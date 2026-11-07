@@ -571,6 +571,13 @@ depth texture the pass depth-tests against the cleared sky; with one it reads th
 Evidence: `packages/sky/test/features-check.mjs` (coverage 0 exact, coverage, depth occlusion in front of and inside the
 layer, motion) at 4x and 1x on a Radeon 680M. Missing: other GPUs, a quiet timing, a comparison with a reference renderer.
 
+`volumetricCloudShadows` (`@margoengine/sky/cloud-shadows`) is a shadow effect that renames the clouds' WGSL field with its
+binding (`shadowFxCloud...N`) and marches it from each receiver to the light. It keeps its own noise volumes, filled by the
+same deterministic generator on its first update, and writes the layer fields with the clouds' own `writeLayer`, so it
+shares no GPU object with `VolumetricClouds` and survives either side's device loss alone. Evidence: `features-check.mjs`,
+48 ground points against the clouds seen from each point toward the sun, mean 0.0018 before and 0.0021 after 1,500 m of
+drift, 0.29 for stale shadows; Radeon 680M. Missing: other GPUs, any timing, a soft edge from the sun's size.
+
 A `ShadowFilterEffect` replaces the named filters' last step in `shadowVisibility`, after the cascade pick and the receiver
 plane. `varianceFilter` turns the depth map into two moments, blurs them by two separable passes when the map changes, and
 bounds the lit share with Chebyshev's inequality. A filter's shader must keep `shadowSampler` read, in a branch never taken,

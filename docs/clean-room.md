@@ -449,6 +449,7 @@ The own solver's kernel (`packages/physics/kernel`, Rust, no dependencies). Noth
 | S26 | energy-conserving step: scattered light (S - S e^(-sigma dt)) / sigma with albedo 1; two-lobe Henyey-Greenstein 0.8 / -0.3 (weight 0.3) | sky/src/volumetric-clouds.ts | Hillaire 2016, "Physically Based Sky, Atmosphere and Cloud Rendering in Frostbite", SIGGRAPH course; Henyey and Greenstein 1941; lobe values Margo's |
 | S27 | ray against concentric shells with the constant formed as |e|^2 + 2R(e_y - h) - h^2 and the stable quadratic roots q, c/q | sky/src/volumetric-clouds.ts | Press et al., "Numerical Recipes", 3rd ed., sec. 5.6 (quadratic roots without cancellation) |
 | S28 | sky light for the clouds: the reflection map cosine-weighted over the upper hemisphere and averaged over the horizon band | sky/src/volumetric-clouds.ts | Margo-own: reuses the sky's reflection map (S19) |
+| S29 | volumetric cloud shadow: the clouds' own density field marched from the receiver to the sun at midpoints, Beer-Lambert transmittance; exit distance as the stable positive root | sky/src/cloud-shadows.ts | Beer-Lambert; the field is S23 (Schneider 2015); roots as S27 (Press et al.) |
 
 ### splats
 

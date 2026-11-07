@@ -70,6 +70,10 @@
     "./volumetric-clouds": {
       "types": "./dist/volumetric-clouds.d.ts",
       "import": "./dist/volumetric-clouds.js"
+    },
+    "./cloud-shadows": {
+      "types": "./dist/cloud-shadows.d.ts",
+      "import": "./dist/cloud-shadows.js"
     }
   },
   "files": [

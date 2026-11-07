@@ -266,6 +266,84 @@ var<workgroup> sums:array<vec4f,128>;
   textureStore(lightOut,vec2i(0,0),vec4f(sums[0].rgb/sums[0].w*unexpose,1));textureStore(lightOut,vec2i(1,0),vec4f(sums[64].rgb/sums[64].w*unexpose,1));}
 }
 `;
+/**
+ * The two tiling noise volumes of the cloud field (64³ shape, 32³ erosion) and their repeating sampler, filled by compute
+ * on the first {@link CloudVolumes.fill}. The generator is deterministic, so every copy holds the same clouds: the
+ * `@margoengine/sky/cloud-shadows` effect keeps its own copy and needs nothing from the clouds' GPU objects.
+ */
+export class CloudVolumes {
+  readonly shape: GPUTexture;
+  readonly erosion: GPUTexture;
+  readonly sampler: GPUSampler;
+  private filled = false;
+  constructor(device: GPUDevice) {
+    const volume = (size: number) =>
+      device.createTexture({
+        size: [size, size, size],
+        dimension: '3d',
+        format: 'rgba8unorm',
+        usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
+      });
+    this.shape = volume(64);
+    this.erosion = volume(32);
+    this.sampler = device.createSampler({
+      magFilter: 'linear',
+      minFilter: 'linear',
+      addressModeU: 'repeat',
+      addressModeV: 'repeat',
+      addressModeW: 'repeat',
+    });
+  }
+  /** Encodes the generation once; later calls do nothing. */
+  fill(device: GPUDevice, encoder: GPUCommandEncoder): void {
+    if (this.filled) return;
+    const code = device.createShaderModule({ code: generate });
+    for (const [texture, entryPoint, groups] of [
+      [this.shape, 'shape', 16],
+      [this.erosion, 'erosion', 8],
+    ] as const) {
+      const pipeline = device.createComputePipeline({ layout: 'auto', compute: { module: code, entryPoint } }),
+        pass = encoder.beginComputePass();
+      pass.setPipeline(pipeline);
+      pass.setBindGroup(
+        0,
+        device.createBindGroup({
+          layout: pipeline.getBindGroupLayout(0),
+          entries: [{ binding: 0, resource: texture.createView() }],
+        }),
+      );
+      pass.dispatchWorkgroups(groups, groups, groups);
+      pass.end();
+    }
+    this.filled = true;
+  }
+  /** Frees both volumes. */
+  dispose(): void {
+    this.shape.destroy();
+    this.erosion.destroy();
+  }
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {
+    this.dispose();
+  }
+}
+/**
+ * Writes the layer's fields of the `Clouds` uniform ({@link cloudField}) into `v`: the planet radius, base and tops,
+ * coverage, density, the noise scales and the drift. Shared by the clouds and their shadows, so both read one field.
+ */
+export function writeLayer(v: Float32Array, options: VolumetricCloudOptions, drift: ArrayLike<number>): void {
+  const scale = options.scale ?? defaults.scale;
+  v[19] = PLANET_RADIUS;
+  v[28] = options.bottom ?? defaults.bottom;
+  v[29] = options.top ?? defaults.top;
+  v[30] = options.coverage ?? defaults.coverage;
+  v[31] = options.density ?? defaults.density;
+  v[32] = 1 / scale;
+  v[33] = 8 / scale;
+  v[36] = drift[0];
+  v[37] = drift[1];
+  v[38] = drift[2];
+}
 const inRange = (value: number, low: number, high: number) => Number.isFinite(value) && value >= low && value <= high;
 /**
  * Volumetric clouds: a layer of real 3D cloud between `bottom` and `top`, ray marched through tiling noise volumes,
@@ -279,11 +357,8 @@ export class VolumetricClouds implements EnginePlugin {
   readonly name: string = 'sky:volumetric-clouds';
   private engine?: Engine;
   private uniform?: GPUBuffer;
-  private shape?: GPUTexture;
-  private erosion?: GPUTexture;
+  private volumes?: CloudVolumes;
   private light?: GPUTexture;
-  private sampler?: GPUSampler;
-  private generated = false;
   private pipeline?: GPURenderPipeline;
   private bind?: GPUBindGroup;
   private key = '';
@@ -305,20 +380,6 @@ export class VolumetricClouds implements EnginePlugin {
     const clouds = new VolumetricClouds(options);
     engineRuntime(engine).use(clouds);
     return clouds;
-  }
-  /**
-   * The layer's GPU resources this frame, for passes that must see the same clouds (`cloudShadows` from
-   * `@margoengine/sky/cloud-shadows`): the uniform (WGSL struct `Clouds` in {@link cloudField}), both noise volumes and
-   * their sampler. Undefined before the first frame on the GPU.
-   */
-  get volume(): { uniform: GPUBuffer; shape: GPUTextureView; erosion: GPUTextureView; sampler: GPUSampler } | undefined {
-    if (!this.uniform || !this.generated) return undefined;
-    return {
-      uniform: this.uniform,
-      shape: this.shape!.createView(),
-      erosion: this.erosion!.createView(),
-      sampler: this.sampler!,
-    };
   }
   private validate(): void {
     const o = this.options;
@@ -359,28 +420,13 @@ export class VolumetricClouds implements EnginePlugin {
         'VolumetricClouds requires WebGPU; attach new VolumetricClouds to a WebGPU engine',
       );
     this.engine = engine;
-    const d = engine.gpu,
-      volume = (size: number) =>
-        d.createTexture({
-          size: [size, size, size],
-          dimension: '3d',
-          format: 'rgba8unorm',
-          usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
-        });
+    const d = engine.gpu;
     this.uniform = d.createBuffer({ size: this.values.byteLength, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
-    this.shape = volume(64);
-    this.erosion = volume(32);
+    this.volumes = new CloudVolumes(d);
     this.light = d.createTexture({
       size: [2, 1],
       format: 'rgba32float',
       usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
-    });
-    this.sampler = d.createSampler({
-      magFilter: 'linear',
-      minFilter: 'linear',
-      addressModeU: 'repeat',
-      addressModeV: 'repeat',
-      addressModeW: 'repeat',
     });
   }
   registerPasses(graph: FrameGraph): void {
@@ -404,27 +450,6 @@ export class VolumetricClouds implements EnginePlugin {
     this.drift[1] = (this.drift[1] + wind[1] * delta) % scale;
     this.drift[2] = (this.drift[2] + (this.options.evolution ?? defaults.evolution) * delta) % scale;
   }
-  private generate(c: Context): void {
-    const code = c.device.createShaderModule({ code: generate });
-    for (const [texture, entryPoint, groups] of [
-      [this.shape!, 'shape', 16],
-      [this.erosion!, 'erosion', 8],
-    ] as const) {
-      const pipeline = c.device.createComputePipeline({ layout: 'auto', compute: { module: code, entryPoint } }),
-        pass = c.encoder.beginComputePass();
-      pass.setPipeline(pipeline);
-      pass.setBindGroup(
-        0,
-        c.device.createBindGroup({
-          layout: pipeline.getBindGroupLayout(0),
-          entries: [{ binding: 0, resource: texture.createView() }],
-        }),
-      );
-      pass.dispatchWorkgroups(groups, groups, groups);
-      pass.end();
-    }
-    this.generated = true;
-  }
   private write(c: Context): boolean {
     const o = this.options,
       v = this.values,
@@ -433,28 +458,18 @@ export class VolumetricClouds implements EnginePlugin {
       throw new MargoError('state', 'Invalid VolumetricClouds camera; give the camera a finite, invertible projection');
     const bottom = o.bottom ?? defaults.bottom,
       top = o.top ?? defaults.top,
-      scale = o.scale ?? defaults.scale,
       sun = sky?.sun ?? o.sunDirection ?? defaultSun,
       length = Math.hypot(sun[0], sun[1], sun[2]) || 1;
     v.set(c.camera.position, 16);
-    v[19] = PLANET_RADIUS;
+    writeLayer(v, o, this.drift);
     for (let i = 0; i < 3; i++) v[20 + i] = sun[i] / length;
     v[23] = o.sunIntensity ?? defaults.sunIntensity;
     // The sun's colour through the sky's atmosphere at the middle of the layer: warm and dim low down, 0 once it has set.
     sunlight(v[21], (bottom + top) / 2000, sky?.options.turbidity ?? 2, this.color);
     v.set(this.color, 24);
     v[27] = 2 ** (sky?.options.exposure ?? 0);
-    v[28] = bottom;
-    v[29] = top;
-    v[30] = o.coverage ?? defaults.coverage;
-    v[31] = o.density ?? defaults.density;
-    v[32] = 1 / scale;
-    v[33] = 8 / scale;
     v[34] = o.maxDistance ?? defaults.maxDistance;
     v[35] = o.steps ?? defaults.steps;
-    v[36] = this.drift[0];
-    v[37] = this.drift[1];
-    v[38] = this.drift[2];
     v[39] = o.lightSteps ?? defaults.lightSteps;
     v[40] = +(c.format !== 'rgba16float');
     const moon = sky?.lights?.[1];
@@ -499,7 +514,7 @@ export class VolumetricClouds implements EnginePlugin {
   private draw(c: Context): void {
     if (!this.uniform) return;
     if (!this.write(c)) return;
-    if (!this.generated) this.generate(c);
+    this.volumes!.fill(c.device, c.encoder);
     this.skyLight(c);
     const depth = this.options.depth ? sceneDepth(c, this.options.depth, 'VolumetricClouds') : undefined,
       samples = c.descriptor.multisample?.count ?? 1,
@@ -543,9 +558,9 @@ export class VolumetricClouds implements EnginePlugin {
         layout: this.pipeline!.getBindGroupLayout(0),
         entries: [
           { binding: 0, resource: { buffer: this.uniform } },
-          { binding: 1, resource: this.shape!.createView() },
-          { binding: 2, resource: this.erosion!.createView() },
-          { binding: 3, resource: this.sampler! },
+          { binding: 1, resource: this.volumes!.shape.createView() },
+          { binding: 2, resource: this.volumes!.erosion.createView() },
+          { binding: 3, resource: this.volumes!.sampler },
           { binding: 4, resource: this.light!.createView() },
           ...(depth ? [{ binding: 5, resource: depth.resource }] : []),
         ],
@@ -564,13 +579,11 @@ export class VolumetricClouds implements EnginePlugin {
   }
   private release(): void {
     this.uniform?.destroy();
-    this.shape?.destroy();
-    this.erosion?.destroy();
+    this.volumes?.dispose();
     this.light?.destroy();
-    this.uniform = this.shape = this.erosion = this.light = this.sampler = undefined;
+    this.uniform = this.volumes = this.light = undefined;
     this.pipeline = this.bind = this.lightPipeline = this.lightGroup = undefined;
     this.bound = this.lightSource = undefined;
-    this.generated = false;
     this.key = '';
   }
   onDeviceRestored(engine: Engine): void {

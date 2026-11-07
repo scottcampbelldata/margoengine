@@ -44,7 +44,6 @@ test('volumetric clouds make their noise volumes once and ray march one pass per
   const h = tracedGPU(),
     clouds = new VolumetricClouds({ sunDirection: [0.2, 0.8, 0.1] });
   h.engine.use(clouds);
-  assert.equal(clouds.volume, undefined, 'No volume before the first frame');
   frame(h, clouds);
   frame(h, clouds);
   assert.ok(h.created.some((r) => r.startsWith('texture(64,64,64,rgba8unorm')), 'shape volume 64^3');
@@ -55,10 +54,8 @@ test('volumetric clouds make their noise volumes once and ray march one pass per
   assert.match(wgsl, /fn cloudDensityAt\(/);
   assert.match(wgsl, /fn cloudShell\(/);
   assert.equal(h.created.filter((r) => r.startsWith('texture(64,64,64')).length, 1, 'Made once, not per frame');
-  assert.ok(clouds.volume, 'The volume is handed out once made');
   assert.ok(cloudField.includes('struct Clouds'));
   clouds.dispose();
-  assert.equal(clouds.volume, undefined);
 });
 
 test('volumetric clouds take their light from a Sky and draw nothing at coverage 0', () => {

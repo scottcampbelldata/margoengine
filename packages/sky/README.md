@@ -39,6 +39,7 @@ const sky = Sky.attach(engine, {model: 'bruneton', clouds: {coverage: 0.4}}, {br
 | `/sun` | typed angles, `setSun` / `setAmbient` over core's light, `sunlitSky`, `sunPath` (not a `Sky` feature) | 2.1 kB |
 | `/weather` | `Weather`, its own plugin (not a `Sky` feature): rain, snow, lightning, thunder timing | 5.6 kB |
 | `/volumetric-clouds` | `VolumetricClouds`, its own plugin: ray-marched 3D clouds you can fly through | 7.3 kB |
+| `/cloud-shadows` | `volumetricCloudShadows`, a shadow effect for `@margoengine/shadows` | 3.2 kB |
 
 Each entry is compressed on its own ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)),
 so sums overstate a combined bundle: the root `Sky` is 10.2 kB with all of them, against 13.7 kB
@@ -156,11 +157,39 @@ in front of the clouds hides them. Without it the clouds draw only over the empt
 | `sunDirection`, `ambient` | [0.3, 0.6, 0.4]; a clear day's | the light without a sky |
 | `depth` | none | the scene depth each frame |
 
-`clouds.drift` holds how far the shapes have moved and risen; `clouds.volume` hands the noise volumes, sampler and
-uniform to passes that must see the same clouds. Cost: one fragment per pixel marching up to `steps` + `steps` ×
+`clouds.drift` holds how far the shapes have moved and risen; `volumetricCloudShadows(clouds)` from
+`@margoengine/sky/cloud-shadows` casts their shadows on the ground (below). Cost: one fragment per pixel marching up to `steps` + `steps` ×
 `lightSteps` noise reads, at full resolution, with no temporal reuse; a 256 × 192 view took about 15 ms a frame on a
 Radeon 680M (diagnostic, taken with other jobs on the machine). Lower `steps` on slow GPUs. Needs WebGPU (`MargoError`
 `'unsupported'` on WebGL2).
+
+### Cloud shadows on the ground
+
+`volumetricCloudShadows(clouds)` from `@margoengine/sky/cloud-shadows` is a shadow effect for `Shadows` or
+`VirtualShadows` (`@margoengine/shadows`): everything that receives shadows darkens under the volumetric clouds, and the
+shadows drift and change with them.
+
+```ts
+import {Engine, PbrMaterial, box} from 'margoengine/core';
+import {Sky} from 'margoengine/sky';
+import {Shadows} from 'margoengine/shadows';
+import {VolumetricClouds} from 'margoengine/sky/volumetric-clouds';
+import {volumetricCloudShadows} from 'margoengine/sky/cloud-shadows';
+const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
+const sky = Sky.attach(engine, {hours: 10, timeScale: 0, lighting: {intensity: 3}});
+const clouds = VolumetricClouds.attach(engine, {sky, coverage: 0.4});
+const ground = engine.createMesh().setGeometry(box(400, 1, 400)).setMaterial(new PbrMaterial({color: '#6a7a4a'}));
+const shadows = Shadows.attach(engine, {effects: [volumetricCloudShadows(clouds, {strength: 0.9})]});
+shadows.add(ground);
+```
+
+Each lit pixel marches the clouds' own density field (the same noise, layer, coverage and drift, read from
+`clouds.options` and `clouds.drift` every frame) from its position toward the shadows' sun, `samples` times (12) through
+the layer, and multiplies the light by the transmittance, `strength` (1) of the way. So the ground is dark where a viewer
+there would see cloud over the sun. The effect keeps its own copy of the noise volumes (the generator is deterministic,
+so the copy is the same cloud) and needs nothing from the clouds' GPU objects; it takes four of a shadow effect's eight
+bindings. The light is the shadows' sun (`engine.lighting.direction`), so drive it from the sky (`lighting`) to keep the
+two together.
 
 ## Sun, ambient and a sky that lights the scene
 

@@ -2320,8 +2320,12 @@
         "gzip": 2123
       },
       "./volumetric-clouds": {
-        "raw": 19188,
-        "gzip": 7315
+        "raw": 19207,
+        "gzip": 7337
+      },
+      "./cloud-shadows": {
+        "raw": 7520,
+        "gzip": 3211
       }
     },
     "@margoengine/splats": {

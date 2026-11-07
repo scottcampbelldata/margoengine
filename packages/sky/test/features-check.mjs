@@ -32,6 +32,43 @@ const checks = {
     );
     return r;
   },
+  async 'cloud-shadows'(page, samples) {
+    const points = [];
+    for (let i = 0; i < 6; i++) for (let j = 0; j < 8; j++) points.push([i * 310 - 800, j * 290 - 1000]);
+    // The view toward the sun weighs cloud at distance t by exp(-t / 40 km) (the haze); along this sun (y = 0.960) the
+    // layer from 1,500 to 2,500 m lies 1,562 to 2,604 m away, so the seen opacity is the shadow's times 0.937 to 0.962.
+    const low = Math.exp(-2604 / 40000),
+      high = Math.exp(-1562 / 40000),
+      error = (shadows, views) =>
+        views.reduce((sum, v, i) => sum + Math.abs(v.opacity - (1 - shadows[i].shadow) * (low + high) / 2), 0) / views.length;
+    const first = await page.evaluate((p) => window.check.read(p), points);
+    assert.equal(first.error, null);
+    assert.deepEqual(first.errors, []);
+    const shaded = first.points.filter((p) => p.shadow < 0.5).length,
+      open = first.points.filter((p) => p.shadow > 0.9).length;
+    assert.ok(shaded >= 5 && open >= 5, `shadow and light both on the ground: ${shaded} shaded, ${open} open`);
+    for (const [i, p] of first.points.entries()) {
+      assert.ok(p.open > 0.1 && p.background < 0.5, `point ${i} reads: ${JSON.stringify(p)}`);
+      // Beyond the haze, the two marches differ only in sampling (24 midpoint samples toward the sun against 64 jittered
+      // view steps): 0.05 allows that on a cloud edge, some eight times the largest difference measured (0.006).
+      assert.ok(
+        p.opacity >= (1 - p.shadow) * low - 0.05 && p.opacity <= (1 - p.shadow) * high + 0.05,
+        `point ${i}: seen opacity ${p.opacity.toFixed(3)}, shadow ${p.shadow.toFixed(3)}`,
+      );
+    }
+    const matched = error(first.points, first.points);
+    assert.ok(matched < 0.01, `mean difference ${matched}`);
+    // Move the clouds 1,500 m: the old shadows no longer match the clouds now seen, the new shadows do.
+    await page.evaluate(() => window.check.advance(1500));
+    const second = await page.evaluate((p) => window.check.read(p), points),
+      stale = error(first.points, second.points),
+      moved = error(second.points, second.points);
+    assert.ok(moved < 0.01 && stale > matched * 10, `matched ${matched}, moved ${moved}, stale ${stale}`);
+    console.log(
+      `ok cloud-shadows ${samples}x: ${shaded} shaded and ${open} open of ${points.length}; mean difference ${matched.toFixed(4)}, after 1,500 m ${moved.toFixed(4)}, stale shadows ${stale.toFixed(4)}`,
+    );
+    return { first, second, matched, moved, stale };
+  },
 };
 const names = process.argv.slice(2).length ? process.argv.slice(2) : Object.keys(checks);
 const context = await openBrowser({ startPath: '/packages/sky/test/volumetric-check.html', port: 5213 }),
