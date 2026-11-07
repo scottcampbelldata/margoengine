@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10196395,
+  "total": 10196688,
   "history": [
     {
       "date": "2026-10-24",
@@ -3212,6 +3212,12 @@
       "commit": "8cc1614e2",
       "reason": "B30: gltf-pro gains the optimize option and its lazy load",
       "grew": 5
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "c3b4c38c",
+      "reason": "fix(tween): smoothDamp writes through Float64Array scratch with one store loop for plain arrays and one for typed arrays, so a mix of array kinds no longer boxes every stored number (96 B per call); adds 37 B gzip to the tween root",
+      "grew": 1
     }
   ],
   "items": {
@@ -3802,7 +3808,7 @@
     "@margoengine/tonemap": 11059,
     "@margoengine/toon": 1701,
     "@margoengine/transitions": 4303,
-    "@margoengine/tween": 5466,
+    "@margoengine/tween": 5759,
     "@margoengine/tween/custom-ease": 2002,
     "@margoengine/tween/motion-path": 1263,
     "@margoengine/tween/scroll": 1198,

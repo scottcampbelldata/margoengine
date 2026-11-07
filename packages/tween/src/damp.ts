@@ -26,6 +26,20 @@ function measure(a: ArrayLike<number>, b: ArrayLike<number> | undefined, n: numb
   measured[0] = peak * Math.sqrt(sum);
 }
 
+/** The new position and velocity, computed here first so each caller array is written by one store loop for its kind. */
+let nextOut = new Float64Array(4),
+  nextVelocity = new Float64Array(4);
+
+/**
+ * Copies `src` into `dst`. One store site that sees plain arrays (including a small integer array turning into a
+ * double one) beside typed arrays falls back to a generic store that boxes every number it writes, so plain arrays and
+ * typed arrays get a loop each and both stay specialized whatever mix of kinds callers pass.
+ */
+function write(dst: DampArray, src: Float64Array, n: number): void {
+  if (Array.isArray(dst)) for (let i = 0; i < n; i++) dst[i] = src[i];
+  else for (let i = 0; i < n; i++) dst[i] = src[i];
+}
+
 function check(name: string, values: ArrayLike<number>, n: number): void {
   if (!values || typeof values.length !== 'number' || values.length !== n)
     throw new RangeError(`smoothDamp ${name} needs ${n} numbers, the length of current; pass arrays of one length`);
@@ -87,54 +101,58 @@ export function smoothDamp<T extends DampArray>(
   check('target', target, n);
   check('velocity', velocity, n);
   if (out.length !== n) throw new RangeError(`smoothDamp out needs ${n} numbers, the length of current`);
-  if (dt === 0) {
-    for (let i = 0; i < n; i++) out[i] = current[i];
-    return out;
+  if (n > nextOut.length) {
+    nextOut = new Float64Array(n);
+    nextVelocity = new Float64Array(n);
   }
-  if (smoothTime === 0) {
-    // No smoothing: land on the target.
+  const next = nextOut,
+    moving = nextVelocity;
+  if (dt === 0 || smoothTime === 0) {
+    // No time passed: stay put and keep the velocity. No smoothing: land on the target at rest.
     for (let i = 0; i < n; i++) {
-      out[i] = target[i];
-      velocity[i] = 0;
+      next[i] = dt === 0 ? current[i] : target[i];
+      moving[i] = dt === 0 ? velocity[i] : 0;
     }
-    return out;
-  }
-  const rate = 2 / smoothTime;
-  // Cap the pull: aim at a virtual target no farther than maxSpeed * smoothTime behind the point.
-  const reach = maxSpeed * smoothTime,
-    distance = reach < Infinity ? (measure(current, target, n), measured[0]) : 0,
-    pull = distance > reach ? reach / distance : 1;
-  if (rate * dt >= SETTLED) {
-    // Settled within this step: the decay underflows to zero, so arrive at the (virtual) target at rest.
-    for (let i = 0; i < n; i++) {
-      out[i] = pull === 1 ? target[i] : current[i] - (current[i] - target[i]) * pull;
-      velocity[i] = 0;
+  } else {
+    const rate = 2 / smoothTime;
+    // Cap the pull: aim at a virtual target no farther than maxSpeed * smoothTime behind the point.
+    const reach = maxSpeed * smoothTime,
+      distance = reach < Infinity ? (measure(current, target, n), measured[0]) : 0,
+      pull = distance > reach ? reach / distance : 1;
+    if (rate * dt >= SETTLED) {
+      // Settled within this step: the decay underflows to zero, so arrive at the (virtual) target at rest.
+      for (let i = 0; i < n; i++) {
+        next[i] = pull === 1 ? target[i] : current[i] - (current[i] - target[i]) * pull;
+        moving[i] = 0;
+      }
+    } else {
+      let hold = 1;
+      if (maxSpeed < Infinity) {
+        measure(velocity, undefined, n);
+        const speed = measured[0];
+        if (speed > maxSpeed) hold = maxSpeed / speed;
+      }
+      const decay = Math.exp(-rate * dt);
+      for (let i = 0; i < n; i++) {
+        const from = current[i],
+          change = pull === 1 ? from - target[i] : (from - target[i]) * pull,
+          anchor = pull === 1 ? target[i] : from - change,
+          v = velocity[i] * hold,
+          push = v + rate * change;
+        next[i] = anchor + (change + push * dt) * decay;
+        moving[i] = (v - rate * push * dt) * decay;
+      }
+      if (maxSpeed < Infinity) {
+        measure(moving, undefined, n);
+        const speed = measured[0];
+        if (speed > maxSpeed) {
+          const scale = maxSpeed / speed;
+          for (let i = 0; i < n; i++) moving[i] *= scale;
+        }
+      }
     }
-    return out;
   }
-  let hold = 1;
-  if (maxSpeed < Infinity) {
-    measure(velocity, undefined, n);
-    const speed = measured[0];
-    if (speed > maxSpeed) hold = maxSpeed / speed;
-  }
-  const decay = Math.exp(-rate * dt);
-  for (let i = 0; i < n; i++) {
-    const from = current[i],
-      change = pull === 1 ? from - target[i] : (from - target[i]) * pull,
-      anchor = pull === 1 ? target[i] : from - change,
-      v = velocity[i] * hold,
-      push = v + rate * change;
-    out[i] = anchor + (change + push * dt) * decay;
-    velocity[i] = (v - rate * push * dt) * decay;
-  }
-  if (maxSpeed < Infinity) {
-    measure(velocity, undefined, n);
-    const speed = measured[0];
-    if (speed > maxSpeed) {
-      const scale = maxSpeed / speed;
-      for (let i = 0; i < n; i++) velocity[i] *= scale;
-    }
-  }
+  write(out, next, n);
+  write(velocity, moving, n);
   return out;
 }

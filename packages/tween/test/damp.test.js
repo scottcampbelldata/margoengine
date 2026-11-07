@@ -142,6 +142,38 @@ test('huge finite coordinates do not overflow the speed limit', () => {
   near(position[0], -1e200, 1, 'moved at most the speed limit');
 });
 
+// %GetOptimizationStatus bit 64: the function runs Turbofan code. V8 compiles it on a background thread, so on a loaded
+// machine (a full verify run) it can arrive after 100,000 calls; until then smoothDamp runs in Maglev, which on V8 13
+// calls Math.sqrt with boxed numbers. Runs `run(1000)` until Turbofan's code is in, for at most 30 s, so the windows
+// below measure the frame loop's steady state whatever the machine's load.
+function untilOptimized(run) {
+  setFlagsFromString('--allow-natives-syntax');
+  const status = new Function('f', 'return %GetOptimizationStatus(f)');
+  for (const deadline = performance.now() + 30_000; !(status(smoothDamp) & 64) && performance.now() < deadline; )
+    run(1000);
+  assert.ok(status(smoothDamp) & 64, `smoothDamp never reached Turbofan (status ${status(smoothDamp)})`);
+}
+
+// Each window starts from an empty young generation, so a call that allocates even 16 bytes grows the heap by 320 KB
+// over 20,000 calls (or collects). A window passes with no collection and under 64 KB grown; one of five must.
+function allocatesNothing(run) {
+  setFlagsFromString('--expose-gc');
+  const gc = runInNewContext('gc'),
+    windows = [];
+  for (let attempt = 0; attempt < 5; attempt++) {
+    gc();
+    const profiler = new GCProfiler(),
+      before = process.memoryUsage().heapUsed;
+    profiler.start();
+    run(20000);
+    const { statistics } = profiler.stop(),
+      grown = process.memoryUsage().heapUsed - before;
+    windows.push({ collections: statistics.length, grown });
+    if (statistics.length === 0 && grown < 64 * 1024) return;
+  }
+  assert.fail(`every window of 20,000 calls allocated: ${JSON.stringify(windows)}`);
+}
+
 test('plain arrays and Float32Array work, and the call allocates nothing per frame', () => {
   const position = [0, 0, 0],
     velocity = [0, 0, 0];
@@ -149,24 +181,48 @@ test('plain arrays and Float32Array work, and the call allocates nothing per fra
   assert.ok(position[0] > 0);
   const p = new Float32Array(3),
     v = new Float32Array(3),
-    t = new Float32Array([1, 2, 3]);
-  for (let i = 0; i < 20000; i++) smoothDamp(p, t, v, 0.3, 4, 1 / 60, p);
-  setFlagsFromString('--expose-gc');
-  const gc = runInNewContext('gc'),
-    windows = [];
-  // Each window starts from an empty young generation, so a call that allocates even 16 bytes grows the heap by 320 KB
-  // over 20,000 calls (or collects). The optimizing compiler may still be finishing in a busy test run, so the call
-  // passes when one of five windows is clean.
-  for (let attempt = 0; attempt < 5; attempt++) {
-    gc();
-    const profiler = new GCProfiler(),
-      before = process.memoryUsage().heapUsed;
-    profiler.start();
-    for (let i = 0; i < 20000; i++) smoothDamp(p, t, v, 0.3, 4, 1 / 60, p);
-    const { statistics } = profiler.stop(),
-      grown = process.memoryUsage().heapUsed - before;
-    windows.push({ collections: statistics.length, grown });
-    if (statistics.length === 0 && grown < 64 * 1024) return;
-  }
-  assert.fail(`every window of 20,000 calls allocated: ${JSON.stringify(windows)}`);
+    t = new Float32Array([1, 2, 3]),
+    dt = 1 / 60;
+  const run = (count) => {
+    for (let i = 0; i < count; i++) smoothDamp(p, t, v, 0.3, 4, dt, p);
+  };
+  run(20000);
+  untilOptimized(run);
+  allocatesNothing(run);
+});
+
+// Regression: once one store site of smoothDamp had seen a plain [0, 0, 0] (small integers, turned into doubles by the
+// first fractional store) beside typed arrays, Turbofan compiled it as a generic store that boxed every number it
+// wrote: about 96 B per call for three components. Every kind of out, velocity and target, mixed in one loop.
+test('any mix of plain arrays and typed arrays allocates nothing per call', () => {
+  const kinds = [() => [0, 0, 0], () => [0.5, 0.5, 0.5], () => new Float32Array(3), () => new Float64Array(3)],
+    positions = [],
+    velocities = [],
+    targets = kinds.map((make) => {
+      const target = make();
+      target[0] = 1;
+      target[1] = 2;
+      target[2] = 3;
+      return target;
+    }),
+    dt = 1 / 60;
+  for (const position of kinds)
+    for (const velocity of kinds) {
+      positions.push(position());
+      velocities.push(velocity());
+    }
+  const run = (count) => {
+    for (let i = 0; i < count; i++) {
+      const pair = i & 15;
+      smoothDamp(positions[pair], targets[(i >> 4) & 3], velocities[pair], 0.3, 4, dt, positions[pair]);
+    }
+  };
+  run(20000);
+  untilOptimized(run);
+  allocatesNothing(run);
+  for (const position of positions)
+    assert.ok(
+      position.every((x, i) => Math.abs(x - (i + 1)) < 0.5),
+      `${[...position]}`,
+    );
 });
