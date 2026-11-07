@@ -187,6 +187,7 @@ async function buildPackage(name) {
           /^@margoengine\/physics$/,
           '@margoengine/clustered/ies',
           '@margoengine/decoders/png',
+          '@margoengine/decoders/image',
         ],
         output: compactOutput,
       },

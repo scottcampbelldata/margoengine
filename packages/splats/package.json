@@ -47,5 +47,8 @@
   },
   "peerDependencies": {
     "@margoengine/core": "^1.0.0"
+  },
+  "devDependencies": {
+    "@margoengine/decoders": "^1.0.0"
   }
 }

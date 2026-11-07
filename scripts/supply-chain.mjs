@@ -173,6 +173,8 @@ const ASSETS = [
   [
     'packages/fbx/test/fixtures/real/NOTICE.md',
     'test fixtures: Maya and 3ds Max FBX files with OBJ frames from the ufbx test data (MIT or Unlicense, Samuli Raivio); commit and sha256 there',
+    'packages/decoders/tests/fixtures/webp/NOTICE.md',
+    'test fixtures: WebP files from two CC0 images on Wikimedia Commons, made with libwebp 1.4.0 tools, and 50 BC blocks from the DDS test images of Pillow (HPND)',
   ],
   [
     'packages/gltf-pro/tests/fixtures/bump/NOTICE.md',

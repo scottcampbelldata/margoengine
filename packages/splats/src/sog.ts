@@ -1,9 +1,9 @@
 // SOG (Spatially Ordered Gaussians) reader. Written from the public SOG format description (PlayCanvas developer
 // documentation, version 2); no other implementation was read.
+import { type DecodedImage, decodeWebpLossless } from '@margoengine/decoders/webp-lossless';
 import { MargoError } from '@margoengine/math/errors';
 import type { SplatData } from './data.js';
 import { type GaussianAttributes, splatsFromAttributes } from './ply.js';
-import { type DecodedImage, decodeWebpLossless } from './webp.js';
 import { readZip } from './zip.js';
 
 /** The loose files of an unbundled SOG, by file name; must include `meta.json`. */
@@ -87,7 +87,13 @@ export async function parseSog(
     signal?.throwIfAborted();
     const bytes = name === undefined ? undefined : files.get(name);
     if (!bytes) throw new RangeError(`The SOG is missing the texture ${name}; pass the complete archive.`);
-    return decodeWebpLossless(bytes);
+    try {
+      return decodeWebpLossless(bytes);
+    } catch (cause) {
+      if ((cause as MargoError).code === 'unsupported')
+        throw new MargoError('unsupported', `The SOG texture ${name} is lossy WebP; re-export the SOG with lossless textures.`);
+      throw new RangeError(`The SOG texture ${name} is damaged; re-export the SOG with lossless textures.`, { cause });
+    }
   };
   const [lowName, highName] = meta.means?.files ?? [],
     low = image(lowName),

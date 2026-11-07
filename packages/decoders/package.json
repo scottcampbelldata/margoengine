@@ -54,6 +54,22 @@
       "types": "./dist/brotli.d.ts",
       "import": "./dist/brotli.js"
     },
+    "./image": {
+      "types": "./dist/image.d.ts",
+      "import": "./dist/image.js"
+    },
+    "./bc": {
+      "types": "./dist/bc.d.ts",
+      "import": "./dist/bc.js"
+    },
+    "./webp": {
+      "types": "./dist/webp.d.ts",
+      "import": "./dist/webp.js"
+    },
+    "./webp-lossless": {
+      "types": "./dist/webp-lossless.d.ts",
+      "import": "./dist/webp-lossless.js"
+    },
     "./tga": {
       "types": "./dist/tga.d.ts",
       "import": "./dist/tga.js"

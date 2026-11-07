@@ -1,6 +1,7 @@
-// Lossless WebP (VP8L) image decoder for the SOG splat format. Written from the public WebP Lossless Bitstream
-// Specification (RFC 9649) and the RIFF container description; no other implementation was read.
-import { MargoError } from '@margoengine/math/errors';
+// Lossless WebP (VP8L), `@margoengine/decoders/webp-lossless`. Written from the public WebP Lossless Bitstream
+// Specification (RFC 9649) and the RIFF container description; no other implementation was read. `webp.ts` adds lossy
+// images and the container's extended forms; this module stays apart so a reader of lossless files pays for nothing else.
+import { decodeFailed, deviceUnsupported } from './errors.js';
 
 /** A decoded image: 8-bit RGBA, row-major, origin at the top left. */
 export interface DecodedImage {
@@ -11,7 +12,7 @@ export interface DecodedImage {
 }
 
 const fail = (why: string): never => {
-  throw new RangeError(`Not a valid lossless WebP image: ${why}; re-export the SOG with lossless textures.`);
+  throw decodeFailed(`Not a valid lossless WebP image: ${why}; pass the complete bytes of the file`);
 };
 
 /** (dx, dy) pairs of the 120 short backward-reference distance codes. */
@@ -37,11 +38,11 @@ class Bits {
   read(n: number): number {
     while (this.have < n) {
       if (this.offset >= this.bytes.length) fail('the data ends early');
-      this.acc += this.bytes[this.offset++] * 2 ** this.have;
+      this.acc |= this.bytes[this.offset++] << this.have;
       this.have += 8;
     }
-    const value = n === 0 ? 0 : this.acc % 2 ** n;
-    this.acc = Math.floor(this.acc / 2 ** n);
+    const value = this.acc & ((1 << n) - 1);
+    this.acc >>>= n;
     this.have -= n;
     return value;
   }
@@ -278,38 +279,10 @@ const addPixels = (a: number, b: number): number =>
 const delta = (t: number, c: number): number => (((t << 24) >> 24) * ((c << 24) >> 24)) >> 5;
 
 /**
- * Decodes a lossless WebP file (RIFF `WEBP` with a `VP8L` chunk) to RGBA bytes.
- * @throws RangeError for damaged data or a file without a VP8L chunk; MargoError `unsupported` for a lossy (VP8) image.
+ * Decodes the transforms and pixels of a VP8L image-stream to packed 0xAARRGGBB, `width x height`. A VP8L chunk's stream
+ * follows its 5-byte header; an ALPH chunk's has no header at all.
  */
-export function decodeWebpLossless(input: Uint8Array): DecodedImage {
-  const view = new DataView(input.buffer, input.byteOffset, input.byteLength);
-  if (input.length < 20 || view.getUint32(0, true) !== 0x46464952 || view.getUint32(8, true) !== 0x50424557)
-    fail('missing the RIFF WEBP header');
-  let at = 12,
-    start = -1,
-    size = 0;
-  while (at + 8 <= input.length) {
-    const tag = view.getUint32(at, true),
-      length = view.getUint32(at + 4, true);
-    if (tag === 0x4c385056) {
-      start = at + 8;
-      size = length;
-      break;
-    }
-    if (tag === 0x20385056)
-      throw new MargoError(
-        'unsupported',
-        'This WebP is lossy (VP8); SOG textures must be lossless, re-export the SOG.',
-      );
-    at += 8 + length + (length & 1);
-  }
-  if (start < 0 || start + size > input.length) fail('no VP8L chunk');
-  const bits = new Bits(input.subarray(0, start + size), start);
-  if (bits.read(8) !== 0x2f) fail('a bad VP8L signature');
-  const width = bits.read(14) + 1,
-    height = bits.read(14) + 1;
-  bits.read(1); // alpha_is_used: a hint only
-  if (bits.read(3) !== 0) fail('an unknown VP8L version');
+function readStream(bits: Bits, width: number, height: number): Uint32Array {
   type Transform = { type: number; bits: number; width: number; data: Uint32Array };
   const transforms: Transform[] = [],
     seen = new Set<number>();
@@ -382,7 +355,19 @@ export function decodeWebpLossless(input: Uint8Array): DecodedImage {
       pixels = out;
     }
   }
-  const data = new Uint8Array(width * height * 4);
+  return pixels;
+}
+
+/** The VP8L chunk at `bytes[start..end]` as RGBA8. */
+export function decodeVP8L(bytes: Uint8Array, start: number, end: number): DecodedImage {
+  const bits = new Bits(bytes.subarray(0, end), start);
+  if (bits.read(8) !== 0x2f) fail('a bad VP8L signature');
+  const width = bits.read(14) + 1,
+    height = bits.read(14) + 1;
+  bits.read(1); // alpha_is_used: a hint only
+  if (bits.read(3) !== 0) fail('an unknown VP8L version');
+  const pixels = readStream(bits, width, height),
+    data = new Uint8Array(width * height * 4);
   for (let i = 0; i < width * height; i++) {
     const p = pixels[i];
     data[i * 4] = (p >>> 16) & 255;
@@ -391,4 +376,51 @@ export function decodeWebpLossless(input: Uint8Array): DecodedImage {
     data[i * 4 + 3] = p >>> 24;
   }
   return { width, height, data };
+}
+
+/** The green channel of a headerless image-stream of `width x height`: how an ALPH chunk stores transparency. */
+export function decodeAlphaStream(
+  bytes: Uint8Array,
+  start: number,
+  end: number,
+  width: number,
+  height: number,
+): Uint8Array {
+  const pixels = readStream(new Bits(bytes.subarray(0, end), start), width, height),
+    alpha = new Uint8Array(width * height);
+  for (let i = 0; i < alpha.length; i++) alpha[i] = (pixels[i] >>> 8) & 255;
+  return alpha;
+}
+
+/**
+ * Decodes a lossless WebP file (RIFF `WEBP` with a `VP8L` chunk) to RGBA bytes. Use `parseWebP` from
+ * `@margoengine/decoders/webp` when a file may be lossy.
+ *
+ * @example
+ * import {decodeWebpLossless} from 'margoengine/decoders/webp-lossless';
+ * const file = new Uint8Array([]); // the bytes of a .webp file
+ * if (file.length) console.log(decodeWebpLossless(file).width);
+ *
+ * @throws MargoError `failed` for damaged data or a file without a VP8L chunk; `unsupported` for a lossy (VP8) image.
+ */
+export function decodeWebpLossless(input: Uint8Array): DecodedImage {
+  const view = new DataView(input.buffer, input.byteOffset, input.byteLength);
+  if (input.length < 20 || view.getUint32(0, true) !== 0x46464952 || view.getUint32(8, true) !== 0x50424557)
+    fail('missing the RIFF WEBP header');
+  let at = 12,
+    start = -1,
+    size = 0;
+  while (at + 8 <= input.length) {
+    const tag = view.getUint32(at, true),
+      length = view.getUint32(at + 4, true);
+    if (tag === 0x4c385056) {
+      start = at + 8;
+      size = length;
+      break;
+    }
+    if (tag === 0x20385056) throw deviceUnsupported('This WebP is lossy (VP8); read it with parseWebP.');
+    at += 8 + length + (length & 1);
+  }
+  if (start < 0 || start + size > input.length) fail('no VP8L chunk');
+  return decodeVP8L(input, start, start + size);
 }

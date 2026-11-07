@@ -550,6 +550,22 @@
       "types": "./dist/decoders/brotli.d.ts",
       "import": "./dist/decoders/brotli.js"
     },
+    "./decoders/image": {
+      "types": "./dist/decoders/image.d.ts",
+      "import": "./dist/decoders/image.js"
+    },
+    "./decoders/bc": {
+      "types": "./dist/decoders/bc.d.ts",
+      "import": "./dist/decoders/bc.js"
+    },
+    "./decoders/webp": {
+      "types": "./dist/decoders/webp.d.ts",
+      "import": "./dist/decoders/webp.js"
+    },
+    "./decoders/webp-lossless": {
+      "types": "./dist/decoders/webp-lossless.d.ts",
+      "import": "./dist/decoders/webp-lossless.js"
+    },
     "./decoders/tga": {
       "types": "./dist/decoders/tga.d.ts",
       "import": "./dist/decoders/tga.js"

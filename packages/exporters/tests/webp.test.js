@@ -1,17 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { transformSync } from 'rolldown/utils';
+import { decodeWebpLossless } from '@margoengine/decoders/webp-lossless';
 import { encodeAnimatedWebP, encodeWebP } from '@margoengine/exporters/webp';
 import { canonicalCodes, codeLengths } from '../dist/prefix-codes.js';
-
-// splats bundles its decoder into its entries, so the test reads the module from source; only this test needs it.
-const here = (path) => new URL(path, import.meta.url),
-  source = transformSync('webp.ts', readFileSync(here('../../splats/src/webp.ts'), 'utf8')).code.replace(
-    '@margoengine/math/errors',
-    here('../../math/dist/errors.js').href,
-  ),
-  { decodeWebpLossless } = await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`);
 
 const seeded = (seed) => () => (seed = Math.imul(seed, 1664525) + 1013904223) >>> 24;
 
