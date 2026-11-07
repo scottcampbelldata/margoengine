@@ -1,18 +1,29 @@
 import test, { mock } from 'node:test';
 import assert from 'node:assert/strict';
+import { Camera } from '@margoengine/core';
 
 // The viewer's wiring against stand-ins; scripts/stage-viewer-gpu-check.js runs the real packages on real WebGPU.
 const log = [];
 const world = { modelFailure: null, lightFailure: null, modelGate: null };
-const part = (name, extra = {}) => ({
-  name,
-  disposed: 0,
-  dispose() {
-    this.disposed++;
-    log.push(`dispose ${name}`);
-  },
-  ...extra,
-});
+/** Throws when the test names this step in `world.fail`. */
+const step = (name) => {
+  if (world.fail === name) throw (world.failure = new Error(`${name} failed`));
+};
+const parts = [];
+const part = (name, extra = {}) => {
+  const made = {
+    name,
+    disposed: 0,
+    dispose() {
+      this.disposed++;
+      log.push(`dispose ${name}`);
+      if (world.cleanupFailure === name) throw new Error(`${name} dispose failed`);
+    },
+    ...extra,
+  };
+  parts.push(made);
+  return made;
+};
 const bounds = new Float32Array([-1, 0, -2, 1, 2, 2]);
 const loadGLTF = async (engine, url, options) => {
   log.push(`load ${url}`);
@@ -21,7 +32,9 @@ const loadGLTF = async (engine, url, options) => {
   options.signal.throwIfAborted();
   if (world.modelFailure) throw world.modelFailure;
   return (world.model = part('model', {
-    bounds: world.emptyModel ? new Float32Array([Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity]) : bounds,
+    bounds:
+      world.modelBounds ??
+      (world.emptyModel ? new Float32Array([Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity]) : bounds),
   }));
 };
 const EnvironmentLighting = {
@@ -30,19 +43,28 @@ const EnvironmentLighting = {
     world.source = source;
     world.lightOptions = options;
     if (world.lightFailure) throw world.lightFailure;
-    return (world.light = part('light', { added: [], add: (model) => world.light.added.push(model) }));
+    return (world.light = part('light', {
+      added: [],
+      add(model) {
+        step('light add');
+        world.light.added.push(model);
+      },
+    }));
   },
 };
 const ColorBackground = {
   attach(engine, options) {
+    step('backdrop');
     return (world.backdrop = part('backdrop', { options }));
   },
 };
 const ContactShadows = {
   attach(engine, options) {
+    step('contact');
     return (world.contact = part('contact', {
       options,
       add(model) {
+        step('contact add');
         this.source = model;
       },
     }));
@@ -50,10 +72,12 @@ const ContactShadows = {
 };
 const Shadows = {
   attach(engine, options) {
+    step('cast');
     return (world.cast = part('shadows', {
       options,
       added: [],
       add(source, how) {
+        step('cast add');
         this.added.push([source, how]);
       },
     }));
@@ -62,6 +86,7 @@ const Shadows = {
 const Tonemap = {
   attach(engine, options) {
     if (world.tonemapFailure) throw world.tonemapFailure;
+    step('tonemap');
     return (world.tonemap = part('tonemap', { options }));
   },
 };
@@ -75,6 +100,7 @@ const { addViewer } = await import('@margoengine/stage/viewer');
 function fixture() {
   log.length = 0;
   for (const key of Object.keys(world)) world[key] = null;
+  world.reported = [];
   const disposal = new AbortController(),
     ticks = new Set(),
     canvas = new EventTarget();
@@ -83,7 +109,9 @@ function fixture() {
     canvas,
     signal: disposal.signal,
     engine: {
+      onError: (error) => world.reported.push(error),
       camera: {
+        fov: 60,
         position: [0, 2, 5],
         target: [0, 0, 0],
         near: 0.1,
@@ -94,10 +122,12 @@ function fixture() {
       },
     },
     onTick(callback) {
+      step('turntable');
       ticks.add(callback);
       return () => ticks.delete(callback);
     },
     box(options) {
+      step('floor');
       return (world.floor = part('floor', { options }));
     },
   };
@@ -263,6 +293,123 @@ test('any failure leaves nothing behind', async () => {
   await assert.rejects(addViewer(stage, '/shoe.glb'), /no tonemap/);
   assert.deepEqual(log.slice(-4), ['dispose contact', 'dispose backdrop', 'dispose light', 'dispose model']);
   assert.equal(ticks.size, 0);
+});
+
+/** A stage on a real Camera, with its listeners recorded, and what a failed addViewer must leave as it found. */
+function realCamera(options) {
+  const f = fixture(),
+    { canvas } = f,
+    add = canvas.addEventListener.bind(canvas),
+    signals = [];
+  parts.length = 0;
+  canvas.addEventListener = (type, listener, how) => {
+    step('listeners');
+    signals.push(how.signal);
+    add(type, listener, how);
+  };
+  const camera = new Camera(options);
+  f.stage.engine.camera = camera;
+  // A fit still animating: only leaving the camera alone keeps it, since it cannot be saved from outside.
+  camera.fitToBoundingBox([-1, -1, -1], [1, 1, 1], { aspect: 2, duration: 1 });
+  camera.advance(0.25);
+  const twin = new Camera(options);
+  twin.fitToBoundingBox([-1, -1, -1], [1, 1, 1], { aspect: 2, duration: 1 });
+  twin.advance(0.25);
+  const fields = ['position', 'target', 'near', 'far', 'fov', 'up'],
+    before = fields.map((key) => camera[key]);
+  return {
+    ...f,
+    camera,
+    assertUntouched() {
+      // All of it at once, so a failure names everything that changed.
+      const changed = fields.filter((key, i) => camera[key] !== before[i]).map((key) => `camera.${key}`);
+      camera.advance(0.75);
+      twin.advance(0.75);
+      if (String([camera.position, camera.target]) !== String([twin.position, twin.target])) changed.push('fit in flight');
+      if (f.ticks.size) changed.push('tick');
+      if (!signals.every((signal) => signal.aborted)) changed.push('listener');
+      for (const made of parts) if (made.disposed !== 1) changed.push(`${made.name} disposed ${made.disposed} times`);
+      assert.deepEqual(changed, []);
+    },
+  };
+}
+
+for (const [name, options] of [
+  ['light add', {}],
+  ['backdrop', {}],
+  ['contact', {}],
+  ['contact add', {}],
+  ['cast', { shadows: 'cascaded' }],
+  ['floor', { shadows: 'cascaded' }],
+  ['cast add', { shadows: 'cascaded' }],
+  ['tonemap', {}],
+  ['listeners', {}],
+  ['turntable', {}],
+])
+  test(`a failure at ${name} leaves the stage as it was, and the error reaches the caller`, async () => {
+    const { stage, assertUntouched } = realCamera();
+    world.fail = name;
+    await assert.rejects(addViewer(stage, '/shoe.glb', options), (error) => error === world.failure);
+    assertUntouched();
+  });
+
+test('an abort at the last moment leaves the stage as it was', async () => {
+  const { stage, assertUntouched } = realCamera(),
+    abort = new AbortController();
+  const attach = Tonemap.attach;
+  Tonemap.attach = (...args) => {
+    abort.abort();
+    return attach(...args);
+  };
+  try {
+    await assert.rejects(addViewer(stage, '/shoe.glb', { signal: abort.signal }), { name: 'AbortError' });
+  } finally {
+    Tonemap.attach = attach;
+  }
+  assertUntouched();
+});
+
+test('framing that fails puts the camera back and takes everything else away', async () => {
+  // More than the fit accepts: fitToBoundingBox refuses after near, far, target and position were set.
+  const { stage, assertUntouched } = realCamera();
+  world.modelBounds = [-1e307, -1e307, -1e307, 1e307, 1e307, 1e307];
+  await assert.rejects(addViewer(stage, '/shoe.glb'), { message: /Bounds: finite values/ });
+  assertUntouched();
+});
+
+test('a long lens frames the model: far reaches past where the fit stands', async () => {
+  const { stage, camera } = realCamera({ fov: 1 });
+  await addViewer(stage, '/shoe.glb');
+  const distance = Math.hypot(...camera.position.map((v, i) => v - camera.target[i]));
+  assert.ok(distance > 100, `stood ${distance} from the model`);
+  assert.ok(camera.far > distance + Math.hypot(2, 2, 4), `far is ${camera.far}`);
+  assert.deepEqual(camera.target, [0, 1, 0]);
+});
+
+test('a part that fails to clean up neither hides the error nor stops the rest, and is reported', async () => {
+  const { stage } = realCamera();
+  world.fail = 'tonemap';
+  world.cleanupFailure = 'contact';
+  await assert.rejects(addViewer(stage, '/shoe.glb'), (error) => error === world.failure);
+  for (const made of parts) assert.equal(made.disposed, 1, `${made.name} is disposed once`);
+  assert.deepEqual(world.reported.map(String), ['Error: contact dispose failed']);
+});
+
+test('viewer.dispose takes every part away, throws the first error, reports the rest, and leaves the camera', async () => {
+  const { stage, camera } = realCamera(),
+    viewer = await addViewer(stage, '/shoe.glb'),
+    { position, near } = camera,
+    dispose = world.backdrop.dispose;
+  world.cleanupFailure = 'tonemap';
+  world.backdrop.dispose = function () {
+    dispose.call(this);
+    throw new Error('backdrop dispose failed');
+  };
+  assert.throws(() => viewer.dispose(), /tonemap dispose failed/);
+  for (const made of parts) assert.equal(made.disposed, 1, `${made.name} is disposed once`);
+  assert.deepEqual(world.reported.map(String), ['Error: backdrop dispose failed']);
+  assert.equal(camera.position, position);
+  assert.equal(camera.near, near);
 });
 
 test('a model with nothing to frame rejects and leaves nothing behind', async () => {

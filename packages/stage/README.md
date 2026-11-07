@@ -160,7 +160,9 @@ viewer.dispose(); // removes the model and everything the viewer added
 | `gltf` | none | `loadGLTF` options, such as a shared `draco` decoder |
 | `signal` | none | Cancels the load; the stage's disposal cancels it too |
 
-The turntable orbits the camera about the world's Y axis, not the model, so a model root off centre stays framed and shadows stay cached. A drag holds it. On any failure nothing stays behind; a file with nothing to draw rejects with `Viewer model has no geometry to frame`. `viewer.dispose()` leaves the camera where it is. Needs WebGPU. The `@margoengine/gltf-pro` model is a `PBRModel` (`viewer.model`), not the `LoadedModel` of `addGLTF`.
+A failed `addViewer` leaves the stage unchanged. Whichever step fails, a package that is not installed, a part that refuses its options or an abort, the error reaches you, everything it added is gone and the camera is as it was, a fit still animating included. Framing the camera is the last step, so nothing can fail after it, and a failure while framing puts the camera back. A part that also fails to clean up goes to `engine.onError` and does not replace the error. `viewer.dispose()` removes every part even if one throws: it throws the first error and sends the others to `engine.onError`.
+
+The turntable orbits the camera about the world's Y axis, not the model, so a model root off centre stays framed and shadows stay cached. A drag holds it. A file with nothing to draw rejects with `Viewer model has no geometry to frame`. `viewer.dispose()` leaves the camera where it is. Needs WebGPU. The `@margoengine/gltf-pro` model is a `PBRModel` (`viewer.model`), not the `LoadedModel` of `addGLTF`.
 
 ## Physics in one call
 

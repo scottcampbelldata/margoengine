@@ -26,6 +26,13 @@
 - `engine.createMesh()` failing to grow the store keeps the engine's slot tables, which a later frame could read and crash on.
 - `LodInstances` and `DynamicInstances` release exactly what they took when `setup` fails.
 
+### Model viewer
+
+- A failed `addViewer` now leaves the stage unchanged. It framed the camera before the steps that can fail, so a failure cleaned up the model and left the camera on near, far, target and position set for a model that was gone, and ended any fit still animating. Framing is now the last step, and a failure while framing puts the camera back.
+- `addViewer` imports all its packages alongside the model, so a missing package fails before anything is set up and the model never draws unframed.
+- A part that throws while cleaning up no longer replaces the error `addViewer` rejects with, or stops the other parts going: it goes to `engine.onError`. `viewer.dispose()` removes every part, throws the first error and reports the rest.
+- `addViewer` frames a model through a long lens. Below about a 1.3 degree `fov` it rejected with `Bounds exceed far: raise camera.far`, a value it had just set itself.
+
 ### Packaging
 
 - A page that imports `margoengine/react` no longer gets the Draco and Basis Wasm in its build. Moved out of that entry: `Model` and `Gltf` (now `margoengine/react/gltf-pro`), `Fbx` (`/fbx`), `Animation` (`/animation`) and `BatchedMesh`, `BatchedItem`, `MeshTransmissionMaterial` (`/materials`).

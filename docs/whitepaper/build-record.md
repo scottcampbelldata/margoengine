@@ -1672,3 +1672,13 @@ Seven jobs for `@margoengine/usdz`, so real production stages open: composition,
 - **Unmeasured:** no timing for any job; each waits for the quiet pass.
 - **Clean room:** the inert rule of job 1 had no published text and was removed. Memory was used for debugging in job 1, then replaced, and UZ1 says so. Search snippets of a third-party USD crate appeared and were never opened. In job 4 a remembered Blender behaviour (the UV winding split) was a guess, confirmed only black box; it touches the oracle comparison and no Margo code.
 - **Gate:** lint, hygiene, verify, the tests of usdz and loaders, the usdz GPU checks, each push from one script that stops at the first failing step. Landings of jobs 1 to 4 and 6 stopped on record conflicts, job 2 and job 6 failed verify once each on a stale limits range and a README type error; nothing failed reached main.
+
+## Failed addViewer
+
+Scott asked for a second static report to be proved or disproved: `addViewer` changed the camera before later steps that can fail. It was true, and the camera was not the whole of it.
+
+- **Old code:** 18 of 31 tests failed. A failure at each of the 9 steps past framing, a missing package and a late abort left `near`, `far`, `target` and `position` changed and ended a fit in flight; the framing block failed alone with the same four fields changed; a throwing cleanup replaced the real error; `viewer.dispose()` left every part after one that threw; a 1 degree lens was refused. `scripts/stage-viewer-gpu-check.js` failed the same way with the real packages.
+- **Fix:** framing is the last step, so nothing can fail after it, and a failure inside it restores what it wrote. A snapshot alone could not be exact: `Camera`'s fit in flight is private. Every import moved alongside the load, so no frame draws the model unframed. Cleanup runs every step and cannot replace the error.
+- **Proved:** each step failed in turn on a real `Camera` with stand-in packages, and each package removed in turn through a resolve hook. On real WebGPU (RTX A6000) `contact`, `cascaded` and `tonemap` each refuse their options, and a second viewer on a live stage is refused: camera, plugins and mesh count are equal and the picture is byte for byte the same.
+- **Limits:** a failed `addViewer` does not freeze the camera while it loads: a visitor who moves it keeps that move (docs/limits.md).
+- **Size:** `viewer` is its own entry, so core and core plus stage do not change.

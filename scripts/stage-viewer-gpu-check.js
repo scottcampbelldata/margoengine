@@ -1,6 +1,7 @@
 // Real-adapter check of the stage's model viewer: `addViewer` with a real glTF on real WebGPU, in each shadow mode. The
 // model must fill the frame, the shadow must darken the ground under it, the turntable must keep the distance and the
-// target, dispose must leave nothing behind, and WebGPU must report no error.
+// target, dispose must leave nothing behind, a failed addViewer must leave the stage and its picture as they were, and
+// WebGPU must report no error.
 // Run from the repository root after building packages (`npm run test:gpu --workspace packages/stage`).
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
@@ -87,6 +88,35 @@ try {
   assert.ok(scene.bounds[1] >= 0.99, `the model is not 1 above its parent: ${scene.bounds}`);
   assert.equal(scene.left, 0, 'addScene left meshes behind');
   assert.deepEqual(scene.gpuErrors, []);
+
+  // A failed addViewer with the real packages: each attach refuses, and the stage and its picture stay byte for byte.
+  await page.evaluate(() => window.viewerPage.scenery());
+  const state = () => page.evaluate(() => window.viewerPage.state()),
+    before = await state(),
+    picture = (await shot('failure-before')).data;
+  results.failures = {};
+  for (const [name, options, refusal] of [
+    ['contact', { shadow: { size: -1 } }, /size must be finite/],
+    ['cascaded', { shadows: 'cascaded', shadow: { cascades: 9 } }, /Invalid shadow cascades/],
+    ['tonemap', { tonemap: { exposure: 99 } }, /Invalid Tonemap options/],
+  ]) {
+    const message = await page.evaluate((o) => window.viewerPage.fail(o), options);
+    assert.match(message, refusal);
+    results.failures[name] = message;
+    assert.deepEqual(await state(), before, `addViewer failed at ${name} and changed the stage`);
+    assert.ok(Buffer.compare((await shot(`failure-${name}`)).data, picture) === 0, `the picture changed after ${name}`);
+  }
+  assert.deepEqual(await page.evaluate(() => window.viewerPage.end()), []);
+
+  // A second viewer on the same stage is refused, and the first one stays whole.
+  await open({ turntable: false });
+  const live = await state(),
+    frame = (await shot('second-before')).data;
+  results.failures.second = await page.evaluate(() => window.viewerPage.fail({ turntable: false }));
+  assert.notEqual(results.failures.second, 'addViewer resolved');
+  assert.deepEqual(await state(), live, 'a refused second viewer changed the stage');
+  assert.ok(Buffer.compare((await shot('second-after')).data, frame) === 0, 'a refused second viewer changed the picture');
+  assert.deepEqual(await close(), { plugins: [], meshes: 0, gpuErrors: [] });
 
   await writeFile('test-results/stage-viewer.json', JSON.stringify({ hardware: browser.hardware, ...results }, null, 2));
   console.log('Stage viewer passed on real WebGPU', JSON.stringify(results));

@@ -113,8 +113,8 @@ function orbit(stage: Stage, angle: number): void {
  * from `@margoengine/environment`, a soft ground shadow from `@margoengine/staging` or a cast one from
  * `@margoengine/shadows`, grading from `@margoengine/tonemap`, a framed camera and a turntable, sized to the model.
  * Each package is imported on the first call and only when its part is on. Rejects with `Install <package>` when one
- * is missing, and with AbortError when `signal` aborts or the stage is disposed first; on any failure nothing stays.
- * Needs WebGPU.
+ * is missing, and with AbortError when `signal` aborts or the stage is disposed first. A failure leaves the stage as it
+ * was: every part goes, the camera is untouched, and the error reaches the caller. Needs WebGPU.
  * @example const viewer = await addViewer(stage, '/shoe.glb', { environment: '/studio.hdr' });
  */
 export async function addViewer(
@@ -142,14 +142,24 @@ export async function addViewer(
   const abort = stageSignal(stage, signal),
     { engine, canvas } = stage;
   abort.throwIfAborted();
-  // Later steps undo first: a failure, a late abort and `dispose()` all run this list.
+  // Later steps undo first: a failure, a late abort and `dispose()` all run this list, every step whatever one throws.
   const undo: (() => void)[] = [],
-    release = (): void => {
-      for (const step of undo.splice(0).reverse()) step();
+    release = (): unknown[] => {
+      const errors: unknown[] = [];
+      // The stage's disposal already took every plugin with the engine.
+      if (!stage.signal.aborted)
+        for (const step of undo.splice(0).reverse())
+          try {
+            step();
+          } catch (error) {
+            errors.push(error);
+          }
+      return errors;
     },
-    // The stage's disposal already took every plugin with the engine.
     dispose = (): void => {
-      if (!stage.signal.aborted) release();
+      const errors = release();
+      for (const error of errors.slice(1)) engine.onError(error);
+      if (errors.length) throw errors[0];
     };
   const loading = await Promise.allSettled([
     optionalPackage('@margoengine/gltf-pro', () => import('@margoengine/gltf-pro'), abort).then(({ loadGLTF }) =>
@@ -161,15 +171,24 @@ export async function addViewer(
           ({ EnvironmentLighting }) =>
             EnvironmentLighting.load(engine, environment ?? studio(), { ...lighting, signal: abort }),
         ),
+    // Every import here, so nothing after the load waits: no frame draws the model unframed, and a missing package
+    // fails before anything is set up.
+    background === false
+      ? null
+      : optionalPackage('@margoengine/environment', () => import('@margoengine/environment'), abort),
+    shadows === 'contact' ? optionalPackage('@margoengine/staging', () => import('@margoengine/staging'), abort) : null,
+    shadows === 'cascaded' ? optionalPackage('@margoengine/shadows', () => import('@margoengine/shadows'), abort) : null,
+    tonemap ? optionalPackage('@margoengine/tonemap', () => import('@margoengine/tonemap'), abort) : null,
   ]);
-  const [modelLoad, lightLoad] = loading;
+  const [modelLoad, lightLoad, backdropLoad, contactLoad, castLoad, gradeLoad] = loading,
+    loaded = <T>(load: PromiseSettledResult<T>): T => (load as PromiseFulfilledResult<T>).value;
   if (modelLoad.status === 'fulfilled') undo.push(() => modelLoad.value.dispose());
   if (lightLoad.status === 'fulfilled' && lightLoad.value) undo.push(() => lightLoad.value!.dispose());
   try {
     for (const load of loading) if (load.status === 'rejected') throw load.reason;
     abort.throwIfAborted();
-    const model = (modelLoad as PromiseFulfilledResult<PBRModel>).value,
-      light = (lightLoad as PromiseFulfilledResult<EnvironmentLighting | null>).value;
+    const model = loaded(modelLoad),
+      light = loaded(lightLoad);
     light?.add(model);
     const bounds = model.bounds,
       size = Math.hypot(bounds[3] - bounds[0], bounds[4] - bounds[1], bounds[5] - bounds[2]),
@@ -179,40 +198,19 @@ export async function addViewer(
         (bounds[2] + bounds[5]) / 2,
       ];
     if (!(size > 0 && size < Infinity)) throw fault('state', 'Viewer model has no geometry to frame');
-    if (fit) {
-      const { camera } = engine;
-      camera.near = size / 200;
-      camera.far = size * 50;
-      camera.target = center;
-      camera.position = [center[0] + size * 0.55, center[1] + size * 0.3, center[2] + size];
-      camera.fitToBoundingBox([bounds[0], bounds[1], bounds[2]], [bounds[3], bounds[4], bounds[5]], {
-        aspect: Math.max(1, canvas.clientWidth) / Math.max(1, canvas.clientHeight),
-        duration: 0,
-      });
-    }
     let backdrop: ColorBackground | null = null;
     if (background !== false) {
-      const { ColorBackground } = await optionalPackage(
-        '@margoengine/environment',
-        () => import('@margoengine/environment'),
-        abort,
-      );
       // Before the shadow, which blends over what is drawn here.
-      const plain = ColorBackground.attach(engine, { color: background, order: 0.25 });
+      const plain = loaded(backdropLoad)!.ColorBackground.attach(engine, { color: background, order: 0.25 });
       undo.push(() => plain.dispose());
       backdrop = plain;
     }
     let shadow3: ContactShadows | Shadows | null = null,
       floor: Mesh | null = null;
     if (shadows === 'contact') {
-      const { ContactShadows } = await optionalPackage(
-        '@margoengine/staging',
-        () => import('@margoengine/staging'),
-        abort,
-      );
       // Sized here rather than with `fit`, which would overwrite the caller's `size` and `position`.
       const foot = Math.max(bounds[3] - bounds[0], bounds[5] - bounds[2], size * 0.1),
-        contact = ContactShadows.attach(engine, {
+        contact = loaded(contactLoad)!.ContactShadows.attach(engine, {
           position: [center[0], bounds[1], center[2]],
           size: foot * 3,
           height: Math.max(bounds[4] - bounds[1], size * 0.1),
@@ -225,10 +223,9 @@ export async function addViewer(
       contact.add(model);
       shadow3 = contact;
     } else if (shadows === 'cascaded') {
-      const { Shadows } = await optionalPackage('@margoengine/shadows', () => import('@margoengine/shadows'), abort);
       const reach = size * 2,
         ground = bounds[1];
-      const cast = Shadows.attach(engine, {
+      const cast = loaded(castLoad)!.Shadows.attach(engine, {
         bounds: {
           min: [center[0] - reach, ground - size * 0.01, center[2] - reach],
           max: [center[0] + reach, bounds[4], center[2] + reach],
@@ -253,8 +250,7 @@ export async function addViewer(
     }
     let grade: Tonemap | null = null;
     if (tonemap) {
-      const { Tonemap } = await optionalPackage('@margoengine/tonemap', () => import('@margoengine/tonemap'), abort);
-      grade = Tonemap.attach(engine, tonemap);
+      grade = loaded(gradeLoad)!.Tonemap.attach(engine, tonemap);
       undo.push(() => grade!.dispose());
     }
     abort.throwIfAborted();
@@ -286,6 +282,28 @@ export async function addViewer(
         else orbit(stage, (delta * Math.PI * 2) / seconds);
       }),
     );
+    // Last, because nothing can undo it: it ends any fit in flight, and `dispose` leaves the camera to the visitor.
+    // fitToBoundingBox throws before it changes anything of its own, so these four fields are all there is to restore.
+    if (fit) {
+      const { camera } = engine,
+        { near, far, target, position } = camera,
+        aspect = Math.max(1, canvas.clientWidth) / Math.max(1, canvas.clientHeight),
+        // Sine of the half angle the fit frames in: it stands back size * 0.55 over this, so a long lens needs more far.
+        lens = Math.sin(Math.atan(Math.tan((camera.fov * Math.PI) / 360) * Math.min(1, aspect)));
+      try {
+        camera.near = size / 200;
+        camera.far = size * Math.max(50, 1 + 1 / lens);
+        camera.target = center;
+        camera.position = [center[0] + size * 0.55, center[1] + size * 0.3, center[2] + size];
+        camera.fitToBoundingBox([bounds[0], bounds[1], bounds[2]], [bounds[3], bounds[4], bounds[5]], {
+          aspect,
+          duration: 0,
+        });
+      } catch (error) {
+        Object.assign(camera, { near, far, target, position });
+        throw error;
+      }
+    }
     return {
       model,
       environment: light,
@@ -303,7 +321,8 @@ export async function addViewer(
       [Symbol.dispose ?? Symbol()]: dispose,
     } as Viewer;
   } catch (error) {
-    dispose();
+    // The caller hears of the failure; a part that also fails to clean up goes to `engine.onError`, not over it.
+    for (const cleanup of release()) engine.onError(cleanup);
     throw error;
   }
 }

@@ -12,6 +12,10 @@ type Page = {
   dropShadow(): Promise<void>;
   close(): Promise<{ plugins: string[]; meshes: number; gpuErrors: string[] }>;
   scene(): Promise<{ bounds: number[]; meshes: number; left: number; gpuErrors: string[] }>;
+  scenery(): Promise<void>;
+  state(): Record<string, unknown>;
+  fail(options: ViewerOptions): Promise<string>;
+  end(): string[];
 };
 const gpuErrors: string[] = [],
   url = '/examples/assets/flight-helmet-mobile.glb';
@@ -66,6 +70,40 @@ const page: Page = {
     const left = app.engine.scene.meshes.size;
     app.dispose();
     return { bounds, meshes, left, gpuErrors: [...gpuErrors] };
+  },
+  // A stage with a scene of the page's own, for a failed addViewer to leave as it was.
+  async scenery() {
+    app = await createStage('#scene', {
+      backend: 'webgpu',
+      controls: false,
+      onError: (error) => gpuErrors.push(String(error)),
+    });
+    (app.engine as unknown as { gpu: GPUDevice }).gpu.addEventListener('uncapturederror', (event) =>
+      gpuErrors.push(event.error.message),
+    );
+    app.box({ size: [1, 2, 1], color: '#b04020' });
+    const { camera } = app.engine;
+    camera.position = [3, 2, 4];
+    camera.target = [0, 0.5, 0];
+    camera.near = 0.5;
+    camera.far = 40;
+    await page.frames(10);
+  },
+  state() {
+    const { position, target, near, far, fov, up } = app.engine.camera;
+    return { position, target, near, far, fov, up, plugins: plugins(), meshes: app.engine.scene.meshes.size };
+  },
+  async fail(options) {
+    const message = await addViewer(app, url, options).then(
+      () => 'addViewer resolved',
+      (error: Error) => error.message,
+    );
+    await page.frames(10);
+    return message;
+  },
+  end() {
+    app.dispose();
+    return [...gpuErrors];
   },
   async close() {
     viewer.dispose();
