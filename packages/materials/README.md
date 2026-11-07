@@ -49,8 +49,13 @@ The four additional glTF lobes share group 3 with clearcoat and transmission.
 metadata creates an installation plan on an ordinary PBR primitive.
 
 ```ts
+import {Engine} from 'margoengine/core';
+import {loadGLTF} from 'margoengine/gltf-pro';
 import {materialLobes, clearcoat} from 'margoengine/materials';
 
+const engine = await Engine.create(document.querySelector('canvas')!);
+const model = await loadGLTF(engine, '/hero.glb');
+const primitive = model.primitives[0];
 primitive.extension = materialLobes({
   sheen: {colorFactor: [0.4, 0.1, 0.05], roughnessFactor: 0.5},
   specular: {factor: 0.8, colorFactor: [1, 0.8, 0.5]},
@@ -228,8 +233,12 @@ An output can reference nested nodes absent from the root list. All listed nodes
 `installNodeMaterial(model, graph)` installs one graph on the model and automatically registers a plugin. Graph transmission acquires the same shared opaque-color capture as glTF transmission and sets the affected primitives to the existing blend path:
 
 ```ts
+import {Engine} from 'margoengine/core';
+import {loadGLTF} from 'margoengine/gltf-pro';
 import {installNodeMaterial} from 'margoengine/materials';
 
+const engine = await Engine.create(document.querySelector('canvas')!);
+const model = await loadGLTF(engine, '/hero.glb');
 const installation = installNodeMaterial(model, {nodes: [{
   type: 'emit',
   color: {type: 'color', value: [1, 1, 1, 1]},
@@ -274,13 +283,14 @@ double-sided) are only core's.
 Everything is live on a `createMesh` mesh, from the next frame:
 
 ```ts
+import {boxGeometry} from 'margoengine/geometry';
 import {PbrMaterial, PhongMaterial, createMesh, loadTexture} from 'margoengine/materials';
 import {Engine} from 'margoengine/core';
 const engine = await Engine.create(document.querySelector('canvas')!);
 
 const tiles = await loadTexture('/tiles.png', {magFilter: 'nearest'});
 const paint = new PhongMaterial({color: 0x84d6bd, map: tiles});
-const mesh = createMesh(engine, geometry, paint);
+const mesh = createMesh(engine, boxGeometry(1, 1, 1), paint);
 paint.color.set('#ff8800');       // or paint.color = 0xff8800; strings and numbers are sRGB, arrays linear
 paint.blending = 'additive';      // render state picks the matching pipeline
 paint.wireframe = true;
@@ -372,11 +382,16 @@ data at once. An edited mesh casts shadows as a dynamic caster from then on, and
 its groups are retired.
 
 ```ts
+// Two quads side by side, in typed arrays so a part of them can change.
+const positions = new Float32Array([0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 0, 0, 2, 0, 0, 2, 1, 0, 1, 1, 0]);
+const normals = new Float32Array(Array.from({length: 8}, () => [0, 0, 1]).flat());
+const uvs = new Float32Array(16), indices = [0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7];
 const geometry = {positions, normals, uvs, indices};
+const tiles = new Material({map: await loadTexture('/tiles.png')});
 const tiled = createMesh(engine, geometry, tiles);
 geometry.uvs.set([0.5, 0, 0.75, 0, 0.75, 0.25, 0.5, 0.25], 8); // vertices 4-7
 tiled.setGeometry(geometry, {start: 4, count: 4}); // uploads 320 bytes
-tiled.setGeometry({positions: more, normals: moreNormals, uvs: moreUvs, indices: moreIndices}); // resize
+tiled.setGeometry({positions: positions.slice(0, 12), normals: normals.slice(0, 12), uvs: uvs.slice(0, 8), indices: [0, 1, 2, 0, 2, 3]}); // resize
 ```
 
 `mesh.dispose()` releases model resources; textures
@@ -422,7 +437,7 @@ of neighbouring tiles. Tiles whose frame did not change upload nothing. Reading 
 application's job.
 
 ```ts
-import {createMesh, tileAnimator} from 'margoengine/materials';
+import {UnlitMaterial, createMesh, loadTexture, tileAnimator} from 'margoengine/materials';
 import {Engine} from 'margoengine/core';
 import {Texture} from 'margoengine/materials';
 const engine = await Engine.create(document.querySelector('canvas')!);
@@ -431,6 +446,13 @@ const water = {frames: [
   {duration: 0.2, uvs: [0, 0, 0.25, 0, 0.25, 0.25, 0, 0.25]},
   {duration: 0.2, uvs: [0.25, 0, 0.5, 0, 0.5, 0.25, 0.25, 0.25]},
 ]};
+const tileset = new UnlitMaterial({map: await loadTexture('/tiles.png')});
+const geometry = {
+  positions: [0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 0, 0, 2, 0, 0, 2, 1, 0, 1, 1, 0],
+  normals: Array.from({length: 8}, () => [0, 0, 1]).flat(),
+  uvs: new Array<number>(16).fill(0),
+  indices: [0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7],
+};
 const mesh = createMesh(engine, geometry, tileset); // geometry.uvs is a number[] or Float32Array
 const play = tileAnimator(mesh, geometry, [{vertex: 0, animation: water}, {vertex: 4, animation: water, start: {frame: 1}}]);
 engine.onFrame(() => play(performance.now() / 1000));
@@ -493,7 +515,8 @@ Use `stencilWriteMask: 0` for comparison without changing stencil. These propert
 alone keeps its pipeline (the reference is set per draw).
 
 ```ts
-import {Material, StencilBuffer, createMesh} from 'margoengine/materials';
+import {LambertMaterial, Material, StencilBuffer, createMesh} from 'margoengine/materials';
+import {planeGeometry} from 'margoengine/geometry';
 import {Engine} from 'margoengine/core';
 import {loadTexture} from 'margoengine/materials';
 const engine = await Engine.create(document.querySelector('canvas')!);
@@ -507,8 +530,8 @@ const clipped = new Material({
   color: '#4488ff', stencilWrite: true, stencilRef: 1,
   stencilFunc: 'equal', stencilWriteMask: 0,
 });
-createMesh(engine, maskGeometry, mask, {renderOrder: -1});
-createMesh(engine, geometry, clipped);
+createMesh(engine, planeGeometry(1, 1), mask, {renderOrder: -1});
+createMesh(engine, planeGeometry(2, 2), clipped);
 ```
 
 `colorWrite: false` suppresses color while retaining depth/stencil processing. `StencilBuffer` borrows a scene
@@ -548,6 +571,7 @@ lights use the same Lambert and Blinn-Phong terms as the directional light. Rect
 roughness.
 
 ```ts
+const tileset = await loadTexture('/tiles.png');
 const tiles = new Material({shading: 'phong', map: tileset, specular: '#222222', shininess: 12, alphaTest: 0.5});
 tiles.shininess = 40; // live
 ```
@@ -673,6 +697,7 @@ Each map has its own UV transform slot (`material.setUVTransform(t, 'alphaMap')`
 `setUVTransform(t)` without a slot set it with the other maps'.
 
 ```ts
+const [leafColour, leafCutout] = await Promise.all([loadTexture('/leaf.png'), loadTexture('/leaf-cutout.png')]);
 const leaves = new LambertMaterial({map: leafColour, alphaMap: leafCutout, alphaTest: 0.5, side: 'double'});
 leaves.alphaMap = null; // live: the next frame draws without it
 ```
@@ -682,7 +707,8 @@ Directional (cascaded and virtual), spot and point shadows, contact shadows, TAA
 ```js
 import { Picking } from '@margoengine/selection';
 import { ContactShadows } from '@margoengine/staging';
-import { PbrMaterial, createMesh } from '@margoengine/materials';
+import { PbrMaterial, createMesh, loadTexture } from '@margoengine/materials';
+import { planeGeometry } from '@margoengine/geometry';
 import {Engine} from '@margoengine/core';
 declare const x: number;
 declare const y: number;
@@ -690,7 +716,8 @@ const engine = await Engine.create(document.querySelector('canvas')!);
 
 Picking.attach(engine);
 const contact = ContactShadows.attach(engine);
-const fence = createMesh(engine, geometry, new PbrMaterial({ map, alphaMap, alphaTest: 0.5 }));
+const [map, alphaMap] = await Promise.all([loadTexture('/fence.png'), loadTexture('/fence-cutout.png')]);
+const fence = createMesh(engine, planeGeometry(2, 1), new PbrMaterial({ map, alphaMap, alphaTest: 0.5 }));
 contact.add(fence);
 await engine.pick(x, y); // null through a hole, and no contact shadow under one
 ```
@@ -998,8 +1025,10 @@ them.
 
 ```ts
 import { Engine } from 'margoengine/core';
-import { LambertMaterial, PbrMaterial, createMesh, loadTexture } from 'margoengine/materials';
+import { Clustered } from 'margoengine/clustered';
+import { LambertMaterial, PbrMaterial, ShadowCatcherMaterial, createMesh, loadTexture } from 'margoengine/materials';
 import { boxGeometry, planeGeometry, sphereGeometry } from 'margoengine/geometry';
+import { Shadows } from 'margoengine/shadows';
 import {WgslMaterial} from 'margoengine/materials';
 declare const canvas: HTMLCanvasElement;
 const engine = await Engine.create(canvas);
@@ -1047,6 +1076,7 @@ effects like any receiver. It is transparent (drawn after opaque meshes, no dept
 `color` and `opacity` are live, and `clone()` keeps it a catcher.
 
 ```ts
+const shadows = Shadows.attach(engine), lights = Clustered.attach(engine);
 const ground = createMesh(engine, planeGeometry(20, 20), new ShadowCatcherMaterial({opacity: 0.5}));
 ground.root.setRotation([-Math.PI / 2, 0, 0]);
 shadows.add(ground);
@@ -1081,6 +1111,7 @@ missing or misdeclared entry point, a name that is not a WGSL identifier or that
 textures.
 
 ```ts
+const ripples = await loadTexture('/ripples.png');
 const water = new WgslMaterial({
   shading: 'phong',
   wgsl: `fn shade(i: Out, s: Surface) -> Surface {
@@ -1111,7 +1142,10 @@ rough dielectric. There is no highlight. Use `magFilter: 'nearest'` on a gradien
 ```ts
 import {ToonMaterial, Texture, createMesh, toonModel} from 'margoengine/materials';
 import {Engine} from 'margoengine/core';
+import {sphereGeometry} from 'margoengine/geometry';
+import {loadGLTF} from 'margoengine/gltf-pro';
 const engine = await Engine.create(document.querySelector('canvas')!);
+const geometry = sphereGeometry(1, 32, 16), model = await loadGLTF(engine, '/hero.glb');
 const bands = new Texture({data: new Uint8Array([40, 40, 40, 255, 140, 140, 140, 255, 255, 255, 255, 255]), width: 3, height: 1},
   {colorSpace: 'linear', magFilter: 'nearest', minFilter: 'nearest', mipmaps: false});
 createMesh(engine, geometry, new ToonMaterial({color: '#e07040', gradientMap: bands}));
@@ -1148,11 +1182,15 @@ face averages and never across a cube edge; an `Environment` is GGX prefiltered,
 `CubeTexture` into one. Bindings 188-190 of the material's group.
 
 ```ts
+import {Engine} from 'margoengine/core';
+import {Environment, loadEnvironmentImage} from 'margoengine/environment';
 import {CubeTexture, PbrMaterial, UnlitMaterial, loadCubeTexture} from 'margoengine/materials';
 import {Texture, WgslMaterial} from 'margoengine/materials';
+const engine = await Engine.create(document.querySelector('canvas')!);
 const sky = await loadCubeTexture(['px.jpg', 'nx.jpg', 'py.jpg', 'ny.jpg', 'pz.jpg', 'nz.jpg']);
 const chrome = new PbrMaterial({metalness: 1, roughness: 0.1, envMap: sky});
 const glass = new UnlitMaterial({envMap: sky, envMapMode: 'refraction', refractionRatio: 0.66, combine: 'mix'});
+const environment = await Environment.attach(engine, await loadEnvironmentImage('/studio.hdr'));
 chrome.envMap = environment; // an @margoengine/environment Environment, or a CubeCamera target
 ```
 
@@ -1285,11 +1323,13 @@ export const chrome = new PbrMaterial({metalness: 1, roughness: 0.1, envMap: sky
 ```ts
 import {KTX2Decoder} from 'margoengine/decoders';
 import {Engine} from 'margoengine/core';
+import {sphereGeometry} from 'margoengine/geometry';
+import {bakeLightmap} from 'margoengine/lightmap';
 import {loadKTX2Texture, createMesh, PbrMaterial, Texture} from 'margoengine/materials';
 const engine = await Engine.create(document.querySelector('canvas')!);
 const decoder = new KTX2Decoder({device: engine.gpu!});
 const albedo = await loadKTX2Texture('/textures/albedo.ktx2', {decoder});
-createMesh(engine, geometry, new PbrMaterial({map: albedo}));
+createMesh(engine, sphereGeometry(1, 32, 16), new PbrMaterial({map: albedo}));
 ```
 
 `loadTexture`, `loadKTX2Texture` and `loadCubeTexture` take a `fetch` option (default `globalThis.fetch`): pass a
@@ -1310,6 +1350,10 @@ For `bakeLightmap(..., { radiometry: 'physical' })` or `bakeRefractedLightmap`, 
 explicit Lambertian diffuse response. Emission remains separate and is added once.
 
 ```ts
+const atlas = await bakeLightmap(
+  {positions: new Float32Array([0, 0, 0, 4, 0, 0, 4, 0, 4, 0, 0, 4]), albedo: new Float32Array([0.8, 0.8, 0.8, 1])},
+  {texelsPerUnit: 4, lights: [{type: 'directional', direction: [0.3, 1, 0.2], intensity: 2}]},
+);
 const texture = new Texture(
   { width: atlas.width, height: atlas.height, data: atlas.textures.lightmap },
   { colorSpace: 'linear', mipmaps: false },

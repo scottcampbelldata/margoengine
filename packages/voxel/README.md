@@ -34,8 +34,9 @@ blockData(door); // 3
 const chunk = new VoxelChunk(stone); // uniform: stored as its palette alone
 chunk.set(5, 31, 5, torch);
 const packed = chunk.pack(); // {palette, bits, words, light}: typed arrays that own their buffers
-postMessage(packed, [packed.palette.buffer, packed.words.buffer]); // add light.buffer when light is a Uint8Array
+postMessage(packed, { transfer: [packed.palette.buffer, packed.words.buffer] }); // add light.buffer when light is a Uint8Array
 // On the main thread:
+const worker = new Worker(new URL('./chunks.js', import.meta.url), { type: 'module' });
 worker.onmessage = ({ data }) => world.addChunk(0, 1, 0, VoxelChunk.unpack(data));
 ```
 
@@ -68,13 +69,14 @@ worker.onmessage = ({ data }) => world.addChunk(0, 1, 0, VoxelChunk.unpack(data)
   whole, not by a cost.
 
 ```ts
-import { connectStairs, doubleSlabState, slabState, stairState, waterlogState } from 'margoengine/voxel';
-import type {VoxelWorld} from 'margoengine/voxel';
-declare const world: VoxelWorld;
+import { BlockTypes, VoxelWorld, connectStairs, doubleSlabState, slabState, stairState, waterlogState } from 'margoengine/voxel';
 declare const x: number;
 declare const y: number;
 declare const z: number;
 
+const blocks = new BlockTypes();
+const world = new VoxelWorld({ blocks });
+const stone = 0, planks = 1; // texture layers
 const water = blocks.define('water', { shape: 'liquid', liquid: true, solid: false, layer: 'translucent' });
 const slab = blocks.define('stone_slab', { shape: 'slab', textures: stone, waterlog: water });
 const stairs = blocks.define('oak_stairs', { shape: 'stair', textures: planks, waterlog: 'water' });
@@ -100,10 +102,9 @@ Ray casts for picking (`engine.pick` does not see voxels), swept boxes for anyth
 player body.
 
 ```ts
+import { BlockTypes, VoxelWorld } from 'margoengine/voxel';
 import { raycastVoxels, sweepBox, VoxelCharacter } from 'margoengine/voxel/query';
 import {Engine} from 'margoengine/core';
-import type {VoxelWorld} from 'margoengine/voxel';
-declare const world: VoxelWorld;
 declare const vx: number;
 declare const dt: number;
 declare const vy: number;
@@ -113,16 +114,22 @@ declare const forwardZ: number;
 declare const sprint: boolean;
 const engine = await Engine.create(document.querySelector('canvas')!);
 
+const blocks = new BlockTypes();
+const stone = blocks.define('stone');
+const world = new VoxelWorld({ blocks });
+const eye: [number, number, number] = [0.5, 81.6, 0.5], forward: [number, number, number] = [0, 0, -1];
 const hit = raycastVoxels(world, eye, forward, 8); // {cell, normal, adjacent, point, distance, state} or null
 if (hit) world.setBlock(...hit.adjacent, stone); // place against the face; setBlock(...hit.cell, 0) breaks it
 raycastVoxels(world, eye, forward, 8, (state, type) => type.liquid); // pick water instead
 
 // An item or a mob: never tunnels, whatever the speed.
+const box = { min: { x: 0, y: 80, z: 0 }, max: { x: 1, y: 81, z: 1 } };
 const { position, hit: axes, onGround } = sweepBox(world, box, [vx * dt, vy * dt, vz * dt]); // box: {min, max}, a Box3
 
 const player = new VoxelCharacter(world, { stepHeight: 0.6, speeds: { walk: 4.317 } });
 player.position = [0.5, 80, 0.5]; // feet; assign again to teleport
 player.flying = false;
+const jump = false, descend = false;
 engine.onFrame((_, dt) => {
   player.update(dt, { direction: [forwardX, 0, forwardZ], jump, descend, sprint });
   const [x, y, z] = player.renderPosition; // interpolated between fixed steps: smooth at any refresh rate
@@ -166,26 +173,35 @@ largest possible chunk (262,148 bytes), and anything malformed throws a `RangeEr
 ```ts
 import { encodeChunk, decodeChunk, encodeBlockChanges, applyBlockChanges, EntityCodec } from 'margoengine/voxel/codec';
 import { IndexedDBChunkStore, MemoryChunkStore } from 'margoengine/voxel/stream';
-import type {VoxelWorld} from 'margoengine/voxel';
-declare const world: VoxelWorld;
+import { BlockTypes, VoxelChunk, VoxelWorld } from 'margoengine/voxel';
 declare const cx: number;
 declare const cy: number;
 declare const cz: number;
 
+const blocks = new BlockTypes();
+const world = new VoxelWorld({ blocks }), otherWorld = new VoxelWorld({ blocks });
+const chunk = new VoxelChunk(blocks.define('stone'));
+const socket = new WebSocket('wss://game.example/world');
 const bytes = await encodeChunk(chunk); // deflate-raw by default; {light: false}, {compress: false}
 world.addChunk(cx, cy, cz, await decodeChunk(bytes));
 
-const edits = [];
+const edits: number[] = [];
 world.onChange((x, y, z, state) => edits.push(x, y, z, state));
-socket.send(encodeBlockChanges(edits)); // sorted, last state per cell, typically 2-4 bytes per change
-applyBlockChanges(otherWorld, message); // all or nothing, through setBlocks (dirty marking, change events)
+const changes = encodeBlockChanges(edits); // sorted, last state per cell, typically 2-4 bytes per change
+socket.send(changes);
+applyBlockChanges(otherWorld, changes); // all or nothing, through setBlocks (dirty marking, change events)
 
 const codec = new EntityCodec({ position: 'position', rotation: 'rotation', health: 'u8', anim: 'u16' });
-socket.send(codec.encode(players, acked)); // Maps of u32 id -> entity; only what changed since `acked`
+const hero = { position: [0, 64, 0] as [number, number, number], rotation: [0, 0, 0, 1] as [number, number, number, number], health: 20, anim: 0 };
+const players = new Map([[1, hero]]);
+const acked = new Map(), received = new Map();
+const message = codec.encode(players, acked); // Maps of u32 id -> entity; only what changed since `acked`
+socket.send(message);
 const state = codec.decode(message, received); // `received`: the receiver's copy of `acked`
 // A server sending one tick to many receivers quantizes each entity once; encode writes the same bytes from it.
 const ready = new Map([...players].map(([id, p]) => [id, codec.prepare(p, id)]));
-for (const client of clients) client.send(codec.encode(nearby(client, ready), client.lastSent));
+const clients = [{ socket, lastSent: new Map() }];
+for (const client of clients) client.socket.send(codec.encode(ready, client.lastSent));
 
 const store = new IndexedDBChunkStore('world-1'); // or new MemoryChunkStore()
 store.put(cx, cy, cz, chunk); // copies the chunk now; puts in one task share one transaction
@@ -221,10 +237,12 @@ bytes each. 1,000 entities: 17,940 bytes in full, 1,796 when 30% moved.
 that pulls vertices from a storage buffer. It is pure and synchronous (phase 3 runs it in workers).
 
 ```ts
+import { BlockTypes, VoxelWorld } from 'margoengine/voxel';
 import { meshChunk, meshInput, decodeQuad, blockMaterials, QUAD_WORDS } from 'margoengine/voxel/mesher';
-import type {VoxelWorld} from 'margoengine/voxel';
-declare const world: VoxelWorld;
 
+const blocks = new BlockTypes();
+const world = new VoxelWorld({ blocks });
+world.setBlock(0, 64, 0, blocks.define('stone'));
 for (const key of world.dirty) {
   const input = meshInput(world, key); // {chunk: packed, shell, light, blocks}; undefined for a removed chunk
   world.dirty.delete(key);
@@ -324,10 +342,12 @@ removed over a 30-deep room (70,000 cells) about 5,400-7,600 cells/ms, put back 
 ## MagicaVoxel `.vox` files (`@margoengine/voxel/vox`)
 
 ```ts
+import { BlockTypes, VoxelWorld } from 'margoengine/voxel';
 import { parseVox, writeVox, pasteVoxModel, readVoxRenderDictionaries } from 'margoengine/voxel/vox';
-import type {VoxelWorld} from 'margoengine/voxel';
-declare const world: VoxelWorld;
 
+const blocks = new BlockTypes();
+const stone = blocks.define('stone');
+const world = new VoxelWorld({ blocks });
 const scene = parseVox(new Uint8Array(await (await fetch('castle.vox')).arrayBuffer()));
 scene.models[0].size; // [x, y, z], MagicaVoxel z up; voxels: Uint8Array of x, y, z, palette index
 scene.palette; // 256 RGBA8 colours, palette index i at 4 * i
@@ -335,6 +355,7 @@ scene.nodes; // transform / group / shape nodes; transform frames have rotation 
 scene.materials[0].rough; // MATL: type, weight, rough, spec, ior, att, flux, plastic (+ attributes Map)
 
 pasteVoxModel(world, scene, [0, 64, 0]); // every visible shape; colours become 'vox:rrggbb' block types
+const mapping = new Array<number>(256).fill(stone);
 pasteVoxModel(world, scene.models[2], [10, 64, 0], mapping); // one model: mapping[paletteIndex] = block state
 
 const node = scene.nodes[2];
@@ -388,6 +409,9 @@ Rapier colliders for the chunks near moving bodies, so mobs, item drops, debris 
 peer: only this entry uses it) with `@dimforge/rapier3d-compat` 0.17.1 or newer.
 
 ```ts
+import RAPIER from '@dimforge/rapier3d-compat';
+import { sphereGeometry } from 'margoengine/geometry';
+import { PbrMaterial, createMesh } from 'margoengine/materials';
 import { Physics } from 'margoengine/physics';
 import { VoxelPhysics } from 'margoengine/voxel/physics';
 import {Engine} from 'margoengine/core';
@@ -400,6 +424,8 @@ declare const y: number;
 declare const z: number;
 const engine = await Engine.create(document.querySelector('canvas')!);
 
+await RAPIER.init();
+const ball = createMesh(engine, sphereGeometry(0.5, 16, 8), new PbrMaterial()).root;
 const physics = Physics.attach(engine, { rapier: RAPIER });
 const voxels = new VoxelPhysics(physics, world, { radius: 1, budget: 2 });
 physics.addBody(mesh, { colliders: { shape: 'box' } }); // lands on the blocks
@@ -493,10 +519,17 @@ queue. The worker script ships as `dist/workers/mesher.js`, a classic script wit
 that your bundler copies as an asset.
 
 ```ts
+import { BlockTypes, VoxelWorld } from 'margoengine/voxel';
 import { VoxelMesher } from 'margoengine/voxel/mesher';
-import type {VoxelWorld} from 'margoengine/voxel';
-declare const world: VoxelWorld;
 
+const world = new VoxelWorld({ blocks: new BlockTypes() });
+const camera = { position: [0, 80, 0] as [number, number, number] };
+const distanceToCamera = (key: string) => {
+  const [cx, cy, cz] = key.split(',').map((part) => Number(part) * 32);
+  return Math.hypot(cx - camera.position[0], cy - camera.position[1], cz - camera.position[2]);
+};
+const meshes = new Map<string, unknown>();
+const upload = (key: string, mesh: unknown) => meshes.set(key, mesh); // your GPU upload
 const mesher = new VoxelMesher(); // {workers}: default half the logical cores minus one, 1 to 4
 mesher.warm(); // optional: start the workers now, so their code is not fetched beside the first chunks
 for (const key of world.dirty) {
@@ -505,7 +538,7 @@ for (const key of world.dirty) {
     if (mesh) upload(key, mesh); // null: cancelled, superseded, or the chunk is gone (world.getChunk tells which)
   });
 }
-mesher.cancel(key); // the pending job of one chunk resolves null
+mesher.cancel('0,2,0'); // the pending job of one chunk resolves null
 mesher.dispose(); // every pending job resolves null; the workers stop
 ```
 
@@ -546,8 +579,9 @@ const streamer = VoxelStreamer.attach(engine, {
   distance: 8, // chunks in x and z (256 blocks); verticalDistance: 4
   frameBudget: 0.5, // main-thread ms per update for chunks joining the world (and chunksPerFrame: 8)
 });
+const otherPlayer = { position: [64, 80, 0] as [number, number, number] };
 streamer.viewers.push(otherPlayer.position); // more positions to load around, in blocks
-if (streamer.pending === 0) hideLoadingScreen(); // chunks in range not loaded yet
+if (streamer.pending === 0) document.querySelector('#loading')?.remove(); // chunks in range not loaded yet
 addEventListener('pagehide', () => streamer.save()); // edits of loaded chunks; unloads save their own
 await streamer.dispose(); // saves, flushes the store, stops the workers; the chunks stay in the world
 ```
@@ -631,14 +665,16 @@ builder and shader are in `./bevel` (2,201 B) and baked light in `./lightmap` (2
 ```ts
 import { BlockTextures, VoxelRenderer } from 'margoengine/voxel/render';
 import { VoxelLighting } from 'margoengine/voxel/light';
+import { BlockTypes, VoxelWorld } from 'margoengine/voxel';
 import {Engine} from 'margoengine/core';
-import type {VoxelWorld} from 'margoengine/voxel';
-declare const world: VoxelWorld;
 declare const x: number;
 declare const y: number;
 declare const z: number;
 const canvas = document.querySelector('canvas')!;
 const engine = await Engine.create(canvas);
+const blocks = new BlockTypes();
+const stone = blocks.define('stone');
+const world = new VoxelWorld({ blocks });
 
 const textures = await BlockTextures.load(['stone.png', 'dirt.png', 'grass-top.png', 'grass-side.png']); // layers 0-3
 // or BlockTextures.fromAtlas(image, { size: 16 }), or new BlockTextures({ images: [canvas, bitmap, ...] })
@@ -723,13 +759,20 @@ machine not quiet): the render-distance-16 world above spawns in 0.63 s; its vox
 ```ts
 import { Shadows } from 'margoengine/shadows';
 import { Clustered } from 'margoengine/clustered';
-import { EnvironmentLighting, Fog } from 'margoengine/environment';
+import { Environment, EnvironmentLighting, Fog, loadEnvironmentImage } from 'margoengine/environment';
+import { Sky } from 'margoengine/sky';
+import { BlockTypes, VoxelWorld } from 'margoengine/voxel';
+import { BlockTextures, VoxelRenderer } from 'margoengine/voxel/render';
 import {Engine} from 'margoengine/core';
 declare const x: number;
 declare const y: number;
 declare const z: number;
 const engine = await Engine.create(document.querySelector('canvas')!);
 
+const world = new VoxelWorld({ blocks: new BlockTypes() });
+const voxels = VoxelRenderer.attach(engine, { world, textures: await BlockTextures.load(['stone.png']) });
+const sky = Sky.attach(engine);
+const environment = EnvironmentLighting.attach(engine, await Environment.attach(engine, await loadEnvironmentImage('/studio.hdr')));
 const shadows = Shadows.attach(engine, { distance: 96, cascades: 2 });
 shadows.add(voxels, { static: true }); // casts (opaque and cutout) and receives; the map is redrawn only on change
 const lights = Clustered.attach(engine);
@@ -789,8 +832,26 @@ quads (a chamfer has no lowered liquid top). Translucent chamfers and quads of a
 front, within the same distance and per-frame budget as quads. Without `bevel` nothing changes.
 
 ```ts
+import { Engine } from 'margoengine/core';
+import { bakeLightmap } from 'margoengine/lightmap';
+import { BlockTypes, VoxelWorld } from 'margoengine/voxel';
 import { voxelLightmap } from 'margoengine/voxel/lightmap';
+import { BlockTextures, VoxelRenderer } from 'margoengine/voxel/render';
 
+const engine = await Engine.create(document.querySelector('canvas')!);
+const world = new VoxelWorld({ blocks: new BlockTypes() });
+const voxels = VoxelRenderer.attach(engine, { world, textures: await BlockTextures.load(['stone.png']) });
+const positions = new Float32Array([0, 0, 0, 4, 0, 0, 4, 0, 4, 0, 0, 4]);
+const atlas = await bakeLightmap(
+  { positions, albedo: new Float32Array([0.8, 0.8, 0.8, 1]) },
+  { texelsPerUnit: 4, lights: [{ type: 'directional', direction: [0.3, 1, 0.2], intensity: 2 }] },
+);
+const texture = engine.gpu!.createTexture({
+  size: [atlas.width, atlas.height],
+  format: 'rgba8unorm',
+  usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+});
+engine.gpu!.queue.writeTexture({ texture }, atlas.textures.lightmap, { bytesPerRow: atlas.width * 4 }, [atlas.width, atlas.height]);
 voxels.lightmap = voxelLightmap({ texture, positions, uv: atlas.uv, scale: atlas.lightmapScale, radiometry: 'physical' });
 voxels.lightmap = undefined; // live lighting again
 ```

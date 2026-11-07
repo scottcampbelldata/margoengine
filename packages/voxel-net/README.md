@@ -10,7 +10,10 @@ Design and decisions: [DESIGN.md](DESIGN.md). Measured capacity: [bench/results.
 
 ```ts
 // Server (Node)
+import { BlockTypes, VoxelWorld } from 'margoengine/voxel';
 import { VoxelServer } from 'margoengine/voxel-net/server';
+const blocks = new BlockTypes();
+blocks.define('stone');
 const server = new VoxelServer({ blocks, generator: { seed: 7 }, flight: true });
 await server.listen(8787, '0.0.0.0');
 
@@ -23,6 +26,8 @@ declare const x: number;
 declare const y: number;
 declare const z: number;
 const engine = await Engine.create(document.querySelector('canvas')!);
+const world = new VoxelWorld({ blocks });
+const drawBox = (...pose: unknown[]) => console.log(...pose); // your renderer
 const client = connectVoxelNet('ws://127.0.0.1:8787', world, { name: 'Ada', view: 6 });
 engine.onFrame((_, dt) => {
   client.update(dt, { keys: Keys.forward | Keys.jump, yaw, pitch }); // moves client.player at 1/120 s steps

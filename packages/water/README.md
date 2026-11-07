@@ -24,6 +24,8 @@ surfaces. Use a size that keeps the shoreline and terrain map within 37.5% of
 `size` of the camera, where the cells are regular.
 
 ```ts
+import {Bloom} from 'margoengine/post/bloom';
+import {Sky} from 'margoengine/sky';
 import {Water} from 'margoengine/water';
 import {Engine} from 'margoengine/core';
 const engine = await Engine.create(document.querySelector('canvas')!);
@@ -41,6 +43,7 @@ Directions are XZ, dimensions/amplitudes are world units, wavelengths are positi
 For the sandbox optics, connect the optional packages:
 
 ```ts
+const bloom = Bloom.attach(engine), sky = Sky.attach(engine);
 Water.attach(engine, {
   depth: () => bloom.depthTexture,
   sceneColor: () => bloom.sceneTexture,
@@ -178,8 +181,10 @@ same colour. Water does not import environment. `fog.enabled = false` clears it 
 
 ```ts
 import {Fog} from 'margoengine/environment';
+import {Water} from 'margoengine/water';
 import {Engine} from 'margoengine/core';
 const engine = await Engine.create(document.querySelector('canvas')!);
+const water = Water.attach(engine, {size: [512, 512]});
 const fog = Fog.attach(engine, {color: '#8090a0', density: 0.02});
 water.setFog(fog);
 ```

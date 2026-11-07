@@ -34,6 +34,7 @@ const scene: VoxelTraceScene = {
 };
 const tracer = VoxelPathTracer.attach(engine, { scene, maxSamples: 512, denoise: true });
 await tracer.ready; // until then frames show the ordinary raster image
+const nextScene = {...scene, revision: 2};
 tracer.setScene(nextScene); // validated as a whole; accumulation restarts
 const png = await tracer.capture({ width: 3840, height: 2160, samples: 1024, signal });
 tracer.enabled = false; // back to the raster frame, bit for bit

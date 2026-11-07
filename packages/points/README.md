@@ -17,6 +17,7 @@ const engine = await Engine.create(canvas);
 const points = PointsPlugin.attach(engine, {pointBudget: 2_000_000});
 
 // Any {positions, colors?, normals?} works, including the point-cloud output of @margoengine/loaders.
+const positions = new Float32Array(30_000).map(() => Math.random() * 10), colors = new Float32Array(30_000).fill(1);
 const cloud = points.add(new PointCloud({
   positions,                       // Float32Array, xyz per point (used in place)
   colors,                          // RGB or RGBA, floats 0..1 or a Uint8Array 0..255
@@ -25,9 +26,11 @@ const cloud = points.add(new PointCloud({
 cloud.attach(mesh);                // follow a core mesh's world matrix
 
 // Change 100 points: only those 1200 bytes are written to the GPU.
+const newXyz = new Float32Array(300).map(() => Math.random() * 10);
 cloud.updatePositions(5000, newXyz);
 
 // Thousands of camera-facing sprites in one draw call.
+const atlasImage = await (await fetch('/labels.png')).blob();
 const labels = points.add(new SpriteBatch({material: {map: await createImageBitmap(atlasImage)}}));
 labels.add({position: [0, 2, 0], size: 0.5, uv: atlasRect(3, 4, 4)});
 
@@ -150,8 +153,12 @@ painting it in the fog colour. Points does not import environment. `fog.enabled 
 
 ```ts
 import {Fog} from 'margoengine/environment';
+import {PointsPlugin, SpriteBatch} from 'margoengine/points';
 import {Engine} from 'margoengine/core';
 const engine = await Engine.create(document.querySelector('canvas')!);
+const points = PointsPlugin.attach(engine);
+const atlas = await createImageBitmap(await (await fetch('/labels.png')).blob());
+const labels = points.add(new SpriteBatch({material: {map: atlas}}));
 points.setFog(Fog.attach(engine, {color: '#8090a0', density: 0.03}));
 labels.material.fog = false; // keep this batch clear
 ```

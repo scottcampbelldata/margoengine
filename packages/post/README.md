@@ -12,14 +12,13 @@ its offscreen PNGs, so exports match what is on screen.
 ```js
 import { ImagePost } from 'margoengine/post/image';
 import {Engine} from 'margoengine/core';
-declare const width: number;
-declare const height: number;
-declare const samples: number;
-declare const signal: AbortSignal;
+const width = 64, height = 64, signal = AbortSignal.timeout(30_000);
 const engine = await Engine.create(document.querySelector('canvas')!);
 
 const post = ImagePost.attach(engine, { bloom: { strength: 0.8, threshold: 1, radius: 0.5 } });
-const png = await post.capture(await tracer.renderImage({ width, height, samples }), { signal });
+// Any linear image: RGB floats, as the voxel path tracer's renderImage gives.
+const image = { width, height, color: new Float32Array(width * height * 3).fill(0.5) };
+const png = await post.capture(image, { signal });
 ```
 
 Options: `bloom` (strength, threshold, radius), `toneMapping` (`'neutral'` by default, `'linear'` or

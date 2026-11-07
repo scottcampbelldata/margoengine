@@ -64,3 +64,34 @@ export const previous = storage(1, 'u32', {atomic: true}).atomicAdd(0, 1);
     '',
   );
 });
+
+test('regression: a block keeps the type of the Var it returns', () => {
+  assert.equal(
+    errors(
+      'block',
+      `import { NodeMaterial, Var, block, vec3 } from '@margoengine/shader';
+const march = block(() => {
+  const light = Var(vec3(0)), depth = Var(0);
+  depth.addAssign(0.01);
+  return light;
+});
+export const material = new NodeMaterial({ colorNode: march });
+`,
+    ),
+    '',
+  );
+});
+
+test('regression: voxel messages are bytes a WebSocket takes', () => {
+  assert.equal(
+    errors(
+      'voxel-bytes',
+      `import { EntityCodec, encodeBlockChanges } from '@margoengine/voxel/codec';
+declare const socket: WebSocket;
+socket.send(encodeBlockChanges([0, 0, 0, 1]));
+socket.send(new EntityCodec({ health: 'u8' }).encode(new Map([[1, { health: 20 }]])));
+`,
+    ),
+    '',
+  );
+});

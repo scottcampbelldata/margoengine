@@ -9,8 +9,10 @@ import it, and `BiomeWorld` never loads it. The PNG writer is in the package (st
 `compress: true` through `CompressionStream`), with no other code behind it and no dependency.
 
 ```js
+import { BiomeWorld } from '@margoengine/biomes';
 import { exportHeight, exportWeights, exportMasks, exportLayer, saveWorld, loadWorld } from '@margoengine/biomes/io';
 
+const world = await BiomeWorld.create();
 const height = await exportHeight(world, 'png16'); // or 'raw16' (little-endian) or 'f32' (metres)
 // height.data is the file; height.min and height.max (metres) map to 0 and 65535 in the 16-bit files
 const { biomes, planes, splats } = await exportWeights(world); // one 0..255 plane per biome; RGBA PNGs of four biomes each

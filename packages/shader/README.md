@@ -47,10 +47,11 @@ Cut-outs and slicing with `discard(condition, value)`, GPU counters and compacti
 
 ```ts
 import {NodeMaterial, ComputePass, storage, discard, texture, materialColor, positionWorld, uniform, select, uint} from 'margoengine/shader';
+import {loadTexture} from 'margoengine/materials';
 import {createStage} from 'margoengine';
-declare const n: number;
+const n = 1024;
 const stage = await createStage('#viewport', {backend: 'webgpu'});
-const slice = uniform(1.5);
+const slice = uniform(1.5), leaf = await loadTexture('/leaf.png'), radii = new Float32Array(n).fill(0.2);
 new NodeMaterial({colorNode: discard(texture(leaf).a.lessThan(0.5), texture(leaf))});          // alpha cut-out
 new NodeMaterial({colorNode: discard(positionWorld.y.greaterThan(slice), materialColor)});   // section the part at y = slice
 
@@ -67,9 +68,11 @@ Statements: variables that change, branches that run one side only, loops that l
 
 ```ts
 import {block, If, Loop, Break, Var, NodeMaterial, ComputePass, storage, texture, uv, vec3, uint} from 'margoengine/shader';
+import {loadTexture} from 'margoengine/materials';
 import {createStage} from 'margoengine';
-declare const n: number;
+const n = 1024;
 const stage = await createStage('#viewport', {backend: 'webgpu'});
+const fog = await loadTexture('/fog.png');
 const march = block(() => {
   const light = Var(vec3(0)), depth = Var(0);                          // Var(0, 'u32') for other types
   Loop(64, () => {
@@ -280,6 +283,7 @@ import {storage, uint} from 'margoengine/shader';
 import {computeReadback} from 'margoengine/shader/readback';
 import {createStage} from 'margoengine';
 const stage = await createStage('#viewport', {backend: 'webgpu'});
+const cells = new Uint32Array(1024);
 const source = storage(Uint32Array.from(cells), 'u32'), output = storage(cells.length, 'u32');
 const controller = new AbortController();
 const {data} = await computeReadback(stage.engine, cells.length, i => output.store(i, source.element(i).add(uint(1))), output, {
@@ -571,6 +575,7 @@ In `lightingNode`, `normalWorld` is the shading normal, after normal maps and `n
 import {ComputePass, Loop, If, Var, globalId, localIndex, storage, uint, workgroup, workgroupBarrier} from 'margoengine/shader';
 import {createStage} from 'margoengine';
 const stage = await createStage('#viewport', {backend: 'webgpu'});
+const values = new Uint32Array(1024).fill(1);
 const input = storage(Uint32Array.from(values), 'u32'), sums = storage(values.length, 'u32');
 const tile = workgroup(256, 'u32');
 ComputePass.attach(stage.engine, values.length, i => {         // values.length: a multiple of 256, as it has barriers
@@ -689,9 +694,13 @@ scene's colour and depth. Raw meshes also cast shadows, write SSAO's G-buffer, a
 
 ```ts
 import {RawShaders, RawShaderMaterial, RawMesh} from 'margoengine/shader/raw';
+import {loadTexture} from 'margoengine/materials';
 import {createStage} from 'margoengine';
 const stage = await createStage('#viewport', {backend: 'webgpu'});
 const raw = RawShaders.attach(stage.engine);
+const texture = await loadTexture('/map.png');
+const positions = new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]), colors = new Float32Array(9).fill(1), uvs = new Float32Array(6);
+const indices = new Uint16Array([0, 1, 2]), offsets = new Float32Array(15 * 3);
 const material = new RawShaderMaterial({
   vertexShader: `
 struct Out { @builtin(position) clip:vec4f, @location(0) color:vec3f, @location(1) uv:vec2f }

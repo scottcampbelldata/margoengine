@@ -71,19 +71,25 @@ of jitter at any distance up to 6,000 km ([docs/large-coordinates.md](../../docs
 
 ```ts
 import {FloatingOrigin} from 'margoengine/cameras/origin';
+import {Raycaster} from 'margoengine/bvh';
 import {Engine} from 'margoengine/core';
+import {boxGeometry} from 'margoengine/geometry';
+import {Material, createMesh} from 'margoengine/materials';
 declare const x: number;
 declare const y: number;
 const engine = await Engine.create(document.querySelector('canvas')!);
 
+const material = new Material({color: '#8d99a6', doubleSided: true});
+const flange = createMesh(engine, boxGeometry(0.4, 0.4, 0.05), material).root;
 const origin = FloatingOrigin.attach(engine);          // default ratio 1000
 origin.place(flange, [2_880_000.12, 3_600_000.65, 3_840_000.31]); // float64 world metres; root meshes or model.root
 origin.lookAt([2_880_000.15, 3_600_000.68, 3_840_000.35], [2_880_000.12, 3_600_000.65, 3_840_000.31]);
 origin.worldPosition(flange);                          // float64 back
 const hit = new Raycaster().setFromEngine(engine, x, y).intersectEngine(engine)[0];
 origin.toWorld(hit.point);                             // pick point in float64 world coordinates
-section.options.planes = [origin.toLocalPlane([0, 0, 1, -3_840_000.31])];
-origin.onRebase(() => { section.options.planes = [origin.toLocalPlane(worldPlane)]; });
+const worldPlane: [number, number, number, number] = [0, 0, 1, -3_840_000.31];
+material.clippingPlanes = [origin.toLocalPlane(worldPlane)];
+origin.onRebase(() => { material.clippingPlanes = [origin.toLocalPlane(worldPlane)]; });
 ```
 
 - **Local coordinates.** While attached, the camera, controls (`OrbitControls`, `CADCameraControls`, any that read
@@ -112,10 +118,14 @@ mask shares a bit with its own. Core does the filtering while it collects instan
 
 ```ts
 import {ALL_LAYERS, layerMask, setCameraLayers, setRenderLayers, withLayers} from 'margoengine/cameras/layers';
+import {Reflector} from 'margoengine/environment/reflector';
+import {loadGLTF} from 'margoengine/gltf-pro';
 import {Engine, type Camera} from 'margoengine/core';
 declare const top: Camera;
 const engine = await Engine.create(document.querySelector('canvas')!);
 
+const helpers = await loadGLTF(engine, '/helpers.glb');
+const mirror = Reflector.attach(engine, {width: 4, height: 3});
 setRenderLayers(helpers.root, layerMask(1));      // a model by its root: children without a mask follow it
 setCameraLayers(engine.camera, layerMask(0));     // the engine camera now skips the helpers
 engine.views = [
@@ -154,10 +164,11 @@ const engine = await Engine.create(canvas);
 
 const projection = CameraProjection.attach(engine, {mode: 'perspective'});
 // A 8192 x 4608 screenshot from 2048 x 1152 tiles: size the canvas to a tile, then render each rectangle.
+const picture = new OffscreenCanvas(8192, 4608).getContext('2d')!;
 for (const t of tileOffsets(8192, 4608, 2048, 1152)) {
   projection.setViewOffset(t.fullWidth, t.fullHeight, t.x, t.y, t.width, t.height);
   engine.render();
-  await copyTile(t, canvas); // read the pixels into your big image at (t.x, t.y)
+  picture.drawImage(canvas, t.x, t.y); // into the big image at (t.x, t.y)
 }
 projection.clearViewOffset();
 ```
@@ -211,7 +222,8 @@ const engine = await Engine.create(document.querySelector('canvas')!);
 // A 1.2 x 0.7 m monitor standing on the desk at the origin, facing +z; corners counter clockwise from the viewer.
 const screen: Screen = {lowerLeft: [-0.6, 0, 0], lowerRight: [0.6, 0, 0], upperLeft: [-0.6, 0.7, 0]};
 const window = OffAxisProjection.attach(engine, screen, [0, 0.4, 0.8]);
-tracker.onmove = (head) => window.setEye(head);     // world metres; the screen stays a window onto the scene
+// The viewer's head in world metres, here from the pointer; the screen stays a window onto the scene.
+addEventListener('pointermove', (event) => window.setEye([event.clientX / innerWidth - 0.5, 0.4, 0.8]));
 
 offAxisFrustum(screen, [0, 0.4, 0.8], 0.1);         // {left, right, bottom, top, xAxis, yAxis, normal, distance}
 
@@ -239,14 +251,19 @@ Aperture, shutter time and ISO set the exposure, the depth of field and the moti
 
 ```ts
 import {DOF} from 'margoengine/dof';
-import {MotionBlur} from 'margoengine/post';
+import {PostStack} from 'margoengine/post';
+import {MotionBlur} from 'margoengine/post/motion-blur';
+import {TAA} from 'margoengine/taa';
 import {Tonemap} from 'margoengine/tonemap';
 import {PhysicalCamera} from 'margoengine/cameras/physical';
 import {Engine} from 'margoengine/core';
 const engine = await Engine.create(document.querySelector('canvas')!);
 
+const dof = DOF.attach(engine), tonemap = Tonemap.attach(engine);
+const taa = TAA.attach(engine), motionBlur = new MotionBlur({velocity: () => taa.velocity});
+PostStack.attach(engine, [motionBlur]);
 const camera = new PhysicalCamera({focalLength: 85, aperture: 1.8, shutter: 1 / 120, iso: 200, focusDistance: 3});
-camera.apply({dof, motionBlur, exposure: tonemap, camera: engine.camera, aspect: 16 / 9}); // your DOF, MotionBlur and Tonemap effects
+camera.apply({dof, motionBlur, exposure: tonemap, camera: engine.camera, aspect: 16 / 9});
 camera.aperture = 5.6;                  // stops down: darker, deeper focus
 camera.apply({dof, motionBlur, exposure: tonemap});
 camera.exposure;                        // stops against the reference: -1 at f/5.6, 1/120 s, ISO 200

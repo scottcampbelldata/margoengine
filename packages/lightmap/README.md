@@ -10,12 +10,15 @@ tree-shakable, core and the stage never import it.
 ```ts
 import { bakeLightmap } from 'margoengine/lightmap';
 
+const positions = new Float32Array([0, 0, 0, 4, 0, 0, 4, 0, 4, 0, 0, 4]);
+const albedo = new Float32Array([0.8, 0.8, 0.8, 1]);
+const abort = new AbortController();
 const atlas = await bakeLightmap(
   { positions, albedo }, // 12 floats per quad (p0, p1, p2, p3), RGBA per quad
   {
     texelsPerUnit: 4,
     lights: [{ type: 'directional', direction: [0.3, 1, 0.2], intensity: 2 }],
-    onProgress: (done, total) => progress.update(done / total),
+    onProgress: (done, total) => console.log(done / total),
     signal: abort.signal,
   },
 );

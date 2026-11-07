@@ -9,7 +9,7 @@ import { ColorInput, Quat } from "@margoengine/math";
 export class EntityCodec<const S extends Readonly<Record<string, EntityField>>> {
     constructor(schema: S);
     prepare(entity: EntityState<S>, id?: number): PreparedEntity;
-    encode(entities: ReadonlyMap<number, EntityState<S> | PreparedEntity>, baseline?: ReadonlyMap<number, EntityState<S> | PreparedEntity>): Uint8Array;
+    encode(entities: ReadonlyMap<number, EntityState<S> | PreparedEntity>, baseline?: ReadonlyMap<number, EntityState<S> | PreparedEntity>): Uint8Array<ArrayBuffer>;
     decode(bytes: Uint8Array, baseline?: ReadonlyMap<number, EntityState<S>>): Map<number, EntityState<S>>;
 }
 
@@ -29,7 +29,7 @@ export function decodeBlockChanges(bytes: Uint8Array): Int32Array;
 
 export function decodeChunk(bytes: Uint8Array): Promise<VoxelChunk>;
 
-export function encodeBlockChanges(changes: ArrayLike<number>): Uint8Array;
+export function encodeBlockChanges(changes: ArrayLike<number>): Uint8Array<ArrayBuffer>;
 
 export function encodeChunk(chunk: VoxelChunk, options?: {
     light?: boolean;

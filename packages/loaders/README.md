@@ -25,6 +25,7 @@ const model = await load('/parts/bracket.3mf', parse3MF, {signal, maxBytes: 64 <
 const {meshes, dispose} = createMeshes(engine, model);   // one mesh + PbrMaterial per object color
 
 // Or parse bytes you already have and build a core Geometry yourself.
+const file = await fetch('/scans/part.ply');
 const scan = parsePLY(await file.arrayBuffer());
 mesh.setGeometry(toGeometry(scan, {normals: 'smooth'}));
 ```
@@ -204,9 +205,9 @@ Parsers stay pure and return plain data. Files a model refers to come through a 
 
 ```ts
 // Electron (main or preload): read next to the model.
-const resolveFromDisk = (path) => fs.promises.readFile(join(dirname(file), path));
+const resolveFromDisk = (path: string) => fs.promises.readFile(join(dirname(file), path));
 // Browser: fetch next to the model.
-const resolve = async (path) => new Uint8Array(await (await fetch(new URL(path, modelUrl))).arrayBuffer());
+const resolve = async (path: string) => new Uint8Array(await (await fetch(new URL(path, modelUrl))).arrayBuffer());
 ```
 
 ## OBJ and MTL
@@ -246,6 +247,8 @@ import {Engine} from 'margoengine/core';
 const engine = await Engine.create(document.querySelector('canvas')!);
 declare const bytes: Uint8Array;
 
+const objUrl = '/models/crate.obj';
+const resolve = async (path: string) => new Uint8Array(await (await fetch(new URL(path, new URL(objUrl, location.href)))).arrayBuffer());
 const obj = await parseOBJ(bytes, {resolve});
 const set = await createMTLMaterials(obj.materials, {baseUrl: objUrl, bump: 'normal'});
 const mesh = createOBJMesh(engine, obj, set); // one mesh, one material slot per usemtl material
@@ -504,7 +507,7 @@ import { parse3MFMaterials } from '@margoengine/loaders/threemf-materials';
 
 const bytes = await (await fetch('/prints/lithophane.3mf')).arrayBuffer();
 const { groups, textures, uvs } = await parse3MFMaterials(bytes);
-const image = await createImageBitmap(new Blob([textures[groups[0].texture ?? 0].data]));
+const image = await createImageBitmap(new Blob([textures[groups[0].texture ?? 0].data.slice()]));
 console.log(image.width, uvs?.length);
 ```
 
@@ -737,6 +740,7 @@ console.log(robot.name, robot.attributes.name, robot.children.length); // robot 
 `tmxLayerQuads(map, layer, {tileSize})` turns one tile layer into a `LoadedGeometry` of quads on the XZ plane facing +Y (column along +X, row along +Z, `tileSize` world units per cell, default 1, layer offsets included), four vertices per tile with UVs from the atlas rectangle (spacing and margin honored, flips applied in Tiled's order, v = 0 at the top of the image), `faceSizes` all 4, one group per tileset and `cells` mapping each quad back to its layer cell. One object per layer, as Crocotile imports TMX:
 
 ```ts
+const resolve = async (path: string) => new Uint8Array(await (await fetch(path)).arrayBuffer());
 const map = await parseTMX(bytes, {resolve});
 for (const layer of map.layers) {
   if (layer.type !== 'tile' || !layer.visible) continue;

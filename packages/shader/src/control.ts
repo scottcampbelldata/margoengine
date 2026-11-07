@@ -192,7 +192,7 @@ export function Let<T extends Type>(value: Node<T>): Node<T> {
  * `colorNode: block(() => { const c = Var(vec3(0)); If(a, () => c.assign(b)); return c; })`.
  * @throws TypeError when the body returns no node.
  */
-export function block<T extends Type>(body: () => Node<T>): Node<T> {
+export function block<T extends Type>(body: () => Node<NoInfer<T>> & { readonly type: T }): Node<T> {
   let value: Node<T> | undefined;
   const list = record(() => {
     value = body();

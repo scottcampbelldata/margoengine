@@ -10,9 +10,17 @@ however many parts there are. WebGPU only.
 ```ts
 import {Engine, PbrMaterial} from 'margoengine/core';
 import {CulledInstances} from 'margoengine/culling';
+import {boxGeometry, toGeometry} from 'margoengine/geometry';
 const canvas = document.querySelector('canvas')!;
 
 const engine = await Engine.create(canvas);
+const plate = toGeometry(boxGeometry(1, 0.1, 1)), bolt = toGeometry(boxGeometry(0.1, 0.2, 0.1));
+const inRow = (count: number) => {
+  const matrices = new Float32Array(count * 16);
+  for (let i = 0; i < count; i++) matrices.set([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, i * 2, 0, 0, 1], i * 16);
+  return matrices;
+};
+const plateMatrices = inRow(4), boltMatrices = inRow(16);
 const parts = CulledInstances.attach(engine, [
   // One batch per (geometry, material); transforms are column-major affine world matrices, 16 floats per part.
   {geometry: plate, material: new PbrMaterial({color: '#8d99a6', metalness: 0.6}), transforms: plateMatrices},
@@ -20,7 +28,7 @@ const parts = CulledInstances.attach(engine, [
 ], {culling: 'occlusion'});
 engine.start();
 
-parts.setTransform(1, 12, matrix);   // batch 1, part 12: one 64-byte upload
+parts.setTransform(1, 12, inRow(1));   // batch 1, part 12: one 64-byte upload
 parts.setVisible(0, 3, false);        // hide a part (isolation)
 parts.culling = 'frustum';            // switch at any time
 console.log(await parts.readCounts()); // parts drawn per batch in the last frame (a GPU readback; for tests and tools)

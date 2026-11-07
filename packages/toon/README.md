@@ -18,7 +18,10 @@ For toon shading per material, on materials meshes (plain, instanced, skinned) a
 ```ts
 import {ToonMaterial, createMesh, toonModel} from 'margoengine/materials';
 import {Engine} from 'margoengine/core';
+import {sphereGeometry} from 'margoengine/geometry';
+import {loadGLTF} from 'margoengine/gltf-pro';
 const engine = await Engine.create(document.querySelector('canvas')!);
+const geometry = sphereGeometry(1, 32, 16), character = await loadGLTF(engine, '/hero.glb');
 createMesh(engine, geometry, new ToonMaterial({color: '#e07040', steps: 3}));
 toonModel(character, {steps: 4});
 ```

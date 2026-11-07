@@ -291,8 +291,14 @@ The placement object is read every frame, so poles, weight and the raycast may c
 
 ```ts
 import {Animator} from 'margoengine/animator';
+import {EngineKernel} from 'margoengine/core';
+import {loadGLTF} from 'margoengine/gltf-pro';
+import {Animation} from 'margoengine/animation';
 import {addInertialization} from 'margoengine/animator/inertialize';
 
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
+const model = await loadGLTF(engine, '/hero.glb');
+const animation = Animation.attach(model);
 const animator = Animator.attach(animation, {
   initial: 'run',
   states: {run: 'Run', stop: 'Stop'},
@@ -316,8 +322,14 @@ Clips of different lengths drift apart in a blend: at half weight a 1 s walk and
 
 ```ts
 import {Animator} from 'margoengine/animator';
+import {EngineKernel} from 'margoengine/core';
+import {loadGLTF} from 'margoengine/gltf-pro';
+import {Animation} from 'margoengine/animation';
 import {addSyncGroup} from 'margoengine/animator/sync';
 
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
+const model = await loadGLTF(engine, '/hero.glb');
+const animation = Animation.attach(model);
 const animator = Animator.attach(animation, {
   initial: 'move', parameters: {speed: 0},
   states: {
@@ -349,10 +361,14 @@ One walk cycle has to serve every speed and direction a game asks for. `addWarpi
 
 ```ts
 import {Animator, addRootMotion} from 'margoengine/animator';
+import {EngineKernel} from 'margoengine/core';
+import {loadGLTF} from 'margoengine/gltf-pro';
+import {Animation} from 'margoengine/animation';
 import {addDistanceWarp, addWarping} from 'margoengine/animator/warping';
-import type {PBRModel} from 'margoengine/gltf-pro';
-declare const model: PBRModel;
 
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
+const model = await loadGLTF(engine, '/hero.glb');
+const animation = Animation.attach(model);
 const animator = Animator.attach(animation, {initial: 'walk', states: {walk: 'Walk', stop: 'Stop'}});
 const node = (name: string) => model.asset.doc.nodes!.findIndex((n) => n.name === name);
 addRootMotion(animator, {joint: node('Hips'), apply: false}); // the game moves the character
@@ -459,8 +475,14 @@ The Animator needs one state per clip, named after it, and `motionStates(animati
 
 ```ts
 import {Animator} from 'margoengine/animator';
+import {EngineKernel} from 'margoengine/core';
+import {loadGLTF} from 'margoengine/gltf-pro';
+import {Animation} from 'margoengine/animation';
 import {addMirror, mirrorPairs} from 'margoengine/animator/mirror';
 
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
+const model = await loadGLTF(engine, '/hero.glb');
+const animation = Animation.attach(model);
 const animator = Animator.attach(animation, {initial: 'swing', states: {swing: 'SwingLeft', idle: 'Idle'}});
 const mirror = {enabled: true, states: ['swing']}; // read every frame
 const handle = addMirror(animator, mirror);
@@ -479,10 +501,14 @@ Partners come from node names: `LeftArm` and `RightArm`, `arm.L` and `arm.R`, `l
 
 ```ts
 import {Animator} from 'margoengine/animator';
+import {EngineKernel} from 'margoengine/core';
+import {loadGLTF} from 'margoengine/gltf-pro';
+import {Animation} from 'margoengine/animation';
 import {addSplineIK, type SplineIKChain} from 'margoengine/animator/spline-ik';
-import type {PBRModel} from 'margoengine/gltf-pro';
-declare const model: PBRModel;
 
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
+const model = await loadGLTF(engine, '/hero.glb');
+const animation = Animation.attach(model);
 const animator = Animator.attach(animation, {initial: 'idle', states: {idle: 'Idle'}});
 const joint = (name: string) => model.asset.doc.nodes!.findIndex((node) => node.name === name);
 const points: [number, number, number][] = [[0, 1, 0], [0.4, 1.3, 0], [0.4, 1.8, 0.3], [0, 2.1, 0.5]];

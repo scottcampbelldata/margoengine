@@ -3165,15 +3165,14 @@ does not own. Each entry says exactly what is needed to close it.
 - **Repro:** `createHeadlessStage({ gpu: create([]), width: 640, height: 360 })`, then `loadGLTF(stage.engine, url)` on `examples/assets/flight-helmet.glb` served over HTTP.
 - **Cause:** image decoding uses the browser's `createImageBitmap`, Node has none, and upload uses `copyExternalImageToTexture`, which needs a browser image. A fix needs a decoder hook in the loaders and an upload through `writeTexture`.
 
-### 289 errors in the package README examples
+### 17 errors in the package README examples
 
-- **What:** `npm run check:readmes` (a step of `verify`) type-checks all 719 examples of the 100 packages. When the check was built it found 715 errors in 181 examples; 388 were fixed in the same commit, and with two more from a selection example that landed the same day 329 remained, and 328 now, in 41 packages (voxel 56, materials 40, scatter 29, shader 23, bvh 20, cameras 17, ragdoll 16, the rest 10 or fewer). `scripts/support/readme-types-known.json` lists each by package and message. A new error fails `verify`, and so does an entry that has been fixed and not removed, so the list only shrinks.
+- **What:** `npm run check:readmes` (a step of `verify`) type-checks all the examples of the packages. When the check was built it found 715 errors in 181 examples. 17 remain, in two packages: ragdoll 16 and rigging 1. `scripts/support/readme-types-known.json` lists them, and the list only shrinks.
 - **Repro:** empty the known list to `{}`, then `npm run build:packages` and `npm run check:readmes`.
-- **Cause:** 285 are names an example uses and never sets up, reader data such as `physics`, `textures` or `candidates`. The README says "runs as written" and these do not. The other 42 are mostly real faults in published types, below. Six of them are `GPUTextureUsage` and `GPUBufferUsage`, which need `@webgpu/types` in the reader's project and in the check.
-- **Published types fixed 2026-11-06:** `EngineKernel` now declares `gpu`, `renderTarget` and `lighting`; importing scene no longer stops plugins fitting `engine.use`; a public `Mesh` is taken by `addOccluder`; shader atomics keep their element type (`tests/public-engine-types.test.js`). 289 errors are left, nearly all names an example never sets up.
-- **Published types still wrong:** `Skeleton` is refused as `IKSkeleton` (rigging); `Var(vec3)` gives a node `colorNode` refuses (shader); the loaders' bytes are `Uint8Array<ArrayBufferLike>`, which is not a `BlobPart`.
-- **Also open:** `modern:test:packages` checks the same examples against the tarballs with no known list, so check:merge fails on these until the list is empty. That is deliberate: the list is for landing, and nothing is released on it.
-- **Needed to close:** fix each type in its package, give each fragment its setup, and run `npm run check:readmes -- --shrink` until the file is `{}`. This list must be empty before release.
+- **Cause:** ragdoll's 16 are names an example uses and never sets up (`physics`, `hips`, `chest`). The README says "runs as written" and these do not. Rigging's one is a published type: `Skeleton` is refused as `IKSkeleton`. Both waited for the lanes working in those packages.
+- **Fixed 2026-11-06:** 272 errors: every other example now sets up what it uses, in the example, so it reads as a reader would paste it. Published types fixed with them: `EngineKernel` declares `gpu`, `renderTarget` and `lighting`; importing scene no longer stops plugins fitting `engine.use`; a public `Mesh` is taken by `addOccluder`; shader atomics keep their element type; `block` keeps the type of the `Var` it returns; voxel messages are bytes `WebSocket.send` takes (`tests/public-engine-types.test.js`). `GPUBufferUsage` and `GPUTextureUsage` are real browser globals TypeScript's DOM library leaves out, so the check declares those two and nothing else (`README_GLOBALS`).
+- **Also open:** `modern:test:packages` checks the same examples against the tarballs with no known list, so check:merge fails on these until the list is empty. That is deliberate: the list is for landing, and nothing is released on it. About 170 older `declare const` lines remain in examples that pass the check: those names are stated, not set up, so those examples still do not run as pasted.
+- **Needed to close:** set up the ragdoll names, fix the rigging type, and run `npm run check:readmes -- --shrink` until the file is `{}`. This list must be empty before release.
 
 ### A limp ragdoll keeps moving on a floor when a limit and a contact cannot both hold
 
@@ -4826,6 +4825,7 @@ const model = await load('/parts/bracket.3mf', parse3MF, {signal, maxBytes: 64 <
 const {meshes, dispose} = createMeshes(engine, model);   // one mesh + PbrMaterial per object color
 
 // Or parse bytes you already have and build a core Geometry yourself.
+const file = await fetch('/scans/part.ply');
 const scan = parsePLY(await file.arrayBuffer());
 mesh.setGeometry(toGeometry(scan, {normals: 'smooth'}));
 ```
@@ -4858,8 +4858,7 @@ Every parser returns the same `LoadedGeometry`:
 | `parseVDB` (`/vdb`, async) | See [VDB volumes](#vdb-volumes) |
 | `parseMaterialX` (`/materialx`) | See [MaterialX](#materialx) |
 | `parseLottie` (`/lottie`) | See [Lottie](#lottie) |
-| `parseNRRD` (`/nrrd`, async) | See [NRRD volumes](#nrrd-volumes) |
-| `parseLDraw` (`/ldraw`, async) | Se
+| `parseNRRD` (`/nrrd`, async) | See [NRRD volumes](#nrrd-vol
 
 [README continues: https://margoengine.com/llms/packages/loaders.md]
 
@@ -5437,10 +5436,11 @@ Cut-outs and slicing with `discard(condition, value)`, GPU counters and compacti
 
 ```ts
 import {NodeMaterial, ComputePass, storage, discard, texture, materialColor, positionWorld, uniform, select, uint} from 'margoengine/shader';
+import {loadTexture} from 'margoengine/materials';
 import {createStage} from 'margoengine';
-declare const n: number;
+const n = 1024;
 const stage = await createStage('#viewport', {backend: 'webgpu'});
-const slice = uniform(1.5);
+const slice = uniform(1.5), leaf = await loadTexture('/leaf.png'), radii = new Float32Array(n).fill(0.2);
 new NodeMaterial({colorNode: discard(texture(leaf).a.lessThan(0.5), texture(leaf))});          // alpha cut-out
 new NodeMaterial({colorNode: discard(positionWorld.y.greaterThan(slice), materialColor)});   // section the part at y = slice
 
@@ -5640,12 +5640,15 @@ tree-shakable, core and the stage never import it.
 ```ts
 import { bakeLightmap } from 'margoengine/lightmap';
 
+const positions = new Float32Array([0, 0, 0, 4, 0, 0, 4, 0, 4, 0, 0, 4]);
+const albedo = new Float32Array([0.8, 0.8, 0.8, 1]);
+const abort = new AbortController();
 const atlas = await bakeLightmap(
   { positions, albedo }, // 12 floats per quad (p0, p1, p2, p3), RGBA per quad
   {
     texelsPerUnit: 4,
     lights: [{ type: 'directional', direction: [0.3, 1, 0.2], intensity: 2 }],
-    onProgress: (done, total) => progress.update(done / total),
+    onProgress: (done, total) => console.log(done / total),
     signal: abort.signal,
   },
 );
@@ -5834,7 +5837,10 @@ For toon shading per material, on materials meshes (plain, instanced, skinned) a
 ```ts
 import {ToonMaterial, createMesh, toonModel} from 'margoengine/materials';
 import {Engine} from 'margoengine/core';
+import {sphereGeometry} from 'margoengine/geometry';
+import {loadGLTF} from 'margoengine/gltf-pro';
 const engine = await Engine.create(document.querySelector('canvas')!);
+const geometry = sphereGeometry(1, 32, 16), character = await loadGLTF(engine, '/hero.glb');
 createMesh(engine, geometry, new ToonMaterial({color: '#e07040', steps: 3}));
 toonModel(character, {steps: 4});
 ```
@@ -5858,9 +5864,11 @@ meshes are opaque; `addMesh` from `margoengine/oit/meshes` draws one see-through
 import {OIT} from 'margoengine/oit';
 import {loadGLTF} from 'margoengine/gltf-pro';
 import {Material, createMesh} from 'margoengine/materials';
+import {boxGeometry} from 'margoengine/geometry';
 import {Engine} from 'margoengine/core';
 const engine = await Engine.create(document.querySelector('canvas')!);
 
+const housingGeometry = boxGeometry(1, 1, 1);
 const oit = OIT.attach(engine);                           // or OIT.attach(engine, {depthScale: 2})
 oit.add(await loadGLTF(engine, '/gearbox.glb'));          // its BLEND primitives
 oit.add(createMesh(engine, housingGeometry, new Material({color: '#9cc3e6', opacity: 0.5, transparent: true, doubleSided: true})));
@@ -5934,9 +5942,15 @@ GPU-baked octahedral imposters for the farthest level. Core is unchanged.
 
 ```ts
 import {Engine, PbrMaterial} from 'margoengine/core';
+import {sphereGeometry, toGeometry} from 'margoengine/geometry';
 import {LODSystem, Imposter} from 'margoengine/lod';
 import {loadGLTF} from 'margoengine/gltf-pro';
 const engine = await Engine.create(document.querySelector('canvas')!);
+const highGeometry = toGeometry(sphereGeometry(1, 64, 32)), midGeometry = toGeometry(sphereGeometry(1, 24, 12));
+const lowGeometry = toGeometry(sphereGeometry(1, 8, 6));
+const material = new PbrMaterial({color: '#8d99a6'});
+const part = () => engine.createMesh().setGeometry(highGeometry).setMaterial(material);
+const parts = [part(), part()];
 
 const lods = LODSystem.attach(engine, {hysteresis: 0.1});
 const imposter = Imposter.bake(engine, highGeometry, {material, frames: 12, frameSize: 128}); // once, at load
@@ -5951,6 +5965,7 @@ for (const part of parts)                      // core meshes; the anchor's worl
 
 // Meshes and models work too: their `visible` (or `root.visible`) is toggled.
 const model = await loadGLTF(engine, '/valve.glb');                  // or createMesh() from @margoengine/materials
+const anchor = part(), lowMesh = part().setGeometry(lowGeometry);
 lods.add(anchor, [{object: model}, {object: lowMesh, screen: 0.05}, {object: Imposter.bake(engine, model)}]);
 
 const data = await imposter.export();          // cache it (IndexedDB, a file) ...
@@ -5974,11 +5989,7 @@ const cached = Imposter.fromData(engine, data); // ... and skip the bake next lo
   mips) and normal + depth + roughness/metalness (RGBA16F). At runtime each instance is a camera-facing quad that
   reprojects the pixel's ray onto the three nearest views (with one depth parallax step per view, so the views agree on
   the surface), blends colour, normal, depth and roughness/metalness by the view weights, relights with the engine light (matching core
-  or gltf-pro shading, whichever the source used) and writes per-pixel depth, so imposters occlude and are occluded
-  correctly. Where the views still disagree (silhouettes), coverage cross-fades over blended alpha 0.25-0.75
-  (alpha-to-coverage under MSAA, a fixed per-pixel dither at 1x) instead of a hard cut at 0.5. Each tile is sampled
-  with its mip level computed from the smooth coordinate and clamped half a texel of the coarser level read, so
-  trilinear filtering never reaches a neighbouring view. Bounding-sphere frustum culling on the CPU, hidden anchors (or
+  or gltf-pro shading, whichever the source used) and writes per-pixel depth, so imposters occlud
 
 [README continues: https://margoengine.com/llms/packages/lod.md]
 
@@ -5996,9 +6007,17 @@ however many parts there are. WebGPU only.
 ```ts
 import {Engine, PbrMaterial} from 'margoengine/core';
 import {CulledInstances} from 'margoengine/culling';
+import {boxGeometry, toGeometry} from 'margoengine/geometry';
 const canvas = document.querySelector('canvas')!;
 
 const engine = await Engine.create(canvas);
+const plate = toGeometry(boxGeometry(1, 0.1, 1)), bolt = toGeometry(boxGeometry(0.1, 0.2, 0.1));
+const inRow = (count: number) => {
+  const matrices = new Float32Array(count * 16);
+  for (let i = 0; i < count; i++) matrices.set([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, i * 2, 0, 0, 1], i * 16);
+  return matrices;
+};
+const plateMatrices = inRow(4), boltMatrices = inRow(16);
 const parts = CulledInstances.attach(engine, [
   // One batch per (geometry, material); transforms are column-major affine world matrices, 16 floats per part.
   {geometry: plate, material: new PbrMaterial({color: '#8d99a6', metalness: 0.6}), transforms: plateMatrices},
@@ -6006,7 +6025,7 @@ const parts = CulledInstances.attach(engine, [
 ], {culling: 'occlusion'});
 engine.start();
 
-parts.setTransform(1, 12, matrix);   // batch 1, part 12: one 64-byte upload
+parts.setTransform(1, 12, inRow(1));   // batch 1, part 12: one 64-byte upload
 parts.setVisible(0, 3, false);        // hide a part (isolation)
 parts.culling = 'frustum';            // switch at any time
 console.log(await parts.readCounts()); // parts drawn per batch in the last frame (a GPU readback; for tests and tools)
@@ -6058,21 +6077,6 @@ Every part's colour, roughness, metalness and sidedness live in its own 96-byte 
 one material. A CAD assembly with hundreds of colours costs one batch per distinct shape. `groupParts` turns a flat list
 of items into those batches and says where each item went:
 
-```ts
-import {Engine, PbrMaterial, box} from 'margoengine/core';
-import {CulledParts, groupParts} from 'margoengine/culling/parts';
-const engine = await Engine.create(document.querySelector('canvas')!);
-const bolt = box(0.2, 0.2, 1);
-const items = Array.from({length: 500}, (_, n) => ({
-  geometry: bolt,
-  material: new PbrMaterial({color: [n / 500, 0.4, 1 - n / 500], metalness: 0.8}),
-  matrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, n % 25, 0, Math.floor(n / 25), 1],
-}));
-const {batches, places} = groupParts(items);   // one batch: 500 colours, one draw
-const parts = CulledParts.attach(engine, batches);
-engine.start();
-```
-
 [README continues: https://margoengine.com/llms/packages/culling.md]
 
 === @margoengine/points (packages/points/README.md) ===
@@ -6096,6 +6100,7 @@ const engine = await Engine.create(canvas);
 const points = PointsPlugin.attach(engine, {pointBudget: 2_000_000});
 
 // Any {positions, colors?, normals?} works, including the point-cloud output of @margoengine/loaders.
+const positions = new Float32Array(30_000).map(() => Math.random() * 10), colors = new Float32Array(30_000).fill(1);
 const cloud = points.add(new PointCloud({
   positions,                       // Float32Array, xyz per point (used in place)
   colors,                          // RGB or RGBA, floats 0..1 or a Uint8Array 0..255
@@ -6104,9 +6109,11 @@ const cloud = points.add(new PointCloud({
 cloud.attach(mesh);                // follow a core mesh's world matrix
 
 // Change 100 points: only those 1200 bytes are written to the GPU.
+const newXyz = new Float32Array(300).map(() => Math.random() * 10);
 cloud.updatePositions(5000, newXyz);
 
 // Thousands of camera-facing sprites in one draw call.
+const atlasImage = await (await fetch('/labels.png')).blob();
 const labels = points.add(new SpriteBatch({material: {map: await createImageBitmap(atlasImage)}}));
 labels.add({position: [0, 2, 0], size: 0.5, uv: atlasRect(3, 4, 4)});
 
@@ -6125,8 +6132,7 @@ canvas.addEventListener('click', event => {
 - **Shapes and shading.** Square points cover exactly `size x size` pixels. Round points are an antialiased disc with an extra pixel of quad. A `map` (any `GPUTexture`, or an `ImageBitmap`, canvas, image, video or `ImageData` that the plugin uploads as `rgba8unorm-srgb`) is sampled across the point, with `alphaTest` or blending. `shading: 'sphere'` lights each point as a sphere impostor and writes its curved depth with `frag_depth`. `edl: true` adds eye-dome lighting: points also write their view depth into an `r32float` target and a full-screen pass multiplies the color by `exp(-32 * strength * mean(max(0, log2 d - log2 d_neighbor)))` over 8 neighbors `edlRadius` pixels away (Boucheny's eye-dome lighting; background neighbors count as 0).
 - **Depth.** Points test against the scene with reversed-Z `greater-equal` and opaque points write depth, so they hide behind meshes and occlude each other. Transparent materials blend without writing depth.
 - **Engine views.** Point sizes and level of detail follow the view being drawn. `pick(x, y)` picks through the canvas view under the point with that view's camera; `pick(x, y, {view: id})` through a named one (`RenderView.id`). A view not drawn for a frame is forgotten.
-- **Orthographic cameras.** Everything is read from `camera.matrix`, so any projection whose clip w is constant (such as `CameraProjection` from `@margoengine/cameras`) works without a dependency on it: world-unit sizes use the matrix's pixels per world unit and stay the same at every depth, sphere impostors write linear depth, eye-dome lighting shades linear depth steps (scaled like the log steps a perspective camera with the same zoom would give), block budgets ignore distance, and picking breaks ties by distance from the near plane (`depth` is then measured from the near plane).
-- **S
+- **Orthographic cameras.** Everything is read from `camera.matrix`, so any projection whose clip w is constant (such as `CameraProjection` from `@margoengine/cameras`) works without a dependency on it: world-unit sizes use the matrix's pixels per world unit and stay the same at every depth, sphere impostors write linear depth, eye-dome lighting
 
 [README continues: https://margoengine.com/llms/packages/points.md]
 
@@ -6818,14 +6824,13 @@ its offscreen PNGs, so exports match what is on screen.
 ```js
 import { ImagePost } from 'margoengine/post/image';
 import {Engine} from 'margoengine/core';
-declare const width: number;
-declare const height: number;
-declare const samples: number;
-declare const signal: AbortSignal;
+const width = 64, height = 64, signal = AbortSignal.timeout(30_000);
 const engine = await Engine.create(document.querySelector('canvas')!);
 
 const post = ImagePost.attach(engine, { bloom: { strength: 0.8, threshold: 1, radius: 0.5 } });
-const png = await post.capture(await tracer.renderImage({ width, height, samples }), { signal });
+// Any linear image: RGB floats, as the voxel path tracer's renderImage gives.
+const image = { width, height, color: new Float32Array(width * height * 3).fill(0.5) };
+const png = await post.capture(image, { signal });
 ```
 
 Options: `bloom` (strength, threshold, radius), `toneMapping` (`'neutral'` by default, `'linear'` or
@@ -7198,8 +7203,9 @@ blockData(door); // 3
 const chunk = new VoxelChunk(stone); // uniform: stored as its palette alone
 chunk.set(5, 31, 5, torch);
 const packed = chunk.pack(); // {palette, bits, words, light}: typed arrays that own their buffers
-postMessage(packed, [packed.palette.buffer, packed.words.buffer]); // add light.buffer when light is a Uint8Array
+postMessage(packed, { transfer: [packed.palette.buffer, packed.words.buffer] }); // add light.buffer when light is a Uint8Array
 // On the main thread:
+const worker = new Worker(new URL('./chunks.js', import.meta.url), { type: 'module' });
 worker.onmessage = ({ data }) => world.addChunk(0, 1, 0, VoxelChunk.unpack(data));
 ```
 
@@ -7226,8 +7232,7 @@ worker.onmessage = ({ data }) => world.addChunk(0, 1, 0, VoxelChunk.unpack(data)
   when its front does; a `corner` given to `stairState` (`'straight'`, `'inner+z'`, `'outer-x'`, ...) is kept.
   `waterlogState(state)` waterlogs a slab or stair: the liquid its type names (`waterlog`, a defined liquid's id or
   name) fills the rest of the cell, meshed, lit and swum in like that liquid, while the block keeps colliding.
-  `shapeOctants(type, state)` gives the half cells a state fills as an 8-bit mask (bit `x + 2y + 4z`, 255 for a cube).
-  They mesh, shade, cast and receive shadows,
+  `shapeOctants(type, state)` gives the half cells a state fill
 
 [README continues: https://margoengine.com/llms/packages/voxel.md]
 
@@ -7269,6 +7274,7 @@ const scene: VoxelTraceScene = {
 };
 const tracer = VoxelPathTracer.attach(engine, { scene, maxSamples: 512, denoise: true });
 await tracer.ready; // until then frames show the ordinary raster image
+const nextScene = {...scene, revision: 2};
 tracer.setScene(nextScene); // validated as a whole; accumulation restarts
 const png = await tracer.capture({ width: 3840, height: 2160, samples: 1024, signal });
 tracer.enabled = false; // back to the raster frame, bit for bit
@@ -7303,6 +7309,9 @@ const engine = await Engine.create(document.querySelector('canvas')!);
 
 const model: VoxelGrid = { size: [32, 32, 32], voxels: new Uint8Array(32 * 32 * 32) };
 const { grid } = rotateGrid(model, { axis: 'y', degrees: 90 }); // a new grid; `model` is unchanged
+const prop: VoxelGrid = { size: [8, 8, 8], voxels: new Uint8Array(8 * 8 * 8) };
+const baseKeys = Array.from({ length: 256 }, (_, i) => `base:${i}`), toolKeys = Array.from({ length: 256 }, (_, i) => `tool:${i}`);
+const baseUsed = new Uint8Array(256), toolUsed = new Uint8Array(256);
 const { paletteMap } = mergePalettes({ baseKeys, toolKeys, baseUsed, toolUsed });
 const merged = combineGrids(grid, prop, { operation: 'union', offset: [4, 0, 4], paletteMap });
 
@@ -7367,6 +7376,8 @@ surfaces. Use a size that keeps the shoreline and terrain map within 37.5% of
 `size` of the camera, where the cells are regular.
 
 ```ts
+import {Bloom} from 'margoengine/post/bloom';
+import {Sky} from 'margoengine/sky';
 import {Water} from 'margoengine/water';
 import {Engine} from 'margoengine/core';
 const engine = await Engine.create(document.querySelector('canvas')!);
@@ -7384,6 +7395,7 @@ Directions are XZ, dimensions/amplitudes are world units, wavelengths are positi
 For the sandbox optics, connect the optional packages:
 
 ```ts
+const bloom = Bloom.attach(engine), sky = Sky.attach(engine);
 Water.attach(engine, {
   depth: () => bloom.depthTexture,
   sceneColor: () => bloom.sceneTexture,
@@ -7483,8 +7495,11 @@ candidate; [docs/limits.md](../../docs/limits.md) ("Scatter cull in candidate or
 
 ```ts
 import {Scatter} from 'margoengine/scatter';
+import {sphereGeometry, toGeometry} from 'margoengine/geometry';
 import {Engine} from 'margoengine/core';
 const engine = await Engine.create(document.querySelector('canvas')!);
+const nearGeometry = toGeometry(sphereGeometry(0.5, 16, 8)), midGeometry = toGeometry(sphereGeometry(0.5, 8, 4));
+const farGeometry = toGeometry(sphereGeometry(0.5, 4, 2));
 const scatter = Scatter.attach(engine, [nearGeometry, midGeometry, farGeometry], {
   count: 10000, area: [50,50], density: 0.8, maxSlope: 45, lod: [25,60,120], lodFade: 2
 });
@@ -7513,17 +7528,9 @@ distribute shader stays the same text.
 
 ```ts
 import { Scatter } from '@margoengine/scatter';
+import { planeGeometry, toGeometry } from '@margoengine/geometry';
 import {Engine} from '@margoengine/core';
 const engine = await Engine.create(document.querySelector('canvas')!);
-
-const farTrees = Scatter.attach(engine, standIn, {
-  count: 100_000,
-  area: [5000, 5000],
-  follow: true,
-  lod: [1000, 2000, 2500],
-  inner: 1000,
-  innerFade: 256,
-});
 ```
 
 [README continues: https://margoengine.com/llms/packages/scatter.md]
@@ -7538,8 +7545,10 @@ Arc-length spline sweeps generate a road surface, raised curbs, hard cross-secti
 
 ```ts
 import {road} from 'margoengine/road';
+import {Spline} from 'margoengine/splines';
 import {Engine} from 'margoengine/core';
 const engine = await Engine.create(document.querySelector('canvas')!);
+const curve = new Spline([[0, 0, 0], [40, 2, 30], [90, 0, 20]]);
 const {geometry, uvs} = road(curve, {width: 6, curbWidth: 0.2, curbHeight: 0.15, uvMeters: 5});
 engine.createMesh().setGeometry(geometry);
 ```
@@ -7881,6 +7890,7 @@ Bezier curves require 3n+1 points and are open. Hermite requires one tangent per
 `kind: 'bspline'` is the uniform cubic B-spline: smoother than Catmull-Rom (continuous curvature) but it only pulls toward interior points, so it does not pass through them; open curves start and end exactly at the first and last point. `kind: 'kochanek-bartels'` passes through every point and adds `tension`, `continuity` and `bias`, each -1 to 1 and 0 by default (all zero is Catmull-Rom).
 
 ```ts
+const waypoints: [number, number, number][] = [[0, 2, 0], [5, 3, 5], [10, 2, 10], [15, 4, 5]];
 const camera = new Spline(waypoints, {kind: 'kochanek-bartels', tension: 0.3, bias: -0.2});
 const smooth = new Spline(waypoints, {kind: 'bspline', closed: true});
 ```
@@ -7888,7 +7898,9 @@ const smooth = new Spline(waypoints, {kind: 'bspline', closed: true});
 ## Closest point (`@margoengine/splines/closest`)
 
 ```ts
+import {Spline} from 'margoengine/splines';
 import {closestPointOnSpline} from 'margoengine/splines/closest';
+const curve = new Spline([[0, 0, 0], [5, 1, 5], [10, 0, 10]]);
 const hit = closestPointOnSpline(curve, [3, 1, 4]);
 // hit.t (0..1), hit.arc (world units along the curve), hit.point, hit.distance
 ```
@@ -7898,7 +7910,9 @@ It samples the curve (`samples`, default the spline's `divisions`), then bisects
 ## Stable frames and roll (`@margoengine/splines/frames`)
 
 ```ts
+import {Spline} from 'margoengine/splines';
 import {SplineFrames} from 'margoengine/splines/frames';
+const curve = new Spline([[0, 0, 0], [5, 1, 5], [10, 0, 10]]);
 const frames = new SplineFrames(curve, {up: [0, 1, 0], roll: (t) => t * 0.5});
 const frame = frames.frameAt(curve.length * 0.25);
 // frame.position, frame.tangent, frame.normal, frame.binormal (binormal = tangent x normal)
@@ -7925,14 +7939,6 @@ const [a, b] = path.split(2);          // two paths sharing knot 2
 Modes: `auto` (smooth through the knot), `linear` (handles point at the neighbors; a segment between two linear knots is straight) and `broken` (the stored `tangentIn` and `tangentOut`, so a corner can point any way). `insertAt` keeps the shape by turning the new knot and its two neighbors `broken`; pass `false` as the third argument to insert an `auto` knot and let the curve reshape. A closed path builds an open Bezier whose last point is its first.
 
 ## Place and deform along a spline (`@margoengine/splines/mesh`)
-
-```ts
-import {placeAlongSpline, deformAlongSpline} from 'margoengine/splines/mesh';
-const posts = placeAlongSpline(curve, {spacing: 2.5, fit: true, forward: 'z'});
-// posts.matrices: count column-major 4x4 matrices, ready for an instance buffer
-const pipe = deformAlongSpline(curve, positions, {axis: 'z', normals, fit: 'stretch'});
-// pipe.positions, pipe.normals
-```
 
 [README continues: https://margoengine.com/llms/packages/splines.md]
 
@@ -8246,7 +8252,10 @@ A virtual camera with analytically integrated critically damped follow and look-
 ```ts
 import {Cinematic} from 'margoengine/cinematic';
 import {Engine} from 'margoengine/core';
+import {boxGeometry} from 'margoengine/geometry';
+import {PbrMaterial, createMesh} from 'margoengine/materials';
 const engine = await Engine.create(document.querySelector('canvas')!);
+const player = createMesh(engine, boxGeometry(0.5, 1.8, 0.5), new PbrMaterial()).root;
 const rig = Cinematic.attach(engine, {offset: [0,3,6], damping: 6});
 rig.follow(player);
 rig.shake(0.2, 0.4);
@@ -8257,9 +8266,13 @@ follow accepts a live mesh from the attached engine or a world-position tuple. M
 Scope the rig with `using` (it calls `dispose()` and returns the camera to your controls):
 
 ```ts
+import RAPIER from '@dimforge/rapier3d-compat';
 import {Cinematic} from 'margoengine/cinematic';
 import {Engine} from 'margoengine/core';
+import {Physics} from 'margoengine/physics';
 const engine = await Engine.create(document.querySelector('canvas')!);
+await RAPIER.init();
+const physics = Physics.attach(engine, {rapier: RAPIER});
 {
   using rig = Cinematic.attach(engine, {offset: [0, 3, 6]});
   rig.follow([0, 1.6, 0]);
@@ -9625,7 +9638,10 @@ Design and decisions: [DESIGN.md](DESIGN.md). Measured capacity: [bench/results.
 
 ```ts
 // Server (Node)
+import { BlockTypes, VoxelWorld } from 'margoengine/voxel';
 import { VoxelServer } from 'margoengine/voxel-net/server';
+const blocks = new BlockTypes();
+blocks.define('stone');
 const server = new VoxelServer({ blocks, generator: { seed: 7 }, flight: true });
 await server.listen(8787, '0.0.0.0');
 
@@ -9638,6 +9654,8 @@ declare const x: number;
 declare const y: number;
 declare const z: number;
 const engine = await Engine.create(document.querySelector('canvas')!);
+const world = new VoxelWorld({ blocks });
+const drawBox = (...pose: unknown[]) => console.log(...pose); // your renderer
 const client = connectVoxelNet('ws://127.0.0.1:8787', world, { name: 'Ada', view: 6 });
 engine.onFrame((_, dt) => {
   client.update(dt, { keys: Keys.forward | Keys.jump, yaw, pitch }); // moves client.player at 1/120 s steps
@@ -9676,10 +9694,6 @@ client.edit(x, y, z, 0); // shown at once; the server confirms it or sends the c
 - **File store** (`./file-store`, Node): `new FileChunkStore(dir)` is a `ChunkStore` with one deflated file per chunk; pass
   it as the server's `store` and edits survive a restart.
 
-## Connections, login and saved edits
-
-Every limit has a safe default; set them on `new VoxelServer({...})`.
-
 [README continues: https://margoengine.com/llms/packages/voxel-net.md]
 
 === @margoengine/bvh (packages/bvh/README.md) ===
@@ -9700,7 +9714,8 @@ query correctness and traversal cost without changing mesh data, public signatur
 
 ```ts
 import {Engine, box} from 'margoengine/core';
-import {MeshBVH, Raycaster, buildAsync, computeGeometryBVHAsync} from 'margoengine/bvh';
+import {MeshBVH, Raycaster, buildAsync, computeGeometryBVHAsync, frustumPlanes} from 'margoengine/bvh';
+import {loadGLTF} from 'margoengine/gltf-pro';
 const canvas = document.querySelector('canvas')!;
 const engine = await Engine.create(canvas);
 
@@ -9713,23 +9728,28 @@ canvas.addEventListener('pointerdown', event => {
 
 // A loaded gltf-pro PBRModel uses its current GPU skin/morph pose.
 // This explicit asynchronous query reads back only deformed vertices.
+const model = await loadGLTF(engine, '/hero.glb');
 const [animatedHit] = await raycaster.intersectModel(model);
 
 // Keep big builds off the main thread; the Raycaster then uses the cached BVH.
+const bigGeometry = box(2, 2, 2);
 await computeGeometryBVHAsync(bigGeometry);
 
 // Direct queries on raw data or a Geometry.
+const positions = new Float32Array([-1, 0, -1, 1, 0, -1, 1, 0, 1, -1, 0, 1]);
+const indices = new Uint32Array([0, 2, 1, 0, 3, 2]);
+const identity = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
 const bvh = MeshBVH.build({positions, indices});           // or MeshBVH.fromGeometry(geometry)
 bvh.raycastFirst({origin: [0, 5, 0], direction: [0, -1, 0]}, {side: 'front'});
-bvh.intersectsSegment([0, 0, 0], [0, 5, 0], {includeFace: face => face !== receiverFace});
+bvh.intersectsSegment([0, 0, 0], [0, 5, 0], {includeFace: face => face !== 1});
 bvh.closestPointToPoint([1, 2, 3], {maxDistance: 0.5});
 bvh.intersectsSphere([0, 0, 0], 0.25);
-bvh.intersectsBox({min: [-1, -1, -1], max: [1, 1, 1]}, boxMatrix);
-bvh.intersectsBVH(otherBVH, otherToThisMatrix, (faceA, faceB) => {});
-bvh.collectFrustum(frustumPlanes(viewProjectionTimesWorld)); // face indices
+bvh.intersectsBox({min: [-1, -1, -1], max: [1, 1, 1]}, identity);
+bvh.intersectsBVH(MeshBVH.build({positions, indices}), identity, (faceA, faceB) => {});
+bvh.collectFrustum(frustumPlanes(identity)); // face indices; pass the view-projection times the world matrix
 
 // Worker build with zero-copy results, then store or ship the tree.
-const tree = await buildAsync({positions, indices}, {transfer: true});
+const tree = await buildAsync({positions: positions.slice(), indices: indices.slice()}, {transfer: true}); // transfer takes the arrays it is given
 const bytes = tree.toArrayBuffer();            // one buffer, 16-byte header
 const again = MeshBVH.fromArrayBuffer(bytes, {positions});
 ```

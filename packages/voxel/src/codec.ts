@@ -159,7 +159,7 @@ export async function decodeChunk(bytes: Uint8Array): Promise<VoxelChunk> {
  * @throws TypeError when `changes` is not an array-like of quadruples or holds a non-number.
  * @throws RangeError for a cell coordinate that is not a 32-bit integer or a state that is not a u32.
  */
-export function encodeBlockChanges(changes: ArrayLike<number>): Uint8Array {
+export function encodeBlockChanges(changes: ArrayLike<number>): Uint8Array<ArrayBuffer> {
   if (!changes || typeof changes !== 'object' || !Number.isInteger(changes.length) || changes.length % 4)
     throw new TypeError('encodeBlockChanges expects a flat [x, y, z, state, ...] array of quadruples');
   const n = changes.length / 4,
@@ -387,7 +387,7 @@ export class EntityCodec<const S extends Readonly<Record<string, EntityField>>> 
   encode(
     entities: ReadonlyMap<number, EntityState<S> | PreparedEntity>,
     baseline?: ReadonlyMap<number, EntityState<S> | PreparedEntity>,
-  ): Uint8Array {
+  ): Uint8Array<ArrayBuffer> {
     if (!(entities instanceof Map) || (baseline !== undefined && !(baseline instanceof Map)))
       throw new TypeError('EntityCodec.encode expects Maps of entity id -> entity');
     const ids = new Set(entities.keys());

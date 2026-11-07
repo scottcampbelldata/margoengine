@@ -83,14 +83,15 @@ import {convexGeometry, decalGeometry, parametricGeometry, roundedBoxGeometry} f
 const button = roundedBoxGeometry(2, 1, 0.4, 4, 0.15);
 
 // The convex hull of any points ([x, y, z] arrays or flat numbers): only the corners become vertices.
-const rock = convexGeometry(points);
+const rock = convexGeometry([[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1], [0.2, 0.2, 0.2]]);
 
 // Any surface (u, v) in [0, 1]: normals come from the surface, UVs are (u, v).
 const wave = parametricGeometry((u, v) => [u * 4 - 2, Math.sin(u * 6) * 0.2, v * 4 - 2], 64, 64);
 
 // A decal: the part of `wall` (geometry plus its world matrix) inside a 0.5 x 0.5 x 0.2 box at `hit`, projected along
 // the box's -z. The result is in world space; draw it with an identity transform and the decal texture.
-const sticker = decalGeometry(wallGeometry, wallMesh.matrix, hit, [0, 0, 0, 1], [0.5, 0.5, 0.2]);
+const wallGeometry = roundedBoxGeometry(4, 3, 0.2, 1, 0), wallMatrix = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+const sticker = decalGeometry(wallGeometry, wallMatrix, [0, 1, 0.1], [0, 0, 0, 1], [0.5, 0.5, 0.2]);
 ```
 
 - `roundedBoxGeometry(width, height, depth, segments = 2, radius = 0.1)`: every edge and corner is rounded; the radius
@@ -573,7 +574,7 @@ engine.onFrame(() => {
 along a path, pipes and snakes.
 
 ```ts
-import {boxGeometry, CatmullRomCurve3} from 'margoengine/geometry';
+import {boxGeometry, CatmullRomCurve3, creasedNormals, toNonIndexed} from 'margoengine/geometry';
 import {CurveFlow, flowGeometry} from 'margoengine/geometry/flow';
 
 const track = new CatmullRomCurve3([[0, 0, 0], [10, 2, 5], [20, 0, 0], [30, 1, -5]]);
@@ -650,7 +651,8 @@ it works on `GeometryData` and on any `{positions, indices?}` mesh.
 
 ```ts
 const tiles = toNonIndexed(boxGeometry(1, 1, 1));
-tiles.normals = creasedNormals(tiles.positions, {angle: 45, groups: tileGroups}); // tileGroups: one id per triangle
+const tileGroups = Array.from({length: tiles.positions.length / 9}, (_, triangle) => triangle >> 1); // one id per triangle
+tiles.normals = creasedNormals(tiles.positions, {angle: 45, groups: tileGroups});
 ```
 
 ## Limits

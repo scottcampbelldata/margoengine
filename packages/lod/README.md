@@ -7,9 +7,15 @@ GPU-baked octahedral imposters for the farthest level. Core is unchanged.
 
 ```ts
 import {Engine, PbrMaterial} from 'margoengine/core';
+import {sphereGeometry, toGeometry} from 'margoengine/geometry';
 import {LODSystem, Imposter} from 'margoengine/lod';
 import {loadGLTF} from 'margoengine/gltf-pro';
 const engine = await Engine.create(document.querySelector('canvas')!);
+const highGeometry = toGeometry(sphereGeometry(1, 64, 32)), midGeometry = toGeometry(sphereGeometry(1, 24, 12));
+const lowGeometry = toGeometry(sphereGeometry(1, 8, 6));
+const material = new PbrMaterial({color: '#8d99a6'});
+const part = () => engine.createMesh().setGeometry(highGeometry).setMaterial(material);
+const parts = [part(), part()];
 
 const lods = LODSystem.attach(engine, {hysteresis: 0.1});
 const imposter = Imposter.bake(engine, highGeometry, {material, frames: 12, frameSize: 128}); // once, at load
@@ -24,6 +30,7 @@ for (const part of parts)                      // core meshes; the anchor's worl
 
 // Meshes and models work too: their `visible` (or `root.visible`) is toggled.
 const model = await loadGLTF(engine, '/valve.glb');                  // or createMesh() from @margoengine/materials
+const anchor = part(), lowMesh = part().setGeometry(lowGeometry);
 lods.add(anchor, [{object: model}, {object: lowMesh, screen: 0.05}, {object: Imposter.bake(engine, model)}]);
 
 const data = await imposter.export();          // cache it (IndexedDB, a file) ...

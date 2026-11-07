@@ -301,8 +301,10 @@ before.
 
 ```ts
 import {Fog} from 'margoengine/environment';
+import {Lines} from 'margoengine/lines';
 import {Engine} from 'margoengine/core';
 const engine = await Engine.create(document.querySelector('canvas')!);
+const lines = Lines.attach(engine);
 const fog = Fog.attach(engine, {color: '#8090a0', near: 5, far: 40});
 lines.setFog(fog);
 ```
@@ -339,9 +341,13 @@ Lines does not import animation. Colours run from `parentColor` (default green) 
 
 ```ts
 import {Lines, SkeletonHelper} from 'margoengine/lines';
+import {Skeleton} from 'margoengine/animation';
 import {Engine} from 'margoengine/core';
+import {loadGLTF} from 'margoengine/gltf-pro';
 const engine = await Engine.create(document.querySelector('canvas')!);
 const lines = Lines.attach(engine);
+const model = await loadGLTF(engine, '/hero.glb');
+const skeleton = new Skeleton([{name: 'hip', parent: -1}, {name: 'knee', parent: 0}]);
 // An @margoengine/animation Skeleton, placed by the skinned mesh it deforms:
 const bones = lines.add(new SkeletonHelper(skeleton, {mesh: model.primitives[0].node, width: 2}));
 const skin = lines.add(SkeletonHelper.fromGLTF(model)); // a loaded, animated glTF

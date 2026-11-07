@@ -1184,7 +1184,8 @@ An audit of the finished batches against their job text listed 70 gaps for the H
 | D1 | Core pass join: accepted limit documented, core unchanged (Scott's ruling) | DONE | `a95fe94b1` | - |
 | B22 | Motion blur pictures: the harness jump found and fixed; three's smear recorded, SSIM not a verdict | DONE | `cebf0bece` | - |
 | README types | README types: published type fixes, 328 to 289 | DONE | `776e6ecf8` | - |
-| 3MF | 3MF: a scene is one object; 26 of 26 slice with supports, 22 with none, no crash; 3DBenchy matches its STL | DONE | this commit | LIM-269 |
+| 3MF | 3MF: a scene is one object; 26 of 26 slice with supports, 22 with none, no crash; 3DBenchy matches its STL | DONE | `aafa5f725` | LIM-269 |
+| README examples | README examples set up what they use: 289 errors to 17, ragdoll and rigging left | DONE | this commit | - |
 
 ## LAZ: one LAS reader, and every point format on a real file
 

@@ -15,7 +15,7 @@ export class ByteWriter {
   f32(v: number): void;
   varint(v: number): void;
   raw(b: Uint8Array): void;
-  done(): Uint8Array;
+  done(): Uint8Array<ArrayBuffer>;
 }
 /** Checked little-endian reads; failures throw RangeError `"<what> <problem>; <fix>"`. */
 export class ByteReader {

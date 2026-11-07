@@ -14,7 +14,8 @@ query correctness and traversal cost without changing mesh data, public signatur
 
 ```ts
 import {Engine, box} from 'margoengine/core';
-import {MeshBVH, Raycaster, buildAsync, computeGeometryBVHAsync} from 'margoengine/bvh';
+import {MeshBVH, Raycaster, buildAsync, computeGeometryBVHAsync, frustumPlanes} from 'margoengine/bvh';
+import {loadGLTF} from 'margoengine/gltf-pro';
 const canvas = document.querySelector('canvas')!;
 const engine = await Engine.create(canvas);
 
@@ -27,23 +28,28 @@ canvas.addEventListener('pointerdown', event => {
 
 // A loaded gltf-pro PBRModel uses its current GPU skin/morph pose.
 // This explicit asynchronous query reads back only deformed vertices.
+const model = await loadGLTF(engine, '/hero.glb');
 const [animatedHit] = await raycaster.intersectModel(model);
 
 // Keep big builds off the main thread; the Raycaster then uses the cached BVH.
+const bigGeometry = box(2, 2, 2);
 await computeGeometryBVHAsync(bigGeometry);
 
 // Direct queries on raw data or a Geometry.
+const positions = new Float32Array([-1, 0, -1, 1, 0, -1, 1, 0, 1, -1, 0, 1]);
+const indices = new Uint32Array([0, 2, 1, 0, 3, 2]);
+const identity = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
 const bvh = MeshBVH.build({positions, indices});           // or MeshBVH.fromGeometry(geometry)
 bvh.raycastFirst({origin: [0, 5, 0], direction: [0, -1, 0]}, {side: 'front'});
-bvh.intersectsSegment([0, 0, 0], [0, 5, 0], {includeFace: face => face !== receiverFace});
+bvh.intersectsSegment([0, 0, 0], [0, 5, 0], {includeFace: face => face !== 1});
 bvh.closestPointToPoint([1, 2, 3], {maxDistance: 0.5});
 bvh.intersectsSphere([0, 0, 0], 0.25);
-bvh.intersectsBox({min: [-1, -1, -1], max: [1, 1, 1]}, boxMatrix);
-bvh.intersectsBVH(otherBVH, otherToThisMatrix, (faceA, faceB) => {});
-bvh.collectFrustum(frustumPlanes(viewProjectionTimesWorld)); // face indices
+bvh.intersectsBox({min: [-1, -1, -1], max: [1, 1, 1]}, identity);
+bvh.intersectsBVH(MeshBVH.build({positions, indices}), identity, (faceA, faceB) => {});
+bvh.collectFrustum(frustumPlanes(identity)); // face indices; pass the view-projection times the world matrix
 
 // Worker build with zero-copy results, then store or ship the tree.
-const tree = await buildAsync({positions, indices}, {transfer: true});
+const tree = await buildAsync({positions: positions.slice(), indices: indices.slice()}, {transfer: true}); // transfer takes the arrays it is given
 const bytes = tree.toArrayBuffer();            // one buffer, 16-byte header
 const again = MeshBVH.fromArrayBuffer(bytes, {positions});
 ```
@@ -106,8 +112,15 @@ occluder BVH; use `creasedNormals` from `@margoengine/geometry` for flat or smoo
 import {MeshBVH, worldTriangles} from 'margoengine/bvh';
 import {bakeVertexColors, limitPalette} from 'margoengine/bvh/bake';
 import {Engine} from 'margoengine/core';
+import {boxGeometry} from 'margoengine/geometry';
+import {PbrMaterial, createMesh} from 'margoengine/materials';
 const engine = await Engine.create(document.querySelector('canvas')!);
+const castAgainst = [createMesh(engine, boxGeometry(4, 3, 0.2), new PbrMaterial())];
 const cast = worldTriangles(engine, castAgainst); // Cast Against: the meshes that occlude
+// The mesh to bake: one triangle in front of the wall, white so far.
+const positions = new Float32Array([0, 0, 1, 1, 0, 1, 0, 1, 1]);
+const normals = new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1]);
+const existing = new Float32Array(9).fill(1);
 const occluder = MeshBVH.build({positions: cast.vertices, indices: cast.indices});
 const colors = bakeVertexColors({positions, normals, colors: existing}, occluder, {
   lights: [{type: 'ambient', intensity: 0.2}, {type: 'directional', direction: [1, 2, 1]},

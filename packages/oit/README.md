@@ -11,9 +11,11 @@ meshes are opaque; `addMesh` from `margoengine/oit/meshes` draws one see-through
 import {OIT} from 'margoengine/oit';
 import {loadGLTF} from 'margoengine/gltf-pro';
 import {Material, createMesh} from 'margoengine/materials';
+import {boxGeometry} from 'margoengine/geometry';
 import {Engine} from 'margoengine/core';
 const engine = await Engine.create(document.querySelector('canvas')!);
 
+const housingGeometry = boxGeometry(1, 1, 1);
 const oit = OIT.attach(engine);                           // or OIT.attach(engine, {depthScale: 2})
 oit.add(await loadGLTF(engine, '/gearbox.glb'));          // its BLEND primitives
 oit.add(createMesh(engine, housingGeometry, new Material({color: '#9cc3e6', opacity: 0.5, transparent: true, doubleSided: true})));

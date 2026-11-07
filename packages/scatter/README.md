@@ -27,8 +27,11 @@ candidate; [docs/limits.md](../../docs/limits.md) ("Scatter cull in candidate or
 
 ```ts
 import {Scatter} from 'margoengine/scatter';
+import {sphereGeometry, toGeometry} from 'margoengine/geometry';
 import {Engine} from 'margoengine/core';
 const engine = await Engine.create(document.querySelector('canvas')!);
+const nearGeometry = toGeometry(sphereGeometry(0.5, 16, 8)), midGeometry = toGeometry(sphereGeometry(0.5, 8, 4));
+const farGeometry = toGeometry(sphereGeometry(0.5, 4, 2));
 const scatter = Scatter.attach(engine, [nearGeometry, midGeometry, farGeometry], {
   count: 10000, area: [50,50], density: 0.8, maxSlope: 45, lod: [25,60,120], lodFade: 2
 });
@@ -57,9 +60,11 @@ distribute shader stays the same text.
 
 ```ts
 import { Scatter } from '@margoengine/scatter';
+import { planeGeometry, toGeometry } from '@margoengine/geometry';
 import {Engine} from '@margoengine/core';
 const engine = await Engine.create(document.querySelector('canvas')!);
 
+const standIn = toGeometry(planeGeometry(4, 8));
 const farTrees = Scatter.attach(engine, standIn, {
   count: 100_000,
   area: [5000, 5000],
@@ -198,9 +203,19 @@ For fixed placement with the engine's PBR lighting and PCSS shadows, use the
 separate `ScatterInstances` export:
 
 ```ts
-import {ScatterInstances} from 'margoengine/scatter';
-import {Engine} from 'margoengine/core';
+import {ScatterInstances, type ScatterBatch} from 'margoengine/scatter';
+import {Shadows} from 'margoengine/shadows';
+import {Engine, PbrMaterial} from 'margoengine/core';
 const engine = await Engine.create(document.querySelector('canvas')!);
+// One batch: a triangle of three 20-float vertices, drawn once at the origin.
+const generateBatches = (): ScatterBatch[] => [{
+  name: 'pebbles',
+  vertices: new Float32Array(60),
+  indices: new Uint32Array([0, 1, 2]),
+  transforms: new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]),
+  material: new PbrMaterial(),
+}];
+const shadows = Shadows.attach(engine);
 const instances = ScatterInstances.attach(engine, () => generateBatches());
 shadows.add(instances, {static: true});
 ```
@@ -224,9 +239,16 @@ packing transforms:
 
 ```ts
 import {PlacementLayout, Scatter} from 'margoengine/scatter';
-import {footprintRadius} from 'margoengine/geometry';
+import {boxGeometry, footprintRadius, toGeometry} from 'margoengine/geometry';
 import {Engine} from 'margoengine/core';
 const engine = await Engine.create(document.querySelector('canvas')!);
+const rockMesh = boxGeometry(1.2, 0.8, 1.2), fernMesh = boxGeometry(0.6, 0.5, 0.6), bushMesh = boxGeometry(0.9, 0.9, 0.9);
+const islandRockGeometry = toGeometry(boxGeometry(0.3, 0.2, 0.3));
+// x, z, scale, yaw.
+const rockCandidates: [number, number, number, number][] = [[8, 0, 1, 0], [12, 3, 1.5, 1]];
+const fernCandidates: [number, number, number, number][] = [[8.2, 0, 1, 0], [-9, 4, 1, 2]];
+const bushCandidates: [number, number, number, number][] = [[-12, -6, 1, 0]];
+const buildingFootprints: [number, number, number, number][] = [[-5, -5, 5, 5]]; // min x, min z, max x, max z
 const layout = new PlacementLayout(buildingFootprints);
 const rocks = layout.place(rockCandidates, footprintRadius(rockMesh));
 const ferns = layout.place(fernCandidates, footprintRadius(fernMesh));
@@ -253,6 +275,8 @@ For a single population, `spacePlacements` also filters ground placements:
 
 ```ts
 import {spacePlacements} from 'margoengine/scatter';
+const candidates: [number, number, number, number][] = [[0, 0, 1, 0], [0.4, 0, 1, 0], [3, 1, 1, 0]]; // x, z, scale, yaw
+const meshFootprintRadius = 0.5;
 const placements = spacePlacements(candidates, meshFootprintRadius, 0.3);
 ```
 
@@ -304,9 +328,15 @@ ordered cull, also pinned).
 
 ```ts
 import { Scatter } from '@margoengine/scatter';
+import { planeGeometry, toGeometry } from '@margoengine/geometry';
 import {Engine} from '@margoengine/core';
 const engine = await Engine.create(document.querySelector('canvas')!);
 
+const blade = toGeometry(planeGeometry(0.05, 0.4, 1, 3));
+const texture = (format: GPUTextureFormat) =>
+  engine.gpu!.createTexture({size: [1024, 1024], format, usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST});
+const heights = texture('r32float');
+const grassDensity = texture('r8unorm');
 const grass = Scatter.attach(engine, blade, {
   count: 200_000,
   area: [240, 240], // around the camera
@@ -346,9 +376,20 @@ culling and rings.
 
 ```ts
 import { ScatterTiles } from '@margoengine/scatter/tiles';
+import { cylinderGeometry, sphereGeometry, toGeometry } from '@margoengine/geometry';
 import {Engine} from '@margoengine/core';
 const engine = await Engine.create(document.querySelector('canvas')!);
 
+const levels = (make: (sides: number) => ReturnType<typeof sphereGeometry>) => {
+  const [a, b, c] = [16, 8, 4].map((sides) => toGeometry(make(sides)));
+  return [a, b, c] as const;
+};
+const [near, middle, far] = levels((sides) => cylinderGeometry(0.3, 0.4, 4, sides));
+const [crownNear, crownMiddle, crownFar] = levels((sides) => sphereGeometry(2, sides, sides / 2));
+const texture = (format: GPUTextureFormat) =>
+  engine.gpu!.createTexture({size: [1024, 1024], format, usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST});
+const heights = texture('r32float');
+const records = new Uint8Array(8 * 100); // 100 trees of 8 bytes
 const oaks = ScatterTiles.attach(engine, [near, middle, far], {
   bounds: [-2048, -2048, 2048, 2048],
   heightmap: () => heights,

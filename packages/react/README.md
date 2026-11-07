@@ -130,8 +130,6 @@ the explicit form.
 import { BoxGeometry, Mesh } from '@margoengine/react';
 import { Box } from '@margoengine/react/geometry';
 import { MeshTransmissionMaterial } from '@margoengine/react/materials';
-declare const x: number;
-declare const y: number;
 
 export function Both() {
   return (
@@ -174,9 +172,15 @@ from the DOM. These rules come from the code in `src/components.tsx` and apply t
 
 In a Playwright test, click and then wait for the state:
 
-```js
-await page.mouse.click(x, y);
+```ts
+import { chromium } from 'playwright';
+
+const browser = await chromium.launch();
+const page = await browser.newPage();
+await page.goto('http://localhost:5173/');
+await page.mouse.click(320, 240);
 await page.waitForFunction(() => document.querySelector('#selected')!.textContent === 'crate');
+await browser.close();
 ```
 
 ## Models and environment
@@ -525,6 +529,7 @@ import {Canvas} from '@margoengine/react';
 // Under `vite dev` the console names the component to use instead of <mesh>.
 export const App = () => (
   <Canvas>
+    {/* @ts-expect-error: the wrong name on purpose, this is what the warning is for. */}
     <mesh />
   </Canvas>
 );

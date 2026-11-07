@@ -6,8 +6,10 @@ Arc-length spline sweeps generate a road surface, raised curbs, hard cross-secti
 
 ```ts
 import {road} from 'margoengine/road';
+import {Spline} from 'margoengine/splines';
 import {Engine} from 'margoengine/core';
 const engine = await Engine.create(document.querySelector('canvas')!);
+const curve = new Spline([[0, 0, 0], [40, 2, 30], [90, 0, 20]]);
 const {geometry, uvs} = road(curve, {width: 6, curbWidth: 0.2, curbHeight: 0.15, uvMeters: 5});
 engine.createMesh().setGeometry(geometry);
 ```

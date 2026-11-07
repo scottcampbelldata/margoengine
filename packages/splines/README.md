@@ -19,6 +19,7 @@ Bezier curves require 3n+1 points and are open. Hermite requires one tangent per
 `kind: 'bspline'` is the uniform cubic B-spline: smoother than Catmull-Rom (continuous curvature) but it only pulls toward interior points, so it does not pass through them; open curves start and end exactly at the first and last point. `kind: 'kochanek-bartels'` passes through every point and adds `tension`, `continuity` and `bias`, each -1 to 1 and 0 by default (all zero is Catmull-Rom).
 
 ```ts
+const waypoints: [number, number, number][] = [[0, 2, 0], [5, 3, 5], [10, 2, 10], [15, 4, 5]];
 const camera = new Spline(waypoints, {kind: 'kochanek-bartels', tension: 0.3, bias: -0.2});
 const smooth = new Spline(waypoints, {kind: 'bspline', closed: true});
 ```
@@ -26,7 +27,9 @@ const smooth = new Spline(waypoints, {kind: 'bspline', closed: true});
 ## Closest point (`@margoengine/splines/closest`)
 
 ```ts
+import {Spline} from 'margoengine/splines';
 import {closestPointOnSpline} from 'margoengine/splines/closest';
+const curve = new Spline([[0, 0, 0], [5, 1, 5], [10, 0, 10]]);
 const hit = closestPointOnSpline(curve, [3, 1, 4]);
 // hit.t (0..1), hit.arc (world units along the curve), hit.point, hit.distance
 ```
@@ -36,7 +39,9 @@ It samples the curve (`samples`, default the spline's `divisions`), then bisects
 ## Stable frames and roll (`@margoengine/splines/frames`)
 
 ```ts
+import {Spline} from 'margoengine/splines';
 import {SplineFrames} from 'margoengine/splines/frames';
+const curve = new Spline([[0, 0, 0], [5, 1, 5], [10, 0, 10]]);
 const frames = new SplineFrames(curve, {up: [0, 1, 0], roll: (t) => t * 0.5});
 const frame = frames.frameAt(curve.length * 0.25);
 // frame.position, frame.tangent, frame.normal, frame.binormal (binormal = tangent x normal)
@@ -65,9 +70,13 @@ Modes: `auto` (smooth through the knot), `linear` (handles point at the neighbor
 ## Place and deform along a spline (`@margoengine/splines/mesh`)
 
 ```ts
+import {boxGeometry} from 'margoengine/geometry';
+import {Spline} from 'margoengine/splines';
 import {placeAlongSpline, deformAlongSpline} from 'margoengine/splines/mesh';
+const curve = new Spline([[0, 0, 0], [5, 1, 5], [10, 0, 10]]);
 const posts = placeAlongSpline(curve, {spacing: 2.5, fit: true, forward: 'z'});
 // posts.matrices: count column-major 4x4 matrices, ready for an instance buffer
+const {positions, normals} = boxGeometry(0.2, 0.2, 1, 1, 1, 16);
 const pipe = deformAlongSpline(curve, positions, {axis: 'z', normals, fit: 'stretch'});
 // pipe.positions, pipe.normals
 ```
@@ -78,6 +87,7 @@ const pipe = deformAlongSpline(curve, positions, {axis: 'z', normals, fit: 'stre
 
 ```ts
 import {fitSpline} from 'margoengine/splines/fit';
+const gpsTrack: [number, number, number][] = [[0, 0, 0], [3, 0, 1], [6, 0, 1.5], [9, 0, 1], [12, 0, 0]];
 const {spline, points, pieces, maxError} = fitSpline(gpsTrack, {tolerance: 0.5});
 ```
 

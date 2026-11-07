@@ -199,6 +199,7 @@ JavaScript runtime: it evaluates only its own syntax tree, with no host access.
 ```ts
 import {runVoxelExpression, VoxelExpressionError} from 'margoengine/procedural/expression';
 declare const signal: AbortSignal;
+const grid = {voxels: new Uint8Array(64 * 32 * 64)};
 const {voxels} = runVoxelExpression({
   source: 'noise(x * f, y * f, z * f) > 0.5 ? tone : color', // one expression per cell
   size: [64, 32, 64], voxels: grid.voxels,                    // voxel-edit layout: x + sx * (z + sz * y), Y up

@@ -11,7 +11,10 @@ A virtual camera with analytically integrated critically damped follow and look-
 ```ts
 import {Cinematic} from 'margoengine/cinematic';
 import {Engine} from 'margoengine/core';
+import {boxGeometry} from 'margoengine/geometry';
+import {PbrMaterial, createMesh} from 'margoengine/materials';
 const engine = await Engine.create(document.querySelector('canvas')!);
+const player = createMesh(engine, boxGeometry(0.5, 1.8, 0.5), new PbrMaterial()).root;
 const rig = Cinematic.attach(engine, {offset: [0,3,6], damping: 6});
 rig.follow(player);
 rig.shake(0.2, 0.4);
@@ -22,9 +25,13 @@ follow accepts a live mesh from the attached engine or a world-position tuple. M
 Scope the rig with `using` (it calls `dispose()` and returns the camera to your controls):
 
 ```ts
+import RAPIER from '@dimforge/rapier3d-compat';
 import {Cinematic} from 'margoengine/cinematic';
 import {Engine} from 'margoengine/core';
+import {Physics} from 'margoengine/physics';
 const engine = await Engine.create(document.querySelector('canvas')!);
+await RAPIER.init();
+const physics = Physics.attach(engine, {rapier: RAPIER});
 {
   using rig = Cinematic.attach(engine, {offset: [0, 3, 6]});
   rig.follow([0, 1.6, 0]);

@@ -85,6 +85,7 @@ const canvas = document.querySelector('canvas')!;
 const engine = await Engine.create(canvas);
 const {clientWidth: width, clientHeight: height} = canvas;
 const spot = worldToScreen(new Vector3(0, 2, 0), engine.camera, width, height, new Vector3());
+const label = document.querySelector<HTMLElement>('#label')!;
 if (spot) label.style.transform = `translate(${spot.x}px, ${spot.y}px)`; // null: behind the camera, hide the label
 const atSameDepth = spot && screenToWorld(spot.x + 10, spot.y, spot.z, engine.camera, width, height, new Vector3());
 ```
@@ -159,6 +160,8 @@ const engine = await Engine.create(document.querySelector('canvas')!);
 const c = engine.camera,
   eye = new Vector3(...c.position),
   cameraWorld = new Matrix4().lookAt(eye, new Vector3(...c.target), new Vector3(...c.up)).setPosition(eye).elements;
+const billboards = [engine.createMesh()], heading: [number, number, number] = [0, 0, 1];
+const play = (clip: string) => console.log(clip);
 for (const mesh of billboards) {
   const p: [number, number, number] = [mesh.position.x, mesh.position.y, mesh.position.z];
   mesh.setQuaternion(billboardRotation(cameraWorld, p, {lockY: true, snap: 45}));

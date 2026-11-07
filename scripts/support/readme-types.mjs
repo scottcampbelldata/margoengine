@@ -29,6 +29,14 @@ export const README_OPTIONS = {
  */
 export const README_BINDING = 'export declare function create(flags: string[]): GPU;';
 
+/**
+ * Browser globals of WebGPU that TypeScript's DOM library leaves out, though every WebGPU browser has them. Only real globals
+ * go here: a name an example needs set up is written in the example.
+ */
+export const README_GLOBALS = `declare const GPUBufferUsage: Readonly<Record<'MAP_READ' | 'MAP_WRITE' | 'COPY_SRC' | 'COPY_DST' | 'INDEX' | 'VERTEX' | 'UNIFORM' | 'STORAGE' | 'INDIRECT' | 'QUERY_RESOLVE', number>>;
+declare const GPUTextureUsage: Readonly<Record<'COPY_SRC' | 'COPY_DST' | 'TEXTURE_BINDING' | 'STORAGE_BINDING' | 'RENDER_ATTACHMENT', number>>;
+`;
+
 /** The compiler options of a project holding the binding's stand-in as `readme-binding.d.ts`. */
 export const README_PROJECT = { ...README_OPTIONS, paths: { webgpu: ['./readme-binding.d.ts'] } };
 
@@ -73,9 +81,10 @@ export function writeExamples(scratch, packages) {
         count++;
       });
   writeFileSync(join(scratch, 'readme-binding.d.ts'), README_BINDING);
+  writeFileSync(join(scratch, 'readme-globals.d.ts'), README_GLOBALS);
   writeFileSync(
     join(scratch, 'tsconfig.json'),
-    JSON.stringify({ compilerOptions: README_PROJECT, include: ['**/*.tsx'] }),
+    JSON.stringify({ compilerOptions: README_PROJECT, include: ['**/*.tsx', 'readme-globals.d.ts'] }),
   );
   return count;
 }

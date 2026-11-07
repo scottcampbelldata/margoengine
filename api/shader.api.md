@@ -420,7 +420,9 @@ export const atan2: <A extends NodeInput[]>(...a: A) => Node<Widest<A>>;
 
 export const bitangentWorld: Node<"vec3f">;
 
-export function block<T extends Type>(body: () => Node<T>): Node<T>;
+export function block<T extends Type>(body: () => Node<NoInfer<T>> & {
+    readonly type: T;
+}): Node<T>;
 
 export const bool: (x: Part) => Node<'bool'>;
 

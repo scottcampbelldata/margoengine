@@ -18,6 +18,9 @@ const engine = await Engine.create(document.querySelector('canvas')!);
 
 const model: VoxelGrid = { size: [32, 32, 32], voxels: new Uint8Array(32 * 32 * 32) };
 const { grid } = rotateGrid(model, { axis: 'y', degrees: 90 }); // a new grid; `model` is unchanged
+const prop: VoxelGrid = { size: [8, 8, 8], voxels: new Uint8Array(8 * 8 * 8) };
+const baseKeys = Array.from({ length: 256 }, (_, i) => `base:${i}`), toolKeys = Array.from({ length: 256 }, (_, i) => `tool:${i}`);
+const baseUsed = new Uint8Array(256), toolUsed = new Uint8Array(256);
 const { paletteMap } = mergePalettes({ baseKeys, toolKeys, baseUsed, toolUsed });
 const merged = combineGrids(grid, prop, { operation: 'union', offset: [4, 0, 4], paletteMap });
 
