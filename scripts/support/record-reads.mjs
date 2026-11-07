@@ -89,7 +89,9 @@ function install(dir) {
     random: Math.random,
   };
   const rawEnv = process.env,
-    temp = resolve(tmpdir()) + sep,
+    // Both spellings of the temp folder: macOS os.tmpdir() is /var/folders/..., a link to /private/var/folders/..., and
+    // a path built from process.cwd() or a module URL comes in the real form.
+    temps = [...new Set([resolve(tmpdir()), fs.realpathSync(tmpdir())])].map((folder) => folder + sep),
     perTest = rawEnv.MARGO_RECORD_PER_TEST === '1' && !rawEnv.MARGO_RECORD_SCOPE && rawEnv.NODE_TEST_CONTEXT;
   const lead = Boolean(perTest && process.argv[1]);
   if (lead) rawEnv.MARGO_RECORD_SCOPE = `test:${resolve(process.argv[1])}`;
@@ -157,7 +159,7 @@ function install(dir) {
   const written = (args) => noteWrite(pathOf(args[0]));
   const made = (args) => {
     const path = pathOf(args[0]);
-    if (path?.startsWith(temp)) noteCover(path);
+    if (path !== undefined && temps.some((folder) => path.startsWith(folder))) noteCover(path);
   };
   const copied = (args) => {
     noteRead(pathOf(args[0]), 'r');

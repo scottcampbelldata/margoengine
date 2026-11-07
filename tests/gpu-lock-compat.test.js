@@ -21,9 +21,24 @@ const settled = (promise, ms = 300) => {
 const BOUND = 30_000;
 const quiet = () => {};
 
+/**
+ * Sets `set` in process.env and clears every other MARGO_GPU_* name, so a lane's ambient setting (MARGO_GPU_SLOTS=2 turns
+ * the third shared holder below into a waiter, and the test hangs) never reaches the lock under test. Returns the undo.
+ */
+function isolateGpuEnv(set) {
+  const saved = {};
+  for (const key of Object.keys(process.env)) if (key.startsWith('MARGO_GPU_')) saved[key] = process.env[key];
+  for (const key of Object.keys(saved)) delete process.env[key];
+  for (const [key, value] of Object.entries(set)) process.env[key] = value;
+  return () => {
+    for (const key of Object.keys(process.env)) if (key.startsWith('MARGO_GPU_')) delete process.env[key];
+    Object.assign(process.env, saved);
+  };
+}
+
 let copies = 0;
 // The new and the old lock module, both on a fresh temp gpu.lock (never the real one); `env` is set while they load
-// and while `body` runs.
+// and while `body` runs, and no other MARGO_GPU_* name is.
 async function withBoth(body, env = {}) {
   const folder = mkdtempSync(join(tmpdir(), 'gpu-lock-compat-')),
     lock = join(folder, 'gpu.lock'),
@@ -35,11 +50,7 @@ async function withBoth(body, env = {}) {
       MARGO_GPU_FRESH_MS: '300',
       ...env,
     },
-    saved = {};
-  for (const [key, value] of Object.entries(set)) {
-    saved[key] = process.env[key];
-    process.env[key] = value;
-  }
+    restore = isolateGpuEnv(set);
   try {
     const now = await import(`../scripts/gpu-lock.mjs?compat=${copies}`);
     const old = await import(`./fixtures/gpu-lock-v1.mjs?compat=${copies++}`);
@@ -47,13 +58,24 @@ async function withBoth(body, env = {}) {
     assert.equal(old.lockDir, lock);
     await body({ now, old, lock });
   } finally {
-    for (const key of Object.keys(saved)) {
-      if (saved[key] === undefined) delete process.env[key];
-      else process.env[key] = saved[key];
-    }
+    restore();
     rmSync(folder, { recursive: true, force: true });
   }
 }
+test('an ambient MARGO_GPU_* setting does not reach the locks under test, and is back afterwards', async () => {
+  const ambient = { MARGO_GPU_SLOTS: '2', MARGO_GPU_WAIT_MAX_MIN: '0.01', MARGO_GPU_LEASE_MS: '1' },
+    restore = isolateGpuEnv(ambient);
+  try {
+    await withBoth(async ({ now }) => {
+      assert.equal(now.slots(), 3);
+      for (const key of Object.keys(ambient)) assert.equal(process.env[key], undefined, key);
+    });
+    for (const [key, value] of Object.entries(ambient)) assert.equal(process.env[key], value, key);
+  } finally {
+    restore();
+  }
+});
+
 const takeNew = (gpu, owner, mode) => gpu.acquire({ owner, mode, poll: 10, log: quiet });
 const takeOld = (gpu, owner) => gpu.acquire({ owner, poll: 10, log: quiet });
 
@@ -198,9 +220,8 @@ test('benchmarks are exclusive: bench* npm scripts and scripts under bench/ or b
 
 test('every explicitly selected lock other than gpu.lock is exclusive with a 30 min hold limit', async () => {
   const folder = mkdtempSync(join(tmpdir(), 'gpu-lock-compat-')),
-    saved = process.env.MARGO_GPU_LOCK;
+    restore = isolateGpuEnv({ MARGO_GPU_LOCK: join(folder, 'other.lock') });
   try {
-    process.env.MARGO_GPU_LOCK = join(folder, 'other.lock');
     const custom = await import(`../scripts/gpu-lock.mjs?custom=${copies++}`);
     assert.equal(custom.resolveMode(undefined), 'exclusive');
     assert.equal(custom.defaultMaxMinutes('exclusive'), 30);
@@ -209,8 +230,7 @@ test('every explicitly selected lock other than gpu.lock is exclusive with a 30 
     assert.equal(gpu.defaultMaxMinutes('shared'), 20);
     assert.equal(gpu.defaultMaxMinutes('exclusive'), 60);
   } finally {
-    if (saved === undefined) delete process.env.MARGO_GPU_LOCK;
-    else process.env.MARGO_GPU_LOCK = saved;
+    restore();
     rmSync(folder, { recursive: true, force: true });
   }
 });

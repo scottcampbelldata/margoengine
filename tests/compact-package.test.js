@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 import test from 'node:test';
@@ -7,11 +7,26 @@ import { pathToFileURL } from 'node:url';
 import { compactPackage } from '../scripts/compact-package.js';
 
 test('stage compaction packages shared chunks and preserves module identities', async (t) => {
-  const root = await mkdtemp(join(tmpdir(), 'margo-compact-')),
-    stage = join(root, 'packages/stage'),
+  const root = await mkdtemp(join(tmpdir(), 'margo-compact-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await stageCompaction(root);
+});
+
+// macOS os.tmpdir() is /var/folders/..., a link to /private/var/folders/..., and the bundler names importers by their
+// real path. An explicit link puts the same split on any system.
+test('stage compaction finds the shared helpers when the checkout is reached through a symlink', async (t) => {
+  const real = await mkdtemp(join(tmpdir(), 'margo-compact-real-')),
+    holder = await mkdtemp(join(tmpdir(), 'margo-compact-link-')),
+    root = join(holder, 'checkout');
+  t.after(() => Promise.all([real, holder].map((dir) => rm(dir, { recursive: true, force: true }))));
+  await symlink(real, root, 'junction');
+  await stageCompaction(root);
+});
+
+async function stageCompaction(root) {
+  const stage = join(root, 'packages/stage'),
     dist = join(stage, 'dist'),
     shared = join(root, 'packages/shared');
-  t.after(() => rm(root, { recursive: true, force: true }));
   await Promise.all([
     mkdir(dist, { recursive: true }),
     mkdir(join(stage, 'src'), { recursive: true }),
@@ -50,7 +65,7 @@ test('stage compaction packages shared chunks and preserves module identities', 
   entry.register(mesh, 'triangles');
   assert.equal(model.lookup(mesh), 'triangles');
   assert.equal(entry.lookup, model.lookup);
-});
+}
 
 test('core compaction ships the canonical clear helper without requiring sibling checkout files', async (t) => {
   const root = await mkdtemp(join(tmpdir(), 'margo-core-clear-')),

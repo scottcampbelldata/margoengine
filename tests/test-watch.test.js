@@ -128,7 +128,9 @@ test('a hung run ends last: its children and grandchildren are gone when it repo
     assert.equal(error, undefined);
     assert.notEqual(status, 0, 'a hung run fails');
     assert.deepEqual(pids.filter(alive), [], 'nothing the run started outlives it');
-    if (process.platform === 'win32') assert.match(stderr, /HUNG RUN ENDED: \d+ child processes stopped and gone/);
+    // The test process and the one it started, on every system: the line is printed only once both are confirmed gone.
+    const ended = /HUNG RUN ENDED: (\d+) child processes stopped and gone/.exec(stderr);
+    assert.ok(ended && Number(ended[1]) >= 2, stderr);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

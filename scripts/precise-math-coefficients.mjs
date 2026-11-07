@@ -114,27 +114,62 @@ export function smallestReducedArgument() {
   return { log2: Math.log2(worst), exponent: at };
 }
 
-/** Solves A c = b (Gaussian elimination with partial pivoting); A is n x n. */
-function solve(A, b) {
-  const n = b.length,
-    M = A.map((row, i) => [...row, b[i]]);
+/**
+ * Least squares: the c minimising |X c - y| for X m x n (m >= n), by Householder QR of X with its columns scaled to unit
+ * length. Not the normal equations X^T X c = X^T y: they square X's condition number, and for a monomial basis such as
+ * atan's u^3 .. u^15 that made the result hang on the last bit of the host's Math.cos and Math.atan (a 1 ulp change
+ * moved atan's leading coefficient across an f32 rounding midpoint, so macOS derived other constants than Windows).
+ */
+function leastSquares(X, y) {
+  const m = X.length,
+    n = X[0].length,
+    scale = [];
+  for (let j = 0; j < n; j++) {
+    let sum = 0;
+    for (let i = 0; i < m; i++) sum += X[i][j] * X[i][j];
+    scale.push(Math.sqrt(sum) || 1);
+  }
+  const R = X.map((row) => row.map((v, j) => v / scale[j])),
+    b = [...y],
+    v = new Array(m);
   for (let k = 0; k < n; k++) {
-    let p = k;
-    for (let i = k + 1; i < n; i++) if (Math.abs(M[i][k]) > Math.abs(M[p][k])) p = i;
-    [M[k], M[p]] = [M[p], M[k]];
-    for (let i = k + 1; i < n; i++) {
-      const f = M[i][k] / M[k][k];
-      for (let j = k; j <= n; j++) M[i][j] -= f * M[k][j];
+    let norm = 0;
+    for (let i = k; i < m; i++) norm += R[i][k] * R[i][k];
+    norm = Math.sqrt(norm);
+    if (norm === 0) continue;
+    const alpha = R[k][k] > 0 ? -norm : norm;
+    let length = 0;
+    for (let i = k; i < m; i++) {
+      v[i] = i === k ? R[k][k] - alpha : R[i][k];
+      length += v[i] * v[i];
     }
+    const reflect = (get, set) => {
+      let dot = 0;
+      for (let i = k; i < m; i++) dot += v[i] * get(i);
+      const f = (2 * dot) / length;
+      for (let i = k; i < m; i++) set(i, get(i) - f * v[i]);
+    };
+    for (let j = k; j < n; j++)
+      reflect(
+        (i) => R[i][j],
+        (i, value) => (R[i][j] = value),
+      );
+    reflect(
+      (i) => b[i],
+      (i, value) => (b[i] = value),
+    );
   }
   const c = new Array(n).fill(0);
   for (let i = n - 1; i >= 0; i--) {
-    let s = M[i][n];
-    for (let j = i + 1; j < n; j++) s -= M[i][j] * c[j];
-    c[i] = s / M[i][i];
+    let s = b[i];
+    for (let j = i + 1; j < n; j++) s -= R[i][j] * c[j];
+    c[i] = s / R[i][i];
   }
-  return c;
+  return c.map((value, j) => value / scale[j]);
 }
+
+/** Relative error (2^-44, 512 f64 ulps) below which Lawson's reweighting stops: what is left is f64 rounding noise. */
+const LAWSON_FLOOR = 2 ** -44;
 
 /**
  * Minimax fit of f(x) ~ base(x) + sum c_j b_j(x) in relative error over [lo, hi] (Lawson's algorithm), then the
@@ -153,26 +188,27 @@ function fit({ f, base, basis, lo, hi, points = 1500 }) {
     let w = rows.map(() => 1 / rows.length),
       c;
     for (let it = 0; it < 120; it++) {
-      const A = Array.from({ length: n }, () => new Array(n).fill(0)),
-        rhs = new Array(n).fill(0);
+      const X = [],
+        y = [];
       for (let i = 0; i < rows.length; i++) {
         const { x, fx } = rows[i],
           bs = basis(x),
-          free = bs.slice(fixed.length).map((v) => v / fx);
+          root = Math.sqrt(w[i]);
         let target = (fx - base(x)) / fx;
         for (let j = 0; j < fixed.length; j++) target -= (fixed[j] * bs[j]) / fx;
-        for (let a = 0; a < n; a++) {
-          rhs[a] += w[i] * free[a] * target;
-          for (let b = 0; b < n; b++) A[a][b] += w[i] * free[a] * free[b];
-        }
+        X.push(bs.slice(fixed.length).map((v) => (root * v) / fx));
+        y.push(root * target);
       }
-      c = solve(A, rhs);
+      c = leastSquares(X, y);
       const err = rows.map(({ x, fx }) => {
         const bs = basis(x);
         let v = base(x);
         for (let j = 0; j < bs.length; j++) v += (j < fixed.length ? fixed[j] : c[j - fixed.length]) * bs[j];
         return Math.abs((v - fx) / fx);
       });
+      // At this error the fit is far past what f32 can hold, and the rest is rounding noise in f64: reweighting by it
+      // piles every weight onto a few points until the system is singular (sinh did that).
+      if (Math.max(...err) < LAWSON_FLOOR) break;
       const total = err.reduce((s, e, i) => s + w[i] * e, 0);
       w = w.map((wi, i) => (wi * err[i]) / total);
     }
@@ -195,6 +231,79 @@ function fit({ f, base, basis, lo, hi, points = 1500 }) {
 
 const powers = (x, from, n) => Array.from({ length: n }, (_, j) => x ** (from + j));
 
+/**
+ * What each polynomial fits: the function, the part kept exact (`base`), the basis of the f32 coefficients and the
+ * range. Built on each call, so it reads Math.* as it is then (the derivation test nudges them).
+ */
+const polynomials = () => ({
+  sin: {
+    f: Math.sin,
+    base: (r) => r,
+    basis: (r) => powers(r * r, 0, 4).map((v) => v * r * r * r),
+    lo: 1e-4,
+    hi: Math.PI / 4 + 1e-6,
+  },
+  cos: {
+    f: Math.cos,
+    base: (r) => 1 - (r * r) / 2,
+    basis: (r) => powers(r * r, 0, 4).map((v) => v * r ** 4),
+    lo: 1e-4,
+    hi: Math.PI / 4 + 1e-6,
+  },
+  atan: {
+    f: Math.atan,
+    base: (u) => u,
+    basis: (u) => powers(u * u, 0, 7).map((v) => v * u ** 3),
+    lo: 1e-4,
+    hi: 0.5 + 1e-6,
+  },
+  asin: {
+    f: Math.asin,
+    base: (x) => x,
+    basis: (x) => powers(x * x, 0, 7).map((v) => v * x ** 3),
+    lo: 1e-4,
+    hi: 0.5 + 1e-6,
+  },
+  sinh: {
+    f: Math.sinh,
+    base: (x) => x,
+    basis: (x) => powers(x * x, 0, 6).map((v) => v * x ** 3),
+    lo: 1e-4,
+    hi: 1 + 1e-6,
+  },
+  cosh: {
+    f: Math.cosh,
+    base: (x) => 1 + (x * x) / 2,
+    basis: (x) => powers(x * x, 0, 5).map((v) => v * x ** 4),
+    lo: 1e-4,
+    hi: 1 + 1e-6,
+  },
+  tanh: {
+    f: Math.tanh,
+    base: (x) => x,
+    basis: (x) => powers(x * x, 0, 7).map((v) => v * x ** 3),
+    lo: 1e-4,
+    hi: 0.55 + 1e-6,
+  },
+  expm1: {
+    f: Math.expm1,
+    base: (r) => r,
+    basis: (r) => powers(r, 2, 6),
+    lo: -Math.LN2 / 2 - 1e-6,
+    hi: Math.LN2 / 2 + 1e-6,
+  },
+  log: {
+    f: (s) => 2 * Math.atanh(s),
+    base: (s) => 2 * s,
+    basis: (s) => powers(s * s, 1, 4).map((v) => v * s),
+    lo: 1e-4,
+    hi: (Math.SQRT2 - 1) / (Math.SQRT2 + 1) + 1e-6,
+  },
+});
+
+/** The f32 coefficients of one polynomial (sin, cos, atan, asin, sinh, cosh, tanh, expm1 or log) and its error. */
+export const fitPolynomial = (name) => fit(polynomials()[name]);
+
 /** Every constant of the precise maths module. */
 export function derive() {
   const shift = BITS;
@@ -209,69 +318,17 @@ export function derive() {
   }
   ln2 *= 2n;
   const log2e = (ONE * ONE) / ln2;
-  const sin = fit({
-    f: Math.sin,
-    base: (r) => r,
-    basis: (r) => powers(r * r, 0, 4).map((v) => v * r * r * r),
-    lo: 1e-4,
-    hi: Math.PI / 4 + 1e-6,
-  });
-  const cos = fit({
-    f: Math.cos,
-    base: (r) => 1 - (r * r) / 2,
-    basis: (r) => powers(r * r, 0, 4).map((v) => v * r ** 4),
-    lo: 1e-4,
-    hi: Math.PI / 4 + 1e-6,
-  });
-  const atan = fit({
-    f: Math.atan,
-    base: (u) => u,
-    basis: (u) => powers(u * u, 0, 7).map((v) => v * u ** 3),
-    lo: 1e-4,
-    hi: 0.5 + 1e-6,
-  });
-  const asin = fit({
-    f: Math.asin,
-    base: (x) => x,
-    basis: (x) => powers(x * x, 0, 7).map((v) => v * x ** 3),
-    lo: 1e-4,
-    hi: 0.5 + 1e-6,
-  });
-  const sinh = fit({
-    f: Math.sinh,
-    base: (x) => x,
-    basis: (x) => powers(x * x, 0, 6).map((v) => v * x ** 3),
-    lo: 1e-4,
-    hi: 1 + 1e-6,
-  });
-  const cosh = fit({
-    f: Math.cosh,
-    base: (x) => 1 + (x * x) / 2,
-    basis: (x) => powers(x * x, 0, 5).map((v) => v * x ** 4),
-    lo: 1e-4,
-    hi: 1 + 1e-6,
-  });
-  const tanh = fit({
-    f: Math.tanh,
-    base: (x) => x,
-    basis: (x) => powers(x * x, 0, 7).map((v) => v * x ** 3),
-    lo: 1e-4,
-    hi: 0.55 + 1e-6,
-  });
-  const expm1 = fit({
-    f: Math.expm1,
-    base: (r) => r,
-    basis: (r) => powers(r, 2, 6),
-    lo: -Math.LN2 / 2 - 1e-6,
-    hi: Math.LN2 / 2 + 1e-6,
-  });
-  const log = fit({
-    f: (s) => 2 * Math.atanh(s),
-    base: (s) => 2 * s,
-    basis: (s) => powers(s * s, 1, 4).map((v) => v * s),
-    lo: 1e-4,
-    hi: (Math.SQRT2 - 1) / (Math.SQRT2 + 1) + 1e-6,
-  });
+  const [sin, cos, atan, asin, sinh, cosh, tanh, expm1, log] = [
+    'sin',
+    'cos',
+    'atan',
+    'asin',
+    'sinh',
+    'cosh',
+    'tanh',
+    'expm1',
+    'log',
+  ].map(fitPolynomial);
   return {
     twoOverPi: twoOverPiTable(),
     // round(pi/2 * 2^31): the reduced fraction times this, in fixed point.

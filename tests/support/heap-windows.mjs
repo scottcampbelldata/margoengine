@@ -2,8 +2,9 @@
 // A window inside which V8 collected garbage under-reports (the collection frees what the window allocated), so a
 // frame that allocates more can read as allocating less: such windows are left out (v8.GCProfiler sees every
 // collection) and measured again. The probes run with a 16 MB young generation (--min-semi-space-size=16), so a
-// window that allocates a few kilobytes per call is never collected, and --single-threaded-gc, so no sweeper thread
-// frees pages while a window counts.
+// window that allocates a few kilobytes per call is never collected, --single-threaded-gc, so no sweeper thread
+// frees pages while a window counts, and --no-concurrent-recompilation and --no-concurrent-sparkplug, so no compiler
+// thread drops its code into a window (macOS arm64 compiles baseline code on one by default).
 import { GCProfiler, getHeapStatistics } from 'node:v8';
 
 /**

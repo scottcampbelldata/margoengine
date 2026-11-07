@@ -6,7 +6,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { PRECISE, PRECISE_FUNCTIONS, preciseMathWgsl } from '../packages/shared/precise-math.js';
-import { derive, PI_FIXED } from '../scripts/precise-math-coefficients.mjs';
+import { derive, fitPolynomial, PI_FIXED } from '../scripts/precise-math-coefficients.mjs';
 import { perturbBuiltinMath, reassociateMath } from '../scripts/browser.js';
 import { bitsOf, preciseCases, preciseReference, reduceHalfPi, worstError } from './precise-math-reference.js';
 
@@ -22,6 +22,29 @@ test('every constant is what scripts/precise-math-coefficients.mjs derives from 
   // The closest any f32 comes to a multiple of pi/2 is 2^-29.2 (at 16367173 * 2^72), so the reduction's 2^-63
   // resolution keeps 34 bits of the smallest reduced argument.
   assert.ok(d.reduction.log2 > -29.5 && d.reduction.log2 < -29, `2^${d.reduction.log2}`);
+});
+
+// The fit once solved normal equations, which square the condition number of a monomial basis: a 1 ulp change in the
+// host's Math.atan or Math.cos (macOS on arm64 against Windows) moved atan's leading coefficient across an f32 rounding
+// midpoint, and every coefficient after it with it. tanh sat 1e-11 from one, inside that noise.
+test('the polynomial fits do not hang on the last bit of the host maths', () => {
+  for (const name of ['atan', 'tanh']) {
+    const want = fitPolynomial(name).coefficients;
+    for (const [math, nudge] of [
+      [name, 1 + 2 ** -52],
+      [name, 1 - 2 ** -53],
+      ['cos', 1 + 2 ** -52],
+      ['cos', 1 - 2 ** -53],
+    ]) {
+      const host = Math[math];
+      Math[math] = (x) => host(x) * nudge;
+      try {
+        assert.deepEqual(fitPolynomial(name).coefficients, want, `${name} with Math.${math} times ${nudge}`);
+      } finally {
+        Math[math] = host;
+      }
+    }
+  }
 });
 
 test('the pi/2 reduction matches exact BigInt arithmetic for f32 inputs of every exponent', () => {

@@ -1,15 +1,20 @@
 import assert from 'node:assert/strict';
+import { existsSync, realpathSync } from 'node:fs';
 import { readFile, readdir, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { build } from 'vite';
 import { compactInternals } from './compact-internals.js';
 import { compactOutput } from './measure-size.js';
 
+// The bundler hands the importer over in real form (macOS os.tmpdir() is /var/folders/..., a link to
+// /private/var/folders/...), so both sides of the shared-helper test are compared as real paths.
+const real = (path) => (existsSync(path) ? realpathSync(path) : path);
+
 export async function compactPackage(name, directory = `packages/${name}`) {
   const root = resolve(directory, 'dist'),
     // Shared helpers bundled into core and the stage; everything else stays an import.
     shared = (name === 'core' ? ['clear-color', 'view-rect', 'errors', 'hypot'] : ['mesh-source', 'errors']).map(
-      (file) => resolve(directory, `../shared/${file}.js`),
+      (file) => real(resolve(directory, `../shared/${file}.js`)),
     ),
     files = (await readdir(root)).filter((file) => file.endsWith('.js'));
   for (const file of files)
@@ -36,7 +41,8 @@ export async function compactPackage(name, directory = `packages/${name}`) {
       },
       rollupOptions: {
         external: (id, importer) =>
-          !!importer && ((name !== 'stage' && name !== 'core') || !shared.includes(resolve(dirname(importer), id))),
+          !!importer &&
+          ((name !== 'stage' && name !== 'core') || !shared.includes(real(resolve(dirname(importer), id)))),
         output: { ...compactOutput, comments: { annotation: true } },
       },
     },

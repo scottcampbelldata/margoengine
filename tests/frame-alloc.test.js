@@ -13,11 +13,15 @@ import { FLOORS, frameBytes, overFloor } from '../scripts/frame-alloc-browser.mj
 // a window measures depends on the frames run, never on the machine's load: with compiler threads that a parallel
 // package build starved, Turbofan's code arrived after the warm-up and the core frame read 300 B (its Maglev cost)
 // against the 256 B limit. The tiers and their bytes are the same; only the wall-clock race is gone.
+// --no-concurrent-sparkplug does the same for the baseline tier: V8 on macOS arm64 compiles Sparkplug code in batches
+// on a background thread by default, and its code landed in whichever window was running when the thread finished, a
+// page at a time (one window read 572 B a call against 72, an allocating frame 128 B against 680).
 const HEAP = [
   '--min-semi-space-size=16',
   '--max-semi-space-size=16',
   '--single-threaded-gc',
   '--no-concurrent-recompilation',
+  '--no-concurrent-sparkplug',
 ];
 // `flags` go to V8 (before the script), `args` to the probe.
 const probeWith = (flags, ...args) =>
@@ -191,6 +195,7 @@ test('the probes leave out a window in which V8 collected garbage', { timeout: 6
           '--single-threaded-gc',
           // As the probes (HEAP above): a compiler thread's work lands in a window at a time the machine's load decides.
           '--no-concurrent-recompilation',
+          '--no-concurrent-sparkplug',
           `--max-semi-space-size=${young}`,
           '--input-type=module',
           '-e',
@@ -214,14 +219,20 @@ try {
 
 // Regression: a read that caught about 210 KB of something else came off all five windows of a run, which then read
 // about -118 B per call, 210 under the 92 B every other run gives. Run by run the windows stayed a fixed step apart.
+// Regression (macOS arm64): V8 compiled baseline code on a background thread there by default, and this run's first window
+// read 572 B (or 334 B) a call against 72 in 9 of 12 runs. Every run forces that thread on, as macOS has it, before the
+// probes' own flags turn it off, so the race is tried on every system.
 test('one heap read that catches something else does not shift every window', { timeout: 60_000 }, () => {
-  const windows = JSON.stringify(new URL('./support/heap-windows.mjs', import.meta.url).href),
-    out = execFileSync(
+  const windows = JSON.stringify(new URL('./support/heap-windows.mjs', import.meta.url).href);
+  for (let run = 0; run < 4; run++) {
+    const out = execFileSync(
       process.execPath,
       [
         '--expose-gc',
+        '--concurrent-sparkplug',
         '--single-threaded-gc',
         '--no-concurrent-recompilation',
+        '--no-concurrent-sparkplug',
         '--max-semi-space-size=16',
         '--input-type=module',
         '-e',
@@ -239,10 +250,11 @@ const { heapWindows } = await import(${windows});
 let kept;
 console.log(JSON.stringify(heapWindows((calls) => { for (let i = 0; i < calls; i++) kept = new Array(1).fill(i); })));`,
       ],
-      { encoding: 'utf8', timeout: 50_000 },
-    ),
-    bytes = JSON.parse(out);
-  for (const b of bytes) assert.ok(b >= 16 && b <= 256, `${bytes.join(', ')} B per call (${host})`);
+      { encoding: 'utf8', timeout: 12_000 },
+    );
+    const bytes = JSON.parse(out);
+    for (const b of bytes) assert.ok(b >= 16 && b <= 256, `run ${run + 1}: ${bytes.join(', ')} B per call (${host})`);
+  }
 });
 
 test('hypot gives Math.hypot bit for bit (V8) without allocating', () => {

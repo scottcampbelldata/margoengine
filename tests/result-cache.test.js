@@ -142,6 +142,34 @@ test("a read of an earlier step's output is allowed; a read of the step's own ou
   assert.ok(!own.inputs.some(([, name]) => name === 'new.js'));
 });
 
+// macOS os.tmpdir() is /var/folders/..., a link to /private/var/folders/...: Node reports module and working folder
+// paths in the real form, so a root given through a link must still own them. An explicit link fails on any system.
+test('a repository reached through a symlink still owns the reads, in either spelling', (t) => {
+  const { root: real, repository } = fixture(t, { 'a.js': 'one', 'b.js': 'two' });
+  const root = join(temp(t), 'linked');
+  symlinkSync(real, root, 'junction');
+  repository.root = root;
+  repository.tracked.add('step.mjs');
+  const step = `import { readFileSync, writeFileSync } from 'node:fs';
+    readFileSync('a.js'); readFileSync(${JSON.stringify(join(root, 'b.js'))});
+    writeFileSync(${JSON.stringify(join(root, 'new.js'))}, 'x'); readFileSync('new.js');`;
+  const { inputs, refused } = manifestOf(record(t, root, step), repository);
+  assert.deepEqual(refused, []);
+  const files = inputs.filter(([kind]) => kind === 'file').map(([, name]) => name);
+  assert.deepEqual(files.sort(), ['a.js', 'b.js', 'step.mjs']);
+});
+
+test('a folder made in the temp folder is covered, whichever spelling of the temp folder made it', (t) => {
+  const { root } = fixture(t);
+  const real = fs.realpathSync(temp(t)),
+    linkedTemp = join(temp(t), 'linked-temp');
+  symlinkSync(real, linkedTemp, 'junction');
+  const step = `import { mkdirSync } from 'node:fs';
+    mkdirSync(${JSON.stringify(join(linkedTemp, 'through-link'))}); mkdirSync(${JSON.stringify(join(real, 'real'))});`;
+  const { covers } = record(t, root, step, { TMPDIR: linkedTemp, TMP: linkedTemp, TEMP: linkedTemp });
+  assert.deepEqual([...covers].sort(), [join(real, 'real'), join(real, 'through-link')]);
+});
+
 test('a file with uncommitted changes, an LFS pointer, a rewritten input and the network are refused', (t) => {
   const { root, repository } = fixture(t, { 'a.js': 'one', 'lfs.bin': 'version https://git-lfs.github.com/spec/v1\n' });
   repository.tracked.add('step.mjs');

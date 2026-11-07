@@ -83,6 +83,62 @@ $found.Count
 if (@($found | Where-Object { -not $_.HasExited }).Count) { exit 3 }
 `;
 
+/** Every process on the machine, pid to parent and whether it is a zombie, from one `ps` listing; skips `ps` itself. */
+function processTable() {
+  const listing = spawnSync('ps', ['-A', '-o', 'pid=,ppid=,stat='], { encoding: 'utf8' }),
+    { status, stdout, stderr, error } = listing;
+  if (status !== 0) throw new Error(`ps failed (status ${status}): ${error?.message ?? stderr}`);
+  const table = new Map();
+  for (const line of stdout.split('\n')) {
+    const [pid, parent, state] = line.trim().split(/\s+/);
+    if (pid && Number(pid) !== listing.pid)
+      table.set(Number(pid), { parent: Number(parent), zombie: state.startsWith('Z') });
+  }
+  return table;
+}
+
+/** Every process below `root` in `table`, children before their children. */
+function below(table, root) {
+  const children = new Map();
+  for (const [pid, { parent }] of table) children.set(parent, [...(children.get(parent) ?? []), pid]);
+  const found = [];
+  for (let at = 0, next = [root]; at < next.length; at++)
+    for (const pid of children.get(next[at]) ?? []) if (!found.includes(pid)) found.push(pid), next.push(pid);
+  return found;
+}
+
+/** Sends a signal; a process that already ended is what was wanted. */
+function signal(pid, name) {
+  try {
+    process.kill(pid, name);
+  } catch (error) {
+    if (error.code !== 'ESRCH') throw error;
+  }
+}
+
+/**
+ * Stops every process below `root` on macOS and Linux, grandchildren included, and waits until each is gone (a zombie
+ * holds no files or folder, so it counts as gone). A grandchild is not in the runner's reach otherwise: the runner's own
+ * SIGTERM ends its test processes only, and a process group would take in whoever started the run. Each listing freezes
+ * what it finds before the next one, so nothing starts a child between the last listing and the kill.
+ */
+function stopTree(root) {
+  const stopped = new Set();
+  for (let fresh = below(processTable(), root); fresh.length; ) {
+    for (const pid of fresh) signal(pid, 'SIGSTOP'), stopped.add(pid);
+    fresh = below(processTable(), root).filter((pid) => !stopped.has(pid));
+  }
+  for (const pid of stopped) signal(pid, 'SIGKILL');
+  const deadline = Date.now() + 20000,
+    pause = new Int32Array(new SharedArrayBuffer(4));
+  for (;;) {
+    const table = processTable(),
+      left = [...stopped].filter((pid) => table.has(pid) && !table.get(pid).zombie);
+    if (!left.length || Date.now() > deadline) return { count: stopped.size, left };
+    Atomics.wait(pause, 0, 0, 50);
+  }
+}
+
 /**
  * Ends this runner and the test processes it started, the runner last: whoever waits on the run may remove the run's
  * folder the moment it ends. `taskkill /T` on this process could not promise that: the runner died while taskkill was
@@ -91,8 +147,14 @@ if (@($found | Where-Object { -not $_.HasExited }).Count) { exit 3 }
  */
 function endRun() {
   if (process.platform !== 'win32') {
-    process.kill(process.pid, 'SIGTERM');
-    return;
+    const { count, left } = stopTree(process.pid);
+    writeSync(
+      2,
+      left.length
+        ? `HUNG RUN: child processes may still be alive: ${left.join(', ')}\n`
+        : `HUNG RUN ENDED: ${count} child processes stopped and gone\n`,
+    );
+    process.exit(1);
   }
   const { status, stdout, stderr, error } = spawnSync(
     'powershell',

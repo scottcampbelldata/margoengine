@@ -273,7 +273,12 @@ functions for code that compares CPU and GPU results or results across vendors:
 The implementation uses public numerical methods: integer Payne-Hanek reduction with a 2/pi table, Cody-Waite
 reduction for ln 2, Dekker products from 12-bit halves, and minimax coefficients derived by
 `scripts/precise-math-coefficients.mjs` at high precision. WGSL is emitted only for requested functions, with shared
-helpers emitted once.
+helpers emitted once. The derivation solves each Lawson step by Householder QR on unit-scaled columns and stops
+reweighting at 2^-44 relative error (f64 noise): the normal equations it used before amplified a 1 ulp difference in the
+host's `Math.atan` or `Math.cos` past an f32 rounding midpoint, so macOS arm64 derived other atan constants than Windows,
+and tanh's stored set had come from that noise. `tests/precise-math.test.js` re-fits atan and tanh with the host maths
+nudged by 1 ulp and needs the same f32 values. The regenerated tanh holds 1.45 ulp (bound 2) on the M6 Mac mini (Metal)
+(`npm run test:browser --workspace packages/compute`, 2026-11-07); other GPUs still need a run with it.
 
 Important primitives:
 

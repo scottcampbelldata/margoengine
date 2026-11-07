@@ -15,6 +15,7 @@ import {
   mkdirSync,
   readdirSync,
   readFileSync,
+  realpathSync,
   renameSync,
   rmSync,
   statSync,
@@ -22,7 +23,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { homedir, release } from 'node:os';
-import { dirname, join, relative, resolve, sep } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { gunzipSync, gzipSync } from 'node:zlib';
 import { margoError } from '../../packages/shared/errors.js';
 import { packageClosure, packageDependencies } from '../package-order.js';
@@ -133,6 +134,43 @@ export function machineFacts(env = process.env) {
 }
 
 /**
+ * The path with every symlink in its folders resolved, so a root reached through a link (macOS os.tmpdir() is /var,
+ * which is /private/var) and the real paths Node reports for modules and the working folder name the same file. The
+ * last part is kept as written, so a linked package folder is still seen as one; a missing tail is kept as written.
+ * `memo` maps a folder to its real path.
+ */
+export function canonicalPath(path, memo = new Map()) {
+  const folder = dirname(path);
+  if (folder === path) return path;
+  let real = memo.get(folder);
+  if (real === undefined) {
+    real = existsSync(folder) ? realpathSync(folder) : canonicalPath(folder, memo);
+    memo.set(folder, real);
+  }
+  return join(real, basename(path));
+}
+
+/** The real path of a root folder, itself included: the form every recorded path is compared in. */
+export function canonicalRoot(root) {
+  const absolute = resolve(root);
+  return existsSync(absolute) ? realpathSync(absolute) : canonicalPath(absolute);
+}
+
+const realRoots = new WeakMap();
+/** The repository's root in canonical form, worked out once per repository. */
+function rootOf(repository) {
+  let found = realRoots.get(repository);
+  if (found === undefined) realRoots.set(repository, (found = canonicalRoot(repository.root)));
+  return found;
+}
+
+/** Writes the root as <root> in a recorded value, whichever of its spellings the step saw. */
+function hideRoot(value, repository) {
+  const spellings = [...new Set([rootOf(repository), resolve(repository.root)])].sort((a, b) => b.length - a.length);
+  return spellings.reduce((shown, spelling) => shown.replaceAll(spelling, '<root>'), value);
+}
+
+/**
  * What the repository knows about its files: tracked, changed and LFS state, and the lock file's package entries. Built
  * once per run; a test passes its own.
  */
@@ -147,7 +185,7 @@ export function readRepository(root) {
   );
   const lock = JSON.parse(readFileSync(join(root, 'package-lock.json'), 'utf8')).packages;
   const stage = git('ls-files', '-s', '-z').split('\0').filter(Boolean);
-  return { root: resolve(root), tracked, dirty, lock, stage };
+  return { root: canonicalRoot(root), tracked, dirty, lock, stage };
 }
 
 /** The hash of the committed blobs whose path matches `pattern`; a dirty match answers with a marker that never holds. */
@@ -274,7 +312,10 @@ export function collectLogs(dir) {
   };
   if (!existsSync(dir)) return { scopes, order: [] };
   const started = readFileSync(join(dir, 'starts.log'), 'utf8').split('\n').filter(Boolean),
-    order = [];
+    order = [],
+    folders = new Map(),
+    real = (path) => canonicalPath(path, folders),
+    scopeName = (name) => (name.startsWith('test:') ? `test:${real(name.slice('test:'.length))}` : name);
   for (const line of started) {
     const [name, startScope] = line.split('\t'),
       file = join(dir, `${name}.json`);
@@ -285,20 +326,28 @@ export function collectLogs(dir) {
     }
     const log = JSON.parse(readFileSync(file, 'utf8'));
     for (const part of log.segments) {
-      const scope = scopeOf(part.scope);
-      if (!order.includes(part.scope)) order.push(part.scope);
-      for (const [path, [kind, at]] of part.reads) {
-        const had = scope.reads.get(path);
+      const name = scopeName(part.scope),
+        scope = scopeOf(name);
+      if (!order.includes(name)) order.push(name);
+      for (const [raw, [kind, at]] of part.reads) {
+        const path = real(raw),
+          had = scope.reads.get(path);
         if (!had) scope.reads.set(path, [kind, at]);
         else mergeRead(had, kind, at);
       }
-      for (const [path, at] of part.writes) scope.writes.set(path, Math.min(at, scope.writes.get(path) ?? at));
-      for (const path of part.covers) scope.covers.add(path);
+      for (const [raw, at] of part.writes) {
+        const path = real(raw);
+        scope.writes.set(path, Math.min(at, scope.writes.get(path) ?? at));
+      }
+      for (const path of part.covers) scope.covers.add(real(path));
       for (const [key, value] of part.env) if (!scope.env.has(key)) scope.env.set(key, value);
-      for (const [args, cwd] of part.git) scope.git.set(JSON.stringify([args, cwd]), [args, cwd]);
+      for (const [args, raw] of part.git) {
+        const cwd = real(raw);
+        scope.git.set(JSON.stringify([args, cwd]), [args, cwd]);
+      }
       for (const program of part.opaque) scope.opaque.add(program);
       for (const host of part.net) scope.net.add(host);
-      for (const [file_, what] of part.clocks) scope.clocks.set(file_, what);
+      for (const [file_, what] of part.clocks) scope.clocks.set(isAbsolute(file_) ? real(file_) : file_, what);
       if (log.lead) {
         scope.exitCode = log.exitCode;
         scope.seconds = part.seconds;
@@ -315,7 +364,7 @@ export function collectLogs(dir) {
  */
 export function buildManifest(record, context) {
   const { repository, hasher, outputs, base, declared, builtOn } = context,
-    root = repository.root;
+    root = rootOf(repository);
   context.memo ??= {};
   context.memo.trees ??= new Map();
   const inputs = new Map(),
@@ -391,7 +440,7 @@ export function buildManifest(record, context) {
   for (const part of base ? [base, record] : [record]) {
     for (const [absolute, [kind, at]] of part.reads) addRead(absolute, kind, at);
     for (const [key, value] of part.env) {
-      const shown = typeof value === 'string' ? value.replaceAll(root, '<root>') : value;
+      const shown = typeof value === 'string' ? hideRoot(value, repository) : value;
       inputs.set(`env:${key}`, ['env', key, shown]);
     }
     for (const [args, cwd] of part.git.values()) {
@@ -472,14 +521,14 @@ function replayGit(args, cwd, context) {
  */
 export function manifestHolds(entry, context, liveEnv = new Map()) {
   const { hasher, repository } = context,
-    root = repository.root;
+    root = rootOf(repository);
   for (const row of entry.inputs) {
     const [kind, name] = row;
     if (kind === 'lock') {
       if (!lockHolds(name, repository)) return false;
     } else if (kind === 'env') {
       const live = liveEnv.has(name) ? liveEnv.get(name) : process.env[name];
-      const shown = typeof live === 'string' ? live.replaceAll(root, '<root>') : null;
+      const shown = typeof live === 'string' ? hideRoot(live, repository) : null;
       if (shown !== row[2]) return false;
     } else if (kind === 'git') {
       const cwd = resolve(root, name);
@@ -721,7 +770,7 @@ export class ShadowRun {
     commit,
     env = process.env,
   }) {
-    this.root = resolve(root);
+    this.root = canonicalRoot(root);
     this.store = store;
     this.facts = facts;
     this.env = env;
