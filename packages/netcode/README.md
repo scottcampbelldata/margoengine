@@ -255,6 +255,67 @@ console.log(one.confirmed, one.stats.rollbacks, one.state.fighters.get(1), two.s
 The test `tests/rollback.test.js` runs four peers for 20 s under 50 ms latency, 20 ms jitter and 10% loss and checks
 that every confirmed frame of every peer has the same checksum as the game run once offline with every real input.
 
+### Past a full mesh: the relay and spectators
+
+A full mesh needs a link from every peer to every other, which stops being practical at about 8. `@margoengine/netcode/relay` gives each peer one link, to a `RollbackRelay`, and shows it the other players through that link as ordinary connections, so `RollbackSession` does not change. The relay runs no game. It also learns each input on the way through, and streams every frame whose inputs are all known to `RollbackSpectator`s, who run the same game on them with no rollback.
+
+```ts
+import { defineGame, defineSchema, LoopbackNetwork } from '@margoengine/netcode';
+import { RollbackSession } from '@margoengine/netcode/rollback';
+import { relayPeers, RollbackRelay, RollbackSpectator } from '@margoengine/netcode/relay';
+
+const schema = defineSchema({
+  types: {
+    Input: { x: 'f32' },
+    Fighter: { x: 'f32' },
+    State: { fighters: { type: 'map', of: 'Fighter', maxSize: 16 } },
+  },
+} as const);
+const game = defineGame({
+  schema,
+  state: 'State',
+  input: 'Input',
+  tickRate: 60,
+  initial: () => ({ fighters: new Map() }),
+  join: (state, id) => void state.fighters.set(id, { x: 0 }),
+  step(state, inputs, _frame, dt) {
+    for (const [id, input] of inputs) state.fighters.get(id)!.x += input.x * dt;
+  },
+});
+
+const network = new LoopbackNetwork({ latency: 30 });
+const now = () => network.time;
+const players = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+const relay = new RollbackRelay({ players });
+const connect = () => {
+  const [near, far] = network.pair();
+  relay.accept(far);
+  return near;
+};
+const sessions = players.map(
+  (local) =>
+    new RollbackSession(game, {
+      players,
+      local,
+      peers: relayPeers(connect(), { players, local }), // one link, however many players
+      now,
+      input: () => ({ x: local % 2 ? 1 : -1 }),
+    }),
+);
+const watcher = new RollbackSpectator(game, connect());
+for (let frame = 0; frame < 300; frame++) {
+  network.advance(1000 / 60);
+  for (const session of sessions) session.update();
+  watcher.update();
+}
+console.log('players at', sessions[0].confirmed, 'spectator at', watcher.frame, watcher.state.fighters.get(1));
+```
+
+- Every message crosses twice, so a player sees the sum of two links' latency instead of one, and the relay carries every player's traffic: with `n` players, a peer's messages reach `n - 1` others through it. It holds no state of the game and cannot change an input, but it is one place that can fail.
+- A spectator starts from the first frame however late it joins, at `maxFrames` a call (default 8), and what it shows is final: the same `onconfirm` checksums as the players. `spectatorDelay` keeps it that many frames behind, so a spectator cannot help a player. Frames are kept for `history` frames (default 216,000: an hour at 60 Hz); a spectator who comes after that is refused.
+- `authorize(player, token)` decides who gets in, with `player` undefined for a spectator. A seat already taken closes with `CloseCode.full`. The relay trusts the `player` a connection names, so with no `authorize` a stranger can take an empty seat.
+- A peer can still send different inputs to different peers: the relay keeps the first it saw for spectators, and the desync check catches the rest.
+
 ## Lag compensation (server-side rewind)
 
 `LagCompensation` keeps where every hit shape (circle or sphere) was at each of the last `history` ticks (default 32).
@@ -784,8 +845,7 @@ Opened straight from disk (`file://`) the page cannot run modules and says so, w
   rollback; the cost of a rollback is that many calls of your `step`. Measured in the 4-peer test (50 ms latency,
   20 ms jitter, 10% loss, 30 frames per second, input delay 2): 147 rollbacks in 581 frames, 185 frames resimulated,
   never more than 3 at once. All peers must use the same `inputDelay`; a mismatch shows up as a desync.
-- Rollback sessions are a full mesh (each peer sends to every other), sensible up to about 8 players; there is no
-  spectator or relay mode yet. Lag compensation tests circles and spheres only (no capsules or boxes).
+- Rollback sessions over direct links are a full mesh (each peer sends to every other), sensible up to about 8 players. Past that use `@margoengine/netcode/relay`, at the cost of a second hop.
 - The WebSocket server has no compression extension (snapshots are small and already delta coded) and no TLS of its
   own (use a reverse proxy). The WebRTC transport is tested here with stand-in channels; signalling is not included.
 - Rooms send the state to each client at the patch rate as a delta against the last state that client got (reliable

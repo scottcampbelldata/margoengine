@@ -63,6 +63,10 @@
       "types": "./dist/extrapolate.d.ts",
       "import": "./dist/extrapolate.js"
     },
+    "./relay": {
+      "types": "./dist/relay.d.ts",
+      "import": "./dist/relay.js"
+    },
     "./interest": {
       "types": "./dist/interest.d.ts",
       "import": "./dist/interest.js"

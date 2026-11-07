@@ -4,6 +4,7 @@
 // prediction, the peer loads the state saved before that frame and simulates again up to the present. Checksums of
 // confirmed frames (every input known) are exchanged to detect a desync.
 import type { Game } from './game.js';
+import { checksumOf, ROLLBACK_INPUTS as INPUTS } from './protocol.js';
 import { Reader, Writer } from './schema.js';
 import { CloseCode, fault, type Connection } from './transport.js';
 
@@ -65,18 +66,10 @@ export interface RollbackStats {
   desyncs: number;
 }
 
-const INPUTS = 32,
-  CHECKSUM = 33,
+const CHECKSUM = 33,
   MAX_INPUTS = 32,
   // Every this many messages to a peer go back to the oldest input it has not acknowledged, however old.
   RESEND_EVERY = 8;
-const checksumOf = (bytes: Uint8Array): number => {
-  // FNV-1a over raw bytes (the schema hash's function runs over text).
-  let hash = 0x811c9dc5;
-  for (const byte of bytes) hash = Math.imul(hash ^ byte, 0x01000193) >>> 0;
-  return hash;
-};
-
 interface Remote<Input> {
   connection: Connection;
   inputs: Map<number, Input>;

@@ -8,6 +8,14 @@ export const ENVELOPE_VERSION = 1;
 export const MAX_INPUTS_PER_MESSAGE = 32;
 /** Most bytes of one encoded input. */
 export const MAX_INPUT_BYTES = 1024;
+/** The kind byte of a rollback session's inputs message. */
+export const ROLLBACK_INPUTS = 32;
+/** FNV-1a over raw bytes (the schema hash's function runs over text): what rollback peers and spectators compare. */
+export const checksumOf = (bytes: Uint8Array): number => {
+  let hash = 0x811c9dc5;
+  for (const byte of bytes) hash = Math.imul(hash ^ byte, 0x01000193) >>> 0;
+  return hash;
+};
 /** Most bytes of a snapshot message around its data: the kind and four 32-bit varints. */
 export const SNAPSHOT_HEADER_BYTES = 21;
 

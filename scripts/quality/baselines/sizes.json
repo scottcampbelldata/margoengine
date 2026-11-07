@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10568406,
+  "total": 10572023,
   "history": [
     {
       "date": "2026-10-24",
@@ -3650,6 +3650,12 @@
       "commit": "0277c06ca",
       "reason": "netcode: new optional entry ./extrapolate, and previousSnapshot on GameClient (batch 114 job 6)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "a006fbd69",
+      "reason": "netcode: new optional entry ./relay, and the outage fix in ./rollback (batch 114 job 7)",
+      "grew": 1
     }
   ],
   "items": {
@@ -4081,6 +4087,7 @@
     "@margoengine/netcode/generate": 5154,
     "@margoengine/netcode/interest": 2516,
     "@margoengine/netcode/node": 6457,
+    "@margoengine/netcode/relay": 3617,
     "@margoengine/netcode/rollback": 3437,
     "@margoengine/netcode/rooms": 6007,
     "@margoengine/netcode/signal": 3320,

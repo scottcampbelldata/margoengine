@@ -1750,6 +1750,10 @@
       "types": "./dist/netcode/extrapolate.d.ts",
       "import": "./dist/netcode/extrapolate.js"
     },
+    "./netcode/relay": {
+      "types": "./dist/netcode/relay.d.ts",
+      "import": "./dist/netcode/relay.js"
+    },
     "./netcode/interest": {
       "types": "./dist/netcode/interest.d.ts",
       "import": "./dist/netcode/interest.js"
