@@ -309,6 +309,7 @@ export interface OBJResult {
 export interface PLYOptions extends SceneOptions {
     binary?: boolean;
     colors?: boolean;
+    upAxis?: 'y' | 'z';
 }
 
 export interface PaletteTexture {
@@ -325,6 +326,7 @@ export interface PixelArtSampling {
 export interface STLOptions extends SceneOptions {
     binary?: boolean;
     name?: string;
+    upAxis?: 'y' | 'z';
 }
 
 export interface SceneOptions {

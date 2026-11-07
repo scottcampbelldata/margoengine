@@ -15,6 +15,7 @@ import {
   type Node,
   type SceneOptions,
   type TextureData,
+  shaper,
 } from './scene.js';
 
 /** Options for {@link exportDAE}. */
@@ -185,6 +186,7 @@ export function exportDAE(source: ExportSource, options: DAEOptions = {}): DAERe
   };
 
   let count = 0;
+  const shape = shaper(roots);
   const node = (n: Node): string => {
     const id = `node-${count++}`,
       m = n.local,
@@ -192,7 +194,8 @@ export function exportDAE(source: ExportSource, options: DAEOptions = {}): DAERe
     let out = `<node id="${id}"${named(n.name, id)} type="NODE"><matrix sid="transform">${rows.map(num).join(' ')}</matrix>`;
     const parts: { geometry: Geo; material?: Mat }[] =
       n.primitives ?? (n.geometry ? [{ geometry: n.geometry, material: n.material }] : []);
-    for (const { geometry: geo, material: mat } of parts) {
+    for (const { geometry: part, material: mat } of parts) {
+      const geo = shape(n, part);
       if (mat?.baseColorTexture && !geo.uvs) throw new TypeError('Textured materials need geometry with uvs');
       out += `<instance_geometry url="#${geometry(geo, n.name)}">`;
       if (mat)

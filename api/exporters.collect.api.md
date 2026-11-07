@@ -153,7 +153,7 @@ export interface TextureData {
     extras?: Extras;
 }
 
-export function collect(source: ExportSource, options?: SceneOptions, plan?: (bytes: number) => void): Node[];
+export function collect(source: ExportSource, options?: SceneOptions, plan?: (bytes: number) => void, loaded?: LoadedModels): Node[];
 
 export function polygons(faceSizes: Uint8Array | undefined, indices: Uint32Array): number[][];
 
@@ -241,6 +241,8 @@ interface LightmapData {
     lightmapScale?: number;
     emissionScale?: number;
 }
+
+type LoadedModels = 'refuse' | 'shape' | 'baseColor';
 
 interface Lookup<K, V> {
     get(key: K): V | undefined;

@@ -31,7 +31,8 @@ export interface OBJOptions extends SceneOptions {
   colorSpace?: 'srgb' | 'linear';
   /**
    * With `materials`, write `map_Kd` for base color textures (and `map_d` for MASK or BLEND materials) and return
-   * the image files in `textures`. Default false.
+   * the image files in `textures`. A loaded glTF model's texture comes from the model file as it is; one that is not a
+   * PNG or JPEG inside that file, or a live Material's, throws. Default false.
    */
   textures?: boolean;
   /**
@@ -111,7 +112,7 @@ export function exportOBJ(source: ExportSource, options: OBJOptions = {}): OBJRe
   let vertexBase = 1,
     uvBase = 1,
     index = 0;
-  for (const item of drawables(collect(source, options))) {
+  for (const item of drawables(collect(source, options, undefined, withTextures ? 'baseColor' : 'shape'))) {
     const { positions, normals, indices } = toWorld(item),
       geo = item.geometry,
       uvs = geo.uvs,
@@ -188,8 +189,18 @@ export function exportOBJ(source: ExportSource, options: OBJOptions = {}): OBJRe
       }
       lines.push(line);
     }
-    // OBJ texture coordinates have v up; glTF and Margo Engine have v down.
-    if (uvs) for (const i of kept) lines.push(`vt ${num(uvs[i * 2])} ${num(1 - uvs[i * 2 + 1])}`);
+    // OBJ texture coordinates have v up; glTF and Margo Engine have v down. MTL has no rotation, so a texture
+    // transform goes into the coordinates: the glTF matrix, offset * rotation * scale.
+    const { offset = [0, 0], scale: repeat = [1, 1], rotation = 0 } =
+        (withTextures && item.material?.baseColorTextureTransform) || {},
+      cos = Math.cos(rotation),
+      sin = Math.sin(rotation);
+    if (uvs)
+      for (const i of kept) {
+        const u = uvs[i * 2] * repeat[0],
+          v = uvs[i * 2 + 1] * repeat[1];
+        lines.push(`vt ${num(offset[0] + cos * u + sin * v)} ${num(1 - (offset[1] - sin * u + cos * v))}`);
+      }
     for (const i of kept) lines.push(`vn ${num(normals[i * 3])} ${num(normals[i * 3 + 1])} ${num(normals[i * 3 + 2])}`);
     const t = uvBase - vertexBase;
     let corner = 0;

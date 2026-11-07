@@ -87,7 +87,7 @@ Live `side: 'back'` triangle materials are saved as ordinary front-only glTF mat
 
 ## How it works
 
-Engine exports recognize primitives loaded by `@margoengine/gltf-pro` and `@margoengine/fbx`, without attaching core geometry. glTF/GLB retain all primitives on each node and their bind-pose skin/morph data; other formats write base geometry. Automatic export of PBR textures (a textured `createMesh` mesh included: use `exportModel`), material extensions, and more than four skin influences throws explicitly. An engine forest containing no supported mesh geometry also throws; visibility filtering and intentionally empty data scenes remain supported.
+Engine exports recognize primitives loaded by `@margoengine/gltf-pro` and `@margoengine/fbx`, without attaching core geometry. glTF/GLB retain all primitives on each node and their bind-pose skin/morph data. Formats with no skeleton write the shape the model has at its nodes' current pose: morph weights first, then the skin, with weights normalized. STL and PLY write a textured model's shape, and OBJ its shape, UVs and flat colors, plus its base color images [with `textures`](#loaded-models-as-obj-stl-and-ply). The other engine exports refuse PBR textures (a textured `createMesh` mesh included: use `exportModel`) and material extensions. More than four skin influences throws in every format. An engine forest containing no supported mesh geometry also throws; visibility filtering and intentionally empty data scenes remain supported.
 
 Engine export entrypoints also bake back-only optional PBR triangles by reversing winding and negating base and morph normals. This preserves their visible side in glTF, GLB, USDZ, OBJ, PLY and STL, including mirrored world transforms. Front-only and double-sided materials retain their existing geometry behavior.
 
@@ -96,7 +96,7 @@ Engine export entrypoints also bake back-only optional PBR triangles by reversin
 - **Deduplication.** One `Geometry` (or geometry data object) is written once: POSITION (with exact Float32 `min`/`max`), NORMAL, optional TANGENT, TEXCOORD_0 and COLOR_0, and indices. One glTF mesh is written per geometry and material pair, and one glTF material per `PbrMaterial`. Images are deduplicated by byte array.
 - **Materials.** `PbrMaterial.data` maps to `pbrMetallicRoughness`: `baseColorFactor` is already linear, then `roughnessFactor`, `metallicFactor` and `doubleSided`. Material data adds emission, alpha mode, base color, metallic-roughness, normal, occlusion and emissive textures, and `KHR_materials_transmission`, `KHR_materials_ior` and `KHR_materials_emissive_strength`.
 - **Binary layout.** Each bufferView starts on a 4-byte boundary, the buffer length is a multiple of 4, GLB JSON is padded with spaces and BIN with zeros. Indices are 16-bit up to 65535 vertices (65535 itself is the restart value) and 32-bit above. Normals and tangents are normalized and tangent `w` is forced to +1 or -1, as the validator requires.
-- **STL, OBJ, PLY** write world-space data. STL uses face normals from the transformed triangle. OBJ writes one `g` group (or `o` object) per mesh, `v`/`vt`/`vn` and 1-based `f v/vt/vn` faces, with `vt` flipped to OBJ's v-up. The MTL has `Kd` and `Ke` in sRGB plus `Pr`, `Pm`, `d` and optional `map_Kd`/`map_d`. PLY merges all meshes into one vertex and face list, with optional 8-bit sRGB colors from vertex colors or the material.
+- **STL, OBJ, PLY** write world-space data. STL and PLY stand a Y-up scene on Z up, as the tools that read them expect (`upAxis`); OBJ stays Y up, which its readers expect. STL uses face normals from the transformed triangle. OBJ writes one `g` group (or `o` object) per mesh, `v`/`vt`/`vn` and 1-based `f v/vt/vn` faces, with `vt` flipped to OBJ's v-up. The MTL has `Kd` and `Ke` in sRGB plus `Pr`, `Pm`, `d` and optional `map_Kd`/`map_d`. PLY merges all meshes into one vertex and face list, with optional 8-bit sRGB colors from vertex colors or the material.
 - **Tree-shaking and SSR.** Each format is its own module and `sideEffects` is false, so importing only `exportSTL` leaves out the glTF writer. Nothing touches `window`, `document`, `navigator` or GPU globals, and base64 is done without `btoa` or `Buffer`.
 
 ## Options
@@ -114,10 +114,11 @@ Engine export entrypoints also bake back-only optional PBR triangles by reversin
 | `binUri` | `exportGLTF` | `'scene.bin'`, a relative file name |
 | `binary` | STL, PLY | STL `true`, PLY `false` (ASCII) |
 | `name` | STL | ASCII `solid` name, or the 80-byte binary header (must not start with `solid`) |
+| `upAxis` | STL, PLY | `'y'`, the scene's up axis. Slicers, CAD tools and Blender read these files with Z up, so `'y'` turns the scene to stand up in them; `'z'` writes its coordinates as they are |
 | `materials`, `mtlName` | OBJ | `false`, `'scene.mtl'` |
 | `colors` | OBJ, PLY | `false`. OBJ appends sRGB vertex colors to `v` lines; PLY writes uchar `red green blue` |
 | `colorSpace` | OBJ | `'srgb'`. `'linear'` writes the vertex colors unconverted |
-| `textures`, `texturePrefix` | OBJ | `false`, `''`. With `materials`, writes `map_Kd` (plus `map_d` for MASK/BLEND) and returns the images in `textures` |
+| `textures`, `texturePrefix` | OBJ | `false`, `''`. With `materials`, writes `map_Kd` (plus `map_d` for MASK/BLEND) and returns the images in `textures`. A `baseColorTextureTransform` goes into the `vt` lines, as MTL has no rotation |
 | `groups` | OBJ | `true`, one `g` per mesh; `false` writes `o` objects |
 | `mergeVertices` | OBJ | `false`. Welds a mesh's corners whose position, uv, normal and written color agree within 1e-5 |
 | `usemtl` | OBJ | `false`. Writes `usemtl <material name>` per mesh without `materials`: one group per palette slot, no `mtllib` and no MTL |
@@ -173,6 +174,31 @@ const glb = exportGLB({nodes: [mesh, joint], animations: [{name: 'Move', channel
 ```
 
 Load these GLBs with `@margoengine/gltf-pro` and attach `@margoengine/animation` for skinning, morphs and clip playback. Other export formats continue to write the static base geometry.
+
+## Loaded models as OBJ, STL and PLY
+
+A model from `loadGLTF` exports with the shape it has now: skinned parts sit on their bones, and morph weights apply.
+Pass the engine, which writes every mesh in it.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {loadGLTF} from 'margoengine/gltf-pro';
+import {exportOBJ, exportPLY, exportSTL} from 'margoengine/exporters';
+
+const engine = await Engine.create(document.querySelector<HTMLCanvasElement>('canvas')!);
+await loadGLTF(engine, '/Fox.glb');
+
+const print = exportSTL(engine);                       // stands on Z up, for a slicer
+const scan = exportPLY(engine, {upAxis: 'z'});         // coordinates as they are
+const {obj, mtl, textures} = exportOBJ(engine, {materials: true, textures: true, mtlName: 'fox.mtl'});
+for (const [path, bytes] of textures) console.log(path, bytes.length); // save each beside the OBJ
+```
+
+With `textures`, each base color image is written as the model file holds it, and the UV set it samples becomes the
+OBJ's one UV set. An image outside the model file, one in another format, or a live `Material`'s throws, as dropping it
+would lose what was asked for: pass `textures: false` for the shape and colors, or use `exportModel`. OBJ has no place for
+the other PBR maps and extensions, so they are left out. MTL multiplies `Kd` by `map_Kd`, and so a tinted texture needs
+a reader that does the same: Blender's importer shows the texture alone.
 
 ## OBJ textures and quads
 

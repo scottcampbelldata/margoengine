@@ -468,7 +468,7 @@ test('STL binary is byte-exact: 80-byte header, count, 50-byte records', async (
     indices: [0, 1, 2, 0, 2, 3],
   };
   const scene = { nodes: [{ translation: [1, 1, 1], children: [{ geometry }] }] };
-  const stl = exportSTL(scene);
+  const stl = exportSTL(scene, { upAxis: 'z' });
   assert.ok(stl instanceof Uint8Array);
   assert.equal(stl.length, 84 + 2 * 50);
   const header = new TextDecoder().decode(stl.subarray(0, 80));
@@ -483,14 +483,14 @@ test('STL binary is byte-exact: 80-byte header, count, 50-byte records', async (
   assert.equal(view.getUint16(84 + 98, true), 0);
 
   // ASCII parses back to the same triangles, and a mirrored transform keeps faces outward.
-  const ascii = exportSTL(scene, { binary: false, name: 'my part' });
+  const ascii = exportSTL(scene, { binary: false, name: 'my part', upAxis: 'z' });
   const facets = parseASCIISTL(ascii);
   assert.match(ascii, /^solid my_part\n/);
   assert.deepEqual(
     facets.map((f) => [...f.normal, ...f.vertices.flat()]),
     [record(0), record(1)],
   );
-  const mirrored = new DataView(exportSTL({ nodes: [{ scale: [1, 1, -1], geometry: box() }] }).buffer);
+  const mirrored = new DataView(exportSTL({ nodes: [{ scale: [1, 1, -1], geometry: box() }] }, { upAxis: 'z' }).buffer);
   for (let i = 0; i < 12; i++) {
     const n = [0, 1, 2].map((k) => mirrored.getFloat32(84 + i * 50 + k * 4, true)),
       a = [0, 1, 2].map((k) => mirrored.getFloat32(84 + i * 50 + 12 + k * 4, true));
@@ -507,7 +507,7 @@ test('STL and PLY and OBJ of an engine scene agree with kernel world matrices', 
     Array.from({ length: 24 }, (_, i) => transformPoint(m, cube.vertices.subarray(i * 6, i * 6 + 3))),
   );
 
-  const stl = new DataView(exportSTL(engine).buffer);
+  const stl = new DataView(exportSTL(engine, { upAxis: 'z' }).buffer);
   assert.equal(stl.getUint32(80, true), 48);
   for (let t = 0; t < 48; t++) {
     const mesh = Math.floor(t / 12),
@@ -526,7 +526,7 @@ test('STL and PLY and OBJ of an engine scene agree with kernel world matrices', 
   }
 
   for (const binary of [false, true]) {
-    const ply = parsePLY(exportPLY(engine, { binary, colors: true }));
+    const ply = parsePLY(exportPLY(engine, { binary, colors: true, upAxis: 'z' }));
     assert.equal(ply.format, binary ? 'binary_little_endian' : 'ascii');
     assert.equal(ply.elements.vertex.length, 96);
     assert.equal(ply.elements.face.length, 48);

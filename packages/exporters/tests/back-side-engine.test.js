@@ -108,7 +108,7 @@ test('world-space engine exports combine back-side winding with mirrored transfo
         [1, 3, 4],
       ],
     );
-    const ply = parsePLY(exportPLY(engine));
+    const ply = parsePLY(exportPLY(engine, { upAxis: 'z' }));
     assert.deepEqual(
       ply.elements.face.map((f) => f.vertex_indices),
       [
@@ -117,7 +117,7 @@ test('world-space engine exports combine back-side winding with mirrored transfo
       ],
     );
     assert.ok(ply.elements.vertex.every((v) => v.nx === 0 && v.ny === 0 && v.nz === -1));
-    const stl = parseASCIISTL(exportSTL(engine, { binary: false }));
+    const stl = parseASCIISTL(exportSTL(engine, { binary: false, upAxis: 'z' }));
     assert.deepEqual(
       stl.map((f) => f.normal.map((v) => v || 0)),
       [
@@ -171,6 +171,20 @@ test('engine exports reject a textured materials mesh instead of dropping its te
     const engine = await headless(),
       map = new Texture({ width: 1, height: 1, data: Uint8Array.of(255, 0, 0, 255) });
     createMesh(engine, quad, new Material({ map }));
-    for (const write of [exportGLTF, exportGLB, exportOBJ, exportDAE])
-      assert.throws(() => write(engine), /exportModel/);
+    for (const write of [exportGLTF, exportGLB, exportDAE]) assert.throws(() => write(engine), /exportModel/);
+    // OBJ writes a texture only when asked to, and then it may not drop one.
+    assert.throws(() => exportOBJ(engine, { materials: true, textures: true }), /exportModel/);
+    assert.ok(exportOBJ(engine).obj.includes('\nf '));
+  }));
+
+test('a materials mesh keeps its UVs: it holds them v up, as OBJ does, and glTF v down', () =>
+  headlessModels(async () => {
+    const engine = await headless();
+    createMesh(engine, { ...quad, uvs: [0, 0.25, 1, 0.25, 1, 1, 0, 1] }, new Material());
+    const vt = exportOBJ(engine)
+      .obj.split('\n')
+      .filter((line) => line.startsWith('vt '))
+      .map((line) => line.split(' ').slice(1).map(Number));
+    assert.deepEqual(vt[0], [0, 0.25]);
+    assert.deepEqual(vt[2], [1, 1]);
   }));

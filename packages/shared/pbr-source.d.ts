@@ -10,6 +10,7 @@ export interface PBRSource {
   readonly asset: {
     readonly doc: GLTFDocument;
     accessor(index: unknown, type?: string): Float32Array;
+    view(index: unknown): Uint8Array;
   };
 }
 

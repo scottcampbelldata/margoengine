@@ -1,6 +1,6 @@
 import { LinearToSRGB as toSrgb } from '@margoengine/math/color';
 // PLY writer: one merged world-space mesh.
-import { byte, collect, drawables, num, toWorld, type ExportSource, type SceneOptions } from './scene.js';
+import { byte, collect, drawables, num, standZUp, toWorld, turnsToZUp, type ExportSource, type SceneOptions } from './scene.js';
 
 /** Options of exportPLY: binary or ASCII output and per-vertex colours. */
 export interface PLYOptions extends SceneOptions {
@@ -8,6 +8,11 @@ export interface PLYOptions extends SceneOptions {
   binary?: boolean;
   /** Write uchar red/green/blue: vertex colors when a mesh has them, else its material base color (sRGB). Default false. */
   colors?: boolean;
+  /**
+   * The scene's up axis. Blender and most scan tools read PLY with Z up, so 'y', the glTF way, turns the scene to stand up
+   * in them; 'z' writes its coordinates as they are. Default 'y'.
+   */
+  upAxis?: 'y' | 'z';
 }
 
 /** Exports PLY with float x/y/z/nx/ny/nz, optional uchar colors and `list uchar uint vertex_indices` faces. */
@@ -18,7 +23,13 @@ export function exportPLY(source: ExportSource, options: PLYOptions = {}): Uint8
     colors = options.colors ?? false;
   if (typeof binary !== 'boolean' || typeof colors !== 'boolean')
     throw new TypeError('binary and colors must be boolean');
-  const items = drawables(collect(source, options)).map((item) => ({ ...toWorld(item), item }));
+  const turn = turnsToZUp(options.upAxis, 'PLY');
+  const items = drawables(collect(source, options, undefined, 'shape')).map((item) => {
+    const { positions, normals, indices } = toWorld(item);
+    return turn
+      ? { positions: standZUp(positions), normals: standZUp(normals), indices, item }
+      : { positions, normals, indices, item };
+  });
   const vertexCount = items.reduce((sum, { item }) => sum + item.geometry.count, 0),
     faceCount = items.reduce((sum, { indices }) => sum + indices.length / 3, 0);
   const header = [

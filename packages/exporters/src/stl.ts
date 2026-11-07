@@ -1,5 +1,5 @@
 // STL writer: world-space triangles with face normals.
-import { collect, drawables, num, toWorld, type ExportSource, type SceneOptions } from './scene.js';
+import { collect, drawables, num, standZUp, toWorld, turnsToZUp, type ExportSource, type SceneOptions } from './scene.js';
 
 /** Options of exportSTL: binary or ASCII output and the solid name. */
 export interface STLOptions extends SceneOptions {
@@ -7,10 +7,20 @@ export interface STLOptions extends SceneOptions {
   binary?: boolean;
   /** ASCII `solid` name, or the binary 80-byte header text (ASCII, must not start with "solid"). */
   name?: string;
+  /**
+   * The scene's up axis. Slicers and CAD tools read STL with Z up, so 'y', the glTF way, turns the scene to stand up in
+   * them; 'z' writes its coordinates as they are. Default 'y'.
+   */
+  upAxis?: 'y' | 'z';
 }
 
-/** World-space positions and winding-corrected indices of every drawable. */
-const meshes = (source: ExportSource, options: SceneOptions) => drawables(collect(source, options)).map(toWorld);
+/** World-space positions and winding-corrected indices of every drawable, a loaded model's skin and morphs included. */
+const meshes = (source: ExportSource, options: STLOptions) => {
+  const turn = turnsToZUp(options.upAxis, 'STL');
+  return drawables(collect(source, options, undefined, 'shape'))
+    .map(toWorld)
+    .map((mesh) => (turn ? { ...mesh, positions: standZUp(mesh.positions) } : mesh));
+};
 
 /** Exports STL. Binary layout: 80-byte header, uint32 triangle count, then 50-byte records (normal, 3 vertices, uint16 0). */
 export function exportSTL(source: ExportSource, options?: STLOptions & { binary?: true }): Uint8Array;

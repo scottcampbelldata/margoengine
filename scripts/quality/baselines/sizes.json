@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 9075189,
+  "total": 9085395,
   "history": [
     {
       "date": "2026-10-24",
@@ -2876,6 +2876,12 @@
       "commit": "1e2612aba",
       "reason": "KHR_interactivity entries of gltf-pro and animation",
       "grew": 4
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "5caa2829b",
+      "reason": "STL, OBJ and PLY of loaded models: skin and morphs applied, STL and PLY stand on Z up, OBJ writes textured models and their base color images.",
+      "grew": 7
     }
   ],
   "items": {
@@ -3037,12 +3043,12 @@
     "@margoengine/environment/reflector": 10874,
     "@margoengine/environment/refractor": 10833,
     "@margoengine/environment/volumetric": 8443,
-    "@margoengine/exporters": 34664,
+    "@margoengine/exporters": 36135,
     "@margoengine/exporters/apng": 2322,
     "@margoengine/exporters/atlas": 2403,
     "@margoengine/exporters/capture": 7241,
-    "@margoengine/exporters/collect": 7908,
-    "@margoengine/exporters/dae": 10560,
+    "@margoengine/exporters/collect": 9358,
+    "@margoengine/exporters/dae": 12101,
     "@margoengine/exporters/draco": 185946,
     "@margoengine/exporters/godot": 10258,
     "@margoengine/exporters/godot-2d": 3416,
@@ -3057,13 +3063,13 @@
     "@margoengine/exporters/meshopt": 8399,
     "@margoengine/exporters/model": 9536,
     "@margoengine/exporters/optimize": 9540,
-    "@margoengine/exporters/roblox": 18377,
+    "@margoengine/exporters/roblox": 20044,
     "@margoengine/exporters/roblox-chunks": 9679,
     "@margoengine/exporters/roblox-runtime": 21053,
     "@margoengine/exporters/roblox-runtime-restore": 6130,
     "@margoengine/exporters/roblox-uv": 3602,
     "@margoengine/exporters/skin": 2459,
-    "@margoengine/exporters/threemf": 14289,
+    "@margoengine/exporters/threemf": 15654,
     "@margoengine/exporters/unity": 41842,
     "@margoengine/exporters/unity-2d": 7318,
     "@margoengine/exporters/unity-pixel-art": 931,
@@ -3074,8 +3080,8 @@
     "@margoengine/exporters/unreal-pixel-art": 1126,
     "@margoengine/exporters/unreal-precision": 28243,
     "@margoengine/exporters/unreal-precision-importer": 16503,
-    "@margoengine/exporters/usdz": 12446,
-    "@margoengine/exporters/usdz-anim": 18965,
+    "@margoengine/exporters/usdz": 13813,
+    "@margoengine/exporters/usdz-anim": 20310,
     "@margoengine/exporters/webp": 3661,
     "@margoengine/fbx": 18653,
     "@margoengine/fbx dist/workers/fbx.js": 58092,

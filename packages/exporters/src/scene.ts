@@ -944,10 +944,22 @@ function isEngine(source: unknown): source is EngineKernel {
 }
 
 /**
+ * @internal What a format does with a loaded model's textures and material extensions: 'refuse' them, keep the 'shape'
+ * and flat colors because the format has no place for more, or also keep the 'baseColor' texture, as the file holds it.
+ */
+export type LoadedModels = 'refuse' | 'shape' | 'baseColor';
+
+/**
  * @internal Collects the exported node forest. `plan`, when given, receives the buffer bytes each new geometry's
  * vertex attributes and each new image will take, before the data is normalized, so a size limit can refuse early.
+ * `loaded` says what a format does with a loaded model's textures and material extensions.
  */
-export function collect(source: ExportSource, options: SceneOptions = {}, plan?: (bytes: number) => void): Node[] {
+export function collect(
+  source: ExportSource,
+  options: SceneOptions = {},
+  plan?: (bytes: number) => void,
+  loaded: LoadedModels = 'refuse',
+): Node[] {
   if (!isObject(options)) fail('Options must be an object');
   const onlyVisible = options.onlyVisible ?? true;
   if (typeof onlyVisible !== 'boolean') fail('onlyVisible must be boolean');
@@ -990,7 +1002,42 @@ export function collect(source: ExportSource, options: SceneOptions = {}, plan?:
     }
     return mat;
   };
-  const pbrSkins = new Map<PBRSource, Map<number, SkinData>>();
+  const pbrSkins = new Map<PBRSource, Map<number, SkinData>>(),
+    pbrMaterials = new Map<unknown, Mat>(),
+    pbrImages = new Map<unknown, TextureData>();
+  /** The base color texture a loaded material's file names, with its bytes as the file holds them. */
+  const baseColorOf = (source: PBRSource, index: number | undefined) => {
+    const { doc } = source.asset,
+      info = index === undefined ? undefined : doc.materials?.[index]?.pbrMetallicRoughness?.baseColorTexture;
+    if (!info) return undefined;
+    const image = doc.images?.[doc.textures?.[info.index]?.source as number];
+    let texture = pbrImages.get(image);
+    if (!texture) {
+      const data = /^data:[^;,]*;base64,(.*)$/s.exec(image?.uri ?? '');
+      const bytes =
+        image?.bufferView !== undefined
+          ? source.asset.view(image.bufferView)
+          : data
+            ? Uint8Array.from(atob(data[1]), (c) => c.charCodeAt(0))
+            : undefined;
+      if (!bytes)
+        fail(
+          'A base color texture here is not a PNG or JPEG inside the model file; pass textures: false for its shape and colors, or use exportModel (@margoengine/exporters/model)',
+        );
+      texture = { image: bytes!, mimeType: bytes![0] === 0x89 ? 'image/png' : 'image/jpeg', name: image?.name };
+      pbrImages.set(image, texture);
+    }
+    const transform = info.extensions?.KHR_texture_transform;
+    return {
+      texture,
+      texCoord: transform?.texCoord ?? info.texCoord ?? 0,
+      transform: transform && {
+        offset: transform.offset ?? [0, 0],
+        scale: transform.scale ?? [1, 1],
+        rotation: transform.rotation ?? 0,
+      },
+    };
+  };
   const pbr = (triangles: Extract<ReturnType<typeof meshTriangles>, { kind: 'pbr' }>, node: Node): void => {
     const { model: source, primitives } = triangles.source,
       // A materials mesh (createMesh) draws its live Material's textures, which gltf-pro's maps do not list.
@@ -1001,16 +1048,23 @@ export function collect(source: ExportSource, options: SceneOptions = {}, plan?:
         count = vertices.length / 20,
         side = mat.side ?? (mat.settings[2] === 2 ? 'back' : mat.settings[2] ? 'double' : 'front');
       if (!Number.isInteger(count) || !count) fail('Invalid PBR primitive vertices');
+      const live = materialSlots.some((k) => (Array.isArray(owner) ? owner[definition.material!] : owner)?.[k]);
       if (
-        mat.maps.some((map: unknown) => map) ||
-        materialSlots.some((k) => (Array.isArray(owner) ? owner[definition.material!] : owner)?.[k]) ||
-        mat.extension ||
-        primitive.extension ||
-        Object.keys(mat.extensions ?? {}).length
+        loaded === 'refuse' &&
+        (mat.maps.some((map: unknown) => map) ||
+          live ||
+          mat.extension ||
+          primitive.extension ||
+          Object.keys(mat.extensions ?? {}).length)
       )
         fail(
-          'PBR texture and material extension export is unsupported; export textured models with exportModel (@margoengine/exporters/model)',
+          'PBR texture and material extension export is unsupported; export textured models with exportModel (@margoengine/exporters/model), or as OBJ, STL or PLY',
         );
+      if (loaded === 'baseColor' && live)
+        fail(
+          'A live Material has no image file to name; pass textures: false for its shape and colors, or use exportModel (@margoengine/exporters/model)',
+        );
+      const base = loaded === 'baseColor' ? baseColorOf(source, definition.material) : undefined;
       const attribute = (offset: number, width: number): Float32Array => {
         const out = new Float32Array(count * width);
         for (let i = 0; i < count; i++)
@@ -1022,6 +1076,16 @@ export function collect(source: ExportSource, options: SceneOptions = {}, plan?:
       if (attrs.TANGENT !== undefined) data.tangents = attribute(8, 4);
       if (attrs.TEXCOORD_0 !== undefined) data.uvs = attribute(12, 2);
       if (attrs.TEXCOORD_1 !== undefined) data.uvs1 = attribute(14, 2);
+      if (owner) {
+        // A materials mesh lists no attributes and holds its UVs v up, for flipY uploads; everything here is v down, as glTF is.
+        const uvs = attribute(12, 2);
+        if (uvs.some((v) => v)) {
+          for (let i = 1; i < uvs.length; i += 2) uvs[i] = 1 - uvs[i];
+          data.uvs = uvs;
+        }
+      }
+      // One UV set is all a format that names image files has, so it holds the set the texture samples.
+      if (base?.texCoord === 1) data.uvs = data.uvs1;
       if (attrs.COLOR_0 !== undefined) data.colors = attribute(16, 4);
       if (attrs.JOINTS_1 !== undefined || attrs.WEIGHTS_1 !== undefined)
         fail('Export supports at most four skin influences per vertex');
@@ -1048,16 +1112,22 @@ export function collect(source: ExportSource, options: SceneOptions = {}, plan?:
           if (morph.normals)
             for (let i = 0; i < morph.normals.length; i++) morph.normals[i] = morph.normals[i] ? -morph.normals[i] : 0;
       }
-      const material = normalizeMaterial({
-        name: mat.name,
-        color: mat.base,
-        roughness: mat.factors[0],
-        metalness: mat.factors[1],
-        emissive: mat.emission,
-        doubleSided: side === 'double',
-        alphaMode: (mat.alphaMode as MaterialData['alphaMode']) ?? 'OPAQUE',
-        alphaCutoff: mat.alphaMode === 'MASK' ? mat.settings[1] : undefined,
-      });
+      let material = pbrMaterials.get(mat);
+      if (!material) {
+        material = normalizeMaterial({
+          name: mat.name,
+          color: mat.base,
+          roughness: mat.factors[0],
+          metalness: mat.factors[1],
+          emissive: mat.emission,
+          doubleSided: side === 'double',
+          alphaMode: (mat.alphaMode as MaterialData['alphaMode']) ?? 'OPAQUE',
+          alphaCutoff: mat.alphaMode === 'MASK' ? mat.settings[1] : undefined,
+          baseColorTexture: base?.texture,
+          baseColorTextureTransform: base?.transform,
+        });
+        pbrMaterials.set(mat, material);
+      }
       return { geometry, material };
     });
     node.geometry = node.primitives[0].geometry;
@@ -1324,6 +1394,23 @@ export function textureFiles(prefix: unknown): { files: Map<string, Uint8Array>;
   };
 }
 
+/** @internal Whether an `upAxis` option turns a Y-up scene onto a format's Z-up axes. */
+export function turnsToZUp(upAxis: unknown, format: string): boolean {
+  if (upAxis !== undefined && upAxis !== 'y' && upAxis !== 'z') throw new RangeError(`${format} upAxis must be 'y' or 'z'`);
+  return upAxis !== 'z';
+}
+
+/** @internal A quarter turn about X that stands Y-up vectors on Z up: a turn, so triangles keep their winding. */
+export function standZUp(values: Float64Array): Float64Array {
+  const out = new Float64Array(values.length);
+  for (let i = 0; i < values.length; i += 3) {
+    out[i] = values[i];
+    out[i + 1] = -values[i + 2];
+    out[i + 2] = values[i + 1];
+  }
+  return out;
+}
+
 /** @internal A drawable with its world transform, in depth-first order. */
 export interface Drawable {
   name?: string;
@@ -1336,18 +1423,138 @@ export interface Drawable {
 const collapsed = (s: readonly number[]): boolean => s.every((v) => v === 0);
 
 export function drawables(nodes: Node[]): Drawable[] {
-  const out: Drawable[] = [];
+  const out: Drawable[] = [],
+    shape = shaper(nodes);
   const walk = (node: Node) => {
     if (collapsed(node.s)) return;
     if (node.primitives)
       for (const primitive of node.primitives)
-        out.push({ name: node.name, geometry: primitive.geometry, material: primitive.material, world: node.world });
+        out.push({
+          name: node.name,
+          geometry: shape(node, primitive.geometry),
+          material: primitive.material,
+          world: node.world,
+        });
     else if (node.geometry)
-      out.push({ name: node.name, geometry: node.geometry, material: node.material, world: node.world });
+      out.push({ name: node.name, geometry: shape(node, node.geometry), material: node.material, world: node.world });
     node.children.forEach(walk);
   };
   nodes.forEach(walk);
   return out;
+}
+
+/** Inverse of an affine column-major matrix, or null when it has none. */
+function invertAffine(m: Float64Array): Float64Array | null {
+  const c0 = m[5] * m[10] - m[6] * m[9],
+    c1 = m[2] * m[9] - m[1] * m[10],
+    c2 = m[1] * m[6] - m[2] * m[5],
+    determinant = m[0] * c0 + m[4] * c1 + m[8] * c2;
+  if (!determinant || !Number.isFinite(determinant)) return null;
+  const k = 1 / determinant,
+    o = new Float64Array(16);
+  o[0] = c0 * k;
+  o[1] = c1 * k;
+  o[2] = c2 * k;
+  o[4] = (m[6] * m[8] - m[4] * m[10]) * k;
+  o[5] = (m[0] * m[10] - m[2] * m[8]) * k;
+  o[6] = (m[2] * m[4] - m[0] * m[6]) * k;
+  o[8] = (m[4] * m[9] - m[5] * m[8]) * k;
+  o[9] = (m[1] * m[8] - m[0] * m[9]) * k;
+  o[10] = (m[0] * m[5] - m[1] * m[4]) * k;
+  for (let r = 0; r < 3; r++) o[12 + r] = -(o[r] * m[12] + o[4 + r] * m[13] + o[8 + r] * m[14]);
+  o[15] = 1;
+  return o;
+}
+
+/**
+ * @internal For formats with no skeleton or morph targets: gives the geometry a node shows at its nodes' current pose, in the
+ * node's own space so that `node.world` still places it. Morphs apply first, then the skin, as in glTF, where a skinned mesh's
+ * own node does not place it. Geometry with neither comes back as it is.
+ */
+export function shaper(roots: Node[]): (node: Node, geometry: Geo) => Geo {
+  const bySource = new Map<ExportNode, Node>(),
+    index = (node: Node): void => {
+      if (node.source) bySource.set(node.source, node);
+      node.children.forEach(index);
+    };
+  roots.forEach(index);
+  return (node, geometry) => {
+    const weights = node.morphWeights,
+      morphs = weights?.some((w) => w) ? geometry.morphs : undefined,
+      skin = node.skin && geometry.joints && geometry.weights ? node.skin : undefined;
+    if (!morphs && !skin) return geometry;
+    const { count } = geometry,
+      positions = Float64Array.from(geometry.positions),
+      normals = Float64Array.from(geometry.normals);
+    morphs?.forEach((morph, m) => {
+      const w = weights![m];
+      if (!w) return;
+      for (let i = 0; i < count * 3; i++) {
+        positions[i] += w * morph.positions[i];
+        if (morph.normals) normals[i] += w * morph.normals[i];
+      }
+    });
+    let indices = geometry.indices;
+    if (skin) {
+      const toNode = invertAffine(node.world);
+      if (!toNode) fail('A skinned node needs an invertible transform');
+      // joint world * inverse bind, taken back into the node's own space.
+      const palette = skin.joints.map((joint, j) => {
+        const target = bySource.get(joint);
+        if (!target) fail('Every skin joint must be exported; pass onlyVisible: false to keep hidden joints');
+        const bind = Float64Array.from({ length: 16 }, (_, i) => skin.inverseBindMatrices[j * 16 + i]);
+        return multiplyMatrices(toNode!, multiplyMatrices(target!.world, bind));
+      });
+      const m = new Float64Array(16),
+        flip = new Uint8Array(count);
+      for (let v = 0; v < count; v++) {
+        let total = 0;
+        for (let k = 0; k < 4; k++) total += geometry.weights![v * 4 + k];
+        if (!total) continue;
+        m.fill(0);
+        for (let k = 0; k < 4; k++) {
+          const w = geometry.weights![v * 4 + k] / total;
+          if (!w) continue;
+          const joint = palette[geometry.joints![v * 4 + k]];
+          if (!joint) throw new RangeError('Joint index exceeds skin joints; keep joint indices below the skin joint count');
+          for (let i = 0; i < 16; i++) m[i] += w * joint[i];
+        }
+        const x = positions[v * 3],
+          y = positions[v * 3 + 1],
+          z = positions[v * 3 + 2],
+          nx = normals[v * 3],
+          ny = normals[v * 3 + 1],
+          nz = normals[v * 3 + 2],
+          determinant = determinant3(m),
+          // A bone scaled to zero hides its part: its vertices collapse as they do when drawn, and keep the normal they had.
+          n = determinant ? normalMatrix(m) : null;
+        for (let r = 0; r < 3; r++) {
+          positions[v * 3 + r] = m[r] * x + m[4 + r] * y + m[8 + r] * z + m[12 + r];
+          if (n) normals[v * 3 + r] = n[r] * nx + n[3 + r] * ny + n[6 + r] * nz;
+        }
+        flip[v] = determinant < 0 ? 1 : 0;
+      }
+      if (flip.some((f) => f)) {
+        indices = indices.slice();
+        for (let i = 0; i < indices.length; i += 3)
+          if (flip[indices[i]]) [indices[i + 1], indices[i + 2]] = [indices[i + 2], indices[i + 1]];
+      }
+    }
+    for (let v = 0; v < count; v++) {
+      const l = Math.hypot(normals[v * 3], normals[v * 3 + 1], normals[v * 3 + 2]) || 1;
+      for (let r = 0; r < 3; r++) normals[v * 3 + r] /= l;
+    }
+    return {
+      ...geometry,
+      positions: Float32Array.from(positions),
+      normals: Float32Array.from(normals),
+      indices,
+      joints: undefined,
+      weights: undefined,
+      morphs: undefined,
+      base: undefined,
+    };
+  };
 }
 
 /** @internal World-space vertices, unit normals and winding-corrected indices of one drawable. */
