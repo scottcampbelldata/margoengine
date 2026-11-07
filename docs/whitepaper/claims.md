@@ -7,6 +7,8 @@ treat it as unverified and open an issue.
 Commands for rerunning everything are in [reproduce.md](reproduce.md). Every past performance loss and significant
 bug the checks caught, with its cause, fix, after number and guard, is in [perf-history.md](perf-history.md). What each
 finished batch of work landed, how it was proved and what is still unproved is in [build-record.md](build-record.md).
+Which claims rest only on a validator, our own reader, a stand-in or a built file, and what would really prove them, is in
+[proof-audit.md](proof-audit.md).
 
 Status:
 
