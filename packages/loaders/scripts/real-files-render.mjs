@@ -84,3 +84,45 @@ export async function renderAll(drawings, folder, report) {
   }
   await writeFile(resolve(folder, '..', 'report.json'), JSON.stringify(report, null, 2));
 }
+
+/** Runs in the page: replays the calls over white, gives the mean grey of each cell of a grid. */
+function replayGrid({ calls, width, height, scale, cells }) {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext('2d', { willReadFrequently: true }),
+    gradients = [];
+  context.fillStyle = '#fff';
+  context.fillRect(0, 0, width, height);
+  context.setTransform(scale[0], 0, 0, scale[1], 0, 0);
+  for (const call of calls) {
+    if (call[0] === 'gradient') gradients[call[1]] = context[call[2]](...call[3]);
+    else if (call[0] === 'stop') gradients[call[1]].addColorStop(...call[2]);
+    else if (call[0] === 'set') context[call[1]] = call[2]?.gradient === undefined ? call[2] : gradients[call[2].gradient];
+    else context[call[1]](...call[2]);
+  }
+  const { data } = context.getImageData(0, 0, width, height),
+    sums = new Float64Array(cells * cells),
+    counts = new Float64Array(cells * cells);
+  for (let y = 0; y < height; y++)
+    for (let x = 0; x < width; x++) {
+      const cell = Math.floor((y * cells) / height) * cells + Math.floor((x * cells) / width),
+        at = (y * width + x) * 4;
+      sums[cell] += (data[at] + data[at + 1] + data[at + 2]) / 3;
+      counts[cell]++;
+    }
+  return Array.from(sums, (sum, n) => Math.round(sum / counts[n]));
+}
+
+/** Replays recorded canvas calls on a real canvas, one job at a time, and gives each job's grid. */
+export async function canvasGrids(jobs) {
+  const browser = await launchBrowser();
+  try {
+    const page = await browser.newPage(),
+      grids = [];
+    for (const job of jobs) grids.push(await page.evaluate(replayGrid, job));
+    return grids;
+  } finally {
+    await closeAll({ browser, servers: [] });
+  }
+}

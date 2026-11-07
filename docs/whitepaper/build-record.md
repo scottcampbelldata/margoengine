@@ -1257,8 +1257,9 @@ An audit of the finished batches against their job text listed 70 gaps for the H
 | B34 | React Canvas loadCompat: the layer first, one engine, listeners stay | DONE | `72164d3a3` | LIM-146 |
 | B36 | LDraw instanced: each placed part stored once | DONE | `883ecd4ce` | LIM-185 |
 | B32 | remeshMesh quads: quad-dominant pairing | DONE | `8999fa60a` | LIM-063 |
-| batch 40 VDB | parseVDB on real OpenVDB files, every grid read | DONE | this commit | LIM-202 |
-| B33 | gltf/textured masked shadow, masked ray, draw counts | DONE | this commit | LIM-347 |
+| batch 40 VDB | parseVDB on real OpenVDB files, every grid read | DONE | `f3e106fab` | LIM-202 |
+| B33 | gltf/textured masked shadow, masked ray, draw counts | DONE | `747c2e4c8` | LIM-347 |
+| Lottie (batch 40) | parseLottie against real exports and lottie-web | DONE | this commit | LIM-205 |
 
 ## LAZ: one LAS reader, and every point format on a real file
 

@@ -2541,6 +2541,222 @@
    ],
    "size": 24456387,
    "sha256": "f3d17c50633052bb9dd320551bbfa77f8baa3dad08ee1043e5276766b2659cb5"
+  },
+  {
+   "id": "lottie-twitterheart",
+   "format": "lottie",
+   "check": "lottie",
+   "entry": "@margoengine/loaders/lottie",
+   "file": "TwitterHeart.json",
+   "url": "https://raw.githubusercontent.com/airbnb/lottie-ios/4.5.0/Tests/Samples/TwitterHeart.json",
+   "licence": "Apache-2.0",
+   "author": "lottie-ios test samples, exported from After Effects by Bodymovin",
+   "reference": "each frame as lottie-web 5.12.2 draws it at 256 px, as 16 by 16 cells of mean grey over white",
+   "size": 27151,
+   "sha256": "d4c529dcd7d948c30da383e9e9de843d187b576f88fee2fdf0b7c5d1be19e9ee",
+   "frames": [
+    {
+     "frame": 34,
+     "grid": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe9e9ffffffffffffffffffffffffffffe9e9ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    },
+    {
+     "frame": 58,
+     "grid": "fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffdfbfefbfffffffffffffffffffffffffdfefffffef7fffffffffffffffffffffffd9293f7fffffffffffffffffffffff8ff9c93fefbfffffffffffffffffffffffffcfbfffcfffffffffffffffffffffff8fef7fdffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    },
+    {
+     "frame": 81,
+     "grid": "fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffffffffffffffffffffffffffffffffffffffeffffffffffffffffffffffffb9b5fffffffffffffffffffffffeffffb9b0fffffffffffffffffffffffffffffffffffffefffffffffffffffffffffefffffffffffffffffffffffffffffffffffffeffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    }
+   ]
+  },
+  {
+   "id": "lottie-hamburgerarrow",
+   "format": "lottie",
+   "check": "lottie",
+   "entry": "@margoengine/loaders/lottie",
+   "file": "HamburgerArrow.json",
+   "url": "https://raw.githubusercontent.com/airbnb/lottie-ios/4.5.0/Tests/Samples/HamburgerArrow.json",
+   "licence": "Apache-2.0",
+   "author": "lottie-ios test samples, exported from After Effects by Bodymovin",
+   "reference": "each frame as lottie-web 5.12.2 draws it at 256 px, as 16 by 16 cells of mean grey over white",
+   "size": 6209,
+   "sha256": "49322690f37d82767c123b48b8a10e99ac32f6b2ae81d91abf380157444c4bb6",
+   "frames": [
+    {
+     "frame": 54,
+     "grid": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc0f8ffffffffffffffffffffffffffd6a1d1eeffffffffffffffffffffffffe7afdff1ffffffffffffffffffffffffffcbfcffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    },
+    {
+     "frame": 90,
+     "grid": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffbffaffffffffffffffffffffffffffd9a2ceebffffffffffffffffffffffffe3aae0f3ffffffffffffffffffffffffffcafaffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    },
+    {
+     "frame": 125,
+     "grid": "fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffeffffffffffffffffffffffffffffffbc9dfffffffffffffffffffffffffff5b5a3f3ffffffffffffffffffffffffcbd6cadafffffffffffffffffffffffffeddefecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    }
+   ]
+  },
+  {
+   "id": "lottie-watermelon",
+   "format": "lottie",
+   "check": "lottie",
+   "entry": "@margoengine/loaders/lottie",
+   "file": "Watermelon.json",
+   "url": "https://raw.githubusercontent.com/airbnb/lottie-ios/4.5.0/Tests/Samples/Watermelon.json",
+   "licence": "Apache-2.0",
+   "author": "lottie-ios test samples, exported from After Effects by Bodymovin",
+   "reference": "each frame as lottie-web 5.12.2 draws it at 256 px, as 16 by 16 cells of mean grey over white",
+   "size": 27246,
+   "sha256": "9510b4f97c597d6904ef5492f1aa4cc7c035330cb634b1f5a836edf63be468f7",
+   "frames": [
+    {
+     "frame": 168,
+     "grid": "fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffbd2d0d0d0d0d0d0d2fbfffffffffffffd9c8d9d8d8d9d8d9dfdffffffffffffffc4938d91918d93c4fffffffffffffffff9b0948d8d94b0fafffffffffffffffffffdd9bfbfdafdffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    },
+    {
+     "frame": 281,
+     "grid": "fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffbd2d0d0d0d0d0d0d2fbfffffffffffffd9c8d9d8d8d9d8d9dfdffffffffffffffc4938d91918d93c4fffffffffffffffff9b0948d8d94b0fafffffffffffffffffffdd9bfbfdafdffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    },
+    {
+     "frame": 394,
+     "grid": "fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffbd2d0d0d0d0d0d0d2fbfffffffffffffd9c8d9d8d8d9d8d9dfdffffffffffffffc4938d91918d93c4fffffffffffffffff9b0948d8d94b0fafffffffffffffffffffdd9bfbfdafdffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    }
+   ]
+  },
+  {
+   "id": "lottie-9squares",
+   "format": "lottie",
+   "check": "lottie",
+   "entry": "@margoengine/loaders/lottie",
+   "file": "9squares_AlBoardman.json",
+   "url": "https://raw.githubusercontent.com/airbnb/lottie-ios/4.5.0/Tests/Samples/9squares_AlBoardman.json",
+   "licence": "Apache-2.0",
+   "author": "lottie-ios test samples, exported from After Effects by Bodymovin",
+   "reference": "each frame as lottie-web 5.12.2 draws it at 256 px, as 16 by 16 cells of mean grey over white",
+   "size": 62308,
+   "sha256": "d6d665a7d67d81e6df60cd467d5fa3244f58f47a0444700658ef4e81a1d09bc9",
+   "frames": [
+    {
+     "frame": 52,
+     "grid": "303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303f43464a47413c3830303030303030504a484944464644414230303030304f574d484141414245454941303030307248414042414141404040573030303453313f3e4143423e3e3f30483030303453313f3e4242423f3e3f304830303030714941404240404140404057303030304e584b494242424145454a403030303030504a4849444546444042303030303030303f43464947423c3830303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030"
+    },
+    {
+     "frame": 88,
+     "grid": "303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303f43464946413c38303030303030304e4a484941434544414130303030304e564a473f42413f4344484030303030734741404240404140413f57303030374d313f3e4142423e3d3f3145313030374d313f3d4142423f3d3f314531303030734943414140404040414057303030304f574c49404141404545494130303030304e464746414243433e41303030303030303e41454745413a3830303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030"
+    },
+    {
+     "frame": 123,
+     "grid": "303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303f43464946413c38303030303030304e4a484941434544414130303030304e564a473f42413f4344484030303030734741404240404140413f57303030374d313f3e4142423e3d3f3145313030374d313f3d4142423f3d3f314531303030734943414140404040414057303030304f574c49404141404545494130303030304e464746414243433e41303030303030303e41454745413a3830303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030"
+    }
+   ]
+  },
+  {
+   "id": "lottie-pinjump",
+   "format": "lottie",
+   "check": "lottie",
+   "entry": "@margoengine/loaders/lottie",
+   "file": "PinJump.json",
+   "url": "https://raw.githubusercontent.com/airbnb/lottie-ios/4.5.0/Tests/Samples/PinJump.json",
+   "licence": "Apache-2.0",
+   "author": "lottie-ios test samples, exported from After Effects by Bodymovin",
+   "reference": "each frame as lottie-web 5.12.2 draws it at 256 px, as 16 by 16 cells of mean grey over white",
+   "size": 36815,
+   "sha256": "05dcbb0e237d05cc20714820a98ea282f47dca817e8dce226cf253b24fa10a1b",
+   "frames": [
+    {
+     "frame": 27,
+     "grid": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc4a6e4ffffffffffffffffffffffffeaacf5a1fffffffffffffffffffffffff695bfabffffffffffffffffffffffffffb27eebfffffffffffffffffefdfdfafdf2c7fdfdfdcffdfefffffffffffffeffffffffffffe4ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    },
+    {
+     "frame": 46,
+     "grid": "fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8a198e1ffffffffffffffffffffffffd1cbefadffffffffffffffffffffffffdb98a8cdffffffffffffffffffffffffeb7fc3fffffffffffffffffffffffffff1eefffffffffffffffffffffffffffffffffffffffffffffffffffffefdfdfdfde9e4fdfdfdfdfdfefffffffffffffffff3f0ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    },
+    {
+     "frame": 65,
+     "grid": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc1a4e2ffffffffffffffffffffffffe9aef8a0fffffffffffffffffffffffff794bcacffffffffffffffffffffffffffb37eebfffffffffffffffffed0fdfdfdf2c7fdfdfafdfdfeffffffffe4fffffffffffffffeffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    }
+   ]
+  },
+  {
+   "id": "lottie-lottielogo1",
+   "format": "lottie",
+   "check": "lottie",
+   "entry": "@margoengine/loaders/lottie",
+   "file": "LottieLogo1.json",
+   "url": "https://raw.githubusercontent.com/airbnb/lottie-ios/4.5.0/Tests/Samples/LottieLogo1.json",
+   "licence": "Apache-2.0",
+   "author": "lottie-ios test samples, exported from After Effects by Bodymovin",
+   "reference": "each frame as lottie-web 5.12.2 draws it at 256 px, as 16 by 16 cells of mean grey over white",
+   "size": 56651,
+   "sha256": "67e8abf1a812770c0e898d91dfb179b50f50745e35ce5fc42e17746949a6b169",
+   "frames": [
+    {
+     "frame": 53,
+     "grid": "8686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686b0868686868686868686868686867e889a8c8886868686868686868686867f937d7c7c868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686"
+    },
+    {
+     "frame": 89,
+     "grid": "8686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686b0b6b3a9966d90ada886868686867e889883a0aa9578aa838286868686867f937d7c7c898686998686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686"
+    },
+    {
+     "frame": 125,
+     "grid": "8686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686b0b6b3a8946b8cafbd8a868686867e889883a0aa9578ae92a190868686867f937d7c7c898686988686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686868686"
+    }
+   ]
+  },
+  {
+   "id": "lottie-lottielogo2",
+   "format": "lottie",
+   "check": "lottie",
+   "entry": "@margoengine/loaders/lottie",
+   "file": "LottieLogo2.json",
+   "url": "https://raw.githubusercontent.com/airbnb/lottie-ios/4.5.0/Tests/Samples/LottieLogo2.json",
+   "licence": "Apache-2.0",
+   "author": "lottie-ios test samples, exported from After Effects by Bodymovin",
+   "reference": "each frame as lottie-web 5.12.2 draws it at 256 px, as 16 by 16 cells of mean grey over white",
+   "size": 88590,
+   "sha256": "7cbef59c7ee0a308e799a4b1ae6d31eede267ae583a750c555accc3171c7a254",
+   "frames": [
+    {
+     "frame": 113,
+     "grid": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffd4eeffedb5add5ffffffffffffffffff8686887675828ffeffffffffffffffff86866f56565674aee0ffffffffffffffe6ba895d56565656566a9de8fffffffffffffffad19f6c5656565682ffffffffffffffffffffffe3b1909ce5ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffadf6ffffffffffffffffffffffffffff"
+    },
+    {
+     "frame": 189,
+     "grid": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe5e5e5e5e5f7fffffffffefdfaf9fafb56565656566dffffffcf5b6c86868686dfdfdfdfdff4fffffffbcccad3d2d2d2fffffffffffffffffffffffffffffffffffff9a493a3afafafafb0b0b0b1b1b1fffff7968598a5a5a4a4a4a4a4a4a4a4ffffffffffffffffffffffbfa4dffffffffffce2e7f8ffffffffe9b59dcee2e2ffffe98686e3ffffffcd565656565656ffffdd8686effffffffee1d8d7d7d6d6ffffd08686fcffffffffffffffffffffffffc4868fffffffffffffffffffffffffffb8869bffffffffffffffffffffff"
+    },
+    {
+     "frame": 264,
+     "grid": "fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7fffffde2e2e4f6e5fdfffffffffffbd2b3b7d4d1afe7dec6faffffffffcfb7d2bec7d6f6d8cfeedaf3ffffffffe9ece6d7dbfffffff5ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    }
+   ]
+  },
+  {
+   "id": "lottie-icontransitions",
+   "format": "lottie",
+   "check": "lottie",
+   "entry": "@margoengine/loaders/lottie",
+   "file": "IconTransitions.json",
+   "url": "https://raw.githubusercontent.com/airbnb/lottie-ios/4.5.0/Tests/Samples/IconTransitions.json",
+   "licence": "Apache-2.0",
+   "author": "lottie-ios test samples, exported from After Effects by Bodymovin",
+   "reference": "each frame as lottie-web 5.12.2 draws it at 256 px, as 16 by 16 cells of mean grey over white",
+   "size": 71306,
+   "sha256": "8dae6b5868fa3df391bf59835bc6b28a6d911f886dbf1bcb324705898ad653d8",
+   "frames": [
+    {
+     "frame": 47,
+     "grid": "fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffbfffbfbfffffffffffffffffffffffff1e4e5ddefffffffffffffffffffffffe2f3eedff3ffffffffffffffffffffffffd7d9ffffffffffffffffffffffffffffd9dafffffffffffffffffffffffffff0ebeaf3ffffffffffffffffffffffffe2ffffe2ffffffffffffffffffffffffe5ffffe5ffffffffffffffffffffffffe5ffffe5ffffffffffffffffffffffffeae5e5ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    },
+    {
+     "frame": 79,
+     "grid": "fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff5e4e5e1f1ffffffffffffffffffffffdef7f0cfedffffffffffffffffffffffffd7d1ccfbffffffffffffffffffffffffdadcf9f5ffffffffffffffffffffffefebe8f2ffffffffffffffffffffffffe2ffffe2ffffffffffffffffffffffffe5ffffe5ffffffffffffffffffffffffe5ffffe5ffffffffffffffffffffffffe8e5e5ebffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    },
+    {
+     "frame": 110,
+     "grid": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe5dee2dde0eafffffffffffffffffffed2e4e5d8e4d5ffffffffffffffffffe3fefffffffff9e8ffffffffffffffffe5ffffffffffffcbfcffffffffffffffe5ffffffffffffe5ffffffffffffffffd9e5e6e6e6e6e4dffffffffffffffffffaebffffffffe6feffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    }
+   ]
   }
  ]
 }

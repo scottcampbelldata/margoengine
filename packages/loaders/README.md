@@ -743,11 +743,12 @@ for (const item of animation.frame(12.5)) // fractions blend between keyframes
   if (item.kind === 'path') console.log(item.fill, item.opacity, item.toShapes({ flipY: true }).length);
 ```
 
-- **Layers.** Shape, solid, image, null and precomposition layers, with parents, in and out frames, time stretch and time remapping. Hand `draw` your loaded images as `{ images: { id: bitmap } }`, by the ids in `animation.images`.
-- **Shapes.** Rectangles, ellipses, polygons, stars, bezier paths and groups, with solid and gradient fills and strokes, dashes and trim paths.
-- **Keyframes.** Bezier easing, per axis where the file gives it, hold keys, spatial curves on positions, and paths that blend between keys.
+- **Layers.** Shape, solid, image, null and precomposition layers, with parents, in and out frames, time stretch and time remapping. A layer's own keyframes run in the time of its composition, as Bodymovin writes them; `st` and `sr` move what a precomposition plays. Hand `draw` your loaded images as `{ images: { id: bitmap } }`, by the ids in `animation.images`.
+- **Shapes.** Rectangles, ellipses, polygons, stars, bezier paths and groups, with solid and gradient fills and strokes, dashes and trim paths, parallel or one by one. A trim reaches every shape before it in scope, also inside groups, and a stroke's width follows the transforms over the stroke.
+- **Keyframes.** Bezier easing, per axis where the file gives it, hold keys, spatial curves on positions (the ease is a share of the arc length), and paths that blend between keys. Colours from 0 to 255 in files older than Bodymovin 4.1.9 are read as such.
 - **Clear the canvas yourself.** `draw` paints over what is there, so call `clearRect` between frames.
 - **`unsupported`.** Masks, track mattes, text layers, effects, blend modes, 3D layers, repeaters, merge paths, rounded corners and star roundness are not drawn. Each one the file uses is named in this list, so check it when a file looks wrong. Expressions are ignored and are not listed.
+- **Proof.** Eight real exports match lottie-web 5.12.2 within 1 of 255 grey levels on a 16 by 16 grid (`REAL_FILES_ONLY=lottie npm run test:real-files`). Files that lean on masks, mattes or expressions differ: see `docs/limits.md`.
 
 ## XML
 

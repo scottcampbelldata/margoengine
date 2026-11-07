@@ -235,6 +235,55 @@ interface Key {
   easing: (dimension: number) => [number, number, number, number];
   /** Handles of a spatial curve, relative to the start and end values. */
   spatial: { out: number[]; in: number[] } | null;
+  /** Distance along the spatial curve at each of its {@link CURVE_STEPS} steps, filled on first use. */
+  lengths?: Float64Array;
+}
+
+/** Steps of the table that turns distance along a spatial curve into its parameter. */
+const CURVE_STEPS = 128;
+
+/**
+ * A position on the spatial curve of `key`. The ease gives the share of the distance travelled, as an After Effects
+ * motion path does, so a straight path with zero handles is a plain straight move.
+ */
+function alongCurve(key: Key, start: number[], end: number[], share: number): number[] {
+  const { out, in: back } = key.spatial!,
+    point = (t: number): number[] => {
+      const u = 1 - t;
+      return start.map((p0, n) => {
+        const p3 = end[n] ?? p0;
+        return u * u * u * p0 + 3 * u * u * t * (p0 + (out[n] ?? 0)) + 3 * u * t * t * (p3 + (back[n] ?? 0)) + t * t * t * p3;
+      });
+    };
+  let lengths = key.lengths;
+  if (!lengths) {
+    lengths = key.lengths = new Float64Array(CURVE_STEPS + 1);
+    let before = point(0);
+    for (let n = 1; n <= CURVE_STEPS; n++) {
+      const here = point(n / CURVE_STEPS);
+      lengths[n] = lengths[n - 1]! + Math.hypot(...here.map((value, k) => value - before[k]!));
+      before = here;
+    }
+  }
+  const total = lengths[CURVE_STEPS]!;
+  if (!(total > 0)) return start;
+  const wanted = share * total;
+  // An ease that overshoots runs on along the curve's end.
+  let low = 0;
+  if (wanted >= total) low = CURVE_STEPS - 1;
+  else if (wanted > 0) {
+    let high = CURVE_STEPS;
+    while (high - low > 1) {
+      const middle = (low + high) >> 1;
+      if (lengths[middle]! <= wanted) low = middle;
+      else high = middle;
+    }
+  }
+  const span = lengths[low + 1]! - lengths[low]!,
+    a = point(low / CURVE_STEPS),
+    b = point((low + 1) / CURVE_STEPS),
+    t = span > 0 ? (wanted - lengths[low]!) / span : 0;
+  return a.map((value, k) => value + (b[k]! - value) * t);
 }
 
 /** A property: a constant, or keyframes with their easing. */
@@ -291,17 +340,7 @@ class Property {
         return ease(x1, y1, x2, y2, x);
       };
     const { start, end } = key;
-    if (key.spatial && Array.isArray(start) && Array.isArray(end)) {
-      const t = eased(0),
-        u = 1 - t,
-        { out, in: back } = key.spatial;
-      return start.map((p0, n) => {
-        const p3 = end[n] ?? p0,
-          p1 = p0 + (out[n] ?? 0),
-          p2 = p3 + (back[n] ?? 0);
-        return u * u * u * p0 + 3 * u * u * t * p1 + 3 * u * t * t * p2 + t * t * t * p3;
-      });
-    }
+    if (key.spatial && Array.isArray(start) && Array.isArray(end)) return alongCurve(key, start, end, eased(0));
     return blend(start, end, eased);
   }
 
@@ -591,19 +630,50 @@ function commandsOf(runs: readonly Run[], matrix: Matrix): OutlineCommand[] {
   return commands;
 }
 
-/** A shape run under its transforms, gathered for the paints that follow it. */
+/** A shape under its transforms, gathered for the styles and modifiers that follow it; a modifier rewrites `runs` in place. */
 interface Gathered {
-  run: Run;
+  runs: Run[];
   matrix: Matrix;
 }
 
 const CAPS = ['butt', 'round', 'square'] as const;
 const JOINS = ['miter', 'round', 'bevel'] as const;
 
-/** What a shape walk gives back: paths for later paints, and the items painted, top first. */
+/**
+ * What a shape walk gives back: paths for later paints, and the items painted, top first. An item is built after the
+ * walk, because a modifier reaches every shape before it in scope, also those a style has already taken.
+ */
 interface Walked {
   gathered: Gathered[];
-  items: LottiePath[];
+  items: (() => LottiePath | null)[];
+}
+
+/** A sequential trim: every run in turn is one line, and `span` (null for none) is the stretch of it that stays. */
+function trimInTurn(shapes: Gathered[], span: readonly [number, number] | null): void {
+  const sizeOf = (run: Run): number => run.pieces.reduce((sum, piece) => sum + lengths(piece)[CHORDS]!, 0),
+    total = shapes.reduce((sum, shape) => sum + shape.runs.reduce((all, run) => all + sizeOf(run), 0), 0);
+  const stretches: [number, number][] = !span
+    ? []
+    : span[0] <= span[1]
+      ? [[span[0], span[1]]]
+      : [
+          [span[0], 1],
+          [0, span[1]],
+        ];
+  let at = 0;
+  for (const shape of shapes) {
+    shape.runs = shape.runs.flatMap((run) => {
+      const size = sizeOf(run),
+        kept: Run[] = [];
+      for (const [from, to] of size > 0 ? stretches : []) {
+        const a = Math.max((from * total - at) / size, 0),
+          b = Math.min((to * total - at) / size, 1);
+        if (b > a) for (const pieces of trim(run.pieces, a, b)) kept.push({ pieces, closed: false });
+      }
+      at += size;
+      return kept;
+    });
+  }
 }
 
 /** The shape items of one list, compiled once, then walked per frame. */
@@ -625,7 +695,7 @@ class ShapeList {
     const reverse = item.d === 3;
     const push = (make: (frame: number) => Bezier | null) => (frame: number, state: Walked, matrix: Matrix) => {
       const path = make(frame);
-      if (path) state.gathered.push({ run: runsOf(reverse ? reversed(path) : path), matrix });
+      if (path) state.gathered.push({ runs: [runsOf(reverse ? reversed(path) : path)], matrix });
     };
     switch (item.ty) {
       case 'gr': {
@@ -689,20 +759,24 @@ class ShapeList {
         const start = new Property(item.s, [0]),
           end = new Property(item.e, [100]),
           offset = new Property(item.o, [0]);
-        if (item.m === 2) note('trim paths one by one');
+        const sequential = item.m === 2;
         return (frame, state) => {
           const wrap = (v: number): number => v - Math.floor(v),
             shift = offset.number(frame) / 360,
             low = Math.min(start.number(frame), end.number(frame)) / 100,
             high = Math.max(start.number(frame), end.number(frame)) / 100;
-          state.gathered = state.gathered.flatMap(({ run, matrix }) => {
-            if (high - low >= 1) return [{ run, matrix }];
-            if (high <= low) return [];
-            return trim(run.pieces, wrap(low + shift), wrap(high + shift)).map((parts) => ({
-              run: { pieces: parts, closed: false },
-              matrix,
-            }));
-          });
+          if (high - low >= 1) return;
+          const from = wrap(low + shift),
+            to = wrap(high + shift);
+          if (sequential) trimInTurn(state.gathered, high <= low ? null : [from, to]);
+          else
+            for (const shape of state.gathered)
+              shape.runs =
+                high <= low
+                  ? []
+                  : shape.runs.flatMap((run) =>
+                      trim(run.pieces, from, to).map((pieces) => ({ pieces, closed: false })),
+                    );
         };
       }
       default:
@@ -728,14 +802,12 @@ class ShapeList {
       lineJoin = JOINS[num(item.lj, 2) - 1] ?? 'round',
       miterLimit = num(item.ml, 4),
       radial = item.t === 2;
-    return (frame, state, _matrix, opacity) => {
-      const { gathered } = state;
-      if (!gathered.length) return;
-      // Stroke width and dashes scale with the transforms above the paint; the scale of its first path stands for all.
-      const scale = meanScale(gathered[0]!.matrix),
-        place = gathered[0]!.matrix,
-        rgb = color.numbers(frame),
-        commands = gathered.flatMap(({ run, matrix }) => commandsOf([run], matrix));
+    return (frame, state, place, opacity) => {
+      const reached = [...state.gathered];
+      if (!reached.length) return;
+      // Stroke width, dashes and gradient ends follow the transforms over the style, whatever the shape sits under.
+      const scale = meanScale(place),
+        rgb = color.numbers(frame);
       let paint: LottieGradient | null = null;
       if (gradient && stops) {
         const [sx = 0, sy = 0] = start.numbers(frame),
@@ -754,21 +826,25 @@ class ShapeList {
         dash = { pattern, offset: offset * scale };
       }
       const solid: [number, number, number] = [rgb[0] ?? 0, rgb[1] ?? 0, rgb[2] ?? 0];
-      state.items.push(
-        makePath({
+      const share = opacity * (alpha.number(frame) / 100),
+        strokeWidth = stroked ? width.number(frame) * scale : 0;
+      state.items.push(() => {
+        const commands = reached.flatMap(({ runs, matrix }) => commandsOf(runs, matrix));
+        if (!commands.length) return null;
+        return makePath({
           commands,
           fill: !stroked && !gradient ? solid : null,
           gradient: paint,
           stroke: stroked && !gradient ? solid : null,
-          opacity: opacity * (alpha.number(frame) / 100),
+          opacity: share,
           fillRule,
-          strokeWidth: stroked ? width.number(frame) * scale : 0,
+          strokeWidth,
           lineCap,
           lineJoin,
           miterLimit,
           dash,
-        }),
-      );
+        });
+      });
     };
   }
 
@@ -911,6 +987,7 @@ class Compiler {
   }
 }
 
+/** A layer's matrix through its parents. */
 const parentMatrix = (layer: Layer, all: readonly Layer[], frame: number): Matrix => {
   let matrix = layer.transform.matrix(frame);
   const seen = new Set<Layer>([layer]);
@@ -937,14 +1014,18 @@ function collect(
   for (let n = layers.length - 1; n >= 0; n--) {
     const layer = layers[n]!;
     if (layer.hidden || frame < layer.inFrame || frame >= layer.outFrame) continue;
-    const local = (frame - layer.startTime) / layer.stretch,
-      here = multiply(matrix, parentMatrix(layer, layers, local)),
-      alpha = opacity * layer.transform.opacity(local);
+    // A layer's own keyframes are written in the time of its composition, so `st` and `sr` move only what a
+    // precomposition plays inside it: a file with `st: -44` keys its layer at 44 to 89, its own in and out frames.
+    const here = multiply(matrix, parentMatrix(layer, layers, frame)),
+      alpha = opacity * layer.transform.opacity(frame);
     if (layer.shapes) {
       const walked: Walked = { gathered: [], items: [] };
-      layer.shapes.walk(local, walked, here, alpha);
+      layer.shapes.walk(frame, walked, here, alpha);
       // Items are in paint order, top first.
-      out.push(...walked.items.reverse());
+      for (const item of walked.items.reverse()) {
+        const path = item();
+        if (path) out.push(path);
+      }
     } else if (layer.solid) {
       const { width, height, color } = layer.solid;
       out.push(
@@ -975,7 +1056,7 @@ function collect(
         });
     } else if (layer.precomp) {
       const { remap, layers: inner } = layer.precomp,
-        time = remap ? remap.number(local) * rate : local;
+        time = remap ? remap.number(frame) * rate : (frame - layer.startTime) / layer.stretch;
       collect(inner, time, rate, sizes, here, alpha, out);
     }
   }
@@ -1035,6 +1116,31 @@ function paintPath(context: LottieCanvas, path: LottiePath): void {
   context.restore();
 }
 
+/** Whether the file's exporter wrote fill and stroke colours from 0 to 255: Bodymovin before 4.1.9. */
+function bytesColours(version: string): boolean {
+  if (!/^\d+\.\d+\.\d+/.test(version)) return false;
+  const [major = 0, minor = 0, patch = 0] = version.split('.').map(Number);
+  return major < 4 || (major === 4 && (minor < 1 || (minor === 1 && patch < 9)));
+}
+
+/** Rewrites the fill and stroke colours under `value` to 0..1, in a file of {@link bytesColours}. */
+function scaleColours(value: unknown): void {
+  if (Array.isArray(value)) for (const item of value) scaleColours(item);
+  if (!isObject(value)) return;
+  if ((value.ty === 'fl' || value.ty === 'st') && isObject(value.c)) {
+    const scaled = (colour: unknown): unknown =>
+      Array.isArray(colour) ? colour.map((part) => (typeof part === 'number' ? part / 255 : part)) : colour;
+    const keys = value.c.k;
+    if (Array.isArray(keys) && isObject(keys[0]))
+      for (const key of list(keys)) {
+        key.s = scaled(key.s);
+        key.e = scaled(key.e);
+      }
+    else value.c.k = scaled(keys);
+  }
+  for (const name of ['layers', 'assets', 'shapes', 'it']) scaleColours(value[name]);
+}
+
 /**
  * Reads a Lottie JSON animation. `frame()` gives the vector shapes of any frame, for `toShapes()` or your own drawing,
  * and `draw()` paints a frame onto a 2D canvas context, which uploads as a texture. What the file uses and a frame
@@ -1053,6 +1159,7 @@ export function parseLottie(input: BinaryInput | string, options: LottieOptions 
   }
   if (!isObject(root) || !Array.isArray(root.layers) || typeof root.fr !== 'number' || !(root.fr > 0))
     throw new LoaderError(F, 'header', 'not a Lottie animation: it needs layers and a frame rate');
+  if (bytesColours(str(root.v))) scaleColours(root);
   const assets = new Map<string, Json>(),
     images: LottieImageAsset[] = [];
   for (const asset of list(root.assets)) {

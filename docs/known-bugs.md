@@ -1103,13 +1103,6 @@ Each is described with its cause and guard in
 
 ## Loaders
 
-### parseLottie is not yet compared with a Lottie player
-
-- **What:** `@margoengine/loaders/lottie` is tested on animations its test writes, by the numbers it gives back, and on a real canvas in the browser test. No file exported from After Effects was read and no frame was compared with a reference player, because neither is on this PC and getting one needs Scott's approval. The sign of layer skew and the stacking of nested groups are the parts most likely to differ.
-- **Repro:** export a file with Bodymovin, draw a frame with `animation.draw`, and compare it with the same frame in a player.
-- **Cause:** no real sample or reference player in the repository.
-- **Needed to close:** add a few sample animations to `THIRD-PARTY-NOTICES.md` with reference frames from a player, and compare them.
-
 ### toGraph of MaterialX is not yet compared with a MaterialX render
 
 - **What:** `@margoengine/loaders/materialx` read one real file, an ambientCG `open_pbr_surface` material kept outside the repository, and its test compiles a graph through `nodeMaterial()`. `@margoengine/usdz/materialx` now reads 19 real `.mtlx` files, their networks match OpenUSD, and the shader defaults were checked against the tables of the Physically Based Shading Nodes document. Still no material was rendered and compared with a MaterialX viewer.

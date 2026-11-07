@@ -144,7 +144,7 @@ const TOOLS = {
   'packages/biomes/tests/gpu-placement-flow-check.mjs':
     'exact-head placement-flow hardware proof pinned to the RTX A6000, run directly',
   'packages/loaders/scripts/real-files-render.mjs':
-    'opt-in drawing of downloaded public files, run directly by test:real-files with REAL_FILES_RENDER=1',
+    'opt-in drawing of downloaded public files, and the Lottie frames of test:real-files, run directly by that script',
   'packages/vfx/test/bench-soft.mjs':
     'benchmark of soft particles with the GPU held exclusively (test:gpu checks the pixels)',
   'packages/voxel-pathtracer/tests/magicavoxel/mv-vox.mjs': 'renders .vox files for a side-by-side comparison',

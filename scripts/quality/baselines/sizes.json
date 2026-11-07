@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10360573,
+  "total": 10316207,
   "history": [
     {
       "date": "2026-10-24",
@@ -3380,6 +3380,12 @@
       "commit": "90a28ea73",
       "reason": "new optional entry @margoengine/navmesh/links",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "747c2e4c8",
+      "reason": "parseLottie gains the deferred style walk, one-by-one trim, arc length easing and legacy colours, each needed to play real exports as lottie-web does",
+      "grew": 1
     }
   ],
   "items": {
@@ -3703,7 +3709,7 @@
     "@margoengine/loaders/kmz": 17581,
     "@margoengine/loaders/las": 1466,
     "@margoengine/loaders/ldraw": 4539,
-    "@margoengine/loaders/lottie": 7591,
+    "@margoengine/loaders/lottie": 8104,
     "@margoengine/loaders/lwo": 4394,
     "@margoengine/loaders/materialx": 5082,
     "@margoengine/loaders/md2": 2265,

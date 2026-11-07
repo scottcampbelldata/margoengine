@@ -311,7 +311,7 @@ test('shape paths blend between keys', () => {
   box(item).forEach((value, n) => near(value, [0, 0, 15, 15][n]));
 });
 
-test('a layer shows only from its in frame up to its out frame, and its time shifts and stretches', () => {
+test('a layer shows only from its in frame up to its out frame, and start time and stretch move a precomposition', () => {
   const ks = {
     o: {
       a: 1,
@@ -322,7 +322,11 @@ test('a layer shows only from its in frame up to its out frame, and its time shi
     },
   };
   const animation = parseLottie(
-    JSON.stringify(anim([shapeLayer([rect(), fill()], { ks, ip: 10, op: 30, st: 10, sr: 2 })])),
+    JSON.stringify(
+      anim([{ ty: 0, refId: 'c', ks: {}, ip: 10, op: 30, st: 10, sr: 2 }], {
+        assets: [{ id: 'c', layers: [shapeLayer([rect(), fill()], { ks })] }],
+      }),
+    ),
   );
   assert.equal(animation.frame(9).length, 0);
   assert.equal(animation.frame(30).length, 0);
@@ -476,7 +480,6 @@ test('what frames leave out is named', () => {
     'star roundness',
     'text layer',
     'track matte',
-    'trim paths one by one',
   ]);
 });
 
@@ -550,4 +553,137 @@ test('a malformed value falls to its default instead of NaN', () => {
   const [path] = one([shapeLayer([{ ty: 'rc', p: k('nope'), s: k([4, 'x']), r: {} }, fill(['a', 0, 0])])]);
   assert.ok(path.commands.flat().every((v) => typeof v === 'string' || Number.isFinite(v)));
   assert.deepEqual(path.fill, [0, 0, 0]);
+});
+
+// What the Bodymovin exporter writes and lottie-web 5.12.2 plays, seen from outside: TwitterHeart keys a layer of
+// `st: -44` at 44 to 89, its own in and out frames.
+test("a layer's own keyframes run in the time of its composition, whatever its start time and stretch", () => {
+  const moving = {
+    a: 1,
+    k: [
+      { t: 0, s: [0, 0, 0], ...linear },
+      { t: 100, s: [100, 0, 0] },
+    ],
+  };
+  const x = (layers, extra) => box(one(layers, 50, extra)[0])[0];
+  near(x([shapeLayer([rect(2, 2), fill()], { ks: { p: moving }, st: -44 })]), 49);
+  near(x([shapeLayer([rect(2, 2), fill()], { ks: { p: moving }, sr: 2 })]), 49);
+  // A parent that starts elsewhere is read at the same frame.
+  near(
+    x([
+      shapeLayer([rect(2, 2), fill()], { parent: 2 }),
+      { ty: 3, ind: 2, ks: { p: moving }, ip: 0, op: 100, st: 20, sr: 2 },
+    ]),
+    49,
+  );
+  const shape = {
+    ...rect(2, 2),
+    p: {
+      a: 1,
+      k: [
+        { t: 0, s: [0, 0], ...linear },
+        { t: 100, s: [100, 0] },
+      ],
+    },
+  };
+  near(x([shapeLayer([shape, fill()], { st: 20 })]), 49);
+  // Time remapping is a property of the layer too, read at the frame itself.
+  const remap = {
+      a: 1,
+      k: [
+        { t: 0, s: [0], ...linear },
+        { t: 100, s: [100 / 30] },
+      ],
+    },
+    assets = [{ id: 'c', layers: [shapeLayer([rect(2, 2), fill()], { ks: { p: moving } })] }];
+  near(x([{ ty: 0, refId: 'c', ks: {}, ip: 0, op: 100, st: 20, sr: 2, tm: remap }], { assets }), 49);
+  // A precomposition plays at (frame - st) / sr.
+  near(x([{ ty: 0, refId: 'c', ks: {}, ip: 0, op: 100, st: 20, sr: 2 }], { assets }), 14);
+});
+
+const trimmer = (end, extra = {}) => ({ ty: 'tm', s: k(0), e: k(end), o: k(0), m: 1, ...extra });
+const line = (from, to) => ({
+  ty: 'sh',
+  ks: k({
+    c: false,
+    v: [from, to],
+    i: [
+      [0, 0],
+      [0, 0],
+    ],
+    o: [
+      [0, 0],
+      [0, 0],
+    ],
+  }),
+});
+const group = (...it) => ({ ty: 'gr', it: [...it, { ty: 'tr', s: k([100, 100]) }] });
+
+test('a trim reaches the shapes before it that a style inside a group or above it has taken', () => {
+  const inGroup = one([shapeLayer([group(line([0, 0], [100, 0]), stroke()), trimmer(50)])]);
+  assert.equal(inGroup.length, 1);
+  near(box(inGroup[0])[2], 50, 0.01);
+  const afterStyle = one([shapeLayer([line([0, 0], [100, 0]), stroke(), trimmer(50)])]);
+  near(box(afterStyle[0])[2], 50, 0.01);
+  // A style after the trim, and the group's own style, both draw the trimmed shape.
+  const both = one([shapeLayer([group(line([0, 0], [100, 0]), stroke()), trimmer(25), fill()])]);
+  assert.equal(both.length, 2);
+  for (const path of both) near(box(path)[2], 25, 0.01);
+  // Nothing left of the shape draws nothing.
+  assert.equal(one([shapeLayer([group(line([0, 0], [100, 0]), stroke()), trimmer(0)])]).length, 0);
+});
+
+test('a trim one by one runs along every shape in turn', () => {
+  const shapes = (end) => [line([0, 0], [100, 0]), line([0, 10], [100, 10]), trimmer(end, { m: 2 }), stroke()];
+  const first = parseLottie(JSON.stringify(anim([shapeLayer(shapes(25))])));
+  assert.deepEqual(first.unsupported, []);
+  near(box(first.frame(0)[0])[2], 50, 0.01);
+  near(box(first.frame(0)[0])[3], 0);
+  const both = one([shapeLayer(shapes(75))])[0];
+  near(box(both)[2], 100, 0.01);
+  near(box(both)[3], 10);
+  assert.equal(both.commands.filter((c) => c[0] === 'M').length, 2);
+  assert.equal(one([shapeLayer(shapes(0))]).length, 0);
+});
+
+test('a stroke and a gradient follow the transforms over the style, not those of the shape', () => {
+  const big = { ty: 'gr', it: [rect(10, 10), { ty: 'tr', s: k([300, 300]) }] };
+  const [drawn] = one([shapeLayer([big, stroke({ w: k(2) })])]);
+  assert.equal(drawn.strokeWidth, 2);
+  assert.deepEqual(box(drawn), [-15, -15, 15, 15]);
+  const gradient = {
+    ty: 'gf',
+    o: k(100),
+    t: 1,
+    s: k([0, 0]),
+    e: k([10, 0]),
+    g: { p: 2, k: k([0, 0, 0, 0, 1, 1, 1, 1]) },
+  };
+  const [painted] = one([shapeLayer([big, gradient])]);
+  assert.deepEqual([...painted.gradient.end], [10, 0]);
+});
+
+test('an ease is a share of the way along a spatial curve, not of the curve parameter', () => {
+  // Handles that bunch the curve parameter: at t = 0.5 this curve is at x = 83.75, but half the way along is x = 50.
+  const key = { t: 0, s: [0, 0, 0], to: [90, 0, 0], ti: [0, 0, 0], ...linear };
+  const ks = { p: { a: 1, k: [key, { t: 100, s: [100, 0, 0] }] } };
+  near(box(one([shapeLayer([rect(2, 2), fill()], { ks })], 50)[0])[0] + 1, 50, 0.1);
+});
+
+test('fill and stroke colours of a file from before Bodymovin 4.1.9 run from 0 to 255', () => {
+  const layers = [shapeLayer([rect(), fill([255, 0, 51])])];
+  assert.deepEqual(one(layers, 0, { v: '4.1.8' })[0].fill, [1, 0, 0.2]);
+  assert.deepEqual(one([shapeLayer([rect(), fill([1, 0, 0.2])])], 0, { v: '4.1.9' })[0].fill, [1, 0, 0.2]);
+  // A file that names no version is not an old one.
+  for (const v of [undefined, '', 'beta'])
+    assert.deepEqual(one([shapeLayer([rect(), fill([1, 0, 0.2])])], 0, { v })[0].fill, [1, 0, 0.2]);
+  const animated = {
+    a: 1,
+    k: [
+      { t: 0, s: [0, 0, 0], e: [255, 255, 255], ...linear },
+      { t: 10, s: [255, 255, 255] },
+    ],
+  };
+  const [middle] = one([shapeLayer([rect(), { ty: 'fl', c: animated, o: k(100) }])], 5, { v: '4.0.0' });
+  near(middle.fill[0], 0.5);
 });

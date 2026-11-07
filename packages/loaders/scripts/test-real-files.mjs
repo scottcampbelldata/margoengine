@@ -44,6 +44,7 @@ import { parseAMF } from '../dist/amf.js';
 import { parseGCode } from '../dist/gcode.js';
 import { parseKMZ } from '../dist/kmz.js';
 import { parseLAS } from '../dist/las.js';
+import { parseLottie } from '../dist/lottie.js';
 import { lasWaveDescriptors, lasWaveform } from '@margoengine/points/las';
 import { parseLDraw } from '../dist/ldraw.js';
 import { parseLWO } from '../dist/lwo.js';
@@ -375,6 +376,31 @@ function lazDecompress(laz) {
   };
 }
 
+const LOTTIE_CELLS = 16,
+  LOTTIE_CELL_LEVELS = 2;
+
+/** A stand-in canvas that keeps every call and assignment, for replay on a real canvas in a page. */
+function recordedCanvas() {
+  const list = [];
+  let gradients = 0;
+  const gradient = (kind) => (...args) => {
+    const id = gradients++;
+    list.push(['gradient', id, kind, args]);
+    return { id, addColorStop: (...stop) => list.push(['stop', id, stop]) };
+  };
+  const context = new Proxy(
+    { createLinearGradient: gradient('createLinearGradient'), createRadialGradient: gradient('createRadialGradient') },
+    {
+      get: (target, name) => target[name] ?? ((...args) => list.push(['call', name, args])),
+      set: (_, name, value) => {
+        list.push(['set', name, value?.id === undefined ? value : { gradient: value.id }]);
+        return true;
+      },
+    },
+  );
+  return { context, list };
+}
+
 /** Each check opens one manifest row, compares with an independent reading and returns what to report and draw. */
 const checks = {
   async ply(bytes) {
@@ -595,6 +621,37 @@ const checks = {
       triangles = indexedTriangles(text(bytes), /coordIndex=['"]([^'"]*)['"]/g);
     return { result: `${checkGeometry(scene, { triangles })}, ${scene.groups?.length} shapes, left out ${scene.warnings.join(', ').slice(0, 200)}`, draw: [mesh(scene)] };
   },
+  /** Each frame through `draw` on a real canvas, cell by cell against the same frame as the player drew it. */
+  async lottie(bytes, item) {
+    const animation = parseLottie(new TextDecoder().decode(bytes));
+    assert.deepEqual(animation.unsupported, [], `${item.file}: features left out`);
+    const scale = 256 / Math.max(animation.width, animation.height),
+      width = Math.round(animation.width * scale),
+      height = Math.round(animation.height * scale),
+      { canvasGrids } = await import('./real-files-render.mjs'),
+      jobs = item.frames.map(({ frame }) => {
+        const calls = recordedCanvas();
+        animation.draw(calls.context, frame);
+        return {
+          calls: calls.list,
+          width,
+          height,
+          scale: [width / animation.width, height / animation.height],
+          cells: LOTTIE_CELLS,
+        };
+      }),
+      grids = await canvasGrids(jobs);
+    let worst = 0;
+    item.frames.forEach(({ frame, grid }, at) => {
+      grids[at].forEach((level, n) => {
+        const off = Math.abs(level - parseInt(grid.slice(n * 2, n * 2 + 2), 16));
+        assert.ok(off <= LOTTIE_CELL_LEVELS, `${item.file} frame ${frame}: cell ${n} is ${off} levels from the player`);
+        worst = Math.max(worst, off);
+      });
+    });
+    return { result: `${item.frames.length} frames, worst cell ${worst} of 255 levels from the player` };
+  },
+
   async vdb(bytes, item) {
     const file = await parseVDB(unzip(bytes).get(item.extract)());
     assert.deepEqual(file.skipped, []);

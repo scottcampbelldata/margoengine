@@ -726,7 +726,7 @@ File formats written from their public descriptions; no reader of another projec
 | LF27 | Blosc chunk header, block offsets and byte shuffle | loaders/src/vdb.ts | The Blosc project's public chunk format description |
 | LF29 | MaterialX elements, types, inheritance of `colorspace` and `fileprefix`, node inputs | loaders/src/materialx.ts | ASWF, "MaterialX Specification" 1.39. Written from the agent's general knowledge of it, with no MaterialX source open |
 | LF30 | Input names and defaults of the four surface shaders | loaders/src/materialx.ts | Autodesk Standard Surface, the OpenPBR Surface specification, the MaterialX glTF PBR node description and the OpenUSD UsdPreviewSurface specification. Same basis as LF29; not compared line by line |
-| LF32 | Lottie JSON: layers, transforms, shapes, keyframes, gradients, trim paths | loaders/src/lottie.ts | The Lottie Animation Community format description. Written from the agent's general knowledge of it, with no player source open |
+| LF32 | Lottie JSON: layers, transforms, shapes, keyframes, gradients, trim paths | loaders/src/lottie.ts | Lottie Animation Format specification, Lottie Animation Community (lottie.github.io/lottie-spec): Shape Rendering Model, Trim Path, Time Stretch, read in full. Behaviour the spec leaves open or real files contradict (layer keys and `st`, colours before Bodymovin 4.1.9) measured from outside: lottie-web 5.12.2 run as a black box in its own folder, its source never read |
 | LF33 | Circle by four cubics, handle 4 (sqrt 2 - 1) / 3; de Casteljau subdivision | loaders/src/lottie.ts | Standard results of computer-aided geometric design |
 | LF28 | LZ4 block format | loaders/src/vdb.ts, loaders/tests/vdb.test.js | Y. Collet, "LZ4 Block Format Description" |
 
