@@ -50,6 +50,38 @@ A `WeatherState` is nine numbers: `rain`, `snow`, `hail` (0..1), `wind` (m/s), `
 
 `wetRoughness`, `wetColor`, `snowWeight` and `surfaceResponse` give a surface's roughness and colour from the ground state: wet is darker (up to 25 percent) and shinier (down to 35 percent of the dry roughness), and snow whitens up-facing surfaces first and steeper ones as the cover grows. `applyWetness(material, dryRoughness, wetness)` sets `material.roughness`. For a shader, paste `surfaceWGSL` ahead of it and call `weather_surface(roughness, color, normalY, wetness, snowCover)`; the real-GPU test checks that WGSL against the JavaScript.
 
+## Puddles and wet ground
+
+`Puddles` from `margoengine/weather/puddles` makes the rain show on every core mesh: surfaces darken and turn shinier
+with the wetness, water gathers in the low spots of flat ground as the ground soaks, and falling rain rings it. It
+follows a `WeatherMachine` or the sky's `Weather` (anything with `wetness`, and `state.rain` or `amount`), or numbers you
+set. WebGPU only.
+
+```ts
+import { WeatherMachine } from 'margoengine/weather';
+import { Puddles } from 'margoengine/weather/puddles';
+import { Engine, PbrMaterial, box } from 'margoengine/core';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+engine.createMesh().setGeometry(box(40, 0.2, 40)).setMaterial(new PbrMaterial({ color: '#4a4a44', roughness: 0.85 }));
+
+const weather = new WeatherMachine('rain', { seed: 3 });
+const puddles = Puddles.attach(engine, { weather, coverage: 0.35 }); // a third of flat ground under water when soaked
+engine.onFrame((_, delta) => weather.update(delta)); // the ground soaks in about 20 s of rain
+puddles.options.size = 5; // wider puddles
+```
+
+It hooks core's mesh shader before lighting, so the sky's light, environment lighting and fog see the wet surface.
+Wetness darkens and smooths every surface as `wetColor` and `wetRoughness` do (set `wetSurfaces: false` to draw only
+the water, for example when you already call `applyWetness`). Water stands where a procedural relief of puddles about
+`size` metres wide (default 3) lies below a water level, on surfaces within about 15 degrees of flat: from wetness
+`start` (0.4) the share of flat ground under water grows to `coverage` (0.3, at most 0.8) at wetness 1. Under water a
+surface is darker by 30 percent, has roughness 0.03 and no metalness, and its normal turns up and is tilted by rings:
+one drop at a time in each `rippleSize` cell (0.35 m) of two offset grids, in a share of the cells equal to the rain,
+by up to `rippleStrength` (0.35). `puddleMask`, `puddleSurface`, `puddleRelief` and `puddleLevel` are the same maths in
+JavaScript; `puddleWGSL` is the shader for your own materials. A bad option throws `RangeError` or `TypeError`; a
+replaced core shader throws `MargoError` `'unsupported'`.
+
 ## Driving the sky
 
 `skyWeather(state, wind?)` returns the sky `Weather` settings for a state: `Object.assign(weather.options, skyWeather(state))`. `hailSettings` does the same for `Hail`. `fogDensity(state)` gives an exponential-fog density per metre (0.0002 clear to 0.02 thick).
@@ -62,10 +94,14 @@ A `WeatherState` is nine numbers: `rain`, `snow`, `hail` (0..1), `wind` (m/s), `
 
 - While rain and snow both fall (a rain-to-snow blend, or the `sleet` preset) `skyWeather` gives the sky's `Weather` `precipitation: 'sleet'`, their sum as `intensity` (at most 1) and the snow's part of it as `snowShare`, so the rain thins as the snow thickens; the sky draws each kind with its share. Hail is drawn alongside either.
 - Hail stones are camera-facing streaks with no lighting or shadows and no splash where they land. The box around the camera is at most 400 m across; stones outside it do not exist.
+- Puddles stand in the low spots of a procedural relief, not of your geometry, and on every flat core mesh, roofs
+  included: there is no cover (water stands under a roof too) and no flow. They draw on core meshes, not glTF-pro
+  models or other packages' own shaders. Rings tilt the normal only; the water has no depth, refraction or reflection
+  of its own beyond the scene's lighting.
 - The presets and the climate chain are design choices, not weather data. Wind speed is a mean at one height with simple noise, not a boundary-layer model.
 - `cloud` and `fog` are numbers for you to feed to your sky and fog; this package does not draw clouds or fog.
 - Hail needs WebGPU; on a WebGL engine `attach` throws `MargoError` `'unsupported'`. Everything else runs anywhere, Node included.
 
-Apache-2.0. Optional, tree-shakable package; no core dependency in the root entry (only `./hail` imports core).
+Apache-2.0. Optional, tree-shakable package; no core dependency in the root entry (only `./hail` and `./puddles` import core).
 
 Build and unit tests: npm test --workspace @margoengine/weather

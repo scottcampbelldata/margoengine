@@ -652,6 +652,13 @@ each with its own uniform buffer (one uploaded buffer holds one draw's values wi
 hash seed, so the two never share spots. Evidence: `features-check.mjs` sleet on a Radeon 680M at 4x and 1x against
 each kind drawn alone. Missing: other GPUs, timing.
 
+Puddles (`@margoengine/weather/puddles`, 2026-11-07) is a hook into core's mesh shader at frame graph order -1, like
+`ShaderEffect`: it renames the fragment input and works on a copy named `i`, setting its colour, roughness, metalness
+and normal before core lights it, so every later hook (sky ambient, environment lighting, fog) reads the wet surface.
+The shared `patchFragment` (packages/weather/src/scene-patch.ts) lets a second surface hook chain on the same copy. One
+32-byte uniform at group 0 binding 160 a frame. Evidence: `browser-check.mjs` puddles on a Radeon 680M at 4x and 1x
+(WGSL against JavaScript, dry untouched, water on ground not walls, rings only on water). Missing: other GPUs, timing.
+
 AstroSky (`@margoengine/sky/astro`, 2026-11-07) is a `ParticleOverlay` draw at frame graph order 2.5, after the sky's
 pass and before fog: one storage buffer of three vec4 a point (the J2000 vector and magnitude, colour, proper motion a
 Julian year; the seven planets the last points, rewritten each frame), the sky matrix (precession, nutation, sidereal

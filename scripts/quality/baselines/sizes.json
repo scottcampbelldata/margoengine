@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10498408,
+  "total": 10502478,
   "history": [
     {
       "date": "2026-10-24",
@@ -3542,6 +3542,12 @@
       "commit": "75dc10d1a",
       "reason": "new optional entry @margoengine/behavior/goap",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "8ac2569ae",
+      "reason": "new optional entry @margoengine/weather/puddles (Puddles: wet ground, puddles and rain rings in core's mesh shader); nothing else grows",
+      "grew": 1
     }
   ],
   "items": {
@@ -4235,6 +4241,7 @@
     "@margoengine/water": 20185,
     "@margoengine/weather": 5230,
     "@margoengine/weather/hail": 4278,
+    "@margoengine/weather/puddles": 4070,
     "@margoengine/webgl": 3663,
     "@margoengine/webgl/auto": 3942,
     "@margoengine/webgl/pick": 5010,

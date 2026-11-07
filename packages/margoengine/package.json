@@ -2754,6 +2754,10 @@
       "types": "./dist/weather/hail.d.ts",
       "import": "./dist/weather/hail.js"
     },
+    "./weather/puddles": {
+      "types": "./dist/weather/puddles.d.ts",
+      "import": "./dist/weather/puddles.js"
+    },
     "./webgl": {
       "types": "./dist/webgl.d.ts",
       "import": "./dist/webgl.js"

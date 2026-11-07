@@ -1,0 +1,72 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Puddles browser check</title><style>body{margin:0}canvas{display:block;width:256px;height:192px}</style></head><body><canvas></canvas>
+<script type="module">
+// Real-GPU proof for @margoengine/weather/puddles: the WGSL against its JavaScript twin, and on core meshes: dry ground
+// untouched, wet ground darker, water on the ground and not on the wall, rain rings that move only on water.
+import {Engine,PbrMaterial,box} from '/packages/core/dist/index.js';
+import {Bloom} from '/packages/post/dist/bloom.js';
+import {sceneSamples} from '/packages/core/dist/quality.js';
+import {Puddles,puddleSurface,puddleWGSL} from '/packages/weather/dist/puddles.js';
+if(new URLSearchParams(location.search).get('samples')==='1')globalThis.margoLow=1;
+const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,9,10],target:[0,0,-4],near:0.1,far:400}}),device=engine.gpu,errors=[];
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const post=Bloom.attach(engine,{strength:0,threshold:100,exposure:0});
+engine.createMesh().setGeometry(box(60,0.2,60)).setMaterial(new PbrMaterial({color:'#20a020',roughness:0.9})).setPosition([0,-0.1,-10]);
+engine.createMesh().setGeometry(box(8,14,1)).setMaterial(new PbrMaterial({color:"#c02020",roughness:0.9})).setPosition([0,7,-8]);
+for(let i=0;i<3;i++){engine.render({delta:1/60});await device.queue.onSubmittedWorkDone();}
+const module=device.createShaderModule({code:'@group(0) @binding(0) var image:texture_2d<f32>;@group(0) @binding(1) var<storage,read_write> result:array<vec4f>;@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u){let s=textureDimensions(image);if(any(id.xy>=s)){return;}result[id.y*s.x+id.x]=textureLoad(image,vec2i(id.xy),0);}'});
+const pipeline=device.createComputePipeline({layout:'auto',compute:{module,entryPoint:'main'}});
+async function read(texture){
+ const bytes=texture.width*texture.height*16,output=device.createBuffer({size:bytes,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),staging=device.createBuffer({size:bytes,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+ const encoder=device.createCommandEncoder(),pass=encoder.beginComputePass();pass.setPipeline(pipeline);
+ pass.setBindGroup(0,device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:texture.createView()},{binding:1,resource:{buffer:output}}]}));
+ pass.dispatchWorkgroups(Math.ceil(texture.width/8),Math.ceil(texture.height/8));pass.end();encoder.copyBufferToBuffer(output,0,staging,0,bytes);device.queue.submit([encoder.finish()]);
+ await staging.mapAsync(GPUMapMode.READ);const data=new Float32Array(staging.getMappedRange()).slice();staging.unmap();output.destroy();staging.destroy();return data;
+}
+async function shot(delta=0){engine.render({delta});await device.queue.onSubmittedWorkDone();return read(post.sceneTexture);}
+const differs=(a,b,p)=>Math.abs(a[p]-b[p])+Math.abs(a[p+1]-b[p+1])+Math.abs(a[p+2]-b[p+2])>1e-4;
+const count=(a,b,mask)=>{let n=0;for(let p=0;p<a.length;p+=4)if((!mask||mask[p/4])&&differs(a,b,p))n++;return n;};
+// The WGSL against puddleSurface on a grid of places, slopes and wetness (no rain, so rings stay out of it).
+async function maths(){
+ const cases=[];for(let x=0;x<12;x+=0.29)for(let z=0;z<12;z+=0.61)for(const ny of [1,0.975,0])for(const w of [0.5,0.8,1])cases.push([x,z,ny,w]);
+ const input=new Float32Array(cases.flat());
+ const code=puddleWGSL+'@group(0) @binding(0) var<storage,read> inp:array<vec4f>;@group(0) @binding(1) var<storage,read_write> outp:array<vec4f>;@compute @workgroup_size(64) fn main(@builtin(global_invocation_id) id:vec3u){if(id.x>=arrayLength(&inp)){return;}let c=inp[id.x];let u=WeatherPuddles(vec4f(c.w,0,0,3),vec4f(0.3,0.4,0.35,0.35));let n=vec3f(sqrt(1.0-c.z*c.z),c.z,0);let s=weather_puddle_surface(vec3f(c.x,0,c.y),n,vec3f(0.4,0.3,0.2),0.8,0.5,true,u);outp[id.x*2u]=s[0];outp[id.x*2u+1u]=s[1];}';
+ const m=device.createShaderModule({code}),p=device.createComputePipeline({layout:'auto',compute:{module:m,entryPoint:'main'}});
+ const a=device.createBuffer({size:input.byteLength,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST}),b=device.createBuffer({size:input.byteLength*2,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),st=device.createBuffer({size:input.byteLength*2,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+ device.queue.writeBuffer(a,0,input);
+ const e=device.createCommandEncoder(),pass=e.beginComputePass();pass.setPipeline(p);pass.setBindGroup(0,device.createBindGroup({layout:p.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:a}},{binding:1,resource:{buffer:b}}]}));pass.dispatchWorkgroups(Math.ceil(cases.length/64));pass.end();e.copyBufferToBuffer(b,0,st,0,input.byteLength*2);device.queue.submit([e.finish()]);
+ await st.mapAsync(GPUMapMode.READ);const out=new Float32Array(st.getMappedRange()).slice();st.unmap();
+ let worst=0,water=0,dry=0;
+ cases.forEach(([x,z,ny,w],i)=>{const js=puddleSurface({color:[0.4,0.3,0.2],roughness:0.8,metal:0.5},x,z,ny,w);const g=out.subarray(i*8,i*8+8);
+  if(js.water>0.999)water++;if(js.water===0)dry++;
+  worst=Math.max(worst,...[0,1,2].map(k=>Math.abs(g[k]-js.color[k])),Math.abs(g[3]-js.roughness),Math.abs(g[4]-js.metal),Math.abs(g[5]-js.water));});
+ return {cases:cases.length,worst,water,dry};
+}
+window.check={samples:sceneSamples,
+ async run(){
+  const out={};device.pushErrorScope('validation');
+  out.maths=await maths();
+  const clear=await shot();
+  const ground=new Uint8Array(clear.length/4),wall=new Uint8Array(clear.length/4);
+  // A pixel is ground or wall when it and its eight neighbours are: an edge pixel holds samples of both (4x MSAA).
+  const W=post.sceneTexture.width,H=post.sceneTexture.height,g0=(p)=>clear[p*4+1]>clear[p*4]*2,w0=(p)=>clear[p*4]>clear[p*4+1]*2;
+  const inner=(f,x,y)=>{for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){const u=x+dx,v=y+dy;if(u<0||v<0||u>=W||v>=H||!f(v*W+u))return 0;}return 1;};
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){ground[y*W+x]=inner(g0,x,y);wall[y*W+x]=inner(w0,x,y);}
+  out.groundPixels=ground.reduce((a,b)=>a+b,0);out.wallPixels=wall.reduce((a,b)=>a+b,0);
+  const puddles=Puddles.attach(engine,{wetness:0});
+  out.dryChanged=count(clear,await shot());
+  puddles.options.wetness=1;puddles.options.coverage=0;
+  const wet=await shot();out.wetGround=count(clear,wet,ground);
+  let sw=0,sd=0;for(let p=0;p<clear.length;p+=4)if(ground[p/4]){sw+=wet[p+1];sd+=clear[p+1];}out.wetRatio=sw/sd;
+  puddles.options.coverage=0.5;
+  const water=await shot();out.waterGround=count(wet,water,ground);out.waterWall=count(wet,water,wall);
+  puddles.options.rain=1;await shot(0.1);const r1=await shot(0);const r2=await shot(0.3);out.ringsMove=count(r1,r2);
+  puddles.options.coverage=0;const o1=await shot(0);const o2=await shot(0.3);out.ringsOutside=count(o1,o2);
+  puddles.options.coverage=0.5;puddles.options.rain=0;const c1=await shot(0);const c2=await shot(0.3);out.calmStill=count(c1,c2);
+  puddles.dispose();out.afterDispose=count(clear,await shot());
+  const error=await device.popErrorScope();
+  out.validation=error?.message??null;out.errors=errors.splice(0);
+  return out;
+ }
+};
+window.ready=true;
+</script></body></html>

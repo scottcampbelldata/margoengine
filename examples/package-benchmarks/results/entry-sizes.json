@@ -1,6 +1,6 @@
 {
-  "commit": "75dc10d1a",
-  "dirty": false,
+  "commit": "8ac2569ae",
+  "dirty": true,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
     "raw": 57071,
@@ -2945,11 +2945,15 @@
     "@margoengine/weather": {
       ".": {
         "raw": 12811,
-        "gzip": 5015
+        "gzip": 5014
       },
       "./hail": {
         "raw": 8908,
         "gzip": 4078
+      },
+      "./puddles": {
+        "raw": 8503,
+        "gzip": 3814
       }
     },
     "@margoengine/webgl": {
