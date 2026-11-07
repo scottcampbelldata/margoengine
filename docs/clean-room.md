@@ -812,6 +812,16 @@ like) was read.
 | Perception (`behavior/perception`) | M. Walsh, "Modeling Perception and Awareness in Tom Clancy's Splinter Cell Blacklist", Game AI Pro 2, chapter 28, 2015 (read in full): perceiving against being aware, test points on the body, vision shapes with a timer scaled by distance, coffin-shaped boxes past a cone, sounds with a radius and a priority, sound distance that is not straight. Its room graph (TEAS) is left to `soundDistance`. Where its text says the "most inclusive" shape sets the time, Margo takes the shortest of the shapes holding the target. D. Isla, B. Blumberg, "Object Persistence for Synthetic Creatures", AAMAS 2002 (read in full): the Probabilistic Occupancy Map, equations 1.3 to 1.11. Equation 1.4 is hard to read in the copy read, and Margo reads it as a constant rate plus max(0, v.l / l.l); shares here are per neighbour, so the total holds at walls, and the grid is square where the paper's is hexagonal. |
 | Environment queries (`behavior/eqs`) | M. Jack, "Tactical Position Selection: An Architecture and Query Language", Game AI Pro, chapter 26, 2013 (read in full): generation, conditions, weights, query options as fallbacks, weights normalized to 0..1, the directness measure of equation 26.1, cheap criteria first and the binary heap of 26.7.4 on the highest potential score. The chapter keeps a lowest and a highest score and can skip a weight once a point has won; Margo keeps the highest only and evaluates the winner fully, so `score` is exact. Criteria are functions here, not the chapter's text language, and the timeslicing of 26.7.5 is left out. |
 
+## Snapshot playback: `@margoengine/net`
+
+Written clean room from the papers and specifications below. No source of a networking library, engine or audio tool was read.
+
+| Area | Source |
+| --- | --- |
+| Adaptive render delay (`net/delay`): the receiver sets its delay from what it measured, no synchronised clocks, loss against delay as the trade | **Read in full:** R. Ramjee, J. Kurose, D. Towsley, H. Schulzrinne, "Adaptive Playout Mechanisms for Packetized Audio Applications in Wide-Area Networks", IEEE INFOCOM 1994 |
+| The delay as a percentile of the last arrivals, a spike followed and not learned from, its `head` 4 and `tail` 2, the 99% point | **Read in full:** S. B. Moon, J. Kurose, D. Towsley, "Packet audio playout delay adjustment: performance bounds and algorithms", Multimedia Systems 6, 1998, its Algorithm 3. Margo's own: measuring the gap to the newest snapshot held, which folds the send interval and loss into one number; a window of 256 where the paper keeps 10,000 packets; a clock that slews where audio moves in silence; a long spike counting as a new route, for the weakness the paper names in section 4.3 |
+| Mean deviation as the measure of jitter (considered; a percentile serves better here, by Moon's results) | **Read:** RFC 3550 section 6.4.1 and RFC 6298 section 2 only |
+
 ## Game networking: `@margoengine/netcode`
 
 Written clean room from the articles, talks and specifications below. No source code of networking libraries or

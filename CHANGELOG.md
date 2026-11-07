@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Networking
+
+- `@margoengine/net/delay`: `AdaptiveDelay` picks the render delay from measured jitter and loss, follows delay spikes, and runs the view's clock so it never jumps back.
+
 ### Physics
 
 - `@margoengine/physics/next` gains `Physics`, `PhysicsBody` and `PhysicsCollider` on the own solver, with the root entry's names and no peer install. Free motion only for now: what needs contacts, joints or queries throws `unsupported`. `KernelWorld` gains `snapshot`, `restore`, `setPose`, `setTarget` and `setLocks`. A replay holds 10,000 steps bit-equal across Node, native code, Chromium and Firefox.

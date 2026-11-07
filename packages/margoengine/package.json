@@ -1678,6 +1678,10 @@
       "types": "./dist/net.d.ts",
       "import": "./dist/net.js"
     },
+    "./net/delay": {
+      "types": "./dist/net/delay.d.ts",
+      "import": "./dist/net/delay.js"
+    },
     "./netcode": {
       "types": "./dist/netcode.d.ts",
       "import": "./dist/netcode.js"

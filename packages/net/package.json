@@ -25,6 +25,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./delay": {
+      "types": "./dist/delay.d.ts",
+      "import": "./dist/delay.js"
     }
   },
   "files": [

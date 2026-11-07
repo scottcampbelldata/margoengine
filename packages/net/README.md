@@ -15,6 +15,40 @@ buffer.sample(renderTimeSeconds, output);
 
 Position interpolation is cubic Hermite using endpoint velocities; rotations use shortest-arc slerp. Ordered snapshots are copied into a preallocated ring, quaternions normalized, and duplicate/out-of-order timestamps return false. Extrapolation uses last velocity up to maxPrediction (default 0.25 seconds), then holds. Before the oldest sample, the oldest pose is held. Outputs are reused by default; supply your own to retain results. This is interpolation/prediction, not transport, authority, rollback or packet security.
 
+## Adaptive render delay
+
+`AdaptiveDelay` in `margoengine/net/delay` picks how far behind the newest snapshot to draw from what the link does, so a calm link draws close and a rough one stays smooth.
+
+```ts
+import {SnapshotBuffer, createSnapshot} from 'margoengine/net';
+import {AdaptiveDelay} from 'margoengine/net/delay';
+const buffer = new SnapshotBuffer();
+const delay = new AdaptiveDelay();
+const pose = createSnapshot();
+// A snapshot stamped with the server's time arrives:
+const serverTime = 12.5;
+buffer.push(serverTime, [1, 0, 2]);
+delay.observe(serverTime, performance.now() / 1000);
+// Each frame:
+const time = delay.renderTime(performance.now() / 1000);
+if (!Number.isNaN(time)) buffer.sample(time, pose);
+console.log(delay.target, delay.spiking);
+```
+
+The sender's clock and yours need no agreement: only differences of received minus sent are used, and the smallest stands for the link's fixed delay plus the clock offset. Each arrival gives the delay it would have needed, which holds the send interval, the jitter and any lost snapshots at once, so a clean link settles on exactly one send interval. The target is the `quantile` of the last `window` of those. A sudden rise past `spikeHead` times the delay is followed and not learned from, until an arrival needs no more than `spikeTail` times the delay before it. The view's clock never goes back: it runs up to `slowdown` slower or `speedup` faster than real time until it reaches the target.
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `quantile` | 0.99 | Share of recent arrivals to cover, 0.5 to 1 |
+| `window` | 256 | Arrivals remembered, 16 to 65,536 |
+| `initial` | 0.1 | Seconds of delay, and the floor, for the first 8 arrivals |
+| `min`, `max` | 0, 1 | Bounds on the delay in seconds |
+| `margin` | 0 | Seconds added to the measured delay |
+| `slowdown`, `speedup` | 0.25, 0.05 | How far off real time the view may run |
+| `spikeHead`, `spikeTail` | 4, 2 | Where a spike starts and ends |
+
+Call `reset()` after a reconnect. Its proof runs on seeded simulated links, not a captured network trace; [docs/limits.md](../../docs/limits.md) has the limits.
+
 Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/net
