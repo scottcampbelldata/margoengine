@@ -423,3 +423,61 @@ test('hierarchy, polygons and shading models follow the COLLADA rules; a COLLADA
     );
   assert.deepEqual([...seen].sort(), [...expected].sort());
 });
+
+test('a node of several primitives is one instance_geometry with one group per primitive, as Godot reads it', () => {
+  const red = { color: [1, 0, 0, 1], roughness: 1 },
+    blue = { color: [0, 0, 1, 1], roughness: 1 },
+    first = { positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], normals: [0, 0, 1, 0, 0, 1, 0, 0, 1], indices: [0, 1, 2] },
+    second = {
+      positions: [5, 0, 0, 6, 0, 0, 5, 1, 0, 6, 1, 0],
+      normals: [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1],
+      uvs: [0, 0, 1, 0, 0, 1, 1, 1],
+      colors: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
+      indices: [0, 1, 2, 2, 1, 3],
+    },
+    primitives = [
+      { geometry: first, material: red },
+      { geometry: second, material: blue },
+    ],
+    { dae } = exportDAE(
+      {
+        nodes: [
+          { name: 'Both', primitives },
+          { name: 'Again', primitives, translation: [0, 0, 9] },
+        ],
+      },
+      { colorSpace: 'linear' },
+    ),
+    collada = readXML(dae);
+  assert.equal(all(collada, 'geometry').length, 1, 'two nodes with the same parts share one geometry');
+  for (const node of all(collada, 'node')) {
+    const bound = all(one(node, 'instance_geometry'), 'instance_material');
+    assert.deepEqual(
+      bound.map((b) => b.attributes.symbol),
+      ['material', 'material-1'],
+    );
+    assert.equal(new Set(bound.map((b) => b.attributes.target)).size, 2, 'each part keeps its own material');
+  }
+  const mesh = one(all(collada, 'geometry')[0], 'mesh'),
+    groups = all(mesh, 'triangles'),
+    floats = (name) => numbers(all(mesh, 'float_array').find((a) => a.attributes.id.endsWith(`-${name}-array`)));
+  assert.deepEqual(
+    groups.map((g) => g.attributes.material),
+    ['material', 'material-1'],
+  );
+  assert.deepEqual(
+    groups.map((g) => numbers(one(g, 'p'))),
+    [
+      [0, 1, 2],
+      [3, 4, 5, 5, 4, 6],
+    ],
+    'the second part indexes past the first',
+  );
+  assert.equal(floats('positions').length, 21);
+  assert.deepEqual(floats('positions').slice(9, 12), [5, 0, 0]);
+  assert.equal(floats('uvs').length, 14, 'a part without uvs keeps the vertices lined up');
+  assert.deepEqual(floats('uvs').slice(0, 6), [0, 0, 0, 0, 0, 0]);
+  assert.deepEqual(floats('uvs').slice(6, 8), [0, 1], 'v still turns to t up');
+  assert.deepEqual(floats('colors').slice(0, 3), [1, 1, 1], 'a part without colors stays white');
+  assert.deepEqual(floats('colors').slice(9, 12), [0.5, 0.5, 0.5]);
+});

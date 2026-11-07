@@ -281,6 +281,8 @@ for (const [path, bytes] of textures) save(path, bytes);
   color texture, when present, replaces the base color through a `surface`/`sampler2D` pair carrying the texture's
   filters and wrap modes; MASK and BLEND write `<transparent opaque="A_ONE">` from the texture or color alpha.
   Effect colors are sRGB. Instances bind the material and `UVSET0`.
+- **Several primitives.** A node of several primitives is one `<geometry>` with one triangle group and one bound
+  material each, so Godot, which takes one `<instance_geometry>` a node, keeps every part.
 - **Not written.** Static pose only, as Crocotile: skins, morph targets, animation, cameras and lights are not
   exported (skinned and morphed meshes keep their base geometry). Metallic-roughness and normal textures, emissive
   textures, double-sidedness and a second UV set are not written either. An empty or fully hidden scene throws.

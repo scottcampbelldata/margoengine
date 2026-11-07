@@ -48,11 +48,14 @@ const rgba = (rgb: readonly number[], alpha = 1) =>
 const filters = { nearest: 'NEAREST', linear: 'LINEAR' },
   wraps = { repeat: 'WRAP', clamp: 'CLAMP', mirror: 'MIRROR' };
 const same = (v: number) => v;
+/** The symbol that ties a node's triangle group to its `<instance_material>`. */
+const symbolOf = (index: number) => (index ? `material-${index}` : 'material');
 
 /**
  * Exports a COLLADA 1.4.1 document (Y up, meters) with the scene's node hierarchy as row-major matrices, one geometry
  * per shared geometry (positions, normals, TEXCOORD and COLOR sources; `<triangles>`, or `<polylist>` when
- * `faceSizes` marks quads), and one material per shared material: `constant` for unlit, `lambert` for `shading:
+ * `faceSizes` marks quads), a node of several primitives being one geometry of several groups, since Godot's reader
+ * takes one `<instance_geometry>` a node, and one material per shared material: `constant` for unlit, `lambert` for `shading:
  * 'lambert'`, `phong` with its `specular` and `shininess` for `shading: 'phong'`; a standard material becomes
  * `lambert` when it is a rough dielectric (roughness 1, metalness 0), else an equivalent `phong`. Each has a base
  * color or texture and transparency for MASK and BLEND. Image paths are relative to the document; the image files come back in `textures`. Static pose only:
@@ -68,7 +71,8 @@ export function exportDAE(source: ExportSource, options: DAEOptions = {}): DAERe
   if (!roots.length) throw new TypeError('DAE export needs a visible node; a COLLADA visual scene cannot be empty');
   const images = new Map<string, string>(),
     materialIds = new Map<Mat, string>(),
-    geometryIds = new Map<Geo, string>(),
+    geometryIds = new Map<string, string>(),
+    geoNumbers = new Map<Geo, number>(),
     effects: string[] = [],
     materials: string[] = [],
     geometries: string[] = [];
@@ -138,11 +142,20 @@ export function exportDAE(source: ExportSource, options: DAEOptions = {}): DAERe
     return id;
   };
 
-  const geometry = (geo: Geo, name: string | undefined): string => {
-    let id = geometryIds.get(geo);
+  /** The number that names a geometry in the key of a list of parts. */
+  const geoNumber = (geo: Geo): number => {
+    let n = geoNumbers.get(geo);
+    if (n === undefined) geoNumbers.set(geo, (n = geoNumbers.size));
+    return n;
+  };
+
+  /** One `<geometry>` for a node's parts: their vertices end to end, one triangle group per part, in part order. */
+  const geometry = (geos: Geo[], name: string | undefined): string => {
+    const key = geos.map(geoNumber).join(' ');
+    let id = geometryIds.get(key);
     if (id) return id;
     id = `geometry-${geometryIds.size}`;
-    geometryIds.set(geo, id);
+    geometryIds.set(key, id);
     const sources: string[] = [],
       inputs: string[] = [];
     const add = (key: string, values: ArrayLike<number>, params: string, input = '') => {
@@ -155,32 +168,66 @@ export function exportDAE(source: ExportSource, options: DAEOptions = {}): DAERe
       if (input)
         inputs.push(`<input semantic="${input}" source="#${s}" offset="0"${input === 'NORMAL' ? '' : ' set="0"'}/>`);
     };
-    add('positions', geo.positions, 'XYZ');
-    add('normals', geo.normals, 'XYZ', 'NORMAL');
-    // COLLADA texture coordinates have t up; glTF and Margo Engine have v down.
-    if (geo.uvs)
+    const vertexCount = (geo: Geo) => geo.positions.length / 3,
+      colorSize = Math.max(...geos.map((geo) => (geo.colors ? geo.colorSize : 0)));
+    add(
+      'positions',
+      geos.flatMap((geo) => Array.from(geo.positions)),
+      'XYZ',
+    );
+    add(
+      'normals',
+      geos.flatMap((geo) => Array.from(geo.normals)),
+      'XYZ',
+      'NORMAL',
+    );
+    // COLLADA texture coordinates have t up; glTF and Margo Engine have v down. A part without uvs takes zeros, as
+    // inputs belong to the whole mesh; nothing reads them, since a textured material needs its part's own uvs.
+    if (geos.some((geo) => geo.uvs))
       add(
         'uvs',
-        geo.uvs.map((v, i) => (i % 2 ? 1 - v : v)),
+        geos.flatMap((geo) =>
+          geo.uvs
+            ? Array.from(geo.uvs, (v, i) => (i % 2 ? 1 - v : v))
+            : new Array<number>(vertexCount(geo) * 2).fill(0),
+        ),
         'ST',
         'TEXCOORD',
       );
-    if (geo.colors)
+    // A part without colors is white, which leaves its material as it is; a part of three channels gains alpha 1.
+    if (colorSize)
       add(
         'colors',
-        geo.colors.map((v, i) => (i % geo.colorSize < 3 ? encode(v) : v)),
-        geo.colorSize === 3 ? 'RGB' : 'RGBA',
+        geos.flatMap((geo) =>
+          Array.from({ length: vertexCount(geo) * colorSize }, (_, i) => {
+            const channel = i % colorSize,
+              vertex = (i - channel) / colorSize;
+            if (!geo.colors || channel >= geo.colorSize) return 1;
+            const v = geo.colors[vertex * geo.colorSize + channel]!;
+            return channel < 3 ? encode(v) : v;
+          }),
+        ),
+        colorSize === 3 ? 'RGB' : 'RGBA',
         'COLOR',
       );
-    const faces = polygons(geo.faceSizes, geo.indices),
-      shared = `<input semantic="VERTEX" source="#${id}-vertices" offset="0"/>${inputs.join('')}`,
-      p = `<p>${faces.flat().join(' ')}</p>`;
-    const primitive = faces.some((face) => face.length === 4)
-      ? `<polylist material="material" count="${faces.length}">${shared}<vcount>${faces.map((f) => f.length).join(' ')}</vcount>${p}</polylist>`
-      : `<triangles material="material" count="${faces.length}">${shared}${p}</triangles>`;
+    const shared = `<input semantic="VERTEX" source="#${id}-vertices" offset="0"/>${inputs.join('')}`;
+    let base = 0;
+    const groups = geos.map((geo, index) => {
+      const faces = polygons(geo.faceSizes, geo.indices),
+        symbol = symbolOf(index),
+        start = base,
+        p = `<p>${faces
+          .flat()
+          .map((corner) => corner + start)
+          .join(' ')}</p>`;
+      base += vertexCount(geo);
+      return faces.some((face) => face.length === 4)
+        ? `<polylist material="${symbol}" count="${faces.length}">${shared}<vcount>${faces.map((f) => f.length).join(' ')}</vcount>${p}</polylist>`
+        : `<triangles material="${symbol}" count="${faces.length}">${shared}${p}</triangles>`;
+    });
     geometries.push(
       `<geometry id="${id}"${named(name, id)}><mesh>${sources.join('')}` +
-        `<vertices id="${id}-vertices"><input semantic="POSITION" source="#${id}-positions"/></vertices>${primitive}</mesh></geometry>`,
+        `<vertices id="${id}-vertices"><input semantic="POSITION" source="#${id}-positions"/></vertices>${groups.join('')}</mesh></geometry>`,
     );
     return id;
   };
@@ -194,15 +241,22 @@ export function exportDAE(source: ExportSource, options: DAEOptions = {}): DAERe
     let out = `<node id="${id}"${named(n.name, id)} type="NODE"><matrix sid="transform">${rows.map(num).join(' ')}</matrix>`;
     const parts: { geometry: Geo; material?: Mat }[] =
       n.primitives ?? (n.geometry ? [{ geometry: n.geometry, material: n.material }] : []);
-    for (const { geometry: part, material: mat } of parts) {
-      const geo = shape(n, part);
-      if (mat?.baseColorTexture && !geo.uvs) throw new TypeError('Textured materials need geometry with uvs');
-      out += `<instance_geometry url="#${geometry(geo, n.name)}">`;
-      if (mat)
-        out +=
-          `<bind_material><technique_common><instance_material symbol="material" target="#${material(mat)}">` +
-          `${geo.uvs ? '<bind_vertex_input semantic="UVSET0" input_semantic="TEXCOORD" input_set="0"/>' : ''}` +
-          '</instance_material></technique_common></bind_material>';
+    if (parts.length) {
+      const geos = parts.map(({ geometry: part, material: mat }) => {
+          const geo = shape(n, part);
+          if (mat?.baseColorTexture && !geo.uvs) throw new TypeError('Textured materials need geometry with uvs');
+          return geo;
+        }),
+        uvInput = geos.some((geo) => geo.uvs)
+          ? '<bind_vertex_input semantic="UVSET0" input_semantic="TEXCOORD" input_set="0"/>'
+          : '',
+        bound = parts.flatMap(({ material: mat }, index) =>
+          mat
+            ? `<instance_material symbol="${symbolOf(index)}" target="#${material(mat)}">${uvInput}</instance_material>`
+            : [],
+        );
+      out += `<instance_geometry url="#${geometry(geos, n.name)}">`;
+      if (bound.length) out += `<bind_material><technique_common>${bound.join('')}</technique_common></bind_material>`;
       out += '</instance_geometry>';
     }
     return `${out}${n.children.map(node).join('')}</node>`;
