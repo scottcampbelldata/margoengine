@@ -24,7 +24,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/cameras | `.` 9, `./origin` 3, `./layers` 8, `./offaxis` 7, `./physical` 5, `./panini` 4, `./wide-cube` 5 | 1 |  | 2,770 |
 | @margoengine/cinematic | `.` 3, `./brain` 13, `./composer` 3, `./dolly` 3, `./group` 4, `./noise` 7, `./confine` 4, `./lens` 5 | 11 |  | 1,947 |
 | @margoengine/clustered | `.` 19, `./shadows` 4, `./area` 6, `./directional` 6, `./ies` 7, `./projector` 7, `./physical-lobes` 1, `./units` 12, `./flicker` 5, `./budget` 2 | 106 |  | 13,694 |
-| @margoengine/compute | `.` 36, `./linalg` 5, `./fft` 8, `./signal` 7, `./random` 5, `./autodiff` 3, `./sparse` 13, `./stream` 8, `./frame` 3, `./subgroups` 5, `./nn` 38, `./graph` 9, `./autotune` 9 | 422 | 26 | 39,061 |
+| @margoengine/compute | `.` 36, `./linalg` 5, `./fft` 8, `./signal` 7, `./random` 5, `./autodiff` 3, `./sparse` 13, `./stream` 8, `./frame` 3, `./subgroups` 5, `./nn` 38, `./graph` 9, `./autotune` 9 | 422 | 26 | 39,066 |
 | @margoengine/controls | `.` 58, `./orbit` 8, `./fly` 2, `./trackball` 2, `./arcball` 10, `./transform` 7, `./drag` 4, `./profiles` 13, `./third-person` 5, `./walk` 6 | 98 |  | 27,266 |
 | @margoengine/core | `.` 17, `./extension` 26 | 19 |  | 21,586 |
 | @margoengine/creative | `.` 15, `./particles` 4, `./targets` 1, `./toon` 2, `./post` 3, `./grass` 2, `./planet` 2, `./stars` 1 | 3 |  | 19,126 |
@@ -104,7 +104,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/voxel | `.` 22, `./query` 7, `./codec` 9, `./stream` 5, `./generate` 5, `./bevel` 5, `./mesher` 12, `./light` 3, `./vox` 14, `./physics` 2, `./render` 10, `./lightmap` 3 | 80 |  | 5,871 |
 | @margoengine/voxel-edit | `.` 59, `./edit` 28, `./pick` 4, `./sparse` 16, `./mesh` 11, `./vox` 23, `./animation` 8, `./history` 3, `./export` 4, `./formats` 13, `./assist` 3, `./library` 6, `./smooth` 3, `./voxelize` 5 | 81 |  | 7,533 |
 | @margoengine/voxel-net | `.` 34, `./server` 13, `./bot` 4, `./file-store` 1 | 15 |  | 8,036 |
-| @margoengine/voxel-pathtracer | `.` 53, `./studio` 12 | 7 |  | 80,273 |
+| @margoengine/voxel-pathtracer | `.` 53, `./studio` 12 | 7 |  | 80,279 |
 | @margoengine/water | `.` 8 |  |  | 19,747 |
 | @margoengine/weather | `.` 37, `./hail` 7, `./puddles` 10, `./snow` 8, `./regions` 5, `./drive` 11, `./audio` 8, `./data` 7 | 9 |  | 5,009 |
 | @margoengine/webgl | `.` 5, `./pick` 2, `./restore` 2, `./auto` 2 | 1 |  | 3,442 |

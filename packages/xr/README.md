@@ -108,7 +108,7 @@ enter.onclick=()=>void xr.requestSession('immersive-vr').catch(engine.onError);
 engine.start();
 ```
 
-Each eye is a view of `engine.render({views})` drawn into a texture, then copied into the session's layer, with the scene's depth written to the layer's depth so the compositor can reproject. In AR the real world shows where the scene draws neither depth nor light. A stage gets the same route with `new Stage(await createXREngine(canvas))`.
+Each eye is a view of `engine.render({views})` drawn into a texture, then copied into the session's layer, with the scene's depth written to the layer's depth so the compositor can reproject. In AR the real world shows where the scene draws neither depth nor light. A stage gets the same route with `new Stage(await createXREngine(canvas))`. On the WebGL2 compatibility layer, call `installXR()` from `@margoengine/webgl2-compat/xr` first and `createXREngine` takes the same route there.
 
 ## Controller and hand models
 

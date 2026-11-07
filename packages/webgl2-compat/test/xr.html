@@ -11,13 +11,17 @@
 // texture array, ?mode=compat on installXR() and a stand-in XRWebGLLayer over a real WebGL framebuffer. No headset is
 // attached to a test machine, so navigator.xr is a stand-in; the devices, shaders and pixels are real. The compat
 // session gets what a WebGL session gets: projections with z in [-1, 1], eyes side by side in one framebuffer (one of
-// them raised, so a y offset is checked), and `layers` refused.
+// them raised, so a y offset is checked), and `layers` refused. ?route=engine makes the engine with createXREngine,
+// so XR draws each eye through the engine's frame graph, and adds a line from @margoengine/lines, a package pass the
+// separate route cannot draw.
 import { Engine, PbrMaterial, box } from '/packages/core/dist/index.js';
+import { Line, Lines } from '/packages/lines/dist/index.js';
 import { install } from '/packages/webgl2-compat/dist/index.js';
 import { installXR } from '/packages/webgl2-compat/dist/xr.js';
-import { XR } from '/packages/xr/dist/index.js';
+import { XR, createXREngine } from '/packages/xr/dist/index.js';
 
 const mode = new URLSearchParams(location.search).get('mode') ?? 'native';
+const route = new URLSearchParams(location.search).get('route') ?? 'separate';
 const SIZE = 256, RAISE = 20, EYES = ['left', 'right'], NEAR = 0.1, FAR = 100;
 const errors = [];
 addEventListener('error', (e) => errors.push(String(e.message)));
@@ -193,11 +197,11 @@ async function main() {
     globalThis.XRWebGLLayer = FakeWebGLLayer;
     installXR({ framebufferScale: 0.5 });
   } else globalThis.XRGPUBinding = FakeGPUBinding;
-  const engine = await Engine.create(canvas, {
-    backend: 'webgpu',
-    exactSize: [SIZE, SIZE],
-    camera: { position: [0, 1, 5], target: [0, 1, 0], near: NEAR, far: FAR },
-  });
+  const options = { exactSize: [SIZE, SIZE], camera: { position: [0, 1, 5], target: [0, 1, 0], near: NEAR, far: FAR } };
+  const engine =
+    route === 'engine' ? await createXREngine(canvas, options) : await Engine.create(canvas, { backend: 'webgpu', ...options });
+  if (route === 'engine')
+    Lines.attach(engine).add(new Line({ positions: [-3, 1.9, 0, 3, 1.9, 0], colors: [0, 1, 0, 0, 1, 0], width: 6 }));
   const cube = box(1, 1, 1);
   for (let i = 0; i < 5; i++)
     engine
@@ -213,6 +217,7 @@ async function main() {
   const device = xr.device;
   window.check = {
     vendor: device.adapterInfo?.vendor ?? null,
+    route: xr.route,
     gl: device.gl ? device.gl.getError() : 0,
     features: session.features,
     baseLayer: !!session.state.baseLayer,
