@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 9946571,
+  "total": 9949986,
   "history": [
     {
       "date": "2026-10-24",
@@ -2948,6 +2948,12 @@
       "commit": "303be0e9e",
       "reason": "new entry @margoengine/cutscene/render and audio in @margoengine/headless/video",
       "grew": 2
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "8b0a6c0ec",
+      "reason": "New entry @margoengine/cutscene/record: the take recorder.",
+      "grew": 1
     }
   ],
   "items": {
@@ -3074,6 +3080,7 @@
     "@margoengine/culling/parts": 15027,
     "@margoengine/culling/shadows": 20972,
     "@margoengine/cutscene": 7115,
+    "@margoengine/cutscene/record": 3415,
     "@margoengine/cutscene/render": 8171,
     "@margoengine/cutscene/shots": 3336,
     "@margoengine/decoders": 492515,

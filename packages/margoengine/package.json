@@ -534,6 +534,10 @@
       "types": "./dist/cutscene/render.d.ts",
       "import": "./dist/cutscene/render.js"
     },
+    "./cutscene/record": {
+      "types": "./dist/cutscene/record.d.ts",
+      "import": "./dist/cutscene/record.js"
+    },
     "./decoders": {
       "types": "./dist/decoders.d.ts",
       "import": "./dist/decoders.js"

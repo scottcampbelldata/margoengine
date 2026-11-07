@@ -270,6 +270,60 @@ nested speed. The mix is a sum with no limiter: `peak` above 1 means it will cli
 naming a sound `sounds` does not hold is a `RangeError`. `cutsceneFrames(cutscene, { fps?, from?, to? })` gives each
 frame's time and state with no engine, for a pipeline of your own.
 
+## Recording takes
+
+`@margoengine/cutscene/record` records live play into cutscene tracks: say what to record, call `capture()` once a
+tick, and `stop()` gives a take to put in a document. It needs `@margoengine/input` only if you record input.
+
+```ts
+import { Camera } from 'margoengine/core';
+import { Cutscene } from 'margoengine/cutscene';
+import { TakeRecorder, appendTake, takeDocument } from 'margoengine/cutscene/record';
+
+const camera = new Camera();
+const hero = { position: [0, 0, 0], rotation: [0, 0, 0] }; // A Mesh works as it is.
+let health = 100;
+
+const recorder = new TakeRecorder({ tolerance: { position: 0.01 } });
+recorder.transform('hero', hero).camera(camera).property('hero', 'health', () => health);
+// recorder.input(input) records every binding of an Input; capture after input.update().
+
+for (let tick = 0; tick < 120; tick++) {
+  hero.position = [tick * 0.05, 0, 0];
+  health -= 0.1;
+  if (tick === 60) recorder.event('door', { open: true }).marker('halfway');
+  recorder.capture(tick / 60); // Your fixed-step clock; with no argument the wall clock runs.
+}
+const take = recorder.stop();
+console.log(take.kept['transform-hero']); // { samples: 120, keys: 1 or more, far fewer than the samples }
+
+const cutscene = new Cutscene(takeDocument(take));
+const position = cutscene.evaluate(1).transforms.hero.position;
+const longer = appendTake({ format: 'margo-cutscene', version: 1, duration: 3, tracks: [] }, take, { at: 1 });
+```
+
+| Record | Source | Comes out as |
+| --- | --- | --- |
+| `transform(name, source)` | A `Mesh`, anything with `position`, `rotation` or `scale`, or a function giving them; 3 rotation values are Euler radians as a `Mesh` holds them, 4 a quaternion | `transform` track `transform-<name>` |
+| `camera(source)` | A `Camera`, or a function giving `position`, `target`, `fov` and `roll` | `camera` track `camera` with a straight-line path |
+| `property(target, name, read)` | A function giving a number or a numeric array | `property` track `property-<target>-<name>` |
+| `input(input, { target? })` | An `Input`; it starts at the next capture | one stepped `property` track for each binding (`state.properties.input.jump`, later bindings `jump#1`), and an event track with `jump` as a binding leaves 0 and `jump:up` as it comes back |
+| `event(name, data?)`, `marker(name)` | Noted at the time of the last capture | `event` track `events`, the take's `markers` |
+
+Keys are thinned on the track's own straight-line interpolation (Ramer-Douglas-Peucker), so every captured sample
+stays within the tolerance of what the tracks play: `position` (world units, also the camera's position and target),
+`rotation` (radians), `scale` and `value` (properties and fields of view, on each component), each default `0.001`. A
+tolerance of 0 keeps every change a straight line cannot explain. Input is never thinned. `take.kept` says how many
+samples each track came from. Signs of quaternions are put on one side, so a source that flips them still turns the
+short way. A recorded rotation is a quaternion: apply it with `mesh.setQuaternion`, and the mesh's world matrix comes
+back as it was.
+
+`takeDocument(take)` makes the take a document; `appendTake(document, take, { at?, prefix? })` gives a new document
+with it added at a time, longer if it must be, and a `prefix` lets a second take of one object sit beside the first.
+`inputTracks(clip, { at?, target? })` turns a saved `InputRecorder` clip of `@margoengine/input/replay` into the same
+tracks. A sample that is not finite is a `RangeError`, and so is a capture time going backwards. `stop()` with nothing
+captured and any use after `stop()` throw `MargoError` `'state'`.
+
 ## Custom tracks
 
 `shotTrack()` is a `CutsceneTrackType`, and you can write your own for anything a document should hold: pass types in

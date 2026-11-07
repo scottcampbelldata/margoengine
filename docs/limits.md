@@ -13,7 +13,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-291). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-292). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -225,6 +225,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Moving platforms for `WalkControls` (`carry`, 2026-11-05) | Proved on stand-in input, synthetic events on a fake element. By method: only the floor carries. A moving wall pushes the walker out but gives it no speed, a tilting floor turns the heading about +Y and leaves the pitch, and one more transform pass runs per update so colliders are this frame's. | A wall has no contact the walker keeps between frames, and a walker stays upright by design. | The pass costs a little on scenes with no moving floor. | `carry: false` skips the pass and keeps last frame's matrices. |
 | Virtual camera shots (`@margoengine/cutscene/shots`, 2026-11-06) | Enforced: shots may not overlap, `blendIn` is at most the shot's length, and the first shot cannot blend, as nothing comes before it. By method: a shot has no memory, so `follow` and `lookAt` sit exactly on their object with no damping, and blending between cameras looking opposite ways turns about the world's up. A live camera is read at every evaluate, so a shot of one is the one thing here that is not a pure function of the time. Not measured: speed. |
 | Render to video (`@margoengine/cutscene/render`, 2026-11-06) | Enforced: the engine must be on a `createHeadlessCanvas` canvas, and a span must lie inside the cutscene. By method: the whole file and the whole mix sit in memory, as in `encodeVideo`; the mix is a sum with no limiter, and a fade's corner inside a 128-sample block is drawn as a straight line. Needs WebCodecs, so a browser or a worker, not Node. Not proven: no player outside the browser has opened a file; AAC and Opus have no edit list, so a player that shows encoder delay shows it. Not measured: speed. |
+| Take recorder (`@margoengine/cutscene/record`, 2026-11-06) | Enforced: capture times may not go backwards, samples must be finite, and a recorder is spent after `stop()`. By method: a sample is what the source gave at `capture()`, so what happened between ticks is lost; positions come from the source as given, so a parented `Mesh` records its local transform; `Camera.up` is not recorded, roll is; thinning is checked on the straight line between kept keys, so a track played with an ease or a curved path would differ. Whole takes sit in memory until `stop()`. Not measured: speed. |
 
 ## Copies of a model
 
