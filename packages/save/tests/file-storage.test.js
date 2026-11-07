@@ -125,3 +125,17 @@ test('on Windows, which cannot fsync a folder, none is tried', async (t) => {
   await fileStorage(path).write('game', new Uint8Array([1]));
   assert.deepEqual(await readdir(path), ['game.save']);
 });
+
+test('keys that differ only by case stay two saves, and any key makes a legal file name', async (t) => {
+  const path = await folder(t),
+    storage = fileStorage(path);
+  await storage.write('Slot', new Uint8Array([1]));
+  await storage.write('slot', new Uint8Array([2]));
+  await storage.write('a*b', new Uint8Array([3]));
+  assert.deepEqual(await storage.read('Slot'), new Uint8Array([1]));
+  assert.deepEqual(await storage.read('slot'), new Uint8Array([2]));
+  assert.deepEqual(await storage.read('a*b'), new Uint8Array([3]));
+  assert.deepEqual(await storage.keys(), ['Slot', 'a*b', 'slot']);
+  assert.equal(await storage.delete('Slot'), true);
+  assert.deepEqual(await storage.read('slot'), new Uint8Array([2]));
+});

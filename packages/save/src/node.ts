@@ -8,6 +8,11 @@ import { keyQueue } from './queue.js';
 import type { SaveStorage } from './storage.js';
 
 const SUFFIX = '.save';
+/** Capitals are escaped too, as most Windows and Mac disks fold case, and `*`, which Windows refuses in a name. */
+const fileName = (key: string): string =>
+  encodeURIComponent(key).replace(/%[0-9A-F]{2}|[A-Z*]/g, (found) =>
+    found.length > 1 ? found : `%${found.charCodeAt(0).toString(16).toUpperCase()}`,
+  ) + SUFFIX;
 const checkKey = (key: string): void => {
   if (typeof key !== 'string' || !key) throw new TypeError('Save key must be a non-empty string, e.g. "slot-1"');
 };
@@ -41,7 +46,7 @@ async function syncFolder(folder: string): Promise<void> {
 }
 
 /**
- * Saves as files in `directory` (created on first write): `encodeURIComponent(key) + '.save'`. Writes go to a
+ * Saves as files in `directory` (created on first write): the key, percent-escaped with its capitals, and `.save`. Writes go to a
  * temporary file first and are renamed over the old save, which is atomic on one file system, and the folder is then
  * fsynced where the system has that. On Windows a save that
  * another program has open cannot be replaced: the write rejects with MargoError `'failed'` and the old save stands.
@@ -49,7 +54,7 @@ async function syncFolder(folder: string): Promise<void> {
 export function fileStorage(directory: string): SaveStorage {
   if (typeof directory !== 'string' || !directory)
     throw new TypeError('fileStorage needs a directory path, e.g. "./saves"');
-  const file = (key: string): string => join(directory, encodeURIComponent(key) + SUFFIX);
+  const file = (key: string): string => join(directory, fileName(key));
   return {
     async read(key, options) {
       checkKey(key);
