@@ -115,7 +115,7 @@ Import the stage for a canvas, camera, controls and loading in a few lines (`imp
 - [@margoengine/kinematics-constraints](https://margoengine.com/llms/packages/kinematics-constraints.md): Standalone analytical capsule, sphere and convex hull constraints for IK target and arm clearance.
 - [@margoengine/rigging](https://margoengine.com/llms/packages/rigging.md): Rigging and animation authoring: automatic skin weights, weight painting, skin checks, IK chains with poles, retarget presets, spring bones, VRM 1.0 avatars, geodesic…
 - [@margoengine/tween](https://margoengine.com/llms/packages/tween.md): Allocation-free numeric tween updates and easing timelines.
-- [@margoengine/cinematic](https://margoengine.com/llms/packages/cinematic.md): Critically damped camera follow, look-at and screen shake.
+- [@margoengine/cinematic](https://margoengine.com/llms/packages/cinematic.md): Virtual cameras with priorities and blends, framing, dolly tracks, group framing, camera noise, confiners and focus tracking, on top of damped follow, look-at and shake.
 - [@margoengine/cutscene](https://margoengine.com/llms/packages/cutscene.md): Cutscene timelines: camera, transform, property, animation, audio, subtitle and event tracks, nested timelines, scrubbing, a player that fires events in order, virtual…
 - [@margoengine/controls](https://margoengine.com/llms/packages/controls.md): Orbit, map, trackball, arcball, fly, first-person, pointer-lock and collision-aware walkthrough (/walk) camera controls, a transform gizmo and drag controls for Margo…
 - [@margoengine/cameras](https://margoengine.com/llms/packages/cameras.md): Orthographic projection and exactly vertical (top-down) views for the core camera, with matching culling and picking.
@@ -234,7 +234,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/kinematics-constraints API](https://margoengine.com/llms/api/kinematics-constraints.md): 3 entry points
 - [@margoengine/rigging API](https://margoengine.com/llms/api/rigging.md): 11 entry points
 - [@margoengine/tween API](https://margoengine.com/llms/api/tween.md): 5 entry points
-- [@margoengine/cinematic API](https://margoengine.com/llms/api/cinematic.md): 7 entry points
+- [@margoengine/cinematic API](https://margoengine.com/llms/api/cinematic.md): 8 entry points
 - [@margoengine/cutscene API](https://margoengine.com/llms/api/cutscene.md): 7 entry points
 - [@margoengine/controls API](https://margoengine.com/llms/api/controls.md): 10 entry points
 - [@margoengine/cameras API](https://margoengine.com/llms/api/cameras.md): 6 entry points

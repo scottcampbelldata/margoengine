@@ -3,6 +3,7 @@
 // node packages/cinematic/test/browser-check.mjs
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../scripts/browser.js';
+import { decodePNG } from '../../../tests/support/png.js';
 
 const context = await openBrowser({ startPath: '/packages/cinematic/test/browser-check.html', port: 'free' }),
   { page, hardware } = context,
@@ -12,6 +13,19 @@ page.on('console', (m) => {
   if (m.type() === 'error') pageErrors.push(m.text());
 });
 const near = (a, b, limit, what) => assert.ok(Math.abs(a - b) <= limit, `${what}: ${a} is not ${b} within ${limit}`);
+// Blur along the middle row in a span of columns: how many pixels lie part way between the darkest and the brightest.
+// A sharp edge has one or two, a blurred one as many as its disk is wide.
+const edge = async (from, to) => {
+  const image = await decodePNG(await page.locator('canvas').screenshot()),
+    row = Math.floor(image.height / 2) * image.width,
+    scale = image.width / 800,
+    values = [];
+  for (let x = Math.round(from * scale); x < to * scale; x++) values.push(image.data[(row + x) * 4 + 1]);
+  const low = Math.min(...values),
+    high = Math.max(...values),
+    middle = values.filter((v) => v > low + (high - low) * 0.1 && v < high - (high - low) * 0.1);
+  return middle.length;
+};
 const run = (name, ...args) => page.evaluate(([n, a]) => window.check[n](...a), [name, args]);
 try {
   console.log('adapter', JSON.stringify(hardware.webgpu));
@@ -46,6 +60,27 @@ try {
   assert.deepEqual(group.ends, ['left', 'right'], 'the far ends of the group sit on the padded edge');
   assert.deepEqual(group.outside, [null, null], 'and nothing lies beyond it');
   assert.deepEqual(group.errors, [], 'no GPU error');
+  // A real DOF on the GPU. The near card sits left of the middle, the far card right of it.
+  const sharp = await run('lens', 'near', 120);
+  near(sharp.focus, 6, 1e-3, 'focus on the near card');
+  const nearEdge = await edge(0, 400),
+    farEdge = await edge(400, 800);
+  console.log('focus near: near edge', nearEdge, 'far edge', farEdge);
+  assert.ok(farEdge > 2 * nearEdge, `the card in focus is the sharp one: ${nearEdge} against ${farEdge}`);
+  const rack = await run('lens', 'far', 1, 0.5);
+  near(rack.focus, 30 + (6 - 30) * Math.exp(-3), 1e-3, 'the rack reaches the DOF at its rate');
+  const other = await run('lens', 'far', 120);
+  near(other.focus, 30, 1e-3, 'focus on the far card');
+  const nearAfter = await edge(0, 400),
+    farAfter = await edge(400, 800);
+  console.log('focus far: near edge', nearAfter, 'far edge', farAfter);
+  assert.ok(nearAfter > 2 * farAfter, `focus moved to the far card: ${farAfter} against ${nearAfter}`);
+  assert.deepEqual(other.errors, [], 'no GPU error');
+
+  const zoom = await run('zoom');
+  console.log('zoom fov', zoom.fov);
+  assert.deepEqual(zoom.inside, [true, true], 'the subject reaches to 4 pixels of its share');
+  assert.deepEqual(zoom.outside, [false, false], 'and stops within 4 pixels of it');
   assert.deepEqual(swap.errors, [], 'no GPU error');
   assert.deepEqual(pageErrors, [], 'no page error');
   console.log('cinematic browser check passed');

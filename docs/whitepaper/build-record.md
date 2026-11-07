@@ -1352,6 +1352,32 @@ Six jobs took `@margoengine/cutscene` from keyed tracks to something a trailer c
 - **Unmeasured:** no job has a timed number. No screen reader ran on the panel, and no person has authored a cutscene with it.
 - **Gate:** lint, hygiene, verify and the package tests for each job, with `test:gpu` suites for jobs 2, 5 and 6, the push from one script that stops at the first failing step.
 
+## Batch 88: cinematic
+
+Seven jobs took `@margoengine/cinematic` from one damped follow rig to a camera system: many virtual cameras with a brain that blends them, and stages for framing, tracks, groups, noise, walls and focus. Each job is its own optional entry; core and stage were not touched.
+
+| # | Job | Status | Commit | Entry | Claim |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Camera priorities and blends | DONE | 352c4348f | `/brain` | LIM-304 |
+| 2 | Framing composer | DONE | 6d3a39322 | `/composer` | LIM-307 |
+| 3 | Dolly tracks | DONE | f557653be | `/dolly` | LIM-308 |
+| 4 | Group framing | DONE | 7ba60bf17 | `/group` | LIM-309 |
+| 5 | Noise profiles | DONE | b146185f4 | `/noise` | LIM-312 |
+| 6 | Confiner volumes | DONE | 5a7ecc2d8 | `/confine` | LIM-313 |
+| 7 | Focus tracking | DONE | this commit | `/lens` | LIM-316 |
+
+- **What was reused:** `Spline` and `closestPointOnSpline` of splines for job 3, `createRandom` of math for job 5, a real `PhysicalCamera` of cameras and a real `DOF` for job 7. Stages are the one extension point: a function, or an object with `update` and `reset`.
+- **Caught before landing, each held by a test:** the noise draft sampled a band at its frequency, which put the middle of its power at 0.52 of it, so the 12 Hz wheel hop and 8 Hz tremor bands sat below the ranges they named; its first test only asked for a window wide enough to pass. A band now takes two lattice points a cycle and the middle reads 1.05 of the frequency. The confiner draft fell short of its margin in sharp corners, 0.33 of 1 at 30 degrees and on the wall at 20; two walls that push a camera back and forth now send it to where their margins meet, and the test fails without that.
+- **Found and left open:** DOF's blurred edges spread to one side only, seen in job 7's pixel rows, in docs/known-bugs.md.
+- **Records:** the batch began by moving batch 85's short lines back from the end of batch 86 (337c88155). Job 3's stand-in wording reached `docs/limits.md` and the README in this commit; its claim had it from the start.
+- **Landings stopped, nothing failed reached main:** job 2 once at verify, on a frame loop with no `fixed-wait` line. Jobs 5 and 6 each stopped once at the start because main had moved, the first with an empty log, so the script now prints why. Job 5 stopped again after a passed gate, and its rebase needed the limits header settled by hand. Job 7 stopped once at verify: its dev dependency on cameras gave post a 13th dependent, past the 12 that keep a change scoped, so the plan for post went full and `tests/check-example-types.test.js`, which read a project list from it, failed. The test now makes the same assertion on cameras, whose plan stays scoped, and the dev dependency stays so a change to cameras reruns the lens test.
+- **Short gate:** main moved after a passed gate under jobs 1, 2, 3, 5 and 7, so each went by the short gate on the rebased commit. Jobs 4 and 6 landed on the full gate.
+- **Proved:** jobs 2, 4 and 7 on real WebGPU, RTX A6000, in Chromium, by the engine's pick and by pixel rows through a real `DOF`, in `packages/cinematic/test/browser-check.mjs`, which `check:gpu-packages` finds by name. Jobs 1, 3, 5 and 6 are CPU tests against closed forms or an independent check. Job 5's band frequencies are measured by a discrete Fourier transform over 6 seeds.
+- **Stand-ins:** job 3's generated tracks, job 5's preset amplitudes chosen by eye, job 6's generated outlines, job 7's two flat cards at f/0.2.
+- **Limits:** an area has no holes and assumes y up. A self-crossing outline is not detected. Focus comes from a known point and does not see what stands in front of it. Noise added after a confiner can leave the volume, so a confiner goes last.
+- **Unmeasured:** no job has a timed number. No preset was compared with recorded camera motion, and no person has judged a shot.
+- **Gate:** lint, hygiene, verify, the README run, the package tests and `tests/claims-file.test.js` for each job, with `test:gpu` for jobs 2, 4 and 7, the push from one script that stops at the first failing step.
+
 ## Lane U: first iPhone failure of animated USDZ
 
 Scott placed Fox-Run in AR Quick Look on an iPhone and stood between the legs of a 79 metre fox; robot-expressive ran off the screen. This one-off lane found why and fixed it in `@margoengine/exporters`.

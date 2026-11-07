@@ -2000,7 +2000,7 @@
     "package": "@margoengine/cinematic",
     "version": "1.0.0",
     "published": false,
-    "description": "Critically damped camera follow, look-at and screen shake.",
+    "description": "Virtual cameras with priorities and blends, framing, dolly tracks, group framing, camera noise, confiners and focus tracking, on top of damped follow, look-at and shake.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "cinematic",
     "install": "npm install @margoengine/core@1.0.0 @margoengine/cinematic@1.0.0",

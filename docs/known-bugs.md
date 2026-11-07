@@ -16,6 +16,17 @@ are still open.
 - **Needed to close:** save both pictures, find the pixels and which pass writes them, and fix it in the package that
   owns that pass.
 
+### A blurred edge of DOF spreads to one side only
+
+- **What:** a card out of focus in `@margoengine/dof` should spread across its outline, half inside and half outside. A far card
+  fades inward and stops dead at its outline (row values 20, 154, 164 and on up to 208, RTX A6000); a near card spreads outward and
+  keeps its full value inside (147, then 208).
+- **Repro:** `node packages/cinematic/test/browser-check.mjs` draws both cards; print the middle row of the picture in `edge`.
+- **Cause:** by design of the gathers, not yet fixed. The far gather takes only samples at the centre's depth or behind it, so sky
+  behind a far card takes nothing from the card. The near gather always counts the foreground centre, at full weight.
+- **Needed to close:** decide from the published work on gather depth of field how a pixel behind a blurred edge takes its share
+  without a sharp subject leaking onto its background, build it in `@margoengine/dof` and test the edge profile on the GPU.
+
 ## README examples
 
 ### 126 of 767 README examples do not run yet

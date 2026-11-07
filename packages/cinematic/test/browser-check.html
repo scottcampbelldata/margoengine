@@ -15,6 +15,8 @@
       import { CameraBrain } from '/packages/cinematic/dist/brain.js';
       import { FramingComposer } from '/packages/cinematic/dist/composer.js';
       import { GroupFraming } from '/packages/cinematic/dist/group.js';
+      import { FocusTracker, focusOutput } from '/packages/cinematic/dist/lens.js';
+      import { DOF } from '/packages/dof/dist/index.js';
 
       const engine = await Engine.create(document.querySelector('canvas'), { backend: 'webgpu' }),
         device = engine.gpu,
@@ -92,6 +94,45 @@
         };
         // The padding leaves a tenth of the width at each side: 80 pixels of 800.
         return { ends: [await at(80, 200), await at(720, 200)], outside: [await at(40, 200), await at(760, 200)], errors };
+      };
+      // Two flat cards at 6 and 30 units, the far one 5 times the size, so both fill the same part of the picture.
+      const card = (position, size) =>
+        engine
+          .createMesh()
+          .setGeometry(box(size, size, 0.02))
+          .setMaterial(new PbrMaterial({ color: '#ffffff', emissive: '#ffffff' }))
+          .setPosition(position);
+      let lens = null;
+      window.check.lens = async (which, frames, delta = 1 / 60) => {
+        if (!lens) {
+          const cards = { near: card([-2001.2, 0, 0], 1), far: card([-1994, 0, -24], 5) },
+            tracker = new FocusTracker(cards.near),
+            dof = DOF.attach(engine, { focalLength: 0.05, aperture: 0.2, maxRadius: 16 });
+          brain.stages.push(focusOutput({ dof }));
+          brain.add({ name: 'lens', priority: 30, position: [-2000, 0, 6], target: [-2000, 0, 0], fov: 40, stages: [tracker] });
+          lens = { cards, tracker, dof };
+          await frame();
+        }
+        lens.tracker.target = lens.cards[which];
+        // fixed-wait: fixed simulation steps are what is under test, not a wait for the GPU
+        for (let i = 0; i < frames; i++) await frame(delta);
+        return { focus: lens.dof.options.focalDistance, errors };
+      };
+      window.check.zoom = async () => {
+        const subject = card([-3000, 0, 0], 1);
+        brain.add({
+          name: 'zoom',
+          priority: 40,
+          position: [-3000, 0, 6],
+          target: [-3000, 0, 0],
+          fov: 60,
+          stages: [new FocusTracker(subject, { size: 1, screenHeight: 0.5, minFov: 1 })],
+        });
+        // fixed-wait: fixed simulation steps are what is under test, not a wait for the GPU
+        for (let i = 0; i < 40; i++) await frame();
+        const hit = async (y) => (await engine.pick(400, y)) === subject;
+        // Half the 400 pixel height: 100 above and below the middle.
+        return { fov: engine.camera.fov, inside: [await hit(104), await hit(296)], outside: [await hit(96), await hit(304)], errors };
       };
       window.ready = true;
     </script>

@@ -167,7 +167,7 @@ brain.add({stages: [new DollyTrack(rail, {target: runner, lead: 2}), new Framing
 | `window` | whole track | Search only this far either side of the cart. Set it when the track passes close to itself. |
 | `lookAlong` | `false` | Look down the track. |
 
-A closed track wraps and the cart takes the short way round; an open one stops at its ends. `dolly.reset()` puts the cart back on the subject at once.
+A closed track wraps and the cart takes the short way round; an open one stops at its ends. `dolly.reset()` puts the cart back on the subject at once. The tests use generated curves as a stand-in for a track from a real level.
 
 ## Group framing
 
@@ -259,6 +259,37 @@ console.log(camera.update(1 / 60).position, room.clamped);
 | `{area, bottom, top}` | An outline of `[x, z]` points on the ground, convex or not, either way round, with optional height limits. |
 
 `margin` (default 0) is the space kept from every wall. `confiner.clamped` says whether the last update moved the camera and `confiner.correction` how far. For walls between the camera and its subject use the `collide` option of `Cinematic`.
+
+## Focus tracking
+
+`FocusTracker` is a focus puller and a zoom operator. It sets the pose's focus from a followed subject, measured along the view as a lens does, and with `size` it also sets the field of view that holds the subject at one size on screen. `focusOutput` goes in `brain.stages` and hands the focus to the lens, so a blend racks focus from one camera to the next:
+
+```ts
+import {PhysicalCamera} from 'margoengine/cameras/physical';
+import {CameraBrain} from 'margoengine/cinematic/brain';
+import {FocusTracker, focusOutput} from 'margoengine/cinematic/lens';
+const brain = new CameraBrain();
+const physical = new PhysicalCamera({focalLength: 85, aperture: 1.8});
+brain.stages.push(focusOutput({physical}));
+const hero = [0, 1.6, 0] as const;
+brain.add({position: [0, 1.6, 6], target: [0, 1.6, 0], stages: [new FocusTracker(hero, {size: 1.8, screenHeight: 0.6})]});
+brain.update(1 / 60);
+console.log(physical.focusDistance, brain.pose.fov);
+```
+
+Pass `dof` as well to drive a `DOF` effect from `@margoengine/dof`.
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `focusDamping` | `6` | How fast focus follows, in 1/seconds. Lower is a slow rack. |
+| `focusOffset` | `0` | Added to the distance, to focus on a face rather than the feet. |
+| `minFocus` | `0.1` | Nearest focus. Keep it beyond the focal length. |
+| `size` | none | Height of the subject in world units. Turns on the field of view. |
+| `screenHeight` | `0.5` | Share of the screen height the subject fills. |
+| `fovDamping` | `4` | How fast the field of view follows. |
+| `minFov`, `maxFov` | `10`, `100` | Limits, in degrees. |
+
+Keep `minFocus` above the lens's focal length: `DOF` refuses a focus at or inside it. Focus comes from the point you give it. To focus on whatever a pixel shows, use `Autofocus` from `@margoengine/dof/autofocus`.
 
 Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 

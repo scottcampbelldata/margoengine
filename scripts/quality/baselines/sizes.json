@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10138382,
+  "total": 10146679,
   "history": [
     {
       "date": "2026-10-24",
@@ -3116,6 +3116,12 @@
       "commit": "a82f958df",
       "reason": "usdz gains the /anim entry for time-sampled transforms and visibility",
       "grew": 2
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "53740d7d1",
+      "reason": "new optional entry @margoengine/cinematic/lens",
+      "grew": 1
     }
   ],
   "items": {
@@ -3196,6 +3202,7 @@
     "@margoengine/cinematic/confine": 1614,
     "@margoengine/cinematic/dolly": 1568,
     "@margoengine/cinematic/group": 2101,
+    "@margoengine/cinematic/lens": 1269,
     "@margoengine/cinematic/noise": 1612,
     "@margoengine/clustered": 13989,
     "@margoengine/clustered/area": 10461,

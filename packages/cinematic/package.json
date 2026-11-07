@@ -1,7 +1,7 @@
 {
   "name": "@margoengine/cinematic",
   "version": "1.0.0",
-  "description": "Critically damped camera follow, look-at and screen shake.",
+  "description": "Virtual cameras with priorities and blends, framing, dolly tracks, group framing, camera noise, confiners and focus tracking, on top of damped follow, look-at and shake.",
   "keywords": [
     "margoengine",
     "webgpu",
@@ -49,6 +49,10 @@
     "./confine": {
       "types": "./dist/confine.d.ts",
       "import": "./dist/confine.js"
+    },
+    "./lens": {
+      "types": "./dist/lens.d.ts",
+      "import": "./dist/lens.js"
     }
   },
   "files": [
@@ -71,5 +75,9 @@
     "test": "npm run build && node --test test/*.test.js",
     "prepack": "npm run build",
     "test:gpu": "cd ../.. && node packages/cinematic/test/browser-check.mjs"
+  },
+  "devDependencies": {
+    "@margoengine/cameras": "^1.0.0",
+    "@margoengine/dof": "^1.0.0"
   }
 }
