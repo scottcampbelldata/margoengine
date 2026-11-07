@@ -145,13 +145,11 @@ function transform(prim: Prim, parent: Float64Array, base: Float64Array): Float6
     return parent;
   }
   if (!Array.isArray(order) || order.some((v) => typeof v !== 'string')) fail('syntax', 'invalid xformOpOrder');
-  let local = identity(),
-    inherited = parent;
-  for (const name of order as string[]) {
-    if (name === '!resetXformStack!') {
-      inherited = base;
-      continue;
-    }
+  // Everything up to the last reset is ignored, by the UsdGeomXformable schema.
+  const reset = (order as string[]).lastIndexOf('!resetXformStack!'),
+    inherited = reset < 0 ? parent : base;
+  let local = identity();
+  for (const name of (order as string[]).slice(reset + 1)) {
     let matrix = identity();
     const value = prim.attrs.get(name);
     if (name === 'xformOp:transform') {

@@ -193,3 +193,18 @@ test("regression: triple single quoted strings, as MaterialX's converter writes 
   const meta = `customLayerData = {\n string source = '''Converted to usd from teapot.obj'''\n}\nmetersPerUnit = 1 upAxis = "Y"`;
   assert.equal(parseUSDA(stage(triangle, meta)).positions.length, 9);
 });
+
+test('USDA ignores every transform op up to the last reset', () => {
+  const result = parseUSDA(
+    stage(`def Xform "Parent" {
+ double3 xformOp:translate = (10,0,0)
+ uniform token[] xformOpOrder = ["xformOp:translate"]
+ def Xform "Late" { double3 xformOp:translate:ignored = (50,0,0)
+ double3 xformOp:translate = (1,2,3)
+ uniform token[] xformOpOrder = ["xformOp:translate:ignored","!resetXformStack!","xformOp:translate"]
+ ${triangle}
+ }
+}`),
+  );
+  assert.deepEqual(Array.from(result.positions.slice(0, 3)), [1, 2, 3]);
+});
