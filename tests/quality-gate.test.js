@@ -2,6 +2,7 @@
 // and each detector sees what it claims to see.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -58,6 +59,17 @@ test('a baseline total is the sum of its items, in the committed files too', () 
     const baseline = readBaseline(root, file.slice(0, -5));
     assert.equal(staleTotal(baseline), undefined, `${file}: total ${baseline.total}; run npm run quality -- --update`);
   }
+});
+
+test('the gate refuses a bare gate name and growth with no gate, and writes nothing', () => {
+  const script = fileURLToPath(new URL('../scripts/quality-gate.mjs', import.meta.url)),
+    run = (...args) => spawnSync(process.execPath, [script, ...args], { encoding: 'utf8' }),
+    bare = run('sizes', '--update', '--reason=x'),
+    wide = run('--update', '--reason=x');
+  assert.equal(bare.status, 2);
+  assert.match(bare.stderr, /--gate=sizes/);
+  assert.equal(wide.status, 2);
+  assert.match(wide.stderr, /--gate=<gate>/);
 });
 
 test('clean-room patterns catch engines and libraries, not the word three', () => {

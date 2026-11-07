@@ -55,6 +55,16 @@ const GATES = {
 };
 
 const only = arg('gate')?.split(',');
+// A bare gate name used to be ignored, so `sizes --update --reason=x` wrote every gate's baseline and accepted any failure.
+const stray = process.argv.slice(2).find((a) => !a.startsWith('--'));
+if (stray) {
+  console.error(`quality: unknown argument ${stray}; name a gate with --gate=${stray}`);
+  process.exit(2);
+}
+if (reason && !only) {
+  console.error('quality: --reason accepts growth, so it needs one gate; add --gate=<gate>');
+  process.exit(2);
+}
 const started = performance.now();
 const files = repoFiles(root);
 const packages = packageList(root, files);
