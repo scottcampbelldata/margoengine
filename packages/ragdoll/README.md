@@ -109,6 +109,8 @@ ragdoll.activate(arm);
 ragdoll.part(arm)?.body.applyImpulse([0, 2, -20]);
 setTimeout(() => ragdoll.deactivate(0.4, arm), 800);
 
+const rightArm = model.nodes.find((node) => node.name === 'RightArm')!;
+const spine = model.nodes.find((node) => node.name === 'Spine')!;
 ragdoll.activate([arm, rightArm]); // a list: both arms
 ragdoll.activate(spine); // the upper body; `activate()` with no bone is all of them
 ```
@@ -141,9 +143,20 @@ one skeleton or the wrong engine, and `unsupported` for a hinge on a Rapier buil
 `addRagdollMotors(ragdoll, options)` gives every joint a motor that pulls its bone toward the pose the animation gives it, while the bone is physical. The character keeps moving, a hit bends it, and the motors take the pose back, instead of it only going limp.
 
 ```ts
+import RAPIER from '@dimforge/rapier3d-compat';
+import { EngineKernel } from 'margoengine/core';
+import { loadGLTF } from 'margoengine/gltf-pro';
+import { Physics } from 'margoengine/physics';
 import { Ragdoll } from 'margoengine/ragdoll';
 import { addRagdollMotors } from 'margoengine/ragdoll/powered';
 
+await RAPIER.init();
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!);
+const physics = new Physics(engine, { rapier: RAPIER });
+physics.addBody(null, { type: 'fixed', colliders: { shape: 'box', halfExtents: [20, 0.1, 20] } });
+const model = await loadGLTF(engine, '/hero.glb');
+const bone = (name: string) => model.nodes.find((node) => node.name === name)!;
+const hips = bone('Hips');
 const ragdoll = Ragdoll.attach(physics, { root: hips });
 const motors = addRagdollMotors(ragdoll, { root: 1 });
 ragdoll.activate(); // physical, and still walking its clip
@@ -151,7 +164,7 @@ ragdoll.activate(); // physical, and still walking its clip
 // A hit: the impulse lands on the chest, the limb weakens at once and gets its strength back over 0.6 seconds.
 motors.hit(ragdoll.bones[4], [0, 0, -150], { weaken: 0.8, recover: 0.6 });
 
-motors.setStrength(hand, 0); // that limb hangs while the rest stays powered
+motors.setStrength(bone('LeftHand'), 0); // that limb hangs while the rest stays powered
 motors.fade(0, 1.5); // weaken over a second and a half: a slow collapse
 ```
 
@@ -187,10 +200,19 @@ Skeletons put small bodies between big limbs, and a solver cannot hold a strong 
 import { Ragdoll } from 'margoengine/ragdoll';
 import { addGetUp } from 'margoengine/ragdoll/getup';
 import { Animation } from 'margoengine/animation';
+import RAPIER from '@dimforge/rapier3d-compat';
+import { EngineKernel } from 'margoengine/core';
+import { loadGLTF } from 'margoengine/gltf-pro';
+import { Physics } from 'margoengine/physics';
 import { Animator } from 'margoengine/animator';
-import type {PBRModel} from 'margoengine/gltf-pro';
-declare const model: PBRModel;
 
+await RAPIER.init();
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!);
+const physics = new Physics(engine, { rapier: RAPIER });
+physics.addBody(null, { type: 'fixed', colliders: { shape: 'box', halfExtents: [20, 0.1, 20] } });
+const model = await loadGLTF(engine, '/hero.glb');
+const bone = (name: string) => model.nodes.find((node) => node.name === name)!;
+const hips = bone('Hips');
 const animator = Animator.attach(Animation.attach(model), {
   initial: 'idle',
   states: { idle: 'Idle', back: 'GetUpFromBack', front: 'GetUpFromFront' },
@@ -199,7 +221,7 @@ const ragdoll = Ragdoll.attach(physics, { root: hips });
 const getUp = addGetUp(ragdoll, animator, { faceUp: 'back', faceDown: 'front', then: 'idle' });
 
 ragdoll.activate();
-head.body.applyImpulse([0, 2, -30]);
+ragdoll.part(bone('Head'))?.body.applyImpulse([0, 2, -30]);
 setTimeout(async () => {
   const { side, mismatch } = await getUp.start();
   console.log(`got up ${side}, ${mismatch} radians from the clip at the root`);
@@ -226,10 +248,19 @@ No facing convention is needed: only the turn about the up axis is free, and wha
 
 ```ts
 import { Ragdoll } from 'margoengine/ragdoll';
+import RAPIER from '@dimforge/rapier3d-compat';
+import { EngineKernel } from 'margoengine/core';
+import { loadGLTF } from 'margoengine/gltf-pro';
+import { Physics } from 'margoengine/physics';
 import { fitRagdollShapes } from 'margoengine/ragdoll/hulls';
-import type {PBRModel} from 'margoengine/gltf-pro';
-declare const model: PBRModel;
 
+await RAPIER.init();
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!);
+const physics = new Physics(engine, { rapier: RAPIER });
+physics.addBody(null, { type: 'fixed', colliders: { shape: 'box', halfExtents: [20, 0.1, 20] } });
+const model = await loadGLTF(engine, '/hero.glb');
+const bone = (name: string) => model.nodes.find((node) => node.name === name)!;
+const hips = bone('Hips');
 const ragdoll = Ragdoll.attach(physics, { root: hips });
 const fitted = fitRagdollShapes(ragdoll, model);
 console.log(`${fitted.length} of ${ragdoll.bones.length} bones fit the mesh`);
@@ -253,10 +284,19 @@ A profile is a ragdoll as plain JSON: bones by name, joints and limits, sizes, m
 
 ```ts
 import { Ragdoll } from 'margoengine/ragdoll';
+import RAPIER from '@dimforge/rapier3d-compat';
+import { EngineKernel } from 'margoengine/core';
+import { loadGLTF } from 'margoengine/gltf-pro';
+import { Physics } from 'margoengine/physics';
 import { humanoidProfile, ragdollOptions, saveRagdollProfile } from 'margoengine/ragdoll/profile';
-import type {PBRModel} from 'margoengine/gltf-pro';
-declare const model: PBRModel;
-declare const otherModel: PBRModel;
+
+await RAPIER.init();
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!);
+const physics = new Physics(engine, { rapier: RAPIER });
+physics.addBody(null, { type: 'fixed', colliders: { shape: 'box', halfExtents: [20, 0.1, 20] } });
+const model = await loadGLTF(engine, '/hero.glb');
+const otherModel = await loadGLTF(engine, '/guard.glb');
+const otherPhysics = new Physics(engine, { rapier: RAPIER });
 
 // Anatomical ranges, hinged knees and elbows, published mass shares.
 const ragdoll = Ragdoll.attach(physics, ragdollOptions(humanoidProfile(model.nodes, { mass: 82 }), model.nodes));
@@ -281,16 +321,24 @@ const again = Ragdoll.attach(otherPhysics, ragdollOptions(JSON.parse(saved), oth
 import { Ragdoll } from 'margoengine/ragdoll';
 import { addRagdollBalance } from 'margoengine/ragdoll/balance';
 import { addRagdollMotors } from 'margoengine/ragdoll/powered';
+import RAPIER from '@dimforge/rapier3d-compat';
+import { EngineKernel } from 'margoengine/core';
+import { loadGLTF } from 'margoengine/gltf-pro';
+import { Physics } from 'margoengine/physics';
 import { humanoidProfile, ragdollOptions } from 'margoengine/ragdoll/profile';
-import type {PBRModel} from 'margoengine/gltf-pro';
-declare const model: PBRModel;
 
+await RAPIER.init();
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!);
+const physics = new Physics(engine, { rapier: RAPIER });
+physics.addBody(null, { type: 'fixed', colliders: { shape: 'box', halfExtents: [20, 0.1, 20] } });
+const model = await loadGLTF(engine, '/hero.glb');
+const bone = (name: string) => model.nodes.find((node) => node.name === name)!;
 const ragdoll = Ragdoll.attach(physics, ragdollOptions(humanoidProfile(model.nodes), model.nodes));
 const motors = addRagdollMotors(ragdoll, { frequency: 8 });
-const balance = addRagdollBalance(ragdoll, motors, { feet: [leftFoot, rightFoot] });
+const balance = addRagdollBalance(ragdoll, motors, { feet: [bone('LeftFoot'), bone('RightFoot')] });
 ragdoll.activate();
 
-motors.hit(chest, [0, 0, -40]); // it stumbles, steps and catches itself
+motors.hit(bone('Spine'), [0, 0, -40]); // it stumbles, steps and catches itself
 if (balance.state === 'fallen') motors.fade(0, 0.5);
 ```
 

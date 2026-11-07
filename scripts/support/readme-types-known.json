@@ -1,16 +1,4 @@
 {
-  "ragdoll": {
-    "TS2304: Cannot find name 'chest'.": 1,
-    "TS2304: Cannot find name 'hand'.": 1,
-    "TS2304: Cannot find name 'head'.": 1,
-    "TS2304: Cannot find name 'hips'.": 3,
-    "TS2304: Cannot find name 'leftFoot'.": 1,
-    "TS2304: Cannot find name 'otherPhysics'.": 1,
-    "TS2304: Cannot find name 'physics'.": 5,
-    "TS2304: Cannot find name 'rightArm'.": 1,
-    "TS2304: Cannot find name 'rightFoot'.": 1,
-    "TS2304: Cannot find name 'spine'.": 1
-  },
   "rigging": {
     "TS2345: Argument of type 'Skeleton' is not assignable to parameter of type 'IKSkeleton'.": 1
   }
