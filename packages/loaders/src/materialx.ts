@@ -66,7 +66,7 @@ export interface MaterialXTextureRequest {
   file: string;
   /** The node's output type: `float`, `color3`, `vector3` and so on. */
   type: string;
-  /** `srgb_texture` means upload as sRGB. Absent means linear data. */
+  /** `srgb_texture` or `srgb_rec709_scene` means upload as sRGB. Absent means linear data. */
   colorspace?: string;
   /** The node's `uaddressmode`, `vaddressmode` and `filtertype` values, when set. */
   addressU?: string;
@@ -140,9 +140,13 @@ function parseValue(text: string, type: string): MaterialXInput['value'] {
     if (text !== 'true' && text !== 'false') throw new LoaderError(F, 'syntax', `bad boolean "${text}"`);
     return text === 'true';
   }
+  if (!Object.hasOwn(COUNTS, type)) return text;
   const count = COUNTS[type];
-  if (count === undefined) return text;
-  const values = text.split(',').map((part) => Number(part));
+  // The specification separates with commas, and real files also write `0.5 0.5`, which OpenUSD reads.
+  const values = text
+    .trim()
+    .split(/\s*,\s*|\s+/)
+    .map((part) => Number(part));
   if (values.length !== count || values.some((value) => !Number.isFinite(value)))
     throw new LoaderError(F, 'syntax', `bad ${type} "${text}"`);
   return values;
@@ -318,9 +322,9 @@ const IGNORED = new Set([
 
 /** The node material colour space of a constant: `linear`, `srgb`, or null for one that cannot be converted here. */
 function constantSpace(colorspace: string | undefined): 'linear' | 'srgb' | null {
-  if (colorspace === undefined || colorspace === '' || colorspace === 'lin_rec709' || colorspace === 'none')
+  if (colorspace === undefined || colorspace === '' || /^(?:lin_rec709(?:_scene)?|none|data)$/.test(colorspace))
     return 'linear';
-  return colorspace === 'srgb_texture' ? 'srgb' : null;
+  return colorspace === 'srgb_texture' || colorspace === 'srgb_rec709_scene' ? 'srgb' : null;
 }
 
 /** One conversion of one material: follows connections, shares nodes, and notes what it drops. */
@@ -534,7 +538,7 @@ async function convert(
 ): Promise<MaterialXConversion> {
   const { shader } = material;
   if (!shader) throw new LoaderError(F, 'syntax', `material ${material.name} has no surface shader`);
-  const map = SURFACES[shader.category];
+  const map = Object.hasOwn(SURFACES, shader.category) ? SURFACES[shader.category] : undefined;
   if (!map) throw new LoaderError(F, 'unsupported', `surface shader ${shader.category} is not converted`);
   const converter = new Converter(doc, options),
     [colorName, colorFallback] = map.color,

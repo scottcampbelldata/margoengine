@@ -345,3 +345,36 @@ test('what is not a usable document is refused with its code', () => {
   refuses(() => parseMaterialX(constant('color3', '1, 2')), 'syntax');
   refuses(() => parseMaterialX(doc('<material name="old"><shaderref name="s"/></material>')), 'unsupported');
 });
+
+test('vector values may be separated by spaces, as real files write them', () => {
+  const parsed = parseMaterialX(
+    doc(`<tiledimage name="T" type="color3">
+       <input name="realworldimagesize" type="vector2" value="0.5 0.5"/>
+       <input name="uvtiling" type="vector2" value=" 1.0, 2.0 "/>
+     </tiledimage>`),
+  );
+  assert.deepEqual(parsed.nodes.T.inputs.realworldimagesize.value, [0.5, 0.5]);
+  assert.deepEqual(parsed.nodes.T.inputs.uvtiling.value, [1, 2]);
+});
+
+test('a type or shader named after an Object member is simply unknown', async () => {
+  const parsed = parseMaterialX(
+    doc(`<constructor name="S" type="surfaceshader"><input name="x" type="constructor" value="1"/></constructor>
+     <surfacematerial name="M" type="material"><input name="surfaceshader" type="surfaceshader" nodename="S"/></surfacematerial>`),
+  );
+  assert.equal(parsed.nodes.S.inputs.x.value, '1');
+  await assert.rejects(parsed.toGraph('M'), (error) => error.name === 'LoaderError' && /constructor/.test(error.message));
+});
+
+test('the colour spaces of the specification that replaced the old names read the same', async () => {
+  const value = async (space) => {
+    const { emit, skipped } = await emitOf(
+      `<standard_surface name="S" type="surfaceshader"><input name="base_color" type="color3" value="0.5, 0.5, 0.5" colorspace="${space}"/></standard_surface>${material('S')}`,
+    );
+    assert.deepEqual(skipped, []);
+    return emit.color.value[0];
+  };
+  assert.equal(await value('srgb_rec709_scene'), await value('srgb_texture'));
+  assert.equal(await value('lin_rec709_scene'), await value('lin_rec709'));
+  assert.equal(await value('data'), await value('none'));
+});
