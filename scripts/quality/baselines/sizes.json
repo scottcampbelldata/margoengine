@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10365336,
+  "total": 10367092,
   "history": [
     {
       "date": "2026-10-24",
@@ -3392,6 +3392,12 @@
       "commit": "e19993afb",
       "reason": "new optional entry @margoengine/navmesh/hierarchy; tile edge runs keep their ends",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "727a36ac1",
+      "reason": "new optional entry @margoengine/navmesh/debug",
+      "grew": 2
     }
   ],
   "items": {
@@ -3799,6 +3805,7 @@
     "@margoengine/navmesh/agents": 15964,
     "@margoengine/navmesh/build": 12727,
     "@margoengine/navmesh/codec": 17103,
+    "@margoengine/navmesh/debug": 1755,
     "@margoengine/navmesh/hierarchy": 4250,
     "@margoengine/navmesh/links": 4288,
     "@margoengine/navmesh/tiles": 15113,
@@ -4121,6 +4128,7 @@
     "leak @margoengine/mesh-edit/bake -> @margoengine/bvh/tree": 1,
     "leak @margoengine/mesh-edit/remesh -> @margoengine/bvh/tree": 1,
     "leak @margoengine/mesh-edit/sculpt-view -> @margoengine/gltf-pro/model": 1,
+    "leak @margoengine/navmesh/debug -> @margoengine/lines": 1,
     "leak @margoengine/oit/meshes -> @margoengine/gltf-pro/model": 1,
     "leak @margoengine/oit/meshes -> @margoengine/materials": 1,
     "leak @margoengine/shader -> @margoengine/gltf-pro/model": 1,

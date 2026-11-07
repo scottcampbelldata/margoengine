@@ -1,5 +1,5 @@
 {
-  "commit": "e19993afb",
+  "commit": "fade1424e",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -1721,6 +1721,10 @@
         "raw": 10287,
         "gzip": 3994
       },
+      "./debug": {
+        "raw": 3215,
+        "gzip": 1499
+      },
       "./tiles": {
         "raw": 41023,
         "gzip": 14823
@@ -1828,8 +1832,8 @@
     },
     "@margoengine/points": {
       ".": {
-        "raw": 68863,
-        "gzip": 23256
+        "raw": 71422,
+        "gzip": 23939
       },
       "./las": {
         "raw": 40390,
@@ -1852,8 +1856,8 @@
         "gzip": 8997
       },
       "./surfels": {
-        "raw": 40568,
-        "gzip": 14418
+        "raw": 40907,
+        "gzip": 14590
       },
       "./potree": {
         "raw": 49603,
@@ -2294,8 +2298,8 @@
         "gzip": 18456
       },
       "./virtual": {
-        "raw": 45847,
-        "gzip": 15574
+        "raw": 46460,
+        "gzip": 15752
       },
       "./light-function": {
         "raw": 3643,
@@ -2984,7 +2988,7 @@
     "packages/shadows/dist/index.js": {
       "raw": 55970,
       "gzip": 18456,
-      "brotli": 16307
+      "brotli": 16301
     },
     "packages/xr/dist/index.js": {
       "raw": 19587,

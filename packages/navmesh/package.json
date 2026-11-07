@@ -1,7 +1,7 @@
 {
   "name": "@margoengine/navmesh",
   "version": "1.0.0",
-  "description": "Convex polygon navigation with A*, funnel paths and ORCA avoidance; navmesh generation from triangles (./build) tiled meshes that rebuild at run time (./tiles), baked files (./codec), jump links (./links) and long routes (./hierarchy).",
+  "description": "Convex polygon navigation with A*, funnel paths and ORCA avoidance; navmesh generation from triangles (./build) tiled meshes that rebuild at run time (./tiles), baked files (./codec), jump links (./links), long routes (./hierarchy) and debug draw (./debug).",
   "keywords": [
     "margoengine",
     "webgpu",
@@ -42,6 +42,10 @@
       "types": "./dist/hierarchy.d.ts",
       "import": "./dist/hierarchy.js"
     },
+    "./debug": {
+      "types": "./dist/debug.d.ts",
+      "import": "./dist/debug.js"
+    },
     "./tiles": {
       "types": "./dist/tiles.d.ts",
       "import": "./dist/tiles.js"
@@ -60,7 +64,13 @@
     "access": "public"
   },
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0"
+    "@margoengine/core": "^1.0.0",
+    "@margoengine/lines": "^1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@margoengine/lines": {
+      "optional": true
+    }
   },
   "dependencies": {
     "@margoengine/math": "^1.0.0"

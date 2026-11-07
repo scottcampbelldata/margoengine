@@ -2,7 +2,7 @@
 
 Import `margoengine/navmesh` from the `margoengine` package, or `@margoengine/navmesh` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
-Dependency-free navigation: A* chooses a polygon corridor, the funnel algorithm pulls it taut, reciprocal ORCA selects collision-avoiding agent velocities in XZ, a `Crowd` manager walks agents along routes with area costs, off-mesh links and obstacles, `@margoengine/navmesh/build` generates the walkable polygons from level triangles, `@margoengine/navmesh/tiles` cuts big worlds into tiles that rebuild at run time, `@margoengine/navmesh/codec` bakes meshes to bytes, `@margoengine/navmesh/links` finds the jumps a level allows, and `@margoengine/navmesh/hierarchy` keeps long routes cheap.
+Dependency-free navigation: A* chooses a polygon corridor, the funnel algorithm pulls it taut, reciprocal ORCA selects collision-avoiding agent velocities in XZ, a `Crowd` manager walks agents along routes with area costs, off-mesh links and obstacles, `@margoengine/navmesh/build` generates the walkable polygons from level triangles, `@margoengine/navmesh/tiles` cuts big worlds into tiles that rebuild at run time, `@margoengine/navmesh/codec` bakes meshes to bytes, `@margoengine/navmesh/links` finds the jumps a level allows, `@margoengine/navmesh/hierarchy` keeps long routes cheap, and `@margoengine/navmesh/debug` draws it all.
 
 ```ts
 import {NavMesh} from 'margoengine/navmesh';
@@ -248,6 +248,40 @@ console.log(hierarchy.update()); // clusters worked out again
 | `clusterTiles` | 4 | tiles along a cluster's side; more makes the coarse graph smaller and each query's two ends dearer |
 | `spacing` | a quarter of a cluster's side | world units between crossings on a wide entrance; smaller gives straighter routes and a bigger graph |
 | `filter` | none | cost per area number, as in `route`; make one hierarchy per agent type |
+
+## Debug draw (`./debug`)
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Lines} from 'margoengine/lines';
+import {Crowd} from 'margoengine/navmesh';
+import {buildNavMesh} from 'margoengine/navmesh/build';
+import {NavDebug, meshLines} from 'margoengine/navmesh/debug';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const lines = new Lines();
+engine.use(lines);
+
+const mesh = buildNavMesh([0, 0, 0, 20, 0, 0, 20, 0, 20, 0, 0, 20], [0, 2, 1, 0, 3, 2], {cs: 0.25, ch: 0.1});
+const crowd = new Crowd(mesh);
+crowd.addAgent({position: [2, 0, 2]}).setTarget([18, 0, 18]);
+
+const debug = new NavDebug(lines, mesh, {crowd});
+debug.showRoute(mesh.route([1, 0, 1], [19, 0, 19]));
+
+function frame() {
+  crowd.update(1 / 60);
+  debug.update(); // agents every frame, the mesh only when it changed
+  requestAnimationFrame(frame);
+}
+frame();
+
+// The same lines as plain data, for a test or your own renderer: no GPU needed.
+const {positions, colors} = meshLines(mesh);
+console.log(positions.length / 6, colors.length);
+```
+
+`NavDebug` draws a `NavMesh` or `TiledNavMesh`: shared edges, outlines (tile lines among them, so tiles show), and off-mesh links as arcs; a `crowd` adds a ring per agent coloured by state (idle grey, moving green, off-mesh amber, arrived blue, unreachable red), its velocity and the rest of its route. `showRoute(route)` shows one route, and `null` clears it. Options: `lift` (0.05 world units off the ground), `width` (1.5 CSS pixels) and `colors`, which takes `inner`, `outline`, `link`, `route` and `agents` by state as linear `[r, g, b]`. `meshLines`, `routeLines` and `crowdLines` return `{positions, colors}` as segment pairs: pass them to `new Line({mode: 'segments', positions, colors})`. `dispose` takes the lines away; `using` works.
 
 Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 
