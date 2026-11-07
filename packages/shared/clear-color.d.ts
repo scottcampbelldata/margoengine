@@ -1,5 +1,5 @@
 export declare const defaultClear: number[];
-/** A `#rrggbb` string as a 24-bit integer, or -1 for any other string. */
+/** A CSS `#rgb` or `#rrggbb` string as a 24-bit integer, or -1 for any other string, alpha forms included. */
 export declare function hexColor(color: string): number;
 export declare function clearColorValue(color: string | false | undefined): readonly number[];
 export declare function clearDraw(

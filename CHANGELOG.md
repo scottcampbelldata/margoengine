@@ -11,6 +11,10 @@
 - `body.colliders`, events and query hits now hand you a `PhysicsCollider`: `shape` replaces `shapeType()`, `valid` replaces `isValid()`, and the setters and getters keep their names. New shapes `voxels` and `halfSpace`, and the options `massless` and `fixInternalEdges`, cover what `custom` was needed for. `PhysicsBody` gains `centerOfMass`, `principalInertia`, `inertiaFrame` and `setMassProperties`, and `PhysicsJoint` gains `anchorA` and `anchorB`. The voxel, glTF and interactivity packages use these and no longer reach the solver's own objects.
 - `await Physics.load()` and `await Physics2D.load()` get the solver ready once per app, and `new Physics(engine)` then needs no options. The stage, React and `applyGLTFPhysics` load it by themselves, so their `rapier` options went, and the Rapier peer moved from `@margoengine/react` and `@margoengine/stage` to `@margoengine/physics` and `@margoengine/physics2d`, which keep it as an optional peer you install beside them. The `rapier` option of `Physics` still works.
 
+### Short hex colours in core
+
+- `PbrMaterial`, a scene's `clearColor` and a view's clear colour take CSS `#rgb` as well as `#rrggbb`: `'#555'` is `'#555555'`. They threw `Invalid Color` before. Alpha forms (`#rgba`, `#rrggbbaa`) are still refused, as core colours have no alpha.
+
 ### Frame counts
 
 - `engine.stats` now reads the frame last drawn. After `engine.render({ camera })` with another camera, `visible` and `drawCalls` used to read the engine camera's view and lose what packages drew, so an app passing its own camera every frame read counts for a view it never showed. A pick no longer changes either count.

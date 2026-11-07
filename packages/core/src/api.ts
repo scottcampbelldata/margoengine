@@ -53,7 +53,7 @@ export interface Mesh {
  */
 export interface Scene {
   readonly name: string;
-  /** Clear colour (`#rrggbb`) for views of this scene, or null to keep the colour below (overlays). A view's `clear` wins. */
+  /** Clear colour (`#rgb` or `#rrggbb`) for views of this scene, or null to keep the colour below (overlays). A view's `clear` wins. */
   background?: string | null;
   /**
    * This scene's sun and ambient light, as `engine.lighting`. Packed arrays, read every frame; set all four components:

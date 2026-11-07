@@ -1,10 +1,10 @@
 {
-  "commit": "db1ddbdf3",
+  "commit": "cded1a7ac",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
-    "raw": 57034,
-    "gzip": 22979,
+    "raw": 57071,
+    "gzip": 23013,
     "limit": 25000
   },
   "packages": {
@@ -508,12 +508,12 @@
     },
     "@margoengine/core": {
       ".": {
-        "raw": 53046,
-        "gzip": 21561
+        "raw": 53083,
+        "gzip": 21586
       },
       "./extension": {
-        "raw": 49893,
-        "gzip": 20653
+        "raw": 49930,
+        "gzip": 20678
       }
     },
     "@margoengine/creative": {
@@ -1426,12 +1426,12 @@
         "gzip": 6156
       },
       "./materialx": {
-        "raw": 13585,
-        "gzip": 4944
+        "raw": 13848,
+        "gzip": 5044
       },
       "./lottie": {
-        "raw": 17385,
-        "gzip": 7335
+        "raw": 18713,
+        "gzip": 7873
       },
       "./xml": {
         "raw": 2562,
@@ -1862,8 +1862,8 @@
     },
     "@margoengine/post": {
       ".": {
-        "raw": 142336,
-        "gzip": 39246
+        "raw": 142373,
+        "gzip": 39274
       },
       "./bloom": {
         "raw": 20092,
@@ -1890,16 +1890,16 @@
         "gzip": 4561
       },
       "./ssr": {
-        "raw": 33105,
-        "gzip": 11286
+        "raw": 33142,
+        "gzip": 11312
       },
       "./gtao": {
         "raw": 37809,
         "gzip": 11883
       },
       "./ssgi": {
-        "raw": 35240,
-        "gzip": 11826
+        "raw": 35277,
+        "gzip": 11851
       },
       "./motion-blur": {
         "raw": 22485,
@@ -2662,8 +2662,8 @@
         "gzip": 7649
       },
       "dist/workers/usdz.js": {
-        "raw": 335247,
-        "gzip": 112734
+        "raw": 335515,
+        "gzip": 112828
       }
     },
     "@margoengine/vfx": {
@@ -2878,20 +2878,20 @@
     },
     "@margoengine/webgl": {
       ".": {
-        "raw": 7911,
-        "gzip": 3410
+        "raw": 7948,
+        "gzip": 3442
       },
       "./pick": {
-        "raw": 11985,
-        "gzip": 4758
+        "raw": 12022,
+        "gzip": 4789
       },
       "./restore": {
         "raw": 1802,
         "gzip": 841
       },
       "./auto": {
-        "raw": 8541,
-        "gzip": 3691
+        "raw": 8578,
+        "gzip": 3718
       }
     },
     "@margoengine/webgl2-compat": {
@@ -3103,9 +3103,9 @@
       "brotli": 70925
     },
     "packages/usdz/dist/workers/usdz.js": {
-      "raw": 331608,
-      "gzip": 112426,
-      "brotli": 96697
+      "raw": 331876,
+      "gzip": 112522,
+      "brotli": 96900
     },
     "packages/loaders/dist/workers/usd.js": {
       "raw": 21482,

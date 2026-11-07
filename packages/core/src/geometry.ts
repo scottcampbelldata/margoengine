@@ -126,7 +126,7 @@ export class PbrMaterial {
     this.data.set([...rgb, 1, Math.max(0.045, roughness), metalness, +doubleSided]);
   }
 }
-/** `color`: '#rrggbb' (sRGB) or linear [r, g, b] in 0..1. */
+/** `color`: '#rgb' or '#rrggbb' (sRGB) or linear [r, g, b] in 0..1. */
 export interface PbrMaterialOptions {
   /** Base color. Default '#4f46e5'. */
   color?: string | readonly number[];

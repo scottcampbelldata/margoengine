@@ -95,7 +95,7 @@ export interface RenderView {
   /** Clip rectangle inside the viewport, same units. Default the viewport. */
   scissor?: readonly [number, number, number, number];
   /**
-   * `color`: a `#rrggbb` clear colour, or false to keep the colour below. `depth`: false keeps the depth. Default: the
+   * `color`: a `#rgb` or `#rrggbb` clear colour, or false to keep the colour below. `depth`: false keeps the depth. Default: the
    * first canvas view clears colour (the scene's `background`, else core's clear colour) and every view clears depth.
    */
   clear?: { color?: string | false; depth?: boolean };

@@ -26,7 +26,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/clustered | `.` 19, `./shadows` 4, `./area` 6, `./directional` 6, `./ies` 7, `./projector` 7, `./physical-lobes` 1, `./units` 12, `./flicker` 5, `./budget` 2 | 106 |  | 13,694 |
 | @margoengine/compute | `.` 36, `./linalg` 5, `./fft` 8, `./signal` 7, `./random` 5, `./autodiff` 3, `./sparse` 13, `./stream` 8, `./frame` 3, `./subgroups` 5, `./nn` 38, `./graph` 9, `./autotune` 9 | 422 | 26 | 39,061 |
 | @margoengine/controls | `.` 58, `./orbit` 8, `./fly` 2, `./trackball` 2, `./arcball` 10, `./transform` 7, `./drag` 4, `./profiles` 13, `./third-person` 5, `./walk` 6 | 98 |  | 27,266 |
-| @margoengine/core | `.` 17, `./extension` 26 | 19 |  | 21,561 |
+| @margoengine/core | `.` 17, `./extension` 26 | 18 |  | 21,586 |
 | @margoengine/creative | `.` 15, `./particles` 4, `./targets` 1, `./toon` 2, `./post` 3, `./grass` 2, `./planet` 2, `./stars` 1 | 3 |  | 19,126 |
 | @margoengine/culling | `.` 12, `./dynamic` 2, `./parts` 6, `./models` 6, `./shadows` 3, `./lod` 3, `./meshlets` 5 | 57 |  | 13,705 |
 | @margoengine/cutscene | `.` 48, `./shots` 9, `./render` 9, `./record` 11, `./lipsync` 13, `./vfx` 13, `./editor` 10 | 151 |  | 6,859 |

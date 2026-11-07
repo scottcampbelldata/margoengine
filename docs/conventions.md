@@ -135,6 +135,13 @@ canvas after every rebuild, in place of `GPURenderer`'s constructor doing it fir
 device, and every frame failed WebGPU's validation on a device that had been healthy. Cost: core 21,541 -> 21,561 B gzip, core + stage
 22,930 -> 22,948 B gzip. The core cap moved to 21,562 B on the same ruling, one over the measurement. It adds no feature.
 
+**Bug fix, CSS `#rgb` colours in core (Scott, 2026-11-07, "Change core"):** `hexColor` in `packages/shared/clear-color.js` reads
+`#rgb` as CSS does (each digit doubled), so `PbrMaterial`, a scene's `clearColor` and a view's clear colour take `'#555'` as `'#555555'`.
+The colour convention (`ColorInput` above) promises `#rgb`; core only passed six digits. Alpha forms stay refused: core colours have no
+alpha. No package can hold it: core bundles the shared parser, and `PbrMaterial` and the clear colour run inside core. Failure prevented:
+a valid CSS colour threw `Invalid Color`. Cost: core 21,561 -> 21,586 B gzip, core + stage 22,979 -> 23,013 B gzip. The core cap moved
+to 21,587 B on the 2026-11-07 ruling, one over the measurement. It adds no feature.
+
 ## Names exported by more than one package
 
 A name declared and exported by two packages must mean the same thing, or be renamed. Decisions:

@@ -1018,7 +1018,7 @@ count phrases against `docs/catalog.json`. It does not validate every size, timi
 cite generated records and retain evidence status. An older WebGL preview-size inconsistency demonstrates why this
 scope matters. So does the audit of 2026-11-06: the 44 B of `Engine.renderTarget` reached `README.md`, `site/index.html` and
 `docs/limits.md`, while 11 other files kept 22,815 B or older, `claims.md` among them, and a replace of the current figure had
-rewritten the dated 22,189 B of the 2026-10-30 cleanup in `docs/limits.md`. Core alone read 21,134 B there; it is 21,561 B.
+rewritten the dated 22,189 B of the 2026-10-30 cleanup in `docs/limits.md`. Core alone read 21,134 B there; it is 21,586 B.
 
 The benchmarking protocol uses AC power, a shared GPU-resource lock, a whole-machine idle gate, warmup, repeated
 measurements, between-case load checks, fixed browser/canvas conditions, and a spread validity limit. Defaults at the

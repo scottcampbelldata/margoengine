@@ -1,8 +1,12 @@
 // One internal clear-color contract for the renderer and optional target owners.
 export const defaultClear = [0.018, 0.023, 0.035, 1];
 
-/** A `#rrggbb` string as a 24-bit integer, or -1 for any other string. */
-export const hexColor = (color) => (/^#[0-9a-f]{6}$/i.test(color) ? parseInt(color.slice(1), 16) : -1);
+/**
+ * A CSS `#rgb` or `#rrggbb` string as a 24-bit integer, or -1 for any other string. `#rgb` doubles each digit, as CSS
+ * does (`#555` is `#555555`). Alpha forms (`#rgba`, `#rrggbbaa`) are refused: core colours have no alpha.
+ */
+export const hexColor = (color) =>
+  /^#([\da-f]{3}){1,2}$/i.test(color) ? parseInt((color[4] ? color : color.replace(/\w/g, '$&$&')).slice(1), 16) : -1;
 
 export function clearColorValue(color) {
   if (typeof color !== 'string') return defaultClear;

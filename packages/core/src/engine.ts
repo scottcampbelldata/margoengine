@@ -311,7 +311,7 @@ export class Mesh {
 export class Scene {
   /** `dispose()`, for `using` (set at the end of this file where the runtime has `Symbol.dispose`). */
   declare [Symbol.dispose]: () => void;
-  /** Clear colour (`#rrggbb`) for views of this scene, or null to keep the colour below (overlays). A view's `clear` wins. Default: core's clear colour. */
+  /** Clear colour (`#rgb` or `#rrggbb`) for views of this scene, or null to keep the colour below (overlays). A view's `clear` wins. Default: core's clear colour. */
   background?: string | null;
   readonly frameGraph = new FrameGraph();
   readonly plugins: ReadonlyMap<string, EnginePlugin> = new Map();
