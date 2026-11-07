@@ -349,3 +349,31 @@ test('MomentOIT refuses a depth range it cannot warp', () => {
   for (const depthRange of [[0, 1], [2, 1], [1, 1], [-1, 2], [1, Number.POSITIVE_INFINITY]])
     assert.throws(() => new MomentOIT({ depthRange }), RangeError);
 });
+
+test('OIT blending: transmission joins the pass as a tint draw and a lit draw, three targets, and the composite dims then lights', async () => {
+  const { engine, model, frame } = await scene(4),
+    oit = OIT.attach(engine, { blending: true });
+  oit.add(model);
+  const log = frame(0),
+    list = passes(log);
+  assert.equal(list.length, 3, 'the opaque pass, then accumulate and composite: no pass for the glass alone');
+  assert.equal(list[1].colorAttachments.length, 3);
+  assert.deepEqual(list[1].colorAttachments[1].clearValue, [1, 1, 1, 1]);
+  assert.equal(draws(log), 5, 'opaque, two BLEND primitives, and the glass twice');
+  const entries = of(log, 'renderPipeline').map((e) => e[2].fragment.entryPoint);
+  assert.ok(entries.includes('margoTint'));
+  assert.deepEqual(entries.filter((e) => e === 'dim' || e === 'light').sort(), ['dim', 'light']);
+  assert.equal(of(log, 'pass.draw').length, 2);
+  oit.dispose();
+});
+
+test('OIT without blending keeps two targets and leaves transmission sorted', async () => {
+  const { engine, model, frame } = await scene(4),
+    oit = OIT.attach(engine);
+  assert.equal(oit.blends, false);
+  oit.add(model);
+  const list = passes(frame(0));
+  assert.equal(list.length, 4);
+  assert.equal(list[2].colorAttachments.length, 2);
+  oit.dispose();
+});

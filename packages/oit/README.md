@@ -47,6 +47,43 @@ restore();                     // back to the opaque mesh, the same frame as bef
 The geometry and material are copied once, so a later `setMaterial` or `setGeometry` needs a new `addMesh`. While
 see-through `mesh.geometry` is null: the mesh casts no shadow and `engine.pick` does not see it, as for every transparent surface.
 
+## Tints, glows and glass (`blending`)
+
+`OIT.attach(engine, {blending: true})` brings the surfaces that otherwise stay sorted into the pass: `additive` and
+`multiply` materials, and native transmission (`KHR_materials_transmission` tints, with no
+`@margoengine/materials/transmission` attached, which keeps its own draws).
+
+```ts
+import {Engine} from 'margoengine/core';
+import {OIT} from 'margoengine/oit';
+import {Material, createMesh} from 'margoengine/materials';
+import {boxGeometry} from 'margoengine/geometry';
+const engine = await Engine.create(document.querySelector('canvas')!);
+
+const oit = OIT.attach(engine, {blending: true});
+oit.add(createMesh(engine, boxGeometry(1, 1, 1), new Material({color: '#ff8040', opacity: 0.5, transparent: true, blending: 'additive'})));
+oit.add(createMesh(engine, boxGeometry(2, 2, 2), new Material({color: '#c0e0d0', transmission: 0.9, roughness: 0.2})));
+```
+
+The result is `background x dimming + average colour x coverage + light`, whatever the order: a third `rgba16float`
+target sums light (additive materials, the lit draw of glass), the revealage target turns `rgba16float` and multiplies
+per channel (normal layers by `1 - alpha`, `multiply` materials by their colour, glass by its tint), and its alpha keeps
+the coverage of normal layers alone. The composite is two draws, one multiplying and one adding, because a per-channel
+factor and a sum need two blends.
+
+Measured on an RTX A6000 (`npm run test:gpu --workspace packages/oit`), at 1x and 4x MSAA: each kind alone, glass with
+maps and volume attenuation included, draws the same 8-bit pixel as the sorted path, and additive over multiply equals
+multiply over additive equals the formula. Time is not measured yet.
+
+Limits:
+
+- Sorted blending treats these in depth order: glass in front of a glow dims it. Here dimming applies to the background
+  only, so light and coloured layers are not dimmed by tints in front of them. That is the price of taking order out.
+- Only this pass takes them. `ExactOIT` and `MomentOIT` leave these surfaces on the sorted path.
+- `blending: 'none'`, other blends and any further render state (`depthWrite`, `depthTest`, stencil, polygon offset)
+  stay on the sorted path.
+- Cost: 16 more bytes per pixel, 64 more under 4x MSAA, and one more full-screen draw.
+
 ## Exact layers (`ExactOIT`)
 
 `margoengine/oit/exact` stores every transparent fragment in a per-pixel list, keeps the nearest `layers` of each pixel
@@ -97,7 +134,7 @@ Limits:
 - Colour is held in half floats: at most 65,504, 11 bits of precision.
 - It needs storage buffers in fragment shaders, so WebGPU only, and not compatibility mode: `setup` throws
   `'unsupported'` there; use `OIT`.
-- Transmission, custom blending and depth overrides keep the sorted path, as for `OIT`.
+- Transmission, custom blending and depth overrides keep the sorted path: `blending` is an `OIT` option only.
 
 ## Moments (`MomentOIT`)
 
@@ -151,7 +188,7 @@ Limits:
   gave 16 where a close one gave 6.5 with a bias of 5e-4. `depthRange` sets it by hand.
 - Every model draws twice, and the second draw reads two more textures, which lowers the 16-texture budget of a material
   to 14. Memory: 18 bytes per pixel, plus 72 under 4x MSAA.
-- Transmission, custom blending and depth overrides keep the sorted path, as for `OIT`.
+- Transmission, custom blending and depth overrides keep the sorted path: `blending` is an `OIT` option only.
 
 ## Hashed alpha
 
@@ -218,9 +255,10 @@ CPU at 45-100 %):
 - Outside about 0.46 to 3.2 × `depthScale` the weight is clamped: nearer or farther layers lose depth ordering among
   themselves (they still blend order-independently). Very bright HDR colours (above ~60 in linear units) can overflow
   the `rgba16float` accumulation when stacked.
-- Transmission (KHR_materials_transmission tints) and materials with custom blending (`additive`, `multiply`, `none`)
-  or depth overrides (`depthWrite`, `depthTest: false`) keep the sorted path. Transparent instances (`PBRInstances`)
-  go through OIT like other primitives.
+- By default transmission (KHR_materials_transmission tints) and materials with custom blending (`additive`,
+  `multiply`, `none`) keep the sorted path; [`blending`](#tints-glows-and-glass-blending) brings all but `none` in.
+  Depth overrides (`depthWrite`, `depthTest: false`) always keep it. Transparent instances (`PBRInstances`) go through
+  OIT like other primitives.
 - Transparent surfaces write no depth, as before: SSAO, DOF and picking see the opaque scene only; TAA has no motion
   vectors for them.
 - Cost: two 1x targets (10 bytes per pixel) plus 4x copies (40 bytes per pixel) under MSAA, and one full-screen

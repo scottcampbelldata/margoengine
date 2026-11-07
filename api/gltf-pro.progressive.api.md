@@ -1095,6 +1095,7 @@ interface PBRTransmission {
 interface PBRTransparency {
     declarations(group: number): string;
     bindings(): GPUBindGroupEntry[];
+    readonly blends?: boolean;
     readonly targets: readonly GPUColorTargetState[];
     begin(): GPURenderPassEncoder;
 }

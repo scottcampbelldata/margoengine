@@ -18,6 +18,11 @@ export interface OITOptions {
   order?: number;
   /** World distance the depth weight is centred on (where a nearer layer starts to dominate). Default: the camera's distance to its target, every frame. */
   depthScale?: number;
+  /**
+   * Also takes additive and multiply materials and native transmission (a transmission hook keeps its own), so tints and
+   * glows blend in any order. Costs one more `rgba16float` target and a second composite draw. Default false.
+   */
+  blending?: boolean;
 }
 
 // Group-2 binding, clear of shadows (1-3), clustered (10-16), IBL/fog (20-25), materials (32-43) and shader nodes.
@@ -33,6 +38,26 @@ fn margoTransparent(color:vec4f,i:Out)->MargoTransparent {
   o.accum=vec4f(color.rgb*w,w); o.reveal=vec4f(a); return o;
 }
 `;
+// `blending`: what each kind of surface leaves. Light adds in `added`, the background multiplies by `reveal.rgb`, and
+// `reveal.a` keeps the coverage of normal layers alone, which scales their average colour.
+const blended = (group: number) => /* wgsl */ `
+override margoKind:u32=0u;
+struct MargoTransparent {@location(0) accum:vec4f, @location(1) reveal:vec4f, @location(2) added:vec4f}
+@group(${group}) @binding(${BINDING}) var<uniform> margoOIT:vec4f;
+fn margoTransparentTint(share:vec4f)->MargoTransparent {
+  var o:MargoTransparent; o.reveal=vec4f(share.rgb,1.0); return o;
+}
+fn margoTransparent(color:vec4f,i:Out)->MargoTransparent {
+  let a=clamp(color.a,0.0,1.0); var o:MargoTransparent; o.reveal=vec4f(1.0);
+  if(margoKind==0u){
+    let d=max(-(f.view*vec4f(i.position,1)).z*margoOIT.x,1e-4);
+    let w=a*clamp(10.0/pow(d,6.0),0.01,1000.0); o.accum=vec4f(color.rgb*w,w); o.reveal=vec4f(1.0-a);
+  } else if(margoKind==1u){o.added=vec4f(color.rgb*a,a);}
+  else if(margoKind==2u){o.reveal=vec4f(color.rgb,1.0);}
+  else {o.added=vec4f(color.rgb,a);}
+  return o;
+}
+`;
 // Over the opaque result: average colour accum.rgb/accum.a at coverage 1 - revealage (premultiplied over, so a
 // TransparentCanvas keeps valid alpha). Untouched pixels have revealage 1 and blend nothing.
 const composite = /* wgsl */ `
@@ -44,6 +69,26 @@ const composite = /* wgsl */ `
 }
 `;
 
+// `blending`: dst * reveal, then + light, as two draws: a colour factor per channel and a sum need two blends.
+const compositeBlended = /* wgsl */ `
+@group(0) @binding(0) var accumMap:texture_2d<f32>;
+@group(0) @binding(1) var revealMap:texture_2d<f32>;
+@group(0) @binding(2) var addedMap:texture_2d<f32>;
+@vertex fn vertex(@builtin(vertex_index) i:u32)->@builtin(position) vec4f {return vec4f(f32(i&1u)*4-1,f32(i>>1u)*4-1,0,1);}
+@fragment fn dim(@builtin(position) p:vec4f)->@location(0) vec4f {return textureLoad(revealMap,vec2i(p.xy),0);}
+@fragment fn light(@builtin(position) p:vec4f)->@location(0) vec4f {
+  let q=vec2i(p.xy); let a=textureLoad(accumMap,q,0); let r=textureLoad(revealMap,q,0).a; let l=textureLoad(addedMap,q,0);
+  return vec4f(a.rgb/max(a.a,1e-5)*(1-r)+l.rgb,1-r+l.a);
+}
+`;
+const add: GPUBlendState = {
+  color: { srcFactor: 'one', dstFactor: 'one' },
+  alpha: { srcFactor: 'one', dstFactor: 'one' },
+};
+const dim: GPUBlendState = {
+  color: { srcFactor: 'zero', dstFactor: 'src' },
+  alpha: { srcFactor: 'zero', dstFactor: 'src' },
+};
 const over: GPUBlendState = {
   color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha' },
   alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' },
@@ -59,19 +104,8 @@ const over: GPUBlendState = {
  * `attach`.
  */
 export class OIT extends TransparentPass {
-  readonly targets: readonly GPUColorTargetState[] = [
-    {
-      format: 'rgba16float',
-      blend: { color: { srcFactor: 'one', dstFactor: 'one' }, alpha: { srcFactor: 'one', dstFactor: 'one' } },
-    },
-    {
-      format: 'r16float',
-      blend: {
-        color: { srcFactor: 'zero', dstFactor: 'one-minus-src' },
-        alpha: { srcFactor: 'zero', dstFactor: 'one-minus-src' },
-      },
-    },
-  ];
+  readonly targets: readonly GPUColorTargetState[];
+  readonly blends: boolean;
   private readonly depthScale?: number;
   private readonly code = new Map<number, string>();
   private readonly values = new Float32Array(4);
@@ -82,6 +116,7 @@ export class OIT extends TransparentPass {
   private views: GPUTextureView[] = [];
   private size = '';
   private readonly pipelines = new Map<string, GPURenderPipeline>();
+  private readonly blendedPipelines = new Map<string, GPURenderPipeline[]>();
   private readonly groups = new Map<GPURenderPipeline, GPUBindGroup>();
 
   static attach(engine: EngineKernel, options?: OITOptions): OIT {
@@ -89,11 +124,28 @@ export class OIT extends TransparentPass {
     engineRuntime(engine).use(value);
     return value;
   }
-  constructor({ order = 8, depthScale }: OITOptions = {}) {
+  constructor({ order = 8, depthScale, blending = false }: OITOptions = {}) {
     if (depthScale !== undefined && !(depthScale > 0 && Number.isFinite(depthScale)))
       throw new RangeError('OIT order must be > 0 and depthScale a positive number');
     super(order);
     this.depthScale = depthScale;
+    this.blends = !!blending;
+    this.targets = blending
+      ? [
+          { format: 'rgba16float', blend: add },
+          { format: 'rgba16float', blend: dim },
+          { format: 'rgba16float', blend: add },
+        ]
+      : [
+          { format: 'rgba16float', blend: add },
+          {
+            format: 'r16float',
+            blend: {
+              color: { srcFactor: 'zero', dstFactor: 'one-minus-src' },
+              alpha: { srcFactor: 'zero', dstFactor: 'one-minus-src' },
+            },
+          },
+        ];
   }
   override setup(engine: Engine): void {
     super.setup(engine);
@@ -101,7 +153,7 @@ export class OIT extends TransparentPass {
   }
   /** @internal gltf-pro transparency hook. */
   declarations(group: number): string {
-    return groupCode(this.code, group, declarations);
+    return groupCode(this.code, group, this.blends ? blended : declarations);
   }
   /** @internal gltf-pro transparency hook. */
   bindings(): GPUBindGroupEntry[] {
@@ -111,26 +163,18 @@ export class OIT extends TransparentPass {
   begin(): GPURenderPassEncoder {
     if (this.pass) return this.pass;
     const c = this.context!,
-      msaa = this.views.length > 2,
+      count = this.targets.length,
+      msaa = this.views.length > count,
       v = this.views;
     const pass = (this.pass = c.encoder.beginRenderPass({
       label: 'oit:accumulate',
-      colorAttachments: [
-        {
-          view: msaa ? v[2] : v[0],
-          resolveTarget: msaa ? v[0] : undefined,
-          clearValue: [0, 0, 0, 0],
-          loadOp: 'clear',
-          storeOp: msaa ? 'discard' : 'store',
-        },
-        {
-          view: msaa ? v[3] : v[1],
-          resolveTarget: msaa ? v[1] : undefined,
-          clearValue: [1, 0, 0, 0],
-          loadOp: 'clear',
-          storeOp: msaa ? 'discard' : 'store',
-        },
-      ],
+      colorAttachments: this.targets.map((_, k) => ({
+        view: msaa ? v[k + count] : v[k],
+        resolveTarget: msaa ? v[k] : undefined,
+        clearValue: k !== 1 ? [0, 0, 0, 0] : this.blends ? [1, 1, 1, 1] : [1, 0, 0, 0],
+        loadOp: 'clear',
+        storeOp: msaa ? 'discard' : 'store',
+      })),
       depthStencilAttachment: { view: c.depth, depthReadOnly: true, stencilReadOnly: true },
     }));
     applyView(pass, c);
@@ -147,8 +191,10 @@ export class OIT extends TransparentPass {
       this.release();
       this.size = size;
       // Resolved (sampled by the composite) targets first, then their multisampled draw targets.
-      for (const count of samples > 1 ? [1, 1, samples, samples] : [1, 1]) {
-        const format = this.targets[this.textures.length % 2].format;
+      const kept = this.targets.length;
+      for (let k = 0; k < (samples > 1 ? kept * 2 : kept); k++) {
+        const format = this.targets[k % kept].format,
+          count = k < kept ? 1 : samples;
         const texture = device.createTexture({
           label: 'oit:' + format,
           size: [c.width, c.height],
@@ -169,6 +215,7 @@ export class OIT extends TransparentPass {
     } finally {
       this.binding = undefined;
     }
+    if (this.blends) return this.compositeBlended(c, samples);
     const key = c.format + samples;
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
@@ -206,6 +253,54 @@ export class OIT extends TransparentPass {
     out.draw(3);
     out.end();
   }
+  private compositeBlended(c: Context, samples: number): void {
+    const device = c.device,
+      key = c.format + samples;
+    let pair = this.blendedPipelines.get(key);
+    if (!pair) {
+      const module = device.createShaderModule({ code: compositeBlended }),
+        layout = device.createPipelineLayout({
+          bindGroupLayouts: [
+            device.createBindGroupLayout({
+              entries: [0, 1, 2].map((binding) => ({
+                binding,
+                visibility: 2,
+                texture: { sampleType: 'unfilterable-float' },
+              })),
+            }),
+          ],
+        });
+      const make = (entryPoint: string, blend: GPUBlendState) =>
+        device.createRenderPipeline({
+          label: 'oit:composite',
+          layout,
+          vertex: { module, entryPoint: 'vertex' },
+          fragment: { module, entryPoint, targets: [{ format: c.format, blend }] },
+          multisample: { count: samples },
+        });
+      this.blendedPipelines.set(key, (pair = [make('dim', dim), make('light', add)]));
+    }
+    let group = this.groups.get(pair[0]);
+    if (!group)
+      this.groups.set(
+        pair[0],
+        (group = device.createBindGroup({
+          layout: pair[0].getBindGroupLayout(0),
+          entries: [0, 1, 2].map((binding) => ({ binding, resource: this.views[binding] })),
+        })),
+      );
+    const out = c.encoder.beginRenderPass({
+      label: 'oit:composite',
+      colorAttachments: [{ view: c.color, loadOp: 'load', storeOp: 'store' }],
+    });
+    applyView(out, c);
+    out.setBindGroup(0, group);
+    for (const pipeline of pair) {
+      out.setPipeline(pipeline);
+      out.draw(3);
+    }
+    out.end();
+  }
   protected release(): void {
     for (const t of this.textures) retire(this.device!, t);
     this.textures = [];
@@ -216,6 +311,7 @@ export class OIT extends TransparentPass {
   protected freeDevice(): void {
     this.release();
     this.pipelines.clear();
+    this.blendedPipelines.clear();
     retire(this.device!, this.uniform);
     this.uniform = undefined;
   }

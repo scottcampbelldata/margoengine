@@ -542,7 +542,8 @@ Explicit XR, probe and other offscreen renderers must provide their own stencil 
 
 These controls affect beauty draws. G-buffer, ambient, occlusion/capture replays, picking and shadows retain their
 existing behavior and do not reproduce stencil masks or polygon bias. Custom state uses the sorted beauty path,
-including native transmission's two-pass tint fallback, instead of OIT or screen-space transmission hooks. The tint
+including native transmission's two-pass tint fallback, instead of OIT or screen-space transmission hooks; `OIT` with
+`blending` takes a state that holds an additive or multiply blend and nothing else. The tint
 tests stencil without writing; the lit draw performs each operation once. Exporters retain underlying materials and
 geometry because glTF has no corresponding stencil or polygon-offset state.
 

@@ -9,8 +9,9 @@ import { PBRModel, PBRTransparency } from "@margoengine/gltf-pro";
 
 export class OIT extends TransparentPass {
     readonly targets: readonly GPUColorTargetState[];
+    readonly blends: boolean;
     static attach(engine: EngineKernel, options?: OITOptions): OIT;
-    constructor({ order, depthScale }?: OITOptions);
+    constructor({ order, depthScale, blending }?: OITOptions);
     setup(engine: Engine): void;
     declarations(group: number): string;
     bindings(): GPUBindGroupEntry[];
@@ -23,6 +24,7 @@ export class OIT extends TransparentPass {
 export interface OITOptions {
     order?: number;
     depthScale?: number;
+    blending?: boolean;
 }
 
 // Not exported from this entry, but used by the exports above:

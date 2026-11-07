@@ -228,12 +228,21 @@ export interface PBRLighting {
  * written. Their fragment returns `margoTransparent(color, i)` instead of `color` (the beauty colour, alpha included).
  * `targets` may be empty for a hook that writes storage: `MargoTransparent` then still needs one member. Declarations
  * holding `var<private> margoCoverage:u32` get the fragment's sample coverage in it before the call.
+ * With `blends` the hook also takes additive and multiply materials and native transmission (see `blends`).
  */
 export interface PBRTransparency {
   /** Module-scope WGSL: `struct MargoTransparent` (one output per target), `fn margoTransparent(color:vec4f,i:Out)->MargoTransparent`, its bindings in `group`. Return the same string on steady frames. */
   declarations(group: number): string;
   /** Group-2 entries for those bindings (after any lighting effects' entries). */
   bindings(): GPUBindGroupEntry[];
+  /**
+   * True: BLEND materials whose `renderState` holds nothing but an additive (`src-alpha`, `one`) or multiply (`zero`,
+   * `src`) colour blend, and native transmission when no transmission hook is set, draw here too. Declarations then hold
+   * `override margoKind:u32`, set per pipeline: 0 normal, 1 additive, 2 multiply, 3 the lit draw of a transmissive surface.
+   * Its tint draw runs first, entry `margoTint`, through `fn margoTransparentTint(share:vec4f)->MargoTransparent`, which
+   * may use no bindings: a tint with no maps binds only the frame group.
+   */
+  readonly blends?: boolean;
   /** Colour targets of the transparent pass, in `MargoTransparent` location order. */
   readonly targets: readonly GPUColorTargetState[];
   /** This frame's transparent pass: the scene depth read-only and these targets; begun on the first draw, ended by the owner. */
@@ -287,6 +296,17 @@ export function transparentPBR(code: string, declarations: string): string {
   if (cache.size >= 64) cache.clear();
   cache.set(code, out);
   return out;
+}
+/** `code` (`transparentPBR`, tint variants applied) with the transmission tint draw returning `margoTransparentTint`. */
+export function transparentTintPBR(code: string): string {
+  const faced = /@fragment fn margoTint\(i:Out,@builtin\(front_facing\) front:bool\)/.test(code);
+  return (
+    code.replace(
+      /@fragment fn margoTint\(i:Out(?:,@builtin\(front_facing\) front:bool)?\)->@location\(0\) vec4f \{/,
+      `fn margoTintShade(i:Out${faced ? ',front:bool' : ''})->vec4f {`,
+    ) +
+    `\n@fragment fn margoTint(i:Out${faced ? ',@builtin(front_facing) front:bool' : ''})->MargoTransparent {return margoTransparentTint(margoTintShade(i${faced ? ',front' : ''}));}\n`
+  );
 }
 /**
  * Material capture hook (contract version 1, README "Capture hook"), set with `PBRModel.setCapture`; screen-space

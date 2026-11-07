@@ -77,6 +77,7 @@ import {
   factorPhysicalShader,
   transmissiveShader,
   transparentPBR,
+  transparentTintPBR,
   capturePBR,
   transmissionPBR,
   texturedTintPBR,
@@ -247,6 +248,21 @@ const ownSlot = (m: PBRMaterial, i: number, x?: GLTFExtendedMaterials) => {
 };
 // What a transparency hook takes over: plain alpha blending (transmission tints and custom render state keep the sorted path).
 const separable = (m: PBRMaterial) => m.settings[0] === 2 && !m.tint && !m.renderState,
+  blendKinds = new WeakMap<PBRRenderState, number>(),
+  /** A hook with `blends`: 1 additive, 2 multiply, 3 native transmission; 0 for what stays on the sorted path. */
+  blendKind = (m: PBRMaterial): number => {
+    const s = m.renderState;
+    if (m.tint) return !s && !m.extension?.replacesPhysical ? 3 : 0;
+    if (m.settings[0] !== 2 || !s?.blend) return 0;
+    let kind = blendKinds.get(s);
+    if (kind === undefined) {
+      const { srcFactor, dstFactor } = s.blend.color,
+        alone = Object.entries(s).every(([name, value]) => name === 'blend' || value === undefined);
+      kind = !alone ? 0 : srcFactor === 'src-alpha' && dstFactor === 'one' ? 1 : srcFactor === 'zero' && dstFactor === 'src' ? 2 : 0;
+      blendKinds.set(s, kind);
+    }
+    return kind;
+  },
   transmits = (m: PBRMaterial) => !!m.tint && !m.renderState && !m.extension?.replacesPhysical,
   /** A loaded material's tint draw reads the surface; a shading hook's material has its own tint. */
   surfaceTint = (m: PBRMaterial) => !!m.attenuation && !m.shading;
@@ -2949,7 +2965,7 @@ export class PBRModel implements EnginePlugin {
       const p = r.primitive,
         m = p.material;
       if (p.topology || r.batch || r.mergedInto) continue;
-      if ((this.transparency && separable(m)) || (this.transmission && transmits(m))) continue;
+      if (this.takesTransparent(m) || (this.transmission && transmits(m))) continue;
       if (!p.instances && !p.deformed && !m.shading?.replacesTextures && !m.maps.some(Boolean)) continue;
       p.node.check();
       const a = p.node.matrix,
@@ -3020,6 +3036,11 @@ export class PBRModel implements EnginePlugin {
       this.lighting.delete(effect);
       this.lightingList = this.lighting.size ? [...this.lighting] : noLighting;
     };
+  }
+  /** Whether this material draws in the transparency hook's pass. */
+  private takesTransparent(m: PBRMaterial): boolean {
+    const hook = this.transparency;
+    return !!hook && (separable(m) || (!!hook.blends && !(m.tint && this.transmission) && blendKind(m) > 0));
   }
   /** Hands this model's BLEND primitives to a transparency hook (README "Transparency hook"); returns a remover that restores sorted blending. */
   setTransparency(hook: PBRTransparency): () => void {
@@ -3434,10 +3455,10 @@ export class PBRModel implements EnginePlugin {
           p.topology
             ? mode !== 'beauty'
             : through
-              ? deferred || !(transmission ? transmits(m) : separable(m))
+              ? deferred || !(transmission ? transmits(m) : this.takesTransparent(m))
               : capture
                 ? deferred || blended(m) || m.ext![0]
-                : mode === 'beauty' && !deferred && ((oit && separable(m)) || (!!this.transmission && transmits(m)))
+                : mode === 'beauty' && !deferred && (this.takesTransparent(m) || (!!this.transmission && transmits(m)))
         )
           continue;
         if (phase !== 'all' && (blended(m) || deferred) !== (phase === 'blend')) continue;
@@ -3750,7 +3771,7 @@ export class PBRModel implements EnginePlugin {
       node = p.node;
     if (r.batch || r.mergedInto || p.instances || p.topology || primitiveAfterOpaque(p)) return false;
     const oit = this.transparency;
-    if ((oit && separable(m)) || (this.transmission && transmits(m))) return false;
+    if (this.takesTransparent(m) || (this.transmission && transmits(m))) return false;
     if (phase !== 'all' && blended(m) !== (phase === 'blend')) return false;
     // The run's view block holds the camera, lights and target only while they are unchanged; nothing but a full
     // draw (its callbacks) can change them during a run, so one check serves the draws until the next full draw.
@@ -4527,6 +4548,7 @@ export class PBRModel implements EnginePlugin {
     if (side === 'back' && !topology) code = backSideShader(code);
     if (m.shading?.texturedTint) code = texturedTintPBR(code);
     else if (surfaceTint(m)) code = surfaceTintPBR(code);
+    if (through && !transmission && this.transparency!.blends && m.tint) code = transparentTintPBR(code);
     if (mode === 'occlusion') {
       const rewritten = occlusionShader(code);
       // An appended occlusion fragment builds the plain surface: give it the extension's edits and bindings too.
@@ -4571,7 +4593,9 @@ export class PBRModel implements EnginePlugin {
     }
     const transmit = !compact && !!m.tint,
       blend = m.settings[0] === 2 || transmit,
-      tinted = transmit && (mode === 'beauty' || mode === 'ambient') && state?.blend === undefined,
+      kind = through && !transmission && this.transparency!.blends ? blendKind(m) : 0,
+      tinted =
+        transmit && (mode === 'beauty' || mode === 'ambient' || (kind === 3 && !compact)) && state?.blend === undefined,
       stateKey = renderStateKey(state) + (external?.depthCompare ?? '') + (extension ? ':extension' : ''),
       samples = c.descriptor.multisample?.count,
       depthFormat = c.descriptor.depthStencil!.format;
@@ -4598,7 +4622,7 @@ export class PBRModel implements EnginePlugin {
       (inst ? ':i' + face + ':' + objectId(inst.layout) : '') +
       (topology ? ':' + topology : '') +
       (laterUV ? ':uv' : '') +
-      (through || capture ? ':o' + objectId((through ? oit! : hook!).targets) : '') +
+      (through || capture ? ':o' + objectId((through ? oit! : hook!).targets) + ':' + kind : '') +
       (tinted && (shading?.texturedTint || surfaceTint(m)) ? ':t' : '');
     let pipeline = draws.pipelines.get(key);
     // A draw that may join an instanced batch derives without building its own pipeline or calling the lighting
@@ -4631,7 +4655,11 @@ export class PBRModel implements EnginePlugin {
         fragment: {
           module,
           entryPoint: entry,
-          constants: { margoFaceTest: face, margoAlphaTest: mask },
+          constants: {
+            margoFaceTest: face,
+            margoAlphaTest: mask,
+            ...(through && !transmission && this.transparency!.blends ? { margoKind: kind } : {}),
+          },
           targets:
             through || capture
               ? ((through ? oit! : hook!).targets as GPUColorTargetState[])
@@ -4720,16 +4748,18 @@ export class PBRModel implements EnginePlugin {
             entryPoint: 'margoTint',
             constants:
               m.shading?.texturedTint || surfaceTint(m) ? { margoFaceTest: face, margoAlphaTest: mask } : undefined,
-            targets: [
-              {
-                format,
-                ...(state?.colorWrite === false ? { writeMask: 0 } : {}),
-                blend: {
-                  color: { srcFactor: 'zero', dstFactor: 'src' },
-                  alpha: { srcFactor: 'zero', dstFactor: 'one' },
-                },
-              },
-            ],
+            targets: through
+              ? (oit!.targets as GPUColorTargetState[])
+              : [
+                  {
+                    format,
+                    ...(state?.colorWrite === false ? { writeMask: 0 } : {}),
+                    blend: {
+                      color: { srcFactor: 'zero', dstFactor: 'src' },
+                      alpha: { srcFactor: 'zero', dstFactor: 'one' },
+                    },
+                  },
+                ],
           },
         };
         if (scratch.compiling) later(key + ':tint', wanted);
