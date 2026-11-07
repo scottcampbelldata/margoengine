@@ -7,7 +7,7 @@ import { MeshBVH, type BVHHit, type GeometryLike } from './bvh.js';
 import { invertMatrix, multiplyMatrices } from '@margoengine/math/mat4';
 import { MargoError } from '@margoengine/math/errors';
 import { transformPoint, type Side } from './math.js';
-import { meshTriangles } from '../../shared/mesh-source.js';
+import { geometrySurface, meshTriangles } from '../../shared/mesh-source.js';
 import { hiddenInTree } from '../../shared/visibility.js';
 import { engineProxies, isModel, type ModelLike, type ModelPrimitiveLike, type PickProxy } from '../../shared/model.js';
 import { isOrthographic, transformPointChecked } from '@margoengine/math/mat4';
@@ -671,6 +671,9 @@ export class Raycaster {
           result.nodeIndex = primitive.nodeIndex;
           result.uv = hitUV(primitive.vertices, hit);
           if (instance !== undefined) result.instanceId = instance;
+        } else {
+          const uv = geometrySurface(node.geometry!)?.uv;
+          if (uv) result.uv = surfaceUV(uv, hit);
         }
         hits.push(result);
       }
@@ -847,6 +850,13 @@ export function hitUV(v: Float32Array, hit: BVHHit): [number, number] {
     c = hit.face[2] * 20 + 12,
     [wa, wb, wc] = hit.barycoord;
   return [wa * v[a] + wb * v[b] + wc * v[c], wa * v[a + 1] + wb * v[b + 1] + wc * v[c + 1]];
+}
+
+/** The uv of a hit on a core mesh whose package keeps them, two floats a vertex. */
+function surfaceUV(v: Float32Array, hit: BVHHit): [number, number] {
+  const [a, b, c] = hit.face,
+    [wa, wb, wc] = hit.barycoord;
+  return [wa * v[a * 2] + wb * v[b * 2] + wc * v[c * 2], wa * v[a * 2 + 1] + wb * v[b * 2 + 1] + wc * v[c * 2 + 1]];
 }
 
 function packPose(source: Float32Array, target: Float32Array): void {

@@ -15,7 +15,7 @@ import { instancedDepth } from '../../shared/instances.js';
 import { displacedDepth } from '../../shared/displacement.js';
 import { shadowPrimitivesInto, coreReceives, unshadowedCore } from '../../shared/shadow-source.js';
 import { viewMatrix } from '../../shared/view.js';
-import { meshTriangles } from '../../shared/mesh-source.js';
+import { geometrySurface, meshTriangles } from '../../shared/mesh-source.js';
 import { sectionState, sectionShader } from '../../shared/section.js';
 import { hiddenInTree } from '../../shared/visibility.js';
 import { invert } from '../../shared/math.js';
@@ -559,7 +559,7 @@ export class VirtualShadows implements EnginePlugin {
       record.meshPrimitive ??= [
         { node: source, vertex: buffers.vertex, index: buffers.index, count: geometry.indices.length, stride: 24 },
       ];
-      Object.assign(record.meshPrimitive[0], buffers).count = geometry.indices.length;
+      Object.assign(record.meshPrimitive[0], buffers, geometrySurface(geometry)?.caster).count = geometry.indices.length;
       return record.meshPrimitive;
     }
     const writer = (source as ShadowSource & { [shadowPrimitivesInto]?: (out: ShadowPrimitive[]) => boolean })[

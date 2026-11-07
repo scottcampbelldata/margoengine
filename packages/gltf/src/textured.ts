@@ -3,6 +3,7 @@
 // shader plus a UV input and a texture read, so a package that patches core's shader applies here too.
 import type { Engine, EnginePlugin, FrameGraph, Geometry, PassContext } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
+import { setGeometrySurface } from '../../shared/mesh-source.js';
 import { generateMipmaps } from '../../shared/mipmaps.js';
 import type { GLTFDocument, GLTFMaterial, GLTFSampler, GLTFTextureInfo } from '../../shared/gltf.js';
 import { entry, integer, readAccessor } from './accessor.js';
@@ -128,6 +129,8 @@ interface Part {
   sampler: GPUSamplerDescriptor;
   uvBuffer?: GPUBuffer;
   block?: GPUBuffer;
+  /** 80-byte vertices of a cut-out, for shadow passes: positions, and uv where the depth shader reads it. */
+  casterBuffer?: GPUBuffer;
   groups: WeakMap<GPURenderPipeline, GPUBindGroup>;
   /** False until the instances went to the GPU whole, and again after a device restore. */
   sent: boolean;
@@ -177,8 +180,10 @@ class TexturedDraw implements EnginePlugin {
   }
   remove(part: Part): void {
     this.parts.delete(part.geometry);
+    setGeometrySurface(part.geometry, undefined);
     part.uvBuffer?.destroy();
     part.block?.destroy();
+    part.casterBuffer?.destroy();
     if (part.bitmap && ![...this.parts.values()].some((other) => other.bitmap === part.bitmap)) {
       this.textures.get(part.bitmap)?.destroy();
       this.textures.delete(part.bitmap);
@@ -210,8 +215,9 @@ class TexturedDraw implements EnginePlugin {
     return texture;
   }
   private upload(part: Part): void {
-    const device = this.engine.gpu!;
-    this.texture(part.bitmap);
+    const device = this.engine.gpu!,
+      texture = this.texture(part.bitmap);
+    setGeometrySurface(part.geometry, { uv: part.uv, caster: part.surface.cutoff > 0 ? this.caster(part, texture) : undefined });
     part.uvBuffer = device.createBuffer({
       size: part.uv.byteLength,
       usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
@@ -222,12 +228,36 @@ class TexturedDraw implements EnginePlugin {
     part.groups = new WeakMap();
     part.sent = false;
   }
+  /** What a shadow pass draws of a cut-out: core's vertices hold no uv, so its depth pass needs vertices that do. */
+  private caster(part: Part, texture: GPUTexture): object {
+    const device = this.engine.gpu!,
+      points = part.geometry.vertices,
+      count = points.length / 6,
+      vertices = new Float32Array(count * 20);
+    for (let i = 0; i < count; i++) {
+      vertices.set(points.subarray(i * 6, i * 6 + 3), i * 20);
+      vertices.set(part.uv.subarray(i * 2, i * 2 + 2), i * 20 + 12);
+    }
+    part.casterBuffer = device.createBuffer({ size: vertices.byteLength, usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST });
+    device.queue.writeBuffer(part.casterBuffer, 0, vertices);
+    return {
+      vertex: part.casterBuffer,
+      stride: 80,
+      alphaTexture: texture.createView(),
+      alphaSampler: device.createSampler(part.sampler),
+      alpha: part.surface.alpha,
+      cutoff: part.surface.cutoff,
+      vertexAlpha: false,
+    };
+  }
   private claim(c: Context): void {
     const batches = c.batches ?? [];
     for (let i = 0; i < batches.length; i++) {
       const batch = batches[i],
         part = this.parts.get(batch.geometry);
       if (!part) continue;
+      // Core counted this frame's draws before this first claim, and `draw` counts this batch.
+      if (!batch.claimed && (batch.count || batch.redirect)) this.engine.stats.drawCalls--;
       batch.claimed = true;
       // Core uploads only what it draws, so its window of changed instances is this pass's to send and reset.
       const start = part.sent ? (batch.start ?? 0) : 0,
@@ -352,6 +382,7 @@ class TexturedDraw implements EnginePlugin {
       pass.setIndexBuffer(buffers.index, 'uint32');
       if (redirect) pass.drawIndexedIndirect(redirect.args, 0);
       else pass.drawIndexed(batch.geometry.indices.length, batch.count);
+      this.engine.stats.drawCalls++;
     }
     pass?.end();
   }
@@ -373,21 +404,83 @@ class TexturedDraw implements EnginePlugin {
   dispose(): void {
     this.release();
     for (const part of this.parts.values()) {
+      setGeometrySurface(part.geometry, undefined);
       part.uvBuffer?.destroy();
       part.block?.destroy();
+      part.casterBuffer?.destroy();
     }
     this.parts.clear();
   }
 }
 /** A file's decoded images and surfaces, from `load` to `finish`. */
 const files = /* @__PURE__ */ new WeakMap<GLTFFile, { images: Map<number, ImageBitmap>; surfaces: Map<number, Surface> }>();
+/** The parts each loaded model draws here, for `texturedAlphaMasks`. */
+const modelParts = /* @__PURE__ */ new WeakMap<Model, Part[]>();
+
+/** Top-left row-major RGBA8 pixels, as `getImageData` gives. */
+export interface TexturedPixels {
+  width: number;
+  height: number;
+  data: ArrayLike<number>;
+}
+/** One cut-out's mask, in the shape `AlphaMask` of `@margoengine/bvh/alpha` reads. */
+export interface TexturedAlphaMask extends TexturedPixels {
+  cutoff: number;
+  factor: number;
+  wrap: readonly ['repeat' | 'mirror' | 'clamp', 'repeat' | 'mirror' | 'clamp'];
+}
+function canvasPixels(image: ImageBitmap): TexturedPixels {
+  if (typeof OffscreenCanvas === 'undefined')
+    throw new TypeError('texturedAlphaMasks needs OffscreenCanvas to read an image here; pass the pixels option.');
+  const canvas = new OffscreenCanvas(image.width, image.height),
+    brush = canvas.getContext('2d', { willReadFrequently: true })!;
+  brush.drawImage(image, 0, 0);
+  return brush.getImageData(0, 0, image.width, image.height);
+}
+const wrapOf = (mode: GPUAddressMode | undefined) =>
+  mode === 'clamp-to-edge' ? ('clamp' as const) : mode === 'mirror-repeat' ? ('mirror' as const) : ('repeat' as const);
+
+/**
+ * The masks of a model loaded with {@link textured}, for `AlphaRaycaster.alphaMask` from `@margoengine/bvh/alpha`, so a
+ * ray passes through the holes of its cut-outs. The GPU picks of `engine.pick` and `Picking` see a cut-out as solid. The
+ * pixels are read once, here, so call it before `model.dispose`. Hits on anything else answer null.
+ * @example ray.alphaMask = await texturedAlphaMasks(model);
+ */
+export async function texturedAlphaMasks(
+  model: Model,
+  { signal, pixels = canvasPixels }: { signal?: AbortSignal; pixels?: (image: ImageBitmap) => TexturedPixels | Promise<TexturedPixels> } = {},
+): Promise<(hit: { mesh: object }) => TexturedAlphaMask | null> {
+  const masks = new Map<Geometry, TexturedAlphaMask>(),
+    read = new Map<ImageBitmap, TexturedPixels>();
+  for (const part of modelParts.get(model) ?? []) {
+    signal?.throwIfAborted();
+    const { surface, bitmap, sampler, geometry } = part;
+    if (!(surface.cutoff > 0)) continue;
+    let image: TexturedPixels = { width: 1, height: 1, data: [255, 255, 255, 255] };
+    if (bitmap) {
+      const known = read.get(bitmap);
+      image = known ?? (await pixels(bitmap));
+      read.set(bitmap, image);
+    }
+    masks.set(geometry, {
+      width: image.width,
+      height: image.height,
+      data: image.data,
+      cutoff: surface.cutoff,
+      factor: surface.alpha,
+      wrap: [wrapOf(sampler.addressModeU), wrapOf(sampler.addressModeV)],
+    });
+  }
+  signal?.throwIfAborted();
+  return (hit) => masks.get((hit.mesh as { geometry?: Geometry }).geometry!) ?? null;
+}
 
 /**
  * Lets the light loader draw a base colour texture and MASK cut-outs: `baseColorTexture` on any TEXCOORD set, with
  * `KHR_texture_transform`, multiplied by `baseColorFactor`, and an alpha test against `alphaCutoff`. WebGPU only. Other
  * maps, BLEND and compressed textures stay refused. The mesh stays a core mesh, so transforms, picking and `dispose` work
- * as for any other, but its cut-outs pick as solid. Needs `loadGLTF` or `parseGLTFAsync`, since images decode
- * asynchronously.
+ * as for any other. A cut-out casts its outline in `@margoengine/shadows`; GPU picks see it as solid, and a ray sees
+ * through it with {@link texturedAlphaMasks}. Needs `loadGLTF` or `parseGLTFAsync`, since images decode asynchronously.
  * @example const model = await loadGLTF(engine, '/prop.glb', { extensions: [textured] });
  */
 export const textured: GLTFExtension = {
@@ -475,6 +568,7 @@ export const textured: GLTFExtension = {
     }
     const owner = draw;
     for (const part of parts) owner.add(part);
+    modelParts.set(model, parts);
     const dispose = model.dispose;
     let live = true;
     model.dispose = () => {

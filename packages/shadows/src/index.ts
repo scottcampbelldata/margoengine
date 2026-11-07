@@ -16,7 +16,7 @@ import { instancedDepth } from '../../shared/instances.js';
 import { displacedDepth } from '../../shared/displacement.js';
 import { shadowPrimitivesInto, coreReceives, unshadowedCore } from '../../shared/shadow-source.js';
 import { viewMatrix } from '../../shared/view.js';
-import { meshTriangles } from '../../shared/mesh-source.js';
+import { geometrySurface, meshTriangles } from '../../shared/mesh-source.js';
 import { sectionState } from '../../shared/section.js';
 import { finiteVector } from '@margoengine/math/validate';
 import { MargoError } from '@margoengine/math/errors';
@@ -1394,7 +1394,7 @@ export class Shadows implements EnginePlugin {
           stride: 24,
         },
       ];
-      Object.assign(record.meshPrimitive[0], buffers).count = geometry.indices.length;
+      Object.assign(record.meshPrimitive[0], buffers, geometrySurface(geometry)?.caster).count = geometry.indices.length;
       return record.meshPrimitive;
     }
     const writer = (source as ShadowSource & { [shadowPrimitivesInto]?: (out: ShadowPrimitive[]) => boolean })[

@@ -1258,6 +1258,7 @@ An audit of the finished batches against their job text listed 70 gaps for the H
 | B36 | LDraw instanced: each placed part stored once | DONE | `883ecd4ce` | LIM-185 |
 | B32 | remeshMesh quads: quad-dominant pairing | DONE | `8999fa60a` | LIM-063 |
 | batch 40 VDB | parseVDB on real OpenVDB files, every grid read | DONE | this commit | LIM-202 |
+| B33 | gltf/textured masked shadow, masked ray, draw counts | DONE | this commit | LIM-347 |
 
 ## LAZ: one LAS reader, and every point format on a real file
 

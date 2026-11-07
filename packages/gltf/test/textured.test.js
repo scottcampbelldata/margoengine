@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { loadGLTF, parseGLTF, parseGLTFAsync } from '../dist/index.js';
 import { quantized } from '../dist/quantized.js';
-import { textured } from '../dist/textured.js';
+import { textured, texturedAlphaMasks } from '../dist/textured.js';
 import { documentOf, gpuEngine, headlessEngine, withBitmaps } from './helpers.js';
 
 const png = new Uint8Array([137, 80, 78, 71]);
@@ -140,6 +140,56 @@ test('a MASK with no texture needs no UVs and no image', async (t) => {
     assert.deepEqual([...device.uniformUploads.at(-1)], [0.5, 0.25, 0, 0]);
     assert.equal(model.meshes[0].material.data[3], 1);
     model.dispose();
+  } finally {
+    engine.dispose();
+  }
+});
+
+test('a cut-out keeps a depth pass that reads its alpha, and only a cut-out', async (t) => {
+  withBitmaps(t);
+  const { engine } = await gpuEngine(t);
+  try {
+    const cut = await load(engine, file({ material: { alphaMode: 'MASK', alphaCutoff: 0.25 } })),
+      plain = await load(engine, file()),
+      { geometrySurface } = await import('../../shared/mesh-source.js'),
+      caster = geometrySurface(cut.meshes[0].geometry).caster;
+    assert.equal(caster.stride, 80);
+    assert.equal(caster.cutoff, 0.25);
+    assert.equal(caster.vertexAlpha, false);
+    assert.ok(caster.alphaTexture && caster.alphaSampler);
+    assert.equal(geometrySurface(plain.meshes[0].geometry).caster, undefined);
+    assert.deepEqual([...geometrySurface(plain.meshes[0].geometry).uv], [...uvs]);
+    const geometry = cut.meshes[0].geometry;
+    cut.dispose();
+    assert.equal(geometrySurface(geometry), undefined);
+    plain.dispose();
+  } finally {
+    engine.dispose();
+  }
+});
+
+test('texturedAlphaMasks gives a cut-out its pixels, cutoff, factor and wrap, and other meshes none', async (t) => {
+  withBitmaps(t);
+  const { engine } = await gpuEngine(t);
+  try {
+    const input = file({
+      material: {
+        alphaMode: 'MASK',
+        alphaCutoff: 0.25,
+        pbrMetallicRoughness: { baseColorTexture: { index: 0 }, baseColorFactor: [1, 1, 1, 0.5] },
+      },
+      samplers: [{ wrapS: 33071, wrapT: 33648 }],
+      textures: [{ source: 0, sampler: 0 }],
+    });
+    const cut = await load(engine, input),
+      plain = await load(engine, file()),
+      image = { width: 1, height: 1, data: [0, 0, 0, 255] },
+      source = await texturedAlphaMasks(cut, { pixels: () => image });
+    assert.deepEqual(source({ mesh: cut.meshes[0] }), { ...image, cutoff: 0.25, factor: 0.5, wrap: ['clamp', 'mirror'] });
+    assert.equal(source({ mesh: plain.meshes[0] }), null);
+    await assert.rejects(texturedAlphaMasks(cut, { signal: AbortSignal.abort(), pixels: () => image }));
+    cut.dispose();
+    plain.dispose();
   } finally {
     engine.dispose();
   }

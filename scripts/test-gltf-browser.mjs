@@ -19,7 +19,9 @@ try {
     const { EngineKernel, box } = await import('/packages/core/dist/index.js');
     const { engineRuntime, PbrMaterial, Camera } = await import('/packages/core/dist/extension.js');
     const { parseGLTFAsync } = await import('/packages/gltf/dist/index.js');
-    const { textured } = await import('/packages/gltf/dist/textured.js');
+    const { textured, texturedAlphaMasks } = await import('/packages/gltf/dist/textured.js');
+    const { Shadows } = await import('/packages/shadows/dist/index.js');
+    const { AlphaRaycaster } = await import('/packages/bvh/dist/alpha.js');
     const { instancing } = await import('/packages/gltf/dist/instancing.js');
     const { loadAuto } = await import('/packages/gltf/dist/auto.js');
     const ensure = (condition, message) => {
@@ -118,6 +120,41 @@ try {
     ensure(near(hole, boxOnly, 0), `The cut-out shows the box: ${hole} vs ${boxOnly}`);
     result.mask = { solid, hole };
 
+    // Counts: core leaves a claimed batch out, this pass adds it back, so a frame reads what it drew.
+    ensure(instance.stats.drawCalls === 2, `A frame of box and cut-out counts ${instance.stats.drawCalls} draws`);
+
+    // A ray stops on the solid half and passes the hole to the box behind.
+    const hole28 = Array.from({ length: 28 }, (_, i) => [34 + i, 32]),
+      ray = new AlphaRaycaster();
+    ray.alphaMask = await texturedAlphaMasks(masked);
+    const hitAt = ([x, y]) => (ray.setFromEngine(instance, x, y), ray.intersectEngine(instance)[0]?.mesh);
+    ensure(hitAt(left) === masked.meshes[0], 'A ray stops on the solid half');
+    ensure(hitAt(right) === back, 'A ray passes through the hole to the box');
+
+    // The shadow has the cut-out's outline. The sun stands to the left, so the solid half's shadow falls on the box inside
+    // the hole and ends there; a caster solid across the quad would shade the whole hole.
+    const sun = instance.lighting.direction.slice();
+    instance.lighting.direction.set([-0.4472136, 0, 0.8944272], 0);
+    const unshaded = pixels(...hole28),
+      shadows = Shadows.attach(instance, { cascades: 1, filter: 'pcf', distance: 20 }),
+      casters = [shadows.add(back), shadows.add(masked.meshes[0])],
+      shaded = pixels(...hole28),
+      dark = shaded.filter((p, i) => p[1] < unshaded[i][1] * 0.8).length,
+      clear = shaded.filter((p, i) => near(p, unshaded[i], 3)).length;
+    casters.pop()();
+    // What the solid half alone casts: a thin core box in its place.
+    const half = engine.createMesh().setGeometry(box(1, 2, 0.01));
+    half.setPosition([-0.5, 0, 0]);
+    casters.push(shadows.add(half));
+    const expectedDark = pixels(...hole28).filter((p, i) => p[1] < unshaded[i][1] * 0.8).length;
+    half.dispose();
+    result.shadow = { dark, expectedDark, clear, of: hole28.length };
+    ensure(dark > 0 && clear > 0, `Through the hole, ${dark} of ${hole28.length} pixels are shaded and ${clear} lit`);
+    ensure(Math.abs(dark - expectedDark) <= 1, `The cut-out shades ${dark} pixels, its solid half alone ${expectedDark}`);
+    casters.forEach((remove) => remove());
+    shadows.dispose();
+    instance.lighting.direction.set(sun);
+
     // baseColorFactor multiplies, and its alpha takes part in the test.
     masked.dispose();
     const tinted = await load(
@@ -151,11 +188,12 @@ try {
         { mesh: 0, translation: [1, 0, 0] },
       ]),
     );
-    pixels(left); // The claim lands during the first frame, after core counted its draws.
+    pixels(left);
+    ensure(engine.stats.drawCalls === 2, `The claim's first frame counts the box and one draw: ${engine.stats.drawCalls}`);
     const row = Array.from({ length: size }, (_, x) => [x, 32]),
       first = pixels(...row).findIndex((pixel) => near(pixel, expected));
     ensure(first >= 0 && first < left[0], `The left instance draws left of the quad's place: ${first}`);
-    ensure(engine.stats.drawCalls === 1, `Only the box is core's draw: ${engine.stats.drawCalls}`);
+    ensure(engine.stats.drawCalls === 2, `The box, and one draw of both instances: ${engine.stats.drawCalls}`);
     pair.nodes[0].setPosition([-1, 5, 0]);
     pair.nodes[1].setPosition([0, 0, 0]);
     const [moved, emptied] = pixels(left, [first, 32]);

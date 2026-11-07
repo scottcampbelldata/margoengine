@@ -81,3 +81,12 @@ export function mergePrimitives(
   normals?: boolean,
   check?: (vertexCount: number, indexCount: number) => void,
 ): { vertices: Float32Array; indices: Uint32Array; stride: 3 | 6 };
+/** What a package keeps of a core geometry beyond core's vertices. */
+export interface GeometrySurface {
+  /** Two floats per geometry vertex: a hit on the mesh reports `uv` from these. */
+  uv?: Float32Array;
+  /** Fields a shadow pass uses in place of the geometry's own: a cut-out's 80-byte vertices and alpha test. */
+  caster?: object;
+}
+export function setGeometrySurface(geometry: object, surface: GeometrySurface | undefined): void;
+export function geometrySurface(geometry: object): GeometrySurface | undefined;

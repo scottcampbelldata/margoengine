@@ -4,6 +4,20 @@ const key = Symbol.for('margoengine.mesh-sources.v1');
 const sources = globalThis[key] ?? new WeakMap();
 if (!globalThis[key]) Object.defineProperty(globalThis, key, { value: sources });
 
+// What a package keeps of a core geometry beyond core's 24-byte vertices: `uv` per vertex, and the `caster` fields a shadow
+// pass uses in place of the geometry's own buffers, so a cut-out casts its outline. Core never reads this.
+const surfaceKey = Symbol.for('margoengine.geometry-surfaces.v1');
+const surfaces = globalThis[surfaceKey] ?? new WeakMap();
+if (!globalThis[surfaceKey]) Object.defineProperty(globalThis, surfaceKey, { value: surfaces });
+
+export function setGeometrySurface(geometry, surface) {
+  if (surface) surfaces.set(geometry, surface);
+  else surfaces.delete(geometry);
+}
+export function geometrySurface(geometry) {
+  return surfaces.get(geometry);
+}
+
 export function setMeshSource(mesh, source) {
   sources.set(mesh, source);
 }

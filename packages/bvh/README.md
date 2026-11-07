@@ -376,7 +376,7 @@ ray.setFromEngine(engine, 320, 240);
 console.log(ray.intersectEngine(engine)[0]?.mesh);
 ```
 
-A hit stays when its alpha is at or above `cutoff`, when `alphaMask` answers null, or when it has no `uv`: core geometry holds none, so masks apply to model primitives and `intersectModel` hits. `uv` is TEXCOORD_0 as the mesh holds it, and a mask's `transform` maps it; `sampleAlpha(mask, u, v)` is the sampler on its own. With a mask set, `firstHitOnly` tests every hit along the ray and then keeps the nearest solid one, since the nearest may be a hole.
+A hit stays when its alpha is at or above `cutoff`, when `alphaMask` answers null, or when it has no `uv`: core geometry holds none, so masks apply to model primitives, `intersectModel` hits and meshes of `@margoengine/gltf/textured`, whose `texturedAlphaMasks` names them. `uv` is TEXCOORD_0 as the mesh holds it, and a mask's `transform` maps it; `sampleAlpha(mask, u, v)` is the sampler on its own. With a mask set, `firstHitOnly` tests every hit along the ray and then keeps the nearest solid one, since the nearest may be a hole.
 
 | Option | Default |
 | --- | --- |

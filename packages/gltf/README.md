@@ -66,7 +66,26 @@ engine.start();
 
 Images decode asynchronously, so for bytes already in memory use `parseGLTFAsync(engine, bytes, [], { extensions })` in
 place of `parseGLTF`. WebGPU only: a WebGL engine refuses the file. The meshes stay core meshes, so they move, pick and
-dispose as usual, and packages that patch core's shader apply to them. A cut-out picks and casts shadows as solid.
+dispose as usual, and packages that patch core's shader apply to them. A cut-out casts its outline through
+`@margoengine/shadows`, and `engine.stats.drawCalls` counts these draws. GPU picks see a cut-out as solid, because core's
+pick draw has no uv; for a ray that passes through the holes, `texturedAlphaMasks(model, {signal, pixels})` gives
+`AlphaRaycaster` its masks. Call it before `model.dispose()`; it reads each image once through an `OffscreenCanvas`, so in
+Node pass `pixels`.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { AlphaRaycaster } from 'margoengine/bvh/alpha';
+import { loadGLTF } from 'margoengine/gltf';
+import { textured, texturedAlphaMasks } from 'margoengine/gltf/textured';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const model = await loadGLTF(engine, '/fence.glb', { extensions: [textured] });
+const ray = new AlphaRaycaster();
+ray.alphaMask = await texturedAlphaMasks(model);
+ray.firstHitOnly = true; // the nearest solid hit
+ray.setFromEngine(engine, 320, 240);
+console.log(ray.intersectEngine(engine)[0]?.mesh);
+```
 
 ### Meshopt compression
 

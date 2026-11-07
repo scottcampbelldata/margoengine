@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10314515,
+  "total": 10293568,
   "history": [
     {
       "date": "2026-10-24",
@@ -3344,6 +3344,12 @@
       "commit": "ef0f5d227",
       "reason": "own physics kernel gains islands and sleeping",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "4922642a5",
+      "reason": "B33: gltf/textured gains the cut-out caster, draw counts and texturedAlphaMasks; bvh reads uv of a core mesh that has them; shadows reads a geometry's caster",
+      "grew": 2
     }
   ],
   "items": {
@@ -3618,12 +3624,12 @@
     "@margoengine/gltf-pro/scene": 1471,
     "@margoengine/gltf-pro/splats": 2100,
     "@margoengine/gltf-pro/worker": 68901,
-    "@margoengine/gltf/auto": 14068,
+    "@margoengine/gltf/auto": 14521,
     "@margoengine/gltf/instancing": 1985,
     "@margoengine/gltf/meshopt": 1205,
     "@margoengine/gltf/quantized": 1385,
     "@margoengine/gltf/scene-data": 1782,
-    "@margoengine/gltf/textured": 5839,
+    "@margoengine/gltf/textured": 6565,
     "@margoengine/headless": 2864,
     "@margoengine/headless/compare": 3074,
     "@margoengine/headless/ffmpeg": 1434,

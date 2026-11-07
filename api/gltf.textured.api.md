@@ -6,7 +6,26 @@
 import { Geometry, Mesh } from "@margoengine/core";
 import { Engine } from "@margoengine/core/extension";
 
+export interface TexturedAlphaMask extends TexturedPixels {
+    cutoff: number;
+    factor: number;
+    wrap: readonly ['repeat' | 'mirror' | 'clamp', 'repeat' | 'mirror' | 'clamp'];
+}
+
+export interface TexturedPixels {
+    width: number;
+    height: number;
+    data: ArrayLike<number>;
+}
+
 export const textured: GLTFExtension;
+
+export function texturedAlphaMasks(model: Model, { signal, pixels }?: {
+    signal?: AbortSignal;
+    pixels?: (image: ImageBitmap) => TexturedPixels | Promise<TexturedPixels>;
+}): Promise<(hit: {
+    mesh: object;
+}) => TexturedAlphaMask | null>;
 
 // Not exported from this entry, but used by the exports above:
 
