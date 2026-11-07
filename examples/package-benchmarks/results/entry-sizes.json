@@ -1,5 +1,5 @@
 {
-  "commit": "84c4ec765",
+  "commit": "83cb1da3f",
   "dirty": true,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -1786,8 +1786,8 @@
     },
     "@margoengine/netcode": {
       ".": {
-        "raw": 38798,
-        "gzip": 12465
+        "raw": 38923,
+        "gzip": 12493
       },
       "./rollback": {
         "raw": 8910,
@@ -1808,6 +1808,10 @@
       "./rooms": {
         "raw": 15526,
         "gzip": 5264
+      },
+      "./smoothing": {
+        "raw": 4046,
+        "gzip": 1502
       },
       "./interest": {
         "raw": 5662,
@@ -2953,7 +2957,7 @@
     "@margoengine/weather": {
       ".": {
         "raw": 12811,
-        "gzip": 5014
+        "gzip": 5013
       },
       "./hail": {
         "raw": 8908,
@@ -2966,6 +2970,10 @@
       "./snow": {
         "raw": 6690,
         "gzip": 3044
+      },
+      "./regions": {
+        "raw": 5731,
+        "gzip": 2248
       }
     },
     "@margoengine/webgl": {

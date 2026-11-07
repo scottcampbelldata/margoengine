@@ -111,6 +111,38 @@ vertex up by it. `snowAt` and `snowDepthAt` are the same maths in JavaScript; `s
 materials. `Snow` and `Puddles` work together on one scene. A bad option throws `RangeError` or `TypeError`; a replaced
 core shader throws `MargoError` `'unsupported'`.
 
+## Weather in different places
+
+`WeatherRegions` from `margoengine/weather/regions` gives a map weather that differs from place to place: a `base`
+weather, `fronts` that sweep across it and leave other weather behind, and `cells` (a storm, a fog bank, a snow squall)
+that drift. It is a pure function of place and time, so every player sees the same weather and a replay repeats it.
+
+```ts
+import { WeatherMachine } from 'margoengine/weather';
+import { WeatherRegions } from 'margoengine/weather/regions';
+
+const map = new WeatherRegions({
+  base: 'partlyCloudy',
+  // A cold front 5 km to the west, moving east at 8 m/s: rain behind it, a squall on it.
+  fronts: [{ origin: [-5000, 0], direction: Math.PI / 2, speed: 8, width: 2000, behind: 'rain', along: 'thunderstorm' }],
+  // A fog bank drifting north at 1 m/s.
+  cells: [{ center: [800, 300], radius: 400, weather: 'fog', velocity: [0, -1] }],
+});
+const camera = new WeatherMachine('clear');
+map.update(60); // a minute on
+map.apply(camera, 0, 0); // the weather where the camera stands, with its ground wetness and wind
+console.log(map.arrival(map.fronts[0], 0, 0), 's until the front arrives');
+```
+
+A front is the line through `origin` at time 0 moving toward `direction` (radians, 0 toward +Z and pi/2 toward +X, as
+`windDirection`) at `speed` (8 m/s); weather changes across `width` (2,000 m), from `ahead` (default the weather beneath)
+to `behind`, with `along` on the line if given. A cell is whole within `radius` and fades over `falloff` (default the
+radius) outside it, moves at `velocity` (`[x, z]` m/s) and, with `life: [from, to]`, grows in and dies out over a tenth
+of that span at each end. Fronts apply in order over the base and cells over the fronts. `stateAt(x, z, t)` samples
+any place and time; `apply(machine, x, z)` sets a machine there (call it every frame before `machine.update`) so its
+wind, ground wetness and snow follow the place; `arrival(front, x, z)` gives the seconds until a front arrives
+(negative once it has passed). `addFront` and `addCell` return removers. Bad input throws `TypeError` or `RangeError`.
+
 ## Driving the sky
 
 `skyWeather(state, wind?)` returns the sky `Weather` settings for a state: `Object.assign(weather.options, skyWeather(state))`. `hailSettings` does the same for `Hail`. `fogDensity(state)` gives an exponential-fog density per metre (0.0002 clear to 0.02 thick).
@@ -130,6 +162,8 @@ core shader throws `MargoError` `'unsupported'`.
 - Snow lifts each vertex by its own normal, so a mesh whose faces share no vertices (`box()`) opens a slit as deep as
   the snow along its top edges; smooth meshes (terrain, shared normals) stay closed. Snow has no cover from roofs and
   no wind drift, and shadows draw the unlifted shape. A vertex stage another package replaced keeps its shape.
+- Region fronts are straight and move at a constant speed, cells are circles at a constant velocity; none bends,
+  stalls or forms by itself. They are authoring shapes, not a forecast model.
 - The presets and the climate chain are design choices, not weather data. Wind speed is a mean at one height with simple noise, not a boundary-layer model.
 - `cloud` and `fog` are numbers for you to feed to your sky and fog; this package does not draw clouds or fog.
 - Hail needs WebGPU; on a WebGL engine `attach` throws `MargoError` `'unsupported'`. Everything else runs anywhere, Node included.
