@@ -13,6 +13,22 @@ export interface AssetCacheOptions {
   timeout?: number;
   /** Network fetch underneath, for example one that adds credentials. Default `globalThis.fetch`. */
   fetch?: typeof fetch;
+  /** Which stored entry a request maps to, for content that differs by request: `varyKeys()` of `@margoengine/cache/vary`. Default: the URL. */
+  keys?: AssetCacheKeys;
+}
+/**
+ * Maps requests to stored entries. Every key is the URL, or the URL, a newline and more, so `delete(url)` removes them
+ * all. `varyKeys()` of `@margoengine/cache/vary` is one that honours `Vary` and credentials.
+ */
+export interface AssetCacheKeys {
+  /** The key to look up; `read(key)` reads a stored record. Undefined: the request goes to the network uncached. */
+  lookup(request: Request, url: string, read: (key: string) => Promise<unknown>): Promise<string | undefined>;
+  /** The key to store a 200 response under, with records to write beside it. Undefined: it is not stored. */
+  store(
+    request: Request,
+    url: string,
+    response: Response,
+  ): Promise<{ key: string; records?: [string, unknown][] } | undefined>;
 }
 /** Counts since construction. `hits` includes `revalidated` and `offline`. */
 export interface AssetCacheStats {
@@ -49,7 +65,7 @@ interface Entry {
 const M = 'meta',
   D = 'data',
   VERSION = '\0version';
-const isEntry = (value: unknown): value is Entry => typeof value === 'object' && value !== null;
+const isEntry = (value: unknown): value is Entry => typeof (value as Entry | null)?.size === 'number';
 
 /**
  * IndexedDB cache for large assets (GLB, .bin, textures, STEP) behind a fetch-compatible `cache.fetch`, which every
@@ -73,6 +89,7 @@ export class AssetCache {
   readonly timeout: number;
   private db: Promise<IDBDatabase | null>;
   private network: typeof globalThis.fetch;
+  private keys?: AssetCacheKeys;
   private checked = new Set<string>();
   private pending = new Set<Promise<unknown>>();
   private writes: Promise<unknown> = Promise.resolve();
@@ -84,12 +101,14 @@ export class AssetCache {
     persist = false,
     timeout = 5000,
     fetch,
+    keys,
   }: AssetCacheOptions = {}) {
     if (!(maxBytes >= 0) || !(timeout >= 0))
       throw new RangeError('AssetCache maxBytes and timeout must be non-negative');
     this.maxBytes = maxBytes;
     this.timeout = timeout;
     this.network = fetch ?? ((input, init) => globalThis.fetch(input, init));
+    this.keys = keys;
     if (persist) globalThis.navigator?.storage?.persist?.().catch(() => {});
     this.db = this.open(name, String(version)).catch(() => null);
   }
@@ -156,22 +175,24 @@ export class AssetCache {
       url = request.url.replace(/#.*/, ''),
       range = request.headers.get('range');
     if (request.method !== 'GET' || !/^https?:/i.test(url)) return this.network(request);
-    const hit = await this.lookup(url);
+    const key = this.keys ? await this.keys.lookup(request, url, (k) => this.read(k)) : url;
+    if (key === undefined) return this.network(request);
+    const hit = await this.lookup(key);
     if (!hit) {
       if (range) {
-        this.fill(url);
+        this.fill(request, key);
         return this.network(request);
       }
       const response = await this.network(request);
       this.stats.misses++;
-      return this.keep(url, response, null);
+      return this.keep(request, key, response, null);
     }
     const [entry, blob] = hit,
-      fresh = entry.fresh > Date.now() || this.checked.has(url);
+      fresh = entry.fresh > Date.now() || this.checked.has(key);
     if (fresh || globalThis.navigator?.onLine === false)
       return this.serve(entry, blob, range, fresh ? undefined : 'offline');
     request.signal.throwIfAborted();
-    this.checked.add(url);
+    this.checked.add(key);
     const headers = new Headers(request.headers),
       controller = new AbortController(),
       abort = () => controller.abort(request.signal.reason);
@@ -201,12 +222,22 @@ export class AssetCache {
     this.stats.misses++;
     // A changed file that fails mid-download (Wi-Fi drop) still leaves the stored copy.
     try {
-      return await this.keep(url, response, range);
+      return await this.keep(request, key, response, range);
     } catch (error) {
       if (request.signal.aborted) throw error;
       return this.serve(entry, blob, range, 'offline');
     }
   };
+
+  private async read(key: string): Promise<unknown> {
+    let found: IDBRequest | undefined;
+    await this.tx('readonly', (meta) => {
+      found = meta.get(key);
+    }).catch(() => {
+      this.stats.errors++;
+    });
+    return found?.result;
+  }
 
   private async lookup(url: string): Promise<[Entry, Blob] | undefined> {
     let entry: IDBRequest | undefined, data: IDBRequest | undefined;
@@ -253,14 +284,16 @@ export class AssetCache {
   }
 
   /** Stores a 200 response (unless `Cache-Control: no-store`) in the background and answers from its bytes. */
-  private async keep(url: string, response: Response, range: string | null): Promise<Response> {
+  private async keep(request: Request, key: string, response: Response, range: string | null): Promise<Response> {
     const control = response.headers.get('cache-control') ?? '',
       age = /max-age=(\d+)/i.exec(control);
     if (response.status !== 200 || /no-store/i.test(control)) return response;
-    const blob = await response.blob(),
+    const url = key.replace(/\n[^]*/, ''),
+      target = this.keys ? await this.keys.store(request, url, response) : { key },
+      blob = await response.blob(),
       now = Date.now();
     const entry: Entry = {
-      url,
+      url: target?.key ?? key,
       size: blob.size,
       type: response.headers.get('content-type') ?? '',
       etag: response.headers.get('etag'),
@@ -269,22 +302,26 @@ export class AssetCache {
       used: now,
       final: response.url || url,
     };
-    this.checked.add(url);
-    if (entry.size <= this.maxBytes) this.queue(() => this.put(entry, blob));
+    this.checked.add(entry.url);
+    if (target && entry.size <= this.maxBytes) this.queue(() => this.put(entry, blob, target.records));
     return this.respond(entry, blob, range);
   }
 
-  private fill(url: string): void {
-    if (this.checked.has(url)) return;
-    this.checked.add(url);
+  /** Downloads the whole file of a range miss in the background, with the request's own headers. */
+  private fill(request: Request, key: string): void {
+    if (this.checked.has(key)) return;
+    this.checked.add(key);
+    const headers = new Headers(request.headers);
+    headers.delete('range');
+    const whole = new Request(request.url, { headers, credentials: request.credentials });
     this.track(
-      this.network(url)
+      this.network(whole)
         .then((response) => {
           this.stats.misses++;
-          return this.keep(url, response, null);
+          return this.keep(whole, key, response, null);
         })
         .catch(() => {
-          this.checked.delete(url);
+          this.checked.delete(key);
         }),
     );
   }
@@ -298,7 +335,7 @@ export class AssetCache {
     );
   }
 
-  private async put(entry: Entry, blob: Blob): Promise<void> {
+  private async put(entry: Entry, blob: Blob, records: [string, unknown][] = []): Promise<void> {
     let all: IDBRequest | undefined;
     await this.tx('readonly', (meta) => {
       all = meta.getAll();
@@ -325,6 +362,7 @@ export class AssetCache {
           }
           data.put(blob, entry.url);
           meta.put(entry, entry.url);
+          for (const [key, value] of records) meta.put(value, key);
         })
       ) {
         this.stats.stored++;
@@ -368,13 +406,19 @@ export class AssetCache {
     };
   }
 
-  /** Removes one URL (resolved against the page). */
+  /** Removes one URL (resolved against the page), with every entry `keys` stored for it. */
   async delete(url: string | URL): Promise<void> {
-    const key = new URL(url, globalThis.location?.href).href.replace(/#.*/, '');
-    this.checked.delete(key);
+    const key = new URL(url, globalThis.location?.href).href.replace(/#.*/, ''),
+      mine = (k: unknown) => k === key || String(k).startsWith(`${key}\n`);
+    for (const k of this.checked) if (mine(k)) this.checked.delete(k);
     await this.tx('readwrite', (meta, data) => {
-      meta.delete(key);
-      data.delete(key);
+      meta.getAllKeys().onsuccess = (event) => {
+        for (const k of (event.target as IDBRequest<IDBValidKey[]>).result)
+          if (mine(k)) {
+            meta.delete(k);
+            data.delete(k);
+          }
+      };
     });
   }
 

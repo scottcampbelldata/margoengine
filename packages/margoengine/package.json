@@ -298,6 +298,10 @@
       "types": "./dist/cache/ranges.d.ts",
       "import": "./dist/cache/ranges.js"
     },
+    "./cache/vary": {
+      "types": "./dist/cache/vary.d.ts",
+      "import": "./dist/cache/vary.js"
+    },
     "./cameras": {
       "types": "./dist/cameras.d.ts",
       "import": "./dist/cameras.js"

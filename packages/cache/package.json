@@ -37,6 +37,10 @@
     "./ranges": {
       "types": "./dist/ranges.d.ts",
       "import": "./dist/ranges.js"
+    },
+    "./vary": {
+      "types": "./dist/vary.d.ts",
+      "import": "./dist/vary.js"
     }
   },
   "files": [

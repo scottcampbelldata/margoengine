@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10272522,
+  "total": 10273343,
   "history": [
     {
       "date": "2026-10-24",
@@ -3272,6 +3272,12 @@
       "commit": "f60d3b4a",
       "reason": "cache/ranges: RangeCache stores HTTP byte ranges as blocks for offline streaming, own entry, root unchanged",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "eed6e15f",
+      "reason": "cache/vary: varyKeys splits AssetCache entries by Vary and credentials, own entry; root gains the keys hook within its budget",
+      "grew": 1
     }
   ],
   "items": {
@@ -3341,6 +3347,7 @@
     "@margoengine/cache/hashed": 871,
     "@margoengine/cache/manager": 1985,
     "@margoengine/cache/ranges": 3986,
+    "@margoengine/cache/vary": 821,
     "@margoengine/cameras": 3008,
     "@margoengine/cameras/layers": 1135,
     "@margoengine/cameras/offaxis": 2078,

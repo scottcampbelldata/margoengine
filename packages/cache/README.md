@@ -209,9 +209,40 @@ self.addEventListener('fetch', e => {
 A dedicated PWA tool (Workbox) is a fine alternative for the app shell; keep model files in AssetCache for the byte
 budget and revalidation.
 
+## Vary, credentials and signed-in users
+
+By default an entry is keyed by its URL, so one URL is one stored file. When the content depends on the request
+(language, encoding, an `Authorization` token, a signed-in user), pass `keys: varyKeys()` from
+`margoengine/cache/vary`, and each such request gets its own entry:
+
+```ts
+import {AssetCache} from 'margoengine/cache';
+import {varyKeys} from 'margoengine/cache/vary';
+
+let user = 'guest'; // set it from your sign-in; a page cannot read the cookies a request sends
+const cache = new AssetCache({
+  name: 'portal',
+  keys: varyKeys({
+    partition: () => user,       // entries of one user are never served to another (default '')
+    headers: ['authorization'],  // request headers that always split entries (default ['authorization'])
+  }),
+});
+const strings = await cache.fetch('/strings.json', {headers: {'Accept-Language': 'fr'}});
+console.log(strings.status);
+```
+
+- The key covers whether the request sends credentials (`credentials: 'include'`, or `'same-origin'` to the page's own
+  origin), the `partition`, the `headers` values and the values of the request headers the stored response's `Vary`
+  names (RFC 9111 section 4.1). Values go into keys as SHA-256 hashes: no token or user id is written to storage.
+- Each URL and credential set remembers the last `Vary` it was answered with; after a server changes its `Vary`, the
+  entries stored under the old one are no longer found and are evicted in time. `Vary: *` is never stored.
+- `delete(url)` removes every entry of the URL. Revalidation and the background fill of a range miss send the request's
+  own headers, so they land in the same entry. `varyNames(value)` parses a `Vary` value.
+- `HashedAssets` and `LoadingManager` work on top unchanged. `RangeCache` (above) is keyed by URL only.
+
 ## Limits
 
-- Keyed by URL only: no `Vary`, and credentials or request headers do not split entries.
+- Keyed by URL unless `keys: varyKeys()` is set (above); `RangeCache` is keyed by URL only.
 - Cross-origin files: `ETag` is readable only when the server exposes it (`Access-Control-Expose-Headers: ETag`);
   `Last-Modified` is always readable. Without either, a stale file is downloaded again on each visit (offline still
   works). `Expires` and `Age` are ignored; `no-cache` and missing `max-age` mean "revalidate".
