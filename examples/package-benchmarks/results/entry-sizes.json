@@ -1,5 +1,5 @@
 {
-  "commit": "e22cbb195",
+  "commit": "4aba1891d",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -260,8 +260,8 @@
         "gzip": 4841
       },
       "./components": {
-        "raw": 37979,
-        "gzip": 14306
+        "raw": 39500,
+        "gzip": 14755
       },
       "./pbr-ext": {
         "raw": 33764,
@@ -1902,8 +1902,8 @@
         "gzip": 19145
       },
       "./next": {
-        "raw": 128349,
-        "gzip": 75605
+        "raw": 134574,
+        "gzip": 80589
       }
     },
     "@margoengine/physics2d": {

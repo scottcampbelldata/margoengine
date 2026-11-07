@@ -12,6 +12,7 @@ export interface MargoComponentsDocument {
     readonly scripts: readonly MargoScriptUse[];
     readonly hasPhysics: boolean;
     readonly hasLights: boolean;
+    readonly camera?: number;
 }
 
 export interface MargoComponentsOptions extends MargoOptions {
@@ -20,6 +21,7 @@ export interface MargoComponentsOptions extends MargoOptions {
     physics?: GLTFPhysicsOptions["physics"];
     clustered?: GLTFLightReceiver;
     exposure?: number;
+    view?: boolean;
 }
 
 export interface MargoScene {
@@ -50,7 +52,7 @@ export function loadMargoComponents(engine: EngineKernel, url: string | URL, { f
 
 export function margoComponents(asset: MargoAsset): MargoComponentsDocument;
 
-export function parseMargoComponents(engine: EngineKernel, input: ArrayBuffer | ArrayBufferView, { signal, maxNodes, scripts, physics, clustered, exposure }?: MargoComponentsOptions): Promise<MargoScene>;
+export function parseMargoComponents(engine: EngineKernel, input: ArrayBuffer | ArrayBufferView, { signal, maxNodes, scripts, physics, clustered, exposure, view }?: MargoComponentsOptions): Promise<MargoScene>;
 
 // Not exported from this entry, but used by the exports above:
 

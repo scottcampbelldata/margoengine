@@ -74,7 +74,7 @@ The reader expands each shared compact geometry once into the existing PBR rende
 
 ## Components (`margo:` tags)
 
-Object custom properties whose names start with `margo:` are kept in `extras.margo.properties` (strings, booleans, finite numbers, and arrays of up to 32 finite numbers). `@margoengine/blender/components` reads the tags its README lists (`margo:collider`, `margo:body`, `margo:light`, `margo:script` and their settings) and writes them into the decoded document as KHR_implicit_shapes, KHR_physics_rigid_bodies and KHR_lights_punctual; the file itself holds only the properties, so the format does not change and older readers keep them as data.
+Object custom properties whose names start with `margo:` are kept in `extras.margo.properties` (strings, booleans, finite numbers, and arrays of up to 32 finite numbers). `@margoengine/blender/components` reads the tags its README lists (`margo:collider`, `margo:body`, `margo:light`, `margo:script` and their settings) and writes them into the decoded document as KHR_implicit_shapes, KHR_physics_rigid_bodies and KHR_lights_punctual; the file itself holds only the properties, so the format does not change and older readers keep them as data. The exporter writes these tags itself for Blender lights and cameras (mesh-less nodes; a camera also has `margo:camera`, `margo:yfov` or `margo:ymag`, `margo:aspect`, `margo:znear`, `margo:zfar` and, for the scene camera, `margo:active`), which the components entry turns into KHR_lights_punctual lights and glTF cameras.
 
 ## Animated files (header flag `1`)
 

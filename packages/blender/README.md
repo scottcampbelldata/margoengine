@@ -61,7 +61,7 @@ The exporter uses Blender native bulk reads and bundled NumPy, with Python 3.11+
 
 Supported materials: direct Principled BSDF; constant metallic/roughness; constant or direct sRGB image base color and emission; tangent-space Non-Color normal maps; constant alpha or the base image's alpha; active UV map; repeat/clamp wrapping and linear/nearest filtering. Embedded images use RGBA8 PNG. Each image is limited to 4096 × 4096, all decoded images to 256 MiB, the file to 256 MiB, and the manifest to 1 MiB. Export writes atomically, so a failed export preserves an existing asset.
 
-Any other surface material is baked at export (next section). Transmission, IOR, coat, sheen and subsurface export as glTF material extensions (see Extended Principled inputs). Unsupported inputs fail by material/object name: linked (textured) transmission, IOR, coat, sheen or subsurface, a coat with an IOR other than 1.5, a tint or a normal map, specular and anisotropy other than the defaults, volume and displacement outputs, HDR textures/emission, and any material that needs baking when baking is off. Geometry Nodes mesh outputs/mesh instances are evaluated; curves, points and volumes must be converted to meshes first. Edits reach a running page through the live link (Live link, below). Emission stays separate from optional tone mapping.
+Any other surface material is baked at export (next section). Transmission, IOR, coat, sheen and subsurface export as glTF material extensions (see Extended Principled inputs). Unsupported inputs fail by material/object name: linked (textured) transmission, IOR, coat, sheen or subsurface, a coat with an IOR other than 1.5, a tint or a normal map, specular and anisotropy other than the defaults, volume and displacement outputs, HDR textures/emission, and any material that needs baking when baking is off. Geometry Nodes mesh outputs/mesh instances are evaluated; curves, points and volumes must be converted to meshes first. Visible lights and cameras export too (Lights and cameras, below). Edits reach a running page through the live link (Live link, below). Emission stays separate from optional tone mapping.
 
 ## Node materials: baked at export
 
@@ -109,6 +109,24 @@ for await (const model of margoLive(engine, 'http://127.0.0.1:8765/', {signal: s
 ```
 
 Edits that arrive while a version loads are coalesced, so only the newest is fetched. Ending the loop (break, `signal`, an error) disposes the last model. Pass `parse: parseMargoPBR` from `margoengine/blender/pbr-ext` for transmission, coat, sheen and subsurface. While Blender is closed the page keeps the last model and the browser reconnects; a version that fails to export leaves the page on the last good one and the panel shows why. The server binds 127.0.0.1 and answers only pages served from this machine (`localhost`, `127.0.0.1`, `[::1]` or a `.localhost` name), so a web site in another tab cannot read the scene. With a real Blender 5.2.3 LTS session the page draws the red plane Blender serves, and the same loop draws it blue after Blender's material edit, with the first version disposed (LIM-410; `tests/live.test.js`, `tools/blender-addon/tests/test_live.py`).
+
+## Lights and cameras
+
+The exporter writes each visible point, spot and sun light and each camera as a node (the dialog's **Lights and cameras** option, `lights_cameras=True` by default; `False` leaves them out). The node carries the `margo:` tags of the Components table, which the add-on writes itself: a light's colour, its intensity (a point or spot light's power in W times 683 lm/W over 4 pi steradians, in candela; a sun's strength in W/m2 times 683, in lux), Custom Distance as its range, and for a spot half its Spot Size as the outer cone and that times one minus Spot Blend as the inner cone. A camera gets `margo:camera` (`perspective` or `orthographic`), its vertical field of view (`margo:yfov`, radians) or half height (`margo:ymag`), the render's aspect ratio (`margo:aspect`), its clip distances (`margo:znear`, `margo:zfar`) and, for the scene's camera, `margo:active`. The `components` entry builds the lights and cameras and opens the scene through the active camera:
+
+```ts
+import {Engine} from 'margoengine/core';
+import {loadMargoComponents} from 'margoengine/blender/components';
+const canvas = document.querySelector<HTMLCanvasElement>('canvas')!;
+const engine = await Engine.create(canvas, {backend:'webgpu'});
+// The test scene in tests/fixtures: a sun, a spot, a point light and two cameras.
+// exposure 1/683 undoes the lumens per watt, so the sun lights the engine at Blender's strength.
+const scene = await loadMargoComponents(engine, '/scene.margo', {exposure: 1 / 683});
+console.log(scene.model.cameras.length, scene.model.lights.map((l) => l.type));
+engine.start();
+```
+
+`view: false` keeps the engine's camera; `viewGLTFCamera(scene.model, scene.model.cameras[i])` from `margoengine/gltf-pro` switches to another. Point and spot lights light the scene through `@margoengine/clustered` (pass `clustered`); without it only the first sun lights it. A real Blender 5.2.3 LTS export points every light and camera where Blender does (to 1e-6) and projects as Blender's `calc_matrix_camera` does, and on the GPU the page opens on Blender's framing with the sun at Blender's strength (LIM-417; `tests/scene.test.js`). Area lights, panoramic cameras and lens shift fail by object name, as does a custom property the exporter writes itself.
 
 ## Characters: armatures, skins, shape keys and actions
 

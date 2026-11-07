@@ -13,6 +13,10 @@
 - `bake.margo`: exported for this project by Blender 5.2.3 LTS from `tools/blender-addon/tests/blender_bake.py`: a
   procedural Principled material and a Diffuse BSDF baked to 32 x 32 images at export, beside a direct Principled
   plane (Apache-2.0, as this repository). Regenerate the same way and copy the file here.
+- `scene.margo` and `scene-truth.json`: exported for this project by Blender 5.2.3 LTS from
+  `tools/blender-addon/tests/blender_scene.py`: a floor and a cube lit by a sun, a spot and a point light, with a
+  perspective scene camera and an orthographic one; the JSON holds Blender's own light directions and camera
+  projections (Apache-2.0, as this repository). Regenerate the same way and copy both files here.
 - `pbr-ext.margo`: exported for this project by Blender 5.2.3 LTS from `tools/blender-addon/tests/blender_pbr_ext.py`:
   Principled planes with transmission, IOR, coat, sheen and subsurface over a backdrop (Apache-2.0, as this
   repository). Regenerate the same way and copy the file here.

@@ -32,10 +32,15 @@ class EXPORT_SCENE_OT_margo(bpy.types.Operator, ExportHelper):
         min=0,
         max=4096,
     )
+    lights_cameras: bpy.props.BoolProperty(
+        name="Lights and cameras",
+        description="Export visible point, spot and sun lights and cameras, so the scene opens lit and framed as authored",
+        default=True,
+    )
 
     def execute(self, context):
         try:
-            size = export_scene(context, self.filepath, bake_size=self.bake_size)
+            size = export_scene(context, self.filepath, bake_size=self.bake_size, lights_cameras=self.lights_cameras)
         except (ValueError, OSError, OverflowError, RuntimeError) as error:
             self.report({"ERROR"}, str(error))
             return {"CANCELLED"}

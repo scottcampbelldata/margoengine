@@ -1,7 +1,8 @@
 // @margoengine/blender/components: tagged `margo:` custom properties of a static .margo scene become glTF Pro colliders,
 // physics bodies, punctual lights and named scripts on load, as Godot's and Unity's import pipelines read tagged
-// objects. The tags become KHR_implicit_shapes, KHR_physics_rigid_bodies and KHR_lights_punctual in the decoded
-// document, so glTF Pro's own readers (`applyGLTFPhysics`, `applyGLTFLights`) do the rest.
+// objects. The tags become KHR_implicit_shapes, KHR_physics_rigid_bodies, KHR_lights_punctual and glTF cameras in the
+// decoded document, so glTF Pro's own readers (`applyGLTFPhysics`, `applyGLTFLights`, `viewGLTFCamera`) do the rest.
+// The add-on writes the tags itself for Blender's lights and cameras, so a lit, framed scene opens as authored.
 import type { EngineKernel } from "@margoengine/core";
 import {
   parsePreparedPBR,
@@ -51,6 +52,8 @@ export interface MargoComponentsDocument {
   readonly hasPhysics: boolean;
   /** True when any object is a light. */
   readonly hasLights: boolean;
+  /** The node index of the camera the scene opens with (the one tagged `margo:active`, else the first), if any. */
+  readonly camera?: number;
 }
 /** Options of {@link parseMargoComponents} and {@link loadMargoComponents}. */
 export interface MargoComponentsOptions extends MargoOptions {
@@ -62,6 +65,8 @@ export interface MargoComponentsOptions extends MargoOptions {
   /** Passed to `applyGLTFLights`: the @margoengine/clustered instance for point and spot lights, and the exposure. */
   clustered?: GLTFLightReceiver;
   exposure?: number;
+  /** Views through the scene's camera ({@link MargoComponentsDocument.camera}) when it has one (default true). */
+  view?: boolean;
 }
 /** A loaded scene with its components. */
 export interface MargoScene {
@@ -75,6 +80,7 @@ export interface MargoScene {
 const bodies = new Set(["static", "dynamic", "kinematic"]),
   shapes = new Set(["box", "sphere", "capsule", "cylinder"]),
   lights = new Set(["point", "spot", "directional"]),
+  cameraTypes = new Set(["perspective", "orthographic"]),
   known = new Set([
     "margo:collider",
     "margo:body",
@@ -90,6 +96,13 @@ const bodies = new Set(["static", "dynamic", "kinematic"]),
     "margo:inner_cone",
     "margo:outer_cone",
     "margo:script",
+    "margo:camera",
+    "margo:yfov",
+    "margo:ymag",
+    "margo:aspect",
+    "margo:znear",
+    "margo:zfar",
+    "margo:active",
   ]);
 /** Edit distance, to catch a misspelt tag (`margo:colider`) that would otherwise stay a plain property. */
 function distance(a: string, b: string): number {
@@ -134,7 +147,10 @@ export function margoComponents(asset: MargoAsset): MargoComponentsDocument {
     shapeList: Json[] = [],
     materialList: Json[] = [],
     lightList: Json[] = [],
+    cameraList: Json[] = [],
     scripts: MargoScriptUse[] = [];
+  const cameraBase = Array.isArray(doc.cameras) ? doc.cameras.length : 0;
+  let activeCamera: number | undefined, firstCamera: number | undefined;
   for (let i = 0; i < count; i++) {
     const node = nodes[i],
       margo = record(node.extras) && record(node.extras.margo) ? node.extras.margo : undefined,
@@ -249,6 +265,34 @@ export function margoComponents(asset: MargoAsset): MargoComponentsDocument {
     } else
       for (const key of ["margo:color", "margo:intensity", "margo:range", "margo:inner_cone", "margo:outer_cone"])
         if (props[key] !== undefined) bad(key, "on an object with margo:light");
+    // Cameras: the node carries a glTF camera looking down its -Z; the scene's active camera comes first.
+    const camera = text("margo:camera", cameraTypes);
+    if (camera) {
+      if (light) bad("margo:camera", "on an object without margo:light");
+      const znear = number("margo:znear", Number.MIN_VALUE, 0.1)!,
+        zfar = number("margo:zfar", Number.MIN_VALUE),
+        aspect = number("margo:aspect", Number.MIN_VALUE);
+      if (zfar !== undefined && zfar <= znear) bad("margo:zfar", "above margo:znear");
+      let def: Json;
+      if (camera === "perspective") {
+        const yfov = number("margo:yfov", Number.MIN_VALUE, Math.PI / 3)!;
+        if (yfov >= Math.PI) bad("margo:yfov", "below pi radians");
+        def = { type: camera, perspective: { yfov, znear, ...(zfar !== undefined ? { zfar } : {}), ...(aspect ? { aspectRatio: aspect } : {}) } };
+        if (props["margo:ymag"] !== undefined) bad("margo:ymag", "on an orthographic camera");
+      } else {
+        const ymag = number("margo:ymag", Number.MIN_VALUE, 1)!;
+        if (zfar === undefined) bad("margo:zfar", "set on an orthographic camera");
+        def = { type: camera, orthographic: { xmag: ymag * (aspect ?? 1), ymag, znear, zfar } };
+        if (props["margo:yfov"] !== undefined) bad("margo:yfov", "on a perspective camera");
+      }
+      const active = props["margo:active"];
+      if (active !== undefined && typeof active !== "boolean") bad("margo:active", "true or false");
+      if (active && activeCamera === undefined) activeCamera = i;
+      firstCamera ??= i;
+      node.camera = cameraBase + cameraList.push(def) - 1;
+    } else
+      for (const key of ["margo:znear", "margo:zfar", "margo:aspect", "margo:yfov", "margo:ymag", "margo:active"])
+        if (props[key] !== undefined) bad(key, "on an object with margo:camera");
     const script = props["margo:script"];
     if (script !== undefined) {
       if (typeof script !== "string" || !script.trim()) bad("margo:script", "a script name, or names separated by commas");
@@ -268,11 +312,18 @@ export function margoComponents(asset: MargoAsset): MargoComponentsDocument {
     root.KHR_lights_punctual = { lights: lightList };
     used.push("KHR_lights_punctual");
   }
+  if (cameraList.length) doc.cameras = [...((doc.cameras as Json[] | undefined) ?? []), ...cameraList] as GLTFDocument["cameras"];
   if (used.length) {
     doc.extensions = root;
     doc.extensionsUsed = [...new Set([...((doc.extensionsUsed as string[] | undefined) ?? []), ...used])];
   }
-  return { document: doc, scripts, hasPhysics: shapeList.length > 0, hasLights: lightList.length > 0 };
+  return {
+    document: doc,
+    scripts,
+    hasPhysics: shapeList.length > 0,
+    hasLights: lightList.length > 0,
+    ...(cameraList.length ? { camera: activeCamera ?? firstCamera } : {}),
+  };
 }
 
 /**
@@ -288,7 +339,7 @@ export function margoComponents(asset: MargoAsset): MargoComponentsDocument {
 export async function parseMargoComponents(
   engine: EngineKernel,
   input: ArrayBuffer | ArrayBufferView,
-  { signal, maxNodes, scripts = {}, physics, clustered, exposure }: MargoComponentsOptions = {},
+  { signal, maxNodes, scripts = {}, physics, clustered, exposure, view = true }: MargoComponentsOptions = {},
 ): Promise<MargoScene> {
   signal?.throwIfAborted();
   const asset = decodeMargo(input, { maxNodes }),
@@ -323,6 +374,11 @@ export async function parseMargoComponents(
       const { applyGLTFLights } = await import("@margoengine/gltf-pro");
       cleanups.push(applyGLTFLights(model, { clustered, exposure }));
       signal?.throwIfAborted();
+    }
+    if (view && parts.camera !== undefined) {
+      const { viewGLTFCamera } = await import("@margoengine/gltf-pro");
+      signal?.throwIfAborted();
+      viewGLTFCamera(model, model.cameras.find((camera) => camera.nodeIndex === parts.camera)!);
     }
     for (const use of parts.scripts) {
       const cleanup = scripts[use.name]({

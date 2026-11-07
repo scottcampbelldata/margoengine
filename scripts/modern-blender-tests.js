@@ -108,6 +108,40 @@ if (process.env.MARGO_BLENDER) {
       fresh.errors[channel] <= fresh.bounds.linear,
       `Blender's fresh bake differs from the node maths in ${channel}: ${JSON.stringify(fresh)}`,
     );
+  // Lights and cameras: a fresh Blender export carries the committed fixture's tags and Blender's same numbers.
+  execFileSync(
+    process.env.MARGO_BLENDER,
+    [
+      "--background",
+      "--factory-startup",
+      "--python-exit-code",
+      "1",
+      "--python",
+      "tools/blender-addon/tests/blender_scene.py",
+      "--",
+      "test-results/blender/scene",
+    ],
+    { stdio: "inherit" },
+  );
+  {
+    const tags = (bytes) =>
+      decodeMargo(bytes).document.nodes.map((n) => [n.name, n.extras.margo.properties, n.translation, n.rotation]);
+    const close = (a, b, path) => {
+      if (typeof a === "number") assert.ok(Math.abs(a - b) < 1e-6, `fresh scene export differs at ${path}: ${a} against ${b}`);
+      else if (a && typeof a === "object") for (const key of new Set([...Object.keys(a), ...Object.keys(b)])) close(a[key], b[key], `${path}.${key}`);
+      else assert.equal(a, b, `fresh scene export differs at ${path}`);
+    };
+    close(
+      tags(await readFile("test-results/blender/scene/scene.margo")),
+      tags(await readFile("packages/blender/tests/fixtures/scene.margo")),
+      "nodes",
+    );
+    close(
+      JSON.parse(await readFile("test-results/blender/scene/scene-truth.json", "utf8")),
+      JSON.parse(await readFile("packages/blender/tests/fixtures/scene-truth.json", "utf8")),
+      "truth",
+    );
+  }
   const { margoComponents } =
     await import("../packages/blender/dist/components.js");
   assert.deepEqual(
@@ -818,8 +852,82 @@ try {
   }
 
 
+  // Lights and cameras (real Blender 5.2.3 export): the scene opens through Blender's scene camera, its sun lights
+  // the engine at Blender's strength (exposure 1/683 undoes the lumens-per-watt conversion) from Blender's direction,
+  // and the red cube Blender frames fills the middle of the picture.
+  const sceneTruth = JSON.parse(
+    await readFile("packages/blender/tests/fixtures/scene-truth.json", "utf8"),
+  );
+  await page.route("**/scene.margo", async (route) =>
+    route.fulfill({
+      body: await readFile("packages/blender/tests/fixtures/scene.margo"),
+      contentType: "application/octet-stream",
+    }),
+  );
+  const framed = await page.evaluate(async () => {
+    const { Engine } = await import("/packages/core/dist/index.js");
+    const { loadMargoComponents } =
+      await import("/packages/blender/dist/components.js");
+    const { waitForPipelines } = await import("/scripts/support/gpu-ready.js");
+    const canvas = document.createElement("canvas");
+    canvas.style.cssText = "width:320px;height:240px";
+    document.body.append(canvas);
+    const engine = await Engine.create(canvas, { backend: "webgpu", capacity: 64 });
+    engine.gpu.pushErrorScope("validation");
+    const scene = await loadMargoComponents(engine, "/scene.margo", { exposure: 1 / 683 });
+    await waitForPipelines(async () => {
+      engine.render({ culling: false });
+      await engine.gpu.queue.onSubmittedWorkDone();
+    });
+    const result = {
+      image: canvas.toDataURL(),
+      position: [...engine.camera.position],
+      target: [...engine.camera.target],
+      fov: engine.camera.fov,
+      sun: [...engine.lighting.direction],
+      cameras: scene.model.cameras.length,
+    };
+    scene.dispose();
+    result.validation = (await engine.gpu.popErrorScope())?.message ?? null;
+    engine.dispose();
+    canvas.remove();
+    return result;
+  });
+  assert.equal(framed.validation, null);
+  assert.equal(framed.cameras, 2);
+  const view = sceneTruth.cameras.View,
+    sunTruth = sceneTruth.lights.Sun.direction;
+  framed.position.forEach((v, i) =>
+    assert.ok(Math.abs(v - view.position[i]) < 1e-4, `camera at ${framed.position}, Blender's at ${view.position}`),
+  );
+  const look = framed.target.map((v, i) => v - framed.position[i]),
+    length = Math.hypot(...look);
+  look.forEach((v, i) =>
+    assert.ok(Math.abs(v / length - view.forward[i]) < 1e-4, `camera looks along ${look}, Blender's ${view.forward}`),
+  );
+  assert.ok(
+    Math.abs(framed.fov - (2 * Math.atan(1 / view.projection[1][1]) * 180) / Math.PI) < 1e-3,
+    `camera fov ${framed.fov}`,
+  );
+  // engine.lighting.direction points toward the light: the opposite of where the sun shines.
+  sunTruth.forEach((v, i) =>
+    assert.ok(Math.abs(framed.sun[i] + v) < 1e-4, `sun toward ${framed.sun}, Blender's sun shines along ${sunTruth}`),
+  );
+  assert.ok(Math.abs(framed.sun[3] - 3) < 1e-4, `the 3 W/m2 sun lights the engine at ${framed.sun[3]}`);
+  {
+    const bytes = Buffer.from(framed.image.split(",")[1], "base64");
+    await writeFile("test-results/blender/scene-framed.png", bytes);
+    const image = await decodePNG(bytes),
+      p = (Math.round(image.height / 2) * image.width + Math.round(image.width / 2)) * 4,
+      [r, g, b] = image.data.subarray(p, p + 3);
+    assert.ok(r > g + 40 && r > b + 40, `the middle of Blender's framing is not the red cube: ${[r, g, b]}`);
+    framed.middle = [r, g, b];
+    delete framed.image;
+  }
+  results.push({ framed });
+
   for (let i = 0; i < results.length; i++) {
-    if (results[i].animated || results[i].components || results[i].baked || results[i].glass || results[i].live) continue;
+    if (results[i].animated || results[i].components || results[i].baked || results[i].glass || results[i].live || results[i].framed) continue;
     const screenshot = Buffer.from(
         results[i].screenshot.split(",")[1],
         "base64",

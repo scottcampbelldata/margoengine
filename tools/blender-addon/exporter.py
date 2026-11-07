@@ -16,10 +16,12 @@ class NeedsBake(ValueError):
     """A node graph the direct Principled subset cannot carry; baking turns it into images."""
 
 
-def export_scene(context, path, bake_size=1024):
+def export_scene(context, path, bake_size=1024, lights_cameras=True):
     """Writes the visible scene to `path` and returns the file size. Materials outside the direct Principled subset
     (procedural node graphs, textured metallic or roughness, other shaders) are baked with Cycles to bake_size x
-    bake_size images on each object's active UV map; bake_size=0 turns baking off, so they fail by name instead."""
+    bake_size images on each object's active UV map; bake_size=0 turns baking off, so they fail by name instead.
+    lights_cameras writes visible point, spot and sun lights and cameras as nodes with `margo:` light and camera tags,
+    which @margoengine/blender/components builds; False leaves them out as before."""
     if bake_size and not 16 <= bake_size <= 4096:
         raise ValueError("bake_size must be 0 (off) or 16 to 4096 pixels")
     # Blender Z-up to Margo/glTF Y-up; a proper rotation preserves winding.
@@ -426,6 +428,58 @@ def export_scene(context, path, bake_size=1024):
         if pending:
             depsgraph = context.evaluated_depsgraph_get()
 
+    LUMENS_PER_WATT = 683  # the luminous efficacy glTF's KHR_lights_punctual and Blender's glTF guidance assume
+
+    def light_properties(obj):
+        """`margo:` light tags for a Blender light: the components entry builds a KHR_lights_punctual light from them."""
+        light = obj.data
+        if light.type == "AREA":
+            raise ValueError(f"Light '{obj.name}': area lights have no glTF punctual equivalent; use a point, spot or sun light")
+        color = [float(c) for c in light.color]
+        if light.type == "SUN":
+            # Sun strength is irradiance in W/m2; a directional light's intensity is illuminance in lux.
+            result = {"margo:light": "directional", "margo:intensity": float(light.energy) * LUMENS_PER_WATT}
+        else:
+            # Power in W over the whole sphere; a spot's power is that of the point light it is cut from.
+            result = {"margo:light": "point" if light.type == "POINT" else "spot", "margo:intensity": float(light.energy) * LUMENS_PER_WATT / (4 * math.pi)}
+            if light.use_custom_distance:
+                result["margo:range"] = float(light.cutoff_distance) * unit_scale
+            if light.type == "SPOT":
+                outer = min(float(light.spot_size) / 2, math.pi / 2)
+                result["margo:outer_cone"] = outer
+                result["margo:inner_cone"] = outer * (1 - float(light.spot_blend))
+        result["margo:color"] = color
+        return result
+
+    def camera_properties(obj, active):
+        """`margo:` camera tags for a Blender camera: the components entry builds a glTF camera from them."""
+        camera = obj.data
+        render = context.scene.render
+        width, height = render.resolution_x * render.pixel_aspect_x, render.resolution_y * render.pixel_aspect_y
+        aspect = width / height
+        if camera.shift_x or camera.shift_y:
+            raise ValueError(f"Camera '{obj.name}': lens shift has no glTF equivalent; set Shift X and Y to 0")
+        fit = camera.sensor_fit
+        if fit == "AUTO":
+            fit = "HORIZONTAL" if aspect >= 1 else "VERTICAL"
+            sensor = camera.sensor_width
+        else:
+            sensor = camera.sensor_width if fit == "HORIZONTAL" else camera.sensor_height
+        result = {"margo:znear": float(camera.clip_start) * unit_scale, "margo:zfar": float(camera.clip_end) * unit_scale, "margo:aspect": aspect}
+        if camera.type == "PERSP":
+            half = math.atan(sensor / (2 * camera.lens))  # half the angle along the fitted side
+            result["margo:camera"] = "perspective"
+            result["margo:yfov"] = 2 * (math.atan(math.tan(half) / aspect) if fit == "HORIZONTAL" else half)
+        elif camera.type == "ORTHO":
+            half = camera.ortho_scale / 2 * unit_scale
+            result["margo:camera"] = "orthographic"
+            result["margo:ymag"] = half / aspect if fit == "HORIZONTAL" else half
+        else:
+            raise ValueError(f"Camera '{obj.name}': panoramic cameras have no glTF equivalent; use a perspective or orthographic camera")
+        if active:
+            result["margo:active"] = True
+        return result
+
     node_of = NodeOf()
     moving = []
     for instance in depsgraph.object_instances:
@@ -458,6 +512,23 @@ def export_scene(context, path, bake_size=1024):
             finally:
                 obj.to_mesh_clear()
         node_of(obj.original, None, convert(instance.matrix_world), mesh=mesh_index, instance=tuple(instance.persistent_id) if instance.is_instance else "")
+    if lights_cameras:
+        for instance in depsgraph.object_instances:
+            obj = instance.object
+            visible = instance.parent.original if instance.is_instance and instance.parent else obj.original
+            if obj.type not in ("LIGHT", "CAMERA") or not instance.show_self or not visible.visible_get(view_layer=context.view_layer):
+                continue
+            tags = light_properties(obj) if obj.type == "LIGHT" else camera_properties(obj, obj.original == context.scene.camera)
+            own = properties(obj.original)
+            clash = sorted(set(own) & set(tags))
+            if clash:
+                raise ValueError(f"Object '{obj.name}': remove the custom property '{clash[0]}'; the exporter writes it from the {obj.type.lower()}")
+            # A light or camera looks down its local -Z with +Y up in Blender and in glTF alike, so only the world
+            # axes change (basis @ M); the mesh conversion basis @ M @ basis^-1 would turn its local axes too.
+            world = basis @ instance.matrix_world
+            world.translation *= unit_scale
+            node = node_of(obj.original, None, world, instance=tuple(instance.persistent_id) if instance.is_instance else "")
+            node["extras"]["margo"]["properties"] = {**own, **tags}
     roots = [node["id"] for node in nodes]
     fields, animation = {}, b""
     if moving:
@@ -465,7 +536,7 @@ def export_scene(context, path, bake_size=1024):
         roots += animated_roots
     for node in nodes:
         del node["id"]
-    if not nodes:
+    if not geometry:
         raise ValueError("No visible mesh triangles to export")
     if len(nodes) > 100_000:
         raise ValueError("Too many exported objects")
