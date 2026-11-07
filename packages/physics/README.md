@@ -268,6 +268,42 @@ world.wake(body);
 world.columns.linearX[body] = 2;
 ```
 
+`Physics` and `PhysicsBody` from this entry keep the names of the root entry, on the own solver, so moving to it is one import. `Physics.load()` needs no peer; a mesh is optional, and an engine moves its meshes as the root entry does, with the same fixed step and interpolation.
+
+```ts
+import {Physics} from 'margoengine/physics/next';
+
+await Physics.load();                  // once per app
+const physics = new Physics(null);     // pass an engine to drive meshes; null runs without one
+const body = physics.addBody(null, {
+  position: [0, 5, 0],
+  colliders: {shape: 'sphere', radius: 0.5, density: 1},
+});
+for (let i = 0; i < 60; i++) physics.step();
+console.log(body.position[1]);         // fallen about 4.9 m in the second
+physics.dispose();
+```
+
+It holds `box`, `sphere` and `capsule` colliders, bodies of every kind, forces, impulses, velocities, damping, locks, kinematic targets, gravity, sleeping and the `beforestep` and `afterstep` events. Bodies do not collide yet. A call that needs what is still to come throws a `MargoError` with code `unsupported` naming what it waits for: other shapes, `setType`, `setMassProperties`, inertia of its own, `ccd`, `follow`, `dominance`, disabling a body, `contactFilter`, friction, restitution and every other contact setting, joints, queries, character controllers, `addModel`, `touching`, `contactPoints`, contact events and `debugRender`. `body.sleep()` and impulses take effect at the next step.
+
+A world is one block of memory, so a snapshot is one copy. `world.snapshot()` returns its bytes and `world.restore(bytes)` puts every row, pair and timer back, into a world of any size. A snapshot reads only in the kernel build that wrote it, and it covers the `KernelWorld`: a `Physics` object also holds bodies and meshes, so its restore comes with `/snapshot`.
+
+```ts
+import {KernelWorld, loadKernel} from 'margoengine/physics/next';
+
+await loadKernel();
+const world = new KernelWorld();
+const body = world.addBody('dynamic');
+world.addCollider(body, 'ball', [0.5]);
+const saved = world.snapshot(),
+  before = world.hash;
+for (let i = 0; i < 60; i++) world.step(1 / 60);
+world.restore(saved);
+console.log(world.hash === before);    // true: stepping again gives the same run
+```
+
+Same calls in the same order with the same kernel build give bit-equal worlds. `world.hash` is a fingerprint of every byte of a world, and the replay test holds it equal over 10,000 steps in Node, native code, Chromium and Firefox. `world.setPose`, `world.setTarget` and `world.setLocks` are the checked ways to write a pose, a kinematic target and locked axes.
+
 ## Limits
 
 - Scale from a parent that shears a part is not represented: a body has a position and a rotation. Mesh scale is read once when a geometry-derived collider is built.
@@ -288,6 +324,8 @@ npm install --prefix /tmp/rapier @dimforge/rapier3d-compat
 MARGOENGINE_RAPIER=/tmp/rapier/node_modules/@dimforge/rapier3d-compat npm test
 MARGOENGINE_RAPIER=/tmp/rapier/node_modules/@dimforge/rapier3d-compat npm run test:browser
 ```
+
+`npm run test:replay` runs the replay in real browsers, Chromium and Firefox by default (`REPLAY_BROWSERS`), with no WebGPU, and fails unless each gives the hashes in `tests/fixtures/replay-hash.json`. `npm run test:browser` runs it too, in the browser the other suites use, so the full check holds it on every machine. `node scripts/replay-golden.mjs` rewrites that file after a kernel change; the native test and every browser must then match it. `REPLAY_FIREFOX` names a Firefox to run in place of Playwright's own, for a machine where that one will not start.
 
 `npm test` runs Node checks against real Rapier, a minimal fake mesh and core's real transform storage: resting boxes, restitution, deterministic irregular frame times, accumulator and interpolation, slerped rotation, joints and motors, sensor events, scene queries, triangle meshes, heightfields and custom Rapier descs, mass and collision filters, forces and CCD, kinematic bodies, character movement and slopes, rope and spring joints, ropes (link lengths, pins, removal), compound colliders (one collider, mass, one contact pair, gaps between parts), convex decomposition against a convex hull (a marble inside a hollow cup), vehicles (suspension load, driving, steering direction, rolling spin, braking, reverse from sleep, wheel meshes), gravity changes waking sleepers, root-only validation, nested PBR/core collider fitting with negative and nonuniform scales, animated-source rejection, failure rollback, debug buffers, buffer reuse during synchronization, and complete disposal.
 

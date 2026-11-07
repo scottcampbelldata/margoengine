@@ -1,6 +1,7 @@
 // The Wasm exports: one world per instance, plain numbers across the boundary, columns read through JS views.
 #![cfg(target_arch = "wasm32")]
 use crate::layout::*;
+use crate::math::{Q, v3};
 use crate::world::World;
 
 static mut WORLD: Option<World> = None;
@@ -45,6 +46,11 @@ pub extern "C" fn world_columns() -> u32 {
 #[unsafe(no_mangle)]
 pub extern "C" fn world_reserve(bodies: u32, colliders: u32) -> u32 {
     world().reserve(bodies, colliders) as u32
+}
+/// Makes room for a snapshot of `bytes`; 0 when memory cannot hold it. JS then writes the block with one copy.
+#[unsafe(no_mangle)]
+pub extern "C" fn world_ensure(bytes: u32) -> u32 {
+    world().arena.ensure(bytes as usize) as u32
 }
 #[unsafe(no_mangle)]
 pub extern "C" fn world_hash() -> u32 {
@@ -132,6 +138,14 @@ pub extern "C" fn body_sleep(body: u32) {
     if world().body_alive(body) {
         world().request_sleep(body);
     }
+}
+#[unsafe(no_mangle)]
+pub extern "C" fn body_set_pose(body: u32, x: f32, y: f32, z: f32, qx: f32, qy: f32, qz: f32, qw: f32, wake: u32) {
+    world().set_pose(body, v3(x, y, z), Q { x: qx, y: qy, z: qz, w: qw }, wake != 0);
+}
+#[unsafe(no_mangle)]
+pub extern "C" fn body_set_target(body: u32, x: f32, y: f32, z: f32, qx: f32, qy: f32, qz: f32, qw: f32) {
+    world().set_target(body, v3(x, y, z), Q { x: qx, y: qy, z: qz, w: qw });
 }
 #[unsafe(no_mangle)]
 pub extern "C" fn body_remove(body: u32) -> u32 {

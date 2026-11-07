@@ -1,7 +1,7 @@
 {
   "gate": "duplicates",
   "about": "duplicated lines per package pair (8-line normalised windows); reexport items: value re-exports across packages",
-  "total": 13,
+  "total": 15,
   "history": [
     {
       "date": "2026-10-24",
@@ -20,10 +20,18 @@
       "commit": "5a46eca7",
       "reason": "The stage facade moved from packages/margoengine to packages/stage: same export * from core",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "1484a92e0",
+      "reason": "own physics entry gains Physics and PhysicsBody",
+      "grew": 2
     }
   ],
   "items": {
     "environment | staging": 12,
+    "family glb-container exporters": 1,
+    "family glb-container tiles": 1,
     "reexport packages/stage/src/index.ts * from @margoengine/core": 1
   }
 }

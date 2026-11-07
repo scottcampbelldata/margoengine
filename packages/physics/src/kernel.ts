@@ -1,6 +1,7 @@
 // The Rust kernel from JavaScript: loads the blueprint and reads the world's columns through typed-array views.
 import { MargoError } from '@margoengine/math/errors';
 import { LoadOnce } from '../../shared/load-once.js';
+import type { Quat, Vec3 } from './math.js';
 import { kernelColumns, wasmBase64 } from './wasm.js';
 
 interface KernelExports extends WebAssembly.Exports {
@@ -30,6 +31,19 @@ interface KernelExports extends WebAssembly.Exports {
   world_sleep_time(): number;
   body_wake(body: number): void;
   body_sleep(body: number): void;
+  world_ensure(bytes: number): number;
+  body_set_pose(
+    body: number,
+    x: number,
+    y: number,
+    z: number,
+    qx: number,
+    qy: number,
+    qz: number,
+    qw: number,
+    wake: number,
+  ): void;
+  body_set_target(body: number, x: number, y: number, z: number, qx: number, qy: number, qz: number, qw: number): void;
   body_add(kind: number): number;
   body_remove(body: number): number;
   body_update_mass(body: number): void;
@@ -146,7 +160,7 @@ export class KernelWorld {
       base = api.world_base();
     this.layout = api.world_layout();
     kernelColumns.forEach(([name, kind, rows], column) => {
-      const at = base + api.world_offset(column),
+      const at = base + (api.world_offset(column) >>> 0),
         length = api.world_capacity(rows);
       this.columns[name] = kind === 'f' ? new Float32Array(buffer, at, length) : new Uint32Array(buffer, at, length);
     });
@@ -227,7 +241,7 @@ export class KernelWorld {
   }
   /** Steps taken so far. */
   get steps(): number {
-    return this.api.world_steps();
+    return this.api.world_steps() >>> 0;
   }
   /**
    * Equal pieces each step is split into (default 4). Forces reach every piece; impulses land once, before the first.
@@ -301,9 +315,10 @@ export class KernelWorld {
       throw new RangeError(`Density must be finite and not negative; 1000 is water (got ${density}).`);
     if (![...position, ...rotation].every(Number.isFinite))
       throw new RangeError('A collider pose must be finite; check what fed it.');
-    const length = Math.hypot(...rotation);
-    if (Math.abs(length - 1) > 1e-3)
-      throw new RangeError(`A collider rotation must be a unit quaternion; normalize it (its length is ${length}).`);
+    const [qx, qy, qz, qw] = rotation,
+      squared = qx * qx + qy * qy + qz * qz + qw * qw;
+    if (!(squared >= 0.998001 && squared <= 1.002001))
+      throw new RangeError(`A collider rotation must be a unit quaternion; normalize it (its length squared is ${squared}).`);
     const add = (): number =>
       this.api.collider_add(
         body,
@@ -343,6 +358,31 @@ export class KernelWorld {
     return this;
   }
   /**
+   * Puts a body at a pose by hand: the step starts from it, interpolation holds it, and a `kinematicPosition` body stays
+   * there until given a target. The kernel normalises the rotation.
+   * @param wake False leaves a sleeper asleep at its new place.
+   */
+  setPose(body: number, position: Vec3, rotation: Quat, wake = true): this {
+    const [x, y, z] = position,
+      [qx, qy, qz, qw] = rotation;
+    this.api.body_set_pose(body, x, y, z, qx, qy, qz, qw, wake ? 1 : 0);
+    return this;
+  }
+  /** The pose a `kinematicPosition` body reaches at the end of the next step. The kernel normalises the rotation. */
+  setTarget(body: number, position: Vec3, rotation: Quat): this {
+    const [x, y, z] = position,
+      [qx, qy, qz, qw] = rotation;
+    this.api.body_set_target(body, x, y, z, qx, qy, qz, qw);
+    return this;
+  }
+  /** Sets the world axes a body may not move along or turn about: bit 0 for x, 1 for y, 2 for z. */
+  setLocks(body: number, { linear, angular }: { linear?: number; angular?: number }): this {
+    const { flags } = this.columns;
+    if (linear !== undefined) flags[body] = (flags[body] & ~(7 << 3)) | (linear << 3);
+    if (angular !== undefined) flags[body] = (flags[body] & ~(7 << 6)) | (angular << 6);
+    return this;
+  }
+  /**
    * Says a body's pose was written by hand. Moving bodies are looked at every step anyway; a fixed or sleeping body is
    * not, so call this after writing the pose of one. A sleeper wakes.
    */
@@ -365,11 +405,37 @@ export class KernelWorld {
   }
   /** Bytes of the world, and of a {@link KernelWorld.snapshot}. */
   get bytes(): number {
-    return this.api.world_bytes();
+    return this.api.world_bytes() >>> 0;
   }
   /** FNV-1a of the world's bytes: equal in every browser, in Node and on any machine for the same inputs. */
   get hash(): number {
-    return this.api.world_hash();
+    return this.api.world_hash() >>> 0;
+  }
+  /** The whole world as one copy of its bytes, for {@link KernelWorld.restore}. Only this kernel build can read them. */
+  snapshot(): Uint8Array {
+    const { api } = this;
+    return new Uint8Array(api.memory.buffer, api.world_base(), this.bytes).slice();
+  }
+  /**
+   * Puts the world back as a {@link KernelWorld.snapshot} found it, in one copy, at the snapshot's size. Rows, pairs, sleep
+   * and every value come back, so the steps after it give the same bits as the first time.
+   * @throws RangeError for bytes that are not a snapshot of this kernel, or when memory cannot hold them.
+   */
+  restore(snapshot: Uint8Array): this {
+    const { api } = this,
+      base = api.world_base(),
+      bytes = snapshot.byteLength,
+      words = new DataView(snapshot.buffer, snapshot.byteOffset, bytes);
+    if (
+      bytes < 8 ||
+      words.getUint32(0, true) !== new DataView(api.memory.buffer).getUint32(base, true) ||
+      words.getUint32(4, true) !== bytes
+    )
+      throw new RangeError('These bytes are not a snapshot of this kernel; use what snapshot() returned.');
+    if (!api.world_ensure(bytes)) throw new RangeError(`Memory cannot hold a snapshot of ${bytes} bytes; free another world, or use a smaller one.`);
+    new Uint8Array(api.memory.buffer, base, bytes).set(snapshot);
+    this.bind();
+    return this;
   }
   /**
    * Makes room for `bodies` and `colliders` rows. Rows keep their index and values; later steps give the same results.

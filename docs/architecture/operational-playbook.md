@@ -220,7 +220,9 @@ A second Rust kernel, the own rigid-body solver, is being built behind `@margoen
 | `packages/physics/kernel/src/broad.rs` | Sweep and prune over fat boxes, the pair rows and their table. |
 | `packages/physics/kernel/src/island.rs` | The awake and active-pair lists, union-find islands, sleep timers and sleeping rings. |
 | `packages/physics/src/wasm.ts` | Generated: raw-deflate blueprint, source hash, column table. |
-| `packages/physics/src/kernel.ts` | `KernelWorld`: instantiate, bind views, grow. |
+| `packages/physics/src/kernel.ts` | `KernelWorld`: instantiate, bind views, grow, snapshot, restore. |
+| `packages/physics/src/next/` | `Physics`, `PhysicsBody` and `PhysicsCollider` on the kernel, with the root entry's names; what is still to come throws `unsupported`. |
+| `packages/physics/src/mesh-fit.ts` | Reading a mesh for physics, shared by both entries. |
 
 `npm run build:physics-kernel` rebuilds it (cargo, wasm-opt -O3, deflate); `npm run modern:build` does too. `npm run build:packages` uses the committed blueprint. `npm run test:physics-kernel` runs the native tests.
 
@@ -238,7 +240,9 @@ Island contract: a step walks the awake list and the active-pair list only, so a
 
 Evidence so far: native tests of layout, growth and hash; Node tests of the views. `packages/physics/kernel/tests/integrate.rs` holds free fall and a projectile against the closed form with the method's own term, a free top against the closed precession rate, a heavy top against the Lagrange rate, energy on a tumbling box and at extreme spin, damping, locks, kinematic targets and an off-origin centre of mass, each bound derived from the method's error term plus f32 rounding. `packages/physics/tests/kernel-step.test.js` repeats the closed forms and the force and impulse contract through the shipped Wasm. `packages/physics/kernel/tests/bodies.rs` checks each solid's mass and moments against a numeric integral of its shape, a dumbbell against the parallel axis theorem, a tilted collider's principal frame, and that freed rows come back last in, first out. `packages/physics/kernel/tests/broad.rs` compares the pairs with brute force on every step of random scenes in which bodies move, teleport, join in batches and leave, and asserts the sorted lists, ranks, pair table and pair lists each time; two runs at different capacities must match, and overlapping balls must always be a pair. `packages/physics/kernel/tests/sleep.rs` compares islands with a plain graph search on random scenes, checks every list and ring through a churn of adds, removals, wakes and sleep requests at two capacities, and proves each rule of the sleep policy. Every row access in the native test build is bounds-checked. `packages/physics/tests/kernel-blueprint.test.js` fails when the committed blueprint's source hash is not the hash of the sources, which closes for this kernel the gap section 1.6 lists for the transform kernel. The gate also rebuilds the blueprint and requires identical bytes.
 
-Missing: everything beyond free motion. Bit equality across browsers and machines is unproved until the replay test exists.
+Replay: `packages/physics/tests/replay-scene.js` runs two 10,000-step scenes, one on `KernelWorld` and one through `Physics`, and hashes the world every 100 steps. `tests/fixtures/replay-hash.json` holds the hashes and the hash of the kernel sources, so a stale file fails. Node (`tests/replay.test.js`), native code (`kernel/tests/replay.rs`, a twin of the kernel scene) and Chromium and Firefox (`npm run test:replay`, in `.github/workflows/browser.yml`) must all give them; `npm run test:browser`, which the full check runs, holds them in that machine's default browser. The scene must reach 8 sleepers, 8 pairs, 8 islands and a growth, and moving one position by 2^-20 must change the hash, so the proof can fail. `tests/step-path.test.js` holds the entry's step path free of `Math`, clocks and `**`, which are the ways TypeScript could part from the kernel.
+
+Missing: everything beyond free motion. Bit equality is proved on one Windows x86-64 PC, in Node, native code, Chromium 156 and Firefox 157 (LIM-366); Safari, ARM and a second machine are not (section 5). Nothing is timed yet: the kernel's speed against Rapier waits for the quiet pass.
 
 ## 2. Precise GPU mathematics
 
@@ -1124,4 +1128,5 @@ The following remain technical gaps, not permission to weaken a check:
 27. Dual quaternion skinning has no frame-time measurement and no run on a GPU other than the RTX A6000.
 28. Bone-texture crowds have no frame-time measurement and no run on a GPU other than the RTX A6000.
 29. GPU Basis transcoding (`@margoengine/decoders/ktx2-gpu`) equals the Wasm transcoder byte for byte on the RTX A6000 only, and
+30. The own physics kernel is proved bit-equal on one Windows x86-64 PC only: no run in Safari, on ARM or on a second machine, and it has no timing against Rapier yet.
     its load time against a cold Wasm transcoder is not measured.

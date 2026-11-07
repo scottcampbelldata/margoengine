@@ -2,8 +2,9 @@
 use crate::layout::*;
 use crate::memory::Arena;
 
-/// Written first in every world; a restore refuses bytes that do not begin with it.
-pub const MAGIC: u32 = 0x4D50_4B31;
+/// Written first in every world; a restore refuses bytes that do not begin with it. It counts the columns, so a snapshot
+/// from a build with another layout is refused too.
+pub const MAGIC: u32 = 0x4D50_4B00 + COLUMNS as u32;
 /// End of a chain of rows.
 pub const NONE: u32 = u32::MAX;
 /// The kinetic energy per unit of mass of a body sliding at 0.02 m/s: v^2 / 2.
@@ -269,6 +270,11 @@ impl World {
             return;
         }
         self.wake(body);
+        self.mark_moved(body);
+    }
+
+    /// Puts a body's colliders on the chain the next step looks at.
+    pub fn mark_moved(&mut self, body: u32) {
         let mut collider = unsafe { *self.u(FIRST_COLLIDER).add(body as usize) };
         while collider != NONE {
             self.mark_pending(collider);

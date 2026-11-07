@@ -27,7 +27,8 @@
   "scripts": {
     "build": "node scripts/build.js",
     "test": "npm run build && node --test tests/*.test.js",
-    "test:browser": "npm run build && node scripts/test-browser.js",
+    "test:browser": "npm run build && node scripts/test-browser.js && node scripts/test-replay.js --browsers=default",
+    "test:replay": "npm run build && node scripts/test-replay.js",
     "prepack": "npm run build"
   },
   "sideEffects": false,

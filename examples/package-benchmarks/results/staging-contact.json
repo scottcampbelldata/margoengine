@@ -1,6 +1,6 @@
 {
- "recordedAt": "2026-10-24T17:31:45.231Z",
- "commit": "f06e5ed3",
+ "recordedAt": "2026-11-07T12:48:28.927Z",
+ "commit": "c6e1ecae0",
  "acPowerBefore": true,
  "pixels": {
   "cubeContact": {
@@ -111,9 +111,9 @@
    "frames": 65,
    "static": false,
    "passesPerFrame": 4,
-   "updateMs": 0.010239999999999999,
+   "updateMs": 0.007168,
    "planeMs": 0.008192,
-   "totalMs": 0.018944,
+   "totalMs": 0.015359999999999999,
    "samples": "1280x720 4x MSAA",
    "resolution": 256,
    "stats": {
@@ -126,8 +126,8 @@
    "static": true,
    "passesPerFrame": 1,
    "updateMs": 0,
-   "planeMs": 0.009216,
-   "totalMs": 0.009216,
+   "planeMs": 0.00512,
+   "totalMs": 0.00512,
    "samples": "1280x720 4x MSAA",
    "resolution": 256,
    "stats": {
@@ -139,9 +139,9 @@
    "frames": 65,
    "static": false,
    "passesPerFrame": 4,
-   "updateMs": 0.028672,
+   "updateMs": 0.024576,
    "planeMs": 0.008192,
-   "totalMs": 0.036864,
+   "totalMs": 0.032768,
    "samples": "1280x720 4x MSAA",
    "resolution": 512,
    "stats": {
@@ -154,8 +154,8 @@
    "static": true,
    "passesPerFrame": 1,
    "updateMs": 0,
-   "planeMs": 0.009216,
-   "totalMs": 0.009216,
+   "planeMs": 0.00512,
+   "totalMs": 0.00512,
    "samples": "1280x720 4x MSAA",
    "resolution": 512,
    "stats": {
@@ -167,9 +167,9 @@
    "frames": 65,
    "static": false,
    "passesPerFrame": 4,
-   "updateMs": 0.15667199999999998,
+   "updateMs": 0.147456,
    "planeMs": 0.008192,
-   "totalMs": 0.16486399999999998,
+   "totalMs": 0.155648,
    "samples": "1280x720 4x MSAA",
    "resolution": 1024,
    "stats": {
@@ -182,8 +182,8 @@
    "static": true,
    "passesPerFrame": 1,
    "updateMs": 0,
-   "planeMs": 0.009216,
-   "totalMs": 0.009216,
+   "planeMs": 0.00512,
+   "totalMs": 0.00512,
    "samples": "1280x720 4x MSAA",
    "resolution": 1024,
    "stats": {
@@ -229,9 +229,9 @@
    "description": "NVIDIA RTX A6000",
    "fallback": false
   },
-  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36 Edg/155.0.0.0",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36 Edg/156.0.0.0",
   "browserName": "chromium",
-  "browserVersion": "155.0.4283.62",
+  "browserVersion": "156.0.4314.58",
   "requestedChannel": "msedge",
   "launchArgs": [
    "--enable-webgpu-developer-features"

@@ -84,6 +84,34 @@ impl World {
         unsafe { *self.u(FLAGS).add(at) }
     }
 
+    /// Puts a body at a pose by hand. The step starts from it, interpolation holds it, and a kinematicPosition body stays
+    /// there until given a target. The rotation is normalised here, as `sqrt` belongs to the kernel. A sleeper stays asleep
+    /// unless `wake`, and its centre moves with it, so a later wake carries on from the new pose.
+    pub fn set_pose(&mut self, body: u32, position: V3, rotation: Q, wake: bool) {
+        if !self.body_alive(body) {
+            return;
+        }
+        if wake {
+            self.wake(body);
+        }
+        let at = body as usize;
+        let rotation = rotation.normalized();
+        for (x, r) in [(POSITION_X, ROTATION_X), (PREVIOUS_X, PREVIOUS_ROTATION_X), (TARGET_X, TARGET_ROTATION_X)] {
+            self.set_v(x, at, position);
+            self.set_q(r, at, rotation);
+        }
+        self.set_v(CENTER_X, at, position.add(rotation.rotate(self.v(LOCAL_CENTER_X, at))));
+        self.mark_moved(body);
+    }
+
+    /// The pose a kinematicPosition body reaches at the end of the next step.
+    pub fn set_target(&mut self, body: u32, position: V3, rotation: Q) {
+        if self.body_alive(body) {
+            self.set_v(TARGET_X, body as usize, position);
+            self.set_q(TARGET_ROTATION_X, body as usize, rotation.normalized());
+        }
+    }
+
     /// Advances the world by `dt` in `substeps` equal pieces. Pairs are found once a step, over the motion the whole step
     /// is expected to make.
     pub fn step(&mut self, dt: f32) {

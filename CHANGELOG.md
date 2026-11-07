@@ -4,6 +4,7 @@
 
 ### Physics
 
+- `@margoengine/physics/next` gains `Physics`, `PhysicsBody` and `PhysicsCollider` on the own solver, with the root entry's names and no peer install. Free motion only for now: what needs contacts, joints or queries throws `unsupported`. `KernelWorld` gains `snapshot`, `restore`, `setPose`, `setTarget` and `setLocks`. A replay holds 10,000 steps bit-equal across Node, native code, Chromium and Firefox.
 - `@margoengine/physics/next`, a preview of Margo's own solver: a Rust kernel in WebAssembly with its world and memory views, bodies that move under gravity, forces and impulses, `substeps` (default 4), and `addCollider` for balls, boxes and capsules, which work out a body's mass, centre and inertia, sweep and prune with `world.pairs()`, and islands that sleep. Rapier stays the default.
 - Revolute and prismatic joints take `frameA` and `frameB` in place of `axis`, so limits count from the rest pose. `physics.solverIterations`, `body.additionalSolverIterations`, `body.appliedForce`, `body.appliedTorque` and `physics.contactPoints(body)` read what used to need the solver's own objects, and `@margoengine/ragdoll` now runs on the public Physics API alone: `Physics.load()` replaces passing `rapier`.
 - `@margoengine/physics2d/outline`: `outlineColliders` and `traceOutlines` make colliders from a sprite's alpha, holes and hollows included.

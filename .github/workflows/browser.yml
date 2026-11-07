@@ -157,6 +157,10 @@ jobs:
         env:
           BROWSER_CHANNEL: chromium
           BROWSER_ARGS: '["--enable-unsafe-webgpu", "--use-webgpu-adapter=swiftshader", "--enable-unsafe-swiftshader", "--use-angle=d3d11-warp"]'
+      - name: Verify the own physics kernel replays bit for bit in Chromium and Firefox
+        run: |
+          node node_modules/@playwright/test/cli.js install firefox
+          npm run test:replay --workspace @margoengine/physics
       - name: Build standalone DOF and tonemapping demos
         run: |
           npm --prefix packages/dof run build:demo

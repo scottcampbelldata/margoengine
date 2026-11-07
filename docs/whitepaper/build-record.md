@@ -1610,6 +1610,33 @@ Five jobs that take every package off Rapier's own objects while Rapier still ru
 - **Unmeasured:** no speed was taken; none of this changes what the solver does each step.
 - **Gate:** lint, hygiene, verify, the tests of physics, ragdoll, gltf-pro, voxel, react and stage, the GPU tests of physics, gltf-pro extensions and react, the push from one script that stops at the first failing step. The first gate of job 5 stopped at verify on the installed Rapier types, where a solver contact point can be null; nothing was pushed.
 
+## Batch 123: physics P1, kernel skeleton
+
+Six jobs that start Margo's own rigid-body solver: a Rust kernel in Wasm, written from papers, behind `@margoengine/physics/next`. Bodies move freely, nothing collides yet, and Rapier stays the default until batch 130.
+
+| # | Job | Status | Commit | Entry | Claim |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Crate, build, blueprint, column layout and views | DONE | `4686da852` | `physics/next` | - |
+| 2 | Integrator, gravity, damping, forces every substep, impulses once | DONE | `759d3fac2` | `physics/next` | LIM-367 |
+| 3 | Free lists, colliders, mass from shapes | DONE | `8cbae1ec8` | `physics/next` | - |
+| 4 | Sweep and prune broad phase with a pair cache | DONE | `c175e5874` | `physics/next` | - |
+| 5 | Islands and sleeping | DONE | `120bd8976` | `physics/next` | - |
+| 6 | `Physics` and `PhysicsBody` on the kernel, snapshot, replay | DONE | this commit | `physics/next` | LIM-366, LIM-367 |
+
+Outside the batch, `a8a83ca39` reads V8's tier bits by measurement (`tests/v8-tiers.test.js`), after a run of this lane showed them read wrongly.
+
+- **Proof asked for:** free fall, a projectile and spinning tops, free and heavy, against closed forms, each bound worked out from the step (`kernel/tests/integrate.rs`, LIM-367). `cargo test` passes. 10,000 steps give equal hashes in Node, native x86-64, Chromium 156 and Firefox 157 (LIM-366). The native twin matched the Wasm hashes on its first run, so no literal differed between the two scenes.
+- **Bugs fixed:** `clear_row` zeroed the dense list columns when they sat in the body class, so a reused row emptied a list slot: `sleepers_in_a_random_churn_keep_every_list_true` in `kernel/tests/sleep.rs`. Columns and hash read as signed numbers past 2^31 through Wasm: `>>> 0` on offsets, bytes, steps and hash, `tests/next-physics.test.js`. V8's tier bits, as above. `checkRotation` in the own entry used `**`, which the language only approximates: found by the step-path rule, `tests/step-path.test.js`.
+- **A test bound corrected before it landed:** the first broad phase test held pair start under 30 steps, by wrong arithmetic: the gap closes at 2 m/s, so a pair starts near step 57. It now holds passes 56 to 58, worked out from the margins, which is tighter.
+- **Coverage held by changing the scene:** the replay scene reached 7 sleepers against a bound of 8, as forces landed too often for bodies to rest. The scene now toggles forces more rarely and damps three bodies in four, reaching 9, with the bound unchanged.
+- **Test tool:** TypeScript 7 has no JavaScript AST API, so `tests/step-path.test.js` carries a small scanner for comments, strings and templates, with tests of its own for what it must find and leave alone.
+- **Checks kept honest:** the size update also wrote two new `no-fix` items into the API baseline. That was reverted and both error messages now name a fix. Verify refused the replay script as a browser driver no check starts, so `test:browser` now runs it in the default browser, with no entry on the tools list.
+- **Sources:** PK1 to PK17 in `docs/clean-room.md`. Read in full: the WebAssembly numerics section, Catto 2005, Catto 2006 slides, Catto 2015, Macklin 2019, Cohen 1995 (I-COLLIDE), Jayanti and Tarjan 2020, Hairer's lecture 2, Marsaglia 2003. Read in part: Erleben's 2005 thesis, chapter 5 and section 6.5, as the rest is on other subjects; the FNV draft, sections 1 to 7, not its source code. Not read: Tarjan 1975, behind a paywall, and its 1972 report, a scan with no text layer; Baraff's 1992 thesis, a scan with no text layer.
+- **Size:** the `@margoengine/physics/next` entry is 27,422 B gzip, 12,876 B of it the deflated kernel. The root entry and core plus stage do not change.
+- **Stand-in or missing:** Firefox ran from a copy of Playwright's build under the worktree, as Windows on this PC would not start it from the home folder; the cause sits in that folder, as the same files run elsewhere, and is not pinned down further. Chromium ran as Playwright's headless shell. Safari, ARM and a second machine are unmeasured.
+- **Unmeasured:** no speed was taken. SIMD integration and the cost of a single add wait for the quiet pass.
+- **Gate:** lint, hygiene, verify, `cargo test`, the blueprint compare, the physics tests, its browser test, `test:replay`, claims and public truth, the push from one script that stops at the first failing step.
+
 ## Batch 49: shadows
 
 Eight jobs for `@margoengine/shadows`, each proved on real glTF models or real elevation against Blender Cycles, a path tracer that shares no code with Margo.

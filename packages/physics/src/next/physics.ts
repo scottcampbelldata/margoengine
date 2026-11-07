@@ -1,0 +1,466 @@
+/// <reference lib="esnext.disposable" preserve="true" />
+// The own solver behind the names `Physics` has today. On the step path: no `Math`, tests/step-path.test.js holds that.
+import { MargoError } from '@margoengine/math/errors';
+import type { EngineKernel, EnginePlugin, Mesh } from '@margoengine/core';
+import type { BodyOptions, BodyType } from '../body.js';
+import { KernelWorld, loadKernel, type KernelLoadOptions } from '../kernel.js';
+import { checkVec, type Quat, type Vec3 } from '../math.js';
+import { colliderGeometry } from '../mesh-fit.js';
+import type { ColliderOptions, ShapeOptions } from '../shapes.js';
+import { PhysicsBody, checkRotation, type BodyOwner } from './body.js';
+import { PhysicsCollider } from './collider.js';
+import { kernelCollider, shapeServed } from './shapes.js';
+import { MeshSync, meshPose } from './sync.js';
+
+/** Options for creating a Physics world; every field has a default. */
+export interface PhysicsOptions {
+  /** Default [0, -9.81, 0]. */
+  gravity?: Vec3;
+  /** Seconds per physics step (default 1/60). */
+  fixedTimestep?: number;
+  /** Most steps per frame; extra time is dropped so a slow frame cannot snowball (default 4). */
+  maxSubsteps?: number;
+  /** Interpolate rendered transforms between the last two steps (default true). */
+  interpolate?: boolean;
+  /** Multiplies frame time, for slow motion (default 1). */
+  timeScale?: number;
+  /** Start paused (default false). */
+  paused?: boolean;
+  /** Equal pieces each step is split into; forces reach every piece and impulses land once (default 4). */
+  substeps?: number;
+  /** The old name of `substeps`, kept for one release. */
+  solverIterations?: number;
+  /** Plugin name (default 'physics'). */
+  name?: string;
+}
+
+/** Events a Physics world emits so far: the contact events come with contacts. */
+export interface PhysicsEventMap {
+  /** Before each fixed step, with the step length. Drive kinematic bodies here. */
+  beforestep: number;
+  afterstep: number;
+}
+
+/** @internal A helper that steps, syncs and is disposed with a world. */
+export interface PhysicsAttachment {
+  beforeStep?(dt: number): void;
+  afterSync?(): void;
+  bodyRemoved?(body: PhysicsBody): void;
+  dispose(): void;
+}
+
+const noop = (): void => {};
+// Set.forEach with the event as thisArg calls listeners without allocating a closure or a snapshot array.
+function callListener(this: never, listener: (event: never) => void): void {
+  listener(this);
+}
+const attachmentSync = (attachment: PhysicsAttachment): void => attachment.afterSync?.();
+const later = (what: string, when: string): MargoError =>
+  new MargoError('unsupported', `${what} is not in the own solver yet; it comes with ${when}. Use @margoengine/physics until then.`);
+const bits = (enabled: readonly [boolean, boolean, boolean]): number =>
+  (enabled[0] ? 0 : 1) | (enabled[1] ? 0 : 2) | (enabled[2] ? 0 : 4);
+
+/**
+ * Rigid-body physics on Margo's own solver as a Margo Engine plugin. The same names as `Physics` from the root entry, with
+ * a fixed timestep, an accumulator and interpolation. Bodies fall, turn and sleep; they do not touch yet, so a call that
+ * needs contacts, joints or queries throws `unsupported`. A preview, removed when it becomes the root.
+ */
+export class Physics implements EnginePlugin, BodyOwner {
+  readonly name: string;
+  fixedTimestep: number;
+  maxSubsteps: number;
+  interpolate: boolean;
+  timeScale: number;
+  paused: boolean;
+  /** Fixed steps taken since creation. */
+  stepCount = 0;
+  private world: KernelWorld | null;
+  private engine: EngineKernel | null = null;
+  private accumulator = 0;
+  private lastAlpha = 1;
+  private disposed = false;
+  private readonly meshes: MeshSync;
+  private readonly bodies = new Set<PhysicsBody>();
+  private readonly byMesh = new Map<Mesh, PhysicsBody>();
+  private readonly byRow = new Map<number, PhysicsCollider>();
+  private readonly attachments = new Set<PhysicsAttachment>();
+  private readonly listeners = new Map<keyof PhysicsEventMap, Set<(event: never) => void>>();
+
+  /**
+   * Gets the solver ready, once per app: compiling it is asynchronous, so `new Physics(engine)` can stay synchronous.
+   * Later calls resolve at once, calls made during a load share it, and a failed load is tried again by the next call.
+   * @example await Physics.load();
+   * const physics = new Physics(engine);
+   * @throws AbortError (the signal's reason) when `signal` aborts first.
+   */
+  static async load(options: KernelLoadOptions = {}): Promise<void> {
+    await loadKernel(options);
+  }
+  /** Creates the Physics on `engine` (preferred over the constructor). */
+  static attach(engine: EngineKernel, options: PhysicsOptions = {}): Physics {
+    return new Physics(engine, options);
+  }
+  /**
+   * @throws MargoError (`state`) before {@link Physics.load} has finished.
+   * @throws MargoError (`unsupported`) for an option the own solver does not hold yet.
+   */
+  constructor(engine: EngineKernel | null, options: PhysicsOptions = {}) {
+    if ('rapier' in options) throw new TypeError('The own solver takes no rapier option; leave it out.');
+    if ('contactFilter' in options) throw later('contactFilter', 'contacts');
+    this.name = options.name ?? 'physics';
+    this.fixedTimestep = options.fixedTimestep ?? 1 / 60;
+    this.maxSubsteps = options.maxSubsteps ?? 4;
+    this.interpolate = options.interpolate ?? true;
+    this.timeScale = options.timeScale ?? 1;
+    this.paused = options.paused ?? false;
+    if (!(this.fixedTimestep > 0 && this.fixedTimestep <= 1)) throw new RangeError('fixedTimestep must be in (0, 1] seconds');
+    if (!Number.isInteger(this.maxSubsteps) || this.maxSubsteps < 1)
+      throw new RangeError('maxSubsteps must be a positive integer');
+    const gravity = options.gravity ?? [0, -9.81, 0];
+    checkVec(gravity, 'Gravity');
+    this.world = new KernelWorld();
+    this.world.setGravity(...gravity);
+    const substeps = options.substeps ?? options.solverIterations;
+    if (substeps !== undefined) this.world.substeps = substeps;
+    this.meshes = new MeshSync(this.world.columns, (body) => this.removeBody(body));
+    if (engine)
+      try {
+        engine.use(this);
+      } catch (error) {
+        this.dispose();
+        throw error;
+      }
+  }
+
+  /** The kernel's world: its columns, `hash`, `snapshot` and `restore`. A preview; it may change while the solver is built. */
+  get kernel(): KernelWorld {
+    if (this.disposed) throw new MargoError('disposed', 'Physics is disposed; create a new Physics.');
+    return this.world!;
+  }
+  get isDisposed(): boolean {
+    return this.disposed;
+  }
+  get gravity(): [number, number, number] {
+    return this.kernel.gravity;
+  }
+  set gravity(value: Vec3) {
+    checkVec(value, 'Gravity');
+    const kernel = this.kernel,
+      old = kernel.gravity;
+    kernel.setGravity(value[0], value[1], value[2]);
+    // A sleeper would float in the old field: wake it.
+    if (old[0] !== value[0] || old[1] !== value[1] || old[2] !== value[2])
+      for (const body of this.bodies) if (body.type === 'dynamic') kernel.wake(body.row);
+  }
+  /** Interpolation factor used by the last `update`: leftover accumulator time over the step length, 0..1. */
+  get alpha(): number {
+    return this.lastAlpha;
+  }
+  /** Leftover simulation time in seconds, less than one step. */
+  get pendingTime(): number {
+    return this.accumulator;
+  }
+  /** Equal pieces each step is split into (default 4). */
+  get substeps(): number {
+    return this.kernel.substeps;
+  }
+  set substeps(substeps: number) {
+    this.kernel.substeps = substeps;
+  }
+  /** The old name of {@link Physics.substeps}, kept for one release. */
+  get solverIterations(): number {
+    return this.substeps;
+  }
+  set solverIterations(passes: number) {
+    this.substeps = passes;
+  }
+  /** How many colliders the world holds. */
+  get colliderCount(): number {
+    return this.byRow.size;
+  }
+  get bodyCount(): number {
+    return this.bodies.size;
+  }
+
+  // Engine plugin hooks.
+  setup(engine: EngineKernel): void {
+    if (this.disposed) throw new MargoError('disposed', 'Physics is disposed; create a new Physics.');
+    if (this.engine && this.engine !== engine)
+      throw new MargoError('attached', 'Physics is attached to another engine; create one Physics per engine.');
+    this.engine = engine;
+  }
+  onPreUpdate(delta: number): void {
+    this.update(delta);
+  }
+
+  /** Advances the accumulator by `delta` seconds, runs whole fixed steps, then writes interpolated poses to meshes. Returns the number of steps. */
+  update(delta: number): number {
+    if (this.disposed) return 0;
+    if (!Number.isFinite(delta) || delta < 0) throw new RangeError('delta must be a finite, non-negative number of seconds');
+    let steps = 0;
+    if (!this.paused) {
+      const dt = this.fixedTimestep;
+      this.accumulator += delta * this.timeScale;
+      while (this.accumulator + dt * 1e-6 >= dt && steps < this.maxSubsteps) {
+        this.step();
+        this.accumulator -= dt;
+        steps++;
+      }
+      if (this.accumulator >= dt) this.accumulator %= dt;
+      if (this.accumulator < 0) this.accumulator = 0;
+      this.lastAlpha = this.interpolate ? this.accumulator / dt : 1;
+    }
+    this.sync();
+    return steps;
+  }
+
+  /** Runs exactly one fixed step. Does not touch meshes; call `sync()` to write them. */
+  step(): void {
+    const kernel = this.kernel,
+      dt = this.fixedTimestep;
+    this.emit('beforestep', dt);
+    if (this.disposed) return;
+    this.attachments.forEach(this.attachmentStep);
+    kernel.step(dt);
+    this.stepCount++;
+    this.emit('afterstep', dt);
+  }
+  private readonly attachmentStep = (attachment: PhysicsAttachment): void => attachment.beforeStep?.(this.fixedTimestep);
+
+  /** Writes body poses to their meshes, interpolated by `alpha` between the last two steps. Allocates nothing. */
+  sync(alpha = this.lastAlpha): void {
+    if (this.disposed) return;
+    if (!Number.isFinite(alpha)) throw new RangeError('Interpolation alpha must be a finite number; pass a value from 0 to 1.');
+    this.meshes.write(this.bodies, !this.interpolate || alpha > 1 ? 1 : alpha < 0 ? 0 : alpha);
+    this.attachments.forEach(attachmentSync);
+  }
+
+  /**
+   * Creates a rigid body, optionally driving `mesh`. Physics works in world space: the body starts at the mesh's world
+   * pose, and each frame the interpolated world pose is written to the mesh's position and rotation (relative to its
+   * parent for a child mesh, using the parent's current world transform, so there is no frame of lag). Scale is never
+   * written.
+   * @throws MargoError (`unsupported`) for an option the own solver does not hold yet.
+   */
+  addBody(mesh: Mesh | null, options: BodyOptions = {}): PhysicsBody {
+    const kernel = this.kernel,
+      type: BodyType = options.type ?? 'dynamic';
+    if (!['dynamic', 'fixed', 'kinematicPosition', 'kinematicVelocity'].includes(type))
+      throw new TypeError(`Unknown body type ${type}; use dynamic, fixed, kinematicPosition or kinematicVelocity.`);
+    if (mesh && this.byMesh.has(mesh))
+      throw new MargoError('state', 'This mesh already has a physics body; remove it first or use the existing body.');
+    if (options.ccd) throw later('ccd', 'continuous collision');
+    if (options.follow) throw later('follow', 'the character and vehicle batch');
+    if (options.dominance) throw later('dominance', 'contacts');
+    const start = mesh ? meshPose(mesh, this.engine) : null,
+      position = options.position ?? start?.position ?? [0, 0, 0],
+      rotation: Quat = options.rotation ?? start?.rotation ?? [0, 0, 0, 1];
+    checkVec(position, 'Position');
+    checkRotation(rotation);
+    if (options.linearVelocity) checkVec(options.linearVelocity, 'linearVelocity');
+    if (options.angularVelocity) checkVec(options.angularVelocity, 'angularVelocity');
+    const row = kernel.addBody(type),
+      body = new PhysicsBody(this, row, mesh, type),
+      columns = kernel.columns;
+    kernel.setPose(row, position, rotation);
+    if (options.linearVelocity) body.setLinearVelocity(options.linearVelocity);
+    if (options.angularVelocity) body.setAngularVelocity(options.angularVelocity);
+    if (options.linearDamping !== undefined) columns.linearDamping[row] = options.linearDamping;
+    if (options.angularDamping !== undefined) columns.angularDamping[row] = options.angularDamping;
+    if (options.gravityScale !== undefined) columns.gravityScale[row] = options.gravityScale;
+    if (options.canSleep !== undefined) kernel.setCanSleep(row, options.canSleep);
+    if (options.additionalMass !== undefined) columns.additionalMass[row] = options.additionalMass;
+    const angular = options.lockRotations ? 7 : options.enabledRotations ? bits(options.enabledRotations) : 0,
+      linear = options.lockTranslations ? 7 : options.enabledTranslations ? bits(options.enabledTranslations) : 0;
+    kernel.setLocks(row, { linear, angular });
+    body.userData = options.userData;
+    body.fitScale = start?.fitScale;
+    // A pose taken from the mesh is already on the mesh; writing it back would only round a child's transform.
+    if (mesh && !options.position && !options.rotation) body.dirty = false;
+    this.bodies.add(body);
+    if (mesh) this.byMesh.set(mesh, body);
+    const colliders =
+      options.colliders === undefined
+        ? mesh
+          ? [{ shape: 'box' } as ColliderOptions]
+          : []
+        : Array.isArray(options.colliders)
+          ? options.colliders
+          : [options.colliders as ColliderOptions];
+    try {
+      for (const collider of colliders) this.addCollider(body, collider);
+    } catch (error) {
+      this.removeBody(body);
+      throw error;
+    }
+    kernel.updateMass(row);
+    if (options.sleeping) kernel.sleep(row);
+    return body;
+  }
+
+  /** The body of a mesh, if it has one. */
+  bodyOf(mesh: Mesh): PhysicsBody | undefined {
+    return this.byMesh.get(mesh);
+  }
+  /** The body a collider or its handle belongs to. */
+  bodyOfCollider(collider: PhysicsCollider | number): PhysicsBody | undefined {
+    return this.byRow.get(typeof collider === 'number' ? collider : collider.handle)?.body;
+  }
+  /** True when the own solver holds this shape. */
+  supportsShape(shape: ShapeOptions['shape']): boolean {
+    return shapeServed(shape);
+  }
+  getBodies(): PhysicsBody[] {
+    return [...this.bodies];
+  }
+
+  /** @internal use `body.addCollider`. */
+  addCollider(body: PhysicsBody, options: ColliderOptions): PhysicsCollider {
+    const { mesh } = body,
+      fitted = (options.shape === 'box' && !options.halfExtents) || (options.shape === 'sphere' && options.radius === undefined),
+      fit =
+        mesh && fitted
+          ? colliderGeometry(mesh, body.fitScale)
+          : { geometry: null, scale: mesh ? ([mesh.scale.x, mesh.scale.y, mesh.scale.z] as const) : ([1, 1, 1] as const) };
+    if (body.fitScale && mesh?.geometry) fit.scale = body.fitScale;
+    const { name, shape, size, options: placed } = kernelCollider(options, fit),
+      row = this.kernel.addCollider(body.row, shape, size, placed),
+      collider = new PhysicsCollider(this.kernel, row, body, name);
+    body.colliders.push(collider);
+    this.byRow.set(row, collider);
+    return collider;
+  }
+  /** @internal use `body.removeCollider`. */
+  removeCollider(body: PhysicsBody, collider: PhysicsCollider): void {
+    const index = body.colliders.indexOf(collider);
+    if (index < 0) throw new MargoError('state', 'Collider does not belong to this body; pass a collider from body.colliders.');
+    body.colliders.splice(index, 1);
+    this.byRow.delete(collider.handle);
+    this.kernel.removeCollider(collider.handle);
+    collider.markRemoved();
+  }
+
+  /** Removes a body with its colliders. */
+  removeBody(body: PhysicsBody): void {
+    if (!this.bodies.has(body)) return;
+    for (const attachment of [...this.attachments]) attachment.bodyRemoved?.(body);
+    for (const collider of body.colliders) this.byRow.delete(collider.handle);
+    this.bodies.delete(body);
+    if (body.mesh) this.byMesh.delete(body.mesh);
+    this.kernel.removeBody(body.row);
+    body.markRemoved();
+  }
+  owns(body: PhysicsBody): boolean {
+    return this.bodies.has(body);
+  }
+  /** @internal Registers a helper that steps and syncs with the world. */
+  attach(attachment: PhysicsAttachment): void {
+    if (this.disposed) throw new MargoError('disposed', 'Physics is disposed; create a new Physics.');
+    this.attachments.add(attachment);
+  }
+  /** @internal Unregisters a helper; returns false when it was not attached. */
+  detach(attachment: PhysicsAttachment): boolean {
+    return this.attachments.delete(attachment);
+  }
+
+  /**
+   * Subscribes to step events. Returns an unsubscribe function.
+   * @throws MargoError (`unsupported`) for a contact event: it could never fire yet.
+   */
+  on<K extends keyof PhysicsEventMap>(type: K, listener: (event: PhysicsEventMap[K]) => void): () => void {
+    if (type !== 'beforestep' && type !== 'afterstep') throw later(`The ${String(type)} event`, 'contacts');
+    if (this.disposed) return noop;
+    let set = this.listeners.get(type);
+    if (!set) this.listeners.set(type, (set = new Set()));
+    set.add(listener);
+    return () => {
+      set!.delete(listener);
+    };
+  }
+  private emit<K extends keyof PhysicsEventMap>(type: K, event: PhysicsEventMap[K]): void {
+    // Listeners removed during dispatch are skipped; listeners added during dispatch also run for this event.
+    this.listeners.get(type)?.forEach(callListener, event);
+  }
+
+  /** Not served yet: throws. */
+  addModel(): never {
+    throw later('addModel', 'trimesh shapes');
+  }
+  /** Not served yet: throws. */
+  addJoint(): never {
+    throw later('addJoint', 'joints');
+  }
+  /** Not served yet: throws. */
+  removeJoint(): never {
+    throw later('removeJoint', 'joints');
+  }
+  /** Not served yet: throws. */
+  createCharacterController(): never {
+    throw later('createCharacterController', 'the character and vehicle batch');
+  }
+  /** Not served yet: throws. */
+  removeController(): never {
+    throw later('removeController', 'the character and vehicle batch');
+  }
+  /** Not served yet: throws. */
+  raycast(): never {
+    throw later('raycast', 'queries');
+  }
+  /** Not served yet: throws. */
+  raycastAll(): never {
+    throw later('raycastAll', 'queries');
+  }
+  /** Not served yet: throws. */
+  shapeCast(): never {
+    throw later('shapeCast', 'queries');
+  }
+  /** Not served yet: throws. */
+  projectPoint(): never {
+    throw later('projectPoint', 'queries');
+  }
+  /** Not served yet: throws. */
+  intersectPoint(): never {
+    throw later('intersectPoint', 'queries');
+  }
+  /** Not served yet: throws. */
+  intersectShape(): never {
+    throw later('intersectShape', 'queries');
+  }
+  /** Not served yet: throws. */
+  touching(): never {
+    throw later('touching', 'contacts');
+  }
+  /** Not served yet: throws. */
+  contactPoints(): never {
+    throw later('contactPoints', 'contacts');
+  }
+  /** Not served yet: throws. */
+  debugRender(): never {
+    throw later('debugRender', 'contacts');
+  }
+
+  /** Frees every body and the world. Detaches from the engine if attached. */
+  dispose(): void {
+    if (this.disposed) return;
+    const engine = this.engine;
+    if (engine && !engine.disposed && engine.hasPlugin(this.name)) {
+      // removePlugin calls back into dispose() after unregistering.
+      try {
+        engine.removePlugin(this.name);
+        return;
+      } catch {
+        /* engine is tearing down; free below */
+      }
+    }
+    for (const attachment of [...this.attachments]) attachment.dispose();
+    for (const body of [...this.bodies]) this.removeBody(body);
+    this.listeners.clear();
+    this.disposed = true;
+    this.engine = null;
+    this.world = null;
+  }
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {
+    this.dispose();
+  }
+}
