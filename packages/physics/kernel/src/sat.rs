@@ -47,6 +47,27 @@ pub enum Feature {
     Edges(usize, usize, V3),
 }
 
+impl Feature {
+    /// As a number for a pair's row: zero is none, two bits of kind, then the face. Edges keep their kind only: a pair that
+    /// touched by edges prefers edges, and whichever pair is deepest then wins.
+    pub fn code(self) -> u32 {
+        match self {
+            Feature::FaceA(f) => 1 | (f as u32) << 2,
+            Feature::FaceB(f) => 2 | (f as u32) << 2,
+            Feature::Edges(..) => 3,
+        }
+    }
+    /// The feature a number names, with no axis for edges.
+    pub fn from_code(code: u32) -> Option<Feature> {
+        match code & 3 {
+            1 => Some(Feature::FaceA((code >> 2) as usize)),
+            2 => Some(Feature::FaceB((code >> 2) as usize)),
+            3 => Some(Feature::Edges(0, 0, v3(0.0, 0.0, 0.0))),
+            _ => None,
+        }
+    }
+}
+
 /// How much a face must lose by before an edge pair or B's face replaces it, in metres. Often several axes tie; contact
 /// points stay coherent when the same kind of feature wins each time (Gregorius 2015).
 const FACE_BIAS: f32 = 1e-3;
@@ -67,6 +88,13 @@ fn query_faces(a: &Poly, b: &Poly, rel: Pose) -> (usize, f32) {
         }
     }
     (best, most)
+}
+
+/// How far `b` lies from one face of `a`. `rel` is `b` in `a`'s frame.
+fn face_separation(a: &Poly, b: &Poly, rel: Pose, f: usize) -> f32 {
+    let n = a.normal(f);
+    let local = rel.q.unrotate(n);
+    n.dot(rel.p) + local.dot(b.support(local.scale(-1.0))) - a.plane(f)
 }
 
 /// True when the arc from `a` to `b` crosses the arc from `c` to `d` on the unit sphere. `bxa` and `dxc` are the normals of
@@ -126,6 +154,12 @@ fn query_edges(a: &Poly, b: &Poly, rel: Pose) -> Option<(usize, usize, V3, f32)>
 /// The separating axis test. `rel` is `b` in `a`'s frame. None when some axis separates the two by more than `limit`.
 /// Otherwise the feature with the largest separation, which is negative when the shapes overlap.
 pub fn sat(a: &Poly, b: &Poly, rel: Pose, limit: f32) -> Option<(Feature, f32)> {
+    sat_coherent(a, b, rel, limit, None)
+}
+
+/// The same, keeping last step's feature while it is within the bias of the best, so a tie does not change the reference
+/// face from step to step (Gregorius 2015: the solver likes contact points built from the same features between frames).
+pub fn sat_coherent(a: &Poly, b: &Poly, rel: Pose, limit: f32, last: Option<Feature>) -> Option<(Feature, f32)> {
     let (face_a, separation_a) = query_faces(a, b, rel);
     if separation_a > limit {
         return None;
@@ -135,17 +169,30 @@ pub fn sat(a: &Poly, b: &Poly, rel: Pose, limit: f32) -> Option<(Feature, f32)> 
     if separation_b > limit {
         return None;
     }
-    let (face, face_separation) =
+    let (face, face_separation_best) =
         if separation_b > separation_a + FACE_BIAS { (Feature::FaceB(face_b), separation_b) } else { (Feature::FaceA(face_a), separation_a) };
-    if let Some((ea, eb, axis, separation)) = query_edges(a, b, rel) {
+    let edges = query_edges(a, b, rel);
+    let mut best = (face, face_separation_best);
+    if let Some((ea, eb, axis, separation)) = edges {
         if separation > limit {
             return None;
         }
-        if separation > face_separation + FACE_BIAS {
-            return Some((Feature::Edges(ea, eb, axis), separation));
+        let margin = if matches!(last, Some(Feature::Edges(..))) { -FACE_BIAS } else { FACE_BIAS };
+        if separation > face_separation_best + margin {
+            best = (Feature::Edges(ea, eb, axis), separation);
         }
     }
-    Some((face, face_separation))
+    let held = match last {
+        Some(Feature::FaceA(f)) if f < a.faces => Some((Feature::FaceA(f), face_separation(a, b, rel, f))),
+        Some(Feature::FaceB(f)) if f < b.faces => Some((Feature::FaceB(f), face_separation(b, a, inverse, f))),
+        _ => None,
+    };
+    if let Some(held) = held {
+        if held.1 + FACE_BIAS >= best.1 {
+            return Some(held);
+        }
+    }
+    Some(best)
 }
 
 /// The closest points of two segments as parameters on each, from setting both partial derivatives of the squared distance

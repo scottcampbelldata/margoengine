@@ -6,7 +6,7 @@ use crate::gjk::{Posed, Segment, epa, gjk};
 use crate::hull::{BoxData, Poly, box_poly};
 use crate::layout::*;
 use crate::math::*;
-use crate::sat::{Feature, Pose, closest_on_segments, sat};
+use crate::sat::{Feature, Pose, closest_on_segments, sat_coherent};
 use crate::world::World;
 
 /// A clipped polygon's most vertices: a largest face, plus one for each side plane of another.
@@ -39,12 +39,16 @@ pub struct Manifold {
     pub normal: V3,
     pub count: usize,
     pub points: [Point; MANIFOLD],
+    /// What the pair held last step, for the coherence of this one: its point ids, how many, and the feature that won.
+    pub held: [u32; MANIFOLD],
+    pub held_count: usize,
+    pub feature: u32,
 }
 
 impl Manifold {
     pub fn new() -> Self {
         let zero = v3(0.0, 0.0, 0.0);
-        Self { normal: zero, count: 0, points: [Point { on_a: zero, on_b: zero, separation: 0.0, id: 0 }; MANIFOLD] }
+        Self { normal: zero, count: 0, points: [Point { on_a: zero, on_b: zero, separation: 0.0, id: 0 }; MANIFOLD], held: [0; MANIFOLD], held_count: 0, feature: 0 }
     }
 }
 
@@ -91,20 +95,78 @@ fn clip(input: &[ClipVertex], output: &mut [ClipVertex; CLIP], normal: V3, offse
     count
 }
 
-/// Keeps the deepest points. Job 5 of the batch replaces this with the reduction by area.
-fn keep_deepest(points: &mut [Point], count: usize, out: &mut Manifold) {
-    let kept = if count < MANIFOLD { count } else { MANIFOLD };
-    for i in 0..kept {
-        let mut best = i;
-        for j in i + 1..count {
-            if points[j].separation < points[best].separation {
-                best = j;
-            }
-        }
-        points.swap(i, best);
-        out.points[i] = points[i];
+/// How much better than a point the pair held last step a new one must score, as a fraction: a tiny turn must not swap a
+/// point for its neighbour, or the solver loses what the point carried and the stack shakes.
+const STICK: f32 = 0.05;
+/// The same for depth, in metres.
+const STICK_DEPTH: f32 = 1e-3;
+
+/// Four of the points, spanning the largest area they can, by the iteration of Gregorius 2015: the deepest point, so
+/// nothing about to tunnel is dropped, then the point farthest from it, then the largest triangle on that edge, then the
+/// point adding the most area outside the triangle, which is a product and a sign rather than a distance. The points lie
+/// on one plane with this `normal`. Gregorius takes the third point by signed area alone; here it is by size, with the
+/// edge turned to suit, so a set lying wholly on one side of the edge is served as well. `held` are last step's ids.
+pub fn reduce(points: &[Point], count: usize, normal: V3, held: &[u32], out: &mut Manifold) {
+    if count <= MANIFOLD {
+        out.points[..count].copy_from_slice(&points[..count]);
+        out.count = count;
+        return;
     }
-    out.count = kept;
+    let is_held = |i: usize| held.iter().any(|&id| id & !ID_FLIP == points[i].id & !ID_FLIP);
+    let favour = |i: usize, score: f32| if is_held(i) { score * (1.0 + STICK) } else { score };
+    let (mut a, mut deepest) = (0, f32::INFINITY);
+    for i in 0..count {
+        let depth = points[i].separation - if is_held(i) { STICK_DEPTH } else { 0.0 };
+        if depth < deepest {
+            deepest = depth;
+            a = i;
+        }
+    }
+    let at = |i: usize| points[i].on_a;
+    let (mut b, mut farthest) = (a, -1.0);
+    for i in 0..count {
+        let between = at(i).sub(at(a));
+        let score = favour(i, between.dot(between));
+        if i != a && score > farthest {
+            farthest = score;
+            b = i;
+        }
+    }
+    // Twice the signed area of a triangle, seen from the normal's side.
+    let area = |x: usize, y: usize, z: usize| at(y).sub(at(x)).cross(at(z).sub(at(x))).dot(normal);
+    let (mut c, mut largest) = (a, -1.0);
+    for i in 0..count {
+        let score = favour(i, area(a, b, i).abs());
+        if i != a && i != b && score > largest {
+            largest = score;
+            c = i;
+        }
+    }
+    if area(a, b, c) < 0.0 {
+        core::mem::swap(&mut a, &mut b);
+    }
+    let (mut d, mut added) = (count, 0.0);
+    for i in 0..count {
+        if i == a || i == b || i == c {
+            continue;
+        }
+        let (ab, bc, ca) = (area(a, b, i), area(b, c, i), area(c, a, i));
+        let outside = if ab < bc { ab } else { bc };
+        let outside = if outside < ca { outside } else { ca };
+        let score = favour(i, -outside);
+        if outside < 0.0 && score > added {
+            added = score;
+            d = i;
+        }
+    }
+    out.points[0] = points[a];
+    out.points[1] = points[b];
+    out.points[2] = points[c];
+    out.count = 3;
+    if d < count {
+        out.points[3] = points[d];
+        out.count = 4;
+    }
 }
 
 /// A face contact (Gregorius 2015): the face of `reference` is the reference face, the most anti-parallel face of
@@ -169,14 +231,16 @@ fn face_contact(reference: &Poly, incident: &Poly, rel: Pose, face: usize, limit
         }
     }
     out.normal = n;
-    keep_deepest(&mut points, kept, out);
+    let held = out.held;
+    reduce(&points, kept, n, &held[..out.held_count], out);
 }
 
 /// A manifold between two polyhedra, in world space. `pose_a` and `pose_b` are the shapes' frames.
 pub fn collide_polys(a: &Poly, pose_a: Pose, b: &Poly, pose_b: Pose, limit: f32, out: &mut Manifold) {
     out.count = 0;
     let rel = pose_a.relative(pose_b);
-    let Some((feature, separation)) = sat(a, b, rel, limit) else { return };
+    let Some((feature, separation)) = sat_coherent(a, b, rel, limit, Feature::from_code(out.feature)) else { return };
+    out.feature = feature.code();
     match feature {
         Feature::FaceA(f) => {
             face_contact(a, b, rel, f, limit, out);
@@ -499,7 +563,13 @@ impl World {
                 continue;
             }
             let limit = self.contact_limit(a, b, dt);
+            manifold.held_count = self.uu(PAIR_CONTACTS, row) as usize;
+            for k in 0..manifold.held_count {
+                manifold.held[k] = self.uu(CONTACT_ID, row * MANIFOLD + k);
+            }
+            manifold.feature = self.uu(PAIR_FEATURE, row);
             self.collide(a, b, limit, &mut manifold);
+            self.set_u(PAIR_FEATURE, row, if manifold.count > 0 { manifold.feature } else { 0 });
             self.store_manifold(row, body_a, body_b, &manifold, ratio);
         }
     }

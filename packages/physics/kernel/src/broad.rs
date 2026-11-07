@@ -492,6 +492,7 @@ impl World {
         self.set_u(PAIR_B, at, b);
         self.set_u(PAIR_FLAGS, at, 0);
         self.set_u(PAIR_CONTACTS, at, 0);
+        self.set_u(PAIR_FEATURE, at, 0);
         self.set_u(PAIR_NEXT_A, at, first_a);
         self.set_u(PAIR_PREVIOUS_A, at, NONE);
         self.set_u(PAIR_NEXT_B, at, first_b);

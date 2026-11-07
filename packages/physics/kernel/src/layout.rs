@@ -187,6 +187,8 @@ columns! {
     PAIR_NORMAL_X f32 Pair,
     PAIR_NORMAL_Y f32 Pair,
     PAIR_NORMAL_Z f32 Pair,
+    // The feature that made the manifold, for the coherence of the next step.
+    PAIR_FEATURE u32 Pair,
     // Open addressing: a pair's row plus one, zero when empty.
     PAIR_TABLE u32 Table,
     // Awake bodies, densely.
