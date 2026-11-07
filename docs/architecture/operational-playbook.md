@@ -601,6 +601,15 @@ the table and the march within 0.05% on one ray across the top; the CPU sun tran
 optical depth to 1e-4. Missing: other GPUs, a reference image or radiance from another renderer, timing (4 to 6 ms per
 frame at 128 x 96 with Bloom, diagnostic).
 
+`LightShafts` (`@margoengine/sky/shafts`) is a screen-space pass after the aerial perspective (order 4.5): a half-size
+r16float mask of open sky (2 x 2 depth taps) times the clouds' transmittance along each view ray, from its own copy of
+the cloud noise volumes, then a fullscreen draw that walks the mask toward the sun's projected position and adds light
+with one-one blending. The sun's screen place is the projection of its direction (w = 0); its clip w is the cosine to
+the view axis and fades the effect, so a sun behind the camera adds nothing. Normalizing by the summed weights makes
+the blur a share of lit air, so the added light is linear in `intensity` and exactly 0 where every sample is occluded.
+Evidence: `features-check.mjs` shafts on a Radeon 680M at 4x and 1x. Missing: other GPUs, a reference renderer,
+timing (about 12 ms per frame at 256 x 192 with Bloom, diagnostic), off-screen occluders.
+
 A `ShadowFilterEffect` replaces the named filters' last step in `shadowVisibility`, after the cascade pick and the receiver
 plane. `varianceFilter` turns the depth map into two moments, blurs them by two separable passes when the map changes, and
 bounds the lit share with Chebyshev's inequality. A filter's shader must keep `shadowSampler` read, in a branch never taken,

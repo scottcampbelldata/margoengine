@@ -2334,6 +2334,10 @@
       "./hillaire": {
         "raw": 18406,
         "gzip": 6607
+      },
+      "./shafts": {
+        "raw": 17828,
+        "gzip": 6883
       }
     },
     "@margoengine/splats": {

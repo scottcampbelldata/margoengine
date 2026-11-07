@@ -1,0 +1,88 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Sky light shafts check</title><style>body{margin:0}canvas{display:block;width:256px;height:192px}</style></head><body><canvas width="256" height="192"></canvas>
+<script type="module">
+// Light shafts on a real GPU, read back from Bloom's HDR scene capture: the light each pixel gains with the shafts on.
+// Driven by features-check.mjs.
+import {Engine,PbrMaterial,box} from '/packages/core/dist/index.js';
+import {sceneSamples} from '/packages/core/dist/quality.js';
+import {Bloom} from '/packages/post/dist/bloom.js';
+import {Sky} from '/packages/sky/dist/index.js';
+import {VolumetricClouds} from '/packages/sky/dist/volumetric-clouds.js';
+import {LightShafts} from '/packages/sky/dist/shafts.js';
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
+if(new URLSearchParams(location.search).get('samples')==='1')globalThis.margoLow=1;
+const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,2,0],target:[0,27,-100],near:0.5,far:200000}}),device=engine.gpu,errors=[];
+engine.stop();
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const post=Bloom.attach(engine,{strength:0,threshold:1,exposure:0});
+const low=[0,0.25,-1],high=[0,1,-1];
+const sky=new Sky({hours:12,timeScale:0,sunDirection:low});engine.use(sky);
+const grey=new PbrMaterial({color:'#5a5a5a',roughness:0.9});
+engine.createMesh().setGeometry(box(4000,0.2,4000)).setMaterial(grey);
+// A panel 100 m away across the whole view toward the low sun (whose ray crosses it at x 0, y 27), with one 6 m hole
+// centred 20 m to the right of the sun. Parked far below until the hole case.
+const holeX=20,holeY=27,half=3,panel=[[-200,holeX-half,-100,200],[holeX+half,200,-100,200],[holeX-half,holeX+half,holeY+half,200],[holeX-half,holeX+half,-100,holeY-half]]
+ .map(([x0,x1,y0,y1])=>({mesh:engine.createMesh().setGeometry(box(x1-x0,y1-y0,1)).setMaterial(grey).setPosition([0,-5000,0]),at:[(x0+x1)/2,(y0+y1)/2,-100]}));
+const showPanel=(on)=>{for(const p of panel)p.mesh.setPosition(on?p.at:[0,-5000,0]);};
+const module=device.createShaderModule({code:'@group(0) @binding(0) var image:texture_2d<f32>;@group(0) @binding(1) var<storage,read_write> result:array<vec4f>;@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u){let s=textureDimensions(image);if(any(id.xy>=s)){return;}result[id.y*s.x+id.x]=textureLoad(image,vec2i(id.xy),0);}'});
+const pipeline=device.createComputePipeline({layout:'auto',compute:{module,entryPoint:'main'}});
+async function read(texture){
+ const bytes=texture.width*texture.height*16,output=device.createBuffer({size:bytes,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),staging=device.createBuffer({size:bytes,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+ const encoder=device.createCommandEncoder(),pass=encoder.beginComputePass();pass.setPipeline(pipeline);
+ pass.setBindGroup(0,device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:texture.createView()},{binding:1,resource:{buffer:output}}]}));
+ pass.dispatchWorkgroups(Math.ceil(texture.width/8),Math.ceil(texture.height/8));pass.end();encoder.copyBufferToBuffer(output,0,staging,0,bytes);device.queue.submit([encoder.finish()]);
+ await staging.mapAsync(GPUMapMode.READ);const data=new Float32Array(staging.getMappedRange()).slice();staging.unmap();output.destroy();staging.destroy();return data;
+}
+const frame=async(delta=0)=>{sky.onPreUpdate(delta);engine.render({delta});await device.queue.onSubmittedWorkDone();return read(post.sceneTexture);};
+const norm=(v)=>{const l=Math.hypot(...v);return v.map((x)=>x/l);};
+const view=(position,direction)=>{engine.camera.position=position;engine.camera.target=position.map((p,i)=>p+direction[i]*100);};
+// The pixel a world direction from the eye lands on, or null off screen.
+const pixel=(direction)=>{
+ const m=engine.camera.matrix,e=engine.camera.position,W=post.sceneTexture.width,H=post.sceneTexture.height,p=e.map((x,i)=>x+direction[i]*1000);
+ const x=m[0]*p[0]+m[4]*p[1]+m[8]*p[2]+m[12],y=m[1]*p[0]+m[5]*p[1]+m[9]*p[2]+m[13],w=m[3]*p[0]+m[7]*p[1]+m[11]*p[2]+m[15];
+ const px=Math.floor((x/w*0.5+0.5)*W),py=Math.floor((0.5-y/w*0.5)*H);return w>0&&px>=0&&py>=0&&px<W&&py<H?py*W+px:null;
+};
+// Directions at angle a (degrees) from s, at angle phi around it.
+const around=(s,a,phi)=>{const r=norm([-s[2],0,s[0]]),u=[r[1]*s[2]-r[2]*s[1],r[2]*s[0]-r[0]*s[2],r[0]*s[1]-r[1]*s[0]],ca=Math.cos(a*Math.PI/180),sa=Math.sin(a*Math.PI/180),cp=Math.cos(phi),sp=Math.sin(phi);return s.map((x,i)=>x*ca+(r[i]*cp+u[i]*sp)*sa);};
+// The light added at a pixel (sum of the three channels), and the most added anywhere.
+const added=(a,b,i)=>i===null?NaN:(a[i*4]-b[i*4])+(a[i*4+1]-b[i*4+1])+(a[i*4+2]-b[i*4+2]);
+const changed=(a,b)=>{let n=0;for(let p=0;p<a.length;p++)if(p%4!==3&&a[p]!==b[p])n++;return n;};
+const withShafts=async(options)=>{const shafts=LightShafts.attach(engine,{sky,depth:()=>post.depthTexture,...options});const t0=performance.now();const image=await frame();const ms=performance.now()-t0;shafts.dispose();return {image,ms};};
+window.check={samples:sceneSamples,
+ async run(){
+  device.pushErrorScope('validation');const out={};const s=norm(low);
+  // Open sky toward a low sun: the shafts add light, most near the sun.
+  view([0,2,0],s);await waitForPipelines(frame);const bare=await frame();
+  await waitForPipelines(async()=>(await withShafts({})).image);
+  const lit=await withShafts({});
+  out.open={angles:[2,8,15,25].map((a)=>added(lit.image,bare,pixel(around(s,a,Math.PI/2)))),ms:lit.ms};
+  // Twice the intensity (default 0.1) adds twice the light, to the rounding of the half-float scene: each stored value is
+  // within half a step, 2^(e - 11) for exponent e, of its true value, and a 4x resolve averages rounded samples and rounds
+  // again, so twice that bounds each value. The gain at twice the intensity minus twice the gain must stay within the sum.
+  const twice=await withShafts({intensity:0.2});const step=(v)=>2*2**(Math.floor(Math.log2(Math.max(Math.abs(v),2**-14)))-11);let lit1=0,off=0,worst=0;
+  for(let p=0;p<bare.length;p++){if(p%4===3)continue;const b=bare[p],a1=lit.image[p],a2=twice.image[p];if(a1>b)lit1++;const tol=step(a2)+step(b)+2*(step(a1)+step(b)),err=Math.abs((a2-b)-2*(a1-b));worst=Math.max(worst,err/tol);if(err>tol)off++;}
+  out.linear={lit:lit1,off,worst};
+  out.zero=changed((await withShafts({intensity:0})).image,bare);
+  // The sun behind the camera: nothing changes.
+  view([0,2,0],s.map((x)=>-x));const back=await frame();out.behind=changed((await withShafts({})).image,back);
+  // The panel with its hole: the pixel beyond the hole, on the line from the sun, is lit; the pixels as far from the
+  // sun on lines without a hole (left, below) gain nothing at all.
+  showPanel(true);view([0,2,0],s);const wall=await frame();const holed=(await withShafts({})).image;showPanel(false);(window.shots??={}).panel={wall,holed};window.shots.open={bare,lit:lit.image};
+  const at=(x,y)=>pixel(norm([x,y-2,-100]));
+  out.hole={hole:added(holed,wall,at(holeX,holeY)),beyond:added(holed,wall,at(holeX*2,holeY)),left:added(holed,wall,at(-holeX*2,holeY)),below:added(holed,wall,at(0,holeY-holeX*2)),openBeyond:added(lit.image,bare,at(holeX*2,holeY))};
+  // A high sun seen through clouds: overcast takes the shafts away; broken cloud makes them uneven around the sun,
+  // where the clear sky gives every direction at one angle the same light.
+  sky.options.sunDirection=high;const h=norm(high);view([0,2,0],h);
+  const ring=(a,b)=>Array.from({length:24},(_,k)=>added(a,b,pixel(around(h,12,k*Math.PI/12))));
+  const cloudy={};
+  for(const [name,coverage] of [['clear',0],['broken',0.5],['overcast',1]]){
+   const clouds=VolumetricClouds.attach(engine,{sky,coverage,density:coverage===1?0.08:0.04});
+   await waitForPipelines(frame);const base=await frame();const image=(await withShafts({clouds})).image;clouds.dispose();
+   window.shots[name]={base,image};cloudy[name]={centre:added(image,base,pixel(around(h,2,0))),ring:ring(image,base)};
+  }
+  out.clouds=cloudy;sky.options.sunDirection=low;
+  const error=await device.popErrorScope();
+  return {...out,error:error?.message??null,errors:errors.splice(0)};
+ }};
+window.shot=(name,key)=>{const f=window.shots[name][key],o=new Array(f.length);for(let p=0;p<f.length;p++)o[p]=(p%4===3)?255:Math.round(255*Math.min(1,Math.pow(f[p]/(1+f[p]),1/2.2)));return o;};
+window.ready=true;
+</script></body></html>

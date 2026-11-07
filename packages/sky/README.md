@@ -42,6 +42,7 @@ const sky = Sky.attach(engine, {model: 'bruneton', clouds: {coverage: 0.4}}, {br
 | `/cloud-shadows` | `volumetricCloudShadows`, a shadow effect for `@margoengine/shadows` | 3.2 kB |
 | `/aerial` | `AerialPerspective`, its own plugin: distant surfaces take the air's colour | 6.5 kB |
 | `/hillaire` | `HillaireSky`, its own plugin: a physical sky with ozone from the ground to space | 6.6 kB |
+| `/shafts` | `LightShafts`, its own plugin: god rays past geometry and through cloud gaps | 6.9 kB |
 
 Each entry is compressed on its own ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)),
 so sums overstate a combined bundle: the root `Sky` is 10.2 kB with all of them, against 13.7 kB
@@ -281,6 +282,52 @@ use it to colour the scene's sun.
 its height. It does not light the scene itself (no engine sun, ambient or reflection map): set core's sun from
 `sky.sun` and `sky.sunTransmittance`. The clouds still colour their sunlight with the root sky's turbidity model.
 On a display target (no HDR scene capture) the sky is display-encoded there. Needs WebGPU.
+
+## Light shafts
+
+`LightShafts` from `@margoengine/sky/shafts` adds god rays: light from the sun streaming past mountains, buildings and
+trees, and through the gaps in `VolumetricClouds`, in the sky itself (Mitchell 2007, "Volumetric Light Scattering as a
+Post-Process", GPU Gems 3 ch. 13). It needs the scene's depth.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Sky} from 'margoengine/sky';
+import {Bloom} from 'margoengine/post/bloom';
+import {VolumetricClouds} from 'margoengine/sky/volumetric-clouds';
+import {LightShafts} from 'margoengine/sky/shafts';
+const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu', camera: {far: 100000}});
+const bloom = Bloom.attach(engine);
+const sky = Sky.attach(engine, {hours: 17.5, timeScale: 0});
+const clouds = VolumetricClouds.attach(engine, {sky, coverage: 0.5, depth: () => bloom.depthTexture});
+const shafts = LightShafts.attach(engine, {sky, clouds, depth: () => bloom.depthTexture});
+shafts.options.intensity = 0.2;
+```
+
+Each frame a half-size mask marks where the sun can be seen: the share of each texel's 2 × 2 pixels that is open sky
+by the scene depth, times the clouds' transmittance along that view ray (their own density field, drift and options,
+marched `cloudSamples` times). Each pixel then samples the mask `samples` times on the line toward the sun's place on
+screen, weighting each step by `decay`; that weighted share of lit air, times the sunlight (the sky's sun colour,
+illuminance and exposure), the air's Henyey-Greenstein phase toward the camera and `intensity`, is added to the scene.
+Pixels whose line to the sun crosses only geometry gain nothing. The shafts fade out as the sun passes 75 degrees off
+the view axis and stop when it is behind the camera.
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `depth` | required | the scene's reversed-Z depth each frame |
+| `sky` | none | the sky to follow (`Sky` or `HillaireSky`); without it `sunDirection` (default [0.3, 0.6, 0.4]) |
+| `clouds` | none | `VolumetricClouds` the light comes through |
+| `intensity` | 0.1 | share of the sunlight the lit air scatters toward the camera, 0 to 100 |
+| `anisotropy` | 0.6 | Henyey-Greenstein g, 0 to 0.95: how strongly the shafts gather near the sun |
+| `decay` | 0.97 | weight kept from one sample to the next, 0.5 to 1 |
+| `length` | 0.9 | share of the way to the sun that is sampled, 0.05 to 1 |
+| `samples` | 48 | mask samples per pixel, 8 to 128 |
+| `cloudSamples` | 12 | cloud samples per mask texel, 2 to 64 |
+| `sunIlluminance` | from the sky | sun strength in the sky's units (as `AerialPerspective`) |
+
+It is a screen-space effect: a sun off screen still casts shafts from its place beyond the edge, but occluders off
+screen cast none, and an orthographic camera gets none. The moon casts no shafts. On a display target (no HDR scene
+capture) the light is display-encoded and blended there, an approximation; with Bloom, tonemapping or another HDR
+capture it is exact. Needs WebGPU.
 
 ## Sun, ambient and a sky that lights the scene
 

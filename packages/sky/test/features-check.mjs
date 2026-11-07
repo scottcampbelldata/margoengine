@@ -110,6 +110,36 @@ const checks = {
       console.log(`ok aerial ${samples}x ${row.name} (${row.distance / 1000} km): transmittance ${show(row.transmittance)} (CPU ${show(row.cpu)}), air ${show(row.inscatter)}`);
     return r;
   },
+  async shafts(page, samples) {
+    const r = await page.evaluate(() => window.check.run());
+    const show = (v) => v.map((x) => x.toFixed(4)).join(', ');
+    console.log(`  shafts ${samples}x open at 2, 8, 15, 25 degrees: ${show(r.open.angles)}; frame ${r.open.ms.toFixed(1)} ms (diagnostic)`);
+    console.log(`  shafts ${samples}x hole ${JSON.stringify(r.hole)}; linear ${JSON.stringify(r.linear)}`);
+    for (const [name, v] of Object.entries(r.clouds)) console.log(`  shafts ${samples}x ${name}: centre ${v.centre.toFixed(4)}, ring ${show(v.ring)}`);
+    assert.equal(r.error, null);
+    assert.deepEqual(r.errors, []);
+    // Open sky: light is added everywhere around the sun, falling with the angle from it (the forward phase).
+    const [a2, a8, a15, a25] = r.open.angles;
+    assert.ok(a25 > 0 && a15 > a25 && a8 > a15 && a2 > a8, `open sky: ${show(r.open.angles)}`);
+    // The added light is linear in the intensity, to the half-float rounding of the scene (bound per value in the page).
+    assert.ok(r.linear.lit > 10000 && r.linear.off === 0, `linear: ${JSON.stringify(r.linear)}`);
+    assert.equal(r.zero, 0, 'intensity 0 changed pixels');
+    assert.equal(r.behind, 0, 'the sun behind the camera changed pixels');
+    // Behind the panel the light comes only through its hole: the pixel beyond the hole on the sun's line gains light,
+    // those as far from the sun on lines that cross only the panel gain exactly nothing.
+    const h = r.hole;
+    assert.ok(h.hole > 0 && h.beyond > 0.1 * h.openBeyond, `hole: ${JSON.stringify(h)}`);
+    assert.equal(h.left, 0, `left of the sun: ${JSON.stringify(h)}`);
+    assert.equal(h.below, 0, `below the sun: ${JSON.stringify(h)}`);
+    // Clouds: overcast leaves under a twentieth of the clear sky's shafts beside the sun; broken cloud spreads the
+    // light around a ring 12 degrees out at least three times as far as the clear sky, which holds it even.
+    const spread = (v) => (Math.max(...v.ring) - Math.min(...v.ring)) / (v.ring.reduce((a, b) => a + b) / v.ring.length);
+    const { clear, broken, overcast } = r.clouds;
+    assert.ok(clear.centre > 0 && overcast.centre < clear.centre / 20, `overcast ${overcast.centre} against clear ${clear.centre}`);
+    assert.ok(spread(clear) < 0.2 && spread(broken) > Math.max(1, 3 * spread(clear)), `ring spread clear ${spread(clear)}, broken ${spread(broken)}`);
+    console.log(`ok shafts ${samples}x: open sky by angle, linear, behind, hole, clouds (spread ${spread(clear).toFixed(3)} clear, ${spread(broken).toFixed(3)} broken)`);
+    return r;
+  },
   async hillaire(page, samples) {
     const r = await page.evaluate(() => window.check.run());
     const show = (v) => v.map((x) => x.toPrecision(4)).join(', ');

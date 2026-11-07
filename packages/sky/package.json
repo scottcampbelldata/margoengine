@@ -82,6 +82,10 @@
     "./hillaire": {
       "types": "./dist/hillaire.d.ts",
       "import": "./dist/hillaire.js"
+    },
+    "./shafts": {
+      "types": "./dist/shafts.d.ts",
+      "import": "./dist/shafts.js"
     }
   },
   "files": [
