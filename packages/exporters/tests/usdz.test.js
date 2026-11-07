@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { box, PbrMaterial } from '@margoengine/core';
-import { exportUSDZ } from '../dist/usdz.js';
+import { readFile } from 'node:fs/promises';
+import { exportUSDZ, measureUSDZ } from '../dist/usdz.js';
 import { exportGLB } from '../dist/index.js';
 import { parseUSDZ, readZipDirectory, readZipEntry } from '@margoengine/loaders';
 import { parseUSDZ as readUSD } from '@margoengine/usdz';
@@ -513,4 +514,17 @@ test('texture offset, scale, rotation and wrap modes round-trip through @margoen
       assert.ok(Math.abs(uvs[corner * 2 + 1] - quad.uvs[v * 2 + 1]) < 1e-6);
     }
   }
+});
+
+test('exportUSDZ takes GLB bytes, so a textured file with no clip has a way in', async () => {
+  const glb = new Uint8Array(await readFile(new URL('./fixtures/BoxTextured.glb', import.meta.url))),
+    archive = exportUSDZ(glb),
+    names = readZipDirectory(archive).map(({ name }) => name),
+    text = await usda(archive);
+  assert.ok(names.some((name) => /\.(png|jpe?g)$/.test(name)), 'the texture travels with the file');
+  assert.match(text, /UsdUVTexture/);
+  const { size, skipped } = measureUSDZ(glb);
+  assert.deepEqual(size.map((value) => Math.round(value * 1e6) / 1e6), [1, 1, 1]);
+  assert.deepEqual(skipped, []);
+  assert.throws(() => exportUSDZ(new Uint8Array(40)), TypeError);
 });

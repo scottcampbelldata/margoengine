@@ -881,9 +881,11 @@ Apache-2.0 licensed.
 
 ## USDZ for AR Quick Look
 
-`exportUSDZ(engineOrDataScene, options)` returns a `Uint8Array`: a static USDA root and its texture images in an uncompressed ZIP with 64-byte-aligned entries. Positions, normals and reflected winding use the existing validated scene collector. Names are kept as display names; hidden descendants are skipped. The stage has a default prim, Y up, meter units, mesh extents and UsdPreviewSurface color/roughness/metalness/emission/opacity materials.
+`exportUSDZ(engineOrDataSceneOrGLB, options)` returns a `Uint8Array`: a static USDA root and its texture images in an uncompressed ZIP with 64-byte-aligned entries. Positions, normals and reflected winding use the existing validated scene collector. Names are kept as display names; hidden descendants are skipped. The stage has a default prim, Y up, meter units, mesh extents and UsdPreviewSurface color/roughness/metalness/emission/opacity materials.
 
-Import `exportUSDZ` from `@margoengine/exporters/usdz`; it loads only USDZ serialization and its shared scene collector. The package root does not export it, so applications that never write USDZ do not carry it.
+A textured model loaded in an engine is refused, as its images are on the GPU: pass the bytes of the GLB, or what `exportModel` gives, and `measureUSDZ(bytes).skipped` names what the file holds that a USDZ cannot.
+
+Import `exportUSDZ` from `@margoengine/exporters/usdz`; it loads only USDZ serialization, the GLB reader and its shared scene collector. The package root does not export it, so applications that never write USDZ do not carry it.
 
 Save as `.usdz`. A supported Apple device can open `<a rel="ar" href="model.usdz"><img src="preview.png" alt="View the model in AR"></a>`. No headset is required to generate or validate the file.
 

@@ -1101,7 +1101,7 @@ export function collect(
           Object.keys(mat.extensions ?? {}).length)
       )
         fail(
-          'PBR texture and material extension export is unsupported; export textured models with exportModel (@margoengine/exporters/model), or as OBJ, STL or PLY',
+          'PBR texture and material extension export is unsupported; export textured models with exportModel (@margoengine/exporters/model), whose GLB bytes exportUSDZ and exportAnimatedUSDZ also take, or as OBJ, STL or PLY',
         );
       if (loaded === 'baseColor' && live)
         fail(

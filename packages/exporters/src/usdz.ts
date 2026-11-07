@@ -8,6 +8,7 @@ import {
   type Geo,
   type Mat,
 } from './scene.js';
+import { sceneOfGLB, type GLBSceneSkip } from './glb-scene.js';
 import {
   boxSize,
   checkPlacement,
@@ -37,6 +38,8 @@ export interface USDZMeasure {
   bounds: USDZBox;
   /** The even scale `height` asked for; 1 without it. */
   scale: number;
+  /** What a GLB held that the USDZ cannot; empty for any other source. */
+  skipped: GLBSceneSkip[];
 }
 
 /** The world box of what `items` draw. */
@@ -60,16 +63,17 @@ function worldBox(items: readonly Drawable[]): USDZBox {
  * const usdz = exportUSDZ(scene, height > 3 ? { height: 1.7, ground: true } : {});
  * ```
  *
- * @throws RangeError for an empty scene or a bad `height`; TypeError for a bad `ground`.
+ * @throws RangeError for an empty scene or a bad `height`; TypeError for a bad `ground`, or bytes that are not a GLB.
  */
-export function measureUSDZ(source: ExportSource, options: USDZOptions = {}): USDZMeasure {
+export function measureUSDZ(source: ExportSource | Uint8Array, options: USDZOptions = {}): USDZMeasure {
   checkPlacement(options);
-  const items = drawables(collect(source, options));
+  const read = source instanceof Uint8Array ? sceneOfGLB(source) : { scene: source, skipped: [] },
+    items = drawables(collect(read.scene, options));
   if (!items.length) throw new RangeError('USDZ requires at least one mesh');
   const rest = worldBox(items),
     placement = placementOf(rest, options),
     bounds = placedBox(rest, placement);
-  return { size: boxSize(bounds), bounds, scale: placement.scale };
+  return { size: boxSize(bounds), bounds, scale: placement.scale, skipped: read.skipped };
 }
 
 /**
@@ -106,7 +110,9 @@ const OUTSIDE_FLOAT32 =
   'USDZ world position exceeds Float32 range; move the model closer to the origin or lower its scale';
 
 /**
- * Static USD meshes with UsdPreviewSurface materials in a stored, 64-byte-aligned USDZ archive. Every mesh is written in
+ * Static USD meshes with UsdPreviewSurface materials in a stored, 64-byte-aligned USDZ archive, from an engine, a data
+ * scene or the bytes of a GLB. A textured model loaded in an engine is refused: pass its GLB bytes, as `exportModel` gives
+ * them, and {@link measureUSDZ} says what the file holds that the USDZ cannot. Every mesh is written in
  * its own space, with the node's world matrix as `xformOp:transform`. A geometry drawn by several nodes is written once,
  * as a `class` prim each node's Mesh references. A node with a reflection in its matrix draws a reflected shape, written
  * once for the nodes that mirror that geometry, with the reflection taken out of its matrix. A material shared by several
@@ -119,16 +125,16 @@ const OUTSIDE_FLOAT32 =
  * are stored as given (PNG or JPEG) under `texturePrefix`. A `baseColorTextureTransform` becomes a `UsdTransform2d`
  * that samples the same texels as the glTF transform: its rotation in degrees with the same sign (the V flip turns
  * glTF's counter-clockwise-with-v-down into USD's counter-clockwise-with-t-up), the translation re-expressed in st.
- * @throws TypeError when a textured material's geometry lacks the UV set it samples, or when vertex colors meet a
- * base color texture (USD Preview Surface cannot multiply them); RangeError for an empty scene, a world position
+ * @throws TypeError for bytes that are not a GLB, when a textured material's geometry lacks the UV set it samples, or when
+ * vertex colors meet a base color texture (USD Preview Surface cannot multiply them); RangeError for an empty scene, a world position
  * outside Float32 range, a bad `height` or an archive over 4 GiB.
  *
  * AR Quick Look shows the file at real size. `height` sets that size in metres and `ground` stands the model on the floor,
  * both through one transform on the root prim; {@link measureUSDZ} says what size the file will be.
  */
-export function exportUSDZ(source: ExportSource, options: USDZOptions = {}): Uint8Array {
+export function exportUSDZ(source: ExportSource | Uint8Array, options: USDZOptions = {}): Uint8Array {
   checkPlacement(options);
-  const items = drawables(collect(source, options));
+  const items = drawables(collect(source instanceof Uint8Array ? sceneOfGLB(source).scene : source, options));
   if (!items.length) throw new RangeError('USDZ requires at least one mesh');
   const placement =
       options.height === undefined && !options.ground ? { scale: 1, lift: 0 } : placementOf(worldBox(items), options),
