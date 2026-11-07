@@ -2,18 +2,18 @@
 
 Scott's order of 2026-11-06: passing checks is not the same as working. All 76 USDZ files passed `usdchecker`, and the first iPhone run failed in seconds: Fox stood 79 m tall. This page goes through [claims.md](claims.md) and [limits.md](../limits.md) and lists each claim whose proof is only a validator, our own reader, a stand-in or a built file, what that proof cannot see, and what would really prove it.
 
-Audited at `2c69e3575`. Rerun it once more after the feature batches end.
+Audited at `72ecd93f1`. Rerun it once more after the feature batches end.
 
 ## Counts
 
 | Where | Audited | Proved only by a tool or stand-in | Partly | Note |
 | --- | --- | --- | --- | --- |
-| LIM rows in claims.md | 283 | 26 of 283 | 36 of 283 | 285 rows, 2 retired or relocated. |
+| LIM rows in claims.md | 285 | 26 of 285 | 38 of 285 | 287 rows, 2 retired or relocated. |
 | Headline numbers | 4 | 0 of 4 | 0 of 4 | They are facts about the built files and the source, so the built file is the right proof. |
 | Whitepaper figures | 19 | 1 of 19 | 0 of 19 | The parity figure is our own reading of a table we wrote. Three voxel figures already read UNPROVEN and are not counted again. |
 | Capabilities | 14 | 2 of 14 | 1 of 14 | Each points at LIM rows below. Input and controls ran on synthetic events, release readiness on a stand-in registry, and the WebGL2 row has stand-in XR. |
 | "Not yet backed" list | 9 | 9 of 9 | 0 of 9 | The list says so itself. |
-| limits.md table rows | 312 | 59 of 312 touch a claim below | | Most rows state an enforced limit or a method, which the source proves. |
+| limits.md table rows | 314 | 59 of 314 touch a claim below | | Most rows state an enforced limit or a method, which the source proves. |
 
 Classes: **Validator**, a checker or outside file tool passed it and no program a person uses opened it. **Own reader**, only Margo's code or the test's reader read it back. **Stand-in**, simulated input, a fake device, a fake session or test data in place of the real thing. **Built file**, the test wrote the bytes it then read.
 
@@ -75,6 +75,8 @@ Part of each claim stands on the real thing. The table names the part that does 
 | LIM-281: FBX type 0 under a sheared parent | A real Maya rig for the rest. This case is a hand-worked result. | Stand-in | What the FBX SDK really gives. | A real file with it, or the SDK's output. | Not run. |
 | LIM-282: Automatic rig | Real meshes, joints measured against authored skeletons. No rigged mesh was drawn on a GPU or opened in another tool. | Own reader | Whether the rig deforms well: a joint in the right place can still bend badly. | Export a rigged mesh, pose it in Blender, and look. | Not run. |
 | LIM-283, LIM-286, LIM-289, LIM-290: Exact and moment transparency, blending in OIT, depth of glass | Real GPU against blending worked out by hand. Generated planes stand in for real glass. | Stand-in | A real model with deep overlapping glass. | A real transparent model drawn against a path traced picture. | Not run. |
+| LIM-291: Render to video | Real GPU and the own encoders of the browser and decoders, on one machine. The scene and tone are generated. | Stand-in | Whether a player outside the browser opens the file. | Open a rendered file in VLC or QuickTime. | Not run. |
+| LIM-292: Take recorder | Real `Mesh`, `Camera` and `Input` classes, with events dispatched by the test. | Stand-in | A real device and a person playing a take. | Record a take with a real gamepad or mouse. | Not run. |
 | LIM-253: USDZ of 25 static GLBs | `usdchecker --arkit`, `usdcat --flatten` with our bounds maths, SceneKit on one file. | Validator | What a person sees on a phone, at what size, and how it behaves in AR. A valid file is not a usable one: LIM-265 passed everything on a Mac and failed on the first iPhone. | AR Quick Look on an iPhone, for a sample. | Blender 5.3 USD importer: 27 of 27 equal in meshes, triangles and bounds within 2e-7, with three settled by plain glTF maths in the file's favour. Quick Look thumbnails on the Mac: 18 of 28 read by eye, right way up and textured; 10 not drawn, the system extension stopped answering. |
 
 ## Real, but compared with ourselves
