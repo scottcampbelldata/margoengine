@@ -3161,16 +3161,16 @@ are still open.
 
 ## README examples
 
-### 107 of 767 README examples do not run yet
+### 106 of 767 README examples do not run yet
 
 - **What:** `npm run check:readme-run`, a step of `check:merge` since 2026-11-07, ran 641 of 767 examples that day (RTX A6000,
-  Chromium). The other 126 went into `scripts/support/readme-run-known.json`; 107 are left there, each with its error. A new failure fails the step, and
+  Chromium). The other 126 went into `scripts/support/readme-run-known.json`; 106 are left there, each with its error. A new failure fails the step, and
   so does an entry that passes or names an example that is gone. An id is the heading above an example and a hash of its code, so
   an example added above one on the list leaves it alone; changing a listed example changes its id, and the entry moves with it.
 - **Repro:** `npm run build:packages`, then `npm run check:readme-run -- --only=<id>` with an id from that list.
-- **Cause:** 90 entries start `sample:`. The example names a file of its own (a font, a scan, a rigged model with named joints)
+- **Cause:** 89 entries start `sample:`. The example names a file of its own (a font, a scan, a rigged model with named joints)
   and the check has no matching sample, or the sample does not fit it, so these say nothing about the example yet. The ragdoll's
-  get-up (no free rig here has get-up clips), the animator's warping (no clip here travels, so a distance warp has nothing to fit), fbx, the animator's joint indices and `usdz/readme-margoengine-usdz-087124` and `usdz/readme-composition-fbebfe` (no `.usdz` file is in the repository) are in this group. 17 start
+  get-up is in this group: it needs prone and supine get-up clips (getting up from the front and from the back) on a humanoid rig, and no free rig in the repository has them; the Quaternius Universal Animation Library Standard 3.0 pack (CC0) was checked on 2026-11-07 and has none (its closest clips, `Sitting_Exit`, `Death01` and `Fixing_Kneeling`, are not get-ups). Fbx, the animator's joint indices and `usdz/readme-margoengine-usdz-087124` and `usdz/readme-composition-fbebfe` (no `.usdz` file is in the repository) are in this group too. 17 start
   `example:`, and these need reading one at a time:
   - Four attach one plugin twice to one engine, which core refuses (`post/readme-smaa-10a00a`, `shadows/readme-margoengine-shadows-7183ea`, `quality/readme-tier-presets-0abcba`,
     `sky/readme-fog-b452c1`), so the example shows two alternatives as if one ran after the other.

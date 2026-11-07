@@ -192,6 +192,10 @@ const ASSETS = [
   ['examples/assets/kaykit/LICENSE-character-animations.txt', 'KayKit Character Animations (Kay Lousberg, CC0)'],
   ['examples/assets/kaykit/LICENSE-dungeon.txt', 'KayKit Dungeon (Kay Lousberg, CC0)'],
   [
+    'examples/assets/quaternius/NOTICE.md',
+    'animator warping example: UAL1_Standard_RM.glb of the Quaternius Universal Animation Library Standard 3.0 (CC0 1.0, Quaternius, https://quaternius.itch.io/universal-animation-library); zip and file sha256 there',
+  ],
+  [
     'packages/creative/examples/earth/assets/ATTRIBUTION.md',
     'Earth demo: NASA Blue Marble, Solar System Scope textures (CC BY 4.0)',
   ],

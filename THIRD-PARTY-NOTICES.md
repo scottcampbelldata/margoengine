@@ -208,6 +208,7 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 | [`examples/assets/kaykit/LICENSE-adventurers.txt`](examples/assets/kaykit/LICENSE-adventurers.txt) | KayKit Adventurers (Kay Lousberg, CC0) |
 | [`examples/assets/kaykit/LICENSE-character-animations.txt`](examples/assets/kaykit/LICENSE-character-animations.txt) | KayKit Character Animations (Kay Lousberg, CC0) |
 | [`examples/assets/kaykit/LICENSE-dungeon.txt`](examples/assets/kaykit/LICENSE-dungeon.txt) | KayKit Dungeon (Kay Lousberg, CC0) |
+| [`examples/assets/quaternius/NOTICE.md`](examples/assets/quaternius/NOTICE.md) | animator warping example: UAL1_Standard_RM.glb of the Quaternius Universal Animation Library Standard 3.0 (CC0 1.0, Quaternius, https://quaternius.itch.io/universal-animation-library); zip and file sha256 there |
 | [`packages/creative/examples/earth/assets/ATTRIBUTION.md`](packages/creative/examples/earth/assets/ATTRIBUTION.md) | Earth demo: NASA Blue Marble, Solar System Scope textures (CC BY 4.0) |
 | [`examples/assets/scifi-helmet-CREDITS.md`](examples/assets/scifi-helmet-CREDITS.md) | SciFiHelmet test and benchmark model (Michael Pavlovic, Norbert Nopper, CC0 1.0) |
 | [`examples/assets/boulder-robot-LICENSE.md`](examples/assets/boulder-robot-LICENSE.md) | Boulder demo climber: Margo-made model and rig, no third-party files |

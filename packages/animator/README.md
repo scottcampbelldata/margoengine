@@ -376,29 +376,31 @@ import {Animation} from 'margoengine/animation';
 import {addDistanceWarp, addWarping} from 'margoengine/animator/warping';
 
 const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
-const model = await loadGLTF(engine, '/hero.glb');
+const model = await loadGLTF(engine, '/UAL1_Standard_RM.glb'); // Quaternius' mannequin (CC0), travel on its root bone
 const animation = Animation.attach(model);
-const animator = Animator.attach(animation, {initial: 'walk', states: {walk: 'Walk', stop: 'Stop'}});
+const animator = Animator.attach(animation, {initial: 'walk', states: {walk: 'Walk_Loop', roll: 'Roll'}});
 const node = (name: string) => model.asset.doc.nodes!.findIndex((n) => n.name === name);
-addRootMotion(animator, {joint: node('Hips'), apply: false, smoothing: 0.5}); // the game moves the character
+addRootMotion(animator, {joint: node('root'), apply: false, smoothing: 0.5}); // the game moves the character
 
 const velocity: [number, number, number] = [0, 0, 0];
 const warp = addWarping(animator, {
-  pelvis: node('Hips'),
-  spine: [node('Spine'), node('Chest')],
+  pelvis: node('pelvis'),
+  speedJoint: node('root'), // the bone whose clip translation is the travel: 1.30 m in Walk_Loop's 1.33 s
+  spine: [node('spine_01'), node('spine_02'), node('spine_03')],
   velocity, // write the character's real velocity into this every frame
   legs: [
-    {hip: node('LeftUpLeg'), knee: node('LeftLeg'), ankle: node('LeftFoot')},
-    {hip: node('RightUpLeg'), knee: node('RightLeg'), ankle: node('RightFoot')},
+    {hip: node('thigh_l'), knee: node('calf_l'), ankle: node('foot_l')},
+    {hip: node('thigh_r'), knee: node('calf_r'), ankle: node('foot_r')},
   ],
 });
-velocity[0] = 0.8; velocity[2] = 0.8;       // a strafe at 1.13 units a second on a forward walk
+velocity[0] = 0.8; velocity[2] = 0.8;       // a strafe at 1.13 m/s on a forward walk
 console.log(warp.turn, warp.stride, warp.rate, warp.pelvisDrop);
 
-const stop = {state: 'stop', joint: node('Hips'), distance: 2};
-addDistanceWarp(animator, stop);
-animator.transition('stop');
-stop.distance = 1.5;                        // what is left to the mark, written every frame
+const roll = {state: 'roll', joint: node('root'), distance: 4};
+const fit = addDistanceWarp(animator, roll);
+console.log(fit.length);                    // 4.99: Roll's travel on root; with 4 m left it starts 0.99 m in
+animator.transition('roll');
+roll.distance = 3.5;                        // what is left to the mark, written every frame
 ```
 
 - **Orientation.** The hips turn toward the direction of travel, up to `maxTurn` (default pi / 2), settling over `turnTime` (default 0.1 s), and `spine` shares out the turn back so the chest keeps facing front. Facing is the `character` node's +Z (default the model's root).
@@ -407,7 +409,7 @@ stop.distance = 1.5;                        // what is left to the mark, written
 - **Limits and rate.** Past `minStride` (default 0.5) and `maxStride` (default 1.6) the clip's rate makes up the rest, from the next frame, so feet stay planted at any speed and a stopped character stops stepping. `adjustRate: false` leaves the rate alone. `animator.time` then runs at that rate; crossfades keep real time.
 - **Pelvis.** It drops by what the longest stride needs, at most `maxPelvisDrop` (default 0.2).
 - **Motion capture.** Proved on CMU takes with contacts found from the data: at speeds from 0.7 to 3 m/s on a 1.31 m/s walk a planted foot slides 24 to 50 mm, against 21 mm in the take itself and 48 to 564 mm with no warp. Pass `smoothing: 0.5` to `addRootMotion`, or the hips' surge shows as foot slide.
-- **Distance.** `addDistanceWarp` stands a clip where the travel of `joint` matches `distance`: `mode: 'stop'` reads what is left, `'start'` what has been covered. Time only runs forward, and a distance longer than the clip holds its first frame. The state must play one clip.
+- **Distance.** `addDistanceWarp` stands a clip where the travel of `joint` matches `distance`: `mode: 'stop'` reads what is left, `'start'` what has been covered. Time only runs forward, and a distance longer than the clip holds its first frame. The state must play one clip. An export with root motion on (such as Quaternius' `_RM` files) keeps the travel on its root bone: pass that bone as `joint` here and as `speedJoint` to `addWarping`.
 
 ## Full-body IK (`margoengine/animator/fbik`)
 
