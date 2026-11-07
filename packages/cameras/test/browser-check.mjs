@@ -116,6 +116,27 @@ try {
     );
   }
   console.log('ok wide angle (panini, equidistant, stereographic)');
+  // Cube capture: the same check past 180 degrees, where the red and blue boxes stand behind the camera.
+  for (const [mode, fov] of [
+    ['equidistant', 260],
+    ['equisolid', 300],
+    ['stereographic', 220],
+    ['panini', 240],
+  ]) {
+    result = await page.evaluate(([m, f]) => window.check.wideCube(m, f), [mode, fov]);
+    assert.equal(result.error, null);
+    assert.deepEqual(result.errors, []);
+    px = await shot();
+    const hit = (name, channel) => {
+      const c = Math.round(result.columns[name]);
+      return [c - 1, c, c + 1].some((x) => is(px(x, 200), channel));
+    };
+    assert.ok(
+      hit('red', 0) && hit('green', 1) && hit('blue', 2),
+      `cube ${mode} columns ${JSON.stringify(result.columns)}: ${[0, 1, 2].map((i) => px(Math.round(Object.values(result.columns)[i]), 200))}`,
+    );
+  }
+  console.log('ok wide angle from a cube (equidistant, equisolid, stereographic, panini)');
   assert.deepEqual(pageErrors, []);
   console.log('cameras browser check passed');
 } finally {

@@ -319,13 +319,45 @@ map.toOutput(x, y);                                        // and back
   a cylinder. Projection after Sharpless, Postle and German (2010).
 - **Fisheye** modes follow r = f·g(θ): equidistant θ, equisolid 2 sin(θ/2), stereographic 2 tan(θ/2), orthographic
   sin θ. The source is one rectilinear picture, so a fisheye reaches only as far as that picture does: under 180
-  degrees across, in practice 120 to 150. A full 180 degree circle needs a cube capture, which this does not do.
+  degrees across, in practice 120 to 150. For 180 degrees and past it, use `WideAngleCube` below.
 - **Crop**: the output plane is zoomed in just enough that no pixel falls outside the source (`crop`, default true);
   `map.zoom` says by how much. With `crop: false` the uncovered corners are black.
 - **Camera**: it reads `engine.camera.fov` and the frame's shape each frame, so a lens set with `focalLength` works.
   Draw the source at the field of view you want to see across.
 - **Errors**: `Invalid wide angle mode; ...`, `Invalid wide angle distance; ...`, `Invalid wide angle view; ...`;
   MargoError `state` outside a PostStack, `unsupported` on WebGL2, `attached` and `disposed`.
+
+## Past 180 degrees: `@margoengine/cameras/wide-cube`
+
+`WideAngleCube` reads a cube captured at the camera, so a fisheye or a Panini sees the whole sphere: `fov` is degrees across
+the width, up to 360 for equidistant and equisolid. WebGPU. Needs `@margoengine/post` and `@margoengine/environment`.
+
+```ts
+import {WideAngleCube} from 'margoengine/cameras/wide-cube';
+import {Engine} from 'margoengine/core';
+const canvas = document.querySelector('canvas')!;
+const engine = await Engine.create(canvas);
+
+const wide = await WideAngleCube.attach(engine, {mode: 'equidistant', fov: 220, size: 512});
+wide.options.fov = 280;                                    // read every frame, like mode, distance and circle
+wide.facesPerFrame = 2;                                    // spread the capture over three frames
+engine.start();                                            // captures before each frame; with engine.render(), call wide.capture() first
+
+// The direction shown at a pointer position, in camera space (forward is [0, 0, -1]):
+const ray = wide.map(canvas.width / canvas.height).toDirection(0.5, 0); // null outside the picture
+wide.dispose();                                            // the effect, its stack and its cube
+```
+
+- **Cost**: six scene draws a frame at `facesPerFrame` 6, on top of the main draw, which the stage replaces. `size`
+  (default 512) sets the sharpness: a face of 512 is about 5.7 texels a degree.
+- **Reach**: equidistant and equisolid up to 360, stereographic below 360, orthographic 180, Panini below 360 at `distance`
+  1 (`distance` 0 stops below 180, larger values also stop short, because the projection folds back). A `fov` past that throws.
+- **Circle**: `circle` (default true) leaves black past half of `fov`; false fills the corners as far as the law reaches.
+- **Light**: the cube holds linear light and this is an HDR stage, so tone mapping comes after it, and a display effect
+  goes after it in your own stack: `const cube = CubeCamera.attach(engine, {size: 512}); PostStack.attach(engine, [new WideAngleCube({cube}), new Tonemap()]);`
+  Faces run the scene passes only, so HDR effects ahead of this stage do not reach the picture. The camera's `fov` is not used.
+- **Errors**: `Invalid wide angle fov ...` and the `WideAngle` errors; MargoError `state` outside a PostStack, with no cube,
+  or for `capture()` before attaching; `unsupported` on WebGL2, `attached` and `disposed`.
 
 Apache-2.0. Optional, tree-shakable package, about 1.7 kB min+gzip ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)); `/origin` and `/layers` are separate entries; core peer: ^0.1.0 || ^1.0.0.
 

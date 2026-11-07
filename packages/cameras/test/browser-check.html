@@ -21,6 +21,15 @@ window.check={
     const want={red:0.7,blue:-0.7,green:0};const columns={};
     for(const [name,nx] of Object.entries(want)){meshes[name].setPosition([nx*4.5*ty,0,-5]);columns[name]=(map.toOutput(nx,0)[0]+1)/2*400;}
     const r=await settle();return {...r,columns};},
+  // A cube capture: boxes behind the camera, at angles no flat picture holds, land where the CPU map says.
+  async wideCube(mode,fov){const {WideAngleCube}=await import('/packages/cameras/dist/wide-cube.js');
+    if(!window.cubeEffect){window.wideEffect?.dispose();projection.dispose();engine.camera.position=[0,0,0];engine.camera.target=[0,0,-1];engine.camera.near=0.1;engine.camera.far=100;window.cubeEffect=await WideAngleCube.attach(engine,{mode,fov,size:512});}
+    Object.assign(window.cubeEffect.options,{mode,fov});
+    const map=window.cubeEffect.map(1),half=fov*Math.PI/360,columns={};
+    // red right of the centre, blue left, each 15 degrees inside the edge; green straight ahead.
+    const at={red:half-0.26,blue:-(half-0.26),green:0};
+    for(const [name,a] of Object.entries(at)){const d=[Math.sin(a),0,-Math.cos(a)];meshes[name].setPosition([d[0]*6,0,d[2]*6]);columns[name]=(map.toOutput(...d)[0]+1)/2*400;}
+    window.cubeEffect.capture();const r=await settle();return {...r,columns};},
   async pick(x,y){const m=await engine.pick(x,y);return Object.entries(meshes).find(([,v])=>v===m)?.[0]??null;},
   async effects(){const [{Shadows},{TAA}]=await Promise.all([import('/packages/shadows/dist/index.js'),import('/packages/taa/dist/index.js')]);const shadows=Shadows.attach(engine);for(const m of Object.values(meshes))shadows.add?.(m);TAA.attach(engine);return window.check.render('orthographic',8);},
 };

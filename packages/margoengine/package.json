@@ -318,6 +318,10 @@
       "types": "./dist/cameras/panini.d.ts",
       "import": "./dist/cameras/panini.js"
     },
+    "./cameras/wide-cube": {
+      "types": "./dist/cameras/wide-cube.d.ts",
+      "import": "./dist/cameras/wide-cube.js"
+    },
     "./cinematic": {
       "types": "./dist/cinematic.d.ts",
       "import": "./dist/cinematic.js"

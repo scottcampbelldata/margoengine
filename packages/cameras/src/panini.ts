@@ -10,11 +10,11 @@ import { group, fullscreen, render } from '../../shared/gpu.js';
 import { margoError } from '../../shared/errors.js';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
 import { applyView, viewLoadOp } from '../../shared/view-rect.js';
+import { GAIN, INVERSE, MODES, type WideAngleMode } from './wide-laws.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 type WideContext = Extract<PassContext, { backend: 'webgpu' }>;
 
-/** The projection to draw: Panini, or a fisheye with the named radius law. */
-export type WideAngleMode = 'panini' | 'equidistant' | 'equisolid' | 'stereographic' | 'orthographic';
+export type { WideAngleMode } from './wide-laws.js';
 
 /** Options of {@link WideAngleMap} and {@link WideAngle}. */
 export interface WideAngleOptions {
@@ -28,26 +28,6 @@ export interface WideAngleOptions {
   enabled?: boolean;
 }
 
-const MODES: Record<WideAngleMode, number> = {
-  panini: 0,
-  equidistant: 1,
-  equisolid: 2,
-  stereographic: 3,
-  orthographic: 4,
-};
-// Radius law g(theta) of a fisheye and its inverse; null outside the domain the law reaches.
-const GAIN: Record<string, (theta: number) => number> = {
-  equidistant: (t) => t,
-  equisolid: (t) => 2 * Math.sin(t / 2),
-  stereographic: (t) => 2 * Math.tan(t / 2),
-  orthographic: (t) => Math.sin(t),
-};
-const INVERSE: Record<string, (r: number) => number | null> = {
-  equidistant: (r) => r,
-  equisolid: (r) => (r <= 2 ? 2 * Math.asin(r / 2) : null),
-  stereographic: (r) => 2 * Math.atan(r / 2),
-  orthographic: (r) => (r <= 1 ? Math.asin(r) : null),
-};
 const EPS = 1e-9;
 
 /**
@@ -204,7 +184,8 @@ const HALF_PI=1.5707963267948966;
  * perspective camera (for example `camera.fov = 100`) and this resamples it. It reads `engine.camera.fov` and the
  * frame's shape each frame, so a camera with a lens (`CameraProjection.focalLength`) works unchanged. Perspective
  * cameras only. The source is one rectilinear picture, so a fisheye reaches only as far as that picture does (under
- * 180 degrees across), and the corners are cropped unless `crop` is false.
+ * 180 degrees across), and the corners are cropped unless `crop` is false. `WideAngleCube` in
+ * `@margoengine/cameras/wide-cube` reads a cube capture and reaches past that.
  * @throws RangeError for an unknown `mode`, a negative `distance` or a field of view outside 0 to 180; MargoError
  * `'state'` outside a PostStack, `'unsupported'` on a WebGL engine, `'attached'` when joined twice, `'disposed'`
  * after `dispose()`.

@@ -45,6 +45,10 @@
     "./panini": {
       "types": "./dist/panini.d.ts",
       "import": "./dist/panini.js"
+    },
+    "./wide-cube": {
+      "types": "./dist/wide-cube.d.ts",
+      "import": "./dist/wide-cube.js"
     }
   },
   "files": [
@@ -57,9 +61,13 @@
   },
   "peerDependencies": {
     "@margoengine/core": "^1.0.0",
+    "@margoengine/environment": "^1.0.0",
     "@margoengine/post": "^1.0.0"
   },
   "peerDependenciesMeta": {
+    "@margoengine/environment": {
+      "optional": true
+    },
     "@margoengine/post": {
       "optional": true
     }
