@@ -859,6 +859,15 @@ Written clean room from the published work below. No source of a camera system i
 | Confiner volumes (`cinematic/confine`) | The even-odd rule for a point in a polygon, as set out in M. Shimrat, "Algorithm 112: Position of point relative to polygon", Communications of the ACM, 1962. Nearest point on a segment and the meeting of two offset lines: standard geometry. The push from the walls is our own |
 | Focus tracking (`cinematic/lens`) | Plane of focus along the view axis, and field of view from subject size: the thin lens and pinhole relations, as `@margoengine/cameras/physical` already uses them. The rack and the zoom are exponential decays of our own |
 
+## State machines: `@margoengine/fsm`
+
+Written clean room from the published work below. No source of a statechart library or another engine was read. Sismic is run as an outside tool through its documented interface (`packages/fsm/test/outside/`); its source was not read.
+
+| Part | Source |
+| --- | --- |
+| Hierarchy, parallel regions, `in(S)` guards (`fsm`, `fsm/parallel`) | D. Harel, "Statecharts: a visual formalism for complex systems", Science of Computer Programming 8(3), 1987 |
+| Choosing before moving, inner transitions before outer ones, entry and exit order, raised events waiting for the end of a step (`fsm/parallel`) | W3C, "State Chart XML (SCXML): State Machine Notation for Control Abstraction", Recommendation, 2015: sections 3.1.3, 3.13, 4.2 and Appendix D (entry and exit order) |
+
 ## Save and load: `@margoengine/save`
 
 Written clean room from the specifications below. No source code of serializers, save systems or engines (Unity

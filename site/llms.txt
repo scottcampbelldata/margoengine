@@ -249,7 +249,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/ragdoll API](https://margoengine.com/llms/api/ragdoll.md): 6 entry points
 - [@margoengine/navmesh API](https://margoengine.com/llms/api/navmesh.md): 2 entry points
 - [@margoengine/ecs API](https://margoengine.com/llms/api/ecs.md): 7 entry points
-- [@margoengine/fsm API](https://margoengine.com/llms/api/fsm.md): 1 entry point
+- [@margoengine/fsm API](https://margoengine.com/llms/api/fsm.md): 2 entry points
 - [@margoengine/behavior API](https://margoengine.com/llms/api/behavior.md): 2 entry points
 - [@margoengine/save API](https://margoengine.com/llms/api/save.md): 2 entry points
 - [@margoengine/net API](https://margoengine.com/llms/api/net.md): 1 entry point

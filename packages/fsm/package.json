@@ -25,6 +25,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./parallel": {
+      "types": "./dist/parallel.d.ts",
+      "import": "./dist/parallel.js"
     }
   },
   "files": [
@@ -44,6 +48,7 @@
   "scripts": {
     "build": "node ../../scripts/build-optional.js fsm",
     "test": "npm run build && node --test test/*.test.js",
+    "test:outside": "node test/outside/check.mjs",
     "prepack": "npm run build"
   }
 }

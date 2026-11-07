@@ -934,6 +934,10 @@
       "types": "./dist/fsm.d.ts",
       "import": "./dist/fsm.js"
     },
+    "./fsm/parallel": {
+      "types": "./dist/fsm/parallel.d.ts",
+      "import": "./dist/fsm/parallel.js"
+    },
     "./geometry": {
       "types": "./dist/geometry.d.ts",
       "import": "./dist/geometry.js"

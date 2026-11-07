@@ -9,6 +9,11 @@ export interface State<C> {
   exit?: (context: C) => void;
   /** Called by `StateMachine.update` for each state on the active path, outermost first, with `delta` in seconds. */
   update?: (context: C, delta: number) => void;
+  /**
+   * Offer an event to a machine nested in this state, such as parallel regions. Runs on the active path before this
+   * state's own transitions, so what is nested wins. Return the action that carries the event out, or null to pass.
+   */
+  plan?: (event: string) => (() => void) | null;
 }
 /** Event-driven edge between two states. */
 export interface Transition {
@@ -73,20 +78,33 @@ export class StateMachine<C> {
   get blend(): number {
     return this.previous && this.duration ? Math.min(1, this.elapsed / this.duration) : 1;
   }
+  /** True while `name` is the current state or one of its ancestors. */
+  matches(name: string): boolean {
+    return this.paths.get(this.state)!.includes(name);
+  }
   /**
-   * Fire the first matching transition whose guard passes, searching from the current state outward to its ancestors.
+   * Choose what `event` would do without doing it: guards run, nothing changes. Searches from the current state outward
+   * to its ancestors, offering each state's `plan` hook first. Returns the action to run, or null when nothing matched.
+   */
+  plan(event: string): (() => void) | null {
+    const path = this.paths.get(this.state)!;
+    for (let i = path.length - 1; i >= 0; i--) {
+      const nested = this.states[path[i]].plan?.(event);
+      if (nested) return nested;
+      for (const transition of this.transitions)
+        if (transition.event === event && transition.from === path[i] && (!transition.guard || transition.guard()))
+          return () => this.goto(transition.to, transition.duration ?? 0);
+    }
+    return null;
+  }
+  /**
+   * Fire the first matching transition whose guard passes, searching as {@link StateMachine.plan} does.
    * Returns false when none matched. Throws as {@link StateMachine.goto} does.
    */
   send(event: string): boolean {
-    const path = this.paths.get(this.state)!;
-    for (let i = path.length - 1; i >= 0; i--)
-      for (const transition of this.transitions) {
-        if (transition.event === event && transition.from === path[i] && (!transition.guard || transition.guard())) {
-          this.goto(transition.to, transition.duration ?? 0);
-          return true;
-        }
-      }
-    return false;
+    const action = this.plan(event);
+    action?.();
+    return action !== null;
   }
   /**
    * Change to `next` directly, exiting and entering only the states below the common ancestor. No-op when already there.

@@ -187,6 +187,10 @@ const ASSETS = [
     'test fixtures: USD composition scenes and two subdivision meshes of https://github.com/usd-wg/assets, commit 091bb5c6 (Apache-2.0, Alliance for OpenUSD working group), with what OpenUSD 26.08 reads from them; RiggedSimple, RiggedFigure and BoxAnimated of the same commit (CC-BY-4.0, Cesium); AnimatedTriangle and InterpolationTest of the same commit (CC0)',
   ],
   [
+    'packages/fsm/test/outside/traces.json',
+    'test fixture: what the Sismic 1.6.14 statechart interpreter (LGPL-3.0, https://github.com/AlexandreDecan/sismic) did with charts this repository generates; output of a tool run outside, no Sismic code is in this repository',
+  ],
+  [
     'packages/fbx/test/fixtures/README.md',
     'test fixtures: original FBX scenes exported for this project by Blender 5.3 from the scripts beside them (CC0 1.0)',
   ],

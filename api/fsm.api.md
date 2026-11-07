@@ -8,6 +8,7 @@ export interface State<C> {
     enter?: (context: C) => void;
     exit?: (context: C) => void;
     update?: (context: C, delta: number) => void;
+    plan?: (event: string) => (() => void) | null;
 }
 
 export class StateMachine<C> {
@@ -19,6 +20,8 @@ export class StateMachine<C> {
     elapsed: number;
     constructor(states: Readonly<Record<string, State<C>>>, initial: string, context: C, transitions?: readonly Transition[]);
     get blend(): number;
+    matches(name: string): boolean;
+    plan(event: string): (() => void) | null;
     send(event: string): boolean;
     goto(next: string, duration?: number): void;
     update(delta: number): void;
