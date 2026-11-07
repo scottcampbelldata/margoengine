@@ -293,3 +293,36 @@ test('view shows the totals and the newest hitch in the panel until dispose', (t
   stats.dispose();
   dom.window.close();
 });
+
+// The engine compiles its startup pipelines inside Engine.create, before anything can attach to it.
+test('trackNext sees compiles made before the tracker joins the engine, and leaves the adapter as it found it', async (t) => {
+  const saved = globalThis.GPUAdapter;
+  t.after(() => (globalThis.GPUAdapter = saved));
+  const device = { createShaderModule: () => ({}), createRenderPipeline: () => ({}), createComputePipeline: () => ({}),
+    createRenderPipelineAsync: async () => ({}), createComputePipelineAsync: async () => ({}) };
+  class Adapter {
+    async requestDevice() {
+      return device;
+    }
+  }
+  const original = Adapter.prototype.requestDevice;
+  globalThis.GPUAdapter = Adapter;
+  const compiles = new PipelineCompiles().trackNext();
+  assert.notEqual(Adapter.prototype.requestDevice, original);
+  const made = await new Adapter().requestDevice();
+  assert.equal(Adapter.prototype.requestDevice, original);
+  made.createShaderModule({ code: '', label: 'startup' });
+  assert.equal(compiles.toJSON().count, 1);
+  assert.equal(compiles.toJSON().compiles[0].label, 'startup');
+  compiles.dispose();
+  const unused = new PipelineCompiles().trackNext();
+  unused.dispose();
+  assert.equal(Adapter.prototype.requestDevice, original);
+});
+
+test('trackNext without WebGPU is refused by name', (t) => {
+  const saved = globalThis.GPUAdapter;
+  t.after(() => (globalThis.GPUAdapter = saved));
+  delete globalThis.GPUAdapter;
+  assert.throws(() => new PipelineCompiles().trackNext(), { code: 'unsupported' });
+});

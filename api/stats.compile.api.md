@@ -31,6 +31,7 @@ export class PipelineCompiles implements EnginePlugin {
     blockingMilliseconds: number;
     static attach(engine: EngineKernel, options?: PipelineCompilesOptions): PipelineCompiles;
     constructor({ hitchMilliseconds, capacity, stacks }?: PipelineCompilesOptions);
+    trackNext(): this;
     track(device: GPUDevice): void;
     frame(milliseconds: number, at?: number): CompileHitch | null;
     onHitch(listener: (hitch: CompileHitch) => void): () => void;

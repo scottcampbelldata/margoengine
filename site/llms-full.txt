@@ -2876,7 +2876,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Image comparison (`@margoengine/headless/compare`, 2026-11-05) | CPU only. Images must be one size. `decodePNG` ignores colour profiles and gamma, and cuts 16-bit samples to 8. SSIM runs on luma, so a change of hue at equal brightness is seen only by the pixel count. | Tests compare a few images, so the plain code is enough, and it runs anywhere. Both measures run in `compareImages` because each misses what the other sees. | A 4K image takes CPU time on every comparison: both passes run in JavaScript, and this has not been timed. | Compare at the size you render your tests, and tune `threshold`, `maxRatio` and `minSSIM` to your scene. |
 | Output formats (`@margoengine/headless/formats`, 2026-11-05) | JPEG is baseline with fixed standard tables, so files are larger than an optimized encoder's. Lossless WebP is a plain encoder (subtract green and three predictors, no colour cache), so files are larger than libwebp's. Lossy WebP needs a browser or worker. EXR is uncompressed. The engine's output is tone-mapped sRGB, so true HDR needs `PostStack`'s `sceneTexture`. | Previews and captures are small and written once, and plain code runs in Node with no codec to install. Every file is decoded by the browser's own decoders in the GPU check. | Bigger files than the best encoders; sizes have not been compared. | Use lossy WebP in a browser for the smallest previews, or run the file through a dedicated optimizer. |
 | Picks in a loop (`engine.pick`, 2026-11-06) | By method: one readback a point. Core queues overlapping calls and asks a plugin for one at a time, so no package can merge them, and core stays as it is. `picking.pickMany(points)` is the batch call: one readback for all of them. | Keeps core's order: each pick reads the scene as its turn comes. | Use `pickMany` for many points. |
-| Pipeline compile tracking (`@margoengine/stats/compile`, 2026-11-06) | Sees compiles made after attach, so not the engine's startup pipelines. Times are CPU time around each call: browsers compile in another process, so a blocking call can return quickly and the stall lands later. A hitch means a compile ran in a slow frame or the frame before it, which is evidence, not proof of the cause. Unlabelled compiles show an empty label; the `stacks` option finds them. Keeps the newest 256 records and hitches by default. |
+| Pipeline compile tracking (`@margoengine/stats/compile`, 2026-11-06) | Sees compiles made after attach; `trackNext()` before `Engine.create` adds the engine's startup pipelines. Times are CPU time around each call: browsers compile in another process, so a blocking call can return quickly and the stall lands later. A hitch means a compile ran in a slow frame or the frame before it, which is evidence, not proof of the cause. Unlabelled compiles show an empty label; the `stacks` option finds them. Keeps the newest 256 records and hitches by default. |
 | CPU phase breakdown (`@margoengine/stats/phases`, 2026-11-06) | CPU time only, with the clock the browser gives: `performance.now()` steps by 5 to 100 microseconds, so a short phase in one frame can read 0 and the averages are the numbers to trust. The frustum test runs inside the one Wasm kernel call, so it is timed in `tick` and cannot be split from world matrices; `cull` is the visible-instance collection after it. `onFrame` callbacks added before attach fall outside the frame. Other scenes in a multi-view frame have no end pass, so time after their submit reads as `encode`. |
 | Leak alerts (`@margoengine/stats/leaks`, 2026-11-06) | Sees what `GPUMemory` sees: objects made after its attach, sized from their descriptors, and a buffer dropped without `destroy()` counts as live. Needs one full window before it can alert, four minutes by default. Growth slower than `minBytes` or `minCount` per window is not reported, and a cycle longer than a quarter of the window can look like growth. After a device loss the old objects stay counted, so make a new `GPUMemory` and `LeakWatch` for the new device. Follows 64 numbers by default; labels past that are not followed, the totals are. |
 | Field telemetry (`@margoengine/stats/beacon`, 2026-11-06) | Percentiles come from 256 logarithmic bins from 0.1 ms to 10 s, so each reads at most 4.6% above the true value; `max` is exact. Frames under 0.1 ms or over 10 s count in the end bins. A failed send is counted, not retried, and with `sendBeacon` or a `no-cors` fetch the endpoint's reply cannot be read, so `sent` means handed to the browser. A report under `minFrames` when the page closes is lost. `sendBeacon` sends the page's cookies for its endpoint; the `fetch` fallback omits them. Asking users for consent is the app's job. |
@@ -4528,7 +4528,7 @@ console.log(JSON.stringify(statsReport(stats, memory)));
 
 Sizes come from the descriptors, so driver padding is not in them, and objects made before `attach` are not seen.
 
-Pipeline compile tracking is in its own entry. It shows which shader and pipeline compiles ran near a slow frame, and when:
+Pipeline compile tracking is in its own entry. It shows which shader and pipeline compiles ran near a slow frame, and when. Read a hitch as evidence, not proof: times are CPU time around each call, and browsers compile in another process, so that is the most a page can see. It sees only what is compiled after it starts, so use `trackNext` below to include the engine's startup pipelines:
 
 ```ts
 import {Engine} from 'margoengine/core';
@@ -4547,7 +4547,19 @@ console.log(JSON.stringify(compiles));          // every record and hitch, when 
 
 Each record has `kind` (`'shader'`, `'render'` or `'compute'`), `label`, `blocking` (false for the `...Async` calls), `startedAt`, `frame`, `milliseconds` (null while an async call runs) and `failed`. A frame over `hitchMilliseconds` (default 33.4) with compiles in it or in the frame before is a hitch, with `frame`, `at`, `milliseconds` and `compiles`, blocking calls first and then the longest. `capacity` (default 256) is how many records and hitches stay; `count` goes on counting. Label your pipelines to read this easily, or pass `stacks: true` (default false) to keep where each call came from.
 
-It follows the engine's device through a device restore and sees only what is compiled after `attach`. Times are CPU time around each call. Browsers compile in another process, so a blocking call can return quickly and the stall arrives later, which is why the frame before counts too. A hitch is evidence that a compile was near a slow frame, not proof that it was the cause. With your own loop, call `compiles.track(device)` and `compiles.frame(milliseconds)` once per frame.
+To see the engine's own startup pipelines as well, start before the engine does:
+
+```ts
+import {Engine} from 'margoengine/core';
+import {PipelineCompiles} from 'margoengine/stats/compile';
+
+const compiles = new PipelineCompiles().trackNext(); // catches the next device this page makes
+const engine = await Engine.create(document.querySelector('canvas')!);
+engine.use(compiles);
+console.log(compiles.toJSON().count, 'compiles so far');
+```
+
+It follows the engine's device through a device restore and sees only what is compiled after `attach`, or after `trackNext`. Times are CPU time around each call. Browsers compile in another process, so a blocking call can return quickly and the stall arrives later, which is why the frame before counts too. A hitch is evidence that a compile was near a slow frame, not proof that it was the cause. With your own loop, call `compiles.track(device)` and `compiles.frame(milliseconds)` once per frame.
 
 The CPU phase breakdown times the kernel tick, culling, encoding and submit of each frame:
 
@@ -4564,17 +4576,6 @@ setInterval(() => console.log(phases.last.encode, phases.average().tick), 1000);
 ```
 
 All numbers are CPU milliseconds, and they add up to `total`:
-
-| Phase | What it covers |
-| --- | --- |
-| `update` | `onFrame` callbacks, plugin updates, resize and camera, up to the kernel tick |
-| `tick` | The kernel tick: world matrices and the frustum test, in one Wasm call |
-| `cull` | Collecting the visible instances into batches and preparing the frame, up to the command encoder |
-| `encode` | Every frame graph pass, then `encoder.finish()` |
-| `submit` | `queue.submit` |
-| `other` | The rest of the frame's task |
-
-`last` is the newest finished frame, one object updated in place; `average()` is the mean over the last `samples` frames (2 to 4096, default 120). `JSON.stringify(phases)` gives `frames`, `last` and `average`. A frame ends when its task does, so read `last` from a later task. Views in one frame add into that frame. Nothing is allocated per frame, and core is not changed: the entry wraps `store.tick`, `createCommandEncoder` and `queue.submit` and adds two frame graph passes until `dispose()`. On WebGL2 `encode` is the frame graph and `submit` is 0.
 
 [README continues: https://margoengine.com/llms/packages/stats.md]
 

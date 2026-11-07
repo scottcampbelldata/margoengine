@@ -98,6 +98,8 @@ export class PipelineCompiles implements EnginePlugin {
   private restore?: () => void;
   private engine?: Engine;
   private removeFrameListener?: () => void;
+  private tracked?: GPUDevice;
+  private untrackNext?: () => void;
   private last = 0;
   private previous = 0;
   private timer?: ReturnType<typeof setInterval>;
@@ -121,11 +123,39 @@ export class PipelineCompiles implements EnginePlugin {
     this.stacks = stacks;
   }
 
+  /**
+   * Catches the next device made on this page, so the engine's startup pipelines are seen too. Call it before
+   * `Engine.create`, then add this tracker with `engine.use(compiles)`. Only `GPUAdapter.prototype.requestDevice` is
+   * wrapped, and only until that device arrives or `dispose()`.
+   * @throws MargoError `unsupported` where the page has no `GPUAdapter`.
+   */
+  trackNext(): this {
+    if (this.disposed)
+      throw new MargoError('disposed', 'PipelineCompiles is disposed; create a new one to track a device.');
+    const adapter = (globalThis as { GPUAdapter?: { prototype: GPUAdapter } }).GPUAdapter?.prototype;
+    if (!adapter) throw new MargoError('unsupported', 'trackNext needs WebGPU; this page has no GPUAdapter');
+    const request = adapter.requestDevice,
+      tracker = this,
+      restore = () => {
+        if (adapter.requestDevice === wrapped) adapter.requestDevice = request;
+      };
+    const wrapped: GPUAdapter['requestDevice'] = async function (this: GPUAdapter, descriptor) {
+      restore();
+      const device = await request.call(this, descriptor);
+      if (!tracker.disposed) tracker.track(device);
+      return device;
+    };
+    adapter.requestDevice = wrapped;
+    this.untrackNext = restore;
+    return this;
+  }
+
   /** Wraps a device's compile calls until `dispose()`, or until another `track`. */
   track(device: GPUDevice): void {
     if (this.disposed)
       throw new MargoError('disposed', 'PipelineCompiles is disposed; create a new one to track a device.');
     this.restore?.();
+    this.tracked = device;
     const target = device as unknown as Record<Method, (descriptor: Descriptor) => unknown>,
       originals = METHODS.map((method) => target[method]),
       wrappers = METHODS.map((method, i) => {
@@ -261,7 +291,7 @@ export class PipelineCompiles implements EnginePlugin {
     if (this.engine)
       throw new MargoError('attached', 'PipelineCompiles is already attached to an engine; create one per engine.');
     this.engine = engine;
-    if (engine.gpu) this.track(engine.gpu);
+    if (engine.gpu && engine.gpu !== this.tracked) this.track(engine.gpu);
     this.removeFrameListener = engine.onFrame((_engine, delta) => {
       const now = performance.now();
       // Delta 0 is a restart: the time since the last frame was a pause, not a slow frame.
@@ -283,6 +313,7 @@ export class PipelineCompiles implements EnginePlugin {
     this.removeFrameListener = undefined;
     this.engine?.removePlugin(this.name);
     this.engine = undefined;
+    this.untrackNext?.();
     this.restore?.();
     clearInterval(this.timer);
     this.row?.remove();

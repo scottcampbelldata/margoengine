@@ -32,7 +32,7 @@ console.log(JSON.stringify(statsReport(stats, memory)));
 
 Sizes come from the descriptors, so driver padding is not in them, and objects made before `attach` are not seen.
 
-Pipeline compile tracking is in its own entry. It shows which shader and pipeline compiles ran near a slow frame, and when:
+Pipeline compile tracking is in its own entry. It shows which shader and pipeline compiles ran near a slow frame, and when. Read a hitch as evidence, not proof: times are CPU time around each call, and browsers compile in another process, so that is the most a page can see. It sees only what is compiled after it starts, so use `trackNext` below to include the engine's startup pipelines:
 
 ```ts
 import {Engine} from 'margoengine/core';
@@ -51,7 +51,19 @@ console.log(JSON.stringify(compiles));          // every record and hitch, when 
 
 Each record has `kind` (`'shader'`, `'render'` or `'compute'`), `label`, `blocking` (false for the `...Async` calls), `startedAt`, `frame`, `milliseconds` (null while an async call runs) and `failed`. A frame over `hitchMilliseconds` (default 33.4) with compiles in it or in the frame before is a hitch, with `frame`, `at`, `milliseconds` and `compiles`, blocking calls first and then the longest. `capacity` (default 256) is how many records and hitches stay; `count` goes on counting. Label your pipelines to read this easily, or pass `stacks: true` (default false) to keep where each call came from.
 
-It follows the engine's device through a device restore and sees only what is compiled after `attach`. Times are CPU time around each call. Browsers compile in another process, so a blocking call can return quickly and the stall arrives later, which is why the frame before counts too. A hitch is evidence that a compile was near a slow frame, not proof that it was the cause. With your own loop, call `compiles.track(device)` and `compiles.frame(milliseconds)` once per frame.
+To see the engine's own startup pipelines as well, start before the engine does:
+
+```ts
+import {Engine} from 'margoengine/core';
+import {PipelineCompiles} from 'margoengine/stats/compile';
+
+const compiles = new PipelineCompiles().trackNext(); // catches the next device this page makes
+const engine = await Engine.create(document.querySelector('canvas')!);
+engine.use(compiles);
+console.log(compiles.toJSON().count, 'compiles so far');
+```
+
+It follows the engine's device through a device restore and sees only what is compiled after `attach`, or after `trackNext`. Times are CPU time around each call. Browsers compile in another process, so a blocking call can return quickly and the stall arrives later, which is why the frame before counts too. A hitch is evidence that a compile was near a slow frame, not proof that it was the cause. With your own loop, call `compiles.track(device)` and `compiles.frame(milliseconds)` once per frame.
 
 The CPU phase breakdown times the kernel tick, culling, encoding and submit of each frame:
 

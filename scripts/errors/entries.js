@@ -522,6 +522,7 @@ export const entries = [
       'ComputeFrame disposed; attach a new one',
       'ComputeFrame is not attached; call ComputeFrame.attach(engine)',
       'ComputeFrame needs the WebGPU backend; the engine runs WebGL2',
+      'trackNext needs WebGPU; this page has no GPUAdapter',
       'ComputeFrame.add takes a bound kernel: gpu.kernel(code).bind(resources)',
       'ComputeFrame.add needs run options ({ count }, { workgroups } or { indirect }) or a function returning them',
       'histogram takes a GpuArray or an Expr',
