@@ -10,13 +10,13 @@ import {
 import { viewMatrix } from '../../shared/view.js';
 import { orthographic } from '../../shared/projection.js';
 import { validateSplats, type SplatData } from './data.js';
-import { foggedProject, project, render } from './shader.js';
+import { foggedProject, project, render, transparentRender } from './shader.js';
 import { checkFog, FOG_BYTES, writeFog, type FogLike } from '../../shared/fog.js';
 export type { FogLike } from '../../shared/fog.js';
 import { histogram, scan, scanTotals, scatter } from './sort.js';
 import { MargoError } from '@margoengine/math/errors';
 import { applyView } from '../../shared/view-rect.js';
-import { alphaBlend } from '../../shared/pass.js';
+import { alphaBlend, surfacePass, transparencySlot, type SurfaceTransparency } from '../../shared/pass.js';
 import { loadCompatRoute } from '../../shared/compat.js';
 export { parseSplat, validateSplats, type SplatData } from './data.js';
 export {
@@ -66,6 +66,7 @@ export class Splats implements EnginePlugin {
   private compatSort?: { pipeline: GPUComputePipeline; group: GPUBindGroup };
   private renders = new Map<string, { pipeline: GPURenderPipeline; group: GPUBindGroup }>();
   private disposed = false;
+  private readonly transparency = transparencySlot();
   // Reused each frame: the draw pass descriptor and the pipeline record for the current target formats.
   private readonly attachment: GPURenderPassColorAttachment = { view: undefined!, loadOp: 'load', storeOp: 'store' };
   private readonly plainDepth: GPURenderPassDepthStencilAttachment = { view: undefined!, depthReadOnly: true };
@@ -266,6 +267,8 @@ export class Splats implements EnginePlugin {
     try {
       if (fog) this.dispatch(pass, fog.pipeline, fog.group, groups, 1);
       else this.dispatch(pass, this.projection!, this.projectionGroup!, groups, 1);
+      // Under a transparency hook the pass orders the layers, so the draw takes the keys as projected.
+      if (this.transparency.hook) return;
       if (this.compatSort) this.dispatch(pass, this.compatSort.pipeline, this.compatSort.group, 1, 1);
       else
         for (let stage = 0; stage < 8; stage++) {
@@ -308,7 +311,43 @@ export class Splats implements EnginePlugin {
     pass.setBindGroup(0, group);
     pass.dispatchWorkgroups(x, y);
   }
+  /** Pipeline and group 0 for this target, and for `hook` when given. */
+  private pipeline(c: Context, key: string, hook?: SurfaceTransparency): NonNullable<Splats['record']> {
+    let record = this.renders.get(key);
+    if (record) return record;
+    const declarations = hook?.surface(1),
+      module = c.device.createShaderModule({ code: declarations ? transparentRender(declarations) : render }),
+      pipeline = c.device.createRenderPipeline({
+        layout: 'auto',
+        vertex: { module, entryPoint: 'vertex' },
+        fragment: {
+          module,
+          entryPoint: hook ? 'transparent' : 'fragment',
+          ...(hook?.blends ? { constants: { margoKind: 0 } } : {}),
+          targets: hook ? [...hook.targets] : [{ format: c.format, blend: alphaBlend }],
+        },
+        multisample: c.descriptor.multisample,
+        depthStencil: {
+          format: c.descriptor.depthStencil!.format,
+          depthWriteEnabled: false,
+          depthCompare: 'greater-equal',
+        },
+      });
+    record = {
+      pipeline,
+      group: c.device.createBindGroup({
+        layout: pipeline.getBindGroupLayout(0),
+        entries: [this.uniform!, this.projected!, this.evaluated!, this.keys[0]].map((buffer, binding) => ({
+          binding,
+          resource: { buffer },
+        })),
+      }),
+    };
+    this.renders.set(key, record);
+    return record;
+  }
   private draw(c: Context): void {
+    if (this.transparency.hook) return;
     const samples = c.descriptor.multisample?.count,
       depthFormat = c.descriptor.depthStencil!.format;
     let record = this.record;
@@ -318,42 +357,7 @@ export class Splats implements EnginePlugin {
       this.recordFormat !== c.format ||
       this.recordDepth !== depthFormat
     ) {
-      const key = samples + ':' + c.format + ':' + depthFormat;
-      record = this.renders.get(key);
-      if (!record) {
-        const module = c.device.createShaderModule({ code: render }),
-          pipeline = c.device.createRenderPipeline({
-            layout: 'auto',
-            vertex: { module, entryPoint: 'vertex' },
-            fragment: {
-              module,
-              entryPoint: 'fragment',
-              targets: [
-                {
-                  format: c.format,
-                  blend: alphaBlend,
-                },
-              ],
-            },
-            multisample: c.descriptor.multisample,
-            depthStencil: {
-              format: c.descriptor.depthStencil!.format,
-              depthWriteEnabled: false,
-              depthCompare: 'greater-equal',
-            },
-          });
-        record = {
-          pipeline,
-          group: c.device.createBindGroup({
-            layout: pipeline.getBindGroupLayout(0),
-            entries: [this.uniform!, this.projected!, this.evaluated!, this.keys[0]].map((buffer, binding) => ({
-              binding,
-              resource: { buffer },
-            })),
-          }),
-        };
-        this.renders.set(key, record);
-      }
+      record = this.pipeline(c, samples + ':' + c.format + ':' + depthFormat);
       this.record = record;
       this.recordSamples = samples;
       this.recordFormat = c.format;
@@ -370,6 +374,28 @@ export class Splats implements EnginePlugin {
     pass.setIndexBuffer(this.index!, 'uint32');
     pass.drawIndexed(6, this.count);
     pass.end();
+    this.engine!.stats.drawCalls++;
+  }
+  /**
+   * Leaves the frame's draw (order 3) and the depth sort to an order-independent pass, which calls `drawTransparent`. Use
+   * `addEffect` from `@margoengine/oit/vfx`. `gpuState.sorted` then holds the keys unsorted. Returns a remover; `released`
+   * runs if this cloud is disposed first.
+   */
+  setTransparency(hook: SurfaceTransparency, released?: () => void): () => void {
+    return this.transparency.set(hook, released);
+  }
+  /** Draws the cloud into `hook`'s pass, depth tested and not written. */
+  drawTransparent(c: Context, hook: SurfaceTransparency): void {
+    if (!this.uniform) return;
+    const declarations = hook.surface(1),
+      { pipeline, group } = this.pipeline(
+        c,
+        c.descriptor.multisample?.count + ':' + c.format + ':' + c.descriptor.depthStencil!.format + declarations,
+        hook,
+      ),
+      pass = surfacePass(c.device, hook, pipeline, group);
+    pass.setIndexBuffer(this.index!, 'uint32');
+    pass.drawIndexed(6, this.count);
     this.engine!.stats.drawCalls++;
   }
   get gpuState(): { sorted: GPUBuffer; ellipses: GPUBuffer; colors: GPUBuffer } {
@@ -399,6 +425,7 @@ export class Splats implements EnginePlugin {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.transparency.released?.();
     this.engine?.removePlugin(this.name);
     this.release();
     this.engine = this.device = undefined;

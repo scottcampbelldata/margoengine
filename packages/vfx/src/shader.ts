@@ -1,6 +1,7 @@
 import { MargoError } from '@margoengine/math/errors';
 import { fogWgsl } from '../../shared/fog.js';
 import { frame } from './frame.js';
+import { surfaceEntry } from '../../shared/pass.js';
 /**
  * Particle i's position/life and velocity/size are vec4s 2i and 2i+1 of the buffer; its colour and rotation (birth angle,
  * angular velocity, initial life) are 2n+2i and 2n+2i+1 (n = capacity), written once at birth. The per-frame update so
@@ -127,6 +128,27 @@ export const multisampled = (billboard: string) =>
 }
 fn shade(i:Out)->vec4f {`,
   );
+const transparentEdits: Array<[string, string]> = [
+  ['@location(0) uv:vec2f,', '@location(0) uv:vec2f,@location(3) margoDepth:f32,'],
+  [
+    'o.clip=f.camera*vec4f(position,1);',
+    'o.clip=f.camera*vec4f(position,1);o.margoDepth=-dot(cross(f.right.xyz,f.up.xyz),position)-f.right.w;',
+  ],
+  ['@fragment fn fragment(i:Out)->@location(0) vec4f {', 'fn margoShade(i:Out)->vec4f {'],
+];
+/** A finished billboard shader (fog, softness and texture in place) with its fragment feeding a transparency hook. */
+export const transparentBillboard = (billboard: string, declarations: string): string => {
+  let code = billboard;
+  for (const [from, to] of transparentEdits) {
+    if (code.split(from).length !== 2)
+      throw new MargoError(
+        'unsupported',
+        'VFX transparency needs the billboard shader it was written for; update its edits',
+      );
+    code = code.replace(from, to);
+  }
+  return declarations + code + surfaceEntry(declarations, 'i:Out', 'margoShade(i)', 'i.clip', 'i.margoDepth');
+};
 const fogEdits: Array<[string, string]> = [
   ['@location(0) uv:vec2f,', '@location(0) uv:vec2f,@location(7) fogWorld:vec3f,'],
   ['o.clip=f.camera*vec4f(position,1);', 'o.clip=f.camera*vec4f(position,1);o.fogWorld=position;'],

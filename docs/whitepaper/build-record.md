@@ -70,8 +70,9 @@ Batches 1 to 3 are phase 1. Batches 19 and 21 are partly done, each with one job
 | [34](#batch-34-materials-part-2-of-2) | materials | 4 | 4 | 0 | 0 | 0 |
 | [35](#batch-35-gltf-pro) | gltf-pro | 8 | 8 | 0 | 0 | 0 |
 | [36](#batch-36-gltf-pro) | gltf-pro | 1 | 1 | 0 | 0 | 0 |
+| [37](#batch-37-oit) | oit | 6 | 5 | 1 | 0 | 0 |
 | [38](#batch-38-gltf) | gltf | 6 | 6 | 0 | 0 | 0 |
-| Total | | 196 | 188 | 2 | 4 | 2 |
+| Total | | 202 | 193 | 3 | 4 | 2 |
 
 ## Batch 1: fixes (part 1 of 3)
 
@@ -938,6 +939,28 @@ One job finished `@margoengine/gltf-pro`'s extension list: a file's own statemen
 - **Limits:** read only, so exporters drop the packets. A packet another extension references reads through `packets`, not `objects`. XMP inside a PNG or JPEG is not read.
 - **Unmeasured:** no speed was timed. The entry adds no shader and draws nothing, so no GPU check is new.
 - **Slips:** the first fuzz run found a refusal whose message quoted `undefined`, which the harness reads as an engine error; the message now names the fix without quoting the value.
+- **Gate:** lint, hygiene, verify, the package tests, the GPU checks and `tests/claims-file.test.js`, the push from one script that stops at the first failing step.
+
+## Batch 37: oit
+
+Six jobs took `@margoengine/oit` past weighted blending: exact and moment-based passes for parts that must come out right, tints and glows in the same pass, glass that TAA and depth of field can see, and particles, splats and points blended with models instead of over them. Each is a new optional entry or option; core and the stage are untouched.
+
+| # | Job | Status | Commit | Entry | Claim |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Hashed alpha | SKIPPED | none | exists as `@margoengine/materials/alpha-hash` | LIM-214 |
+| 2 | Exact linked lists | DONE | 9fd6e8ad8 | `/exact` | LIM-283 |
+| 3 | Moment OIT | DONE | 17470b741 | `/moments` | LIM-286 |
+| 4 | Transmission, custom blending | DONE | ff31a398e | `blending` of `OIT` | LIM-288 |
+| 5 | Depth and motion | DONE | 839264f9b | `/depth` | LIM-289 |
+| 6 | Particles and VFX in OIT | DONE | this commit | `/vfx` | LIM-293 |
+
+- **Route:** `addEffect` works through a hook beside gltf-pro's. Each pass splits its declarations into `margoTransparentAt(color, clip, depth)` and a PBR wrapper; `VFX`, `Splats` and `PointsPlugin` own their shader edits and hand it their view depth. `PointsPlugin` now culls in a pass before anything draws, because its order 10 comes after the transparent pass at 8.
+- **Bugs fixed, each with a regression test:** none in existing code beyond a stale README pointer ("glTF Pro README Transparency hook" does not exist), reworded in job 2. Open: two identical runs of GlassVaseFlowers differ on a few pixels, cause not found (`docs/known-bugs.md`).
+- **Proved:** on an RTX A6000, 1x and 4x MSAA, on generated layers: exact 0.66 of 255 against weighted 13.26 on four layers; moments 6.24 against 13.26, dense layers 2.81 against 71.81; each blending kind equals the sorted 8-bit pixel; glass depth equals an opaque plane bit for bit, velocity 0.0289 against 0, depth of field 6 soft pixels against 0, a click lands on glass. Effects land within 2 of 255 of the formula on both sides of a pane, and hand the pass depth 3.5 at 3.5 in both camera kinds. Real files: six Khronos models, three new in `examples/assets/khronos-samples/`, through every pass from eight sides with no GPU error (`real-check.mjs`): on GlassVaseFlowers moments move 0.63% of pixels against exact, weighted 2.30%; `TransparentDepth` moved pixels nearer on all six and none farther.
+- **Stand-ins:** planes and single effects are generated. The real files have no reference picture, so what they give is gaps between paths, not correctness. Their particles are generated too.
+- **Limits:** `blending` is on `OIT` only, so `ExactOIT` and `MomentOIT` leave native transmission alone, which on real files is most glass: TransmissionTest and CommercialRefrigerator draw nothing in them. With `blending`, stacked glass adds light with no dimming between parts, up to 247 of 255 on 1% of TransmissionTest's side view. A BLEND part inside transmission draws over it without `blending`. `MomentOIT` falls back to near and far with an effect added. Surfels stay out; `TransparentDepth` takes models only.
+- **Unmeasured:** no time on any job; timed numbers would be diagnostic with lanes running. Only one GPU has run any of it.
+- **Slips:** blending files were drafted in the tree during a landing and moved out before the next add; the moment default range was too wide (error 20 and 16) until a box round the added models and `fit()`; a failed `&&` chain left gltf-pro unbuilt. Job 6: a view depth written to the uniform in every frame changed a pinned VFX trace, so it writes only under a hook; an empty `constants` key changed the recorded pipelines in the `quality-presets` proof, so it is set only under a hook; a `declare` in the splats README failed the examples gate; the first real run lit nothing, because the models were not added to the environment lighting, and its numbers were thrown away. Job 6 stopped at verify five times, nothing failed reached main: a README example with a declared stand-in, the `constants` key, the duplicates gate on the hook holder and bind lines copied into three packages, now `transparencySlot` and `surfacePass` in `packages/shared/pass.js`, and the camera basis test in `packages/cameras`, which pins the padding the points near plane had taken, so that value too is written only under a hook, and a race between the worker package's README test and the port test's walk of `packages/`, fixed by keeping the scratch folder under `test-results`.
 - **Gate:** lint, hygiene, verify, the package tests, the GPU checks and `tests/claims-file.test.js`, the push from one script that stops at the first failing step.
 
 ## Batch 38: gltf

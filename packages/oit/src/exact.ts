@@ -12,7 +12,7 @@ import { MargoError } from '@margoengine/math/errors';
 import { applyView } from '../../shared/view-rect.js';
 import { currentFrame, retire, writeUniform } from '../../shared/frame-resources.js';
 import { alphaBlend, groupCode } from '../../shared/pass.js';
-import { TransparentPass } from './pass.js';
+import { TransparentPass, pbrLayer } from './pass.js';
 
 export type { TransparentPass };
 
@@ -47,19 +47,19 @@ const NODE_BYTES = 16;
 // A node is colour and alpha as four halves, depth, then the next node with the coverage mask in the top 4 bits
 // (WebGPU has 1 or 4 samples). Slot 0 means the end of a list, and the word after the last pixel counts fragments.
 const LINK = 0x0fffffff;
-const declarations = (group: number) => /* wgsl */ `
+const surface = (group: number) => /* wgsl */ `
 struct MargoTransparent {@location(0) unused:vec4f}
 @group(${group}) @binding(${BINDING}) var<uniform> margoOIT:vec4u;
 @group(${group}) @binding(${BINDING + 1}) var<storage,read_write> margoHeads:array<atomic<u32>>;
 @group(${group}) @binding(${BINDING + 2}) var<storage,read_write> margoNodes:array<vec4u>;
 var<private> margoCoverage:u32;
-fn margoTransparent(color:vec4f,i:Out)->MargoTransparent {
+fn margoTransparentAt(color:vec4f,clip:vec4f,depth:f32)->MargoTransparent {
   var o:MargoTransparent; let a=clamp(color.a,0.0,1.0);
   if(a>=1.0/1024.0){
     let slot=atomicAdd(&margoHeads[margoOIT.y],1u)+1u;
     if(slot<margoOIT.z){
-      let p=vec2u(i.clip.xy); let next=atomicExchange(&margoHeads[p.y*margoOIT.x+p.x],slot); let c=min(color.rgb,vec3f(65504.0));
-      margoNodes[slot]=vec4u(pack2x16float(c.rg),pack2x16float(vec2f(c.b,a)),bitcast<u32>(i.clip.z),next|(margoCoverage<<28u));
+      let p=vec2u(clip.xy); let next=atomicExchange(&margoHeads[p.y*margoOIT.x+p.x],slot); let c=min(color.rgb,vec3f(65504.0));
+      margoNodes[slot]=vec4u(pack2x16float(c.rg),pack2x16float(vec2f(c.b,a)),bitcast<u32>(clip.z),next|(margoCoverage<<28u));
     }
   }
   return o;
@@ -130,8 +130,14 @@ struct Result {@location(0) color:vec4f, @builtin(frag_depth) depth:f32, @builti
 export class ExactOIT extends TransparentPass {
   readonly targets: readonly GPUColorTargetState[] = [];
   readonly layers: number;
+  readonly layout: readonly GPUBindGroupLayoutEntry[] = [
+    { binding: BINDING, visibility: 2, buffer: {} },
+    { binding: BINDING + 1, visibility: 2, buffer: { type: 'storage' } },
+    { binding: BINDING + 2, visibility: 2, buffer: { type: 'storage' } },
+  ];
   private readonly poolShare: number;
   private readonly code = new Map<number, string>();
+  private readonly surfaceCode = new Map<number, string>();
   private readonly words = new Uint32Array(4);
   private readonly values = new Float32Array(this.words.buffer);
   private uniform?: GPUBuffer;
@@ -183,7 +189,11 @@ export class ExactOIT extends TransparentPass {
   }
   /** @internal gltf-pro transparency hook. */
   declarations(group: number): string {
-    return groupCode(this.code, group, declarations);
+    return groupCode(this.code, group, (g) => this.surface(g) + pbrLayer);
+  }
+  /** @internal Effect hook. */
+  surface(group: number): string {
+    return groupCode(this.surfaceCode, group, surface);
   }
   /** @internal gltf-pro transparency hook. */
   bindings(): GPUBindGroupEntry[] {
@@ -254,7 +264,7 @@ export class ExactOIT extends TransparentPass {
   protected render(c: Context): void {
     // This view draws in the frame: what it releases waits while another view's commands still need it.
     currentFrame(c.device, c.view ?? c);
-    if (this.disposed || !this.models.size) return;
+    if (this.disposed || this.empty) return;
     this.readCount();
     this.prepare(c);
     this.words.set([c.width, c.width * c.height, this.capacity, c.height]);

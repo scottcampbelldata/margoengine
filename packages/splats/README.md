@@ -40,6 +40,28 @@ const cloud = Splats.attach(engine, parseSplat(await (await fetch('/capture.spla
 cloud.setFog(Fog.attach(engine, {color: '#8090a0', density: 0.02}));
 ```
 
+## With glass
+
+The cloud sorts against itself and blends over the scene, so glass in front of it comes out wrong. `addEffect` from
+[`margoengine/oit/vfx`](../oit/README.md#particles-splats-and-points-addeffect) draws it in the same pass as the glass:
+
+```ts
+import {Engine} from 'margoengine/core';
+import {ExactOIT} from 'margoengine/oit/exact';
+import {addEffect} from 'margoengine/oit/vfx';
+import {Splats} from 'margoengine/splats';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const cloud = Splats.attach(engine, {
+  positions: new Float32Array([0, 0, -1]),
+  covariances: new Float32Array([0.1, 0, 0, 0.1, 0, 0.1]),
+  colors: new Float32Array([0.2, 0.6, 1, 0.8]),
+});
+addEffect(ExactOIT.attach(engine, {layers: 32}), cloud);
+```
+
+The depth sort stops while it is in the pass, and `ExactOIT` keeps only the nearest `layers` per pixel, so a dense capture
+looks thinner than its own draw. Leave a capture on its own draw unless glass must cut through it.
+
 ## PLY captures, editing and level of detail (`./data`)
 
 ```ts

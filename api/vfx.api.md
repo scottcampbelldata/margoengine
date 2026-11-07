@@ -155,6 +155,15 @@ type OwnedResources = {
     destroy(): void;
 }[];
 
+interface SurfaceTransparency {
+  surface(group: number): string;
+  readonly layout: readonly GPUBindGroupLayoutEntry[];
+  bindings(): GPUBindGroupEntry[];
+  readonly blends?: boolean;
+  readonly targets: readonly GPUColorTargetState[];
+  begin(): GPURenderPassEncoder;
+}
+
 // used as VFXBase
 class VFX implements EnginePlugin {
     readonly options: VFXOptions;
@@ -167,6 +176,8 @@ class VFX implements EnginePlugin {
     burst(count: number): this;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
+    setTransparency(hook: SurfaceTransparency, released?: () => void): () => void;
+    drawTransparent(c: Context, hook: SurfaceTransparency): void;
     get gpuState(): {
         particles: GPUBuffer;
         indirect: GPUBuffer;

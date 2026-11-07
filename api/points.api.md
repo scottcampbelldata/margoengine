@@ -4,7 +4,7 @@
 
 ```ts
 import { EngineKernel, Mesh } from "@margoengine/core";
-import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
+import { Engine, EnginePlugin, FrameGraph, PassContext } from "@margoengine/core/extension";
 
 export const ASPRS_CLASSES: Readonly<Record<number, string>>;
 
@@ -214,6 +214,10 @@ export class PointsPlugin implements EnginePlugin {
     dispose(): void;
     [Symbol.dispose]: () => void;
     pick(x: number, y: number, options?: PointsPickOptions): PointsPickResult | null;
+    setTransparency(hook: SurfaceTransparency, released?: () => void): () => void;
+    drawTransparent(context: Extract<PassContext, {
+        backend: 'webgpu';
+    }>, hook: SurfaceTransparency): void;
 }
 
 export interface PointsPluginOptions {
@@ -369,5 +373,14 @@ type P = ArrayLike<number>;
 
 interface PointOwner {
     remove(item: unknown): void;
+}
+
+interface SurfaceTransparency {
+  surface(group: number): string;
+  readonly layout: readonly GPUBindGroupLayoutEntry[];
+  bindings(): GPUBindGroupEntry[];
+  readonly blends?: boolean;
+  readonly targets: readonly GPUColorTargetState[];
+  begin(): GPURenderPassEncoder;
 }
 ```

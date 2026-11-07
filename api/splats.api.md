@@ -4,7 +4,7 @@
 
 ```ts
 import { EngineKernel } from "@margoengine/core";
-import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
+import { Engine, EnginePlugin, FrameGraph, PassContext } from "@margoengine/core/extension";
 import { ColorInput } from "@margoengine/math";
 
 export interface FogLike {
@@ -65,6 +65,8 @@ export class Splats implements EnginePlugin {
     static attach(instance: EngineKernel, data: SplatData): Splats;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
+    setTransparency(hook: SurfaceTransparency, released?: () => void): () => void;
+    drawTransparent(c: Context, hook: SurfaceTransparency): void;
     get gpuState(): {
         sorted: GPUBuffer;
         ellipses: GPUBuffer;
@@ -110,4 +112,19 @@ export function splatsFromAttributes(raw: GaussianAttributes, { linear: stored }
 export function transformSplats(data: SplatData, matrix: ArrayLike<number>): SplatData;
 
 export function validateSplats(data: SplatData): number;
+
+// Not exported from this entry, but used by the exports above:
+
+type Context = Extract<PassContext, {
+    backend: 'webgpu';
+}>;
+
+interface SurfaceTransparency {
+  surface(group: number): string;
+  readonly layout: readonly GPUBindGroupLayoutEntry[];
+  bindings(): GPUBindGroupEntry[];
+  readonly blends?: boolean;
+  readonly targets: readonly GPUColorTargetState[];
+  begin(): GPURenderPassEncoder;
+}
 ```

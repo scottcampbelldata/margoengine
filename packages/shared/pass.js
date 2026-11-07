@@ -34,6 +34,36 @@ export function attachableMesh(mesh) {
   return mesh;
 }
 
+/** The fragment entry `transparent` of an effect under a transparency hook: `inputs` are its parameters, the rest WGSL expressions. */
+export function surfaceEntry(declarations, inputs, color, clip, depth) {
+  const coverage = declarations.includes('var<private> margoCoverage:u32');
+  return `\n@fragment fn transparent(${inputs}${coverage ? ',@builtin(sample_mask) margoMask:u32' : ''})->MargoTransparent {${coverage ? 'margoCoverage=margoMask;' : ''}return margoTransparentAt(${color},${clip},${depth});}\n`;
+}
+
+/** Holds an effect's transparency hook: `set` takes it and `released`, and returns the remover. */
+export function transparencySlot() {
+  return {
+    hook: undefined,
+    released: undefined,
+    set(hook, released) {
+      this.hook = hook;
+      this.released = released;
+      return () => {
+        if (this.hook === hook) this.hook = this.released = undefined;
+      };
+    },
+  };
+}
+
+/** `hook`'s pass with `pipeline` set, `group` at group 0 and the hook's bindings at group 1, for an effect with an auto layout. */
+export function surfacePass(device, hook, pipeline, group) {
+  const pass = hook.begin();
+  pass.setPipeline(pipeline);
+  pass.setBindGroup(0, group);
+  pass.setBindGroup(1, device.createBindGroup({ layout: pipeline.getBindGroupLayout(1), entries: hook.bindings() }));
+  return pass;
+}
+
 /** The WGSL `make(group)` builds for bind group `group`, made once per group and kept in `cache`. */
 export function groupCode(cache, group, make) {
   let code = cache.get(group);

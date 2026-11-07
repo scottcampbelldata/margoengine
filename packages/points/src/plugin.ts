@@ -26,11 +26,13 @@ import {
   foggedShader,
   pointShader,
   spriteShader,
+  surfaceShader,
 } from './shaders.js';
 import { checkFog, FOG_BYTES, writeFog, type FogLike } from '../../shared/fog.js';
 import { applyView, viewRect, viewSize, ViewStates } from '../../shared/view-rect.js';
 import { generateMipmaps } from '../../shared/mipmaps.js';
-import { alphaBlend } from '../../shared/pass.js';
+import { alphaBlend, transparencySlot, type SurfaceTransparency } from '../../shared/pass.js';
+import { orthographic as orthographicTerms } from '../../shared/projection.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number };
 declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };
@@ -227,6 +229,7 @@ export class PointsPlugin implements EnginePlugin {
   private fogSource: FogLike | null = null;
   private fogGpu?: {
     buffer: GPUBuffer;
+    layout: GPUBindGroupLayout;
     group: GPUBindGroup;
     pointLayout: GPUPipelineLayout;
     spriteLayout: GPUPipelineLayout;
@@ -259,6 +262,13 @@ export class PointsPlugin implements EnginePlugin {
   private readonly cloudDraws: CloudDraw[] = [];
   private readonly cloudDrawScratch: CloudDraw[] = [];
   private readonly spriteDraws: SpriteDraw[] = [];
+  /** This view's own cloud and sprite draws come first in their lists, up to Count; the hook's follow, up to End. */
+  private cloudCount = 0;
+  private cloudEnd = 0;
+  private spriteCount = 0;
+  private spriteEnd = 0;
+  private readonly transparency = transparencySlot();
+  private readonly hookLayouts = new Map<readonly GPUBindGroupLayoutEntry[], GPUBindGroupLayout>();
   private readonly spriteDrawScratch: SpriteDraw[] = [];
   private readonly pointColor: GPURenderPassColorAttachment = { view: undefined!, loadOp: 'load', storeOp: 'store' };
   private readonly pointColors: GPURenderPassColorAttachment[] = [this.pointColor];
@@ -438,6 +448,8 @@ export class PointsPlugin implements EnginePlugin {
   }
 
   registerPasses(graph: FrameGraph): void {
+    // Before anything draws, so that a pass ahead of this plugin's order finds this frame's clouds and sprites.
+    graph.add({ name: `${this.name}:prepare`, order: Math.min(this.order, -6), execute: this.prepare });
     graph.add({ name: `${this.name}:draw`, order: this.order, execute: this.execute });
   }
 
@@ -452,6 +464,7 @@ export class PointsPlugin implements EnginePlugin {
 
   /** Releases every GPU resource. Clouds and batches stay registered, so the plugin can be used again. */
   dispose(): void {
+    this.transparency.released?.();
     this.releaseGpu();
     this.engine = undefined;
   }
@@ -801,6 +814,8 @@ export class PointsPlugin implements EnginePlugin {
     this.pickViews.clear();
     this.pickView = undefined;
     this.pipelines.clear();
+    this.hookLayouts.clear();
+    this.cloudCount = this.cloudEnd = this.spriteCount = this.spriteEnd = 0;
     this.mipCache.clear();
   }
 
@@ -835,6 +850,7 @@ export class PointsPlugin implements EnginePlugin {
       buffer = device.createBuffer({ size: FOG_BYTES, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     return (this.fogGpu = {
       buffer,
+      layout,
       group: device.createBindGroup({ layout, entries: [{ binding: 0, resource: { buffer } }] }),
       pointLayout: device.createPipelineLayout({ bindGroupLayouts: [gpu.frameLayout, gpu.cloudLayout, layout] }),
       spriteLayout: device.createPipelineLayout({ bindGroupLayouts: [gpu.frameLayout, gpu.spriteLayout, layout] }),
@@ -909,6 +925,115 @@ export class PointsPlugin implements EnginePlugin {
       this.pipelines.set(key, pipeline);
     }
     return pipeline;
+  }
+
+  /** Whether `material` leaves this plugin's own draws for the transparency hook. */
+  private takes(material: AnyMaterial): boolean {
+    const hook = this.transparency.hook;
+    return (
+      !!hook &&
+      material.transparent &&
+      !material.writesDepth &&
+      material.depthTest &&
+      (material.blending === 'normal' || !!hook.blends)
+    );
+  }
+
+  /** The bind group layout of a hook's group 3. */
+  private hookLayout(hook: SurfaceTransparency): GPUBindGroupLayout {
+    let layout = this.hookLayouts.get(hook.layout);
+    if (!layout)
+      this.hookLayouts.set(
+        hook.layout,
+        (layout = this.device!.createBindGroupLayout({ entries: [...hook.layout] })),
+      );
+    return layout;
+  }
+
+  /** A point or sprite pipeline into the hook's pass. Fog's group 2 is in every layout, bound or used or not. */
+  private surfacePipeline(
+    context: GpuContext,
+    kind: 'point' | 'sprite',
+    material: AnyMaterial,
+    hook: SurfaceTransparency,
+  ): GPURenderPipeline {
+    const additive = material.blending === 'additive',
+      fogged = this.fogged(material),
+      declarations = hook.surface(3),
+      depthFormat = context.descriptor.depthStencil!.format,
+      key = `t|${kind}|${context.descriptor.multisample?.count}|${depthFormat}|${additive}|${fogged}|${declarations}`;
+    let pipeline = this.pipelines.get(key);
+    if (!pipeline) {
+      const device = this.device!,
+        gpu = this.gpu!,
+        module = device.createShaderModule({
+          code: surfaceShader(kind, declarations, fogged ? additive : undefined),
+        });
+      pipeline = device.createRenderPipeline({
+        layout: device.createPipelineLayout({
+          bindGroupLayouts: [
+            gpu.frameLayout,
+            kind === 'point' ? gpu.cloudLayout : gpu.spriteLayout,
+            this.fogResources().layout,
+            this.hookLayout(hook),
+          ],
+        }),
+        vertex: { module, entryPoint: 'vertex' },
+        fragment: {
+          module,
+          entryPoint: 'transparent',
+          constants: hook.blends ? { margoKind: +additive } : undefined,
+          targets: [...hook.targets],
+        },
+        primitive: { topology: 'triangle-strip', cullMode: 'none' },
+        multisample: context.descriptor.multisample,
+        depthStencil: { format: depthFormat, depthWriteEnabled: false, depthCompare: 'greater-equal' },
+      });
+      this.pipelines.set(key, pipeline);
+    }
+    return pipeline;
+  }
+
+  /**
+   * Leaves the transparent clouds and sprites to an order-independent pass, which calls `drawTransparent`: those that
+   * test depth and do not write it, additive ones only if the hook takes them. Use `addEffect` from
+   * `@margoengine/oit/vfx`. Returns a remover; `released` runs if this plugin is disposed first.
+   */
+  setTransparency(hook: SurfaceTransparency, released?: () => void): () => void {
+    return this.transparency.set(hook, released);
+  }
+
+  /** Draws this frame's transparent clouds and sprites into `hook`'s pass, depth tested and not written. */
+  drawTransparent(context: Extract<PassContext, { backend: 'webgpu' }>, hook: SurfaceTransparency): void {
+    if (this.cloudEnd === this.cloudCount && this.spriteEnd === this.spriteCount) return;
+    const gpu = this.gpu!,
+      s = this.stats,
+      target = context as GpuContext,
+      pass = hook.begin();
+    pass.setBindGroup(0, gpu.frameGroup);
+    pass.setBindGroup(2, this.fogResources().group);
+    pass.setBindGroup(
+      3,
+      this.device!.createBindGroup({ layout: this.hookLayout(hook), entries: hook.bindings() }),
+    );
+    for (let i = this.cloudCount; i < this.cloudEnd; i++) {
+      const { cloud, r, view, first, end } = this.cloudDraws[i];
+      pass.setPipeline(this.surfacePipeline(target, 'point', cloud.material, hook));
+      pass.setBindGroup(1, this.cloudGroup(r, view, cloud.material.mapFilter === 'nearest' ? gpu.nearest : gpu.linear));
+      for (let e = first; e < end; e++) {
+        const n = this.blockAllotment[e];
+        if (!n) continue;
+        pass.draw(4, n, 0, cloud.blocks.starts[this.entryBlock[e]]);
+        s.drawCalls++;
+      }
+    }
+    for (let i = this.spriteCount; i < this.spriteEnd; i++) {
+      const { batch, group } = this.spriteDraws[i];
+      pass.setPipeline(this.surfacePipeline(target, 'sprite', batch.material, hook));
+      pass.setBindGroup(1, group);
+      pass.draw(4, batch.count);
+      s.drawCalls++;
+    }
   }
 
   private edlPipeline(format: GPUTextureFormat, count: number): GPURenderPipeline {
@@ -986,6 +1111,8 @@ export class PointsPlugin implements EnginePlugin {
       c = context.camera.matrix,
       [width, height] = viewSize(context);
     this.orthographic = fillFrame(f, this.view, context.camera, width, height, context.format);
+    // Under a hook, an orthographic camera's near plane view depth, which clip z counts from.
+    f[27] = this.transparency.hook ? (orthographicTerms(context.camera.matrix, context.camera.position)?.near ?? 0) : 0;
     this.device!.queue.writeBuffer(this.gpu!.frame, 0, f);
     const picked = (this.pickView = this.pickViews.get(context));
     picked.viewProj.set(c);
@@ -1070,8 +1197,10 @@ export class PointsPlugin implements EnginePlugin {
     return r.group;
   }
 
-  private readonly execute = (context: PassContext): void => {
+  /** Uploads, culls and shares the point budget for this view, and leaves out what the transparency hook draws. */
+  private readonly prepare = (context: PassContext): void => {
     const s = this.stats;
+    this.cloudCount = this.cloudEnd = this.spriteCount = this.spriteEnd = 0;
     s.clouds =
       s.blocks =
       s.blocksVisible =
@@ -1173,8 +1302,110 @@ export class PointsPlugin implements EnginePlugin {
       this.blockAllotment = allotment = new Uint32Array(Math.max(16, entryBlock.length, allotment.length * 2));
     s.pointsDrawn = allocateBudget(entryCount, entryWeight, entryBlock.length, this.pointBudget, allotment);
 
-    // 3. Draw: opaque clouds front to back, then transparent clouds back to front.
+    // Clouds the transparency hook draws wait at the end of the list.
     const draws = this.cloudDraws;
+    let kept = 0;
+    for (let i = 0; i < cloudDrawCount; i++) {
+      const a = draws[i];
+      if (this.takes(a.cloud.material)) {
+        for (let e = a.first; e < a.end; e++) {
+          if (!allotment[e]) continue;
+          a.r.drawn.push(entryBlock[e], allotment[e]);
+          a.cloud.stats.pointsDrawn += allotment[e];
+        }
+      } else {
+        draws[i] = draws[kept];
+        draws[kept++] = a;
+      }
+    }
+    this.cloudCount = kept;
+    this.cloudEnd = cloudDrawCount;
+
+    // 3. Sprites: upload and uniforms.
+    let spriteTotal = 0;
+    for (const batch of this.batches) {
+      if (!batch.visible || !batch.count) continue;
+      const mesh = batch.attachedMesh,
+        model = mesh ? meshWorldMatrix(engine, mesh) : batch.matrix;
+      if (!model) continue;
+      const m = batch.material;
+      m.validate();
+      const r = this.ensureBatch(batch);
+      if (batch.dirty.length) {
+        for (const [start, end] of mergeRanges(batch.dirty)) {
+          const to = Math.min(end, batch.count);
+          if (to <= start) continue;
+          device.queue.writeBuffer(
+            r.instances,
+            start * SPRITE_STRIDE * 4,
+            batch.data as Float32Array<ArrayBuffer>,
+            start * SPRITE_STRIDE,
+            (to - start) * SPRITE_STRIDE,
+          );
+          s.uploads++;
+          s.uploadBytes += (to - start) * SPRITE_STRIDE * 4;
+        }
+        batch.dirty.length = 0;
+      }
+      const view = this.texture(m) ?? gpu.whiteView,
+        f = r.floats;
+      f.set(model, 0);
+      f.set(m.color, 16);
+      f[19] = m.opacity;
+      f[20] = m.rotation;
+      f[21] = m.alphaTest;
+      f[22] = m.sizeUnits === 'pixels' ? 1 : 0;
+      // Clipping planes: count in params.w (negative: intersection), planes from byte 96, unused slots zeroed.
+      const planes = m['clipping'];
+      f[23] = (planes.length / 4) * (m.clipIntersection ? -1 : 1);
+      f.set(planes, 24);
+      f.fill(0, 24 + planes.length);
+      let changed = false;
+      for (let i = 0; i < f.length; i++)
+        if (!Object.is(r.written[i], f[i])) {
+          changed = true;
+          break;
+        }
+      if (changed) {
+        device.queue.writeBuffer(r.uniform, 0, f);
+        r.written.set(f);
+      }
+      let sprite = this.spriteDraws[spriteTotal];
+      const group = this.batchGroup(r, view, m.mapFilter === 'nearest' ? gpu.nearest : gpu.linear);
+      if (!sprite) this.spriteDraws[spriteTotal] = sprite = { batch, group };
+      else {
+        sprite.batch = batch;
+        sprite.group = group;
+      }
+      spriteTotal++;
+    }
+    let keptSprites = 0;
+    for (let i = 0; i < spriteTotal; i++) {
+      const sprite = this.spriteDraws[i];
+      if (this.takes(sprite.batch.material)) s.sprites += sprite.batch.count;
+      else {
+        this.spriteDraws[i] = this.spriteDraws[keptSprites];
+        this.spriteDraws[keptSprites++] = sprite;
+      }
+    }
+    this.spriteCount = keptSprites;
+    this.spriteEnd = spriteTotal;
+  };
+
+  private readonly execute = (context: PassContext): void => {
+    if (context.backend !== 'webgpu') return;
+    const cloudDrawCount = this.cloudCount,
+      spriteCount = this.spriteCount;
+    if (!cloudDrawCount && !spriteCount) return;
+    const s = this.stats,
+      gpu = this.gpu!,
+      device = this.device!,
+      camera = context.camera,
+      draws = this.cloudDraws,
+      allotment = this.blockAllotment,
+      entryBlock = this.entryBlock,
+      entryDistance = this.entryDistance;
+    // 4. Draw: opaque clouds front to back, then transparent clouds back to front.
     let edlUsed = false;
     for (let i = 0; i < cloudDrawCount; i++) if (draws[i].cloud.material.edl) edlUsed = true;
     for (let i = 0; i < cloudDrawCount; i++) {
@@ -1245,64 +1476,7 @@ export class PointsPlugin implements EnginePlugin {
       }
     }
 
-    // 4. Sprites, one instanced draw per batch.
-    let spriteCount = 0;
-    for (const batch of this.batches) {
-      if (!batch.visible || !batch.count) continue;
-      const mesh = batch.attachedMesh,
-        model = mesh ? meshWorldMatrix(engine, mesh) : batch.matrix;
-      if (!model) continue;
-      const m = batch.material;
-      m.validate();
-      const r = this.ensureBatch(batch);
-      if (batch.dirty.length) {
-        for (const [start, end] of mergeRanges(batch.dirty)) {
-          const to = Math.min(end, batch.count);
-          if (to <= start) continue;
-          device.queue.writeBuffer(
-            r.instances,
-            start * SPRITE_STRIDE * 4,
-            batch.data as Float32Array<ArrayBuffer>,
-            start * SPRITE_STRIDE,
-            (to - start) * SPRITE_STRIDE,
-          );
-          s.uploads++;
-          s.uploadBytes += (to - start) * SPRITE_STRIDE * 4;
-        }
-        batch.dirty.length = 0;
-      }
-      const view = this.texture(m) ?? gpu.whiteView,
-        f = r.floats;
-      f.set(model, 0);
-      f.set(m.color, 16);
-      f[19] = m.opacity;
-      f[20] = m.rotation;
-      f[21] = m.alphaTest;
-      f[22] = m.sizeUnits === 'pixels' ? 1 : 0;
-      // Clipping planes: count in params.w (negative: intersection), planes from byte 96, unused slots zeroed.
-      const planes = m['clipping'];
-      f[23] = (planes.length / 4) * (m.clipIntersection ? -1 : 1);
-      f.set(planes, 24);
-      f.fill(0, 24 + planes.length);
-      let changed = false;
-      for (let i = 0; i < f.length; i++)
-        if (!Object.is(r.written[i], f[i])) {
-          changed = true;
-          break;
-        }
-      if (changed) {
-        device.queue.writeBuffer(r.uniform, 0, f);
-        r.written.set(f);
-      }
-      let sprite = this.spriteDraws[spriteCount];
-      const group = this.batchGroup(r, view, m.mapFilter === 'nearest' ? gpu.nearest : gpu.linear);
-      if (!sprite) this.spriteDraws[spriteCount] = sprite = { batch, group };
-      else {
-        sprite.batch = batch;
-        sprite.group = group;
-      }
-      spriteCount++;
-    }
+    // 5. Sprites, one instanced draw per batch.
     if (spriteCount) {
       sortCount(
         this.spriteDraws,

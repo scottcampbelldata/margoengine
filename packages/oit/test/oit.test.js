@@ -10,6 +10,7 @@ import { addMesh } from '../dist/meshes.js';
 import { ExactOIT } from '../dist/exact.js';
 import { MomentOIT } from '../dist/moments.js';
 import { TransparentDepth } from '../dist/depth.js';
+import { addEffect } from '../dist/vfx.js';
 import { animatedTriangle } from '../../../tests/support/gltf-pro-fixture.js';
 
 // Opaque, BLEND, BLEND + transmission (keeps the sorted path) and BLEND + clearcoat (physical variant).
@@ -408,4 +409,81 @@ test('TransparentDepth redraws transparent surfaces, depth only, after the pass 
 test('TransparentDepth refuses settings it cannot keep', () => {
   for (const threshold of [0, -1, 1.5, Number.NaN]) assert.throws(() => new TransparentDepth({ threshold }), RangeError);
   assert.throws(() => new TransparentDepth({ order: 0 }), RangeError);
+});
+
+/** An effect that records what the pass asks of it. */
+function fakeEffect() {
+  return {
+    hooks: [],
+    drawn: [],
+    released: undefined,
+    setTransparency(hook, released) {
+      this.hooks.push(hook);
+      this.released = released;
+      return () => this.hooks.pop();
+    },
+    drawTransparent(c, hook) {
+      this.drawn.push(hook);
+      hook.begin();
+    },
+  };
+}
+
+test('addEffect hands an effect the pass, draws it in the pass and hands it back', async () => {
+  const { engine, frame } = await scene(1),
+    oit = OIT.attach(engine),
+    effect = fakeEffect();
+  const remove = addEffect(oit, effect);
+  assert.equal(addEffect(oit, effect), remove, 'adding twice is adding once');
+  assert.deepEqual(effect.hooks, [oit]);
+  assert.match(oit.surface(1), /fn margoTransparentAt\(color:vec4f,clip:vec4f,depth:f32\)/);
+  assert.doesNotMatch(oit.surface(1), /\bOut\b|f\.view/, 'nothing of the PBR shader, which an effect does not have');
+  assert.match(oit.declarations(2), /fn margoTransparent\(color:vec4f,i:Out\)/);
+  assert.deepEqual(passes(frame(0)).map((p) => p.label).slice(-2), ['oit:accumulate', 'oit:composite'], 'no model needed');
+  assert.equal(effect.drawn.length, 1);
+  remove();
+  assert.deepEqual(effect.hooks, [], 'handed back');
+  assert.equal(oit.effects.size, 0);
+  effect.drawn.length = 0;
+  frame(1);
+  assert.equal(effect.drawn.length, 0, 'not drawn again');
+});
+
+test('MomentOIT asks an effect to draw twice, with a hook for each pass, and ExactOIT once', async () => {
+  const { engine, frame } = await scene(1),
+    moments = MomentOIT.attach(engine),
+    effect = fakeEffect();
+  addEffect(moments, effect);
+  frame(0);
+  assert.equal(effect.drawn.length, 2);
+  assert.notEqual(effect.drawn[0], effect.drawn[1]);
+  for (const hook of effect.drawn) assert.match(hook.surface(1), /fn margoTransparentAt/);
+  assert.equal(effect.drawn[1].layout.length, 3, 'the shading hook binds the two moment targets');
+  moments.dispose();
+  const exact = ExactOIT.attach(engine),
+    other = fakeEffect();
+  addEffect(exact, other);
+  frame(1);
+  assert.equal(other.drawn.length, 1);
+  assert.match(exact.surface(1), /var<private> margoCoverage:u32/);
+});
+
+test('an effect disposed first leaves the pass; a disposed pass hands every effect back', async () => {
+  const { engine } = await scene(1),
+    oit = OIT.attach(engine),
+    gone = fakeEffect(),
+    kept = fakeEffect();
+  addEffect(oit, gone);
+  addEffect(oit, kept);
+  gone.released();
+  assert.deepEqual([...oit.effects.keys()], [kept]);
+  oit.dispose();
+  assert.deepEqual(kept.hooks, []);
+  assert.throws(() => addEffect(oit, fakeEffect()), /disposed/);
+});
+
+test('addEffect refuses what is no effect, and a pass not attached', () => {
+  assert.throws(() => addEffect(new OIT(), fakeEffect()), /attach/);
+  assert.throws(() => addEffect(new OIT(), {}), /VFX, Splats or PointsPlugin/);
+  assert.throws(() => addEffect(new OIT(), null), TypeError);
 });

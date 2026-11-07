@@ -164,6 +164,26 @@ points.setFog(Fog.attach(engine, {color: '#8090a0', density: 0.03}));
 labels.material.fog = false; // keep this batch clear
 ```
 
+## With glass
+
+Transparent clouds and sprites blend over the scene at order 10. `addEffect` from
+[`margoengine/oit/vfx`](../oit/README.md#particles-splats-and-points-addeffect) draws those that test depth and write none
+in the same pass as glass; the rest keep their draw:
+
+```ts
+import {Engine} from 'margoengine/core';
+import {OIT} from 'margoengine/oit';
+import {addEffect} from 'margoengine/oit/vfx';
+import {PointsPlugin, PointCloud} from 'margoengine/points';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const points = PointsPlugin.attach(engine);
+points.add(new PointCloud({positions: new Float32Array([0, 0, 0]), material: {size: 8, transparent: true, opacity: 0.5}}));
+addEffect(OIT.attach(engine, {blending: true}), points);
+```
+
+Culling and the point budget run before anything draws, so the pass, at order 8, finds this frame's points. Additive
+materials join only `blending`. Surfels stay out.
+
 ## Clipping planes
 
 `PointsMaterial.clippingPlanes` and `SpriteMaterial.clippingPlanes` take up to 6 world-space planes `[a, b, c, d]`;

@@ -12,11 +12,12 @@ import { finiteVector } from '@margoengine/math/validate';
 import { MargoError } from '@margoengine/math/errors';
 import { viewMatrix } from '../../shared/view.js';
 import { preset } from '../../shared/preset.js';
-import { simulationShader, billboardShader, multisampled, foggedBillboard } from './shader.js';
+import { simulationShader, billboardShader, multisampled, foggedBillboard, transparentBillboard } from './shader.js';
 import { checkFog, FOG_BYTES, writeFog, type FogLike } from '../../shared/fog.js';
 export type { FogLike } from '../../shared/fog.js';
 import { applyView } from '../../shared/view-rect.js';
 import { loadCompatRoute } from '../../shared/compat.js';
+import { surfacePass, transparencySlot, type SurfaceTransparency } from '../../shared/pass.js';
 declare const GPUBufferUsage: {
   UNIFORM: number;
   STORAGE: number;
@@ -273,6 +274,7 @@ export class VFX implements EnginePlugin {
   private curveRuntime?: ReturnType<NonNullable<VFXFeatures['curves']>['create']>;
   private emitterRuntime?: ReturnType<NonNullable<VFXFeatures['emitter']>['create']>;
   private emitterShape?: string;
+  private readonly transparency = transparencySlot();
   private sorter?: ReturnType<NonNullable<VFXFeatures['sort']>['create']>;
   /** On the WebGL2 layer, once loaded: the simulation as point draws on the GPU and the draw without a read-back (./compat.js). */
   private route?: { kernels: import('./compat.js').SimulationRoute; billboard(code: string): string; binding: number };
@@ -573,6 +575,7 @@ export class VFX implements EnginePlugin {
       this.values[20 + i] = this.view[i * 4 + 1];
       this.values[48 + i] = o.emissionExtent?.[i] ?? 0;
     }
+    this.values[19] = this.transparency.hook ? this.view[14] : 0;
     // up.w: pixels per world unit at clip w = 1, the clip-space length of the camera's up axis times half the viewport
     // height, so the billboard can keep far particles at least 1.5 px across.
     const m = this.values,
@@ -631,7 +634,8 @@ export class VFX implements EnginePlugin {
     this.sorter?.run(pass);
     pass.end();
   }
-  private draw(c: Context): void {
+  /** The pipeline and group 0 of a draw into the frame, or with `hook` into its pass. */
+  private prepare(c: Context, hook?: SurfaceTransparency): [GPURenderPipeline, GPUBindGroup] {
     if (this.renderFormat !== c.format || this.renderDepth !== c.descriptor.depthStencil!.format) {
       this.renderFormat = c.format;
       this.renderDepth = c.descriptor.depthStencil!.format;
@@ -655,31 +659,44 @@ export class VFX implements EnginePlugin {
       samples = this.softRuntime.write(c, this.options.depth!(), this.view, softness);
       if (this.softRuntime.changed) this.renderGroups.clear();
     }
-    const key =
-      this.renderKey + ':' + c.descriptor.multisample?.count + (fog ? ':fog' : '') + (samples ? ':soft' + samples : '');
+    const declarations = hook?.surface(1),
+      key =
+        this.renderKey +
+        ':' +
+        c.descriptor.multisample?.count +
+        (fog ? ':fog' : '') +
+        (samples ? ':soft' + samples : '') +
+        (declarations ?? '');
     let pipeline = this.renders.get(key);
     if (!pipeline) {
       const lit = samples ? this.features.soft!.patch(this.billboard, samples) : this.billboard,
         fogged = fog ? foggedBillboard(lit) : lit,
         billboard = this.route ? this.route.billboard(fogged) : fogged;
       const module = c.device.createShaderModule({
-        code: (c.descriptor.multisample?.count ?? 1) > 1 ? multisampled(billboard) : billboard,
+        code: declarations
+          ? transparentBillboard(billboard, declarations)
+          : (c.descriptor.multisample?.count ?? 1) > 1
+            ? multisampled(billboard)
+            : billboard,
       });
       pipeline = c.device.createRenderPipeline({
         layout: 'auto',
         vertex: { module, entryPoint: 'vertex' },
         fragment: {
           module,
-          entryPoint: 'fragment',
-          targets: [
-            {
-              format: c.format,
-              blend: {
-                color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha' },
-                alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' },
-              },
-            },
-          ],
+          entryPoint: hook ? 'transparent' : 'fragment',
+          ...(hook?.blends ? { constants: { margoKind: 0 } } : {}),
+          targets: hook
+            ? [...hook.targets]
+            : [
+                {
+                  format: c.format,
+                  blend: {
+                    color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha' },
+                    alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' },
+                  },
+                },
+              ],
         },
         multisample: c.descriptor.multisample,
         depthStencil: {
@@ -709,6 +726,11 @@ export class VFX implements EnginePlugin {
       });
       this.renderGroups.set(pipeline, group);
     }
+    return [pipeline, group];
+  }
+  private draw(c: Context): void {
+    if (this.transparency.hook) return;
+    const [pipeline, group] = this.prepare(c);
     this.attachment.view = c.color;
     this.depthAttachment.view = c.depth;
     this.depthAttachment.stencilReadOnly = c.descriptor.depthStencil!.format.includes('stencil') ? true : undefined;
@@ -719,6 +741,22 @@ export class VFX implements EnginePlugin {
     if (this.route) pass.draw(3, this.capacity);
     else pass.drawIndirect(this.visible!, 0);
     pass.end();
+    this.engine!.stats.drawCalls++;
+  }
+  /**
+   * Leaves the frame's draw (order 6) to an order-independent pass, which calls `drawTransparent`. Use `addEffect` from
+   * `@margoengine/oit/vfx`. Returns a remover; `released` runs if this effect is disposed first.
+   */
+  setTransparency(hook: SurfaceTransparency, released?: () => void): () => void {
+    return this.transparency.set(hook, released);
+  }
+  /** Draws the particles into `hook`'s pass, depth tested and not written. */
+  drawTransparent(c: Context, hook: SurfaceTransparency): void {
+    if (!this.visible) return;
+    const [pipeline, group] = this.prepare(c, hook),
+      pass = surfacePass(c.device, hook, pipeline, group);
+    if (this.route) pass.draw(3, this.capacity);
+    else pass.drawIndirect(this.visible, 0);
     this.engine!.stats.drawCalls++;
   }
   get gpuState(): { particles: GPUBuffer; indirect: GPUBuffer; alive: GPUBuffer; visible: GPUBuffer } {
@@ -758,6 +796,7 @@ export class VFX implements EnginePlugin {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.transparency.released?.();
     this.engine?.removePlugin(this.name);
     this.release();
     this.engine = this.device = undefined;

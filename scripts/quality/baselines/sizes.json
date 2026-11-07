@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10011518,
+  "total": 10014343,
   "history": [
     {
       "date": "2026-10-24",
@@ -2972,6 +2972,12 @@
       "commit": "1f4cca859",
       "reason": "B28 ring grab in ArcballGizmo and B39 SH3.rotate: new features in optional entries",
       "grew": 2
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "237cd14b6",
+      "reason": "oit/vfx entry and effect hooks in oit, vfx, splats and points",
+      "grew": 4
     }
   ],
   "items": {
@@ -3365,12 +3371,13 @@
     "@margoengine/oit/exact": 4537,
     "@margoengine/oit/meshes": 747,
     "@margoengine/oit/moments": 4197,
+    "@margoengine/oit/vfx": 486,
     "@margoengine/physics": 16756,
     "@margoengine/physics2d": 7920,
     "@margoengine/pixel": 4664,
     "@margoengine/pixel/palette": 4341,
     "@margoengine/pixel/render3d": 3866,
-    "@margoengine/points": 22648,
+    "@margoengine/points": 23954,
     "@margoengine/points/copc": 15633,
     "@margoengine/points/e57": 6537,
     "@margoengine/points/las": 14148,
@@ -3380,7 +3387,7 @@
     "@margoengine/points/octree": 9267,
     "@margoengine/points/pick": 5274,
     "@margoengine/points/potree": 17694,
-    "@margoengine/points/surfels": 14856,
+    "@margoengine/points/surfels": 14851,
     "@margoengine/post": 40110,
     "@margoengine/post/afterimage": 5619,
     "@margoengine/post/bloom": 6716,
@@ -3547,8 +3554,8 @@
     "@margoengine/usdz": 9314,
     "@margoengine/usdz dist/workers/usdz.js": 72539,
     "@margoengine/usdz/worker": 10380,
-    "@margoengine/vfx": 16613,
-    "@margoengine/vfx/base": 10476,
+    "@margoengine/vfx": 17135,
+    "@margoengine/vfx/base": 10992,
     "@margoengine/vfx/curves": 1816,
     "@margoengine/vfx/emitter": 2656,
     "@margoengine/vfx/obstacles": 1364,

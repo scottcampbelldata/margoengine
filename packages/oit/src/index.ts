@@ -6,7 +6,7 @@ import { engineRuntime, type Engine, type PassContext } from '@margoengine/core/
 import { applyView } from '../../shared/view-rect.js';
 import { currentFrame, retire, writeUniform } from '../../shared/frame-resources.js';
 import { groupCode } from '../../shared/pass.js';
-import { TransparentPass } from './pass.js';
+import { TransparentPass, pbrLayer } from './pass.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; RENDER_ATTACHMENT: number };
@@ -29,28 +29,28 @@ export interface OITOptions {
 const BINDING = 120;
 // Weight: alpha * clamp(10 / (depth / scale)^6, 0.01, 1000). The power sets how strongly a nearer layer wins (exact for
 // two 50% layers 12% apart in depth); the clamp keeps 64 LDR layers inside rgba16float. Unclamped from 0.46 to 3.2 x scale.
-const declarations = (group: number) => /* wgsl */ `
+const surface = (group: number) => /* wgsl */ `
 struct MargoTransparent {@location(0) accum:vec4f, @location(1) reveal:vec4f}
 @group(${group}) @binding(${BINDING}) var<uniform> margoOIT:vec4f;
-fn margoTransparent(color:vec4f,i:Out)->MargoTransparent {
-  let a=clamp(color.a,0.0,1.0); let d=max(-(f.view*vec4f(i.position,1)).z*margoOIT.x,1e-4);
+fn margoTransparentAt(color:vec4f,clip:vec4f,depth:f32)->MargoTransparent {
+  let a=clamp(color.a,0.0,1.0); let d=max(depth*margoOIT.x,1e-4);
   let w=a*clamp(10.0/pow(d,6.0),0.01,1000.0); var o:MargoTransparent;
   o.accum=vec4f(color.rgb*w,w); o.reveal=vec4f(a); return o;
 }
 `;
 // `blending`: what each kind of surface leaves. Light adds in `added`, the background multiplies by `reveal.rgb`, and
 // `reveal.a` keeps the coverage of normal layers alone, which scales their average colour.
-const blended = (group: number) => /* wgsl */ `
+const surfaceBlended = (group: number) => /* wgsl */ `
 override margoKind:u32=0u;
 struct MargoTransparent {@location(0) accum:vec4f, @location(1) reveal:vec4f, @location(2) added:vec4f}
 @group(${group}) @binding(${BINDING}) var<uniform> margoOIT:vec4f;
 fn margoTransparentTint(share:vec4f)->MargoTransparent {
   var o:MargoTransparent; o.reveal=vec4f(share.rgb,1.0); return o;
 }
-fn margoTransparent(color:vec4f,i:Out)->MargoTransparent {
+fn margoTransparentAt(color:vec4f,clip:vec4f,depth:f32)->MargoTransparent {
   let a=clamp(color.a,0.0,1.0); var o:MargoTransparent; o.reveal=vec4f(1.0);
   if(margoKind==0u){
-    let d=max(-(f.view*vec4f(i.position,1)).z*margoOIT.x,1e-4);
+    let d=max(depth*margoOIT.x,1e-4);
     let w=a*clamp(10.0/pow(d,6.0),0.01,1000.0); o.accum=vec4f(color.rgb*w,w); o.reveal=vec4f(1.0-a);
   } else if(margoKind==1u){o.added=vec4f(color.rgb*a,a);}
   else if(margoKind==2u){o.reveal=vec4f(color.rgb,1.0);}
@@ -107,7 +107,9 @@ export class OIT extends TransparentPass {
   readonly targets: readonly GPUColorTargetState[];
   readonly blends: boolean;
   private readonly depthScale?: number;
+  readonly layout: readonly GPUBindGroupLayoutEntry[] = [{ binding: BINDING, visibility: 2, buffer: {} }];
   private readonly code = new Map<number, string>();
+  private readonly surfaceCode = new Map<number, string>();
   private readonly values = new Float32Array(4);
   private uniform?: GPUBuffer;
   /** This view's uniform binding while its models draw (a frame-arena slice for a second view). */
@@ -153,7 +155,11 @@ export class OIT extends TransparentPass {
   }
   /** @internal gltf-pro transparency hook. */
   declarations(group: number): string {
-    return groupCode(this.code, group, this.blends ? blended : declarations);
+    return groupCode(this.code, group, (g) => this.surface(g) + pbrLayer);
+  }
+  /** @internal Effect hook. */
+  surface(group: number): string {
+    return groupCode(this.surfaceCode, group, this.blends ? surfaceBlended : surface);
   }
   /** @internal gltf-pro transparency hook. */
   bindings(): GPUBindGroupEntry[] {
@@ -183,7 +189,7 @@ export class OIT extends TransparentPass {
   protected render(c: Context): void {
     // This view draws in the frame: what it releases waits while another view's commands still need it.
     currentFrame(c.device, c.view ?? c);
-    if (this.disposed || !this.models.size) return;
+    if (this.disposed || this.empty) return;
     const samples = c.descriptor.multisample?.count ?? 1,
       size = c.width + 'x' + c.height + 'x' + samples,
       device = c.device;

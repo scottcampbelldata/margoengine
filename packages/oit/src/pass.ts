@@ -3,12 +3,26 @@
 import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine/core/extension';
 import type { PBRModel, PBRTransparency } from '@margoengine/gltf-pro';
 import { MargoError } from '@margoengine/math/errors';
+import type { SurfaceTransparency } from '../../shared/pass.js';
 
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 let serial = 0;
 
+/** A drawable that is no PBR surface and can feed an order-independent pass: `VFX`, `Splats`, `PointsPlugin`. */
+export interface TransparentEffect {
+  /** Leaves the effect's own drawing for `drawTransparent`. Returns a remover; `released` runs if the effect is disposed first. */
+  setTransparency(hook: SurfaceTransparency, released?: () => void): () => void;
+  /** Draws into `hook`'s pass; a pass may ask twice in one frame. */
+  drawTransparent(c: Context, hook: SurfaceTransparency): void;
+}
+/** What every PBR surface passes on to `margoTransparentAt`. */
+export const pbrLayer = `fn margoTransparent(color:vec4f,i:Out)->MargoTransparent {
+  return margoTransparentAt(color,i.clip,-(f.view*vec4f(i.position,1)).z);
+}
+`;
+
 /** The part of an order-independent pass that `oit.add(model)` and `addMesh` work on: `OIT`, `ExactOIT` and `MomentOIT`. */
-export abstract class TransparentPass implements EnginePlugin, PBRTransparency {
+export abstract class TransparentPass implements EnginePlugin, PBRTransparency, SurfaceTransparency {
   readonly name = 'oit:' + serial++;
   readonly order: number;
   abstract readonly targets: readonly GPUColorTargetState[];
@@ -17,6 +31,8 @@ export abstract class TransparentPass implements EnginePlugin, PBRTransparency {
   protected device?: GPUDevice;
   protected disposed = false;
   protected readonly models = new Map<PBRModel, () => void>();
+  /** @internal Effects added with `addEffect` (`@margoengine/oit/vfx`) and their removers. */
+  readonly effects = new Map<TransparentEffect, () => void>();
   protected context?: Context;
   protected pass?: GPURenderPassEncoder;
 
@@ -26,11 +42,7 @@ export abstract class TransparentPass implements EnginePlugin, PBRTransparency {
   }
   /** Draws a gltf-pro model's BLEND primitives (or a transparent materials mesh) order-independently. Returns a remover. */
   add(model: PBRModel): () => void {
-    if (this.disposed || !this.engine)
-      throw new MargoError(
-        this.disposed ? 'disposed' : 'state',
-        this.disposed ? 'OIT is disposed; create a new OIT' : 'OIT.add needs OIT.attach(engine) first',
-      );
+    this.ready();
     let release = this.models.get(model);
     if (!release) {
       const restore = model.setTransparency(this),
@@ -45,6 +57,14 @@ export abstract class TransparentPass implements EnginePlugin, PBRTransparency {
       this.models.set(model, release);
     }
     return release;
+  }
+  /** @internal Throws unless the pass can take something to draw. */
+  ready(): void {
+    if (this.disposed || !this.engine)
+      throw new MargoError(
+        this.disposed ? 'disposed' : 'state',
+        this.disposed ? 'OIT is disposed; create a new OIT' : 'OIT.add needs OIT.attach(engine) first',
+      );
   }
   setup(engine: Engine): void {
     if (this.disposed) throw new MargoError('disposed', 'OIT is disposed; create a new OIT');
@@ -65,9 +85,17 @@ export abstract class TransparentPass implements EnginePlugin, PBRTransparency {
   abstract declarations(group: number): string;
   /** @internal gltf-pro transparency hook. */
   abstract bindings(): GPUBindGroupEntry[];
+  /** @internal Effect hook: the declarations without what only a PBR surface has. */
+  abstract surface(group: number): string;
+  /** @internal Effect hook. */
+  abstract readonly layout: readonly GPUBindGroupLayoutEntry[];
   /** @internal gltf-pro transparency hook: this frame's transparent pass, begun on the first transparent draw. */
   abstract begin(): GPURenderPassEncoder;
   protected abstract render(c: Context): void;
+  /** Whether nothing was added. */
+  protected get empty(): boolean {
+    return !this.models.size && !this.effects.size;
+  }
   /** Frees what depends on the render size. */
   protected abstract release(): void;
   /** Frees everything held on the current device. */
@@ -78,6 +106,7 @@ export abstract class TransparentPass implements EnginePlugin, PBRTransparency {
     this.pass = undefined;
     try {
       for (const model of this.models.keys()) model.draw(c, 'transparent', c.color, c.depth);
+      for (const effect of this.effects.keys()) effect.drawTransparent(c, this);
     } catch (error) {
       (this.pass as GPURenderPassEncoder | undefined)?.end();
       this.pass = undefined;
@@ -99,7 +128,7 @@ export abstract class TransparentPass implements EnginePlugin, PBRTransparency {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
-    for (const release of [...this.models.values()]) release();
+    for (const release of [...this.models.values(), ...this.effects.values()]) release();
     this.freeDevice();
     this.engine?.removePlugin(this.name);
   }

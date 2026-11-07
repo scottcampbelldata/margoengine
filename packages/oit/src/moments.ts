@@ -9,8 +9,8 @@ import { engineRuntime, type Engine, type PassContext } from '@margoengine/core/
 import type { PBRModel, PBRTransparency } from '@margoengine/gltf-pro';
 import { applyView } from '../../shared/view-rect.js';
 import { currentFrame, retire, writeUniform } from '../../shared/frame-resources.js';
-import { alphaBlend, groupCode } from '../../shared/pass.js';
-import { TransparentPass } from './pass.js';
+import { alphaBlend, groupCode, type SurfaceTransparency } from '../../shared/pass.js';
+import { TransparentPass, pbrLayer } from './pass.js';
 
 export type { TransparentPass };
 
@@ -25,7 +25,8 @@ export interface MomentOITOptions {
   /**
    * Nearest and farthest view depth the moments resolve, `[near, far]`, with 0 < near < far; layers outside blend as if
    * at the end they passed. A range close around the transparent parts is the sharpest. Default: the box round the added
-   * models, as they stood on the first frame after `add` or `fit`, seen from each frame's camera.
+   * models, as they stood on the first frame after `add` or `fit`, seen from each frame's camera; with an effect added
+   * (`@margoengine/oit/vfx`), which has no box, the camera's near and far.
    */
   depthRange?: readonly [number, number];
 }
@@ -37,8 +38,8 @@ const add: GPUBlendState = {
   alpha: { srcFactor: 'one', dstFactor: 'one' },
 };
 const warp = /* wgsl */ `
-fn margoWarp(i:Out)->f32 {
-  return clamp(log(max(-(f.view*vec4f(i.position,1)).z,1e-6))*margoOIT.x+margoOIT.y,-1.0,1.0);
+fn margoWarp(depth:f32)->f32 {
+  return clamp(log(max(depth,1e-6))*margoOIT.x+margoOIT.y,-1.0,1.0);
 }
 `;
 // Depth is warped to -1..1 by its logarithm (x, y of the uniform). Optical depth, not alpha, is what adds up.
@@ -46,8 +47,8 @@ const sums = (group: number) => /* wgsl */ `
 struct MargoTransparent {@location(0) moments:vec4f, @location(1) optical:vec4f}
 @group(${group}) @binding(${BINDING}) var<uniform> margoOIT:vec4f;
 ${warp}
-fn margoTransparent(color:vec4f,i:Out)->MargoTransparent {
-  let tau=-log(1.0-clamp(color.a,0.0,0.999)); let z=margoWarp(i); let z2=z*z; var o:MargoTransparent;
+fn margoTransparentAt(color:vec4f,clip:vec4f,depth:f32)->MargoTransparent {
+  let tau=-log(1.0-clamp(color.a,0.0,0.999)); let z=margoWarp(depth); let z2=z*z; var o:MargoTransparent;
   o.moments=tau*vec4f(z,z2,z2*z,z2*z2); o.optical=vec4f(tau); return o;
 }
 `;
@@ -72,10 +73,10 @@ fn margoInFront(b:vec4f,z:f32)->f32 {
   let share=vec3f((m.y-(lo+hi)*m.x+lo*hi)/((z-lo)*(z-hi)),(m.y-(z+hi)*m.x+z*hi)/((lo-z)*(lo-hi)),(m.y-(z+lo)*m.x+z*lo)/((hi-z)*(hi-lo)));
   return clamp(select(0.0,share.y,lo<z)+select(0.0,share.z,hi<z)+0.25*share.x,0.0,1.0);
 }
-fn margoTransparent(color:vec4f,i:Out)->MargoTransparent {
-  let q=vec2i(i.clip.xy); let total=textureLoad(margoOptical,q,0).r; var o:MargoTransparent;
+fn margoTransparentAt(color:vec4f,clip:vec4f,depth:f32)->MargoTransparent {
+  let q=vec2i(clip.xy); let total=textureLoad(margoOptical,q,0).r; var o:MargoTransparent;
   var t=1.0;
-  if(total>1e-5){t=exp(-total*margoInFront(textureLoad(margoMoments,q,0)/total,margoWarp(i)));}
+  if(total>1e-5){t=exp(-total*margoInFront(textureLoad(margoMoments,q,0)/total,margoWarp(depth)));}
   let w=clamp(color.a,0.0,1.0)*t; o.color=vec4f(color.rgb*w,w); return o;
 }
 `;
@@ -110,8 +111,11 @@ export class MomentOIT extends TransparentPass {
   private readonly range?: readonly [number, number];
   /** World box of the added models: min x, y, z, max x, y, z. */
   private box?: number[];
+  readonly layout: readonly GPUBindGroupLayoutEntry[] = [{ binding: BINDING, visibility: 2, buffer: {} }];
   private readonly code = new Map<number, string>();
+  private readonly surfaceCode = new Map<number, string>();
   private readonly shadeCode = new Map<number, string>();
+  private readonly shadeSurface = new Map<number, string>();
   private readonly values = new Float32Array(4);
   private uniform?: GPUBuffer;
   /** This view's uniform binding while its models draw (a frame-arena slice for a second view). */
@@ -124,9 +128,15 @@ export class MomentOIT extends TransparentPass {
   private readonly groups = new Map<GPURenderPipeline, GPUBindGroup>();
   private shading?: GPURenderPassEncoder;
   /** The second draw of each model, a hook of its own because its shader and target differ. */
-  private readonly shader: PBRTransparency = {
+  private readonly shader: PBRTransparency & SurfaceTransparency = {
     targets: [{ format: 'rgba16float', blend: add }],
-    declarations: (group) => groupCode(this.shadeCode, group, shade),
+    layout: [
+      ...this.layout,
+      { binding: BINDING + 1, visibility: 2, texture: { sampleType: 'unfilterable-float' } },
+      { binding: BINDING + 2, visibility: 2, texture: { sampleType: 'unfilterable-float' } },
+    ],
+    declarations: (group) => groupCode(this.shadeCode, group, (g) => this.shader.surface(g) + pbrLayer),
+    surface: (group) => groupCode(this.shadeSurface, group, shade),
     bindings: () => [
       { binding: BINDING, resource: this.binding ?? { buffer: this.uniform! } },
       { binding: BINDING + 1, resource: this.views[0] },
@@ -160,6 +170,7 @@ export class MomentOIT extends TransparentPass {
   }
   /** The view depths the box round the added models spans from this camera, a little wider so its faces stay inside. */
   private depthSpan(c: Context): [number, number] {
+    if (this.effects.size) return [c.camera.near, c.camera.far];
     let box = this.box;
     if (!box) {
       box = this.box = [Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity];
@@ -188,7 +199,11 @@ export class MomentOIT extends TransparentPass {
   }
   /** @internal gltf-pro transparency hook. */
   declarations(group: number): string {
-    return groupCode(this.code, group, sums);
+    return groupCode(this.code, group, (g) => this.surface(g) + pbrLayer);
+  }
+  /** @internal Effect hook. */
+  surface(group: number): string {
+    return groupCode(this.surfaceCode, group, sums);
   }
   /** @internal gltf-pro transparency hook. */
   bindings(): GPUBindGroupEntry[] {
@@ -227,7 +242,7 @@ export class MomentOIT extends TransparentPass {
   protected render(c: Context): void {
     // This view draws in the frame: what it releases waits while another view's commands still need it.
     currentFrame(c.device, c.view ?? c);
-    if (this.disposed || !this.models.size) return;
+    if (this.disposed || this.empty) return;
     const samples = c.descriptor.multisample?.count ?? 1,
       size = c.width + 'x' + c.height + 'x' + samples,
       device = c.device;
@@ -259,6 +274,7 @@ export class MomentOIT extends TransparentPass {
       this.shading = undefined;
       try {
         for (const model of this.models.keys()) model.drawTransparent(c, this.shader);
+        for (const effect of this.effects.keys()) effect.drawTransparent(c, this.shader);
       } finally {
         (this.shading as GPURenderPassEncoder | undefined)?.end();
         this.shading = undefined;

@@ -150,7 +150,7 @@ const ASSETS = [
   ['examples/assets/khronos/README.md', '32 Khronos glTF sample models, each CC0 1.0 or CC BY 4.0 with its credit'],
   [
     'examples/assets/khronos-samples/README.md',
-    'Collada and KHR_animation_pointer test models: AnimatedColorsCube (CC0 1.0, Khronos glTF-Sample-Assets), Cesium Man `.dae` and texture (CC BY 4.0, Cesium); URLs, pinned commits and sha256 there',
+    'Collada, KHR_animation_pointer and transparency test models: AnimatedColorsCube, GlassVaseFlowers, TransmissionTest (CC0 1.0, Khronos glTF-Sample-Assets), DiffuseTransmissionPlant (CC BY 4.0 and CC0 1.0, same source), Cesium Man `.dae` and texture (CC BY 4.0, Cesium); URLs, pinned commits and sha256 there',
   ],
   ['examples/assets/kaykit/LICENSE-adventurers.txt', 'KayKit Adventurers (Kay Lousberg, CC0)'],
   ['examples/assets/kaykit/LICENSE-character-animations.txt', 'KayKit Character Animations (Kay Lousberg, CC0)'],

@@ -2575,7 +2575,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-292). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-293). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -2625,6 +2625,8 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Exact transparency (`@margoengine/oit/exact`, 2026-11-06) | By method: four 50% layers land within 0.66 of 255 of blending worked out by hand at 1x and 4x MSAA, and crossing sheets swap at the line (RTX A6000). Time not measured. | Holds the nearest `layers` per pixel (default 8, at most 32) and 8,388,608 fragments a frame on a default device, hidden ones included: 4 screen layers at 1920x1080, 1 at 3840x2160. | A short list drops fragments for the few frames before it grows, and past the limit for good (`stats.dropped`); it never shrinks. Half-float colour. Needs fragment storage buffers. Transmission and custom blending stay on the sorted path. |
 | Moment transparency (`@margoengine/oit/moments`, 2026-11-06) | By method: worst channel 6.24 of 255 for four layers and 2.81 for two dense ones against 13.26 and 71.81 for weighted blending, at 1x and 4x MSAA (RTX A6000). Time not measured. | Still an approximation: a layer dims itself by a quarter of its own optical depth. Every model draws twice; a material's texture budget falls from 16 to 14. | Accuracy follows the depth range, by default a box measured on the first frame after `add` or `fit`: a model moved far from it loses depth order until `fit()`. Transmission and custom blending stay on the sorted path. |
 | Blending in OIT (`blending` of `@margoengine/oit`, 2026-11-06) | By method: additive, multiply and native transmission, with maps and attenuation, each draw the sorted path's 8-bit pixel at 1x and 4x MSAA (RTX A6000). Time not measured. | Tints and `multiply` dim the background only, not layers behind them in the pass: that is what makes them order-free. `OIT` only, not `ExactOIT` or `MomentOIT`. | 16 more bytes per pixel, 64 under 4x MSAA, and one more full-screen draw. `none`, other blends and further render state stay sorted. |
+| Effects in OIT (`@margoengine/oit/vfx`, 2026-11-06) | By method: particles, splats, points and sprites land within 2 of 255 of the formula on either side of a 50% pane in `ExactOIT` at 1x and 4x MSAA, where their own draws put them on top (RTX A6000). Time not measured. | Stand-in layers. Clouds and sprites join only if transparent, depth tested and not writing depth; additive ones only with `blending`. Surfels and `TransparentDepth` stay out. Sphere points test at their flat quad. | Splats stop sorting and lose all past `layers` under `ExactOIT`. `MomentOIT` falls back to the camera's near and far with an effect added; many layers close together are untested there. |
+| OIT on real files (Khronos samples, 2026-11-06) | Six models through every pass at 4x MSAA from eight sides, no GPU error. Against exact, on GlassVaseFlowers: moments move 0.63% of pixels, weighted 2.30% (RTX A6000). | Real glass is mostly transmission, which `ExactOIT` and `MomentOIT` leave alone: TransmissionTest and CommercialRefrigerator draw nothing in them. | `blending` lets stacked glass add light with no dimming between parts: up to 247 of 255 on 1% of TransmissionTest's side view. A BLEND part inside transmission draws over it without `blending`. |
 | Depth of glass (`@margoengine/oit/depth`, 2026-11-06) | By method: glass writes the depth value of an opaque plane in its place at 1x and 4x MSAA, moving glass gets its vector, and a glass edge blurs under depth of field (RTX A6000). Time not measured. | One depth per pixel: what lies behind the glass reprojects and blurs with it. Alpha under `threshold` stays out; additive and multiply never enter. | Depth-tested drawing after it sees glass as solid: lines at order 20 behind it disappear unless `order` moves past them, which hides the glass from TAA and SSAO. Surfaces draw once more. |
 | Stochastic tiling (`@margoengine/materials/stochastic`, 2026-11-06) | On an RTX A6000 a real floor texture tiled four times correlates with itself one repeat over at 1.00 plain and 0.004 with the feature, real wood keeps 0.98 of its contrast, and a chain of solid mips shows no edge. | Offsets only, no rotation. Maps must repeat. Passes without the colour shader and `displacementMap` read plainly. A texture with no 1 x 1 mip blends without the contrast gain. | Three reads per map in place of one; features wider than `cellSize` are cut at patch edges. Cost not timed. |
 | Hair, eye and skin shading (`@margoengine/materials/hair`, `/eye`, `/skin`, 2026-11-06) | On an RTX A6000 hair's highlights land within a row of the formula on a flat stand-in and reach 0.117 of the 0.121 possible on the real Seed-san hair mesh, skin matches its table within 1% and an 8-bit step on stand-in spheres of 5 mm and 2 m, and the pupil's edges match a Snell trace within 1.5 pixels on a stand-in sphere. Seed-san has no eyeball, so the eye's real-mesh run is on a shallow iris plate about 6% off a 65 mm sphere: the pupil sits on the axis and opens four times in area. | Sun and `Clustered` point, spot and directional lights only: area lights, ambient and environment reflections keep the plain model. A shadow map cuts skin's bleed past the terminator. `anisotropy` and a thin film are refused. `eye()` needs a mesh near a sphere. | Fibres are shifted lobes, with no light through the strand. The skin table's 64 columns blur the terminator by 0.016 of n.l. Cost not timed. |
@@ -2980,6 +2982,18 @@ the entry: `PbrMaterial` is core's material and pulls in no other package.
 What is known to be wrong or not yet proven, and what it would take to close each item. Design limits (where a
 boundary is a decision, with its escape hatch) live in [limits.md](limits.md); this page lists defects and checks that
 are still open.
+
+## Rendering
+
+### Two identical runs of GlassVaseFlowers can differ on a few pixels
+
+- **What:** the same model, camera and sorted path, built twice in one page, differed on fewer than 8 of 147,456 pixels
+  by up to 9 of 255 at 4x MSAA, in one of six Khronos models tried (RTX A6000). Seen once on TransmissionTest too.
+- **Repro:** `node packages/oit/test/gpu/real-check.mjs`; the `repeat` field of each model's line.
+- **Cause, not found:** the frame's inputs are the same; the model holds both native transmission and a BLEND part. No
+  check of it yet separates the transmission pass from the rest.
+- **Needed to close:** save both pictures, find the pixels and which pass writes them, and fix it in the package that
+  owns that pass.
 
 ## Boulder demo
 
@@ -5885,7 +5899,9 @@ weighted blended OIT (McGuire and Bavoil, JCGT 2013) by default, [moments](#mome
 `margoengine/oit/moments` for a closer result, or exact per-pixel layers from
 [`margoengine/oit/exact`](#exact-layers-exactoit). Overlapping transparent parts (a translucent CAD housing over
 translucent and opaque gears) no longer pop as the camera orbits, because nothing depends on draw order any more. Core
-meshes are opaque; `addMesh` from `margoengine/oit/meshes` draws one see-through. WebGPU only.
+meshes are opaque; `addMesh` from `margoengine/oit/meshes` draws one see-through, and
+[`addEffect`](#particles-splats-and-points-addeffect) from `margoengine/oit/vfx` brings particles, splats and points into
+the same pass. WebGPU only.
 
 ```ts
 import {OIT} from 'margoengine/oit';

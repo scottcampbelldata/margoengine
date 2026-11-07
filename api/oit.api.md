@@ -10,10 +10,12 @@ import { PBRModel, PBRTransparency } from "@margoengine/gltf-pro";
 export class OIT extends TransparentPass {
     readonly targets: readonly GPUColorTargetState[];
     readonly blends: boolean;
+    readonly layout: readonly GPUBindGroupLayoutEntry[];
     static attach(engine: EngineKernel, options?: OITOptions): OIT;
     constructor({ order, depthScale, blending }?: OITOptions);
     setup(engine: Engine): void;
     declarations(group: number): string;
+    surface(group: number): string;
     bindings(): GPUBindGroupEntry[];
     begin(): GPURenderPassEncoder;
     protected render(c: Context): void;
@@ -37,7 +39,21 @@ type Context = Extract<PassContext, {
     backend: 'webgpu';
 }>;
 
-abstract class TransparentPass implements EnginePlugin, PBRTransparency {
+interface SurfaceTransparency {
+  surface(group: number): string;
+  readonly layout: readonly GPUBindGroupLayoutEntry[];
+  bindings(): GPUBindGroupEntry[];
+  readonly blends?: boolean;
+  readonly targets: readonly GPUColorTargetState[];
+  begin(): GPURenderPassEncoder;
+}
+
+interface TransparentEffect {
+    setTransparency(hook: SurfaceTransparency, released?: () => void): () => void;
+    drawTransparent(c: Context, hook: SurfaceTransparency): void;
+}
+
+abstract class TransparentPass implements EnginePlugin, PBRTransparency, SurfaceTransparency {
     readonly name: string;
     readonly order: number;
     abstract readonly targets: readonly GPUColorTargetState[];
@@ -45,16 +61,21 @@ abstract class TransparentPass implements EnginePlugin, PBRTransparency {
     protected device?: GPUDevice;
     protected disposed: boolean;
     protected readonly models: Map<PBRModel, () => void>;
+    readonly effects: Map<TransparentEffect, () => void>;
     protected context?: Context;
     protected pass?: GPURenderPassEncoder;
     constructor(order: number);
     add(model: PBRModel): () => void;
+    ready(): void;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
     abstract declarations(group: number): string;
     abstract bindings(): GPUBindGroupEntry[];
+    abstract surface(group: number): string;
+    abstract readonly layout: readonly GPUBindGroupLayoutEntry[];
     abstract begin(): GPURenderPassEncoder;
     protected abstract render(c: Context): void;
+    protected get empty(): boolean;
     protected abstract release(): void;
     protected abstract freeDevice(): void;
     protected drawModels(c: Context): boolean;

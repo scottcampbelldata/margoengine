@@ -137,6 +137,21 @@ const fog = Fog.attach(engine, {color: '#8090a0', near: 5, far: 60});
 sparks.setFog(fog);
 ```
 
+### In an order-independent pass
+
+Particles blend over the scene in a pass of their own, so they paint over glass in front of them. `addEffect` from
+[`margoengine/oit/vfx`](../oit/README.md#particles-splats-and-points-addeffect) draws them with the glass instead, fog,
+softness and textures included:
+
+```ts
+import {Engine} from 'margoengine/core';
+import {OIT} from 'margoengine/oit';
+import {addEffect} from 'margoengine/oit/vfx';
+import {VFX} from 'margoengine/vfx';
+const engine = await Engine.create(document.querySelector('canvas')!);
+addEffect(OIT.attach(engine), VFX.attach(engine, {capacity: 10_000}));
+```
+
 ### Soft particles
 
 `softness` (world units, default 0 = off) fades each particle over that distance in front of any opaque surface behind

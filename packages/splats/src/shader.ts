@@ -1,5 +1,6 @@
 import { MargoError } from '@margoengine/math/errors';
 import { fogWgsl } from '../../shared/fog.js';
+import { surfaceEntry } from '../../shared/pass.js';
 const frame = `struct Frame {camera:mat4x4f,view:mat4x4f,eye:vec4f,viewport:vec4f,settings:vec4f,counts:vec4u}
 @group(0) @binding(0) var<uniform> f:Frame;
 struct Ellipse {center:vec4f,axes:vec4f}`;
@@ -76,3 +77,25 @@ struct Out {@builtin(position) clip:vec4f,@location(0) corner:vec2f,@location(1)
 }
 @fragment fn fragment(i:Out)->@location(0) vec4f {let power=-4.5*dot(i.corner,i.corner);if(power<-4.5){discard;}let alpha=min(0.99,i.color.a*exp(power));if(alpha<1.0/255){discard;}
   var c=i.color.rgb;if(f.settings.z<0.5){c=clamp(c,vec3f(0),vec3f(1));c=select(c*12.92,1.055*pow(c,vec3f(1.0/2.4))-0.055,c>=vec3f(0.0031308));}return vec4f(c,alpha);}`;
+const transparentEdits: Array<[string, string]> = [
+  ['@location(1) color:vec4f}', '@location(1) color:vec4f,@location(2) margoDepth:f32}'],
+  // The sort key holds the view depth, counted from the near plane under an orthographic camera.
+  [
+    'o.corner=corner;',
+    'o.corner=corner;o.margoDepth=bitcast<f32>(~sorted[instance].x)+select(0.0,f.settings.x,f.settings.w>0.5);',
+  ],
+  ['@fragment fn fragment(i:Out)->@location(0) vec4f {', 'fn margoShade(i:Out)->vec4f {'],
+];
+/** `render` with its fragment feeding a transparency hook. */
+export function transparentRender(declarations: string): string {
+  let code = render;
+  for (const [from, to] of transparentEdits) {
+    if (code.split(from).length !== 2)
+      throw new MargoError(
+        'unsupported',
+        'Splat transparency needs the render shader it was written for; update its edits',
+      );
+    code = code.replace(from, to);
+  }
+  return declarations + code + surfaceEntry(declarations, 'i:Out', 'margoShade(i)', 'i.clip', 'i.margoDepth');
+}

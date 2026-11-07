@@ -1578,6 +1578,10 @@
       "types": "./dist/oit/depth.d.ts",
       "import": "./dist/oit/depth.js"
     },
+    "./oit/vfx": {
+      "types": "./dist/oit/vfx.d.ts",
+      "import": "./dist/oit/vfx.js"
+    },
     "./physics": {
       "types": "./dist/physics.d.ts",
       "import": "./dist/physics.js"

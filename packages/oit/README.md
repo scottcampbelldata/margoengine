@@ -7,7 +7,9 @@ weighted blended OIT (McGuire and Bavoil, JCGT 2013) by default, [moments](#mome
 `margoengine/oit/moments` for a closer result, or exact per-pixel layers from
 [`margoengine/oit/exact`](#exact-layers-exactoit). Overlapping transparent parts (a translucent CAD housing over
 translucent and opaque gears) no longer pop as the camera orbits, because nothing depends on draw order any more. Core
-meshes are opaque; `addMesh` from `margoengine/oit/meshes` draws one see-through. WebGPU only.
+meshes are opaque; `addMesh` from `margoengine/oit/meshes` draws one see-through, and
+[`addEffect`](#particles-splats-and-points-addeffect) from `margoengine/oit/vfx` brings particles, splats and points into
+the same pass. WebGPU only.
 
 ```ts
 import {OIT} from 'margoengine/oit';
@@ -236,6 +238,94 @@ Limits:
 - What is behind the glass gets the glass's depth, so it blurs and reprojects as the glass does. One depth per pixel.
 - The surfaces draw once more, shader included, for depth alone.
 - Without `model` in an order-independent pass its BLEND primitives still draw sorted; this entry works the same.
+
+## Particles, splats and points (`addEffect`)
+
+Particles, splats and points blend over the scene in their own passes, so glass and smoke land in draw order: a particle
+behind a pane still paints over it. `addEffect` from `margoengine/oit/vfx` draws them in the same pass as the models,
+so each pixel's layers meet in one place.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {ExactOIT} from 'margoengine/oit/exact';
+import {addEffect} from 'margoengine/oit/vfx';
+import {Material, createMesh} from 'margoengine/materials';
+import {boxGeometry} from 'margoengine/geometry';
+import {VFX} from 'margoengine/vfx';
+import {Splats} from 'margoengine/splats';
+import {PointsPlugin, PointCloud} from 'margoengine/points';
+const engine = await Engine.create(document.querySelector('canvas')!);
+
+const oit = ExactOIT.attach(engine);                // or OIT, or MomentOIT
+oit.add(createMesh(engine, boxGeometry(2, 1, 0.1), new Material({color: '#9cc3e6', opacity: 0.4, transparent: true})));
+
+const remove = addEffect(oit, VFX.attach(engine, {capacity: 10_000, color: [1, 0.5, 0.1, 0.6]}));
+addEffect(oit, Splats.attach(engine, {
+  positions: new Float32Array([0, 0, -1]),
+  covariances: new Float32Array([0.1, 0, 0, 0.1, 0, 0.1]),
+  colors: new Float32Array([0.2, 0.6, 1, 0.8]),
+}));
+const points = PointsPlugin.attach(engine);
+points.add(new PointCloud({positions: new Float32Array([0, 0, 1]), material: {size: 8, transparent: true, opacity: 0.5}}));
+addEffect(oit, points);                             // its transparent clouds and sprites
+remove();                                           // the particles go back to their own draw
+```
+
+Fog, soft particles, particle textures and sphere-shaded points keep working in the pass. Disposing the effect takes it
+out; disposing the pass puts every effect back on its own draw, bit for bit.
+
+Measured on an RTX A6000 (`npm run test:gpu --workspace packages/oit`), at 1x and 4x MSAA, for particles, splats, points
+and sprites alike: in `ExactOIT` with a 50% pane, each lands within 2 of 255 of the formula on either side of the pane.
+On their own draws a red particle behind the pane reads (221, 17, 42), as if in front; in the pass it reads
+(119, 17, 144). Alone in any pass each stays within 2 of 255 of its own draw. The view depth each hands the pass reads
+3.5 for a layer 3.5 from the eye, under perspective and orthographic cameras. All on generated layers; time is not
+measured yet.
+
+Limits:
+
+- `PointsPlugin`'s clouds and sprites join if they are `transparent`, test depth and write none. Additive ones need
+  `OIT` with `blending`, and keep their own draw otherwise; there they add to the canvas alpha as additive materials do.
+- A pass draws what the plugin culled for that view, so the point budget still applies. Surfels stay out.
+- Sphere-shaded points test depth at their flat quad, without the sphere's depth, and take no eye-dome lighting.
+- `Splats` stop sorting while in a pass: `gpuState.sorted` holds the keys in data order. Splats far past `layers` deep
+  lose the rest under `ExactOIT`, and weighted blending of dense clouds is far from the sorted picture: a trained capture
+  wants its own sorted draw unless glass must cut through it.
+- `MomentOIT` has no box for an effect, so with one added its default range is the camera's near and far. On a pane and
+  one effect that cost nothing, at near 0.05 and far 100: the far layer read 112 of 255, against 106 with
+  `depthRange: [3, 6]` and 119 exact. Many layers close together are untested; set `depthRange` if they blur.
+- With 4x MSAA a textured particle covers the samples of its triangle, not only of its quad: under a pixel at the edge.
+- `TransparentDepth` takes models only; effects stay out of the depth.
+
+## Real files
+
+`packages/oit/test/gpu/real-check.mjs` runs six Khronos sample models through every pass at 4x MSAA from eight sides, in
+a real environment, with no GPU error. Share of pixels more than 2 of 255 apart, the worst of the eight sides, RTX
+A6000:
+
+| Model | Parts in `ExactOIT` | Exact against sorted | `blending` against sorted | Weighted against exact | Moments against exact |
+| --- | --- | --- | --- | --- | --- |
+| GlassVaseFlowers | 1 BLEND | 2.56%, worst 95 | 3.29%, worst 117 | 2.30%, worst 45 | 0.63%, worst 43 |
+| DiffuseTransmissionPlant | 4 BLEND | under 0.01%, worst 13 | under 0.01%, worst 18 | under 0.01%, worst 18 | 0.01%, worst 28 |
+| AlphaBlendModeTest | 2 BLEND | 0.02%, worst 16 | 0.06%, worst 26 | 0.07%, worst 17 | 0.06%, worst 19 |
+| LightsPunctualLamp | 1 BLEND | 0, nothing overlaps | 0.17%, worst 64 | 0 | 0 |
+| TransmissionTest | none | 0, nothing taken | 0.99%, worst 247 | 0 | 0 |
+| CommercialRefrigerator | none | 0, nothing taken | 0.02%, worst 27 | 0 | 0 |
+
+What that shows:
+
+- Most real glass is `KHR_materials_transmission`, which only `OIT` with `blending` takes. `ExactOIT` and `MomentOIT`
+  leave those models as they were: on the last two rows they draw nothing.
+- Where layers stack, moments stay closest to exact, as on generated planes.
+- A BLEND part that sits inside native transmission draws over it unless `blending` is on, because the transmission
+  stays in the scene pass: the vase's 2.56%.
+- `blending` gives up what sorted glass does between glass parts. Seen along a row of spheres in TransmissionTest, each
+  sphere's light adds up and none dims the next, so 1% of the picture moves by as much as 247 of 255. No reference
+  picture says which is right there; for glass behind glass, stay on the sorted path.
+- Two identical sorted runs of GlassVaseFlowers can differ on a few pixels by up to 9 of 255 (docs/known-bugs.md), so
+  gaps that small mean nothing.
+
+`TransparentDepth` brought pixels nearer on all six and none farther (9.72% of the vase's picture, 13.58% of the
+refrigerator's). Particles through the middle of each model draw with its BLEND parts in `ExactOIT` with no GPU error.
 
 ## Hashed alpha
 

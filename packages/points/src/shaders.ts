@@ -1,5 +1,6 @@
 import { MargoError } from '@margoengine/math/errors';
 import { fogWgsl } from '../../shared/fog.js';
+import { surfaceEntry } from '../../shared/pass.js';
 
 /** Flag bits of `Cloud.flags.x`, shared by the plugin and the point shader. */
 export const FLAG = {
@@ -217,6 +218,26 @@ const fogEdits = {
   ],
   sprite: [['return encode(color);', 'return encode(fogged(color,fogAmount(i.world)));']],
 } as const;
+const spriteHead = '@fragment fn fragment(i:VOut)->@location(0) vec4f{';
+/**
+ * The point or sprite shader (fogged when `additive` is given: whether it blends additively) with its colour feeding a
+ * transparency hook whose `declarations` sit at group 3. The fragment's position w is 1 / clip w, the view depth of a
+ * perspective camera; an orthographic one counts it from the near plane.
+ */
+export function surfaceShader(kind: 'point' | 'sprite', declarations: string, additive?: boolean): string {
+  let code = additive === undefined ? (kind === 'point' ? pointShader : spriteShader) : foggedShader(kind, additive);
+  if (kind === 'sprite') {
+    if (code.split(spriteHead).length !== 2)
+      throw new MargoError('unsupported', 'Sprite transparency needs the shader it was written for; update its edit');
+    code = code.replace(spriteHead, 'fn margoShade(i:VOut)->vec4f{');
+  }
+  return (
+    declarations +
+    code +
+    'fn margoViewDepth(p:vec4f)->f32{return select(1.0/p.w,frame.right.w+(1.0-p.z)/frame.depth.y,frame.depth.w>0.5);}\n' +
+    surfaceEntry(declarations, 'i:VOut', kind === 'point' ? 'surface(i).color' : 'margoShade(i)', 'i.clip', 'margoViewDepth(i.clip)')
+  );
+}
 /** The point (`kind` 'point') or sprite shader with scene fog at group 2, for normal or additive blending. */
 export function foggedShader(kind: 'point' | 'sprite', additive: boolean): string {
   let code = kind === 'point' ? pointShader : spriteShader;

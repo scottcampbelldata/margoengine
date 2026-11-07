@@ -40,7 +40,6 @@ export function fillFrame(
   f[24] = v[0];
   f[25] = v[4];
   f[26] = v[8];
-  f[27] = 0;
   f[28] = v[1];
   f[29] = v[5];
   f[30] = v[9];

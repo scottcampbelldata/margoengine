@@ -4,6 +4,18 @@ What is known to be wrong or not yet proven, and what it would take to close eac
 boundary is a decision, with its escape hatch) live in [limits.md](limits.md); this page lists defects and checks that
 are still open.
 
+## Rendering
+
+### Two identical runs of GlassVaseFlowers can differ on a few pixels
+
+- **What:** the same model, camera and sorted path, built twice in one page, differed on fewer than 8 of 147,456 pixels
+  by up to 9 of 255 at 4x MSAA, in one of six Khronos models tried (RTX A6000). Seen once on TransmissionTest too.
+- **Repro:** `node packages/oit/test/gpu/real-check.mjs`; the `repeat` field of each model's line.
+- **Cause, not found:** the frame's inputs are the same; the model holds both native transmission and a BLEND part. No
+  check of it yet separates the transmission pass from the rest.
+- **Needed to close:** save both pictures, find the pixels and which pass writes them, and fix it in the package that
+  owns that pass.
+
 ## Boulder demo
 
 ### The robot's arm shows a copper piston through its shell at close range
