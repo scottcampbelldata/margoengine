@@ -126,9 +126,7 @@ export interface PickingOverlay {
   /** Draws item `n` as ID `firstId + n`, after every mesh. */
   drawPick(context: PickingOverlayContext): void;
   /** The hit for item `index` of the last `drawPick`, or null. `mesh` must be a live mesh of the picked scene. */
-  pickHit(
-    index: number,
-  ): {
+  pickHit(index: number): {
     mesh: PublicMesh;
     line?: object;
     segment?: number;
@@ -895,22 +893,22 @@ export class Picking implements EnginePlugin {
     const candidates = !this.primitives.hasSources
       ? undefined
       : this.primitives.draw(c, matrix, {
-        format: 'r32uint',
-        depthFormat: 'depth32float',
-        filter: (node, _primitive, source, index) => {
-          const owner = models.indexOf(source as unknown as ModelLike),
-            p = owner < 0 ? undefined : models[owner].primitives[index];
-          return (
-            inView(scope, node) &&
-            !p?.instances &&
-            (!p || !!p.deformed || intersects(matrix, node.matrix, sphere(p), this.clip))
-          );
-        },
-        id: (node, source, index) => {
-          const owner = models.indexOf(source as unknown as ModelLike);
-          return owner < 0 ? node.id + 1 : e.store.capacity + 1 + starts[owner] + index;
-        },
-      });
+          format: 'r32uint',
+          depthFormat: 'depth32float',
+          filter: (node, _primitive, source, index) => {
+            const owner = models.indexOf(source as unknown as ModelLike),
+              p = owner < 0 ? undefined : models[owner].primitives[index];
+            return (
+              inView(scope, node) &&
+              !p?.instances &&
+              (!p || !!p.deformed || intersects(matrix, node.matrix, sphere(p), this.clip))
+            );
+          },
+          id: (node, source, index) => {
+            const owner = models.indexOf(source as unknown as ModelLike);
+            return owner < 0 ? node.id + 1 : e.store.capacity + 1 + starts[owner] + index;
+          },
+        });
     this.overlays.forEach((overlay, slot) =>
       overlay?.drawPick({
         encoder,

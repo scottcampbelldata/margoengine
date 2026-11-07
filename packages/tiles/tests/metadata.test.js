@@ -11,8 +11,10 @@ import { TilesRenderer, parsePnts } from '../dist/index.js';
 import { dracoPoints, readStructuralMetadata } from '../dist/metadata.js';
 import { dracoPnts, memoryFetch, settle } from './generator.js';
 
-const asset = (path) => new Uint8Array(readFileSync(new URL(`../../../examples/assets/3d-tiles/${path}`, import.meta.url)));
-const drc = (name) => new Uint8Array(readFileSync(new URL(`../../decoders/tests/fixtures/draco-points/${name}`, import.meta.url)));
+const asset = (path) =>
+  new Uint8Array(readFileSync(new URL(`../../../examples/assets/3d-tiles/${path}`, import.meta.url)));
+const drc = (name) =>
+  new Uint8Array(readFileSync(new URL(`../../decoders/tests/fixtures/draco-points/${name}`, import.meta.url)));
 
 // Google's full Draco decoder, as @margoengine/decoders ships it; its wrapper takes its Node path from these globals.
 globalThis.require ??= createRequire(import.meta.url);
@@ -20,7 +22,9 @@ globalThis.__dirname ??= fileURLToPath(new URL('../../decoders/dist/draco-full/'
 (0, eval)(readFileSync(new URL('../../decoders/dist/draco-full/draco_wasm_wrapper.js', import.meta.url), 'utf8'));
 const { module: draco } = await new Promise((resolve, reject) =>
   globalThis
-    .DracoDecoderModule({ wasmBinary: readFileSync(new URL('../../decoders/dist/draco-full/draco_decoder.wasm', import.meta.url)) })
+    .DracoDecoderModule({
+      wasmBinary: readFileSync(new URL('../../decoders/dist/draco-full/draco_decoder.wasm', import.meta.url)),
+    })
     .then((module) => resolve({ module }), reject),
 );
 /** The same decode as the worker decoder of @margoengine/decoders/draco-points, in this thread. */
@@ -30,7 +34,12 @@ test('metadata: a real ComplexTypes table reads as its README lists (normalized,
   const metadata = readStructuralMetadata(asset('EXT_structural_metadata/ComplexTypes/ComplexTypes.gltf')),
     [table] = metadata.propertyTables;
   assert.equal(table.count, 4);
-  const raw = [[0, 255], [0, 128, 255], [0, 85, 170, 255], [0, 64, 128, 192, 255]],
+  const raw = [
+      [0, 255],
+      [0, 128, 255],
+      [0, 85, 170, 255],
+      [0, 64, 128, 192, 255],
+    ],
     bools = [
       [true, false, true, false, true, false, true, false, true, false],
       [true, true, false, false, true, true, false, false, true, true],
@@ -39,15 +48,26 @@ test('metadata: a real ComplexTypes table reads as its README lists (normalized,
     ],
     // The fourth row's typo is the sample's own; the words are split from one string.
     strings = ['One', 'One Two', 'One Two Three', 'One Two Theee Four'].map((words) => words.split(' ')),
-    enums = [[0, 1], [1, 2], [2, 0], [1, 2]],
+    enums = [
+      [0, 1],
+      [1, 2],
+      [2, 0],
+      [1, 2],
+    ],
     names = ['ExampleEnumValueA', 'ExampleEnumValueB', 'ExampleEnumValueC'];
   for (let row = 0; row < 4; row++) {
     const values = table.row(row);
     // Normalized UINT8 is value / 255, exactly in float64.
-    assert.deepEqual(values.example_variable_length_ARRAY_normalized_UINT8, raw[row].map((v) => v / 255));
+    assert.deepEqual(
+      values.example_variable_length_ARRAY_normalized_UINT8,
+      raw[row].map((v) => v / 255),
+    );
     assert.deepEqual(values.example_fixed_length_ARRAY_BOOLEAN, bools[row]);
     assert.deepEqual(values.example_variable_length_ARRAY_STRING, strings[row]);
-    assert.deepEqual(values.example_fixed_length_ARRAY_ENUM, enums[row].map((v) => names[v]));
+    assert.deepEqual(
+      values.example_fixed_length_ARRAY_ENUM,
+      enums[row].map((v) => names[v]),
+    );
   }
   assert.equal(table.get(4, 'example_fixed_length_ARRAY_BOOLEAN'), undefined, 'a row past the table reads as nothing');
 });
@@ -60,11 +80,18 @@ test('metadata: a picked vertex of a real sample leads through its feature ID to
   assert.equal(set.featureCount, 4);
   assert.equal(set.attribute, 0);
   // The README's values, as float32 holds them (one float32 step at 3.2 is 2.4e-7).
-  const want = [[0, 0.1, 0.2], [1, 1.1, 1.2], [2, 2.1, 2.2], [3, 3.1, 3.2]];
+  const want = [
+    [0, 0.1, 0.2],
+    [1, 1.1, 1.2],
+    [2, 2.1, 2.2],
+    [3, 3.1, 3.2],
+  ];
   for (let vertex = 0; vertex < set.ids.length; vertex++) {
     const feature = metadata.feature(0, 0, vertex);
     assert.equal(feature.id, set.ids[vertex]);
-    feature.properties.example_VEC3_FLOAT32.forEach((v, k) => assert.ok(Math.abs(v - Math.fround(want[feature.id][k])) === 0));
+    feature.properties.example_VEC3_FLOAT32.forEach((v, k) =>
+      assert.ok(Math.abs(v - Math.fround(want[feature.id][k])) === 0),
+    );
   }
   assert.deepEqual([...new Set(set.ids)], [0, 1, 2, 3], 'the quad strip has four features');
   assert.equal(metadata.feature(0, 0, 999), undefined, 'a vertex past the primitive has no feature');
@@ -74,15 +101,28 @@ test('metadata: noData gives the default, offset and scale apply after normalizi
   const values = new Uint8Array([0, 255, 128, 7]),
     json = {
       asset: { version: '2.0' },
-      buffers: [{ byteLength: 4, uri: `data:application/octet-stream;base64,${Buffer.from(values).toString('base64')}` }],
-      bufferViews: [{ buffer: 0, byteLength: 4 }, { buffer: 0, byteOffset: 2, byteLength: 4 }],
+      buffers: [
+        { byteLength: 4, uri: `data:application/octet-stream;base64,${Buffer.from(values).toString('base64')}` },
+      ],
+      bufferViews: [
+        { buffer: 0, byteLength: 4 },
+        { buffer: 0, byteOffset: 2, byteLength: 4 },
+      ],
       extensions: {
         EXT_structural_metadata: {
           schema: {
             classes: {
               c: {
                 properties: {
-                  level: { type: 'SCALAR', componentType: 'UINT8', normalized: true, offset: 10, scale: 2, noData: 7, default: -1 },
+                  level: {
+                    type: 'SCALAR',
+                    componentType: 'UINT8',
+                    normalized: true,
+                    offset: 10,
+                    scale: 2,
+                    noData: 7,
+                    default: -1,
+                  },
                 },
               },
             },
@@ -92,7 +132,10 @@ test('metadata: noData gives the default, offset and scale apply after normalizi
       },
     };
   const table = readStructuralMetadata(new TextEncoder().encode(JSON.stringify(json))).propertyTables[0];
-  assert.deepEqual([0, 1, 2, 3].map((r) => table.get(r, 'level')), [10, 12, 10 + (2 * 128) / 255, -1]);
+  assert.deepEqual(
+    [0, 1, 2, 3].map((r) => table.get(r, 'level')),
+    [10, 12, 10 + (2 * 128) / 255, -1],
+  );
   json.extensions.EXT_structural_metadata.propertyTables[0].properties.level.values = 1;
   assert.throws(() => readStructuralMetadata(new TextEncoder().encode(JSON.stringify(json))), RangeError);
 });
@@ -119,7 +162,11 @@ test('draco pnts: batch table properties come out of the Draco buffer, and a mis
     position = decoded.attributes.find((a) => a.name === 'POSITION'),
     intensity = decoded.attributes.find((a) => a.name === 'intensity');
   const content = parsePnts(
-    dracoPnts(bytes, { length: 1000, properties: { POSITION: position.uniqueId }, batch: { intensity: intensity.uniqueId } }),
+    dracoPnts(bytes, {
+      length: 1000,
+      properties: { POSITION: position.uniqueId },
+      batch: { intensity: intensity.uniqueId },
+    }),
   );
   const points = await dracoPoints(content, undefined, source);
   assert.deepEqual([...points.batchTable.values('intensity')], [...intensity.array]);
@@ -142,7 +189,14 @@ test('draco pnts: a Draco range past the feature table binary is refused', () =>
 test('draco pnts: without the dracoPoints option the renderer fails the tile with a coded error naming the entry', async () => {
   const content = dracoPnts(drc('cube_pc.drc'), { length: 24, properties: { POSITION: 0 } }),
     files = new Map([
-      ['tileset.json', JSON.stringify({ asset: { version: '1.1' }, geometricError: 10, root: { boundingVolume: { sphere: [0, 0, 0, 5] }, geometricError: 0, content: { uri: 'p.pnts' } } })],
+      [
+        'tileset.json',
+        JSON.stringify({
+          asset: { version: '1.1' },
+          geometricError: 10,
+          root: { boundingVolume: { sphere: [0, 0, 0, 5] }, geometricError: 0, content: { uri: 'p.pnts' } },
+        }),
+      ],
       ['p.pnts', content],
     ]),
     memory = memoryFetch(files),

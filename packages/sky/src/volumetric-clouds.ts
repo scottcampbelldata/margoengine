@@ -385,7 +385,9 @@ export class VolumetricClouds implements EnginePlugin {
     const o = this.options;
     if (typeof o !== 'object' || o === null) throw new TypeError('VolumetricClouds options must be an object');
     if (o.sky !== undefined && (typeof o.sky !== 'object' || o.sky === null || !(o.sky.sun?.length >= 3)))
-      throw new TypeError('VolumetricClouds sky must be a Sky (with a sun direction); pass the sky that lights the clouds');
+      throw new TypeError(
+        'VolumetricClouds sky must be a Sky (with a sun direction); pass the sky that lights the clouds',
+      );
     if (o.depth !== undefined && typeof o.depth !== 'function')
       throw new TypeError('VolumetricClouds depth must be a function returning the scene depth texture');
     if (o.sunDirection) finiteVector(o.sunDirection, 3, 'VolumetricClouds sunDirection');
@@ -421,7 +423,10 @@ export class VolumetricClouds implements EnginePlugin {
       );
     this.engine = engine;
     const d = engine.gpu;
-    this.uniform = d.createBuffer({ size: this.values.byteLength, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.uniform = d.createBuffer({
+      size: this.values.byteLength,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
     this.volumes = new CloudVolumes(d);
     this.light = d.createTexture({
       size: [2, 1],

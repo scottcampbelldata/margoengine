@@ -68,7 +68,10 @@ export const i3dm: TilesInstancesDrawer = async (
   tile: TilesetTile,
   signal: AbortSignal,
 ): Promise<TileRenderable> => {
-  if (!content.length) return { bytes: content.byteLength, get visible() {
+  if (!content.length)
+    return {
+      bytes: content.byteLength,
+      get visible() {
         return false;
       },
       set visible(_value: boolean) {},
@@ -107,10 +110,7 @@ export const i3dm: TilesInstancesDrawer = async (
       primitive.instances = rows;
     }
     nodes = byNode.size;
-    host.place(
-      root,
-      host.contentMatrix(tile, [rtc[0] + center[0], rtc[1] + center[1], rtc[2] + center[2]], false),
-    );
+    host.place(root, host.contentMatrix(tile, [rtc[0] + center[0], rtc[1] + center[1], rtc[2] + center[2]], false));
     root.visible = false;
   } catch (error) {
     model.dispose();

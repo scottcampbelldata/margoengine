@@ -91,7 +91,10 @@ export async function parseSog(
       return decodeWebpLossless(bytes);
     } catch (cause) {
       if ((cause as MargoError).code === 'unsupported')
-        throw new MargoError('unsupported', `The SOG texture ${name} is lossy WebP; re-export the SOG with lossless textures.`);
+        throw new MargoError(
+          'unsupported',
+          `The SOG texture ${name} is lossy WebP; re-export the SOG with lossless textures.`,
+        );
       throw new RangeError(`The SOG texture ${name} is damaged; re-export the SOG with lossless textures.`, { cause });
     }
   };

@@ -124,7 +124,8 @@ export async function encodePng(
     throw rangeError('encodePng needs a positive integer width and depth', 'biomes');
   const stride = (width * channels * bitDepth) >> 3,
     raw = new Uint8Array((stride + 1) * depth);
-  if (rows.length !== stride * depth) throw rangeError('encodePng rows are the wrong length for width, depth and depth bits', 'biomes');
+  if (rows.length !== stride * depth)
+    throw rangeError('encodePng rows are the wrong length for width, depth and depth bits', 'biomes');
   for (let j = 0; j < depth; j++) raw.set(rows.subarray(j * stride, (j + 1) * stride), j * (stride + 1) + 1);
   const idat = options.compress ? await zlibDeflate(raw, options.signal) : zlibStored(raw),
     header = new Uint8Array(13),
@@ -159,7 +160,8 @@ async function stitch(
   name: string,
   options: ExportOptions,
 ): Promise<{ layer: RasterLayer; width: number; depth: number; channels: number }> {
-  if (typeof name !== 'string' || !(name in LAYERS)) throw rangeError('Unknown biome layer name; use names from LAYERS', 'biomes');
+  if (typeof name !== 'string' || !(name in LAYERS))
+    throw rangeError('Unknown biome layer name; use names from LAYERS', 'biomes');
   const rect = options.tiles ?? [0, 0, world.tilesX - 1, world.tilesZ - 1];
   if (
     !Array.isArray(rect) ||
@@ -184,9 +186,7 @@ async function stitch(
     depth = Math.min((rect[3] + 1) * cells, worldCells[1]) - z0,
     format = LAYERS[name].format,
     channels = format === 'rgba8' ? 4 : 1,
-    Type = (
-      { i32: Int32Array, i16: Int16Array, u16: Uint16Array, u8: Uint8Array, rgba8: Uint8Array } as const
-    )[format],
+    Type = ({ i32: Int32Array, i16: Int16Array, u16: Uint16Array, u8: Uint8Array, rgba8: Uint8Array } as const)[format],
     data = new Type(width * depth * channels);
   for (let tz = rect[1]; tz <= rect[3]; tz++)
     for (let tx = rect[0]; tx <= rect[2]; tx++) {
@@ -197,7 +197,10 @@ async function stitch(
         cz = tz * cells - z0,
         span = Math.min(cells, width - cx) * channels;
       for (let j = 0; j < cells && cz + j < depth; j++)
-        data.set(source.data.subarray(j * cells * channels, j * cells * channels + span), ((cz + j) * width + cx) * channels);
+        data.set(
+          source.data.subarray(j * cells * channels, j * cells * channels + span),
+          ((cz + j) * width + cx) * channels,
+        );
     }
   const info = LAYERS[name];
   return { layer: { name, format, width, depth, data, scale: info.scale, unit: info.unit }, width, depth, channels };
@@ -229,7 +232,8 @@ export async function exportHeight(
   const out = new Uint8Array(width * depth * (format === 'f32' ? 4 : 2)),
     view = new DataView(out.buffer),
     range = hi - lo;
-  if (format === 'f32') for (let i = 0; i < mm.length; i++) view.setFloat32(i * 4, mm[i] / 1000, true); // float division: millimetres to metres
+  if (format === 'f32')
+    for (let i = 0; i < mm.length; i++) view.setFloat32(i * 4, mm[i] / 1000, true); // float division: millimetres to metres
   else {
     const big = format === 'png16';
     for (let i = 0; i < mm.length; i++) view.setUint16(i * 2, range ? divFloor((mm[i] - lo) * 65535, range) : 0, !big);
@@ -324,16 +328,15 @@ const unbase64 = (text: string): Uint8Array => {
 };
 
 /** What `loadWorld` builds a world from: the saved options (classifier and heights restored) and the saved edits. */
-async function worldOptions(
-  json: string | object,
-): Promise<{ options: BiomeWorldOptions; edits: LayerWrite[] }> {
+async function worldOptions(json: string | object): Promise<{ options: BiomeWorldOptions; edits: LayerWrite[] }> {
   const saved = (typeof json === 'string' ? JSON.parse(json) : json) as {
     format?: unknown;
     version?: unknown;
     options?: Record<string, any>;
     edits?: { name: string; x: number; z: number; data: string }[];
   };
-  if (typeof saved !== 'object' || saved === null) throw typeError('loadWorld takes the JSON text or object that saveWorld(world) returns', 'biomes');
+  if (typeof saved !== 'object' || saved === null)
+    throw typeError('loadWorld takes the JSON text or object that saveWorld(world) returns', 'biomes');
   if (saved.format !== 'margo-biomes-world' || saved.version !== 1 || !saved.options || !Array.isArray(saved.edits))
     throw rangeError('Not a saved biome world (format margo-biomes-world, version 1)', 'biomes');
   const options: Record<string, any> = { ...saved.options };
@@ -400,7 +403,11 @@ export function saveWorld(world: BiomeWorld): unknown {
       ecotone,
       biomes,
       classifier:
-        classifier === 'envelopes' ? classifier : classifier.spec ? { kind: classifier.kind, spec: classifier.spec } : classifier.kind,
+        classifier === 'envelopes'
+          ? classifier
+          : classifier.spec
+            ? { kind: classifier.kind, spec: classifier.spec }
+            : classifier.kind,
       paint,
       height: encode(h),
     },

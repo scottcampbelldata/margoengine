@@ -40,10 +40,19 @@ async function oneTile(budget, loadModel) {
   const json = {
     asset: { version: '1.1' },
     geometricError: 10,
-    root: { boundingVolume: { box: [0, 0, 0, 5, 0, 0, 0, 5, 0, 0, 0, 5] }, geometricError: 0, content: { uri: 'a.glb' } },
+    root: {
+      boundingVolume: { box: [0, 0, 0, 5, 0, 0, 0, 5, 0, 0, 0, 5] },
+      geometricError: 0,
+      content: { uri: 'a.glb' },
+    },
   };
   const glb = boxGLB(),
-    memory = memoryFetch(new Map([['tileset.json', encoder.encode(JSON.stringify(json))], ['a.glb', glb]])),
+    memory = memoryFetch(
+      new Map([
+        ['tileset.json', encoder.encode(JSON.stringify(json))],
+        ['a.glb', glb],
+      ]),
+    ),
     mesh = () => {
       const m = { visible: true, matrix: new Float32Array(16), check() {}, dispose() {} };
       m.setPosition = m.setQuaternion = m.setScale = () => m;
@@ -81,5 +90,8 @@ test("budget: the renderer counts a tile's GPU bytes by default, its file with b
   const custom = await oneTile('gpu', () => ({}));
   assert.equal(custom.renderer.tileset.progress.bytes, custom.file);
   custom.renderer.dispose();
-  await assert.rejects(oneTile('vram', () => ({})), /Invalid budget/);
+  await assert.rejects(
+    oneTile('vram', () => ({})),
+    /Invalid budget/,
+  );
 });

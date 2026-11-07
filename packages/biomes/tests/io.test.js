@@ -18,12 +18,9 @@ function decodePng(bytes) {
     const length = view.getUint32(at),
       type = String.fromCharCode(...bytes.subarray(at + 4, at + 8)),
       body = bytes.subarray(at + 8, at + 8 + length);
-    assert.equal(
-      view.getUint32(at + 8 + length),
-      crc32(bytes.subarray(at + 4, at + 8 + length)),
-      `CRC of ${type}`,
-    );
-    if (type === 'IHDR') head = { width: view.getUint32(at + 8), depth: view.getUint32(at + 12), bits: body[8], color: body[9] };
+    assert.equal(view.getUint32(at + 8 + length), crc32(bytes.subarray(at + 4, at + 8 + length)), `CRC of ${type}`);
+    if (type === 'IHDR')
+      head = { width: view.getUint32(at + 8), depth: view.getUint32(at + 12), bits: body[8], color: body[9] };
     if (type === 'IDAT') idat.push(body);
     at += 12 + length;
   }
@@ -78,11 +75,20 @@ test('exportHeight: raw16, png16 and f32 carry the same heights as the tiles', a
   ]) {
     const cell = j * 512 + 256 + i;
     assert.equal(floats.getFloat32(cell * 4, true), Math.fround(mm[j * 256 + i] / 1000));
-    assert.equal(shorts.getUint16(cell * 2, true), Math.floor(((mm[j * 256 + i] - Math.round(raw.min * 1000)) * 65535) / range));
+    assert.equal(
+      shorts.getUint16(cell * 2, true),
+      Math.floor(((mm[j * 256 + i] - Math.round(raw.min * 1000)) * 65535) / range),
+    );
   }
   const all = new Uint16Array(raw.data.buffer);
-  assert.equal(all.reduce((a, b) => Math.min(a, b)), 0);
-  assert.equal(all.reduce((a, b) => Math.max(a, b)), 65535);
+  assert.equal(
+    all.reduce((a, b) => Math.min(a, b)),
+    0,
+  );
+  assert.equal(
+    all.reduce((a, b) => Math.max(a, b)),
+    65535,
+  );
   // The PNG holds the RAW samples big-endian.
   const d = decodePng(png.data),
     pixels = new DataView(d.rows.buffer);
@@ -107,7 +113,10 @@ test('exportWeights and exportMasks: one plane and one PNG per biome, weights ad
   const world = await BiomeWorld.create(options),
     weights = await exportWeights(world),
     masks = await exportMasks(world);
-  assert.deepEqual(weights.biomes, world.biomes.map((b) => b.id));
+  assert.deepEqual(
+    weights.biomes,
+    world.biomes.map((b) => b.id),
+  );
   assert.equal(weights.planes.length, weights.biomes.length);
   for (let cell = 0; cell < 512 * 512; cell += 331) {
     let sum = 0;
@@ -122,7 +131,10 @@ test('exportWeights and exportMasks: one plane and one PNG per biome, weights ad
     assert.deepEqual([...d.rows], [...weights.planes[i]]);
     d.rows.forEach((value, cell) => (sums[cell] += value));
   });
-  assert.ok(sums.every((sum) => sum === 255), 'the mask files, read back, add up to 255 in every cell');
+  assert.ok(
+    sums.every((sum) => sum === 255),
+    'the mask files, read back, add up to 255 in every cell',
+  );
   assert.equal(weights.splats.length, Math.ceil(weights.biomes.length / 4));
   const splat = decodePng(weights.splats[0].png);
   assert.deepEqual([splat.bits, splat.color], [8, 6]);
@@ -135,7 +147,10 @@ test('exportLayer: JSON and CSV hold the stored integers of the tiles', async ()
     json = JSON.parse(await exportLayer(world, 'temperature', 'json', { tiles: [0, 0, 0, 0] })),
     csv = await exportLayer(world, 'temperature', 'csv', { tiles: [0, 0, 0, 0] }),
     tile = await world.tile(0, 0, { layers: ['temperature'] });
-  assert.deepEqual([json.name, json.format, json.unit, json.width, json.depth, json.channels], ['temperature', 'i16', 'C', 256, 256, 1]);
+  assert.deepEqual(
+    [json.name, json.format, json.unit, json.width, json.depth, json.channels],
+    ['temperature', 'i16', 'C', 256, 256, 1],
+  );
   assert.deepEqual(json.data, [...tile.layer('temperature').data]);
   const rows = csv.trimEnd().split('\n');
   assert.equal(rows.length, 256);
@@ -194,7 +209,10 @@ test('saveWorld refuses what JSON cannot hold, and loadWorld refuses other data'
   assert.throws(() => saveWorld(world), { code: 'unsupported' });
   await assert.rejects(loadWorld({ format: 'other' }), RangeError);
   // The message names the functions that exist (it once named BiomeWorld.from and world.toJSON, which do not).
-  await assert.rejects(loadWorld('null'), (e) => e instanceof TypeError && /saveWorld/.test(e.message) && !/toJSON|BiomeWorld.from/.test(e.message));
+  await assert.rejects(
+    loadWorld('null'),
+    (e) => e instanceof TypeError && /saveWorld/.test(e.message) && !/toJSON|BiomeWorld.from/.test(e.message),
+  );
 });
 
 test('the io entry is lazy: no static import of the root reaches it', async () => {

@@ -7,7 +7,13 @@
 // star's temperature from B-V. The star catalogue is read in the byte layout of the Yale Bright Star Catalogue, 5th
 // edition (Hoffleit and Warren, 1991, CDS V/50).
 import type { EngineKernel } from '@margoengine/core';
-import { engineRuntime, type Engine, type EnginePlugin, type FrameGraph, type PassContext } from '@margoengine/core/extension';
+import {
+  engineRuntime,
+  type Engine,
+  type EnginePlugin,
+  type FrameGraph,
+  type PassContext,
+} from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
 import type { Vec3 } from '@margoengine/math';
 import { ParticleOverlay } from '../../shared/particle-overlay.js';
@@ -138,7 +144,8 @@ export function deltaT(date: Date): number {
 const timeOf = (date: Date, options: AstroOptions = {}) => {
   const jd = julianDay(date),
     dt = options.deltaT ?? deltaT(date);
-  if (!Number.isFinite(dt)) throw new RangeError(`Invalid deltaT ${dt}; pass seconds of terrestrial minus universal time.`);
+  if (!Number.isFinite(dt))
+    throw new RangeError(`Invalid deltaT ${dt}; pass seconds of terrestrial minus universal time.`);
   return { jd, t: (jd + dt / 86400 - 2451545) / 36525 };
 };
 
@@ -354,34 +361,33 @@ export function sunPosition(date: Date, observer: Observer, options: AstroOption
 // coefficient of distance (1e-3 km). Table 47.B: the same multiples and the sine coefficient of latitude.
 // prettier-ignore
 const lunarLR = [
-  0,0,1,0,6288774,-20905355, 2,0,-1,0,1274027,-3699111, 2,0,0,0,658314,-2955968, 0,0,2,0,213618,-569925,
-  0,1,0,0,-185116,48888, 0,0,0,2,-114332,-3149, 2,0,-2,0,58793,246158, 2,-1,-1,0,57066,-152138,
-  2,0,1,0,53322,-170733, 2,-1,0,0,45758,-204586, 0,1,-1,0,-40923,-129620, 1,0,0,0,-34720,108743,
-  0,1,1,0,-30383,104755, 2,0,0,-2,15327,10321, 0,0,1,2,-12528,0, 0,0,1,-2,10980,79661,
-  4,0,-1,0,10675,-34782, 0,0,3,0,10034,-23210, 4,0,-2,0,8548,-21636, 2,1,-1,0,-7888,24208,
-  2,1,0,0,-6766,30824, 1,0,-1,0,-5163,-8379, 1,1,0,0,4987,-16675, 2,-1,1,0,4036,-12831,
-  2,0,2,0,3994,-10445, 4,0,0,0,3861,-11650, 2,0,-3,0,3665,14403, 0,1,-2,0,-2689,-7003,
-  2,0,-1,2,-2602,0, 2,-1,-2,0,2390,10056, 1,0,1,0,-2348,6322, 2,-2,0,0,2236,-9884,
-  0,1,2,0,-2120,5751, 0,2,0,0,-2069,0, 2,-2,-1,0,2048,-4950, 2,0,1,-2,-1773,4130,
-  2,0,0,2,-1595,0, 4,-1,-1,0,1215,-3958, 0,0,2,2,-1110,0, 3,0,-1,0,-892,3258,
-  2,1,1,0,-810,2616, 4,-1,-2,0,759,-1897, 0,2,-1,0,-713,-2117, 2,2,-1,0,-700,2354,
-  2,1,-2,0,691,0, 2,-1,0,-2,596,0, 4,0,1,0,549,-1423, 0,0,4,0,537,-1117,
-  4,-1,0,0,520,-1571, 1,0,-2,0,-487,-1739, 2,1,0,-2,-399,0, 0,0,2,-2,-381,-4421,
-  1,1,1,0,351,0, 3,0,-2,0,-340,0, 4,0,-3,0,330,0, 2,-1,2,0,327,0,
-  0,2,1,0,-323,1165, 1,1,-1,0,299,0, 2,0,3,0,294,0, 2,0,-1,-2,0,8752,
+  0, 0, 1, 0, 6288774, -20905355, 2, 0, -1, 0, 1274027, -3699111, 2, 0, 0, 0, 658314, -2955968, 0, 0, 2, 0, 213618,
+  -569925, 0, 1, 0, 0, -185116, 48888, 0, 0, 0, 2, -114332, -3149, 2, 0, -2, 0, 58793, 246158, 2, -1, -1, 0, 57066,
+  -152138, 2, 0, 1, 0, 53322, -170733, 2, -1, 0, 0, 45758, -204586, 0, 1, -1, 0, -40923, -129620, 1, 0, 0, 0, -34720,
+  108743, 0, 1, 1, 0, -30383, 104755, 2, 0, 0, -2, 15327, 10321, 0, 0, 1, 2, -12528, 0, 0, 0, 1, -2, 10980, 79661, 4, 0,
+  -1, 0, 10675, -34782, 0, 0, 3, 0, 10034, -23210, 4, 0, -2, 0, 8548, -21636, 2, 1, -1, 0, -7888, 24208, 2, 1, 0, 0,
+  -6766, 30824, 1, 0, -1, 0, -5163, -8379, 1, 1, 0, 0, 4987, -16675, 2, -1, 1, 0, 4036, -12831, 2, 0, 2, 0, 3994,
+  -10445, 4, 0, 0, 0, 3861, -11650, 2, 0, -3, 0, 3665, 14403, 0, 1, -2, 0, -2689, -7003, 2, 0, -1, 2, -2602, 0, 2, -1,
+  -2, 0, 2390, 10056, 1, 0, 1, 0, -2348, 6322, 2, -2, 0, 0, 2236, -9884, 0, 1, 2, 0, -2120, 5751, 0, 2, 0, 0, -2069, 0,
+  2, -2, -1, 0, 2048, -4950, 2, 0, 1, -2, -1773, 4130, 2, 0, 0, 2, -1595, 0, 4, -1, -1, 0, 1215, -3958, 0, 0, 2, 2,
+  -1110, 0, 3, 0, -1, 0, -892, 3258, 2, 1, 1, 0, -810, 2616, 4, -1, -2, 0, 759, -1897, 0, 2, -1, 0, -713, -2117, 2, 2,
+  -1, 0, -700, 2354, 2, 1, -2, 0, 691, 0, 2, -1, 0, -2, 596, 0, 4, 0, 1, 0, 549, -1423, 0, 0, 4, 0, 537, -1117, 4, -1,
+  0, 0, 520, -1571, 1, 0, -2, 0, -487, -1739, 2, 1, 0, -2, -399, 0, 0, 0, 2, -2, -381, -4421, 1, 1, 1, 0, 351, 0, 3, 0,
+  -2, 0, -340, 0, 4, 0, -3, 0, 330, 0, 2, -1, 2, 0, 327, 0, 0, 2, 1, 0, -323, 1165, 1, 1, -1, 0, 299, 0, 2, 0, 3, 0,
+  294, 0, 2, 0, -1, -2, 0, 8752,
 ];
 // prettier-ignore
 const lunarB = [
-  0,0,0,1,5128122, 0,0,1,1,280602, 0,0,1,-1,277693, 2,0,0,-1,173237, 2,0,-1,1,55413, 2,0,-1,-1,46271,
-  2,0,0,1,32573, 0,0,2,1,17198, 2,0,1,-1,9266, 0,0,2,-1,8822, 2,-1,0,-1,8216, 2,0,-2,-1,4324,
-  2,0,1,1,4200, 2,1,0,-1,-3359, 2,-1,-1,1,2463, 2,-1,0,1,2211, 2,-1,-1,-1,2065, 0,1,-1,-1,-1870,
-  4,0,-1,-1,1828, 0,1,0,1,-1794, 0,0,0,3,-1749, 0,1,-1,1,-1565, 1,0,0,1,-1491, 0,1,1,1,-1475,
-  0,1,1,-1,-1410, 0,1,0,-1,-1344, 1,0,0,-1,-1335, 0,0,3,1,1107, 4,0,0,-1,1021, 4,0,-1,1,833,
-  0,0,1,-3,777, 4,0,-2,1,671, 2,0,0,-3,607, 2,0,2,-1,596, 2,-1,1,-1,491, 2,0,-2,1,-451,
-  0,0,3,-1,439, 2,0,2,1,422, 2,0,-3,-1,421, 2,1,-1,1,-366, 2,1,0,1,-351, 4,0,0,1,331,
-  2,-1,1,1,315, 2,-2,0,-1,302, 0,0,1,3,-283, 2,1,1,-1,-229, 1,1,0,-1,223, 1,1,0,1,223,
-  0,1,-2,-1,-220, 2,1,-1,-1,-220, 1,0,1,1,-185, 2,-1,-2,-1,181, 0,1,2,1,-177, 4,0,-2,-1,176,
-  4,-1,-1,-1,166, 1,0,1,-1,-164, 4,0,1,-1,132, 1,0,-1,-1,-119, 4,-1,0,-1,115, 2,-2,0,1,107,
+  0, 0, 0, 1, 5128122, 0, 0, 1, 1, 280602, 0, 0, 1, -1, 277693, 2, 0, 0, -1, 173237, 2, 0, -1, 1, 55413, 2, 0, -1, -1,
+  46271, 2, 0, 0, 1, 32573, 0, 0, 2, 1, 17198, 2, 0, 1, -1, 9266, 0, 0, 2, -1, 8822, 2, -1, 0, -1, 8216, 2, 0, -2, -1,
+  4324, 2, 0, 1, 1, 4200, 2, 1, 0, -1, -3359, 2, -1, -1, 1, 2463, 2, -1, 0, 1, 2211, 2, -1, -1, -1, 2065, 0, 1, -1, -1,
+  -1870, 4, 0, -1, -1, 1828, 0, 1, 0, 1, -1794, 0, 0, 0, 3, -1749, 0, 1, -1, 1, -1565, 1, 0, 0, 1, -1491, 0, 1, 1, 1,
+  -1475, 0, 1, 1, -1, -1410, 0, 1, 0, -1, -1344, 1, 0, 0, -1, -1335, 0, 0, 3, 1, 1107, 4, 0, 0, -1, 1021, 4, 0, -1, 1,
+  833, 0, 0, 1, -3, 777, 4, 0, -2, 1, 671, 2, 0, 0, -3, 607, 2, 0, 2, -1, 596, 2, -1, 1, -1, 491, 2, 0, -2, 1, -451, 0,
+  0, 3, -1, 439, 2, 0, 2, 1, 422, 2, 0, -3, -1, 421, 2, 1, -1, 1, -366, 2, 1, 0, 1, -351, 4, 0, 0, 1, 331, 2, -1, 1, 1,
+  315, 2, -2, 0, -1, 302, 0, 0, 1, 3, -283, 2, 1, 1, -1, -229, 1, 1, 0, -1, 223, 1, 1, 0, 1, 223, 0, 1, -2, -1, -220, 2,
+  1, -1, -1, -220, 1, 0, 1, 1, -185, 2, -1, -2, -1, 181, 0, 1, 2, 1, -177, 4, 0, -2, -1, 176, 4, -1, -1, -1, 166, 1, 0,
+  1, -1, -164, 4, 0, 1, -1, 132, 1, 0, -1, -1, -119, 4, -1, 0, -1, 115, 2, -2, 0, 1, 107,
 ];
 
 /** The moon's geometric ecliptic longitude and latitude of date in degrees and distance in km (Meeus 47, full series). */
@@ -410,7 +416,10 @@ const lunar = (t: number) => {
     sr += lunarLR[i + 5] * k * cos(arg);
   }
   for (let i = 0; i < lunarB.length; i += 5)
-    sb += lunarB[i + 4] * scale(lunarB[i + 1]) * sin(lunarB[i] * d + lunarB[i + 1] * m + lunarB[i + 2] * mp + lunarB[i + 3] * f);
+    sb +=
+      lunarB[i + 4] *
+      scale(lunarB[i + 1]) *
+      sin(lunarB[i] * d + lunarB[i + 1] * m + lunarB[i + 2] * mp + lunarB[i + 3] * f);
   // Venus (A1), Jupiter (A2) and the Earth's flattening (L' terms).
   sl += 3958 * sin(a1) + 1962 * sin(lp - f) + 318 * sin(a2);
   sb +=
@@ -448,22 +457,17 @@ export function moonPosition(date: Date, observer: Observer, options: AstroOptio
 // third.
 // prettier-ignore
 const elements = [
-  0.38709927, 0.20563593, 7.00497902, 252.2503235, 77.45779628, 48.33076593,
-  0.00000037, 0.00001906, -0.00594749, 149472.67411175, 0.16047689, -0.12534081,
-  0.72333566, 0.00677672, 3.39467605, 181.9790995, 131.60246718, 76.67984255,
-  0.0000039, -0.00004107, -0.0007889, 58517.81538729, 0.00268329, -0.27769418,
-  1.00000261, 0.01671123, -0.00001531, 100.46457166, 102.93768193, 0,
-  0.00000562, -0.00004392, -0.01294668, 35999.37244981, 0.32327364, 0,
-  1.52371034, 0.0933941, 1.84969142, -4.55343205, -23.94362959, 49.55953891,
-  0.00001847, 0.00007882, -0.00813131, 19140.30268499, 0.44441088, -0.29257343,
-  5.202887, 0.04838624, 1.30439695, 34.39644051, 14.72847983, 100.47390909,
-  -0.00011607, -0.00013253, -0.00183714, 3034.74612775, 0.21252668, 0.20469106,
-  9.53667594, 0.05386179, 2.48599187, 49.95424423, 92.59887831, 113.66242448,
-  -0.0012506, -0.00050991, 0.00193609, 1222.49362201, -0.41897216, -0.28867794,
-  19.18916464, 0.04725744, 0.77263783, 313.23810451, 170.9542763, 74.01692503,
-  -0.00196176, -0.00004397, -0.00242939, 428.48202785, 0.40805281, 0.04240589,
-  30.06992276, 0.00859048, 1.77004347, -55.12002969, 44.96476227, 131.78422574,
-  0.00026291, 0.00005105, 0.00035372, 218.45945325, -0.32241464, -0.00508664,
+  0.38709927, 0.20563593, 7.00497902, 252.2503235, 77.45779628, 48.33076593, 0.00000037, 0.00001906, -0.00594749,
+  149472.67411175, 0.16047689, -0.12534081, 0.72333566, 0.00677672, 3.39467605, 181.9790995, 131.60246718, 76.67984255,
+  0.0000039, -0.00004107, -0.0007889, 58517.81538729, 0.00268329, -0.27769418, 1.00000261, 0.01671123, -0.00001531,
+  100.46457166, 102.93768193, 0, 0.00000562, -0.00004392, -0.01294668, 35999.37244981, 0.32327364, 0, 1.52371034,
+  0.0933941, 1.84969142, -4.55343205, -23.94362959, 49.55953891, 0.00001847, 0.00007882, -0.00813131, 19140.30268499,
+  0.44441088, -0.29257343, 5.202887, 0.04838624, 1.30439695, 34.39644051, 14.72847983, 100.47390909, -0.00011607,
+  -0.00013253, -0.00183714, 3034.74612775, 0.21252668, 0.20469106, 9.53667594, 0.05386179, 2.48599187, 49.95424423,
+  92.59887831, 113.66242448, -0.0012506, -0.00050991, 0.00193609, 1222.49362201, -0.41897216, -0.28867794, 19.18916464,
+  0.04725744, 0.77263783, 313.23810451, 170.9542763, 74.01692503, -0.00196176, -0.00004397, -0.00242939, 428.48202785,
+  0.40805281, 0.04240589, 30.06992276, 0.00859048, 1.77004347, -55.12002969, 44.96476227, 131.78422574, 0.00026291,
+  0.00005105, 0.00035372, 218.45945325, -0.32241464, -0.00508664,
 ];
 /** Heliocentric J2000 ecliptic position in AU of body `k` (0 Mercury, 2 Earth-Moon barycentre, 8 Neptune). */
 const orbit = (k: number, t: number): Vec3 => {
@@ -528,7 +532,11 @@ export function planetPositions(date: Date, observer: Observer, options: AstroOp
       r = Math.hypot(...helio),
       big = Math.hypot(...earth),
       // J2000 ecliptic to J2000 equator.
-      j2000: Vec3 = [v[0] / delta, (v[1] * cos(ej) - v[2] * sin(ej)) / delta, (v[1] * sin(ej) + v[2] * cos(ej)) / delta],
+      j2000: Vec3 = [
+        v[0] / delta,
+        (v[1] * cos(ej) - v[2] * sin(ej)) / delta,
+        (v[1] * sin(ej) + v[2] * cos(ej)) / delta,
+      ],
       i = Math.acos(Math.max(-1, Math.min(1, (r * r + delta * delta - big * big) / (2 * r * delta)))) / rad;
     return {
       ...strip(place(f, apply(toDate, j2000), delta * au)),
@@ -577,7 +585,9 @@ export function parseBrightStarCatalog(text: string, options: { maxMagnitude?: n
     if (!field(76, 90)) continue;
     const hr = Number(field(1, 4)),
       ra = (Number(field(76, 77)) + Number(field(78, 79)) / 60 + Number(field(80, 83)) / 3600) * 15,
-      dec = (field(84, 84) === '-' ? -1 : 1) * (Number(field(85, 86)) + Number(field(87, 88)) / 60 + Number(field(89, 90)) / 3600),
+      dec =
+        (field(84, 84) === '-' ? -1 : 1) *
+        (Number(field(85, 86)) + Number(field(87, 88)) / 60 + Number(field(89, 90)) / 3600),
       vText = field(103, 107),
       bvText = field(110, 114),
       mag = Number(vText),
@@ -595,7 +605,10 @@ export function parseBrightStarCatalog(text: string, options: { maxMagnitude?: n
       !Number.isFinite(pa) ||
       !Number.isFinite(pd)
     )
-      throw new MargoError('failed', `Bright star record on line ${n + 1} does not parse: ${JSON.stringify(line.slice(0, 20))}; give the CDS V/50 catalog layout`);
+      throw new MargoError(
+        'failed',
+        `Bright star record on line ${n + 1} does not parse: ${JSON.stringify(line.slice(0, 20))}; give the CDS V/50 catalog layout`,
+      );
     if (mag > limit) continue;
     rows.push({
       hr,
@@ -633,10 +646,13 @@ export async function fetchBrightStarCatalog(
   options: { signal?: AbortSignal; maxMagnitude?: number } = {},
 ): Promise<StarCatalog> {
   const response = await fetch(url, { signal: options.signal });
-  if (!response.ok) throw new MargoError('failed', `Star catalogue ${String(url)} answered HTTP ${response.status}; check the URL`);
+  if (!response.ok)
+    throw new MargoError('failed', `Star catalogue ${String(url)} answered HTTP ${response.status}; check the URL`);
   let bytes = new Uint8Array(await response.arrayBuffer());
   if (bytes[0] === 0x1f && bytes[1] === 0x8b)
-    bytes = new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
+    bytes = new Uint8Array(
+      await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer(),
+    );
   return parseBrightStarCatalog(new TextDecoder('latin1').decode(bytes), options);
 }
 
@@ -696,7 +712,8 @@ const number = (value: unknown, name: string, low: number, high: number) => {
 const validate = (o: AstroSkyOptions) => {
   checkObserver(o);
   if (o.date !== undefined) checkDate(o.date);
-  if (o.deltaT !== undefined && !Number.isFinite(o.deltaT)) throw new RangeError('Invalid AstroSky deltaT; pass seconds.');
+  if (o.deltaT !== undefined && !Number.isFinite(o.deltaT))
+    throw new RangeError('Invalid AstroSky deltaT; pass seconds.');
   number(o.timeScale, 'timeScale', -1e6, 1e6);
   number(o.brightness, 'brightness', 0, 1000);
   number(o.limitingMagnitude, 'limitingMagnitude', -30, 30);

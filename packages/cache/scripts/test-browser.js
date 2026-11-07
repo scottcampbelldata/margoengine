@@ -36,7 +36,9 @@ const files = {
     '/cache-files/huge': Buffer.alloc(400, 4),
   },
   log = [];
-const fileOf = (path) => files[path] ?? (/^\/cache-files\/tile\/\d+$/.test(path) ? Buffer.alloc(10, Number(path.split('/').pop()) & 255) : undefined);
+const fileOf = (path) =>
+  files[path] ??
+  (/^\/cache-files\/tile\/\d+$/.test(path) ? Buffer.alloc(10, Number(path.split('/').pop()) & 255) : undefined);
 
 const server = await createServer({
   root,
@@ -105,7 +107,10 @@ try {
     try {
       return await Promise.race([
         page.evaluate(([n, a]) => window.cacheChecks[n](...a), [name, args]),
-        new Promise((_, reject) => (timer = setTimeout(() => reject(new Error(`${name} took over ${CALL_LIMIT / 1000} s`)), CALL_LIMIT))),
+        new Promise(
+          (_, reject) =>
+            (timer = setTimeout(() => reject(new Error(`${name} took over ${CALL_LIMIT / 1000} s`)), CALL_LIMIT)),
+        ),
       ]);
     } finally {
       clearTimeout(timer);
@@ -121,7 +126,10 @@ try {
     coldRequests = log.slice(before);
   assert.equal(cold.buffers[0], sha(bin), 'the streamed buffer equals the file');
   assert.ok(coldRequests.length > 2, `streamed in ranges (${coldRequests.length} requests)`);
-  assert.ok(coldRequests.every((r) => /^bytes=\d+-\d+$/.test(r.range ?? '')), 'every request is a range');
+  assert.ok(
+    coldRequests.every((r) => /^bytes=\d+-\d+$/.test(r.range ?? '')),
+    'every request is a range',
+  );
   assert.equal(cold.usage.bytes, glb.length, 'every byte the stream read is stored');
   report.cold = { requests: coldRequests.length, stats: cold.stats, usage: cold.usage };
 
@@ -144,7 +152,11 @@ try {
   const warm = await call('streamRanges', 'chair', '/cache-files/chair.glb'),
     warmRequests = log.slice(before);
   assert.equal(warm.buffers[0], sha(bin));
-  assert.deepEqual(warmRequests, [{ path: '/cache-files/chair.glb', range: 'bytes=0-0', etag }], 'one conditional request');
+  assert.deepEqual(
+    warmRequests,
+    [{ path: '/cache-files/chair.glb', range: 'bytes=0-0', etag }],
+    'one conditional request',
+  );
   assert.equal(warm.stats.misses, 0);
   report.revalidated = { requests: warmRequests, stats: warm.stats };
 
@@ -154,7 +166,11 @@ try {
   assert.equal(covered.status, 206);
   assert.equal(covered.contentRange, `bytes 1000-2999/${glb.length}`);
   assert.equal(covered.digest, sha(glb.subarray(1000, 3000)));
-  assert.deepEqual(log.slice(before), [{ path: '/cache-files/chair.glb', range: 'bytes=0-0', etag }], 'no request for the range');
+  assert.deepEqual(
+    log.slice(before),
+    [{ path: '/cache-files/chair.glb', range: 'bytes=0-0', etag }],
+    'no request for the range',
+  );
   assert.equal(covered.stats.revalidated, 1);
 
   // 5. Eviction index on the real IndexedDB: least recently used first, and an evicted file is gone offline.

@@ -113,7 +113,11 @@ try {
   assert.deepEqual(splat.errors, [], 'cesium-splats: WebGPU or engine errors');
   check(
     'splats, real file: the 27 Gaussian splats of CesiumJS sh_unit_cube are drawn in one cloud where float64 maths puts them',
-    splat.splats === 27 && splat.clouds === 1 && splat.centres >= 20 && splat.drawn === splat.directDrawn && splat.differ === 0,
+    splat.splats === 27 &&
+      splat.clouds === 1 &&
+      splat.centres >= 20 &&
+      splat.drawn === splat.directDrawn &&
+      splat.differ === 0,
     splat,
   );
   check(

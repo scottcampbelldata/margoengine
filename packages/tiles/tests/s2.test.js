@@ -61,7 +61,8 @@ test('S2 tokens: the README availability figure, face 0 children in Morton order
 });
 
 test('S2 tokens: malformed tokens are refused with a TypeError naming the problem', () => {
-  for (const bad of ['', 'xyz', '0', 'd', '12345678901234567', '18']) assert.throws(() => parseS2Token(bad), TypeError, bad);
+  for (const bad of ['', 'xyz', '0', 'd', '12345678901234567', '18'])
+    assert.throws(() => parseS2Token(bad), TypeError, bad);
   assert.throws(() => s2Token({ face: 6, level: 0, i: 0, j: 0 }), RangeError);
   assert.throws(() => s2Token({ face: 0, level: 1, i: 2, j: 0 }), RangeError);
 });
@@ -121,7 +122,9 @@ test('S2 volumes: the box holds every point of the extruded cell, and is tight f
         p = cartographicToEcef(...s2LonLat(cell, s, t), height);
       for (let a = 0; a < 3; a++) {
         const d =
-          ((p[0] - bounds.center[0]) * h[a * 3] + (p[1] - bounds.center[1]) * h[a * 3 + 1] + (p[2] - bounds.center[2]) * h[a * 3 + 2]) /
+          ((p[0] - bounds.center[0]) * h[a * 3] +
+            (p[1] - bounds.center[1]) * h[a * 3 + 1] +
+            (p[2] - bounds.center[2]) * h[a * 3 + 2]) /
           lengths[a];
         // Inside, to float64 rounding at earth scale (1e-6 m).
         assert.ok(Math.abs(d) <= lengths[a] + 1e-6, `${token}: axis ${a} ${Math.abs(d)} > ${lengths[a]}`);
@@ -131,7 +134,11 @@ test('S2 volumes: the box holds every point of the extruded cell, and is tight f
     // The padding is the sagitta of a 16th of the cell: for a cell under 1,000 km it adds under 1% per axis
     // beyond what 4,000 samples reach (and for the flat axis of a short cell, at most a few metres).
     if (cell.level >= 6)
-      for (let a = 0; a < 3; a++) assert.ok(lengths[a] - used[a] <= 0.01 * lengths[a] + 5, `${token} axis ${a} loose: ${lengths[a]} vs ${used[a]}`);
+      for (let a = 0; a < 3; a++)
+        assert.ok(
+          lengths[a] - used[a] <= 0.01 * lengths[a] + 5,
+          `${token} axis ${a} loose: ${lengths[a]} vs ${used[a]}`,
+        );
   }
 });
 
@@ -165,7 +172,10 @@ test('S2 tilesets: the README example loads with boundingVolumes: [s2], and is r
     },
   };
   const memory = memoryFetch(new Map([['tileset.json', encoder.encode(JSON.stringify(tileset))]]));
-  await assert.rejects(Tileset.load(memory.url, { fetch: memory.fetch }), (e) => e.code === 'unsupported' && /tiles\/s2/.test(e.message));
+  await assert.rejects(
+    Tileset.load(memory.url, { fetch: memory.fetch }),
+    (e) => e.code === 'unsupported' && /tiles\/s2/.test(e.message),
+  );
   const loaded = await Tileset.load(memory.url, { fetch: memory.fetch, boundingVolumes: [s2] });
   let tile = loaded.root;
   for (const token of ['3', '2c', '2f', '2ec']) {
@@ -185,7 +195,10 @@ test('S2 tilesets: the README example loads with boundingVolumes: [s2], and is r
   loaded.update({ position: cartographicToEcef(Math.PI / 2, 0.3, 10), screenHeight: 1080, fov: 60 });
   assert.equal(loaded.root.distance, 0);
 });
-const heightsOf = (token) => ({ minimumHeight: 0, maximumHeight: { 3: 1_000_000, '2c': 500_000, '2f': 250_000, '2ec': 125_000 }[token] });
+const heightsOf = (token) => ({
+  minimumHeight: 0,
+  maximumHeight: { 3: 1_000_000, '2c': 500_000, '2f': 250_000, '2ec': 125_000 }[token],
+});
 
 test('S2 implicit tiling: a quadtree child is the S2 child cell at Morton (x, y), an octree child its height slab', async () => {
   for (const scheme of ['QUADTREE', 'OCTREE']) {
@@ -197,7 +210,12 @@ test('S2 implicit tiling: a quadtree child is the S2 child cell at Morton (x, y)
         boundingVolume: s2Volume('04', 0, 500_000),
         refine: 'REPLACE',
         geometricError: 5_000,
-        implicitTiling: { subdivisionScheme: scheme, subtreeLevels: 2, availableLevels: 2, subtrees: { uri: 'subtrees/{level}/{x}/{y}.subtree' } },
+        implicitTiling: {
+          subdivisionScheme: scheme,
+          subtreeLevels: 2,
+          availableLevels: 2,
+          subtrees: { uri: 'subtrees/{level}/{x}/{y}.subtree' },
+        },
       },
     };
     const files = new Map([
@@ -213,10 +231,13 @@ test('S2 implicit tiling: a quadtree child is the S2 child cell at Morton (x, y)
     assert.equal(loaded.root.children.length, scheme === 'OCTREE' ? 8 : 4, scheme);
     for (const child of loaded.root.children) {
       const { x, y, z } = child.implicit,
-        token = ['01', '03', '07', '05', '1d', '1f', '1b', '19', '09', '0f', '0b', '0d', '11', '17', '13', '15'][mortonIndex2(x, y)],
+        token = ['01', '03', '07', '05', '1d', '1f', '1b', '19', '09', '0f', '0b', '0d', '11', '17', '13', '15'][
+          mortonIndex2(x, y)
+        ],
         heights = scheme === 'OCTREE' ? [z * 250_000, (z + 1) * 250_000] : [0, 500_000],
         want = s2Bounds({ token, minimumHeight: heights[0], maximumHeight: heights[1] });
-      for (let k = 0; k < 3; k++) assert.ok(Math.abs(child.bounds.center[k] - want.center[k]) < 1e-6, `${scheme} ${x} ${y} ${z}`);
+      for (let k = 0; k < 3; k++)
+        assert.ok(Math.abs(child.bounds.center[k] - want.center[k]) < 1e-6, `${scheme} ${x} ${y} ${z}`);
     }
   }
 });

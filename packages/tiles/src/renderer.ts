@@ -339,10 +339,7 @@ export class TilesRenderer implements EnginePlugin {
         cloud.visible = false;
         return {
           // Points upload their positions (float32 xyz) and RGBA8 colours.
-          bytes:
-            this.budget === 'gpu'
-              ? (content.positions.length / 3) * (12 + (colors ? 4 : 0))
-              : content.byteLength,
+          bytes: this.budget === 'gpu' ? (content.positions.length / 3) * (12 + (colors ? 4 : 0)) : content.byteLength,
           get visible() {
             return cloud.visible;
           },

@@ -40,13 +40,24 @@ test('terrain: the real Cesium World Terrain tile 9/759/335 decodes to Everest, 
     doc = JSON.parse(new TextDecoder().decode(gltf.subarray(20, 20 + jsonLength))),
     bin = gltf.subarray(28 + jsonLength),
     pv = doc.bufferViews[doc.accessors[0].bufferView],
-    positions = new Float32Array(bin.buffer.slice(bin.byteOffset + pv.byteOffset, bin.byteOffset + pv.byteOffset + pv.byteLength));
+    positions = new Float32Array(
+      bin.buffer.slice(bin.byteOffset + pv.byteOffset, bin.byteOffset + pv.byteOffset + pv.byteLength),
+    );
   for (let i = 0; i < count; i++) {
     // glTF y-up back to ECEF z-up: (x, y, z) -> (x, -z, y), plus the RTC centre.
-    const p = [positions[i * 3] + mesh.center[0], -positions[i * 3 + 2] + mesh.center[1], positions[i * 3 + 1] + mesh.center[2]];
+    const p = [
+      positions[i * 3] + mesh.center[0],
+      -positions[i * 3 + 2] + mesh.center[1],
+      positions[i * 3 + 1] + mesh.center[2],
+    ];
     assert.ok(Math.hypot(p[0] - cx, p[1] - cy, p[2] - cz) <= r + 1, `vertex ${i} outside the sphere`);
     const c = ecefToCartographic(...p);
-    assert.ok(c.longitude >= west - 1e-9 && c.longitude <= east + 1e-9 && c.latitude >= south - 1e-9 && c.latitude <= north + 1e-9);
+    assert.ok(
+      c.longitude >= west - 1e-9 &&
+        c.longitude <= east + 1e-9 &&
+        c.latitude >= south - 1e-9 &&
+        c.latitude <= north + 1e-9,
+    );
   }
 });
 
@@ -54,26 +65,45 @@ test('terrain: oct normals and the water mask extension of the real Cesium sampl
   const mesh = parseQuantizedMesh(file('QuantizedMeshWithOctVertexNormals/tile.octvertexnormals.terrain'));
   assert.equal(mesh.normals.length, mesh.u.length * 2);
   // Oct normals of ground point away from the earth: positive along the vertex's own up for nearly all vertices.
-  const watered = parseQuantizedMesh(file('QuantizedMeshWithOctVertexNormalsAndWaterMask/tile.octvertexnormals.watermask.terrain'));
+  const watered = parseQuantizedMesh(
+    file('QuantizedMeshWithOctVertexNormalsAndWaterMask/tile.octvertexnormals.watermask.terrain'),
+  );
   assert.ok(watered.waterMask.length === 1 || watered.waterMask.length === 65536);
   assert.equal(watered.normals.length, watered.u.length * 2);
 });
 
 test('terrain: a cut tile is refused with a RangeError, never read past its end', () => {
   const bytes = file('QuantizedMeshWithOctVertexNormals/tile.octvertexnormals.terrain');
-  for (const n of [0, 50, 88, 100, 600, bytes.length - 3]) assert.throws(() => parseQuantizedMesh(bytes.subarray(0, n)), RangeError, `cut at ${n}`);
+  for (const n of [0, 50, 88, 100, 600, bytes.length - 3])
+    assert.throws(() => parseQuantizedMesh(bytes.subarray(0, n)), RangeError, `cut at ${n}`);
 });
 
 test('terrain: the layer becomes an implicit tileset, its tiles b3dm with imagery UVs inside the image', async () => {
   const layer = file('QuantizedMeshWithOctVertexNormals/layer.json'),
     tile = file('QuantizedMeshWithOctVertexNormals/tile.octvertexnormals.terrain'),
     png = new Uint8Array([0x89, 0x50, 0x4e, 0x47]),
-    outer = memoryFetch(new Map([['layer.json', layer], ['tile.octvertexnormals.terrain', tile], ['img/0/0/0.png', png], ['img/1/0/0.png', png], ['img/1/1/0.png', png], ['img/1/0/1.png', png], ['img/1/1/1.png', png]]));
+    outer = memoryFetch(
+      new Map([
+        ['layer.json', layer],
+        ['tile.octvertexnormals.terrain', tile],
+        ['img/0/0/0.png', png],
+        ['img/1/0/0.png', png],
+        ['img/1/1/0.png', png],
+        ['img/1/0/1.png', png],
+        ['img/1/1/1.png', png],
+      ]),
+    );
   const fetch = (url, init) => outer.fetch(String(url).split('?')[0], init);
-  const source = await terrain('https://tiles.test/layer.json', { fetch, imagery: { url: 'https://tiles.test/img/{z}/{x}/{y}.png' } });
+  const source = await terrain('https://tiles.test/layer.json', {
+    fetch,
+    imagery: { url: 'https://tiles.test/img/{z}/{x}/{y}.png' },
+  });
   assert.equal(source.maximumLevel, 1);
   const contents = [];
-  const tileset = await Tileset.load(source.url, { fetch: source.fetch, content: (content) => (contents.push(content), { bytes: 1, visible: false, dispose() {} }) });
+  const tileset = await Tileset.load(source.url, {
+    fetch: source.fetch,
+    content: (content) => (contents.push(content), { bytes: 1, visible: false, dispose() {} }),
+  });
   assert.equal(tileset.root.children.length, 2);
   for (let i = 0; i < 40 && contents.length < 2; i++) {
     tileset.update({ position: [0, 0, 20_000_000], screenHeight: 1080, fov: 60 });
@@ -91,12 +121,24 @@ test('terrain: the layer becomes an implicit tileset, its tiles b3dm with imager
     const uv = doc.accessors[3],
       bin = g.subarray(28 + jl),
       bv = doc.bufferViews[uv.bufferView],
-      values = new Float32Array(bin.buffer.slice(bin.byteOffset + bv.byteOffset, bin.byteOffset + bv.byteOffset + bv.byteLength));
+      values = new Float32Array(
+        bin.buffer.slice(bin.byteOffset + bv.byteOffset, bin.byteOffset + bv.byteOffset + bv.byteLength),
+      );
     for (const value of values) assert.ok(value >= -1e-6 && value <= 1 + 1e-6, `uv ${value}`);
   }
   // Only EPSG:4326 tms layers are read; anything else is refused by name.
-  const mercator = memoryFetch(new Map([['layer.json', new TextEncoder().encode(JSON.stringify({ tiles: ['{z}/{x}/{y}.terrain'], projection: 'EPSG:3857' }))]]));
-  await assert.rejects(terrain('https://tiles.test/layer.json', { fetch: mercator.fetch }), (e) => e.code === 'unsupported');
+  const mercator = memoryFetch(
+    new Map([
+      [
+        'layer.json',
+        new TextEncoder().encode(JSON.stringify({ tiles: ['{z}/{x}/{y}.terrain'], projection: 'EPSG:3857' })),
+      ],
+    ]),
+  );
+  await assert.rejects(
+    terrain('https://tiles.test/layer.json', { fetch: mercator.fetch }),
+    (e) => e.code === 'unsupported',
+  );
 });
 
 test('terrain: its b3dm holds a whole GLB container the shared walker accepts, with and without a drape', () => {
@@ -107,7 +149,10 @@ test('terrain: its b3dm holds a whole GLB container the shared walker accepts, w
   for (const d of [undefined, drape]) {
     const gltf = parseContent(meshB3dm(mesh, rectangle, d, 0)).gltf,
       chunks = glbChunks(gltf);
-    assert.deepEqual(chunks.map((c) => c.type), [GLB_JSON, GLB_BIN]);
+    assert.deepEqual(
+      chunks.map((c) => c.type),
+      [GLB_JSON, GLB_BIN],
+    );
     const doc = JSON.parse(new TextDecoder().decode(chunks[0].data));
     assert.equal(doc.buffers[0].byteLength, chunks[1].data.length);
     assert.equal(doc.asset.version, '2.0');

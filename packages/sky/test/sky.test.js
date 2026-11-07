@@ -420,7 +420,10 @@ test('moonlight, ambient color and the reflected night sky share a continuous cl
   assert.equal(sky.nightFactor, 0);
   assert.equal(h.engine.lighting.direction[3], 6);
   assert.deepEqual(Array.from(values().subarray(0, 3)), options.lighting.ambient.day.map(Math.fround));
-  assert.match(h.context.shader, /let margoAmbient=skyLighting\(n,v,i\.color,i\.material\.y,i\.material\.x,vec3f\(0\.04\),1\.0\);/);
+  assert.match(
+    h.context.shader,
+    /let margoAmbient=skyLighting\(n,v,i\.color,i\.material\.y,i\.material\.x,vec3f\(0\.04\),1\.0\);/,
+  );
   assert.match(h.context.shader, /\*0\.0\*frame\.ambient\.rgb\+margoAmbient;/, 'The constant ambient gives way');
   assert.ok(h.context.bindings.some((e) => e.binding === 8 && e.resource.buffer === ambient()));
   const map = h.context.bindings.find((e) => e.binding === 10).resource,
@@ -679,7 +682,10 @@ test('a sky with environment lights PBR meshes as a fallback environment, withou
   };
   frame();
   // Metals get image-based light: the sky's own split-sum term replaces core's constant ambient (zero for metals).
-  assert.match(h.context.shader, /let margoAmbient=skyLighting\(n,v,i\.color,i\.material\.y,i\.material\.x,vec3f\(0\.04\),1\.0\);/);
+  assert.match(
+    h.context.shader,
+    /let margoAmbient=skyLighting\(n,v,i\.color,i\.material\.y,i\.material\.x,vec3f\(0\.04\),1\.0\);/,
+  );
   assert.ok(h.context.bindings.some((e) => e.binding === 10) && h.context.bindings.some((e) => e.binding === 11));
   const ambient = h.resources.find((r) => !r.destroyed && r.size === 160),
     floor = new Float32Array(ambient.data).subarray(36, 39);

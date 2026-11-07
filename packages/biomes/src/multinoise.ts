@@ -118,7 +118,8 @@ export function multiNoise(spec: MultiNoiseSpec): ZoneClassifier {
     if (!p || typeof p !== 'object' || typeof p.biome !== 'string' || !p.at || typeof p.at !== 'object')
       throw typeError('multiNoise points are { biome, at } with a biome id and positions per axis field', 'biomes');
     for (const key of Object.keys(p.at))
-      if (!read.some((a) => a.field === key)) throw rangeError('multiNoise point names a field that is not an axis', 'biomes');
+      if (!read.some((a) => a.field === key))
+        throw rangeError('multiNoise point names a field that is not an axis', 'biomes');
     const box = read.map((a, i) => {
       const v = p.at[a.field];
       if (v === undefined) return null;
@@ -161,7 +162,8 @@ export function multiNoise(spec: MultiNoiseSpec): ZoneClassifier {
         byBiome: number[][] = ids.map(() => []);
       placed.forEach((p, q) => {
         const b = ids.indexOf(p.biome);
-        if (b < 0) throw rangeError('multiNoise names a biome the world does not have; add it to BiomeWorld biomes', 'biomes');
+        if (b < 0)
+          throw rangeError('multiNoise names a biome the world does not have; add it to BiomeWorld biomes', 'biomes');
         owner[q] = b;
         byBiome[b].push(q);
         p.box.forEach((e, a) => {

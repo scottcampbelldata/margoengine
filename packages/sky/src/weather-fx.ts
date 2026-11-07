@@ -66,7 +66,14 @@ export interface WeatherFxOptions {
   /** Radius of a lens drop, a share of the view's height, 0.002 to 0.2. Default 0.03. */
   dropSize?: number;
 }
-const defaults = { ground: 0, resolution: 256, splashes: 3000, splashSize: 0.15, lensDrops: 40, dropSize: 0.03 } as const;
+const defaults = {
+  ground: 0,
+  resolution: 256,
+  splashes: 3000,
+  splashSize: 0.15,
+  lensDrops: 40,
+  dropSize: 0.03,
+} as const;
 // The cover map: a top-down orthographic depth over the weather's box, depth 0 at `top` (1 km over the camera) and 1 at
 // the box's floor, so a texel's depth is the height of the topmost occluder there.
 const ABOVE = 1000;
@@ -164,7 +171,11 @@ const inRange = (value: number, low: number, high: number) => Number.isFinite(va
 export class WeatherFX implements EnginePlugin {
   readonly name: string = 'sky:weather-fx';
   private engine?: Engine;
-  private readonly occlusion: { buffer: GPUBuffer | undefined; view: GPUTextureView | undefined; shader(code: string): string } = {
+  private readonly occlusion: {
+    buffer: GPUBuffer | undefined;
+    view: GPUTextureView | undefined;
+    shader(code: string): string;
+  } = {
     buffer: undefined,
     view: undefined,
     shader: covered,
@@ -286,11 +297,21 @@ export class WeatherFX implements EnginePlugin {
       if ('id' in source) {
         const mesh = meshRuntime(source as Mesh);
         if (mesh.engine !== engine)
-          throw new MargoError('attached', 'WeatherFX occluder belongs to another engine; use meshes of the same engine');
+          throw new MargoError(
+            'attached',
+            'WeatherFX occluder belongs to another engine; use meshes of the same engine',
+          );
         const buffers = mesh.geometry && mesh.visible ? engine.geometryBuffers(mesh.geometry) : null;
         if (buffers)
-          add({ node: mesh, vertex: buffers.vertex, index: buffers.index, count: mesh.geometry!.indices.length, stride: 24 });
-      } else for (const p of (source as { shadowPrimitives?: readonly OccluderPrimitive[] }).shadowPrimitives ?? []) add(p);
+          add({
+            node: mesh,
+            vertex: buffers.vertex,
+            index: buffers.index,
+            count: mesh.geometry!.indices.length,
+            stride: 24,
+          });
+      } else
+        for (const p of (source as { shadowPrimitives?: readonly OccluderPrimitive[] }).shadowPrimitives ?? []) add(p);
     }
     return k;
   }
@@ -335,13 +356,21 @@ export class WeatherFX implements EnginePlugin {
     const k = this.gather();
     if (k && (!this.models || this.models.size < k * 64)) {
       this.models?.destroy();
-      this.models = d.createBuffer({ size: this.matrices.byteLength, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+      this.models = d.createBuffer({
+        size: this.matrices.byteLength,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+      });
       this.groups.clear();
     }
     if (k) d.queue.writeBuffer(this.models!, 0, this.matrices as Float32Array<ArrayBuffer>, 0, k * 16);
     const pass = c.encoder.beginRenderPass({
       colorAttachments: [],
-      depthStencilAttachment: { view: this.occlusion.view!, depthClearValue: 1, depthLoadOp: 'clear', depthStoreOp: 'store' },
+      depthStencilAttachment: {
+        view: this.occlusion.view!,
+        depthClearValue: 1,
+        depthLoadOp: 'clear',
+        depthStoreOp: 'store',
+      },
     });
     for (const { p, k: index } of this.draws) {
       let pipeline = this.pipelines.get(p.stride);
@@ -353,7 +382,10 @@ export class WeatherFX implements EnginePlugin {
             module,
             entryPoint: 'vertex',
             buffers: [
-              { arrayStride: p.stride, attributes: [{ shaderLocation: 0, offset: 0, format: p.stride === 80 ? 'float32x4' : 'float32x3' }] },
+              {
+                arrayStride: p.stride,
+                attributes: [{ shaderLocation: 0, offset: 0, format: p.stride === 80 ? 'float32x4' : 'float32x3' }],
+              },
             ],
           },
           depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare: 'less' },

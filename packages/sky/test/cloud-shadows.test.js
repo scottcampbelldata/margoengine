@@ -17,7 +17,11 @@ test('cloud shadows carry the clouds field under their own names at their bindin
   assert.match(wgsl, /@group\(2\) @binding\(5\) var<uniform> shadowFxCloudFrame5:ShadowFxClouds5;/);
   assert.match(wgsl, /@group\(2\) @binding\(8\) var shadowFxCloudSampler5:sampler;/);
   assert.match(wgsl, /fn shadowFxCloudDensityAt5\(/);
-  assert.doesNotMatch(wgsl, /\bcloudDensityAt\(|\bstruct Clouds\b/, 'every name is prefixed, so two effects cannot clash');
+  assert.doesNotMatch(
+    wgsl,
+    /\bcloudDensityAt\(|\bstruct Clouds\b/,
+    'every name is prefixed, so two effects cannot clash',
+  );
   assert.equal(shade.call, 'vec3f(shadowFxVolume5(position))');
 });
 
@@ -44,7 +48,10 @@ test('cloud shadows read the clouds options and drift every frame and keep their
   assert.equal(v[36], 50, 'the drift the clouds have now');
   assert.deepEqual([...v.subarray(20, 23)], [0, 1, 0], "the shadows' own light");
   assert.equal(v[41], 1, 'strength');
-  assert.ok(h.created.some((r) => r.startsWith('texture(64,64,64,rgba8unorm')), 'its own copy of the noise volumes');
+  assert.ok(
+    h.created.some((r) => r.startsWith('texture(64,64,64,rgba8unorm')),
+    'its own copy of the noise volumes',
+  );
   shade.options.samples = 1;
   assert.throws(() => shade.update({ context: { device, encoder: h.context.encoder }, light: [0, 1, 0] }), /samples/);
   shade.dispose();

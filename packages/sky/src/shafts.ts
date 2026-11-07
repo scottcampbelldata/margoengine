@@ -95,7 +95,10 @@ fn shaftCloudsOpen(d:vec3f,jitter:f32)->f32 {
  return exp(-od*c.layer.w);
 }
 `;
-const maskShader = (depth: string, clouds: boolean) => /* wgsl */ `${fullscreen}${common}${depth}${clouds ? cloudMask : ''}
+const maskShader = (
+  depth: string,
+  clouds: boolean,
+) => /* wgsl */ `${fullscreen}${common}${depth}${clouds ? cloudMask : ''}
 @fragment fn mask(i:Vertex)->@location(0) vec4f {
  let full=vec2i(textureDimensions(sceneDepth));let base=vec2i(i.position.xy)*2;var open=0.0;
  for(var k=0;k<4;k++){if(sceneDepthAt(min(base+vec2i(k&1,k>>1),full-1))<=0.0){open+=0.25;}}
@@ -167,7 +170,9 @@ export class LightShafts implements EnginePlugin {
     if (typeof o !== 'object' || o === null || typeof o.depth !== 'function')
       throw new TypeError('LightShafts needs a depth function returning the scene depth texture; pass {depth}');
     if (o.sky !== undefined && (typeof o.sky !== 'object' || o.sky === null || !(o.sky.sun?.length >= 3)))
-      throw new TypeError('LightShafts sky must be a Sky (with a sun direction); pass the sky whose sun casts the shafts');
+      throw new TypeError(
+        'LightShafts sky must be a Sky (with a sun direction); pass the sky whose sun casts the shafts',
+      );
     if (o.clouds !== undefined && (typeof o.clouds?.options !== 'object' || !(o.clouds.drift?.length >= 3)))
       throw new TypeError('LightShafts clouds must be VolumetricClouds; pass the clouds the light comes through');
     if (o.sunDirection) finiteVector(o.sunDirection, 3, 'LightShafts sunDirection');
@@ -198,7 +203,10 @@ export class LightShafts implements EnginePlugin {
       );
     this.engine = engine;
     const d = engine.gpu;
-    this.uniform = d.createBuffer({ size: this.values.byteLength, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.uniform = d.createBuffer({
+      size: this.values.byteLength,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
     this.sampler = d.createSampler({ magFilter: 'linear', minFilter: 'linear' });
   }
   registerPasses(graph: FrameGraph): void {
@@ -264,7 +272,10 @@ export class LightShafts implements EnginePlugin {
     writeLayer(v, clouds.options, clouds.drift);
     v[34] = clouds.options.maxDistance ?? 80000;
     v[35] = this.options.cloudSamples ?? defaults.cloudSamples;
-    this.cloudUniform ??= c.device.createBuffer({ size: v.byteLength, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.cloudUniform ??= c.device.createBuffer({
+      size: v.byteLength,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
     this.volumes ??= new CloudVolumes(c.device);
     this.volumes.fill(c.device, c.encoder);
     c.device.queue.writeBuffer(this.cloudUniform, 0, v as Float32Array<ArrayBuffer>);

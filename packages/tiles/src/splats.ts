@@ -244,7 +244,8 @@ export const splats: TilesModelDrawer = async (
   // Under 'content': the file. The splats' CPU arrays kept for rebuilds are not GPU memory and are not counted.
   let bytes = host.measure(model, content.byteLength);
   if (host.budget === 'gpu')
-    for (const { data } of placed) bytes += (data.positions.length / 3) * 128 + (data.sphericalHarmonics?.byteLength ?? 0);
+    for (const { data } of placed)
+      bytes += (data.positions.length / 3) * 128 + (data.sphericalHarmonics?.byteLength ?? 0);
   return {
     bytes,
     get visible() {

@@ -24,7 +24,24 @@ async function sampleSplats() {
 function farMatrix() {
   const c = Math.cos(0.7),
     s = Math.sin(0.7);
-  return Float64Array.from([c * 2, s * 2, 0, 0, -s * 2, c * 2, 0, 0, 0, 0, 2, 0, 1_215_013.25, -4_736_021.5, 4_081_007.75, 1]);
+  return Float64Array.from([
+    c * 2,
+    s * 2,
+    0,
+    0,
+    -s * 2,
+    c * 2,
+    0,
+    0,
+    0,
+    0,
+    2,
+    0,
+    1_215_013.25,
+    -4_736_021.5,
+    4_081_007.75,
+    1,
+  ]);
 }
 
 function fakeEngine() {
@@ -78,7 +95,9 @@ async function cube(options) {
 test('splat tiles: holdsSplats tells a KHR_gaussian_splatting glTF from a plain one', () => {
   assert.equal(holdsSplats({ type: 'glb', gltf: sampleGlb(), byteLength: 0 }), true);
   assert.equal(holdsSplats({ type: 'glb', gltf: boxGLB(), byteLength: 0 }), false);
-  const text = new TextEncoder().encode(JSON.stringify({ asset: { version: '2.0' }, extensionsUsed: ['KHR_gaussian_splatting'] }));
+  const text = new TextEncoder().encode(
+    JSON.stringify({ asset: { version: '2.0' }, extensionsUsed: ['KHR_gaussian_splatting'] }),
+  );
   assert.equal(holdsSplats({ type: 'gltf', gltf: text, byteLength: 0 }), true);
 });
 
@@ -127,7 +146,10 @@ test('splat tiles: the real sample placed far from the origin keeps float64 posi
   // Shapes and harmonics match @margoengine/splats' own transform with the same matrix.
   const whole = transformSplats(data, matrix);
   for (let i = 0; i < whole.covariances.length; i++)
-    assert.ok(Math.abs(placed.data.covariances[i] - whole.covariances[i]) <= 1e-5 * (1 + Math.abs(whole.covariances[i])), `covariance ${i}`);
+    assert.ok(
+      Math.abs(placed.data.covariances[i] - whole.covariances[i]) <= 1e-5 * (1 + Math.abs(whole.covariances[i])),
+      `covariance ${i}`,
+    );
   assert.deepEqual(placed.data.sphericalHarmonics, whole.sphericalHarmonics);
   // Built around an offset near the tile (a floating origin 3 m away), every centre is exact to float32 at that size.
   const offset = [matrix[12] + 1, matrix[13] - 2, matrix[14] + 2],
@@ -169,7 +191,8 @@ test('splat tiles: mergePlaced pads harmonics to the largest degree, band 0 from
   const merged = mergePlaced([plain, banded]);
   assert.equal(merged.sphericalHarmonics.length, 2 * 9 * 3);
   const C0 = 0.2820947917738781;
-  for (let c = 0; c < 3; c++) assert.ok(Math.abs(0.5 + C0 * merged.sphericalHarmonics[c] - plain.data.colors[c]) < 1e-6);
+  for (let c = 0; c < 3; c++)
+    assert.ok(Math.abs(0.5 + C0 * merged.sphericalHarmonics[c] - plain.data.colors[c]) < 1e-6);
   for (let i = 3; i < 27; i++) assert.equal(merged.sphericalHarmonics[i], 0, `higher band ${i} of the plain splat`);
   assert.deepEqual(merged.sphericalHarmonics.subarray(27), sh);
   assert.deepEqual([...merged.positions], [10, 0, 0, 1, 2, 3]);
@@ -192,7 +215,14 @@ function scene(limit) {
   const splats = new TileSplats(
     host,
     (_engine, data) => {
-      const cloud = { count: data.positions.length / 3, data, disposed: false, dispose() { cloud.disposed = true; } };
+      const cloud = {
+        count: data.positions.length / 3,
+        data,
+        disposed: false,
+        dispose() {
+          cloud.disposed = true;
+        },
+      };
       built.push(cloud);
       return cloud;
     },
@@ -256,5 +286,8 @@ test('splat tiles: past the per-cloud limit the visible splats start another clo
   const s = scene(5);
   for (const n of [3, 2, 4]) s.splats.show(s.splats.add(part(n, n)), true);
   s.update();
-  assert.deepEqual(s.splats.clouds.map((c) => c.count), [5, 4]);
+  assert.deepEqual(
+    s.splats.clouds.map((c) => c.count),
+    [5, 4],
+  );
 });

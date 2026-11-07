@@ -92,13 +92,17 @@ fn shadowFxVolume${at}(position:vec3f)->f32 {
       if (owner === device) return;
       this.dispose();
       owner = device;
-      uniform = device.createBuffer({ size: values.byteLength, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+      uniform = device.createBuffer({
+        size: values.byteLength,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      });
       volumes = new CloudVolumes(device);
     },
     update(frame) {
       const { strength = 1, samples = 12 } = this.options,
         { device, encoder } = frame.context;
-      if (!(strength >= 0 && strength <= 1)) throw new RangeError('Invalid cloud shadow strength; use a number from 0 to 1');
+      if (!(strength >= 0 && strength <= 1))
+        throw new RangeError('Invalid cloud shadow strength; use a number from 0 to 1');
       if (!Number.isInteger(samples) || samples < 2 || samples > 64)
         throw new RangeError('Invalid cloud shadow samples; use an integer from 2 to 64');
       volumes!.fill(device, encoder);

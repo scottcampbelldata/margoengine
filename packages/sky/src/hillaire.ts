@@ -290,7 +290,13 @@ export class HillaireSky implements EnginePlugin {
         layout: 'auto',
         compute: { module: d.createShaderModule({ code: skyViewShader }), entryPoint: 'main' },
       });
-      return { pipeline, group: d.createBindGroup({ layout: pipeline.getBindGroupLayout(0), entries: entries(this.skyView!.createView()) }) };
+      return {
+        pipeline,
+        group: d.createBindGroup({
+          layout: pipeline.getBindGroupLayout(0),
+          entries: entries(this.skyView!.createView()),
+        }),
+      };
     })();
     // The table is needed only inside the air; from space every pixel marches.
     if (t.values[45] < this.parameters.topRadius) {
@@ -308,9 +314,16 @@ export class HillaireSky implements EnginePlugin {
         vertex: { module, entryPoint: 'vertex' },
         fragment: { module, entryPoint: 'fragment', targets: [{ format: c.format }] },
         multisample: c.descriptor.multisample,
-        depthStencil: { format: c.descriptor.depthStencil!.format, depthCompare: 'greater-equal', depthWriteEnabled: false },
+        depthStencil: {
+          format: c.descriptor.depthStencil!.format,
+          depthCompare: 'greater-equal',
+          depthWriteEnabled: false,
+        },
       });
-      this.bind = d.createBindGroup({ layout: this.render.getBindGroupLayout(0), entries: entries(this.skyView!.createView()) });
+      this.bind = d.createBindGroup({
+        layout: this.render.getBindGroupLayout(0),
+        entries: entries(this.skyView!.createView()),
+      });
       this.key = key;
     }
     this.presentation.colorAttachments[0].view = c.color;

@@ -213,18 +213,25 @@ export class AerialPerspective implements EnginePlugin {
       lent = o.atmosphere ? undefined : o.sky?.resolvedAtmosphere,
       a = lent ?? this.parameters!;
     if (!invertMatrixStable(c.camera.matrix, v.subarray(0, 16), this.scratch))
-      throw new MargoError('state', 'Invalid AerialPerspective camera; give the camera a finite, invertible projection');
+      throw new MargoError(
+        'state',
+        'Invalid AerialPerspective camera; give the camera a finite, invertible projection',
+      );
     // The sky's own haze: its turbidity scales Mie scattering by max(0.25, (T - 1) / 2) (atmosphere.ts).
     t.medium(a, o.sky && !lent ? Math.max(0.25, ((o.sky.options.turbidity ?? 2) - 1) / 2) : 1);
     v[34] =
-      o.sunIlluminance ?? o.sky?.sunIlluminance ?? (o.sky && (o.sky.options.model ?? 'preetham') === 'preetham' ? 10 : 20);
+      o.sunIlluminance ??
+      o.sky?.sunIlluminance ??
+      (o.sky && (o.sky.options.model ?? 'preetham') === 'preetham' ? 10 : 20);
     for (let i = 0; i < 3; i++) v[36 + i] = sun[i] / length;
     v[39] = 2 ** (o.sky?.options.exposure ?? 0);
     v.set(c.camera.position, 40);
     v[43] = perUnit / 1000;
     v[44] = (o.maxDistance ?? 64000) / 1000;
     // The planet's centre lies under the camera: radius = ground + height (km), at least a metre up.
-    v[45] = a.bottomRadius + Math.max(0.001, (c.camera.position[1] * perUnit + (o.altitude ?? o.sky?.options.altitude ?? 0)) / 1000);
+    v[45] =
+      a.bottomRadius +
+      Math.max(0.001, (c.camera.position[1] * perUnit + (o.altitude ?? o.sky?.options.altitude ?? 0)) / 1000);
     v[46] = +(c.format !== 'rgba16float');
   }
   private draw(c: Context): void {

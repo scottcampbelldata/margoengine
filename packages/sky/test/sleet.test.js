@@ -53,6 +53,12 @@ test('sleet draws the rain and the snow, each with its share of the particles an
   // Plain rain is drawn once, as it always was.
   weather.options.precipitation = 'rain';
   frame();
-  assert.deepEqual(h.commands().filter((c) => c.startsWith('draw 6 ')).slice(2), ['draw 6 19200']);
+  assert.deepEqual(
+    h
+      .commands()
+      .filter((c) => c.startsWith('draw 6 '))
+      .slice(2),
+    ['draw 6 19200'],
+  );
   weather.dispose();
 });

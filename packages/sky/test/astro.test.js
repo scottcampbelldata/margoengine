@@ -51,7 +51,12 @@ test('sidereal time and nutation (Meeus 12.a, 12.b, 22.a)', () => {
   near(greenwichSiderealTime(new Date(Date.UTC(1987, 3, 10, 19, 21))).degrees, 128.7378734, 1e-6, 'mean 12.b');
   // Apparent 12.a is 13h10m46.1351s; the short nutation series is within 0.5 arcseconds in longitude.
   const apparent = (13 + 10 / 60 + 46.1351 / 3600) * 15;
-  near(greenwichSiderealTime(new Date(Date.UTC(1987, 3, 10)), { apparent: true }).degrees, apparent, 0.5 * arcsec, '12.a');
+  near(
+    greenwichSiderealTime(new Date(Date.UTC(1987, 3, 10)), { apparent: true }).degrees,
+    apparent,
+    0.5 * arcsec,
+    '12.a',
+  );
   const n = nutation(td(2446895.5), tdOptions);
   near(n.longitude.degrees, -3.788 * arcsec, 0.5 * arcsec, 'delta psi');
   near(n.obliquity.degrees, 9.443 * arcsec, 0.1 * arcsec, 'delta epsilon');
@@ -135,7 +140,12 @@ test('the real Bright Star Catalogue', () => {
   const polaris = all.numbers.indexOf(424),
     p = [...all.positions.subarray(polaris * 3, polaris * 3 + 3)];
   // atan2 reads the float32 vector well near the pole, where asin of z would magnify its rounding 78 times.
-  near((Math.atan2(p[2], Math.hypot(p[0], p[1])) * 180) / Math.PI, 89 + 15 / 60 + 51 / 3600, 1e-5, 'Polaris declination');
+  near(
+    (Math.atan2(p[2], Math.hypot(p[0], p[1])) * 180) / Math.PI,
+    89 + 15 / 60 + 51 / 3600,
+    1e-5,
+    'Polaris declination',
+  );
   // Proper motion: Arcturus moves 2.28 arcseconds a year (BSC5: -1.093 and -1.998).
   const arcturus = all.numbers.indexOf(5340),
     pm = all.motions.subarray(arcturus * 3, arcturus * 3 + 3);
@@ -186,7 +196,13 @@ test('AstroSky drives the sky and draws every star and planet at night', () => {
   const before = h.commands().length;
   h.context.bindings = [];
   h.engine.frameGraph.execute(h.context);
-  assert.equal(h.commands().slice(before).filter((c) => c.startsWith('draw 6 ')).length, 0);
+  assert.equal(
+    h
+      .commands()
+      .slice(before)
+      .filter((c) => c.startsWith('draw 6 ')).length,
+    0,
+  );
   for (const bad of [{ timeScale: 2e6 }, { pointSize: 0.1 }, { latitude: 52 }, { catalog: {} }])
     assert.throws(() => new AstroSky({ ...observer, ...bad }), /AstroSky|observer|catalog/, JSON.stringify(bad));
   astro.dispose();

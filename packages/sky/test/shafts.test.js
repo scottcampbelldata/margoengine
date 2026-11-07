@@ -77,7 +77,10 @@ test('light shafts draw a half-size mask and a blend over the scene, only with d
   assert.equal(v[23], 1);
   assert.deepEqual([v[30], v[31], v[32], v[33]], [Math.fround(0.9), 48, Math.fround(0.97), Math.fround(0.6)]);
   assert.deepEqual([...v.subarray(36, 40)], [0, 0, 1, 1], 'the whole target');
-  assert.ok(h.created.some((r) => r.startsWith('texture(64,48,r16float')), 'a half-size mask');
+  assert.ok(
+    h.created.some((r) => r.startsWith('texture(64,48,r16float')),
+    'a half-size mask',
+  );
   const code = [...h.shaders.values()].join('\n');
   assert.match(code, /@fragment fn mask\(/);
   assert.match(code, /@fragment fn composite\(/);
@@ -136,7 +139,10 @@ test('light shafts march the clouds they are given, from their options and drift
   const code = [...h.shaders.values()].join('\n');
   assert.match(code, /fn shaftCloudsOpen\(/);
   assert.match(code, /texture_depth_2d/);
-  assert.ok(h.created.some((r) => r.startsWith('texture(64,64,64,rgba8unorm')), 'its own copy of the noise volumes');
+  assert.ok(
+    h.created.some((r) => r.startsWith('texture(64,64,64,rgba8unorm')),
+    'its own copy of the noise volumes',
+  );
   shafts.dispose();
   sky.dispose();
 });

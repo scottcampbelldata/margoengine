@@ -430,7 +430,10 @@ export class Sky implements EnginePlugin {
     const runtime = engineRuntime(engine);
     // Core calls a second plugin of one name only "Invalid plugin"; say that it is a second sky and what to do instead.
     if (runtime.plugins.has('sky'))
-      throw margoError('attached', 'This scene already has a Sky; change sky.options on that one, or dispose() it first');
+      throw margoError(
+        'attached',
+        'This scene already has a Sky; change sky.options on that one, or dispose() it first',
+      );
     const effect = new this(options, features);
     runtime.use(effect);
     return effect;

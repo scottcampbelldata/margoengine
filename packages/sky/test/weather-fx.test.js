@@ -75,10 +75,16 @@ test('the cover map follows the camera on its texel grid and draws each occluder
   // 1,000 m over the camera and the range reaches the box's 12 m and a metre below it.
   const frame = writes.find((v) => v.length === 8);
   assert.deepEqual([...frame], [3 * 0.3125 - 10, -11 * 0.3125 - 10, 1 / 20, 1007, 1013, 64, 0, 0].map(Math.fround));
-  assert.ok(h.created.some((r) => r.startsWith('texture(64,64,depth32float')), 'the cover map');
+  assert.ok(
+    h.created.some((r) => r.startsWith('texture(64,64,depth32float')),
+    'the cover map',
+  );
   const commands = h.commands();
   assert.equal(commands.filter((c) => c.startsWith('drawIndexed 6 1 0 0')).length, 2, 'both occluders, one draw each');
-  assert.ok(commands.some((c) => c === 'drawIndexed 6 1 0 0 1'), "the second reads the second matrix");
+  assert.ok(
+    commands.some((c) => c === 'drawIndexed 6 1 0 0 1'),
+    'the second reads the second matrix',
+  );
   const models = writes.find((v) => v.length >= 32 && v[12] === 3 && v[28] === 3);
   assert.ok(models, 'both world matrices uploaded');
   fx.dispose();

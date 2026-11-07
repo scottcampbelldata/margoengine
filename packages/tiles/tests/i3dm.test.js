@@ -1,7 +1,16 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { TilesRenderer, Y_UP_TO_Z_UP, invert, multiply, parseI3dm, transformDirection, transformPoint, translation } from '../dist/index.js';
+import {
+  TilesRenderer,
+  Y_UP_TO_Z_UP,
+  invert,
+  multiply,
+  parseI3dm,
+  transformDirection,
+  transformPoint,
+  translation,
+} from '../dist/index.js';
 import { i3dm, instanceCenter, instanceMatrices } from '../dist/i3dm.js';
 import { boxGLB, groveTileset, i3dm as writeI3dm, memoryFetch, settle } from './generator.js';
 
@@ -11,10 +20,22 @@ const close = (a, b, eps, what) => assert.ok(Math.abs(a - b) <= eps, `${what}: $
 function compose(t, q, s) {
   const [x, y, z, w] = q;
   return Float64Array.from([
-    (1 - 2 * (y * y + z * z)) * s[0], 2 * (x * y + z * w) * s[0], 2 * (x * z - y * w) * s[0], 0,
-    2 * (x * y - z * w) * s[1], (1 - 2 * (x * x + z * z)) * s[1], 2 * (y * z + x * w) * s[1], 0,
-    2 * (x * z + y * w) * s[2], 2 * (y * z - x * w) * s[2], (1 - 2 * (x * x + y * y)) * s[2], 0,
-    t[0], t[1], t[2], 1,
+    (1 - 2 * (y * y + z * z)) * s[0],
+    2 * (x * y + z * w) * s[0],
+    2 * (x * z - y * w) * s[0],
+    0,
+    2 * (x * y - z * w) * s[1],
+    (1 - 2 * (x * x + z * z)) * s[1],
+    2 * (y * z + x * w) * s[1],
+    0,
+    2 * (x * z + y * w) * s[2],
+    2 * (y * z - x * w) * s[2],
+    (1 - 2 * (x * x + y * y)) * s[2],
+    0,
+    t[0],
+    t[1],
+    t[2],
+    1,
   ]);
 }
 /** A seeded rotation, scale and translation, column-major. */
@@ -23,7 +44,11 @@ function randomMatrix(seed, reach) {
   const r = () => ((s = (s * 16807) % 2147483647) / 2147483647) * 2 - 1;
   const q = [r(), r(), r(), r()],
     l = Math.hypot(...q);
-  return compose([r() * reach, r() * reach, r() * reach], q.map((v) => v / l), [1 + r() * 0.5, 1 + r() * 0.5, 1 + r() * 0.5]);
+  return compose(
+    [r() * reach, r() * reach, r() * reach],
+    q.map((v) => v / l),
+    [1 + r() * 0.5, 1 + r() * 0.5, 1 + r() * 0.5],
+  );
 }
 
 test('i3dm maths: root x node x instance row equals translate(center) x instance x y-up to z-up x node', () => {
@@ -75,7 +100,15 @@ function fakeEngine() {
   const loadModel = async (_engine, gltf) => {
     const root = mesh(),
       node = mesh(Float32Array.from([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 1, 2, 3, 1])),
-      model = { root, gltf, primitives: [{ node }, { node }], disposed: 0, dispose() { model.disposed++; } };
+      model = {
+        root,
+        gltf,
+        primitives: [{ node }, { node }],
+        disposed: 0,
+        dispose() {
+          model.disposed++;
+        },
+      };
     models.push(model);
     return model;
   };
@@ -86,7 +119,12 @@ async function grove(options = {}) {
   const data = groveTileset(options.grove);
   const memory = memoryFetch(data.files);
   const { engine, loadModel, models } = fakeEngine();
-  const renderer = await TilesRenderer.load(engine, memory.url, { fetch: memory.fetch, loadModel, i3dm, ...options.renderer });
+  const renderer = await TilesRenderer.load(engine, memory.url, {
+    fetch: memory.fetch,
+    loadModel,
+    i3dm,
+    ...options.renderer,
+  });
   const errors = [];
   renderer.tileset.on('error', ({ error }) => errors.push(error));
   for (let i = 0; i < 30 && renderer.tileset.progress.ready + renderer.tileset.progress.failed < 1; i++) {
@@ -129,7 +167,10 @@ test('i3dm: an external glTF (gltfFormat 0) is fetched relative to the tile with
   const { memory, models, errors, renderer } = await grove({ grove: { uri: true } });
   assert.deepEqual(errors, []);
   assert.equal(models.length, 1);
-  assert.ok(memory.requests.some((r) => r.endsWith('models/tree.glb')), memory.requests.join());
+  assert.ok(
+    memory.requests.some((r) => r.endsWith('models/tree.glb')),
+    memory.requests.join(),
+  );
   assert.equal(models[0].primitives[0].instances.count, 25);
   renderer.dispose();
 });
@@ -167,7 +208,12 @@ test('i3dm: zero instances load no model and draw nothing', async () => {
 
 test('i3dm: the real TilesetWithTreeBillboards sample (Cesium, CC0) places all 25 trees at their feet, standing up', async () => {
   const folder = new URL('../../../examples/assets/3d-tiles/TilesetWithTreeBillboards/', import.meta.url),
-    files = new Map(['tileset.json', 'tree.i3dm', 'tree_billboard.i3dm'].map((name) => [name, new Uint8Array(readFileSync(new URL(name, folder)))])),
+    files = new Map(
+      ['tileset.json', 'tree.i3dm', 'tree_billboard.i3dm'].map((name) => [
+        name,
+        new Uint8Array(readFileSync(new URL(name, folder))),
+      ]),
+    ),
     memory = memoryFetch(files),
     { engine, loadModel, models } = fakeEngine(),
     renderer = await TilesRenderer.load(engine, memory.url, { fetch: memory.fetch, loadModel, i3dm }),
@@ -180,7 +226,9 @@ test('i3dm: the real TilesetWithTreeBillboards sample (Cesium, CC0) places all 2
   assert.deepEqual(errors, []);
   assert.ok(models.length >= 1);
   for (const model of models) {
-    const name = ['tree.i3dm', 'tree_billboard.i3dm'].find((n) => parseI3dm(files.get(n)).gltf.byteLength === model.gltf.byteLength),
+    const name = ['tree.i3dm', 'tree_billboard.i3dm'].find(
+        (n) => parseI3dm(files.get(n)).gltf.byteLength === model.gltf.byteLength,
+      ),
       content = parseI3dm(files.get(name)),
       rows = model.primitives[0].instances;
     assert.equal(content.length, 25, name);

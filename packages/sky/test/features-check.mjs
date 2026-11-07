@@ -25,7 +25,11 @@ const checks = {
     assert.equal(r.pillar.changed, 0, `clouds drew over the near pillar: ${JSON.stringify(r.pillar)}`);
     // The block 160 m ahead of a camera inside dense cloud is veiled by the cloud in between.
     assert.ok(r.block.changed > r.block.total * 0.9, `cloud in front of the block: ${JSON.stringify(r.block)}`);
-    assert.equal(r.noDepth.pillar.changed, 0, `without depth the clouds covered geometry: ${JSON.stringify(r.noDepth)}`);
+    assert.equal(
+      r.noDepth.pillar.changed,
+      0,
+      `without depth the clouds covered geometry: ${JSON.stringify(r.noDepth)}`,
+    );
     assert.ok(r.noDepth.sky.changed > r.noDepth.sky.total * 0.2, `without depth: ${JSON.stringify(r.noDepth)}`);
     console.log(
       `ok volumetric ${samples}x: ground ${r.ground.shown.changed}/${r.ground.shown.total}, inside ${r.inside.shown.changed}, above ${r.above.shown.changed}; frame ${r.ground.ms.toFixed(1)} / ${r.inside.ms.toFixed(1)} / ${r.above.ms.toFixed(1)} ms (diagnostic)`,
@@ -40,7 +44,8 @@ const checks = {
     const low = Math.exp(-2604 / 40000),
       high = Math.exp(-1562 / 40000),
       error = (shadows, views) =>
-        views.reduce((sum, v, i) => sum + Math.abs(v.opacity - (1 - shadows[i].shadow) * (low + high) / 2), 0) / views.length;
+        views.reduce((sum, v, i) => sum + Math.abs(v.opacity - ((1 - shadows[i].shadow) * (low + high)) / 2), 0) /
+        views.length;
     const first = await page.evaluate((p) => window.check.read(p), points);
     assert.equal(first.error, null);
     assert.deepEqual(first.errors, []);
@@ -76,17 +81,30 @@ const checks = {
     // Beer-Lambert along the same ray on the CPU: Rayleigh, Mie (times 0.5, the sky's turbidity 2) and ozone from Hillaire
     // 2020 Table 1, 20,000 steps from 10 m up at the pair's elevation over the planet's curve.
     const transmittance = (distance, elevation) => {
-      const R = 6360, r0 = R + 0.01, n = 20000, dt = distance / 1000 / n, sin = Math.sin((elevation * Math.PI) / 180), out = [0, 0, 0];
+      const R = 6360,
+        r0 = R + 0.01,
+        n = 20000,
+        dt = distance / 1000 / n,
+        sin = Math.sin((elevation * Math.PI) / 180),
+        out = [0, 0, 0];
       for (let i = 0; i < n; i++) {
-        const t = (i + 0.5) * dt, h = Math.sqrt(r0 * r0 + t * t + 2 * r0 * t * sin) - R,
-          mie = (0.003996 + 0.00444) * 0.5 * Math.exp(-h / 1.2), ozone = Math.max(0, 1 - Math.abs(h - 25) / 15);
-        [0.005802, 0.013558, 0.0331].forEach((b, c) => (out[c] += (b * Math.exp(-h / 8) + mie + [0.00065, 0.001881, 0.000085][c] * ozone) * dt));
+        const t = (i + 0.5) * dt,
+          h = Math.sqrt(r0 * r0 + t * t + 2 * r0 * t * sin) - R,
+          mie = (0.003996 + 0.00444) * 0.5 * Math.exp(-h / 1.2),
+          ozone = Math.max(0, 1 - Math.abs(h - 25) / 15);
+        [0.005802, 0.013558, 0.0331].forEach(
+          (b, c) => (out[c] += (b * Math.exp(-h / 8) + mie + [0.00065, 0.001881, 0.000085][c] * ozone) * dt),
+        );
       }
       return out.map((v) => Math.exp(-v));
     };
     // The GPU volume takes two midpoint steps per slice and interpolates linearly between slices; 0.015 is 2.5 times the
     // largest difference measured (0.0058, blue at 40 km).
-    const rows = ['near', 'mid', 'far'].map((name) => ({ name, ...r[name], cpu: transmittance(r[name].distance, r[name].elevation) }));
+    const rows = ['near', 'mid', 'far'].map((name) => ({
+      name,
+      ...r[name],
+      cpu: transmittance(r[name].distance, r[name].elevation),
+    }));
     for (const row of rows) {
       assert.ok(row.skySame, `${row.name}: the sky pixel changed`);
       for (let c = 0; c < 3; c++)
@@ -97,25 +115,39 @@ const checks = {
     }
     const [near, mid, far] = rows;
     for (let c = 0; c < 3; c++) {
-      assert.ok(near.transmittance[c] > mid.transmittance[c] && mid.transmittance[c] > far.transmittance[c], 'farther fades more');
-      assert.ok(near.inscatter[c] < mid.inscatter[c] && mid.inscatter[c] < far.inscatter[c], 'farther takes more of the air');
+      assert.ok(
+        near.transmittance[c] > mid.transmittance[c] && mid.transmittance[c] > far.transmittance[c],
+        'farther fades more',
+      );
+      assert.ok(
+        near.inscatter[c] < mid.inscatter[c] && mid.inscatter[c] < far.inscatter[c],
+        'farther takes more of the air',
+      );
     }
     // Mountains go blue: the light the air adds is bluest, and blue is what it takes away most.
     for (const row of [mid, far]) {
-      assert.ok(row.inscatter[2] > row.inscatter[1] && row.inscatter[1] > row.inscatter[0], `${row.name} air is not blue: ${row.inscatter}`);
+      assert.ok(
+        row.inscatter[2] > row.inscatter[1] && row.inscatter[1] > row.inscatter[0],
+        `${row.name} air is not blue: ${row.inscatter}`,
+      );
       assert.ok(row.transmittance[2] < row.transmittance[0], `${row.name}: blue must fade first`);
     }
     const show = (v) => v.map((x) => x.toFixed(4)).join(', ');
     for (const row of rows)
-      console.log(`ok aerial ${samples}x ${row.name} (${row.distance / 1000} km): transmittance ${show(row.transmittance)} (CPU ${show(row.cpu)}), air ${show(row.inscatter)}`);
+      console.log(
+        `ok aerial ${samples}x ${row.name} (${row.distance / 1000} km): transmittance ${show(row.transmittance)} (CPU ${show(row.cpu)}), air ${show(row.inscatter)}`,
+      );
     return r;
   },
   async shafts(page, samples) {
     const r = await page.evaluate(() => window.check.run());
     const show = (v) => v.map((x) => x.toFixed(4)).join(', ');
-    console.log(`  shafts ${samples}x open at 2, 8, 15, 25 degrees: ${show(r.open.angles)}; frame ${r.open.ms.toFixed(1)} ms (diagnostic)`);
+    console.log(
+      `  shafts ${samples}x open at 2, 8, 15, 25 degrees: ${show(r.open.angles)}; frame ${r.open.ms.toFixed(1)} ms (diagnostic)`,
+    );
     console.log(`  shafts ${samples}x hole ${JSON.stringify(r.hole)}; linear ${JSON.stringify(r.linear)}`);
-    for (const [name, v] of Object.entries(r.clouds)) console.log(`  shafts ${samples}x ${name}: centre ${v.centre.toFixed(4)}, ring ${show(v.ring)}`);
+    for (const [name, v] of Object.entries(r.clouds))
+      console.log(`  shafts ${samples}x ${name}: centre ${v.centre.toFixed(4)}, ring ${show(v.ring)}`);
     assert.equal(r.error, null);
     assert.deepEqual(r.errors, []);
     // Open sky: light is added everywhere around the sun, falling with the angle from it (the forward phase).
@@ -133,16 +165,27 @@ const checks = {
     assert.equal(h.below, 0, `below the sun: ${JSON.stringify(h)}`);
     // Clouds: overcast leaves under a twentieth of the clear sky's shafts beside the sun; broken cloud spreads the
     // light around a ring 12 degrees out at least three times as far as the clear sky, which holds it even.
-    const spread = (v) => (Math.max(...v.ring) - Math.min(...v.ring)) / (v.ring.reduce((a, b) => a + b) / v.ring.length);
+    const spread = (v) =>
+      (Math.max(...v.ring) - Math.min(...v.ring)) / (v.ring.reduce((a, b) => a + b) / v.ring.length);
     const { clear, broken, overcast } = r.clouds;
-    assert.ok(clear.centre > 0 && overcast.centre < clear.centre / 20, `overcast ${overcast.centre} against clear ${clear.centre}`);
-    assert.ok(spread(clear) < 0.2 && spread(broken) > Math.max(1, 3 * spread(clear)), `ring spread clear ${spread(clear)}, broken ${spread(broken)}`);
-    console.log(`ok shafts ${samples}x: open sky by angle, linear, behind, hole, clouds (spread ${spread(clear).toFixed(3)} clear, ${spread(broken).toFixed(3)} broken)`);
+    assert.ok(
+      clear.centre > 0 && overcast.centre < clear.centre / 20,
+      `overcast ${overcast.centre} against clear ${clear.centre}`,
+    );
+    assert.ok(
+      spread(clear) < 0.2 && spread(broken) > Math.max(1, 3 * spread(clear)),
+      `ring spread clear ${spread(clear)}, broken ${spread(broken)}`,
+    );
+    console.log(
+      `ok shafts ${samples}x: open sky by angle, linear, behind, hole, clouds (spread ${spread(clear).toFixed(3)} clear, ${spread(broken).toFixed(3)} broken)`,
+    );
     return r;
   },
   async 'weather-fx'(page, samples) {
     const r = await page.evaluate(() => window.check.run());
-    console.log(`  weather-fx ${samples}x half ${JSON.stringify(r.half)}; map ${JSON.stringify(r.map)}; splashes ${JSON.stringify(r.splashes)} under the roof ${JSON.stringify(r.splashesHalf)}; lens open ${r.open}, roofed ${r.roofed}`);
+    console.log(
+      `  weather-fx ${samples}x half ${JSON.stringify(r.half)}; map ${JSON.stringify(r.map)}; splashes ${JSON.stringify(r.splashes)} under the roof ${JSON.stringify(r.splashesHalf)}; lens open ${r.open}, roofed ${r.roofed}`,
+    );
     assert.equal(r.error, null);
     assert.deepEqual(r.errors, []);
     // Half the view under a roof: without the effects rain falls in both halves; with them not one pixel of the
@@ -174,9 +217,14 @@ const checks = {
     // A flake too faint to move the bare frame by a half-float step can still tip the rain's own value by one step
     // (2^-10 relative, the 10-bit mantissa of the HDR target): no pixel may differ by more, and few by that.
     assert.ok(r.worst <= 2 ** -10, `sleet off by more than one half-float step: ${JSON.stringify(r)}`);
-    assert.ok(r.rainMismatch + r.snowMismatch <= 0.01 * (r.rainOnly + r.snowOnly), `too many steps: ${JSON.stringify(r)}`);
+    assert.ok(
+      r.rainMismatch + r.snowMismatch <= 0.01 * (r.rainOnly + r.snowOnly),
+      `too many steps: ${JSON.stringify(r)}`,
+    );
     assert.equal(r.extra, 0, `sleet drew elsewhere: ${JSON.stringify(r)}`);
-    console.log(`ok sleet ${samples}x: ${r.rainOnly} rain and ${r.snowOnly} snow pixels match each kind alone (${r.rainMismatch + r.snowMismatch} by one half-float step)`);
+    console.log(
+      `ok sleet ${samples}x: ${r.rainOnly} rain and ${r.snowOnly} snow pixels match each kind alone (${r.rainMismatch + r.snowMismatch} by one half-float step)`,
+    );
     return r;
   },
   async astro(page, samples) {
@@ -209,9 +257,22 @@ const checks = {
   async hillaire(page, samples) {
     const r = await page.evaluate(() => window.check.run());
     const show = (v) => v.map((x) => x.toPrecision(4)).join(', ');
-    for (const name of ['noon', 'sunset', 'antisolar', 'twilight', 'twilightNoOzone', 'ground', 'limb', 'space', 'under', 'over'])
+    for (const name of [
+      'noon',
+      'sunset',
+      'antisolar',
+      'twilight',
+      'twilightNoOzone',
+      'ground',
+      'limb',
+      'space',
+      'under',
+      'over',
+    ])
       console.log(`  hillaire ${samples}x ${name}: ${show(r[name])}`);
-    console.log(`  hillaire ${samples}x disc ${show(r.disc.centre)} beside ${show(r.disc.beside)}; frame ${r.disc.ms.toFixed(1)} ms, orbit ${r.orbitMs.toFixed(1)} ms (diagnostic)`);
+    console.log(
+      `  hillaire ${samples}x disc ${show(r.disc.centre)} beside ${show(r.disc.beside)}; frame ${r.disc.ms.toFixed(1)} ms, orbit ${r.orbitMs.toFixed(1)} ms (diagnostic)`,
+    );
     assert.equal(r.error, null);
     assert.deepEqual(r.errors, []);
     const [noonR, noonG, noonB] = r.noon,
@@ -224,18 +285,33 @@ const checks = {
     // (0.085e-3), so with it the zenith is bluer against red and green than without it (Hulburt 1953).
     const ratio = (v, c) => v[2] / v[c];
     for (const c of [0, 1])
-      assert.ok(ratio(r.twilight, c) > ratio(r.twilightNoOzone, c), `ozone: ${show(r.twilight)} against ${show(r.twilightNoOzone)}`);
+      assert.ok(
+        ratio(r.twilight, c) > ratio(r.twilightNoOzone, c),
+        `ozone: ${show(r.twilight)} against ${show(r.twilightNoOzone)}`,
+      );
     // From 1,000 km: the sunlit ground shows, the limb is blue, and space beyond the air is black.
-    assert.ok(r.ground.every((v) => v > 0.1), `ground from orbit ${show(r.ground)}`);
+    assert.ok(
+      r.ground.every((v) => v > 0.1),
+      `ground from orbit ${show(r.ground)}`,
+    );
     assert.ok(r.limb[2] > r.limb[1] && r.limb[1] > r.limb[0] && r.limb[2] > 0, `limb ${show(r.limb)}`);
     assert.deepEqual(r.space, [0, 0, 0]);
     // The same ray from 99 km (the sky-view table) and 101 km (the per-pixel march) agree: 1 km more of thin air
     // changes it little. Measured 0.0005; 0.02 holds forty times that.
     for (let c = 0; c < 3; c++)
-      assert.ok(Math.abs(r.under[c] - r.over[c]) < 0.02 * r.under[c], `across the top: ${show(r.under)} against ${show(r.over)}`);
+      assert.ok(
+        Math.abs(r.under[c] - r.over[c]) < 0.02 * r.under[c],
+        `across the top: ${show(r.under)} against ${show(r.over)}`,
+      );
     // The disc: its true radiance (about 3e5) is held at the largest half float, far above the sky beside it.
-    assert.ok(r.disc.centre.every((v) => v === 65504), `disc ${show(r.disc.centre)}`);
-    assert.ok(r.disc.beside.every((v) => v > 0 && v < 10), `beside the disc ${show(r.disc.beside)}`);
+    assert.ok(
+      r.disc.centre.every((v) => v === 65504),
+      `disc ${show(r.disc.centre)}`,
+    );
+    assert.ok(
+      r.disc.beside.every((v) => v > 0 && v < 10),
+      `beside the disc ${show(r.disc.beside)}`,
+    );
     // Geometry is left as it was; the sky above it changes.
     assert.deepEqual(r.pillar.withSky, r.pillar.bare, 'the sky drew over the pillar');
     assert.notDeepEqual(r.pillar.skyPixel[0], r.pillar.skyPixel[1], 'the sky did not draw');

@@ -33,7 +33,11 @@ test('aerial perspective needs a depth function and checks its options', () => {
   const depth = () => undefined;
   assert.doesNotThrow(() => new AerialPerspective({ depth, maxDistance: 100000, metersPerUnit: 50 }));
   for (const bad of [{ maxDistance: 10 }, { metersPerUnit: 0 }, { altitude: -1 }, { sunIlluminance: -1 }])
-    assert.throws(() => new AerialPerspective({ depth, ...bad }), /Invalid AerialPerspective options/, JSON.stringify(bad));
+    assert.throws(
+      () => new AerialPerspective({ depth, ...bad }),
+      /Invalid AerialPerspective options/,
+      JSON.stringify(bad),
+    );
   assert.throws(() => new AerialPerspective({ depth, atmosphere: { mieG: 2 } }), /mieG/);
 });
 
@@ -67,9 +71,19 @@ test('aerial perspective builds its tables once, its volume every frame, and dra
   assert.match(code, /fn integrateScattering\(/);
   assert.match(code, /@fragment fn transmit\(/);
   assert.match(code, /texture_depth_multisampled_2d/);
-  assert.ok(h.created.some((r) => r.startsWith('texture(256,64,rgba16float')), 'transmittance table');
-  assert.ok(h.created.some((r) => r.startsWith('texture(32,32,rgba16float')), 'multiple scattering table');
-  assert.equal(h.created.filter((r) => r.startsWith('texture(32,32,32,rgba16float')).length, 2, 'scatter and transmittance volumes');
+  assert.ok(
+    h.created.some((r) => r.startsWith('texture(256,64,rgba16float')),
+    'transmittance table',
+  );
+  assert.ok(
+    h.created.some((r) => r.startsWith('texture(32,32,rgba16float')),
+    'multiple scattering table',
+  );
+  assert.equal(
+    h.created.filter((r) => r.startsWith('texture(32,32,32,rgba16float')).length,
+    2,
+    'scatter and transmittance volumes',
+  );
   const v = writes.at(-1);
   // The sky's turbidity 3 scales Mie scattering by (3 - 1) / 2 = 1; the Preetham sky lends illuminance 10.
   assert.equal(v[20], Math.fround(0.003996));

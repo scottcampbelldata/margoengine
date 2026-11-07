@@ -19,13 +19,24 @@ const uniformWrites = (h) => {
 
 test('the Hillaire sky checks its options and moves its sun by the clock or a direction', () => {
   assert.throws(() => new HillaireSky(null), /must be an object/);
-  for (const bad of [{ exposure: 40 }, { sunIlluminance: -1 }, { metersPerUnit: 0 }, { altitude: -1 }, { altitude: 2e8 }, { hours: NaN }])
+  for (const bad of [
+    { exposure: 40 },
+    { sunIlluminance: -1 },
+    { metersPerUnit: 0 },
+    { altitude: -1 },
+    { altitude: 2e8 },
+    { hours: NaN },
+  ])
     assert.throws(() => new HillaireSky(bad), /Invalid HillaireSky options/, JSON.stringify(bad));
   assert.throws(() => new HillaireSky({ sunDirection: [0, 0, 0] }), /nonzero/);
   assert.throws(() => new HillaireSky({ sunDisc: 1 }), /true or false/);
   assert.throws(() => new HillaireSky({ atmosphere: { mieG: 1 } }), /mieG/);
   const sky = new HillaireSky({ hours: 6, timeScale: 1 });
-  assert.deepEqual(Array.from(sky.sun, (v) => Math.round(v * 1e6) / 1e6), [1, 0, 0], 'sunrise in +x');
+  assert.deepEqual(
+    Array.from(sky.sun, (v) => Math.round(v * 1e6) / 1e6),
+    [1, 0, 0],
+    'sunrise in +x',
+  );
   sky.onPreUpdate(6);
   assert.equal(sky.options.hours, 12);
   assert.ok(Math.abs(sky.sun[1] - 1) < 1e-6, 'noon overhead');
@@ -46,8 +57,14 @@ test('the sun reaches the camera through Rayleigh, Mie and ozone: white at noon,
   // 100 km keep the exponentials within 1e-4 of it.
   const a = EARTH_ATMOSPHERE;
   for (let c = 0; c < 3; c++) {
-    const depth = a.rayleigh[c] * a.rayleighHeight * (1 - Math.exp(-100 / a.rayleighHeight)) + (a.mie + a.mieAbsorption) * a.mieHeight + a.ozone[c] * a.ozoneWidth;
-    assert.ok(Math.abs(sky.sunTransmittance[c] - Math.exp(-depth)) < 1e-4, `channel ${c}: ${sky.sunTransmittance[c]} against ${Math.exp(-depth)}`);
+    const depth =
+      a.rayleigh[c] * a.rayleighHeight * (1 - Math.exp(-100 / a.rayleighHeight)) +
+      (a.mie + a.mieAbsorption) * a.mieHeight +
+      a.ozone[c] * a.ozoneWidth;
+    assert.ok(
+      Math.abs(sky.sunTransmittance[c] - Math.exp(-depth)) < 1e-4,
+      `channel ${c}: ${sky.sunTransmittance[c]} against ${Math.exp(-depth)}`,
+    );
   }
   // One degree above the horizon the light crosses some 26 times the air it crosses overhead: blue is gone and red leads.
   sky.options.sunDirection = [Math.cos(Math.PI / 180), Math.sin(Math.PI / 180), 0];
@@ -75,9 +92,18 @@ test('the Hillaire sky builds its tables once, the sky view every frame inside t
   const code = [...h.shaders.values()].join('\n');
   assert.match(code, /var skyView:texture_storage_2d<rgba16float,write>/);
   assert.match(code, /fn skyViewUV\(/);
-  assert.ok(h.created.some((r) => r.startsWith('texture(256,64,rgba16float')), 'transmittance table');
-  assert.ok(h.created.some((r) => r.startsWith('texture(32,32,rgba16float')), 'multiple scattering table');
-  assert.ok(h.created.some((r) => r.startsWith('texture(192,108,rgba16float')), 'sky-view table');
+  assert.ok(
+    h.created.some((r) => r.startsWith('texture(256,64,rgba16float')),
+    'transmittance table',
+  );
+  assert.ok(
+    h.created.some((r) => r.startsWith('texture(32,32,rgba16float')),
+    'multiple scattering table',
+  );
+  assert.ok(
+    h.created.some((r) => r.startsWith('texture(192,108,rgba16float')),
+    'sky-view table',
+  );
   const v = writes.at(-1);
   assert.equal(v[39], 2, 'exposure 1 doubles the sky');
   assert.equal(v[34], 20);
@@ -90,15 +116,30 @@ test('the Hillaire sky builds its tables once, the sky view every frame inside t
   sky.options.altitude = 500000;
   h.frame();
   assert.equal(dispatches(), inside, 'from space the sky marches per pixel instead');
-  assert.ok(h.created.some((c) => c.startsWith('render(') && c.includes('"depthCompare":"greater-equal"')), 'drawn only where the scene left depth clear');
+  assert.ok(
+    h.created.some((c) => c.startsWith('render(') && c.includes('"depthCompare":"greater-equal"')),
+    'drawn only where the scene left depth clear',
+  );
   sky.dispose();
 });
 
 test('aerial perspective takes a Hillaire sky whole: its atmosphere, illuminance, scale and altitude', () => {
   const h = tracedGPU();
-  const sky = new HillaireSky({ hours: 10, timeScale: 0, sunIlluminance: 30, metersPerUnit: 4, altitude: 1500, atmosphere: { mie: 0.01 } }),
+  const sky = new HillaireSky({
+      hours: 10,
+      timeScale: 0,
+      sunIlluminance: 30,
+      metersPerUnit: 4,
+      altitude: 1500,
+      atmosphere: { mie: 0.01 },
+    }),
     depth = Object.assign(
-      h.engine.gpu.createTexture({ size: [128, 96], format: 'depth32float', sampleCount: 4, usage: globalThis.GPUTextureUsage.TEXTURE_BINDING }),
+      h.engine.gpu.createTexture({
+        size: [128, 96],
+        format: 'depth32float',
+        sampleCount: 4,
+        usage: globalThis.GPUTextureUsage.TEXTURE_BINDING,
+      }),
       { depthOrArrayLayers: 1 },
     ),
     aerial = new AerialPerspective({ sky, depth: () => depth }),

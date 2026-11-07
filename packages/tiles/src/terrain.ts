@@ -37,7 +37,8 @@ export interface QuantizedMesh {
   readonly metadata?: unknown;
 }
 
-const bad = (why: string) => new RangeError(`Invalid quantized-mesh tile: ${why}; the file is cut or not quantized-mesh-1.0`);
+const bad = (why: string) =>
+  new RangeError(`Invalid quantized-mesh tile: ${why}; the file is cut or not quantized-mesh-1.0`);
 
 /** Decodes a quantized-mesh-1.0 tile (not gzipped). Throws RangeError when it is cut short or inconsistent. */
 export function parseQuantizedMesh(bytes: Uint8Array): QuantizedMesh {
@@ -289,7 +290,8 @@ export async function terrain(layerUrl: string | URL, options: TerrainOptions = 
   const serve = async (path: string, signal?: AbortSignal): Promise<Uint8Array> => {
     if (path === 'tileset.json') return encoder.encode(JSON.stringify(json));
     const match = /^([01])\/(\d+)\/(\d+)\/(\d+)\.(subtree|b3dm)$/.exec(path);
-    if (!match) throw new TypeError(`Unknown terrain path ${path}; request only the URLs of the tileset terrain() made`);
+    if (!match)
+      throw new TypeError(`Unknown terrain path ${path}; request only the URLs of the tileset terrain() made`);
     const [, r, l, ix, iy, kind] = match,
       level = Number(l),
       // Implicit tile (level, x, y) under root r is terrain tile (level, r * 2^level + x, y).
@@ -454,7 +456,8 @@ async function imageryFor(
     answer = await fetcher(url, { signal });
   if (!answer.ok) throw failed(url, answer.status);
   const mimeType =
-    imagery.mimeType ?? (/\.jpe?g(\?|$)/i.test(url) ? 'image/jpeg' : /\.webp(\?|$)/i.test(url) ? 'image/webp' : 'image/png');
+    imagery.mimeType ??
+    (/\.jpe?g(\?|$)/i.test(url) ? 'image/jpeg' : /\.webp(\?|$)/i.test(url) ? 'image/webp' : 'image/png');
   return {
     bytes: new Uint8Array(await answer.arrayBuffer()),
     mimeType,
@@ -467,7 +470,12 @@ async function imageryFor(
  * skirts `skirt` metres deep along its four edges, normals from the tile or from its triangles, and the imagery as an
  * unlit base colour texture.
  */
-export function meshB3dm(mesh: QuantizedMesh, rectangle: Rectangle, drape: Drape | undefined, skirt: number): Uint8Array {
+export function meshB3dm(
+  mesh: QuantizedMesh,
+  rectangle: Rectangle,
+  drape: Drape | undefined,
+  skirt: number,
+): Uint8Array {
   const [west, south, east, north] = rectangle,
     count = mesh.u.length,
     edges = [mesh.west, mesh.south, mesh.east, mesh.north],
@@ -599,7 +607,9 @@ function glb(
     accessors,
     bufferViews: views,
   };
-  let material: Record<string, unknown> = { pbrMetallicRoughness: { baseColorFactor: [0.6, 0.6, 0.58, 1], metallicFactor: 0, roughnessFactor: 1 } };
+  let material: Record<string, unknown> = {
+    pbrMetallicRoughness: { baseColorFactor: [0.6, 0.6, 0.58, 1], metallicFactor: 0, roughnessFactor: 1 },
+  };
   if (drape && uvs) {
     accessors.push({ bufferView: add(uvs, 34962), componentType: 5126, count, type: 'VEC2' });
     attributes.TEXCOORD_0 = 3;

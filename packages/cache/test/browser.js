@@ -23,7 +23,9 @@ for (const proto of [IDBObjectStore.prototype, IDBIndex.prototype])
   }
 
 const hex = async (bytes) =>
-  [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map((b) => b.toString(16).padStart(2, '0')).join('');
+  [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))]
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
 const tick = () => new Promise((resolve) => setTimeout(resolve, 2));
 const read = async (response) => new Uint8Array(await response.arrayBuffer());
 
@@ -75,7 +77,12 @@ window.cacheChecks = {
       response = await ranges.fetch(url, { headers: { Range: range } });
     const body = await read(response);
     await ranges.flush();
-    return { status: response.status, contentRange: response.headers.get('content-range'), digest: await hex(body), stats: { ...ranges.stats } };
+    return {
+      status: response.status,
+      contentRange: response.headers.get('content-range'),
+      digest: await hex(body),
+      stats: { ...ranges.stats },
+    };
   },
 
   /** a, b, a, c, then a file over the 250-byte budget, with the index: what is evicted and what is left. */

@@ -124,7 +124,11 @@ async function run(name: string): Promise<unknown> {
     // shaders), which gltf-pro refuses with a coded error, as glTF says a loader must for a required extension.
     engine.camera.position = [0, 70, 110];
     engine.camera.target = [0, 0, 0];
-    tiles = await TilesRenderer.load(engine, '../../../examples/assets/3d-tiles/TilesetWithTreeBillboards/tileset.json', { i3dm });
+    tiles = await TilesRenderer.load(
+      engine,
+      '../../../examples/assets/3d-tiles/TilesetWithTreeBillboards/tileset.json',
+      { i3dm },
+    );
     tiles.tileset.on('error', ({ error }) => errors.push(`tile: ${(error as Error).message}`));
     const timing = await converge();
     const data = pixels();
@@ -162,11 +166,16 @@ async function run(name: string): Promise<unknown> {
         g.fillStyle = (i + j) % 2 ? '#ff2020' : '#2040ff';
         g.fillRect(i * 8, j * 8, 8, 8);
       }
-    const png = new Uint8Array(await (await new Promise<Blob>((r) => checker.toBlob((b) => r(b!), 'image/png'))).arrayBuffer());
+    const png = new Uint8Array(
+      await (await new Promise<Blob>((r) => checker.toBlob((b) => r(b!), 'image/png'))).arrayBuffer(),
+    );
     const folder = '../../../examples/assets/terrain/QuantizedMeshWithOctVertexNormals/',
       fetchAll = async (input: string, init?: { signal?: AbortSignal }) =>
         input.startsWith('imagery/') ? new Response(png) : fetch(input.split('?')[0], init);
-    const source = await terrain(folder + 'layer.json', { fetch: fetchAll, imagery: { url: 'imagery/{z}/{x}/{y}.png' } });
+    const source = await terrain(folder + 'layer.json', {
+      fetch: fetchAll,
+      imagery: { url: 'imagery/{z}/{x}/{y}.png' },
+    });
     engine.camera.near = 100_000;
     engine.camera.far = 100_000_000;
     engine.camera.position = [0, 8_000_000, 22_000_000];
@@ -217,19 +226,42 @@ async function run(name: string): Promise<unknown> {
     device.createBuffer = (d) => track(createBuffer(d), d.size) as GPUBuffer;
     device.createTexture = (d) => {
       const t = createTexture(d),
-        [w, h, layers = 1] = Array.isArray(d.size) ? d.size : [(d.size as GPUExtent3DDict).width, (d.size as GPUExtent3DDict).height ?? 1, (d.size as GPUExtent3DDict).depthOrArrayLayers ?? 1];
+        [w, h, layers = 1] = Array.isArray(d.size)
+          ? d.size
+          : [
+              (d.size as GPUExtent3DDict).width,
+              (d.size as GPUExtent3DDict).height ?? 1,
+              (d.size as GPUExtent3DDict).depthOrArrayLayers ?? 1,
+            ];
       let bytes = 0;
-      for (let l = 0; l < (d.mipLevelCount ?? 1); l++) bytes += Math.max(1, w >> l) * Math.max(1, h >> l) * layers * texel(d.format);
+      for (let l = 0; l < (d.mipLevelCount ?? 1); l++)
+        bytes += Math.max(1, w >> l) * Math.max(1, h >> l) * layers * texel(d.format);
       // Render targets (the frame's own) are not tile memory; keep them apart by their usage.
-      return track(t, d.usage & GPUTextureUsage.TEXTURE_BINDING && !(d.usage & GPUTextureUsage.STORAGE_BINDING) ? bytes * (d.sampleCount ?? 1) : 0) as GPUTexture;
+      return track(
+        t,
+        d.usage & GPUTextureUsage.TEXTURE_BINDING && !(d.usage & GPUTextureUsage.STORAGE_BINDING)
+          ? bytes * (d.sampleCount ?? 1)
+          : 0,
+      ) as GPUTexture;
     };
-    const glb = new Uint8Array(await (await fetch('../../../examples/assets/khronos/BoomBox/BoomBox.glb')).arrayBuffer());
+    const glb = new Uint8Array(
+      await (await fetch('../../../examples/assets/khronos/BoomBox/BoomBox.glb')).arrayBuffer(),
+    );
     const json = {
       asset: { version: '1.1' },
       geometricError: 1,
-      root: { boundingVolume: { box: [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1] }, geometricError: 0, content: { uri: 'boom.glb' } },
+      root: {
+        boundingVolume: { box: [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1] },
+        geometricError: 0,
+        content: { uri: 'boom.glb' },
+      },
     };
-    const files = memoryFetch(new Map([['tileset.json', new TextEncoder().encode(JSON.stringify(json))], ['boom.glb', glb]]));
+    const files = memoryFetch(
+      new Map([
+        ['tileset.json', new TextEncoder().encode(JSON.stringify(json))],
+        ['boom.glb', glb],
+      ]),
+    );
     engine.camera.position = [0, 0, 0.08];
     engine.camera.target = [0, 0, 0];
     await frame();

@@ -633,7 +633,10 @@ test('tileset: a relative tileset URL resolves against the page, and so do its t
     files = new Map([...data.files].map(([path, bytes]) => [`app/data/${path}`, bytes])),
     memory = memoryFetch(files, { base: 'https://site.test/' }),
     had = Object.getOwnPropertyDescriptor(globalThis, 'location');
-  Object.defineProperty(globalThis, 'location', { value: { href: 'https://site.test/app/index.html' }, configurable: true });
+  Object.defineProperty(globalThis, 'location', {
+    value: { href: 'https://site.test/app/index.html' },
+    configurable: true,
+  });
   try {
     const tileset = await Tileset.load('data/tileset.json', {
       fetch: memory.fetch,

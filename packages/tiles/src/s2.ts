@@ -80,7 +80,9 @@ export function s2Token({ face, level, i, j }: S2Cell): string {
     i >= n ||
     j >= n
   )
-    throw new RangeError(`Invalid S2 cell ${JSON.stringify({ face, level, i, j })}; face 0-5, level 0-30, i and j on its grid`);
+    throw new RangeError(
+      `Invalid S2 cell ${JSON.stringify({ face, level, i, j })}; face 0-5, level 0-30, i and j on its grid`,
+    );
   let id = BigInt(face) << 61n,
     orientation = face & SWAP;
   for (let k = 0; k < level; k++) {
@@ -133,7 +135,12 @@ const SAMPLES = 16;
  * axes east, north and up at the cell's centre, sized by a grid of points on its bottom and top surfaces, then grown
  * by the largest gap between those points and the surface (the sagitta at the ellipsoid's largest curvature radius).
  */
-export function s2CellBounds(cell: S2Cell, minimumHeight: number, maximumHeight: number, split?: SplitBounds): TileBounds {
+export function s2CellBounds(
+  cell: S2Cell,
+  minimumHeight: number,
+  maximumHeight: number,
+  split?: SplitBounds,
+): TileBounds {
   if (!Number.isFinite(minimumHeight) || !Number.isFinite(maximumHeight) || minimumHeight > maximumHeight)
     throw new RangeError(
       `Invalid S2 heights ${minimumHeight} and ${maximumHeight}; give finite metres with minimumHeight <= maximumHeight`,
@@ -152,8 +159,7 @@ export function s2CellBounds(cell: S2Cell, minimumHeight: number, maximumHeight:
       for (const h of [minimumHeight, maximumHeight]) {
         const p = cartographicToEcef(plon, plat, h);
         for (let k = 0; k < 3; k++) {
-          const d =
-            (p[0] - origin[0]) * axes[k][0] + (p[1] - origin[1]) * axes[k][1] + (p[2] - origin[2]) * axes[k][2];
+          const d = (p[0] - origin[0]) * axes[k][0] + (p[1] - origin[1]) * axes[k][1] + (p[2] - origin[2]) * axes[k][2];
           low[k] = Math.min(low[k], d);
           high[k] = Math.max(high[k], d);
         }
@@ -162,8 +168,7 @@ export function s2CellBounds(cell: S2Cell, minimumHeight: number, maximumHeight:
   // Largest angle between neighbouring samples (sides and diagonals of each grid square).
   let angle = 0;
   const at = (a: number, b: number) => directions[a * (SAMPLES + 1) + b];
-  const between = (p: number[], q: number[]) =>
-    Math.acos(Math.min(1, p[0] * q[0] + p[1] * q[1] + p[2] * q[2]));
+  const between = (p: number[], q: number[]) => Math.acos(Math.min(1, p[0] * q[0] + p[1] * q[1] + p[2] * q[2]));
   for (let a = 0; a < SAMPLES; a++)
     for (let b = 0; b < SAMPLES; b++)
       angle = Math.max(
@@ -199,7 +204,8 @@ export function s2Bounds(volume: S2VolumeJSON): TileBounds {
   const split: SplitBounds = (scheme, level, x, y, z) => {
     const n = 2 ** level,
       cell = { face: root.face, level: root.level + level, i: root.i * n + x, j: root.j * n + y };
-    if (cell.level > 30) throw new RangeError(`Implicit S2 tile level ${cell.level} is past S2's 30 levels; lower availableLevels`);
+    if (cell.level > 30)
+      throw new RangeError(`Implicit S2 tile level ${cell.level} is past S2's 30 levels; lower availableLevels`);
     if (scheme !== 'OCTREE') return s2CellBounds(cell, minimumHeight, maximumHeight);
     const slab = (maximumHeight - minimumHeight) / n;
     return s2CellBounds(cell, minimumHeight + slab * z, minimumHeight + slab * (z + 1));

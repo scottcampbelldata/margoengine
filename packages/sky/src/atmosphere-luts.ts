@@ -61,7 +61,8 @@ export function atmosphereParameters(p: AtmosphereParameters = {}): Required<Atm
   }
   const positive = (key: keyof typeof earth, low = 0) => {
     const v = a[key] as number;
-    if (!(Number.isFinite(v) && v >= low)) throw new RangeError(`Invalid atmosphere ${key}; use a finite number of ${low} or more`);
+    if (!(Number.isFinite(v) && v >= low))
+      throw new RangeError(`Invalid atmosphere ${key}; use a finite number of ${low} or more`);
   };
   for (const key of ['mie', 'mieAbsorption', 'ozoneCenter'] as const) positive(key);
   for (const key of ['rayleighHeight', 'mieHeight', 'ozoneWidth'] as const) positive(key, 1e-3);
@@ -199,7 +200,10 @@ export class AtmosphereTables {
         format: 'rgba16float',
         usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
       });
-    this.uniform = device.createBuffer({ size: this.values.byteLength, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.uniform = device.createBuffer({
+      size: this.values.byteLength,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
     this.transmittance = table(256, 64);
     this.multiple = table(32, 32);
     this.sampler = device.createSampler({ magFilter: 'linear', minFilter: 'linear' });
@@ -228,8 +232,14 @@ export class AtmosphereTables {
     if (key === this.key) return;
     this.key = key;
     const [t, m] = (this.pipelines ??= [
-      d.createComputePipeline({ layout: 'auto', compute: { module: d.createShaderModule({ code: transmittance }), entryPoint: 'main' } }),
-      d.createComputePipeline({ layout: 'auto', compute: { module: d.createShaderModule({ code: multiple }), entryPoint: 'main' } }),
+      d.createComputePipeline({
+        layout: 'auto',
+        compute: { module: d.createShaderModule({ code: transmittance }), entryPoint: 'main' },
+      }),
+      d.createComputePipeline({
+        layout: 'auto',
+        compute: { module: d.createShaderModule({ code: multiple }), entryPoint: 'main' },
+      }),
     ]);
     let pass = encoder.beginComputePass();
     pass.setPipeline(t);

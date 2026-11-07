@@ -46,8 +46,14 @@ test('volumetric clouds make their noise volumes once and ray march one pass per
   h.engine.use(clouds);
   frame(h, clouds);
   frame(h, clouds);
-  assert.ok(h.created.some((r) => r.startsWith('texture(64,64,64,rgba8unorm')), 'shape volume 64^3');
-  assert.ok(h.created.some((r) => r.startsWith('texture(32,32,32,rgba8unorm')), 'erosion volume 32^3');
+  assert.ok(
+    h.created.some((r) => r.startsWith('texture(64,64,64,rgba8unorm')),
+    'shape volume 64^3',
+  );
+  assert.ok(
+    h.created.some((r) => r.startsWith('texture(32,32,32,rgba8unorm')),
+    'erosion volume 32^3',
+  );
   const wgsl = code(h);
   assert.match(wgsl, /fn shape\(/);
   assert.match(wgsl, /fn erosion\(/);
@@ -71,7 +77,10 @@ test('volumetric clouds take their light from a Sky and draw nothing at coverage
   frame(h, sky, clouds);
   // The sky's reflection map lights the clouds, reduced on the GPU to light from above and from the horizon.
   assert.match(code(h), /var<workgroup> sums/);
-  assert.ok(h.created.some((r) => r.startsWith('texture(64,32')), 'The sky reflection map was asked for');
+  assert.ok(
+    h.created.some((r) => r.startsWith('texture(64,32')),
+    'The sky reflection map was asked for',
+  );
   clouds.dispose();
   sky.dispose();
 });

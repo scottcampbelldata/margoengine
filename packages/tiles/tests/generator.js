@@ -443,12 +443,20 @@ export function groveTileset({ n = 5, spacing = 40, lon = -75.6, lat = 40.04, ur
   // A y-up glTF box standing on its base: the instance origin is the foot of the tree.
   const tree = boxGLB({ size: [6, height, 6], center: [0, height / 2, 0], color: [0.2, 0.7, 0.25] });
   if (uri) files.set('models/tree.glb', tree);
-  files.set('tiles/grove.i3dm', i3dm(uri ? '../models/tree.glb' : tree, { positions, rtcCenter: rtc, eastNorthUp: true }));
+  files.set(
+    'tiles/grove.i3dm',
+    i3dm(uri ? '../models/tree.glb' : tree, { positions, rtcCenter: rtc, eastNorthUp: true }),
+  );
   const radius = Math.hypot(n * spacing, height) + 10;
   const tileset = {
     asset: { version: '1.0' },
     geometricError: 100,
-    root: { boundingVolume: { sphere: [...rtc, radius] }, geometricError: 0, refine: 'ADD', content: { uri: 'tiles/grove.i3dm' } },
+    root: {
+      boundingVolume: { sphere: [...rtc, radius] },
+      geometricError: 0,
+      refine: 'ADD',
+      content: { uri: 'tiles/grove.i3dm' },
+    },
   };
   files.set('tileset.json', encoder.encode(JSON.stringify(tileset)));
   return { files, tileset, rtc, offsets };
@@ -459,7 +467,10 @@ export function groveTileset({ n = 5, spacing = 40, lon = -75.6, lat = 40.04, ur
  * `batch` batch table properties to Draco attribute IDs. The Draco bytes are the caller's; this wrapper is a stand-in.
  */
 export function dracoPnts(drc, { length, properties, batch, batchLength } = {}) {
-  const featureJSON = { POINTS_LENGTH: length, extensions: { '3DTILES_draco_point_compression': { properties, byteOffset: 0, byteLength: drc.byteLength } } };
+  const featureJSON = {
+    POINTS_LENGTH: length,
+    extensions: { '3DTILES_draco_point_compression': { properties, byteOffset: 0, byteLength: drc.byteLength } },
+  };
   for (const name of Object.keys(properties)) featureJSON[name] = { byteOffset: 0 };
   let batchJSON = null;
   if (batch) {

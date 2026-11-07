@@ -93,7 +93,18 @@ test('On the WebGL2 preview Picking needs webglPicking, then answers through eng
   assert.deepEqual(await picking.pick(10, 10), { mesh });
   assert.equal(await picking.pick(60, 10), null);
   const view = { viewport: [0, 0, 50, 50] };
-  assert.deepEqual(await picking.pickMany([[10, 10], [60, 10], [-1, 0], [200, 0]], view), [{ mesh }, null, null, null]);
+  assert.deepEqual(
+    await picking.pickMany(
+      [
+        [10, 10],
+        [60, 10],
+        [-1, 0],
+        [200, 0],
+      ],
+      view,
+    ),
+    [{ mesh }, null, null, null],
+  );
   assert.deepEqual(asked.at(-1), [60, 10, view]);
   assert.throws(
     () => picking.addOverlay({}),

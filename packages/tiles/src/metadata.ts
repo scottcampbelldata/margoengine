@@ -21,7 +21,17 @@ export type MetadataComponentType =
   | 'FLOAT32'
   | 'FLOAT64';
 /** A metadata property type. */
-export type MetadataType = 'SCALAR' | 'VEC2' | 'VEC3' | 'VEC4' | 'MAT2' | 'MAT3' | 'MAT4' | 'STRING' | 'BOOLEAN' | 'ENUM';
+export type MetadataType =
+  | 'SCALAR'
+  | 'VEC2'
+  | 'VEC3'
+  | 'VEC4'
+  | 'MAT2'
+  | 'MAT3'
+  | 'MAT4'
+  | 'STRING'
+  | 'BOOLEAN'
+  | 'ENUM';
 
 /** A class property of a metadata schema. */
 export interface ClassPropertyJSON {
@@ -77,7 +87,16 @@ const SIZE: Record<MetadataComponentType, number> = {
   FLOAT32: 4,
   FLOAT64: 8,
 };
-const COMPONENTS: Record<string, number> = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT2: 4, MAT3: 9, MAT4: 16, ENUM: 1 };
+const COMPONENTS: Record<string, number> = {
+  SCALAR: 1,
+  VEC2: 2,
+  VEC3: 3,
+  VEC4: 4,
+  MAT2: 4,
+  MAT3: 9,
+  MAT4: 16,
+  ENUM: 1,
+};
 /** Largest value of each integer type, for normalized values (64-bit as a double, as the specification allows). */
 const MAX: Partial<Record<MetadataComponentType, number>> = {
   INT8: 127,
@@ -164,7 +183,9 @@ class Column {
   private offsetAt(view: DataView, index: number, type: MetadataComponentType, what: string): number {
     const size = SIZE[type];
     if ((index + 1) * size > view.byteLength)
-      throw new RangeError(`Property ${this.name}: ${what} ${index} is past its buffer view; the file is truncated or corrupt`);
+      throw new RangeError(
+        `Property ${this.name}: ${what} ${index} is past its buffer view; the file is truncated or corrupt`,
+      );
     return component(view, index * size, type);
   }
   /** Element range [start, end) of one row: element indices into the values (or string offsets). */
@@ -182,7 +203,10 @@ class Column {
       type = d.type;
     if (type === 'BOOLEAN') {
       const byte = index >> 3;
-      if (byte >= this.values.byteLength) throw new RangeError(`Property ${this.name}: boolean ${index} is past its buffer view; the file is truncated or corrupt, re-export it`);
+      if (byte >= this.values.byteLength)
+        throw new RangeError(
+          `Property ${this.name}: boolean ${index} is past its buffer view; the file is truncated or corrupt, re-export it`,
+        );
       return ((this.values.getUint8(byte) >> (index & 7)) & 1) === 1;
     }
     if (type === 'STRING') {
@@ -197,7 +221,9 @@ class Column {
       n = this.components,
       at = index * n * size;
     if (at + n * size > this.values.byteLength)
-      throw new RangeError(`Property ${this.name}: element ${index} is past its buffer view; the file is truncated or corrupt`);
+      throw new RangeError(
+        `Property ${this.name}: element ${index} is past its buffer view; the file is truncated or corrupt`,
+      );
     const out: number[] = [];
     for (let k = 0; k < n; k++) out.push(component(this.values, at + k * size, ct));
     if (type === 'ENUM') return this.enumValues?.get(out[0]) ?? out[0];
@@ -232,7 +258,8 @@ class Column {
     if (!Number.isInteger(row) || row < 0 || row >= this.count) return undefined;
     const d = this.definition,
       [start, end] = this.range(row);
-    if (end < start) throw new RangeError(`Property ${this.name}: array ${row} ends before it starts; the file is corrupt`);
+    if (end < start)
+      throw new RangeError(`Property ${this.name}: array ${row} ends before it starts; the file is corrupt`);
     const raw = Array.from({ length: end - start }, (_, i) => this.element(start + i));
     const value = d.array ? raw : raw[0];
     if (d.noData !== undefined && this.equals(value, d.noData)) return d.default;
@@ -251,17 +278,25 @@ export class PropertyTable {
     views: Views,
   ) {
     const klass = schema.classes?.[json.class];
-    if (!klass) throw new TypeError(`Property table ${json.name ?? ''} names class ${json.class}, which the schema lacks; add the class to the schema or fix the table`);
+    if (!klass)
+      throw new TypeError(
+        `Property table ${json.name ?? ''} names class ${json.class}, which the schema lacks; add the class to the schema or fix the table`,
+      );
     if (!Number.isInteger(json.count) || json.count < 0)
       throw new TypeError(`Property table ${json.name ?? json.class}: count must be a whole number of 0 or more`);
     const definitions = klass.properties ?? {};
     this.names = Object.keys(definitions);
     for (const [name, column] of Object.entries(json.properties ?? {})) {
       const definition = definitions[name];
-      if (!definition) throw new TypeError(`Property table ${json.class}: property ${name} is not in the class; add it to the class or remove the column`);
+      if (!definition)
+        throw new TypeError(
+          `Property table ${json.class}: property ${name} is not in the class; add it to the class or remove the column`,
+        );
       const enumDef = definition.type === 'ENUM' ? schema.enums?.[definition.enumType ?? ''] : undefined;
       if (definition.type === 'ENUM' && !enumDef)
-        throw new TypeError(`Property ${name}: enum ${definition.enumType} is not in the schema; add the enum to the schema`);
+        throw new TypeError(
+          `Property ${name}: enum ${definition.enumType} is not in the schema; add the enum to the schema`,
+        );
       this.columns.set(
         name,
         new Column(
@@ -441,12 +476,16 @@ export function readStructuralMetadata(gltf: Uint8Array, options: StructuralMeta
         vertices = position === undefined ? 0 : (json.accessors?.[position]?.count ?? 0);
       return (features?.featureIds ?? []).map((set): FeatureIdSet => {
         if (set.propertyTable !== undefined && !tables[set.propertyTable])
-          throw new TypeError(`Feature ID set names property table ${set.propertyTable}, which the glTF lacks; the file is corrupt, re-export it`);
+          throw new TypeError(
+            `Feature ID set names property table ${set.propertyTable}, which the glTF lacks; the file is corrupt, re-export it`,
+          );
         let ids: Uint32Array | undefined;
         if (set.attribute !== undefined) {
           const accessor = primitive.attributes[`_FEATURE_ID_${set.attribute}`];
           if (accessor === undefined)
-            throw new TypeError(`Feature ID set uses attribute _FEATURE_ID_${set.attribute}, which the primitive lacks; the file is corrupt, re-export it`);
+            throw new TypeError(
+              `Feature ID set uses attribute _FEATURE_ID_${set.attribute}, which the primitive lacks; the file is corrupt, re-export it`,
+            );
           ids = scalarIds(accessor, vertices);
         } else if (!set.texture) ids = Uint32Array.from({ length: vertices }, (_, i) => i);
         return {
@@ -506,11 +545,16 @@ export async function dracoPoints(
   signal?.throwIfAborted();
   const n = decoded.pointCount;
   if (n !== draco.length)
-    throw new TypeError(`Draco pnts holds ${n} points but POINTS_LENGTH is ${draco.length}; the file is corrupt, re-encode it`);
+    throw new TypeError(
+      `Draco pnts holds ${n} points but POINTS_LENGTH is ${draco.length}; the file is corrupt, re-encode it`,
+    );
   const attribute = (name: string, id: number | undefined, size: number) => {
     if (id === undefined) return undefined;
     const found = decoded.attributes.find((a) => a.uniqueId === id);
-    if (!found) throw new TypeError(`Draco pnts names attribute ${id} for ${name}, which the Draco buffer lacks; the file is corrupt, re-encode it`);
+    if (!found)
+      throw new TypeError(
+        `Draco pnts names attribute ${id} for ${name}, which the Draco buffer lacks; the file is corrupt, re-encode it`,
+      );
     if (found.itemSize !== size || found.array.length < n * size)
       throw new TypeError(`Draco pnts ${name} has ${found.itemSize} components per point; ${size} are needed`);
     return found;
@@ -538,7 +582,10 @@ export async function dracoPoints(
     const json: Record<string, unknown> = { ...batchTable.json };
     for (const [name, id] of Object.entries(draco.batchProperties)) {
       const found = decoded.attributes.find((a) => a.uniqueId === id);
-      if (!found) throw new TypeError(`Draco pnts batch property ${name} names attribute ${id}, which the buffer lacks; the file is corrupt, re-encode it`);
+      if (!found)
+        throw new TypeError(
+          `Draco pnts batch property ${name} names attribute ${id}, which the buffer lacks; the file is corrupt, re-encode it`,
+        );
       const size = found.itemSize,
         values = Array.from(found.array);
       json[name] = size === 1 ? values : Array.from({ length: n }, (_, i) => values.slice(i * size, i * size + size));

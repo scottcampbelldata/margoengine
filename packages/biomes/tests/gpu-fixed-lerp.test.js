@@ -43,13 +43,14 @@ test('hardware proof rejects missing, unknown, software, virtual and fallback ad
 test('WebGL adapter names are rejected even when the WebGPU vendor matches', () => {
   for (const vendor of [undefined, '', '   ', 123, 'amd', 'nvidia', 'NVIDIA']) {
     assert.throws(
-      () => requireHardwareAdapter({
-        name: 'ANGLE (NVIDIA, NVIDIA RTX A6000)',
-        nameSource: 'webgl',
-        renderer: 'ANGLE (NVIDIA, NVIDIA RTX A6000)',
-        vendor,
-        fallback: false,
-      }),
+      () =>
+        requireHardwareAdapter({
+          name: 'ANGLE (NVIDIA, NVIDIA RTX A6000)',
+          nameSource: 'webgl',
+          renderer: 'ANGLE (NVIDIA, NVIDIA RTX A6000)',
+          vendor,
+          fallback: false,
+        }),
       /WebGPU adapter description missing; cannot identify the GPU that ran WGSL/,
     );
   }
@@ -73,13 +74,14 @@ test('WebGPU descriptions are accepted without a WebGL vendor link', () => {
 
 test('hardware proof rejects mismatched WebGPU and WebGL PCI device ids', () => {
   assert.throws(
-    () => requireHardwareAdapter({
-      name: 'NVIDIA RTX A6000',
-      nameSource: 'webgpu',
-      device: '0x2231',
-      renderer: 'ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11)',
-      fallback: false,
-    }),
+    () =>
+      requireHardwareAdapter({
+        name: 'NVIDIA RTX A6000',
+        nameSource: 'webgpu',
+        device: '0x2231',
+        renderer: 'ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11)',
+        fallback: false,
+      }),
     /WebGPU adapter device does not match the WebGL renderer/,
   );
 });

@@ -28,7 +28,8 @@ test('globalThis.fetch set to AssetCache.fetch goes to the network once, not to 
     assert.deepEqual(await read(await globalThis.fetch(base + 'a')), bytes(3000));
     assert.equal(network.log.length, 1);
     await cache.flush();
-  }));
+  }),
+);
 
 test('globalThis.fetch set to RangeCache.fetch goes to the network once, not to itself', { timeout: 5000 }, () =>
   withServer(async (network) => {
@@ -39,7 +40,8 @@ test('globalThis.fetch set to RangeCache.fetch goes to the network once, not to 
     assert.deepEqual(await read(response), bytes(3000).slice(10, 20));
     assert.equal(network.log.length, 1);
     await ranges.flush();
-  }));
+  }),
+);
 
 test('globalThis.fetch set to LoadingManager.fetch goes to the network once, not to itself', { timeout: 5000 }, () =>
   withServer(async (network) => {
@@ -47,4 +49,5 @@ test('globalThis.fetch set to LoadingManager.fetch goes to the network once, not
     globalThis.fetch = manager.fetch;
     assert.deepEqual(await read(await globalThis.fetch(base + 'a')), bytes(3000));
     assert.equal(network.log.length, 1);
-  }));
+  }),
+);

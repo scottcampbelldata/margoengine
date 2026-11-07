@@ -22,7 +22,8 @@ const score = (c, biomes, slots, planes, cells) => {
   return biomes.map((_, b) => [...member.subarray(b * cells, (b + 1) * cells)]);
 };
 const axis = { field: 'temperature', range: [0, 100] }; // stored x 100: 0..10000
-const line = (...points) => multiNoise({ axes: [axis], points: points.map(([b, t]) => ({ biome: b, at: { temperature: t } })), blend: 0 });
+const line = (...points) =>
+  multiNoise({ axes: [axis], points: points.map(([b, t]) => ({ biome: b, at: { temperature: t } })), blend: 0 });
 
 test('nearest point wins; midway ties go to the higher priority, then the smaller id', () => {
   const c = line(['a', 20], ['b', 60]);
@@ -60,7 +61,14 @@ test('inputs beyond the axis range count as its edge, in both directions', () =>
 });
 
 test('blend: shares fall smoothly with distance, sum to at least 1 at the nearest, and vanish past the band', () => {
-  const c = multiNoise({ axes: [axis], points: [{ biome: 'a', at: { temperature: 40 } }, { biome: 'b', at: { temperature: 60 } }], blend: 0.2 });
+  const c = multiNoise({
+    axes: [axis],
+    points: [
+      { biome: 'a', at: { temperature: 40 } },
+      { biome: 'b', at: { temperature: 60 } },
+    ],
+    blend: 0.2,
+  });
   const values = [];
   for (let t = 3000; t <= 7000; t += 100) values.push(t);
   const [a, b] = score(c, [biome('a'), biome('b')], ['temperature'], [values], values.length);
@@ -73,13 +81,19 @@ test('blend: shares fall smoothly with distance, sum to at least 1 at the neares
   const mid = values.indexOf(5000);
   assert.equal(a[mid], b[mid], 'equal at the midpoint');
   assert.ok(a[mid] > 0 && a[mid] <= ONE);
-  assert.ok(a.some((v) => v > 0 && v < ONE), 'a smooth ramp, not a step');
+  assert.ok(
+    a.some((v) => v > 0 && v < ONE),
+    'a smooth ramp, not a step',
+  );
 });
 
 test('weights scale a gap: a heavy axis decides, a light one only breaks near ties', () => {
   const spec = (w) =>
     multiNoise({
-      axes: [{ ...axis, weight: w }, { field: 'rainfall', range: [0, 1000] }],
+      axes: [
+        { ...axis, weight: w },
+        { field: 'rainfall', range: [0, 1000] },
+      ],
       points: [
         { biome: 'a', at: { temperature: 50, rainfall: 0 } },
         { biome: 'b', at: { temperature: 60, rainfall: 400 } },
@@ -88,8 +102,16 @@ test('weights scale a gap: a heavy axis decides, a light one only breaks near ti
     });
   const slots = ['temperature', 'rainfall'],
     cell = (w) => score(spec(w), [biome('a'), biome('b')], slots, [[5400], [250]], 1).map((m) => m[0]);
-  assert.deepEqual(cell(1), [0, ONE], 'b is nearer: its rainfall gap (0.15) is smaller than the one for a (0.25) and the temperature gaps are small');
-  assert.deepEqual(cell(16), [ONE, 0], 'temperature counts sixteen times, and the temperature gap to a (0.04) is smaller than to b (0.06)');
+  assert.deepEqual(
+    cell(1),
+    [0, ONE],
+    'b is nearer: its rainfall gap (0.15) is smaller than the one for a (0.25) and the temperature gaps are small',
+  );
+  assert.deepEqual(
+    cell(16),
+    [ONE, 0],
+    'temperature counts sixteen times, and the temperature gap to a (0.04) is smaller than to b (0.06)',
+  );
 });
 
 test('a biome with no point never appears; a point naming a biome the world lacks fails', () => {
@@ -97,7 +119,10 @@ test('a biome with no point never appears; a point naming a biome the world lack
   const [a, spare] = score(c, [biome('a'), biome('spare')], ['temperature'], [[0, 10000]], 2);
   assert.deepEqual(a, [ONE, ONE]);
   assert.deepEqual(spare, [0, 0]);
-  assert.throws(() => c.scorer([biome('other')], () => 0), { name: 'RangeError', message: /biome the world does not have/ });
+  assert.throws(() => c.scorer([biome('other')], () => 0), {
+    name: 'RangeError',
+    message: /biome the world does not have/,
+  });
 });
 
 test('validation: every bad spec names what is wrong', () => {
@@ -106,7 +131,11 @@ test('validation: every bad spec names what is wrong', () => {
   bad(undefined, 'TypeError', /takes \{ axes, points/);
   bad({ axes: 1, points: [] }, 'TypeError', /takes \{ axes, points/);
   bad({ ...ok, axes: [] }, 'RangeError', /1 to 8 axes/);
-  bad({ ...ok, axes: Array.from({ length: 9 }, (_, i) => ({ field: 'mask/n' + i, range: [0, 1] })) }, 'RangeError', /1 to 8 axes/);
+  bad(
+    { ...ok, axes: Array.from({ length: 9 }, (_, i) => ({ field: 'mask/n' + i, range: [0, 1] })) },
+    'RangeError',
+    /1 to 8 axes/,
+  );
   bad({ ...ok, points: [] }, 'RangeError', /1 to 1,024 points/);
   bad({ ...ok, points: Array.from({ length: 1025 }, () => ok.points[0]) }, 'RangeError', /1 to 1,024 points/);
   bad({ ...ok, blend: -0.1 }, 'RangeError', /blend/);
@@ -134,11 +163,22 @@ test('validation: every bad spec names what is wrong', () => {
 
 test('the maximum sizes work: 8 axes, 1,024 points, a heavy weight, the full range', () => {
   const fields = ['temperature', 'rainfall', 'moisture', 'height', 'coldest', 'warmest', 'gdd5', 'season'],
-    ranges = [[-20, 40], [0, 4000], [0, 1], [-100, 4000], [-30, 30], [-10, 45], [0, 6000], [0, 365]],
+    ranges = [
+      [-20, 40],
+      [0, 4000],
+      [0, 1],
+      [-100, 4000],
+      [-30, 30],
+      [-10, 45],
+      [0, 6000],
+      [0, 365],
+    ],
     axes = fields.map((field, i) => ({ field, range: ranges[i], weight: 16 })),
     points = Array.from({ length: 1024 }, (_, i) => ({
       biome: i % 2 ? 'a' : 'b',
-      at: Object.fromEntries(fields.map((f, a) => [f, ranges[a][0] + ((ranges[a][1] - ranges[a][0]) * ((i * (a + 3)) % 17)) / 17])),
+      at: Object.fromEntries(
+        fields.map((f, a) => [f, ranges[a][0] + ((ranges[a][1] - ranges[a][0]) * ((i * (a + 3)) % 17)) / 17]),
+      ),
     })),
     c = multiNoise({ axes, points, blend: 1 }),
     cells = 64,
@@ -229,7 +269,8 @@ test('a painted mask is an axis: noise you write decides the biome', async () =>
 });
 
 test('golden digests: five worlds, pinned', async () => {
-  for (const [name, c] of Object.entries(cases)) assert.equal(await (await makeWorld(c)).digest(2, 1), golden[name], name);
+  for (const [name, c] of Object.entries(cases))
+    assert.equal(await (await makeWorld(c)).digest(2, 1), golden[name], name);
 });
 
 test('1 worker and 4 workers give the main thread bytes', { timeout: 240000 }, async () => {

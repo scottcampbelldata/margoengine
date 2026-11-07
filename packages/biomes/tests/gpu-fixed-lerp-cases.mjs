@@ -34,11 +34,7 @@ export function bilinearOracle(a, b, c, d, fx, fz) {
 
 export function requireHardwareAdapter(info) {
   assert.equal(info.fallback, false, 'Require a positively identified non-fallback WebGPU adapter');
-  assert.equal(
-    info.nameSource,
-    'webgpu',
-    'WebGPU adapter description missing; cannot identify the GPU that ran WGSL',
-  );
+  assert.equal(info.nameSource, 'webgpu', 'WebGPU adapter description missing; cannot identify the GPU that ran WGSL');
   assert.ok(info.name?.trim(), 'WebGPU adapter description missing; cannot identify the GPU that ran WGSL');
   assert.doesNotMatch(
     [info.name, info.vendor, info.architecture, info.device, info.renderer].join(' '),

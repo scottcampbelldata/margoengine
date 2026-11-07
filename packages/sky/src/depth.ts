@@ -27,7 +27,9 @@ export function sceneDepth(c: Context, provider: () => GPUTexture | undefined, o
     !(depth.usage & GPUTextureUsage.TEXTURE_BINDING) ||
     (depth.sampleCount !== 1 && depth.sampleCount !== samples)
   )
-    throw new RangeError(`${owner} requires sampleable scene depth matching the viewport; pass the scene's depth texture`);
+    throw new RangeError(
+      `${owner} requires sampleable scene depth matching the viewport; pass the scene's depth texture`,
+    );
   const target = sceneTarget(c),
     live = target?.samples === 4 && target.resolvedDepth === depth ? target.depthSource : undefined;
   return live
