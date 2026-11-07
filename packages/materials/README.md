@@ -493,7 +493,7 @@ material flag. Core materials keep their existing API.
 
 `new Material({wireframe: true})` draws triangle edges with native WebGPU lines. `wireframe` defaults to `false`
 and is live. Geometry groups and instanced meshes use each group's material setting.
-Edges include triangulation diagonals; shared triangle edges can be drawn more than once. Wide-line thickness
+Edges include triangulation diagonals; an edge two triangles of a group share is drawn once. Wide-line thickness
 controls are not provided.
 
 Wireframe alone keeps the existing render-state and transparency paths. The original triangle geometry remains
@@ -550,7 +550,9 @@ including native transmission's two-pass tint fallback, instead of OIT or screen
 tests stencil without writing; the lit draw performs each operation once. Exporters retain underlying materials and
 geometry because glTF has no corresponding stencil or polygon-offset state.
 
-Native `primitive.material.renderState` accepts WebGPU `depthBias`, `depthBiasSlopeScale`, `depthBiasClamp`,
+On a materials mesh `primitive.material.renderState` reads the state the material's options make; a value set there wins for
+that primitive and `undefined` gives the material's back, both on the next frame. Native `primitive.material.renderState`
+accepts WebGPU `depthBias`, `depthBiasSlopeScale`, `depthBiasClamp`,
 `stencilFront`, `stencilBack`, `stencilReadMask`, `stencilWriteMask`, `stencilReference` and `colorWrite`.
 Native bias keeps WebGPU's sign by default. `depthBiasMode: 'away'` interprets positive bias as away from the camera
 on both the main reverse-Z renderer and forward-Z offscreen renderers; constructed materials use this mode.

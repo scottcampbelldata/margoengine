@@ -3987,8 +3987,14 @@ function envBindings(m: Material, device: GPUDevice, owner: object): GPUBindGrou
 /** A record's material, engine and placeholder ext row: hidden (not enumerable), so `{...record}` copies skip them. */
 const recordMaterial = Symbol('material'),
   recordRuntime = Symbol('runtime'),
-  recordExt = Symbol('ext');
-type MaterialRecord = PBRMaterial & { [recordMaterial]: Material; [recordRuntime]: Engine; [recordExt]: number[] };
+  recordExt = Symbol('ext'),
+  recordState = Symbol('renderState');
+type MaterialRecord = PBRMaterial & {
+  [recordMaterial]: Material;
+  [recordRuntime]: Engine;
+  [recordExt]: number[];
+  [recordState]?: PBRRenderState;
+};
 /**
  * A live record field, read from the record's material on every access. Enumerable and configurable like the data
  * properties they replace (`{...record}` copies still work). The getters are made once and shared by every record, so
@@ -4029,7 +4035,15 @@ const surfaceFields: PropertyDescriptorMap = {
   tint: live((m) => m.tint),
   extended: live(extendedOf),
   extensions: live(extensionsOf),
-  renderState: live(renderStateOf),
+  // Read from the material, unless this primitive was given a native state of its own (undefined gives it back).
+  renderState: {
+    ...live((m, g) => g[recordState] ?? renderStateOf(m)),
+    set(this: MaterialRecord, v: PBRRenderState | undefined) {
+      this[recordState] = v;
+      // A steady material's draws are not looked at again, so the next frame has to see a change.
+      this[recordMaterial]['changes'] = changeStamp();
+    },
+  },
   displacement: live((m, g) => {
     const device = g[recordRuntime].gpu;
     return (device && m.caster(device, g[recordRuntime])) ?? displacementOf(m, device, g[recordRuntime]);
@@ -4164,6 +4178,7 @@ function surface(blank: PropertyDescriptorMap, m: Material, runtime: Engine): PB
   fields[recordMaterial] = { value: m };
   fields[recordRuntime] = { value: runtime };
   fields[recordExt] = { value: blank.ext?.value };
+  fields[recordState] = { value: undefined, writable: true };
   return Object.defineProperties({}, fields) as PBRMaterial;
 }
 const shaderRevisions = new WeakMap<Material, { key: number; revision: number }>();

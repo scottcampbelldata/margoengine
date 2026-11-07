@@ -87,6 +87,11 @@ test('constructed meshes map forward-Z polygon offset values to reverse-Z and pr
       material,
     );
     assert.equal(material.customState, true);
+    // A native state on the primitive wins and undefined gives the material's back. This threw once the record went live.
+    const own = { depthBias: 9 };
+    model.primitives[0].material.renderState = own;
+    assert.equal(model.primitives[0].material.renderState, own);
+    model.primitives[0].material.renderState = undefined;
     const state = model.primitives[0].material.renderState;
     assert.equal(state.colorWrite, false);
     assert.equal(state.depthBiasMode, 'away');
