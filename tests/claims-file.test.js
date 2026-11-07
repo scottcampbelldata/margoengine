@@ -42,3 +42,18 @@ test('docs/limits.md names the last limit claim', () => {
   const [, last] = /LIM-001 to LIM-(\d+)/.exec(limits);
   assert.equal(Number(last), Math.max(...ids));
 });
+
+// docs/limits.md is merged as often. A keep-both in a rebase once left two copies of each of 14 rows ("WebGPU first",
+// the FBX, OBJ and exporter rows among them), one copy with a stale size or without another lane's sentence.
+test('no table in docs/limits.md holds two rows for one limit', () => {
+  const seen = new Map();
+  let section = '';
+  for (const line of limits.replace(/\r\n/g, '\n').split('\n')) {
+    if (line.startsWith('#')) section = line;
+    const name = /^\| ([^|]+?) \|/.exec(line)?.[1];
+    if (!name || name === 'Limit' || /^-+$/.test(name)) continue;
+    const key = `${section}\0${name}`;
+    assert.ok(!seen.has(key), `docs/limits.md "${section}" has two rows named ${name}`);
+    seen.set(key, true);
+  }
+});
