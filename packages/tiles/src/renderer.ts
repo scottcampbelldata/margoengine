@@ -402,6 +402,11 @@ export class TilesRenderer implements EnginePlugin {
         return this.i3dm((this.host ??= this.contentHost(engine)), content, tile, signal);
     }
   }
+  /** Calls `listener` after every selection update (tile visibility set, `last` current); returns the unsubscribe. */
+  onUpdate(listener: () => void): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
   /** Bytes a model counts against the budget (see `budget`). */
   measure(model: TilesModel, fileBytes: number): number {
     return this.budget === 'gpu' ? (modelGpuBytes(model as MeasurableModel) ?? fileBytes) : fileBytes;
@@ -417,10 +422,7 @@ export class TilesRenderer implements EnginePlugin {
       forget: (mesh) => this.origin?.forget(mesh),
       contentMatrix: (tile, rtc, gltf) => this.contentMatrix(tile, rtc, gltf),
       fetch: (url, signal) => this.tileset.fetchBytes(url, signal),
-      onUpdate: (listener) => {
-        this.listeners.add(listener);
-        return () => this.listeners.delete(listener);
-      },
+      onUpdate: (listener) => this.onUpdate(listener),
       offset: () => {
         const o = this.origin?.origin;
         return o ? [o[0], o[1], o[2]] : [0, 0, 0];

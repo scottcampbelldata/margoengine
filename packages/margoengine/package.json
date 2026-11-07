@@ -2478,6 +2478,10 @@
       "types": "./dist/tiles/terrain.d.ts",
       "import": "./dist/tiles/terrain.js"
     },
+    "./tiles/ion": {
+      "types": "./dist/tiles/ion.d.ts",
+      "import": "./dist/tiles/ion.js"
+    },
     "./tonemap": {
       "types": "./dist/tonemap.d.ts",
       "import": "./dist/tonemap.js"

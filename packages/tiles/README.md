@@ -214,6 +214,36 @@ projection.height = 150;
 
 `TilesRenderer.orthographicHeight(matrix)` returns the view height of an orthographic view-projection matrix and undefined for a perspective one (and for core's all-zero matrix before the first frame).
 
+## Hosted tilesets: sign-in and credits
+
+`margoengine/tiles/ion` signs in to token-based tile services and lists the credits they require on screen. `ionAsset(id, { accessToken })` asks Cesium ion for the asset's endpoint and returns its URL, a `fetch` that sends the asset's own short-lived token as a bearer header to that host only (asking ion again once when it answers 401) and its attributions. `hostedTileset(url, { query, headers })` signs any other service: Google's photorealistic 3D Tiles take `{ query: { key } }`, and the `session` a tile URL hands out goes on to the tiles it links (`carry`). `TileCredits.follow(tiles, { credits, element })` keeps an element's text to what the view needs: the service's attributions, then the glTF `asset.copyright` of the tiles drawn now, split on semicolons, most frequent first.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { TilesRenderer } from 'margoengine/tiles';
+import { TileCredits, hostedTileset, ionAsset } from 'margoengine/tiles/ion';
+
+const engine = await Engine.create(document.querySelector('canvas')!, {
+  camera: { position: [0, 400, 600], target: [0, 0, 0], far: 50_000 },
+});
+// Your Cesium ion token and asset ID (from ion's asset page); without one, a keyed stand-in on this page's server.
+const ionToken = '';
+const source = ionToken
+  ? await ionAsset(96188, { accessToken: ionToken })
+  : hostedTileset(new URL('3d-tiles/TilesetWithRequestVolume/city/tileset.json', location.href), {
+      query: { key: 'your-api-key' },
+    });
+const tiles = await TilesRenderer.load(engine, source.url, { fetch: source.fetch });
+const credits = TileCredits.follow(tiles, {
+  credits: source.credits,
+  element: document.body.appendChild(document.createElement('div')),
+});
+engine.start();
+console.log(credits.text()); // the service's attributions, then the drawn tiles' copyright
+```
+
+A terrain asset works the same way: `terrain(source.url, { fetch: source.fetch })`. `credits.text(separator, true)` leaves out what ion marks `collapsible` (it may sit behind a credits button); `credits.html()` gives the service's own HTML (ion's links and logos) as it sent it, with the tiles' copyright escaped, for an app that trusts the service with its markup. Tokens go in headers, never in URLs the signing adds (a `query` you give is yours). An asset ion only points at (`externalType`, such as Bing imagery) throws code `unsupported`; a refused token or a missing asset throws code `failed`, naming the fix.
+
 ## Without the engine
 
 `Tileset` is engine-free: give it a view each frame and a content factory, and it does the rest. This is how the tests drive it, and how to stream tiles into your own renderer or a server-side job.
@@ -242,4 +272,5 @@ The content parsers (`parseB3dm`, `parsePnts`, `parseI3dm`, `parseCmpt`, `parseC
 - Draco pnts decode in Web Workers (`@margoengine/decoders/draco-points`), so not in Node without a decoder of your own.
 - A tile whose glTF requires KHR_techniques_webgl (archived GLSL shaders, such as the billboard level of Cesium's TilesetWithTreeBillboards) fails with code `unsupported`, as glTF says a loader must; the rest of the tileset draws.
 - `budget: 'gpu'` counts gltf-pro models exactly from their arrays and images (Khronos BoomBox: within 0.1% of what the device allocated); points, i3dm rows and splats by their buffer layouts; a custom `loadModel` whose models have no `primitives` is counted by file size. Uniform buffers, pipelines and the engine's own targets are not tile memory and are not counted.
+- Hosted tilesets: an ion token is asked for again only after a 401, once per expiry; requests to other hosts (a tile URL on another server) go unsigned; the credits are counted from glTF `asset.copyright` only (b3dm, i3dm and glTF content), so pnts tiles and imagery name none; nothing here draws a logo.
 - Orthographic cameras are told apart by the clip w row of `camera.matrix`: a projection that mixes the two (clip w that varies only a little with depth) is read as perspective, and before the first frame the renderer selects as perspective.

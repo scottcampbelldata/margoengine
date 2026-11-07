@@ -273,6 +273,7 @@ export class TilesRenderer implements EnginePlugin {
     static orthographicHeight(matrix: ArrayLike<number> | undefined): number | undefined;
     contentMatrix(tile: TilesetTile, rtc?: readonly number[], gltf?: boolean): TileMatrix;
     createContent(content: TileContent, tile: TilesetTile, signal: AbortSignal): Promise<TileRenderable>;
+    onUpdate(listener: () => void): () => void;
     measure(model: TilesModel, fileBytes: number): number;
     dispose(): void;
     [Symbol.dispose](): void;

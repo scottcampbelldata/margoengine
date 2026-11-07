@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10474561,
+  "total": 10477346,
   "history": [
     {
       "date": "2026-10-24",
@@ -3494,6 +3494,12 @@
       "commit": "25bcc5f97",
       "reason": "new entry @margoengine/net/delay, AdaptiveDelay",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "ce48e93f8",
+      "reason": "new entry tiles/ion: hosted tileset sign-in and credits; root gains TilesRenderer.onUpdate (batch 47 job 8)",
+      "grew": 1
     }
   ],
   "items": {
@@ -4111,6 +4117,7 @@
     "@margoengine/tilemap/tiled": 4264,
     "@margoengine/tiles": 15927,
     "@margoengine/tiles/i3dm": 1629,
+    "@margoengine/tiles/ion": 2785,
     "@margoengine/tiles/metadata": 4946,
     "@margoengine/tiles/s2": 3004,
     "@margoengine/tiles/splats": 1822,

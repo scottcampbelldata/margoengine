@@ -1895,3 +1895,69 @@ quality gate refuse a baseline whose total is not the sum of its items; this com
   GPU tests on the Radeon 680M under the GPU lock, for every job's full landing. Pushes after a rebase onto commits
   that touch nothing the sky uses reran the sky and weather tests, the records' tests, the sizes gate and api:check;
   the quality-gate fix and this record ran hygiene, the tests they touch and the sizes gate (Scott's order that day).
+
+## Lane H batch 47: tiles
+
+Eight jobs for `@margoengine/tiles` on the Beelink (lane H, work list 3), each a new optional entry or a renderer
+option; core and stage are untouched. Jobs 1, 3, 5 and 6 are proved on real files and on a real GPU, a Radeon 680M,
+through `packages/tiles/tests/tiles-browser.ts` (16 checks); jobs 2, 4, 7 and 8 in Node. Nothing is timed.
+
+| # | Job | Status | Commit | Entry | Claim |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Draw i3dm instances | DONE | `34108a2b` | `/i3dm` | LIM-344 |
+| 2 | Binary metadata and Draco points | DONE | `0dba1b47` | `/metadata` | LIM-359, LIM-360 |
+| 3 | Gaussian splat tiles | DONE | `24c935b9` | `/splats` | LIM-361 |
+| 4 | S2 bounding volumes | DONE | `d60d24d3` | `/s2`, root `boundingVolumes` option | LIM-362 |
+| 5 | GPU memory budget | DONE | `61939f68` | root `budget` option | LIM-363 |
+| 6 | Terrain and imagery overlays | DONE | `49b6fec2` | `/terrain` | LIM-364 |
+| 7 | Orthographic cameras in the renderer | DONE | `ce48e93f` | root, read from `camera.matrix` | LIM-370 |
+| 8 | Hosted tileset sign-in and attribution | DONE | this commit | `/ion`, root `TilesRenderer.onUpdate` | LIM-373 |
+
+Fixes in the same batch: `74e05c36` (README check: an LFS pointer is told by its first line, not its size;
+regression `tests/run-readme-examples.test.js`), `1c2b04bc` (the tiles README examples run on real Cesium samples, and a
+relative tileset URL resolves against the page; regressions `packages/tiles/tests/tiles.test.js` and
+`tests/run-readme-examples.test.js`), `7e18cc655` (terrain writes its GLB header with the shared constants, output
+byte-identical; regression `packages/tiles/tests/terrain.test.js`).
+
+- **Bugs fixed:** the README check dropped every real file under 200 bytes as an LFS pointer, so a 60-byte buffer was
+  answered with another model's `.bin`; `Tileset.load` with a relative URL in a page fetched the JSON but failed every
+  tile with "Cannot resolve tile URI"; a splat glTF tile was handed to `loadModel` and its splats drawn outside the
+  tile (job 3, regression `packages/tiles/tests/splats.test.js`); terrain's GLB literals duplicated the shared ones
+  (quality duplicates gate). The four tiles README examples fetched example.com and sat on the known list; they now
+  run on real samples and left it.
+- **Proved:** i3dm: Cesium's real TilesetWithTreeBillboards places all 25 trees, drawn where float64 maths puts them.
+  Metadata: real Cesium property tables read as their README lists; real Draco bitstreams (google/draco) in a
+  stand-in pnts decode as Draco's own decoder gives. Splats: CesiumJS's real sh_unit_cube drawn pixel for pixel as
+  `@margoengine/splats` draws it (0 of 129,600 pixels differ). S2: the extension README's id table, all 20 cells of its
+  availability figure and its Philadelphia example (STAND-IN: no real S2 dataset). Budget: Khronos BoomBox counts
+  89,836,912 B against 89,902,448 B allocated at the device. Terrain: Cesium World Terrain's real tile 9/759/335 puts
+  its highest vertex on Everest's summit; a real two-level layer draws as a globe with STAND-IN checker imagery.
+  Orthographic: generated matrices give the view height to 1e-4 and the root's error follows zoom, not distance.
+  Ion: stand-in servers answering as the ion endpoint and a keyed service are documented to; the token reaches only
+  its host, one renewal serves three requests in flight; credits read the real `asset.copyright` of Khronos's Fox and
+  AlphaBlendModeTest GLBs.
+- **Sizes:** the tiles root budget went from 14,561 B to 15,927 B gzip (splat hooks, budget count, S2 option); the
+  orthographic height and `onUpdate` fit inside it. New entries: i3dm 1,629 B, metadata 4,946 B, splats 1,822 B, s2
+  3,004 B, terrain 5,974 B, ion 2,785 B. Core and stage are untouched.
+- **Limits:** the renderer's default budget now counts GPU bytes, so apps with file-size budgets evict sooner;
+  orthographic selection is read from the matrix and is perspective before the first frame; no live ion or Google
+  request was made (no token on this machine). Rows in docs/limits.md.
+- **Sources:** the 3D Tiles 1.1 specification and extensions, quantized-mesh-1.0, the S2 cell hierarchy guide, the
+  ion REST API and Map Tiles API documentation, glTF 2.0; rows in `docs/clean-room.md`.
+- **Slips:** the first jobs 1 and 2 landing's rebase dropped the LIM-344 edit (the resolver kept main's row), fixed by
+  hand before it reached main. Job 2's first landing stopped at verify (the quality gate threw on a 'Three' clean-room
+  hit), fixed and amended; it then stopped at verify twice on the voxel-sandbox plaza-shard EPERM (fixed by
+  `2139b6cc7`, not lane H). A batch rebase met main's LIM-354 to 358, so ours (354 to 359) became 359 to 364;
+  the renumbering script refused the overlapping shift and the five tiles limits rows were renumbered by hand, so the
+  commit messages of jobs 2 to 6 still name the old numbers. Job 7's claim was written as LIM-368 and landed as LIM-370
+  after main took 368 and 369; job 8 wrote LIM-371 and landed as LIM-373. Job 8's first landing died on a
+  connection reset at fetch, before any check; its second stopped at api:check, the rebase having kept main's
+  api-surface row for tiles, so the record was regenerated and the landing run again whole. The orthographic draft predated the list-3 format commit and was reapplied on it; the
+  first run failed on tests whose stand-in engines have no `camera.matrix`, so a missing matrix now reads as perspective.
+- **Gate:** jobs 1 and 2 by the full landing (lint, hygiene, verify, the tiles tests, the tiles browser checks under the
+  GPU lock). Jobs 3 to 6 by Scott's quick landing that day (rebase, records, build, api:check, supply-chain check, the
+  tiles tests, the claims, llms, lock and api-conventions tests, the 16 browser checks), with lint, hygiene, readmes,
+  parity, the API quality gate and the tiles README run (8 of 8) before it. Jobs 7 and 8 by machines.md item 5: rebase,
+  build, api:check, `npm run quality`, lint, hygiene, the tiles tests, the claims, llms and lock tests and the tiles
+  browser checks under the GPU lock; the README run for tiles before each. One `npm run verify` on the newest main after
+  the last push.
