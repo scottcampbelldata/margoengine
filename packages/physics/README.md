@@ -232,18 +232,22 @@ Queries take `maxDistance`, `solid`, `groups`, `exclude` (a body), `excludeSenso
 
 ## Own solver preview
 
-`@margoengine/physics/next` is Margo's own solver while it is built, a Rust kernel compiled to WebAssembly and shipped inside the package, so you need no toolchain and no peer install. Rapier stays the default until the switch; this entry is a preview and goes away then. Today it holds the kernel's world and its memory, with no bodies or stepping yet.
+`@margoengine/physics/next` is Margo's own solver while it is built, a Rust kernel compiled to WebAssembly and shipped inside the package, so you need no toolchain and no peer install. Rapier stays the default until the switch; this entry is a preview and goes away then. Today it holds the kernel's world, its memory and bodies that move under forces, with no contacts yet.
 
 ```ts
 import {KernelWorld, loadKernel} from 'margoengine/physics/next';
 
 await loadKernel();                     // once per app
 const world = new KernelWorld(1024);    // rows of bodies; world.reserve(n) adds more
-world.columns.positionY[0] = 5;         // a column is a typed-array view of the kernel's memory
-console.log(world.bytes, world.hash);   // the hash is equal in every browser and in Node
+const body = world.addBody('dynamic');  // or 'fixed', 'kinematicPosition', 'kinematicVelocity'
+world.columns.inverseMass[body] = 1;    // a column is a typed-array view of the kernel's memory
+world.columns.positionY[body] = 5;
+world.columns.impulseX[body] = 2;       // lands once, before the first substep
+for (let i = 0; i < 60; i++) world.step(1 / 60);
+console.log(world.columns.positionY[body], world.hash); // the hash is equal in every browser and in Node
 ```
 
-Read views from `world.columns` each time: `reserve` replaces them. Each world is its own Wasm instance.
+Read views from `world.columns` each time: `reserve` and `addBody` can replace them. Each world is its own Wasm instance. Gravity defaults to `[0, -9.81, 0]` (`world.setGravity(x, y, z)`) and each step runs 4 substeps (`world.substeps`). A force in `forceX` and the columns beside it stays until you clear it and reaches every substep; an impulse in `impulseX` lands once, before the first. A dynamic body with no mass does not fall.
 
 ## Limits
 

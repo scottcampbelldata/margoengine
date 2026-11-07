@@ -214,6 +214,8 @@ A second Rust kernel, the own rigid-body solver, is being built behind `@margoen
 | `packages/physics/kernel/Cargo.toml`, `Cargo.lock` | Rust crate `margoengine-physics-kernel`, no dependencies, `cdylib` and `rlib`, the same release profile as section 1.1. |
 | `packages/physics/kernel/src/layout.rs` | The column table. `packages/physics/scripts/build-kernel.mjs` parses it, so JS and Rust read one list. |
 | `packages/physics/kernel/src/world.rs` | The world: header and columns in one block, addressed by offset. |
+| `packages/physics/kernel/src/integrate.rs` | The step: impulses once, then per substep the velocity update and the pose update. |
+| `packages/physics/kernel/src/math.rs` | Scalar, vector and quaternion maths, correctly rounded on both targets. |
 | `packages/physics/src/wasm.ts` | Generated: raw-deflate blueprint, source hash, column table. |
 | `packages/physics/src/kernel.ts` | `KernelWorld`: instantiate, bind views, grow. |
 
@@ -223,9 +225,11 @@ Memory contract: one Wasm instance per world, from `__heap_base`. Every column h
 
 Determinism contract: same inputs, same call order and same kernel build give bit-equal state on every machine, browser and Node. Wasm floats round to nearest, ties to even, and only NaN payloads may differ, so the state may hold no NaN. The kernel uses `+ - * /`, `sqrt`, compares and integers; no trigonometry, no fused or relaxed operations.
 
-Evidence so far: native tests of layout, growth and hash; Node tests of the views. `packages/physics/tests/kernel-blueprint.test.js` fails when the committed blueprint's source hash is not the hash of the sources, which closes for this kernel the gap section 1.6 lists for the transform kernel. The gate also rebuilds the blueprint and requires identical bytes.
+Step contract: `world_step(dt)` lands impulses once, before the first substep; forces stay in their columns and reach every substep, until the caller clears them. Each substep is semi-implicit Euler (velocity, then pose with the new velocity), so a body's reported velocity is the one that moved it. The gyroscopic term is one implicit-midpoint step in the principal frame, two Newton steps, and may not raise the energy. Rotation uses the exact exponential from a series, with no trigonometry. The contact and joint passes will go between the two halves of a substep.
 
-Missing: everything that needs bodies. No step exists yet, so bit equality across browsers and machines is unproved.
+Evidence so far: native tests of layout, growth and hash; Node tests of the views. `packages/physics/kernel/tests/integrate.rs` holds free fall and a projectile against the closed form with the method's own term, a free top against the closed precession rate, a heavy top against the Lagrange rate, energy on a tumbling box and at extreme spin, damping, locks, kinematic targets and an off-origin centre of mass, each bound derived from the method's error term plus f32 rounding. `packages/physics/tests/kernel-step.test.js` repeats the closed forms and the force and impulse contract through the shipped Wasm. `packages/physics/tests/kernel-blueprint.test.js` fails when the committed blueprint's source hash is not the hash of the sources, which closes for this kernel the gap section 1.6 lists for the transform kernel. The gate also rebuilds the blueprint and requires identical bytes.
+
+Missing: everything beyond free motion. Bit equality across browsers and machines is unproved until the replay test exists.
 
 ## 2. Precise GPU mathematics
 

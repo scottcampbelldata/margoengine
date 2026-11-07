@@ -13,7 +13,25 @@ interface KernelExports extends WebAssembly.Exports {
   world_columns(): number;
   world_reserve(bodies: number): number;
   world_hash(): number;
+  world_set_gravity(x: number, y: number, z: number): void;
+  world_gravity(axis: number): number;
+  world_set_substeps(substeps: number): void;
+  world_substeps(): number;
+  world_steps(): number;
+  world_step(dt: number): void;
+  body_add(kind: number): number;
 }
+
+/** How a body moves: `dynamic` by forces, `kinematicPosition` to a target, `kinematicVelocity` at its velocity. */
+export type KernelBodyKind = 'fixed' | 'dynamic' | 'kinematicPosition' | 'kinematicVelocity';
+
+/** The kind bits of the `flags` column (kernel/src/layout.rs). */
+const bodyKinds: Readonly<Record<KernelBodyKind, number>> = {
+  fixed: 0,
+  dynamic: 2,
+  kinematicPosition: 4,
+  kinematicVelocity: 6,
+};
 
 const compiled = new LoadOnce<WebAssembly.Module>(async () => {
   const bytes = Uint8Array.from(atob(wasmBase64), (c) => c.charCodeAt(0));
@@ -77,6 +95,63 @@ export class KernelWorld {
   /** Rows of body columns. */
   get capacity(): number {
     return this.api.world_capacity(0);
+  }
+  /** Steps taken so far. */
+  get steps(): number {
+    return this.api.world_steps();
+  }
+  /**
+   * Equal pieces each step is split into (default 4). Forces reach every piece; impulses land once, before the first.
+   * @throws RangeError unless it is a whole number from 1 up.
+   */
+  get substeps(): number {
+    return this.api.world_substeps();
+  }
+  set substeps(substeps: number) {
+    if (!Number.isInteger(substeps) || substeps < 1 || substeps > 0xffff)
+      throw new RangeError(`Substeps must be a whole number from 1 to 65535; use 4 unless you measured (got ${substeps}).`);
+    this.api.world_set_substeps(substeps);
+  }
+  /** Gravity as `[x, y, z]`, in m/s^2 (default `[0, -9.81, 0]`, read back as f32). */
+  get gravity(): [number, number, number] {
+    const { api } = this;
+    return [api.world_gravity(0), api.world_gravity(1), api.world_gravity(2)];
+  }
+  /**
+   * Sets gravity.
+   * @throws RangeError for a value that is not finite: a NaN in the state would end bit equality.
+   */
+  setGravity(x: number, y: number, z: number): this {
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z))
+      throw new RangeError(`Gravity must be three finite numbers; check what fed it (got ${x}, ${y}, ${z}).`);
+    this.api.world_set_gravity(x, y, z);
+    return this;
+  }
+  /**
+   * Adds a body and returns its row, which is its index in every column. Grows the world when the rows run out, so read
+   * views from `columns` after this call. A new row is at the origin with no mass: give a dynamic body `inverseMass`.
+   * @throws RangeError for an unknown kind, or when the world cannot grow.
+   */
+  addBody(kind: KernelBodyKind): number {
+    const bits = Object.hasOwn(bodyKinds, kind) ? bodyKinds[kind] : undefined;
+    if (bits === undefined)
+      throw new RangeError(`Unknown body kind ${String(kind)}; use one of ${Object.keys(bodyKinds).join(', ')}.`);
+    let row = this.api.body_add(bits);
+    if (row < 0) {
+      this.reserve(this.capacity * 2);
+      row = this.api.body_add(bits);
+    }
+    return row;
+  }
+  /**
+   * Advances the world by `dt` seconds, in {@link KernelWorld.substeps} equal pieces.
+   * @throws RangeError unless `dt` is finite and above zero.
+   */
+  step(dt: number): this {
+    if (!(dt > 0) || !Number.isFinite(dt))
+      throw new RangeError(`A step must be finite and above zero; a usual step is 1 / 60 (got ${dt}).`);
+    this.api.world_step(dt);
+    return this;
   }
   /** Bytes of the world, and of a {@link KernelWorld.snapshot}. */
   get bytes(): number {

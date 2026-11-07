@@ -50,3 +50,32 @@ pub extern "C" fn world_reserve(bodies: u32) -> u32 {
 pub extern "C" fn world_hash() -> u32 {
     world().hash()
 }
+#[unsafe(no_mangle)]
+pub extern "C" fn world_set_gravity(x: f32, y: f32, z: f32) {
+    world().header_mut().gravity = [x, y, z];
+}
+#[unsafe(no_mangle)]
+pub extern "C" fn world_set_substeps(substeps: u32) {
+    world().header_mut().substeps = substeps;
+}
+#[unsafe(no_mangle)]
+pub extern "C" fn world_steps() -> u32 {
+    world().header().steps
+}
+#[unsafe(no_mangle)]
+pub extern "C" fn world_substeps() -> u32 {
+    world().header().substeps
+}
+#[unsafe(no_mangle)]
+pub extern "C" fn world_gravity(axis: u32) -> f32 {
+    world().header().gravity[axis as usize]
+}
+/// A new row of the given kind, or -1 when the rows are used up.
+#[unsafe(no_mangle)]
+pub extern "C" fn body_add(kind: u32) -> i32 {
+    world().add_body(kind).map_or(-1, |row| row as i32)
+}
+#[unsafe(no_mangle)]
+pub extern "C" fn world_step(dt: f32) {
+    world().step(dt);
+}

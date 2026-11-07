@@ -12,6 +12,12 @@ pub struct Header {
     pub bytes: u32,
     pub capacity: [u32; ROW_CLASSES],
     pub offsets: [u32; COLUMNS],
+    /// Rows handed out so far.
+    pub rows: u32,
+    /// Steps taken, and how many substeps split each.
+    pub steps: u32,
+    pub substeps: u32,
+    pub gravity: [f32; 3],
 }
 
 const HEADER_BYTES: u32 = ((core::mem::size_of::<Header>() + 15) & !15) as u32;
@@ -35,7 +41,7 @@ impl World {
         let world = Self { arena };
         unsafe {
             core::ptr::write_bytes(world.arena.base, 0, bytes as usize);
-            world.header_ptr().write(Header { magic: MAGIC, bytes, capacity, offsets });
+            world.header_ptr().write(Header { magic: MAGIC, bytes, capacity, offsets, rows: 0, steps: 0, substeps: 4, gravity: [0.0, -9.81, 0.0] });
         }
         Some(world)
     }
@@ -101,6 +107,24 @@ impl World {
         header.capacity = capacity;
         header.offsets = new_offsets;
         true
+    }
+
+    /// Hands out the next row: identity rotations, unit gravity scale, the given kind. None when the rows are used up,
+    /// so the caller reserves more and asks again.
+    pub fn add_body(&mut self, kind: u32) -> Option<u32> {
+        let row = self.header().rows;
+        if row >= self.header().capacity[0] {
+            return None;
+        }
+        self.header_mut().rows = row + 1;
+        let at = row as usize;
+        unsafe {
+            for column in [ROTATION_W, PREVIOUS_ROTATION_W, INERTIA_FRAME_W, TARGET_ROTATION_W, GRAVITY_SCALE] {
+                *self.f(column).add(at) = 1.0;
+            }
+            *self.u(FLAGS).add(at) = ALIVE | (kind & KIND);
+        }
+        Some(row)
     }
 
     /// FNV-1a over the world's 32-bit words, the replay proof's fingerprint: everything a step can change is inside.
