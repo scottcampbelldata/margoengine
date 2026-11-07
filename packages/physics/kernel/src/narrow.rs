@@ -560,7 +560,7 @@ impl World {
             let (body_a, body_b) = (self.uu(COLLIDER_BODY, a) as usize, self.uu(COLLIDER_BODY, b) as usize);
             // Scripted bodies pass through each other: nothing can push them.
             if self.flags(body_a) & KIND != DYNAMIC && self.flags(body_b) & KIND != DYNAMIC || self.joined(body_a, body_b) {
-                self.set_u(PAIR_CONTACTS, row, 0);
+                self.drop_contacts(row, body_a, body_b);
                 continue;
             }
             let limit = self.contact_limit(a, b, dt);
@@ -571,6 +571,9 @@ impl World {
             manifold.feature = self.uu(PAIR_FEATURE, row);
             self.collide(a, b, limit, &mut manifold);
             self.set_u(PAIR_FEATURE, row, if manifold.count > 0 { manifold.feature } else { 0 });
+            if manifold.count == 0 {
+                self.drop_contacts(row, body_a, body_b);
+            }
             self.store_manifold(row, body_a, body_b, &manifold, ratio);
         }
     }

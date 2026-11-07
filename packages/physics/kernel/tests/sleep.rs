@@ -517,3 +517,35 @@ fn sleepers_in_a_random_churn_keep_every_list_true() {
     };
     assert_eq!(run(1, 1), run(3000, 3000));
 }
+
+#[test]
+fn a_body_whose_support_goes_falls_though_its_time_to_sleep_ran_out_long_ago() {
+    // The lower block cannot sleep, so the upper one rests with its timer long full. Each way of taking the support has to
+    // start that timer again, or the upper block sleeps in mid air at the first look.
+    for way in 0..2 {
+        let mut w = World::new(4, 4).unwrap();
+        let floor = w.add_body(FIXED).unwrap();
+        w.add_collider(floor, SHAPE_BOX, [50.0, 0.5, 50.0], [0.0; 3], IDENTITY, 0.0).unwrap();
+        w.set_pose(floor, v3(0.0, -0.5, 0.0), Q::IDENTITY, false);
+        let lower = w.add_body(DYNAMIC).unwrap();
+        w.add_collider(lower, SHAPE_BOX, [0.5, 0.5, 0.5], [0.0; 3], IDENTITY, 1.0).unwrap();
+        w.set_pose(lower, v3(0.0, 0.5, 0.0), Q::IDENTITY, false);
+        w.set_u(FLAGS, lower as usize, w.flags(lower as usize) & !CAN_SLEEP);
+        let upper = w.add_body(DYNAMIC).unwrap();
+        w.add_collider(upper, SHAPE_BOX, [0.5, 0.5, 0.5], [0.0; 3], IDENTITY, 1.0).unwrap();
+        w.set_pose(upper, v3(0.0, 1.5, 0.0), Q::IDENTITY, false);
+        for _ in 0..120 {
+            w.step(DT);
+        }
+        if way == 0 {
+            w.remove_body(lower);
+        } else {
+            w.set_pose(lower, v3(20.0, 0.5, 0.0), Q::IDENTITY, true);
+        }
+        for _ in 0..30 {
+            w.step(DT);
+        }
+        let y = w.v(POSITION_X, upper as usize).y;
+        assert!(y < 1.0, "way {way}: it hangs at {y}");
+    }
+}

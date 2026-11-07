@@ -18,6 +18,28 @@ use crate::world::{NONE, World};
 const NOISE: f32 = 1e-6;
 
 impl World {
+    /// A pair's contacts go: each body counts its stillness again. A body that cannot sleep keeps its island awake, so what rests
+    /// on it can be long past its time to sleep, and with its support gone it would sleep in mid air at the next look.
+    pub fn drop_contacts(&mut self, row: usize, a: usize, b: usize) {
+        if self.uu(PAIR_CONTACTS, row) != 0 {
+            self.set_u(PAIR_CONTACTS, row, 0);
+            self.set_s(SLEEP_TIME, a, 0.0);
+            self.set_s(SLEEP_TIME, b, 0.0);
+        }
+    }
+
+    /// A pair leaves the broad phase, with a body that may already be gone.
+    pub fn pair_leaves(&mut self, row: usize) {
+        if self.uu(PAIR_CONTACTS, row) != 0 {
+            for collider in [self.uu(PAIR_A, row), self.uu(PAIR_B, row)] {
+                let body = self.uu(COLLIDER_BODY, collider as usize);
+                if body != NONE {
+                    self.set_s(SLEEP_TIME, body as usize, 0.0);
+                }
+            }
+        }
+    }
+
     /// True when `body` is on the awake list.
     #[inline(always)]
     pub fn is_awake(&self, body: usize) -> bool {

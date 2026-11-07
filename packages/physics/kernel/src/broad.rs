@@ -541,6 +541,7 @@ impl World {
 
     /// Removes a pair. The table closes the gap by moving back any entry the gap would cut off from its hash.
     pub fn remove_pair(&mut self, row: u32) {
+        self.pair_leaves(row as usize);
         self.deactivate_pair(row);
         let at = row as usize;
         let (a, b) = (self.uu(PAIR_A, at), self.uu(PAIR_B, at));
