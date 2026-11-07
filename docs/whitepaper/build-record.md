@@ -1473,7 +1473,14 @@ Scott's order of 2026-11-07, one at a time, each pushed before the next.
 | 1b | RiggedFigure slid more at 8 passes after item 1 | DONE | `82ead69e5` | `/balance` | LIM-248 |
 | 2 | Seed-san's creep | DONE | `82ead69e5` | `/balance` | LIM-248 |
 | 5 | Mage's shake, and Mage in the strict test | DONE | `82ead69e5` | `/balance` | LIM-248 |
+| 4 | Pushes: what is fair, swing end on contact, every figure's numbers | CLOSED FOR KNIGHT, TALL FIGURES OPEN | this commit | `/balance` | LIM-248 |
 | 3 | Rod motors: real inertia in the gains and caps | DONE, ANKLE BAND REJECTED | this commit | `/powered`, `/balance` | LIM-248 |
+
+**Item 4, pushes.** Knight fails the push reading in 3 / 1 / 7 of 128 at 8 / 10 / 16 passes, was 3 / 3 / 2, and falls in none. That is fair physics: every one of those stands still by 14 s after 6 to 19 steps. A 1.5 m/s push on the upper body moves the centre of mass at 0.90 m/s, its capture point 0.21 m out, and with 0.28 s steps of 0.253 m a point mass can stop by stepping alone only from a push of about 0.77 m/s. Capture Point 2006 says one step stops a fall only if the capture region is in reach, so past that it takes more steps, and the ankles and the width of the stance are what get Knight there. No code changed.
+
+- **Swing end on foot contact, tried once:** worse over all seven figures, 964 pushes failed of 2,688 against 854, with Rogue, Mage and Barbarian worse and Knight falling once. Not landed.
+- **Also tried:** leaving a foot in the air out of the stance legs, 926 failed. Two other reaches for a step: no better. Not landed.
+- **Found:** RiggedFigure and Seed-san fall from 0.5 m/s, which capture point theory does not excuse, and the balance is the owner. In known-bugs.md with the reads so far. Every figure's numbers are in limits.md, and LIM-248 now says the 1.5 m/s push is Knight's.
 
 **Item 3, rod motors.** Gains and caps now come from each body's real centre of mass and inertia. Head turned after one second with motors alone, before and after: Knight 0.831 / 0.003 rad, Barbarian 0.528 / 0.002, Ranger 0.783 / 0.002, Rogue 0.807 / 0.000, Mage 0.185 / 0.005. RiggedFigure 0.055 / 0.049 and Seed-san 0.014 / 0.056 are the two whose rod figure was already at or above the real one (ratio 1.09 and 30.6): RiggedFigure's reading is its body folding, 0.000 with the hips pinned, and Seed-san's motor is softer by that ratio, a steady 0.080 rad pinned against 0.030.
 
