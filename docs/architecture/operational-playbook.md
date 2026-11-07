@@ -578,6 +578,14 @@ shares no GPU object with `VolumetricClouds` and survives either side's device l
 48 ground points against the clouds seen from each point toward the sun, mean 0.0018 before and 0.0021 after 1,500 m of
 drift, 0.29 for stale shadows; Radeon 680M. Missing: other GPUs, any timing, a soft edge from the sun's size.
 
+`AerialPerspective` (`@margoengine/sky/aerial`) is the first user of `atmosphere-luts.ts`, the sky's Hillaire 2020 model in
+kilometres: a 256 x 64 transmittance table (Bruneton 2017 mapping) and a 32 x 32 multiple scattering table, recomputed only
+when the medium changes, and a 32^3 camera volume each frame, one thread per column marching its slices in turn. Ray
+and sphere constants use (|o| - r)(|o| + r), so a camera a metre up keeps its horizon in f32. The composite is two blended
+draws in one pass (dst x T, then + L), exact per channel without dual-source blending, which core does not request.
+Evidence: `features-check.mjs` aerial, transmittance within 0.006 of a CPU Beer-Lambert integral at 1, 10 and 40 km on a
+Radeon 680M. Missing: other GPUs, any timing, an in-scattering reference.
+
 A `ShadowFilterEffect` replaces the named filters' last step in `shadowVisibility`, after the cascade pick and the receiver
 plane. `varianceFilter` turns the depth map into two moments, blurs them by two separable passes when the map changes, and
 bounds the lit share with Chebyshev's inequality. A filter's shader must keep `shadowSampler` read, in a branch never taken,

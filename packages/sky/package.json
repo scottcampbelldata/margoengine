@@ -74,6 +74,10 @@
     "./cloud-shadows": {
       "types": "./dist/cloud-shadows.d.ts",
       "import": "./dist/cloud-shadows.js"
+    },
+    "./aerial": {
+      "types": "./dist/aerial.d.ts",
+      "import": "./dist/aerial.js"
     }
   },
   "files": [

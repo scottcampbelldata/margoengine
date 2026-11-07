@@ -1,0 +1,50 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Sky aerial perspective check</title><style>body{margin:0}canvas{display:block;width:128px;height:96px}</style></head><body><canvas width="128" height="96"></canvas>
+<script type="module">
+// Aerial perspective on a real GPU: a dark and a bright box side by side at 1, 10 and 40 km give, per channel, the air's
+// transmittance (from their difference) and in-scattered light. Driven by features-check.mjs.
+import {Engine,PbrMaterial,box} from '/packages/core/dist/index.js';
+import {sceneSamples} from '/packages/core/dist/quality.js';
+import {Bloom} from '/packages/post/dist/bloom.js';
+import {Sky} from '/packages/sky/dist/index.js';
+import {AerialPerspective} from '/packages/sky/dist/aerial.js';
+if(new URLSearchParams(location.search).get('samples')==='1')globalThis.margoLow=1;
+const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,10,0],target:[0,10,-1000],fov:6,near:1,far:200000}}),device=engine.gpu,errors=[];
+engine.stop();
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const post=Bloom.attach(engine,{strength:0,threshold:1,exposure:0});
+const sky=new Sky({hours:10,timeScale:0});engine.use(sky);
+// Pairs at distance d, elevation e (degrees): each box 1.6 degrees wide, centred 1 degree either side of the aim.
+const pairs={near:[1000,6],mid:[10000,3],far:[40000,1]},rad=Math.PI/180;
+for(const [d,e] of Object.values(pairs))for(const [side,color] of [[-1,'#202020'],[1,'#c0c0c0']]){
+ const az=side*rad,el=e*rad;
+ engine.createMesh().setGeometry(box(d*0.028,d*0.05,d*0.028)).setMaterial(new PbrMaterial({color,roughness:1,metalness:0}))
+  .setPosition([Math.sin(az)*Math.cos(el)*d,10+Math.sin(el)*d,-Math.cos(az)*Math.cos(el)*d]);
+}
+const module=device.createShaderModule({code:'@group(0) @binding(0) var image:texture_2d<f32>;@group(0) @binding(1) var<storage,read_write> result:array<vec4f>;@compute @workgroup_size(1) fn main(@builtin(global_invocation_id) id:vec3u){let s=textureDimensions(image);let p=array<vec2u,3>(vec2u(s.x/2u-s.x/6u,s.y/2u),vec2u(s.x/2u+s.x/6u,s.y/2u),vec2u(s.x/2u,2u));result[id.x]=textureLoad(image,p[id.x],0);}'});
+const pipeline=device.createComputePipeline({layout:'auto',compute:{module,entryPoint:'main'}});
+// The left box, the right box and a sky pixel at the top of Bloom's HDR scene capture.
+async function sample(){
+ engine.render({delta:0});
+ const output=device.createBuffer({size:48,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),staging=device.createBuffer({size:48,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+ const encoder=device.createCommandEncoder(),pass=encoder.beginComputePass();pass.setPipeline(pipeline);
+ pass.setBindGroup(0,device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:post.sceneTexture.createView()},{binding:1,resource:{buffer:output}}]}));
+ pass.dispatchWorkgroups(3);pass.end();encoder.copyBufferToBuffer(output,0,staging,0,48);device.queue.submit([encoder.finish()]);
+ await staging.mapAsync(GPUMapMode.READ);const v=Array.from(new Float32Array(staging.getMappedRange()));staging.unmap();output.destroy();staging.destroy();
+ return {dark:v.slice(0,3),bright:v.slice(4,7),sky:v.slice(8,11)};
+}
+window.check={samples:sceneSamples,
+ async run(){
+  device.pushErrorScope('validation');const out={};
+  for(const [name,[d,e]] of Object.entries(pairs)){
+   engine.camera.target=[0,10+Math.sin(e*rad)*1000,-Math.cos(e*rad)*1000];
+   await sample();const bare=await sample();
+   const aerial=AerialPerspective.attach(engine,{sky,depth:()=>post.depthTexture});
+   await sample();const air=await sample();aerial.dispose();
+   const transmittance=[0,1,2].map(c=>(air.bright[c]-air.dark[c])/(bare.bright[c]-bare.dark[c]));
+   out[name]={distance:d,elevation:e,bare,air,transmittance,inscatter:[0,1,2].map(c=>air.dark[c]-transmittance[c]*bare.dark[c]),skySame:bare.sky.every((v,c)=>v===air.sky[c])};
+  }
+  const error=await device.popErrorScope();
+  return {...out,error:error?.message??null,errors:errors.splice(0)};
+ }};
+window.ready=true;
+</script></body></html>

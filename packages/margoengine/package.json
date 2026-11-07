@@ -2198,6 +2198,10 @@
       "types": "./dist/sky/cloud-shadows.d.ts",
       "import": "./dist/sky/cloud-shadows.js"
     },
+    "./sky/aerial": {
+      "types": "./dist/sky/aerial.d.ts",
+      "import": "./dist/sky/aerial.js"
+    },
     "./splats": {
       "types": "./dist/splats.d.ts",
       "import": "./dist/splats.js"

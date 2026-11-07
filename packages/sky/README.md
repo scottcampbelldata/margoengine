@@ -40,6 +40,7 @@ const sky = Sky.attach(engine, {model: 'bruneton', clouds: {coverage: 0.4}}, {br
 | `/weather` | `Weather`, its own plugin (not a `Sky` feature): rain, snow, lightning, thunder timing | 5.6 kB |
 | `/volumetric-clouds` | `VolumetricClouds`, its own plugin: ray-marched 3D clouds you can fly through | 7.3 kB |
 | `/cloud-shadows` | `volumetricCloudShadows`, a shadow effect for `@margoengine/shadows` | 3.2 kB |
+| `/aerial` | `AerialPerspective`, its own plugin: distant surfaces take the air's colour | 6.5 kB |
 
 Each entry is compressed on its own ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)),
 so sums overstate a combined bundle: the root `Sky` is 10.2 kB with all of them, against 13.7 kB
@@ -190,6 +191,47 @@ there would see cloud over the sun. The effect keeps its own copy of the noise v
 so the copy is the same cloud) and needs nothing from the clouds' GPU objects; it takes four of a shadow effect's eight
 bindings. The light is the shadows' sun (`engine.lighting.direction`), so drive it from the sky (`lighting`) to keep the
 two together.
+
+## Aerial perspective
+
+`AerialPerspective` from `@margoengine/sky/aerial` gives scene surfaces the air in front of them: each pixel is
+multiplied by the air's transmittance, per colour channel, and given the light the air scatters toward the camera, so
+distant mountains turn blue and hazy by real scattering (Hillaire 2020). It needs the scene's depth.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Sky} from 'margoengine/sky';
+import {Bloom} from 'margoengine/post/bloom';
+import {AerialPerspective} from 'margoengine/sky/aerial';
+const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu', camera: {far: 100000}});
+const bloom = Bloom.attach(engine);
+const sky = Sky.attach(engine, {hours: 16, timeScale: 0});
+const aerial = AerialPerspective.attach(engine, {sky, depth: () => bloom.depthTexture});
+aerial.options.metersPerUnit = 10; // a small scene with the air of a large one
+```
+
+The air is Earth's by default (`EARTH_ATMOSPHERE`, Hillaire 2020 Table 1): Rayleigh scattering, Mie scattering and
+absorption, an ozone layer and the ground's albedo; `atmosphere` changes any of them (`atmosphereParameters` checks a
+set and fills the rest). Two tables are worked out once per atmosphere, the transmittance to the top (256 × 64) and
+multiple scattering (32 × 32, Hillaire 2020's second order over 64 directions summed as a geometric series). Each
+frame a compute pass marches 32 × 32 view columns through 32 slices, reaching `maxDistance` (64 km) on a square-root
+spacing, so slices are dense near the camera; the pixel reads its slice by its distance. With a `sky`, the sun, the
+sky's turbidity (which scales Mie scattering as the sky does) and its exposure carry over; `sunIlluminance` defaults
+to what matches the sky's model (20 for Bruneton, 10 for Preetham, the sky's own for `HillaireSky`).
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `depth` | required | the scene's reversed-Z depth each frame |
+| `sky` | none | the sky to follow; without it `sunDirection` (default [0.3, 0.6, 0.4]) |
+| `maxDistance` | 64,000 | metres the air is worked out to; farther pixels keep that value |
+| `metersPerUnit` | 1 | metres per world unit |
+| `altitude` | 0 | metres added to the camera's height |
+| `sunIlluminance` | from the sky | sun strength in the sky's units |
+| `atmosphere` | Earth | the planet's air, kilometres |
+
+The planet's centre is taken under the camera, at its height. Sky pixels (no depth) are untouched. On a display
+target (no HDR scene capture) the air's light is display-encoded and blended there, an approximation; with Bloom,
+tonemapping or another HDR capture it is exact. Needs WebGPU.
 
 ## Sun, ambient and a sky that lights the scene
 
@@ -452,7 +494,7 @@ no change to your code: the package loads a small route there that computes the 
 This is a screen-space-free particle overlay: no splashes on the ground, no rain running down the lens, no rain
 occlusion under roofs (it respects the scene depth, not covered areas).
 
-This is a compact atmospheric approximation, not a reference-quality reproduction of the original planetary renderer: no ozone spectrum, ground-albedo irradiance feedback, terrain light shafts or physical aerial perspective. Coarse angular sampling can band; the visible horizon uses a skyward sample to avoid a dark ground strip. Preetham is a daytime model with a night fade.
+This is a compact atmospheric approximation, not a reference-quality reproduction of the original planetary renderer: no ozone spectrum, ground-albedo irradiance feedback or terrain light shafts (physical aerial perspective is the `/aerial` entry). Coarse angular sampling can band; the visible horizon uses a skyward sample to avoid a dark ground strip. Preetham is a daytime model with a night fade.
 
 Models: [Preetham daylight notes](https://renderwonk.com/publications/s2003-course/preetham/notes-preetham.pdf), [Bruneton scattering equations](https://ebruneton.github.io/precomputed_atmospheric_scattering/atmosphere/functions.glsl.html).
 

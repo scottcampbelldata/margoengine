@@ -69,6 +69,47 @@ const checks = {
     );
     return { first, second, matched, moved, stale };
   },
+  async aerial(page, samples) {
+    const r = await page.evaluate(() => window.check.run());
+    assert.equal(r.error, null);
+    assert.deepEqual(r.errors, []);
+    // Beer-Lambert along the same ray on the CPU: Rayleigh, Mie (times 0.5, the sky's turbidity 2) and ozone from Hillaire
+    // 2020 Table 1, 20,000 steps from 10 m up at the pair's elevation over the planet's curve.
+    const transmittance = (distance, elevation) => {
+      const R = 6360, r0 = R + 0.01, n = 20000, dt = distance / 1000 / n, sin = Math.sin((elevation * Math.PI) / 180), out = [0, 0, 0];
+      for (let i = 0; i < n; i++) {
+        const t = (i + 0.5) * dt, h = Math.sqrt(r0 * r0 + t * t + 2 * r0 * t * sin) - R,
+          mie = (0.003996 + 0.00444) * 0.5 * Math.exp(-h / 1.2), ozone = Math.max(0, 1 - Math.abs(h - 25) / 15);
+        [0.005802, 0.013558, 0.0331].forEach((b, c) => (out[c] += (b * Math.exp(-h / 8) + mie + [0.00065, 0.001881, 0.000085][c] * ozone) * dt));
+      }
+      return out.map((v) => Math.exp(-v));
+    };
+    // The GPU volume takes two midpoint steps per slice and interpolates linearly between slices; 0.015 is 2.5 times the
+    // largest difference measured (0.0058, blue at 40 km).
+    const rows = ['near', 'mid', 'far'].map((name) => ({ name, ...r[name], cpu: transmittance(r[name].distance, r[name].elevation) }));
+    for (const row of rows) {
+      assert.ok(row.skySame, `${row.name}: the sky pixel changed`);
+      for (let c = 0; c < 3; c++)
+        assert.ok(
+          Math.abs(row.transmittance[c] - row.cpu[c]) < 0.015,
+          `${row.name} channel ${c}: GPU transmittance ${row.transmittance[c]} against ${row.cpu[c]} on the CPU`,
+        );
+    }
+    const [near, mid, far] = rows;
+    for (let c = 0; c < 3; c++) {
+      assert.ok(near.transmittance[c] > mid.transmittance[c] && mid.transmittance[c] > far.transmittance[c], 'farther fades more');
+      assert.ok(near.inscatter[c] < mid.inscatter[c] && mid.inscatter[c] < far.inscatter[c], 'farther takes more of the air');
+    }
+    // Mountains go blue: the light the air adds is bluest, and blue is what it takes away most.
+    for (const row of [mid, far]) {
+      assert.ok(row.inscatter[2] > row.inscatter[1] && row.inscatter[1] > row.inscatter[0], `${row.name} air is not blue: ${row.inscatter}`);
+      assert.ok(row.transmittance[2] < row.transmittance[0], `${row.name}: blue must fade first`);
+    }
+    const show = (v) => v.map((x) => x.toFixed(4)).join(', ');
+    for (const row of rows)
+      console.log(`ok aerial ${samples}x ${row.name} (${row.distance / 1000} km): transmittance ${show(row.transmittance)} (CPU ${show(row.cpu)}), air ${show(row.inscatter)}`);
+    return r;
+  },
 };
 const names = process.argv.slice(2).length ? process.argv.slice(2) : Object.keys(checks);
 const context = await openBrowser({ startPath: '/packages/sky/test/volumetric-check.html', port: 5213 }),

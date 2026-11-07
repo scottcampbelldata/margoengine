@@ -2326,6 +2326,10 @@
       "./cloud-shadows": {
         "raw": 7520,
         "gzip": 3211
+      },
+      "./aerial": {
+        "raw": 18677,
+        "gzip": 6463
       }
     },
     "@margoengine/splats": {
