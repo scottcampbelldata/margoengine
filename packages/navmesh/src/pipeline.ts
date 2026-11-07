@@ -1130,10 +1130,27 @@ export function polygonise(
   // Simplification of one stretch (both ends kept). Exact mode only drops points on straight runs.
   const tolerance = config.maxSimplificationError,
     longest = config.maxEdgeLen;
+  const onEdge = (v: number) => {
+    const [x0, z0, x1, z1] = grid.keep as Keep;
+    return vx[v] === x0 || vx[v] === x1 + 1 || vz[v] === z0 || vz[v] === z1 + 1;
+  };
   const simplify = (ids: number[], exact: boolean, wall: boolean): number[] => {
     const n = ids.length,
       keep = new Uint8Array(n);
     keep[0] = keep[n - 1] = 1;
+    // A run along the tile's edge keeps its ends: the tile next door meets it there, and a notch a cell deep is less
+    // than the tolerance, so a door on a tile line would otherwise lose its way through.
+    if (grid.keep)
+      for (let i = 1; i < n - 1; i++)
+        if (
+          onEdge(ids[i]) &&
+          !(
+            onEdge(ids[i - 1]) &&
+            onEdge(ids[i + 1]) &&
+            !turn(vx[ids[i - 1]], vz[ids[i - 1]], vx[ids[i]], vz[ids[i]], vx[ids[i + 1]], vz[ids[i + 1]])
+          )
+        )
+          keep[i] = 1;
     if (exact) {
       for (let i = 1; i < n - 1; i++) {
         const a = ids[i - 1],

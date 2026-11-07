@@ -1634,6 +1634,10 @@
       "types": "./dist/navmesh/links.d.ts",
       "import": "./dist/navmesh/links.js"
     },
+    "./navmesh/hierarchy": {
+      "types": "./dist/navmesh/hierarchy.d.ts",
+      "import": "./dist/navmesh/hierarchy.js"
+    },
     "./navmesh/tiles": {
       "types": "./dist/navmesh/tiles.d.ts",
       "import": "./dist/navmesh/tiles.js"

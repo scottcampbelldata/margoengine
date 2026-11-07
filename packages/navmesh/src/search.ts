@@ -58,6 +58,8 @@ export class CorridorSearch {
   private entry = new Float64Array(0);
   private heapKey = new Float64Array(1);
   private heapNode = new Int32Array(1);
+  /** What the last corridor {@link CorridorSearch.find} returned costs, the walk to its end included. */
+  cost = 0;
   /** Makes room for `polygons` polygons and `links` links in all. */
   reserve(polygons: number, links: number): void {
     if (this.g.length < polygons) {
@@ -180,6 +182,7 @@ export class CorridorSearch {
         }
       }
     }
+    this.cost = g[to] + Math.hypot(gx - entry[to * 3], gy - entry[to * 3 + 1], gz - entry[to * 3 + 2]) * costs[to];
     const corridor: Link[] = [];
     for (let node = to; node !== from; node = parent[node]) corridor.push(adjacency[parent[node]][parentLink[node]]);
     return corridor.reverse();

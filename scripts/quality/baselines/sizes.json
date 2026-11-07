@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10316207,
+  "total": 10365336,
   "history": [
     {
       "date": "2026-10-24",
@@ -3386,6 +3386,12 @@
       "commit": "747c2e4c8",
       "reason": "parseLottie gains the deferred style walk, one-by-one trim, arc length easing and legacy colours, each needed to play real exports as lottie-web does",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "e19993afb",
+      "reason": "new optional entry @margoengine/navmesh/hierarchy; tile edge runs keep their ends",
+      "grew": 1
     }
   ],
   "items": {
@@ -3793,6 +3799,7 @@
     "@margoengine/navmesh/agents": 15964,
     "@margoengine/navmesh/build": 12727,
     "@margoengine/navmesh/codec": 17103,
+    "@margoengine/navmesh/hierarchy": 4250,
     "@margoengine/navmesh/links": 4288,
     "@margoengine/navmesh/tiles": 15113,
     "@margoengine/net": 1371,

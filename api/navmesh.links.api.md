@@ -223,6 +223,16 @@ class TiledNavMesh implements NavSurface {
     route(start: Vec3, end: Vec3, filter?: NavFilter): NavRoute | null;
     addOffMeshLink(start: Vec3, end: Vec3, options?: OffMeshLinkOptions): number;
     removeOffMeshLink(id: number): boolean;
+    get tileSpan(): number;
+    graph(filter?: NavFilter): {
+        count: number;
+        adjacency: readonly (readonly Link[])[];
+        costs: ArrayLike<number>;
+        owners: readonly ({
+            x: number;
+            z: number;
+        } | null)[];
+    };
     snapshot(level: boolean): TiledState;
     restore(state: TiledState): void;
     dispose(): void;

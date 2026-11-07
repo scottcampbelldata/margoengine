@@ -262,3 +262,21 @@ test('queries and changes check what they are given', () => {
   world.dispose();
   assert.throws(() => world.update(), /disposed/);
 });
+
+test('a door in a wall on a tile line joins the tiles either side', () => {
+  // The wall starts on the line x = 32, so the door's cells reach that line in a notch one cell deep, less than the
+  // simplification tolerance. Regression: the notch was simplified away and the two tiles never met.
+  const [positions, indices] = level(64, [
+      [32, 32.5, 0, 20],
+      [32, 32.5, 23, 64],
+    ]),
+    world = new TiledNavMesh(positions, indices, {
+      cs: 0.5,
+      ch: 0.1,
+      walkableRadius: 1,
+      walkableHeight: 10,
+      tileSize: 16,
+    });
+  assert.ok(world.route([5, 0, 21], [50, 0, 21]));
+  assert.ok(world.route([50, 0, 5], [5, 0, 50]));
+});

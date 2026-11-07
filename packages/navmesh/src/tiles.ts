@@ -685,6 +685,25 @@ export class TiledNavMesh implements NavSurface {
     }
     link.from = link.to = -1;
   }
+  /** World units along a tile's side. */
+  get tileSpan(): number {
+    return this.span;
+  }
+  /** @internal The polygon graph, for `./hierarchy` and `./debug`; live arrays, read only. */
+  graph(filter?: NavFilter): {
+    count: number;
+    adjacency: readonly (readonly Link[])[];
+    costs: ArrayLike<number>;
+    owners: readonly ({ x: number; z: number } | null)[];
+  } {
+    this.check();
+    return {
+      count: this.count,
+      adjacency: this.adjacency,
+      costs: filter ? this.applyFilter(filter) : this.costs,
+      owners: this.owners,
+    };
+  }
   /** @internal Everything `./codec` saves, with the level when `level` is set. */
   snapshot(level: boolean): TiledState {
     this.check();

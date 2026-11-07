@@ -2,7 +2,7 @@
 
 Import `margoengine/navmesh` from the `margoengine` package, or `@margoengine/navmesh` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
-Dependency-free navigation: A* chooses a polygon corridor, the funnel algorithm pulls it taut, reciprocal ORCA selects collision-avoiding agent velocities in XZ, a `Crowd` manager walks agents along routes with area costs, off-mesh links and obstacles, `@margoengine/navmesh/build` generates the walkable polygons from level triangles, `@margoengine/navmesh/tiles` cuts big worlds into tiles that rebuild at run time, `@margoengine/navmesh/codec` bakes meshes to bytes, and `@margoengine/navmesh/links` finds the jumps a level allows.
+Dependency-free navigation: A* chooses a polygon corridor, the funnel algorithm pulls it taut, reciprocal ORCA selects collision-avoiding agent velocities in XZ, a `Crowd` manager walks agents along routes with area costs, off-mesh links and obstacles, `@margoengine/navmesh/build` generates the walkable polygons from level triangles, `@margoengine/navmesh/tiles` cuts big worlds into tiles that rebuild at run time, `@margoengine/navmesh/codec` bakes meshes to bytes, `@margoengine/navmesh/links` finds the jumps a level allows, and `@margoengine/navmesh/hierarchy` keeps long routes cheap.
 
 ```ts
 import {NavMesh} from 'margoengine/navmesh';
@@ -222,6 +222,32 @@ console.log(link.kind, jumpPoint(link, 0.5));
 | `jumpCost` | 1 | what a jump costs above the distance it covers |
 
 A jump follows its one arc and lands the first time that arc meets ground on the way down; it counts only if the body touches nothing on the way and the fall is within `maxFall`. So `jumps` lists what the agent can really do: a long leap, and a small hop that lands close under a ledge. Each link gives `start`, `end`, `cost`, `kind` (`across`, `down` or `up`), and the `height` and `distance` of its arc. `positions` and `indices` are what the body is tested against. Links are one way: a gap crossed both ways gets one each way. On a `TiledNavMesh` they sleep and wake with their ground, but run `findJumpLinks` again after the level changes.
+
+## Long routes in huge worlds (`./hierarchy`)
+
+```ts
+import {NavHierarchy} from 'margoengine/navmesh/hierarchy';
+import {TiledNavMesh} from 'margoengine/navmesh/tiles';
+
+const positions = [0, 0, 0, 512, 0, 0, 512, 0, 512, 0, 0, 512], indices = [0, 2, 1, 0, 3, 2];
+const world = new TiledNavMesh(positions, indices, {cs: 0.5, ch: 0.1, tileSize: 32});
+
+const hierarchy = new NavHierarchy(world, {clusterTiles: 2});
+console.log(hierarchy.path([5, 0, 5], [500, 0, 500]));
+
+// A door shuts: rebuild the tiles, and the next query works out only the clusters that touch them.
+world.addObstacle({min: [100, 0, 100], max: [104, 3, 101]});
+world.update();
+console.log(hierarchy.update()); // clusters worked out again
+```
+
+`route` and `path` answer as they do on the mesh, with both ends on the mesh. The search runs on a coarse graph of the crossings between clusters, whose walking costs are cached, then joins the cached corridors and pulls them taut. It finds a route whenever one can be walked, near the shortest: use `world.route` when you need the search over every polygon. Tile rebuilds and off-mesh links are picked up by the next query.
+
+| Option | Default | Unit |
+| --- | --- | --- |
+| `clusterTiles` | 4 | tiles along a cluster's side; more makes the coarse graph smaller and each query's two ends dearer |
+| `spacing` | a quarter of a cluster's side | world units between crossings on a wide entrance; smaller gives straighter routes and a bigger graph |
+| `filter` | none | cost per area number, as in `route`; make one hierarchy per agent type |
 
 Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 
