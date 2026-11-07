@@ -188,10 +188,11 @@ first, and `@margoengine/loaders/vtk-xml` reads `vtkLZMADataCompressor` blocks w
 import { decodeBzip2 } from '@margoengine/decoders/bzip2';
 import { decodeXz } from '@margoengine/decoders/xz';
 
-const bz2 = new Uint8Array(await (await fetch('/volume.raw.bz2')).arrayBuffer()),
-  xz = new Uint8Array(await (await fetch('/points.bin.xz')).arrayBuffer());
-const volume = decodeBzip2(bz2, { maxBytes: 1 << 28 });
-const points = decodeXz(xz);
+const bz2 = new Uint8Array(await (await fetch('/floats.1.bz2')).arrayBuffer()),
+  xz = new Uint8Array(await (await fetch('/floats.crc64.xz')).arrayBuffer());
+const fromBzip2 = decodeBzip2(bz2, { maxBytes: 1 << 28 });
+const fromXz = decodeXz(xz);
+console.log(fromBzip2.length, fromXz.length);
 ```
 
 | Option | Default | What it does |

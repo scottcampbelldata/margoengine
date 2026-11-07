@@ -139,7 +139,7 @@ import {MilkyWay} from 'margoengine/scenery/stars';
 const canvas = document.querySelector<HTMLCanvasElement>('canvas')!;
 const engine = await Engine.create(canvas, {backend: 'webgpu'});
 const sky = new Sky({night: {}});
-const catalog = await fetchBrightStarCatalog('/data/bsc5.gz');
+const catalog = await fetchBrightStarCatalog('/catalog.gz'); // CDS V/50, served beside your page
 const astro = new AstroSky({latitude: degrees(-30), longitude: degrees(20), sky, catalog});
 engine.use(astro);
 engine.use(sky);

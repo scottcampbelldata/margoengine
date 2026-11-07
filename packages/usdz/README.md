@@ -70,8 +70,8 @@ import {skeletons} from 'margoengine/usdz/skel';
 
 const canvas=document.createElement('canvas');document.body.append(canvas);
 const engine=await Engine.create(canvas,{backend:'webgpu',capacity:100000});
-const robot=await loadUSDZ(engine,'/robot.usdz',{extensions:[composition(),skeletons()]});
-Animation.attach(robot).play(0);
+const figure=await loadUSDZ(engine,'/RiggedFigure.usdz',{extensions:[composition(),skeletons()]});
+Animation.attach(figure).play(0);
 engine.start();
 ```
 
@@ -91,8 +91,8 @@ import {animation} from 'margoengine/usdz/anim';
 
 const canvas=document.createElement('canvas');document.body.append(canvas);
 const engine=await Engine.create(canvas,{backend:'webgpu',capacity:100000});
-const toy=await loadUSDZ(engine,'/toy.usdz',{extensions:[composition(),animation()]});
-Animation.attach(toy,{pointers:pointerChannels}).play(0);
+const box=await loadUSDZ(engine,'/BoxAnimated.usdz',{extensions:[composition(),animation()]});
+Animation.attach(box,{pointers:pointerChannels}).play(0);
 engine.start();
 ```
 
@@ -104,13 +104,13 @@ engine.start();
 
 ```ts
 import {Engine} from 'margoengine/core';
-import {loadUSDZ} from 'margoengine/usdz';
-import {composition} from 'margoengine/usdz/compose';
+import {loadUSDFiles} from 'margoengine/usdz/compose';
 import {subdivision} from 'margoengine/usdz/subdiv';
 
 const canvas=document.createElement('canvas');document.body.append(canvas);
 const engine=await Engine.create(canvas,{backend:'webgpu',capacity:100000});
-const pawn=await loadUSDZ(engine,'/pawn.usdz',{extensions:[composition(),subdivision({level:2})]});
+// A cube cage that asks for catmullClark, from the AOUSD working group's test assets.
+const cube=await loadUSDFiles(engine,'/subdiv_catmullClark.usda',{extensions:[subdivision({level:2})]});
 engine.start();
 ```
 
@@ -127,13 +127,13 @@ USD's schema default is `catmullClark`, so a polygon model that forgets `subdivi
 ```ts
 import {Engine} from 'margoengine/core';
 import {applyGLTFLights,viewGLTFCamera} from 'margoengine/gltf-pro';
-import {loadUSDZ} from 'margoengine/usdz';
-import {composition} from 'margoengine/usdz/compose';
+import {loadUSDFiles} from 'margoengine/usdz/compose';
 import {lights} from 'margoengine/usdz/lux';
 
 const canvas=document.createElement('canvas');document.body.append(canvas);
 const engine=await Engine.create(canvas,{backend:'webgpu',capacity:100000});
-const room=await loadUSDZ(engine,'/room.usdz',{extensions:[composition(),lights()]});
+// The Standard Shader Ball's room, lit by rect lights, from the AOUSD working group's assets.
+const room=await loadUSDFiles(engine,'/environment.usda',{extensions:[lights()]});
 applyGLTFLights(room); // the sun; pass {clustered} from margoengine/clustered for lamps
 if(room.cameras.length)viewGLTFCamera(room,0);
 engine.start();
@@ -189,10 +189,11 @@ import {materialGraph,materialX} from 'margoengine/usdz/materialx';
 const canvas=document.createElement('canvas');document.body.append(canvas);
 const engine=await Engine.create(canvas,{backend:'webgpu',capacity:100000});
 const read=async(id:string)=>{
-  const response=await fetch('/chess/'+id);
+  const response=await fetch('/materialx/'+id);
   return response.ok?new Uint8Array(await response.arrayBuffer()):undefined;
 };
-const asset=await parseUSDFiles('chess_set.usda',read,{extensions:[materialX()]});
+// Meshes bound to the materials of a MaterialX document, from the AOUSD working group's test assets.
+const asset=await parseUSDFiles('TextureCoordinateTestMaterialX.usda',read,{extensions:[materialX()]});
 const model=await asset.create(engine);
 engine.start();
 // The whole network as a node material, where a PBR material cannot hold it.
