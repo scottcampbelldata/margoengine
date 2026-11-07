@@ -2766,6 +2766,10 @@
       "types": "./dist/weather/puddles.d.ts",
       "import": "./dist/weather/puddles.js"
     },
+    "./weather/snow": {
+      "types": "./dist/weather/snow.d.ts",
+      "import": "./dist/weather/snow.js"
+    },
     "./webgl": {
       "types": "./dist/webgl.d.ts",
       "import": "./dist/webgl.js"

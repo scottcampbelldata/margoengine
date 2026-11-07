@@ -1,0 +1,81 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Snow browser check</title><style>body{margin:0}canvas{display:block;width:256px;height:192px}</style></head><body><canvas id="a"></canvas><canvas id="b"></canvas>
+<script type="module">
+// Real-GPU proof for @margoengine/weather/snow: the WGSL against its JavaScript twin; on core meshes no cover changes
+// nothing, full cover whitens the ground and leaves a wall bare; the snow has depth (a plate's far edge rises on screen
+// by the projected thickness); and snow and puddles hook the same shader together.
+import {Engine,Geometry,PbrMaterial,box} from '/packages/core/dist/index.js';
+import {sceneSamples} from '/packages/core/dist/quality.js';
+import {Bloom} from '/packages/post/dist/bloom.js';
+import {Snow,snowAt,snowDepthAt,snowWGSL} from '/packages/weather/dist/snow.js';
+import {Puddles} from '/packages/weather/dist/puddles.js';
+if(new URLSearchParams(location.search).get('samples')==='1')globalThis.margoLow=1;
+const errors=[];
+async function make(canvas,camera){const engine=await Engine.create(canvas,{backend:'webgpu',camera});engine.stop();engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));return {engine,post:Bloom.attach(engine,{strength:0,threshold:100,exposure:0})};}
+const A=await make(document.querySelector('#a'),{position:[0,9,10],target:[0,0,-4],near:0.1,far:400});
+A.engine.createMesh().setGeometry(box(60,0.2,60)).setMaterial(new PbrMaterial({color:'#20a020',roughness:0.9})).setPosition([0,-0.1,-10]);
+A.engine.createMesh().setGeometry(box(8,14,1)).setMaterial(new PbrMaterial({color:'#c02020',roughness:0.9})).setPosition([0,7,-8]);
+// A plate with only its top face: lifting it cannot open a slit, and its far edge shows the lift on screen.
+const B=await make(document.querySelector('#b'),{position:[0,2,6],target:[0,2,-10],near:0.1,far:400});
+const plate=new Geometry([-2,0,-2, 2,0,-2, 2,0,2, -2,0,2],[0,1,0, 0,1,0, 0,1,0, 0,1,0],[0,2,1, 0,3,2]);
+B.engine.createMesh().setGeometry(plate).setMaterial(new PbrMaterial({color:'#20a020',roughness:0.9}));
+const device=A.engine.gpu;
+const module=(d)=>d.createShaderModule({code:'@group(0) @binding(0) var image:texture_2d<f32>;@group(0) @binding(1) var<storage,read_write> result:array<vec4f>;@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u){let s=textureDimensions(image);if(any(id.xy>=s)){return;}result[id.y*s.x+id.x]=textureLoad(image,vec2i(id.xy),0);}'});
+async function read(d,texture){
+ const pipeline=d.createComputePipeline({layout:'auto',compute:{module:module(d),entryPoint:'main'}});
+ const bytes=texture.width*texture.height*16,output=d.createBuffer({size:bytes,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),staging=d.createBuffer({size:bytes,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+ const encoder=d.createCommandEncoder(),pass=encoder.beginComputePass();pass.setPipeline(pipeline);
+ pass.setBindGroup(0,d.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:texture.createView()},{binding:1,resource:{buffer:output}}]}));
+ pass.dispatchWorkgroups(Math.ceil(texture.width/8),Math.ceil(texture.height/8));pass.end();encoder.copyBufferToBuffer(output,0,staging,0,bytes);d.queue.submit([encoder.finish()]);
+ await staging.mapAsync(GPUMapMode.READ);const data=new Float32Array(staging.getMappedRange()).slice();staging.unmap();output.destroy();staging.destroy();return data;
+}
+async function shot(s){s.engine.render({delta:0});await s.engine.gpu.queue.onSubmittedWorkDone();return read(s.engine.gpu,s.post.sceneTexture);}
+const differs=(a,b,p)=>Math.abs(a[p]-b[p])+Math.abs(a[p+1]-b[p+1])+Math.abs(a[p+2]-b[p+2])>1e-4;
+const count=(a,b,mask)=>{let n=0;for(let p=0;p<a.length;p+=4)if((!mask||mask[p/4])&&differs(a,b,p))n++;return n;};
+async function maths(){
+ const cases=[];for(let x=0;x<12;x+=0.37)for(let z=0;z<12;z+=0.53)for(const ny of [1,0.8,0.5,0.2])for(const c of [0.3,0.7,1])cases.push([x,z,ny,c]);
+ const input=new Float32Array(cases.flat());
+ const code=snowWGSL+'@group(0) @binding(0) var<storage,read> inp:array<vec4f>;@group(0) @binding(1) var<storage,read_write> outp:array<vec2f>;@compute @workgroup_size(64) fn main(@builtin(global_invocation_id) id:vec3u){if(id.x>=arrayLength(&inp)){return;}let c=inp[id.x];let u=WeatherSnow(vec4f(c.w,0.2,0.4,4),vec4f(0.9,0.92,0.95,0.85),vec4f(0.3,0,0,0));outp[id.x]=vec2f(weather_snow_at(c.xy,c.z,c.w),weather_snow_depth(c.xy,c.z,u));}';
+ const m=device.createShaderModule({code}),p=device.createComputePipeline({layout:'auto',compute:{module:m,entryPoint:'main'}});
+ const a=device.createBuffer({size:input.byteLength,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST}),b=device.createBuffer({size:input.byteLength/2,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),st=device.createBuffer({size:input.byteLength/2,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+ device.queue.writeBuffer(a,0,input);
+ const e=device.createCommandEncoder(),pass=e.beginComputePass();pass.setPipeline(p);pass.setBindGroup(0,device.createBindGroup({layout:p.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:a}},{binding:1,resource:{buffer:b}}]}));pass.dispatchWorkgroups(Math.ceil(cases.length/64));pass.end();e.copyBufferToBuffer(b,0,st,0,input.byteLength/2);device.queue.submit([e.finish()]);
+ await st.mapAsync(GPUMapMode.READ);const out=new Float32Array(st.getMappedRange()).slice();st.unmap();
+ let worst=0,partial=0;
+ cases.forEach(([x,z,ny,c],i)=>{const w=snowAt(x,z,ny,c),d=snowDepthAt(x,z,ny,c,{depth:0.2});if(w>0.01&&w<0.99)partial++;worst=Math.max(worst,Math.abs(out[i*2]-w),Math.abs(out[i*2+1]-d));});
+ return {cases:cases.length,worst,partial};
+}
+// The far edge of the plate: the topmost row of the middle column that differs from the background (row 0).
+function edge(img,W,H){const x=W>>1,b=x*4;for(let y=0;y<H;y++){const p=(y*W+x)*4;if(Math.abs(img[p]-img[b])+Math.abs(img[p+1]-img[b+1])+Math.abs(img[p+2]-img[b+2])>0.01)return y;}return -1;}
+window.check={samples:sceneSamples,
+ async run(){
+  const out={};device.pushErrorScope('validation');
+  out.maths=await maths();
+  const clear=await shot(A);
+  const W=A.post.sceneTexture.width,H=A.post.sceneTexture.height,ground=new Uint8Array(W*H),wall=new Uint8Array(W*H);
+  const g0=(p)=>clear[p*4+1]>clear[p*4]*2,w0=(p)=>clear[p*4]>clear[p*4+1]*2;
+  const inner=(f,x,y)=>{for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){const u=x+dx,v=y+dy;if(u<0||v<0||u>=W||v>=H||!f(v*W+u))return 0;}return 1;};
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){ground[y*W+x]=inner(g0,x,y);wall[y*W+x]=inner(w0,x,y);}
+  out.groundPixels=ground.reduce((a,b)=>a+b,0);out.wallPixels=wall.reduce((a,b)=>a+b,0);
+  const snow=Snow.attach(A.engine,{cover:0,depth:0});
+  out.noneChanged=count(clear,await shot(A));
+  snow.options.cover=1;const full=await shot(A);
+  out.groundWhite=0;for(let p=0;p<full.length;p+=4)if(ground[p/4]&&full[p]>clear[p+1]*0.5&&full[p+2]>clear[p+1]*0.5)out.groundWhite++;
+  out.wallChanged=count(clear,full,wall);
+  // Snow and puddles on one shader: both hooks compile together and each still acts.
+  const puddles=Puddles.attach(A.engine,{wetness:1,coverage:0.5});const both=await shot(A);
+  out.withPuddles=count(full,both);
+  puddles.dispose();snow.dispose();out.afterDispose=count(clear,await shot(A));
+  // Depth: the plate's far edge, bare and under 0.5 m of even snow, against where the camera puts the lifted edge.
+  const bare=await shot(B),BW=B.post.sceneTexture.width,BH=B.post.sceneTexture.height;
+  const lift=Snow.attach(B.engine,{cover:1,depth:0.5,variation:0});
+  const deep=await shot(B);
+  const project=(y)=>{const m=B.engine.camera.matrix,v=[0,y,-2,1],c=[0,1,2,3].map(r=>m[r]*v[0]+m[4+r]*v[1]+m[8+r]*v[2]+m[12+r]*v[3]);return (1-c[1]/c[3])/2*BH;};
+  out.edgeBare=edge(bare,BW,BH);out.edgeDeep=edge(deep,BW,BH);out.expectedBare=project(0);out.expectedDeep=project(0.5);
+  lift.dispose();
+  const error=await device.popErrorScope();
+  out.validation=error?.message??null;out.errors=errors.splice(0);
+  return out;
+ }
+};
+window.ready=true;
+</script></body></html>

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10507023,
+  "total": 10510323,
   "history": [
     {
       "date": "2026-10-24",
@@ -3560,6 +3560,12 @@
       "commit": "7b70a3a8d",
       "reason": "new optional entry @margoengine/behavior/smart-objects",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "84c4ec765",
+      "reason": "new optional entry @margoengine/weather/snow (Snow: snow with depth on core meshes); nothing else grows",
+      "grew": 1
     }
   ],
   "items": {
@@ -4256,6 +4262,7 @@
     "@margoengine/weather": 5230,
     "@margoengine/weather/hail": 4278,
     "@margoengine/weather/puddles": 4070,
+    "@margoengine/weather/snow": 3300,
     "@margoengine/webgl": 3663,
     "@margoengine/webgl/auto": 3942,
     "@margoengine/webgl/pick": 5010,

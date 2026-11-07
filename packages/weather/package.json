@@ -38,6 +38,10 @@
     "./puddles": {
       "types": "./dist/puddles.d.ts",
       "import": "./dist/puddles.js"
+    },
+    "./snow": {
+      "types": "./dist/snow.d.ts",
+      "import": "./dist/snow.js"
     }
   },
   "files": [

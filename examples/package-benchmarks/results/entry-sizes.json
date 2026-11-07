@@ -1,6 +1,6 @@
 {
-  "commit": "7b70a3a8d",
-  "dirty": false,
+  "commit": "84c4ec765",
+  "dirty": true,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
     "raw": 57071,
@@ -2962,6 +2962,10 @@
       "./puddles": {
         "raw": 8503,
         "gzip": 3814
+      },
+      "./snow": {
+        "raw": 6690,
+        "gzip": 3044
       }
     },
     "@margoengine/webgl": {

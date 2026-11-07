@@ -192,7 +192,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/shadows API](https://margoengine.com/llms/api/shadows.md): 8 entry points
 - [@margoengine/lightmap API](https://margoengine.com/llms/api/lightmap.md): 3 entry points
 - [@margoengine/sky API](https://margoengine.com/llms/api/sky.md): 19 entry points
-- [@margoengine/weather API](https://margoengine.com/llms/api/weather.md): 3 entry points
+- [@margoengine/weather API](https://margoengine.com/llms/api/weather.md): 4 entry points
 - [@margoengine/toon API](https://margoengine.com/llms/api/toon.md): 1 entry point
 - [@margoengine/oit API](https://margoengine.com/llms/api/oit.md): 6 entry points
 - [@margoengine/lod API](https://margoengine.com/llms/api/lod.md): 4 entry points

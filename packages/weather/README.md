@@ -82,6 +82,35 @@ by up to `rippleStrength` (0.35). `puddleMask`, `puddleSurface`, `puddleRelief` 
 JavaScript; `puddleWGSL` is the shader for your own materials. A bad option throws `RangeError` or `TypeError`; a
 replaced core shader throws `MargoError` `'unsupported'`.
 
+## Snow with depth
+
+`Snow` from `margoengine/weather/snow` lays snow on every core mesh: up-facing surfaces whiten first and steeper ones
+as the cover grows, the snow line is patchy, the surface has a fine grain, and the snow has thickness: covered
+surfaces are lifted by it, so a step or a kerb fills in and a plate's edge rises. It follows a `WeatherMachine` or the
+sky's `Weather` by their `snowCover`, or the `cover` you set. WebGPU only.
+
+```ts
+import { WeatherMachine } from 'margoengine/weather';
+import { Snow } from 'margoengine/weather/snow';
+import { Engine, PbrMaterial, box } from 'margoengine/core';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+engine.createMesh().setGeometry(box(40, 0.2, 40)).setMaterial(new PbrMaterial({ color: '#3d4a33', roughness: 0.9 }));
+
+const weather = new WeatherMachine('snow', { seed: 2 });
+const snow = Snow.attach(engine, { weather, depth: 0.2 }); // 20 cm on flat ground at full cover
+engine.onFrame((_, delta) => weather.update(delta)); // snow cover builds in about 2 minutes
+snow.options.variation = 0.6; // deeper drifts and thinner patches
+```
+
+Cover follows `snowWeight` (at full cover anything within about 70 degrees of flat), with the edge broken up by noise.
+Under snow a surface takes `color` (`SNOW_COLOR`) and `roughness` (`SNOW_ROUGHNESS`), loses its metalness and has a
+grain of strength `grain` (0.3). Its thickness is `depth` (0.12 m) times the cover on flat ground, less on slopes and
+none on walls, varied in drifts `drift` metres wide (4) by up to `variation` (0.4): the vertex stage moves each covered
+vertex up by it. `snowAt` and `snowDepthAt` are the same maths in JavaScript; `snowWGSL` is the shader for your own
+materials. `Snow` and `Puddles` work together on one scene. A bad option throws `RangeError` or `TypeError`; a replaced
+core shader throws `MargoError` `'unsupported'`.
+
 ## Driving the sky
 
 `skyWeather(state, wind?)` returns the sky `Weather` settings for a state: `Object.assign(weather.options, skyWeather(state))`. `hailSettings` does the same for `Hail`. `fogDensity(state)` gives an exponential-fog density per metre (0.0002 clear to 0.02 thick).
@@ -98,10 +127,13 @@ replaced core shader throws `MargoError` `'unsupported'`.
   included: there is no cover (water stands under a roof too) and no flow. They draw on core meshes, not glTF-pro
   models or other packages' own shaders. Rings tilt the normal only; the water has no depth, refraction or reflection
   of its own beyond the scene's lighting.
+- Snow lifts each vertex by its own normal, so a mesh whose faces share no vertices (`box()`) opens a slit as deep as
+  the snow along its top edges; smooth meshes (terrain, shared normals) stay closed. Snow has no cover from roofs and
+  no wind drift, and shadows draw the unlifted shape. A vertex stage another package replaced keeps its shape.
 - The presets and the climate chain are design choices, not weather data. Wind speed is a mean at one height with simple noise, not a boundary-layer model.
 - `cloud` and `fog` are numbers for you to feed to your sky and fog; this package does not draw clouds or fog.
 - Hail needs WebGPU; on a WebGL engine `attach` throws `MargoError` `'unsupported'`. Everything else runs anywhere, Node included.
 
-Apache-2.0. Optional, tree-shakable package; no core dependency in the root entry (only `./hail` and `./puddles` import core).
+Apache-2.0. Optional, tree-shakable package; no core dependency in the root entry (only `./hail`, `./puddles` and `./snow` import core).
 
 Build and unit tests: npm test --workspace @margoengine/weather

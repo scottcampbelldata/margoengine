@@ -1,9 +1,11 @@
 // Real-GPU proof (run from the repository root after building packages, one GPU job at a time):
-//   node packages/weather/tests/browser-check.mjs [hail] [puddles] ...   (no name runs every check)
+//   node packages/weather/tests/browser-check.mjs [hail] [puddles] [snow] ...   (no name runs every check)
 // hail: hail draws on a real GPU, moves with time, repeats exactly for the same time and seed, leaves no trace when
 // off, and the WGSL surface functions match the JavaScript ones.
 // puddles: the puddle WGSL matches its JavaScript twin, and on core meshes dry ground is untouched, wet ground darkens,
 // water stands on the ground and not on walls, and rain rings it.
+// snow: the snow WGSL matches its JavaScript twin; no cover changes nothing, full cover whitens the ground and not a
+// wall, the snow lifts a surface by its depth on screen, and it chains with puddles.
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
@@ -42,6 +44,21 @@ const checks = {
     assert.equal(r.calmStill, 0, 'without rain the water is still');
     assert.equal(r.afterDispose, 0, 'a disposed Puddles leaves no trace');
     return `puddles maths worst ${r.maths.worst}, water ${r.waterGround}/${r.groundPixels}, rings ${r.ringsMove}`;
+  },
+  snow(r) {
+    // Float32 against double through the same smoothsteps and noise: about 1e-6 of weight and depth.
+    assert.ok(r.maths.cases >= 2000 && r.maths.worst < 1e-4, `WGSL snow differs from JavaScript by ${r.maths.worst}`);
+    assert.ok(r.maths.partial > 100, `cases on the snow line: ${r.maths.partial}`);
+    assert.equal(r.noneChanged, 0, 'cover 0 changes no pixel');
+    assert.ok(r.groundWhite > 0.95 * r.groundPixels, `full cover whitens the ground: ${r.groundWhite} of ${r.groundPixels}`);
+    assert.equal(r.wallChanged, 0, 'a wall stays bare');
+    assert.ok(r.withPuddles > 0, 'puddles still act on the snow-hooked shader');
+    assert.equal(r.afterDispose, 0, 'disposed hooks leave no trace');
+    // The far edge is found to the pixel row, so it sits within a row (and a row for coverage) of where it projects.
+    assert.ok(Math.abs(r.edgeBare - r.expectedBare) <= 1.5, `bare edge ${r.edgeBare} vs ${r.expectedBare}`);
+    assert.ok(Math.abs(r.edgeDeep - r.expectedDeep) <= 1.5, `snowed edge ${r.edgeDeep} vs ${r.expectedDeep}`);
+    assert.ok(r.edgeBare - r.edgeDeep >= 5, `the snow lifts the edge by ${r.edgeBare - r.edgeDeep} rows`);
+    return `snow maths worst ${r.maths.worst}, ground white ${r.groundWhite}/${r.groundPixels}, edge ${r.edgeBare} -> ${r.edgeDeep} (expected ${r.expectedBare.toFixed(1)} -> ${r.expectedDeep.toFixed(1)})`;
   },
 };
 const wanted = process.argv.slice(2).length ? process.argv.slice(2) : Object.keys(checks);

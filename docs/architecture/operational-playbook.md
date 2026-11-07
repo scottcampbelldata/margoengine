@@ -659,6 +659,13 @@ The shared `patchFragment` (packages/weather/src/scene-patch.ts) lets a second s
 32-byte uniform at group 0 binding 160 a frame. Evidence: `browser-check.mjs` puddles on a Radeon 680M at 4x and 1x
 (WGSL against JavaScript, dry untouched, water on ground not walls, rings only on water). Missing: other GPUs, timing.
 
+Snow (`@margoengine/weather/snow`, 2026-11-07) is the second surface hook: besides the fragment change it rewrites
+core's vertex line `let p=model*vec4f(i.position,1);` to lift the world position by the snow's thickness, from the
+world normal it computes the same way core does, before the clip position. A vertex stage that another package
+replaced has no such line, and the snow there is colour and grain only. One 48-byte uniform at group 0 binding 161.
+Evidence: `browser-check.mjs` snow on a Radeon 680M at 4x and 1x (the plate's edge rises where the camera projects
+it, snow with puddles on one shader). Missing: other GPUs, timing, the slit on split-normal meshes.
+
 AstroSky (`@margoengine/sky/astro`, 2026-11-07) is a `ParticleOverlay` draw at frame graph order 2.5, after the sky's
 pass and before fog: one storage buffer of three vec4 a point (the J2000 vector and magnitude, colour, proper motion a
 Julian year; the seven planets the last points, rewritten each frame), the sky matrix (precession, nutation, sidereal
