@@ -192,6 +192,28 @@ console.log(terrainFrame(86.925, 27.988).length); // 16
 
 `parseQuantizedMesh(bytes)` decodes a tile (header, vertices, triangles, edges, oct normals, water mask, metadata); a cut tile throws a `RangeError`. Imagery is `EPSG:3857` with `xyz` rows by default (`projection`, `scheme`, `maximumLevel`, `mimeType` change it); each terrain tile takes the deepest imagery tile that holds it whole, at most one level deeper than the terrain. Without `imagery` the terrain draws lit, in grey, with the tile's normals or ones made from its triangles. Pass `fetch` to `terrain` for headers such as an access token.
 
+## Orthographic cameras
+
+Maps and plan views use an orthographic camera, such as `CameraProjection` from `margoengine/cameras`. The renderer reads it from `engine.camera.matrix` with no extra call: when the clip w row is constant, the screen-space error becomes `geometricError x screenHeight / orthographicHeight`, the world height the view shows (converted to tileset units through the frame), so zooming in refines and moving the camera along its axis does not.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { CameraProjection } from 'margoengine/cameras';
+import { TilesRenderer } from 'margoengine/tiles';
+
+const canvas = document.querySelector('canvas')!;
+const engine = await Engine.create(canvas, { camera: { position: [0, 2000, 0.01], target: [0, 0, 0], far: 50_000 } });
+// A plan view 600 m tall: tiles refine for 600 m on screen, whatever the eye height.
+const projection = CameraProjection.attach(engine, { mode: 'orthographic', height: 600 });
+const tiles = await TilesRenderer.load(engine, '3d-tiles/TilesetWithRequestVolume/city/tileset.json');
+tiles.tileset.on('progress', ({ ready }) => console.log(`${ready} tiles ready`));
+engine.start();
+// Later, zoom in four times: the next frame's selection refines for 150 m on screen.
+projection.height = 150;
+```
+
+`TilesRenderer.orthographicHeight(matrix)` returns the view height of an orthographic view-projection matrix and undefined for a perspective one (and for core's all-zero matrix before the first frame).
+
 ## Without the engine
 
 `Tileset` is engine-free: give it a view each frame and a content factory, and it does the rest. This is how the tests drive it, and how to stream tiles into your own renderer or a server-side job.
@@ -220,4 +242,4 @@ The content parsers (`parseB3dm`, `parsePnts`, `parseI3dm`, `parseCmpt`, `parseC
 - Draco pnts decode in Web Workers (`@margoengine/decoders/draco-points`), so not in Node without a decoder of your own.
 - A tile whose glTF requires KHR_techniques_webgl (archived GLSL shaders, such as the billboard level of Cesium's TilesetWithTreeBillboards) fails with code `unsupported`, as glTF says a loader must; the rest of the tileset draws.
 - `budget: 'gpu'` counts gltf-pro models exactly from their arrays and images (Khronos BoomBox: within 0.1% of what the device allocated); points, i3dm rows and splats by their buffer layouts; a custom `loadModel` whose models have no `primitives` is counted by file size. Uniform buffers, pipelines and the engine's own targets are not tile memory and are not counted.
-- Orthographic cameras need `Tileset.update` with `orthographicHeight`; the renderer reads a perspective camera.
+- Orthographic cameras are told apart by the clip w row of `camera.matrix`: a projection that mixes the two (clip w that varies only a little with depth) is read as perspective, and before the first frame the renderer selects as perspective.

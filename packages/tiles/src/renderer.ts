@@ -253,14 +253,31 @@ export class TilesRenderer implements EnginePlugin {
       for (let j = 0; j < 3; j++) planes[p * 4 + j] = a * f[j * 4] + b * f[j * 4 + 1] + c * f[j * 4 + 2];
       planes[p * 4 + 3] = a * f[12] + b * f[13] + c * f[14] + d;
     }
+    const height = TilesRenderer.orthographicHeight(camera.matrix);
     this.last = this.tileset.update({
       position: this.toTileset(world),
       planes,
       screenHeight: engine.canvas.height || 1,
       fov: camera.fov,
+      // An orthographic camera (a constant clip w, as CameraProjection from @margoengine/cameras makes): its view
+      // height in tileset units, so screen-space error follows the zoom rather than the distance.
+      ...(height === undefined ? {} : { orthographicHeight: height / Math.hypot(f[0], f[1], f[2]) }),
     });
     for (const listener of this.listeners) listener();
     return this.last;
+  }
+  /**
+   * The world height an orthographic view-projection `matrix` (column-major) shows, or undefined for a perspective one
+   * (or for no matrix, or core's all-zero matrix before the first frame).
+   * Orthographic means the clip w row is (0, 0, 0, w): then NDC y spans 2 over a world height of 2 w / |row y|.
+   */
+  static orthographicHeight(matrix: ArrayLike<number> | undefined): number | undefined {
+    if (!matrix) return undefined;
+    const w = matrix[15],
+      scale = Math.max(Math.abs(matrix[3]), Math.abs(matrix[7]), Math.abs(matrix[11]));
+    if (!(Math.abs(w) > 0) || scale > 1e-9 * Math.abs(w)) return undefined;
+    const row = Math.hypot(matrix[1], matrix[5], matrix[9]);
+    return row > 0 ? (2 * Math.abs(w)) / row : undefined;
   }
   /** World matrix (float64) of a tile's glTF content: frame x tile transform x RTC x y-up to z-up. */
   contentMatrix(tile: TilesetTile, rtc?: readonly number[], gltf = true): TileMatrix {

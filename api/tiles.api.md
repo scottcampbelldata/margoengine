@@ -270,6 +270,7 @@ export class TilesRenderer implements EnginePlugin {
     cartographicToWorld(longitude: number, latitude: number, height?: number): Vec3;
     onPreUpdate(): void;
     update(): TilesFrame;
+    static orthographicHeight(matrix: ArrayLike<number> | undefined): number | undefined;
     contentMatrix(tile: TilesetTile, rtc?: readonly number[], gltf?: boolean): TileMatrix;
     createContent(content: TileContent, tile: TilesetTile, signal: AbortSignal): Promise<TileRenderable>;
     measure(model: TilesModel, fileBytes: number): number;
