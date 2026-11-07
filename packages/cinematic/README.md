@@ -65,6 +65,48 @@ or `@margoengine/bvh`'s Raycaster (`firstHitOnly`, `far = max`) over the level. 
 character from the query, and start it above the floor if the look-at point sits on it (the arm
 starts at the target, usually the character's feet).
 
+## Camera priorities and blends
+
+`@margoengine/cinematic/brain` runs many virtual cameras and shows one. Every enabled `VirtualCamera` keeps moving; the `CameraBrain` puts the highest `priority` on screen and blends when that changes. Raise a priority to take the shot:
+
+```ts
+import {CameraBrain} from 'margoengine/cinematic/brain';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const brain = CameraBrain.attach(engine, {
+  blend: {duration: 1.5},
+  rules: [{from: 'wide', to: 'boss', duration: 0}],
+});
+brain.add({name: 'wide', priority: 10, position: [0, 8, 20], target: [0, 1, 0], fov: 50});
+const boss = brain.add({name: 'boss', priority: 0, position: [3, 2, 6], target: [0, 2, 0], fov: 35});
+brain.on('change', ({from, to}) => console.log(from?.name, 'to', to.name));
+boss.priority = 20; // The next frame cuts to it, by the rule. Set it back and it blends out over 1.5 s.
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `blend` | `{duration: 1}` | Used when no rule matches. `duration` in seconds, 0 is a cut; `ease` takes and gives 0..1 (any tween easing), default smoothstep; `style` `'direct'` moves straight across, `'orbit'` swings around the subject. |
+| `rules` | none | `{from, to, ...blend}` with camera names or `'*'`. The exact pair wins, then `from` to `'*'`, `'*'` to `to`, `'*'` to `'*'`. |
+| `camera` | `engine.camera` | The camera written. |
+| `aspect` | the canvas's | Width / height, read by stages. |
+| `name` | `'cinematic-brain'` | Plugin name, so each view of a split screen can have a brain. |
+
+On a tie the camera on screen stays; with none on screen the one added last wins. A switch in the middle of a blend starts from what is on screen, and every camera in a blend keeps moving. `brain.cut()` ends a blend now. `camera.enabled = false` takes a camera out of the running and stops its work; its stages start fresh when it comes back.
+
+A camera starts each frame from its `base` pose and runs its `stages` in order; `brain.stages` run after them on the blended pose. A stage is a function `(pose, delta, context) => void` or an object with `update` and `reset`. `rigStage` makes a `Cinematic` rig a stage, so the spring follow of this package drives a virtual camera. Do not attach that rig to the engine:
+
+```ts
+import {Cinematic} from 'margoengine/cinematic';
+import {CameraBrain, rigStage} from 'margoengine/cinematic/brain';
+const brain = new CameraBrain();
+const rig = new Cinematic({offset: [0, 3, 6]});
+rig.follow([0, 1, 0]);
+brain.add({name: 'follow', stages: [rigStage(rig)]});
+console.log(brain.update(1 / 60).position);
+```
+
+Cutscenes have their own timed cameras in `@margoengine/cutscene/shots`; the brain is for play, where what happens decides the shot.
+
 Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/cinematic

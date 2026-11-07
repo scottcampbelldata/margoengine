@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10099580,
+  "total": 10102842,
   "history": [
     {
       "date": "2026-10-24",
@@ -3020,6 +3020,12 @@
       "commit": "e89e68899",
       "reason": "usdz: new entry /compose reads USD composition; base entry gains the shared asset walk",
       "grew": 5
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "f2bdfd4e8",
+      "reason": "new optional entry @margoengine/cinematic/brain",
+      "grew": 1
     }
   ],
   "items": {
@@ -3095,6 +3101,7 @@
     "@margoengine/cameras/panini": 3289,
     "@margoengine/cameras/physical": 1349,
     "@margoengine/cinematic": 2076,
+    "@margoengine/cinematic/brain": 3262,
     "@margoengine/clustered": 13989,
     "@margoengine/clustered/area": 10461,
     "@margoengine/clustered/budget": 723,

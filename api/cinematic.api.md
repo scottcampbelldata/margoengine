@@ -14,6 +14,8 @@ export class Cinematic implements EnginePlugin {
     readonly offset: Float64Array;
     readonly position: Float64Array<ArrayBuffer>;
     readonly lookAt: Float64Array<ArrayBuffer>;
+    readonly cameraPosition: Float32Array<ArrayBuffer>;
+    readonly cameraTarget: Float32Array<ArrayBuffer>;
     constructor(options?: CinematicOptions);
     static attach(engine: EngineKernel, options?: CinematicOptions): Cinematic;
     setOrbitOffset(yaw: number, pitch: number, distance: number, height?: number): void;

@@ -13,7 +13,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-303). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-304). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -242,6 +242,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Lip sync (`@margoengine/cutscene/lipsync`, 2026-11-06) | Enforced: phonemes must be known ARPAbet or viseme names, inside their clip and sorted; `sampleRate` must be 8,000 or more. By method: `analyseSpeech` reads level and formants, not words, so it tells closed, hiss and open apart but no other consonants; one clean voice at a time; about half of vowel frames right on two sentences of one speaker, and those two set its thresholds, so other voices and noisy audio are not measured. How each viseme maps to VRM and ARKit shapes is Margo's own choice. Not measured: speed. |
 | VFX and activation tracks (`@margoengine/cutscene/vfx`, 2026-11-06) | By method: a seek replays drawn frames, one for each step, so it costs that many frames of GPU time; the replay is capped at `longest` (default 10 s), and past that it starts that far back, so the particles are alike in kind only. It lands exactly only with frames of `stepSize`; other frame lengths land near. Playing backward is a seek every frame. A pause does not hold particles while you keep drawing. Effects read at the top timeline's time, so a nested timeline with `speed` replays on that time. Not proven: `VFX.reset()` on the WebGL2 route. Not measured: speed of a seek. |
 | Timeline editor (`@margoengine/cutscene/editor`, 2026-11-06) | Enforced: every edit must leave a valid document, or it is refused whole. By method: top-level tracks only, a nested timeline moves as one clip; no curve editor, and clip lengths and key values change through `setItem`, not by dragging; undo keeps 200 steps as whole copies of the document, so a very large document costs memory; a change makes a new document, as a `Cutscene` is frozen, so the player is rebuilt by the caller. Needs a DOM for the panel; `TimelineModel` does not. Not proven: no screen reader run, Chromium only. Not measured: speed on large documents. |
+| Camera brain (`@margoengine/cinematic/brain`, 2026-11-07) | Enforced: names in one brain differ, a blend's `duration` is 0 or more, priorities are finite. By method: every enabled camera runs every frame, so the cost grows with the camera count; disable the ones not in use. A blend is linear in position, field of view and roll, with the view turned on the shortest arc, so `'direct'` can pass through a subject (use `'orbit'`). An `ease` is clamped to 0..1, so no overshoot. Blend rules match by name. Not measured: no timed number. | LIM-304 |
 
 ## Copies of a model
 

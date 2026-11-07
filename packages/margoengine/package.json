@@ -322,6 +322,10 @@
       "types": "./dist/cinematic.d.ts",
       "import": "./dist/cinematic.js"
     },
+    "./cinematic/brain": {
+      "types": "./dist/cinematic/brain.d.ts",
+      "import": "./dist/cinematic/brain.js"
+    },
     "./clustered": {
       "types": "./dist/clustered.d.ts",
       "import": "./dist/clustered.js"

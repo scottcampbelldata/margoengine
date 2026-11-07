@@ -25,6 +25,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./brain": {
+      "types": "./dist/brain.d.ts",
+      "import": "./dist/brain.js"
     }
   },
   "files": [

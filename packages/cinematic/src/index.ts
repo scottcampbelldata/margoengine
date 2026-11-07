@@ -47,8 +47,10 @@ export class Cinematic implements EnginePlugin {
   readonly lookAt = new Float64Array(3);
   private readonly velocity = new Float64Array(6);
   private readonly target = new Float64Array(3);
-  private readonly cameraPosition = new Float32Array(3);
-  private readonly cameraTarget = new Float32Array(3);
+  /** Where the last update put the camera: spring, shake, ground and walls included. Read it, do not keep it. */
+  readonly cameraPosition = new Float32Array(3);
+  /** What the last update aimed at. Read it, do not keep it. */
+  readonly cameraTarget = new Float32Array(3);
   private readonly armDirection = new Float64Array(3);
   /** Arm length allowed by the last `collide` hit, easing back out; Infinity when unobstructed. */
   private reach = Infinity;

@@ -821,6 +821,14 @@ Sequencer, Godot AnimationPlayer, Theatre.js, GSAP, three.js, Babylon and the li
 | VFX and activation tracks (`cutscene/vfx`) | Replay of a deterministic simulation from its last empty state: Margo's own design over `@margoengine/vfx`, with no outside source |
 | Timeline editor (`cutscene/editor`) | Plain DOM, WAI-ARIA 1.2 roles (`slider`, `toolbar`, `group`), Pointer Events and `EditHistory` of `@margoengine/inspector`; the layout is the common one of rows under a ruler, from no source |
 
+## Cinematic cameras: `@margoengine/cinematic`
+
+Written clean room from the published work below. No source of a camera system in any engine or add-on was read.
+
+| Area | Source |
+| --- | --- |
+| Camera brain (`cinematic/brain`) | Priorities and a selector over many cameras: our own design from the public idea, as surveyed by M. Christie, P. Olivier and J.-M. Normand, "Camera Control in Computer Graphics", Computer Graphics Forum 27(8), 2008. View blend: spherical linear interpolation of a direction (K. Shoemake, 1985), with the length mixed. The blend stack and the screen up carried through a pole are our own design |
+
 ## Save and load: `@margoengine/save`
 
 Written clean room from the specifications below. No source code of serializers, save systems or engines (Unity
