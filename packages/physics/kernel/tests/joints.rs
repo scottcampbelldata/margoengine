@@ -980,3 +980,118 @@ fn a_rotation_motor_cap_is_a_torque_about_the_joint() {
     }
 }
 
+fn rope(w: &mut World, a: u32, b: u32, on_a: V3, on_b: V3, length: f32) -> u32 {
+    let joint = w.add_joint(a, b, JOINT_DISTANCE).unwrap();
+    set_anchor(w, joint, on_a, on_b);
+    set_limit(w, joint, 0, f32::NEG_INFINITY, length);
+    joint
+}
+fn spring(w: &mut World, a: u32, b: u32, rest: f32, stiffness: f32, damping: f32) -> u32 {
+    let joint = w.add_joint(a, b, JOINT_DISTANCE).unwrap();
+    set_motor(w, joint, 0, rest, 0.0, stiffness, damping);
+    w.set_u(JOINT_FLAGS, joint as usize, w.uu(JOINT_FLAGS, joint as usize) | JOINT_MOTOR_FORCE);
+    joint
+}
+
+#[test]
+fn a_rope_is_slack_inside_its_length_and_holds_at_it() {
+    let mut w = world(4);
+    let hook = anchor(&mut w);
+    place(&mut w, hook, v3(0.0, 10.0, 0.0));
+    let weight = point(&mut w, v3(0.5, 10.0, 0.0), 1.0, 0.01);
+    rope(&mut w, hook, weight, v3(0.0, 0.0, 0.0), v3(0.0, 0.0, 0.0), 2.0);
+    // Free fall until the rope comes taut: y = 10 - g t^2 / 2 with the bob inside the circle.
+    run(&mut w, 15);
+    let t = 0.25f64;
+    let fell = 10.0 - w.v(POSITION_X, weight as usize).y as f64;
+    assert!((fell - G * t * t / 2.0).abs() < 0.01, "slack: {fell}");
+    let mut farthest: f32 = 0.0;
+    for _ in 0..600 {
+        w.step(DT);
+        let at = w.v(POSITION_X, weight as usize).sub(v3(0.0, 10.0, 0.0));
+        farthest = farthest.max(sqrt(at.dot(at)));
+    }
+    println!("rope: farthest {farthest:.6}");
+    assert!(farthest < 2.002, "{farthest}");
+}
+
+#[test]
+fn a_taut_rope_swings_with_the_period_of_the_elliptic_closed_form() {
+    // A swing under 90 degrees keeps a rope taut, so it is a pendulum of the rope's length.
+    let mut w = world(4);
+    let hook = anchor(&mut w);
+    place(&mut w, hook, v3(0.0, 2.0, 0.0));
+    let (length, theta) = (1.5f64, 60f64.to_radians());
+    let bob = point(&mut w, v3((length * theta.sin()) as f32, 2.0 - (length * theta.cos()) as f32, 0.0), 2.0, 0.01);
+    rope(&mut w, hook, bob, v3(0.0, 0.0, 0.0), v3(0.0, 0.0, 0.0), length as f32);
+    let got = measured_period(&mut w, bob, 900);
+    let want = 4.0 * (length / G).sqrt() * elliptic_k((theta / 2.0).sin());
+    println!("rope period {got:.5} of {want:.5}");
+    assert!((got / want - 1.0).abs() < 1e-3, "{got} against {want}");
+}
+
+#[test]
+fn a_rope_carries_a_heavy_load_on_a_light_one() {
+    let mut w = world(4);
+    let hook = anchor(&mut w);
+    place(&mut w, hook, v3(0.0, 10.0, 0.0));
+    let light = point(&mut w, v3(0.0, 9.0, 0.0), 1.0, 0.01);
+    let heavy = point(&mut w, v3(0.0, 8.0, 0.0), 1000.0, 10.0);
+    rope(&mut w, hook, light, v3(0.0, 0.0, 0.0), v3(0.0, 0.0, 0.0), 1.0);
+    rope(&mut w, light, heavy, v3(0.0, 0.0, 0.0), v3(0.0, 0.0, 0.0), 1.0);
+    // Limits are one row at a time, so the load rests a little long (docs/limits.md); it has to rest, and stay.
+    run(&mut w, 300);
+    let drop = 10.0 - w.v(POSITION_X, heavy as usize).y;
+    run(&mut w, 600);
+    let later = 10.0 - w.v(POSITION_X, heavy as usize).y;
+    println!("heavy on rope: {drop:.5}, then {later:.5}");
+    assert!((drop - 2.0).abs() < 0.04, "{drop}");
+    assert!((later - drop).abs() < 1e-3, "{drop} then {later}");
+}
+
+#[test]
+fn a_spring_keeps_the_frequency_and_decay_of_implicit_euler() {
+    // No load, no damping: x'' = -w^2 x. Implicit Euler keeps the frequency to second order and scales the amplitude by
+    // 1 / sqrt(1 + (w h)^2) a substep.
+    let mut w = world(4);
+    w.header_mut().gravity = [0.0, 0.0, 0.0];
+    let hook = anchor(&mut w);
+    let (mass, stiffness) = (2.0f32, 50.0f32);
+    let weight = point(&mut w, v3(1.5, 0.0, 0.0), mass, 0.01);
+    spring(&mut w, hook, weight, 1.0, stiffness, 0.0);
+    let frequency = (stiffness as f64 / mass as f64).sqrt();
+    let (mut crossings, mut last) = (vec![], 0.5f64);
+    let mut high = 0.0f64;
+    for step in 1..=600 {
+        w.step(DT);
+        let x = w.v(POSITION_X, weight as usize).x as f64 - 1.0;
+        if last < 0.0 && x >= 0.0 {
+            crossings.push(DT as f64 * (step as f64 - 1.0 + (-last) / (x - last)));
+        }
+        if step > 540 {
+            high = high.max(x.abs());
+        }
+        last = x;
+    }
+    let period = (crossings[crossings.len() - 1] - crossings[0]) / (crossings.len() - 1) as f64;
+    let want = 2.0 * std::f64::consts::PI / frequency;
+    let wh = frequency * DT as f64 / 8.0;
+    let decay = 0.5 * (1.0 + wh * wh).powf(-0.5 * 8.0 * 570.0);
+    println!("spring period {period:.5} of {want:.5}, amplitude {high:.5} of {decay:.5}");
+    assert!((period / want - 1.0).abs() < 1e-3, "{period}");
+    assert!((high / decay - 1.0).abs() < 0.03, "{high} against {decay}");
+}
+
+#[test]
+fn a_spring_settles_at_its_rest_length_plus_the_static_stretch() {
+    let mut w = world(4);
+    let hook = anchor(&mut w);
+    place(&mut w, hook, v3(0.0, 10.0, 0.0));
+    let weight = point(&mut w, v3(0.0, 9.0, 0.0), 2.0, 0.01);
+    spring(&mut w, hook, weight, 1.0, 50.0, 5.0);
+    run(&mut w, 600);
+    let stretch = 10.0 - w.v(POSITION_X, weight as usize).y as f64;
+    let want = 1.0 + 2.0 * G / 50.0;
+    println!("spring stretch {stretch:.5} of {want:.5}");
+    assert!((stretch - want).abs() < 1e-3, "{stretch}");
+}

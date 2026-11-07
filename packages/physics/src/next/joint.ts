@@ -2,7 +2,7 @@
 // that needs a square root goes through the kernel, so a joint set up in one browser is the joint set up in another.
 import { MargoError } from '@margoengine/math/errors';
 import type { JointOptions, JointType, MotorOptions, RotationMotorOptions } from '../joints.js';
-import { JOINT_CONE, JOINT_CONTACTS, JOINT_LIMIT, JOINT_LOCK, JOINT_MOTOR_FORCE, JOINT_MOTOR_ON, type KernelWorld } from '../kernel.js';
+import { JOINT_CONE, JOINT_CONTACTS, JOINT_DISTANCE, JOINT_LIMIT, JOINT_LOCK, JOINT_MOTOR_FORCE, JOINT_MOTOR_ON, type KernelWorld } from '../kernel.js';
 import { checkVec, type Quat, type Vec3 } from '../math.js';
 import type { PhysicsBody } from './body.js';
 
@@ -52,6 +52,9 @@ const locks: Readonly<Partial<Record<JointType | 'cone', number>>> = {
   revolute: JOINT_LOCK * (LINEAR | (6 << 3)),
   prismatic: JOINT_LOCK * (6 | ANGULAR),
   cone: JOINT_LOCK * LINEAR | JOINT_CONE | (JOINT_LIMIT << SWING),
+  // The first axis of these two is the line between the anchors, and what it reads is their distance.
+  rope: JOINT_DISTANCE | (JOINT_LIMIT << SLIDE),
+  spring: JOINT_DISTANCE | (JOINT_MOTOR_ON << SLIDE) | (JOINT_MOTOR_FORCE << SLIDE),
 };
 
 function checkLimits(min: number, max: number): void {
@@ -260,7 +263,6 @@ export function createJoint(owner: JointOwner, bodyA: PhysicsBody, bodyB: Physic
   const { type, anchorA = [0, 0, 0], anchorB = [0, 0, 0] } = options,
     locked = locks[type];
   if (type === 'generic') throw later('The generic joint', 'the shapes and queries batch');
-  if (type === 'rope' || type === 'spring') throw later(`The ${type} joint`, 'rope and spring joints');
   if (locked === undefined)
     throw new TypeError(`Unknown joint type ${String(type)}; use fixed, spherical, revolute, prismatic, cone, rope, spring or generic.`);
   checkVec(anchorA, 'anchorA');
@@ -275,6 +277,15 @@ export function createJoint(owner: JointOwner, bodyA: PhysicsBody, bodyB: Physic
       if (axis[0] === 0 && axis[1] === 0 && axis[2] === 0) throw new RangeError('Joint axis must be nonzero');
     }
     if (limits) checkLimits(limits[0], limits[1]);
+  }
+  if (type === 'rope' && !(options.length > 0 && Number.isFinite(options.length)))
+    throw new RangeError('Rope joint length must be a positive finite number; pass the longest anchor distance.');
+  if (type === 'spring') {
+    const { restLength, stiffness, damping = 0 } = options;
+    if (!(restLength >= 0) || !Number.isFinite(restLength))
+      throw new RangeError('Spring restLength must be a finite number of at least 0; pass the relaxed distance.');
+    if (!(stiffness >= 0 && damping >= 0) || !Number.isFinite(stiffness) || !Number.isFinite(damping))
+      throw new RangeError('Spring stiffness and damping must be finite numbers of at least 0; pass N/m and N*s/m.');
   }
   if (type === 'cone') {
     const { axis, swing, twist } = options;
@@ -305,6 +316,16 @@ export function createJoint(owner: JointOwner, bodyA: PhysicsBody, bodyB: Physic
     if (axis) kernel.setJointAxis(row, axis);
     if (limits) joint.setLimits(limits[0], limits[1]);
     if (motor) joint.setMotor(motor);
+  }
+  if (type === 'rope') {
+    columns.jointMin0[row] = -Infinity;
+    columns.jointMax0[row] = options.length;
+  }
+  if (type === 'spring') {
+    columns.jointTarget0[row] = options.restLength;
+    columns.jointStiffness0[row] = options.stiffness;
+    columns.jointDamping0[row] = options.damping ?? 0;
+    columns.jointCap0[row] = Infinity;
   }
   if (type === 'cone') {
     if (options.axis) kernel.setJointAxis(row, options.axis);

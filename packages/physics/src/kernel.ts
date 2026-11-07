@@ -93,6 +93,7 @@ export const JOINT_MOTOR_FORCE = 1 << 18;
 /** Not shifted: the two bodies may collide with each other. */
 export const JOINT_CONTACTS = 1 << 25;
 export const JOINT_CONE = 1 << 26;
+export const JOINT_DISTANCE = 1 << 27;
 
 /** How a body moves: `dynamic` by forces, `kinematicPosition` to a target, `kinematicVelocity` at its velocity. */
 export type KernelBodyKind = 'fixed' | 'dynamic' | 'kinematicPosition' | 'kinematicVelocity';

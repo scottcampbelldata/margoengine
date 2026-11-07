@@ -116,16 +116,24 @@ export function kernelScene(KernelWorld, steps = REPLAY_STEPS, visit = () => {})
   };
   for (let i = 0; i < 48; i++) spawn();
   // Joints of each kind between any two rows, so some form chains and rings; the removals below take them with their bodies.
-  for (let i = 0; i < 20; i++) {
+  for (let i = 0; i < 24; i++) {
     const a = rows[random.below(rows.length)],
       b = rows[random.below(rows.length)];
     if (a === b) continue;
     const cone = 7 | (1 << 26) | ((1 << 6) << 4) | ((1 << 6) << 3),
-      joint = world.addJoint(a, b, i < 16 ? [7, 7 | (6 << 3), 6 | (7 << 3), 63][i % 4] : cone);
+      reach = (1 << 27) | (i % 2 === 0 ? 1 << 6 : (1 << 12) | (1 << 18)),
+      joint = world.addJoint(a, b, i < 16 ? [7, 7 | (6 << 3), 6 | (7 << 3), 63][i % 4] : i < 20 ? cone : reach);
     c.jointAnchorAX[joint] = random.value() / 4;
     c.jointAnchorAY[joint] = random.value() / 4;
     c.jointAnchorBZ[joint] = random.value() / 4;
-    if (i >= 16) {
+    if (i >= 20) {
+      c.jointMin0[joint] = -Infinity;
+      c.jointMax0[joint] = 2;
+      c.jointTarget0[joint] = 1;
+      c.jointStiffness0[joint] = 40;
+      c.jointDamping0[joint] = 2;
+      c.jointCap0[joint] = Infinity;
+    } else if (i >= 16) {
       c.jointMin3[joint] = -0.4;
       c.jointMax3[joint] = 0.4;
       c.jointMin4[joint] = -Infinity;

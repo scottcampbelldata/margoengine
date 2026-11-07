@@ -105,19 +105,27 @@ fn scene() -> Vec<u32> {
     for _ in 0..48 {
         spawn(&mut w, &mut random, &mut rows, hull);
     }
-    for i in 0..20usize {
+    for i in 0..24usize {
         let a = rows[random.below(rows.len() as u32) as usize];
         let b = rows[random.below(rows.len() as u32) as usize];
         if a == b {
             continue;
         }
         let cone = 7 | JOINT_CONE | JOINT_LIMIT << 4 | JOINT_LIMIT << 3;
-        let joint = w.add_joint(a, b, if i < 16 { [7, 7 | (6 << 3), 6 | (7 << 3), 63][i % 4] } else { cone }).unwrap();
+        let reach = JOINT_DISTANCE | if i % 2 == 0 { JOINT_LIMIT } else { JOINT_MOTOR_ON | JOINT_MOTOR_FORCE };
+        let joint = w.add_joint(a, b, if i < 16 { [7, 7 | (6 << 3), 6 | (7 << 3), 63][i % 4] } else if i < 20 { cone } else { reach }).unwrap();
         let at = joint as usize;
         w.set_s(JOINT_ANCHOR_A_X, at, random.value() / 4.0);
         w.set_s(JOINT_ANCHOR_A_Y, at, random.value() / 4.0);
         w.set_s(JOINT_ANCHOR_B_Z, at, random.value() / 4.0);
-        if i >= 16 {
+        if i >= 20 {
+            w.set_s(JOINT_MIN_0, at, f32::NEG_INFINITY);
+            w.set_s(JOINT_MAX_0, at, 2.0);
+            w.set_s(JOINT_TARGET_0, at, 1.0);
+            w.set_s(JOINT_STIFFNESS_0, at, 40.0);
+            w.set_s(JOINT_DAMPING_0, at, 2.0);
+            w.set_s(JOINT_CAP_0, at, f32::INFINITY);
+        } else if i >= 16 {
             w.set_s(JOINT_MIN_3, at, -0.4);
             w.set_s(JOINT_MAX_3, at, 0.4);
             w.set_s(JOINT_MIN_4, at, f32::NEG_INFINITY);

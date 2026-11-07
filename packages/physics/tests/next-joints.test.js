@@ -193,8 +193,6 @@ test('wrong input says what to pass', () => {
   assert.throws(() => hinge.setMotor({ maxForce: -1 }), /maxForce must be 0 or more/);
   for (const call of [
     () => physics.addJoint(a, b, { type: 'generic' }),
-    () => physics.addJoint(a, b, { type: 'rope', length: 1 }),
-    () => physics.addJoint(a, b, { type: 'spring', restLength: 1, stiffness: 1 }),
     () => joint.setAxisLimits(),
     () => joint.setAxisMotor(),
   ])
@@ -383,5 +381,50 @@ test('maxForce caps a motor at the torque it names, on a ball joint and on a hin
     axis: [0, 0, 1],
   });
   assert.throws(() => hinge.setRotationMotor([0, 0, 0, 1]), { name: 'TypeError', message: /spherical joint/ });
+  physics.dispose();
+});
+
+const distance = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+
+test('rope joints cap the anchor distance and let the bodies come closer', () => {
+  const physics = new Physics(null),
+    hook = physics.addBody(null, { type: 'fixed', position: [0, 10, 0], colliders: [] }),
+    weight = physics.addBody(null, { position: [0.5, 10, 0], colliders: { shape: 'sphere', radius: 0.1 } });
+  physics.addJoint(hook, weight, { type: 'rope', length: 2 });
+  let farthest = 0;
+  for (let i = 0; i < 240; i++) {
+    physics.step();
+    farthest = Math.max(farthest, distance(weight.position, [0, 10, 0]));
+  }
+  assert.ok(farthest < 2.02, `never stretches past its length (${farthest})`);
+  near(distance(weight.position, [0, 10, 0]), 2, 0.02, 'hangs taut at its length');
+  near(weight.position[1], 8, 0.05, 'hangs below the hook');
+  physics.dispose();
+});
+
+test('spring joints settle at the rest length plus the static extension', () => {
+  const physics = new Physics(null),
+    hook = physics.addBody(null, { type: 'fixed', position: [0, 10, 0], colliders: [] }),
+    weight = physics.addBody(null, { position: [0, 9, 0], colliders: { shape: 'sphere', radius: 0.1, mass: 2 } }),
+    stiffness = 50;
+  physics.addJoint(hook, weight, { type: 'spring', restLength: 1, stiffness, damping: 5 });
+  for (let i = 0; i < 600; i++) physics.step();
+  // A force spring (Hooke's law): the stretch under a 2 kg load is m g / k.
+  near(10 - weight.position[1], 1 + (2 * 9.81) / stiffness, 0.01, 'equilibrium length');
+  near(weight.linearVelocity[1], 0, 0.01, 'damped to rest');
+  physics.gravity = [0, 0, 0];
+  for (let i = 0; i < 600; i++) physics.step();
+  near(10 - weight.position[1], 1, 0.01, 'rest length without load');
+  physics.dispose();
+});
+
+test('rope and spring joints refuse what they cannot be', () => {
+  const physics = new Physics(null),
+    a = physics.addBody(null, { colliders: [] }),
+    b = physics.addBody(null, { colliders: [] });
+  assert.throws(() => physics.addJoint(a, b, { type: 'rope', length: 0 }), /positive finite number/);
+  assert.throws(() => physics.addJoint(a, b, { type: 'spring', restLength: -1, stiffness: 1 }), /restLength/);
+  assert.throws(() => physics.addJoint(a, b, { type: 'spring', restLength: 1, stiffness: -1 }), /stiffness and damping/);
+  assert.throws(() => physics.addJoint(a, b, { type: 'rope', length: 1 }).setLimits(0, 1), /need a revolute or prismatic joint/);
   physics.dispose();
 });
