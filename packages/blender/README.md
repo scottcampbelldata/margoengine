@@ -17,7 +17,7 @@ import {Engine} from 'margoengine/core';
 import {loadMargo,parseMargo,decodeMargo} from 'margoengine/blender';
 const canvas = document.querySelector<HTMLCanvasElement>('canvas')!;
 const engine = await Engine.create(canvas, {backend:'webgpu',capacity:4096});
-const model = await loadMargo(engine, '/scene.margo');
+const model = await loadMargo(engine, '/triangle.margo'); // a test scene in tests/fixtures
 const b = model.bounds;
 engine.camera.fitToBoundingBox([b[0],b[1],b[2]], [b[3],b[4],b[5]], {duration:0});
 engine.start();
@@ -49,7 +49,7 @@ With the existing stage facade (available locally as `margoengine`), load into i
 import {createStage} from 'margoengine';
 import {loadMargo} from 'margoengine/blender';
 const stage = await createStage('#scene', {backend:'webgpu',capacity:4096});
-const model = await loadMargo(stage.engine, '/assets/machine_cell.margo');
+const model = await loadMargo(stage.engine, '/mixed-triangle.margo'); // a test scene in tests/fixtures
 const b = model.bounds;
 stage.engine.camera.fitToBoundingBox([b[0],b[1],b[2]], [b[3],b[4],b[5]], {duration:0});
 window.addEventListener('pagehide', () => stage.dispose(), {once:true});

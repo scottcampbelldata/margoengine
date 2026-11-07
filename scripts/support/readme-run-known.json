@@ -17,8 +17,6 @@
   "animator/readme-warping-margoengine-animator-war-67b2a2": "sample: RangeError: Unknown animator clip \"Stop\"; use a clip name from animation.clips",
   "audio/readme-cancel-a-load-and-clean-up-with-67985e": "sample: MargoError: HTTP 404 loading /sounds/step.ogg; check the URL and that the server allows this origin",
   "audio/readme-margoengine-audio-136569": "sample: MargoError: HTTP 404 loading /sounds/engine.ogg; check the URL and that the server allows this origin",
-  "blender/readme-blender-installation-and-export-119a0a": "sample: MargoError: .margo download request failed: HTTP 404; check the URL and that the server serves it",
-  "blender/readme-margoengine-blender-577bd7": "sample: MargoError: .margo download request failed: HTTP 404; check the URL and that the server serves it",
   "cameras/readme-physical-exposure-margoengine-ca-6d1c49": "example: MargoError: Tonemap needs an explicit HDR source when another effect owns scene capture; pass options.source",
   "clustered/readme-ies-profiles-9e957a": "sample: RangeError: Invalid IES file: no TILT= line; pass the text of a valid IES LM-63 photometric file",
   "cutscene/readme-render-to-video-4f9104": "sample: EncodingError: Unable to decode audio data",
