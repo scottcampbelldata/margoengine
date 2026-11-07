@@ -7,6 +7,7 @@ import { gaussianSplats, readGaussianSplats } from '../../gltf-pro/dist/splats.j
 import { glbChunks } from '../../shared/glb.js';
 import { i3dm } from '../dist/i3dm.js';
 import { splats, tileSplats } from '../dist/splats.js';
+import { terrain } from '../dist/terrain.js';
 import { Splats, transformSplats } from '../../splats/dist/index.js';
 import { TilesRenderer } from '../dist/index.js';
 import { cityTileset, groveTileset, memoryFetch } from './generator.js';
@@ -146,6 +147,46 @@ async function run(name: string): Promise<unknown> {
       errors: [...errors],
     };
     tiles.dispose();
+    return result;
+  }
+  if (name === 'terrain') {
+    // Cesium's real quantized-mesh sample (CesiumJS Specs/Data, Apache-2.0, oct normals) as a whole-globe layer of two
+    // levels, every tile the same file placed in its own rectangle, draped with a STAND-IN imagery tile made here: a
+    // red and blue checker, so the drape shows as both colours on the globe.
+    const from = errors.length,
+      checker = document.createElement('canvas');
+    checker.width = checker.height = 64;
+    const g = checker.getContext('2d')!;
+    for (let i = 0; i < 8; i++)
+      for (let j = 0; j < 8; j++) {
+        g.fillStyle = (i + j) % 2 ? '#ff2020' : '#2040ff';
+        g.fillRect(i * 8, j * 8, 8, 8);
+      }
+    const png = new Uint8Array(await (await new Promise<Blob>((r) => checker.toBlob((b) => r(b!), 'image/png'))).arrayBuffer());
+    const folder = '../../../examples/assets/terrain/QuantizedMeshWithOctVertexNormals/',
+      fetchAll = async (input: string, init?: { signal?: AbortSignal }) =>
+        input.startsWith('imagery/') ? new Response(png) : fetch(input.split('?')[0], init);
+    const source = await terrain(folder + 'layer.json', { fetch: fetchAll, imagery: { url: 'imagery/{z}/{x}/{y}.png' } });
+    engine.camera.near = 100_000;
+    engine.camera.far = 100_000_000;
+    engine.camera.position = [0, 8_000_000, 22_000_000];
+    engine.camera.target = [0, 0, 0];
+    tiles = await TilesRenderer.load(engine, source.url, { fetch: source.fetch, frame: 'local' });
+    tiles.tileset.on('error', ({ error }) => errors.push(`tile: ${(error as Error).message}`));
+    const timing = await converge();
+    const data = pixels();
+    let litCount = 0,
+      red = 0,
+      blue = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i] + data[i + 1] + data[i + 2] > 30) litCount++;
+      if (data[i] > 150 && data[i + 2] < 100) red++;
+      if (data[i + 2] > 150 && data[i] < 100) blue++;
+    }
+    const result = { ...timing, ...snapshot(), lit: litCount, red, blue, errors: errors.slice(from) };
+    tiles.dispose();
+    engine.camera.near = 1;
+    engine.camera.far = 20_000;
     return result;
   }
   if (name === 'gpu-memory') {

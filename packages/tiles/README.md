@@ -169,6 +169,29 @@ console.log(tileset.root.bounds.center);
 
 Each cell becomes an oriented box in ECEF (east, north and up at the cell's centre) around a 17 x 17 grid of points on its bottom and top surfaces, grown by the curvature between those points, so it holds the whole volume; the tile transform is ignored, as the extension says. Tokens, the Hilbert order on each face (odd faces mirrored) and the quadratic projection follow the extension and the S2 cell hierarchy guide. With implicit tiling a quadtree tile (level, x, y) is the S2 cell at (x, y) on its parent's (i, j) grid, and an octree tile also takes its slab of the heights. `parseS2Token`, `s2Token`, `s2LonLat` and `s2CellBounds` are exported.
 
+## Terrain and imagery
+
+`margoengine/tiles/terrain` streams quantized-mesh terrain (the format Cesium terrain servers publish) draped with map imagery, so a globe works without a photogrammetry dataset. `terrain(layerUrl)` reads the layer's `layer.json` and returns a tileset URL and a fetch for the renderer: the layer's two geographic root tiles become an implicit quadtree each, and every terrain tile becomes, on request, a b3dm mesh with skirts, RTC-centred in float64, with its imagery tile as an unlit texture. Selection, streaming, the memory budget and a floating origin are then the renderer's own.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { TilesRenderer } from 'margoengine/tiles';
+import { terrain, terrainFrame } from 'margoengine/tiles/terrain';
+
+const engine = await Engine.create(document.querySelector('canvas')!, {
+  camera: { position: [0, 8_000_000, 22_000_000], target: [0, 0, 0], near: 100_000, far: 100_000_000 },
+});
+// A real two-level quantized-mesh layer from CesiumJS's test data (examples/assets/terrain in this repository).
+// Add imagery: { url: 'https://your.tile.server/{z}/{x}/{y}.png' } to drape XYZ map tiles you may use.
+const source = await terrain('terrain/QuantizedMeshWithOctVertexNormals/layer.json');
+const tiles = await TilesRenderer.load(engine, source.url, { fetch: source.fetch, frame: 'local' });
+engine.start();
+// Close to the ground, centre the world on your area instead: frame: terrainFrame(86.925, 27.988) (degrees).
+console.log(terrainFrame(86.925, 27.988).length); // 16
+```
+
+`parseQuantizedMesh(bytes)` decodes a tile (header, vertices, triangles, edges, oct normals, water mask, metadata); a cut tile throws a `RangeError`. Imagery is `EPSG:3857` with `xyz` rows by default (`projection`, `scheme`, `maximumLevel`, `mimeType` change it); each terrain tile takes the deepest imagery tile that holds it whole, at most one level deeper than the terrain. Without `imagery` the terrain draws lit, in grey, with the tile's normals or ones made from its triangles. Pass `fetch` to `terrain` for headers such as an access token.
+
 ## Without the engine
 
 `Tileset` is engine-free: give it a view each frame and a content factory, and it does the rest. This is how the tests drive it, and how to stream tiles into your own renderer or a server-side job.
@@ -191,6 +214,7 @@ The content parsers (`parseB3dm`, `parsePnts`, `parseI3dm`, `parseCmpt`, `parseC
 
 - i3dm batch tables are read (`content.batchTable`) but per-instance picking and per-instance colours are not wired to them; an i3dm external glTF resolves against the tile's first content URL.
 - S2 boxes are boxes: near a face cell's corners a box holds more than the cell (selection may load a tile slightly early); no real S2 dataset was found to test on, so the proof uses the extension's own examples and figures.
+- Terrain: only `EPSG:4326` `tms` layers; tile availability from `layer.json` `available` (a layer without it, such as one using `metadataAvailability`, is assumed whole up to `maxzoom`, and a missing tile fails while its parent stays); one imagery tile per terrain tile, so near the poles and for very coarse terrain the imagery is a level coarser than it could be; every region spans -500 to 9,000 m, so selection boxes are taller than the ground; water mask and metadata are read but not drawn.
 - Splat tiles: the visible cloud is rebuilt on the CPU and uploaded again when the visible tiles change, which costs time in proportion to the visible splats (not measured); splats do not write depth or receive lighting (see `@margoengine/splats`); the renderer's `loadModel` is not used for splat tiles; a glTF tile with external buffers is not read.
 - Metadata: feature ID textures are named, not read (sample the texture yourself); property textures, property attributes and a `schemaUri` schema in glTF are not read; 64-bit integers become doubles (exact to 2^53); feature IDs of a Draco-compressed glTF primitive are not read; picking a vertex is yours (a raycast hit), the tables then give its feature.
 - Draco pnts decode in Web Workers (`@margoengine/decoders/draco-points`), so not in Node without a decoder of your own.

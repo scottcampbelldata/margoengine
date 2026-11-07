@@ -2454,6 +2454,10 @@
       "types": "./dist/tiles/s2.d.ts",
       "import": "./dist/tiles/s2.js"
     },
+    "./tiles/terrain": {
+      "types": "./dist/tiles/terrain.d.ts",
+      "import": "./dist/tiles/terrain.js"
+    },
     "./tonemap": {
       "types": "./dist/tonemap.d.ts",
       "import": "./dist/tonemap.js"

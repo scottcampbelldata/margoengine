@@ -45,6 +45,10 @@
     "./s2": {
       "types": "./dist/s2.d.ts",
       "import": "./dist/s2.js"
+    },
+    "./terrain": {
+      "types": "./dist/terrain.d.ts",
+      "import": "./dist/terrain.js"
     }
   },
   "files": [

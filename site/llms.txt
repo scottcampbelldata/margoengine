@@ -184,7 +184,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/blender API](https://margoengine.com/llms/api/blender.md): 1 entry point
 - [@margoengine/cache API](https://margoengine.com/llms/api/cache.md): 8 entry points
 - [@margoengine/splats API](https://margoengine.com/llms/api/splats.md): 2 entry points
-- [@margoengine/tiles API](https://margoengine.com/llms/api/tiles.md): 5 entry points
+- [@margoengine/tiles API](https://margoengine.com/llms/api/tiles.md): 6 entry points
 - [@margoengine/materials API](https://margoengine.com/llms/api/materials.md): 13 entry points
 - [@margoengine/shader API](https://margoengine.com/llms/api/shader.md): 13 entry points
 - [@margoengine/environment API](https://margoengine.com/llms/api/environment.md): 7 entry points
@@ -303,7 +303,7 @@ One page per package: every exported name with its declaration, generated from t
 - [Reading the three.js parity counts](https://margoengine.com/llms/docs/three-parity-matrix.md): The table in threejs-parity.md was rewritten by feature group: 194 features, 165 COVERED, 5 PARTIAL, 13 MISSING, plus 11 NOT PLANNED by…
 - [three.js r186 parity matrix](https://margoengine.com/llms/docs/threejs-parity.md): What Margo Engine covers compared with three.js r186 and its common add-ons (`three/addons`), one row per feature group. It is for roadmap…
 - [Site demos on the WebGL2 compatibility layer](https://margoengine.com/llms/docs/webgl2-compat-demos.md): Every live demo on margoengine.com and every model of the Khronos gallery, drawn once on native WebGPU and once on the WebGL2…
-- [How to work](https://margoengine.com/llms/docs/work-lists/how-to-work.md): Copied from the first account's working notes, so helpers on other accounts follow the same rules. `AGENTS.md` wins over this file. Batch…
+- [How to work](https://margoengine.com/llms/docs/work-lists/how-to-work.md): Copied from the first account's working notes, so helpers on other accounts follow the same rules. `AGENTS.md` wins over this file. The…
 - [Work list 1](https://margoengine.com/llms/docs/work-lists/list-1.md): Stays with the first account, the manager session. Listed so the other accounts know what not to touch.
 - [Batch prompts for work list 2](https://margoengine.com/llms/docs/work-lists/list-2-prompts.md): Each section is the full prompt for one batch.
 - [Work list 2](https://margoengine.com/llms/docs/work-lists/list-2.md): For the second account. Start now.

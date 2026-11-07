@@ -92,6 +92,15 @@ try {
     real,
   );
 
+  const globe = (results.terrain = await call((n) => window.tilesFixture.run(n), 'terrain'));
+  assert.deepEqual(globe.errors, [], 'terrain: WebGPU or engine errors');
+  check(
+    'terrain, real quantized-mesh: the globe is drawn from its tiles, draped with both colours of the imagery',
+    // From 23,400 km the earth's disc covers about 12,500 of the 129,600 pixels (radius about 63 px).
+    globe.selected >= 2 && globe.lit > 10_000 && globe.red > 500 && globe.blue > 500,
+    globe,
+  );
+
   const memory = (results.gpuMemory = await call((n) => window.tilesFixture.run(n), 'gpu-memory'));
   assert.deepEqual(memory.errors, [], 'gpu-memory: WebGPU or engine errors');
   check(
