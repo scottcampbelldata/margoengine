@@ -67,6 +67,10 @@
       "types": "./dist/relay.d.ts",
       "import": "./dist/relay.js"
     },
+    "./hitboxes": {
+      "types": "./dist/hitboxes.d.ts",
+      "import": "./dist/hitboxes.js"
+    },
     "./interest": {
       "types": "./dist/interest.d.ts",
       "import": "./dist/interest.js"

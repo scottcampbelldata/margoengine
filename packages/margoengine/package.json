@@ -1758,6 +1758,10 @@
       "types": "./dist/netcode/relay.d.ts",
       "import": "./dist/netcode/relay.js"
     },
+    "./netcode/hitboxes": {
+      "types": "./dist/netcode/hitboxes.d.ts",
+      "import": "./dist/netcode/hitboxes.js"
+    },
     "./netcode/interest": {
       "types": "./dist/netcode/interest.d.ts",
       "import": "./dist/netcode/interest.js"

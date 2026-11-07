@@ -335,6 +335,33 @@ const hit = lag.raycast(100.5, [1, -5], [0, 1]);
 console.log(hit?.id, hit?.distance); // 7 4.5
 ```
 
+### Boxes and capsules
+
+`LagCompensation` tests circles and spheres. `HitboxRewind` (its own entry, `@margoengine/netcode/hitboxes`) has the same `record`, `at` and `raycast`, and also takes boxes and capsules that turn. It is 3D: a 2D game passes z as 0.
+
+```ts
+import { HitboxRewind } from '@margoengine/netcode/hitboxes';
+
+const rewind = new HitboxRewind({ history: 32 });
+const turned = [0, Math.sin(Math.PI / 8), 0, Math.cos(Math.PI / 8)]; // a quarter turn about y, as [x, y, z, w]
+rewind.record(100, [
+  [7, { position: [0, 1, 0], radius: 0.4, halfHeight: 0.5 }], // a player: a standing capsule
+  [8, { position: [4, 1, 0], halfExtents: [2, 1, 0.1] }], // a shield: a box
+]);
+rewind.record(101, [
+  [7, { position: [2, 1, 0], radius: 0.4, halfHeight: 0.5 }],
+  [8, { position: [4, 1, 0], halfExtents: [2, 1, 0.1], rotation: turned }],
+]);
+// A shooter that saw tick 100.5 aimed along +z from (1, 1, -5): the capsule was at x = 1 then.
+const hit = rewind.raycast(100.5, [1, 1, -5], [0, 0, 1], { maxDistance: 100 });
+console.log(hit?.id, hit?.distance, hit?.point);
+```
+
+- Shapes: `{ position, radius }` is a sphere, `{ position, halfExtents, rotation? }` a box, and `{ position, radius, halfHeight, rotation? }` a capsule along its own y axis, `2 * (halfHeight + radius)` tall in all. `rotation` is a quaternion `[x, y, z, w]`, normalised for you, default none.
+- Between two ticks positions and sizes blend in a line and rotations the short way round. A shape that changes between box and capsule takes the nearer tick. A tick older than `history` is clamped, so a client cannot rewind further.
+- For several parts of one body, give each its own id and map ids back to the player yourself.
+- The ray tests are those of `@margoengine/math`: a slab test for boxes and `Capsule.intersectRay`, in each shape's own frame. Spheres give what `LagCompensation` gives.
+
 ## Interest management and bandwidth budgets
 
 `InterestManager` (its own entry, `@margoengine/netcode/interest`) is a ready-made `view` for `GameServer`: each client gets only the entities within `radius` of its player, the most important first, and no snapshot message goes over `budget` bytes. What it leaves out never reaches that client, so a cheat cannot read it from the wire.

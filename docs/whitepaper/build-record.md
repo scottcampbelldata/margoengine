@@ -2092,3 +2092,27 @@ Follow-up in the same batch: `34dd3b7a` makes the drive check wait for its pipel
 - **Gate:** per job: rebase, build:packages, api:check, `npm run quality`, lint, hygiene, the weather tests, the
   umbrella test, the weather GPU checks under the GPU lock, the claims, llms, lock-sync, sizes-page and fixed-waits
   tests; `npm run verify` for job 6 (the lock file) and once on the newest main after the last push.
+
+## Lane N batch 114: netcode
+
+Eight jobs for `@margoengine/netcode`, on this PC with the full check per job; each is a new optional entry or an option of one, and core and stage are untouched. The batch's aim is that the things a real multiplayer game reaches for next are there: send less, hide corrections and gaps, more ways to connect, and rollback past a mesh. Nothing is timed.
+
+| # | Job | Status | Commit | Entry | Claim |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Interest management and bandwidth budgets | DONE | `a1ebcac4` | `/interest` | LIM-384 |
+| 2 | Correction smoothing | DONE | `83cb1da3` | `/smoothing` | LIM-387 |
+| 3 | WebTransport | DONE | `9245f896` | `/webtransport` | LIM-393 |
+| 4 | Reconnection and seat reservation | DONE | `12a6231c` | `/rooms` | LIM-395 |
+| 5 | Signalling for WebRTC | DONE | `710d8d1b` | `/signal` | LIM-398 |
+| 6 | Extrapolation | DONE | `7e9f299a` | `/extrapolate` | LIM-400 |
+| 7 | Rollback spectators and relay | DONE | `11b26c93` | `/relay` | LIM-401 |
+| 8 | Lag compensation for boxes and capsules | DONE | this commit | `/hitboxes` | LIM-406 |
+
+- **Job 3's server:** Node has no HTTP/3 server, so the entry is the client and a server-side wrapper over a session of the W3C shape; the server host is supplied by the user. Job 4 holds the seat of a client that had one; reserving a seat ahead for a player who has not joined is not built. Both are in `docs/limits.md`.
+- **Bugs fixed:** a join hung when its first ping was lost (`6e0790c0`, `packages/netcode/tests/netcode.test.js`). After an outage longer than `redundancy`, rollback peers never resent the gap and stalled for good (`43449838`, `packages/netcode/tests/rollback.test.js`; it confirmed 32 frames before and 32 after without the fix). The result cache's `evict` threw when another worktree's run removed a stored file after the listing, which failed verify after every test had passed (`tests/result-cache.test.js`). Three were caught in the drafts before they landed, each with a test in `tests/signal.test.js` or the browser proof: `SignalClient.join` on a closed connection waited for ever, an ICE candidate could leave ahead of its description, and the signalling server closing dropped every working link.
+- **Proved on real things:** WebTransport by `openWebTransport`, built, in real Chromium 156 against a real HTTP/3 server on the outside test tool aioquic 1.7.2, by hand (`docs/whitepaper/reproduce.md`). Signalling by three real pages of Edge 157 on the package's WebSocket server, with a full WebRTC mesh that goes on after the server closes (`npm run test:browser --workspace @margoengine/netcode`).
+- **Stand-in:** everything else runs on `LoopbackNetwork` or generated numbers: interest, smoothing, reconnection, extrapolation, the relay (16 peers and a spectator, checksums equal frame by frame) and the rewind (against a walk along the ray on 300 random rays, and against `LagCompensation` on 200). No real network, STUN or TURN server, and no browser but Chromium's engine.
+- **Sources:** all read through text or a summarising fetch. Boulanger et al. (2006) in part (sections 2.2, 3.1 to 3.3, 5.2, 6). Fiedler, "State Synchronization": the priority accumulator and visual smoothing sections. Aggarwal et al. (NetGames 2004): most of it. W3C WebTransport Candidate Recommendation: the first 100,000 of 285,173 characters, through a summarising fetch. RFC 8838: sections 9, 11, 17, 18. RFC 8829: sections 3.5.2 and 4.1.19. Not read: the Tribes networking paper (no authors' copy found) and the Cannon article on rollback spectators. The relay and the reconnection have no outside source.
+- **Limits:** rows in `docs/limits.md`, Platform. `server.py` of the WebTransport proof overrides a private settings method of aioquic to announce what Chromium asks for; it is test-only and not shipped. Chromium reported a `maxDatagramSize` of 1,211 B on loopback, so a bigger snapshot takes the stream. No speed is measured; the encode cost of `InterestManager` is in the quiet pass.
+- **Slips:** job 1's first land stopped at the API quality gate. Job 3's first land stopped at verify on three rule tests (bounded teardown, marked waits, generated notices), job 4's on a marked wait, and job 8's on the result cache bug; each was fixed and the full check run again. Main moved during each full check, so jobs 2 to 7 landed by the short rule after the full check passed on the parent. Job 2 left a stale README limit, fixed in job 3's commit.
+- **Gate:** lint, hygiene, verify, the net and netcode tests, check:readmes and check:readme-run for each job; the browser proof for job 5.

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10574000,
+  "total": 10575834,
   "history": [
     {
       "date": "2026-10-24",
@@ -3662,6 +3662,12 @@
       "commit": "54ad70507",
       "reason": "new optional entry @margoengine/behavior/htn",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "cdf15b314",
+      "reason": "netcode: new optional entry ./hitboxes (batch 114 job 8)",
+      "grew": 1
     }
   ],
   "items": {
@@ -4092,6 +4098,7 @@
     "@margoengine/netcode": 12819,
     "@margoengine/netcode/extrapolate": 799,
     "@margoengine/netcode/generate": 5154,
+    "@margoengine/netcode/hitboxes": 1834,
     "@margoengine/netcode/interest": 2516,
     "@margoengine/netcode/node": 6457,
     "@margoengine/netcode/relay": 3617,

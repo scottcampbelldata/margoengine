@@ -4,6 +4,7 @@
 
 ### Networking
 
+- `@margoengine/netcode/hitboxes`: `HitboxRewind` rewinds boxes and capsules that turn, as `LagCompensation` does spheres.
 - `@margoengine/netcode/relay`: `RollbackRelay`, `relayPeers` and `RollbackSpectator` take rollback sessions past a full mesh, proved with 16 peers and a spectator whose checksums match theirs.
 - `RollbackSession` no longer stalls for good after an outage longer than `redundancy`: every 8th message goes back to the oldest input not acknowledged.
 - `@margoengine/netcode/extrapolate`: `Extrapolator` keeps entities moving when the next snapshot is late, for up to `maxTicks`, and blends to the truth when it comes. `GameClient` gains `previousSnapshot`.
