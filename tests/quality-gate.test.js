@@ -2,12 +2,13 @@
 // and each detector sees what it claims to see.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { cleanRoomGate, ENGINES } from '../scripts/quality/clean-room.js';
 import { FAMILIES, normalise } from '../scripts/quality/duplicates.js';
-import { BASELINES, compare, readBaseline, updateBaseline } from '../scripts/quality/ratchet.js';
+import { BASELINES, compare, readBaseline, staleTotal, updateBaseline } from '../scripts/quality/ratchet.js';
 import { headroom } from '../scripts/quality/sizes.js';
 
 test('compare fails on new and worse items and lists improvements', () => {
@@ -44,6 +45,18 @@ test('updateBaseline shrinks freely, grows only with a reason, and logs the reas
     );
   } finally {
     rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('a baseline total is the sum of its items, in the committed files too', () => {
+  // A merge settled by hand once kept sizes.json's total by adding the growth: 22,126 B off the sum of its items.
+  assert.equal(staleTotal({ total: 3, items: { a: 1, b: 2 } }), undefined);
+  assert.equal(staleTotal({ total: 2, items: { a: 1, b: 2 } }), 3);
+  assert.equal(staleTotal({ items: { a: 1 } }), undefined);
+  const root = fileURLToPath(new URL('..', import.meta.url));
+  for (const file of readdirSync(join(root, BASELINES)).filter((n) => n.endsWith('.json'))) {
+    const baseline = readBaseline(root, file.slice(0, -5));
+    assert.equal(staleTotal(baseline), undefined, `${file}: total ${baseline.total}; run npm run quality -- --update`);
   }
 });
 

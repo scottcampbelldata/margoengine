@@ -34,6 +34,16 @@ export function compare(measured, baseline, allowance = (v) => v) {
   return { worse, better };
 }
 
+/**
+ * The sum a baseline's `total` must hold, when it holds another (a hand-settled merge that added the growth instead of
+ * summing the items); undefined when the total is right or absent. `updateBaseline` always writes the true sum.
+ */
+export function staleTotal(baseline) {
+  if (baseline.total === undefined) return undefined;
+  const sum = Object.values(baseline.items).reduce((a, b) => a + b, 0);
+  return baseline.total === sum ? undefined : sum;
+}
+
 function headCommit(root) {
   try {
     return execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: root, encoding: 'utf8', stdio: 'pipe' }).trim();

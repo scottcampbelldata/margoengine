@@ -15,7 +15,7 @@ import { apiGate } from './quality/api.js';
 import { cleanRoomGate } from './quality/clean-room.js';
 import { duplicatesGate } from './quality/duplicates.js';
 import { packageList, repoFiles } from './quality/packages.js';
-import { compare, readBaseline, updateBaseline } from './quality/ratchet.js';
+import { compare, readBaseline, staleTotal, updateBaseline } from './quality/ratchet.js';
 import { sizesGate } from './quality/sizes.js';
 import { testsGate } from './quality/tests-floor.js';
 
@@ -78,6 +78,13 @@ for (const [gate, def] of Object.entries(GATES)) {
     });
     console.log(`quality ${gate}: baseline written, ${count} items${grown.length ? `, ${grown.length} grown` : ''}`);
     continue;
+  }
+  const sum = staleTotal(baseline);
+  if (sum !== undefined) {
+    failed++;
+    console.error(
+      `quality ${gate}: FAIL, the baseline total ${baseline.total} is not the sum of its items, ${sum} (a hand-settled merge). Fix: npm run quality -- --gate=${gate} --update.`,
+    );
   }
   if (worse.length) {
     failed++;
