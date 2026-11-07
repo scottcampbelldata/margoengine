@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { runInNewContext } from 'node:vm';
 import { GCProfiler, setFlagsFromString } from 'node:v8';
+import { v8Tiers } from '../../../scripts/support/v8-tiers.mjs';
 import { Spring, smoothDamp } from '../dist/index.js';
 
 const near = (a, b, eps, message = '') => assert.ok(Math.abs(a - b) <= eps, `${message} ${a} vs ${b}`);
@@ -142,16 +143,13 @@ test('huge finite coordinates do not overflow the speed limit', () => {
   near(position[0], -1e200, 1, 'moved at most the speed limit');
 });
 
-// %GetOptimizationStatus bit 64: the function runs Turbofan code. V8 compiles it on a background thread, so on a loaded
-// machine (a full verify run) it can arrive after 100,000 calls; until then smoothDamp runs in Maglev, which on V8 13
+// V8 compiles Turbofan's code on a background thread, so on a loaded machine (a full verify run) it can arrive after 100,000 calls; until then smoothDamp runs in Maglev, which on V8 13
 // calls Math.sqrt with boxed numbers. Runs `run(1000)` until Turbofan's code is in, for at most 30 s, so the windows
 // below measure the frame loop's steady state whatever the machine's load.
 function untilOptimized(run) {
-  setFlagsFromString('--allow-natives-syntax');
-  const status = new Function('f', 'return %GetOptimizationStatus(f)');
-  for (const deadline = performance.now() + 30_000; !(status(smoothDamp) & 64) && performance.now() < deadline; )
-    run(1000);
-  assert.ok(status(smoothDamp) & 64, `smoothDamp never reached Turbofan (status ${status(smoothDamp)})`);
+  const { isTurbofan, status } = v8Tiers();
+  for (const deadline = performance.now() + 30_000; !isTurbofan(smoothDamp) && performance.now() < deadline; ) run(1000);
+  assert.ok(isTurbofan(smoothDamp), `smoothDamp never reached Turbofan (status ${status(smoothDamp)})`);
 }
 
 // Each window starts from an empty young generation, so a call that allocates even 16 bytes grows the heap by 320 KB

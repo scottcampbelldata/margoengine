@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10257646,
+  "total": 10261397,
   "history": [
     {
       "date": "2026-10-24",
@@ -3254,6 +3254,12 @@
       "commit": "850b2e33",
       "reason": "sky gains the optional hillaire entry",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "84c81d4cf",
+      "reason": "the own physics kernel gains the integrator",
+      "grew": 1
     }
   ],
   "items": {
@@ -3667,7 +3673,7 @@
     "@margoengine/oit/moments": 4197,
     "@margoengine/oit/vfx": 486,
     "@margoengine/physics": 19679,
-    "@margoengine/physics/next": 2905,
+    "@margoengine/physics/next": 6656,
     "@margoengine/physics2d": 8199,
     "@margoengine/physics2d/outline": 2524,
     "@margoengine/pixel": 4664,
@@ -3792,15 +3798,19 @@
     "@margoengine/shadows/virtual": 15956,
     "@margoengine/shadows/vsm": 2046,
     "@margoengine/sky": 16975,
+    "@margoengine/sky/aerial": 6719,
     "@margoengine/sky/base": 7004,
     "@margoengine/sky/bruneton": 2557,
+    "@margoengine/sky/cloud-shadows": 3448,
     "@margoengine/sky/clouds": 2338,
     "@margoengine/sky/fog": 2295,
+    "@margoengine/sky/hillaire": 6858,
     "@margoengine/sky/lighting": 4064,
     "@margoengine/sky/night": 2523,
     "@margoengine/sky/preetham": 953,
     "@margoengine/sky/reflection": 1325,
     "@margoengine/sky/sun": 2379,
+    "@margoengine/sky/volumetric-clouds": 7571,
     "@margoengine/sky/weather": 5843,
     "@margoengine/splats": 25646,
     "@margoengine/splats/data": 17665,
@@ -3984,10 +3994,6 @@
     "margoengine": 308,
     "margoengine/game": 996,
     "margoengine/viz": 800,
-    "margoengine/web": 577,
-    "@margoengine/sky/volumetric-clouds": 7571,
-    "@margoengine/sky/cloud-shadows": 3448,
-    "@margoengine/sky/aerial": 6719,
-    "@margoengine/sky/hillaire": 6858
+    "margoengine/web": 577
   }
 }

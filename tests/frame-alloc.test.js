@@ -153,13 +153,13 @@ test("one late frame leaves core's frame loop optimized", { timeout: 120_000 }, 
         { encoding: 'utf8', timeout: 100_000 },
       ),
     );
-  // Bit 16 of %GetOptimizationStatus: the function runs optimized code. Default tiers, and V8 stopped at Maglev.
+  // Default tiers, and V8 stopped at Maglev.
   for (const flags of [[], ...(noTier ? [] : [['--max-opt=2']])]) {
-    const { before, after } = status(...flags);
-    assert.ok(before & 16, `the frame loop never got optimized (status ${before}; ${flags.join(' ')} ${host})`);
+    const { before, after, statuses } = status(...flags);
+    assert.ok(before, `the frame loop never got optimized (status ${statuses[0]}; ${flags.join(' ')} ${host})`);
     assert.ok(
-      after & 16,
-      `a late frame deoptimized the frame loop (status ${before} -> ${after}; ${flags.join(' ')} ${host})`,
+      after,
+      `a late frame deoptimized the frame loop (status ${statuses.join(' -> ')}; ${flags.join(' ')} ${host})`,
     );
   }
 });

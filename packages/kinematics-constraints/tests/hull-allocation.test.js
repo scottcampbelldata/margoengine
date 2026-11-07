@@ -9,9 +9,9 @@ import { runAllocationProbe } from './support/allocation-probe.js';
 // the same driver garbage as tests/capsule-allocation.test.js: each window started its driver in the interpreter. The
 // probe now runs each driver until it has Turbofan code before measuring, with --no-concurrent-recompilation.
 test('hull queries and hull solves allocate nothing per call', { timeout: 300_000 }, (t) => {
-  for (const { name, clean, windows, status } of runAllocationProbe('hull')) {
-    // Bit 64 of %GetOptimizationStatus: the driver runs Turbofan code, so the windows measured the kernel's steady state.
-    assert.ok(status & 64, `${name}: the driver never reached Turbofan (status ${status})`);
+  for (const { name, clean, windows, turbofan, status } of runAllocationProbe('hull')) {
+    // The driver runs Turbofan code, so the windows measured the kernel's steady state.
+    assert.ok(turbofan, `${name}: the driver never reached Turbofan (status ${status})`);
     assert.ok(clean, `${name}: every window of 20,000 allocated: ${JSON.stringify(windows)}`);
     t.diagnostic(`${name}: ${windows.at(-1).grown} B over 20,000`);
   }
