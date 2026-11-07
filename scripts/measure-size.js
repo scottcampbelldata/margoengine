@@ -14,6 +14,7 @@ export const external = [
   '@margoengine/core/extension',
   '@margoengine/animation',
   '@margoengine/gltf-pro',
+  '@margoengine/gltf-pro/model',
   '@margoengine/blender',
   '@margoengine/gltf',
   '@margoengine/creative',

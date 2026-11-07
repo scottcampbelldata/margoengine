@@ -30,6 +30,4 @@ export { Tonemap } from "@margoengine/tonemap";
 export { Tween } from "@margoengine/tween";
 
 export { createStage } from "@margoengine/stage";
-
-export { loadGLTF } from "@margoengine/gltf-pro";
 ```

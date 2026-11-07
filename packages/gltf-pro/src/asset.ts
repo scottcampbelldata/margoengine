@@ -106,6 +106,12 @@ export interface GLTFDecoderHooks {
     ): void;
   };
   ktx2?: { transcode(data: Uint8Array, options?: { signal?: AbortSignal }): Promise<GLTFCompressedImage> };
+  /**
+   * Where the built-in Draco and KTX2 decoders come from when `draco` or `ktx2` is not given. `loadGLTF` and
+   * `parseGLTFAsync` of the package root set `() => import('@margoengine/decoders')`; nothing else names that module,
+   * so a bundler that only reads @margoengine/gltf-pro/model copies no Wasm file.
+   */
+  decoderModule?: () => Promise<typeof import('@margoengine/decoders')>;
   /** Streams KTX2 images instead of decoding them whole; `loadGLTFProgressive` sets it from its `textures` option. */
   textureStream?: GLTFTextureOpener;
   /** EXT_mesh_gpu_instancing: `instancing` from @margoengine/gltf-pro/instancing. */
@@ -815,6 +821,18 @@ function validateKTX2(result: TranscodedKTX2Result, header: ReturnType<typeof kt
   asset.reserveDecodedBytes(total);
   return { ktx2: result, width: result.width, height: result.height, close() {} };
 }
+/** The module holding the built-in decoders; a file that needs one without a way to reach it is refused by name. */
+export function decoderSource(asset: GLTFAsset, format: string): NonNullable<GLTFDecoderHooks['decoderModule']> {
+  const source = asset.hooks.decoderModule;
+  if (!source)
+    throw margoError(
+      'unsupported',
+      format === 'Draco'
+        ? 'This file needs the Draco decoder; load it with loadGLTF from @margoengine/gltf-pro, or pass decoders.decoderModule'
+        : 'This file needs the KTX2 decoder; load it with loadGLTF from @margoengine/gltf-pro, or pass decoders.decoderModule',
+    );
+  return source;
+}
 function ktxDecoder(asset: GLTFAsset, options: GLTFImageOptions) {
   let decoder = options.ktx2,
     owned: KTX2Decoder | undefined;
@@ -823,7 +841,7 @@ function ktxDecoder(asset: GLTFAsset, options: GLTFImageOptions) {
       options.signal?.throwIfAborted();
       const header = ktxHeader(data, asset, options.device);
       if (!decoder) {
-        const { KTX2Decoder } = await import('@margoengine/decoders');
+        const { KTX2Decoder } = await decoderSource(asset, 'KTX2')();
         options.signal?.throwIfAborted();
         decoder = owned = new KTX2Decoder({ device: options.device });
       }

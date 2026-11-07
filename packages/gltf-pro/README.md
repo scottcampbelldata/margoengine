@@ -87,6 +87,20 @@ failure.
 The positional `await parseGLTFAsync(engine, input, buffers, images, {signal, draco, ktx2})` overload keeps supplied
 ordinary bitmaps and decodes embedded KTX2 when needed. Passing `undefined` for buffers with a fourth or fifth argument
 retains this positional behavior. Use the no-options/options-object form for automatic ordinary image decoding.
+`@margoengine/gltf-pro/model` holds `PBRModel`, `PBRDrawRun`, `GLTFAsset`, `parseGLTF`, `parsePreparedPBR`, `closeImages`,
+`textureTransform`, `textureCoordinates` and every type, and reaches no decoder module. A bundler copies the Draco and
+Basis Wasm when it reads a module that names them, used or not, so import from `/model` in code that loads no compressed
+file. Only the package root names them; a Draco or KTX2 file reached any other way is refused with `unsupported`, unless
+`decoders.decoderModule` says where they are:
+
+```ts
+import {GLTFAsset} from 'margoengine/gltf-pro/model';
+const doc = await (await fetch('/model.gltf')).json();
+const bytes = new Uint8Array(await (await fetch('/model.bin')).arrayBuffer());
+const asset = new GLTFAsset(doc, [bytes], undefined, {decoderModule: () => import('margoengine/decoders')});
+await asset.decode();
+```
+
 The existing `parseGLTF(engine, input, buffers, images)` remains synchronous for
 uncompressed and meshopt assets; Draco input directs callers to the async API.
 Both async APIs accept `{signal}`, an optional reusable `draco` decoder with a

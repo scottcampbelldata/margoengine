@@ -4,7 +4,7 @@ import {
   textureTransform,
   type PBRMaterial,
   type PBRPrimitive,
-} from '@margoengine/gltf-pro';
+} from '@margoengine/gltf-pro/model';
 import { MargoError } from '@margoengine/math';
 import { animationDefinition, animationIndex, animationSampler, type AnimationDefinition } from './gltf.js';
 import { sampleTrackInto } from './sampling.js';

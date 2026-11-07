@@ -12,7 +12,6 @@ export { Label, LabelRenderer } from '@margoengine/labels';
 export { HTML } from '@margoengine/html';
 export { OrbitControls, MapControls } from '@margoengine/controls/orbit';
 export { CameraProjection } from '@margoengine/cameras';
-export { loadGLTF } from '@margoengine/gltf-pro';
 export { EnvironmentLighting, ColorBackground } from '@margoengine/environment';
 export { Tween } from '@margoengine/tween';
 export { Stats } from '@margoengine/stats';

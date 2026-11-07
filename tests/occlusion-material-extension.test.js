@@ -14,6 +14,6 @@ test('the occlusion entry gets the extension surface edits and bindings', () => 
   assert.equal(code.match(/var s=surface\(i,front\);/g).length, 2);
   for (const part of ['_ = materialFactors;', '_ = materialTexture0;', '_ = materialSampler0;', 's.roughness=0.5;'])
     assert.equal(code.split(part).length - 1, 2, part);
-  const source = readFileSync(new URL('../packages/gltf-pro/src/index.ts', import.meta.url), 'utf8');
+  const source = readFileSync(new URL('../packages/gltf-pro/src/model.ts', import.meta.url), 'utf8');
   assert.match(source, /occlusionShader\(code\);[\s\S]{0,300}materialExtensionSurface\(rewritten\.code, extension\)/);
 });

@@ -121,6 +121,18 @@ export const entries = [
     fix: 'Install the named package (for example `npm i @margoengine/gltf`), or pass `{format}`: one of gltf, glb.',
   },
   {
+    id: 'gltf-decoders',
+    title: 'A compressed glTF reached without the decoders',
+    kind: 'message',
+    messages: [
+      'This file needs the Draco decoder; load it with loadGLTF from @margoengine/gltf-pro, or pass decoders.decoderModule',
+      'This file needs the KTX2 decoder; load it with loadGLTF from @margoengine/gltf-pro, or pass decoders.decoderModule',
+    ],
+    cause:
+      'Only the root of `@margoengine/gltf-pro` names the decoders, so builds of `@margoengine/gltf-pro/model` carry no Wasm. A Draco or KTX2 file came through that entry.',
+    fix: "Use `loadGLTF` from `@margoengine/gltf-pro`, or pass `decoders: {decoderModule: () => import('@margoengine/decoders')}`.",
+  },
+  {
     id: 'camera',
     title: 'Camera and controls values',
     kind: 'family',

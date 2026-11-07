@@ -1,4 +1,4 @@
-import { PBRModel } from '@margoengine/gltf-pro';
+import { PBRModel } from '@margoengine/gltf-pro/model';
 import { createKeyframeClip, sampleKeyframes, type KeyframeClip, type KeyframeTrackData } from './keyframes.js';
 import { Skeleton, type BonePose } from './skin.js';
 import { normalizeQuaternion } from '@margoengine/math/quat';

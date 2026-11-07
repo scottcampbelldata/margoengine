@@ -21,7 +21,6 @@ export const KITS = {
     about: 'Games: models, animation, light and shadow, sky, physics, audio, input, effects',
     from: [
       ['@margoengine/stage', ['createStage', 'Stage']],
-      ['@margoengine/gltf-pro', ['loadGLTF', 'parseGLTF']],
       ['@margoengine/animation', ['Animation', 'AnimationGroup']],
       ['@margoengine/animator', ['Animator']],
       ['@margoengine/materials', ['Material', 'Texture', 'loadTexture', 'createMesh', 'createInstancedMesh']],
@@ -64,7 +63,6 @@ export const KITS = {
       ['@margoengine/html', ['HTML']],
       ['@margoengine/controls/orbit', ['OrbitControls', 'MapControls']],
       ['@margoengine/cameras', ['CameraProjection']],
-      ['@margoengine/gltf-pro', ['loadGLTF']],
       ['@margoengine/environment', ['EnvironmentLighting', 'ColorBackground']],
       ['@margoengine/tween', ['Tween']],
       ['@margoengine/stats', ['Stats']],
@@ -77,7 +75,6 @@ export const KITS = {
     about: 'Product viewers and 3D on web pages: a glTF model, studio light, orbit, HTML on top',
     from: [
       ['@margoengine/stage', ['createStage', 'Stage']],
-      ['@margoengine/gltf-pro', ['loadGLTF']],
       ['@margoengine/environment', ['Environment', 'EnvironmentLighting', 'ColorBackground']],
       ['@margoengine/controls/orbit', ['OrbitControls']],
       ['@margoengine/shadows', ['Shadows']],

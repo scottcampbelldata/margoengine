@@ -11,8 +11,8 @@ extra install), and it costs nothing you do not use: a bundler keeps only the na
 | Kit | For | Everything in it, at startup |
 | --- | --- | --- |
 | `margoengine/game` | Games: models, animation, light and shadow, sky, physics, audio, input, effects | 341,740 B |
-| `margoengine/viz` | Data and scientific visualization: figures and GPU compute, points, lines, splats, terrain, labels and text | 301,511 B |
-| `margoengine/web` | Product viewers and 3D on web pages: a glTF model, studio light, orbit, HTML on top | 165,577 B |
+| `margoengine/viz` | Data and scientific visualization: figures and GPU compute, points, lines, splats, terrain, labels and text | 228,204 B |
+| `margoengine/web` | Product viewers and 3D on web pages: a glTF model, studio light, orbit, HTML on top | 97,175 B |
 
 The last column is min+gzip JavaScript with every name in the kit used, core and stage included (an app that uses
 part of a kit pays for that part; core + stage alone is 22,859 B). Wasm decoders, workers and lazily loaded parts
@@ -21,6 +21,10 @@ moves more than 3%.
 
 Each kit also re-exports `createStage` and `Stage`, so a whole app can start from one line. Option types and the
 rest of each package stay in that package: `import type {ShadowsOptions} from 'margoengine/shadows'`.
+
+`loadGLTF` is not in a kit: `import {loadGLTF} from 'margoengine/gltf-pro'`. It reaches the Draco and Basis decoders, and
+a bundler copies their Wasm files when it reads the module, before tree-shaking, so a kit that held it would put
+720 KB of files in every build, used or not.
 
 ## A game in one import
 
@@ -59,7 +63,6 @@ Games: models, animation, light and shadow, sky, physics, audio, input, effects.
 | From | Names |
 | --- | --- |
 | `margoengine` | `createStage`, `Stage` |
-| `margoengine/gltf-pro` | `loadGLTF`, `parseGLTF` |
 | `margoengine/animation` | `Animation`, `AnimationGroup` |
 | `margoengine/animator` | `Animator` |
 | `margoengine/materials` | `Material`, `Texture`, `loadTexture`, `createMesh`, `createInstancedMesh` |
@@ -100,7 +103,6 @@ Data and scientific visualization: figures and GPU compute, points, lines, splat
 | `margoengine/html` | `HTML` |
 | `margoengine/controls/orbit` | `OrbitControls`, `MapControls` |
 | `margoengine/cameras` | `CameraProjection` |
-| `margoengine/gltf-pro` | `loadGLTF` |
 | `margoengine/environment` | `EnvironmentLighting`, `ColorBackground` |
 | `margoengine/tween` | `Tween` |
 | `margoengine/stats` | `Stats` |
@@ -115,7 +117,6 @@ Product viewers and 3D on web pages: a glTF model, studio light, orbit, HTML on 
 | From | Names |
 | --- | --- |
 | `margoengine` | `createStage`, `Stage` |
-| `margoengine/gltf-pro` | `loadGLTF` |
 | `margoengine/environment` | `Environment`, `EnvironmentLighting`, `ColorBackground` |
 | `margoengine/controls/orbit` | `OrbitControls` |
 | `margoengine/shadows` | `Shadows` |

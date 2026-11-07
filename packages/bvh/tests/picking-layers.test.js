@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
 const { parseGLTFAsync } = await import(
-  process.env.MARGO_SOURCE_TEST ? '../../gltf-pro/src/index.ts' : '../../gltf-pro/dist/index.js'
+  process.env.MARGO_SOURCE_TEST ? '../../gltf-pro/src/model.ts' : '../../gltf-pro/dist/index.js'
 );
 import { exportGLB } from '../../exporters/dist/index.js';
 const { Raycaster } = await import(process.env.MARGO_SOURCE_TEST ? '../src/index.ts' : '../dist/index.js');

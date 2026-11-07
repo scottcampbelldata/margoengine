@@ -22,7 +22,7 @@ const root = resolve(import.meta.dirname, '..');
 
 /** Runs the check's own steps on one README text, against the built packages. */
 function check(t, tag, markdown) {
-  const scratch = join(root, `test-results/readme-types-test-${process.pid}-${tag}/readme-types`),
+  const scratch = join(root, `test-results/readme-types-test-${tag}/readme-types`),
     folder = join(scratch, '..', 'fixture');
   mkdirSync(folder, { recursive: true });
   t.after(() => rmSync(join(scratch, '..'), { recursive: true, force: true }));

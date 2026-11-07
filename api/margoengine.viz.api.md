@@ -65,7 +65,5 @@ export { createFigure } from "@margoengine/sciviz";
 
 export { createStage } from "@margoengine/stage";
 
-export { loadGLTF } from "@margoengine/gltf-pro";
-
 export { parseSplat } from "@margoengine/splats";
 ```

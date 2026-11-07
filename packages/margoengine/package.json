@@ -974,6 +974,10 @@
       "types": "./dist/gltf-pro.d.ts",
       "import": "./dist/gltf-pro.js"
     },
+    "./gltf-pro/model": {
+      "types": "./dist/gltf-pro/model.d.ts",
+      "import": "./dist/gltf-pro/model.js"
+    },
     "./gltf-pro/asset": {
       "types": "./dist/gltf-pro/asset.d.ts",
       "import": "./dist/gltf-pro/asset.js"

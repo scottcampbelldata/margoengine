@@ -5,6 +5,7 @@ import { canUseWorker, movable, runWorker } from '../../shared/worker.js';
 import { GLTFAsset, loadAsset, closeImages, type AssetOptions, type GLTFDecoderHooks } from './asset.js';
 import { PBRModel, loadGLTF, parseGLTFAsync, type GLTFLoadOptions } from './index.js';
 import { packed } from './pack.js';
+import { withDecoders } from './decoder-default.js';
 import { prepareAsset, type PreparedGLTF } from './prepare.js';
 export type { PreparedGLTF } from './prepare.js';
 // Draco, meshopt and KTX2 decode on this thread; the instancing reader only composes the worker-decoded accessors. A custom
@@ -63,7 +64,7 @@ async function finishPrepared(
   if (prepared.deferred) {
     const { asset, images } = await loadAsset(
       prepared.baseURL,
-      { ...options, buffers: prepared.buffers },
+      withDecoders({ ...options, buffers: prepared.buffers }),
       prepared.doc,
       { device: engineRuntime(instance).gpu ?? undefined, ktx2: options.ktx2 },
       false,

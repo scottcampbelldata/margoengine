@@ -1210,7 +1210,8 @@ An audit of the finished batches against their job text listed 70 gaps for the H
 | Texture 3 | decodeImage, KTX2 in Node | DONE | `8969ed132` | LIM-285 |
 | Texture 4 | exportOBJ and compressTextures on held textures | DONE | `7f23a4c4a` | LIM-285 |
 | README 1 | last README error, Skeleton in rigging types | DONE | `3cd3d347d` | - |
-| README stand-ins | README examples run as pasted | DONE | this commit | - |
+| README stand-ins | README examples run as pasted | DONE | `831d00371` | - |
+| B20 | Kits and materials emit no Draco or Basis file | DONE | this commit | - |
 
 ## LAZ: one LAS reader, and every point format on a real file
 

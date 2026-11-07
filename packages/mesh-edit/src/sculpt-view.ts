@@ -1,7 +1,7 @@
 // @margoengine/mesh-edit/sculpt-view: draws a sculpt session with gltf-pro and keeps it up to date. Each frame uploads only
 // the vertices the brush changed; triangles changing (dynamic topology, or an undo of it) rewrite the whole mesh.
 import type { Engine, EnginePlugin } from '@margoengine/core';
-import { GLTFAsset, PBRModel } from '@margoengine/gltf-pro';
+import { GLTFAsset, PBRModel } from '@margoengine/gltf-pro/model';
 import type { MeshSculptSession, SculptDrawing } from './sculpt.js';
 
 /** Options for {@link SculptView}. */

@@ -158,6 +158,7 @@ async function buildPackage(name) {
           '@margoengine/clustered',
           '@margoengine/clustered/directional',
           '@margoengine/gltf-pro',
+          '@margoengine/gltf-pro/model',
           '@margoengine/gltf-pro/interactivity',
           '@margoengine/selection',
           '@margoengine/gltf-pro/instancing',

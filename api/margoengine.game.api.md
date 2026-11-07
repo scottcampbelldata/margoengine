@@ -79,11 +79,7 @@ export { createStage } from "@margoengine/stage";
 
 export { cylinderGeometry } from "@margoengine/geometry";
 
-export { loadGLTF } from "@margoengine/gltf-pro";
-
 export { loadTexture } from "@margoengine/materials";
-
-export { parseGLTF } from "@margoengine/gltf-pro";
 
 export { planeGeometry } from "@margoengine/geometry";
 

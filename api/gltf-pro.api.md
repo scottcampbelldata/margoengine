@@ -85,6 +85,7 @@ export interface GLTFDecoderHooks {
             signal?: AbortSignal;
         }): Promise<GLTFCompressedImage>;
     };
+    decoderModule?: () => Promise<typeof import('@margoengine/decoders')>;
     textureStream?: GLTFTextureOpener;
     instancing?: {
         read(asset: GLTFAsset, extension: GLTFInstancing): PBRInstances | undefined;

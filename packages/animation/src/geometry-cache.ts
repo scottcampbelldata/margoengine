@@ -3,7 +3,7 @@
 // chunk carries its own topology, so a mesh may change vertex count as it plays. Only a few chunks are held at a time.
 import type { EngineKernel } from '@margoengine/core';
 import type { Engine, EnginePlugin } from '@margoengine/core/extension';
-import { GLTFAsset, PBRModel, type GLTFDocument } from '@margoengine/gltf-pro';
+import { GLTFAsset, PBRModel, type GLTFDocument } from '@margoengine/gltf-pro/model';
 import { MargoError } from '@margoengine/math/errors';
 
 declare const GPUBufferUsage: { STORAGE: number; VERTEX: number; COPY_DST: number; COPY_SRC: number };

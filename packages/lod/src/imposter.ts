@@ -1,7 +1,7 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import { Geometry, PbrMaterial, type EngineKernel, type Mesh } from '@margoengine/core';
 import { engineRuntime, meshRuntime, type Engine, type PassContext } from '@margoengine/core/extension';
-import { GLTFAsset, PBRModel } from '@margoengine/gltf-pro';
+import { GLTFAsset, PBRModel } from '@margoengine/gltf-pro/model';
 import { neutralShader } from '../../shared/display.js';
 import type { MutableVec3, Vec3 } from '@margoengine/math';
 import { MargoError } from '@margoengine/math/errors';

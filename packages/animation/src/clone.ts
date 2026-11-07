@@ -1,4 +1,4 @@
-import { PBRModel, closeImages, type PreparedGeometry } from '@margoengine/gltf-pro';
+import { PBRModel, closeImages, type PreparedGeometry } from '@margoengine/gltf-pro/model';
 import { MargoError } from '@margoengine/math/errors';
 
 /**

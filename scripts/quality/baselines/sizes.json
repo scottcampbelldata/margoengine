@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 9954178,
+  "total": 10003008,
   "history": [
     {
       "date": "2026-10-24",
@@ -2960,6 +2960,12 @@
       "commit": "ef68799a8",
       "reason": "decodePNG reads interlaced files and checks CRCs; exportUSDZ takes GLB bytes through the GLB reader",
       "grew": 2
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "831d00371",
+      "reason": "gltf-pro gains the model entry that keeps decoders out of builds that load no compressed file",
+      "grew": 23
     }
   ],
   "items": {
@@ -3652,8 +3658,31 @@
     "leak @margoengine/usdz -> @margoengine/gltf-pro": 1,
     "leak @margoengine/usdz/worker -> @margoengine/gltf-pro/worker": 1,
     "margoengine": 308,
-    "margoengine/game": 1030,
+    "margoengine/game": 996,
     "margoengine/viz": 800,
-    "margoengine/web": 599
+    "margoengine/web": 577,
+    "@margoengine/gltf-pro/model": 56493,
+    "leak @margoengine/animation -> @margoengine/gltf-pro/model": 1,
+    "leak @margoengine/animation/geometry-cache -> @margoengine/gltf-pro/model": 1,
+    "leak @margoengine/animation/interactivity -> @margoengine/gltf-pro/model": 1,
+    "leak @margoengine/animation/pointer -> @margoengine/gltf-pro/model": 1,
+    "leak @margoengine/animation/skeleton-utils -> @margoengine/gltf-pro/model": 1,
+    "leak @margoengine/blender -> @margoengine/gltf-pro/model": 1,
+    "leak @margoengine/loaders/mtl -> @margoengine/gltf-pro/model": 1,
+    "leak @margoengine/loaders/render -> @margoengine/gltf-pro/model": 1,
+    "leak @margoengine/lod -> @margoengine/gltf-pro/model": 1,
+    "leak @margoengine/materials -> @margoengine/gltf-pro/model": 1,
+    "leak @margoengine/materials/batched -> @margoengine/gltf-pro/model": 1,
+    "leak @margoengine/materials/mips -> @margoengine/gltf-pro/model": 1,
+    "leak @margoengine/materials/skin -> @margoengine/gltf-pro/model": 1,
+    "leak @margoengine/materials/stochastic -> @margoengine/gltf-pro/model": 1,
+    "leak @margoengine/mesh-edit/sculpt-view -> @margoengine/gltf-pro/model": 1,
+    "leak @margoengine/oit/meshes -> @margoengine/gltf-pro/model": 1,
+    "leak @margoengine/shader -> @margoengine/gltf-pro/model": 1,
+    "leak @margoengine/shader/editor -> @margoengine/gltf-pro/model": 1,
+    "leak @margoengine/shader/graph -> @margoengine/gltf-pro/model": 1,
+    "leak @margoengine/shader/lighting -> @margoengine/gltf-pro/model": 1,
+    "leak @margoengine/shader/pass -> @margoengine/gltf-pro/model": 1,
+    "leak @margoengine/usdz -> @margoengine/gltf-pro/model": 1
   }
 }

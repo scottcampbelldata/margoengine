@@ -13,7 +13,7 @@ import {
   type PBRRenderState,
   type TextureTransform,
   type MaterialSide,
-} from '@margoengine/gltf-pro';
+} from '@margoengine/gltf-pro/model';
 import { PBRInstances } from '@margoengine/gltf-pro/instancing';
 import { extendedMaterials } from '@margoengine/gltf-pro/extended';
 import { physicalMapsShader } from './physical-maps.js';

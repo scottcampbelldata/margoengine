@@ -7,7 +7,7 @@ import {
   type MaterialExtensionTexture,
   type PBRMaterial,
   type PBRModel,
-} from '@margoengine/gltf-pro';
+} from '@margoengine/gltf-pro/model';
 import { coordinateSlot } from './coordinates.js';
 import type { Engine, EnginePlugin } from '@margoengine/core/extension';
 import { Cleanup } from '../../shared/cleanup.js';

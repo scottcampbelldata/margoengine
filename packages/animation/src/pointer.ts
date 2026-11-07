@@ -1,4 +1,4 @@
-import { textureCoordinates, textureTransform } from '@margoengine/gltf-pro';
+import { textureCoordinates, textureTransform } from '@margoengine/gltf-pro/model';
 import type { GLTFLight, PBRMaterial, PBRModel, TextureTransform } from '@margoengine/gltf-pro';
 import { attenuationPower } from '../../shared/attenuation.js';
 import { createKeyframeClip, type Keyframe, type KeyframeClip, type PropertyTrackData } from './keyframes.js';

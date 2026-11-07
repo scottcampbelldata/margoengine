@@ -36,6 +36,10 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./model": {
+      "types": "./dist/model-entry.d.ts",
+      "import": "./dist/model-entry.js"
+    },
     "./asset": {
       "types": "./dist/asset-entry.d.ts",
       "import": "./dist/asset-entry.js"

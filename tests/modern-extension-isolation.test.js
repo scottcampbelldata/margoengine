@@ -9,6 +9,7 @@ test('optional packages stay isolated and an accessor-only import discards rende
     '@margoengine/animation',
     '@margoengine/animation/sampling',
     '@margoengine/gltf-pro',
+    '@margoengine/gltf-pro/model',
     '@margoengine/blender',
     // gltf-pro loads these on demand: a dynamic import is the one link allowed, which the check below holds.
     '@margoengine/splats',

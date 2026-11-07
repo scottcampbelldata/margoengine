@@ -1,5 +1,5 @@
 import { MargoError } from '@margoengine/math/errors';
-import { PBRModel } from '@margoengine/gltf-pro';
+import { PBRModel } from '@margoengine/gltf-pro/model';
 import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine/core/extension';
 import { SceneTarget, sceneTarget } from '../../shared/msaa.js';
 import { currentFrame, retire } from '../../shared/frame-resources.js';

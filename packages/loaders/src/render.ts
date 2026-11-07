@@ -1,5 +1,5 @@
 import type { EngineKernel, Mesh } from '@margoengine/core';
-import { parsePreparedPBR, type GLTFDocument, type PBRModel, type PreparedGeometry } from '@margoengine/gltf-pro';
+import { parsePreparedPBR, type GLTFDocument, type PBRModel, type PreparedGeometry } from '@margoengine/gltf-pro/model';
 import { SRGBToLinear } from '@margoengine/math/color';
 import type { CreateMeshesOptions } from './engine.js';
 import { CORE_MAX_VERTICES, toGeometry } from './geometry.js';
