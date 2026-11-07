@@ -1691,12 +1691,12 @@ and offline mode, on a real Khronos file (`packages/cache/scripts/test-browser.j
 
 | # | Job | Status | Commit | Entry | Claim |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Range request caching | DONE | `8c775f68` | `/ranges` | LIM-337 |
-| 2 | Vary and request-header keys | DONE | `6af1a5f2` | `/vary`, root `keys` option | LIM-338 |
-| 3 | Eviction index | DONE | `65eb78e3` | `/eviction` (suggested `/index`), root `eviction` option | LIM-339 |
-| 4 | Asset bundles with dependencies | DONE | `86c457a4` | `/bundles` | LIM-340 |
-| 5 | Expires and Age | DONE | `40acf109` | root `freshness` option | LIM-341 |
-| 6 | Prioritized prefetch | DONE | `50b34275` | `/prefetch` | LIM-342 |
+| 1 | Range request caching | DONE | `8c775f68` | `/ranges` | LIM-338 |
+| 2 | Vary and request-header keys | DONE | `6af1a5f2` | `/vary`, root `keys` option | LIM-339 |
+| 3 | Eviction index | DONE | `65eb78e3` | `/eviction` (suggested `/index`), root `eviction` option | LIM-340 |
+| 4 | Asset bundles with dependencies | DONE | `86c457a4` | `/bundles` | LIM-341 |
+| 5 | Expires and Age | DONE | `40acf109` | root `freshness` option | LIM-342 |
+| 6 | Prioritized prefetch | DONE | `50b34275` | `/prefetch` | LIM-343 |
 
 Follow-ups in the same batch: `e4d3092c` makes the LoadingManager README example run as written, `28968273` stops a
 cache set as `globalThis.fetch` from calling itself, and this commit adds the real-browser check.
