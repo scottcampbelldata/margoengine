@@ -49,6 +49,7 @@ The same server also serves the loader examples:
 | [blender-loader/](blender-loader/) | Loading a `.margo` file exported from Blender |
 | [usdz-loader/](usdz-loader/) | Loading USDZ and USDA files |
 | [webxr-orbit/](webxr-orbit/) | A WebXR session around a simple scene |
+| [xr-device-check/](xr-device-check/) | Runs WebXR on a real headset or phone and saves the record [docs/xr-device-runs](../docs/xr-device-runs/README.md) keeps |
 
 ## Projects
 

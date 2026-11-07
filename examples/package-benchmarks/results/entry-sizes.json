@@ -1,5 +1,5 @@
 {
-  "commit": "f0f0a7925",
+  "commit": "db6371ff3",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -3142,8 +3142,12 @@
     },
     "@margoengine/xr": {
       ".": {
-        "raw": 19587,
-        "gzip": 6612
+        "raw": 19477,
+        "gzip": 6567
+      },
+      "./device-check": {
+        "raw": 4596,
+        "gzip": 2088
       }
     }
   },
@@ -3180,8 +3184,8 @@
     },
     "packages/xr/dist/index.js": {
       "raw": 19587,
-      "gzip": 6612,
-      "brotli": 5899
+      "gzip": 6603,
+      "brotli": 5896
     },
     "packages/gltf-pro/dist/index.js": {
       "raw": 1411360,

@@ -1,7 +1,7 @@
 {
   "name": "@margoengine/xr",
   "version": "1.0.0",
-  "description": "Optional WebGPU WebXR sessions, input poses and stereo rendering for Margo Engine.",
+  "description": "Optional WebGPU WebXR sessions, input poses and stereo rendering for Margo Engine, with real-device runs (./device-check).",
   "keywords": [
     "margoengine",
     "webgpu",
@@ -26,8 +26,8 @@
     "access": "public"
   },
   "scripts": {
-    "build": "node scripts/build.js",
-    "test": "npm run build && node --test tests/xr.test.js tests/hit-test.test.js",
+    "build": "node ../../scripts/build-optional.js xr",
+    "test": "npm run build && node --test tests/*.test.js",
     "prepack": "npm run build"
   },
   "sideEffects": false,
@@ -35,6 +35,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./device-check": {
+      "types": "./dist/device-check.d.ts",
+      "import": "./dist/device-check.js"
     }
   },
   "files": [

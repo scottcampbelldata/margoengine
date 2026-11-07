@@ -2,6 +2,7 @@ import { Engine, box, PbrMaterial } from '@margoengine/core';
 import { XR } from '@margoengine/xr';
 import { Stage } from '@margoengine/stage';
 import { addXRButton } from '@margoengine/stage/xr';
+import { runDeviceCheck, xrRunGaps, XR_RUN_TARGETS } from '@margoengine/xr/device-check';
 import type {
   XRBinding,
   XRMode,
@@ -184,6 +185,11 @@ async function run() {
     await device.queue.onSubmittedWorkDone();
     if (Math.abs(centers[0] - centers[1]) < 2) throw new Error('Stereo projections did not separate the eye images');
     await xr.end();
+    // A device run on the same stand-in: real frames and real WebGPU, and the record says it proves nothing.
+    const run = await runDeviceCheck(xr, { seconds: 0.2 }),
+      gaps = xrRunGaps(run, XR_RUN_TARGETS[0]);
+    if (run.native || !run.tracked || run.views !== 2 || run.errors.length || !gaps.join().includes('stand-in'))
+      throw new Error(`Stand-in device run: ${JSON.stringify(run)}`);
     xr.dispose();
     const button = await enterByButton(new Stage(engine));
     engine.dispose();

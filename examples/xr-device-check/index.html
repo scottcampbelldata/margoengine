@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Margo XR device check</title>
+  </head>
+  <body>
+    <h1>Margo XR device check</h1>
+    <p id="status">Looking for WebXR</p>
+    <button id="vr" disabled>Run VR</button>
+    <button id="ar" disabled>Run AR</button>
+    <form id="questions" hidden>
+      <p>What did you see?</p>
+      <label><input type="checkbox" name="scene" /> The scene stood still and looked solid in both eyes</label><br />
+      <label><input type="checkbox" name="tracking" /> The view followed my head with no jumps</label><br />
+      <label><input type="checkbox" name="input" /> The cube changed colour when I pressed, pinched or tapped</label><br />
+      <label><input type="checkbox" name="exit" /> Leaving the session brought this page back</label><br />
+      <button>Done</button>
+    </form>
+    <a id="save" hidden>Save the record</a>
+    <pre id="report"></pre>
+    <canvas width="320" height="180"></canvas>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

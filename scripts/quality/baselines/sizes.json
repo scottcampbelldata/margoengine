@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10658114,
+  "total": 10660458,
   "history": [
     {
       "date": "2026-10-24",
@@ -3758,6 +3758,12 @@
       "commit": "c25e2cc0c",
       "reason": "new optional entry @margoengine/blender/curves: curves, point clouds and volumes from Blender",
       "grew": 3
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "db6371ff3",
+      "reason": "new optional entry @margoengine/xr/device-check",
+      "grew": 1
     }
   ],
   "items": {
@@ -4499,6 +4505,7 @@
     "@margoengine/worker": 2128,
     "@margoengine/worker/canvas": 1597,
     "@margoengine/xr": 6748,
+    "@margoengine/xr/device-check": 2344,
     "leak @margoengine/animation -> @margoengine/gltf-pro/model": 1,
     "leak @margoengine/animation/geometry-cache -> @margoengine/gltf-pro/model": 1,
     "leak @margoengine/animation/interactivity -> @margoengine/gltf-pro/interactivity": 1,

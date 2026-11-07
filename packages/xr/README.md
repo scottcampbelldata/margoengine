@@ -71,3 +71,21 @@ await xr.requestSession('immersive-ar', {
 });
 hits = await HitTest.create(xr, { from: 'viewer' });
 ```
+
+## Device runs
+
+`runDeviceCheck` from `@margoengine/xr/device-check` runs one session and gives back what happened: frames, poses, views, frame times, inputs, granted features and failures. `examples/xr-device-check` is the page to open on a headset or phone; [docs/xr-device-runs](../../docs/xr-device-runs/README.md) keeps the records, and `npm run check:xr-runs` prints which routes a real device has proven. No real device has run yet: all four routes read NOT RUN. A run whose `navigator.xr` is a JavaScript stand-in has `native: false` and proves nothing.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { XR } from 'margoengine/xr';
+import { runDeviceCheck } from 'margoengine/xr/device-check';
+
+const canvas = document.querySelector('canvas')!;
+const engine = await Engine.create(canvas, { backend: 'webgpu' });
+const xr = await XR.create(engine);
+document.querySelector('button')!.onclick = async () => {
+  const run = await runDeviceCheck(xr, { mode: 'immersive-vr', seconds: 20 });
+  console.log(run.tracked, 'tracked frames at', run.frameMs.median, 'ms');
+};
+```

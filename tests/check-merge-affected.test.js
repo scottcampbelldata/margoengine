@@ -535,7 +535,7 @@ test('the bundler matrix does not take the GPU lock, and a render in a browser i
   );
 });
 
-test('verify runs the same checks as before plus the parity count, hygiene first, the build second, the rest after the build', () => {
+test('verify runs the same checks as before plus the parity count and the XR device-run gate, hygiene first, the build second, the rest after the build', () => {
   assert.equal(manifest.scripts.verify, 'node scripts/verify.mjs');
   assert.deepEqual(SERIAL, ['node scripts/hygiene.js --verify', 'npm run build:packages']);
   assert.deepEqual(
@@ -544,6 +544,7 @@ test('verify runs the same checks as before plus the parity count, hygiene first
       'npm run api:check',
       'npm run quality',
       'npm run check:parity',
+      'npm run check:xr-runs',
       'npm run build --workspace examples/gameplay-sandbox',
       'npm run test --workspace examples/gameplay-sandbox',
       'npm run build --workspace examples/voxel-sandbox',

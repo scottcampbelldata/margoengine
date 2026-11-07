@@ -22,6 +22,7 @@ export const EXAMPLE_FOLDERS = [
   'quickstart',
   'usdz-loader',
   'webxr-orbit',
+  'xr-device-check',
 ];
 
 /**

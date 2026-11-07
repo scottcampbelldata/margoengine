@@ -1305,7 +1305,7 @@
     "package": "@margoengine/xr",
     "version": "1.0.0",
     "published": false,
-    "description": "Optional WebGPU WebXR sessions, input poses and stereo rendering for Margo Engine.",
+    "description": "Optional WebGPU WebXR sessions, input poses and stereo rendering for Margo Engine, with real-device runs (./device-check).",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "xr",
     "install": "npm install @margoengine/core@1.0.0 @margoengine/xr@1.0.0",

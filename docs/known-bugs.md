@@ -202,6 +202,15 @@ does not own. Each entry says exactly what is needed to close it.
   WebGPU XR binding (`XRGPUBinding`), or an AR headset with the same; then a reticle placed on a real floor and a real
   table (viewer source) and by screen tap (transient source), one placement anchored, and the result recorded here.
 
+### WebXR: no run on a real headset or AR phone
+
+- **What:** nothing in `@margoengine/xr` has run on a real device: sessions, stereo drawing, inputs, hit testing, or the
+  WebGL2 layer's route. `npm run check:xr-runs` lists the four routes, each NOT RUN.
+- **Verified:** real WebGPU with a stand-in session (`npm run modern:test:xr:browser`), mocks in
+  `packages/xr/tests`, and `packages/webgl2-compat/test/xr-browser.mjs`. This PC has no OpenXR runtime.
+- **Needed to close:** run `examples/xr-device-check` on each route's device and add the records to
+  [xr-device-runs](xr-device-runs/README.md). The gate then asks for this entry to go.
+
 ### Intel Arc 140V: three GPU-suite failures fixed on this PC and rechecked on Intel by the outside audit
 
 - **Verified on Intel** (Core Ultra 7 258V, Arc 140V, driver 32.0.101.8860, main at 30bea6fa, recheck of 2026-10-27):

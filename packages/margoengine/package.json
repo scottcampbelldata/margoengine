@@ -2938,6 +2938,10 @@
       "types": "./dist/xr.d.ts",
       "import": "./dist/xr.js"
     },
+    "./xr/device-check": {
+      "types": "./dist/xr/device-check.d.ts",
+      "import": "./dist/xr/device-check.js"
+    },
     "./game": {
       "types": "./dist/game.d.ts",
       "import": "./dist/game.js"

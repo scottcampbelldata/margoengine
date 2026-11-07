@@ -104,7 +104,7 @@ node --test tests/catalog.test.js
 | [`@margoengine/labels`](../packages/labels/README.md) | HTML labels and CSS 3D objects positioned over a Margo Engine canvas. |
 | [`@margoengine/html`](../packages/html/README.md) | World-space DOM anchors, CSS3D placement and scene-depth occlusion. |
 | [`@margoengine/video`](../packages/video/README.md) | WebGPU external video textures and optional Web Audio sampling. |
-| [`@margoengine/xr`](../packages/xr/README.md) | Optional WebGPU WebXR sessions, input poses and stereo rendering for Margo Engine. |
+| [`@margoengine/xr`](../packages/xr/README.md) | Optional WebGPU WebXR sessions, input poses and stereo rendering for Margo Engine, with real-device runs (./device-check). |
 | [`@margoengine/headless`](../packages/headless/README.md) | Render without a browser page: a stand-in canvas for core, GPU globals from the WebGPU binding you pass in, and readback to RGBA pixels or PNG bytes. |
 | [`@margoengine/staging`](../packages/staging/README.md) | Product-shot staging: soft ground contact shadows (shadow-catcher plane) for core meshes and glTF models. |
 

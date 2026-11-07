@@ -165,6 +165,7 @@
     "test:docs:browser": "node scripts/docs-browser-test.mjs",
     "quality": "node scripts/quality-gate.mjs",
     "check:parity": "node scripts/check-parity-table.mjs",
+    "check:xr-runs": "node scripts/check-xr-runs.mjs",
     "format": "biome format --write",
     "lint": "biome lint",
     "check:views": "node scripts/test-views-browser.mjs",
