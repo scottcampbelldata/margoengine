@@ -54,8 +54,11 @@ interface Leg {
   footRest: number[];
   /** The hip joint from the hips' origin, at rest. */
   hip: Vec3;
-  /** Largest torque of the knee, N m: as a motor's cap, the limb's inertia about the joint times its acceleration. */
+  /** Largest torque of the knee, N m: what the whole body's weight turns about it at the shorter of the leg's two levers. */
   kneeCap: number;
+  /** Inertia of the shin and foot about the knee, as the motors reckon it, and the hinge angle the leg's motors were last set to. */
+  kneeInertia: number;
+  bend: number;
   /** How far the sole reaches forward and back of the ankle along the character's forward, and to each side. */
   sole: { front: number; back: number; left: number; right: number };
   /** The bend a straight hinge already has in the rig: the angle at the knee between thigh and shin, at hinge angle 0. */
@@ -96,6 +99,9 @@ const HEIGHT_FREQUENCY = 12,
   LEAN_FREQUENCY = 6;
 /** Frequency in rad/s of the solver motor on a joint the rod motors cannot hold. */
 const JOINT_FREQUENCY = 30;
+/** Frequency in rad/s of the spring on a stance knee at its full strength, and the radians off its bend it needs to reach that. */
+const KNEE_FREQUENCY = 50,
+  KNEE_BAND = 0.15;
 /** Seconds the character takes to sink from its pose to `stance`. */
 const SETTLE_TIME = 0.9;
 /**
@@ -173,6 +179,10 @@ export class RagdollBalance {
   private readonly given: Float64Array;
   /** The feet's colliders as they came, for {@link dispose}. */
   private readonly soles: { part: RagdollPart; shape: RagdollPart['shape'] }[] = [];
+  /** Where the hips stood at the last step, and how they moved to get there: see {@link readHips}. */
+  private hipsWere: { position: Vec3; rotation: number[] } | null = null;
+  private hipsSpeed: Vec3 = [0, 0, 0];
+  private hipsSpin: Vec3 = [0, 0, 0];
 
   /** @internal use {@link addRagdollBalance}. */
   constructor(
@@ -210,6 +220,8 @@ export class RagdollBalance {
         footRest: [...foot.body.rotation],
         hip: minus(hip, hips.body.position),
         kneeCap: 0,
+        kneeInertia: 0,
+        bend: 0,
         restBend: Math.acos(Math.max(-1, Math.min(1, dot(unit(minus(knee, hip)), unit(minus(ankle, knee)))))),
         sole: { front: 0, back: 0, left: 0, right: 0 },
         plant: [ankle[0], ankle[1], ankle[2]],
@@ -251,7 +263,10 @@ export class RagdollBalance {
       if (!i) return 0;
       return this.limbInertia(part) * MOTOR_ACCELERATION < this.limbWeight(part) ? this.realInertia(part) : 0;
     });
-    for (const one of this.legs) one.kneeCap = this.limbInertia(one.lower) * MOTOR_ACCELERATION;
+    for (const one of this.legs) {
+      one.kneeCap = this.total * this.gravity * Math.min(one.thigh, one.shin);
+      one.kneeInertia = this.limbInertia(one.lower);
+    }
     this.natural = Math.sqrt(this.gravity / massHeight);
     this.stepTime = within(options.stepTime, 0.28, 0.05, 2, 'stepTime');
     this.lift = within(options.stepHeight, 0.15, 0, 1, 'stepHeight') * reach;
@@ -278,8 +293,31 @@ export class RagdollBalance {
   private step(dt: number): void {
     if (this.disposed || !this.ragdoll.bones[0].body.valid) return;
     this.wanted.fill(0);
+    this.readHips(dt);
     this.control(dt);
     this.settle();
+  }
+
+  /**
+   * How the hips moved over the last step, from where they went. The velocity a body reports at the end of a step holds what
+   * the solver's last pass left in it: Seed-san's hips reported 0.02 m/s one way while they moved 0.008 m/s the other, and the
+   * height's spring rang on that at half the frame rate.
+   */
+  private readHips(dt: number): void {
+    const hips = this.ragdoll.bones[0].body,
+      position: Vec3 = [hips.position[0], hips.position[1], hips.position[2]],
+      rotation = [...hips.rotation],
+      was = this.hipsWere;
+    if (was) {
+      const turn = multiplyQuaternions(rotation, conjugateQuaternion(was.rotation)),
+        sign = turn[3] < 0 ? -2 / dt : 2 / dt;
+      this.hipsSpeed = times(minus(position, was.position), 1 / dt);
+      this.hipsSpin = [turn[0] * sign, turn[1] * sign, turn[2] * sign];
+    } else {
+      this.hipsSpeed = [hips.linearVelocity[0], hips.linearVelocity[1], hips.linearVelocity[2]];
+      this.hipsSpin = [hips.angularVelocity[0], hips.angularVelocity[1], hips.angularVelocity[2]];
+    }
+    this.hipsWere = { position, rotation };
   }
 
   /**
@@ -374,8 +412,12 @@ export class RagdollBalance {
   /**
    * Motors whose caps come from a rod per body cannot hold a limb whose mass lies past its bone (a head on a short neck:
    * Knight's rod inertia is 0.003 kg m² against 0.96 real, so its cap of 1.1 N m loses to up to 12 N m of weight). These joints
-   * get a solver motor from the limb's real inertia, and a swinging foot one that keeps it level. The listeners run in the
-   * order they were added, so this comes after the rod motors' own step and replaces it.
+   * get a solver motor from the limb's real inertia, and a swinging foot one that keeps it level. A stance knee has its torque
+   * from {@link carryWeight} and only a spring beside it, with no damper and growing with how far the knee is off its bend: a
+   * solver motor on a knee the body's weight goes through slid the feet along the floor, a body at rest included, in proportion
+   * to its damping and stiffness (RiggedFigure 0.045 m in five seconds). Without the spring a thrown leg lands loose and
+   * the character stumbles on. The listeners run in the order they were added, so this comes after the rod motors' own step
+   * and replaces it.
    */
   private holdJoints(): void {
     const bones = this.ragdoll.bones,
@@ -393,12 +435,36 @@ export class RagdollBalance {
         target = multiplyQuaternions([a[3], a[4], a[5], a[6]], conjugateQuaternion(part.bind));
       part.joint!.setRotationMotor(target as [number, number, number, number], motor(inertia));
     });
-    for (const leg of this.legs)
-      if (leg.swing)
+    for (const leg of this.legs) {
+      if (leg.swing) {
         leg.foot.joint!.setRotationMotor(
           multiplyQuaternions(conjugateQuaternion(leg.lower.body.rotation), leg.footRest) as [number, number, number, number],
           motor(this.real[bones.indexOf(leg.foot)] || this.footInertia),
         );
+        continue;
+      }
+      const share = Math.min(1, Math.abs(leg.bend - this.kneeAngle(leg)) / KNEE_BAND) * strength;
+      if (share > 0)
+        leg.lower.joint!.setMotor({
+          model: 'force',
+          targetPosition: leg.bend,
+          targetVelocity: 0,
+          stiffness: leg.kneeInertia * KNEE_FREQUENCY * KNEE_FREQUENCY * share,
+          damping: 0,
+          maxForce: leg.kneeInertia * MOTOR_ACCELERATION * strength,
+        });
+      else leg.lower.joint!.clearMotor();
+    }
+  }
+
+  /** The hinge angle the knee stands at. */
+  private kneeAngle(leg: Leg): number {
+    const axis = (leg.lower.spec as { axis: ArrayLike<number> }).axis,
+      turn = multiplyQuaternions(
+        conjugateQuaternion(leg.lower.rest),
+        multiplyQuaternions(conjugateQuaternion(leg.upper.body.rotation), leg.lower.body.rotation),
+      );
+    return 2 * Math.atan2(dot(turn, axis), turn[3]);
   }
 
   /** Sets the solver passes a bone's island gets on top of the world's. Rapier's own call: the physics package has no wrapper. */
@@ -541,7 +607,7 @@ export class RagdollBalance {
       feet = times(stance.reduce((sum, leg) => add(sum, leg.plant), [0, 0, 0] as Vec3), 1 / count),
       want = dot(feet, this.up) + this.height * this.stanceNow,
       w = HEIGHT_FREQUENCY,
-      rise = implicit(w) * (w * w * (want - dot(hips.position, this.up)) - 2 * w * dot(hips.linearVelocity, this.up)),
+      rise = implicit(w) * (w * w * (want - dot(hips.position, this.up)) - 2 * w * dot(this.hipsSpeed, this.up)),
       h = LEAN_FREQUENCY,
       push = times(minus(times(minus(support, position), h * h), times(velocity, 2 * h)), implicit(h)),
       flat = minus(push, times(this.up, dot(push, this.up))),
@@ -634,7 +700,7 @@ export class RagdollBalance {
       w = this.upright,
       c = 2 * w,
       gain = dt / (1 + c * dt + w * w * dt * dt),
-      spin = hips.angularVelocity,
+      spin = this.hipsSpin,
       turn = [0, 1, 2].map((k) => gain * (w * w * error[k] * angle - c * spin[k])) as Vec3,
       cap = this.maxUpright * dt,
       strength = size(turn);
@@ -721,6 +787,7 @@ export class RagdollBalance {
     motors.setTarget(leg.upper, multiplyQuaternions(conjugateQuaternion(body.rotation), upper));
     motors.setTarget(leg.lower, multiplyQuaternions(leg.lower.rest, turnAbout(spec.axis, bend)));
     motors.setTarget(leg.foot, multiplyQuaternions(conjugateQuaternion(leg.lower.body.rotation), leg.footRest));
+    leg.bend = bend;
   }
 
   /** The outside help when `carry` is set: a capped force under the upper body, moved as one rigid body. */
@@ -759,6 +826,7 @@ export class RagdollBalance {
       leg.swing = null;
     }
     this.floor = dot(times(add(this.legs[0].plant, this.legs[1].plant), 0.5), this.up);
+    this.hipsWere = null;
     this.state = 'standing';
     return this;
   }

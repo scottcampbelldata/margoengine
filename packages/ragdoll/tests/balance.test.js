@@ -133,12 +133,38 @@ for (const ulps of [1, 4, 16])
     assert.deepEqual(failures, []);
   });
 
-// Figures beyond Knight: its kin have other bodies on one skeleton, and RiggedFigure is another skeleton, 70 kg on bent knees.
+// Figures beyond Knight: its kin have other bodies on one skeleton, and RiggedFigure and Seed-san are other skeletons, 70 kg
+// on bent knees and 60 kg with long feet.
 const kin = (name) => [`kaykit/adventurers/characters/${name}.glb`, bones, 30];
+const seedSan = [
+  'vrm/Seed-san.vrm',
+  (rig) => ({
+    hips: rig.node('hips'),
+    spine: rig.node('spine'),
+    chest: rig.node('chest'),
+    head: rig.node('head 1'),
+    ...Object.fromEntries(
+      [
+        ['left', 'L'],
+        ['right', 'R'],
+      ].flatMap(([side, s]) => [
+        [`${side}UpperArm`, rig.node(`upper_arm.${s}`)],
+        [`${side}LowerArm`, rig.node(`forearm.${s}`)],
+        [`${side}Hand`, rig.node(`hand.${s}`)],
+        [`${side}UpperLeg`, rig.node(`thigh.${s}`)],
+        [`${side}LowerLeg`, rig.node(`shin.${s}`)],
+        [`${side}Foot`, rig.node(`foot.${s}`)],
+      ]),
+    ),
+  }),
+  60,
+];
 const figures = {
   Barbarian: kin('Barbarian'),
   Ranger: kin('Ranger'),
   Rogue: kin('Rogue'),
+  Mage: kin('Mage'),
+  'Seed-san': seedSan,
   RiggedFigure: [
     'khronos/RiggedFigure/RiggedFigure.glb',
     (rig) => ({
@@ -175,29 +201,38 @@ async function figure([path, boneMap, mass], rounding, passes) {
   const motors = addRagdollMotors(ragdoll, { frequency: 8 }),
     keeper = addRagdollBalance(ragdoll, motors, { feet: [map.leftFoot, map.rightFoot] });
   ragdoll.activate();
-  return { rig, ragdoll, keeper, hips: ragdoll.bones[0].body };
+  return { rig, ragdoll, keeper, hips: ragdoll.bones[0].body, feet: [ragdoll.part(map.leftFoot).body, ragdoll.part(map.rightFoot).body] };
 }
 
 // Knight's bounds as shares of the hip height, so a bigger figure is held to the same standing: 0.05 m and 0.02 m on 0.406 m.
+// Feet that stand stay where they stand: a solver motor on a knee slid them 0.045 m in five seconds on RiggedFigure and 0.007 m
+// on Seed-san and Mage, with a body otherwise at rest and friction nowhere near its limit.
+const FOOT_SLIDE = 0.002;
 for (const [name, entry] of Object.entries(figures))
   test(`${name} settles on its own legs, whatever the rounding of its hull points`, { skip, timeout: 300_000 }, async () => {
     const failures = [];
     for (const ulps of [1, 4, 16])
       for (let seed = 1; seed <= 8; seed++) {
-        const { rig, ragdoll, keeper, hips } = await figure(entry, { ulps, seed }),
+        const { rig, ragdoll, keeper, hips, feet } = await figure(entry, { ulps, seed }),
           size = hips.position[1],
           fail = (what) => failures.push(`${ulps} steps, seed ${seed}: ${what}`);
         let steps = 0,
           settled,
-          drift = 0;
+          stood,
+          drift = 0,
+          slide = 0;
         const heights = [];
         for (let frame = 1; frame <= 360; frame++) {
           rig.frames(1);
           if (frame === 60) {
             settled = [...hips.position];
+            stood = feet.map((foot) => [...foot.position]);
             steps = keeper.steps;
           }
-          if (settled) drift = Math.max(drift, Math.hypot(hips.position[0] - settled[0], hips.position[2] - settled[2]));
+          if (settled) {
+            drift = Math.max(drift, Math.hypot(hips.position[0] - settled[0], hips.position[2] - settled[2]));
+            feet.forEach(({ position }, i) => (slide = Math.max(slide, Math.hypot(position[0] - stood[i][0], position[2] - stood[i][2]))));
+          }
           if (frame >= 120) heights.push(hips.position[1]);
         }
         const speed = [0, 0, 0];
@@ -210,6 +245,7 @@ for (const [name, entry] of Object.entries(figures))
         if (keeper.state === 'fallen') fail('it fell');
         if (keeper.steps !== steps) fail(`${keeper.steps - steps} steps after frame 60`);
         if (drift >= (0.05 / 0.406) * size) fail(`hips drifted ${drift} m`);
+        if (slide >= FOOT_SLIDE) fail(`a foot slid ${slide} m`);
         if (Math.max(...heights) - Math.min(...heights) >= (0.02 / 0.406) * size) fail('its hips did not hold their height');
         if (still >= 0.02) fail(`centre of mass at ${still} m/s`);
         if (keeper.carried !== 0) fail('an outside force carried it');
@@ -220,29 +256,6 @@ for (const [name, entry] of Object.entries(figures))
 
 // The torques go through the solver's passes as forces. As impulses before the first pass, 16 passes crept every figure
 // at about 0.03 m/s where 10 held, and RiggedFigure and Seed-san fell: more solver work must never read worse.
-const seedSan = [
-  'vrm/Seed-san.vrm',
-  (rig) => ({
-    hips: rig.node('hips'),
-    spine: rig.node('spine'),
-    chest: rig.node('chest'),
-    head: rig.node('head 1'),
-    ...Object.fromEntries(
-      [
-        ['left', 'L'],
-        ['right', 'R'],
-      ].flatMap(([side, s]) => [
-        [`${side}UpperArm`, rig.node(`upper_arm.${s}`)],
-        [`${side}LowerArm`, rig.node(`forearm.${s}`)],
-        [`${side}Hand`, rig.node(`hand.${s}`)],
-        [`${side}UpperLeg`, rig.node(`thigh.${s}`)],
-        [`${side}LowerLeg`, rig.node(`shin.${s}`)],
-        [`${side}Foot`, rig.node(`foot.${s}`)],
-      ]),
-    ),
-  }),
-  60,
-];
 async function creep(entry, passes, rounding) {
   const { rig, ragdoll, keeper, hips } = await figure(entry, rounding, passes),
     size = hips.position[1];
@@ -258,7 +271,7 @@ async function creep(entry, passes, rounding) {
   rig.dispose();
   return read;
 }
-for (const [name, entry] of Object.entries({ Knight: kin('Knight'), Mage: kin('Mage'), ...figures, 'Seed-san': seedSan }))
+for (const [name, entry] of Object.entries({ Knight: kin('Knight'), ...figures }))
   test(`${name} at 16 solver passes reads no worse than at 10`, { skip, timeout: 120_000 }, async () => {
     for (const seed of [1, 2, 3]) {
       const rounding = { ulps: 4, seed },
@@ -271,6 +284,29 @@ for (const [name, entry] of Object.entries({ Knight: kin('Knight'), Mage: kin('M
       assert.ok(sixteen.drift <= Math.max(ten.drift, 0.001), `seed ${seed} drifts ${sixteen.drift} m at 16, ${ten.drift} m at 10`);
     }
   });
+
+// The controller reads how the hips moved from where they went. What a body reports at the end of a step is what the solver's
+// last pass left: Seed-san's hips reported 0.02 m/s one way while moving 0.008 m/s the other, and at 10 passes the height's
+// spring rang on that at half the frame rate, 0.026 m/s, for as long as it stood.
+test('Seed-san stands quiet at 10 solver passes, whatever the rounding of its hull points', { skip, timeout: 120_000 }, async () => {
+  const failures = [];
+  for (const ulps of [1, 4, 16])
+    for (let seed = 1; seed <= 8; seed++) {
+      const { rig, ragdoll } = await figure(seedSan, { ulps, seed }, 10),
+        mass = ragdoll.bones.reduce((sum, { body }) => sum + body.mass, 0);
+      let most = 0;
+      rig.frames(300);
+      for (let frame = 0; frame < 60; frame++) {
+        rig.frames(1);
+        const momentum = [0, 0, 0];
+        for (const { body } of ragdoll.bones) body.linearVelocity.forEach((v, k) => (momentum[k] += v * body.mass));
+        most = Math.max(most, Math.hypot(...momentum) / mass);
+      }
+      if (most >= 0.005) failures.push(`${ulps} steps, seed ${seed}: ${most} m/s`);
+      rig.dispose();
+    }
+  assert.deepEqual(failures, []);
+});
 
 // A contact keeps four points for the solver. A fitted boot's sole has many, a few millimetres apart in height, and which
 // four were kept changed with the slightest turn: the foot dropped on a point left out and the body shook.

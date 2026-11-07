@@ -1443,7 +1443,10 @@ Scott's order of 2026-11-07, one at a time, each pushed before the next.
 
 | # | Job | Status | Commit | Entry | Claim |
 | --- | --- | --- | --- | --- | --- |
-| 1 | 16 solver passes no worse than 10 | DONE | this commit | `/balance` | LIM-248 |
+| 1 | 16 solver passes no worse than 10 | DONE | 0caee8194 | `/balance` | LIM-248 |
+| 1b | RiggedFigure slid more at 8 passes after item 1 | DONE | this commit | `/balance` | LIM-248 |
+| 2 | Seed-san's creep | DONE | this commit | `/balance` | LIM-248 |
+| 5 | Mage's shake, and Mage in the strict test | DONE | this commit | `/balance` | LIM-248 |
 
 **Item 1, worst of 24 roundings, hips drift over five seconds at 8 / 10 / 16 passes (before: one rounding, centre of mass m/s at 8 / 10 / 16).**
 
@@ -1482,3 +1485,21 @@ Two jobs Scott approved on 2026-11-07. A core bug fix for `engine.stats`, and th
 - **Proved:** two runs through check:merge's runner failed on real findings, the next passed, and so did the run on the rebased tree: 641 of 767. A known entry that passes and a new failure each failed the step on the way.
 - **Not done:** a known entry that fails with a new error is not caught. 118 of 126 reasons matched exactly, and the rest hold build paths, cut text or a module name that changes per run, so an exact compare would fail on nothing.
 - **Gate:** lint, hygiene, verify, the tests of what changed, core's GPU check and `check:views` for job 1, the push from one script that stops at the first failing step.
+**Items 1b, 2 and 5, one cause. Worst of 24 roundings at 8 / 10 / 16 passes: drift of the hips over five seconds, m.**
+
+| Figure | Before | After | Worst foot slide, before and after, at 8 |
+| --- | --- | --- | --- |
+| Knight | 0.0014 / 0.0011 / 0.0006 | 0.0008 / 0.0008 / 0.0009 | 0.0012, 0.0003 |
+| Barbarian | 0.0005 / 0.0006 / 0.0006 | 0.0006 / 0.0006 / 0.0006 | 0.0009, 0.0003 |
+| Ranger | 0.0022 / 0.0014 / 0.0005 | 0.0008 / 0.0008 / 0.0009 | 0.0024, 0.0003 |
+| Rogue | 0.0015 / 0.0007 / 0.0003 | 0.0008 / 0.0008 / 0.0009 | 0.0018, 0.0003 |
+| Mage | 0.0072 / 0.0049 / 0.0022 | 0.0005 / 0.0005 / 0.0005 | 0.0070, 0.0002 |
+| RiggedFigure | 0.0385 / 0.0291 / 0.0155 | 0.0005 / 0.0007 / 0.0009 | 0.0452, 0.0005 |
+| Seed-san | 0.0077 / 0.0057 / 0.0031 | 0.0020 / 0.0015 / 0.0012 | 0.0069, 0.0009 |
+
+- **How it was found:** a foot read 0.0062 m/s from its positions and 0.0001 from its reported velocity, friction from 0.6 to 20 changed no digit, and with the controller stopped the feet slid on, so the loads alone did it. Taking one thing away at a time, only the knee motor stopped them: 9 mm/s to 0.16.
+- **Cause:** Margo's. The stance knee had two controllers, the balance's torque and the rod motor's spring and damper. The 0.0207 m RiggedFigure read before item 1 was the same slide, forward at 0.004 m/s against 0.0076, on a curve that rose with passes, so item 1 did not make a good result worse. Why a motor moves a contact is Rapier's and stays open in known-bugs.md, to be remeasured on Margo's solver.
+- **Fix:** a stance knee has its torque and a spring with no damper that grows with its error, full at 0.15 rad. No spring at all held still but let a thrown leg land loose, 11 of 128 pushes bad with one fall; the spring at full strength slid RiggedFigure 0.0093 m. The knee's torque cap comes from the body's weight: alone at the rod's 8.9 N m Ranger sank. The hips' speed and spin come from where they went: on reported velocities Seed-san rang at 0.026 m/s at 10 passes.
+- **Pushes moved too:** 128 at 1.5 m/s on Knight at 8 / 10 / 16 passes: 3 / 3 / 2 do not end still and none fall, from 8 / 6 / 8.
+- **Existing tests changed:** Mage and Seed-san join the strict figure test and the test gains a foot bound, 0.002 m, tighter than anything there; no tolerance rose. With the rod motor back four figures fail it; on reported velocities the new quiet test fails.
+- **Size:** `@margoengine/ragdoll/balance` grew for the knee spring and the hips' reading and its budget was raised for it: an optional entry; core and stage do not change.
