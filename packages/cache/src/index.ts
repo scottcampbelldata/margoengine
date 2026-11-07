@@ -1,4 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
+import { freshUntil } from './http.js';
 /** Options for `new AssetCache(...)`. A negative or NaN `maxBytes` or `timeout` throws a RangeError. */
 export interface AssetCacheOptions {
   /** IndexedDB database name, one per app or asset set. Default `'margo-assets'`. */
@@ -13,6 +14,12 @@ export interface AssetCacheOptions {
   timeout?: number;
   /** Network fetch underneath, for example one that adds credentials. Default `globalThis.fetch`. */
   fetch?: typeof fetch;
+  /**
+   * How long a stored file is used without revalidating. `'http'`: `Cache-Control: max-age`, else `Expires`, less the
+   * response's `Age` and how old its `Date` is, as RFC 9111 has a private cache do. `'max-age'`: `max-age` alone, with
+   * `Expires` and `Age` ignored (before 2026-11-07 the only way). Default `'http'`.
+   */
+  freshness?: 'http' | 'max-age';
   /** Which stored entry a request maps to, for content that differs by request: `varyKeys()` of `@margoengine/cache/vary`. Default: the URL. */
   keys?: AssetCacheKeys;
   /** How eviction finds the least recently used files: `evictionIndex()` of `@margoengine/cache/eviction`. Default: read every entry's metadata before each write. */
@@ -129,6 +136,7 @@ export class AssetCache {
   private db: Promise<IDBDatabase | null>;
   private network: typeof globalThis.fetch;
   private keys?: AssetCacheKeys;
+  private maxAgeOnly: boolean;
   private eviction?: AssetCacheEviction;
   private checked = new Set<string>();
   private pending = new Set<Promise<unknown>>();
@@ -143,6 +151,7 @@ export class AssetCache {
     fetch,
     keys,
     eviction,
+    freshness = 'http',
   }: AssetCacheOptions = {}) {
     if (!(maxBytes >= 0) || !(timeout >= 0))
       throw new RangeError('AssetCache maxBytes and timeout must be non-negative');
@@ -150,6 +159,7 @@ export class AssetCache {
     this.timeout = timeout;
     this.network = fetch ?? ((input, init) => globalThis.fetch(input, init));
     this.keys = keys;
+    this.maxAgeOnly = freshness === 'max-age';
     this.eviction = eviction;
     if (persist) globalThis.navigator?.storage?.persist?.().catch(() => {});
     this.db = this.open(name, String(version)).catch(() => null);
@@ -228,9 +238,10 @@ export class AssetCache {
         this.fill(request, key);
         return this.network(request);
       }
-      const response = await this.network(request);
+      const sent = Date.now(),
+        response = await this.network(request);
       this.stats.misses++;
-      return this.keep(request, key, response, null);
+      return this.keep(request, key, response, null, sent);
     }
     const [entry, blob] = hit,
       fresh = entry.fresh > Date.now() || this.checked.has(key);
@@ -245,7 +256,8 @@ export class AssetCache {
     if (entry.etag) headers.set('if-none-match', entry.etag);
     if (entry.modified) headers.set('if-modified-since', entry.modified);
     request.signal.addEventListener('abort', abort, { once: true });
-    const timer = setTimeout(() => controller.abort(), this.timeout);
+    const timer = setTimeout(() => controller.abort(), this.timeout),
+      sent = Date.now();
     let response: Response;
     try {
       response = await this.network(new Request(request, { headers, signal: controller.signal }));
@@ -256,8 +268,8 @@ export class AssetCache {
       clearTimeout(timer);
     }
     if (response.status === 304) {
-      const age = /max-age=(\d+)/i.exec(response.headers.get('cache-control') ?? '');
-      if (age) entry.fresh = Date.now() + +age[1] * 1e3;
+      const fresh = freshUntil(response.headers, Date.now(), sent, this.maxAgeOnly);
+      if (fresh) entry.fresh = fresh;
       return this.serve(entry, blob, range, 'revalidated');
     }
     if (response.status !== 200) {
@@ -267,7 +279,7 @@ export class AssetCache {
     this.stats.misses++;
     // A changed file that fails mid-download (Wi-Fi drop) still leaves the stored copy.
     try {
-      return await this.keep(request, key, response, range);
+      return await this.keep(request, key, response, range, sent);
     } catch (error) {
       if (request.signal.aborted) throw error;
       return this.serve(entry, blob, range, 'offline');
@@ -329,9 +341,15 @@ export class AssetCache {
   }
 
   /** Stores a 200 response (unless `Cache-Control: no-store`) in the background and answers from its bytes. */
-  private async keep(request: Request, key: string, response: Response, range: string | null): Promise<Response> {
+  private async keep(
+    request: Request,
+    key: string,
+    response: Response,
+    range: string | null,
+    sent: number,
+  ): Promise<Response> {
     const control = response.headers.get('cache-control') ?? '',
-      age = /max-age=(\d+)/i.exec(control);
+      received = Date.now();
     if (response.status !== 200 || /no-store/i.test(control)) return response;
     const url = key.replace(/\n[^]*/, ''),
       target = this.keys ? await this.keys.store(request, url, response) : { key },
@@ -343,7 +361,7 @@ export class AssetCache {
       type: response.headers.get('content-type') ?? '',
       etag: response.headers.get('etag'),
       modified: response.headers.get('last-modified'),
-      fresh: age && !/no-cache/i.test(control) ? now + +age[1] * 1e3 : 0,
+      fresh: freshUntil(response.headers, received, sent, this.maxAgeOnly),
       used: now,
       final: response.url || url,
     };
@@ -358,12 +376,13 @@ export class AssetCache {
     this.checked.add(key);
     const headers = new Headers(request.headers);
     headers.delete('range');
-    const whole = new Request(request.url, { headers, credentials: request.credentials });
+    const whole = new Request(request.url, { headers, credentials: request.credentials }),
+      sent = Date.now();
     this.track(
       this.network(whole)
         .then((response) => {
           this.stats.misses++;
-          return this.keep(whole, key, response, null);
+          return this.keep(whole, key, response, null, sent);
         })
         .catch(() => {
           this.checked.delete(key);

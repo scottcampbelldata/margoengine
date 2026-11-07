@@ -7,7 +7,7 @@ export class AssetCache {
     readonly stats: AssetCacheStats;
     readonly maxBytes: number;
     readonly timeout: number;
-    constructor({ name, version, maxBytes, persist, timeout, fetch, keys, eviction }?: AssetCacheOptions);
+    constructor({ name, version, maxBytes, persist, timeout, fetch, keys, eviction, freshness }?: AssetCacheOptions);
     readonly fetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
     flush(): Promise<void>;
     usage(): Promise<AssetCacheUsage>;
@@ -46,6 +46,7 @@ export interface AssetCacheOptions {
     persist?: boolean;
     timeout?: number;
     fetch?: typeof fetch;
+    freshness?: 'http' | 'max-age';
     keys?: AssetCacheKeys;
     eviction?: AssetCacheEviction;
 }

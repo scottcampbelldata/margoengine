@@ -4,7 +4,7 @@ Import `margoengine/cache` from the `margoengine` package, or `@margoengine/cach
 
 Opt-in offline asset cache. Heavy GLB, .bin and texture files are kept in IndexedDB, so repeat visits load them
 from disk and the viewer keeps working with bad or no Wi-Fi (a factory floor). `cache.fetch` is fetch-compatible and
-every loader takes it as its `fetch` option; apps that do not import this package pay nothing for it. About 2.8 kB
+every loader takes it as its `fetch` option; apps that do not import this package pay nothing for it. About 3.0 kB
 min+gzip, no dependencies, no engine needed. Works in windows, Web Workers and service workers.
 
 ```ts
@@ -18,6 +18,7 @@ const cache = new AssetCache({
   version: '2026.10',      // change it to drop every stored file (a new release of the assets)
   maxBytes: 2 ** 30,       // byte budget; least recently used files are evicted beyond it (default 512 MiB)
   persist: true,           // ask the browser not to evict this origin's storage (main thread only)
+  freshness: 'http',       // max-age, else Expires, less Age (default); 'max-age' ignores Expires and Age
 });
 const line = await loadGLTF(engine, '/line-4.glb', {fetch: cache.fetch});
 
@@ -167,10 +168,16 @@ manager.abort(); // cancels every request in flight (each reports onError); the 
 - Miss: network, then the 200 body is stored in the background (`cache.flush()` waits for it). `Cache-Control:
   no-store` and non-200 responses are not stored. A redirected response keeps its final URL, so relative URIs in a
   .gltf still resolve.
-- Hit: served without a request while `Cache-Control: max-age` holds; otherwise revalidated once per AssetCache (one
+- Hit: served without a request while the file is fresh; otherwise revalidated once per AssetCache (one
   per page load in practice) with `If-None-Match` / `If-Modified-Since`. 304: served from the cache. 200: replaces
   the stored copy. Network error, any other status, or no answer within `timeout` (default 5 s): the stored copy is
   served (`stats.offline`). `navigator.onLine === false` skips the request. Aborting your own `signal` still rejects.
+- Fresh (`freshness: 'http'`, the default, as RFC 9111 has a private cache do): for `Cache-Control: max-age`, else
+  `Expires` minus `Date`, less the age the file already had when it arrived: the larger of its `Age` header plus the
+  request's round trip and how far its `Date` lies behind the local clock. A 304 refreshes it the same way.
+  `no-cache`, no lifetime, an invalid `Expires` (such as `0`) or a file already older than its lifetime means
+  "revalidate". `s-maxage` is for shared caches and is ignored. `freshness: 'max-age'` uses `max-age` alone and
+  ignores `Expires` and `Age`, as before 2026-11-07. `RangeCache` computes freshness as `'http'` does.
 - `version`: the database stores the version it was filled with; opening with another one deletes every file.
 - Range requests (`Range: bytes=a-b`, `a-`, `-n`): a hit is answered 206 from the stored whole file (416 when
   unsatisfiable; a multi-range request gets the whole file). A miss goes to the network unchanged and downloads the
@@ -309,7 +316,8 @@ console.log(level.bounds, changed);
 - Keyed by URL unless `keys: varyKeys()` is set (above); `RangeCache` is keyed by URL only.
 - Cross-origin files: `ETag` is readable only when the server exposes it (`Access-Control-Expose-Headers: ETag`);
   `Last-Modified` is always readable. Without either, a stale file is downloaded again on each visit (offline still
-  works). `Expires` and `Age` are ignored; `no-cache` and missing `max-age` mean "revalidate".
+  works). `Age` and `Date` are not CORS-safelisted: unless the server exposes them, a cross-origin file is taken as
+  new when it arrives and `Expires` is counted from the local clock.
 - A miss is read fully before the loader gets it (all Margo loaders read whole files anyway).
 - Eviction reads every entry's metadata (not the bytes) before each write unless `eviction: evictionIndex()` is set
   (above): fine for thousands of files.

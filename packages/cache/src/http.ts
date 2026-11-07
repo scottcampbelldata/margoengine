@@ -18,11 +18,26 @@ export function contentRange(header: string | null): [number, number, number] | 
   return match ? [+match[1], +match[2], +match[3]] : undefined;
 }
 
-/** Freshness end time (ms since the epoch) from `Cache-Control: max-age`; 0 (revalidate) for `no-cache` or none. */
-export function freshUntil(headers: Headers, now: number): number {
+/**
+ * Until when (ms since the epoch) a response is fresh, as a private cache computes it (RFC 9111 sections 4.2.1 and
+ * 4.2.3): its lifetime is `Cache-Control: max-age`, else `Expires` minus `Date`; its age when received is the larger of
+ * `Age` plus the request's round trip and how far `Date` lies behind the clock. 0 (revalidate) for `no-cache`, no
+ * lifetime, an invalid `Expires` or a response already older than its lifetime. `maxAgeOnly` keeps to `max-age` alone
+ * and ignores `Age`, as AssetCache did before its `freshness` option. `sent` and `received` are when the request went
+ * out and the response came back.
+ */
+export function freshUntil(headers: Headers, received: number, sent = received, maxAgeOnly = false): number {
   const control = headers.get('cache-control') ?? '',
-    age = /max-age=(\d+)/i.exec(control);
-  return age && !/no-cache/i.test(control) ? now + +age[1] * 1e3 : 0;
+    maxAge = /(?:^|[,\s])max-age\s*=\s*"?(\d+)/i.exec(control);
+  if (/no-cache/i.test(control)) return 0;
+  if (maxAgeOnly) return maxAge ? received + +maxAge[1] * 1e3 : 0;
+  const date = Date.parse(headers.get('date') ?? ''),
+    origin = Number.isNaN(date) ? received : date,
+    expires = headers.get('expires'),
+    lifetime = maxAge ? +maxAge[1] * 1e3 : expires === null ? Number.NaN : Date.parse(expires) - origin,
+    age = /^\d+$/.test(headers.get('age')?.trim() ?? '') ? +headers.get('age')! * 1e3 : 0,
+    initial = Math.max(0, received - origin, age + received - sent);
+  return lifetime > initial ? received + lifetime - initial : 0;
 }
 
 /** Runs body in one transaction over the given stores; resolves when it commits, rejects when it aborts. */
