@@ -1682,3 +1682,42 @@ Scott asked for a second static report to be proved or disproved: `addViewer` ch
 - **Proved:** each step failed in turn on a real `Camera` with stand-in packages, and each package removed in turn through a resolve hook. On real WebGPU (RTX A6000) `contact`, `cascaded` and `tonemap` each refuse their options, and a second viewer on a live stage is refused: camera, plugins and mesh count are equal and the picture is byte for byte the same.
 - **Limits:** a failed `addViewer` does not freeze the camera while it loads: a visitor who moves it keeps that move (docs/limits.md).
 - **Size:** `viewer` is its own entry, so core and core plus stage do not change.
+## Batch 46: cache
+
+Six jobs for `@margoengine/cache` on the Beelink (lane H, work list 3), each a new optional entry or option. Every
+proof runs in Node on stand-ins: an in-memory IndexedDB (`packages/cache/test/support.js`) and stand-in HTTP servers;
+job 1 also runs gltf-pro's real streaming code through the cache. Nothing is timed.
+
+| # | Job | Status | Commit | Entry | Claim |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Range request caching | DONE | `eed6e15f` | `/ranges` | LIM-320 |
+| 2 | Vary and request-header keys | DONE | `2000d95a` | `/vary`, root `keys` option | LIM-321 |
+| 3 | Eviction index | DONE | `ab65ccb1` | `/eviction` (suggested `/index`), root `eviction` option | LIM-322 |
+| 4 | Asset bundles with dependencies | DONE | `12d4ffe1` | `/bundles` | LIM-323 |
+| 5 | Expires and Age | DONE | `a1ced6fc` | root `freshness` option | LIM-337 |
+| 6 | Prioritized prefetch | DONE | this commit | `/prefetch` | LIM-338 |
+
+- **Bugs fixed:** the background fill of an AssetCache range miss dropped the request's headers, so a negotiated or
+  authenticated file was stored from a bare request (`packages/cache/test/vary.test.js`, the revalidation and range
+  fill test); AssetCache ignored `Age`, so a file already old on arrival was used as fresh for its whole `max-age`
+  (`packages/cache/test/freshness.test.js`). The tests' in-memory IndexedDB committed every transaction's whole
+  snapshot, read-only ones too, so overlapping transactions could undo each other's writes; it now commits only the
+  keys a transaction wrote (`packages/cache/test/ranges.test.js` runs reads and writes side by side).
+- **Proved:** gltf-pro's `GLTFStream` loads a 1 MB+ GLB through `RangeCache` in ranges, then offline from the stored
+  blocks with one failed revalidation and no other request. With 2,000 stored files, 30 writes read 120 records with
+  `evictionIndex` against 60,030 without it, evicting the same files. Two languages, two tokens and two users are kept
+  apart by `varyKeys`, and no token is stored. Bundles download each shared file once and only changed files on a
+  release. Expires, Age and Date follow RFC 9111 section 4.2. Prefetch order, idle start, concurrency, cancel, hold
+  and pause are checked step by step; `throttle` takes no less than the time its rate allows.
+- **Root:** the `@margoengine/cache` root grew from 2,407 B to 2,991 B gzip for the `keys`, `eviction` and
+  `freshness` options; every new feature's logic is in its own entry. Core and stage are untouched.
+- **Limits:** no job has run in a real browser or service worker yet; IndexedDB, `requestIdleCallback` and servers are
+  stand-ins. `throttle` paces body reads, not the socket. Rows in docs/limits.md, Platform.
+- **Sources:** RFC 9110, RFC 9111, the WHATWG Fetch Standard, Indexed Database API 3.0 and the idle callback spec,
+  recorded as CA1 to CA6 in `docs/clean-room.md`.
+- **Slips:** `npx biome lint` was run once in the worktree, against the no-npx rule; later runs used the local
+  `node_modules/.bin`. The suggested `/index` entry became `/eviction`, since `margoengine/cache/index` reads as the
+  root. Not pushed: landing was not open, so `npm run verify` and the push wait for the manager's landing.
+- **Gate:** lint, hygiene, the cache tests, check:readmes, check:parity, the size gate, and check:readme-run for the
+  cache examples on the Radeon 680M under the GPU lock (9 of 10 ran; the one failure is the known manager example).
+

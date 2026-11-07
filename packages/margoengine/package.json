@@ -310,6 +310,10 @@
       "types": "./dist/cache/bundles.d.ts",
       "import": "./dist/cache/bundles.js"
     },
+    "./cache/prefetch": {
+      "types": "./dist/cache/prefetch.d.ts",
+      "import": "./dist/cache/prefetch.js"
+    },
     "./cameras": {
       "types": "./dist/cameras.d.ts",
       "import": "./dist/cameras.js"

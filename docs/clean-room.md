@@ -87,6 +87,17 @@ carry the same citation as a one-line comment in the code.
 | --- | --- | --- | --- |
 | BK1 | vertex-colour bake: Lambert, Karis 2013 window, spot smoothstep, cosine AO | bvh/src/bake.ts | Karis 2013 windowed inverse-square falloff; Lambert; spot smoothstep and cosine AO are textbook forms |
 
+### cache
+
+| id | formula | file | source |
+| --- | --- | --- | --- |
+| CA1 | byte ranges, `Content-Range`, conditional requests | cache/src/http.ts, cache/src/ranges.ts | RFC 9110 (HTTP Semantics) sections 13.1 and 14 |
+| CA2 | freshness lifetime and current age (`max-age`, `Expires`, `Date`, `Age`), `Vary` matching, `no-store` and `no-cache` | cache/src/http.ts, cache/src/vary.ts | RFC 9111 (HTTP Caching) sections 4.1, 4.2.1, 4.2.3 and 5.2 |
+| CA3 | which response headers a page can read (CORS-safelisted), `credentials` modes, request `priority` | cache/src/vary.ts, cache/src/prefetch.ts | WHATWG Fetch Standard |
+| CA4 | index cursors in key order, versioned open and upgrade | cache/src/eviction.ts | W3C Indexed Database API 3.0 |
+| CA5 | idle callbacks with a timeout | cache/src/prefetch.ts | W3C Cooperative Scheduling of Background Tasks (`requestIdleCallback`) |
+| CA6 | token-bucket pacing of body reads | cache/src/prefetch.ts | the textbook token bucket (Tanenbaum, Computer Networks, traffic shaping) |
+
 ### clustered
 
 | id | formula | file | source |

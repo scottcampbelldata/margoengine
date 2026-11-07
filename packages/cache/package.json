@@ -49,6 +49,10 @@
     "./bundles": {
       "types": "./dist/bundles.d.ts",
       "import": "./dist/bundles.js"
+    },
+    "./prefetch": {
+      "types": "./dist/prefetch.d.ts",
+      "import": "./dist/prefetch.js"
     }
   },
   "files": [

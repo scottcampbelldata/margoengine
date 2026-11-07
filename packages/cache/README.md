@@ -311,6 +311,43 @@ console.log(level.bounds, changed);
 - `bundles.fetch` answers a listed file from its hashed copy, so loaders resolve a .gltf's buffers and images through
   it; unlisted URLs pass through to the cache.
 
+## Prefetching the next level
+
+`margoengine/cache/prefetch` fetches the files the app will need next (the next level, the area ahead) in idle time,
+highest priority first and a few at a time, so they are in the cache before they are asked for. `throttle` caps the
+bandwidth it takes.
+
+```ts
+import {AssetCache} from 'margoengine/cache';
+import {Prefetcher, throttle} from 'margoengine/cache/prefetch';
+
+const cache = new AssetCache({name: 'game'}); // the app's own loads, at full speed
+// Prefetching goes through a second AssetCache on the same database, with its network capped at 2 MB/s.
+const background = new AssetCache({name: 'game', fetch: throttle(fetch, {bytesPerSecond: 2_000_000})});
+const prefetch = new Prefetcher({
+  fetch: background.fetch, // so every prefetched file is stored
+  concurrency: 2,          // files at once (default 2)
+  idleTimeout: 2000,       // longest wait for idle time before a request starts anyway, ms (default 2000)
+});
+
+const next = prefetch.add(['/level2/map.glb', '/level2/props.glb'], {group: 'level2', priority: 1});
+prefetch.add({url: '/level2/boss.glb', priority: 5, group: 'level2'}); // goes first
+await prefetch.hold(cache.fetch('/level1/map.glb')); // a foreground load: no new prefetch starts until it ends
+console.log(await next, prefetch.stats); // [{url, status: 'done', bytes}, ...], {queued, active, done, ...}
+prefetch.cancel('level2'); // the player turned back: drop what waits, abort what is in flight
+```
+
+- Each request starts in an idle callback (`requestIdleCallback`; the next task where there is none, as in workers),
+  so prefetching does not compete with a frame. `idle: false` starts them at once.
+- `add` resolves when its files have ended, each `{url, status: 'done' | 'failed' | 'cancelled', bytes, error?}`; an
+  HTTP error status fails with MargoError `'failed'`. A URL is fetched once per Prefetcher: adding it again while it
+  waits only raises its priority; a cancelled one may be added again.
+- `pause()` and `resume()`, `hold(promise)` for foreground loads, `settle()` to wait for the queue, `dispose()` (or
+  `using`, or the `signal` option) to cancel everything.
+- `throttle(fetch, {bytesPerSecond, burst})` reads response bodies no faster than the rate, over every request made
+  through it; the browser's buffers and TCP flow control then slow the download itself. Give it to the prefetching
+  AssetCache only, as above, so the app's own loads keep the full bandwidth.
+
 ## Limits
 
 - Keyed by URL unless `keys: varyKeys()` is set (above); `RangeCache` is keyed by URL only.
@@ -321,6 +358,9 @@ console.log(level.bounds, changed);
 - A miss is read fully before the loader gets it (all Margo loaders read whole files anyway).
 - Eviction reads every entry's metadata (not the bytes) before each write unless `eviction: evictionIndex()` is set
   (above): fine for thousands of files.
+- Prefetcher and throttle: proved in Node with stand-in servers and a stand-in `requestIdleCallback`; not yet run in a
+  browser. `throttle` paces how fast bodies are read, so the bytes already in the browser's buffers when the limit
+  applies arrive at full speed.
 - RangeCache: proved in Node with gltf-pro's real streaming code, an in-memory IndexedDB and a stand-in server; not yet
   run in a browser or service worker, and not timed. Eviction reads every file's record (one per file, not per block)
   before each write. Two requests in flight at once that share a block both fetch it (it is stored once).
