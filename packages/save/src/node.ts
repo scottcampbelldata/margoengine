@@ -2,7 +2,9 @@
 // renamed into place, so a crash mid-write leaves the previous save whole. A separate entry, so browser bundles never
 // see node:fs.
 import { mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
+import { MargoError } from '@margoengine/math/errors';
+import { keyQueue } from './queue.js';
 import type { SaveStorage } from './storage.js';
 
 const SUFFIX = '.save';
@@ -15,9 +17,17 @@ const reason = (error: unknown, signal?: AbortSignal): unknown => (signal?.abort
 
 let counter = 0;
 
+// Windows refuses to rename over a file with any open handle. Reads, renames and deletes of one file take turns, across
+// every fileStorage of this process; the slow part of a write, its temporary file, does not wait.
+const turn = keyQueue();
+/** On Windows these mean the target is open elsewhere. */
+const isHeld = (error: unknown): boolean =>
+  process.platform === 'win32' && ['EPERM', 'EACCES', 'EBUSY'].includes((error as { code?: string })?.code ?? '');
+
 /**
  * Saves as files in `directory` (created on first write): `encodeURIComponent(key) + '.save'`. Writes go to a
- * temporary file first and are renamed over the old save, which is atomic on one file system.
+ * temporary file first and are renamed over the old save, which is atomic on one file system. On Windows a save that
+ * another program has open cannot be replaced: the write rejects with MargoError `'failed'` and the old save stands.
  */
 export function fileStorage(directory: string): SaveStorage {
   if (typeof directory !== 'string' || !directory)
@@ -28,7 +38,8 @@ export function fileStorage(directory: string): SaveStorage {
       checkKey(key);
       options?.signal?.throwIfAborted();
       try {
-        return new Uint8Array(await readFile(file(key), { signal: options?.signal }));
+        const path = file(key);
+        return await turn(resolve(path), async () => new Uint8Array(await readFile(path, { signal: options?.signal })));
       } catch (error) {
         if (isMissing(error)) return null;
         throw reason(error, options?.signal);
@@ -44,9 +55,14 @@ export function fileStorage(directory: string): SaveStorage {
       try {
         await writeFile(temporary, bytes, { signal: options?.signal, flush: true });
         options?.signal?.throwIfAborted();
-        await rename(temporary, file(key));
+        await turn(resolve(file(key)), () => rename(temporary, file(key)));
       } catch (error) {
         await rm(temporary, { force: true });
+        if (isHeld(error) && !options?.signal?.aborted)
+          throw Object.assign(
+            new MargoError('failed', `Save '${key}' is open in another program, so the old save stands; close it and save again`),
+            { cause: error },
+          );
         throw reason(error, options?.signal);
       }
     },
@@ -54,7 +70,7 @@ export function fileStorage(directory: string): SaveStorage {
       checkKey(key);
       options?.signal?.throwIfAborted();
       try {
-        await rm(file(key));
+        await turn(resolve(file(key)), () => rm(file(key)));
         return true;
       } catch (error) {
         if (isMissing(error)) return false;
