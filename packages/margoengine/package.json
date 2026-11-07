@@ -2794,6 +2794,10 @@
       "types": "./dist/weather/drive.d.ts",
       "import": "./dist/weather/drive.js"
     },
+    "./weather/audio": {
+      "types": "./dist/weather/audio.d.ts",
+      "import": "./dist/weather/audio.js"
+    },
     "./webgl": {
       "types": "./dist/webgl.d.ts",
       "import": "./dist/webgl.js"

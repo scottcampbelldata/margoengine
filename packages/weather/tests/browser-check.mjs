@@ -7,6 +7,7 @@
 // water stands on the ground and not on walls, and rain rings it.
 // snow: the snow WGSL matches its JavaScript twin; no cover changes nothing, full cover whitens the ground and not a
 // wall, the snow lifts a surface by its depth on screen, and it chains with puddles.
+// audio: an OfflineAudioContext renders the rain, wind and thunder layers through @margoengine/audio.
 // drive: WeatherDrive puts a machine's cloud and fog into the real Sky, VolumetricClouds and environment Fog.
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
@@ -78,6 +79,19 @@ const checks = {
     assert.ok(r.fog.ground > 0.5 * r.fog.third, `fog over the ground: ${r.fog.ground} of ${r.fog.third}`);
     return `drive overcast ${r.overcast.sky}/${r.overcast.third} sky pixels, fog ${r.fog.ground}/${r.fog.third} ground pixels`;
   },
+  audio(r) {
+    assert.ok(r.finite, 'every rendered sample is a finite number');
+    assert.ok(r.calm < 0.002, `calm air is near silent: ${r.calm}`);
+    assert.ok(r.rain > 20 * r.calm && r.rain > 0.02, `rain is heard: ${r.rain}`);
+    assert.ok(r.gale > 4 * r.breeze, `a gale is louder than a breeze: ${r.gale} against ${r.breeze}`);
+    // Low-passed at 2.5 kHz, rain keeps less of its power in fast changes than with hail's 6.9 kHz cutoff; band-passed
+    // wind near 1 kHz keeps least.
+    assert.ok(r.hailBright > 1.3 * r.rainBright, `hail brightens the rain: ${r.hailBright} against ${r.rainBright}`);
+    assert.ok(r.windBright < r.rainBright, `wind is darker than rain: ${r.windBright} against ${r.rainBright}`);
+    assert.ok(r.thunderEarly > 4 * r.thunderLate, `the rumble dies away: ${r.thunderEarly} then ${r.thunderLate}`);
+    assert.ok(r.thunderAfter < 0.01 * r.thunderEarly, `and ends: ${r.thunderAfter}`);
+    return `audio rain ${r.rain.toFixed(4)}, gale ${r.gale.toFixed(4)} / breeze ${r.breeze.toFixed(4)}, thunder ${r.thunderEarly.toFixed(4)} -> ${r.thunderLate.toFixed(4)}`;
+  },
 };
 const wanted = process.argv.slice(2).length ? process.argv.slice(2) : Object.keys(checks);
 for (const name of wanted) assert.ok(checks[name], `unknown check ${name}; use ${Object.keys(checks).join(', ')}`);
@@ -94,7 +108,7 @@ page.on('console', (m) => {
 try {
   console.log('adapter', JSON.stringify(hardware.webgpu));
   for (const run of wanted.flatMap((name) =>
-    name === 'hail'
+    name === 'hail' || name === 'audio'
       ? [[name, '']]
       : [
           [name, '?samples=4'],

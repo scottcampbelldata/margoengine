@@ -1,0 +1,40 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Weather audio browser check</title></head><body>
+<script type="module">
+// Real Web Audio proof for @margoengine/weather/audio: an OfflineAudioContext renders the layers through
+// @margoengine/audio. Calm is near silent, rain is loud and broad, wind is low and rises with the wind, hail brightens
+// the rain, and a thunder strike adds a rumble as long as asked that dies away.
+import {AudioListener} from '/packages/audio/dist/index.js';
+import {WeatherAudio} from '/packages/weather/dist/audio.js';
+import {WEATHER_PRESETS} from '/packages/weather/dist/index.js';
+const rate=24000;
+async function render(state,{seconds=2,thunder}={}){
+ const context=new OfflineAudioContext(1,rate*seconds,rate);
+ const listener=new AudioListener({context,smoothing:0});
+ const sounds=new WeatherAudio(listener,{weather:{state},seed:5});
+ if(thunder)sounds.thunder(thunder);
+ const buffer=await context.startRendering();
+ sounds.dispose();listener.dispose();
+ return buffer.getChannelData(0).slice();
+}
+const rms=(x,from=0,to=x.length)=>{let s=0;for(let i=from;i<to;i++)s+=x[i]*x[i];return Math.sqrt(s/(to-from));};
+// Share of the signal's power above 2 kHz, from a first difference (a high-pass whose gain is 2 sin(pi f / rate)).
+const bright=(x)=>{let d=0;for(let i=1;i<x.length;i++)d+=(x[i]-x[i-1])**2;return d/Math.max(1e-12,x.reduce((s,v)=>s+v*v,0));};
+window.check={
+ async run(){
+  const out={};
+  const calm=await render({...WEATHER_PRESETS.clear,wind:0});
+  const rain=await render({...WEATHER_PRESETS.rain,wind:0});
+  const hail=await render({...WEATHER_PRESETS.rain,wind:0,hail:0.8});
+  const breeze=await render({...WEATHER_PRESETS.clear,wind:6});
+  const gale=await render({...WEATHER_PRESETS.clear,wind:24});
+  out.calm=rms(calm);out.rain=rms(rain);out.breeze=rms(breeze);out.gale=rms(gale);
+  out.rainBright=bright(rain);out.hailBright=bright(hail);out.windBright=bright(gale);
+  const strike=await render({...WEATHER_PRESETS.clear,wind:0},{seconds:5,thunder:{loudness:1,rumble:3}});
+  out.thunderEarly=rms(strike,0,rate*0.5);out.thunderLate=rms(strike,rate*2.5,rate*3);out.thunderAfter=rms(strike,rate*3.5,rate*5);
+  out.finite=[calm,rain,hail,breeze,gale,strike].every(x=>x.every(Number.isFinite));
+  out.validation=null;out.errors=[];
+  return out;
+ }
+};
+window.ready=true;
+</script></body></html>

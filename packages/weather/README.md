@@ -143,6 +143,36 @@ any place and time; `apply(machine, x, z)` sets a machine there (call it every f
 wind, ground wetness and snow follow the place; `arrival(front, x, z)` gives the seconds until a front arrives
 (negative once it has passed). `addFront` and `addCell` return removers. Bad input throws `TypeError` or `RangeError`.
 
+## Weather you can hear
+
+`WeatherAudio` from `margoengine/weather/audio` plays rain, wind and thunder through `@margoengine/audio`, following a
+weather state. Rain and wind are looping noise that it generates itself, so it needs no sound files; thunder is one
+rumble per strike, as loud and as long as the strike, for example from the sky `Weather`'s `onThunder`.
+
+```ts
+import { AudioListener } from 'margoengine/audio';
+import { WeatherMachine } from 'margoengine/weather';
+import { WeatherAudio } from 'margoengine/weather/audio';
+import { Engine } from 'margoengine/core';
+import { Weather } from 'margoengine/sky/weather';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const listener = AudioListener.attach(engine); // resumes on the first click or key press
+const weather = new WeatherMachine('thunderstorm');
+const sky = Weather.attach(engine, { lightning: {} });
+const sounds = WeatherAudio.attach(engine, listener, { weather, volume: 0.8 }); // follows the weather every frame
+engine.onFrame((_, delta) => weather.update(delta));
+sky.onThunder((strike) => sounds.thunder(strike)); // a rumble when the thunder arrives
+```
+
+The rain's volume is `rain` (0.6) times the rain to the power 0.7, hail adding half its share, through a low-pass that
+opens from 2.5 to 8 kHz with the hail; the wind's is `wind` (0.5) times (speed / 25) to the power 1.5, gusts lifting it
+by up to a third, through a band-pass that rises from 250 Hz by 30 Hz per m/s; `volume` (1) scales everything and
+`thunder` (1) a strike at loudness 1. `rainSound` and `windSound` are the `Audio` objects, for routing further.
+`buffers: {rain, wind, thunder}` plays your own recordings instead (a thunder recording is played faster or slower to
+fit the strike's length). `weatherAudioMix(state)` gives the levels alone and `weatherNoise(rate)` the generated samples.
+`new WeatherAudio(listener, options)` and `update()` work without an engine; `dispose()` stops everything.
+
 ## Driving the sky
 
 `skyWeather(state, wind?)` returns the sky `Weather` settings for a state: `Object.assign(weather.options, skyWeather(state))`. `hailSettings` does the same for `Hail`. `fogDensity(state)` gives an exponential-fog density per metre (0.0002 clear to 0.02 thick).
@@ -200,6 +230,8 @@ Stones are lit (`lit`, default true) as small ice balls by the engine's light (`
   no wind drift, and shadows draw the unlifted shape. A vertex stage another package replaced keeps its shape.
 - Region fronts are straight and move at a constant speed, cells are circles at a constant velocity; none bends,
   stalls or forms by itself. They are authoring shapes, not a forecast model.
+- Weather audio is one rain and one wind loop heard everywhere at once (no louder rain on a roof, no wind direction)
+  and a generated rumble per strike; give `buffers` for recorded sound.
 - The presets and the climate chain are design choices, not weather data. Wind speed is a mean at one height with simple noise, not a boundary-layer model.
 - This package draws no clouds or fog of its own: `WeatherDrive` feeds `cloud` and `fog` to the sky's and the
   environment's.

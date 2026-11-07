@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10527083,
+  "total": 10528991,
   "history": [
     {
       "date": "2026-10-24",
@@ -3608,6 +3608,12 @@
       "commit": "ddd0a02d9",
       "reason": "netcode: new optional entry ./webtransport (batch 114 job 3)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "9245f8968",
+      "reason": "new optional entry @margoengine/weather/audio (WeatherAudio: rain, wind and thunder through @margoengine/audio); nothing else grows",
+      "grew": 1
     }
   ],
   "items": {
@@ -4306,6 +4312,7 @@
     "@margoengine/voxel/vox": 12969,
     "@margoengine/water": 20185,
     "@margoengine/weather": 5230,
+    "@margoengine/weather/audio": 1908,
     "@margoengine/weather/drive": 1714,
     "@margoengine/weather/hail": 5489,
     "@margoengine/weather/puddles": 4070,

@@ -50,6 +50,10 @@
     "./drive": {
       "types": "./dist/drive.d.ts",
       "import": "./dist/drive.js"
+    },
+    "./audio": {
+      "types": "./dist/audio.d.ts",
+      "import": "./dist/audio.js"
     }
   },
   "files": [
@@ -64,6 +68,7 @@
     "@margoengine/core": "^1.0.0"
   },
   "dependencies": {
+    "@margoengine/audio": "^1.0.0",
     "@margoengine/math": "^1.0.0"
   },
   "scripts": {
