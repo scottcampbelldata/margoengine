@@ -187,7 +187,10 @@ export class EyeViews {
         descriptor = image.getViewDescriptor(),
         depthTexture = image.depthStencilTexture;
       if (depthTexture && depthTexture.format !== 'depth24plus')
-        throw margoError('unsupported', `The XR layer's depth is ${depthTexture.format}; create the layer with depth24plus`);
+        throw margoError(
+          'unsupported',
+          `The XR layer's depth is ${depthTexture.format}; create the layer with depth24plus`,
+        );
       this.build(image.colorTexture.format, ar, !!depthTexture);
       const pipelines = this.pipelines!;
       this.offset[0] = x;

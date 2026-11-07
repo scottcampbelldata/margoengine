@@ -169,7 +169,7 @@ interface XRNativeSession extends EventTarget {
     }): Promise<XRTransientInputHitTestSource>;
     requestReferenceSpace(type: string): Promise<XRSpace>;
     updateRenderState(state: {
-        layers?: XRProjectionLayer[];
+        layers?: readonly object[];
         baseLayer?: unknown;
         depthNear?: number;
         depthFar?: number;
@@ -199,11 +199,6 @@ interface XRPose {
         };
     };
     emulatedPosition: boolean;
-}
-
-interface XRProjectionLayer {
-    baseLayer?: unknown;
-    destroy(): void;
 }
 
 interface XRRayLike {

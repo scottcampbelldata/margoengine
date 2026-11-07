@@ -141,6 +141,8 @@ export class XR implements EnginePlugin {
   private readonly state: XRFrameState = { time: 0, delta: 0, frame: null!, viewer: null, inputs: this.controllers };
   private readonly renderOptions = { culling: false, delta: 0 };
   private resume = false;
+  /** True while composition layers sit below the scene, so the scene keeps alpha where it draws nothing. */
+  private seeThrough = false;
 
   /** True when the browser can start `mode`: WebXR (and for immersive modes WebGPU bindings) is present and supports it. */
   static async isSupported(mode: XRMode = 'immersive-vr'): Promise<boolean> {
@@ -227,6 +229,41 @@ export class XR implements EnginePlugin {
   /** The session's reference space (the space of frame poses and hit results); undefined without a session. */
   get referenceSpace(): XRSpace | undefined {
     return this.space;
+  }
+  /**
+   * Replaces the space of frame poses, controllers and hits for the rest of the session: `Locomotion` from
+   * `@margoengine/xr/layers` passes an offset of the current one (WebXR `getOffsetReferenceSpace`) to teleport and turn.
+   */
+  useReferenceSpace(space: XRSpace): void {
+    if (!this.session || !this.space)
+      throw new MargoError(
+        'state',
+        'useReferenceSpace needs an active session; call it after xr.requestSession resolves',
+      );
+    if (!space || typeof space !== 'object')
+      throw new TypeError(
+        'useReferenceSpace needs an XRReferenceSpace; pass xr.referenceSpace.getOffsetReferenceSpace(transform)',
+      );
+    this.space = space;
+  }
+  /** The immersive session's WebGPU binding and the device its layers use; undefined otherwise. For `XRLayers`. */
+  get layerBinding(): { binding: XRBinding; device: GPUDevice } | undefined {
+    return this.session && this.binding && this.layer ? { binding: this.binding, device: this.device } : undefined;
+  }
+  /**
+   * Shows `below`, then the scene, then `above` (WebXR Layers: composited in order with source-over). While any layer is
+   * below, the scene keeps alpha where it draws nothing, as in AR, so the layers show through. For `XRLayers`.
+   */
+  setLayers(below: readonly object[], above: readonly object[]): void {
+    if (!this.session || !this.layer)
+      throw new MargoError('state', 'setLayers needs an immersive session; call it after xr.requestSession resolves');
+    if (this.layer.baseLayer)
+      throw new MargoError(
+        'unsupported',
+        "Composition layers need the browser's own XRGPUBinding; the WebGL2 layer's route shows a single XRWebGLLayer",
+      );
+    this.seeThrough = below.length > 0;
+    this.session.updateRenderState({ layers: [...below, this.layer, ...above] });
   }
   private readonly uncaptured = (event: GPUUncapturedErrorEvent): void => {
     if (!this.disposed) this.fail(new MargoError('failed', `XR GPU error: ${event.error.message}`));
@@ -367,12 +404,19 @@ export class XR implements EnginePlugin {
       if (this.disposed || frame.session !== this.session) return;
       // shortcut: keep the canvas mirror and duplicate GPU buffers, upgrade when shared XR device hooks are available.
       if (this.mode !== 'inline' && this.eyes) {
-        if (viewer) this.eyes.render(this.binding!, this.layer!, viewer, delta, this.mode === 'immersive-ar');
+        if (viewer)
+          this.eyes.render(this.binding!, this.layer!, viewer, delta, this.mode === 'immersive-ar' || this.seeThrough);
       } else if (this.mode !== 'inline') {
         this.renderOptions.delta = delta;
         this.engine.render(this.renderOptions);
         if (viewer)
-          this.renderer!.render(this.engine, this.binding!, this.layer!, viewer, this.mode === 'immersive-ar');
+          this.renderer!.render(
+            this.engine,
+            this.binding!,
+            this.layer!,
+            viewer,
+            this.mode === 'immersive-ar' || this.seeThrough,
+          );
       }
       if (this.session === frame.session && !this.disposed)
         this.handle = frame.session.requestAnimationFrame(this.frame);
@@ -404,6 +448,7 @@ export class XR implements EnginePlugin {
     this.callback = undefined;
     this.space = undefined;
     this.binding = undefined;
+    this.seeThrough = false;
     this.layer?.destroy();
     this.layer = undefined;
     this.renderer?.dispose();

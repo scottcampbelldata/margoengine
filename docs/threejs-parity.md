@@ -8,9 +8,9 @@ What Margo Engine covers compared with three.js r186 and its common add-ons (`th
 
 | Status | Count | Meaning |
 | --- | --- | --- |
-| COVERED | 167 | A Margo package implements the feature in a form a three.js user would accept as equivalent (limits noted). |
+| COVERED | 168 | A Margo package implements the feature in a form a three.js user would accept as equivalent (limits noted). |
 | PARTIAL | 5 | Some of it exists, but a common use case is missing. The notes say what. |
-| MISSING | 12 | Worth having and not written yet. Listed below with what to do. |
+| MISSING | 11 | Worth having and not written yet. Listed below with what to do. |
 | NOT PLANNED | 11 | Out of scope by decision. The note says why and what to use instead. |
 
 The earlier version of this table had 161 rows and hid several gaps inside one coarse row or inside a COVERED row's notes. Those gaps now have rows of their own, which is why the MISSING count went up while no feature was lost.
@@ -304,22 +304,22 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 
 | three.js | Status | Margo | Shows it | Notes |
 | --- | --- | --- | --- | --- |
-| WebXR VR (`renderer.xr`) | PARTIAL | xr `XR.requestSession('immersive-vr')` (`packages/xr/src/index.ts`) | | Requires the native `XRGPUBinding` (WebGPU), or `installXR()` from `@margoengine/webgl2-compat/xr` on the WebGL2 layer. Draws core meshes and loader-owned glTF-pro PBR models (skinning and morphs included) in both eyes. On an engine from `Engine.create` (route 'separate') other plugin passes and post effects are not drawn; an engine from `createXREngine` draws them (row below). Controller and hand models are `@margoengine/xr/models`. Not implemented: locomotion; caller-owned extension textures raise an error. Untested on physical headsets. |
+| WebXR VR (`renderer.xr`) | PARTIAL | xr `XR.requestSession('immersive-vr')` (`packages/xr/src/index.ts`) | | Requires the native `XRGPUBinding` (WebGPU), or `installXR()` from `@margoengine/webgl2-compat/xr` on the WebGL2 layer. Draws core meshes and loader-owned glTF-pro PBR models (skinning and morphs included) in both eyes. On an engine from `Engine.create` (route 'separate') other plugin passes and post effects are not drawn; an engine from `createXREngine` draws them (row below). Controller and hand models are `@margoengine/xr/models`. Composition layers, haptics and teleport are `@margoengine/xr/layers`. Caller-owned extension textures raise an error. Untested on physical headsets. |
 | WebXR AR (hit test, anchors, plane detection, depth sensing, light estimation) | PARTIAL | xr `immersive-ar` session mode; `HitTest` (`packages/xr/src/hit-test.ts`); `ARPlanes`, `ARDepth`, `ARLight` (`@margoengine/xr/ar`, `packages/xr/src/ar.ts`) | | Hit testing from the viewer, an input source or transient input (screen taps), results as poses in the reference space, anchors through `hits.anchor(hit)`. Detected planes with events and meshes, CPU depth as metres and world points, and the light estimate turned into the reference space and applied to core's sun and ambient. No GPU depth (occlusion) and no reflection cube map. Tested with stand-in sessions only; never run on an AR device. |
 | Controller and hand input poses | COVERED † | xr `XRController` (`packages/xr/src/controller.ts`) | | Target-ray and grip poses, buttons, axes, 25 hand joints; react `Controller` binds a mesh to the grip or target-ray pose with select and squeeze events. |
 | XRControllerModelFactory, XRHandModelFactory | COVERED | xr `XRModels`, `fetchProfile`, `componentStates`, `responseWeight` (`@margoengine/xr/models`, `packages/xr/src/models.ts`) | | A generic controller of core meshes whose trigger, squeeze and thumbstick move with an `xr-standard` gamepad, and hands as 25 joint spheres sized by their WebXR radii plus 24 bone cylinders; no files needed. A device's own glTF model comes from the WebXR input profile assets an app serves (`fetchProfile`), with its visual responses weighed by `componentStates` and `responseWeight`. No skinned hand mesh. Tested with stand-in inputs; untested on a headset. |
 | Plugin passes and post effects in XR | COVERED † | xr `createXREngine` (`packages/xr/src/eyes.ts`) | `tests/modern-xr-passes.ts` | Each eye is a view of the engine's frame graph on its own XR-compatible device; both eyes match a desktop render byte for byte. Untested on a headset. |
-| XR layers, locomotion, haptics, XR video | MISSING | xr | | Needs a headset test first. |
+| XR layers, locomotion, haptics, XR video | COVERED | xr `XRLayers`, `pulse`, `teleportArc`, `Locomotion` (`@margoengine/xr/layers`, `packages/xr/src/layers.ts`) | | Quad, cylinder, equirect and cube composition layers and XRMediaBinding video layers, drawn per eye and face from images or a WebGPU function; controller pulses through hapticActuators or the dual-rumble actuator; a teleport arc and teleport and snap turn by offsetting the reference space. Layers need the browser's own XRGPUBinding with 'layers'. Tested with stand-ins; untested on a headset. |
 
 ## What is missing or partial, and what to do
 
-Recounted from the rows (2026-11-07): 5 PARTIAL, 12 MISSING. Each fix goes in the optional package named; core stays frozen for features.
+Recounted from the rows (2026-11-07): 5 PARTIAL, 11 MISSING. Each fix goes in the optional package named; core stays frozen for features.
 
 | Row | What is missing | What to do |
 | --- | --- | --- |
 | Meshlet rendering | PARTIAL. One mesh, one matrix; no instancing or Hi-Z per cluster. | Extend `@margoengine/culling/meshlets`. |
 | Node materials / TSL | PARTIAL. No statement-level `If`, workgroup memory or light nodes. | Extend `@margoengine/shader`. |
-| WebXR VR, WebXR AR | PARTIAL. Never run on a headset or AR device. | Test on a device first (`examples/xr-device-check`), then the XR layers and locomotion row. |
+| WebXR VR, WebXR AR | PARTIAL. Never run on a headset or AR device. | Test on a device first (`examples/xr-device-check`). |
 | WebGL2 fallback | PARTIAL. M8 is done; the voxel path tracer runs on it, slowly compiled on ANGLE Direct3D, XR runs on it through `/xr`, and the integrated-GPU frame-budget run is still to be recorded. | See [the roadmap](webgl2-compat-roadmap.md). |
 | Shadows from alpha cut-outs, soft particles | MISSING. | Planned before v1.0.0, one landing per package. |
 | Rendering in a worker, render into layers, compute writing textures, environment blend and ground projection, KTX2 arrays and cubes, NRRD, subsurface blur | MISSING. | After v1.0.0, in the owning package. |

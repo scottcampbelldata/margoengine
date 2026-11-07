@@ -6,11 +6,24 @@ import { componentStates, fetchProfile, HAND_BONES, profileLayout, responseWeigh
 
 async function engine(t) {
   const store = await TransformStore.create(256),
-    context = { backend: 'webgpu', shader: wgsl, descriptor: { vertex: { entryPoint: 'vertex', buffers: [] } }, draw() {} };
+    context = {
+      backend: 'webgpu',
+      shader: wgsl,
+      descriptor: { vertex: { entryPoint: 'vertex', buffers: [] } },
+      draw() {},
+    };
   const e = new Engine(
     { width: 1, height: 1, getContext() {} },
     store,
-    { backend: 'webgpu', add() {}, remove() {}, dispose() {}, render(camera, light, batches, graph) { graph.execute(context); } },
+    {
+      backend: 'webgpu',
+      add() {},
+      remove() {},
+      dispose() {},
+      render(camera, light, batches, graph) {
+        graph.execute(context);
+      },
+    },
     undefined,
     null,
   );
@@ -30,7 +43,9 @@ function host(controllers) {
     },
   };
 }
-const pose = (x, y, z, q = [0, 0, 0, 1]) => ({ transform: { position: { x, y, z, w: 1 }, orientation: { x: q[0], y: q[1], z: q[2], w: q[3] } } });
+const pose = (x, y, z, q = [0, 0, 0, 1]) => ({
+  transform: { position: { x, y, z, w: 1 }, orientation: { x: q[0], y: q[1], z: q[2], w: q[3] } },
+});
 function controller(source) {
   return {
     source,
@@ -53,7 +68,10 @@ test('a held controller follows its grip, and its trigger, squeeze and thumbstic
   xr.step();
   const meshes = models.controllerMeshes(c.source);
   assert.equal(meshes.length, 7);
-  assert.ok(meshes.every((m) => !m.visible), 'hidden while the grip is untracked');
+  assert.ok(
+    meshes.every((m) => !m.visible),
+    'hidden while the grip is untracked',
+  );
   c.grip = pose(0.2, 1.1, -0.3);
   c.buttons[0] = 1;
   c.buttons[1] = 1;
@@ -61,7 +79,10 @@ test('a held controller follows its grip, and its trigger, squeeze and thumbstic
   xr.step();
   const [root, , , trigger, squeeze, stick] = meshes;
   assert.ok(meshes.every((m) => m.visible));
-  assert.deepEqual([root.position.x, root.position.y, root.position.z].map((v) => +v.toFixed(5)), [0.2, 1.1, -0.3]);
+  assert.deepEqual(
+    [root.position.x, root.position.y, root.position.z].map((v) => +v.toFixed(5)),
+    [0.2, 1.1, -0.3],
+  );
   assert.ok(Math.abs(trigger.rotation.x - 0.35) < 1e-6, 'trigger swings 0.35 rad when fully pulled');
   assert.notEqual(trigger.material, squeeze.material, 'the pressed trigger has the pressed colour');
   assert.ok(Math.abs(stick.rotation.z - 0.4) < 1e-6, 'thumbstick leans with its x axis');
@@ -113,7 +134,10 @@ test('a tracked hand draws a sphere at each joint scaled by its radius and a cyl
   assert.ok(Math.abs(bone.scale.z - length) < 1e-6);
   c.handTracked[0] = 0;
   xr.step();
-  assert.ok(joints.every((m) => !m.visible), 'an untracked hand hides');
+  assert.ok(
+    joints.every((m) => !m.visible),
+    'an untracked hand hides',
+  );
   models.dispose();
   assert.throws(() => XRModels.attach({}, e), /pass the XR, then the engine/);
 });
@@ -123,7 +147,10 @@ const profile = {
   layouts: {
     'left-right': {
       assetPath: 'model.glb',
-      gamepad: { buttons: ['trigger', 'squeeze', null, 'stick'], axes: [null, null, { componentId: 'stick', axis: 'xAxis' }, { componentId: 'stick', axis: 'yAxis' }] },
+      gamepad: {
+        buttons: ['trigger', 'squeeze', null, 'stick'],
+        axes: [null, null, { componentId: 'stick', axis: 'xAxis' }, { componentId: 'stick', axis: 'yAxis' }],
+      },
       components: { trigger: {}, squeeze: {}, stick: {} },
     },
   },
@@ -140,8 +167,15 @@ test('component states follow the layout gamepad mapping, and visual responses w
   assert.equal(states.squeeze.state, 'touched');
   assert.deepEqual([states.stick.xAxis, states.stick.yAxis], [-1, 0.5]);
   assert.equal(responseWeight({ componentProperty: 'button', states: ['pressed'] }, states.trigger), 0.625);
-  assert.equal(responseWeight({ componentProperty: 'yAxis', states: ['default', 'touched', 'pressed'] }, states.stick), 0.75);
-  assert.equal(responseWeight({ componentProperty: 'xAxis', states: ['pressed'] }, states.stick), 0.5, 'an axis rests at the middle');
+  assert.equal(
+    responseWeight({ componentProperty: 'yAxis', states: ['default', 'touched', 'pressed'] }, states.stick),
+    0.75,
+  );
+  assert.equal(
+    responseWeight({ componentProperty: 'xAxis', states: ['pressed'] }, states.stick),
+    0.5,
+    'an axis rests at the middle',
+  );
   assert.equal(responseWeight({ componentProperty: 'state', states: ['touched'] }, states.squeeze), 1);
   assert.equal(profileLayout(profile, 'none'), undefined);
 });
@@ -152,14 +186,33 @@ test('fetchProfile picks the most specific listed profile, falls back, and says 
   t.after(() => (globalThis.fetch = saved));
   globalThis.fetch = async (url) => {
     asked.push(String(url));
-    if (String(url).endsWith('profilesList.json')) return { ok: true, json: async () => ({ 'test-pad': { path: 'test-pad/profile.json' }, 'generic-trigger': { path: 'generic-trigger/profile.json' } }) };
+    if (String(url).endsWith('profilesList.json'))
+      return {
+        ok: true,
+        json: async () => ({
+          'test-pad': { path: 'test-pad/profile.json' },
+          'generic-trigger': { path: 'generic-trigger/profile.json' },
+        }),
+      };
     if (String(url).endsWith('test-pad/profile.json')) return { ok: true, json: async () => profile };
     return { ok: false, status: 404 };
   };
-  const found = await fetchProfile({ profiles: ['vendor-x', 'test-pad'], handedness: 'right' }, 'https://cdn.example/profiles');
+  const found = await fetchProfile(
+    { profiles: ['vendor-x', 'test-pad'], handedness: 'right' },
+    'https://cdn.example/profiles',
+  );
   assert.equal(found.id, 'test-pad');
   assert.equal(found.assetUrl, 'https://cdn.example/profiles/test-pad/model.glb');
-  assert.deepEqual(asked, ['https://cdn.example/profiles/profilesList.json', 'https://cdn.example/profiles/test-pad/profile.json']);
-  await assert.rejects(fetchProfile({ profiles: ['vendor-x'], handedness: 'right' }, 'https://cdn.example/profiles'), /serve the input profile assets/);
-  await assert.rejects(fetchProfile({ profiles: ['vendor-x'], handedness: 'right' }, 'https://cdn.example/profiles', { fallback: 'none' }), /pass a listed fallback/);
+  assert.deepEqual(asked, [
+    'https://cdn.example/profiles/profilesList.json',
+    'https://cdn.example/profiles/test-pad/profile.json',
+  ]);
+  await assert.rejects(
+    fetchProfile({ profiles: ['vendor-x'], handedness: 'right' }, 'https://cdn.example/profiles'),
+    /serve the input profile assets/,
+  );
+  await assert.rejects(
+    fetchProfile({ profiles: ['vendor-x'], handedness: 'right' }, 'https://cdn.example/profiles', { fallback: 'none' }),
+    /pass a listed fallback/,
+  );
 });

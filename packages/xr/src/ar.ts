@@ -367,9 +367,7 @@ export class ARLight {
   update(frame: XRNativeFrame): void {
     const get = (
         frame as {
-          getLightEstimate?(
-            probe: object,
-          ): {
+          getLightEstimate?(probe: object): {
             sphericalHarmonicsCoefficients: Float32Array;
             primaryLightDirection: { x: number; y: number; z: number };
             primaryLightIntensity: { x: number; y: number; z: number };

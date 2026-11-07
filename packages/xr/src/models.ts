@@ -59,7 +59,8 @@ function cylinder(segments = 12): Geometry {
       positions.push(Math.cos(phi), Math.sin(phi), z);
       normals.push(Math.cos(phi), Math.sin(phi), 0);
     }
-  for (let s = 0; s < segments; s++) indices.push(s, s + 1, s + segments + 1, s + 1, s + segments + 2, s + segments + 1);
+  for (let s = 0; s < segments; s++)
+    indices.push(s, s + 1, s + segments + 1, s + 1, s + segments + 2, s + segments + 1);
   for (const z of [-0.5, 0.5]) {
     const centre = positions.length / 3;
     positions.push(0, 0, z);
@@ -182,7 +183,8 @@ export class XRModels {
   private hand(source: XRInputSource): HandParts {
     let parts = this.handParts.get(source);
     if (parts) return parts;
-    const mesh = (geometry: Geometry) => this.engine.createMesh().setGeometry(geometry).setMaterial(this.materials.hand);
+    const mesh = (geometry: Geometry) =>
+      this.engine.createMesh().setGeometry(geometry).setMaterial(this.materials.hand);
     parts = {
       joints: Array.from({ length: 25 }, () => mesh(this.geometry.sphere)),
       bones: HAND_BONES.map(() => mesh(this.geometry.cylinder)),
@@ -235,7 +237,9 @@ export class XRModels {
       pressed = (i: number) => standard && i < controller.buttonCount && b[i * 3 + 1] === 1;
     parts.root.setPosition([p.x, p.y, p.z]).setQuaternion([o.x, o.y, o.z, o.w]);
     // The trigger swings back towards the grip by up to 0.35 radians; the squeeze sinks 4 mm.
-    parts.trigger.setRotation([trigger * 0.35, 0, 0]).setMaterial(pressed(0) ? this.materials.pressed : this.materials.body);
+    parts.trigger
+      .setRotation([trigger * 0.35, 0, 0])
+      .setMaterial(pressed(0) ? this.materials.pressed : this.materials.body);
     parts.squeeze
       .setPosition([parts.palm * (0.019 - 0.004 * squeeze), 0, 0.005])
       .setMaterial(pressed(1) ? this.materials.pressed : this.materials.body);
@@ -280,7 +284,11 @@ export class XRModels {
       }
       mesh
         .setPosition([ax + dx / 2, ay + dy / 2, az + dz / 2])
-        .setQuaternion(this.rotation.setFromUnitVectors(NEG_Z, this.towards(dx / length, dy / length, dz / length)).toArray(q) as number[])
+        .setQuaternion(
+          this.rotation
+            .setFromUnitVectors(NEG_Z, this.towards(dx / length, dy / length, dz / length))
+            .toArray(q) as number[],
+        )
         .setScale([radius, radius, length]);
     }
   }
@@ -382,18 +390,27 @@ export async function fetchProfile(
     get = async (url: URL) => {
       const response = await fetch(url, { signal });
       if (!response.ok)
-        throw margoError('failed', `${url} answered ${response.status}; serve the input profile assets at the base URL`);
+        throw margoError(
+          'failed',
+          `${url} answered ${response.status}; serve the input profile assets at the base URL`,
+        );
       return response.json();
     },
     list = (await get(new URL('profilesList.json', root))) as Record<string, { path: string; deprecated?: boolean }>,
     id = [...source.profiles, fallback].find((name) => Object.hasOwn(list, name));
   if (!id)
-    throw margoError('unsupported', `No input profile listed for ${source.profiles.join(', ') || 'this source'}; pass a listed fallback`);
+    throw margoError(
+      'unsupported',
+      `No input profile listed for ${source.profiles.join(', ') || 'this source'}; pass a listed fallback`,
+    );
   const url = new URL(list[id].path, root),
     profile = (await get(url)) as InputProfile,
     layout = profileLayout(profile, source.handedness);
   if (!layout)
-    throw margoError('unsupported', `Profile ${id} has no layout for handedness '${source.handedness}'; use another profile`);
+    throw margoError(
+      'unsupported',
+      `Profile ${id} has no layout for handedness '${source.handedness}'; use another profile`,
+    );
   return { id, profile, layout, assetUrl: new URL(layout.assetPath ?? `${source.handedness}.glb`, url).href };
 }
 

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10683665,
+  "total": 10687943,
   "history": [
     {
       "date": "2026-10-24",
@@ -3806,6 +3806,12 @@
       "commit": "ffcc1e84b",
       "reason": "new entry @margoengine/terrain/layers-pbr, about 2.7 KB gzip",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "f7a17519d",
+      "reason": "xr/layers: new optional entry, layers, haptics, video and locomotion",
+      "grew": 2
     }
   ],
   "items": {
@@ -4549,9 +4555,10 @@
     "@margoengine/wfc/overlapping": 2259,
     "@margoengine/worker": 2128,
     "@margoengine/worker/canvas": 1597,
-    "@margoengine/xr": 8631,
+    "@margoengine/xr": 8967,
     "@margoengine/xr/ar": 2828,
     "@margoengine/xr/device-check": 2344,
+    "@margoengine/xr/layers": 3942,
     "@margoengine/xr/models": 3208,
     "leak @margoengine/animation -> @margoengine/gltf-pro/model": 1,
     "leak @margoengine/animation/geometry-cache -> @margoengine/gltf-pro/model": 1,

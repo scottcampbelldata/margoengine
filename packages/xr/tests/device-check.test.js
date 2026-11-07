@@ -134,7 +134,12 @@ const target = XR_RUN_TARGETS.find((entry) => entry.id === 'vr-webgpu');
 test('a run on the browser with everything confirmed proves its route and no other', () => {
   assert.deepEqual(checkXRRun(proved), []);
   assert.deepEqual(xrRunGaps(proved, target), []);
-  assert.ok(xrRunGaps(proved, XR_RUN_TARGETS.find((entry) => entry.id === 'ar-webgpu')).length);
+  assert.ok(
+    xrRunGaps(
+      proved,
+      XR_RUN_TARGETS.find((entry) => entry.id === 'ar-webgpu'),
+    ).length,
+  );
 });
 
 test('each thing a real run needs is checked on its own', () => {

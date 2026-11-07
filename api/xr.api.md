@@ -56,6 +56,12 @@ export class XR implements EnginePlugin {
     setup(engine: Engine): void;
     onFrame(callback: (state: XRFrameState) => void): () => void;
     get referenceSpace(): XRSpace | undefined;
+    useReferenceSpace(space: XRSpace): void;
+    get layerBinding(): {
+        binding: XRBinding;
+        device: GPUDevice;
+    } | undefined;
+    setLayers(below: readonly object[], above: readonly object[]): void;
     registerPasses(graph: FrameGraph): void;
     requestSession(mode?: XRMode, options?: XRSessionOptions): Promise<XRNativeSession>;
     end(): Promise<void>;
@@ -148,6 +154,12 @@ class XR implements EnginePlugin {
     setup(engine: Engine): void;
     onFrame(callback: (state: XRFrameState) => void): () => void;
     get referenceSpace(): XRSpace | undefined;
+    useReferenceSpace(space: XRSpace): void;
+    get layerBinding(): {
+        binding: XRBinding;
+        device: GPUDevice;
+    } | undefined;
+    setLayers(below: readonly object[], above: readonly object[]): void;
     registerPasses(graph: FrameGraph): void;
     requestSession(mode?: XRMode, options?: XRSessionOptions): Promise<XRNativeSession>;
     end(): Promise<void>;
@@ -181,7 +193,7 @@ export interface XRNativeSession extends EventTarget {
     }): Promise<XRTransientInputHitTestSource>;
     requestReferenceSpace(type: string): Promise<XRSpace>;
     updateRenderState(state: {
-        layers?: XRProjectionLayer[];
+        layers?: readonly object[];
         baseLayer?: unknown;
         depthNear?: number;
         depthFar?: number;

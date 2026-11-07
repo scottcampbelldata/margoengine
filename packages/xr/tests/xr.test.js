@@ -435,6 +435,32 @@ test('requestSession passes module init members through, and its own feature lis
   assert.ok(!f.requests[0].init.requiredFeatures.includes('bogus'));
   await xr.end();
 });
+test('setLayers puts layers around the projection layer, and useReferenceSpace replaces the pose space', async (t) => {
+  const f = await fixture(t),
+    xr = await XRManager.create(f.engine);
+  assert.equal(xr.layerBinding, undefined);
+  assert.throws(() => xr.setLayers([], []), /after xr.requestSession resolves/);
+  assert.throws(() => xr.useReferenceSpace({}), /after xr.requestSession resolves/);
+  await xr.requestSession('immersive-vr');
+  const projection = f.session.state.layers[0],
+    sky = { name: 'sky' },
+    panel = { name: 'panel' };
+  assert.ok(xr.layerBinding.binding && xr.layerBinding.device);
+  const viewer = { ...pose(0), views: [{ eye: 'left', projectionMatrix: identity(), transform: pose(0).transform }] },
+    clear = () => f.passes.at(-3).descriptor.colorAttachments[0].clearValue.a;
+  f.session.tick(10, viewer);
+  assert.equal(clear(), 1, 'a VR scene alone is opaque');
+  xr.setLayers([sky], [panel]);
+  assert.deepEqual(f.session.state.layers, [sky, projection, panel]);
+  f.session.tick(20, viewer);
+  assert.equal(clear(), 0, 'with a layer below, the scene keeps alpha where it draws nothing');
+  const moved = { name: 'moved' };
+  xr.useReferenceSpace(moved);
+  assert.equal(xr.referenceSpace, moved);
+  assert.throws(() => xr.useReferenceSpace(null), /getOffsetReferenceSpace/);
+  await xr.end();
+  assert.equal(xr.layerBinding, undefined);
+});
 test('controller hand matrices are preallocated and clear when tracking is lost', () => {
   const source = { targetRaySpace: {}, profiles: [], hand: new Map([['wrist', {}]]) },
     controller = new XRController(source),

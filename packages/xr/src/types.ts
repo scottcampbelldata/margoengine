@@ -93,7 +93,8 @@ export interface XRNativeSession extends EventTarget {
   }): Promise<XRTransientInputHitTestSource>;
   requestReferenceSpace(type: string): Promise<XRSpace>;
   updateRenderState(state: {
-    layers?: XRProjectionLayer[];
+    /** The projection layer, and with the WebXR Layers module any composition layers around it. */
+    layers?: readonly object[];
     baseLayer?: unknown;
     depthNear?: number;
     depthFar?: number;

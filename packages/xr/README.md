@@ -158,3 +158,37 @@ enter.onclick=async()=>{
 ```
 
 Each `create` throws a coded error naming the feature to ask for when the session lacks it.
+
+## Layers, haptics, video and locomotion
+
+`@margoengine/xr/layers` adds WebXR composition layers, controller vibration and teleport movement. Layers are drawn by the headset's compositor at their own resolution, so text and video stay sharp. Ask for `optionalFeatures: ['layers']`.
+
+- `XRLayers.attach(xr)` then `quad`, `cylinder`, `equirect`, `cube` or `video(element)`: each takes `pixels`, a placement and `content` (an image, a `{left, right}` pair, six cube faces, or a function that draws into each eye's texture). Quads, cylinders and video sit above the scene, equirect and cube skies below it; `isStatic: true` draws once until `redraw()` or the compositor asks.
+- `pulse(controller, intensity, milliseconds)` vibrates a controller and resolves false when it has no actuator.
+- `teleportArc(origin, direction, options)` samples the parabola a teleport pointer draws and where it lands; `Locomotion.attach(xr)` moves the player there with `teleport(point, yaw)` and turns with `turn(yaw)`, by offsetting the reference space.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {XR} from 'margoengine/xr';
+import {Locomotion,XRLayers,pulse,teleportArc} from 'margoengine/xr/layers';
+
+const canvas=document.createElement('canvas');document.body.append(canvas);
+const engine=await Engine.create(canvas,{backend:'webgpu'});
+const xr=await XR.create(engine);
+const menu=new OffscreenCanvas(512,256);const pen=menu.getContext('2d')!;pen.fillStyle='#223';pen.fillRect(0,0,512,256);pen.fillStyle='#fff';pen.font='48px sans-serif';pen.fillText('Hello',40,140);
+const enter=document.createElement('button');enter.textContent='Enter VR';document.body.append(enter);
+enter.onclick=async()=>{
+  await xr.requestSession('immersive-vr',{optionalFeatures:['layers']});
+  const layers=XRLayers.attach(xr);
+  layers.quad({pixels:[512,256],size:[1,0.5],position:[0,1.5,-1.5],content:menu,isStatic:true});
+  const move=Locomotion.attach(xr);
+  xr.onFrame(({inputs})=>{
+    const c=xr.controllers[0],ray=c?.targetRay;if(!ray)return;
+    const p=ray.transform.position,m=c.targetRayMatrix;
+    const arc=teleportArc([p.x,p.y,p.z],[-m[8],-m[9],-m[10]]);
+    if(arc.hit&&c.buttons[1]){move.teleport(arc.hit);void pulse(c,0.6,40);}
+  });
+};
+```
+
+Without the browser's layer support `XRLayers.attach` and each layer throw a coded error that names the feature to ask for.

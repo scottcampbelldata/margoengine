@@ -47,6 +47,10 @@
     "./ar": {
       "types": "./dist/ar.d.ts",
       "import": "./dist/ar.js"
+    },
+    "./layers": {
+      "types": "./dist/layers.d.ts",
+      "import": "./dist/layers.js"
     }
   },
   "files": [
