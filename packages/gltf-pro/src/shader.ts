@@ -243,6 +243,11 @@ export interface PBRTransparency {
    * may use no bindings: a tint with no maps binds only the frame group.
    */
   readonly blends?: boolean;
+  /**
+   * True: the surfaces write depth, and native transmission draws here whatever transmission hook is set, without its
+   * tint draw. For a hook used through `PBRModel.drawTransparent` after the colour has drawn.
+   */
+  readonly depthWrite?: boolean;
   /** Colour targets of the transparent pass, in `MargoTransparent` location order. */
   readonly targets: readonly GPUColorTargetState[];
   /** This frame's transparent pass: the scene depth read-only and these targets; begun on the first draw, ended by the owner. */

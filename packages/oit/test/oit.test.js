@@ -9,6 +9,7 @@ import { OIT } from '../dist/index.js';
 import { addMesh } from '../dist/meshes.js';
 import { ExactOIT } from '../dist/exact.js';
 import { MomentOIT } from '../dist/moments.js';
+import { TransparentDepth } from '../dist/depth.js';
 import { animatedTriangle } from '../../../tests/support/gltf-pro-fixture.js';
 
 // Opaque, BLEND, BLEND + transmission (keeps the sorted path) and BLEND + clearcoat (physical variant).
@@ -376,4 +377,35 @@ test('OIT without blending keeps two targets and leaves transmission sorted', as
   assert.equal(list.length, 4);
   assert.equal(list[2].colorAttachments.length, 2);
   oit.dispose();
+});
+
+test('TransparentDepth redraws transparent surfaces, depth only, after the pass that coloured them', async () => {
+  const { engine, model, view, frame, id } = await scene(4),
+    oit = OIT.attach(engine),
+    glass = TransparentDepth.attach(engine);
+  assert.throws(() => new TransparentDepth().add(model), /attach/);
+  oit.add(model);
+  const remove = glass.add(model),
+    list = passes(frame(0)),
+    labels = list.map((p) => p.label);
+  assert.ok(labels.indexOf('oit:depth') > labels.indexOf('oit:composite'));
+  const pass = list[labels.indexOf('oit:depth')];
+  assert.deepEqual(pass.colorAttachments, []);
+  assert.deepEqual(pass.depthStencilAttachment, {
+    view: id(view.c.depth),
+    depthLoadOp: 'load',
+    depthStoreOp: 'store',
+    stencilReadOnly: true,
+  });
+  assert.equal(of(frame(1), 'beginRenderPass').length, list.length, 'steady frames keep the same passes');
+  assert.equal(glass.velocity(model).shadowPrimitives.length, 3, 'two BLEND primitives and the glass');
+  remove();
+  assert.equal(passes(frame(3)).some((p) => p.label === 'oit:depth'), false, 'a removed model writes nothing');
+  glass.dispose();
+  oit.dispose();
+});
+
+test('TransparentDepth refuses settings it cannot keep', () => {
+  for (const threshold of [0, -1, 1.5, Number.NaN]) assert.throws(() => new TransparentDepth({ threshold }), RangeError);
+  assert.throws(() => new TransparentDepth({ order: 0 }), RangeError);
 });

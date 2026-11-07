@@ -190,6 +190,53 @@ Limits:
   to 14. Memory: 18 bytes per pixel, plus 72 under 4x MSAA.
 - Transmission, custom blending and depth overrides keep the sorted path: `blending` is an `OIT` option only.
 
+## Depth and motion for glass (`TransparentDepth`)
+
+Transparent surfaces write no depth, so TAA, depth of field and SSAO look straight through them. `margoengine/oit/depth`
+adds them to the scene depth after their colour has drawn, whichever pass drew it.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {OIT} from 'margoengine/oit';
+import {TransparentDepth} from 'margoengine/oit/depth';
+import {Material, createMesh} from 'margoengine/materials';
+import {boxGeometry} from 'margoengine/geometry';
+import {PostStack, FXAA} from 'margoengine/post';
+import {TAA} from 'margoengine/taa';
+const engine = await Engine.create(document.querySelector('canvas')!);
+
+const stack = PostStack.attach(engine, [new FXAA()]);
+const taa = TAA.attach(engine, {velocityOnly: true, depth: () => stack.depthTexture});
+const pane = createMesh(engine, boxGeometry(2, 1, 0.1), new Material({color: '#9cc3e6', opacity: 0.4, transparent: true}));
+OIT.attach(engine).add(pane);
+const glass = TransparentDepth.attach(engine, {threshold: 0.2});
+glass.add(pane);                    // into the depth
+taa.add(glass.velocity(pane));      // its own motion vectors, for glass that moves
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `threshold` | 0.1 | Least alpha that enters the depth, above 0, at most 1. Native transmission always enters. Additive and multiply materials never do. |
+| `order` | 8.5 | Frame graph order: after the transparent colour at 8, before TAA at 9 and SSAO at 10. |
+
+- TAA: camera motion reprojects from the glass, and `glass.velocity(model)` gives moving glass its vectors. Where layers
+  overlap the nearest wins.
+- Depth of field and SSAO read the glass through the same depth. Focus lands on it, and what is behind it blurs with it.
+- Picking needs nothing from this entry: `Picking` takes BLEND primitives as they are, `picking.add(model)`.
+
+Measured on an RTX A6000 (`npm run test:gpu --workspace packages/oit`), at 1x and 4x MSAA: glass writes the same depth
+value as an opaque plane in its place, under OIT too, and parts under the threshold stay out. Moving glass shows its
+vector where it read zero before, and a glass edge in front of a focused wall blurs only with this entry. All on
+generated planes; time is not measured yet.
+
+Limits:
+
+- Everything depth-tested after `order` sees the glass as solid: lines (order 20) behind it disappear. A later `order`
+  keeps them, and then TAA, SSAO and the rest no longer see the glass.
+- What is behind the glass gets the glass's depth, so it blurs and reprojects as the glass does. One depth per pixel.
+- The surfaces draw once more, shader included, for depth alone.
+- Without `model` in an order-independent pass its BLEND primitives still draw sorted; this entry works the same.
+
 ## Hashed alpha
 
 Noise-based transparency that writes depth, for hair and foliage under TAA, shadows and SSAO, is a material feature,
@@ -259,7 +306,7 @@ CPU at 45-100 %):
   `multiply`, `none`) keep the sorted path; [`blending`](#tints-glows-and-glass-blending) brings all but `none` in.
   Depth overrides (`depthWrite`, `depthTest: false`) always keep it. Transparent instances (`PBRInstances`) go through
   OIT like other primitives.
-- Transparent surfaces write no depth, as before: SSAO, DOF and picking see the opaque scene only; TAA has no motion
-  vectors for them.
+- Transparent surfaces write no depth, as before: SSAO and DOF see the opaque scene only, and TAA has no motion vectors
+  for them, until [`TransparentDepth`](#depth-and-motion-for-glass-transparentdepth) adds them.
 - Cost: two 1x targets (10 bytes per pixel) plus 4x copies (40 bytes per pixel) under MSAA, and one full-screen
   composite whenever something transparent is visible: about twice the GPU time of sorted blending in the table above.

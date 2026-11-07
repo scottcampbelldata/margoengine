@@ -258,14 +258,7 @@ export class MomentOIT extends TransparentPass {
       this.context = c;
       this.shading = undefined;
       try {
-        for (const model of this.models.keys()) {
-          model.setTransparency(this.shader);
-          try {
-            model.draw(c, 'transparent', c.color, c.depth);
-          } finally {
-            model.setTransparency(this);
-          }
-        }
+        for (const model of this.models.keys()) model.drawTransparent(c, this.shader);
       } finally {
         (this.shading as GPURenderPassEncoder | undefined)?.end();
         this.shading = undefined;

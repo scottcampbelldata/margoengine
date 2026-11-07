@@ -976,6 +976,7 @@ class PBRModel implements EnginePlugin {
     image(index: number): Exclude<GLTFImage, undefined>;
     uploadImage(index: number, device: GPUDevice, srgb?: boolean): GPUTexture;
     addLighting(effect: LightingEffect): () => void;
+    drawTransparent(c: Context, hook: PBRTransparency): void;
     setTransparency(hook: PBRTransparency): () => void;
     setCapture(hook: PBRCapture): () => void;
     setTransmission(hook: PBRTransmission): () => void;
@@ -1096,6 +1097,7 @@ interface PBRTransparency {
     declarations(group: number): string;
     bindings(): GPUBindGroupEntry[];
     readonly blends?: boolean;
+    readonly depthWrite?: boolean;
     readonly targets: readonly GPUColorTargetState[];
     begin(): GPURenderPassEncoder;
 }

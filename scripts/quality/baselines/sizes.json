@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 9127573,
+  "total": 9129567,
   "history": [
     {
       "date": "2026-10-24",
@@ -2924,6 +2924,12 @@
       "commit": "e26852a72",
       "reason": "oit blending option, gltf-pro blends hook",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "f4c813be6",
+      "reason": "oit/depth entry, gltf-pro drawTransparent",
+      "grew": 1
     }
   ],
   "items": {
@@ -3306,9 +3312,10 @@
     "@margoengine/netcode/webrtc": 998,
     "@margoengine/netcode/websocket": 1076,
     "@margoengine/oit": 3808,
+    "@margoengine/oit/depth": 2004,
     "@margoengine/oit/exact": 4537,
     "@margoengine/oit/meshes": 747,
-    "@margoengine/oit/moments": 4207,
+    "@margoengine/oit/moments": 4197,
     "@margoengine/physics": 16756,
     "@margoengine/physics2d": 7920,
     "@margoengine/pixel": 4664,

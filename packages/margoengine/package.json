@@ -1546,6 +1546,10 @@
       "types": "./dist/oit/moments.d.ts",
       "import": "./dist/oit/moments.js"
     },
+    "./oit/depth": {
+      "types": "./dist/oit/depth.d.ts",
+      "import": "./dist/oit/depth.js"
+    },
     "./physics": {
       "types": "./dist/physics.d.ts",
       "import": "./dist/physics.js"

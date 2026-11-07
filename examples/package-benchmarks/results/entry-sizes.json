@@ -1,5 +1,5 @@
 {
-  "commit": "f3962fbeb",
+  "commit": "f4c813be6",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -978,8 +978,8 @@
     },
     "@margoengine/gltf-pro": {
       ".": {
-        "raw": 202907,
-        "gzip": 64425
+        "raw": 203133,
+        "gzip": 64470
       },
       "./asset": {
         "raw": 17549,
@@ -1002,8 +1002,8 @@
         "gzip": 20663
       },
       "./progressive": {
-        "raw": 227872,
-        "gzip": 73342
+        "raw": 228098,
+        "gzip": 73381
       },
       "./splats": {
         "raw": 3750,
@@ -1030,8 +1030,8 @@
         "gzip": 568
       },
       "./worker": {
-        "raw": 204857,
-        "gzip": 64944
+        "raw": 205083,
+        "gzip": 64985
       },
       "dist/workers/gltf.js": {
         "raw": 72940,
@@ -1632,8 +1632,12 @@
         "gzip": 4281
       },
       "./moments": {
-        "raw": 9672,
-        "gzip": 3951
+        "raw": 9595,
+        "gzip": 3941
+      },
+      "./depth": {
+        "raw": 3913,
+        "gzip": 1748
       }
     },
     "@margoengine/physics": {
@@ -2426,8 +2430,8 @@
         "gzip": 10077
       },
       "dist/workers/usdz.js": {
-        "raw": 218637,
-        "gzip": 71134
+        "raw": 218863,
+        "gzip": 71177
       }
     },
     "@margoengine/vfx": {
@@ -2752,9 +2756,9 @@
       "brotli": 5879
     },
     "packages/gltf-pro/dist/index.js": {
-      "raw": 1403334,
-      "gzip": 567317,
-      "brotli": 463103
+      "raw": 1403560,
+      "gzip": 567356,
+      "brotli": 463271
     },
     "packages/staging/dist/index.js": {
       "raw": 21901,
@@ -2867,9 +2871,9 @@
       "brotli": 54195
     },
     "packages/usdz/dist/workers/usdz.js": {
-      "raw": 216086,
-      "gzip": 70940,
-      "brotli": 61267
+      "raw": 216312,
+      "gzip": 70976,
+      "brotli": 61342
     },
     "packages/loaders/dist/workers/usd.js": {
       "raw": 21469,

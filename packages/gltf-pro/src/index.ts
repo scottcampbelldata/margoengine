@@ -3040,7 +3040,22 @@ export class PBRModel implements EnginePlugin {
   /** Whether this material draws in the transparency hook's pass. */
   private takesTransparent(m: PBRMaterial): boolean {
     const hook = this.transparency;
-    return !!hook && (separable(m) || (!!hook.blends && !(m.tint && this.transmission) && blendKind(m) > 0));
+    return (
+      !!hook && (separable(m) || (!!hook.blends && !(m.tint && this.transmission && !hook.depthWrite) && blendKind(m) > 0))
+    );
+  }
+  /**
+   * Draws the BLEND primitives into `hook`'s pass, as `draw(c, 'transparent', ...)` does, in place of the hook set with
+   * `setTransparency` for this call alone: a second pass over the same surfaces.
+   */
+  drawTransparent(c: Context, hook: PBRTransparency): void {
+    const set = this.transparency;
+    this.transparency = hook;
+    try {
+      this.draw(c, 'transparent', c.color, c.depth);
+    } finally {
+      this.transparency = set;
+    }
   }
   /** Hands this model's BLEND primitives to a transparency hook (README "Transparency hook"); returns a remover that restores sorted blending. */
   setTransparency(hook: PBRTransparency): () => void {
@@ -4595,7 +4610,9 @@ export class PBRModel implements EnginePlugin {
       blend = m.settings[0] === 2 || transmit,
       kind = through && !transmission && this.transparency!.blends ? blendKind(m) : 0,
       tinted =
-        transmit && (mode === 'beauty' || mode === 'ambient' || (kind === 3 && !compact)) && state?.blend === undefined,
+        transmit &&
+        (mode === 'beauty' || mode === 'ambient' || (kind === 3 && !compact && !this.transparency!.depthWrite)) &&
+        state?.blend === undefined,
       stateKey = renderStateKey(state) + (external?.depthCompare ?? '') + (extension ? ':extension' : ''),
       samples = c.descriptor.multisample?.count,
       depthFormat = c.descriptor.depthStencil!.format;
@@ -4707,7 +4724,9 @@ export class PBRModel implements EnginePlugin {
             external?.depthCompare === 'less' || external?.depthCompare === 'less-equal',
           ),
           format: c.descriptor.depthStencil!.format,
-          depthWriteEnabled: state?.depthWrite ?? ((mode === 'beauty' || capture) && !blend),
+          depthWriteEnabled:
+            state?.depthWrite ??
+            (((mode === 'beauty' || capture) && !blend) || (through && !transmission && !!this.transparency!.depthWrite)),
           depthCompare:
             external?.depthCompare ??
             state?.depthCompare ??
