@@ -1433,6 +1433,34 @@ The balance controller settled only on the exact hull points of one build. It no
 - **Ruled out by measurement:** a stiff solver ankle (falls), a soft solver spring as a torque, knee torque alone, a foot-on-ground filter, smoothing the torques over two frames (better on Knight, worse on Mage), filtering the velocity, damping against the feet's velocity (32 of 128 pushes bad), holding the centre of mass over the feet from the hips (Seed-san leaned 0.1 rad). Height and lean gains are flat around the values kept.
 - **Existing tests changed:** none; the tests added sit beside them.
 - **Size:** `@margoengine/ragdoll/balance` grew from 3,159 to 5,153 bytes gzipped and its budget was raised for it: the torques through the legs are what replace the outside force. An optional entry; core and stage do not change.
-- **Not proved:** turning, slopes, or a world above 8 solver passes: at 16 the KayKit figures creep about 0.03 m/s and RiggedFigure and Seed-san fall.
+- **Not proved:** turning, slopes. A world above 8 solver passes crept or fell at this commit; the next section fixes that.
 - **Unmeasured:** no speed number, including what the added passes cost.
 - **Gate:** lint, hygiene, verify, the ragdoll tests and `tests/claims-file.test.js`, the push from one script that stops at the first failing step.
+
+## Ragdoll: the five items left by balance
+
+Scott's order of 2026-11-07, one at a time, each pushed before the next.
+
+| # | Job | Status | Commit | Entry | Claim |
+| --- | --- | --- | --- | --- | --- |
+| 1 | 16 solver passes no worse than 10 | DONE | this commit | `/balance` | LIM-248 |
+
+**Item 1, worst of 24 roundings, hips drift over five seconds at 8 / 10 / 16 passes (before: one rounding, centre of mass m/s at 8 / 10 / 16).**
+
+| Figure | Before | After, drift m |
+| --- | --- | --- |
+| Knight | 0.0038 / 0.0081 / 0.0336 | 0.0014 / 0.0011 / 0.0006 |
+| Barbarian | 0.0067 / 0.0057 / 0.0308 | 0.0005 / 0.0006 / 0.0006 |
+| Ranger | 0.0034 / 0.0051 / 0.0384 | 0.0022 / 0.0014 / 0.0005 |
+| Rogue | 0.0074 / 0.0101 / 0.0338 | 0.0015 / 0.0007 / 0.0003 |
+| Mage | 0.0077 / 0.0146 / 0.0340 | 0.0072 / 0.0049 / 0.0022 |
+| RiggedFigure | 0.0096 / 0.0124 / 0.0354 | 0.0385 / 0.0291 / 0.0155 |
+| Seed-san | 0.0173 / 0.0166 / 0.0341 | 0.0077 / 0.0057 / 0.0031 |
+
+- **Cause:** the torques were impulses before the first pass, so one pass's friction and sole weight had to take a whole step's kick. Rapier gives a force in every pass. They are forces now, and the 16 passes read best.
+- **Same fix, three more:** Seed-san's ratchet on its ankle limit stops, and a flat sole of four corners ends Mage's shake: both in known-bugs.md, Fixed 2026-11-07. A sole limit that bites only with two feet down took the falls in 128 pushes from 3 to 0.
+- **Worse at this commit:** RiggedFigure at 8 passes drifts 0.0385 m where it read 0.0207, inside the bound of the existing test. Listed in known-bugs.md.
+- **Pushes, 128 at 1.5 m/s on Knight:** 8 do not end still at 8 passes and none fall; 6 at 10; 8 at 16.
+- **Ruled out for the falls:** leaving a raised foot out of the limit, the plant read on the floor, a cap by weight, velocities from position differences, lower gains, no target speed. Scaling the limit by 1, 1.5, 2, 3, 4 and 6 gave 17, 31, 11, 1, 10 and 3 falls: no scale is safe, so it holds only on two feet.
+- **Existing tests changed:** none; 9 of the tests added fail without the fix.
+- **Size:** `@margoengine/ragdoll/balance` grew from 5,153 to about 5,650 bytes gzipped and its budget was raised for it: the force book-keeping and the flat sole. An optional entry; core and stage do not change.

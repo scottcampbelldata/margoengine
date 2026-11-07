@@ -5,7 +5,9 @@
 // Two-bone maths sets each leg's motors from where the hips should be to where its foot is. The weight goes through the
 // stance legs as joint torques by the transpose of the leg's Jacobian (J. Pratt et al., "Virtual Model Control", 1997):
 // equal and opposite pairs on the bones of each joint, so nothing from outside holds it up. `carry` is an outside force,
-// off by default, and `carried` reports what it gave. Written clean room from those papers; no engine's source was read.
+// off by default, and `carried` reports what it gave. The torques are forces for the whole step, so the solver gives them
+// through its passes: M. Macklin et al., "Small Steps in Physics Simulation", SCA 2019, is the scheme of those passes. Written
+// clean room from those papers; no engine's source was read.
 import type { Mesh } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
 import { conjugateQuaternion, multiplyQuaternions, rotateByQuaternion } from '@margoengine/math/quat';
@@ -102,12 +104,14 @@ const SETTLE_TIME = 0.9;
  * along the floor before a body many times heavier can answer it. Without it every figure measured steps or falls.
  */
 const LEG_INERTIA = 0.012;
-/** Solver passes the character's island gets, the world's included. Measured best: at 16 every figure creeps or falls. */
+/** Solver passes the character's island gets, the world's included, at the least: a world set higher keeps its own. */
 const SOLVER_PASSES = 8;
 /** The share of the line between the feet, from each end, that does not count as between them: a wide stance still steps. */
 const STANCE_INSET = 0.25;
 /** How much better one step must leave the capture point, as a share of `stepTrigger`, to outrank the foot left behind. */
 const CLEARLY_BETTER = 0.25;
+/** How far above a foot's lowest point its collider still counts as sole, as a share of the foot's length. */
+const SOLE_HEIGHT = 0.1;
 /** The share of what friction holds that the pull over the feet may use. */
 const GRIP = 0.8;
 const ease = (t: number): number => t * t * (3 - 2 * t);
@@ -162,8 +166,13 @@ export class RagdollBalance {
   /** How far through {@link SETTLE_TIME}, 0 to 1. */
   private settled = 0;
   private stanceNow = 1;
-  /** False until the first step, when added inertia takes effect: see {@link step}. */
+  /** False until the first step, when added inertia takes effect: see {@link control}. */
   private primed = false;
+  /** Each bone's force and torque for this step, xyz each, and what the bodies hold from the last. */
+  private readonly wanted: Float64Array;
+  private readonly given: Float64Array;
+  /** The feet's colliders as they came, for {@link dispose}. */
+  private readonly soles: { part: RagdollPart; shape: RagdollPart['shape'] }[] = [];
 
   /** @internal use {@link addRagdollBalance}. */
   constructor(
@@ -222,6 +231,7 @@ export class RagdollBalance {
     this.stanceLine = sideways;
     // Left of a character is +x when it faces +z with y up: its forward is left x up.
     this.forward = unit(cross(unit(sideways), this.up));
+    for (const one of this.legs) this.flatten(one);
     this.total = bones.reduce((sum, part) => sum + part.body.mass, 0);
     this.upperMass = this.upper.reduce((sum, part) => sum + part.body.mass, 0);
     this.upperShare = this.upperMass / this.total;
@@ -241,10 +251,7 @@ export class RagdollBalance {
       if (!i) return 0;
       return this.limbInertia(part) * MOTOR_ACCELERATION < this.limbWeight(part) ? this.realInertia(part) : 0;
     });
-    for (const one of this.legs) {
-      one.kneeCap = this.limbInertia(one.lower) * MOTOR_ACCELERATION;
-      one.sole = this.soleOf(one);
-    }
+    for (const one of this.legs) one.kneeCap = this.limbInertia(one.lower) * MOTOR_ACCELERATION;
     this.natural = Math.sqrt(this.gravity / massHeight);
     this.stepTime = within(options.stepTime, 0.28, 0.05, 2, 'stepTime');
     this.lift = within(options.stepHeight, 0.15, 0, 1, 'stepHeight') * reach;
@@ -254,6 +261,8 @@ export class RagdollBalance {
     this.upright = within(options.upright, 10, 0, 1000, 'upright');
     this.maxUpright = within(options.maxUpright, 40, 0, 1e6, 'maxUpright');
     this.fallTilt = within(options.fallTilt, 0.8, 0.01, Math.PI, 'fallTilt');
+    this.wanted = new Float64Array(bones.length * 6);
+    this.given = new Float64Array(bones.length * 6);
     this.off = ragdoll.physics.on('beforestep', (dt) => this.step(dt));
   }
 
@@ -267,8 +276,47 @@ export class RagdollBalance {
   }
 
   private step(dt: number): void {
-    if (this.disposed || this.state === 'fallen' || !this.ragdoll.bones[0].body.valid) return;
-    if (this.ragdoll.bones[0].body.type !== 'dynamic') return;
+    if (this.disposed || !this.ragdoll.bones[0].body.valid) return;
+    this.wanted.fill(0);
+    this.control(dt);
+    this.settle();
+  }
+
+  /**
+   * Hands the bodies what this step wants as forces. A force goes through every solver pass; an impulse would land before the
+   * first, where one pass's share of friction and of the sole's weight must take a whole step's kick, so more passes meant
+   * less hold and the feet crept at the same speed on every figure. Only the change is added: a force stays until taken
+   * off, and anyone else's stays on the body. A bone that is not dynamic holds its force out of reach, so it is cleared.
+   */
+  private settle(): void {
+    const { wanted, given } = this;
+    this.ragdoll.bones.forEach((part, i) => {
+      const a = i * 6,
+        body = part.body;
+      if (body.type !== 'dynamic') {
+        if (given.subarray(a, a + 6).some((value) => value !== 0)) body.resetForces(false);
+        given.fill(0, a, a + 6);
+        return;
+      }
+      const force: Vec3 = [wanted[a] - given[a], wanted[a + 1] - given[a + 1], wanted[a + 2] - given[a + 2]],
+        torque: Vec3 = [wanted[a + 3] - given[a + 3], wanted[a + 4] - given[a + 4], wanted[a + 5] - given[a + 5]];
+      if (force[0] || force[1] || force[2]) body.addForce(force);
+      if (torque[0] || torque[1] || torque[2]) body.addTorque(torque);
+      given.set(wanted.subarray(a, a + 6), a);
+    });
+  }
+
+  /** Adds to what bone `part` is given this step, N and N m. */
+  private give(part: RagdollPart, force: Vec3 | null, torque: Vec3 | null): void {
+    const a = this.ragdoll.bones.indexOf(part) * 6;
+    for (let k = 0; k < 3; k++) {
+      if (force) this.wanted[a + k] += force[k];
+      if (torque) this.wanted[a + 3 + k] += torque[k];
+    }
+  }
+
+  private control(dt: number): void {
+    if (this.state === 'fallen' || this.ragdoll.bones[0].body.type !== 'dynamic') return;
     if (this.tilt > this.fallTilt) {
       this.fall();
       return;
@@ -438,10 +486,40 @@ export class RagdollBalance {
     for (let i = 0; i + 2 < shape.points.length; i += 3)
       points.push(rotateByQuaternion([shape.points[i], shape.points[i + 1], shape.points[i + 2]], foot.body.rotation) as Vec3);
     const lowest = Math.min(...points.map((point) => dot(point, this.up))),
-      sole = points.filter((point) => dot(point, this.up) < lowest + foot.length * 0.1),
+      sole = points.filter((point) => dot(point, this.up) < lowest + foot.length * SOLE_HEIGHT),
       along = sole.map((point) => dot(point, this.forward)),
       across = sole.map((point) => dot(point, side));
     return { front: Math.max(...along), back: -Math.min(...along), left: Math.max(...across), right: -Math.min(...across) };
+  }
+
+  /**
+   * Gives a hull foot a sole of four corners on one plane, the box of what {@link soleOf} found, and keeps the rest of the
+   * hull. A hull fitted to a boot has a sole of many points a few millimetres apart in height, and a contact keeps four of
+   * them for the solver: which four changes with the slightest turn, so the foot rocked and dropped on a point left out,
+   * and the body shook. Four corners are all kept, and they are the sole the ankle torques reckon with.
+   */
+  private flatten(leg: Leg): void {
+    leg.sole = this.soleOf(leg);
+    const foot = leg.foot,
+      shape = foot.shape;
+    if (shape.type !== 'hull') return;
+    const turn = foot.body.rotation,
+      back = conjugateQuaternion(turn),
+      side = cross(this.up, this.forward),
+      points: Vec3[] = [];
+    for (let i = 0; i + 2 < shape.points.length; i += 3)
+      points.push(rotateByQuaternion([shape.points[i], shape.points[i + 1], shape.points[i + 2]], turn) as Vec3);
+    const lowest = Math.min(...points.map((point) => dot(point, this.up))),
+      above = points.filter((point) => dot(point, this.up) >= lowest + foot.length * SOLE_HEIGHT),
+      { front, back: heel, left, right } = leg.sole,
+      corner = (along: number, across: number): Vec3 =>
+        add(add(times(this.forward, along), times(side, across)), times(this.up, lowest)),
+      corners = [corner(front, left), corner(front, -right), corner(-heel, left), corner(-heel, -right)];
+    this.soles.push({ part: foot, shape });
+    this.ragdoll.setShape(foot, {
+      type: 'hull',
+      points: [...corners, ...above].flatMap((point) => [...rotateByQuaternion(point, back)]),
+    });
   }
 
   /**
@@ -512,33 +590,37 @@ export class RagdollBalance {
       moment = add(moment, cross(r, times(cross(turn, r), part.body.mass)));
     });
     const torque = times(moment, 1 / (dt * count));
-    // The ground holds no more than the sole reaches: the turn gives way to what the force needs. Pressing on the toes
-    // turns the shin back, so forward of the ankle is the negative side of `side`.
+    // Standing, the ground holds no more than the sole reaches: the turn gives way to what the force needs. Pressing on the
+    // toes turns the shin back, so forward of the ankle is the negative side of `side`. Through a step nothing is held back:
+    // the foot may roll on its edge until the other lands, and the ground answers only what it can.
+    const limited = count === 2;
     let share = 1;
     const room = (value: number, more: number, low: number, high: number): number => {
       if (Math.abs(more) < 1e-9) return 1;
       return Math.max(0, Math.min(1, ((more > 0 ? high : low) - value) / more));
     };
-    for (const { leg, atAnkle, foot } of wants) {
-      share = Math.min(share, room(dot(atAnkle, side), dot(torque, side), -leg.sole.front * foot, leg.sole.back * foot));
-      share = Math.min(share, room(dot(atAnkle, this.forward), dot(torque, this.forward), -leg.sole.right * foot, leg.sole.left * foot));
-    }
-    const held = times(torque, share);
-    this.upper.forEach((part, i) => part.body.applyImpulse(times(cross(times(turn, share), minus(points[i], centre)), part.body.mass)));
+    if (limited)
+      for (const { leg, atAnkle, foot } of wants) {
+        share = Math.min(share, room(dot(atAnkle, side), dot(torque, side), -leg.sole.front * foot, leg.sole.back * foot));
+        share = Math.min(share, room(dot(atAnkle, this.forward), dot(torque, this.forward), -leg.sole.right * foot, leg.sole.left * foot));
+      }
+    const held = times(torque, share),
+      inside = (value: number, low: number, high: number): number => (limited ? Math.max(low, Math.min(high, value)) : value);
+    this.upper.forEach((part, i) => this.give(part, times(cross(times(turn, share), minus(points[i], centre)), part.body.mass / dt), null));
     // The turn's reaction goes down through hip, knee and ankle to the foot: on the thighs alone the hip motors would cancel it.
     for (const { leg, atKnee, atAnkle, foot } of wants) {
       const axis = rotateByQuaternion((leg.lower.spec as { axis: ArrayLike<number> }).axis, leg.lower.body.rotation),
         bend = dot(add(atKnee, held), axis),
-        kneeTorque = times(axis, Math.max(-leg.kneeCap, Math.min(leg.kneeCap, bend)) * dt * strength),
+        kneeTorque = times(axis, Math.max(-leg.kneeCap, Math.min(leg.kneeCap, bend)) * strength),
         full = add(atAnkle, held),
-        pitch = Math.max(-leg.sole.front * foot, Math.min(leg.sole.back * foot, dot(full, side))),
-        roll = Math.max(-leg.sole.right * foot, Math.min(leg.sole.left * foot, dot(full, this.forward))),
+        pitch = inside(dot(full, side), -leg.sole.front * foot, leg.sole.back * foot),
+        roll = inside(dot(full, this.forward), -leg.sole.right * foot, leg.sole.left * foot),
         twistCap = 0.5 * friction * foot * leg.sole.left,
-        twist = Math.max(-twistCap, Math.min(twistCap, dot(full, this.up))),
-        ankleTorque = times(add(add(times(side, pitch), times(this.forward, roll)), times(this.up, twist)), dt * strength);
-      leg.upper.body.applyTorqueImpulse(minus(kneeTorque, times(held, dt)));
-      leg.lower.body.applyTorqueImpulse(minus(ankleTorque, kneeTorque));
-      leg.foot.body.applyTorqueImpulse(times(ankleTorque, -1));
+        twist = inside(dot(full, this.up), -twistCap, twistCap),
+        ankleTorque = times(add(add(times(side, pitch), times(this.forward, roll)), times(this.up, twist)), strength);
+      this.give(leg.upper, null, minus(kneeTorque, held));
+      this.give(leg.lower, null, minus(ankleTorque, kneeTorque));
+      this.give(leg.foot, null, times(ankleTorque, -1));
     }
   }
 
@@ -688,6 +770,9 @@ export class RagdollBalance {
     this.off();
     this.fall();
     if (!this.ragdoll.bones[0].body.valid) return;
+    this.wanted.fill(0);
+    this.settle();
+    for (const { part, shape } of this.soles) this.ragdoll.setShape(part, shape);
     for (const part of this.ragdoll.bones) this.solverPasses(part, 0);
     for (const { foot, lower } of this.legs) for (const part of [foot, lower]) this.addInertia(part, 0);
   }
@@ -701,7 +786,7 @@ export class RagdollBalance {
  * Keeps a powered ragdoll on its feet: it stands, and steps to where its momentum says it must when pushed. Add it with the
  * character standing still in the pose to hold, before `activate`. It stands on its own legs: every torque is a pair inside
  * the body, the ground answers within the sole, and a hard enough blow knocks it over. It adds inertia to the feet and shins
- * and solver passes to the character's island, and `dispose` takes them away.
+ * and solver passes to the character's island and gives a hull foot a flat sole of four corners, and `dispose` takes them away.
  * @example
  * const motors = addRagdollMotors(ragdoll, { frequency: 8 });
  * const balance = addRagdollBalance(ragdoll, motors, { feet: [leftFoot, rightFoot] });

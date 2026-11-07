@@ -278,12 +278,12 @@ does not own. Each entry says exactly what is needed to close it.
 - **Tried, measured on the same falls:** skipping the correction on touching limbs settles it (under 0.1 m/s) but a spine ended 2.3 rad past its limit. A fifth of the correction on touching limbs left 0.2 to 0.65 m/s and 0.5 to 1.6 rad. Pulling the joint back with its motor, inside the solver, settled it (under 0.2 m/s) but left bones 1.1 to 1.9 rad past their limits and tore a pinned joint test apart by 3 cm. Each trades a moving limb for a broken pose, so none shipped.
 - **Needed to close:** a cone limit as a real solver constraint, with stiffness that does not depend on the limb's own inertia, so a wrist under a body holds as well as a thigh. Rapier has per axis limits on a generic joint, which make a pyramid rather than a cone.
 
-### Seed-san creeps while it balances
+### Seed-san and RiggedFigure creep while they balance
 
-- **What:** Seed-san (`vrm/Seed-san.vrm`, 60 kg) stands on `@margoengine/ragdoll/balance` with no step, its hips within 3 mm of their height and 0.01 rad of upright, and both feet slide at 0.018 m/s, 0.095 m in five seconds. Every other figure measured stays within 0.023 m.
-- **Repro:** `humanoidProfile` with its bones named (`hips`, `head 1`, `thigh.L`, `shin.L`, `foot.L` and so on), `fitRagdollShapes`, `addRagdollMotors(ragdoll, {frequency: 8})`, `addRagdollBalance`, 360 frames, and log the feet.
-- **Cause, as far as found:** a foot reads a steady spin of 0.16 rad/s about the forward axis at a steady height, and that spin times the ankle's height is the creep. The ankle torque is given before the solver runs, so the foot turns a little on one sole edge each frame and contact flattens it pivoting on the other: it walks sideways. Its sole reaches 4.5 cm to each side, the narrowest measured. Damping the centre of mass against the feet's slow average took it to 0.014 m/s and did not end it.
-- **Needed to close:** ankle torque the solver gives inside its passes, rather than before them.
+- **What:** on `@margoengine/ragdoll/balance` at the default 8 solver passes, worst of 24 hull roundings over five seconds, Seed-san (`vrm/Seed-san.vrm`, 60 kg) drifts 0.0077 m and RiggedFigure 0.0385 m. Both stand with no step and hold their height. Knight.glb and the other KayKit figures stay within 0.0072 m.
+- **Repro:** `humanoidProfile` with its bones named (`hips`, `head 1`, `thigh.L`, `shin.L`, `foot.L` and so on), `fitRagdollShapes`, `addRagdollMotors(ragdoll, {frequency: 8})`, `addRagdollBalance`, 360 frames, and log the hips.
+- **Cause, as far as found:** what is left falls as solver passes rise (RiggedFigure 0.0385, 0.0291, 0.0155 m at 8, 10, 16) and with the world's inner solver iterations, so it is the solver not converging on a body held by torques. The 0.018 m/s Seed-san read before was another cause, now gone: see Fixed 2026-11-07.
+- **Needed to close:** next on Lane G's list.
 
 ### A rod motor cannot hold a limb whose mass lies past its bone
 
@@ -865,6 +865,15 @@ diagnostic). Their causes and the fixes that landed are in `bench/parity-causes.
 - **Plan:** `1342d03dc` now shares the bind-pose block between copies in `DeformArena`, as the morph deltas are; its effect
   on these numbers is not remeasured yet. If a quiet rerun does not close the gap, record what is left as an accepted
   difference.
+
+## Fixed 2026-11-07
+
+| Bug | Cause | Fix | Regression test |
+| --- | --- | --- | --- |
+| Balance read worse with more solver passes: at 16 every figure crept about 0.034 m/s where 10 read 0.006 to 0.017, and RiggedFigure and Seed-san fell or drifted 0.09 to 0.15 m | The torques were impulses before the first pass, so one pass's share of friction and of the sole's weight had to take a whole step's kick: the more passes, the less each held, and the feet slid at the same speed on every figure | The torques are forces through every pass, changed only by what differs from the last step | `packages/ragdoll/tests/balance.test.js` (`at 16 solver passes reads no worse than at 10`, `it holds its torques as forces`) |
+| Mage shook about half a millimetre, 5 of 24 roundings reading over 0.02 m/s on one frame, and other fitted boots chattered | A contact keeps four points for the solver and a fitted sole has many, a few millimetres apart in height, so which four changed with the slightest turn: Mage's right foot dropped 1.8 mm onto a point left out | A hull foot stands on a flat sole of four corners while it balances; `dispose` puts the hull back. Worst read 0.0044 m/s | `packages/ragdoll/tests/balance.test.js` (`a foot stands on a flat sole of four corners`) |
+| Seed-san crept 0.018 m/s, 0.095 m in five seconds | Its foot stood tipped 0.40 rad on the heel, past the ankle's 0.6 rad cone with the bend it held, so the limit pass turned it 0.0016 rad each step and contact flattened it back: a ratchet, read as a steady spin of 0.1 to 0.16 rad/s | With real forces the foot stays flat and no limit turns. 0.0031 m/s at worst; what is left is listed under Open defects | `packages/ragdoll/tests/balance.test.js` (`Seed-san at 16 solver passes reads no worse than at 10`) |
+| A push of 1.5 m/s threw Knight in 3 of 128 | The sole limit gave way through a step, when the one stance foot needs the whole torque to stop the body, so the ankle let go | The limit holds only with two feet down: on one foot the ground answers what it can and the foot may roll on its edge. 0 of 128 fall | `packages/ragdoll/tests/balance.test.js` (the existing push tests) |
 
 ## Fixed 2026-11-06
 

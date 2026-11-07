@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10105622,
+  "total": 10100076,
   "history": [
     {
       "date": "2026-10-24",
@@ -3032,6 +3032,12 @@
       "commit": "7fc61533a",
       "reason": "@margoengine/shadows/light-function: new optional entry; shadows and sky gain the effect hook and sky.cloudLayer",
       "grew": 2
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "7974a966b",
+      "reason": "balance: torques as forces through the passes and a flat four corner sole, Lane G item 1",
+      "grew": 1
     }
   ],
   "items": {
@@ -3482,7 +3488,7 @@
     "@margoengine/quality/ssaa": 2241,
     "@margoengine/quality/warm": 1536,
     "@margoengine/ragdoll": 7368,
-    "@margoengine/ragdoll/balance": 5409,
+    "@margoengine/ragdoll/balance": 5905,
     "@margoengine/ragdoll/getup": 1994,
     "@margoengine/ragdoll/hulls": 2007,
     "@margoengine/ragdoll/powered": 3402,
