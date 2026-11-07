@@ -1,8 +1,8 @@
 // File storage for Node, Electron and other servers: one file per key in a directory, written to a temporary file and
 // renamed into place, so a crash mid-write leaves the previous save whole. A separate entry, so browser bundles never
 // see node:fs.
-import { mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { mkdir, open, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { dirname, join, resolve, sep, toNamespacedPath } from 'node:path';
 import { MargoError } from '@margoengine/math/errors';
 import { keyQueue } from './queue.js';
 import type { SaveStorage } from './storage.js';
@@ -25,8 +25,25 @@ const isHeld = (error: unknown): boolean =>
   process.platform === 'win32' && ['EPERM', 'EACCES', 'EBUSY'].includes((error as { code?: string })?.code ?? '');
 
 /**
+ * Makes a folder's entries reach the disk: fsync of a file does not cover its name (Pillai et al., OSDI 2014). Windows
+ * has no fsync of a folder, and a file system that has none answers EINVAL or ENOTSUP.
+ */
+async function syncFolder(folder: string): Promise<void> {
+  if (process.platform === 'win32') return;
+  const handle = await open(folder, 'r');
+  try {
+    await handle.sync();
+  } catch (error) {
+    if (!['EINVAL', 'ENOTSUP'].includes((error as { code?: string })?.code ?? '')) throw error;
+  } finally {
+    await handle.close();
+  }
+}
+
+/**
  * Saves as files in `directory` (created on first write): `encodeURIComponent(key) + '.save'`. Writes go to a
- * temporary file first and are renamed over the old save, which is atomic on one file system. On Windows a save that
+ * temporary file first and are renamed over the old save, which is atomic on one file system, and the folder is then
+ * fsynced where the system has that. On Windows a save that
  * another program has open cannot be replaced: the write rejects with MargoError `'failed'` and the old save stands.
  */
 export function fileStorage(directory: string): SaveStorage {
@@ -50,7 +67,7 @@ export function fileStorage(directory: string): SaveStorage {
       if (!(bytes instanceof Uint8Array))
         throw new TypeError('Save bytes must be a Uint8Array; encode the document with encodeSave');
       options?.signal?.throwIfAborted();
-      await mkdir(directory, { recursive: true });
+      const made = await mkdir(directory, { recursive: true });
       const temporary = `${file(key)}.${Date.now().toString(36)}-${++counter}.tmp`;
       try {
         await writeFile(temporary, bytes, { signal: options?.signal, flush: true });
@@ -64,6 +81,14 @@ export function fileStorage(directory: string): SaveStorage {
             { cause: error },
           );
         throw reason(error, options?.signal);
+      }
+      await syncFolder(directory);
+      // A folder this write made is an entry of its parent, up to the first that was already there.
+      // mkdir answers with a namespaced path, so the levels are counted on that form.
+      if (made) {
+        const levels = toNamespacedPath(resolve(directory)).split(sep).length - made.split(sep).length;
+        for (let level = 0, folder = dirname(resolve(directory)); level <= levels; level++, folder = dirname(folder))
+          await syncFolder(folder);
       }
     },
     async delete(key, options) {
