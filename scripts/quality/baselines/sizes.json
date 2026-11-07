@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10589322,
+  "total": 10607133,
   "history": [
     {
       "date": "2026-10-24",
@@ -3680,6 +3680,12 @@
       "commit": "b75d2f233",
       "reason": "blender/pbr-ext: new optional entry, loads .margo with glTF Pro's physical material shader",
       "grew": 2
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "8cf13f64b",
+      "reason": "new entry @margoengine/scenery/scenes",
+      "grew": 2
     }
   ],
   "items": {
@@ -4227,6 +4233,7 @@
     "@margoengine/scene/mesh": 2119,
     "@margoengine/scenery": 474,
     "@margoengine/scenery/presets": 1233,
+    "@margoengine/scenery/scenes": 17810,
     "@margoengine/scenery/sky": 474,
     "@margoengine/sciviz": 36802,
     "@margoengine/sciviz/bricks": 14265,
@@ -4453,6 +4460,7 @@
     "leak @margoengine/navmesh/debug -> @margoengine/lines": 1,
     "leak @margoengine/oit/meshes -> @margoengine/gltf-pro/model": 1,
     "leak @margoengine/oit/meshes -> @margoengine/materials": 1,
+    "leak @margoengine/scenery/scenes -> @margoengine/sky": 1,
     "leak @margoengine/shader -> @margoengine/gltf-pro/model": 1,
     "leak @margoengine/shader -> @margoengine/materials": 1,
     "leak @margoengine/shader/editor -> @margoengine/gltf-pro/model": 1,

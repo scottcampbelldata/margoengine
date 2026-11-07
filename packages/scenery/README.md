@@ -86,5 +86,42 @@ about a fifth of the clear noon ground's light (measured on a Radeon 680M; dayli
 against about 100 klux). These are looks, not a measured site: the cloud sheet is the sky's 2D sheet and nothing casts
 cloud shadows; scene exposure is `Tonemap`'s (`@margoengine/tonemap`).
 
-This ESM package includes strict TypeScript declarations, requires core 1.0.0 and `@margoengine/sky`, and supported
+## Scene presets
+
+`@margoengine/scenery/scenes` attaches a whole look in one call: a day preset's sky, sun and sky light, fog, bloom
+and a display grade.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {PresetScene} from 'margoengine/scenery/scenes';
+
+const canvas = document.querySelector<HTMLCanvasElement>('canvas')!;
+const engine = await Engine.create(canvas, {backend: 'webgpu'});
+const scene = PresetScene.attach(engine, 'goldenHour');
+engine.start();
+scene.set('overcast'); // switch everything at once
+scene.tonemap.options.autoExposure = true; // or fine-tune a part
+scene.dispose(); // removes the sky and the post stack (or attach with `using`)
+```
+
+`PresetScene.attach(engine, name)` adds `sky` (the root `Sky` from `@margoengine/sky`, with `dayPreset(name)` and
+sky fog over the scene depth) and `post`, a `PostStack` from `@margoengine/post/stack` of `bloom` (`Bloom`) and
+`tonemap` (`Tonemap` from `@margoengine/tonemap`); the fog reads the stack's depth. Every value sits on the parts'
+own `options`, read every frame. `set(name)` switches sky, light, fog, bloom and grade without re-creating anything;
+`dispose()` (or `using`) removes both plugins. Pass a name or a `ScenePreset` object; `SCENE_PRESETS` holds the
+frozen values and `scenePresetNames` the names (those of the day presets). Unknown names and out-of-range values
+throw `RangeError` before anything is attached; `set` after `dispose` throws `MargoError` `'disposed'`. WebGPU only.
+
+| Preset | Fog (visibility) | Bloom strength, threshold | Exposure | Contrast | White balance | Vignette |
+| --- | --- | --- | --- | --- | --- | --- |
+| `noon` | 20 km | 0.03, 1.5 | 0 | 1 | 6500 K | 0 |
+| `goldenHour` | 10 km | 0.08, 1 | +1.5 | 1.05 | 7200 K (warmer) | 0.15 |
+| `overcast` | 2 km | 0.02, 1.5 | +2.3 | 0.95 | 6500 K | 0 |
+| `dawn` | 600 m (mist) | 0.06, 1 | +2.5 | 1 | 6000 K (cooler) | 0.15 |
+
+The fog is exponential from the camera, density 3.912 / visibility (the distance where an object fades to 2%
+contrast); the exposure brings each scene's lit ground back near noon's on screen. The fog takes the clear sky's
+colour in each direction, so under overcast a far object fades a little bluer than the cloud above it.
+
+This ESM package includes strict TypeScript declarations, requires core 1.0.0 and `@margoengine/sky` (the scenes entry also `@margoengine/post` and `@margoengine/tonemap`), and supported
 WebGPU hardware on HTTPS or localhost. Apache-2.0 licensed.

@@ -1,0 +1,62 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Scenery scene presets check</title><style>body{margin:0}canvas{display:block;width:128px;height:96px}</style></head><body><canvas width="128" height="96"></canvas>
+<script type="module">
+// The four scene presets on a real GPU, read from the displayed canvas (after bloom and the grade): the lit ground
+// near the camera, and in HDR the fog's transmittance to a block 1.4 km away. Driven by scenery-check.mjs.
+import {Engine,PbrMaterial,box} from '/packages/core/dist/index.js';
+import {sceneSamples} from '/packages/core/dist/quality.js';
+import {PresetScene,scenePresetNames} from '/packages/scenery/dist/scenes.js';
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
+if(new URLSearchParams(location.search).get('samples')==='1')globalThis.margoLow=1;
+const canvas=document.querySelector('canvas');
+const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[0,2,0],target:[0,0,0.5],fov:20,near:0.5,far:200000}}),device=engine.gpu,errors=[];
+engine.stop();
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const grey=new PbrMaterial({color:'#808080',roughness:1});
+engine.createMesh().setGeometry(box(8000,0.2,8000)).setMaterial(grey).setPosition([0,-0.1,0]);
+engine.createMesh().setGeometry(box(200,200,200)).setMaterial(new PbrMaterial({color:'#303030',roughness:1})).setPosition([0,100,-1500]);
+const module=device.createShaderModule({code:'@group(0) @binding(0) var image:texture_2d<f32>;@group(0) @binding(1) var<storage,read_write> result:array<vec4f>;@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u){let s=textureDimensions(image);if(any(id.xy>=s)){return;}result[id.y*s.x+id.x]=textureLoad(image,vec2i(id.xy),0);}'});
+const pipeline=device.createComputePipeline({layout:'auto',compute:{module,entryPoint:'main'}});
+async function hdr(scene){
+ engine.render({delta:0});
+ const texture=scene.post.sceneTexture,w=texture.width,h=texture.height,bytes=w*h*16;
+ const output=device.createBuffer({size:bytes,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),staging=device.createBuffer({size:bytes,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+ const encoder=device.createCommandEncoder(),pass=encoder.beginComputePass();pass.setPipeline(pipeline);
+ pass.setBindGroup(0,device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:texture.createView()},{binding:1,resource:{buffer:output}}]}));
+ pass.dispatchWorkgroups(Math.ceil(w/8),Math.ceil(h/8));pass.end();encoder.copyBufferToBuffer(output,0,staging,0,bytes);device.queue.submit([encoder.finish()]);
+ await staging.mapAsync(GPUMapMode.READ);const v=new Float32Array(staging.getMappedRange()).slice();staging.unmap();output.destroy();staging.destroy();
+ return {w,h,at:(x,y)=>Array.from(v.subarray((y*w+x)*4,(y*w+x)*4+3))};
+}
+const plugins=()=>engine.plugins?.size??null;
+// One frame as displayed: 8-bit sRGB, read the way a screenshot is.
+async function frame(){
+ const c=new OffscreenCanvas(canvas.width,canvas.height),g=c.getContext('2d',{willReadFrequently:true});
+ engine.render({delta:0});g.drawImage(canvas,0,0);
+ const d=g.getImageData(0,0,c.width,c.height).data,w=c.width;
+ return (x,y)=>[d[(y*w+x)*4],d[(y*w+x)*4+1],d[(y*w+x)*4+2]];
+}
+// The ground as displayed, and the block in HDR (before the grade) with the preset's fog, with none and with fog so
+// thick it shows only the fog's colour: the share of the block's own light left is the fog's transmittance.
+async function look(scene){
+ engine.camera.position=[0,2,0];engine.camera.target=[0,0,0.5];await frame();const g=(await frame())(64,48);
+ engine.camera.target=[0,100,-1500];const fog=scene.sky.options.fog,density=fog.density,block=async()=>{await hdr(scene);const f=await hdr(scene);return f.at(f.w>>1,f.h>>1);};
+ const b=await block();fog.density=0;const clear=await block();fog.density=1;const full=await block();fog.density=density;
+ const d=(a,c)=>a.reduce((s,x,i)=>s+Math.abs(x-c[i]),0);
+ return {ground:g,block:b,clear,full,transmittance:d(b,full)/d(clear,full)};
+}
+window.check={samples:sceneSamples,
+ async run(){
+  device.pushErrorScope('validation');const out={},before=plugins();
+  for(const name of scenePresetNames){
+   const scene=PresetScene.attach(engine,name);await waitForPipelines(frame);
+   out[name]=await look(scene);scene.dispose();
+  }
+  // One scene switched from noon to dawn, against dawn attached fresh; then removed with using.
+  {
+   using scene=PresetScene.attach(engine,'noon');await look(scene);scene.set('dawn');out.switched=await look(scene);
+  }
+  out.plugins={before,after:plugins()};
+  const error=await device.popErrorScope();
+  return {...out,error:error?.message??null,errors:errors.splice(0)};
+ }};
+window.ready=true;
+</script></body></html>

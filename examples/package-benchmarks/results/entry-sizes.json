@@ -1,5 +1,5 @@
 {
-  "commit": "b48fb2e0a",
+  "commit": "8cf13f64b",
   "dirty": true,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -257,7 +257,11 @@
       },
       "./components": {
         "raw": 37979,
-        "gzip": 14298
+        "gzip": 14306
+      },
+      "./pbr-ext": {
+        "raw": 33764,
+        "gzip": 11897
       }
     },
     "@margoengine/bvh": {
@@ -2304,6 +2308,10 @@
       "./presets": {
         "raw": 2019,
         "gzip": 977
+      },
+      "./scenes": {
+        "raw": 59747,
+        "gzip": 17291
       }
     },
     "@margoengine/sciviz": {

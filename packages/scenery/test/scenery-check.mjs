@@ -44,6 +44,41 @@ const checks = {
     );
     return r;
   },
+  async scenes(page, samples) {
+    const r = await page.evaluate(() => window.check.run());
+    assert.equal(r.error, null);
+    assert.deepEqual(r.errors, []);
+    const names = ['noon', 'goldenHour', 'overcast', 'dawn'],
+      mean = (v) => sum(v) / 3,
+      // Visibility 20 km, 10 km, 2 km, 600 m (density 3.912 / visibility); the block's face is 1,403 m along the ray.
+      expected = { noon: 3.912 / 20000, goldenHour: 3.912 / 10000, overcast: 3.912 / 2000, dawn: 3.912 / 600 };
+    for (const name of names)
+      console.log(
+        `  scenes ${samples}x ${name}: ground on screen ${r[name].ground}, fog transmittance ${r[name].transmittance.toFixed(4)} (exp(-density x d) ${Math.exp(-expected[name] * 1403).toFixed(4)})`,
+      );
+    // On screen (8-bit, after bloom and the grade) every scene's lit ground is within a factor of two of noon's,
+    // though the presets light it 0.2 to 0.7 times as much in HDR: the grade's exposure brings it back.
+    for (const name of names) {
+      const k = mean(r[name].ground) / mean(r.noon.ground);
+      assert.ok(k > 0.5 && k < 2, `${name} ground ${k.toFixed(2)} of noon on screen`);
+    }
+    // The fog leaves exp(-density x distance) of the block's own light (Beer-Lambert, the 'exp' falloff from 0 m):
+    // within 0.02, the reach of the block's depth across the centre texel and of half-float colour.
+    for (const name of names) {
+      const want = Math.exp(-expected[name] * 1403);
+      assert.ok(Math.abs(r[name].transmittance - want) < 0.02, `${name} transmittance ${r[name].transmittance}, want ${want}`);
+    }
+    // set() switches a running scene to the picture of one attached fresh, and dispose removes every plugin it added.
+    r.switched.ground.forEach((x, i) =>
+      assert.ok(Math.abs(x - r.dawn.ground[i]) <= 2, `switched ${r.switched.ground} against ${r.dawn.ground}`),
+    );
+    assert.ok(Math.abs(r.switched.transmittance - r.dawn.transmittance) < 1e-3);
+    assert.equal(r.plugins.after, r.plugins.before);
+    console.log(
+      `ok scenes ${samples}x: ground on screen ${names.map((n) => mean(r[n].ground).toFixed(0)).join(', ')}; fog transmittance ${names.map((n) => r[n].transmittance.toFixed(3)).join(', ')}`,
+    );
+    return r;
+  },
 };
 const names = process.argv.slice(2).length ? process.argv.slice(2) : Object.keys(checks);
 const context = await openBrowser({ startPath: `/packages/scenery/test/${names[0]}-check.html`, port: 'free' }),

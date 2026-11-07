@@ -41,6 +41,10 @@
     "./presets": {
       "types": "./dist/presets.d.ts",
       "import": "./dist/presets.js"
+    },
+    "./scenes": {
+      "types": "./dist/scenes.d.ts",
+      "import": "./dist/scenes.js"
     }
   },
   "files": [
@@ -51,6 +55,9 @@
     "@margoengine/core": "^1.0.0"
   },
   "dependencies": {
-    "@margoengine/sky": "^1.0.0"
+    "@margoengine/math": "^1.0.0",
+    "@margoengine/post": "^1.0.0",
+    "@margoengine/sky": "^1.0.0",
+    "@margoengine/tonemap": "^1.0.0"
   }
 }

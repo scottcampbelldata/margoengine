@@ -2190,6 +2190,10 @@
       "types": "./dist/scenery/presets.d.ts",
       "import": "./dist/scenery/presets.js"
     },
+    "./scenery/scenes": {
+      "types": "./dist/scenery/scenes.d.ts",
+      "import": "./dist/scenery/scenes.js"
+    },
     "./sciviz": {
       "types": "./dist/sciviz.d.ts",
       "import": "./dist/sciviz.js"
