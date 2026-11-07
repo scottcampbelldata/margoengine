@@ -41,7 +41,7 @@ Run `npm run package:blender` from the repository root (Python 3.11+). This crea
 4. Enable **Margo Engine Exporter** if it is not enabled automatically.
 5. Use **File → Export → Margo (.margo)**.
 
-The declared minimum is Blender 4.2; installation/export were developed against Blender 5.3 Beta and are exercised only when `MARGO_BLENDER` points at a Blender executable (no recorded run yet). Blender 4.0/4.1 are outside this range. The single folder inside the ZIP follows Blender's [extension archive layout](https://docs.blender.org/manual/en/4.2/advanced/extensions/getting_started.html) and also preserves legacy add-on discovery. Open exported assets with `/examples/blender-loader/index.html` using `npm run modern:dev:extensions`.
+The declared minimum is Blender 4.2; installation/export were developed against Blender 5.3 Beta and are exercised only when `MARGO_BLENDER` points at a Blender executable (run on Blender 5.3 Beta, 2026-11-06, claim LIM-287; not in the checks). Blender 4.0/4.1 are outside this range. The single folder inside the ZIP follows Blender's [extension archive layout](https://docs.blender.org/manual/en/4.2/advanced/extensions/getting_started.html) and also preserves legacy add-on discovery. Open exported assets with `/examples/blender-loader/index.html` using `npm run modern:dev:extensions`.
 
 With the existing stage facade (available locally as `margoengine`), load into its engine and let its render loop draw the attached model:
 
