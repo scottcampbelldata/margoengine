@@ -468,6 +468,105 @@ that far back, so the particles are alike in kind only. Playing backward is a se
 cutscene and not the particles: stop drawing, or `delta` 0, to hold them.
 
 
+## Timeline editor
+
+`@margoengine/cutscene/editor` is an optional panel for authoring in your own page: scrub, zoom, snap, and add, move
+and delete keys, clips, events and markers with undo. Margo has no visual editor by design, so this stays a separate
+tool: nothing else in the package imports it. It needs `@margoengine/inspector` for its undo stack.
+
+```ts
+import { CutscenePlayer } from 'margoengine/cutscene';
+import { TimelineEditor } from 'margoengine/cutscene/editor';
+
+const editor = new TimelineEditor(
+  {
+    format: 'margo-cutscene',
+    version: 1,
+    duration: 8,
+    tracks: [
+      { type: 'transform', id: 'door', target: 'door', keys: [{ time: 1, position: [0, 0, 0] }, { time: 3, position: [2, 0, 0] }] },
+      { type: 'audio', id: 'music', clips: [{ start: 0, duration: 6, sound: 'theme' }] },
+    ],
+  },
+  { parent: document.body, zoom: 120 },
+);
+
+let player = new CutscenePlayer(editor.model.cutscene());
+editor.on('seek', (time) => player.seek(time)); // The scene follows the scrub.
+editor.on('change', () => {
+  player = new CutscenePlayer(editor.model.cutscene()); // A document is frozen once loaded, so edits make a new one.
+  player.seek(editor.time);
+});
+localStorage.setItem('intro', editor.model.save());
+```
+
+Pass `tracks` for custom track types, as for `Cutscene`; their clips show and move like any others.
+
+| Option | Meaning | Default |
+| --- | --- | --- |
+| `parent` | Where the panel goes; or place `editor.element` yourself | none |
+| `zoom` | Pixels a second, 10 to 2000 | `100` |
+| `step` | Grid in seconds, also what an arrow key moves | `0.1` |
+| `snap` | Snap to the grid, other items and the playhead while dragging | `true` |
+| `fileName` | Name of the file the Export button saves | `'cutscene.json'` |
+| `tracks`, `history` | Custom track types, and an `EditHistory` to share with your tool | none, a new one |
+
+Drag the ruler to scrub and an item to move it; Shift or Ctrl adds to the selection and a selection moves together.
+Ctrl and the wheel zoom about the pointer. Every action is on the keyboard too, and each item is a button a screen
+reader names:
+
+| Key | Does |
+| --- | --- |
+| Left, Right | Moves the selection a step, or the playhead with nothing selected; Shift makes it ten |
+| Home, End | Playhead to the ends |
+| K | Adds a key at the playhead on the current row, the one last clicked |
+| Delete, Backspace | Deletes the selection |
+| Ctrl+Z, Ctrl+Shift+Z, Ctrl+Y | Undo and redo; Cmd works too |
+| +, - | Zoom |
+| Escape | Clears the selection |
+
+`editor.on('seek' | 'select' | 'change', listener)` returns an unsubscribe function; `editor.time`, `editor.zoom` and
+`editor.selection` read and set; `dispose()` or `using` removes it. The panel's colours are CSS variables on `.mtl`
+(`--bg`, `--panel`, `--line`, `--text`, `--dim`, `--accent`, `--clip`).
+
+`editor.model` is a `TimelineModel`, the editing itself with no DOM, so it runs in Node and in your own panel:
+
+```ts
+import { MARKERS, TimelineModel } from 'margoengine/cutscene/editor';
+
+const model = new TimelineModel({
+  format: 'margo-cutscene',
+  version: 1,
+  duration: 8,
+  tracks: [{ type: 'property', id: 'fade', target: 'screen', property: 'opacity', keys: [{ time: 0, value: 1 }, { time: 4, value: 0 }] }],
+});
+const key = model.addKey('fade', 2); // Holds 0.5, what the track gives there.
+const [moved] = model.moveItems([key], 0.5);
+model.setItem(moved, { value: 0.25, ease: 'easeOutCubic' });
+model.addKey(MARKERS, 6, { name: 'reveal' });
+model.undo();
+model.redo();
+const text = model.save(); // JSON text; new Cutscene(text) reads it.
+```
+
+| Member | Does |
+| --- | --- |
+| `rows` | Each track with its items, then the markers row (`MARKERS`) |
+| `addKey(track, time, fields?)` | A key holding the track's value there, or an event or marker; `addItem(track, item)` adds a whole key or clip |
+| `moveItems(items, delta)` | Moves them together, stopping at the ends of the timeline, and gives their new refs |
+| `setItem(ref, fields)`, `deleteItems(items)`, `setDuration(seconds)` | Give false when the document refuses, and then change nothing |
+| `begin(label)`, `commit()` | A run of edits that undoes as one, such as a drag |
+| `undo()`, `redo()`, `history` | The `EditHistory` behind them |
+| `snap(time, { step?, reach?, ignore?, times? })` | The time to use: on an item or given time within `reach`, else on the grid |
+| `on('change', listener)` | After every change, undo and redo included |
+| `document`, `toJSON()`, `save()`, `cutscene()` | A copy, for `JSON.stringify`, JSON text, a `Cutscene` to play or render |
+
+Every edit leaves a valid document: one that would break it, such as two shots overlapping or a track's last key
+going, is refused whole. Refs are places in a list, so use the ones the last edit gave. What is inside a nested
+timeline does not show: its clip moves as one piece, and to edit inside it, open that timeline as a document of its
+own. There is no curve editor, and clip lengths and key values are set by `setItem`, not by dragging.
+
+
 ## Custom tracks
 
 `shotTrack()` is a `CutsceneTrackType`, and you can write your own for anything a document should hold: pass types in

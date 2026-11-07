@@ -1336,6 +1336,32 @@ Five jobs took `@margoengine/tween` from single tweens to the things a motion de
 - **Limits:** colliders hold still during a swept check. `docs/limits.md` has them all.
 - **Unmeasured:** neither job has a timed number.
 - **Gate:** lint, hygiene, verify, the package tests, `tests/claims-file.test.js`, the push from one script that stops at the first failing step.
+
+## Batch 87: cutscene
+
+Six jobs took `@margoengine/cutscene` from keyed tracks to something a trailer can be made with: virtual cameras with blends, a video file out, takes recorded from live play, a mouth that follows dialogue, particle effects a seek can land on, and a panel to author it all in a page. Each is a new optional entry; core and stage did not change. `@margoengine/vfx` gained `VFX.reset()`, and the package's root gained the hook custom tracks use.
+
+| # | Job | Status | Commit | Entry | Claim |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Virtual camera shots with blends | DONE | 939164ff2 | `/shots` | LIM-288 |
+| 2 | Render to video | DONE | 5a2b0391f | `/render` | LIM-291 |
+| 3 | Take recorder | DONE | 9b67dde61 | `/record` | LIM-292 |
+| 4 | Dialogue and lip sync track | DONE | 1286121bc | `/lipsync` | LIM-299 |
+| 5 | VFX and activation tracks | DONE | 7524238cf | `/vfx` | LIM-300 |
+| 6 | Timeline editor | DONE | this commit | `/editor` | LIM-302 |
+
+- **What was reused:** job 3 on `InputRecorder` of input/replay and the quaternions of math; job 4's tests on `VRMExpressions` and the face names of rigging; job 5's bursts on `eventsBetween`; job 6's undo on `EditHistory` of inspector.
+- **Bugs fixed:** the Video output row of `docs/limits.md` sat above the page's title, and moved to the Rendering table with job 2. Caught in the drafts, each held by a test of its job: `visemesAt` searching backward stopped at a short sound; the mouth jumped at clip ends; camera thinning allowed sqrt(3) times its tolerance; a capped effect replay fired bursts from before the cap; replay rounded a burst to the nearest tick, a frame off; a seek's effect drew other random numbers than playing, as frames and time differed at a clip's start; and what lingered from an earlier clip was lost in a seek. A redesign fixed the last three: the director replays from when the effects were last empty and resets when a clip finds one empty.
+- **Found by the first real browser run of job 6:** 25 arrow steps put the playhead at 2.500000000000001, and a key added there kept it in the file, so a step now tidies the sum. A key added from the keyboard left the focus on the ruler, so a screen reader said nothing of it, and the new key takes the focus now. Regression: `packages/cutscene/tests/editor-browser.mjs`. Its wheel check first ran on a panel wider than the zoomed timeline, where no scroll exists to hold a time under the pointer, so that step runs at 800 pixels wide.
+- **Landings stopped, nothing failed reached main:** job 2 twice, on port 5297 held by the depth check (moved to 5341) and on a `node_modules` missing `webgpu` and `@webgpu/types` at their locked versions. Job 4 at verify, on `spawnSync python3 EINVAL` in the exporters precision test: intermittent, not reproduced in 3,831 parallel spawns, cause unconfirmed, in `docs/known-bugs.md`. Job 5 at verify, on `tsc` out of memory while the lanes loaded the machine.
+- **A slip:** job 4's first landing read as exit 0, the exit of the `echo` after it, while its log said `LAND_EXIT 1`. Job 5 and a rebase began before the log was read, and both were undone. Nothing reached main.
+- **Found by testing the tests:** the first GPU run of job 5 failed at frame 200, as dead slots of a wiped buffer differ from played ones with no live particle. That frame compares the live count and the picture, and the claim says so.
+- **Proved:** job 3 on a real `Mesh` on the real kernel, world matrix within 1e-5 through `setQuaternion`, a real `Camera`, and real `Input` on real key and pointer events. Job 4 on two real CMU ARCTIC sentences, against their phone labels: silence 0.867, speech 0.945, vowels 0.515 against 0.421 for always saying the commonest, hiss 0.716, driving real morphs of the Seed-san avatar through `VRMExpressions`. Job 5 on a real GPU (`packages/cutscene/tests/vfx-browser.mjs`): frames 40, 70, 100, 110 and 140 byte-equal in particle buffer and picture by play and by seek. Job 6 in real Chromium under a real mouse and keyboard, with its real download read by a real `Cutscene`, and in Node with 300 random edits.
+- **Stand-ins:** job 2's 440 Hz tone and generated scene. Job 4's thresholds were set on the same two sentences it is scored on, one speaker, and no held-out voice was tried; the claim and limits say so.
+- **Limits:** a seek through effects costs a drawn frame for each step of the replay. The editor shows top-level tracks only, has no curve editor, and keeps 200 undo steps as whole documents. `docs/limits.md` has them all.
+- **Unmeasured:** no job has a timed number. No screen reader ran on the panel, and no person has authored a cutscene with it.
+- **Gate:** lint, hygiene, verify and the package tests for each job, with `test:gpu` suites for jobs 2, 5 and 6, the push from one script that stops at the first failing step.
+
 ## Lane U: first iPhone failure of animated USDZ
 
 Scott placed Fox-Run in AR Quick Look on an iPhone and stood between the legs of a 79 metre fox; robot-expressive ran off the screen. This one-off lane found why and fixed it in `@margoengine/exporters`.

@@ -818,6 +818,7 @@ Sequencer, Godot AnimationPlayer, Theatre.js, GSAP, three.js, Babylon and the li
 | Take recorder (`cutscene/record`) | Key thinning by D. Douglas and T. Peucker, "Algorithms for the reduction of the number of points", The Canadian Cartographer, 1973 (after U. Ramer, 1972), measured on the track's own interpolation; input through `@margoengine/input/replay` |
 | Lip sync (`cutscene/lipsync`) | Linear prediction by J. Makhoul, "Linear prediction: a tutorial review", Proceedings of the IEEE, 1975; the vowel chart of G. Peterson and H. Barney, "Control methods used in a study of the vowels", JASA, 1952; ARPAbet symbols as the CMU Pronouncing Dictionary lists them; VRM 1.0 preset names and Apple's published `ARFaceAnchor.BlendShapeLocation` names; test speech from CMU ARCTIC (notice beside the files) |
 | VFX and activation tracks (`cutscene/vfx`) | Replay of a deterministic simulation from its last empty state: Margo's own design over `@margoengine/vfx`, with no outside source |
+| Timeline editor (`cutscene/editor`) | Plain DOM, WAI-ARIA 1.2 roles (`slider`, `toolbar`, `group`), Pointer Events and `EditHistory` of `@margoengine/inspector`; the layout is the common one of rows under a ruler, from no source |
 
 ## Save and load: `@margoengine/save`
 

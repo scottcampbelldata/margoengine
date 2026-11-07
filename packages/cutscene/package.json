@@ -1,7 +1,7 @@
 {
   "name": "@margoengine/cutscene",
   "version": "1.0.0",
-  "description": "Cutscene timelines: camera, transform, property, animation, audio, subtitle and event tracks, nested timelines, scrubbing, a player that fires events in order, virtual camera shots with blends, rendering to a video file, a take recorder, dialogue with lip sync, and particle and activation tracks.",
+  "description": "Cutscene timelines: camera, transform, property, animation, audio, subtitle and event tracks, nested timelines, scrubbing, a player that fires events in order, virtual camera shots with blends, rendering to a video file, a take recorder, dialogue with lip sync, and particle and activation tracks, and a timeline editor panel.",
   "keywords": [
     "margoengine",
     "webgpu",
@@ -49,6 +49,10 @@
     "./vfx": {
       "types": "./dist/vfx.d.ts",
       "import": "./dist/vfx.js"
+    },
+    "./editor": {
+      "types": "./dist/editor.d.ts",
+      "import": "./dist/editor.js"
     }
   },
   "files": [
@@ -66,13 +70,14 @@
   "scripts": {
     "build": "node ../../scripts/build-optional.js cutscene",
     "test": "npm run build && node --test tests/*.test.js",
-    "test:gpu": "npm run build && node tests/render-browser.mjs && node tests/vfx-browser.mjs",
+    "test:gpu": "npm run build && node tests/render-browser.mjs && node tests/vfx-browser.mjs && node tests/editor-browser.mjs",
     "prepack": "npm run build"
   },
   "peerDependencies": {
     "@margoengine/core": "^1.0.0",
     "@margoengine/headless": "^1.0.0",
-    "@margoengine/input": "^1.0.0"
+    "@margoengine/input": "^1.0.0",
+    "@margoengine/inspector": "^1.0.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/core": {
@@ -82,6 +87,9 @@
       "optional": true
     },
     "@margoengine/input": {
+      "optional": true
+    },
+    "@margoengine/inspector": {
       "optional": true
     }
   }

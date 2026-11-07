@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10056969,
+  "total": 10068329,
   "history": [
     {
       "date": "2026-10-24",
@@ -3008,6 +3008,12 @@
       "commit": "463a15c6c",
       "reason": "drawShadow casters in VirtualShadows and the shadowReach helper",
       "grew": 2
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "f56b46a3c",
+      "reason": "New entry @margoengine/cutscene/editor.",
+      "grew": 1
     }
   ],
   "items": {
@@ -3134,6 +3140,7 @@
     "@margoengine/culling/parts": 15027,
     "@margoengine/culling/shadows": 20972,
     "@margoengine/cutscene": 7115,
+    "@margoengine/cutscene/editor": 11360,
     "@margoengine/cutscene/lipsync": 3364,
     "@margoengine/cutscene/record": 3415,
     "@margoengine/cutscene/render": 8171,

@@ -546,6 +546,10 @@
       "types": "./dist/cutscene/vfx.d.ts",
       "import": "./dist/cutscene/vfx.js"
     },
+    "./cutscene/editor": {
+      "types": "./dist/cutscene/editor.d.ts",
+      "import": "./dist/cutscene/editor.js"
+    },
     "./decoders": {
       "types": "./dist/decoders.d.ts",
       "import": "./dist/decoders.js"
