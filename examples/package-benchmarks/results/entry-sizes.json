@@ -1,5 +1,5 @@
 {
-  "commit": "01509b6fb",
+  "commit": "554541609",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -1766,6 +1766,10 @@
       "./delay": {
         "raw": 3640,
         "gzip": 1295
+      },
+      "./fields": {
+        "raw": 6705,
+        "gzip": 2646
       }
     },
     "@margoengine/netcode": {
@@ -1830,8 +1834,8 @@
         "gzip": 19145
       },
       "./next": {
-        "raw": 83438,
-        "gzip": 47811
+        "raw": 85631,
+        "gzip": 49094
       }
     },
     "@margoengine/physics2d": {
