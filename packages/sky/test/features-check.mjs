@@ -110,6 +110,42 @@ const checks = {
       console.log(`ok aerial ${samples}x ${row.name} (${row.distance / 1000} km): transmittance ${show(row.transmittance)} (CPU ${show(row.cpu)}), air ${show(row.inscatter)}`);
     return r;
   },
+  async hillaire(page, samples) {
+    const r = await page.evaluate(() => window.check.run());
+    const show = (v) => v.map((x) => x.toPrecision(4)).join(', ');
+    for (const name of ['noon', 'sunset', 'antisolar', 'twilight', 'twilightNoOzone', 'ground', 'limb', 'space', 'under', 'over'])
+      console.log(`  hillaire ${samples}x ${name}: ${show(r[name])}`);
+    console.log(`  hillaire ${samples}x disc ${show(r.disc.centre)} beside ${show(r.disc.beside)}; frame ${r.disc.ms.toFixed(1)} ms, orbit ${r.orbitMs.toFixed(1)} ms (diagnostic)`);
+    assert.equal(r.error, null);
+    assert.deepEqual(r.errors, []);
+    const [noonR, noonG, noonB] = r.noon,
+      [setR, setG, setB] = r.sunset;
+    // Rayleigh scattering goes as the inverse fourth power of wavelength: the day sky away from the sun is blue.
+    assert.ok(noonB > noonG && noonG > noonR, `noon sky not blue: ${show(r.noon)}`);
+    // Near a low sun the long path has taken the blue out: orange, brighter than the sky opposite.
+    assert.ok(setR > setG && setG > setB && setR > r.antisolar[0], `sunset not orange: ${show(r.sunset)}`);
+    // Twilight, sun below the horizon: ozone absorbs green (1.881e-3 /km) and red (0.650e-3) far more than blue
+    // (0.085e-3), so with it the zenith is bluer against red and green than without it (Hulburt 1953).
+    const ratio = (v, c) => v[2] / v[c];
+    for (const c of [0, 1])
+      assert.ok(ratio(r.twilight, c) > ratio(r.twilightNoOzone, c), `ozone: ${show(r.twilight)} against ${show(r.twilightNoOzone)}`);
+    // From 1,000 km: the sunlit ground shows, the limb is blue, and space beyond the air is black.
+    assert.ok(r.ground.every((v) => v > 0.1), `ground from orbit ${show(r.ground)}`);
+    assert.ok(r.limb[2] > r.limb[1] && r.limb[1] > r.limb[0] && r.limb[2] > 0, `limb ${show(r.limb)}`);
+    assert.deepEqual(r.space, [0, 0, 0]);
+    // The same ray from 99 km (the sky-view table) and 101 km (the per-pixel march) agree: 1 km more of thin air
+    // changes it little. Measured 0.0005; 0.02 holds forty times that.
+    for (let c = 0; c < 3; c++)
+      assert.ok(Math.abs(r.under[c] - r.over[c]) < 0.02 * r.under[c], `across the top: ${show(r.under)} against ${show(r.over)}`);
+    // The disc: its true radiance (about 3e5) is held at the largest half float, far above the sky beside it.
+    assert.ok(r.disc.centre.every((v) => v === 65504), `disc ${show(r.disc.centre)}`);
+    assert.ok(r.disc.beside.every((v) => v > 0 && v < 10), `beside the disc ${show(r.disc.beside)}`);
+    // Geometry is left as it was; the sky above it changes.
+    assert.deepEqual(r.pillar.withSky, r.pillar.bare, 'the sky drew over the pillar');
+    assert.notDeepEqual(r.pillar.skyPixel[0], r.pillar.skyPixel[1], 'the sky did not draw');
+    console.log(`ok hillaire ${samples}x: noon, sunset, twilight ozone, orbit, table against march, disc and depth`);
+    return r;
+  },
 };
 const names = process.argv.slice(2).length ? process.argv.slice(2) : Object.keys(checks);
 const context = await openBrowser({ startPath: '/packages/sky/test/volumetric-check.html', port: 5213 }),

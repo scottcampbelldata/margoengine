@@ -15,6 +15,7 @@ import { margoError } from '../../shared/errors.js';
 import type { Vec3 } from '@margoengine/math';
 import { MargoError } from '@margoengine/math/errors';
 import { celestialShader } from './celestial.js';
+import { sunDirection } from './clock.js';
 import { head, mid, transmittance, sunlight } from './atmosphere.js';
 import { displayShader } from '../../shared/display.js';
 import { applyView } from '../../shared/view-rect.js';
@@ -132,21 +133,7 @@ export const skyEnvironmentFloor: { readonly day: Vec3; readonly night: Vec3 } =
   day: [0.04, 0.04, 0.04],
   night: [0.01, 0.015, 0.03],
 };
-/**
- * Unit sun direction for a clock time: rises at 6 (+x), zenith at 12 (+y), sets at 18 (-x), in the XY plane. Writes
- * into `out` (3 elements) and returns it.
- * @throws RangeError when `hours` is not finite or `out` does not have 3 elements.
- */
-export function sunDirection(hours: number, out = new Float32Array(3)): Float32Array {
-  if (!Number.isFinite(hours) || out.length !== 3)
-    throw new RangeError('Invalid sun clock; pass finite hours and an out array of 3 elements.');
-  // Margo clock model (not astronomical): the sun moves on a circle through east and the zenith.
-  const angle = (((hours % 24) - 6) * Math.PI) / 12;
-  out[0] = Math.cos(angle);
-  out[1] = Math.sin(angle);
-  out[2] = 0;
-  return out;
-}
+export { sunDirection } from './clock.js';
 /**
  * Direction toward the sun from azimuth (+Z toward +X) and elevation, both in DEGREES (not radians). Elevation is
  * -90..90. A radians value such as 0.61 is read as 0.61 degrees, a sun on the horizon; with typed angles

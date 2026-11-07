@@ -25,12 +25,23 @@ import { depthWGSL, sceneDepth } from './depth.js';
 export { EARTH_ATMOSPHERE, atmosphereParameters, type AtmosphereParameters } from './atmosphere-luts.js';
 declare const GPUTextureUsage: { STORAGE_BINDING: number; TEXTURE_BINDING: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
-/** The sky an {@link AerialPerspective} follows: `Sky` from `@margoengine/sky` fits (its sun, turbidity and exposure). */
+/**
+ * The sky an {@link AerialPerspective} follows: `Sky` from `@margoengine/sky` fits (its sun, turbidity and exposure), and
+ * so does `HillaireSky` from `@margoengine/sky/hillaire` (its sun, exposure, illuminance, atmosphere and scale).
+ */
 export interface AerialSky {
   readonly sun: ArrayLike<number>;
-  readonly options: { readonly turbidity?: number; readonly exposure?: number; readonly model?: string };
+  readonly options: {
+    readonly turbidity?: number;
+    readonly exposure?: number;
+    readonly model?: string;
+    readonly metersPerUnit?: number;
+    readonly altitude?: number;
+  };
   /** A sky with its own sun illuminance (`HillaireSky`) lends it, so the air and the sky agree. */
   readonly sunIlluminance?: number;
+  /** A sky with its own atmosphere (`HillaireSky`) lends it whole: the air then ignores turbidity. */
+  readonly resolvedAtmosphere?: Readonly<Required<AtmosphereParameters>>;
 }
 /** {@link AerialPerspective} settings, read every frame from `aerial.options`. */
 export interface AerialPerspectiveOptions {
@@ -42,9 +53,9 @@ export interface AerialPerspectiveOptions {
   sunDirection?: Vec3;
   /** Farthest distance the air is worked out to, metres, 1000 to 400,000; beyond it the air holds that value. Default 64,000. */
   maxDistance?: number;
-  /** Metres per world unit, above 0 and at most 1,000,000. Default 1; raise it to give a small scene the air of a large one. */
+  /** Metres per world unit, above 0 and at most 1,000,000. Default: the sky's, else 1; raise it to give a small scene the air of a large one. */
   metersPerUnit?: number;
-  /** Metres added to the camera's height above the ground, 0 to 100,000. Default 0. */
+  /** Metres added to the camera's height above the ground, 0 to 100,000. Default: the sky's, else 0. */
   altitude?: number;
   /**
    * Sun illuminance in the sky's units. Default: the sky's own when it has one; 20 with the Bruneton model, which is
@@ -52,7 +63,7 @@ export interface AerialPerspectiveOptions {
    * this air's at 20; 20 without a sky.
    */
   sunIlluminance?: number;
-  /** The planet's air, kilometres (Hillaire 2020); default Earth. Read when it changes. */
+  /** The planet's air, kilometres (Hillaire 2020); default the sky's own when it has one, else Earth. Read when it changes. */
   atmosphere?: AtmosphereParameters;
 }
 const SLICES = 32;
@@ -198,12 +209,13 @@ export class AerialPerspective implements EnginePlugin {
       v = t.values,
       sun = o.sky?.sun ?? o.sunDirection ?? [0.3, 0.6, 0.4],
       length = Math.hypot(sun[0], sun[1], sun[2]) || 1,
-      perUnit = o.metersPerUnit ?? 1,
-      a = this.parameters!;
+      perUnit = o.metersPerUnit ?? o.sky?.options.metersPerUnit ?? 1,
+      lent = o.atmosphere ? undefined : o.sky?.resolvedAtmosphere,
+      a = lent ?? this.parameters!;
     if (!invertMatrixStable(c.camera.matrix, v.subarray(0, 16), this.scratch))
       throw new MargoError('state', 'Invalid AerialPerspective camera; give the camera a finite, invertible projection');
     // The sky's own haze: its turbidity scales Mie scattering by max(0.25, (T - 1) / 2) (atmosphere.ts).
-    t.medium(a, o.sky ? Math.max(0.25, ((o.sky.options.turbidity ?? 2) - 1) / 2) : 1);
+    t.medium(a, o.sky && !lent ? Math.max(0.25, ((o.sky.options.turbidity ?? 2) - 1) / 2) : 1);
     v[34] =
       o.sunIlluminance ?? o.sky?.sunIlluminance ?? (o.sky && (o.sky.options.model ?? 'preetham') === 'preetham' ? 10 : 20);
     for (let i = 0; i < 3; i++) v[36 + i] = sun[i] / length;
@@ -212,7 +224,7 @@ export class AerialPerspective implements EnginePlugin {
     v[43] = perUnit / 1000;
     v[44] = (o.maxDistance ?? 64000) / 1000;
     // The planet's centre lies under the camera: radius = ground + height (km), at least a metre up.
-    v[45] = a.bottomRadius + Math.max(0.001, (c.camera.position[1] * perUnit + (o.altitude ?? 0)) / 1000);
+    v[45] = a.bottomRadius + Math.max(0.001, (c.camera.position[1] * perUnit + (o.altitude ?? o.sky?.options.altitude ?? 0)) / 1000);
     v[46] = +(c.format !== 'rgba16float');
   }
   private draw(c: Context): void {

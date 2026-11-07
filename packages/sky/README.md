@@ -41,6 +41,7 @@ const sky = Sky.attach(engine, {model: 'bruneton', clouds: {coverage: 0.4}}, {br
 | `/volumetric-clouds` | `VolumetricClouds`, its own plugin: ray-marched 3D clouds you can fly through | 7.3 kB |
 | `/cloud-shadows` | `volumetricCloudShadows`, a shadow effect for `@margoengine/shadows` | 3.2 kB |
 | `/aerial` | `AerialPerspective`, its own plugin: distant surfaces take the air's colour | 6.5 kB |
+| `/hillaire` | `HillaireSky`, its own plugin: a physical sky with ozone from the ground to space | 6.6 kB |
 
 Each entry is compressed on its own ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)),
 so sums overstate a combined bundle: the root `Sky` is 10.2 kB with all of them, against 13.7 kB
@@ -217,21 +218,69 @@ multiple scattering (32 × 32, Hillaire 2020's second order over 64 directions s
 frame a compute pass marches 32 × 32 view columns through 32 slices, reaching `maxDistance` (64 km) on a square-root
 spacing, so slices are dense near the camera; the pixel reads its slice by its distance. With a `sky`, the sun, the
 sky's turbidity (which scales Mie scattering as the sky does) and its exposure carry over; `sunIlluminance` defaults
-to what matches the sky's model (20 for Bruneton, 10 for Preetham, the sky's own for `HillaireSky`).
+to what matches the sky's model (20 for Bruneton, 10 for Preetham, the sky's own for `HillaireSky`). A `HillaireSky`
+lends its whole atmosphere, its `metersPerUnit` and its `altitude` too, so the air and the sky behind it agree.
 
 | Option | Default | Meaning |
 | --- | --- | --- |
 | `depth` | required | the scene's reversed-Z depth each frame |
 | `sky` | none | the sky to follow; without it `sunDirection` (default [0.3, 0.6, 0.4]) |
 | `maxDistance` | 64,000 | metres the air is worked out to; farther pixels keep that value |
-| `metersPerUnit` | 1 | metres per world unit |
-| `altitude` | 0 | metres added to the camera's height |
+| `metersPerUnit` | the sky's, else 1 | metres per world unit |
+| `altitude` | the sky's, else 0 | metres added to the camera's height |
 | `sunIlluminance` | from the sky | sun strength in the sky's units |
-| `atmosphere` | Earth | the planet's air, kilometres |
+| `atmosphere` | the sky's, else Earth | the planet's air, kilometres |
 
 The planet's centre is taken under the camera, at its height. Sky pixels (no depth) are untouched. On a display
 target (no HDR scene capture) the air's light is display-encoded and blended there, an approximation; with Bloom,
 tonemapping or another HDR capture it is exact. Needs WebGPU.
+
+## Hillaire sky: from the ground to space
+
+`HillaireSky` from `@margoengine/sky/hillaire` is a physically based sky after Hillaire 2020 ("A Scalable and Production
+Ready Sky and Atmosphere Rendering Technique"): Rayleigh and Mie scattering, Mie absorption and an ozone layer, single
+scattering toward the sun plus multiple scattering, so sunsets turn orange and red by the air alone and the zenith stays
+blue through twilight, the ozone's doing. It is its own plugin, drawn behind the scene where `Sky` draws, so use it in
+place of `Sky`, not with it.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Bloom} from 'margoengine/post/bloom';
+import {HillaireSky} from 'margoengine/sky/hillaire';
+import {AerialPerspective} from 'margoengine/sky/aerial';
+const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu', camera: {far: 100000}});
+const bloom = Bloom.attach(engine);
+const sky = HillaireSky.attach(engine, {hours: 18.2, timeScale: 0});
+AerialPerspective.attach(engine, {sky, depth: () => bloom.depthTexture});
+sky.options.altitude = 400000; // the same sky from orbit, 400 km up
+```
+
+Two tables are made once per atmosphere, shared with `AerialPerspective`: the transmittance to the top (256 × 64) and
+multiple scattering (32 × 32). Each frame a compute pass fills a 192 × 108 sky-view table, the sky around the camera by
+azimuth from the sun and zenith angle, its rows squeezed toward the horizon where the colour changes fastest (Hillaire
+2020 section 5.2); every sky pixel then reads it. Above the top of the air (100 km on Earth) the table no longer fits
+the view, so each pixel marches its own ray through the air instead: the planet's sunlit ground (Lambert, the ground
+albedo), the blue limb and black space. The sun's disc (0.27° in radius) is the illuminance over its solid angle, dimmed by the air in front of it,
+held at 65,504 (the largest half float, as the true value at illuminance 20 is about 300,000); `sunDisc: false` leaves it out.
+`sky.sunTransmittance` holds the share of sunlight (rgb) that reaches the camera, worked out on the CPU each frame:
+use it to colour the scene's sun.
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `hours` | 12 | clock time; the sun moves as `Sky`'s does (rises at 6 in +x) |
+| `timeScale` | 1 / 3600 | clock hours per second; 0 holds the time |
+| `sunDirection` | from the clock | direction toward the sun, in place of the clock |
+| `exposure` | 0 | stops: the sky is multiplied by 2^exposure |
+| `sunIlluminance` | 20 | the sun at the top of the air, in the scene's light units (`Sky`'s Bruneton scale) |
+| `metersPerUnit` | 1 | metres per world unit |
+| `altitude` | 0 | metres added to the camera's height, up to 100,000 km |
+| `sunDisc` | true | draw the sun's disc |
+| `atmosphere` | Earth | the planet's air, kilometres (`EARTH_ATMOSPHERE`, Hillaire 2020 Table 1) |
+
+`AerialPerspective` and `VolumetricClouds` take it as their `sky`. The planet's centre is taken under the camera, at
+its height. It does not light the scene itself (no engine sun, ambient or reflection map): set core's sun from
+`sky.sun` and `sky.sunTransmittance`. The clouds still colour their sunlight with the root sky's turbidity model.
+On a display target (no HDR scene capture) the sky is display-encoded there. Needs WebGPU.
 
 ## Sun, ambient and a sky that lights the scene
 

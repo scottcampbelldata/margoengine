@@ -78,6 +78,10 @@
     "./aerial": {
       "types": "./dist/aerial.d.ts",
       "import": "./dist/aerial.js"
+    },
+    "./hillaire": {
+      "types": "./dist/hillaire.d.ts",
+      "import": "./dist/hillaire.js"
     }
   },
   "files": [

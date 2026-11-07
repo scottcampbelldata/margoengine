@@ -2276,12 +2276,12 @@
     },
     "@margoengine/sky": {
       ".": {
-        "raw": 46404,
-        "gzip": 16684
+        "raw": 46408,
+        "gzip": 16687
       },
       "./base": {
-        "raw": 17537,
-        "gzip": 6885
+        "raw": 17541,
+        "gzip": 6895
       },
       "./preetham": {
         "raw": 1657,
@@ -2328,8 +2328,12 @@
         "gzip": 3211
       },
       "./aerial": {
-        "raw": 18677,
-        "gzip": 6463
+        "raw": 18787,
+        "gzip": 6496
+      },
+      "./hillaire": {
+        "raw": 18406,
+        "gzip": 6607
       }
     },
     "@margoengine/splats": {
@@ -2898,9 +2902,9 @@
       "brotli": 6003
     },
     "packages/scenery/dist/sky.js": {
-      "raw": 23088,
-      "gzip": 9238,
-      "brotli": 8236
+      "raw": 23092,
+      "gzip": 9241,
+      "brotli": 8240
     },
     "packages/creative/dist/particles.js": {
       "raw": 43160,

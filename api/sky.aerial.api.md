@@ -36,8 +36,11 @@ export interface AerialSky {
         readonly turbidity?: number;
         readonly exposure?: number;
         readonly model?: string;
+        readonly metersPerUnit?: number;
+        readonly altitude?: number;
     };
     readonly sunIlluminance?: number;
+    readonly resolvedAtmosphere?: Readonly<Required<AtmosphereParameters>>;
 }
 
 export interface AtmosphereParameters {

@@ -2202,6 +2202,10 @@
       "types": "./dist/sky/aerial.d.ts",
       "import": "./dist/sky/aerial.js"
     },
+    "./sky/hillaire": {
+      "types": "./dist/sky/hillaire.d.ts",
+      "import": "./dist/sky/hillaire.js"
+    },
     "./splats": {
       "types": "./dist/splats.d.ts",
       "import": "./dist/splats.js"
