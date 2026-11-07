@@ -139,6 +139,10 @@ export class GameClient<State, Input> {
     get predicted(): State;
     get serverTick(): number;
     get authoritative(): State;
+    get previousSnapshot(): {
+        tick: number;
+        state: State;
+    } | undefined;
     get open(): boolean;
     get viewTick(): number;
     update(): void;

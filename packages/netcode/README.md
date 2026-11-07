@@ -126,6 +126,67 @@ for (let frame = 0; frame < 300; frame++) {
 console.log('delay', delay.target, 'view tick', client?.viewTick);
 ```
 
+## Extrapolation
+
+`client.interpolated()` holds the newest snapshot when the next one is late, so a remote player freezes. `Extrapolator` (its own entry, `@margoengine/netcode/extrapolate`) draws the same view, but past the newest snapshot it keeps moving on at the speed of the last two, for up to `maxTicks`, then holds. When the truth arrives it blends from what was on screen instead of jumping.
+
+```ts
+import { defineGame, defineSchema, GameClient, GameServer, LoopbackNetwork } from '@margoengine/netcode';
+import { Extrapolator } from '@margoengine/netcode/extrapolate';
+
+const schema = defineSchema({
+  types: {
+    Input: { x: 'f32' },
+    Box: { x: 'f32', heading: { type: 'f32', interpolate: 'angle' } },
+    State: { boxes: { type: 'map', of: 'Box', maxSize: 8 } },
+  },
+} as const);
+const game = defineGame({
+  schema,
+  state: 'State',
+  input: 'Input',
+  tickRate: 30,
+  initial: () => ({ boxes: new Map() }),
+  join: (state, id) => void state.boxes.set(id, { x: 0, heading: 0 }),
+  step(state, _inputs, _tick, dt) {
+    for (const box of state.boxes.values()) box.x += 3 * dt;
+  },
+});
+
+const network = new LoopbackNetwork({ latency: 40 });
+const now = () => network.time;
+const server = new GameServer(game, { now });
+network.listen().onconnection = (connection) => server.accept(connection);
+let stalled = false;
+const tick = () => {
+  network.advance(1000 / 60);
+  if (!stalled) while (network.time >= (server.tick + 1) * game.tickMs) server.step();
+};
+const joining = GameClient.join(game, network.connect(), { now, input: () => ({ x: 0 }) });
+let joined = false;
+joining.then(() => (joined = true));
+while (!joined) {
+  tick();
+  await null;
+}
+const client = await joining;
+const view = new Extrapolator(client, { now, maxTicks: 6, blend: 100 });
+for (let frame = 0; frame < 180; frame++) {
+  stalled = frame >= 90 && frame < 120; // half a second with no snapshots
+  tick();
+  client.update();
+  const box = view.state().boxes.get(client.player); // draw this in place of client.interpolated()
+  if (frame % 15 === 0) console.log(frame, box?.x, 'ticks late', view.late);
+}
+```
+
+- `'linear'` fields move on in a line and `'angle'` fields the short way; integers, booleans and strings keep their newest value, as in `interpolated()`.
+- `maxTicks` (default 6) bounds how wrong a guess can get: 200 ms at 30 ticks a second. Past it the entity holds.
+- `blend` (default 100 ms, 0 jumps) is the time from what was drawn to the truth once a snapshot arrives. A snapshot that lands while still late starts a blend too.
+- It is a straight line from the last two snapshots, so it overshoots a turn or a stop, and a teleport in the newest snapshot flings the entity on for `maxTicks`. Keep `maxTicks` small, or set it to 0 for a game full of sudden moves.
+- It draws; it does not predict. `client.predicted` and the server see nothing of it, and a shot still rewinds to `client.viewTick`, the interpolated view, not to what was guessed.
+- `client.previousSnapshot` is the snapshot before the newest with its tick, for your own schemes. `SnapshotBuffer` in `@margoengine/net` extrapolates transforms for a game not on `GameClient`.
+
 ## Determinism: why prediction converges exactly
 
 The server simulates from exactly the values clients decode: after every tick it encodes the state and continues from
@@ -716,7 +777,7 @@ Opened straight from disk (`file://`) the page cannot run modules and says so, w
 - Snapshots go to every client every `snapshotEvery` ticks, the whole state (or your `view` of it) as a delta; there
   is no priority or bandwidth budget per entity yet. Measured on the arena fixture (8 players, 4 crates): 99 bytes per
   snapshot on average.
-- `interpolated()` holds the newest snapshot when the next one is late; it does not extrapolate.
+- `interpolated()` holds the newest snapshot when the next one is late; `Extrapolator` moves on instead.
 - A client more than 8 ticks off its target jumps instead of slewing; a client that falls more than 4 x `history`
   ticks behind skips ticks rather than replaying them.
 - Rollback keeps `maxRollback + 2` saved states (encoded bytes) and resimulates at most `maxRollback` frames per

@@ -209,6 +209,13 @@ export class GameClient<State, Input> {
   get authoritative(): State {
     return this.snapshots.latest as State;
   }
+  /** The snapshot before the newest, with its tick; undefined with fewer than two. For reading only. */
+  get previousSnapshot(): { tick: number; state: State } | undefined {
+    const slot = this.snapshots.previous;
+    if (slot < 0) return undefined;
+    const tick = this.snapshots.times[slot];
+    return { tick, state: this.snapshots.get(tick) as State };
+  }
   /** Whether the connection is open. */
   get open(): boolean {
     return !this.closed;
@@ -418,7 +425,7 @@ export class GameClient<State, Input> {
   /**
    * The state the server had `interpolationDelay` ticks before the newest snapshot should have arrived, blended
    * between the two snapshots around that time: draw other players and objects from this. Holds the newest snapshot
-   * when the next is late (no extrapolation).
+   * when the next is late; `Extrapolator` from `@margoengine/netcode/extrapolate` moves on instead.
    */
   interpolated(): State {
     const ms = this.game.tickMs,

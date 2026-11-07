@@ -59,6 +59,10 @@
       "types": "./dist/signal.d.ts",
       "import": "./dist/signal.js"
     },
+    "./extrapolate": {
+      "types": "./dist/extrapolate.d.ts",
+      "import": "./dist/extrapolate.js"
+    },
     "./interest": {
       "types": "./dist/interest.d.ts",
       "import": "./dist/interest.js"

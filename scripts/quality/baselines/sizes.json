@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10567607,
+  "total": 10568406,
   "history": [
     {
       "date": "2026-10-24",
@@ -3644,6 +3644,12 @@
       "commit": "15163911e",
       "reason": "physics/next gains joints: joint rows, exact path solve, limits, motors and their Wasm kernel, first build, not tuned",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "0277c06ca",
+      "reason": "netcode: new optional entry ./extrapolate, and previousSnapshot on GameClient (batch 114 job 6)",
+      "grew": 1
     }
   ],
   "items": {
@@ -4071,6 +4077,7 @@
     "@margoengine/net/fields": 2902,
     "@margoengine/net/timeline": 1495,
     "@margoengine/netcode": 12819,
+    "@margoengine/netcode/extrapolate": 799,
     "@margoengine/netcode/generate": 5154,
     "@margoengine/netcode/interest": 2516,
     "@margoengine/netcode/node": 6457,
