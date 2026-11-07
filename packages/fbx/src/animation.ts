@@ -441,12 +441,16 @@ export function buildAnimations(ctx: SceneContext, morphs: MorphBinding[]): Anim
       if (!all.length) continue;
       const width = curves.length,
         rest = binding.mesh.node.morphWeights!,
-        weightsAt = (time: number) => curves.map((c, k) => (c ? sample(c, time) / 100 : rest[k])),
+        weightsAt = (time: number) => curves.map((c, k) => (c ? binding.shapes[k](sample(c, time)) : rest[k])),
         // Weights run from 0 to 1, so an absolute 1e-5 is the transform tolerance at that size.
         agree = (a: number[], b: number[], p: number[], alpha: number) =>
           p.every((v, k) => Math.abs(v - (a[k] * (1 - alpha) + b[k] * alpha)) <= 1e-5),
         seed = commonTimes(all),
-        times = all.some((c) => c.at) ? refineTimes(seed, weightsAt, agree, jumpStarts(all)) : seed;
+        // A stop of an in-between shape is a corner in time, so the search ends there at its depth, some 20 microseconds wide.
+        times =
+          binding.stepped || all.some((c) => c.at)
+            ? refineTimes(seed, weightsAt, agree, jumpStarts(all), undefined, binding.stepped)
+            : seed;
       reserve(times.length * (width + 1));
       const values = new Float32Array(times.length * width);
       for (let i = 0; i < times.length; i++) values.set(weightsAt(times[i]), i * width);

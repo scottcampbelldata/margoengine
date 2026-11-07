@@ -6,6 +6,10 @@ import { children, type SceneContext, type MeshBinding } from './scene.js';
 export interface MorphBinding {
   mesh: MeshBinding;
   channels: bigint[];
+  /** Each target's weight from its channel's percent. */
+  shapes: ((percent: number) => number)[];
+  /** A shape weight is not a straight line of the percent, so a curve between two keys needs more keys. */
+  stepped: boolean;
 }
 interface ShapeData {
   cpCount: number;
@@ -18,7 +22,10 @@ export function attachMorphs(ctx: SceneContext, mesh: MeshBinding): MorphBinding
   const shapes = children(ctx, id(mesh.source.properties[0])).filter((n) => n.properties[2] === 'BlendShape'),
     targets: MorphData[] = [],
     channels: bigint[] = [],
-    weights: number[] = [];
+    weights: number[] = [],
+    shaping: ((percent: number) => number)[] = [],
+    entry = ctx.extensions.find((extension) => extension.inbetweens);
+  let stepped = false;
   if (!shapes.length) return;
   const cpCount = array(mesh.source, 'Vertices').length / 3,
     m = mesh.geometric;
@@ -35,26 +42,27 @@ export function attachMorphs(ctx: SceneContext, mesh: MeshBinding): MorphBinding
     )) {
       ctx.signal?.throwIfAborted();
       const sources = children(ctx, id(channel.properties[0])).filter((n) => n.properties[2] === 'Shape');
-      const full = findChild(channel, 'FullWeights');
+      const full = findChild(channel, 'FullWeights'),
+        values = full ? array(channel, 'FullWeights') : [];
+      ctx.budget.work(values.length);
       // Blender also emits one all-100 FullWeights value per affected control point.
-      if (sources.length !== 1)
+      let plain = sources.length === 1;
+      for (let i = 0; i < values.length && plain; i++) plain = Math.abs(values[i] - 100) <= 1e-6;
+      if (!plain && !entry)
         throw new TypeError(
-          `Unsupported FBX progressive morph: ${objectName(channel)}; bake or remove it in your 3D tool before export`,
+          `FBX progressive morph: ${objectName(channel)}; pass deformers from @margoengine/fbx/deformers, or bake it in your 3D tool`,
         );
-      if (full) {
-        const values = array(channel, 'FullWeights');
-        ctx.budget.work(values.length);
-        for (let i = 0; i < values.length; i++)
-          if (!Number.isFinite(values[i]) || Math.abs(values[i] - 100) > 1e-6)
-            throw new TypeError(
-              `Unsupported FBX progressive morph: ${objectName(channel)}; bake or remove it in your 3D tool before export`,
-            );
-      }
+      const stops = plain ? [{ shape: sources[0], percent: 100 }] : entry!.inbetweens!(channel, sources),
+        at = stops.map((stop) => stop.percent);
+      if (!plain) stepped = true;
+      const percent = Number(property(channel, 'DeformPercent', 0));
+      if (!Number.isFinite(percent)) throw new RangeError('Invalid FBX morph weight; re-export the file, it looks damaged');
+      for (const stop of stops) {
       if (targets.length >= 256)
         throw new RangeError(
           'FBX morph target budget exceeded; simplify or split the scene, the import limits are listed in the README',
         );
-      const shape = sources[0];
+      const shape = stop.shape;
       let data = cache.get(shape);
       if (!data) {
         const indices = array(shape, 'Indexes'),
@@ -133,16 +141,22 @@ export function attachMorphs(ctx: SceneContext, mesh: MeshBinding): MorphBinding
             throw new RangeError('FBX morph normal overflow; scale the model down or move it nearer the origin');
         }
       }
-      const weight = Number(property(channel, 'DeformPercent', 0)) / 100;
-      if (!Number.isFinite(weight))
-        throw new RangeError('Invalid FBX morph weight; re-export the file, it looks damaged');
+      const shaped = plain
+        ? (value: number) => value / 100
+        : (value: number) => entry!.inbetweenWeight!(at, stop.percent, value);
       ctx.budget.reserve(128);
-      targets.push({ name: objectName(channel), positions: out, normals: normalOut });
-      weights.push(weight);
+      targets.push({
+        name: plain || stop === stops[stops.length - 1] ? objectName(channel) : `${objectName(channel)} ${stop.percent}`,
+        positions: out,
+        normals: normalOut,
+      });
+      weights.push(shaped(percent));
+      shaping.push(shaped);
       channels.push(id(channel.properties[0]));
+      }
     }
   if (!targets.length) return;
   mesh.geometry.morphs = targets;
   mesh.node.morphWeights = weights;
-  return { mesh, channels };
+  return { mesh, channels, shapes: shaping, stepped };
 }

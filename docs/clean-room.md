@@ -210,7 +210,7 @@ carry the same citation as a one-line comment in the code.
 | EX13 | FBX inherit types, the meaning of a cluster's Transform, auto tangent clamps | fbx/src/inherit.ts, skin.ts, layers.ts | The public FBX SDK reference (FbxTransform::EInheritType, FbxAnimCurveDef) and Maya's documented joint matrix with its inverse parent scale; that Transform is the inverse bind and type 2 follows Maya's order were measured on the stored values and OBJ frames of real files; no reader source read |
 | EX14 | FBX physically based materials and layered textures: the property names real files carry, the specular to metallic sum | fbx/src/pbr.ts | Autodesk's public help on the Max Physical and PBR materials, the Stingray PBS shader and Arnold Standard Surface; the FBX SDK class reference (FbxLayeredTexture); the published glTF notes on KHR_materials_pbrSpecularGlossiness conversion. Read from real files; no code of any importer read. |
 | EX15 | FBX curve records: the NURBS fields real files carry and the wrapped points of a periodic form | fbx/src/curves.ts | FbxNurbsCurve class reference, real Maya and 3ds Max files; the evaluation is Piegl and Tiller, The NURBS Book, in geometry/nurbs |
-### gltf-pro
+| EX16 | In-between weights and blended skin share | fbx/src/deformers.ts, fbx/src/skin.ts | FbxBlendShapeChannel, FbxSkin and FbxCluster class references; piecewise linear stops and the share measured against OBJ frames Maya wrote |
 
 | id | formula | file | source |
 | --- | --- | --- | --- |

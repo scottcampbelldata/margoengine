@@ -7,12 +7,15 @@ import { convertFBX } from './index.js';
 import type { FBXExtension } from './extension.js';
 import { animationLayers } from './layers.js';
 import { nurbsCurves } from './curves.js';
-const budget = 64 * 1024 * 1024; // convertFBX's input budget
+import { deformers } from './deformers.js';
 import { pbrMaterials } from './pbr.js';
-const known: readonly FBXExtension[] = [sceneExtras, animationLayers];
+import { sceneExtras } from './scene-extras.js';
+const budget = 64 * 1024 * 1024; // convertFBX's input budget
+// Functions cannot cross to a worker, so the page sends names and the worker holds every entry.
+const known: readonly FBXExtension[] = [sceneExtras, animationLayers, pbrMaterials, nurbsCurves, deformers];
 type FBXJob = {
   url?: string;
-const known: readonly FBXExtension[] = [sceneExtras, animationLayers, pbrMaterials, nurbsCurves, deformers];
+  input?: ArrayBuffer;
   resourcePath?: string;
   allowedURLs?: readonly string[];
   extensions?: readonly string[];

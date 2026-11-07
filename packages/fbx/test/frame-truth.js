@@ -53,7 +53,7 @@ function keyed(times, values, width, step, time, normalize) {
 }
 
 /** Every vertex of the GLB's meshes in world space at `time` of clip `clip` (default the first). */
-export function posed(buffer, time, clip = 0) {
+export function posed(buffer, time, clip = 0, capture) {
   const { doc, accessor } = readGLB(buffer),
     state = doc.nodes.map((n) => ({
       t: n.translation ?? [0, 0, 0],
@@ -103,6 +103,7 @@ export function posed(buffer, time, clip = 0) {
         joints = accessor(primitive.attributes.JOINTS_0),
         amounts = accessor(primitive.attributes.WEIGHTS_0),
         matrices = skin.joints.map((joint, k) => multiply(world[joint], Array.from(binds.subarray(k * 16, k * 16 + 16))));
+      capture?.({ matrices, joints, weights: amounts, positions });
       for (let v = 0; v * 3 < positions.length; v++) {
         const sum = [0, 0, 0];
         for (let k = 0; k < 4; k++) {
@@ -116,6 +117,22 @@ export function posed(buffer, time, clip = 0) {
     }
   });
   return out;
+}
+
+/** What the skinning of the first skinned primitive reads at `time`, for a runtime other than plain glTF. */
+export function skinInputs(buffer, time) {
+  let got;
+  posed(buffer, time, 0, (inputs) => {
+    got ??= inputs;
+  });
+  const palette = new Float32Array(got.matrices.length * 16);
+  got.matrices.forEach((m, i) => palette.set(m, i * 16));
+  return {
+    palette,
+    joints: Uint16Array.from(got.joints),
+    weights: Float32Array.from(got.weights),
+    positions: Float32Array.from(got.positions),
+  };
 }
 
 export const objVertices = (text) =>
