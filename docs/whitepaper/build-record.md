@@ -2288,7 +2288,7 @@ Eight jobs for `@margoengine/blender` and the Blender add-on (`tools/blender-add
 | 5 | Live link | DONE | `c44d21f6` | `/live`, add-on `LiveLink` | LIM-410 |
 | 6 | Lights and cameras | DONE | `c25e2cc0` | add-on `lights_cameras` option, read by `/components` | LIM-417 |
 | 7 | Curves, points and volumes | DONE | `94a48aab` | `/curves`, add-on `curves` option | LIM-420 |
-| 8 | Compressed textures in .margo | DONE | this commit | `/ktx2` | LIM-422 |
+| 8 | Compressed textures in .margo | DONE | `7f2aaf7e` | `/ktx2` | LIM-428 |
 
 Fix in the same batch: `02ca99be` (the README's two `loadMargo` examples asked for files no folder holds and sat on the
 README runner's known-failure list; they now load the package's real fixtures and left the list).
@@ -2323,7 +2323,7 @@ README runner's known-failure list; they now load the package's real fixtures an
   `record:wgsl-corpus`, which only jobs that add WGSL need, and timed out; it then lost a push race and landed by the
   short rule. The rebase script renumbered `claims.md` without staging it (fixed: it is in its `git add` list, with a
   guard that the claims end at the expected number). Job 7's first landing failed on the ZIP bug above. Job 8's claim
-  was written as LIM-421 and landed as LIM-422 after main took LIM-421. Job 8's first landing stopped at verify on
+  was written as LIM-421 and landed as LIM-428 after main took LIM-421 to LIM-427. The rebase script renumbers claims, limits and READMEs but not this record, so this section first named LIM-422; fixed after the push. Job 8's first landing stopped at verify on
   `tests/node22-packages.test.js`: `compressMargo` runs in Node, but `@margoengine/blender` sat in the browser-only list
   of `scripts/node22-packages.json`; it moved to the Node list, so its tests also run on Node 22 in CI.
 - **Gate:** per job by machines.md item 5: rebase, build:packages, api:check, `npm run quality`, lint, hygiene, the
