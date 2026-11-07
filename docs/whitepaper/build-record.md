@@ -1265,7 +1265,8 @@ An audit of the finished batches against their job text listed 70 gaps for the H
 | sample_index (points) | eye-dome lighting on the compatibility level | DONE | this commit | - |
 | soft VirtualShadows on the level | VirtualShadows soft on the compatibility level | DONE | `e94d18caf` | - |
 | Batch 81 geometry cache | PC2 and MDD readers, a real cache played | DONE | `d47fd042a` | LIM-355 |
-| B82 | LIM-211 and LIM-213 on real CMU takes | DONE | this commit | LIM-211, LIM-213 |
+| B82 | LIM-211 and LIM-213 on real CMU takes | DONE | `95f3e4a63` | LIM-211, LIM-213 |
+| test-readers-fbx | The sixth test reader: exportFBX read from its bytes, and by Blender | DONE | this commit | - |
 
 ## LAZ: one LAS reader, and every point format on a real file
 

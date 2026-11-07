@@ -1,7 +1,9 @@
-// exportFBX round trips through the package's own importer: every file written here is read back with convertFBX and
-// compared on the GLB accessors. Fixtures are built in the test.
+// exportFBX round trips through the package's own importer: files written here are read back with convertFBX and
+// compared on the GLB accessors. `readRecords` reads the binary file from its bytes with nothing from this package, so
+// a value both sides get wrong the same way still fails. Fixtures are built in the test.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { inflateSync } from 'node:zlib';
 import { exportFBX } from '../dist/export.js';
 import { convertFBX } from '../dist/index.js';
 
@@ -271,6 +273,166 @@ for (const [form, ascii] of forms) {
     assert.equal(triangles, 2);
   });
 }
+
+/**
+ * The binary file read straight from its bytes, with nothing from this package: records of end offset, property count,
+ * property bytes and name, then typed properties, then children up to a zero record. A wrong value in the file cannot
+ * hide behind the importer reading it back the same wrong way.
+ */
+function readRecords(fbx) {
+  const view = new DataView(fbx.buffer, fbx.byteOffset, fbx.byteLength),
+    latin = new TextDecoder('latin1');
+  const scalars = {
+    Y: [2, (at) => view.getInt16(at, true)],
+    C: [1, (at) => fbx[at]],
+    I: [4, (at) => view.getInt32(at, true)],
+    F: [4, (at) => view.getFloat32(at, true)],
+    D: [8, (at) => view.getFloat64(at, true)],
+    L: [8, (at) => view.getBigInt64(at, true)],
+  };
+  const arrays = { f: Float32Array, d: Float64Array, i: Int32Array, l: BigInt64Array, b: Uint8Array };
+  const property = (start) => {
+    const type = String.fromCharCode(fbx[start]),
+      at = start + 1;
+    if (scalars[type]) return [scalars[type][1](at), at + scalars[type][0]];
+    if (type === 'S' || type === 'R') {
+      const length = view.getUint32(at, true),
+        bytes = fbx.subarray(at + 4, at + 4 + length);
+      return [type === 'S' ? latin.decode(bytes) : bytes, at + 4 + length];
+    }
+    const count = view.getUint32(at, true),
+      deflated = view.getUint32(at + 4, true) === 1,
+      length = view.getUint32(at + 8, true),
+      stored = fbx.subarray(at + 12, at + 12 + length),
+      raw = deflated ? inflateSync(stored) : stored;
+    return [new arrays[type](raw.slice().buffer, 0, count), at + 12 + length];
+  };
+  const record = (at) => {
+    const end = view.getUint32(at, true);
+    if (!end) return null;
+    const count = view.getUint32(at + 4, true),
+      length = fbx[at + 12],
+      props = [],
+      children = [];
+    let place = at + 13 + length;
+    const after = place + view.getUint32(at + 8, true);
+    for (let i = 0; i < count; i++) {
+      const [value, next] = property(place);
+      props.push(value);
+      place = next;
+    }
+    assert.equal(place, after, 'the property bytes add up');
+    for (place = after; place < end; ) {
+      const child = record(place);
+      if (!child) break;
+      children.push(child);
+      place = child.end;
+    }
+    return { name: latin.decode(fbx.subarray(at + 13, at + 13 + length)), props, children, end };
+  };
+  const top = [];
+  for (let at = 27, next = record(at); next; at = next.end, next = record(at)) top.push(next);
+  return top;
+}
+const child = (node, name) => node.children.find((c) => c.name === name);
+const named = (node, name) => node.children.filter((c) => c.name === name);
+const setting = (node, name) => child(node, 'Properties70').children.find((p) => p.props[0] === name)?.props.slice(4);
+const plain = (value) => Array.from(value, Number);
+
+test('the bytes of the file hold the scene, read with no importer', async () => {
+  const seconds = 46186158000n,
+    node = {
+      name: 'Quad',
+      translation: [1, 2, 3],
+      scale: [2, 2, 2],
+      primitives: [{ geometry: quad(), material: { name: 'Red', color: [1, 0.5, 0, 1], roughness: 1 } }],
+    },
+    { fbx } = await exportFBX({
+      nodes: [node],
+      animations: [
+        {
+          name: 'Walk',
+          channels: [{ node, path: 'translation', times: new Float32Array([0, 1]), values: new Float32Array([1, 2, 3, 4, 5, 6]) }],
+        },
+      ],
+    }),
+    top = readRecords(fbx),
+    section = (name) => top.find((c) => c.name === name),
+    objects = section('Objects'),
+    settings = section('GlobalSettings');
+  assert.deepEqual(setting(settings, 'UpAxis'), [1]);
+  assert.deepEqual(setting(settings, 'UnitScaleFactor'), [1], 'centimetres');
+  const [model] = named(objects, 'Model'),
+    [geometry] = named(objects, 'Geometry'),
+    [material] = named(objects, 'Material');
+  assert.equal(model.props[1], 'Quad\0\x01Model');
+  assert.equal(model.props[2], 'Mesh');
+  assert.deepEqual(setting(model, 'Lcl Translation'), [100, 200, 300], 'metres in the scene are centimetres in the file');
+  assert.deepEqual(setting(model, 'Lcl Scaling'), [2, 2, 2]);
+  assert.deepEqual(plain(child(geometry, 'Vertices').props[0]), [0, 0, 0, 100, 0, 0, 100, 100, 0, 0, 100, 0]);
+  assert.deepEqual(plain(child(geometry, 'PolygonVertexIndex').props[0]), [0, 1, -3, 0, 2, -4], 'a polygon ends on a negated index');
+  const normals = child(geometry, 'LayerElementNormal'),
+    uvs = child(geometry, 'LayerElementUV');
+  assert.equal(child(normals, 'MappingInformationType').props[0], 'ByPolygonVertex');
+  assert.deepEqual(plain(child(normals, 'Normals').props[0]), [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1]);
+  assert.deepEqual(plain(child(normals, 'NormalsIndex').props[0]), [0, 1, 2, 0, 2, 3]);
+  assert.deepEqual(plain(child(uvs, 'UV').props[0]), [0, 0, 1, 0, 1, 1, 0, 1], 'V runs up in the file and down in glTF');
+  assert.deepEqual(plain(child(uvs, 'UVIndex').props[0]), [0, 1, 2, 0, 2, 3]);
+  assert.equal(material.props[1], 'Red\0\x01Material');
+  assert.deepEqual(setting(material, 'DiffuseColor'), [1, 0.5, 0]);
+  const curves = named(objects, 'AnimationCurve');
+  assert.equal(curves.length, 3);
+  for (const curve of curves) assert.deepEqual([...child(curve, 'KeyTime').props[0]], [0n, seconds], 'one second in FBX ticks');
+  assert.deepEqual(curves.map((curve) => plain(child(curve, 'KeyValueFloat').props[0])), [[100, 400], [200, 500], [300, 600]]);
+  // Each link by id: the file's own graph, not the order the writer happened to use.
+  const id = (object) => object.props[0],
+    links = section('Connections').children.map((c) => c.props),
+    [stack] = named(objects, 'AnimationStack'),
+    [layer] = named(objects, 'AnimationLayer'),
+    [curveNode] = named(objects, 'AnimationCurveNode'),
+    linked = (kind, from, to, field) =>
+      links.some((l) => l[0] === kind && l[1] === id(from) && l[2] === (to === 0 ? 0n : id(to)) && l[3] === field);
+  assert.ok(linked('OO', model, 0), 'the model hangs from the scene root');
+  assert.ok(linked('OO', geometry, model), 'the geometry belongs to the model');
+  assert.ok(linked('OO', material, model), 'the material belongs to the model');
+  assert.ok(linked('OO', layer, stack), 'the layer belongs to the take');
+  assert.ok(linked('OO', curveNode, layer), 'the curve node belongs to the layer');
+  assert.ok(linked('OP', curveNode, model, 'Lcl Translation'), 'the curve node drives the translation');
+  for (const [i, axis] of ['d|X', 'd|Y', 'd|Z'].entries())
+    assert.ok(linked('OP', curves[i], curveNode, axis), `curve ${i} drives ${axis}`);
+});
+
+test('a skin in the bytes: each cluster lists its points and weights and hangs from the skin', async () => {
+  const bone = { name: 'Bone', translation: [0, 1, 0] },
+    other = { name: 'Other', translation: [0, 2, 0] },
+    geometry = {
+      ...quad(),
+      joints: new Uint16Array([0, 1, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]),
+      weights: new Float32Array([1, 0, 0, 0, 0.25, 0.75, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]),
+    },
+    skinned = {
+      name: 'Skinned',
+      geometry,
+      skin: { joints: [bone, other], inverseBindMatrices: new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, -1, 0, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, -2, 0, 1]) },
+    },
+    { fbx } = await exportFBX({ nodes: [bone, other, skinned] }),
+    top = readRecords(fbx),
+    objects = top.find((c) => c.name === 'Objects'),
+    deformers = named(objects, 'Deformer'),
+    skin = deformers.find((d) => d.props[2] === 'Skin'),
+    clusters = deformers.filter((d) => d.props[2] === 'Cluster'),
+    links = top.find((c) => c.name === 'Connections').children.map((c) => c.props);
+  assert.equal(clusters.length, 2);
+  const gathered = clusters.map((cluster) => ({
+    points: plain(child(cluster, 'Indexes').props[0]),
+    weights: plain(child(cluster, 'Weights').props[0]),
+  }));
+  assert.deepEqual(gathered, [
+    { points: [0, 1], weights: [1, 0.25] },
+    { points: [1, 2, 3], weights: [0.75, 1, 1] },
+  ]);
+  for (const cluster of clusters) assert.ok(links.some((l) => l[1] === cluster.props[0] && l[2] === skin.props[0]));
+});
 
 test('binary layout: header, 7400 records, deflated arrays, footer', async () => {
   const { fbx } = await exportFBX({ nodes: [{ name: 'Big', geometry: quad() }] }),
