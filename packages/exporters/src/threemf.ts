@@ -35,8 +35,15 @@ export interface Export3MFOptions extends SceneOptions {
   unit?: ThreeMFUnit;
   /** Which scene axis is up. A printer's Z is up, so `'y'`, the glTF way, turns the scene to stand on the bed. Default `'y'`. */
   upAxis?: 'y' | 'z';
-  /** Written as the file's Title metadata. */
+  /** Written as the file's Title metadata, and as the name of the assembly. */
   title?: string;
+  /**
+   * `true` writes a scene of several nodes as one object whose mesh holds every part where the scene put it, each part a
+   * shell of its own, so a slicer keeps them together and prints their union by the format's positive fill rule. `false`
+   * writes one build item for each node, a geometry drawn twice stored once: slicers read each item as an object they move
+   * on their own, so parts that overlap collide. Default `true`.
+   */
+  assembly?: boolean;
   /** Stops the archive step. */
   signal?: AbortSignal;
 }
@@ -66,10 +73,19 @@ interface Shape {
   palette?: string[];
 }
 
-/**
- * Welds by position, in file units, and drops the triangles that leaves with no area. `mirrored` reflects the shape in X and
- * reverses its triangles.
- */
+/** The positions moved by `transform`, a column-major 4 x 4 matrix. */
+function moved(positions: ArrayLike<number>, m: ArrayLike<number>): Float64Array {
+  const out = new Float64Array(positions.length);
+  for (let v = 0; v + 2 < positions.length; v += 3) {
+    const x = positions[v],
+      y = positions[v + 1],
+      z = positions[v + 2];
+    for (let k = 0; k < 3; k++) out[v + k] = m[k] * x + m[4 + k] * y + m[8 + k] * z + m[12 + k];
+  }
+  return out;
+}
+
+/** Welds by position, in file units, and drops the triangles that leaves with no area. `mirrored` reverses the triangles. */
 function shapeOf(
   positions: ArrayLike<number>,
   indices: ArrayLike<number>,
@@ -77,12 +93,11 @@ function shapeOf(
   scale: number,
   mirrored: boolean,
 ): Shape {
-  const flip = mirrored ? -1 : 1;
   const known = new Map<string, number>(),
     vertices: number[] = [],
     weld = new Uint32Array(positions.length / 3);
   for (let v = 0; v < weld.length; v++) {
-    const x = Math.fround(positions[v * 3] * flip * scale),
+    const x = Math.fround(positions[v * 3] * scale),
       y = Math.fround(positions[v * 3 + 1] * scale),
       z = Math.fround(positions[v * 3 + 2] * scale),
       key = `${x} ${y} ${z}`;
@@ -126,23 +141,29 @@ function vertexColors(geometry: Geo, material: Mat): ((vertex: number) => string
   };
 }
 
-/**
- * The 3 x 4 matrix of a build item: rows of a row-vector transform, as 3MF lists them, of the scene `world` matrix with
- * the turn to Z up and the translation in file units.
- */
-function itemTransform(world: ArrayLike<number>, zUp: boolean, scale: number): string {
-  const column = (at: number): number[] => {
-    const [x, y, z] = [world[at], world[at + 1], world[at + 2]];
-    return zUp ? [x, -z, y] : [x, y, z];
-  };
+/** The scene `world` matrix with the turn to Z up, column-major. */
+function upright(world: ArrayLike<number>, zUp: boolean): number[] {
+  const out = Array.from(world);
+  if (zUp)
+    for (let at = 0; at < 16; at += 4) {
+      out[at + 1] = -world[at + 2];
+      out[at + 2] = world[at + 1];
+    }
+  return out;
+}
+
+/** The 3 x 4 matrix of a build item, rows of a row-vector transform as 3MF lists them, with the translation in file units. */
+function itemTransform(placed: readonly number[], scale: number): string {
+  const column = (at: number): number[] => placed.slice(at, at + 3);
   const out = [...column(0), ...column(4), ...column(8), ...column(12).map((value) => value * scale)];
   return out.map(num).join(' ');
 }
 
 /**
- * Exports a scene or GLB bytes as a 3MF file: one object for each geometry, placed by build items, so a geometry drawn by several nodes
- * is stored once. A node with a reflection in its matrix draws a reflected object, shared by the nodes that mirror that
- * geometry, so no build item carries a reflection and a slicer sees nothing inside out. Colours come from the material's
+ * Exports a scene or GLB bytes as a 3MF file. A scene of one node is one object on one build item. A scene of several is one
+ * object holding every part in place, so a slicer prints what the scene shows; with `assembly: false` each node is a build
+ * item instead, one object for each geometry, and a mirroring node draws a reflected object those nodes share. Either way no
+ * transform carries a reflection, so a slicer sees nothing inside out. Colours come from the material's
  * base colour and from vertex colours; textures are not written. Vertices are welded by position, but a slicer still needs
  * a closed mesh to print: an open one is written as it is.
  *
@@ -163,7 +184,7 @@ export async function export3MF(
   source: ExportSource | Uint8Array,
   options: Export3MFOptions = {},
 ): Promise<Uint8Array> {
-  const { unit = 'millimeter', upAxis = 'y', title, signal } = options;
+  const { unit = 'millimeter', upAxis = 'y', title, assembly = true, signal } = options;
   if (!Object.hasOwn(UNITS, unit)) throw new RangeError(`3MF unit must be one of ${Object.keys(UNITS).join(', ')}`);
   if (upAxis !== 'y' && upAxis !== 'z') throw new RangeError("3MF upAxis must be 'y' or 'z'");
   signal?.throwIfAborted();
@@ -175,6 +196,8 @@ export async function export3MF(
     objects: string[] = [],
     groups: string[] = [],
     build: string[] = [],
+    merged: { vertices: string[]; faces: string[]; pindex: number; name?: string } = { vertices: [], faces: [], pindex: -1 },
+    together = assembly && items.length > 1,
     shared = new Map<string, number>(),
     seen = new Map<Geo, number>(),
     geometries = (geometry: Geo): number => {
@@ -191,8 +214,10 @@ export async function export3MF(
     if (index === undefined) materials.set(color, (index = materials.size));
     return index;
   };
-  const write = (shape: Shape, name: string | undefined, material: Mat): number => {
-    const { vertices, triangles, corners, palette } = shape;
+  /** Adds a shape's vertices and triangles to lists that may hold others; `pindex` is its colour where the object's differs. */
+  const append = (shape: Shape, vertices: string[], faces: string[], pindex?: number): void => {
+    const { triangles, corners, palette } = shape,
+      first = vertices.length;
     let group = 0;
     if (palette) {
       group = id++;
@@ -200,38 +225,57 @@ export async function export3MF(
         `<m:colorgroup id="${group}">${palette.map((color) => `<m:color color="${color}"/>`).join('')}</m:colorgroup>`,
       );
     }
-    const object = id++,
-      lines: string[] = [];
-    for (let v = 0; v < vertices.length; v += 3)
-      lines.push(`<vertex x="${num(vertices[v])}" y="${num(vertices[v + 1])}" z="${num(vertices[v + 2])}"/>`);
-    const faces: string[] = [];
-    for (let t = 0; t < triangles.length; t += 3) {
-      const colour = corners ? ` pid="${group}" p1="${corners[t]}" p2="${corners[t + 1]}" p3="${corners[t + 2]}"` : '';
-      faces.push(`<triangle v1="${triangles[t]}" v2="${triangles[t + 1]}" v3="${triangles[t + 2]}"${colour}/>`);
+    for (let v = 0; v < shape.vertices.length; v += 3) {
+      const [x, y, z] = [shape.vertices[v], shape.vertices[v + 1], shape.vertices[v + 2]];
+      vertices.push(`<vertex x="${num(x)}" y="${num(y)}" z="${num(z)}"/>`);
     }
+    const plain = pindex === undefined ? '' : ` pid="1" p1="${pindex}"`;
+    for (let t = 0; t < triangles.length; t += 3) {
+      const colour = corners ? ` pid="${group}" p1="${corners[t]}" p2="${corners[t + 1]}" p3="${corners[t + 2]}"` : plain;
+      faces.push(
+        `<triangle v1="${triangles[t] + first}" v2="${triangles[t + 1] + first}" v3="${triangles[t + 2] + first}"${colour}/>`,
+      );
+    }
+  };
+  const object = (vertices: string[], faces: string[], pindex: number, name: string | undefined): number => {
+    const at = id++;
     objects.push(
-      `<object id="${object}" type="model" pid="1" pindex="${materialIndex(material)}"${name ? ` name="${escaped(name)}"` : ''}>` +
-        `<mesh><vertices>${lines.join('')}</vertices><triangles>${faces.join('')}</triangles></mesh></object>`,
+      `<object id="${at}" type="model" pid="1" pindex="${pindex}"${name ? ` name="${escaped(name)}"` : ''}>` +
+        `<mesh><vertices>${vertices.join('')}</vertices><triangles>${faces.join('')}</triangles></mesh></object>`,
     );
-    return object;
+    return at;
   };
   const placed = (item: Drawable, material: Mat): void => {
     const { geometry, name } = item,
       determinant = determinant3(item.world),
       mirrored = determinant < 0,
       world = mirrored ? item.world.map((v, i) => (i < 3 ? -v : v)) : item.world,
-      key = `${geometries(geometry)} ${materialIndex(material)} ${mirrored}`;
+      pindex = materialIndex(material),
+      key = `${geometries(geometry)} ${pindex} ${mirrored}`;
     if (!determinant || !Number.isFinite(determinant))
       throw new RangeError('3MF needs a transform with a non-zero determinant; give the node a nonzero scale');
-    let object = shared.get(key);
-    if (object === undefined) {
-      const shape = shapeOf(geometry.positions, geometry.indices, vertexColors(geometry, material), scale, mirrored);
+    const colors = vertexColors(geometry, material);
+    if (together) {
+      const shape = shapeOf(moved(geometry.positions, upright(item.world, zUp)), geometry.indices, colors, scale, mirrored);
       if (!shape.triangles.length) return;
-      shared.set(key, (object = write(shape, name, material)));
+      if (merged.pindex < 0) Object.assign(merged, { pindex, name: title === undefined ? name : String(title) });
+      append(shape, merged.vertices, merged.faces, pindex === merged.pindex ? undefined : pindex);
+      return;
     }
-    build.push(`<item objectid="${object}" transform="${itemTransform(world, zUp, scale)}"/>`);
+    let at = shared.get(key);
+    if (at === undefined) {
+      const positions = mirrored ? moved(geometry.positions, [-1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]) : geometry.positions,
+        shape = shapeOf(positions, geometry.indices, colors, scale, mirrored);
+      if (!shape.triangles.length) return;
+      const vertices: string[] = [],
+        faces: string[] = [];
+      append(shape, vertices, faces);
+      shared.set(key, (at = object(vertices, faces, pindex, name)));
+    }
+    build.push(`<item objectid="${at}" transform="${itemTransform(upright(world, zUp), scale)}"/>`);
   };
   for (const item of items) placed(item, item.material ?? fallback);
+  if (merged.faces.length) build.push(`<item objectid="${object(merged.vertices, merged.faces, merged.pindex, merged.name)}"/>`);
   if (!build.length) throw new RangeError('3MF requires at least one mesh with triangles');
   const base = [...materials.keys()].map((color) => `<base name="${color}" displaycolor="${color}"/>`).join(''),
     model =

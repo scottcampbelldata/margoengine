@@ -10,6 +10,7 @@ export interface Export3MFOptions extends SceneOptions {
     unit?: ThreeMFUnit;
     upAxis?: 'y' | 'z';
     title?: string;
+    assembly?: boolean;
     signal?: AbortSignal;
 }
 

@@ -975,7 +975,7 @@ A joint under nodes that are not joints takes their motion, and a joint scaled t
 
 ## 3MF for 3D printing (`@margoengine/exporters/threemf`)
 
-`export3MF(source, options)` writes a scene or GLB bytes as a 3MF file, which slicers prefer over STL because it holds its unit, its colours and one object placed many times.
+`export3MF(source, options)` writes a scene or GLB bytes as a 3MF file, which slicers prefer over STL because it holds its unit and its colours.
 
 ```ts
 import { export3MF } from 'margoengine/exporters/threemf';
@@ -998,13 +998,14 @@ console.log(`${file.length} bytes`);
 | --- | --- | --- |
 | `unit` | `'millimeter'` | `micron`, `millimeter`, `centimeter`, `inch`, `foot` or `meter`. Scene lengths are metres, as in glTF, and are converted, so a 1 m cube is 1000 long in `'millimeter'` |
 | `upAxis` | `'y'` | The scene's up axis. A printer's Z is up, so `'y'` turns the scene to stand on the bed; `'z'` leaves it as it is |
-| `title` | none | The file's Title metadata |
+| `title` | none | The file's Title metadata, and the assembly's name |
+| `assembly` | `true` | Writes a scene of several nodes as one object, every part in place. `false` writes a build item for each node |
 | `signal` | none | Stops the archive step |
 | The collector's options | as `exportGLB` | What the scene collects |
 
-Each geometry and material pair is one object, and each node a build item that places it, so a part drawn fifty times is stored once. Vertices are welded by position, in the file's unit and at Float32, because a slicer needs triangles that share their edges; a triangle that leaves with no area goes. A node with a reflection in its matrix places a reflected object, shared by the nodes that mirror that geometry, so no item carries a reflection and nothing turns inside out.
+A scene of several nodes is one object whose mesh holds every part where the scene put it, each part a shell of its own, so a slicer keeps the parts together and prints their union. Slicers read each build item as an object to move and scale on its own, components included, and PrusaSlicer 2.9.7 crashes on overlapping ones; a model is one thing to them. A part drawn fifty times is stored fifty times this way. With `assembly: false` each geometry and material pair is one object and each node a build item that places it, so a part is stored once, for a plate of separate prints that do not overlap. Vertices are welded by position within a part, in the file's unit and at Float32, because a slicer needs triangles that share their edges; a triangle that leaves with no area goes. A reflection is written into the triangles, so no item carries one and nothing turns inside out.
 
-Base colours become `basematerials` and vertex colours a `colorgroup`, corner by corner, both in sRGB with alpha when it is not 1. Textures are not written; the material's base colour stands for them. Welding closes seams but does not repair a mesh: an open one is written as it is, and a slicer will say so.
+Base colours become `basematerials` and vertex colours a `colorgroup`, corner by corner, both in sRGB with alpha when it is not 1. Textures are not written; the material's base colour stands for them. Welding closes seams but does not repair a mesh: an open one is written as it is, and a slicer will say so. A model with parts floating over the bed needs supports on, as on any slicer: with nothing on the first layer PrusaSlicer stops at "no extrusions in the first layer".
 
 ## Collision and UV animation per engine
 

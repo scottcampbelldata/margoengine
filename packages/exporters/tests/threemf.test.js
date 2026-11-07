@@ -87,16 +87,19 @@ test("upAxis 'z' leaves the axes as they are", async () => {
   assert.match(text, /transform="1 0 0 0 1 0 0 0 1 0 0 0"/);
 });
 
-test('one geometry and material is one object placed many times', async () => {
+test('with assembly off, one geometry and material is one object placed many times', async () => {
   const material = { color: [1, 0, 0, 1] },
     text = await model(
-      await export3MF({
-        nodes: [
-          { translation: [0, 0, 0], geometry: box, material },
-          { translation: [5, 0, 0], geometry: box, material },
-          { translation: [10, 0, 0], geometry: box, material: { color: [0, 1, 0, 1] } },
-        ],
-      }),
+      await export3MF(
+        {
+          nodes: [
+            { translation: [0, 0, 0], geometry: box, material },
+            { translation: [5, 0, 0], geometry: box, material },
+            { translation: [10, 0, 0], geometry: box, material: { color: [0, 1, 0, 1] } },
+          ],
+        },
+        { assembly: false },
+      ),
     );
   assert.equal(count(text, /<object /g), 2);
   assert.equal(count(text, /<item /g), 3);
@@ -132,9 +135,73 @@ test('vertex colours become a colour group, corner by corner', async () => {
   assert.match(text, /<triangle v1="0" v2="1" v3="2" pid="\d+" p1="0" p2="1" p3="2"\/>/);
 });
 
-test('mirrored nodes share a reflected object, and no item keeps a reflection', async () => {
+test('parts that overlap are one object on one build item, so a slicer cannot pull them apart', async () => {
+  // PrusaSlicer 2.9.7 read each build item, and each component too, as an object of its own: overlapping ones crashed it
+  // (0xC0000005 after "gcode path conflicts") and --scale-to-fit sized each on its own.
+  const file = await export3MF(
+      { nodes: [{ geometry: box }, { translation: [1, 0, 0], geometry: box }, { translation: [2, 0, 0], geometry: box }] },
+      { title: 'Stack' },
+    ),
+    text = await model(file);
+  assert.equal(count(text, /<object /g), 1);
+  assert.equal(count(text, /<item /g), 1);
+  assert.equal(count(text, /<components>/g), 0);
+  assert.equal(count(text, /<triangle /g), 36);
+  assert.match(text, /<object id="\d+" type="model" pid="1" pindex="0" name="Stack">/);
+  assert.match(text, /<item objectid="\d+"\/>/);
+  // Placed in the mesh, in file units, Y up turned to Z up: the third box ends at X = 2 + 2 m and at Y = -4 m.
+  assert.match(text, /x="4000" y="-4000" z="3000"/);
+  const parsed = await parse3MF(file, { units: 'file' });
+  assert.ok(Math.abs(volume(parsed) - 3 * 24e9) < 3, 'each part closed and outward');
+});
+
+test('parts that touch stay separate shells: a shared corner would leave edges of four triangles', async () => {
+  const text = await model(
+    await export3MF({ nodes: [{ geometry: box }, { translation: [2, 0, 0], geometry: box }] }),
+  );
+  assert.equal(count(text, /<vertex /g), 16);
+  const uses = new Map();
+  for (const [, a, b, c] of text.matchAll(/<triangle v1="(\d+)" v2="(\d+)" v3="(\d+)"/g))
+    for (const [u, v] of [[a, b], [b, c], [c, a]]) {
+      const edge = [+u, +v].sort((x, y) => x - y).join();
+      uses.set(edge, (uses.get(edge) ?? 0) + 1);
+    }
+  assert.deepEqual([...new Set(uses.values())], [2], 'every edge has two triangles');
+});
+
+test('a mirrored part of an assembly stays outward, and the file holds no reflection', async () => {
+  const file = await export3MF({ nodes: [{ geometry: box }, { translation: [5, 0, 0], scale: [-1, 1, 1], geometry: box }] }),
+    text = await model(file);
+  assert.ok(!text.includes('transform='));
+  assert.match(text, /x="3000" y="-4000"/, 'the reflection runs back from X = 5 m to 3 m');
+  const parsed = await parse3MF(file, { units: 'file' });
+  assert.ok(Math.abs(volume(parsed) - 2 * 24e9) < 2);
+});
+
+test('parts of an assembly keep their colours triangle by triangle', async () => {
+  const painted = {
+      positions: new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]),
+      normals: new Float32Array(9),
+      colors: new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1]),
+      indices: new Uint32Array([0, 1, 2]),
+    },
+    text = await model(
+      await export3MF({
+        nodes: [
+          { geometry: box, material: { color: [1, 0, 0, 1] } },
+          { translation: [5, 0, 0], geometry: box, material: { color: [0, 1, 0, 1] } },
+          { translation: [9, 0, 0], geometry: painted },
+        ],
+      }),
+    );
+  assert.match(text, /<object id="\d+" type="model" pid="1" pindex="0"/);
+  assert.equal(count(text, /pid="1" p1="1"\/>/g), 12, 'the second part names its colour, the first takes the object\'s');
+  assert.match(text, /<triangle v1="16" v2="17" v3="18" pid="\d+" p1="0" p2="1" p3="2"\/>/);
+});
+
+test('with assembly off, mirrored nodes share a reflected object, and no item keeps a reflection', async () => {
   const mirrored = (x) => ({ translation: [x, 0, 0], scale: [-1, 1, 1], geometry: box }),
-    file = await export3MF({ nodes: [{ geometry: box }, mirrored(5), mirrored(9)] }),
+    file = await export3MF({ nodes: [{ geometry: box }, mirrored(5), mirrored(9)] }, { assembly: false }),
     text = await model(file);
   assert.equal(count(text, /<object /g), 2, 'the geometry and its reflection');
   for (const [, values] of text.matchAll(/transform="([^"]+)"/g)) {
