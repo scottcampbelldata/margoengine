@@ -46,7 +46,7 @@ export interface IKSkeleton {
         scale: ArrayLike<number>;
     };
     setPose(bone: number, pose: {
-        rotation: readonly number[];
+        rotation: readonly [number, number, number, number];
     }): unknown;
 }
 

@@ -359,12 +359,19 @@ function partial(q: readonly number[], fraction: number): [number, number, numbe
   return [q[0] * k, q[1] * k, q[2] * k, Math.cos(angle / 2)];
 }
 
+const quaternionAt = (values: Float64Array, at: number): [number, number, number, number] => [
+  values[at],
+  values[at + 1],
+  values[at + 2],
+  values[at + 3],
+];
+
 /** A skeleton {@link solveSkeletonIK} can pose: `@margoengine/animation`'s `Skeleton` fits. */
 export interface IKSkeleton {
   readonly parents: readonly number[];
   readonly names: readonly string[];
   getPose(bone: number): { translation: ArrayLike<number>; rotation: ArrayLike<number>; scale: ArrayLike<number> };
-  setPose(bone: number, pose: { rotation: readonly number[] }): unknown;
+  setPose(bone: number, pose: { rotation: readonly [number, number, number, number] }): unknown;
 }
 
 /**
@@ -389,7 +396,7 @@ export function solveSkeletonIK(
   const joints = (chain?.joints ?? []).map((joint) => (typeof joint === 'string' ? names.indexOf(joint) : joint));
   const result = solvePoseIK({ parents, local }, { ...chain, joints });
   for (let i = 0; i < joints.length - 1; i++)
-    skeleton.setPose(joints[i], { rotation: Array.from(local.subarray(joints[i] * 10 + 3, joints[i] * 10 + 7)) });
+    skeleton.setPose(joints[i], { rotation: quaternionAt(local, joints[i] * 10 + 3) });
   return result;
 }
 

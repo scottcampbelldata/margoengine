@@ -123,7 +123,10 @@ export interface SpringPose {
 export interface SpringSkeleton {
   readonly parents: readonly number[];
   getPose(bone: number): { translation: ArrayLike<number>; rotation: ArrayLike<number>; scale: ArrayLike<number> };
-  setPose(bone: number, pose: { translation: readonly number[]; rotation: readonly number[] }): unknown;
+  setPose(
+    bone: number,
+    pose: { translation: readonly [number, number, number]; rotation: readonly [number, number, number, number] },
+  ): unknown;
 }
 
 /** The rate the settings are per step of, as in VRM. */
@@ -700,8 +703,8 @@ export class SpringBones {
     this.stepPose({ parents: this.parents, local }, delta, root);
     for (const b of this.bones())
       skeleton.setPose(b, {
-        translation: Array.from(local.subarray(b * 10, b * 10 + 3)),
-        rotation: Array.from(local.subarray(b * 10 + 3, b * 10 + 7)),
+        translation: [local[b * 10], local[b * 10 + 1], local[b * 10 + 2]],
+        rotation: [local[b * 10 + 3], local[b * 10 + 4], local[b * 10 + 5], local[b * 10 + 6]],
       });
   }
 }

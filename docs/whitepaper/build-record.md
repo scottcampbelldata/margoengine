@@ -1209,6 +1209,7 @@ An audit of the finished batches against their job text listed 70 gaps for the H
 | Texture 2 | BC on the CPU, DDS array size 0 | DONE | this commit | LIM-285 |
 | Texture 3 | decodeImage, KTX2 in Node | DONE | this commit | LIM-285 |
 | Texture 4 | exportOBJ and compressTextures on held textures | DONE | this commit | LIM-285 |
+| README 1 | last README error, Skeleton in rigging types | DONE | this commit | - |
 
 ## LAZ: one LAS reader, and every point format on a real file
 

@@ -90,8 +90,8 @@ export interface SpringSkeleton {
         scale: ArrayLike<number>;
     };
     setPose(bone: number, pose: {
-        translation: readonly number[];
-        rotation: readonly number[];
+        translation: readonly [number, number, number];
+        rotation: readonly [number, number, number, number];
     }): unknown;
 }
 

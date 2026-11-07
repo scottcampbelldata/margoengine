@@ -217,15 +217,6 @@ does not own. Each entry says exactly what is needed to close it.
 - **Repro:** `createHeadlessStage({ gpu: create([]), width: 640, height: 360 })`, then `loadGLTF(stage.engine, url)` on `examples/assets/flight-helmet.glb` served over HTTP.
 - **Cause:** image decoding uses the browser's `createImageBitmap`, Node has none, and upload uses `copyExternalImageToTexture`, which needs a browser image. A fix needs a decoder hook in the loaders and an upload through `writeTexture`.
 
-### 1 error in the package README examples
-
-- **What:** `npm run check:readmes` (a step of `verify`) type-checks all the examples of the packages. When the check was built it found 715 errors in 181 examples. One remains, in rigging. `scripts/support/readme-types-known.json` lists them, and the list only shrinks.
-- **Repro:** empty the known list to `{}`, then `npm run build:packages` and `npm run check:readmes`.
-- **Cause:** a published type: `Skeleton` is refused as `IKSkeleton`, whose `setPose` takes `readonly number[]` where `Skeleton`'s takes a four-number tuple. It waits for the lane working in rigging.
-- **Fixed 2026-11-06:** 288 errors: every other example now sets up what it uses, in the example, so it reads as a reader would paste it. Published types fixed with them: `EngineKernel` declares `gpu`, `renderTarget` and `lighting`; importing scene no longer stops plugins fitting `engine.use`; a public `Mesh` is taken by `addOccluder`; shader atomics keep their element type; `block` keeps the type of the `Var` it returns; voxel messages are bytes `WebSocket.send` takes (`tests/public-engine-types.test.js`). `GPUBufferUsage` and `GPUTextureUsage` are real browser globals TypeScript's DOM library leaves out, so the check declares those two and nothing else (`README_GLOBALS`).
-- **Also open:** `modern:test:packages` checks the same examples against the tarballs with no known list, so check:merge fails on these until the list is empty. That is deliberate: the list is for landing, and nothing is released on it. About 170 older `declare const` lines remain in examples that pass the check: those names are stated, not set up, so those examples still do not run as pasted.
-- **Needed to close:** fix the rigging type and run `npm run check:readmes -- --shrink` until the file is `{}`. This list must be empty before release.
-
 ### A limp ragdoll keeps moving on a floor when a limit and a contact cannot both hold
 
 - **What:** a ragdoll lying where a floor holds a limb past its cone limit never comes to rest: Knight.glb with the humanoid preset and fitted hulls, pushed over, still has a hand at 0.7 to 1 m/s after 20 s, with the limb up to 0.8 rad past its limit. Capsules settle under default limits (0.05 m/s) because they are thin enough to meet the limits on the floor. Limits a body can meet lying down settle hulls as well (`swing` 2.5, under 0.05 m/s).

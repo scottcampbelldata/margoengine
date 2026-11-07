@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 9892470,
+  "total": 9926801,
   "history": [
     {
       "date": "2026-10-24",
@@ -2936,6 +2936,12 @@
       "commit": "e885db8a7",
       "reason": "WebP, BC and image decoder entries, and exportOBJ and compressTextures reading them",
       "grew": 7
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "db3f78531",
+      "reason": "exportOBJ holds images waiting for writeTextures, in the shared scene code every writer bundles",
+      "grew": 1
     }
   ],
   "items": {
@@ -3064,9 +3070,11 @@
     "@margoengine/cutscene": 7115,
     "@margoengine/cutscene/shots": 3336,
     "@margoengine/decoders": 492515,
+    "@margoengine/decoders/bc": 3890,
     "@margoengine/decoders/brotli": 68932,
     "@margoengine/decoders/dds": 3029,
     "@margoengine/decoders/draco-points": 154011,
+    "@margoengine/decoders/image": 786471,
     "@margoengine/decoders/jxl": 902155,
     "@margoengine/decoders/ktx": 2851,
     "@margoengine/decoders/ktx2-gpu": 14314,
@@ -3081,6 +3089,8 @@
     "@margoengine/decoders/texture": 914,
     "@margoengine/decoders/tga": 1614,
     "@margoengine/decoders/tiff": 4129,
+    "@margoengine/decoders/webp": 11720,
+    "@margoengine/decoders/webp-lossless": 3366,
     "@margoengine/dof": 7880,
     "@margoengine/dof/autofocus": 2154,
     "@margoengine/dof/lens": 1506,
@@ -3103,7 +3113,7 @@
     "@margoengine/exporters/atlas": 2403,
     "@margoengine/exporters/capture": 7241,
     "@margoengine/exporters/collect": 9643,
-    "@margoengine/exporters/dae": 12101,
+    "@margoengine/exporters/dae": 12699,
     "@margoengine/exporters/draco": 185946,
     "@margoengine/exporters/godot": 10258,
     "@margoengine/exporters/godot-2d": 3416,
@@ -3624,10 +3634,6 @@
     "margoengine": 308,
     "margoengine/game": 1030,
     "margoengine/viz": 800,
-    "margoengine/web": 599,
-    "@margoengine/decoders/bc": 3890,
-    "@margoengine/decoders/image": 786471,
-    "@margoengine/decoders/webp": 11720,
-    "@margoengine/decoders/webp-lossless": 3366
+    "margoengine/web": 599
   }
 }

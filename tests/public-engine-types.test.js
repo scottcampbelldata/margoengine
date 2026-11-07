@@ -95,3 +95,20 @@ socket.send(new EntityCodec({ health: 'u8' }).encode(new Map([[1, { health: 20 }
     '',
   );
 });
+
+test('regression: an animation Skeleton is what rigging poses', () => {
+  assert.equal(
+    errors(
+      'skeleton',
+      `import type { Skeleton } from '@margoengine/animation';
+import { solveSkeletonIK, type IKSkeleton } from '@margoengine/rigging/ik';
+import type { SpringSkeleton } from '@margoengine/rigging/springs';
+declare const skeleton: Skeleton;
+export const ik: IKSkeleton = skeleton;
+export const springs: SpringSkeleton = skeleton;
+export const solve = solveSkeletonIK;
+`,
+    ),
+    '',
+  );
+});
