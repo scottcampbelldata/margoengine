@@ -163,7 +163,7 @@ assert.ok(result.pass, `${result.different} pixels changed, SSIM ${result.ssim}`
 | `compareImages(actual, reference, { threshold?, maxRatio?, minSSIM? })` | Both limits must hold for `pass`. `maxRatio` defaults to 0.001, `minSSIM` to 0.99, `threshold` to 2. Resolves the `pixelDiff` result with `image`, plus `pass` and `ssim`. |
 | `pixelDiff(a, b, { threshold?, image? })` | `{ different, total, ratio, largest, mean }`. A pixel differs when a channel moves more than `threshold`, 0 to 255, default 2. Colours are compared premultiplied, so colour under full transparency does not count. `image: true` adds changed pixels in red over a faded `a`. |
 | `ssim(a, b, { window?, sigma?, map? })` | Structural similarity as `{ score }`: 1 for identical images. `window` defaults to 11, `sigma` to 1.5, as published, on luma. `map: true` adds the score of each window. |
-| `decodePNG(bytes)` | A PNG file as RGBA pixels: every colour type and bit depth, 16-bit samples cut to 8. Interlaced files reject. Colour profiles and gamma are ignored. |
+| `decodePNG(bytes)` | A PNG file as RGBA pixels: every colour type and bit depth, interlaced or not, 16-bit samples cut to 8. A chunk with a bad CRC or a bit depth its colour type cannot have rejects. Colour profiles and gamma are ignored. All of PngSuite reads as Chromium reads it. |
 
 A pixel count sees how many pixels moved, and SSIM sees whether the picture looks different: a slight brightness change fails
 the first and passes the second, and a small hole does the opposite. Images of different sizes reject.

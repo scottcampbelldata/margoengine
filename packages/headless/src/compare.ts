@@ -196,7 +196,36 @@ export function ssim(a: HeadlessPixels, b: HeadlessPixels, options: SSIMOptions 
 }
 
 const PNG_SIGNATURE = [137, 80, 78, 71, 13, 10, 26, 10],
-  PNG_CHANNELS: Readonly<Record<number, number>> = { 0: 1, 2: 3, 3: 1, 4: 2, 6: 4 };
+  PNG_CHANNELS: Readonly<Record<number, number>> = { 0: 1, 2: 3, 3: 1, 4: 2, 6: 4 },
+  /** The bit depths the PNG specification allows for each colour type. */
+  PNG_DEPTHS: Readonly<Record<number, readonly number[]>> = {
+    0: [1, 2, 4, 8, 16],
+    2: [8, 16],
+    3: [1, 2, 4, 8],
+    4: [8, 16],
+    6: [8, 16],
+  },
+  /** Adam7's seven passes, each as first column, first row, column step, row step. */
+  ADAM7 = [
+    [0, 0, 8, 8],
+    [4, 0, 8, 8],
+    [0, 4, 4, 8],
+    [2, 0, 4, 4],
+    [0, 2, 2, 4],
+    [1, 0, 2, 2],
+    [0, 1, 1, 2],
+  ],
+  CRC_TABLE = Uint32Array.from({ length: 256 }, (_, n) => {
+    for (let bit = 0; bit < 8; bit++) n = n & 1 ? 0xedb88320 ^ (n >>> 1) : n >>> 1;
+    return n >>> 0;
+  });
+
+/** PNG's CRC-32 of a chunk's name and body. */
+function chunkCRC(bytes: Uint8Array): number {
+  let crc = 0xffffffff;
+  for (let i = 0; i < bytes.length; i++) crc = CRC_TABLE[(crc ^ bytes[i]) & 255] ^ (crc >>> 8);
+  return (crc ^ 0xffffffff) >>> 0;
+}
 
 const badPNG = () => fault('failed', 'Not a PNG file this reader can use', 'headless');
 
@@ -230,7 +259,8 @@ function unfilter(raw: Uint8Array, stride: number, height: number, step: number)
 
 /**
  * Reads a PNG file to RGBA pixels, so a reference image made by any tool can be compared. Takes every colour type at
- * every bit depth; 16-bit samples keep their high byte. Rejects interlaced files. Colour profiles and gamma are ignored.
+ * every bit depth, interlaced or not; 16-bit samples keep their high byte. A chunk whose CRC does not match, or a bit depth
+ * the colour type does not allow, is refused. Colour profiles and gamma are ignored.
  */
 export async function decodePNG(bytes: Uint8Array): Promise<HeadlessPixels> {
   if (!(bytes instanceof Uint8Array)) throw typeError('decodePNG needs PNG file bytes', 'headless');
@@ -241,13 +271,16 @@ export async function decodePNG(bytes: Uint8Array): Promise<HeadlessPixels> {
     depth = bytes[24],
     type = bytes[25],
     channels = PNG_CHANNELS[type];
-  if (!channels || !width || !height || bytes[28] !== 0) throw badPNG();
-  const compressed: Uint8Array[] = [];
+  if (!channels || !PNG_DEPTHS[type].includes(depth) || !width || !height || bytes[28] > 1) throw badPNG();
+  const interlaced = bytes[28] === 1,
+    compressed: Uint8Array[] = [];
   let palette: Uint8Array | undefined, transparency: Uint8Array | undefined;
   for (let at = 8; at + 12 <= bytes.length; ) {
     const length = view.getUint32(at),
       name = String.fromCharCode(...bytes.subarray(at + 4, at + 8)),
       body = bytes.subarray(at + 8, at + 8 + length);
+    if (at + 12 + length > bytes.length || view.getUint32(at + 8 + length) !== chunkCRC(bytes.subarray(at + 4, at + 8 + length)))
+      throw badPNG();
     if (name === 'IDAT') compressed.push(body);
     else if (name === 'PLTE') palette = body;
     else if (name === 'tRNS') transparency = body;
@@ -258,48 +291,61 @@ export async function decodePNG(bytes: Uint8Array): Promise<HeadlessPixels> {
   const stream = new Blob(compressed as BlobPart[]).stream().pipeThrough(new DecompressionStream('deflate')),
     raw = new Uint8Array(await new Response(stream).arrayBuffer()),
     bits = channels * depth,
-    stride = Math.ceil((width * bits) / 8);
-  if (raw.length < (stride + 1) * height) throw badPNG();
-  const rows = unfilter(raw, stride, height, Math.max(1, bits >> 3)),
     data = new Uint8Array(width * height * 4),
     most = 2 ** Math.min(depth, 8) - 1,
-    sample = (y: number, index: number): number => {
-      const at = y * stride;
-      if (depth === 16) return rows[at + index * 2];
-      if (depth === 8) return rows[at + index];
-      const bit = index * depth;
-      return (rows[at + (bit >> 3)] >> (8 - depth - (bit & 7))) & most;
-    },
+    scale = 255 / most,
     // The transparent colour of grey and RGB files is stored in 16 bits per sample, whatever the depth.
-    key = (index: number) => (transparency!.length > index * 2 + 1 ? (transparency![index * 2] << 8) | transparency![index * 2 + 1] : -1),
-    whole = (y: number, index: number) =>
-      depth === 16 ? (rows[y * stride + index * 2] << 8) | rows[y * stride + index * 2 + 1] : sample(y, index);
-  for (let y = 0; y < height; y++)
-    for (let x = 0; x < width; x++) {
-      const at = (y * width + x) * 4,
-        scale = 255 / most;
-      if (type === 3) {
-        const index = sample(y, x);
-        if (!palette || index * 3 + 2 >= palette.length) throw badPNG();
-        data.set(palette.subarray(index * 3, index * 3 + 3), at);
-        data[at + 3] = transparency?.[index] ?? 255;
-      } else if (type === 0 || type === 4) {
-        data.fill(Math.round(sample(y, x * channels) * scale), at, at + 3);
-        data[at + 3] =
-          type === 4
-            ? Math.round(sample(y, x * 2 + 1) * scale)
-            : transparency && whole(y, x) === key(0)
-              ? 0
-              : 255;
-      } else {
-        for (let c = 0; c < 3; c++) data[at + c] = Math.round(sample(y, x * channels + c) * scale);
-        data[at + 3] =
-          type === 6
-            ? Math.round(sample(y, x * 4 + 3) * scale)
-            : transparency && [0, 1, 2].every((c) => whole(y, x * 3 + c) === key(c))
-              ? 0
-              : 255;
+    key = (index: number) => (transparency!.length > index * 2 + 1 ? (transparency![index * 2] << 8) | transparency![index * 2 + 1] : -1);
+  let consumed = 0;
+  // Reads one image of `across` by `down` pixels from the stream, its pixel (x, y) landing at (left + x * stepX, top + y * stepY).
+  const pass = (across: number, down: number, left: number, top: number, stepX: number, stepY: number): void => {
+    const stride = Math.ceil((across * bits) / 8);
+    if (raw.length < consumed + (stride + 1) * down) throw badPNG();
+    const rows = unfilter(raw.subarray(consumed), stride, down, Math.max(1, bits >> 3)),
+      sample = (y: number, index: number): number => {
+        const at = y * stride;
+        if (depth === 16) return rows[at + index * 2];
+        if (depth === 8) return rows[at + index];
+        const bit = index * depth;
+        return (rows[at + (bit >> 3)] >> (8 - depth - (bit & 7))) & most;
+      },
+      whole = (y: number, index: number) =>
+        depth === 16 ? (rows[y * stride + index * 2] << 8) | rows[y * stride + index * 2 + 1] : sample(y, index);
+    consumed += (stride + 1) * down;
+    for (let y = 0; y < down; y++)
+      for (let x = 0; x < across; x++) {
+        const at = ((top + y * stepY) * width + left + x * stepX) * 4;
+        if (type === 3) {
+          const index = sample(y, x);
+          if (!palette || index * 3 + 2 >= palette.length) throw badPNG();
+          data.set(palette.subarray(index * 3, index * 3 + 3), at);
+          data[at + 3] = transparency?.[index] ?? 255;
+        } else if (type === 0 || type === 4) {
+          data.fill(Math.round(sample(y, x * channels) * scale), at, at + 3);
+          data[at + 3] =
+            type === 4
+              ? Math.round(sample(y, x * 2 + 1) * scale)
+              : transparency && whole(y, x) === key(0)
+                ? 0
+                : 255;
+        } else {
+          for (let c = 0; c < 3; c++) data[at + c] = Math.round(sample(y, x * channels + c) * scale);
+          data[at + 3] =
+            type === 6
+              ? Math.round(sample(y, x * 4 + 3) * scale)
+              : transparency && [0, 1, 2].every((c) => whole(y, x * 3 + c) === key(c))
+                ? 0
+                : 255;
+        }
       }
+  };
+  if (!interlaced) pass(width, height, 0, 0, 1, 1);
+  else
+    for (const [left, top, stepX, stepY] of ADAM7) {
+      const across = Math.ceil((width - left) / stepX),
+        down = Math.ceil((height - top) / stepY);
+      // A small image leaves some passes with no pixels, and those have no rows in the stream.
+      if (across > 0 && down > 0) pass(across, down, left, top, stepX, stepY);
     }
   return { width, height, data };
 }

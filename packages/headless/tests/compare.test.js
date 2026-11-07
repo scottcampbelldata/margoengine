@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import { deflateSync } from 'node:zlib';
 import { encodePNG } from '../dist/index.js';
 import { compareImages, decodePNG, pixelDiff, ssim } from '../dist/compare.js';
@@ -239,10 +241,33 @@ test('decodePNG reads each colour type and depth', async () => {
 test('decodePNG refuses what is not a PNG it can read', async () => {
   await assert.rejects(decodePNG(new Uint8Array(40)), { code: 'failed' });
   await assert.rejects(decodePNG('x.png'), TypeError);
-  await assert.rejects(decodePNG(png({ width: 1, height: 1, type: 0, rows: [0, 1], interlace: 1 })), { code: 'failed' });
+  await assert.rejects(decodePNG(png({ width: 1, height: 1, type: 0, rows: [0, 1], interlace: 2 })), { code: 'failed' });
   await assert.rejects(decodePNG(png({ width: 1, height: 1, type: 0, rows: [9, 1] })), { code: 'failed' });
   await assert.rejects(decodePNG(png({ width: 9, height: 9, type: 0, rows: [0, 1] })), { code: 'failed' });
   await assert.rejects(decodePNG(png({ width: 1, height: 1, type: 3, rows: [0, 1] })), { code: 'failed' });
+});
+
+test('decodePNG refuses a broken chunk and a bit depth the colour type cannot have', async () => {
+  const good = png({ width: 1, height: 1, type: 0, rows: [0, 1] }),
+    broken = good.slice();
+  broken[broken.length - 20] ^= 1; // a bit of the image stream, so only its CRC can tell
+  await assert.rejects(decodePNG(broken), { code: 'failed' });
+  await assert.rejects(decodePNG(png({ width: 1, height: 1, type: 2, depth: 4, rows: [0, 1, 2] })), { code: 'failed' });
+  await assert.rejects(decodePNG(png({ width: 1, height: 1, type: 0, depth: 0, rows: [0, 1] })), { code: 'failed' });
+});
+
+test('decodePNG gives what Chromium\'s decoder gives on PngSuite, and refuses what it refuses', async () => {
+  const folder = new URL('./fixtures/pngsuite/', import.meta.url),
+    { reads, refuses } = JSON.parse(await readFile(new URL('chromium.json', folder), 'utf8'));
+  assert.equal(reads.length, 162);
+  assert.equal(refuses.length, 14);
+  for (const { file, width, height, sha256 } of reads) {
+    const image = await decodePNG(new Uint8Array(await readFile(new URL(file, folder))));
+    assert.deepEqual([image.width, image.height], [width, height], file);
+    assert.equal(createHash('sha256').update(image.data).digest('hex'), sha256, file);
+  }
+  for (const file of refuses)
+    await assert.rejects(decodePNG(new Uint8Array(await readFile(new URL(file, folder)))), { code: 'failed' }, file);
 });
 
 test('compareImages passes the same picture, fails a changed one, and takes PNG bytes', async () => {

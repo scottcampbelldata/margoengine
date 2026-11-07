@@ -192,6 +192,7 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 | [`examples/assets/ATTRIBUTION.md`](examples/assets/ATTRIBUTION.md) | demo models: RobotExpressive (CC0), FlightHelmet (CC0), Tokyo diorama (Apache-2.0); test mesh: MakeHuman base mesh (CC0) |
 | [`examples/assets/vrm/README.md`](examples/assets/vrm/README.md) | sample avatars for the VRM tests: Seed-san and VRM1_Constraint_Twist_Sample (VRM Consortium samples, VRM Public License 1.0; Seed-san model by VirtualCast, Inc.; (c) 2022 pixiv Inc.) |
 | [`examples/assets/robot-CREDITS.md`](examples/assets/robot-CREDITS.md) | RobotExpressive upstream credits (Tomás Laulhé, Don McCurdy; CC0) |
+| [`packages/headless/tests/fixtures/pngsuite/NOTICE.md`](packages/headless/tests/fixtures/pngsuite/NOTICE.md) | test fixtures: PngSuite 2017jul19 by Willem van Schaik (free to use, copy, modify and distribute) |
 | [`examples/assets/tokyo-diorama-CREDITS.md`](examples/assets/tokyo-diorama-CREDITS.md) | Tokyo diorama: Poly Haven textures (CC0), Noto Sans CJK (OFL 1.1); inspiration credit to Glen Fox, Littlest Tokyo (CC BY 4.0, nothing copied) |
 | [`examples/assets/khronos/README.md`](examples/assets/khronos/README.md) | 32 Khronos glTF sample models, each CC0 1.0 or CC BY 4.0 with its credit |
 | [`examples/assets/khronos-samples/README.md`](examples/assets/khronos-samples/README.md) | Collada and KHR_animation_pointer test models: AnimatedColorsCube (CC0 1.0, Khronos glTF-Sample-Assets), Cesium Man `.dae` and texture (CC BY 4.0, Cesium); URLs, pinned commits and sha256 there |

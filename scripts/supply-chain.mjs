@@ -140,6 +140,10 @@ const ASSETS = [
   ],
   ['examples/assets/robot-CREDITS.md', 'RobotExpressive upstream credits (Tomás Laulhé, Don McCurdy; CC0)'],
   [
+    'packages/headless/tests/fixtures/pngsuite/NOTICE.md',
+    'test fixtures: PngSuite 2017jul19 by Willem van Schaik (free to use, copy, modify and distribute)',
+  ],
+  [
     'examples/assets/tokyo-diorama-CREDITS.md',
     'Tokyo diorama: Poly Haven textures (CC0), Noto Sans CJK (OFL 1.1); inspiration credit to Glen Fox, Littlest Tokyo (CC BY 4.0, nothing copied)',
   ],
