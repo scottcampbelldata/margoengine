@@ -202,6 +202,19 @@ pub extern "C" fn body_update_mass(body: u32) {
         world().update_mass(body);
     }
 }
+/// Changes how a body moves: one of the FIXED, DYNAMIC, KINEMATIC_ bits.
+#[unsafe(no_mangle)]
+pub extern "C" fn body_set_kind(body: u32, kind: u32) {
+    world().set_body_kind(body, kind);
+}
+/// Sets a body's own solid: mass at a point of its frame, principal moments along a frame of its own, then its mass again.
+#[unsafe(no_mangle)]
+#[allow(clippy::too_many_arguments)]
+pub extern "C" fn body_set_own(body: u32, mass: f32, x: f32, y: f32, z: f32, ix: f32, iy: f32, iz: f32, qx: f32, qy: f32, qz: f32, qw: f32) {
+    if world().body_alive(body) {
+        world().set_own_solid(body, mass, v3(x, y, z), v3(ix, iy, iz), Q { x: qx, y: qy, z: qz, w: qw });
+    }
+}
 /// A new joint between two bodies, or -1 when one is gone, they are one body, or memory is out. JS then writes its columns.
 #[unsafe(no_mangle)]
 pub extern "C" fn joint_add(a: u32, b: u32, flags: u32) -> i32 {

@@ -78,6 +78,8 @@ pub struct Header {
     pub events: u32,
     /// Not zero: the narrow phase asks the contact filter about each pair.
     pub filtering: u32,
+    /// The most extra passes an island of this step asks for: each substep runs `iterations` plus this many passes.
+    pub extra_passes: u32,
 }
 
 const HEADER_BYTES: u32 = ((core::mem::size_of::<Header>() + 15) & !15) as u32;
@@ -151,6 +153,7 @@ impl World {
                 lost: NONE,
                 events: 0,
                 filtering: 0,
+                extra_passes: 0,
             });
         }
         Some(world)
@@ -250,7 +253,7 @@ impl World {
         let at = row as usize;
         self.clear_row(Rows::Body, at, GENERATION);
         unsafe {
-            for column in [ROTATION_W, PREVIOUS_ROTATION_W, INERTIA_FRAME_W, TARGET_ROTATION_W, GRAVITY_SCALE] {
+            for column in [ROTATION_W, PREVIOUS_ROTATION_W, INERTIA_FRAME_W, TARGET_ROTATION_W, OWN_FRAME_W, GRAVITY_SCALE] {
                 *self.f(column).add(at) = 1.0;
             }
             *self.u(FLAGS).add(at) = ALIVE | CAN_SLEEP | (kind & KIND);

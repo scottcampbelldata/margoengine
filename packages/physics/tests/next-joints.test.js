@@ -191,12 +191,14 @@ test('wrong input says what to pass', () => {
   assert.throws(() => joint.setMotor({}), /need a revolute or prismatic joint/);
   const hinge = physics.addJoint(a, b, { type: 'revolute', axis: [1, 0, 0] });
   assert.throws(() => hinge.setMotor({ maxForce: -1 }), /maxForce must be 0 or more/);
-  for (const call of [
-    () => physics.addJoint(a, b, { type: 'generic' }),
-    () => joint.setAxisLimits(),
-    () => joint.setAxisMotor(),
-  ])
-    assert.throws(call, { code: 'unsupported', message: /not in the own solver yet/ });
+  assert.throws(() => joint.setAxisLimits('angX', 0, 1), /need a generic joint/);
+  assert.throws(() => joint.setAxisMotor('angX', {}), /need a generic joint/);
+  const generic = physics.addJoint(a, b, { type: 'generic', locked: ['linX', 'linY', 'linZ'] });
+  assert.throws(() => generic.setAxisLimits('linX', 0, 1), /locks linX, so it has no range/);
+  assert.throws(() => generic.setAxisLimits('angW', 0, 1), /Unknown joint axis angW/);
+  assert.throws(() => generic.setAxisLimits('angX', 1, 0), /finite min <= max/);
+  assert.throws(() => generic.setLimits(0, 1), /need a revolute or prismatic joint/);
+  assert.throws(() => physics.addJoint(a, b, { type: 'generic', locked: ['linQ'] }), /Unknown joint axis linQ/);
   physics.dispose();
   other.dispose();
 });

@@ -117,6 +117,21 @@ columns! {
     NEXT_FREE u32 Body,
     ADDITIONAL_MASS f32 Body,
     FIRST_COLLIDER u32 Body,
+    // A solid of the body's own on top of its colliders: mass at a point of its frame, and principal moments along a frame
+    // of its own, both in the body's frame. setAdditionalMass and setMassProperties write it.
+    OWN_MASS f32 Body,
+    OWN_CENTER_X f32 Body,
+    OWN_CENTER_Y f32 Body,
+    OWN_CENTER_Z f32 Body,
+    OWN_INERTIA_X f32 Body,
+    OWN_INERTIA_Y f32 Body,
+    OWN_INERTIA_Z f32 Body,
+    OWN_FRAME_X f32 Body,
+    OWN_FRAME_Y f32 Body,
+    OWN_FRAME_Z f32 Body,
+    OWN_FRAME_W f32 Body,
+    // Solver passes the body's island takes on top of the world's.
+    EXTRA_PASSES u32 Body,
     // The first of the body's joints: the chain runs through JOINT_NEXT_A or JOINT_NEXT_B, whichever side the body is on.
     FIRST_JOINT u32 Body,
     // Sleep: seconds under the threshold, and the energy the window began with.
@@ -239,6 +254,8 @@ columns! {
     ISLAND_START u32 BodyList,
     ISLAND_COUNT u32 BodyList,
     ISLAND_READY u32 BodyList,
+    // The most extra passes any body of the island asks for.
+    ISLAND_PASSES u32 BodyList,
     // A manifold's points. An anchor is the point on each surface, from its body's centre of mass in its body's frame.
     // Separation is along the normal, negative when the shapes overlap. The id names the features that made the point.
     CONTACT_ANCHOR_A_X f32 Contact,

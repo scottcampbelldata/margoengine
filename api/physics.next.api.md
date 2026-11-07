@@ -194,6 +194,8 @@ export class KernelWorld {
     setJointAxis(joint: number, axis: readonly [number, number, number]): void;
     setJointFrames(joint: number, a: Quat, b: Quat): void;
     updateMass(body: number): this;
+    setKind(body: number, kind: KernelBodyKind): this;
+    setOwnSolid(body: number, mass: number, center: Vec3, inertia: Vec3, frame?: Quat): this;
     setPose(body: number, position: Vec3, rotation: Quat, wake?: boolean): this;
     setTarget(body: number, position: Vec3, rotation: Quat): this;
     setLocks(body: number, { linear, angular }: {
@@ -283,7 +285,6 @@ export class Physics implements EnginePlugin, BodyOwner {
 export class PhysicsBody {
     readonly row: number;
     readonly mesh: Mesh | null;
-    readonly type: BodyType;
     readonly colliders: PhysicsCollider[];
     userData: unknown;
     restWritten: boolean;
@@ -291,12 +292,12 @@ export class PhysicsBody {
     depth: number;
     dirty: boolean;
     constructor(owner: BodyOwner,
-    row: number, mesh: Mesh | null,
-    type: BodyType);
+    row: number, mesh: Mesh | null, kind: BodyType);
+    get type(): BodyType;
     get valid(): boolean;
     markRemoved(): void;
     private get columns();
-    setType(): never;
+    setType(type: BodyType, wakeUp?: boolean): this;
     get position(): [number, number, number];
     get rotation(): [number, number, number, number];
     setPosition(position: Vec3, wakeUp?: boolean): this;
@@ -322,7 +323,12 @@ export class PhysicsBody {
     get centerOfMass(): [number, number, number];
     get principalInertia(): [number, number, number];
     get inertiaFrame(): [number, number, number, number];
-    setMassProperties(): never;
+    setMassProperties(properties: {
+        mass?: number;
+        centerOfMass?: Vec3;
+        inertia?: Vec3;
+        inertiaFrame?: Quat;
+    }): this;
     get gravityScale(): number;
     set gravityScale(value: number);
     get additionalSolverIterations(): number;
@@ -355,6 +361,7 @@ export class PhysicsCollider {
     isEnabled(): boolean;
     setEnabled(enabled: boolean): this;
     density(): number;
+    setDensity(density: number): this;
     translationWrtParent(): {
         x: number;
         y: number;
@@ -413,8 +420,8 @@ export class PhysicsJoint {
     } | null;
     setMotor(motor: MotorOptions): this;
     setRotationMotor(rotation: Quat, motor?: RotationMotorOptions): this;
-    setAxisLimits(): never;
-    setAxisMotor(): never;
+    setAxisLimits(dof: JointDof, min: number, max: number): this;
+    setAxisMotor(dof: JointDof, motor: MotorOptions): this;
     clearMotor(): this;
     set contactsEnabled(value: boolean);
     get contactsEnabled(): boolean;

@@ -57,6 +57,21 @@ interface KernelExports extends WebAssembly.Exports {
   body_add(kind: number): number;
   body_remove(body: number): number;
   body_update_mass(body: number): void;
+  body_set_kind(body: number, kind: number): void;
+  body_set_own(
+    body: number,
+    mass: number,
+    x: number,
+    y: number,
+    z: number,
+    ix: number,
+    iy: number,
+    iz: number,
+    qx: number,
+    qy: number,
+    qz: number,
+    qw: number,
+  ): void;
   collider_add(
     body: number,
     shape: number,
@@ -615,6 +630,28 @@ export class KernelWorld {
    */
   updateMass(body: number): this {
     this.api.body_update_mass(body);
+    return this;
+  }
+  /**
+   * Changes how a body moves, keeping its pose, colliders and joints. It wakes, with what it touches. A body made fixed
+   * stops and drops its pairs with other fixed bodies, so what they touched ends; one made `kinematicPosition` holds its
+   * pose until given a target.
+   * @throws RangeError for an unknown kind.
+   */
+  setKind(body: number, kind: KernelBodyKind): this {
+    const bits = Object.hasOwn(bodyKinds, kind) ? bodyKinds[kind] : undefined;
+    if (bits === undefined)
+      throw new RangeError(`Unknown body kind ${String(kind)}; use one of ${Object.keys(bodyKinds).join(', ')}.`);
+    this.api.body_set_kind(body, bits);
+    return this;
+  }
+  /**
+   * Gives a body a solid of its own on top of its colliders and works out its mass again: `mass` kilograms at `center`,
+   * and principal moments `inertia` in kg m² along `frame`, all in the body's frame. It replaces an earlier one, and the
+   * `additionalMass` column goes to 0. With no collider mass these figures are the body's, exactly.
+   */
+  setOwnSolid(body: number, mass: number, center: Vec3, inertia: Vec3, frame: Quat = [0, 0, 0, 1]): this {
+    this.api.body_set_own(body, mass, center[0], center[1], center[2], inertia[0], inertia[1], inertia[2], frame[0], frame[1], frame[2], frame[3]);
     return this;
   }
   /**

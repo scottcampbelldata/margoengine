@@ -287,7 +287,8 @@ impl World {
 
     /// One pass over the points. `biased`: the soft pass, which pushes; otherwise the relaxing one, which takes the push's
     /// speed back out and tallies the drift.
-    pub fn solve_contacts(&mut self, h: f32, step: Soft, biased: bool, turn: usize) {
+    /// `least`: a pair joins only when its island asks for at least this many extra passes (see `step`).
+    pub fn solve_contacts(&mut self, h: f32, step: Soft, biased: bool, turn: usize, least: u32) {
         let max_push = self.header().contact_max_push;
         let slop = self.header().contact_slop;
         let threshold = self.bounce_speed(h);
@@ -295,6 +296,9 @@ impl World {
         for i in 0..self.header().solving as usize {
             let row = self.uu(SOLVE_PAIRS, i) as usize;
             let (a, b) = self.pair_bodies(row as u32);
+            if least > 0 && self.extra_of(a).max(self.extra_of(b)) < least {
+                continue;
+            }
             let (mut body_a, mut body_b) = self.pair_moving(row, a, b);
             let (center_a, center_b) = (self.v(CENTER_X, a), self.v(CENTER_X, b));
             let (rotation_a, rotation_b) = (self.q(ROTATION_X, a), self.q(ROTATION_X, b));

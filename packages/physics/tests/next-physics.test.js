@@ -23,9 +23,6 @@ test('a call that is not served yet says so, and what to use', () => {
     () => physics.debugRender(),
     () => physics.addBody(null, { ccd: true }),
     () => physics.addBody(null, { colliders: { shape: 'cylinder', radius: 1, halfHeight: 1 } }),
-    () => body.setType('fixed'),
-    () => body.setMassProperties(),
-    () => body.setAdditionalMass(1, [1, 1, 1]),
     () => {
       body.ccd = true;
     },

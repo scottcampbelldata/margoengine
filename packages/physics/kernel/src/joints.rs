@@ -843,7 +843,8 @@ impl World {
     }
 
     /// One pass over the joints.
-    pub fn solve_joints(&mut self, h: f32, stiffness: Soft, pass: Pass) {
+    /// A path joins only when its island asks for at least `least` extra passes and fewer than `below` (see `step`).
+    pub fn solve_joints(&mut self, h: f32, stiffness: Soft, pass: Pass, least: u32, below: u32) {
         let most = self.header().joint_max_push;
         let solving = self.header().joint_solving as usize;
         let mut first = 0;
@@ -851,6 +852,15 @@ impl World {
             let mut last = first;
             while last + 1 < solving && self.uu(SOLVE_VIA, last + 1) != NONE {
                 last += 1;
+            }
+            if least > 0 || below != u32::MAX {
+                // A path's joints are one island's: joints join the islands of their bodies.
+                let row = self.uu(SOLVE_JOINTS, first) as usize;
+                let extra = self.extra_of(self.uu(JOINT_A, row) as usize).max(self.extra_of(self.uu(JOINT_B, row) as usize));
+                if extra < least || extra >= below {
+                    first = last + 1;
+                    continue;
+                }
             }
             let rate = self.s(SOLVE_SHARE, first) / h;
             for i in first..=last {

@@ -48,9 +48,12 @@ export class PhysicsBody {
     /** The body's row in every column of the kernel. */
     readonly row: number,
     readonly mesh: Mesh | null,
-    /** How the body moves. */
-    readonly type: BodyType,
+    private kind: BodyType,
   ) {}
+  /** How the body moves now; change it with {@link PhysicsBody.setType}. */
+  get type(): BodyType {
+    return this.kind;
+  }
   get valid(): boolean {
     return !this.removed;
   }
@@ -68,9 +71,24 @@ export class PhysicsBody {
   private get columns(): KernelWorld['columns'] {
     return this.world().columns;
   }
-  /** Not served yet: throws. */
-  setType(): never {
-    throw later('setType', 'the shapes and queries batch');
+  /**
+   * Switches how the body moves, keeping its pose, colliders and joints: a ragdoll going limp (`'dynamic'`) or back under
+   * animation (`'kinematicPosition'`), a door that unlocks. A dynamic or kinematic body keeps its velocity; one made fixed
+   * stops, and what it touched among fixed bodies ends. A body made `'kinematicPosition'` holds its pose until given a
+   * target. The body wakes whatever `wakeUp` says, with what it touches: the own solver lists a body again when its kind
+   * changes.
+   */
+  setType(type: BodyType, wakeUp = true): this {
+    const kernel = this.world();
+    if (typeof type !== 'string' || !['dynamic', 'fixed', 'kinematicPosition', 'kinematicVelocity'].includes(type))
+      throw new TypeError(`Unknown body type ${String(type)}; use dynamic, fixed, kinematicPosition or kinematicVelocity.`);
+    void wakeUp;
+    if (type === this.kind) return this;
+    kernel.setKind(this.row, type);
+    this.kind = type;
+    this.dirty = true;
+    this.restWritten = false;
+    return this;
   }
 
   /** Current physics position (end of the last step, not interpolated). */
@@ -243,16 +261,15 @@ export class PhysicsBody {
     return inverse > 0 ? 1 / inverse : 0;
   }
   /**
-   * Mass in kilograms on top of what the colliders give, spread as they are, so it scales the inertia too. Replaces what an
-   * earlier call added; 0 removes it. Takes effect at once. Inertia of its own is not served yet.
+   * Mass in kilograms and inertia in kg m² (about the body's x, y and z axes) on top of what the colliders give: the mass
+   * sits at the centre of mass the body has now, so alone it leaves the inertia as it is. Replaces what an earlier call,
+   * `setMassProperties` or the `additionalMass` option added; 0 removes it. Takes effect at once.
    */
   setAdditionalMass(mass: number, inertia: Vec3 = [0, 0, 0]): this {
     checkVec(inertia, 'Inertia');
     if (!(mass >= 0) || mass === Infinity || inertia.some((value) => value < 0))
       throw new RangeError('Additional mass and inertia must be finite numbers of at least 0; pass kilograms and kg m².');
-    if (inertia.some((value) => value > 0)) throw later('Inertia of its own', 'the shapes and queries batch');
-    this.columns.additionalMass[this.row] = mass;
-    this.world().updateMass(this.row);
+    this.world().setOwnSolid(this.row, mass, this.centerOfMass, inertia);
     return this;
   }
   /** Centre of mass in the body's frame. */
@@ -273,9 +290,35 @@ export class PhysicsBody {
       { row } = this;
     return [inertiaFrameX[row], inertiaFrameY[row], inertiaFrameZ[row], inertiaFrameW[row]];
   }
-  /** Not served yet: throws. */
-  setMassProperties(): never {
-    throw later('setMassProperties', 'the shapes and queries batch');
+  /**
+   * Replaces what the colliders give with these figures, for a mass and inertia that come from a file or a measurement.
+   * Any figure left out keeps the body's present value; a new `mass` alone scales the inertia with it, as a shape's does.
+   * Inertia is about the axes `inertiaFrame` names, and a 0 moment reads as infinite. Takes effect at once. The body's
+   * colliders get density 0, and colliders added later add the mass of their own density.
+   */
+  setMassProperties(properties: { mass?: number; centerOfMass?: Vec3; inertia?: Vec3; inertiaFrame?: Quat }): this {
+    const kernel = this.world(),
+      { mass, centerOfMass, inertia, inertiaFrame } = properties,
+      computed = this.mass,
+      total = mass ?? computed;
+    if (!(total >= 0) || total === Infinity) throw new RangeError('Mass must be a finite number of at least 0; pass kilograms.');
+    if (centerOfMass) checkVec(centerOfMass, 'Centre of mass');
+    if (inertia) {
+      checkVec(inertia, 'Inertia');
+      if (inertia.some((value) => value < 0)) throw new RangeError('Inertia must not be negative; pass kg m².');
+    }
+    if (inertiaFrame) checkRotation(inertiaFrame);
+    const [px, py, pz] = this.principalInertia,
+      // A shape's inertia grows with its mass.
+      over = computed > 0 ? total / computed : 0,
+      center = centerOfMass ?? this.centerOfMass,
+      moments: Vec3 = inertia ?? [px * over, py * over, pz * over],
+      frame = inertiaFrame ?? (inertia ? [0, 0, 0, 1] : this.inertiaFrame),
+      { colliderDensity } = kernel.columns;
+    for (const collider of this.colliders) colliderDensity[collider.handle] = 0;
+    kernel.setOwnSolid(this.row, total, center, moments, frame);
+    kernel.wake(this.row);
+    return this;
   }
   get gravityScale(): number {
     return this.columns.gravityScale[this.row];
@@ -285,13 +328,14 @@ export class PhysicsBody {
     this.world().wake(this.row);
     this.columns.gravityScale[this.row] = value;
   }
-  /** Not served yet: reads 0, and any other value throws. */
+  /** Solver passes the island of this body takes on top of the world's `solverIterations` (default 0). */
   get additionalSolverIterations(): number {
-    this.world();
-    return 0;
+    return this.columns.extraPasses[this.row];
   }
   set additionalSolverIterations(passes: number) {
-    if (passes !== 0) throw later('additionalSolverIterations', 'the shapes and queries batch');
+    if (!Number.isInteger(passes) || passes < 0 || passes > 1000)
+      throw new RangeError('Additional solver iterations must be a whole number from 0 to 1000; pass extra passes.');
+    this.columns.extraPasses[this.row] = passes;
   }
   /** Not served yet: reads false, and true throws. */
   get ccd(): boolean {

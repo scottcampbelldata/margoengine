@@ -142,19 +142,24 @@ impl World {
             self.refresh_joints();
             self.warm_start();
             self.warm_start_joints();
-            let passes = self.header().iterations;
+            // An island that asks for e extra passes takes the last iterations + e of iterations + most, so it runs as a world of
+            // iterations + e would and the pushing pass stays the last for all. `least` is the fewest extra passes a row's
+            // island must ask for to join a pass.
+            let (passes, most) = (self.header().iterations, self.header().extra_passes);
             // Only a settling pass teaches the warm start what a joint carries.
             if passes < 2 {
-                self.solve_joints(h, stiffness, Pass::Settle);
+                self.solve_joints(h, stiffness, Pass::Settle, 0, 2 - passes);
             }
-            for pass in 1..=passes {
-                self.solve_joints(h, stiffness, if pass == passes { Pass::Push } else { Pass::Settle });
-                self.solve_contacts(h, stiffness, true, substep as usize);
+            let all = passes + most;
+            for pass in 1..=all {
+                let least = (most + 1).saturating_sub(pass);
+                self.solve_joints(h, stiffness, if pass == all { Pass::Push } else { Pass::Settle }, least, u32::MAX);
+                self.solve_contacts(h, stiffness, true, substep as usize, least);
             }
             self.integrate_poses(h, substep + 1 == substeps);
             self.refresh_joints();
-            self.solve_joints(h, stiffness, Pass::Relax);
-            self.solve_contacts(h, stiffness, false, substep as usize);
+            self.solve_joints(h, stiffness, Pass::Relax, 0, u32::MAX);
+            self.solve_contacts(h, stiffness, false, substep as usize, 0);
             self.solve_impacts();
         }
         self.gather_events();

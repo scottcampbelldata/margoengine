@@ -130,10 +130,15 @@ pub fn principal(a: Sym) -> (V3, Q) {
 }
 
 impl World {
-    /// Mass, centre and inertia of `body` from its colliders, plus its additional mass, which scales the inertia with
-    /// the mass: it adds weight spread as the colliders are. Keeps the pose of the origin; the centre moves within it.
+    /// Mass, centre and inertia of `body`: its colliders and its own solid added by the parallel axis theorem, then its
+    /// additional mass, which scales the inertia with the mass: it adds weight spread as the rest is. With no collider
+    /// mass the own solid is the body, its figures kept exactly as given. Keeps the pose of the origin; the centre moves
+    /// within it.
     pub fn update_mass(&mut self, body: u32) {
         let at = body as usize;
+        let (own_mass, own_center, own_moments, own_frame) =
+            (self.s(OWN_MASS, at), self.v(OWN_CENTER_X, at), self.v(OWN_INERTIA_X, at), self.q(OWN_FRAME_X, at));
+        let own = own_mass > 0.0 || own_moments.x > 0.0 || own_moments.y > 0.0 || own_moments.z > 0.0;
         let mut mass = 0.0f32;
         let mut moment_sum = v3(0.0, 0.0, 0.0);
         // First pass: total mass and centre.
@@ -145,21 +150,36 @@ impl World {
             moment_sum = moment_sum.add(self.solid_center(c).scale(solid.mass));
             collider = unsafe { *self.u(COLLIDER_NEXT).add(c) };
         }
-        let center = if mass > 0.0 { moment_sum.scale(1.0 / mass) } else { v3(0.0, 0.0, 0.0) };
-        // Second pass: inertia about that centre.
-        let mut inertia = Sym { xx: 0.0, yy: 0.0, zz: 0.0, xy: 0.0, xz: 0.0, yz: 0.0 };
-        let mut collider = unsafe { *self.u(FIRST_COLLIDER).add(at) };
-        while collider != NONE {
-            let c = collider as usize;
-            let solid = self.collider_solid(c);
-            add_rotated(&mut inertia, self.solid_frame(c), solid.moments);
-            add_offset(&mut inertia, solid.mass, self.solid_center(c).sub(center));
-            collider = unsafe { *self.u(COLLIDER_NEXT).add(c) };
-        }
-        let (mut moments, frame) = principal(inertia);
-        let total = mass + self.s(ADDITIONAL_MASS, at);
-        if mass > 0.0 {
-            moments = moments.scale(total / mass);
+        let base = mass + own_mass;
+        let center = if mass == 0.0 {
+            own_center
+        } else if own {
+            moment_sum.add(own_center.scale(own_mass)).scale(1.0 / base)
+        } else {
+            moment_sum.scale(1.0 / mass)
+        };
+        let (mut moments, frame) = if mass == 0.0 {
+            (own_moments, own_frame)
+        } else {
+            // Second pass: inertia about that centre.
+            let mut inertia = Sym { xx: 0.0, yy: 0.0, zz: 0.0, xy: 0.0, xz: 0.0, yz: 0.0 };
+            let mut collider = unsafe { *self.u(FIRST_COLLIDER).add(at) };
+            while collider != NONE {
+                let c = collider as usize;
+                let solid = self.collider_solid(c);
+                add_rotated(&mut inertia, self.solid_frame(c), solid.moments);
+                add_offset(&mut inertia, solid.mass, self.solid_center(c).sub(center));
+                collider = unsafe { *self.u(COLLIDER_NEXT).add(c) };
+            }
+            if own {
+                add_rotated(&mut inertia, own_frame, own_moments);
+                add_offset(&mut inertia, own_mass, own_center.sub(center));
+            }
+            principal(inertia)
+        };
+        let total = base + self.s(ADDITIONAL_MASS, at);
+        if base > 0.0 {
+            moments = moments.scale(total / base);
         }
         let invert = |value: f32| if value > 0.0 { 1.0 / value } else { 0.0 };
         self.set_s(INVERSE_MASS, at, invert(total));
@@ -167,6 +187,18 @@ impl World {
         self.set_v(INERTIA_X, at, moments);
         self.set_v(INVERSE_INERTIA_X, at, v3(invert(moments.x), invert(moments.y), invert(moments.z)));
         self.set_q(INERTIA_FRAME_X, at, frame);
+    }
+
+    /// Sets a body's own solid and works out its mass again. The frame is made unit length here, and the additional mass
+    /// goes: the own solid takes its place, as one figure of what is added.
+    pub fn set_own_solid(&mut self, body: u32, mass: f32, center: V3, moments: V3, frame: Q) {
+        let at = body as usize;
+        self.set_s(OWN_MASS, at, mass);
+        self.set_v(OWN_CENTER_X, at, center);
+        self.set_v(OWN_INERTIA_X, at, moments);
+        self.set_q(OWN_FRAME_X, at, frame.normalized());
+        self.set_s(ADDITIONAL_MASS, at, 0.0);
+        self.update_mass(body);
     }
 
     fn collider_solid(&self, c: usize) -> Solid {

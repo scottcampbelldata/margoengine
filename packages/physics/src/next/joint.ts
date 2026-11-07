@@ -1,13 +1,10 @@
 // A joint on the own solver: the names of ../joints.ts, written straight into the kernel's joint columns. No `Math`: a value
 // that needs a square root goes through the kernel, so a joint set up in one browser is the joint set up in another.
 import { MargoError } from '@margoengine/math/errors';
-import type { JointOptions, JointType, MotorOptions, RotationMotorOptions } from '../joints.js';
+import type { JointDof, JointOptions, JointType, MotorOptions, RotationMotorOptions } from '../joints.js';
 import { JOINT_CONE, JOINT_CONTACTS, JOINT_DISTANCE, JOINT_LIMIT, JOINT_LOCK, JOINT_MOTOR_FORCE, JOINT_MOTOR_ON, type KernelWorld } from '../kernel.js';
 import { checkVec, type Quat, type Vec3 } from '../math.js';
 import type { PhysicsBody } from './body.js';
-
-const later = (what: string, when: string): MargoError =>
-  new MargoError('unsupported', `${what} is not in the own solver yet; it comes with ${when}. Use @margoengine/physics until then.`);
 
 /**
  * A ball joint held inside a cone, the joint of a shoulder or a hip. Frame X on `bodyB` stays within `swing` of frame X on
@@ -46,6 +43,8 @@ const TWIST = 3,
   ELLIPSE = 5;
 const LINEAR = 7,
   ANGULAR = 7 << 3;
+/** A generic joint's axes, in the order of the kernel's axis columns. */
+const DOFS: readonly JointDof[] = ['linX', 'linY', 'linZ', 'angX', 'angY', 'angZ'];
 const locks: Readonly<Partial<Record<JointType | 'cone', number>>> = {
   fixed: JOINT_LOCK * (LINEAR | ANGULAR),
   spherical: JOINT_LOCK * LINEAR,
@@ -164,8 +163,10 @@ export class PhysicsJoint {
   }
   /** Drives the joint's axis: toward `targetVelocity`, or as a spring toward `targetPosition`. */
   setMotor(motor: MotorOptions): this {
-    const axis = this.unit(),
-      { row } = this,
+    return this.drive(this.unit(), motor);
+  }
+  private drive(axis: number, motor: MotorOptions): this {
+    const { row } = this,
       columns = this.owner.kernel.columns,
       cap = motor.maxForce ?? Infinity,
       position = motor.targetPosition;
@@ -179,6 +180,16 @@ export class PhysicsJoint {
     columns.jointFlags[row] = (columns.jointFlags[row] & ~force) | (JOINT_MOTOR_ON << axis) | (motor.model === 'force' ? force : 0);
     this.wake();
     return this;
+  }
+  /** A generic joint's axis by name, one it does not lock. */
+  private free(dof: JointDof): number {
+    if (this.removed) throw new MargoError('state', 'Joint was removed; create a new one with physics.addJoint.');
+    if (this.type !== 'generic') throw new TypeError('Axis limits and motors need a generic joint; use setLimits or setMotor.');
+    const axis = DOFS.indexOf(dof);
+    if (axis < 0) throw new TypeError(`Unknown joint axis ${String(dof)}; use linX, linY, linZ, angX, angY or angZ.`);
+    if (this.owner.kernel.columns.jointFlags[this.row] & (JOINT_LOCK << axis))
+      throw new RangeError(`The joint locks ${dof}, so it has no range to limit or drive; leave it out of locked.`);
+    return axis;
   }
   /**
    * A spherical joint's spring toward `rotation`, a unit quaternion [x, y, z, w] of `bodyB` in the frame of `bodyA`. The
@@ -216,21 +227,29 @@ export class PhysicsJoint {
     this.wake();
     return this;
   }
-  /** Not served yet: throws. */
-  setAxisLimits(): never {
-    throw later('The generic joint', 'the shapes and queries batch');
+  /** Generic joints: keeps one free axis between `min` and `max`, in radians or units, from frame A to frame B. */
+  setAxisLimits(dof: JointDof, min: number, max: number): this {
+    const axis = this.free(dof);
+    checkLimits(min, max);
+    const { row } = this,
+      columns = this.owner.kernel.columns;
+    columns[`jointMin${axis}`][row] = min;
+    columns[`jointMax${axis}`][row] = max;
+    columns.jointFlags[row] |= JOINT_LIMIT << axis;
+    this.wake();
+    return this;
   }
-  /** Not served yet: throws. */
-  setAxisMotor(): never {
-    throw later('The generic joint', 'the shapes and queries batch');
+  /** Generic joints: a motor on one axis, its target in the same measure as {@link PhysicsJoint.setAxisLimits}. */
+  setAxisMotor(dof: JointDof, motor: MotorOptions): this {
+    return this.drive(this.free(dof), motor);
   }
-  /** Turns the motor off. */
+  /** Turns the motor off: every axis's, on a spherical or generic joint. */
   clearMotor(): this {
-    const spherical = this.type === 'spherical' && !this.removed,
-      first = spherical ? TURN : this.unit(),
+    const many = (this.type === 'spherical' || this.type === 'generic') && !this.removed,
+      first = !many ? this.unit() : this.type === 'generic' ? 0 : TURN,
       { row } = this,
       columns = this.owner.kernel.columns;
-    for (let axis = first; axis < first + (spherical ? 3 : 1); axis++) {
+    for (let axis = first; axis < first + (many ? 6 - first : 1); axis++) {
       columns.jointFlags[row] &= ~(JOINT_MOTOR_ON << axis);
       columns[`jointMotor${axis}`][row] = 0;
     }
@@ -261,8 +280,7 @@ export class PhysicsJoint {
  */
 export function createJoint(owner: JointOwner, bodyA: PhysicsBody, bodyB: PhysicsBody, options: NextJointOptions): PhysicsJoint {
   const { type, anchorA = [0, 0, 0], anchorB = [0, 0, 0] } = options,
-    locked = locks[type];
-  if (type === 'generic') throw later('The generic joint', 'the shapes and queries batch');
+    locked = type === 'generic' ? genericLocks(options.locked ?? []) : locks[type];
   if (locked === undefined)
     throw new TypeError(`Unknown joint type ${String(type)}; use fixed, spherical, revolute, prismatic, cone, rope, spring or generic.`);
   checkVec(anchorA, 'anchorA');
@@ -331,5 +349,20 @@ export function createJoint(owner: JointOwner, bodyA: PhysicsBody, bodyB: Physic
     if (options.axis) kernel.setJointAxis(row, options.axis);
     joint.setCone(options.swing, options.twist);
   }
+  if (type === 'generic') {
+    for (const [dof, range] of Object.entries(options.limits ?? {})) if (range) joint.setAxisLimits(dof as JointDof, range[0], range[1]);
+    for (const [dof, motor] of Object.entries(options.motors ?? {})) if (motor) joint.setAxisMotor(dof as JointDof, motor);
+  }
   return joint;
+}
+
+/** The lock bits of a generic joint's `locked` axes. */
+function genericLocks(locked: readonly JointDof[]): number {
+  let bits = 0;
+  for (const dof of locked) {
+    const axis = DOFS.indexOf(dof);
+    if (axis < 0) throw new TypeError(`Unknown joint axis ${String(dof)}; use linX, linY, linZ, angX, angY or angZ.`);
+    bits |= JOINT_LOCK << axis;
+  }
+  return bits;
 }

@@ -271,6 +271,11 @@ impl World {
                 self.set_u(ISLAND_ID, root, id);
                 self.set_u(ISLAND_COUNT, id as usize, 0);
                 self.set_u(ISLAND_READY, id as usize, 1);
+                self.set_u(ISLAND_PASSES, id as usize, 0);
+            }
+            let extra = self.uu(EXTRA_PASSES, body as usize);
+            if extra > self.uu(ISLAND_PASSES, id as usize) {
+                self.set_u(ISLAND_PASSES, id as usize, extra);
             }
             self.set_u(ISLAND_ID, body as usize, id);
             self.set_u(ISLAND_COUNT, id as usize, self.uu(ISLAND_COUNT, id as usize) + 1);
@@ -295,12 +300,16 @@ impl World {
         }
         // Islands that are ready leave; the others move down and tell their bodies their new number.
         let mut kept = 0;
+        let mut most = 0;
         for id in 0..islands {
             let count = self.uu(ISLAND_COUNT, id);
             let first = self.uu(ISLAND_START, id) - count;
             if self.uu(ISLAND_READY, id) != 0 {
                 self.put_to_sleep(first as usize, count as usize);
             } else {
+                let extra = self.uu(ISLAND_PASSES, id);
+                most = most.max(extra);
+                self.set_u(ISLAND_PASSES, kept, extra);
                 self.set_u(ISLAND_START, kept, first);
                 self.set_u(ISLAND_COUNT, kept, count);
                 for at in first..first + count {
@@ -310,6 +319,105 @@ impl World {
             }
         }
         self.header_mut().islands = kept as u32;
+        self.header_mut().extra_passes = most;
+    }
+
+    /// Extra passes the island of a body asks for: 0 for a body in no island of this step.
+    #[inline(always)]
+    pub fn extra_of(&self, body: usize) -> u32 {
+        if self.flags(body) & KIND == DYNAMIC && self.is_awake(body) {
+            let id = self.uu(ISLAND_ID, body);
+            if id != NONE {
+                return self.uu(ISLAND_PASSES, id as usize);
+            }
+        }
+        0
+    }
+
+    /// Changes how a body moves, keeping its pose, colliders and joints. Two fixed bodies have no pair, so a body that stops
+    /// being fixed finds the fixed colliders its boxes overlap now, and the broad phase finds the rest as its boxes move; a
+    /// body that becomes fixed drops its pairs with fixed bodies, and what they touched ends. A fixed body is still, so it
+    /// loses its speed; a kinematicPosition body's target starts at its pose, so it stays put until given one. It wakes,
+    /// and so does what it touches.
+    pub fn set_body_kind(&mut self, body: u32, kind: u32) {
+        let at = body as usize;
+        let kind = kind & KIND;
+        if !self.body_alive(body) || self.flags(at) & KIND == kind {
+            return;
+        }
+        let was_fixed = self.flags(at) & KIND == FIXED;
+        self.wake(body);
+        let mut collider = self.uu(FIRST_COLLIDER, at);
+        while collider != NONE {
+            self.touch_collider(collider);
+            collider = self.uu(COLLIDER_NEXT, collider as usize);
+        }
+        self.set_u(FLAGS, at, self.flags(at) & !KIND | kind);
+        let out = self.flags(at) & DISABLED != 0;
+        if was_fixed {
+            if !out {
+                self.set_s(SLEEP_TIME, at, 0.0);
+                self.list_awake(body);
+            }
+            let ends = self.header().endpoints as usize;
+            let mut collider = self.uu(FIRST_COLLIDER, at);
+            while collider != NONE {
+                let c = collider as usize;
+                if self.uu(COLLIDER_STATE, c) & IN_BROAD != 0 {
+                    for i in 0..ends {
+                        let id = self.uu(ENDPOINT_ID_X, i);
+                        let other = (id >> 1) as usize;
+                        if id & 1 == 0 && other != c && self.uu(COLLIDER_STATE, other) & REMOVED == 0 {
+                            let owner = self.uu(COLLIDER_BODY, other) as usize;
+                            if owner != at && self.flags(owner) & KIND == FIXED && self.boxes_overlap(c, other) {
+                                self.add_pair(collider, other as u32);
+                            }
+                        }
+                    }
+                }
+                collider = self.uu(COLLIDER_NEXT, c);
+            }
+        } else if kind == FIXED {
+            let mut collider = self.uu(FIRST_COLLIDER, at);
+            while collider != NONE {
+                let mut pair = self.uu(COLLIDER_PAIRS, collider as usize);
+                while pair != NONE {
+                    let next = self.next_pair(pair, collider);
+                    let (a, b) = self.pair_bodies(pair);
+                    let other = if a == at { b } else { a };
+                    if self.flags(other) & KIND == FIXED {
+                        self.remove_pair(pair);
+                    }
+                    pair = next;
+                }
+                collider = self.uu(COLLIDER_NEXT, collider as usize);
+            }
+            if self.is_awake(at) {
+                self.unlist_awake(body);
+            }
+            self.set_v(LINEAR_X, at, v3(0.0, 0.0, 0.0));
+            self.set_v(ANGULAR_X, at, v3(0.0, 0.0, 0.0));
+        }
+        if kind == KINEMATIC_POSITION {
+            self.set_v(TARGET_X, at, self.v(POSITION_X, at));
+            self.set_q(TARGET_ROTATION_X, at, self.q(ROTATION_X, at));
+        }
+        // Pairs go on the active list while a body of theirs is awake, and only then.
+        let mut collider = self.uu(FIRST_COLLIDER, at);
+        while collider != NONE {
+            let mut pair = self.uu(COLLIDER_PAIRS, collider as usize);
+            while pair != NONE {
+                let (a, b) = self.pair_bodies(pair);
+                if self.is_awake(a) || self.is_awake(b) {
+                    self.activate_pair(pair);
+                } else {
+                    self.deactivate_pair(pair);
+                }
+                pair = self.next_pair(pair, collider);
+            }
+            collider = self.uu(COLLIDER_NEXT, collider as usize);
+        }
+        self.mark_moved(body);
     }
 
     /// True when an awake body should wake a sleeper it touches: every dynamic one, and a kinematic one that moves.

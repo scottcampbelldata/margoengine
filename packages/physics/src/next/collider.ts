@@ -61,6 +61,14 @@ export class PhysicsCollider {
   density(): number {
     return this.columns().colliderDensity[this.handle];
   }
+  /** Kilograms a cubic metre; the body's mass, centre and inertia are worked out again at once. */
+  setDensity(density: number): this {
+    if (!(density >= 0) || density === Infinity)
+      throw new RangeError('Collider density must be a finite number of at least 0; pass kilograms a cubic metre.');
+    this.columns().colliderDensity[this.handle] = density;
+    this.kernel.updateMass(this.body.row);
+    return this;
+  }
   /** Centre in its body's frame. */
   translationWrtParent(): { x: number; y: number; z: number } {
     const { colliderX, colliderY, colliderZ } = this.columns(),

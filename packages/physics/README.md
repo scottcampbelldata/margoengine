@@ -214,7 +214,7 @@ await Physics.load();
 const physics = new Physics(null);
 const wall = physics.addBody(null, {type: 'fixed', colliders: []});
 const door = physics.addBody(null, {position: [1, 0, 0], colliders: {shape: 'box', halfExtents: [1, 1, 0.05]}});
-// A door hinge, opened by a spring toward 0.6 rad.
+// A door hinge, opened by a spring toward 0.6 rad. The same lines run on the own solver, margoengine/physics/next.
 physics.addJoint(wall, door, {
   type: 'generic',
   anchorB: [-1, 0, 0],
@@ -306,7 +306,25 @@ console.log(body.position[1]);         // fallen about 4.9 m in the second
 physics.dispose();
 ```
 
-It holds `box`, `sphere`, `capsule` and `convexHull` colliders, bodies of every kind, forces, impulses, velocities, damping, locks, kinematic targets, gravity, sleeping and the `beforestep` and `afterstep` events. Bodies collide, with friction, restitution and the four combine rules, and `physics.touching(a, b)` and `physics.contactPoints(body)` read the contacts of the last step. Contact and intersection events, sensors, `collisionGroups`, `solverGroups`, `contactFilter`, `dominance` and `enabled` on bodies and colliders work as on the root entry, with the same names. A call that needs what is still to come throws a `MargoError` with code `unsupported` naming what it waits for: the other shapes and `addModel`, `setType`, `setMassProperties`, inertia of its own, `additionalSolverIterations` and the `generic` joint with the shapes and queries batch, `ccd` with continuous collision, queries, `follow` and character controllers, and `debugRender`. `body.sleep()` and impulses take effect at the next step.
+It holds `box`, `sphere`, `capsule` and `convexHull` colliders, bodies of every kind, forces, impulses, velocities, damping, locks, kinematic targets, gravity, sleeping and the `beforestep` and `afterstep` events. Bodies collide, with friction, restitution and the four combine rules, and `physics.touching(a, b)` and `physics.contactPoints(body)` read the contacts of the last step. Contact and intersection events, sensors, `collisionGroups`, `solverGroups`, `contactFilter`, `dominance` and `enabled` on bodies and colliders work as on the root entry, with the same names. `body.setType`, `setAdditionalMass` (with inertia of its own), `setMassProperties`, `collider.setDensity` and `additionalSolverIterations` work as on the root entry, with the same names and errors. A call that needs what is still to come throws a `MargoError` with code `unsupported` naming what it waits for: the other shapes and `addModel` with the shapes and queries batch, `ccd` with continuous collision, queries, `follow` and character controllers, and `debugRender`. `body.sleep()` and impulses take effect at the next step.
+
+`setType` keeps the pose, colliders and joints: a body made fixed stops, and its touches with other fixed bodies end; one made `kinematicPosition` holds its pose until given a target; a dynamic or kinematic body keeps its velocity. The body wakes whatever `wakeUp` says, with what it touches. `setAdditionalMass(mass, inertia)` puts the mass at the centre of mass the body has now, so alone it leaves the inertia as it is, and replaces an earlier call, `setMassProperties` and the `additionalMass` option, which spreads its mass as the colliders are. `setMassProperties` sets the colliders' density to 0, and colliders added later add their own mass. `additionalSolverIterations` (0 to 1000) gives the body's island that many passes more: it runs as a world of that many passes would, bit for bit, and the other islands are left alone.
+
+```ts
+import {Physics} from 'margoengine/physics/next';
+
+await Physics.load();
+const physics = new Physics(null);
+physics.addBody(null, {type: 'fixed', position: [0, -0.5, 0], colliders: {shape: 'box', halfExtents: [20, 0.5, 20]}});
+// A crate held in place until it is let go, with a mass and inertia from a measurement.
+const crate = physics.addBody(null, {type: 'fixed', position: [0, 0.5, 0], colliders: {shape: 'box', halfExtents: [0.5, 0.5, 0.5]}});
+crate.setMassProperties({mass: 12, centerOfMass: [0, -0.2, 0], inertia: [2, 2, 2]});
+crate.additionalSolverIterations = 4;   // a stiffer island, for a tall stack on top
+crate.setType('dynamic');
+for (let i = 0; i < 60; i++) physics.step();
+console.log(crate.mass.toFixed(2), crate.position[1].toFixed(2)); // 12.00 0.50: on the floor it was touching
+physics.dispose();
+```
 
 A `convexHull` takes `points` (flat x, y, z numbers), or `geometry`, or the body's mesh when it has neither, scaled with the mesh, as on the root entry. The solver builds it by Quickhull: points inside, repeats and points within 2.5e-5 of the hull's size of a face are dropped, triangles in one plane become one face of up to 256 corners, and colliders built from the same points share one hull. `convexHull(points)` returns the `vertices` and `faces` it builds, for drawing or checking; it throws a `RangeError` naming the fix for fewer than four points or points that span no volume.
 
@@ -377,7 +395,7 @@ console.log(hardest);                   // the landing, far above the 29.43 N of
 physics.dispose();
 ```
 
-`physics.addJoint(bodyA, bodyB, options)` holds the root entry's `fixed`, `spherical`, `revolute`, `prismatic`, `rope` and `spring` joints, with `limits`, `motor`, `axis` or `frameA` and `frameB`, `contactsEnabled`, `joint.setLimits`, `setMotor`, `setRotationMotor`, `clearMotor`, `remove`, and the same errors. A joint keeps its two bodies from colliding unless `contactsEnabled` is true, and leaves with either body. The `generic` kind throws `unsupported` until the shapes and queries batch. A `rope` is slack inside its `length` and stops dead at it, and a `spring` is Hooke's law in implicit form, so any stiffness is stable, at the price of the decay implicit Euler brings: 1 / sqrt(1 + (w h)^2) a substep, about 23 percent of the amplitude in 10 s for a spring of 5 rad/s.
+`physics.addJoint(bodyA, bodyB, options)` holds the root entry's `fixed`, `spherical`, `revolute`, `prismatic`, `rope` and `spring` joints, and `generic` joints, with `limits`, `motor`, `axis` or `frameA` and `frameB`, `locked`, `motors`, `contactsEnabled`, `joint.setLimits`, `setMotor`, `setRotationMotor`, `setAxisLimits`, `setAxisMotor`, `clearMotor`, `remove`, and the same errors. A joint keeps its two bodies from colliding unless `contactsEnabled` is true, and leaves with either body. A `generic` joint is the joint its locks make, bit for bit: all six are a `fixed` joint, the linear three a `spherical` one. An axis with one free turning axis reads its angle past a whole turn; with two or three free, each reads its part of the rotation vector from frame A to frame B. A limit or motor on a locked axis throws a `RangeError`, and `clearMotor` stops every axis's motor. A `rope` is slack inside its `length` and stops dead at it, and a `spring` is Hooke's law in implicit form, so any stiffness is stable, at the price of the decay implicit Euler brings: 1 / sqrt(1 + (w h)^2) a substep, about 23 percent of the amplitude in 10 s for a spring of 5 rad/s.
 
 A joint that cannot be met stays calm rather than exact: a chain pulled straight between two walls and a little too short holds under 1 m/s, and an open joint closes at 3 m/s plus what the turning carries its anchors, so a body you move by hand comes back over several steps and does not jump past what is in the way. `docs/limits.md` gives what each limit costs. `world.step` and `physics.step` throw `MargoError` with code `failed` when a body goes past 1e15 in position or speed, which a true path can do: a bead free on a spinning rail flies out exponentially. The world keeps its last state and steps no more, so restore a snapshot or build it again with the joint limited.
 
