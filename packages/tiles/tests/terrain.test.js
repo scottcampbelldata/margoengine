@@ -4,6 +4,7 @@ import test from 'node:test';
 import { Tileset, ecefToCartographic, parseContent } from '../dist/index.js';
 import { geographicTileRectangle, meshB3dm, parseQuantizedMesh, terrain } from '../dist/terrain.js';
 import { memoryFetch, settle } from './generator.js';
+import { GLB_BIN, GLB_JSON, glbChunks } from '../../shared/glb.js';
 
 const folder = new URL('../../../examples/assets/terrain/', import.meta.url),
   file = (name) => new Uint8Array(readFileSync(new URL(name, folder)));
@@ -96,4 +97,19 @@ test('terrain: the layer becomes an implicit tileset, its tiles b3dm with imager
   // Only EPSG:4326 tms layers are read; anything else is refused by name.
   const mercator = memoryFetch(new Map([['layer.json', new TextEncoder().encode(JSON.stringify({ tiles: ['{z}/{x}/{y}.terrain'], projection: 'EPSG:3857' }))]]));
   await assert.rejects(terrain('https://tiles.test/layer.json', { fetch: mercator.fetch }), (e) => e.code === 'unsupported');
+});
+
+test('terrain: its b3dm holds a whole GLB container the shared walker accepts, with and without a drape', () => {
+  // Regression: terrain once wrote its own GLB header beside packages/shared/glb.js; it now uses the shared constants.
+  const mesh = parseQuantizedMesh(file('CesiumWorldTerrainSample/9/759/335.terrain')),
+    rectangle = geographicTileRectangle(9, 759, 335),
+    drape = { bytes: new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1]), mimeType: 'image/png', uv: (a, b) => [a, b] };
+  for (const d of [undefined, drape]) {
+    const gltf = parseContent(meshB3dm(mesh, rectangle, d, 0)).gltf,
+      chunks = glbChunks(gltf);
+    assert.deepEqual(chunks.map((c) => c.type), [GLB_JSON, GLB_BIN]);
+    const doc = JSON.parse(new TextDecoder().decode(chunks[0].data));
+    assert.equal(doc.buffers[0].byteLength, chunks[1].data.length);
+    assert.equal(doc.asset.version, '2.0');
+  }
 });

@@ -7,6 +7,7 @@
 // edge lists, extensions), the layer.json manifest it describes, the OSGeo Tile Map Service and the Web Mercator
 // (EPSG:3857) tiling, and 3D Tiles 1.1 implicit tiling.
 import { MargoError } from '@margoengine/math/errors';
+import { GLB_BIN, GLB_JSON, GLB_MAGIC } from '../../shared/glb.js';
 import { type TileMatrix, Z_UP_TO_Y_UP, invert, multiply } from './matrix.js';
 import { cartographicToEcef, eastNorthUpToEcef, WGS84_A } from './wgs84.js';
 
@@ -618,15 +619,15 @@ function glb(
     jsonLength = Math.ceil(json.byteLength / 4) * 4,
     out = new Uint8Array(12 + 8 + jsonLength + 8 + length),
     view = new DataView(out.buffer);
-  view.setUint32(0, 0x46546c67, true);
+  view.setUint32(0, GLB_MAGIC, true);
   view.setUint32(4, 2, true);
   view.setUint32(8, out.byteLength, true);
   view.setUint32(12, jsonLength, true);
-  view.setUint32(16, 0x4e4f534a, true);
+  view.setUint32(16, GLB_JSON, true);
   out.fill(0x20, 20, 20 + jsonLength);
   out.set(json, 20);
   view.setUint32(20 + jsonLength, length, true);
-  view.setUint32(24 + jsonLength, 0x004e4942, true);
+  view.setUint32(24 + jsonLength, GLB_BIN, true);
   let at = 28 + jsonLength;
   for (const part of parts) {
     out.set(part, at);

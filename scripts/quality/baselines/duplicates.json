@@ -1,7 +1,7 @@
 {
   "gate": "duplicates",
   "about": "duplicated lines per package pair (8-line normalised windows); reexport items: value re-exports across packages",
-  "total": 15,
+  "total": 13,
   "history": [
     {
       "date": "2026-10-24",
@@ -30,8 +30,6 @@
   ],
   "items": {
     "environment | staging": 12,
-    "family glb-container exporters": 1,
-    "family glb-container tiles": 1,
     "reexport packages/stage/src/index.ts * from @margoengine/core": 1
   }
 }
