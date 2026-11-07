@@ -64,8 +64,11 @@ export function pose(asset, seconds) {
       const j = Math.min(i + 1, times.length - 1),
         f = j === i || interpolation === 'STEP' ? 0 : Math.min(1, Math.max(0, (seconds - times[i]) / (times[j] - times[i]))),
         at = (k) => Array.from(values.subarray(k * width, k * width + width));
-      if (!animated.has(target.node)) animated.set(target.node, {});
-      animated.get(target.node)[target.path] = between(at(i), at(j), f, target.path);
+      const pointer = target.extensions?.KHR_animation_pointer?.pointer,
+        id = pointer ? Number(pointer.split('/')[2]) : target.node;
+      if (!animated.has(id)) animated.set(id, {});
+      if (pointer) animated.get(id).visible = at(seconds < times[0] ? 0 : times[j] <= seconds ? j : i)[0] !== 0;
+      else animated.get(id)[target.path] = between(at(i), at(j), f, target.path);
     }
   const world = new Array(doc.nodes.length);
   const walk = (id, parent) => {
@@ -113,6 +116,24 @@ export function vertices(asset, id, { world, animated, data }) {
     out.push(sum);
   }
   return out;
+}
+/** The node of the prim at `path`, by the names on the way down. */
+export function nodeAt(asset, path) {
+  const { nodes } = asset.document;
+  let id = 0;
+  for (const name of path.split('/').slice(1)) {
+    id = nodes[id].children?.find((child) => nodes[child].name === name);
+    if (id === undefined) return undefined;
+  }
+  return id;
+}
+/** Whether a node shows under a pose: it and everything above it are visible. */
+export function shown(asset, id, { animated }) {
+  const { nodes } = asset.document,
+    own = (at) => animated.get(at)?.visible ?? nodes[at].extensions?.KHR_node_visibility?.visible ?? true,
+    above = (at) => nodes.findIndex((node) => node.children?.includes(at));
+  for (let at = id; at >= 0; at = above(at)) if (!own(at)) return false;
+  return true;
 }
 /** The node of the mesh at `path`. */
 export function nodeOf(asset, path) {

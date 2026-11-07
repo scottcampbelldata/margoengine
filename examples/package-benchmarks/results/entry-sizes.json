@@ -1,5 +1,5 @@
 {
-  "commit": "f1af890a3",
+  "commit": "a82f958df",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -26,8 +26,8 @@
         "gzip": 7094
       },
       "./interactivity": {
-        "raw": 71530,
-        "gzip": 24212
+        "raw": 71467,
+        "gzip": 24176
       },
       "./skeleton-utils": {
         "raw": 25061,
@@ -1094,8 +1094,8 @@
         "gzip": 3214
       },
       "./physics": {
-        "raw": 22419,
-        "gzip": 8959
+        "raw": 21978,
+        "gzip": 8715
       },
       "./interactivity": {
         "raw": 49400,
@@ -1726,8 +1726,8 @@
     },
     "@margoengine/physics": {
       ".": {
-        "raw": 51006,
-        "gzip": 16988
+        "raw": 55806,
+        "gzip": 18256
       }
     },
     "@margoengine/physics2d": {
@@ -2522,24 +2522,28 @@
     },
     "@margoengine/usdz": {
       ".": {
-        "raw": 27972,
-        "gzip": 11268
+        "raw": 28228,
+        "gzip": 11372
       },
       "./worker": {
-        "raw": 30862,
-        "gzip": 12321
+        "raw": 31119,
+        "gzip": 12425
       },
       "./compose": {
-        "raw": 45445,
-        "gzip": 17433
+        "raw": 45702,
+        "gzip": 17537
       },
       "./skel": {
-        "raw": 19121,
-        "gzip": 7731
+        "raw": 19284,
+        "gzip": 7808
+      },
+      "./anim": {
+        "raw": 14699,
+        "gzip": 6180
       },
       "dist/workers/usdz.js": {
-        "raw": 263230,
-        "gzip": 87529
+        "raw": 267422,
+        "gzip": 89075
       }
     },
     "@margoengine/vfx": {
@@ -2630,8 +2634,8 @@
         "gzip": 12734
       },
       "./physics": {
-        "raw": 28327,
-        "gzip": 10132
+        "raw": 27468,
+        "gzip": 9778
       },
       "./render": {
         "raw": 65528,
@@ -2879,9 +2883,9 @@
       "brotli": 9639
     },
     "packages/physics/dist/index.js": {
-      "raw": 51006,
-      "gzip": 16988,
-      "brotli": 15052
+      "raw": 55806,
+      "gzip": 18256,
+      "brotli": 16191
     },
     "packages/save/dist/index.js": {
       "raw": 19849,
@@ -2979,9 +2983,9 @@
       "brotli": 69572
     },
     "packages/usdz/dist/workers/usdz.js": {
-      "raw": 260231,
-      "gzip": 87290,
-      "brotli": 75229
+      "raw": 264391,
+      "gzip": 88835,
+      "brotli": 76567
     },
     "packages/loaders/dist/workers/usd.js": {
       "raw": 21469,

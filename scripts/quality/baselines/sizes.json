@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10138874,
+  "total": 10145902,
   "history": [
     {
       "date": "2026-10-24",
@@ -3110,6 +3110,12 @@
       "commit": "f675ce50d",
       "reason": "physics: PhysicsCollider wrapper, voxels and halfSpace shapes, mass accessors",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "a82f958df",
+      "reason": "usdz gains the /anim entry for time-sampled transforms and visibility",
+      "grew": 2
     }
   ],
   "items": {
@@ -3702,7 +3708,8 @@
     "@margoengine/ui/react": 28301,
     "@margoengine/usdz": 11508,
     "@margoengine/usdz dist/workers/usdz.js": 90080,
-    "@margoengine/usdz/compose": 17472,
+    "@margoengine/usdz/anim": 6436,
+    "@margoengine/usdz/compose": 18064,
     "@margoengine/usdz/skel": 7987,
     "@margoengine/usdz/worker": 12590,
     "@margoengine/vfx": 17135,

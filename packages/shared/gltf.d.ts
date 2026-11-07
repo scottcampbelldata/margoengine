@@ -214,7 +214,7 @@ export interface GLTFSkin extends GLTFProperty {
 }
 export interface GLTFAnimation extends GLTFProperty {
   samplers: { input: number; output: number; interpolation?: string }[];
-  channels: { sampler: number; target: { node?: number; path: string } }[];
+  channels: { sampler: number; target: { node?: number; path: string; extensions?: Record<string, unknown> } }[];
 }
 export interface GLTFLightDefinition extends GLTFProperty {
   type: 'directional' | 'point' | 'spot';

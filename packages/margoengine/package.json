@@ -2370,6 +2370,10 @@
       "types": "./dist/usdz/skel.d.ts",
       "import": "./dist/usdz/skel.js"
     },
+    "./usdz/anim": {
+      "types": "./dist/usdz/anim.d.ts",
+      "import": "./dist/usdz/anim.js"
+    },
     "./vfx": {
       "types": "./dist/vfx.d.ts",
       "import": "./dist/vfx.js"

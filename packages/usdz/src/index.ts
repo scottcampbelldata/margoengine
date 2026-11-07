@@ -677,7 +677,7 @@ function asset(
     displays.set(id, { color, opacity: vertexOpacity, uv: mapped ? uvPrimvar(mapped) : undefined });
     return id;
   }
-  function accessor(data: Float32Array | Uint32Array | Uint16Array, type: string): number {
+  function accessor(data: Float32Array | Uint32Array | Uint16Array | Uint8Array, type: string): number {
     const buffer = buffers.length;
     buffers.push(data);
     doc.buffers.push({ byteLength: data.byteLength });
@@ -686,7 +686,7 @@ function asset(
     const index = doc.accessors.length;
     doc.accessors.push({
       bufferView: view,
-      componentType: data instanceof Uint32Array ? 5125 : data instanceof Uint16Array ? 5123 : 5126,
+      componentType: data instanceof Uint32Array ? 5125 : data instanceof Uint16Array ? 5123 : data instanceof Uint8Array ? 5121 : 5126,
       count: data.length / (type === 'MAT4' ? 16 : type === 'VEC4' ? 4 : type === 'VEC3' ? 3 : type === 'VEC2' ? 2 : 1),
       type,
     });
@@ -737,7 +737,13 @@ function asset(
       else subsetsOf.set(owner, [path]);
     }
   const scenes = hooks(options).filter((hook) => hook.scene),
-    sceneMeshes: SceneMesh[] = [];
+    sceneMeshes: SceneMesh[] = [],
+    opOrder = (path: string): unknown => attrs(path, 'xformOpOrder') ?? specs[path].fields.xformOpOrder,
+    transform = (path: string, get: (name: string) => unknown) => compose(opOrder(path), get),
+    /** True for a prim an extension will show after its first sample. */
+    shownLater = (path: string) =>
+      scenes.some((hook) => hook.showsLater) &&
+      (specs[path + '.visibility']?.fields.timeSamples as TimeSamples | undefined)?.values.some((v) => v !== 'invisible');
   let totalVertices = 0,
     totalTriangles = 0,
     polygonWork = 0;
@@ -747,13 +753,13 @@ function asset(
       const parent = path.slice(0, path.lastIndexOf('/')) || '/',
         parentId = nodeIds.get(parent);
       if (parentId === undefined) continue;
-      if (spec.fields.active === false || attrs(path, 'visibility') === 'invisible') continue;
+      if (spec.fields.active === false || (attrs(path, 'visibility') === 'invisible' && !shownLater(path))) continue;
       const type = spec.fields.typeName;
       // Shading prims and subsets are read through what uses them; they place nothing in the scene.
       if (type === 'Material' || type === 'Shader' || type === 'NodeGraph' || type === 'GeomSubset') continue;
       const node: GLTFNode & { children: number[] } = {
           name: path.split('/').at(-1),
-          matrix: compose(attrs(path, 'xformOpOrder') ?? spec.fields.xformOpOrder, (name) => attrs(path, name)),
+          matrix: transform(path, (name) => attrs(path, name)),
           children: [],
         },
         id = doc.nodes.length;
@@ -982,7 +988,20 @@ function asset(
       });
     }
   if (!meshes.length) fail('no renderable meshes');
-  for (const hook of scenes) hook.scene!({ specs, document: doc, nodes: nodeIds, meshes: sceneMeshes, accessor, soft });
+  for (const hook of scenes)
+    hook.scene!({
+      specs,
+      document: doc,
+      nodes: nodeIds,
+      meshes: sceneMeshes,
+      accessor,
+      opOrder: (path) => {
+        const order = path === '/' ? undefined : opOrder(path);
+        return Array.isArray(order) ? (order as string[]) : undefined;
+      },
+      transform,
+      soft,
+    });
   for (const source of sources)
     for (const name of [source.path, source.roughness?.path, source.metallic?.path])
       if (name && !entries.has(name)) fail('missing texture ' + name);

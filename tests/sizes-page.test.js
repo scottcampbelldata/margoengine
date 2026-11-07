@@ -182,3 +182,8 @@ test('sizes page refuses a network record from another build', () => {
     /basic-scene-network\.json/,
   );
 });
+
+test('every external of a file loaded later is a pattern, as entry-sizes tests each id against it', () => {
+  for (const { file, external = [] } of LAZY_FILES)
+    for (const pattern of external) assert.ok(pattern instanceof RegExp, `${file} lists ${pattern}, which is no RegExp`);
+});

@@ -164,6 +164,79 @@ try {
     }
   }, Array.from(await readFile('packages/usdz/tests/fixtures/real/rigged/RiggedFigure.usdz')));
   assert.deepEqual(rigged, { moved: true, repeats: true, gpuErrors: [] });
+  // A real animated file moves on the GPU, and a stand-in stage's late prim appears through its pointer channel.
+  const played = await page.evaluate(
+    async ({ box, stage }) => {
+      const { Engine } = await import('/packages/core/dist/index.js'),
+        { engineRuntime } = await import('/packages/core/dist/extension.js'),
+        { parseUSDZ } = await import('/packages/usdz/dist/index.js'),
+        { composition, parseUSDFiles } = await import('/packages/usdz/dist/compose.js'),
+        { animation } = await import('/packages/usdz/dist/anim.js'),
+        { Animation } = await import('/packages/animation/dist/index.js'),
+        { pointerChannels } = await import('/packages/animation/dist/pointer.js');
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = 256;
+      canvas.style.cssText = 'width:256px;height:256px';
+      document.body.append(canvas);
+      const engine = await Engine.create(canvas, {
+          backend: 'webgpu',
+          capacity: 64,
+          camera: { position: [0, 0.5, 6], target: [0, 0.5, 0] },
+        }),
+        gpuErrors = [];
+      engineRuntime(engine).gpu.addEventListener('uncapturederror', (event) => gpuErrors.push(event.error.message));
+      const run = async (asset, times) => {
+        const model = await asset.create(engine),
+          player = Animation.attach(model, { pointers: pointerChannels });
+        player.play(asset.document.animations[0].name);
+        const frames = times.map((time) => {
+          player.seek(time);
+          engine.render({ culling: false });
+          return canvas.toDataURL();
+        });
+        const { warnings } = player;
+        player.dispose?.();
+        model.destroy();
+        return { frames, warnings };
+      };
+      try {
+        const real = await run(await parseUSDZ(new Uint8Array(box), { extensions: [composition(), animation()] }), [0, 1.2]),
+          // Without the moving parent the late mesh is the only change between these two moments.
+          late = await run(
+            await parseUSDFiles('late.usda', () => new TextEncoder().encode(stage), { extensions: [animation()] }),
+            [0.1, 0.6, 0.9],
+          );
+        return {
+          moved: real.frames[0] !== real.frames[1],
+          appears: late.frames[0] !== late.frames[1],
+          leaves: late.frames[0] === late.frames[2],
+          warnings: [...real.warnings, ...late.warnings],
+          gpuErrors,
+        };
+      } finally {
+        engine.dispose();
+        canvas.remove();
+      }
+    },
+    {
+      box: Array.from(await readFile('packages/usdz/tests/fixtures/real/animated/BoxAnimated.usdz')),
+      stage: `#usda 1.0
+(
+    metersPerUnit = 1
+    upAxis = "Y"
+    timeCodesPerSecond = 10
+)
+def Mesh "Late"
+{
+    token visibility.timeSamples = { 0: "invisible", 5: "inherited", 7: "invisible" }
+    uniform token subdivisionScheme = "none"
+    int[] faceVertexCounts = [3]
+    int[] faceVertexIndices = [0, 1, 2]
+    point3f[] points = [(-1, 0, 0), (1, 0, 0), (0, 2, 0)]
+}`,
+    },
+  );
+  assert.deepEqual(played, { moved: true, appears: true, leaves: true, warnings: [], gpuErrors: [] });
   assert.deepEqual(errors, []);
   await writeFile('test-results/modern-usdz.json', JSON.stringify({ hardware: browser.hardware, ...result }, null, 2));
   console.log('USDZ texture packing, real WebGPU pixels, bitmap teardown and file-picker demo passed');

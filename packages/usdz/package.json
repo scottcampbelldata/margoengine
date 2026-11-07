@@ -42,6 +42,10 @@
     "./skel": {
       "types": "./dist/skel.d.ts",
       "import": "./dist/skel.js"
+    },
+    "./anim": {
+      "types": "./dist/anim.d.ts",
+      "import": "./dist/anim.js"
     }
   },
   "scripts": {

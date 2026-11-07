@@ -8,8 +8,9 @@ import { parseUSDZ, type USDExtension, type USDOptions } from './index.js';
 import { parseUSD } from './any.js';
 import { composition } from './compose.js';
 import { skeletons } from './skel.js';
+import { animation } from './anim.js';
 
-const known: Record<string, (options?: never) => USDExtension> = { compose: composition, skel: skeletons };
+const known: Record<string, (options?: never) => USDExtension> = { compose: composition, skel: skeletons, anim: animation };
 serve(async ({ url, input, options: sent }: { url?: string; input?: ArrayBuffer | string; options: USDOptions }) => {
   const options: USDOptions = {
     ...sent,

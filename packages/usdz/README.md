@@ -76,3 +76,24 @@ engine.start();
 ```
 
 `skeletons()` has no options. A point may have eight influences, the engine's limit: past that the strongest eight stay, scaled to the same total, and `asset.issues` says so. Bindings outside a `SkelRoot` mean nothing, as the schema says. A `skel:animationSource` on the Skeleton prim counts when nothing above the mesh binds one.
+
+## Time-sampled transforms and visibility
+
+`animation()` from `margoengine/usdz/anim` plays `timeSamples` on `xformOp`s and `visibility` as the stage's clip, named after its default prim and shared with `skeletons()`. Clip seconds come from `timeCodesPerSecond`. A `.usdz` also needs `composition()`; `loadUSDFiles` composes by itself.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Animation} from 'margoengine/animation';
+import {pointerChannels} from 'margoengine/animation/pointer';
+import {loadUSDZ} from 'margoengine/usdz';
+import {composition} from 'margoengine/usdz/compose';
+import {animation} from 'margoengine/usdz/anim';
+
+const canvas=document.createElement('canvas');document.body.append(canvas);
+const engine=await Engine.create(canvas,{backend:'webgpu',capacity:100000});
+const toy=await loadUSDZ(engine,'/toy.usdz',{extensions:[composition(),animation()]});
+Animation.attach(toy,{pointers:pointerChannels}).play(0);
+engine.start();
+```
+
+`animation()` has no options. Each prim's ops are evaluated as a stage does, held past both ends and linear between samples, then split into translation, rotation and scale keys. A move two keys can carry stays two keys. One they cannot, such as a rotation after a scale, gets a key on every time code, and a turn wider than 45 degrees between keys gets more, so spins keep their turns. Visibility plays through `KHR_node_visibility` and `KHR_animation_pointer`, which is why `Animation` needs `pointerChannels`; a prim that starts invisible and shows later stays in the scene, hidden until then. Shear has no node form: the nearest rotation and scale play and `asset.issues` says so. Time-sampled `points` do not play.

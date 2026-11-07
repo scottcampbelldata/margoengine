@@ -9,7 +9,10 @@ export interface Clip {
   seconds(times: readonly number[]): number[];
   /** Adds one channel; channels given the same `times` array share one input. */
   channel(node: number, path: string, times: number[], values: Float32Array, interpolation?: string): void;
+  /** Adds one KHR_animation_pointer channel of booleans, which hold from key to key. */
+  pointer(pointer: string, times: number[], values: Uint8Array): void;
 }
+type Target = NonNullable<GLTFAnimation['channels']>[number]['target'];
 const clips = new WeakMap<object, Clip>();
 const widths: Record<string, string> = { translation: 'VEC3', scale: 'VEC3', rotation: 'VEC4', weights: 'SCALAR' };
 
@@ -21,30 +24,38 @@ export function clipOf(read: SceneRead): Clip {
     rate = fields.timeCodesPerSecond ?? fields.framesPerSecond ?? 24,
     perSecond = typeof rate === 'number' && rate > 0 ? rate : 24;
   // A sample before the stage's start would be a negative time, which a clip cannot hold: the clip starts there instead.
-  let start = typeof fields.startTimeCode === 'number' ? fields.startTimeCode : Infinity;
+  let start = typeof fields.startTimeCode === 'number' ? fields.startTimeCode : Infinity,
+    earliest = Infinity;
   for (const path in read.specs) {
     const first = (read.specs[path].fields.timeSamples as TimeSamples | undefined)?.times[0];
-    if (first !== undefined && first < start) start = first;
+    if (first !== undefined && first < earliest) earliest = first;
   }
+  // A clip's times are float32. A lead-in of over 2^20 codes would blur them, and it only holds the first pose anyway.
+  if (earliest < start || earliest - start > 2 ** 20) start = earliest;
   const inputs = new Map<number[], number>();
   let animation: GLTFAnimation | undefined;
+  const add = (target: Target, times: number[], output: number, interpolation: string) => {
+    if (!animation) {
+      animation = { name: String(fields.defaultPrim ?? 'USD'), samplers: [], channels: [] };
+      (read.document.animations ??= []).push(animation);
+    }
+    let input = inputs.get(times);
+    if (input === undefined) {
+      input = read.accessor(Float32Array.from(times), 'SCALAR');
+      read.document.accessors![input].min = [times[0]];
+      read.document.accessors![input].max = [times[times.length - 1]];
+      inputs.set(times, input);
+    }
+    animation.channels.push({ sampler: animation.samplers.length, target });
+    animation.samplers.push({ input, output, interpolation });
+  };
   const clip: Clip = {
     seconds: (times) => times.map((t) => (t - start) / perSecond),
     channel(node, path, times, values, interpolation = 'LINEAR') {
-      if (!animation) {
-        animation = { name: String(fields.defaultPrim ?? 'USD'), samplers: [], channels: [] };
-        (read.document.animations ??= []).push(animation);
-      }
-      let input = inputs.get(times);
-      if (input === undefined) {
-        input = read.accessor(Float32Array.from(times), 'SCALAR');
-        read.document.accessors![input].min = [times[0]];
-        read.document.accessors![input].max = [times[times.length - 1]];
-        inputs.set(times, input);
-      }
-      const output = read.accessor(values, widths[path]);
-      animation.channels.push({ sampler: animation.samplers.length, target: { node, path } });
-      animation.samplers.push({ input, output, interpolation });
+      add({ node, path }, times, read.accessor(values, widths[path]), interpolation);
+    },
+    pointer(pointer, times, values) {
+      add({ path: 'pointer', extensions: { KHR_animation_pointer: { pointer } } }, times, read.accessor(values, 'SCALAR'), 'STEP');
     },
   };
   clips.set(read.document, clip);

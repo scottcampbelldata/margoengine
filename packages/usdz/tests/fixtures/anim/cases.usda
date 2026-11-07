@@ -1,0 +1,100 @@
+#usda 1.0
+(
+    defaultPrim = "Show"
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 0
+    endTimeCode = 10
+    timeCodesPerSecond = 10
+)
+def Xform "Show"
+{
+    double3 xformOp:translate.timeSamples = { 0: (0, 0, 0), 10: (10, 0, 0) }
+    uniform token[] xformOpOrder = ["xformOp:translate"]
+
+    def Mesh "Tile"
+    {
+        uniform token subdivisionScheme = "none"
+        int[] faceVertexCounts = [3]
+        int[] faceVertexIndices = [0, 1, 2]
+        point3f[] points = [(0, 0, 0), (1, 0, 0), (0, 1, 0)]
+    }
+    def Xform "Blended"
+    {
+        matrix4d xformOp:transform.timeSamples = {
+            0: ((1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1)),
+            10: ((0, 1, 0, 0), (-1, 0, 0, 0), (0, 0, 1, 0), (4, 0, 0, 1)),
+        }
+        uniform token[] xformOpOrder = ["xformOp:transform"]
+    }
+    def Xform "Short"
+    {
+        quatf xformOp:orient.timeSamples = { 0: (1, 0, 0, 0), 10: (-0.5, 0, 0, 0.8660254) }
+        uniform token[] xformOpOrder = ["xformOp:orient"]
+    }
+    def Xform "Spin"
+    {
+        float3 xformOp:rotateXYZ.timeSamples = { 0: (0, 0, 0), 10: (90, 0, 720) }
+        uniform token[] xformOpOrder = ["xformOp:rotateXYZ"]
+    }
+    def Xform "Blocked"
+    {
+        double3 xformOp:translate.timeSamples = { 0: (2, 0, 0), 4: None, 6: (6, 0, 0), 10: (10, 0, 0) }
+        double3 xformOp:scale = (2, 2, 2)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+    }
+    def Xform "LateStart"
+    {
+        double3 xformOp:translate = (1, 2, 3)
+        double3 xformOp:translate.timeSamples = { 2: (0, 0, 0), 4: (4, 0, 0) }
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+    def Xform "Grow"
+    {
+        double3 xformOp:scale.timeSamples = { 0: (0, 0, 0), 10: (1, 1, 1) }
+        float xformOp:rotateZ = 30
+        uniform token[] xformOpOrder = ["xformOp:rotateZ", "xformOp:scale"]
+    }
+    def Xform "Undone"
+    {
+        double3 xformOp:translate.timeSamples = { 0: (0, 0, 0), 10: (10, 0, 0) }
+        float xformOp:rotateZ:spin.timeSamples = { 0: 0, 10: 90 }
+        uniform token[] xformOpOrder = ["xformOp:translate", "!invert!xformOp:rotateZ:spin"]
+    }
+    def Xform "ScaledThenMoved"
+    {
+        double3 xformOp:scale.timeSamples = { 0: (1, 1, 1), 10: (3, 3, 3) }
+        double3 xformOp:translate.timeSamples = { 0: (1, 0, 0), 10: (2, 0, 0) }
+        uniform token[] xformOpOrder = ["xformOp:scale", "xformOp:translate"]
+    }
+    def Xform "Held"
+    {
+        double3 xformOp:translate.timeSamples = { 3: (5, 5, 5), 7: (5, 5, 5) }
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+    def Xform "Late"
+    {
+        token visibility.timeSamples = { 0: "invisible", 5: "inherited" }
+
+        def Mesh "Shown"
+        {
+            token visibility.timeSamples = { 0: "inherited", 7: "invisible" }
+            uniform token subdivisionScheme = "none"
+            int[] faceVertexCounts = [3]
+            int[] faceVertexIndices = [0, 1, 2]
+            point3f[] points = [(0, 0, 0), (1, 0, 0), (0, 1, 0)]
+        }
+    }
+    def Xform "NeverShown"
+    {
+        token visibility.timeSamples = { 0: "invisible", 5: "invisible" }
+    }
+    def Xform "Sheared"
+    {
+        matrix4d xformOp:transform.timeSamples = {
+            0: ((1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1)),
+            10: ((1, 0, 0, 0), (1, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1)),
+        }
+        uniform token[] xformOpOrder = ["xformOp:transform"]
+    }
+}

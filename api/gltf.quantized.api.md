@@ -28,7 +28,7 @@ interface GLTFAccessor extends GLTFProperty {
 
 interface GLTFAnimation extends GLTFProperty {
   samplers: { input: number; output: number; interpolation?: string }[];
-  channels: { sampler: number; target: { node?: number; path: string } }[];
+  channels: { sampler: number; target: { node?: number; path: string; extensions?: Record<string, unknown> } }[];
 }
 
 interface GLTFBuffer extends GLTFProperty<GLTFBufferExtensions> {

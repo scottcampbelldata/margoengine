@@ -44,7 +44,11 @@ export interface SceneRead {
   nodes: Map<string, number>;
   meshes: SceneMesh[];
   /** Adds a buffer and an accessor over it, and returns the accessor's index. */
-  accessor(data: Float32Array | Uint32Array | Uint16Array, type: string): number;
+  accessor(data: Float32Array | Uint32Array | Uint16Array | Uint8Array, type: string): number;
+  /** A prim's xformOpOrder, when it authors one. */
+  opOrder(path: string): string[] | undefined;
+  /** A prim's local matrix from its ordered ops, with `get` reading each op's value. */
+  transform(path: string, get: (name: string) => unknown): number[];
   /** Lists something that could not be used; the file still opens. */
   soft(message: string): void;
 }
@@ -54,4 +58,6 @@ export interface ExtensionHooks extends USDExtension {
   compose?(read: LayerRead): Specs;
   /** Adds to the finished scene: skins, clips and the like. */
   scene?(read: SceneRead): void;
+  /** Keeps a prim that starts invisible but has a visible sample later, so this extension can show it then. */
+  showsLater?: boolean;
 }
