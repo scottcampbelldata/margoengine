@@ -37,6 +37,10 @@
     "./metadata": {
       "types": "./dist/metadata.d.ts",
       "import": "./dist/metadata.js"
+    },
+    "./splats": {
+      "types": "./dist/splats.d.ts",
+      "import": "./dist/splats.js"
     }
   },
   "files": [
@@ -54,7 +58,8 @@
     "@margoengine/core": "^1.0.0",
     "@margoengine/gltf-pro": "^1.0.0",
     "@margoengine/points": "^1.0.0",
-    "@margoengine/decoders": "^1.0.0"
+    "@margoengine/decoders": "^1.0.0",
+    "@margoengine/splats": "^1.0.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/gltf-pro": {
@@ -64,6 +69,9 @@
       "optional": true
     },
     "@margoengine/decoders": {
+      "optional": true
+    },
+    "@margoengine/splats": {
       "optional": true
     }
   },

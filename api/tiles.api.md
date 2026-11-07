@@ -214,6 +214,8 @@ export interface TilesModel {
     dispose(): void;
 }
 
+export type TilesModelDrawer = (host: TilesContentHost, content: ModelContent, tile: TilesetTile, signal: AbortSignal) => Promise<TileRenderable>;
+
 export interface TilesOrigin {
     place(mesh: Mesh, world: ArrayLike<number>): void;
     forget(mesh: Mesh): void;
@@ -261,6 +263,7 @@ export interface TilesRendererOptions extends Omit<TilesetOptions, 'content'> {
     pointBudget?: number;
     i3dm?: TilesInstancesDrawer;
     dracoPoints?: (content: PointsContent, signal: AbortSignal) => Promise<PointsContent>;
+    splats?: TilesModelDrawer;
 }
 
 export interface TilesView {
@@ -435,6 +438,8 @@ export function fromArray(values: ArrayLike<number>): TileMatrix;
 
 export function geodeticNormal(x: number, y: number, z: number): [number, number, number];
 
+export function holdsSplats(content: ModelContent): boolean;
+
 export function identity(): TileMatrix;
 
 export function implicitBounds(root: TileBounds, scheme: 'QUADTREE' | 'OCTREE', level: number, x: number, y: number, z?: number): TileBounds;
@@ -493,6 +498,8 @@ interface TilesContentHost {
     forget(mesh: Mesh): void;
     contentMatrix(tile: TilesetTile, rtc?: readonly number[], gltf?: boolean): TileMatrix;
     fetch(url: string, signal: AbortSignal): Promise<Uint8Array>;
+    onUpdate(listener: () => void): () => void;
+    offset(): Vec3;
 }
 
 type TilesInstancesDrawer = (host: TilesContentHost, content: InstancesContent, tile: TilesetTile, signal: AbortSignal) => Promise<TileRenderable>;

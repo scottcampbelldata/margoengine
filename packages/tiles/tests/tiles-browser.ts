@@ -2,7 +2,12 @@
 // tiles, anchored in ECEF at 40 N 75.6 W) streamed by TilesRenderer through gltf-pro and drawn by the engine.
 // tests/tiles-browser.mjs drives it and checks the numbers. Built imports, so it uses the published package boundary.
 import { Engine } from '../../core/dist/extension.js';
+import { GLTFAsset } from '../../gltf-pro/dist/index.js';
+import { gaussianSplats, readGaussianSplats } from '../../gltf-pro/dist/splats.js';
+import { glbChunks } from '../../shared/glb.js';
 import { i3dm } from '../dist/i3dm.js';
+import { splats, tileSplats } from '../dist/splats.js';
+import { Splats, transformSplats } from '../../splats/dist/index.js';
 import { TilesRenderer } from '../dist/index.js';
 import { cityTileset, groveTileset, memoryFetch } from './generator.js';
 
@@ -142,6 +147,78 @@ async function run(name: string): Promise<unknown> {
     };
     tiles.dispose();
     return result;
+  }
+  if (name === 'cesium-splats') {
+    // CesiumJS's real sh_unit_cube splat tileset (Specs/Data, Apache-2.0): one glTF tile of 27 Gaussian splats with
+    // SH degree 3 in an SPZ payload (KHR_gaussian_splatting_compression_spz_2), not geo-referenced ('local' frame).
+    const base = '../../../examples/assets/3d-tiles/GaussianSplats/sh_unit_cube/',
+      from = errors.length; // the cases before leave their own (expected) errors
+    const bytes = new Uint8Array(await (await fetch(base + '0/0.glb')).arrayBuffer()),
+      [json, binary] = glbChunks(bytes),
+      doc = JSON.parse(new TextDecoder().decode(json.data)),
+      raw = await readGaussianSplats(
+        new GLTFAsset(doc, [], binary.data, { splats: gaussianSplats }, 2 ** 30),
+        doc.meshes[0].primitives[0],
+      );
+    // Its one node turns and moves the primitive (z up to y up, then 50 m along x and z, -50 m along y).
+    const data = transformSplats(raw, doc.nodes[0].matrix);
+    const count = data.positions.length / 3;
+    let low = [Infinity, Infinity, Infinity],
+      high = [-Infinity, -Infinity, -Infinity];
+    for (let i = 0; i < count; i++)
+      for (let k = 0; k < 3; k++) {
+        low[k] = Math.min(low[k], data.positions[i * 3 + k]);
+        high[k] = Math.max(high[k], data.positions[i * 3 + k]);
+      }
+    tiles = await TilesRenderer.load(engine, base + 'tileset.json', { splats });
+    tiles.tileset.on('error', ({ error }) => errors.push(`tile: ${(error as Error).message}`));
+    // glTF content in a 'local' frame: the y-up to z-up turn and the frame's z-up to y-up cancel, so a centre's world
+    // position is its glTF position. Look at the cube from 2.5 of its spans away.
+    const middle = low.map((v, k) => (v + high[k]) / 2),
+      span = Math.max(...high.map((v, k) => v - low[k]));
+    engine.camera.position = [middle[0] + span * 1.2, middle[1] + span * 0.9, middle[2] + span * 2];
+    engine.camera.target = middle;
+    const timing = await converge();
+    const data2 = pixels();
+    const scene = await tileSplats((tiles as unknown as { host: Parameters<typeof tileSplats>[0] }).host);
+    const centres = Array.from({ length: count }, (_, i) =>
+      project([data.positions[i * 3], data.positions[i * 3 + 1], data.positions[i * 3 + 2]]),
+    ).filter(([x, y, w]) => w > 0 && x > 2 && x < W - 2 && y > 2 && y < H - 2);
+    let lit2 = 0;
+    for (let i = 0; i < data2.length; i += 4) if (data2[i] + data2[i + 1] + data2[i + 2] > 30) lit2++;
+    const result = {
+      ...timing,
+      ...snapshot(),
+      splats: scene?.count ?? 0,
+      clouds: scene?.clouds.length ?? 0,
+      centres: centres.length,
+      drawn: centres.filter(([x, y]) => lit(data2, x, y)).length,
+      lit: lit2,
+      errors: errors.slice(from),
+    };
+    // Hiding the tile (selection frozen) empties the cloud at the next flush (the renderer flushes after each update).
+    tiles.enabled = false;
+    for (const tile of tiles.last.selected) if (tile.renderable) tile.renderable.visible = false;
+    scene?.flush();
+    const hidden = scene?.count ?? -1;
+    tiles.dispose();
+    const after = pixels();
+    let litAfter = 0;
+    for (let i = 0; i < after.length; i += 4) if (after[i] + after[i + 1] + after[i + 2] > 30) litAfter++;
+    // The control: the same splats drawn straight by @margoengine/splats at their glTF positions. The tile path must
+    // give the same picture (the same splats, in the same place, the same shapes and colours).
+    const direct = Splats.attach(engine, data),
+      reference = pixels();
+    direct.dispose();
+    let differ = 0,
+      worst = 0;
+    for (let i = 0; i < reference.length; i += 4) {
+      const d = Math.max(...[0, 1, 2].map((c) => Math.abs(reference[i + c] - data2[i + c])));
+      worst = Math.max(worst, d);
+      if (d > 2) differ++;
+    }
+    const directDrawn = centres.filter(([x, y]) => lit(reference, x, y)).length;
+    return { ...result, hidden, litAfter, cloudsAfter: scene?.clouds.length ?? -1, directDrawn, differ, worst };
   }
   if (name === 'city') {
     tiles = await TilesRenderer.load(engine, memory.url, {

@@ -161,6 +161,10 @@ const ASSETS = [
     '3D Tiles test tilesets: TilesetWithTreeBillboards (i3dm, CC0 1.0), the city of TilesetWithRequestVolume (b3dm, CC BY 3.0, Cesium) and two EXT_structural_metadata glTF samples (CC0 1.0) from https://github.com/CesiumGS/3d-tiles-samples; commit and sha256 there',
   ],
   [
+    'examples/assets/3d-tiles/GaussianSplats/NOTICE.md',
+    'Gaussian splat 3D Tiles tileset sh_unit_cube (KHR_gaussian_splatting with SPZ, Apache-2.0, Cesium GS, Inc.) from CesiumJS test data, https://github.com/CesiumGS/cesium; commit and sha256 there',
+  ],
+  [
     'packages/shadows/test/outside/reference.py',
     'Shadow reference pictures in packages/shadows/test/fixtures/outside: rendered by Blender Cycles from the Khronos models above (their licences apply), made by this script',
   ],

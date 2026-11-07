@@ -92,6 +92,19 @@ try {
     real,
   );
 
+  const splat = (results.cesiumSplats = await call((n) => window.tilesFixture.run(n), 'cesium-splats'));
+  assert.deepEqual(splat.errors, [], 'cesium-splats: WebGPU or engine errors');
+  check(
+    'splats, real file: the 27 Gaussian splats of CesiumJS sh_unit_cube are drawn in one cloud where float64 maths puts them',
+    splat.splats === 27 && splat.clouds === 1 && splat.centres >= 20 && splat.drawn === splat.directDrawn && splat.differ === 0,
+    splat,
+  );
+  check(
+    'splats: a hidden splat tile leaves the cloud, and dispose frees it and draws nothing',
+    splat.hidden === 0 && splat.cloudsAfter === 0 && splat.litAfter === 0,
+    splat,
+  );
+
   assert.deepEqual(pageErrors, []);
   for (const name of checks) console.log(`ok - ${name}`);
   console.log(

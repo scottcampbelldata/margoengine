@@ -569,6 +569,7 @@
       "expandTemplate",
       "fromArray",
       "geodeticNormal",
+      "holdsSplats",
       "identity",
       "implicitBounds",
       "invert",

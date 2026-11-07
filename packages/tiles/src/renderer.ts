@@ -5,7 +5,7 @@
 // float64 frame matrix; see the README's "Coordinates and precision".
 import type { EngineKernel, EnginePlugin, Mesh, Vec3 } from '@margoengine/core';
 import { MargoError } from '@margoengine/math/errors';
-import type { InstancesContent, PointsContent, TileContent } from './formats.js';
+import type { InstancesContent, ModelContent, PointsContent, TileContent } from './formats.js';
 import {
   type TileMatrix,
   Y_UP_TO_Z_UP,
@@ -52,6 +52,30 @@ export interface TilesContentHost {
   contentMatrix(tile: TilesetTile, rtc?: readonly number[], gltf?: boolean): TileMatrix;
   /** Fetches bytes with the tileset's own fetch and signal. */
   fetch(url: string, signal: AbortSignal): Promise<Uint8Array>;
+  /** Calls `listener` at the end of every selection update (after tile visibility is set); returns the unsubscribe. */
+  onUpdate(listener: () => void): () => void;
+  /** Float64 world position of engine-local [0, 0, 0]: the floating origin's, or [0, 0, 0] without one. */
+  offset(): Vec3;
+}
+
+/** Draws glTF content of a kind the default model path does not, such as `splats` from `@margoengine/tiles/splats`. */
+export type TilesModelDrawer = (
+  host: TilesContentHost,
+  content: ModelContent,
+  tile: TilesetTile,
+  signal: AbortSignal,
+) => Promise<TileRenderable>;
+
+/** True when glTF / GLB / b3dm content holds Gaussian splats (KHR_gaussian_splatting in its glTF JSON). */
+export function holdsSplats(content: ModelContent): boolean {
+  const bytes = content.gltf;
+  let json = bytes;
+  // GLB: 12-byte header, then the JSON chunk's length and type, then the JSON.
+  if (bytes.byteLength >= 20 && bytes[0] === 0x67 && bytes[1] === 0x6c && bytes[2] === 0x54 && bytes[3] === 0x46) {
+    const length = new DataView(bytes.buffer, bytes.byteOffset + 12, 4).getUint32(0, true);
+    json = bytes.subarray(20, Math.min(bytes.byteLength, 20 + length));
+  }
+  return new TextDecoder().decode(json).includes('"KHR_gaussian_splatting"');
 }
 
 /** Draws Instanced 3D Model (i3dm) content; `i3dm` from `@margoengine/tiles/i3dm` is one. */
@@ -87,6 +111,11 @@ export interface TilesRendererOptions extends Omit<TilesetOptions, 'content'> {
    * `@margoengine/tiles/metadata`. Without it such a tile fails with code `unsupported`.
    */
   dracoPoints?: (content: PointsContent, signal: AbortSignal) => Promise<PointsContent>;
+  /**
+   * Draws glTF content that holds Gaussian splats (KHR_gaussian_splatting): pass `splats` from
+   * `@margoengine/tiles/splats`. Without it such a tile fails with code `unsupported`.
+   */
+  splats?: TilesModelDrawer;
 }
 
 interface PointsHost {
@@ -116,6 +145,8 @@ export class TilesRenderer implements EnginePlugin {
   private readonly pointBudget: number;
   private readonly i3dm?: TilesInstancesDrawer;
   private readonly dracoPoints?: TilesRendererOptions['dracoPoints'];
+  private readonly splats?: TilesModelDrawer;
+  private readonly listeners = new Set<() => void>();
   private host?: TilesContentHost;
   private points?: Promise<{ host: PointsHost; PointCloud: new (options: object) => object }>;
   private readonly planes = new Float64Array(24);
@@ -146,6 +177,7 @@ export class TilesRenderer implements EnginePlugin {
     this.pointBudget = options.pointBudget ?? 2_000_000;
     this.i3dm = options.i3dm;
     this.dracoPoints = options.dracoPoints;
+    this.splats = options.splats;
     this.loadModel =
       options.loadModel ??
       (async (engine, gltf, signal) => {
@@ -212,6 +244,7 @@ export class TilesRenderer implements EnginePlugin {
       screenHeight: engine.canvas.height || 1,
       fov: camera.fov,
     });
+    for (const listener of this.listeners) listener();
     return this.last;
   }
   /** World matrix (float64) of a tile's glTF content: frame x tile transform x RTC x y-up to z-up. */
@@ -236,6 +269,14 @@ export class TilesRenderer implements EnginePlugin {
       case 'glb':
       case 'gltf':
       case 'b3dm': {
+        if (holdsSplats(content)) {
+          if (!this.splats)
+            throw new MargoError(
+              'unsupported',
+              "Gaussian splat tiles (KHR_gaussian_splatting) need their drawer: import { splats } from '@margoengine/tiles/splats' and pass { splats } to TilesRenderer.load",
+            );
+          return this.splats((this.host ??= this.contentHost(engine)), content, tile, signal);
+        }
         const model = await this.loadModel(engine, content.gltf, signal);
         if (signal.aborted) {
           model.dispose();
@@ -337,6 +378,14 @@ export class TilesRenderer implements EnginePlugin {
       forget: (mesh) => this.origin?.forget(mesh),
       contentMatrix: (tile, rtc, gltf) => this.contentMatrix(tile, rtc, gltf),
       fetch: (url, signal) => this.tileset.fetchBytes(url, signal),
+      onUpdate: (listener) => {
+        this.listeners.add(listener);
+        return () => this.listeners.delete(listener);
+      },
+      offset: () => {
+        const o = this.origin?.origin;
+        return o ? [o[0], o[1], o[2]] : [0, 0, 0];
+      },
     };
   }
   private async loadPoints(

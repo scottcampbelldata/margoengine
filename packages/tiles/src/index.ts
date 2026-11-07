@@ -19,7 +19,14 @@ export {
   type MetadataEntity,
   type MetadataSchema,
 } from './tileset.js';
-export { TilesRenderer, type TilesRendererOptions, type TilesOrigin, type TilesModel } from './renderer.js';
+export {
+  TilesRenderer,
+  holdsSplats,
+  type TilesRendererOptions,
+  type TilesOrigin,
+  type TilesModel,
+  type TilesModelDrawer,
+} from './renderer.js';
 export { TileBounds, createBounds, boxBounds, sphereBounds, regionBounds, type BoundingVolumeJSON } from './bounds.js';
 export {
   parseContent,

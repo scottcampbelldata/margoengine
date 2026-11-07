@@ -38,7 +38,7 @@ The renderer updates selection every frame from `engine.camera`. `tiles.dispose(
 | Refinement | `REPLACE` (children drawn only once every visible child is ready, so no holes and no overlap) and `ADD` |
 | Implicit tiling | `QUADTREE` and `OCTREE`, `subtreeLevels`, `availableLevels` (or the 1.0 extension's `maximumLevel`), binary and JSON subtree files, constant and bitstream availability, child subtrees, `{level}` `{x}` `{y}` `{z}` templates |
 | External tilesets | content that is tileset JSON becomes the tile's child; its transforms continue from the tile |
-| Content | glTF and GLB, b3dm (with `RTC_CENTER` and the batch table), pnts (`POSITION`, `POSITION_QUANTIZED`, `RGBA`, `RGB`, `RGB565`, `NORMAL`, `NORMAL_OCT16P`, `BATCH_ID`, `CONSTANT_RGBA`, Draco-compressed with `dracoPoints` from `margoengine/tiles/metadata`), cmpt (nested), i3dm (`POSITION`, `POSITION_QUANTIZED`, `NORMAL_UP` / `NORMAL_RIGHT` and their oct-encoded forms, `SCALE`, `SCALE_NON_UNIFORM`, `EAST_NORTH_UP`, `RTC_CENTER`, embedded or external glTF; drawn with `i3dm` from `margoengine/tiles/i3dm`) |
+| Content | glTF and GLB, b3dm (with `RTC_CENTER` and the batch table), pnts (`POSITION`, `POSITION_QUANTIZED`, `RGBA`, `RGB`, `RGB565`, `NORMAL`, `NORMAL_OCT16P`, `BATCH_ID`, `CONSTANT_RGBA`, Draco-compressed with `dracoPoints` from `margoengine/tiles/metadata`), cmpt (nested), i3dm (`POSITION`, `POSITION_QUANTIZED`, `NORMAL_UP` / `NORMAL_RIGHT` and their oct-encoded forms, `SCALE`, `SCALE_NON_UNIFORM`, `EAST_NORTH_UP`, `RTC_CENTER`, embedded or external glTF; drawn with `i3dm` from `margoengine/tiles/i3dm`), glTF with Gaussian splats (`KHR_gaussian_splatting`, SPZ-compressed or not; drawn with `splats` from `margoengine/tiles/splats`) |
 | Metadata | `schema` / `schemaUri`, `metadata` on the tileset, tiles and contents, `groups`; `tileset.properties(entity)` fills in schema defaults; glTF `EXT_structural_metadata` property tables and `EXT_mesh_features` feature IDs with `readStructuralMetadata` from `margoengine/tiles/metadata` |
 
 ## Selection
@@ -64,6 +64,7 @@ Each update measures every visible tile's screen-space error, `geometricError x 
 | `pointBudget` (renderer) | 2,000,000 | Budget of the points plugin made for pnts tiles. |
 | `i3dm` (renderer) | none | The i3dm drawer from `margoengine/tiles/i3dm`; without it an i3dm tile fails with code `unsupported`. |
 | `dracoPoints` (renderer) | none | The Draco pnts decoder from `margoengine/tiles/metadata`; without it a Draco pnts tile fails with code `unsupported`. |
+| `splats` (renderer) | none | The Gaussian splat drawer from `margoengine/tiles/splats`; without it a glTF tile holding `KHR_gaussian_splatting` fails with code `unsupported`. |
 
 ## Coordinates and precision
 
@@ -128,6 +129,23 @@ console.log(metadata.propertyTables[0].get(1, 'example_variable_length_ARRAY_STR
 
 `dracoPoints(content)` turns Draco pnts into ordinary point content: `POSITION`, `RGBA` or `RGB`, `NORMAL` and `BATCH_ID` from the Draco buffer, and the batch table properties the extension names. For your own renderer, call it from the `Tileset` content factory; a third argument takes any decoder with `decode(bytes)`.
 
+## Gaussian splat tiles
+
+Photoreal captures are now published as 3D Tiles whose glTF content holds Gaussian splats (`KHR_gaussian_splatting`, often with the SPZ payload of the draft `KHR_gaussian_splatting_compression_spz_2`, declared through `3DTILES_content_gltf`). Pass the drawer from `margoengine/tiles/splats`: gltf-pro reads each tile's splats and meshes, and [`@margoengine/splats`](../splats/README.md) draws them. Tilesets without splats never load this module.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { TilesRenderer } from 'margoengine/tiles';
+import { splats } from 'margoengine/tiles/splats';
+
+const engine = await Engine.create(document.querySelector('canvas')!, { camera: { position: [170, 40, 250], target: [50, -50, 50] } });
+// CesiumJS's real sh_unit_cube: 27 splats with SH degree 3 in an SPZ payload (examples/assets/3d-tiles in this repository).
+const tiles = await TilesRenderer.load(engine, '3d-tiles/GaussianSplats/sh_unit_cube/tileset.json', { splats });
+engine.start();
+```
+
+Every visible tile's splats go into one cloud, so splats of neighbouring and overlapping tiles sort together rather than tile by tile; the cloud is rebuilt after an update that changed which tiles show (one rebuild for a whole REPLACE swap, so no frame shows both levels or neither) and when a floating origin moves. Each primitive is placed by `frame x tile transform x RTC x y-up to z-up x node` in float64: shapes and harmonics are turned by the linear part, and the translation is added in float64 when the cloud is built, so splats keep float32 precision at the tile's own size even at ECEF distances. Tiles with different harmonic degrees merge at the highest one. Past 3,000,000 visible splats a second cloud starts (`SPLATS_PER_CLOUD`), and those two sort apart. `placeSplats`, `mergePlaced` and `TileSplats` are exported for your own renderer.
+
 ## Without the engine
 
 `Tileset` is engine-free: give it a view each frame and a content factory, and it does the rest. This is how the tests drive it, and how to stream tiles into your own renderer or a server-side job.
@@ -150,6 +168,7 @@ The content parsers (`parseB3dm`, `parsePnts`, `parseI3dm`, `parseCmpt`, `parseC
 
 - i3dm batch tables are read (`content.batchTable`) but per-instance picking and per-instance colours are not wired to them; an i3dm external glTF resolves against the tile's first content URL.
 - S2 bounding volumes are not read.
+- Splat tiles: the visible cloud is rebuilt on the CPU and uploaded again when the visible tiles change, which costs time in proportion to the visible splats (not measured); splats do not write depth or receive lighting (see `@margoengine/splats`); the renderer's `loadModel` is not used for splat tiles; a glTF tile with external buffers is not read.
 - Metadata: feature ID textures are named, not read (sample the texture yourself); property textures, property attributes and a `schemaUri` schema in glTF are not read; 64-bit integers become doubles (exact to 2^53); feature IDs of a Draco-compressed glTF primitive are not read; picking a vertex is yours (a raycast hit), the tables then give its feature.
 - Draco pnts decode in Web Workers (`@margoengine/decoders/draco-points`), so not in Node without a decoder of your own.
 - A tile whose glTF requires KHR_techniques_webgl (archived GLSL shaders, such as the billboard level of Cesium's TilesetWithTreeBillboards) fails with code `unsupported`, as glTF says a loader must; the rest of the tileset draws.
