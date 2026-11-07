@@ -4,7 +4,7 @@ Import `margoengine/cache` from the `margoengine` package, or `@margoengine/cach
 
 Opt-in offline asset cache. Heavy GLB, .bin and texture files are kept in IndexedDB, so repeat visits load them
 from disk and the viewer keeps working with bad or no Wi-Fi (a factory floor). `cache.fetch` is fetch-compatible and
-every loader takes it as its `fetch` option; apps that do not import this package pay nothing for it. About 2.4 kB
+every loader takes it as its `fetch` option; apps that do not import this package pay nothing for it. About 2.8 kB
 min+gzip, no dependencies, no engine needed. Works in windows, Web Workers and service workers.
 
 ```ts
@@ -240,6 +240,29 @@ console.log(strings.status);
   own headers, so they land in the same entry. `varyNames(value)` parses a `Vary` value.
 - `HashedAssets` and `LoadingManager` work on top unchanged. `RangeCache` (above) is keyed by URL only.
 
+## Eviction index for big caches
+
+By default each write reads every stored file's metadata (not the bytes) to find what to evict: fine for thousands
+of files. For tens of thousands (map tiles), pass `eviction: evictionIndex()` from `margoengine/cache/eviction`:
+an IndexedDB index on last use and a running byte and file total, kept in the same transaction as every write, so a
+write reads the totals and only the files it evicts.
+
+```ts
+import {AssetCache} from 'margoengine/cache';
+import {evictionIndex} from 'margoengine/cache/eviction';
+
+const tiles = new AssetCache({name: 'map-tiles', maxBytes: 2 ** 30, eviction: evictionIndex()});
+const tile = await tiles.fetch('/tiles/12/2048/1361.png');
+console.log(tile.status, await tiles.usage()); // usage() reads the totals too: {bytes, files, ...}
+```
+
+- Same eviction as the default: least recently used first, never the file being written, a file over `maxBytes` not
+  stored, and on `QuotaExceededError` as many more bytes as the new file needs, then one retry.
+- It moves the database to IndexedDB version 2. An existing database gets the index and its totals once, on the first
+  open. After that, open it with the index every time: an AssetCache without it cannot open a version 2 database and
+  goes to the network. Use a new `name` to go back.
+- Works with `keys: varyKeys()`, `HashedAssets` and `LoadingManager`.
+
 ## Limits
 
 - Keyed by URL unless `keys: varyKeys()` is set (above); `RangeCache` is keyed by URL only.
@@ -247,7 +270,8 @@ console.log(strings.status);
   `Last-Modified` is always readable. Without either, a stale file is downloaded again on each visit (offline still
   works). `Expires` and `Age` are ignored; `no-cache` and missing `max-age` mean "revalidate".
 - A miss is read fully before the loader gets it (all Margo loaders read whole files anyway).
-- Eviction reads every entry's metadata (not the bytes) before each write: fine for thousands of files.
+- Eviction reads every entry's metadata (not the bytes) before each write unless `eviction: evictionIndex()` is set
+  (above): fine for thousands of files.
 - RangeCache: proved in Node with gltf-pro's real streaming code, an in-memory IndexedDB and a stand-in server; not yet
   run in a browser or service worker, and not timed. Eviction reads every file's record (one per file, not per block)
   before each write. Two requests in flight at once that share a block both fetch it (it is stored once).

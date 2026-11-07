@@ -302,6 +302,10 @@
       "types": "./dist/cache/vary.d.ts",
       "import": "./dist/cache/vary.js"
     },
+    "./cache/eviction": {
+      "types": "./dist/cache/eviction.d.ts",
+      "import": "./dist/cache/eviction.js"
+    },
     "./cameras": {
       "types": "./dist/cameras.d.ts",
       "import": "./dist/cameras.js"

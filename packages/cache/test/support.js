@@ -7,9 +7,11 @@
  * keys it wrote (a read-only one commits nothing), so overlapping transactions do not undo each other. Versioned open
  * runs onupgradeneeded with the old version; a lower version than stored fails with VersionError. Object stores support
  * createIndex(name, keyPath) and index(name).openCursor() in ascending key order, with cursor.continue() and delete().
+ * `counts.reads` counts the records handed out by get, getAll and cursors.
  */
 export function fakeIndexedDB({ quota = Infinity, broken = false } = {}) {
   const databases = new Map(),
+    counts = { reads: 0 },
     later = (fn) => setTimeout(fn, 0);
   const copy = (value) => (value instanceof Blob ? value : structuredClone(value));
   const order = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
@@ -29,8 +31,16 @@ export function fakeIndexedDB({ quota = Infinity, broken = false } = {}) {
       return request(run);
     };
     return {
-      get: (key) => request(() => copy(map.get(key))),
-      getAll: () => request(() => [...map.values()].map(copy)),
+      get: (key) =>
+        request(() => {
+          if (map.has(key)) counts.reads++;
+          return copy(map.get(key));
+        }),
+      getAll: () =>
+        request(() => {
+          counts.reads += map.size;
+          return [...map.values()].map(copy);
+        }),
       getAllKeys: () => request(() => [...map.keys()]),
       count: () => request(() => map.size),
       put: (value, key) =>
@@ -70,6 +80,7 @@ export function fakeIndexedDB({ quota = Infinity, broken = false } = {}) {
                   r.result = null;
                 } else {
                   const [key, value] = rows[i++];
+                  counts.reads++;
                   r.result = {
                     primaryKey: key,
                     key: value[path],
@@ -92,6 +103,7 @@ export function fakeIndexedDB({ quota = Infinity, broken = false } = {}) {
   };
   return {
     databases,
+    counts,
     open(name, version = 1) {
       const request = {};
       later(() => {

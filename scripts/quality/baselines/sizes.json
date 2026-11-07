@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10273343,
+  "total": 10274507,
   "history": [
     {
       "date": "2026-10-24",
@@ -3278,6 +3278,12 @@
       "commit": "eed6e15f",
       "reason": "cache/vary: varyKeys splits AssetCache entries by Vary and credentials, own entry; root gains the keys hook within its budget",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "2000d95a",
+      "reason": "cache/eviction: evictionIndex keeps a last-use index and totals, own entry; the root gains the keys and eviction hooks (2,778 B)",
+      "grew": 2
     }
   ],
   "items": {
@@ -3343,7 +3349,8 @@
     "@margoengine/bvh/scene": 3782,
     "@margoengine/bvh/sdf": 3090,
     "@margoengine/bvh/tree": 10524,
-    "@margoengine/cache": 2663,
+    "@margoengine/cache": 3034,
+    "@margoengine/cache/eviction": 793,
     "@margoengine/cache/hashed": 871,
     "@margoengine/cache/manager": 1985,
     "@margoengine/cache/ranges": 3986,

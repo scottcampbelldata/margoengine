@@ -17,7 +17,7 @@ class AssetCache {
     readonly stats: AssetCacheStats;
     readonly maxBytes: number;
     readonly timeout: number;
-    constructor({ name, version, maxBytes, persist, timeout, fetch, keys }?: AssetCacheOptions);
+    constructor({ name, version, maxBytes, persist, timeout, fetch, keys, eviction }?: AssetCacheOptions);
     readonly fetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
     flush(): Promise<void>;
     usage(): Promise<AssetCacheUsage>;
@@ -25,6 +25,20 @@ class AssetCache {
     clear(): Promise<void>;
     dispose(): void;
     [Symbol.dispose]: () => void;
+}
+
+interface AssetCacheEntry {
+    url: string;
+    size: number;
+    used: number;
+}
+
+interface AssetCacheEviction {
+    readonly version: number;
+    upgrade(meta: IDBObjectStore, oldVersion: number): void;
+    write(meta: IDBObjectStore, data: IDBObjectStore, entry: AssetCacheEntry, blob: Blob, limit: number, squeeze: boolean, done: (evicted: number) => void): void;
+    remove(meta: IDBObjectStore, data: IDBObjectStore, key: IDBValidKey): void;
+    usage(meta: IDBObjectStore, done: (bytes: number, files: number) => void): void;
 }
 
 interface AssetCacheKeys {
@@ -43,6 +57,7 @@ interface AssetCacheOptions {
     timeout?: number;
     fetch?: typeof fetch;
     keys?: AssetCacheKeys;
+    eviction?: AssetCacheEviction;
 }
 
 interface AssetCacheStats {

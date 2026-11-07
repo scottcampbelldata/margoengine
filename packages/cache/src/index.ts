@@ -15,6 +15,45 @@ export interface AssetCacheOptions {
   fetch?: typeof fetch;
   /** Which stored entry a request maps to, for content that differs by request: `varyKeys()` of `@margoengine/cache/vary`. Default: the URL. */
   keys?: AssetCacheKeys;
+  /** How eviction finds the least recently used files: `evictionIndex()` of `@margoengine/cache/eviction`. Default: read every entry's metadata before each write. */
+  eviction?: AssetCacheEviction;
+}
+/** A stored file's record, as AssetCache writes it in its `meta` store. */
+export interface AssetCacheEntry {
+  /** Its key: the URL, or what `keys` chose. */
+  url: string;
+  /** Bytes. */
+  size: number;
+  /** Last use, ms since the epoch. */
+  used: number;
+}
+/**
+ * Bookkeeping for eviction kept inside AssetCache's own transactions. `@margoengine/cache/eviction` provides one that keeps
+ * an index on last use and a running byte total, so a write reads only the files it evicts.
+ */
+export interface AssetCacheEviction {
+  /** The IndexedDB version the database needs, above 1; a database at a higher version opens with it too. */
+  readonly version: number;
+  /** Adds what it needs during an upgrade from `oldVersion` (0 for a new database). */
+  upgrade(meta: IDBObjectStore, oldVersion: number): void;
+  /**
+   * In a readwrite transaction: evicts least recently used entries (never `entry.url`) until the stored bytes plus
+   * `entry` fit `limit` (with `squeeze`, also at most the bytes of the other entries), writes `entry` and `blob`, and
+   * calls `done` with the number evicted.
+   */
+  write(
+    meta: IDBObjectStore,
+    data: IDBObjectStore,
+    entry: AssetCacheEntry,
+    blob: Blob,
+    limit: number,
+    squeeze: boolean,
+    done: (evicted: number) => void,
+  ): void;
+  /** In a readwrite transaction: removes one key from both stores. */
+  remove(meta: IDBObjectStore, data: IDBObjectStore, key: IDBValidKey): void;
+  /** In a readonly transaction: calls `done` with the stored bytes and files. */
+  usage(meta: IDBObjectStore, done: (bytes: number, files: number) => void): void;
 }
 /**
  * Maps requests to stored entries. Every key is the URL, or the URL, a newline and more, so `delete(url)` removes them
@@ -90,6 +129,7 @@ export class AssetCache {
   private db: Promise<IDBDatabase | null>;
   private network: typeof globalThis.fetch;
   private keys?: AssetCacheKeys;
+  private eviction?: AssetCacheEviction;
   private checked = new Set<string>();
   private pending = new Set<Promise<unknown>>();
   private writes: Promise<unknown> = Promise.resolve();
@@ -102,6 +142,7 @@ export class AssetCache {
     timeout = 5000,
     fetch,
     keys,
+    eviction,
   }: AssetCacheOptions = {}) {
     if (!(maxBytes >= 0) || !(timeout >= 0))
       throw new RangeError('AssetCache maxBytes and timeout must be non-negative');
@@ -109,15 +150,19 @@ export class AssetCache {
     this.timeout = timeout;
     this.network = fetch ?? ((input, init) => globalThis.fetch(input, init));
     this.keys = keys;
+    this.eviction = eviction;
     if (persist) globalThis.navigator?.storage?.persist?.().catch(() => {});
     this.db = this.open(name, String(version)).catch(() => null);
   }
 
   private async open(name: string, version: string): Promise<IDBDatabase> {
-    const request = indexedDB.open(name, 1);
-    request.onupgradeneeded = () => {
-      request.result.createObjectStore(M);
-      request.result.createObjectStore(D);
+    const request = indexedDB.open(name, this.eviction?.version ?? 1);
+    request.onupgradeneeded = (event) => {
+      if (event.oldVersion < 1) {
+        request.result.createObjectStore(M);
+        request.result.createObjectStore(D);
+      }
+      this.eviction?.upgrade(request.transaction!.objectStore(M), event.oldVersion);
     };
     const db = await new Promise<IDBDatabase>((ok, no) => {
       request.onsuccess = () => ok(request.result);
@@ -336,6 +381,29 @@ export class AssetCache {
   }
 
   private async put(entry: Entry, blob: Blob, records: [string, unknown][] = []): Promise<void> {
+    const eviction = this.eviction;
+    if (eviction) {
+      const write = async (squeeze: boolean) => {
+        let evicted = 0;
+        if (
+          await this.tx('readwrite', (meta, data) => {
+            for (const [key, value] of records) meta.put(value, key);
+            eviction.write(meta, data, entry, blob, this.maxBytes, squeeze, (n) => {
+              evicted = n;
+            });
+          })
+        ) {
+          this.stats.stored++;
+          this.stats.evicted += evicted;
+        }
+      };
+      try {
+        return await write(false);
+      } catch (error) {
+        if ((error as Error)?.name !== 'QuotaExceededError') throw error;
+        return await write(true);
+      }
+    }
     let all: IDBRequest | undefined;
     await this.tx('readonly', (meta) => {
       all = meta.getAll();
@@ -390,17 +458,24 @@ export class AssetCache {
 
   /** Bytes and files stored here, plus the origin's `navigator.storage.estimate()` where available. */
   async usage(): Promise<AssetCacheUsage> {
-    let all: IDBRequest | undefined;
+    let all: IDBRequest | undefined,
+      bytes = 0,
+      files = 0;
     await this.tx('readonly', (meta) => {
-      all = meta.getAll();
+      if (this.eviction)
+        this.eviction.usage(meta, (b, f) => {
+          bytes = b;
+          files = f;
+        });
+      else all = meta.getAll();
     }).catch(() => {
       this.stats.errors++;
     });
     const entries = ((all?.result ?? []) as unknown[]).filter(isEntry),
       estimate = await globalThis.navigator?.storage?.estimate?.().catch(() => undefined);
     return {
-      bytes: entries.reduce((sum, e) => sum + e.size, 0),
-      files: entries.length,
+      bytes: entries.reduce((sum, e) => sum + e.size, bytes),
+      files: entries.length + files,
       quota: estimate?.quota,
       usage: estimate?.usage,
     };
@@ -414,7 +489,8 @@ export class AssetCache {
     await this.tx('readwrite', (meta, data) => {
       meta.getAllKeys().onsuccess = (event) => {
         for (const k of (event.target as IDBRequest<IDBValidKey[]>).result)
-          if (mine(k)) {
+          if (mine(k) && this.eviction) this.eviction.remove(meta, data, k);
+          else if (mine(k)) {
             meta.delete(k);
             data.delete(k);
           }

@@ -41,6 +41,10 @@
     "./vary": {
       "types": "./dist/vary.d.ts",
       "import": "./dist/vary.js"
+    },
+    "./eviction": {
+      "types": "./dist/eviction.d.ts",
+      "import": "./dist/eviction.js"
     }
   },
   "files": [
