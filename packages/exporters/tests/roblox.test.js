@@ -63,6 +63,24 @@ test('every primitive splits into parts that keep each corner and attribute valu
   }
 });
 
+test('the parts in the file hold the source triangles in order, read with no help from the mapping', () => {
+  const positions = Array.from({ length: 36 }, (_, i) => (i * 7) % 11),
+    indices = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 2, 5, 8, 1, 4, 7],
+    normals = Array(12).fill([0, 0, 1]).flat(),
+    scene = { nodes: [{ name: 'n', geometry: { positions, normals, indices } }] },
+    file = readGLB(exportRobloxGLB(scene, { maxTrianglesPerPart: 2 }).glb),
+    corners = [];
+  for (const primitive of file.json.meshes[0].primitives) {
+    const stored = values(file, primitive.attributes.POSITION);
+    assert.ok(values(file, primitive.indices).length <= 6, 'the cap, in the file');
+    for (const index of values(file, primitive.indices)) corners.push([...stored.slice(index * 3, index * 3 + 3)]);
+  }
+  assert.deepEqual(
+    corners,
+    indices.map((index) => positions.slice(index * 3, index * 3 + 3)),
+  );
+});
+
 test('the default cap makes parts of 20,000 triangles and a partial last part', () => {
   for (const [triangles, expected] of [
     [20_000, [20_000]],

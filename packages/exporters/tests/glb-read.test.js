@@ -35,6 +35,22 @@ test('readAccessor returns the exported positions and indices', () => {
   assert.equal(indices.width, 1);
 });
 
+test('readAccessor equals the bytes the file holds, read by hand from the chunks', () => {
+  const file = triangle(),
+    view = new DataView(file.buffer, file.byteOffset, file.byteLength),
+    jsonLength = view.getUint32(12, true),
+    json = JSON.parse(new TextDecoder().decode(file.subarray(20, 20 + jsonLength))),
+    bin = 20 + jsonLength + 8,
+    id = json.meshes[0].primitives[0].attributes.POSITION,
+    { byteOffset = 0 } = json.bufferViews[json.accessors[id].bufferView],
+    stored = Array.from({ length: 9 }, (_, i) => view.getFloat32(bin + byteOffset + i * 4, true));
+  assert.equal(view.getUint32(0, true), 0x46546c67, 'glTF');
+  assert.equal(view.getUint32(8, true), file.length);
+  assert.equal(view.getUint32(20 + jsonLength + 4, true), 0x004e4942, 'BIN');
+  assert.deepEqual(stored, [0, 0, 0, 1, 0, 0, 0, 1, 0]);
+  assert.deepEqual([...readAccessor(splitGLB(file), id).values], stored);
+});
+
 test('readAccessor packs strided views and keeps integer values as stored', () => {
   // Two VEC2 uint16 elements with a 8-byte stride: [1, 2] pad pad [3, 4] pad pad.
   const bin = new Uint8Array(16),

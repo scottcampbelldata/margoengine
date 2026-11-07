@@ -89,6 +89,46 @@ test('LAS round trip: every point format 0 to 10 through writeLAS and parseLAS',
   }
 });
 
+// The file's own bytes by the tables of the LAS 1.4 specification, with no help from parseLAS. laspy 2 reads the same.
+test('the written bytes hold the header fields and records the specification lays out', () => {
+  const data = survey(200);
+  for (const [format, minor, offsets] of [
+    [3, 2, { flags: 14, classification: 15, gps: 20, rgb: 28 }],
+    [7, 4, { flags: 14, classification: 16, gps: 22, rgb: 30 }],
+  ]) {
+    const { extra, ...plain } = data,
+      file = writeLAS({ ...plain, pointFormat: format, versionMinor: minor }),
+      view = new DataView(file.buffer, file.byteOffset, file.byteLength),
+      f64 = (at) => view.getFloat64(at, true),
+      first = view.getUint32(96, true),
+      length = view.getUint16(105, true);
+    assert.equal(String.fromCharCode(...file.subarray(0, 4)), 'LASF');
+    assert.deepEqual([file[24], file[25]], [1, minor]);
+    assert.equal(file[104], format);
+    assert.equal(length, LAS_RECORD_SIZES[format]);
+    assert.equal(minor === 4 ? Number(view.getBigUint64(247, true)) : view.getUint32(107, true), 200);
+    assert.equal(file.length, first + 200 * length, 'the records end the file');
+    const scale = [f64(131), f64(139), f64(147)],
+      offset = [f64(155), f64(163), f64(171)];
+    for (let i = 0; i < 200; i++) {
+      const at = first + i * length;
+      for (let k = 0; k < 3; k++) {
+        const stored = view.getInt32(at + k * 4, true) * scale[k] + offset[k];
+        assert.ok(Math.abs(stored - data.positions[i * 3 + k]) <= scale[k], `format ${format} point ${i}`);
+      }
+      assert.equal(view.getUint16(at + 12, true), data.intensity[i]);
+      const flags = file[at + offsets.flags];
+      assert.deepEqual(
+        minor === 4 ? [flags & 15, flags >> 4] : [flags & 7, (flags >> 3) & 7],
+        [data.returnNumber[i], data.numberOfReturns[i]],
+      );
+      assert.equal(file[at + offsets.classification] & 31, data.classification[i]);
+      assert.equal(f64(at + offsets.gps), data.gpsTime[i]);
+      for (let k = 0; k < 3; k++) assert.equal(view.getUint16(at + offsets.rgb + k * 2, true), data.rgb[i * 3 + k]);
+    }
+  }
+});
+
 test('LAS header: 1.4 64-bit counts, bounding box, CRS from GeoTIFF keys, partial reads, stride and maxPoints', async () => {
   const file = writeLAS({ ...survey(1000), epsg: 26918 });
   const { header, records } = readLASHeader(file);

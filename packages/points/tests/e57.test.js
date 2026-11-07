@@ -81,6 +81,45 @@ test('E57 round trip: double, scaled-integer and spherical scans, intensity, col
   assert.ok(centred.origin[0] > 0);
 });
 
+// The file's own bytes by ASTM E2807, with no help from parseE57: pages, header, XML and the first packet of doubles.
+test('the written bytes hold the pages, header, XML and packets the standard lays out', () => {
+  const { positions } = scanData(300),
+    file = writeE57([{ name: 'raw', positions }]),
+    view = new DataView(file.buffer, file.byteOffset, file.byteLength),
+    u64 = (at) => Number(view.getBigUint64(at, true)),
+    pageSize = u64(40),
+    payload = pageSize - 4;
+  assert.equal(String.fromCharCode(...file.subarray(0, 8)), 'ASTM-E57');
+  assert.deepEqual([view.getUint32(8, true), view.getUint32(12, true)], [1, 0]);
+  assert.equal(u64(16), file.length);
+  assert.equal(pageSize, 1024);
+  for (let at = 0; at < file.length; at += pageSize)
+    assert.equal(view.getUint32(at + payload), crc32c(file.subarray(at, at + payload)), `page at ${at}`);
+  // Every page gives up its checksum, so a logical stream runs over the payloads.
+  const logical = new Uint8Array((file.length / pageSize) * payload);
+  for (let page = 0; page < file.length / pageSize; page++)
+    logical.set(file.subarray(page * pageSize, page * pageSize + payload), page * payload);
+  const toLogical = (physical) => Math.floor(physical / pageSize) * payload + (physical % pageSize),
+    start = toLogical(u64(24)),
+    xml = new TextDecoder().decode(logical.subarray(start, start + u64(32)));
+  assert.match(xml, /<e57Root type="Structure"/);
+  assert.match(xml, /<name type="String"><!\[CDATA\[raw\]\]><\/name>/);
+  const points = xml.match(/<points type="CompressedVector" fileOffset="(\d+)" recordCount="(\d+)">/);
+  assert.equal(Number(points[2]), 300);
+  assert.match(xml, /<cartesianX type="Float"/);
+  const logicalView = new DataView(logical.buffer),
+    section = toLogical(Number(points[1]));
+  assert.equal(logical[section], 1, 'a compressed vector section');
+  const packet = toLogical(Number(logicalView.getBigUint64(section + 16, true)));
+  assert.equal(logical[packet], 1, 'a data packet');
+  const streams = logicalView.getUint16(packet + 4, true),
+    bytes = logicalView.getUint16(packet + 6, true),
+    data = packet + 6 + streams * 2;
+  assert.equal(streams, 3, 'x, y and z');
+  assert.equal(bytes % 8, 0);
+  for (let i = 0; i < bytes / 8; i++) assert.equal(logicalView.getFloat64(data + i * 8, true), positions[i * 3], `x of ${i}`);
+});
+
 test('E57 integrity: a flipped byte fails its page checksum; truncated or corrupt files never crash or hang', () => {
   const file = writeE57([{ positions: scanData(500).positions, resolution: 0.001 }]);
   const bad = file.slice();

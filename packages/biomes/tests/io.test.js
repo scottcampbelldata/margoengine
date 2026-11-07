@@ -95,6 +95,10 @@ test('exportHeight: tiles option exports a rectangle, and bad input is a RangeEr
   const world = await BiomeWorld.create(options),
     part = await exportHeight(world, 'f32', { tiles: [1, 0, 1, 1] });
   assert.deepEqual([part.width, part.depth], [256, 512]);
+  assert.equal(part.data.length, 256 * 512 * 4, 'the file holds that rectangle');
+  const stored = new DataView(part.data.buffer),
+    below = (await world.tile(1, 1, { layers: ['height'] })).layer('height').data;
+  assert.equal(stored.getFloat32((300 * 256 + 7) * 4, true), Math.fround(below[(300 - 256) * 256 + 7] / 1000));
   await assert.rejects(exportHeight(world, 'f32', { tiles: [0, 0, 2, 0] }), RangeError);
   await assert.rejects(exportHeight(world, 'tiff'), RangeError);
 });
@@ -111,11 +115,14 @@ test('exportWeights and exportMasks: one plane and one PNG per biome, weights ad
     assert.equal(sum, 255, 'cell ' + cell);
   }
   assert.deepEqual([...masks.keys()], weights.biomes);
+  const sums = new Uint16Array(512 * 512);
   weights.biomes.forEach((id, i) => {
     const d = decodePng(masks.get(id));
     assert.deepEqual([d.width, d.depth, d.bits, d.color], [512, 512, 8, 0]);
     assert.deepEqual([...d.rows], [...weights.planes[i]]);
+    d.rows.forEach((value, cell) => (sums[cell] += value));
   });
+  assert.ok(sums.every((sum) => sum === 255), 'the mask files, read back, add up to 255 in every cell');
   assert.equal(weights.splats.length, Math.ceil(weights.biomes.length / 4));
   const splat = decodePng(weights.splats[0].png);
   assert.deepEqual([splat.bits, splat.color], [8, 6]);
