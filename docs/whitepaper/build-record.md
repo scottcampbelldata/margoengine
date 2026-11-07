@@ -2060,7 +2060,7 @@ scene is drawn by core. Nothing is timed.
 | 4 | Hail lighting and splashes | DONE | `ad570c7e` | `lit` and `splashes` on `/hail` | LIM-390 |
 | 5 | Clouds and fog drawn from state | DONE | `01899b91` | `/drive` (`WeatherDrive`) | LIM-391 |
 | 6 | Weather audio cues | DONE | `91e24eda` | `/audio` (`WeatherAudio`) | LIM-394 |
-| 7 | Real weather data import | DONE | this commit | `/data` (`parseMetar`, `metarState`) | LIM-395 |
+| 7 | Real weather data import | DONE | `bb580b6a` | `/data` (`parseMetar`, `metarState`) | LIM-397 |
 
 Follow-up in the same batch: `34dd3b7a` makes the drive check wait for its pipelines instead of three frames.
 
