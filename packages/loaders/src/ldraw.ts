@@ -38,7 +38,31 @@ export interface LDrawOptions extends ParseLimits {
   maxDepth?: number;
   /** Most sub-file references expanded in the model. Default 4,000,000. */
   maxInstances?: number;
+  /**
+   * Keeps each placed `.dat` part as one geometry with a matrix per placement, in `instances`, so a model of many alike
+   * bricks costs each brick once. What is not a placed part stays in the main mesh, and so do mirrored placements. Default
+   * false: everything expands into the main mesh.
+   */
+  instanced?: boolean;
   signal?: AbortSignal;
+}
+
+/** One `.dat` part in one colour, placed one or more times: from `instanced`. */
+export interface LDrawInstances {
+  /** The part's file, as the model names it. */
+  file: string;
+  /** The colour code the part took from its reference. */
+  code: number;
+  /** The part in its own LDraw units, with a group per colour, as the main mesh has them. */
+  positions: Float32Array;
+  indices: Uint32Array;
+  groups: LoadedGroup[];
+  /** Edge and conditional lines in the part's own units, as on {@link LDrawModel}. */
+  lines: Float32Array;
+  lineColors: Float32Array;
+  conditionalLines: Float32Array;
+  /** A column-major 4x4 per placement: part units to the model's units and axes. */
+  matrices: Float32Array;
 }
 
 /** What {@link parseLDraw} returns: one triangle mesh with a group per colour, plus the model's lines. */
@@ -51,6 +75,8 @@ export interface LDrawModel extends LoadedGeometry {
   lineColors: Float32Array;
   /** Four xyz points per conditional line: its two ends, then its two control points. */
   conditionalLines: Float32Array;
+  /** With `instanced`: the placed parts, which the main mesh and lines then leave out. Otherwise empty. */
+  instances: LDrawInstances[];
   /** The colours the model uses. */
   palette: LDrawColor[];
   /** The first title comment of the main file, when it has one. */
@@ -336,6 +362,7 @@ export async function parseLDraw(input: BinaryInput | string, options: LDrawOpti
     maxInstances = options.maxInstances ?? 4_000_000,
     searchPaths = options.searchPaths ?? DEFAULT_PATHS,
     edges = options.edges ?? true,
+    instanced = options.instanced ?? false,
     mainColor = options.color ?? 7;
   throwIfAborted(signal, F);
   if (!Number.isSafeInteger(maxDepth) || maxDepth < 0)
@@ -391,13 +418,20 @@ export async function parseLDraw(input: BinaryInput | string, options: LDrawOpti
     }
   }
 
-  const positions = floats(),
-    lines = floats(),
-    lineColors = floats(),
-    conditional = floats(),
-    buckets = new Map<number, Growable<Uint32Array>>(),
+  /** Where geometry goes: the main mesh, or a placed part's own. */
+  const sink = () => ({
+      positions: floats(),
+      lines: floats(),
+      lineColors: floats(),
+      conditional: floats(),
+      buckets: new Map<number, Growable<Uint32Array>>(),
+      triangles: 0,
+    }),
+    whole = sink(),
+    placed = new Map<string, { file: string; code: number; into: ReturnType<typeof sink>; matrices: number[] }>(),
     used = new Map<number, LDrawColor>(),
     visiting = new Set<Part>();
+  let out = whole;
   let triangles = 0,
     instances = 0;
 
@@ -422,8 +456,8 @@ export async function parseLDraw(input: BinaryInput | string, options: LDrawOpti
     warn(`colour ${code} is not in the palette; it draws as light grey`);
     return palette.get(7)!;
   };
-  const point = (out: Growable<Float32Array>, m: Matrix, p: number[], at: number): void =>
-    out.push3(
+  const point = (to: Growable<Float32Array>, m: Matrix, p: number[], at: number): void =>
+    to.push3(
       m[0] * p[at] + m[1] * p[at + 1] + m[2] * p[at + 2] + m[9],
       m[3] * p[at] + m[4] * p[at + 1] + m[5] * p[at + 2] + m[10],
       m[6] * p[at] + m[7] * p[at + 1] + m[8] * p[at + 2] + m[11],
@@ -431,15 +465,16 @@ export async function parseLDraw(input: BinaryInput | string, options: LDrawOpti
   const polygon = (shape: Shape, m: Matrix, inverted: boolean, parent: number): void => {
     const entry = color(shape.code, parent),
       corners = shape.kind === 3 ? 3 : 4,
-      base = positions.length / 3,
+      base = out.positions.length / 3,
       count = (corners - 2) * (shape.both ? 2 : 1);
     if (base + corners > maxVertices)
       throw new LoaderError(F, 'limit', `vertex count exceeds the limit of ${maxVertices}`);
+    out.triangles += count;
     triangles += count;
     if (triangles > maxTriangles) throw new LoaderError(F, 'limit', `triangle count exceeds the limit of ${maxTriangles}`);
-    for (let c = 0; c < corners; c++) point(positions, m, shape.points, c * 3);
-    let bucket = buckets.get(entry.code);
-    if (!bucket) buckets.set(entry.code, (bucket = uints()));
+    for (let c = 0; c < corners; c++) point(out.positions, m, shape.points, c * 3);
+    let bucket = out.buckets.get(entry.code);
+    if (!bucket) out.buckets.set(entry.code, (bucket = uints()));
     used.set(entry.code, entry);
     const flip = shape.reverse !== inverted;
     for (let c = 1; c + 1 < corners; c++) {
@@ -448,6 +483,7 @@ export async function parseLDraw(input: BinaryInput | string, options: LDrawOpti
     }
   };
   const line = (shape: Shape, m: Matrix, parent: number): void => {
+    const { lines, lineColors, conditional } = out;
     if (shape.kind === 5) {
       if ((conditional.length + lines.length) / 3 + 4 > maxVertices)
         throw new LoaderError(F, 'limit', `vertex count exceeds the limit of ${maxVertices}`);
@@ -472,14 +508,28 @@ export async function parseLDraw(input: BinaryInput | string, options: LDrawOpti
         if (!child) continue;
         if (++instances > maxInstances)
           throw new LoaderError(F, 'limit', `the model expands to more than ${maxInstances} sub-file references`);
-        const flips = determinant(command.matrix) < 0;
-        walk(
-          child,
-          multiply(m, command.matrix),
-          inverted !== flips !== command.invert,
-          command.code === MAIN ? parent : command.code === EDGE ? color(EDGE, parent).code : command.code,
-          depth + 1,
-        );
+        const flips = determinant(command.matrix) < 0,
+          next = multiply(m, command.matrix),
+          turned = inverted !== flips !== command.invert,
+          code = command.code === MAIN ? parent : command.code === EDGE ? color(EDGE, parent).code : command.code;
+        // A mirrored placement stays in the main mesh: a renderer's winding would not follow a mirrored matrix.
+        if (instanced && out === whole && key(command.file).endsWith('.dat') && determinant(next) > 0) {
+          const id = `${key(command.file)}|${code}|${turned}`;
+          let place = placed.get(id);
+          if (!place) {
+            place = { file: command.file, code, into: sink(), matrices: [] };
+            placed.set(id, place);
+            out = place.into;
+            walk(child, IDENTITY, turned, code, depth + 1);
+            out = whole;
+          }
+          place.matrices.push(
+            next[0], next[3], next[6], 0,
+            next[1], next[4], next[7], 0,
+            next[2], next[5], next[8], 0,
+            next[9], next[10], next[11], 1,
+          );
+        } else walk(child, next, turned, code, depth + 1);
       } else if (command.kind === 3 || command.kind === 4) polygon(command, m, inverted, parent);
       else if (edges) line(command, m, parent);
     }
@@ -488,29 +538,40 @@ export async function parseLDraw(input: BinaryInput | string, options: LDrawOpti
   const root: Matrix = options.units === 'file' ? IDENTITY : [LDU, 0, 0, 0, -LDU, 0, 0, 0, -LDU, 0, 0, 0];
   walk(parts.get(main)!, root, false, mainColor, 0);
 
-  const indices = new Uint32Array(triangles * 3),
-    groups: LoadedGroup[] = [];
-  let start = 0;
-  for (const [code, bucket] of buckets) {
-    const entry = used.get(code)!;
-    indices.set(bucket.array.subarray(0, bucket.length), start);
-    groups.push({
-      start,
-      count: bucket.length,
-      name: entry.name,
-      objectId: String(code),
-      color: [...entry.color],
-    });
-    start += bucket.length;
-  }
+  const finish = (from: ReturnType<typeof sink>) => {
+    const indices = new Uint32Array(from.triangles * 3),
+      groups: LoadedGroup[] = [];
+    let start = 0;
+    for (const [code, bucket] of from.buckets) {
+      const entry = used.get(code)!;
+      indices.set(bucket.array.subarray(0, bucket.length), start);
+      groups.push({
+        start,
+        count: bucket.length,
+        name: entry.name,
+        objectId: String(code),
+        color: [...entry.color],
+      });
+      start += bucket.length;
+    }
+    return {
+      positions: from.positions.result(),
+      indices,
+      groups,
+      lines: from.lines.result(),
+      lineColors: from.lineColors.result(),
+      conditionalLines: from.conditional.result(),
+    };
+  };
   const model: LDrawModel = {
     kind: 'mesh',
-    positions: positions.result(),
-    indices,
-    groups,
-    lines: lines.result(),
-    lineColors: lineColors.result(),
-    conditionalLines: conditional.result(),
+    ...finish(whole),
+    instances: [...placed.values()].map(({ file, code, into, matrices }) => ({
+      file,
+      code,
+      ...finish(into),
+      matrices: new Float32Array(matrices),
+    })),
     palette: [...used.values()],
     missing: [...missing],
     warnings: [...warnings],

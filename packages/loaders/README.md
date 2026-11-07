@@ -497,9 +497,39 @@ console.log(model.missing);
 - **Colours.** 16 takes the colour of the reference above it and 24 that colour's edge. `0x2RRGGBB` is a direct colour. `0 !COLOUR` lines and `LDConfig.ldr` fill the palette, read through `resolve` or passed as `config`; without one, the 16 classic colours apply and an unknown code draws light grey with a warning.
 - **Parts.** Each reference tries `searchPaths` in order, in lower case with forward slashes. An MPD pack's own files win over the library, and each file is read once.
 - **Winding.** A file with `0 BFC CERTIFY` keeps its winding through mirrors, `CW` and `INVERTNEXT`. Polygons of an uncertified file, or inside `NOCLIP`, are written on both sides, so they draw correctly with back faces culled. Each file's own certification decides, so a certified part inside a plain `.ldr` model still culls.
+- **Repeated parts.** `instanced: true` keeps each placed `.dat` part in each colour as one geometry with a matrix per placement, in `model.instances`, so a wall of a thousand alike bricks stores one brick and draws in one call. The main mesh and lines then hold only what is not a placed part, and mirrored placements, which stay expanded because a renderer's winding does not follow a mirrored matrix. See the example below.
 - **Units.** By default 1 LDraw unit is 0.4 mm and the model turns Y up. `units: 'file'` keeps LDraw units with -Y up.
 - **Lines.** `lines` and `lineColors` go to `@margoengine/lines` in `segments` mode. `conditionalLines` holds four points each: the two ends, then the two control points that decide whether to draw it. `edges: false` drops them all.
 - **Limits.** `maxDepth` (64), `maxInstances` (4,000,000) and the shared vertex and triangle limits stop a file of doubling references. Texture maps (`!TEXMAP`) are skipped with a warning.
+
+
+Drawing repeated parts with `@margoengine/materials`, one instanced mesh a part:
+
+```ts
+import { createStage } from '@margoengine/stage';
+import { computeVertexNormals } from '@margoengine/loaders/common';
+import { parseLDraw } from '@margoengine/loaders/ldraw';
+import { createInstancedMesh, Material } from '@margoengine/materials';
+
+const stage = await createStage('#viewport', { backend: 'webgpu' });
+const brick = '3 16 0 0 0 20 0 0 0 0 20\n3 16 20 0 0 20 0 20 0 0 20\n';
+const row = Array.from({ length: 100 }, (_, i) => `1 4 ${i * 20} 0 0 1 0 0 0 1 0 0 0 1 brick.dat`).join('\n');
+const model = await parseLDraw(row, {
+  instanced: true,
+  resolve: async (path) => (path === 'parts/brick.dat' ? brick : Promise.reject(new Error('not here'))),
+});
+for (const { positions, indices, groups, matrices } of model.instances) {
+  const materials = groups.map(({ color }) => new Material({ color: color as [number, number, number, number] })),
+    geometry = {
+      positions,
+      normals: computeVertexNormals(positions, indices),
+      indices,
+      groups: groups.map(({ start, count }, materialIndex) => ({ start, count, materialIndex })),
+    },
+    mesh = createInstancedMesh(stage.engine, geometry, materials, matrices.length / 16);
+  for (let i = 0; i < matrices.length / 16; i++) mesh.instances.setMatrixAt(i, matrices.subarray(i * 16, i * 16 + 16));
+}
+```
 
 ## 3MF textures and colour groups
 

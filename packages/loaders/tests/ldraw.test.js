@@ -254,3 +254,70 @@ test('other line types warn and texture maps are named once', async () => {
   assert.equal(model.indices.length, 6);
   assert.deepEqual(model.warnings, ['line type 7 is not part of LDraw', 'texture maps are not read']);
 });
+
+const brick = '0 BFC CERTIFY CCW\n3 16 0 0 0 1 0 0 0 1 0\n4 16 0 0 1 1 0 1 1 1 1 0 1 1\n2 24 0 0 0 1 0 0\n';
+const placements = [
+  '1 4 0 0 0 1 0 0 0 1 0 0 0 1 brick.dat',
+  '1 4 20 0 0 0 0 1 0 1 0 -1 0 0 brick.dat',
+  '1 4 0 -24 0 2 0 0 0 2 0 0 0 2 brick.dat',
+  '1 1 40 0 0 1 0 0 0 1 0 0 0 1 brick.dat',
+  '0 BFC INVERTNEXT',
+  '1 1 60 0 0 1 0 0 0 1 0 0 0 1 brick.dat',
+  '1 4 80 0 0 -1 0 0 0 1 0 0 0 1 brick.dat',
+  '3 2 0 0 0 9 0 0 0 9 0',
+].join('\n');
+const soup = (positions, indices, matrix) => {
+  const at = (v) => {
+    const [x, y, z] = positions.subarray(v * 3, v * 3 + 3);
+    return matrix
+      ? [0, 1, 2].map((r) => matrix[r] * x + matrix[4 + r] * y + matrix[8 + r] * z + matrix[12 + r])
+      : [x, y, z];
+  };
+  const out = [];
+  for (let t = 0; t < indices.length; t += 3) {
+    const corners = [0, 1, 2].map((k) => at(indices[t + k]).map((v) => v.toFixed(3)).join(' ')),
+      first = corners.indexOf([...corners].sort()[0]);
+    // Rotated to a fixed corner, not sorted: the winding has to match too.
+    out.push([0, 1, 2].map((k) => corners[(first + k) % 3]).join(' | '));
+  }
+  return out;
+};
+
+test('instanced draws the same triangles and lines as expanding, each part stored once', async () => {
+  const options = { resolve: library({ 'parts/brick.dat': brick }) },
+    flat = await parseLDraw(placements, options),
+    model = await parseLDraw(placements, { ...options, instanced: true }),
+    triangles = [...soup(model.positions, model.indices)];
+  for (const part of model.instances)
+    for (let i = 0; i < part.matrices.length; i += 16)
+      triangles.push(...soup(part.positions, part.indices, part.matrices.subarray(i, i + 16)));
+  assert.deepEqual(triangles.sort(), soup(flat.positions, flat.indices).sort());
+  assert.deepEqual(flat.instances, []);
+  // Red with its winding kept, red turned over, and the four-placement yellow would be three parts; the mirror is none.
+  assert.deepEqual(model.instances.map((p) => [p.code, p.matrices.length / 16]).sort(), [[1, 1], [1, 1], [4, 3]]);
+  assert.equal(model.instances[0].file, 'brick.dat');
+  assert.ok(model.instances[0].lines.length > 0 && model.instances[0].lineColors.length > 0);
+  const stored = model.instances.reduce((n, p) => n + p.indices.length, 0) + model.indices.length;
+  assert.ok(stored < flat.indices.length, `${stored} of ${flat.indices.length}`);
+});
+
+test('a part that repeats holds one geometry, and colours inside a part stay groups of it', async () => {
+  const many = Array.from({ length: 500 }, (_, i) => `1 4 ${i * 20} 0 0 1 0 0 0 1 0 0 0 1 two.dat`).join('\n'),
+    model = await parseLDraw(many, {
+      instanced: true,
+      resolve: library({ 'parts/two.dat': '3 16 0 0 0 1 0 0 0 1 0\n3 14 0 0 1 1 0 1 0 1 1\n' }),
+    }),
+    [part] = model.instances;
+  assert.equal(model.instances.length, 1);
+  assert.equal(part.matrices.length, 500 * 16);
+  assert.deepEqual(part.groups.map((g) => g.objectId).sort(), ['14', '4']);
+  assert.equal(model.positions.length, 0);
+  assert.equal(part.matrices[16 * 499 + 12].toFixed(3), (499 * 20 * 0.0004).toFixed(3), 'in the model\'s metres');
+});
+
+test('a sub-model of an MPD is walked through, and the parts inside it instance', async () => {
+  const mpd = '0 FILE main.ldr\n1 16 0 0 0 1 0 0 0 1 0 0 0 1 wing.ldr\n1 16 50 0 0 1 0 0 0 1 0 0 0 1 wing.ldr\n0 FILE wing.ldr\n1 4 0 0 0 1 0 0 0 1 0 0 0 1 brick.dat\n',
+    model = await parseLDraw(mpd, { instanced: true, resolve: library({ 'parts/brick.dat': brick }) });
+  assert.equal(model.instances.length, 1);
+  assert.equal(model.instances[0].matrices.length, 32);
+});
