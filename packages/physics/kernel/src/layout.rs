@@ -210,6 +210,15 @@ columns! {
     CONTACT_X f32 Contact,
     CONTACT_Y f32 Contact,
     CONTACT_Z f32 Contact,
+    // What a point carries from step to step: its normal impulse, its tangent impulse as a world vector, and how far its
+    // friction anchor has drifted, a world vector too.
+    CONTACT_NORMAL_IMPULSE f32 Contact,
+    CONTACT_TANGENT_X f32 Contact,
+    CONTACT_TANGENT_Y f32 Contact,
+    CONTACT_TANGENT_Z f32 Contact,
+    CONTACT_DRIFT_X f32 Contact,
+    CONTACT_DRIFT_Y f32 Contact,
+    CONTACT_DRIFT_Z f32 Contact,
     // A hull: where its rows start and how many it has; an interior point; the box around it; volume, and the principal
     // moments per unit of density with their frame, about its centroid.
     HULL_FIRST_VERTEX u32 Hull,

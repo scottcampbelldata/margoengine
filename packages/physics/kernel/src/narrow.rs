@@ -482,26 +482,13 @@ impl World {
         }
     }
 
-    /// Writes a manifold into a pair's rows, with anchors from each body's centre of mass in each body's frame.
-    fn store_manifold(&mut self, row: usize, a: usize, b: usize, manifold: &Manifold) {
-        self.set_u(PAIR_CONTACTS, row, manifold.count as u32);
-        self.set_v(PAIR_NORMAL_X, row, manifold.normal);
-        let (rotation_a, rotation_b) = (self.q(ROTATION_X, a), self.q(ROTATION_X, b));
-        let center_a = self.v(POSITION_X, a).add(rotation_a.rotate(self.v(LOCAL_CENTER_X, a)));
-        let center_b = self.v(POSITION_X, b).add(rotation_b.rotate(self.v(LOCAL_CENTER_X, b)));
-        for (k, point) in manifold.points.iter().enumerate().take(manifold.count) {
-            let at = row * MANIFOLD + k;
-            self.set_v(CONTACT_ANCHOR_A_X, at, rotation_a.unrotate(point.on_a.sub(center_a)));
-            self.set_v(CONTACT_ANCHOR_B_X, at, rotation_b.unrotate(point.on_b.sub(center_b)));
-            self.set_s(CONTACT_SEPARATION, at, point.separation);
-            self.set_u(CONTACT_ID, at, point.id);
-            self.set_v(CONTACT_X, at, point.on_a.add(point.on_b).scale(0.5));
-        }
-    }
-
     /// Finds the manifold of every pair with an awake body. A pair of two sleepers keeps the one it has.
     pub fn narrow_phase(&mut self, dt: f32) {
         let mut manifold = Manifold::new();
+        let h = dt / self.header().substeps as f32;
+        let before = self.header().contact_substep;
+        let ratio = if before > 0.0 { h / before } else { 1.0 };
+        self.header_mut().contact_substep = h;
         for i in 0..self.header().active_pairs as usize {
             let row = self.uu(ACTIVE_PAIRS, i) as usize;
             let (a, b) = (self.uu(PAIR_A, row) as usize, self.uu(PAIR_B, row) as usize);
@@ -513,7 +500,7 @@ impl World {
             }
             let limit = self.contact_limit(a, b, dt);
             self.collide(a, b, limit, &mut manifold);
-            self.store_manifold(row, body_a, body_b, &manifold);
+            self.store_manifold(row, body_a, body_b, &manifold, ratio);
         }
     }
 }

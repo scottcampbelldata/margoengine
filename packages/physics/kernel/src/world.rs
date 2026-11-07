@@ -48,6 +48,8 @@ pub struct Header {
     pub sleep_time: f32,
     /// Rows of hulls, vertices, half-edges and faces handed out so far.
     pub hull_rows: [u32; 4],
+    /// The substep the carried impulses were made for, zero before the first step.
+    pub contact_substep: f32,
 }
 
 const HEADER_BYTES: u32 = ((core::mem::size_of::<Header>() + 15) & !15) as u32;
@@ -96,6 +98,7 @@ impl World {
                 sleep_energy: SLEEP_ENERGY_DEFAULT,
                 sleep_time: 0.5,
                 hull_rows: [0; 4],
+                contact_substep: 0.0,
             });
         }
         Some(world)

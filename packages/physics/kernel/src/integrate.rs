@@ -8,7 +8,7 @@ use crate::world::World;
 
 /// World change from a world torque-like vector: I^-1 v, worked in the principal frame `frame`.
 #[inline(always)]
-fn apply_inverse_inertia(inverse: V3, frame: Q, v: V3) -> V3 {
+pub fn apply_inverse_inertia(inverse: V3, frame: Q, v: V3) -> V3 {
     frame.rotate(inverse.mul(frame.unrotate(v)))
 }
 
@@ -220,7 +220,7 @@ impl World {
 
 /// Zeroes the components whose bit is set, bits 0 to 2 for X, Y, Z.
 #[inline(always)]
-fn lock(v: V3, bits: u32) -> V3 {
+pub fn lock(v: V3, bits: u32) -> V3 {
     v3(
         if bits & 1 != 0 { 0.0 } else { v.x },
         if bits & 2 != 0 { 0.0 } else { v.y },
