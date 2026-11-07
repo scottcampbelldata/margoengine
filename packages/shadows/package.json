@@ -65,6 +65,10 @@
     "./distance": {
       "types": "./dist/distance.d.ts",
       "import": "./dist/distance.js"
+    },
+    "./style": {
+      "types": "./dist/style.d.ts",
+      "import": "./dist/style.js"
     }
   },
   "files": [

@@ -34,6 +34,7 @@ interface ShadowEffect<Context = unknown> {
     wgsl(group: number, binding: number): string;
     readonly tint?: string;
     readonly call?: string;
+    readonly style?: string;
     resources?(): readonly GPUBindingResource[];
     setup?(device: GPUDevice, map: ShadowEffectMap): void;
     update?(frame: ShadowEffectFrame<Context>): void;

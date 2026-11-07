@@ -1,5 +1,5 @@
 {
-  "commit": "a82f958df",
+  "commit": "c783d6150",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -338,6 +338,10 @@
       "./confine": {
         "raw": 2959,
         "gzip": 1358
+      },
+      "./lens": {
+        "raw": 2140,
+        "gzip": 1013
       }
     },
     "@margoengine/clustered": {
@@ -1726,8 +1730,8 @@
     },
     "@margoengine/physics": {
       ".": {
-        "raw": 55806,
-        "gzip": 18256
+        "raw": 57357,
+        "gzip": 18717
       }
     },
     "@margoengine/physics2d": {
@@ -1924,8 +1928,8 @@
         "gzip": 7330
       },
       "./powered": {
-        "raw": 7933,
-        "gzip": 3200
+        "raw": 8339,
+        "gzip": 3363
       },
       "./getup": {
         "raw": 3805,
@@ -1940,8 +1944,8 @@
         "gzip": 2163
       },
       "./balance": {
-        "raw": 15731,
-        "gzip": 5976
+        "raw": 14295,
+        "gzip": 5484
       }
     },
     "@margoengine/react": {
@@ -2214,12 +2218,12 @@
     },
     "@margoengine/shadows": {
       ".": {
-        "raw": 55535,
-        "gzip": 18305
+        "raw": 55743,
+        "gzip": 18383
       },
       "./virtual": {
-        "raw": 45421,
-        "gzip": 15413
+        "raw": 45629,
+        "gzip": 15491
       },
       "./light-function": {
         "raw": 3643,
@@ -2236,6 +2240,10 @@
       "./distance": {
         "raw": 4919,
         "gzip": 2165
+      },
+      "./style": {
+        "raw": 834,
+        "gzip": 543
       }
     },
     "@margoengine/sky": {
@@ -2858,9 +2866,9 @@
       "brotli": 26250
     },
     "packages/shadows/dist/index.js": {
-      "raw": 55535,
-      "gzip": 18305,
-      "brotli": 16166
+      "raw": 55743,
+      "gzip": 18383,
+      "brotli": 16279
     },
     "packages/xr/dist/index.js": {
       "raw": 19428,
@@ -2883,9 +2891,9 @@
       "brotli": 9639
     },
     "packages/physics/dist/index.js": {
-      "raw": 55806,
-      "gzip": 18256,
-      "brotli": 16191
+      "raw": 57357,
+      "gzip": 18717,
+      "brotli": 16578
     },
     "packages/save/dist/index.js": {
       "raw": 19849,

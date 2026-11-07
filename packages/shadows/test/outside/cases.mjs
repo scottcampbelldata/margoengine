@@ -46,5 +46,13 @@ export const cases = [
   { name: 'rainier-far', scene: 'rainier', kind: 'shadows', minShadow: 2000, iou: 0.75, difference: 0.05, options: { distance: 30, filter: 'hard', casterMargin: 10, far: { bias: 0.1, sunSize: 0 } } },
   { name: 'rainier-far-virtual', scene: 'rainier', kind: 'virtual', minShadow: 2000, iou: 0.75, difference: 0.05, options: { distance: 30, filter: 'hard', casterMargin: 10, far: { bias: 0.1, sunSize: 0 } } },
   { name: 'rainier-far-control', scene: 'rainier', kind: 'shadows', minShadow: 2000, below: 0.2, options: { distance: 30, filter: 'hard', casterMargin: 10 } },
+  // A styled shadow against two suns of the same direction in Cycles: one casting, of colour 1 - floor, and one casting nothing,
+  // of colour floor, whose light is exactly what the style leaves. Red and blue are separate renders, as the floors differ.
+  // `near` is the bound of the plain plant's edges on a mean over the shadow, some 3 of 100 pixels off by the floor's height.
+  // The control is the same plant with no style, which leaves none of the floor.
+  { name: 'style-red', scene: 'style-red', kind: 'shadows', core: 0.5, near: 0.03, difference: 0.03, options: { ...hard, look: { intensity: 0.8, color: [0.1, 0.3, 0.6] } } },
+  { name: 'style-blue', scene: 'style-blue', kind: 'shadows', core: 0.8, near: 0.03, difference: 0.03, channel: 2, options: { ...hard, look: { intensity: 0.8, color: [0.1, 0.3, 0.6] } } },
+  { name: 'style-virtual', scene: 'style-red', kind: 'virtual', core: 0.5, near: 0.03, difference: 0.03, options: { distance: 8, filter: 'hard', casterMargin: 2, bias: 0.001, normalBias: 0.002, look: { intensity: 0.8, color: [0.1, 0.3, 0.6] } } },
+  { name: 'style-control', scene: 'style-red', kind: 'shadows', core: 0.5, far: 0.2, difference: 0.03, options: hard },
   { name: 'alpha-control', scene: 'alpha', kind: 'shadows', minShadow: 1000, below: 0.78, control: 'solid', options: panels },
 ];

@@ -66,7 +66,9 @@ try {
     const lit = await shot(),
       visibility = await fixture(`${c.reference ?? c.scene}.visibility`),
       mask = await fixture(`${c.reference ?? c.scene}.mask`),
-      { width, height } = lit;
+      { width, height } = lit,
+      // Which colour is compared, for a shadow whose channels differ. The reference holds that channel.
+      channel = c.channel ?? 0;
     assert.equal(visibility.width, width, 'the reference and the frame must be the same size');
     let both = 0,
       either = 0,
@@ -89,7 +91,7 @@ try {
           }
         // Red, as the reference: a tinted shadow has channels of its own.
         const base = linear(open.data[o]),
-          ours = base > 0.004 ? Math.min(1, light(lit.data[o]) / light(open.data[o])) : 1,
+          ours = base > 0.004 ? Math.min(1, light(lit.data[o + channel]) / light(open.data[o + channel])) : 1,
           theirs = visibility.data[o + 1] / 255;
         out[o] = hidden ? 255 : ours * 255;
         out[o + 1] = hidden ? 0 : theirs * 255;

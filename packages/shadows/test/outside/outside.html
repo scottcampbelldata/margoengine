@@ -11,6 +11,7 @@ import {lightPattern} from '/packages/shadows/dist/light-function.js';
 import {varianceFilter} from '/packages/shadows/dist/vsm.js';
 import {transmission} from '/packages/shadows/dist/transmission.js';
 import {distanceShadows} from '/packages/shadows/dist/distance.js';
+import {shadowStyle} from '/packages/shadows/dist/style.js';
 import {Terrain} from '/packages/terrain/dist/index.js';
 const canvas=document.querySelector('canvas'),errors=[];
 const scenes=await (await fetch('/packages/shadows/test/outside/scenes.json')).json();
@@ -80,6 +81,7 @@ window.check={
       const {width,height,heights}=await terrarium('/'+scene.terrain);
       options={...options,effects:[distanceShadows({heights,columns:width,rows:height,origin:[-scene.extent/2,-scene.extent/2],size:[scene.extent,scene.extent],heightScale:scene.heightScale,...options.far})]};
     }
+    if(options.look)options={...options,effects:[shadowStyle(options.look)]};
     if(options.variance)options={...options,filter:varianceFilter(options.variance)};
     effect=c.attach(engine,options);
     if(ground)effect.add(ground,{castShadow:false});

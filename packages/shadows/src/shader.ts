@@ -39,6 +39,8 @@ export interface ShadowEffect<Context = unknown> {
   readonly tint?: string;
   /** A WGSL `vec3f` over `position` and `normal` that multiplies the light; omitted, the effect multiplies nothing. */
   readonly call?: string;
+  /** The name of a WGSL function from the light's whole shadow to what it leaves, both `vec3f`. One effect at most has this. */
+  readonly style?: string;
   /** The resources of those bindings in order, read when the receivers' bindings are made. */
   resources?(): readonly GPUBindingResource[];
   /** Makes GPU objects; runs at attach, after a new map size and after a device loss. Runs again on the same effect. */
@@ -185,7 +187,7 @@ fn shadowTint(position:vec3f,normal:vec3f)->vec3f {
 }
 `
     : ''
-}${effects.length ? 'fn shadowReach()->f32 {return shadowFrame.splits.w;}\n' : ''}${declarations}fn shadowLit(direct:vec3f,position:vec3f,normal:vec3f)->vec3f {if(all(direct==vec3f(0))){return direct;}return direct*shadowVisibility(position,normal)${colored ? '*shadowTint(position,normal)' : ''}${effectCalls(effects)};}
+}${effects.length ? 'fn shadowReach()->f32 {return shadowFrame.splits.w;}\n' : ''}${declarations}fn shadowLit(direct:vec3f,position:vec3f,normal:vec3f)->vec3f {if(all(direct==vec3f(0))){return direct;}return ${effectLight(effects, `shadowVisibility(position,normal)${colored ? '*shadowTint(position,normal)' : ''}`)};}
 `;
 }
 /** The effects' declarations. */
@@ -194,6 +196,11 @@ export const effectDeclarations = (group: number, effects: readonly ShadowEffect
 /** The effects' factors, each with its leading `*`. */
 export const effectCalls = (effects: readonly ShadowEffect[]): string =>
   effects.map((effect) => (effect.call ? '*' + effect.call : '')).join('');
+/** `direct` times the shadow `visibility` and the effects give, through the style if an effect has one. */
+export const effectLight = (effects: readonly ShadowEffect[], visibility: string): string => {
+  const style = effects.find((effect) => effect.style)?.style;
+  return style ? `direct*${style}(vec3f(1)*${visibility}${effectCalls(effects)})` : `direct*${visibility}${effectCalls(effects)}`;
+};
 /** The effects' bind group entries. */
 export const effectEntries = (effects: readonly ShadowEffect[]): GPUBindGroupEntry[] =>
   effects.flatMap((effect, i) =>
@@ -204,6 +211,7 @@ export const validEffects = (effects: unknown): readonly ShadowEffect[] => {
   if (effects === undefined) return [];
   if (!Array.isArray(effects) || !effects.every((effect) => typeof effect?.wgsl === 'function'))
     throw new TypeError('Invalid shadow effects; give an array of effects such as cloudShadows(sky)');
+  if (effects.filter((effect) => 'style' in effect).length > 1) throw new TypeError('Invalid shadow effects; give one shadowStyle');
   return effects;
 };
 /** Moves the effects' declarations in `code` to the bindings `map` gives (a scene's `section` plugin holds their slots). */

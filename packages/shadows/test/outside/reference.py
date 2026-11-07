@@ -233,6 +233,18 @@ sun_object = bpy.data.objects.new('sun', sun)
 scene.collection.objects.link(sun_object)
 sun_object.rotation_mode = 'QUATERNION'
 sun_object.rotation_quaternion = (-axes(spec['toLight']).normalized()).to_track_quat('-Z', 'Y')
+if 'floor' in spec:
+    # What a style leaves in a full shadow, as light: a second sun that casts nothing, the first keeping the rest.
+    sun.color = [1 - v for v in spec['floor']]
+    second = bpy.data.lights.new('uncast', 'SUN')
+    second.energy = 1
+    second.angle = sun.angle
+    second.color = spec['floor']
+    second.use_shadow = False
+    second_object = bpy.data.objects.new('uncast', second)
+    scene.collection.objects.link(second_object)
+    second_object.rotation_mode = 'QUATERNION'
+    second_object.rotation_quaternion = sun_object.rotation_quaternion
 
 camera = bpy.data.cameras.new('camera')
 camera.sensor_fit = 'VERTICAL'
@@ -256,7 +268,7 @@ def render(tag):
     pixels = list(image.pixels)
     bpy.data.images.remove(image)
     os.remove(file)
-    return pixels[0::4]
+    return pixels[spec.get('channel', 0)::4]
 
 
 def write(tag, values):
@@ -294,6 +306,8 @@ clear = render('without')
 write('visibility', [min(1, a / b) if b > 1e-6 else 1 for a, b in zip(shadowed, clear)])
 # Where the model hides the ground: the sun off and the ground gone, the model's surface glows through the same outline.
 sun_object.hide_render = True
+if 'floor' in spec:
+    second_object.hide_render = True
 ground.hide_render = True
 for o in model:
     o.hide_render = False

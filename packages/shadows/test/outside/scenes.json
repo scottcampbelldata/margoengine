@@ -6,6 +6,24 @@
     "ground": { "size": 6, "y": 0 },
     "size": 512
   },
+  "style-red": {
+    "model": "examples/assets/khronos-samples/DiffuseTransmissionPlant.glb",
+    "toLight": [-0.5, 1, 0.3],
+    "camera": { "position": [0.2, 1.7, 1.0], "target": [0.2, 0, 0], "fov": 50 },
+    "ground": { "size": 6, "y": 0 },
+    "size": 512,
+    "floor": [0.28, 0.44, 0.68],
+    "channel": 0
+  },
+  "style-blue": {
+    "model": "examples/assets/khronos-samples/DiffuseTransmissionPlant.glb",
+    "toLight": [-0.5, 1, 0.3],
+    "camera": { "position": [0.2, 1.7, 1.0], "target": [0.2, 0, 0], "fov": 50 },
+    "ground": { "size": 6, "y": 0 },
+    "size": 512,
+    "floor": [0.28, 0.44, 0.68],
+    "channel": 2
+  },
   "soft": {
     "model": "examples/assets/khronos-samples/DiffuseTransmissionPlant.glb",
     "toLight": [-0.5, 1, 0.3],

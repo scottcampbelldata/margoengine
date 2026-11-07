@@ -182,7 +182,7 @@ engine.start();
 
 The mask lies across the light and travels along it. Its right is world up crossed with the sun, and image up is world up as the sun sees it. It adds one sampled texture and one sampler to every receiver, and gltf-pro's richest materials already use all 16 sampled textures of a stage, so such a material names the limit in an error; `cloudShadows` adds one uniform buffer and no texture.
 
-The `effects` array is fixed at construction. With none, the receivers' shaders and the frame are unchanged. An effect is any object with `wgsl(group, binding)` and `call`, four bindings from 40, resources named `shadowFx...`: see `ShadowEffect` in the types.
+The `effects` array is fixed at construction. With none, the receivers' shaders and the frame are unchanged. An effect is any object with `wgsl(group, binding)` and `call` or `style`, four bindings from 40, resources named `shadowFx...`: see `ShadowEffect` in the types.
 
 ## Variance shadow maps
 
@@ -269,6 +269,30 @@ engine.start();
 | `sunStep` | 0.25 | Degrees the sun must move before the field is marched again, 0 or more. Live. |
 
 It works with `Shadows` and `VirtualShadows`, on every receiver. Only what is in the field casts here: a building past the reach casts nothing unless its height is in `heights`. Outside the field nothing is shaded. Y is up.
+
+## Shadow intensity and colour
+
+`@margoengine/shadows/style` sets how dark a light's shadow is and tints it, for stylised and art directed scenes. It takes the light's whole shadow: the map's, tinted casters' and the other effects' together. Lit ground keeps its light exactly.
+
+```ts
+import {EngineKernel, box} from 'margoengine/core';
+import {Shadows} from 'margoengine/shadows';
+import {shadowStyle} from 'margoengine/shadows/style';
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend: 'webgpu'});
+const style = shadowStyle({intensity: 0.7, color: [0.1, 0.1, 0.4]});
+const shadows = Shadows.attach(engine, {effects: [style]});
+shadows.add(engine.createMesh().setGeometry(box(1, 1, 1)).setPosition([0, 1, 0]));
+shadows.add(engine.createMesh().setGeometry(box(20, 0.1, 20)), {castShadow: false});
+engine.start();
+style.options.intensity = 0.4;
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `intensity` | 1 | How much of the light a full shadow takes away, 0 to 1: 0 is no shadow, 1 takes all of it. Live. |
+| `color` | [0, 0, 0] | The colour a full shadow takes the light towards, linear RGB, each 0 to 1. Live. |
+
+A point keeps `mix(floor, 1, visibility)` of the light per channel, where `floor` is `1 - intensity + intensity * color`. It works with `Shadows` and `VirtualShadows`, one per shadows object, and each shadows object is one light.
 
 ## Virtual shadow maps
 

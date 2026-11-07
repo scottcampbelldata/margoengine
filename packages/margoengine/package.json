@@ -2114,6 +2114,10 @@
       "types": "./dist/shadows/distance.d.ts",
       "import": "./dist/shadows/distance.js"
     },
+    "./shadows/style": {
+      "types": "./dist/shadows/style.d.ts",
+      "import": "./dist/shadows/style.js"
+    },
     "./sky": {
       "types": "./dist/sky.d.ts",
       "import": "./dist/sky.js"

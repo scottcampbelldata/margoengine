@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10146679,
+  "total": 10147992,
   "history": [
     {
       "date": "2026-10-24",
@@ -3122,6 +3122,12 @@
       "commit": "53740d7d1",
       "reason": "new optional entry @margoengine/cinematic/lens",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "c783d6150",
+      "reason": "shadows gains the optional style entry",
+      "grew": 2
     }
   ],
   "items": {
@@ -3648,8 +3654,9 @@
     "@margoengine/shadows": 18738,
     "@margoengine/shadows/distance": 2421,
     "@margoengine/shadows/light-function": 1921,
+    "@margoengine/shadows/style": 799,
     "@margoengine/shadows/transmission": 1027,
-    "@margoengine/shadows/virtual": 15442,
+    "@margoengine/shadows/virtual": 15956,
     "@margoengine/shadows/vsm": 2046,
     "@margoengine/sky": 16975,
     "@margoengine/sky/base": 7004,
