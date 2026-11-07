@@ -798,7 +798,8 @@ export async function parseVDB(input: BinaryInput, options: VDBOptions = {}): Pr
       parent = reader.text('grid parent').split('\x1e')[0]!,
       gridAt = reader.i64('grid offset'),
       blockAt = reader.i64('block offset');
-    reader.i64('end offset');
+    // A grid's bytes follow its descriptor, and the next descriptor follows them.
+    reader.seek(reader.i64('end offset'), `grid ${name}`);
     descriptors.push({ name, type, parent, gridAt, blockAt });
   }
 

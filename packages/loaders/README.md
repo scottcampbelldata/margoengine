@@ -134,7 +134,7 @@ The repository's speed matrix (`docs/whitepaper`, row 10.11) measures this loade
 
 ## Real files
 
-`tests/real-files/manifest.json` names 108 public files from the tools people use: Blender, 3ds Max, AutoCAD, Rhino, CATIA, PrusaSlicer, Tiled, LightWave and more, each with its URL, licence, author, size and SHA-256. The files are not in this repository.
+`tests/real-files/manifest.json` names 111 public files from the tools people use: Blender, 3ds Max, AutoCAD, Rhino, CATIA, PrusaSlicer, Tiled, LightWave and more, each with its URL, licence, author, size and SHA-256. The files are not in this repository.
 
 ```sh
 npm run test:real-files -w @margoengine/loaders

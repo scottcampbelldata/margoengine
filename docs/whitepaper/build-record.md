@@ -1252,11 +1252,12 @@ An audit of the finished batches against their job text listed 70 gaps for the H
 | B24 | Wide-angle cube capture, `/wide-cube` | DONE | `f68d5c96d` | LIM-321 |
 | B29 | Flat trails, `normal` on `Trail` | DONE | `6d7d62bee` | LIM-083 |
 | B30 | Triangle order at import, `optimize` and `reorder` | DONE | `a786cd9d4` | LIM-322 |
-| B35 | bzip2 and xz decoders; NRRD bzip2, VTK XML LZMA | DONE | this commit | LIM-344 |
-| B31 | bake on autoLOD, bakeSurfaceMaps | DONE | this commit | LIM-345 |
-| B34 | React Canvas loadCompat: the layer first, one engine, listeners stay | DONE | this commit | LIM-146 |
-| B36 | LDraw instanced: each placed part stored once | DONE | this commit | LIM-185 |
-| B32 | remeshMesh quads: quad-dominant pairing | DONE | this commit | LIM-063 |
+| B35 | bzip2 and xz decoders; NRRD bzip2, VTK XML LZMA | DONE | `b358afabb` | LIM-344 |
+| B31 | bake on autoLOD, bakeSurfaceMaps | DONE | `82c532b63` | LIM-345 |
+| B34 | React Canvas loadCompat: the layer first, one engine, listeners stay | DONE | `72164d3a3` | LIM-146 |
+| B36 | LDraw instanced: each placed part stored once | DONE | `883ecd4ce` | LIM-185 |
+| B32 | remeshMesh quads: quad-dominant pairing | DONE | `8999fa60a` | LIM-063 |
+| batch 40 VDB | parseVDB on real OpenVDB files, every grid read | DONE | this commit | LIM-202 |
 
 ## LAZ: one LAS reader, and every point format on a real file
 

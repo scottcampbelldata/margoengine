@@ -48,6 +48,7 @@ import { lasWaveDescriptors, lasWaveform } from '@margoengine/points/las';
 import { parseLDraw } from '../dist/ldraw.js';
 import { parseLWO } from '../dist/lwo.js';
 import { parseMD2 } from '../dist/md2.js';
+import { parseVDB } from '../dist/vdb.js';
 import { parseBVH } from '../dist/mocap.js';
 import { parseNRRD } from '../dist/nrrd.js';
 import { evaluateNurbsCurve, evaluateNurbsSurface } from '../dist/nurbs.js';
@@ -593,6 +594,21 @@ const checks = {
     const scene = parseX3D(bytes),
       triangles = indexedTriangles(text(bytes), /coordIndex=['"]([^'"]*)['"]/g);
     return { result: `${checkGeometry(scene, { triangles })}, ${scene.groups?.length} shapes, left out ${scene.warnings.join(', ').slice(0, 200)}`, draw: [mesh(scene)] };
+  },
+  async vdb(bytes, item) {
+    const file = await parseVDB(unzip(bytes).get(item.extract)());
+    assert.deepEqual(file.skipped, []);
+    assert.deepEqual(file.grids.map((grid) => grid.name), item.grids.map((grid) => grid.name));
+    for (const expected of item.grids) {
+      const grid = file.grids.find(({ name }) => name === expected.name);
+      assert.equal(grid.activeVoxels, expected.activeVoxels);
+      assert.deepEqual(grid.box, expected.box);
+      for (const [x, y, z, value, active] of expected.samples) {
+        assert.equal(grid.at(x, y, z), value, `${grid.name} at ${x} ${y} ${z}`);
+        assert.equal(grid.isActive(x, y, z), active, `${grid.name} active at ${x} ${y} ${z}`);
+      }
+    }
+    return { result: `${file.grids.map((grid) => `${grid.name}: ${grid.activeVoxels} active, ${grid.leaves.length} leaves`).join('; ')}, equal to OpenVDB` };
   },
   async gcode(bytes, item) {
     const source = unzip(bytes).get(item.extract)(),

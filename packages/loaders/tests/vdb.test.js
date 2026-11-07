@@ -314,23 +314,24 @@ function file(grids, { version = 224, fileMeta = metaBlock(), offsets = 1 } = {}
     4 +
     Buffer.byteLength(grid.parent ?? '') +
     24;
-  let at = head.length + grids.reduce((sum, grid) => sum + descriptorSize(grid), 0);
-  const descriptors = [],
-    bodies = [];
+  // As OpenVDB lays a file out: each descriptor, then its grid, then the next descriptor.
+  let at = head.length;
+  const parts = [head];
   for (const grid of grids) {
-    const body = grid.raw ? { bytes: grid.raw, blockAt: at } : gridBytes(grid, at);
-    descriptors.push(
+    const start = at + descriptorSize(grid),
+      body = grid.raw ? { bytes: grid.raw, blockAt: start } : gridBytes(grid, start);
+    parts.push(
       text(grid.name),
       text(typeName(grid)),
       text(grid.parent ?? ''),
-      i64(at),
+      i64(start),
       i64(body.blockAt),
-      i64(at + body.bytes.length),
+      i64(start + body.bytes.length),
+      body.bytes,
     );
-    bodies.push(body.bytes);
-    at += body.bytes.length;
+    at = start + body.bytes.length;
   }
-  return Buffer.concat([head, ...descriptors, ...bodies]);
+  return Buffer.concat(parts);
 }
 
 const leaf = (origin, active, values = (i) => i / 4, extra = {}) => ({ origin, active, values, ...extra });
@@ -479,8 +480,12 @@ function withBlock(block, compression = BLOSC) {
     { blockAt } = gridBytes({ compression, leaves: [leaf([0, 0, 0], [0], () => 1)] }, 0),
     // Offset of this one grid in the file: the file minus the grid's own length.
     gridLength = gridBytes({ compression, leaves: [leaf([0, 0, 0], [0], () => 1)] }, 0).bytes.length,
-    at = good.length - gridLength + blockAt + 64 + 1;
-  return Buffer.concat([good.subarray(0, at), block]);
+    start = good.length - gridLength,
+    at = start + blockAt + 64 + 1,
+    out = Buffer.concat([good.subarray(0, at), block]);
+  // The descriptor's end offset, its last eight bytes, follows the new block.
+  out.writeBigInt64LE(BigInt(out.length), start - 8);
+  return out;
 }
 
 const ramp = () => Buffer.concat([...Array(512).keys()].map((i) => f32(i % 16)));
@@ -812,6 +817,15 @@ test('what is not a usable file is refused with its code', async () => {
   const controller = new AbortController();
   controller.abort();
   await refuses(parseVDB(good, { signal: controller.signal }), 'aborted');
+});
+
+test('each grid follows its own descriptor, as in a file OpenVDB wrote, and two grids both read', async () => {
+  const one = (name, value) => ({ name, leaves: [leaf([0, 0, 0], [0], () => value)] }),
+    { grids } = await parseVDB(file([one('first', 1), one('second', 2)]));
+  assert.deepEqual(
+    grids.map((grid) => [grid.name, grid.at(0, 0, 0)]),
+    [['first', 1], ['second', 2]],
+  );
 });
 
 test('counts and offsets that claim more than the file holds are refused before any allocation', async () => {

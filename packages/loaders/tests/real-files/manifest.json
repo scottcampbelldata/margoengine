@@ -2101,6 +2101,446 @@
    "author": "VIRLUX",
    "size": 693769,
    "sha256": "a48e42fc330a0beb2cad52250adfd0d57cb4543c058dbd5a25ffd736ceb3f1eb"
+  },
+  {
+   "id": "vdb-sphere",
+   "format": "vdb",
+   "check": "vdb",
+   "entry": "@margoengine/loaders/vdb",
+   "file": "sphere.vdb-1.0.0.zip",
+   "extract": "sphere.vdb",
+   "url": "https://artifacts.aswf.io/io/aswf/openvdb/models/sphere.vdb/1.0.0/sphere.vdb-1.0.0.zip",
+   "licence": "no licence named on openvdb.org/download; not redistributed",
+   "author": "OpenVDB sample models, Academy Software Foundation",
+   "reference": "each grid as OpenVDB 13.0 reads it, through Blender 5.3 openvdb module, seed 11",
+   "grids": [
+    {
+     "name": "ls_sphere",
+     "activeVoxels": 270638,
+     "box": [
+      -62,
+      -62,
+      -62,
+      62,
+      62,
+      62
+     ],
+     "samples": [
+      [
+       47,
+       13,
+       -38,
+       0.09112548828125,
+       true
+      ],
+      [
+       51,
+       26,
+       19,
+       0.0157928466796875,
+       true
+      ],
+      [
+       -57,
+       14,
+       -12,
+       -0.00458526611328125,
+       true
+      ],
+      [
+       50,
+       -32,
+       14,
+       0.049591064453125,
+       true
+      ],
+      [
+       45,
+       -37,
+       4,
+       -0.08026123046875,
+       true
+      ],
+      [
+       10,
+       36,
+       -49,
+       0.08099365234375,
+       true
+      ],
+      [
+       -25,
+       -13,
+       -54,
+       0.045501708984375,
+       true
+      ],
+      [
+       -56,
+       -2,
+       -14,
+       -0.11212158203125,
+       true
+      ],
+      [
+       -5,
+       48,
+       9,
+       -0.1500244140625,
+       false
+      ],
+      [
+       47,
+       56,
+       37,
+       0.1500244140625,
+       false
+      ],
+      [
+       -3,
+       -5,
+       3,
+       -0.1500244140625,
+       false
+      ],
+      [
+       -39,
+       40,
+       3,
+       -0.1500244140625,
+       false
+      ]
+     ]
+    }
+   ],
+   "size": 355772,
+   "sha256": "3636c974cf66cf155bfbe08fd3495e41eb8ec73662e50ecc9e6cbb5e009f27e8"
+  },
+  {
+   "id": "vdb-smoke",
+   "format": "vdb",
+   "check": "vdb",
+   "entry": "@margoengine/loaders/vdb",
+   "file": "smoke1.vdb-1.0.0.zip",
+   "extract": "smoke.vdb",
+   "url": "https://artifacts.aswf.io/io/aswf/openvdb/models/smoke1.vdb/1.0.0/smoke1.vdb-1.0.0.zip",
+   "licence": "no licence named on openvdb.org/download; not redistributed",
+   "author": "OpenVDB sample models, Academy Software Foundation",
+   "reference": "each grid as OpenVDB 13.0 reads it, through Blender 5.3 openvdb module, seed 11",
+   "grids": [
+    {
+     "name": "density",
+     "activeVoxels": 1049275,
+     "box": [
+      1,
+      2,
+      1,
+      111,
+      223,
+      112
+     ],
+     "samples": [
+      [
+       76,
+       50,
+       24,
+       0.01433563232421875,
+       true
+      ],
+      [
+       103,
+       133,
+       61,
+       0.00550079345703125,
+       true
+      ],
+      [
+       81,
+       159,
+       102,
+       3.248453140258789e-05,
+       true
+      ],
+      [
+       51,
+       117,
+       84,
+       0.105224609375,
+       true
+      ],
+      [
+       100,
+       120,
+       42,
+       8.726119995117188e-05,
+       true
+      ],
+      [
+       57,
+       153,
+       108,
+       0.00018548965454101562,
+       true
+      ],
+      [
+       26,
+       134,
+       30,
+       0.16259765625,
+       true
+      ],
+      [
+       59,
+       169,
+       36,
+       0.0187530517578125,
+       true
+      ],
+      [
+       58,
+       223,
+       72,
+       0.0,
+       false
+      ],
+      [
+       110,
+       201,
+       60,
+       0.0,
+       false
+      ],
+      [
+       58,
+       132,
+       110,
+       0.0,
+       false
+      ],
+      [
+       24,
+       26,
+       58,
+       0.0,
+       false
+      ]
+     ]
+    }
+   ],
+   "size": 2075604,
+   "sha256": "dca7a0477e77fac197a969f5f418057fc3f89b12887c35d1fc9c1b0d2892f20f"
+  },
+  {
+   "id": "vdb-fire",
+   "format": "vdb",
+   "check": "vdb",
+   "entry": "@margoengine/loaders/vdb",
+   "file": "fire.vdb-1.0.0.zip",
+   "extract": "fire.vdb",
+   "url": "https://artifacts.aswf.io/io/aswf/openvdb/models/fire.vdb/1.0.0/fire.vdb-1.0.0.zip",
+   "licence": "no licence named on openvdb.org/download; not redistributed",
+   "author": "OpenVDB sample models, Academy Software Foundation",
+   "reference": "each grid as OpenVDB 13.0 reads it, through Blender 5.3 openvdb module, seed 11",
+   "grids": [
+    {
+     "name": "density",
+     "activeVoxels": 4458790,
+     "box": [
+      0,
+      5,
+      0,
+      160,
+      368,
+      152
+     ],
+     "samples": [
+      [
+       24,
+       233,
+       77,
+       0.0029354095458984375,
+       true
+      ],
+      [
+       115,
+       339,
+       40,
+       0.00028252601623535156,
+       true
+      ],
+      [
+       59,
+       332,
+       75,
+       0.001544952392578125,
+       true
+      ],
+      [
+       65,
+       166,
+       58,
+       0.052642822265625,
+       true
+      ],
+      [
+       17,
+       293,
+       27,
+       6.943941116333008e-05,
+       true
+      ],
+      [
+       102,
+       60,
+       74,
+       0.30029296875,
+       true
+      ],
+      [
+       101,
+       219,
+       18,
+       0.0012359619140625,
+       true
+      ],
+      [
+       104,
+       65,
+       34,
+       0.416259765625,
+       true
+      ],
+      [
+       115,
+       291,
+       119,
+       0.0,
+       false
+      ],
+      [
+       115,
+       265,
+       150,
+       0.0,
+       false
+      ],
+      [
+       48,
+       99,
+       131,
+       0.0,
+       false
+      ],
+      [
+       121,
+       327,
+       47,
+       0.0,
+       false
+      ]
+     ]
+    },
+    {
+     "name": "temperature",
+     "activeVoxels": 4139727,
+     "box": [
+      0,
+      3,
+      0,
+      159,
+      368,
+      152
+     ],
+     "samples": [
+      [
+       115,
+       289,
+       119,
+       4.841382542508654e-05,
+       true
+      ],
+      [
+       24,
+       231,
+       77,
+       0.013882281258702278,
+       true
+      ],
+      [
+       115,
+       337,
+       40,
+       2.0606164980563335e-05,
+       true
+      ],
+      [
+       118,
+       170,
+       112,
+       0.05004126951098442,
+       true
+      ],
+      [
+       59,
+       330,
+       75,
+       0.0013524397509172559,
+       true
+      ],
+      [
+       65,
+       164,
+       58,
+       0.24075230956077576,
+       true
+      ],
+      [
+       102,
+       58,
+       74,
+       8.53157901763916,
+       true
+      ],
+      [
+       101,
+       217,
+       18,
+       0.0010851112892851233,
+       true
+      ],
+      [
+       115,
+       263,
+       150,
+       0.0,
+       false
+      ],
+      [
+       48,
+       97,
+       131,
+       0.0,
+       false
+      ],
+      [
+       121,
+       325,
+       47,
+       0.0,
+       false
+      ],
+      [
+       36,
+       49,
+       137,
+       0.0,
+       false
+      ]
+     ]
+    }
+   ],
+   "size": 24456387,
+   "sha256": "f3d17c50633052bb9dd320551bbfa77f8baa3dad08ee1043e5276766b2659cb5"
   }
  ]
 }

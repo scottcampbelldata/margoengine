@@ -972,6 +972,7 @@ diagnostic). Their causes and the fixes that landed are in `bench/parity-causes.
 | LAZ point14: X and Y past the header bounds for points with four or more returns | Rows 4 and up of the return group map were wrong | First return group 3, last 5, those between 4, checked on real files up to six returns | `packages/points/tests/laz-encoder.js` round trips |
 | `parse3DM` threw on every file with the real rhino3dm | `File3dmLayerTable.delete(id)` hides the handle's `delete`, and the stand-in had no such table | The free comes from the base that owns `isDeleted` | `packages/loaders/tests/3dm.test.js` |
 | `parse3DM` read solid objects as meshes | They have `vertices` and `faces` of their own kind | Only an object with vertex colours is a mesh | `packages/loaders/tests/3dm.test.js` |
+| `parseVDB` read only the first grid of a file OpenVDB wrote, then ran off into its bytes | Each grid sits right after its descriptor, and the reader and the test's own writer both put the descriptors together at the head | The reader goes to each descriptor's end offset, and the test writes files as OpenVDB does | `packages/loaders/tests/vdb.test.js`, `vdb-fire` in `packages/loaders/tests/real-files/manifest.json` |
 | `parsePLY` refused Blender 2.4x files | A bare `Created by` header line had no keyword | Kept as a comment | `packages/loaders/tests/loaders.test.js` |
 | `parseXYZ` refused swisstopo files | An `X Y Z` line before the data read as a bad point | A line with no numbers before the data is skipped | `packages/loaders/tests/loaders.test.js` |
 | `parseDXF` read binary files before R13 as silently empty, and never read a binary file's version | Those files have one-byte group codes with 255 as the escape, and `$ACADVER` was searched as text | Both forms are read | `packages/loaders/tests/dxf.test.js` |
@@ -1106,10 +1107,3 @@ Each is described with its cause and guard in
 - **Repro:** convert a material from the MaterialX sample library, render it on a sphere and compare with MaterialXView.
 - **Cause:** no reference renderer or sample library in the repository.
 - **Needed to close:** add sample documents to `THIRD-PARTY-NOTICES.md` with reference renders, and compare them.
-
-### parseVDB is not yet run against a file OpenVDB wrote
-
-- **What:** `@margoengine/loaders/vdb` is tested only on files its own test writes. No published byte-level specification of `.vdb` exists, so the reader and the test's writer share one reading of the format, and a mistake in it would pass both. No real file was on this PC, and getting one needs a download or an OpenVDB install, which needs Scott's approval. The Blosc path has the same gap: its chunks come from the test's own encoder, not from the Blosc library.
-- **Repro:** load any `.vdb` from Blender, Houdini or EmberGen with `parseVDB(bytes)`.
-- **Cause:** no real sample file in the repository.
-- **Needed to close:** add a small sample, compressed with Blosc, to `THIRD-PARTY-NOTICES.md`, and test its voxel count, box and a few values against what OpenVDB reports.
