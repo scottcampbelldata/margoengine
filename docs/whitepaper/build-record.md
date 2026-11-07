@@ -1214,6 +1214,7 @@ An audit of the finished batches against their job text listed 70 gaps for the H
 | B20 | Kits and materials emit no Draco or Basis file | DONE | this commit | - |
 | B23 | engine.pick in a loop documented, pickMany is the batch | DONE | this commit | - |
 | B26 | PipelineCompiles.trackNext, limit said first | DONE | this commit | - |
+| B37 | cull phase limit documented | DONE | this commit | - |
 
 ## LAZ: one LAS reader, and every point format on a real file
 

@@ -85,7 +85,7 @@ All numbers are CPU milliseconds, and they add up to `total`:
 | --- | --- |
 | `update` | `onFrame` callbacks, plugin updates, resize and camera, up to the kernel tick |
 | `tick` | The kernel tick: world matrices and the frustum test, in one Wasm call |
-| `cull` | Collecting the visible instances into batches and preparing the frame, up to the command encoder |
+| `cull` | Collecting the visible instances into batches and preparing the frame, up to the command encoder. Core's frustum test runs inside the kernel's one Wasm call, so its time is in `tick`, not here |
 | `encode` | Every frame graph pass, then `encoder.finish()` |
 | `submit` | `queue.submit` |
 | `other` | The rest of the frame's task |
