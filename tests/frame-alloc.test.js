@@ -123,6 +123,9 @@ test(`a shadowed frame in the middle tier adds at most ${tier?.shadows} bytes to
 // numbers (about 530 B per frame); invertMatrixStable boxed its 48 finiteness checks (about 595 B per call).
 // Regression (Node 24): on V8 13 the fit took 993 B (Math.max in hypotOf, Math.min in cascadeSplits) and the
 // inverse 865 B (Math.max over the row scales, Math.fround over the result); both are calls there.
+// Regression (2026-11-07): with --no-concurrent-recompilation the cascade probe read 273.5 B against 256. Its driver
+// read near and far from its camera object to pass them to cascadeSplits, which Maglev does not inline, and boxed
+// both on every call in the loop's on-stack replacement code; the probe now passes them as they are (241.5 B).
 test('the cascade fit and the stable matrix inverse allocate little in the middle tier', {
   timeout: 300_000,
   skip: noTier,

@@ -20,14 +20,21 @@ if (name === 'invert') {
   call = () => invertMatrixStable(m, out, workspace);
 } else if (name === 'cascades') {
   const { cascadeSplits, fitCascades } = await load('packages/shadows/dist/index.js');
-  const camera = { position: [3.3, 2.1, 5.7], target: [0.1, 0.4, -0.3], fov: 60, near: 0.1, far: 93.7 },
+  // The driver passes near and far as they are, not read from camera: V8 13's Maglev does not inline cascadeSplits
+  // (280 bytes of bytecode, two calls deep here) and boxes a number it loaded from an object field to pass it, two heap
+  // numbers (32 B) per call that the probe's own loop would add. With --no-concurrent-recompilation the windows run
+  // that loop's on-stack replacement code, which boxes them on every call; the loop's own Maglev code, which arrived
+  // later without the flag, read them once per window. They are the caller's bytes either way, not the package's.
+  const near = 0.1,
+    far = 93.7,
+    camera = { position: [3.3, 2.1, 5.7], target: [0.1, 0.4, -0.3], fov: 60, near, far },
     direction = [-0.37, -0.81, -0.45],
     splits = new Float32Array(4),
     matrices = new Float32Array(64),
     ranges = new Float32Array(4),
     result = { matrices, ranges };
   call = () => {
-    cascadeSplits(camera.near, camera.far, 0.5, splits, 4);
+    cascadeSplits(near, far, 0.5, splits, 4);
     fitCascades(camera, 4 / 3, direction, 1024, splits, matrices, ranges, 100, result, 4);
   };
 } else throw new TypeError(`Unknown case ${name}`);
