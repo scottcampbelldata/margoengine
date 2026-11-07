@@ -324,6 +324,74 @@ with it added at a time, longer if it must be, and a `prefix` lets a second take
 tracks. A sample that is not finite is a `RangeError`, and so is a capture time going backwards. `stop()` with nothing
 captured and any use after `stop()` throw `MargoError` `'state'`.
 
+## Dialogue and lip sync
+
+`@margoengine/cutscene/lipsync` adds a `lipsync` track: timed phonemes go in, weights for 15 visemes come out as a pure
+function of the time, so scrubbing moves the mouth as playing does. Phonemes come from a tool (a forced aligner gives
+the best mouth), or `analyseSpeech` reads them out of the dialogue audio itself.
+
+```ts
+import { CutscenePlayer } from 'margoengine/cutscene';
+import { analyseSpeech, lipSyncTrack, mouthOf, mouthShapes, type LipSyncTrack } from 'margoengine/cutscene/lipsync';
+
+const dialogue: LipSyncTrack = {
+  type: 'lipsync',
+  id: 'ada-lines',
+  target: 'ada',
+  clips: [
+    // Phoneme data: ARPAbet, with or without stress digits, or viseme names. Times are from the start of the clip.
+    {
+      start: 0.5,
+      duration: 1,
+      phonemes: [
+        { time: 0, phoneme: 'HH' },
+        { time: 0.1, phoneme: 'AH0' },
+        { time: 0.2, phoneme: 'L' },
+        { time: 0.3, end: 0.7, phoneme: 'OW1' },
+      ],
+    },
+  ],
+};
+// Or from audio: an AudioBuffer's channel gives the samples.
+const rate = 16_000;
+const speech = new Float32Array(rate).map((_, i) => 0.5 * Math.sin(i / 3) * Math.sin(i / 900));
+dialogue.clips.push({ start: 2, duration: 1, phonemes: analyseSpeech(speech, rate) });
+
+const player = new CutscenePlayer(
+  { format: 'margo-cutscene', version: 1, duration: 4, tracks: [dialogue] },
+  { tracks: [lipSyncTrack()] },
+);
+void player.play();
+player.update(0.9);
+const mouth = mouthOf(player.state, 'ada'); // { oh: 1 }
+const shapes = mouthShapes(mouth, 'vrm'); // { oh: 1 }: VRM's five mouth expressions
+```
+
+| Field | Meaning | Default |
+| --- | --- | --- |
+| `target` | The character, the key `mouthOf` reads | required |
+| `blend` | Seconds a mouth takes to move into and out of a sound | `0.06` |
+| clip `phonemes` | `{ time, end?, phoneme, weight? }` sorted by `time`; `end` defaults to the next sound's time, and `weight` (0 to 1) to 1 | required |
+| clip `gain` | Scale on every weight | `1` |
+
+The visemes are `sil PP FF TH DD kk CH SS nn RR aa E ih oh ou`, the names game and avatar tools use (`VISEMES`, and
+`visemeOf(phoneme)` for one sound). Weights of neighbouring sounds cross over the blend and never sum past 1; what is
+left of 1 is the mouth at rest, so a line opens into its first sound and closes after its last with no jump. Two
+tracks on one character add up, within 1. Clips fire `enter` and `exit`, named after the character, and nest in
+timelines like any clip. `visemesAt(clip, t, blend?)` is the same reading with no document.
+
+`mouthShapes(weights, set)` turns weights into blend shapes to set. `'visemes'` (default) names them `viseme_aa` and
+so on, as avatar tools do. `'vrm'` gives the VRM 1.0 presets `aa ih ou ee oh`, for `vrm.expressions.set` of
+`@margoengine/rigging/vrm`. `'arkit'` gives Apple's face shape names, a frame `face.push` of
+`@margoengine/rigging/face` takes as it is. Each sound's mix of shapes is a choice of ours, not a standard.
+
+`analyseSpeech(samples, sampleRate, { step?, floor?, shortest? })` needs no words and no transcript. It finds silence
+by level, hiss by its share of high sound, and each vowel's mouth from its formants, by linear prediction, on a chart
+scaled to the speaker. It is a rough mouth, not a transcript: it tells closed, hiss and open apart but no other
+consonants, a pause under about 70 ms goes unseen, and it gets about half of vowel frames right. Use phonemes from an
+aligner when the mouth must be exact.
+
+
 ## Custom tracks
 
 `shotTrack()` is a `CutsceneTrackType`, and you can write your own for anything a document should hold: pass types in

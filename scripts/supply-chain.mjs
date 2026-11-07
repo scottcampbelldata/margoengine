@@ -138,6 +138,10 @@ const ASSETS = [
     'examples/assets/vrm/README.md',
     'sample avatars for the VRM tests: Seed-san and VRM1_Constraint_Twist_Sample (VRM Consortium samples, VRM Public License 1.0; Seed-san model by VirtualCast, Inc.; (c) 2022 pixiv Inc.)',
   ],
+  [
+    'packages/cutscene/tests/fixtures/arctic/NOTICE.md',
+    'test speech for @margoengine/cutscene/lipsync: two sentences of the CMU ARCTIC voice cmu_us_slt_arctic with their phoneme labels (Carnegie Mellon University, 2003; free for any purpose under the notice in the fixture COPYING file; never shipped)',
+  ],
   ['examples/assets/robot-CREDITS.md', 'RobotExpressive upstream credits (Tomás Laulhé, Don McCurdy; CC0)'],
   [
     'packages/headless/tests/fixtures/pngsuite/NOTICE.md',

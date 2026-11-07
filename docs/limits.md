@@ -13,7 +13,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-298). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-299). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -238,6 +238,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Virtual camera shots (`@margoengine/cutscene/shots`, 2026-11-06) | Enforced: shots may not overlap, `blendIn` is at most the shot's length, and the first shot cannot blend, as nothing comes before it. By method: a shot has no memory, so `follow` and `lookAt` sit exactly on their object with no damping, and blending between cameras looking opposite ways turns about the world's up. A live camera is read at every evaluate, so a shot of one is the one thing here that is not a pure function of the time. Not measured: speed. |
 | Render to video (`@margoengine/cutscene/render`, 2026-11-06) | Enforced: the engine must be on a `createHeadlessCanvas` canvas, and a span must lie inside the cutscene. By method: the whole file and the whole mix sit in memory, as in `encodeVideo`; the mix is a sum with no limiter, and a fade's corner inside a 128-sample block is drawn as a straight line. Needs WebCodecs, so a browser or a worker, not Node. Not proven: no player outside the browser has opened a file; AAC and Opus have no edit list, so a player that shows encoder delay shows it. Not measured: speed. |
 | Take recorder (`@margoengine/cutscene/record`, 2026-11-06) | Enforced: capture times may not go backwards, samples must be finite, and a recorder is spent after `stop()`. By method: a sample is what the source gave at `capture()`, so what happened between ticks is lost; positions come from the source as given, so a parented `Mesh` records its local transform; `Camera.up` is not recorded, roll is; thinning is checked on the straight line between kept keys, so a track played with an ease or a curved path would differ. Whole takes sit in memory until `stop()`. Not measured: speed. |
+| Lip sync (`@margoengine/cutscene/lipsync`, 2026-11-06) | Enforced: phonemes must be known ARPAbet or viseme names, inside their clip and sorted; `sampleRate` must be 8,000 or more. By method: `analyseSpeech` reads level and formants, not words, so it tells closed, hiss and open apart but no other consonants; one clean voice at a time; about half of vowel frames right on two sentences of one speaker, and those two set its thresholds, so other voices and noisy audio are not measured. How each viseme maps to VRM and ARKit shapes is Margo's own choice. Not measured: speed. |
 
 ## Copies of a model
 

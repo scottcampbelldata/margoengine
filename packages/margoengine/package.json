@@ -538,6 +538,10 @@
       "types": "./dist/cutscene/record.d.ts",
       "import": "./dist/cutscene/record.js"
     },
+    "./cutscene/lipsync": {
+      "types": "./dist/cutscene/lipsync.d.ts",
+      "import": "./dist/cutscene/lipsync.js"
+    },
     "./decoders": {
       "types": "./dist/decoders.d.ts",
       "import": "./dist/decoders.js"

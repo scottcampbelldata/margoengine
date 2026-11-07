@@ -222,6 +222,20 @@ does not own. Each entry says exactly what is needed to close it.
 
 ## Open defects
 
+### A Python script test can fail to spawn on Windows, about once in thousands of runs
+
+- **What:** `packages/exporters/tests/precision-native.test.js` failed in `verify` with `spawnSync python3 EINVAL`, on
+  the `python -c` call, just after `python3 --version` had worked in the same test (2026-11-06, during a run with other
+  lanes loading the machine; `pixel-art.test.js` makes the same call, and one earlier failure of this kind is in the
+  history of commit bdcb72659). The test passed in the verify 14 minutes before on the same code.
+- **Repro:** none on demand. 3,831 runs of `python3 -c` from 32 parallel spawns in 90 s all started, and the test alone
+  passes.
+- **Cause, not yet confirmed:** `python3` here is the Microsoft Store app execution alias, and `EINVAL` comes from
+  `CreateProcess`. Ruled out: the length of the script, the environment that `scripts/support/record-reads.mjs` passes
+  (the same on the call before), and spawn concurrency alone.
+- **Needed to close:** catch it again with the Windows error code, or run the tests with a Python that is not the alias
+  and see whether it stops.
+
 ### A textured glTF does not load in Node
 
 - **What:** in Node on the `webgpu` binding, `loadGLTF` of `@margoengine/gltf-pro` rejects with `glTF image 0 could not be decoded (createImageBitmap is not defined)`, so a server thumbnail of a textured model cannot be made. Untextured scenes, sky and shadows draw.

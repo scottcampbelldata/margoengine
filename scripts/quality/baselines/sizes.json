@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10048167,
+  "total": 10051531,
   "history": [
     {
       "date": "2026-10-24",
@@ -2984,6 +2984,12 @@
       "commit": "c1b9a6f7f",
       "reason": "fbx: entries pbr, curves, deformers, camera and light export",
       "grew": 10
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "50cc3e2c9",
+      "reason": "New entry @margoengine/cutscene/lipsync: dialogue and lip sync.",
+      "grew": 1
     }
   ],
   "items": {
@@ -3110,6 +3116,7 @@
     "@margoengine/culling/parts": 15027,
     "@margoengine/culling/shadows": 20972,
     "@margoengine/cutscene": 7115,
+    "@margoengine/cutscene/lipsync": 3364,
     "@margoengine/cutscene/record": 3415,
     "@margoengine/cutscene/render": 8171,
     "@margoengine/cutscene/shots": 3336,
