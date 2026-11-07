@@ -66,3 +66,17 @@ test('rewind blends between recorded ticks, clamps to the history and checks its
   assert.throws(() => lag.record(14, [[1, { position: [0, Number.NaN], radius: 1 }]]), RangeError);
   assert.throws(() => new LagCompensation({ history: 1 }), RangeError);
 });
+
+test('at a recorded tick, a shape only the next tick holds does not exist yet', () => {
+  const lag = new LagCompensation({ history: 8 }),
+    shape = { position: [0, 0], radius: 1 };
+  lag.record(1, [[1, shape]]);
+  lag.record(2, [[1, shape]]);
+  lag.record(3, [
+    [1, shape],
+    [2, { position: [5, 0], radius: 1 }],
+  ]);
+  assert.deepEqual([...lag.at(2).keys()], [1]);
+  assert.equal(lag.raycast(2, [5, 5], [0, -1]), undefined);
+  assert.deepEqual([...lag.at(3).keys()].sort(), [1, 2]);
+});

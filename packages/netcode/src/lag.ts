@@ -95,6 +95,7 @@ export class LagCompensation {
     const a = f[i - 1],
       b = f[i],
       t = (tick - a.tick) / (b.tick - a.tick);
+    if (a.tick === tick) return new Map(a.boxes);
     for (const [id, nb] of b.boxes) {
       const na = a.boxes.get(id);
       if (!na || na.position.length !== nb.position.length) {
