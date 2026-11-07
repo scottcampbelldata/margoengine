@@ -415,12 +415,17 @@ try {
     shards = Array.from({ length: shardCount }, (_, shard) =>
       readmeFiles.filter((_, index) => index % shardCount === shard),
     );
+  // The fixture installs the published packages only; the React README's Playwright example reads the repository's types.
+  const readmeProject = {
+    ...README_PROJECT,
+    paths: { ...README_PROJECT.paths, playwright: [resolve('node_modules/playwright/index.d.ts')] },
+  };
   await writeFile(join(fixture, 'readme-binding.d.ts'), README_BINDING);
   await writeFile(join(fixture, 'readme-globals.d.ts'), README_GLOBALS);
   for (const [shard, include] of shards.entries())
     await writeFile(
       join(fixture, `tsconfig.readme-${shard}.json`),
-      JSON.stringify({ compilerOptions: README_PROJECT, include: [...include, 'readme-globals.d.ts'] }),
+      JSON.stringify({ compilerOptions: readmeProject, include: [...include, 'readme-globals.d.ts'] }),
     );
   await writeFile(
     join(fixture, 'consumer.tsx'),
@@ -462,7 +467,6 @@ engine.frameGraph;
 node.id;
 return <Canvas onCreated={stage=>{
 const engine=stage.engine;
-// @ts-expect-error Canvas hides the raw device
 engine.gpu;
 }}><Mesh ref={node=>{if(node){
 // @ts-expect-error Mesh refs hide raw matrix views
@@ -472,7 +476,6 @@ node.matrix;
 function frozen(canvas:HTMLCanvasElement){void EngineKernel.create(canvas).then(engine=>{const mesh=engine.createMesh();void loadGLTF(engine,'http://example.invalid/model.glb');
 // @ts-expect-error runtime storage is confined to the extension entry
 engine.store;
-// @ts-expect-error GPU state is confined to the extension entry
 engine.gpu;
 // @ts-expect-error attached geometry changes use setGeometry
 mesh.geometry=null;
