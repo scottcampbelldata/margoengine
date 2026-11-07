@@ -652,7 +652,12 @@ export class ResultStore {
     const folder = join(this.dir, 'dist'),
       files = readdirSync(folder)
         .filter((name) => name.endsWith('.gz'))
-        .map((name) => ({ path: join(folder, name), ...pick(statSync(join(folder, name))) }))
+        // Worktrees share the store, so another run may have removed a file since the listing: it is no longer stored.
+        .flatMap((name) => {
+          const path = join(folder, name),
+            stat = statSync(path, { throwIfNoEntry: false });
+          return stat ? [{ path, ...pick(stat) }] : [];
+        })
         .sort((a, b) => a.at - b.at);
     let total = files.reduce((sum, { size }) => sum + size, 0);
     for (const { path, size } of files) {

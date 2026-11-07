@@ -594,3 +594,25 @@ test('two processes with one process id keep two logs', (t) => {
   const reads = [...collectLogs(dir).scopes.get('').reads.keys()].join(' ');
   assert.ok(reads.includes('first.js') && reads.includes('second.js'), reads);
 });
+
+test('evict takes a stored output another run removed while it was looking', (t) => {
+  const dir = join(temp(t), 'store'),
+    store = new ResultStore(dir, { capBytes: 1 }),
+    folder = join(temp(t), 'out');
+  mkdirSync(folder, { recursive: true });
+  writeFileSync(join(folder, 'a.txt'), 'a');
+  store.storeOutput('kept', folder);
+  const gone = join(dir, 'dist', 'gone.gz'),
+    real = fs.statSync;
+  writeFileSync(gone, 'x');
+  fs.statSync = (path, ...rest) => {
+    if (path === gone) fs.rmSync(gone, { force: true });
+    return real(path, ...rest);
+  };
+  syncBuiltinESMExports();
+  t.after(() => {
+    fs.statSync = real;
+    syncBuiltinESMExports();
+  });
+  assert.equal(store.evict(), 0);
+});
