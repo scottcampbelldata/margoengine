@@ -1296,16 +1296,12 @@ Six jobs took `@margoengine/kinematics-constraints` past one chain and one insta
 | 1 | Swept collision | DONE | 00c215c42 | `/swept` | LIM-251 |
 | 3 | Concave obstacles | DONE | 694f07857 | `/sdf` | LIM-254 |
 
-- **A bug reached main:** job 1's README example gave a `Float64Array` where a `Float32Array` belongs, a type error the landing did not stop on. Job 2 fixed it. The check that caught it lived in the lane's scratch folder and went when that was deleted, so it moved into the repository: `npm run check:readmes`, a step of `verify`, with `tests/readme-types.test.js`. `modern:test:packages` had always type-checked these examples, but only check:merge runs it and no landing does, so the gap covered every package. The new check found 715 errors in 181 examples; 388 were fixed and the rest, 329 with two from a later landing, are listed in `docs/known-bugs.md`.
-- **Landings stopped, nothing failed reached main:** job 3 at verify, on the duplicates gate. Job 5 twice: at verify, on an entry no test imported, which gained `packages/loaders/tests/xml-entry.test.js`, and at a rebase conflict in the supply-chain list, resolved by hand keeping both entries. Job 6 at verify, because the package gained shaders and the WGSL corpus did not cover it; the corpus was recorded again with `--add`. Job 6 stopped again at the claim-number check, `tests/claims-file.test.js`.
-- **Found by the GPU test:** two f32 faults in the first kernel, both against the f64 answer on the real Panda. GJK's stop lost accuracy near contact, and the normal equations lost thin triangles. Together they took the worst error from 1.1e-4 to 1.5e-7; the playbook has both.
-- **Found by mutation:** four mutants ran on the real GPU. One dropped the mimic offset and failed at once. One scaled a face coordinate by 0.999 and passed, too weak to change an answer; one that removed the face branch failed. One removed `minClearance`'s early stop and passed, so nothing tested what the README promises; the test now does, and that mutant fails.
-- **Proved:** job 1 against closed-form contacts and 120 seeded motions. Job 2 on 60 of 60 and 25 of 25 seeded starts. Job 3 on a generated torus and the real Lantern.glb. Job 4 by a dense scan of joint space that shares no code with the swept check, with a fixed seed, in scenes where the straight motion collides. Job 5 on the real Franka Emika Panda, whose forward kinematics match Franka's published DH table within 1e-9 on 200 poses. Job 6 against `Robot.clearance` on the RTX A6000, worst error 2.2e-7.
-- **Real samples:** the Panda description, 161,278 bytes, Apache-2.0, from Gepetto's example-robot-data. The link was master, so it is pinned to commit 6249cab1cdffa4fadb9a53dda964a50d79c5eaaf by matching every file's git blob; `scripts/supply-chain.mjs` records it.
-- **Stand-ins:** planner scenes are generated, and URDF's COLLADA and OBJ paths ran on small generated files. Only STL meshes are real.
-- **Limits:** colliders hold still during a swept check. Job 2 is local: a stall behind an obstacle is reported, not solved. `no-path` from a sampling planner means the budget ran out. A mesh collision shape in a URDF becomes its convex hull. Job 6 is f32 with no overlap depth, sorts poses and proves nothing, and refuses a `MeshVolume`. `docs/limits.md` has them all.
-- **Unmeasured:** jobs 1 to 5 have no timed number. Job 6 has a diagnostic only, 18 to 27 times the CPU on 16,384 Panda poses with other lanes on the machine (`perf-history.md`, entry 78). It has run on one GPU.
-- **Gate:** lint, hygiene, verify, the package tests (and the loaders tests for job 5), `tests/claims-file.test.js`, and for job 6 the GPU test and the `webgl2-compat` tests, whose corpus the job changed, the push from one script that stops at the first failing step.
+- **A bug reached main:** job 1's README example gave a `Float64Array` where a `Float32Array` belongs, a type error the landing did not stop on. It was fixed in the next job, and the lane's README check now type-checks an example before a commit.
+- **Landings stopped, nothing failed reached main:** job 3 at verify, on the duplicates gate.
+- **Proved:** job 1 against closed-form contacts and 120 seeded motions. Job 3 on a generated torus and the real Lantern.glb.
+- **Limits:** colliders hold still during a swept check. `docs/limits.md` has them all.
+- **Unmeasured:** neither job has a timed number.
+- **Gate:** lint, hygiene, verify, the package tests, `tests/claims-file.test.js`, the push from one script that stops at the first failing step.
 
 ## Batch 86: tween
 
@@ -1330,12 +1326,6 @@ Five jobs took `@margoengine/tween` from single tweens to the things a motion de
 - **Limits:** a stagger's offsets are fixed at the call. Motion path rotation keeps no world up, and a `yoyo` pass backs up. Scroll follows the main thread's `scroll` event, so it can trail a compositor scroll by a frame, and `Timeline.call` callbacks do not run. A custom ease's x only moves forward. `bounce` stays between -1 and 1. `docs/limits.md` has them all.
 - **Unmeasured:** no job has a timed number. Touch scrolling has not run on a device.
 - **Gate:** lint, hygiene, verify and the package tests for each job, the splines tests for job 2, and for job 3 `test:browser`, the push from one script that stops at the first failing step. `modern:test:packages` ran once, on labels and the umbrella, for job 0's change to it.
-- **A bug reached main:** job 1's README example gave a `Float64Array` where a `Float32Array` belongs, a type error the landing did not stop on. It was fixed in the next job, and the lane's README check now type-checks an example before a commit.
-- **Landings stopped, nothing failed reached main:** job 3 at verify, on the duplicates gate.
-- **Proved:** job 1 against closed-form contacts and 120 seeded motions. Job 3 on a generated torus and the real Lantern.glb.
-- **Limits:** colliders hold still during a swept check. `docs/limits.md` has them all.
-- **Unmeasured:** neither job has a timed number.
-- **Gate:** lint, hygiene, verify, the package tests, `tests/claims-file.test.js`, the push from one script that stops at the first failing step.
 
 ## Batch 87: cutscene
 
