@@ -4,6 +4,8 @@
 
 ### Networking
 
+- `@margoengine/net/timeline`: one home for time-ordered snapshots. `SnapshotBuffer`, and `GameClient`, `LagCompensation` and angle fields in `@margoengine/netcode`, all sit on it. `GameClient` takes an `AdaptiveDelay` as `interpolationDelay`. `@margoengine/net` no longer asks for core as a peer.
+- `LagCompensation.at` at a recorded tick no longer holds a shape that only the next tick has, so a shot cannot hit something that did not exist yet.
 - `@margoengine/net/fields`: `FieldBuffer` interpolates scale, colour in linear light, looping animation time and any other named field alongside the pose.
 - `@margoengine/net/delay`: `AdaptiveDelay` picks the render delay from measured jitter and loss, follows delay spikes, and runs the view's clock so it never jumps back.
 

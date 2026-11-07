@@ -33,6 +33,10 @@
     "./fields": {
       "types": "./dist/fields.d.ts",
       "import": "./dist/fields.js"
+    },
+    "./timeline": {
+      "types": "./dist/timeline.d.ts",
+      "import": "./dist/timeline.js"
     }
   },
   "files": [
@@ -45,9 +49,6 @@
   },
   "dependencies": {
     "@margoengine/math": "^1.0.0"
-  },
-  "peerDependencies": {
-    "@margoengine/core": "^1.0.0"
   },
   "scripts": {
     "build": "node ../../scripts/build-optional.js net",

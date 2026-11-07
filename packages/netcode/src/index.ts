@@ -40,5 +40,5 @@ export {
   type Envelope,
 } from './protocol.js';
 export { GameServer, type GameServerOptions, type GameServerStats, type RateLimits } from './server.js';
-export { GameClient, type GameClientOptions, type GameClientStats } from './client.js';
+export { GameClient, type GameClientOptions, type GameClientStats, type ViewClock } from './client.js';
 export { LagCompensation, type Hitbox, type RewindHit } from './lag.js';

@@ -1998,3 +1998,24 @@ Follow-up in the same batch: `45d38a12` measures entry-sizes.json and basic-scen
 - **Gate:** per job: rebase, build:packages, api:check, `npm run quality`, lint, hygiene, the sky, react, scenery,
   gameplay-sandbox and voxel-sandbox tests, the sky GPU tests under the GPU lock, the claims, llms, lock-sync and
   sizes-page tests. One `npm run verify` on the newest main after the last push.
+
+## Lane N batch 113: net
+
+Three jobs for `@margoengine/net`, on this PC with the full check per job; each is a new optional entry, and core and
+stage are untouched. The batch's aim is that snapshot playback has one home: a measured delay, any field, one ring.
+Nothing is timed.
+
+| # | Job | Status | Commit | Entry | Claim |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Adaptive interpolation delay | DONE | `35affb36` | `/delay` | LIM-373 |
+| 2 | Any field interpolation | DONE | `55454160` | `/fields` | LIM-377 |
+| 3 | One home with netcode | DONE | this commit | `/timeline` | the next claim after LIM-377 on the day |
+
+- **Job 3 in full:** `TimeRing` and `Timeline` hold the order, the ring and the search. `SnapshotBuffer` keeps its 11-float rows with the ring reading the time inside them; `FieldBuffer`, `GameClient`'s snapshot history (a map and a list before) and `LagCompensation`'s frames (an array with a linear search before) all sit on it, and netcode's angle blend is the shared one. `GameClient` takes an `AdaptiveDelay` as `interpolationDelay`, typed by a small interface so netcode does not load it. `@margoengine/net` loses its core peer, which it never imported, so a netcode server does not pull core in.
+- **Bugs fixed:** `LagCompensation.at` at an exact recorded tick blended toward the next tick at weight 0, so a shape only the next tick held came through and a shot could hit it before it existed (`packages/netcode/tests/lag.test.js`). `tests/sizes-page.test.js` failed on main after `01c3aec9` moved entry-sizes.json alone; both records were measured afresh (`b1180f8b`), and `45d38a12` from another lane landed the same repair minutes earlier, so the commit carries only the fields row and the commit lines.
+- **Proved:** the tests of each entry. Delay: a clean link gives exactly one send interval at any clock offset, the 99th percentile of uniform jitter, lost snapshots, the spike shape of Moon et al., a lasting route change, clock drift within its bound, a view that never goes back. On a link that turns bad and calms it goes hungry on under 2% of frames, over three times less than a fixed delay of the same mean. Fields: colour in linear light against IEC 61966-2-1's value, loop seams both ways, no blend across a clip, and the pose bit for bit against `SnapshotBuffer` over 320 samples. Timeline: every existing `net` and `netcode` test passes unchanged on the shared ring; on the loopback, the client's view on a clean link sits closer than the fixed default, never goes hungry, and under 60 ms of jitter goes hungry on under 3% of frames.
+- **Stand-in:** every link above is simulated and seeded (the test's own and `LoopbackNetwork`). No captured network trace was used.
+- **Sources:** Ramjee, Kurose, Towsley and Schulzrinne (1994) and Moon, Kurose and Towsley (1998), both read in full from text pulled out of their PDFs, in which equations lose some symbols; RFC 3550 section 6.4.1 and RFC 6298 section 2 only. Shoemake (1985) was not re-read: slerp predates this batch. Table in `docs/clean-room.md`.
+- **Limits:** rows in `docs/limits.md`, Platform. voxel-net keeps its fixed `interpolationDelay` in seconds and its `SnapshotBuffer`; it could take an `AdaptiveDelay` the same way, and that was left out of this batch's scope.
+- **Slips:** main moved during each full check, so jobs 1 and 2 landed by the short rule after their full check passed on the parent. A test snippet in a shell quote ran the word `view` as a command and opened Vim; stopped, nothing changed. Job 1's README example ran only at job 2's landing, when the landing script gained check:readme-run; it passed.
+- **Gate:** lint, hygiene, verify, the net, netcode and voxel-net tests, check:readmes and check:readme-run.

@@ -1,10 +1,21 @@
 // The client: predicts its own player by running the game's step ahead of the server with its own inputs,
 // reconciles when a snapshot disagrees (back to the server's state, then replays the inputs the server has not
 // seen), and draws everything else interpolated between snapshots a little in the past.
+import { Timeline } from '@margoengine/net/timeline';
 import { ClockSync } from './clock.js';
 import type { Game } from './game.js';
 import { decodeEnvelope, encodeEnvelope, MAX_INPUTS_PER_MESSAGE, ENVELOPE_VERSION } from './protocol.js';
 import { CloseCode, fault, type Connection } from './transport.js';
+
+/** The part of `AdaptiveDelay` the client uses: fed each snapshot's server time and arrival in seconds. */
+export interface ViewClock {
+  /** Records one snapshot. */
+  observe(sent: number, received: number): boolean;
+  /** The server time to show at local time `now`, NaN before the first snapshot. */
+  renderTime(now: number): number;
+  /** Forgets the link. */
+  reset(): void;
+}
 
 /** Options of {@link GameClient.join}. */
 export interface GameClientOptions<Input> {
@@ -14,8 +25,11 @@ export interface GameClientOptions<Input> {
   now?: () => number;
   /** Extra ticks of input lead over the measured delay, to absorb jitter (default 1). */
   inputBuffer?: number;
-  /** Ticks the interpolated view stays behind the newest snapshot (default 2 snapshot intervals). */
-  interpolationDelay?: number;
+  /**
+   * Ticks the interpolated view stays behind the newest snapshot (default 2 snapshot intervals), or an `AdaptiveDelay`
+   * from `@margoengine/net/delay` to pick the delay from what the link does. Passing one is what loads it.
+   */
+  interpolationDelay?: number | ViewClock;
   /** How many of the newest unconfirmed inputs each input message repeats, 1 to 32 (default 8). */
   redundancy?: number;
   /** Ticks of inputs, predictions and snapshots kept (default 128). */
@@ -99,8 +113,8 @@ export class GameClient<State, Input> {
   private closed = false;
   private readonly inputs = new Map<number, Input>();
   private readonly predictions = new Map<number, Uint8Array>();
-  private readonly snapshots = new Map<number, State>();
-  private snapshotTicks: number[] = [];
+  private readonly snapshots: Timeline<State>;
+  private readonly viewClock: ViewClock | undefined;
   private readonly pings = new Map<number, number>();
   private ready: (() => void) | null = null;
 
@@ -123,6 +137,14 @@ export class GameClient<State, Input> {
     if (!(this.buffer >= 0) || !(this.pingEvery > 0))
       throw new RangeError('GameClient needs inputBuffer >= 0 and pingInterval > 0; fix the options');
     this.clock = new ClockSync(game.tickMs);
+    this.snapshots = new Timeline(this.keep);
+    const view = options.interpolationDelay;
+    if (typeof view === 'object') {
+      if (typeof view?.observe !== 'function' || typeof view.renderTime !== 'function')
+        throw new TypeError('GameClient interpolationDelay needs a number of ticks or an AdaptiveDelay; fix the option');
+      view.reset();
+      this.viewClock = view;
+    }
   }
 
   /**
@@ -180,7 +202,7 @@ export class GameClient<State, Input> {
   }
   /** The newest snapshot: the server's state at {@link GameClient.serverTick}. */
   get authoritative(): State {
-    return this.snapshots.get(this.newest) as State;
+    return this.snapshots.latest as State;
   }
   /** Whether the connection is open. */
   get open(): boolean {
@@ -221,7 +243,7 @@ export class GameClient<State, Input> {
         }
         this.player = message.player;
         this.snapshotEvery = Math.max(1, message.snapshotEvery);
-        this.delay = this.options.interpolationDelay ?? 2 * this.snapshotEvery;
+        this.delay = this.viewClock ? 0 : ((this.options.interpolationDelay as number) ?? 2 * this.snapshotEvery);
         this.ping(now);
         break;
       case 'pong': {
@@ -278,10 +300,9 @@ export class GameClient<State, Input> {
         : game.schema.decodeDelta(game.stateType, data, base)
     ) as State;
     this.newest = tick;
-    this.snapshots.set(tick, state);
-    this.snapshotTicks.push(tick);
-    while (this.snapshotTicks.length && this.snapshotTicks[0] <= tick - this.keep)
-      this.snapshots.delete(this.snapshotTicks.shift() as number);
+    this.snapshots.add(tick, state);
+    this.snapshots.dropThrough(tick - this.keep);
+    this.viewClock?.observe((tick * game.tickMs) / 1000, now / 1000);
     this.inputAck = Math.max(this.inputAck, input);
     this.stats.snapshots++;
     if (missed > this.serverMissed) {
@@ -392,28 +413,20 @@ export class GameClient<State, Input> {
   interpolated(): State {
     const ms = this.game.tickMs,
       now = this.now(),
-      target = this.clock.serverTick(now) - (this.clock.rtt / 2 + 2 * this.clock.jitter) / ms - this.delay,
-      ticks = this.snapshotTicks;
-    // The view's clock runs smoothly: it follows the target by running up to 10% faster or slower, so a new clock
-    // sample never makes the view jump back; only an error over 4 ticks (a stall) jumps.
-    const error = target - this.renderTick;
-    if (Number.isNaN(error) || Math.abs(error) > 4) this.renderTick = target;
-    else this.renderTick += (Math.max(0, now - this.lastRender) / ms) * Math.min(1.1, Math.max(0.9, 1 + 0.1 * error));
-    this.lastRender = now;
-    const at = this.renderTick;
-    if (!ticks.length) return this.predictedState as State;
-    if (at >= ticks[ticks.length - 1]) return this.snapshots.get(ticks[ticks.length - 1]) as State;
-    if (at <= ticks[0]) return this.snapshots.get(ticks[0]) as State;
-    let i = ticks.length - 1;
-    while (ticks[i - 1] > at) i--;
-    const a = ticks[i - 1],
-      b = ticks[i];
-    return this.game.schema.interpolate(
-      this.game.stateType,
-      this.snapshots.get(a),
-      this.snapshots.get(b),
-      (at - a) / (b - a),
-    ) as State;
+      snapshots = this.snapshots;
+    if (this.viewClock) this.renderTick = (this.viewClock.renderTime(now / 1000) * 1000) / ms;
+    else {
+      const target = this.clock.serverTick(now) - (this.clock.rtt / 2 + 2 * this.clock.jitter) / ms - this.delay;
+      // The view's clock runs smoothly: it follows the target by running up to 10% faster or slower, so a new clock
+      // sample never makes the view jump back; only an error over 4 ticks (a stall) jumps.
+      const error = target - this.renderTick;
+      if (Number.isNaN(error) || Math.abs(error) > 4) this.renderTick = target;
+      else this.renderTick += (Math.max(0, now - this.lastRender) / ms) * Math.min(1.1, Math.max(0.9, 1 + 0.1 * error));
+      this.lastRender = now;
+    }
+    if (!snapshots.locate(this.renderTick)) return this.predictedState as State;
+    if (snapshots.a === snapshots.b) return snapshots.from as State;
+    return this.game.schema.interpolate(this.game.stateType, snapshots.from, snapshots.to, snapshots.u) as State;
   }
 
   /**

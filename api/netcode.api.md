@@ -151,7 +151,7 @@ export interface GameClientOptions<Input> {
     input(tick: number): Input;
     now?: () => number;
     inputBuffer?: number;
-    interpolationDelay?: number;
+    interpolationDelay?: number | ViewClock;
     redundancy?: number;
     history?: number;
     pingInterval?: number;
@@ -397,6 +397,12 @@ export interface UntypedSchema {
     equals(name: string, a: unknown, b: unknown): boolean;
     clone(name: string, value: unknown): unknown;
     interpolate(name: string, a: unknown, b: unknown, t: number): unknown;
+}
+
+export interface ViewClock {
+    observe(sent: number, received: number): boolean;
+    renderTime(now: number): number;
+    reset(): void;
 }
 
 export function decodeEnvelope(bytes: Uint8Array): Envelope;

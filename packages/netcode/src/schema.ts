@@ -1,6 +1,7 @@
 // The schema-first binary codec: one schema definition gives full encoding, delta encoding against a baseline,
 // canonical equality and interpolation for every named struct. The wire format is written out in README.md ("Wire
 // format") so another language (a Rust server) can generate the same encoders from the same normalized JSON.
+import { blendAngle } from '@margoengine/net/timeline';
 import { ByteReader, ByteWriter, unzigzag, zigzag } from '../../shared/bytes.js';
 
 /** Number kinds: fixed-width integers, 32-bit LEB128 varints (`uint`, zigzag `int`) and little-endian floats. */
@@ -366,8 +367,7 @@ export class Reader extends ByteReader {
 }
 
 const utf8 = new TextEncoder(),
-  text = new TextDecoder('utf-8', { fatal: true }),
-  TAU = 2 * Math.PI;
+  text = new TextDecoder('utf-8', { fatal: true });
 
 interface Node {
   write(w: Writer, v: unknown, path: string): void;
@@ -383,12 +383,7 @@ const lerpOf = (mode: FieldInterpolation): ((a: number, b: number, t: number) =>
   mode === 'linear'
     ? (a, b, t) => a + (b - a) * t
     : mode === 'angle'
-      ? (a, b, t) => {
-          let d = (b - a) % TAU;
-          if (d > Math.PI) d -= TAU;
-          else if (d <= -Math.PI) d += TAU;
-          return a + d * t;
-        }
+      ? blendAngle
       : (a, b, t) => (t >= 1 ? b : a);
 
 const number = (path: string, v: unknown): number => {

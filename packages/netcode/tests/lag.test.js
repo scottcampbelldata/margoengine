@@ -80,3 +80,20 @@ test('at a recorded tick, a shape only the next tick holds does not exist yet', 
   assert.equal(lag.raycast(2, [5, 5], [0, -1]), undefined);
   assert.deepEqual([...lag.at(3).keys()].sort(), [1, 2]);
 });
+
+test('the rewind keeps only its history, replacing a repeated tick', () => {
+  const lag = new LagCompensation({ history: 2 }),
+    shape = (x) => [[1, { position: [x, 0], radius: 1 }]];
+  assert.equal(lag.range, undefined);
+  lag.record(1, shape(1));
+  lag.record(2, shape(2));
+  lag.record(2, shape(5));
+  assert.deepEqual(lag.range, [1, 2]);
+  assert.equal(lag.at(2).get(1).position[0], 5);
+  lag.record(3, shape(6));
+  assert.deepEqual(lag.range, [2, 3]);
+  assert.equal(lag.at(0).get(1).position[0], 5);
+  assert.throws(() => lag.record(1, shape(1)), RangeError);
+  lag.clear();
+  assert.equal(lag.range, undefined);
+});

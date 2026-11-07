@@ -83,7 +83,25 @@ console.log(now?.position, now?.tint, now?.clipTime);
 
 The options are `capacity` (default 32) and `maxPrediction` (default 0.25 seconds). Like `SnapshotBuffer`, it ignores older or repeated times, gives the oldest snapshot before the ring begins, and reuses its output unless you pass your own from `create()`. Change the `clip` number on every restart of a clip, as a restart without one reads as a scrub back.
 
-Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
+## One timeline
+
+`margoengine/net/timeline` is the one home of time-ordered snapshots in the engine. `SnapshotBuffer` and `FieldBuffer` here, and the client and the rewind of `@margoengine/netcode`, all sit on it. Use `Timeline` for snapshots that are objects, and `TimeRing` for rows of numbers in your own storage.
+
+```ts
+import {Timeline, blendAngle} from 'margoengine/net/timeline';
+const states = new Timeline<{heading: number}>(32);
+states.add(100, {heading: 3});
+states.add(102, {heading: -3});
+states.dropThrough(90); // what is older than you need
+if (states.locate(101) && states.from && states.to) {
+  // `a` and `b` are equal on an entry and outside the ring; `past` says how far beyond the newest.
+  console.log(blendAngle(states.from.heading, states.to.heading, states.u));
+}
+```
+
+Times must rise: `add` refuses an older or repeated one, and `replace` changes the value at a time already held. `get` finds an exact time in O(log n), `locate` the two entries around a moment. The same file exports the blends the buffers share: `blendAngle`, `slerpInto` and `normalizeQuaternion`.
+
+Apache-2.0. Optional, tree-shakable package; `/fields` depends on `@margoengine/math`, and nothing here needs core.
 
 Build and unit tests: npm test --workspace @margoengine/net
 

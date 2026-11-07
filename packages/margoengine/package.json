@@ -1686,6 +1686,10 @@
       "types": "./dist/net/fields.d.ts",
       "import": "./dist/net/fields.js"
     },
+    "./net/timeline": {
+      "types": "./dist/net/timeline.d.ts",
+      "import": "./dist/net/timeline.js"
+    },
     "./netcode": {
       "types": "./dist/netcode.d.ts",
       "import": "./dist/netcode.js"

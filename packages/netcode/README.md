@@ -76,7 +76,8 @@ frame; the loop above drives both by hand so the example runs anywhere, at once,
   predicts with the game's own step; on each snapshot compares its prediction for that tick byte for byte and, when
   they differ, goes back to the server's state and replays its unconfirmed inputs. Each input message repeats the
   newest 8 unconfirmed inputs, so a lost packet costs nothing. `interpolated()` blends the two snapshots around a
-  render time a little in the past (default 2 snapshot intervals plus the jitter) on a clock that never runs backwards.
+  render time a little in the past (default 2 snapshot intervals plus the jitter, or what an `AdaptiveDelay` measures;
+  see below) on a clock that never runs backwards.
 - **Clock sync** (`ClockSync`): Cristian's method over the last 8 pings; the fastest round trip gives the offset and
   the spread of round trips gives the jitter. The server also reports how many ticks it ran without the client's input,
   and the client leads by one more tick for a while each time that grows.
@@ -84,6 +85,46 @@ frame; the loop above drives both by hand so the example runs anywhere, at once,
   `onclose`). `LoopbackNetwork` is the in-memory one, on a virtual clock: latency, jitter, loss, duplication and
   reordering from a seed, reliable messages resent under loss and never reordered. `messages(connection, { signal })`
   reads any connection as an async iterator.
+
+## Measured render delay
+
+Pass an `AdaptiveDelay` from `@margoengine/net/delay` as `interpolationDelay` and the view stays as close as what the link allows, one snapshot interval on a clean one, instead of a fixed number of ticks. Nothing loads it unless you do. Snapshots live on `Timeline` from `@margoengine/net/timeline`, the same ring `SnapshotBuffer` uses.
+
+```ts
+import { AdaptiveDelay } from 'margoengine/net/delay';
+import { defineGame, defineSchema, GameClient, GameServer, LoopbackNetwork } from 'margoengine/netcode';
+
+const schema = defineSchema({
+  version: 1,
+  types: { Input: { x: 'f32' }, State: { x: 'f32' } },
+} as const);
+const game = defineGame({
+  schema,
+  state: 'State',
+  input: 'Input',
+  tickRate: 30,
+  initial: () => ({ x: 0 }),
+  step: (state, inputs, _tick, dt) => {
+    for (const input of inputs.values()) state.x += input.x * dt;
+  },
+});
+const network = new LoopbackNetwork({ latency: 40, jitter: 30, seed: 3 });
+const now = () => network.time;
+const server = new GameServer(game, { now });
+network.listen().onconnection = (connection) => server.accept(connection);
+const delay = new AdaptiveDelay();
+const joining = GameClient.join(game, network.connect(), { now, input: () => ({ x: 1 }), interpolationDelay: delay });
+let client: Awaited<typeof joining> | undefined;
+joining.then((joined) => (client = joined));
+for (let frame = 0; frame < 300; frame++) {
+  network.advance(1000 / 60);
+  if (network.time >= (server.tick + 1) * game.tickMs) server.step();
+  client?.update();
+  client?.interpolated();
+  await null;
+}
+console.log('delay', delay.target, 'view tick', client?.viewTick);
+```
 
 ## Determinism: why prediction converges exactly
 
@@ -441,6 +482,6 @@ Optimization" (GDC 2001); Timothy Ford, "Overwatch Gameplay Architecture and Net
 "Probabilistic clock synchronization" (1989); the LEB128 and zigzag encodings as specified for DWARF and Protocol
 Buffers; FNV-1a as published by Fowler, Noll and Vo. No library's source was read.
 
-Apache-2.0. Optional, tree-shakable package; depends on `@margoengine/math` only.
+Apache-2.0. Optional, tree-shakable package; depends on `@margoengine/math` and `@margoengine/net` only.
 
 Build and unit tests: npm test --workspace @margoengine/netcode

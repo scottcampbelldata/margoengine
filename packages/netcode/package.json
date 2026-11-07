@@ -61,7 +61,8 @@
     "access": "public"
   },
   "dependencies": {
-    "@margoengine/math": "^1.0.0"
+    "@margoengine/math": "^1.0.0",
+    "@margoengine/net": "^1.0.0"
   },
   "scripts": {
     "build": "node ../../scripts/build-optional.js netcode",

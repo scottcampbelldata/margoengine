@@ -2,6 +2,8 @@
 // shot against the shapes as they were at the moment the shooter saw them (its interpolated view), not where they
 // are now. That is what makes a shot that looked like a hit on screen count as one.
 
+import { Timeline } from '@margoengine/net/timeline';
+
 /** One hit shape: a circle (2 coordinates) or a sphere (3) of `radius`. */
 export interface Hitbox {
   /** Centre: [x, y] or [x, y, z]. */
@@ -20,10 +22,7 @@ export interface RewindHit {
   point: number[];
 }
 
-interface Frame {
-  tick: number;
-  boxes: Map<number, { position: number[]; radius: number }>;
-}
+type Shapes = Map<number, { position: number[]; radius: number }>;
 
 /**
  * Where every hit shape was at each of the last `history` ticks.
@@ -40,18 +39,19 @@ interface Frame {
 export class LagCompensation {
   /** Ticks kept. */
   readonly history: number;
-  private readonly frames: Frame[] = [];
+  private readonly frames: Timeline<Shapes>;
   /** @throws RangeError for a history that is not an integer from 2 to 4096. */
   constructor({ history = 32 }: { history?: number } = {}) {
     if (!Number.isInteger(history) || history < 2 || history > 4096)
       throw new RangeError(`LagCompensation history is ${history}; pass an integer from 2 to 4096 ticks`);
     this.history = history;
+    this.frames = new Timeline(history);
   }
 
   /** The oldest and newest ticks held, or undefined while empty. */
   get range(): [number, number] | undefined {
     const f = this.frames;
-    return f.length ? [f[0].tick, f[f.length - 1].tick] : undefined;
+    return f.count ? [f.oldest, f.newest] : undefined;
   }
 
   /**
@@ -61,10 +61,10 @@ export class LagCompensation {
    */
   record(tick: number, shapes: Iterable<readonly [number, Hitbox]>): void {
     if (!Number.isFinite(tick)) throw new RangeError(`LagCompensation tick is ${tick}; pass a finite tick`);
-    const last = this.frames[this.frames.length - 1];
-    if (last && tick < last.tick)
-      throw new RangeError(`LagCompensation tick ${tick} is older than ${last.tick}; record ticks in order`);
-    const boxes = new Map<number, { position: number[]; radius: number }>();
+    const frames = this.frames;
+    if (tick < frames.newest)
+      throw new RangeError(`LagCompensation tick ${tick} is older than ${frames.newest}; record ticks in order`);
+    const boxes: Shapes = new Map();
     for (const [id, shape] of shapes) {
       if (!shape || !Array.isArray(shape.position) || typeof shape.radius !== 'number')
         throw new TypeError('LagCompensation shapes need { position: [x, y] or [x, y, z], radius }; pass that shape');
@@ -74,9 +74,7 @@ export class LagCompensation {
         throw new RangeError(`LagCompensation shape ${id} radius is ${shape.radius}; use 0 or more`);
       boxes.set(id, { position: [...shape.position], radius: shape.radius });
     }
-    if (last && tick === last.tick) this.frames.pop();
-    this.frames.push({ tick, boxes });
-    while (this.frames.length > this.history) this.frames.shift();
+    if (!frames.add(tick, boxes)) frames.replace(tick, boxes);
   }
 
   /**
@@ -87,17 +85,13 @@ export class LagCompensation {
   at(tick: number): Map<number, Hitbox> {
     const out = new Map<number, Hitbox>(),
       f = this.frames;
-    if (!f.length || !Number.isFinite(tick)) return out;
-    if (tick <= f[0].tick) return new Map(f[0].boxes);
-    if (tick >= f[f.length - 1].tick) return new Map(f[f.length - 1].boxes);
-    let i = f.length - 1;
-    while (f[i - 1].tick > tick) i--;
-    const a = f[i - 1],
-      b = f[i],
-      t = (tick - a.tick) / (b.tick - a.tick);
-    if (a.tick === tick) return new Map(a.boxes);
-    for (const [id, nb] of b.boxes) {
-      const na = a.boxes.get(id);
+    if (!Number.isFinite(tick) || !f.locate(tick)) return out;
+    if (f.a === f.b) return new Map(f.from);
+    const a = f.from as Shapes,
+      b = f.to as Shapes,
+      t = f.u;
+    for (const [id, nb] of b) {
+      const na = a.get(id);
       if (!na || na.position.length !== nb.position.length) {
         out.set(id, t < 0.5 && na ? na : nb);
         continue;
@@ -107,7 +101,7 @@ export class LagCompensation {
         radius: na.radius + (nb.radius - na.radius) * t,
       });
     }
-    for (const [id, na] of a.boxes) if (!out.has(id) && t < 0.5) out.set(id, na);
+    for (const [id, na] of a) if (!out.has(id) && t < 0.5) out.set(id, na);
     return out;
   }
 
@@ -156,6 +150,6 @@ export class LagCompensation {
 
   /** Drops every recorded tick. */
   clear(): void {
-    this.frames.length = 0;
+    this.frames.clear();
   }
 }

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10484383,
+  "total": 10486446,
   "history": [
     {
       "date": "2026-10-24",
@@ -3518,6 +3518,12 @@
       "commit": "0fe47d44d",
       "reason": "sky/presets: Earth and Mars presets for the Hillaire entries (new entry, 1,576 B); per-channel Mie in the shared atmosphere",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "a087be854",
+      "reason": "new entry @margoengine/net/timeline; netcode reaches it at run time",
+      "grew": 3
     }
   ],
   "items": {
@@ -3935,10 +3941,11 @@
     "@margoengine/navmesh/tiles": 15113,
     "@margoengine/navmesh/volume": 4975,
     "@margoengine/navmesh/voxel": 16031,
-    "@margoengine/net": 1371,
+    "@margoengine/net": 1985,
     "@margoengine/net/delay": 1551,
     "@margoengine/net/fields": 2902,
-    "@margoengine/netcode": 12865,
+    "@margoengine/net/timeline": 1495,
+    "@margoengine/netcode": 12819,
     "@margoengine/netcode/generate": 5154,
     "@margoengine/netcode/node": 6457,
     "@margoengine/netcode/rollback": 3437,

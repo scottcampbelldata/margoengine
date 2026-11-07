@@ -106,14 +106,89 @@ export class TimeRing {
   get previous(): number {
     return this.count > 1 ? this.slot(this.count - 2) : -1;
   }
+  /** The slot of the oldest entry, or -1 while empty. */
+  get first(): number {
+    return this.count ? this.slot(0) : -1;
+  }
   /** The slot of the newest entry, or -1 while empty. */
   get last(): number {
     return this.count ? this.slot(this.count - 1) : -1;
   }
 
+  /** Drops every entry at or before `time`. */
+  dropThrough(time: number): void {
+    while (this.count && this.oldest <= time) this.count--;
+  }
+
   /** Drops every entry. */
   clear(): void {
     this.count = this.head = 0;
+  }
+}
+
+/**
+ * A {@link TimeRing} that holds a value for each entry, for snapshots that are objects and not rows of numbers.
+ *
+ * @example
+ * ```ts
+ * import { Timeline } from '@margoengine/net/timeline';
+ *
+ * const states = new Timeline<{ x: number }>(32);
+ * states.add(100, { x: 1 });
+ * states.add(102, { x: 3 });
+ * if (states.locate(101) && states.from && states.to) {
+ *   const x = states.from.x + (states.to.x - states.from.x) * states.u;
+ *   console.log(x);
+ * }
+ * ```
+ */
+export class Timeline<T> extends TimeRing {
+  private readonly values: (T | undefined)[];
+  /** @throws RangeError for a capacity that is not an integer from 2 to 65536. */
+  constructor(capacity: number) {
+    super(capacity);
+    this.values = new Array(capacity).fill(undefined);
+  }
+  /** Adds `value` at `time`. @returns False for a time not newer than the newest, which changes nothing. */
+  add(time: number, value: T): boolean {
+    const slot = this.push(time);
+    if (slot < 0) return false;
+    this.values[slot] = value;
+    return true;
+  }
+  /** The value at exactly `time`, if held. */
+  get(time: number): T | undefined {
+    const slot = this.find(time);
+    return slot < 0 ? undefined : this.values[slot];
+  }
+  /** Replaces the value at exactly `time`. @returns False when no entry has that time. */
+  replace(time: number, value: T): boolean {
+    const slot = this.find(time);
+    if (slot < 0) return false;
+    this.values[slot] = value;
+    return true;
+  }
+  /** The value at {@link TimeRing.a}, after {@link TimeRing.locate}. */
+  get from(): T | undefined {
+    return this.values[this.a];
+  }
+  /** The value at {@link TimeRing.b}, after {@link TimeRing.locate}. */
+  get to(): T | undefined {
+    return this.values[this.b];
+  }
+  /** The newest value, if any. */
+  get latest(): T | undefined {
+    return this.count ? this.values[this.last] : undefined;
+  }
+  override dropThrough(time: number): void {
+    while (this.count && this.oldest <= time) {
+      this.values[this.first] = undefined;
+      this.count--;
+    }
+  }
+  override clear(): void {
+    this.values.fill(undefined);
+    super.clear();
   }
 }
 

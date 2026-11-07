@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { CloseCode, encodeEnvelope, GameClient, LoopbackNetwork, ENVELOPE_VERSION } from '../dist/index.js';
+import { AdaptiveDelay } from '@margoengine/net/delay';
 import { arena, game, schema } from './arena.js';
 
 const same = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
@@ -90,6 +91,44 @@ test('interpolation draws other players smoothly between snapshots despite jitte
   const server = world.server.state.boxes.get(mover.player).x,
     shown = watcher.interpolated().boxes.get(mover.player).x;
   assert.ok(server - shown >= 0 && server - shown < 19 * 0.5, `lag ${server - shown}`);
+});
+
+test('an AdaptiveDelay runs the view: smooth, behind what arrived, and closer on a calm link', async () => {
+  const run = async (conditions, interpolationDelay) => {
+    const world = arena(conditions),
+      mover = await world.join({ input: () => ({ x: 1, y: 0, boost: false }) }),
+      watcher = await world.join({ interpolationDelay });
+    let last = -Infinity,
+      hungry = 0,
+      frames = 0,
+      behind = 0;
+    for (let i = 0; i < 600; i++) {
+      world.frame();
+      const box = watcher.interpolated().boxes.get(mover.player);
+      if (i < 120 || !box) continue;
+      assert.ok(watcher.viewTick >= last, `view went back at frame ${i}`);
+      last = watcher.viewTick;
+      frames++;
+      behind += watcher.serverTick - watcher.viewTick;
+      if (watcher.viewTick > watcher.serverTick) hungry++;
+    }
+    return { behind: behind / frames, hungry: hungry / frames };
+  };
+  const calm = await run({ latency: 50, seed: 4 }, new AdaptiveDelay()),
+    fixed = await run({ latency: 50, seed: 4 }),
+    rough = await run({ latency: 50, jitter: 60, seed: 4 }, new AdaptiveDelay());
+  // On a clean link one snapshot interval is enough, where the fixed default holds two.
+  assert.ok(calm.behind < fixed.behind, `${calm.behind} against ${fixed.behind}`);
+  assert.equal(calm.hungry, 0);
+  assert.ok(rough.behind > calm.behind, `${rough.behind} against ${calm.behind}`);
+  assert.ok(rough.hungry < 0.03, `hungry ${rough.hungry}`);
+});
+
+test('interpolationDelay refuses what is neither ticks nor a view clock', () => {
+  assert.throws(() => GameClient.join(game, {}, { input: () => ({}), interpolationDelay: {} }), {
+    name: 'TypeError',
+    message: /interpolationDelay/,
+  });
 });
 
 test('soak: 8 clients under loss and jitter for 60 s all stay joined and converge', async (t) => {
