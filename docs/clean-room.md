@@ -909,6 +909,15 @@ Written clean room from the published work below. No source of a camera system i
 | Confiner volumes (`cinematic/confine`) | The even-odd rule for a point in a polygon, as set out in M. Shimrat, "Algorithm 112: Position of point relative to polygon", Communications of the ACM, 1962. Nearest point on a segment and the meeting of two offset lines: standard geometry. The push from the walls is our own |
 | Focus tracking (`cinematic/lens`) | Plane of focus along the view axis, and field of view from subject size: the thin lens and pinhole relations, as `@margoengine/cameras/physical` already uses them. The rack and the zoom are exponential decays of our own |
 
+## Navigation: `@margoengine/navmesh`
+
+Written clean room from the published work below. No source of a navmesh library or another engine was read; Recast and Detour were not opened. The earlier parts of this package (ORCA, the funnel, the voxel pipeline) cite their sources in `packages/navmesh/src/`.
+
+| Area | Source |
+| --- | --- |
+| Tiles (`navmesh/tiles`) | Rebuilding only what changed has the aim of W. G. van Toll, A. F. Cook IV, R. Geraerts, "A navigation mesh for dynamic environments", Computer Animation and Virtual Worlds 23(5-6), 2012, whose medial axis repair we did not use: Margo's mesh comes from voxels, so a tile re-runs the pipeline of `./build` on its own cells and a border. The border, the kept cells and the stitching of polygon edges on a tile line are our own design. |
+| Search from portals (`navmesh`, all shapes) | Search states at portal midpoints: M. Kallmann, "Path planning in triangulations", IJCAI workshop on reasoning, representation and learning in computer games, 2005, as D. Demyen and M. Buro describe it in "Efficient Triangulation-Based Pathfinding", AAAI 2006. The cost of a polygon as the walk from entry to exit, and the heuristic to the end point and not a polygon centre, follow from that. |
+
 ## State machines: `@margoengine/fsm`
 
 Written clean room from the published work below. No source of a statechart library or another engine was read. Sismic is run as an outside tool through its documented interface (`packages/fsm/test/outside/`); its source was not read.

@@ -14,9 +14,9 @@ export interface Agent {
 }
 
 export class Crowd {
-    readonly navMesh: NavMesh;
+    readonly navMesh: NavSurface;
     readonly agents: CrowdAgent[];
-    constructor(navMesh: NavMesh, options?: CrowdOptions);
+    constructor(navMesh: NavSurface, options?: CrowdOptions);
     place(position: Vec3): {
         point: Vec3;
         polygon: number;
@@ -93,11 +93,15 @@ export interface CrowdOptions {
     timeHorizon?: number;
 }
 
-export class NavMesh {
+export type NavLink = Readonly<Link>;
+
+export class NavMesh implements NavSurface {
     readonly vertices: readonly Vec3[];
     constructor(vertices: readonly Vec3[], polygons: readonly (readonly number[])[]);
     get polygonCount(): number;
     get version(): number;
+    polygonVertices(index: number): readonly number[];
+    polygonLinks(index: number): readonly NavLink[];
     polygonCenter(index: number): Vec3;
     setAreaCost(index: number, cost: number): this;
     areaCost(index: number): number;
@@ -118,6 +122,17 @@ export interface NavRoute {
     offMesh: number[];
 }
 
+export interface NavSurface {
+    readonly version: number;
+    locate(position: Vec3): number;
+    closestPoint(position: Vec3): {
+        point: Vec3;
+        polygon: number;
+    } | null;
+    heightAt(index: number, x: number, z: number): number;
+    route(start: Vec3, end: Vec3): NavRoute | null;
+}
+
 export interface OffMeshLinkOptions {
     bidirectional?: boolean;
     cost?: number;
@@ -126,4 +141,16 @@ export interface OffMeshLinkOptions {
 export { Vec3 } from "@margoengine/core";
 
 export function avoid(agent: Agent, neighbors: readonly Agent[], delta?: number, horizon?: number, output?: Float64Array<ArrayBuffer>): Float64Array;
+
+// Not exported from this entry, but used by the exports above:
+
+interface Link {
+    to: number;
+    left: Vec3;
+    right: Vec3;
+    cost?: number;
+    offMesh?: number;
+    start?: Vec3;
+    end?: Vec3;
+}
 ```

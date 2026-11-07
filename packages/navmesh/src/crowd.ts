@@ -3,7 +3,7 @@
 // and dynamic obstacles with ORCA, stay on the walkable polygons and cross off-mesh links. Kept out of NavMesh so an
 // app that only queries paths does not bundle it.
 import { MargoError } from '@margoengine/math/errors';
-import type { NavMesh, Vec3 } from './index.js';
+import type { NavSurface, Vec3 } from './index.js';
 import { avoid, type Agent } from './orca.js';
 
 /** Where a crowd agent is in its journey. */
@@ -195,17 +195,19 @@ export class Crowd {
   private readonly timeHorizon: number;
   private nextId = 1;
   private disposed = false;
+  /** The mesh version the agents last stood on. */
+  private seen: number;
   private readonly output = new Float64Array(2);
   private readonly neighbors: Agent[] = [];
   private readonly obstacleDiscs: Agent[] = [];
   private readonly candidates: { agent: Agent; distance: number }[] = [];
 
   /**
-   * @param navMesh The walkable polygons the agents stay on.
+   * @param navMesh The walkable polygons the agents stay on: a `NavMesh` or a tiled mesh.
    * @param options Avoidance settings.
    */
   constructor(
-    readonly navMesh: NavMesh,
+    readonly navMesh: NavSurface,
     options: CrowdOptions = {},
   ) {
     if (typeof navMesh?.route !== 'function')
@@ -215,6 +217,7 @@ export class Crowd {
     if (!Number.isInteger(this.maxNeighbors) || this.maxNeighbors < 0 || this.maxNeighbors > 4096)
       throw new RangeError('Crowd maxNeighbors must be an integer from 0 to 4096');
     this.timeHorizon = positive(options.timeHorizon, 2, 'Crowd timeHorizon');
+    this.seen = navMesh.version;
   }
 
   /** @internal a point moved onto the mesh, with its polygon. */
@@ -279,6 +282,18 @@ export class Crowd {
     if (dt === 0) return;
     const mesh = this.navMesh,
       version = mesh.version;
+    // A rebuilt tile renumbers its polygons and may have closed over an agent: stand each one on the mesh again.
+    if (version !== this.seen) {
+      this.seen = version;
+      for (const agent of this.agents) {
+        if (agent.state === 'offmesh') continue;
+        const placed = this.place(agent.position);
+        agent.position[0] = placed.point[0];
+        agent.position[1] = placed.point[1];
+        agent.position[2] = placed.point[2];
+        agent.polygon = placed.polygon;
+      }
+    }
     // 1. Obstacles as one-sided ORCA discs, then each agent's plan and preferred velocity.
     const obstacles = this.obstacleDiscs;
     obstacles.length = 0;

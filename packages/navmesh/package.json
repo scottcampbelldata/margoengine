@@ -1,7 +1,7 @@
 {
   "name": "@margoengine/navmesh",
   "version": "1.0.0",
-  "description": "Convex polygon navigation with A*, funnel paths and ORCA avoidance; navmesh generation from triangles (./build).",
+  "description": "Convex polygon navigation with A*, funnel paths and ORCA avoidance; navmesh generation from triangles (./build) and tiled meshes that rebuild at run time (./tiles).",
   "keywords": [
     "margoengine",
     "webgpu",
@@ -29,6 +29,10 @@
     "./build": {
       "types": "./dist/build.d.ts",
       "import": "./dist/build.js"
+    },
+    "./tiles": {
+      "types": "./dist/tiles.d.ts",
+      "import": "./dist/tiles.js"
     }
   },
   "files": [

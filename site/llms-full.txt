@@ -428,7 +428,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 | [`@margoengine/physics`](packages/physics/README.md) | Rigid-body physics for Margo Engine on Rapier: fixed-step engine plugin with interpolation, colliders, joints, queries, events and a character controller. |
 | [`@margoengine/physics2d`](packages/physics2d/README.md) | 2D rigid-body physics for Margo Engine on Rapier: fixed-step plugin with interpolation, sprite-driven bodies, joints, queries, events, a character controller and tile map colliders. |
 | [`@margoengine/ragdoll`](packages/ragdoll/README.md) | Ragdolls on Margo physics: capsule bodies from a skeleton, cone and hinge joint limits, kinematic hit boxes, going limp and blending back to the animation. |
-| [`@margoengine/navmesh`](packages/navmesh/README.md) | Convex polygon navigation with A*, funnel paths and ORCA avoidance; navmesh generation from triangles (./build). |
+| [`@margoengine/navmesh`](packages/navmesh/README.md) | Convex polygon navigation with A*, funnel paths and ORCA avoidance; navmesh generation from triangles (./build) and tiled meshes that rebuild at run time (./tiles). |
 | [`@margoengine/ecs`](packages/ecs/README.md) | Typed-array packed sparse-set entity component storage. |
 | [`@margoengine/fsm`](packages/fsm/README.md) | Hierarchical state machines with history, delayed transitions, parallel regions, JSON documents, snapshots and traces. |
 | [`@margoengine/behavior`](packages/behavior/README.md) | Game AI: behaviour trees with a typed blackboard and async tasks, utility-AI scoring, and steering and flocking behaviours. |
@@ -2593,7 +2593,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-346). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-347). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -2851,6 +2851,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Delayed transitions (`after` of `@margoengine/fsm`, 2026-11-07) | Enforced: `after` is finite and above 0, a transition has `event` or `after` but not both; over 100,000 delayed transitions in one `update` throw, so a long `delta` with very short delays in a loop ends in an error. By method: time is the sum of `delta`, so a paused game pauses delays; a declined guard is asked again on each update, not once as a delayed event would be; a hook that changes state inside a split `delta` ends that piece; a delay shorter than the rounding of `clock` (about 1e-16 of it) does not count. Stand-in: the proof charts are generated, not from a shipped game. Not measured: no timed number. | LIM-323 |
 | Machines as data (`@margoengine/fsm/document`, 2026-11-07) | Enforced: `version` 1, known keys only, every state, transition and name checked; a load with any problem throws. By method: hooks and guards are names, so a document needs its `bindings`; a state with regions takes no hooks; the `plan` hook of a state cannot be saved; `forward` of hand-built regions is not saved, and loaded regions always forward to the machine holding them. Stand-in: the proof charts are generated, not from a shipped game. Not measured: no timed number. | LIM-325 |
 | Snapshots and trace (`@margoengine/fsm/trace`, 2026-11-07) | Enforced: a snapshot must fit the machine, or it is refused with the machine untouched; neither call works from a hook during a change; one trace per machine; `capacity` a whole number of at least 1. By method: restore runs no hooks, so the context is the caller's to save; a hook that throws leaves its state change half done, and a snapshot from before it is the way back; the snapshot names no definition, so a changed machine that still fits is not noticed; events waiting in `raise` cannot be in a snapshot, as they exist only during a delivery; each region has its own `clock`, which stops while the regions stop, so times in a trace compare within one machine. Stand-in: the proof charts are generated, not from a shipped game. Not measured: no timed number. | LIM-332 |
+| Tiled navmesh (`@margoengine/navmesh/tiles`, 2026-11-07) | Enforced: `tileSize` 8 to 1024 cells; the settings and limits of `./build`, without its 16,000,000 cell limit on a whole level; each tile holds the limits of one `NavMesh`. By method: portals across a tile line link polygon edges that overlap there within `walkableClimb` plus the surface's rise, so a tile line is not checked for clearance a second time. A walkable island crossing a tile line is kept whatever its size, since neither tile sees all of it (`minRegionArea` holds inside a tile). Polygon numbers change when a tile rebuilds, so per-polygon `setAreaCost` is not offered: close a way with `addObstacle`. A loaded lattice is fixed by the first level's lowest corner; meshes may be added anywhere. Measured, diagnostic, on a busy machine: 160 m city, 8,081 polygons, 249 ms whole build, 2.4 ms per 64 cell tile; 0.8 ms per 32 cell tile. No quiet run yet. |
 
 ## Copies of a model
 
@@ -9510,7 +9511,7 @@ const custom = Ragdoll.attach(physics, {
 
 Import `margoengine/navmesh` from the `margoengine` package, or `@margoengine/navmesh` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
-Dependency-free navigation: A* chooses a polygon corridor, the funnel algorithm pulls it taut, reciprocal ORCA selects collision-avoiding agent velocities in XZ, a `Crowd` manager walks agents along routes with area costs, off-mesh links and obstacles, and `@margoengine/navmesh/build` generates the walkable polygons from level triangles.
+Dependency-free navigation: A* chooses a polygon corridor, the funnel algorithm pulls it taut, reciprocal ORCA selects collision-avoiding agent velocities in XZ, a `Crowd` manager walks agents along routes with area costs, off-mesh links and obstacles, `@margoengine/navmesh/build` generates the walkable polygons from level triangles, and `@margoengine/navmesh/tiles` cuts big worlds into tiles that rebuild at run time.
 
 ```ts
 import {NavMesh} from 'margoengine/navmesh';
@@ -9518,7 +9519,7 @@ const mesh = new NavMesh([[0,0,0], [10,0,0], [0,0,10]], [[0,1,2]]);
 const path = mesh.path([1,0,1], [2,0,2]);
 ```
 
-Polygons must be strictly convex, planar and nonvertical. Neighbor polygons share vertex-index edges; welded coordinates with different indices do not link. Outside or disconnected endpoints return null. Paths use supplied endpoint heights and portal vertex heights. The bounded open set uses a binary heap (4096 polygons maximum). Shared-edge portals are oriented from the source polygon, independently of polygon winding or center-to-center alignment. Agent radii are handled by avoid(), not by corridor inset: build an already-eroded walkable mesh (the generator below does). ORCA expects current velocities and preferred velocities for all reciprocal agents, uses seconds, and bounds output by maxSpeed; when no velocity avoids every neighbor it returns the one that breaks the constraints least. Static-wall constraints are not generated here; a neighbour with `reciprocal: false` (an obstacle, a player) leaves all of the avoidance to the agent.
+Polygons must be strictly convex, planar and nonvertical. Neighbor polygons share vertex-index edges; welded coordinates with different indices do not link. Outside or disconnected endpoints return null. Paths use supplied endpoint heights and portal vertex heights. The bounded open set uses a binary heap (4096 polygons maximum; `./tiles` goes past that). Shared-edge portals are oriented from the source polygon, independently of polygon winding or center-to-center alignment. Agent radii are handled by avoid(), not by corridor inset: build an already-eroded walkable mesh (the generator below does). ORCA expects current velocities and preferred velocities for all reciprocal agents, uses seconds, and bounds output by maxSpeed; when no velocity avoids every neighbor it returns the one that breaks the constraints least. Static-wall constraints are not generated here; a neighbour with `reciprocal: false` (an obstacle, a player) leaves all of the avoidance to the agent.
 
 ## Crowds, area costs, off-mesh links and obstacles
 

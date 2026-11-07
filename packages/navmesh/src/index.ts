@@ -1,17 +1,10 @@
 import type { Vec3 } from '@margoengine/math';
+import { CorridorSearch, copy, cross, distance, point, routeThrough, type Link, type NavRoute } from './search.js';
 
 export type { Vec3 };
-interface Link {
-  to: number;
-  left: Vec3;
-  right: Vec3;
-  cost: number;
-  /** Off-mesh link id, for a jump, ladder or teleport link; undefined for a shared-edge portal. */
-  offMesh?: number;
-  /** Off-mesh link ends: where the agent leaves this polygon and where it lands. */
-  start?: Vec3;
-  end?: Vec3;
-}
+export type { NavRoute };
+/** One way out of a polygon ({@link NavMesh.polygonLinks}): a portal, or an off-mesh link when `offMesh` is set. */
+export type NavLink = Readonly<Link>;
 
 /** Options of {@link NavMesh.addOffMeshLink}. */
 export interface OffMeshLinkOptions {
@@ -21,12 +14,14 @@ export interface OffMeshLinkOptions {
   cost?: number;
 }
 
-/** A path with the waypoints where off-mesh links start ({@link NavMesh.route}). */
-export interface NavRoute {
-  /** Corner points from the start to the end, both included. */
-  points: Vec3[];
-  /** Indices `i` into `points` where the segment from `points[i]` to `points[i + 1]` crosses an off-mesh link. */
-  offMesh: number[];
+/** What a {@link Crowd} needs of the surface its agents walk on: a {@link NavMesh} or a tiled mesh. */
+export interface NavSurface {
+  /** Counts changes that can change a route, so a crowd knows to plan again. */
+  readonly version: number;
+  locate(position: Vec3): number;
+  closestPoint(position: Vec3): { point: Vec3; polygon: number } | null;
+  heightAt(index: number, x: number, z: number): number;
+  route(start: Vec3, end: Vec3): NavRoute | null;
 }
 interface Polygon {
   vertices: readonly number[];
@@ -34,19 +29,8 @@ interface Polygon {
   links: Link[];
   plane: readonly [number, number, number, number];
 }
-const cross = (a: Vec3, b: Vec3, c: Vec3) => (b[0] - a[0]) * (c[2] - a[2]) - (b[2] - a[2]) * (c[0] - a[0]);
-/** Same point within the point-equality floor (1e-8 per axis, our own choice). */
-const same = (a: Vec3, b: Vec3) =>
-  a === b || (Math.abs(a[0] - b[0]) <= 1e-8 && Math.abs(a[1] - b[1]) <= 1e-8 && Math.abs(a[2] - b[2]) <= 1e-8);
-const copy = (v: Vec3) => [v[0], v[1], v[2]] as unknown as Vec3;
-const distance = (a: Vec3, b: Vec3) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
-function point(value: Vec3): void {
-  if (value.length !== 3 || value.some((v) => !Number.isFinite(Math.fround(v))))
-    throw new RangeError('Point must be finite [x, y, z]; pass numbers.');
-}
-
 /** Convex planar walkable polygons, linked by shared vertex-index edges. */
-export class NavMesh {
+export class NavMesh implements NavSurface {
   /** Copies of the vertex positions given to the constructor. */
   readonly vertices: readonly Vec3[];
   private readonly polygons: Polygon[] = [];
@@ -54,16 +38,8 @@ export class NavMesh {
   private readonly signs: Float64Array;
   private readonly edgeStart: Int32Array;
   private readonly edges: Float64Array;
-  /** Search state reused by every path call; the heap holds one entry per improved polygon cost. */
-  private readonly g: Float64Array;
-  private readonly f: Float64Array;
-  private readonly h: Float64Array;
-  private readonly parent: Int32Array;
-  private readonly state: Uint8Array;
-  private heapKey: Float64Array;
-  private heapNode: Int32Array;
-  /** Link (index into the parent polygon's links) the search arrived by, per polygon. */
-  private readonly parentLink: Int32Array;
+  private readonly search = new CorridorSearch();
+  private readonly adjacency: Link[][];
   /** Area cost multiplier per polygon: 1 by default, Infinity when blocked. */
   private readonly costs: Float64Array;
   private nextLink = 1;
@@ -151,7 +127,6 @@ export class NavMesh {
             to,
             left: this.vertices[leftFirst ? a : b],
             right: this.vertices[leftFirst ? b : a],
-            cost: distance(this.polygons[from].center, this.polygons[to].center),
           });
         }
       }
@@ -179,14 +154,8 @@ export class NavMesh {
       }
       this.edgeStart[i + 1] = at >> 2;
     }
-    this.g = new Float64Array(count);
-    this.f = new Float64Array(count);
-    this.h = new Float64Array(count);
-    this.parent = new Int32Array(count);
-    this.parentLink = new Int32Array(count);
-    this.state = new Uint8Array(count);
-    this.heapKey = new Float64Array(linkCount + 1);
-    this.heapNode = new Int32Array(linkCount + 1);
+    this.search.reserve(count, linkCount);
+    this.adjacency = this.polygons.map((p) => p.links);
     this.costs = new Float64Array(count).fill(1);
   }
   /** Number of polygons. */
@@ -196,6 +165,14 @@ export class NavMesh {
   /** Counts changes that can change a route (area costs, off-mesh links), so a crowd knows to plan again. */
   get version(): number {
     return this.changes;
+  }
+  /** Vertex indices of polygon `index`, in winding order. */
+  polygonVertices(index: number): readonly number[] {
+    return this.polygon(index).vertices;
+  }
+  /** The ways out of polygon `index`: shared-edge portals, then off-mesh links. Read only. */
+  polygonLinks(index: number): readonly NavLink[] {
+    return this.polygon(index).links;
   }
   /** Centre of polygon `index` (the mean of its vertices). */
   polygonCenter(index: number): Vec3 {
@@ -284,8 +261,7 @@ export class NavMesh {
         to: b,
         left: copy(s),
         right: copy(s),
-        // Centre to link start, the link itself, link end to the next centre: comparable with portal costs.
-        cost: distance(polygon.center, s) + cost + distance(e, this.polygons[b].center),
+        cost,
         offMesh: id,
         start: copy(s),
         end: copy(e),
@@ -293,28 +269,26 @@ export class NavMesh {
     };
     add(from, to, start, end);
     if (options.bidirectional ?? true) add(to, from, end, start);
-    this.growHeap();
+    this.search.reserve(this.polygons.length, this.linkCount());
     this.changes++;
     return id;
   }
   /** Removes an off-mesh link by the id {@link NavMesh.addOffMeshLink} returned; false when there is none. */
   removeOffMeshLink(id: number): boolean {
     let found = false;
-    for (const polygon of this.polygons) {
-      const before = polygon.links.length;
-      polygon.links = polygon.links.filter((link) => link.offMesh !== id);
-      if (polygon.links.length !== before) found = true;
-    }
+    for (const { links } of this.polygons)
+      for (let i = links.length - 1; i >= 0; i--)
+        if (links[i].offMesh === id) {
+          links.splice(i, 1);
+          found = true;
+        }
     if (found) this.changes++;
     return found;
   }
-  private growHeap(): void {
+  private linkCount(): number {
     let links = 0;
     for (const polygon of this.polygons) links += polygon.links.length;
-    if (this.heapKey.length < links + 1) {
-      this.heapKey = new Float64Array(links + 1);
-      this.heapNode = new Int32Array(links + 1);
-    }
+    return links;
   }
   /**
    * Index of the polygon containing `position` in XZ, choosing the one vertically nearest when several
@@ -368,162 +342,8 @@ export class NavMesh {
       to = this.locate(end);
     if (from < 0 || to < 0 || !(this.costs[to] < Infinity)) return null;
     if (from === to) return { points: [copy(start), copy(end)], offMesh: [] };
-    const polygons = this.polygons,
-      { g, f, h, parent, parentLink, state, heapKey, heapNode, costs } = this,
-      goal = polygons[to].center;
-    g.fill(Infinity);
-    state.fill(0);
-    g[from] = 0;
-    f[from] = h[from] = distance(polygons[from].center, goal);
-    state[from] = 1;
-    // Open set as a binary heap ordered by (f, polygon index): the same pick as a lowest-f, lowest-index scan.
-    let size = 1;
-    heapKey[0] = f[from];
-    heapNode[0] = from;
-    while (true) {
-      let current = -1;
-      while (size) {
-        const key = heapKey[0],
-          node = heapNode[0],
-          lastKey = heapKey[--size],
-          lastNode = heapNode[size];
-        let i = 0;
-        for (let child = 1; child < size; child = i * 2 + 1) {
-          if (
-            child + 1 < size &&
-            (heapKey[child + 1] < heapKey[child] ||
-              (heapKey[child + 1] === heapKey[child] && heapNode[child + 1] < heapNode[child]))
-          )
-            child++;
-          if (lastKey < heapKey[child] || (lastKey === heapKey[child] && lastNode < heapNode[child])) break;
-          heapKey[i] = heapKey[child];
-          heapNode[i] = heapNode[child];
-          i = child;
-        }
-        heapKey[i] = lastKey;
-        heapNode[i] = lastNode;
-        // Entries left behind by a later cost improvement or an already closed polygon are stale.
-        if (state[node] === 1 && f[node] === key) {
-          current = node;
-          break;
-        }
-      }
-      if (current < 0) return null;
-      if (current === to) break;
-      state[current] = 2;
-      const links = polygons[current].links;
-      for (let l = 0; l < links.length; l++) {
-        const link = links[l],
-          next = link.to;
-        if (state[next] === 2 || !(costs[next] < Infinity)) continue;
-        // Off-mesh links cost what they say; portals cost their length times the entered polygon's area cost.
-        const candidate = g[current] + (link.offMesh === undefined ? link.cost * costs[next] : link.cost);
-        if (candidate < g[next]) {
-          if (state[next] === 0) h[next] = distance(polygons[next].center, goal);
-          const key = candidate + h[next];
-          parent[next] = current;
-          parentLink[next] = l;
-          g[next] = candidate;
-          f[next] = key;
-          state[next] = 1;
-          let i = size++;
-          for (
-            let up = (i - 1) >> 1;
-            i > 0 && (key < heapKey[up] || (key === heapKey[up] && next < heapNode[up]));
-            i = up, up = (i - 1) >> 1
-          ) {
-            heapKey[i] = heapKey[up];
-            heapNode[i] = heapNode[up];
-          }
-          heapKey[i] = key;
-          heapNode[i] = next;
-        }
-      }
-    }
-    const corridor = [to],
-      via: number[] = [];
-    for (let node = to; node !== from; ) {
-      via.push(parentLink[node]);
-      node = parent[node];
-      corridor.push(node);
-    }
-    corridor.reverse();
-    via.reverse();
-    // Pull each stretch between off-mesh links taut on its own; a link joins two stretches end to start.
-    const points: Vec3[] = [],
-      offMesh: number[] = [];
-    const append = (part: Vec3[]) => {
-      for (const v of part) if (!points.length || !same(v, points[points.length - 1])) points.push(v);
-    };
-    let first = 0,
-      origin: Vec3 = start;
-    for (let i = 0; i < via.length; i++) {
-      const link = polygons[corridor[i]].links[via[i]];
-      if (link.offMesh === undefined) continue;
-      append(this.pull(corridor.slice(first, i + 1), via.slice(first, i), origin, link.start!));
-      offMesh.push(points.length - 1);
-      points.push(copy(link.end!));
-      origin = link.end!;
-      first = i + 1;
-    }
-    const last = this.pull(corridor.slice(first), via.slice(first), origin, end);
-    // The first point of the last stretch is the landing point already added.
-    append(offMesh.length ? last.slice(1) : last);
-    return { points, offMesh };
-  }
-  /** Funnel deque reused by `pull`: the left chain grows down from the apex slot, the right chain up. */
-  private readonly funnel: Vec3[] = [];
-  /**
-   * Shortest XZ polyline from `start` to `end` through the corridor's portals: the funnel of D. T. Lee and
-   * F. P. Preparata (Networks 14, 1984), as used by J. Hershberger and J. Snoeyink (CGTA 4, 1994). The deque holds
-   * the shortest paths from the apex to the latest left and right portal ends; the left chain only turns
-   * counter-clockwise, the right one only clockwise. A new end point pops the vertices of its own chain it can see
-   * past; when it crosses the other chain, the apex walks along that chain and every vertex passed is a corner.
-   */
-  private pull(corridor: readonly number[], via: readonly number[], start: Vec3, end: Vec3): Vec3[] {
-    const result: Vec3[] = [copy(start)],
-      polygons = this.polygons,
-      portals = corridor.length - 1,
-      middle = portals + 2,
-      deque = this.funnel;
-    if (deque.length < 2 * middle + 1) deque.length = 2 * middle + 1;
-    deque[middle] = start;
-    let low = middle,
-      apex = middle,
-      high = middle;
-    const corner = (v: Vec3) => {
-      if (!same(v, result[result.length - 1])) result.push(copy(v));
-    };
-    const addLeft = (p: Vec3) => {
-      if (same(p, deque[low])) return;
-      while (low < apex && cross(deque[low + 1], deque[low], p) <= 0) low++;
-      if (low === apex) {
-        // p is clockwise of the right chain's first edge: the path to p wraps that chain's vertices.
-        while (apex < high && cross(deque[apex], deque[apex + 1], p) < 0) corner(deque[++apex]);
-        low = apex;
-      }
-      deque[--low] = p;
-    };
-    const addRight = (p: Vec3) => {
-      if (same(p, deque[high])) return;
-      while (high > apex && cross(deque[high - 1], deque[high], p) >= 0) high--;
-      if (high === apex) {
-        while (apex > low && cross(deque[apex], deque[apex - 1], p) > 0) corner(deque[--apex]);
-        high = apex;
-      }
-      deque[++high] = p;
-    };
-    for (let i = 0; i < portals; i++) {
-      const link = polygons[corridor[i]].links[via[i]];
-      addLeft(link.left);
-      addRight(link.right);
-    }
-    // The end is a portal of zero width; the left chain then runs from the apex to it.
-    addLeft(end);
-    for (let i = apex - 1; i > low; i--) corner(deque[i]);
-    if (!same(end, result[result.length - 1])) result.push(copy(end));
-    deque.fill(undefined as unknown as Vec3, 0, 2 * middle + 1);
-    return result;
+    const corridor = this.search.find(from, to, start, end, this.polygons.length, this.adjacency, this.costs);
+    return corridor && routeThrough(corridor, start, end);
   }
 }
 export { avoid, type Agent } from './orca.js';

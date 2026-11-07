@@ -42,11 +42,25 @@ export function buildNavMesh(positions: ArrayLike<number>, indices: ArrayLike<nu
 
 // Not exported from this entry, but used by the exports above:
 
-class NavMesh {
+interface Link {
+    to: number;
+    left: Vec3;
+    right: Vec3;
+    cost?: number;
+    offMesh?: number;
+    start?: Vec3;
+    end?: Vec3;
+}
+
+type NavLink = Readonly<Link>;
+
+class NavMesh implements NavSurface {
     readonly vertices: readonly Vec3[];
     constructor(vertices: readonly Vec3[], polygons: readonly (readonly number[])[]);
     get polygonCount(): number;
     get version(): number;
+    polygonVertices(index: number): readonly number[];
+    polygonLinks(index: number): readonly NavLink[];
     polygonCenter(index: number): Vec3;
     setAreaCost(index: number, cost: number): this;
     areaCost(index: number): number;
@@ -65,6 +79,17 @@ class NavMesh {
 interface NavRoute {
     points: Vec3[];
     offMesh: number[];
+}
+
+interface NavSurface {
+    readonly version: number;
+    locate(position: Vec3): number;
+    closestPoint(position: Vec3): {
+        point: Vec3;
+        polygon: number;
+    } | null;
+    heightAt(index: number, x: number, z: number): number;
+    route(start: Vec3, end: Vec3): NavRoute | null;
 }
 
 interface OffMeshLinkOptions {
