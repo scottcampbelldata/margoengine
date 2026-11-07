@@ -49,7 +49,7 @@ the ones it imports. With `margoengine` the entries are `margoengine/stage/<entr
 | `@margoengine/stage/environment` | `await addEnvironment(app, source, options)`: image-based lighting from an HDR, EXR or UltraHDR JPEG | `@margoengine/environment` |
 | `@margoengine/stage/shadows` | `await addShadows(app, options)`: cascaded shadows; the meshes present now cast | `@margoengine/shadows` |
 | `@margoengine/stage/xr` | `await addXRButton(app, options)`: an accessible Enter VR or Enter AR button that starts an XR session | `@margoengine/xr` |
-| `@margoengine/stage/physics` | `await addBody(app, mesh, options)`: a rigid body and a fitted collider, loading physics on first use; `await addPhysics(app, options)` for the world | `@margoengine/physics`, `@dimforge/rapier3d-compat` |
+| `@margoengine/stage/physics` | `await addBody(app, mesh, options)`: a rigid body and a fitted collider, loading physics on first use; `await addPhysics(app, options)` for the world | `@margoengine/physics` and its solver |
 | `@margoengine/stage/scene` | `await addScene(app, source, options)`: loads a save or prefab document, one mesh per entity, with lights and cameras, all or nothing | `@margoengine/save`; `@margoengine/gltf-pro` when an entity names a model, `@margoengine/animation` when two entities name the same one, `@margoengine/clustered` for point, spot and extra directional lights |
 | `@margoengine/stage/viewer` | `await addViewer(app, url, options)`: a product viewer: model, image-based light, backdrop, shadow, tone mapping, fit and turntable tuned together | `@margoengine/gltf-pro`, `@margoengine/environment`, `@margoengine/staging` or `@margoengine/shadows`, `@margoengine/tonemap` |
 
@@ -164,7 +164,7 @@ The turntable orbits the camera about the world's Y axis, not the model, so a mo
 
 ## Physics in one call
 
-`addBody` gives a stage mesh a rigid body and a collider. The first call imports `@margoengine/physics` and Rapier, initializes Rapier and attaches one world to the stage, which then steps with the frame loop. Install both: `npm i @margoengine/physics @dimforge/rapier3d-compat`.
+`addBody` gives a stage mesh a rigid body and a collider. The first call imports `@margoengine/physics`, runs `Physics.load()` and attaches one world to the stage, which then steps with the frame loop. Install it and the solver its README names.
 
 ```ts
 import {createStage} from 'margoengine';
@@ -188,7 +188,6 @@ Without `colliders` the shape comes from the geometry: a box, a sphere (uniforml
 | --- | --- | --- |
 | `addBody`: `collider` | none | Friction, restitution, density and so on of the collider picked for the mesh; ignored with `colliders` |
 | `addBody`: `colliders` and the rest | a fitted collider | As `physics.addBody`: `type` (`'dynamic'`), velocities, damping, `ccd` |
-| `addPhysics`: `rapier` | `@dimforge/rapier3d-compat`, imported and initialized | An initialized Rapier module of your own |
 | `addPhysics`: `gravity`, `fixedTimestep` and the rest | as `Physics` | World options, on the first call only; afterwards set them on the world, and options reject with `state` |
 | `addPhysics`: `signal` | none | Cancels the wait; the stage's disposal cancels it too |
 

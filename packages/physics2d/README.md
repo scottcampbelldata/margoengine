@@ -7,11 +7,10 @@ Import `margoengine/physics2d` from the `margoengine` package, or `@margoengine/
 World units are sprite pixels, y points down and angles are radians, clockwise on screen. `pixelsPerMeter` (default 32) maps them to Rapier's metres, so a 16 pixel tile is half a metre. Mass, density, force and impulse use Rapier's units.
 
 ```ts
-import RAPIER from '@dimforge/rapier2d-compat';
 import {Physics2D} from 'margoengine/physics2d';
 
-await RAPIER.init();
-const physics = new Physics2D(null, {rapier: RAPIER}); // or new Physics2D(engine, ...) to step with the engine
+await Physics2D.load();
+const physics = new Physics2D(null); // or new Physics2D(engine, ...) to step with the engine
 
 // A tile map: tiles with collision shapes (or a `solid: true` property) become one fixed body.
 physics.addTileMap({
@@ -40,6 +39,6 @@ It exports `Physics2D`, `Body2D`, `Joint2D`, `CharacterController2D`, `interacti
 
 Queries (`raycast`, `overlapPoint`, `overlapShape`, `castShape`) see every collider added or moved since the last step: they bring Rapier's broad phase up to date with a zero-length step first, which moves nothing and raises no events.
 
-Apache-2.0. Optional, tree-shakable package; core peer: ^1.0.0, Rapier peer optional.
+Apache-2.0. Optional, tree-shakable package; core peer: ^1.0.0, Rapier peer optional: `npm i @margoengine/physics2d @dimforge/rapier2d-compat`.
 
 Build and unit tests: npm test --workspace @margoengine/physics2d

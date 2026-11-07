@@ -141,7 +141,7 @@ engine.start();
   skinned meshes collide in their bind pose; on slopes the ring can hold the eye up to 0.9 × radius × the slope's
   tangent higher; a primitive's tree is built synchronously the first time the walker comes near it
   (`computePrimitiveBVHAsync` builds them in a worker beforehand). For rigid bodies, joints and vehicles use
-  `@margoengine/physics` (Rapier).
+  `@margoengine/physics`.
 
 ## Third-person camera: `@margoengine/controls/third-person`
 

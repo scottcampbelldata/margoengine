@@ -1,6 +1,7 @@
 export { Physics } from './physics.js';
 export type {
   PhysicsOptions,
+  PhysicsLoadOptions,
   PhysicsEventMap,
   CollisionEvent,
   CollisionEventType,

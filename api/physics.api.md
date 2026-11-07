@@ -218,8 +218,9 @@ export class Physics implements EnginePlugin, BodyOwner {
     timeScale: number;
     paused: boolean;
     stepCount: number;
-    static attach(engine: EngineKernel, options: PhysicsOptions): Physics;
-    constructor(engine: EngineKernel | null, options: PhysicsOptions);
+    static load({ signal }?: PhysicsLoadOptions): Promise<void>;
+    static attach(engine: EngineKernel, options?: PhysicsOptions): Physics;
+    constructor(engine: EngineKernel | null, options?: PhysicsOptions);
     get world(): World;
     get isDisposed(): boolean;
     get gravity(): [number, number, number];
@@ -350,8 +351,12 @@ export class PhysicsJoint {
     remove(): void;
 }
 
+export interface PhysicsLoadOptions {
+    signal?: AbortSignal;
+}
+
 export interface PhysicsOptions {
-    rapier: RapierModule;
+    rapier?: RapierModule;
     gravity?: Vec3;
     fixedTimestep?: number;
     maxSubsteps?: number;

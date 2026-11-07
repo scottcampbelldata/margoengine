@@ -1,4 +1,3 @@
-import RAPIER from '@dimforge/rapier3d-compat';
 import {
   Animation,
   Animator,
@@ -18,7 +17,7 @@ import {loadGLTF} from 'margoengine/gltf-pro';
 const hud = document.querySelector('#hud')!;
 
 async function start() {
-  await RAPIER.init();
+  await Physics.load();
   const stage = await createStage('#viewport', { controls: false, camera: { position: [0, 4, 9], target: [0, 1, 0] } });
   const engine = stage.engine;
   const sky = Sky.attach(engine, {
@@ -28,7 +27,7 @@ async function start() {
   });
   const shadows = Shadows.attach(engine, { resolution: 2048, distance: 40, lightSize: 0.02 });
   Bloom.attach(engine, { strength: 0.35, threshold: 1 });
-  const physics = new Physics(engine, { rapier: RAPIER });
+  const physics = new Physics(engine);
 
   // The ground and a stack of crates that fall over when you walk into them.
   const ground = stage.box({ size: [40, 1, 40], position: [0, -0.5, 0], color: '#6f8f4e', roughness: 0.95 });

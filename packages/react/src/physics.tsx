@@ -6,7 +6,6 @@ import type {
   PhysicsOptions,
   PhysicsBody,
   BodyOptions,
-  RapierModule,
   ColliderOptions,
   CollisionEvent,
   JointOptions,
@@ -25,30 +24,15 @@ interface PhysicsState {
 }
 const Context = createContext<PhysicsState | null>(null);
 /** Props of the Physics component; every prop is optional unless noted. */
-export interface PhysicsProps extends Omit<PhysicsOptions, 'rapier'> {
+export interface PhysicsProps extends PhysicsOptions {
   children?: ReactNode;
-  /** Supply initialized Rapier, or let the optional Rapier peer initialize lazily. */
-  rapier?: RapierModule | PromiseLike<RapierModule>;
   onReady?: (physics: PhysicsWorld) => void;
   onError?: (error: unknown) => void;
 }
-let defaultRapier: Promise<RapierModule> | undefined;
-function loadRapier(): Promise<RapierModule> {
-  return (defaultRapier ??= (async () => {
-    const module = await optionalPeer('@dimforge/rapier3d-compat', () => import('@dimforge/rapier3d-compat'));
-    const api = module.default ?? module;
-    await api.init();
-    return api as unknown as RapierModule;
-  })().catch((error) => {
-    defaultRapier = undefined;
-    throw error;
-  }));
-}
 
-/** Own one optional Rapier world, stepped by the engine in always and demand modes. */
+/** Own one optional physics world, loaded on mount, stepped by the engine in always and demand modes. */
 export function Physics({
   children,
-  rapier,
   onReady,
   onError,
   gravity,
@@ -65,15 +49,13 @@ export function Physics({
     (lease) => {
       let current: PhysicsWorld | undefined;
       setWorld(null);
-      void Promise.all([
-        optionalPeer('@margoengine/physics', () => import('@margoengine/physics')),
-        rapier ?? loadRapier(),
-      ])
-        .then(([api, R]) => {
+      void optionalPeer('@margoengine/physics', () => import('@margoengine/physics'))
+        .then(async (api) => {
+          await api.Physics.load();
           if (!lease.active || engine.disposed) return;
-          current = new api.Physics(null, { ...options, ...latest.current, rapier: R });
+          current = new api.Physics(null, { ...options, ...latest.current });
           const instance = current;
-          // The wrapper's update runs after Rapier synchronization, before the engine ticks transforms.
+          // The wrapper's update runs after the solver's step, before the engine ticks transforms.
           engine.use({
             name: instance.name,
             setup: () => instance.setup(engine as unknown as EngineKernel),
@@ -102,7 +84,6 @@ export function Physics({
     },
     [
       engine,
-      rapier,
       sync,
       options.name,
       options.fixedTimestep,
@@ -755,7 +736,6 @@ export type {
   PhysicsBody,
   BodyOptions,
   PhysicsOptions,
-  RapierModule,
   ColliderOptions,
   CollisionEvent,
   JointOptions,

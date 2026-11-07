@@ -1099,12 +1099,11 @@ a bundler copies their Wasm files when it reads the module, before tree-shaking,
 ## A game in one import
 
 ```ts
-import RAPIER from '@dimforge/rapier3d-compat';
 import {Physics, Shadows, createStage} from 'margoengine/game';
 
-await RAPIER.init();
+await Physics.load();
 const stage = await createStage('#viewport');
-const physics = new Physics(stage.engine, {rapier: RAPIER});
+const physics = new Physics(stage.engine);
 const shadows = Shadows.attach(stage.engine, {resolution: 2048});
 const floor = stage.box({size: [10, 1, 10], position: [0, -0.5, 0]});
 const crate = stage.box({position: [0, 4, 0], color: '#c08040'});
@@ -4204,12 +4203,12 @@ A namespace import tree-shakes like named imports in every modern bundler: only 
 
 ## Third-party libraries
 
-Three packages use a library you install yourself, only when you use that package. Everything else is in the one
+Two packages use a library you install yourself, only when you use that package. Everything else is in the one
 install.
 
 | Package | Install | Why |
 | --- | --- | --- |
-| `margoengine/physics` | `npm i @dimforge/rapier3d-compat` | You pass the initialized Rapier module to `new Physics(engine, {rapier})` |
+| `margoengine/physics` | `npm i @dimforge/rapier3d-compat` | The solver; `await Physics.load()` readies it once per app |
 | `margoengine/react` | `npm i react react-dom` | It is a React component library |
 
 `margoengine/react` holds every React binding but five groups, each its own entry: `margoengine/react/gltf-pro`
@@ -8407,13 +8406,12 @@ follow accepts a live mesh from the attached engine or a world-position tuple. M
 Scope the rig with `using` (it calls `dispose()` and returns the camera to your controls):
 
 ```ts
-import RAPIER from '@dimforge/rapier3d-compat';
 import {Cinematic} from 'margoengine/cinematic';
 import {Engine} from 'margoengine/core';
 import {Physics} from 'margoengine/physics';
 const engine = await Engine.create(document.querySelector('canvas')!);
-await RAPIER.init();
-const physics = Physics.attach(engine, {rapier: RAPIER});
+await Physics.load();
+const physics = Physics.attach(engine);
 {
   using rig = Cinematic.attach(engine, {offset: [0, 3, 6]});
   rig.follow([0, 1.6, 0]);
@@ -9164,14 +9162,13 @@ Build from source with `npm run build` in `packages/physics`.
 It exports `Physics` (the world: bodies, colliders, joints, queries and events), `PhysicsBody`, `PhysicsJoint`, `CharacterController`, `Vehicle` and `Rope`. The React components in `@margoengine/react/physics` are `<Physics>`, `<RigidBody>`, the collider components (`CuboidCollider`, `BallCollider` and others), `useJoint`, `usePhysics`, `useBeforePhysicsStep` and `useAfterPhysicsStep`. Rapier is not bundled: you install `@dimforge/rapier3d-compat` (Apache-2.0) yourself and pass the initialized module in.
 
 ```ts
-import RAPIER from '@dimforge/rapier3d-compat';
 import {Engine, PbrMaterial, box} from 'margoengine/core';
 import {Physics, collisionGroups} from 'margoengine/physics';
 
-await RAPIER.init();
+await Physics.load();
 const canvas = document.querySelector('canvas')!;
 const engine = await Engine.create(canvas);
-const physics = new Physics(engine, {rapier: RAPIER}); // registers itself with engine.use()
+const physics = new Physics(engine); // registers itself with engine.use()
 
 const floor = engine.createMesh().setGeometry(box(20, 1, 20)).setPosition([0, -0.5, 0]);
 physics.addBody(floor, {type: 'fixed'});                 // box collider fitted to the geometry
@@ -9208,13 +9205,12 @@ engine.start(); // each frame's delta drives the accumulator
 ## Ropes, vehicles and compound shapes
 
 ```ts
-import RAPIER from '@dimforge/rapier3d-compat';
 import {Engine, box} from 'margoengine/core';
 import {Physics, Rope, Vehicle} from 'margoengine/physics';
 
-await RAPIER.init();
+await Physics.load();
 const engine = await Engine.create(document.querySelector('canvas')!);
-const physics = new Physics(engine, {rapier: RAPIER});
+const physics = new Physics(engine);
 physics.addBody(null, {type: 'fixed', position: [0, -0.5, 0], colliders: {shape: 'box', halfExtents: [50, 0.5, 50]}});
 
 // A rope hung from a fixed hook, carrying a crate. rope.points() is the polyline for @margoengine/lines.
@@ -9241,11 +9237,10 @@ Import `margoengine/physics2d` from the `margoengine` package, or `@margoengine/
 World units are sprite pixels, y points down and angles are radians, clockwise on screen. `pixelsPerMeter` (default 32) maps them to Rapier's metres, so a 16 pixel tile is half a metre. Mass, density, force and impulse use Rapier's units.
 
 ```ts
-import RAPIER from '@dimforge/rapier2d-compat';
 import {Physics2D} from 'margoengine/physics2d';
 
-await RAPIER.init();
-const physics = new Physics2D(null, {rapier: RAPIER}); // or new Physics2D(engine, ...) to step with the engine
+await Physics2D.load();
+const physics = new Physics2D(null); // or new Physics2D(engine, ...) to step with the engine
 
 // A tile map: tiles with collision shapes (or a `solid: true` property) become one fixed body.
 physics.addTileMap({
@@ -9274,7 +9269,7 @@ It exports `Physics2D`, `Body2D`, `Joint2D`, `CharacterController2D`, `interacti
 
 Queries (`raycast`, `overlapPoint`, `overlapShape`, `castShape`) see every collider added or moved since the last step: they bring Rapier's broad phase up to date with a zero-length step first, which moves nothing and raises no events.
 
-Apache-2.0. Optional, tree-shakable package; core peer: ^1.0.0, Rapier peer optional.
+Apache-2.0. Optional, tree-shakable package; core peer: ^1.0.0, Rapier peer optional: `npm i @margoengine/physics2d @dimforge/rapier2d-compat`.
 
 Build and unit tests: npm test --workspace @margoengine/physics2d
 

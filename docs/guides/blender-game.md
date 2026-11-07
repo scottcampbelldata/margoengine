@@ -183,12 +183,11 @@ decoders.draco.dispose(); decoders.ktx2.dispose(); // when no more loads are exp
 configuration), initializes it, and passes the module in:
 
 ```ts
-import RAPIER from '@dimforge/rapier3d-compat';
 import {Physics} from '@margoengine/physics';
 import {loadGLTF} from '@margoengine/gltf-pro';
 
-await RAPIER.init();
-const physics = Physics.attach(engine, {rapier: RAPIER}); // fixed 1/60 s steps, meshes interpolated between them
+await Physics.load();
+const physics = Physics.attach(engine); // fixed 1/60 s steps, meshes interpolated between them
 const level = await loadGLTF(engine, '/assets/level.glb');
 
 // Static triangle colliders for the whole level in one call: a body per Blender object (hits then report that
@@ -234,15 +233,14 @@ physics.on('intersectionstart', ({meshA, meshB}) => {
 and two-bone foot IK on top of it. Clip names are your Blender Action names.
 
 ```ts
-import RAPIER from '@dimforge/rapier3d-compat';
 import {loadGLTF} from '@margoengine/gltf-pro';
 import {Animation} from '@margoengine/animation';
 import {Animator} from '@margoengine/animator';
 import {Physics} from '@margoengine/physics';
 import {Raycaster} from '@margoengine/bvh';
 
-await RAPIER.init();
-const physics = Physics.attach(engine, {rapier: RAPIER});
+await Physics.load();
+const physics = Physics.attach(engine);
 const level = await loadGLTF(engine, '/assets/level.glb');
 const hero = await loadGLTF(engine, '/assets/hero.glb'); // Actions: Idle, Walk, Run, Jump, Wave
 

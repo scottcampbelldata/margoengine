@@ -77,7 +77,6 @@ const REACT_EXTRA = {
   './fbx': ['@margoengine/gltf-pro'],
   './animation': ['@margoengine/animator'],
   './materials': ['@margoengine/gltf-pro'],
-  './physics': ['@dimforge/rapier3d-compat'],
   './dof': ['@margoengine/post'],
   './tonemap': ['@margoengine/post'],
   './taa': ['@margoengine/post'],

@@ -113,7 +113,6 @@ const optionalPeers = [
   '@margoengine/tonemap',
   '@margoengine/taa',
   '@margoengine/physics',
-  '@dimforge/rapier3d-compat',
   '@margoengine/xr',
   '@margoengine/materials',
   '@margoengine/animation',

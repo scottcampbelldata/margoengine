@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10131514,
+  "total": 10132391,
   "history": [
     {
       "date": "2026-10-24",
@@ -3080,6 +3080,12 @@
       "commit": "d383010ad",
       "reason": "Light through leaves: new transmission entry and the light-side normal in gltf-pro",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "f5d8ab248",
+      "reason": "Physics.load: the shared LoadOnce and the solver import, 232 B in physics and 23 B in physics2d; both leave with Rapier at the switch",
+      "grew": 2
     }
   ],
   "items": {
@@ -3334,7 +3340,7 @@
     "@margoengine/gltf-pro/lights": 3470,
     "@margoengine/gltf-pro/metadata": 2432,
     "@margoengine/gltf-pro/model": 56493,
-    "@margoengine/gltf-pro/physics": 9260,
+    "@margoengine/gltf-pro/physics": 9228,
     "@margoengine/gltf-pro/prepare": 21088,
     "@margoengine/gltf-pro/progressive": 75015,
     "@margoengine/gltf-pro/scene": 1471,
@@ -3485,8 +3491,8 @@
     "@margoengine/oit/meshes": 747,
     "@margoengine/oit/moments": 4197,
     "@margoengine/oit/vfx": 486,
-    "@margoengine/physics": 16756,
-    "@margoengine/physics2d": 7920,
+    "@margoengine/physics": 17498,
+    "@margoengine/physics2d": 8199,
     "@margoengine/pixel": 4664,
     "@margoengine/pixel/palette": 4341,
     "@margoengine/pixel/render3d": 3866,
@@ -3551,7 +3557,7 @@
     "@margoengine/react/html": 1529,
     "@margoengine/react/lines": 999,
     "@margoengine/react/materials": 4316,
-    "@margoengine/react/physics": 6225,
+    "@margoengine/react/physics": 6167,
     "@margoengine/react/post": 4243,
     "@margoengine/react/shadows": 3839,
     "@margoengine/react/sky": 1052,
@@ -3633,7 +3639,7 @@
     "@margoengine/stage/environment": 747,
     "@margoengine/stage/gltf": 1621,
     "@margoengine/stage/particles": 724,
-    "@margoengine/stage/physics": 1458,
+    "@margoengine/stage/physics": 1404,
     "@margoengine/stage/scene": 3441,
     "@margoengine/stage/shadows": 750,
     "@margoengine/stage/sky": 719,

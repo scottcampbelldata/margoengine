@@ -29,12 +29,11 @@ a bundler copies their Wasm files when it reads the module, before tree-shaking,
 ## A game in one import
 
 ```ts
-import RAPIER from '@dimforge/rapier3d-compat';
 import {Physics, Shadows, createStage} from 'margoengine/game';
 
-await RAPIER.init();
+await Physics.load();
 const stage = await createStage('#viewport');
-const physics = new Physics(stage.engine, {rapier: RAPIER});
+const physics = new Physics(stage.engine);
 const shadows = Shadows.attach(stage.engine, {resolution: 2048});
 const floor = stage.box({size: [10, 1, 10], position: [0, -0.5, 0]});
 const crate = stage.box({position: [0, 4, 0], color: '#c08040'});

@@ -99,11 +99,12 @@ const near = (actual, expected, tolerance, label) =>
   assert.ok(Math.abs(actual - expected) <= tolerance, `${label}: ${actual} not within ${tolerance} of ${expected}`);
 const angleAbout = (q, axis) => 2 * Math.atan2(q[0] * axis[0] + q[1] * axis[1] + q[2] * axis[2], q[3]);
 
-test('requires an initialized Rapier module and is SSR safe', () => {
+test('a world needs the solver loaded, and importing touches no browser global', () => {
   for (const name of ['window', 'document', 'GPUBufferUsage', 'GPUTextureUsage'])
     assert.equal(globalThis[name], undefined, `${name} touched`);
-  assert.throws(() => new Physics(null, {}), /initialized Rapier module/);
-  assert.throws(() => new Physics(null, { rapier: {} }), /initialized Rapier module/);
+  assert.throws(() => new Physics(null), { name: 'MargoError', code: 'state', message: /await Physics\.load\(\)/ });
+  assert.throws(() => Physics.attach(null, {}), { name: 'MargoError', code: 'state' });
+  assert.throws(() => new Physics(null, { rapier: {} }), { name: 'TypeError', message: /initialized module/ });
 });
 
 test('rejected plugin attachment releases the new world and event queue', () => {

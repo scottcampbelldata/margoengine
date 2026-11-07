@@ -381,7 +381,7 @@ function LoadingBar() {
 
 ## Physics
 
-Physics is a separate entry, so an app without it never needs Rapier. Import it from `@margoengine/react/physics`:
+Physics is a separate entry, so an app without it never loads a solver. Import it from `@margoengine/react/physics`:
 `Physics`, `RigidBody`, the colliders (`CuboidCollider`, `BallCollider`, `CapsuleCollider`, `CylinderCollider`,
 `ConeCollider`, `ConvexHullCollider`, `TrimeshCollider`, `HeightfieldCollider`), `useJoint`, `usePhysics`,
 `useBeforePhysicsStep` and `useAfterPhysicsStep`. `Physics` creates the world; each `RigidBody` owns the meshes inside

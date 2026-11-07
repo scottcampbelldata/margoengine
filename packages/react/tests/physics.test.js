@@ -6,7 +6,7 @@ import { Physics as RealPhysics } from '@margoengine/physics';
 import RAPIER from '@dimforge/rapier3d-compat';
 const warn = console.warn;
 console.warn = () => {};
-await RAPIER.init();
+await RealPhysics.load();
 console.warn = warn;
 const { Canvas, Mesh, BoxGeometry, useMargo } = await (await import('./entries.js')).allEntries();
 const { Physics, RigidBody, CuboidCollider, BallCollider, usePhysics } = await import('../dist/physics.js');
@@ -72,7 +72,6 @@ test('Physics dynamically binds a real Rapier world and RigidBody fits descendan
       h(
         Physics,
         {
-          rapier: RAPIER,
           interpolate: false,
           onReady: (value) => {
             world = value;
@@ -115,7 +114,7 @@ test('RigidBody retains translated, rotated and scaled parents while synchronizi
     tree(
       h(
         Physics,
-        { rapier: RAPIER, gravity: [0, 0, 0], interpolate: false },
+        { gravity: [0, 0, 0], interpolate: false },
         h(
           Mesh,
           { position: [10, 2, 0], rotation: [0, 0, Math.PI / 2], scale: [2, 2, 2] },
@@ -158,7 +157,6 @@ test('removing a RigidBody releases only its body; unmount disposes the optional
       h(
         Physics,
         {
-          rapier: RAPIER,
           onReady: (value) => {
             world = value;
           },
@@ -190,7 +188,7 @@ test('removing a RigidBody releases only its body; unmount disposes the optional
   assert.equal(engines.at(-1).hasPlugin('physics'), false);
 });
 
-test('Physics initializes the default optional Rapier peer and advances through demand invalidate', async () => {
+test('Physics loads the solver by itself and advances through demand invalidate', async () => {
   let context, world;
   function Probe() {
     context = useMargo();
@@ -229,7 +227,6 @@ test('Physics updates mutable world properties without recreating bodies', async
       h(
         Physics,
         {
-          rapier: RAPIER,
           paused,
           gravity,
           onReady: (value) => {
@@ -260,17 +257,11 @@ test('Physics updates mutable world properties without recreating bodies', async
 });
 
 test('pending Physics initialization cannot attach a world after its provider unmounts', async () => {
-  let resolve,
-    ready = 0;
-  const pending = new Promise((value) => {
-    resolve = value;
-  });
-  const view = render(tree(h(Physics, { rapier: pending, onReady: () => ready++ }, h(RigidBody, null, shape()))));
-  await flush();
+  let ready = 0;
+  const view = render(tree(h(Physics, { onReady: () => ready++ }, h(RigidBody, null, shape()))));
   const engine = engines.at(-1);
   view.unmount();
   await flush();
-  await act(async () => resolve(RAPIER));
   assert.equal(ready, 0);
   assert.equal(engine.hasPlugin('physics'), false);
 });
@@ -282,7 +273,6 @@ test('RigidBody transform prop changes reset the body at the requested world pos
       h(
         Physics,
         {
-          rapier: RAPIER,
           gravity: [0, 0, 0],
           onReady: (value) => {
             world = value;
@@ -314,10 +304,10 @@ test('RigidBody transform prop changes reset the body at the requested world pos
 
 test('Physics reports initialization errors through onError and Canvas without leaking a world', async () => {
   const failures = [];
-  render(tree(h(Physics, { rapier: {}, onError: (error) => failures.push(error) })));
+  render(tree(h(Physics, { fixedTimestep: -1, onError: (error) => failures.push(error) })));
   await flush();
   assert.equal(failures.length, 1);
-  assert.match(String(failures[0]), /initialized Rapier/);
+  assert.match(String(failures[0]), /fixedTimestep must be/);
   assert.equal(engines.at(-1).hasPlugin('physics'), false);
 });
 
@@ -327,7 +317,7 @@ test('automatic cuboid uses loader bounds for GPU-only model geometry under tran
     tree(
       h(
         Physics,
-        { rapier: RAPIER, gravity: [0, 0, 0] },
+        { gravity: [0, 0, 0] },
         h(
           Mesh,
           { position: [10, 2, 0], rotation: [0, 0, Math.PI / 2], scale: [2, 2, 2] },
@@ -360,7 +350,7 @@ test('hull falls back to bounds corners and unusable bounds report a handled dia
     tree(
       h(
         Physics,
-        { rapier: RAPIER },
+        null,
         h(RigidBody, { colliders: 'hull', onReady: (value) => (hull = value) }, h(BoundsModel)),
         h(RigidBody, { onReady: (value) => (broken = value) }, h(BoundsModel, { brokenBounds: true })),
       ),
@@ -384,7 +374,7 @@ test('exact trimesh from retained CPU geometry uses indexed triangles without re
     tree(
       h(
         Physics,
-        { rapier: RAPIER },
+        null,
         h(RigidBody, { type: 'fixed', colliders: 'trimesh', onReady: (value) => (exact = value) }, shape()),
         h(
           RigidBody,
@@ -412,7 +402,7 @@ test('missing CPU geometry reports the actionable automatic trimesh diagnostic o
     tree(
       h(
         Physics,
-        { rapier: RAPIER },
+        null,
         h(
           RigidBody,
           { colliders: 'trimesh', onReady: (value) => (body = value), onError: (error) => failures.push(error) },
@@ -442,7 +432,7 @@ test('explicit cuboid and ball children bypass automatic fitting and release onl
       tree(
         h(
           Physics,
-          { rapier: RAPIER, gravity: [0, 0, 0] },
+          { gravity: [0, 0, 0] },
           h(
             RigidBody,
             { colliders: 'trimesh', scale: [2, 2, 2], onReady: (value) => (body = value) },
@@ -472,7 +462,7 @@ test('explicit cuboid and ball children bypass automatic fitting and release onl
   assert.deepEqual(failures, []);
   assert.equal(view.queryByRole('alert'), null);
   const sphere = body.colliders[0];
-  view.rerender(tree(h(Physics, { rapier: RAPIER })));
+  view.rerender(tree(h(Physics, null)));
   await flush();
   assert.equal(body.valid, false);
   assert.equal(sphere.isValid(), false);
@@ -484,7 +474,7 @@ test('explicit collider is available before the visual model loads and colliders
     tree(
       h(
         Physics,
-        { rapier: RAPIER },
+        null,
         h(
           RigidBody,
           { colliders: false, onReady: (value) => (body = value) },
@@ -512,7 +502,7 @@ test('explicit collider transform prop updates replace only their collider after
       tree(
         h(
           Physics,
-          { rapier: RAPIER, gravity: [0, 0, 0] },
+          { gravity: [0, 0, 0] },
           h(
             RigidBody,
             { colliders: false, scale: [2, 2, 2], onReady: (value) => (body = value) },
@@ -579,7 +569,7 @@ test('late loader bounds fit after a StrictMode Suspense hide and reveal replace
     tree(
       h(
         Physics,
-        { rapier: RAPIER, gravity: [0, 0, 0] },
+        { gravity: [0, 0, 0] },
         h(
           Suspense,
           { fallback: h('span', null, 'model pending') },

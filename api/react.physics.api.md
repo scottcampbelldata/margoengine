@@ -59,7 +59,7 @@ export interface HeightfieldColliderProps extends ColliderBaseProps {
 
 export { JointOptions } from "@margoengine/physics";
 
-export function Physics({ children, rapier, onReady, onError, gravity, paused, timeScale, ...options }: PhysicsProps): import("react").JSX.Element;
+export function Physics({ children, onReady, onError, gravity, paused, timeScale, ...options }: PhysicsProps): import("react").JSX.Element;
 
 export { PhysicsBody } from "@margoengine/physics";
 
@@ -67,14 +67,11 @@ export { PhysicsJoint } from "@margoengine/physics";
 
 export { PhysicsOptions } from "@margoengine/physics";
 
-export interface PhysicsProps extends Omit<PhysicsOptions, 'rapier'> {
+export interface PhysicsProps extends PhysicsOptions {
     children?: ReactNode;
-    rapier?: RapierModule | PromiseLike<RapierModule>;
     onReady?: (physics: PhysicsWorld) => void;
     onError?: (error: unknown) => void;
 }
-
-export { RapierModule } from "@margoengine/physics";
 
 export function RigidBody({ children, position, rotation, scale, onClick, onPointerOver, onPointerOut, ...options }: RigidBodyProps): import("react").JSX.Element;
 

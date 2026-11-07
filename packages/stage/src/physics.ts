@@ -6,16 +6,13 @@ import type {
   Physics,
   PhysicsBody,
   PhysicsOptions,
-  RapierModule,
 } from '@margoengine/physics';
 import type { Stage } from './index.js';
 import { optionalPackage, stageSignal } from './feature.js';
 import { fault } from '../../shared/errors.js';
 
-/** Options for `addPhysics`: the `Physics` options, with `rapier` optional. */
-export interface AddPhysicsOptions extends Omit<PhysicsOptions, 'rapier'> {
-  /** An initialized Rapier module. Default `@dimforge/rapier3d-compat`, imported and initialized on the first call. */
-  rapier?: RapierModule;
+/** Options for `addPhysics`: the `Physics` options, and a signal for the load. */
+export interface AddPhysicsOptions extends PhysicsOptions {
   /** Cancels the load; the stage's disposal cancels it too. */
   signal?: AbortSignal;
 }
@@ -27,29 +24,19 @@ export interface AddBodyOptions extends BodyOptions {
 
 const worlds = new WeakMap<Stage, Promise<Physics>>();
 
-async function createWorld(stage: Stage, { rapier, ...options }: Omit<AddPhysicsOptions, 'signal'>): Promise<Physics> {
+async function createWorld(stage: Stage, options: PhysicsOptions): Promise<Physics> {
   const { Physics } = await optionalPackage(
     '@margoengine/physics',
     () => import('@margoengine/physics'),
     stage.signal,
   );
-  if (!rapier) {
-    const module = await optionalPackage(
-        '@dimforge/rapier3d-compat',
-        () => import('@dimforge/rapier3d-compat'),
-        stage.signal,
-      ),
-      api = module.default ?? module;
-    await api.init();
-    stage.signal.throwIfAborted();
-    rapier = api as unknown as RapierModule;
-  }
-  return Physics.attach(stage.engine, { ...options, rapier });
+  await Physics.load({ signal: stage.signal });
+  return Physics.attach(stage.engine, options);
 }
 
 /**
- * The stage's physics world, made on the first call: imports `@margoengine/physics` and Rapier, initializes Rapier and
- * attaches the world, which then steps with the frame loop. Later calls return the same world. Rejects with
+ * The stage's physics world, made on the first call: imports `@margoengine/physics`, runs `Physics.load()` and attaches
+ * the world, which then steps with the frame loop. Later calls return the same world. Rejects with
  * `Install <package>` when one is missing, with AbortError when `signal` aborts or the stage is disposed first, and with
  * `state` when options are passed once the world exists: change those on the world.
  * @example const physics = await addPhysics(stage, { gravity: [0, -3.7, 0] });

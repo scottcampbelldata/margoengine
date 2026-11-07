@@ -25,13 +25,12 @@ follow accepts a live mesh from the attached engine or a world-position tuple. M
 Scope the rig with `using` (it calls `dispose()` and returns the camera to your controls):
 
 ```ts
-import RAPIER from '@dimforge/rapier3d-compat';
 import {Cinematic} from 'margoengine/cinematic';
 import {Engine} from 'margoengine/core';
 import {Physics} from 'margoengine/physics';
 const engine = await Engine.create(document.querySelector('canvas')!);
-await RAPIER.init();
-const physics = Physics.attach(engine, {rapier: RAPIER});
+await Physics.load();
+const physics = Physics.attach(engine);
 {
   using rig = Cinematic.attach(engine, {offset: [0, 3, 6]});
   rig.follow([0, 1.6, 0]);

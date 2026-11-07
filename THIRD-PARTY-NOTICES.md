@@ -10,13 +10,13 @@ the allowed list, or a runtime dependency has an install script, a deprecation o
 
 ## Runtime npm dependencies of published packages (direct and transitive)
 
-90 of 101 packages have no third-party runtime dependency at all (internal `@margoengine/*` ranges only).
+91 of 101 packages have no third-party runtime dependency at all (internal `@margoengine/*` ranges only).
 Versions are the ones in `package-lock.json`; users get whatever their own lockfile resolves inside our ranges.
 
 | Package | Version (lock) | Licence | Kind | Used by | Why |
 | --- | --- | --- | --- | --- | --- |
 | `@dimforge/rapier2d-compat` | 0.21.0 | Apache-2.0 | optional peer | @margoengine/physics2d, margoengine | Rapier 2D rigid-body solver; optional, the app installs and initializes it |
-| `@dimforge/rapier3d-compat` | 0.21.0 | Apache-2.0 | optional peer | @margoengine/physics, @margoengine/react, @margoengine/stage, margoengine | Rapier rigid-body solver; optional, the app installs and initializes it |
+| `@dimforge/rapier3d-compat` | 0.21.0 | Apache-2.0 | optional peer | @margoengine/physics, margoengine | Rapier rigid-body solver; optional, the app installs and initializes it |
 | `react` | 19.3.0 | MIT | optional peer | @margoengine/react, @margoengine/ui, margoengine | React component bindings for the stage |
 | `react-dom` | 19.3.0 | MIT | optional peer | @margoengine/react, margoengine | React DOM root and portal rendering for scene and HTML components |
 | `scheduler` | 0.28.0 | MIT | transitive (via react-dom) | margoengine | React DOM scheduling dependency |
@@ -138,7 +138,7 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 | `@margoengine/procedural` | none | none | LICENSE, NOTICE |
 | `@margoengine/quality` | none | none | LICENSE, NOTICE |
 | `@margoengine/ragdoll` | none | none | LICENSE, NOTICE |
-| `@margoengine/react` | @dimforge/rapier3d-compat >=0.14.0 <1 (optional peer); react-dom ^18.0.0 \|\| ^19.0.0 (optional peer); react ^18.0.0 \|\| ^19.0.0 (optional peer) | none | LICENSE, NOTICE |
+| `@margoengine/react` | react-dom ^18.0.0 \|\| ^19.0.0 (optional peer); react ^18.0.0 \|\| ^19.0.0 (optional peer) | none | LICENSE, NOTICE |
 | `@margoengine/rigging` | none | none | LICENSE, NOTICE |
 | `@margoengine/road` | none | none | LICENSE, NOTICE |
 | `@margoengine/save` | none | none | LICENSE, NOTICE |
@@ -153,7 +153,7 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 | `@margoengine/splats` | none | none | LICENSE, NOTICE |
 | `@margoengine/splines` | none | none | LICENSE, NOTICE |
 | `@margoengine/sprites` | none | none | LICENSE, NOTICE |
-| `@margoengine/stage` | @dimforge/rapier3d-compat >=0.14.0 <1 (optional peer) | none | LICENSE, NOTICE |
+| `@margoengine/stage` | none | none | LICENSE, NOTICE |
 | `@margoengine/staging` | none | none | LICENSE, NOTICE |
 | `@margoengine/stats` | none | none | LICENSE, NOTICE |
 | `@margoengine/taa` | none | none | LICENSE, NOTICE |

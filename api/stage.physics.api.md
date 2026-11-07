@@ -4,14 +4,13 @@
 
 ```ts
 import { EngineKernel, EnginePlugin, Geometry, Mesh, PbrMaterial, Scene, Vec3 } from "@margoengine/core";
-import { BodyOptions, ColliderSettings, Physics, PhysicsBody, PhysicsOptions, RapierModule } from "@margoengine/physics";
+import { BodyOptions, ColliderSettings, Physics, PhysicsBody, PhysicsOptions } from "@margoengine/physics";
 
 export interface AddBodyOptions extends BodyOptions {
     collider?: ColliderSettings;
 }
 
-export interface AddPhysicsOptions extends Omit<PhysicsOptions, 'rapier'> {
-    rapier?: RapierModule;
+export interface AddPhysicsOptions extends PhysicsOptions {
     signal?: AbortSignal;
 }
 

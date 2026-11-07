@@ -352,7 +352,7 @@ test('600 steps with joints, contacts and a map are bit-for-bit repeatable', () 
 });
 
 test('errors name the fix; removed bodies and disposed worlds are refused', () => {
-  assert.throws(() => new Physics2D(null, {}), TypeError);
+  assert.throws(() => new Physics2D(null, { rapier: {} }), TypeError);
   assert.throws(() => world({ fixedTimestep: 0 }), RangeError);
   assert.throws(() => world({ pixelsPerMeter: -1 }), RangeError);
   assert.throws(() => world({ gravity: [0] }), TypeError);

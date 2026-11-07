@@ -107,7 +107,7 @@ export const LAZY_FILES = [
     label: '@margoengine/physics',
     kind: 'Chunk',
     measure: 'bundle',
-    external: core,
+    external: [...core, '@dimforge/rapier3d-compat'],
     when: '`addPhysics(stage)` or `addBody(stage, mesh)` (`margoengine/stage/physics`), first call',
   },
   {
@@ -324,7 +324,7 @@ export const LAZY_FILES = [
     kind: 'JS with inlined Wasm',
     measure: 'bundle',
     external: [],
-    when: 'Your import of the Rapier peer (no separate .wasm request: the Wasm is base64 in the module); compiled by `await RAPIER.init()` before `new Physics(engine, {rapier})`',
+    when: '`await Physics.load()`, once per app (no separate .wasm request: the Wasm is base64 in the module)',
   },
 ];
 

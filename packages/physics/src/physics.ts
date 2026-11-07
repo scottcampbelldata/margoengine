@@ -3,6 +3,7 @@ import { MargoError } from '@margoengine/math/errors';
 import type { Collider, EventQueue, PhysicsHooks, Ray, RigidBody, World } from './rapier-types.js';
 import type { EngineKernel, EnginePlugin, Mesh } from '@margoengine/core';
 import { meshRuntime, Mesh as CoreMesh } from '@margoengine/core/extension';
+import { LoadOnce } from '../../shared/load-once.js';
 import { meshTriangles, mergePrimitives } from '../../shared/mesh-source.js';
 import { PhysicsBody, type BodyOptions, type BodyOwner, type BodyType } from './body.js';
 import { CharacterController, type CharacterControllerOptions } from './character.js';
@@ -24,8 +25,8 @@ import type { ModelLike, ModelPrimitiveLike } from '../../shared/model.js';
 
 /** Options for creating a Physics world; every field has a default. */
 export interface PhysicsOptions {
-  /** The initialized `@dimforge/rapier3d-compat` module. */
-  rapier: RapierModule;
+  /** A Rapier module you initialized yourself. Default: the one `Physics.load()` loaded. */
+  rapier?: RapierModule;
   /** Default [0, -9.81, 0]. */
   gravity?: Vec3;
   /** Seconds per physics step (default 1/60). */
@@ -44,6 +45,12 @@ export interface PhysicsOptions {
   contactFilter?: (a: PhysicsBody, b: PhysicsBody) => boolean;
   /** Plugin name (default 'physics'). */
   name?: string;
+}
+
+/** Options of {@link Physics.load}. */
+export interface PhysicsLoadOptions {
+  /** Stops waiting for the load; the load itself carries on and a later call reuses it. */
+  signal?: AbortSignal;
 }
 
 /** Kind of collision event: `contactstart` and `contactend` for solid contacts, `intersectionstart` and `intersectionend` for sensors. */
@@ -153,6 +160,14 @@ function callListener(this: never, listener: (event: never) => void): void {
 }
 const identityRotation: Quat = [0, 0, 0, 1];
 
+// The solver `Physics.load` loaded, shared by every world of the app.
+const solver = new LoadOnce<RapierModule>(async () => {
+  const module = await import('@dimforge/rapier3d-compat'),
+    api = module.default ?? module;
+  await api.init();
+  return api as unknown as RapierModule;
+});
+
 /**
  * Rigid-body physics on Rapier as a Margo Engine engine plugin. Steps a fixed timestep with an accumulator and
  * writes interpolated poses through reused buffers and core's extension transform storage.
@@ -211,16 +226,26 @@ export class Physics implements EnginePlugin, BodyOwner {
     });
   };
 
+  /**
+   * Gets the solver ready, once per app: compiling it is asynchronous, so `new Physics(engine)` can stay synchronous.
+   * Later calls resolve at once, calls made during a load share it, and a failed load is tried again by the next call.
+   * @example await Physics.load();
+   * const physics = new Physics(engine);
+   * @throws AbortError (the signal's reason) when `signal` aborts first.
+   */
+  static async load({ signal }: PhysicsLoadOptions = {}): Promise<void> {
+    await solver.load(signal);
+  }
   /** Creates the Physics on `engine` (preferred over the constructor). */
-  static attach(engine: EngineKernel, options: PhysicsOptions): Physics {
+  static attach(engine: EngineKernel, options: PhysicsOptions = {}): Physics {
     return new Physics(engine, options);
   }
-  constructor(engine: EngineKernel | null, options: PhysicsOptions) {
-    const R = options?.rapier;
-    if (!R || typeof R.World !== 'function' || !R.ColliderDesc)
-      throw new TypeError(
-        'Pass the initialized Rapier module: new Physics(engine, {rapier: RAPIER}) after await RAPIER.init()',
-      );
+  /** @throws MargoError (`state`) before {@link Physics.load} has finished. */
+  constructor(engine: EngineKernel | null, options: PhysicsOptions = {}) {
+    const R = options.rapier ?? solver.value;
+    if (!R) throw new MargoError('state', 'Physics is not loaded; call await Physics.load() once before new Physics().');
+    if (typeof R.World !== 'function' || !R.ColliderDesc)
+      throw new TypeError('The rapier option needs the initialized module; leave it out and call await Physics.load().');
     this.rapier = R;
     this.name = options.name ?? 'physics';
     this.fixedTimestep = options.fixedTimestep ?? 1 / 60;

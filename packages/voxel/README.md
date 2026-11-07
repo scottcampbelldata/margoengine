@@ -411,7 +411,6 @@ Rapier colliders for the chunks near moving bodies, so mobs, item drops, debris 
 peer: only this entry uses it) with `@dimforge/rapier3d-compat` 0.17.1 or newer.
 
 ```ts
-import RAPIER from '@dimforge/rapier3d-compat';
 import { sphereGeometry } from 'margoengine/geometry';
 import { PbrMaterial, createMesh } from 'margoengine/materials';
 import { Physics } from 'margoengine/physics';
@@ -428,9 +427,9 @@ const z = 0;
 const engine = await Engine.create(document.querySelector('canvas')!);
 const mesh = engine.createMesh().setGeometry(box());
 
-await RAPIER.init();
+await Physics.load();
 const ball = createMesh(engine, sphereGeometry(0.5, 16, 8), new PbrMaterial()).root;
-const physics = Physics.attach(engine, { rapier: RAPIER });
+const physics = Physics.attach(engine);
 const voxels = new VoxelPhysics(physics, world, { radius: 1, budget: 2 });
 physics.addBody(mesh, { colliders: { shape: 'box' } }); // lands on the blocks
 physics.addBody(ball, { colliders: { shape: 'sphere' } }); // rolls on them (triangle meshes, see below)

@@ -23,7 +23,7 @@ Canvas on the server creates no GPU, physics world, pointer lock or XR session. 
 | `@margoengine/react/post` | `EffectComposer`, `Bloom`, `SSAO`, `GTAO`, `SSR`, `SSGI`, `MotionBlur`, `LensFlare`, `SMAA`, `FXAA`, `Glitch`, `Afterimage`, `DepthTexture`, `SceneTargets` | `@margoengine/post` |
 | `@margoengine/react/dof`, `/tonemap`, `/taa` | `DepthOfField`, `Tonemap`, `TAA` (inside an `EffectComposer`) | `@margoengine/dof`, `tonemap` or `taa`, and `@margoengine/post` |
 | `@margoengine/react/voxel` | `Voxels`, `useBlockTextures` | `@margoengine/voxel` |
-| `@margoengine/react/physics` | `Physics`, `RigidBody`, the collider components, `usePhysics`, `useJoint`, `useBeforePhysicsStep`, `useAfterPhysicsStep` | `@margoengine/physics`, `@dimforge/rapier3d-compat` |
+| `@margoengine/react/physics` | `Physics`, `RigidBody`, the collider components, `usePhysics`, `useJoint`, `useBeforePhysicsStep`, `useAfterPhysicsStep` | `@margoengine/physics` |
 | `@margoengine/react/xr` | `XR`, `Controller`, `useXR` | `@margoengine/xr` |
 
 These are Margo components and native plugins. There is no
@@ -213,8 +213,8 @@ import {Physics, RigidBody} from '@margoengine/react/physics';
 </Canvas>;
 ```
 
-`Physics` initializes Rapier lazily, or accepts an initialized module/promise in
-`rapier`. It forwards native world options, steps through the engine in always
+`Physics` runs `Physics.load()` from `@margoengine/physics` when it mounts.
+It forwards native world options, steps through the engine in always
 and demand modes, and exposes the world through `onReady` and `usePhysics()`
 (`null` during initialization). Gravity, paused state and time scale update in
 place. Unmount disposes the world and removes its plugin.
@@ -330,7 +330,7 @@ demand mode. Unmount detaches events and disposes the manager/session.
 Run `npm run build:packages`, `npm run modern:test:react`, `npm run typecheck`,
 `npm run test:modules:packages`, and `npm run measure:size` from the workspace.
 `npm run test:browser --workspace @margoengine/react` exercises the scene
-components with real WebGPU and Rapier.
+components with real WebGPU and real physics.
 `npm run test:after-scene:browser --workspace @margoengine/react` checks lit shape colors, transmission, animated picking and
 crossfades on WebGPU. Unit tests cover StrictMode, Suspense,
 optional imports, source ownership, parent transforms, post limits and mocked

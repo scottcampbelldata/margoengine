@@ -116,12 +116,10 @@ interface Track {
   mode: string;
 }
 
-/** Options of {@link applyGLTFPhysics}: pass `physics`, or `rapier` for a world made here. */
+/** Options of {@link applyGLTFPhysics}. */
 export interface GLTFPhysicsOptions {
-  /** The world to add to. Default: a new one on the model's engine, which needs `rapier`. */
+  /** The world to add to. Default: a new one on the model's engine, after `Physics.load()`. */
   physics?: Physics;
-  /** The initialized `@dimforge/rapier3d-compat` module, for a world made here. */
-  rapier?: RapierModule;
 }
 /** A trigger volume of the file: its node, and the body that carries it. */
 export interface GLTFTrigger {
@@ -439,23 +437,22 @@ const motionPointer = /^\/nodes\/(\d+)\/extensions\/KHR_physics_rigid_bodies\/mo
  *
  * @example
  * const model = await loadGLTF(engine, '/door.gltf');
- * const world = await applyGLTFPhysics(model, {rapier});
+ * const world = await applyGLTFPhysics(model);
  * world.onTrigger(({entered, nodeIndex}) => console.log(entered, nodeIndex));
- * @throws TypeError without `physics` or `rapier`, or for a file that breaks the extension's rules.
+ * @throws TypeError for a file that breaks the extension's rules.
  * @throws RangeError past 15 distinct collision filters.
  */
-export async function applyGLTFPhysics(model: PBRModel, options: GLTFPhysicsOptions): Promise<GLTFPhysics> {
-  if (!options?.physics && !options?.rapier)
-    throw new TypeError('applyGLTFPhysics needs a world or Rapier; pass {physics} or {rapier}');
+export async function applyGLTFPhysics(model: PBRModel, options: GLTFPhysicsOptions = {}): Promise<GLTFPhysics> {
   const { Physics: World, collisionGroups } = await import('@margoengine/physics').catch((error) => {
     throw margoError(
       'unsupported',
       `glTF physics needs @margoengine/physics (${error instanceof Error ? error.message : error}): install it to use @margoengine/gltf-pro/physics`,
     );
   });
+  if (!options.physics) await World.load();
   const engine = model['engine'],
     own = !options.physics,
-    physics = options.physics ?? World.attach(engine, { rapier: options.rapier! }),
+    physics = options.physics ?? World.attach(engine),
     doc = model.asset.doc as GLTFDocument & Record<string, any>,
     nodes = (doc.nodes ?? []) as NodeDoc[],
     root = ((doc.extensions as any)?.KHR_physics_rigid_bodies ?? {}) as { physicsMaterials?: Material[]; collisionFilters?: Filter[]; physicsJoints?: JointDef[] },

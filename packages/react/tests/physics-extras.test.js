@@ -36,7 +36,7 @@ test('every collider shape mounts on its body and takes the parent scale', async
     tree(
       h(
         Physics,
-        { rapier: RAPIER, gravity: [0, 0, 0] },
+        { gravity: [0, 0, 0] },
         h(
           RigidBody,
           { colliders: false, scale: [2, 3, 2], onReady: (value) => (body = value) },
@@ -83,7 +83,7 @@ test('RigidBody contact and intersection callbacks fire for their own body only 
     tree(
       h(
         Physics,
-        { rapier: RAPIER, interpolate: false },
+        { interpolate: false },
         h(
           RigidBody,
           {
@@ -134,7 +134,7 @@ test('a sensor collider reports intersection start and end to its body', async (
     tree(
       h(
         Physics,
-        { rapier: RAPIER, interpolate: false, gravity: [0, 0, 0] },
+        { interpolate: false, gravity: [0, 0, 0] },
         h(
           RigidBody,
           {
@@ -173,7 +173,7 @@ test('useJoint links two bodies, rebuilds on option changes and removes the join
       h(RigidBody, { position: [2, 0, 0], colliders: false, onReady: setB }, h(BallCollider, { args: [0.25] })),
     );
   }
-  const scene = (limit) => tree(h(Physics, { rapier: RAPIER, onReady: (value) => (world = value) }, h(Rig, { limit })));
+  const scene = (limit) => tree(h(Physics, { onReady: (value) => (world = value) }, h(Rig, { limit })));
   const view = render(scene(0.5));
   await flush();
   assert.ok(joints.length > 0);
@@ -199,7 +199,7 @@ test('useBeforePhysicsStep and useAfterPhysicsStep run once per fixed step and s
     useAfterPhysicsStep(() => log.push(`after ${tag}`));
     return null;
   }
-  const scene = (tag) => tree(h(Physics, { rapier: RAPIER }, h(Probe, { tag })));
+  const scene = (tag) => tree(h(Physics, null, h(Probe, { tag })));
   const view = render(scene('a'));
   await flush();
   await step(1);

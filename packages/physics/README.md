@@ -9,14 +9,13 @@ Build from source with `npm run build` in `packages/physics`.
 It exports `Physics` (the world: bodies, colliders, joints, queries and events), `PhysicsBody`, `PhysicsJoint`, `CharacterController`, `Vehicle` and `Rope`. The React components in `@margoengine/react/physics` are `<Physics>`, `<RigidBody>`, the collider components (`CuboidCollider`, `BallCollider` and others), `useJoint`, `usePhysics`, `useBeforePhysicsStep` and `useAfterPhysicsStep`. Rapier is not bundled: you install `@dimforge/rapier3d-compat` (Apache-2.0) yourself and pass the initialized module in.
 
 ```ts
-import RAPIER from '@dimforge/rapier3d-compat';
 import {Engine, PbrMaterial, box} from 'margoengine/core';
 import {Physics, collisionGroups} from 'margoengine/physics';
 
-await RAPIER.init();
+await Physics.load();
 const canvas = document.querySelector('canvas')!;
 const engine = await Engine.create(canvas);
-const physics = new Physics(engine, {rapier: RAPIER}); // registers itself with engine.use()
+const physics = new Physics(engine); // registers itself with engine.use()
 
 const floor = engine.createMesh().setGeometry(box(20, 1, 20)).setPosition([0, -0.5, 0]);
 physics.addBody(floor, {type: 'fixed'});                 // box collider fitted to the geometry
@@ -53,13 +52,12 @@ engine.start(); // each frame's delta drives the accumulator
 ## Ropes, vehicles and compound shapes
 
 ```ts
-import RAPIER from '@dimforge/rapier3d-compat';
 import {Engine, box} from 'margoengine/core';
 import {Physics, Rope, Vehicle} from 'margoengine/physics';
 
-await RAPIER.init();
+await Physics.load();
 const engine = await Engine.create(document.querySelector('canvas')!);
-const physics = new Physics(engine, {rapier: RAPIER});
+const physics = new Physics(engine);
 physics.addBody(null, {type: 'fixed', position: [0, -0.5, 0], colliders: {shape: 'box', halfExtents: [50, 0.5, 50]}});
 
 // A rope hung from a fixed hook, carrying a crate. rope.points() is the polyline for @margoengine/lines.
@@ -112,7 +110,7 @@ Static meshes loaded by `@margoengine/gltf-pro` or `@margoengine/fbx` support fi
 
 The root-level mesh requirement still applies. A skinned or morphed primitive rejects geometry-derived fitting with `Skinned mesh needs an explicit collider`; pass explicit dimensions or a capsule for animated characters. A root with no usable triangles throws `No geometry` and keeps no body. Use `colliders: []` for an intentionally colliderless body. Explicit collider dimensions, offsets and ownership keep their existing behavior.
 
-- **Optional peer dependency.** The package never imports Rapier; `new Physics(engine, {rapier})` takes the initialized module, so the 1.6 MB (gzip) Rapier bundle stays out of builds that do not use physics and you choose the Rapier version and loading strategy (`rapier3d-compat` inlines its Wasm, so it works in any bundler without asset configuration). Tested with `@dimforge/rapier3d-compat` 0.21.0.
+- **One load per app.** Install the solver beside this package: `npm i @margoengine/physics @dimforge/rapier3d-compat`. It is an optional peer until Margo's own solver replaces it. `await Physics.load()` imports and compiles the solver, then `new Physics(engine)` stays synchronous. Wasm compiles asynchronously on the main thread, so that wait cannot live in a constructor. Later calls resolve at once, calls during a load share it, a failed load is tried again by the next call, and `{signal}` stops one caller's wait. A world made before the load throws a `MargoError` with code `state`. The solver stays a dynamic import, so its 1.6 MB (gzip) stays out of the first load of a page. It is a peer dependency that npm installs with this package (`rapier3d-compat` inlines its Wasm, so it works in any bundler without asset configuration); tested with `@dimforge/rapier3d-compat` 0.21.0. The `rapier` option still takes a module you initialized yourself, for another Rapier version.
 - **Fixed timestep with an accumulator.** `onPreUpdate(delta)` adds `delta * timeScale` to an accumulator and runs whole steps of `fixedTimestep` (default 1/60 s), at most `maxSubsteps` (default 4) per frame. Time beyond that is dropped so a long hitch cannot snowball. Each step is identical regardless of frame rate, so a given sequence of inputs replays bit for bit.
 - **Interpolation.** After each step the plugin stores the previous and current pose of every non-fixed body. Meshes get `lerp(previous, current, alpha)` for position and a shortest-arc slerp for rotation, where `alpha = accumulator / fixedTimestep`. Rendering therefore lags physics by less than one step and moves smoothly at any refresh rate. `interpolate: false` writes the latest step instead. Teleports (`body.setPosition`) reset both poses, so they do not streak.
 - **Mesh writes.** `sync()` reuses preallocated position and quaternion buffers. It writes them with core's `setPosition` and `setQuaternion`, which allocate nothing. Sleeping or motionless bodies are written once and then skipped. Fixed bodies are written only when moved through the body API. Scale is never touched. Rapier stepping, events and scene queries are not allocation-free.
@@ -145,7 +143,7 @@ The root-level mesh requirement still applies. A skinned or morphed primitive re
 
 | Option | Default | Notes |
 | --- | --- | --- |
-| `rapier` | required | The module after `await RAPIER.init()` |
+| `rapier` | the one `Physics.load()` loaded | A Rapier module you initialized yourself; leave it out unless you need another version |
 | `gravity` | `[0, -9.81, 0]` | Also `physics.gravity = [...]` |
 | `fixedTimestep` | `1 / 60` | Seconds per step |
 | `maxSubsteps` | `4` | Steps per frame before the backlog is dropped |
@@ -166,9 +164,8 @@ A `'generic'` joint picks its six degrees of freedom, named `linX`, `linY`, `lin
 
 ```ts
 import {Physics} from 'margoengine/physics';
-import RAPIER from '@dimforge/rapier3d-compat';
-await RAPIER.init();
-const physics = new Physics(null, {rapier: RAPIER});
+await Physics.load();
+const physics = new Physics(null);
 const wall = physics.addBody(null, {type: 'fixed', colliders: []});
 const door = physics.addBody(null, {position: [1, 0, 0], colliders: {shape: 'box', halfExtents: [1, 1, 0.05]}});
 // A door hinge, opened by a spring toward 0.6 rad.

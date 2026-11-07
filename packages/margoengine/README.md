@@ -51,12 +51,12 @@ A namespace import tree-shakes like named imports in every modern bundler: only 
 
 ## Third-party libraries
 
-Three packages use a library you install yourself, only when you use that package. Everything else is in the one
+Two packages use a library you install yourself, only when you use that package. Everything else is in the one
 install.
 
 | Package | Install | Why |
 | --- | --- | --- |
-| `margoengine/physics` | `npm i @dimforge/rapier3d-compat` | You pass the initialized Rapier module to `new Physics(engine, {rapier})` |
+| `margoengine/physics` | `npm i @dimforge/rapier3d-compat` | The solver; `await Physics.load()` readies it once per app |
 | `margoengine/react` | `npm i react react-dom` | It is a React component library |
 
 `margoengine/react` holds every React binding but five groups, each its own entry: `margoengine/react/gltf-pro`

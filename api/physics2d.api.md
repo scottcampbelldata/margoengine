@@ -178,8 +178,9 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
     timeScale: number;
     paused: boolean;
     stepCount: number;
-    static attach(engine: EngineKernel, options: Physics2DOptions): Physics2D;
-    constructor(engine: EngineKernel | null, options: Physics2DOptions);
+    static load({ signal }?: Physics2DLoadOptions): Promise<void>;
+    static attach(engine: EngineKernel, options?: Physics2DOptions): Physics2D;
+    constructor(engine: EngineKernel | null, options?: Physics2DOptions);
     get world(): World2D;
     get isDisposed(): boolean;
     get gravity(): [number, number];
@@ -218,8 +219,12 @@ export interface Physics2DEventMap {
     afterstep: number;
 }
 
+export interface Physics2DLoadOptions {
+    signal?: AbortSignal;
+}
+
 export interface Physics2DOptions {
-    rapier: RapierModule2D;
+    rapier?: RapierModule2D;
     pixelsPerMeter?: number;
     gravity?: Vec2D;
     fixedTimestep?: number;

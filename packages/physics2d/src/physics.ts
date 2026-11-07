@@ -1,6 +1,7 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import { MargoError } from '@margoengine/math/errors';
 import type { EngineKernel, EnginePlugin } from '@margoengine/core';
+import { LoadOnce } from '../../shared/load-once.js';
 import { Body2D, type BodyOptions2D, type BodyOwner2D, type BodyType2D, type SpriteLike } from './body.js';
 import { CharacterController2D, type CharacterOptions2D } from './character.js';
 import { Joint2D, createJointData, type JointOptions2D } from './joint.js';
@@ -14,10 +15,16 @@ import type {
 import { createColliderDesc, type ColliderOptions2D, type ShapeOptions2D, type Vec2D } from './shapes.js';
 import { tileMapColliders, type TileMapBodyOptions, type TileMapSource } from './tilemap.js';
 
+/** Options of {@link Physics2D.load}. */
+export interface Physics2DLoadOptions {
+  /** Stops waiting for the load; the load itself carries on and a later call reuses it. */
+  signal?: AbortSignal;
+}
+
 /** Options for creating a Physics2D world; every field has a default. */
 export interface Physics2DOptions {
-  /** The initialized `@dimforge/rapier2d-compat` module. */
-  rapier: RapierModule2D;
+  /** A Rapier 2D module you initialized yourself. Default: the one `Physics2D.load()` loaded. */
+  rapier?: RapierModule2D;
   /**
    * World2D units per metre (default 32). Rapier works best with bodies between 0.1 and 10 metres, so a 16 pixel tile is
    * half a metre. Positions, sizes, velocities and gravity are in world units; mass, density, force and impulse stay in
@@ -102,6 +109,14 @@ function callListener(this: never, listener: (event: never) => void): void {
 }
 const TWO_PI = Math.PI * 2;
 
+// The solver `Physics2D.load` loaded, shared by every world of the app.
+const solver = new LoadOnce<RapierModule2D>(async () => {
+  const module = await import('@dimforge/rapier2d-compat'),
+    api = module.default ?? module;
+  await api.init();
+  return api as unknown as RapierModule2D;
+});
+
 /**
  * 2D rigid-body physics on Rapier as a Margo Engine plugin. Steps a fixed timestep with an accumulator and writes
  * interpolated poses to sprites. Y is down, like sprites; angles are radians, clockwise on screen.
@@ -134,16 +149,26 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
   private syncAlpha = 1;
   private stale = false;
 
+  /**
+   * Gets the solver ready, once per app: compiling it is asynchronous, so `new Physics2D(engine)` can stay synchronous.
+   * Later calls resolve at once, calls made during a load share it, and a failed load is tried again by the next call.
+   * @example await Physics2D.load();
+   * const physics = new Physics2D(engine);
+   * @throws AbortError (the signal's reason) when `signal` aborts first.
+   */
+  static async load({ signal }: Physics2DLoadOptions = {}): Promise<void> {
+    await solver.load(signal);
+  }
   /** Creates the Physics2D on `engine` (preferred over the constructor). */
-  static attach(engine: EngineKernel, options: Physics2DOptions): Physics2D {
+  static attach(engine: EngineKernel, options: Physics2DOptions = {}): Physics2D {
     return new Physics2D(engine, options);
   }
-  constructor(engine: EngineKernel | null, options: Physics2DOptions) {
-    const R = options?.rapier;
-    if (!R || typeof R.World !== 'function' || !R.ColliderDesc)
-      throw new TypeError(
-        'Pass the initialized Rapier 2D module: new Physics2D(engine, {rapier: RAPIER}) after await RAPIER.init()',
-      );
+  /** @throws MargoError (`state`) before {@link Physics2D.load} has finished. */
+  constructor(engine: EngineKernel | null, options: Physics2DOptions = {}) {
+    const R = options.rapier ?? solver.value;
+    if (!R) throw new MargoError('state', 'Physics2D is not loaded; call await Physics2D.load() once before new Physics2D().');
+    if (typeof R.World !== 'function' || !R.ColliderDesc)
+      throw new TypeError('The rapier option needs the initialized module; leave it out and call await Physics2D.load().');
     this.rapier = R;
     this.name = options.name ?? 'physics2d';
     const ppm = options.pixelsPerMeter ?? 32;

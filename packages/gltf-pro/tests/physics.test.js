@@ -12,7 +12,7 @@ import { applyGLTFPhysics, filterMasks, jointOptions, shapeCollider } from '../d
 
 const warn = console.warn;
 console.warn = () => {};
-await RAPIER.init();
+await Physics.load();
 console.warn = warn;
 
 const fixture = (name) => fileURLToPath(new URL(`./fixtures/physics/${name}`, import.meta.url));
@@ -34,7 +34,7 @@ const docModel = (doc) => {
   return { asset: new GLTFAsset(full, []), nodes: [] };
 };
 async function load(model, options = {}) {
-  const physics = new Physics(null, { rapier: RAPIER, ...options });
+  const physics = new Physics(null, options);
   const gltf = await applyGLTFPhysics(model, { physics });
   return { physics, gltf };
 }
@@ -60,8 +60,10 @@ test('a file that requires the extensions loads as data', () => {
   assert.doesNotThrow(() => new GLTFAsset(doc, []));
 });
 
-test('without a world or Rapier the entry says what to pass', async () => {
-  await assert.rejects(applyGLTFPhysics({}, {}), /pass \{physics\} or \{rapier\}/);
+test('without a world the entry loads the solver and makes one', async () => {
+  const gltf = await applyGLTFPhysics(docModel({}));
+  assert.equal(gltf.bodies.size, 0);
+  gltf.dispose();
 });
 
 test('the real JointPendulum swings with the period of a physical pendulum', async () => {
@@ -464,7 +466,7 @@ test('a broken file is refused with no bodies left behind', async () => {
     [physicsNode({ motion: {}, collider: colliderOn() }), physicsNode({ collider: colliderOn(7) })],
     [box([1, 1, 1])],
   );
-  const physics = new Physics(null, { rapier: RAPIER });
+  const physics = new Physics(null);
   await assert.rejects(applyGLTFPhysics(docModel(file), { physics }), /shape index/);
   assert.equal(physics.getBodies().length, 0);
   const missing = fileOf([physicsNode({ joint: { connectedNode: 5, joint: 0 } })], [], { physicsJoints: [{}] });

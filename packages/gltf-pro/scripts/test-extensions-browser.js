@@ -573,11 +573,9 @@ const checks = {
     const result = await page.evaluate(async () => {
       const { loadGLTF } = await import('/packages/gltf-pro/dist/index.js'),
         { applyGLTFPhysics } = await import('/packages/gltf-pro/dist/physics.js'),
-        { default: RAPIER } = await import('/node_modules/@dimforge/rapier3d-compat/dist/rapier.mjs'),
         { engine } = window.check;
-      await RAPIER.init();
       const model = await loadGLTF(engine, '/packages/gltf-pro/tests/fixtures/physics/JointPendulum.gltf'),
-        world = await applyGLTFPhysics(model, { rapier: RAPIER }),
+        world = await applyGLTFPhysics(model),
         node = model.nodes[1],
         start = node.matrix[12],
         arm = () => Math.hypot(node.matrix[12], node.matrix[13] - 3, node.matrix[14]),

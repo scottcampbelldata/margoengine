@@ -375,11 +375,9 @@ Limits are in [docs/limits.md](../../docs/limits.md): lights stay where their no
 import {createStage} from 'margoengine';
 import {loadGLTF} from 'margoengine/gltf-pro';
 import {applyGLTFPhysics} from 'margoengine/gltf-pro/physics';
-import RAPIER from '@dimforge/rapier3d-compat';
-await RAPIER.init();
 const stage = await createStage('#viewport', {backend: 'webgpu'});
 const model = await loadGLTF(stage.engine, '/door.gltf');
-const world = await applyGLTFPhysics(model, {rapier: RAPIER});
+const world = await applyGLTFPhysics(model);
 world.onTrigger(({entered, nodeIndex, motionNodeIndex}) => console.log(entered, nodeIndex, motionNodeIndex));
 console.log(world.bodies.size, world.joints.size, world.notes);
 // world.dispose() removes all of it.
@@ -387,8 +385,7 @@ console.log(world.bodies.size, world.joints.size, world.notes);
 
 | Option | Default | Meaning |
 | --- | --- | --- |
-| `physics` | one attached here | The `Physics` world to add to. |
-| `rapier` | none | The initialized Rapier module, for a world made here. Pass this or `physics`. |
+| `physics` | one attached here, after `Physics.load()` | The `Physics` world to add to. |
 
 Read against pull request 2424 (`KHR_physics_rigid_bodies`, status Draft) and pull request 2370 (`KHR_implicit_shapes`, status Release Candidate) on the Khronos glTF repository as of 2026-11-06. Both can still change.
 

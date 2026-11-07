@@ -94,7 +94,6 @@
     "@margoengine/staging": "^1.0.0",
     "@margoengine/tonemap": "^1.0.0",
     "@margoengine/physics": "^1.0.0",
-    "@dimforge/rapier3d-compat": ">=0.14.0 <1",
     "@margoengine/save": "^1.0.0",
     "@margoengine/animation": "^1.0.0",
     "@margoengine/clustered": "^1.0.0"
@@ -134,9 +133,6 @@
       "optional": true
     },
     "@margoengine/physics": {
-      "optional": true
-    },
-    "@dimforge/rapier3d-compat": {
       "optional": true
     },
     "@margoengine/save": {

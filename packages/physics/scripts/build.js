@@ -18,7 +18,7 @@ await build({
     emptyOutDir: true,
     target: 'es2022',
     lib: { entry: resolve(root, 'src/index.ts'), formats: ['es'], fileName: 'index' },
-    rollupOptions: { external: ['@margoengine/core', '@margoengine/core/extension'] },
+    rollupOptions: { external: ['@margoengine/core', '@margoengine/core/extension', '@dimforge/rapier3d-compat'] },
   },
 });
 execFileSync(

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Physics
+
+- `await Physics.load()` and `await Physics2D.load()` get the solver ready once per app, and `new Physics(engine)` then needs no options. The stage, React and `applyGLTFPhysics` load it by themselves, so their `rapier` options went, and the Rapier peer moved from `@margoengine/react` and `@margoengine/stage` to `@margoengine/physics` and `@margoengine/physics2d`, which keep it as an optional peer you install beside them. The `rapier` option of `Physics` still works.
+
 ### Frame counts
 
 - `engine.stats` now reads the frame last drawn. After `engine.render({ camera })` with another camera, `visible` and `drawCalls` used to read the engine camera's view and lose what packages drew, so an app passing its own camera every frame read counts for a view it never showed. A pick no longer changes either count.

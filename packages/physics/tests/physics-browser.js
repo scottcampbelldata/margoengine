@@ -1,4 +1,3 @@
-import RAPIER from '@dimforge/rapier3d-compat';
 import { Engine, PbrMaterial, box } from '@margoengine/core';
 import { engineRuntime, meshRuntime } from '@margoengine/core/extension';
 import { Physics } from '@margoengine/physics';
@@ -85,7 +84,7 @@ const project = (m, [x, y, z]) => {
 };
 
 window.runPhysicsTests = async () => {
-  await RAPIER.init();
+  await Physics.load();
   const canvas = document.querySelector('#view');
   const engine = await Engine.create(canvas, {
     backend: 'webgpu',
@@ -93,13 +92,13 @@ window.runPhysicsTests = async () => {
   });
   const runtime = engineRuntime(engine),
     device = runtime.gpu,
-    report = { checks: [], backend: engine.backend, rapier: RAPIER.version() };
+    report = { checks: [], backend: engine.backend };
   const errors = [];
   device.addEventListener('uncapturederror', (event) => errors.push(event.error.message));
   device.pushErrorScope('validation');
   const capture = new Capture();
   engine.use(capture);
-  const physics = new Physics(engine, { rapier: RAPIER });
+  const physics = new Physics(engine);
   assert(engine.hasPlugin('physics'), 'physics plugin attached');
 
   const floor = engine

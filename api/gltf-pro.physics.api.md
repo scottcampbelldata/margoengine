@@ -28,7 +28,6 @@ export interface GLTFPhysicsNote {
 
 export interface GLTFPhysicsOptions {
     physics?: Physics;
-    rapier?: RapierModule;
 }
 
 export interface GLTFTrigger {
@@ -44,7 +43,7 @@ export interface GLTFTriggerEvent {
     body: PhysicsBody;
 }
 
-export function applyGLTFPhysics(model: PBRModel, options: GLTFPhysicsOptions): Promise<GLTFPhysics>;
+export function applyGLTFPhysics(model: PBRModel, options?: GLTFPhysicsOptions): Promise<GLTFPhysics>;
 
 export function filterMasks(filters: readonly Filter[]): {
     memberships: number;
