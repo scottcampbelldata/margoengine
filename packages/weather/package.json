@@ -54,6 +54,10 @@
     "./audio": {
       "types": "./dist/audio.d.ts",
       "import": "./dist/audio.js"
+    },
+    "./data": {
+      "types": "./dist/data.d.ts",
+      "import": "./dist/data.js"
     }
   },
   "files": [

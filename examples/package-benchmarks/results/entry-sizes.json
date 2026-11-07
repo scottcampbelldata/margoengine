@@ -1,5 +1,5 @@
 {
-  "commit": "9245f8968",
+  "commit": "b4521dc97",
   "dirty": true,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -250,6 +250,10 @@
       "./anim": {
         "raw": 12291,
         "gzip": 4841
+      },
+      "./components": {
+        "raw": 37979,
+        "gzip": 14298
       }
     },
     "@margoengine/bvh": {
@@ -1814,8 +1818,8 @@
         "gzip": 6212
       },
       "./rooms": {
-        "raw": 15526,
-        "gzip": 5264
+        "raw": 17310,
+        "gzip": 5751
       },
       "./smoothing": {
         "raw": 4046,
@@ -2994,6 +2998,10 @@
       "./audio": {
         "raw": 3941,
         "gzip": 1652
+      },
+      "./data": {
+        "raw": 5499,
+        "gzip": 2532
       }
     },
     "@margoengine/webgl": {

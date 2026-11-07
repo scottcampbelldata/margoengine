@@ -300,6 +300,10 @@ const ASSETS = [
     'packages/sky/test/fixtures/bsc5/NOTICE.md',
     'test fixtures: the Yale Bright Star Catalogue, 5th Revised Ed. (Hoffleit D. and Warren Jr W.H., NSSDC/ADC 1991), CDS catalogue V/50 catalog.gz and ReadMe byte for byte from the CDS VizieR mirror https://vizier.cfa.harvard.edu/ftp/cats/V/50/ (catalog.gz 573,921 bytes, SHA-256 3dc44b1e90be8fbe5bcc7656032560f51275f985c7e3f783c9028e1838ec7bed; ReadMe 11,571 bytes, SHA-256 44fd9c73e2eecad0beb47bdfa3f01c60fd43f93d6964198e31fcd48732de5b33; downloaded 2026-11-07), cross-checked against NASA HEASARC table bsc5p (heasarc_bsc5p.tdat.gz, SHA-256 122628cde2d8bedf7e16ddf5f888167ac58c04b5592d6155408ce297f3073931, not kept); CDS terms: free to use with acknowledgement of the CDS and of the catalogue authors',
   ],
+  [
+    'packages/weather/tests/fixtures/metar/NOTICE.md',
+    'test fixtures: 798 METAR and SPECI reports of 50 aerodromes, the 12 hours before 2026-11-07 17:15 UTC, byte for byte from the NOAA Aviation Weather Center data service https://aviationweather.gov/api/data/metar (metar.txt 30,720 bytes, SHA-256 2ab25e4c497e3dec530ab26135ca3fe762ce0b0dae7f36f5db0bc69a5a6fdf79; metar2.txt 30,134 bytes, SHA-256 177e105cf7947f97ea84d344700b1956211f5683aee8da5a66c186b99e59c43d; downloaded 2026-11-07); a United States Government work, public domain in the United States; the observations of the issuing national weather services, exchanged under WMO Resolution 40',
+  ],
 ];
 
 /** Every published package: packages/* with a package.json, plus the two npm tools. */

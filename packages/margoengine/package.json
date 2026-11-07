@@ -2802,6 +2802,10 @@
       "types": "./dist/weather/audio.d.ts",
       "import": "./dist/weather/audio.js"
     },
+    "./weather/data": {
+      "types": "./dist/weather/data.d.ts",
+      "import": "./dist/weather/data.js"
+    },
     "./webgl": {
       "types": "./dist/webgl.d.ts",
       "import": "./dist/webgl.js"

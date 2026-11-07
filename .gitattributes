@@ -47,3 +47,4 @@ packages/sky/test/fixtures/bsc5/ReadMe -text
 
 # Real motion capture, byte for byte as tests/fixtures/cmu-mocap/NOTICE.md hashes it.
 tests/fixtures/cmu-mocap/*.bvh -text
+packages/weather/tests/fixtures/metar/*.txt -text

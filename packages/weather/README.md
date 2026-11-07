@@ -173,6 +173,38 @@ by up to a third, through a band-pass that rises from 250 Hz by 30 Hz per m/s; `
 fit the strike's length). `weatherAudioMix(state)` gives the levels alone and `weatherNoise(rate)` the generated samples.
 `new WeatherAudio(listener, options)` and `update()` work without an engine; `dispose()` stops everything.
 
+## Real weather: METAR reports
+
+`margoengine/weather/data` reads METAR and SPECI reports, the aerodrome weather observations that every airport
+publishes every half hour, and turns one into a weather state, so a visualisation or a flight simulator can show the
+weather that is really there. It follows the code form of WMO-No. 306 (FM 15 and FM 16) and ICAO Annex 3, and the
+United States variant (statute miles, inches of mercury, `CLR`, remarks).
+
+```ts
+import { WeatherMachine } from 'margoengine/weather';
+import { parseMetar, metarState } from 'margoengine/weather/data';
+
+const report = parseMetar('METAR EGLL 071150Z 24015G27KT 4000 -SHRA BKN014 SCT025CB 12/09 Q1003 NOSIG');
+console.log(report.wind, report.visibility, report.clouds, report.temperature, report.pressure);
+const weather = new WeatherMachine('clear');
+weather.transitionTo(metarState(report), { seconds: 60 }); // blend into what the airport reports
+```
+
+`parseMetar(text)` returns the station, day and UTC time, `auto` and `corrected`, the wind (the direction it blows
+from in degrees, speed and gusts in m/s, the variable sector), the visibility in metres (`10000` for 10 km or more,
+`CAVOK` included), present weather groups (intensity, descriptor, phenomena), cloud layers (cover and base in metres,
+CB or TCU), vertical visibility, temperature and dew point in degrees Celsius, pressure in hectopascals (from QNH or
+the altimeter setting), recent weather, the trend and the remarks as written. A group it does not know goes to
+`unknown` rather than throwing; a text with no station and time throws `SyntaxError`.
+
+`metarState(report, {north})` maps it: rain, snow and hail 0.3, 0.6 and 0.95 for light, moderate and heavy (drizzle,
+snow grains and small hail at half, ice pellets as half rain and half snow); lightning 0.6 for a thunderstorm, 0.9
+heavy, 0.3 in the vicinity; cloud the greatest layer's oktas over 8 (FEW 1.5, SCT 3.5, BKN 6, OVC 8, a full sky under
+vertical visibility); wind the mean, gust the gust's excess over the mean, and the direction it blows toward with north
+at -Z (`north` turns it for a world laid out otherwise); fog from the visibility by Koschmieder's law (extinction 3 /
+visibility, the 5 percent contrast that defines visibility), so `fogDensity` of the state gives that extinction back.
+`weatherFromMetar(text)` does both in one call.
+
 ## Driving the sky
 
 `skyWeather(state, wind?)` returns the sky `Weather` settings for a state: `Object.assign(weather.options, skyWeather(state))`. `hailSettings` does the same for `Hail`. `fogDensity(state)` gives an exponential-fog density per metre (0.0002 clear to 0.02 thick).
@@ -232,6 +264,8 @@ Stones are lit (`lit`, default true) as small ice balls by the engine's light (`
   stalls or forms by itself. They are authoring shapes, not a forecast model.
 - Weather audio is one rain and one wind loop heard everywhere at once (no louder rain on a roof, no wind direction)
   and a generated rumble per strike; give `buffers` for recorded sound.
+- METAR reading is one observation at a time: trends and remarks stay text, TAF forecasts are not read, and the
+  state keeps the greatest cloud cover, three precipitation intensities and fog from the visibility alone.
 - The presets and the climate chain are design choices, not weather data. Wind speed is a mean at one height with simple noise, not a boundary-layer model.
 - This package draws no clouds or fog of its own: `WeatherDrive` feeds `cloud` and `fog` to the sky's and the
   environment's.

@@ -2044,3 +2044,51 @@ Nothing is timed.
 - **Limits:** rows in `docs/limits.md`, Platform. voxel-net keeps its fixed `interpolationDelay` in seconds and its `SnapshotBuffer`; it could take an `AdaptiveDelay` the same way, and that was left out of this batch's scope.
 - **Slips:** main moved during each full check, so jobs 1 and 2 landed by the short rule after their full check passed on the parent. A test snippet in a shell quote ran the word `view` as a command and opened Vim; stopped, nothing changed. Job 1's README example ran only at job 2's landing, when the landing script gained check:readme-run; it passed.
 - **Gate:** lint, hygiene, verify, the net, netcode and voxel-net tests, check:readmes and check:readme-run.
+
+## Lane I batch 59: weather
+
+Seven jobs for `@margoengine/weather` on the Beelink (lane I, work list 3): five new optional entries, one option of
+the hail entry and a data reader. Core and stage are untouched; `packages/audio` is used through its public API only.
+GPU work is proved on a Radeon 680M through `packages/weather/tests/browser-check.mjs`, at 4x and 1x MSAA where the
+scene is drawn by core. Nothing is timed.
+
+| # | Job | Status | Commit | Entry | Claim |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Puddles and wet surfaces | DONE | `c74d4871` | `/puddles` (`Puddles`) | LIM-383 |
+| 2 | Snow accumulation with depth | DONE | `c4a75fc9` | `/snow` (`Snow`) | LIM-386 |
+| 3 | Spatial weather regions | DONE | `3e1e67c2` | `/regions` (`WeatherRegions`) | LIM-388 |
+| 4 | Hail lighting and splashes | DONE | `ad570c7e` | `lit` and `splashes` on `/hail` | LIM-390 |
+| 5 | Clouds and fog drawn from state | DONE | `01899b91` | `/drive` (`WeatherDrive`) | LIM-391 |
+| 6 | Weather audio cues | DONE | `91e24eda` | `/audio` (`WeatherAudio`) | LIM-394 |
+| 7 | Real weather data import | DONE | this commit | `/data` (`parseMetar`, `metarState`) | LIM-395 |
+
+Follow-up in the same batch: `34dd3b7a` makes the drive check wait for its pipelines instead of three frames.
+
+- **Built from:** puddles and snow are hooks into core's mesh shader before lighting (a copy of the fragment input,
+  shared `SurfaceHook` and `patchFragment` in `packages/weather/src/scene-patch.ts`, so the two chain), snow also
+  lifting the vertex by its thickness; wet surfaces as darker, smoother layers after Lagarde 2013; the hail's ice balls
+  by Lambert and Blinn 1977; fog from visibility by Koschmieder's law; METAR from WMO-No. 306 FM 15 and FM 16, ICAO
+  Annex 3 and FMH-1. Rows S48 to S54 in `docs/clean-room.md`.
+- **Proved:** puddles: dry untouched, soaked ground keeps 0.72 of its light, water on ground and not walls, rings only
+  on water, WGSL within 1.2e-5 of JavaScript. Snow: a plate's edge rises 10 rows under 0.5 m where the camera projects
+  it, ground white, walls bare. Regions: arrival at distance / speed, blends bounded by their slope. Hail: lit stones
+  9.5 times brighter toward the sun than away, flat ones unchanged, chips near the ground. Drive: the real Sky,
+  VolumetricClouds and Fog take its numbers, overcast covers the sky and fog the ground. Audio: an OfflineAudioContext
+  hears rain, a gale 5.5 times a breeze, a rumble that dies away. Data: 798 real METAR reports of 50 aerodromes (NOAA
+  Aviation Weather Center, recorded through scripts/supply-chain.mjs) read with no group left over.
+- **Sizes:** new `/puddles` 4,070 B gzip, `/snow` 3,300, `/regions` 2,504, `/drive` 1,714, `/audio` 1,908; `/hail`
+  4,278 to 5,489; the root entry unchanged at 5,230. `@margoengine/weather` now depends on `@margoengine/audio`.
+- **Bugs fixed with tests:** two surface hooks would have declared the shared noise twice (the hook adds it once,
+  `snow-check.html` draws snow and puddles together); the METAR reader dropped a minimum visibility without a
+  direction and a runway range without its R, and turned a world's north the wrong way (`data.test.js` on the real
+  reports and the north case).
+- **Limits:** one GPU; puddles and snow on core meshes only, with no cover from roofs; snow opens a slit on meshes
+  whose faces share no vertices; hail stones take no scene shadows; the audio is generated noise heard everywhere at
+  once; METAR trends, remarks and TAF are not decoded. Rows in docs/limits.md.
+- **Slips:** job 5's drive check waited a fixed three frames; verify on main caught it in tests/check-fixed-waits.test.js
+  and `34dd3b7a` fixed it before job 6 landed. Several landings stopped on rebase conflicts in the shared records and
+  were rebuilt on main inside the landing lock, renumbering their claims from the file. Job 6's first landing was
+  stopped for that fix; its script was killed and the landing lock it held was removed by this lane.
+- **Gate:** per job: rebase, build:packages, api:check, `npm run quality`, lint, hygiene, the weather tests, the
+  umbrella test, the weather GPU checks under the GPU lock, the claims, llms, lock-sync, sizes-page and fixed-waits
+  tests; `npm run verify` for job 6 (the lock file) and once on the newest main after the last push.
