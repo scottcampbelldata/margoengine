@@ -1,5 +1,6 @@
-import { LinearToSRGB as toSrgb } from '@margoengine/math/color';
 // Wavefront OBJ writer, plus an optional MTL file and textures.
+import { LinearToSRGB as toSrgb } from '@margoengine/math/color';
+import { MargoError } from '@margoengine/math/errors';
 import {
   collect,
   drawables,
@@ -65,6 +66,12 @@ export interface OBJResult {
   textures: Map<string, Uint8Array>;
   /** With `opacityMaps`: each opacity map's file name and the texture file whose alpha it holds. */
   opacityMaps: Map<string, string>;
+  /**
+   * Files the MTL names that a loaded model does not yet hold as PNG or JPEG: the bytes of a WebP, KTX2, DDS or AVIF
+   * image, or the URL of a file beside the model. Decoding and fetching take time, so `await writeTextures(result)`
+   * moves each into `textures`.
+   */
+  undecoded: Map<string, Uint8Array | URL>;
 }
 
 const linear = (v: number): number => v;
@@ -222,16 +229,52 @@ export function exportOBJ(source: ExportSource, options: OBJOptions = {}): OBJRe
     mtl: withMaterials ? mtl.join('\n') : null,
     textures: files.files,
     opacityMaps: opacity,
+    undecoded: files.held,
   };
 }
 
 /**
+ * Fetches and decodes the images an `exportOBJ` result lists in `undecoded` and adds each to `result.textures` under
+ * the name the MTL gives it, so a model exports whatever its textures are held in. Does nothing when `undecoded` is empty.
+ *
+ * @example
+ * import {exportOBJ, writeTextures} from 'margoengine/exporters';
+ * declare const engine: Parameters<typeof exportOBJ>[0];
+ * const result = exportOBJ(engine, {materials: true, textures: true});
+ * await writeTextures(result);
+ *
+ * @throws MargoError `failed` when a file beside the model cannot be fetched; what `decodeImage` from
+ * `@margoengine/decoders/image` throws for a damaged image or one it cannot read.
+ */
+export async function writeTextures(result: OBJResult, options: { signal?: AbortSignal } = {}): Promise<void> {
+  if (!result.undecoded.size) return;
+  const { decodeImage, imageFormat } = await import('@margoengine/decoders/image');
+  const { encodePNG } = await import('./capture.js');
+  for (const [file, held] of result.undecoded) {
+    let bytes: Uint8Array;
+    if (held instanceof URL) {
+      const response = await fetch(held, { signal: options.signal });
+      if (!response.ok)
+        throw new MargoError('failed', `Could not fetch ${held.href} (${response.status}); keep the image beside the model`);
+      bytes = new Uint8Array(await response.arrayBuffer());
+    } else bytes = held;
+    const format = imageFormat(bytes);
+    result.textures.set(
+      file,
+      format === 'png' || format === 'jpeg' ? bytes : await encodePNG(await decodeImage(bytes, options)),
+    );
+    result.undecoded.delete(file);
+  }
+}
+
+/**
  * Encodes the opacity maps an `exportOBJ` result with `opacityMaps` names: each texture's alpha in every color
- * channel, fully opaque, as PNG, added to `result.textures`.
+ * channel, fully opaque, as PNG, added to `result.textures`. Runs {@link writeTextures} first, as a map may read one.
  * @throws TypeError when such a texture is not PNG (JPEG has no alpha); what decodePNG and encodePNG throw.
  */
 export async function writeOpacityMaps(result: OBJResult): Promise<void> {
   if (!result.opacityMaps.size) return;
+  await writeTextures(result);
   const { decodePNG } = await import('@margoengine/decoders/png');
   const { encodePNG } = await import('./capture.js');
   for (const [map, file] of result.opacityMaps) {

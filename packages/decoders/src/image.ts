@@ -214,7 +214,7 @@ function nodeBasis(): ReturnType<typeof import('./codec.js').startBasis> {
  * @throws MargoError `failed` when the bytes are not a known image, or are damaged.
  */
 export async function decodeImage(bytes: Uint8Array, options: DecodeImageOptions = {}): Promise<DecodedImage> {
-  if (!(bytes instanceof Uint8Array)) throw new TypeError('decodeImage takes a Uint8Array of an image file');
+  if (!(bytes instanceof Uint8Array)) throw new TypeError("bytes must be a Uint8Array; pass the image file's bytes");
   const format = imageFormat(bytes);
   switch (format) {
     case 'png':

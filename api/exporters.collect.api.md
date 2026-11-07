@@ -163,6 +163,7 @@ export function polygons(faceSizes: Uint8Array | undefined, indices: Uint32Array
 
 export function textureFiles(prefix: unknown): {
     files: Map<string, Uint8Array>;
+    held: Map<string, Uint8Array | URL>;
     name(texture: TextureData): string;
 };
 

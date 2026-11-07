@@ -9,6 +9,8 @@ export interface PBRSource {
   readonly primitives: readonly PBRSourcePrimitive[];
   readonly asset: {
     readonly doc: GLTFDocument;
+    /** Where the file came from, so its relative image URIs can be fetched. */
+    readonly baseURL?: string;
     accessor(index: unknown, type?: string): Float32Array;
     view(index: unknown): Uint8Array;
   };

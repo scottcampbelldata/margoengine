@@ -8,6 +8,8 @@ import { encodePNG } from '@margoengine/exporters/capture';
 import { compressTextures, encodeKTX2 } from '@margoengine/exporters/ktx2';
 import { transcodeKTX2 } from '../../decoders/dist/codec.js';
 import { basis } from '../../decoders/tests/support/ktx2.js';
+import { parseWebP } from '../../decoders/dist/webp.js';
+import { dds } from '../../decoders/tests/support/texture-encoders.js';
 import { validate } from './helpers.js';
 
 const transcoder = await basis(),
@@ -303,10 +305,10 @@ test('compressTextures reads a data URI and adds the BIN chunk it needs', async 
 
 test('compressTextures leaves what it cannot compress, says why, and returns the input when nothing changed', async () => {
   const png = await encodePNG(quadrants(16, FOUR)),
-    webp = new TextEncoder().encode('RIFF....WEBPVP8L'),
+    unknown = new TextEncoder().encode('RIFF....WAVEfmt '),
     glb = handmade(
-      [{ uri: 'wood.png' }, { bytes: webp, mimeType: 'image/webp' }, { bytes: png, mimeType: 'image/png' }],
-      [{ source: 0 }, { source: 1 }, { source: 2 }, { extensions: { EXT_texture_webp: { source: 1 } } }],
+      [{ uri: 'wood.png' }, { bytes: unknown, mimeType: 'image/bmp' }, { bytes: png, mimeType: 'image/png' }],
+      [{ source: 0 }, { source: 1 }, { source: 2 }, { extensions: { EXT_texture_other: { source: 1 } } }],
       {
         pbrMetallicRoughness: { baseColorTexture: { index: 0 }, metallicRoughnessTexture: { index: 1 } },
         emissiveTexture: { index: 3 },
@@ -321,6 +323,71 @@ test('compressTextures leaves what it cannot compress, says why, and returns the
     { texture: 2, reason: 'not-on-a-material' },
     { texture: 3, reason: 'other-image-extension' },
   ]);
+});
+
+const webpFixture = () => file('../../decoders/tests/fixtures/webp/lossless.webp'),
+  ddsFixture = () => dds({ width: 16, height: 16, fourCC: 'DXT1', data: new Uint8Array(128) }),
+  colorOf = (extensions, images) =>
+    handmade(images, [extensions], { pbrMetallicRoughness: { baseColorTexture: { index: 0 } } });
+
+test('compressTextures decodes a texture held in WebP and drops the extension', async () => {
+  const source = webpFixture(),
+    expected = parseWebP(source),
+    glb = colorOf({ extensions: { EXT_texture_webp: { source: 0 } } }, [{ bytes: source, mimeType: 'image/webp' }]),
+    parts0 = splitGLB(glb);
+  parts0.json.extensionsUsed = ['EXT_texture_webp'];
+  parts0.json.extensionsRequired = ['EXT_texture_webp'];
+  const result = await compressTextures(joinGLB(parts0), { color: 'uastc' }),
+    parts = splitGLB(result.glb),
+    decoded = pixels(ktx2Of(parts, 0)).mipmaps[0];
+  assert.equal(result.compressed, 1);
+  assert.deepEqual(result.skipped, []);
+  assert.equal(parts.json.images.length, 1);
+  assert.equal(parts.json.images[0].mimeType, 'image/ktx2');
+  assert.deepEqual(parts.json.extensionsUsed, ['KHR_texture_basisu']);
+  assert.deepEqual(parts.json.extensionsRequired, ['KHR_texture_basisu']);
+  assert.equal(parts.json.textures[0].extensions.EXT_texture_webp, undefined);
+  // The encoder grows 97 x 83 to multiples of 4; compare the mean of the picture that was there.
+  assert.deepEqual([decoded.width, decoded.height], [100, 84]);
+  let sum = 0,
+    want = 0;
+  for (let y = 0; y < expected.height; y++)
+    for (let x = 0; x < expected.width; x++) {
+      sum += decoded.data[(y * decoded.width + x) * 4];
+      want += expected.data[(y * expected.width + x) * 4];
+    }
+  assert.ok(Math.abs(sum - want) / (expected.width * expected.height) < 2);
+});
+
+test('compressTextures decodes a texture held in DDS', async () => {
+  const glb = colorOf({ extensions: { MSFT_texture_dds: { source: 0 } } }, [
+      { bytes: ddsFixture(), mimeType: 'image/vnd-ms.dds' },
+    ]),
+    result = await compressTextures(glb),
+    parts = splitGLB(result.glb);
+  assert.equal(result.compressed, 1);
+  assert.equal(header(ktx2Of(parts, 0)).width, 16);
+});
+
+test('compressTextures takes a plain fallback before the image an extension holds', async () => {
+  const png = await encodePNG(quadrants(16, FOUR)),
+    glb = colorOf({ source: 0, extensions: { EXT_texture_webp: { source: 1 } } }, [
+      { bytes: png, mimeType: 'image/png' },
+      { bytes: webpFixture(), mimeType: 'image/webp' },
+    ]),
+    result = await compressTextures(glb),
+    parts = splitGLB(result.glb);
+  assert.equal(result.compressed, 1);
+  assert.equal(parts.json.images.length, 1, 'the WebP left too');
+  assert.equal(header(ktx2Of(parts, 0)).width, 16);
+});
+
+test('compressTextures skips a texture held in AVIF, which has no decoder here', async () => {
+  const avif = new TextEncoder().encode('   ftypavif'),
+    glb = colorOf({ extensions: { EXT_texture_avif: { source: 0 } } }, [{ bytes: avif, mimeType: 'image/avif' }]),
+    result = await compressTextures(glb);
+  assert.equal(result.compressed, 0);
+  assert.deepEqual(result.skipped, [{ texture: 0, reason: 'not-png-or-jpeg' }]);
 });
 
 test('compressTextures on its own output has nothing to do', async () => {

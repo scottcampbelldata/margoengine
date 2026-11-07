@@ -242,6 +242,22 @@ The MTL writes `Kd`, `Ks`/`Ns` (Phong), `Ke`, `Pr`/`Pm`, `d` (1 for opaque mater
 `exportOBJ` names those files in `opacityMaps`; `await writeOpacityMaps(result)` encodes each from its PNG's alpha
 into `result.textures`.
 
+A loaded model's base colour may be held in WebP, KTX2 (Basis Universal) or DDS, or sit in a file beside a `.gltf`. Decoding and fetching take time and `exportOBJ` is synchronous, so the MTL names a `.png` for each and the file waits in `undecoded`. `await writeTextures(result)` fetches and decodes them into `textures`. A PNG or JPEG fallback in the model is taken first and needs neither. AVIF has no decoder yet, so `writeTextures` throws on it. `writeOpacityMaps` runs `writeTextures` first.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {loadGLTF} from 'margoengine/gltf-pro';
+import {exportOBJ, writeTextures} from 'margoengine/exporters';
+const engine = await Engine.create(document.querySelector('canvas')!);
+
+await loadGLTF(engine, '/models/watch-webp.gltf');
+const result = exportOBJ(engine, {materials: true, textures: true});
+await writeTextures(result);
+for (const [name, bytes] of result.textures) console.log(name, bytes.length);
+```
+
+In Node, load a KTX2 model with `nodeKTX2` from `margoengine/decoders/image`.
+
 ## COLLADA (.dae)
 
 `exportDAE(engineOrDataScene, options)` from `@margoengine/exporters/dae` (or the package root) returns
@@ -763,7 +779,9 @@ console.log(`${file.length} bytes of .ktx2`);
 
 ETC1S is the smallest and the most lossy; UASTC keeps more detail in more bytes. On the GPU a texture takes a byte a pixel from UASTC and half that from opaque ETC1S, where a PNG or JPEG takes four. On the wire the result depends on the source: PNG models here came to as little as 57% of their size, while a model of heavily compressed JPEGs can double. `data: 'etc1s'` and `uastcRDO` trade quality for bytes; `uastcRDO: 1` took Lantern from 57% to 46%, in over twice the time. A material decides each texture's role, so colour is marked sRGB and everything else linear; a texture read in two roles is split in two. Each texture gets a full mip chain and grows to the next multiples of 4, which the extension requires. The PNG and JPEG images leave the file and `KHR_texture_basisu` becomes required, so a reader without it cannot show them.
 
-`skipped` names each texture left as it was: one no material reads, one already in KTX2, one held by WebP, AVIF or DDS, an image in an outside file, an image that is neither PNG nor JPEG. A file with nothing to compress comes back as the same bytes. Images keep their stored samples: EXIF orientation and colour profiles are ignored, as glTF says, and 16-bit PNG samples keep their high byte.
+Textures held in WebP or DDS (`EXT_texture_webp`, `MSFT_texture_dds`) are decoded first and their extension leaves the file; a PNG or JPEG fallback beside one is used instead of decoding it.
+
+`skipped` names each texture left as it was: one no material reads, one already in KTX2, one held in another image extension, an image in an outside file, an image with no decoder here, AVIF among them. A file with nothing to compress comes back as the same bytes. Images keep their stored samples: EXIF orientation and colour profiles are ignored, as glTF says, and 16-bit PNG samples keep their high byte.
 
 ### Meshopt (`@margoengine/exporters/meshopt`)
 

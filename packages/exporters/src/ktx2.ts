@@ -209,6 +209,9 @@ const isPNGOrJPEG = (bytes: Uint8Array): boolean =>
   (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) ||
   (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff);
 
+/** The glTF extensions whose images this reads: a decoder turns them into pixels, and the KTX2 image takes their place. */
+const HELD_IN = ['EXT_texture_webp', 'EXT_texture_avif', 'MSFT_texture_dds'];
+
 /** Drops images no texture reads any more and renumbers the rest. */
 function dropUnusedImages(json: JSONObject): void {
   const sources = (texture: JSONObject): JSONObject[] => [
@@ -234,7 +237,8 @@ function dropUnusedImages(json: JSONObject): void {
 /**
  * Stores the textures of a GLB as KTX2 images (`KHR_texture_basisu`): colour as ETC1S, normal maps and data as UASTC, each
  * with a full mip chain. The role of a texture comes from the material fields that read it; a texture read in two roles
- * is split in two. The source PNG and JPEG images leave the file, so the extension becomes required.
+ * is split in two. Images held in WebP or DDS (`EXT_texture_webp`, `MSFT_texture_dds`) are decoded first. The source images
+ * leave the file, so the extension becomes required.
  *
  * @example
  * ```ts
@@ -271,6 +275,21 @@ export async function compressTextures(
       roles.set(role, [...(roles.get(role) ?? []), info]);
     });
 
+  // Pixels of each decoded image, once, however many textures read it.
+  const pixelsOf = new Map<number, Promise<RGBAImage>>(),
+    decoded = (image: number, bytes: Uint8Array, signal?: AbortSignal): Promise<RGBAImage> => {
+      let pixels = pixelsOf.get(image);
+      if (!pixels) {
+        pixels = import('@margoengine/decoders/image').then(({ decodeImage }) => decodeImage(bytes, { signal }));
+        pixelsOf.set(image, pixels);
+      }
+      return pixels;
+    },
+    canDecode = async (bytes: Uint8Array): Promise<boolean> => {
+      const format = (await import('@margoengine/decoders/image')).imageFormat(bytes);
+      return format === 'webp' || format === 'dds';
+    };
+
   // One job for each image in each role, however many textures read it.
   const jobs = new Map<string, { job: BasisJob; name?: string; textures: JSONObject[] }>(),
     textures: JSONObject[] = json.textures ?? [];
@@ -283,18 +302,28 @@ export async function compressTextures(
       skip = (reason: KTX2SkippedTexture['reason']): void => void skipped.push({ texture: index, reason });
     if (extensions.includes(EXTENSION)) skip('already-compressed');
     else if (!roles) skip('not-on-a-material');
-    else if (texture.source === undefined || extensions.some((name) => /^(EXT|MSFT)_texture_/.test(name)))
+    else if (extensions.some((name) => /^(EXT|MSFT)_texture_/.test(name) && !HELD_IN.includes(name)))
+      skip('other-image-extension');
+    else if (texture.source === undefined && !extensions.some((name) => HELD_IN.includes(name)))
       skip('other-image-extension');
     else {
-      const image = json.images?.[texture.source];
-      if (!image)
-        throw new RangeError(
-          `glTF texture ${index} reads image ${texture.source}, which does not exist; repair the GLB`,
-        );
-      const bytes = imageBytes(json, parts.bin, image);
+      // A plain PNG or JPEG fallback needs no decoding, so it goes first.
+      const held = [texture.source, ...HELD_IN.map((name) => texture.extensions?.[name]?.source)].filter(
+          (source) => source !== undefined,
+        ),
+        images = held.map((source) => {
+          const image = json.images?.[source];
+          if (!image)
+            throw new RangeError(`glTF texture ${index} reads image ${source}, which does not exist; repair the GLB`);
+          return { source, image, bytes: imageBytes(json, parts.bin, image) };
+        }),
+        stored = images.filter(({ bytes }) => bytes),
+        { source: imageIndex, image, bytes } = stored.find(({ bytes }) => isPNGOrJPEG(bytes!)) ?? stored[0] ?? images[0];
+      const readable = bytes && (isPNGOrJPEG(bytes) || (await canDecode(bytes)));
       if (!bytes) skip('external-image');
-      else if (!isPNGOrJPEG(bytes)) skip('not-png-or-jpeg');
+      else if (!readable) skip('not-png-or-jpeg');
       else {
+        const pixels = isPNGOrJPEG(bytes) ? bytes.slice() : await decoded(imageIndex, bytes, options.signal);
         let first = true;
         for (const [role, infos] of roles) {
           // The first role keeps this texture; each other role gets a copy, which comes after every original.
@@ -305,7 +334,7 @@ export async function compressTextures(
             for (const info of infos) info.index = textures.length - 1;
           }
           first = false;
-          const key = `${texture.source} ${role}`,
+          const key = `${imageIndex} ${role}`,
             planned = jobs.get(key);
           if (planned) planned.textures.push(target);
           else
@@ -313,7 +342,7 @@ export async function compressTextures(
               name: image.name,
               textures: [target],
               job: {
-                source: bytes.slice(),
+                source: pixels,
                 mode: formats[role],
                 srgb: role === 'color',
                 normalMap: role === 'normal',
@@ -347,10 +376,17 @@ export async function compressTextures(
     json.images.push({ ...(name === undefined ? {} : { name }), bufferView, mimeType: 'image/ktx2' });
     for (const texture of readers) {
       delete texture.source;
+      for (const held of HELD_IN) delete texture.extensions?.[held];
       texture.extensions = { ...texture.extensions, [EXTENSION]: { source } };
     }
   });
   dropUnusedImages(json);
+  for (const held of HELD_IN)
+    if (!textures.some((texture) => texture.extensions?.[held])) {
+      json.extensionsUsed = json.extensionsUsed?.filter((name: string) => name !== held);
+      json.extensionsRequired = json.extensionsRequired?.filter((name: string) => name !== held);
+    }
+  if (!json.extensionsRequired?.length) delete json.extensionsRequired;
   useExtension(json, EXTENSION, true);
   return { glb: joinGLB(packGLB(parts, views)), compressed, skipped };
 }

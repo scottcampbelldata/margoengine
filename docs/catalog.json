@@ -462,7 +462,8 @@
       "readAccessor",
       "sampleFrames",
       "splitGLB",
-      "writeOpacityMaps"
+      "writeOpacityMaps",
+      "writeTextures"
     ],
     "category": "Loading and formats"
   },

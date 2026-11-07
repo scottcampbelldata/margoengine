@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 9129567,
+  "total": 9892470,
   "history": [
     {
       "date": "2026-10-24",
@@ -2930,6 +2930,12 @@
       "commit": "f4c813be6",
       "reason": "oit/depth entry, gltf-pro drawTransparent",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "e885db8a7",
+      "reason": "WebP, BC and image decoder entries, and exportOBJ and compressTextures reading them",
+      "grew": 7
     }
   ],
   "items": {
@@ -3096,7 +3102,7 @@
     "@margoengine/exporters/apng": 2322,
     "@margoengine/exporters/atlas": 2403,
     "@margoengine/exporters/capture": 7241,
-    "@margoengine/exporters/collect": 9358,
+    "@margoengine/exporters/collect": 9643,
     "@margoengine/exporters/dae": 12101,
     "@margoengine/exporters/draco": 185946,
     "@margoengine/exporters/godot": 10258,
@@ -3118,7 +3124,7 @@
     "@margoengine/exporters/roblox-runtime-restore": 6130,
     "@margoengine/exporters/roblox-uv": 3602,
     "@margoengine/exporters/skin": 2459,
-    "@margoengine/exporters/threemf": 15654,
+    "@margoengine/exporters/threemf": 16202,
     "@margoengine/exporters/unity": 41842,
     "@margoengine/exporters/unity-2d": 7318,
     "@margoengine/exporters/unity-pixel-art": 931,
@@ -3444,7 +3450,7 @@
     "@margoengine/sky/reflection": 1325,
     "@margoengine/sky/sun": 2379,
     "@margoengine/sky/weather": 5843,
-    "@margoengine/splats": 24851,
+    "@margoengine/splats": 25646,
     "@margoengine/splats/data": 17665,
     "@margoengine/splines": 1853,
     "@margoengine/splines/closest": 983,
@@ -3618,6 +3624,10 @@
     "margoengine": 308,
     "margoengine/game": 1030,
     "margoengine/viz": 800,
-    "margoengine/web": 599
+    "margoengine/web": 599,
+    "@margoengine/decoders/bc": 3890,
+    "@margoengine/decoders/image": 786471,
+    "@margoengine/decoders/webp": 11720,
+    "@margoengine/decoders/webp-lossless": 3366
   }
 }

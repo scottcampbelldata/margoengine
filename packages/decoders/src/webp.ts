@@ -162,7 +162,7 @@ function readFrame(
  * @throws MargoError `failed` when the bytes are not a complete, valid WebP file.
  */
 export function parseWebP(bytes: Uint8Array, options: WebPOptions = {}): DecodedWebP {
-  if (!(bytes instanceof Uint8Array)) throw new TypeError('parseWebP takes a Uint8Array of a WebP file');
+  if (!(bytes instanceof Uint8Array)) throw new TypeError("bytes must be a Uint8Array; pass the WebP file's bytes");
   const maxPixels = options.maxPixels ?? 2 ** 26;
   if (bytes.length < 20 || tag(bytes, 0) !== 'RIFF' || tag(bytes, 8) !== 'WEBP') throw corrupt('header is missing');
   const end = Math.min(bytes.length, 8 + u32(bytes, 4));

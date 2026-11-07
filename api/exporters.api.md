@@ -307,6 +307,7 @@ export interface OBJResult {
     mtl: string | null;
     textures: Map<string, Uint8Array>;
     opacityMaps: Map<string, string>;
+    undecoded: Map<string, Uint8Array | URL>;
 }
 
 export interface PLYOptions extends SceneOptions {
@@ -424,6 +425,10 @@ export function sampleFrames(first: number, last: number, fps: number, maxFrames
 export function splitGLB(bytes: Uint8Array, options?: SplitGLBOptions): GLBParts;
 
 export function writeOpacityMaps(result: OBJResult): Promise<void>;
+
+export function writeTextures(result: OBJResult, options?: {
+    signal?: AbortSignal;
+}): Promise<void>;
 
 // Not exported from this entry, but used by the exports above:
 

@@ -680,15 +680,23 @@ export function normalizeGeometry(data: Geometry | GeometryData): Geo {
 const faceNormals = (positions: Float32Array, indices: Uint32Array, count: number): Float64Array =>
   accumulateNormals(positions, indices, new Float64Array(count * 3));
 
+const isPNG = (image: Uint8Array): boolean =>
+  image.length > 8 && image[0] === 0x89 && image[1] === 0x50 && image[2] === 0x4e && image[3] === 0x47;
+const isJPEG = (image: Uint8Array): boolean =>
+  image.length > 3 && image[0] === 0xff && image[1] === 0xd8 && image[2] === 0xff;
+
+/** The glTF extensions that hold a texture's image, tried after its plain `source`. */
+const IMAGE_EXTENSIONS = ['KHR_texture_basisu', 'EXT_texture_webp', 'EXT_texture_avif', 'MSFT_texture_dds'] as const;
+/** Images of a loaded model not yet a PNG or JPEG in memory, by `TextureData.image`: bytes held in WebP, KTX2, DDS or AVIF, or a file beside the model. */
+const undecoded = new WeakMap<Uint8Array, Uint8Array | URL>();
+
 /** @internal A validated texture, or undefined. */
 export function checkTexture(texture: unknown, label: string): TextureData | undefined {
   if (texture === undefined) return undefined;
   if (!isObject(texture) || !(texture.image instanceof Uint8Array)) fail(`${label} needs an image Uint8Array`);
   const { image, mimeType, name } = texture as unknown as TextureData;
   if (name !== undefined && typeof name !== 'string') fail(`${label} name must be a string`);
-  const png = image.length > 8 && image[0] === 0x89 && image[1] === 0x50 && image[2] === 0x4e && image[3] === 0x47;
-  const jpeg = image.length > 3 && image[0] === 0xff && image[1] === 0xd8 && image[2] === 0xff;
-  if (mimeType === 'image/png' ? !png : mimeType === 'image/jpeg' ? !jpeg : true)
+  if (!undecoded.has(image) && (mimeType === 'image/png' ? !isPNG(image) : mimeType === 'image/jpeg' ? !isJPEG(image) : true))
     fail(`${label} must be a PNG or JPEG matching its mimeType`);
   for (const [key, values] of [
     ['magFilter', filters],
@@ -1029,21 +1037,37 @@ export function collect(
     const { doc } = source.asset,
       info = index === undefined ? undefined : doc.materials?.[index]?.pbrMetallicRoughness?.baseColorTexture;
     if (!info) return undefined;
-    const image = doc.images?.[doc.textures?.[info.index]?.source as number];
+    const definition = doc.textures?.[info.index],
+      named = definition?.extensions as Record<string, { source?: number } | undefined> | undefined,
+      held = [definition?.source, ...IMAGE_EXTENSIONS.map((name) => named?.[name]?.source)]
+        .filter((at): at is number => at !== undefined)
+        .map((at) => {
+          const image = doc.images?.[at],
+            data = /^data:[^;,]*;base64,(.*)$/s.exec(image?.uri ?? '');
+          return {
+            image,
+            bytes:
+              image?.bufferView !== undefined
+                ? source.asset.view(image.bufferView)
+                : data
+                  ? Uint8Array.from(atob(data[1]), (c) => c.charCodeAt(0))
+                  : undefined,
+            file: image?.uri && !data && source.asset.baseURL ? new URL(image.uri, source.asset.baseURL) : undefined,
+          };
+        })
+        .filter(({ bytes, file }) => bytes || file),
+      // A PNG or JPEG needs no decoding, so a fallback image beats a compressed one.
+      chosen = held.find(({ bytes }) => bytes && (isPNG(bytes) || isJPEG(bytes))) ?? held[0];
+    if (!chosen)
+      fail(
+        'A base color texture here has no image the model can reach; pass textures: false for its shape and colors, or use exportModel (@margoengine/exporters/model)',
+      );
+    const { image, bytes, file } = chosen!;
     let texture = pbrImages.get(image);
     if (!texture) {
-      const data = /^data:[^;,]*;base64,(.*)$/s.exec(image?.uri ?? '');
-      const bytes =
-        image?.bufferView !== undefined
-          ? source.asset.view(image.bufferView)
-          : data
-            ? Uint8Array.from(atob(data[1]), (c) => c.charCodeAt(0))
-            : undefined;
-      if (!bytes)
-        fail(
-          'A base color texture here is not a PNG or JPEG inside the model file; pass textures: false for its shape and colors, or use exportModel (@margoengine/exporters/model)',
-        );
-      texture = { image: bytes!, mimeType: bytes![0] === 0x89 ? 'image/png' : 'image/jpeg', name: image?.name };
+      const jpeg = bytes ? isJPEG(bytes) : image?.mimeType === 'image/jpeg' || /\.jpe?g$/i.test(image?.uri ?? '');
+      texture = { image: bytes ?? new Uint8Array(0), mimeType: jpeg ? 'image/jpeg' : 'image/png', name: image?.name };
+      if (!bytes || (!isPNG(bytes) && !jpeg)) undecoded.set(texture.image, bytes ?? file!);
       pbrImages.set(image, texture);
     }
     const transform = info.extensions?.KHR_texture_transform;
@@ -1392,13 +1416,19 @@ export function polygons(faceSizes: Uint8Array | undefined, indices: Uint32Array
 }
 
 /** @internal Names each texture image's file once, `${prefix}${name}.png` or `.jpg`, and collects name -> bytes. */
-export function textureFiles(prefix: unknown): { files: Map<string, Uint8Array>; name(texture: TextureData): string } {
+export function textureFiles(prefix: unknown): {
+  files: Map<string, Uint8Array>;
+  held: Map<string, Uint8Array | URL>;
+  name(texture: TextureData): string;
+} {
   if (typeof prefix !== 'string' || !/^[\w./-]*$/.test(prefix))
     throw new TypeError('texturePrefix may hold only letters, digits, _ . - and /');
   const files = new Map<string, Uint8Array>(),
+    held = new Map<string, Uint8Array | URL>(),
     names = new Map<Uint8Array, string>();
   return {
     files,
+    held,
     name(texture) {
       let name = names.get(texture.image);
       if (name === undefined) {
@@ -1407,9 +1437,11 @@ export function textureFiles(prefix: unknown): { files: Map<string, Uint8Array>;
             ((texture.name ?? '').replace(/\.(png|jpe?g)$/i, '').replace(/[^\w.-]+/g, '_') || `texture_${names.size}`),
           ext = texture.mimeType === 'image/png' ? '.png' : '.jpg';
         name = base + ext;
-        for (let n = 2; files.has(name); n++) name = `${base}_${n}${ext}`;
+        for (let n = 2; files.has(name) || held.has(name); n++) name = `${base}_${n}${ext}`;
         names.set(texture.image, name);
-        files.set(name, texture.image);
+        const waiting = undecoded.get(texture.image);
+        if (waiting) held.set(name, waiting);
+        else files.set(name, texture.image);
       }
       return name;
     },

@@ -110,6 +110,47 @@ Each attribute has `name` (the file's `name` metadata, or `POSITION`, `NORMAL`, 
 `uniqueId`, `array`, `itemSize` and `normalized`. `decode` takes `signal`, `transfer` and `limits` (`maxVertices`, `maxDecodedBytes`), which are
 checked before any output is allocated; `decoderPath` names another folder for the two decoder files.
 
+## WebP (`@margoengine/decoders/webp`)
+
+`parseWebP(bytes)` reads lossy (VP8), lossless (VP8L) and extended WebP files to RGBA8 in plain TypeScript, with no image API, so it runs in Node and in a worker. Written from RFC 6386 and RFC 9649. `alpha` chunks of every coding and filter are read. An animated file gives its first frame. Colour profiles are ignored. `decodeWebpLossless` from `/webp-lossless` is the VP8L part alone.
+
+```ts
+import {parseWebP} from 'margoengine/decoders/webp';
+
+// The smallest lossless file: one transparent pixel.
+const file = Uint8Array.from(atob('UklGRhoAAABXRUJQVlA4TA0AAAAvAAAAEAcQERGIiP4HAA=='), (c) => c.charCodeAt(0));
+const {width, height, data, lossless} = parseWebP(file);
+console.log(width, height, data.length, lossless); // 1 1 4 true
+```
+
+Checked against dwebp 1.4.0, run as an outside tool, on 139 real files: the Y, U and V planes byte for byte on every lossy file and RGBA exact on every lossless file. After upsampling, RGB is at most 1 of 255 from dwebp's. `packages/decoders/scripts/test-real-textures.mjs <folder>` repeats it.
+
+## Any image to pixels (`@margoengine/decoders/image`, `/bc`)
+
+`decodeImage(bytes, {signal})` turns a PNG, WebP, DDS, KTX or KTX2 file into RGBA8 rows, whichever it is: the file's signature picks the reader, and each reader loads only when a file needs it. `imageFormat(bytes)` names the format. `textureFileToRGBA(file)` does it for a parsed `TextureFile`. `decodeBC(format, blocks, width, height)` from `/bc` decodes BC1 to BC7 on the CPU. Basis Universal KTX2 goes through a worker in a browser and through the shipped Wasm in the calling thread in Node.
+
+```ts
+import {decodeImage, imageFormat} from 'margoengine/decoders/image';
+
+const file = Uint8Array.from(atob('UklGRhoAAABXRUJQVlA4TA0AAAAvAAAAEAcQERGIiP4HAA=='), (c) => c.charCodeAt(0));
+console.log(imageFormat(file)); // webp
+const {width, height, data} = await decodeImage(file);
+console.log(width, height, data.length); // 1 1 4
+```
+
+A JPEG and AVIF are refused with code `unsupported`, as are native ETC, EAC and ASTC blocks. Signed formats map -1..1 to 0..255, as a normal map held in an unsigned image does. Float formats clamp to 0..1 and come out sRGB encoded.
+
+In Node, which has no Web Worker for `KTX2Decoder`, pass `nodeKTX2` as the `ktx2` option of `loadGLTF` to load a Basis Universal model. It transcodes to RGBA8, four times the bytes of a GPU format, so a large model needs a larger `maxDownloadBytes`, which sets the decoded budget too:
+
+```ts
+import {Engine} from 'margoengine/core';
+import {nodeKTX2} from 'margoengine/decoders/image';
+import {loadGLTF} from 'margoengine/gltf-pro';
+const engine = await Engine.create(document.querySelector('canvas')!);
+
+const model = await loadGLTF(engine, 'https://example.com/helmet.gltf', {ktx2: nodeKTX2, maxDownloadBytes: 2 ** 29});
+```
+
 ## Texture upload (`@margoengine/decoders/texture`)
 
 `getSupportedTranscodeFormat`, `getBytesPerRow` and `createKTX2Texture` (also on the root) without the transcoder or the
