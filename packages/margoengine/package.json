@@ -542,6 +542,10 @@
       "types": "./dist/cutscene/lipsync.d.ts",
       "import": "./dist/cutscene/lipsync.js"
     },
+    "./cutscene/vfx": {
+      "types": "./dist/cutscene/vfx.d.ts",
+      "import": "./dist/cutscene/vfx.js"
+    },
     "./decoders": {
       "types": "./dist/decoders.d.ts",
       "import": "./dist/decoders.js"

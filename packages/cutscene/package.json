@@ -1,7 +1,7 @@
 {
   "name": "@margoengine/cutscene",
   "version": "1.0.0",
-  "description": "Cutscene timelines: camera, transform, property, animation, audio, subtitle and event tracks, nested timelines, scrubbing, a player that fires events in order, virtual camera shots with blends, rendering to a video file, a take recorder, and dialogue with lip sync.",
+  "description": "Cutscene timelines: camera, transform, property, animation, audio, subtitle and event tracks, nested timelines, scrubbing, a player that fires events in order, virtual camera shots with blends, rendering to a video file, a take recorder, dialogue with lip sync, and particle and activation tracks.",
   "keywords": [
     "margoengine",
     "webgpu",
@@ -45,6 +45,10 @@
     "./lipsync": {
       "types": "./dist/lipsync.d.ts",
       "import": "./dist/lipsync.js"
+    },
+    "./vfx": {
+      "types": "./dist/vfx.d.ts",
+      "import": "./dist/vfx.js"
     }
   },
   "files": [
@@ -62,7 +66,7 @@
   "scripts": {
     "build": "node ../../scripts/build-optional.js cutscene",
     "test": "npm run build && node --test tests/*.test.js",
-    "test:gpu": "npm run build && node tests/render-browser.mjs",
+    "test:gpu": "npm run build && node tests/render-browser.mjs && node tests/vfx-browser.mjs",
     "prepack": "npm run build"
   },
   "peerDependencies": {

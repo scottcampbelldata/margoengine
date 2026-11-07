@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10053781,
+  "total": 10055613,
   "history": [
     {
       "date": "2026-10-24",
@@ -2996,6 +2996,12 @@
       "commit": "a23dae280",
       "reason": "balance carries the weight through the legs instead of an outside force: torques, sole limits, real inertia",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "d709529b6",
+      "reason": "New entry @margoengine/cutscene/vfx and VFX.reset for seeks.",
+      "grew": 1
     }
   ],
   "items": {
@@ -3126,6 +3132,7 @@
     "@margoengine/cutscene/record": 3415,
     "@margoengine/cutscene/render": 8171,
     "@margoengine/cutscene/shots": 3336,
+    "@margoengine/cutscene/vfx": 1832,
     "@margoengine/decoders": 492515,
     "@margoengine/decoders/bc": 3890,
     "@margoengine/decoders/brotli": 68932,

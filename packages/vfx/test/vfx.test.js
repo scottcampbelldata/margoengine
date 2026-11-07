@@ -27,6 +27,42 @@ test('initial population is emitted once at attachment and again after device re
     assert.throws(() => new VFX({ capacity: 32, initialCount }), /initial/);
 });
 
+test('reset puts the clock, the seed and the waiting births back, and clears the particles', () => {
+  const h = optionalGPU();
+  h.engine.stats = { drawCalls: 0 };
+  const effect = new VFX({ capacity: 32, initialCount: 17, rate: 0 }),
+    uniform = () => h.resources.findLast((r) => r.size === 224 && !r.destroyed).data;
+  // Before attachment there is nothing to clear, and attaching still adds initialCount once.
+  assert.equal(effect.reset(), effect);
+  h.engine.use(effect);
+  h.frame();
+  const first = { budget: new Uint32Array(uniform())[53], seed: new Uint32Array(uniform())[54], time: new Float32Array(uniform())[31] };
+  assert.equal(first.budget, 17);
+  effect.options.rate = 120;
+  h.frame();
+  h.frame();
+  assert.notEqual(new Uint32Array(uniform())[54], first.seed);
+  const { particles, alive, indirect, visible } = effect.gpuState;
+  new Uint8Array(particles.data).fill(7);
+  new Uint8Array(alive.data).fill(7);
+  new Uint32Array(indirect.data).set([3, 9, 0, 0, 0]);
+  new Uint32Array(visible.data).set([3, 9, 0, 0, 0]);
+  effect.options.rate = 0;
+  effect.reset();
+  assert.ok(new Uint8Array(particles.data).every((byte) => byte === 0), 'every slot dead');
+  assert.ok(new Uint8Array(alive.data).every((byte) => byte === 0));
+  for (const counts of [indirect, visible]) assert.deepEqual([...new Uint32Array(counts.data)], [3, 0, 0, 0, 0]);
+  h.frame();
+  assert.deepEqual(
+    { budget: new Uint32Array(uniform())[53], seed: new Uint32Array(uniform())[54], time: new Float32Array(uniform())[31] },
+    first,
+    'the first frame again',
+  );
+  effect.dispose();
+  assert.throws(() => effect.reset(), /disposed/);
+  h.cleanup();
+});
+
 test('one current 64-byte particle buffer survives frames and is retired once on restoration/disposal', () => {
   const h = optionalGPU();
   h.engine.stats = { drawCalls: 0 };

@@ -1,5 +1,5 @@
 {
-  "commit": "2540c6c72",
+  "commit": "d709529b6",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -548,6 +548,10 @@
       "./lipsync": {
         "raw": 6617,
         "gzip": 3108
+      },
+      "./vfx": {
+        "raw": 3466,
+        "gzip": 1576
       }
     },
     "@margoengine/decoders": {
@@ -1908,8 +1912,8 @@
         "gzip": 2163
       },
       "./balance": {
-        "raw": 7031,
-        "gzip": 2903
+        "raw": 13387,
+        "gzip": 5153
       }
     },
     "@margoengine/react": {
@@ -2488,12 +2492,12 @@
     },
     "@margoengine/vfx": {
       ".": {
-        "raw": 50252,
-        "gzip": 16635
+        "raw": 50692,
+        "gzip": 16708
       },
       "./base": {
-        "raw": 32172,
-        "gzip": 10671
+        "raw": 32612,
+        "gzip": 10746
       },
       "./obstacles": {
         "raw": 2388,
@@ -2783,9 +2787,9 @@
       "brotli": 8118
     },
     "packages/creative/dist/particles.js": {
-      "raw": 42720,
-      "gzip": 14602,
-      "brotli": 13040
+      "raw": 43160,
+      "gzip": 14675,
+      "brotli": 13124
     },
     "packages/creative/dist/post.js": {
       "raw": 19217,

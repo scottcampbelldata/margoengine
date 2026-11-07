@@ -392,6 +392,82 @@ consonants, a pause under about 70 ms goes unseen, and it gets about half of vow
 aligner when the mouth must be exact.
 
 
+## Particle effects and activation
+
+`@margoengine/cutscene/vfx` adds a `vfx` track that starts, stops and bursts particle effects on the timeline, and an
+`activation` track that shows and hides objects. Both are pure, as every track is. Particles have a past, so
+`VfxDirector` turns the state into starts, stops and bursts, and a seek runs the same frames again.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { Cutscene, CutscenePlayer } from 'margoengine/cutscene';
+import { VfxDirector, activationTrack, applyActivation, vfxTrack } from 'margoengine/cutscene/vfx';
+import { VFX } from 'margoengine/vfx';
+
+const engine = await Engine.create(document.querySelector('canvas')!, { backend: 'webgpu' });
+const sparks = VFX.attach(engine, { capacity: 10_000, lifetime: [0.5, 1.5], velocity: [0, 3, 0] });
+const door = engine.createMesh();
+
+const cutscene = new Cutscene(
+  {
+    format: 'margo-cutscene',
+    version: 1,
+    duration: 6,
+    tracks: [
+      {
+        type: 'vfx',
+        id: 'fire',
+        target: 'sparks',
+        clips: [{ start: 1, duration: 3, rate: 800, bursts: [{ time: 0.5, count: 2000 }] }],
+      },
+      { type: 'activation', id: 'door-on', target: 'door', clips: [{ start: 2, duration: 4 }] },
+    ],
+  },
+  { tracks: [vfxTrack(), activationTrack()] },
+);
+const player = new CutscenePlayer(cutscene);
+const director = new VfxDirector(cutscene, { sparks }, { step: (delta) => engine.render({ delta }) });
+
+// Each frame, in this order:
+function frame(delta: number): void {
+  player.update(delta);
+  director.apply(player.state);
+  applyActivation(player.state, { door });
+  engine.render({ delta });
+}
+void player.play();
+frame(1 / 60);
+
+player.seek(3.2); // A scrub, however far: the frame drawn next is the one playing to 3.2 s shows.
+director.apply(player.state);
+engine.render({ delta: 1 / 60 });
+```
+
+| Field | Meaning | Default |
+| --- | --- | --- |
+| `vfx` `target` | The effect's name in the director | required |
+| `vfx` clip `rate` | Births a second while the clip runs | the rate the effect had when the director took it |
+| `vfx` clip `bursts` | `{ time, count }` sorted by time, seconds into the clip | none |
+| `activation` `target`, `clips` | The object, and spans it shows | required |
+| `activation` `invert` | Hides it during the spans instead | `false` |
+| director `step(delta)` | Draws one frame of the replay. Required | |
+| director `stepSize` | Seconds of a replay frame: use your frame time | `1 / 60` |
+| director `longest` | Seconds a seek replays at most | `10` |
+
+`effectsOf(state)` and `activeOf(state)` give the plain state, for an effect or object of your own; clips fire `enter`
+and `exit`, and bursts fire an event `<target>:burst` with `{ count }`. The director needs only `options.rate`,
+`burst(count)` and `reset()`, so `VFX` of `@margoengine/vfx` fits and so does your own. Objects you do not pass to
+`applyActivation` are left alone, and a `Mesh` fits as it is.
+
+The director holds an effect off until a clip. Playing, an effect a clip finds empty starts fresh, so its random
+numbers depend on the cutscene alone. A frame that is not the next one (a seek, a step back, a leap past 8 frames)
+wipes the effects and plays again from when they were last empty, through as many clips as still have particles alive
+by `options.lifetime`. It costs one drawn frame for each step of replay. With the same `stepSize` as your frames it
+lands on the same particles, byte for byte; with frames of another length it lands near them. Past `longest` it starts
+that far back, so the particles are alike in kind only. Playing backward is a seek on every frame. A pause stops the
+cutscene and not the particles: stop drawing, or `delta` 0, to hold them.
+
+
 ## Custom tracks
 
 `shotTrack()` is a `CutsceneTrackType`, and you can write your own for anything a document should hold: pass types in

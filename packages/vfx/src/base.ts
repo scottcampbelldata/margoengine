@@ -416,6 +416,22 @@ export class VFX implements EnginePlugin {
     this.burstCount = Math.min(this.capacity, this.burstCount + count);
     return this;
   }
+  /**
+   * Back to how the effect began: no particles, its clock at 0 and `initialCount` waiting, so the same frames after it
+   * give the same particles, for a seek. Call it between frames.
+   * @throws MargoError `'disposed'` after `dispose()`.
+   */
+  reset(): this {
+    if (this.disposed) throw new MargoError('disposed', 'VFX is disposed; attach a new VFX to reset it');
+    this.time = this.remainder = this.frames = this.burstCount = 0;
+    // Before attachment there is nothing to clear, and attaching adds initialCount itself.
+    if (!this.device) return this;
+    this.burstCount = this.options.initialCount ?? 0;
+    for (const buffer of [this.particles!, this.alive!]) this.device.queue.writeBuffer(buffer, 0, new Uint8Array(buffer.size));
+    for (const buffer of [this.indirect!, this.visible!])
+      this.device.queue.writeBuffer(buffer, 0, new Uint32Array([3, 0, 0, 0, 0]));
+    return this;
+  }
   setup(engine: Engine): void {
     if (this.disposed || !engine.gpu)
       throw new MargoError(

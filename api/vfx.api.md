@@ -174,6 +174,7 @@ class VFX implements EnginePlugin {
     get fog(): FogLike | null;
     setFog(fog: FogLike | null): this;
     burst(count: number): this;
+    reset(): this;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
     setTransparency(hook: SurfaceTransparency, released?: () => void): () => void;

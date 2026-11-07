@@ -817,6 +817,7 @@ Sequencer, Godot AnimationPlayer, Theatre.js, GSAP, three.js, Babylon and the li
 | Render to video (`cutscene/render`) | Fixed-step rendering through `@margoengine/headless/video`; the sound track follows RFC 7845 (Ogg Opus, for `OpusHead`), RFC 9559 and the WebM guidelines, Encapsulation of Opus in ISO Base Media (opus-codec.org) and ISO/IEC 14496-1, 14496-3 and 14496-14 for `esds`; the mix is plain sums and straight-line resampling |
 | Take recorder (`cutscene/record`) | Key thinning by D. Douglas and T. Peucker, "Algorithms for the reduction of the number of points", The Canadian Cartographer, 1973 (after U. Ramer, 1972), measured on the track's own interpolation; input through `@margoengine/input/replay` |
 | Lip sync (`cutscene/lipsync`) | Linear prediction by J. Makhoul, "Linear prediction: a tutorial review", Proceedings of the IEEE, 1975; the vowel chart of G. Peterson and H. Barney, "Control methods used in a study of the vowels", JASA, 1952; ARPAbet symbols as the CMU Pronouncing Dictionary lists them; VRM 1.0 preset names and Apple's published `ARFaceAnchor.BlendShapeLocation` names; test speech from CMU ARCTIC (notice beside the files) |
+| VFX and activation tracks (`cutscene/vfx`) | Replay of a deterministic simulation from its last empty state: Margo's own design over `@margoengine/vfx`, with no outside source |
 
 ## Save and load: `@margoengine/save`
 
