@@ -25,6 +25,61 @@ def glb_materials(path):
     return {m.get('name'): m for m in json.loads(data[20:20 + length]).get('materials', [])}
 
 
+def glb_image(texture):
+    # A texture of the file as a Blender image, read from the file's own bytes: what the importer does with this extension
+    # has no part in the reference.
+    with open(path, 'rb') as f:
+        data = f.read()
+    length = struct.unpack_from('<I', data, 12)[0]
+    gltf = json.loads(data[20:20 + length])
+    view = gltf['bufferViews'][gltf['images'][gltf['textures'][texture['index']]['source']]['bufferView']]
+    start = 20 + length + 8 + view.get('byteOffset', 0)
+    file = os.path.join(out, f"{scene_name}-texture-{texture['index']}.png")
+    with open(file, 'wb') as f:
+        f.write(data[start:start + view['byteLength']])
+    image = bpy.data.images.load(file)
+    image.pack()
+    os.remove(file)
+    return image
+
+
+def translucent(tree, info):
+    # KHR_materials_diffuse_transmission: the BTDF's colour times its factor, the rest of the diffuse black, as only the light
+    # coming through is measured. Factor in the texture's alpha, colour in its RGB, as the extension defines them.
+    dt = info['extensions']['KHR_materials_diffuse_transmission']
+    colour = dt.get('diffuseTransmissionColorFactor', [1, 1, 1])
+    surface = tree.nodes.new('ShaderNodeBsdfTranslucent')
+    black = tree.nodes.new('ShaderNodeBsdfDiffuse')
+    black.inputs['Color'].default_value = (0, 0, 0, 1)
+    tint = tree.nodes.new('ShaderNodeRGB')
+    tint.outputs[0].default_value = (*colour, 1)
+    source = tint.outputs[0]
+    if 'diffuseTransmissionColorTexture' in dt:
+        image = tree.nodes.new('ShaderNodeTexImage')
+        image.image = glb_image(dt['diffuseTransmissionColorTexture'])
+        multiply = tree.nodes.new('ShaderNodeMixRGB')
+        multiply.blend_type = 'MULTIPLY'
+        multiply.inputs[0].default_value = 1
+        tree.links.new(tint.outputs[0], multiply.inputs[1])
+        tree.links.new(image.outputs['Color'], multiply.inputs[2])
+        source = multiply.outputs[0]
+    tree.links.new(source, surface.inputs['Color'])
+    share = tree.nodes.new('ShaderNodeMixShader')
+    share.inputs[0].default_value = dt.get('diffuseTransmissionFactor', 0)
+    if 'diffuseTransmissionTexture' in dt:
+        image = tree.nodes.new('ShaderNodeTexImage')
+        image.image = glb_image(dt['diffuseTransmissionTexture'])
+        image.image.colorspace_settings.name = 'Non-Color'
+        factor = tree.nodes.new('ShaderNodeMath')
+        factor.operation = 'MULTIPLY'
+        factor.inputs[1].default_value = dt.get('diffuseTransmissionFactor', 0)
+        tree.links.new(image.outputs['Alpha'], factor.inputs[0])
+        tree.links.new(factor.outputs[0], share.inputs[0])
+    tree.links.new(black.outputs[0], share.inputs[1])
+    tree.links.new(surface.outputs[0], share.inputs[2])
+    return share.outputs[0]
+
+
 def plain(material, modes):
     # Only the outline matters here: alpha under the file's own cutoff is a hole, the rest black diffuse. BLEND casts
     # nothing, as Margo's plain depth map documents.
@@ -48,7 +103,8 @@ def plain(material, modes):
     else:
         mix.inputs[0].default_value = 0 if mode == 'BLEND' or spec.get('masksOnly') else 1
     tree.links.new(hole.outputs[0], mix.inputs[1])
-    tree.links.new(diffuse.outputs[0], mix.inputs[2])
+    through = spec.get('translucent') and 'KHR_materials_diffuse_transmission' in info.get('extensions', {})
+    tree.links.new(translucent(tree, info) if through else diffuse.outputs[0], mix.inputs[2])
     tree.links.new(mix.outputs[0], output.inputs['Surface'])
     surfaces.append((tree, mix, mode))
 
@@ -61,6 +117,8 @@ scene.cycles.device = 'CPU'
 scene.cycles.samples = spec.get('samples', 64)
 scene.cycles.use_denoising = False
 scene.cycles.max_bounces = spec.get('bounces', 0)
+scene.cycles.diffuse_bounces = spec.get('bounces', 0)
+scene.cycles.transmission_bounces = spec.get('bounces', 0)
 scene.cycles.transparent_max_bounces = 32
 scene.render.resolution_x = scene.render.resolution_y = spec['size']
 scene.render.filter_size = 0.5

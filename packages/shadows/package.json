@@ -30,6 +30,7 @@
     "test:gpu:cutout-casters": "cd ../.. && node packages/shadows/test/cutout-casters-browser.mjs",
     "test:gpu:light-function": "cd ../.. && node packages/shadows/test/light-function-browser.mjs",
     "test:gpu:outside": "cd ../.. && node packages/shadows/test/outside/check.mjs",
+    "test:gpu:transmission": "cd ../.. && node packages/shadows/test/transmission-browser.mjs",
     "test:gpu:vsm": "cd ../.. && node packages/shadows/test/vsm-browser.mjs",
     "test:gpu:virtual-custom": "cd ../.. && node packages/shadows/test/virtual-custom-browser.mjs",
     "test:gpu:virtual": "cd ../.. && node packages/shadows/test/virtual-sampling-browser.mjs",
@@ -55,6 +56,10 @@
     "./vsm": {
       "types": "./dist/vsm.d.ts",
       "import": "./dist/vsm.js"
+    },
+    "./transmission": {
+      "types": "./dist/transmission.d.ts",
+      "import": "./dist/transmission.js"
     }
   },
   "files": [

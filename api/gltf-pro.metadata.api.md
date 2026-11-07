@@ -862,7 +862,7 @@ class PBRInstances {
 
 interface PBRLighting {
     readonly declarations: string;
-    direct?(direct: string): string;
+    direct?(direct: string, normal?: string): string;
     readonly light?: string;
     readonly ambient?: string;
     readonly sky?: string;
@@ -1173,6 +1173,7 @@ interface RunView {
 
 interface ShadowCasterRecord {
     primitive: PBRPrimitive;
+    transmits?: readonly number[];
     node: Mesh;
     vertex: GPUBuffer;
     vertexOffset: number;

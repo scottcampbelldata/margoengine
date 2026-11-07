@@ -4,6 +4,7 @@
 // shadow perimeter, not from a run's result.
 const box = { min: [-1.2, -0.1, -1.2], max: [1.2, 1, 1.2] };
 const hard = { resolution: 4096, bounds: box, filter: 'hard', casterMargin: 1, bias: 0.0002, normalBias: 0.002 };
+const cup = { resolution: 4096, bounds: { min: [-0.3, -0.01, -0.3], max: [0.3, 0.12, 0.3] }, filter: 'hard', casterMargin: 1, bias: 0.0002, normalBias: 0.0005 };
 const panels = { ...hard, bounds: { min: [-6, -0.2, -6], max: [6, 2.5, 3] } };
 export const cases = [
   // Leaves of the real DiffuseTransmissionPlant, an alpha MASK material on modelled leaf outlines.
@@ -30,5 +31,14 @@ export const cases = [
   // a variance edge has one width, so it is too wide near the stems and too narrow far up, and the bound is that spread.
   { name: 'soft-pcss', scene: 'soft', kind: 'shadows', minShadow: 2000, iou: 0.85, difference: 0.03, options: { ...hard, filter: 'soft', lightSize: 0.04 } },
   { name: 'soft-variance', scene: 'soft', kind: 'shadows', minShadow: 2000, iou: 0.75, difference: 0.03, options: { ...hard, filter: undefined, variance: { size: 2048, blur: 8, bleed: 0.1 } } },
+  // Light through real leaves and a real cup, against Cycles' translucent BSDF of KHR_materials_diffuse_transmission with one
+  // bounce, deep in the shadow (`core`). A sheet scatters what it passes, so the ground far below gets the small share the sheet
+  // subtends there: under 1 percent in both renderers, where the control, the light going straight on, gives 5. One 8-bit step
+  // here is about 0.004, so `near` is two steps and a half. Margo reads the factors alone, so `scale` gives the cup's texture
+  // its mean, 0.47. A closed cup is this model's worst case, one scatter where light takes two walls: its bound is the 0.04
+  // that one extra scatter can leave, and docs/limits.md says so.
+  { name: 'leaf-through', scene: 'leaf', kind: 'shadows', core: 0.1, near: 0.01, difference: 0.03, options: { ...hard, colored: true, size: 0.05 } },
+  { name: 'leaf-straight', scene: 'leaf', kind: 'shadows', core: 0.1, far: 0.04, difference: 0.03, options: { ...hard, colored: true } },
+  { name: 'cup-through', scene: 'cup', kind: 'shadows', core: 0.1, near: 0.05, difference: 0.03, options: { ...cup, colored: true, scale: 0.47, size: 0.015 } },
   { name: 'alpha-control', scene: 'alpha', kind: 'shadows', minShadow: 1000, below: 0.78, control: 'solid', options: panels },
 ];

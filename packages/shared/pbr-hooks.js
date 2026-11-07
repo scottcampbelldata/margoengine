@@ -43,7 +43,9 @@ function composeLightPBR(code, hooks, cache) {
   const layered = code.includes('fn margoAmbientLayers(');
   if (hooks.direct) {
     // A coat lights its lobe through the same visibility, evaluated once. `direct` hooks scale the light they wrap.
-    const wrapped = hooks.direct('direct');
+    // A surface lit from behind (diffuse transmission) declares which way its own light comes from: shadow lookups offset
+    // towards the light, so such a surface must not take the back of itself for a caster.
+    const wrapped = hooks.direct('direct', code.includes('fn margoLightSide(') ? 'margoLightSide(s.n,l)' : undefined);
     if (code.includes(directVisibility) && wrapped !== 'direct') {
       const light = code.includes('fn margoLit(') ? 'margoLit(s,l,direct)' : 'vec3f(1)';
       // A block's own `direct` is what the hook wrote about. In front of the ambient hook's statement as well, so the

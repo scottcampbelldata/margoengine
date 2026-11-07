@@ -181,7 +181,7 @@ export class VirtualShadows implements EnginePlugin {
   private disposed = false;
   private sources: Source[] = [];
   private readonly lightingOwners = new Map<ShadowSource, { remove: () => void; count: number }>();
-  private readonly hooks = new Map<number, { declarations: string; direct(direct: string): string }>();
+  private readonly hooks = new Map<number, { declarations: string; direct(direct: string, normal?: string): string }>();
   private readonly shaders = new Map<number, Map<string, string>>();
   private readonly pipelines = new Map<string, GPURenderPipeline>();
   private readonly draws = new Map<Mesh, Map<object, Draw>>();
@@ -397,7 +397,7 @@ export class VirtualShadows implements EnginePlugin {
     return output;
   }
   /** gltf-pro lighting hooks for bind group `group`. */
-  pbr(group: number): { declarations: string; direct(direct: string): string } {
+  pbr(group: number): { declarations: string; direct(direct: string, normal?: string): string } {
     const filter = this.options.filter ?? 'soft',
       key = shaderKey(filter, group);
     let hooks = this.hooks.get(key);
@@ -406,7 +406,7 @@ export class VirtualShadows implements EnginePlugin {
         key,
         (hooks = {
           declarations: virtualSampling(group, filter, this.effects as readonly ShadowEffect[]),
-          direct: (d) => `shadowLit(${d},i.position,s.n)`,
+          direct: (d, n) => (n ? `shadowLit(${d},i.position,${n})` : `shadowLit(${d},i.position,s.n)`),
         }),
       );
     return hooks;

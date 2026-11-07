@@ -9,6 +9,7 @@ import {Shadows} from '/packages/shadows/dist/index.js';
 import {VirtualShadows} from '/packages/shadows/dist/virtual.js';
 import {lightPattern} from '/packages/shadows/dist/light-function.js';
 import {varianceFilter} from '/packages/shadows/dist/vsm.js';
+import {transmission} from '/packages/shadows/dist/transmission.js';
 import {Terrain} from '/packages/terrain/dist/index.js';
 const canvas=document.querySelector('canvas'),errors=[];
 const scenes=await (await fetch('/packages/shadows/test/outside/scenes.json')).json();
@@ -71,6 +72,8 @@ window.check={
     const c=kind==='virtual'?VirtualShadows:Shadows,p=scene.pattern;
     // control 'shifted': the mask a quarter turn off, so the check must fail.
     if(p)options={...options,effects:[lightPattern({texture:mask,size:p.size,offset:control==='shifted'?[p.offset[0]+0.25,p.offset[1]+0.25]:p.offset})]};
+    const leaves=options.colored&&model?transmission(model,{scale:options.scale,size:options.size}):undefined;
+    if(leaves&&options.size)options={...options,effects:[leaves.effect]};
     if(options.variance)options={...options,filter:varianceFilter(options.variance)};
     effect=c.attach(engine,options);
     if(ground)effect.add(ground,{castShadow:false});
@@ -78,7 +81,7 @@ window.check={
     if(p){}
     else if(scene.terrain)effect.add(model,{static:true,castShadow:control!=='nocast'});
     else if(control==='solid')effect.add({shadowPrimitives:masks.map(p=>({...p,alphaTexture:undefined,alphaSampler:undefined,cutoff:0}))});
-    else effect.add(scene.masksOnly?{shadowPrimitives:masks}:model);
+    else effect.add(scene.masksOnly?{shadowPrimitives:masks}:leaves??model);
     await frames(kind==='virtual'?30:3);
     return errors;
   },

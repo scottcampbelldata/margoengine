@@ -1,0 +1,32 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Shadows: transmission</title><style>body{margin:0;background:#000}canvas{display:block;width:512px;height:512px}</style></head><body><canvas width="512" height="512"></canvas>
+<script type="module">
+// The real DiffuseTransmissionPlant seen from under its leaves, the sun above them, so what is seen is light through the leaves.
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
+import {Engine} from '/packages/core/dist/index.js';
+import {loadGLTF} from '/packages/gltf-pro/dist/index.js';
+import {Shadows} from '/packages/shadows/dist/index.js';
+import {transmission} from '/packages/shadows/dist/transmission.js';
+const canvas=document.querySelector('canvas'),errors=[];
+const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[-0.05,0.02,0.05],target:[0,0.6,0],fov:70,near:0.01,far:20}}),device=engine.gpu;
+engine.stop();
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+engine.lighting.radiance.set([6,6,6,0]);
+engine.lighting.direction.set([0,1,0]);
+const frames=async(n)=>{device.pushErrorScope('validation');for(let i=0;i<n;i++){engine.render();await device.queue.onSubmittedWorkDone();}const e=await device.popErrorScope();if(e)errors.push(e.message);};
+const model=await loadGLTF(engine,'/examples/assets/khronos-samples/DiffuseTransmissionPlant.glb');
+const bounds={min:[-1.2,-0.1,-1.2],max:[1.2,1,1.2]};
+let effect;
+window.check={
+  async show(colored){
+    effect?.dispose();effect=undefined;
+    if(colored!==undefined){
+      const leaves=transmission(model);
+      effect=Shadows.attach(engine,{resolution:4096,bounds,filter:'hard',casterMargin:1,bias:0.0002,normalBias:0.002,colored,effects:colored?[leaves.effect]:[]});
+      effect.add(colored?leaves:model);
+    }
+    await waitForPipelines(()=>frames(1));await frames(3);
+    return errors;
+  },
+};
+window.ready=true;
+</script></body></html>

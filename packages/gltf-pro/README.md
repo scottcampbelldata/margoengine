@@ -273,6 +273,8 @@ console.log(model.primitives[0].uvs);
 
 ### Scattering in glTF volumes (`KHR_materials_volume_scatter`, draft)
 
+A material with `KHR_materials_diffuse_transmission` glows from behind under shadows too: its lighting hook's `direct(direct, normal)` gets the side facing the light, so the surface does not shadow its own back. Its shadow casters carry `transmits`, the factor times the colour factor, for `transmission` of `@margoengine/shadows/transmission`.
+
 `loadGLTF` and `parseGLTFAsync` read `KHR_materials_volume_scatter` by themselves through `@margoengine/gltf-pro/extended`, so milky glass, jade and wax look solid where the light has far to go and clear where it has not. It needs `KHR_materials_volume` with a thickness and an `attenuationDistance`, and light that enters: `KHR_materials_transmission` or `KHR_materials_diffuse_transmission`. Otherwise it does nothing, as the spec has it. `multiscatterColorFactor` (default `[0, 0, 0]`) times `multiscatterColorTexture` (sRGB) is the multi-scatter colour; `scatterAnisotropy` (default `0`, from -1 to 1) moves scattering forward or back.
 
 ```ts

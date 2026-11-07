@@ -548,6 +548,15 @@ since 'auto' layouts drop what no code reads; `shadowSampling` adds that branch.
 grain 0.00023 against 0.0033 for PCSS; `check.mjs`, the real plant under a soft Cycles sun, overlap 0.76 and mean difference
 0.0088, PCSS 0.97 and 0.0010. RTX A6000. Missing: other GPUs, and any timing.
 
+A surface lit from behind has to look up its shadow on the side facing the light: `shadowVisibility` offsets along the normal,
+which on a leaf's far side lands behind the leaf. A shader that declares `margoLightSide` (gltf-pro with diffuse transmission)
+gets that normal through the `direct` hook's second argument, and every other shader's text is unchanged. `transmission`
+moves what `transmits` to the tint map, and its effect's `tint` expression scales the light by the disc form factor over the
+gap to the caster, read from the tint depth. Evidence: `packages/shadows/test/transmission-browser.mjs`, from under the real
+plant leaves keep 0.34 of the light through them, 0.06 without the fix; `check.mjs`, deep in the shadow 0.0001 and Cycles'
+translucent BSDF 0.0023 on the plant, 0.05 for light going straight on, 0.04 and 0.004 on the Teacup. RTX A6000. Missing: other
+GPUs, transmission textures, more than one scatter.
+
 `LodInstances` (`@margoengine/culling/lod`) tests each instance against the frustum and picks its level in one compute pass:
 the level is the first whose limit the world sphere's radius in pixels reaches. Instances append to their level's list by
 atomic add, and the counts are copied to each level's indirect arguments, so core draws each list through `Batch.redirect`. On

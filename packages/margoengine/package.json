@@ -2094,6 +2094,10 @@
       "types": "./dist/shadows/vsm.d.ts",
       "import": "./dist/shadows/vsm.js"
     },
+    "./shadows/transmission": {
+      "types": "./dist/shadows/transmission.d.ts",
+      "import": "./dist/shadows/transmission.js"
+    },
     "./sky": {
       "types": "./dist/sky.d.ts",
       "import": "./dist/sky.js"

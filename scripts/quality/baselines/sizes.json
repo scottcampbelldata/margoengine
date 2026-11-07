@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10130487,
+  "total": 10131514,
   "history": [
     {
       "date": "2026-10-24",
@@ -3074,6 +3074,12 @@
       "commit": "e97b82431",
       "reason": "@margoengine/usdz gains the /skel entry",
       "grew": 2
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "d383010ad",
+      "reason": "Light through leaves: new transmission entry and the light-side normal in gltf-pro",
+      "grew": 1
     }
   ],
   "items": {
@@ -3596,6 +3602,7 @@
     "@margoengine/shader/utils": 7295,
     "@margoengine/shadows": 18738,
     "@margoengine/shadows/light-function": 1921,
+    "@margoengine/shadows/transmission": 1027,
     "@margoengine/shadows/virtual": 15442,
     "@margoengine/shadows/vsm": 2046,
     "@margoengine/sky": 16975,

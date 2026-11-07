@@ -162,6 +162,8 @@ export interface ShadowPrepareContext {
 }
 /** One drawable shadow caster (the contract gltf-pro models, materials meshes and terrain expose as `shadowPrimitives`). */
 export interface ShadowPrimitive {
+  /** Linear RGB of the light it lets through; `transmission` from `@margoengine/shadows/transmission` reads it. */
+  transmits?: readonly number[];
   /** Identity of the primitive's cached draw (default: its index buffer). */
   primitive?: object;
   /** The mesh whose world matrix, visibility and engine the caster follows. */
@@ -407,7 +409,7 @@ export class Shadows implements EnginePlugin {
     near: 0.1,
     far: 500,
   } as unknown as Camera;
-  private readonly hooks = new Map<number, { declarations: string; direct(direct: string): string }>();
+  private readonly hooks = new Map<number, { declarations: string; direct(direct: string, normal?: string): string }>();
   private readonly lightingOwners = new Map<ShadowSource, { remove: () => void; count: number }>();
   private readonly values = new Float32Array(92);
   private readonly ranges = this.values.subarray(84, 88);
@@ -722,7 +724,7 @@ export class Shadows implements EnginePlugin {
     cache.set(source, output);
     return output;
   }
-  pbr(group: number): { declarations: string; direct(direct: string): string } {
+  pbr(group: number): { declarations: string; direct(direct: string, normal?: string): string } {
     const filter = this.options.filter ?? 'soft',
       anisotropic = this.anisotropic(),
       key = shaderKey(filter, group, anisotropic);
@@ -732,7 +734,7 @@ export class Shadows implements EnginePlugin {
         key,
         (hooks = {
           declarations: this.sampling(group, filter, anisotropic),
-          direct: (d) => `shadowLit(${d},i.position,s.n)`,
+          direct: (d, n) => (n ? `shadowLit(${d},i.position,${n})` : `shadowLit(${d},i.position,s.n)`),
         }),
       );
     return hooks;

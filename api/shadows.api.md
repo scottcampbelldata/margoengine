@@ -15,6 +15,7 @@ export interface ShadowContext {
 
 export interface ShadowEffect<Context = unknown> {
     wgsl(group: number, binding: number): string;
+    readonly tint?: string;
     readonly call?: string;
     resources?(): readonly GPUBindingResource[];
     setup?(device: GPUDevice, map: ShadowEffectMap): void;
@@ -77,6 +78,7 @@ export interface ShadowPrepareContext {
 }
 
 export interface ShadowPrimitive {
+    transmits?: readonly number[];
     primitive?: object;
     node: Mesh;
     vertex: GPUBuffer;
@@ -142,7 +144,7 @@ export class Shadows implements EnginePlugin {
     shader(source: string, group?: number): string;
     pbr(group: number): {
         declarations: string;
-        direct(direct: string): string;
+        direct(direct: string, normal?: string): string;
     };
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;

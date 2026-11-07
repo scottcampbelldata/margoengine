@@ -1197,6 +1197,8 @@ interface DrawResource {
 }
 interface ShadowCasterRecord {
   primitive: PBRPrimitive;
+  /** Linear RGB of the light a diffuse transmission material lets through, for `transmission` of `@margoengine/shadows`. */
+  transmits?: readonly number[];
   node: Mesh;
   vertex: GPUBuffer;
   /** Byte offset and size of the primitive's vertices in `vertex` (a deformer's shared buffer). */
@@ -1320,6 +1322,10 @@ function fillShadow(r: DrawResource, value: ShadowCasterRecord): void {
   else delete value.opacity;
   if (m.vertexAlpha === false && value.cutoff > 0) value.vertexAlpha = false;
   else delete value.vertexAlpha;
+  // Rows 20 to 23 of `physical`: KHR_materials_diffuse_transmission's factor, then its colour. Its textures are not read.
+  const diffuse = m.extended?.diffuseTransmission ? m.physical! : undefined;
+  if (diffuse) value.transmits = [diffuse[21] * diffuse[20], diffuse[22] * diffuse[20], diffuse[23] * diffuse[20]];
+  else delete value.transmits;
   value.instances = p.instances;
   const displacement = m.displacement,
     clip = m.clip;

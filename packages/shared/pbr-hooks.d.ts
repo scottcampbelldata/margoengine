@@ -1,6 +1,6 @@
 export interface PBRHooks {
   readonly declarations: string;
-  direct?(direct: string): string;
+  direct?(direct: string, normal?: string): string;
   readonly light?: string;
   readonly ambient?: string;
   readonly coat?: string;

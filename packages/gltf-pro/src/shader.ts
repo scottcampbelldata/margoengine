@@ -195,8 +195,11 @@ ${lightingTerms}@fragment fn fragment(i:Out,@builtin(front_facing) front:bool)->
 export interface PBRLighting {
   /** Module-scope WGSL put before the shader: the effect's bindings in the group passed to `pbr(group)`, helper functions. */
   readonly declarations: string;
-  /** Wraps the directional light term (shadows), e.g. `direct => \`shadowLit(${direct},i.position,s.n)\``. */
-  direct?(direct: string): string;
+  /**
+   * Wraps the directional light term (shadows), e.g. `direct => \`shadowLit(${direct},i.position,s.n)\``. `normal`, when
+   * given, is the WGSL of the normal to use there in place of `s.n`: a surface lit from behind gives the side facing the light.
+   */
+  direct?(direct: string, normal?: string): string;
   /** vec3f light added before the directional term (local lights). */
   readonly light?: string;
   /** vec3f replacing the hemisphere ambient (image-based lighting). SSAO's ambient replay returns it. At most one effect. */
@@ -687,7 +690,7 @@ export const directWgsl = (anisotropic: boolean, scatter = false): string => `fn
 // The layering above is a Margo derivation; margoSky is the Margo design-choice hemisphere of lightingTerms.
 const ambientWgsl = (
   plan: ExtendedPlan,
-) => `fn margoSky(n:vec3f)->vec3f {return mix(vec3f(0.35,0.3,0.25),vec3f(1),clamp(n.y*0.5+0.5,0.0,1.0));}
+) => `${plan.diffuseTransmission ? 'fn margoLightSide(n:vec3f,l:vec3f)->vec3f {return select(n,-n,dot(n,l)<0.0);}\n' : ''}fn margoSky(n:vec3f)->vec3f {return mix(vec3f(0.35,0.3,0.25),vec3f(1),clamp(n.y*0.5+0.5,0.0,1.0));}
 fn margoFront(s:Surface)->Surface {var o=s; o.base=vec4f(s.base.rgb*(1-s.tr)*(1-s.dt.w)${plan.scatter ? '+s.sc' : ''},s.base.a); return o;}
 fn margoHemisphere(s:Surface)->vec3f {
   let f0=mix(mix(s.f0,s.base.rgb,s.metal),s.ir.rgb,s.ir.w); let k=(1-s.metal)*(1-s.tr);

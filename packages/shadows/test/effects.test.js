@@ -108,3 +108,24 @@ test('varianceFilter checks its settings', async () => {
   assert.doesNotThrow(() => new Shadows({ filter }));
   assert.throws(() => new Shadows({ filter: { nope: 1 } }), RangeError);
 });
+test('transmission moves what lets light through to the tint map', async () => {
+  const { transmission } = await import('../dist/transmission.js');
+  assert.throws(() => transmission({}), TypeError);
+  const leaf = { index: 1, transmits: [0.2, 0.4, 0.1] },
+    stem = { index: 2 },
+    glass = { index: 3, tint: [0.9, 0.9, 0.9] };
+  const source = transmission({ shadowPrimitives: [leaf, stem], tintPrimitives: [glass] }, { scale: 2 });
+  assert.deepEqual(source.shadowPrimitives, [stem]);
+  assert.deepEqual(source.tintPrimitives.map((p) => p.tint), [glass.tint, [0.4, 0.8, 0.2]]);
+  assert.throws(() => source.addLighting({ options: {} }), TypeError);
+  assert.doesNotThrow(() => source.addLighting({ options: { colored: true } }));
+  source.options.scale = -1;
+  assert.throws(() => source.tintPrimitives, RangeError);
+});
+test('a tint expression takes over the light behind a tint caster, and only then', async () => {
+  const { transmission } = await import('../dist/transmission.js');
+  const { effect } = transmission({ shadowPrimitives: [] });
+  const code = shadowSampling(0, 'hard', false, true, false, [effect]);
+  assert.ok(/shadowFxSpread40\(through,gap\)/.test(code));
+  assert.ok(!shadowSampling(0, 'hard', false, true, false, []).includes('gap'));
+});

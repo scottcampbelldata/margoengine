@@ -210,6 +210,33 @@ engine.start();
 
 The blur runs only when the map changes, and its cost follows the map's texels, not the lit pixels. Choose it over PCSS for a wide edge with no grain; choose PCSS where edges must harden towards the caster, because a variance edge has one width everywhere, and where casters overlap at different depths, because some light bleeds between them. `VirtualShadows` keeps its named filters: it has no map of this shape to blur.
 
+## Light through leaves
+
+`@margoengine/shadows/transmission` lets thin surfaces pass light on. Any primitive whose gltf-pro material has `KHR_materials_diffuse_transmission` tints the light behind it instead of blocking it; everything else casts as before.
+
+```ts
+import {EngineKernel, box} from 'margoengine/core';
+import {loadGLTF} from 'margoengine/gltf-pro';
+import {Shadows} from 'margoengine/shadows';
+import {transmission} from 'margoengine/shadows/transmission';
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend: 'webgpu'});
+const model = await loadGLTF(engine, 'plant.glb');
+const leaves = transmission(model, {size: 0.05});
+const shadows = Shadows.attach(engine, {colored: true, effects: [leaves.effect]});
+shadows.add(leaves);
+shadows.add(engine.createMesh().setGeometry(box(6, 0.02, 6)), {castShadow: false});
+engine.start();
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `size` | 0.05 | World radius of a leaf or sheet. A thin surface scatters what it passes, so a receiver `d` behind it takes `size^2 / (size^2 + d^2)` of it: leaves touching other leaves pass light on, and the ground far below gets little, as it does in a path tracer. Live. |
+| `scale` | 1 | Multiplies the light through, to stand for a transmission texture: Margo reads the material's factor and colour factor, not their textures. Live. |
+
+The side of a leaf away from the sun also keeps its glow under any `Shadows` or `VirtualShadows`, with or without this entry: gltf-pro asks for the shadow lookup on the side facing the light.
+
+`leaves.effect` spreads the light behind every tint caster of those shadows, so coloured glass in the same `Shadows` fades with distance too. It reads the tint depth directly, which a device at the compatibility level cannot do.
+
 ## Virtual shadow maps
 
 `margoengine/shadows/virtual` is a second, optional entry for one directional light: `VirtualShadows` keeps the texel density a camera needs at every distance, in small pages of depth, and renders only the pages that are seen and have changed. Importing it costs `Shadows` users nothing; the root entry does not reach it.

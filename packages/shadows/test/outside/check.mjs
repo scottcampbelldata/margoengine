@@ -72,7 +72,10 @@ try {
       either = 0,
       difference = 0,
       count = 0,
-      shadowed = 0;
+      shadowed = 0,
+      oursThrough = 0,
+      theirsThrough = 0,
+      through = 0;
     const out = new Uint8Array(width * height * 4);
     for (let y = 0; y < height; y++)
       for (let x = 0; x < width; x++) {
@@ -84,8 +87,9 @@ try {
             const q = (Math.min(height - 1, Math.max(0, y + j)) * width + Math.min(width - 1, Math.max(0, x + i))) * 4;
             hidden ||= mask.data[q] > 127;
           }
-        const base = linear(open.data[o + 1]),
-          ours = base > 0.004 ? Math.min(1, light(lit.data[o + 1]) / light(open.data[o + 1])) : 1,
+        // Red, as the reference: a tinted shadow has channels of its own.
+        const base = linear(open.data[o]),
+          ours = base > 0.004 ? Math.min(1, light(lit.data[o]) / light(open.data[o])) : 1,
           theirs = visibility.data[o + 1] / 255;
         out[o] = hidden ? 255 : ours * 255;
         out[o + 1] = hidden ? 0 : theirs * 255;
@@ -100,17 +104,33 @@ try {
         if (a && b) both++;
         if (a || b) either++;
         if (b) shadowed++;
+        // The light that reaches the ground inside the shadow.
+        if (theirs < (c.core ?? 0.9)) {
+          oursThrough += ours;
+          theirsThrough += theirs;
+          through++;
+        }
       }
     const row = {
       name: c.name,
       iou: +(both / either).toFixed(4),
       meanDifference: +(difference / count).toFixed(4),
       shadowedPixels: shadowed,
+      ours: +(oursThrough / through).toFixed(4),
+      theirs: +(theirsThrough / through).toFixed(4),
     };
     console.log(JSON.stringify(row));
     if (dump) {
       await mkdir(dump, { recursive: true });
       await writeFile(`${dump}/${c.name}.png`, encodePNG(width, height, out));
+    }
+    if (c.core) {
+      // Light deep in the shadow, by what cases.mjs allows: `near` of Cycles, or for a control at least `far` from it.
+      const gap = Math.abs(row.ours - row.theirs);
+      if (c.near !== undefined && gap > c.near) failures.push(`${c.name}: ${row.ours} of the light in the shadow, Cycles ${row.theirs}`);
+      if (c.far !== undefined && gap < c.far) failures.push(`${c.name}: the control reached ${row.ours}, Cycles ${row.theirs}`);
+      if (row.meanDifference > c.difference) failures.push(`${c.name}: mean difference ${row.meanDifference}, allowed ${c.difference}`);
+      continue;
     }
     if (shadowed < c.minShadow) failures.push(`${c.name}: only ${shadowed} shadowed pixels, so nothing is measured`);
     if (c.below !== undefined) {

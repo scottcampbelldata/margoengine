@@ -365,6 +365,8 @@ carry the same citation as a one-line comment in the code.
 | SH11 | cloud shadow: the sky's own coverage remap and erosion along the ray to the sun, Beer-Lambert opacity | shadows/src/light-function.ts | Schneider 2015, "The Real-Time Volumetric Cloudscapes of Horizon Zero Dawn" (as the sky's clouds) |
 | SH13 | variance shadow map: two moments, separable tent blur, Chebyshev upper bound | shadows/src/vsm.ts | Donnelly and Lauritzen 2006, "Variance Shadow Maps", I3D |
 | SH14 | light bleeding reduction: the bound remapped from an amount to 1 | shadows/src/vsm.ts | Lauritzen 2007, "Summed-Area Variance Shadow Maps", GPU Gems 3, chapter 8 |
+| SH15 | light through a thin surface: factor times colour, the back lit by the opposite-hemisphere BTDF | shadows/src/transmission.ts, gltf-pro/src/shader.ts | Khronos KHR_materials_diffuse_transmission specification |
+| SH16 | share of a scattering sheet at a distance: size^2 / (size^2 + d^2) | shadows/src/transmission.ts | Differential element to parallel disc configuration factor: Siegel and Howell, "Thermal Radiation Heat Transfer" |
 | SH12 | light pattern: a mask across a directional light | shadows/src/light-function.ts | Segal et al. 1992, "Fast Shadows and Lighting Effects Using Texture Mapping" (projective light textures) |
 
 ### shared

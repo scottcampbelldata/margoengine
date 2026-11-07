@@ -32,6 +32,11 @@ export interface ShadowEffectMap {
 export interface ShadowEffect<Context = unknown> {
   /** WGSL declarations for bind group `group`, resources named `shadowFx...` from binding `binding` up (four at most). */
   wgsl(group: number, binding: number): string;
+  /**
+   * With `colored`, a WGSL `vec3f` for the light reaching a receiver from a tint caster, over `through` (the tint map's
+   * colour) and `gap` (world distance behind the caster). Omitted, it goes straight on as `through`.
+   */
+  readonly tint?: string;
   /** A WGSL `vec3f` over `position` and `normal` that multiplies the light; omitted, the effect multiplies nothing. */
   readonly call?: string;
   /** The resources of those bindings in order, read when the receivers' bindings are made. */
@@ -132,6 +137,9 @@ export function shadowSampling(
           .replace('max(texel.x,', 'max(texel,')
           .replace('clamp(penumbra,texel.x,0.1)', 'clamp(penumbra,texel,vec2f(0.1))')
       : chosen;
+  // Declared first: its `tint` names the binding `wgsl` chose.
+  const declarations = effectDeclarations(group, effects),
+    spread = effects.find((effect) => effect.tint)?.tint;
   return /* wgsl */ `
 struct ShadowFrame {matrices:array<mat4x4f,4>,view:mat4x4f,splits:vec4f,ranges:vec4f,settings:vec4f,nearest:vec4f}
 @group(${group}) @binding(1) var<uniform> shadowFrame:ShadowFrame;
@@ -173,11 +181,11 @@ fn shadowTint(position:vec3f,normal:vec3f)->vec3f {
   let projected=shadowFrame.matrices[layer]*vec4f(position+normalize(normal)*shadowFrame.settings.z,1);
   let uv=projected.xy*vec2f(0.5,-0.5)+0.5;let reference=projected.z-shadowFrame.settings.y;
   if(any(uv<vec2f(0))||any(uv>vec2f(1))||reference<=0||reference>=1){return vec3f(1);}
-  return mix(textureSampleLevel(shadowTintMap,shadowTintSampler,uv,i32(layer),0).rgb,vec3f(1),textureSampleCompareLevel(shadowTintDepth,shadowSampler,uv,i32(layer),reference));
+  ${spread ? `let through=textureSampleLevel(shadowTintMap,shadowTintSampler,uv,i32(layer),0).rgb;let gap=max(reference-textureLoad(shadowTintDepth,vec2i(uv*vec2f(textureDimensions(shadowTintDepth))),i32(layer),0),0.0)*shadowFrame.ranges[layer];\n  return mix(${spread},vec3f(1),textureSampleCompareLevel(shadowTintDepth,shadowSampler,uv,i32(layer),reference));` : 'return mix(textureSampleLevel(shadowTintMap,shadowTintSampler,uv,i32(layer),0).rgb,vec3f(1),textureSampleCompareLevel(shadowTintDepth,shadowSampler,uv,i32(layer),reference));'}
 }
 `
     : ''
-}${effects.length ? 'fn shadowReach()->f32 {return shadowFrame.splits.w;}\n' : ''}${effectDeclarations(group, effects)}fn shadowLit(direct:vec3f,position:vec3f,normal:vec3f)->vec3f {if(all(direct==vec3f(0))){return direct;}return direct*shadowVisibility(position,normal)${colored ? '*shadowTint(position,normal)' : ''}${effectCalls(effects)};}
+}${effects.length ? 'fn shadowReach()->f32 {return shadowFrame.splits.w;}\n' : ''}${declarations}fn shadowLit(direct:vec3f,position:vec3f,normal:vec3f)->vec3f {if(all(direct==vec3f(0))){return direct;}return direct*shadowVisibility(position,normal)${colored ? '*shadowTint(position,normal)' : ''}${effectCalls(effects)};}
 `;
 }
 /** The effects' declarations. */

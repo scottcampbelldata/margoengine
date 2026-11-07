@@ -41,6 +41,7 @@ export function lightPattern<Context extends {
 
 interface ShadowEffect<Context = unknown> {
     wgsl(group: number, binding: number): string;
+    readonly tint?: string;
     readonly call?: string;
     resources?(): readonly GPUBindingResource[];
     setup?(device: GPUDevice, map: ShadowEffectMap): void;
