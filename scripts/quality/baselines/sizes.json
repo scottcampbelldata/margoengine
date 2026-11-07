@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10525264,
+  "total": 10527083,
   "history": [
     {
       "date": "2026-10-24",
@@ -3602,6 +3602,12 @@
       "commit": "97cd41aff",
       "reason": "new optional entry @margoengine/behavior/flowfield",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "ddd0a02d9",
+      "reason": "netcode: new optional entry ./webtransport (batch 114 job 3)",
+      "grew": 1
     }
   ],
   "items": {
@@ -4036,6 +4042,7 @@
     "@margoengine/netcode/smoothing": 1758,
     "@margoengine/netcode/webrtc": 998,
     "@margoengine/netcode/websocket": 1076,
+    "@margoengine/netcode/webtransport": 1819,
     "@margoengine/oit": 3808,
     "@margoengine/oit/depth": 2004,
     "@margoengine/oit/exact": 4537,

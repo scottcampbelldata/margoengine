@@ -1734,6 +1734,10 @@
       "types": "./dist/netcode/smoothing.d.ts",
       "import": "./dist/netcode/smoothing.js"
     },
+    "./netcode/webtransport": {
+      "types": "./dist/netcode/webtransport.d.ts",
+      "import": "./dist/netcode/webtransport.js"
+    },
     "./netcode/interest": {
       "types": "./dist/netcode/interest.d.ts",
       "import": "./dist/netcode/interest.js"

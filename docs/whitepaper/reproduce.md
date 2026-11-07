@@ -172,6 +172,7 @@ route is a clone because 1.0.0 is not on npm yet.
 | FBX PBR materials from Max and Maya | `node --test packages/fbx/test/pbr.test.js` after `npm run build --workspace @margoengine/fbx` reads real 3ds Max and Maya files. |
 | FBX curves and deformers against Max and Maya | `node --test packages/fbx/test/curves.test.js packages/fbx/test/deformers.test.js` after `npm run build --workspace @margoengine/fbx` reads real files and Maya's OBJ frames. |
 | FBX camera and light export in Blender | Write a scene with `exportFBX`, then `blender --background --factory-startup --python packages/fbx/test/fixtures/blender-read-export.py -- /absolute/file.fbx /absolute/out.json` and compare the JSON with the scene, Blender's axes being x, -z, y. |
+| WebTransport in a real browser against a real HTTP/3 server | `python -m venv <folder>`, `<folder>/Scripts/python -m pip install aioquic==1.7.2`, `npm run build --workspace @margoengine/netcode`, then `node packages/netcode/tests/webtransport-proof/proof.mjs <folder>/Scripts/python`. It starts `server.py`, opens the built `openWebTransport` in Playwright's Chromium, and prints each message and `proof passed` | no | console | By hand, 2026-11-07 |
 | Unit tests, API snapshots, size gate | `npm run verify` | no | console | `npm run verify:full` adds packed-package and interop suites. |
 
 ## A second machine

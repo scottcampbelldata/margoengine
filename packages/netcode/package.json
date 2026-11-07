@@ -51,6 +51,10 @@
       "types": "./dist/smoothing.d.ts",
       "import": "./dist/smoothing.js"
     },
+    "./webtransport": {
+      "types": "./dist/webtransport.d.ts",
+      "import": "./dist/webtransport.js"
+    },
     "./interest": {
       "types": "./dist/interest.d.ts",
       "import": "./dist/interest.js"

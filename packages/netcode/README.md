@@ -351,6 +351,14 @@ Each transport is its own entry, so an app loads only the one it uses.
   wraps them as a `Connection`, so snapshots and inputs really are unreliable and never wait behind a lost packet.
   Signalling (offer, answer, ICE candidates) is yours to carry, over any channel. Works for client-server and for
   `RollbackSession` peers.
+- `@margoengine/netcode/webtransport`: `openWebTransport(url, { signal, serverCertificateHashes, congestionControl })`
+  resolves with a `Connection` over the W3C WebTransport class on HTTP/3: 'unreliable' messages are real datagrams, so a
+  lost snapshot never holds up the next, with no ICE and no signalling, and 'reliable' messages go length-prefixed on
+  one bidirectional stream. A message bigger than `maxDatagramSize` goes on the stream rather than vanish, and a full
+  datagram queue drops the message, a stale snapshot being worse than none. Where there is no WebTransport it rejects
+  with code `unsupported`: fall back to `openWebSocket`. The server end is yours to host: Node has no HTTP/3 server, so
+  `acceptWebTransport(session)` takes a session of the W3C shape from the HTTP/3 server you run and gives the `Connection`
+  for `server.accept`, and `webTransportConnection(session, stream)` wraps a stream you opened yourself. See "WebTransport" below.
 - `@margoengine/netcode/node` (Node only): `listenWebSocket({ port, host, path, origins, maxConnections, firstMessageTimeout, maxPayload })` is a WebSocket
   server written here from RFC 6455 on `node:http` and `node:crypto` (no dependency): binary messages only (text
   closes with 1003), client frames must be masked (1002), messages over `maxPayload` (default 64 KiB) close with 1009,
@@ -408,6 +416,49 @@ Behind TLS: run it on a private port behind a reverse proxy (nginx, Caddy) that 
 upgrade. The default `origins` compares the page's Origin with the request's `Host` header, so if the proxy rewrites
 `Host` (or the page is served from another host than the game server), set `origins` to your site's origin, for
 example `origins: ['https://game.example.com']`; `origins: '*'` accepts any page.
+
+## WebTransport
+
+```ts
+import { defineGame, defineSchema, GameClient, type GameServer } from '@margoengine/netcode';
+import { acceptWebTransport, openWebTransport, type WebTransportSession } from '@margoengine/netcode/webtransport';
+
+const schema = defineSchema({
+  types: {
+    Input: { x: 'f32' },
+    State: { x: 'f32' },
+  },
+} as const);
+const game = defineGame({
+  schema,
+  state: 'State',
+  input: 'Input',
+  initial: () => ({ x: 0 }),
+  step(state, inputs, _tick, dt) {
+    for (const [, input] of inputs) state.x += input.x * dt;
+  },
+});
+
+// In a browser: one line. A session that is not up rejects with a coded error; `signal` aborts it.
+async function join(url: string) {
+  const connection = await openWebTransport(url);
+  return GameClient.join(game, connection, { input: () => ({ x: 1 }) });
+}
+
+// In the HTTP/3 server you run: hand each session of the W3C shape to the game.
+async function welcome(server: GameServer<unknown, unknown>, session: WebTransportSession) {
+  server.accept(await acceptWebTransport(session));
+}
+
+console.log('ready to wire up', join.name, welcome.name);
+```
+
+- A server with no public certificate passes `serverCertificateHashes` from a self-signed certificate of at most 14 days, the browser's rule.
+- `congestionControl` defaults to `'low-latency'` here, for snapshots; it is a hint the browser may ignore.
+- Chromium reported a `maxDatagramSize` of 1,211 B on loopback. A snapshot over the limit goes on the stream, in order and behind anything lost, so keep snapshots small (see the budgets of `@margoengine/netcode/interest`).
+- Options shared with the other transports: `dropUnreliableAbove` (default 65,536 B waiting on the stream) and `maxMessageBytes` (default 16 MiB; a bigger reliable message closes the connection with `CloseCode.rateLimit`).
+- Close codes and reasons reach the other end; a reason is cut to 1,024 bytes on a character boundary, as the W3C API asks.
+- Proved against a real browser and a real HTTP/3 server: `packages/netcode/tests/webtransport-proof/` runs Chromium against an echo server on the outside tool aioquic, which is test-only and is not shipped.
 
 ## Rooms and matchmaking
 
@@ -544,7 +595,7 @@ Opened straight from disk (`file://`) the page cannot run modules and says so, w
   differ from the prediction and the client replays its unconfirmed ticks each time. That is correct but costs CPU in
   proportion to the lead (a few ticks) times the step's cost. Draw other players from `interpolated()`, not from
   `predicted`.
-- Corrections are applied at once; there is no visual smoothing of a correction yet.
+- Corrections are applied at once to `client.predicted`. To draw them eased over a few frames use `CorrectionSmoother`.
 - Snapshots go to every client every `snapshotEvery` ticks, the whole state (or your `view` of it) as a delta; there
   is no priority or bandwidth budget per entity yet. Measured on the arena fixture (8 players, 4 crates): 99 bytes per
   snapshot on average.
@@ -605,7 +656,7 @@ Clean room, from public descriptions only: Glenn Fiedler's articles "Fix Your Ti
 interpolation); Yahn Bernier, "Latency Compensating Methods in Client/Server In-game Protocol Design and
 Optimization" (GDC 2001); Timothy Ford, "Overwatch Gameplay Architecture and Netcode" (GDC 2017); F. Cristian,
 "Probabilistic clock synchronization" (1989); the LEB128 and zigzag encodings as specified for DWARF and Protocol
-Buffers; FNV-1a as published by Fowler, Noll and Vo. No library's source was read.
+Buffers; FNV-1a as published by Fowler, Noll and Vo; the W3C WebTransport Candidate Recommendation, in part. No library's source was read.
 
 Apache-2.0. Optional, tree-shakable package; depends on `@margoengine/math` and `@margoengine/net` only.
 

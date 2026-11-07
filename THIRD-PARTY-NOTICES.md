@@ -246,3 +246,4 @@ Install scripts anywhere in the lock: fsevents@2.3.3, webgpu@0.6.2. Deprecated: 
 install script only clears the macOS quarantine flag on its binary. `rhino3dm` and `laz-perf` are not in the lock: the opt-in
 `test:real-files:runtimes` tool of `@margoengine/loaders` fetches them at pinned versions into an ignored folder, for real-file tests only. CI and releases install with `npm ci`, which refuses a lockfile that does not match `package.json` and checks
 every tarball against its integrity hash.
+`aioquic` (BSD-3-Clause) is not in the lock: `packages/netcode/tests/webtransport-proof/server.py` uses it through a Python virtual environment of your own, for the by-hand WebTransport proof only. It is never shipped.

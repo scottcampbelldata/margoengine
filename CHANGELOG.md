@@ -4,6 +4,7 @@
 
 ### Networking
 
+- `@margoengine/netcode/webtransport`: `openWebTransport`, `acceptWebTransport` and `webTransportConnection` give a `Connection` of real datagrams and a reliable stream over HTTP/3, proved in Chromium against a real HTTP/3 server. The server host is yours to supply: Node has no HTTP/3 server.
 - `@margoengine/netcode/smoothing`: `CorrectionSmoother` blends prediction errors away over a few frames instead of snapping, while the simulation stays exact. `GameClient` gains `oncorrection(before, after)`.
 - `@margoengine/netcode/interest`: `InterestManager` sends each client only the entities near it, by accumulated priority, within a byte budget per snapshot. The `view` of `GameServer` now also gets the state the client confirmed.
 - `GameClient.join` no longer waits for ever when its first ping is lost.
