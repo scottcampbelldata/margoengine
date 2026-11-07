@@ -278,6 +278,10 @@
       "types": "./dist/blender/pbr-ext.d.ts",
       "import": "./dist/blender/pbr-ext.js"
     },
+    "./blender/live": {
+      "types": "./dist/blender/live.d.ts",
+      "import": "./dist/blender/live.js"
+    },
     "./bvh": {
       "types": "./dist/bvh.d.ts",
       "import": "./dist/bvh.js"

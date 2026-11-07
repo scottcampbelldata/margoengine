@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import { build } from "vite";
@@ -733,8 +733,93 @@ try {
   );
   results.push({ glass });
 
+  // Live link (real Blender 5.2.3 session): the add-on serves a red plane, the page draws it, Blender turns it blue
+  // and the same margoLive loop draws the blue one.
+  if (process.env.MARGO_BLENDER) {
+    const blender = spawn(
+      process.env.MARGO_BLENDER,
+      [
+        "--background",
+        "--factory-startup",
+        "--python-exit-code",
+        "1",
+        "--python",
+        "tools/blender-addon/tests/blender_live.py",
+      ],
+      { stdio: ["ignore", "pipe", "inherit"] },
+    );
+    const exited = new Promise((resolve) => blender.on("exit", resolve));
+    let output = "";
+    const url = await new Promise((resolve, reject) => {
+      // A hard bound for Blender to start and listen, which a working run never nears.
+      const timer = setTimeout(() => reject(new Error(`Blender's live link did not start: ${output}`)), 120_000);
+      blender.stdout.on("data", (chunk) => {
+        output += chunk;
+        const found = /MARGO_LIVE (\S+)/.exec(output);
+        if (found) {
+          clearTimeout(timer);
+          resolve(found[1]);
+        }
+      });
+      blender.on("exit", (code) => reject(new Error(`Blender exited ${code} before its live link started: ${output}`)));
+    });
+    let liveShots;
+    try {
+      liveShots = await page.evaluate(async (url) => {
+        const { Engine } = await import("/packages/core/dist/index.js");
+        const { margoLive } = await import("/packages/blender/dist/live.js");
+        const { waitForPipelines } = await import("/scripts/support/gpu-ready.js");
+        const canvas = document.createElement("canvas");
+        canvas.style.cssText = "width:256px;height:256px";
+        document.body.append(canvas);
+        const engine = await Engine.create(canvas, {
+          backend: "webgpu",
+          capacity: 16,
+          camera: { position: [0, 3, 0.001], target: [0, 0, 0] },
+        });
+        engine.camera.up = [0, 0, -1];
+        engine.gpu.pushErrorScope("validation");
+        const shots = [];
+        for await (const model of margoLive(engine, url, { signal: AbortSignal.timeout(120_000) })) {
+          await waitForPipelines(async () => {
+            engine.render({ culling: false });
+            await engine.gpu.queue.onSubmittedWorkDone();
+          });
+          shots.push({ image: canvas.toDataURL(), meshes: engine.meshes.size });
+          if (shots.length === 2) break;
+        }
+        const validation = (await engine.gpu.popErrorScope())?.message ?? null;
+        const left = engine.meshes.size;
+        engine.dispose();
+        canvas.remove();
+        return { shots, validation, left };
+      }, url);
+    } catch (error) {
+      // Blender waits for the page; a failed page check must not leave it running.
+      blender.kill();
+      throw error;
+    }
+    assert.equal(await exited, 0, `Blender's live link script failed: ${output}`);
+    assert.equal(liveShots.validation, null);
+    assert.equal(liveShots.shots.length, 2, "the page did not get both versions");
+    assert.equal(liveShots.left, 0, "the last live model was not disposed when the loop ended");
+    const colours = [];
+    for (const [i, shot] of liveShots.shots.entries()) {
+      const bytes = Buffer.from(shot.image.split(",")[1], "base64");
+      await writeFile(`test-results/blender/live-${i + 1}.png`, bytes);
+      const image = await decodePNG(bytes),
+        p = (Math.round(image.height / 2) * image.width + Math.round(image.width / 2)) * 4;
+      colours.push([...image.data.subarray(p, p + 3)]);
+    }
+    assert.ok(colours[0][0] > colours[0][2] + 40, `version 1 is not red: ${colours[0]}`);
+    assert.ok(colours[1][2] > colours[1][0] + 40, `the edited version is not blue: ${colours[1]}`);
+    assert.equal(liveShots.shots[1].meshes, liveShots.shots[0].meshes, "the old version was not disposed");
+    results.push({ live: { colours } });
+  }
+
+
   for (let i = 0; i < results.length; i++) {
-    if (results[i].animated || results[i].components || results[i].baked || results[i].glass) continue;
+    if (results[i].animated || results[i].components || results[i].baked || results[i].glass || results[i].live) continue;
     const screenshot = Buffer.from(
         results[i].screenshot.split(",")[1],
         "base64",

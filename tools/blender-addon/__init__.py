@@ -11,9 +11,13 @@ bl_info = {
 if __package__.startswith("bl_ext."):
     del bl_info  # Extensions use their manifest; keep legacy discovery metadata above.
 
+import os
+import tempfile
+
 import bpy
 from bpy_extras.io_utils import ExportHelper
 from .exporter import export_scene
+from .live import LiveLink
 
 
 class EXPORT_SCENE_OT_margo(bpy.types.Operator, ExportHelper):
@@ -39,15 +43,79 @@ class EXPORT_SCENE_OT_margo(bpy.types.Operator, ExportHelper):
         return {"FINISHED"}
 
 
+def live_export(bake_size=256):
+    """export(context) -> the .margo bytes of the scene, through a temporary file (export_scene writes atomically)."""
+
+    def export(context):
+        handle, path = tempfile.mkstemp(suffix=".margo")
+        os.close(handle)
+        try:
+            export_scene(context, path, bake_size=bake_size)
+            with open(path, "rb") as file:
+                return file.read()
+        finally:
+            os.remove(path)
+
+    return export
+
+
+links = {}  # the running live link, at most one per Blender session
+
+
+class MARGO_OT_live_link(bpy.types.Operator):
+    """Serve the scene to running pages and update them as it changes (@margoengine/blender/live)"""
+
+    bl_idname = "margo.live_link"
+    bl_label = "Margo Live Link"
+    port: bpy.props.IntProperty(name="Port", description="Local port pages connect to; 0 picks a free one", default=8765, min=0, max=65535)
+    bake_size: bpy.props.IntProperty(name="Bake size", description="Bake size for node materials while live; 0 turns baking off", default=256, min=0, max=4096)
+
+    def execute(self, context):
+        if "link" in links:
+            links.pop("link").stop()
+            self.report({"INFO"}, "Margo live link stopped")
+            return {"FINISHED"}
+        link = LiveLink(live_export(self.bake_size), port=self.port)
+        try:
+            url = link.start()
+        except OSError as error:
+            self.report({"ERROR"}, f"Margo live link could not listen on port {self.port}: {error}")
+            return {"CANCELLED"}
+        links["link"] = link
+        self.report({"INFO"}, f"Margo live link at {url}")
+        return {"FINISHED"}
+
+
+class MARGO_PT_live_link(bpy.types.Panel):
+    bl_label = "Margo Live Link"
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_category = "Margo"
+
+    def draw(self, context):
+        link = links.get("link")
+        self.layout.operator(MARGO_OT_live_link.bl_idname, text="Stop live link" if link else "Start live link")
+        if link and link.server:
+            self.layout.label(text=link.server.url)
+            if link.error:
+                self.layout.label(text=link.error, icon="ERROR")
+
+
 def menu_export(self, context):
     self.layout.operator(EXPORT_SCENE_OT_margo.bl_idname, text="Margo (.margo)")
 
 
 def register():
     bpy.utils.register_class(EXPORT_SCENE_OT_margo)
+    bpy.utils.register_class(MARGO_OT_live_link)
+    bpy.utils.register_class(MARGO_PT_live_link)
     bpy.types.TOPBAR_MT_file_export.append(menu_export)
 
 
 def unregister():
+    if "link" in links:
+        links.pop("link").stop()
+    bpy.utils.unregister_class(MARGO_PT_live_link)
+    bpy.utils.unregister_class(MARGO_OT_live_link)
     bpy.types.TOPBAR_MT_file_export.remove(menu_export)
     bpy.utils.unregister_class(EXPORT_SCENE_OT_margo)

@@ -42,6 +42,10 @@
     "./pbr-ext": {
       "types": "./dist/pbr-ext.d.ts",
       "import": "./dist/pbr-ext.js"
+    },
+    "./live": {
+      "types": "./dist/live.d.ts",
+      "import": "./dist/live.js"
     }
   },
   "scripts": {

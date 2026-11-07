@@ -11,3 +11,4 @@ tags = ["Import-Export"]
 
 [permissions]
 files = "Read textures and export .margo scenes"
+network = "Live link: serve the scene to pages on this machine (127.0.0.1 only)"

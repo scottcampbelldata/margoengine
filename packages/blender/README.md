@@ -61,7 +61,7 @@ The exporter uses Blender native bulk reads and bundled NumPy, with Python 3.11+
 
 Supported materials: direct Principled BSDF; constant metallic/roughness; constant or direct sRGB image base color and emission; tangent-space Non-Color normal maps; constant alpha or the base image's alpha; active UV map; repeat/clamp wrapping and linear/nearest filtering. Embedded images use RGBA8 PNG. Each image is limited to 4096 × 4096, all decoded images to 256 MiB, the file to 256 MiB, and the manifest to 1 MiB. Export writes atomically, so a failed export preserves an existing asset.
 
-Any other surface material is baked at export (next section). Transmission, IOR, coat, sheen and subsurface export as glTF material extensions (see Extended Principled inputs). Unsupported inputs fail by material/object name: linked (textured) transmission, IOR, coat, sheen or subsurface, a coat with an IOR other than 1.5, a tint or a normal map, specular and anisotropy other than the defaults, volume and displacement outputs, HDR textures/emission, and any material that needs baking when baking is off. Geometry Nodes mesh outputs/mesh instances are evaluated; curves, points and volumes must be converted to meshes first. Live link is a subsequent milestone. Emission stays separate from optional tone mapping.
+Any other surface material is baked at export (next section). Transmission, IOR, coat, sheen and subsurface export as glTF material extensions (see Extended Principled inputs). Unsupported inputs fail by material/object name: linked (textured) transmission, IOR, coat, sheen or subsurface, a coat with an IOR other than 1.5, a tint or a normal map, specular and anisotropy other than the defaults, volume and displacement outputs, HDR textures/emission, and any material that needs baking when baking is off. Geometry Nodes mesh outputs/mesh instances are evaluated; curves, points and volumes must be converted to meshes first. Edits reach a running page through the live link (Live link, below). Emission stays separate from optional tone mapping.
 
 ## Node materials: baked at export
 
@@ -89,6 +89,26 @@ window.addEventListener('pagehide', () => { model.dispose(); stage.dispose(); },
 ```
 
 `parseMargoPBR(engine, bytes)` does the same from bytes; `margoMaterialExtensions` lists what the add-on writes. The physical shader's WGSL loads only with this entry. A real Blender 5.2.3 LTS export carries Blender's values (LIM-408; `tests/pbr-ext.test.js`), and on the GPU its glass plane shows the backdrop behind it.
+
+## Live link: edits in Blender reach a running page
+
+Open the **Margo** tab of the 3D Viewport's sidebar (N) and press **Start live link**. The add-on serves the scene on this machine only (`http://127.0.0.1:8765/` by default; the operator `margo.live_link` takes `port`, and `bake_size`, 256 while live) and exports it again after each edit Blender reports (geometry, transforms, materials or properties), at most four times a second. The `live` entry follows it: each version is fetched, attached, and the one before disposed.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {margoLive} from 'margoengine/blender/live';
+const canvas = document.querySelector<HTMLCanvasElement>('canvas')!;
+const engine = await Engine.create(canvas, {backend:'webgpu'});
+engine.start();
+const stop = new AbortController();
+window.addEventListener('pagehide', () => stop.abort(), {once:true});
+for await (const model of margoLive(engine, 'http://127.0.0.1:8765/', {signal: stop.signal})) {
+  const b = model.bounds; // the version Blender holds now; the previous one is already disposed
+  engine.camera.fitToBoundingBox([b[0],b[1],b[2]], [b[3],b[4],b[5]], {duration:0});
+}
+```
+
+Edits that arrive while a version loads are coalesced, so only the newest is fetched. Ending the loop (break, `signal`, an error) disposes the last model. Pass `parse: parseMargoPBR` from `margoengine/blender/pbr-ext` for transmission, coat, sheen and subsurface. While Blender is closed the page keeps the last model and the browser reconnects; a version that fails to export leaves the page on the last good one and the panel shows why. The server binds 127.0.0.1 and answers only pages served from this machine (`localhost`, `127.0.0.1`, `[::1]` or a `.localhost` name), so a web site in another tab cannot read the scene. With a real Blender 5.2.3 LTS session the page draws the red plane Blender serves, and the same loop draws it blue after Blender's material edit, with the first version disposed (LIM-410; `tests/live.test.js`, `tools/blender-addon/tests/test_live.py`).
 
 ## Characters: armatures, skins, shape keys and actions
 
