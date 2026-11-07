@@ -6,6 +6,7 @@ import { boxGeometry } from '/packages/geometry/dist/primitives.js';
 import { createInstancedMesh, createMesh, Material } from '/packages/materials/dist/index.js';
 import { CulledInstances } from '/packages/culling/dist/index.js';
 import { Shadows } from '/packages/shadows/dist/index.js';
+import { VirtualShadows } from '/packages/shadows/dist/virtual.js';
 import { PostStack } from '/packages/post/dist/stack.js';
 import { Bloom } from '/packages/post/dist/bloom.js';
 import { Tonemap } from '/packages/tonemap/dist/index.js';
@@ -172,6 +173,9 @@ const PACKAGES = {
   shadows(engine) {
     const shadows = Shadows.attach(engine, { resolution: 256, distance: 20 });
     shadows.add(scene(engine));
+  },
+  'virtual shadows soft'(engine) {
+    VirtualShadows.attach(engine, { poolSize: 1024 }).add(scene(engine));
   },
   'materials createMesh': (engine) => createMesh(engine, boxGeometry(1, 1, 1), new Material({ color: '#ff2000' })),
   'materials createInstancedMesh': (engine) => {

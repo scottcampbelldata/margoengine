@@ -129,3 +129,18 @@ test('a tint expression takes over the light behind a tint caster, and only then
   assert.ok(/shadowFxSpread40\(through,gap\)/.test(code));
   assert.ok(!shadowSampling(0, 'hard', false, true, false, []).includes('gap'));
 });
+
+test("the 'soft' search reads the pool as float on a device at the compatibility level", () => {
+  const shadows = new VirtualShadows({ filter: 'soft' }),
+    full = shadows.pbr(2).declarations;
+  assert.doesNotMatch(full, /shadowDepth/);
+  assert.match(full, /textureLoad\(shadowMap/);
+  const level = new VirtualShadows({ filter: 'soft' });
+  level.device = { features: new Set() };
+  const code = level.pbr(2).declarations;
+  assert.match(code, /@group\(2\) @binding\(30\) var shadowDepth:texture_2d<f32>/);
+  assert.doesNotMatch(code, /textureLoad\(shadowMap/);
+  const pcf = new VirtualShadows({ filter: 'pcf' });
+  pcf.device = { features: new Set() };
+  assert.doesNotMatch(pcf.pbr(2).declarations, /shadowDepth/);
+});

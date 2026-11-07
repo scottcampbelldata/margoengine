@@ -45,13 +45,21 @@ fn shadowNoise(position:vec3f)->f32 {
 `;
 const firstLevel = /* wgsl */ `fn shadowFirst(footprint:f32)->u32 {return u32(clamp(ceil(log2(max(footprint,0.0000001)*126.0/shadowFrame.levels[0].w)),0.0,shadowFrame.info.z-1.0));}`;
 /** Receiver declarations and `shadowLit`, for bind group `group`. */
-export function virtualSampling(group: number, filter: ShadowFilter = 'soft', effects: readonly ShadowEffect[] = []): string {
+export function virtualSampling(
+  group: number,
+  filter: ShadowFilter = 'soft',
+  effects: readonly ShadowEffect[] = [],
+  level = false,
+): string {
+  // The compatibility level forbids textureLoad of a depth texture: the search reads the pool bound again as float.
+  const search = level && filter === 'soft';
   return /* wgsl */ `
 ${frame}
 @group(${group}) @binding(1) var<uniform> shadowFrame:ShadowFrame;
 @group(${group}) @binding(2) var shadowMap:texture_depth_2d;
 @group(${group}) @binding(3) var shadowSampler:sampler_comparison;
-@group(${group}) @binding(31) var shadowPages:texture_2d_array<u32>;
+${search ? `@group(${group}) @binding(30) var shadowDepth:texture_2d<f32>;
+` : ''}@group(${group}) @binding(31) var shadowPages:texture_2d_array<u32>;
 ${firstLevel}
 fn shadowPage(light:vec2f,first:u32)->vec4f {
   for(var level=first;level<u32(shadowFrame.info.z);level++){
@@ -79,7 +87,7 @@ ${filter === 'soft' ? soft : ''}fn shadowVisibility(position:vec3f,normal:vec3f)
   let facing=vec3f(dot(n,shadowFrame.right.xyz),dot(n,shadowFrame.up.xyz),dot(n,shadowFrame.forward.xyz));var slope=vec2f(0);
   if(abs(facing.z)>0.001){slope=clamp(-facing.xy/facing.z,vec2f(-2),vec2f(2));}
   reference-=(abs(slope.x)+abs(slope.y))*found.z*0.5/range;let level=u32(found.w);
-  ${filters[filter]}
+  ${search ? filters.soft.replace('textureLoad(shadowMap,vec2i(page.xy*dimensions),0)', 'textureLoad(shadowDepth,vec2i(page.xy*dimensions),0).x') : filters[filter]}
 }
 ${effectDeclarations(group, effects)}fn shadowLit(direct:vec3f,position:vec3f,normal:vec3f)->vec3f {if(all(direct==vec3f(0))){return direct;}return ${effectLight(effects, 'shadowVisibility(position,normal)')};}
 `;

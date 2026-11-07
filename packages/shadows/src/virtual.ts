@@ -11,6 +11,7 @@ import {
 } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
 import { preset } from '../../shared/preset.js';
+import { compatibilityLevel } from '../../shared/compat.js';
 import { instancedDepth } from '../../shared/instances.js';
 import { displacedDepth } from '../../shared/displacement.js';
 import { shadowPrimitivesInto, coreReceives, unshadowedCore } from '../../shared/shadow-source.js';
@@ -391,7 +392,7 @@ export class VirtualShadows implements EnginePlugin {
         'unsupported',
         "VirtualShadows require the standard PBR lighting shader; remove the plugin that replaced core's shader",
       );
-    const output = virtualSampling(group, filter, this.effects as readonly ShadowEffect[]) + code;
+    const output = virtualSampling(group, filter, this.effects as readonly ShadowEffect[], compatibilityLevel(this.device!)) + code;
     if (!cache) this.shaders.set(key, (cache = new Map()));
     cache.set(source, output);
     return output;
@@ -405,7 +406,7 @@ export class VirtualShadows implements EnginePlugin {
       this.hooks.set(
         key,
         (hooks = {
-          declarations: virtualSampling(group, filter, this.effects as readonly ShadowEffect[]),
+          declarations: virtualSampling(group, filter, this.effects as readonly ShadowEffect[], compatibilityLevel(this.device!)),
           direct: (d, n) => (n ? `shadowLit(${d},i.position,${n})` : `shadowLit(${d},i.position,s.n)`),
         }),
       );
@@ -461,14 +462,16 @@ export class VirtualShadows implements EnginePlugin {
     this.white = device.createTexture({ size: [1, 1], format: 'rgba8unorm', usage });
     device.queue.writeTexture({ texture: this.white }, new Uint8Array(4).fill(255), { bytesPerRow: 4 }, [1, 1]);
     this.whiteView = this.white.createView();
+    const poolView = this.pool.createView();
     this.entries = [
       { binding: 1, resource: { buffer: this.uniform } },
-      { binding: 2, resource: this.pool.createView() },
+      { binding: 2, resource: poolView },
       { binding: 3, resource: this.sampler },
       { binding: 31, resource: this.tableTexture.createView({ dimension: '2d-array' }) },
     ];
     for (const effect of this.effects) effect.setup?.(device, { width: size, height: size, layers: 1 });
     this.entries.push(...effectEntries(this.effects as readonly ShadowEffect[]));
+    if ((o.filter ?? 'soft') === 'soft' && compatibilityLevel(device)) this.entries.push({ binding: 30, resource: poolView });
     const words = (levels * PAGES_PER_SIDE * PAGES_PER_SIDE) / 32;
     this.requestBuffer = device.createBuffer({
       size: words * 4,
@@ -500,7 +503,11 @@ export class VirtualShadows implements EnginePlugin {
             .replace('@binding(1) var<uniform> shadowFrame', `@binding(${base}) var<uniform> shadowFrame`)
             .replace('@binding(2) var shadowMap', `@binding(${base + 1}) var shadowMap`)
             .replace('@binding(3) var shadowSampler', `@binding(${base + 2}) var shadowSampler`)
-            .replace('@binding(31) var shadowPages', `@binding(${base + 3}) var shadowPages`);
+            .replace('@binding(31) var shadowPages', `@binding(${base + 3}) var shadowPages`)
+            .replace(
+              '@binding(30) var shadowDepth',
+              `@binding(${base + entries.findIndex((e) => e.binding === 30)}) var shadowDepth`,
+            );
           entries.forEach((entry, i) => c.bindings.push({ ...entry, binding: base + i }));
         } else {
           c.shader = this.shader(c.shader);

@@ -104,8 +104,9 @@ What it does:
   draws: 10 ms instead of 0.9 s a frame at 720p); splats sort their depth keys in one CPU dispatch (18 ms instead of
   44 ms for 10,000 splats; one readback of the keys a frame); `CulledInstances` and `CulledMeshes` cull against the
   frustum on the CPU and upload what they keep (1.1 ms instead of 11.7 ms for 10,000 parts; `'occlusion'` culls
-  against the frustum only there). Each draws the same pixels as on native WebGPU. VFX, creative particles and
-  scatter run their WebGPU kernels on the CPU tier, the plan's route for them. The voxel path tracer runs its `trace` kernel as a fragment shader with four float targets and the rest on the tiers above; ANGLE's Direct3D backend does not finish compiling it, so that page keeps the raster image (its [README](../voxel-pathtracer/README.md#on-the-webgl2-compatibility-layer)).
+  against the frustum only there). Each draws the same pixels as on native WebGPU. VFX, with its creative particles preset, and
+  `Scatter` run their kernels as point draws on the GPU (`compat.ts` in each package). `ScatterTiles` runs its WebGPU
+  kernels on the CPU tier. The voxel path tracer runs its `trace` kernel as a fragment shader with four float targets and the rest on the tiers above; ANGLE's Direct3D backend does not finish compiling it, so that page keeps the raster image (its [README](../voxel-pathtracer/README.md#on-the-webgl2-compatibility-layer)).
 - **WGSL front end** (`margoengine/webgl2-compat/wgsl`, milestone M1): `checkWGSL(source)` and `parseWGSL(source)`.
 - `webgl2Capabilities(gl)` and `probeWebGL2()`: what a browser's WebGL2 offers and the tier it reaches. The layer
   renders only on the `full` tier: renderable float colour targets (`EXT_color_buffer_float`) and `highp` in fragment

@@ -41,7 +41,7 @@ try {
   assert.ok(result.levels.edlLit > 0, 'points reach the frame');
   assert.equal(result.levels.edl.count, 0, 'the eye-dome lit frame is the same at both levels');
   // Each of these runs on the level.
-  for (const name of ['core alone', 'materials createMesh', 'materials createInstancedMesh', 'shadows', 'culling', 'post bloom and tonemap'])
+  for (const name of ['core alone', 'virtual shadows soft', 'materials createMesh', 'materials createInstancedMesh', 'shadows', 'culling', 'post bloom and tonemap'])
     assert.match(result.packages[name], /^ok, [1-9]/, name);
   assert.deepEqual(pageErrors, []);
 } finally {
