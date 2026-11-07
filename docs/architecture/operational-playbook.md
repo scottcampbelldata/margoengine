@@ -397,7 +397,7 @@ Packages on the level (2026-11-06): the adapter's `createShaderModule` turns a d
 float type with `.x` on each load, and default layouts then bind it `unfilterable-float`, so culling's pyramid and
 Shadows' nearest depth run unchanged. `compatibilityLevel` in `packages/shared/compat.js` names the rest: Shadows binds
 its map a second time as float for the blocker search (a depth texture takes no plain sampler there), `SceneTarget`
-copies 4x depth with one masked draw per sample (no `sample_index`), Bloom keeps each level in its own texture (no two
+copies 4x depth with one masked draw per sample (no `sample_index`), points' eye-dome lighting does the same and draws its depth in a second pass, as bytes in rgba8unorm (r32float does not multisample at the level, and it has no blend to match the colour target's), the frame equal to the full level's on the forced device, Bloom keeps each level in its own texture (no two
 views of one texture in a dispatch) and `PostStack` captures 4x in `rg11b10ufloat`. Evidence in the same check: Shadows
 0 bytes apart from the full level with a real shadow on the floor, four depth samples read back as written, the post
 frame within 2 of 255. Missing: fog, volumetrics, points, water spray and soft `VirtualShadows` (known-bugs.md).

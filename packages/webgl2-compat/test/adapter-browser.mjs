@@ -36,6 +36,10 @@ try {
   assert.equal(result.levels.shadow.count, 0, 'the shadowed frame is the same at both levels');
   // PostStack's multisampled capture is rg11b10ufloat at the level (docs/limits.md): the frame may round apart, by this.
   assert.ok(result.levels.post.largest <= 2, `the post frame stays within 2 of 255, got ${result.levels.post.largest}`);
+  // Eye-dome lighting reads each of the four samples by a masked draw per sample, its depth packed into bytes.
+  console.log('levels', JSON.stringify({ edl: result.levels.edl, lit: result.levels.edlLit }));
+  assert.ok(result.levels.edlLit > 0, 'points reach the frame');
+  assert.equal(result.levels.edl.count, 0, 'the eye-dome lit frame is the same at both levels');
   // Each of these runs on the level.
   for (const name of ['core alone', 'materials createMesh', 'materials createInstancedMesh', 'shadows', 'culling', 'post bloom and tonemap'])
     assert.match(result.packages[name], /^ok, [1-9]/, name);

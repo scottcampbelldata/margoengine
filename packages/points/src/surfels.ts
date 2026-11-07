@@ -13,6 +13,8 @@ import { meshWorldMatrix } from '@margoengine/math/mesh';
 import { alphaBlend } from '../../shared/pass.js';
 import { checkFog, FOG_BYTES, fogWgsl, writeFog, type FogLike } from '../../shared/fog.js';
 import { applyView, viewSize } from '../../shared/view-rect.js';
+import { compatibilityLevel } from '../../shared/compat.js';
+import { MargoError } from '@margoengine/math/errors';
 import { PointCloud } from './cloud.js';
 import { fillFrame } from './frame.js';
 import { allocateBudget, boxInFrustum, mergeRanges, screenArea, worldBox } from './math.js';
@@ -451,9 +453,15 @@ export class SurfelPlugin implements EnginePlugin {
       { width, height } = context,
       old = this.targets;
     if (old && old.width === width && old.height === height && old.samples === samples) return old;
+    const device = this.device!;
+    // The sums need a multisampled float target to add into, and the level has no such format.
+    if (samples > 1 && compatibilityLevel(device))
+      throw new MargoError(
+        'unsupported',
+        'SurfelPlugin cannot run at 4x on the WebGPU compatibility level, which multisamples no float format; use the WebGL2 layer',
+      );
     this.releaseTargets();
-    const device = this.device!,
-      layout = this.textureLayout(samples),
+    const layout = this.textureLayout(samples),
       make = (format: GPUTextureFormat) =>
         device.createTexture({
           size: [width, height],

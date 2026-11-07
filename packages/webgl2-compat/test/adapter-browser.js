@@ -11,6 +11,7 @@ import { Bloom } from '/packages/post/dist/bloom.js';
 import { Tonemap } from '/packages/tonemap/dist/index.js';
 import { allowCompatibilityAdapters } from '/packages/webgl2-compat/dist/adapter.js';
 import { SceneTarget } from '/packages/shared/msaa.js';
+import { PointCloud, PointsPlugin } from '/packages/points/dist/index.js';
 
 const open = async (options) => {
   const canvas = document.createElement('canvas');
@@ -59,6 +60,18 @@ const shadowScene = (engine) => {
 const postScene = (engine) => {
   scene(engine);
   PostStack.attach(engine, [new Bloom({ strength: 0.6 }), new Tonemap()]);
+};
+/** A bumpy sheet of points, so that eye-dome lighting has depth steps to work on. */
+const sheet = () => {
+  const positions = [];
+  for (let z = -40; z <= 40; z++)
+    for (let x = -40; x <= 40; x++) positions.push(x / 20, Math.sin(x / 3) * Math.cos(z / 4) * 0.3, z / 20);
+  return positions;
+};
+const edlScene = (engine) => {
+  const plugin = new PointsPlugin();
+  engine.use(plugin);
+  plugin.add(new PointCloud({ positions: sheet(), material: { size: 6, color: '#ffc040', edl: true } }));
 };
 /** The last of three frames of a scene seen from above, on a new engine. */
 const frames = async (build) => {
@@ -193,7 +206,8 @@ window.check = {
     close(full);
     const floorFull = await frames(floorScene),
       shadowFull = await frames(shadowScene),
-      postFull = await frames(postScene);
+      postFull = await frames(postScene),
+      edlFull = await frames(edlScene);
 
     const adapters = allowCompatibilityAdapters({ force: true }),
       compat = await open({}),
@@ -223,13 +237,16 @@ window.check = {
     close(compat);
     const shadowLevel = await frames(shadowScene),
       postLevel = await frames(postScene),
+      edlLevel = await frames(edlScene),
       levels = {
         shadowCast: compare(floorFull.bytes, shadowFull.bytes),
         shadow: compare(shadowFull.bytes, shadowLevel.bytes),
         post: compare(postFull.bytes, postLevel.bytes),
+        edl: compare(edlFull.bytes, edlLevel.bytes),
+        edlLit: edlLevel.bytes.reduce((sum, value, i) => sum + +(i % 4 === 0 && value > 100), 0),
         samplesFull,
         samples,
-        errors: [...shadowLevel.errors, ...postLevel.errors],
+        errors: [...shadowLevel.errors, ...postLevel.errors, ...edlLevel.errors],
       };
 
     const packages = {};

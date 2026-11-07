@@ -238,6 +238,44 @@ export function surfaceShader(kind: 'point' | 'sprite', declarations: string, ad
     surfaceEntry(declarations, 'i:VOut', kind === 'point' ? 'surface(i).color' : 'margoShade(i)', 'i.clip', 'margoViewDepth(i.clip)')
   );
 }
+/**
+ * A depth as the four bytes of its float, for a target at the compatibility level: r32float cannot be multisampled
+ * there and rgba8unorm can. No blending or resolve touches these targets, so the bytes come back exact.
+ */
+export const depthPacking: string = /* wgsl */ `
+fn packDepth(d:f32)->vec4f{
+  let b=bitcast<u32>(d);
+  return vec4f(f32(b&255u),f32((b>>8u)&255u),f32((b>>16u)&255u),f32(b>>24u))/255.0;
+}
+fn unpackDepth(c:vec4f)->f32{
+  let b=vec4u(round(c*255.0));
+  return bitcast<f32>(b.x|(b.y<<8u)|(b.z<<16u)|(b.w<<24u));
+}
+`;
+
+/** `code` with each edit made once; a shader that no longer holds the text is a bug here, not a missed edit. */
+export function edited(code: string, edits: readonly (readonly [string, string])[]): string {
+  let out = code;
+  for (const [from, to] of edits) {
+    if (out.split(from).length !== 2)
+      throw new MargoError('unsupported', `Points needs the shaders it was written for; no ${from} to edit.`);
+    out = out.replace(from, to);
+  }
+  return out;
+}
+
+/** `code`, a point shader, with its eye-dome depth output packed by {@link depthPacking}. */
+export const packedDepthPoints = (code: string): string =>
+  edited(code, [
+    ['struct EdlOut{@location(0) color:vec4f,@location(1) depth:f32}', 'struct EdlOut{@location(0) color:vec4f,@location(1) depth:vec4f}'],
+    ['@location(1) edl:f32,@builtin(frag_depth)', '@location(1) edl:vec4f,@builtin(frag_depth)'],
+    ['return EdlOut(s.color,i.info.y);', 'return EdlOut(s.color,packDepth(i.info.y));'],
+    [
+      'return SphereEdlOut(s.color,max(i.info.y-i.info.z*s.nz,frame.depth.z),sphereDepth(i,s.nz));',
+      'return SphereEdlOut(s.color,packDepth(max(i.info.y-i.info.z*s.nz,frame.depth.z)),sphereDepth(i,s.nz));',
+    ],
+  ]) + depthPacking;
+
 /** The point (`kind` 'point') or sprite shader with scene fog at group 2, for normal or additive blending. */
 export function foggedShader(kind: 'point' | 'sprite', additive: boolean): string {
   let code = kind === 'point' ? pointShader : spriteShader;

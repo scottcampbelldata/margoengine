@@ -22,14 +22,17 @@ import {
   FLAG,
   FRAME_BYTES,
   SPRITE_BYTES,
+  depthPacking,
   edlShader,
   foggedShader,
+  packedDepthPoints,
   pointShader,
   spriteShader,
   surfaceShader,
 } from './shaders.js';
 import { checkFog, FOG_BYTES, writeFog, type FogLike } from '../../shared/fog.js';
 import { applyView, viewRect, viewSize, ViewStates } from '../../shared/view-rect.js';
+import { compatibilityLevel } from '../../shared/compat.js';
 import { generateMipmaps } from '../../shared/mipmaps.js';
 import { alphaBlend, transparencySlot, type SurfaceTransparency } from '../../shared/pass.js';
 import { orthographic as orthographicTerms } from '../../shared/projection.js';
@@ -192,6 +195,7 @@ export class PointsPlugin implements EnginePlugin {
   private readonly owned = new Map<AnyMaterial, OwnedTexture>();
   private readonly borrowed = new WeakMap<GPUTexture, { device: GPUDevice; view: GPUTextureView }>();
   private readonly pipelines = new Map<string, GPURenderPipeline>();
+  private edlLayout: GPUPipelineLayout | null = null;
   private readonly mipCache = new Map<string, GPURenderPipeline>();
   /** Told when clouds come and go (`@margoengine/points/pick`). */
   private readonly watchers = new Set<{ added(cloud: PointCloud): void; removed(cloud: PointCloud): void }>();
@@ -814,6 +818,7 @@ export class PointsPlugin implements EnginePlugin {
     this.pickViews.clear();
     this.pickView = undefined;
     this.pipelines.clear();
+    this.edlLayout = null;
     this.hookLayouts.clear();
     this.cloudCount = this.cloudEnd = this.spriteCount = this.spriteEnd = 0;
     this.mipCache.clear();
@@ -870,7 +875,8 @@ export class PointsPlugin implements EnginePlugin {
     return module;
   }
 
-  private pointPipeline(context: GpuContext, material: PointsMaterial, edl: boolean): GPURenderPipeline {
+  /** `edl` adds the eye-dome depth target to the colour; `'alone'` draws that target only, testing against the depth. */
+  private pointPipeline(context: GpuContext, material: PointsMaterial, edl: boolean | 'alone'): GPURenderPipeline {
     const depthFormat = context.descriptor.depthStencil!.format,
       sphere = material.shading === 'sphere',
       fogged = this.fogged(material);
@@ -878,9 +884,18 @@ export class PointsPlugin implements EnginePlugin {
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
       const gpu = this.gpu!,
-        module = fogged ? this.fogModule('point', material) : gpu.pointModule;
-      const targets: GPUColorTargetState[] = [{ format: context.format, blend: this.blend(material.blending) }];
-      if (edl) targets.push({ format: 'r32float' });
+        module =
+          edl === 'alone'
+            ? this.device!.createShaderModule({
+                code: packedDepthPoints(fogged ? foggedShader('point', material.blending === 'additive') : pointShader),
+              })
+            : fogged
+              ? this.fogModule('point', material)
+              : gpu.pointModule;
+      const targets: (GPUColorTargetState | null)[] = [
+        edl === 'alone' ? null : { format: context.format, blend: this.blend(material.blending) },
+      ];
+      if (edl) targets.push({ format: edl === 'alone' ? 'rgba8unorm' : 'r32float' });
       pipeline = this.device!.createRenderPipeline({
         layout: fogged ? this.fogResources().pointLayout : gpu.pointPipelineLayout,
         vertex: { module, entryPoint: 'vertex' },
@@ -889,7 +904,7 @@ export class PointsPlugin implements EnginePlugin {
         multisample: context.descriptor.multisample,
         depthStencil: {
           format: depthFormat,
-          depthWriteEnabled: material.writesDepth,
+          depthWriteEnabled: edl !== 'alone' && material.writesDepth,
           depthCompare: material.depthTest ? 'greater-equal' : 'always',
         },
       });
@@ -1036,24 +1051,59 @@ export class PointsPlugin implements EnginePlugin {
     }
   }
 
-  private edlPipeline(format: GPUTextureFormat, count: number): GPURenderPipeline {
-    const key = `e|${format}|${count}`;
+  /**
+   * The lighting pipelines of a target: one, or at the compatibility level, which has no `sample_index`, one per
+   * sample of a multisampled target, its mask writing that sample alone.
+   */
+  private edlPipelines(format: GPUTextureFormat, count: number): GPURenderPipeline[] {
+    if (!compatibilityLevel(this.device!)) return [this.edlPipeline(format, count, null)];
+    return Array.from({ length: count }, (_, sample) => this.edlPipeline(format, count, sample));
+  }
+
+  /** The layout of every multisampled lighting pipeline, shared so that one bind group serves each sample's. */
+  private edlSampledLayout(): GPUPipelineLayout {
+    const device = this.device!;
+    return (this.edlLayout ??= device.createPipelineLayout({
+      bindGroupLayouts: [
+        device.createBindGroupLayout({
+          entries: [
+            {
+              binding: 0,
+              visibility: GPUShaderStage.FRAGMENT,
+              texture: { sampleType: 'unfilterable-float', multisampled: true },
+            },
+            { binding: 1, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } },
+          ],
+        }),
+      ],
+    }));
+  }
+
+  private edlPipeline(format: GPUTextureFormat, count: number, sample: number | null): GPURenderPipeline {
+    const key = `e|${format}|${count}|${sample}`;
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
       const gpu = this.gpu!,
+        // Compare matching coverage samples; averaging empty samples invents depth steps.
+        sampled = edlShader.replace('texture_2d<f32>', 'texture_multisampled_2d<f32>'),
         module =
-          count === 1
-            ? gpu.edlModule
-            : this.device!.createShaderModule({
+          sample !== null
+            ? this.device!.createShaderModule({
                 code:
-                  // Compare matching coverage samples; averaging empty samples invents depth steps.
-                  edlShader
-                    .replace('texture_2d<f32>', 'texture_multisampled_2d<f32>')
+                  (count === 1 ? edlShader : sampled).replace(
+                    /textureLoad\(depths,([pq]),0\)\.r/g,
+                    `unpackDepth(textureLoad(depths,$1,${sample}))`,
+                  ) + depthPacking,
+              })
+            : count === 1
+              ? gpu.edlModule
+              : this.device!.createShaderModule({
+                  code: sampled
                     .replace('position:vec4f)', 'position:vec4f,@builtin(sample_index) sample:u32)')
                     .replace(/textureLoad\(depths,([pq]),0\)/g, 'textureLoad(depths,$1,i32(sample))'),
-              });
+                });
       pipeline = this.device!.createRenderPipeline({
-        layout: count === 1 ? gpu.edlPipelineLayout : 'auto',
+        layout: count === 1 ? gpu.edlPipelineLayout : this.edlSampledLayout(),
         vertex: { module, entryPoint: 'vertex' },
         fragment: {
           module,
@@ -1069,7 +1119,7 @@ export class PointsPlugin implements EnginePlugin {
           ],
         },
         primitive: { topology: 'triangle-list' },
-        multisample: { count },
+        multisample: sample === null ? { count } : { count, mask: 1 << sample },
       });
       this.pipelines.set(key, pipeline);
     }
@@ -1090,7 +1140,7 @@ export class PointsPlugin implements EnginePlugin {
     const texture = device.createTexture({
       size: [width, height],
       sampleCount,
-      format: 'r32float',
+      format: compatibilityLevel(device) ? 'rgba8unorm' : 'r32float',
       usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
     });
     const view = texture.createView();
@@ -1408,10 +1458,13 @@ export class PointsPlugin implements EnginePlugin {
     // 4. Draw: opaque clouds front to back, then transparent clouds back to front.
     let edlUsed = false;
     for (let i = 0; i < cloudDrawCount; i++) if (draws[i].cloud.material.edl) edlUsed = true;
+    // The compatibility level wants one blend on all targets and r32float has none, so there the eye-dome depth is a
+    // second pass of the same draws. It tests against the finished depth, which leaves the same last writer per sample.
+    const edlApart = edlUsed && compatibilityLevel(device);
     for (let i = 0; i < cloudDrawCount; i++) {
       const a = draws[i];
       a.r.transparent = a.cloud.material.transparent;
-      a.r.pipeline = this.pointPipeline(context as GpuContext, a.cloud.material, edlUsed);
+      a.r.pipeline = this.pointPipeline(context as GpuContext, a.cloud.material, edlUsed && !edlApart);
     }
     sortCount(draws, cloudDrawCount, this.cloudDrawScratch, (a, b) => +a.r.transparent - +b.r.transparent);
     if (cloudDrawCount) {
@@ -1420,20 +1473,20 @@ export class PointsPlugin implements EnginePlugin {
       this.pointColor.view = context.color;
       if (edlUsed) {
         const count = context.descriptor.multisample?.count ?? 1;
-        const target = this.edlTarget(context.width, context.height, count, this.edlPipeline(context.format, count));
+        const target = this.edlTarget(context.width, context.height, count, this.edlPipelines(context.format, count)[0]!);
         this.edlColor.view = target.view;
         colorAttachments[1] = this.edlColor;
-        colorAttachments.length = 2;
+        colorAttachments.length = edlApart ? 1 : 2;
       } else colorAttachments.length = 1;
       const depthAttachment = this.sceneDepth;
       depthAttachment.view = context.depth;
       if (depthFormat.includes('stencil')) depthAttachment.stencilReadOnly = true;
       else delete depthAttachment.stencilReadOnly;
+      const order = this.blockOrder;
       const pass = context.encoder.beginRenderPass({ colorAttachments, depthStencilAttachment: depthAttachment });
       applyView(pass, context);
       pass.setBindGroup(0, gpu.frameGroup);
       if (this.fogUsed) pass.setBindGroup(2, this.fogGpu!.group);
-      const order = this.blockOrder;
       for (let i = 0; i < cloudDrawCount; i++) {
         const a = draws[i],
           { cloud, r } = a,
@@ -1456,6 +1509,26 @@ export class PointsPlugin implements EnginePlugin {
         }
       }
       pass.end();
+      if (edlApart) {
+        const depthPass = context.encoder.beginRenderPass({
+          colorAttachments: [null, this.edlColor],
+          depthStencilAttachment: depthAttachment,
+        });
+        applyView(depthPass, context);
+        depthPass.setBindGroup(0, gpu.frameGroup);
+        if (this.fogUsed) depthPass.setBindGroup(2, this.fogGpu!.group);
+        for (let i = 0; i < cloudDrawCount; i++) {
+          const { cloud, r, view } = draws[i];
+          depthPass.setPipeline(this.pointPipeline(context as GpuContext, cloud.material, 'alone'));
+          depthPass.setBindGroup(1, this.cloudGroup(r, view, cloud.material.mapFilter === 'nearest' ? gpu.nearest : gpu.linear));
+          // `drawn` holds this frame's blocks of every cloud in draw order, as block and count pairs.
+          for (let n = 0; n < r.drawn.length; n += 2) {
+            depthPass.draw(4, r.drawn[n + 1]!, 0, cloud.blocks.starts[r.drawn[n]!]);
+            s.drawCalls++;
+          }
+        }
+        depthPass.end();
+      }
       if (edlUsed && this.edl) {
         // Orthographic EDL shades linear depth steps, scaled like log2 steps at the distance where a perspective
         // camera with this fov has the same zoom.
@@ -1468,11 +1541,13 @@ export class PointsPlugin implements EnginePlugin {
         this.pointColors.length = 1;
         const edlPass = context.encoder.beginRenderPass({ colorAttachments: this.pointColors });
         applyView(edlPass, context);
-        edlPass.setPipeline(this.edlPipeline(context.format, context.descriptor.multisample?.count ?? 1));
         edlPass.setBindGroup(0, this.edl.group);
-        edlPass.draw(3);
+        for (const pipeline of this.edlPipelines(context.format, context.descriptor.multisample?.count ?? 1)) {
+          edlPass.setPipeline(pipeline);
+          edlPass.draw(3);
+          s.drawCalls++;
+        }
         edlPass.end();
-        s.drawCalls++;
       }
     }
 

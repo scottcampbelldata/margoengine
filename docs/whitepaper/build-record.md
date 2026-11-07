@@ -1261,7 +1261,8 @@ An audit of the finished batches against their job text listed 70 gaps for the H
 | B33 | gltf/textured masked shadow, masked ray, draw counts | DONE | `747c2e4c8` | LIM-347 |
 | Lottie (batch 40) | parseLottie against real exports and lottie-web | DONE | this commit | LIM-205 |
 | MaterialX (batch 40) | parseMaterialX shader defaults against published nodedefs | DONE | this commit | LIM-205 |
-| C6 | encodeWithFFmpeg on real ffmpeg | DONE | this commit | LIM-087 |
+| C6 | encodeWithFFmpeg on real ffmpeg | DONE | `ce012c894` | LIM-087 |
+| sample_index (points) | eye-dome lighting on the compatibility level | DONE | this commit | - |
 
 ## LAZ: one LAS reader, and every point format on a real file
 

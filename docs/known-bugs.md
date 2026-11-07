@@ -417,20 +417,12 @@ Sweep record: every package's tests and browser or GPU tests on the Mac mini (M6
 - **Meanwhile:** a page on this route gets the raster view. WebGPU is the route on such a machine where the browser has
   it, and ANGLE Vulkan works.
 
-### Five shaders still break WebGPU compatibility-level rules
+### Four routes still break WebGPU compatibility-level rules
 
-- **What:** with `allowCompatibilityAdapters` from `@margoengine/webgl2-compat/adapter`, these use something the level
-  forbids, found by reading the code and not yet run there: `FogPass` in `@margoengine/sky`, the volumetric pass in
-  `@margoengine/environment`, `@margoengine/points` (plugin and surfels) and the spray in `@margoengine/water` take
-  `@builtin(sample_index)` at 4x; `VirtualShadows` with the `'soft'` filter loads its depth pool in a shader that also
-  samples it. A page can use the WebGL2 layer instead.
-- **Repro:** `npm run build:packages`, add the package to `PACKAGES` in
-  `packages/webgl2-compat/test/adapter-browser.js`, then `node scripts/gpu-lock.mjs run --owner=<you> -- node
-  packages/webgl2-compat/test/adapter-browser.mjs`, and read `packages` in `test-results/compat-adapter.json`.
-- **Cause:** the level has no `sample_index` in a fragment shader, and no `textureLoad` of a depth texture type.
-- **Needed to close:** the routes `Shadows` and `SceneTarget` took: a masked draw per sample (`packages/shared/msaa.js`
-  `copyDepth`), and the map bound a second time as float (`packages/shadows/src/shader.ts`, `level`). Then add the names
-  to the list `adapter-browser.mjs` asserts.
+- **What:** with `allowCompatibilityAdapters` from `@margoengine/webgl2-compat/adapter`, `FogPass` in `@margoengine/sky`, the volumetric pass in `@margoengine/environment` and the spray in `@margoengine/water` take `@builtin(sample_index)` at 4x, found by reading the code and not yet run there. `VirtualShadows` with the `'soft'` filter loads its depth pool in a shader that also samples it. `SurfelPlugin` at 4x refuses with `unsupported`. A page can use the WebGL2 layer instead.
+- **Repro:** `npm run build:packages`, add the package to `PACKAGES` in `packages/webgl2-compat/test/adapter-browser.js`, then `node scripts/gpu-lock.mjs run --owner=<you> -- node packages/webgl2-compat/test/adapter-browser.mjs`, and read `packages` in `test-results/compat-adapter.json`.
+- **Cause:** the level has no `sample_index` in a fragment shader, no `textureLoad` of a depth texture type, and no multisampled float format: neither r32float nor rgba16float, so the surfel sums have nothing to add into at 4x.
+- **Needed to close:** the routes `Shadows`, `SceneTarget` and eye-dome lighting took: a masked draw per sample (`packages/shared/msaa.js` `copyDepth`, `packages/points/src/plugin.ts` `edlPipelines`), and the map bound a second time as float (`packages/shadows/src/shader.ts`, `level`). Surfels need sums in a format the level multisamples, or a single-sample pass with its own copy of the scene depth. Then add the names to the list `adapter-browser.mjs` asserts.
 
 ### Native glass on a display-encoded target adds its lit draw in encoded values
 
