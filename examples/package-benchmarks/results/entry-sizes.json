@@ -1,5 +1,5 @@
 {
-  "commit": "1c68e2ced",
+  "commit": "e66d34c6e",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -1906,12 +1906,12 @@
     },
     "@margoengine/physics": {
       ".": {
-        "raw": 59030,
-        "gzip": 19145
+        "raw": 59051,
+        "gzip": 19165
       },
       "./next": {
-        "raw": 152179,
-        "gzip": 89048
+        "raw": 152767,
+        "gzip": 89317
       }
     },
     "@margoengine/physics2d": {
@@ -2558,12 +2558,16 @@
     },
     "@margoengine/splats": {
       ".": {
-        "raw": 71755,
-        "gzip": 25435
+        "raw": 71793,
+        "gzip": 25446
+      },
+      "./depth": {
+        "raw": 3954,
+        "gzip": 1863
       },
       "./data": {
         "raw": 47693,
-        "gzip": 17520
+        "gzip": 17523
       }
     },
     "@margoengine/splines": {
@@ -3248,9 +3252,9 @@
       "brotli": 7854
     },
     "packages/gltf-pro/dist/index.js": {
-      "raw": 1411360,
-      "gzip": 570032,
-      "brotli": 465550
+      "raw": 1411398,
+      "gzip": 570460,
+      "brotli": 465788
     },
     "packages/staging/dist/index.js": {
       "raw": 22060,
@@ -3263,9 +3267,9 @@
       "brotli": 9639
     },
     "packages/physics/dist/index.js": {
-      "raw": 59030,
-      "gzip": 19145,
-      "brotli": 16889
+      "raw": 59051,
+      "gzip": 19165,
+      "brotli": 16941
     },
     "packages/save/dist/index.js": {
       "raw": 19901,

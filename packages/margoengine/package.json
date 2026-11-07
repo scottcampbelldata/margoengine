@@ -2430,6 +2430,10 @@
       "types": "./dist/splats.d.ts",
       "import": "./dist/splats.js"
     },
+    "./splats/depth": {
+      "types": "./dist/splats/depth.d.ts",
+      "import": "./dist/splats/depth.js"
+    },
     "./splats/data": {
       "types": "./dist/splats/data.d.ts",
       "import": "./dist/splats/data.js"

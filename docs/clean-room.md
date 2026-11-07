@@ -532,6 +532,7 @@ The own solver's kernel (`packages/physics/kernel`, Rust, no dependencies). Noth
 | SP1 | view-dependent colour from real SH degree 0-3, +0.5 DC offset | splats/src/shader.ts | real SH normalisation: Sloan 2008, "Stupid Spherical Harmonics Tricks" App. A. Sign pattern and +0.5 offset are the 3DGS asset convention (Kerbl et al. 2023), needed to read trained .ply files |
 | SP2 | EWA projection (view rotation, perspective Jacobian), 2D low-pass dilation, eigen axes, 3 sigma extent | splats/src/shader.ts | Zwicker et al. 2001, EWA Splatting eq. 29-31; 0.3 px^2 dilation is the 3D Gaussian Splatting asset convention (Kerbl et al. 2023) |
 | SP3 | Gaussian falloff, alpha cap, low-alpha discard | splats/src/shader.ts | Kerbl et al. 2023, "3D Gaussian Splatting", App. C (clamp to 0.99, skip below 1/255) |
+| SP4 | alpha-tested splat depth: the colour pass's 3 sigma quad and Gaussian falloff, depth written where opacity reaches a threshold, nearest wins (reversed Z) | splats/src/depth.ts | Kerbl et al. 2023, "3D Gaussian Splatting for Real-Time Radiance Field Rendering", ACM TOG 42(4), App. C (falloff, 0.99 cap); Zwicker et al. 2001, "EWA Splatting" (ellipses); W3C WebGPU specification (depth-only render pass, depthCompare) |
 
 ### taa
 

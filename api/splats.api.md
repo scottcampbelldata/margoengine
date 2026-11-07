@@ -67,6 +67,7 @@ export class Splats implements EnginePlugin {
     registerPasses(graph: FrameGraph): void;
     setTransparency(hook: SurfaceTransparency, released?: () => void): () => void;
     drawTransparent(c: Context, hook: SurfaceTransparency): void;
+    get attached(): boolean;
     get gpuState(): {
         sorted: GPUBuffer;
         ellipses: GPUBuffer;

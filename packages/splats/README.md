@@ -27,7 +27,7 @@ Orthographic cameras (any `camera.matrix` with a constant clip w, such as `Camer
 
 Each frame creates sortable unsigned depth keys on the GPU. Eight stable 4-bit LSD radix passes run per-workgroup histograms, hierarchical exclusive prefix scans, a scan of block totals, and scatter. Workgroup bit masks and population counts preserve input order within equal digits; equal-depth splats retain source order. Off-frustum, transparent and out-of-range centers sort to the end and render no fragments. The runtime performs no CPU sorting, per-splat frame allocation or GPU readback.
 
-Base GPU allocations are approximately 128 bytes per splat (384 MB at three million), plus small histograms/uniforms and optional SH. CPU copies for recovery are additional. Center-depth sorting approximates intersecting ellipsoids; near-plane-crossing centers are culled. Multiple clouds sort independently: combine overlapping clouds into one data set when global order matters. Splats do not write opaque depth, cast directional shadows or receive PBR lighting. They can render alongside shadows, clustered meshes, animation, VFX and TAA; temporal history uses underlying opaque depth. Frame rate and sorting time depend on hardware and fill rate, with no 1-2 ms or locked-60-FPS guarantee.
+Base GPU allocations are approximately 128 bytes per splat (384 MB at three million), plus small histograms/uniforms and optional SH. CPU copies for recovery are additional. Center-depth sorting approximates intersecting ellipsoids; near-plane-crossing centers are culled. Multiple clouds sort independently: combine overlapping clouds into one data set when global order matters. Splats do not write depth unless `./depth` is attached (below), cast directional shadows or receive PBR lighting. They can render alongside shadows, clustered meshes, animation, VFX and TAA; temporal history uses underlying opaque depth. Frame rate and sorting time depend on hardware and fill rate, with no 1-2 ms or locked-60-FPS guarantee.
 
 `cloud.setFog(fog)` fogs the cloud with `@margoengine/environment`'s `Fog` or any object with its fields (`color`, `near`, `far`, `density`, `heightFalloff`, `height`, `enabled`), read every frame with Fog's maths. Each splat's colour fades toward the fog colour by the fog at its centre, in the projection pass and in linear before the display encoding; opacity is unchanged. The package does not import environment. `fog.enabled = false` clears it without recompiling; `cloud.setFog(null)` (the default) draws exactly as before.
 
@@ -105,3 +105,32 @@ console.log(spz.positions.length / 3, sog.positions.length / 3);
 ```
 
 `gpuState` exposes sorted key/index pairs, projected ellipses and evaluated colors (fogged while a fog is set) for diagnostics. Ellipse records are eight floats: normalized center xyz and opacity, then two normalized-screen ellipse axes. `dispose()`/`destroy()` releases all owned GPU resources. Device restoration reuploads the copied input and recreates sorting/rendering passes. The package stays outside core/stage and has no dependencies on other optional renderers; parser-only imports discard GPU code. It follows the workspace's `@margoengine/*` naming convention.
+
+## Depth with meshes (`./depth`)
+
+Meshes drawn before a cloud (every `@margoengine/materials` mesh) already hide the splats behind them: the cloud depth
+tests against the scene. What draws after the cloud (later passes, other clouds, points, particles, post effects that
+read depth) cannot see it, because splats blend and write no depth. `SplatDepth` writes it:
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Splats} from 'margoengine/splats';
+import {SplatDepth} from 'margoengine/splats/depth';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const cloud = Splats.attach(engine, {
+  positions: new Float32Array([0, 0, 0]),
+  covariances: new Float32Array([0.25, 0, 0, 0.25, 0, 0.01]),
+  colors: new Float32Array([1, 0, 0, 0.95]),
+});
+const depth = SplatDepth.attach(engine, cloud, {threshold: 0.5});
+depth.threshold = 0.3; // live: lower writes more of a thin capture
+```
+
+- Right after the cloud draws (frame-graph order 3.5, option `order`), each splat writes the scene depth where its own
+  Gaussian opacity at the pixel reaches `threshold` (default 0.5; the colour pass caps opacity at 0.99, so 1 writes
+  nothing). The nearest such splat wins (reversed Z). No colour is written, and the cloud draws exactly as before.
+- It is alpha-tested depth, not accumulated: a pixel where many faint splats add up to a solid look, each under the
+  threshold, gets no depth. On the real raccoon capture (test fixture) threshold 0.5 gave depth to 1,514 of the 4,463
+  pixels the capture covers; lower it for thin captures.
+- Depth is the splat's centre depth over its whole ellipse, as the colour pass places it.
+- `dispose()` stops the writes; a cloud that is not attached, or is disposed, writes nothing.

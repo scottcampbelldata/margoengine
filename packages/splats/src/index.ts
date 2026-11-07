@@ -398,6 +398,10 @@ export class Splats implements EnginePlugin {
     pass.drawIndexed(6, this.count);
     this.engine!.stats.drawCalls++;
   }
+  /** Whether the cloud is attached to a live engine, so `gpuState` holds its buffers. */
+  get attached(): boolean {
+    return !!this.projected;
+  }
   get gpuState(): { sorted: GPUBuffer; ellipses: GPUBuffer; colors: GPUBuffer } {
     if (!this.projected || !this.evaluated || !this.keys.length)
       throw new MargoError('state', 'Splats are not attached; attach them to an engine first');

@@ -24,6 +24,7 @@
     "access": "public"
   },
   "scripts": {
+    "test:gpu": "cd ../.. && node packages/splats/test/gpu/check.mjs",
     "test": "node --test test/*.test.js ../../tests/modern-temporal.test.js ../../tests/modern-data-subpaths.test.js",
     "prepack": "npm --prefix ../.. run build:packages"
   },
@@ -32,6 +33,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./depth": {
+      "types": "./dist/depth.d.ts",
+      "import": "./dist/depth.js"
     },
     "./data": {
       "types": "./dist/data.d.ts",

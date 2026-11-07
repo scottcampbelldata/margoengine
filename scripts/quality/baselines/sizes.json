@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10756305,
+  "total": 10758424,
   "history": [
     {
       "date": "2026-10-24",
@@ -3884,6 +3884,12 @@
       "commit": "1996612e0",
       "reason": "physics/next: setType wake flag and kinematic rest for Rapier parity",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "9ce54b640",
+      "reason": "splats/depth: SplatDepth writes a cloud's depth after it draws (batch 80 job 1); splats root gains Splats.attached",
+      "grew": 1
     }
   ],
   "items": {
@@ -4493,6 +4499,7 @@
     "@margoengine/sky/weather-fx": 5533,
     "@margoengine/splats": 25646,
     "@margoengine/splats/data": 17665,
+    "@margoengine/splats/depth": 2119,
     "@margoengine/splines": 1853,
     "@margoengine/splines/closest": 983,
     "@margoengine/splines/fit": 3250,
