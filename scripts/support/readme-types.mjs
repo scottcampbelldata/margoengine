@@ -172,12 +172,22 @@ export function compareKnown(errors, known) {
   return { fresh, gone };
 }
 
+/**
+ * A new scratch folder for `folder`'s examples. Inside the package, so its package.json makes the files modules and
+ * node_modules resolves as for a consumer; under test-results, which git and the tests that walk the sources skip, so
+ * a walk running beside a package's own test never meets files about to go.
+ */
+export function readmeScratch(folder) {
+  const parent = join(resolve(folder), 'test-results');
+  mkdirSync(parent, { recursive: true });
+  return mkdtempSync(join(parent, 'readme-check-'));
+}
+
 /** Type-checks one package folder's examples on their own; returns the compiler's lines, an empty list passes. */
 export function readmeTypeErrors(folder) {
   if (!packageMarkdown(folder).some(({ markdown }) => readmeExamples(markdown).length))
     return [`${folder}/README.md has no examples`];
-  // Inside the package, so its package.json makes the files modules and node_modules resolves as for a consumer.
-  const scratch = mkdtempSync(join(resolve(folder), '.readme-check-'));
+  const scratch = readmeScratch(folder);
   try {
     writeExamples(scratch, [{ name: basename(folder), folder }]);
     return compile(scratch);

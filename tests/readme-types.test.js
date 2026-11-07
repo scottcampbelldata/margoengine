@@ -3,7 +3,7 @@
 // ran in check:merge and no landing runs check:merge.
 import assert from 'node:assert/strict';
 import { readFileSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { join, relative, resolve, sep } from 'node:path';
 import test from 'node:test';
 import { workspacePackages } from '../scripts/check-readme-types.mjs';
 import {
@@ -12,6 +12,7 @@ import {
   packageMarkdown,
   parseErrors,
   readmeExamples,
+  readmeScratch,
   standIns,
   tally,
   writeExamples,
@@ -135,4 +136,13 @@ test('a declared stand-in in an example is found, and no package README or guide
   for (const { name, folder } of workspacePackages())
     for (const { document, markdown } of packageMarkdown(folder))
       assert.deepEqual(standIns(markdown), [], `${name} ${document}`);
+});
+
+// A package test's scratch folder sat in the package's own folder, so the port test's walk of packages/ listed a file in
+// it and read it after it had gone: ENOENT stopped a landing that changed neither.
+test('a package test keeps its example scratch folder under test-results', (t) => {
+  const folder = join(root, `test-results/readme-scratch-test-${process.pid}`);
+  t.after(() => rmSync(folder, { recursive: true, force: true }));
+  mkdirSync(folder, { recursive: true });
+  assert.equal(relative(folder, readmeScratch(folder)).split(sep)[0], 'test-results');
 });
