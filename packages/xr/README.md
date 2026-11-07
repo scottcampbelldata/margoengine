@@ -109,3 +109,23 @@ engine.start();
 ```
 
 Each eye is a view of `engine.render({views})` drawn into a texture, then copied into the session's layer, with the scene's depth written to the layer's depth so the compositor can reproject. In AR the real world shows where the scene draws neither depth nor light. A stage gets the same route with `new Stage(await createXREngine(canvas))`.
+
+## Controller and hand models
+
+`XRModels` from `@margoengine/xr/models` draws every input source the session has: a controller at its grip, whose trigger swings, squeeze sinks and thumbstick leans as they are used and turn blue while pressed (on a gamepad with the `xr-standard` mapping; other mappings leave the parts at rest), and each tracked hand as a sphere per joint (sized by the joint radius WebXR reports) and a cylinder per bone. The models are core meshes and need no files. A source whose `skipRendering` is true (the system draws it) is hidden.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {XR} from 'margoengine/xr';
+import {XRModels} from 'margoengine/xr/models';
+
+const canvas=document.createElement('canvas');document.body.append(canvas);
+const engine=await Engine.create(canvas,{backend:'webgpu'});
+const xr=await XR.create(engine);
+const models=XRModels.attach(xr,engine,{handColor:'#d8b49a'});
+const enter=document.createElement('button');enter.textContent='Enter VR';document.body.append(enter);
+enter.onclick=()=>void xr.requestSession('immersive-vr',{optionalFeatures:['hand-tracking']}).catch(engine.onError);
+// models.dispose() removes the meshes.
+```
+
+For a device's own model, serve the [WebXR input profile assets](https://github.com/immersive-web/webxr-input-profiles) and call `fetchProfile(source, baseUrl)`: it picks the most specific listed profile and gives its layout and model URL. `componentStates(layout, controller)` and `responseWeight(response, state)` give each node's weight for the layout's visual responses each frame. `xr.onFrame(callback)` runs a function every XR frame, before the session's own `onFrame`.

@@ -439,6 +439,28 @@ test('controller hand matrices are preallocated and clear when tracking is lost'
   assert.equal(controller.handTracked[0], 0);
   assert.ok(matrix.every((value) => value === 0));
 });
+test('controller joint radii follow the joint poses and clear when tracking is lost', () => {
+  const controller = new XRController({ targetRaySpace: {}, profiles: [], hand: new Map([['wrist', {}]]) }),
+    frame = { getPose: () => null, getJointPose: () => ({ ...pose(2), radius: 0.011 }) };
+  controller.update(frame, {});
+  assert.ok(Math.abs(controller.handRadii[0] - 0.011) < 1e-7);
+  frame.getJointPose = () => null;
+  controller.update(frame, {});
+  assert.equal(controller.handRadii[0], 0);
+});
+test('xr.onFrame runs every XR frame before the session callback, and its stop function ends it', async (t) => {
+  const f = await fixture(t),
+    xr = await XRManager.create(f.engine),
+    order = [];
+  assert.throws(() => xr.onFrame(1), /pass \(state\) =>/);
+  const stop = xr.onFrame((state) => order.push(['hook', state.inputs.length]));
+  await useXRSession(xr, 'inline', { onFrame: () => order.push(['session']) });
+  f.session.tick(0, null);
+  stop();
+  f.session.tick(20, null);
+  assert.deepEqual(order, [['hook', 1], ['session'], ['session']]);
+  await xr.end();
+});
 test('missing immersive bindings permit inline tracking and leave the desktop loop active', async (t) => {
   const f = await fixture(t);
   delete globalThis.XRGPUBinding;

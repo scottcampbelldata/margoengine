@@ -1197,6 +1197,6 @@ features add no core or stage functionality.
 | Shadows from alpha cut-outs, `alphaHash`, object-space normal maps, your own mip levels | Missing, planned before v1.0.0 (shadows, materials) |
 | Picking fat lines, soft particles | Missing, planned before v1.0.0 (lines, vfx) |
 | Rendering in a worker, render into layers, compute writing textures, environment blend, KTX2 arrays and cubes, NRRD, subsurface blur | Missing, after v1.0.0 |
-| WebXR plane detection, depth, light estimation, controller and hand models | Needs a headset test first (`@margoengine/xr`) |
+| WebXR plane detection, depth, light estimation | Needs a headset test first (`@margoengine/xr`) |
 | WebGL2 for every package | In development: `@margoengine/webgl2-compat` |
 | Long-tail loaders, Draco, KTX2 or G-code writers, stereo on a flat screen, deferred shading, cloth, fluids | Not planned for v1.0.0 |

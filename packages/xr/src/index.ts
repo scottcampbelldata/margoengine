@@ -129,6 +129,7 @@ export class XR implements EnginePlugin {
   private last: number | null = null;
   private mode: XRMode = 'immersive-vr';
   private callback?: XRSessionOptions['onFrame'];
+  private readonly listeners = new Set<(state: XRFrameState) => void>();
   /** One controller per current input source; updated each XR frame and kept in step with the session's inputs. */
   readonly controllers: XRController[] = [];
   private readonly state: XRFrameState = { time: 0, delta: 0, frame: null!, viewer: null, inputs: this.controllers };
@@ -207,6 +208,15 @@ export class XR implements EnginePlugin {
   setup(engine: Engine): void {
     this.engine = engine;
     if (this.route === 'engine') this.eyes = new EyeViews(engine, this.device);
+  }
+  /**
+   * Calls `callback` every XR frame of every session, after the poses and controllers update and before the session's
+   * own `onFrame`; packages such as `XRModels` follow the inputs through it. Returns the function that stops it.
+   */
+  onFrame(callback: (state: XRFrameState) => void): () => void {
+    if (typeof callback !== 'function') throw new TypeError('xr.onFrame needs a function; pass (state) => {...}');
+    this.listeners.add(callback);
+    return () => void this.listeners.delete(callback);
   }
   /** The session's reference space (the space of frame poses and hit results); undefined without a session. */
   get referenceSpace(): XRSpace | undefined {
@@ -345,6 +355,7 @@ export class XR implements EnginePlugin {
       this.state.delta = delta;
       this.state.frame = frame;
       this.state.viewer = viewer;
+      for (const listener of this.listeners) listener(this.state);
       this.callback?.(this.state);
       if (this.disposed || frame.session !== this.session) return;
       // shortcut: keep the canvas mirror and duplicate GPU buffers, upgrade when shared XR device hooks are available.

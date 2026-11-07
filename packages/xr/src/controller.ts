@@ -18,6 +18,8 @@ export class XRController {
   readonly handMatrices = new Float32Array(25 * 16);
   /** 1 for each joint that has a pose this frame. */
   readonly handTracked = new Uint8Array(25);
+  /** Each joint's radius in metres (WebXR Hand Input: a sphere at the joint touching the skin); 0 when untracked. */
+  readonly handRadii = new Float32Array(25);
   /** Buttons the gamepad reports. */
   buttonCount = 0;
   /** Axes the gamepad reports. */
@@ -57,11 +59,13 @@ export class XRController {
     }
     this.handMatrices.fill(0);
     this.handTracked.fill(0);
+    this.handRadii.fill(0);
     for (let i = 0; i < this.joints.length; i++) {
-      const pose = frame.getJointPose?.(this.joints[i], space);
+      const pose = frame.getJointPose?.(this.joints[i], space) as (XRPose & { radius?: number }) | null | undefined;
       if (pose) {
         this.handMatrices.set(pose.transform.matrix, i * 16);
         this.handTracked[i] = 1;
+        this.handRadii[i] = pose.radius ?? 0;
       }
     }
   }

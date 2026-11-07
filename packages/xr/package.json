@@ -39,6 +39,10 @@
     "./device-check": {
       "types": "./dist/device-check.d.ts",
       "import": "./dist/device-check.js"
+    },
+    "./models": {
+      "types": "./dist/models.d.ts",
+      "import": "./dist/models.js"
     }
   },
   "files": [

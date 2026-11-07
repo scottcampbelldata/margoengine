@@ -2946,6 +2946,10 @@
       "types": "./dist/xr/device-check.d.ts",
       "import": "./dist/xr/device-check.js"
     },
+    "./xr/models": {
+      "types": "./dist/xr/models.d.ts",
+      "import": "./dist/xr/models.js"
+    },
     "./game": {
       "types": "./dist/game.d.ts",
       "import": "./dist/game.js"

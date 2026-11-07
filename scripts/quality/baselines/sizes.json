@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10669076,
+  "total": 10672284,
   "history": [
     {
       "date": "2026-10-24",
@@ -3782,6 +3782,12 @@
       "commit": "2ab476fd1",
       "reason": "new entry @margoengine/terrain/query, about 3.6 KB gzip",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "dbd618f4e",
+      "reason": "xr/models: new optional entry, controller and hand models",
+      "grew": 1
     }
   ],
   "items": {
@@ -4525,6 +4531,7 @@
     "@margoengine/worker/canvas": 1597,
     "@margoengine/xr": 8631,
     "@margoengine/xr/device-check": 2344,
+    "@margoengine/xr/models": 3208,
     "leak @margoengine/animation -> @margoengine/gltf-pro/model": 1,
     "leak @margoengine/animation/geometry-cache -> @margoengine/gltf-pro/model": 1,
     "leak @margoengine/animation/interactivity -> @margoengine/gltf-pro/interactivity": 1,

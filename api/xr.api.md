@@ -54,6 +54,7 @@ export class XR implements EnginePlugin {
     }): Promise<XR>;
     private constructor();
     setup(engine: Engine): void;
+    onFrame(callback: (state: XRFrameState) => void): () => void;
     get referenceSpace(): XRSpace | undefined;
     registerPasses(graph: FrameGraph): void;
     requestSession(mode?: XRMode, options?: XRSessionOptions): Promise<XRNativeSession>;
@@ -88,6 +89,7 @@ export class XRController {
     readonly axes: Float32Array<ArrayBuffer>;
     readonly handMatrices: Float32Array<ArrayBuffer>;
     readonly handTracked: Uint8Array<ArrayBuffer>;
+    readonly handRadii: Float32Array<ArrayBuffer>;
     buttonCount: number;
     axisCount: number;
     constructor(source: XRInputSource);
@@ -144,6 +146,7 @@ class XR implements EnginePlugin {
     }): Promise<XR>;
     private constructor();
     setup(engine: Engine): void;
+    onFrame(callback: (state: XRFrameState) => void): () => void;
     get referenceSpace(): XRSpace | undefined;
     registerPasses(graph: FrameGraph): void;
     requestSession(mode?: XRMode, options?: XRSessionOptions): Promise<XRNativeSession>;
