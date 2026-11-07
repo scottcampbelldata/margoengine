@@ -382,6 +382,7 @@ The own solver's kernel (`packages/physics/kernel`, Rust, no dependencies). Noth
 | P-33 | Vignette | post/src/image.ts | cos^4 natural-vignetting law (1/(1+t^2)^2); scale 0.2238 fitted to observed MagicaVoxel output |
 | P-34 | ImagePost curves and display gamma | post/src/image.ts | as cited |
 | P-35 | Projected decal fade | post/src/decals.ts | Margo-own: Margo design |
+| P-36 | Separable screen-space subsurface blur, per-channel Gaussian profile in world units | post/src/sss.ts | Jimenez, Zsolnai, Jarabo, Freude, Auzinger, Wu, von der Pahlen, Wimmer, Gutierrez, "Separable Subsurface Scattering", Computer Graphics Forum 34(6), 2015 (method, from the paper's description); d'Eon and Luebke, "Advanced Techniques for Realistic Real-Time Skin Rendering", GPU Gems 3 ch. 14, 2007 (profiles as sums of Gaussians, red widest). Both read from memory of the publications, not re-read for this change; the single Gaussian per channel and the default shares are Margo-own |
 
 ### scatter
 

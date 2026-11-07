@@ -1958,6 +1958,10 @@
       "types": "./dist/post/contact-shadows.d.ts",
       "import": "./dist/post/contact-shadows.js"
     },
+    "./post/sss": {
+      "types": "./dist/post/sss.d.ts",
+      "import": "./dist/post/sss.js"
+    },
     "./procedural": {
       "types": "./dist/procedural.d.ts",
       "import": "./dist/procedural.js"

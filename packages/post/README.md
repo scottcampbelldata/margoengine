@@ -553,6 +553,53 @@ const engine = await Engine.create(canvas, {backend: 'webgpu'});
 ContactShadows.attach(engine, {distance: 0.3});
 ```
 
+## Subsurface scattering: `SSS`
+
+`@margoengine/post/sss` (6,945 B min+gzip, its own entry; it carries the stack) softens skin, wax and marble: light that enters such a surface leaves it a little way off, so
+`SSS` blurs the lit image of the pixels you mark by a colour profile measured in world units. It is the screen-space
+half of subsurface scattering; the `subsurface` option of `@margoengine/materials` is the other half (light seen
+through thin parts and wrapped round the terminator). An HDR `PostStack` effect: put it first among the HDR effects.
+
+```ts
+import {createStage} from 'margoengine';
+import {PostStack} from 'margoengine/post/stack';
+import {SceneTargets} from 'margoengine/post/mrt';
+import {SSS} from 'margoengine/post/sss';
+import {Tonemap} from 'margoengine/tonemap';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+// Mark what scatters: here every surface lighter than half grey, as an r8 mask (any red channel 0..1 works).
+const targets = SceneTargets.attach(stage.engine, {
+  outputs: {skin: {wgsl: 'vec4f(step(0.5, t.albedo.r))', format: 'r8unorm'}},
+});
+const sss = new SSS({mask: () => targets.texture('skin'), radius: 0.012});
+PostStack.attach(stage.engine, [sss, new Tonemap()]);
+sss.options.profile = [1, 0.85, 0.7]; // marble: options are read every frame
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `mask` | none | Red channel 0..1 of a texture over the frame: how much each pixel scatters (`SceneTargets` output, `() => selection.maskTexture`). Nothing scatters without it |
+| `radius` | `0.01` | How far light travels under the surface, world units (1 cm: skin at metre scale) |
+| `profile` | `[1, 0.4, 0.25]` | Red, green, blue spread, each a share of `radius` (skin: red travels farthest); wax and marble spread more evenly |
+| `strength` | `1` | Share of the scattered light mixed in, times the mask |
+| `taps` | `8` | Taps on each side of a pixel in each of the two passes, 1 to 32 |
+| `enabled` | `true` | False passes frames through |
+
+- **Method.** The separable screen-space blur of Jimenez et al. (2015): one 1-D pass across, one down. Each channel's
+  kernel is a Gaussian as wide as `radius x profile` (d'Eon and Luebke 2007 fit measured skin profiles with sums of
+  Gaussians, red the widest). Widths are in world units, turned into pixels from the depth at each pixel, so the look
+  keeps its size at any distance and works for orthographic cameras. Weights are normalised per channel, so a flat
+  colour stays exactly that colour. A tap off the mask, on the background or across a depth step (a gap larger than
+  `radius`) counts as the centre colour, so light does not bleed across silhouettes or onto unmarked objects.
+- **Checked on a real GPU** (`packages/post/test/sss-browser.mjs`, M6 Mac mini, Metal, Chromium): a light
+  and a dark box meeting in an edge, both masked, `radius` 0.12, 16 taps: the 10 to 90% edge is 15 px wide in red, 6 in
+  green and 3 in blue (sharp without SSS), the flat faces keep their colour to 0/255, the background is untouched, and
+  no mask equals no effect exactly.
+- **Limits.** Screen space: only what is on screen scatters, and one 2-D Gaussian per channel stands in for a sum of
+  them (no long red tail). The kernel stops at 64 px each side, so a surface filling the screen near the camera
+  scatters less than `radius` asks. The mask is yours to supply; a material's `subsurface` value does not mark pixels
+  by itself. One `rgba16float` texture at the frame size. GPU cost not measured yet. WebGPU only.
+
 ## Multiple render targets: `SceneTargets`
 
 `@margoengine/post/mrt` draws the scene's surfaces into several named textures in one pass. Each output is a built-in
