@@ -137,9 +137,13 @@ function sunThrough(a: Required<AtmosphereParameters>, r: number, mu: number, ou
       dt = (2 * length * u) / 256,
       h = Math.sqrt(r * r + t * t + 2 * r * t * mu) - a.bottomRadius,
       rayleigh = Math.exp(-h / a.rayleighHeight),
-      mie = (a.mie + a.mieAbsorption) * Math.exp(-h / a.mieHeight),
+      mie = Math.exp(-h / a.mieHeight),
       ozone = Math.max(0, 1 - Math.abs(h - a.ozoneCenter) / a.ozoneWidth);
-    for (let c = 0; c < 3; c++) depth[c] += (a.rayleigh[c] * rayleigh + mie + a.ozone[c] * ozone) * dt;
+    for (let c = 0; c < 3; c++) {
+      const scatter = typeof a.mie === 'number' ? a.mie : a.mie[c],
+        absorb = typeof a.mieAbsorption === 'number' ? a.mieAbsorption : a.mieAbsorption[c];
+      depth[c] += (a.rayleigh[c] * rayleigh + (scatter + absorb) * mie + a.ozone[c] * ozone) * dt;
+    }
   }
   for (let c = 0; c < 3; c++) out[c] = Math.exp(-depth[c]);
 }

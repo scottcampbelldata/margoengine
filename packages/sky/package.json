@@ -94,6 +94,10 @@
     "./weather-fx": {
       "types": "./dist/weather-fx.d.ts",
       "import": "./dist/weather-fx.js"
+    },
+    "./presets": {
+      "types": "./dist/presets.d.ts",
+      "import": "./dist/presets.js"
     }
   },
   "files": [

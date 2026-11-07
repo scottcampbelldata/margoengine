@@ -16,10 +16,10 @@ export interface AtmosphereParameters {
   rayleigh?: Vec3;
   /** Rayleigh scale height, km. Default 8. */
   rayleighHeight?: number;
-  /** Mie scattering per km at the ground. Default 0.003996. */
-  mie?: number;
-  /** Mie absorption per km at the ground. Default 0.00444. */
-  mieAbsorption?: number;
+  /** Mie scattering per km at the ground: one number (grey, as Earth's haze) or RGB (coloured dust). Default 0.003996. */
+  mie?: number | Vec3;
+  /** Mie absorption per km at the ground: one number or RGB. Default 0.00444. */
+  mieAbsorption?: number | Vec3;
   /** Mie scale height, km. Default 1.2. */
   mieHeight?: number;
   /** Mie phase asymmetry (Cornette-Shanks), -0.99 to 0.99. Default 0.8. */
@@ -64,7 +64,15 @@ export function atmosphereParameters(p: AtmosphereParameters = {}): Required<Atm
     if (!(Number.isFinite(v) && v >= low))
       throw new RangeError(`Invalid atmosphere ${key}; use a finite number of ${low} or more`);
   };
-  for (const key of ['mie', 'mieAbsorption', 'ozoneCenter'] as const) positive(key);
+  for (const key of ['mie', 'mieAbsorption'] as const) {
+    const v = a[key];
+    if (typeof v === 'number') positive(key);
+    else {
+      finiteVector(v, 3, `Atmosphere ${key}`);
+      if (v.some((x) => x < 0)) throw new RangeError(`Invalid atmosphere ${key}; use values of 0 or more`);
+    }
+  }
+  positive('ozoneCenter');
   for (const key of ['rayleighHeight', 'mieHeight', 'ozoneWidth'] as const) positive(key, 1e-3);
   positive('bottomRadius', 1);
   if (!(a.topRadius > a.bottomRadius && a.topRadius <= a.bottomRadius * 2))
@@ -74,7 +82,8 @@ export function atmosphereParameters(p: AtmosphereParameters = {}): Required<Atm
 }
 // Uniform layout (vec4s after the matrix): rayleigh rgb + height, mie scattering/absorption/height/g, ozone rgb +
 // centre, albedo rgb + ozone half width, radii bottom/top + sun illuminance + display flag, sun xyz + exposure scale,
-// eye xyz (km from the planet centre) + km per world unit, view: aerial reach km, slices, 0, 0.
+// eye xyz (km from the planet centre) + km per world unit, view: aerial reach km, slices, 0, 0; then Mie scattering
+// rgb and Mie absorption rgb (each times the Mie scale), which the medium reads: mie.x and mie.y hold their green.
 // Distance along unit d from o (km from the centre) to the sphere of radius r: the far root from inside, the near one
 // from outside, -1 when missed. The constant is (|o| - r)(|o| + r), which keeps a camera a metre up exact in f32.
 // Transmittance table mapping (Bruneton 2017 sec. 2.3): x_mu over the distance to the top, x_r over the horizon length.
@@ -85,14 +94,14 @@ export function atmosphereParameters(p: AtmosphereParameters = {}): Required<Atm
  * (table mappings, ozone tent); Cornette and Shanks 1992 (Mie phase).
  */
 export const atmosphereCommon = /* wgsl */ `
-struct Atmosphere {inverse:mat4x4f,rayleigh:vec4f,mie:vec4f,ozone:vec4f,ground:vec4f,radii:vec4f,sun:vec4f,eye:vec4f,view:vec4f}
+struct Atmosphere {inverse:mat4x4f,rayleigh:vec4f,mie:vec4f,ozone:vec4f,ground:vec4f,radii:vec4f,sun:vec4f,eye:vec4f,view:vec4f,mieScattering:vec4f,mieAbsorption:vec4f}
 const PI=3.14159265;
 fn atmosphereExtinction(a:Atmosphere,h:f32)->vec3f {
  let r=exp(-h/a.rayleigh.w);let m=exp(-h/a.mie.z);let o=max(0.0,1.0-abs(h-a.ozone.w)/a.ground.w);
- return a.rayleigh.rgb*r+vec3f((a.mie.x+a.mie.y)*m)+a.ozone.rgb*o;
+ return a.rayleigh.rgb*r+(a.mieScattering.rgb+a.mieAbsorption.rgb)*m+a.ozone.rgb*o;
 }
 fn atmosphereRayleigh(a:Atmosphere,h:f32)->vec3f {return a.rayleigh.rgb*exp(-h/a.rayleigh.w);}
-fn atmosphereMie(a:Atmosphere,h:f32)->f32 {return a.mie.x*exp(-h/a.mie.z);}
+fn atmosphereMie(a:Atmosphere,h:f32)->vec3f {return a.mieScattering.rgb*exp(-h/a.mie.z);}
 fn rayleighPhase(nu:f32)->f32 {return 3.0/(16.0*PI)*(1.0+nu*nu);}
 fn miePhase(nu:f32,g:f32)->f32 {return 3.0/(8.0*PI)*(1.0-g*g)*(1.0+nu*nu)/((2.0+g*g)*pow(max(1.0+g*g-2.0*g*nu,1e-4),1.5));}
 fn sphereHit(o:vec3f,d:vec3f,r:f32)->f32 {
@@ -168,7 +177,7 @@ var<workgroup> sums:array<vec3f,128>;
  var throughput=vec3f(1);var l2=vec3f(0);var fms=vec3f(0);
  for(var i=0;i<20;i++){
   let p=o+d*((f32(i)+0.5)*dt);let pr=length(p);let h=pr-a.radii.x;
-  let scatter=atmosphereRayleigh(a,h)+vec3f(atmosphereMie(a,h));let ext=atmosphereExtinction(a,h);
+  let scatter=atmosphereRayleigh(a,h)+atmosphereMie(a,h);let ext=atmosphereExtinction(a,h);
   let shadow=select(1.0,0.0,sphereHit(p,sun,a.radii.x*0.99999)>=0.0&&dot(p,sun)<0.0);
   let step=exp(-ext*dt);let integral=throughput*(1.0-step)/max(ext,vec3f(1e-7));
   l2+=integral*scatter*transmittanceToTop(a,pr,dot(p/pr,sun))*shadow/(4.0*PI);fms+=integral*scatter;throughput*=step;
@@ -190,7 +199,7 @@ export class AtmosphereTables {
   readonly multiple: GPUTexture;
   readonly sampler: GPUSampler;
   /** The uniform's values: write the view fields, then {@link AtmosphereTables.upload}. */
-  readonly values = new Float32Array(48);
+  readonly values = new Float32Array(56);
   private key = '';
   private pipelines?: [GPUComputePipeline, GPUComputePipeline];
   constructor(private readonly device: GPUDevice) {
@@ -213,8 +222,13 @@ export class AtmosphereTables {
     const v = this.values;
     v.set(a.rayleigh, 16);
     v[19] = a.rayleighHeight;
-    v[20] = a.mie * mieScale;
-    v[21] = a.mieAbsorption * mieScale;
+    const rgb = (x: number | Vec3, c: number) => (typeof x === 'number' ? x : x[c]) * mieScale;
+    v[20] = rgb(a.mie, 1);
+    v[21] = rgb(a.mieAbsorption, 1);
+    for (let c = 0; c < 3; c++) {
+      v[48 + c] = rgb(a.mie, c);
+      v[52 + c] = rgb(a.mieAbsorption, c);
+    }
     v[22] = a.mieHeight;
     v[23] = a.mieG;
     v.set(a.ozone, 24);
@@ -228,7 +242,7 @@ export class AtmosphereTables {
   upload(encoder: GPUCommandEncoder): void {
     const d = this.device;
     d.queue.writeBuffer(this.uniform, 0, this.values as Float32Array<ArrayBuffer>);
-    const key = Array.from(this.values.subarray(16, 34)).join();
+    const key = Array.from(this.values.subarray(16, 34)).join() + ':' + Array.from(this.values.subarray(48, 55)).join();
     if (key === this.key) return;
     this.key = key;
     const [t, m] = (this.pipelines ??= [

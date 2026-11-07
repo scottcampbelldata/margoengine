@@ -2302,6 +2302,10 @@
       "types": "./dist/sky/weather-fx.d.ts",
       "import": "./dist/sky/weather-fx.js"
     },
+    "./sky/presets": {
+      "types": "./dist/sky/presets.d.ts",
+      "import": "./dist/sky/presets.js"
+    },
     "./splats": {
       "types": "./dist/splats.d.ts",
       "import": "./dist/splats.js"

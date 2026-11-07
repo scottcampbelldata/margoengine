@@ -43,6 +43,7 @@ const sky = Sky.attach(engine, {model: 'bruneton', clouds: {coverage: 0.4}}, {br
 | `/aerial` | `AerialPerspective`, its own plugin: distant surfaces take the air's colour | 6.5 kB |
 | `/hillaire` | `HillaireSky`, its own plugin: a physical sky with ozone from the ground to space | 6.6 kB |
 | `/shafts` | `LightShafts`, its own plugin: god rays past geometry and through cloud gaps | 6.9 kB |
+| `/presets` | `EARTH`, `MARS` and `marsAtmosphere` for the Hillaire entries (not a `Sky` feature) | 1.6 kB |
 | `/astro` | `AstroSky`, its own plugin: the real sun, moon, planets and catalogue stars for a date and place | 9.5 kB |
 | `/weather-fx` | `WeatherFX`, its own plugin: no rain under roofs, splashes, a wet lens | 5.3 kB |
 
@@ -309,6 +310,30 @@ use it to colour the scene's sun.
 its height. It does not light the scene itself (no engine sun, ambient or reflection map): set core's sun from
 `sky.sun` and `sky.sunTransmittance`. The clouds still colour their sunlight with the root sky's turbidity model.
 On a display target (no HDR scene capture) the sky is display-encoded there. Needs WebGPU.
+
+### Other worlds: presets
+
+`@margoengine/sky/presets` gives `HillaireSky` and `AerialPerspective` the air and sunlight of other worlds. Each preset
+is `{atmosphere, sunIlluminance}`, so spread it into the options:
+
+```ts
+import {Engine} from 'margoengine/core';
+import {HillaireSky} from 'margoengine/sky/hillaire';
+import {MARS, marsAtmosphere} from 'margoengine/sky/presets';
+const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
+// A clear day on Mars: a butterscotch sky with a bright glow around a smaller, dimmer sun.
+const sky = HillaireSky.attach(engine, {...MARS, hours: 10});
+sky.options.atmosphere = marsAtmosphere(3); // later, a regional dust storm
+```
+
+`EARTH` is the entries' own default. `MARS` takes its size and air from NASA's Mars Fact Sheet (radius 3,389.5 km,
+6.36 mb at about 214 K, scale height 11 km, 95% CO2, Bond albedo 0.25, 0.431 of Earth's sunlight). Its Rayleigh
+scattering is CO2's measured cross section (Sneep and Ubachs 2005) at that density, about 58 times thinner than
+Earth's air, so the dust colours the sky: `marsAtmosphere(opticalDepth)` spreads that dust optical depth (0.5 on a
+clear day, 0 to 10) over the gas's scale height, scattering 0.975 of the red light it meets, 0.94 of the green and
+0.90 of the blue (Wolff et al. 2009, the blue Margo's reading of their curve), forward with asymmetry 0.67 (Chen-Chen
+et al. 2019). Any atmosphere may now give `mie` and `mieAbsorption` per channel. On a Radeon 680M, 90 degrees from a
+sun 40 degrees up, the clear Martian sky reads red over blue 1.17 (Earth's reads blue over red 4.7) and a storm 1.82.
 
 ## Light shafts
 

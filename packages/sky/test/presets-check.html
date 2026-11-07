@@ -1,0 +1,54 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Sky presets check</title><style>body{margin:0}canvas{display:block;width:128px;height:96px}</style></head><body><canvas width="128" height="96"></canvas>
+<script type="module">
+// The Hillaire sky with the Earth and Mars presets on a real GPU, read from Bloom's HDR scene capture: the day sky
+// away from the sun and beside it, and Mars in a dust storm. Driven by features-check.mjs.
+import {Engine} from '/packages/core/dist/index.js';
+import {sceneSamples} from '/packages/core/dist/quality.js';
+import {Bloom} from '/packages/post/dist/bloom.js';
+import {HillaireSky} from '/packages/sky/dist/hillaire.js';
+import {EARTH,MARS,marsAtmosphere} from '/packages/sky/dist/presets.js';
+if(new URLSearchParams(location.search).get('samples')==='1')globalThis.margoLow=1;
+const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,2,0],target:[0,2,-1],fov:20,near:0.5,far:100000}}),device=engine.gpu,errors=[];
+engine.stop();
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const post=Bloom.attach(engine,{strength:0,threshold:1,exposure:0}),rad=Math.PI/180;
+const module=device.createShaderModule({code:'@group(0) @binding(0) var image:texture_2d<f32>;@group(0) @binding(1) var<storage,read_write> result:array<vec4f>;@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u){let s=textureDimensions(image);if(id.x<s.x&&id.y<s.y){result[id.y*s.x+id.x]=textureLoad(image,id.xy,0);}}'});
+const pipeline=device.createComputePipeline({layout:'auto',compute:{module,entryPoint:'main'}});
+// The whole HDR capture after one frame; a pixel is read as image(x, y).
+async function frame(){
+ const t0=performance.now();engine.render({delta:0});
+ const w=post.sceneTexture.width,h=post.sceneTexture.height,size=w*h*16;
+ const output=device.createBuffer({size,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),staging=device.createBuffer({size,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+ const encoder=device.createCommandEncoder(),pass=encoder.beginComputePass();pass.setPipeline(pipeline);
+ pass.setBindGroup(0,device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:post.sceneTexture.createView()},{binding:1,resource:{buffer:output}}]}));
+ pass.dispatchWorkgroups(Math.ceil(w/8),Math.ceil(h/8));pass.end();encoder.copyBufferToBuffer(output,0,staging,0,size);device.queue.submit([encoder.finish()]);
+ await staging.mapAsync(GPUMapMode.READ);const v=new Float32Array(staging.getMappedRange().slice(0));staging.unmap();output.destroy();staging.destroy();
+ const ms=performance.now()-t0;
+ return {ms,at:(x,y)=>Array.from(v.subarray((y*w+x)*4,(y*w+x)*4+3)),w,h};
+}
+// Aim the camera at azimuth (degrees from -z toward +x) and elevation, `height` metres up; the centre pixel is that ray.
+function aim(azimuth,elevation,height=2){
+ const a=azimuth*rad,e=elevation*rad;engine.camera.position=[0,height,0];
+ engine.camera.target=[Math.sin(a)*Math.cos(e)*1000,height+Math.sin(e)*1000,-Math.cos(a)*Math.cos(e)*1000];
+}
+const sunAt=(azimuth,elevation)=>{const a=azimuth*rad,e=elevation*rad;return [Math.sin(a)*Math.cos(e),Math.sin(e),-Math.cos(a)*Math.cos(e)];};
+async function centre(sky,options,az,el,height){
+ Object.assign(sky.options,options);aim(az,el,height);await frame();const f=await frame();return {v:f.at(f.w>>1,f.h>>1),ms:f.ms,f};
+}
+window.check={samples:sceneSamples,
+ async run(){
+  device.pushErrorScope('validation');
+  const sky=HillaireSky.attach(engine,{timeScale:0,sunDisc:false}),out={};
+  const at=async(preset,az,el)=>(await centre(sky,{...preset,sunDirection:sunAt(0,40)},az,el)).v;
+  for(const [name,preset] of [['earth',EARTH],['mars',MARS],['storm',{atmosphere:marsAtmosphere(3),sunIlluminance:MARS.sunIlluminance}]]){
+   // 90 degrees from a sun 40 degrees up, 30 degrees above the horizon; and 5 degrees from the sun.
+   out[name]={away:await at(preset,90,30),near:await at(preset,0,35)};
+  }
+  sky.options.atmosphere=undefined;sky.options.sunIlluminance=undefined;
+  out.plain={away:(await centre(sky,{sunDirection:sunAt(0,40)},90,30)).v};
+  sky.dispose();
+  const error=await device.popErrorScope();
+  return {...out,error:error?.message??null,errors:errors.splice(0)};
+ }};
+window.ready=true;
+</script></body></html>

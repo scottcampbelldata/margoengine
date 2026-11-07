@@ -622,6 +622,14 @@ the recorded traces stand; a change of albedo rebuilds the scattering once, not 
 `features-check.mjs` albedo on a Radeon 680M at 4x and 1x (snow +113% at the horizon, sand +49%, albedo 0 bit for
 bit). Missing: other GPUs, a reference sky, timing.
 
+`@margoengine/sky/presets` holds other worlds for the Hillaire model (`EARTH`, `MARS`, `marsAtmosphere`). To colour
+Martian dust the medium now reads Mie scattering and absorption per channel: two vec4s at the end of the `Atmosphere`
+uniform (now 224 bytes), which the extinction, the in-scattering and the multiple scattering table read, and the CPU
+sun transmittance per channel too; a number still means grey. The tables are keyed on them, so a new preset rebuilds
+both once. Evidence: `features-check.mjs` presets on a Radeon 680M at 4x and 1x (Earth blue and bit-identical to the
+default, Mars red over blue 1.17, a storm 1.82), and the hillaire, aerial and shafts checks unchanged. Missing: other
+GPUs, a photograph or reference renderer of Mars, timing.
+
 `LightShafts` (`@margoengine/sky/shafts`) is a screen-space pass after the aerial perspective (order 4.5): a half-size
 r16float mask of open sky (2 x 2 depth taps) times the clouds' transmittance along each view ray, from its own copy of
 the cloud noise volumes, then a fullscreen draw that walks the mask toward the sun's projected position and adds light

@@ -51,7 +51,7 @@ test('aerial perspective builds its tables once, its volume every frame, and dra
     queue = h.engine.gpu.queue,
     write = queue.writeBuffer.bind(queue);
   queue.writeBuffer = (buffer, offset, data) => {
-    if (data.length === 48) writes.push(Float32Array.from(data));
+    if (data.length === 56) writes.push(Float32Array.from(data));
     return write(buffer, offset, data);
   };
   h.engine.use(sky);
@@ -87,6 +87,9 @@ test('aerial perspective builds its tables once, its volume every frame, and dra
   const v = writes.at(-1);
   // The sky's turbidity 3 scales Mie scattering by (3 - 1) / 2 = 1; the Preetham sky lends illuminance 10.
   assert.equal(v[20], Math.fround(0.003996));
+  // The medium reads Mie scattering and absorption per channel (48-50, 52-54); grey haze gives three equal values.
+  assert.deepEqual([...v.subarray(48, 51)], [0.003996, 0.003996, 0.003996].map(Math.fround));
+  assert.deepEqual([...v.subarray(52, 55)], [0.00444, 0.00444, 0.00444].map(Math.fround));
   assert.equal(v[34], 10);
   sky.options.turbidity = 5;
   sky.options.model = 'bruneton';

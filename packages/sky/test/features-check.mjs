@@ -364,6 +364,36 @@ checks.albedo = async (page, samples) => {
   );
   return r;
 };
+checks.presets = async (page, samples) => {
+  const r = await page.evaluate(() => window.check.run());
+  const show = (v) => v.map((x) => x.toPrecision(4)).join(', ');
+  for (const name of ['earth', 'mars', 'storm'])
+    console.log(`  presets ${samples}x ${name}: away ${show(r[name].away)}, near the sun ${show(r[name].near)}`);
+  assert.equal(r.error, null);
+  assert.deepEqual(r.errors, []);
+  // The Earth preset is the default sky, to the bit.
+  assert.deepEqual(r.earth.away, r.plain.away);
+  // Earth's day sky is blue: Rayleigh scattering goes as 1 / lambda^4.
+  const [er, eg, eb] = r.earth.away;
+  assert.ok(eb > eg && eg > er, `earth ${show(r.earth.away)}`);
+  // Mars's is butterscotch: its air is 58 times thinner, so the dust, which absorbs blue (single scattering albedo
+  // 0.90) more than red (0.975), colours the sky; red leads green leads blue.
+  for (const name of ['mars', 'storm']) {
+    const [mr, mg, mb] = r[name].away;
+    assert.ok(mr > mg && mg > mb, `${name} ${show(r[name].away)}`);
+  }
+  // Dust scatters forward (g 0.67): beside the sun the Martian sky is many times brighter than 90 degrees away,
+  // more so than Earth's clear air. Measured on this GPU in the presets log.
+  const glow = (name) => r[name].near[0] / r[name].away[0];
+  assert.ok(glow('mars') > glow('earth') && glow('mars') > 3, `glow mars ${glow('mars')}, earth ${glow('earth')}`);
+  // A dust storm (optical depth 3) turns the sky redder still than a clear day's.
+  const redness = (v) => v[0] / v[2];
+  assert.ok(redness(r.storm.away) > redness(r.mars.away), `storm ${show(r.storm.away)}, clear ${show(r.mars.away)}`);
+  console.log(
+    `ok presets ${samples}x: earth blue, mars red over blue ${redness(r.mars.away).toFixed(2)}, storm ${redness(r.storm.away).toFixed(2)}; glow beside the sun mars ${glow('mars').toFixed(1)}, earth ${glow('earth').toFixed(1)}`,
+  );
+  return r;
+};
 const names = process.argv.slice(2).length ? process.argv.slice(2) : Object.keys(checks);
 const context = await openBrowser({ startPath: '/packages/sky/test/volumetric-check.html', port: 5213 }),
   { page, hardware } = context,

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10482551,
+  "total": 10484383,
   "history": [
     {
       "date": "2026-10-24",
@@ -3512,6 +3512,12 @@
       "commit": "89aec9d0f",
       "reason": "new entry @margoengine/net/fields, FieldBuffer",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "0fe47d44d",
+      "reason": "sky/presets: Earth and Mars presets for the Hillaire entries (new entry, 1,576 B); per-channel Mie in the shared atmosphere",
+      "grew": 1
     }
   ],
   "items": {
@@ -4082,6 +4088,7 @@
     "@margoengine/sky/lighting": 4064,
     "@margoengine/sky/night": 2523,
     "@margoengine/sky/preetham": 953,
+    "@margoengine/sky/presets": 1832,
     "@margoengine/sky/reflection": 1325,
     "@margoengine/sky/shafts": 7139,
     "@margoengine/sky/sun": 2379,

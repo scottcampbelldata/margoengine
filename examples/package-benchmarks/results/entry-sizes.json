@@ -1,6 +1,6 @@
 {
-  "commit": "554541609",
-  "dirty": false,
+  "commit": "b1180f8b5",
+  "dirty": true,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
     "raw": 57071,
@@ -2412,12 +2412,12 @@
         "gzip": 3211
       },
       "./aerial": {
-        "raw": 18787,
-        "gzip": 6496
+        "raw": 19173,
+        "gzip": 6611
       },
       "./hillaire": {
-        "raw": 18406,
-        "gzip": 6607
+        "raw": 18890,
+        "gzip": 6735
       },
       "./shafts": {
         "raw": 17828,
@@ -2430,6 +2430,10 @@
       "./weather-fx": {
         "raw": 13664,
         "gzip": 5277
+      },
+      "./presets": {
+        "raw": 3584,
+        "gzip": 1576
       }
     },
     "@margoengine/splats": {

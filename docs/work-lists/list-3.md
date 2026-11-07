@@ -17,7 +17,7 @@ For the third account. Starts when Scott is home and opens it.
 | H | loading and interface | 108 | selection | 3 | todo |
 | H | loading and interface | 109 | viewcube | 5 | todo |
 | I | sky and land | 57 | sky | 8 | done |
-| I | sky and land | 58 | sky | 2 | todo |
+| I | sky and land | 58 | sky | 2 | done |
 | I | sky and land | 59 | weather | 7 | todo |
 | I | sky and land | 60 | scenery | 5 | todo |
 | I | sky and land | 61 | terrain | 8 | todo |

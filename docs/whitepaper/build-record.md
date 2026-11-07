@@ -1961,3 +1961,40 @@ byte-identical; regression `packages/tiles/tests/terrain.test.js`).
   build, api:check, `npm run quality`, lint, hygiene, the tiles tests, the claims, llms and lock tests and the tiles
   browser checks under the GPU lock; the README run for tiles before each. One `npm run verify` on the newest main after
   the last push.
+
+## Lane I batch 58: sky, part 2
+
+Two jobs for `@margoengine/sky` on the Beelink (lane I, work list 3): an option of the Bruneton entry and a new
+optional entry. Core and stage are untouched. Both are proved on a real GPU, a Radeon 680M, at 4x and 1x MSAA through
+`packages/sky/test/features-check.mjs`. Nothing is timed.
+
+| # | Job | Status | Commit | Entry | Claim |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Ground albedo feedback | DONE | `01c3aec9` | `groundAlbedo` on `/bruneton` | LIM-375 |
+| 2 | Other planets | DONE | this commit | `/presets` (`EARTH`, `MARS`, `marsAtmosphere`) | LIM-378 |
+
+Follow-up in the same batch: `45d38a12` measures entry-sizes.json and basic-scene-network.json at one commit again.
+
+- **Built from:** job 1, Bruneton and Neyret 2008 (the ground as a Lambertian boundary of the precomputation, its
+  irradiance per order); job 2, NASA's Mars Fact Sheet, Sneep and Ubachs 2005 (CO2 Rayleigh cross section), Wolff et
+  al. 2009 and 2008, Chen-Chen et al. 2019 and Lemmon et al. 2015 for the dust. Rows S46 and S47 in
+  `docs/clean-room.md`. Job 2 also lets any Hillaire atmosphere give Mie scattering and absorption per channel (two
+  more vec4s in the shared `Atmosphere` uniform), which the aerial perspective and light shafts read unchanged.
+- **Proved:** job 1, albedo 0 is the sky without the option to the bit, with the same passes and shaders (the
+  recorded traces stand); snow at 0.9 lifts the horizon 90 degrees from a sun 30 degrees up by 113% (green), sand at
+  0.4 by 49%, 2.31 times sand's gain for 2.25 times the albedo; the size matches a single-scattering estimate. Job 2,
+  every Mars value is recomputed from its source in the unit tests; Earth blue and equal to the default, Mars
+  butterscotch (red over blue 1.17), a dust storm redder (1.82), a 12.4 times brighter glow 5 degrees from the sun
+  against Earth's 3.5; the hillaire, aerial and shafts checks pass unchanged.
+- **Sizes:** `/bruneton` 2,301 to 3,002 B gzip, `/base` +96 B, new `/presets` 1,576 B; the root `Sky` 17.7 kB.
+- **Limits:** one GPU; behaviour bounds, not a photograph or reference renderer. One albedo for the whole ground; the
+  Martian dust has one phase function for every colour (no blue sunset), and its green and blue albedo are Margo's
+  reading of published curves. Rows in docs/limits.md.
+- **Slips:** job 1's landing measured entry-sizes.json at its own commit before the records amend, so main held a
+  record naming a commit not on main and tests/sizes-page.test.js failed; fixed in `45d38a12` (both records measured
+  on clean main), and job 2's landing measures them on main's commit before recommitting and runs that test. Job 1's
+  first two landings stopped on rebase conflicts in the shared records; the claim was renumbered from the file inside
+  the landing lock (LIM-369 to LIM-375).
+- **Gate:** per job: rebase, build:packages, api:check, `npm run quality`, lint, hygiene, the sky, react, scenery,
+  gameplay-sandbox and voxel-sandbox tests, the sky GPU tests under the GPU lock, the claims, llms, lock-sync and
+  sizes-page tests. One `npm run verify` on the newest main after the last push.

@@ -11,7 +11,7 @@ const uniformWrites = (h) => {
     queue = h.engine.gpu.queue,
     write = queue.writeBuffer.bind(queue);
   queue.writeBuffer = (buffer, offset, data) => {
-    if (data.length === 48) writes.push(Float32Array.from(data));
+    if (data.length === 56) writes.push(Float32Array.from(data));
     return write(buffer, offset, data);
   };
   return writes;

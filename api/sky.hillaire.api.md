@@ -11,8 +11,8 @@ export interface AtmosphereParameters {
     topRadius?: number;
     rayleigh?: Vec3;
     rayleighHeight?: number;
-    mie?: number;
-    mieAbsorption?: number;
+    mie?: number | Vec3;
+    mieAbsorption?: number | Vec3;
     mieHeight?: number;
     mieG?: number;
     ozone?: Vec3;
