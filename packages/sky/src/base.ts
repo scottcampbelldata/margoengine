@@ -189,7 +189,8 @@ export interface SkyFeatures {
     readonly tail: string;
     create(device: GPUDevice, uniform: GPUBufferBinding, transmission: GPUTextureView, owned: Owned): SkyTables;
   };
-  clouds?: { readonly wgsl: string; validate(clouds: SkyCloudOptions): void };
+  /** `field`: the WGSL of the cloud noise alone, `cloudOctaves` over a km position, for other passes that read the same clouds. */
+  clouds?: { readonly wgsl: string; readonly field?: string; validate(clouds: SkyCloudOptions): void };
   night?: {
     readonly wgsl: string;
     validate(night: SkyNightOptions): void;
@@ -332,6 +333,16 @@ export class Sky implements EnginePlugin {
   private lit?: ReturnType<NonNullable<SkyFeatures['lighting']>['create']>;
   private targets = new Map<SkyLightingTarget, () => void>();
   /** Borrowed linear HDR sky environment (needs the reflection feature); rebuilt on device restoration. */
+  /**
+   * The cloud layer this frame, for what must match it (`cloudShadows` from `@margoengine/shadows/light-function`):
+   * `field` is its noise as WGSL, `drift` the metres it has moved along the wind. Undefined without clouds.
+   */
+  get cloudLayer(): { field: string; coverage: number; drift: number; height: number } | undefined {
+    const options = this.options.clouds,
+      field = this.features.clouds?.field;
+    if (!options || !field) return undefined;
+    return { field, coverage: options.coverage ?? 0.45, drift: this.cloudTime, height: options.height ?? 1500 };
+  }
   get reflectionTexture(): GPUTexture | undefined {
     this.reflectionRequested = true;
     return this.reflection?.texture;

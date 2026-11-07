@@ -30,7 +30,15 @@ import {
   staleCaster,
 } from '../../shared/caster.js';
 import { PAGES_PER_SIDE, PAGE_TEXELS, PagePool, basePageSize, pageIndex, pageMatrix, pageSize } from './pages.js';
-import { shadowDepth, type ShadowFilter } from './shader.js';
+import {
+  shadowDepth,
+  effectEntries,
+  moveEffects,
+  validEffects,
+  type ShadowEffect,
+  type ShadowEffectFrame,
+  type ShadowFilter,
+} from './shader.js';
 import { pageClear, pageCopy, pageFeedback, pageNearest, virtualSampling } from './virtual-shader.js';
 import type { ShadowPrimitive, ShadowSource } from './index.js';
 export type { ShadowFilter } from './shader.js';
@@ -73,6 +81,8 @@ export interface VirtualShadowOptions {
   casterMargin?: number;
   /** Edge filter (default `'soft'`), as `Shadows`. Read when receiver shaders are built. */
   filter?: ShadowFilter;
+  /** What else shapes the sun, as `Shadows`' `effects` option. Fixed at construction. Default none. */
+  effects?: readonly ShadowEffect<VirtualPassContext>[];
 }
 interface Source {
   source: ShadowSource | Mesh;
@@ -217,8 +227,15 @@ export class VirtualShadows implements EnginePlugin {
   private readonly address = [0, 0, 0];
   private origin = Number.NaN;
   private dirty = true;
+  private readonly effects: readonly ShadowEffect<VirtualPassContext>[];
+  private readonly effectFrame: ShadowEffectFrame<VirtualPassContext> = {
+    context: undefined!,
+    light: new Float32Array(3),
+    changed: false,
+  };
   constructor(readonly options: VirtualShadowOptions = {}) {
     this.options = preset('shadows', options);
+    this.effects = validEffects(this.options.effects) as readonly ShadowEffect<VirtualPassContext>[];
     this.validate();
   }
   /** Attaches a new effect to `instance`. */
@@ -374,7 +391,7 @@ export class VirtualShadows implements EnginePlugin {
         'unsupported',
         "VirtualShadows require the standard PBR lighting shader; remove the plugin that replaced core's shader",
       );
-    const output = virtualSampling(group, filter) + code;
+    const output = virtualSampling(group, filter, this.effects as readonly ShadowEffect[]) + code;
     if (!cache) this.shaders.set(key, (cache = new Map()));
     cache.set(source, output);
     return output;
@@ -388,7 +405,7 @@ export class VirtualShadows implements EnginePlugin {
       this.hooks.set(
         key,
         (hooks = {
-          declarations: virtualSampling(group, filter),
+          declarations: virtualSampling(group, filter, this.effects as readonly ShadowEffect[]),
           direct: (d) => `shadowLit(${d},i.position,s.n)`,
         }),
       );
@@ -450,6 +467,8 @@ export class VirtualShadows implements EnginePlugin {
       { binding: 3, resource: this.sampler },
       { binding: 31, resource: this.tableTexture.createView({ dimension: '2d-array' }) },
     ];
+    for (const effect of this.effects) effect.setup?.(device, { width: size, height: size, layers: 1 });
+    this.entries.push(...effectEntries(this.effects as readonly ShadowEffect[]));
     const words = (levels * PAGES_PER_SIDE * PAGES_PER_SIDE) / 32;
     this.requestBuffer = device.createBuffer({
       size: words * 4,
@@ -476,12 +495,13 @@ export class VirtualShadows implements EnginePlugin {
         if (sectionState(c)) {
           // The scene's `section` plugin owns its binding: move the shadow declarations past the occupied slots.
           const base = Math.max(31, ...c.bindings.map((entry) => entry.binding)) + 1;
-          c.shader = this.shader(c.shader)
+          const entries = this.bindings();
+          c.shader = moveEffects(this.shader(c.shader), (binding) => base + entries.findIndex((e) => e.binding === binding))
             .replace('@binding(1) var<uniform> shadowFrame', `@binding(${base}) var<uniform> shadowFrame`)
             .replace('@binding(2) var shadowMap', `@binding(${base + 1}) var shadowMap`)
             .replace('@binding(3) var shadowSampler', `@binding(${base + 2}) var shadowSampler`)
             .replace('@binding(31) var shadowPages', `@binding(${base + 3}) var shadowPages`);
-          this.bindings().forEach((entry, i) => c.bindings.push({ ...entry, binding: base + i }));
+          entries.forEach((entry, i) => c.bindings.push({ ...entry, binding: base + i }));
         } else {
           c.shader = this.shader(c.shader);
           const entries = this.bindings();
@@ -903,6 +923,8 @@ export class VirtualShadows implements EnginePlugin {
     this.ringNext ^= 1;
     // After this frame's submit, which runs synchronously once the frame graph returns: a buffer may not be mapped before.
     queueMicrotask(() => {
+      // A dispose in the frame's own task has already destroyed the buffer.
+      if (!this.ring.includes(slot)) return;
       slot.buffer.mapAsync(GPUMapMode.READ).then(
         () => {
           this.requests.set(new Uint32Array(slot.buffer.getMappedRange()));
@@ -1002,6 +1024,15 @@ export class VirtualShadows implements EnginePlugin {
     this.feedback(c);
     this.stats.casterDraws = draws;
     if ((o.filter ?? 'soft') === 'soft' && this.nearestStale) this.nearest(c);
+    if (this.effects.length) {
+      const frame = this.effectFrame,
+        light = frame.light as Float32Array;
+      for (let i = 0; i < 3; i++) light[i] = -this.forward[i];
+      frame.context = c;
+      frame.changed = true;
+      for (let i = 0; i < this.effects.length; i++) this.effects[i].update?.(frame);
+      frame.context = undefined!;
+    }
   }
   /** Reduces each level's mapped pages to the level's nearest depth for the PCSS search, when pages changed. */
   private nearest(c: VirtualPassContext): void {
@@ -1226,6 +1257,7 @@ export class VirtualShadows implements EnginePlugin {
   }
   private release(): void {
     this.clearDraws();
+    for (const effect of this.effects) effect.dispose?.();
     for (const texture of [this.pool, this.cached, this.tableTexture, this.white]) texture?.destroy();
     this.uniform?.destroy();
     this.requestBuffer?.destroy();

@@ -57,7 +57,7 @@ export interface FeatureTargets {
     };
     shadows?: {
         options: {
-            filter?: 'soft' | 'pcf' | 'hard';
+            filter?: 'soft' | 'pcf' | 'hard' | object;
             distance?: number;
             resolution?: number | readonly [number, number];
             cascades?: number;

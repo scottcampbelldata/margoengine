@@ -1,8 +1,5 @@
 import type { SkyFeatures } from './base.js';
-/** Procedural cloud layer on a curved shell, lit by the sun through the atmosphere (`clouds` option). */
-export const clouds: NonNullable<SkyFeatures['clouds']> = {
-  // shortcut: one procedural cloud layer, use volumetric clouds for flight through the layer.
-  wgsl: /* wgsl */ `
+const field = /* wgsl */ `
 // Integer hash pcg2d (Jarzynski and Olano 2020): exact on every GPU, where sin-based hashes lose precision far out.
 fn cloudHash(p:vec2i)->f32 {
  var v=bitcast<vec2u>(p)*1664525u+1013904223u;
@@ -25,7 +22,12 @@ fn cloudOctaves(p:vec2f,footprint:f32,first:u32,last:u32)->f32 {
  }
  return sum/max(total,0.000001);
 }
-// Coverage remap (Schneider 2015): the low-frequency shape says where clouds are, coverage how much sky they fill.
+`;
+/** Procedural cloud layer on a curved shell, lit by the sun through the atmosphere (`clouds` option). */
+export const clouds: NonNullable<SkyFeatures['clouds']> = {
+  field,
+  // shortcut: one procedural cloud layer, use volumetric clouds for flight through the layer.
+  wgsl: /* wgsl */ `${field}// Coverage remap (Schneider 2015): the low-frequency shape says where clouds are, coverage how much sky they fill.
 fn cloudCover(shape:f32)->f32 {return clamp((shape-1.0+frame.clouds.x)/max(frame.clouds.x,0.001),0.0,1.0);}
 // Two Henyey-Greenstein lobes (Hillaire 2016), forward g=0.6 and back g=-0.25, scaled so isotropic scattering is 1.
 fn cloudPhase(nu:f32)->f32 {return mix(0.9375/pow(1.0625+0.5*nu,1.5),0.64/pow(1.36-1.2*nu,1.5),0.6);}

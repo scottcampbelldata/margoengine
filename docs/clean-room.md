@@ -361,6 +361,8 @@ carry the same citation as a one-line comment in the code.
 | SH8 | receiver-plane depth bias from the light-space normal; minus half-footprint | shadows/src/shader.ts | slope |
 | SH9 | normal-offset receiver position; constant bias; light size | shadows/src/shader.ts, shadows/src/index.ts | Holbert 2011, "Normal Offset Shadows" (GDC poster / blog) |
 | SH10 | depth-only caster with alpha test | shadows/src/shader.ts | Margo-own: Margo design choice |
+| SH11 | cloud shadow: the sky's own coverage remap and erosion along the ray to the sun, Beer-Lambert opacity | shadows/src/light-function.ts | Schneider 2015, "The Real-Time Volumetric Cloudscapes of Horizon Zero Dawn" (as the sky's clouds) |
+| SH12 | light pattern: a mask across a directional light | shadows/src/light-function.ts | Segal et al. 1992, "Fast Shadows and Lighting Effects Using Texture Mapping" (projective light textures) |
 
 ### shared
 

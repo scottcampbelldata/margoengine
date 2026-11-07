@@ -5,6 +5,49 @@
  * 2x2 bilinear comparison), the cheapest edge.
  */
 export type ShadowFilter = 'soft' | 'pcf' | 'hard';
+/** The first binding of `effects`; each effect has four from there. Past Shadows' and the other lighting effects' own. */
+export const EFFECT_BINDING = 40;
+/** What a {@link ShadowEffect} sees of a frame. Borrowed: use it synchronously. */
+export interface ShadowEffectFrame<Context = unknown> {
+  /** The frame's WebGPU pass context; no pass is open on its encoder. */
+  context: Context;
+  /** Unit direction towards the light. */
+  light: ArrayLike<number>;
+  /** The depth map changed this frame. */
+  changed: boolean;
+  /** The depth map, `depth32float`, one layer per cascade; undefined on `VirtualShadows`. */
+  map?: GPUTextureView;
+}
+/** The depth map's size, for an effect that keeps maps of its own. */
+export interface ShadowEffectMap {
+  width: number;
+  height: number;
+  layers: number;
+}
+/**
+ * Something the shadow pass multiplies the sun by, from `@margoengine/shadows/light-function` and the other optional
+ * entries, or written by hand. Give it in the `effects` option of `Shadows` or `VirtualShadows`: every receiver, gltf-pro
+ * models and materials included, then takes it. WebGPU only; resource names start `shadowFx`.
+ */
+export interface ShadowEffect<Context = unknown> {
+  /** WGSL declarations for bind group `group`, resources named `shadowFx...` from binding `binding` up (four at most). */
+  wgsl(group: number, binding: number): string;
+  /** A WGSL `vec3f` over `position` and `normal` that multiplies the light; omitted, the effect multiplies nothing. */
+  readonly call?: string;
+  /** The resources of those bindings in order, read when the receivers' bindings are made. */
+  resources?(): readonly GPUBindingResource[];
+  /** Makes GPU objects; runs at attach, after a new map size and after a device loss. Runs again on the same effect. */
+  setup?(device: GPUDevice, map: ShadowEffectMap): void;
+  /** Runs once per frame after the depth passes. */
+  update?(frame: ShadowEffectFrame<Context>): void;
+  /** Frees GPU objects. */
+  dispose?(): void;
+}
+/** A {@link ShadowEffect} that replaces the edge filter: `filter` takes it in place of a name. */
+export interface ShadowFilterEffect<Context = unknown> extends ShadowEffect<Context> {
+  /** WGSL that returns visibility, 0 to 1, in place of the named filters, with `uv`, `layer` and `reference` in scope. */
+  readonly body: string;
+}
 // Each filter's last step, after the cascade lookup (layer) and receiver-plane bias shared by all three.
 const filters: Record<ShadowFilter, string> = {
   // Taps follow a golden-angle (Vogel) spiral computed in the loop: tap j sits at radius sqrt((j+0.5)/n), turned one
@@ -67,10 +110,11 @@ const filters: Record<ShadowFilter, string> = {
 // one. The blocker search reads the same map bound a second time as float (binding 30), which only `'soft'` needs.
 export function shadowSampling(
   group: number,
-  filter: ShadowFilter = 'soft',
+  filter: ShadowFilter | ShadowFilterEffect = 'soft',
   anisotropic = false,
   colored = false,
   level = false,
+  effects: readonly ShadowEffect[] = [],
 ): string {
   const search = level && filter === 'soft',
     chosen = search
@@ -78,7 +122,9 @@ export function shadowSampling(
           'textureLoad(shadowMap,coord,i32(layer),0)',
           'textureLoad(shadowDepth,coord,i32(layer),0).x',
         )
-      : filters[filter],
+      : typeof filter === 'object'
+        ? filter.body
+        : filters[filter],
     body = anisotropic
       ? chosen
           .replaceAll('length(rowX)*0.5', 'vec2f(length(rowX),length(rowY))*0.5')
@@ -130,9 +176,30 @@ fn shadowTint(position:vec3f,normal:vec3f)->vec3f {
 }
 `
     : ''
-}fn shadowLit(direct:vec3f,position:vec3f,normal:vec3f)->vec3f {if(all(direct==vec3f(0))){return direct;}return direct*shadowVisibility(position,normal)${colored ? '*shadowTint(position,normal)' : ''};}
+}${effects.length ? 'fn shadowReach()->f32 {return shadowFrame.splits.w;}\n' : ''}${effectDeclarations(group, effects)}fn shadowLit(direct:vec3f,position:vec3f,normal:vec3f)->vec3f {if(all(direct==vec3f(0))){return direct;}return direct*shadowVisibility(position,normal)${colored ? '*shadowTint(position,normal)' : ''}${effectCalls(effects)};}
 `;
 }
+/** The effects' declarations. */
+export const effectDeclarations = (group: number, effects: readonly ShadowEffect[]): string =>
+  effects.map((effect, i) => effect.wgsl(group, EFFECT_BINDING + i * 4)).join('');
+/** The effects' factors, each with its leading `*`. */
+export const effectCalls = (effects: readonly ShadowEffect[]): string =>
+  effects.map((effect) => (effect.call ? '*' + effect.call : '')).join('');
+/** The effects' bind group entries. */
+export const effectEntries = (effects: readonly ShadowEffect[]): GPUBindGroupEntry[] =>
+  effects.flatMap((effect, i) =>
+    (effect.resources?.() ?? []).map((resource, k) => ({ binding: EFFECT_BINDING + i * 4 + k, resource })),
+  );
+/** `options.effects`, checked. */
+export const validEffects = (effects: unknown): readonly ShadowEffect[] => {
+  if (effects === undefined) return [];
+  if (!Array.isArray(effects) || !effects.every((effect) => typeof effect?.wgsl === 'function'))
+    throw new TypeError('Invalid shadow effects; give an array of effects such as cloudShadows(sky)');
+  return effects;
+};
+/** Moves the effects' declarations in `code` to the bindings `map` gives (a scene's `section` plugin holds their slots). */
+export const moveEffects = (code: string, map: (binding: number) => number): string =>
+  code.replace(/@binding\((\d+)\)( var(?:<[^>]*>)? ?shadowFx)/g, (_, binding, rest) => `@binding(${map(+binding)})${rest}`);
 // Each layer's nearest depth for the PCSS search (shadowFrame.nearest): a workgroup takes the minimum of a 32x32 block,
 // four by four texels per invocation, then one atomicMin per workgroup into the layer's slot. Depths lie in 0..1, where
 // f32 bit patterns order as the values do, so atomicMin on the u32 bits is a float minimum. The frame seeds the slots

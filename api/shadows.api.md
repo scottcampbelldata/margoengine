@@ -13,7 +13,33 @@ export interface ShadowContext {
     cascade: number;
 }
 
+export interface ShadowEffect<Context = unknown> {
+    wgsl(group: number, binding: number): string;
+    readonly call?: string;
+    resources?(): readonly GPUBindingResource[];
+    setup?(device: GPUDevice, map: ShadowEffectMap): void;
+    update?(frame: ShadowEffectFrame<Context>): void;
+    dispose?(): void;
+}
+
+export interface ShadowEffectFrame<Context = unknown> {
+    context: Context;
+    light: ArrayLike<number>;
+    changed: boolean;
+    map?: GPUTextureView;
+}
+
+export interface ShadowEffectMap {
+    width: number;
+    height: number;
+    layers: number;
+}
+
 export type ShadowFilter = 'soft' | 'pcf' | 'hard';
+
+export interface ShadowFilterEffect<Context = unknown> extends ShadowEffect<Context> {
+    readonly body: string;
+}
 
 export interface ShadowOptions {
     resolution?: number | readonly [number, number];
@@ -37,10 +63,11 @@ export interface ShadowOptions {
         near: number;
         far: number;
     };
-    filter?: ShadowFilter;
+    filter?: ShadowFilter | ShadowFilterEffect<ShadowPassContext>;
     cascades?: number;
     cadence?: readonly number[];
     colored?: boolean;
+    effects?: readonly ShadowEffect<ShadowPassContext>[];
 }
 
 export interface ShadowPrepareContext {

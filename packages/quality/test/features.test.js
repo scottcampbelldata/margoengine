@@ -310,3 +310,8 @@ test('featureKnobs leaves out what cannot go lower', () => {
   const fixed = featureKnobs({ shadows: { options: { filter: 'hard', resolution: 16, bounds: {} } } });
   assert.deepEqual(fixed, [], 'a box has one map: no cascades to lose');
 });
+test('a filter effect on Shadows is no step on the filter ladder', () => {
+  const shadows = { options: { filter: { body: 'return 1;' }, resolution: 2048 } };
+  assert.ok(!featureKnobs({ shadows }).some((knob) => knob.name === 'shadow filter'));
+  assert.deepEqual(shadows.options.filter, { body: 'return 1;' });
+});

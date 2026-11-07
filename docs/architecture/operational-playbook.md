@@ -525,8 +525,20 @@ encoder and submit, and the sources need no change. Feedback runs after the page
 with slot 0 and the camera's matrix. Voxels read `shadowReach()` where the shadow pass defines it, as `VirtualShadows` does,
 since `splits` is a field of the cascades' uniform alone; terrain reads its lighting group's layout from the WGSL the effects declared, since a table of
 binding numbers fitted only `Shadows`. Evidence: `packages/shadows/test/virtual-custom-browser.mjs`, overlap 0.97, 0.95 and
-0.95 with `Shadows` for culled parts, scatter and voxels; real Mount Rainier elevation against Blender Cycles, overlap 0.88
+0.95 with `Shadows` for culled parts, scatter and voxels; real Mount Rainier elevation against Blender Cycles, overlap 0.86
 (`Shadows`) and 0.81 (`VirtualShadows`), 0 with the terrain not casting, RTX A6000. Missing: other GPUs.
+
+Both shadow classes take `effects`: objects that declare WGSL at bindings 40 and up (four each), give a factor that
+`shadowLit` multiplies the sun by, and update once a frame after the depth passes. With none the shader text is what it was,
+which the golden GPU proofs pin. `cloudShadows` runs the sky's cloud remap and erosion along the ray to the sun, with the
+sky's noise text, clock and height read from `sky.cloudLayer`, so there is one cloud field, not a copy. `check.mjs` in
+`packages/shadows/test/outside` now reads partial light back through Khronos PBR Neutral's toe on a white ground below the
+curve's shoulder: until then only full shadow was measured, and partial values on a dim blue ground read too dark. Evidence:
+`packages/shadows/test/outside/check.mjs`, a real image as `lightPattern` against a real sheet of it across the sun in Cycles,
+overlap 0.996, mean difference 0.0074, 0.71 and 0.26 for the same mask shifted; `packages/shadows/test/light-function-browser.mjs`,
+ground and the sky's own render along the sun ray agree on all 256 points, before and after 2,400 m of drift, against 0.64 for
+the old ground and the new sky, and core meshes, materials, gltf-pro, terrain and voxels go dark under a black pattern in both
+classes. Missing: other GPUs; a real cloud photograph over real ground is not the claim, the claim is agreement with the sky.
 
 `LodInstances` (`@margoengine/culling/lod`) tests each instance against the frustum and picks its level in one compute pass:
 the level is the first whose limit the world sphere's radius in pixels reaches. Instances append to their level's list by

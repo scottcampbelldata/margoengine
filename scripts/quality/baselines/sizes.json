@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10102842,
+  "total": 10105622,
   "history": [
     {
       "date": "2026-10-24",
@@ -3026,6 +3026,12 @@
       "commit": "f2bdfd4e8",
       "reason": "new optional entry @margoengine/cinematic/brain",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "7fc61533a",
+      "reason": "@margoengine/shadows/light-function: new optional entry; shadows and sky gain the effect hook and sky.cloudLayer",
+      "grew": 2
     }
   ],
   "items": {
@@ -3543,7 +3549,8 @@
     "@margoengine/shader/readback": 8876,
     "@margoengine/shader/subgroups": 3517,
     "@margoengine/shader/utils": 7295,
-    "@margoengine/shadows": 17879,
+    "@margoengine/shadows": 18738,
+    "@margoengine/shadows/light-function": 1921,
     "@margoengine/shadows/virtual": 15442,
     "@margoengine/sky": 16975,
     "@margoengine/sky/base": 7004,

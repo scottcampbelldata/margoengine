@@ -21,7 +21,18 @@ import { sectionState } from '../../shared/section.js';
 import { finiteVector } from '@margoengine/math/validate';
 import { MargoError } from '@margoengine/math/errors';
 import { cascadeSplits, fitCascades } from './cascades.js';
-import { shadowSampling, shadowDepth, nearestDepth, type ShadowFilter } from './shader.js';
+import {
+  shadowSampling,
+  shadowDepth,
+  nearestDepth,
+  effectEntries,
+  moveEffects,
+  validEffects,
+  type ShadowEffect,
+  type ShadowEffectFrame,
+  type ShadowFilter,
+  type ShadowFilterEffect,
+} from './shader.js';
 import { hiddenInTree } from '../../shared/visibility.js';
 import { compatibilityLevel, loadCompatRoute } from '../../shared/compat.js';
 import { hypot, hypotOf, hypotTerms } from '../../shared/hypot.js';
@@ -40,7 +51,13 @@ import {
   staleCaster,
 } from '../../shared/caster.js';
 export { cascadeSplits, fitCascades } from './cascades.js';
-export type { ShadowFilter } from './shader.js';
+export type {
+  ShadowEffect,
+  ShadowEffectFrame,
+  ShadowEffectMap,
+  ShadowFilter,
+  ShadowFilterEffect,
+} from './shader.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; COPY_SRC: number; STORAGE: number };
 declare const GPUTextureUsage: {
   RENDER_ATTACHMENT: number;
@@ -90,9 +107,10 @@ export interface ShadowOptions {
    * Edge filter (default `'soft'`). `'soft'` is PCSS: penumbrae widen with blocker distance and `lightSize`, 16
    * blocker reads and 32 comparison taps per lit pixel. `'pcf'` takes four hardware comparison taps (an edge about
    * three texels wide, `lightSize` unused): the light and phone quality tiers use it. `'hard'` takes one. Read when
-   * receiver shaders are built.
+   * receiver shaders are built. A {@link ShadowFilterEffect} (`varianceFilter` from `@margoengine/shadows/vsm`) replaces
+   * the named filters; fixed at construction.
    */
-  filter?: ShadowFilter;
+  filter?: ShadowFilter | ShadowFilterEffect<ShadowPassContext>;
   /**
    * Cascades, 1 to 4 (default 4). Fewer cascades render fewer depth passes per frame and cover `distance` with coarser
    * texels; the phone quality tier uses 2. Ignored with `bounds` or `frustum` (always one map). Live: a new count
@@ -112,6 +130,12 @@ export interface ShadowOptions {
    * redraw every frame, twice. Fixed at construction. Off, the receivers' shaders and the frame are unchanged.
    */
   colored?: boolean;
+  /**
+   * What else shapes the sun, each a {@link ShadowEffect}: `cloudShadows` and `lightPattern` from
+   * `@margoengine/shadows/light-function`, for example. Each adds its bindings to every receiver. Fixed at construction.
+   * Default none: the receivers' shaders and the frame are then unchanged.
+   */
+  effects?: readonly ShadowEffect<ShadowPassContext>[];
 }
 /** What a custom `ShadowSource.drawShadow` receives for one cascade. Borrowed: use it synchronously. */
 export interface ShadowContext {
@@ -270,8 +294,8 @@ const emptyPrimitives: readonly ShadowPrimitive[] = [];
 const validTint = (tint: unknown): tint is readonly number[] =>
   Array.isArray(tint) && tint.length === 3 && tint.every((v) => v >= 0 && v <= 1);
 /** A shader cache key: filter, bind group and anisotropy as one number (bit 1 is left for the receive patch). */
-const shaderKey = (filter: string, group: number, anisotropic: boolean) =>
-  group * 16 + (filter === 'soft' ? 0 : filter === 'pcf' ? 4 : 8) + (anisotropic ? 1 : 0);
+const shaderKey = (filter: unknown, group: number, anisotropic: boolean) =>
+  group * 16 + (filter === 'soft' ? 0 : filter === 'pcf' ? 4 : filter === 'hard' ? 8 : 12) + (anisotropic ? 1 : 0);
 /** A tint map pipeline: no depth, and what it draws multiplies the map by the pass's blend constant. */
 const tintPipeline = (
   device: GPUDevice,
@@ -416,6 +440,13 @@ export class Shadows implements EnginePlugin {
   private readonly copyDestination: GPUTexelCopyTextureInfo = { texture: undefined! };
   private readonly copySize = { width: 0, height: 0, depthOrArrayLayers: 4 };
   private readonly colored: boolean;
+  /** `effects`, then an effect `filter`. */
+  private readonly effects: readonly ShadowEffect<ShadowPassContext>[];
+  private readonly effectFrame: ShadowEffectFrame<ShadowPassContext> = {
+    context: undefined!,
+    light: this.light,
+    changed: false,
+  };
   private tintMap?: GPUTexture;
   private tintDepth?: GPUTexture;
   private tintViews: GPUTextureView[] = [];
@@ -436,6 +467,11 @@ export class Shadows implements EnginePlugin {
   constructor(readonly options: ShadowOptions = {}) {
     this.options = preset('shadows', options);
     this.colored = this.options.colored === true;
+    const filter = this.options.filter;
+    this.effects = [
+      ...(validEffects(this.options.effects) as readonly ShadowEffect<ShadowPassContext>[]),
+      ...(typeof filter === 'object' && filter ? [filter] : []),
+    ];
     this.validate();
   }
   get depthTexture(): GPUTexture | undefined {
@@ -512,8 +548,8 @@ export class Shadows implements EnginePlugin {
     if ((o.colored ?? false) !== this.colored)
       throw new TypeError('Shadow colored is fixed at construction and a boolean; create a new Shadows instead');
     const filter = o.filter ?? 'soft';
-    if (filter !== 'soft' && filter !== 'pcf' && filter !== 'hard')
-      throw new RangeError(`Invalid shadow filter '${String(filter)}': use 'soft', 'pcf' or 'hard'`);
+    if (filter !== 'soft' && filter !== 'pcf' && filter !== 'hard' && typeof (filter as ShadowFilterEffect).body !== 'string')
+      throw new RangeError(`Invalid shadow filter '${String(filter)}': use 'soft', 'pcf', 'hard' or a filter effect`);
     const resolution = o.resolution ?? 2048,
       square = typeof resolution === 'number';
     if (!square && (!Array.isArray(resolution) || resolution.length !== 2 || !resolution.every(powerOfTwo)))
@@ -653,6 +689,10 @@ export class Shadows implements EnginePlugin {
       throw new MargoError('state', 'Shadows are not attached; attach them to an engine first');
     return this.entries;
   }
+  private sampling(group: number, filter: ShadowFilter | ShadowFilterEffect, anisotropic: boolean): string {
+    const level = compatibilityLevel(this.device);
+    return shadowSampling(group, filter, anisotropic, this.colored, level, this.effects as readonly ShadowEffect[]);
+  }
   shader(source: string, group = 0): string {
     const filter = this.options.filter ?? 'soft',
       receive = unshadowedCore(this.engine, source),
@@ -674,7 +714,7 @@ export class Shadows implements EnginePlugin {
         'unsupported',
         "Shadows require the standard PBR lighting shader; remove the plugin that replaced core's shader",
       );
-    const output = shadowSampling(group, filter, anisotropic, this.colored, compatibilityLevel(this.device)) + code;
+    const output = this.sampling(group, filter, anisotropic) + code;
     if (!cache) {
       cache = new Map();
       this.shaders.set(key, cache);
@@ -691,7 +731,7 @@ export class Shadows implements EnginePlugin {
       this.hooks.set(
         key,
         (hooks = {
-          declarations: shadowSampling(group, filter, anisotropic, this.colored, compatibilityLevel(this.device)),
+          declarations: this.sampling(group, filter, anisotropic),
           direct: (d) => `shadowLit(${d},i.position,s.n)`,
         }),
       );
@@ -794,6 +834,8 @@ export class Shadows implements EnginePlugin {
   }
   /** Receiver bindings: a fresh array view whenever the maps are reallocated, so receivers rebuild their groups. */
   private bind(): void {
+    for (const effect of this.effects)
+      effect.setup?.(this.device!, { width: this.width, height: this.height, layers: this.cascadeCount });
     this.entries = [
       { binding: 1, resource: { buffer: this.uniform! } },
       { binding: 2, resource: (this.combinedView = this.combined!.createView({ dimension: '2d-array' })) },
@@ -809,6 +851,7 @@ export class Shadows implements EnginePlugin {
         { binding: 29, resource: this.tintSampler },
       );
     }
+    this.entries.push(...effectEntries(this.effects as readonly ShadowEffect[]));
     this.nearestGroup = undefined;
     this.dirty = true;
   }
@@ -823,7 +866,7 @@ export class Shadows implements EnginePlugin {
           // The scene's `section` plugin owns its existing binding. Move only the shadow
           // sampling declarations and resources past the occupied slots.
           const base = Math.max(0, ...c.bindings.map((entry) => entry.binding)) + 1;
-          c.shader = this.shader(c.shader)
+          c.shader = moveEffects(this.shader(c.shader), (binding) => binding + base - 1)
             .replace('@binding(1) var<uniform> shadowFrame', `@binding(${base}) var<uniform> shadowFrame`)
             .replace('@binding(2) var shadowMap', `@binding(${base + 1}) var shadowMap`)
             .replace('@binding(3) var shadowSampler', `@binding(${base + 2}) var shadowSampler`)
@@ -1055,6 +1098,16 @@ export class Shadows implements EnginePlugin {
     if ((this.options.filter ?? 'soft') !== 'soft') this.nearestStale ||= rendered || moving;
     else if (rendered || moving || this.nearestStale) this.nearest(c);
     if (this.colored) this.tints(c);
+    this.updateEffects(c, rendered || moving);
+  }
+  private updateEffects(c: ShadowPassContext, changed: boolean): void {
+    if (!this.effects.length) return;
+    const frame = this.effectFrame;
+    frame.context = c;
+    frame.changed = changed;
+    frame.map = this.combinedView;
+    for (let i = 0; i < this.effects.length; i++) this.effects[i].update?.(frame);
+    frame.context = undefined!;
   }
   /** The light through this frame's tinting casters, in the tint map, and how near they are, in its depth. */
   private tints(c: ShadowPassContext): void {
@@ -1135,6 +1188,7 @@ export class Shadows implements EnginePlugin {
     this.dirty = false;
     if ((this.options.filter ?? 'soft') !== 'soft') this.nearestStale ||= changed;
     else if (changed || this.nearestStale) this.nearest(c);
+    this.updateEffects(c, changed);
   }
   /**
    * Reduces each layer of the combined map to its nearest depth and copies it into the frame uniform: the PCSS search
@@ -1667,6 +1721,7 @@ export class Shadows implements EnginePlugin {
   }
   private release(): void {
     this.clearDraws();
+    for (const effect of this.effects) effect.dispose?.();
     for (const texture of [this.cached, this.combined, this.white, this.tintMap, this.tintDepth]) texture?.destroy();
     this.tintMap = this.tintDepth = this.tintSampler = undefined;
     this.tintViews = [];

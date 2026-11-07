@@ -11,6 +11,12 @@ export class Sky implements EnginePlugin {
     readonly name: string;
     readonly sun: Float32Array<ArrayBuffer>;
     readonly moon: Float32Array<ArrayBuffer>;
+    get cloudLayer(): {
+        field: string;
+        coverage: number;
+        drift: number;
+        height: number;
+    } | undefined;
     get reflectionTexture(): GPUTexture | undefined;
     get nightFactor(): number;
     readonly lights: readonly [{
@@ -53,6 +59,7 @@ export interface SkyFeatures {
     };
     clouds?: {
         readonly wgsl: string;
+        readonly field?: string;
         validate(clouds: SkyCloudOptions): void;
     };
     night?: {

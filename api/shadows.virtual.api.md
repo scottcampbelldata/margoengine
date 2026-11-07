@@ -18,6 +18,7 @@ export interface VirtualShadowOptions {
     normalBias?: number;
     casterMargin?: number;
     filter?: ShadowFilter;
+    effects?: readonly ShadowEffect<VirtualPassContext>[];
 }
 
 export class VirtualShadows implements EnginePlugin {
@@ -62,6 +63,32 @@ interface ShadowContext {
     cascade: number;
 }
 
+interface ShadowEffect<Context = unknown> {
+    wgsl(group: number, binding: number): string;
+    readonly call?: string;
+    resources?(): readonly GPUBindingResource[];
+    setup?(device: GPUDevice, map: ShadowEffectMap): void;
+    update?(frame: ShadowEffectFrame<Context>): void;
+    dispose?(): void;
+}
+
+interface ShadowEffectFrame<Context = unknown> {
+    context: Context;
+    light: ArrayLike<number>;
+    changed: boolean;
+    map?: GPUTextureView;
+}
+
+interface ShadowEffectMap {
+    width: number;
+    height: number;
+    layers: number;
+}
+
+interface ShadowFilterEffect<Context = unknown> extends ShadowEffect<Context> {
+    readonly body: string;
+}
+
 interface ShadowOptions {
     resolution?: number | readonly [number, number];
     distance?: number;
@@ -84,10 +111,11 @@ interface ShadowOptions {
         near: number;
         far: number;
     };
-    filter?: ShadowFilter;
+    filter?: ShadowFilter | ShadowFilterEffect<ShadowPassContext>;
     cascades?: number;
     cadence?: readonly number[];
     colored?: boolean;
+    effects?: readonly ShadowEffect<ShadowPassContext>[];
 }
 
 type ShadowPassContext = Extract<PassContext, {
@@ -179,4 +207,8 @@ class Shadows implements EnginePlugin {
 interface TintedShadowPrimitive extends ShadowPrimitive {
     tint: readonly number[];
 }
+
+type VirtualPassContext = Extract<PassContext, {
+    backend: 'webgpu';
+}>;
 ```

@@ -714,3 +714,12 @@ test('a sky with environment lights PBR meshes as a fallback environment, withou
   assert.throws(() => new BaseSky({ environment: true }), /lighting from @margoengine\/sky\/lighting/);
   assert.throws(() => new Sky({ environment: 1 }), RangeError);
 });
+test('cloudLayer gives the cloud field, height and clock to what must match the clouds', () => {
+  assert.equal(new Sky({ hours: 12 }).cloudLayer, undefined);
+  const sky = new Sky({ hours: 12, clouds: { coverage: 0.3, speed: 10, height: 2000 } });
+  sky.onPreUpdate(5);
+  const layer = sky.cloudLayer;
+  assert.match(layer.field, /fn cloudOctaves\(/);
+  assert.doesNotMatch(layer.field, /frame\./, 'the field must stand alone, away from the sky frame');
+  assert.deepEqual([layer.coverage, layer.drift, layer.height], [0.3, 50, 2000]);
+});

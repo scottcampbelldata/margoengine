@@ -2074,6 +2074,10 @@
       "types": "./dist/shadows/virtual.d.ts",
       "import": "./dist/shadows/virtual.js"
     },
+    "./shadows/light-function": {
+      "types": "./dist/shadows/light-function.d.ts",
+      "import": "./dist/shadows/light-function.js"
+    },
     "./sky": {
       "types": "./dist/sky.d.ts",
       "import": "./dist/sky.js"

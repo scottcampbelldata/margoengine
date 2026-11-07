@@ -275,7 +275,7 @@ export interface FeatureTargets {
    */
   shadows?: {
     options: {
-      filter?: 'soft' | 'pcf' | 'hard';
+      filter?: 'soft' | 'pcf' | 'hard' | object;
       distance?: number;
       resolution?: number | readonly [number, number];
       cascades?: number;
@@ -328,7 +328,9 @@ export function featureKnobs({
   if (ssr?.enabled) knobs.push(halved('ssr', ssr, 'steps', ssr.options.steps ?? 64, 1));
   if (shadows) {
     const { options } = shadows,
-      filters = (['soft', 'pcf', 'hard'] as const).slice(['soft', 'pcf', 'hard'].indexOf(options.filter ?? 'soft'));
+      // A filter effect (`varianceFilter`) binds its own resources at construction: it is no step on this ladder.
+      named = typeof options.filter === 'object' ? 'hard' : (options.filter ?? 'soft'),
+      filters = (['soft', 'pcf', 'hard'] as const).slice(['soft', 'pcf', 'hard'].indexOf(named));
     if (filters.length > 1) knobs.push(optionKnob('shadow filter', options, 'filter', filters, 1.5));
     if (options.distance !== undefined) {
       const { distance } = options;

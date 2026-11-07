@@ -136,6 +136,54 @@ Off by default, and off the receivers' shaders and the frame are unchanged. On, 
 
 Limits: the tint's edge is bilinear, with no penumbra, under every filter. The tint map keeps the nearest tinting caster's depth, so a surface between two panes takes both colours. A `drawShadow` source cannot tint.
 
+## Cloud shadows and light patterns
+
+`@margoengine/shadows/light-function` shapes the sun between the sky and the ground. Give its effects to `Shadows` or `VirtualShadows`; every receiver takes them (core meshes, materials, gltf-pro models, terrain, voxels).
+
+```ts
+import {EngineKernel, box} from 'margoengine/core';
+import {Shadows} from 'margoengine/shadows';
+import {cloudShadows} from 'margoengine/shadows/light-function';
+import {Sky} from 'margoengine/sky';
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend: 'webgpu'});
+const sky = Sky.attach(engine, {clouds: {coverage: 0.45}});
+const shade = cloudShadows(sky);
+const shadows = Shadows.attach(engine, {effects: [shade]});
+shadows.add(engine.createMesh().setGeometry(box(4000, 1, 4000)));
+shade.options.strength = 0.8;
+engine.start();
+```
+
+`cloudShadows(sky, options)` reads the sky's own cloud noise, clock and height where a ground point's ray to the sun meets the cloud shell, so the shadow lies under the cloud that stands in front of the sun and moves with it. World units are metres, as the sky takes them. `strength` (default 1) is how much of the cloud's opacity reaches the ground and `sunSize` (default 0.0093 radians) blurs its edge. A sky with no `clouds` shades nothing. The sun is `engine.lighting.direction`: keep it and the sky's sun together, which the sky's `lighting` option does.
+
+`lightPattern({texture})` is a mask over the sun, what a gobo does on a stage: its colour multiplies the sun.
+
+```ts
+import {EngineKernel, box} from 'margoengine/core';
+import {Shadows} from 'margoengine/shadows';
+import {lightPattern} from 'margoengine/shadows/light-function';
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend: 'webgpu'});
+const device = engine.gpu!;
+const mask = device.createTexture({size: [2, 2], format: 'rgba8unorm', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST});
+device.queue.writeTexture({texture: mask}, new Uint8Array([255, 255, 255, 255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255, 255]), {bytesPerRow: 8}, [2, 2]);
+const pattern = lightPattern({texture: mask.createView(), size: 6, speed: [0.02, 0]});
+const shadows = Shadows.attach(engine, {effects: [pattern]});
+shadows.add(engine.createMesh().setGeometry(box(30, 1, 30)));
+engine.start();
+```
+
+| `lightPattern` option | Default | Meaning |
+| --- | --- | --- |
+| `texture` | required | Any filterable 2D view. Read when receivers bind; the rest are live on `pattern.options`. |
+| `size` | 10 | World units of one repeat, on a surface facing the sun. |
+| `offset` | [0, 0] | Repeats it has moved, along u and v. |
+| `speed` | [0, 0] | Repeats per second it scrolls, along u and v. |
+| `strength` | 1 | How much of the mask applies, 0 to 1. |
+
+The mask lies across the light and travels along it. Its right is world up crossed with the sun, and image up is world up as the sun sees it. It adds one sampled texture and one sampler to every receiver, and gltf-pro's richest materials already use all 16 sampled textures of a stage, so such a material names the limit in an error; `cloudShadows` adds one uniform buffer and no texture.
+
+The `effects` array is fixed at construction. With none, the receivers' shaders and the frame are unchanged. An effect is any object with `wgsl(group, binding)` and `call`, four bindings from 40, resources named `shadowFx...`: see `ShadowEffect` in the types.
+
 ## Virtual shadow maps
 
 `margoengine/shadows/virtual` is a second, optional entry for one directional light: `VirtualShadows` keeps the texel density a camera needs at every distance, in small pages of depth, and renders only the pages that are seen and have changed. Importing it costs `Shadows` users nothing; the root entry does not reach it.

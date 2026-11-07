@@ -14,6 +14,13 @@
     "ground": { "size": 30, "y": 0 },
     "size": 512
   },
+  "pattern": {
+    "pattern": { "image": "packages/creative/examples/earth/assets/2k_earth_clouds.jpg", "size": 14, "offset": [0.0, 0.33], "distance": 20 },
+    "toLight": [-0.4, 1, 0.3],
+    "camera": { "position": [0, 6, 3], "target": [0, 0, 0], "fov": 50 },
+    "ground": { "size": 30, "y": 0 },
+    "size": 512
+  },
   "rainier": {
     "terrain": "packages/shadows/test/fixtures/rainier-terrarium.png",
     "extent": 270,

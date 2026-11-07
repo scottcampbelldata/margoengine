@@ -28,6 +28,7 @@
     "test:gpu": "cd ../.. && node packages/shadows/test/lit-faces-browser.mjs",
     "test:gpu:colored": "cd ../.. && node packages/shadows/test/colored-browser.mjs",
     "test:gpu:cutout-casters": "cd ../.. && node packages/shadows/test/cutout-casters-browser.mjs",
+    "test:gpu:light-function": "cd ../.. && node packages/shadows/test/light-function-browser.mjs",
     "test:gpu:outside": "cd ../.. && node packages/shadows/test/outside/check.mjs",
     "test:gpu:virtual-custom": "cd ../.. && node packages/shadows/test/virtual-custom-browser.mjs",
     "test:gpu:virtual": "cd ../.. && node packages/shadows/test/virtual-sampling-browser.mjs",
@@ -45,6 +46,10 @@
     "./virtual": {
       "types": "./dist/virtual.d.ts",
       "import": "./dist/virtual.js"
+    },
+    "./light-function": {
+      "types": "./dist/light-function.d.ts",
+      "import": "./dist/light-function.js"
     }
   },
   "files": [

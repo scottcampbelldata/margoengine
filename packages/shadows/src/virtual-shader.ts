@@ -1,7 +1,7 @@
 // WGSL of the virtual shadow map. Receivers project a world position into light space, walk the clipmap from the level
 // the pixel's footprint asks for to the first level whose page is resident, and compare in the physical pool. Comments
 // stay out of the WGSL: they would ship.
-import type { ShadowFilter } from './shader.js';
+import { effectCalls, effectDeclarations, type ShadowEffect, type ShadowFilter } from './shader.js';
 
 // Each filter's last step, after the level walk (found: pool uv, texel size, level) and the receiver-plane bias, as in the
 // root's shader.ts: the same taps, in world units of light space, each tap reading the page table for its own position,
@@ -45,7 +45,7 @@ fn shadowNoise(position:vec3f)->f32 {
 `;
 const firstLevel = /* wgsl */ `fn shadowFirst(footprint:f32)->u32 {return u32(clamp(ceil(log2(max(footprint,0.0000001)*126.0/shadowFrame.levels[0].w)),0.0,shadowFrame.info.z-1.0));}`;
 /** Receiver declarations and `shadowLit`, for bind group `group`. */
-export function virtualSampling(group: number, filter: ShadowFilter = 'soft'): string {
+export function virtualSampling(group: number, filter: ShadowFilter = 'soft', effects: readonly ShadowEffect[] = []): string {
   return /* wgsl */ `
 ${frame}
 @group(${group}) @binding(1) var<uniform> shadowFrame:ShadowFrame;
@@ -81,7 +81,7 @@ ${filter === 'soft' ? soft : ''}fn shadowVisibility(position:vec3f,normal:vec3f)
   reference-=(abs(slope.x)+abs(slope.y))*found.z*0.5/range;let level=u32(found.w);
   ${filters[filter]}
 }
-fn shadowLit(direct:vec3f,position:vec3f,normal:vec3f)->vec3f {if(all(direct==vec3f(0))){return direct;}return direct*shadowVisibility(position,normal);}
+${effectDeclarations(group, effects)}fn shadowLit(direct:vec3f,position:vec3f,normal:vec3f)->vec3f {if(all(direct==vec3f(0))){return direct;}return direct*shadowVisibility(position,normal)${effectCalls(effects)};}
 `;
 }
 // A page copy inside a render pass: a partial copy of a depth texture is not allowed in WebGPU (depth copies take the

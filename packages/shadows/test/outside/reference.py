@@ -104,6 +104,7 @@ def terrarium():
 
 land = terrarium() if 'terrain' in spec else None
 path = os.path.join(root, spec['model']) if 'model' in spec else None
+pattern = spec.get('pattern')
 if path:
     bpy.ops.import_scene.gltf(filepath=path)
 model = [o for o in scene.objects if o.type == 'MESH' and o is not land]
@@ -123,6 +124,39 @@ if corners:
     print('BOUNDS gltf axes',
           [round(min(c[0] for c in corners), 3), round(min(c[2] for c in corners), 3), round(min(-c[1] for c in corners), 3)],
           [round(max(c[0] for c in corners), 3), round(max(c[2] for c in corners), 3), round(max(-c[1] for c in corners), 3)])
+
+def mask_plane():
+    # A real sheet across the sun, its image as what it lets through, so the light on the ground is the image's colour.
+    # Its axes are what lightPattern documents: right is world up crossed with the sun, and image up is that basis's up.
+    to_light = Vector(spec['toLight']).normalized()
+    right = Vector((to_light.z, 0, -to_light.x)).normalized()
+    up = to_light.cross(right)
+    half = pattern['size'] / 2
+    middle = to_light * pattern['distance']
+    corners = [(-half, -half), (half, -half), (half, half), (-half, half)]
+    mesh = bpy.data.meshes.new('mask')
+    mesh.from_pydata([tuple(axes(middle + right * a + up * b)) for a, b in corners], [], [(0, 1, 2, 3)])
+    layer = mesh.uv_layers.new()
+    offset = pattern.get('offset', [0, 0])
+    for loop, (a, b) in zip(layer.data, corners):
+        loop.uv = (a / pattern['size'] + 0.5 + offset[0], b / pattern['size'] + 0.5 - offset[1])
+    material = bpy.data.materials.new('mask')
+    tree = material.node_tree
+    tree.nodes.clear()
+    image = tree.nodes.new('ShaderNodeTexImage')
+    image.image = bpy.data.images.load(os.path.join(root, pattern['image']))
+    image.extension = 'REPEAT'
+    through = tree.nodes.new('ShaderNodeBsdfTransparent')
+    tree.links.new(image.outputs['Color'], through.inputs['Color'])
+    tree.links.new(through.outputs[0], tree.nodes.new('ShaderNodeOutputMaterial').inputs['Surface'])
+    mesh.materials.append(material)
+    sheet = bpy.data.objects.new('mask', mesh)
+    scene.collection.objects.link(sheet)
+    return sheet
+
+
+if pattern:
+    model.append(mask_plane())
 
 ground = None
 if 'ground' in spec:

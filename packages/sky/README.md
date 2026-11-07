@@ -73,7 +73,8 @@ by night. A sky pixel evaluates at most ten noise lookups (four for the shape an
 erosion, six for the sun samples), two where the sky is clear, and no
 texture reads. The visible sky, water's reflection and the lighting environment use
 the same cloud field and clock, with filtering matched to each target's resolution.
-This layer has no cloud shadows on the ground or volumetric flight-through rendering.
+`sky.cloudLayer` gives the layer's noise and clock to what must match it: `cloudShadows(sky)` from
+`@margoengine/shadows/light-function` darkens the ground under these clouds. There is no volumetric flight-through rendering.
 
 timeScale is clock hours per real second. Sun direction is exposed in the reused sun buffer. The sky draws only where the reversed-Z scene depth is clear. Bruneton precomputation includes transmittance, single scattering, scattering density and orders 2..4, cached until turbidity changes. Tables interpolate four dimensions (radius, view zenith, sun zenith, view/sun angle), with 8 x 32 x 16 x 8 samples; angular and ray integration use 32 samples. Camera Y is meters above Earth; atmosphere math is kilometers.
 

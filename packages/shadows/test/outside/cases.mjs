@@ -18,7 +18,13 @@ export const cases = [
   // Real elevation of Mount Rainier (Terrarium tile 10/165/360), a `drawShadow` source. Terrain draws a clipmap of its heights
   // and Cycles the tile's own grid, so edges can differ by one cell, 1 unit, some 2 pixels here.
   { name: 'rainier-shadows', scene: 'rainier', kind: 'shadows', minShadow: 2000, iou: 0.75, difference: 0.05, options: { resolution: 4096, bounds: { min: [-135, 0, -135], max: [135, 45, 135] }, filter: 'hard', casterMargin: 10, bias: 0.0002, normalBias: 0.05 } },
-  { name: 'rainier-virtual', scene: 'rainier', kind: 'virtual', minShadow: 2000, iou: 0.75, difference: 0.05, options: { distance: 400, filter: 'hard', casterMargin: 100, bias: 0.2, normalBias: 0.2 } },
+  { name: 'rainier-virtual', scene: 'rainier', kind: 'virtual', minShadow: 2000, iou: 0.75, difference: 0.05, options: { distance: 400, filter: 'hard', casterMargin: 100, bias: 0.1, normalBias: 0.1 } },
   { name: 'rainier-control', scene: 'rainier', kind: 'virtual', minShadow: 2000, below: 0.75, control: 'nocast', options: { distance: 400, filter: 'hard', casterMargin: 100, bias: 0.2, normalBias: 0.2 } },
+  // A real image as a light pattern against a real sheet of that image across the sun. Both read the same texels, so what
+  // parts them is how a bilinear tap at one sample per pixel meets Cycles' 64 samples: the edges of the half-light regions
+  // move by under a pixel, which is a few percent of these thin wisps' perimeter over area.
+  { name: 'pattern-shadows', scene: 'pattern', kind: 'shadows', minShadow: 2000, iou: 0.9, difference: 0.03, options: { resolution: 256, bounds: box, filter: 'hard' } },
+  { name: 'pattern-virtual', scene: 'pattern', kind: 'virtual', minShadow: 2000, iou: 0.9, difference: 0.03, options: { distance: 20, filter: 'hard' } },
+  { name: 'pattern-control', scene: 'pattern', kind: 'shadows', minShadow: 2000, below: 0.8, control: 'shifted', options: { resolution: 256, bounds: box, filter: 'hard' } },
   { name: 'alpha-control', scene: 'alpha', kind: 'shadows', minShadow: 1000, below: 0.78, control: 'solid', options: panels },
 ];

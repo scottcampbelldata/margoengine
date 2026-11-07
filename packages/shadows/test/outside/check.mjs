@@ -17,6 +17,12 @@ const linear = (v) => {
   const c = v / 255;
   return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
 };
+// What core and gltf-pro wrote back to light: under Khronos PBR Neutral's compression a grey keeps its value but for the
+// toe, 0.04 off from 0.08 up and 6.25 x x below. A shadow's ratio is a ratio of light, so a partial one needs this.
+const light = (v) => {
+  const y = linear(v);
+  return y >= 0.04 ? y + 0.04 : 0.4 * Math.sqrt(y);
+};
 // A difference picture for --dump: red Margo, green Cycles, blue their difference, full red where the model hides the ground.
 const encodePNG = (width, height, rgba) => {
   const rows = Buffer.alloc((width * 4 + 1) * height);
@@ -79,7 +85,7 @@ try {
             hidden ||= mask.data[q] > 127;
           }
         const base = linear(open.data[o + 1]),
-          ours = base > 0.004 ? Math.min(1, linear(lit.data[o + 1]) / base) : 1,
+          ours = base > 0.004 ? Math.min(1, light(lit.data[o + 1]) / light(open.data[o + 1])) : 1,
           theirs = visibility.data[o + 1] / 255;
         out[o] = hidden ? 255 : ours * 255;
         out[o + 1] = hidden ? 0 : theirs * 255;

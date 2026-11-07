@@ -1,5 +1,5 @@
 {
-  "commit": "967c3dacb",
+  "commit": "7fc61533a",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -314,6 +314,10 @@
       ".": {
         "raw": 5623,
         "gzip": 1947
+      },
+      "./brain": {
+        "raw": 7856,
+        "gzip": 3006
       }
     },
     "@margoengine/clustered": {
@@ -1886,8 +1890,8 @@
         "gzip": 1985
       },
       "./features": {
-        "raw": 4807,
-        "gzip": 2156
+        "raw": 4844,
+        "gzip": 2172
       },
       "./power": {
         "raw": 5176,
@@ -2190,22 +2194,26 @@
     },
     "@margoengine/shadows": {
       ".": {
-        "raw": 53677,
-        "gzip": 17703
+        "raw": 55009,
+        "gzip": 18192
       },
       "./virtual": {
-        "raw": 44301,
-        "gzip": 14992
+        "raw": 45381,
+        "gzip": 15404
+      },
+      "./light-function": {
+        "raw": 3643,
+        "gzip": 1665
       }
     },
     "@margoengine/sky": {
       ".": {
-        "raw": 46094,
-        "gzip": 16497
+        "raw": 46278,
+        "gzip": 16591
       },
       "./base": {
-        "raw": 17233,
-        "gzip": 6758
+        "raw": 17398,
+        "gzip": 6815
       },
       "./preetham": {
         "raw": 1657,
@@ -2216,8 +2224,8 @@
         "gzip": 2301
       },
       "./clouds": {
-        "raw": 4493,
-        "gzip": 2202
+        "raw": 4510,
+        "gzip": 2216
       },
       "./night": {
         "raw": 4571,
@@ -2790,9 +2798,9 @@
       "brotli": 6003
     },
     "packages/scenery/dist/sky.js": {
-      "raw": 22780,
-      "gzip": 9103,
-      "brotli": 8118
+      "raw": 22945,
+      "gzip": 9163,
+      "brotli": 8171
     },
     "packages/creative/dist/particles.js": {
       "raw": 43160,
@@ -2810,9 +2818,9 @@
       "brotli": 26250
     },
     "packages/shadows/dist/index.js": {
-      "raw": 53677,
-      "gzip": 17703,
-      "brotli": 15628
+      "raw": 55009,
+      "gzip": 18192,
+      "brotli": 16054
     },
     "packages/xr/dist/index.js": {
       "raw": 19428,
