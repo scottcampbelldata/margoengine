@@ -1665,6 +1665,32 @@ The jobs landed in another order than the prompt lists: SAT, GJK and the expandi
 - **Unmeasured:** no speed was taken, so the solver's cost and every row against Rapier wait for batch 129 and the quiet pass.
 - **Gate:** per job: `cargo test`, the blueprint compare, lint, hygiene, verify, claims, the physics tests, its browser test, `test:replay` in Node, Chromium and Firefox, public truth, and the baseline diff read by a guard that stops on any baseline but `sizes` or any row of another package, the push from one script that stops at the first failing step.
 
+## Batch 125: physics P3, joints
+
+Joints for Margo's own solver, from papers: fixed, spherical, revolute and prismatic with limits and motors, the cone joint, spherical motors, rope and spring, contact forces, and the extra job the manager added, events, sensors, groups, the contact filter, dominance and disabling a body, with the root entry's names so the switch in batch 130 loses nothing. Rapier stays the default until then.
+
+| # | Job | Status | Commit | Entry | Claim |
+| --- | --- | --- | --- | --- | --- |
+| 0 | Proofs of batch 124's fixes seen failing without them, papers read in full | DONE | `503b04429` | `physics/next` | none |
+| 1 | Fixed, spherical, revolute and prismatic joints | DONE | `03cdb9c0a` | `physics/next` | LIM-399 |
+| 2 | Cone joints, and limits that stop dead and rest | DONE | `1b2cb485f` | `physics/next` | LIM-402 |
+| 3 | Spherical motors | DONE | `167ef9039` | `physics/next` | LIM-405 |
+| fix | Joints that depend on each other reach NaN | DONE | `0290c0bd8` | `physics/next` | LIM-416 |
+| fix | A round shape with its core on a face loses its contact | DONE | `6c690e166` | `physics/next` | none |
+| fix | A body whose support goes sleeps in mid air | DONE | `2e62f1fce` | `physics/next` | none |
+| 4 | Rope and spring joints | DONE | `d92c89a20` | `physics/next` | LIM-422 |
+| 5 | Contact forces | DONE | `bf32c567a` | `physics/next` | LIM-423 |
+| 6 | Events, sensors, groups, contact filter, dominance, disabling | DONE | `2ab476fd1` | `physics/next` | LIM-425 |
+
+- **Proof asked for:** pendulum periods 2.46434, 2.90326 and 4.33433 s against the elliptic integral; a double pendulum's energy stays within +0.0532 and -0.0731 J of 19.62 J; a chain of fifty links with a 1000:1 end mass stretches 0 m hanging and swinging; a limb a floor holds past its cone rests (`a_limb_a_floor_holds_past_its_cone_rests`), which closes that known bug. All native in `kernel/tests/joints.rs`; the replay holds the Wasm build bit-equal to native.
+- **How locks are solved:** exact along paths of joints by block Cholesky of the block tridiagonal J M^-1 J^T in doubles (Baraff 1996), with RATTLE's two stages, push then relax. There is no closure solve: a loop settles over passes, a parallelogram to 2.00435 of 2.00422 m, a 10 by 10 grid to 0.18 mm, 30 by 30 to 0.95 mm, a ring to 0.5 mm, a tree to 7.25 mm.
+- **The NaN hunt:** the replay's own scene reached NaN on 27 of 40 seeds, which was also the one native and Wasm mismatch, every differing word a NaN against a NaN of the other sign. The cause: rows that depend on each other were not seen, K built in f32 with pivots in order, so rounding was inverted, 18,904,462 m/s on a body held by ten rows on six freedoms. The fix is K in doubles with complete pivoting and Higham 1990's stop at f32 epsilon. Three limits stay, each with its reason, cost and paper in `docs/limits.md` and a test in `kernel/tests/stability.rs` seen failing without it: the speed cap (Buss and Kim 2005, ClampMag), the push bound near a singular pose (Buss and Kim 2005, section 4) and the warm-start line search (our own). A body past 1e15 stops the world with `failed`. After it, 200 random webs of 10,000 steps reach no NaN.
+- **Bugs fixed:** limits bounced and a limb never rested (job 2); the NaN blow up (above); a ball or capsule with its core on a box face had no contact, as the expanding polytope grew a dented solid (`a_round_shape_with_its_core_on_the_surface_of_a_box_still_touches_it`); a body whose support went slept in mid air (`a_body_whose_support_goes_falls_though_its_time_to_sleep_ran_out_long_ago`); dominance made a body fall through its floor, caught before landing, now only between dynamic bodies.
+- **Test and scene changes:** the next-physics refusal list follows what landed; the reserve test grows joint rows first; the door test starts at 0.5 rad, not 0.74; the replay scene gained joints, cones, a rope, a spring, sensors, groups, a filter, dominance and toggles, its fixture regenerated each time.
+- **Sizes:** kernel 183,041 B raw, 63,734 B deflated (batch 124: 160,159 and 57,669); `physics/next` 86,240 B gzip (batch 124: 76,329).
+- **Papers:** read in full: Wang 2015, Baraff 1996, Montanari 2017, Muller 2020, Catto 2011, 2013 and 2014, Dobrowolski 2015, Tan, Liu and Turk 2011, Higham 1990 and 2009, Buss 2009, Buss and Kim 2005. In part: Hairer, section V.5. Not read: Lacoursiere; Tomcin 2014 and Cline and Pai 2003 could not be obtained. `docs/clean-room.md` PK24 and PK25.
+- **Open:** a loop has no closure solve; the range check runs once a step; a sensor reads the pose a step starts from, so it reports up to a step late; generic joints, setType, setMassProperties, inertia of its own and additionalSolverIterations refuse, naming the shapes and queries batch (126).
+
 ## Batch 49: shadows
 
 Eight jobs for `@margoengine/shadows`, each proved on real glTF models or real elevation against Blender Cycles, a path tracer that shares no code with Margo.
