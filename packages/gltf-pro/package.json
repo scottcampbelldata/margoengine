@@ -72,6 +72,10 @@
       "types": "./dist/physics.d.ts",
       "import": "./dist/physics.js"
     },
+    "./interactivity": {
+      "types": "./dist/interactivity.d.ts",
+      "import": "./dist/interactivity.js"
+    },
     "./coordinates": {
       "types": "./dist/coordinates.d.ts",
       "import": "./dist/coordinates.js"

@@ -23,6 +23,8 @@ export interface PointerPlan {
 
 export const pointerChannels: PointerChannels;
 
+export function pointerWriter(model: PBRModel, pointer: string): ((value: ArrayLike<number>) => void) | undefined;
+
 // Not exported from this entry, but used by the exports above:
 
 interface AnimationDefinition {

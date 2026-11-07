@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 9033444,
+  "total": 9075189,
   "history": [
     {
       "date": "2026-10-24",
@@ -2870,6 +2870,12 @@
       "commit": "b7372dfef",
       "reason": "USDZ real size: height, ground, measureUSDZ, size and bounds in the result, skin points at rest in the world, extent per frame on SkelRoot. A real iPhone showed a 79 metre fox.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "1e2612aba",
+      "reason": "KHR_interactivity entries of gltf-pro and animation",
+      "grew": 4
     }
   ],
   "items": {
@@ -2878,6 +2884,7 @@
     "@margoengine/animation/dqs": 3473,
     "@margoengine/animation/geometry-cache": 4645,
     "@margoengine/animation/instanced-skin": 9634,
+    "@margoengine/animation/interactivity": 24936,
     "@margoengine/animation/lod": 2768,
     "@margoengine/animation/morph-gpu": 3265,
     "@margoengine/animation/pointer": 7146,
@@ -3100,6 +3107,7 @@
     "@margoengine/gltf-pro/coordinates": 755,
     "@margoengine/gltf-pro/extended": 8224,
     "@margoengine/gltf-pro/instancing": 3350,
+    "@margoengine/gltf-pro/interactivity": 16807,
     "@margoengine/gltf-pro/lights": 3470,
     "@margoengine/gltf-pro/physics": 9260,
     "@margoengine/gltf-pro/prepare": 21088,
@@ -3497,6 +3505,8 @@
     "@margoengine/xr": 6748,
     "leak @margoengine/animation -> @margoengine/gltf-pro": 1,
     "leak @margoengine/animation/geometry-cache -> @margoengine/gltf-pro": 1,
+    "leak @margoengine/animation/interactivity -> @margoengine/gltf-pro": 1,
+    "leak @margoengine/animation/interactivity -> @margoengine/gltf-pro/interactivity": 1,
     "leak @margoengine/animation/pointer -> @margoengine/gltf-pro": 1,
     "leak @margoengine/animation/skeleton-utils -> @margoengine/gltf-pro": 1,
     "leak @margoengine/blender -> @margoengine/gltf-pro": 1,

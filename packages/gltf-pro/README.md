@@ -384,6 +384,50 @@ Read against pull request 2424 (`KHR_physics_rigid_bodies`, status Draft) and pu
 
 Limits are in [docs/limits.md](../../docs/limits.md): Rapier's order of combine rules differs from the draft's, soft limits are held hard, ranges on several axes are boxes, finite planes are thin boxes, and a file can have 15 distinct collision filters.
 
+### Behaviour graphs in glTF (`/interactivity`)
+
+`KHR_interactivity` carries a behaviour graph in the file: on a click, play an animation, change a material, wait, count. `KHR_node_selectability` and `KHR_node_hoverability` say which nodes take a click or a hover. Every loader reads such a file, even with these as required extensions. To run the graph on a rendered model, attach it with `@margoengine/animation/interactivity`, which [its README](../animation/README.md#behaviour-graphs-margoengineanimationinteractivity) covers. This entry is the graph alone: it needs no engine, and time moves only through `tick`, so a server or a test can run a file.
+
+```ts
+import {GLTFAsset} from 'margoengine/gltf-pro';
+import {loadBehaviorGraph} from 'margoengine/gltf-pro/interactivity';
+
+const doc = {
+  asset: {version: '2.0'},
+  extensions: {
+    KHR_interactivity: {
+      graphs: [{
+        events: [{id: 'ready'}],
+        declarations: [{op: 'event/onStart'}, {op: 'event/send'}],
+        nodes: [
+          {declaration: 0, flows: {out: {node: 1, socket: 'in'}}},
+          {declaration: 1, configuration: {event: {value: [0]}}},
+        ],
+      }],
+    },
+  },
+};
+const {graph, rejected} = loadBehaviorGraph(new GLTFAsset(doc, []));
+if (rejected) console.warn(rejected);
+graph?.on('ready', () => console.log('the file is running'));
+graph?.tick(1 / 60);
+```
+
+| Option of `loadBehaviorGraph` | Default | Meaning |
+| --- | --- | --- |
+| `live` | none | Called with each written property's pointer and value. |
+| `camera` | none | Returns the viewer's camera for `activeCamera`; without it those pointers read as NaN. |
+| `sample` | none | Samples a clip's channel. `sampleChannel` of `@margoengine/animation/interactivity`. Without it `animation/start` takes its `err` flow. |
+| `physics` | none | Runs `rigid_body/*` operations. |
+| `log` | none | Receives `debug/log` text. |
+| `maxActivations` | 1,000,000 | Node activations one step may run before the graph halts. A graph can loop forever, and a file is untrusted. |
+| `maxEventsPerTick` | 10,000 | Custom events one tick delivers; the rest wait for the next tick. |
+| `supported` | none | More extension names for a graph to see as enabled. |
+
+`graph` has `tick(seconds)`, `on(id, listener)`, `send(id, values)`, `variable(idOrName)`, `select(node, info)`, `hover(node)`, `link(otherGraph)` for files that share events, and `halted`, the reason a graph stopped. A graph the specification rejects comes back as `rejected` and the model stays valid.
+
+Read against the specification on Khronos main at commit a7963af6dc (2026-10-19), status "Complete, Ratified by the Khronos Group". On the published conformance suite this entry passes 1,155 of 1,156 sub-tests and rejects 187 of 187 invalid graphs. The one failure is a disagreement between that suite and the glTF Object Model, described with the other limits in [docs/limits.md](../../docs/limits.md).
+
 ### Texture mip streaming (`textures` of `/progressive`)
 
 KTX 2.0 keeps the smallest mip first, so a texture can start from a small read of the head of its file. With `textures` set, `loadGLTFProgressive` opens each KTX2 image from those smallest levels and loads finer ones only as the texture's size on screen calls for them, inside a memory budget. Levels nothing needs leave when the budget runs out. It reuses `KTX2Streamer` of `@margoengine/decoders/ktx2-stream`, loaded only with this option.

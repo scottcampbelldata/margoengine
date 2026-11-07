@@ -465,6 +465,108 @@ const settle = (camera) =>
   }, camera);
 
 const checks = {
+  // A red quad fills the middle of the view; a real mouse click must reach the graph through the engine's own pick, and the
+  // graph's write must reach the screen on the engine's loop. The file's clip moves the quad, so its staying put shows that
+  // the file's animation did not start by itself.
+  async 'interactivity: a real click runs the file graph, which turns the material green on the engine loop'() {
+    await open();
+    await page.evaluate(async () => {
+      const { parseGLTFAsync } = await import('/packages/gltf-pro/dist/index.js'),
+        { GLTFInteractivity } = await import('/packages/animation/dist/interactivity.js'),
+        { engine } = window.check,
+        positions = new Float32Array([-1, -1, 0, 1, -1, 0, 1, 1, 0, -1, 1, 0]),
+        normals = new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1]),
+        indices = new Uint16Array([0, 1, 2, 0, 2, 3]),
+        times = new Float32Array([0, 1]),
+        moves = new Float32Array([0, 0, 0, 5, 0, 0]),
+        parts = [positions, normals, indices, times, moves].map((a) => new Uint8Array(a.buffer)),
+        bytes = new Uint8Array(parts.reduce((sum, p) => sum + p.length, 0));
+      let at = 0;
+      const views = parts.map((part) => {
+        bytes.set(part, at);
+        at += part.length;
+        return { buffer: 0, byteOffset: at - part.length, byteLength: part.length };
+      });
+      const doc = {
+        asset: { version: '2.0' },
+        extensionsUsed: ['KHR_interactivity', 'KHR_node_selectability'],
+        scene: 0,
+        scenes: [{ nodes: [0] }],
+        nodes: [{ mesh: 0 }],
+        meshes: [{ primitives: [{ attributes: { POSITION: 0, NORMAL: 1 }, indices: 2, material: 0 }] }],
+        materials: [{ emissiveFactor: [1, 0, 0], pbrMetallicRoughness: { baseColorFactor: [0, 0, 0, 1] } }],
+        accessors: [
+          { bufferView: 0, componentType: 5126, count: 4, type: 'VEC3', min: [-1, -1, 0], max: [1, 1, 0] },
+          { bufferView: 1, componentType: 5126, count: 4, type: 'VEC3' },
+          { bufferView: 2, componentType: 5123, count: 6, type: 'SCALAR' },
+          { bufferView: 3, componentType: 5126, count: 2, type: 'SCALAR', min: [0], max: [1] },
+          { bufferView: 4, componentType: 5126, count: 2, type: 'VEC3' },
+        ],
+        animations: [{ samplers: [{ input: 3, output: 4 }], channels: [{ sampler: 0, target: { node: 0, path: 'translation' } }] }],
+        bufferViews: views,
+        buffers: [{ byteLength: bytes.length }],
+        extensions: {
+          KHR_interactivity: {
+            graph: 0,
+            graphs: [
+              {
+                types: [{ signature: 'float3' }, { signature: 'int' }, { signature: 'ref' }],
+                declarations: [
+                  {
+                    op: 'event/onSelect',
+                    extension: 'KHR_node_selectability',
+                    outputValueSockets: {
+                      selectedNode: { type: 2 },
+                      selectionRayOrigin: { type: 0 },
+                      selectionPoint: { type: 0 },
+                      controllerIndex: { type: 1 },
+                      event: { type: 2 },
+                    },
+                  },
+                  { op: 'pointer/set' },
+                ],
+                nodes: [
+                  { declaration: 0, configuration: { nodeIndex: { value: [0] } }, flows: { out: { node: 1, socket: 'in' } } },
+                  {
+                    declaration: 1,
+                    configuration: { pointer: { value: ['/materials/0/emissiveFactor'] }, type: { value: [0] } },
+                    values: { value: { type: 0, value: [0, 1, 0] } },
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      };
+      const json = new TextEncoder().encode(JSON.stringify(doc).padEnd(Math.ceil(JSON.stringify(doc).length / 4) * 4)),
+        tail = Math.ceil(bytes.length / 4) * 4,
+        glb = new Uint8Array(28 + json.length + tail),
+        head = new DataView(glb.buffer);
+      head.setUint32(0, 0x46546c67, true);
+      head.setUint32(4, 2, true);
+      head.setUint32(8, glb.length, true);
+      head.setUint32(12, json.length, true);
+      head.setUint32(16, 0x4e4f534a, true);
+      glb.set(json, 20);
+      head.setUint32(20 + json.length, tail, true);
+      head.setUint32(24 + json.length, 0x004e4942, true);
+      glb.set(bytes, 28 + json.length);
+      window.check.model = await parseGLTFAsync(engine, glb, {});
+      window.check.behaviour = GLTFInteractivity.attach(window.check.model);
+    });
+    const middle = size / 2,
+      before = await pixels();
+    assert.equal(await page.evaluate(() => window.check.behaviour.rejected ?? null), null);
+    assert.ok(before.at(middle, middle)[0] > 200 && before.at(middle, middle)[1] < 40, `red before: ${before.at(middle, middle)}`);
+    await page.mouse.click(middle, middle);
+    await page.waitForFunction(() => window.check.model.primitives[0].material.emission[1] === 1, null, { timeout: 10000 });
+    const after = await pixels();
+    assert.ok(after.at(middle, middle)[1] > 200 && after.at(middle, middle)[0] < 40, `green after: ${after.at(middle, middle)}`);
+    assert.deepEqual(await page.evaluate(() => window.check.behaviour.notes), []);
+    assert.equal(await page.evaluate(() => window.check.model.nodes[0].position.x), 0, 'the clip did not start itself');
+    await page.evaluate(() => window.check.behaviour.dispose());
+    await close();
+  },
   // The bob's node starts 0.6 rad out on a 2 m arm from a pivot at (0, 3, 0), and its drawn mesh is what the body moves.
   async 'physics: the real JointPendulum swings its loaded node on the engine loop, the arm held at 2 m'() {
     await open();

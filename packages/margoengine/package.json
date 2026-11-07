@@ -54,6 +54,10 @@
       "types": "./dist/animation/pointer.d.ts",
       "import": "./dist/animation/pointer.js"
     },
+    "./animation/interactivity": {
+      "types": "./dist/animation/interactivity.d.ts",
+      "import": "./dist/animation/interactivity.js"
+    },
     "./animation/skeleton-utils": {
       "types": "./dist/animation/skeleton-utils.d.ts",
       "import": "./dist/animation/skeleton-utils.js"
@@ -973,6 +977,10 @@
     "./gltf-pro/physics": {
       "types": "./dist/gltf-pro/physics.d.ts",
       "import": "./dist/gltf-pro/physics.js"
+    },
+    "./gltf-pro/interactivity": {
+      "types": "./dist/gltf-pro/interactivity.d.ts",
+      "import": "./dist/gltf-pro/interactivity.js"
     },
     "./gltf-pro/coordinates": {
       "types": "./dist/gltf-pro/coordinates.d.ts",

@@ -183,6 +183,10 @@ const ASSETS = [
     'test fixture: a texture of the Khronos glTF-Sample-Assets FlightHelmet, glTF-KTX-BasisU (CC0-1.0, Gary Hsu and Microsoft)',
   ],
   [
+    'packages/gltf-pro/tests/fixtures/interactivity/NOTICE.md',
+    'test fixtures: conformance files of https://github.com/KhronosGroup/glTF-Test-Assets-Interactivity, commit f99d9b6 (CC-BY-4.0, The Khronos Group)',
+  ],
+  [
     'packages/gltf-pro/tests/fixtures/physics/NOTICE.md',
     'test fixtures: the KHR_physics_rigid_bodies sample files of https://github.com/visgl/luma.gl/tree/master/examples/gltf/physics/assets (MIT, vis.gl contributors)',
   ],

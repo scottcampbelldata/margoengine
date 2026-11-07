@@ -250,6 +250,39 @@ export const pointerChannels: PointerChannels = (model, def, clip) => {
   };
 };
 
+/**
+ * A writer of one object model property of the live model, for a value that does not come from a clip: `value` holds its
+ * components. Undefined for a property the model has no live value for. Shares its state with playing clips.
+ */
+export function pointerWriter(model: PBRModel, pointer: string): ((value: ArrayLike<number>) => void) | undefined {
+  const weight = /^\/nodes\/(\d+)\/weights\/(\d+)$/.exec(pointer);
+  if (weight)
+    return (value) => {
+      for (const p of model.primitives) if (p.nodeIndex === +weight[1]) p.weights[+weight[2]] = value[0];
+    };
+  let resolved: ReturnType<typeof resolvePointer>;
+  try {
+    resolved = resolvePointer(model, model.asset.doc as unknown as Json, pointer, 'Behaviour graph');
+  } catch (error) {
+    if (error instanceof Skip) return undefined;
+    throw error;
+  }
+  if (!('path' in resolved)) {
+    let states = shared.get(model);
+    if (!states) shared.set(model, (states = new Map()));
+    const write = resolved.make(states);
+    return (value) => write(Float64Array.from(value));
+  }
+  const node = model.nodes[resolved.nodes[0]],
+    { path } = resolved;
+  if (!node || path === 'weights') return undefined;
+  return (value) => {
+    if (path === 'rotation') node.setQuaternion(Array.from(value));
+    else if (path === 'scale') node.setScale(Array.from(value) as [number, number, number]);
+    else node.setPosition(Array.from(value) as [number, number, number]);
+  };
+}
+
 function index(token: string | undefined, length: number, what: string, label: string, pointer: string): number {
   if (token === undefined || !/^(0|[1-9]\d*)$/.test(token) || Number(token) >= length)
     throw new TypeError(`${label} pointer ${pointer} names no ${what} ${token ?? ''}; point at an existing index`);

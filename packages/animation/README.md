@@ -284,6 +284,33 @@ leaves undefined (a camera without `zfar`, a light without `range`), factors glt
 without the materials decoder, transmission on a material loaded without it) and targets no scene node or primitive
 uses.
 
+## Behaviour graphs (`@margoengine/animation/interactivity`)
+
+A glTF file can carry its own behaviour: on a click, play this clip, turn that material green. `GLTFInteractivity` runs the `KHR_interactivity` graph of a loaded model on the engine's frame loop, so the file behaves with no code of the app's. The graph itself lives in [`@margoengine/gltf-pro/interactivity`](../gltf-pro/README.md#behaviour-graphs-in-gltf-interactivity); this entry reaches the engine, and sits in this package because it plays clips and writes the same live properties as `KHR_animation_pointer`.
+
+```ts
+import {createStage} from 'margoengine';
+import {loadGLTF} from 'margoengine/gltf-pro';
+import {GLTFInteractivity} from 'margoengine/animation/interactivity';
+
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+const model = await loadGLTF(stage.engine, '/product.glb');
+const behaviour = GLTFInteractivity.attach(model);
+if (behaviour.rejected) console.warn(behaviour.rejected);
+behaviour.graph?.on('checkout', ({variant}) => console.log(variant));
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `pointer` | `true` | Turns pointer input on the canvas into select and hover events. Attaches `Picking` of `@margoengine/selection`, an optional peer loaded on first use, unless the engine has a picker. |
+| `physics` | none | The `GLTFPhysics` of `@margoengine/gltf-pro/physics`, for `rigid_body/*` operations and trigger events. |
+| `shareCamera` | `true` | Reports the viewer's camera to the graph. `false` makes `activeCamera` read as NaN, for a file you do not trust with where the viewer looks. |
+| `log` | none | Receives `debug/log` text. |
+| `maxActivations` | 1,000,000 | Node activations one step may run before the graph halts. |
+| `maxEventsPerTick` | 10,000 | Custom events one tick delivers. |
+
+A file's clips start only when its graph says so, so do not also play them with `Animation`. A press that moves over 4 CSS pixels is a drag and selects nothing. A click passes through unselectable nodes to what is behind them, and the graph receives the point it hit. `behaviour.notes` lists properties the graph wrote that it can read back but that change nothing on screen. `dispose()` stops the input.
+
 ## Groups: one clip for many models
 
 `AnimationGroup` is one clip and one clock for a crowd. Members are glTF-pro models'

@@ -192,6 +192,10 @@ const supported = new Set([
   'EXT_lights_image_based',
   // Data until @margoengine/gltf-pro/physics builds them.
   'KHR_physics_rigid_bodies',
+  // Data until @margoengine/gltf-pro/interactivity runs them.
+  'KHR_interactivity',
+  'KHR_node_selectability',
+  'KHR_node_hoverability',
   'KHR_implicit_shapes',
   // Played by @margoengine/animation (Animation); gltf-pro loads the channels as data.
   'KHR_animation_pointer',
