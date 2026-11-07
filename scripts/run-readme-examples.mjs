@@ -3,7 +3,8 @@
 // fetches is answered with a real sample of that format. An example passes when nothing threw, no promise was left rejected
 // and the GPU reported no validation error. One that fails and is not on the known list fails the check, and so does a known
 // entry that now passes or names an example that is gone, so the list (scripts/support/readme-run-known.json) only ever shrinks.
-// A step of check:merge, whole in the full check, never in verify or a gate before the push. It holds one
+// A step of check:merge, whole in the full check, never in verify or a gate before the push; verify's
+// tests/run-readme-examples.test.js does check that every known entry still names an example, as a README edit renames one. It holds one
 // shared GPU slot, and the GPU lock ends its whole process tree at LIMIT_MINUTES.
 //   npm run check:readme-run                       the check; needs a build, and uses the GPU
 //   npm run check:readme-run -- --only=biomes      the examples whose id holds that text

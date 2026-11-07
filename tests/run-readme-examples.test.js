@@ -14,8 +14,10 @@ import {
   assetFile,
   claimScratch,
   sampleFiles,
+  collectExamples,
 } from '../scripts/run-readme-examples.mjs';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { workspacePackages } from '../scripts/check-readme-types.mjs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -222,4 +224,13 @@ test('a run starting never deletes the files of a run still going in the same ch
   } finally {
     rmSync(base, { recursive: true, force: true });
   }
+});
+
+test('every known-list entry names an example the READMEs still hold, so an edit that renames one is seen in verify', () => {
+  // An example's id carries a hash of its code, so a README edit renames it. check:readme-run is a GPU step of the full
+  // check only, so on 2026-11-07 eight renamed known failures (2 animator, 6 ragdoll) went unseen until it ran.
+  const known = JSON.parse(readFileSync(new URL('../scripts/support/readme-run-known.json', import.meta.url), 'utf8')),
+    ids = new Set(collectExamples(workspacePackages()).map(({ id }) => id)),
+    gone = Object.keys(known).filter((id) => !ids.has(id));
+  assert.deepEqual(gone, [], 'run npm run check:readme-run -- --only=<package> and fix the renamed example, or -- --shrink if it passes');
 });
