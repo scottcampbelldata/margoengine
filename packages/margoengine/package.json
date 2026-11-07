@@ -142,6 +142,10 @@
       "types": "./dist/behavior/perception.d.ts",
       "import": "./dist/behavior/perception.js"
     },
+    "./behavior/eqs": {
+      "types": "./dist/behavior/eqs.d.ts",
+      "import": "./dist/behavior/eqs.js"
+    },
     "./biomes": {
       "types": "./dist/biomes.d.ts",
       "import": "./dist/biomes.js"

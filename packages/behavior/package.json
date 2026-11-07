@@ -1,7 +1,7 @@
 {
   "name": "@margoengine/behavior",
   "version": "1.0.0",
-  "description": "Game AI: behaviour trees with a typed blackboard and async tasks, utility-AI scoring, steering and flocking behaviours, and perception (./perception).",
+  "description": "Game AI: behaviour trees with a typed blackboard and async tasks, utility-AI scoring, steering and flocking behaviours, perception (./perception), and environment queries (./eqs).",
   "keywords": [
     "margoengine",
     "webgpu",
@@ -39,6 +39,10 @@
     "./perception": {
       "types": "./dist/perception.d.ts",
       "import": "./dist/perception.js"
+    },
+    "./eqs": {
+      "types": "./dist/eqs.d.ts",
+      "import": "./dist/eqs.js"
     }
   },
   "files": [

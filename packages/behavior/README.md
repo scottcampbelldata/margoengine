@@ -248,6 +248,65 @@ awareness to at least that value. Memories fade over `forgetTime` and go at 0; t
 with an optional velocity to favour a direction, `observe` pins it and returns how surprising the place was, `cull`
 clears nodes seen empty, and `best` is where to look next. Walking there and calling `cull` again is a search.
 
+## Environment queries
+
+Ask the level for a spot: collect candidate points, throw out those that fail a condition, score the rest, take the best.
+
+```ts
+import { sphereOcclusion } from 'margoengine/behavior/perception';
+import { coverFrom, directness, distance, gridAround, queryPoints, ringsAround, visibleFrom } from 'margoengine/behavior/eqs';
+
+const me = [0, 0, 0];
+const enemy = [20, 0, 4];
+const lineOfSight = sphereOcclusion([{ position: [10, 0, 2], radius: 3 }]);
+const coverSpots = [
+  { position: [7, 0, 6], facing: [1, 0, -0.2], data: 'crate' },
+  { position: [-4, 0, 3], facing: [-1, 0, 0], data: 'wall' },
+];
+
+// Cover first; if no cover works, any hidden point near me.
+const [spot] = queryPoints([
+  {
+    candidates: coverSpots,
+    conditions: [{ test: coverFrom(enemy), min: 1 }],
+    weights: [{ test: distance(me), weight: -1 }],
+  },
+  {
+    candidates: gridAround(me, 12, 2),
+    conditions: [{ test: visibleFrom(enemy, lineOfSight, 1.2), max: 0 }],
+    weights: [{ test: distance(me), weight: -1 }],
+  },
+]);
+spot?.position; // where to go; undefined means this behaviour does not fit here, so pick another
+
+// A flank: a move that gets no closer and no further, in view of the enemy.
+const flanks = queryPoints(
+  [
+    {
+      candidates: ringsAround(me, 15),
+      conditions: [
+        { test: directness(me, enemy), min: -0.1, max: 0.1 },
+        { test: visibleFrom(enemy, lineOfSight), min: 1 },
+      ],
+    },
+  ],
+  { count: 3 },
+);
+flanks.length; // up to three, best first
+```
+
+Each option in the list is tried in order and the first that finds a valid point answers; `option` on a result says
+which. A condition reads the raw value, so `{test: distance(me), max: 8}` means 8 m. A weight scales the value to 0..1
+by the criterion's `limits` and multiplies, so a point far past the limit cannot swamp the other weights, and a negative
+`weight` prefers low values. The built-in criteria are `distance`, `directness`, `reachBefore`, `visibleFrom` and
+`coverFrom`. Your own is an object with `value(candidate)`, optional `limits`, and `expensive: true` for anything slow:
+wrap `navMesh.path` to score the real walk, or a physics ray.
+
+Cheap conditions and weights run on every candidate. Expensive ones run last, always on the point that can still score
+highest, so a point that cannot win never pays for its ray. The answer is the one full evaluation gives, and equal
+scores go to the candidate collected first. `explainQuery(option)` runs everything and returns every candidate with its
+score and the first condition it failed, for drawing in a debug view.
+
 Errors name their fix: a bad argument throws `TypeError` or `RangeError` (`Agent maxSpeed must be a finite number of
 0 or more`), a call that is not valid right now throws `MargoError` with code `state` (ticking from inside a handler),
 `disposed` (after `dispose()`) or `failed` (a rejected task). `using tree = new BehaviorTree(...)` halts it at the end
