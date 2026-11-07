@@ -54,7 +54,7 @@ in `@margoengine/exporters` bakes back-only winding and normals into glTF-compat
 
 Set `primitive.material.wireframe = true` to draw triangle edges as one-pixel WebGPU lines. The flag is live,
 defaults to false, and applies to beauty, auxiliary, transparency, capture and shadow passes, including groups,
-instances and deformed vertices. Each triangle contributes all three edges, so shared edges blend twice on
+instances and deformed vertices. Each edge draws once per primitive, so a shared edge blends like any other on
 transparent surfaces. Points and existing lines keep their topology. Lines ignore triangle face culling and
 polygon bias. Edge index buffers are allocated on first use, reused across toggles, and released on restoration
 or disposal. Picking, CPU snapshots and glTF export retain the original filled triangle geometry; glTF has no

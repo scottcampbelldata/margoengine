@@ -636,21 +636,6 @@ function joinBatch(
   d.joinedRun = run;
   push(batch, model, r, d);
 }
-// The encoder of the last frame that counted, per engine.
-const countedFrames = new WeakMap<object, GPUCommandEncoder>();
-/**
- * Adds `count` to `stats.visible`. Core starts that number on every frame it draws; a draw run by hand, with its own encoder and
- * no frame of core's, would add to the frame before, so a first count starts again from the meshes core collected, which the batches hold.
- */
-function countVisible(engine: EngineKernel, c: Context, count: number): void {
-  const { stats } = engine;
-  if (countedFrames.get(stats) !== c.encoder) {
-    countedFrames.set(stats, c.encoder);
-    stats.visible = 0;
-    if (c.batches) for (const batch of c.batches) stats.visible += batch.count;
-  }
-  stats.visible += count;
-}
 /** The nodes one draw of `r` shows: the parts it was merged from, or its instances. */
 const nodesDrawn = (r: DrawResource): number => r.batch?.parts.length ?? r.primitive.instances?.count ?? 1;
 /** Adds member `r` (of `model`, derivation `d`) to `batch`. */
@@ -1225,8 +1210,7 @@ interface ShadowCasterRecord {
   surfaceClip?: GPUBufferBinding;
   dynamic: boolean;
 }
-// Keep the original triangle buffer for queries and exports. Duplicate shared
-// edges deliberately: transparent triangle wireframes blend each edge twice.
+// Keep the original triangle buffer for queries and exports.
 /**
  * The line-list indices of triangle list `triangles`' edges, each edge once, in first-seen order. An edge two triangles
  * share was listed twice (a b, b c, c a per triangle): a closed mesh drew every line twice, twice the vertex and line
@@ -3702,7 +3686,7 @@ export class PBRModel implements EnginePlugin {
           pass = undefined;
         }
         if ((mode === 'beauty' || through) && !external) {
-          countVisible(this.engine, c, nodesDrawn(r));
+          this.engine.stats.visible += nodesDrawn(r);
           this.engine.stats.drawCalls++;
         }
       }
@@ -3871,7 +3855,7 @@ export class PBRModel implements EnginePlugin {
     // Every member counts as drawn, as a draw of its own did (counted here rather than once per member).
     let drawn = 0;
     for (let i = 0; i < members.length; i++) drawn += nodesDrawn(members[i]);
-    countVisible(this.engine, c, drawn);
+    this.engine.stats.visible += drawn;
     beginDraw(device, view);
     const scratch = (scratchStack[scratchDepth] ??= createDrawScratch(c.color, c.depth));
     scratchDepth++;
