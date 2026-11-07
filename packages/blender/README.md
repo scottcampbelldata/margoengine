@@ -161,6 +161,24 @@ engine.start();
 
 A real Blender 5.2.3 LTS export evaluates to Blender's own Convert to Mesh polylines to 2e-5 m (Bezier with free, aligned, auto and vector handles; poly; Uniform and Endpoint NURBS with weights, open and cyclic; open and cyclic Catmull-Rom hair), keeps the cloud's points, radii and colour, and its volume reads with `parseVDB` voxel for voxel as Blender's bundled openvdb module reads it (LIM-420; `tests/curves.test.js`). `evaluateSpline` refuses NURBS with Bezier knot modes and cyclic NURBS with Endpoint knots by name (their control data is still in the file), a scene with both animation and shapes fails to export by name, and a beveled or extruded curve exports as its spline, not its surface. Volume grids keep Blender's Z-up object space; `matrix` places them.
 
+## Compressed textures: KTX2 in `.margo` (`margoengine/blender/ktx2`)
+
+`compressMargo` re-encodes an exported file's PNG textures as KTX2 with Basis Universal (`@margoengine/exporters/ktx2`, Binomial's encoder in Wasm, in Node or a browser worker), so the file downloads smaller and, on an engine created with the texture-compression features, its textures stay compressed on the GPU; colour slots stay sRGB, normal maps are encoded as normal maps, metallic-roughness and other data as linear. `loadMargoKTX2` transcodes each one on the engine's device with `KTX2Decoder` of `@margoengine/decoders` (pass `ktx2` to reuse one) and draws the scene as `loadMargo` does. The add-on still writes PNG; compress the file after export, here in Node:
+
+```ts
+import {readFile, writeFile} from 'node:fs/promises';
+import {compressMargo, decodeMargoKTX2} from 'margoengine/blender/ktx2';
+const source = await readFile(new URL('./tests/fixtures/bake.margo', import.meta.url));
+const compressed = await compressMargo(source); // {mode: 'uastc'} for closer to the PNG, at more bytes
+console.log(source.length, '->', compressed.length, decodeMargoKTX2(compressed).document.images?.[0]?.mimeType);
+await writeFile('bake-ktx2.margo', compressed);
+// In the page, ask for the compressed formats, or the textures upload as RGBA8:
+// const engine = await Engine.create(canvas, {features: ['texture-compression-bc', 'texture-compression-astc', 'texture-compression-etc2']});
+// const model = await loadMargoKTX2(engine, '/bake-ktx2.margo');
+```
+
+On the baked fixture (four 32 x 32 textures from Blender 5.2.3) the file goes from 6,660 to 5,464 bytes with ETC1S and 5,712 with UASTC; UASTC images transcode back within a mean of 0.5 of 255 of the PNG (ETC1S within 5.0). On a Radeon 680M with those features the textures upload as BC7 with their 6 mips, and the gradient plane's frame differs from the PNG file's by a mean of 0.25 of 255 with UASTC and 2.3 with ETC1S (the uniform plane: 0 and 0.43); a file whose two colour images trade places draws them swapped, so the pixels come from the KTX2 data (LIM-428; `tests/ktx2.test.js`, `scripts/modern-blender-tests.js`). Bigger textures gain more; tiny ones can grow. Animated files and files with curves, points or volumes are refused by name; `decodeMargo` refuses a KTX2 file by name.
+
 ## Characters: armatures, skins, shape keys and actions
 
 A mesh with an Armature modifier or shape keys exports as an animated `.margo`: the armature's bones become joint nodes, vertex groups of deform bones become up to eight normalised influences per vertex, shape keys become morph targets, and each action (the active one, NLA strips' and the shape keys') becomes a clip sampled at every frame. Load it with the `anim` entry and play it with `@margoengine/animation`:

@@ -35,6 +35,23 @@ interface MargoDocument extends Record<string, unknown> {
   nodes?: unknown[];
   images?: MargoImage[];
 }
+/** Checks a KTX2 section's identifier and 2D size (1..4096, one layer, one face) and returns its size. */
+function ktx2Size(bytes: Uint8Array<ArrayBuffer>): [width: number, height: number] {
+  const id = [0xab, 0x4b, 0x54, 0x58, 0x20, 0x32, 0x30, 0xbb, 0x0d, 0x0a, 0x1a, 0x0a],
+    view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  if (bytes.length < 80 || id.some((v, i) => bytes[i] !== v) || view.getUint32(28, true) > 1 || view.getUint32(32, true) > 1 || view.getUint32(36, true) !== 1)
+    throw new TypeError(
+      "Invalid .margo KTX2 image; embed 2D KTX 2.0 textures (compressMargo writes them), so compress the file again",
+    );
+  const width = view.getUint32(20, true),
+    height = view.getUint32(24, true);
+  if (!width || !height || width > 4096 || height > 4096)
+    throw new RangeError(
+      ".margo images exceed decoded size limit; use textures of at most 4096 x 4096 pixels",
+    );
+  return [width, height];
+}
+
 /**
  * Checks a static scene manifest against its sections and decodes its geometry and images (decodeMargo's work after
  * the container checks); the curves entry runs it on a shapes file's meshes.
@@ -44,6 +61,7 @@ export function decodeScene(
   sections: readonly MargoSection[],
   manifest: unknown,
   maxNodes: number,
+  ktx2 = false,
 ): MargoAsset {
   const doc = manifest as MargoDocument | null;
   if (
@@ -139,6 +157,20 @@ export function decodeScene(
   });
   let decoded = 0;
   const images = (doc.images ?? []).map((image) => {
+    if (image?.mimeType === "image/ktx2" && image.uri === undefined) {
+      if (!ktx2)
+        throw new TypeError(
+          ".margo with KTX2 textures; load it with parseMargoKTX2 or loadMargoKTX2 from @margoengine/blender/ktx2",
+        );
+      const { bytes } = section(image.section, 8),
+        [width, height] = ktx2Size(bytes);
+      decoded += width * height * 4;
+      if (decoded > maxBytes)
+        throw new RangeError(
+          ".margo images exceed decoded size limit; use textures of at most 4096 x 4096 pixels",
+        );
+      return bytes;
+    }
     if (!image || image.mimeType !== "image/png" || image.uri !== undefined)
       throw new TypeError(
         ".margo images must be embedded PNG; export textures as embedded PNG sections, not URIs",

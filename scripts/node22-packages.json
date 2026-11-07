@@ -74,7 +74,8 @@
     "@margoengine/gltf": {
       "reason": "margo-convert parses glTF with it in Node; its own tests are a section of tests/modern.test.js (core, run on 24), so the margo-convert tests cover its Node path here",
       "tests": ["tests/margo-convert-pipeline.test.js"]
-    }
+    },
+    "@margoengine/blender": "compressMargo (@margoengine/blender/ktx2) re-encodes .margo textures in Node; decodeMargo checks files with no GPU"
   },
   "contributorNode": {
     "@margoengine/react": "its unit tests rely on node:test mock.module timing that Node 22 does not give (bug 18), so they run on the contributors' Node 24.18; React 18 SSR itself runs on Node 22 in the end-user proof"
@@ -87,7 +88,6 @@
     "@margoengine/sprites": "2D sprites render with WebGPU (instanced pipelines, textures); runs in the browser",
     "@margoengine/animation": "renders with WebGPU (its src creates GPU pipelines, buffers or textures); runs in the browser",
     "@margoengine/audio": "drives the DOM, pointer and keyboard input, Web Audio, WebXR or WebGL; runs in the browser",
-    "@margoengine/blender": "loads Blender .margo assets into an engine for the WebGPU PBR renderer; runs in the browser",
     "@margoengine/clustered": "renders with WebGPU (its src creates GPU pipelines, buffers or textures); runs in the browser",
     "@margoengine/controls": "drives the DOM, pointer and keyboard input, Web Audio, WebXR or WebGL; runs in the browser",
     "@margoengine/core": "the engine facade a page imports; on Node it is only imported (SSR), which the end-user proof covers",

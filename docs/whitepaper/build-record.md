@@ -2272,3 +2272,61 @@ proved on a Radeon 680M through `packages/scenery/test/scenery-check.mjs`, at 4x
 - **Gate:** per job: rebase, build:packages, api:check, `npm run quality`, lint, hygiene, the scenery and stage tests,
   the umbrella and API convention tests, the scenery GPU checks under the GPU lock, the claims, llms, lock-sync,
   sizes-page and fixed-waits tests; `npm run verify` for job 2 (the lock file) and on the newest main with job 5.
+
+## Lane H batch 48: blender
+
+Eight jobs for `@margoengine/blender` and the Blender add-on (`tools/blender-addon`) on the Beelink (lane H, work list
+3), each a new optional entry or an add-on step; core and stage are untouched. Every job is proved on a real Blender
+5.2.3 LTS export, and the GPU parts on a Radeon 680M through `scripts/modern-blender-tests.js`. Nothing is timed.
+
+| # | Job | Status | Commit | Entry | Claim |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Skeletal animation and shape keys | DONE | `84b605cd` | `/anim` | LIM-389 |
+| 2 | Custom properties to components | DONE | `b4521dc9` | `/components` | LIM-396 |
+| 3 | Node graph baking | DONE | `b75d2f23` | add-on bake step (no runtime bytes) | LIM-401 |
+| 4 | Extended Principled inputs | DONE | `6d48efd1` | `/pbr-ext` | LIM-408 |
+| 5 | Live link | DONE | `c44d21f6` | `/live`, add-on `LiveLink` | LIM-410 |
+| 6 | Lights and cameras | DONE | `c25e2cc0` | add-on `lights_cameras` option, read by `/components` | LIM-417 |
+| 7 | Curves, points and volumes | DONE | `94a48aab` | `/curves`, add-on `curves` option | LIM-420 |
+| 8 | Compressed textures in .margo | DONE | this commit | `/ktx2` | LIM-422 |
+
+Fix in the same batch: `02ca99be` (the README's two `loadMargo` examples asked for files no folder holds and sat on the
+README runner's known-failure list; they now load the package's real fixtures and left the list).
+
+- **Proved:** anim: glTF rules on the converted rig stay within 1.1e-6 m of Blender's own deformed vertices at all 40
+  frames, `@margoengine/animation` on the GPU within 1.2e-6 m. Components: the real solver rests a tagged crate and
+  ball within 1 cm of y = 0.5; the tagged sun lights the engine at 3 lux. Baking: every texel of the 32 x 32 bakes
+  within 0.012 of the node maths, a second export gives the same bytes. Extended inputs: values equal Blender's within
+  float32 rounding, the glass plane shows the backdrop through it. Live link: a real Blender session's red plane turns
+  blue on the page through Blender's depsgraph handler. Lights and cameras: directions and projections match Blender's
+  world matrices and `calc_matrix_camera` to 1e-6, the page opens through Blender's camera. Curves: `evaluateSpline`
+  matches Blender's Convert to Mesh to 2e-5 m, the cloud and the OpenVDB volume keep Blender's values. KTX2: the
+  fixture's four 32 x 32 textures go from 6,660 B to 5,464 (ETC1S) or 5,712 (UASTC); with the texture-compression
+  features the textures upload as BC7 with 6 mips, the gradient plane differs from the PNG frame by a mean of 0.25 of
+  255 (UASTC) and 2.3 (ETC1S), and a file whose two colour images trade places draws them swapped.
+- **Bugs fixed with tests:** job 5: the GPU test killed Blender in a finally block and raced its own clean exit; it is
+  now killed only when the page check throws. Job 7: `package_addon.py` left `curves.py` out of the add-on ZIP, found by
+  the GPU install test; `tools/blender-addon/tests/test_package.py` now requires every add-on module in the archive.
+  Job 8: the first KTX2 GPU check compared the uniform-colour plane only, which Basis Universal keeps exactly, so a
+  frame identical to the PNG frame (mean difference 0) proved nothing; the check now counts the transcoder's calls,
+  reads the model's GPU texture formats, measures the gradient plane and draws a file with two KTX2 images swapped,
+  so it fails when the KTX2 data is not what is drawn. It also showed the engine's device holds BC7 only when the
+  engine asks for the texture-compression features (RGBA8 otherwise): the README said the textures stay compressed
+  without that condition; the README, the entry's docs and the limit now say so, and the check runs both engines.
+- **Sizes:** new entries only; `@margoengine/exporters/ktx2` is external in `scripts/build-modern.js` and
+  `scripts/measure-size.js` (it had been inlined into the modern build as a 2.4 MB chunk). Core and stage are
+  untouched.
+- **Limits:** KTX2 compression is a step after export (Blender's Python has no Basis encoder), static files only;
+  curves NURBS Bezier knot modes and cyclic Endpoint NURBS are refused by name; drawing curves, points and volumes is
+  left to their packages; area lights and panoramic cameras fail by name. Rows in docs/limits.md.
+- **Slips:** job 6 waited on the scenery WGSL corpus failure on main; its first re-landing ran the whole
+  `record:wgsl-corpus`, which only jobs that add WGSL need, and timed out; it then lost a push race and landed by the
+  short rule. The rebase script renumbered `claims.md` without staging it (fixed: it is in its `git add` list, with a
+  guard that the claims end at the expected number). Job 7's first landing failed on the ZIP bug above. Job 8's claim
+  was written as LIM-421 and landed as LIM-422 after main took LIM-421. Job 8's first landing stopped at verify on
+  `tests/node22-packages.test.js`: `compressMargo` runs in Node, but `@margoengine/blender` sat in the browser-only list
+  of `scripts/node22-packages.json`; it moved to the Node list, so its tests also run on Node 22 in CI.
+- **Gate:** per job by machines.md item 5: rebase, build:packages, api:check, `npm run quality`, lint, hygiene, the
+  blender tests and the add-on's Python tests, the claims, llms, lock-sync, sizes-page and fixed-waits tests, the
+  blender GPU checks under the GPU lock; `npm run verify` for jobs 6 and 8 (job 8 changes `scripts/`), which is also the
+  verify on the newest main after the last push.

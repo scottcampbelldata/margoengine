@@ -90,7 +90,7 @@ export function readContainer(
         ? [1, 2, 3, 4, 5]
         : flags === shapesFlag
           ? [1, 2, 3, 4, 6, 7]
-          : [1, 2, 3, 4];
+          : [1, 2, 3, 4, 8];
   let end = 64 + count * 16;
   for (let i = 0; i < count; i++) {
     const at = 64 + i * 16,

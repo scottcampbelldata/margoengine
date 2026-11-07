@@ -808,6 +808,145 @@ try {
   );
   results.push({ glass });
 
+  // KTX2 textures (real Blender 5.2.3 export compressed in Node by @margoengine/blender/ktx2). Three proofs that the
+  // KTX2 sections, not PNGs, reach the GPU: every image goes through the transcoder, the model's 32 x 32 textures are
+  // block-compressed formats on an engine that requests the texture-compression features (RGBA8 on one that does not:
+  // the "rgba8" run), and a file whose two base colour KTX2 images trade places (the PNG file unchanged) draws the
+  // Painted plane with the Procedural plane's gradient. The Painted plane's colour is uniform, which Basis Universal
+  // keeps exactly, so the codec's loss is measured on the Procedural plane's gradient.
+  const { compressMargo } = await import("../packages/blender/dist/ktx2.js");
+  const fixture = await readFile("packages/blender/tests/fixtures/bake.margo");
+  const ktx2Files = {
+    uastc: await compressMargo(fixture, { mode: "uastc" }),
+    etc1s: await compressMargo(fixture, { mode: "etc1s" }),
+  };
+  {
+    // Images 0 and 2 (Procedural and Painted base colour, sections 3 and 5) trade sections in the manifest.
+    const swapped = new Uint8Array(ktx2Files.uastc),
+      view = new DataView(swapped.buffer),
+      at = view.getUint32(68, true),
+      text = new TextDecoder().decode(swapped.subarray(at, at + view.getUint32(72, true))),
+      a = '{"section":3,"mimeType":"image/ktx2"}',
+      b = '{"section":5,"mimeType":"image/ktx2"}';
+    assert.ok(text.includes(a) && text.includes(b), "the KTX2 manifest names sections 3 and 5");
+    const next = text.replace(a, "\0").replace(b, a).replace("\0", b);
+    assert.equal(next.length, text.length);
+    swapped.set(new TextEncoder().encode(next), at);
+    ktx2Files.swapped = swapped;
+  }
+  for (const [name, file] of Object.entries(ktx2Files))
+    await page.route(`**/bake-${name}.margo`, (route) =>
+      route.fulfill({ body: Buffer.from(file), contentType: "application/octet-stream" }),
+    );
+  const ktx2Shots = await page.evaluate(async () => {
+    const { Engine } = await import("/packages/core/dist/index.js");
+    const { loadMargo } = await import("/packages/blender/dist/index.js");
+    const { loadMargoKTX2 } = await import("/packages/blender/dist/ktx2.js");
+    const { KTX2Decoder } = await import("/packages/decoders/dist/index.js");
+    const { waitForPipelines } = await import("/scripts/support/gpu-ready.js");
+    const shots = {};
+    for (const name of ["png", "uastc", "etc1s", "swapped", "rgba8"]) {
+      const canvas = document.createElement("canvas");
+      canvas.style.cssText = "width:256px;height:256px";
+      document.body.append(canvas);
+      const features = ["texture-compression-bc", "texture-compression-astc", "texture-compression-etc2"];
+      const engine = await Engine.create(canvas, { backend: "webgpu", capacity: 16, features: name === "rgba8" ? [] : features });
+      engine.gpu.pushErrorScope("validation");
+      const decoder = new KTX2Decoder({ device: engine.gpu }),
+        transcoded = [];
+      const ktx2 = {
+        async transcode(data, options) {
+          const result = await decoder.transcode(data, options);
+          transcoded.push({ format: result.format, width: result.width, levels: result.mipmaps.length });
+          return result;
+        },
+      };
+      const model =
+        name === "png"
+          ? await loadMargo(engine, "/bake.margo")
+          : await loadMargoKTX2(engine, `/bake-${name === "rgba8" ? "uastc" : name}.margo`, { ktx2 });
+      const shot = { transcoded, frames: {} };
+      // The model's own GPU textures: the four 32 x 32 images (1 x 1 textures are empty slots' defaults).
+      shot.textures = model.textures
+        .filter((t) => t.width === 32)
+        .map((t) => ({ format: t.format, levels: t.mipLevelCount }));
+      shot.features = ["bc", "astc", "etc2"].filter((f) => engine.gpu.features.has(`texture-compression-${f}`));
+      for (const [plane, x] of [["Procedural", -3], ["Painted", 0]]) {
+        engine.camera.position = [x, 2.5, 0];
+        engine.camera.target = [x, 0, 0];
+        engine.camera.up = [0, 0, -1];
+        await waitForPipelines(async () => {
+          engine.render({ culling: false });
+          await engine.gpu.queue.onSubmittedWorkDone();
+        });
+        shot.frames[plane] = canvas.toDataURL();
+      }
+      shot.validation = (await engine.gpu.popErrorScope())?.message ?? null;
+      model.destroy();
+      decoder.dispose();
+      engine.dispose();
+      canvas.remove();
+      shots[name] = shot;
+    }
+    return shots;
+  });
+  const ktx2Frames = {};
+  for (const [name, shot] of Object.entries(ktx2Shots)) {
+    assert.equal(shot.validation, null, `KTX2 check, ${name}`);
+    assert.equal(shot.textures.length, 4, `KTX2 check, ${name}: the four baked images reach the GPU`);
+    if (name === "png") {
+      assert.deepEqual(shot.transcoded, [], "the PNG file transcodes nothing");
+      assert.ok(shot.textures.every((t) => t.format.startsWith("rgba8unorm")), JSON.stringify(shot.textures));
+    } else {
+      assert.equal(shot.transcoded.length, 4, `KTX2 check, ${name}: every image goes through the KTX2 transcoder`);
+      if (name === "rgba8")
+        assert.ok(
+          shot.features.length === 0 && shot.textures.every((t) => t.format.startsWith("rgba8unorm") && t.levels === 6),
+          `KTX2 check, rgba8: an engine with no compression features holds RGBA8 with 6 mips: ${JSON.stringify(shot.textures)}`,
+        );
+      else if (shot.features.length)
+        assert.ok(
+          shot.textures.every((t) => /^(bc7|astc|etc2)/.test(t.format) && t.levels === 6),
+          `KTX2 check, ${name}: the GPU textures are block-compressed with 6 mips: ${JSON.stringify(shot.textures)}`,
+        );
+    }
+    ktx2Frames[name] = {};
+    for (const [plane, url] of Object.entries(shot.frames)) {
+      const bytes = Buffer.from(url.split(",")[1], "base64");
+      await writeFile(`test-results/blender/ktx2-${name}-${plane}.png`, bytes);
+      ktx2Frames[name][plane] = await decodePNG(bytes);
+    }
+  }
+  /** Mean absolute RGB difference of two frames, in 255ths. */
+  const frameDifference = (a, b) => {
+    let total = 0;
+    for (let i = 0; i < a.data.length; i += 4)
+      for (let c = 0; c < 3; c++) total += Math.abs(a.data[i + c] - b.data[i + c]);
+    return total / ((a.data.length / 4) * 3);
+  };
+  const ktx2Result = { features: ktx2Shots.uastc.features, textures: ktx2Shots.uastc.textures, png: { bytes: fixture.length } };
+  for (const name of ["uastc", "etc1s", "swapped", "rgba8"])
+    ktx2Result[name] = {
+      bytes: (ktx2Files[name] ?? ktx2Files.uastc).length,
+      formats: [...new Set(ktx2Shots[name].textures.map((t) => t.format))],
+      Procedural: frameDifference(ktx2Frames.png.Procedural, ktx2Frames[name].Procedural),
+      Painted: frameDifference(ktx2Frames.png.Painted, ktx2Frames[name].Painted),
+    };
+  console.log("KTX2 frames:", JSON.stringify(ktx2Result));
+  const gradient = (image) => [mean(image, 0.33, 0.37, 0.45, 0.55)[0], mean(image, 0.63, 0.67, 0.45, 0.55)[0]];
+  for (const name of ["png", "uastc", "etc1s"]) {
+    const [left, right] = gradient(ktx2Frames[name].Procedural);
+    assert.ok(right > left + 20, `KTX2 check, ${name}: the Procedural red does not rise with u: ${left}, ${right}`);
+  }
+  // The swap: the Painted plane now draws the Procedural gradient, so KTX2 bytes (not the PNGs) give its pixels.
+  const [swapLeft, swapRight] = gradient(ktx2Frames.swapped.Painted);
+  assert.ok(swapRight > swapLeft + 20, `the swapped KTX2 images do not draw: Painted red ${swapLeft}, ${swapRight}`);
+  assert.ok(ktx2Result.swapped.Painted > 10, "the swapped KTX2 Painted plane matches the PNG frame");
+  assert.ok(ktx2Result.rgba8.Procedural < 1, `UASTC as RGBA8 differs from the PNG frame by ${ktx2Result.rgba8.Procedural}`);
+  assert.ok(ktx2Result.uastc.Procedural < 1, `UASTC frame differs from the PNG frame by ${ktx2Result.uastc.Procedural}`);
+  assert.ok(ktx2Result.etc1s.Procedural < 4, `ETC1S frame differs from the PNG frame by ${ktx2Result.etc1s.Procedural}`);
+  results.push({ ktx2: ktx2Result });
+
   // Live link (real Blender 5.2.3 session): the add-on serves a red plane, the page draws it, Blender turns it blue
   // and the same margoLive loop draws the blue one.
   if (process.env.MARGO_BLENDER) {
@@ -968,7 +1107,7 @@ try {
   results.push({ framed });
 
   for (let i = 0; i < results.length; i++) {
-    if (results[i].animated || results[i].components || results[i].baked || results[i].glass || results[i].live || results[i].framed) continue;
+    if (results[i].animated || results[i].components || results[i].baked || results[i].glass || results[i].live || results[i].framed || results[i].ktx2) continue;
     const screenshot = Buffer.from(
         results[i].screenshot.split(",")[1],
         "base64",

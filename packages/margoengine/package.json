@@ -290,6 +290,10 @@
       "types": "./dist/blender/curves.d.ts",
       "import": "./dist/blender/curves.js"
     },
+    "./blender/ktx2": {
+      "types": "./dist/blender/ktx2.d.ts",
+      "import": "./dist/blender/ktx2.js"
+    },
     "./bvh": {
       "types": "./dist/bvh.d.ts",
       "import": "./dist/bvh.js"

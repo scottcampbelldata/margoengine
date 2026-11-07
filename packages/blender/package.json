@@ -50,6 +50,10 @@
     "./curves": {
       "types": "./dist/curves.d.ts",
       "import": "./dist/curves.js"
+    },
+    "./ktx2": {
+      "types": "./dist/ktx2.d.ts",
+      "import": "./dist/ktx2.js"
     }
   },
   "scripts": {
@@ -58,9 +62,19 @@
   },
   "peerDependencies": {
     "@margoengine/core": "^1.0.0",
-    "@margoengine/gltf-pro": "^1.0.0"
+    "@margoengine/gltf-pro": "^1.0.0",
+    "@margoengine/decoders": "^1.0.0",
+    "@margoengine/exporters": "^1.0.0"
   },
   "publishConfig": {
     "access": "public"
+  },
+  "peerDependenciesMeta": {
+    "@margoengine/decoders": {
+      "optional": true
+    },
+    "@margoengine/exporters": {
+      "optional": true
+    }
   }
 }

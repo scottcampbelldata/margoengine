@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10672284,
+  "total": 10678018,
   "history": [
     {
       "date": "2026-10-24",
@@ -3788,6 +3788,12 @@
       "commit": "dbd618f4e",
       "reason": "xr/models: new optional entry, controller and hand models",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "94a48aabf",
+      "reason": "new entry @margoengine/blender/ktx2: KTX2 textures in .margo",
+      "grew": 3
     }
   ],
   "items": {
@@ -3853,7 +3859,8 @@
     "@margoengine/blender/anim": 5097,
     "@margoengine/blender/components": 15198,
     "@margoengine/blender/curves": 6480,
-    "@margoengine/blender/live": 4649,
+    "@margoengine/blender/ktx2": 5429,
+    "@margoengine/blender/live": 4953,
     "@margoengine/blender/pbr-ext": 12254,
     "@margoengine/bvh": 23398,
     "@margoengine/bvh/alpha": 16873,
@@ -4542,6 +4549,7 @@
     "leak @margoengine/blender/anim -> @margoengine/gltf-pro/model": 1,
     "leak @margoengine/blender/components -> @margoengine/gltf-pro/model": 1,
     "leak @margoengine/blender/curves -> @margoengine/gltf-pro/model": 1,
+    "leak @margoengine/blender/ktx2 -> @margoengine/gltf-pro/model": 1,
     "leak @margoengine/blender/live -> @margoengine/gltf-pro/model": 1,
     "leak @margoengine/blender/pbr-ext -> @margoengine/gltf-pro/model": 1,
     "leak @margoengine/controls -> @margoengine/bvh": 1,

@@ -1,5 +1,5 @@
 {
-  "commit": "dbd618f4e",
+  "commit": "7ff420b5f",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -252,28 +252,32 @@
     },
     "@margoengine/blender": {
       ".": {
-        "raw": 10358,
-        "gzip": 4083
+        "raw": 11251,
+        "gzip": 4301
       },
       "./anim": {
-        "raw": 12475,
-        "gzip": 4901
+        "raw": 12477,
+        "gzip": 4902
       },
       "./components": {
-        "raw": 39726,
-        "gzip": 14827
+        "raw": 40619,
+        "gzip": 15050
       },
       "./pbr-ext": {
-        "raw": 33990,
-        "gzip": 11973
+        "raw": 34883,
+        "gzip": 12192
       },
       "./live": {
-        "raw": 11271,
-        "gzip": 4473
+        "raw": 12164,
+        "gzip": 4697
       },
       "./curves": {
-        "raw": 15946,
-        "gzip": 6224
+        "raw": 16839,
+        "gzip": 6450
+      },
+      "./ktx2": {
+        "raw": 13543,
+        "gzip": 5173
       }
     },
     "@margoengine/bvh": {

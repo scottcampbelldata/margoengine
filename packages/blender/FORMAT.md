@@ -26,6 +26,7 @@ Immediately after the header, each section has four uint32 fields: `type`, `offs
 | 3 | Triangle indices; nonzero multiple of 6 bytes (UINT16) or 12 bytes (UINT32) |
 | 4 | Embedded RGBA8, non-interlaced PNG |
 | 5 | Animation data (animated files only): skin influences, inverse bind matrices, morph deltas and keyframes |
+| 8 | Embedded KTX 2.0 texture (Basis Universal), static files only; see "KTX2 textures" |
 
 ## Index format: type-3 section header flags
 
@@ -105,3 +106,7 @@ The manifest adds three arrays, and a node points at one entry with `curves`, `p
 - `pointClouds[i]`: `{section, count, attributes}`.
 - `attributes` maps a name to `{byteOffset, components}` in the type-6 `section`, `count` values of `components` floats each: `position` (3, required), `handleLeft`, `handleRight` (3, Bezier, required for a Bezier spline), `handleTypeLeft`, `handleTypeRight` (1, Blender's enum: 0 free, 1 auto, 2 vector, 3 aligned), `radius` (1, metres), `tilt` (1, radians), `weight` (1, NURBS) and, for a point cloud, `color` (4, linear RGBA of its first colour attribute). An attribute Blender does not hold is left out. Positions, handles and radii are in the object's space in Y-up metres, as mesh vertices are, and the node's TRS places them.
 - `volumes[i]`: `{section, grids}`: the type-7 section and the grid names. OpenVDB keeps Blender's Z-up object space, so a volume's node TRS is the unit scale times the Z-up to Y-up turn times the object's world matrix.
+
+## KTX2 textures
+
+A static file may hold its textures as KTX 2.0 files with Basis Universal data instead of PNG: `images[i]` is then `{section, mimeType: "image/ktx2"}` with a type-8 `section`. The identifier is checked, each texture is 2D (one layer, one face) and 1..4096 pixels a side, and the decoded budget counts it as RGBA8. `compressMargo` in `@margoengine/blender/ktx2` writes such a file from an exported one (colour slots as sRGB, normal maps as normal maps, other data as linear); `decodeMargo` refuses it by name, and `parseMargoKTX2` transcodes it on the device.
