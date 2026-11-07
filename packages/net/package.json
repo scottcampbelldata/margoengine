@@ -29,6 +29,10 @@
     "./delay": {
       "types": "./dist/delay.d.ts",
       "import": "./dist/delay.js"
+    },
+    "./fields": {
+      "types": "./dist/fields.d.ts",
+      "import": "./dist/fields.js"
     }
   },
   "files": [
@@ -38,6 +42,9 @@
   ],
   "publishConfig": {
     "access": "public"
+  },
+  "dependencies": {
+    "@margoengine/math": "^1.0.0"
   },
   "peerDependencies": {
     "@margoengine/core": "^1.0.0"

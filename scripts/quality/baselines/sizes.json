@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10479649,
+  "total": 10482551,
   "history": [
     {
       "date": "2026-10-24",
@@ -3506,6 +3506,12 @@
       "commit": "feffd3eba",
       "reason": "sky/bruneton ground albedo feedback: irradiance and ground density WGSL (+445 B), groundAlbedo option in base (+96 B)",
       "grew": 3
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "89aec9d0f",
+      "reason": "new entry @margoengine/net/fields, FieldBuffer",
+      "grew": 1
     }
   ],
   "items": {
@@ -3925,6 +3931,7 @@
     "@margoengine/navmesh/voxel": 16031,
     "@margoengine/net": 1371,
     "@margoengine/net/delay": 1551,
+    "@margoengine/net/fields": 2902,
     "@margoengine/netcode": 12865,
     "@margoengine/netcode/generate": 5154,
     "@margoengine/netcode/node": 6457,

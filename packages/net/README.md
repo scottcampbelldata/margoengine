@@ -49,6 +49,40 @@ The sender's clock and yours need no agreement: only differences of received min
 
 Call `reset()` after a reconnect. Its proof runs on seeded simulated links, not a captured network trace; [docs/limits.md](../../docs/limits.md) has the limits.
 
+## Any field
+
+`FieldBuffer` in `margoengine/net/fields` does for any fields you name what `SnapshotBuffer` does for the pose, each field blending its own way.
+
+```ts
+import {FieldBuffer} from 'margoengine/net/fields';
+const buffer = new FieldBuffer({
+  position: {type: 'hermite', velocity: 'velocity'},
+  velocity: {type: 'linear', size: 3},
+  rotation: {type: 'quaternion'},
+  scale: {type: 'linear', size: 3},
+  tint: {type: 'color'},
+  clip: {type: 'step'},
+  clipTime: {type: 'time', period: 1.2, clip: 'clip'},
+});
+buffer.push(10, {position: [0, 0, 0], velocity: [1, 0, 0], rotation: [0, 0, 0, 1], scale: [1, 1, 1], tint: [1, 0, 0], clip: 2, clipTime: 1.15});
+// A later snapshot need only hold what changed.
+buffer.push(10.1, {position: [0.1, 0, 0], tint: [0, 0, 1], clipTime: 0.05});
+const now = buffer.sample(10.05);
+console.log(now?.position, now?.tint, now?.clipTime);
+```
+
+| Type | Blend | Past the newest snapshot |
+| --- | --- | --- |
+| `linear` | Straight line. One plain number, or `size` numbers | Holds |
+| `hermite` | Cubic through both ends, using its `velocity` field (a `linear` field of the same size) | Runs on, up to `maxPrediction` |
+| `angle` | Radians, the short way round | Holds |
+| `quaternion` | Shortest-arc slerp, normalized when pushed | Holds |
+| `color` | RGB or RGBA in linear light; `space` is `'srgb'` (default) or `'linear'`, alpha straight | Holds |
+| `time` | Animation time. `period` loops it through the seam; `clip` names a `step` field it never blends across | Runs on at its last rate, up to `maxPrediction` |
+| `step` | None: changes on the next snapshot's time | Holds |
+
+The options are `capacity` (default 32) and `maxPrediction` (default 0.25 seconds). Like `SnapshotBuffer`, it ignores older or repeated times, gives the oldest snapshot before the ring begins, and reuses its output unless you pass your own from `create()`. Change the `clip` number on every restart of a clip, as a restart without one reads as a scrub back.
+
 Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/net

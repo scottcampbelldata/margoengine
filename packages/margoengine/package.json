@@ -1682,6 +1682,10 @@
       "types": "./dist/net/delay.d.ts",
       "import": "./dist/net/delay.js"
     },
+    "./net/fields": {
+      "types": "./dist/net/fields.d.ts",
+      "import": "./dist/net/fields.js"
+    },
     "./netcode": {
       "types": "./dist/netcode.d.ts",
       "import": "./dist/netcode.js"

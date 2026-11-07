@@ -4,6 +4,7 @@
 
 ### Networking
 
+- `@margoengine/net/fields`: `FieldBuffer` interpolates scale, colour in linear light, looping animation time and any other named field alongside the pose.
 - `@margoengine/net/delay`: `AdaptiveDelay` picks the render delay from measured jitter and loss, follows delay spikes, and runs the view's clock so it never jumps back.
 
 ### Physics
