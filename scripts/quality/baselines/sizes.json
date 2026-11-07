@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10312323,
+  "total": 10314515,
   "history": [
     {
       "date": "2026-10-24",
@@ -3338,6 +3338,12 @@
       "commit": "7bb5e464d",
       "reason": "new optional entry @margoengine/navmesh/tiles; shared search and pipeline chunks",
       "grew": 3
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "ef0f5d227",
+      "reason": "own physics kernel gains islands and sleeping",
+      "grew": 1
     }
   ],
   "items": {
@@ -3759,7 +3765,7 @@
     "@margoengine/oit/moments": 4197,
     "@margoengine/oit/vfx": 486,
     "@margoengine/physics": 19679,
-    "@margoengine/physics/next": 13870,
+    "@margoengine/physics/next": 16062,
     "@margoengine/physics2d": 8199,
     "@margoengine/physics2d/outline": 2524,
     "@margoengine/pixel": 4664,

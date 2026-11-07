@@ -69,7 +69,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/procedural | `.` 40, `./standin` 1, `./noise` 10, `./lsystem` 12, `./voronoi` 15, `./expression` 15 |  |  | 12,594 |
 | @margoengine/quality | `.` 27, `./warm` 3, `./ssaa` 6, `./features` 11, `./power` 8 | 4 | 2 | 3,686 |
 | @margoengine/ragdoll | `.` 8, `./powered` 4, `./getup` 6, `./hulls` 5, `./profile` 6, `./balance` 4 | 50 |  | 7,173 |
-| @margoengine/react | `.` 43, `./controls` 12, `./gltf-pro` 5, `./fbx` 2, `./animation` 3, `./environment` 8, `./html` 2, `./shadows` 4, `./sky` 2, `./text` 2, `./geometry` 6, `./materials` 6, `./post` 28, `./dof` 2, `./tonemap` 2, `./taa` 2, `./voxel` 3, `./physics` 33, `./xr` 12, `./lines` 2, `./devtools` 2, `./helpers` 8 | 46 |  | 8,193 |
+| @margoengine/react | `.` 43, `./controls` 12, `./gltf-pro` 5, `./fbx` 2, `./animation` 3, `./environment` 8, `./html` 2, `./shadows` 4, `./sky` 2, `./text` 2, `./geometry` 6, `./materials` 6, `./post` 28, `./dof` 2, `./tonemap` 2, `./taa` 2, `./voxel` 3, `./physics` 33, `./xr` 12, `./lines` 2, `./devtools` 2, `./helpers` 8 | 46 |  | 8,267 |
 | @margoengine/rigging | `.` 21, `./ik` 12, `./retarget` 10, `./hulls` 4, `./springs` 13, `./vrm` 26, `./autorig` 3, `./voxel-weights` 3, `./correctives` 9, `./transfer` 4, `./face` 10 | 47 |  | 7,631 |
 | @margoengine/road | `.` 3 |  |  | 1,027 |
 | @margoengine/save | `.` 42, `./node` 1 | 2 |  | 6,696 |
@@ -91,7 +91,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/terrain | `.` 13 | 2 |  | 12,517 |
 | @margoengine/text | `.` 35, `./rich` 8, `./msdf` 4 | 22 |  | 15,928 |
 | @margoengine/tilemap | `.` 41, `./autotile` 13, `./ldtk` 8, `./tiled` 6 | 28 |  | 7,179 |
-| @margoengine/tiles | `.` 72, `./i3dm` 3 | 24 |  | 14,136 |
+| @margoengine/tiles | `.` 72, `./i3dm` 3 | 24 |  | 14,254 |
 | @margoengine/tonemap | `.` 7 |  |  | 10,884 |
 | @margoengine/toon | `.` 2 |  |  | 1,471 |
 | @margoengine/transitions | `.` 2 |  |  | 4,201 |

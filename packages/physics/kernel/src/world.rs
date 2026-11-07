@@ -6,6 +6,8 @@ use crate::memory::Arena;
 pub const MAGIC: u32 = 0x4D50_4B31;
 /// End of a chain of rows.
 pub const NONE: u32 = u32::MAX;
+/// The kinetic energy per unit of mass of a body sliding at 0.02 m/s: v^2 / 2.
+const SLEEP_ENERGY_DEFAULT: f32 = 2e-4;
 
 /// Scalars of the world. Lives at the start of the block, so a snapshot carries it.
 #[repr(C)]
@@ -36,6 +38,13 @@ pub struct Header {
     pub free_pair: u32,
     /// Set when memory could not hold a new pair.
     pub failed: u32,
+    /// Bodies on the awake list, pairs on the active list, islands awake after the last step.
+    pub awake: u32,
+    pub active_pairs: u32,
+    pub islands: u32,
+    /// A body sleeps under this kinetic energy per unit of mass, in J/kg, held for this many seconds.
+    pub sleep_energy: f32,
+    pub sleep_time: f32,
 }
 
 const HEADER_BYTES: u32 = ((core::mem::size_of::<Header>() + 15) & !15) as u32;
@@ -78,6 +87,11 @@ impl World {
                 pair_rows: 0,
                 free_pair: NONE,
                 failed: 0,
+                awake: 0,
+                active_pairs: 0,
+                islands: 0,
+                sleep_energy: SLEEP_ENERGY_DEFAULT,
+                sleep_time: 0.5,
             });
         }
         Some(world)
@@ -94,6 +108,11 @@ impl World {
     #[inline(always)]
     pub fn header_mut(&mut self) -> &mut Header {
         unsafe { &mut *self.header_ptr() }
+    }
+    /// In test builds, every row access proves it is inside its column.
+    #[inline(always)]
+    pub fn in_rows(&self, column: usize, at: usize) {
+        debug_assert!(at < self.header().capacity[COLUMN_ROWS[column] as usize] as usize, "row {at} of column {column}");
     }
     /// Start of a column of floats.
     #[inline(always)]
@@ -175,8 +194,13 @@ impl World {
             for column in [ROTATION_W, PREVIOUS_ROTATION_W, INERTIA_FRAME_W, TARGET_ROTATION_W, GRAVITY_SCALE] {
                 *self.f(column).add(at) = 1.0;
             }
-            *self.u(FLAGS).add(at) = ALIVE | (kind & KIND);
+            *self.u(FLAGS).add(at) = ALIVE | CAN_SLEEP | (kind & KIND);
             *self.u(FIRST_COLLIDER).add(at) = NONE;
+            *self.u(AWAKE_SLOT).add(at) = NONE;
+            *self.u(ISLAND_NEXT).add(at) = NONE;
+        }
+        if kind & KIND != FIXED {
+            self.list_awake(row);
         }
         Some(row)
     }
@@ -192,7 +216,12 @@ impl World {
         if !self.body_alive(body) {
             return false;
         }
+        // Its neighbours may have rested on it.
+        self.wake(body);
         let at = body as usize;
+        if unsafe { *self.u(AWAKE_SLOT).add(at) } != NONE {
+            self.unlist_awake(body);
+        }
         let mut collider = unsafe { *self.u(FIRST_COLLIDER).add(at) };
         while collider != NONE {
             let next = unsafe { *self.u(COLLIDER_NEXT).add(collider as usize) };
@@ -234,11 +263,12 @@ impl World {
         }
     }
 
-    /// Says a body's pose was written by hand: a fixed body's box is looked at again by the next step.
+    /// Says a body's pose was written by hand: a sleeping body wakes and a fixed body's box is looked at again.
     pub fn touch_body(&mut self, body: u32) {
         if !self.body_alive(body) {
             return;
         }
+        self.wake(body);
         let mut collider = unsafe { *self.u(FIRST_COLLIDER).add(body as usize) };
         while collider != NONE {
             self.mark_pending(collider);
@@ -252,6 +282,7 @@ impl World {
         if !self.body_alive(body) {
             return None;
         }
+        self.wake(body);
         let header = self.header();
         let (free, rows, capacity) = (header.free_collider, header.collider_rows, header.capacity[1]);
         let row = if free != NONE {
@@ -306,6 +337,7 @@ impl World {
         if body == NONE || !self.body_alive(body) {
             return false;
         }
+        self.wake(body);
         unsafe {
             let next = *self.u(COLLIDER_NEXT).add(at);
             let first = self.u(FIRST_COLLIDER).add(body as usize);

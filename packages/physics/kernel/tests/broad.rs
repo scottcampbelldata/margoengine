@@ -291,6 +291,7 @@ fn a_still_body_moves_no_end_and_a_slow_one_moves_them_rarely() {
         w.step(1.0 / 60.0);
     }
     assert_eq!(w.s(FAT_MIN_X, c), start);
+    w.wake(body as u32);
     w.set_v(LINEAR_X, body, v3(0.6, 0.0, 0.0)); // 0.01 m a step, against a margin of 0.04 m each side
     let mut moves = 0;
     let mut last = w.s(FAT_MIN_X, c);

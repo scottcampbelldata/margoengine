@@ -7,6 +7,7 @@
 pub mod api;
 pub mod broad;
 pub mod integrate;
+pub mod island;
 pub mod layout;
 pub mod mass;
 pub mod math;

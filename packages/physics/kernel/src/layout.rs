@@ -12,8 +12,10 @@ pub enum Rows {
     Pair,
     /// The pair table's slots, a power of two.
     Table,
+    /// One row a body too, but dense lists: an index here is a place in a list, not a body, so freeing a row leaves them.
+    BodyList,
 }
-pub const ROW_CLASSES: usize = 5;
+pub const ROW_CLASSES: usize = 6;
 
 macro_rules! columns {
     ($($name:ident $kind:ident $rows:ident,)*) => {
@@ -101,6 +103,17 @@ columns! {
     NEXT_FREE u32 Body,
     ADDITIONAL_MASS f32 Body,
     FIRST_COLLIDER u32 Body,
+    // Sleep: seconds under the threshold, and the energy the window began with.
+    SLEEP_TIME f32 Body,
+    SLEEP_ENERGY f32 Body,
+    // A body's place in the awake list, NONE when it is not there.
+    AWAKE_SLOT u32 Body,
+    // Islands of this step: the forest, and a body's island.
+    ISLAND_PARENT u32 Body,
+    ISLAND_SIZE u32 Body,
+    ISLAND_ID u32 Body,
+    // The next body of a sleeping island's ring.
+    ISLAND_NEXT u32 Body,
     // Colliders: a shape in its body's frame.
     COLLIDER_BODY u32 Collider,
     COLLIDER_NEXT u32 Collider,
@@ -135,8 +148,6 @@ columns! {
     RANK_MAX_X u32 Collider,
     RANK_MAX_Y u32 Collider,
     RANK_MAX_Z u32 Collider,
-    // Colliders that joined in this step.
-    LIST_NEW u32 Collider,
     // The sorted lists, one per axis. An id is the collider's row shifted left, plus 1 for a box's max end.
     ENDPOINT_VALUE_X f32 Endpoint,
     ENDPOINT_VALUE_Y f32 Endpoint,
@@ -144,7 +155,9 @@ columns! {
     ENDPOINT_ID_X u32 Endpoint,
     ENDPOINT_ID_Y u32 Endpoint,
     ENDPOINT_ID_Z u32 Endpoint,
-    // Working space of one step. A collider that moved can be listed twice only when its box holds a NaN.
+    // Working space of one step: colliders that joined, colliders that moved. One can be listed as moved twice only when
+    // its box holds a NaN, so these take endpoint rows.
+    LIST_NEW u32 Endpoint,
     LIST_MOVED u32 Endpoint,
     SCRATCH_A u32 Endpoint,
     SCRATCH_B u32 Endpoint,
@@ -157,8 +170,18 @@ columns! {
     PAIR_PREVIOUS_A u32 Pair,
     PAIR_NEXT_B u32 Pair,
     PAIR_PREVIOUS_B u32 Pair,
+    // The pairs with an awake body, densely, and each pair's place in that list, NONE when it is not there.
+    ACTIVE_PAIRS u32 Pair,
+    PAIR_SLOT u32 Pair,
     // Open addressing: a pair's row plus one, zero when empty.
     PAIR_TABLE u32 Table,
+    // Awake bodies, densely.
+    AWAKE u32 BodyList,
+    // Islands of this step: bodies in runs, one run an island; each run's start, length, and whether all its bodies are ready.
+    ISLAND_BODIES u32 BodyList,
+    ISLAND_START u32 BodyList,
+    ISLAND_COUNT u32 BodyList,
+    ISLAND_READY u32 BodyList,
 }
 
 /// Rows every column of a class is padded to, so each column stays on a 16-byte boundary.
@@ -185,7 +208,7 @@ pub fn offsets(start: u32, capacity: &[u32; ROW_CLASSES]) -> Option<([u32; COLUM
 
 /// The rows of every class for `bodies` and `colliders`, keeping the pairs a world already has room for.
 pub fn capacities(bodies: u32, colliders: u32, pairs: u32) -> [u32; ROW_CLASSES] {
-    [bodies, colliders, colliders * 2, pairs, (pairs * 2).next_power_of_two()]
+    [bodies, colliders, colliders * 2, pairs, (pairs * 2).next_power_of_two(), bodies]
 }
 
 /// Most bodies and colliders one world holds.
@@ -213,6 +236,10 @@ pub const LOCK_LINEAR_X: u32 = 1 << 3;
 pub const LOCK_LINEAR: u32 = 7 << 3;
 pub const LOCK_ANGULAR_X: u32 = 1 << 6;
 pub const LOCK_ANGULAR: u32 = 7 << 6;
+/// Asleep: on no list a step walks. Fixed bodies never are.
+pub const SLEEPING: u32 = 1 << 9;
+/// May go to sleep; a body without it keeps its island awake.
+pub const CAN_SLEEP: u32 = 1 << 10;
 
 // Bits of the COLLIDER_STATE column.
 /// Its ends are in the sorted lists.

@@ -232,7 +232,7 @@ Queries take `maxDistance`, `solid`, `groups`, `exclude` (a body), `excludeSenso
 
 ## Own solver preview
 
-`@margoengine/physics/next` is Margo's own solver while it is built, a Rust kernel compiled to WebAssembly and shipped inside the package, so you need no toolchain and no peer install. Rapier stays the default until the switch; this entry is a preview and goes away then. Today it holds the kernel's world, its memory, bodies with colliders that move under forces, and the pairs of colliders that come near each other, with no contacts yet.
+`@margoengine/physics/next` is Margo's own solver while it is built, a Rust kernel compiled to WebAssembly and shipped inside the package, so you need no toolchain and no peer install. Rapier stays the default until the switch; this entry is a preview and goes away then. Today it holds the kernel's world, its memory, bodies with colliders that move under forces, the pairs of colliders that come near each other, and islands that sleep, with no contacts yet.
 
 ```ts
 import {KernelWorld, loadKernel} from 'margoengine/physics/next';
@@ -250,7 +250,23 @@ console.log(world.columns.positionY[body], world.hash); // the hash is equal in 
 
 Read views from `world.columns` each time: `reserve` and `addBody` can replace them. Each world is its own Wasm instance. Gravity defaults to `[0, -9.81, 0]` (`world.setGravity(x, y, z)`) and each step runs 4 substeps (`world.substeps`). A force in `forceX` and the columns beside it stays until you clear it and reaches every substep; an impulse in `impulseX` lands once, before the first. A body's mass, centre of mass and inertia come from its colliders; write `additionalMass` and call `world.updateMass(body)` to add weight, which is spread as the colliders are, so it scales the inertia too. A dynamic body with no mass does not fall. `world.removeBody(body)` and `world.removeCollider(box)` free their rows, and a later add takes the last one freed; a collider's row comes back after the next step.
 
-Each step finds pairs: `world.pairCount`, and `world.pairs()` for the collider rows, the lower first. A pair means two fat boxes overlap, where a fat box holds everything the step can reach plus 0.04 m, so a pair is near, not yet touching. Colliders of one body or of two fixed bodies are no pair. A step can grow the world, so read views after it, and call `world.touch(body)` after writing a fixed body's pose by hand.
+Each step finds pairs: `world.pairCount`, and `world.pairs()` for the collider rows, the lower first. A pair means two fat boxes overlap, where a fat box holds everything the step can reach plus 0.04 m, so a pair is near, not yet touching. Colliders of one body or of two fixed bodies are no pair. A step can grow the world, so read views after it, and call `world.touch(body)` after writing a fixed or sleeping body's pose by hand.
+
+Bodies that touch form an island, and fixed and kinematic bodies join none, so two piles on one floor are two islands. A body is still when its kinetic energy per unit of mass stays under `world.sleepEnergy` (0.0002 J/kg, a slide of 0.02 m/s) for `world.sleepTime` (0.5 s) and has not risen across that time; a body under a force is never still. An island sleeps when all of it is still, and costs a step nothing until a body that moves touches it. `world.setSleep(energy, time)` changes both; `world.wake(body)`, `world.sleep(body)`, `world.isSleeping(body)` and `world.setCanSleep(body, false)` work per body; `world.awakeCount` and `world.islandCount` tell you what a step walks. Writing a sleeper's columns does not wake it, so call `wake` first.
+
+```ts
+import {KernelWorld, loadKernel} from 'margoengine/physics/next';
+
+await loadKernel();
+const world = new KernelWorld();
+world.setGravity(0, 0, 0);
+const body = world.addBody('dynamic');
+world.addCollider(body, 'ball', [0.5]);
+for (let i = 0; i < 40; i++) world.step(1 / 60);
+console.log(world.isSleeping(body), world.awakeCount); // true 0
+world.wake(body);
+world.columns.linearX[body] = 2;
+```
 
 ## Limits
 

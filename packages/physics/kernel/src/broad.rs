@@ -34,10 +34,12 @@ fn pair_hash(a: u32, b: u32) -> u32 {
 impl World {
     #[inline(always)]
     pub fn uu(&self, column: usize, at: usize) -> u32 {
+        self.in_rows(column, at);
         unsafe { *self.u(column).add(at) }
     }
     #[inline(always)]
     pub fn set_u(&mut self, column: usize, at: usize, value: u32) {
+        self.in_rows(column, at);
         unsafe { *self.u(column).add(at) = value }
     }
 
@@ -178,12 +180,8 @@ impl World {
             self.header_mut().free_collider = gone;
             gone = next;
         }
-        for body in 0..self.header().rows as usize {
-            let flags = self.flags(body);
-            if flags & ALIVE == 0 || flags & KIND == FIXED {
-                continue;
-            }
-            let mut c = self.uu(FIRST_COLLIDER, body);
+        for slot in 0..self.header().awake as usize {
+            let mut c = self.uu(FIRST_COLLIDER, self.uu(AWAKE, slot) as usize);
             while c != NONE {
                 let at = c as usize;
                 if self.uu(COLLIDER_STATE, at) & IN_BROAD != 0 && self.refresh(at, dt) {
@@ -492,8 +490,12 @@ impl World {
         self.set_u(COLLIDER_PAIRS, a as usize, row);
         self.set_u(COLLIDER_PAIRS, b as usize, row);
         self.table_insert(row);
-        let header = self.header_mut();
-        header.pairs += 1;
+        self.header_mut().pairs += 1;
+        self.set_u(PAIR_SLOT, at, NONE);
+        let (body_a, body_b) = (body_a as usize, body_b as usize);
+        if self.uu(AWAKE_SLOT, body_a) != NONE || self.uu(AWAKE_SLOT, body_b) != NONE {
+            self.activate_pair(row);
+        }
     }
 
     /// Sets `row`'s link back along `collider`'s list to `previous`.
@@ -527,6 +529,7 @@ impl World {
 
     /// Removes a pair. The table closes the gap by moving back any entry the gap would cut off from its hash.
     pub fn remove_pair(&mut self, row: u32) {
+        self.deactivate_pair(row);
         let at = row as usize;
         let (a, b) = (self.uu(PAIR_A, at), self.uu(PAIR_B, at));
         self.unlink(row, a, PAIR_NEXT_A, PAIR_PREVIOUS_A);

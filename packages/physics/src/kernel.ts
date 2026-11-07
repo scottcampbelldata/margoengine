@@ -23,6 +23,13 @@ interface KernelExports extends WebAssembly.Exports {
   world_pairs(): number;
   world_pair_rows(): number;
   body_touch(body: number): void;
+  world_awake(): number;
+  world_islands(): number;
+  world_set_sleep(energy: number, time: number): void;
+  world_sleep_energy(): number;
+  world_sleep_time(): number;
+  body_wake(body: number): void;
+  body_sleep(body: number): void;
   body_add(kind: number): number;
   body_remove(body: number): number;
   body_update_mass(body: number): void;
@@ -66,6 +73,11 @@ export interface KernelColliderOptions {
   /** In kg/m^3 (default 1000, water). 0 adds no mass. */
   density?: number;
 }
+
+/** Bits of the `flags` column (kernel/src/layout.rs). */
+const ALIVE = 1,
+  SLEEPING = 1 << 9,
+  CAN_SLEEP = 1 << 10;
 
 /** The kind bits of the `flags` column (kernel/src/layout.rs). */
 const bodyKinds: Readonly<Record<KernelBodyKind, number>> = {
@@ -162,6 +174,56 @@ export class KernelWorld {
       out: [number, number][] = [];
     for (let row = 0; row < rows; row++) if (pairA[row] !== 0xffffffff) out.push([pairA[row], pairB[row]]);
     return out;
+  }
+  /** Bodies a step walks: the moving ones. Sleeping and fixed bodies are on no list, so they cost a step nothing. */
+  get awakeCount(): number {
+    return this.api.world_awake();
+  }
+  /** Groups of touching bodies still awake after the last step. Fixed and kinematic bodies join none. */
+  get islandCount(): number {
+    return this.api.world_islands();
+  }
+  /** Kinetic energy per unit of mass under which a body counts as still, in J/kg (default 0.0002, a slide of 0.02 m/s). */
+  get sleepEnergy(): number {
+    return this.api.world_sleep_energy();
+  }
+  /** Seconds a body must stay still before it may sleep (default 0.5). */
+  get sleepTime(): number {
+    return this.api.world_sleep_time();
+  }
+  /**
+   * Sets when bodies sleep: under `energy` J/kg for `time` seconds, with no energy gained across that time.
+   * @throws RangeError unless both are finite and not negative.
+   */
+  setSleep(energy: number, time: number): this {
+    if (!(energy >= 0) || !(time >= 0) || !Number.isFinite(energy) || !Number.isFinite(time))
+      throw new RangeError(`Sleep needs a finite energy and time, not negative; the defaults are 0.0002 and 0.5 (got ${energy}, ${time}).`);
+    this.api.world_set_sleep(energy, time);
+    return this;
+  }
+  /** True when the row holds a sleeping body. */
+  isSleeping(body: number): boolean {
+    const flags = this.columns.flags[body] ?? 0;
+    return (flags & ALIVE) !== 0 && (flags & SLEEPING) !== 0;
+  }
+  /**
+   * Wakes a body and every body it sleeps with. Writing a sleeper's velocity or force columns does not wake it, so call
+   * this first.
+   */
+  wake(body: number): this {
+    this.api.body_wake(body);
+    return this;
+  }
+  /** Asks a dynamic body to stop and sleep. It goes when every body it touches is ready too. */
+  sleep(body: number): this {
+    this.api.body_sleep(body);
+    return this;
+  }
+  /** Sets whether a body may sleep (default true). A body that may not keeps everything it touches awake. */
+  setCanSleep(body: number, canSleep: boolean): this {
+    const { flags } = this.columns;
+    flags[body] = canSleep ? flags[body] | CAN_SLEEP : flags[body] & ~CAN_SLEEP;
+    return this;
   }
   /** Steps taken so far. */
   get steps(): number {
@@ -281,8 +343,8 @@ export class KernelWorld {
     return this;
   }
   /**
-   * Says a body's pose was written by hand. Moving bodies are looked at every step anyway; a fixed body is not, so call
-   * this after writing the pose of one.
+   * Says a body's pose was written by hand. Moving bodies are looked at every step anyway; a fixed or sleeping body is
+   * not, so call this after writing the pose of one. A sleeper wakes.
    */
   touch(body: number): this {
     this.api.body_touch(body);

@@ -70,14 +70,17 @@ impl World {
     }
     #[inline(always)]
     pub fn s(&self, column: usize, at: usize) -> f32 {
+        self.in_rows(column, at);
         unsafe { *self.f(column).add(at) }
     }
     #[inline(always)]
     pub fn set_s(&mut self, column: usize, at: usize, value: f32) {
+        self.in_rows(column, at);
         unsafe { *self.f(column).add(at) = value }
     }
     #[inline(always)]
     pub fn flags(&self, at: usize) -> u32 {
+        self.in_rows(FLAGS, at);
         unsafe { *self.u(FLAGS).add(at) }
     }
 
@@ -88,6 +91,7 @@ impl World {
         let h = dt / substeps as f32;
         self.begin_step(dt);
         self.broad_update(dt);
+        self.update_islands(dt);
         for substep in 0..substeps {
             self.integrate_velocities(h);
             self.integrate_poses(h, substep + 1 == substeps);
@@ -97,12 +101,9 @@ impl World {
 
     /// Keeps the pose the step starts from, finds each centre of mass, lands impulses, works out kinematic velocities.
     fn begin_step(&mut self, dt: f32) {
-        for at in 0..self.header().rows as usize {
-            let flags = self.flags(at);
-            let kind = flags & KIND;
-            if flags & ALIVE == 0 || kind == FIXED {
-                continue;
-            }
+        for slot in 0..self.header().awake as usize {
+            let at = self.uu(AWAKE, slot) as usize;
+            let kind = self.flags(at) & KIND;
             let position = self.v(POSITION_X, at);
             let rotation = self.q(ROTATION_X, at);
             self.set_v(PREVIOUS_X, at, position);
@@ -129,9 +130,10 @@ impl World {
     fn integrate_velocities(&mut self, h: f32) {
         let gravity = self.header().gravity;
         let gravity = v3(gravity[0], gravity[1], gravity[2]);
-        for at in 0..self.header().rows as usize {
+        for slot in 0..self.header().awake as usize {
+            let at = self.uu(AWAKE, slot) as usize;
             let flags = self.flags(at);
-            if flags & ALIVE == 0 || flags & KIND != DYNAMIC {
+            if flags & KIND != DYNAMIC {
                 continue;
             }
             let inverse_mass = self.s(INVERSE_MASS, at);
@@ -166,12 +168,9 @@ impl World {
     /// Semi-implicit Euler's position half, with the velocities just updated, so the velocity a body reports is the one
     /// that moved it. A kinematicPosition body lands exactly on its target on the last substep.
     fn integrate_poses(&mut self, h: f32, last: bool) {
-        for at in 0..self.header().rows as usize {
-            let flags = self.flags(at);
-            let kind = flags & KIND;
-            if flags & ALIVE == 0 || kind == FIXED {
-                continue;
-            }
+        for slot in 0..self.header().awake as usize {
+            let at = self.uu(AWAKE, slot) as usize;
+            let kind = self.flags(at) & KIND;
             if last && kind == KINEMATIC_POSITION {
                 let rotation = self.q(TARGET_ROTATION_X, at);
                 let position = self.v(TARGET_X, at);

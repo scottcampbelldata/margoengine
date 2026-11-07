@@ -98,6 +98,41 @@ pub extern "C" fn world_pair_rows() -> u32 {
 pub extern "C" fn body_touch(body: u32) {
     world().touch_body(body);
 }
+/// Bodies a step walks: the moving ones, as sleepers and fixed bodies are on no list.
+#[unsafe(no_mangle)]
+pub extern "C" fn world_awake() -> u32 {
+    world().header().awake
+}
+#[unsafe(no_mangle)]
+pub extern "C" fn world_islands() -> u32 {
+    world().header().islands
+}
+#[unsafe(no_mangle)]
+pub extern "C" fn world_set_sleep(energy: f32, time: f32) {
+    let header = world().header_mut();
+    header.sleep_energy = energy;
+    header.sleep_time = time;
+}
+#[unsafe(no_mangle)]
+pub extern "C" fn world_sleep_energy() -> f32 {
+    world().header().sleep_energy
+}
+#[unsafe(no_mangle)]
+pub extern "C" fn world_sleep_time() -> f32 {
+    world().header().sleep_time
+}
+#[unsafe(no_mangle)]
+pub extern "C" fn body_wake(body: u32) {
+    if world().body_alive(body) {
+        world().wake(body);
+    }
+}
+#[unsafe(no_mangle)]
+pub extern "C" fn body_sleep(body: u32) {
+    if world().body_alive(body) {
+        world().request_sleep(body);
+    }
+}
 #[unsafe(no_mangle)]
 pub extern "C" fn body_remove(body: u32) -> u32 {
     world().remove_body(body) as u32

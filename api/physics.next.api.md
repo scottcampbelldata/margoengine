@@ -26,6 +26,15 @@ export class KernelWorld {
     get colliderCapacity(): number;
     get pairCount(): number;
     pairs(): [number, number][];
+    get awakeCount(): number;
+    get islandCount(): number;
+    get sleepEnergy(): number;
+    get sleepTime(): number;
+    setSleep(energy: number, time: number): this;
+    isSleeping(body: number): boolean;
+    wake(body: number): this;
+    sleep(body: number): this;
+    setCanSleep(body: number, canSleep: boolean): this;
     get steps(): number;
     get substeps(): number;
     set substeps(substeps: number);
