@@ -132,6 +132,7 @@ export interface EngineKernel {
   dispose(): void;
   /** `dispose()`, so `using engine = await Engine.create(canvas)` disposes it at the end of the block (where the runtime has `Symbol.dispose`). Disposal is synchronous, so there is no `Symbol.asyncDispose`. */
   [Symbol.dispose](): void;
+  /** Moves the engine to a new device. A failure leaves it, and the canvas, on the device they had. */
   rebootDevice(): Promise<void>;
   use(plugin: EnginePlugin): this;
   hasPlugin(name: string): boolean;

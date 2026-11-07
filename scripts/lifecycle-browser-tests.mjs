@@ -192,6 +192,20 @@ try {
     await t.done('C geometry during restore');
     return lost;
   });
+  await scenario('C: a restore that fails on a healthy device leaves the canvas drawing', async () => {
+    const t = await open();
+    await t.run('stage');
+    await t.run('drain');
+    const canvas = t.page.locator('#app canvas'),
+      before = await canvas.screenshot(),
+      failed = await t.run('failRestore');
+    assert.match(failed.rejected, /GPU buffer limit/, 'the restore fails on the rebuild');
+    assert.equal(failed.kept, true, 'the engine stays on its device');
+    assert.deepEqual(failed.gpuErrors, [], 'the old device reports no error');
+    assert.ok(before.equals(await canvas.screenshot()), 'the picture is the same');
+    await t.done('C failed restore');
+    return failed;
+  });
   // Every browser that gets this far is Chromium-based (the only family with WebGPU here), so it has a GPU process.
   await scenario('C: stage recovers from a GPU process crash', async () => {
     const t = await open();

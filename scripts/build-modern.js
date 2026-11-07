@@ -282,10 +282,11 @@ for (const name of packages) {
     );
   sizes[name] = { raw: Buffer.byteLength(code), gzip: gzipSync(code).length };
 }
-// 21,542 B, one over core's measured 21,541 B because the check is strict: the failed-allocation rollback took core from
-// 21,487 B, and Scott ruled on 2026-11-07 that a core bug fix may pass the cap by what it measures. The 21,504 B this
+// 21,562 B, one over core's measured 21,561 B because the check is strict. Scott ruled on 2026-11-07 that a core bug fix
+// may pass the cap by what it measures: the failed-allocation rollback took core from 21,487 B to 21,541 B, and a restore
+// that configures the canvas last, so a failed one cannot strand it on a dead device, took it to 21,561 B. The 21,504 B this
 // comment named before was a slip of arithmetic: `21 * 1024 + 512` enforced 22,016 B from 2026-10-27 until this line.
-const CORE_ONLY_CEILING = 21_542;
+const CORE_ONLY_CEILING = 21_562;
 assert.ok(sizes.core.gzip < CORE_ONLY_CEILING, `Core exceeds ${CORE_ONLY_CEILING} B gzip: ${sizes.core.gzip}`);
 assert.ok(sizes.core.gzip + sizes.gltf.gzip < 30 * 1024, 'Core + glTF exceed 30 KiB gzip');
 const { modules, ...baseSize } = await measureCoreStage();

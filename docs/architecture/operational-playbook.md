@@ -771,7 +771,7 @@ and links a slow frame to the compiles in it or the frame before, blocking calls
 
 Core treats `device.lost` and relevant frame-time DOM exceptions as loss. Recovery is deduplicated by one shared
 promise, creates a new adapter/device/renderer with the same features and samples, re-adds every geometry batch from
-CPU copies, swaps renderers, rearms the watcher, and calls every plugin's restore hook in its scene. CPU-side Wasm
+CPU copies, configures the canvas for the new device, swaps renderers, rearms the watcher, and calls every plugin's restore hook in its scene. CPU-side Wasm
 transforms and instance arrays survive. Frames skip rendering during recovery, and accessing geometry buffers reports
 a restore-specific coded error. The WebGL2 compatibility device feeds its context loss through the same path.
 
@@ -786,6 +786,13 @@ disposal run to the end and rethrow the first error. A full instance collection 
 Evidence: `tests/deep-core-allocation-failure.test.js` on a fake device; on a real one, the lifecycle scenario that sets geometry on a
 destroyed device and in the hook. Missing: `createBuffer` does not throw on a real out-of-memory, it reports later through
 `uncapturederror`, so no check exercises a true GPU out-of-memory and core does not roll one back. It surfaces as a `gpu-lost` error.
+
+Configuring the canvas is the one step of a restore with no way back, so it is the last step that can fail (2026-11-07):
+`GPURenderer.create` skips it for a restore, and `rebootDevice` calls `GPURenderer.configure` after every batch is rebuilt. A failed restore
+leaves the canvas on the old device, and one that ends after `engine.dispose()` never touches the canvas. Evidence: the lifecycle scenario
+"a restore that fails on a healthy device" compares the picture before and after and watches the old device for errors, on a real device
+whose successor reports a lowered buffer limit; `tests/deep-core-allocation-failure.test.js` runs the real `GPURenderer.create` on a fake
+device, including a `configure` that throws. Missing: a restore that fails on hardware that really has a smaller limit than the old device.
 
 Known rendering gaps:
 
@@ -989,7 +996,7 @@ count phrases against `docs/catalog.json`. It does not validate every size, timi
 cite generated records and retain evidence status. An older WebGL preview-size inconsistency demonstrates why this
 scope matters. So does the audit of 2026-11-06: the 44 B of `Engine.renderTarget` reached `README.md`, `site/index.html` and
 `docs/limits.md`, while 11 other files kept 22,815 B or older, `claims.md` among them, and a replace of the current figure had
-rewritten the dated 22,189 B of the 2026-10-30 cleanup in `docs/limits.md`. Core alone read 21,134 B there; it is 21,541 B.
+rewritten the dated 22,189 B of the 2026-10-30 cleanup in `docs/limits.md`. Core alone read 21,134 B there; it is 21,561 B.
 
 The benchmarking protocol uses AC power, a shared GPU-resource lock, a whole-machine idle gate, warmup, repeated
 measurements, between-case load checks, fixed browser/canvas conditions, and a spread validity limit. Defaults at the

@@ -1735,3 +1735,13 @@ cache set as `globalThis.fetch` from calling itself, and this commit adds the re
 - **Found outside cache:** the README check drops real files under 200 bytes as LFS pointers, so a glTF whose `.bin` is
   that small gets another model's buffer; recorded in docs/known-bugs.md with repro and cause.
 
+
+
+## Failed restore on a healthy device
+
+`docs/known-bugs.md` held an entry from reading the code, not reproduced: a failed manual `rebootDevice` could leave the canvas on a dead device. Scott's go: he will not ship a bugged core. It was true.
+
+- **Old code:** on real WebGPU (RTX A6000) the next frame failed with `[Invalid TextureView] is associated with [Device], and cannot be used with [Device]`, then `[Invalid CommandBuffer]`. On a fake device the canvas named the destroyed device, 2 of 3 new tests failed; the second bug they found: a restore ending after `engine.dispose()` unconfigured a canvas that may have a new owner.
+- **Fix:** `GPURenderer.configure` is its own step, and a restore takes it after every rebuild. The third test covers a `configure` that throws; it passed on the old code and guards the new step.
+- **Proved:** the lifecycle scenario "a restore that fails on a healthy device": the same picture byte for byte, no error on the old device. `tests/deep-core-allocation-failure.test.js` runs the real `GPURenderer.create` on a fake device. The failure is stand-in in one way: the real next device reports a lowered `maxBufferSize`, because no hardware here has a smaller limit than the one before it.
+- **Size:** core 21,541 to 21,561 B gzip, core plus stage 22,930 to 22,948 B. The cap is 21,562 B on Scott's ruling, one over the measurement.

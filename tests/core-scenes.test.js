@@ -492,6 +492,7 @@ async function claimRig() {
   const makeRenderer = () => ({
     backend: 'webgpu',
     add() {},
+    configure() {},
     remove() {},
     dispose() {},
     render(camera, lighting, batches, graph) {

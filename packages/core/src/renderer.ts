@@ -271,6 +271,7 @@ export class GPURenderer implements Renderer {
     features: GPUFeatureName[] = [],
     samples: number = sceneSamples(),
     startup: StartupOptions = {},
+    configure = true,
   ): Promise<GPURenderer> {
     const gpu = navigator.gpu,
       power = startup.powerPreference,
@@ -348,7 +349,9 @@ export class GPURenderer implements Renderer {
         );
       const context = canvas.getContext('webgpu') as GPUCanvasContext | null;
       if (!context) throw fault('unsupported', 'No WebGPU canvas', 'webgpu');
-      return new GPURenderer(canvas, device, context, format, pipeline, descriptor, culled);
+      const renderer = new GPURenderer(canvas, device, context, format, pipeline, descriptor, culled);
+      if (configure) renderer.configure();
+      return renderer;
     } catch (error) {
       device.destroy();
       throw error;
@@ -373,12 +376,6 @@ export class GPURenderer implements Renderer {
       layout: culled.getBindGroupLayout(0),
       entries: [{ binding: 0, resource: { buffer: this.uniform } }],
     });
-    try {
-      context.configure({ device, format });
-    } catch (error) {
-      this.uniform.destroy();
-      throw error;
-    }
     device.lost.then((info) => {
       this.deviceLost = true;
       if (!this.disposed) this.onLost?.(fault('failed', `GPU lost: ${info.message}`, 'gpu-lost'));
@@ -386,6 +383,11 @@ export class GPURenderer implements Renderer {
     device.addEventListener('uncapturederror', (event) => {
       this.lost = fault('failed', event.error.message, 'gpu-lost');
     });
+  }
+
+  /** Moves the canvas to this device. It has no way back, so a restore does it after everything that can fail. */
+  configure(): void {
+    this.context.configure({ device: this.device, format: this.format });
   }
 
   add(geometry: Geometry, capacity: number): void {

@@ -176,6 +176,29 @@ const lifecycle = {
     const state = await lifecycle.replacedSinceMark();
     return { ...state, added: e.stats.visible - before, meshes: meshes.length + idle.length };
   },
+  /**
+   * A restore that fails on a healthy device: the next device reports a buffer limit below the scene's geometry, so
+   * `rebootDevice` cannot rebuild on it. Resolves the rejection and what the old device said about the frames after.
+   */
+  async failRestore() {
+    const e = engine()!,
+      device = e.gpu!,
+      gpuErrors: string[] = [],
+      request = GPUAdapter.prototype.requestDevice;
+    device.addEventListener('uncapturederror', (event) => gpuErrors.push((event as GPUUncapturedErrorEvent).error.message));
+    GPUAdapter.prototype.requestDevice = async function (...args) {
+      const small = await request.apply(this, args);
+      Object.defineProperty(small, 'limits', { value: { maxBufferSize: 4 } });
+      return small;
+    };
+    const rejected = await e.rebootDevice().then(
+      () => null,
+      (error: Error) => error.message,
+    );
+    GPUAdapter.prototype.requestDevice = request;
+    await frames(10);
+    return { rejected, kept: e.gpu === device, gpuErrors };
+  },
   /** Remembers the current device, for `replacedSinceMark` after a loss the test causes from outside the page. */
   markDevice() {
     marked = engine()!.gpu;

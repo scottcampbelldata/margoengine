@@ -1,10 +1,10 @@
 {
-  "commit": "85b6c56fc",
+  "commit": "eac2236a3",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
-    "raw": 56831,
-    "gzip": 22930,
+    "raw": 56869,
+    "gzip": 22948,
     "limit": 25000
   },
   "packages": {
@@ -272,16 +272,36 @@
     },
     "@margoengine/cache": {
       ".": {
-        "raw": 5784,
-        "gzip": 2407
+        "raw": 7438,
+        "gzip": 3005
       },
       "./manager": {
-        "raw": 3961,
-        "gzip": 1729
+        "raw": 3989,
+        "gzip": 1738
       },
       "./hashed": {
         "raw": 1047,
         "gzip": 615
+      },
+      "./ranges": {
+        "raw": 9776,
+        "gzip": 3865
+      },
+      "./vary": {
+        "raw": 931,
+        "gzip": 565
+      },
+      "./eviction": {
+        "raw": 995,
+        "gzip": 537
+      },
+      "./bundles": {
+        "raw": 3583,
+        "gzip": 1627
+      },
+      "./prefetch": {
+        "raw": 4279,
+        "gzip": 1811
       }
     },
     "@margoengine/cameras": {
@@ -488,12 +508,12 @@
     },
     "@margoengine/core": {
       ".": {
-        "raw": 53008,
-        "gzip": 21541
+        "raw": 53046,
+        "gzip": 21561
       },
       "./extension": {
-        "raw": 49855,
-        "gzip": 20627
+        "raw": 49893,
+        "gzip": 20653
       }
     },
     "@margoengine/creative": {
@@ -1750,8 +1770,8 @@
         "gzip": 19105
       },
       "./next": {
-        "raw": 4141,
-        "gzip": 2649
+        "raw": 10101,
+        "gzip": 6400
       }
     },
     "@margoengine/physics2d": {

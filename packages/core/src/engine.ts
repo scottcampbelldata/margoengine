@@ -505,13 +505,15 @@ export class Engine {
     if (this.recovery) return this.recovery;
     this.recovery = (async () => {
       const previous = this.renderer,
-        next = await GPURenderer.create(this.canvas, this.features, this.exact, { powerPreference: this.power });
+        next = await GPURenderer.create(this.canvas, this.features, this.exact, { powerPreference: this.power }, false);
+      // `next` has not touched the canvas, which may have a new owner by now.
       if (this.disposed || this.disposing) {
-        next.dispose();
+        next.dispose(false);
         return;
       }
       try {
         for (const batch of this.batches.values()) next.add(batch.geometry, batch.instances.length / 24);
+        next.configure();
       } catch (error) {
         next.dispose(false);
         throw error;

@@ -12,8 +12,23 @@ const ROOMY = 1 << 30;
 globalThis.GPUBufferUsage ??= { COPY_DST: 8, INDEX: 16, VERTEX: 32, UNIFORM: 64, STORAGE: 128, INDIRECT: 256 };
 globalThis.GPUTextureUsage ??= { RENDER_ATTACHMENT: 16 };
 
+/** A canvas's one context, whichever renderer configures it: `device` is the device the canvas draws from. */
+const fakeContext = () => {
+  const context = {
+    device: null,
+    configure({ device }) {
+      context.device = device;
+    },
+    unconfigure() {
+      context.device = null;
+    },
+    getCurrentTexture: () => ({ createView: () => ({}) }),
+  };
+  return context;
+};
+
 function makeGpu() {
-  const gpu = { live: new Set(), draws: [], throwOn: 0, limits: { maxBufferSize: ROOMY } };
+  const gpu = { live: new Set(), draws: [], throwOn: 0, limits: { maxBufferSize: ROOMY }, context: fakeContext() };
   const bound = (buffer) => assert.ok(gpu.live.has(buffer), 'a draw binds a destroyed buffer');
   const pass = {
     setPipeline() {},
@@ -30,7 +45,12 @@ function makeGpu() {
     features: new Set(),
     limits: gpu.limits,
     addEventListener() {},
-    destroy() {},
+    destroyed: false,
+    destroy() {
+      device.destroyed = true;
+    },
+    createShaderModule: () => ({}),
+    createRenderPipelineAsync: async () => pipeline,
     createBindGroup: () => ({}),
     createTexture: () => ({ createView: () => ({}), destroy() {} }),
     createCommandEncoder: () => ({ finish: () => ({}), beginRenderPass: () => pass }),
@@ -56,7 +76,7 @@ function makeGpu() {
   gpu.renderer = new GPURenderer(
     { width: 4, height: 4 },
     device,
-    { configure() {}, unconfigure() {}, getCurrentTexture: () => ({ createView: () => ({}) }) },
+    gpu.context,
     'bgra8unorm',
     pipeline,
     { multisample: { count: 1 }, depthStencil: { format: 'depth32float' } },
@@ -69,6 +89,7 @@ function makeGpu() {
     return render.call(this, camera, lighting, batches, ...rest);
   };
   gpu.device = device;
+  gpu.context.device = device;
   gpu.heal = () => {
     gpu.throwOn = 0;
     gpu.limits.maxBufferSize = ROOMY;
@@ -76,11 +97,11 @@ function makeGpu() {
   return gpu;
 }
 
-const canvas = () => ({ width: 4, height: 4, clientWidth: 4, clientHeight: 4 });
+const canvas = (context) => ({ width: 4, height: 4, clientWidth: 4, clientHeight: 4, getContext: () => context });
 
 async function makeEngine(capacity = 16) {
   const gpu = makeGpu(),
-    engine = new Engine(canvas(), await TransformStore.create(capacity), gpu.renderer, undefined, null);
+    engine = new Engine(canvas(gpu.context), await TransformStore.create(capacity), gpu.renderer, undefined, null);
   engine.render({ culling: false });
   return { engine, gpu };
 }
@@ -372,6 +393,79 @@ test('a restore that cannot rebuild a batch keeps the engine on its renderer, an
   } finally {
     engine.dispose();
   }
+});
+
+/** Runs `run` with the real `GPURenderer.create` answering from `device`, as a browser's `navigator.gpu` would. */
+async function withDevice(device, run) {
+  const adapter = { features: new Set(), limits: {}, requestDevice: async () => device };
+  Object.defineProperty(navigator, 'gpu', {
+    configurable: true,
+    value: { requestAdapter: async () => adapter, getPreferredCanvasFormat: () => 'bgra8unorm' },
+  });
+  try {
+    return await run();
+  } finally {
+    delete navigator.gpu;
+  }
+}
+
+test('a restore that cannot rebuild a batch leaves the canvas on the device still drawing', async () => {
+  const { engine, gpu } = await makeEngine(),
+    next = makeGpu(),
+    retry = makeGpu(),
+    mesh = engine.createMesh().setGeometry(triangle());
+  try {
+    draw(engine, gpu);
+    next.limits.maxBufferSize = 8;
+    await withDevice(next.device, () => assert.rejects(engine.rebootDevice(), /GPU buffer limit/));
+    assert.equal(next.device.destroyed, true, 'the failed device is freed');
+    assert.equal(gpu.context.device, gpu.device, 'the canvas is on the device the engine draws with');
+    assert.deepEqual(draw(engine, gpu), [1]);
+    await withDevice(retry.device, () => engine.rebootDevice());
+    assert.equal(gpu.context.device, retry.device, 'a retry moves the canvas');
+    assert.equal(gpu.device.destroyed, true, 'and frees the old device');
+    mesh.dispose();
+  } finally {
+    engine.dispose();
+  }
+});
+
+test('a restore that cannot configure the canvas keeps the engine on its renderer', async () => {
+  const { engine, gpu } = await makeEngine(),
+    next = makeGpu(),
+    held = next.live.size,
+    configure = gpu.context.configure,
+    mesh = engine.createMesh().setGeometry(triangle());
+  try {
+    draw(engine, gpu);
+    gpu.context.configure = () => {
+      throw new TypeError('no such format');
+    };
+    await withDevice(next.device, () => assert.rejects(engine.rebootDevice(), /no such format/));
+    gpu.context.configure = configure;
+    assert.equal(engine.gpu, gpu.device);
+    assert.equal(next.device.destroyed, true, 'the failed device is freed');
+    assert.equal(next.live.size, held, 'with everything rebuilt on it');
+    assert.deepEqual(draw(engine, gpu), [1]);
+    mesh.dispose();
+  } finally {
+    engine.dispose();
+  }
+});
+
+test('a restore that ends after dispose leaves the canvas to whoever holds it now', async () => {
+  const { engine, gpu } = await makeEngine(),
+    next = makeGpu(),
+    owner = {},
+    create = next.device.createShaderModule;
+  next.device.createShaderModule = () => {
+    engine.dispose();
+    gpu.context.device = owner; // the page made another engine on this canvas
+    return create();
+  };
+  await withDevice(next.device, () => engine.rebootDevice());
+  assert.equal(next.device.destroyed, true);
+  assert.equal(gpu.context.device, owner);
 });
 
 test('one failing onDeviceRestored leaves no other plugin on the lost device', async () => {

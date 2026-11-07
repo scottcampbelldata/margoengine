@@ -23,6 +23,8 @@
 - Geometry set during a device restore reaches the right renderer: inside `onDeviceRestored` it used to get no buffers, or too small a buffer, and the next frame failed.
 - One plugin throwing in `onDeviceRestored` no longer leaves the plugins after it on the lost device, and one throwing in `dispose` no longer stops `scene.dispose()`, which left the other plugins and the scene's meshes behind. The first error still reaches you.
 - An invalid material now fails every frame until it is fixed. It failed once, then the next frame drew part of the batch with no error, and the meshes after it stayed missing even once the material was fixed.
+- A failed `engine.rebootDevice()` on a healthy device no longer kills the canvas. It moved the canvas to the new device before rebuilding the geometry there, so when the rebuild failed the canvas stayed on a destroyed device and the next frame failed WebGPU's validation. The canvas now moves last.
+- A restore that ends after `engine.dispose()` no longer unconfigures the canvas, which may belong to a new engine by then.
 - `engine.createMesh()` failing to grow the store keeps the engine's slot tables, which a later frame could read and crash on.
 - `LodInstances` and `DynamicInstances` release exactly what they took when `setup` fails.
 

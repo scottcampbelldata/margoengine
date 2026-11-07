@@ -291,16 +291,6 @@ does not own. Each entry says exactly what is needed to close it.
 
 ## Open defects
 
-### A failed manual `rebootDevice` on a healthy device can leave the canvas on the dead device
-
-- **What:** `GPURenderer`'s constructor configures the canvas for the new device. If `rebootDevice` then cannot rebuild a batch
-  on that device it disposes the new renderer and stays on the old one, whose canvas context still names the destroyed device.
-- **Repro:** read from the code, not reproduced: call `engine.rebootDevice()` with the old device healthy, on an adapter
-  whose `maxBufferSize` is below a geometry the old device held. After a real device loss it does no harm: the old renderer
-  draws nothing and a retry configures the canvas again.
-- **Cause:** configuring the canvas is the one step of a restore with no way back: `Renderer` has no call to configure it again.
-- **Needed to close:** a way to reconfigure the old renderer, or the rebuild moved ahead of the configure, with a test.
-
 ### A Python script test can fail to spawn on Windows, about once in thousands of runs
 
 - **What:** `packages/exporters/tests/precision-native.test.js` failed in `verify` with `spawnSync python3 EINVAL`, on
@@ -941,6 +931,8 @@ diagnostic). Their causes and the fixes that landed are in `bench/parity-causes.
 
 | Bug | Cause | Fix | Regression test |
 | --- | --- | --- | --- |
+| A failed `rebootDevice` on a healthy device left the canvas on a destroyed device: the next frame failed WebGPU's validation (`[Invalid TextureView] is associated with [Device], and cannot be used with [Device]`) | `GPURenderer`'s constructor configured the canvas, the one step of a restore with no way back, before the batches were rebuilt; when one could not be, the new device was destroyed and the old renderer kept drawing into a canvas that named it | `GPURenderer.configure` is its own step, and a restore takes it after every rebuild | `tests/deep-core-allocation-failure.test.js`, the scenario "a restore that fails on a healthy device" in `scripts/lifecycle-browser-tests.mjs` |
+| A restore that ended after `engine.dispose()` unconfigured the canvas, which a new engine could hold by then | The new renderer configured the canvas and its disposal unconfigured it | It has not touched the canvas at that point, and leaves it alone | `tests/deep-core-allocation-failure.test.js` |
 | A failed `addViewer` left the camera on near, far, target and position set for a model that was gone, and ended any fit still animating | The camera was framed before the steps that can fail, and the undo list cannot cover it: a fit in flight is private to `Camera`, and `dispose` must leave the camera to the visitor | Framing is the last step, and a failure inside it restores those four fields; every import runs alongside the load, so nothing after the load waits | `packages/stage/tests/viewer.test.js`, `packages/stage/tests/viewer-missing-package.test.js`, `scripts/stage-viewer-gpu-check.js` |
 | A part that threw while `addViewer` cleaned up replaced the real error, and in `viewer.dispose()` too it left every part after it | The undo loop was plain, and it ran inside the catch | Every step runs. The failure reaches the caller and a cleanup error goes to `engine.onError`; `viewer.dispose()` throws the first and reports the rest | `packages/stage/tests/viewer.test.js` |
 | `addViewer` rejected a long lens with `Bounds exceed far: raise camera.far`, a value it had just set and the caller cannot change | Far was 50 model sizes whatever the lens, and the fit stands back further than that below about a 1.3 degree `fov` | Far covers the distance the lens needs, and stays 50 model sizes for every other lens | `packages/stage/tests/viewer.test.js` |

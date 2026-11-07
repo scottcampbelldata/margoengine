@@ -61,6 +61,9 @@ old one. WebGPU reports a real out-of-memory later, as a device error on the nex
 `scene.dispose()` and `engine.dispose()` finish even when a plugin's `dispose` throws, then throw the first error.
 `rebootDevice()` tells every plugin through `onDeviceRestored` the same way.
 
+A `rebootDevice()` that fails leaves the engine and the canvas on the device they had, so on a healthy device the page
+keeps drawing and you can try again. The canvas moves to the new device only once every geometry is rebuilt on it.
+
 ## Camera for one render
 
 `engine.render({camera: anotherCamera, delta: 0})` draws the implicit scene through that camera. The camera supplied to `Engine.create` remains `engine.camera`; its fit animation does not advance during the alternate render. Before returning, core restores the primary camera's frustum, visible instances and batches, including when a pass throws. `engine.stats` keeps the counts of the frame it drew: an app that passes its own camera every frame reads what is on screen, package draws included. A pick changes neither count. Plugins receive one pre-update callback per call. A later ordinary render or pick uses the primary camera.

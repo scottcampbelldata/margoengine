@@ -129,6 +129,12 @@ next frame threw a `TypeError` and meshes already drawing stopped. Cost: core 21
 gzip. The core cap moved to 21,542 B on Scott's ruling, one over the measurement; the 21,504 B it was documented at was never what the
 build enforced (`21 * 1024 + 512` is 22,016 B), so the enforced cap went down. It adds no feature.
 
+**Bug fix, a failed restore on a healthy device (Scott, 2026-11-07, "im not shipping s bugged core"):** `rebootDevice` configures the
+canvas after every rebuild, in place of `GPURenderer`'s constructor doing it first. No package can hold it: `GPURenderer` and
+`rebootDevice` are core, and the order of the steps is inside them. Failure prevented: after a failed restore the canvas named a destroyed
+device, and every frame failed WebGPU's validation on a device that had been healthy. Cost: core 21,541 -> 21,561 B gzip, core + stage
+22,930 -> 22,948 B gzip. The core cap moved to 21,562 B on the same ruling, one over the measurement. It adds no feature.
+
 ## Names exported by more than one package
 
 A name declared and exported by two packages must mean the same thing, or be renamed. Decisions:
