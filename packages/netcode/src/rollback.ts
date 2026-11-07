@@ -23,7 +23,7 @@ export interface RollbackOptions<Input> {
   maxRollback?: number;
   /** Exchange a checksum every this many confirmed frames, 0 for never (default 30). */
   checksumEvery?: number;
-  /** How many of the newest inputs each message repeats, 1 to 32 (default 8). */
+  /** How many of the newest inputs each message repeats, 1 to 32 (default 8); every 8th goes back to the oldest not acknowledged. */
   redundancy?: number;
   /** The clock in milliseconds for {@link RollbackSession.update} (default `performance.now`). */
   now?: () => number;
@@ -67,7 +67,9 @@ export interface RollbackStats {
 
 const INPUTS = 32,
   CHECKSUM = 33,
-  MAX_INPUTS = 32;
+  MAX_INPUTS = 32,
+  // Every this many messages to a peer go back to the oldest input it has not acknowledged, however old.
+  RESEND_EVERY = 8;
 const checksumOf = (bytes: Uint8Array): number => {
   // FNV-1a over raw bytes (the schema hash's function runs over text).
   let hash = 0x811c9dc5;
@@ -83,6 +85,7 @@ interface Remote<Input> {
   frame: number;
   advantage: number;
   checksums: Map<number, number>;
+  sent: number;
 }
 
 /**
@@ -165,6 +168,7 @@ export class RollbackSession<State, Input> {
         frame: 0,
         advantage: 0,
         checksums: new Map(),
+        sent: 0,
       };
       this.remotes.set(player, remote);
       connection.onmessage = (data) => this.receive(player, remote, data);
@@ -360,7 +364,9 @@ export class RollbackSession<State, Input> {
     const game = this.game,
       last = this.frameNumber + 1 + this.delay;
     for (const remote of this.remotes.values()) {
-      const first = Math.max(remote.ack + 1, last - this.redundancy + 1, this.delay + 1);
+      // After an outage the gap can be older than the newest inputs: without going back for it both peers stall for good.
+      const newest = ++remote.sent % RESEND_EVERY ? last - this.redundancy + 1 : 0,
+        first = Math.max(remote.ack + 1, newest, this.delay + 1);
       const w = new Writer(64);
       w.u8(INPUTS);
       w.varint(this.frameNumber);
@@ -369,7 +375,7 @@ export class RollbackSession<State, Input> {
       w.varint(remote.confirmed);
       w.varint(first);
       const inputs: Uint8Array[] = [];
-      for (let f = first; f <= last; f++) {
+      for (let f = first; f <= last && inputs.length < MAX_INPUTS; f++) {
         const input = this.own.get(f);
         if (input === undefined) break;
         inputs.push(game.schema.encode(game.inputType, input));

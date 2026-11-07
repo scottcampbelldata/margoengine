@@ -4,6 +4,7 @@
 
 ### Networking
 
+- `RollbackSession` no longer stalls for good after an outage longer than `redundancy`: every 8th message goes back to the oldest input not acknowledged.
 - `@margoengine/netcode/extrapolate`: `Extrapolator` keeps entities moving when the next snapshot is late, for up to `maxTicks`, and blends to the truth when it comes. `GameClient` gains `previousSnapshot`.
 - `@margoengine/netcode/signal`: `SignalServer`, `SignalClient` and `PeerMesh` let peers of a room find each other and make WebRTC links, proved with three real Chromium pages.
 - `@margoengine/netcode/rooms`: `reconnectWindow`, `onDrop`, `onReconnect`, `room.dropped`, `JoinedRoom.reconnectionToken` and `RoomsClient.reconnect` let a dropped player come back to the same room and seat. The join reply now carries the token, so a rooms client and server must be the same version.

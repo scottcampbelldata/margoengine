@@ -181,3 +181,38 @@ test('a silent peer stalls the session after maxRollback frames instead of runni
     (e) => e.code === 'disposed',
   );
 });
+
+test('rollback: peers come back from an outage longer than the redundancy', () => {
+  const network = new LoopbackNetwork({ latency: 30, seed: 9 }),
+    [ab, ba] = network.pair();
+  let down = false;
+  for (const link of [ab, ba]) {
+    const send = link.send.bind(link);
+    link.send = (data, channel) => {
+      if (!down || channel !== 'unreliable') send(data, channel);
+    };
+  }
+  const session = (local, other, link) =>
+    new RollbackSession(game, {
+      players: [1, 2],
+      local,
+      peers: new Map([[other, link]]),
+      input: (frame) => ({ x: Math.sin(frame / 9 + local), y: 0, boost: false }),
+      now: () => network.time,
+    });
+  const sessions = [session(1, 2, ab), session(2, 1, ba)];
+  const run = (ms) => {
+    for (const end = network.time + ms; network.time < end; ) {
+      network.advance(1000 / 60);
+      for (const s of sessions) s.update();
+    }
+  };
+  run(1000);
+  down = true;
+  run(1000);
+  const during = Math.min(...sessions.map((s) => s.confirmed));
+  down = false;
+  run(2000);
+  const after = Math.min(...sessions.map((s) => s.confirmed));
+  assert.ok(after > during + 60, `confirmed ${during} during the outage and ${after} after it`);
+});
