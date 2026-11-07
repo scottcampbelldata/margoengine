@@ -210,7 +210,8 @@ export function indexedDBStorage(options: IndexedDBStorageOptions = {}): SaveSto
   ): Promise<T> => {
     const db = await open(signal);
     signal?.throwIfAborted();
-    const tx = db.transaction(storeName, mode);
+    // Strict: the transaction completes once the data is on the disk, not when the system has it (Indexed Database 3.0, 2.7).
+    const tx = db.transaction(storeName, mode, { durability: mode === 'readwrite' ? 'strict' : 'default' });
     const done = new Promise<void>((resolve, reject) => {
       tx.oncomplete = () => resolve();
       tx.onabort = tx.onerror = () =>

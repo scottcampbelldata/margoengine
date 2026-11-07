@@ -25,6 +25,8 @@ export function fakeIndexedDB() {
   const later = (fn) => setTimeout(fn, 0);
   const factory = {
     failWrites: false,
+    /** The durability option of each readwrite transaction, in order. */
+    durabilities: [],
     open(name) {
       const req = { result: null, error: null, onsuccess: null, onerror: null, onupgradeneeded: null };
       later(() => {
@@ -34,7 +36,8 @@ export function fakeIndexedDB() {
         const db = {
           objectStoreNames: { contains: (s) => stores.has(s) },
           createObjectStore: (s) => stores.set(s, new Map()),
-          transaction(storeName, mode) {
+          transaction(storeName, mode, options) {
+            if (mode === 'readwrite') factory.durabilities.push(options?.durability);
             const data = stores.get(storeName);
             const pending = new Map(data);
             const tx = { error: null, oncomplete: null, onabort: null, onerror: null, aborted: false };

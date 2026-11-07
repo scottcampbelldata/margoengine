@@ -543,3 +543,11 @@ test('fuzz: mutated and random input never crashes validateSave; parseSave and l
     }
   }
 });
+
+test('IndexedDB writes ask for strict durability, so a finished save has reached the disk', async () => {
+  const idb = fakeIndexedDB(),
+    storage = indexedDBStorage({ factory: idb });
+  await storage.write('a', new Uint8Array([1]));
+  await storage.delete('a');
+  assert.deepEqual(idb.durabilities, ['strict', 'strict']);
+});
