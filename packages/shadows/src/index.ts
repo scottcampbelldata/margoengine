@@ -79,7 +79,7 @@ export interface ShadowOptions {
   resolution?: number | readonly [number, number];
   /**
    * Farthest shadowed distance from the camera, world units, > 0. Default 500; when unset and every caster is a core
-   * mesh, the cascades also tighten to the casters' bounds.
+   * mesh, or a node that draws nothing, the cascades also tighten to the casters' bounds.
    */
   distance?: number;
   /** Cascade split blend, 0 (uniform) to 1 (logarithmic). Default 0.5. */
@@ -898,7 +898,8 @@ export class Shadows implements EnginePlugin {
     let core = this.options.distance === undefined && this.sources.length > 0;
     for (let i = 0; core && i < this.sources.length; i++) {
       const source = this.sources[i].source;
-      core = 'id' in source && !!source.geometry;
+      // A node with no geometry and no model behind it (a glTF group) draws nothing, so it changes no bounds.
+      core = 'id' in source && (!!source.geometry || !meshTriangles(source));
     }
     if (!core) return fit;
     // ponytail: one pass over every core mesh per frame; cache on store revisions if 100k-part scenes leave distance unset.

@@ -40,14 +40,17 @@ test('without a distance, core-mesh casters fit the cascades to their bounding s
     };
   const fitted = new Shadows({ resolution: 64 }),
     fixed = new Shadows({ resolution: 64, distance: 500 }),
-    custom = new Shadows({ resolution: 64 });
+    custom = new Shadows({ resolution: 64 }),
+    grouped = new Shadows({ resolution: 64 });
   try {
-    for (const shadows of [fitted, fixed, custom]) {
+    for (const shadows of [fitted, fixed, custom, grouped]) {
       shadows.setup(engine);
       shadows.add(floor);
       shadows.add(cube);
     }
     custom.add({ drawShadow() {} });
+    // A glTF model's group nodes are meshes with no geometry: stage's addShadows adds every mesh, and each one stopped the fit.
+    grouped.add(engine.createMesh());
     // Floor sphere r = 0.5 * hypot(6, 0.2, 6) about the floor centre; camera 6.3 m from the scene centre: far is
     // distance + radius rounded up to a quarter octave.
     const far = split(fitted);
@@ -55,6 +58,7 @@ test('without a distance, core-mesh casters fit the cascades to their bounding s
     assert.equal(far, Math.fround(2 ** (Math.round(Math.log2(far) * 4) / 4)), 'quarter-octave step');
     assert.equal(split(fixed), 500);
     assert.equal(split(custom), 500);
+    assert.equal(split(grouped), far, 'a node that draws nothing leaves the fit alone');
     floor.setScale([100, 1, 100]);
     assert.equal(split(fitted), 500, 'a scene larger than 500 m keeps the default');
   } finally {
