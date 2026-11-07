@@ -3269,31 +3269,31 @@
     },
     {
       "date": "2026-11-07",
-      "commit": "f60d3b4a",
+      "commit": "b3fe7bdd",
       "reason": "cache/ranges: RangeCache stores HTTP byte ranges as blocks for offline streaming, own entry, root unchanged",
       "grew": 1
     },
     {
       "date": "2026-11-07",
-      "commit": "eed6e15f",
+      "commit": "8c775f68",
       "reason": "cache/vary: varyKeys splits AssetCache entries by Vary and credentials, own entry; root gains the keys hook within its budget",
       "grew": 1
     },
     {
       "date": "2026-11-07",
-      "commit": "2000d95a",
+      "commit": "6af1a5f2",
       "reason": "cache/eviction: evictionIndex keeps a last-use index and totals, own entry; the root gains the keys and eviction hooks (2,778 B)",
       "grew": 2
     },
     {
       "date": "2026-11-07",
-      "commit": "ab65ccb1",
+      "commit": "65eb78e3",
       "reason": "cache/bundles: AssetBundles loads versioned bundles with dependencies over HashedAssets, own entry, root unchanged",
       "grew": 1
     },
     {
       "date": "2026-11-07",
-      "commit": "a1ced6fc",
+      "commit": "40acf109",
       "reason": "cache/prefetch: Prefetcher fetches by priority in idle time, throttle caps bandwidth, own entry, root unchanged",
       "grew": 1
     }

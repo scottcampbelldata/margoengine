@@ -1685,39 +1685,53 @@ Scott asked for a second static report to be proved or disproved: `addViewer` ch
 ## Batch 46: cache
 
 Six jobs for `@margoengine/cache` on the Beelink (lane H, work list 3), each a new optional entry or option. Every
-proof runs in Node on stand-ins: an in-memory IndexedDB (`packages/cache/test/support.js`) and stand-in HTTP servers;
-job 1 also runs gltf-pro's real streaming code through the cache. Nothing is timed.
+job is proved in Node on stand-ins: an in-memory IndexedDB (`packages/cache/test/support.js`) and stand-in HTTP servers.
+The range cache (job 1) and the eviction index (job 3) are also proved in a real browser, with its own IndexedDB, fetch
+and offline mode, on a real Khronos file (`packages/cache/scripts/test-browser.js`). Nothing is timed.
 
 | # | Job | Status | Commit | Entry | Claim |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Range request caching | DONE | `eed6e15f` | `/ranges` | LIM-320 |
-| 2 | Vary and request-header keys | DONE | `2000d95a` | `/vary`, root `keys` option | LIM-321 |
-| 3 | Eviction index | DONE | `ab65ccb1` | `/eviction` (suggested `/index`), root `eviction` option | LIM-322 |
-| 4 | Asset bundles with dependencies | DONE | `12d4ffe1` | `/bundles` | LIM-323 |
-| 5 | Expires and Age | DONE | `a1ced6fc` | root `freshness` option | LIM-337 |
-| 6 | Prioritized prefetch | DONE | this commit | `/prefetch` | LIM-338 |
+| 1 | Range request caching | DONE | `8c775f68` | `/ranges` | LIM-337 |
+| 2 | Vary and request-header keys | DONE | `6af1a5f2` | `/vary`, root `keys` option | LIM-338 |
+| 3 | Eviction index | DONE | `65eb78e3` | `/eviction` (suggested `/index`), root `eviction` option | LIM-339 |
+| 4 | Asset bundles with dependencies | DONE | `86c457a4` | `/bundles` | LIM-340 |
+| 5 | Expires and Age | DONE | `40acf109` | root `freshness` option | LIM-341 |
+| 6 | Prioritized prefetch | DONE | `50b34275` | `/prefetch` | LIM-342 |
+
+Follow-ups in the same batch: `e4d3092c` makes the LoadingManager README example run as written, `28968273` stops a
+cache set as `globalThis.fetch` from calling itself, and this commit adds the real-browser check.
 
 - **Bugs fixed:** the background fill of an AssetCache range miss dropped the request's headers, so a negotiated or
   authenticated file was stored from a bare request (`packages/cache/test/vary.test.js`, the revalidation and range
   fill test); AssetCache ignored `Age`, so a file already old on arrival was used as fresh for its whole `max-age`
   (`packages/cache/test/freshness.test.js`). The tests' in-memory IndexedDB committed every transaction's whole
   snapshot, read-only ones too, so overlapping transactions could undo each other's writes; it now commits only the
-  keys a transaction wrote (`packages/cache/test/ranges.test.js` runs reads and writes side by side).
+  keys a transaction wrote (`packages/cache/test/ranges.test.js` runs reads and writes side by side). AssetCache,
+  RangeCache, LoadingManager and Prefetcher read `globalThis.fetch` at each request, so `globalThis.fetch = cache.fetch`
+  made a cache call itself without end and the request never settled; found by the real-browser check, fixed by keeping
+  the `globalThis.fetch` of construction (`packages/cache/test/global-fetch.test.js`). The LoadingManager README example
+  fetched from example.com, which serves nothing and sends no CORS header; it now loads same-origin files and runs in
+  check:readme-run, off the known list.
 - **Proved:** gltf-pro's `GLTFStream` loads a 1 MB+ GLB through `RangeCache` in ranges, then offline from the stored
-  blocks with one failed revalidation and no other request. With 2,000 stored files, 30 writes read 120 records with
+  blocks with one failed revalidation and no other request. In Chromium 156 and Edge 157 it reads the real SheenChair.glb
+  (4,125,648 B) in 10 ranges, again offline after a reload with no request reaching the server, and revalidates with one
+  conditional one-byte request in a new session. With 2,000 stored files, on the stand-in and on the browser's IndexedDB alike, 30 writes read 120 records with
   `evictionIndex` against 60,030 without it, evicting the same files. Two languages, two tokens and two users are kept
   apart by `varyKeys`, and no token is stored. Bundles download each shared file once and only changed files on a
   release. Expires, Age and Date follow RFC 9111 section 4.2. Prefetch order, idle start, concurrency, cancel, hold
   and pause are checked step by step; `throttle` takes no less than the time its rate allows.
 - **Root:** the `@margoengine/cache` root grew from 2,407 B to 2,991 B gzip for the `keys`, `eviction` and
   `freshness` options; every new feature's logic is in its own entry. Core and stage are untouched.
-- **Limits:** no job has run in a real browser or service worker yet; IndexedDB, `requestIdleCallback` and servers are
-  stand-ins. `throttle` paces body reads, not the socket. Rows in docs/limits.md, Platform.
+- **Limits:** jobs 2, 4, 5 and 6 have run in Node only, on stand-ins (IndexedDB, `requestIdleCallback`, servers); no
+  job has run in a service worker. `throttle` paces body reads, not the socket. Rows in docs/limits.md, Platform.
 - **Sources:** RFC 9110, RFC 9111, the WHATWG Fetch Standard, Indexed Database API 3.0 and the idle callback spec,
   recorded as CA1 to CA6 in `docs/clean-room.md`.
 - **Slips:** `npx biome lint` was run once in the worktree, against the no-npx rule; later runs used the local
   `node_modules/.bin`. The suggested `/index` entry became `/eviction`, since `margoengine/cache/index` reads as the
   root. Not pushed: landing was not open, so `npm run verify` and the push wait for the manager's landing.
 - **Gate:** lint, hygiene, the cache tests, check:readmes, check:parity, the size gate, and check:readme-run for the
-  cache examples on the Radeon 680M under the GPU lock (9 of 10 ran; the one failure is the known manager example).
+  cache examples on the Radeon 680M under the GPU lock (10 of 10 run since the manager example's fix), and
+  `npm run test:browser --workspace @margoengine/cache` in Chromium and Edge.
+- **Found outside cache:** the README check drops real files under 200 bytes as LFS pointers, so a glTF whose `.bin` is
+  that small gets another model's buffer; recorded in docs/known-bugs.md with repro and cause.
 
