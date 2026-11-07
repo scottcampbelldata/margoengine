@@ -1017,7 +1017,6 @@ function asset(
         ...(subsets.length ? { subsets } : {}),
       });
     }
-  if (!meshes.length) fail('no renderable meshes');
   for (const hook of scenes)
     hook.scene!({
       specs,
@@ -1035,6 +1034,9 @@ function asset(
   for (const source of sources)
     for (const name of [source.path, source.roughness?.path, source.metallic?.path])
       if (name && !entries.has(name)) fail('missing texture ' + name);
+  // A stage of cameras or lights alone is something to open; the entries that read them have run by now.
+  if (!meshes.length && !doc.nodes.some((node) => node.camera !== undefined || node.extensions?.KHR_lights_punctual))
+    fail('no renderable meshes');
   return new USDAsset(doc, buffers, meshes, sources, entries, issues);
 }
 function read(input: string | BinaryInput, entries: Map<string, Uint8Array>, id: string, options: USDOptions): USDAsset {

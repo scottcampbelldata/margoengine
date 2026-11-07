@@ -119,3 +119,26 @@ engine.start();
 USD's schema default is `catmullClark`, so a polygon model that forgets `subdivisionScheme = "none"` is smoothed: that is what the file asks for. Refined meshes get normals of their own, as the schema says, and an edge that stays sharp keeps a hard normal. Primvars, UVs, display colours, material subsets, joint influences and blend shape offsets follow the refined faces; a point keeps its 8 strongest influences. Without this entry a subdivided mesh loads as its cage, with an issue.
 
 `loop` takes triangles only; other faces refine as `catmullClark`, with an issue. `triangleSubdivisionRule = "smooth"` refines by the standard rule, with an issue. A face-varying value that repeats at a point joins the faces it touches: equal numbers count as one value, indexed or not.
+
+## Lights and cameras
+
+`lights()` from `margoengine/usdz/lux` reads `DistantLight`, `SphereLight`, `RectLight`, `DiskLight`, `CylinderLight` and `Camera` prims into the glTF document, so a lit stage opens lit: they load as `model.lights` and `model.cameras`, and `applyGLTFLights` and `viewGLTFCamera` from `margoengine/gltf-pro` use them. A `.usdz` also needs `composition()`; `loadUSDFiles` composes by itself. A stage holding only cameras or lights opens too.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {applyGLTFLights,viewGLTFCamera} from 'margoengine/gltf-pro';
+import {loadUSDZ} from 'margoengine/usdz';
+import {composition} from 'margoengine/usdz/compose';
+import {lights} from 'margoengine/usdz/lux';
+
+const canvas=document.createElement('canvas');document.body.append(canvas);
+const engine=await Engine.create(canvas,{backend:'webgpu',capacity:100000});
+const room=await loadUSDZ(engine,'/room.usdz',{extensions:[composition(),lights()]});
+applyGLTFLights(room); // the sun; pass {clustered} from margoengine/clustered for lamps
+if(room.cameras.length)viewGLTFCamera(room,0);
+engine.start();
+```
+
+`lights()` has no options. A light's luminance is `intensity * 2^exposure * color`, with `colorTemperature` when enabled, by the LightAPI schema. A lamp gives that luminance times the area it shows along its axis, in candela, and `normalize` divides by its whole surface; sizes count the transform stack's scale. A distant light gives lux from the disc `angle` fills, and with `normalize` the luminance itself. `shaping:cone:angle` under 90 makes a spot, with `shaping:cone:softness` setting its inner angle. A glTF colour stops at 1, so a stronger black body colour moves into `intensity`.
+
+A dome light has no punctual form. It is listed in `asset.issues`, and `domeLight(asset)` gives its `path`, `file`, `intensity` and `color` for an `Environment` from `margoengine/environment`. `blackbody(kelvin)` is exported too.

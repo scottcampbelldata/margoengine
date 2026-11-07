@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10175111,
+  "total": 10177332,
   "history": [
     {
       "date": "2026-10-24",
@@ -3146,6 +3146,12 @@
       "commit": "6b8029dff",
       "reason": "usdz: new entry /subdiv, and the shape hook the base reader calls",
       "grew": 4
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "63916e9a7",
+      "reason": "usdz lights and cameras entry",
+      "grew": 1
     }
   ],
   "items": {
@@ -3744,6 +3750,7 @@
     "@margoengine/usdz dist/workers/usdz.js": 102634,
     "@margoengine/usdz/anim": 6436,
     "@margoengine/usdz/compose": 18064,
+    "@margoengine/usdz/lux": 2221,
     "@margoengine/usdz/skel": 7987,
     "@margoengine/usdz/subdiv": 4929,
     "@margoengine/usdz/worker": 13046,

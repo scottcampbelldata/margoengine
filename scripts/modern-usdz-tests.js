@@ -272,6 +272,62 @@ def Mesh "Late"
     }
   }, await readFile('packages/usdz/tests/fixtures/real/usd-wg/test_assets/schemaTests/usdGeom/meshes/subdiv_catmullClark/subdiv_catmullClark.usda', 'utf8'));
   assert.deepEqual(refined, { differs: true, gpuErrors: [] });
+  // A lit stage draws lit: its sun moves the engine's light, its camera moves the view, and both change the picture.
+  const lit = await page.evaluate(async (stage) => {
+    const { Engine } = await import('/packages/core/dist/index.js'),
+      { engineRuntime } = await import('/packages/core/dist/extension.js'),
+      { parseUSDFiles } = await import('/packages/usdz/dist/compose.js'),
+      { lights } = await import('/packages/usdz/dist/lux.js'),
+      { applyGLTFLights, viewGLTFCamera } = await import('/packages/gltf-pro/dist/index.js');
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 256;
+    canvas.style.cssText = 'width:256px;height:256px';
+    document.body.append(canvas);
+    const engine = await Engine.create(canvas, { backend: 'webgpu', capacity: 64, camera: { position: [1.5, 1.5, 3], target: [0, 0, 0] } }),
+      gpuErrors = [];
+    engineRuntime(engine).gpu.addEventListener('uncapturederror', (event) => gpuErrors.push(event.error.message));
+    try {
+      const asset = await parseUSDFiles('stage.usda', () => new TextEncoder().encode(stage), { extensions: [lights()] }),
+        model = await asset.create(engine),
+        frame = () => {
+          engine.render({ culling: false });
+          return canvas.toDataURL();
+        },
+        plain = frame();
+      applyGLTFLights(model);
+      const sunlit = frame();
+      viewGLTFCamera(model, 0);
+      const seen = frame();
+      model.destroy();
+      return { sun: plain !== sunlit, camera: sunlit !== seen, gpuErrors };
+    } finally {
+      engine.dispose();
+      canvas.remove();
+    }
+  }, `#usda 1.0
+(
+    metersPerUnit = 1
+    upAxis = "Y"
+)
+def Mesh "M"
+{
+    uniform token subdivisionScheme = "none"
+    int[] faceVertexCounts = [4]
+    int[] faceVertexIndices = [0, 1, 2, 3]
+    point3f[] points = [(-1, -1, 0), (1, -1, 0), (1, 1, 0), (-1, 1, 0)]
+}
+def DistantLight "Sun"
+{
+    double3 xformOp:rotateXYZ = (-30, 40, 0)
+    uniform token[] xformOpOrder = ["xformOp:rotateXYZ"]
+    color3f inputs:color = (1, 0.4, 0.2)
+}
+def Camera "Shot"
+{
+    double3 xformOp:translate = (0.5, 0, 4)
+    uniform token[] xformOpOrder = ["xformOp:translate"]
+}`);
+  assert.deepEqual(lit, { sun: true, camera: true, gpuErrors: [] });
   assert.deepEqual(errors, []);
   await writeFile('test-results/modern-usdz.json', JSON.stringify({ hardware: browser.hardware, ...result }, null, 2));
   console.log('USDZ texture packing, real WebGPU pixels, bitmap teardown and file-picker demo passed');

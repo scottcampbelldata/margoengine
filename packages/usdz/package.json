@@ -50,6 +50,10 @@
     "./subdiv": {
       "types": "./dist/subdiv.d.ts",
       "import": "./dist/subdiv.js"
+    },
+    "./lux": {
+      "types": "./dist/lux.d.ts",
+      "import": "./dist/lux.js"
     }
   },
   "scripts": {
