@@ -1,5 +1,5 @@
 {
-  "commit": "e2b1acafa",
+  "commit": "71ce2fac1",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -974,8 +974,8 @@
     },
     "@margoengine/gltf-pro": {
       ".": {
-        "raw": 201606,
-        "gzip": 64095
+        "raw": 201729,
+        "gzip": 64139
       },
       "./asset": {
         "raw": 17549,
@@ -998,8 +998,8 @@
         "gzip": 20663
       },
       "./progressive": {
-        "raw": 226584,
-        "gzip": 72959
+        "raw": 226707,
+        "gzip": 73006
       },
       "./splats": {
         "raw": 3750,
@@ -1026,8 +1026,8 @@
         "gzip": 568
       },
       "./worker": {
-        "raw": 203552,
-        "gzip": 64577
+        "raw": 203675,
+        "gzip": 64622
       },
       "dist/workers/gltf.js": {
         "raw": 72940,
@@ -1616,12 +1616,16 @@
     },
     "@margoengine/oit": {
       ".": {
-        "raw": 7054,
-        "gzip": 2950
+        "raw": 7209,
+        "gzip": 3010
       },
       "./meshes": {
         "raw": 769,
         "gzip": 491
+      },
+      "./exact": {
+        "raw": 10906,
+        "gzip": 4281
       }
     },
     "@margoengine/physics": {
@@ -2414,8 +2418,8 @@
         "gzip": 10077
       },
       "dist/workers/usdz.js": {
-        "raw": 217365,
-        "gzip": 70785
+        "raw": 217488,
+        "gzip": 70830
       }
     },
     "@margoengine/vfx": {
@@ -2740,9 +2744,9 @@
       "brotli": 5879
     },
     "packages/gltf-pro/dist/index.js": {
-      "raw": 1402033,
-      "gzip": 566994,
-      "brotli": 463054
+      "raw": 1402156,
+      "gzip": 567451,
+      "brotli": 463187
     },
     "packages/staging/dist/index.js": {
       "raw": 21901,
@@ -2855,9 +2859,9 @@
       "brotli": 54090
     },
     "packages/usdz/dist/workers/usdz.js": {
-      "raw": 214830,
-      "gzip": 70580,
-      "brotli": 61025
+      "raw": 214953,
+      "gzip": 70631,
+      "brotli": 61000
     },
     "packages/loaders/dist/workers/usd.js": {
       "raw": 21469,

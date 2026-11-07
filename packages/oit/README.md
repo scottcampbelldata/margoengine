@@ -3,7 +3,8 @@
 Import `margoengine/oit` from the `margoengine` package, or `@margoengine/oit` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Order-independent transparency for glTF Pro BLEND primitives and `@margoengine/materials` transparent meshes:
-weighted blended OIT (McGuire and Bavoil, JCGT 2013). Overlapping transparent parts (a translucent CAD housing over
+weighted blended OIT (McGuire and Bavoil, JCGT 2013) by default, or exact per-pixel layers from
+[`margoengine/oit/exact`](#exact-layers-exactoit). Overlapping transparent parts (a translucent CAD housing over
 translucent and opaque gears) no longer pop as the camera orbits, because nothing depends on draw order any more. Core
 meshes are opaque; `addMesh` from `margoengine/oit/meshes` draws one see-through. WebGPU only.
 
@@ -23,7 +24,7 @@ oit.add(createMesh(engine, housingGeometry, new Material({color: '#9cc3e6', opac
 ```
 
 Models that are not added keep glTF Pro's per-primitive back-to-front sorting, unchanged: the package hooks in through
-glTF Pro's declared transparency hook (`PBRModel.setTransparency`, glTF Pro README "Transparency hook"), not text
+glTF Pro's declared transparency hook (`PBRModel.setTransparency`, documented on `PBRTransparency`), not text
 patches, and without it every GPU call is identical (`examples/package-benchmarks/proofs/oit-detached.proof.js`).
 Size: 2,210 B min+gzip (`examples/package-benchmarks/results/entry-sizes.json`); the hook adds 323 B to glTF Pro's
 root entry. Core and the stage are unchanged.
@@ -44,6 +45,63 @@ restore();                     // back to the opaque mesh, the same frame as bef
 
 The geometry and material are copied once, so a later `setMaterial` or `setGeometry` needs a new `addMesh`. While
 see-through `mesh.geometry` is null: the mesh casts no shadow and `engine.pick` does not see it, as for every transparent surface.
+
+## Exact layers (`ExactOIT`)
+
+`margoengine/oit/exact` stores every transparent fragment in a per-pixel list, keeps the nearest `layers` of each pixel
+and blends them in true depth order. The result is what sorted blending would give if every pixel were sorted on its
+own, so surfaces that cut through each other come out right, where the weighted pass above only approximates.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {ExactOIT} from 'margoengine/oit/exact';
+import {Material, createMesh} from 'margoengine/materials';
+import {boxGeometry} from 'margoengine/geometry';
+const engine = await Engine.create(document.querySelector('canvas')!);
+
+const oit = ExactOIT.attach(engine, {layers: 8});          // the default; 1 to 32
+oit.add(createMesh(engine, boxGeometry(1, 1, 1), new Material({color: '#9cc3e6', opacity: 0.4, transparent: true, doubleSided: true})));
+engine.render();
+console.log(oit.stats);                                    // {fragments, dropped, capacity, limit}, a few frames behind
+```
+
+`add`, `addMesh`, the frame graph place and `dispose` work as for `OIT`. Options, all fixed at construction:
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `layers` | 8 | Nearest layers kept per pixel, 1 to 32. Farther ones are left out, so a pixel with more loses the far end. Fragments behind opaque surfaces sort last and do not take a place from visible ones. |
+| `pool` | 2 | Starting list size in fragments per screen pixel. The list grows by itself, see below. |
+| `order` | 8 | Frame graph order, as for `OIT`. |
+
+How it runs: the transparent draws append to the list in a pass with no colour targets (four halves of colour and
+alpha, depth, the coverage mask and the link: 16 bytes a fragment). A compute pass sorts each pixel's list and cuts it
+to `layers`. The resolve then draws one full-screen triangle per layer, far to near, with normal blending. A fragment
+shader that writes storage runs ahead of the depth test, and core's scene depth cannot be sampled, so hidden fragments
+reach the list too; each resolve layer writes `frag_depth` and leaves the depth test to the hardware, so hidden layers
+drop out per sample, and the stored coverage mask keeps MSAA edges. Coplanar layers order by their colour bits, the same
+on every frame.
+
+Measured on an RTX A6000 (`npm run test:gpu --workspace packages/oit`), the same four unlit planes as the table below:
+0.66 of 255 from blending worked out by hand, at 1x and 4x MSAA; the weighted pass gives more than 3 times that. Adding
+the models in another order changes no pixel, and two sheets that cross swap at the line. Time is not measured yet.
+
+Limits:
+
+- The list holds what one storage binding allows: 8,388,608 fragments on a default device (128 MiB). That is every
+  transparent fragment of the frame, hidden ones included: 4 screen layers at 1920x1080, 1 at 3840x2160. A short list
+  drops fragments for the few frames until its read-back makes it grow, and it never shrinks; past `limit` it keeps
+  dropping, which `stats.dropped` shows and which looks like missing layers, not wrong blending.
+- Memory: 16 bytes per list fragment (the default `pool` starts at 32 bytes per pixel, about 63 MiB at 1920x1080) plus 4
+  bytes per pixel.
+- Colour is held in half floats: at most 65,504, 11 bits of precision.
+- It needs storage buffers in fragment shaders, so WebGPU only, and not compatibility mode: `setup` throws
+  `'unsupported'` there; use `OIT`.
+- Transmission, custom blending and depth overrides keep the sorted path, as for `OIT`.
+
+## Hashed alpha
+
+Noise-based transparency that writes depth, for hair and foliage under TAA, shadows and SSAO, is a material feature,
+not a pass: `alphaHash()` from `margoengine/materials/alpha-hash` (materials README, "Hashed alpha").
 
 ## How it works
 

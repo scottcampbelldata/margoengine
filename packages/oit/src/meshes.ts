@@ -1,6 +1,6 @@
 import type { EngineKernel, Mesh } from '@margoengine/core';
 import { Material, createMesh } from '@margoengine/materials';
-import type { OIT } from './index.js';
+import type { TransparentPass } from './pass.js';
 
 /** `addMesh` settings. */
 export interface OITMeshOptions {
@@ -9,14 +9,14 @@ export interface OITMeshOptions {
 }
 
 /**
- * Draws a core mesh see-through in an {@link OIT} pass. Core meshes are opaque, so its colour, roughness, metalness, sides
+ * Draws a core mesh see-through in an order-independent pass (`OIT`, `ExactOIT`). Core meshes are opaque, so its colour, roughness, metalness, sides
  * and geometry are copied at this call to a transparent materials mesh that follows its transforms and `visible`. The
  * core mesh gives up its geometry (no opaque draw, no shadow, no pick) until the returned function restores it.
  * @throws TypeError for a mesh without geometry.
  * @throws RangeError for an `opacity` outside 0 to 1.
  */
 export function addMesh(
-  oit: OIT,
+  oit: TransparentPass,
   engine: EngineKernel,
   mesh: Mesh,
   { opacity = 0.5 }: OITMeshOptions = {},

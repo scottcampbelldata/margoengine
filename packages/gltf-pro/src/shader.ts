@@ -226,6 +226,8 @@ export interface PBRLighting {
  * primitives (no transmission, no `renderState`) leave the beauty pass and draw only when the owner calls
  * `model.draw(c, 'transparent', ...)`, into `begin()`'s pass with these `targets`, depth tested (greater-equal) and not
  * written. Their fragment returns `margoTransparent(color, i)` instead of `color` (the beauty colour, alpha included).
+ * `targets` may be empty for a hook that writes storage: `MargoTransparent` then still needs one member. Declarations
+ * holding `var<private> margoCoverage:u32` get the fragment's sample coverage in it before the call.
  */
 export interface PBRTransparency {
   /** Module-scope WGSL: `struct MargoTransparent` (one output per target), `fn margoTransparent(color:vec4f,i:Out)->MargoTransparent`, its bindings in `group`. Return the same string on steady frames. */
@@ -272,10 +274,12 @@ export function transparentPBR(code: string, declarations: string): string {
       'failed',
       'PBR transparency hook point missing or used twice; keep exactly one hook marker in the shader source',
     );
+  // Declarations holding `var<private> margoCoverage:u32` receive the fragment's sample coverage there first.
+  const coverage = declarations.includes('var<private> margoCoverage:u32');
   out =
     declarations +
     code.replace(head, 'fn margoShade(i:Out,front:bool)->vec4f {') +
-    '\n@fragment fn transparent(i:Out,@builtin(front_facing) front:bool)->MargoTransparent {return margoTransparent(margoShade(i,front),i);}\n';
+    `\n@fragment fn transparent(i:Out,@builtin(front_facing) front:bool${coverage ? ',@builtin(sample_mask) mask:u32' : ''})->MargoTransparent {${coverage ? 'margoCoverage=mask;' : ''}return margoTransparent(margoShade(i,front),i);}\n`;
   if (!cache) {
     if (through.size >= 8) through.clear();
     through.set(declarations, (cache = new Map()));

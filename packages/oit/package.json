@@ -1,7 +1,7 @@
 {
   "name": "@margoengine/oit",
   "version": "1.0.0",
-  "description": "Weighted blended order-independent transparency for gltf-pro BLEND primitives and materials transparent meshes: no popping between overlapping transparent parts.",
+  "description": "Order-independent transparency for gltf-pro BLEND primitives and materials transparent meshes: weighted blending, or exact per-pixel layer lists, with no popping between overlapping transparent parts.",
   "keywords": [
     "margoengine",
     "webgpu",
@@ -29,6 +29,10 @@
     "./meshes": {
       "types": "./dist/meshes.d.ts",
       "import": "./dist/meshes.js"
+    },
+    "./exact": {
+      "types": "./dist/exact.d.ts",
+      "import": "./dist/exact.js"
     }
   },
   "files": [
@@ -51,7 +55,7 @@
     "build": "node ../../scripts/build-optional.js oit",
     "test": "npm run build && node --test test/*.test.js",
     "prepack": "npm run build",
-    "test:gpu": "cd ../.. && node packages/oit/test/gpu/meshes-check.mjs"
+    "test:gpu": "cd ../.. && node packages/oit/test/gpu/meshes-check.mjs && node packages/oit/test/gpu/exact-check.mjs"
   },
   "peerDependenciesMeta": {
     "@margoengine/materials": {

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 9114591,
+  "total": 9119128,
   "history": [
     {
       "date": "2026-10-24",
@@ -2900,6 +2900,12 @@
       "commit": "e2b1acafa",
       "reason": "automatic rig from mesh: new entry @margoengine/rigging/autorig",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "71ce2fac1",
+      "reason": "oit/exact entry, TransparentPass shared base, gltf-pro coverage hook",
+      "grew": 1
     }
   ],
   "items": {
@@ -3281,6 +3287,7 @@
     "@margoengine/netcode/webrtc": 998,
     "@margoengine/netcode/websocket": 1076,
     "@margoengine/oit": 3199,
+    "@margoengine/oit/exact": 4537,
     "@margoengine/oit/meshes": 747,
     "@margoengine/physics": 16756,
     "@margoengine/physics2d": 7920,

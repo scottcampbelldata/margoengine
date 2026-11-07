@@ -4,28 +4,60 @@
 
 ```ts
 import { EngineKernel } from "@margoengine/core";
-import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
+import { Engine, EnginePlugin, FrameGraph, PassContext } from "@margoengine/core/extension";
 import { PBRModel, PBRTransparency } from "@margoengine/gltf-pro";
 
-export class OIT implements EnginePlugin, PBRTransparency {
-    readonly name: string;
-    readonly order: number;
+export class OIT extends TransparentPass {
     readonly targets: readonly GPUColorTargetState[];
     static attach(engine: EngineKernel, options?: OITOptions): OIT;
     constructor({ order, depthScale }?: OITOptions);
-    add(model: PBRModel): () => void;
     setup(engine: Engine): void;
-    registerPasses(graph: FrameGraph): void;
     declarations(group: number): string;
     bindings(): GPUBindGroupEntry[];
     begin(): GPURenderPassEncoder;
-    onDeviceRestored(engine: Engine): void;
-    dispose(): void;
-    [Symbol.dispose]: () => void;
+    protected render(c: Context): void;
+    protected release(): void;
+    protected freeDevice(): void;
 }
 
 export interface OITOptions {
     order?: number;
     depthScale?: number;
+}
+
+// Not exported from this entry, but used by the exports above:
+
+type Context = Extract<PassContext, {
+    backend: 'webgpu';
+}>;
+
+type Context = Extract<PassContext, {
+    backend: 'webgpu';
+}>;
+
+abstract class TransparentPass implements EnginePlugin, PBRTransparency {
+    readonly name: string;
+    readonly order: number;
+    abstract readonly targets: readonly GPUColorTargetState[];
+    protected engine?: Engine;
+    protected device?: GPUDevice;
+    protected disposed: boolean;
+    protected readonly models: Map<PBRModel, () => void>;
+    protected context?: Context;
+    protected pass?: GPURenderPassEncoder;
+    constructor(order: number);
+    add(model: PBRModel): () => void;
+    setup(engine: Engine): void;
+    registerPasses(graph: FrameGraph): void;
+    abstract declarations(group: number): string;
+    abstract bindings(): GPUBindGroupEntry[];
+    abstract begin(): GPURenderPassEncoder;
+    protected abstract render(c: Context): void;
+    protected abstract release(): void;
+    protected abstract freeDevice(): void;
+    protected drawModels(c: Context): boolean;
+    onDeviceRestored(engine: Engine): void;
+    dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 ```

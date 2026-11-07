@@ -2,18 +2,11 @@
 // Weighted blended order-independent transparency (McGuire and Bavoil, JCGT 2013) for gltf-pro BLEND primitives and
 // @margoengine/materials transparent meshes, through gltf-pro's transparency hook (no shader text search).
 import type { EngineKernel } from '@margoengine/core';
-import {
-  engineRuntime,
-  type Engine,
-  type EnginePlugin,
-  type FrameGraph,
-  type PassContext,
-} from '@margoengine/core/extension';
-import type { PBRModel, PBRTransparency } from '@margoengine/gltf-pro';
-import { MargoError } from '@margoengine/math/errors';
+import { engineRuntime, type Engine, type PassContext } from '@margoengine/core/extension';
 import { applyView } from '../../shared/view-rect.js';
 import { currentFrame, retire, writeUniform } from '../../shared/frame-resources.js';
 import { groupCode } from '../../shared/pass.js';
+import { TransparentPass } from './pass.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; RENDER_ATTACHMENT: number };
@@ -50,11 +43,11 @@ const composite = /* wgsl */ `
   let q=vec2i(p.xy); let a=textureLoad(accumMap,q,0); return vec4f(a.rgb/max(a.a,1e-5),1-textureLoad(revealMap,q,0).r);
 }
 `;
+
 const over: GPUBlendState = {
   color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha' },
   alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' },
 };
-let serial = 0;
 
 /**
  * Order-independent transparency: `oit.add(model)` draws the model's BLEND primitives (gltf-pro) or a transparent
@@ -65,9 +58,7 @@ let serial = 0;
  * @throws MargoError `'unsupported'` on a WebGL engine, `'disposed'` after `dispose()`, `'state'` from `add` before
  * `attach`.
  */
-export class OIT implements EnginePlugin, PBRTransparency {
-  readonly name = 'oit:' + serial++;
-  readonly order: number;
+export class OIT extends TransparentPass {
   readonly targets: readonly GPUColorTargetState[] = [
     {
       format: 'rgba16float',
@@ -82,11 +73,6 @@ export class OIT implements EnginePlugin, PBRTransparency {
     },
   ];
   private readonly depthScale?: number;
-  private engine?: Engine;
-  /** Device of the current GPU resources, so a release after device restoration retires them on their own device. */
-  private device?: GPUDevice;
-  private disposed = false;
-  private readonly models = new Map<PBRModel, () => void>();
   private readonly code = new Map<number, string>();
   private readonly values = new Float32Array(4);
   private uniform?: GPUBuffer;
@@ -97,8 +83,6 @@ export class OIT implements EnginePlugin, PBRTransparency {
   private size = '';
   private readonly pipelines = new Map<string, GPURenderPipeline>();
   private readonly groups = new Map<GPURenderPipeline, GPUBindGroup>();
-  private context?: Context;
-  private pass?: GPURenderPassEncoder;
 
   static attach(engine: EngineKernel, options?: OITOptions): OIT {
     const value = new OIT(options);
@@ -106,52 +90,14 @@ export class OIT implements EnginePlugin, PBRTransparency {
     return value;
   }
   constructor({ order = 8, depthScale }: OITOptions = {}) {
-    if (
-      !Number.isFinite(order) ||
-      order <= 0 ||
-      (depthScale !== undefined && !(depthScale > 0 && Number.isFinite(depthScale)))
-    )
+    if (depthScale !== undefined && !(depthScale > 0 && Number.isFinite(depthScale)))
       throw new RangeError('OIT order must be > 0 and depthScale a positive number');
-    this.order = order;
+    super(order);
     this.depthScale = depthScale;
   }
-  /** Draws a gltf-pro model's BLEND primitives (or a transparent materials mesh) order-independently. Returns a remover. */
-  add(model: PBRModel): () => void {
-    if (this.disposed || !this.engine)
-      throw new MargoError(
-        this.disposed ? 'disposed' : 'state',
-        this.disposed ? 'OIT is disposed; create a new OIT' : 'OIT.add needs OIT.attach(engine) first',
-      );
-    let release = this.models.get(model);
-    if (!release) {
-      const restore = model.setTransparency(this),
-        forget = model.onDispose(() => this.models.delete(model));
-      release = () => {
-        if (this.models.get(model) === release) {
-          this.models.delete(model);
-          forget();
-          restore();
-        }
-      };
-      this.models.set(model, release);
-    }
-    return release;
-  }
-  setup(engine: Engine): void {
-    if (this.disposed) throw new MargoError('disposed', 'OIT is disposed; create a new OIT');
-    if (!engine.gpu) throw new MargoError('unsupported', 'OIT requires WebGPU; use a WebGPU engine');
-    this.engine = engine;
-    this.device = engine.gpu;
-    this.uniform = engine.gpu.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
-  }
-  registerPasses(graph: FrameGraph): void {
-    graph.add({
-      name: this.name,
-      order: this.order,
-      execute: (c) => {
-        if (c.backend === 'webgpu') this.render(c);
-      },
-    });
+  override setup(engine: Engine): void {
+    super.setup(engine);
+    this.uniform = engine.gpu!.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
   }
   /** @internal gltf-pro transparency hook. */
   declarations(group: number): string {
@@ -190,7 +136,7 @@ export class OIT implements EnginePlugin, PBRTransparency {
     applyView(pass, c);
     return pass;
   }
-  private render(c: Context): void {
+  protected render(c: Context): void {
     // This view draws in the frame: what it releases waits while another view's commands still need it.
     currentFrame(c.device, c.view ?? c);
     if (this.disposed || !this.models.size) return;
@@ -218,22 +164,11 @@ export class OIT implements EnginePlugin, PBRTransparency {
     this.values[0] = 1 / (scale || 1);
     // A second view in the same frame gets its own copy of the uniform.
     this.binding = writeUniform(device, this.uniform!, this.values, c.view ?? c);
-    this.context = c;
-    this.pass = undefined;
     try {
-      for (const model of this.models.keys()) model.draw(c, 'transparent', c.color, c.depth);
-    } catch (error) {
-      (this.pass as GPURenderPassEncoder | undefined)?.end();
-      this.pass = undefined;
-      throw error;
+      if (!this.drawModels(c)) return;
     } finally {
-      this.context = undefined;
       this.binding = undefined;
     }
-    const pass = this.pass as GPURenderPassEncoder | undefined;
-    if (!pass) return;
-    pass.end();
-    this.pass = undefined;
     const key = c.format + samples;
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
@@ -271,32 +206,17 @@ export class OIT implements EnginePlugin, PBRTransparency {
     out.draw(3);
     out.end();
   }
-  private release(): void {
+  protected release(): void {
     for (const t of this.textures) retire(this.device!, t);
     this.textures = [];
     this.views = [];
     this.size = '';
     this.groups.clear();
   }
-  onDeviceRestored(engine: Engine): void {
-    this.release();
-    this.pipelines.clear();
-    retire(this.device!, this.uniform);
-    this.setup(engine);
-  }
-  /** Restores sorted blending on every added model and frees the targets. */
-  dispose(): void {
-    if (this.disposed) return;
-    this.disposed = true;
-    for (const release of [...this.models.values()]) release();
+  protected freeDevice(): void {
     this.release();
     this.pipelines.clear();
     retire(this.device!, this.uniform);
     this.uniform = undefined;
-    this.engine?.removePlugin(this.name);
-  }
-  declare [Symbol.dispose]: () => void;
-  [(Symbol.dispose ?? Symbol()) as symbol](): void {
-    this.dispose();
   }
 }

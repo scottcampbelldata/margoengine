@@ -7,6 +7,7 @@ import { extendedMaterials } from '../../gltf-pro/dist/extended.js';
 import { Material, Texture, createMesh } from '../../materials/dist/index.js';
 import { OIT } from '../dist/index.js';
 import { addMesh } from '../dist/meshes.js';
+import { ExactOIT } from '../dist/exact.js';
 import { animatedTriangle } from '../../../tests/support/gltf-pro-fixture.js';
 
 // Opaque, BLEND, BLEND + transmission (keeps the sorted path) and BLEND + clearcoat (physical variant).
@@ -266,4 +267,40 @@ test('two views in one frame keep their own depth scale', async () => {
 test('addMesh refuses a mesh without geometry and an opacity outside 0 to 1', () => {
   assert.throws(() => addMesh({}, {}, { geometry: null }), /setGeometry/);
   assert.throws(() => addMesh({}, {}, { geometry: {} }, { opacity: 2 }), /opacity/);
+});
+
+test('ExactOIT: BLEND primitives go to the list pass with no colour targets, then one sort and one draw per layer over the scene', async () => {
+  const { engine, model, view, frame, id } = await scene(4),
+    oit = ExactOIT.attach(engine, { layers: 5 });
+  assert.throws(() => new ExactOIT().add(model), /attach/);
+  oit.add(model);
+  const log = frame(0),
+    list = passes(log);
+  const [fill, resolve] = list.slice(2);
+  assert.equal(fill.label, 'oit:list');
+  assert.deepEqual(fill.colorAttachments, []);
+  const readOnly = { view: id(view.c.depth), depthReadOnly: true, stencilReadOnly: true };
+  assert.deepEqual(fill.depthStencilAttachment, readOnly, 'scene depth, read only');
+  assert.equal(resolve.label, 'oit:resolve');
+  assert.deepEqual(resolve.colorAttachments, [{ view: id(view.c.color), loadOp: 'load', storeOp: 'store' }]);
+  assert.deepEqual(resolve.depthStencilAttachment, readOnly, 'the hardware test drops hidden layers');
+  const transparent = of(log, 'renderPipeline')
+    .map((e) => e[2])
+    .filter((p) => p.fragment.entryPoint === 'transparent');
+  assert.ok(transparent.length);
+  for (const p of transparent) assert.deepEqual(p.fragment.targets, []);
+  const [layerDraw] = of(log, 'pass.draw');
+  assert.deepEqual(layerDraw.slice(1, 3), [3, 5], 'one instance per kept layer');
+  oit.dispose();
+  assert.equal(
+    passes(frame(1)).some((p) => p.label?.startsWith('oit:')),
+    false,
+    'dispose restores sorted blending',
+  );
+});
+
+test('ExactOIT refuses settings it cannot keep', () => {
+  for (const layers of [0, 33, 1.5, Number.NaN]) assert.throws(() => new ExactOIT({ layers }), RangeError);
+  for (const pool of [0, -1, Number.POSITIVE_INFINITY]) assert.throws(() => new ExactOIT({ pool }), RangeError);
+  assert.throws(() => new ExactOIT({ order: 0 }), RangeError);
 });
