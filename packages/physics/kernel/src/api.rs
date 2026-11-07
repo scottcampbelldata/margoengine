@@ -13,8 +13,8 @@ fn world() -> &'static mut World {
 
 /// Creates this instance's one world; 0 when it cannot.
 #[unsafe(no_mangle)]
-pub extern "C" fn world_new(bodies: u32) -> u32 {
-    match World::new(bodies) {
+pub extern "C" fn world_new(bodies: u32, colliders: u32) -> u32 {
+    match World::new(bodies, colliders) {
         Some(created) => {
             unsafe { *core::ptr::addr_of_mut!(WORLD) = Some(created) };
             1
@@ -43,8 +43,8 @@ pub extern "C" fn world_columns() -> u32 {
     COLUMNS as u32
 }
 #[unsafe(no_mangle)]
-pub extern "C" fn world_reserve(bodies: u32) -> u32 {
-    world().reserve(bodies) as u32
+pub extern "C" fn world_reserve(bodies: u32, colliders: u32) -> u32 {
+    world().reserve(bodies, colliders) as u32
 }
 #[unsafe(no_mangle)]
 pub extern "C" fn world_hash() -> u32 {
@@ -78,4 +78,26 @@ pub extern "C" fn body_add(kind: u32) -> i32 {
 #[unsafe(no_mangle)]
 pub extern "C" fn world_step(dt: f32) {
     world().step(dt);
+}
+#[unsafe(no_mangle)]
+pub extern "C" fn body_remove(body: u32) -> u32 {
+    world().remove_body(body) as u32
+}
+/// Recomputes a body's mass after its additional mass changed.
+#[unsafe(no_mangle)]
+pub extern "C" fn body_update_mass(body: u32) {
+    if world().body_alive(body) {
+        world().update_mass(body);
+    }
+}
+/// A new collider on `body`, or -1 when the rows are used up or the body is gone.
+#[unsafe(no_mangle)]
+pub extern "C" fn collider_add(
+    body: u32, shape: u32, a: f32, b: f32, c: f32, x: f32, y: f32, z: f32, qx: f32, qy: f32, qz: f32, qw: f32, density: f32,
+) -> i32 {
+    world().add_collider(body, shape, [a, b, c], [x, y, z], [qx, qy, qz, qw], density).map_or(-1, |row| row as i32)
+}
+#[unsafe(no_mangle)]
+pub extern "C" fn collider_remove(collider: u32) -> u32 {
+    world().remove_collider(collider) as u32
 }

@@ -5,26 +5,39 @@
 ```ts
 export type KernelBodyKind = 'fixed' | 'dynamic' | 'kinematicPosition' | 'kinematicVelocity';
 
+export interface KernelColliderOptions {
+    position?: readonly [number, number, number];
+    rotation?: readonly [number, number, number, number];
+    density?: number;
+}
+
 export type KernelColumn = Float32Array | Uint32Array;
 
 export interface KernelLoadOptions {
     signal?: AbortSignal;
 }
 
+export type KernelShape = 'ball' | 'box' | 'capsule';
+
 export class KernelWorld {
     readonly columns: Record<string, KernelColumn>;
-    constructor(bodies?: number);
+    constructor(bodies?: number, colliders?: number);
     get capacity(): number;
+    get colliderCapacity(): number;
     get steps(): number;
     get substeps(): number;
     set substeps(substeps: number);
     get gravity(): [number, number, number];
     setGravity(x: number, y: number, z: number): this;
     addBody(kind: KernelBodyKind): number;
+    removeBody(body: number): boolean;
+    addCollider(body: number, shape: KernelShape, size: readonly number[], options?: KernelColliderOptions): number;
+    removeCollider(collider: number): boolean;
+    updateMass(body: number): this;
     step(dt: number): this;
     get bytes(): number;
     get hash(): number;
-    reserve(bodies: number): this;
+    reserve(bodies: number, colliders?: number): this;
 }
 
 export function loadKernel({ signal }?: KernelLoadOptions): Promise<void>;

@@ -19,7 +19,7 @@ fn dynamic(world: &mut World, inverse_mass: f32, moments: [f32; 3]) -> usize {
     at
 }
 fn world(g: [f32; 3], substeps: u32) -> World {
-    let mut w = World::new(16).unwrap();
+    let mut w = World::new(16, 16).unwrap();
     w.header_mut().gravity = g;
     w.header_mut().substeps = substeps;
     w

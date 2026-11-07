@@ -134,8 +134,11 @@ impl World {
             }
             let inverse_mass = self.s(INVERSE_MASS, at);
             let mut linear = self.v(LINEAR_X, at);
-            linear = linear.add(gravity.scale(self.s(GRAVITY_SCALE, at) * h));
-            linear = linear.add(self.v(FORCE_X, at).scale(inverse_mass * h));
+            // A dynamic body with no mass yet has nothing for gravity to act on.
+            if inverse_mass > 0.0 {
+                linear = linear.add(gravity.scale(self.s(GRAVITY_SCALE, at) * h));
+                linear = linear.add(self.v(FORCE_X, at).scale(inverse_mass * h));
+            }
 
             let frame = self.q(ROTATION_X, at).mul(self.q(INERTIA_FRAME_X, at));
             let turn = apply_inverse_inertia(self.v(INVERSE_INERTIA_X, at), frame, self.v(TORQUE_X, at));

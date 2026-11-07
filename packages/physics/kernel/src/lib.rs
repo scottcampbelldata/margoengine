@@ -7,6 +7,7 @@
 pub mod api;
 pub mod integrate;
 pub mod layout;
+pub mod mass;
 pub mod math;
 pub mod memory;
 pub mod world;

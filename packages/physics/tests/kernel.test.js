@@ -38,7 +38,9 @@ test('reserve keeps rows at their index, and views are rebuilt', async () => {
   assert.equal(world.columns.flags[3], 9);
   assert.equal(world.columns.positionY[4], 0);
   assert.equal(world.columns.positionY.length, 100_000);
-  assert.ok(world.bytes > 100_000 * 4 * Object.keys(world.columns).length - 1);
+  const bodyColumns = Object.values(world.columns).filter((column) => column.length === 100_000).length;
+  assert.ok(bodyColumns > 50);
+  assert.ok(world.bytes >= 100_000 * 4 * bodyColumns);
   assert.throws(() => world.reserve(2 ** 23), RangeError);
 });
 

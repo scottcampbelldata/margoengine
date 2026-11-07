@@ -6,8 +6,9 @@
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Rows {
     Body,
+    Collider,
 }
-pub const ROW_CLASSES: usize = 1;
+pub const ROW_CLASSES: usize = 2;
 
 macro_rules! columns {
     ($($name:ident $kind:ident $rows:ident,)*) => {
@@ -91,6 +92,26 @@ columns! {
     // Slot state: bit flags, the slot's generation.
     FLAGS u32 Body,
     GENERATION u32 Body,
+    // The next free row; mass given on top of the colliders'; the first of the body's colliders.
+    NEXT_FREE u32 Body,
+    ADDITIONAL_MASS f32 Body,
+    FIRST_COLLIDER u32 Body,
+    // Colliders: a shape in its body's frame.
+    COLLIDER_BODY u32 Collider,
+    COLLIDER_NEXT u32 Collider,
+    COLLIDER_GENERATION u32 Collider,
+    COLLIDER_SHAPE u32 Collider,
+    COLLIDER_A f32 Collider,
+    COLLIDER_B f32 Collider,
+    COLLIDER_C f32 Collider,
+    COLLIDER_X f32 Collider,
+    COLLIDER_Y f32 Collider,
+    COLLIDER_Z f32 Collider,
+    COLLIDER_ROTATION_X f32 Collider,
+    COLLIDER_ROTATION_Y f32 Collider,
+    COLLIDER_ROTATION_Z f32 Collider,
+    COLLIDER_ROTATION_W f32 Collider,
+    COLLIDER_DENSITY f32 Collider,
 }
 
 /// Rows every column of a class is padded to, so each column stays on a 16-byte boundary.
@@ -114,6 +135,13 @@ pub fn offsets(start: u32, capacity: &[u32; ROW_CLASSES]) -> ([u32; COLUMNS], u3
 
 /// Most bodies one world holds: every column stays inside 32-bit offsets, with room to copy on growth.
 pub const MAX_BODIES: u32 = 1 << 22;
+pub const MAX_COLLIDERS: u32 = 1 << 22;
+
+// Values of the COLLIDER_SHAPE column. A, B, C hold the size: a ball's radius; a box's half extents; a capsule's radius
+// and half the length of its core along local Y.
+pub const SHAPE_BALL: u32 = 0;
+pub const SHAPE_BOX: u32 = 1;
+pub const SHAPE_CAPSULE: u32 = 2;
 
 // Bits of the FLAGS column.
 pub const ALIVE: u32 = 1;
