@@ -73,13 +73,19 @@ export async function initBasis(
   load: ScriptLoader = evaluateScript,
 ): Promise<ModuleBox<BasisModule>> {
   const [, wasmBinary] = await Promise.all([load(transcoderURL), binary(wasmURL)]);
-  const factory = (
-    globalThis as typeof globalThis & { BASIS?: (options: { wasmBinary: ArrayBuffer }) => PromiseLike<BasisModule> }
-  ).BASIS;
+  const factory = (globalThis as typeof globalThis & { BASIS?: BasisFactory }).BASIS;
   if (typeof factory !== 'function')
     throw decodeFailed(
       'Basis transcoder did not define BASIS; load the unmodified basis_transcoder.js from the package assets',
     );
+  return startBasis(factory, wasmBinary);
+}
+
+/** The factory `basis_transcoder.js` defines. */
+export type BasisFactory = (options: { wasmBinary: ArrayBuffer }) => PromiseLike<BasisModule>;
+
+/** Starts a loaded transcoder: Node requires the wrapper rather than evaluating it, so it joins here. */
+export async function startBasis(factory: BasisFactory, wasmBinary: ArrayBuffer): Promise<ModuleBox<BasisModule>> {
   const module = await new Promise<{ m: BasisModule }>((resolve, reject) => {
     factory({ wasmBinary }).then((m) => resolve({ m }), reject);
   }).then((box) => box.m);

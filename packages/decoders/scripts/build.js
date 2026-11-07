@@ -45,6 +45,8 @@ for (const folder of ['draco', 'draco-full', 'basis', 'jxl']) {
     await copyFile(resolve(root, 'vendor', folder, file), resolve(dist, folder, file));
 }
 // The Basis transcoder's embind wrappers would need 'unsafe-eval'; ship the closure form instead (scripts/static-embind.js).
+// Node loads the Emscripten wrapper with require, so its folder is CommonJS.
+await writeFile(resolve(dist, 'basis/package.json'), '{ "type": "commonjs" }\n');
 const basis = resolve(dist, 'basis/basis_transcoder.js');
 await writeFile(basis, staticEmbind(await readFile(basis, 'utf8'), 'basis_transcoder.js'));
 await copyFile(resolve(root, 'vendor/NOTICE.md'), resolve(dist, 'THIRD-PARTY-NOTICE.md'));
