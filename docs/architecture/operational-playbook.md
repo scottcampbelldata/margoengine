@@ -205,6 +205,28 @@ Known kernel gaps:
 - The native/Wasm half-way turn-reduction rounding difference is untested.
 - Growth and one rotation-sync bridge call lack isolated cost measurements.
 
+### 1.7 Physics kernel
+
+A second Rust kernel, the own rigid-body solver, is being built behind `@margoengine/physics/next`. Rapier stays the default until the switch. It shares the transform kernel's pattern, not its code.
+
+| File | Role |
+| --- | --- |
+| `packages/physics/kernel/Cargo.toml`, `Cargo.lock` | Rust crate `margoengine-physics-kernel`, no dependencies, `cdylib` and `rlib`, the same release profile as section 1.1. |
+| `packages/physics/kernel/src/layout.rs` | The column table. `packages/physics/scripts/build-kernel.mjs` parses it, so JS and Rust read one list. |
+| `packages/physics/kernel/src/world.rs` | The world: header and columns in one block, addressed by offset. |
+| `packages/physics/src/wasm.ts` | Generated: raw-deflate blueprint, source hash, column table. |
+| `packages/physics/src/kernel.ts` | `KernelWorld`: instantiate, bind views, grow. |
+
+`npm run build:physics-kernel` rebuilds it (cargo, wasm-opt -O3, deflate); `npm run modern:build` does too. `npm run build:packages` uses the committed blueprint. `npm run test:physics-kernel` runs the native tests.
+
+Memory contract: one Wasm instance per world, from `__heap_base`. Every column holds 4-byte rows and starts on 16 bytes; a row keeps its index for life. `reserve` lays out the larger world above the old block and copies it down to the base, so offsets stay relative and a copy of the block is a whole world. Growth changes no later result, since nothing iterates a column by capacity.
+
+Determinism contract: same inputs, same call order and same kernel build give bit-equal state on every machine, browser and Node. Wasm floats round to nearest, ties to even, and only NaN payloads may differ, so the state may hold no NaN. The kernel uses `+ - * /`, `sqrt`, compares and integers; no trigonometry, no fused or relaxed operations.
+
+Evidence so far: native tests of layout, growth and hash; Node tests of the views. `packages/physics/tests/kernel-blueprint.test.js` fails when the committed blueprint's source hash is not the hash of the sources, which closes for this kernel the gap section 1.6 lists for the transform kernel. The gate also rebuilds the blueprint and requires identical bytes.
+
+Missing: everything that needs bodies. No step exists yet, so bit equality across browsers and machines is unproved.
+
 ## 2. Precise GPU mathematics
 
 WGSL permits large builtin errors and floating-point reassociation. `packages/shared/precise-math.js` provides 19 f32

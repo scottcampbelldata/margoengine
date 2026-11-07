@@ -58,6 +58,8 @@ if (!precompiled)
     ],
     { stdio: 'inherit' },
   );
+// The physics kernel has its own blueprint, built the same way; --precompiled keeps the committed one.
+if (!precompiled) execFileSync(process.execPath, ['packages/physics/scripts/build-kernel.mjs'], { stdio: 'inherit' });
 const wasm = precompiled
   ? inflateRawSync(
       Buffer.from(

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10187079,
+  "total": 10189984,
   "history": [
     {
       "date": "2026-10-24",
@@ -3188,6 +3188,12 @@
       "commit": "759fa39c5",
       "reason": "new optional entry @margoengine/fsm/document",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "8a56ee16e",
+      "reason": "new preview entry physics/next: the own solver kernel, optional, core and stage untouched",
+      "grew": 1
     }
   ],
   "items": {
@@ -3599,6 +3605,7 @@
     "@margoengine/oit/moments": 4197,
     "@margoengine/oit/vfx": 486,
     "@margoengine/physics": 19679,
+    "@margoengine/physics/next": 2905,
     "@margoengine/physics2d": 8199,
     "@margoengine/physics2d/outline": 2524,
     "@margoengine/pixel": 4664,

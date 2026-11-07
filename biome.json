@@ -13,7 +13,8 @@
       "!**/dist",
       "!**/vendor",
       "!packages/clustered/src/ltc.ts",
-      "!packages/core/src/wasm.ts"
+      "!packages/core/src/wasm.ts",
+      "!packages/physics/src/wasm.ts"
     ]
   },
   "formatter": {

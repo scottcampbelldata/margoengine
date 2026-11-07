@@ -187,6 +187,14 @@ carry the same citation as a one-line comment in the code.
 | EX7 | Godot SpriteFrames and TileSet text resources, TileMapLayer.set_cell flips | exporters/src/godot-2d.ts | Godot's public TSCN/TRES format documentation and class reference |
 | EX8 | Unity TextureImporter meta, AnimationClip, Tilemap and TileBase use | exporters/src/unity-2d.ts | Unity's public manual and scripting reference |
 
+### physics
+
+The own solver's kernel (`packages/physics/kernel`, Rust, no dependencies). Nothing here comes from the source of Rapier, parry, Box2D, Jolt, Bullet, PhysX or any paper's companion repository; none was opened.
+
+| id | formula | file | source |
+| --- | --- | --- | --- |
+| PK1 | Bit-equal floats: every operator rounds to nearest, ties to even; NaN payloads are the one freedom, so no NaN may reach the state; no fused or relaxed operation is used | physics/kernel/src/math.rs, lib.rs | **Read:** the WebAssembly specification, *Execution: Numerics*, section Floating-Point Operations. The rule that follows from it (only + - * / sqrt, compares and integers) is the plan's |
+
 ### physics2d
 
 | id | formula | file | source |

@@ -230,6 +230,21 @@ Character controller options: `offset` (0.01), `up`, `maxSlopeClimbAngle` (45 de
 
 Queries take `maxDistance`, `solid`, `groups`, `exclude` (a body), `excludeSensors`, `excludeFixed`, `excludeKinematic`, `excludeDynamic` and `predicate(body, collider)`. Ray and shape-cast distances are along the normalized direction. Queries see the world as of the last step.
 
+## Own solver preview
+
+`@margoengine/physics/next` is Margo's own solver while it is built, a Rust kernel compiled to WebAssembly and shipped inside the package, so you need no toolchain and no peer install. Rapier stays the default until the switch; this entry is a preview and goes away then. Today it holds the kernel's world and its memory, with no bodies or stepping yet.
+
+```ts
+import {KernelWorld, loadKernel} from 'margoengine/physics/next';
+
+await loadKernel();                     // once per app
+const world = new KernelWorld(1024);    // rows of bodies; world.reserve(n) adds more
+world.columns.positionY[0] = 5;         // a column is a typed-array view of the kernel's memory
+console.log(world.bytes, world.hash);   // the hash is equal in every browser and in Node
+```
+
+Read views from `world.columns` each time: `reserve` replaces them. Each world is its own Wasm instance.
+
 ## Limits
 
 - Scale from a parent that shears a part is not represented: a body has a position and a rotation. Mesh scale is read once when a geometry-derived collider is built.

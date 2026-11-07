@@ -1650,6 +1650,10 @@
       "types": "./dist/physics.d.ts",
       "import": "./dist/physics.js"
     },
+    "./physics/next": {
+      "types": "./dist/physics/next.d.ts",
+      "import": "./dist/physics/next.js"
+    },
     "./physics2d": {
       "types": "./dist/physics2d.d.ts",
       "import": "./dist/physics2d.js"

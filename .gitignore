@@ -5,6 +5,7 @@ packages/*/NOTICE
 test-results/
 *.log
 packages/*/target/
+packages/physics/kernel/target/
 examples/next/.next/
 examples/next/next-env.d.ts
 *.tsbuildinfo
