@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { loadGLTF } from '@margoengine/gltf-pro';
 import { parse3MF } from '@margoengine/loaders';
-import { exportDAE, exportOBJ, exportPLY, exportSTL } from '../dist/index.js';
+import { exportDAE, exportGLB, exportOBJ, exportPLY, exportSTL } from '../dist/index.js';
 import { export3MF } from '../dist/threemf.js';
 import { loadedPBREngine } from '../../../tests/support/loaded-pbr-fixtures.js';
 
@@ -254,4 +254,11 @@ test('MTL has no rotation, so a texture transform goes into the OBJ coordinates 
   near(got[2], [3.25, 0.5], 1e-6, 'uv 0 1');
   // With no texture written there is nothing for the transform to serve, so the file's UVs stay.
   near(vt({}, { offset: [0.25, 0.5], scale: [2, 3] })[1], [1, 1], 1e-6, 'no texture');
+});
+
+test('a model passed where an engine goes names the fix, not a node transform', async () => {
+  const { engine, model } = await load('khronos/Fox/Fox.glb');
+  for (const write of [exportSTL, exportPLY, exportOBJ, exportDAE, exportGLB])
+    assert.throws(() => write(model), /loaded model is not a scene: pass the engine it was added to/);
+  engine.dispose();
 });

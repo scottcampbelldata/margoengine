@@ -1178,6 +1178,9 @@ export function collect(
     }
   };
 
+  // A loaded model has nodes too, so without this it fails later with an error about a node's transform.
+  if (isObject(source) && 'asset' in source && 'primitives' in source)
+    fail('A loaded model is not a scene: pass the engine it was added to, or use exportModel for its own file');
   if (isEngine(source)) {
     const engine = engineRuntime(source);
     if (engine.disposed)
