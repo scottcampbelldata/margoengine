@@ -1,6 +1,6 @@
 // DDS reading (`@margoengine/decoders/dds`), written from Microsoft's DirectDraw Surface documentation (DDS_HEADER,
 // DDS_PIXELFORMAT, DDS_HEADER_DXT10). Block-compressed BC1-BC7 data passes through untouched as the matching WebGPU
-// format (it needs `texture-compression-bc`); BGRA8, BGRX8, 565, 5551, 4444, luminance and other bit-mask formats
+// format (it needs `texture-compression-bc`; `decodeBC` in `bc.ts` gives the pixels on the CPU); BGRA8, BGRX8, 565, 5551, 4444, luminance and other bit-mask formats
 // become rgba8unorm; RGBA8, R8, RG8, 16- and 32-bit float and the packed float formats pass through. 2D textures, cube
 // maps and arrays of either, with their mip chains. Volume and 1D textures are refused.
 import { decodeFailed } from './errors.js';
@@ -128,10 +128,10 @@ export function parseDDS(bytes: Uint8Array): TextureFile {
     if (bytes.length < 148) throw corrupt('DX10 header is missing');
     const dxgi = u32(128),
       converted = DXGI_MASKS[dxgi];
-    if (u32(132) !== 3) throw refuse(`resource dimension ${u32(132)} (only 2D textures)`);
+    // Some writers leave the dimension and array size at zero; such a file is one 2D texture.
+    if (u32(132) !== 3 && u32(132) !== 0) throw refuse(`resource dimension ${u32(132)} (only 2D textures)`);
     cube = !!(u32(136) & 4);
-    count = u32(140);
-    if (!count) throw corrupt('array size is 0');
+    count = u32(140) || 1;
     hasAlpha = (u32(144) & 7) !== 3;
     at = 148;
     if (converted) {

@@ -294,10 +294,6 @@ test('DDS refuses bad magic, truncation, bad sizes, unsupported layouts and form
     () => parseDDS(dds({ width: 4, height: 4, dx10: { format: 28, dimension: 4 }, data: sequence(64) })),
     /resource dimension 4/,
   );
-  failed(
-    () => parseDDS(dds({ width: 4, height: 4, dx10: { format: 28, array: 0 }, data: sequence(64) })),
-    /array size is 0/,
-  );
   // Partial cube maps: five faces, and only +X.
   failed(() => parseDDS(patched(112, 0x200 | 0x7c00)), /cube map without all six faces/);
   failed(() => parseDDS(patched(112, 0x200 | 0x400)), /cube map without all six faces/);
@@ -551,4 +547,13 @@ test('uploadTexture writes every level of every layer, and names the missing com
   const plain = mockDevice();
   uploadKTX(plain, parseDDS(dds({ width: 3, height: 1, dx10: { format: 54 }, data: sequence(6) })));
   assert.deepEqual(plain.calls[1].slice(3), [{ bytesPerRow: 6, rowsPerImage: 1 }, [3, 1, 1]]);
+});
+
+test('a DX10 header with dimension and array size left at zero is one 2D texture', () => {
+  // Real writers do this: bc1.dds and bc5_snorm.dds of Pillow's test images (tests/real-files/manifest.json).
+  for (const dx10 of [{ format: 28, array: 0 }, { format: 28, dimension: 0, array: 0 }, { format: 28, dimension: 0 }]) {
+    const file = parseDDS(dds({ width: 4, height: 4, dx10, data: sequence(64) }));
+    assert.equal(file.format, 'rgba8unorm');
+    assert.deepEqual([file.mipmaps.length, file.mipmaps[0].width], [1, 4]);
+  }
 });

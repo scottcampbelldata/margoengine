@@ -1206,6 +1206,7 @@ An audit of the finished batches against their job text listed 70 gaps for the H
 | 3MF loaded | export3MF takes a textured model loaded in an engine, as STL does | DONE | `bec3f89d1` | LIM-269 |
 | README ragdoll | Ragdoll README examples set up what they use: 17 errors to 1 | DONE | `d80e1cbba` | - |
 | Texture 1 | WebP reading | DONE | this commit | LIM-285 |
+| Texture 2 | BC on the CPU, DDS array size 0 | DONE | this commit | LIM-285 |
 
 ## LAZ: one LAS reader, and every point format on a real file
 
