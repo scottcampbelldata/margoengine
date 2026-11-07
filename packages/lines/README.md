@@ -157,8 +157,9 @@ pointer.reset();
 | `fade` | `1` | Opacity falls as `(1 - part) ^ fade` along the trail, part being the larger of age over `lifetime` and distance over `maxLength`; 0 does not fade |
 | `color`, `tailColor` | white, the head's | Colours at the two ends; `trail.setColor(color, tailColor)` changes them |
 | `tailWidth` | `1` | Width at the far end as a fraction of the head's, 0..1; ignored on a dashed trail |
+| `normal` | none | Lays the trail flat, facing this world direction: `[0, 1, 0]` for a tyre track on level ground. `width` is then world units across, the strip does not turn to the camera, it picks like any line, and `depthBias` keeps it off the ground. Not with `dashed` |
 
-Any `LineMaterial` option applies too. The far end is cut exactly at the limit, between two points, so a trail shrinks smoothly, and a target that stops fades out with the rest of its trail. Like every line a trail faces the camera, so a flat ribbon on the ground, such as a tyre track seen from low down, is not what it draws. It is a line, so it also picks and takes fog and clipping planes.
+Any `LineMaterial` option applies too. The far end is cut exactly at the limit, between two points, so a trail shrinks smoothly, and a target that stops fades out with the rest of its trail. Like every line a trail faces the camera, unless `normal` lays it flat: a strip of world width that holds still as the camera moves, for a tyre track. It lies facing that one direction, so it does not follow a hill, and its segments are not joined at a corner.
 
 ## Massive batches
 

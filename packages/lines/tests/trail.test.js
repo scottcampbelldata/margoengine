@@ -158,3 +158,14 @@ test('the plugin passes the frame delta, and a trail compiles the width shader o
     'dashed trails keep the plain shader',
   );
 });
+
+test('a flat trail keeps a unit normal, takes world units and refuses what it cannot draw', () => {
+  const trail = new Trail({ normal: [0, 2, 0], width: 0.4 });
+  assert.deepEqual(trail.flatNormal, [0, 1, 0]);
+  assert.equal(trail.material.worldUnits, true);
+  assert.equal(new Trail().flatNormal, null);
+  assert.throws(() => new Trail({ normal: [0, 0, 0] }), /no direction/);
+  assert.throws(() => new Trail({ normal: [0, 1] }), /3 values/);
+  assert.throws(() => new Trail({ normal: [0, NaN, 0] }), RangeError);
+  assert.throws(() => new Trail({ normal: [0, 1, 0], dashed: true }), /no dashes/);
+});

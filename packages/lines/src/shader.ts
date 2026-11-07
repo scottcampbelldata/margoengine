@@ -222,10 +222,43 @@ export const pointWidthShader = (code: string): string =>
 
 /** `code` for a line with a depth bias: the fourth value of `style.b` moves it that fraction of its distance nearer. */
 export const biasedShader = (code: string): string =>
-  code.replace(
-    'o.clip=vec4f(base.xy+cr.off/(0.5*frame.viewport.xy)*base.w,base.z,base.w);',
-    'o.clip=vec4f(base.xy+cr.off/(0.5*frame.viewport.xy)*base.w,min(base.z*(1.0+style.b.w),base.w),base.w);',
-  );
+  code
+    .replace(
+      'o.clip=vec4f(base.xy+cr.off/(0.5*frame.viewport.xy)*base.w,base.z,base.w);',
+      'o.clip=vec4f(base.xy+cr.off/(0.5*frame.viewport.xy)*base.w,min(base.z*(1.0+style.b.w),base.w),base.w);',
+    )
+    .replace('o.clip=placed;', 'o.clip=vec4f(placed.xy,min(placed.z*(1.0+style.b.w),placed.w),placed.w);');
+
+/**
+ * `code` with a vertex entry for a flat ribbon: each point spreads across its normal x the line's direction there, in
+ * world units, scaled by the point's fourth value, so the strip lies in the world and does not turn to the camera. A segment
+ * uses the first 6 vertices of its block. A ribbon has no dashes, so the normal rides in the dash fields of the style. `picking` carries the segment on, as the pick shader's `Out` has it.
+ */
+export const ribbonShader = (code: string, picking = false): string =>
+  code +
+  /* wgsl */ `
+@vertex fn ribbonVertex(@builtin(vertex_index) vi:u32,@builtin(instance_index) ii:u32)->Out{
+  var o:Out;
+  o.clip=vec4f(2.0,2.0,0.0,1.0);o.color=vec4f(0.0);o.edge=vec4f(0.0,1.0,-1e4,-1e4);o.dist=0.0;
+  if(vi>=6u){return o;}
+  let ends=array<u32,6>(0u,0u,1u,0u,1u,1u);let sides=array<f32,6>(-1.0,1.0,1.0,-1.0,1.0,-1.0);
+  let k=ii+ends[vi];let last=style.flags.y-1u;
+  let before=style.model*vec4f(points[select(k,k-1u,k>0u)].xyz,1.0);
+  let after=style.model*vec4f(points[min(k+1u,last)].xyz,1.0);
+  let here=style.model*vec4f(points[k].xyz,1.0);
+  let across=cross(vec3f(style.a.zw,style.b.x),after.xyz/after.w-before.xyz/before.w);
+  let size=length(across);
+  let side=select(vec3f(0.0),across/size,size>1e-9);
+  let w=here.xyz/here.w+side*(sides[vi]*0.5*style.a.x*points[k].w);
+  let placed=frame.viewProj*vec4f(w,1.0);
+  o.clip=placed;
+  var tint=vec4f(1.0);
+  if((style.flags.z&64u)!=0u){tint=colors[k];}
+  o.color=tint*style.color;
+  o.world=w;${picking ? 'o.segment=ii;' : ''}
+  return o;
+}
+`;
 
 /** The fragment's dash step, which `dashCapShader` replaces. */
 const dashStep = 'cover*=select(select(0.0,1.0,inside>=0.0),clamp(inside/fw+0.5,0.0,1.0),aa);';

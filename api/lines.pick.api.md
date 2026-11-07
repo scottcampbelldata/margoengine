@@ -70,6 +70,7 @@ class Line {
     capacityVersion: number;
     totalDistance: number;
     protected pointWidths: boolean;
+    protected flatNormal: readonly [number, number, number] | null;
     constructor(options?: LineOptions);
     get count(): number;
     get segmentCount(): number;

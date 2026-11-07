@@ -194,6 +194,65 @@ async function trail() {
   return 'Trail follows a mesh, thins and fades toward its far end, and disappears when aged out';
 }
 
+// A tyre track: seen from the side a flat strip is a sliver, where a camera-facing trail keeps its width; from above it
+// holds its world width, tapers to the tail, and a pick lands on it.
+async function ribbon() {
+  const { engine, lines, frame, done } = await rig(),
+    make = (normal) =>
+      lines.add(new Trail({ normal, width: 2, maxLength: 9, tailWidth: 0.5, fade: 0, color: RED, minDistance: 0 })),
+    lay = (trail) => {
+      for (const x of [-4, -2, 0, 2, 4]) trail.moveTo(x, 0, 0);
+      trail.update(engine, 0);
+    },
+    rows = (image, x) => {
+      let count = 0;
+      for (let y = 0; y < 256; y++) if (isRed(image.at(x, y))) count++;
+      return count;
+    };
+  try {
+    const flat = make([0, 1, 0]);
+    lay(flat);
+    engine.camera.position = [0, 10, 0.001];
+    engine.camera.target = [0, 0, 0];
+    let image = await frame();
+    const head = rows(image, 205),
+      tail = rows(image, 51),
+      expected = (2 / (2 * 10 * Math.tan(Math.PI / 6))) * 256;
+    assert(Math.abs(Math.max(head, tail) - expected) < 3, `A flat trail is 2 world units wide: ${head}, ${tail} of ${expected}`);
+    assert(Math.min(head, tail) < 0.75 * Math.max(head, tail), `A flat trail tapers: ${head}, ${tail}`);
+    engine.camera.position = [0, 0.01, 10];
+    image = await frame();
+    assert(rows(image, 128) <= 2, `Seen edge on, a flat trail is a sliver: ${rows(image, 128)}`);
+    flat.dispose?.();
+    lines.remove(flat);
+    const facing = make(undefined);
+    lay(facing);
+    facing.material.set({ worldUnits: true });
+    image = await frame();
+    assert(rows(image, 128) > 20, `A trail with no normal still faces the camera: ${rows(image, 128)}`);
+  } finally {
+    done();
+  }
+  const { engine: picked, lines: pickLines, done: pickDone } = await rig();
+  try {
+    const picker = Picking.attach(picked, { capture: false }),
+      linePicking = LinePicking.attach(picker, pickLines),
+      strip = pickLines.add(new Trail({ normal: [0, 0, 1], width: 2, lifetime: Infinity, fade: 0, minDistance: 0 }));
+    for (const x of [-3, 0, 3]) strip.moveTo(x, 0, 0);
+    strip.update(picked, 0);
+    picked.render();
+    await picked.gpu.queue.onSubmittedWorkDone();
+    const near = await picker.pick(...pixel(1, 0.8, 0)),
+      off = await picker.pick(...pixel(1, 1.4, 0));
+    assert(near?.line === strip, 'A pick inside the width of a flat trail lands on it');
+    assert(off?.line !== strip, 'A pick past the width of a flat trail misses it');
+    linePicking.dispose?.();
+  } finally {
+    pickDone();
+  }
+  return 'A flat trail lies in the world at its world width, tapers, shows edge on as a sliver, and picks across its width.';
+}
+
 async function batch() {
   const { engine, frame, done } = await rig();
   const batches = LineBatches.attach(engine);
@@ -385,6 +444,6 @@ async function dashCaps() {
 
 window.runLineFeatures = async () => {
   const checks = [];
-  for (const check of [depthWrite, picking, trail, batch, hidden, coverage, filled, dashCaps]) checks.push(await check());
+  for (const check of [depthWrite, picking, trail, ribbon, batch, hidden, coverage, filled, dashCaps]) checks.push(await check());
   return checks;
 };

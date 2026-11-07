@@ -28,16 +28,30 @@ export interface TrailOptions extends Omit<LineOptions, 'positions' | 'colors' |
   tailColor?: ColorInput;
   /** Width at the far end as a fraction of the head's, 0..1. Ignored on a dashed trail. Default 1. */
   tailWidth?: number;
+  /**
+   * Lays the trail flat, facing this world direction, such as [0, 1, 0] for a tyre track on level ground: a strip `width`
+   * world units across that does not turn to the camera. Default none: the trail faces the camera. Not with `dashed`.
+   */
+  normal?: ArrayLike<number>;
 }
 
 const white = [1, 1, 1];
 const rgb = (color: ColorInput | undefined, fallback: ArrayLike<number>): number[] =>
   Array.from((color === undefined ? fallback : parseColor(color)) as ArrayLike<number>);
 
+/** `normal` at length 1. Throws RangeError for anything but a finite direction. */
+function unit(normal: ArrayLike<number>): [number, number, number] {
+  if (normal.length !== 3) throw new RangeError('Trail normal needs 3 values; pass [x, y, z]');
+  finiteArray(normal, 'Trail normal');
+  const size = Math.hypot(normal[0], normal[1], normal[2]);
+  if (!size) throw new RangeError('Trail normal has no direction; pass a vector longer than 0');
+  return [normal[0] / size, normal[1] / size, normal[2] / size];
+}
+
 /**
  * A line that follows a mesh, a function or `moveTo` calls and fades over time, distance or both: missiles, swords,
  * cursors. Add it to a `Lines` plugin; it advances with the plugin's frames. Its points are in world space and, like
- * every line, it faces the camera.
+ * every line, it faces the camera unless `normal` lays it flat.
  * @throws RangeError for an out-of-range option.
  */
 export class Trail extends Line {
@@ -71,6 +85,7 @@ export class Trail extends Line {
       color,
       tailColor,
       tailWidth = 1,
+      normal,
       ...style
     } = options;
     if (!(lifetime > 0) || !(maxLength > 0) || !(minDistance >= 0) || !(fade >= 0) || !Number.isFinite(fade))
@@ -80,7 +95,15 @@ export class Trail extends Line {
     if (!(tailWidth >= 0 && tailWidth <= 1)) throw new RangeError('Invalid trail tailWidth; pass a value from 0 to 1');
     if (offset.length !== 3) throw new RangeError('Trail offset needs 3 values; pass [x, y, z]');
     finiteArray(offset, 'Trail offset');
-    super({ ...style, positions: new Float32Array(maxPoints * 3), colors: new Float32Array(maxPoints * 4) });
+    const facing = normal === undefined ? null : unit(normal);
+    if (facing && style.dashed) throw new RangeError('A flat trail has no dashes; leave out normal or dashed');
+    super({
+      ...style,
+      ...(facing ? { worldUnits: true } : {}),
+      positions: new Float32Array(maxPoints * 3),
+      colors: new Float32Array(maxPoints * 4),
+    });
+    this.flatNormal = facing;
     this.capacity = maxPoints;
     this.samples = new Float64Array(maxPoints * 4);
     this.target = target;

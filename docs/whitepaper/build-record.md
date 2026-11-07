@@ -1250,6 +1250,7 @@ An audit of the finished batches against their job text listed 70 gaps for the H
 | readme-run | README examples run in Node or a real page; a new failure fails | DONE | `6efdd9284` | - |
 | GPU checks | 22 loose scripts/*-gpu-check.js run once and wired into check:gpu-packages, ssao held in LOOSE_CHECKS; five had rotted | DONE | `e06175cb7` | - |
 | B24 | Wide-angle cube capture, `/wide-cube` | DONE | this commit | LIM-321 |
+| B29 | Flat trails, `normal` on `Trail` | DONE | this commit | LIM-083 |
 
 ## LAZ: one LAS reader, and every point format on a real file
 

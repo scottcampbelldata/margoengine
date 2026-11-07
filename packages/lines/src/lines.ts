@@ -5,7 +5,7 @@ import { meshWorldMatrix } from '@margoengine/math/mesh';
 import { CAPS, JOINS, MODES, VERTICES_PER_SEGMENT } from './geometry.js';
 import { Line } from './line.js';
 import { fillFrame } from './math.js';
-import { biasedShader, dashCapShader, filledShader, foggedLineShader, lineShader, phasedShader, pointWidthShader } from './shader.js';
+import { biasedShader, dashCapShader, filledShader, foggedLineShader, lineShader, phasedShader, pointWidthShader, ribbonShader } from './shader.js';
 import { checkFog, FOG_BYTES, writeFog, type FogLike } from '../../shared/fog.js';
 import { applyView } from '../../shared/view-rect.js';
 import { overlayDepthPass, overlayPass, alphaBlend } from '../../shared/pass.js';
@@ -32,13 +32,14 @@ let warned = false;
 
 /**
  * Bytes of the per-line Style uniform: model (0), color (64), a (80), b (96), flags (112: mode, count, bits, clipping
- * plane count) and 6 clipping planes (128).
+ * plane count) and 6 clipping planes (128). A flat ribbon's normal takes the dash fields, as it has no dashes.
  */
 const STYLE_BYTES = 224;
 
 /**
  * Pipeline variant bits: draw over the scene, fogged, write depth, a width per point, only behind the scene, a depth
- * bias, alpha to coverage, round or square dash ends, solid triangles; the draw step (shader.ts) sits above them.
+ * bias, alpha to coverage, round or square dash ends, solid triangles, a flat ribbon; the draw step (shader.ts) sits
+ * above them.
  */
 const ON_TOP = 1,
   FOGGED = 2,
@@ -50,7 +51,8 @@ const ON_TOP = 1,
   ROUND_DASH = 128,
   SQUARE_DASH = 256,
   FILL = 512,
-  STEP = 1024;
+  RIBBON = 1024,
+  STEP = 2048;
 
 /** Solid triangles write depth when nothing about them is translucent. */
 const fillWrites = (line: Line): boolean => line['fillOpaque'] && line.material.opacity === 1 && !line.material.behind;
@@ -200,6 +202,7 @@ export class Lines implements EnginePlugin {
     let module = this.modules.get(key);
     if (!module) {
       let code = variant & FOGGED ? foggedLineShader() : lineShader;
+      if (variant & RIBBON) code = ribbonShader(code);
       if (variant & WIDTHS) code = pointWidthShader(code);
       if (variant & BIAS) code = biasedShader(code);
       if (variant & ROUND_DASH) code = dashCapShader(code, 'round');
@@ -227,7 +230,7 @@ export class Lines implements EnginePlugin {
         module = this.module(variant);
       pipeline = this.device!.createRenderPipeline({
         layout: fog?.pipeline ?? this.layouts!.pipeline,
-        vertex: { module, entryPoint: variant & FILL ? 'fillVertex' : 'vertex' },
+        vertex: { module, entryPoint: variant & FILL ? 'fillVertex' : variant & RIBBON ? 'ribbonVertex' : 'vertex' },
         fragment: {
           module,
           entryPoint: 'fragment',
@@ -383,9 +386,12 @@ export class Lines implements EnginePlugin {
       f[19] = material.opacity;
       f[20] = material.width;
       f[21] = material.miterLimit;
-      f[22] = material.dashSize;
-      f[23] = material.gapSize;
-      f[24] = material.dashOffset;
+      if (line['flatNormal']) f.set(line['flatNormal'], 22);
+      else {
+        f[22] = material.dashSize;
+        f[23] = material.gapSize;
+        f[24] = material.dashOffset;
+      }
       f[25] = line.totalDistance;
       f[26] = material.antialias ? 1 : 0;
       f[27] = material.depthBias;
@@ -396,7 +402,7 @@ export class Lines implements EnginePlugin {
         JOINS.indexOf(material.join) |
         (CAPS.indexOf(material.cap) << 2) |
         (material.worldUnits ? 16 : 0) |
-        (material.dashed ? 32 : 0) |
+        (material.dashed && !line['flatNormal'] ? 32 : 0) |
         (vertexColors ? 64 : 0);
       // Clipping planes: count in flags.w (bit 16: intersection), planes from byte 128, unused slots zeroed.
       const planes = material['clipping'];
@@ -520,6 +526,7 @@ export class Lines implements EnginePlugin {
       if (edge && (!antialias || covered)) continue;
       const bits =
           (line['pointWidths'] && !dashed ? WIDTHS : 0) |
+          (line['flatNormal'] ? RIBBON : 0) |
           (behind ? BEHIND : 0) |
           (depthBias ? BIAS : 0) |
           (covered ? COVER : 0) |

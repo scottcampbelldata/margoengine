@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10183368,
+  "total": 10183946,
   "history": [
     {
       "date": "2026-10-24",
@@ -3200,6 +3200,12 @@
       "commit": "d1dfce2e4",
       "reason": "B24: new entry cameras/wide-cube",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "492862b16",
+      "reason": "B29: lines gains a flat ribbon variant",
+      "grew": 2
     }
   ],
   "items": {
@@ -3501,8 +3507,8 @@
     "@margoengine/lines/batch": 6524,
     "@margoengine/lines/edges": 4811,
     "@margoengine/lines/hidden": 4136,
-    "@margoengine/lines/pick": 5929,
-    "@margoengine/lines/trail": 5197,
+    "@margoengine/lines/pick": 6245,
+    "@margoengine/lines/trail": 5459,
     "@margoengine/loaders": 52602,
     "@margoengine/loaders dist/workers/usd.js": 8435,
     "@margoengine/loaders/3dm": 4094,

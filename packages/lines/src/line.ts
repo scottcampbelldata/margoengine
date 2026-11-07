@@ -221,6 +221,8 @@ export class Line {
   private fillOpaque = false;
   /** The points' fourth value scales the width at each point instead of holding a dash distance (`Trail`); dashes win. */
   protected pointWidths = false;
+  /** The world direction a flat ribbon faces, or null for a line that turns to the camera. */
+  protected flatNormal: readonly [number, number, number] | null = null;
   private pointCount = 0;
   private mount: Mesh | null = null;
   private owner?: LineOwner;

@@ -32,6 +32,7 @@ export interface TrailOptions extends Omit<LineOptions, 'positions' | 'colors' |
     color?: ColorInput;
     tailColor?: ColorInput;
     tailWidth?: number;
+    normal?: ArrayLike<number>;
 }
 
 // Not exported from this entry, but used by the exports above:
@@ -47,6 +48,7 @@ class Line {
     capacityVersion: number;
     totalDistance: number;
     protected pointWidths: boolean;
+    protected flatNormal: readonly [number, number, number] | null;
     constructor(options?: LineOptions);
     get count(): number;
     get segmentCount(): number;

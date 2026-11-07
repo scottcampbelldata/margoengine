@@ -7,7 +7,7 @@ import { VERTICES_PER_SEGMENT } from './geometry.js';
 import type { Line } from './line.js';
 import type { Lines } from './lines.js';
 import { fillFrame } from './math.js';
-import { biasedShader, clipCut, lineShader, pointWidthShader } from './shader.js';
+import { biasedShader, clipCut, lineShader, pointWidthShader, ribbonShader } from './shader.js';
 import { beginPickPass, ensurePickBase } from '../../shared/pick-base.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
@@ -52,6 +52,8 @@ interface Gpu {
   baseGroup?: GPUBindGroup;
   /** Pipelines by compare, then whether the line has a width per point. */
   pipelines: Record<'depth' | 'top', [GPURenderPipeline, GPURenderPipeline]>;
+  /** The pipeline of a flat ribbon, made when the first one is picked. */
+  ribbon(depthCompare: GPUCompareFunction): GPURenderPipeline;
 }
 
 /** Bytes between two lines' ID bases: WebGPU's dynamic offset alignment. */
@@ -132,10 +134,11 @@ export class LinePicking {
       layout = device.createPipelineLayout({ bindGroupLayouts: [layouts.frame, layouts.style, baseLayout] }),
       plain = device.createShaderModule({ code: biasedShader(linePickShader()) }),
       widths = device.createShaderModule({ code: biasedShader(pointWidthShader(linePickShader())) }),
-      pipeline = (depthCompare: GPUCompareFunction, module: GPUShaderModule) =>
+      ribbons = new Map<GPUCompareFunction, GPURenderPipeline>(),
+      pipeline = (depthCompare: GPUCompareFunction, module: GPUShaderModule, entryPoint = 'vertex') =>
         device.createRenderPipeline({
           layout,
-          vertex: { module, entryPoint: 'vertex' },
+          vertex: { module, entryPoint },
           fragment: { module, entryPoint: 'fragment', targets: [{ format: 'r32uint' }] },
           primitive: { topology: 'triangle-list', cullMode: 'none' },
           depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare },
@@ -151,6 +154,15 @@ export class LinePicking {
       pipelines: {
         depth: [pipeline('greater-equal', plain), pipeline('greater-equal', widths)],
         top: [pipeline('always', plain), pipeline('always', widths)],
+      },
+      ribbon: (depthCompare) => {
+        let made = ribbons.get(depthCompare);
+        if (!made) {
+          const code = biasedShader(ribbonShader(linePickShader(), true));
+          made = pipeline(depthCompare, device.createShaderModule({ code }), 'ribbonVertex');
+          ribbons.set(depthCompare, made);
+        }
+        return made;
       },
     });
   }
@@ -201,14 +213,18 @@ export class LinePicking {
       const pass = beginPickPass(c, gpu.frameGroup);
       let next = 0,
         slot = 0;
-      for (const [list, pipelines] of [
-        [depthTested, gpu.pipelines.depth],
-        [top, gpu.pipelines.top],
+      for (const [list, pipelines, compare] of [
+        [depthTested, gpu.pipelines.depth, 'greater-equal'],
+        [top, gpu.pipelines.top, 'always'],
       ] as const)
         for (const [line, r] of list) {
           const segments = line.segmentCount;
           if (next + segments > MAX_IDS) break;
-          pass.setPipeline(pipelines[line['pointWidths'] && !line.material.dashed ? 1 : 0]);
+          pass.setPipeline(
+            line['flatNormal']
+              ? gpu.ribbon(compare)
+              : pipelines[line['pointWidths'] && !line.material.dashed ? 1 : 0],
+          );
           bases[(slot * BASE_STRIDE) / 4] = c.firstId + next;
           this.entries.push({ line, first: next });
           pass.setBindGroup(1, r.group);
