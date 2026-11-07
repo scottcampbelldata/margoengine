@@ -2277,11 +2277,11 @@
     "@margoengine/sky": {
       ".": {
         "raw": 46278,
-        "gzip": 16591
+        "gzip": 16587
       },
       "./base": {
         "raw": 17398,
-        "gzip": 6815
+        "gzip": 6814
       },
       "./preetham": {
         "raw": 1657,
@@ -2318,6 +2318,10 @@
       "./sun": {
         "raw": 5386,
         "gzip": 2123
+      },
+      "./volumetric-clouds": {
+        "raw": 19188,
+        "gzip": 7315
       }
     },
     "@margoengine/splats": {
@@ -2886,9 +2890,9 @@
       "brotli": 6003
     },
     "packages/scenery/dist/sky.js": {
-      "raw": 22945,
-      "gzip": 9163,
-      "brotli": 8171
+      "raw": 22949,
+      "gzip": 9168,
+      "brotli": 8175
     },
     "packages/creative/dist/particles.js": {
       "raw": 43160,

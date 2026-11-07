@@ -2190,6 +2190,10 @@
       "types": "./dist/sky/sun.d.ts",
       "import": "./dist/sky/sun.js"
     },
+    "./sky/volumetric-clouds": {
+      "types": "./dist/sky/volumetric-clouds.d.ts",
+      "import": "./dist/sky/volumetric-clouds.js"
+    },
     "./splats": {
       "types": "./dist/splats.d.ts",
       "import": "./dist/splats.js"

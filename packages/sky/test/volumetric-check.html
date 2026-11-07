@@ -1,0 +1,62 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Sky volumetric clouds check</title><style>body{margin:0}canvas{display:block;width:256px;height:192px}</style></head><body><canvas></canvas>
+<script type="module">
+// Volumetric clouds on a real GPU, read back from Bloom's HDR scene capture. Driven by features-check.mjs.
+import {Engine,PbrMaterial,box} from '/packages/core/dist/index.js';
+import {sceneSamples} from '/packages/core/dist/quality.js';
+import {Bloom} from '/packages/post/dist/bloom.js';
+import {Sky} from '/packages/sky/dist/index.js';
+import {VolumetricClouds} from '/packages/sky/dist/volumetric-clouds.js';
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
+if(new URLSearchParams(location.search).get('samples')==='1')globalThis.margoLow=1;
+const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,2,0],target:[0,40,-60],near:0.5,far:200000}}),device=engine.gpu,errors=[];
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const post=Bloom.attach(engine,{strength:0,threshold:1,exposure:0});
+engine.createMesh().setGeometry(box(4000,0.2,4000)).setMaterial(new PbrMaterial({color:'#4a5a3a',roughness:0.9})).setPosition([0,0,0]);
+// A pillar 30 m in front of the ground camera, and a block 120 m in front of the camera inside the layer.
+engine.createMesh().setGeometry(box(8,60,8)).setMaterial(new PbrMaterial({color:'#8a8070',roughness:0.6})).setPosition([0,30,-30]);
+engine.createMesh().setGeometry(box(40,40,40)).setMaterial(new PbrMaterial({color:'#8a8070',roughness:0.6})).setPosition([0,2700,-120]);
+const sky=new Sky({hours:10,timeScale:0});engine.use(sky);void sky.reflectionTexture;
+const module=device.createShaderModule({code:'@group(0) @binding(0) var image:texture_2d<f32>;@group(0) @binding(1) var<storage,read_write> result:array<vec4f>;@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u){let s=textureDimensions(image);if(any(id.xy>=s)){return;}result[id.y*s.x+id.x]=textureLoad(image,vec2i(id.xy),0);}'});
+const pipeline=device.createComputePipeline({layout:'auto',compute:{module,entryPoint:'main'}});
+async function read(texture){
+ const bytes=texture.width*texture.height*16,output=device.createBuffer({size:bytes,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),staging=device.createBuffer({size:bytes,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+ const encoder=device.createCommandEncoder(),pass=encoder.beginComputePass();pass.setPipeline(pipeline);
+ pass.setBindGroup(0,device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:texture.createView()},{binding:1,resource:{buffer:output}}]}));
+ pass.dispatchWorkgroups(Math.ceil(texture.width/8),Math.ceil(texture.height/8));pass.end();encoder.copyBufferToBuffer(output,0,staging,0,bytes);device.queue.submit([encoder.finish()]);
+ await staging.mapAsync(GPUMapMode.READ);const data=new Float32Array(staging.getMappedRange()).slice();staging.unmap();output.destroy();staging.destroy();return data;
+}
+const frame=async(delta=0)=>{engine.render({delta});await device.queue.onSubmittedWorkDone();return read(post.sceneTexture);};
+const view=(position,target)=>{engine.camera.position=position;engine.camera.target=target;};
+// Pixels that differ by more than one 8-bit step, and the fraction of all pixels they are.
+const diff=(a,b,mask)=>{let n=0,total=0;for(let p=0;p<a.length;p+=4){if(mask&&!mask(p/4))continue;total++;let d=0;for(let c=0;c<3;c++)d=Math.max(d,Math.abs(a[p+c]-b[p+c]));if(d>1/255)n++;}return {changed:n,total};};
+const views={ground:[[0,2,0],[0,40,-60]],inside:[[0,2700,40],[0,2700,-60]],above:[[0,7000,0],[0,5000,-4000]]};
+window.check={samples:sceneSamples,
+ async run(){
+  device.pushErrorScope('validation');const out={};
+  for(const [name,[position,target]] of Object.entries(views)){
+   view(position,target);await waitForPipelines(frame);
+   const clear=await frame();
+   const none=VolumetricClouds.attach(engine,{sky,coverage:0,depth:()=>post.depthTexture});const zero=await frame();none.dispose();
+   const clouds=VolumetricClouds.attach(engine,{sky,depth:()=>post.depthTexture});
+   const t0=performance.now();const shown=await frame();const ms=performance.now()-t0;
+   clouds.onPreUpdate(60);const later=await frame();clouds.dispose();
+   (window.shots??={})[name]={clear,shown,later};out[name]={zero:diff(zero,clear).changed,shown:diff(shown,clear),evolved:diff(later,shown),ms};
+  }
+  // Depth: the pillar 30 m away hides the clouds behind it; the block inside the layer is veiled by cloud before it.
+  const w=post.sceneTexture.width,h=post.sceneTexture.height,centre=(i)=>Math.abs(i%w-w/2)<4&&Math.abs(Math.floor(i/w)-h*0.55)<6;
+  view(...views.ground);await frame();const pillar=await frame();
+  let clouds=VolumetricClouds.attach(engine,{sky,coverage:0.9,depth:()=>post.depthTexture});const pillarClouds=await frame();clouds.dispose();
+  out.pillar=diff(pillarClouds,pillar,centre);
+  view(...views.inside);await frame();const block=await frame();
+  clouds=VolumetricClouds.attach(engine,{sky,coverage:1,density:0.08,depth:()=>post.depthTexture});const blockClouds=await frame();clouds.dispose();
+  out.block=diff(blockClouds,block,centre);
+  // Without a depth texture the clouds draw only over the empty sky: the pillar stays as it was, the sky beside it changes.
+  view(...views.ground);await frame();const bare=await frame();
+  clouds=VolumetricClouds.attach(engine,{sky,coverage:0.9});const noDepth=await frame();clouds.dispose();
+  out.noDepth={pillar:diff(noDepth,bare,centre),sky:diff(noDepth,bare,(i)=>i%w<w/4)};
+  const error=await device.popErrorScope();
+  return {...out,error:error?.message??null,errors:errors.splice(0)};
+ }};
+window.shot=(name,key)=>{const f=window.shots[name][key],o=new Array(f.length);for(let p=0;p<f.length;p++)o[p]=(p%4===3)?255:Math.round(255*Math.min(1,Math.pow(f[p]/(1+f[p]),1/2.2)));return o;};
+window.ready=true;
+</script></body></html>

@@ -562,6 +562,15 @@ ground and the sky's own render along the sun ray agree on all 256 points, befor
 the old ground and the new sky, and core meshes, materials, gltf-pro, terrain and voxels go dark under a black pattern in both
 classes. Missing: other GPUs; a real cloud photograph over real ground is not the claim, the claim is agreement with the sky.
 
+`VolumetricClouds` (`@margoengine/sky/volumetric-clouds`) ray marches a layer between two shells around the planet in one
+full-screen fragment pass at order 3, between the sky and its fog. f32 cannot form |o|^2 - (R + h)^2 at planet scale, so the
+shell roots use the constant |e|^2 + 2R(e_y - h) - h^2 from the camera's own position and the stable quadratic form, and a
+point's height is (|p|^2 + 2R p_y) / (|o| + R). Two tiling noise volumes are generated once by compute on the first frame and
+after a device loss; the sky light is reduced from the sky's reflection map by one 64-thread workgroup each frame. Without a
+depth texture the pass depth-tests against the cleared sky; with one it reads the first sample of multisampled depth.
+Evidence: `packages/sky/test/features-check.mjs` (coverage 0 exact, coverage, depth occlusion in front of and inside the
+layer, motion) at 4x and 1x on a Radeon 680M. Missing: other GPUs, a quiet timing, a comparison with a reference renderer.
+
 A `ShadowFilterEffect` replaces the named filters' last step in `shadowVisibility`, after the cascade pick and the receiver
 plane. `varianceFilter` turns the depth map into two moments, blurs them by two separable passes when the map changes, and
 bounds the lit share with Chebyshev's inequality. A filter's shader must keep `shadowSampler` read, in a branch never taken,

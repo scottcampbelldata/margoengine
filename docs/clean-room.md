@@ -443,6 +443,12 @@ The own solver's kernel (`packages/physics/kernel`, Rust, no dependencies). Noth
 | S20 | post depth fog beyond `start`, exp or exp2, height boost (1 + max(-y,0) h) | sky/src/fog.ts | OpenGL fog equations; height term Margo's |
 | S21 | sun from clock (circle through east, zenith at noon), from angles; day/night blend window (sun.y+0.12)/0.2; moon intensity 0.1 x sun | sky/src/base.ts | Margo-own: not astronomical |
 | S22 | `sunPath`: day angle 2 pi (d - 1) / 365, declination and equation of time Fourier series; elevation and azimuth from the hour angle, declination and latitude | sky/src/sun.ts | Spencer, "Fourier series representation of the position of the sun", Search 2(5), 1971 (coefficients); the spherical formulas are standard positional astronomy |
+| S23 | tiling cloud noise volumes: Perlin-Worley and Worley fBm (shape, 64³), Worley fBm (erosion, 32³); coverage remap, height profile, erosion that turns from wisps to billows with height | sky/src/volumetric-clouds.ts | Schneider 2015, "The Real-Time Volumetric Cloudscapes of Horizon Zero Dawn", SIGGRAPH Advances in Real-Time Rendering; Worley 1996, "A Cellular Texture Basis Function", SIGGRAPH; Perlin 2002, "Improving Noise", SIGGRAPH (quintic fade). The 0.67 to 0.87 stretch is measured from this generator; the profile and the 0.35 erosion are Margo's |
+| S24 | pcg3d hash | sky/src/volumetric-clouds.ts | Jarzynski & Olano 2020, "Hash Functions for GPU Rendering", JCGT 9(3) |
+| S25 | multiple scattering as octaves a^i, b^i, c^i (a = b = c = 0.5, three octaves) | sky/src/volumetric-clouds.ts | Wrenninge, Kulla and Lundqvist 2013, "Oz: The Great and Volumetric", SIGGRAPH Talks |
+| S26 | energy-conserving step: scattered light (S - S e^(-sigma dt)) / sigma with albedo 1; two-lobe Henyey-Greenstein 0.8 / -0.3 (weight 0.3) | sky/src/volumetric-clouds.ts | Hillaire 2016, "Physically Based Sky, Atmosphere and Cloud Rendering in Frostbite", SIGGRAPH course; Henyey and Greenstein 1941; lobe values Margo's |
+| S27 | ray against concentric shells with the constant formed as |e|^2 + 2R(e_y - h) - h^2 and the stable quadratic roots q, c/q | sky/src/volumetric-clouds.ts | Press et al., "Numerical Recipes", 3rd ed., sec. 5.6 (quadratic roots without cancellation) |
+| S28 | sky light for the clouds: the reflection map cosine-weighted over the upper hemisphere and averaged over the horizon band | sky/src/volumetric-clouds.ts | Margo-own: reuses the sky's reflection map (S19) |
 
 ### splats
 

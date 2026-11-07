@@ -80,7 +80,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/selection | `.` 27 | 5 |  | 20,712 |
 | @margoengine/shader | `.` 189, `./noise` 14, `./graph` 17, `./readback` 4, `./raw` 21, `./effects` 19, `./editor` 24, `./compute-texture` 9, `./lighting` 11, `./deform` 11, `./pass` 7, `./utils` 37, `./subgroups` 12 | 347 | 1 | 18,452 |
 | @margoengine/shadows | `.` 14, `./virtual` 3, `./light-function` 6, `./vsm` 3, `./transmission` 3, `./distance` 3, `./style` 3, `./rt` 5 | 45 |  | 18,395 |
-| @margoengine/sky | `.` 12, `./base` 13, `./preetham` 1, `./bruneton` 1, `./clouds` 1, `./night` 1, `./fog` 1, `./reflection` 1, `./lighting` 1, `./weather` 8, `./sun` 19 | 97 |  | 16,591 |
+| @margoengine/sky | `.` 12, `./base` 13, `./preetham` 1, `./bruneton` 1, `./clouds` 1, `./night` 1, `./fog` 1, `./reflection` 1, `./lighting` 1, `./weather` 8, `./sun` 19, `./volumetric-clouds` 5 | 97 |  | 16,587 |
 | @margoengine/splats | `.` 21, `./data` 19 | 2 |  | 25,435 |
 | @margoengine/splines | `.` 3, `./closest` 4, `./frames` 8, `./knots` 5, `./mesh` 9, `./fit` 3 | 20 |  | 1,597 |
 | @margoengine/sprites | `.` 14, `./animation` 6, `./aseprite` 13, `./atlas` 3 | 6 |  | 4,803 |

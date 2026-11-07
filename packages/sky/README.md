@@ -38,6 +38,7 @@ const sky = Sky.attach(engine, {model: 'bruneton', clouds: {coverage: 0.4}}, {br
 | `/lighting` | `lighting` (engine sun/moon light, ambient) | 1.0 kB |
 | `/sun` | typed angles, `setSun` / `setAmbient` over core's light, `sunlitSky`, `sunPath` (not a `Sky` feature) | 2.1 kB |
 | `/weather` | `Weather`, its own plugin (not a `Sky` feature): rain, snow, lightning, thunder timing | 5.6 kB |
+| `/volumetric-clouds` | `VolumetricClouds`, its own plugin: ray-marched 3D clouds you can fly through | 7.3 kB |
 
 Each entry is compressed on its own ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)),
 so sums overstate a combined bundle: the root `Sky` is 10.2 kB with all of them, against 13.7 kB
@@ -74,7 +75,7 @@ erosion, six for the sun samples), two where the sky is clear, and no
 texture reads. The visible sky, water's reflection and the lighting environment use
 the same cloud field and clock, with filtering matched to each target's resolution.
 `sky.cloudLayer` gives the layer's noise and clock to what must match it: `cloudShadows(sky)` from
-`@margoengine/shadows/light-function` darkens the ground under these clouds. There is no volumetric flight-through rendering.
+`@margoengine/shadows/light-function` darkens the ground under these clouds. For clouds you can fly through, see [Volumetric clouds](#volumetric-clouds).
 
 timeScale is clock hours per real second. Sun direction is exposed in the reused sun buffer. The sky draws only where the reversed-Z scene depth is clear. Bruneton precomputation includes transmittance, single scattering, scattering density and orders 2..4, cached until turbidity changes. Tables interpolate four dimensions (radius, view zenith, sun zenith, view/sun angle), with 8 x 32 x 16 x 8 samples; angular and ray integration use 32 samples. Camera Y is meters above Earth; atmosphere math is kilometers.
 
@@ -99,6 +100,67 @@ more air, warming and dimming it (at 17:34 with turbidity 3.2 the sun is at abou
 69% strength, with green at 64% and blue at 21% of red). Surfaces add their own N·L,
 so there is no further elevation factor. `sunlight(mu, altitude, turbidity)` returns
 that colour for any sun elevation. `sunset` is deprecated and ignored.
+
+## Volumetric clouds
+
+`VolumetricClouds` from `@margoengine/sky/volumetric-clouds` is a layer of real 3D cloud between two heights that
+you can fly into, through and above. It is its own plugin: give it the sky that lights it, and leave the sky's own
+`clouds` option off.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Sky} from 'margoengine/sky';
+import {Bloom} from 'margoengine/post/bloom';
+import {VolumetricClouds} from 'margoengine/sky/volumetric-clouds';
+const engine = await Engine.create(document.querySelector('canvas')!, {
+  backend: 'webgpu', camera: {position: [0, 2, 0], target: [0, 40, -60], far: 200000},
+});
+const bloom = Bloom.attach(engine);
+const sky = Sky.attach(engine, {hours: 10, timeScale: 0});
+const clouds = VolumetricClouds.attach(engine, {sky, coverage: 0.5, depth: () => bloom.depthTexture});
+clouds.options.wind = [15, 0]; // options are read every frame
+```
+
+Each pixel marches its view ray through the layer (`steps` samples, 64 by default, each starting at its own fraction of
+a step so the steps do not band) and, wherever there is cloud, `lightSteps` samples (6) toward the sun. The shapes come
+from two tiling noise volumes made once on the GPU (Schneider 2015): a 64³ Perlin-Worley and Worley volume for the
+billows and a 32³ Worley volume that erodes their edges, wispy at the base and rounded higher up. A coarse slice of the
+same volume spreads the clouds into groups and clear patches. The light is Beer-Lambert with the powder darkening,
+two Henyey-Greenstein lobes, and multiple scattering as three octaves of weaker extinction and flatter phase (Wrenninge
+et al. 2013), integrated step by step as Hillaire 2016 does, so the sun breaks through gaps in shafts and cloud edges
+glow toward the sun. The layer sits on the planet's curve (radius 6,360 km), so it reaches the horizon, and far cloud
+thins into the haze as the sky's own layer does (half at 28 km).
+
+With a `sky`, the sun's direction and its colour through the sky's atmosphere (warm and dim when low, nothing once it
+has set), the sky's exposure, its moon light and its sky light carry over. The sky light comes from the sky's 64 × 32
+reflection map (the `reflection` feature, part of the root `Sky`), reduced on the GPU each frame to the light from above
+and from the horizon; reading `sky.reflectionTexture` turns that map's refresh on. A sky without the feature, or no sky,
+uses `ambient` and `sunDirection`.
+
+`depth` takes the scene's reversed-Z depth each frame (any effect's scene depth, as the sky's fog does). With it the
+march stops at scene surfaces, so a camera inside the layer sees cloud in front of nearby objects, and a mountain
+in front of the clouds hides them. Without it the clouds draw only over the empty sky.
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `sky` | none | the `Sky` that lights the clouds |
+| `coverage` | 0.5 | share of the sky covered, 0 to 1; 0 draws nothing |
+| `bottom`, `top` | 1500, 4000 | the layer's base and tops in metres above the ground (100 to 20,000) |
+| `density` | 0.04 | extinction per metre inside the densest cloud |
+| `scale` | 14,000 | metres one repeat of the shapes spans; the erosion repeats eight times as often |
+| `wind` | [10, 3] | metres per second along X and Z |
+| `evolution` | 3 | metres per second the field rises through itself, so shapes change as they drift |
+| `steps`, `lightSteps` | 64, 6 | samples along the view ray and toward the sun |
+| `maxDistance` | 80,000 | farthest cloud drawn, metres |
+| `sunIntensity` | 1.6 | sun radiance on the clouds in the sky's units, as the sky's own layer |
+| `sunDirection`, `ambient` | [0.3, 0.6, 0.4]; a clear day's | the light without a sky |
+| `depth` | none | the scene depth each frame |
+
+`clouds.drift` holds how far the shapes have moved and risen; `clouds.volume` hands the noise volumes, sampler and
+uniform to passes that must see the same clouds. Cost: one fragment per pixel marching up to `steps` + `steps` ×
+`lightSteps` noise reads, at full resolution, with no temporal reuse; a 256 × 192 view took about 15 ms a frame on a
+Radeon 680M (diagnostic, taken with other jobs on the machine). Lower `steps` on slow GPUs. Needs WebGPU (`MargoError`
+`'unsupported'` on WebGL2).
 
 ## Sun, ambient and a sky that lights the scene
 
