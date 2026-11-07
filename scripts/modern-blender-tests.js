@@ -162,10 +162,6 @@ try {
       const model = await loadMargo(engine, '/fixture-' + i + '.margo');
       assert(model.nodes.length === 2 && model.primitives.length === 2, 'Missing scene instances');
       assert(model.primitives[0].vertices === model.primitives[1].vertices, 'Geometry was repacked per instance');
-      assert(
-        model.shadowPrimitives[0].vertex === model.shadowPrimitives[1].vertex,
-        'Shared geometry was uploaded twice',
-      );
       const p = model.primitives[0],
         first = p.vertices[0];
       assert(first < -0.59 && first > -0.61, 'Packed geometry changed');
@@ -175,7 +171,9 @@ try {
       ssao.add(model);
       engine.render({ culling: false });
       await device.queue.onSubmittedWorkDone();
-      assert(engine.stats.drawCalls >= 2, 'Packed model did not draw');
+      // Two nodes on one geometry merge into one static batch, so one draw and one shadow record.
+      assert(engine.stats.drawCalls === 1, 'Packed model did not draw as one batch');
+      assert(model.shadowPrimitives.length === 1, 'The two nodes were not merged');
       const validation = await device.popErrorScope();
       assert(!validation, validation?.message);
       window.margoCanvas = canvas;
@@ -236,7 +234,11 @@ try {
     } finally {
       device.createBuffer = createBuffer;
     }
-    assert(allocated.length === 4, 'Expected one shared vertex/index buffer and two instance uniforms');
+    // The geometry once (vertices, indices), the uniform ring, and the static batch the two nodes merge into.
+    assert(
+      allocated.map((r) => r.buffer.size).join(' ') === '240 12 65536 480 24',
+      'Expected one shared vertex/index buffer, one uniform ring and one merged batch',
+    );
     assert(
       allocated.every((record) => record.destroys === 0),
       'Model buffers were destroyed before unmount',

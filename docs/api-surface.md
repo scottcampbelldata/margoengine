@@ -39,7 +39,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/fsm | `.` 3 |  |  | 952 |
 | @margoengine/geometry | `.` 76, `./shapes` 20, `./triangulate` 5, `./extrude` 6, `./primitives` 17, `./utils` 36, `./extras` 6, `./nurbs` 8, `./sample` 4, `./optimize` 9, `./flow` 7, `./delaunay` 5, `./polygon` 16, `./sweep` 9, `./tessellate` 4, `./gpu` 15 | 52 |  | 23,971 |
 | @margoengine/gltf | `.` 8, `./auto` 3, `./instancing` 1, `./meshopt` 1, `./quantized` 1, `./scene-data` 6, `./textured` 1 | 186 |  | 6,698 |
-| @margoengine/gltf-pro | `.` 50, `./asset` 2, `./scene` 8, `./extended` 3, `./instancing` 3, `./prepare` 3, `./progressive` 6, `./splats` 2, `./lights` 10, `./physics` 9, `./interactivity` 10, `./metadata` 13, `./coordinates` 3, `./worker` 4 | 752 | 3 | 64,095 |
+| @margoengine/gltf-pro | `.` 50, `./asset` 2, `./scene` 8, `./extended` 3, `./instancing` 3, `./prepare` 3, `./progressive` 6, `./splats` 2, `./lights` 10, `./physics` 9, `./interactivity` 10, `./metadata` 13, `./coordinates` 3, `./worker` 4 | 752 | 3 | 64,139 |
 | @margoengine/headless | `.` 11, `./video` 11, `./ffmpeg` 4, `./stage` 3, `./compare` 11, `./formats` 9 | 8 |  | 2,611 |
 | @margoengine/html | `.` 7 |  |  | 4,954 |
 | @margoengine/input | `.` 13, `./interactions` 6, `./players` 6, `./motion` 3, `./replay` 6, `./pen` 3 | 12 |  | 5,220 |
@@ -60,7 +60,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/navmesh | `.` 13, `./build` 4 | 3 |  | 6,864 |
 | @margoengine/net | `.` 3 |  |  | 1,259 |
 | @margoengine/netcode | `.` 47, `./rollback` 4, `./websocket` 2, `./webrtc` 3, `./node` 6, `./rooms` 11, `./generate` 2 | 62 |  | 12,490 |
-| @margoengine/oit | `.` 2, `./meshes` 2, `./exact` 4 | 7 |  | 2,950 |
+| @margoengine/oit | `.` 2, `./meshes` 2, `./exact` 4 | 7 |  | 3,010 |
 | @margoengine/physics | `.` 45 | 23 |  | 16,705 |
 | @margoengine/physics2d | `.` 29 | 16 |  | 7,664 |
 | @margoengine/pixel | `.` 13, `./palette` 15, `./render3d` 8 |  |  | 4,408 |
