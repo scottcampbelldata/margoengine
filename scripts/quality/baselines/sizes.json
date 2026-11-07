@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10427613,
+  "total": 10431371,
   "history": [
     {
       "date": "2026-10-24",
@@ -3458,6 +3458,12 @@
       "commit": "6095c48a1",
       "reason": "own physics entry gains Physics and PhysicsBody",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "1bcc9dba3",
+      "reason": "new optional entry @margoengine/behavior/perception",
+      "grew": 1
     }
   ],
   "items": {
@@ -3479,12 +3485,13 @@
     "@margoengine/animator/graph": 8542,
     "@margoengine/animator/inertialize": 2150,
     "@margoengine/animator/mirror": 2030,
-    "@margoengine/animator/motion-matching": 7253,
+    "@margoengine/animator/motion-matching": 7250,
     "@margoengine/animator/spline-ik": 4094,
     "@margoengine/animator/sync": 2070,
     "@margoengine/animator/warping": 4883,
     "@margoengine/audio": 7716,
-    "@margoengine/behavior": 8909,
+    "@margoengine/behavior": 8897,
+    "@margoengine/behavior/perception": 3773,
     "@margoengine/behavior/steering": 3827,
     "@margoengine/biomes": 16819,
     "@margoengine/biomes dist/workers/biomes.js": 50739,

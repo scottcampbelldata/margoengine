@@ -2398,7 +2398,7 @@
     "package": "@margoengine/behavior",
     "version": "1.0.0",
     "published": false,
-    "description": "Game AI: behaviour trees with a typed blackboard and async tasks, utility-AI scoring, and steering and flocking behaviours.",
+    "description": "Game AI: behaviour trees with a typed blackboard and async tasks, utility-AI scoring, steering and flocking behaviours, and perception (./perception).",
     "requirements": "See the package guide for requirements",
     "keywords": "behavior",
     "install": "npm install @margoengine/behavior@1.0.0",

@@ -1,5 +1,5 @@
 {
-  "commit": "3cb89d851",
+  "commit": "db1ed4f78",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -64,8 +64,8 @@
     },
     "@margoengine/animator": {
       ".": {
-        "raw": 53309,
-        "gzip": 18734
+        "raw": 53837,
+        "gzip": 18933
       },
       "./graph": {
         "raw": 25855,
@@ -80,16 +80,16 @@
         "gzip": 1859
       },
       "./warping": {
-        "raw": 11179,
-        "gzip": 4651
+        "raw": 11175,
+        "gzip": 4650
       },
       "./fbik": {
         "raw": 12694,
         "gzip": 5434
       },
       "./motion-matching": {
-        "raw": 17048,
-        "gzip": 6997
+        "raw": 17046,
+        "gzip": 6994
       },
       "./mirror": {
         "raw": 3490,
@@ -109,11 +109,15 @@
     "@margoengine/behavior": {
       ".": {
         "raw": 24282,
-        "gzip": 8649
+        "gzip": 8637
       },
       "./steering": {
         "raw": 8839,
         "gzip": 3571
+      },
+      "./perception": {
+        "raw": 9303,
+        "gzip": 3517
       }
     },
     "@margoengine/biomes": {
@@ -1810,12 +1814,12 @@
     },
     "@margoengine/physics": {
       ".": {
-        "raw": 59034,
-        "gzip": 19137
+        "raw": 59030,
+        "gzip": 19145
       },
       "./next": {
-        "raw": 24674,
-        "gzip": 15594
+        "raw": 53353,
+        "gzip": 26644
       }
     },
     "@margoengine/physics2d": {
@@ -2614,8 +2618,8 @@
         "gzip": 2748
       },
       "./terrain": {
-        "raw": 12875,
-        "gzip": 5743
+        "raw": 12887,
+        "gzip": 5747
       }
     },
     "@margoengine/tonemap": {
@@ -3043,9 +3047,9 @@
       "brotli": 9639
     },
     "packages/physics/dist/index.js": {
-      "raw": 59034,
-      "gzip": 19137,
-      "brotli": 16929
+      "raw": 59030,
+      "gzip": 19145,
+      "brotli": 16889
     },
     "packages/save/dist/index.js": {
       "raw": 19849,

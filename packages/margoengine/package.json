@@ -138,6 +138,10 @@
       "types": "./dist/behavior/steering.d.ts",
       "import": "./dist/behavior/steering.js"
     },
+    "./behavior/perception": {
+      "types": "./dist/behavior/perception.d.ts",
+      "import": "./dist/behavior/perception.js"
+    },
     "./biomes": {
       "types": "./dist/biomes.d.ts",
       "import": "./dist/biomes.js"

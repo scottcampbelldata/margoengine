@@ -134,7 +134,7 @@ Import the stage for a canvas, camera, controls and loading in a few lines (`imp
 - [@margoengine/navmesh](https://margoengine.com/llms/packages/navmesh.md): Convex polygon navigation with A*, funnel paths and ORCA avoidance; navmesh generation from triangles (./build) tiled meshes that rebuild at run time (./tiles), baked…
 - [@margoengine/ecs](https://margoengine.com/llms/packages/ecs.md): Typed-array packed sparse-set entity component storage.
 - [@margoengine/fsm](https://margoengine.com/llms/packages/fsm.md): Hierarchical state machines with history, delayed transitions, parallel regions, JSON documents, snapshots and traces.
-- [@margoengine/behavior](https://margoengine.com/llms/packages/behavior.md): Game AI: behaviour trees with a typed blackboard and async tasks, utility-AI scoring, and steering and flocking behaviours.
+- [@margoengine/behavior](https://margoengine.com/llms/packages/behavior.md): Game AI: behaviour trees with a typed blackboard and async tasks, utility-AI scoring, steering and flocking behaviours, and perception (./perception).
 - [@margoengine/save](https://margoengine.com/llms/packages/save.md): Save and load: versioned scene and world documents with stable ids, prefabs with overrides, migrations, all-or-nothing loading and storage adapters.
 - [@margoengine/net](https://margoengine.com/llms/packages/net.md): Hermite and quaternion snapshot interpolation with bounded prediction.
 - [@margoengine/netcode](https://margoengine.com/llms/packages/netcode.md): Game networking for any game: schema-first binary codec with delta snapshots, an authoritative fixed-timestep server, client prediction and reconciliation…
@@ -250,7 +250,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/navmesh API](https://margoengine.com/llms/api/navmesh.md): 10 entry points
 - [@margoengine/ecs API](https://margoengine.com/llms/api/ecs.md): 7 entry points
 - [@margoengine/fsm API](https://margoengine.com/llms/api/fsm.md): 4 entry points
-- [@margoengine/behavior API](https://margoengine.com/llms/api/behavior.md): 2 entry points
+- [@margoengine/behavior API](https://margoengine.com/llms/api/behavior.md): 3 entry points
 - [@margoengine/save API](https://margoengine.com/llms/api/save.md): 2 entry points
 - [@margoengine/net API](https://margoengine.com/llms/api/net.md): 1 entry point
 - [@margoengine/netcode API](https://margoengine.com/llms/api/netcode.md): 7 entry points

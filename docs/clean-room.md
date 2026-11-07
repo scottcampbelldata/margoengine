@@ -806,6 +806,7 @@ like) was read.
 | Steering (seek, flee, arrive, pursue, evade, wander, obstacle avoidance, path following, priorities) | C. W. Reynolds, "Steering Behaviors For Autonomous Characters", Game Developers Conference 1999 |
 | Flocking (separation, alignment, cohesion) | C. W. Reynolds, "Flocks, herds and schools: a distributed behavioral model", ACM SIGGRAPH 1987 |
 | Seeded random stream | `@margoengine/math`'s `createRandom` (mulberry32) |
+| Perception (`behavior/perception`) | M. Walsh, "Modeling Perception and Awareness in Tom Clancy's Splinter Cell Blacklist", Game AI Pro 2, chapter 28, 2015 (read in full): perceiving against being aware, test points on the body, vision shapes with a timer scaled by distance, coffin-shaped boxes past a cone, sounds with a radius and a priority, sound distance that is not straight. Its room graph (TEAS) is left to `soundDistance`. Where its text says the "most inclusive" shape sets the time, Margo takes the shortest of the shapes holding the target. D. Isla, B. Blumberg, "Object Persistence for Synthetic Creatures", AAMAS 2002 (read in full): the Probabilistic Occupancy Map, equations 1.3 to 1.11. Equation 1.4 is hard to read in the copy read, and Margo reads it as a constant rate plus max(0, v.l / l.l); shares here are per neighbour, so the total holds at walls, and the grid is square where the paper's is hexagonal. |
 
 ## Game networking: `@margoengine/netcode`
 

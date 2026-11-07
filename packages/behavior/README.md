@@ -2,8 +2,8 @@
 
 Import `margoengine/behavior` from the `margoengine` package, or `@margoengine/behavior` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
-Game AI for agents: behaviour trees with a typed blackboard and async tasks, utility-AI scoring, and steering and
-flocking behaviours. No rendering, no globals, nothing runs on import; it works the same in the browser, a worker or
+Game AI for agents: behaviour trees with a typed blackboard and async tasks, utility-AI scoring, steering and
+flocking behaviours, and perception. No rendering, no globals, nothing runs on import; it works the same in the browser, a worker or
 Node. For states with cross-fades use `@margoengine/fsm`; for walking on a navigation mesh with ORCA avoidance use
 `@margoengine/navmesh`'s `Crowd`. Both work with this package (below).
 
@@ -188,6 +188,65 @@ With `@margoengine/navmesh`: a `CrowdAgent` is a steering agent as it is (`posit
 crowd's `agents` are valid neighbours, and a route from `navMesh.path(start, end)` is a valid `followPath` path. The
 crowd itself steers its agents to their targets with ORCA avoidance; use these behaviours for agents the crowd does
 not drive (birds, fish, a pet following the player) or to compute a preferred velocity for `avoid`.
+
+## Perception
+
+Sight, hearing and a memory of last seen targets, written to the blackboard your behaviour tree already reads.
+
+```ts
+import { Blackboard } from 'margoengine/behavior';
+import {
+  OccupancyMap,
+  Perception,
+  perceptionLevel,
+  perceptionPosition,
+  sphereOcclusion,
+} from 'margoengine/behavior/perception';
+
+const blackboard = new Blackboard();
+const guard = { position: [0, 0, 0], forward: [0, 0, 1] };
+const eyes = new Perception(guard, {
+  blackboard,
+  eyeHeight: 1.6,
+  sight: [
+    { kind: 'cone', range: 12, fov: 1.9, nearTime: 0.2, farTime: 1 },
+    { kind: 'coffin', range: 40, shoulder: 15, width: 10, nearTime: 1, farTime: 4 },
+  ],
+  lineOfSight: sphereOcclusion([{ position: [2, 1, 6], radius: 1 }]),
+});
+
+const player = { id: 'player', position: [0, 1, 8], velocity: [1, 0, 0] };
+eyes.update(1 / 60, [player]); // every tick
+eyes.hear({ position: [3, 0, -2], radius: 15, priority: 0.6 }); // when something makes a noise
+
+blackboard.get(perceptionLevel); // 'calm', 'suspicious' or 'aware'
+blackboard.get(perceptionPosition); // last known position, or null
+eyes.predict('player'); // where it probably went
+
+// Lost it? Spread the chance out, rule out what the guard can see, and go to the best guess.
+const map = OccupancyMap.grid({ min: [-20, -20], size: [40, 40], cell: 1 });
+map.observe(player.position);
+map.diffuse();
+map.cull((at) => eyes.canSee(at));
+map.best();
+```
+
+A target held by a sight shape with enough `points` in view (`pointsNeeded`, say two of eight bones, more for a target
+in cover) fills its awareness over the shape's detection time, which runs linearly from `nearTime` at the eye to
+`farTime` at `range` and divides by the target's `visibility`. With several shapes the shortest time wins. A `coffin`
+widens to `width` at `shoulder` and narrows to nothing at `range`, so far away the guard sees what is ahead, not the
+wide edge a cone would give it. Sound carries its `radius` in sound distance; pass `soundDistance` to measure it around
+walls, for example the length of `navMesh.path(from, to)`, and `hearing` to scale it per agent. A `priority` raises
+awareness to at least that value. Memories fade over `forgetTime` and go at 0; the level drops from `aware` through
+`suspicious` to `calm` on the way, which is what a guard giving up looks like.
+
+`lineOfSight` takes any `(from, to) => boolean`: `sphereOcclusion`, `navVolume.lineOfSight` from
+`@margoengine/navmesh/volume`, or a physics ray. Without one nothing blocks sight. Blackboard keys are
+`perceptionTarget`, `perceptionPosition`, `perceptionLevel` and `perceptionVisible`, written only when they change.
+
+`OccupancyMap` holds the chance a lost target is at each node of a grid or any graph you give it: `diffuse` spreads it,
+with an optional velocity to favour a direction, `observe` pins it and returns how surprising the place was, `cull`
+clears nodes seen empty, and `best` is where to look next. Walking there and calling `cull` again is a search.
 
 Errors name their fix: a bad argument throws `TypeError` or `RangeError` (`Agent maxSpeed must be a finite number of
 0 or more`), a call that is not valid right now throws `MargoError` with code `state` (ticking from inside a handler),
