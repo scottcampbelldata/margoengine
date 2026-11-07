@@ -12,6 +12,21 @@ export interface BoundingVolumeJSON {
   extensions?: Record<string, unknown>;
 }
 
+/**
+ * Reads a bounding volume extension, such as `s2` from `@margoengine/tiles/s2` (3DTILES_bounding_volume_S2). Pass it in
+ * `boundingVolumes` of `Tileset.load` or `TilesRenderer.load`; a volume carrying the extension is then read by it,
+ * ignoring the tile transform as such extensions specify, and the tileset may list the extension as required.
+ */
+export interface BoundingVolumeExtension {
+  /** The extension's name in `boundingVolume.extensions` and `extensionsRequired`. */
+  readonly name: string;
+  /** The bounds of the extension object (a box in ECEF, with `split` for implicit tiling). Throws on invalid input. */
+  bounds(volume: unknown): TileBounds;
+}
+
+/** Bounds of implicit tile (level, x, y, z) below a root volume, for a volume that subdivides its own way. */
+export type SplitBounds = (scheme: 'QUADTREE' | 'OCTREE', level: number, x: number, y: number, z: number) => TileBounds;
+
 /** An oriented box (centre, three half-axis vectors) with its bounding sphere, in tileset coordinates. */
 export class TileBounds {
   /** Centre, x y z. */
@@ -24,12 +39,14 @@ export class TileBounds {
   readonly region?: Float64Array;
   /** True when built from a sphere (its box is the sphere's cube; distance uses the sphere). */
   readonly sphere: boolean;
+  /** How an extension volume (such as an S2 cell) subdivides under implicit tiling; undefined for box, region, sphere. */
+  readonly split?: SplitBounds;
   private readonly unit = new Float64Array(9);
   private readonly lengths = new Float64Array(3);
   constructor(
     center: ArrayLike<number>,
     halfAxes: ArrayLike<number>,
-    options: { region?: ArrayLike<number>; sphere?: number } = {},
+    options: { region?: ArrayLike<number>; sphere?: number; split?: SplitBounds } = {},
   ) {
     this.center = Float64Array.from(center);
     this.halfAxes = Float64Array.from(halfAxes);
@@ -40,6 +57,7 @@ export class TileBounds {
     )
       throw new RangeError('Invalid bounding volume; give finite numbers (box: 12, region: 6, sphere: 4)');
     if (options.region) this.region = Float64Array.from(options.region);
+    if (options.split) this.split = options.split;
     this.sphere = options.sphere !== undefined;
     for (let i = 0; i < 3; i++) {
       const x = this.halfAxes[i * 3],
@@ -212,9 +230,17 @@ export function regionBounds(region: ArrayLike<number>): TileBounds {
 }
 
 /** Builds the bounds of a `boundingVolume` under a tile's computed transform. */
-export function createBounds(volume: BoundingVolumeJSON | undefined, transform?: ArrayLike<number>): TileBounds {
+export function createBounds(
+  volume: BoundingVolumeJSON | undefined,
+  transform?: ArrayLike<number>,
+  extensions: readonly BoundingVolumeExtension[] = [],
+): TileBounds {
   if (!volume || typeof volume !== 'object')
     throw new TypeError('Tile has no boundingVolume; give it a box, region or sphere');
+  for (const extension of extensions) {
+    const value = volume.extensions?.[extension.name];
+    if (value !== undefined) return extension.bounds(value);
+  }
   const check = (array: unknown, length: number, kind: string): readonly number[] => {
     if (
       !Array.isArray(array) ||
@@ -227,5 +253,9 @@ export function createBounds(volume: BoundingVolumeJSON | undefined, transform?:
   if (volume.box) return boxBounds(check(volume.box, 12, 'box'), transform);
   if (volume.region) return regionBounds(check(volume.region, 6, 'region'));
   if (volume.sphere) return sphereBounds(check(volume.sphere, 4, 'sphere'), transform);
-  throw new TypeError('Unsupported boundingVolume; give a box, region or sphere (S2 cells are not supported)');
+  throw new TypeError(
+    volume.extensions?.['3DTILES_bounding_volume_S2'] !== undefined
+      ? "S2 bounding volumes need their reader: import { s2 } from '@margoengine/tiles/s2' and pass { boundingVolumes: [s2] }"
+      : 'Unsupported boundingVolume; give a box, region or sphere',
+  );
 }

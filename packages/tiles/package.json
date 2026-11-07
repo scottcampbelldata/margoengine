@@ -41,6 +41,10 @@
     "./splats": {
       "types": "./dist/splats.d.ts",
       "import": "./dist/splats.js"
+    },
+    "./s2": {
+      "types": "./dist/s2.d.ts",
+      "import": "./dist/s2.js"
     }
   },
   "files": [

@@ -842,6 +842,8 @@ Written clean room from the specifications and papers below. No source code of 3
 | Octahedral normals (NORMAL_OCT16P, OCT32P) | Z. H. Cigolle, S. Donow, D. Evangelakos, M. Mara, M. McGuire and Q. Meyer, "A survey of efficient representations for independent unit vectors", JCGT 3(2), 2014 |
 | Quaternion from a rotation matrix | S. W. Shepperd, "Quaternion from rotation matrix", J. Guidance and Control 1(3), 1978 |
 | Oriented-box frustum and distance tests | Separating-axis projection of a box onto a plane normal (C. Ericson, "Real-Time Collision Detection", 2005, ch. 5) |
+| Gaussian splat tiles (`tiles/splats`) | Khronos KHR_gaussian_splatting README (ratified); 3D Tiles 1.1 glTF content and `3DTILES_content_gltf`; the splats are read by gltf-pro and drawn by @margoengine/splats, both Margo's own |
+| S2 cell volumes (`tiles/s2`) | CesiumGS/3d-tiles, `3DTILES_bounding_volume_S2` README (cell IDs, tokens, quadratic projection, extrusion, implicit subdivision and its availability figure); the S2 cell hierarchy guide, s2geometry.io/devguide/s2cell_hierarchy (faces, Hilbert curve, odd faces mirrored); D. Hilbert, "Ueber die stetige Abbildung einer Linie auf ein Flaechenstueck", Math. Annalen 38, 1891. No S2 library source was read |
 
 ## Point clouds: LAS, octree and colours in `@margoengine/points`
 

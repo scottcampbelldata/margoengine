@@ -24,6 +24,11 @@ export class BatchTable {
     feature(batchId: number): Record<string, unknown>;
 }
 
+export interface BoundingVolumeExtension {
+    readonly name: string;
+    bounds(volume: unknown): TileBounds;
+}
+
 export interface BoundingVolumeJSON {
     box?: readonly number[];
     region?: readonly number[];
@@ -156,6 +161,8 @@ export type Priority = readonly [group: number, key: number];
 
 export type Refine = 'ADD' | 'REPLACE';
 
+export type SplitBounds = (scheme: 'QUADTREE' | 'OCTREE', level: number, x: number, y: number, z: number) => TileBounds;
+
 export interface Subtree {
     readonly tiles: Availability;
     readonly contents: readonly Availability[];
@@ -169,9 +176,11 @@ export class TileBounds {
     readonly radius: number;
     readonly region?: Float64Array;
     readonly sphere: boolean;
+    readonly split?: SplitBounds;
     constructor(center: ArrayLike<number>, halfAxes: ArrayLike<number>, options?: {
         region?: ArrayLike<number>;
         sphere?: number;
+        split?: SplitBounds;
     });
     distanceTo(point: ArrayLike<number>): number;
     contains(point: ArrayLike<number>): boolean;
@@ -345,6 +354,7 @@ export interface TilesetOptions {
     skipLevelOfDetail?: boolean;
     skipScreenSpaceErrorFactor?: number;
     content?: ContentFactory;
+    boundingVolumes?: readonly BoundingVolumeExtension[];
 }
 
 export class TilesetTile {
@@ -420,7 +430,7 @@ export function cartographicToEcef(longitude: number, latitude: number, height?:
 
 export function contentMagic(bytes: Uint8Array): 'b3dm' | 'pnts' | 'i3dm' | 'cmpt' | 'glTF' | 'subt' | 'json' | undefined;
 
-export function createBounds(volume: BoundingVolumeJSON | undefined, transform?: ArrayLike<number>): TileBounds;
+export function createBounds(volume: BoundingVolumeJSON | undefined, transform?: ArrayLike<number>, extensions?: readonly BoundingVolumeExtension[]): TileBounds;
 
 export function decompose(m: ArrayLike<number>): {
     translation: [number, number, number];

@@ -34,7 +34,7 @@ The renderer updates selection every frame from `engine.camera`. `tiles.dispose(
 | Part of the specification | Support |
 | --- | --- |
 | Tileset JSON | `asset`, `geometricError`, `root`, `children`, `transform` (composed in float64), `refine` (inherited), `content` / `contents` (several per tile), `viewerRequestVolume`, `content.boundingVolume`, `properties`, `extensionsRequired` (unknown required extensions fail with code `unsupported`) |
-| Bounding volumes | `box`, `region` (always in EPSG:4979, ignores transforms), `sphere`; S2 is not supported |
+| Bounding volumes | `box`, `region` (always in EPSG:4979, ignores transforms), `sphere`; S2 cells (`3DTILES_bounding_volume_S2`, explicit and implicit) with `s2` from `margoengine/tiles/s2` |
 | Refinement | `REPLACE` (children drawn only once every visible child is ready, so no holes and no overlap) and `ADD` |
 | Implicit tiling | `QUADTREE` and `OCTREE`, `subtreeLevels`, `availableLevels` (or the 1.0 extension's `maximumLevel`), binary and JSON subtree files, constant and bitstream availability, child subtrees, `{level}` `{x}` `{y}` `{z}` templates |
 | External tilesets | content that is tileset JSON becomes the tile's child; its transforms continue from the tile |
@@ -56,6 +56,7 @@ Each update measures every visible tile's screen-space error, `geometricError x 
 | `memoryBudget` | 512 MiB | Bytes of ready content kept. Past it, the least recently used tiles outside the view are evicted; if the view alone needs more, only hole-filling loads start (`tileset.overBudget` is then true). |
 | `skipLevelOfDetail` | `false` | Skip loading far-too-coarse parents (see Selection). |
 | `skipScreenSpaceErrorFactor` | `16` | How coarse a parent may be before it is skipped. |
+| `boundingVolumes` | none | Bounding volume extensions to read: `[s2]` from `margoengine/tiles/s2`. A tileset that requires S2 without it fails with code `unsupported`. |
 | `fetch` | `globalThis.fetch` | Your own fetch: auth headers, an offline cache, tests. |
 | `signal` | none | `AbortSignal` for the load and every later request. |
 | `frame` (renderer) | `'enu'` | `'enu'`, `'local'` or a 4x4 matrix; see below. |
@@ -146,6 +147,27 @@ engine.start();
 
 Every visible tile's splats go into one cloud, so splats of neighbouring and overlapping tiles sort together rather than tile by tile; the cloud is rebuilt after an update that changed which tiles show (one rebuild for a whole REPLACE swap, so no frame shows both levels or neither) and when a floating origin moves. Each primitive is placed by `frame x tile transform x RTC x y-up to z-up x node` in float64: shapes and harmonics are turned by the linear part, and the translation is added in float64 when the cloud is built, so splats keep float32 precision at the tile's own size even at ECEF distances. Tiles with different harmonic degrees merge at the highest one. Past 3,000,000 visible splats a second cloud starts (`SPLATS_PER_CLOUD`), and those two sort apart. `placeSplats`, `mergePlaced` and `TileSplats` are exported for your own renderer.
 
+## S2 cells
+
+Global datasets often bound their tiles with S2 cells (`3DTILES_bounding_volume_S2`): a cell of S2's cube-face hierarchy, by its token, extruded along the ellipsoid normals between two heights. Pass `s2` from `margoengine/tiles/s2`; tilesets without S2 never load it.
+
+```ts
+import { Tileset } from 'margoengine/tiles';
+import { parseS2Token, s2, s2Bounds } from 'margoengine/tiles/s2';
+
+// The extension's own example: the S2 cell "89c6c7" over Philadelphia's Center City, from the ground to 1 km.
+const volume = { token: '89c6c7', minimumHeight: 0, maximumHeight: 1000 };
+console.log(parseS2Token(volume.token)); // { face: 4, level: 10, i: ..., j: ... }
+console.log(s2Bounds(volume).radius.toFixed(0), 'm bounding radius');
+
+const json = { asset: { version: '1.1' }, geometricError: 100, extensionsRequired: ['3DTILES_bounding_volume_S2'],
+  root: { geometricError: 0, boundingVolume: { extensions: { '3DTILES_bounding_volume_S2': volume } } } };
+const tileset = await Tileset.load(URL.createObjectURL(new Blob([JSON.stringify(json)])), { boundingVolumes: [s2] });
+console.log(tileset.root.bounds.center);
+```
+
+Each cell becomes an oriented box in ECEF (east, north and up at the cell's centre) around a 17 x 17 grid of points on its bottom and top surfaces, grown by the curvature between those points, so it holds the whole volume; the tile transform is ignored, as the extension says. Tokens, the Hilbert order on each face (odd faces mirrored) and the quadratic projection follow the extension and the S2 cell hierarchy guide. With implicit tiling a quadtree tile (level, x, y) is the S2 cell at (x, y) on its parent's (i, j) grid, and an octree tile also takes its slab of the heights. `parseS2Token`, `s2Token`, `s2LonLat` and `s2CellBounds` are exported.
+
 ## Without the engine
 
 `Tileset` is engine-free: give it a view each frame and a content factory, and it does the rest. This is how the tests drive it, and how to stream tiles into your own renderer or a server-side job.
@@ -167,7 +189,7 @@ The content parsers (`parseB3dm`, `parsePnts`, `parseI3dm`, `parseCmpt`, `parseC
 ## Limits
 
 - i3dm batch tables are read (`content.batchTable`) but per-instance picking and per-instance colours are not wired to them; an i3dm external glTF resolves against the tile's first content URL.
-- S2 bounding volumes are not read.
+- S2 boxes are boxes: near a face cell's corners a box holds more than the cell (selection may load a tile slightly early); no real S2 dataset was found to test on, so the proof uses the extension's own examples and figures.
 - Splat tiles: the visible cloud is rebuilt on the CPU and uploaded again when the visible tiles change, which costs time in proportion to the visible splats (not measured); splats do not write depth or receive lighting (see `@margoengine/splats`); the renderer's `loadModel` is not used for splat tiles; a glTF tile with external buffers is not read.
 - Metadata: feature ID textures are named, not read (sample the texture yourself); property textures, property attributes and a `schemaUri` schema in glTF are not read; 64-bit integers become doubles (exact to 2^53); feature IDs of a Draco-compressed glTF primitive are not read; picking a vertex is yours (a raycast hit), the tables then give its feature.
 - Draco pnts decode in Web Workers (`@margoengine/decoders/draco-points`), so not in Node without a decoder of your own.

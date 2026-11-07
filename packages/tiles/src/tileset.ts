@@ -4,7 +4,7 @@
 // least-recently-used eviction, metadata and progress events. Engine-free: content is handed to a `ContentFactory`
 // (the engine renderer in renderer.ts makes gltf-pro models). Written from the OGC 3D Tiles 1.1 specification.
 import { MargoError } from '@margoengine/math/errors';
-import { type BoundingVolumeJSON, type TileBounds, createBounds } from './bounds.js';
+import { type BoundingVolumeExtension, type BoundingVolumeJSON, type TileBounds, createBounds } from './bounds.js';
 import { type TileContent, contentMagic, parseContent } from './formats.js';
 import {
   type ImplicitTilingJSON,
@@ -216,6 +216,8 @@ export interface TilesetOptions {
   skipScreenSpaceErrorFactor?: number;
   /** Makes renderables from parsed content. Default: keep the parsed content only (bytes = content size). */
   content?: ContentFactory;
+  /** Bounding volume extensions to read, such as `s2` from `@margoengine/tiles/s2`. Default none. */
+  boundingVolumes?: readonly BoundingVolumeExtension[];
 }
 
 /** Counts reported by `progress` and `idle` events and `tileset.progress`. */
@@ -305,6 +307,7 @@ export class Tileset {
   private readonly queue: FetchQueue;
   private readonly controller = new AbortController();
   private readonly factory?: ContentFactory;
+  private readonly volumes: readonly BoundingVolumeExtension[];
   private readonly listeners = new Map<keyof TilesetEvents, Set<(event: never) => void>>();
   private readonly ready = new Set<TilesetTile>();
   private readonly failed = new Set<TilesetTile>();
@@ -335,7 +338,8 @@ export class Tileset {
   }
   private constructor(json: unknown, url: string, options: TilesetOptions, schema?: MetadataSchema) {
     this.url = url;
-    this.json = checkTileset(json, url);
+    this.volumes = options.boundingVolumes ?? [];
+    this.json = checkTileset(json, url, this.volumes);
     this.fetcher = options.fetch ?? globalThis.fetch?.bind(globalThis);
     if (!this.fetcher) throw new MargoError('unsupported', 'No fetch available; pass options.fetch');
     this.maximumScreenSpaceError = checkNumber(options.maximumScreenSpaceError ?? 16, 'maximumScreenSpaceError');
@@ -602,7 +606,7 @@ export class Tileset {
   }
 
   private attachExternal(tile: TilesetTile, json: unknown, url: string): void {
-    const external = checkTileset(json, url);
+    const external = checkTileset(json, url, this.volumes);
     tile.children = [this.buildTile(external.root, tile, tile.transform, url, `${url}#root`, tile.refine)];
     tile.external = true;
     tile.state = 'ready';
@@ -657,7 +661,7 @@ export class Tileset {
         throw new TypeError(`Invalid ${path}.content${contents.length > 1 ? `s[${i}]` : ''}; give it a uri`);
       return uri;
     });
-    const bounds = createBounds(json.boundingVolume, transform);
+    const bounds = createBounds(json.boundingVolume, transform, this.volumes);
     if (json.implicitTiling) {
       const it = json.implicitTiling;
       if (it.subdivisionScheme !== 'QUADTREE' && it.subdivisionScheme !== 'OCTREE')
@@ -703,8 +707,12 @@ export class Tileset {
       refine,
       transform,
       bounds,
-      contentBounds: contents[0]?.boundingVolume ? createBounds(contents[0].boundingVolume, transform) : undefined,
-      viewerRequestVolume: json.viewerRequestVolume ? createBounds(json.viewerRequestVolume, transform) : undefined,
+      contentBounds: contents[0]?.boundingVolume
+        ? createBounds(contents[0].boundingVolume, transform, this.volumes)
+        : undefined,
+      viewerRequestVolume: json.viewerRequestVolume
+        ? createBounds(json.viewerRequestVolume, transform, this.volumes)
+        : undefined,
       contentUrls: urls.map((u) => resolveUrl(u, base)),
       metadata: json.metadata,
       contentMetadata: contents.map((c) => c.metadata),
@@ -863,7 +871,7 @@ function parseJSONBytes(bytes: Uint8Array, url: string): unknown {
   }
 }
 
-function checkTileset(json: unknown, url: string): TilesetJSON {
+function checkTileset(json: unknown, url: string, volumes: readonly BoundingVolumeExtension[]): TilesetJSON {
   if (!json || typeof json !== 'object') throw new TypeError(`Invalid tileset ${url}; it must be a JSON object`);
   const t = json as TilesetJSON;
   if (!t.asset || typeof t.asset.version !== 'string')
@@ -876,12 +884,15 @@ function checkTileset(json: unknown, url: string): TilesetJSON {
     '3DTILES_metadata',
     '3DTILES_content_gltf',
     '3DTILES_multiple_contents',
+    ...volumes.map((v) => v.name),
   ]);
   for (const name of t.extensionsRequired ?? [])
     if (!known.has(name))
       throw new MargoError(
         'unsupported',
-        `Tileset ${url} requires extension ${name}, which this loader does not implement; use a tileset without it`,
+        name === '3DTILES_bounding_volume_S2'
+          ? `Tileset ${url} requires S2 bounding volumes: import { s2 } from '@margoengine/tiles/s2' and pass { boundingVolumes: [s2] }`
+          : `Tileset ${url} requires extension ${name}, which this loader does not implement; use a tileset without it`,
       );
   return t;
 }

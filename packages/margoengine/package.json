@@ -2450,6 +2450,10 @@
       "types": "./dist/tiles/splats.d.ts",
       "import": "./dist/tiles/splats.js"
     },
+    "./tiles/s2": {
+      "types": "./dist/tiles/s2.d.ts",
+      "import": "./dist/tiles/s2.js"
+    },
     "./tonemap": {
       "types": "./dist/tonemap.d.ts",
       "import": "./dist/tonemap.js"

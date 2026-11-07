@@ -27,7 +27,16 @@ export {
   type TilesModel,
   type TilesModelDrawer,
 } from './renderer.js';
-export { TileBounds, createBounds, boxBounds, sphereBounds, regionBounds, type BoundingVolumeJSON } from './bounds.js';
+export {
+  TileBounds,
+  createBounds,
+  boxBounds,
+  sphereBounds,
+  regionBounds,
+  type BoundingVolumeJSON,
+  type BoundingVolumeExtension,
+  type SplitBounds,
+} from './bounds.js';
 export {
   parseContent,
   parseB3dm,

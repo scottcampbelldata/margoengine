@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10446495,
+  "total": 10449475,
   "history": [
     {
       "date": "2026-10-24",
@@ -3428,6 +3428,12 @@
       "commit": "053c97ca7",
       "reason": "tiles/splats: Gaussian splat tiles (batch 47 job 3)",
       "grew": 2
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "ae97bb92b",
+      "reason": "tiles/s2: S2 bounding volumes (batch 47 job 4)",
+      "grew": 1
     }
   ],
   "items": {
@@ -4040,7 +4046,8 @@
     "@margoengine/tilemap/tiled": 4264,
     "@margoengine/tiles": 15241,
     "@margoengine/tiles/i3dm": 1629,
-    "@margoengine/tiles/metadata": 4970,
+    "@margoengine/tiles/metadata": 4946,
+    "@margoengine/tiles/s2": 3004,
     "@margoengine/tiles/splats": 1822,
     "@margoengine/tonemap": 11059,
     "@margoengine/toon": 1701,

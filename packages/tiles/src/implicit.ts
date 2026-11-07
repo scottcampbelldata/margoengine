@@ -175,6 +175,7 @@ export function implicitBounds(
   y: number,
   z = 0,
 ): TileBounds {
+  if (root.split) return root.split(scheme, level, x, y, z);
   const n = 2 ** level;
   if (root.region) {
     const [west, south, east, north, minH, maxH] = root.region;

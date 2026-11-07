@@ -113,6 +113,8 @@ interface PointsContent {
 
 type Refine = 'ADD' | 'REPLACE';
 
+type SplitBounds = (scheme: 'QUADTREE' | 'OCTREE', level: number, x: number, y: number, z: number) => TileBounds;
+
 interface Subtree {
     readonly tiles: Availability;
     readonly contents: readonly Availability[];
@@ -126,9 +128,11 @@ class TileBounds {
     readonly radius: number;
     readonly region?: Float64Array;
     readonly sphere: boolean;
+    readonly split?: SplitBounds;
     constructor(center: ArrayLike<number>, halfAxes: ArrayLike<number>, options?: {
         region?: ArrayLike<number>;
         sphere?: number;
+        split?: SplitBounds;
     });
     distanceTo(point: ArrayLike<number>): number;
     contains(point: ArrayLike<number>): boolean;
