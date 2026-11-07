@@ -469,6 +469,14 @@ test('property: save -> bytes -> load gives the same document and the same expan
       [...handles.keys()],
       expanded.map((e) => e.id),
     );
+    // What the adapter built, read from the live world and not from the document.
+    assert.deepEqual(
+      expanded.map(({ id }) => world.live.get(id).entity.components),
+      expanded.map(({ components }) => components),
+    );
+    for (const { id, components } of expanded)
+      for (const [name, value] of Object.entries(components))
+        if (value && value.$ref) assert.ok(world.live.get(id).links[name], `${id} keeps its link ${name}`);
     // Saving the loaded world again (its resolved entities as a flat save) expands to the same world.
     const flat = { format: 'margo-save', version: doc.version, entities: expanded.map(({ source: _, ...e }) => e) };
     assert.deepEqual(

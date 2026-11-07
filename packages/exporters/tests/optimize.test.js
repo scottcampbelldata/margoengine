@@ -271,6 +271,7 @@ test('simplify keeps the fraction asked, a subset of the source vertices, and th
   // A collapse removes at most two triangles, so the count lands on the target or the one above it.
   assert.ok(stats.trianglesAfter <= Math.ceil(16 * 16 * 2 * 0.25) + 1, `${stats.trianglesAfter} triangles`);
   assert.ok(stats.trianglesAfter >= 16 * 16 * 2 * 0.25 - 2);
+  assert.equal(readAccessor(parts, primitive.indices).count / 3, stats.trianglesAfter, 'the file holds what the stats say');
   assert.equal(readAccessor(parts, primitive.attributes.WEIGHTS_0).count, positions.count);
   await clean(glb);
 });
@@ -397,6 +398,7 @@ test('a flat-shaded mesh reaches its ratio, and each kept triangle takes its own
     list = readAccessor(parts, primitive.indices).values;
   // A collapse removes at most two triangles, and the simplifier may stop one short.
   assert.ok(stats.trianglesAfter <= faces * 0.25 + 2, `${stats.trianglesAfter} triangles`);
+  assert.equal(list.length / 3, stats.trianglesAfter, 'the file holds what the stats say');
   for (let t = 0; t < list.length; t += 3) {
     const [a, b, c] = [0, 1, 2].map((k) => [...positions.subarray(list[t + k] * 3, list[t + k] * 3 + 3)]),
       u = a.map((v, i) => b[i] - v),

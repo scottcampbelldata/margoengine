@@ -40,6 +40,8 @@ test('the result says the Fox is 79 metres tall, so nobody finds out on a phone'
   const { size, bounds, scale, usdz } = await exportAnimatedUSDZ(asset(FOX), { clip: 'Run' }),
     text = await usda(usdz);
   nearAll(size, [25.185, 79.029, 154.72], 0.01, 'rest size');
+  const held = boxOfPoints(text);
+  nearAll(held.max.map((value, i) => value - held.min[i]), size, 0.01, 'the file\'s own points say the size the result says');
   // Run reaches past the rest pose: the feet go below the floor and the body stretches.
   nearAll(bounds.min, [-17.5, -3.722, -98.26], 0.05, 'clip min');
   nearAll(bounds.max, [17.02, 77.13, 75.19], 0.05, 'clip max');

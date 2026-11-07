@@ -117,6 +117,12 @@ test(
       chain.map((j) => j.name),
     );
     assert.equal(json.nodes[gltfSkin.skeleton].name, 'Root');
+    // What the file holds for each vertex, not what went in.
+    const { attributes } = json.meshes[json.nodes.find((node) => node.skin !== undefined).mesh].primitives[0],
+      held = (name) => Array.from(accessor(json, bin, attributes[name]));
+    assert.deepEqual(held('POSITION'), Array.from(positions, Math.fround));
+    assert.deepEqual(held('JOINTS_0'), Array.from(weights.joints));
+    assert.deepEqual(held('WEIGHTS_0'), Array.from(weights.weights));
     // Rest pose: each joint's node-chain translation plus its inverse bind translation is zero.
     const parents = new Map();
     json.nodes.forEach((node, i) => (node.children ?? []).forEach((c) => parents.set(c, i)));
