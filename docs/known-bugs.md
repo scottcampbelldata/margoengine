@@ -29,14 +29,14 @@ are still open.
 
 ## README examples
 
-### 126 of 767 README examples do not run yet
+### 125 of 767 README examples do not run yet
 
 - **What:** `npm run check:readme-run`, a step of `check:merge` since 2026-11-07, ran 641 of 767 examples that day (RTX A6000,
-  Chromium). The other 126 are in `scripts/support/readme-run-known.json`, each with its error. A new failure fails the step, and
+  Chromium). The other 126 went into `scripts/support/readme-run-known.json`; 125 are left there, each with its error. A new failure fails the step, and
   so does an entry that passes or names an example that is gone. An id is the heading above an example and a hash of its code, so
   an example added above one on the list leaves it alone; changing a listed example changes its id, and the entry moves with it.
 - **Repro:** `npm run build:packages`, then `npm run check:readme-run -- --only=<id>` with an id from that list.
-- **Cause:** 107 entries start `sample:`. The example names a file of its own (a font, a scan, a rigged model with named joints)
+- **Cause:** 106 entries start `sample:`. The example names a file of its own (a font, a scan, a rigged model with named joints)
   and the check has no matching sample, or the sample does not fit it, so these say nothing about the example yet. Ragdoll,
   fbx, the animator's joint indices and `usdz/readme-margoengine-usdz-087124` and `usdz/readme-composition-fbebfe` (no `.usdz` file is in the repository) are in this group. 19 start
   `example:`, and these need reading one at a time:
@@ -50,6 +50,19 @@ are still open.
     `headless/readme-image-sequences-and-video-37bcc7` needs ffmpeg and `voxel-net/readme-margoengine-voxel-net-b6eba6` is a server and a page in one example.
 - **Needed to close:** a matching sample for each `sample:` entry, each `example:` entry fixed in its README or its package, and
   the list empty.
+
+### The README check serves the wrong buffer to a glTF whose real .bin is under 200 bytes
+
+- **What:** an example that loads a `.gltf` the check has no file of that name for gets the smallest `.gltf` sample,
+  `examples/assets/khronos/Cameras/Cameras.gltf`. Its buffer, `Cameras.bin`, is a real 60-byte file, but the check serves
+  the smallest other `.bin` in its place, so the model fails with "Invalid glTF triangle indices". Six entries on the known
+  list end that way (exporters, gltf-pro). Found 2026-11-07 while fixing cache's LoadingManager example.
+- **Repro:** `npm run build:packages`, then `npm run check:readme-run -- --only=gltf-pro/readme-bump-maps-in-gltf-ext-materials-d683f4`.
+- **Cause:** `sampleFiles` in `scripts/run-readme-examples.mjs` drops every file under 200 bytes as a Git LFS pointer or a
+  stub, real files included: `Cameras.bin`, `MultipleScenes_square.bin`, `MultipleScenes_triangle.bin` and
+  `TextureTransformTest.bin`.
+- **Needed to close:** tell an LFS pointer by its first line (`version https://git-lfs.github.com/spec/v1`), not by its size,
+  keep a real small file as a sample of its own name, rerun the whole check and shrink the known list by what then passes.
 
 ## Checks
 

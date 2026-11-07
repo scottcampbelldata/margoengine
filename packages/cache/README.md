@@ -133,12 +133,12 @@ const manager = new LoadingManager({
 });
 // Every requested URL, siblings included, goes through the modifier: here a dropped folder's files as blob: URLs.
 manager.setURLModifier((url) => {
-  const file = dropped.get(new URL(url).pathname.split('/').pop() ?? '');
+  const file = dropped.get(new URL(url, location.href).pathname.split('/').pop() ?? '');
   return file ? URL.createObjectURL(file) : url;
 });
-const [model, chair] = await Promise.all([
-  loadGLTF(engine, 'https://example.com/models/line-4.gltf', {fetch: manager.fetch}),
-  loadOBJ(engine, 'https://example.com/models/chair.obj', {fetch: manager.fetch}),
+const [mug, chair] = await Promise.all([
+  loadGLTF(engine, '/models/mug_full.gltf', {fetch: manager.fetch}), // its .bin and .png go through the manager too
+  loadOBJ(engine, '/models/chair.obj', {fetch: manager.fetch}),
 ]);
 
 // Work that does not fetch counts too; manager.signal aborts with the manager.
