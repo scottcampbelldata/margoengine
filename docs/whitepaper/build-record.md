@@ -68,8 +68,9 @@ Batches 1 to 3 are phase 1. Batches 19 and 21 are partly done, each with one job
 | [32](#batch-32-shader-part-2-of-2) | shader | 4 | 4 | 0 | 0 | 0 |
 | [33](#batch-33-materials-part-1-of-2) | materials | 8 | 8 | 0 | 0 | 0 |
 | [34](#batch-34-materials-part-2-of-2) | materials | 4 | 4 | 0 | 0 | 0 |
+| [35](#batch-35-gltf-pro) | gltf-pro | 8 | 8 | 0 | 0 | 0 |
 | [38](#batch-38-gltf) | gltf | 6 | 6 | 0 | 0 | 0 |
-| Total | | 187 | 179 | 2 | 4 | 2 |
+| Total | | 195 | 187 | 2 | 4 | 2 |
 
 ## Batch 1: fixes (part 1 of 3)
 
@@ -897,6 +898,29 @@ before the fragment stage where the device can.
   against discard are queued for the quiet speed pass. Only an RTX A6000 has run these checks. No real eyeball has been measured.
 - **Gate:** core and stage were not touched; job 4 needed no core change, as core's `options.features` already passes the feature
   to the device. The new entries are recorded in the size gate. Nothing failed reached `main`.
+
+## Batch 35: gltf-pro
+
+Eight jobs took `@margoengine/gltf-pro` to the glTF extensions that were still missing: splats, bump, later UV sets, volume scatter, fixture and image lights, texture streaming, rigid bodies and behaviour graphs. Each big one is an optional entry; core and stage did not change.
+
+| # | Job | Status | Commit | Entry | Claim |
+| --- | --- | --- | --- | --- | --- |
+| 1 | KHR_gaussian_splatting | DONE | 18e04b891 | `/splats` | LIM-256 |
+| 2 | EXT_materials_bump | DONE | d75aa0ea9 | root | LIM-259 |
+| 3 | TEXCOORD_2 and 3 | DONE | 6a169101f | root | LIM-261 |
+| 4 | KHR_materials_volume_scatter | DONE | e0c78f9c7 | root | LIM-264 |
+| 5 | EXT_lights_ies, EXT_lights_image_based | DONE | 9a4655720 | `/lights` | LIM-266 |
+| 6 | Texture mip streaming | DONE | 58b4138a4 | `textures` of `/progressive` | LIM-271 |
+| 7 | KHR_physics_rigid_bodies, KHR_implicit_shapes | DONE | 0e2dd31f7 | `/physics` | LIM-275 |
+| 8 | KHR_interactivity | DONE | 869810a55 | `/interactivity`, `@margoengine/animation/interactivity` | LIM-276 |
+
+- **Bugs fixed, each with a regression test:** flat splats rounded to a covariance `validateSplats` refused (`packages/splats/test/splat-edit.test.js`). `parseIES` did not read the `IES:LM-63-2019` first line and multiplied candela by the field after the ballast factor, which is the file generation type in 2019, so a real 8,500 cd sample read 9,350 (`packages/clustered/test/ies.test.js`). A body on a driven joint went to sleep, so a slow door stopped at 0.6486 of 0.7 (`packages/gltf-pro/tests/physics.test.js`). bvh named `TEXCOORD_1` for any later set. The `kinematics` row of `scripts/supply-chain.mjs` held the uv row's strings after a bad merge that dropped the uv notice.
+- **Proved:** job 1 on real CesiumJS and godot-gsplat files. Job 3 on a real Blender 5.3 export. Job 4 on the real Khronos ScatteringSkull. Job 5 on the real Example.gltf, the wall within 3 percent of Lambert, and type B on a real floodlight report: every V plane meets at H = 90 and the table holds 5,871.8 lm against 5,871 stated, 6,531.1 with the axes swapped. Job 6 on the real FlightHelmet: 4,163,257 of 33,959,955 B read from far, and a close-up equal to the plain loader byte for byte. Job 7 on five real MIT samples: the pendulum at 2.9374 s against 2.9382 s by formula. Job 8 at 1,155 of 1,156 conformance sub-tests, 187 of 187 invalid graphs rejected, and a real click on an RTX A6000 that turns a file's material green on the engine loop while its clip stays unstarted.
+- **Stand-ins:** job 2's height ramp checks use built tables. Job 1's mesh plus splats depth file, job 5's image-light cube (the real EnvironmentTest is under the Adobe Stock License, so it stays out of the repository) and job 8's click file, a graph built for the check, as no published file turns a material on a click.
+- **Limits:** job 8 fails one sub-test on purpose: `/scene isValid` declares `int` where the glTF Object Model says `ref`, and Margo keeps the specification. Hover stops at the first object. Jobs 4 and 7 follow drafts and say so; the two physics extensions can still change. Job 5 keeps `irradianceCoefficients` as data only, and no file can show the sign of type B's V. Job 3 casts and picks a cut-out on set 2 or 3 uncut. Job 6 keeps PNG and JPEG whole. Each has its row in `docs/limits.md`.
+- **Unmeasured:** no speed was timed for jobs 1, 7 or 8, and no large graph has been timed. Job 8 has no GPU run of skins and physics driven together.
+- **Slips:** verify failed once on job 5, a fixture `NOTICE.md` under `packages/` named another engine, and the credit moved to the supply-chain row. It failed once on job 6: `GLTFTextureStream` had no static `attach`, and a test used a fixed 50 ms wait. It failed twice on job 7: a `new (shape: Shape)` type that broke five README examples, then stale ignored output in `packages/ifc` and `margoengine/viz` 18 B past the stated size. Nothing was loosened: each was fixed at the cause, and the sizes page states the measured figures. Job 8 first gave gltf-pro a peer on animation, which `scripts/package-order.js` refused as a cycle, so the binding moved to animation. Its first draft called `engine.pick` with no picker attached, which returns nothing for a glTF model; the GPU check caught it. A wait script was started with no arguments and went to the background, and was stopped by its own id. A shell heredoc with apostrophes failed, and scripts moved to files.
+- **Gate:** lint, hygiene, verify, the package tests, the GPU checks and `tests/claims-file.test.js`, the push from one script that stops at the first failing step.
 
 ## Batch 38: gltf
 

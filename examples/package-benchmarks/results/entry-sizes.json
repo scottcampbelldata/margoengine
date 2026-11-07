@@ -1,5 +1,5 @@
 {
-  "commit": "ff174c028",
+  "commit": "1547c6c2d",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -696,8 +696,8 @@
         "gzip": 18412
       },
       "./threemf": {
-        "raw": 38045,
-        "gzip": 13872
+        "raw": 38828,
+        "gzip": 14158
       },
       "./model": {
         "raw": 24235,

@@ -183,6 +183,10 @@ const ASSETS = [
     'test fixture: a texture of the Khronos glTF-Sample-Assets FlightHelmet, glTF-KTX-BasisU (CC0-1.0, Gary Hsu and Microsoft)',
   ],
   [
+    'packages/clustered/test/fixtures/NOTICE.md',
+    'test fixture: TypeB-AsymmetricNarrow.ies, a GE Lighting Solutions Evolve LED Flood report, as Type B - 03.ies of https://github.com/lfaynshteyn/ies_rescale, commit bf2e6a6a (MIT, Lev Faynshteyn)',
+  ],
+  [
     'packages/gltf-pro/tests/fixtures/interactivity/NOTICE.md',
     'test fixtures: conformance files of https://github.com/KhronosGroup/glTF-Test-Assets-Interactivity, commit f99d9b6 (CC-BY-4.0, The Khronos Group)',
   ],

@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { Clustered } from '../dist/index.js';
 import { IESLights, parseIES, iesCandela, MAX_IES_PROFILES } from '../dist/ies.js';
 import { wgsl } from '../../core/src/shaders.ts';
@@ -99,6 +100,49 @@ test('parseIES puts a type B table on the type C grid: beam at vertical 0, H alo
   // Behind the fixture, past V = 90, nothing was measured.
   assert.equal(iesCandela(profile, 120, 90), 0);
   assert.equal(iesCandela(profile, 180, 0), 0);
+});
+
+// Two facts of a real report fix the axes without trusting any reading of the definitions: all its V planes share one
+// candela at H = 90, so they meet there, and its table holds the lumens it states only with H as the latitude.
+test('a real type B file: its planes meet at H = 90, and H as latitude gives the lumens the file states', () => {
+  const text = readFileSync(new URL('./fixtures/TypeB-AsymmetricNarrow.ies', import.meta.url), 'latin1'),
+    stated = +/\[_ABSOLUTELUMENS\]\s*(\d+)/.exec(text)[1],
+    numbers = text.slice(text.indexOf('TILT')).split('\n').slice(1).join(' ').trim().split(/\s+/).map(Number),
+    [rows, columns] = [numbers[3], numbers[4]],
+    vertical = numbers.slice(13, 13 + rows),
+    horizontal = numbers.slice(13 + rows, 13 + rows + columns),
+    candela = numbers.slice(13 + rows + columns),
+    at = (v, h) => candela[h * rows + v],
+    radians = Math.PI / 180;
+  assert.equal(numbers[5], 2, 'photometric type B');
+  assert.equal(stated, 5871);
+  // At the pole; V = 90 by contrast runs from 3.6 to 19.6 cd over H, so the planes do not meet there.
+  const pole = Array.from({ length: rows }, (_, v) => at(v, columns - 1));
+  assert.equal(new Set(pole).size, 1);
+  const flux = (weight) => {
+    let sum = 0;
+    for (let h = 0; h + 1 < columns; h++)
+      for (let v = 0; v + 1 < rows; v++)
+        sum += ((at(v, h) + at(v + 1, h) + at(v, h + 1) + at(v + 1, h + 1)) / 4) * weight(vertical[v], vertical[v + 1], horizontal[h], horizontal[h + 1]);
+    return sum;
+  };
+  const sine = (a, b) => Math.sin(b * radians) - Math.sin(a * radians),
+    span = (a, b) => (b - a) * radians,
+    latitude = flux((v0, v1, h0, h1) => span(v0, v1) * sine(h0, h1)),
+    swapped = flux((v0, v1, h0, h1) => span(h0, h1) * sine(v0, v1));
+  // The file rounds its lumens to 1.
+  assert.ok(Math.abs(latitude - stated) < 1, `${latitude} lm`);
+  assert.ok(swapped / stated > 1.1, `the other way round is ${swapped} lm`);
+
+  const profile = parseIES(text);
+  assert.equal(iesCandela(profile, 90, 0), pole[0]);
+  assert.equal(iesCandela(profile, 90, 180), pole[0]);
+  assert.equal(iesCandela(profile, 0, 0), at((rows - 1) / 2, (columns - 1) / 2));
+  // The whole sphere of the parsed grid: 1 degree steps over a table of 2.5 degrees, read linearly, cost it 0.05 percent.
+  let parsed = 0;
+  for (let theta = 0.5; theta < 180; theta++)
+    for (let phi = 0.5; phi < 360; phi++) parsed += iesCandela(profile, theta, phi) * Math.sin(theta * radians) * radians * radians;
+  assert.ok(Math.abs(parsed / stated - 1) < 1e-3, `${parsed} lm`);
 });
 
 test('a type B table from 0 mirrors, and a table that stops short emits nothing past its end', () => {

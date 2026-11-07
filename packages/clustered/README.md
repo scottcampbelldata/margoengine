@@ -209,7 +209,7 @@ a spot's `direction`, or straight down for a point light; horizontal angle 0 is 
 plus `rotation` radians. Mirrored files (last horizontal angle 90° or 180°, or 90° to 270°) are unfolded as LM-63
 describes; vertical angles outside the file emit nothing; lamp tilt data is read past and not applied; type A throws.
 A type B file (floodlights) is resampled onto the same 1° × 5° grid with its beam at vertical angle 0, its horizontal
-angles along plane 0 and its vertical angles along plane 90; past the angles it measured it emits nothing. The ballast-lamp
+angles along plane 0 and its vertical angles along plane 90; past the angles it measured it emits nothing. These axes are checked on a real floodlight report in `test/fixtures`. The ballast-lamp
 factor scales candela only in files before LM-63-2002: later revisions keep that place for other things. The shader reads a 1° × 5° grid of each profile (one column when it is rotationally symmetric) from one storage
 buffer (binding 142), filtered bilinearly by hand: no textures. At most 16 distinct profiles at a time. Without profiles
 it adds nothing to the shaders or the GPU work.
