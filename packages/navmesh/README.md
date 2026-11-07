@@ -2,7 +2,7 @@
 
 Import `margoengine/navmesh` from the `margoengine` package, or `@margoengine/navmesh` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
-Dependency-free navigation: A* chooses a polygon corridor, the funnel algorithm pulls it taut, reciprocal ORCA selects collision-avoiding agent velocities in XZ, a `Crowd` manager walks agents along routes with area costs, off-mesh links and obstacles, `@margoengine/navmesh/build` generates the walkable polygons from level triangles, `@margoengine/navmesh/tiles` cuts big worlds into tiles that rebuild at run time, and `@margoengine/navmesh/codec` bakes meshes to bytes.
+Dependency-free navigation: A* chooses a polygon corridor, the funnel algorithm pulls it taut, reciprocal ORCA selects collision-avoiding agent velocities in XZ, a `Crowd` manager walks agents along routes with area costs, off-mesh links and obstacles, `@margoengine/navmesh/build` generates the walkable polygons from level triangles, `@margoengine/navmesh/tiles` cuts big worlds into tiles that rebuild at run time, `@margoengine/navmesh/codec` bakes meshes to bytes, and `@margoengine/navmesh/links` finds the jumps a level allows.
 
 ```ts
 import {NavMesh} from 'margoengine/navmesh';
@@ -189,6 +189,39 @@ The format, little-endian: a 16 byte header (`MNAV`, u16 version 1, u16 kind: 0 
 
 - A mesh: vertex count and vertices; polygon count, and for each its vertex count, vertex numbers and area byte; the polygons whose cost is not 1, as number and cost; then the links as start, end, cost and a two-way byte.
 - Tiles: settings as sized JSON, the origin, the next id; tiles as x, z, rise and a mesh without links; waiting tiles as x, z; links as id, start, end, cost and a two-way byte; then a byte for the level and, when set, obstacles as id, min, max, and geometry as id, sized f32 positions and sized u32 indices.
+
+## Jump links (`./links`)
+
+```ts
+import {buildNavMesh} from 'margoengine/navmesh/build';
+import {addJumpLinks, findJumpLinks, jumpPoint} from 'margoengine/navmesh/links';
+
+// Two floors 20 x 20 m with a 2 m gap between them.
+const positions = [0, 0, 0, 20, 0, 0, 20, 0, 20, 0, 0, 20, 22, 0, 0, 42, 0, 0, 42, 0, 20, 22, 0, 20];
+const indices = [0, 2, 1, 0, 3, 2, 4, 6, 5, 4, 7, 6];
+const mesh = buildNavMesh(positions, indices, {cs: 0.1, ch: 0.05, walkableRadius: 5, walkableHeight: 40});
+
+const links = findJumpLinks(mesh, positions, indices, {radius: 0.5, height: 2});
+addJumpLinks(mesh, links);
+const route = mesh.route([15, 0, 10], [30, 0, 10]);
+console.log(route?.offMesh); // where the route jumps
+
+// To play a jump: 0 at takeoff, 1 at the landing.
+const [link] = links;
+console.log(link.kind, jumpPoint(link, 0.5));
+```
+
+| Option | Default | Unit |
+| --- | --- | --- |
+| `radius`, `height` | 0.5, 2 | the agent's body; give what the mesh was built for |
+| `climb` | 0.4 | highest step it walks; the top of what counts as `across` |
+| `jumps` | `{height: 1, distance: 4}`, `{height: 0.25, distance: 1.5}` | each arc it can make: how far up, and how far along before it is back at the height it left |
+| `maxFall` | 6 | furthest it may fall, from the top of the arc |
+| `spacing` | 1 | metres between takeoffs along an edge |
+| `directions` | 9 | directions tried at a takeoff, fanned 160 degrees |
+| `jumpCost` | 1 | what a jump costs above the distance it covers |
+
+A jump follows its one arc and lands the first time that arc meets ground on the way down; it counts only if the body touches nothing on the way and the fall is within `maxFall`. So `jumps` lists what the agent can really do: a long leap, and a small hop that lands close under a ledge. Each link gives `start`, `end`, `cost`, `kind` (`across`, `down` or `up`), and the `height` and `distance` of its arc. `positions` and `indices` are what the body is tested against. Links are one way: a gap crossed both ways gets one each way. On a `TiledNavMesh` they sleep and wake with their ground, but run `findJumpLinks` again after the level changes.
 
 Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 

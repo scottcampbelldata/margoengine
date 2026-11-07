@@ -1630,6 +1630,10 @@
       "types": "./dist/navmesh/codec.d.ts",
       "import": "./dist/navmesh/codec.js"
     },
+    "./navmesh/links": {
+      "types": "./dist/navmesh/links.d.ts",
+      "import": "./dist/navmesh/links.js"
+    },
     "./navmesh/tiles": {
       "types": "./dist/navmesh/tiles.d.ts",
       "import": "./dist/navmesh/tiles.js"

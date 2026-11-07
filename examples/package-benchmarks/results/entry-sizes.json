@@ -1,5 +1,5 @@
 {
-  "commit": "23bb64502",
+  "commit": "db1ddbdf3",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -1712,6 +1712,10 @@
       "./codec": {
         "raw": 46448,
         "gzip": 16604
+      },
+      "./links": {
+        "raw": 9095,
+        "gzip": 4032
       },
       "./tiles": {
         "raw": 40568,
