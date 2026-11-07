@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10110337,
+  "total": 10111905,
   "history": [
     {
       "date": "2026-10-24",
@@ -3050,6 +3050,12 @@
       "commit": "675d4c370",
       "reason": "new optional entry @margoengine/cinematic/composer",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "6d3a39322",
+      "reason": "new optional entry @margoengine/cinematic/dolly",
+      "grew": 1
     }
   ],
   "items": {
@@ -3127,6 +3133,7 @@
     "@margoengine/cinematic": 2076,
     "@margoengine/cinematic/brain": 3262,
     "@margoengine/cinematic/composer": 2173,
+    "@margoengine/cinematic/dolly": 1568,
     "@margoengine/clustered": 13989,
     "@margoengine/clustered/area": 10461,
     "@margoengine/clustered/budget": 723,

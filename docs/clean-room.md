@@ -833,6 +833,7 @@ Written clean room from the published work below. No source of a camera system i
 | --- | --- |
 | Camera brain (`cinematic/brain`) | Priorities and a selector over many cameras: our own design from the public idea, as surveyed by M. Christie, P. Olivier and J.-M. Normand, "Camera Control in Computer Graphics", Computer Graphics Forum 27(8), 2008. View blend: spherical linear interpolation of a direction (K. Shoemake, 1985), with the length mixed. The blend stack and the screen up carried through a pole are our own design |
 | Framing composer (`cinematic/composer`) | Solving the aim from where a subject should appear on screen: J. Blinn, "Where am I? What am I looking at?", IEEE Computer Graphics and Applications 8(4), 1988. The closed form for pitch and heading with no roll, the zones and the frame-rate independent decay are our own derivation; the dead and soft zones are the public idea, with no source read |
+| Dolly tracks (`cinematic/dolly`) | Nearest point by `closestPointOnSpline` of `@margoengine/splines`. Golden-section search for the window: J. Kiefer, "Sequential minimax search for a maximum", Proceedings of the American Mathematical Society, 1953. Our own design otherwise |
 
 ## Save and load: `@margoengine/save`
 

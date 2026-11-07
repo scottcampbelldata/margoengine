@@ -140,6 +140,36 @@ The target is a mesh, a world point or a function giving one. Sizes are shares o
 
 `composer.onScreen` says where the subject is, and `composer.reset()` snaps it back to `screen`, as after a teleport. The camera's `reset()` does the same for all its stages.
 
+## Dolly tracks
+
+`DollyTrack` puts the camera on a rail: any `Spline` from `@margoengine/splines`. Give it a target and the cart goes to the point of the track nearest that target, so the camera keeps pace with the subject without keyframes. It is a stage and goes first; aim afterwards with `FramingComposer`, or let `lookAlong` look down the track.
+
+```ts
+import {CameraBrain} from 'margoengine/cinematic/brain';
+import {FramingComposer} from 'margoengine/cinematic/composer';
+import {DollyTrack} from 'margoengine/cinematic/dolly';
+import {Engine} from 'margoengine/core';
+import {boxGeometry} from 'margoengine/geometry';
+import {PbrMaterial, createMesh} from 'margoengine/materials';
+import {Spline} from 'margoengine/splines';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const runner = createMesh(engine, boxGeometry(0.5, 1.8, 0.5), new PbrMaterial()).root;
+const rail = new Spline([[-20, 3, 8], [0, 4, 10], [20, 3, 8]]);
+const brain = CameraBrain.attach(engine);
+brain.add({stages: [new DollyTrack(rail, {target: runner, lead: 2}), new FramingComposer(runner)]});
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `target` | none | A mesh, point or function. Without one the cart stays at `position`; write `dolly.position` to move it. |
+| `position` | `0`, or nearest to `target` | Start, in world units along the track. |
+| `lead` | `0` | Stay this far ahead of the nearest point; below 0 is behind. |
+| `damping` | `4` | Catch-up rate in 1/seconds. |
+| `window` | whole track | Search only this far either side of the cart. Set it when the track passes close to itself. |
+| `lookAlong` | `false` | Look down the track. |
+
+A closed track wraps and the cart takes the short way round; an open one stops at its ends. `dolly.reset()` puts the cart back on the subject at once.
+
 Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/cinematic

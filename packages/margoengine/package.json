@@ -330,6 +330,10 @@
       "types": "./dist/cinematic/composer.d.ts",
       "import": "./dist/cinematic/composer.js"
     },
+    "./cinematic/dolly": {
+      "types": "./dist/cinematic/dolly.d.ts",
+      "import": "./dist/cinematic/dolly.js"
+    },
     "./clustered": {
       "types": "./dist/clustered.d.ts",
       "import": "./dist/clustered.js"
