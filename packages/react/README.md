@@ -491,7 +491,18 @@ export function Viewer() {
 | Prop | Default | Effect |
 | --- | --- | --- |
 | `loadFallback` | none | `(signal: AbortSignal) => Promise<factory \| { webglRenderer }>`. Called once per engine, only without WebGPU (or with `backend="webgl2"`); `signal` aborts on unmount. A rejection reaches `onError` as a `MargoError` with code `unsupported`. Ignored when `fallback` or `backend="webgpu"` is set. |
+| `loadCompat` | none | `() => Promise<{ install() }>`, the WebGL2 compatibility layer. Installed before the engine is made, only without WebGPU, so packages the preview refuses still draw: one engine, one `onCreated`, and listeners stay on the canvas. If the browser's WebGL2 is too old to carry it, `loadFallback` runs, or `onError` gets the refusal. |
 | `fallbackContent` | the plain "needs a browser with WebGPU" text | Shown in place of the text for the `unsupported` error; `onError` still receives it. |
+
+A scene that uses more than plain meshes wants `loadCompat`: the preview draws core meshes only, and the layer carries the packages. It is a larger download, and only visitors without WebGPU fetch it.
+
+```tsx
+import { Canvas } from '@margoengine/react';
+
+export function Viewer() {
+  return <Canvas loadCompat={() => import('@margoengine/webgl2-compat')} loadFallback={() => import('@margoengine/webgl')} />;
+}
+```
 
 ## Pixel ratio and GPU choice
 

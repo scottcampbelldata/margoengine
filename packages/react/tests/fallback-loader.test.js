@@ -73,6 +73,81 @@ afterEach(() => {
   created.length = 0;
 });
 
+test('loadCompat installs the layer first: one engine on WebGPU, and the preview loader stays unused', async () => {
+  gpu(undefined);
+  let fallbacks = 0,
+    installs = 0,
+    made = 0;
+  const canvases = [],
+    compat = async () => ({
+      install: async () => {
+        installs++;
+        gpu(adapter);
+      },
+    }),
+    view = render(
+      h(Canvas, {
+        loadCompat: compat,
+        loadFallback: async () => (fallbacks++, webglRenderer),
+        onCreated: (stage) => (made++, canvases.push(stage.engine.canvas)),
+      }),
+    );
+  await flush();
+  assert.equal(installs, 1);
+  assert.equal(fallbacks, 0);
+  assert.equal(made, 1, 'the scene is set up once');
+  assert.equal(created.length, 1);
+  assert.equal(created[0].options.fallback, undefined);
+  assert.equal(canvases[0], view.container.querySelector('canvas'), 'the same element, so listeners stay');
+});
+
+test('loadCompat does nothing with WebGPU there, or when the app asks for the preview', async () => {
+  gpu(adapter);
+  let calls = 0;
+  const compat = async () => (calls++, { install: async () => {} });
+  render(h(Canvas, { loadCompat: compat }));
+  await flush();
+  assert.equal(calls, 0);
+  cleanup();
+  gpu(undefined);
+  render(h(Canvas, { backend: 'webgl2', fallback: webglRenderer, loadCompat: compat }));
+  await flush();
+  assert.equal(calls, 0);
+});
+
+test('a refused layer falls to loadFallback, and with none the refusal reaches onError', async () => {
+  gpu(undefined);
+  const refusal = Object.assign(new Error('WebGL2 is too old'), { code: 'unsupported' }),
+    compat = async () => ({ install: async () => { throw refusal; } }),
+    errors = [];
+  render(h(Canvas, { loadCompat: compat, loadFallback: async () => webglRenderer }));
+  await flush();
+  assert.equal(created[0].options.fallback, webglRenderer);
+  cleanup();
+  created.length = 0;
+  render(h(Canvas, { loadCompat: compat, onError: (error) => errors.push(error) }));
+  await flush();
+  assert.deepEqual(errors, [refusal]);
+  assert.equal(created.length, 0);
+});
+
+test('a broken loadCompat is not hidden by loadFallback', async () => {
+  gpu(undefined);
+  const broken = new Error('chunk failed to load'),
+    errors = [];
+  render(
+    h(Canvas, {
+      loadCompat: async () => {
+        throw broken;
+      },
+      loadFallback: async () => webglRenderer,
+      onError: (error) => errors.push(error),
+    }),
+  );
+  await flush();
+  assert.deepEqual(errors, [broken]);
+});
+
 test('with WebGPU the loader never runs and the engine gets no fallback', async () => {
   gpu(adapter);
   let calls = 0;

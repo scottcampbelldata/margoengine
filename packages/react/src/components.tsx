@@ -115,6 +115,16 @@ export interface CanvasProps extends EngineOptions {
     signal: AbortSignal,
   ) => Promise<RendererFactory | { webglRenderer: RendererFactory; webglPicking?: () => EnginePlugin }>;
   /**
+   * Loads the WebGL2 compatibility layer for browsers without WebGPU, with a dynamic import of its package (the README
+   * has the line). The Canvas installs it before it creates the engine, so a scene that uses
+   * packages the small preview refuses draws on the first try: one engine, one `onCreated`, and listeners on the canvas
+   * stay. Called only when WebGPU is missing, and never with `backend="webgl2"`, which asks for the preview. A browser
+   * whose WebGL2 is below what the layer needs makes `install` refuse with code `unsupported`: then `loadFallback` runs
+   * if given, and otherwise the refusal goes to `onError`. Ignored when `fallback` is given; read when the engine is
+   * created, so a new function does not recreate the engine. Default: none.
+   */
+  loadCompat?: () => Promise<{ install(): Promise<unknown> }>;
+  /**
    * Shown in place of the default text when the browser has no WebGPU and no usable renderer fallback: an SVG, a
    * skeleton or a pre-rendered image. `onError` still receives the coded `unsupported` error. Default: the plain
    * message "This 3D scene needs a browser with WebGPU, such as a current Chrome, Edge or Safari."
@@ -166,6 +176,7 @@ export function MargoCanvas({
   fallback,
   loadFallback,
   fallbackContent,
+  loadCompat,
   frameloop = 'always',
   maxDpr,
   onCreated,
@@ -175,7 +186,8 @@ export function MargoCanvas({
     queue = useRef<Promise<void>>(Promise.resolve()),
     created = useRef(onCreated),
     errorHandler = useRef(onError),
-    fallbackLoader = useRef(loadFallback);
+    fallbackLoader = useRef(loadFallback),
+    compatLoader = useRef(loadCompat);
   const [stage, setStage] = useState<StageFacade | null>(null),
     [error, setError] = useState<unknown>(null),
     [shadow, setShadow] = useState<Shadows | null>(null);
@@ -229,6 +241,7 @@ export function MargoCanvas({
   created.current = onCreated;
   errorHandler.current = onError;
   fallbackLoader.current = loadFallback;
+  compatLoader.current = loadCompat;
   cameraOptions.current = camera;
   powerOption.current = powerPreference;
   frameloopOptions.current = frameloop;
@@ -288,7 +301,17 @@ export function MargoCanvas({
         if (maxDpr !== undefined) releasePixelRatio = capPixelRatio(maxDpr);
         let renderer = fallback,
           picking: (() => EnginePlugin) | undefined;
-        const load = fallbackLoader.current;
+        const load = fallbackLoader.current,
+          compat = compatLoader.current;
+        if (!renderer && compat && backend !== 'webgl2' && !(await hasWebGPU())) {
+          if (cancelled) return;
+          try {
+            await (await compat()).install();
+          } catch (error) {
+            if (!load || (error as { code?: string }).code !== 'unsupported') throw error;
+          }
+          if (cancelled) return;
+        }
         if (!renderer && load && backend !== 'webgpu' && (backend === 'webgl2' || !(await hasWebGPU()))) {
           if (cancelled) return;
           const loaded = await resolveFallback(load, abort.signal);

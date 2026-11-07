@@ -103,7 +103,7 @@ the loss. An engine that draws on demand rather than with `engine.start()` shoul
 ## Automatic escalation
 
 The preview draws plain core meshes, and other packages refuse it with code `unsupported`. `autoEngine` from
-`margoengine/webgl/auto` picks the path a page's own packages can draw on, so a visitor never gets half a scene: WebGPU
+`margoengine/webgl/auto` (for React, the `loadCompat` prop of `Canvas`, which goes straight to the layer) picks the path a page's own packages can draw on, so a visitor never gets half a scene: WebGPU
 when the browser has it, else this preview, else, when a package refuses the preview, the
 [compatibility layer](../webgl2-compat/README.md). One option turns that last step on: `loadCompat`, the layer's dynamic
 import. Each WebGL2 package is downloaded only if it is used.
