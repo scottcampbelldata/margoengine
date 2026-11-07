@@ -428,6 +428,65 @@ graph?.tick(1 / 60);
 
 Read against the specification on Khronos main at commit a7963af6dc (2026-10-19), status "Complete, Ratified by the Khronos Group". On the published conformance suite this entry passes 1,155 of 1,156 sub-tests and rejects 187 of 187 invalid graphs. The one failure is a disagreement between that suite and the glTF Object Model, described with the other limits in [docs/limits.md](../../docs/limits.md).
 
+### Author, licence and copyright in glTF (`/metadata`)
+
+`KHR_xmp_json_ld` carries XMP metadata in the file: who made it, under what licence, and which object each statement is about. Every loader keeps it as plain data, so it costs nothing until you import the entry, and a file that lists the extension as required still loads. `readGLTFMetadata` takes a loaded model, a `GLTFAsset` or a glTF document.
+
+```ts
+import {GLTFAsset} from 'margoengine/gltf-pro';
+import {readGLTFMetadata} from 'margoengine/gltf-pro/metadata';
+
+const doc = {
+  asset: {version: '2.0', copyright: '2026 Ana Silva', extensions: {KHR_xmp_json_ld: {packet: 0}}},
+  meshes: [{name: 'Chair', primitives: [], extensions: {KHR_xmp_json_ld: {packet: 1}}}],
+  extensions: {
+    KHR_xmp_json_ld: {
+      packets: [
+        {
+          '@context': {dc: 'http://purl.org/dc/elements/1.1/'},
+          'dc:creator': {'@list': ['Ana Silva']},
+          'dc:rights': 'CC-BY-4.0',
+        },
+        {
+          '@context': {dc: 'http://purl.org/dc/elements/1.1/', rdf: 'http://www.w3.org/1999/02/22-rdf-syntax-ns#'},
+          'dc:title': {
+            '@type': 'rdf:Alt',
+            'rdf:_1': {'@language': 'en-us', '@value': 'Chair'},
+            'rdf:_2': {'@language': 'it-it', '@value': 'Sedia'},
+          },
+        },
+      ],
+    },
+  },
+};
+const metadata = readGLTFMetadata(new GLTFAsset(doc, []), {language: 'it'});
+console.log(metadata.asset.authors, metadata.asset.license, metadata.asset.copyright);
+console.log(metadata.fieldsOf('mesh', 0).title, metadata.fieldsOf('mesh', 0).authors); // Sedia, and the file's author
+for (const packet of metadata.packets) console.log(packet.fields.title, packet.fields.license); // every credit in the file
+```
+
+| Field | Read from |
+| --- | --- |
+| `title`, `description`, `date`, `source` | `dc:title`, `dc:description`, the first `dc:date`, `dc:source` |
+| `authors`, `contributors`, `publishers` | `dc:creator`, `dc:contributor`, `dc:publisher`, always arrays |
+| `tool` | `xmp:CreatorTool`; for the whole file, else glTF `asset.generator` |
+| `rights` | `dc:rights` as written |
+| `license` | `cc:license`, else `xmpRights:UsageTerms`, else `xmpRights:WebStatement`, else `rights` |
+| `copyright` | For the whole file glTF `asset.copyright`, else `rights`; for an object its own `rights`, else the whole file's |
+
+| Member of the result | Meaning |
+| --- | --- |
+| `asset` | The fields for the whole file. A file without the extension still gives `asset.copyright` and `asset.generator`. |
+| `objects` | Each scene, node, mesh, material, image and animation with its own packet. |
+| `fieldsOf(kind, index)` | The fields for one object: its packet over `asset`, property by property, as the extension gives objects precedence. |
+| `packets` | Every packet, referenced or not, with `fields`, `properties`, `raw` and `get(namespace, name)` for any other XMP property. `xmpNamespaces` holds the URIs of `dc`, `xmp`, `xmpRights`, `cc` and `rdf`. |
+
+| Option of `readGLTFMetadata` | Default | Meaning |
+| --- | --- | --- |
+| `language` | none | BCP 47 tag to prefer among language alternatives: the exact tag, then the same language in another region. With none, or no match, `x-default`, then the first listed. |
+
+Properties resolve by namespace URI, so `dc11:creator` reads as an author when `dc11` names Dublin Core, and `dc:creator` does not when a packet points `dc` elsewhere. A prefix a packet leaves out of `@context` keeps its usual meaning, because a real exporter writes `xmp:CreatorTool` that way. A bad packet list or `packet` reference throws a `TypeError` here and never at load. Limits are in [docs/limits.md](../../docs/limits.md).
+
 ### Texture mip streaming (`textures` of `/progressive`)
 
 KTX 2.0 keeps the smallest mip first, so a texture can start from a small read of the head of its file. With `textures` set, `loadGLTFProgressive` opens each KTX2 image from those smallest levels and loads finer ones only as the texture's size on screen calls for them, inside a memory budget. Levels nothing needs leave when the budget runs out. It reuses `KTX2Streamer` of `@margoengine/decoders/ktx2-stream`, loaded only with this option.

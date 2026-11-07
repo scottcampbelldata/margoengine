@@ -1,0 +1,289 @@
+{
+  "asset": {
+    "version": "2.0",
+    "extensions": {
+      "KHR_xmp": {
+        "packet": 0
+      },
+      "KHR_xmp_json_ld": {
+        "packet": 0
+      }
+    },
+    "generator": "COLLADA2GLTF"
+  },
+  "extensionsUsed": [
+    "KHR_xmp",
+    "KHR_xmp_json_ld"
+  ],
+  "accessors": [
+    {
+      "min": [
+        0
+      ],
+      "type": "SCALAR",
+      "bufferView": 0,
+      "max": [
+        23
+      ],
+      "componentType": 5123,
+      "byteOffset": 0,
+      "count": 36
+    },
+    {
+      "componentType": 5126,
+      "byteOffset": 0,
+      "count": 24,
+      "bufferView": 1,
+      "max": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "type": "VEC3",
+      "min": [
+        -1.0,
+        -1.0,
+        -1.0
+      ]
+    },
+    {
+      "componentType": 5126,
+      "byteOffset": 288,
+      "type": "VEC3",
+      "min": [
+        -0.5,
+        -0.5,
+        -0.5
+      ],
+      "max": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "count": 24,
+      "bufferView": 1
+    }
+  ],
+  "buffers": [
+    {
+      "byteLength": 648,
+      "uri": "Box0.bin"
+    }
+  ],
+  "bufferViews": [
+    {
+      "target": 34963,
+      "byteLength": 72,
+      "byteOffset": 576,
+      "buffer": 0
+    },
+    {
+      "byteOffset": 0,
+      "byteStride": 12,
+      "target": 34962,
+      "buffer": 0,
+      "byteLength": 576
+    }
+  ],
+  "materials": [
+    {
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          0.800000011920929,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "metallicFactor": 0.0
+      },
+      "name": "Red"
+    }
+  ],
+  "meshes": [
+    {
+      "primitives": [
+        {
+          "attributes": {
+            "NORMAL": 1,
+            "POSITION": 2
+          },
+          "indices": 0,
+          "material": 0,
+          "mode": 4
+        }
+      ],
+      "name": "Mesh"
+    }
+  ],
+  "nodes": [
+    {
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        -1.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "children": [
+        1
+      ]
+    },
+    {
+      "mesh": 0
+    }
+  ],
+  "scene": 0,
+  "scenes": [
+    {
+      "nodes": [
+        0
+      ]
+    }
+  ],
+  "extensions": {
+    "KHR_xmp": {
+      "@context": {
+        "dc": "http://purl.org/dc/elements/1.1/"
+      },
+      "packets": [
+        {
+          "dc:contributor": [
+            "Creator1Name",
+            "Creator2Email@email.com",
+            "Creator3Name<Email@email.com>"
+          ],
+          "dc:coverage": "Bay Area, California, United States",
+          "dc:creator": [
+            "CreatorName",
+            "CreatorEmail@email.com"
+          ],
+          "dc:date": [
+            "1997-07-16T19:20:30+01:00"
+          ],
+          "dc:description": {
+            "en-us": "text"
+          },
+          "dc:format": "model/gltf-binary",
+          "dc:identifier": "urn:stock-id:292930",
+          "dc:language": [
+            "en"
+          ],
+          "dc:publisher": [
+            "Company"
+          ],
+          "dc:relation": [
+            "https://www.khronos.org/"
+          ],
+          "dc:rights": {
+            "en-us": "BSD"
+          },
+          "dc:source": "http://related_resource.org/derived_from_this.gltf",
+          "dc:subject": [
+            "architecture"
+          ],
+          "dc:title": {
+            "en-us": "MyModel",
+            "it-it": "Mio Modello"
+          },
+          "dc:type": [
+            "Physical Object"
+          ]
+        }
+      ]
+    },
+    "KHR_xmp_json_ld": {
+      "packets": [
+        {
+          "@context": {
+            "dc": "http://purl.org/dc/elements/1.1/",
+            "rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+          },
+          "@id": "",
+          "dc:contributor": {
+            "@set": [
+              "Creator1Name",
+              "Creator2Email@email.com",
+              "Creator3Name<Email@email.com>"
+            ]
+          },
+          "dc:coverage": "Bay Area, California, United States",
+          "dc:creator": {
+            "@list": [
+              "CreatorName",
+              "CreatorEmail@email.com"
+            ]
+          },
+          "dc:date": {
+            "@list": [
+              "1997-07-16T19:20:30+01:00"
+            ]
+          },
+          "dc:description": {
+            "@type": "rdf:Alt",
+            "rdf:_1": {
+              "@language": "en-us",
+              "@value": "text"
+            }
+          },
+          "dc:format": "model/gltf-binary",
+          "dc:identifier": "urn:stock-id:292930",
+          "dc:language": {
+            "@set": [
+              "en"
+            ]
+          },
+          "dc:publisher": {
+            "@set": [
+              "Company"
+            ]
+          },
+          "dc:relation": {
+            "@set": [
+              "https://www.khronos.org/"
+            ]
+          },
+          "dc:rights": {
+            "@type": "rdf:Alt",
+            "rdf:_1": {
+              "@language": "en-us",
+              "@value": "BSD"
+            }
+          },
+          "dc:source": "http://related_resource.org/derived_from_this.gltf",
+          "dc:subject": {
+            "@set": [
+              "architecture"
+            ]
+          },
+          "dc:title": {
+            "@type": "rdf:Alt",
+            "rdf:_1": {
+              "@language": "en-us",
+              "@value": "MyModel"
+            },
+            "rdf:_2": {
+              "@language": "it-it",
+              "@value": "Mio Modello"
+            }
+          },
+          "dc:type": {
+            "@set": [
+              "Physical Object"
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

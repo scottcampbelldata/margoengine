@@ -20,6 +20,8 @@ import {
   files,
   fromGLB,
   gltfSeeds,
+  hostileMetadata,
+  metadataSeeds,
   hash,
   headless,
   imageBitmap,
@@ -311,6 +313,30 @@ export default [
       },
     },
   ),
+  gltfPro('gltf-pro/metadata', 'gltf-pro readGLTFMetadata: KHR_xmp_json_ld packets, references, language alternatives', {
+    async setup() {
+      this.read = (await import(dist('gltf-pro/dist/metadata.js'))).readGLTFMetadata;
+    },
+    seeds: async () => metadataSeeds(),
+    generators: [
+      function hostilePackets(r, context) {
+        return hostileMetadata(r, context.seeds);
+      },
+    ],
+    async run(bytes) {
+      let doc;
+      try {
+        doc = JSON.parse(decoder.decode(bytes));
+      } catch {
+        return;
+      }
+      if (!doc || typeof doc !== 'object') return;
+      const metadata = this.read(doc, { language: 'en' });
+      for (const fields of [metadata.asset, ...metadata.packets.map((p) => p.fields)])
+        if (![...fields.authors, ...fields.contributors, ...fields.publishers].every((v) => typeof v === 'string'))
+          throw new Error('GARBAGE: a metadata name is not text');
+    },
+  }),
   gltfPro(
     'gltf-pro/worker',
     'gltf-pro parse-worker job: prepareGLTF, structured clone with transfers, modelFromPrepared',

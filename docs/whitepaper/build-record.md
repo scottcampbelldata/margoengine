@@ -69,8 +69,9 @@ Batches 1 to 3 are phase 1. Batches 19 and 21 are partly done, each with one job
 | [33](#batch-33-materials-part-1-of-2) | materials | 8 | 8 | 0 | 0 | 0 |
 | [34](#batch-34-materials-part-2-of-2) | materials | 4 | 4 | 0 | 0 | 0 |
 | [35](#batch-35-gltf-pro) | gltf-pro | 8 | 8 | 0 | 0 | 0 |
+| [36](#batch-36-gltf-pro) | gltf-pro | 1 | 1 | 0 | 0 | 0 |
 | [38](#batch-38-gltf) | gltf | 6 | 6 | 0 | 0 | 0 |
-| Total | | 195 | 187 | 2 | 4 | 2 |
+| Total | | 196 | 188 | 2 | 4 | 2 |
 
 ## Batch 1: fixes (part 1 of 3)
 
@@ -920,6 +921,23 @@ Eight jobs took `@margoengine/gltf-pro` to the glTF extensions that were still m
 - **Limits:** job 8 fails one sub-test on purpose: `/scene isValid` declares `int` where the glTF Object Model says `ref`, and Margo keeps the specification. Hover stops at the first object. Jobs 4 and 7 follow drafts and say so; the two physics extensions can still change. Job 5 keeps `irradianceCoefficients` as data only, and no file can show the sign of type B's V. Job 3 casts and picks a cut-out on set 2 or 3 uncut. Job 6 keeps PNG and JPEG whole. Each has its row in `docs/limits.md`.
 - **Unmeasured:** no speed was timed for jobs 1, 7 or 8, and no large graph has been timed. Job 8 has no GPU run of skins and physics driven together.
 - **Slips:** verify failed once on job 5, a fixture `NOTICE.md` under `packages/` named another engine, and the credit moved to the supply-chain row. It failed once on job 6: `GLTFTextureStream` had no static `attach`, and a test used a fixed 50 ms wait. It failed twice on job 7: a `new (shape: Shape)` type that broke five README examples, then stale ignored output in `packages/ifc` and `margoengine/viz` 18 B past the stated size. Nothing was loosened: each was fixed at the cause, and the sizes page states the measured figures. Job 8 first gave gltf-pro a peer on animation, which `scripts/package-order.js` refused as a cycle, so the binding moved to animation. Its first draft called `engine.pick` with no picker attached, which returns nothing for a glTF model; the GPU check caught it. A wait script was started with no arguments and went to the background, and was stopped by its own id. A shell heredoc with apostrophes failed, and scripts moved to files.
+- **Gate:** lint, hygiene, verify, the package tests, the GPU checks and `tests/claims-file.test.js`, the push from one script that stops at the first failing step.
+
+## Batch 36: gltf-pro
+
+One job finished `@margoengine/gltf-pro`'s extension list: a file's own statement of who made it and under what licence, for asset pipelines and attribution. It is a new optional entry, so nothing is paid until it is imported, and core and stage are untouched.
+
+| # | Job | Status | Commit | Entry | Claim |
+| --- | --- | --- | --- | --- | --- |
+| 1 | KHR_xmp_json_ld | DONE | this commit | `/metadata` | LIM-278 |
+
+- **Entry:** the suggested `/asset` already holds `GLTFAsset`, so the metadata is a new entry `/metadata`. `readGLTFMetadata(model)` is a function of the entry and no `model.metadata` field exists, as with `/lights` and `/physics`, so the root carries none of its code.
+- **Bugs fixed, each with a regression test:** a file listing `KHR_xmp_json_ld` in `extensionsRequired` was refused at load, though the extension says it has no effect on rendering (`packages/gltf-pro/tests/metadata.test.js`, "a file requiring the extension loads").
+- **Proved:** real files for author, licence and copyright. `XmpMetadataRoundedCube.glb` loads as a model on the main thread and through the parse-worker job. Also read: the Khronos metadata tool's `Box.gltf` with its buffer and its two language edge cases, `boom_box.gltf` and `rocket_ship.gltf`, and the already committed ScatteringSkull. A survey of all 280 glTF and GLB files of glTF-Sample-Assets at 8f492390, leaving out its embedded, Draco, quantized and meshopt copies, found the extension in two models only. The `gltf-pro/metadata` fuzz target ran 32,876 inputs with no finding.
+- **Stand-ins:** `cc:license`, `xmpRights:UsageTerms` and `xmpRights:WebStatement` appear in no file found, so the licence order is tested on built documents, as are broken references, a renamed Dublin Core prefix, structures and the five object kinds besides `mesh`.
+- **Limits:** read only, so exporters drop the packets. A packet another extension references reads through `packets`, not `objects`. XMP inside a PNG or JPEG is not read.
+- **Unmeasured:** no speed was timed. The entry adds no shader and draws nothing, so no GPU check is new.
+- **Slips:** the first fuzz run found a refusal whose message quoted `undefined`, which the harness reads as an engine error; the message now names the fix without quoting the value.
 - **Gate:** lint, hygiene, verify, the package tests, the GPU checks and `tests/claims-file.test.js`, the push from one script that stops at the first failing step.
 
 ## Batch 38: gltf

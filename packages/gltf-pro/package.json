@@ -76,6 +76,10 @@
       "types": "./dist/interactivity.d.ts",
       "import": "./dist/interactivity.js"
     },
+    "./metadata": {
+      "types": "./dist/metadata.d.ts",
+      "import": "./dist/metadata.js"
+    },
     "./coordinates": {
       "types": "./dist/coordinates.d.ts",
       "import": "./dist/coordinates.js"

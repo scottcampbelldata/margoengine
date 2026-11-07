@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 9085395,
+  "total": 9087827,
   "history": [
     {
       "date": "2026-10-24",
@@ -2882,6 +2882,12 @@
       "commit": "5caa2829b",
       "reason": "STL, OBJ and PLY of loaded models: skin and morphs applied, STL and PLY stand on Z up, OBJ writes textured models and their base color images.",
       "grew": 7
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "71f2607dd",
+      "reason": "gltf-pro gains the metadata entry for KHR_xmp_json_ld",
+      "grew": 1
     }
   ],
   "items": {
@@ -3115,6 +3121,7 @@
     "@margoengine/gltf-pro/instancing": 3350,
     "@margoengine/gltf-pro/interactivity": 16807,
     "@margoengine/gltf-pro/lights": 3470,
+    "@margoengine/gltf-pro/metadata": 2432,
     "@margoengine/gltf-pro/physics": 9260,
     "@margoengine/gltf-pro/prepare": 21088,
     "@margoengine/gltf-pro/progressive": 75015,

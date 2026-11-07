@@ -197,6 +197,8 @@ const supported = new Set([
   'KHR_node_selectability',
   'KHR_node_hoverability',
   'KHR_implicit_shapes',
+  // Data until @margoengine/gltf-pro/metadata reads it; it never changes what is drawn.
+  'KHR_xmp_json_ld',
   // Played by @margoengine/animation (Animation); gltf-pro loads the channels as data.
   'KHR_animation_pointer',
 ]);

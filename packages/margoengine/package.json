@@ -982,6 +982,10 @@
       "types": "./dist/gltf-pro/interactivity.d.ts",
       "import": "./dist/gltf-pro/interactivity.js"
     },
+    "./gltf-pro/metadata": {
+      "types": "./dist/gltf-pro/metadata.d.ts",
+      "import": "./dist/gltf-pro/metadata.js"
+    },
     "./gltf-pro/coordinates": {
       "types": "./dist/gltf-pro/coordinates.d.ts",
       "import": "./dist/gltf-pro/coordinates.js"

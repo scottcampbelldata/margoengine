@@ -175,6 +175,10 @@ const ASSETS = [
     'test fixture: FourUV.glb, exported for this project by Blender 5.3 from fixtures/uv/four-uv.blender.py (Apache-2.0, as this repository)',
   ],
   [
+    'packages/gltf-pro/tests/fixtures/metadata/NOTICE.md',
+    'test fixtures: XmpMetadataRoundedCube.glb of Khronos glTF-Sample-Assets, commit 8f492390 (CC-BY-4.0, Adam Morris); Box.gltf, Box0.bin and the language edge cases of https://github.com/KhronosGroup/glTF-Metadata-CLI, commit e35dbb00 (CC-BY-4.0, The Khronos Group); boom_box.gltf (CC0-1.0, The Khronos Group) and rocket_ship.gltf (CC-BY-3.0, Poly by Google and aaronfranke) of https://github.com/omigroup/gltf-extensions, commit 4f1fe73b, exported by the Godot Engine',
+  ],
+  [
     'packages/gltf-pro/tests/fixtures/scatter/NOTICE.md',
     'test fixture: ScatteringSkull.gltf, the material of the Khronos glTF-Sample-Assets sample (CC0-1.0, Vladimir Petkovic and Adobe Inc.)',
   ],

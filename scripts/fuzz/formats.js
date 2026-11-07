@@ -418,6 +418,56 @@ const nested = (depth, leaf) => {
   for (let i = 0; i < depth; i++) v = [v];
   return v;
 };
+/** The published files carrying KHR_xmp_json_ld, as JSON text. */
+export function metadataSeeds() {
+  const dir = 'packages/gltf-pro/tests/fixtures/metadata';
+  return readdirSync(join(root, dir))
+    .filter((name) => /\.(glb|gltf)$/.test(name))
+    .sort()
+    .map((name) => {
+      const bytes = read(`${dir}/${name}`);
+      return name.endsWith('.glb') ? encoder.encode(JSON.stringify(fromGLB(bytes).doc)) : bytes;
+    });
+}
+// Values a packet can hold that no writer means: every JSON-LD keyword misused, inherited names, nesting past any limit.
+const hostileValues = (r) => [
+  null,
+  [],
+  {},
+  1e308,
+  { '@list': 'x' },
+  { '@set': [null, [], { '@value': null }] },
+  { '@value': { '@value': 1 } },
+  { '@language': 5, '@value': 'x' },
+  { '@context': { '@language': '__proto__' }, '@set': ['x'] },
+  { '@type': 'rdf:Alt', 'rdf:_1': null, 'rdf:_x': 1, 'rdf:_99999999999999999999': { '@value': 'x' } },
+  { '@type': ['rdf:Alt'] },
+  { '__proto__:x': 1, 'constructor:y': { 'toString:z': 2 } },
+  nested(r.pick([70, 5000]), { '@list': ['x'] }),
+];
+/** A published file with one packet, reference or `@context` entry made hostile. */
+export function hostileMetadata(r, seeds) {
+  const doc = JSON.parse(decoder.decode(r.pick(seeds))),
+    packets = doc.extensions.KHR_xmp_json_ld.packets,
+    value = r.pick(hostileValues(r));
+  switch (r.int(5)) {
+    case 0:
+      doc.asset.extensions.KHR_xmp_json_ld = r.pick([{ packet: r.pick([-1, 1e9, 0.5, '0']) }, 7, null]);
+      break;
+    case 1:
+      doc.extensions.KHR_xmp_json_ld = r.pick([{}, { packets: 'x' }, { packets: [null] }, { packets: [[]] }]);
+      break;
+    case 2:
+      r.pick(packets)['@context'] = r.pick([undefined, 'x', { dc: 5 }, { dc: 'x', rdf: null }]);
+      break;
+    case 3:
+      r.pick(packets)[r.pick(['dc:creator', 'dc:title', 'dc:rights', 'dc:date', 'xmp:CreatorTool', '@id'])] = value;
+      break;
+    default:
+      r.pick(packets)['dc:subject'] = { '@set': [value, value] };
+  }
+  return encoder.encode(JSON.stringify(doc));
+}
 // Extension payloads gltf-pro reads, with hostile members, so any seed reaches the extension parsers.
 const extensionPayloads = (r) => ({
   KHR_texture_transform: {
