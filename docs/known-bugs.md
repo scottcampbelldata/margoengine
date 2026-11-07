@@ -311,6 +311,13 @@ does not own. Each entry says exactly what is needed to close it.
 - **Repro:** `createHeadlessStage({ gpu: create([]), width: 640, height: 360 })`, then `loadGLTF(stage.engine, url)` on `examples/assets/flight-helmet.glb` served over HTTP.
 - **Cause:** image decoding uses the browser's `createImageBitmap`, Node has none, and upload uses `copyExternalImageToTexture`, which needs a browser image. A fix needs a decoder hook in the loaders and an upload through `writeTexture`.
 
+### `PbrMaterial` rejects three-digit CSS hex colours
+
+- **What:** `new PbrMaterial({color: '#555'})` throws `TypeError: Invalid Color`, where CSS, three.js and Babylon all read `#555` as `#555555`. Found when a sky README example used it (`npm run check:readme-run -- --packages=sky`).
+- **Repro:** `new PbrMaterial({color: '#844'})` in any page with `margoengine/core`.
+- **Cause:** `hexColor` in `packages/shared/clear-color.js`, which core bundles for `PbrMaterial` and the clear colour, takes six digits only. Changing it changes core, which needs Scott; the sky README uses six digits meanwhile.
+- **Needed to close:** Scott's go for the core change, then `#rgb` (and `#rgba` if colours ever take alpha) expanded to six digits, with a test.
+
 ### A limp ragdoll keeps moving on a floor when a limit and a contact cannot both hold
 
 - **What:** a ragdoll lying where a floor holds a limb past its cone limit never comes to rest: Knight.glb with the humanoid preset and fitted hulls, pushed over, still has a hand at 0.7 to 1 m/s after 20 s, with the limb up to 0.8 rad past its limit. Capsules settle under default limits (0.05 m/s) because they are thin enough to meet the limits on the floor. Limits a body can meet lying down settle hulls as well (`swing` 2.5, under 0.05 m/s).

@@ -619,6 +619,14 @@ the blur a share of lit air, so the added light is linear in `intensity` and exa
 Evidence: `features-check.mjs` shafts on a Radeon 680M at 4x and 1x. Missing: other GPUs, a reference renderer,
 timing (about 12 ms per frame at 256 x 192 with Bloom, diagnostic), off-screen occluders.
 
+`WeatherFX` (`@margoengine/sky/weather-fx`) draws its occluders each frame (order 5.9) into a depth32float map from above,
+an orthographic view over the weather's box snapped to its texel grid; each occluder's world matrix sits in one storage
+buffer read by `firstInstance`, so the draws share one bind group. `Weather` reads the map through a hook
+(`weather.occlusion`, its `shader(code)` adding the cover read), so the weather entry carries no cover code; its
+`ParticleOverlay` (packages/shared) now takes extra bind group entries and rebuilds its pipeline when the shader
+changes. A one-thread compute step keeps the lens wetness on the GPU. Evidence: `features-check.mjs` weather-fx on a
+Radeon 680M at 4x and 1x. Missing: other GPUs, timing, cover finer than a texel.
+
 A `ShadowFilterEffect` replaces the named filters' last step in `shadowVisibility`, after the cascade pick and the receiver
 plane. `varianceFilter` turns the depth map into two moments, blurs them by two separable passes when the map changes, and
 bounds the lit share with Chebyshev's inequality. A filter's shader must keep `shadowSampler` read, in a branch never taken,

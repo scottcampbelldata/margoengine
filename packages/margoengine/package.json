@@ -2242,6 +2242,10 @@
       "types": "./dist/sky/shafts.d.ts",
       "import": "./dist/sky/shafts.js"
     },
+    "./sky/weather-fx": {
+      "types": "./dist/sky/weather-fx.d.ts",
+      "import": "./dist/sky/weather-fx.js"
+    },
     "./splats": {
       "types": "./dist/splats.d.ts",
       "import": "./dist/splats.js"

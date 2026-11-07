@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10293568,
+  "total": 10299101,
   "history": [
     {
       "date": "2026-10-24",
@@ -3350,6 +3350,12 @@
       "commit": "4922642a5",
       "reason": "B33: gltf/textured gains the cut-out caster, draw counts and texturedAlphaMasks; bvh reads uv of a core mesh that has them; shadows reads a geometry's caster",
       "grew": 2
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "9c3545c7",
+      "reason": "new entry @margoengine/sky/weather-fx (WeatherFX)",
+      "grew": 1
     }
   ],
   "items": {
@@ -3911,6 +3917,7 @@
     "@margoengine/sky/sun": 2379,
     "@margoengine/sky/volumetric-clouds": 7571,
     "@margoengine/sky/weather": 5843,
+    "@margoengine/sky/weather-fx": 5533,
     "@margoengine/splats": 25646,
     "@margoengine/splats/data": 17665,
     "@margoengine/splines": 1853,

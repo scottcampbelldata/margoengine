@@ -67,6 +67,17 @@ export interface WeatherOptions {
   lightning?: WeatherLightningOptions;
 }
 
+/**
+ * What keeps rain and snow off: the cover map `WeatherFX` (`@margoengine/sky/weather-fx`) draws each frame, its frame
+ * uniform (binding 1) and its top-down depth (binding 2). While both are set the weather draws its particles with
+ * `shader(code)`, its own WGSL with the cover read in, which drops every particle under cover.
+ */
+export interface WeatherOcclusion {
+  readonly buffer: GPUBuffer | undefined;
+  readonly view: GPUTextureView | undefined;
+  shader(code: string): string;
+}
+
 /** One lightning strike, given to {@link Weather.onLightning} listeners and, later, to {@link Weather.onThunder} ones. */
 export interface LightningStrike {
   /** 1 for the first strike, counting up. */
@@ -273,6 +284,9 @@ export class Weather implements EnginePlugin {
   readonly name: string = 'weather';
   /** Where the listener (the ear and the eye) is: strikes are placed around it. The render pass follows the camera. */
   readonly listener = new Float32Array(3);
+  /** Set by `WeatherFX` from `@margoengine/sky/weather-fx`: the cover map under which no rain or snow falls. */
+  occlusion?: WeatherOcclusion;
+  private coverEntries?: GPUBindGroupEntry[];
   private readonly overlay = new ParticleOverlay();
   private engine?: Engine;
   private uniform?: GPUBuffer;
@@ -566,7 +580,16 @@ export class Weather implements EnginePlugin {
     v[41] = fall;
     v[42] = wind[1];
     v[43] = Math.max(1, (tall / 540) * 1.2);
-    this.overlay.draw(c, shader, this.uniform!, v as Float32Array<ArrayBuffer>, count);
+    const cover = this.occlusion;
+    if (cover?.buffer && cover.view) {
+      const e = this.coverEntries;
+      if (!e || (e[0].resource as GPUBufferBinding).buffer !== cover.buffer || e[1].resource !== cover.view)
+        this.coverEntries = [
+          { binding: 1, resource: { buffer: cover.buffer } },
+          { binding: 2, resource: cover.view },
+        ];
+      this.overlay.draw(c, cover.shader(shader), this.uniform!, v as Float32Array<ArrayBuffer>, count, this.coverEntries);
+    } else this.overlay.draw(c, shader, this.uniform!, v as Float32Array<ArrayBuffer>, count);
   }
 
   private drawFlash(c: WeatherPassContext): void {
@@ -612,6 +635,7 @@ export class Weather implements EnginePlugin {
     this.flashUniform?.destroy();
     this.uniform = this.flashUniform = undefined;
     this.overlay.release();
+    this.coverEntries = undefined;
     this.flashPipeline = this.flashBind = undefined;
     this.flashKey = '';
   }

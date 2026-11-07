@@ -140,6 +140,29 @@ const checks = {
     console.log(`ok shafts ${samples}x: open sky by angle, linear, behind, hole, clouds (spread ${spread(clear).toFixed(3)} clear, ${spread(broken).toFixed(3)} broken)`);
     return r;
   },
+  async 'weather-fx'(page, samples) {
+    const r = await page.evaluate(() => window.check.run());
+    console.log(`  weather-fx ${samples}x half ${JSON.stringify(r.half)}; map ${JSON.stringify(r.map)}; splashes ${JSON.stringify(r.splashes)} under the roof ${JSON.stringify(r.splashesHalf)}; lens open ${r.open}, roofed ${r.roofed}`);
+    assert.equal(r.error, null);
+    assert.deepEqual(r.errors, []);
+    // Half the view under a roof: without the effects rain falls in both halves; with them not one pixel of the
+    // covered half changes, and rain still falls in the open half.
+    assert.ok(r.half.without.left > 50 && r.half.without.right > 50, `rain without cover: ${JSON.stringify(r.half)}`);
+    assert.equal(r.half.with.left, 0, `rain under the roof: ${JSON.stringify(r.half)}`);
+    assert.ok(r.half.with.right > 50, `rain in the open: ${JSON.stringify(r.half)}`);
+    // The cover map holds the roof's top and the ground's: depth32float over 1,021 m keeps heights to a few
+    // millimetres (2^-24 of the range is 6e-5 m); 0.01 m allows the rasterizer's depth interpolation.
+    assert.ok(r.map.checked > 1000 && r.map.worst < 0.01, `cover map: ${JSON.stringify(r.map)}`);
+    // Splashes change ground pixels in the open, none under the roof.
+    assert.ok(r.splashes.left + r.splashes.right > 100, `splashes: ${JSON.stringify(r.splashes)}`);
+    assert.equal(r.splashesHalf.left, 0, `splashes under the roof: ${JSON.stringify(r.splashesHalf)}`);
+    assert.ok(r.splashesHalf.right > 50, `splashes beside the roof: ${JSON.stringify(r.splashesHalf)}`);
+    // Ten seconds in the open rain put drops on the lens; ten under a roof leave it dry.
+    assert.ok(r.open > 500, `lens in the open: ${r.open}`);
+    assert.equal(r.roofed, 0, `lens under a roof: ${r.roofed}`);
+    console.log(`ok weather-fx ${samples}x: cover, map, splashes, lens`);
+    return r;
+  },
   async hillaire(page, samples) {
     const r = await page.evaluate(() => window.check.run());
     const show = (v) => v.map((x) => x.toPrecision(4)).join(', ');

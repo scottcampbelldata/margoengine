@@ -48,8 +48,8 @@ export function tracedGPU() {
     `compute(${x.compute.entryPoint}:${sha(x.compute.module.code.slice(x.compute.module.code.lastIndexOf('@compute')))})`,
   ]);
   wrap(d, 'createRenderPipeline', (x) => {
-    const state = JSON.stringify([x.fragment.targets, x.multisample, x.depthStencil]);
-    return [`render(${stage(x.vertex)},${stage(x.fragment)},${state})`, `render(${x.fragment.entryPoint},${state})`];
+    const state = JSON.stringify([x.fragment?.targets, x.multisample, x.depthStencil]);
+    return [`render(${stage(x.vertex)},${stage(x.fragment)},${state})`, `render(${x.fragment?.entryPoint ?? x.vertex.entryPoint},${state})`];
   });
   const entries = (x, key) =>
     x.entries.map((e) => e.binding + '=' + of(e.resource.buffer ?? e.resource.texture ?? e.resource, key)).join(',');
@@ -66,6 +66,8 @@ export function tracedGPU() {
     setIndexBuffer: (b) => commands.push(['setIndexBuffer', b]),
     dispatchWorkgroups: (...a) => commands.push(['dispatch', ...a]),
     draw: (...a) => commands.push(['draw', ...a]),
+    drawIndexed: (...a) => commands.push(['drawIndexed', ...a]),
+    setVertexBuffer: (slot, b, offset) => commands.push(['setVertexBuffer', slot, b, offset]),
     drawIndexedIndirect: (b, o) => commands.push(['drawIndexedIndirect', b, o]),
     drawIndirect: (b, o) => commands.push(['drawIndirect', b, o]),
     end: () => commands.push(['end']),

@@ -2344,8 +2344,8 @@
         "gzip": 3841
       },
       "./weather": {
-        "raw": 14371,
-        "gzip": 5587
+        "raw": 14830,
+        "gzip": 5737
       },
       "./sun": {
         "raw": 5386,
@@ -2370,6 +2370,10 @@
       "./shafts": {
         "raw": 17828,
         "gzip": 6883
+      },
+      "./weather-fx": {
+        "raw": 13664,
+        "gzip": 5277
       }
     },
     "@margoengine/splats": {
@@ -2856,8 +2860,8 @@
         "gzip": 4974
       },
       "./hail": {
-        "raw": 8766,
-        "gzip": 4022
+        "raw": 8908,
+        "gzip": 4078
       }
     },
     "@margoengine/webgl": {

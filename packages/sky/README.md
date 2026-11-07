@@ -37,12 +37,13 @@ const sky = Sky.attach(engine, {model: 'bruneton', clouds: {coverage: 0.4}}, {br
 | `/reflection` | `reflectionTexture` | 0.8 kB |
 | `/lighting` | `lighting` (engine sun/moon light, ambient) | 1.0 kB |
 | `/sun` | typed angles, `setSun` / `setAmbient` over core's light, `sunlitSky`, `sunPath` (not a `Sky` feature) | 2.1 kB |
-| `/weather` | `Weather`, its own plugin (not a `Sky` feature): rain, snow, lightning, thunder timing | 5.6 kB |
+| `/weather` | `Weather`, its own plugin (not a `Sky` feature): rain, snow, lightning, thunder timing | 5.7 kB |
 | `/volumetric-clouds` | `VolumetricClouds`, its own plugin: ray-marched 3D clouds you can fly through | 7.3 kB |
 | `/cloud-shadows` | `volumetricCloudShadows`, a shadow effect for `@margoengine/shadows` | 3.2 kB |
 | `/aerial` | `AerialPerspective`, its own plugin: distant surfaces take the air's colour | 6.5 kB |
 | `/hillaire` | `HillaireSky`, its own plugin: a physical sky with ozone from the ground to space | 6.6 kB |
 | `/shafts` | `LightShafts`, its own plugin: god rays past geometry and through cloud gaps | 6.9 kB |
+| `/weather-fx` | `WeatherFX`, its own plugin: no rain under roofs, splashes, a wet lens | 5.3 kB |
 
 Each entry is compressed on its own ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)),
 so sums overstate a combined bundle: the root `Sky` is 10.2 kB with all of them, against 13.7 kB
@@ -591,10 +592,51 @@ roughness with it) and `snowCover` (builds in 2 minutes, melts in 5; drive a sno
 position strikes are placed around; the render pass follows the camera, and without a GPU engine you may set it yourself
 and call `onPreUpdate(delta)` for audio or game logic. `Weather` needs WebGPU (`MargoError` `'unsupported'` on WebGL2). Sky lighting runs on the WebGL2 compatibility layer with
 no change to your code: the package loads a small route there that computes the same light on the GPU.
-This is a screen-space-free particle overlay: no splashes on the ground, no rain running down the lens, no rain
-occlusion under roofs (it respects the scene depth, not covered areas).
+On its own the weather respects the scene depth, not covered areas: rain falls under roofs, makes no splashes and
+leaves the lens dry. `WeatherFX` (below) adds all three.
 
-This is a compact atmospheric approximation, not a reference-quality reproduction of the original planetary renderer: no ozone spectrum, ground-albedo irradiance feedback or terrain light shafts (physical aerial perspective is the `/aerial` entry). Coarse angular sampling can band; the visible horizon uses a skyward sample to avoid a dark ground strip. Preetham is a daytime model with a night fade.
+### Rain splashes, wet lens and cover
+
+`WeatherFX` from `@margoengine/sky/weather-fx` makes the rain meet the scene: no rain or snow falls under roofs,
+bridges and trees, splashes rise where the rain lands, and drops gather on the lens of a camera standing in the open.
+Give it the meshes or models that keep rain off (the ground too, so splashes land on it).
+
+```ts
+import {Engine, PbrMaterial, box} from 'margoengine/core';
+import {Weather} from 'margoengine/sky/weather';
+import {WeatherFX} from 'margoengine/sky/weather-fx';
+const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
+const ground = engine.createMesh().setGeometry(box(200, 0.2, 200)).setMaterial(new PbrMaterial({color: '#555555'}));
+const roof = engine.createMesh().setGeometry(box(8, 0.3, 8)).setMaterial(new PbrMaterial({color: '#884444'})).setPosition([0, 3, -6]);
+const weather = Weather.attach(engine, {intensity: 0.9});
+const fx = WeatherFX.attach(engine, {weather, occluders: [roof, ground]});
+fx.options.lensDrops = 60; // a wetter lens
+```
+
+Each frame the occluders are drawn from above into a depth map over the weather's box (`resolution` texels a side,
+256), as a shadow map is drawn from the sun: each texel holds the height of the topmost surface there. The weather
+drops every particle below that height, so nothing falls under cover, and each splash slot lands once every third of a
+second at a random place in the box, on that surface (on `ground`, default 0, where the map holds none): a crown ring
+and four droplets, depth-tested against the scene. The lens wets toward the rain's amount in about 4 s while the
+camera stands in the open (by the same map) and dries in about 25 s under cover or when the rain stops; its drops are
+clear discs with a dark rim and a highlight, a few running down.
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `weather` | required | the `Weather` to follow |
+| `occluders` | none | core meshes, or models and terrain with `shadowPrimitives`, that keep rain off |
+| `ground` | 0 | height where splashes land when no occluder is below |
+| `resolution` | 256 | cover map texels per side, 32 to 2048 |
+| `splashes` | 3,000 | splash slots at full rain, 0 to 100,000 |
+| `splashSize` | 0.15 | splash height in metres |
+| `lensDrops` | 40 | drops on a lens in full rain, 0 to 500 |
+| `dropSize` | 0.03 | drop radius, a share of the view's height |
+
+Occluders are drawn without skinning, morphing, instancing or displacement (their rest shapes), and alpha-masked
+leaves cover whole; snow is kept off under cover but makes no splashes and no lens drops. Lens drops shade the frame
+rather than refract it. Needs WebGPU.
+
+This is a compact atmospheric approximation, not a reference-quality reproduction of the original planetary renderer: no ozone spectrum or ground-albedo irradiance feedback (physical aerial perspective is the `/aerial` entry, light shafts the `/shafts` entry and a sky with ozone the `/hillaire` entry). Coarse angular sampling can band; the visible horizon uses a skyward sample to avoid a dark ground strip. Preetham is a daytime model with a night fade.
 
 Models: [Preetham daylight notes](https://renderwonk.com/publications/s2003-course/preetham/notes-preetham.pdf), [Bruneton scattering equations](https://ebruneton.github.io/precomputed_atmospheric_scattering/atmosphere/functions.glsl.html).
 

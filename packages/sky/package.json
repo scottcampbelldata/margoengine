@@ -86,6 +86,10 @@
     "./shafts": {
       "types": "./dist/shafts.d.ts",
       "import": "./dist/shafts.js"
+    },
+    "./weather-fx": {
+      "types": "./dist/weather-fx.d.ts",
+      "import": "./dist/weather-fx.js"
     }
   },
   "files": [

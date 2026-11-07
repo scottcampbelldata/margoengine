@@ -29,6 +29,7 @@ export class Weather implements EnginePlugin {
     readonly options: WeatherOptions;
     readonly name: string;
     readonly listener: Float32Array<ArrayBuffer>;
+    occlusion?: WeatherOcclusion;
     constructor(options?: WeatherOptions);
     static attach(engine: EngineKernel, options?: WeatherOptions): Weather;
     get amount(): number;
@@ -55,6 +56,12 @@ export interface WeatherLightningOptions {
     strength?: number;
     color?: Vec3;
     seed?: number;
+}
+
+export interface WeatherOcclusion {
+    readonly buffer: GPUBuffer | undefined;
+    readonly view: GPUTextureView | undefined;
+    shader(code: string): string;
 }
 
 export interface WeatherOptions {
