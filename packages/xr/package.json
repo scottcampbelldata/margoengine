@@ -51,6 +51,10 @@
     "./layers": {
       "types": "./dist/layers.d.ts",
       "import": "./dist/layers.js"
+    },
+    "./interaction": {
+      "types": "./dist/interaction.d.ts",
+      "import": "./dist/interaction.js"
     }
   },
   "files": [

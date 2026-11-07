@@ -192,3 +192,27 @@ enter.onclick=async()=>{
 ```
 
 Without the browser's layer support `XRLayers.attach` and each layer throw a coded error that names the feature to ask for.
+
+## Interaction toolkit
+
+`Interaction.attach(xr, { grabbables, sockets, panels })` from `@margoengine/xr/interaction` handles the usual hand and controller interactions. Squeeze (or pinch, on a tracked hand) near an object or with the ray on it to pick it up; it follows the grip as you hold it. Let go over a socket that fits and it snaps in; otherwise `onRelease` gets its speed for a throw. Point the ray at a panel and press the trigger (or pinch) for `down` and `up`, with `u` and `v` from the panel's top left. The arrays stay live: push or remove items at any time.
+
+```ts
+import {Engine,PbrMaterial,box as boxGeometry} from 'margoengine/core';
+import {Quaternion} from 'margoengine/math/quaternion';
+import {Vector3} from 'margoengine/math/vector3';
+import {XR} from 'margoengine/xr';
+import {Interaction,grabbable} from 'margoengine/xr/interaction';
+
+const canvas=document.createElement('canvas');document.body.append(canvas);
+const engine=await Engine.create(canvas,{backend:'webgpu'});
+const xr=await XR.create(engine);
+const box=engine.createMesh().setGeometry(boxGeometry()).setMaterial(new PbrMaterial({color:'#e8a33d'})).setScale([0.1,0.1,0.1]).setPosition([0,1,-0.5]);
+const cube=grabbable(box,{radius:0.08});
+const shelf={position:new Vector3(0.3,1,-0.5),orientation:new Quaternion(),radius:0.1,held:null};
+const button={position:new Vector3(0,1.4,-1),orientation:new Quaternion(),size:[0.3,0.1] as const,onPointer:(e:{type:string})=>{if(e.type==='up')console.log('clicked');}};
+const ui=Interaction.attach(xr,{grabbables:[cube],sockets:[shelf],panels:[button]});
+const enter=document.createElement('button');enter.textContent='Enter VR';document.body.append(enter);
+enter.onclick=()=>void xr.requestSession('immersive-vr',{optionalFeatures:['hand-tracking']}).catch(engine.onError);
+// ui.rays[i] tells where each ray points, for drawing a pointer; ui.dispose() lets go of everything.
+```

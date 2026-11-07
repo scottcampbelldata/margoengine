@@ -2974,6 +2974,10 @@
       "types": "./dist/xr/layers.d.ts",
       "import": "./dist/xr/layers.js"
     },
+    "./xr/interaction": {
+      "types": "./dist/xr/interaction.d.ts",
+      "import": "./dist/xr/interaction.js"
+    },
     "./game": {
       "types": "./dist/game.d.ts",
       "import": "./dist/game.js"
