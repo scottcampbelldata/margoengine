@@ -8,6 +8,7 @@ import init, { JxlImage } from '../dist/jxl/jxl_oxide_wasm.js';
 import { JXLDecoder, jxlTextureFile, readJXLHeader } from '../dist/jxl.js';
 import { renderJXL } from '../dist/jxl-render.js';
 import { decodePNG } from '../dist/png.js';
+import { profileToSRGB, readICCProfile } from '../dist/icc.js';
 
 const fixtures = new URL('./fixtures/jxl/', import.meta.url),
   file = (name) => new Uint8Array(readFileSync(new URL(name, fixtures))),
@@ -78,6 +79,105 @@ test('a premultiplied file comes out with straight alpha, divided once', () => {
   }
   assert.ok(worstAlpha <= 1, `alpha differs by ${worstAlpha}`);
   assert.ok(worst <= 2, `colour differs by ${worst}`);
+});
+
+// Pixels of a red bench on grass, read from `sips -m "sRGB Profile.icc"` on macOS 27.2: ColorSync, the engine under Safari,
+// on the samples and profile the module hands out. LittleCMS 2.19 gives the same. As stored they are a green bench.
+test('a file stored in its own ICC profile comes out in sRGB, as ColorSync gives it', () => {
+  const { width, data } = renderJXL(glue, file('bench_oriented_brg.jxl')),
+    colorSync = [
+      [100, 100, 111, 135, 72],
+      [300, 250, 209, 55, 51],
+      [500, 400, 48, 45, 54],
+      [50, 450, 113, 127, 141],
+      [303, 120, 120, 75, 73],
+    ];
+  for (const [x, y, ...rgb] of colorSync) {
+    const at = (y * width + x) * 4;
+    assert.deepEqual([...data.subarray(at, at + 3)], rgb, `pixel ${x}, ${y}`);
+  }
+});
+
+// A profile of the tags named, each `[name, bytes]`, in colour space `space`.
+function profile(space, tags) {
+  const table = 132 + tags.length * 12,
+    size = tags.reduce((sum, [, bytes]) => sum + bytes.length, table),
+    out = new Uint8Array(size),
+    view = new DataView(out.buffer),
+    ascii = (at, text) => out.set(Buffer.from(text, 'latin1'), at);
+  ascii(16, space);
+  view.setUint32(128, tags.length);
+  let at = table;
+  tags.forEach(([name, bytes], i) => {
+    ascii(132 + i * 12, name);
+    view.setUint32(136 + i * 12, at);
+    view.setUint32(140 + i * 12, bytes.length);
+    out.set(bytes, at);
+    at += bytes.length;
+  });
+  return out;
+}
+
+function type(name, length, write) {
+  const bytes = new Uint8Array(length);
+  bytes.set(Buffer.from(name, 'latin1'));
+  write(new DataView(bytes.buffer));
+  return bytes;
+}
+
+const gamma = (value) => type('curv', 14, (view) => (view.setUint32(8, 1), view.setUint16(12, value * 256))),
+  xyz = (x, y, z) =>
+    type('XYZ ', 20, (view) => [x, y, z].forEach((value, i) => view.setInt32(8 + i * 4, Math.round(value * 65536)))),
+  parametric = (kind, values) =>
+    type('para', 12 + values.length * 4, (view) => {
+      view.setUint16(8, kind);
+      values.forEach((value, i) => view.setInt32(12 + i * 4, Math.round(value * 65536)));
+    }),
+  table = (values) =>
+    type('curv', 12 + values.length * 2, (view) => {
+      view.setUint32(8, values.length);
+      values.forEach((value, i) => view.setUint16(12 + i * 2, value));
+    }),
+  srgbColumns = [
+    ['rXYZ', xyz(0.4360747, 0.2225045, 0.0139322)],
+    ['gXYZ', xyz(0.3850649, 0.7168786, 0.0971045)],
+    ['bXYZ', xyz(0.1430804, 0.0606169, 0.7141733)],
+  ],
+  srgbCurve = parametric(3, [2.4, 1 / 1.055, 0.055 / 1.055, 1 / 12.92, 0.04045]),
+  curves = (curve) => ['rTRC', 'gTRC', 'bTRC'].map((name) => [name, curve]);
+
+test('a profile that is sRGB leaves every level where it was, and alpha is carried over', () => {
+  const read = readICCProfile(profile('RGB ', [...srgbColumns, ...curves(srgbCurve)])),
+    samples = new Uint16Array(256 * 4);
+  for (let level = 0; level < 256; level++) samples.set([level * 257, level * 257, level * 257, level * 257], level * 4);
+  const out = profileToSRGB(samples, read);
+  for (let level = 0; level < 256; level++)
+    for (let channel = 0; channel < 4; channel++) assert.equal(out[level * 4 + channel], level, `level ${level}`);
+});
+
+test('gamma, table and every parametric curve give their value, and grey needs one curve', () => {
+  const curveOf = (curve) => readICCProfile(profile('GRAY', [['kTRC', curve]])).curves[0],
+    close = (actual, expected) => assert.ok(Math.abs(actual - expected) < 1e-4, `${actual} against ${expected}`);
+  close(curveOf(gamma(2))(0.5), 0.25);
+  close(curveOf(table([0, 65535, 0]))(0.25), 0.5);
+  close(curveOf(table([]))(0.3), 0.3);
+  close(curveOf(parametric(0, [2]))(0.5), 0.25);
+  close(curveOf(parametric(1, [2, 2, -0.5]))(0.5), 0.25);
+  close(curveOf(parametric(1, [2, 2, -0.5]))(0.1), 0);
+  close(curveOf(parametric(2, [2, 2, -0.5, 0.25]))(0.1), 0.25);
+  close(curveOf(parametric(3, [2, 1, 0, 0.5, 0.5]))(0.25), 0.125);
+  close(curveOf(parametric(4, [2, 1, 0, 0.5, 0.5, 0.25, 0.125]))(0.25), 0.25);
+  close(curveOf(parametric(4, [2, 1, 0, 0.5, 0.5, 0.25, 0.125]))(0.5), 0.5);
+});
+
+test('a lookup table profile, a CMYK profile, an unknown curve and a damaged profile are not read', () => {
+  const pointsOutside = profile('GRAY', [['kTRC', gamma(2)]]);
+  new DataView(pointsOutside.buffer).setUint32(136, 1 << 20);
+  assert.equal(readICCProfile(profile('RGB ', [['A2B0', new Uint8Array(32)]])), undefined);
+  assert.equal(readICCProfile(profile('CMYK', [['kTRC', gamma(2)]])), undefined);
+  assert.equal(readICCProfile(profile('GRAY', [['kTRC', parametric(9, [])]])), undefined);
+  assert.equal(readICCProfile(pointsOutside), undefined);
+  assert.equal(readICCProfile(new Uint8Array(0)), undefined);
 });
 
 test('an animation gives its first frame', () => {

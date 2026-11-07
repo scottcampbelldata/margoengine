@@ -31,8 +31,8 @@ export interface JXLDecodeOptions {
 }
 
 /**
- * A decoded JPEG XL image: RGBA8 rows, top row first, straight alpha, `width * height * 4` bytes. sRGB, unless the Wasm path
- * read a file with an ICC profile not stored in XYB: those samples come out as stored (docs/known-bugs.md).
+ * A decoded JPEG XL image: RGBA8 rows, top row first, straight alpha, `width * height * 4` bytes, sRGB. The one exception is
+ * an RGB profile built on lookup tables alone, which the Wasm path cannot read: those samples come out as stored.
  */
 export interface JXLImage extends DecodedJXL {
   hasAlpha: boolean;

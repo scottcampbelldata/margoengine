@@ -72,7 +72,8 @@ const texture = uploadTexture(device, jxlTextureFile(image));
 `readJXLHeader(bytes)` reads the size, bit depth, alpha, orientation and colour encoding without decoding. `decode` takes `signal`,
 `maxPixels` (default 2^26) and `transfer`; `new JXLDecoder({browser: false})` always uses the Wasm, and `decoderPath` names another
 folder for `jxl_oxide_wasm_bg.wasm`. `image.decoder` says which ran. Bit depths above 8 come out as 8, an animation gives its first
-frame, a file with an ICC profile and no XYB comes out as stored, and CMYK files are refused (`docs/limits.md`).
+frame, and CMYK files are refused. The Wasm path gives sRGB whatever the file is stored in: it converts through a matrix and curve or
+grey ICC profile, and only an RGB profile built on lookup tables alone comes out as stored (`docs/limits.md`).
 
 ## PVR (`@margoengine/decoders/pvr`)
 

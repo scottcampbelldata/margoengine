@@ -1,6 +1,8 @@
 // One JPEG XL decode on the vendored jxl-oxide module, to straight-alpha sRGB RGBA8. It runs in jxl.worker.ts, and in
-// anything else that has loaded the module. jxl-oxide hands out PNG bytes, so decodePNG reads them.
+// anything else that has loaded the module. jxl-oxide hands out PNG bytes, so decodePNG reads them. The module has no colour
+// engine: a file whose samples are not in XYB comes out as stored, with the profile beside it, so icc.ts finishes the job.
 import { decodeFailed } from './errors.js';
+import { profileToSRGB, readICCProfile, type ICCProfile } from './icc.js';
 import { readJXLHeader } from './jxl-file.js';
 import { decodePNG } from './png.js';
 
@@ -9,7 +11,7 @@ export interface JXLModule {
   JxlImage: new () => {
     feedBytes(bytes: Uint8Array): number;
     tryInit(): boolean;
-    render(keyframe?: number): { encodeToPng(): Uint8Array };
+    render(keyframe?: number): { readonly iccProfile: Uint8Array; encodeToPng(): Uint8Array };
     free(): void;
     forceSrgb: boolean;
     readonly loaded: boolean;
@@ -36,9 +38,21 @@ function unpremultiply(samples: Uint16Array): Uint8Array {
   return out;
 }
 
+/** Divides 16-bit premultiplied samples by their alpha, in place, staying at 16 bits. */
+function straighten(samples: Uint16Array): void {
+  for (let at = 0; at < samples.length; at += 4) {
+    const alpha = samples[at + 3];
+    if (alpha)
+      for (let channel = 0; channel < 3; channel++)
+        samples[at + channel] = Math.round((Math.min(samples[at + channel], alpha) / alpha) * 65535);
+  }
+}
+
 /**
  * Decodes the first frame. A premultiplied sRGB file keeps 16 bits until it is divided by its alpha, because dividing 8-bit
- * samples by a small alpha would magnify their rounding; every other file comes out of the module as 8-bit sRGB.
+ * samples by a small alpha would magnify their rounding, and so does a file the module hands back in its own profile, which
+ * converts to sRGB here. Every other file comes out of the module as 8-bit sRGB. A profile built on lookup tables alone
+ * cannot be read, so its samples stay as stored.
  *
  * @throws RangeError when the image is larger than `maxPixels`.
  * @throws MargoError `failed` when the file is cut short, corrupt or in a colour model with no RGB rendering (CMYK).
@@ -51,18 +65,25 @@ export function renderJXL(module: JXLModule, bytes: Uint8Array, maxPixels = 2 **
     );
   const image = new module.JxlImage(),
     exact = header.alphaPremultiplied && header.srgb;
-  let png: Uint8Array;
+  let png: Uint8Array, profile: ICCProfile | undefined;
   try {
     image.feedBytes(bytes);
     if (!image.tryInit() || !image.loaded)
       throw decodeFailed('JPEG XL: the file is cut short; pass the complete bytes of a .jxl file');
     image.forceSrgb = !exact;
-    png = image.render(0).encodeToPng();
+    const render = image.render(0);
+    profile = readICCProfile(render.iccProfile);
+    png = render.encodeToPng();
   } catch (error) {
     if ((error instanceof Error && error.name === 'MargoError') || error instanceof WebAssembly.RuntimeError) throw error;
     throw decodeFailed(`JPEG XL: ${String(error)}; check the file, and convert CMYK images to RGB first`, error);
   } finally {
     image.free();
+  }
+  if (profile) {
+    const { width, height, data } = decodePNG(png, { maxPixels, bitDepth: 16 });
+    if (header.alphaPremultiplied) straighten(data);
+    return { width, height, data: profileToSRGB(data, profile) };
   }
   if (!header.alphaPremultiplied) return decodePNG(png, { maxPixels });
   if (exact) {

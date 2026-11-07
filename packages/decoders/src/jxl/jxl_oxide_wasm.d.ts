@@ -8,6 +8,8 @@ export class JxlImage {
   readonly loaded: boolean;
 }
 export class RenderResult {
+  /** The profile the samples are in. Empty when they are sRGB. */
+  readonly iccProfile: Uint8Array;
   /** Consumes the render, so there is nothing left to free. */
   encodeToPng(): Uint8Array;
 }

@@ -1238,8 +1238,9 @@ An audit of the finished batches against their job text listed 70 gaps for the H
 | B23 | engine.pick in a loop documented, pickMany is the batch | DONE | `69ae59107` | - |
 | B26 | PipelineCompiles.trackNext, limit said first | DONE | `2157dbe73` | - |
 | B37 | cull phase limit documented | DONE | `ca45d8bb3` | - |
-| B28 | 13/7 Arcball gizmo | DONE | this commit | LIM limits row |
-| B39 | 8/5 Spherical harmonics | DONE | this commit | LIM-048 |
+| B28 | 13/7 Arcball gizmo | DONE | `5b4dd4af7` | LIM limits row |
+| B39 | 8/5 Spherical harmonics | DONE | `5b4dd4af7` | LIM-048 |
+| jxl-icc | JPEG XL Wasm path applies the file's ICC profile | DONE | this commit | LIM-233 |
 
 ## LAZ: one LAS reader, and every point format on a real file
 

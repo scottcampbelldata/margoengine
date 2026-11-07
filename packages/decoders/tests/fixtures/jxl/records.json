@@ -17,7 +17,7 @@
   "bench_oriented_brg": {
     "width": 606,
     "height": 500,
-    "sha256": "c9dd77159982c2a77c2546fd3dc070dbad033c60f6b376b4f2629983a3c6dfe3"
+    "sha256": "ea37113ec11cb6c5f67d81dffaf62265c8aad36f1723346280a42f6787fe31b1"
   },
   "bicycles": {
     "width": 1024,
@@ -37,7 +37,7 @@
   "patches_lossless": {
     "width": 1600,
     "height": 1096,
-    "sha256": "21fbf3b99c57a0163b82053f2e5c1cfdff5079cf9bfcdfb15ba86f8099bbb4cc"
+    "sha256": "44eddaabcf766968daa82d1cfe60b29e9b3eb59a655b69815f44c8df3ed00c78"
   },
   "sunset_logo": {
     "width": 924,
