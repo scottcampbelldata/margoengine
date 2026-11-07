@@ -84,7 +84,20 @@ function everyState(state, into = []) {
   return into;
 }
 
-/** The chart of one seed: compound and parallel states, event transitions, guards on what is active. */
+// History goes where Margo's property and a history target mean the same: not on a child a parent enters by `initial`,
+// not under a shallow parent, and deep only with no regions below, as Margo's regions keep their own memory.
+function remember(next, state, shallowAbove) {
+  for (const child of state.children) {
+    const entered = state.initial === child.name || state.parallel || child.region,
+      compound = child.children.length && !child.parallel,
+      holdsRegions = everyState(child).some((inner) => inner.parallel);
+    if (compound && !entered && !shallowAbove && next(100) < 60)
+      child.history = holdsRegions || next(2) ? 'shallow' : 'deep';
+    remember(next, child, child.history === 'shallow');
+  }
+}
+
+/** The chart of one seed: compound and parallel states, history, event transitions, guards on what is active. */
 export function makeChart(seed) {
   const next = random(seed * 2654435761 + 1),
     root = { name: 'root', children: [], transitions: [], initial: '' },
@@ -97,14 +110,10 @@ export function makeChart(seed) {
   }
   root.initial = root.children[0].name;
   wire(next, root, everyState(root));
+  remember(next, root, false);
   const script = [];
   for (let i = 0; i < SCRIPT_LENGTH; i++) script.push(EVENTS[next(EVENTS.length)]);
   return { root, script };
-}
-
-// The leaf a target comes down to through `initial`.
-function leaf(state, byName) {
-  return state.initial ? leaf(byName.get(state.initial), byName) : state;
 }
 
 function machineOf(top, states, byName, runners) {
@@ -112,11 +121,13 @@ function machineOf(top, states, byName, runners) {
     transitions = [];
   const add = (state, parent) => {
     const entry = parent ? { parent: parent.name } : {};
+    if (state.initial) entry.initial = state.initial;
+    if (state.history) entry.history = state.history;
     if (state.parallel) {
       const regions = {};
       for (const region of state.children) {
         const inner = machineOf(region, [region], byName, runners);
-        regions[region.name] = { ...inner, initial: leaf(region, byName).name };
+        regions[region.name] = { ...inner, initial: region.name };
       }
       const running = new ParallelRegions(regions, {});
       runners.set(state.name, running);
@@ -124,10 +135,9 @@ function machineOf(top, states, byName, runners) {
     }
     table[state.name] = entry;
     for (const transition of state.transitions) {
-      const target = byName.get(transition.to);
       transitions.push({
         from: state.name,
-        to: leaf(target, byName).name,
+        to: transition.to,
         event: transition.event,
         ...(transition.active ? { guard: () => runners.isActive(transition.active) } : {}),
       });
@@ -160,7 +170,7 @@ export function runMargo({ root, script }) {
   runners.isActive = (name) => name === 'root' || active(name, machine);
   const { states, transitions } = machineOf(root, root.children, byName, runners);
   // Nothing is active until the constructor returns, and guards only run after that.
-  machine = new StateMachine(states, leaf(root, byName).name, {}, transitions);
+  machine = new StateMachine(states, root.initial, {}, transitions);
   const atoms = () =>
     leaves(machine, [])
       .filter((name) => !byName.get(name).children.length)

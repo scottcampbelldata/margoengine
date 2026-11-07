@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10181370,
+  "total": 10181717,
   "history": [
     {
       "date": "2026-10-24",
@@ -3170,6 +3170,12 @@
       "commit": "fd25eb3e8",
       "reason": "new optional entry @margoengine/fsm/parallel",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "fbfc52155",
+      "reason": "fsm root gains history and initial",
+      "grew": 1
     }
   ],
   "items": {
@@ -3398,7 +3404,7 @@
     "@margoengine/fbx/pbr": 3843,
     "@margoengine/fbx/scene-extras": 2735,
     "@margoengine/fbx/worker": 23098,
-    "@margoengine/fsm": 1131,
+    "@margoengine/fsm": 1478,
     "@margoengine/fsm/parallel": 2033,
     "@margoengine/geometry": 24691,
     "@margoengine/geometry/delaunay": 3404,

@@ -34,6 +34,8 @@ export interface Region<C> {
 
 interface State<C> {
     parent?: string;
+    initial?: string;
+    history?: 'shallow' | 'deep';
     enter?: (context: C) => void;
     exit?: (context: C) => void;
     update?: (context: C, delta: number) => void;
@@ -47,6 +49,7 @@ class StateMachine<C> {
     state: string;
     previous: string | null;
     elapsed: number;
+    readonly memory: Map<string, string>;
     constructor(states: Readonly<Record<string, State<C>>>, initial: string, context: C, transitions?: readonly Transition[]);
     get blend(): number;
     matches(name: string): boolean;

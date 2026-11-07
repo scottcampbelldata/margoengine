@@ -28,6 +28,18 @@ charts.forEach((chart, index) => {
       console.log(`seed ${index + 1} step ${i}: Margo [${margo[i]}] Sismic [${outside[i]}]`);
   }
 });
-console.log(JSON.stringify({ charts: charts.length, steps, moved, differ }));
+const count = (state, test) => (test(state) ? 1 : 0) + state.children.reduce((sum, child) => sum + count(child, test), 0),
+  total = (test) => charts.reduce((sum, chart) => sum + count(chart.root, test), 0);
+console.log(
+  JSON.stringify({
+    charts: charts.length,
+    steps,
+    moved,
+    differ,
+    parallel: total((state) => state.parallel),
+    shallow: total((state) => state.history === 'shallow'),
+    deep: total((state) => state.history === 'deep'),
+  }),
+);
 if (differ) process.exit(1);
 writeFileSync(new URL('traces.json', folder), `${JSON.stringify(traces)}\n`);

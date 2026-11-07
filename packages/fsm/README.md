@@ -15,6 +15,39 @@ machine.update(1 / 60);
 
 State hooks receive context; update hooks also receive delta seconds. Guards can decline an event transition. Hierarchy cycles and unknown states are rejected. goto changes state directly. Recursive transitions from enter/exit hooks are rejected. Cross-fade progress is a timer for the caller's animation mixer; this package does not own animations.
 
+## History states
+
+Give a parent `history` and it returns to where it was when you come back, for pause menus and interrupts. Give it `initial` for the child to start in before that, and for any parent that should never rest on itself.
+
+```ts
+import {StateMachine} from 'margoengine/fsm';
+
+const machine = new StateMachine({
+  play: {history: 'deep', initial: 'explore'},
+  explore: {parent: 'play'},
+  combat: {parent: 'play', initial: 'melee'},
+  melee: {parent: 'combat'},
+  ranged: {parent: 'combat'},
+  pause: {}
+}, 'play', {}, [
+  {from: 'explore', to: 'combat', event: 'enemy'},
+  {from: 'melee', to: 'ranged', event: 'switch'},
+  {from: 'play', to: 'pause', event: 'pause'},
+  {from: 'pause', to: 'play', event: 'resume'}
+]);
+machine.send('enemy');
+machine.send('switch');
+machine.send('pause');
+machine.send('resume');
+console.log(machine.state); // 'ranged'; with history: 'shallow', 'melee', as combat restarts at its initial
+```
+
+- A transition to `play` uses the memory; a transition straight to a child of `play` does not, and an exit records it again as usual.
+- The memory counts when the state is entered. A transition to a parent the machine is still inside goes to the parent's `initial`, or stops on the parent if it has none.
+- `machine.memory` maps each state to what it remembers: `machine.memory.delete('play')` forgets one, `machine.memory.clear()` forgets all.
+- Each state with `history` keeps its own memory, and a state remembered by a parent uses its own on the way in.
+- Parallel regions inside remembered states start again at their `initial`, unless the regions have `{history: true}`.
+
 ## Parallel regions (`margoengine/fsm/parallel`)
 
 Run independent states at once, such as what a character's legs do and what its weapon does. Each region is an ordinary machine with one active state of its own; they share a context and hear the same events. Two machines side by side would do until a guard in one reads the other, or a hook in one tells the other: `ParallelRegions` settles those.

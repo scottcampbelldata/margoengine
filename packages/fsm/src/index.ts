@@ -3,6 +3,14 @@ import { MargoError } from '@margoengine/math/errors';
 export interface State<C> {
   /** Name of the parent state; ancestors stay entered while moving between their children. */
   parent?: string;
+  /** Descendant to go on to when this state is the target of a transition. Default none: the machine stops here. */
+  initial?: string;
+  /**
+   * Remember where the machine was when it left this state, and return there when it comes back: `'shallow'` to the
+   * child that was active, which then starts as usual; `'deep'` to the exact innermost state. Before the first visit,
+   * `initial` applies. Default none.
+   */
+  history?: 'shallow' | 'deep';
   /** Called on entry, outermost ancestor first. */
   enter?: (context: C) => void;
   /** Called on exit, innermost state first. */
@@ -37,12 +45,15 @@ export class StateMachine<C> {
   previous: string | null = null;
   /** Seconds since the last state change. */
   elapsed = 0;
+  /** What each state with `history` remembers, by state name. Delete a key, or clear it, to forget. */
+  readonly memory = new Map<string, string>();
   private duration = 0;
   private changing = false;
   private readonly paths = new Map<string, readonly string[]>();
   /**
    * Build the machine and enter `initial` (and its ancestors).
-   * @throws TypeError for an unknown parent, a hierarchy cycle, an unknown initial state, or an invalid transition.
+   * @throws TypeError for an unknown parent, a hierarchy cycle, an unknown initial state, a state's `initial` that is
+   * not its descendant, an unknown `history`, or an invalid transition.
    */
   constructor(
     readonly states: Readonly<Record<string, State<C>>>,
@@ -61,6 +72,13 @@ export class StateMachine<C> {
       }
       this.paths.set(key, path);
     }
+    for (const key of Object.keys(states)) {
+      const { initial: first, history } = states[key];
+      if (first !== undefined && !(this.paths.get(first)?.includes(key) && first !== key))
+        throw new TypeError(`Invalid initial of state ${key}; name one of its descendants`);
+      if (history !== undefined && history !== 'shallow' && history !== 'deep')
+        throw new TypeError(`Invalid history of state ${key}; use 'shallow' or 'deep'`);
+    }
     if (!this.paths.has(initial)) throw new TypeError('Unknown initial state; name a state added with state()');
     for (const transition of transitions)
       if (
@@ -72,7 +90,8 @@ export class StateMachine<C> {
       )
         throw new TypeError('Invalid transition; give from and to as existing state names');
     this.state = initial;
-    for (const name of this.paths.get(initial)!) states[name].enter?.(context);
+    this.state = this.resolve(initial);
+    for (const name of this.paths.get(this.state)!) states[name].enter?.(context);
   }
   /** Cross-fade progress in [0, 1]; 1 when no cross-fade is running. */
   get blend(): number {
@@ -107,7 +126,9 @@ export class StateMachine<C> {
     return action !== null;
   }
   /**
-   * Change to `next` directly, exiting and entering only the states below the common ancestor. No-op when already there.
+   * Change to `next` directly, exiting and entering only the states below the common ancestor. A `next` being entered
+   * goes on to what it remembers, else to its `initial`; one already active goes on to its `initial`. No-op when that
+   * is where the machine already is.
    * @param duration Cross-fade time in seconds, finite and >= 0. Default 0.
    * @throws RangeError for an unknown state or invalid `duration`.
    * @throws MargoError `'state'` when called from an enter/exit hook.
@@ -120,6 +141,7 @@ export class StateMachine<C> {
         'state',
         'Recursive state transition; call goto() after the current enter/exit callback returns',
       );
+    next = this.resolve(next);
     if (next === this.state) return;
     const from = this.paths.get(this.state)!,
       to = this.paths.get(next)!;
@@ -127,7 +149,14 @@ export class StateMachine<C> {
     while (common < from.length && common < to.length && from[common] === to[common]) common++;
     this.changing = true;
     try {
-      for (let i = from.length - 1; i >= common; i--) this.states[from[i]].exit?.(this.context);
+      for (let i = from.length - 1; i >= common; i--) {
+        const state = this.states[from[i]];
+        if (state.history) {
+          if (i === from.length - 1) this.memory.delete(from[i]);
+          else this.memory.set(from[i], state.history === 'deep' ? this.state : from[i + 1]);
+        }
+        state.exit?.(this.context);
+      }
       this.previous = duration > 0 ? this.state : null;
       this.state = next;
       this.duration = duration;
@@ -135,6 +164,15 @@ export class StateMachine<C> {
       for (let i = common; i < to.length; i++) this.states[to[i]].enter?.(this.context);
     } finally {
       this.changing = false;
+    }
+  }
+  // Where a transition to `name` ends: memory counts only for a state being entered, as one still active was never left.
+  private resolve(name: string): string {
+    const active = this.paths.get(this.state)!;
+    for (;;) {
+      const child = (active.includes(name) ? undefined : this.memory.get(name)) ?? this.states[name].initial;
+      if (child === undefined) return name;
+      name = child;
     }
   }
   /**
