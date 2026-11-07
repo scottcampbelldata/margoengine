@@ -33,39 +33,36 @@ are still open.
 
 - **What:** `npm run check:readme-run`, a step of `check:merge` since 2026-11-07, ran 641 of 767 examples that day (RTX A6000,
   Chromium). The other 126 are in `scripts/support/readme-run-known.json`, each with its error. A new failure fails the step, and
-  so does an entry that passes or names an example that is gone. An id is a position in its README, so an example added above
-  one on the list moves it: the step then names both, and the entry moves with its example.
+  so does an entry that passes or names an example that is gone. An id is the heading above an example and a hash of its code, so
+  an example added above one on the list leaves it alone; changing a listed example changes its id, and the entry moves with it.
 - **Repro:** `npm run build:packages`, then `npm run check:readme-run -- --only=<id>` with an id from that list.
 - **Cause:** 107 entries start `sample:`. The example names a file of its own (a font, a scan, a rigged model with named joints)
   and the check has no matching sample, or the sample does not fit it, so these say nothing about the example yet. Ragdoll,
-  fbx, the animator's joint indices and `usdz/readme-0` and `-1` (no `.usdz` file is in the repository) are in this group. 19 start
+  fbx, the animator's joint indices and `usdz/readme-margoengine-usdz-087124` and `usdz/readme-composition-fbebfe` (no `.usdz` file is in the repository) are in this group. 19 start
   `example:`, and these need reading one at a time:
-  - Five attach one plugin twice to one engine, which core refuses (`post/readme-7`, `shadows/readme-0`, `quality/readme-4`,
-    `sky/readme-6`, `ragdoll/readme-4`), so the example shows two alternatives as if one ran after the other.
-  - `cameras/readme-6` needs `source` on Tonemap, `exporters/readme-28` reads a second view the example never made,
-    `exporters/readme-32` needs the Studio source profile, `stage/readme-1` gets a model minimal glTF refuses, and
-    `headless/readme-3` passes a page engine to `readPixels`.
-  - `react/readme-0` and `-3` fail on how the page loads React, `worker/readme-0` on the worker's message, `input/readme-1`
-    times out, `loaders/readme-2` needs a page, `loaders/readme-22` wants an OpenVDB sample, `xr/readme-1` needs a headset,
-    `headless/readme-4` needs ffmpeg and `voxel-net/readme-0` is a server and a page in one example.
+  - Five attach one plugin twice to one engine, which core refuses (`post/readme-smaa-10a00a`, `shadows/readme-margoengine-shadows-7183ea`, `quality/readme-tier-presets-0abcba`,
+    `sky/readme-fog-b452c1`, `ragdoll/readme-saved-profiles-margoengine-ragdo-104541`), so the example shows two alternatives as if one ran after the other.
+  - `cameras/readme-physical-exposure-margoengine-ca-6d1c49` needs `source` on Tonemap, `exporters/readme-render-to-file-80cd28` reads a second view the example never made,
+    `exporters/readme-unity-asset-and-support-bundles-a4fd05` needs the Studio source profile, `stage/readme-feature-entries-a6844a` gets a model minimal glTF refuses, and
+    `headless/readme-image-sequences-and-video-9967ce` passes a page engine to `readPixels`.
+  - `react/readme-first-scene-e7b2ea` and `react/readme-pointer-events-and-picking-8b5eb7` fail on how the page loads React, `worker/readme-margoengine-worker-b56e85` on the worker's message, `input/readme-chords-contexts-rebinding-and-pr-5e2c1c`
+    times out, `loaders/readme-optional-vertex-color-and-opacit-5d5952` needs a page, `loaders/readme-vdb-volumes-573d3c` wants an OpenVDB sample, `xr/readme-ar-hit-testing-f7eedf` needs a headset,
+    `headless/readme-image-sequences-and-video-37bcc7` needs ffmpeg and `voxel-net/readme-margoengine-voxel-net-b6eba6` is a server and a page in one example.
 - **Needed to close:** a matching sample for each `sample:` entry, each `example:` entry fixed in its README or its package, and
   the list empty.
 
 ## Checks
 
-### 20 GPU check scripts run in no check
+### SSAO's orthographic picture moves with the eye
 
-- **What:** 20 `scripts/*-gpu-check.js` files are named by no `package.json`, no suite and no test, so nothing runs them:
-  clustered-falloff, clustered-shadow, env-mirror, fog-all, light-render, mat-more, material-back-side,
-  material-depth-distance, material-dispersion, material-render-state, material-wireframe, materials-uv-groups,
-  normal-map-orientation, orthographic, physical-material-maps, shader-raw, sheen-albedo, ssao, stage-features and
-  tonemap-lut-sizes.
-- **Repro:** `git grep -l <name>-gpu-check.js -- package.json 'packages/*/package.json' 'scripts/*.mjs' 'scripts/*.js' 'tests/*.js'`
-  lists only the script itself, or nothing.
-- **Cause:** each was written for one job and run by hand. `unrunBrowserSuites` in `scripts/gpu-package-tests.mjs` looks at npm
-  scripts only, so a plain file is not seen. A twenty-first, `core-parity-hooks-gpu-check.js`, had failed unseen since 2026-10-17:
-  its reference shader still held the old display curve. It runs in `modern:test:extensions` now.
-- **Needed to close:** run each once, fix what has rotted, put each in a suite or remove it, and make the check see plain files.
+- **What:** `scripts/ssao-gpu-check.js` fails on main: moving an orthographic eye along its view from 6 m to 0.6 m changes the
+  picture at silhouettes, 87 bytes past 2 levels (limit 90) and one edge pixel by 17 (limit 16). An orthographic picture has no
+  reason to change at all. It is the one `*-gpu-check.js` file no check runs, stated in `LOOSE_CHECKS`; the plan refuses any other.
+- **Repro:** `npm run build:packages`, then `node scripts/ssao-gpu-check.js`.
+- **Cause:** `SSAO` keeps linear view depth in the half-float G-buffer (`packages/post/src/ssao.ts`, the note beside `gbuffer`),
+  which holds about 0.004 m at 6 m and 0.125 m at 200 m. The limit of 16 was set before the display curve changed on 2026-10-17.
+- **Needed to close:** view depth in an `r32float` target of its own, which also serves scenes past 65,504 units; then the check
+  joins `post` as `test:gpu:ssao` and leaves `LOOSE_CHECKS`. The limit stays.
 
 ## Boulder demo
 

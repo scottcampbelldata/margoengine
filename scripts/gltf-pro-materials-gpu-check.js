@@ -5,7 +5,7 @@
 // transmission) match the CPU reference written from the Khronos specs (tests/support/khr-brdf.js) on the GPU.
 // Run from the repository root after `npm run build:packages`, with the GPU lock held:
 //   node scripts/gpu-lock.mjs run --owner=<id> -- node scripts/gltf-pro-materials-gpu-check.js
-// Writes examples/package-benchmarks/results/gltf-pro-materials-gpu.json (a correctness check: no timing, no quiet gate).
+// Writes test-results/gltf-pro-materials-gpu.json (a correctness check: no timing, no quiet gate).
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
 import { openBrowser } from './browser.js';
@@ -251,7 +251,7 @@ try {
   };
   console.log(JSON.stringify(report, null, 1));
   await writeFile(
-    'examples/package-benchmarks/results/gltf-pro-materials-gpu.json',
+    'test-results/gltf-pro-materials-gpu.json',
     JSON.stringify({ date: new Date().toISOString(), ...report }, null, 1) + '\n',
   );
   for (const p of result.compiled) {

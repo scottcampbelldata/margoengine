@@ -1,8 +1,9 @@
 // Real-GPU check for fog on water, VFX particles, Gaussian splats, points/sprites and lines (setFog), and for lines'
 // SkeletonHelper. Run under the GPU lock:
 //   node scripts/gpu-lock.mjs run --owner=fog-all -- node scripts/fog-all-gpu-check.js [--baseline]
-// --baseline records the unfogged images of the current dist (run it on the dist from before fog existed); a later run
-// requires its unfogged images to equal them bit for bit. Each fogged image G is checked against U + a (F - U): U the
+// --baseline records the unfogged images of the current dist (run it on the dist from before a change); a later run
+// requires its unfogged images to equal them bit for bit, and with none on disk says which it did not compare. Each fogged
+// image G is checked against U + a (F - U): U the
 // same scene unfogged, F at full fog (a = 1) and a environment Fog's analytic amount at that pixel's surface point.
 // That relation is linear in the colour, so it holds through alpha blending, additive blending and MSAA resolve.
 import assert from 'node:assert/strict';
@@ -26,7 +27,8 @@ try {
   const page = browser.page,
     errors = [],
     checks = [],
-    failures = [];
+    failures = [],
+    unmatched = [];
   page.on('pageerror', (error) => errors.push(error.message));
   assert.equal(browser.hardware.webgpu?.fallback, false, 'Physical WebGPU adapter required');
   const call = (name, ...args) => page.evaluate(([name, args]) => window.fogFixture[name](...args), [name, args]);
@@ -71,7 +73,7 @@ try {
       if (old) {
         await call('import', kind + '-baseline', JSON.parse(old).data);
         await equal(`${kind} without fog equals the pre-fog dist bit for bit`, u, kind + '-baseline');
-      } else record(`${kind} pre-fog baseline present`, false, { file });
+      } else unmatched.push(file);
       if (!hasFog) continue;
       for (const [label, fog] of [
         ['linear+height', LIN],
@@ -195,9 +197,10 @@ try {
       errors: [...errors, ...fixtureErrors],
     },
   );
+  if (unmatched.length) console.log(`No baseline, so not compared with an earlier build: ${unmatched.join(', ')}`);
   await writeFile(
     `${folder}/gpu.json`,
-    JSON.stringify({ hardware: browser.hardware, baseline, checks, failures }, null, 2) + '\n',
+    JSON.stringify({ hardware: browser.hardware, baseline, checks, failures, unmatched }, null, 2) + '\n',
   );
   console.log(
     JSON.stringify(

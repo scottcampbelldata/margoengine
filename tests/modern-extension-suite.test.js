@@ -5,7 +5,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
-import { NOT_IN_CHECKS, ROOT, unrunBrowserSuites, unrunReleaseGates } from '../scripts/gpu-package-tests.mjs';
+import {
+  LOOSE_CHECKS,
+  NOT_IN_CHECKS,
+  plan,
+  ROOT,
+  unrunBrowserSuites,
+  unrunCheckFiles,
+  unrunReleaseGates,
+} from '../scripts/gpu-package-tests.mjs';
 import { STEPS } from '../scripts/modern-extension-suite.mjs';
 
 const read = (path) => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
@@ -69,6 +77,24 @@ test('a test:* browser suite must be in a check, a copy of one, a step of the ex
     unrunBrowserSuites(scripts, read, { 'test:ran': '' }, { 'test:said': 'a reason' }, ['scripts/step.js']),
     ['test:lost', 'modern:test:lost'],
   );
+});
+
+test('a plain GPU check file no command names is found, and a step, a command or a stated reason covers it', () => {
+  const files = ['scripts/a-gpu-check.js', 'scripts/b-gpu-check.js', 'scripts/c-gpu-check.js', 'scripts/d-gpu-check.js'];
+  assert.deepEqual(
+    unrunCheckFiles(files, ['cd ../.. && node scripts/a-gpu-check.js'], ['scripts/b-gpu-check.js'], {
+      'scripts/c-gpu-check.js': 'a reason',
+    }),
+    ['scripts/d-gpu-check.js'],
+  );
+});
+
+test('the plan runs every GPU check file, and each one left out says why', () => {
+  assert.ok(plan().length > 0, 'plan() throws on a GPU check no command names');
+  for (const [file, reason] of Object.entries(LOOSE_CHECKS)) {
+    assert.ok(existsSync(new URL(`../${file}`, import.meta.url)), `${file} is gone; remove it from LOOSE_CHECKS`);
+    assert.ok(reason.length > 20, `${file} needs a stated reason`);
+  }
 });
 
 test('every browser suite of this repo is in a check or in NOT_IN_CHECKS with a reason', () => {

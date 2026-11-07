@@ -31,7 +31,17 @@
     "test:gpu:cutout-casters": "cd ../.. && node packages/shadows/test/cutout-casters-browser.mjs",
     "test:gpu:cutout-passes": "cd ../.. && node packages/materials/test/cutout-passes-browser.mjs",
     "test:gpu:vertex-inputs": "cd ../.. && node packages/materials/test/vertex-inputs-browser.mjs",
-    "test:gpu:features": "cd ../.. && node packages/materials/test/features-browser.mjs"
+    "test:gpu:features": "cd ../.. && node packages/materials/test/features-browser.mjs",
+    "test:gpu:more": "cd ../.. && node scripts/mat-more-gpu-check.js",
+    "test:gpu:back-side": "cd ../.. && node scripts/material-back-side-gpu-check.js",
+    "test:gpu:depth-distance": "cd ../.. && node scripts/material-depth-distance-gpu-check.js",
+    "test:gpu:dispersion": "cd ../.. && node scripts/material-dispersion-gpu-check.js",
+    "test:gpu:render-state": "cd ../.. && node scripts/material-render-state-gpu-check.js",
+    "test:gpu:wireframe": "cd ../.. && node scripts/material-wireframe-gpu-check.js",
+    "test:gpu:uv-groups": "cd ../.. && node scripts/materials-uv-groups-gpu-check.js",
+    "test:gpu:normal-map": "cd ../.. && node scripts/normal-map-orientation-gpu-check.js",
+    "test:gpu:physical-maps": "cd ../.. && node scripts/physical-material-maps-gpu-check.js",
+    "test:gpu:sheen-albedo": "cd ../.. && node scripts/sheen-albedo-gpu-check.js"
   },
   "sideEffects": false,
   "exports": {

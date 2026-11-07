@@ -55,7 +55,8 @@ try {
       wire.image.row.count <= (samples === 1 ? 1 : 2),
       true,
     );
-    for (const [label, options] of [
+    // Each edge draws once, so a blended surface compares with a line list holding each edge once.
+    for (const [label, options, list] of [
       ['native', { native: true }],
       ['nonindexed', { nonindexed: true }],
       ['mirrored', { mirror: true }],
@@ -64,10 +65,14 @@ try {
       ['color-map', { map: 'color' }],
       ['alpha-mask', { map: 'alpha' }],
       ['deformed-buffer', { deformation: true }],
-      ['transparent', { material: { transparent: true, opacity: 0.5, depthWrite: false } }],
-      ['physical-tint', { material: { transmission: 0.8, thickness: 0.2, attenuationColor: [0.3, 0.6, 0.8] } }],
+      ['transparent', { material: { transparent: true, opacity: 0.5, depthWrite: false } }, { deduplicated: true }],
+      [
+        'physical-tint',
+        { material: { transmission: 0.8, thickness: 0.2, attenuationColor: [0.3, 0.6, 0.8] } },
+        { deduplicated: true },
+      ],
     ]) {
-      const expected = await render(label + '-explicit', { ...options, reference: true }),
+      const expected = await render(label + '-explicit', { ...options, ...list, reference: true }),
         actual = await render(label + '-wireframe', options);
       check(label + ' matches independent explicit line-list pixels', actual.image.hash, expected.image.hash);
       check(label + ' actually draws visible lines', actual.image.whole.count > 0, true);

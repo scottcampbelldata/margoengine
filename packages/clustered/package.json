@@ -27,7 +27,11 @@
     "test": "node --test tests/*.test.js test/*.test.js",
     "test:gpu": "cd ../.. && node packages/shadows/test/cutout-casters-browser.mjs",
     "test:gpu:area": "cd ../.. && node examples/package-benchmarks/area-lights-gpu.mjs",
-    "prepack": "npm --prefix ../.. run build:packages"
+    "prepack": "npm --prefix ../.. run build:packages",
+    "test:gpu:falloff": "cd ../.. && node scripts/clustered-falloff-gpu-check.js",
+    "test:gpu:shadow": "cd ../.. && node scripts/clustered-shadow-gpu-check.js",
+    "test:gpu:light-render": "cd ../.. && node scripts/light-render-gpu-check.js",
+    "test:gpu:orthographic": "cd ../.. && node scripts/orthographic-gpu-check.js"
   },
   "sideEffects": false,
   "exports": {

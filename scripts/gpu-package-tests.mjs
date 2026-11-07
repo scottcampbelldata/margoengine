@@ -93,6 +93,14 @@ export const NOT_IN_CHECKS = {
   'modern:test:citadel': 'the Night Citadel page is being removed (Scott, 2026-10-31)',
   'modern:test:blender': 'drives Blender, which Scott has not cleared for the checks (needs his go)',
 };
+/**
+ * `scripts/*-gpu-check.js` files that no check runs, each with its reason (unrunCheckFiles fails the plan for any other).
+ * Twenty-one such files were once written for one job and run by hand: nothing ran them, and five had rotted.
+ */
+export const LOOSE_CHECKS = {
+  'scripts/ssao-gpu-check.js':
+    'fails on main: one edge pixel moves 17 levels against a limit of 16 when the eye moves, from the half-float view depth in post (docs/known-bugs.md); it joins post when that is fixed',
+};
 /** Commands a root suite needs first (it reads their output), run once before it. */
 export const PREPARE = {
   'modern:test:browser': [
@@ -195,6 +203,14 @@ export function unrunBrowserSuites(scripts, read, inChecks = ROOT, exempt = NOT_
   });
 }
 
+/**
+ * The `scripts/*-gpu-check.js` files no planned command names: not in `commands`, not a step of modern:test:extensions
+ * (`covered`), not in LOOSE_CHECKS. unrunBrowserSuites sees npm scripts only, so a plain file is seen here.
+ */
+export function unrunCheckFiles(files, commands, covered = [], exempt = LOOSE_CHECKS) {
+  return files.filter((file) => !(file in exempt) && !covered.includes(file) && !commands.some((text) => text.includes(file)));
+}
+
 /** A test's stable id: `dof/test:browser` for a package script, `root/modern:test:xr:browser` for a root suite. */
 export const testId = (test) => (test.name ? `root/${test.name}` : test.label.replace(' ', '/'));
 
@@ -256,6 +272,14 @@ export function plan() {
     if (!scripts[name]) throw new Error(`ROOT lists ${name}, which package.json no longer has; remove it from ROOT`);
     tests.push({ label: `root ${name}`, cwd: '.', command: `npm run ${name}`, name, dir: 'root', script: name });
   }
+  const checkFiles = readdirSync(join(root, 'scripts'))
+      .filter((file) => file.endsWith('-gpu-check.js'))
+      .map((file) => `scripts/${file}`),
+    unnamed = unrunCheckFiles(checkFiles, tests.map((test) => (test.name ? scripts[test.name] : test.command)), STEPS);
+  if (unnamed.length)
+    throw new Error(
+      `GPU check(s) ${unnamed.join(', ')} are in no check, so they rot unseen; name each in a package's test:gpu script or, with its reason, in LOOSE_CHECKS`,
+    );
   // A timing test takes the GPU exclusively itself; it runs as its own step under the exclusive hold, never in a
   // shared slot beside other suites (or its measurements carry their load).
   for (const test of tests) {

@@ -1244,10 +1244,11 @@ An audit of the finished batches against their job text listed 70 gaps for the H
 | jxl-icc | JPEG XL Wasm path applies the file's ICC profile | DONE | `99be50288` | LIM-233 |
 | stats-visible | stats.visible counts a glTF model's nodes once a frame | DONE | `5051c31a0` | - |
 | test-readers | Five of the six test readers read the file under test; fbx waits | DONE | `4131fd1e1` | - |
-| spawn-einval | Python test scripts never start the Windows app alias; a failed probe fails | DONE | this commit | - |
-| B38 | A loft of sections with holes: holes pair by order, caps leave them open | DONE | this commit | - |
-| B27 | TransformControls occluder: a hidden handle takes no pointer | DONE | this commit | - |
-| readme-run | README examples run in Node or a real page; a new failure fails | DONE | this commit | - |
+| spawn-einval | Python test scripts never start the Windows app alias; a failed probe fails | DONE | `2dbaf192c` | - |
+| B38 | A loft of sections with holes: holes pair by order, caps leave them open | DONE | `d3ef473ac` | - |
+| B27 | TransformControls occluder: a hidden handle takes no pointer | DONE | `89b05d6e5` | - |
+| readme-run | README examples run in Node or a real page; a new failure fails | DONE | `6efdd9284` | - |
+| GPU checks | 22 loose scripts/*-gpu-check.js run once and wired into check:gpu-packages, ssao held in LOOSE_CHECKS; five had rotted | DONE | this commit | - |
 
 ## LAZ: one LAS reader, and every point format on a real file
 

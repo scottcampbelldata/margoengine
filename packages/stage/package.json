@@ -27,7 +27,8 @@
   "scripts": {
     "test": "node --experimental-test-module-mocks --test ../../tests/modern-wrapper.test.js ../../tests/modern-facade-lifecycle.test.js ../../tests/deep-stage-sphere.test.js ../../tests/modern-silent-facade-drops.test.js tests/*.test.js",
     "test:gpu": "cd ../.. && node scripts/stage-viewer-gpu-check.js && node packages/stage/test/gpu/scene-check.mjs",
-    "prepack": "npm --prefix ../.. run build:packages"
+    "prepack": "npm --prefix ../.. run build:packages",
+    "test:gpu:features": "cd ../.. && node scripts/stage-features-gpu-check.js"
   },
   "sideEffects": false,
   "exports": {

@@ -28,7 +28,8 @@
     "test": "node --test tests/*.test.js ../../tests/modern-extensions.test.js ../../tests/modern-gltf*.test.js ../../tests/gltf-draco-limits.test.js ../../tests/deep-render-pbr-resources.test.js",
     "prepack": "npm --prefix ../.. run build:packages",
     "test:shader:browser": "cd ../.. && node packages/gltf-pro/scripts/test-shader-review.js",
-    "test:extensions:browser": "cd ../.. && node packages/gltf-pro/scripts/test-extensions-browser.js"
+    "test:extensions:browser": "cd ../.. && node packages/gltf-pro/scripts/test-extensions-browser.js",
+    "test:gpu:materials": "cd ../.. && node scripts/gltf-pro-materials-gpu-check.js"
   },
   "sideEffects": false,
   "exports": {

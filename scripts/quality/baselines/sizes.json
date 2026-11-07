@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10178162,
+  "total": 10149167,
   "history": [
     {
       "date": "2026-10-24",
@@ -3158,6 +3158,12 @@
       "commit": "cfd5a2361",
       "reason": "physics: joint frames, solver passes, applied forces and contactPoints, the calls ragdoll took from the solver",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "8b1f29a7a",
+      "reason": "materials records: a primitive's renderState is writable again, restoring a documented API lost in 7bd9533d4",
+      "grew": 3
     }
   ],
   "items": {
@@ -3501,11 +3507,11 @@
     "@margoengine/materials/eye": 3629,
     "@margoengine/materials/hair": 2011,
     "@margoengine/materials/layered": 3230,
-    "@margoengine/materials/mips": 10731,
+    "@margoengine/materials/mips": 11119,
     "@margoengine/materials/object-normal": 950,
     "@margoengine/materials/prefilter": 1933,
-    "@margoengine/materials/skin": 11181,
-    "@margoengine/materials/stochastic": 2402,
+    "@margoengine/materials/skin": 11568,
+    "@margoengine/materials/stochastic": 2802,
     "@margoengine/materials/transmission": 8350,
     "@margoengine/math": 20105,
     "@margoengine/math/affine": 3936,

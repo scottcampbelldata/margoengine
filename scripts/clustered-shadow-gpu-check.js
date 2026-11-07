@@ -1,7 +1,8 @@
 // Real-GPU check for clustered directional and area-light shadows (fixture tests/clustered-shadow-browser.ts).
 // node scripts/gpu-lock.mjs run --owner=clustered-shadow -- node scripts/clustered-shadow-gpu-check.js [--baseline]
-// --baseline records the shadow-off scenes (images, lit shader text, probe radiance) with the build in dist; a normal
-// run requires them to be identical, then checks shadowed scenes against analytic occlusion.
+// --baseline records the shadow-off scenes (images, lit shader text, probe radiance) with the build in dist; a later run
+// requires them to be identical. That proof is for a change, against the build from before it, so with no baseline on disk
+// the run says so and goes on. It always checks the shadowed scenes against analytic occlusion.
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
@@ -67,8 +68,10 @@ try {
     await writeFile(`${folder}/baseline.json`, JSON.stringify(record, null, 2) + '\n');
     console.log(JSON.stringify({ baseline: `${folder}/baseline.json`, scenes: Object.keys(record) }, null, 2));
   } else {
-    const before = JSON.parse(await readFile(`${folder}/baseline.json`, 'utf8'));
-    for (const [label, now] of Object.entries(record)) {
+    const saved = await readFile(`${folder}/baseline.json`, 'utf8').catch(() => null),
+      before = saved ? JSON.parse(saved) : {};
+    if (!saved) console.log(`No ${folder}/baseline.json: the shadow-off scenes were not compared with an earlier build.`);
+    for (const [label, now] of saved ? Object.entries(record) : []) {
       const old = before[label];
       check(`${label}: lit shader text unchanged with the new shadows off`, now.shader === old.shader, {
         before: old.shader,
