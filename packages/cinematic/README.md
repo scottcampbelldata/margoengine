@@ -107,6 +107,39 @@ console.log(brain.update(1 / 60).position);
 
 Cutscenes have their own timed cameras in `@margoengine/cutscene/shots`; the brain is for play, where what happens decides the shot.
 
+## Framing composer
+
+`FramingComposer` keeps a subject on a chosen spot of the screen the way a camera operator does: small moves leave the picture still, bigger ones are caught up with, and the subject never leaves the frame. It is a stage, so it goes after whatever places the camera. It only turns the camera:
+
+```ts
+import {CameraBrain} from 'margoengine/cinematic/brain';
+import {FramingComposer} from 'margoengine/cinematic/composer';
+import {Engine} from 'margoengine/core';
+import {boxGeometry} from 'margoengine/geometry';
+import {PbrMaterial, createMesh} from 'margoengine/materials';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const player = createMesh(engine, boxGeometry(0.5, 1.8, 0.5), new PbrMaterial()).root;
+const brain = CameraBrain.attach(engine);
+brain.add({
+  position: [0, 4, 12],
+  stages: [new FramingComposer(player, {screen: [0.4, 0.6], deadZone: [0.15, 0.1], lookahead: 0.4})],
+});
+```
+
+The target is a mesh, a world point or a function giving one. Sizes are shares of the screen, and `screen` counts from the top left.
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `screen` | `[0.5, 0.5]` | Where the subject sits. `[1 / 3, 0.5]` is the rule of thirds. |
+| `deadZone` | `[0.1, 0.1]` | Full width and height of the box around `screen` where the camera does not move. |
+| `softZone` | `[0.8, 0.8]` | The box the subject never leaves. Between the two the camera catches up. |
+| `damping` | `4` | Catch-up rate in 1/seconds, or `[horizontal, vertical]`. Higher is stiffer. Any frame rate gives the same motion. |
+| `lookahead` | `0` | Seconds to aim ahead of the subject along its velocity. |
+| `lookaheadSmoothing` | `6` | How fast the measured velocity follows, in 1/seconds. Lower is calmer. |
+| `lookaheadVertical` | `true` | Turn it off for a platformer, so a jump does not nod the camera. |
+
+`composer.onScreen` says where the subject is, and `composer.reset()` snaps it back to `screen`, as after a teleport. The camera's `reset()` does the same for all its stages.
+
 Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/cinematic

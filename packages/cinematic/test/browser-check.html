@@ -1,0 +1,78 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Cinematic browser check</title>
+    <style>
+      body { margin: 0; }
+      canvas { display: block; width: 800px; height: 400px; }
+    </style>
+  </head>
+  <body>
+    <canvas width="800" height="400"></canvas>
+    <script type="module">
+      import { Engine, PbrMaterial, box } from '/packages/core/dist/index.js';
+      import { CameraBrain } from '/packages/cinematic/dist/brain.js';
+      import { FramingComposer } from '/packages/cinematic/dist/composer.js';
+
+      const engine = await Engine.create(document.querySelector('canvas'), { backend: 'webgpu' }),
+        device = engine.gpu,
+        errors = [];
+      device.addEventListener('uncapturederror', (e) => errors.push(e.error.message));
+      const add = (position, size = 0.4) => {
+        return engine
+          .createMesh()
+          .setGeometry(box(size, size, size))
+          .setMaterial(new PbrMaterial({ color: '#ff0000' }))
+          .setPosition(position);
+      };
+      const frame = async (delta = 1 / 60) => {
+        engine.render({ delta });
+        await device.queue.onSubmittedWorkDone();
+      };
+      const brain = CameraBrain.attach(engine, { blend: { duration: 0.5 } }),
+        subject = add([0, 1, 0]),
+        composer = new FramingComposer(subject, { screen: [0.25, 0.75], deadZone: [0.1, 0.1], softZone: [0.5, 0.4] }),
+        follow = brain.add({ name: 'follow', priority: 1, position: [0, 3, 12], target: [0, 1, 0], fov: 40, stages: [composer] }),
+        wide = brain.add({ name: 'wide', priority: 0, position: [20, 10, 20], target: [0, 0, 0], fov: 60 });
+      const pick = async (x, y) => (await engine.pick(x, y)) === subject;
+      window.check = {
+        async framed() {
+          // fixed-wait: fixed simulation steps are what is under test, not a wait for the GPU
+          for (let i = 0; i < 3; i++) await frame();
+          const [x, y] = composer.onScreen;
+          return {
+            x,
+            y,
+            center: await pick(x * 800, y * 400),
+            left: await pick(x * 800 - 40, y * 400),
+            right: await pick(x * 800 + 40, y * 400),
+            above: await pick(x * 800, y * 400 - 40),
+            below: await pick(x * 800, y * 400 + 40),
+            errors,
+          };
+        },
+        async move(position, frames) {
+          subject.setPosition(position);
+          // fixed-wait: fixed simulation steps are what is under test, not a wait for the GPU
+          for (let i = 0; i < frames; i++) await frame();
+          const [x, y] = composer.onScreen;
+          return { x, y, hit: await pick(x * 800, y * 400), errors };
+        },
+        async swap() {
+          wide.priority = 5;
+          await frame();
+          const during = [];
+          // fixed-wait: fixed simulation steps are what is under test, not a wait for the GPU
+          for (let i = 0; i < 40; i++) {
+            await frame();
+            during.push([...engine.camera.position]);
+          }
+          follow.priority = 0;
+          return { during, live: brain.live.name, position: [...engine.camera.position], errors };
+        },
+      };
+      window.ready = true;
+    </script>
+  </body>
+</html>
