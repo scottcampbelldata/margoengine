@@ -33,7 +33,7 @@ Use HTTPS or localhost and call `requestSession` from a user gesture. `isSupport
 
 Immersive XR stops the engine RAF after entry and automatically restarts it on exit/disconnection. Update animation in XR `onFrame`; engine `onFrame` and React `useFrame` belong to the window RAF. Core plugin `onPreUpdate` runs once per immersive XR frame. Inline tracking leaves the window RAF active.
 
-Core geometry/materials use the shared base shader, per-eye uniforms, native [0,1] projections, viewports and texture-array descriptors. Loader-owned PBR models are discovered through the optional triangle registry and use their PBR shader in both eyes. The canvas mirror and XR buffers use separate devices; each eye owns independent PBR resources and deformation kernels, sharing current CPU pose data without advancing playback twice. Late animation attachment/removal and extension replacements synchronize before drawing. Caller-owned material extension texture views require recreation for the XR device and report an explicit error. Advanced post effects, controller visuals, locomotion, and hit testing remain outside this renderer.
+Core geometry/materials use the shared base shader, per-eye uniforms, native [0,1] projections, viewports and texture-array descriptors. Loader-owned PBR models are discovered through the optional triangle registry and use their PBR shader in both eyes. The canvas mirror and XR buffers use separate devices; each eye owns independent PBR resources and deformation kernels, sharing current CPU pose data without advancing playback twice. Late animation attachment/removal and extension replacements synchronize before drawing. Caller-owned material extension texture views require recreation for the XR device and report an explicit error. That separate route draws no package passes or post effects; an engine from `createXREngine` draws them all (below).
 
 `XRController` reuses target-ray/grip matrices, 32 button triplets (value/pressed/touched), 16 axes, and 25 hand joint matrices/tracking flags when granted. Controllers change on `inputsourceschange`. Frame state, input arrays and existing controller buffers retain identity; copy to retain a past frame. Browser-owned poses and GPU descriptors may allocate; this is not a whole-runtime zero-GC guarantee.
 
@@ -89,3 +89,23 @@ document.querySelector('button')!.onclick = async () => {
   console.log(run.tracked, 'tracked frames at', run.frameMs.median, 'ms');
 };
 ```
+
+## Package passes and post effects in XR
+
+Create the engine with `createXREngine` instead of `Engine.create` and XR draws through the engine's own frame graph on its own GPU device: lines, point clouds, terrain, shadows, sky and post effects appear in both eyes as they do on the desktop. `xr.route` is `'engine'`. An engine from `Engine.create` keeps the older `'separate'` route, which draws core meshes and glTF-pro models only.
+
+```ts
+import {box} from 'margoengine/core';
+import {XR,createXREngine} from 'margoengine/xr';
+
+const canvas=document.createElement('canvas');document.body.append(canvas);
+const engine=await createXREngine(canvas);
+engine.createMesh().setGeometry(box()).setPosition([0,1.5,-2]);
+const xr=await XR.create(engine);
+console.log(xr.route); // 'engine'
+const enter=document.createElement('button');enter.textContent='Enter VR';document.body.append(enter);
+enter.onclick=()=>void xr.requestSession('immersive-vr').catch(engine.onError);
+engine.start();
+```
+
+Each eye is a view of `engine.render({views})` drawn into a texture, then copied into the session's layer, with the scene's depth written to the layer's depth so the compositor can reproject. In AR the real world shows where the scene draws neither depth nor light. A stage gets the same route with `new Stage(await createXREngine(canvas))`.

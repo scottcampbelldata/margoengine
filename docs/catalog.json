@@ -1315,6 +1315,7 @@
       "XR",
       "XRController",
       "XRManager",
+      "createXREngine",
       "useXRSession"
     ],
     "category": "Rendering and lighting"

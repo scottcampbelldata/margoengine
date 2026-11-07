@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Engine, TransformStore, box, FrameGraph } from '@margoengine/core/extension';
 import { wgsl } from '../../core/dist/shaders.js';
-import { XR, XRManager, XRController, useXRSession } from '../dist/index.js';
+import { XR, XRManager, XRController, useXRSession, createXREngine } from '../dist/index.js';
 const identity = () => new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
 const pose = (x) => ({
   transform: {
@@ -706,4 +706,41 @@ test("the WebGL2 layer's binding runs a session on an XRWebGLLayer: no webgpu fe
     'no depth pass without a compositor depth texture',
   );
   await xr.end();
+});
+
+test('createXREngine asks for an XR-compatible adapter and puts requestAdapter back, also when creation fails', async () => {
+  const saved = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+  const asked = [];
+  const gpu = {
+    async requestAdapter(init) {
+      asked.push(init);
+      return null;
+    },
+    getPreferredCanvasFormat: () => 'bgra8unorm',
+  };
+  const own = gpu.requestAdapter;
+  Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { gpu } });
+  try {
+    const canvas = { width: 8, height: 8, getContext: () => null, addEventListener() {}, removeEventListener() {} };
+    await assert.rejects(createXREngine(canvas, { powerPreference: 'high-performance' }));
+    assert.ok(asked.length >= 1, 'the engine asked for an adapter');
+    for (const init of asked) assert.equal(init.xrCompatible, true);
+    assert.equal(asked[0].powerPreference, 'high-performance', 'the engine options still reach the adapter');
+    assert.equal(gpu.requestAdapter, own);
+    assert.ok(Object.hasOwn(gpu, 'requestAdapter'));
+  } finally {
+    if (saved) Object.defineProperty(globalThis, 'navigator', saved);
+    else delete globalThis.navigator;
+  }
+});
+
+test('createXREngine without WebGPU says what is needed', async () => {
+  const saved = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+  Object.defineProperty(globalThis, 'navigator', { configurable: true, value: {} });
+  try {
+    await assert.rejects(createXREngine({}), /needs WebGPU; use a browser with WebGPU and WebXR/);
+  } finally {
+    if (saved) Object.defineProperty(globalThis, 'navigator', saved);
+    else delete globalThis.navigator;
+  }
 });

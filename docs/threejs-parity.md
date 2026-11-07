@@ -4,11 +4,11 @@ What Margo Engine covers compared with three.js r186 and its common add-ons (`th
 
 ## Summary
 
-194 three.js features in 19 areas (recounted from the rows 2026-10-31; 51 of the COVERED rows are marked †):
+195 three.js features in 19 areas (recounted from the rows 2026-11-07; 52 of the COVERED rows are marked †):
 
 | Status | Count | Meaning |
 | --- | --- | --- |
-| COVERED | 165 | A Margo package implements the feature in a form a three.js user would accept as equivalent (limits noted). |
+| COVERED | 166 | A Margo package implements the feature in a form a three.js user would accept as equivalent (limits noted). |
 | PARTIAL | 5 | Some of it exists, but a common use case is missing. The notes say what. |
 | MISSING | 13 | Worth having and not written yet. Listed below with what to do. |
 | NOT PLANNED | 11 | Out of scope by decision. The note says why and what to use instead. |
@@ -308,7 +308,8 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 | WebXR AR (hit test, anchors, plane detection, depth sensing, light estimation) | PARTIAL | xr `immersive-ar` session mode; `HitTest` (`packages/xr/src/hit-test.ts`) | | Hit testing from the viewer, an input source or transient input (screen taps), results as poses in the reference space, anchors through `hits.anchor(hit)`. Plane detection, depth sensing and light estimation are not wrapped. Tested against the WebXR Hit Test Module's interfaces with a mocked session only; never run on an AR device. |
 | Controller and hand input poses | COVERED † | xr `XRController` (`packages/xr/src/controller.ts`) | | Target-ray and grip poses, buttons, axes, 25 hand joints; react `Controller` binds a mesh to the grip or target-ray pose with select and squeeze events. |
 | XRControllerModelFactory, XRHandModelFactory | MISSING | xr | | Poses and 25 hand joints exist; the models come after a headset test. |
-| XR layers, locomotion, haptics, XR video, plugin passes in XR | MISSING | xr | | Needs a headset test first. XR draws core meshes and glTF-pro models only. |
+| Plugin passes and post effects in XR | COVERED † | xr `createXREngine` (`packages/xr/src/eyes.ts`) | `tests/modern-xr-passes.ts` | Each eye is a view of the engine's frame graph on its own XR-compatible device; both eyes match a desktop render byte for byte. Untested on a headset. |
+| XR layers, locomotion, haptics, XR video | MISSING | xr | | Needs a headset test first. |
 
 ## What is missing or partial, and what to do
 
@@ -318,7 +319,7 @@ Recounted from the rows (2026-11-06): 5 PARTIAL, 13 MISSING. Each fix goes in th
 | --- | --- | --- |
 | Meshlet rendering | PARTIAL. One mesh, one matrix; no instancing or Hi-Z per cluster. | Extend `@margoengine/culling/meshlets`. |
 | Node materials / TSL | PARTIAL. No statement-level `If`, workgroup memory or light nodes. | Extend `@margoengine/shader`. |
-| WebXR VR, WebXR AR | PARTIAL. Never run on a headset or AR device. | Test on a device first, then the XR layers, locomotion and plugin-pass row, then controller and hand models. |
+| WebXR VR, WebXR AR | PARTIAL. Never run on a headset or AR device. | Test on a device first (`examples/xr-device-check`), then the XR layers and locomotion row, then controller and hand models. |
 | WebGL2 fallback | PARTIAL. M8 is done; the voxel path tracer runs on it, slowly compiled on ANGLE Direct3D, XR runs on it through `/xr`, and the integrated-GPU frame-budget run is still to be recorded. | See [the roadmap](webgl2-compat-roadmap.md). |
 | Shadows from alpha cut-outs, soft particles | MISSING. | Planned before v1.0.0, one landing per package. |
 | Rendering in a worker, render into layers, compute writing textures, environment blend and ground projection, KTX2 arrays and cubes, NRRD, subsurface blur | MISSING. | After v1.0.0, in the owning package. |

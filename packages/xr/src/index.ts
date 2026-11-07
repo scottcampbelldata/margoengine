@@ -6,10 +6,11 @@ import {
   type FrameGraph,
   type PassContext,
 } from '@margoengine/core/extension';
-import type { EngineKernel } from '@margoengine/core';
+import { Engine as PublicEngine, type EngineKernel, type EngineOptions } from '@margoengine/core';
 import { MargoError } from '@margoengine/math/errors';
 import { COMPAT_VENDOR } from '../../shared/compat.js';
 import { StereoRenderer } from './renderer.js';
+import { EyeViews } from './eyes.js';
 import { XRController } from './controller.js';
 export { XRController } from './controller.js';
 export { HitTest, type Hit, type HitTestHost, type HitTestOptions } from './hit-test.js';
@@ -65,6 +66,42 @@ const platform = () =>
     XRGPUBinding?: (new (session: XRNativeSession, device: GPUDevice) => XRBinding) & { webgl?: boolean };
   };
 const system = (): XRSystem | undefined => (globalThis.navigator as (Navigator & { xr?: XRSystem }) | undefined)?.xr;
+/** Devices of engines made by `createXREngine`: XR-compatible, so XR draws through them. */
+const xrDevices = new WeakSet<GPUDevice>();
+
+/**
+ * Creates a WebGPU engine on an XR-compatible adapter (WebXR/WebGPU binding: `requestAdapter({xrCompatible: true})`),
+ * so `XR.create` shares its GPU device and draws each eye through the engine's own frame graph: lines, points,
+ * terrain, shadows and post effects appear in both eyes as on the desktop. Takes the options of `Engine.create`;
+ * `backend` is always 'webgpu'. After a device loss and restore the engine's new device is not XR-compatible, and a new
+ * `XR.create` draws through a device of its own, as with a plain engine.
+ * @throws MargoError 'unsupported' without WebGPU.
+ */
+export async function createXREngine(
+  canvas: HTMLCanvasElement,
+  options: Omit<EngineOptions, 'backend'> = {},
+): Promise<EngineKernel> {
+  const gpu = globalThis.navigator?.gpu;
+  if (!gpu) throw new MargoError('unsupported', 'createXREngine needs WebGPU; use a browser with WebGPU and WebXR');
+  // Core asks for its adapter itself, so the request gains xrCompatible for the length of the creation only.
+  const own = Object.getOwnPropertyDescriptor(gpu, 'requestAdapter'),
+    request = gpu.requestAdapter;
+  Object.defineProperty(gpu, 'requestAdapter', {
+    configurable: true,
+    writable: true,
+    value: (init?: GPURequestAdapterOptions) => request.call(gpu, { ...init, xrCompatible: true } as GPURequestAdapterOptions),
+  });
+  let engine: EngineKernel;
+  try {
+    engine = await PublicEngine.create(canvas, { ...options, backend: 'webgpu' });
+  } finally {
+    if (own) Object.defineProperty(gpu, 'requestAdapter', own);
+    else delete (gpu as { requestAdapter?: unknown }).requestAdapter;
+  }
+  const device = engineRuntime(engine).gpu;
+  if (device) xrDevices.add(device);
+  return engine;
+}
 
 /** WebGPU WebXR plugin: negotiates a session, tracks inputs and draws the scene in stereo. `using` or `dispose()` detaches it. */
 export class XR implements EnginePlugin {
@@ -72,8 +109,15 @@ export class XR implements EnginePlugin {
   readonly name = 'xr';
   /** The active native session, or null. */
   session: XRNativeSession | null = null;
+  /**
+   * How the eyes are drawn. 'engine': through the engine's frame graph on its own device (an engine from
+   * `createXREngine`), so every package pass and post effect draws. 'separate': on a device of XR's own, which draws
+   * core meshes and loader PBR models only.
+   */
+  readonly route: 'engine' | 'separate';
   private engine!: Engine;
-  private readonly renderer: StereoRenderer;
+  private readonly renderer?: StereoRenderer;
+  private eyes?: EyeViews;
   private context?: Extract<PassContext, { backend: 'webgpu' }>;
   private binding?: XRBinding;
   private layer?: XRProjectionLayer;
@@ -111,6 +155,11 @@ export class XR implements EnginePlugin {
       );
     if (!system())
       throw new MargoError('unsupported', 'WebXR is unavailable; use a WebXR browser over HTTPS or localhost.');
+    if (runtime.gpu && xrDevices.has(runtime.gpu)) {
+      const xr = new XR(runtime.gpu, true);
+      runtime.use(xr);
+      return xr;
+    }
     const adapter = await navigator.gpu.requestAdapter({
       xrCompatible: !!platform().XRGPUBinding,
     } as GPURequestAdapterOptions);
@@ -140,18 +189,24 @@ export class XR implements EnginePlugin {
       throw error;
     }
   }
-  private constructor(private readonly device: GPUDevice) {
-    this.renderer = new StereoRenderer(device);
+  private constructor(
+    private readonly device: GPUDevice,
+    shared = false,
+  ) {
+    this.route = shared ? 'engine' : 'separate';
+    if (!shared) this.renderer = new StereoRenderer(device);
     device.lost.then((info) => {
       if (!this.disposed) {
         this.lost = true;
         this.fail(new MargoError('failed', `XR GPU device lost: ${info.message}; create a new XR with XR.create.`));
       }
     });
-    device.addEventListener('uncapturederror', this.uncaptured);
+    // The engine reports its own device's errors; a device of XR's own reports here.
+    if (!shared) device.addEventListener('uncapturederror', this.uncaptured);
   }
   setup(engine: Engine): void {
     this.engine = engine;
+    if (this.route === 'engine') this.eyes = new EyeViews(engine, this.device);
   }
   /** The session's reference space (the space of frame poses and hit results); undefined without a session. */
   get referenceSpace(): XRSpace | undefined {
@@ -245,13 +300,20 @@ export class XR implements EnginePlugin {
       if (this.disposed || this.session !== session)
         throw new MargoError('state', 'XR session ended during initialization; request a new session.');
       options.signal?.throwIfAborted();
+      if (this.eyes) {
+        this.engine.stop();
+        this.resume = true;
+        this.last = null;
+        this.handle = session.requestAnimationFrame(this.frame);
+        return session;
+      }
       this.engine.render({ culling: false });
       if (!this.context)
         throw new MargoError(
           'state',
           'WebGPU scene descriptor unavailable; add the XR plugin before the first frame renders.',
         );
-      this.renderer.configure(this.context, colorFormat);
+      this.renderer!.configure(this.context, colorFormat);
       this.engine.stop();
       this.resume = true;
       this.last = null;
@@ -286,10 +348,12 @@ export class XR implements EnginePlugin {
       this.callback?.(this.state);
       if (this.disposed || frame.session !== this.session) return;
       // shortcut: keep the canvas mirror and duplicate GPU buffers, upgrade when shared XR device hooks are available.
-      if (this.mode !== 'inline') {
+      if (this.mode !== 'inline' && this.eyes) {
+        if (viewer) this.eyes.render(this.binding!, this.layer!, viewer, delta, this.mode === 'immersive-ar');
+      } else if (this.mode !== 'inline') {
         this.renderOptions.delta = delta;
         this.engine.render(this.renderOptions);
-        if (viewer) this.renderer.render(this.engine, this.binding!, this.layer!, viewer, this.mode === 'immersive-ar');
+        if (viewer) this.renderer!.render(this.engine, this.binding!, this.layer!, viewer, this.mode === 'immersive-ar');
       }
       if (this.session === frame.session && !this.disposed)
         this.handle = frame.session.requestAnimationFrame(this.frame);
@@ -323,7 +387,8 @@ export class XR implements EnginePlugin {
     this.binding = undefined;
     this.layer?.destroy();
     this.layer = undefined;
-    this.renderer.dispose();
+    this.renderer?.dispose();
+    this.eyes?.dispose();
     if (this.resume) {
       this.resume = false;
       if (!this.disposed && !this.engine.disposed) this.engine.start();
@@ -347,7 +412,8 @@ export class XR implements EnginePlugin {
     const session = this.session;
     this.ended();
     this.device.removeEventListener('uncapturederror', this.uncaptured);
-    this.device.destroy();
+    // The engine's own device stays with the engine.
+    if (this.route === 'separate') this.device.destroy();
     if (session) void session.end().catch((error) => this.engine.onError(error));
     if (this.engine?.hasPlugin(this.name)) this.engine.removePlugin(this.name);
   }

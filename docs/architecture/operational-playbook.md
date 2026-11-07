@@ -435,6 +435,15 @@ into the opaque framebuffer after the submit, and the view's projection is remap
 `packages/webgl2-compat/test/xr-browser.mjs` in `test:gpu`, 0 differing pixels in both eyes on the RTX A6000 with stand-in
 XR objects. Missing: a real headset.
 
+**XR through the engine (2026-11-07).** An engine made by `createXREngine` (`@margoengine/xr`) asks for its adapter with
+`xrCompatible: true`, so `XR.create` shares its device and draws each eye as one view of `engine.render({views})`: every
+package pass and post effect runs per eye as it runs per view on the desktop. Each eye renders into a texture, a blit copies
+it into the layer's sub-image, and a second blit writes the layer's forward depth24plus depth as 1 minus the scene's reversed
+depth (the nearest sample). In AR the alpha is the share of samples that wrote depth, or the brightest channel where none
+did. Evidence: `tests/modern-xr-passes.ts` in `modern:test:xr:browser`, both eyes byte-equal to a desktop render of the same
+camera with a line, a point cloud, terrain and bloom, on the RTX A6000 with a stand-in session. Missing: a real headset;
+this route on the WebGL2 layer.
+
 `install()` returns without changes when real WebGPU has an adapter, unless forced. Otherwise it probes WebGL2,
 requires highp fragment floats/ints and `EXT_color_buffer_float`, defines a `CompatGPU` at `navigator.gpu`, patches
 only `getContext('webgpu')`, and installs missing WebGPU flag constants. `uninstall()` reverses those changes. Lower
