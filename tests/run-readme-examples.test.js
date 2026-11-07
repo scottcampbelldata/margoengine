@@ -11,7 +11,11 @@ import {
   pickExamples,
   placeOf,
   runInNode,
+  sampleFiles,
 } from '../scripts/run-readme-examples.mjs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 const samples = { byName: new Map(), byExtension: new Map() };
 
@@ -129,3 +133,31 @@ test('the files and elements an example asks for are found', () => {
   assert.deepEqual(namedFiles("await load('/models/crate.glb');"), ['/models/crate.glb']);
   assert.ok(askedElements("document.querySelector('#viewport');").length > 0);
 });
+
+// Regression: files under 200 bytes were dropped as LFS pointers, so a real 60-byte .bin (Cameras.bin) was replaced by
+// another model's buffer. A pointer is told by its first line; a small real file stays a sample of its own name.
+test('a small real file is a sample, and an LFS pointer of any size is not', () => {
+  const folder = mkdtempSync(join(tmpdir(), 'readme-samples-'));
+  try {
+    writeFileSync(join(folder, 'Cameras.bin'), Buffer.alloc(60, 7));
+    writeFileSync(
+      join(folder, 'Big.bin'),
+      `version https://git-lfs.github.com/spec/v1\noid sha256:${'a'.repeat(64)}\nsize 123456\n`,
+    );
+    writeFileSync(join(folder, 'empty.png'), '');
+    const { byName, byExtension } = sampleFiles(['Cameras.bin', 'Big.bin', 'empty.png'], folder);
+    assert.equal(byName.get('cameras.bin')?.size, 60);
+    assert.equal(byName.has('big.bin'), false);
+    assert.equal(byExtension.get('.bin')?.path, join(folder, 'Cameras.bin'));
+    assert.equal(byExtension.has('.png'), false);
+    // A smaller .bin of another model must not stand in for the chosen .gltf's own buffer.
+    writeFileSync(join(folder, 'Other.bin'), Buffer.alloc(20, 1));
+    writeFileSync(join(folder, 'Cameras.gltf'), JSON.stringify({ buffers: [{ uri: 'Cameras.bin', byteLength: 60 }] }));
+    const paired = sampleFiles(['Cameras.bin', 'Other.bin', 'Cameras.gltf'], folder).byExtension;
+    assert.equal(paired.get('.gltf')?.path, join(folder, 'Cameras.gltf'));
+    assert.equal(paired.get('.bin')?.path, join(folder, 'Cameras.bin'));
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
+

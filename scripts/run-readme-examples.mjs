@@ -97,31 +97,46 @@ function modelWithClips(file) {
   return file;
 }
 
+const LFS_POINTER = 'version https://git-lfs.github.com/spec/v1';
+
+/** True for a Git LFS pointer left in place of its file: told by its first line, never by its size (real files can be tiny). */
+export function isLfsPointer(path) {
+  if (statSync(path).size > 1024) return false;
+  return readFileSync(path, 'latin1').startsWith(LFS_POINTER);
+}
+
 /**
  * The samples a file name stands for: `byName` for a file of that very name in the sample folders, `byExtension` for the
- * smallest real file of each extension.
+ * smallest real file of each extension. `files` are repository paths under `base` (default: the sample folders git lists).
  */
-export function sampleFiles() {
-  const listed = spawnSync('git', ['ls-files', 'examples/assets', 'packages/*/tests', 'packages/*/test'], {
-      cwd: root,
-      encoding: 'utf8',
-      maxBuffer: 2 ** 26,
-    }).stdout,
+export function sampleFiles(files, base = root) {
+  const listed =
+      files ??
+      spawnSync('git', ['ls-files', 'examples/assets', 'packages/*/tests', 'packages/*/test'], {
+        cwd: root,
+        encoding: 'utf8',
+        maxBuffer: 2 ** 26,
+      }).stdout.split('\n'),
     samples = new Map(),
     byName = new Map();
-  for (const file of listed.split('\n').filter(Boolean)) {
-    const path = join(root, file),
+  for (const file of listed.filter(Boolean)) {
+    const path = join(base, file),
       extension = extname(file).toLowerCase();
     // A file kept to test a refusal is no sample.
     if (!extension || CODE.has(extension) || !existsSync(path) || /invalid|corrupt|truncat|broken|malformed|\bbad\b|damaged/i.test(file))
       continue;
     const { size } = statSync(path);
-    // Under 200 bytes is a Git LFS pointer or a stub, and a loader would rightly refuse it.
-    if (size < 200) continue;
+    // An empty file or a Git LFS pointer is no sample, and a loader would rightly refuse it; a small real file is one.
+    if (!size || isLfsPointer(path)) continue;
     byName.set(basename(file).toLowerCase(), { path, size });
     if (PREFERRED[extension] === file) samples.set(extension, { path, size: 0 });
     if (size < (samples.get(extension)?.size ?? 2 ** 24)) samples.set(extension, { path, size });
   }
+  // A .gltf and a .bin an example names together are one model, so the .bin stands for that .gltf's own buffer.
+  const gltf = samples.get('.gltf'),
+    uri = gltf && JSON.parse(readFileSync(gltf.path, 'utf8')).buffers?.[0]?.uri,
+    buffer = typeof uri === 'string' && !uri.startsWith('data:') ? join(dirname(gltf.path), decodeURI(uri)) : undefined;
+  if (buffer && existsSync(buffer) && !isLfsPointer(buffer)) samples.set('.bin', { path: buffer, size: statSync(buffer).size });
   return { byName, byExtension: samples };
 }
 

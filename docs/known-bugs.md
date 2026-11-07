@@ -29,16 +29,16 @@ are still open.
 
 ## README examples
 
-### 125 of 767 README examples do not run yet
+### 119 of 767 README examples do not run yet
 
 - **What:** `npm run check:readme-run`, a step of `check:merge` since 2026-11-07, ran 641 of 767 examples that day (RTX A6000,
-  Chromium). The other 126 went into `scripts/support/readme-run-known.json`; 125 are left there, each with its error. A new failure fails the step, and
+  Chromium). The other 126 went into `scripts/support/readme-run-known.json`; 119 are left there, each with its error. A new failure fails the step, and
   so does an entry that passes or names an example that is gone. An id is the heading above an example and a hash of its code, so
   an example added above one on the list leaves it alone; changing a listed example changes its id, and the entry moves with it.
 - **Repro:** `npm run build:packages`, then `npm run check:readme-run -- --only=<id>` with an id from that list.
-- **Cause:** 106 entries start `sample:`. The example names a file of its own (a font, a scan, a rigged model with named joints)
+- **Cause:** 101 entries start `sample:`. The example names a file of its own (a font, a scan, a rigged model with named joints)
   and the check has no matching sample, or the sample does not fit it, so these say nothing about the example yet. Ragdoll,
-  fbx, the animator's joint indices and `usdz/readme-margoengine-usdz-087124` and `usdz/readme-composition-fbebfe` (no `.usdz` file is in the repository) are in this group. 19 start
+  fbx, the animator's joint indices and `usdz/readme-margoengine-usdz-087124` and `usdz/readme-composition-fbebfe` (no `.usdz` file is in the repository) are in this group. 18 start
   `example:`, and these need reading one at a time:
   - Five attach one plugin twice to one engine, which core refuses (`post/readme-smaa-10a00a`, `shadows/readme-margoengine-shadows-7183ea`, `quality/readme-tier-presets-0abcba`,
     `sky/readme-fog-b452c1`, `ragdoll/readme-saved-profiles-margoengine-ragdo-104541`), so the example shows two alternatives as if one ran after the other.
@@ -51,18 +51,20 @@ are still open.
 - **Needed to close:** a matching sample for each `sample:` entry, each `example:` entry fixed in its README or its package, and
   the list empty.
 
-### The README check serves the wrong buffer to a glTF whose real .bin is under 200 bytes
+### The README check counts a Node example that reaches its time limit as a pass
 
-- **What:** an example that loads a `.gltf` the check has no file of that name for gets the smallest `.gltf` sample,
-  `examples/assets/khronos/Cameras/Cameras.gltf`. Its buffer, `Cameras.bin`, is a real 60-byte file, but the check serves
-  the smallest other `.bin` in its place, so the model fails with "Invalid glTF triangle indices". Six entries on the known
-  list end that way (exporters, gltf-pro). Found 2026-11-07 while fixing cache's LoadingManager example.
-- **Repro:** `npm run build:packages`, then `npm run check:readme-run -- --only=gltf-pro/readme-bump-maps-in-gltf-ext-materials-d683f4`.
-- **Cause:** `sampleFiles` in `scripts/run-readme-examples.mjs` drops every file under 200 bytes as a Git LFS pointer or a
-  stub, real files included: `Cameras.bin`, `MultipleScenes_square.bin`, `MultipleScenes_triangle.bin` and
-  `TextureTransformTest.bin`.
-- **Needed to close:** tell an LFS pointer by its first line (`version https://git-lfs.github.com/spec/v1`), not by its size,
-  keep a real small file as a sample of its own name, rerun the whole check and shrink the known list by what then passes.
+- **What:** `runInNode` in `scripts/run-readme-examples.mjs` reports `pass` (note "ran to the 30 s limit") for an example
+  that is still running at 30 s. Under a whole run's load, examples that fail in a few seconds alone can reach the limit
+  and pass, so the same example passes in one run and fails in another, and a known entry can read "passes, still on the
+  known list" only because the machine was busy. Seen 2026-11-07 on the Beelink: four rigging entries
+  (`readme-corrective-shapes-...-ff3e5c`, `readme-face-tracking-...-8fff06`, `readme-ik-chains-...-138226`,
+  `readme-spring-bones-...-a41e82`) passed in a whole run and failed with their listed errors in a run of three packages.
+- **Repro:** on a loaded machine, `npm run check:readme-run`, then `npm run check:readme-run -- --packages=rigging`; compare
+  the rigging results in the two reports.
+- **Cause:** a time limit is taken as "a long-running example, such as a server", not as "unknown"; the result depends on the
+  machine's load.
+- **Needed to close:** tell a server or loop that is meant to keep running from a slow failure (for example by its
+  `listen` port, as `nodeTurns` already reads it), and give the others enough time, or report them as unknown rather than pass.
 
 ## Checks
 
