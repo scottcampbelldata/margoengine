@@ -1,6 +1,6 @@
 # How to work
 
-Copied from the first account's working notes, so helpers on other accounts follow the same rules. `AGENTS.md` wins over this file. Batch prompts are in `docs/work-lists/list-N-prompts.md`. Handoff notes go in your worktree's `.lane/` folder. Where it says manager, that is your account's session. Lane means stream.
+Copied from the first account's working notes, so helpers on other accounts follow the same rules. `AGENTS.md` wins over this file. The one exception is what a job runs before it lands: `machines.md` item 5 sets that, and a failure stops the stream until it is fixed. Batch prompts are in `docs/work-lists/list-N-prompts.md`. Handoff notes go in your worktree's `.lane/` folder. Where it says manager, that is your account's session. Lane means stream.
 
 ## Brief for every helper
 
