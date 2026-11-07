@@ -44,3 +44,6 @@ packages/webgl2-compat/test/corpus/*.br binary
 # The Yale Bright Star Catalogue (CDS V/50), kept byte for byte as the archive serves it; its NOTICE.md gives the hashes
 packages/sky/test/fixtures/bsc5/catalog.gz binary
 packages/sky/test/fixtures/bsc5/ReadMe -text
+
+# Real motion capture, byte for byte as tests/fixtures/cmu-mocap/NOTICE.md hashes it.
+tests/fixtures/cmu-mocap/*.bvh -text

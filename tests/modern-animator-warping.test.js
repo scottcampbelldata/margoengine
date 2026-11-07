@@ -78,6 +78,20 @@ for (const speed of [0.7, 1, 1.4]) {
   });
 }
 
+test('a clip that starts away from the origin warps about the hips, as a real take does', async (t) => {
+  const walkAt = bipedWalk({ duration: 1, speed: 1 }),
+    tracks = { ...walkAt.tracks, 'Hips.translation': (time) => [0.5, 1, time - 3] },
+    f = await animatorRun(animatorDocument(BIPED, { Walk: { ...walkAt, tracks } }), { initial: 'walk', states: { walk: 'Walk' } }),
+    i = (name) => f.index.get(name);
+  t.after(() => f.release());
+  f.pelvis = i('Hips');
+  f.legs = ['Left', 'Right'].map((side) => ({ hip: i(`${side}UpLeg`), knee: i(`${side}Leg`), ankle: i(`${side}Foot`) }));
+  addRootMotion(f.animator, { joint: f.pelvis, apply: false });
+  addWarping(f.animator, { pelvis: f.pelvis, legs: f.legs, velocity: [0, 0, 0.7] });
+  const slid = slide(f, [0, 0, 0.7]);
+  assert.ok(slid < 2e-3, `slid ${slid}`);
+});
+
 test('without the warp the same foot slides by the speed difference', async (t) => {
   const f = await rig();
   t.after(() => f.release());

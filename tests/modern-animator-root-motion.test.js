@@ -157,6 +157,74 @@ test('yaw root motion turns the character and unwinds the bone', async (t) => {
   assert.ok(Math.abs(Math.abs(bone[3]) - 1) < 1e-6, `bone unwound to no yaw: ${bone}`);
 });
 
+test('smoothing takes the journey and leaves the surge in the pose, and a lap still travels a whole lap', async (t) => {
+  // Hips that surge: 1 m a lap plus a wobble that is 0 at the lap's ends, keyed finely enough to average.
+  const result = animatedTriangle(),
+    { doc, buffers } = result,
+    count = 121,
+    surge = (time) => [time + 0.05 * Math.sin(4 * Math.PI * time), 0, 0],
+    add = (values, type) => {
+      const data = new Float32Array(values);
+      buffers.push(data);
+      doc.buffers.push({ byteLength: data.byteLength });
+      doc.bufferViews.push({ buffer: buffers.length - 1, byteLength: data.byteLength });
+      doc.accessors.push({ bufferView: doc.bufferViews.length - 1, componentType: 5126, count: data.length / (type === 'VEC3' ? 3 : 1), type });
+      return doc.accessors.length - 1;
+    },
+    times = Array.from({ length: count }, (_, i) => i / (count - 1));
+  doc.animations.push({
+    name: 'Surge',
+    channels: [{ sampler: 0, target: { node: 1, path: 'translation' } }],
+    samplers: [{ input: add(times, 'SCALAR'), output: add(times.flatMap(surge), 'VEC3') }],
+  });
+  const store = await TransformStore.create(16),
+    engine = new Engine({ width: 16, height: 16, clientWidth: 16, clientHeight: 16 }, store, {
+      backend: 'webgl2',
+      add() {},
+      remove() {},
+      render() {},
+      dispose() {},
+    }),
+    model = new PBRModel(engine, new GLTFAsset(doc, buffers)),
+    animation = new Animation(model),
+    animator = new Animator(animation, { initial: 'surge', states: { surge: 'Surge' } });
+  engine.use({ name: animation.name, setup() {} });
+  engine.use(animator);
+  t.after(() => {
+    animator.dispose();
+    animation.dispose();
+    model.dispose();
+    engine.dispose();
+  });
+  // 0.5 s is one period of the wobble, so the journey is straight: a steady 1 m/s.
+  const motion = addRootMotion(animator, { joint: 1, target: model.root, smoothing: 0.5 }),
+    bone = model.nodes[1].id,
+    transforms = store.transforms,
+    step = 1 / 120;
+  let fastest = 0,
+    slowest = Infinity,
+    kept = 0;
+  for (let i = 0; i < 300; i++) {
+    animator.onPreUpdate(step);
+    if (i > 0) {
+      const speed = motion.translation[0] / step;
+      fastest = Math.max(fastest, speed);
+      slowest = Math.min(slowest, speed);
+    }
+    kept = Math.max(kept, Math.abs(transforms.x[bone]));
+  }
+  assert.ok(fastest < 1.01 && slowest > 0.99, `the character ran from ${slowest} to ${fastest} m/s`);
+  assert.ok(Math.abs(kept - 0.05) < 2e-3, `the pose kept ${kept} of the 0.05 surge`);
+  assert.ok(Math.abs(transforms.x[model.root.id] - 2.5) < 0.01, `moved ${transforms.x[model.root.id]} in 2.5 s`);
+});
+
+test('smoothing must be 0 seconds or more', async (t) => {
+  const f = await animated({ initial: 'walk', states: { walk: 'Move' } });
+  t.after(() => f.release());
+  assert.throws(() => addRootMotion(f.animator, { joint: 1, smoothing: -1 }), /smoothing must be 0 seconds or more/);
+  assert.throws(() => addRootMotion(f.animator, { joint: 1, smoothing: NaN }), /smoothing/);
+});
+
 test('root motion input checks', async (t) => {
   const f = await animated({ initial: 'walk', states: { walk: 'Move' } });
   t.after(() => f.release());

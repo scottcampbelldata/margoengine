@@ -101,11 +101,14 @@ const motion = addRootMotion(animator, {
   axes: 'xz', // default: ground-plane travel; the hips' bob stays animated ('xyz' takes all of it)
   rotation: false, // default: true also takes the hips' turn about +Y and turns the target by it
   apply: true, // default: false only reports, e.g. to feed a physics character controller
+  smoothing: 0, // default: seconds of path averaged into the travel; 0.5 suits a real walk
 });
 engine.start();
 console.log(motion.translation, motion.yaw); // last frame's travel and turn
 motion.dispose(); // the hips travel with the clip again
 ```
+
+`smoothing` matters for motion capture. Real hips surge and lag on every step; at 0 all of that counts as travel, so it leaves the pose, and a game that moves the character steadily sees it as foot slide (44 mm on a CMU walk, where the take's own feet slide 21 mm). About one step of `smoothing` takes only the journey and leaves the surge in the pose (27 mm). A loop keeps its whole lap of travel; a clip that stops carries its path on through its ends.
 
 A transition starts the new state's travel at its time 0; during a crossfade the travel follows the new state. Yaw is taken per clip cycle, so a clip should turn less than half a turn per cycle. The target's ancestors need nonzero scales.
 
@@ -377,7 +380,7 @@ const model = await loadGLTF(engine, '/hero.glb');
 const animation = Animation.attach(model);
 const animator = Animator.attach(animation, {initial: 'walk', states: {walk: 'Walk', stop: 'Stop'}});
 const node = (name: string) => model.asset.doc.nodes!.findIndex((n) => n.name === name);
-addRootMotion(animator, {joint: node('Hips'), apply: false}); // the game moves the character
+addRootMotion(animator, {joint: node('Hips'), apply: false, smoothing: 0.5}); // the game moves the character
 
 const velocity: [number, number, number] = [0, 0, 0];
 const warp = addWarping(animator, {
@@ -399,10 +402,11 @@ stop.distance = 1.5;                        // what is left to the mark, written
 ```
 
 - **Orientation.** The hips turn toward the direction of travel, up to `maxTurn` (default pi / 2), settling over `turnTime` (default 0.1 s), and `spine` shares out the turn back so the chest keeps facing front. Facing is the `character` node's +Z (default the model's root).
-- **Stride.** Each foot's offset from the character scales along the direction of travel by real speed over clip speed, so a planted foot stands still. Knees bend toward each leg's `pole`, by default forward of the animated knee, and feet keep their world rotation.
+- **Stride.** Each foot's offset from the hips scales along the direction of travel by real speed over clip speed, so a planted foot stands still. Knees bend toward each leg's `pole`, by default forward of the animated knee, and feet keep their world rotation.
 - **Clip speed.** Measured from the `speedJoint` travel (default `pelvis`) of the state's clips through its blend tree. In-place clips have no travel to measure: set `clipSpeed`. `addRootMotion` with `apply: false` keeps a travelling clip's bone in place while the game moves the character.
 - **Limits and rate.** Past `minStride` (default 0.5) and `maxStride` (default 1.6) the clip's rate makes up the rest, from the next frame, so feet stay planted at any speed and a stopped character stops stepping. `adjustRate: false` leaves the rate alone. `animator.time` then runs at that rate; crossfades keep real time.
 - **Pelvis.** It drops by what the longest stride needs, at most `maxPelvisDrop` (default 0.2).
+- **Motion capture.** Proved on CMU takes with contacts found from the data: at speeds from 0.7 to 3 m/s on a 1.31 m/s walk a planted foot slides 24 to 50 mm, against 21 mm in the take itself and 48 to 564 mm with no warp. Pass `smoothing: 0.5` to `addRootMotion`, or the hips' surge shows as foot slide.
 - **Distance.** `addDistanceWarp` stands a clip where the travel of `joint` matches `distance`: `mode: 'stop'` reads what is left, `'start'` what has been covered. Time only runs forward, and a distance longer than the clip holds its first frame. The state must play one clip.
 
 ## Full-body IK (`margoengine/animator/fbik`)
@@ -471,7 +475,9 @@ console.log(same.rows, same.search(same.features.subarray(0, same.width)).clip);
 - **Database.** `root` is the hips: their path on the ground, averaged over `smoothing` seconds (default 0.5), is the character's root, so a walk's sway stays in the pose. `bones` are the bones to match (1-8, usually the feet). `clips` defaults to every clip; give `{clip, loop, speed}` to say a clip does not loop or to tell an in-place clip how fast it travels. `rate` (default 30 rows a second), `trajectory` (default a third, two thirds and one second ahead), `forward` (the rest pose's facing, default +Z) and `weights` set the rest. A row of a clip that does not loop whose path runs past its end can be played but not landed on.
 - **Features.** Each row holds the bones' places and speeds, the hips' speed, and the root's future places and facings, all in the root's own frame. Each group is centred and scaled by its spread, then weighted: `position` 0.5, `velocity` 0.5, `hips` 1, `trajectory` 2, `facing` 1.5. The path counts most, so a request is answered even with no clip that eases into it.
 - **Search.** `database.search(query)` is exact: boxes around 16 and 64 rows are skipped when their nearest corner cannot win, and the answer is what comparing every row gives.
-- **Matching.** `velocity` and `facing` (default the way `velocity` points) are smoothed into a predicted path over `response` seconds (default 0.5). Every `interval` (default 0.1 s) the search runs; a row must beat the current one by `stickiness` (default 0.05) and be over 0.2 s away. `blend` (default 0.2 s) is the inertialization. The clips play in place and `character` (default the model's root) moves along the predicted path; `drive: false` leaves that to the game. `matcher.search()` searches on the next frame.
+- **Matching.** `velocity` and `facing` (default the way `velocity` points) are smoothed into a predicted path over `response` seconds (default 0.5). Every `interval` (default 0.1 s) the search runs; a row must beat the current one by `stickiness` (default 1, measured on motion capture, where 0.05 jumped three times as often and the feet paid for it) and be over 0.2 s away. `blend` (default 0.2 s) is the inertialization. The clips play in place and `character` (default the model's root) moves along the predicted path; `drive: false` leaves that to the game. `matcher.search()` searches on the next frame.
+
+Motion capture works as it comes: on eight CMU takes, with `{clip, loop: false}` and no speed labelled by hand, a request for 1.1, 1.3, 1.7, 2.7 or 4 m/s plays the take recorded at that speed. A take that ends forces a jump, so longer takes jump less: a 1.1 s run jumped 19 times in 4 s, a 3.5 s walk 4 times.
 
 The Animator needs one state per clip, named after it, and `motionStates(animation)` gives that. The search is on the CPU, and the database holds what you put in it: it has no clip for a move you did not record, and a character asked for one plays the nearest it has.
 

@@ -214,3 +214,21 @@ export const largestGap = (a, b) => {
   return gap;
 };
 export { Animator };
+
+/** BVH's unit in the CMU files: 1 / 0.45 inches a unit, so a person's leg measures 0.85 m and a walk 1.3 m/s. */
+export const CMU_SCALE = (2.54 / 100) / 0.45;
+
+/** A joint table like {@link BIPED} from what `parseBVH` returns, under a `Root` that keeps the hips free to move. */
+export function mocapJoints({ bones }) {
+  const joints = { Root: [null, 0, 0, 0] };
+  for (const bone of bones) joints[bone.name] = [bone.parent < 0 ? 'Root' : bones[bone.parent].name, ...bone.translation];
+  return joints;
+}
+
+/** A clip for {@link animatorDocument} from what `parseBVH` returns: one glTF key on every frame of the file. */
+export function mocapClip({ clip, frameTime, frames }) {
+  const tracks = {};
+  for (const { target, path, keys } of clip.tracks)
+    tracks[`${target}.${path}`] = (t) => keys[Math.min(keys.length - 1, Math.round(t / frameTime))].value;
+  return { duration: (frames - 1) * frameTime, fps: 1 / frameTime, tracks };
+}

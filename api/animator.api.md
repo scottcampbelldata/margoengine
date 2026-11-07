@@ -261,6 +261,7 @@ export interface RootMotionOptions {
     axes?: 'xz' | 'xyz';
     rotation?: boolean;
     apply?: boolean;
+    smoothing?: number;
 }
 
 export interface StateClock {

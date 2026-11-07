@@ -40,7 +40,7 @@ export interface Warping {
   clipSpeed?: number;
   /** glTF node index of the bone whose clip translation is the travel (default `pelvis`). */
   speedJoint?: number;
-  /** Node that stands for the character: its +Z is its facing, its position the stride's centre. Default the model's root. */
+  /** Node that stands for the character: its +Z is its facing. Default the model's root. */
   character?: Mesh;
   /** Joints from the pelvis up that share the counter-turn, each a descendant of the last. Default none: the upper body turns with the hips. */
   spine?: readonly number[];
@@ -231,8 +231,7 @@ export function addWarping(animator: Animator, warp: Warping): WarpingHandle {
     animator.clipRate = rate;
     const dx = speed > 1e-4 ? velocity[0] / speed : Math.sin(facing + turned),
       dz = speed > 1e-4 ? velocity[2] / speed : Math.cos(facing + turned),
-      px = m[12],
-      pz = m[14],
+      [px, , pz] = position(pelvis),
       targets: Vec3[] = legs.map(({ ankle }, i) => {
         const a = position(ankle),
           along = ((a[0] - px) * dx + (a[2] - pz) * dz) * (stride - 1);

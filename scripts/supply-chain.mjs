@@ -142,6 +142,10 @@ const ASSETS = [
     'packages/cutscene/tests/fixtures/arctic/NOTICE.md',
     'test speech for @margoengine/cutscene/lipsync: two sentences of the CMU ARCTIC voice cmu_us_slt_arctic with their phoneme labels (Carnegie Mellon University, 2003; free for any purpose under the notice in the fixture COPYING file; never shipped)',
   ],
+  [
+    'tests/fixtures/cmu-mocap/NOTICE.md',
+    'test motion capture for @margoengine/animator: nine takes of subjects 2 and 16 from the CMU Graphics Lab Motion Capture Database (mocap.cs.cmu.edu, funded by NSF EIA-0196217; free for research and commercial use) in the BVH conversion by Bruce Hahne',
+  ],
   ['examples/assets/robot-CREDITS.md', 'RobotExpressive upstream credits (Tomás Laulhé, Don McCurdy; CC0)'],
   [
     'packages/headless/tests/fixtures/pngsuite/NOTICE.md',

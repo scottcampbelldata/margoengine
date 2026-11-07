@@ -109,7 +109,7 @@ export interface MotionMatching {
   blend?: number;
   /** Seconds the character takes to reach a new velocity or facing (default 0.5). */
   response?: number;
-  /** How much better a row must be to leave the current one, in cost (default 0.05). */
+  /** How much better a row must be to leave the current one, in cost (default 1). */
   stickiness?: number;
 }
 
@@ -634,7 +634,7 @@ export function addMotionMatching(animator: Animator, matching: MotionMatching):
   const read = () => {
     const interval = matching.interval ?? 0.1,
       response = matching.response ?? 0.5,
-      stickiness = matching.stickiness ?? 0.05;
+      stickiness = matching.stickiness ?? 1;
     finiteVector(matching.velocity, 3, 'Motion matching velocity');
     if (matching.facing) finiteVector(matching.facing, 3, 'Motion matching facing');
     if (!(interval > 0 && interval < Infinity)) throw new RangeError('Motion matching interval must be above 0 seconds');

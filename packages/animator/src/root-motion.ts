@@ -18,6 +18,12 @@ export interface RootMotionOptions {
   rotation?: boolean;
   /** Move the target (default true). False only reports the travel in `translation` and `yaw`, e.g. for a physics character controller. */
   apply?: boolean;
+  /**
+   * Seconds of the bone's path averaged into the travel (default 0: all of it is travel). A real walk's hips surge and
+   * lag on every step; at 0 that surge leaves the pose, and a character moved at a steady speed shows it as foot slide.
+   * About one step, 0.5, leaves the surge in the pose and takes only the journey. Turns are not averaged.
+   */
+  smoothing?: number;
 }
 
 /** A root-motion handle: the last frame's travel, and its remover. */
@@ -41,14 +47,17 @@ const yawOf = (q: ArrayLike<number>): number => {
   return Math.atan2(2 * (x * z + w * y), 1 - 2 * (x * x + y * y));
 };
 const wrap = (angle: number) => angle - 2 * Math.PI * Math.round(angle / (2 * Math.PI));
+/** Samples of the bone's path in one {@link RootMotionOptions.smoothing} average. */
+const AVERAGE = 16;
 
 /**
  * Takes root motion from `animator`'s clips: every frame the travel the current state's clips give `options.joint`
  * between the previous and the current time (summed over loops and weighted by the blend tree) is removed from that
  * bone's pose and added to `options.target`, rotated into the target's parent space. With `rotation`, the bone's yaw
  * is taken the same way. A transition starts the new state's travel from its time 0; during a crossfade the travel
- * follows the new state. Returns the handle; dispose it to stop.
- * @throws RangeError for an invalid joint.
+ * follows the new state. With `smoothing`, travel is the bone's averaged path and what is left of its path stays in
+ * the pose. Returns the handle; dispose it to stop.
+ * @throws RangeError for an invalid joint or smoothing.
  */
 export function addRootMotion(animator: Animator, options: RootMotionOptions): RootMotion {
   const model = animator.animation.model,
@@ -59,10 +68,12 @@ export function addRootMotion(animator: Animator, options: RootMotionOptions): R
   const axes = options.axes ?? 'xz',
     turn = options.rotation ?? false,
     apply = options.apply ?? true,
-    target = options.target ?? model.root;
+    target = options.target ?? model.root,
+    smoothing = options.smoothing ?? 0;
   if (axes !== 'xz' && axes !== 'xyz') throw new RangeError("Root motion axes must be 'xz' or 'xyz'");
   if (typeof turn !== 'boolean' || typeof apply !== 'boolean')
     throw new TypeError('Root motion rotation and apply must be booleans');
+  if (!(smoothing >= 0 && smoothing < Infinity)) throw new RangeError('Root motion smoothing must be 0 seconds or more');
   // Each clip's root translation and rotation tracks, found once.
   const tracks = new Map<Clip, { translation?: Track; rotation?: Track }>();
   for (const clip of animator.animation.clips) {
@@ -76,6 +87,31 @@ export function addRootMotion(animator: Animator, options: RootMotionOptions): R
     scratch4 = new Float32Array(4),
     at = (track: Track, time: number, out: Float32Array) =>
       sampleTrackInto(track.times, track.values, track.width, time, track.interpolation, track.width === 4, out);
+  /** The bone at any time: a loop carries on by whole laps, and past an end of a clip that stops the path runs on through that end. */
+  const carried = (track: Track, d: number, time: number): number[] => {
+    if (animator.animation.options.loop ?? true) {
+      const laps = Math.floor(time / d),
+        place = Array.from(at(track, time - laps * d, scratch3)),
+        end = Array.from(at(track, d, scratch3)),
+        start = at(track, 0, scratch3);
+      return place.map((v, c) => v + laps * (end[c] - start[c]));
+    }
+    const edge = time < 0 ? 0 : time > d ? d : time,
+      fixed = Array.from(at(track, edge, scratch3));
+    if (edge === time) return fixed;
+    const mirror = at(track, Math.min(d, Math.max(0, 2 * edge - time)), scratch3);
+    return fixed.map((v, c) => 2 * v - mirror[c]);
+  };
+  /** The place on the path travel is counted along: the bone itself, or its average over `smoothing` seconds. */
+  const place = (track: Track, d: number, time: number): number[] => {
+    if (!(smoothing > 0 && d > 0)) return Array.from(at(track, time, scratch3));
+    const sum = [0, 0, 0];
+    for (let k = 0; k < AVERAGE; k++) {
+      const spot = carried(track, d, time + ((k + 0.5) / AVERAGE - 0.5) * smoothing);
+      for (let c = 0; c < 3; c++) sum[c] += spot[c] / AVERAGE;
+    }
+    return sum;
+  };
   const translation: [number, number, number] = [0, 0, 0];
   // Travel is measured from where the Animator is now, so a motion added mid-clip starts with no jump.
   let yaw = 0,
@@ -90,10 +126,10 @@ export function addRootMotion(animator: Animator, options: RootMotionOptions): R
     const local = (time: number) => (loop && d > 0 ? time % d : Math.min(time, d)),
       loops = loop && d > 0 ? Math.floor(b / d) - Math.floor(a / d) : 0;
     if (move) {
-      const start = Array.from(at(move, 0, scratch3)),
-        end = Array.from(at(move, d, scratch3)),
-        from = Array.from(at(move, local(a), scratch3)),
-        to = Array.from(at(move, local(b), scratch3));
+      const start = place(move, d, 0),
+        end = place(move, d, d),
+        from = place(move, d, local(a)),
+        to = place(move, d, local(b));
       for (let c = 0; c < 3; c++) {
         sum[c] += weight * (loops * (end[c] - start[c]) + to[c] - from[c]);
         offset[c] += weight * (to[c] - start[c]);
