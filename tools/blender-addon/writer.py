@@ -22,7 +22,8 @@ def png(width, height, rgba):
             + chunk(b"IDAT", zlib.compress(rows)) + chunk(b"IEND", b""))
 
 
-def encode(document, geometry, images=()):
+def encode(document, geometry, images=(), animation=b""):
+    """`animation` holds the animated scene's skins, morph targets and keyframes; bufferViews name it as `section: "data"`."""
     sections = [(1, b"", 0)]
     shared = {}
 
@@ -36,8 +37,11 @@ def encode(document, geometry, images=()):
 
     doc = dict(document)
     doc["asset"] = {"version": "2.0", "generator": "margo-blender 1.0.0"}
+    fields = doc.pop("meshes", None) or [{}] * len(geometry)
+    if len(fields) != len(geometry):
+        raise ValueError("Mesh fields must match the geometry")
     doc["meshes"] = []
-    for mesh in geometry:
+    for mesh, field in zip(geometry, fields):
         primitives = []
         for primitive in mesh:
             vertex, index = primitive["vertices"], primitive["indices"]
@@ -63,8 +67,19 @@ def encode(document, geometry, images=()):
             primitives.append(record)
         if not primitives:
             raise ValueError("Mesh has no triangles")
-        doc["meshes"].append({"primitives": primitives})
+        doc["meshes"].append(dict(field, primitives=primitives))
     doc["images"] = [{"section": add(4, image), "mimeType": "image/png"} for image in images]
+    if animation:
+        data_section = len(sections)
+        sections.append((5, bytes(animation), 0))
+        views = []
+        for view in doc.get("bufferViews", ()):
+            if view.get("section") != "data" or view.get("byteOffset", 0) + view["byteLength"] > len(animation):
+                raise ValueError("Animation buffer view outside the data section")
+            views.append(dict(view, section=data_section))
+        doc["bufferViews"] = views
+    elif any(key in doc for key in ("bufferViews", "accessors", "skins", "animations")):
+        raise ValueError("Animated scene without a data section")
     manifest = json.dumps(doc, ensure_ascii=False, allow_nan=False, separators=(",", ":")).encode("utf-8")
     if len(manifest) > 1024 * 1024 or not 3 <= len(sections) <= 4096:
         raise ValueError(".margo manifest/section budget exceeded")
@@ -78,12 +93,12 @@ def encode(document, geometry, images=()):
         offset += len(padded)
     if offset > MAX_BYTES:
         raise ValueError(".margo exceeds 256 MiB")
-    header = struct.pack("<16I", 0x4F47524D, 1, offset, len(sections), 64, 0, 80, *([0] * 9))
+    header = struct.pack("<16I", 0x4F47524D, 1, offset, len(sections), 64, 1 if animation else 0, 80, *([0] * 9))
     return header + b"".join(table) + b"".join(payload)
 
 
-def write(path, document, geometry, images=()):
-    data = encode(document, geometry, images)
+def write(path, document, geometry, images=(), animation=b""):
+    data = encode(document, geometry, images, animation)
     destination = os.path.abspath(path)
     temporary = None
     try:

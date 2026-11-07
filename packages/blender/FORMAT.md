@@ -11,7 +11,7 @@ All numeric binary fields are little-endian. Maximum file length is 256 MiB. Off
 | 8 | Exact padded file length |
 | 12 | Section count, 3..4096 |
 | 16 | Section table offset, always `64` |
-| 20 | Flags, always `0` |
+| 20 | Flags: `0`, or `1` for an animated file (see "Animated files") |
 | 24 | Default vertex stride, `80`; a type-2 section's compact layout flag overrides it to `24` |
 | 28..60 | Reserved, always `0` |
 
@@ -25,6 +25,7 @@ Immediately after the header, each section has four uint32 fields: `type`, `offs
 | 2 | Packed vertices; nonzero multiple of 80 bytes (flags `0`) or 24 bytes (flags `1`) |
 | 3 | Triangle indices; nonzero multiple of 6 bytes (UINT16) or 12 bytes (UINT32) |
 | 4 | Embedded RGBA8, non-interlaced PNG |
+| 5 | Animation data (animated files only): skin influences, inverse bind matrices, morph deltas and keyframes |
 
 ## Index format: type-3 section header flags
 
@@ -68,3 +69,17 @@ All values must be finite. Each primitive has 3..1,000,000 vertices and triangle
 Meshes without UVs, tangents or vertex colors use this layout. Positions and normals have the same finite-value, unit-vector and vertex/index limits as PBR vertices. The writer accepts `stride: 24` on a primitive and encodes it as a vertex-section flag, omitting it from the manifest. Omitted stride defaults to `80`.
 
 The reader expands each shared compact geometry once into the existing PBR renderer layout: position w = 1, normal w = 0, zero tangents/UVs and white vertex color. PBR vertices and uint32 indices remain typed-array views of the input. Aggregate decoded geometry, including expanded vertices and indices, is bounded at 256 MiB before allocation. GPU uploads copy bytes. Unknown versions, default strides and layout flags fail explicitly; this file is not a dump of the engine's Wasm memory or device-specific uniforms.
+
+## Animated files (header flag `1`)
+
+An exported scene with an Armature modifier or shape keys sets header flag `1` and adds one type-5 section. The static reader (`decodeMargo`, `parseMargo`, `loadMargo`) refuses such a file by name; `@margoengine/blender/anim` reads both kinds. In an animated file the manifest may also hold, with glTF 2.0 meaning:
+
+- `bufferViews[i]`: `{section, byteOffset, byteLength}` with `section` the type-5 section ID and `byteOffset` relative to it. Views lie inside the section.
+- `accessors`, `skins` and `animations`, referring to those views. Joints are UNSIGNED_SHORT VEC4, weights FLOAT VEC4 normalised to sum 1, inverse bind matrices FLOAT MAT4, keyframe times FLOAT SCALAR in seconds from the clip's first frame with min and max, morph deltas FLOAT VEC3 with min and max.
+- primitive `attributes` with only `JOINTS_0`, `WEIGHTS_0`, `JOINTS_1` and `WEIGHTS_1` (up to eight influences), and `targets` with `POSITION` (and optional `NORMAL`) accessors. Vertices and indices stay in type-2 and type-3 sections.
+- mesh `weights` (the shape-key values at export) and `extras.targetNames` (the shape-key names).
+- nodes with `children` and `skin`: each armature becomes a node at its world transform with one child node per bone, in the bone hierarchy. A joint's TRS is the pose shown at export; the inverse bind matrices hold the rest pose. A skinned mesh's node is the identity, as glTF ignores it.
+
+Each action becomes one clip named after it: the armature's active action and its NLA strips' actions, and the shape keys' actions, sampled at every frame of the action's range with LINEAR interpolation (rotations as continuous quaternions). A clip starts from the pose shown at export, so a bone or key the action does not key keeps that pose; channels equal to it throughout are omitted. Object-level animation, constraints' targets outside the armature and drivers are baked into the bone samples only.
+
+`margoToGLTF(bytes)` turns either kind into a glTF 2.0 document whose single buffer is the file: type-2 sections become interleaved bufferViews (stride 80: POSITION 0, NORMAL 16, TANGENT 32 when no tangent has w = 0, TEXCOORD_0 48, TEXCOORD_1 56, COLOR_0 64; stride 24: POSITION 0, NORMAL 12), type-3 sections index accessors, type-4 sections images, and the manifest's views move by their section's file offset.

@@ -1,171 +1,260 @@
-import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import { readFile, writeFile, mkdir } from 'node:fs/promises';
-import { resolve } from 'node:path';
-import { build } from 'vite';
-import { findPython } from './support/find-python.mjs';
-import { openBrowser } from './browser.js';
-import { decodePNG } from '../tests/support/png.js';
-import { decodeMargo } from '../packages/blender/dist/index.js';
-import { GLTFAsset } from '../packages/gltf-pro/dist/index.js';
+import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { resolve } from "node:path";
+import { build } from "vite";
+import { findPython } from "./support/find-python.mjs";
+import { openBrowser } from "./browser.js";
+import { decodePNG } from "../tests/support/png.js";
+import { decodeMargo } from "../packages/blender/dist/index.js";
+import { GLTFAsset } from "../packages/gltf-pro/dist/index.js";
 
-await mkdir('test-results/blender', { recursive: true });
+await mkdir("test-results/blender", { recursive: true });
 const fixtures = [
-  await readFile('packages/blender/tests/fixtures/triangle.margo'),
-  await readFile('packages/blender/tests/fixtures/compact-triangle.margo'),
+  await readFile("packages/blender/tests/fixtures/triangle.margo"),
+  await readFile("packages/blender/tests/fixtures/compact-triangle.margo"),
 ];
 if (process.env.MARGO_BLENDER) {
-  execFileSync(findPython(), ['tools/blender-addon/package_addon.py'], { stdio: 'inherit' });
+  execFileSync(findPython(), ["tools/blender-addon/package_addon.py"], {
+    stdio: "inherit",
+  });
   execFileSync(
     process.env.MARGO_BLENDER,
     [
-      '--background',
-      '--factory-startup',
-      '--python-exit-code',
-      '1',
-      '--python',
-      'tools/blender-addon/tests/blender_install.py',
-      '--',
-      'dist/margo-blender-addon-v1.0.0.zip',
+      "--background",
+      "--factory-startup",
+      "--python-exit-code",
+      "1",
+      "--python",
+      "tools/blender-addon/tests/blender_install.py",
+      "--",
+      "dist/margo-blender-addon-v1.0.0.zip",
     ],
     {
-      stdio: 'inherit',
-      env: { ...process.env, BLENDER_USER_RESOURCES: resolve('test-results/blender/install-profile') },
+      stdio: "inherit",
+      env: {
+        ...process.env,
+        BLENDER_USER_RESOURCES: resolve("test-results/blender/install-profile"),
+      },
     },
   );
   execFileSync(
     process.env.MARGO_BLENDER,
     [
-      '--background',
-      '--factory-startup',
-      '--python-exit-code',
-      '1',
-      '--python',
-      'tools/blender-addon/tests/blender_roundtrip.py',
-      '--',
-      'test-results/blender',
+      "--background",
+      "--factory-startup",
+      "--python-exit-code",
+      "1",
+      "--python",
+      "tools/blender-addon/tests/blender_roundtrip.py",
+      "--",
+      "test-results/blender",
     ],
-    { stdio: 'inherit' },
+    { stdio: "inherit" },
   );
-  const exported = await readFile('test-results/blender/blender.margo'),
+  execFileSync(
+    process.env.MARGO_BLENDER,
+    [
+      "--background",
+      "--factory-startup",
+      "--python-exit-code",
+      "1",
+      "--python",
+      "tools/blender-addon/tests/blender_anim.py",
+      "--",
+      "test-results/blender/anim",
+    ],
+    { stdio: "inherit" },
+  );
+  const { margoToGLTF } = await import("../packages/blender/dist/anim.js");
+  assert.deepEqual(
+    margoToGLTF(await readFile("test-results/blender/anim/anim.margo"))
+      .document.animations.map((a) => a.name)
+      .sort(),
+    ["Bend", "Breathe", "Twist"],
+    "Blender armature, NLA and shape-key actions must export as three clips",
+  );
+  const exported = await readFile("test-results/blender/blender.margo"),
     asset = decodeMargo(exported);
-  assert.equal(asset.document.meshes.length, 1, 'Identical Blender meshes must share packed geometry');
-  assert.equal(asset.document.nodes.length, 2);
-  const mirrored = asset.document.nodes.find((n) => n.name === 'Mirrored');
-  assert.ok(mirrored.scale.reduce((a, b) => a * b, 1) < 0, 'Mirrored transform lost its determinant');
   assert.equal(
-    asset.document.nodes.find((n) => n.name === 'Triangle').extras.margo.properties['margo:shadow_caster'],
+    asset.document.meshes.length,
+    1,
+    "Identical Blender meshes must share packed geometry",
+  );
+  assert.equal(asset.document.nodes.length, 2);
+  const mirrored = asset.document.nodes.find((n) => n.name === "Mirrored");
+  assert.ok(
+    mirrored.scale.reduce((a, b) => a * b, 1) < 0,
+    "Mirrored transform lost its determinant",
+  );
+  assert.equal(
+    asset.document.nodes.find((n) => n.name === "Triangle").extras.margo
+      .properties["margo:shadow_caster"],
     true,
   );
   assert.deepEqual(
-    asset.document.nodes.find((n) => n.name === 'Triangle').extras.margo.properties['margo:lod_dist'],
+    asset.document.nodes.find((n) => n.name === "Triangle").extras.margo
+      .properties["margo:lod_dist"],
     [15, 45, 90],
   );
   const png = await decodePNG(asset.images[0]),
-    expected = await decodePNG(await readFile('test-results/blender/texture.png'));
-  assert.deepEqual(png.data, expected.data, 'Blender changed source texture color/alpha or orientation');
-  const native = await readFile('test-results/blender/native.glb'),
+    expected = await decodePNG(
+      await readFile("test-results/blender/texture.png"),
+    );
+  assert.deepEqual(
+    png.data,
+    expected.data,
+    "Blender changed source texture color/alpha or orientation",
+  );
+  const native = await readFile("test-results/blender/native.glb"),
     jsonLength = native.readUInt32LE(12),
     document = JSON.parse(native.subarray(20, 20 + jsonLength).toString()),
     binary = native.subarray(28 + jsonLength);
   const gltf = new GLTFAsset(document, [binary]),
     attributes = document.meshes[0].primitives[0].attributes;
-  const positions = gltf.accessor(attributes.POSITION, 'VEC3'),
-    normals = gltf.accessor(attributes.NORMAL, 'VEC3'),
-    tangents = gltf.accessor(attributes.TANGENT, 'VEC4'),
-    uv = gltf.accessor(attributes.TEXCOORD_0, 'VEC2');
+  const positions = gltf.accessor(attributes.POSITION, "VEC3"),
+    normals = gltf.accessor(attributes.NORMAL, "VEC3"),
+    tangents = gltf.accessor(attributes.TANGENT, "VEC4"),
+    uv = gltf.accessor(attributes.TEXCOORD_0, "VEC2");
   const packed = asset.geometry[0][0].vertices;
   for (let i = 0; i < packed.length / 20; i++) {
-    const match = Array.from({ length: positions.length / 3 }, (_, j) => j).find((j) =>
-      [0, 1, 2].every((c) => Math.abs(positions[j * 3 + c] - packed[i * 20 + c]) < 1e-5),
+    const match = Array.from(
+      { length: positions.length / 3 },
+      (_, j) => j,
+    ).find((j) =>
+      [0, 1, 2].every(
+        (c) => Math.abs(positions[j * 3 + c] - packed[i * 20 + c]) < 1e-5,
+      ),
     );
-    assert.notEqual(match, undefined, 'Position differs from Blender glTF export');
+    assert.notEqual(
+      match,
+      undefined,
+      "Position differs from Blender glTF export",
+    );
     for (let c = 0; c < 3; c++)
       assert.ok(
         Math.abs(normals[match * 3 + c] - packed[i * 20 + 4 + c]) < 1e-5,
-        'Normal differs from Blender glTF export',
+        "Normal differs from Blender glTF export",
       );
     for (let c = 0; c < 4; c++)
       assert.ok(
         Math.abs(tangents[match * 4 + c] - packed[i * 20 + 8 + c]) < 1e-5,
-        'Tangent differs from Blender glTF export',
+        "Tangent differs from Blender glTF export",
       );
     for (let c = 0; c < 2; c++)
-      assert.ok(Math.abs(uv[match * 2 + c] - packed[i * 20 + 12 + c]) < 1e-5, 'UV differs from Blender glTF export');
+      assert.ok(
+        Math.abs(uv[match * 2 + c] - packed[i * 20 + 12 + c]) < 1e-5,
+        "UV differs from Blender glTF export",
+      );
   }
-  const modified = decodeMargo(await readFile('test-results/blender/modifier.margo'));
+  const modified = decodeMargo(
+    await readFile("test-results/blender/modifier.margo"),
+  );
   assert.ok(
     modified.geometry.some((parts) => parts[0].indices.length > 3),
-    'Export ignored evaluated modifiers',
+    "Export ignored evaluated modifiers",
   );
-  const instanced = decodeMargo(await readFile('test-results/blender/instances.margo'));
-  assert.equal(instanced.document.nodes.length, 3, 'Collection prototype absent from scene was not exported');
-  assert.deepEqual(instanced.document.nodes.find((n) => n.name === 'Prototype').translation, [0, -2, 0]);
-  const centimeters = decodeMargo(await readFile('test-results/blender/centimeters.margo'));
+  const instanced = decodeMargo(
+    await readFile("test-results/blender/instances.margo"),
+  );
+  assert.equal(
+    instanced.document.nodes.length,
+    3,
+    "Collection prototype absent from scene was not exported",
+  );
+  assert.deepEqual(
+    instanced.document.nodes.find((n) => n.name === "Prototype").translation,
+    [0, -2, 0],
+  );
+  const centimeters = decodeMargo(
+    await readFile("test-results/blender/centimeters.margo"),
+  );
   assert.ok(
     Math.abs(centimeters.geometry[0][0].vertices[0] + 0.006) < 1e-7,
-    'Geometry units were not converted to meters',
+    "Geometry units were not converted to meters",
   );
   assert.ok(
-    Math.abs(centimeters.document.nodes.find((n) => n.name === 'Mirrored').translation[0] - 0.02) < 1e-7,
-    'Transform units were not converted to meters',
+    Math.abs(
+      centimeters.document.nodes.find((n) => n.name === "Mirrored")
+        .translation[0] - 0.02,
+    ) < 1e-7,
+    "Transform units were not converted to meters",
   );
-  const compact = decodeMargo(await readFile('test-results/blender/compact-instances.margo'));
+  const compact = decodeMargo(
+    await readFile("test-results/blender/compact-instances.margo"),
+  );
   assert.equal(compact.document.nodes.length, 100);
   assert.equal(compact.geometry.length, 1);
   assert.equal(compact.geometry[0][0].vertices.length, 60);
-  const overrides = decodeMargo(await readFile('test-results/blender/compact-overrides.margo'));
+  const overrides = decodeMargo(
+    await readFile("test-results/blender/compact-overrides.margo"),
+  );
   assert.equal(overrides.geometry.length, 2);
   fixtures.push(exported);
 }
 const demo = await build({
   configFile: false,
-  logLevel: 'silent',
-  build: { write: false, rollupOptions: { input: 'examples/blender-loader/index.html' } },
+  logLevel: "silent",
+  build: {
+    write: false,
+    rollupOptions: { input: "examples/blender-loader/index.html" },
+  },
 });
 assert.ok(
-  demo.output.some((c) => c.type === 'chunk' && c.isEntry),
-  'Blender viewer build failed',
+  demo.output.some((c) => c.type === "chunk" && c.isEntry),
+  "Blender viewer build failed",
 );
-const browser = await openBrowser({ startPath: '/tests/modern-extension.html' }),
+const browser = await openBrowser({
+    startPath: "/tests/modern-extension.html",
+  }),
   { page, hardware } = browser,
   errors = [];
-page.on('pageerror', (e) => errors.push(e.message));
-page.on('console', (m) => {
-  if (m.type() === 'error') errors.push(m.text());
+page.on("pageerror", (e) => errors.push(e.message));
+page.on("console", (m) => {
+  if (m.type() === "error") errors.push(m.text());
 });
 try {
   for (let i = 0; i < fixtures.length; i++)
-    await page.route('**/fixture-' + i + '.margo', (route) =>
-      route.fulfill({ body: fixtures[i], contentType: 'application/octet-stream' }),
+    await page.route("**/fixture-" + i + ".margo", (route) =>
+      route.fulfill({
+        body: fixtures[i],
+        contentType: "application/octet-stream",
+      }),
     );
   const results = await page.evaluate(async (count) => {
-    const { Engine } = await import('/packages/core/dist/index.js');
-    const { createStage } = await import('/packages/stage/dist/index.js');
-    const { decodeMargo, loadMargo, parseMargo } = await import('/packages/blender/dist/index.js');
-    const { Shadows } = await import('/packages/shadows/dist/index.js');
-    const { SSAO } = await import('/packages/post/dist/index.js');
+    const { Engine } = await import("/packages/core/dist/index.js");
+    const { createStage } = await import("/packages/stage/dist/index.js");
+    const { decodeMargo, loadMargo, parseMargo } =
+      await import("/packages/blender/dist/index.js");
+    const { Shadows } = await import("/packages/shadows/dist/index.js");
+    const { SSAO } = await import("/packages/post/dist/index.js");
     const assert = (ok, message) => {
       if (!ok) throw new Error(message);
     };
     const results = [];
     for (let i = 0; i < count; i++) {
-      const canvas = document.createElement('canvas');
-      canvas.style.cssText = 'width:256px;height:256px';
+      const canvas = document.createElement("canvas");
+      canvas.style.cssText = "width:256px;height:256px";
       document.body.append(canvas);
       const engine = await Engine.create(canvas, {
-        backend: 'webgpu',
+        backend: "webgpu",
         capacity: 16,
         camera: { position: [0, 0, 3], target: [0, 0, 0] },
       });
       const device = engine.gpu;
-      device.pushErrorScope('validation');
-      const model = await loadMargo(engine, '/fixture-' + i + '.margo');
-      assert(model.nodes.length === 2 && model.primitives.length === 2, 'Missing scene instances');
-      assert(model.primitives[0].vertices === model.primitives[1].vertices, 'Geometry was repacked per instance');
+      device.pushErrorScope("validation");
+      const model = await loadMargo(engine, "/fixture-" + i + ".margo");
+      assert(
+        model.nodes.length === 2 && model.primitives.length === 2,
+        "Missing scene instances",
+      );
+      assert(
+        model.primitives[0].vertices === model.primitives[1].vertices,
+        "Geometry was repacked per instance",
+      );
       const p = model.primitives[0],
         first = p.vertices[0];
-      assert(first < -0.59 && first > -0.61, 'Packed geometry changed');
+      assert(first < -0.59 && first > -0.61, "Packed geometry changed");
       const shadows = Shadows.attach(engine, { resolution: 64, distance: 10 });
       shadows.add(model);
       const ssao = SSAO.attach(engine, { samples: 4 });
@@ -173,48 +262,65 @@ try {
       engine.render({ culling: false });
       await device.queue.onSubmittedWorkDone();
       // Two nodes on one geometry merge into one static batch, so one draw and one shadow record.
-      assert(engine.stats.drawCalls === 1, 'Packed model did not draw as one batch');
-      assert(model.shadowPrimitives.length === 1, 'The two nodes were not merged');
+      assert(
+        engine.stats.drawCalls === 1,
+        "Packed model did not draw as one batch",
+      );
+      assert(
+        model.shadowPrimitives.length === 1,
+        "The two nodes were not merged",
+      );
       const validation = await device.popErrorScope();
       assert(!validation, validation?.message);
       window.margoCanvas = canvas;
       const screenshot = canvas.toDataURL();
       await engine.rebootDevice();
-      engine.gpu.pushErrorScope('validation');
+      engine.gpu.pushErrorScope("validation");
       engine.render({ culling: false });
       await engine.gpu.queue.onSubmittedWorkDone();
       const restored = await engine.gpu.popErrorScope();
       assert(!restored, restored?.message);
-      assert(p.vertices[0] === first, 'Device restoration lost CPU geometry');
+      assert(p.vertices[0] === first, "Device restoration lost CPU geometry");
       model.destroy();
-      assert(engine.meshes.size === 0, 'Model destruction leaked handles');
+      assert(engine.meshes.size === 0, "Model destruction leaked handles");
       shadows.destroy();
       ssao.destroy();
       engine.dispose();
       canvas.remove();
       results.push({ instances: model.primitives.length, screenshot });
     }
-    const canvas = document.createElement('canvas');
-    canvas.style.cssText = 'width:256px;height:256px';
+    const canvas = document.createElement("canvas");
+    canvas.style.cssText = "width:256px;height:256px";
     document.body.append(canvas);
-    const small = await Engine.create(canvas, { backend: 'webgpu', capacity: 1 });
-    const bytes = await (await fetch('/fixture-0.margo')).arrayBuffer();
+    const small = await Engine.create(canvas, {
+      backend: "webgpu",
+      capacity: 1,
+    });
+    const bytes = await (await fetch("/fixture-0.margo")).arrayBuffer();
     let failed = false;
     small.store.grow = () => {
-      throw new Error('Transform allocation');
+      throw new Error("Transform allocation");
     };
     try {
       await parseMargo(small, bytes);
     } catch (error) {
       failed = /Transform allocation/.test(error.message);
     }
-    assert(failed && small.meshes.size === 0, 'Capacity failure did not roll back');
+    assert(
+      failed && small.meshes.size === 0,
+      "Capacity failure did not roll back",
+    );
     small.dispose();
     canvas.remove();
-    const container = document.createElement('div');
-    container.style.cssText = 'width:256px;height:256px';
+    const container = document.createElement("div");
+    container.style.cssText = "width:256px;height:256px";
     document.body.append(container);
-    const stage = await createStage(container, { backend: 'webgpu', capacity: 16, controls: false, autoStart: false });
+    const stage = await createStage(container, {
+      backend: "webgpu",
+      capacity: 16,
+      controls: false,
+      autoStart: false,
+    });
     const device = stage.engine.gpu,
       createBuffer = device.createBuffer,
       allocated = [];
@@ -231,69 +337,196 @@ try {
     };
     let mounted;
     try {
-      mounted = await loadMargo(stage.engine, '/fixture-0.margo');
+      mounted = await loadMargo(stage.engine, "/fixture-0.margo");
     } finally {
       device.createBuffer = createBuffer;
     }
     // The geometry once (vertices, indices), the uniform ring, and the static batch the two nodes merge into.
     assert(
-      allocated.map((r) => r.buffer.size).join(' ') === '240 12 65536 480 24',
-      'Expected one shared vertex/index buffer, one uniform ring and one merged batch',
+      allocated.map((r) => r.buffer.size).join(" ") === "240 12 65536 480 24",
+      "Expected one shared vertex/index buffer, one uniform ring and one merged batch",
     );
     assert(
       allocated.every((record) => record.destroys === 0),
-      'Model buffers were destroyed before unmount',
+      "Model buffers were destroyed before unmount",
     );
     stage.dispose();
     stage.dispose();
     assert(
       allocated.every((record) => record.destroys === 1),
-      'Stage disposal did not destroy every model buffer exactly once',
+      "Stage disposal did not destroy every model buffer exactly once",
     );
     assert(
-      stage.engine.meshes.size === 0 && !container.querySelector('canvas'),
-      'Stage disposal leaked handles or owned canvas',
+      stage.engine.meshes.size === 0 && !container.querySelector("canvas"),
+      "Stage disposal leaked handles or owned canvas",
     );
     mounted.destroy();
     assert(
       allocated.every((record) => record.destroys === 1),
-      'Model cleanup after unmount destroyed buffers twice',
+      "Model cleanup after unmount destroyed buffers twice",
     );
     container.remove();
     results[0].stageCleanupBuffers = allocated.length;
     const asset = decodeMargo(bytes);
-    assert(asset.geometry[0][0].vertices.buffer === bytes, 'Decoder copied geometry');
+    assert(
+      asset.geometry[0][0].vertices.buffer === bytes,
+      "Decoder copied geometry",
+    );
     return results;
   }, fixtures.length);
+  // Animated .margo (real Blender 5.2.3 export): glTF Pro draws it and Animation's GPU skinning and morphs reach
+  // Blender's own deformed vertices.
+  const animTruth = JSON.parse(
+    await readFile("packages/blender/tests/fixtures/anim-truth.json", "utf8"),
+  );
+  await page.route("**/anim.margo", async (route) =>
+    route.fulfill({
+      body: await readFile("packages/blender/tests/fixtures/anim.margo"),
+      contentType: "application/octet-stream",
+    }),
+  );
+  const animated = await page.evaluate(async (truth) => {
+    const { Engine } = await import("/packages/core/dist/index.js");
+    const { loadAnimatedMargo } =
+      await import("/packages/blender/dist/anim.js");
+    const { Animation } = await import("/packages/animation/dist/index.js");
+    const canvas = document.createElement("canvas");
+    canvas.style.cssText = "width:256px;height:256px";
+    document.body.append(canvas);
+    const engine = await Engine.create(canvas, {
+      backend: "webgpu",
+      capacity: 64,
+      camera: { position: [0, 2, 6], target: [0.5, 1, -2] },
+    });
+    engine.gpu.pushErrorScope("validation");
+    const model = await loadAnimatedMargo(engine, "/anim.margo"),
+      animation = Animation.attach(model, { loop: false }), // a looping clip shows its first frame at its end time
+      primitive = model.primitives.find((p) => p.deformed),
+      count = primitive.vertices.length / 20,
+      order = Array.from({ length: count }, (_, v) =>
+        truth.rest.findIndex((r) =>
+          r.every(
+            (x, d) => Math.abs(x - primitive.vertices[v * 20 + d]) < 2e-6,
+          ),
+        ),
+      );
+    let worst = 0,
+      compared = 0;
+    const clips = {};
+    for (const [name, frames] of Object.entries(truth.clips))
+      for (const seconds of Object.keys(frames).filter(
+        (_, i, all) => i % 3 === 0 || i === all.length - 1,
+      )) {
+        animation.play(name);
+        animation.playing = false;
+        animation.seek(Number(seconds));
+        engine.render({ culling: false });
+        const copy = engine.gpu.createBuffer({
+            size: primitive.vertices.byteLength,
+            usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+          }),
+          encoder = engine.gpu.createCommandEncoder();
+        encoder.copyBufferToBuffer(
+          primitive.deformed,
+          primitive.deformedOffset ?? 0,
+          copy,
+          0,
+          copy.size,
+        );
+        engine.gpu.queue.submit([encoder.finish()]);
+        await copy.mapAsync(GPUMapMode.READ);
+        const out = new Float32Array(copy.getMappedRange()).slice();
+        copy.destroy();
+        for (let v = 0; v < count; v++)
+          for (let d = 0; d < 3; d++) {
+            const difference = Math.abs(
+              out[v * 20 + d] - frames[seconds][order[v]][d],
+            );
+            worst = Math.max(worst, difference);
+            clips[name] = Math.max(clips[name] ?? 0, difference);
+          }
+        compared += count;
+      }
+    const validation = await engine.gpu.popErrorScope();
+    animation.destroy();
+    model.destroy();
+    engine.dispose();
+    canvas.remove();
+    return {
+      worst,
+      clips,
+      compared,
+      matched: !order.includes(-1),
+      validation: validation?.message ?? null,
+    };
+  }, animTruth);
+  assert.ok(animated.matched, "Every animated vertex is a Blender vertex");
+  assert.equal(animated.validation, null);
+  assert.ok(animated.compared > 500, "Too few animated vertices compared");
+  assert.ok(
+    animated.worst < 1e-4,
+    `GPU skinning differs from Blender by ${JSON.stringify(animated.clips)} m`,
+  );
+  results.push({ animated });
   for (let i = 0; i < results.length; i++) {
-    const screenshot = Buffer.from(results[i].screenshot.split(',')[1], 'base64'),
+    if (results[i].animated) continue;
+    const screenshot = Buffer.from(
+        results[i].screenshot.split(",")[1],
+        "base64",
+      ),
       image = await decodePNG(screenshot);
     let colorful = 0;
     for (let p = 0; p < image.data.length; p += 4)
-      if (Math.max(...image.data.subarray(p, p + 3)) - Math.min(...image.data.subarray(p, p + 3)) > 30) colorful++;
-    assert.ok(colorful > 100, 'Textured .margo produced no colored pixels');
-    await writeFile('test-results/blender/render-' + i + '.png', screenshot);
+      if (
+        Math.max(...image.data.subarray(p, p + 3)) -
+          Math.min(...image.data.subarray(p, p + 3)) >
+        30
+      )
+        colorful++;
+    assert.ok(colorful > 100, "Textured .margo produced no colored pixels");
+    await writeFile("test-results/blender/render-" + i + ".png", screenshot);
     delete results[i].screenshot;
     results[i].colorfulPixels = colorful;
   }
-  await page.goto('http://127.0.0.1:5193/examples/blender-loader/index.html');
+  await page.goto("http://127.0.0.1:5193/examples/blender-loader/index.html");
   await page.waitForFunction(
-    () => !document.querySelector('#file').disabled && document.querySelector('canvas').width > 1,
+    () =>
+      !document.querySelector("#file").disabled &&
+      document.querySelector("canvas").width > 1,
   );
   await page
-    .locator('#file')
-    .setInputFiles({ name: 'fixture.margo', mimeType: 'application/octet-stream', buffer: fixtures[0] });
+    .locator("#file")
+    .setInputFiles({
+      name: "fixture.margo",
+      mimeType: "application/octet-stream",
+      buffer: fixtures[0],
+    });
   await page.waitForFunction(
-    () => document.querySelector('#status').textContent !== 'Choose a .margo file exported from Blender.',
+    () =>
+      document.querySelector("#status").textContent !==
+      "Choose a .margo file exported from Blender.",
   );
-  assert.match(await page.locator('#status').innerText(), /2 objects/);
-  await page.locator('#viewport').screenshot({ path: 'test-results/blender/viewer.png' });
+  assert.match(await page.locator("#status").innerText(), /2 objects/);
   await page
-    .locator('#file')
-    .setInputFiles({ name: 'invalid.margo', mimeType: 'application/octet-stream', buffer: Buffer.from('invalid') });
-  await page.waitForFunction(() => document.querySelector('#status').textContent.includes('Invalid .margo size'));
+    .locator("#viewport")
+    .screenshot({ path: "test-results/blender/viewer.png" });
+  await page
+    .locator("#file")
+    .setInputFiles({
+      name: "invalid.margo",
+      mimeType: "application/octet-stream",
+      buffer: Buffer.from("invalid"),
+    });
+  await page.waitForFunction(() =>
+    document
+      .querySelector("#status")
+      .textContent.includes("Invalid .margo size"),
+  );
   assert.deepEqual(errors, []);
-  await writeFile('test-results/modern-blender.json', JSON.stringify({ hardware, results }, null, 2));
+  await writeFile(
+    "test-results/modern-blender.json",
+    JSON.stringify({ hardware, results }, null, 2),
+  );
   console.log(JSON.stringify({ hardware, results }, null, 2));
 } finally {
   await browser.close();

@@ -10,7 +10,7 @@ manifest = tomllib.loads((root / "blender_manifest.toml").read_text(encoding="ut
 def package(destination):
     destination.parent.mkdir(parents=True, exist_ok=True)
     with ZipFile(destination, "w", ZIP_DEFLATED) as archive:
-        for name in ("blender_manifest.toml", "__init__.py", "exporter.py", "writer.py"):
+        for name in ("blender_manifest.toml", "__init__.py", "exporter.py", "animation.py", "writer.py"):
             archive.write(root / name, manifest["id"] + "/" + name)
         for name in ("LICENSE", "NOTICE"):
             archive.write(root.parents[1] / name, manifest["id"] + "/" + name)

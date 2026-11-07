@@ -258,6 +258,10 @@
       "types": "./dist/blender.d.ts",
       "import": "./dist/blender.js"
     },
+    "./blender/anim": {
+      "types": "./dist/blender/anim.d.ts",
+      "import": "./dist/blender/anim.js"
+    },
     "./bvh": {
       "types": "./dist/bvh.d.ts",
       "import": "./dist/bvh.js"

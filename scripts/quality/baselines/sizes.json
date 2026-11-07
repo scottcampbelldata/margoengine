@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10514585,
+  "total": 10519683,
   "history": [
     {
       "date": "2026-10-24",
@@ -3578,6 +3578,12 @@
       "commit": "83cb1da3f",
       "reason": "new optional entry @margoengine/weather/regions (WeatherRegions: fronts and drifting cells); nothing else grows",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "b1180f8b5",
+      "reason": "blender/anim: new optional entry reading animated .margo (skins, shape keys, clips) as glTF over the file; the root shares its container checks",
+      "grew": 2
     }
   ],
   "items": {
@@ -3637,6 +3643,7 @@
     "@margoengine/biomes/workers": 2878,
     "@margoengine/biomes/zones": 3875,
     "@margoengine/blender": 4000,
+    "@margoengine/blender/anim": 5097,
     "@margoengine/bvh": 23398,
     "@margoengine/bvh/alpha": 16873,
     "@margoengine/bvh/bake": 2583,
@@ -4302,6 +4309,7 @@
     "leak @margoengine/animation/pointer -> @margoengine/gltf-pro/model": 1,
     "leak @margoengine/animation/skeleton-utils -> @margoengine/gltf-pro/model": 1,
     "leak @margoengine/blender -> @margoengine/gltf-pro/model": 1,
+    "leak @margoengine/blender/anim -> @margoengine/gltf-pro/model": 1,
     "leak @margoengine/controls -> @margoengine/bvh": 1,
     "leak @margoengine/controls/drag -> @margoengine/bvh": 1,
     "leak @margoengine/controls/third-person -> @margoengine/bvh": 1,

@@ -207,6 +207,10 @@ const ASSETS = [
     'test fixture: what the Sismic 1.6.14 statechart interpreter (LGPL-3.0, https://github.com/AlexandreDecan/sismic) did with charts this repository generates; output of a tool run outside, no Sismic code is in this repository',
   ],
   [
+    'packages/blender/tests/fixtures/README.md',
+    'test fixtures: an animated .margo and its deformed vertices, exported for this project by Blender 5.2.3 LTS from tools/blender-addon/tests/blender_anim.py (Apache-2.0, as this repository)',
+  ],
+  [
     'packages/fbx/test/fixtures/README.md',
     'test fixtures: original FBX scenes exported for this project by Blender 5.3 from the scripts beside them (CC0 1.0)',
   ],

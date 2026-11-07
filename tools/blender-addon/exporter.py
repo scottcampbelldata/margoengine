@@ -7,6 +7,7 @@ import uuid
 import bpy
 import numpy as np
 from mathutils import Matrix, Vector
+from .animation import animated, export_animated
 from .writer import png, write
 
 
@@ -148,13 +149,141 @@ def export_scene(context, path):
         materials.append(result)
         return material_ids[key]
 
+    def pack(obj, mesh, slots, extra=None, rest=None):
+        """Corner-split, deduplicated primitives per material slot; `extra` adds per-loop columns kept with each vertex."""
+        mesh.calc_loop_triangles()
+        if not mesh.loop_triangles:
+            return None
+        if len(mesh.loop_triangles) > 1_000_000:
+            raise ValueError(f"Object '{obj.name}': too many triangles")
+        uv_layer = mesh.uv_layers.active
+        if uv_layer:
+            mesh.calc_tangents(uvmap=uv_layer.name)
+        stride = 24 if not uv_layer and not mesh.color_attributes else 80
+        triangle_loops = np.empty(len(mesh.loop_triangles) * 3, dtype=np.int32)
+        triangle_materials = np.empty(len(mesh.loop_triangles), dtype=np.int32)
+        loop_vertices = np.empty(len(mesh.loops), dtype=np.int32)
+        coordinates = np.empty(len(mesh.vertices) * 3, dtype=np.float32)
+        normals = np.empty(len(mesh.loops) * 3, dtype=np.float32)
+        mesh.loop_triangles.foreach_get("loops", triangle_loops)
+        mesh.loop_triangles.foreach_get("material_index", triangle_materials)
+        mesh.loops.foreach_get("vertex_index", loop_vertices)
+        mesh.vertices.foreach_get("co", coordinates)
+        if rest is not None:
+            coordinates = rest.copy()
+        mesh.loops.foreach_get("normal", normals)
+        coordinates = coordinates.reshape(-1, 3)[:, (0, 2, 1)]
+        coordinates[:, 2] *= -1
+        coordinates *= unit_scale
+        normals = normals.reshape(-1, 3)[:, (0, 2, 1)]
+        normals[:, 2] *= -1
+        # Imported tessellated meshes can carry invalid corner normals; export those as +Y.
+        with np.errstate(over="ignore", invalid="ignore"):
+            lengths = np.einsum("ij,ij->i", normals, normals)
+        valid = np.isfinite(normals).all(axis=1) & np.isfinite(lengths) & (lengths >= 1e-6)
+        normals[valid] /= np.sqrt(lengths[valid])[:, None]
+        normals[~valid] = (0, 1, 0)
+        values = np.zeros((len(mesh.loops), stride // 4), dtype="<f4")
+        values[:, :3] = coordinates[loop_vertices]
+        values[:, 3:6] = normals if stride == 24 else 0
+        if stride == 80:
+            values[:, 3] = 1
+            values[:, 4:7] = normals
+            values[:, 16:20] = 1
+            if uv_layer:
+                tangents = np.empty(len(mesh.loops) * 3, dtype=np.float32)
+                signs = np.empty(len(mesh.loops), dtype=np.float32)
+                uv = np.empty(len(mesh.loops) * 2, dtype=np.float32)
+                mesh.loops.foreach_get("tangent", tangents)
+                mesh.loops.foreach_get("bitangent_sign", signs)
+                uv_layer.data.foreach_get("uv", uv)
+                values[:, 8:11] = tangents.reshape(-1, 3)[:, (0, 2, 1)]
+                values[:, 10] *= -1
+                values[:, 11] = signs
+                values[:, 12:14] = uv.reshape(-1, 2)
+                values[:, 13] = 1 - values[:, 13]
+        if not np.isfinite(values).all():
+            raise ValueError(f"Object '{obj.name}': invalid vertex")
+        triangle_loops = triangle_loops.reshape(-1, 3)
+        columns = values if extra is None else np.concatenate([values, extra], axis=1)
+        width = columns.shape[1] * 4
+        primitives = []
+        for slot in np.unique(triangle_materials):
+            corners = columns[triangle_loops[triangle_materials == slot].ravel()]
+            _, first, inverse = np.unique(corners.view(f"V{width}").ravel(), return_index=True, return_inverse=True)
+            order = np.argsort(first)
+            remap = np.empty(len(first), dtype="<u4")
+            remap[order] = np.arange(len(first), dtype=np.uint32)
+            unique = corners[first[order]]
+            vertices = np.ascontiguousarray(unique[:, :stride // 4])
+            mat = slots[slot] if slot < len(slots) else None
+            mid = material_id(mat)
+            if materials[mid].get("pbrMetallicRoughness", {}).get("baseColorTexture") or materials[mid].get("normalTexture") or materials[mid].get("emissiveTexture"):
+                if not uv_layer:
+                    raise ValueError(f"Object '{obj.name}': textured material requires an active UV map")
+            bounds = vertices[:, :3].min(axis=0).tolist() + vertices[:, :3].max(axis=0).tolist()
+            primitives.append({"vertices": vertices.tobytes(), "indices": remap[inverse].tobytes(), "material": mid, "stride": stride, "bounds": bounds})
+            if extra is not None:
+                primitives[-1]["extra"] = unique[:, stride // 4:]
+        return primitives
+
     depsgraph = context.evaluated_depsgraph_get()
     unit_scale = context.scene.unit_settings.scale_length
     inverse_basis = basis.inverted()
+    def convert(matrix):
+        """A Blender world-space matrix in Margo's Y-up metres."""
+        result = basis @ matrix @ inverse_basis
+        result.translation *= unit_scale
+        return result
+
+    class NodeOf:
+        """Appends one node per call: TRS from a converted matrix, asset ID and `margo:` properties."""
+
+        def __init__(self):
+            self.nodes, self.meshes, self.convert = nodes, {}, convert
+
+        def __call__(self, obj, bone, world, mesh=None, instance=""):
+            translation, rotation, scale = world.decompose()
+            rebuilt = Matrix.LocRotScale(translation, rotation, scale)
+            label = f"Bone '{bone.name}' of '{obj.name}'" if bone else f"Object '{obj.name}'"
+            if any(abs(world[r][c] - rebuilt[r][c]) > 1e-4 * max(1, abs(world[r][c])) for r in range(4) for c in range(4)) or any(abs(v) < 1e-8 for v in scale):
+                raise ValueError(f"{label}: shear/singular transforms must be applied before export")
+            identity = f"{obj.library.filepath if obj.library else ''}:{obj.name_full}:{instance}" + (f":{bone.name}" if bone else "")
+            node = {"name": bone.name if bone else obj.name_full}
+            if mesh is not None:
+                node["mesh"] = mesh
+            node.update({"translation": list(translation), "rotation": [rotation.x, rotation.y, rotation.z, rotation.w], "scale": list(scale), "extras": {"margo": {"id": str(uuid.uuid5(uuid.NAMESPACE_URL, identity)), "properties": {} if bone else properties(obj)}}})
+            node["id"] = len(nodes)
+            nodes.append(node)
+            return node
+
+    def properties(obj):
+        result = {}
+        for key in obj.keys():
+            if not key.startswith("margo:"):
+                continue
+            value = obj[key]
+            if hasattr(value, "to_list"):
+                value = value.to_list()
+            if isinstance(value, list):
+                if len(value) > 32 or not all(isinstance(v, (int, float)) and math.isfinite(v) for v in value):
+                    raise ValueError(f"Object '{obj.name}': '{key}' requires at most 32 finite numbers")
+            elif not isinstance(value, (str, bool, int, float)) or isinstance(value, (int, float)) and not math.isfinite(value):
+                raise ValueError(f"Object '{obj.name}': unsupported custom property '{key}'")
+            result[key] = value
+        return result
+
+    node_of = NodeOf()
+    moving = []
     for instance in depsgraph.object_instances:
         obj = instance.object
         visible = instance.parent.original if instance.is_instance and instance.parent else obj.original
         if obj.type != "MESH" or not instance.show_self or not visible.visible_get(view_layer=context.view_layer):
+            continue
+        if animated(obj.original):
+            if instance.is_instance:
+                raise ValueError(f"Object '{obj.name}': animated meshes cannot be instanced; make the instance real")
+            moving.append(obj.original)
             continue
         slots = tuple(slot.material for slot in obj.material_slots)
         cache_key = (obj.data.name, tuple(mat.as_pointer() if mat else None for mat in slots))
@@ -165,73 +294,9 @@ def export_scene(context, path):
         if mesh_index is None:
             mesh = obj.to_mesh(preserve_all_data_layers=True, depsgraph=depsgraph)
             try:
-                mesh.calc_loop_triangles()
-                if not mesh.loop_triangles:
+                primitives = pack(obj, mesh, slots)
+                if primitives is None:
                     continue
-                if len(mesh.loop_triangles) > 1_000_000:
-                    raise ValueError(f"Object '{obj.name}': too many triangles")
-                uv_layer = mesh.uv_layers.active
-                if uv_layer:
-                    mesh.calc_tangents(uvmap=uv_layer.name)
-                stride = 24 if not uv_layer and not mesh.color_attributes else 80
-                triangle_loops = np.empty(len(mesh.loop_triangles) * 3, dtype=np.int32)
-                triangle_materials = np.empty(len(mesh.loop_triangles), dtype=np.int32)
-                loop_vertices = np.empty(len(mesh.loops), dtype=np.int32)
-                coordinates = np.empty(len(mesh.vertices) * 3, dtype=np.float32)
-                normals = np.empty(len(mesh.loops) * 3, dtype=np.float32)
-                mesh.loop_triangles.foreach_get("loops", triangle_loops)
-                mesh.loop_triangles.foreach_get("material_index", triangle_materials)
-                mesh.loops.foreach_get("vertex_index", loop_vertices)
-                mesh.vertices.foreach_get("co", coordinates)
-                mesh.loops.foreach_get("normal", normals)
-                coordinates = coordinates.reshape(-1, 3)[:, (0, 2, 1)]
-                coordinates[:, 2] *= -1
-                coordinates *= unit_scale
-                normals = normals.reshape(-1, 3)[:, (0, 2, 1)]
-                normals[:, 2] *= -1
-                # Imported tessellated meshes can carry invalid corner normals; export those as +Y.
-                with np.errstate(over="ignore", invalid="ignore"):
-                    lengths = np.einsum("ij,ij->i", normals, normals)
-                valid = np.isfinite(normals).all(axis=1) & np.isfinite(lengths) & (lengths >= 1e-6)
-                normals[valid] /= np.sqrt(lengths[valid])[:, None]
-                normals[~valid] = (0, 1, 0)
-                values = np.zeros((len(mesh.loops), stride // 4), dtype="<f4")
-                values[:, :3] = coordinates[loop_vertices]
-                values[:, 3:6] = normals if stride == 24 else 0
-                if stride == 80:
-                    values[:, 3] = 1
-                    values[:, 4:7] = normals
-                    values[:, 16:20] = 1
-                    if uv_layer:
-                        tangents = np.empty(len(mesh.loops) * 3, dtype=np.float32)
-                        signs = np.empty(len(mesh.loops), dtype=np.float32)
-                        uv = np.empty(len(mesh.loops) * 2, dtype=np.float32)
-                        mesh.loops.foreach_get("tangent", tangents)
-                        mesh.loops.foreach_get("bitangent_sign", signs)
-                        uv_layer.data.foreach_get("uv", uv)
-                        values[:, 8:11] = tangents.reshape(-1, 3)[:, (0, 2, 1)]
-                        values[:, 10] *= -1
-                        values[:, 11] = signs
-                        values[:, 12:14] = uv.reshape(-1, 2)
-                        values[:, 13] = 1 - values[:, 13]
-                if not np.isfinite(values).all():
-                    raise ValueError(f"Object '{obj.name}': invalid vertex")
-                triangle_loops = triangle_loops.reshape(-1, 3)
-                primitives = []
-                for slot in np.unique(triangle_materials):
-                    corners = values[triangle_loops[triangle_materials == slot].ravel()]
-                    _, first, inverse = np.unique(corners.view(f"V{stride}").ravel(), return_index=True, return_inverse=True)
-                    order = np.argsort(first)
-                    remap = np.empty(len(first), dtype="<u4")
-                    remap[order] = np.arange(len(first), dtype=np.uint32)
-                    vertices = corners[first[order]]
-                    mat = slots[slot] if slot < len(slots) else None
-                    mid = material_id(mat)
-                    if materials[mid].get("pbrMetallicRoughness", {}).get("baseColorTexture") or materials[mid].get("normalTexture") or materials[mid].get("emissiveTexture"):
-                        if not uv_layer:
-                            raise ValueError(f"Object '{obj.name}': textured material requires an active UV map")
-                    bounds = vertices[:, :3].min(axis=0).tolist() + vertices[:, :3].max(axis=0).tolist()
-                    primitives.append({"vertices": vertices.tobytes(), "indices": remap[inverse].tobytes(), "material": mid, "stride": stride, "bounds": bounds})
                 digest = tuple((hashlib.sha256(p["vertices"] + p["indices"]).digest(), p["material"], p["stride"]) for p in primitives)
                 if digest not in mesh_ids:
                     mesh_ids[digest] = len(geometry)
@@ -240,30 +305,18 @@ def export_scene(context, path):
                 cached[data_key] = mesh_index
             finally:
                 obj.to_mesh_clear()
-        world = basis @ instance.matrix_world @ inverse_basis
-        world.translation *= unit_scale
-        translation, rotation, scale = world.decompose()
-        rebuilt = Matrix.LocRotScale(translation, rotation, scale)
-        if any(abs(world[r][c] - rebuilt[r][c]) > 1e-4 * max(1, abs(world[r][c])) for r in range(4) for c in range(4)) or any(abs(v) < 1e-8 for v in scale):
-            raise ValueError(f"Object '{obj.name}': shear/singular transforms must be applied before export")
-        identity = f"{obj.original.library.filepath if obj.original.library else ''}:{obj.original.name_full}:{tuple(instance.persistent_id) if instance.is_instance else ''}"
-        properties = {}
-        for key in obj.original.keys():
-            if not key.startswith("margo:"):
-                continue
-            value = obj.original[key]
-            if hasattr(value, "to_list"):
-                value = value.to_list()
-            if isinstance(value, list):
-                if len(value) > 32 or not all(isinstance(v, (int, float)) and math.isfinite(v) for v in value):
-                    raise ValueError(f"Object '{obj.name}': '{key}' requires at most 32 finite numbers")
-            elif not isinstance(value, (str, bool, int, float)) or isinstance(value, (int, float)) and not math.isfinite(value):
-                raise ValueError(f"Object '{obj.name}': unsupported custom property '{key}'")
-            properties[key] = value
-        nodes.append({"name": obj.original.name_full, "mesh": mesh_index, "translation": list(translation), "rotation": [rotation.x, rotation.y, rotation.z, rotation.w], "scale": list(scale), "extras": {"margo": {"id": str(uuid.uuid5(uuid.NAMESPACE_URL, identity)), "properties": properties}}})
+        node_of(obj.original, None, convert(instance.matrix_world), mesh=mesh_index, instance=tuple(instance.persistent_id) if instance.is_instance else "")
+    roots = [node["id"] for node in nodes]
+    fields, animation = {}, b""
+    if moving:
+        animated_roots, fields, animation = export_animated(context, moving, pack, convert, node_of, geometry)
+        roots += animated_roots
+    for node in nodes:
+        del node["id"]
     if not nodes:
         raise ValueError("No visible mesh triangles to export")
     if len(nodes) > 100_000:
         raise ValueError("Too many exported objects")
-    document = {"nodes": nodes, "materials": materials, "textures": textures, "samplers": samplers, "scenes": [{"nodes": list(range(len(nodes)))}], "scene": 0}
-    return write(path, document, geometry, images)
+    meshes = [node_of.meshes.get(i, {}) for i in range(len(geometry))]
+    document = {"nodes": nodes, "meshes": meshes, "materials": materials, "textures": textures, "samplers": samplers, "scenes": [{"nodes": roots}], "scene": 0, **fields}
+    return write(path, document, geometry, images, animation)

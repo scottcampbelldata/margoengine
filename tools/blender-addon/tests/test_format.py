@@ -126,6 +126,24 @@ class FormatTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             format.encode(document, geometry, images)
 
+    def test_animation_section_sets_the_header_flag(self):
+        document, geometry, images = fixture()
+        document = dict(document, bufferViews=[{"section": "data", "byteOffset": 0, "byteLength": 8}],
+                        accessors=[{"bufferView": 0, "componentType": 5126, "count": 2, "type": "SCALAR"}])
+        data = format.encode(document, geometry, images, b"\0" * 8)
+        flags = struct.unpack_from("<I", data, 20)[0]
+        count = struct.unpack_from("<I", data, 12)[0]
+        table = [struct.unpack_from("<4I", data, 64 + 16 * i) for i in range(count)]
+        manifest = json.loads(data[table[0][1]:table[0][1] + table[0][2]])
+        self.assertEqual(flags, 1)
+        self.assertEqual(table[-1][0], 5)
+        self.assertEqual(manifest["bufferViews"][0]["section"], count - 1)
+        self.assertEqual(format.encode(*fixture())[20], 0)
+        with self.assertRaisesRegex(ValueError, "without a data section"):
+            format.encode(document, geometry, images)
+        with self.assertRaisesRegex(ValueError, "outside the data section"):
+            format.encode(document, geometry, images, b"\0" * 4)
+
     def test_png_pixels_roundtrip(self):
         rgba = bytes((230, 40, 20, 255, 40, 230, 20, 255, 20, 40, 230, 255, 230, 230, 20, 255))
         data = format.png(2, 2, rgba)

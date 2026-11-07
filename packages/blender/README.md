@@ -61,7 +61,28 @@ The exporter uses Blender native bulk reads and bundled NumPy, with Python 3.11+
 
 Supported materials: direct Principled BSDF; constant metallic/roughness; constant or direct sRGB image base color and emission; tangent-space Non-Color normal maps; constant alpha or the base image's alpha; active UV map; repeat/clamp wrapping and linear/nearest filtering. Embedded images use RGBA8 PNG. Each image is limited to 4096 × 4096, all decoded images to 256 MiB, the file to 256 MiB, and the manifest to 1 MiB. Export writes atomically, so a failed export preserves an existing asset.
 
-Unsupported inputs fail by material/object name: procedural node graphs, textured metallic/roughness, transmission, variable IOR, coat, sheen, subsurface, HDR textures/emission, custom texture mappings, and animation. Geometry Nodes mesh outputs/mesh instances are evaluated; curves, points and volumes must be converted to meshes first. Node graph baking, live link, skeletal animation and automatic gameplay registration are subsequent milestones. Emission stays separate from optional tone mapping.
+Unsupported inputs fail by material/object name: procedural node graphs, textured metallic/roughness, transmission, variable IOR, coat, sheen, subsurface, HDR textures/emission and custom texture mappings. Geometry Nodes mesh outputs/mesh instances are evaluated; curves, points and volumes must be converted to meshes first. Node graph baking, live link and automatic gameplay registration are subsequent milestones. Emission stays separate from optional tone mapping.
+
+## Characters: armatures, skins, shape keys and actions
+
+A mesh with an Armature modifier or shape keys exports as an animated `.margo`: the armature's bones become joint nodes, vertex groups of deform bones become up to eight normalised influences per vertex, shape keys become morph targets, and each action (the active one, NLA strips' and the shape keys') becomes a clip sampled at every frame. Load it with the `anim` entry and play it with `@margoengine/animation`:
+
+```ts
+import {Engine} from 'margoengine/core';
+import {loadAnimatedMargo} from 'margoengine/blender/anim';
+import {Animation} from 'margoengine/animation';
+const canvas = document.querySelector<HTMLCanvasElement>('canvas')!;
+const engine = await Engine.create(canvas, {backend:'webgpu'});
+const hero = await loadAnimatedMargo(engine, '/anim.margo'); // the test rig in tests/fixtures
+const animation = Animation.attach(hero);
+animation.play('Bend'); // the Blender action's name
+animation.setMorph(hero.asset.doc.nodes!.findIndex((n) => n.name === 'Tube'), 0, 0.5); // first shape key at half
+engine.start();
+```
+
+`parseAnimatedMargo(engine, bytes, {signal})` reads local bytes, and `margoToGLTF(bytes)` gives the glTF 2.0 document over the file's own bytes without a GPU. The static `loadMargo` refuses an animated file and names this entry. Real Blender 5.2.3 output played this way stays within 1.1e-6 m of Blender's own deformed vertices at every frame of three clips (CPU, by glTF rules) and within 1e-4 m on the GPU (claim LIM-389).
+
+The exporter refuses, by object name: other modifiers on an animated mesh (apply them first), envelopes, Preserve Volume or a mask group on the Armature modifier, a vertex without deform-bone weight, more than eight influences, absolute, muted or vertex-group-masked shape keys, and instanced animated meshes. Object-level animation is not exported (bones only); the export is at the scene's current frame for everything else.
 
 ## Verification
 
@@ -77,7 +98,7 @@ npm run modern:test:interop:packages
 npm run measure:size
 ```
 
-Set `MARGO_BLENDER` to a Blender executable when running `modern:test:blender` to install/enable/export/disable the packaged ZIP in a disposable background profile, then generate and check real exporter fixtures. Without it (as in the CI workflow), the run checks the Python-written fixture, rendered textured pixels, shared GPU geometry, shadow/SSAO compatibility, device restoration and rollback. The Python tests also verify the checked-in fixture matches the writer. The package is optional and decode-only imports discard the PBR renderer.
+Set `MARGO_BLENDER` to a Blender executable when running `modern:test:blender` to install/enable/export/disable the packaged ZIP in a disposable background profile, then generate and check real exporter fixtures (including the animated rig of `tools/blender-addon/tests/blender_anim.py`, whose committed output and Blender truth `tests/anim.test.js` checks on every run). Without it (as in the CI workflow), the run checks the Python-written fixture, rendered textured pixels, shared GPU geometry, shadow/SSAO compatibility, device restoration and rollback. The Python tests also verify the checked-in fixture matches the writer. The package is optional and decode-only imports discard the PBR renderer.
 
 The package checks compile packed consumers and the first README example under strict NodeNext and Bundler resolution. Isolation tests build both core-only and core + stage entries without Blender/PBR modules. Browser tests track every buffer created by `loadMargo` and require exactly one `destroy()` per buffer when the stage unmounts.
 

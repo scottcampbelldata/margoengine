@@ -30,6 +30,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./anim": {
+      "types": "./dist/anim.d.ts",
+      "import": "./dist/anim.js"
     }
   },
   "scripts": {
