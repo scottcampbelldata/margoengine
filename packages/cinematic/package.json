@@ -37,6 +37,10 @@
     "./dolly": {
       "types": "./dist/dolly.d.ts",
       "import": "./dist/dolly.js"
+    },
+    "./group": {
+      "types": "./dist/group.d.ts",
+      "import": "./dist/group.js"
     }
   },
   "files": [

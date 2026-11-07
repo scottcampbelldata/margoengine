@@ -42,6 +42,10 @@ try {
     const step = Math.hypot(...swap.during[i].map((v, k) => v - swap.during[i - 1][k]));
     assert.ok(step < 4, `no jump in the blend: ${step} at frame ${i}`);
   }
+  const group = await run('group');
+  assert.deepEqual(group.ends, ['left', 'right'], 'the far ends of the group sit on the padded edge');
+  assert.deepEqual(group.outside, [null, null], 'and nothing lies beyond it');
+  assert.deepEqual(group.errors, [], 'no GPU error');
   assert.deepEqual(swap.errors, [], 'no GPU error');
   assert.deepEqual(pageErrors, [], 'no page error');
   console.log('cinematic browser check passed');

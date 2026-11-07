@@ -14,6 +14,7 @@
       import { Engine, PbrMaterial, box } from '/packages/core/dist/index.js';
       import { CameraBrain } from '/packages/cinematic/dist/brain.js';
       import { FramingComposer } from '/packages/cinematic/dist/composer.js';
+      import { GroupFraming } from '/packages/cinematic/dist/group.js';
 
       const engine = await Engine.create(document.querySelector('canvas'), { backend: 'webgpu' }),
         device = engine.gpu,
@@ -71,6 +72,26 @@
           follow.priority = 0;
           return { during, live: brain.live.name, position: [...engine.camera.position], errors };
         },
+      };
+      window.check.group = async () => {
+        const left = add([994, 0, 0]),
+          right = add([1006, 0, 0]);
+        brain.add({
+          name: 'group',
+          priority: 20,
+          position: [1000, 0, 30],
+          target: [1000, 0, 0],
+          fov: 40,
+          stages: [new GroupFraming([left, right], { padding: 0.1 })],
+        });
+        // fixed-wait: fixed simulation steps are what is under test, not a wait for the GPU
+        for (let i = 0; i < 40; i++) await frame();
+        const at = async (x, y) => {
+          const mesh = await engine.pick(x, y);
+          return mesh === left ? 'left' : mesh === right ? 'right' : null;
+        };
+        // The padding leaves a tenth of the width at each side: 80 pixels of 800.
+        return { ends: [await at(80, 200), await at(720, 200)], outside: [await at(40, 200), await at(760, 200)], errors };
       };
       window.ready = true;
     </script>

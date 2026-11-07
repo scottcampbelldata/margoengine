@@ -170,6 +170,40 @@ brain.add({stages: [new DollyTrack(rail, {target: runner, lead: 2}), new Framing
 
 A closed track wraps and the cart takes the short way round; an open one stops at its ends. `dolly.reset()` puts the cart back on the subject at once.
 
+## Group framing
+
+`GroupFraming` keeps several subjects in one shot. It aims at their centre and moves or zooms until all of them fit. The angle of the shot comes from the pose, so set that with the camera's `position` and `target`, or an earlier stage:
+
+```ts
+import {CameraBrain} from 'margoengine/cinematic/brain';
+import {GroupFraming} from 'margoengine/cinematic/group';
+import {Engine} from 'margoengine/core';
+import {boxGeometry} from 'margoengine/geometry';
+import {PbrMaterial, createMesh} from 'margoengine/materials';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const player = (x: number) => {
+  const mesh = createMesh(engine, boxGeometry(0.5, 1.8, 0.5), new PbrMaterial()).root;
+  mesh.setPosition([x, 0, 0]);
+  return mesh;
+};
+const brain = CameraBrain.attach(engine);
+const group = new GroupFraming(
+  [{target: player(-4), radius: 1}, {target: player(4), radius: 1, weight: 2}],
+  {mode: 'both', maxDistance: 40},
+);
+brain.add({position: [0, 8, 14], target: [0, 1, 0], fov: 45, stages: [group]});
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `mode` | `'dolly'` | `'dolly'` moves along the view; `'zoom'` stands still and changes the field of view; `'both'` moves, then zooms for what the distance limits left. |
+| `padding` | `0.1` | Share of the screen kept clear at each side. |
+| `minDistance`, `maxDistance` | `1`, `Infinity` | How near and far the camera goes from the centre. |
+| `minFov`, `maxFov` | `10`, `100` | Limits of the zoom, in degrees. |
+| `damping` | `4` | How fast the shot follows, in 1/seconds. |
+
+A member is a mesh, a point, a function or `{target, radius, weight}`. `radius` is a sphere that stays in view; `weight` pulls the centre, and 0 leaves the member out. `group.members` can change at any time. `group.fits` is false when the limits stop the shot, and `group.center` can feed a `FramingComposer`: `new FramingComposer(() => group.center)`.
+
 Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/cinematic

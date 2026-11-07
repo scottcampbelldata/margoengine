@@ -334,6 +334,10 @@
       "types": "./dist/cinematic/dolly.d.ts",
       "import": "./dist/cinematic/dolly.js"
     },
+    "./cinematic/group": {
+      "types": "./dist/cinematic/group.d.ts",
+      "import": "./dist/cinematic/group.js"
+    },
     "./clustered": {
       "types": "./dist/clustered.d.ts",
       "import": "./dist/clustered.js"
