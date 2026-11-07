@@ -431,7 +431,7 @@ const notched = polygonDifference(disc, [[0, -0.5], [3, -0.5], [3, 0.5], [0, 0.5
 with scale and twist that change along it. A loft skins a surface over several different profiles.
 
 ```ts
-import {CatmullRomCurve3} from 'margoengine/geometry';
+import {CatmullRomCurve3, Path, Shape} from 'margoengine/geometry';
 import {loftGeometry, sweepGeometry} from 'margoengine/geometry/sweep';
 
 const circle = (radius: number, corners = 32): [number, number][] =>
@@ -461,6 +461,17 @@ const duct = loftGeometry([
   {profile: square(1), position: [0, 0, 0]},
   {profile: circle(0.8), position: [0, 2, 4], normal: [0, 1, 1]},
 ], {smooth: false, steps: 12});
+
+// A hollow one: each section is a Shape with a hole, and holes pair up by their order.
+const ring = (radius: number, wall: number) => {
+  const shape = new Shape(circle(radius));
+  shape.holes.push(new Path(circle(radius - wall)));
+  return shape;
+};
+const pipe = loftGeometry([
+  {profile: ring(1, 0.1), position: [0, 0, 0]},
+  {profile: ring(0.6, 0.1), position: [0, 0, 3]},
+]);
 ```
 
 - `sweepGeometry(profile, path, options)`: `profile` is a ring of `[x, y]` points, a `Shape` with holes, or a `Path`, and
@@ -666,7 +677,7 @@ tiles.normals = creasedNormals(tiles.positions, {angle: 45, groups: tileGroups})
 - `computeTangents` follows UVs with v up, as the primitives have them. UVs stored v down, as in glTF files, give the opposite `w`; flip v first or negate `w`.
 - By default a shape with collinear points on its outline can leave T-junctions between the extruded caps and walls, because `triangulateShape` drops those points. Pass `triangulate: triangulateConstrained` to keep them.
 - Polygon results are exact on a grid of 2^26 steps across the input, not in doubles: a vertex at a crossing moves by up to half a step, and features under two steps wide are dropped. A round join is a chain of chords, so a rounded outset is up to `arcTolerance` smaller than the true curve.
-- `sweepGeometry` turns frames smoothly, so a path with a sharp corner pinches the profile there: round the corner in the path. A profile wider than the path's bend folds through itself. `loftGeometry` sections cannot have holes, and turning a section more than about 90 degrees from its neighbour twists the surface in a way `align` cannot undo.
+- `sweepGeometry` turns frames smoothly, so a path with a sharp corner pinches the profile there: round the corner in the path. A profile wider than the path's bend folds through itself. `loftGeometry` holes are skinned by their order, so every section needs the same number of them and a hole's partner is the one in the same place in the list. Turning a section more than about 90 degrees from its neighbour twists the surface in a way `align` cannot undo.
 - `edgesGeometry` and `wireframe` return index pairs, not a line geometry; core has no line primitive.
 - Core's `Geometry` accepts up to 1,000,000 vertices, so `toGeometry` throws above that.
 

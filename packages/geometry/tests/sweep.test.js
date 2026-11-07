@@ -319,11 +319,51 @@ test('loft rejects what it cannot build', () => {
   assert.throws(() => loftGeometry([square(), square()], { segments: 1.5 }), RangeError);
   const holed = new Shape(square(2));
   holed.holes.push(new Path(square(1)));
-  assert.throws(() => loftGeometry([holed, square()]), RangeError);
+  assert.throws(() => loftGeometry([holed, square()]), /same number/);
   assert.throws(() => loftGeometry([{ profile: square(), normal: [0, 0, 0] }, square()]), RangeError);
 });
 
 test('every curve type drives a sweep', () => {
   const flat = new EllipseCurve(0, 0, 5, 3, 0, Math.PI, false);
   solid(sweepGeometry(square(0.2), flat, { steps: 32 }), '2D path');
+});
+
+test('a loft of sections with holes is a closed tube: walls in and out, and caps with the hole left open', () => {
+  const pipe = (outer, inner) => {
+    const shape = new Shape(square(outer));
+    shape.holes.push(new Path(square(inner)));
+    return shape;
+  };
+  const geometry = loftGeometry(
+      [
+        { profile: pipe(2, 1), position: [0, 0, 0] },
+        { profile: pipe(2, 1), position: [0, 0, 3] },
+      ],
+      { smooth: false },
+    ),
+    { positions, indices } = geometry;
+  // The divergence theorem over the triangles: a closed surface facing out gives the solid's volume, (4 * 4 - 2 * 2) * 3.
+  let volume = 0;
+  for (let t = 0; t < indices.length; t += 3) {
+    const [a, b, c] = [0, 1, 2].map((k) => Array.from(positions.subarray(indices[t + k] * 3, indices[t + k] * 3 + 3)));
+    volume +=
+      (a[0] * (b[1] * c[2] - b[2] * c[1]) + a[1] * (b[2] * c[0] - b[0] * c[2]) + a[2] * (b[0] * c[1] - b[1] * c[0])) / 6;
+  }
+  assert.ok(Math.abs(volume - 36) < 1e-4, `volume ${volume}`);
+  assert.equal(geometry.groups.length, 2);
+  // No cap triangle lies over the hole: their centres are outside it.
+  for (let t = 0; t < geometry.groups[0].count; t += 3) {
+    const centre = [0, 1].map((k) => [0, 1, 2].reduce((sum, c) => sum + positions[indices[t + c] * 3 + k], 0) / 3);
+    assert.ok(Math.max(Math.abs(centre[0]), Math.abs(centre[1])) >= 1 - 1e-6, `cap triangle at ${centre}`);
+  }
+});
+
+test('a hole may change shape along a loft, and goes to the hole of the same place', () => {
+  const round = new Shape(square(3)),
+    held = new Shape(circle(12, 3));
+  round.holes.push(new Path(circle(16, 1)));
+  held.holes.push(new Path(square(1)));
+  const data = loftGeometry([round, { profile: held, position: [0, 0, 2] }], { smooth: false });
+  assert.ok(data.indices.length > 0);
+  for (const value of data.normals) assert.ok(Number.isFinite(value));
 });

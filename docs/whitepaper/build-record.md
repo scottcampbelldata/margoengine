@@ -1244,6 +1244,7 @@ An audit of the finished batches against their job text listed 70 gaps for the H
 | stats-visible | stats.visible counts a glTF model's nodes once a frame | DONE | `5051c31a0` | - |
 | test-readers | Five of the six test readers read the file under test; fbx waits | DONE | `4131fd1e1` | - |
 | spawn-einval | Python test scripts never start the Windows app alias; a failed probe fails | DONE | this commit | - |
+| B38 | A loft of sections with holes: holes pair by order, caps leave them open | DONE | this commit | - |
 
 ## LAZ: one LAS reader, and every point format on a real file
 

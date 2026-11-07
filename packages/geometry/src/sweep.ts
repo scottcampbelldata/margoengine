@@ -384,25 +384,27 @@ function planeAxes(normal: MutableVec3): [MutableVec3, MutableVec3] {
   return [across, cross(normal, across)];
 }
 
-function sectionRing(section: LoftSection, index: number, segments: number): MutableVec3[] {
+/** A section's rings in space: its outline, then its holes. */
+function sectionRings(section: LoftSection, index: number, segments: number): MutableVec3[][] {
   const placed = !Array.isArray(section) && 'profile' in (section as object);
   if (!placed && Array.isArray(section) && (section as readonly number[][])[0]?.length === 3) {
     const ring = distinct(section as readonly MutableVec3[], true);
     if (ring.length < 3) throw new RangeError(`Loft section of ${ring.length} points; pass at least 3`);
-    return ring;
+    return [ring];
   }
   const { profile, position = [0, 0, index], normal = [0, 0, 1], scale = 1 } = (
     placed ? section : { profile: section }
   ) as LoftPlacement;
-  const [ring, ...holes] = profileRings(profile, segments, true),
+  const rings = profileRings(profile, segments, true),
     facingWay = normalize([normal[0], normal[1], normal[2]] as MutableVec3);
-  if (holes.length) throw new RangeError('Loft sections cannot have holes; pass an outline');
   if (!(dot(facingWay, facingWay) > 0.5)) throw new RangeError('Invalid section normal; pass a finite vector that is not zero');
   const [sizeX, sizeY] = sizeOf(scale),
     [across, upward] = planeAxes(facingWay);
-  return ring.map(
-    ([x, y]) =>
-      [0, 1, 2].map((k) => position[k] + across[k] * x * sizeX + upward[k] * y * sizeY) as unknown as MutableVec3,
+  return rings.map((ring) =>
+    ring.map(
+      ([x, y]) =>
+        [0, 1, 2].map((k) => position[k] + across[k] * x * sizeX + upward[k] * y * sizeY) as unknown as MutableVec3,
+    ),
   );
 }
 
@@ -470,7 +472,8 @@ function spline(p0: number, p1: number, p2: number, p3: number, t: number): numb
 /**
  * Skins a surface over sections that may differ in shape and point count: square to circle to star. Points are matched
  * by their share of the way round each ring, from starts chosen to twist least. By default the surface runs smoothly
- * through every section. Walls are group 1 and caps group 0.
+ * through every section. Sections with holes skin each hole to the same hole of the next section, by their order, so every
+ * section needs the same number of them. Walls are group 1 and caps group 0.
  */
 export function loftGeometry(sections: readonly LoftSection[], options: LoftOptions = {}): GeometryData {
   const { smooth = true, closed = false, segments, align = true } = options,
@@ -480,68 +483,82 @@ export function loftGeometry(sections: readonly LoftSection[], options: LoftOpti
   if (segments !== undefined) steady(segments, 'segments');
   if (sections.length < (closed ? 3 : 2))
     throw new RangeError(`Loft of ${sections.length} sections; pass at least ${closed ? 3 : 2}`);
-  const rings = sections.map((section, i) => sectionRing(section, i, curveSegments)),
-    centres = rings.map(centreOf);
-  // Every ring runs counter-clockwise seen from the end of the loft, so walls face out.
-  rings.forEach((ring, i) => {
-    const count = rings.length,
-      next = closed ? (i + 1) % count : Math.min(i + 1, count - 1),
-      previous = closed ? (i + count - 1) % count : Math.max(i - 1, 0),
-      going = centres[next].map((x, k) => x - centres[previous][k]);
-    if (dot(ringNormal(ring), going) < 0) ring.reverse();
-  });
-  if (align) for (let i = 1; i < rings.length; i++) rings[i] = aligned(rings[i], rings[i - 1]);
-  const ringShares = rings.map((ring) => arcShares(ring, true)),
-    shares = segments
-      ? Array.from({ length: segments }, (_, j) => j / segments)
-      : sharedShares(ringShares),
-    grid = rings.map((ring, r) => shares.map((share) => ringPoint(ring, ringShares[r], share))),
-    sharp = grid.map((row) => corners(row, true, crease)),
-    hard = shares.map((_, j) => sharp.every((row) => row[j])),
-    count = rings.length,
-    spans = closed ? count : count - 1,
-    rows: number[][] = [],
-    point = (i: number, j: number, k: number): number => {
-      if (closed) return grid[(i + count) % count][j][k];
-      if (i < 0) return 2 * grid[0][j][k] - grid[1][j][k];
-      if (i >= count) return 2 * grid[count - 1][j][k] - grid[count - 2][j][k];
-      return grid[i][j][k];
-    };
-  for (let span = 0; span < spans; span++)
-    for (let step = 0; step < steps; step++) {
-      const t = step / steps,
-        row: number[] = [];
-      for (let j = 0; j < shares.length; j++)
-        for (let k = 0; k < 3; k++)
-          row.push(
-            smooth
-              ? spline(point(span - 1, j, k), point(span, j, k), point(span + 1, j, k), point(span + 2, j, k), t)
-              : point(span, j, k) + (point(span + 1, j, k) - point(span, j, k)) * t,
-          );
-      rows.push(row);
-    }
-  rows.push(closed ? rows[0] : grid[count - 1].flat());
-  const surface = new Surface();
-  surface.strip(
-    rows,
-    [...shares, 1],
-    hard,
-    true,
-    closed,
-    rows.map((_, i) => i / (rows.length - 1)),
-  );
+  const sets = sections.map((section, i) => sectionRings(section, i, curveSegments)),
+    centres = sets.map(([outline]) => centreOf(outline)),
+    count = sets.length,
+    holes = sets[0].length - 1,
+    surface = new Surface();
+  for (const set of sets)
+    if (set.length !== holes + 1)
+      throw new RangeError(`Loft sections with ${holes} and ${set.length - 1} holes; pass the same number in every section`);
+  /** Skins one ring of every section, and gives the rows of the surface. Holes run the other way, so walls face the solid's outside. */
+  const skin = (given: readonly MutableVec3[][], sign: number): number[][] => {
+    const rings = given.map((ring) => ring.slice());
+    // Every outline runs counter-clockwise seen from the end of the loft, so walls face out.
+    rings.forEach((ring, i) => {
+      const next = closed ? (i + 1) % count : Math.min(i + 1, count - 1),
+        previous = closed ? (i + count - 1) % count : Math.max(i - 1, 0),
+        going = centres[next].map((x, k) => x - centres[previous][k]);
+      if (dot(ringNormal(ring), going) * sign < 0) ring.reverse();
+    });
+    if (align) for (let i = 1; i < rings.length; i++) rings[i] = aligned(rings[i], rings[i - 1]);
+    const ringShares = rings.map((ring) => arcShares(ring, true)),
+      shares = segments
+        ? Array.from({ length: segments }, (_, j) => j / segments)
+        : sharedShares(ringShares),
+      grid = rings.map((ring, r) => shares.map((share) => ringPoint(ring, ringShares[r], share))),
+      sharp = grid.map((row) => corners(row, true, crease)),
+      hard = shares.map((_, j) => sharp.every((row) => row[j])),
+      spans = closed ? count : count - 1,
+      rows: number[][] = [],
+      point = (i: number, j: number, k: number): number => {
+        if (closed) return grid[(i + count) % count][j][k];
+        if (i < 0) return 2 * grid[0][j][k] - grid[1][j][k];
+        if (i >= count) return 2 * grid[count - 1][j][k] - grid[count - 2][j][k];
+        return grid[i][j][k];
+      };
+    for (let span = 0; span < spans; span++)
+      for (let step = 0; step < steps; step++) {
+        const t = step / steps,
+          row: number[] = [];
+        for (let j = 0; j < shares.length; j++)
+          for (let k = 0; k < 3; k++)
+            row.push(
+              smooth
+                ? spline(point(span - 1, j, k), point(span, j, k), point(span + 1, j, k), point(span + 2, j, k), t)
+                : point(span, j, k) + (point(span + 1, j, k) - point(span, j, k)) * t,
+            );
+        rows.push(row);
+      }
+    rows.push(closed ? rows[0] : grid[count - 1].flat());
+    surface.strip(
+      rows,
+      [...shares, 1],
+      hard,
+      true,
+      closed,
+      rows.map((_, i) => i / (rows.length - 1)),
+    );
+    return rows;
+  };
+  const skins = [skin(sets.map(([outline]) => outline), 1)];
+  for (let hole = 1; hole <= holes; hole++) skins.push(skin(sets.map((set) => set[hole]), -1));
   if (caps && !closed)
-    for (const [row, flip] of [
-      [rows[0], true],
-      [rows[rows.length - 1], false],
+    for (const [at, flip] of [
+      [0, true],
+      [-1, false],
     ] as const) {
-      const ring: MutableVec3[] = [];
-      for (let j = 0; j < row.length; j += 3) ring.push([row[j], row[j + 1], row[j + 2]]);
-      const facingWay = normalize(ringNormal(ring)),
+      const rows = skins.map((rows) => rows.at(at)!),
+        rings = rows.map((row) => {
+          const ring: MutableVec3[] = [];
+          for (let j = 0; j < row.length; j += 3) ring.push([row[j], row[j + 1], row[j + 2]]);
+          return ring;
+        }),
+        facingWay = normalize(ringNormal(rings[0])),
         [across, upward] = planeAxes(facingWay),
-        flat = ring.map((p) => [dot(p, across), dot(p, upward)] as MutableVec2),
-        { indices } = triangulateConstrained(flat);
-      surface.cap(row, flat, indices, flip ? [-facingWay[0], -facingWay[1], -facingWay[2]] : facingWay, flip);
+        flat = rings.map((ring) => ring.map((p) => [dot(p, across), dot(p, upward)] as MutableVec2)),
+        { indices } = triangulateConstrained(flat[0], flat.slice(1));
+      surface.cap(rows.flat(), flat.flat(), indices, flip ? [-facingWay[0], -facingWay[1], -facingWay[2]] : facingWay, flip);
     }
   return surface.done();
 }
