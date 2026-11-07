@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { TilesRenderer, Y_UP_TO_Z_UP, invert, multiply, parseI3dm, transformDirection, transformPoint, translation } from '../dist/index.js';
 import { i3dm, instanceCenter, instanceMatrices } from '../dist/i3dm.js';
@@ -162,4 +163,40 @@ test('i3dm: zero instances load no model and draw nothing', async () => {
   assert.equal(drawn.visible, false);
   drawn.dispose();
   assert.equal(models.length, 0);
+});
+
+test('i3dm: the real TilesetWithTreeBillboards sample (Cesium, CC0) places all 25 trees at their feet, standing up', async () => {
+  const folder = new URL('../../../examples/assets/3d-tiles/TilesetWithTreeBillboards/', import.meta.url),
+    files = new Map(['tileset.json', 'tree.i3dm', 'tree_billboard.i3dm'].map((name) => [name, new Uint8Array(readFileSync(new URL(name, folder)))])),
+    memory = memoryFetch(files),
+    { engine, loadModel, models } = fakeEngine(),
+    renderer = await TilesRenderer.load(engine, memory.url, { fetch: memory.fetch, loadModel, i3dm }),
+    errors = [];
+  renderer.tileset.on('error', ({ error }) => errors.push(error));
+  for (let i = 0; i < 40 && models.length < 1; i++) {
+    renderer.update();
+    await settle(4);
+  }
+  assert.deepEqual(errors, []);
+  assert.ok(models.length >= 1);
+  for (const model of models) {
+    const name = ['tree.i3dm', 'tree_billboard.i3dm'].find((n) => parseI3dm(files.get(n)).gltf.byteLength === model.gltf.byteLength),
+      content = parseI3dm(files.get(name)),
+      rows = model.primitives[0].instances;
+    assert.equal(content.length, 25, name);
+    assert.equal(rows.count, 25, name);
+    const root = compose(model.root.position, model.root.quaternion, model.root.scale),
+      node = model.primitives[0].node.matrix;
+    for (let i = 0; i < 25; i++) {
+      const world = multiply(multiply(root, node), rows.data.subarray(i * 24, i * 24 + 16)),
+        foot = transformPoint(world, transformPoint(invert(node), [0, 0, 0])),
+        want = renderer.toWorld([0, 1, 2].map((k) => content.matrices[i * 16 + 12 + k]));
+      // 5 mm: float32 rows within the grove's 100 m reach hold about 8 micrometres; the rest is the fake's float32 node.
+      for (let k = 0; k < 3; k++) close(foot[k], want[k], 5e-3, `${name} tree ${i} axis ${k}`);
+      const up = transformDirection(world, [0, 1, 0]);
+      // EAST_NORTH_UP at each tree: within 100 m of the frame's centre the local up turns by under 2e-5 rad.
+      close(up[1] / Math.hypot(...up), 1, 1e-4, `${name} tree ${i} stands up`);
+    }
+  }
+  renderer.dispose();
 });

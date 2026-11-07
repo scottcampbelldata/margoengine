@@ -625,3 +625,26 @@ test('memory budget: when the view alone passes the budget, refinement waits ins
   const leaves = [...tileset.tiles()].filter((t) => t.depth === 2 && t.state === 'ready').length;
   assert.ok(leaves < 16, `refinement stopped part way: ${leaves} of 16 leaves`);
 });
+
+// Regression: in a page, Tileset.load('data/tileset.json') fetched the JSON (fetch resolves against the page) but
+// then every tile failed with "Cannot resolve tile URI": the relative tileset URL was kept as the base.
+test('tileset: a relative tileset URL resolves against the page, and so do its tiles', async () => {
+  const data = cityTileset({ levels: 2 }),
+    files = new Map([...data.files].map(([path, bytes]) => [`app/data/${path}`, bytes])),
+    memory = memoryFetch(files, { base: 'https://site.test/' }),
+    had = Object.getOwnPropertyDescriptor(globalThis, 'location');
+  Object.defineProperty(globalThis, 'location', { value: { href: 'https://site.test/app/index.html' }, configurable: true });
+  try {
+    const tileset = await Tileset.load('data/tileset.json', {
+      fetch: memory.fetch,
+      content: (content) => ({ bytes: content.byteLength, visible: false, dispose() {} }),
+    });
+    assert.equal(tileset.url, 'https://site.test/app/data/tileset.json');
+    assert.ok(tileset.root.contentUrls.length > 0);
+    assert.ok(tileset.root.contentUrls.every((url) => url.startsWith('https://site.test/app/data/')));
+    tileset.dispose();
+  } finally {
+    if (had) Object.defineProperty(globalThis, 'location', had);
+    else delete globalThis.location;
+  }
+});

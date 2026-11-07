@@ -255,6 +255,16 @@ export interface TilesFrame {
 
 const DEFAULT_BUDGET = 512 * 1024 * 1024;
 
+/**
+ * A tileset URL made absolute: a relative one resolves against the page, as `fetch` resolves it, so the tiles it links
+ * resolve against the same place. Outside a page (no `location`) it stays as given.
+ */
+function absoluteUrl(url: string): string {
+  if (URL.canParse(url)) return url;
+  const page = (globalThis as { location?: { href?: unknown } }).location?.href;
+  return typeof page === 'string' && URL.canParse(url, page) ? new URL(url, page).href : url;
+}
+
 function resolveUrl(uri: string, base: string): string {
   try {
     return new URL(uri, base).href;
@@ -306,7 +316,7 @@ export class Tileset {
 
   /** Fetches tileset JSON (and its `schemaUri`) and returns the tileset. Aborts with `options.signal`. */
   static async load(url: string | URL, options: TilesetOptions = {}): Promise<Tileset> {
-    const href = String(url),
+    const href = absoluteUrl(String(url)),
       fetcher = options.fetch ?? globalThis.fetch?.bind(globalThis);
     if (!fetcher) throw new MargoError('unsupported', 'No fetch available; pass options.fetch');
     const json = await fetchJSON(fetcher, href, options.signal);
@@ -321,7 +331,7 @@ export class Tileset {
   }
   /** A tileset from JSON already in memory; relative URIs resolve against `url`. */
   static from(json: unknown, url: string | URL, options: TilesetOptions = {}): Tileset {
-    return new Tileset(json, String(url), options);
+    return new Tileset(json, absoluteUrl(String(url)), options);
   }
   private constructor(json: unknown, url: string, options: TilesetOptions, schema?: MetadataSchema) {
     this.url = url;

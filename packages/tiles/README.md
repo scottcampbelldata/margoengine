@@ -13,8 +13,9 @@ import { TilesRenderer } from 'margoengine/tiles';
 const canvas = document.querySelector('canvas')!;
 const engine = await Engine.create(canvas, { camera: { position: [0, 400, 600], target: [0, 0, 0], far: 50_000 } });
 
+// A real sample city (examples/assets/3d-tiles in this repository); give your own tileset's URL.
 // The tileset's centre lands at the world origin, x east, y up, -z north (the default 'enu' frame).
-const tiles = await TilesRenderer.load(engine, 'https://example.com/city/tileset.json', {
+const tiles = await TilesRenderer.load(engine, '3d-tiles/TilesetWithRequestVolume/city/tileset.json', {
   maximumScreenSpaceError: 16, // pixels; lower is sharper and loads more
   memoryBudget: 256 * 1024 * 1024, // bytes of tile content kept
 });
@@ -76,8 +77,8 @@ import { TilesRenderer } from 'margoengine/tiles';
 
 const engine = await Engine.create(document.querySelector('canvas')!);
 const origin = FloatingOrigin.attach(engine);
-const tiles = await TilesRenderer.load(engine, 'https://example.com/globe/tileset.json', { origin });
-origin.lookAt(tiles.cartographicToWorld(2.35, 48.85, 600), tiles.cartographicToWorld(2.35, 48.86, 0));
+const tiles = await TilesRenderer.load(engine, '3d-tiles/TilesetWithRequestVolume/city/tileset.json', { origin });
+origin.lookAt(tiles.cartographicToWorld(-75.613, 40.038, 300), tiles.cartographicToWorld(-75.613, 40.042, 0));
 ```
 
 `toWorld(ecef)`, `toTileset(world)` and `cartographicToWorld(lon, lat, height)` convert points; the WGS84 helpers (`cartographicToEcef`, `ecefToCartographic`, `eastNorthUpToEcef`) are exported too.
@@ -92,7 +93,8 @@ import { TilesRenderer } from 'margoengine/tiles';
 import { i3dm } from 'margoengine/tiles/i3dm';
 
 const engine = await Engine.create(document.querySelector('canvas')!);
-const tiles = await TilesRenderer.load(engine, 'https://example.com/trees/tileset.json', { i3dm });
+// 25 trees as i3dm, a real sample (examples/assets/3d-tiles in this repository).
+const tiles = await TilesRenderer.load(engine, '3d-tiles/TilesetWithTreeBillboards/tileset.json', { i3dm });
 engine.start();
 ```
 
@@ -105,7 +107,7 @@ Each instance is placed as the specification says: tile transform x `RTC_CENTER`
 ```ts
 import { Tileset, type TileRenderable } from 'margoengine/tiles';
 
-const tileset = await Tileset.load('https://example.com/city/tileset.json', {
+const tileset = await Tileset.load('3d-tiles/TilesetWithRequestVolume/city/tileset.json', {
   content: (content, tile, signal): TileRenderable => ({ bytes: content.byteLength, visible: false, dispose() {} }),
 });
 const frame = tileset.update({ position: [1_215_000, -4_736_000, 4_081_000], screenHeight: 1080, fov: 60 });
@@ -120,5 +122,6 @@ The content parsers (`parseB3dm`, `parsePnts`, `parseI3dm`, `parseCmpt`, `parseC
 
 - i3dm batch tables are read (`content.batchTable`) but per-instance picking and per-instance colours are not wired to them; an i3dm external glTF resolves against the tile's first content URL.
 - S2 bounding volumes, Draco-compressed pnts and binary metadata property tables are not read.
+- A tile whose glTF requires KHR_techniques_webgl (archived GLSL shaders, such as the billboard level of Cesium's TilesetWithTreeBillboards) fails with code `unsupported`, as glTF says a loader must; the rest of the tileset draws.
 - Memory is counted as the bytes of each tile's content file, not the GPU memory its model takes.
 - Orthographic cameras need `Tileset.update` with `orthographicHeight`; the renderer reads a perspective camera.

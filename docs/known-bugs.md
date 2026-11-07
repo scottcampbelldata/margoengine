@@ -29,14 +29,14 @@ are still open.
 
 ## README examples
 
-### 119 of 767 README examples do not run yet
+### 115 of 767 README examples do not run yet
 
 - **What:** `npm run check:readme-run`, a step of `check:merge` since 2026-11-07, ran 641 of 767 examples that day (RTX A6000,
-  Chromium). The other 126 went into `scripts/support/readme-run-known.json`; 119 are left there, each with its error. A new failure fails the step, and
+  Chromium). The other 126 went into `scripts/support/readme-run-known.json`; 115 are left there, each with its error. A new failure fails the step, and
   so does an entry that passes or names an example that is gone. An id is the heading above an example and a hash of its code, so
   an example added above one on the list leaves it alone; changing a listed example changes its id, and the entry moves with it.
 - **Repro:** `npm run build:packages`, then `npm run check:readme-run -- --only=<id>` with an id from that list.
-- **Cause:** 101 entries start `sample:`. The example names a file of its own (a font, a scan, a rigged model with named joints)
+- **Cause:** 97 entries start `sample:`. The example names a file of its own (a font, a scan, a rigged model with named joints)
   and the check has no matching sample, or the sample does not fit it, so these say nothing about the example yet. Ragdoll,
   fbx, the animator's joint indices and `usdz/readme-margoengine-usdz-087124` and `usdz/readme-composition-fbebfe` (no `.usdz` file is in the repository) are in this group. 18 start
   `example:`, and these need reading one at a time:

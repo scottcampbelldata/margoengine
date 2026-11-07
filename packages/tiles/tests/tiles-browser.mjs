@@ -80,6 +80,18 @@ try {
   );
   check('i3dm: the gap between trees stays background (instances, not one stretched box)', !grove.gapLit, grove);
 
+  const real = (results.cesiumTrees = await call((n) => window.tilesFixture.run(n), 'cesium-trees'));
+  assert.deepEqual(
+    real.errors.filter((e) => !/^tile: Required glTF extensions are unsupported: KHR_techniques_webgl/.test(e)),
+    [],
+    'cesium-trees: WebGPU or engine errors',
+  );
+  check(
+    'i3dm, real file: the 25 trees of Cesium TilesetWithTreeBillboards are drawn where float64 maths puts them',
+    real.trees === 25 && real.onScreen >= 20 && real.drawn === real.onScreen,
+    real,
+  );
+
   assert.deepEqual(pageErrors, []);
   for (const name of checks) console.log(`ok - ${name}`);
   console.log(

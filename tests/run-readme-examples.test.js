@@ -11,9 +11,10 @@ import {
   pickExamples,
   placeOf,
   runInNode,
+  assetFile,
   sampleFiles,
 } from '../scripts/run-readme-examples.mjs';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -161,3 +162,20 @@ test('a small real file is a sample, and an LFS pointer of any size is not', () 
   }
 });
 
+// Regression: a tileset (JSON that links its tiles by relative path) was never served, so every tiles example failed
+// with "Failed to fetch". A page now gets a file under examples/assets by its path there, links included.
+test('a page gets a sample of several files by its path under examples/assets', () => {
+  const folder = mkdtempSync(join(tmpdir(), 'readme-assets-'));
+  try {
+    mkdirSync(join(folder, 'city', 'tiles'), { recursive: true });
+    writeFileSync(join(folder, 'city', 'tileset.json'), '{"root":{"content":{"uri":"tiles/a.b3dm"}}}');
+    writeFileSync(join(folder, 'city', 'tiles', 'a.b3dm'), 'b3dm');
+    assert.equal(assetFile('/city/tileset.json', folder)?.path, join(folder, 'city', 'tileset.json'));
+    assert.equal(assetFile('/city/tiles/a.b3dm', folder)?.path, join(folder, 'city', 'tiles', 'a.b3dm'));
+    assert.equal(assetFile('/city', folder), undefined);
+    assert.equal(assetFile('/city/missing.json', folder), undefined);
+    assert.equal(assetFile('/../outside.json', folder), undefined);
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+  }
+});

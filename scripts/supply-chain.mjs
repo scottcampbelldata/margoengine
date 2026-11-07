@@ -157,6 +157,10 @@ const ASSETS = [
     'Collada, KHR_animation_pointer and transparency test models: AnimatedColorsCube, GlassVaseFlowers, TransmissionTest (CC0 1.0, Khronos glTF-Sample-Assets), DiffuseTransmissionPlant (CC BY 4.0 and CC0 1.0, same source), Cesium Man `.dae` and texture (CC BY 4.0, Cesium); URLs, pinned commits and sha256 there',
   ],
   [
+    'examples/assets/3d-tiles/NOTICE.md',
+    '3D Tiles test tilesets: TilesetWithTreeBillboards (i3dm, CC0 1.0) and the city of TilesetWithRequestVolume (b3dm, CC BY 3.0, Cesium) from https://github.com/CesiumGS/3d-tiles-samples; commit and sha256 there',
+  ],
+  [
     'packages/shadows/test/outside/reference.py',
     'Shadow reference pictures in packages/shadows/test/fixtures/outside: rendered by Blender Cycles from the Khronos models above (their licences apply), made by this script',
   ],

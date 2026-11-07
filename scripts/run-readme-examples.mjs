@@ -12,7 +12,7 @@
 //   npm run check:readme-run -- --shrink           writes the known list down to what still fails; it never adds an entry
 import { spawn, spawnSync } from 'node:child_process';
 import { copyFileSync, createReadStream, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
-import { basename, dirname, extname, join, resolve } from 'node:path';
+import { basename, dirname, extname, join, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createServer, transformWithOxc } from 'vite';
 import { acquire } from './gpu-lock.mjs';
@@ -140,6 +140,15 @@ export function sampleFiles(files, base = root) {
   return { byName, byExtension: samples };
 }
 
+/**
+ * The file under `examples/assets` a page asks for by its path there, such as `3d-tiles/TilesetWithTreeBillboards/tileset.json`:
+ * a sample made of several files (a tileset and its tiles) is served as it is, relative links included. Undefined when there is none.
+ */
+export function assetFile(pathname, base = join(root, 'examples/assets')) {
+  const path = resolve(base, `.${pathname}`);
+  return path.startsWith(base + sep) && existsSync(path) && statSync(path).isFile() && !isLfsPointer(path) ? { path } : undefined;
+}
+
 const sampleFor = ({ byName, byExtension }, name) =>
   byName.get(basename(name).toLowerCase()) ?? byExtension.get(extname(name).toLowerCase());
 
@@ -254,7 +263,7 @@ async function startPages(samples) {
             }
             // Minimal glTF takes static models only, so its examples get one.
             const minimal = /\.gl(?:b|tf)$/.test(pathname) && request.headers.referer?.includes('example=%2Fgltf%2F'),
-              sample = minimal ? { path: samples.staticModel } : sampleFor(samples, pathname);
+              sample = minimal ? { path: samples.staticModel } : (assetFile(pathname) ?? sampleFor(samples, pathname));
             if (!sample || /\.(?:tsx|js|mjs|css|html)$/.test(pathname) || pathname.startsWith('/@') || pathname.includes('/node_modules/') || pathname.includes('/packages/'))
               return next();
             createReadStream(sample.path).pipe(response);

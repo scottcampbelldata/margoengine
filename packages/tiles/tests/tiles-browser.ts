@@ -111,6 +111,38 @@ async function run(name: string): Promise<unknown> {
     tiles.dispose();
     return result;
   }
+  if (name === 'cesium-trees') {
+    // The real TilesetWithTreeBillboards sample (Cesium 3d-tiles-samples, CC0): 25 trees in each of two i3dm tiles,
+    // fetched from the repository by a relative URL, as a page would. Close enough (under 146 m) that the root's
+    // geometric error of 10 m refines to the full trees; the root's billboards need KHR_techniques_webgl (GLSL
+    // shaders), which gltf-pro refuses with a coded error, as glTF says a loader must for a required extension.
+    engine.camera.position = [0, 70, 110];
+    engine.camera.target = [0, 0, 0];
+    tiles = await TilesRenderer.load(engine, '../../../examples/assets/3d-tiles/TilesetWithTreeBillboards/tileset.json', { i3dm });
+    tiles.tileset.on('error', ({ error }) => errors.push(`tile: ${(error as Error).message}`));
+    const timing = await converge();
+    const data = pixels();
+    const shown = tiles.last.selected.flatMap((tile) => tile.contents) as unknown as { matrices?: Float64Array }[];
+    const trees = shown.flatMap((content) =>
+      Array.from({ length: (content.matrices?.length ?? 0) / 16 }, (_, i) => {
+        const foot = tiles.toWorld([0, 1, 2].map((k) => content.matrices![i * 16 + 12 + k]));
+        // 10 m up the 20 m tree is the textured crown; the trunk below is darker than the lit threshold.
+        return project([foot[0], foot[1] + 10, foot[2]]);
+      }),
+    );
+    const onScreen = trees.filter(([x, y, w]) => w > 0 && x > 4 && x < W - 4 && y > 4 && y < H - 4);
+    const result = {
+      ...timing,
+      ...snapshot(),
+      trees: trees.length,
+      onScreen: onScreen.length,
+      drawn: onScreen.filter(([x, y]) => lit(data, x, y)).length,
+      urls: tiles.last.selected.map((tile) => tile.contentUrls[0]?.split('/').pop()),
+      errors: [...errors],
+    };
+    tiles.dispose();
+    return result;
+  }
   if (name === 'city') {
     tiles = await TilesRenderer.load(engine, memory.url, {
       fetch: memory.fetch,

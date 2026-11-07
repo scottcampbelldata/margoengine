@@ -2807,7 +2807,8 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Inside test and mesh distance (`@margoengine/bvh/inside`) | Enforced: `accuracy` above 0, `maxDistance` and `minDistance` at least 0, a 16 number matrix. By method: the winding number is an estimate at `accuracy` below `Infinity`, measured under 0.03 at the default; `pointInside` on a large hole or a surface with no inside answers by a one half cut; `meshDistance` measures surfaces, so a mesh inside another answers the gap, not 0, and a matrix with shear keeps its answer exact but loosens its box tests. | Inside answers survive small holes and flipped patches; clearance answers come with both closest points. | Pass `accuracy: Infinity` for the exact sum; combine `meshDistance` with `pointInside` to detect a mesh held wholly inside another. |
 | GPU build for deforming meshes (`GPUDynamicBVH` in `@margoengine/bvh/gpu-build`) | Enforced: the sort keys, tree and indices each fit `maxStorageBufferBindingSize`; indices fixed at creation; the vertex buffer holds every index. By method: 'build' sorts by a bitonic network, log squared dispatches, then 64 climb dispatches each update, whatever the mesh; a Morton tree queries slower than a CPU SAH tree; 'refit' queries slow down as the pose leaves the rest pose; float32 throughout. | Rays through a pose only the GPU wrote match a CPU tree of that pose; the tree can reach 62 levels on stacked triangles. | Use 'refit' for small deformations; split a mesh that is over the limits. `fromModel` follows gltf-pro primitives on a real skin (Fox.glb); a primitive the deformer moves to another buffer or offset needs a new tree, and `encode` says so. |
 | Alpha-masked picking (`AlphaRaycaster` in `@margoengine/bvh/alpha`) | Enforced: mask bytes match `width * height * 4`, `cutoff` from 0 to 1, `wrap` of `repeat`, `mirror` or `clamp`, per axis if asked. By method: CPU only, with pixels the caller supplies or `modelAlphaMasks` reads once from a loaded model: base colour alpha, cutoff, factor, wrap and `KHR_texture_transform`. It leaves a map on TEXCOORD_1 or a KTX2 map solid and lists it in `skipped`, reads no vertex colour alpha, and samples level 0 with a linear filter whatever the sampler says, so a distant cut-out may differ from the mip the GPU drew (3,166 of 3,200 pixels of AlphaBlendModeTest.glb agree with the GPU pick). Core geometry has no uv, so its hits stay, except on a mesh of `@margoengine/gltf/textured`, whose masks come from `texturedAlphaMasks`; a first-hit query tests all hits along the ray. | A pick through a hole lands on what is behind it. | Keep a CPU copy of each masked texture and name it in `alphaMask`. |
-| i3dm instances (`@margoengine/tiles/i3dm`, 2026-11-07) | Proved on a generated stand-in tile on a real GPU (LIM-344), not on a real i3dm file. By method: one `PBRInstances` per glTF node of the tile, float32 rows relative to the mean instance position, so a tile wider than about 30 km loses millimetres; the batch table is read but not used for picking or colours; an external glTF resolves against the tile's first content URL. | i3dm places instances in the tile's frame; the rows are float32 on the GPU. | Instances of a very wide tile move by up to a few millimetres; picking returns the tile's model, not one instance. | Split very wide i3dm tiles; read `content.batchTable` yourself for per-instance data. |
+| Alpha-masked picking (`AlphaRaycaster` in `@margoengine/bvh/alpha`) | Enforced: mask bytes match `width * height * 4`, `cutoff` from 0 to 1, `wrap` of `repeat`, `mirror` or `clamp`, per axis if asked. By method: CPU only, with pixels the caller supplies or `modelAlphaMasks` reads once from a loaded model: base colour alpha, cutoff, factor, wrap and `KHR_texture_transform`. It leaves a map on TEXCOORD_1 or a KTX2 map solid and lists it in `skipped`, reads no vertex colour alpha, and samples level 0 with a linear filter whatever the sampler says, so a distant cut-out may differ from the mip the GPU drew (3,166 of 3,200 pixels of AlphaBlendModeTest.glb agree with the GPU pick). Core geometry has no uv, so its hits stay; a first-hit query tests all hits along the ray. | A pick through a hole lands on what is behind it. | Keep a CPU copy of each masked texture and name it in `alphaMask`. |
+| i3dm instances (`@margoengine/tiles/i3dm`, 2026-11-07) | Proved on Cesium's real TilesetWithTreeBillboards and a generated tile on a real GPU (LIM-344). A tile whose glTF requires KHR_techniques_webgl (GLSL shaders, archived; that sample's billboard level) fails with code `unsupported` and the rest draws. By method: one `PBRInstances` per glTF node of the tile, float32 rows relative to the mean instance position, so a tile wider than about 30 km loses millimetres; the batch table is read but not used for picking or colours; an external glTF resolves against the tile's first content URL. | i3dm places instances in the tile's frame; the rows are float32 on the GPU. | Instances of a very wide tile move by up to a few millimetres; picking returns the tile's model, not one instance. | Split very wide i3dm tiles; read `content.batchTable` yourself for per-instance data. |
 
 ## Entities
 
@@ -3093,16 +3094,16 @@ are still open.
 
 ## README examples
 
-### 125 of 767 README examples do not run yet
+### 115 of 767 README examples do not run yet
 
 - **What:** `npm run check:readme-run`, a step of `check:merge` since 2026-11-07, ran 641 of 767 examples that day (RTX A6000,
-  Chromium). The other 126 went into `scripts/support/readme-run-known.json`; 125 are left there, each with its error. A new failure fails the step, and
+  Chromium). The other 126 went into `scripts/support/readme-run-known.json`; 115 are left there, each with its error. A new failure fails the step, and
   so does an entry that passes or names an example that is gone. An id is the heading above an example and a hash of its code, so
   an example added above one on the list leaves it alone; changing a listed example changes its id, and the entry moves with it.
 - **Repro:** `npm run build:packages`, then `npm run check:readme-run -- --only=<id>` with an id from that list.
-- **Cause:** 106 entries start `sample:`. The example names a file of its own (a font, a scan, a rigged model with named joints)
+- **Cause:** 97 entries start `sample:`. The example names a file of its own (a font, a scan, a rigged model with named joints)
   and the check has no matching sample, or the sample does not fit it, so these say nothing about the example yet. Ragdoll,
-  fbx, the animator's joint indices and `usdz/readme-margoengine-usdz-087124` and `usdz/readme-composition-fbebfe` (no `.usdz` file is in the repository) are in this group. 19 start
+  fbx, the animator's joint indices and `usdz/readme-margoengine-usdz-087124` and `usdz/readme-composition-fbebfe` (no `.usdz` file is in the repository) are in this group. 18 start
   `example:`, and these need reading one at a time:
   - Five attach one plugin twice to one engine, which core refuses (`post/readme-smaa-10a00a`, `shadows/readme-margoengine-shadows-7183ea`, `quality/readme-tier-presets-0abcba`,
     `sky/readme-fog-b452c1`, `ragdoll/readme-saved-profiles-margoengine-ragdo-104541`), so the example shows two alternatives as if one ran after the other.
@@ -3115,18 +3116,20 @@ are still open.
 - **Needed to close:** a matching sample for each `sample:` entry, each `example:` entry fixed in its README or its package, and
   the list empty.
 
-### The README check serves the wrong buffer to a glTF whose real .bin is under 200 bytes
+### The README check counts a Node example that reaches its time limit as a pass
 
-- **What:** an example that loads a `.gltf` the check has no file of that name for gets the smallest `.gltf` sample,
-  `examples/assets/khronos/Cameras/Cameras.gltf`. Its buffer, `Cameras.bin`, is a real 60-byte file, but the check serves
-  the smallest other `.bin` in its place, so the model fails with "Invalid glTF triangle indices". Six entries on the known
-  list end that way (exporters, gltf-pro). Found 2026-11-07 while fixing cache's LoadingManager example.
-- **Repro:** `npm run build:packages`, then `npm run check:readme-run -- --only=gltf-pro/readme-bump-maps-in-gltf-ext-materials-d683f4`.
-- **Cause:** `sampleFiles` in `scripts/run-readme-examples.mjs` drops every file under 200 bytes as a Git LFS pointer or a
-  stub, real files included: `Cameras.bin`, `MultipleScenes_square.bin`, `MultipleScenes_triangle.bin` and
-  `TextureTransformTest.bin`.
-- **Needed to close:** tell an LFS pointer by its first line (`version https://git-lfs.github.com/spec/v1`), not by its size,
-  keep a real small file as a sample of its own name, rerun the whole check and shrink the known list by what then passes.
+- **What:** `runInNode` in `scripts/run-readme-examples.mjs` reports `pass` (note "ran to the 30 s limit") for an example
+  that is still running at 30 s. Under a whole run's load, examples that fail in a few seconds alone can reach the limit
+  and pass, so the same example passes in one run and fails in another, and a known entry can read "passes, still on the
+  known list" only because the machine was busy. Seen 2026-11-07 on the Beelink: four rigging entries
+  (`readme-corrective-shapes-...-ff3e5c`, `readme-face-tracking-...-8fff06`, `readme-ik-chains-...-138226`,
+  `readme-spring-bones-...-a41e82`) passed in a whole run and failed with their listed errors in a run of three packages.
+- **Repro:** on a loaded machine, `npm run check:readme-run`, then `npm run check:readme-run -- --packages=rigging`; compare
+  the rigging results in the two reports.
+- **Cause:** a time limit is taken as "a long-running example, such as a server", not as "unknown"; the result depends on the
+  machine's load.
+- **Needed to close:** tell a server or loop that is meant to keep running from a slow failure (for example by its
+  `listen` port, as `nodeTurns` already reads it), and give the others enough time, or report them as unknown rather than pass.
 
 ## Checks
 
@@ -5558,8 +5561,9 @@ import { TilesRenderer } from 'margoengine/tiles';
 const canvas = document.querySelector('canvas')!;
 const engine = await Engine.create(canvas, { camera: { position: [0, 400, 600], target: [0, 0, 0], far: 50_000 } });
 
+// A real sample city (examples/assets/3d-tiles in this repository); give your own tileset's URL.
 // The tileset's centre lands at the world origin, x east, y up, -z north (the default 'enu' frame).
-const tiles = await TilesRenderer.load(engine, 'https://example.com/city/tileset.json', {
+const tiles = await TilesRenderer.load(engine, '3d-tiles/TilesetWithRequestVolume/city/tileset.json', {
   maximumScreenSpaceError: 16, // pixels; lower is sharper and loads more
   memoryBudget: 256 * 1024 * 1024, // bytes of tile content kept
 });
