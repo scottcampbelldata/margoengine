@@ -207,8 +207,11 @@ if (!quick) {
   for (const [name, owners] of declared)
     for (const dir of owners.keys()) add(dir, 'types', 1, dupNames.has(name) ? 1 : 0);
 
-  // --- Gate 6: TSDoc on exported symbols (TypeScript checker over dist/*.d.ts, like scripts/api-report.js).
-  const { API, SymbolFlags } = await import('typescript/unstable/sync');
+  // --- Gate 6: TSDoc on exported symbols (TypeScript checker over dist/*.d.ts, like scripts/api-report.js). The async
+  // API, not the sync one: on Windows the sync client gives a new tsgo a fixed ~5 s to open a named pipe and threw
+  // "SyncRpcChannel: timed out connecting to named pipe" under verify's load; the async client talks over stdio and
+  // waits for the process (tests/typescript-api-transport.test.js).
+  const { API, SymbolFlags } = await import('typescript/unstable/async');
   const { SyntaxKind } = await import('typescript/unstable/ast');
   const entries = packages.flatMap((dir) =>
     Object.entries(json(`packages/${dir}/package.json`).exports ?? {})
@@ -242,27 +245,31 @@ if (!quick) {
   const undocumented = {};
   const api = new API({ cwd: root });
   try {
-    const { checker, program } = api.updateSnapshot({ openProjects: [join(temp, 'tsconfig.json')] }).getProjects()[0];
+    const snapshot = await api.updateSnapshot({ openProjects: [join(temp, 'tsconfig.json')] });
+    const { checker, program } = snapshot.getProjects()[0];
     const seen = new Set();
     for (const { dir, dts } of entries) {
       const home = slash(join(root, 'packages', dir)).toLowerCase() + '/';
-      for (const symbol of checker.getExportsOfModule(checker.getSymbolAtLocation(program.getSourceFile(dts)))) {
-        const target = symbol.flags & SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol;
+      const module = await checker.getSymbolAtLocation(await program.getSourceFile(dts));
+      for (const symbol of await checker.getExportsOfModule(module)) {
+        const target = symbol.flags & SymbolFlags.Alias ? await checker.getAliasedSymbol(symbol) : symbol;
         const declarations = target.declarations ?? [];
         if (!declarations.length || seen.has(target.id) || declarations[0].kind === SyntaxKind.SourceFile) continue;
         if (!slash(declarations[0].path).toLowerCase().startsWith(home)) continue; // re-exported from another package
         seen.add(target.id);
-        const documented = declarations.some((d) => {
-          const node = d.resolve();
+        let documented = false;
+        for (const d of declarations) {
+          const node = await d.resolve();
           const statement = node.kind === SyntaxKind.VariableDeclaration ? node.parent.parent : node;
-          return (node.jsDoc?.length ?? 0) + (statement.jsDoc?.length ?? 0) > 0;
-        });
+          documented = (node.jsDoc?.length ?? 0) + (statement.jsDoc?.length ?? 0) > 0;
+          if (documented) break;
+        }
         add(dir, 'tsdoc', 1, documented ? 0 : 1);
         if (!documented) (undocumented[dir] ??= []).push(symbol.name);
       }
     }
   } finally {
-    api.close();
+    await api.close();
   }
 
   // --- Gate 7: error convention (typed throws). Also recorded per file for the quality gate (not scored): `bare` Error

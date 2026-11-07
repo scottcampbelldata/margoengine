@@ -928,6 +928,7 @@ Known rendering gaps:
 | Public truth | `tests/public-truth.test.js` | Structured license and package-count statements match their canonical sources. |
 | Timing-test hygiene | fixed-wait and wall-budget tests | Tests wait for readiness; code speed uses CPU time; justified real-time bounds are marked. Both read tracked files only (`git ls-files`), so git-ignored scratch builds cannot fail them. |
 | Async hygiene | support async call test | Async helpers in tests/scripts are awaited or returned. |
+| TypeScript checker transport | `tests/typescript-api-transport.test.js` | `scripts/hygiene.js` and `scripts/api-report.js` start tsgo through `typescript/unstable/async` (stdio, waits for the process); no tracked file uses `typescript/unstable/sync`, whose Windows client gives tsgo a fixed ~5 s to open a named pipe and failed `npm run quality` under verify's load on 2026-11-07. |
 | Node compatibility | CI matrix and proof-golden tests | Minimum and supported Node APIs and proof results stay compatible. |
 | Rust kernel | `npm run test:kernel` | Native kernel invariants. |
 | Class fields | `tests/class-fields.test.js` | Packages on the shared tsconfig declare no bare class fields; `@margoengine/materials` is the one named exception. |
@@ -968,6 +969,11 @@ are the enforceable non-regression layer for the overlapping categories.
 `scripts/verify.mjs` runs fast hygiene and one package build in order, then independent chains in parallel: API,
 quality, parity, sandbox build/tests, unit tests at bounded concurrency, documentation links, size measurement, and
 current proofs. A chain failure terminates the other process trees. Serial mode remains available for diagnosis.
+Three of those chains start a TypeScript checker (tsgo) at about the same time: API reports, quality (through hygiene
+gate 6) and the API report tests in the unit step. Each starts it through the async API, whose start has no fixed time
+limit, so a slow start under load waits instead of failing; the step's own timeout still bounds a hang. Evidence: a
+repro that starves a new tsgo with high-priority busy loops on every core made the sync API fail after 11 s and the
+async API connect once the load ended (Beelink, 2026-11-07).
 The unit test step gives each test 300 s (`TEST_TIMEOUT_MS`, against 32 s for the longest measured), and
 `scripts/support/test-watch.mjs` watches from the runner's process: a test file silent for 360 s, through a blocked event
 loop or a process that stays alive after its tests, prints `HUNG TEST:` with the file and test and ends the run.

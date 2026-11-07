@@ -5,8 +5,11 @@
 // docs/api-surface.md. `--package=<name>` and optional `--entry=<subpath>` limit checking and updates to one package
 // or entry; the program still loads every package's declarations, because another package's `declare module` changes
 // this package's symbols, so a scoped report is the same text the full run writes. Needs `npm run build:packages`. Uses TypeScript 7's checker through its
-// `typescript/unstable/sync` API (no extra dependency); that API is marked unstable, so a TypeScript bump may need edits.
-import { API, SymbolFlags } from 'typescript/unstable/sync';
+// `typescript/unstable/async` API (no extra dependency); that API is marked unstable, so a TypeScript bump may need edits.
+// Not the sync API: on Windows its client gives a new tsgo a fixed ~5 s to open a named pipe and throws "SyncRpcChannel:
+// timed out connecting to named pipe" on a loaded machine; the async client talks over stdio and waits for the process
+// (tests/typescript-api-transport.test.js).
+import { API, SymbolFlags } from 'typescript/unstable/async';
 import { SyntaxKind } from 'typescript/unstable/ast';
 import {
   existsSync,
@@ -104,66 +107,75 @@ const entryOf = new Map(packages.flatMap((pkg) => pkg.entries.map((entry) => [ke
 const exportedBy = new Map(); // symbol id -> first entry of the declaring package that exports it (for import lines)
 let reports;
 try {
-  const project = api.updateSnapshot({ openProjects: [join(temp, 'tsconfig.json')] }).getProjects()[0];
+  const project = (await api.updateSnapshot({ openProjects: [join(temp, 'tsconfig.json')] })).getProjects()[0];
   const { checker, program } = project;
   for (const pkg of packages)
     for (const entry of pkg.entries) {
-      const source = program.getSourceFile(entry.dts);
+      const source = await program.getSourceFile(entry.dts);
       if (!source) continue;
-      const module = checker.getSymbolAtLocation(source);
+      const module = await checker.getSymbolAtLocation(source);
       if (!module) continue;
-      for (const symbol of checker.getExportsOfModule(module)) {
-        const target = symbol.flags & SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol;
+      for (const symbol of await checker.getExportsOfModule(module)) {
+        const target = symbol.flags & SymbolFlags.Alias ? await checker.getAliasedSymbol(symbol) : symbol;
         const path = target.declarations?.[0]?.path;
         if (path && key(path).startsWith(pkg.home) && !exportedBy.has(target.id))
           exportedBy.set(target.id, entry.specifier);
       }
     }
-  reports = reportPackages.map((pkg) => pkg.entries.map((entry) => ({ pkg, entry, ...report(project, pkg, entry) })));
+  reports = [];
+  for (const pkg of reportPackages) {
+    const rows = [];
+    for (const entry of pkg.entries) rows.push({ pkg, entry, ...(await report(project, pkg, entry)) });
+    reports.push(rows);
+  }
 } finally {
-  api.close();
+  await api.close();
   rmSync(temp, { recursive: true, force: true });
 }
 
-function report({ program, checker }, pkg, entry) {
+async function report({ program, checker }, pkg, entry) {
   const local = (path) => {
     const p = key(path);
     return p.startsWith(pkg.home) || p.startsWith(shared);
   };
-  const resolveAlias = (symbol) => (symbol.flags & SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol);
+  const resolveAlias = async (symbol) =>
+    symbol.flags & SymbolFlags.Alias ? await checker.getAliasedSymbol(symbol) : symbol;
   const queue = []; // local declarations whose type references still need a look
   const exported = new Set();
   const imports = new Set();
   const namespaces = new Set(); // "spec\0localName" of namespace imports (`import * as localName from spec`)
   const counts = { exports: 0, any: 0, unexported: 0 };
 
-  const renderModule = (moduleSymbol, indent) => {
-    const exports = [...checker.getExportsOfModule(moduleSymbol)].sort((a, b) => byText(a.name, b.name));
-    for (const symbol of exports) exported.add(resolveAlias(symbol).id);
-    return exports.map((symbol) => renderExport(symbol, indent)).join('\n\n');
+  // One request at a time, in export order: rendering pushes onto `queue` and reads `exported`, so the text is stable.
+  const renderModule = async (moduleSymbol, indent) => {
+    const exports = [...(await checker.getExportsOfModule(moduleSymbol))].sort((a, b) => byText(a.name, b.name));
+    for (const symbol of exports) exported.add((await resolveAlias(symbol)).id);
+    const texts = [];
+    for (const symbol of exports) texts.push(await renderExport(symbol, indent));
+    return texts.join('\n\n');
   };
-  const renderExport = (symbol, indent) => {
-    const target = resolveAlias(symbol);
+  const renderExport = async (symbol, indent) => {
+    const target = await resolveAlias(symbol);
     // Another package's `declare module` merges into this symbol: that is its API, not this entry's.
     const merged = target.declarations ?? [],
       own = merged.filter((declaration) => local(declaration.path)),
       declarations = own.length ? own : merged;
     if (!declarations.length) return `${indent}export { ${symbol.name} }; // unresolved`;
     if (declarations[0].kind === SyntaxKind.SourceFile)
-      return `${indent}export namespace ${symbol.name} {\n${renderModule(target, indent + '    ')}\n${indent}}`;
+      return `${indent}export namespace ${symbol.name} {\n${await renderModule(target, indent + '    ')}\n${indent}}`;
     const rename = target.name === symbol.name ? '' : `${target.name} as `;
     if (!local(declarations[0].path))
       return `${indent}export { ${rename}${symbol.name} } from "${ownerOf(declarations[0].path)}";`;
     queue.push(...declarations);
-    const texts = renderDeclarations(declarations).map(
+    const texts = (await renderDeclarations(declarations)).map(
       (text) => indent + (rename ? '' : 'export ') + text.replaceAll('\n', '\n' + indent),
     );
     return (rename ? `${indent}export { ${rename}${symbol.name} };\n` : '') + texts.join('\n');
   };
 
-  const entrySymbol = checker.getSymbolAtLocation(program.getSourceFile(entry.dts));
-  counts.exports = checker.getExportsOfModule(entrySymbol).length;
-  let body = renderModule(entrySymbol, '');
+  const entrySymbol = await checker.getSymbolAtLocation(await program.getSourceFile(entry.dts));
+  counts.exports = (await checker.getExportsOfModule(entrySymbol)).length;
+  let body = await renderModule(entrySymbol, '');
 
   // Package-local types that exported declarations mention but this entry does not export (API Extractor's
   // "forgotten exports"): their shape is part of this entry's API, so they are snapshotted too.
@@ -182,12 +194,12 @@ function report({ program, checker }, pkg, entry) {
       if (name && name.getText() !== 'this') references.push(name);
       node.forEachChild(visit);
     };
-    visit(declaration.resolve());
+    visit(await declaration.resolve());
     if (!references.length) continue;
-    const symbols = checker.getSymbolAtLocation(references);
+    const symbols = await checker.getSymbolAtLocation(references);
     for (const [index, found] of symbols.entries()) {
       if (!found) continue;
-      const symbol = resolveAlias(found);
+      const symbol = await resolveAlias(found);
       if (exported.has(symbol.id) || symbol.flags & SymbolFlags.TypeParameter) continue;
       if (seen.has(symbol.id)) {
         seen.get(symbol.id)?.used.add(references[index].getText());
@@ -206,13 +218,14 @@ function report({ program, checker }, pkg, entry) {
       const workspace = packages.some((p) => p.name === owner);
       if (owner)
         imports.add(`${exportedBy.get(symbol.id) ?? (workspace ? owner + '#internal' : owner)}\0${symbol.name}`);
-      const declarations = all.filter((d) => local(d.path) && topLevel(d.resolve()));
+      const declarations = [];
+      for (const d of all) if (local(d.path) && topLevel(await d.resolve())) declarations.push(d);
       if (!declarations.length) continue;
       const item = {
         name: symbol.name,
         path: key(declarations[0].path),
         used: new Set([references[index].getText()]),
-        text: renderDeclarations(declarations).join('\n'),
+        text: (await renderDeclarations(declarations)).join('\n'),
       };
       // A `declare module` in another package gives the same declaration a second, merged symbol.
       const twin = unexported.find((other) => other.path === item.path && other.text === item.text);
@@ -256,11 +269,10 @@ function report({ program, checker }, pkg, entry) {
 
   // Global augmentations in the package's loaded declaration files (they apply whenever the package's types load).
   const globals = [];
-  for (const file of program
-    .getSourceFileNames()
+  for (const file of (await program.getSourceFileNames())
     .filter((f) => key(f).startsWith(pkg.home))
     .sort((a, b) => byText(key(a), key(b)))) {
-    for (const statement of program.getSourceFile(file)?.statements ?? []) {
+    for (const statement of (await program.getSourceFile(file))?.statements ?? []) {
       if (statement.kind === SyntaxKind.ModuleDeclaration && /^declare\s+global\b/.test(statement.getText()))
         globals.push('declare ' + clean(statement));
     }
@@ -278,8 +290,8 @@ function topLevel(node) {
 }
 
 // All declarations of one symbol (overloads, merged interfaces, class + namespace), in source order.
-function renderDeclarations(handles) {
-  const nodes = handles.map((h) => h.resolve()).filter(Boolean);
+async function renderDeclarations(handles) {
+  const nodes = (await Promise.all(handles.map((h) => h.resolve()))).filter(Boolean);
   nodes.sort((a, b) => byText(key(a.getSourceFile().fileName), key(b.getSourceFile().fileName)) || a.pos - b.pos);
   return [
     ...new Set(
