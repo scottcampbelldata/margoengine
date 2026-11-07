@@ -46,6 +46,19 @@ A vertex that differs in any kept layer is split, so a file with a separate ligh
 
 Proof: a grid from Blender's own exporter with three UV maps and two colour attributes (`test/fixtures/blender-layers.py`) keeps every value Blender reports.
 
+## Scale inheritance
+
+Every inherit type imports, under any ancestor scale, animated or not. Type 1 is a plain parent and child, so it needs nothing extra, and a shear from an uneven scale above a rotation comes out of the chain as it does in the source tool. Type 2 is Maya's segment scale compensate: the child keeps the parent's translation scale and loses its local scale, so it gets a helper node named `<name> inherit` that holds the translation and the inverse of that scale. Type 0 has the helper too when the scale above is uneven or animated, and if a shear sits above it, it leaves for an empty parent named `<root> group` and holds its whole world, baked through every clip. The helper and the group are real nodes in the GLB, so a walk of the tree sees them; rotation order 6 (spherical) reads as XYZ.
+
+```ts
+import {loadFBX} from 'margoengine/fbx';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const rig = await loadFBX(engine, '/assets/maya-rig.fbx');
+```
+
+Proof: a real Maya rig that mixes types 1 and 2 under uneven animated scale matches all eight frames Maya wrote to the OBJ's six decimals (`test/inherit.test.js`). Type 0 under a shear is by hand-worked result only (stand-in): no real file with it was found.
+
 ## Animation layers and cubic curves
 
 `animationLayers` from `margoengine/fbx/layers` reads every kind of curve (cubic with auto, user, weighted and TCB tangents, constant, constant next) and blends a stack's layers, so clips from MotionBuilder and Maya import as authored.
@@ -114,7 +127,7 @@ Changed on the way: rotations become XYZ Euler curves, with keys added where str
 
 Not written, as FBX has no common slot or the data has no file form here: tangents (tools derive them), the metallic-roughness and occlusion textures, texture transforms, cameras, lights, material animations, and `extras`. Mixing a material with none in one node's primitives rejects with the fix named.
 
-Children of a node with an uneven scale get `InheritType` 1, the plain parent x local product a scene means. This importer rejects such files and zero scales; other tools read them. Blender reads binary FBX only, so use the ASCII form with other tools.
+Children of a node with an uneven scale get `InheritType` 1, the plain parent x local product a scene means. This importer reads them as well. Blender reads binary FBX only, so use the ASCII form with other tools.
 
 `node packages/fbx/test/write-acceptance.js <folder>` writes the files for a manual import check, after a build.
 
@@ -122,7 +135,7 @@ Children of a node with an uneven scale get `InheritType` 1, the plain parent x 
 
 Input is capped at 64 MiB, converted GLB at 128 MiB, expanded position vertices at 1,000,000 across mesh instances, and decoded texture pixels at 16,000,000. Parsing also bounds cumulative decoded arrays to 64 MiB, allocation accounting to 128 MiB, node/property counts, hierarchy depth, and work. Geometry, deformation, and animation have additional work/output limits. These are import budgets, not a zero-allocation or peak-heap guarantee. The downstream glTF runtime separately limits GLB/buffer bytes to 64 MiB, so a larger `convertFBX` result may be exportable but cannot be attached by `parseFBX`.
 
-Unsupported data rejects explicitly: InheritType other than 0, nonuniform ancestor scales (including animated parent scales), unrepresentable shear, spherical rotation order, Additive/TotalOne or nonlinear skinning, progressive morphs, layered textures, and, without `animationLayers`, cubic/mixed/constant-next curves and more than one animation layer. Cameras and lights stay empty nodes without `sceneExtras`. Non-mesh geometry does not produce renderable output. Curves on anything but a node's transform or a blend channel's weight are left out. Extra UV/layer sets and unsupported material maps are omitted. Arbitrary shader graphs are outside the supported material subset.
+Unsupported data rejects explicitly: an InheritType that does not exist, a shear on a node of its own, Additive/TotalOne or nonlinear skinning, progressive morphs, layered textures, and, without `animationLayers`, cubic/mixed/constant-next curves and more than one animation layer. Cameras and lights stay empty nodes without `sceneExtras`. Non-mesh geometry does not produce renderable output. Curves on anything but a node's transform or a blend channel's weight are left out. Extra UV/layer sets and unsupported material maps are omitted. Arbitrary shader graphs are outside the supported material subset.
 
 Array decompression requires platform `DecompressionStream('deflate')`. Image decoding in `parseFBX` requires `createImageBitmap`; `convertFBX` can run headlessly without image decoding. Cancellation is checked during fetch, decompression, parsing, baking, and image decoding; synchronous CPU sections cannot process a newly dispatched abort until the JavaScript event loop resumes.
 

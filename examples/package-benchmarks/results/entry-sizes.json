@@ -1,5 +1,5 @@
 {
-  "commit": "bea14393a",
+  "commit": "4ce63d605",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -684,32 +684,32 @@
     },
     "@margoengine/exporters": {
       ".": {
-        "raw": 102984,
-        "gzip": 35082
+        "raw": 103518,
+        "gzip": 35209
       },
       "./usdz": {
-        "raw": 37544,
-        "gzip": 13410
+        "raw": 37830,
+        "gzip": 13473
       },
       "./usdz-anim": {
-        "raw": 55276,
-        "gzip": 19718
+        "raw": 55562,
+        "gzip": 19785
       },
       "./threemf": {
-        "raw": 42683,
-        "gzip": 15488
+        "raw": 42969,
+        "gzip": 15555
       },
       "./model": {
         "raw": 24235,
         "gzip": 9403
       },
       "./collect": {
-        "raw": 25229,
-        "gzip": 9085
+        "raw": 25515,
+        "gzip": 9149
       },
       "./dae": {
-        "raw": 32104,
-        "gzip": 11748
+        "raw": 32390,
+        "gzip": 11808
       },
       "./capture": {
         "raw": 18182,
@@ -724,8 +724,8 @@
         "gzip": 3415
       },
       "./roblox": {
-        "raw": 59901,
-        "gzip": 19460
+        "raw": 60435,
+        "gzip": 19577
       },
       "./roblox-chunks": {
         "raw": 25454,
@@ -846,24 +846,28 @@
     },
     "@margoengine/fbx": {
       ".": {
-        "raw": 58161,
-        "gzip": 18253
+        "raw": 65050,
+        "gzip": 20607
       },
       "./worker": {
-        "raw": 60797,
-        "gzip": 19160
+        "raw": 67718,
+        "gzip": 21521
       },
       "./export": {
         "raw": 19132,
-        "gzip": 7659
+        "gzip": 7657
       },
       "./scene-extras": {
         "raw": 5289,
         "gzip": 2479
       },
+      "./layers": {
+        "raw": 10393,
+        "gzip": 4524
+      },
       "dist/workers/fbx.js": {
-        "raw": 183501,
-        "gzip": 57630
+        "raw": 197426,
+        "gzip": 62387
       }
     },
     "@margoengine/fsm": {
@@ -2842,9 +2846,9 @@
       "brotli": 14114
     },
     "packages/fbx/dist/workers/fbx.js": {
-      "raw": 182136,
-      "gzip": 57537,
-      "brotli": 50076
+      "raw": 195741,
+      "gzip": 62262,
+      "brotli": 54090
     },
     "packages/usdz/dist/workers/usdz.js": {
       "raw": 214830,

@@ -18,6 +18,7 @@ import {
   determinant3,
 } from './math.js';
 import { buildGeometry, type BuiltGeometry } from './geometry.js';
+import { applyInheritance, type InheritBinding } from './inherit.js';
 import type { ExtensionHooks } from './extension.js';
 
 /** Cumulative import allocations and work, including repeated mesh instances. */
@@ -67,6 +68,10 @@ export interface SceneContext {
   document: FBXDocument;
   nodes: Map<bigint, ExportNode>;
   models: Map<bigint, FBXNode>;
+  /** Each model's parent model. */
+  parents: Map<bigint, bigint>;
+  /** Models with a helper parent, for the inherit types a glTF parent and child cannot give. */
+  inherit: Map<bigint, InheritBinding>;
   incoming: Map<bigint, FBXConnection[]>;
   outgoing: Map<bigint, FBXConnection[]>;
   meshes: MeshBinding[];
@@ -132,6 +137,8 @@ export function context(
     document,
     nodes: new Map(),
     models: new Map(),
+    parents: new Map(),
+    inherit: new Map(),
     incoming,
     outgoing,
     meshes: [],
@@ -323,7 +330,7 @@ export function buildScene(ctx: SceneContext): void {
     ctx.nodes.set(key, node);
     ctx.models.set(key, model);
   }
-  const parentIds = new Map<bigint, bigint>();
+  const parentIds = ctx.parents;
   for (const [key, node] of ctx.nodes) {
     ctx.budget.work((ctx.outgoing.get(key) ?? []).length);
     const parents = (ctx.outgoing.get(key) ?? []).filter((c) => c.kind === 'OO' && ctx.nodes.has(c.parent));
@@ -334,19 +341,14 @@ export function buildScene(ctx: SceneContext): void {
       (ctx.nodes.get(parents[0].parent)!.children as ExportNode[]).push(node);
     } else ctx.roots.push(node);
   }
-  for (const [key, node] of ctx.nodes) {
+  for (const key of ctx.nodes.keys()) {
     let depth = 0;
     for (let parent = parentIds.get(key); parent !== undefined; parent = parentIds.get(parent)) {
       ctx.budget.work();
       if (++depth > 60) throw new RangeError('FBX hierarchy is too deep; flatten the hierarchy');
-      const s = ctx.nodes.get(parent)!.scale ?? [1, 1, 1];
-      // RrSs inheritance is not parent*local when ancestors have nonuniform scale.
-      if (Math.abs(s[0] - s[1]) > 1e-7 || Math.abs(s[1] - s[2]) > 1e-7)
-        throw new TypeError(
-          `Unsupported FBX nonuniform parent scale: ${node.name}; bake or remove it in your 3D tool before export`,
-        );
     }
   }
+  applyInheritance(ctx);
   let vertices = 0;
   const instances = new Map<FBXNode, number>(),
     cache = new Map<FBXNode, BuiltGeometry>();

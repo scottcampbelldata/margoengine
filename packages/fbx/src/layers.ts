@@ -13,7 +13,8 @@ const CONSTANT = 2,
   CONSTANT_NEXT = 0x100,
   TANGENT_TCB = 0x200,
   TANGENT_USER = 0x400,
-  TANGENT_CLAMP = 0x1000,
+  /** Generic clamp and progressive clamp: Maya's auto keys carry the second, and both are flat at a turning point. */
+  TANGENT_CLAMP = 0x1000 | 0x4000,
   WEIGHTED_RIGHT = 0x1000000,
   WEIGHTED_NEXT_LEFT = 0x2000000,
   // A weight of one third of the interval is what a plain Hermite segment has.

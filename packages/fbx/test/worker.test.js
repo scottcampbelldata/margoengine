@@ -101,6 +101,13 @@ test('FBX worker preserves unsupported inheritance errors from the native parser
       ['P', ['FrontAxis', 'int', 'Integer', '', { I: 1 }]],
       ['P', ['FrontAxisSign', 'int', 'Integer', '', { I: -1 }]],
     );
+    // Types 0, 1 and 2 all import, so the error this test carries over the worker is a type that does not exist.
+    const inherit = (node) => {
+      if (!Array.isArray(node)) return;
+      if (node[0] === 'P' && node[1]?.[0] === 'InheritType') node[1][node[1].length - 1] = { I: 9 };
+      node.forEach(inherit);
+    };
+    inherit(scene);
     const input = new Uint8Array(binary(scene, { compress: true }));
     await assert.rejects(parseFBX(await headless(), input.slice()), /unsupported InheritType/);
     await assert.rejects(

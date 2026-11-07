@@ -52,7 +52,8 @@ export function scaling(value: ArrayLike<number>): Float64Array {
   return m;
 }
 
-const orders = ['XYZ', 'XZY', 'YZX', 'YXZ', 'ZXY', 'ZYX'];
+// The seventh is the SDK's spherical XYZ, which it says is read as Euler XYZ outside a tool's own interpolation.
+const orders = ['XYZ', 'XZY', 'YZX', 'YXZ', 'ZXY', 'ZYX', 'XYZ'];
 /** FBX's Euler order names specify the order in which fixed-axis rotations are applied. */
 export function rotationEuler(degrees: ArrayLike<number>, order = 0): Float64Array {
   const v = vector(degrees, 'Euler rotation');
@@ -161,6 +162,31 @@ export function decomposeTRS(m: ArrayLike<number>): TRS {
   };
 }
 
+/**
+ * Rotation and scale of a matrix that may hold shear, as the FBX SDK takes them from a parent's world: each scale is its
+ * column's length and the rotation is the columns made perpendicular in order, X first.
+ */
+export function rotationAndScale(m: ArrayLike<number>): Pick<TRS, 'rotation' | 'scale'> {
+  const column = (c: number) => [m[c * 4], m[c * 4 + 1], m[c * 4 + 2]],
+    dot = (a: number[], b: number[]) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2],
+    x = column(0),
+    y = column(1),
+    z = column(2),
+    sign = determinant3(m) < 0 ? -1 : 1,
+    scale = [Math.hypot(...x) * sign, Math.hypot(...y), Math.hypot(...z)];
+  if (!scale[0] || !scale[1] || !scale[2])
+    throw new RangeError('FBX singular transform; clean up the source model before export');
+  const a = x.map((v) => v / scale[0]),
+    along = dot(y, a),
+    b = y.map((v, k) => v - a[k] * along),
+    lengthB = Math.hypot(...b),
+    c = [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]].map((v) => v / lengthB),
+    r = [...a, ...b.map((v) => v / lengthB), ...c],
+    q = rotationToQuaternion(r);
+  normalizeQuaternion(q, q);
+  return { rotation: [q[0], q[1], q[2], q[3]], scale };
+}
+
 export function transformPoint(m: ArrayLike<number>, x: number, y: number, z: number): number[] {
   return [
     m[0] * x + m[4] * y + m[8] * z + m[12],
@@ -221,12 +247,7 @@ function pivotChain(node: FBXNode): PivotChain {
   // Absent flags retain authored rotations; some FBX producers omit the default template values.
   const active = property(node, 'RotationActive', 1),
     rotationActive = active !== 0 && active !== false;
-  const order = rotationActive ? Number(property(node, 'RotationOrder', 0)) : 0,
-    inherit = Number(property(node, 'InheritType', 0));
-  if (inherit !== 0 && inherit !== 1)
-    throw new RangeError(
-      `FBX unsupported InheritType ${inherit} on ${objectName(node)}; bake or remove it in your 3D tool before export`,
-    );
+  const order = rotationActive ? Number(property(node, 'RotationOrder', 0)) : 0;
   if (!orders[order])
     throw new RangeError(
       `FBX unsupported RotationOrder ${order} on ${objectName(node)}; bake or remove it in your 3D tool before export`,

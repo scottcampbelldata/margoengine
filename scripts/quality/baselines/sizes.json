@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 9087827,
+  "total": 9103965,
   "history": [
     {
       "date": "2026-10-24",
@@ -2888,6 +2888,12 @@
       "commit": "71f2607dd",
       "reason": "gltf-pro gains the metadata entry for KHR_xmp_json_ld",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "4ce63d605",
+      "reason": "FBX layers, inherit types and more real file support (batch 43 jobs 2 to 4)",
+      "grew": 4
     }
   ],
   "items": {
@@ -3089,11 +3095,12 @@
     "@margoengine/exporters/usdz": 13813,
     "@margoengine/exporters/usdz-anim": 20310,
     "@margoengine/exporters/webp": 3661,
-    "@margoengine/fbx": 18653,
-    "@margoengine/fbx dist/workers/fbx.js": 58092,
-    "@margoengine/fbx/export": 7915,
+    "@margoengine/fbx": 21226,
+    "@margoengine/fbx dist/workers/fbx.js": 64259,
+    "@margoengine/fbx/export": 7913,
+    "@margoengine/fbx/layers": 4780,
     "@margoengine/fbx/scene-extras": 2735,
-    "@margoengine/fbx/worker": 19547,
+    "@margoengine/fbx/worker": 22167,
     "@margoengine/fsm": 1131,
     "@margoengine/geometry": 24691,
     "@margoengine/geometry/delaunay": 3404,

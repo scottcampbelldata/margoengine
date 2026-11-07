@@ -141,7 +141,7 @@ test('native scene rejects unsupported inheritance, missing bind data and progre
   const source = rigFixture();
   const cases = [
     [
-      source.replace('Model: 3, "Model::Root", "LimbNode" {', 'Model: 3, "Model::Root", "LimbNode" {\n InheritType: 2'),
+      source.replace('Model: 3, "Model::Root", "LimbNode" {', 'Model: 3, "Model::Root", "LimbNode" {\n InheritType: 3'),
       /InheritType/,
     ],
     [source.replace('TransformLink: *16', 'MissingTransformLink: *16'), /bind matrix/i],
@@ -156,10 +156,6 @@ test('native scene rejects unsupported inheritance, missing bind data and progre
         'AnimationLayer: 31, "AnimLayer::Base", "" {\n BlendMode: 1',
       ),
       /layer mode/i,
-    ],
-    [
-      source.replace('C: "OP",32,4,"Lcl Translation"', 'C: "OP",32,3,"Lcl Scaling"'),
-      /animated nonuniform parent scale/i,
     ],
   ];
   for (const [fixture, pattern] of cases) await assert.rejects(convertFBX(bytes(fixture)), pattern);

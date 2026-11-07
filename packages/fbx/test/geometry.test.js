@@ -191,6 +191,20 @@ test('self-intersecting same-sign-turn star polygons are rejected', () => {
   assert.throws(() => buildGeometry(mesh(positions, [0, 2, 4, 1, -4])), /crosses itself/);
 });
 
+test('a zero tangent, or one along the normal, becomes a unit vector across the normal', () => {
+  for (const given of [
+    [0, 0, 0],
+    [0, 0, 1],
+  ]) {
+    const result = buildGeometry(
+      mesh([0, 0, 0, 1, 0, 0, 0, 1, 0], [0, 1, -3], [layer('LayerElementTangent', 'AllSame', 'Direct', 'Tangents', given)]),
+    );
+    const t = result.primitives[0].geometry.tangents;
+    assert.ok(Math.abs(Math.hypot(t[0], t[1], t[2]) - 1) < 1e-6);
+    assert.ok(Math.abs(t[2]) < 1e-6);
+  }
+});
+
 test('FBX tangent frame reverses handedness when V is flipped', () => {
   const result = buildGeometry(
     mesh(
@@ -237,7 +251,9 @@ test('all six FBX fixed-axis Euler orders produce known quarter-turn results', (
   ];
   for (let order = 0; order < 6; order++)
     close(transformPoint(rotationEuler([90, 90, 90], order), 1, 0, 0), expected[order]);
-  assert.throws(() => rotationEuler([0, 0, 0], 6), /RotationOrder/);
+  // Spherical order is 6: Maya's interpolation choice, with the angles still read as XYZ.
+  close(rotationEuler([23, 48, 71], 6), rotationEuler([23, 48, 71], 0));
+  assert.throws(() => rotationEuler([0, 0, 0], 7), /RotationOrder/);
 });
 
 test('matrix inverse and mirrored TRS decomposition preserve the affine transform', () => {
@@ -284,7 +300,6 @@ test('FBX pivots, pre-rotation and inverse post-rotation bake into local TRS', (
   const source = model({ GeometricTranslation: [5, 0, 0] });
   close(fbxLocalTransform(source), identity());
   close(transformPoint(fbxGeometricTransform(source), 0, 0, 0), [5, 0, 0]);
-  assert.throws(() => fbxLocalTransform(model({ InheritType: 2 })), /InheritType 2 on Fixture/);
 });
 
 test('one node evaluated at many keys: each result is its own matrix, equal to the chain composed from scratch', () => {

@@ -398,8 +398,16 @@ export function buildGeometry(node: FBXNode, all = false): BuiltGeometry {
       tx -= nx * projection;
       ty -= ny * projection;
       tz -= nz * projection;
-      const tlength = Math.hypot(tx, ty, tz);
-      if (!tlength) throw new RangeError('FBX tangent must be nonzero and perpendicular to its normal');
+      let tlength = Math.hypot(tx, ty, tz);
+      // Tools write a zero tangent, or the normal, where a face's UVs give no direction. No texture has a direction to
+      // follow there either, so any unit vector across the normal serves: the axis least like it, made perpendicular.
+      if (tlength < 1e-6) {
+        const axis = Math.abs(nx) <= Math.abs(ny) && Math.abs(nx) <= Math.abs(nz) ? 0 : Math.abs(ny) <= Math.abs(nz) ? 1 : 2;
+        tx = (axis === 0 ? 1 : 0) - nx * (axis === 0 ? nx : axis === 1 ? ny : nz);
+        ty = (axis === 1 ? 1 : 0) - ny * (axis === 0 ? nx : axis === 1 ? ny : nz);
+        tz = (axis === 2 ? 1 : 0) - nz * (axis === 0 ? nx : axis === 1 ? ny : nz);
+        tlength = Math.hypot(tx, ty, tz);
+      }
       tx /= tlength;
       ty /= tlength;
       tz /= tlength;

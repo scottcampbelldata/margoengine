@@ -1,5 +1,6 @@
-import type { AnimationData, AnimationChannelData } from '@margoengine/exporters';
+import type { AnimationData, AnimationChannelData, ExportNode } from '@margoengine/exporters';
 import { array, findChild, id, objectName, property, type FBXNode } from './document.js';
+import { ancestors, helperParts, place, type Placements } from './inherit.js';
 import { children, localParts, type SceneContext } from './scene.js';
 import type { MorphBinding } from './morph.js';
 
@@ -136,41 +137,27 @@ function commonTimes(curves: Curve[]): number[] {
 }
 export type Axes = (Curve | undefined)[];
 type Parts = ReturnType<typeof localParts>;
-function createLocalSampler(
-  ctx: SceneContext,
-  model: FBXNode,
-  tracks: Map<string, Axes>,
-): (time: number) => Parts {
-  const defaults = {
-    translation: property(model, 'Lcl Translation', [0, 0, 0]),
-    rotation: property(model, 'Lcl Rotation', [0, 0, 0]),
-    scale: property(model, 'Lcl Scaling', [1, 1, 1]),
-  };
-  const hasModelChildren = children(ctx, id(model.properties[0])).some((n) => n.name === 'Model');
+type Override = { translation?: number[]; rotation?: number[]; scale?: number[] };
+/** A model's animated values at a time: each track's axes, the model's own value on an axis with no curve. */
+function overrides(model: FBXNode, tracks: Map<string, Axes>, time: number): Override {
+  const override: Override = {};
+  for (const [name, path, rest] of [
+    ['Lcl Translation', 'translation', [0, 0, 0]],
+    ['Lcl Rotation', 'rotation', [0, 0, 0]],
+    ['Lcl Scaling', 'scale', [1, 1, 1]],
+  ] as const) {
+    const axes = tracks.get(name);
+    if (!axes) continue;
+    const fixed = property(model, name, rest) as ArrayLike<number>;
+    override[path] = [0, 1, 2].map((k) => (axes[k] ? sample(axes[k]!, time) : fixed[k]));
+  }
+  return override;
+}
+function createLocalSampler(ctx: SceneContext, model: FBXNode, tracks: Map<string, Axes>): (time: number) => Parts {
   let samples = 0;
   return function sampleLocal(time: number): Parts {
     if ((++samples & 255) === 0) ctx.signal?.throwIfAborted();
-    const override: { translation?: number[]; rotation?: number[]; scale?: number[] } = {};
-    for (const [name, path] of [
-      ['Lcl Translation', 'translation'],
-      ['Lcl Rotation', 'rotation'],
-      ['Lcl Scaling', 'scale'],
-    ] as const) {
-      const axes = tracks.get(name);
-      if (axes)
-        override[path] = [0, 1, 2].map((k) =>
-          axes[k] ? sample(axes[k]!, time) : (defaults[path] as ArrayLike<number>)[k],
-        );
-    }
-    if (
-      hasModelChildren &&
-      override.scale &&
-      (Math.abs(override.scale[0] - override.scale[1]) > 1e-7 || Math.abs(override.scale[1] - override.scale[2]) > 1e-7)
-    )
-      throw new TypeError(
-        'Unsupported FBX animated nonuniform parent scale; bake or remove it in your 3D tool before export',
-      );
-    return localParts(ctx, model, override, true);
+    return localParts(ctx, model, overrides(model, tracks, time), true);
   };
 }
 
@@ -359,9 +346,44 @@ export function buildAnimations(ctx: SceneContext, morphs: MorphBinding[]): Anim
   for (const stack of ctx.document.objects.values()) {
     if (stack.name !== 'AnimationStack') continue;
     const channels: AnimationChannelData[] = [],
+      write = (
+        node: ExportNode,
+        times: number[],
+        at: (time: number) => Parts,
+        tracks: Map<string, Axes>,
+        interpolation: Curve['interpolation'] = [...tracks.values()].flat().find(Boolean)!.interpolation,
+      ) => {
+        reserve(times.length * 11);
+        const outputs = {
+          translation: new Float32Array(times.length * 3),
+          rotation: new Float32Array(times.length * 4),
+          scale: new Float32Array(times.length * 3),
+        };
+        for (let i = 0; i < times.length; i++) {
+          const value = at(times[i]);
+          outputs.translation.set(value.translation, i * 3);
+          outputs.rotation.set(value.rotation, i * 4);
+          outputs.scale.set(value.scale, i * 3);
+          if (i)
+            keepQuaternionHemisphere(
+              outputs.rotation.subarray((i - 1) * 4, i * 4),
+              outputs.rotation.subarray(i * 4, i * 4 + 4),
+            );
+        }
+        for (const [name, path, width] of [
+          ['Lcl Translation', 'translation', 3],
+          ['Lcl Rotation', 'rotation', 4],
+          ['Lcl Scaling', 'scale', 3],
+        ] as const) {
+          const rest = node[path] ?? (path === 'rotation' ? [0, 0, 0, 1] : path === 'scale' ? [1, 1, 1] : [0, 0, 0]);
+          if (tracks.has(name) || outputs[path].some((v, i) => Math.abs(v - rest[i % width]) > 1e-6))
+            channels.push({ node, path, interpolation, times: Float32Array.from(times), values: outputs[path] });
+        }
+      },
       layers = children(ctx, id(stack.properties[0])).filter((n) => n.name === 'AnimationLayer'),
       { models, weights } = blender ? blender.blend!(ctx, layers, read) : singleLayer(ctx, layers, cache);
     for (const [key, tracks] of models) {
+      if (ctx.inherit.has(key)) continue;
       const model = ctx.models.get(key)!,
         node = ctx.nodes.get(key)!,
         all = [...tracks.values()].flat().filter((c): c is Curve => !!c),
@@ -376,32 +398,42 @@ export function buildAnimations(ctx: SceneContext, morphs: MorphBinding[]): Anim
                 !!turning?.some((c) => c?.wrapped),
               )
             : seed;
-      reserve(times.length * 11);
-      const outputs = {
-        translation: new Float32Array(times.length * 3),
-        rotation: new Float32Array(times.length * 4),
-        scale: new Float32Array(times.length * 3),
-      };
-      for (let i = 0; i < times.length; i++) {
-        const value = sampleLocal(times[i]);
-        outputs.translation.set(value.translation, i * 3);
-        outputs.rotation.set(value.rotation, i * 4);
-        outputs.scale.set(value.scale, i * 3);
-        if (i)
-          keepQuaternionHemisphere(
-            outputs.rotation.subarray((i - 1) * 4, i * 4),
-            outputs.rotation.subarray(i * 4, i * 4 + 4),
-          );
-      }
-      for (const [name, path, width] of [
-        ['Lcl Translation', 'translation', 3],
-        ['Lcl Rotation', 'rotation', 4],
-        ['Lcl Scaling', 'scale', 3],
-      ] as const) {
-        const rest = node[path] ?? (path === 'rotation' ? [0, 0, 0, 1] : path === 'scale' ? [1, 1, 1] : [0, 0, 0]);
-        if (tracks.has(name) || outputs[path].some((v, i) => Math.abs(v - rest[i % width]) > 1e-6))
-          channels.push({ node, path, interpolation, times: Float32Array.from(times), values: outputs[path] });
-      }
+      write(node, times, sampleLocal, tracks);
+    }
+    // A node with a helper moves with its own curves and with any scale above it.
+    for (const key of ctx.inherit.keys()) {
+      const own = models.get(key),
+        binding = ctx.inherit.get(key)!,
+        // A detached node holds its world, so all of its ancestors move it; below a helper only their scale reaches it.
+        above = ancestors(ctx, key).flatMap((up) =>
+          binding.detached ? [...(models.get(up)?.values() ?? [])].flat() : (models.get(up)?.get('Lcl Scaling') ?? []),
+        ),
+        all = [...(own?.values() ?? []), above].flat().filter((c): c is Curve => !!c);
+      if (!all.length) continue;
+      const at = (time: number) => {
+          const memo: Placements = new Map(),
+            read = (model: bigint) => {
+              const tracks = models.get(model);
+              return tracks && overrides(ctx.models.get(model)!, tracks, time);
+            };
+          return helperParts(ctx, place(ctx, key, read, memo), binding);
+        },
+        seed = commonTimes(all),
+        turning = own?.get('Lcl Rotation'),
+        times =
+          all[0].interpolation === 'LINEAR'
+            ? refineTimes(
+                seed,
+                at,
+                (a, b, p, alpha) =>
+                  (!a.helper || partsAgree(a.helper, b.helper!, p.helper!, alpha)) && partsAgree(a.own, b.own, p.own, alpha),
+                jumpStarts(all),
+                (start, end) =>
+                  (turning ?? []).some((c) => c && !c.wrapped && Math.abs(sample(c, end) - sample(c, start)) > 45),
+              )
+            : seed;
+      if (binding.helper) write(binding.helper, times, (time) => at(time).helper!, new Map(), all[0].interpolation);
+      write(ctx.nodes.get(key)!, times, (time) => at(time).own, new Map(), all[0].interpolation);
     }
     for (const binding of morphs) {
       const curves = binding.channels.map((key) => weights.get(key)),
