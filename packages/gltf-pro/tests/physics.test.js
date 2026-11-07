@@ -1,11 +1,10 @@
-// KHR_physics_rigid_bodies and KHR_implicit_shapes against real Rapier: the published sample files, and what they do when
+// KHR_physics_rigid_bodies and KHR_implicit_shapes against the real solver: the published sample files, and what they do when
 // simulated, held to the mechanics they describe. Samples without a licence are read through MARGO_SPLAT_SAMPLES.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import RAPIER from '../../../node_modules/@dimforge/rapier3d-compat/dist/rapier.mjs';
 import { Physics, collisionGroups } from '../../physics/dist/index.js';
 import { GLTFAsset } from '../dist/index.js';
 import { applyGLTFPhysics, filterMasks, jointOptions, shapeCollider } from '../dist/physics.js';
@@ -15,6 +14,8 @@ console.warn = () => {};
 await Physics.load();
 console.warn = warn;
 
+const vectorOf = ([x, y, z]) => ({ x, y, z });
+const quatOf = ({ rotation: [x, y, z, w] }) => ({ x, y, z, w });
 const fixture = (name) => fileURLToPath(new URL(`./fixtures/physics/${name}`, import.meta.url));
 const samples = process.env.MARGO_SPLAT_SAMPLES ? join(process.env.MARGO_SPLAT_SAMPLES, 'physics') : undefined;
 const unlicensed = samples && existsSync(join(samples, 'JointTypes.gltf')) ? false : 'set MARGO_SPLAT_SAMPLES to the samples folder';
@@ -70,16 +71,16 @@ test('the real JointPendulum swings with the period of a physical pendulum', asy
   const { physics, gltf } = await load(modelOf(fixture('JointPendulum.gltf')));
   assert.deepEqual(gltf.notes, []);
   const bob = gltf.bodies.get(1);
-  assert.equal(bob.raw.mass(), 1);
+  assert.equal(bob.mass, 1);
   // Pivot 2 m from a centre of mass of 1 kg and 0.1 kg m2, released 0.6 rad out.
   const moment = 0.1 + 1 * 2 * 2,
     amplitude = 0.6,
     small = 2 * Math.PI * Math.sqrt(moment / (9.81 * 2)),
     expected = small * (1 + amplitude ** 2 / 16 + (11 * amplitude ** 4) / 3072);
   const crossings = [];
-  let last = bob.raw.translation().x;
+  let last = bob.position[0];
   steps(physics, 60 * 12, (i) => {
-    const x = bob.raw.translation().x;
+    const x = bob.position[0];
     if (last > 0 !== x > 0) crossings.push((i + 1 - x / (x - last)) / 60);
     last = x;
   });
@@ -88,8 +89,8 @@ test('the real JointPendulum swings with the period of a physical pendulum', asy
   // Semi-implicit Euler at 60 Hz moves the period by about (w dt)^2 / 24, under 0.01 percent; 1 percent leaves the joint's solver its error.
   near(period, expected, expected * 0.01, 'period');
   // The pivot stays at the frame the file names.
-  const q = bob.raw.rotation(),
-    p = bob.raw.translation(),
+  const q = quatOf(bob),
+    p = vectorOf(bob.position),
     pivotX = p.x + 2 * 2 * (q.x * q.y - q.z * q.w),
     pivotY = p.y + 2 * (1 - 2 * (q.x * q.x + q.z * q.z));
   near(pivotX, 0, 1e-2, 'pivot x');
@@ -103,7 +104,7 @@ test('the real DrivenHinge holds its target, connected frame ahead of the joint 
   const { physics, gltf } = await load(model);
   const door = gltf.bodies.get(1);
   steps(physics, 60 * 30);
-  const q = door.raw.rotation(),
+  const q = quatOf(door),
     yaw = 2 * Math.atan2(q.y, q.w);
   // A spring of 8 and a damper of 2 on 1 kg m2 plus 2 kg at 1 m: damping ratio 0.2 at 1.6 rad/s, under 0.1 percent left
   // after 30 s. A sleeping door stopped at 0.65. The connected node is at +0.7 in the door's frame, so the door turns -0.7.
@@ -119,7 +120,7 @@ test('the animated drive target of the real DrivenHinge moves the door, on the w
   assert.ok(new Set(values).size > 1, 'the track moves');
   const door = gltf.bodies.get(1);
   const seen = [];
-  steps(physics, Math.ceil(times.at(-1) * 60), () => seen.push(2 * Math.atan2(door.raw.rotation().y, door.raw.rotation().w)));
+  steps(physics, Math.ceil(times.at(-1) * 60), () => seen.push(2 * Math.atan2(quatOf(door).y, quatOf(door).w)));
   const span = Math.max(...seen) - Math.min(...seen);
   assert.ok(span > 0.1, 'the door moved with the channel: ' + span);
 });
@@ -129,10 +130,10 @@ test('setPointer writes a drive and a motion, and says false for what it does no
   const { physics, gltf } = await load(model);
   assert.equal(gltf.setPointer('/extensions/KHR_physics_rigid_bodies/physicsJoints/0/drives/0/positionTarget', -0.5), true);
   steps(physics, 60 * 30);
-  const q = gltf.bodies.get(1).raw.rotation();
+  const q = quatOf(gltf.bodies.get(1));
   near(2 * Math.atan2(q.y, q.w), 0.5, 2e-3, 'door angle');
   assert.equal(gltf.setPointer('/nodes/1/extensions/KHR_physics_rigid_bodies/motion/gravityFactor', 0.25), true);
-  assert.equal(gltf.bodies.get(1).raw.gravityScale(), 0.25);
+  assert.equal(gltf.bodies.get(1).gravityScale, 0.25);
   assert.equal(gltf.setPointer('/nodes/0/extensions/KHR_physics_rigid_bodies/motion/mass', 1), false);
   assert.equal(gltf.setPointer('/extensions/KHR_physics_rigid_bodies/physicsJoints/9/drives/0/stiffness', 1), false);
 });
@@ -190,14 +191,14 @@ test('the real AnimatedPlatform carries the kinematic node as the animation move
     rider = gltf.bodies.get(2);
   assert.equal(platform.type, 'kinematicPosition');
   steps(physics, 60);
-  const start = rider.raw.translation().x;
+  const start = rider.position[0];
   // The animation, standing in for the Animation player, slides the node 1 m in 1 s.
   steps(physics, 60, () => {
     matrix[12] += 1 / 60;
   });
-  near(platform.raw.translation().x, -1, 1 / 30, 'platform');
+  near(platform.position[0], -1, 1 / 30, 'platform');
   // Friction carries the rider; a cube on a moving floor slips a little as the floor starts.
-  assert.ok(rider.raw.translation().x - start > 0.5, 'rider moved with it: ' + rider.raw.translation().x);
+  assert.ok(rider.position[0] - start > 0.5, 'rider moved with it: ' + rider.position[0]);
 });
 
 test('the real AnimatedScale grows the collider with the scale of its node', async () => {
@@ -208,13 +209,13 @@ test('the real AnimatedScale grows the collider with the scale of its node', asy
   const platform = gltf.bodies.get(1);
   near(platform.colliders[0].halfExtents().y, 0.15, 1e-6, 'before');
   steps(physics, 90);
-  const rest = gltf.bodies.get(2).raw.translation().y;
+  const rest = gltf.bodies.get(2).position[1];
   // Top of the platform 0.5 + 0.15, plus half the cube, 0.25.
   near(rest, 0.9, 0.02, 'rider at rest');
   matrix[5] = 1.3;
   steps(physics, 90);
   near(platform.colliders[0].halfExtents().y, 0.65, 1e-6, 'after');
-  near(gltf.bodies.get(2).raw.translation().y, 1.4, 0.02, 'rider lifted');
+  near(gltf.bodies.get(2).position[1], 1.4, 0.02, 'rider lifted');
 });
 
 test('restitution bounces to e squared of the drop, and friction stops a slide where the coefficient says', async () => {
@@ -230,11 +231,11 @@ test('restitution bounces to e squared of the drop, and friction stops a slide w
   const ball = gltf.bodies.get(1);
   let peak = 0,
     bounced = false,
-    last = ball.raw.linvel().y;
+    last = ball.linearVelocity[1];
   steps(physics, 240, () => {
-    const v = ball.raw.linvel().y;
+    const v = ball.linearVelocity[1];
     if (v > 0) bounced = true;
-    if (bounced) peak = Math.max(peak, ball.raw.translation().y - 0.5);
+    if (bounced) peak = Math.max(peak, ball.position[1] - 0.5);
     last = v;
   });
   assert.ok(bounced);
@@ -246,7 +247,7 @@ test('restitution bounces to e squared of the drop, and friction stops a slide w
   near(rule.friction(), 0.4, 1e-6, 'friction');
 });
 
-test('collision filters reach Rapier: each side must let the other in, and system lists compare whole', async () => {
+test('collision filters reach the solver: each side must let the other in, and system lists compare whole', async () => {
   const filters = [
     { collisionSystems: ['a'], notCollideWithSystems: ['b'] },
     { collisionSystems: ['b'] },
@@ -274,8 +275,8 @@ test('collision filters reach Rapier: each side must let the other in, and syste
   );
   const { physics, gltf } = await load(docModel(file));
   steps(physics, 120);
-  near(gltf.bodies.get(1).raw.translation().y, 0.5, 0.02, 'allowed pair rests');
-  assert.ok(gltf.bodies.get(2).raw.translation().y < -1, 'refused pair falls through');
+  near(gltf.bodies.get(1).position[1], 0.5, 0.02, 'allowed pair rests');
+  assert.ok(gltf.bodies.get(2).position[1] < -1, 'refused pair falls through');
 });
 
 test('more than 15 distinct filters is refused, identical ones share a group', () => {
@@ -306,25 +307,24 @@ test('mass, inertia, centre of mass and gravity factor take the file; 0 is infin
     [box([1, 1, 1])],
   );
   const { physics, gltf } = await load(docModel(file));
-  const sized = gltf.bodies.get(0).raw,
-    custom = gltf.bodies.get(1).raw,
-    inertia = sized.principalInertia();
-  assert.equal(sized.mass(), 8);
+  const sized = gltf.bodies.get(0),
+    custom = gltf.bodies.get(1),
+    inertia = sized.principalInertia;
+  assert.equal(sized.mass, 8);
   // Solid cube of 8 kg, side 1: m s^2 / 6 about each axis.
-  near(inertia.x, 8 / 6, 1e-4, 'inertia follows the shape when only mass is set');
-  assert.equal(custom.mass(), 2);
-  near(custom.localCom().x, 1, 1e-6, 'centre of mass is in node space, scale 2');
-  const moments = custom.principalInertia();
+  near(inertia[0], 8 / 6, 1e-4, 'inertia follows the shape when only mass is set');
+  assert.equal(custom.mass, 2);
+  near(custom.centerOfMass[0], 1, 1e-6, 'centre of mass is in node space, scale 2');
   assert.deepEqual(
-    [moments.x, moments.y, moments.z].map((v) => Math.round(v * 1e4) / 1e4).sort(),
+    custom.principalInertia.map((v) => Math.round(v * 1e4) / 1e4).sort(),
     [1, 2, 3],
   );
-  assert.equal(custom.gravityScale(), 0.5);
+  assert.equal(custom.gravityScale, 0.5);
   steps(physics, 60);
-  near(gltf.bodies.get(2).raw.translation().y, 0, 1e-6, 'infinite mass does not fall');
-  near(gltf.bodies.get(3).raw.translation().x, 16, 1e-3, 'kinematic keeps its velocity');
+  near(gltf.bodies.get(2).position[1], 0, 1e-6, 'infinite mass does not fall');
+  near(gltf.bodies.get(3).position[0], 16, 1e-3, 'kinematic keeps its velocity');
   // A node space spin about Z, on a node turned 90 degrees about Y, is a world spin about X.
-  const spin = gltf.bodies.get(4).raw.angvel();
+  const spin = vectorOf(gltf.bodies.get(4).angularVelocity);
   near(spin.x, 1, 1e-3, 'spin');
   near(spin.z, 0, 1e-3, 'spin');
 });
@@ -354,7 +354,7 @@ test('a collider joins the body above it, a child motion is its own body, and sc
 
 test('the implicit shapes map to their exact collider, or a hull with a note', () => {
   const unit = [1, 1, 1],
-    make = (shape, scale = unit) => shapeCollider(shape, scale, RAPIER);
+    make = (shape, scale = unit) => shapeCollider(shape, scale);
   assert.deepEqual(make(box([1, 2, 3]), [2, 2, 2]).collider, { shape: 'box', halfExtents: [1, 2, 3] });
   assert.deepEqual(make({ type: 'sphere' }).collider, { shape: 'sphere', radius: 0.5 });
   assert.deepEqual(make({ type: 'cylinder' }).collider, { shape: 'cylinder', halfHeight: 0.25, radius: 0.25 });
@@ -380,7 +380,7 @@ test('the implicit shapes map to their exact collider, or a hull with a note', (
   const tapered = make({ type: 'cylinder', cylinder: { height: 1, radiusTop: 0.2, radiusBottom: 0.6 } });
   assert.equal(count(tapered), 64);
   assert.match(tapered.note, /64 points/);
-  assert.equal(make({ type: 'plane' }).collider.shape, 'custom');
+  assert.equal(make({ type: 'plane' }).collider.shape, 'halfSpace');
   const panel = make({ type: 'plane', plane: { sizeX: 2, sizeZ: 4 } });
   assert.deepEqual(panel.collider.halfExtents, [1, 0.001, 2]);
   assert.deepEqual(panel.collider.offset, [0, -0.001, 0]);
@@ -398,7 +398,7 @@ test('an infinite plane stops what falls on it, its normal +Y of the node', asyn
   );
   const { physics, gltf } = await load(docModel(file));
   steps(physics, 180);
-  near(gltf.bodies.get(1).raw.translation().y, -0.5, 0.02, 'resting');
+  near(gltf.bodies.get(1).position[1], -0.5, 0.02, 'resting');
 });
 
 test('joint limits become locks, ranges and notes; several axes at once say what they lose', () => {
@@ -503,7 +503,7 @@ test('a mesh collider is the mesh of the node it names, as triangles or a hull',
   assert.equal(still.vertices().length, 12);
   assert.deepEqual([...still.vertices()].slice(0, 3), [-2, 0, -2], 'the node scale reaches the triangles');
   assert.equal(still.indices().length, 12);
-  assert.ok(gltf.bodies.get(1).raw.mass() > 0, 'a hull has volume');
+  assert.ok(gltf.bodies.get(1).mass > 0, 'a hull has volume');
 });
 
 for (const [name, joints] of [
@@ -521,7 +521,7 @@ for (const [name, joints] of [
     assert.ok(gltf.bodies.size > 0);
     steps(physics, 240);
     for (const made of gltf.bodies.values()) {
-      const p = made.raw.translation();
+      const p = vectorOf(made.position);
       assert.ok([p.x, p.y, p.z].every(Number.isFinite), 'finite pose');
     }
   });
@@ -534,8 +534,8 @@ test('the real Materials_Restitution orders its bounces by coefficient', { skip:
     bounced = new Set();
   steps(physics, 300, () => {
     for (const [i, made] of movers) {
-      if (made.raw.linvel().y > 0) bounced.add(i);
-      if (bounced.has(i)) peaks.set(i, Math.max(peaks.get(i), made.raw.translation().y));
+      if (made.linearVelocity[1] > 0) bounced.add(i);
+      if (bounced.has(i)) peaks.set(i, Math.max(peaks.get(i), made.position[1]));
     }
   });
   const restitution = (i) => gltf.bodies.get(i).colliders[0].restitution(),
@@ -557,8 +557,8 @@ test('the real JointTypes keeps every closed anchor together while the bodies fa
     defs = model.asset.doc.extensions.KHR_physics_rigid_bodies.physicsJoints,
     gap = (joint) => {
       const turn = (body, v) => {
-          const q = body.raw.rotation(),
-            p = body.raw.translation(),
+          const q = quatOf(body),
+            p = vectorOf(body.position),
             tx = 2 * (q.y * v.z - q.z * v.y),
             ty = 2 * (q.z * v.x - q.x * v.z),
             tz = 2 * (q.x * v.y - q.y * v.x);
@@ -568,8 +568,8 @@ test('the real JointTypes keeps every closed anchor together while the bodies fa
             p.z + v.z + q.w * tz + q.x * ty - q.y * tx,
           ];
         },
-        a = turn(joint.bodyA, joint.raw.anchor1()),
-        b = turn(joint.bodyB, joint.raw.anchor2());
+        a = turn(joint.bodyA, vectorOf(joint.anchorA)),
+        b = turn(joint.bodyB, vectorOf(joint.anchorB));
       return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
     };
   const closed = [...gltf.joints].filter(([node]) => {
@@ -580,7 +580,7 @@ test('the real JointTypes keeps every closed anchor together while the bodies fa
   const moved = new Set();
   steps(physics, 240, () => {
     for (const [node, joint] of closed) {
-      if (Math.hypot(joint.bodyB.raw.linvel().y, joint.bodyA.raw.linvel().y) > 0.05) moved.add(node);
+      if (Math.hypot(joint.bodyB.linearVelocity[1], joint.bodyA.linearVelocity[1]) > 0.05) moved.add(node);
       // The solver works a joint error off over steps: 1 cm against bodies moving about a metre a second.
       assert.ok(gap(joint) < 0.01, `joint of node ${node} opened ${gap(joint)}`);
     }

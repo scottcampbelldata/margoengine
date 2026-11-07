@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import React, { StrictMode, Suspense } from 'react';
 import { engines, render, act, flush, close, near } from './physics-xr-support.js';
 import { Physics as RealPhysics } from '@margoengine/physics';
-import RAPIER from '@dimforge/rapier3d-compat';
 const warn = console.warn;
 console.warn = () => {};
 await RealPhysics.load();
@@ -58,7 +57,7 @@ function BoundsModel({ position = [0, 0, 0], brokenBounds = false }) {
 }
 afterEach(close);
 
-test('Physics dynamically binds a real Rapier world and RigidBody fits descendant geometry once in StrictMode', async () => {
+test('Physics dynamically binds a real solver world and RigidBody fits descendant geometry once in StrictMode', async () => {
   let world,
     body,
     ready = 0,
@@ -359,7 +358,7 @@ test('hull falls back to bounds corners and unusable bounds report a handled dia
   );
   await flush();
   assert.equal(hull.colliders.length, 1);
-  assert.equal(hull.colliders[0].shapeType(), RAPIER.ShapeType.ConvexPolyhedron);
+  assert.equal(hull.colliders[0].shape, 'convexHull');
   near(hull.mass, 48);
   for (let frame = 0; frame < 3; frame++) engines.at(-1).render({ delta: 0 });
   assert.equal(broken.colliders.length, 0);
@@ -386,7 +385,7 @@ test('exact trimesh from retained CPU geometry uses indexed triangles without re
   );
   await flush();
   assert.equal(exact.colliders.length, 1);
-  assert.equal(exact.colliders[0].shapeType(), RAPIER.ShapeType.TriMesh);
+  assert.equal(exact.colliders[0].shape, 'trimesh');
   assert.equal(exact.colliders[0].vertices().length, 72);
   assert.equal(exact.colliders[0].indices().length, 36);
   assert.equal(native.colliders.length, 1);
@@ -456,7 +455,7 @@ test('explicit cuboid and ball children bypass automatic fitting and release onl
   near(cuboid.friction(), 0.2);
   view.rerender(scene(false));
   await flush();
-  assert.equal(cuboid.isValid(), false);
+  assert.equal(cuboid.valid, false);
   assert.equal(body.colliders.length, 1);
   near(body.colliders[0].radius(), 0.8);
   assert.deepEqual(failures, []);
@@ -465,7 +464,7 @@ test('explicit cuboid and ball children bypass automatic fitting and release onl
   view.rerender(tree(h(Physics, null)));
   await flush();
   assert.equal(body.valid, false);
-  assert.equal(sphere.isValid(), false);
+  assert.equal(sphere.valid, false);
 });
 
 test('explicit collider is available before the visual model loads and colliders=false never creates an automatic duplicate', async () => {
@@ -530,10 +529,10 @@ test('explicit collider transform prop updates replace only their collider after
   await flush();
   assert.equal(body, original);
   assert.equal(body.colliders.length, 2);
-  assert.equal(oldBox.isValid(), false);
-  assert.equal(oldBall.isValid(), false);
-  const box = body.colliders.find((collider) => collider.shapeType() === RAPIER.ShapeType.Cuboid),
-    ball = body.colliders.find((collider) => collider.shapeType() === RAPIER.ShapeType.Ball),
+  assert.equal(oldBox.valid, false);
+  assert.equal(oldBall.valid, false);
+  const box = body.colliders.find((collider) => collider.shape === 'box'),
+    ball = body.colliders.find((collider) => collider.shape === 'sphere'),
     half = box.halfExtents(),
     position = box.translationWrtParent(),
     rotation = box.rotationWrtParent();

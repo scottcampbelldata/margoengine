@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10138038,
+  "total": 10138874,
   "history": [
     {
       "date": "2026-10-24",
@@ -3104,6 +3104,12 @@
       "commit": "f1af890a3",
       "reason": "shadows gains the optional distance entry",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "f675ce50d",
+      "reason": "physics: PhysicsCollider wrapper, voxels and halfSpace shapes, mass accessors",
+      "grew": 1
     }
   ],
   "items": {
@@ -3112,7 +3118,7 @@
     "@margoengine/animation/dqs": 3473,
     "@margoengine/animation/geometry-cache": 4645,
     "@margoengine/animation/instanced-skin": 9634,
-    "@margoengine/animation/interactivity": 24936,
+    "@margoengine/animation/interactivity": 24902,
     "@margoengine/animation/lod": 2768,
     "@margoengine/animation/morph-gpu": 3265,
     "@margoengine/animation/pointer": 7146,
@@ -3360,7 +3366,7 @@
     "@margoengine/gltf-pro/lights": 3470,
     "@margoengine/gltf-pro/metadata": 2432,
     "@margoengine/gltf-pro/model": 56493,
-    "@margoengine/gltf-pro/physics": 9228,
+    "@margoengine/gltf-pro/physics": 8977,
     "@margoengine/gltf-pro/prepare": 21088,
     "@margoengine/gltf-pro/progressive": 75015,
     "@margoengine/gltf-pro/scene": 1471,
@@ -3511,7 +3517,7 @@
     "@margoengine/oit/meshes": 747,
     "@margoengine/oit/moments": 4197,
     "@margoengine/oit/vfx": 486,
-    "@margoengine/physics": 17498,
+    "@margoengine/physics": 18804,
     "@margoengine/physics2d": 8199,
     "@margoengine/pixel": 4664,
     "@margoengine/pixel/palette": 4341,
@@ -3739,7 +3745,7 @@
     "@margoengine/voxel/light": 8638,
     "@margoengine/voxel/lightmap": 2762,
     "@margoengine/voxel/mesher": 8312,
-    "@margoengine/voxel/physics": 10257,
+    "@margoengine/voxel/physics": 10072,
     "@margoengine/voxel/query": 3821,
     "@margoengine/voxel/render": 24125,
     "@margoengine/voxel/stream": 13408,

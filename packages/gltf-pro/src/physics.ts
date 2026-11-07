@@ -11,7 +11,6 @@ import type {
   Physics,
   PhysicsBody,
   PhysicsJoint,
-  RapierModule,
 } from '@margoengine/physics';
 import { margoError } from '../../shared/errors.js';
 import type { GLTFDocument, GLTFPrimitive } from '../../shared/gltf.js';
@@ -209,7 +208,6 @@ function rotate(m: ArrayLike<number>, v: readonly number[]): Vec3 {
   const r = rigid(m);
   return [0, 1, 2].map((i) => r[i] * v[0] + r[4 + i] * v[1] + r[8 + i] * v[2]) as Vec3;
 }
-const vector = (v: readonly number[]) => ({ x: v[0], y: v[1], z: v[2] });
 
 function compose(a: Quat, b: Quat = [0, 0, 0, 1]): Quat {
   return [
@@ -276,11 +274,7 @@ const ball = (y: number, radius: number, scale: Vec3, out: number[]) => {
 };
 
 /** What a shape of the file is at `scale`, in the world's collider terms, with a note where it cannot be exact. */
-export function shapeCollider(
-  shape: ImplicitShape,
-  scale: Vec3,
-  rapier: Pick<RapierModule, 'ColliderDesc' | 'HalfSpace'>,
-): { collider: ColliderOptions; note?: string } {
+export function shapeCollider(shape: ImplicitShape, scale: Vec3): { collider: ColliderOptions; note?: string } {
   const [sx, sy, sz] = scale,
     even = (a: number, b: number) => Math.abs(a - b) <= 1e-6 * Math.max(a, b),
     round = even(sx, sz),
@@ -327,7 +321,7 @@ export function shapeCollider(
     case 'plane': {
       const { sizeX, sizeZ, doubleSided } = shape.plane ?? {};
       if (sizeX === undefined && sizeZ === undefined && !doubleSided)
-        return { collider: { shape: 'custom', desc: new rapier.ColliderDesc(new rapier.HalfSpace({ x: 0, y: 1, z: 0 }) as never) } };
+        return { collider: { shape: 'halfSpace' } };
       // A face has no thickness to solve against, so it is a box 2 mm thick with its top on the plane; an open side goes 1 km.
       const half = 0.001,
         wide = 1000;
@@ -578,7 +572,7 @@ export async function applyGLTFPhysics(model: PBRModel, options: GLTFPhysicsOpti
     if (geometry.shape !== undefined) {
       const shape = shapes[geometry.shape];
       if (!shape) throw invalid('KHR_implicit_shapes shape index');
-      const made = shapeCollider(shape, size, physics.rapier);
+      const made = shapeCollider(shape, size);
       collider = made.collider;
       if (made.note) note(nodeIndex, made.note);
     } else {
@@ -634,7 +628,7 @@ export async function applyGLTFPhysics(model: PBRModel, options: GLTFPhysicsOpti
     // A trigger detects and has no mass.
     if (trigger?.geometry) attach(i, trigger.geometry, { ...settings(i, trigger.collisionFilter), sensor: true, density: 0 });
   });
-  // Rapier puts a slow body to sleep, and a drive that is still pulling it would stop short of its target.
+  // The solver puts a slow body to sleep, and a drive that is still pulling it would stop short of its target.
   const driven = new Set<number>();
   nodes.forEach((_, i) => {
     const joint = data(i)?.joint;
@@ -674,23 +668,12 @@ export async function applyGLTFPhysics(model: PBRModel, options: GLTFPhysicsOpti
   const massOf = (made: PhysicsBody, motion: Motion, scale: Vec3) => {
     const { mass: kilograms, inertiaDiagonal: inertia, centerOfMass: centre, inertiaOrientation: frame } = motion;
     if (kilograms === undefined && !inertia && !centre) return;
-    const { raw } = made,
-      computed = raw.mass(),
-      com = raw.localCom(),
-      principal = raw.principalInertia(),
-      axes = raw.principalInertiaLocalFrame(),
-      total = kilograms ?? computed,
-      // A shape's inertia grows with its mass. Rapier reads 0 as infinite, as the draft does.
-      over = computed > 0 ? total / computed : 0;
-    for (const collider of made.colliders) collider.setDensity(0);
-    raw.setAdditionalMassProperties(
-      total,
-      centre ? vector(centre.map((v, a) => v * scale[a])) : com,
-      inertia ? vector(inertia) : vector([principal.x * over, principal.y * over, principal.z * over]),
-      frame ? { x: frame[0], y: frame[1], z: frame[2], w: frame[3] } : inertia ? { x: 0, y: 0, z: 0, w: 1 } : axes,
-      true,
-    );
-    raw.recomputeMassPropertiesFromColliders();
+    made.setMassProperties({
+      mass: kilograms,
+      centerOfMass: centre && (centre.map((v, a) => v * scale[a]) as unknown as Vec3),
+      inertia: inertia as Vec3 | undefined,
+      inertiaFrame: frame as Quat | undefined,
+    });
   };
   const dispose = () => {
     for (const stop of removers.splice(0)) stop();
@@ -704,9 +687,9 @@ export async function applyGLTFPhysics(model: PBRModel, options: GLTFPhysicsOpti
       if (!motion) return;
       const matrix = world(i),
         made = body(i, motion.isKinematic ? 'kinematicVelocity' : 'dynamic');
-      if (motion.linearVelocity) made.raw.setLinvel(vector(rotate(matrix, motion.linearVelocity)), true);
-      if (motion.angularVelocity) made.raw.setAngvel(vector(rotate(matrix, motion.angularVelocity)), true);
-      if (motion.gravityFactor !== undefined) made.raw.setGravityScale(motion.gravityFactor, true);
+      if (motion.linearVelocity) made.setLinearVelocity(rotate(matrix, motion.linearVelocity));
+      if (motion.angularVelocity) made.setAngularVelocity(rotate(matrix, motion.angularVelocity));
+      if (motion.gravityFactor !== undefined) made.gravityScale = motion.gravityFactor;
       if (!motion.isKinematic) massOf(made, motion, split(matrix).scale);
     });
     for (const i of parts.keys()) if (!bodies.has(i)) body(i, 'fixed');
@@ -757,13 +740,13 @@ export async function applyGLTFPhysics(model: PBRModel, options: GLTFPhysicsOpti
     if (!motion || !made) return false;
     if (motion[2] === 'gravityFactor') {
       if (typeof value !== 'number') return false;
-      made.raw.setGravityScale(value, true);
+      made.gravityScale = value;
       return true;
     }
     if (typeof value === 'number') return false;
-    const turned = vector(rotate(world(+motion[1]), value));
-    if (motion[2] === 'linearVelocity') made.raw.setLinvel(turned, true);
-    else made.raw.setAngvel(turned, true);
+    const turned = rotate(world(+motion[1]), value);
+    if (motion[2] === 'linearVelocity') made.setLinearVelocity(turned);
+    else made.setAngularVelocity(turned);
     return true;
   };
   // A follower's collider is rebuilt when its node's scale moves, as a shape has no scale of its own.
@@ -793,8 +776,8 @@ export async function applyGLTFPhysics(model: PBRModel, options: GLTFPhysicsOpti
         }
         for (const { body: moving, node } of follow) {
           const { position, rotation } = split(world(node));
-          moving.raw.setNextKinematicTranslation(vector(position));
-          moving.raw.setNextKinematicRotation({ x: rotation[0], y: rotation[1], z: rotation[2], w: rotation[3] });
+          moving.setNextPosition(position);
+          moving.setNextRotation(rotation);
           for (const part of parts.get(node) ?? []) if (above(part.node, rescaled)) resize(part, moving);
         }
       }),

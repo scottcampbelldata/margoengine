@@ -1176,7 +1176,7 @@ rtest(
       assert.equal(physics.world.bodies.len(), 0);
       assert.equal(physics.world.colliders.len(), 0);
       assert.equal(physics.bodyOf(root), undefined);
-      assert.equal(physics['byCollider'].size, 0);
+      assert.equal(physics['byHandle'].size, 0);
       clearMeshSource(child);
       child.dispose();
       engine.createMesh().setGeometry(box());
@@ -1264,7 +1264,7 @@ test('published physics declarations keep Rapier optional and accept its install
     import * as RAPIER from '@dimforge/rapier3d-compat';
     const installed: RapierModule = RAPIER;
     const world: Physics['world'] = new RAPIER.World({x: 0, y: -9.81, z: 0});
-    const collider: PhysicsBody['colliders'][number] = world.createCollider(RAPIER.ColliderDesc.ball(1));
+    const collider: ReturnType<Physics['world']['createCollider']> = world.createCollider(RAPIER.ColliderDesc.ball(1));
     void installed;
     void collider;
   `,

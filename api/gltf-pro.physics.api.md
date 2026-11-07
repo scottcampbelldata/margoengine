@@ -6,7 +6,7 @@
 import { EngineKernel } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph, Mesh, PassContext } from "@margoengine/core/extension";
 import { DracoDecodeOptions, TranscodedKTX2Result } from "@margoengine/decoders";
-import { ColliderOptions, JointOptions, Physics, PhysicsBody, PhysicsJoint, RapierModule } from "@margoengine/physics";
+import { ColliderOptions, JointOptions, Physics, PhysicsBody, PhysicsJoint } from "@margoengine/physics";
 import { Splats } from "@margoengine/splats";
 
 export interface GLTFPhysics {
@@ -52,7 +52,7 @@ export function filterMasks(filters: readonly Filter[]): {
 
 export function jointOptions({ limits, drives }: JointDef, notes?: string[]): Pick<GenericOptions, 'locked' | 'limits' | 'motors'>;
 
-export function shapeCollider(shape: ImplicitShape, scale: Vec3, rapier: Pick<RapierModule, 'ColliderDesc' | 'HalfSpace'>): {
+export function shapeCollider(shape: ImplicitShape, scale: Vec3): {
     collider: ColliderOptions;
     note?: string;
 };

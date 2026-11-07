@@ -1,6 +1,7 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import { MargoError } from '@margoengine/math/errors';
 import type { Collider, KinematicCharacterController, World } from './rapier-types.js';
+import type { PhysicsCollider } from './collider.js';
 import type { PhysicsBody } from './body.js';
 import { checkVec, tuple, vec, type Vec3 } from './math.js';
 
@@ -46,7 +47,11 @@ export class CharacterController {
 
   /** @internal */
   constructor(
-    private readonly owner: { readonly world: World; removeController(controller: CharacterController): void },
+    private readonly owner: {
+      readonly world: World;
+      removeController(controller: CharacterController): void;
+      colliderOf(raw: Collider): PhysicsCollider | undefined;
+    },
     readonly body: PhysicsBody,
     options: CharacterControllerOptions = {},
   ) {
@@ -87,7 +92,7 @@ export class CharacterController {
    */
   move(
     desired: Vec3,
-    filter?: { groups?: number; flags?: number; predicate?: (collider: Collider) => boolean },
+    filter?: { groups?: number; flags?: number; predicate?: (collider: PhysicsCollider) => boolean },
   ): CharacterMoveResult {
     if (this.disposed)
       throw new MargoError(
@@ -97,8 +102,19 @@ export class CharacterController {
     if (!this.body.valid)
       throw new MargoError('state', 'Character body was removed; create a new body and controller.');
     checkVec(desired, 'Desired movement');
-    const collider = this.body.colliders[0];
-    this.raw.computeColliderMovement(collider, vec(desired), filter?.flags, filter?.groups, filter?.predicate);
+    const collider = this.body.colliders[0],
+      predicate = filter?.predicate;
+    this.raw.computeColliderMovement(
+      collider.raw,
+      vec(desired),
+      filter?.flags,
+      filter?.groups,
+      predicate &&
+        ((raw) => {
+          const other = this.owner.colliderOf(raw);
+          return !!other && predicate(other);
+        }),
+    );
     const movement = tuple(this.raw.computedMovement()),
       t = this.body.raw.translation();
     this.body.raw.setNextKinematicTranslation({ x: t.x + movement[0], y: t.y + movement[1], z: t.z + movement[2] });

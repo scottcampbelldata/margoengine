@@ -397,7 +397,7 @@ Read against pull request 2424 (`KHR_physics_rigid_bodies`, status Draft) and pu
 - `world.bodyOf(node)` finds the body that moves a node. `world.setPointer(pointer, value)` writes a joint drive's `maxForce`, `positionTarget`, `velocityTarget`, `stiffness` or `damping`, or a motion's `linearVelocity`, `angularVelocity` or `gravityFactor`, and returns false for anything else.
 - `world.notes` lists what this file asks for that the world holds only approximately, by node. Empty means the file is represented as written.
 
-Limits are in [docs/limits.md](../../docs/limits.md): Rapier's order of combine rules differs from the draft's, soft limits are held hard, ranges on several axes are boxes, finite planes are thin boxes, and a file can have 15 distinct collision filters.
+Limits are in [docs/limits.md](../../docs/limits.md): the solver's order of combine rules differs from the draft's, soft limits are held hard, ranges on several axes are boxes, finite planes are thin boxes, and a file can have 15 distinct collision filters.
 
 ### Behaviour graphs in glTF (`/interactivity`)
 

@@ -4,20 +4,17 @@ import { Stage, Geometry, box, sphere } from '@margoengine/stage';
 import { Engine, TransformStore } from '@margoengine/core/extension';
 import { addBody, addPhysics } from '@margoengine/stage/physics';
 
-// Real Rapier and a real engine on a stand-in renderer: bodies really fall, and the collider shapes are Rapier's own.
+// The real solver and a real engine on a stand-in renderer: bodies really fall, and the collider shapes are the solver's own.
 async function fixture() {
   const store = await TransformStore.create(32),
     renderer = { backend: 'webgl2', add() {}, remove() {}, render() {}, dispose() {} },
     engine = new Engine({ width: 8, height: 8, clientWidth: 8, clientHeight: 8 }, store, renderer, undefined, null);
   return new Stage(engine);
 }
-const silent = mock.method(console, 'warn', () => {}); // Rapier's own init notice
+const silent = mock.method(console, 'warn', () => {}); // the solver's own init notice
 test.after(() => silent.mock.restore());
-const collider = (body) => body.colliders[0].raw ?? body.colliders[0];
-const shapeOf = (body, R) => {
-  const type = collider(body).shapeType();
-  return Object.keys(R.ShapeType).find((name) => R.ShapeType[name] === type);
-};
+const collider = (body) => body.colliders[0];
+const shapeOf = (body) => collider(body).shape;
 
 test('addBody loads physics on first use, and a body falls and lands on the floor', async () => {
   const stage = await fixture(),
@@ -60,27 +57,25 @@ test('a world the caller disposed is replaced on the next call', async () => {
 
 test('the collider is the simplest shape that fits the mesh', async () => {
   const stage = await fixture(),
-    { rapier: R } = await addPhysics(stage),
     up = [0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0],
     ramp = new Geometry([0, 0, 0, 2, 0, 0, 0, 1, 0, 0, 0, 2], up, [0, 1, 2, 0, 2, 3, 0, 3, 1, 1, 3, 2]),
     flat = new Geometry([0, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1], up, [0, 2, 1, 0, 3, 2]);
   const shape = async (geometry, options, scale) => {
     const mesh = stage.mesh(geometry, scale ? { scale } : {});
-    return shapeOf(await addBody(stage, mesh, options), R);
+    return shapeOf(await addBody(stage, mesh, options));
   };
-  assert.equal(await shape(box(1, 2, 3)), 'Cuboid');
-  assert.equal(await shape(sphere(1, 16)), 'Ball');
-  assert.equal(await shape(sphere(1, 16), {}, [1, 2, 1]), 'ConvexPolyhedron', 'a stretched sphere is no ball');
-  assert.equal(await shape(ramp), 'ConvexPolyhedron');
-  assert.equal(await shape(ramp, { type: 'fixed' }), 'TriMesh');
-  assert.equal(await shape(ramp, { type: 'kinematicPosition' }), 'TriMesh');
-  assert.equal(await shape(flat, { type: 'fixed' }), 'TriMesh', 'a flat mesh has corners but no volume');
+  assert.equal(await shape(box(1, 2, 3)), 'box');
+  assert.equal(await shape(sphere(1, 16)), 'sphere');
+  assert.equal(await shape(sphere(1, 16), {}, [1, 2, 1]), 'convexHull', 'a stretched sphere is no ball');
+  assert.equal(await shape(ramp), 'convexHull');
+  assert.equal(await shape(ramp, { type: 'fixed' }), 'trimesh');
+  assert.equal(await shape(ramp, { type: 'kinematicPosition' }), 'trimesh');
+  assert.equal(await shape(flat, { type: 'fixed' }), 'trimesh', 'a flat mesh has corners but no volume');
   stage.dispose();
 });
 
 test('collider settings reach the collider; given colliders win over the fitted one', async () => {
   const stage = await fixture(),
-    { rapier: R } = await addPhysics(stage),
     bouncy = await addBody(stage, stage.sphere(), { collider: { restitution: 0.6, friction: 0.2 } }),
     named = await addBody(stage, stage.box(), {
       colliders: { shape: 'sphere', radius: 2 },
@@ -88,37 +83,26 @@ test('collider settings reach the collider; given colliders win over the fitted 
     });
   assert.ok(Math.abs(collider(bouncy).restitution() - 0.6) < 1e-6);
   assert.ok(Math.abs(collider(bouncy).friction() - 0.2) < 1e-6);
-  assert.equal(shapeOf(named, R), 'Ball');
+  assert.equal(shapeOf(named), 'sphere');
   assert.equal(collider(named).restitution(), 0);
   stage.dispose();
 });
 
 test('a root without geometry gets a box around what it holds, with collider settings too', async () => {
   const stage = await fixture(),
-    { rapier: R } = await addPhysics(stage),
     root = stage.engine.createMesh();
   stage.box({ size: [2, 2, 2], parent: root });
   const body = await addBody(stage, root, { collider: { restitution: 0.5 } });
-  assert.equal(shapeOf(body, R), 'Cuboid');
+  assert.equal(shapeOf(body), 'box');
   assert.ok(Math.abs(collider(body).restitution() - 0.5) < 1e-6);
   stage.dispose();
 });
 
 test('a body with no mesh takes named colliders', async () => {
   const stage = await fixture(),
-    { rapier: R } = await addPhysics(stage),
     body = await addBody(stage, null, { type: 'fixed', colliders: { shape: 'box', halfExtents: [1, 1, 1] } });
-  assert.equal(shapeOf(body, R), 'Cuboid');
+  assert.equal(shapeOf(body), 'box');
   stage.dispose();
-});
-
-test('a given rapier module is used as it is', async () => {
-  const stage = await fixture(),
-    { rapier } = await addPhysics(stage),
-    other = await fixture();
-  assert.equal((await addPhysics(other, { rapier })).rapier, rapier);
-  stage.dispose();
-  other.dispose();
 });
 
 test('abort and stage disposal reject with AbortError', async () => {

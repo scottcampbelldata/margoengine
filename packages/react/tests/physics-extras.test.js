@@ -2,10 +2,10 @@ import test, { afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import React, { StrictMode, useState } from 'react';
 import { engines, render, act, flush, close, near } from './physics-xr-support.js';
-import RAPIER from '@dimforge/rapier3d-compat';
+import { Physics as RealPhysics } from '@margoengine/physics';
 const warn = console.warn;
 console.warn = () => {};
-await RAPIER.init();
+await RealPhysics.load();
 console.warn = warn;
 const { Canvas } = await (await import('./entries.js')).allEntries();
 const {
@@ -73,7 +73,7 @@ test('every collider shape mounts on its body and takes the parent scale', async
   near(extent(2), 2);
   assert.equal(mesh.indices().length, 3);
   assert.ok(Math.max(...mesh.vertices()) >= 2 - 1e-4);
-  assert.ok(field.isValid());
+  assert.ok(field.valid);
   assert.deepEqual(engines.at(-1).errors, []);
 });
 

@@ -16,6 +16,8 @@ export type {
   ModelBodyOptions,
 } from './physics.js';
 export { PhysicsBody } from './body.js';
+export { PhysicsCollider } from './collider.js';
+export type { ColliderShape } from './collider.js';
 export type { BodyOptions, BodyType } from './body.js';
 export { PhysicsJoint } from './joints.js';
 export type { JointDof, JointOptions, JointType, MotorOptions, RotationMotorOptions } from './joints.js';

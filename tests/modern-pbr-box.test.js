@@ -166,7 +166,7 @@ test('Box addBody(model.root) fits the attached grandchild through the authored 
       const body = physics.addBody(model.root);
       assert.equal(body.colliders.length, 1);
       assert.equal(physics.bodyCount, 1);
-      assert.equal(body.colliders[0].parent().handle, body.raw.handle);
+      assert.equal(body.colliders[0].body, body);
       assertColliderBounds(body.colliders[0], authored, 'attached Box');
       assert.deepEqual(
         [model.root, ...model.nodes].map((node) => engine.store.parents[node.id]),

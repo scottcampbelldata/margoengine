@@ -1,5 +1,6 @@
 import { MargoError } from '@margoengine/math/errors';
-import type { Collider, RigidBody, World } from './rapier-types.js';
+import type { RigidBody, World } from './rapier-types.js';
+import type { PhysicsCollider } from './collider.js';
 import type { Mesh } from '@margoengine/core';
 import { checkVec, quat, tuple, tuple4, vec, type Quat, type Vec3 } from './math.js';
 import type { ColliderOptions, RapierModule } from './shapes.js';
@@ -48,15 +49,15 @@ export interface BodyOptions {
 export interface BodyOwner {
   readonly rapier: RapierModule;
   readonly world: World;
-  addCollider(body: PhysicsBody, options: ColliderOptions): Collider;
-  removeCollider(body: PhysicsBody, collider: Collider): void;
+  addCollider(body: PhysicsBody, options: ColliderOptions): PhysicsCollider;
+  removeCollider(body: PhysicsBody, collider: PhysicsCollider): void;
   removeBody(body: PhysicsBody): void;
 }
 
 /** A Rapier rigid body bound to an optional core mesh. */
 export class PhysicsBody {
-  /** The colliders attached to this body (Rapier `Collider` objects). */
-  readonly colliders: Collider[] = [];
+  /** The colliders attached to this body. */
+  readonly colliders: PhysicsCollider[] = [];
   userData: unknown;
   /** @internal previous (0..6) and current (7..13) step poses, xyz + quaternion. */
   readonly pose = new Float64Array(14);
@@ -110,6 +111,7 @@ export class PhysicsBody {
   /** @internal */
   markRemoved(): void {
     this.removed = true;
+    for (const collider of this.colliders) collider.markRemoved();
     this.colliders.length = 0;
   }
   private check(): RigidBody {
@@ -244,6 +246,46 @@ export class PhysicsBody {
     this.check().setAdditionalMassProperties(mass, this.raw.localCom(), vec(inertia), { x: 0, y: 0, z: 0, w: 1 }, true);
     return this;
   }
+  /** Centre of mass in the body's frame. */
+  get centerOfMass(): [number, number, number] {
+    return tuple(this.check().localCom());
+  }
+  /** Moments of inertia in kg m² about the principal axes, which {@link PhysicsBody.inertiaFrame} turns from the body's frame. */
+  get principalInertia(): [number, number, number] {
+    return tuple(this.check().principalInertia());
+  }
+  /** Rotation of the principal axes of inertia in the body's frame, a quaternion [x, y, z, w]. */
+  get inertiaFrame(): [number, number, number, number] {
+    return tuple4(this.check().principalInertiaLocalFrame());
+  }
+  /**
+   * Replaces what the colliders give with these figures, for a mass and inertia that come from a file or a measurement.
+   * Any figure left out keeps the body's present value; a new `mass` alone scales the inertia with it, as a shape's does.
+   * Inertia is about the axes `inertiaFrame` names, a 0 moment reads as infinite. Takes effect at once. Colliders added
+   * later have density 0 of their own to set.
+   */
+  setMassProperties(properties: { mass?: number; centerOfMass?: Vec3; inertia?: Vec3; inertiaFrame?: Quat }): this {
+    const raw = this.check(),
+      { mass, centerOfMass, inertia, inertiaFrame } = properties,
+      computed = raw.mass(),
+      total = mass ?? computed;
+    if (!(total >= 0) || total === Infinity) throw new RangeError('Mass must be a finite number of at least 0; pass kilograms.');
+    if (centerOfMass) checkVec(centerOfMass, 'Centre of mass');
+    if (inertia) {
+      checkVec(inertia, 'Inertia');
+      if (inertia.some((value) => value < 0)) throw new RangeError('Inertia must not be negative; pass kg m².');
+    }
+    const principal = raw.principalInertia(),
+      // A shape's inertia grows with its mass.
+      over = computed > 0 ? total / computed : 0;
+    const center = centerOfMass ? vec(centerOfMass) : raw.localCom(),
+      moments = inertia ? vec(inertia) : vec([principal.x * over, principal.y * over, principal.z * over]),
+      frame = inertiaFrame ? quat(inertiaFrame) : inertia ? { x: 0, y: 0, z: 0, w: 1 } : raw.principalInertiaLocalFrame();
+    for (const collider of this.colliders) collider.setDensity(0);
+    raw.setAdditionalMassProperties(total, center, moments, frame, true);
+    raw.recomputeMassPropertiesFromColliders();
+    return this;
+  }
   get gravityScale(): number {
     return this.check().gravityScale();
   }
@@ -272,11 +314,11 @@ export class PhysicsBody {
   }
 
   /** Attaches another collider to this body. */
-  addCollider(options: ColliderOptions): Collider {
+  addCollider(options: ColliderOptions): PhysicsCollider {
     this.check();
     return this.owner.addCollider(this, options);
   }
-  removeCollider(collider: Collider): void {
+  removeCollider(collider: PhysicsCollider): void {
     this.check();
     this.owner.removeCollider(this, collider);
   }

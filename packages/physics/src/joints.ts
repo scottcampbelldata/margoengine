@@ -2,7 +2,7 @@ import { MargoError } from '@margoengine/math/errors';
 import type { ImpulseJoint, JointData, SphericalImpulseJoint, UnitImpulseJoint } from './rapier-types.js';
 import type { RapierModule } from './shapes.js';
 import type { PhysicsBody } from './body.js';
-import { checkVec, quat, vec, type Quat, type Vec3 } from './math.js';
+import { checkVec, quat, tuple, vec, type Quat, type Vec3 } from './math.js';
 
 /** Drives a joint axis toward a target velocity or, as a spring, a target position. */
 export interface MotorOptions {
@@ -95,6 +95,14 @@ export class PhysicsJoint {
   /** @internal */
   markRemoved(): void {
     this.removed = true;
+  }
+  /** Where the joint holds `bodyA`, in that body's frame. */
+  get anchorA(): [number, number, number] {
+    return tuple(this.raw.anchor1());
+  }
+  /** Where the joint holds `bodyB`, in that body's frame. */
+  get anchorB(): [number, number, number] {
+    return tuple(this.raw.anchor2());
   }
   private unit(): UnitImpulseJoint {
     if (!this.valid) throw new MargoError('state', 'Joint was removed; create a new one with physics.addJoint.');

@@ -47,7 +47,13 @@ export interface Collider {
   setFriction(friction: number): void;
   setRestitution(restitution: number): void;
   setCollisionGroups(groups: number): void;
+  collisionGroups(): number;
   setSolverGroups(groups: number): void;
+  solverGroups(): number;
+  containsPoint(point: Vector): boolean;
+  setVoxel(x: number, y: number, z: number, filled: boolean): void;
+  combineVoxelStates(other: Collider, sx: number, sy: number, sz: number): void;
+  propagateVoxelChange(other: Collider, x: number, y: number, z: number, sx: number, sy: number, sz: number): void;
 }
 export interface ColliderDesc {
   shape: Shape;
@@ -58,6 +64,7 @@ export interface ColliderDesc {
   setFrictionCombineRule(rule: number): ColliderDesc;
   setRestitutionCombineRule(rule: number): ColliderDesc;
   setMass(mass: number): ColliderDesc;
+  setMassProperties(mass: number, center: Vector, inertia: Vector, frame: Rotation): ColliderDesc;
   setDensity(density: number): ColliderDesc;
   setSensor(sensor: boolean): ColliderDesc;
   setActiveCollisionTypes(types: number): ColliderDesc;
@@ -134,6 +141,8 @@ export interface ImpulseJoint {
   isValid(): boolean;
   contactsEnabled(): boolean;
   setContactsEnabled(enabled: boolean): void;
+  anchor1(): Vector;
+  anchor2(): Vector;
   /** Rapier 0.20 and later. */
   setLocalFrame1(anchor: Vector, rotation: Rotation): void;
   /** Rapier 0.20 and later. */
@@ -151,7 +160,6 @@ export interface UnitImpulseJoint extends ImpulseJoint {
 }
 /** Rapier 0.20 and later: a motor per axis of a spherical joint. */
 export interface SphericalImpulseJoint extends ImpulseJoint {
-  anchor1(): Vector;
   configureMotorModel(axis: number, model: number): void;
   setMotorMaxForce(axis: number, force: number): void;
   configureMotor(axis: number, position: number, velocity: number, stiffness: number, damping: number): void;
@@ -297,6 +305,9 @@ export interface RapierModule {
   EventQueue: new (autoDrain: boolean) => EventQueue;
   Ray: new (origin: Vector, direction: Vector) => Ray;
   HalfSpace: new (normal: Vector) => Shape;
+  ShapeType: Record<string, number | string>;
+  TriMeshFlags?: { FIX_INTERNAL_EDGES?: number };
+  Collider?: { prototype: Partial<Collider> };
   ColliderDesc: {
     // Takes Rapier's own Shape class, wider than Shape here: `never` keeps the real module assignable to this type.
     new (shape: never): ColliderDesc;
@@ -306,7 +317,8 @@ export interface RapierModule {
     cylinder(halfHeight: number, radius: number): ColliderDesc;
     cone(halfHeight: number, radius: number): ColliderDesc;
     convexHull(points: Float32Array): ColliderDesc | null;
-    trimesh(vertices: Float32Array, indices: Uint32Array): ColliderDesc;
+    trimesh(vertices: Float32Array, indices: Uint32Array, flags?: number): ColliderDesc;
+    voxels?(cells: Int32Array, size: Vector): ColliderDesc;
     heightfield(rows: number, columns: number, heights: Float32Array, scale: Vector): ColliderDesc;
     /** Rapier 0.19 and later. */
     compound?(shapes: Shape[], positions: Vector[], rotations: Rotation[]): ColliderDesc;

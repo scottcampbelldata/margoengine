@@ -5,7 +5,7 @@
 ```ts
 import { Vec3 } from "@margoengine/core";
 import { ColorInput } from "@margoengine/math";
-import { CollisionEvent, Physics, PhysicsBody } from "@margoengine/physics";
+import { Physics, PhysicsBody, PhysicsCollider } from "@margoengine/physics";
 
 export class VoxelPhysics {
     readonly radius: number;
@@ -14,8 +14,8 @@ export class VoxelPhysics {
     get budget(): number;
     set budget(value: number);
     get pending(): number;
-    get colliders(): ReadonlyMap<string, readonly CollisionEvent['colliderA'][]>;
-    chunkOf(collider: CollisionEvent['colliderA']): string | undefined;
+    get colliders(): ReadonlyMap<string, readonly PhysicsCollider[]>;
+    chunkOf(collider: PhysicsCollider): string | undefined;
     dispose(): void;
     [Symbol.dispose]: () => void;
 }

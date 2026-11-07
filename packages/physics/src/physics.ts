@@ -1,6 +1,7 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import { MargoError } from '@margoengine/math/errors';
 import type { Collider, EventQueue, PhysicsHooks, Ray, RigidBody, World } from './rapier-types.js';
+import { PhysicsCollider } from './collider.js';
 import type { EngineKernel, EnginePlugin, Mesh } from '@margoengine/core';
 import { meshRuntime, Mesh as CoreMesh } from '@margoengine/core/extension';
 import { LoadOnce } from '../../shared/load-once.js';
@@ -13,6 +14,8 @@ import {
   configureCollider,
   createColliderDesc,
   geometryPositions,
+  shapeName,
+  shapeSupported,
   type ColliderOptions,
   type ColliderGeometry,
   type ColliderSettings,
@@ -62,8 +65,8 @@ export interface CollisionEvent {
   bodyB: PhysicsBody;
   meshA: Mesh | null;
   meshB: Mesh | null;
-  colliderA: Collider;
-  colliderB: Collider;
+  colliderA: PhysicsCollider;
+  colliderB: PhysicsCollider;
   /** True when either collider is a sensor (intersection events). */
   sensor: boolean;
 }
@@ -89,7 +92,7 @@ export interface QueryFilter {
   excludeKinematic?: boolean;
   excludeDynamic?: boolean;
   /** Return false to skip a body. */
-  predicate?: (body: PhysicsBody, collider: Collider) => boolean;
+  predicate?: (body: PhysicsBody, collider: PhysicsCollider) => boolean;
 }
 /** Options of `Physics.raycast` and `raycastAll`: the query filter plus a distance limit and solid starts. */
 export interface PhysicsRaycastOptions extends QueryFilter {
@@ -102,7 +105,7 @@ export interface PhysicsRaycastOptions extends QueryFilter {
 export interface Hit {
   body: PhysicsBody;
   mesh: Mesh | null;
-  collider: Collider;
+  collider: PhysicsCollider;
 }
 /** A ray hit with its point and surface normal. */
 export interface RaycastHit extends Hit {
@@ -191,7 +194,7 @@ export class Physics implements EnginePlugin, BodyOwner {
   private disposed = false;
   private readonly bodies = new Set<PhysicsBody>();
   private readonly byMesh = new Map<Mesh, PhysicsBody>();
-  private readonly byCollider = new Map<number, PhysicsBody>();
+  private readonly byHandle = new Map<number, PhysicsCollider>();
   private readonly joints = new Set<PhysicsJoint>();
   private readonly controllers = new Set<CharacterController>();
   private readonly attachments = new Set<PhysicsAttachment>();
@@ -207,13 +210,12 @@ export class Physics implements EnginePlugin, BodyOwner {
   private collecting: CollisionEvent[] = this.eventBuffer;
   private dispatching = false;
   private readonly collect = (h1: number, h2: number, started: boolean): void => {
-    const bodyA = this.byCollider.get(h1),
-      bodyB = this.byCollider.get(h2);
-    if (!bodyA || !bodyB) return;
-    const world = this.worldRef!,
-      colliderA = world.getCollider(h1),
-      colliderB = world.getCollider(h2);
-    const sensor = !!(colliderA?.isSensor() || colliderB?.isSensor());
+    const colliderA = this.byHandle.get(h1),
+      colliderB = this.byHandle.get(h2);
+    if (!colliderA || !colliderB) return;
+    const bodyA = colliderA.body,
+      bodyB = colliderB.body,
+      sensor = colliderA.isSensor() || colliderB.isSensor();
     this.collecting.push({
       type: sensor ? (started ? 'intersectionstart' : 'intersectionend') : started ? 'contactstart' : 'contactend',
       bodyA,
@@ -271,8 +273,8 @@ export class Physics implements EnginePlugin, BodyOwner {
     const filter = options.contactFilter;
     if (filter) {
       const allow = (h1: number, h2: number): boolean => {
-        const a = this.byCollider.get(h1),
-          b = this.byCollider.get(h2);
+        const a = this.byHandle.get(h1)?.body,
+          b = this.byHandle.get(h2)?.body;
         return !a || !b || filter(a, b) !== false;
       };
       this.hooks = {
@@ -732,16 +734,24 @@ export class Physics implements EnginePlugin, BodyOwner {
   bodyOf(mesh: Mesh): PhysicsBody | undefined {
     return this.byMesh.get(mesh);
   }
-  /** The body owning a Rapier collider or collider handle. */
-  bodyOfCollider(collider: Collider | number): PhysicsBody | undefined {
-    return this.byCollider.get(typeof collider === 'number' ? collider : collider?.handle);
+  /** The body owning a collider or collider handle. */
+  bodyOfCollider(collider: PhysicsCollider | number): PhysicsBody | undefined {
+    return this.byHandle.get(typeof collider === 'number' ? collider : collider?.handle)?.body;
+  }
+  /** @internal The collider behind the solver's own object, for predicates the solver calls. */
+  colliderOf(raw: Collider): PhysicsCollider | undefined {
+    return this.byHandle.get(raw.handle);
+  }
+  /** Whether this world's solver can make `shape`. Every shape but `voxels` always can. */
+  supportsShape(shape: ShapeOptions['shape']): boolean {
+    return shapeSupported(this.rapier, shape);
   }
   getBodies(): PhysicsBody[] {
     return [...this.bodies];
   }
 
   /** @internal use `body.addCollider`. */
-  addCollider(body: PhysicsBody, options: ColliderOptions): Collider {
+  addCollider(body: PhysicsBody, options: ColliderOptions): PhysicsCollider {
     const R = this.rapier,
       mesh = body.mesh;
     const needsGeometry =
@@ -760,21 +770,23 @@ export class Physics implements EnginePlugin, BodyOwner {
     if (body.fitScale && mesh?.geometry) fit.scale = body.fitScale;
     const { desc, center } = createColliderDesc(R, options, fit);
     configureCollider(R, desc, options, center, !!this.hooks);
-    const collider = this.world.createCollider(desc, body.raw);
+    const raw = this.world.createCollider(desc, body.raw),
+      collider = new PhysicsCollider(raw, body, shapeName(R, options.shape, raw.shapeType()));
     body.colliders.push(collider);
-    this.byCollider.set(collider.handle, body);
+    this.byHandle.set(raw.handle, collider);
     // Rapier folds a collider's mass in at the next step; a game reads `mass` before that.
     body.raw.recomputeMassPropertiesFromColliders();
     return collider;
   }
   /** @internal use `body.removeCollider`. */
-  removeCollider(body: PhysicsBody, collider: Collider): void {
+  removeCollider(body: PhysicsBody, collider: PhysicsCollider): void {
     const index = body.colliders.indexOf(collider);
     if (index < 0)
       throw new MargoError('state', 'Collider does not belong to this body; pass a collider from body.colliders.');
     body.colliders.splice(index, 1);
-    this.byCollider.delete(collider.handle);
-    this.world.removeCollider(collider, true);
+    this.byHandle.delete(collider.handle);
+    this.world.removeCollider(collider.raw, true);
+    collider.markRemoved();
     body.raw.recomputeMassPropertiesFromColliders();
   }
 
@@ -784,7 +796,7 @@ export class Physics implements EnginePlugin, BodyOwner {
     for (const joint of this.joints) if (joint.bodyA === body || joint.bodyB === body) this.removeJoint(joint);
     for (const controller of this.controllers) if (controller.body === body) controller.dispose();
     for (const attachment of [...this.attachments]) attachment.bodyRemoved?.(body);
-    for (const collider of body.colliders) this.byCollider.delete(collider.handle);
+    for (const collider of body.colliders) this.byHandle.delete(collider.handle);
     this.bodies.delete(body);
     if (body.mesh) this.byMesh.delete(body.mesh);
     this.world.removeRigidBody(body.raw);
@@ -894,15 +906,15 @@ export class Physics implements EnginePlugin, BodyOwner {
       filter.groups,
       undefined,
       filter.exclude?.raw,
-      (collider) => {
-        const body = this.byCollider.get(collider.handle);
-        return !!body && (!predicate || predicate(body, collider));
+      (raw) => {
+        const collider = this.byHandle.get(raw.handle);
+        return !!collider && (!predicate || predicate(collider.body, collider));
       },
     ];
   }
-  private hit(collider: Collider): Hit | null {
-    const body = this.byCollider.get(collider.handle);
-    return body ? { body, mesh: body.mesh, collider } : null;
+  private hit(raw: Collider): Hit | null {
+    const collider = this.byHandle.get(raw.handle);
+    return collider ? { body: collider.body, mesh: collider.body.mesh, collider } : null;
   }
   private ray(origin: Vec3, direction: Vec3): { ray: Ray; dir: [number, number, number] } {
     checkVec(origin, 'Ray origin');
@@ -1018,7 +1030,7 @@ export class Physics implements EnginePlugin, BodyOwner {
     this.world.intersectionsWithPoint(
       vec(point),
       (collider) => {
-        const body = this.byCollider.get(collider.handle);
+        const body = this.byHandle.get(collider.handle)?.body;
         if (body) found.add(body);
         return true;
       },
@@ -1047,7 +1059,7 @@ export class Physics implements EnginePlugin, BodyOwner {
       quat(rotation),
       query,
       (collider) => {
-        const body = this.byCollider.get(collider.handle);
+        const body = this.byHandle.get(collider.handle)?.body;
         if (body) found.add(body);
         return true;
       },
@@ -1066,11 +1078,11 @@ export class Physics implements EnginePlugin, BodyOwner {
     for (const ca of a.colliders)
       for (const cb of b.colliders) {
         if (ca.isSensor() || cb.isSensor()) {
-          if (world.intersectionPair(ca, cb)) return true;
+          if (world.intersectionPair(ca.raw, cb.raw)) return true;
           continue;
         }
         let touching = false;
-        world.contactPair(ca, cb, (manifold) => {
+        world.contactPair(ca.raw, cb.raw, (manifold) => {
           if (manifold.numContacts() > 0) touching = true;
         });
         if (touching) return true;

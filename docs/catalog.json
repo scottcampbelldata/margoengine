@@ -2284,6 +2284,7 @@
       "CharacterController",
       "Physics",
       "PhysicsBody",
+      "PhysicsCollider",
       "PhysicsJoint",
       "Rope",
       "Vehicle",

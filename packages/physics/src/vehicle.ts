@@ -2,6 +2,7 @@
 import { MargoError } from '@margoengine/math/errors';
 import type { Mesh } from '@margoengine/core';
 import type { Collider, DynamicRayCastVehicleController } from './rapier-types.js';
+import type { PhysicsCollider } from './collider.js';
 import type { PhysicsBody } from './body.js';
 import type { Physics, PhysicsAttachment } from './physics.js';
 import { checkVec, vec, tuple, type Vec3 } from './math.js';
@@ -58,7 +59,7 @@ export interface VehicleOptions {
   /** Packed interaction groups of the wheel rays, see `collisionGroups` (default all). */
   groups?: number;
   /** Return false to make the wheels ignore a collider (the chassis's own colliders are always ignored). */
-  predicate?: (collider: Collider) => boolean;
+  predicate?: (collider: PhysicsCollider) => boolean;
 }
 
 /** Driver input for {@link Vehicle.setInput}, each axis normalized. */
@@ -195,7 +196,13 @@ export class Vehicle implements PhysicsAttachment {
       if (!Number.isFinite(value) || value < 0)
         throw new RangeError(`Vehicle ${label} must be a finite number of at least 0`);
     this.groups = options.groups;
-    this.predicate = options.predicate;
+    const predicate = options.predicate;
+    this.predicate =
+      predicate &&
+      ((raw) => {
+        const other = physics.colliderOf(raw);
+        return !!other && predicate(other);
+      });
     const raw = world.createVehicleController(chassis.raw);
     this.raw = raw;
     wheels.forEach((wheel, i) => {

@@ -29,9 +29,8 @@ other engine code). No new runtime dependency. Margo names. Errors per docs/conv
 - Workers: `src/<name>.worker.ts` -> `dist/workers/<name>.js` classic IIFE (scripts/build-workers.js:8-36), started with
   `new URL('./workers/x.js?no-inline', import.meta.url)` (packages/fbx/src/worker.ts:6); build-optional.js builds
   every `exports` entry. Decoders pool (packages/decoders/src/pool.ts:71-224) has no priority/cancel.
-- Rapier 0.21.0: ColliderDesc.voxels, setVoxel, combineVoxelStates, propagateVoxelChange
-  (node_modules/@dimforge/rapier3d-compat/dist/geometry/collider.d.ts:434-470, 753); physics exposes `rapier`, `world`
-  (packages/physics/src/physics.ts:155, 260).
+- `@margoengine/physics`: the `voxels` shape with `setVoxel`, `combineVoxelStates`, `propagateVoxelChange` on
+  `PhysicsCollider`; `physics.supportsShape('voxels')`.
 - Real-GPU tests: follow packages/sky/test/browser-check.mjs (openBrowser from scripts/browser.js) under
   `node scripts/gpu-lock.mjs run --owner=...`. WGSL is only proven valid in the browser; WGSL changes also need
   build:site + visual:check.
@@ -81,7 +80,7 @@ fromAtlas(), live set(layer, image)); `BlockTexturesOptions` (size, images).
 distance, state); `sweepBox(world, box, motion) -> VoxelSweep`; `VoxelSweep` (position, hit axes, onGround);
 `VoxelCharacter` (walk, step-up, swim, fly); `VoxelCharacterOptions` (size, stepHeight, gravity, speeds);
 `VoxelMoveIntent` (wish direction, jump, descend, sprint).
-`./physics`: `VoxelPhysics` (Rapier voxel colliders for chunks near bodies); `VoxelPhysicsOptions` (radius).
+`./physics`: `VoxelPhysics` (voxel colliders for chunks near bodies); `VoxelPhysicsOptions` (radius).
 `./stream`: `VoxelStreamer` (rings around viewers, priority queue, memory budget, save on unload);
 `VoxelStreamerOptions` (world, generator: NoiseTerrainOptions or a URL, store, distance, verticalDistance, workers,
 memoryBudget); `ChunkStore` (get, put, delete, flush); `IndexedDBChunkStore`.
@@ -207,7 +206,7 @@ on vfx's texture option). Avoided taken names: `World`, `RayHit`, `WorkerPool`.
 8. Codec + store: round trips, fuzz targets in `npm run fuzz`, IndexedDBChunkStore.
 9. Streaming + generation: rings, priority, LRU eviction, built-in and URL generators; no holes, memory budget.
 10. `.vox`: round trip incl. unknown chunks, real fixture, fuzzing.
-11. Rapier (`./physics`).
+11. Physics (`./physics`).
 12. Extras: AudioVoicePool, vfx atlas frames, (optional) decoders on the shared pool.
 13. Example + benchmarks: examples/voxel-sandbox, a /voxel/ site page with visual baselines (fixed seed and time),
    benchmark JSON for RD 8 and 16 behind the quiet gate, README, limits.md rows, catalog, api:update.
@@ -217,7 +216,7 @@ Order: 1 first; then 2, 6, 7, 8, 10, 11, 12 can run in parallel (they need only 
 ## As built (phases 1-13; recorded by the merger 2026-10-19)
 
 Status: on main are phases 1 (storage), 2 (mesher), 3 (worker mesher), 4 (renderer), 5 (renderer lighting), 6 (light),
-7 (queries), 8 (codec, store), 9 (streaming, generation), 10 (.vox), 11 (Rapier), 12 (extras: audio and vfx) and 13
+7 (queries), 8 (codec, store), 9 (streaming, generation), 10 (.vox), 11 (physics), 12 (extras: audio and vfx) and 13
 (example and benchmarks). Names and decisions beyond the lists above:
 
 - Storage: `BlockType` (what `get` and `table` return); `VoxelChunk.getLight`/`setLight`/`fillLight`/`byteLength`;
@@ -243,9 +242,9 @@ Status: on main are phases 1 (storage), 2 (mesher), 3 (worker mesher), 4 (render
   2 workers under load; unpacking 8 chunks a frame costs 1.2-1.5 ms on the main thread at full speed.
 - .vox: `VoxChunk`; records keep their raw `attributes`; all 48 rotation bytes; `pasteVoxModel` pastes a whole scene
   (z up becomes world y, y becomes world -z). Pasting writes chunk by chunk (`writeChunkCells`, 1028862d4): about 40-50 ms per million voxels, against 70-290 ms with one setBlock each (printed by vox.test.js); a test pins that the cells, dirty set and onChange events match the per-cell path.
-- Rapier: `new VoxelPhysics(physics, world, {radius})`, `colliders`; colliders follow every non-fixed body and are
-  kept until no body is within radius + 1. Rapier 0.21.0 panics on ball-vs-voxel edges (dimforge/rapier #1046 reports it; see #1029, #1043,
-  #993, fix PR #1030), so chunks near a ball get a FIX_INTERNAL_EDGES triangle mesh and keep a disabled voxel
+- Physics: `new VoxelPhysics(physics, world, {radius})`, `colliders`; colliders follow every non-fixed body and are
+  kept until no body is within radius + 1. Today's solver panics on ball-vs-voxel edges, so chunks near a ball get a
+  `fixInternalEdges` triangle mesh and keep a disabled voxel
   collider. The builds are spread over physics steps by `VoxelPhysics.budget` (default 2 ms a step, live; nearest chunk
   first, at least one unit a step): a cave-heavy chunk near a ball is meshed in 25 steps of at most 1.8 ms instead of
   one step of 37 ms (60 pieces of at most 2,048 triangles; physics.test.js, which counts triangles meshed per step). Voxel colliders belong to the fixed

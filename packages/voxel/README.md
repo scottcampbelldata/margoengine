@@ -406,9 +406,9 @@ replaced at the same voxel count) 45-52 ms (113-142 ms).
 
 ## Physics (`@margoengine/voxel/physics`)
 
-Rapier colliders for the chunks near moving bodies, so mobs, item drops, debris and balls of a
+Colliders for the chunks near moving bodies, so mobs, item drops, debris and balls of a
 [`@margoengine/physics`](../physics/README.md) world collide with the blocks. Needs `@margoengine/physics` (an optional
-peer: only this entry uses it) with `@dimforge/rapier3d-compat` 0.17.1 or newer.
+peer: only this entry uses it) and a solver with the `voxels` shape, which `physics.supportsShape('voxels')` tells.
 
 ```ts
 import { sphereGeometry } from 'margoengine/geometry';
@@ -439,7 +439,7 @@ physics.on('contactstart', (event) => {
 world.setBlock(x, y, z, 0); // the collider changes in place; the body falls
 voxels.budget = 4; // milliseconds of collider building per physics step, live
 voxels.pending; // chunks whose colliders are still being built
-voxels.colliders; // Map of chunk key -> the Rapier colliders bodies touch
+voxels.colliders; // Map of chunk key -> the colliders bodies touch
 voxels.dispose();
 ```
 
@@ -453,20 +453,19 @@ voxels.dispose();
   `y + 0.5` and on a stair's step or back.
 - **What collides.** The chunk's surface: cells of block types with `solid` (the default) that touch a non-solid cell
   or an unloaded chunk. Buried cells are left out, so an underground chunk costs almost nothing.
-- **Seams and edits.** Each chunk has a Rapier voxel collider, coupled with its neighbours through
+- **Seams and edits.** Each chunk has a `voxels` collider, coupled with its neighbours through
   `combineVoxelStates`, so bodies slide across chunk borders without catching on internal edges. `onChange` edits
   call `setVoxel` (and `propagateVoxelChange` on chunk borders): no rebuilds. A digging edit adds the solid cells it
   uncovers.
-- **Balls.** Rapier 0.21.0 panics (`RuntimeError: unreachable`, which ends the Rapier instance) when a `sphere`
-  collider meets a voxel edge: rolling off a ledge, across a chunk border or into a wall (open upstream reports:
-  rapier issues 1029 and 1043). So chunks within `radius` of a body with a `sphere` collider also get a triangle mesh
-  of the same faces (merged into rectangles, built with `FIX_INTERNAL_EDGES` so balls roll over edges and seams without
+- **Balls.** Today's solver panics (`RuntimeError: unreachable`, which ends its instance) when a `sphere`
+  collider meets a voxel edge: rolling off a ledge, across a chunk border or into a wall. So chunks within `radius` of a body with a `sphere` collider also get a triangle mesh
+  of the same faces (merged into rectangles, built with `fixInternalEdges` so balls roll over edges and seams without
   a kick) and their voxel collider is disabled; it is still edited and coupled, so voxel chunks beside them stay
   seamless for boxes and capsules. They switch back once no ball body is within `radius + 1`. A mesh is cut into
   pieces of at most 2,048 triangles (the chunk is halved, horizontal cuts first, until each piece fits: a terrain
-  surface is 1-2 pieces, a 50% random cave chunk 60), so no single Rapier build is long and an edit in or beside a
-  piece rebuilds only that piece. Rapier can drop up to one step of travel where a ball passes from one collider to
-  the next, a chunk border or a piece seam (separate Rapier boxes do the same); there is no bump.
+  surface is 1-2 pieces, a 50% random cave chunk 60), so no single build is long and an edit in or beside a
+  piece rebuilds only that piece. The solver can drop up to one step of travel where a ball passes from one collider to
+  the next, a chunk border or a piece seam (separate boxes do the same); there is no bump.
 - **Building over steps.** `budget` (milliseconds per physics step, default 2, live) spreads the building. What a
   body can reach before the next step (its collider's size, plus two steps of its velocity, plus 1 m) is built in that
   step whatever it costs: the surroundings of a body that spawns or is teleported, a chunk loaded under a body, the

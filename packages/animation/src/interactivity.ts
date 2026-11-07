@@ -294,15 +294,13 @@ export class GLTFInteractivity implements EnginePlugin {
 }
 
 function graphPhysics(world: GLTFPhysics): GraphPhysics {
-  const vector = (v: number[]) => ({ x: v[0], y: v[1], z: v[2] });
+  const vec3 = (v: number[]) => v as [number, number, number];
   return {
     applyImpulse(nodeIndex, linear, angular) {
-      const { raw } = world.bodyOf(nodeIndex) ?? {};
-      raw?.applyImpulse(vector(linear), true);
-      raw?.applyTorqueImpulse(vector(angular), true);
+      world.bodyOf(nodeIndex)?.applyImpulse(vec3(linear)).applyTorqueImpulse(vec3(angular));
     },
     applyPointImpulse(nodeIndex, impulse, position) {
-      world.bodyOf(nodeIndex)?.raw.applyImpulseAtPoint(vector(impulse), vector(position), true);
+      world.bodyOf(nodeIndex)?.applyImpulse(vec3(impulse), vec3(position));
     },
     rayCast(start, end) {
       const direction = end.map((e, i) => e - start[i]),

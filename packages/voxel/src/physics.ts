@@ -1,7 +1,7 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-// @margoengine/voxel/physics: Rapier voxel colliders for the chunks near moving bodies (design: DESIGN.md phase 11).
-// Only types come from @margoengine/physics: this entry adds no runtime import, so neither it nor the root pulls Rapier.
-import type { CollisionEvent, Physics, PhysicsBody, ShapeOptions } from '@margoengine/physics';
+// @margoengine/voxel/physics: voxel colliders for the chunks near moving bodies (design: DESIGN.md phase 11).
+// Only types come from @margoengine/physics: this entry adds no runtime import, so neither it nor the root pulls a solver.
+import type { ColliderOptions, Physics, PhysicsBody, PhysicsCollider } from '@margoengine/physics';
 import { MargoError } from '@margoengine/math/errors';
 import { octants } from './octants.js';
 import { paletteOf, type VoxelChunk } from './chunk.js';
@@ -22,50 +22,8 @@ export interface VoxelPhysicsOptions {
   budget?: number;
 }
 
-type Collider = CollisionEvent['colliderA'];
-type Desc = Extract<ShapeOptions, { shape: 'custom' }>['desc'];
-interface Vec {
-  x: number;
-  y: number;
-  z: number;
-}
-// The Rapier >= 0.17.1 voxel API this module uses, structurally (as @margoengine/physics types Rapier).
-interface VoxelCollider extends Collider {
-  setVoxel(x: number, y: number, z: number, filled: boolean): void;
-  combineVoxelStates(other: VoxelCollider, sx: number, sy: number, sz: number): void;
-  propagateVoxelChange(other: VoxelCollider, x: number, y: number, z: number, sx: number, sy: number, sz: number): void;
-}
-interface BodyCollider extends Collider {
-  halfExtents(target?: Vec): Vec | null;
-  translationWrtParent(target?: Vec): Vec | null;
-  roundRadius(): number;
-}
-interface MassDesc extends Desc {
-  setMassProperties(mass: number, center: Vec, inertia: Vec, frame: Vec & { w: number }): MassDesc;
-}
-interface RapierVoxels {
-  ColliderDesc: {
-    voxels?(cells: Int32Array, size: Vec): MassDesc;
-    trimesh(vertices: Float32Array, indices: Uint32Array, flags?: number): MassDesc;
-  };
-  Collider?: { prototype: Partial<VoxelCollider> };
-  ShapeType: Record<
-    'Ball' | 'Cuboid' | 'RoundCuboid' | 'Capsule' | 'Cylinder' | 'Cone' | 'RoundCylinder' | 'RoundCone',
-    number
-  >;
-  TriMeshFlags?: { FIX_INTERNAL_EDGES?: number };
-}
-interface RapierBody {
-  isFixed(): boolean;
-  translation(): Vec;
-  linvel(): Vec;
-  numColliders(): number;
-  collider(i: number): BodyCollider;
-}
-interface RapierWorld {
-  forEachRigidBody(f: (body: RapierBody) => void): void;
-}
-// A box of chunk-local cells [x0, y0, z0, x1, y1, z1) meshed as one Rapier triangle mesh.
+type Collider = PhysicsCollider;
+// A box of chunk-local cells [x0, y0, z0, x1, y1, z1) meshed as one triangle mesh.
 interface Piece {
   readonly box: readonly number[];
   // The mesh (null when the box has no open faces or is not built yet); kept until its rebuild replaces it.
@@ -81,7 +39,7 @@ interface Entry {
   chunk: VoxelChunk;
   // Always kept up to date (edits, coupling) once built; disabled in MESH mode, when only its neighbours' coupling
   // uses it. Null until its first build.
-  collider: VoxelCollider | null;
+  collider: Collider | null;
   // The voxel collider is missing or has stale borders.
   rebuild: boolean;
   // VOXELS, BUILDING (pieces built disabled, voxel collider active) or MESH (pieces active, voxel collider disabled).
@@ -109,10 +67,7 @@ interface Near {
   b: number;
 }
 
-const ONE = { x: 1, y: 1, z: 1 },
-  ZERO = { x: 0, y: 0, z: 0 },
-  IDENTITY = { x: 0, y: 0, z: 0, w: 1 },
-  WHOLE: readonly number[] = [0, 0, 0, 32, 32, 32],
+const WHOLE: readonly number[] = [0, 0, 0, 32, 32, 32],
   // Face d: +x, -x, +y, -y, +z, -z; d ^ 1 is the opposite face, d >> 1 its axis.
   DX = [1, -1, 0, 0, 0, 0],
   DY = [0, 0, 1, -1, 0, 0],
@@ -122,7 +77,7 @@ const ONE = { x: 1, y: 1, z: 1 },
   VOXELS = 0,
   BUILDING = 1,
   MESH = 2,
-  // Most triangles in one mesh piece: one Rapier FIX_INTERNAL_EDGES build of about 1 ms on the reference desktop.
+  // Most triangles in one mesh piece: one `fixInternalEdges` build of about 1 ms on the reference desktop.
   PIECE = 2048,
   // Metres added to every body's reach: what a body can touch before the next step is never left pending.
   MARGIN = 1;
@@ -144,6 +99,7 @@ const RECTS: readonly (readonly number[])[][] = Array.from({ length: 16 }, (_, m
   }
   return out;
 });
+const isBall = (collider: Collider): boolean => collider.shape === 'sphere';
 const neighbour = (e: Entry, d: number): string => chunkKey(e.cx + DX[d], e.cy + DY[d], e.cz + DZ[d]);
 const same = (a: Map<string, number>, b: Map<string, number>): boolean => {
   if (a.size !== b.size) return false;
@@ -158,22 +114,22 @@ const checkBudget = (budget: unknown): number => {
 };
 
 /**
- * Rapier colliders for a {@link VoxelWorld}, so dynamic bodies (mobs, item drops, debris, balls) and kinematic
+ * Colliders for a {@link VoxelWorld}, so dynamic bodies (mobs, item drops, debris, balls) and kinematic
  * character controllers of a `@margoengine/physics` world collide with its blocks. Before each physics step, every
  * loaded chunk within `radius` chunks of any non-fixed body (dynamic or kinematic, awake or asleep: a sleeping body
  * keeps its floor) gets a collider in cell coordinates, built from the chunk's surface: its solid cells (block types
  * with `solid`) with at least one non-solid face neighbour, reading neighbour chunks (an unloaded one counts as air).
  * Solid slabs and stairs collide as their half-block boxes instead: each chunk with any gets one more triangle mesh of
- * their open faces (`FIX_INTERNAL_EDGES`), rebuilt when a cell in or beside one changes, so bodies rest on a slab's
+ * their open faces (`fixInternalEdges`), rebuilt when a cell in or beside one changes, so bodies rest on a slab's
  * top and climb stairs.
  * A chunk keeps it until no body is within `radius + 1` (so a body on a chunk border does not make chunks come and go
  * every step) or the chunk unloads.
  *
- * That is a Rapier voxel collider: neighbouring ones are coupled with `combineVoxelStates`, and edits
+ * That is a `voxels` collider: neighbouring ones are coupled with `combineVoxelStates`, and edits
  * (`VoxelWorld.onChange`) update them in place with `setVoxel` and `propagateVoxelChange`, so bodies cross chunk
- * borders without snagging and a block removed under a body lets it fall. Rapier 0.21 panics when a ball collider
- * meets a voxel edge (rapier issues 1029 and 1043), so a chunk within `radius` of a body with a `'sphere'` collider
- * also gets a triangle mesh of the same open faces (merged into rectangles, `FIX_INTERNAL_EDGES` so balls roll over
+ * borders without snagging and a block removed under a body lets it fall. The solver panics when a ball collider
+ * meets a voxel edge, so a chunk within `radius` of a body with a `'sphere'` collider
+ * also gets a triangle mesh of the same open faces (merged into rectangles, `fixInternalEdges` so balls roll over
  * its edges and seams smoothly), split into pieces of at most 2,048 triangles, and its voxel collider is disabled,
  * still updated and coupled so the voxel chunks beside it stay seamless; that lasts until no ball body is within
  * `radius + 1`. An edit rebuilds only the pieces holding the changed cell and its neighbours.
@@ -198,8 +154,6 @@ export class VoxelPhysics {
   readonly body: PhysicsBody;
   private readonly physics: Physics;
   private readonly world: VoxelWorld;
-  private readonly rapier: RapierVoxels;
-  private readonly raw: RapierWorld;
   private limit: number;
   private readonly entries = new Map<string, Entry>();
   // Entries with something to build, and the entry of every collider handle.
@@ -214,7 +168,6 @@ export class VoxelPhysics {
   private readonly cost = [0.5, 0.3, 0.5, 0.3];
   // x, y, z, reach, ball per non-fixed body, gathered when there is work.
   private readonly spheres: number[] = [];
-  private readonly vector = { x: 0, y: 0, z: 0 };
   private readonly cells = new Int32Array(32768 * 3);
   private readonly mask = new Uint8Array(32768);
   private readonly faces = new Uint8Array(32768);
@@ -232,14 +185,11 @@ export class VoxelPhysics {
    * @throws TypeError when `physics` is not a `@margoengine/physics` Physics or `world` is not a {@link VoxelWorld}.
    * @throws RangeError (TypeError for a non-number) unless `options.radius` is an integer >= 1 and `options.budget`
    * a number >= 0.
-   * @throws MargoError `'disposed'` when `physics` is disposed, `'unsupported'` when its Rapier has no voxel
-   * colliders or no `TriMeshFlags.FIX_INTERNAL_EDGES` (needs `@dimforge/rapier3d-compat` 0.17.1 or newer).
+   * @throws MargoError `'disposed'` when `physics` is disposed, `'unsupported'` when its solver has no `voxels` shape.
    */
   constructor(physics: Physics, world: VoxelWorld, options: VoxelPhysicsOptions = {}) {
-    if (!physics || typeof physics.on !== 'function' || !physics.rapier)
-      throw new TypeError(
-        'VoxelPhysics needs a Physics: pass Physics.attach(engine, {rapier}) from @margoengine/physics',
-      );
+    if (!physics || typeof physics.on !== 'function' || typeof physics.addBody !== 'function')
+      throw new TypeError('VoxelPhysics needs a Physics: pass Physics.attach(engine) from @margoengine/physics');
     if (!(world instanceof VoxelWorld))
       throw new TypeError('VoxelPhysics needs a VoxelWorld: pass new VoxelWorld({blocks})');
     const { radius = 1, budget = 2 } = options ?? {};
@@ -249,20 +199,10 @@ export class VoxelPhysics {
     this.limit = checkBudget(budget);
     if (physics.isDisposed)
       throw new MargoError('disposed', 'Physics is disposed; pass a live Physics to VoxelPhysics');
-    const rapier = physics.rapier as unknown as RapierVoxels;
-    if (
-      typeof rapier.ColliderDesc.voxels !== 'function' ||
-      typeof rapier.Collider?.prototype.combineVoxelStates !== 'function' ||
-      typeof rapier.TriMeshFlags?.FIX_INTERNAL_EDGES !== 'number'
-    )
-      throw new MargoError(
-        'unsupported',
-        'This Rapier has no voxel colliders; install @dimforge/rapier3d-compat 0.17.1 or newer for VoxelPhysics',
-      );
+    if (!physics.supportsShape('voxels'))
+      throw new MargoError('unsupported', 'This physics solver has no voxel colliders; upgrade it for VoxelPhysics');
     this.physics = physics;
     this.world = world;
-    this.rapier = rapier;
-    this.raw = physics.world as unknown as RapierWorld;
     this.radius = radius;
     this.body = physics.addBody(null, { type: 'fixed', colliders: [], userData: this });
     this.offStep = physics.on('beforestep', () => this.update());
@@ -292,7 +232,7 @@ export class VoxelPhysics {
    * collider is replaced when its chunk is replaced or comes back into range, and a mesh piece also when it is edited,
    * so settings changed on one (friction, groups) do not last.
    */
-  get colliders(): ReadonlyMap<string, readonly CollisionEvent['colliderA'][]> {
+  get colliders(): ReadonlyMap<string, readonly PhysicsCollider[]> {
     const out = new Map<string, Collider[]>();
     for (const [key, entry] of this.entries) {
       const list: Collider[] = [];
@@ -308,7 +248,7 @@ export class VoxelPhysics {
    * The chunk key ({@link chunkKey}) of one of this VoxelPhysics' colliders (voxels or mesh piece), such as the
    * `colliderA` or `colliderB` of a collision event with {@link VoxelPhysics.body}; undefined for any other collider.
    */
-  chunkOf(collider: CollisionEvent['colliderA']): string | undefined {
+  chunkOf(collider: PhysicsCollider): string | undefined {
     return this.owners.get(collider?.handle)?.key;
   }
   /**
@@ -339,21 +279,20 @@ export class VoxelPhysics {
     }
     this.retired.length = 0;
     const r = this.radius,
-      ballShape = this.rapier.ShapeType.Ball,
       centres = new Map<string, number>();
-    this.raw.forEachRigidBody((body) => {
-      if (body.isFixed()) return;
-      const t = body.translation(),
-        cx = Math.floor(t.x / 32),
-        cy = Math.floor(t.y / 32),
-        cz = Math.floor(t.z / 32);
+    for (const body of this.physics.getBodies()) {
+      if (body.type === 'fixed') continue;
+      const [x, y, z] = body.position,
+        cx = Math.floor(x / 32),
+        cy = Math.floor(y / 32),
+        cz = Math.floor(z / 32);
       // A body at NaN or beyond the 32-bit cell range has no chunks around it.
-      if (!(Math.abs(cx) <= LIMIT - r - 1 && Math.abs(cy) <= LIMIT - r - 1 && Math.abs(cz) <= LIMIT - r - 1)) return;
+      if (!(Math.abs(cx) <= LIMIT - r - 1 && Math.abs(cy) <= LIMIT - r - 1 && Math.abs(cz) <= LIMIT - r - 1)) continue;
       const key = chunkKey(cx, cy, cz);
       let balls = centres.get(key) ?? 0;
-      for (let i = body.numColliders(); !balls && i-- > 0; ) if (body.collider(i).shapeType() === ballShape) balls = 1;
+      if (!balls && body.colliders.some(isBall)) balls = 1;
       centres.set(key, balls);
-    });
+    }
     if (!same(centres, this.centres)) this.survey(centres);
     const world = this.world;
     for (const entry of this.entries.values()) {
@@ -523,36 +462,23 @@ export class VoxelPhysics {
   // Gathers a bounding sphere per non-fixed body, grown by two steps of its velocity and MARGIN.
   private reach(): void {
     const out = this.spheres,
-      S = this.rapier.ShapeType,
-      v = this.vector,
       travel = 2 * this.physics.fixedTimestep;
     out.length = 0;
-    this.raw.forEachRigidBody((body) => {
-      if (body.isFixed()) return;
-      const t = body.translation(),
-        l = body.linvel();
+    for (const body of this.physics.getBodies()) {
+      if (body.type === 'fixed') continue;
+      const [x, y, z] = body.position,
+        [vx, vy, vz] = body.linearVelocity;
       let extent = 0,
         ball = 0;
-      for (let i = body.numColliders(); i-- > 0; ) {
-        const c = body.collider(i),
-          type = c.shapeType();
-        let size = 32; // another shape: assume a chunk, so everything around it is built at once
-        if (type === S.Ball) {
-          size = c.radius();
-          ball = 1;
-        } else if (type === S.Capsule) size = c.halfHeight() + c.radius();
-        else if (type === S.Cylinder || type === S.Cone) size = Math.hypot(c.halfHeight(), c.radius());
-        else if (type === S.RoundCylinder || type === S.RoundCone)
-          size = Math.hypot(c.halfHeight(), c.radius()) + c.roundRadius();
-        else if (type === S.Cuboid || type === S.RoundCuboid) {
-          const h = c.halfExtents(v);
-          if (h) size = Math.hypot(h.x, h.y, h.z) + (type === S.RoundCuboid ? c.roundRadius() : 0);
-        }
-        const p = c.translationWrtParent(v);
+      for (const collider of body.colliders) {
+        if (isBall(collider)) ball = 1;
+        // Another shape: assume a chunk, so everything around it is built at once.
+        const size = collider.boundingRadius ?? 32,
+          p = collider.translationWrtParent();
         extent = Math.max(extent, size + (p ? Math.hypot(p.x, p.y, p.z) : 0));
       }
-      out.push(t.x, t.y, t.z, extent + travel * Math.hypot(l.x, l.y, l.z) + MARGIN, ball);
-    });
+      out.push(x, y, z, extent + travel * Math.hypot(vx, vy, vz) + MARGIN, ball);
+    }
   }
   // Starts (mesh) or ends the triangle mesh of a chunk; the voxel collider is disabled exactly in MESH mode.
   private setMode(entry: Entry, mesh: boolean): void {
@@ -577,11 +503,10 @@ export class VoxelPhysics {
     for (const piece of entry.pieces) piece.collider?.setEnabled(true);
   }
   // Adds a collider to the voxel body (enabled or not) for `entry`.
-  private attach(desc: MassDesc, entry: Entry, enabled: boolean): Collider {
-    // Explicit zero mass: otherwise Rapier integrates every voxel and triangle into the fixed body's mass properties
-    // at the next step (8 ms for 11 cave chunks on the reference desktop).
-    desc.setMassProperties(0, ZERO, ZERO, IDENTITY);
-    const collider = this.body.addCollider({ shape: 'custom', desc, enabled });
+  private attach(shape: ColliderOptions, entry: Entry, enabled: boolean): Collider {
+    // Massless: otherwise every voxel and triangle is integrated into the fixed body's mass properties at the next step
+    // (8 ms for 11 cave chunks on the reference desktop).
+    const collider = this.body.addCollider({ ...shape, massless: true, enabled });
     this.owners.set(collider.handle, entry);
     return collider;
   }
@@ -692,12 +617,7 @@ export class VoxelPhysics {
     const quads = positions.length / 12,
       indices = new Uint32Array(quads * 6);
     for (let q = 0; q < quads; q++) indices.set([q * 4, q * 4 + 1, q * 4 + 2, q * 4, q * 4 + 2, q * 4 + 3], q * 6);
-    const R = this.rapier;
-    entry.parts = this.attach(
-      R.ColliderDesc.trimesh(Float32Array.from(positions), indices, R.TriMeshFlags?.FIX_INTERNAL_EDGES),
-      entry,
-      true,
-    );
+    entry.parts = this.attach({ shape: 'trimesh', vertices: positions, indices, fixInternalEdges: true }, entry, true);
   }
   // The slab and stair mesh of the chunk holding world cell (x, y, z) rebuilds.
   private reshape(x: number, y: number, z: number): void {
@@ -754,11 +674,7 @@ export class VoxelPhysics {
           cells[n++] = entry.cz * 32 + ((i >> 5) & 31);
         }
     if (keep) entry.scanned = true;
-    const collider = this.attach(
-      this.rapier.ColliderDesc.voxels!(cells.subarray(0, n), ONE),
-      entry,
-      entry.mode !== MESH,
-    ) as VoxelCollider;
+    const collider = this.attach({ shape: 'voxels', cells: cells.subarray(0, n) }, entry, entry.mode !== MESH);
     if (entry.collider) this.retire(entry.collider);
     entry.collider = collider;
     entry.rebuild = false;
@@ -771,7 +687,7 @@ export class VoxelPhysics {
     // Couple with the face neighbours built so far (voxel states only track the faces); later ones couple with it.
     for (let d = 0; d < 6; d++) {
       const other = this.entries.get(neighbour(entry, d))?.collider;
-      if (other) collider.combineVoxelStates(other, 0, 0, 0);
+      if (other) collider.combineVoxelStates(other);
     }
   }
   // Builds piece i of the chunk's mesh from its faces (enabled in MESH mode), replacing its previous mesh; over the
@@ -794,14 +710,14 @@ export class VoxelPhysics {
       entry.pieces.push({ box: high, collider: null, dirty: true });
       return true;
     }
-    const R = this.rapier,
-      collider = triangles
+    const collider = triangles
         ? this.attach(
-            R.ColliderDesc.trimesh(
-              this.vertices.subarray(0, triangles * 6),
-              this.indices.subarray(0, triangles * 3),
-              R.TriMeshFlags?.FIX_INTERNAL_EDGES,
-            ),
+            {
+              shape: 'trimesh',
+              vertices: this.vertices.subarray(0, triangles * 6),
+              indices: this.indices.subarray(0, triangles * 3),
+              fixInternalEdges: true,
+            },
             entry,
             entry.mode === MESH,
           )
@@ -931,7 +847,7 @@ export class VoxelPhysics {
   }
   private propagate(entry: Entry, cx: number, cy: number, cz: number, x: number, y: number, z: number): void {
     const other = this.entries.get(chunkKey(cx, cy, cz))?.collider;
-    if (other) entry.collider!.propagateVoxelChange(other, x, y, z, 0, 0, 0);
+    if (other) entry.collider!.propagateVoxelChange(other, x, y, z);
   }
   // The mesh piece holding cell (x, y, z) rebuilds, after a rescan of its chunk.
   private touch(x: number, y: number, z: number): void {

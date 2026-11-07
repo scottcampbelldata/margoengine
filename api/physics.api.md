@@ -36,12 +36,13 @@ export class CharacterController {
     constructor(owner: {
         readonly world: World;
         removeController(controller: CharacterController): void;
+        colliderOf(raw: Collider): PhysicsCollider | undefined;
     }, body: PhysicsBody, options?: CharacterControllerOptions);
     get grounded(): boolean;
     move(desired: Vec3, filter?: {
         groups?: number;
         flags?: number;
-        predicate?: (collider: Collider) => boolean;
+        predicate?: (collider: PhysicsCollider) => boolean;
     }): CharacterMoveResult;
     dispose(): void;
     [Symbol.dispose]: () => void;
@@ -86,6 +87,7 @@ export interface ColliderSettings {
     restitutionCombine?: CombineRule;
     density?: number;
     mass?: number;
+    massless?: boolean;
     sensor?: boolean;
     collisionGroups?: number;
     solverGroups?: number;
@@ -93,14 +95,16 @@ export interface ColliderSettings {
     enabled?: boolean;
 }
 
+export type ColliderShape = ShapeOptions['shape'];
+
 export interface CollisionEvent {
     type: CollisionEventType;
     bodyA: PhysicsBody;
     bodyB: PhysicsBody;
     meshA: Mesh | null;
     meshB: Mesh | null;
-    colliderA: Collider;
-    colliderB: Collider;
+    colliderA: PhysicsCollider;
+    colliderB: PhysicsCollider;
     sensor: boolean;
 }
 
@@ -137,7 +141,7 @@ export type CompoundPart = ({
 export interface Hit {
     body: PhysicsBody;
     mesh: Mesh | null;
-    collider: Collider;
+    collider: PhysicsCollider;
 }
 
 export type JointDof = 'linX' | 'linY' | 'linZ' | 'angX' | 'angY' | 'angZ';
@@ -236,10 +240,12 @@ export class Physics implements EnginePlugin, BodyOwner {
     addBody(mesh: Mesh | null, options?: BodyOptions): PhysicsBody;
     addModel(model: ModelLike, options?: ModelBodyOptions): PhysicsBody[];
     bodyOf(mesh: Mesh): PhysicsBody | undefined;
-    bodyOfCollider(collider: Collider | number): PhysicsBody | undefined;
+    bodyOfCollider(collider: PhysicsCollider | number): PhysicsBody | undefined;
+    colliderOf(raw: Collider): PhysicsCollider | undefined;
+    supportsShape(shape: ShapeOptions['shape']): boolean;
     getBodies(): PhysicsBody[];
-    addCollider(body: PhysicsBody, options: ColliderOptions): Collider;
-    removeCollider(body: PhysicsBody, collider: Collider): void;
+    addCollider(body: PhysicsBody, options: ColliderOptions): PhysicsCollider;
+    removeCollider(body: PhysicsBody, collider: PhysicsCollider): void;
     removeBody(body: PhysicsBody): void;
     addJoint(bodyA: PhysicsBody, bodyB: PhysicsBody, options: JointOptions): PhysicsJoint;
     removeJoint(joint: PhysicsJoint): void;
@@ -273,7 +279,7 @@ export class Physics implements EnginePlugin, BodyOwner {
 export class PhysicsBody {
     readonly raw: RigidBody;
     readonly mesh: Mesh | null;
-    readonly colliders: Collider[];
+    readonly colliders: PhysicsCollider[];
     userData: unknown;
     readonly pose: Float64Array<ArrayBuffer>;
     restWritten: boolean;
@@ -306,6 +312,15 @@ export class PhysicsBody {
     wakeUp(): this;
     get mass(): number;
     setAdditionalMass(mass: number, inertia?: Vec3): this;
+    get centerOfMass(): [number, number, number];
+    get principalInertia(): [number, number, number];
+    get inertiaFrame(): [number, number, number, number];
+    setMassProperties(properties: {
+        mass?: number;
+        centerOfMass?: Vec3;
+        inertia?: Vec3;
+        inertiaFrame?: Quat;
+    }): this;
     get gravityScale(): number;
     set gravityScale(value: number);
     get ccd(): boolean;
@@ -314,9 +329,51 @@ export class PhysicsBody {
     set enabled(value: boolean);
     lockRotations(locked?: boolean): this;
     lockTranslations(locked?: boolean): this;
-    addCollider(options: ColliderOptions): Collider;
-    removeCollider(collider: Collider): void;
+    addCollider(options: ColliderOptions): PhysicsCollider;
+    removeCollider(collider: PhysicsCollider): void;
     remove(): void;
+}
+
+export class PhysicsCollider {
+    readonly raw: Collider;
+    readonly body: PhysicsBody;
+    readonly shape: ColliderShape;
+    constructor(
+    raw: Collider,
+    body: PhysicsBody,
+    shape: ColliderShape);
+    get handle(): number;
+    get valid(): boolean;
+    markRemoved(): void;
+    get boundingRadius(): number | null;
+    isSensor(): boolean;
+    setSensor(sensor: boolean): this;
+    isEnabled(): boolean;
+    setEnabled(enabled: boolean): this;
+    friction(): number;
+    setFriction(friction: number): this;
+    restitution(): number;
+    setRestitution(restitution: number): this;
+    density(): number;
+    setDensity(density: number): this;
+    mass(): number;
+    collisionGroups(): number;
+    setCollisionGroups(groups: number): this;
+    solverGroups(): number;
+    setSolverGroups(groups: number): this;
+    translation(): Vector;
+    rotation(): Rotation;
+    translationWrtParent(): Vector | null;
+    rotationWrtParent(): Rotation | null;
+    halfExtents(): Vector | null;
+    radius(): number;
+    halfHeight(): number;
+    vertices(): Float32Array;
+    indices(): Uint32Array | undefined;
+    containsPoint(point: Vector): boolean;
+    setVoxel(x: number, y: number, z: number, filled: boolean): this;
+    combineVoxelStates(other: PhysicsCollider, sx?: number, sy?: number, sz?: number): this;
+    propagateVoxelChange(other: PhysicsCollider, x: number, y: number, z: number, sx?: number, sy?: number, sz?: number): this;
 }
 
 export interface PhysicsEventMap {
@@ -339,6 +396,8 @@ export class PhysicsJoint {
     }, raw: ImpulseJoint, type: JointType, bodyA: PhysicsBody, bodyB: PhysicsBody);
     get valid(): boolean;
     markRemoved(): void;
+    get anchorA(): [number, number, number];
+    get anchorB(): [number, number, number];
     setLimits(min: number, max: number): this;
     get limits(): [number, number] | null;
     setMotor(motor: MotorOptions): this;
@@ -388,7 +447,7 @@ export interface QueryFilter {
     excludeFixed?: boolean;
     excludeKinematic?: boolean;
     excludeDynamic?: boolean;
-    predicate?: (body: PhysicsBody, collider: Collider) => boolean;
+    predicate?: (body: PhysicsBody, collider: PhysicsCollider) => boolean;
 }
 
 export interface RapierModule {
@@ -396,6 +455,13 @@ export interface RapierModule {
     EventQueue: new (autoDrain: boolean) => EventQueue;
     Ray: new (origin: Vector, direction: Vector) => Ray;
     HalfSpace: new (normal: Vector) => Shape;
+    ShapeType: Record<string, number | string>;
+    TriMeshFlags?: {
+        FIX_INTERNAL_EDGES?: number;
+    };
+    Collider?: {
+        prototype: Partial<Collider>;
+    };
     ColliderDesc: {
         new (shape: never): ColliderDesc;
         cuboid(x: number, y: number, z: number): ColliderDesc;
@@ -404,7 +470,8 @@ export interface RapierModule {
         cylinder(halfHeight: number, radius: number): ColliderDesc;
         cone(halfHeight: number, radius: number): ColliderDesc;
         convexHull(points: Float32Array): ColliderDesc | null;
-        trimesh(vertices: Float32Array, indices: Uint32Array): ColliderDesc;
+        trimesh(vertices: Float32Array, indices: Uint32Array, flags?: number): ColliderDesc;
+        voxels?(cells: Int32Array, size: Vector): ColliderDesc;
         heightfield(rows: number, columns: number, heights: Float32Array, scale: Vector): ColliderDesc;
         compound?(shapes: Shape[], positions: Vector[], rotations: Rotation[]): ColliderDesc;
         convexDecomposition?(vertices: Float32Array, indices: Uint32Array): ColliderDesc | null;
@@ -510,6 +577,7 @@ export type ShapeOptions = {
     geometry?: ColliderGeometry;
     vertices?: ArrayLike<number>;
     indices?: ArrayLike<number>;
+    fixInternalEdges?: boolean;
 } | {
     shape: 'heightfield';
     rows: number;
@@ -526,6 +594,15 @@ export type ShapeOptions = {
     geometry?: ColliderGeometry;
     vertices?: ArrayLike<number>;
     indices?: ArrayLike<number>;
+}
+ | {
+    shape: 'voxels';
+    cells: Int32Array;
+    size?: Vec3;
+}
+ | {
+    shape: 'halfSpace';
+    normal?: Vec3;
 }
  | {
     shape: 'custom';
@@ -572,7 +649,7 @@ export interface VehicleOptions {
     maxBrakeForce?: number;
     maxSteeringAngle?: number;
     groups?: number;
-    predicate?: (collider: Collider) => boolean;
+    predicate?: (collider: PhysicsCollider) => boolean;
 }
 
 export interface WheelOptions {
@@ -615,8 +692,8 @@ export function geometryPositions(source: ColliderGeometry, scale?: Vec3): Float
 interface BodyOwner {
     readonly rapier: RapierModule;
     readonly world: World;
-    addCollider(body: PhysicsBody, options: ColliderOptions): Collider;
-    removeCollider(body: PhysicsBody, collider: Collider): void;
+    addCollider(body: PhysicsBody, options: ColliderOptions): PhysicsCollider;
+    removeCollider(body: PhysicsBody, collider: PhysicsCollider): void;
     removeBody(body: PhysicsBody): void;
 }
 
@@ -649,7 +726,13 @@ interface Collider {
     setFriction(friction: number): void;
     setRestitution(restitution: number): void;
     setCollisionGroups(groups: number): void;
+    collisionGroups(): number;
     setSolverGroups(groups: number): void;
+    solverGroups(): number;
+    containsPoint(point: Vector): boolean;
+    setVoxel(x: number, y: number, z: number, filled: boolean): void;
+    combineVoxelStates(other: Collider, sx: number, sy: number, sz: number): void;
+    propagateVoxelChange(other: Collider, x: number, y: number, z: number, sx: number, sy: number, sz: number): void;
 }
 
 interface ColliderDesc {
@@ -661,6 +744,7 @@ interface ColliderDesc {
     setFrictionCombineRule(rule: number): ColliderDesc;
     setRestitutionCombineRule(rule: number): ColliderDesc;
     setMass(mass: number): ColliderDesc;
+    setMassProperties(mass: number, center: Vector, inertia: Vector, frame: Rotation): ColliderDesc;
     setDensity(density: number): ColliderDesc;
     setSensor(sensor: boolean): ColliderDesc;
     setActiveCollisionTypes(types: number): ColliderDesc;
@@ -712,6 +796,8 @@ interface ImpulseJoint {
     isValid(): boolean;
     contactsEnabled(): boolean;
     setContactsEnabled(enabled: boolean): void;
+    anchor1(): Vector;
+    anchor2(): Vector;
     setLocalFrame1(anchor: Vector, rotation: Rotation): void;
     setLocalFrame2(anchor: Vector, rotation: Rotation): void;
 }
@@ -849,7 +935,6 @@ interface Shape {
 }
 
 interface SphericalImpulseJoint extends ImpulseJoint {
-    anchor1(): Vector;
     configureMotorModel(axis: number, model: number): void;
     setMotorMaxForce(axis: number, force: number): void;
     configureMotor(axis: number, position: number, velocity: number, stiffness: number, damping: number): void;
