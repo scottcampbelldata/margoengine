@@ -854,6 +854,17 @@ Level nodes sit outside the scene, copy their node's transform and skin, and fol
 
 `skipped` lists the primitives left as they were: Draco ones, ones with no position, points, lines, strips and fans, and, with `reason: 'too-large'`, a primitive past the simplifier's 200,000 vertices or faces, which is welded but not simplified. Meshopt buffers are refused: optimize first, then compress. `weldVertices(arrays, indices, vertexCount)` is the weld on its own, and `margo-convert` uses it.
 
+## Reading JPEG pixels (`@margoengine/exporters/jpeg-read`)
+
+`decodeJPEG` turns JPEG bytes into RGBA pixels with no canvas, in Node or a worker. Writers that repack images use it; `@margoengine/fbx/pbr` packs metal and rough maps with it.
+
+```ts
+import {decodeJPEG} from 'margoengine/exporters/jpeg-read';
+const response = await fetch('/assets/rough.jpg');
+const {width, height} = decodeJPEG(new Uint8Array(await response.arrayBuffer()));
+console.log(width, height);
+```
+
 ## Limits
 
 The engine/data-scene `exportGLTF` and `exportGLB` entrypoints write cameras, lights, extras and

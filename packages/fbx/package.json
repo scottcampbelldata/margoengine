@@ -41,6 +41,10 @@
     "./layers": {
       "types": "./dist/layers.d.ts",
       "import": "./dist/layers.js"
+    },
+    "./pbr": {
+      "types": "./dist/pbr.d.ts",
+      "import": "./dist/pbr.js"
     }
   },
   "files": [
@@ -52,6 +56,7 @@
     "access": "public"
   },
   "dependencies": {
+    "@margoengine/decoders": "^1.0.0",
     "@margoengine/exporters": "^1.0.0",
     "@margoengine/gltf-pro": "^1.0.0",
     "@margoengine/geometry": "^1.0.0"

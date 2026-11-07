@@ -5,6 +5,8 @@ folder of https://github.com/ufbx/ufbx at commit 1d097696e33b367bb3152b175aeb2d9
 choice; Copyright (c) 2020 Samuli Raivio. They are test data only, are not in any npm tarball, and no code of that
 repository is used or was read.
 
+`maxPbrMaterial_specGloss.fbx` is from the `test/models/FBX` folder of https://github.com/assimp/assimp at commit 0623040c1eaf426f660f43892b3469c9fdb99842; licence BSD-3-Clause, Copyright (c) 2006-2024 assimp team. It was written by 3ds Max.
+
 SHA-256 sums:
 
 ```text
@@ -21,6 +23,11 @@ e6334605adfec46ec33dea1e93c30b70d4f60f8921dc1c3a0762c72f070eda03  maya_mixed_inh
 647e177a782010e631e75c8dee9aa5926446f037bac166c956aaa28a6e843866  maya_mixed_inherit_mode_5.obj
 831b298de7df0a1cf2dacc610ec7c5a2db5c03dfef29e75a26d8a272c03e2500  maya_mixed_inherit_mode_6.obj
 72f2b4289dbf395a73d8f5652e182531232d9209c4b6599c6235294b0897b111  maya_mixed_inherit_mode_7.obj
+f84508c39a019d1a837d5cf7ef60dfbee0ab82df975863c4ea72a9170410edef  max_pbr_metal_rough_material_7700_ascii.fbx
+1eb4bf4c714fc748d8959bae44eed2f8763bdad0606907de55e3671fb3f69800  max_physical_material_properties_7500_ascii.fbx
+a7d05185611285723f6eb1acb77d7735cf906451bf7edf0129374460eb8c1715  maya_shaderfx_pbs_material_7700_binary.fbx
+c380e089b5bf51e2496be600a1de968405ecb856f075fc05950cc19fc97df2c1  maya_texture_layers_7500_binary.fbx
+3617267c212f6f95340ee42f62a05ee079f38fcd24a0451f02a4deb47d20c7c0  maxPbrMaterial_specGloss.fbx
 78ad2c3511678301d8f9143cc239ebed7caa46e34fc847f3a21c2f697b6d2807  maya_rotation_order_7500_binary.fbx
 d47fd240ee698fa1c3c58e441f9cfd4390a5092308ef9dc686ef3ed130d813af  maya_rotation_order.obj
 ```

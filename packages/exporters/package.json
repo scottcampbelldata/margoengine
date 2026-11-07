@@ -65,6 +65,10 @@
       "types": "./dist/capture.d.ts",
       "import": "./dist/capture.js"
     },
+    "./jpeg-read": {
+      "types": "./dist/jpeg-read.d.ts",
+      "import": "./dist/jpeg-read.js"
+    },
     "./apng": {
       "types": "./dist/apng.d.ts",
       "import": "./dist/apng.js"
