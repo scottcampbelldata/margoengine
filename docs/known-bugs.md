@@ -18,24 +18,43 @@ are still open.
 
 ## README examples
 
-### 129 of 757 README examples do not run yet
+### 126 of 767 README examples do not run yet
 
-- **What:** `npm run check:readme-run` ran 628 of 757 examples on 2026-11-06 (RTX A6000, Chromium). The other 129 are in
-  `scripts/support/readme-run-known.json`, each with its error.
+- **What:** `npm run check:readme-run`, a step of `check:merge` since 2026-11-07, ran 641 of 767 examples that day (RTX A6000,
+  Chromium). The other 126 are in `scripts/support/readme-run-known.json`, each with its error. A new failure fails the step, and
+  so does an entry that passes or names an example that is gone. An id is a position in its README, so an example added above
+  one on the list moves it: the step then names both, and the entry moves with its example.
 - **Repro:** `npm run build:packages`, then `npm run check:readme-run -- --only=<id>` with an id from that list.
-- **Cause:** 109 entries start `sample:`. The example names a file of its own (a font, a scan, a rigged model with named joints)
+- **Cause:** 107 entries start `sample:`. The example names a file of its own (a font, a scan, a rigged model with named joints)
   and the check has no matching sample, or the sample does not fit it, so these say nothing about the example yet. Ragdoll,
-  fbx and the animator's joint indices are in this group. 20 start `example:`, and these need reading one at a time:
+  fbx, the animator's joint indices and `usdz/readme-0` and `-1` (no `.usdz` file is in the repository) are in this group. 19 start
+  `example:`, and these need reading one at a time:
   - Five attach one plugin twice to one engine, which core refuses (`post/readme-7`, `shadows/readme-0`, `quality/readme-4`,
     `sky/readme-6`, `ragdoll/readme-4`), so the example shows two alternatives as if one ran after the other.
   - `cameras/readme-6` needs `source` on Tonemap, `exporters/readme-28` reads a second view the example never made,
     `exporters/readme-32` needs the Studio source profile, `stage/readme-1` gets a model minimal glTF refuses, and
     `headless/readme-3` passes a page engine to `readPixels`.
   - `react/readme-0` and `-3` fail on how the page loads React, `worker/readme-0` on the worker's message, `input/readme-1`
-    times out, `controls/readme-5` and `-6` find no WebGPU in Node, `loaders/readme-2` needs a page, `loaders/readme-22`
-    wants an OpenVDB sample, `xr/readme-1` needs a headset and `headless/readme-4` needs ffmpeg.
+    times out, `loaders/readme-2` needs a page, `loaders/readme-22` wants an OpenVDB sample, `xr/readme-1` needs a headset,
+    `headless/readme-4` needs ffmpeg and `voxel-net/readme-0` is a server and a page in one example.
 - **Needed to close:** a matching sample for each `sample:` entry, each `example:` entry fixed in its README or its package, and
   the list empty.
+
+## Checks
+
+### 20 GPU check scripts run in no check
+
+- **What:** 20 `scripts/*-gpu-check.js` files are named by no `package.json`, no suite and no test, so nothing runs them:
+  clustered-falloff, clustered-shadow, env-mirror, fog-all, light-render, mat-more, material-back-side,
+  material-depth-distance, material-dispersion, material-render-state, material-wireframe, materials-uv-groups,
+  normal-map-orientation, orthographic, physical-material-maps, shader-raw, sheen-albedo, ssao, stage-features and
+  tonemap-lut-sizes.
+- **Repro:** `git grep -l <name>-gpu-check.js -- package.json 'packages/*/package.json' 'scripts/*.mjs' 'scripts/*.js' 'tests/*.js'`
+  lists only the script itself, or nothing.
+- **Cause:** each was written for one job and run by hand. `unrunBrowserSuites` in `scripts/gpu-package-tests.mjs` looks at npm
+  scripts only, so a plain file is not seen. A twenty-first, `core-parity-hooks-gpu-check.js`, had failed unseen since 2026-10-17:
+  its reference shader still held the old display curve. It runs in `modern:test:extensions` now.
+- **Needed to close:** run each once, fix what has rotted, put each in a suite or remove it, and make the check see plain files.
 
 ## Boulder demo
 

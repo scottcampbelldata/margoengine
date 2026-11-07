@@ -23,6 +23,8 @@
 // or a changed example file reaches, all of them in the full run. The package tarball test always runs, on the affected packages' README examples (the umbrella smoke
 // test every time; whole when a file it runs changed), and the bundler matrix runs when a changed package is one it
 // builds or imports, or a file it runs changed (scripts/support/affected-packages.mjs); the full run keeps both whole.
+// check:readme-run, on the GPU, runs the same packages' examples as the tarball test, every example when
+// a file it runs changed, and every example in the full run, the check after a push. It is in no gate before the push.
 // The mode and the reason are printed first and written to test-results/check-merge.json. A step that fails while the
 // Windows event log shows a GPU driver reset (scripts/support/driver-resets.mjs, bug 25) runs once more; the reset is
 // printed and recorded with the step, and a second failure fails the run. A run that passed only that way says so: a
@@ -88,8 +90,8 @@ export const GPU_STEPS = [
 ];
 /** Steps known to need no GPU narrowing; a step in neither list fails the unit test so someone decides. */
 export const PLAIN_STEPS = ['verify', 'check:fresh-clone', 'build:site', 'check:quickstart'];
-/** Package-level steps (no GPU) that always run in some form and are narrowed by packageScopes. */
-export const SCOPED_STEPS = ['check:examples-types', 'modern:test:packages', 'modern:test:bundlers'];
+/** Package-level steps narrowed by packageScopes; check:readme-run is the one of them that uses the GPU. */
+export const SCOPED_STEPS = ['check:examples-types', 'modern:test:packages', 'modern:test:bundlers', 'check:readme-run'];
 
 /** Steps that never drive the GPU: no heat watch. */
 export const NO_GPU_STEPS = ['verify', 'check:fresh-clone'];
@@ -158,6 +160,12 @@ export function planSteps({ steps, decision, tests, workspaces, testId, scope })
           : [{ command }];
       case 'modern:test:bundlers':
         return !scope || scope.bundlers.run ? [{ command }] : skip(scope.bundlers.reason);
+      // The packages whose examples can change, as for the tarball test; every example when a file the step runs changed.
+      case 'check:readme-run':
+        if (!scope || scope.packages.full || hit.has('readme-run')) return [{ command }];
+        return scope.packages.dirs.length
+          ? [{ command: `${command} -- --packages=${scope.packages.dirs.join(',')}` }]
+          : skip(none);
       default:
         return [{ command }];
     }
@@ -584,6 +592,8 @@ export const STEP_AFTER = {
   'check:examples-types': ['verify'],
   'check:fresh-clone': ['verify'],
   'check:quickstart': ['verify'],
+  // Reads verify's build; it must not run beside a build of dist.
+  'check:readme-run': ['verify'],
   'modern:test:packages': ['verify'],
   'modern:test:bundlers': ['modern:test:packages'],
   ...Object.fromEntries(GPU_STEPS.map((step) => [step, ['build:site']])),

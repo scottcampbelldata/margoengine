@@ -504,6 +504,29 @@ test('full decisions keep the package test whole and the bundler matrix on', () 
     );
 });
 
+test('check:readme-run: every example in the full run, narrowed only on an affected run, and never before the push', () => {
+  const step = (planned) => planned.find((p) => stepName(p.command) === 'check:readme-run'),
+    whole = { command: 'npm run check:readme-run' };
+  // The full check is never narrowed or skipped, whatever made it full.
+  assert.deepEqual(step(planFiles(ctx, ['docs/known-bugs.md'], { MARGO_FULL: '1' }).planned), whole);
+  assert.deepEqual(step(planFor(['packages/core/src/engine.ts']).planned), whole, 'core makes a full run');
+  // A file the step runs: every example, so a stale known list is found.
+  for (const file of ['scripts/run-readme-examples.mjs', 'scripts/support/readme-run-known.json'])
+    assert.deepEqual(step(planFor([file]).planned), whole, file);
+  // A package: its examples and its dependents'. A README: its own.
+  assert.match(step(planFor(['packages/dof/src/index.ts']).planned).command, /^npm run check:readme-run -- --packages=.*\bdof\b/);
+  assert.equal(step(planFor(['packages/dof/README.md']).planned).command, 'npm run check:readme-run -- --packages=dof');
+  assert.ok(step(planFor(['docs/known-bugs.md']).planned).skip, 'no example can change');
+  // The full check after the push only: the gates before it are lint, hygiene, verify and the package tests.
+  assert.ok(![...SERIAL, ...PARALLEL.flat()].some((command) => command.includes('readme-run')), 'not in verify');
+});
+
+test('check:readme-run holds a GPU slot with a hard limit in its own script, so no runner can leave it unlimited', () => {
+  const text = readFileSync(resolve(root, 'scripts/run-readme-examples.mjs'), 'utf8');
+  assert.match(text, /acquire\(\{ owner: 'check-readme-run', max: LIMIT_MINUTES \}\)/);
+  assert.equal(Number(/LIMIT_MINUTES = (\d+)/.exec(text)[1]), 60);
+});
+
 test('the bundler matrix does not take the GPU lock, and a render in a browser is the only reason it would', () => {
   assert.equal(manifest.scripts['modern:test:bundlers'], 'node scripts/bundler-matrix.mjs');
   assert.doesNotMatch(

@@ -1464,3 +1464,21 @@ Scott's order of 2026-11-07, one at a time, each pushed before the next.
 - **Ruled out for the falls:** leaving a raised foot out of the limit, the plant read on the floor, a cap by weight, velocities from position differences, lower gains, no target speed. Scaling the limit by 1, 1.5, 2, 3, 4 and 6 gave 17, 31, 11, 1, 10 and 3 falls: no scale is safe, so it holds only on two feet.
 - **Existing tests changed:** none; 9 of the tests added fail without the fix.
 - **Size:** `@margoengine/ragdoll/balance` grew from 5,153 to about 5,650 bytes gzipped and its budget was raised for it: the force book-keeping and the flat sole. An optional entry; core and stage do not change.
+
+## Frame counts after another camera, and the README run in check:merge
+
+Two jobs Scott approved on 2026-11-07. A core bug fix for `engine.stats`, and the README run as a step of the full check after a push.
+
+| # | Job | Status | Commit | Entry | Claim |
+| --- | --- | --- | --- | --- | --- |
+| 1 | `engine.stats` reads the frame last drawn | DONE | `7974a966b` | core | limits row Frame counts |
+| 2 | `check:readme-run` in `check:merge` | DONE | this commit | - | - |
+
+- **Root cause, job 1:** `collectInstances` set the counts, and the restore after `engine.render({ camera })` and every pick collect too, so both overwrote what the frame and its packages had counted.
+- **Size:** core 21,468 to 21,487 B gzip, 17 B under its cap; core plus stage 22,859 to 22,878 B.
+- **Existing tests changed:** one assertion in `tests/core-parity-hooks.test.js` pinned the primary view's counts after another camera; it now pins the frame last drawn, and the README sentence changed with it. Frustum, visibility and batches stay restored and pinned.
+- **Bugs found on the way:** `scripts/core-parity-hooks-gpu-check.js` ran in no check and had failed since 2026-10-17 on a stale reference shader: fixed, and it runs in `modern:test:extensions`. Four voxel-net examples listened on 8787 side by side, so the losers failed: examples on one port now take turns, regression test in `tests/run-readme-examples.test.js`. 20 more GPU check scripts run in no check: `docs/known-bugs.md`.
+- **Job 2:** whole in the full check, narrowed to the affected packages otherwise, every example when a file it runs changes, in no gate before the push. One shared GPU slot, ended by the GPU lock at 60 minutes.
+- **Proved:** two runs through check:merge's runner failed on real findings, the next passed, and so did the run on the rebased tree: 641 of 767. A known entry that passes and a new failure each failed the step on the way.
+- **Not done:** a known entry that fails with a new error is not caught. 118 of 126 reasons matched exactly, and the rest hold build paths, cut text or a module name that changes per run, so an exact compare would fail on nothing.
+- **Gate:** lint, hygiene, verify, the tests of what changed, core's GPU check and `check:views` for job 1, the push from one script that stops at the first failing step.
