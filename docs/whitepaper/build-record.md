@@ -1241,6 +1241,7 @@ An audit of the finished batches against their job text listed 70 gaps for the H
 | B28 | 13/7 Arcball gizmo | DONE | `5b4dd4af7` | LIM limits row |
 | B39 | 8/5 Spherical harmonics | DONE | `5b4dd4af7` | LIM-048 |
 | jxl-icc | JPEG XL Wasm path applies the file's ICC profile | DONE | this commit | LIM-233 |
+| stats-visible | stats.visible counts a glTF model's nodes once a frame | DONE | this commit | - |
 
 ## LAZ: one LAS reader, and every point format on a real file
 

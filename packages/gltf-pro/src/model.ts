@@ -636,6 +636,23 @@ function joinBatch(
   d.joinedRun = run;
   push(batch, model, r, d);
 }
+// The encoder of the last frame that counted, per engine.
+const countedFrames = new WeakMap<object, GPUCommandEncoder>();
+/**
+ * Adds `count` to `stats.visible`. Core sets that number only when it collects again, so a frame that collects nothing would
+ * add to the frame before: a frame's first count starts again from the meshes core collected, which the batches hold.
+ */
+function countVisible(engine: EngineKernel, c: Context, count: number): void {
+  const { stats } = engine;
+  if (countedFrames.get(stats) !== c.encoder) {
+    countedFrames.set(stats, c.encoder);
+    stats.visible = 0;
+    if (c.batches) for (const batch of c.batches) stats.visible += batch.count;
+  }
+  stats.visible += count;
+}
+/** The nodes one draw of `r` shows: the parts it was merged from, or its instances. */
+const nodesDrawn = (r: DrawResource): number => r.batch?.parts.length ?? r.primitive.instances?.count ?? 1;
 /** Adds member `r` (of `model`, derivation `d`) to `batch`. */
 function push(batch: PendingBatch, model: PBRModel, r: DrawResource, d: DrawDerivation): void {
   batch.members.push(r);
@@ -3679,7 +3696,7 @@ export class PBRModel implements EnginePlugin {
           pass = undefined;
         }
         if ((mode === 'beauty' || through) && !external) {
-          this.engine.stats.visible += inst ? inst.count : 1;
+          countVisible(this.engine, c, nodesDrawn(r));
           this.engine.stats.drawCalls++;
         }
       }
@@ -3846,7 +3863,9 @@ export class PBRModel implements EnginePlugin {
       section = frame.section;
     if (bound.pass !== pass) resetBindings(bound, pass);
     // Every member counts as drawn, as a draw of its own did (counted here rather than once per member).
-    this.engine.stats.visible += members.length;
+    let drawn = 0;
+    for (let i = 0; i < members.length; i++) drawn += nodesDrawn(members[i]);
+    countVisible(this.engine, c, drawn);
     beginDraw(device, view);
     const scratch = (scratchStack[scratchDepth] ??= createDrawScratch(c.color, c.depth));
     scratchDepth++;
