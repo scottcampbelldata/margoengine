@@ -32,6 +32,10 @@ export interface MaterialXNode {
   type: string;
   /** Inputs by name. Null prototype. */
   inputs: Record<string, MaterialXInput>;
+  /** The `version` attribute, such as `1.0.0`: which published definition of the node it means. */
+  version?: string;
+  /** The `nodedef` attribute: the definition it names outright. */
+  nodedef?: string;
 }
 
 /** A `nodegraph`: nodes, its named outputs and the inputs it takes from outside. */
@@ -187,7 +191,7 @@ function readInput(element: XMLElement, scope: Scope): MaterialXInput {
 const table = <T>(): Record<string, T> => Object.create(null) as Record<string, T>;
 
 function readNode(element: XMLElement, scope: Scope): MaterialXNode {
-  const { name, type } = element.attributes,
+  const { name, type, version, nodedef } = element.attributes,
     here = scoped(element, scope);
   if (!name) throw new LoaderError(F, 'syntax', `<${element.name}> has no name`);
   const inputs = table<MaterialXInput>();
@@ -196,7 +200,14 @@ function readNode(element: XMLElement, scope: Scope): MaterialXNode {
       const input = readInput(child, here);
       inputs[input.name] = input;
     }
-  return { category: element.name, name, type: type ?? '', inputs };
+  return {
+    category: element.name,
+    name,
+    type: type ?? '',
+    inputs,
+    ...(version ? { version } : {}),
+    ...(nodedef ? { nodedef } : {}),
+  };
 }
 
 /** Elements of a document that are not nodes. */
@@ -336,6 +347,22 @@ function constantSpace(colorspace: string | undefined): 'linear' | 'srgb' | null
     return 'linear';
   return colorspace === 'srgb_texture' || colorspace === 'srgb_rec709_scene' ? 'srgb' : null;
 }
+
+/** The older definition of `standard_surface`, which a node asks for by name: same look, split the other way. */
+const STANDARD_SURFACE_100: SurfaceMap = {
+  ...SURFACES.standard_surface!,
+  color: ['base_color', [1, 1, 1]],
+  weight: ['base', 0.8],
+};
+
+const surfaceOf = (shader: MaterialXNode): SurfaceMap | undefined => {
+  if (
+    shader.category === 'standard_surface' &&
+    (shader.version === '1.0.0' || shader.nodedef === 'ND_standard_surface_surfaceshader_100')
+  )
+    return STANDARD_SURFACE_100;
+  return Object.hasOwn(SURFACES, shader.category) ? SURFACES[shader.category] : undefined;
+};
 
 /** One conversion of one material: follows connections, shares nodes, and notes what it drops. */
 class Converter {
@@ -548,7 +575,7 @@ async function convert(
 ): Promise<MaterialXConversion> {
   const { shader } = material;
   if (!shader) throw new LoaderError(F, 'syntax', `material ${material.name} has no surface shader`);
-  const map = Object.hasOwn(SURFACES, shader.category) ? SURFACES[shader.category] : undefined;
+  const map = surfaceOf(shader);
   if (!map) throw new LoaderError(F, 'unsupported', `surface shader ${shader.category} is not converted`);
   const converter = new Converter(doc, options),
     [colorName, colorFallback] = map.color,
@@ -557,7 +584,8 @@ async function convert(
     type: 'color',
     value: [...colorFallback, 1],
   };
-  if (map.weight && !converter.isOff(shader, map.weight[0], map.weight[1]))
+  // A weight is a no-op only when it comes to 1; an unset weight takes the definition's default.
+  if (map.weight && (map.weight[1] !== 1 || !converter.isOff(shader, map.weight[0], 1)))
     color = { type: 'mul', a: color, b: await converter.slot(shader, map.weight) };
   const emit: Extract<MaterialGraph['nodes'][number], { type: 'emit' }> = {
     type: 'emit',

@@ -25,7 +25,7 @@ What is not counted: a claim about maths, an API or a limit, proved by running t
 
 | Claim | Proof today | Class | What that proof cannot detect | What would really prove it | Real test so far |
 | --- | --- | --- | --- | --- | --- |
-| LIM-205: MaterialX and Lottie output | Our parser, our graph, a canvas that uploads. The row says no reference was compared. | Own reader | Whether a material or an animation looks like it does in the tool that made it. | MaterialX reference renders, and frames from a Lottie player, compared by picture. | Not run. |
+| LIM-205: MaterialX and Lottie output | Our parser, our graph, a canvas that uploads. The row says no reference was compared. | Own reader | Whether a material or an animation looks like it does in the tool that made it. | MaterialX reference renders, and frames from a Lottie player, compared by picture. | Lottie run: eight real exports against lottie-web 5.12.2, within 1 of 255 levels on a 16 by 16 grid. MaterialX renders not run; defaults pinned to the published nodedefs. |
 | LIM-202: parseVDB | Files the test writes byte by byte. | Built file | Anything OpenVDB does that the test's author did not know. It has never read a file OpenVDB wrote. | A real .vdb from OpenVDB or Blender, with the values compared. | Not run. |
 | LIM-032: Moving 14,500 meshes in 4 ms | Stand-in GPU device in Node. | Stand-in | The cost of real submission. The figure is CPU work on a fake device. | The same scene on a real page and GPU, frame time read from the engine. | Not run. |
 | LIM-038: Mesh optimisation | A simulated 16-vertex cache and a software depth buffer. | Stand-in | Whether a real GPU gets faster: its cache is not this cache. | GPU frame time before and after on real meshes, on the quiet run. | Not run. |

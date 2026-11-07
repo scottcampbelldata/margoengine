@@ -718,7 +718,7 @@ const extension = nodeMaterial(graph); // primitive.extension = extension
 console.log(Object.keys(extension).length);
 ```
 
-- **Shaders.** `standard_surface`, `open_pbr_surface`, `gltf_pbr` and `UsdPreviewSurface`: base colour and its weight, metal, roughness, normal, coat and transmission. An unset input takes that shader's own default. Converting another shader is refused with code `unsupported`, though the document still reads.
+- **Shaders.** `standard_surface`, `open_pbr_surface`, `gltf_pbr` and `UsdPreviewSurface`: base colour and its weight, metal, roughness, normal, coat and transmission. An unset input takes the default of that shader's published definition; a `standard_surface` with `version="1.0.0"` takes that definition's. Converting another shader is refused with code `unsupported`, though the document still reads.
 - **Nodes.** `image`, `tiledimage`, `gltf_image`, `constant`, `add`, `multiply`, `subtract`, `mix`, `dot`, `convert` and `normalmap`, inside and outside node graphs, with interface inputs.
 - **Images.** Pass `texture`, which gets `{ file, type, colorspace, addressU, addressV, filter }` once per image and returns `{ view, sampler }`. Upload `srgb_texture` images as sRGB. An image feeds a lobe as the node material reads it, so roughness reads green and metal blue: a grey image works, and a packed one needs `metalRough` by hand.
 - **`skipped`.** Node materials are a closed set, so whatever has no form there is listed with its reason and the input keeps its default: emission, opacity, noise and other procedural nodes. `uvtiling` and `uvoffset` are listed too, and the image still applies untiled.

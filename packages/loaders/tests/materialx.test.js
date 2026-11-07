@@ -378,3 +378,43 @@ test('the colour spaces of the specification that replaced the old names read th
   assert.equal(await value('lin_rec709_scene'), await value('lin_rec709'));
   assert.equal(await value('data'), await value('none'));
 });
+
+// Published nodedefs: standard_surface 1.0.1 and 1.0.0, open_pbr_surface 1.1.2, gltf_pbr 2.0.1 and UsdPreviewSurface 2.6.
+const PUBLISHED = {
+  standard_surface: { color: [0.8, 0.8, 0.8], roughness: 0.2, metal: 0, coat: ['coat', 0.1], ior: ['transmission', 'specular_IOR'] },
+  open_pbr_surface: { color: [0.8, 0.8, 0.8], roughness: 0.3, metal: 0, coat: ['coat_weight', 0], ior: ['transmission_weight', 'specular_ior'] },
+  gltf_pbr: { color: [1, 1, 1], roughness: 1, metal: 1, coat: ['clearcoat', 0], ior: ['transmission', 'ior'] },
+  UsdPreviewSurface: { color: [0.18, 0.18, 0.18], roughness: 0.5, metal: 0, coat: ['clearcoat', 0.01], ior: ['transmission', 'ior'] },
+};
+
+for (const [category, want] of Object.entries(PUBLISHED))
+  test(`${category} with nothing set takes the defaults of its published definition`, async () => {
+    const shader = (inputs) => `<${category} name="S" type="surfaceshader">${inputs}</${category}>${material('S')}`,
+      { emit } = await emitOf(shader(''));
+    assert.deepEqual(emit.color.value.slice(0, 3), want.color);
+    assert.equal(emit.metalRough.roughness.value, want.roughness);
+    assert.equal(emit.metalRough.metal.value, want.metal);
+    assert.equal(emit.clearcoat, undefined);
+    assert.equal(emit.transmission, undefined);
+    const on = (name) => `<input name="${name}" type="float" value="0.5" />`,
+      lobes = (await emitOf(shader(on(want.coat[0]) + on(want.ior[0])))).emit;
+    assert.ok(Math.abs(lobes.clearcoat.roughness.value - want.coat[1]) < 1e-9);
+    assert.equal(lobes.transmission.ior.value, 1.5);
+  });
+
+test('a standard_surface that names the older definition takes its base and base colour', async () => {
+  const older = async (attribute, inputs = '') =>
+    (await emitOf(`<standard_surface name="S" type="surfaceshader" ${attribute}>${inputs}</standard_surface>${material('S')}`))
+      .emit.color;
+  for (const attribute of ['version="1.0.0"', 'nodedef="ND_standard_surface_surfaceshader_100"']) {
+    const unset = await older(attribute);
+    assert.equal(unset.type, 'mul');
+    assert.deepEqual(unset.a.value.slice(0, 3), [1, 1, 1]);
+    assert.equal(unset.b.value, 0.8);
+    const red = await older(attribute, '<input name="base_color" type="color3" value="1, 0, 0" />');
+    assert.deepEqual(red.a.value.slice(0, 3), [1, 0, 0]);
+    assert.equal(red.b.value, 0.8);
+  }
+  const current = await older('version="1.0.1"', '<input name="base_color" type="color3" value="1, 0, 0" />');
+  assert.deepEqual(current.value.slice(0, 3), [1, 0, 0]);
+});

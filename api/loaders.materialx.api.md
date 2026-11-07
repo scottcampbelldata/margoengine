@@ -55,6 +55,8 @@ export interface MaterialXNode {
     name: string;
     type: string;
     inputs: Record<string, MaterialXInput>;
+    version?: string;
+    nodedef?: string;
 }
 
 export interface MaterialXNodeGraph {
