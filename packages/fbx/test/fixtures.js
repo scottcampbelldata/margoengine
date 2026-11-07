@@ -308,7 +308,7 @@ export function rich({ morphAnimation = false } = {}) {
       ['Version', [I(100)]],
       arr('Indexes', 'i', indexes),
       arr('Weights', 'd', weights),
-      arr('Transform', 'd', T(0, 0, 0)),
+      arr('Transform', 'd', T(-link[12], -link[13], -link[14])),
       arr('TransformLink', 'd', link),
     ],
   ];

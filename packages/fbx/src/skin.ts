@@ -1,6 +1,5 @@
 import type { SkinData } from '@margoengine/exporters';
 import { array, findChild, id, objectName } from './document.js';
-import { inverse, multiply } from './math.js';
 import { children, convertedMatrix, type SceneContext, type MeshBinding } from './scene.js';
 
 interface PreparedSkin {
@@ -88,10 +87,10 @@ function prepare(ctx: SceneContext, mesh: MeshBinding): PreparedSkin | null {
     }
     if (transform.length !== 16 || link.length !== 16)
       throw new TypeError(`Invalid FBX bind matrix: ${label}; re-export the file, it looks damaged`);
-    // Geometry transforms are already baked into vertices. Transform is the mesh-node bind space.
+    // Transform takes the mesh into the joint at bind, so it is the inverse bind matrix: link x Transform is the mesh's
+    // world, the same on every cluster of a real file. Geometry transforms are already baked into vertices.
     ctx.budget.reserve(256);
-    const bind = multiply(inverse(convertedMatrix(ctx, link)), convertedMatrix(ctx, transform));
-    binds.set(bind, jointIndex * 16);
+    binds.set(convertedMatrix(ctx, transform), jointIndex * 16);
     for (let i = 0; i < 16; i++)
       if (!Number.isFinite(binds[jointIndex * 16 + i]))
         throw new RangeError(`Invalid FBX bind matrix: ${label}; re-export the file, it looks damaged`);

@@ -43,8 +43,7 @@ test('real Blender FBX retains its three joints, explicit bind matrix and Bend q
   assert.equal(clusters.length, 3);
   const middleCluster = clusters.find((node) => objectName(node) === 'Middle');
   assert.ok(middleCluster);
-  // These sixteen source numbers describe mesh bind translation +1 X and an
-  // identity joint bind. inverse(TransformLink) * Transform is therefore +1 X.
+  // These sixteen source numbers describe an identity joint bind and a mesh +1 X from it: Transform is the inverse bind.
   assert.deepEqual([...array(middleCluster, 'Transform')], [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1]);
   assert.deepEqual([...array(middleCluster, 'TransformLink')], [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
   const stacks = objects.filter((node) => node.name === 'AnimationStack');

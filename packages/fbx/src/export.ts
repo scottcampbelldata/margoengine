@@ -372,8 +372,8 @@ function buildTree(source: ExportSource, options: FBXExportOptions, files: Retur
           ['Version', [int(100)]],
           ['Indexes', [Int32Array.from(influences[index].keys())]],
           ['Weights', [Float64Array.from(influences[index].values())]],
-          ['Transform', [bindSpace]],
-          // Joint world at bind: the mesh's world at bind times the inverse of the inverse bind matrix.
+          // Mesh into joint at bind, which is the inverse bind matrix; link x Transform gives the mesh's world.
+          ['Transform', [bind]],
           ['TransformLink', [multiply(bindSpace, inverse(bind))]],
         ]);
       link(cluster, deformer);

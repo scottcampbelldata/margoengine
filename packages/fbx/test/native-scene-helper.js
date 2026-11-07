@@ -40,7 +40,7 @@ export function rigFixture({
   Mode: "${mode}"
   ${array('Indexes', [0, 1, 2])}
   ${array('Weights', [0.5, 0.5, 0.5])}
-  ${array('Transform', translated(meshTranslation[0]))}
+  ${array('Transform', translated(meshTranslation[0] - 1))}
   ${array('TransformLink', translated(1))}
  }`;
   const morphObjects = !morph
