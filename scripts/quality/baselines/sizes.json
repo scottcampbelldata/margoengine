@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10456135,
+  "total": 10416231,
   "history": [
     {
       "date": "2026-10-24",
@@ -3446,6 +3446,12 @@
       "commit": "2501b2371",
       "reason": "tiles/terrain: quantized-mesh terrain and imagery (batch 47 job 6)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "f69dee913",
+      "reason": "new optional entry @margoengine/navmesh/volume",
+      "grew": 1
     }
   ],
   "items": {
@@ -3858,6 +3864,7 @@
     "@margoengine/navmesh/hierarchy": 4250,
     "@margoengine/navmesh/links": 4288,
     "@margoengine/navmesh/tiles": 15113,
+    "@margoengine/navmesh/volume": 4975,
     "@margoengine/navmesh/voxel": 16031,
     "@margoengine/net": 1371,
     "@margoengine/netcode": 12865,

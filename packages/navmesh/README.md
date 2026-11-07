@@ -2,7 +2,7 @@
 
 Import `margoengine/navmesh` from the `margoengine` package, or `@margoengine/navmesh` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
-Dependency-free navigation: A* chooses a polygon corridor, the funnel algorithm pulls it taut, reciprocal ORCA selects collision-avoiding agent velocities in XZ, a `Crowd` manager walks agents along routes with area costs, off-mesh links and obstacles, `@margoengine/navmesh/build` generates the walkable polygons from level triangles, `@margoengine/navmesh/tiles` cuts big worlds into tiles that rebuild at run time, `@margoengine/navmesh/codec` bakes meshes to bytes, `@margoengine/navmesh/links` finds the jumps a level allows, `@margoengine/navmesh/hierarchy` keeps long routes cheap, `@margoengine/navmesh/debug` draws it all, and `@margoengine/navmesh/voxel` builds straight from voxel chunks.
+Dependency-free navigation: A* chooses a polygon corridor, the funnel algorithm pulls it taut, reciprocal ORCA selects collision-avoiding agent velocities in XZ, a `Crowd` manager walks agents along routes with area costs, off-mesh links and obstacles, `@margoengine/navmesh/build` generates the walkable polygons from level triangles, `@margoengine/navmesh/tiles` cuts big worlds into tiles that rebuild at run time, `@margoengine/navmesh/codec` bakes meshes to bytes, `@margoengine/navmesh/links` finds the jumps a level allows, `@margoengine/navmesh/hierarchy` keeps long routes cheap, `@margoengine/navmesh/debug` draws it all, `@margoengine/navmesh/voxel` builds straight from voxel chunks, and `@margoengine/navmesh/volume` routes flying agents in 3D.
 
 ```ts
 import {NavMesh} from 'margoengine/navmesh';
@@ -308,6 +308,34 @@ mesh.dispose(); // stops listening to the world
 ```
 
 `VoxelNavMesh` is a `TiledNavMesh`: routes, off-mesh links, `update`, a `Crowd`, `./debug` and `./hierarchy` all work on it. Its options are those of `./tiles`, with `cs` 0.5 and `ch` 0.25 by default, each one block over a whole number, and `solid(type, state)` to choose what is ground and what bumps a walker, by default `BlockType.solid`: pass `(type) => type.solid || type.liquid` for a walker that wades. A slab or stair counts as the half blocks it fills, and unloaded chunks are air. Chunks that load or unload mark their tiles too.
+
+## Flying agents (`./volume`)
+
+```ts
+import {NavVolume} from 'margoengine/navmesh/volume';
+
+// A 40 m floor and a 10 m tall block in the middle of it, as triangles (Y up).
+const positions = [0, 0, 0, 40, 0, 0, 40, 0, 40, 0, 0, 40, 15, 0, 15, 25, 0, 15, 25, 0, 25, 15, 0, 25, 15, 10, 15, 25, 10, 15, 25, 10, 25, 15, 10, 25];
+const indices = [0, 2, 1, 0, 3, 2, 8, 10, 9, 8, 11, 10, 4, 5, 9, 4, 9, 8, 5, 6, 10, 5, 10, 9, 6, 7, 11, 6, 11, 10, 7, 4, 8, 7, 8, 11];
+
+const volume = new NavVolume(positions, indices, {voxelSize: 0.5, radius: 0.5, padding: 10});
+console.log(volume.path([2, 5, 20], [38, 5, 20])); // round or over the block, in 3D
+console.log(volume.lineOfSight([2, 15, 2], [38, 15, 38]));
+console.log(volume.nodeCount, volume.byteLength);
+
+// An end too close to a solid has no path; move it out first.
+const perch = volume.closestFree([14.5, 5, 20]);
+if (perch) console.log(volume.path(perch, [38, 5, 20]));
+```
+
+| Option | Default | Unit |
+| --- | --- | --- |
+| `voxelSize` | 0.5 | side of the smallest cell, world units |
+| `radius` | 0.5 | the flyer's radius: solids grow by it |
+| `min`, `max` | the level, plus `padding` | corners of the volume |
+| `padding` | 8 voxels | open air around the level |
+
+`path(start, end)` gives corner points clear of every triangle by the radius, or null when an end is not free or nothing joins them. `isFree(point)`, `lineOfSight(a, b)` and `closestFree(point, reach = 8)` answer in the same world; the hollow inside of a closed solid counts as free, so `closestFree` right against a thin wall can pick the far side, and `path` then says null. Free space costs almost nothing: a node with no children is open air however big, so open sky takes no memory. The volume is built once; make a new one if the level changes.
 
 Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 

@@ -1650,6 +1650,10 @@
       "types": "./dist/navmesh/voxel.d.ts",
       "import": "./dist/navmesh/voxel.js"
     },
+    "./navmesh/volume": {
+      "types": "./dist/navmesh/volume.d.ts",
+      "import": "./dist/navmesh/volume.js"
+    },
     "./navmesh/tiles": {
       "types": "./dist/navmesh/tiles.d.ts",
       "import": "./dist/navmesh/tiles.js"

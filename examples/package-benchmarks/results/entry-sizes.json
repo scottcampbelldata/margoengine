@@ -1,5 +1,5 @@
 {
-  "commit": "6d32962e3",
+  "commit": "3cb89d851",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -56,6 +56,10 @@
       "./geometry-cache": {
         "raw": 11249,
         "gzip": 4392
+      },
+      "./point-cache": {
+        "raw": 1955,
+        "gzip": 1002
       }
     },
     "@margoengine/animator": {
@@ -1729,6 +1733,10 @@
         "raw": 43000,
         "gzip": 15564
       },
+      "./volume": {
+        "raw": 11027,
+        "gzip": 4719
+      },
       "./tiles": {
         "raw": 41023,
         "gzip": 14823
@@ -2586,12 +2594,28 @@
     },
     "@margoengine/tiles": {
       ".": {
-        "raw": 41940,
-        "gzip": 14309
+        "raw": 45680,
+        "gzip": 15463
       },
       "./i3dm": {
-        "raw": 2725,
-        "gzip": 1373
+        "raw": 2794,
+        "gzip": 1425
+      },
+      "./metadata": {
+        "raw": 13556,
+        "gzip": 4690
+      },
+      "./splats": {
+        "raw": 3508,
+        "gzip": 1580
+      },
+      "./s2": {
+        "raw": 6142,
+        "gzip": 2748
+      },
+      "./terrain": {
+        "raw": 12875,
+        "gzip": 5743
       }
     },
     "@margoengine/tonemap": {
@@ -2850,16 +2874,16 @@
     },
     "@margoengine/voxel-net": {
       ".": {
-        "raw": 22113,
-        "gzip": 8033
+        "raw": 22120,
+        "gzip": 8036
       },
       "./server": {
         "raw": 46035,
         "gzip": 16650
       },
       "./bot": {
-        "raw": 25151,
-        "gzip": 9442
+        "raw": 25158,
+        "gzip": 9445
       },
       "./file-store": {
         "raw": 1513,

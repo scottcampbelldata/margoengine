@@ -1758,3 +1758,30 @@ cache set as `globalThis.fetch` from calling itself, and this commit adds the re
 - **Fix:** `GPURenderer.configure` is its own step, and a restore takes it after every rebuild. The third test covers a `configure` that throws; it passed on the old code and guards the new step.
 - **Proved:** the lifecycle scenario "a restore that fails on a healthy device": the same picture byte for byte, no error on the old device. `tests/deep-core-allocation-failure.test.js` runs the real `GPURenderer.create` on a fake device. The failure is stand-in in one way: the real next device reports a lowered `maxBufferSize`, because no hardware here has a smaller limit than the one before it.
 - **Size:** core 21,541 to 21,561 B gzip, core plus stage 22,930 to 22,948 B. The cap is 21,562 B on Scott's ruling, one over the measurement.
+
+## Lane C batch 93: navmesh
+
+The batch took `@margoengine/navmesh` from one mesh of 4,096 polygons to what big, changing worlds and other kinds of walker need. Eight jobs, each a new optional entry; core and stage were not touched.
+
+| Job | Status | Commit | Entry |
+| --- | --- | --- | --- |
+| 1 Tiled navmesh with run time rebuild | DONE | c76599da7 | `./tiles` |
+| 2 Agent types and route filters | DONE | 50badf139 | `./agents` |
+| 3 Save and load baked meshes | DONE | 90a28ea73 | `./codec` |
+| 4 Automatic link generation | DONE | 369fe06ee | `./links` |
+| 5 Hierarchical paths | DONE | 727a36ac1 | `./hierarchy` |
+| 6 Debug draw | DONE | 212863285 | `./debug` |
+| 7 Navmesh from voxel worlds | DONE | a6d145f0b | `./voxel` |
+| 8 3D navigation for flying agents | DONE | this commit | `./volume` |
+
+Bugs fixed, each with its test:
+
+- A filter multiplier below 1 broke the A* lower bound (Hart, Nilsson, Raphael 1968, Theorem 1), so `checkFilter` refuses it (job 2, `packages/navmesh/test/agents.test.js`).
+- A door in a wall on a tile line left the tiles either side unjoined: its cells reach the line in a notch one cell deep, under the simplification tolerance, so the notch was smoothed away and the mesh fell into islands, 48 of 821 polygons reachable in the case that showed it. Runs along a tile's edge now keep their ends (job 5, found by its test; "a door in a wall on a tile line joins the tiles either side" in `packages/navmesh/test/tiles.test.js`, which fails without the fix).
+- A jump whose arc never reaches a ledge counted as landing within a climb of it; it must meet the ground (job 4, before landing, "a short wall can be jumped on to, a tall one cannot").
+
+How it was proved: package tests in Node on generated levels, all stand-ins; routes and reachability against the exact search for the hierarchy, the mesh built from the same blocks as triangles for the voxel entry, the arc's own equation for jump landings, random points and a plain grid search for the volume. Debug draw is checked as data with a stand-in host, not on a screen.
+
+Sources are in `docs/clean-room.md` under Navigation: read in full Demyen and Buro 2006, Hart, Nilsson, Raphael 1968, van de Kerkhof 2016 (sections 1 to 9 and references), Botea et al. 2004, Nash, Koenig, Tovey 2010, Brewer 2017; van Toll et al. 2012 in part and not built from. Kallmann 2005 could not be had. No navmesh library was opened.
+
+Limits and what is unmeasured: every entry has a row in `docs/limits.md`. No timing here is a quiet run: the one number recorded, 3.1 ms exact against 0.22 ms on a generated 1 km world, was taken with other lanes running and is diagnostic. Real levels, real voxel worlds and the debug picture on a screen are still to do.
