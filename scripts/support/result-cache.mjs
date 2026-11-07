@@ -15,6 +15,7 @@ import {
   mkdirSync,
   readdirSync,
   readFileSync,
+  renameSync,
   rmSync,
   statSync,
   utimesSync,
@@ -589,12 +590,16 @@ export class ResultStore {
       .sort((a, b) => b.at - a.at)
       .slice(CANDIDATES_PER_STEP)
       .forEach(({ name }) => {
-        // Windows refuses a delete (EPERM, EBUSY) while another lane reads or deletes the same file. The entry is only
-        // over the count, not wrong: it stays until the next put prunes this step. Anything else still throws.
+        // While Windows deletes a file, opening that name fails with EPERM, which a reader cannot tell from a real refusal.
+        // So the entry leaves its name first, in one step, and only a name no reader lists is deleted. Windows can refuse
+        // the move (EPERM, EBUSY) while another lane moves the same file, and that lane may have won (ENOENT). The entry is
+        // only over the count, not wrong: it stays until the next put prunes this step. Anything else still throws.
         try {
-          rmSync(join(folder, name), { force: true });
+          const gone = join(folder, `${name}.${process.pid}.${randomBytes(4).toString('hex')}.tmp`);
+          renameSync(join(folder, name), gone);
+          rmSync(gone, { force: true });
         } catch (error) {
-          if (error.code !== 'EPERM' && error.code !== 'EBUSY') throw error;
+          if (error.code !== 'ENOENT' && error.code !== 'EPERM' && error.code !== 'EBUSY') throw error;
         }
       });
   }

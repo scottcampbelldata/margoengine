@@ -293,17 +293,16 @@ test('an entry another run prunes after the listing counts as not stored', (t) =
 
 test('a prune another run blocks leaves the entry for the next put; other errors still throw', (t) => {
   const store = new ResultStore(join(temp(t), 'store'));
-  const { rmSync: remove } = fs,
+  const { renameSync: move } = fs,
     refusing = (code, work) => {
-      fs.rmSync = (path, ...rest) => {
-        if (!String(path).endsWith('.tmp')) throw Object.assign(new Error(code), { code });
-        return remove(path, ...rest);
+      fs.renameSync = () => {
+        throw Object.assign(new Error(code), { code });
       };
       syncBuiltinESMExports();
       try {
         return work();
       } finally {
-        fs.rmSync = remove;
+        fs.renameSync = move;
         syncBuiltinESMExports();
       }
     },
@@ -319,7 +318,30 @@ test('a prune another run blocks leaves the entry for the next put; other errors
   assert.equal(files(), full + 2, 'the refused entries stay for now');
   put();
   assert.equal(files(), full, 'the next put prunes them');
+  assert.equal(refusing('ENOENT', put), true, 'another run moved it first');
+  put();
   assert.throws(() => refusing('EIO', put), { code: 'EIO' });
+});
+
+test('a prune takes an entry off its name before deleting it, so no reader opens a file mid delete', (t) => {
+  const store = new ResultStore(join(temp(t), 'store')),
+    { rmSync: remove } = fs,
+    deleted = [];
+  fs.rmSync = (path, ...rest) => {
+    deleted.push(String(path));
+    return remove(path, ...rest);
+  };
+  syncBuiltinESMExports();
+  t.after(() => {
+    fs.rmSync = remove;
+    syncBuiltinESMExports();
+  });
+  for (let key = 0; key < 12; key++) store.put({ step: 'step', key: `k${key}`, passed: true });
+  assert.equal(store.candidates('step').length, 8);
+  assert.ok(deleted.length > 12, 'temp names and pruned entries were deleted');
+  assert.deepEqual(deleted.filter((path) => path.endsWith('.json')), []);
+  const folder = join(store.dir, 'steps', readdirSync(join(store.dir, 'steps'))[0]);
+  assert.equal(readdirSync(folder).length, 8, 'nothing is left under a moved name');
 });
 
 test('a stored entry that cannot be parsed still throws', (t) => {
