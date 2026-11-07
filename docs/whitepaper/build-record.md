@@ -1813,3 +1813,83 @@ How it was proved: package tests in Node on generated levels, all stand-ins; rou
 Sources are in `docs/clean-room.md` under Navigation: read in full Demyen and Buro 2006, Hart, Nilsson, Raphael 1968, van de Kerkhof 2016 (sections 1 to 9 and references), Botea et al. 2004, Nash, Koenig, Tovey 2010, Brewer 2017; van Toll et al. 2012 in part and not built from. Kallmann 2005 could not be had. No navmesh library was opened.
 
 Limits and what is unmeasured: every entry has a row in `docs/limits.md`. No timing here is a quiet run: the one number recorded, 3.1 ms exact against 0.22 ms on a generated 1 km world, was taken with other lanes running and is diagnostic. Real levels, real voxel worlds and the debug picture on a screen are still to do.
+
+## Lane I batch 57: sky, part 1
+
+Eight jobs for `@margoengine/sky` on the Beelink (lane I, work list 3), each a new optional entry or option of the sky
+package; core and stage are untouched. Every job is proved on a real GPU, a Radeon 680M, at 4x and 1x MSAA through
+`packages/sky/test/features-check.mjs`, and the astronomical sky also against Meeus' worked examples and a real star
+catalogue. Nothing is timed: timings taken while other lanes ran are diagnostic.
+
+| # | Job | Status | Commit | Entry | Claim |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Volumetric raymarched clouds | DONE | `a012cfd9` | `/volumetric-clouds` | LIM-333 |
+| 2 | Cloud shadows on the ground | DONE | `79dbb4f2` | `/cloud-shadows` | LIM-334 |
+| 3 | Physical aerial perspective | DONE | `814e4892` | `/aerial` | LIM-335 |
+| 4 | Scalable atmosphere (Hillaire) | DONE | `9e28eee1` | `/hillaire` | LIM-336 |
+| 5 | Astronomical sun, moon and stars | DONE | `1d396430` | `/astro` | LIM-358 |
+| 6 | Terrain light shafts | DONE | `9c3545c7` | `/shafts` | LIM-337 |
+| 7 | Rain splashes, wet lens and occlusion | DONE | `0d2b7904` | `/weather-fx` | LIM-349 |
+| 8 | Mixed precipitation (sleet) | DONE | `bfae1b4b` | `precipitation: 'sleet'` on `/weather` | LIM-351 |
+
+Follow-ups in the same batch: `7053219c` makes the README's day/night example run as written; `a2e68ec5` lets
+check:readme-run answer an example with the package test fixture it names; `2df145f0` makes the
+quality gate refuse a baseline whose total is not the sum of its items; this commit adds this section.
+
+- **Bugs fixed:** the README's day/night block had no imports, so it ran after the fog example and attached a second
+  `Sky` to one engine, and core said only "Invalid plugin"; the example now makes its own engine and `Sky.attach`
+  throws MargoError `'attached'` (`packages/sky/test/sky.test.js`). In job 5, found by its own checks: `AstroSky` read
+  the sky's `nightFactor` in its update, before the sky's pass set it, so the first day frame still drew the stars
+  (15,499 pixels on the GPU check; `packages/sky/test/astro.test.js` now sets the night after the update, and the GPU
+  check's day case draws 0); straight alpha took the sky behind a star times its alpha, 5% of a magnitude 3.5 star's
+  light on the check's night sky, against the 3% the check claimed (on a float target the alpha is now the brightest
+  channel over 64: 0.3% measured, the check's bound 1% from half-float rounding); the tracing GPU mock dropped
+  `writeBuffer`'s `dataOffset` and `size`, so a partial upload overran the buffer (`tests/support/gpu-trace.js`, by
+  `astro.test.js`). Two test slips of the staged job 5 tests, fixed before landing: a float32 magnitude compared with a
+  double, and Polaris' declination read by `asin` of a float32 vector, which magnifies its rounding 78 times at the
+  pole (now `atan2`, same bound). `scripts/quality/baselines/sizes.json` held a total 22,126 B below the sum of its
+  items after a hand-settled merge (at `747c2e4c` and `0d2b7904`; re-summed by a later `--update`), and main held another,
+  44,879 B above the sum, from `24c935b9a` (re-summed in `2df145f0`); the quality gate
+  now fails on such a total and `tests/quality-gate.test.js` checks every committed baseline. check:readme-run listed
+  the packages' fixtures by the pathspec `packages/*/test`, which git matches against whole paths, so no fixture was
+  ever a sample and the astro example (and points' `fullwave.laz`) got a 404; fixtures now answer to their own name only
+  (`tests/run-readme-examples.test.js`), and the stand-in for an extension still comes from examples/assets alone, since
+  listing fixtures for extensions would have changed 153 answers to odd files such as a damaged PNG.
+- **Proved:** clouds: coverage 0 changes no pixel, a near pillar keeps every pixel, a block inside dense cloud is veiled,
+  a minute of wind changes the clouds. Cloud shadows: at 48 ground points the shadow matches the clouds' own opacity
+  toward the sun to a mean of 0.0018 (0.0021 after 1,500 m of drift, 0.29 for stale shadows). Aerial perspective:
+  transmittance at 1, 10 and 40 km matches Beer-Lambert integrated on the CPU to 0.006 per channel. Hillaire: blue
+  noon, orange sunset, a bluer twilight zenith with ozone, ground, limb and black space from 1,000 km, table and march
+  within 0.05%. Shafts: open sky gains light falling with the angle from the sun, a panel's one hole lights only the
+  pixels beyond it, linear in intensity, clouds take the shafts away. Weather FX: not one covered pixel changes under
+  a roof, cover heights within 4e-5 m, splashes only in the open, the lens wets in rain and stays dry under cover.
+  Sleet equals rain and snow each drawn alone on every pixel only one touches, 5 pixels (4x) one half-float step off.
+  Astro: Meeus 7.a, 12.a, 12.b, 21.b, 22.a, 25.a, 47.a, 48.a and 33.a within their stated bounds; the real Yale Bright
+  Star Catalogue (CDS V/50, 9,096 stars, agreeing with NASA HEASARC's copy within 0.00005 degree and in V exactly);
+  81 isolated stars within 0.034 px of their computed places with their light within 0.3%, nothing below the horizon
+  or by day, the moon's lit limb within 0.1 degree of the sun's side.
+- **Sizes:** new entries 9.5 kB (astro), 7.3, 3.2, 6.5, 6.6, 6.9 and 5.3 kB gzip; `/weather` 5,843 to 6,189 B budget
+  for sleet; the night entry grew by 155 B for `moonLitBySun`. The sky README's older size rows were stale and now
+  match entry-sizes.json. Core and stage are untouched.
+- **Limits:** one GPU each; behaviour bounds, not a reference renderer or photograph, for jobs 1 to 4, 6 and 7. Astro
+  by method: the sun to about 0.01 degree, the moon about 10 arcseconds, the planets tens of arcseconds (Saturn
+  arcminutes), no aberration, Saturn's magnitude without its rings, planets as points, stars drawn over the moon's
+  disc. Rows in docs/limits.md.
+- **Sources:** S23 to S45 in `docs/clean-room.md`; for astro Meeus (1998), Standish (JPL), Espenak and Meeus (NASA
+  2006), Saemundsson (1986), Kasten and Young (1989), Ballesteros (2012) and the BSC5 ReadMe. The catalogue fixture's
+  source, CDS terms and hashes are in `packages/sky/test/fixtures/bsc5/NOTICE.md` and THIRD-PARTY-NOTICES.md; the CDS
+  server at Strasbourg did not answer that day, so it came from the CDS mirror at the Harvard-Smithsonian CfA.
+- **Slips:** job 7's GPU check tripped main's new check-fixed-waits gate (ten one-frame steps of lens time) and was
+  marked `// fixed-wait:` with its reason before landing; its first landing failed on a stale llms-full.txt after an
+  auto-merged rebase, regenerated. main's docs/api-surface.md summary was one name stale; job 7 regenerated it. One
+  landing script was started with `&` inside a foreground call; it ran to the end, no harm. Job 5's model and planet
+  tables, typed from Meeus and JPL, passed their worked examples unchanged. Job 5's first landing stopped on rebase
+  conflicts in the shared records (settled as main's side plus its own rows, the claim renumbered from the file), and its
+  second failed verify in `tests/sizes-page.test.js`: the regenerated entry-sizes.json named its own commit, while
+  basic-scene-network.json pins main's; the record keeps main's commit with the measured sky rows. Its third landing
+  passed every check but did not push, as main moved during it; after two more rebases (the claim renumbered to
+  LIM-357, then LIM-358) and regenerated records it landed by the short rule, the second rebase inside the landing lock.
+- **Gate:** lint, hygiene, verify, the sky and weather tests, check:readme-run for sky and weather and both packages'
+  GPU tests on the Radeon 680M under the GPU lock, for every job's full landing. Pushes after a rebase onto commits
+  that touch nothing the sky uses reran the sky and weather tests, the records' tests, the sizes gate and api:check;
+  the quality-gate fix and this record ran hygiene, the tests they touch and the sizes gate (Scott's order that day).
