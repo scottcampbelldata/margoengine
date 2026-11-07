@@ -54,7 +54,7 @@ pub fn soft(hertz: f32, zeta: f32, h: f32) -> Soft {
 
 /// A symmetric 3 by 3 matrix: the world inverse inertia, with any locked axes zeroed in its rows and columns.
 #[derive(Clone, Copy)]
-struct Sym {
+pub struct Sym {
     xx: f32,
     xy: f32,
     xz: f32,
@@ -65,18 +65,18 @@ struct Sym {
 
 impl Sym {
     #[inline(always)]
-    fn mul(&self, v: V3) -> V3 {
+    pub fn mul(&self, v: V3) -> V3 {
         v3(self.xx * v.x + self.xy * v.y + self.xz * v.z, self.xy * v.x + self.yy * v.y + self.yz * v.z, self.xz * v.x + self.yz * v.y + self.zz * v.z)
     }
 }
 
 /// What the solver needs of a body, held while it works on a pair.
 #[derive(Clone, Copy)]
-struct Moving {
-    mass: V3,
-    inertia: Sym,
-    linear: V3,
-    angular: V3,
+pub struct Moving {
+    pub mass: V3,
+    pub inertia: Sym,
+    pub linear: V3,
+    pub angular: V3,
 }
 
 impl Moving {
@@ -100,7 +100,7 @@ impl Moving {
 
 impl World {
     #[inline(always)]
-    fn moving(&self, at: usize) -> Moving {
+    pub fn moving(&self, at: usize) -> Moving {
         Moving {
             mass: self.v(SOLVE_MASS_X, at),
             inertia: Sym {
@@ -117,13 +117,13 @@ impl World {
     }
 
     #[inline(always)]
-    fn settle(&mut self, at: usize, body: &Moving) {
+    pub fn settle(&mut self, at: usize, body: &Moving) {
         self.set_v(LINEAR_X, at, body.linear);
         self.set_v(ANGULAR_X, at, body.angular);
     }
 
     /// Writes what the solver knows of a body: nothing moves one that is not an awake dynamic body, and locks hold.
-    fn solver_mass(&mut self, at: usize) {
+    pub fn solver_mass(&mut self, at: usize) {
         let flags = self.flags(at);
         let rotation = self.q(ROTATION_X, at);
         self.set_v(CENTER_X, at, self.v(POSITION_X, at).add(rotation.rotate(self.v(LOCAL_CENTER_X, at))));

@@ -553,12 +553,13 @@ impl World {
         let before = self.header().contact_substep;
         let ratio = if before > 0.0 { h / before } else { 1.0 };
         self.header_mut().contact_substep = h;
+        self.header_mut().substep_ratio = ratio;
         for i in 0..self.header().active_pairs as usize {
             let row = self.uu(ACTIVE_PAIRS, i) as usize;
             let (a, b) = (self.uu(PAIR_A, row) as usize, self.uu(PAIR_B, row) as usize);
             let (body_a, body_b) = (self.uu(COLLIDER_BODY, a) as usize, self.uu(COLLIDER_BODY, b) as usize);
             // Scripted bodies pass through each other: nothing can push them.
-            if self.flags(body_a) & KIND != DYNAMIC && self.flags(body_b) & KIND != DYNAMIC {
+            if self.flags(body_a) & KIND != DYNAMIC && self.flags(body_b) & KIND != DYNAMIC || self.joined(body_a, body_b) {
                 self.set_u(PAIR_CONTACTS, row, 0);
                 continue;
             }

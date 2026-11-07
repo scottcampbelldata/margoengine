@@ -105,6 +105,32 @@ fn scene() -> Vec<u32> {
     for _ in 0..48 {
         spawn(&mut w, &mut random, &mut rows, hull);
     }
+    for i in 0..16usize {
+        let a = rows[random.below(rows.len() as u32) as usize];
+        let b = rows[random.below(rows.len() as u32) as usize];
+        if a == b {
+            continue;
+        }
+        let joint = w.add_joint(a, b, [7, 7 | (6 << 3), 6 | (7 << 3), 63][i % 4]).unwrap();
+        let at = joint as usize;
+        w.set_s(JOINT_ANCHOR_A_X, at, random.value() / 4.0);
+        w.set_s(JOINT_ANCHOR_A_Y, at, random.value() / 4.0);
+        w.set_s(JOINT_ANCHOR_B_Z, at, random.value() / 4.0);
+        if i % 4 == 1 {
+            let (x, z) = (random.value(), random.value());
+            w.set_joint_axis(joint, v3(x, 1.0, z));
+            w.set_u(JOINT_FLAGS, at, w.uu(JOINT_FLAGS, at) | JOINT_LIMIT << 3);
+            w.set_s(JOINT_MIN_3, at, -1.0);
+            w.set_s(JOINT_MAX_3, at, 1.0);
+        }
+        if i % 8 == 1 {
+            w.set_u(JOINT_FLAGS, at, w.uu(JOINT_FLAGS, at) | JOINT_MOTOR_ON << 3);
+            w.set_s(JOINT_TARGET_3, at, 0.5);
+            w.set_s(JOINT_STIFFNESS_3, at, 50.0);
+            w.set_s(JOINT_DAMPING_3, at, 5.0);
+            w.set_s(JOINT_CAP_3, at, 100.0);
+        }
+    }
     for i in 0..STEPS {
         if i % 512 == 0 {
             w.header_mut().gravity = GRAVITY[((i / 512) % 4) as usize];

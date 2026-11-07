@@ -32,6 +32,49 @@ export type BodyType = 'dynamic' | 'fixed' | 'kinematicPosition' | 'kinematicVel
 
 export type ColliderOptions = ShapeOptions & ColliderSettings;
 
+export type JointDof = 'linX' | 'linY' | 'linZ' | 'angX' | 'angY' | 'angZ';
+
+export type JointOptions = (JointBase & {
+    type: 'fixed';
+    frameA?: Quat;
+    frameB?: Quat;
+}) | (JointBase & {
+    type: 'spherical';
+})
+ | (JointBase & {
+    type: 'rope';
+    length: number;
+})
+ | (JointBase & {
+    type: 'spring';
+    restLength: number;
+    stiffness: number;
+    damping?: number;
+}) | (JointBase & {
+    type: 'revolute' | 'prismatic';
+    limits?: readonly [number, number];
+    motor?: MotorOptions;
+} & ({
+    axis: Vec3;
+    frameA?: undefined;
+    frameB?: undefined;
+}
+ | {
+    axis?: undefined;
+    frameA: Quat;
+    frameB: Quat;
+}))
+ | (JointBase & {
+    type: 'generic';
+    frameA?: Quat;
+    frameB?: Quat;
+    locked?: readonly JointDof[];
+    limits?: Readonly<Partial<Record<JointDof, readonly [number, number]>>>;
+    motors?: Readonly<Partial<Record<JointDof, MotorOptions>>>;
+});
+
+export type JointType = JointOptions['type'];
+
 export type KernelBodyKind = 'fixed' | 'dynamic' | 'kinematicPosition' | 'kinematicVelocity';
 
 export interface KernelColliderOptions {
@@ -97,6 +140,10 @@ export class KernelWorld {
     addCollider(body: number, shape: KernelShape, size: readonly number[], options?: KernelColliderOptions): number;
     addHull(vertices: readonly (readonly [number, number, number])[], faces: readonly (readonly number[])[]): number;
     removeCollider(collider: number): boolean;
+    addJoint(a: number, b: number, flags: number): number;
+    removeJoint(joint: number): boolean;
+    setJointAxis(joint: number, axis: readonly [number, number, number]): void;
+    setJointFrames(joint: number, a: Quat, b: Quat): void;
     updateMass(body: number): this;
     setPose(body: number, position: Vec3, rotation: Quat, wake?: boolean): this;
     setTarget(body: number, position: Vec3, rotation: Quat): this;
@@ -111,6 +158,15 @@ export class KernelWorld {
     snapshot(): Uint8Array;
     restore(snapshot: Uint8Array): this;
     reserve(bodies: number, colliders?: number): this;
+}
+
+export interface MotorOptions {
+    targetVelocity?: number;
+    targetPosition?: number;
+    stiffness?: number;
+    damping?: number;
+    model?: 'acceleration' | 'force';
+    maxForce?: number;
 }
 
 export class Physics implements EnginePlugin, BodyOwner {
@@ -156,8 +212,8 @@ export class Physics implements EnginePlugin, BodyOwner {
     detach(attachment: PhysicsAttachment): boolean;
     on<K extends keyof PhysicsEventMap>(type: K, listener: (event: PhysicsEventMap[K]) => void): () => void;
     addModel(): never;
-    addJoint(): never;
-    removeJoint(): never;
+    addJoint(bodyA: PhysicsBody, bodyB: PhysicsBody, options: JointOptions): PhysicsJoint;
+    removeJoint(joint: PhysicsJoint): void;
     createCharacterController(): never;
     removeController(): never;
     raycast(): never;
@@ -276,6 +332,29 @@ export interface PhysicsEventMap {
     afterstep: number;
 }
 
+export class PhysicsJoint {
+    readonly row: number;
+    readonly type: JointType;
+    readonly bodyA: PhysicsBody;
+    readonly bodyB: PhysicsBody;
+    constructor(owner: JointOwner,
+    row: number, type: JointType, bodyA: PhysicsBody, bodyB: PhysicsBody);
+    get valid(): boolean;
+    markRemoved(): void;
+    get anchorA(): [number, number, number];
+    get anchorB(): [number, number, number];
+    setLimits(min: number, max: number): this;
+    get limits(): [number, number] | null;
+    setMotor(motor: MotorOptions): this;
+    setRotationMotor(): never;
+    setAxisLimits(): never;
+    setAxisMotor(): never;
+    clearMotor(): this;
+    set contactsEnabled(value: boolean);
+    get contactsEnabled(): boolean;
+    remove(): void;
+}
+
 export interface PhysicsOptions {
     gravity?: Vec3;
     fixedTimestep?: number;
@@ -288,6 +367,10 @@ export interface PhysicsOptions {
     solverIterations?: number;
     name?: string;
 }
+
+export type RotationMotorOptions = Pick<MotorOptions, 'stiffness' | 'damping' | 'model' | 'maxForce'> & {
+    targetVelocity?: Vec3;
+};
 
 export type ShapeOptions = {
     shape: 'box';
@@ -431,6 +514,17 @@ type CompoundPart = ({
     offset?: Vec3;
     rotation?: Quat;
 };
+
+interface JointBase {
+    anchorA?: Vec3;
+    anchorB?: Vec3;
+    contactsEnabled?: boolean;
+}
+
+interface JointOwner {
+    readonly kernel: KernelWorld;
+    removeJoint(joint: PhysicsJoint): void;
+}
 
 interface PhysicsAttachment {
     beforeStep?(dt: number): void;

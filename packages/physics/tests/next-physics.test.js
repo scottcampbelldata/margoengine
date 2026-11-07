@@ -12,8 +12,6 @@ test('a call that is not served yet says so, and what to use', () => {
   const unsupported = { code: 'unsupported', message: /not in the own solver yet|does not have yet/ };
   for (const call of [
     () => physics.addModel(),
-    () => physics.addJoint(),
-    () => physics.removeJoint(),
     () => physics.createCharacterController(),
     () => physics.removeController(),
     () => physics.raycast(),

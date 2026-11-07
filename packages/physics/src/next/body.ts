@@ -70,7 +70,7 @@ export class PhysicsBody {
   }
   /** Not served yet: throws. */
   setType(): never {
-    throw later('setType', 'the batch that needs it, as a kind change must rebuild the pairs');
+    throw later('setType', 'the shapes and queries batch');
   }
 
   /** Current physics position (end of the last step, not interpolated). */
@@ -250,7 +250,7 @@ export class PhysicsBody {
     checkVec(inertia, 'Inertia');
     if (!(mass >= 0) || mass === Infinity || inertia.some((value) => value < 0))
       throw new RangeError('Additional mass and inertia must be finite numbers of at least 0; pass kilograms and kg m².');
-    if (inertia.some((value) => value > 0)) throw later('Inertia of its own', 'joints and articulations');
+    if (inertia.some((value) => value > 0)) throw later('Inertia of its own', 'the shapes and queries batch');
     this.columns.additionalMass[this.row] = mass;
     this.world().updateMass(this.row);
     return this;
@@ -275,7 +275,7 @@ export class PhysicsBody {
   }
   /** Not served yet: throws. */
   setMassProperties(): never {
-    throw later('setMassProperties', 'joints and articulations');
+    throw later('setMassProperties', 'the shapes and queries batch');
   }
   get gravityScale(): number {
     return this.columns.gravityScale[this.row];
@@ -291,7 +291,7 @@ export class PhysicsBody {
     return 0;
   }
   set additionalSolverIterations(passes: number) {
-    if (passes !== 0) throw later('additionalSolverIterations', 'joints and articulations');
+    if (passes !== 0) throw later('additionalSolverIterations', 'the shapes and queries batch');
   }
   /** Not served yet: reads false, and true throws. */
   get ccd(): boolean {

@@ -232,7 +232,7 @@ Queries take `maxDistance`, `solid`, `groups`, `exclude` (a body), `excludeSenso
 
 ## Own solver preview
 
-`@margoengine/physics/next` is Margo's own solver while it is built, a Rust kernel compiled to WebAssembly and shipped inside the package, so you need no toolchain and no peer install. Rapier stays the default until the switch; this entry is a preview and goes away then. Today it holds the kernel's world, its memory, bodies with colliders that move under forces, the pairs of colliders that come near each other, and islands that sleep, with no contacts yet.
+`@margoengine/physics/next` is Margo's own solver while it is built, a Rust kernel compiled to WebAssembly and shipped inside the package, so you need no toolchain and no peer install. Rapier stays the default until the switch; this entry is a preview and goes away then. Today it holds the kernel's world, its memory, bodies with colliders that move under forces, contacts, joints, and islands that sleep.
 
 ```ts
 import {KernelWorld, loadKernel} from 'margoengine/physics/next';
@@ -307,6 +307,33 @@ physics.dispose();
 ```
 
 It holds `box`, `sphere` and `capsule` colliders, bodies of every kind, forces, impulses, velocities, damping, locks, kinematic targets, gravity, sleeping and the `beforestep` and `afterstep` events. Bodies collide, with friction, restitution and the four combine rules, and `physics.touching(a, b)` and `physics.contactPoints(body)` read the contacts of the last step. Contact events, sensors and groups are not served yet. A call that needs what is still to come throws a `MargoError` with code `unsupported` naming what it waits for: other shapes, `setType`, `setMassProperties`, inertia of its own, `ccd`, `follow`, `dominance`, disabling a body, `contactFilter`, friction, restitution and every other contact setting, joints, queries, character controllers, `addModel`, `touching`, `contactPoints`, contact events and `debugRender`. `body.sleep()` and impulses take effect at the next step.
+
+`physics.addJoint(bodyA, bodyB, options)` holds the root entry's `fixed`, `spherical`, `revolute` and `prismatic` joints, with `limits`, `motor`, `axis` or `frameA` and `frameB`, `contactsEnabled`, `joint.setLimits`, `setMotor`, `clearMotor`, `remove`, and the same errors. A joint keeps its two bodies from colliding unless `contactsEnabled` is true, and leaves with either body. The `rope`, `spring` and `generic` kinds and `setRotationMotor` throw `unsupported` until they come.
+
+```ts
+import {Physics} from 'margoengine/physics/next';
+
+await Physics.load();
+const physics = new Physics(null);
+const wall = physics.addBody(null, {type: 'fixed', colliders: []});
+const door = physics.addBody(null, {
+  position: [0.5, 0, 0],
+  colliders: {shape: 'box', halfExtents: [0.5, 1, 0.05], density: 1},
+});
+const hinge = physics.addJoint(wall, door, {
+  type: 'revolute',
+  anchorB: [-0.5, 0, 0],                // the hinge line, in the door's frame
+  axis: [0, 1, 0],
+  limits: [-0.5, 0.5],                  // radians from the rest pose
+  motor: {targetVelocity: 1, damping: 50},
+});
+for (let i = 0; i < 120; i++) physics.step();
+console.log(door.rotation);             // turned half a radian about Y, against the limit
+hinge.clearMotor();
+physics.dispose();
+```
+
+Locks along a chain are solved exactly, so a chain of 50 holds a 1000 to 1 end mass. A branch or a closed loop settles pass by pass, so it holds under its own weight and gives way a little under a far heavier body: the numbers are in `docs/limits.md`.
 
 Each step is 8 substeps of 2 solver passes by default (`physics.substeps`, `physics.iterations`). `friction` defaults to 0.5, `restitution` to 0, and each combine rule to `average`; when two colliders ask for different rules the pair takes the higher, `max`, `multiply`, `min`, `average`. `collider.setFriction` and `collider.setRestitution` take effect at the next step.
 

@@ -21,8 +21,13 @@ pub enum Rows {
     HullVertex,
     HullEdge,
     HullFace,
+    Joint,
+    /// One row a joint too, but a dense list, for the same reason as `BodyList`.
+    JointList,
+    /// JOINT_WORDS rows a joint: what a substep keeps of it.
+    JointScratch,
 }
-pub const ROW_CLASSES: usize = 11;
+pub const ROW_CLASSES: usize = 14;
 
 macro_rules! columns {
     ($($name:ident $kind:ident $rows:ident,)*) => {
@@ -110,6 +115,8 @@ columns! {
     NEXT_FREE u32 Body,
     ADDITIONAL_MASS f32 Body,
     FIRST_COLLIDER u32 Body,
+    // The first of the body's joints: the chain runs through JOINT_NEXT_A or JOINT_NEXT_B, whichever side the body is on.
+    FIRST_JOINT u32 Body,
     // Sleep: seconds under the threshold, and the energy the window began with.
     SLEEP_TIME f32 Body,
     SLEEP_ENERGY f32 Body,
@@ -298,6 +305,94 @@ columns! {
     FACE_NORMAL_Y f32 HullFace,
     FACE_NORMAL_Z f32 HullFace,
     FACE_OFFSET f32 HullFace,
+    // Joints: two bodies, the JOINT_ bits below, and the chain of each body's joints. A free row has its next in JOINT_NEXT_A.
+    JOINT_A u32 Joint,
+    JOINT_B u32 Joint,
+    JOINT_FLAGS u32 Joint,
+    JOINT_NEXT_A u32 Joint,
+    JOINT_NEXT_B u32 Joint,
+    // Where the joint holds each body, from the body's origin in its frame, and the joint's frame on each body.
+    JOINT_ANCHOR_A_X f32 Joint,
+    JOINT_ANCHOR_A_Y f32 Joint,
+    JOINT_ANCHOR_A_Z f32 Joint,
+    JOINT_ANCHOR_B_X f32 Joint,
+    JOINT_ANCHOR_B_Y f32 Joint,
+    JOINT_ANCHOR_B_Z f32 Joint,
+    JOINT_FRAME_A_X f32 Joint,
+    JOINT_FRAME_A_Y f32 Joint,
+    JOINT_FRAME_A_Z f32 Joint,
+    JOINT_FRAME_A_W f32 Joint,
+    JOINT_FRAME_B_X f32 Joint,
+    JOINT_FRAME_B_Y f32 Joint,
+    JOINT_FRAME_B_Z f32 Joint,
+    JOINT_FRAME_B_W f32 Joint,
+    // Six axes in a row: along X, Y, Z of frame A, then about them. Limits; a motor's target, target speed, gains and cap;
+    // the impulse a lock or limit carries, and the impulse its motor carries. A column plus an axis names that axis.
+    JOINT_MIN_0 f32 Joint,
+    JOINT_MIN_1 f32 Joint,
+    JOINT_MIN_2 f32 Joint,
+    JOINT_MIN_3 f32 Joint,
+    JOINT_MIN_4 f32 Joint,
+    JOINT_MIN_5 f32 Joint,
+    JOINT_MAX_0 f32 Joint,
+    JOINT_MAX_1 f32 Joint,
+    JOINT_MAX_2 f32 Joint,
+    JOINT_MAX_3 f32 Joint,
+    JOINT_MAX_4 f32 Joint,
+    JOINT_MAX_5 f32 Joint,
+    JOINT_TARGET_0 f32 Joint,
+    JOINT_TARGET_1 f32 Joint,
+    JOINT_TARGET_2 f32 Joint,
+    JOINT_TARGET_3 f32 Joint,
+    JOINT_TARGET_4 f32 Joint,
+    JOINT_TARGET_5 f32 Joint,
+    JOINT_SPEED_0 f32 Joint,
+    JOINT_SPEED_1 f32 Joint,
+    JOINT_SPEED_2 f32 Joint,
+    JOINT_SPEED_3 f32 Joint,
+    JOINT_SPEED_4 f32 Joint,
+    JOINT_SPEED_5 f32 Joint,
+    JOINT_STIFFNESS_0 f32 Joint,
+    JOINT_STIFFNESS_1 f32 Joint,
+    JOINT_STIFFNESS_2 f32 Joint,
+    JOINT_STIFFNESS_3 f32 Joint,
+    JOINT_STIFFNESS_4 f32 Joint,
+    JOINT_STIFFNESS_5 f32 Joint,
+    JOINT_DAMPING_0 f32 Joint,
+    JOINT_DAMPING_1 f32 Joint,
+    JOINT_DAMPING_2 f32 Joint,
+    JOINT_DAMPING_3 f32 Joint,
+    JOINT_DAMPING_4 f32 Joint,
+    JOINT_DAMPING_5 f32 Joint,
+    JOINT_CAP_0 f32 Joint,
+    JOINT_CAP_1 f32 Joint,
+    JOINT_CAP_2 f32 Joint,
+    JOINT_CAP_3 f32 Joint,
+    JOINT_CAP_4 f32 Joint,
+    JOINT_CAP_5 f32 Joint,
+    JOINT_IMPULSE_0 f32 Joint,
+    JOINT_IMPULSE_1 f32 Joint,
+    JOINT_IMPULSE_2 f32 Joint,
+    JOINT_IMPULSE_3 f32 Joint,
+    JOINT_IMPULSE_4 f32 Joint,
+    JOINT_IMPULSE_5 f32 Joint,
+    JOINT_MOTOR_0 f32 Joint,
+    JOINT_MOTOR_1 f32 Joint,
+    JOINT_MOTOR_2 f32 Joint,
+    JOINT_MOTOR_3 f32 Joint,
+    JOINT_MOTOR_4 f32 Joint,
+    JOINT_MOTOR_5 f32 Joint,
+    // The angle of a joint with one free turning axis, counted past a whole turn.
+    JOINT_ANGLE f32 Joint,
+    // The step a joint was last listed in, plus one.
+    JOINT_SEEN u32 Joint,
+    // The joints this step solves, densely, in paths: a row with a body in SOLVE_VIA goes on from the row before through it.
+    SOLVE_JOINTS u32 JointList,
+    SOLVE_VIA u32 JointList,
+    // The share of its error each listed joint closes in a biased pass.
+    SOLVE_SHARE f32 JointList,
+    // Rows, measures and factors of the solving joints.
+    JOINT_SCRATCH f32 JointScratch,
 }
 
 /// Rows every column of a class is padded to, so each column stays on a 16-byte boundary.
@@ -326,14 +421,19 @@ pub fn offsets(start: u32, capacity: &[u32; ROW_CLASSES]) -> Option<([u32; COLUM
 pub const MANIFOLD: usize = 4;
 
 /// The rows of every class for `bodies`, `colliders` and `pairs`, keeping the hull rows a world already has room for.
-pub fn capacities(bodies: u32, colliders: u32, pairs: u32, hulls: [u32; 4]) -> [u32; ROW_CLASSES] {
+pub fn capacities(bodies: u32, colliders: u32, pairs: u32, hulls: [u32; 4], joints: u32) -> [u32; ROW_CLASSES] {
     let [hull, vertices, edges, faces] = hulls;
-    [bodies, colliders, colliders * 2, pairs, (pairs * 2).next_power_of_two(), bodies, pairs * MANIFOLD as u32, hull, vertices, edges, faces]
+    [bodies, colliders, colliders * 2, pairs, (pairs * 2).next_power_of_two(), bodies, pairs * MANIFOLD as u32, hull, vertices, edges, faces, joints, joints, joints * JOINT_WORDS]
 }
 
 /// Most bodies and colliders one world holds.
 pub const MAX_BODIES: u32 = 1 << 22;
 pub const MAX_COLLIDERS: u32 = 1 << 22;
+/// Words of JOINT_SCRATCH a joint takes: 64 for its rows and measures, then doubles, 36 of inverse, 36 of link, 6 of right side,
+/// 6 of what the pushing pass gave.
+pub const JOINT_WORDS: u32 = 64 + 2 * (36 + 36 + 6 + 6);
+/// Most joints one world holds.
+pub const MAX_JOINTS: u32 = 1 << 22;
 /// Pairs the broad phase can hold; its table then fills 2^30 slots and its points 2^31 rows.
 pub const MAX_PAIRS: u32 = 1 << 29;
 /// Edges of a hull's largest face: the clipper's buffers are sized by it.
@@ -379,3 +479,18 @@ pub const PENDING: u32 = 2;
 pub const REMOVED: u32 = 4;
 /// Joining the lists in this step.
 pub const JOINING: u32 = 8;
+
+// Bits of the JOINT_FLAGS column. Each of the first four is six bits, one an axis in the order of the JOINT_ axis columns.
+/// The axis does not move.
+pub const JOINT_LOCK: u32 = 1;
+/// The axis stays between JOINT_MIN and JOINT_MAX.
+pub const JOINT_LIMIT: u32 = 1 << 6;
+/// A motor drives the axis.
+pub const JOINT_MOTOR_ON: u32 = 1 << 12;
+/// That motor's gains are in force units; otherwise they are per unit of effective mass, so its load does not change them.
+pub const JOINT_MOTOR_FORCE: u32 = 1 << 18;
+pub const JOINT_ALIVE: u32 = 1 << 24;
+/// The two bodies may collide with each other.
+pub const JOINT_CONTACTS: u32 = 1 << 25;
+/// The first axis is the line between the anchors, and what it measures is their distance: a rope's limit, a spring's motor.
+pub const JOINT_DISTANCE: u32 = 1 << 27;

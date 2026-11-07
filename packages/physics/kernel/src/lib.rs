@@ -11,6 +11,7 @@ pub mod gjk;
 pub mod hull;
 pub mod integrate;
 pub mod island;
+pub mod joints;
 pub mod layout;
 pub mod mass;
 pub mod math;

@@ -2,6 +2,7 @@
 // solver go between those two. Forces stay in their columns and reach every substep; impulses land once, before the
 // first. Both are the kernel's contract, from Margo's ragdoll findings: a force given as an impulse before the first pass
 // lets one pass's friction take a whole step's kick.
+use crate::joints::Pass;
 use crate::layout::*;
 use crate::math::*;
 use crate::solver::soft;
@@ -123,17 +124,28 @@ impl World {
         self.narrow_phase(dt);
         self.update_islands(dt);
         self.prepare_contacts();
+        self.prepare_joints();
         // A soft constraint stiffer than a quarter of the substep rate shakes a pile the passes cannot settle (measured).
         let (hertz, damping) = (self.header().contact_hertz, self.header().contact_damping);
         let hertz = if hertz * h > 0.25 { 0.25 / h } else { hertz };
         let stiffness = soft(hertz, damping, h);
         for substep in 0..substeps {
             self.integrate_velocities(h);
+            self.refresh_joints();
             self.warm_start();
-            for _ in 0..self.header().iterations {
+            self.warm_start_joints();
+            let passes = self.header().iterations;
+            // Only a settling pass teaches the warm start what a joint carries.
+            if passes < 2 {
+                self.solve_joints(h, Pass::Settle);
+            }
+            for pass in 1..=passes {
+                self.solve_joints(h, if pass == passes { Pass::Push } else { Pass::Settle });
                 self.solve_contacts(h, stiffness, true, substep as usize);
             }
             self.integrate_poses(h, substep + 1 == substeps);
+            self.refresh_joints();
+            self.solve_joints(h, Pass::Relax);
             self.solve_contacts(h, stiffness, false, substep as usize);
             self.solve_impacts();
         }

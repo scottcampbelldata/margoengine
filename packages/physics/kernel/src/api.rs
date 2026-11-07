@@ -166,6 +166,27 @@ pub extern "C" fn body_update_mass(body: u32) {
         world().update_mass(body);
     }
 }
+/// A new joint between two bodies, or -1 when one is gone, they are one body, or memory is out. JS then writes its columns.
+#[unsafe(no_mangle)]
+pub extern "C" fn joint_add(a: u32, b: u32, flags: u32) -> i32 {
+    world().add_joint(a, b, flags).map_or(-1, |row| row as i32)
+}
+#[unsafe(no_mangle)]
+pub extern "C" fn joint_remove(joint: u32) -> u32 {
+    world().remove_joint(joint) as u32
+}
+/// Sets both frames so that frame X runs along `axis`.
+#[unsafe(no_mangle)]
+pub extern "C" fn joint_set_axis(joint: u32, x: f32, y: f32, z: f32) {
+    world().set_joint_axis(joint, v3(x, y, z));
+}
+/// Sets the joint's frame on each body, here so they come out unit length.
+#[unsafe(no_mangle)]
+#[allow(clippy::too_many_arguments)]
+pub extern "C" fn joint_set_frames(joint: u32, ax: f32, ay: f32, az: f32, aw: f32, bx: f32, by: f32, bz: f32, bw: f32) {
+    world().set_q(JOINT_FRAME_A_X, joint as usize, Q { x: ax, y: ay, z: az, w: aw }.normalized());
+    world().set_q(JOINT_FRAME_B_X, joint as usize, Q { x: bx, y: by, z: bz, w: bw }.normalized());
+}
 /// A new collider on `body`, or -1 when the rows are used up or the body is gone.
 #[unsafe(no_mangle)]
 pub extern "C" fn collider_add(

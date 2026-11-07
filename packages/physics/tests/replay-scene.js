@@ -115,6 +115,29 @@ export function kernelScene(KernelWorld, steps = REPLAY_STEPS, visit = () => {})
     rows.push(row);
   };
   for (let i = 0; i < 48; i++) spawn();
+  // Joints of each kind between any two rows, so some form chains and rings; the removals below take them with their bodies.
+  for (let i = 0; i < 16; i++) {
+    const a = rows[random.below(rows.length)],
+      b = rows[random.below(rows.length)];
+    if (a === b) continue;
+    const joint = world.addJoint(a, b, [7, 7 | (6 << 3), 6 | (7 << 3), 63][i % 4]);
+    c.jointAnchorAX[joint] = random.value() / 4;
+    c.jointAnchorAY[joint] = random.value() / 4;
+    c.jointAnchorBZ[joint] = random.value() / 4;
+    if (i % 4 === 1) {
+      world.setJointAxis(joint, [random.value(), 1, random.value()]);
+      c.jointFlags[joint] |= (1 << 6) << 3;
+      c.jointMin3[joint] = -1;
+      c.jointMax3[joint] = 1;
+    }
+    if (i % 8 === 1) {
+      c.jointFlags[joint] |= (1 << 12) << 3;
+      c.jointTarget3[joint] = 0.5;
+      c.jointStiffness3[joint] = 50;
+      c.jointDamping3[joint] = 5;
+      c.jointCap3[joint] = 100;
+    }
+  }
   for (let i = 0; i < steps; i++) {
     if (i % 512 === 0) {
       world.setGravity(...GRAVITY[(i / 512) % 4]);

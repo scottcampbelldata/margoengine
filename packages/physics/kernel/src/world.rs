@@ -61,6 +61,17 @@ pub struct Header {
     /// Pairs the solver works on in this step, and points struck in this substep.
     pub solving: u32,
     pub impacts: u32,
+    /// This substep's length over the last step's, for impulses carried across a change of step.
+    pub substep_ratio: f32,
+    /// Joint rows handed out so far; the first freed one to hand out again; joints the solver works on in this step.
+    pub joint_rows: u32,
+    pub free_joint: u32,
+    pub joint_solving: u32,
+    /// Joint stiffness: the share of a joint's error a biased pass closes when the solve is exact, when it is only a pass of
+    /// Gauss-Seidel among other joints, and how fast it may close it, in units a second.
+    pub joint_share: f32,
+    pub joint_loose_share: f32,
+    pub joint_max_push: f32,
 }
 
 const HEADER_BYTES: u32 = ((core::mem::size_of::<Header>() + 15) & !15) as u32;
@@ -76,7 +87,7 @@ impl World {
             return None;
         }
         let mut arena = Arena::new();
-        let capacity = capacities(bodies, colliders, colliders.max(16), [0; 4]);
+        let capacity = capacities(bodies, colliders, colliders.max(16), [0; 4], 0);
         let (offsets, bytes) = offsets(HEADER_BYTES, &capacity)?;
         if !arena.ensure(bytes as usize) {
             return None;
@@ -117,6 +128,13 @@ impl World {
                 iterations: 2,
                 solving: 0,
                 impacts: 0,
+                substep_ratio: 1.0,
+                joint_rows: 0,
+                free_joint: NONE,
+                joint_solving: 0,
+                joint_share: 1.0,
+                joint_loose_share: 0.2,
+                joint_max_push: 3.0,
             });
         }
         Some(world)
@@ -157,7 +175,7 @@ impl World {
         if bodies > MAX_BODIES || colliders > MAX_COLLIDERS {
             return false;
         }
-        self.grow(capacities(bodies.max(old[0]), colliders.max(old[1]), old[3], [old[7], old[8], old[9], old[10]]))
+        self.grow(capacities(bodies.max(old[0]), colliders.max(old[1]), old[3], [old[7], old[8], old[9], old[10]], old[11]))
     }
 
     /// Moves every column up to its place in the larger layout, last column first, so nothing is overwritten before it
@@ -191,7 +209,7 @@ impl World {
     }
 
     /// Zeroes one row of every column of a class but `keep`, which counts reuse.
-    fn clear_row(&mut self, class: Rows, at: usize, keep: usize) {
+    pub fn clear_row(&mut self, class: Rows, at: usize, keep: usize) {
         for column in 0..COLUMNS {
             if COLUMN_ROWS[column] as usize == class as usize && column != keep {
                 unsafe { *self.u(column).add(at) = 0 };
@@ -221,6 +239,7 @@ impl World {
             }
             *self.u(FLAGS).add(at) = ALIVE | CAN_SLEEP | (kind & KIND);
             *self.u(FIRST_COLLIDER).add(at) = NONE;
+            *self.u(FIRST_JOINT).add(at) = NONE;
             *self.u(AWAKE_SLOT).add(at) = NONE;
             *self.u(ISLAND_NEXT).add(at) = NONE;
         }
@@ -243,6 +262,7 @@ impl World {
         }
         // Its neighbours may have rested on it.
         self.wake(body);
+        self.remove_joints_of(body);
         let at = body as usize;
         if unsafe { *self.u(AWAKE_SLOT).add(at) } != NONE {
             self.unlist_awake(body);
@@ -426,6 +446,7 @@ mod tests {
     fn reserve_keeps_every_row_at_its_index() {
         let mut world = World::new(5, 5).unwrap();
         assert!(world.reserve_hull(5, 5, 5, 5));
+        assert!(world.grow_joints());
         for row in 0..5 {
             for column in 0..COLUMNS {
                 unsafe { *world.u(column).add(row) = (column * 100 + row) as u32 };
@@ -433,6 +454,7 @@ mod tests {
         }
         assert!(world.reserve(1000, 1000));
         assert!(world.reserve_hull(1000, 1000, 1000, 1000));
+        assert!(world.grow_joints());
         assert_eq!(world.header().capacity[0], 1000);
         for row in 0..5 {
             for column in 0..COLUMNS {

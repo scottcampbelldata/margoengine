@@ -15,6 +15,32 @@ pub fn sqrt(value: f32) -> f32 {
     }
 }
 
+/// pi and half of it as the nearest f32.
+pub const PI: f32 = 3.141_592_7;
+pub const HALF_PI: f32 = 1.570_796_4;
+
+/// The arc tangent of `t` from 0 to 1: two halvings by atan t = 2 atan(t / (1 + sqrt(1 + t^2))) bring it under tan(pi/16),
+/// where the Gregory series stops under f32 rounding. Plus, times, divide and sqrt only, so bit-equal everywhere.
+#[inline]
+fn arc_tangent(t: f32) -> f32 {
+    let t = t / (1.0 + sqrt(1.0 + t * t));
+    let t = t / (1.0 + sqrt(1.0 + t * t));
+    let s = t * t;
+    4.0 * t * (1.0 + s * (-1.0 / 3.0 + s * (1.0 / 5.0 + s * (-1.0 / 7.0 + s * (1.0 / 9.0)))))
+}
+
+/// The angle of the point (x, y) from the X axis, from -pi to pi; 0 at the origin.
+#[inline]
+pub fn atan2(y: f32, x: f32) -> f32 {
+    let (size_y, size_x) = (y.abs(), x.abs());
+    if size_x == 0.0 && size_y == 0.0 {
+        return 0.0;
+    }
+    let angle = if size_y <= size_x { arc_tangent(size_y / size_x) } else { HALF_PI - arc_tangent(size_x / size_y) };
+    let angle = if x < 0.0 { PI - angle } else { angle };
+    if y < 0.0 { -angle } else { angle }
+}
+
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct V3 {
     pub x: f32,

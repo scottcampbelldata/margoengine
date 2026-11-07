@@ -20,7 +20,7 @@ const NOISE: f32 = 1e-6;
 impl World {
     /// True when `body` is on the awake list.
     #[inline(always)]
-    fn is_awake(&self, body: usize) -> bool {
+    pub fn is_awake(&self, body: usize) -> bool {
         self.uu(AWAKE_SLOT, body) != NONE
     }
 
@@ -181,7 +181,7 @@ impl World {
 
     /// Joins two trees, the smaller under the larger; at equal sizes the first root stays.
     #[inline(always)]
-    fn unite(&mut self, a: u32, b: u32) {
+    pub fn unite(&mut self, a: u32, b: u32) {
         let (a, b) = (self.find(a), self.find(b));
         if a != b {
             let (size_a, size_b) = (self.uu(ISLAND_SIZE, a as usize), self.uu(ISLAND_SIZE, b as usize));
@@ -210,6 +210,7 @@ impl World {
                 }
             }
         }
+        self.wake_across_joints();
         let awake = self.header().awake as usize;
         for i in 0..awake {
             let body = self.uu(AWAKE, i);
@@ -231,6 +232,7 @@ impl World {
                 }
             }
         }
+        self.unite_joints();
         // Number the islands, count their bodies, and see whether all of each are ready. A root holds its island's number.
         let mut islands = 0usize;
         for i in 0..awake {
@@ -289,12 +291,12 @@ impl World {
 
     /// True when an awake body should wake a sleeper it touches: every dynamic one, and a kinematic one that moves.
     #[inline(always)]
-    fn disturbs(&self, body: usize) -> bool {
+    pub fn disturbs(&self, body: usize) -> bool {
         self.is_awake(body) && (self.flags(body) & KIND == DYNAMIC || self.moving_kinematic(body))
     }
 
     #[inline(always)]
-    fn moving_kinematic(&self, body: usize) -> bool {
+    pub fn moving_kinematic(&self, body: usize) -> bool {
         let kind = self.flags(body) & KIND;
         if kind == FIXED || kind == DYNAMIC {
             return false;

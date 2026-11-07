@@ -3,12 +3,14 @@
 import { MargoError } from '@margoengine/math/errors';
 import type { EngineKernel, EnginePlugin, Mesh } from '@margoengine/core';
 import type { BodyOptions, BodyType } from '../body.js';
+import type { JointOptions } from '../joints.js';
 import { KernelWorld, loadKernel, type KernelContactPoint, type KernelLoadOptions } from '../kernel.js';
 import { checkVec, type Quat, type Vec3 } from '../math.js';
 import { colliderGeometry } from '../mesh-fit.js';
 import type { ColliderOptions, ShapeOptions } from '../shapes.js';
 import { PhysicsBody, checkRotation, type BodyOwner } from './body.js';
 import { PhysicsCollider } from './collider.js';
+import { PhysicsJoint, createJoint } from './joint.js';
 import { kernelCollider, shapeServed } from './shapes.js';
 import { MeshSync, meshPose } from './sync.js';
 
@@ -66,7 +68,7 @@ const bits = (enabled: readonly [boolean, boolean, boolean]): number =>
 
 /**
  * Rigid-body physics on Margo's own solver as a Margo Engine plugin. The same names as `Physics` from the root entry, with
- * a fixed timestep, an accumulator and interpolation. Bodies fall, turn, collide and sleep; a call that needs joints or
+ * a fixed timestep, an accumulator and interpolation. Bodies fall, turn, collide, sleep and hold joints; a call that needs
  * queries throws `unsupported`. A preview, removed when it becomes the root.
  */
 export class Physics implements EnginePlugin, BodyOwner {
@@ -85,6 +87,7 @@ export class Physics implements EnginePlugin, BodyOwner {
   private disposed = false;
   private readonly meshes: MeshSync;
   private readonly bodies = new Set<PhysicsBody>();
+  private readonly joints = new Set<PhysicsJoint>();
   private readonly byMesh = new Map<Mesh, PhysicsBody>();
   private readonly byRow = new Map<number, PhysicsCollider>();
   private readonly attachments = new Set<PhysicsAttachment>();
@@ -352,10 +355,11 @@ export class Physics implements EnginePlugin, BodyOwner {
     collider.markRemoved();
   }
 
-  /** Removes a body with its colliders. */
+  /** Removes a body with its colliders and joints. */
   removeBody(body: PhysicsBody): void {
     if (!this.bodies.has(body)) return;
     for (const attachment of [...this.attachments]) attachment.bodyRemoved?.(body);
+    for (const joint of this.joints) if (joint.bodyA === body || joint.bodyB === body) this.removeJoint(joint);
     for (const collider of body.colliders) this.byRow.delete(collider.handle);
     this.bodies.delete(body);
     if (body.mesh) this.byMesh.delete(body.mesh);
@@ -398,13 +402,25 @@ export class Physics implements EnginePlugin, BodyOwner {
   addModel(): never {
     throw later('addModel', 'trimesh shapes');
   }
-  /** Not served yet: throws. */
-  addJoint(): never {
-    throw later('addJoint', 'joints');
+  /**
+   * Connects two bodies with a fixed, spherical, revolute or prismatic joint. Anchors are in each body's local frame.
+   * @throws MargoError (`state`) unless both bodies belong to this world and are two bodies.
+   * @throws MargoError (`unsupported`) for a kind the own solver does not hold yet.
+   */
+  addJoint(bodyA: PhysicsBody, bodyB: PhysicsBody, options: JointOptions): PhysicsJoint {
+    if (!this.bodies.has(bodyA) || !this.bodies.has(bodyB))
+      throw new MargoError('state', 'Both bodies must belong to this physics world; add them with physics.addBody first.');
+    if (bodyA === bodyB)
+      throw new MargoError('state', 'A joint needs two different bodies; pass bodyA and bodyB that are not the same.');
+    const joint = createJoint(this, bodyA, bodyB, options);
+    this.joints.add(joint);
+    return joint;
   }
-  /** Not served yet: throws. */
-  removeJoint(): never {
-    throw later('removeJoint', 'joints');
+  /** @internal use `joint.remove`. */
+  removeJoint(joint: PhysicsJoint): void {
+    if (!this.joints.delete(joint)) return;
+    this.kernel.removeJoint(joint.row);
+    joint.markRemoved();
   }
   /** Not served yet: throws. */
   createCharacterController(): never {

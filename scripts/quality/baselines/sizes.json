@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10550329,
+  "total": 10567607,
   "history": [
     {
       "date": "2026-10-24",
@@ -3638,6 +3638,12 @@
       "commit": "f9b487f60",
       "reason": "netcode: new optional entry ./signal (batch 114 job 5)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "15163911e",
+      "reason": "physics/next gains joints: joint rows, exact path solve, limits, motors and their Wasm kernel, first build, not tuned",
+      "grew": 1
     }
   ],
   "items": {
@@ -4082,7 +4088,7 @@
     "@margoengine/oit/moments": 4197,
     "@margoengine/oit/vfx": 486,
     "@margoengine/physics": 19679,
-    "@margoengine/physics/next": 59051,
+    "@margoengine/physics/next": 76329,
     "@margoengine/physics2d": 8199,
     "@margoengine/physics2d/outline": 2524,
     "@margoengine/pixel": 4664,

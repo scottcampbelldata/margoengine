@@ -65,10 +65,32 @@ interface KernelExports extends WebAssembly.Exports {
     density: number,
   ): number;
   collider_remove(collider: number): number;
+  joint_add(a: number, b: number, flags: number): number;
+  joint_remove(joint: number): number;
+  joint_set_axis(joint: number, x: number, y: number, z: number): void;
+  joint_set_frames(
+    joint: number,
+    ax: number,
+    ay: number,
+    az: number,
+    aw: number,
+    bx: number,
+    by: number,
+    bz: number,
+    bw: number,
+  ): void;
   hull_begin(vertices: number, faces: number, edges: number): number;
   hull_end(vertices: number, faces: number, edges: number): number;
   hull_next(rows: number): number;
 }
+
+/** Bits of the `jointFlags` column, each shifted by the axis it is for: 0 to 2 along frame A, 3 to 5 about it. */
+export const JOINT_LOCK = 1;
+export const JOINT_LIMIT = 1 << 6;
+export const JOINT_MOTOR_ON = 1 << 12;
+export const JOINT_MOTOR_FORCE = 1 << 18;
+/** Not shifted: the two bodies may collide with each other. */
+export const JOINT_CONTACTS = 1 << 25;
 
 /** How a body moves: `dynamic` by forces, `kinematicPosition` to a target, `kinematicVelocity` at its velocity. */
 export type KernelBodyKind = 'fixed' | 'dynamic' | 'kinematicPosition' | 'kinematicVelocity';
@@ -501,6 +523,34 @@ export class KernelWorld {
    */
   removeCollider(collider: number): boolean {
     return Number.isInteger(collider) && collider >= 0 && this.api.collider_remove(collider) === 1;
+  }
+  /**
+   * Adds a joint between two bodies and returns its row in the joint columns. Grows the world when the rows run out, so
+   * read views from `columns` after this call. Its frames start as the identity and every other column as zero.
+   * @param flags The `JOINT_` bits; the axes it locks hold from the first step.
+   * @throws RangeError for a body that is gone, a body joined to itself, or when the world cannot grow.
+   */
+  addJoint(a: number, b: number, flags: number): number {
+    const { api } = this,
+      row = api.joint_add(a, b, flags);
+    if (row < 0) throw new RangeError(`Rows ${a} and ${b} cannot take a joint; use two rows addBody returned, or free memory.`);
+    if (api.world_layout() !== this.layout) this.bind();
+    return row;
+  }
+  /**
+   * Removes a joint and wakes its bodies. Its row comes back from a later {@link KernelWorld.addJoint}, last freed first.
+   * @returns false when the row holds no joint.
+   */
+  removeJoint(joint: number): boolean {
+    return Number.isInteger(joint) && joint >= 0 && this.api.joint_remove(joint) === 1;
+  }
+  /** Turns a joint's frames on both bodies so that frame X runs along `axis`, a direction in each body's own frame. */
+  setJointAxis(joint: number, axis: readonly [number, number, number]): void {
+    this.api.joint_set_axis(joint, axis[0], axis[1], axis[2]);
+  }
+  /** Sets a joint's frame on each body, as quaternions `[x, y, z, w]` in that body's frame; the kernel makes them unit length. */
+  setJointFrames(joint: number, a: Quat, b: Quat): void {
+    this.api.joint_set_frames(joint, a[0], a[1], a[2], a[3], b[0], b[1], b[2], b[3]);
   }
   /**
    * Works out a body's mass again, after a write to its `additionalMass` column. Extra mass is spread as the colliders
