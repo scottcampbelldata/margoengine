@@ -7,8 +7,9 @@ import { serve } from '../../shared/worker.js';
 import { parseUSDZ, type USDExtension, type USDOptions } from './index.js';
 import { parseUSD } from './any.js';
 import { composition } from './compose.js';
+import { skeletons } from './skel.js';
 
-const known: Record<string, (options?: never) => USDExtension> = { compose: composition };
+const known: Record<string, (options?: never) => USDExtension> = { compose: composition, skel: skeletons };
 serve(async ({ url, input, options: sent }: { url?: string; input?: ArrayBuffer | string; options: USDOptions }) => {
   const options: USDOptions = {
     ...sent,

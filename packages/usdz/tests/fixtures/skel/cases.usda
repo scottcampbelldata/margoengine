@@ -1,0 +1,93 @@
+#usda 1.0
+(
+    defaultPrim = "Rig"
+    metersPerUnit = 1
+    upAxis = "Y"
+    startTimeCode = 0
+    endTimeCode = 8
+    timeCodesPerSecond = 4
+)
+def SkelRoot "Rig" (
+    prepend apiSchemas = ["SkelBindingAPI"]
+)
+{
+    rel skel:skeleton = </Rig/Bones>
+    rel skel:animationSource = </Rig/Motion>
+    double3 xformOp:translate = (5, 0, 0)
+    uniform token[] xformOpOrder = ["xformOp:translate"]
+
+    def Skeleton "Bones"
+    {
+        uniform token[] joints = ["A", "A/B", "A/B/C"]
+        uniform matrix4d[] bindTransforms = [
+            ((1,0,0,0),(0,1,0,0),(0,0,1,0),(0,0,0,1)),
+            ((1,0,0,0),(0,1,0,0),(0,0,1,0),(0,1,0,1)),
+            ((1,0,0,0),(0,1,0,0),(0,0,1,0),(0,2,0,1))
+        ]
+        uniform matrix4d[] restTransforms = [
+            ((1,0,0,0),(0,1,0,0),(0,0,1,0),(0,0,0,1)),
+            ((1,0,0,0),(0,1,0,0),(0,0,1,0),(0,1,0,1)),
+            ((1,0,0,0),(0,1,0,0),(0,0,1,0),(0,1,0,1))
+        ]
+    }
+    def SkelAnimation "Motion"
+    {
+        uniform token[] joints = ["A/B/C", "A/B"]
+        float3[] translations.timeSamples = { 0: [(0,1,0),(0,1,0)], 4: [(0.5,1,0),(0,1.5,0)], 8: [(0,1,0),(0,1,0)] }
+        quatf[] rotations.timeSamples = { 0: [(1,0,0,0),(1,0,0,0)], 8: [(0.70710678,0,0,0.70710678),(0.70710678,0.70710678,0,0)] }
+        half3[] scales = [(1,1,1),(1,1,1)]
+        uniform token[] blendShapes = ["unused", "Lift", "Bulge"]
+        float[] blendShapeWeights.timeSamples = { 0: [1, 0, 0], 2: [0, 0.2, 1], 4: [0, 0.9, -0.5], 8: [0, 1.5, 0.3] }
+    }
+    def Mesh "Strip" (
+        prepend apiSchemas = ["SkelBindingAPI"]
+    )
+    {
+        uniform token subdivisionScheme = "none"
+        int[] faceVertexCounts = [4, 4]
+        int[] faceVertexIndices = [0, 1, 3, 2, 2, 3, 5, 4]
+        point3f[] points = [(-1,0,0),(1,0,0),(-1,1,0),(1,1,0),(-1,2,0),(1,2,0)]
+        double3 xformOp:translate = (100, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+        matrix4d primvars:skel:geomBindTransform = ((2,0,0,0),(0,1,0,0),(0,0,1,0),(0,0,1,1))
+        uniform token[] skel:joints = ["A/B/C", "A/B"]
+        int[] primvars:skel:jointIndices = [1,0, 1,0, 1,0, 1,0, 0,1, 0,1] (elementSize = 2; interpolation = "vertex")
+        float[] primvars:skel:jointWeights = [1,0, 1,0, 0.5,0.5, 0.5,0.5, 1,0, 0.75,0.25] (elementSize = 2; interpolation = "vertex")
+        uniform token[] skel:blendShapes = ["Bulge", "Lift"]
+        rel skel:blendShapeTargets = [</Rig/Strip/Bulge>, </Rig/Strip/Lift>]
+
+        def BlendShape "Lift"
+        {
+            uniform vector3f[] offsets = [(0,0,1),(0,0,1)]
+            uniform int[] pointIndices = [4, 5]
+            uniform vector3f[] inbetweens:half = [(0,0,2),(0,0,3)] (weight = 0.5)
+        }
+        def BlendShape "Bulge"
+        {
+            uniform vector3f[] offsets = [(1,0,0),(0,0,0),(1,0,0),(0,0,0),(1,0,0),(0,0,0)]
+        }
+    }
+    def Mesh "Rigid" (
+        prepend apiSchemas = ["SkelBindingAPI"]
+    )
+    {
+        uniform token subdivisionScheme = "none"
+        int[] faceVertexCounts = [3]
+        int[] faceVertexIndices = [0, 1, 2]
+        point3f[] points = [(3,0,0),(4,0,0),(3,1,0)]
+        int[] primvars:skel:jointIndices = [2] (elementSize = 1; interpolation = "constant")
+        float[] primvars:skel:jointWeights = [1] (elementSize = 1; interpolation = "constant")
+    }
+}
+def Mesh "Outside" (
+    prepend apiSchemas = ["SkelBindingAPI"]
+)
+{
+    uniform token subdivisionScheme = "none"
+    int[] faceVertexCounts = [3]
+    int[] faceVertexIndices = [0, 1, 2]
+    point3f[] points = [(0,0,0),(1,0,0),(0,1,0)]
+    rel skel:skeleton = </Rig/Bones>
+    int[] primvars:skel:jointIndices = [0, 0, 0] (elementSize = 1; interpolation = "vertex")
+    float[] primvars:skel:jointWeights = [1, 1, 1] (elementSize = 1; interpolation = "vertex")
+}

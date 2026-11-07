@@ -2350,6 +2350,10 @@
       "types": "./dist/usdz/compose.d.ts",
       "import": "./dist/usdz/compose.js"
     },
+    "./usdz/skel": {
+      "types": "./dist/usdz/skel.d.ts",
+      "import": "./dist/usdz/skel.js"
+    },
     "./vfx": {
       "types": "./dist/vfx.d.ts",
       "import": "./dist/vfx.js"

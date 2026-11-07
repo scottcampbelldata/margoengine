@@ -38,6 +38,10 @@
     "./compose": {
       "types": "./dist/compose.d.ts",
       "import": "./dist/compose.js"
+    },
+    "./skel": {
+      "types": "./dist/skel.d.ts",
+      "import": "./dist/skel.js"
     }
   },
   "scripts": {

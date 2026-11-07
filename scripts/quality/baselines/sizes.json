@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10106445,
+  "total": 10130487,
   "history": [
     {
       "date": "2026-10-24",
@@ -3068,6 +3068,12 @@
       "commit": "0caee8194",
       "reason": "knee spring and the hips reading from positions: the stance knee stops sliding the feet",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "e97b82431",
+      "reason": "@margoengine/usdz gains the /skel entry",
+      "grew": 2
     }
   ],
   "items": {
@@ -3655,8 +3661,9 @@
     "@margoengine/ui": 28221,
     "@margoengine/ui/react": 28301,
     "@margoengine/usdz": 11508,
-    "@margoengine/usdz dist/workers/usdz.js": 81913,
+    "@margoengine/usdz dist/workers/usdz.js": 90080,
     "@margoengine/usdz/compose": 17472,
+    "@margoengine/usdz/skel": 7987,
     "@margoengine/usdz/worker": 12590,
     "@margoengine/vfx": 17135,
     "@margoengine/vfx/base": 10992,

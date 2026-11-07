@@ -10,7 +10,7 @@ import {
 } from '@margoengine/loaders/common';
 import { readUSDA, type USDPrim, type USDValue } from '@margoengine/loaders/usd';
 import { parseCrate, type Specs, type TimeSamples } from './crate.js';
-import type { ExtensionHooks, USDExtension, USDIssue } from './extension.js';
+import type { ExtensionHooks, SceneMesh, USDExtension, USDIssue } from './extension.js';
 import type { GLTFDocument, GLTFMaterial, GLTFNode } from '../../shared/gltf.js';
 import { multiplyMatrices } from '@margoengine/math/mat4';
 
@@ -677,7 +677,7 @@ function asset(
     displays.set(id, { color, opacity: vertexOpacity, uv: mapped ? uvPrimvar(mapped) : undefined });
     return id;
   }
-  function accessor(data: Float32Array | Uint32Array, type: string): number {
+  function accessor(data: Float32Array | Uint32Array | Uint16Array, type: string): number {
     const buffer = buffers.length;
     buffers.push(data);
     doc.buffers.push({ byteLength: data.byteLength });
@@ -686,8 +686,8 @@ function asset(
     const index = doc.accessors.length;
     doc.accessors.push({
       bufferView: view,
-      componentType: data instanceof Uint32Array ? 5125 : 5126,
-      count: data.length / (type === 'VEC4' ? 4 : type === 'VEC3' ? 3 : type === 'VEC2' ? 2 : 1),
+      componentType: data instanceof Uint32Array ? 5125 : data instanceof Uint16Array ? 5123 : 5126,
+      count: data.length / (type === 'MAT4' ? 16 : type === 'VEC4' ? 4 : type === 'VEC3' ? 3 : type === 'VEC2' ? 2 : 1),
       type,
     });
     return index;
@@ -736,6 +736,8 @@ function asset(
       if (list) list.push(path);
       else subsetsOf.set(owner, [path]);
     }
+  const scenes = hooks(options).filter((hook) => hook.scene),
+    sceneMeshes: SceneMesh[] = [];
   let totalVertices = 0,
     totalTriangles = 0,
     polygonWork = 0;
@@ -806,6 +808,7 @@ function asset(
         normals = new Float32Array(triangles * 9),
         uvs = uv ? new Float32Array(triangles * 6) : undefined,
         indices = new Uint32Array(triangles * 3),
+        vertexOf = scenes.length ? new Uint32Array(triangles * 3) : undefined,
         firstTriangle = new Uint32Array(counts.length + 1),
         colors = reads.color || reads.opacity ? new Float32Array(triangles * 12) : undefined,
         tint = reads.color && displayStream(path, 'displayColor', reads.color, 3),
@@ -916,6 +919,7 @@ function asset(
               if (fade) colors[at * 4 + 3] = fade.values[entry(fade, 1, 'primvars:displayOpacity')];
             }
             indices[at] = at;
+            if (vertexOf) vertexOf[at] = vertex;
             at++;
           }
         cursor += count;
@@ -965,6 +969,7 @@ function asset(
       const mesh = doc.meshes.length;
       doc.meshes.push({ primitives });
       node.mesh = mesh;
+      if (vertexOf) sceneMeshes.push({ path, node: id, mesh, vertexOf });
       meshes.push({
         path,
         positions,
@@ -977,6 +982,7 @@ function asset(
       });
     }
   if (!meshes.length) fail('no renderable meshes');
+  for (const hook of scenes) hook.scene!({ specs, document: doc, nodes: nodeIds, meshes: sceneMeshes, accessor, soft });
   for (const source of sources)
     for (const name of [source.path, source.roughness?.path, source.metallic?.path])
       if (name && !entries.has(name)) fail('missing texture ' + name);

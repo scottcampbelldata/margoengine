@@ -1,3 +1,4 @@
+import type { GLTFDocument } from '../../shared/gltf.js';
 import type { Specs } from './crate.js';
 
 /**
@@ -24,8 +25,33 @@ export interface LayerRead {
   issues: USDIssue[];
   signal?: AbortSignal;
 }
+/** A mesh of the scene, as the scene hook gets it. */
+export interface SceneMesh {
+  /** Prim path. */
+  path: string;
+  /** Index of its node in the document. */
+  node: number;
+  /** Index of its mesh in the document. */
+  mesh: number;
+  /** The authored point behind each expanded vertex. */
+  vertexOf: Uint32Array;
+}
+/** What the scene hook gets once every prim has its node. */
+export interface SceneRead {
+  specs: Specs;
+  document: GLTFDocument;
+  /** Node index by prim path. */
+  nodes: Map<string, number>;
+  meshes: SceneMesh[];
+  /** Adds a buffer and an accessor over it, and returns the accessor's index. */
+  accessor(data: Float32Array | Uint32Array | Uint16Array, type: string): number;
+  /** Lists something that could not be used; the file still opens. */
+  soft(message: string): void;
+}
 /** What an extension does: each hook runs at its step of the import. */
 export interface ExtensionHooks extends USDExtension {
   /** Turns the root layer into one flat spec map, in place of reading it as a single static layer. */
   compose?(read: LayerRead): Specs;
+  /** Adds to the finished scene: skins, clips and the like. */
+  scene?(read: SceneRead): void;
 }

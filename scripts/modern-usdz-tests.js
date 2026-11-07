@@ -123,6 +123,48 @@ try {
   // Exercise the example's actual file-selection path with the same synthetic archive.
   await page.locator('input[type=file]').setInputFiles('test-results/usdz-textured.usdz');
   await page.waitForFunction(() => document.querySelector('#status').textContent === 'Loaded 1 meshes');
+  // A real rigged file: its clip plays on the GPU, so two moments of it draw differently.
+  const rigged = await page.evaluate(async (data) => {
+    const { Engine } = await import('/packages/core/dist/index.js'),
+      { engineRuntime } = await import('/packages/core/dist/extension.js'),
+      { parseUSDZ } = await import('/packages/usdz/dist/index.js'),
+      { composition } = await import('/packages/usdz/dist/compose.js'),
+      { skeletons } = await import('/packages/usdz/dist/skel.js'),
+      { Animation } = await import('/packages/animation/dist/index.js');
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 256;
+    canvas.style.cssText = 'width:256px;height:256px';
+    document.body.append(canvas);
+    const engine = await Engine.create(canvas, {
+        backend: 'webgpu',
+        capacity: 64,
+        camera: { position: [0, 0.8, 3.5], target: [0, 0.7, 0] },
+      }),
+      gpuErrors = [];
+    engineRuntime(engine).gpu.addEventListener('uncapturederror', (event) => gpuErrors.push(event.error.message));
+    try {
+      const asset = await parseUSDZ(new Uint8Array(data), { extensions: [composition(), skeletons()] }),
+        model = await asset.create(engine),
+        animation = Animation.attach(model);
+      animation.play(asset.document.animations[0].name);
+      const frame = (time) => {
+        animation.seek(time);
+        engine.render({ culling: false });
+        return canvas.toDataURL();
+      };
+      const first = frame(0),
+        later = frame(0.7),
+        again = frame(0);
+      animation.dispose?.();
+      model.destroy();
+      return { moved: first !== later, repeats: first === again, gpuErrors };
+    } finally {
+      engine.dispose();
+      canvas.remove();
+    }
+  }, Array.from(await readFile('packages/usdz/tests/fixtures/real/rigged/RiggedFigure.usdz')));
+  assert.deepEqual(rigged, { moved: true, repeats: true, gpuErrors: [] });
+  assert.deepEqual(errors, []);
   await writeFile('test-results/modern-usdz.json', JSON.stringify({ hardware: browser.hardware, ...result }, null, 2));
   console.log('USDZ texture packing, real WebGPU pixels, bitmap teardown and file-picker demo passed');
 } finally {

@@ -8,5 +8,7 @@ copied, unchanged, except that `_common/teapot.usda` is left out for its size; n
 `../openusd.json` is what OpenUSD 26.08 reads from these files and from `../fuzz` (`tests/oracle/truth.py`, run in Blender
 5.3's Python). `../fuzz` scenes are random stand-ins made for this test; only their expected results come from OpenUSD.
 
+`rigged/` holds RiggedSimple.usdz and RiggedFigure.usdz, unchanged, from `test_assets/USDZ` of the same commit: models donated by Cesium for glTF testing, under the Creative Commons Attribution 4.0 International licence as their READMEs there state. `../skel/openusd.json` is what OpenUSD 26.08 computes for them and for `../skel/cases.usda`, a stand-in written for this test.
+
 Pixar's Kitchen Set and the UsdSkel examples and Apple's Quick Look gallery are not free to redistribute: they are read
 from a local download and never stored here. See `docs/whitepaper/reproduce.md`.
