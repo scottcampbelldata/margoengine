@@ -47,6 +47,20 @@ Back faces of single-sided materials (`doubleSided: false`) are culled by the GP
 
 The canvas is opaque. For a transparent canvas over HTML and CSS, attach `TransparentCanvas` from `@margoengine/environment`; core needs no option.
 
+## When an allocation fails
+
+`mesh.setGeometry()` allocates a geometry's GPU buffers the first time a mesh uses it, and larger instance storage as more
+meshes share it. If that throws, for example `GPU buffer limit` from a geometry bigger than `maxBufferSize`, nothing has
+changed: the error reaches you, the mesh keeps the geometry it had and keeps drawing it, every other mesh draws as before,
+and calling again once there is room works. `engine.createMesh()` does the same when the transform store cannot grow.
+
+Growing keeps the old buffers until the new ones exist, so for that moment a batch holds both. A `Renderer` passed as
+`fallback` must do the same: `add` on a geometry it already holds replaces the storage, new first, and a throw keeps the
+old one. WebGPU reports a real out-of-memory later, as a device error on the next frame, not as a throw from this call.
+
+`scene.dispose()` and `engine.dispose()` finish even when a plugin's `dispose` throws, then throw the first error.
+`rebootDevice()` tells every plugin through `onDeviceRestored` the same way.
+
 ## Camera for one render
 
 `engine.render({camera: anotherCamera, delta: 0})` draws the implicit scene through that camera. The camera supplied to `Engine.create` remains `engine.camera`; its fit animation does not advance during the alternate render. Before returning, core restores the primary camera's frustum, visible instances and batches, including when a pass throws. `engine.stats` keeps the counts of the frame it drew: an app that passes its own camera every frame reads what is on screen, package draws included. A pick changes neither count. Plugins receive one pre-update callback per call. A later ordinary render or pick uses the primary camera.

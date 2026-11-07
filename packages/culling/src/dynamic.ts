@@ -424,9 +424,10 @@ export class DynamicInstances implements EnginePlugin {
       throw new RangeError(
         `DynamicInstances capacity ${this.capacity} needs ${this.capacity * 96} bytes of storage; this device binds at most ${storage}`,
       );
+    // Retained first: `use` runs dispose when setup throws, and dispose releases only with `engine` set.
+    engine.retain(this.own);
     this.engine = engine;
     this.device = d;
-    engine.retain(this.own);
     loadCompatRoute(d, () => import('./compat.js'))?.then(({ dynamicRoute }) => {
       if (this.device === d) this.route = dynamicRoute(this.capacity);
     });

@@ -63,6 +63,14 @@ export type FrameCallback = (engine: Engine, delta: number) => void;
 const positionFields = ['x', 'y', 'z'] as const,
   scaleFields = ['sx', 'sy', 'sz'] as const;
 const owners = new WeakMap<EnginePlugin, Scene>();
+/** One step of a job that must finish whatever fails: its error waits in `errors`, and the job rethrows the first at the end. */
+const attempt = (errors: unknown[], run: () => void): void => {
+  try {
+    run();
+  } catch (error) {
+    errors.push(error);
+  }
+};
 
 /**
  * Live x/y/z view of a mesh's position (world units), rotation (Euler radians) or scale in the transform store. Writes
@@ -332,13 +340,18 @@ export class Scene {
   removePlugin(name: string): void {
     this.engine.removePlugin(name, this);
   }
-  /** Disposes this scene's plugins and meshes and removes the scene. The default scene lives as long as the engine. */
+  /**
+   * Disposes this scene's plugins and meshes and removes the scene. The default scene lives as long as the engine. A
+   * plugin that throws does not stop the rest: everything goes, then the first error is thrown.
+   */
   dispose(): void {
-    const engine = this.engine;
+    const engine = this.engine,
+      errors: unknown[] = [];
     if (this === engine.scene) throw typeError('Default scene: dispose the engine instead', 'scene');
     if (!engine.scenes.delete(this)) return;
-    for (const name of this.plugins.keys()) engine.removePlugin(name, this);
+    for (const name of this.plugins.keys()) attempt(errors, () => engine.removePlugin(name, this));
     for (const mesh of this.meshes.values()) engine.remove(mesh);
+    if (errors.length) throw errors[0];
   }
 }
 
@@ -506,14 +519,14 @@ export class Engine {
       this.renderer = next;
       this.watchDevice();
       previous.dispose(false);
+      // Every plugin hears of it, whatever one throws: a plugin not told keeps objects of the lost device.
+      const errors: unknown[] = [];
       for (const scene of this.scenes) {
         const outer = this.enter(scene);
-        try {
-          for (const plugin of scene.plugins.values()) plugin.onDeviceRestored?.(this);
-        } finally {
-          this.enter(outer);
-        }
+        for (const plugin of scene.plugins.values()) attempt(errors, () => plugin.onDeviceRestored?.(this));
+        this.enter(outer);
       }
+      if (errors.length) throw errors[0];
     })().finally(() => {
       this.recovery = undefined;
     });
@@ -619,13 +632,16 @@ export class Engine {
     parent?.check();
     if (parent && (parent.engine !== this || parent.scene !== scene)) throw typeError('Foreign parent', 'hierarchy');
     const id = this.free.pop() ?? this.next++;
-    // Double the store when full (seen and slots are rebuilt by the full collection the new mesh forces).
+    // Double the store when full (seen and slots are rebuilt by the full collection the new mesh forces). They are
+    // swapped in only once the store has grown: a frame after a failed growth reads the slots of the last collection.
     if (id >= this.store.capacity)
       try {
-        const size = Math.min(id * 2, 1 << 23);
-        this.seen = new Uint8Array(size);
-        this.slots = new Int32Array(size);
+        const size = Math.min(id * 2, 1 << 23),
+          seen = new Uint8Array(size),
+          slots = new Int32Array(size);
         this.store.grow(size);
+        this.seen = seen;
+        this.slots = slots;
         this.meshes.forEach(views);
       } catch (error) {
         this.next = id;
@@ -666,20 +682,24 @@ export class Engine {
     this.store.visible[mesh.id] = 0;
     this.free.push(mesh.id);
   }
+  /**
+   * Takes one reference to `geometry`, allocating or growing its storage. Everything that can fail comes first, so a
+   * throw leaves the engine, the batch and its GPU buffers as they were; a later call can retry.
+   */
   retain(geometry: Geometry): void {
-    let batch = this.batches.get(geometry);
-    if (!batch) {
-      this.batches.set(geometry, (batch = { geometry, instances: new Float32Array(), count: 0, references: 0 }));
-      this.batchList.push(batch);
-    }
+    const batch = this.batches.get(geometry) ?? { geometry, instances: new Float32Array(), count: 0, references: 0 };
     // Size instance storage to the meshes using this geometry, doubling as it grows, not to the engine capacity.
-    if (batch.references++ >= batch.instances.length / 24) {
-      const size = batch.references * 2;
-      batch.instances = new Float32Array(size * 24);
-      if (!this.recovery) {
-        this.renderer.remove(geometry);
-        this.renderer.add(geometry, size);
-      }
+    if (batch.references >= batch.instances.length / 24) {
+      const size = (batch.references + 1) * 2,
+        instances = new Float32Array(size * 24);
+      // On the renderer in use even during a restore: that one may fail and stay, and hooks run on the restored one.
+      this.renderer.add(geometry, size);
+      batch.instances = instances;
+      this.collected = -1;
+    }
+    if (!batch.references++) {
+      this.batches.set(geometry, batch);
+      this.batchList.push(batch);
     }
   }
   release(geometry: Geometry): void {
@@ -936,6 +956,8 @@ export class Engine {
     for (let m = 0; !full && m < this.materials.length; m++)
       for (let i = 0, values = this.materials[m]; !full && i < 8; i++) full = values[0].data[i] !== values[i + 1];
     if (full) {
+      // Until it finishes: a material that throws below leaves counts part-way and `materials`, which found it, empty.
+      this.collected = -1;
       for (const batch of this.batchList) batch.count = batch.mask = 0;
       this.unshadowed = 0;
       this.materialFrame++;
@@ -1109,26 +1131,15 @@ export class Engine {
     if (this.disposed || this.disposing) return;
     this.disposing = true;
     this.stop();
-    let failed = false,
-      failure: unknown;
-    const cleanup = (run: () => void) => {
-      try {
-        run();
-      } catch (error) {
-        if (!failed) {
-          failed = true;
-          failure = error;
-        }
-      }
-    };
+    const errors: unknown[] = [];
     for (const scene of this.scenes)
-      for (const name of scene.plugins.keys()) cleanup(() => this.removePlugin(name, scene));
-    for (const mesh of this.meshes.values()) cleanup(() => mesh.dispose());
+      for (const name of scene.plugins.keys()) attempt(errors, () => this.removePlugin(name, scene));
+    for (const mesh of this.meshes.values()) attempt(errors, () => mesh.dispose());
     this.callbacks.clear();
-    cleanup(() => this.renderer.dispose());
-    cleanup(() => this.store.dispose());
+    attempt(errors, () => this.renderer.dispose());
+    attempt(errors, () => this.store.dispose());
     this.disposed = true;
-    if (failed) throw failure;
+    if (errors.length) throw errors[0];
   }
 }
 // `using`: Symbol.dispose is dispose(), on runtimes that have the symbol (others keep plain dispose()).

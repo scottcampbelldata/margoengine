@@ -216,10 +216,17 @@ export class LodInstances implements EnginePlugin {
       throw new RangeError(
         `LodInstances of ${this.count} needs ${this.count * 96} bytes of storage; this device binds at most ${d.limits.maxStorageBufferBindingSize}`,
       );
+    // All levels or none, before `engine` is set: `use` runs dispose when setup throws, and dispose releases every level.
+    let held = 0;
+    try {
+      for (; held < this.levels.length; held++) engine.retain(this.levels[held].own);
+    } catch (error) {
+      while (held) engine.release(this.levels[--held].own);
+      throw error;
+    }
     this.engine = engine;
     this.device = d;
     this.compat = compatTier(d) === 'webgl2';
-    for (const level of this.levels) engine.retain(level.own);
   }
   registerPasses(graph: FrameGraph): void {
     graph.add({

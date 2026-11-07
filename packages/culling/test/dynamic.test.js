@@ -327,3 +327,12 @@ test('`world` is built only for what reads it: once per cull, on the shadow pass
   crowd.prepareShadow({ context: h.context });
   assert.equal(passes, 3, 'each cull needs its own fill');
 });
+
+test('a failed retain in setup releases nothing, and the error reaches the caller', () => {
+  const h = harness();
+  h.engine.retain = () => {
+    throw new RangeError('GPU buffer limit');
+  };
+  assert.throws(() => h.engine.use(new DynamicInstances({ geometry: box(), material: new PbrMaterial(), capacity: 8 })), /GPU buffer limit/);
+  assert.deepEqual(h.released, []);
+});

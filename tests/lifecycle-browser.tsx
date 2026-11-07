@@ -6,6 +6,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import RAPIER from '@dimforge/rapier3d-compat';
 import { Canvas, useFrame, useMargo, type MargoContextValue } from '@margoengine/react';
 import { Box } from '@margoengine/react/geometry';
+import { box } from '@margoengine/core';
 import { createStage, type Engine, type Stage } from '@margoengine/stage';
 import { Physics, type PhysicsBody } from '@margoengine/physics';
 
@@ -147,6 +148,33 @@ const lifecycle = {
     lifecycle.markDevice();
     marked!.destroy();
     return lifecycle.replacedSinceMark();
+  },
+  /**
+   * Loses the device with geometry changing all through the restore: on the lost device while the new one is awaited
+   * (a batch that grows, a new batch), and inside onDeviceRestored on the new one. Resolves what the frames then draw.
+   */
+  async loseDeviceSettingGeometry() {
+    const e = engine()!,
+      shared = box(),
+      meshes = [e.createMesh().setGeometry(shared), e.createMesh().setGeometry(shared)],
+      idle = [e.createMesh(), e.createMesh(), e.createMesh(), e.createMesh()];
+    e.use({
+      name: 'lifecycle-restore',
+      setup() {},
+      onDeviceRestored() {
+        idle[2].setGeometry(shared);
+        idle[3].setGeometry(box(2));
+      },
+    });
+    await frames(3);
+    const before = e.stats.visible;
+    lifecycle.markDevice();
+    marked!.destroy();
+    await marked!.lost; // the renderer's own handler ran first: the restore is under way, on the lost renderer
+    idle[0].setGeometry(shared);
+    idle[1].setGeometry(box(3));
+    const state = await lifecycle.replacedSinceMark();
+    return { ...state, added: e.stats.visible - before, meshes: meshes.length + idle.length };
   },
   /** Remembers the current device, for `replacedSinceMark` after a loss the test causes from outside the page. */
   markDevice() {

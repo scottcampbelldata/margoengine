@@ -181,6 +181,17 @@ try {
       await t.done(`C ${kind} destroy`);
       return lost;
     });
+  await scenario('C: geometry set during a restore draws on the new device', async () => {
+    const t = await open();
+    await t.run('stage');
+    const lost = await t.run('loseDeviceSettingGeometry');
+    assert.equal(lost.lost?.reason, 'destroyed', 'the device reports it was destroyed');
+    assert.equal(lost.replaced, true, 'a new device replaces the destroyed one');
+    assert.ok(lost.frames >= 4, 'frames keep coming after the device is back');
+    assert.equal(lost.added, 4, 'the four meshes given geometry during the restore are drawn');
+    await t.done('C geometry during restore');
+    return lost;
+  });
   // Every browser that gets this far is Chromium-based (the only family with WebGPU here), so it has a GPU process.
   await scenario('C: stage recovers from a GPU process crash', async () => {
     const t = await open();

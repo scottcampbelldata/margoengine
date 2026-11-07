@@ -39,6 +39,7 @@ export interface Mesh {
   setRotation(value: Vec3): this;
   setQuaternion(value: readonly number[]): this;
   setParent(parent: Mesh | null): this;
+  /** A throw (GPU buffer limit, allocation) changes nothing: the mesh keeps its geometry and keeps drawing, and a retry works. */
   setGeometry(value: Geometry | null): this;
   setMaterial(value: PbrMaterial): this;
   dispose(): void;

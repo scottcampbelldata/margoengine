@@ -121,6 +121,14 @@ the collection after `engine.render({ camera })`, and the one a pick runs, overw
 core's private restore after every plugin hook, and a package would have to wrap `engine.render`. Cost: core 21,468 -> 21,487 B gzip,
 core + stage 22,859 -> 22,878 B gzip. It adds no feature.
 
+**Bug fix, failed allocations (Scott, 2026-11-07, "if its a bug it needs fixed if we go over thats fine"):** `Engine.retain` allocates
+before it changes anything, `Renderer.add` replaces a held geometry new first, and restore, scene disposal, store growth and instance
+collection no longer leave state half-changed when a step throws. No package can hold it: the batch table, the reference counts and the
+renderer's buffers are core's private state, and `Mesh.setGeometry` runs inside core. Failure prevented: after a failed allocation the
+next frame threw a `TypeError` and meshes already drawing stopped. Cost: core 21,487 -> 21,541 B gzip, core + stage 22,878 -> 22,930 B
+gzip. The core cap moved to 21,542 B on Scott's ruling, one over the measurement; the 21,504 B it was documented at was never what the
+build enforced (`21 * 1024 + 512` is 22,016 B), so the enforced cap went down. It adds no feature.
+
 ## Names exported by more than one package
 
 A name declared and exported by two packages must mean the same thing, or be renamed. Decisions:

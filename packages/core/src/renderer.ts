@@ -143,6 +143,8 @@ export interface RenderTarget {
  * Backend contract the engine draws through: core's WebGPU renderer, or an `EngineOptions.fallback` such as WebGL2.
  * `add` sizes a geometry's instance storage (`capacity` instances), `render` draws one frame (`delta` in seconds), and
  * `onLost` reports device loss. `view` draws into that rectangle and keeps earlier views' color when `index` is not 0.
+ * `add` on a geometry it already holds replaces its storage: the new storage is made first and the old freed after, so
+ * a throw leaves the old storage in use and nothing new allocated.
  */
 export interface Renderer {
   readonly backend: 'webgpu' | 'webgl2';
@@ -404,6 +406,7 @@ export class GPURenderer implements Renderer {
         usage: GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
       });
       buffers.push(instance);
+      this.remove(geometry);
       this.resources.set(geometry, { vertex, index, instance, frame: -1 });
     } catch (error) {
       for (const buffer of buffers) buffer.destroy();

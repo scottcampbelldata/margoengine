@@ -15,6 +15,17 @@
 
 - `engine.stats` now reads the frame last drawn. After `engine.render({ camera })` with another camera, `visible` and `drawCalls` used to read the engine camera's view and lose what packages drew, so an app passing its own camera every frame read counts for a view it never showed. A pick no longer changes either count.
 
+### Failed allocations
+
+- `mesh.setGeometry()` that throws now changes nothing. A geometry over the GPU buffer limit used to leave a half-made batch: the retry returned without buffers and the next frame threw a `TypeError`. A failed growth destroyed the buffers of meshes already drawing, so they stopped too. Now the error reaches you, the mesh keeps drawing its old geometry and a retry works. While a batch grows it holds its old and new buffers for a moment.
+- `Renderer.add` on a geometry it already holds now replaces its storage, new first, and a throw keeps the old one; `engine.retain` no longer calls `remove` first. Core's renderer and `@margoengine/webgl` do this, and a custom `fallback` renderer must too.
+- `engine.retain` growing a batch no longer blanks the instances already drawn.
+- Geometry set during a device restore reaches the right renderer: inside `onDeviceRestored` it used to get no buffers, or too small a buffer, and the next frame failed.
+- One plugin throwing in `onDeviceRestored` no longer leaves the plugins after it on the lost device, and one throwing in `dispose` no longer stops `scene.dispose()`, which left the other plugins and the scene's meshes behind. The first error still reaches you.
+- An invalid material now fails every frame until it is fixed. It failed once, then the next frame drew part of the batch with no error, and the meshes after it stayed missing even once the material was fixed.
+- `engine.createMesh()` failing to grow the store keeps the engine's slot tables, which a later frame could read and crash on.
+- `LodInstances` and `DynamicInstances` release exactly what they took when `setup` fails.
+
 ### Packaging
 
 - A page that imports `margoengine/react` no longer gets the Draco and Basis Wasm in its build. Moved out of that entry: `Model` and `Gltf` (now `margoengine/react/gltf-pro`), `Fbx` (`/fbx`), `Animation` (`/animation`) and `BatchedMesh`, `BatchedItem`, `MeshTransmissionMaterial` (`/materials`).

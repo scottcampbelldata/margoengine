@@ -730,6 +730,15 @@ a restore-specific coded error. The WebGL2 compatibility device feeds its contex
 Tests destroy devices and GPU processes during lifecycle checks, compare every visual demo before and after loss,
 exercise scenes and multi-view water, restore compatibility devices, and include restore events in proof stories.
 
+A step that can throw runs before any state changes (2026-11-07). `Engine.retain` makes the instance array and calls `Renderer.add`
+first, then swaps the array, counts the reference and registers the batch; `Renderer.add` frees a held geometry's old buffers only after
+the new ones exist. It always allocates on the renderer in use, so during a restore that is the lost one, whose buffers go with it (a
+restore that fails leaves it in place with every geometry held), and inside `onDeviceRestored` the new one. Restore hooks and scene
+disposal run to the end and rethrow the first error. A full instance collection clears `collected` first, so one that throws repeats.
+Evidence: `tests/deep-core-allocation-failure.test.js` on a fake device; on a real one, the lifecycle scenario that sets geometry on a
+destroyed device and in the hook. Missing: `createBuffer` does not throw on a real out-of-memory, it reports later through
+`uncapturederror`, so no check exercises a true GPU out-of-memory and core does not roll one back. It surfaces as a `gpu-lost` error.
+
 Known rendering gaps:
 
 - WebGL preview size is stated inconsistently in older public files; current generated size records are authoritative.
@@ -932,7 +941,7 @@ count phrases against `docs/catalog.json`. It does not validate every size, timi
 cite generated records and retain evidence status. An older WebGL preview-size inconsistency demonstrates why this
 scope matters. So does the audit of 2026-11-06: the 44 B of `Engine.renderTarget` reached `README.md`, `site/index.html` and
 `docs/limits.md`, while 11 other files kept 22,815 B or older, `claims.md` among them, and a replace of the current figure had
-rewritten the dated 22,189 B of the 2026-10-30 cleanup in `docs/limits.md`. Core alone read 21,134 B there; it is 21,487 B.
+rewritten the dated 22,189 B of the 2026-10-30 cleanup in `docs/limits.md`. Core alone read 21,134 B there; it is 21,541 B.
 
 The benchmarking protocol uses AC power, a shared GPU-resource lock, a whole-machine idle gate, warmup, repeated
 measurements, between-case load checks, fixed browser/canvas conditions, and a spread validity limit. Defaults at the
@@ -995,6 +1004,7 @@ The following remain technical gaps, not permission to weaken a check:
 7. Compatibility CPU compute runs 13 to 41 times slower without `unsafe-eval` (interpreter); broad CSP prose must remain scoped to the native engine.
 8. Compatibility path-tracer kernels remain outside the practical shader-compilation budget.
 9. Visual baselines do not cover every supported GPU/browser/OS combination.
+   A true GPU out-of-memory is not exercised either: failed allocations are proved on the throwing paths only (section 3.6).
 10. The WebGL preview size was inconsistent across older public sources; current generated evidence should replace
     every stale statement.
 11. One duplicate-window comment says eight lines while implementation and conventions use six.

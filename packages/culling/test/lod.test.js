@@ -85,3 +85,16 @@ test('on the WebGL2 layer every shown instance draws the first level, without co
   assert.equal(args[1], 2);
   assert.equal(h.pipelines.filter((p) => p.compute).length, 1, 'compiled, never dispatched');
 });
+
+test('a level that cannot be retained releases the levels taken, once each, and the error reaches the caller', () => {
+  const h = harness(),
+    retained = [],
+    released = [];
+  h.engine.retain = (geometry) => {
+    if (retained.length === 1) throw new RangeError('GPU buffer limit');
+    retained.push(geometry);
+  };
+  h.engine.release = (geometry) => released.push(geometry);
+  assert.throws(() => h.engine.use(new LodInstances(options())), /GPU buffer limit/);
+  assert.deepEqual(released, retained, 'only what was retained is released');
+});

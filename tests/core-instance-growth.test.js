@@ -24,7 +24,7 @@ test('instance storage grows with the meshes using a geometry, not with engine c
       meshes = [];
     for (let i = 0; i < 5; i++) meshes.push(engine.createMesh().setGeometry(geometry));
     // 1 mesh -> room for 2, 3 -> 6: two allocations instead of one 100,000-instance buffer.
-    assert.deepEqual(calls, [['remove'], ['add', 2], ['remove'], ['add', 6]]);
+    assert.deepEqual(calls, [['add', 2], ['add', 6]]);
     engine.render();
     assert.equal(engine.stats.visible, 5);
     for (const mesh of meshes) mesh.dispose();

@@ -151,6 +151,7 @@ export class GLRenderer implements Renderer {
     const gl = this.gl,
       buffers: WebGLBuffer[] = [];
     if (this.recovering && gl.isContextLost()) {
+      this.remove(geometry);
       this.resources.set(geometry, { vao: null, buffers, instance: null, capacity });
       return;
     }
@@ -185,6 +186,8 @@ export class GLRenderer implements Renderer {
           'failed',
           `GL buffer failed (error ${error}); use a smaller geometry or check the context`,
         );
+      // Replaces a geometry already held, last of all: a throw above keeps the old buffers in use (Renderer.add).
+      this.remove(geometry);
       this.resources.set(geometry, { vao, buffers, instance, capacity });
     } catch (error) {
       for (const buffer of buffers) gl.deleteBuffer(buffer);
