@@ -274,6 +274,70 @@ console.log(interest.stats(client?.player ?? 0)); // { inScope, sent, deferred, 
 
 `view` also gets the state the client confirmed as a third argument, so a `view` of your own can see what would cost nothing to send.
 
+## Correction smoothing
+
+When a snapshot corrects the prediction, `client.predicted` jumps to the truth at once. `CorrectionSmoother` (its own entry, `@margoengine/netcode/smoothing`) gives you a state to draw in which that jump is blended away over a few frames, while the simulation stays exact: every number has an offset that shrinks over time, drawn as value plus offset, and a correction folds into the offset so nothing moves on screen at that moment.
+
+```ts
+import { defineGame, defineSchema, GameClient, GameServer, LoopbackNetwork } from 'margoengine/netcode';
+import { CorrectionSmoother } from 'margoengine/netcode/smoothing';
+
+const schema = defineSchema({
+  types: {
+    Input: { x: 'f32' },
+    Box: { x: 'f32', heading: { type: 'f32', interpolate: 'angle' } },
+    State: { boxes: { type: 'map', of: 'Box', maxSize: 8 } },
+  },
+} as const);
+const game = defineGame({
+  schema,
+  state: 'State',
+  input: 'Input',
+  tickRate: 30,
+  initial: () => ({ boxes: new Map() }),
+  join: (state, id) => void state.boxes.set(id, { x: 0, heading: 0 }),
+  step(state, inputs, _tick, dt) {
+    for (const [id, input] of inputs) {
+      const box = state.boxes.get(id);
+      if (box) box.x += input.x * dt;
+    }
+  },
+});
+
+const network = new LoopbackNetwork({ latency: 40 });
+const now = () => network.time;
+const server = new GameServer(game, { now });
+network.listen().onconnection = (connection) => server.accept(connection);
+const tick = () => {
+  network.advance(1000 / 60);
+  if (network.time >= (server.tick + 1) * game.tickMs) server.step();
+};
+const joining = GameClient.join(game, network.connect(), { now, input: () => ({ x: 1 }) });
+let joined = false;
+joining.then(() => (joined = true));
+while (!joined) {
+  tick();
+  await null;
+}
+const client = await joining;
+const smooth = new CorrectionSmoother(client, { now, halfLife: 50, snap: 10 });
+for (let frame = 0; frame < 120; frame++) {
+  tick();
+  if (frame === 60) server.state.boxes.get(client.player)!.x += 2; // something the client cannot predict
+  client.update();
+  const drawn = smooth.state(); // draw this; client.predicted stays exact
+  if (frame % 20 === 0) console.log(drawn.boxes.get(client.player)?.x, 'left to blend', smooth.error);
+}
+```
+
+- Every field the schema interpolates eases: `'linear'` numbers in a line, `'angle'` numbers the short way round. Integers, booleans and strings step at once, as they do in `interpolated()`. Maps, arrays, optionals and nested structs are followed; an entity that appears or goes gets no offset.
+- `halfLife` (default 50 ms) is how long an error takes to halve, by the clock, so the blend is the same at any frame rate.
+- `fast: { from, to, halfLife }` blends in a second, shorter half life for errors from `from` to `to` world units, so a small error eases gently and a big one does not drag on. The numbers of one struct shrink as one vector, keeping its direction.
+- `snap` (default never) is the distance over which an error jumps instead of blending: a teleport or a respawn. `smooth.reset()` clears everything by hand.
+- `smooth.state()` returns `client.predicted` itself once settled, so a settled frame allocates nothing. Do not write to what it returns. `smooth.error` is what is left. `close()` or `using` stops it.
+
+A `GameClient` also has `oncorrection(before, after)`, called with the predicted state just before and just after each correction: the raw event, for your own smoothing or for logging how often prediction goes wrong.
+
 ## Transports and the Node server
 
 Each transport is its own entry, so an app loads only the one it uses.

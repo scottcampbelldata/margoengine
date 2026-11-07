@@ -90,6 +90,11 @@ export class GameClient<State, Input> {
   };
   /** This client's player id (0 until welcomed). */
   player = 0;
+  /**
+   * Called when a snapshot changes the prediction, with the predicted state just before and just after, at the same
+   * tick. `CorrectionSmoother` from `@margoengine/netcode/smoothing` uses it; both states are for reading only.
+   */
+  oncorrection: ((before: State, after: State) => void) | null = null;
   private readonly clock: ClockSync;
   private readonly now: () => number;
   private readonly keep: number;
@@ -323,10 +328,12 @@ export class GameClient<State, Input> {
   private reconcile(tick: number, state: State): void {
     const game = this.game,
       bytes = game.schema.encode(game.stateType, state);
-    if (this.predictedState === undefined || tick > this.predictedTick) {
+    const before = this.predictedState;
+    if (before === undefined || tick > this.predictedTick) {
       this.predictedState = game.schema.decode(game.stateType, bytes) as State;
       this.predictedTick = tick;
       this.predictions.set(tick, bytes);
+      if (before !== undefined) this.oncorrection?.(before, this.predictedState);
       return;
     }
     const predicted = this.predictions.get(tick);
@@ -341,6 +348,7 @@ export class GameClient<State, Input> {
       this.simulate(t, this.inputs.get(t));
       this.stats.replayed++;
     }
+    this.oncorrection?.(before, this.predictedState as State);
   }
 
   private simulate(tick: number, input: Input | undefined): void {

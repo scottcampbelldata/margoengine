@@ -1722,6 +1722,10 @@
       "types": "./dist/netcode/rooms.d.ts",
       "import": "./dist/netcode/rooms.js"
     },
+    "./netcode/smoothing": {
+      "types": "./dist/netcode/smoothing.d.ts",
+      "import": "./dist/netcode/smoothing.js"
+    },
     "./netcode/interest": {
       "types": "./dist/netcode/interest.d.ts",
       "import": "./dist/netcode/interest.js"

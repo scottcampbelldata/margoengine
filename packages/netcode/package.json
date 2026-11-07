@@ -47,6 +47,10 @@
       "types": "./dist/rooms.d.ts",
       "import": "./dist/rooms.js"
     },
+    "./smoothing": {
+      "types": "./dist/smoothing.d.ts",
+      "import": "./dist/smoothing.js"
+    },
     "./interest": {
       "types": "./dist/interest.d.ts",
       "import": "./dist/interest.js"

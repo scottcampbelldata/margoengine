@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10510323,
+  "total": 10512081,
   "history": [
     {
       "date": "2026-10-24",
@@ -3566,6 +3566,12 @@
       "commit": "84c4ec765",
       "reason": "new optional entry @margoengine/weather/snow (Snow: snow with depth on core meshes); nothing else grows",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "3dd29e159",
+      "reason": "netcode: new optional entry ./smoothing, and oncorrection on GameClient (batch 114 job 2)",
+      "grew": 1
     }
   ],
   "items": {
@@ -3995,6 +4001,7 @@
     "@margoengine/netcode/node": 6457,
     "@margoengine/netcode/rollback": 3437,
     "@margoengine/netcode/rooms": 5505,
+    "@margoengine/netcode/smoothing": 1758,
     "@margoengine/netcode/webrtc": 998,
     "@margoengine/netcode/websocket": 1076,
     "@margoengine/oit": 3808,

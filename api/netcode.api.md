@@ -132,6 +132,7 @@ export class GameClient<State, Input> {
     readonly connection: Connection;
     readonly stats: GameClientStats;
     player: number;
+    oncorrection: ((before: State, after: State) => void) | null;
     private constructor();
     static join<State, Input>(game: Game<State, Input>, connection: Connection, options: GameClientOptions<Input>): Promise<GameClient<State, Input>>;
     get tick(): number;

@@ -4,6 +4,7 @@
 
 ### Networking
 
+- `@margoengine/netcode/smoothing`: `CorrectionSmoother` blends prediction errors away over a few frames instead of snapping, while the simulation stays exact. `GameClient` gains `oncorrection(before, after)`.
 - `@margoengine/netcode/interest`: `InterestManager` sends each client only the entities near it, by accumulated priority, within a byte budget per snapshot. The `view` of `GameServer` now also gets the state the client confirmed.
 - `GameClient.join` no longer waits for ever when its first ping is lost.
 - `@margoengine/net/timeline`: one home for time-ordered snapshots. `SnapshotBuffer`, and `GameClient`, `LagCompensation` and angle fields in `@margoengine/netcode`, all sit on it. `GameClient` takes an `AdaptiveDelay` as `interpolationDelay`. `@margoengine/net` no longer asks for core as a peer.
