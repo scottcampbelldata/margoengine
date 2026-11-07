@@ -8,7 +8,7 @@
 // sleeps when all its bodies are ready. A sleeping island is a ring of bodies: waking any one wakes the ring in time
 // proportional to its size, and until then it is on no list a step walks, so sleepers cost nothing.
 //
-// In P1 two bodies touch when their fat boxes overlap. `touching` is where the narrow phase's flag goes in P2.
+// Two bodies touch when their pair holds contact points. Those reach a little past the surfaces, as far as a step can go.
 use crate::layout::*;
 use crate::math::*;
 use crate::world::{NONE, World};
@@ -69,10 +69,10 @@ impl World {
         (self.uu(COLLIDER_BODY, self.uu(PAIR_A, at) as usize) as usize, self.uu(COLLIDER_BODY, self.uu(PAIR_B, at) as usize) as usize)
     }
 
-    /// True when a pair's bodies touch. The narrow phase of P2 replaces this with its flag.
+    /// True when a pair's bodies touch.
     #[inline(always)]
-    fn touching(&self, _row: u32) -> bool {
-        true
+    fn touching(&self, row: u32) -> bool {
+        self.uu(PAIR_CONTACTS, row as usize) != 0
     }
 
     /// Wakes a sleeping body and the whole ring it sleeps in; does nothing to one that is awake.

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10463136,
+  "total": 10473010,
   "history": [
     {
       "date": "2026-10-24",
@@ -3482,6 +3482,12 @@
       "commit": "b87b0ecaf",
       "reason": "new optional entry @margoengine/behavior/eqs",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "6a0795daf",
+      "reason": "physics/next 38,225 to 47,811 B: the deflated kernel grows 23,318 to 32,908 B for GJK, signed volumes, the expanding polytope and the round-shape contact paths, batch 124 job 2; the entry's JavaScript does not change",
+      "grew": 1
     }
   ],
   "items": {
@@ -3914,7 +3920,7 @@
     "@margoengine/oit/moments": 4197,
     "@margoengine/oit/vfx": 486,
     "@margoengine/physics": 19679,
-    "@margoengine/physics/next": 39372,
+    "@margoengine/physics/next": 49246,
     "@margoengine/physics2d": 8199,
     "@margoengine/physics2d/outline": 2524,
     "@margoengine/pixel": 4664,

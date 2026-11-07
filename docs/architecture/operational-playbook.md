@@ -207,7 +207,7 @@ Known kernel gaps:
 
 ### 1.7 Physics kernel
 
-A second Rust kernel, the own rigid-body solver, is being built behind `@margoengine/physics/next`. Rapier stays the default until the switch. It shares the transform kernel's pattern, not its code. Its narrow phase runs once a step, before islands, over pairs with an awake body: manifolds of up to four points live in rows of the world, so a snapshot carries them, and hulls are rows too, held for the world's life.
+A second Rust kernel, the own rigid-body solver, is being built behind `@margoengine/physics/next`. Rapier stays the default until the switch. It shares the transform kernel's pattern, not its code. Its narrow phase runs once a step, before islands, over pairs with an awake body: manifolds of up to four points live in rows of the world, so a snapshot carries them, and hulls are rows too, held for the world's life. Boxes and hulls go by the separating axis test; anything with a ball or capsule goes by GJK distance and an expanding polytope. Two bodies count as touching, for islands and sleep, when their pair holds points, no longer when their fat boxes overlap. Evidence: both paths against brute force in doubles on random poses, native; Wasm through the replay.
 
 | File | Role |
 | --- | --- |

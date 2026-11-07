@@ -87,3 +87,23 @@ test('many hulls grow the world and keep what is in it', async () => {
   assert.equal(world.columns.positionY[body], 7);
   assert.equal(world.columns.hullFaces[39], 5);
 });
+
+test('a ball and a capsule touch the floor through the same contacts', async () => {
+  await loadKernel();
+  const world = new KernelWorld(4);
+  world.setGravity(0, 0, 0);
+  const floor = world.addBody('fixed'),
+    ball = world.addBody('dynamic'),
+    capsule = world.addBody('dynamic');
+  world.addCollider(floor, 'box', [5, 0.5, 5], { density: 0 });
+  world.addCollider(ball, 'ball', [0.5]);
+  world.addCollider(capsule, 'capsule', [0.25, 0.5]);
+  world.columns.positionX[ball] = -2;
+  world.columns.positionY[ball] = 0.99;
+  world.columns.positionX[capsule] = 2;
+  world.columns.positionY[capsule] = 1.24;
+  world.step(1 / 60);
+  const counts = world.contacts().map((contact) => contact.points.length);
+  assert.deepEqual(counts.sort(), [1, 1]);
+  assert.ok(Math.abs(world.contacts()[0].points[0].separation + 0.01) < 1e-4);
+});

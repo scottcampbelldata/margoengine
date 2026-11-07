@@ -268,7 +268,7 @@ world.wake(body);
 world.columns.linearX[body] = 2;
 ```
 
-Each step then finds contact points between the near pairs of boxes and hulls: `world.contacts()` returns one manifold a pair, up to four points that share a normal from the first collider to the second. A `hull` is any closed convex polyhedron, added once with `world.addHull(vertices, faces)` and shared by every collider that names its row; its mass, centre and inertia come from the faces. Points follow the separating axis test: the touching faces are clipped against each other, so a box resting on a box has all four corners from its first step. Bodies do not push each other yet: that is job 4 of this batch.
+Each step then finds contact points between the near pairs of every shape: `world.contacts()` returns one manifold a pair, up to four points that share a normal from the first collider to the second. A `hull` is any closed convex polyhedron, added once with `world.addHull(vertices, faces)` and shared by every collider that names its row; its mass, centre and inertia come from the faces. Points follow the separating axis test: the touching faces are clipped against each other, so a box resting on a box has all four corners from its first step. A ball or capsule against anything goes by distance (GJK), and by the expanding polytope when its core is inside; a capsule lying along a face or another capsule gets two points. Bodies do not push each other yet: that is job 4 of this batch.
 
 ```ts
 import {KernelWorld, loadKernel} from 'margoengine/physics/next';

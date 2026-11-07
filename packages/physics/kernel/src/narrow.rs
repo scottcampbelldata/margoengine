@@ -2,6 +2,7 @@
 // as Gregorius 2015 sets out: find the touching features, then clip one face against the side planes of the other, so a
 // box resting on a box has all its points from the first frame, with no artificial torque while they gather.
 use crate::broad::MARGIN;
+use crate::gjk::{Posed, Segment, epa, gjk};
 use crate::hull::{BoxData, Poly, box_poly};
 use crate::layout::*;
 use crate::math::*;
@@ -16,6 +17,12 @@ const CLIP: usize = 2 * MAX_FACE_EDGES as usize;
 const ID_FLIP: u32 = 1 << 31;
 const ID_CLIPPED: u32 = 1 << 30;
 const ID_EDGES: u32 = 1 << 29;
+// Round shapes: one point, or the two ends of what a capsule shares with a face or another capsule.
+const ID_END: u32 = 1 << 28;
+/// A capsule lies along a face or another capsule when the cosine between the normals is past this, about 2.6 degrees.
+const PARALLEL: f32 = 0.999;
+/// Centres closer than this have no direction between them.
+const COINCIDENT: f32 = 1e-6;
 
 /// One point of a manifold, in world space: the point on each surface and the gap along the normal.
 #[derive(Clone, Copy, Debug)]
@@ -202,6 +209,187 @@ pub fn collide_polys(a: &Poly, pose_a: Pose, b: &Poly, pose_b: Pose, limit: f32,
     }
 }
 
+/// A round shape: a ball is a point with a radius, a capsule a segment with one (Gregorius 2015), in world space.
+#[derive(Clone, Copy)]
+struct Round {
+    p: V3,
+    q: V3,
+    radius: f32,
+}
+
+/// Any unit vector square to `v`.
+fn square_to(v: V3) -> V3 {
+    let a = v.abs();
+    let axis = if a.x <= a.y && a.x <= a.z {
+        v3(1.0, 0.0, 0.0)
+    } else if a.y <= a.z {
+        v3(0.0, 1.0, 0.0)
+    } else {
+        v3(0.0, 0.0, 1.0)
+    };
+    let c = v.cross(axis);
+    let squared = c.dot(c);
+    if squared > 0.0 { c.scale(1.0 / sqrt(squared)) } else { v3(0.0, 1.0, 0.0) }
+}
+
+/// Two round shapes: the closest points of their cores, with a sphere around each. Two capsules lying side by side get
+/// two points, the first core clipped against the ends of the second, or they would spin on one (Gregorius 2015).
+fn collide_rounds(a: Round, b: Round, limit: f32, out: &mut Manifold) {
+    out.count = 0;
+    let (s, t) = closest_on_segments(a.p, a.q, b.p, b.q);
+    let (axis_a, axis_b) = (a.q.sub(a.p), b.q.sub(b.p));
+    let (on_a, on_b) = (a.p.add(axis_a.scale(s)), b.p.add(axis_b.scale(t)));
+    let between = on_b.sub(on_a);
+    let distance = sqrt(between.dot(between));
+    let radii = a.radius + b.radius;
+    if distance - radii > limit {
+        return;
+    }
+    let normal = if distance > COINCIDENT {
+        between.scale(1.0 / distance)
+    } else {
+        // Cores that meet: across both when they cross, else any way square to the one there is, else up.
+        let c = axis_a.cross(axis_b);
+        if c.dot(c) > 1e-10 {
+            c.scale(1.0 / sqrt(c.dot(c)))
+        } else if axis_a.dot(axis_a) > 0.0 {
+            square_to(axis_a)
+        } else if axis_b.dot(axis_b) > 0.0 {
+            square_to(axis_b)
+        } else {
+            v3(0.0, 1.0, 0.0)
+        }
+    };
+    out.normal = normal;
+    let (length_a, length_b) = (axis_a.dot(axis_a), axis_b.dot(axis_b));
+    if length_a > 0.0 && length_b > 0.0 {
+        let cosine = axis_a.dot(axis_b);
+        if cosine * cosine > PARALLEL * PARALLEL * length_a * length_b {
+            // Where B's core lies along A's.
+            let along = |x: V3| x.sub(a.p).dot(axis_a) / length_a;
+            let (low, high) = (along(b.p), along(b.q));
+            let (low, high) = if low < high { (low, high) } else { (high, low) };
+            let (low, high) = (if low < 0.0 { 0.0 } else { low }, if high > 1.0 { 1.0 } else { high });
+            if high > low {
+                let mut count = 0;
+                for (end, at) in [low, high].iter().enumerate() {
+                    let on_core = a.p.add(axis_a.scale(*at));
+                    let t = on_core.sub(b.p).dot(axis_b) / length_b;
+                    let t = if t < 0.0 { 0.0 } else if t > 1.0 { 1.0 } else { t };
+                    let across = b.p.add(axis_b.scale(t));
+                    let separation = across.sub(on_core).dot(normal) - radii;
+                    if separation <= limit {
+                        let on_a = on_core.add(normal.scale(a.radius));
+                        let on_b = across.sub(normal.scale(b.radius));
+                        out.points[count] = Point { on_a, on_b, separation, id: ID_END | end as u32 };
+                        count += 1;
+                    }
+                }
+                out.count = count;
+                if count > 0 {
+                    return;
+                }
+            }
+        }
+    }
+    out.points[0] = Point { on_a: on_a.add(normal.scale(a.radius)), on_b: on_b.sub(normal.scale(b.radius)), separation: distance - radii, id: 0 };
+    out.count = 1;
+}
+
+/// A round shape and a polyhedron. The core goes to GJK: shallow, its distance to the polyhedron gives the point; deep,
+/// with the core inside, the expanding polytope gives the way out (Gregorius 2015 uses a SAT there; this kernel takes the
+/// plan's route, which also serves shapes with no faces). Normal from the round shape to the polyhedron, in world space.
+fn collide_round_poly(round: Round, poly: &Poly, pose: Pose, limit: f32, out: &mut Manifold) {
+    out.count = 0;
+    let core = Segment { p: pose.unapply(round.p), q: pose.unapply(round.q) };
+    let posed = Posed { shape: poly, pose: Pose { p: v3(0.0, 0.0, 0.0), q: Q::IDENTITY } };
+    let first = core.p.sub(poly.center);
+    let found = gjk(&core, &posed, first, limit + round.radius);
+    if found.apart {
+        return;
+    }
+    let (normal, on_core, on_poly, gap);
+    if !found.overlap && found.distance > COINCIDENT {
+        let between = found.on_b.sub(found.on_a);
+        normal = between.scale(1.0 / found.distance);
+        on_core = found.on_a;
+        on_poly = found.on_b;
+        gap = found.distance;
+    } else {
+        let Some(way_out) = epa(&core, &posed, &found) else { return };
+        normal = way_out.normal;
+        on_core = way_out.on_a;
+        on_poly = way_out.on_b;
+        gap = -way_out.depth;
+    }
+    let separation = gap - round.radius;
+    if separation > limit {
+        return;
+    }
+    out.normal = pose.q.rotate(normal);
+    if core.p != core.q && edge_on_face(&core, poly, normal, round.radius, limit, pose, out) {
+        return;
+    }
+    let surface = on_core.add(normal.scale(round.radius));
+    out.points[0] = Point { on_a: pose.apply(surface), on_b: pose.apply(on_poly), separation, id: 0 };
+    out.count = 1;
+}
+
+/// When a capsule lies against a face, its core clipped against the face's side planes gives two points at once
+/// (Gregorius 2015, slides 76 to 78). All in the polyhedron's frame until the points go out. False when no face faces it.
+fn edge_on_face(core: &Segment, poly: &Poly, normal: V3, radius: f32, limit: f32, pose: Pose, out: &mut Manifold) -> bool {
+    let (mut face, mut best) = (0, PARALLEL);
+    let mut found = false;
+    for f in 0..poly.faces {
+        let along = -poly.normal(f).dot(normal);
+        if along > best {
+            best = along;
+            face = f;
+            found = true;
+        }
+    }
+    if !found {
+        return false;
+    }
+    let n = poly.normal(face);
+    let (mut p, mut q) = (core.p, core.q);
+    let start = poly.first(face);
+    let mut e = start;
+    loop {
+        let next = poly.next(e);
+        let (a, b) = (poly.vertex(poly.origin(e)), poly.vertex(poly.origin(next)));
+        let side = b.sub(a).cross(n);
+        let (dp, dq) = (side.dot(p.sub(a)), side.dot(q.sub(a)));
+        if dp > 0.0 && dq > 0.0 {
+            return false;
+        }
+        if dp > 0.0 {
+            p = p.add(q.sub(p).scale(dp / (dp - dq)));
+        } else if dq > 0.0 {
+            q = q.add(p.sub(q).scale(dq / (dq - dp)));
+        }
+        e = next;
+        if e == start {
+            break;
+        }
+    }
+    let offset = poly.plane(face);
+    let mut count = 0;
+    for (end, at) in [p, q].iter().enumerate() {
+        let height = n.dot(*at) - offset;
+        let separation = height - radius;
+        if separation <= limit {
+            let on_face = at.sub(n.scale(height));
+            let surface = at.sub(n.scale(radius));
+            out.points[count] = Point { on_a: pose.apply(surface), on_b: pose.apply(on_face), separation, id: ID_END | end as u32 };
+            count += 1;
+        }
+    }
+    out.count = count;
+    out.normal = pose.q.rotate(n.scale(-1.0));
+    count > 0
+}
+
 impl World {
     /// A collider's frame in world space.
     #[inline(always)]
@@ -254,15 +442,43 @@ impl World {
         sqrt(offset.dot(offset)) + radius
     }
 
-    /// One manifold between two colliders.
+    /// A ball or capsule collider in world space.
+    #[inline(always)]
+    fn round(&self, c: usize) -> Round {
+        let pose = self.collider_pose(c);
+        let radius = self.s(COLLIDER_A, c);
+        if self.uu(COLLIDER_SHAPE, c) == SHAPE_BALL {
+            return Round { p: pose.p, q: pose.p, radius };
+        }
+        let along = pose.q.rotate(v3(0.0, self.s(COLLIDER_B, c), 0.0));
+        Round { p: pose.p.sub(along), q: pose.p.add(along), radius }
+    }
+
+    /// One manifold between two colliders, from `a` to `b`.
     pub fn collide(&self, a: usize, b: usize, limit: f32, out: &mut Manifold) {
         out.count = 0;
         let (shape_a, shape_b) = (self.uu(COLLIDER_SHAPE, a), self.uu(COLLIDER_SHAPE, b));
         let polyhedral = |shape: u32| shape == SHAPE_BOX || shape == SHAPE_HULL;
-        if polyhedral(shape_a) && polyhedral(shape_b) {
-            let (mut data_a, mut data_b) = (BoxData::new(), BoxData::new());
-            let (poly_a, poly_b) = (self.poly(a, &mut data_a), self.poly(b, &mut data_b));
-            collide_polys(&poly_a, self.collider_pose(a), &poly_b, self.collider_pose(b), limit, out);
+        let (mut data_a, mut data_b) = (BoxData::new(), BoxData::new());
+        match (polyhedral(shape_a), polyhedral(shape_b)) {
+            (true, true) => {
+                let (poly_a, poly_b) = (self.poly(a, &mut data_a), self.poly(b, &mut data_b));
+                collide_polys(&poly_a, self.collider_pose(a), &poly_b, self.collider_pose(b), limit, out);
+            }
+            (false, true) => {
+                let poly = self.poly(b, &mut data_b);
+                collide_round_poly(self.round(a), &poly, self.collider_pose(b), limit, out);
+            }
+            (true, false) => {
+                let poly = self.poly(a, &mut data_a);
+                collide_round_poly(self.round(b), &poly, self.collider_pose(a), limit, out);
+                // That found the normal from B to A.
+                out.normal = out.normal.scale(-1.0);
+                for point in out.points.iter_mut().take(out.count) {
+                    core::mem::swap(&mut point.on_a, &mut point.on_b);
+                }
+            }
+            (false, false) => collide_rounds(self.round(a), self.round(b), limit, out),
         }
     }
 

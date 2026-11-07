@@ -1,4 +1,5 @@
 // Islands against a plain search of the graph, and sleeping against what each rule of the policy promises.
+use margoengine_physics_kernel::broad::MARGIN;
 use margoengine_physics_kernel::layout::*;
 use margoengine_physics_kernel::math::*;
 use margoengine_physics_kernel::world::{NONE, World};
@@ -87,7 +88,19 @@ fn check(w: &World) {
     assert_eq!(active, expected_active);
 }
 
-/// Islands by a plain depth-first search over awake dynamic bodies and the pairs between them, as sets of bodies.
+/// Two of this file's balls touch, by plain sphere maths and without asking the kernel: the gap at the pose the step found
+/// contacts in, against the margin and what each ball can cover in the step. A contact group is objects in direct or
+/// indirect touching contact (Erleben 2005, 2.3.4), so a pair the broad phase holds is not yet an edge.
+fn balls_touch(w: &World, a: usize, b: usize) -> bool {
+    let between = w.v(PREVIOUS_X, a).sub(w.v(PREVIOUS_X, b));
+    let speed = |body: usize| {
+        let (linear, angular) = (w.v(LINEAR_X, body), w.v(ANGULAR_X, body));
+        linear.dot(linear).sqrt() + angular.dot(angular).sqrt() * 0.5
+    };
+    between.dot(between).sqrt() - 1.0 <= MARGIN + (speed(a) + speed(b)) * DT
+}
+
+/// Islands by a plain depth-first search over awake dynamic bodies and the touching pairs between them, as sets of bodies.
 fn components(w: &World) -> BTreeSet<BTreeSet<u32>> {
     let mut edges: BTreeMap<u32, Vec<u32>> = BTreeMap::new();
     let dynamic = |body: usize| w.flags(body) & KIND == DYNAMIC;
@@ -99,7 +112,7 @@ fn components(w: &World) -> BTreeSet<BTreeSet<u32>> {
     }
     for slot in 0..w.header().active_pairs {
         let (a, b) = w.pair_bodies(w.uu(ACTIVE_PAIRS, slot as usize));
-        if dynamic(a) && dynamic(b) {
+        if dynamic(a) && dynamic(b) && balls_touch(w, a, b) {
             edges.entry(a as u32).or_default().push(b as u32);
             edges.entry(b as u32).or_default().push(a as u32);
         }
@@ -182,6 +195,62 @@ fn fixed_and_kinematic_bodies_join_no_island() {
         assert_eq!(w.header().islands, 2);
         assert_ne!(w.uu(ISLAND_ID, a as usize), w.uu(ISLAND_ID, b as usize));
     }
+}
+
+#[test]
+fn fat_boxes_that_overlap_are_not_touching() {
+    // A gap of 0.06: over the margin, so no contact, but the fat boxes, a margin out on each side, overlap. In P1, before
+    // contacts, every pair the broad phase held counted as touching.
+    let mut w = free_world(2);
+    let (a, b) = (ball(&mut w, DYNAMIC, 0.0), ball(&mut w, DYNAMIC, 1.06));
+    w.step(DT);
+    assert_eq!(w.header().pairs, 1, "the broad phase holds the pair");
+    assert_eq!(w.uu(PAIR_CONTACTS, w.uu(ACTIVE_PAIRS, 0) as usize), 0);
+    assert_eq!(w.header().islands, 2);
+    assert_ne!(w.uu(ISLAND_ID, a as usize), w.uu(ISLAND_ID, b as usize));
+    // Closer than the margin: now they touch, and make one island.
+    w.set_v(POSITION_X, b as usize, v3(1.02, 0.0, 0.0));
+    w.touch_body(b);
+    w.step(DT);
+    assert_eq!(w.header().islands, 1);
+    assert_eq!(w.uu(ISLAND_ID, a as usize), w.uu(ISLAND_ID, b as usize));
+}
+
+#[test]
+fn a_moving_body_near_a_sleeper_wakes_it_only_on_touching() {
+    // The mover slides past inside the sleeper's fat box, 0.06 clear of it, then turns in.
+    let distance = |w: &World, body: u32| {
+        let at = w.v(POSITION_X, body as usize);
+        at.dot(at).sqrt()
+    };
+    let mut w = free_world(2);
+    let sleeper = ball(&mut w, DYNAMIC, 0.0);
+    for _ in 0..40 {
+        w.step(DT);
+    }
+    assert!(asleep(&w, sleeper));
+    let mover = ball(&mut w, DYNAMIC, 1.06);
+    w.set_v(POSITION_X, mover as usize, v3(1.06, -1.0, 0.0));
+    w.touch_body(mover);
+    w.set_v(LINEAR_X, mover as usize, v3(0.0, 0.1, 0.0));
+    let mut steps = 0;
+    while w.v(POSITION_X, mover as usize).y < 1.0 {
+        w.step(DT);
+        steps += 1;
+        assert!(steps < 1300);
+        let gap = distance(&w, mover) - 1.0;
+        if gap > MARGIN + 0.1 * DT + 0.002 {
+            assert!(asleep(&w, sleeper), "step {steps}, gap {gap}");
+        }
+    }
+    assert!(asleep(&w, sleeper), "it passed 0.06 clear");
+    w.set_v(LINEAR_X, mover as usize, v3(-0.1, 0.0, 0.0));
+    while asleep(&w, sleeper) {
+        w.step(DT);
+        steps += 1;
+        assert!(steps < 2000);
+    }
+    assert!(distance(&w, mover) - 1.0 <= MARGIN + 0.1 * DT + 0.002);
 }
 
 #[test]
