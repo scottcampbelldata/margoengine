@@ -45,6 +45,10 @@
     "./noise": {
       "types": "./dist/noise.d.ts",
       "import": "./dist/noise.js"
+    },
+    "./confine": {
+      "types": "./dist/confine.d.ts",
+      "import": "./dist/confine.js"
     }
   },
   "files": [

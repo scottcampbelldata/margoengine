@@ -236,6 +236,30 @@ console.log(brain.update(1 / 60).position);
 
 `position` moves along the camera's own axes in world units; `rotation` is `pitch`, `yaw` and `roll` in radians. The motion is a function of time, so it does not change with the frame rate; set `noise.time` to replay a moment. The amplitudes of the presets were chosen by eye and their frequencies follow published ranges, so treat them as starting points. Keep a band below half the frame rate. For one short hit, use `Cinematic.shake`.
 
+## Confiner volumes
+
+`CameraConfiner` keeps the camera inside a box or an area of the level, however it got out. The camera keeps looking at the same point. Put it last on a camera, after noise, or in `brain.stages`, where it holds blends between cameras too:
+
+```ts
+import {CameraBrain} from 'margoengine/cinematic/brain';
+import {CameraConfiner} from 'margoengine/cinematic/confine';
+const brain = new CameraBrain();
+brain.stages.push(new CameraConfiner({min: [-50, 0.5, -50], max: [50, 30, 50]}, {margin: 1}));
+const room = new CameraConfiner(
+  {area: [[0, 0], [30, 0], [30, 30], [20, 30], [20, 10], [10, 10], [10, 30], [0, 30]], bottom: 1, top: 6},
+  {margin: 0.5},
+);
+const camera = brain.add({position: [15, 3, 25], target: [15, 2, 0], stages: [room]});
+console.log(camera.update(1 / 60).position, room.clamped);
+```
+
+| Shape | Meaning |
+| --- | --- |
+| `{min, max}` | A box, aligned to the world axes. |
+| `{area, bottom, top}` | An outline of `[x, z]` points on the ground, convex or not, either way round, with optional height limits. |
+
+`margin` (default 0) is the space kept from every wall. `confiner.clamped` says whether the last update moved the camera and `confiner.correction` how far. For walls between the camera and its subject use the `collide` option of `Cinematic`.
+
 Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/cinematic

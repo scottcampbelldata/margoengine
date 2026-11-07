@@ -342,6 +342,10 @@
       "types": "./dist/cinematic/noise.d.ts",
       "import": "./dist/cinematic/noise.js"
     },
+    "./cinematic/confine": {
+      "types": "./dist/cinematic/confine.d.ts",
+      "import": "./dist/cinematic/confine.js"
+    },
     "./clustered": {
       "types": "./dist/clustered.d.ts",
       "import": "./dist/clustered.js"
