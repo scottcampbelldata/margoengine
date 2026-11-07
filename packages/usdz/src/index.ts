@@ -737,6 +737,7 @@ function asset(
       else subsetsOf.set(owner, [path]);
     }
   const scenes = hooks(options).filter((hook) => hook.scene),
+    shaper = hooks(options).find((hook) => hook.shape),
     sceneMeshes: SceneMesh[] = [],
     opOrder = (path: string): unknown => attrs(path, 'xformOpOrder') ?? specs[path].fields.xformOpOrder,
     transform = (path: string, get: (name: string) => unknown) => compose(opOrder(path), get),
@@ -772,13 +773,14 @@ function asset(
       purposes.set(path, inherited);
       if (type !== 'Mesh' || inherited === 'guide' || inherited === 'proxy') continue;
       if (
-        (attrs(path, 'subdivisionScheme') ?? 'catmullClark') !== 'none' ||
-        (attrs(path, 'holeIndices') as ArrayLike<number> | undefined)?.length
+        !shaper &&
+        ((attrs(path, 'subdivisionScheme') ?? 'catmullClark') !== 'none' ||
+          (attrs(path, 'holeIndices') as ArrayLike<number> | undefined)?.length)
       )
         soft('subdivision and hole faces are unsupported');
       // A mesh with no points draws nothing; a stage skips it too.
       if (composed && !(attrs(path, 'points') as ArrayLike<number> | undefined)?.length) continue;
-      const points = numeric(attrs(path, 'points')),
+      let points = numeric(attrs(path, 'points')),
         counts = numeric(attrs(path, 'faceVertexCounts')),
         faces = numeric(attrs(path, 'faceVertexIndices'));
       if (points.length % 3) fail('invalid points');
@@ -787,38 +789,65 @@ function asset(
       for (let i = 0; i < counts.length; i++) {
         const count = counts[i];
         if (!Number.isSafeInteger(count) || count < 0 || (count < 3 && !composed)) fail('invalid face count');
-        if (count >= 3) triangles += count - 2;
         corners += count;
       }
       if (corners !== faces.length) fail('topology counts mismatch');
-      totalVertices += triangles * 3;
-      totalTriangles += triangles;
-      if (totalVertices > limits.maxVertices || totalTriangles > limits.maxTriangles) fail('geometry exceeds limit');
       for (let i = 0; i < faces.length; i++)
         if (!Number.isSafeInteger(faces[i]) || faces[i] < 0 || faces[i] >= points.length / 3)
           fail('face index outside points');
+      const orientation = attrs(path, 'orientation') ?? 'rightHanded';
+      if (typeof orientation !== 'string' || !['leftHanded', 'rightHanded'].includes(orientation))
+        fail('invalid orientation');
+      const faceCount = counts.length,
+        shape = shaper?.shape!({
+          specs,
+          path,
+          points,
+          counts,
+          faces,
+          flip: orientation === 'leftHanded',
+          maxTriangles: limits.maxTriangles,
+          value: (name) => attrs(path, name),
+          attr: attrs,
+          soft,
+        });
+      if (shape) ({ points, counts, faces } = shape);
+      for (let i = 0; i < counts.length; i++) if (counts[i] >= 3) triangles += counts[i] - 2;
+      totalVertices += triangles * 3;
+      totalTriangles += triangles;
+      if (totalVertices > limits.maxVertices || totalTriangles > limits.maxTriangles) fail('geometry exceeds limit');
+      /** A stream of the authored mesh, as one value per corner of the new faces. */
+      const reshaped = (stream: ArrayLike<number>, width: number, property: string, indices?: ArrayLike<number>) =>
+        shape!.corners(stream, width, indices, specs[path + '.' + property]?.fields.interpolation as string | undefined);
       // A normals primvar beats the normals attribute. What is not a list of vectors is no normals at all.
       const normalName = specs[path + '.primvars:normals'] ? 'primvars:normals' : 'normals',
         normalAttribute = attrs(path, normalName),
         normalValue = composed && !normalList(normalAttribute, specs[path + '.' + normalName]?.fields.typeName) ? undefined : normalAttribute,
-        normalIndices = attrs(path, normalName + ':indices') as ArrayLike<number> | undefined,
+        authoredNormalIndices = attrs(path, normalName + ':indices') as ArrayLike<number> | undefined,
+        normalIndices = shape ? undefined : authoredNormalIndices,
         materialId = material(path),
         reads = displays.get(materialId)!,
         uvName = [reads.uv, 'st', 'UVMap', 'uv', 'st0', 'st_0', 'map1'].find((name) => name && specs[path + '.primvars:' + name]),
         uvValue = uvName ? attrs(path, 'primvars:' + uvName) : undefined,
-        normal = normalValue === undefined ? undefined : numeric(normalValue),
-        uv = uvValue === undefined ? undefined : numeric(uvValue),
+        authoredNormal = normalValue === undefined ? undefined : numeric(normalValue),
+        // A subdivided mesh has normals of its own, as the schema says.
+        normal = shape?.normals ?? (shape && authoredNormal ? reshaped(authoredNormal, 3, normalName, authoredNormalIndices) : authoredNormal),
         uvProperty = 'primvars:' + uvName,
-        uvIndices = attrs(path, uvProperty + ':indices') as ArrayLike<number> | undefined,
+        authoredUV = uvValue === undefined ? undefined : numeric(uvValue),
+        authoredUVIndices = attrs(path, uvProperty + ':indices') as ArrayLike<number> | undefined,
+        uv = shape && authoredUV ? reshaped(authoredUV, 2, uvProperty, authoredUVIndices) : authoredUV,
+        uvIndices = shape ? undefined : authoredUVIndices,
         positions = new Float32Array(triangles * 9),
         normals = new Float32Array(triangles * 9),
         uvs = uv ? new Float32Array(triangles * 6) : undefined,
         indices = new Uint32Array(triangles * 3),
         vertexOf = scenes.length ? new Uint32Array(triangles * 3) : undefined,
-        firstTriangle = new Uint32Array(counts.length + 1),
+        firstTriangle = new Uint32Array(faceCount + 1),
         colors = reads.color || reads.opacity ? new Float32Array(triangles * 12) : undefined,
-        tint = reads.color && displayStream(path, 'displayColor', reads.color, 3),
-        fade = reads.opacity && displayStream(path, 'displayOpacity', reads.opacity, 1);
+        shaped = (stream: DisplayStream, width: number, property: string): DisplayStream =>
+          shape ? { values: reshaped(stream.values, width, property, stream.indices) } : stream,
+        tint = reads.color && shaped(displayStream(path, 'displayColor', reads.color, 3), 3, 'primvars:displayColor'),
+        fade = reads.opacity && shaped(displayStream(path, 'displayOpacity', reads.opacity, 1), 1, 'primvars:displayOpacity');
       const sample = (
         stream: ArrayLike<number>,
         width: number,
@@ -827,6 +856,7 @@ function asset(
         face: number,
         property: string,
       ): number => {
+        if (shape) return corner;
         const interpolation = specs[path + '.' + property]?.fields.interpolation;
         if (interpolation === 'constant') return 0;
         if (interpolation === 'uniform') return face;
@@ -838,15 +868,15 @@ function asset(
         return fail('unsupported stream interpolation');
       };
       let cursor = 0,
-        at = 0;
-      const orientation = attrs(path, 'orientation') ?? 'rightHanded';
-      if (typeof orientation !== 'string' || !['leftHanded', 'rightHanded'].includes(orientation))
-        fail('invalid orientation');
+        at = 0,
+        reached = 0;
       for (let f = 0; f < counts.length; f++) {
-        const count = counts[f];
-        firstTriangle[f] = at / 3;
+        const count = counts[f],
+          own = shape ? shape.face[f] : f;
+        // Faces that were left out own no triangles.
+        while (reached <= own) firstTriangle[reached++] = at / 3;
         // shortcut: triangles and convex planar polygons, tessellate concave polygons before loading.
-        if (count > 3 && !composed) {
+        if (count > 3 && !composed && !shape) {
           if (count > 1024) fail('polygon exceeds validation limit');
           if ((polygonWork += count * count) > 10_000_000) fail('polygon validation work exceeds limit');
           const a = faces[cursor] * 3,
@@ -930,7 +960,7 @@ function asset(
           }
         cursor += count;
       }
-      firstTriangle[counts.length] = at / 3;
+      while (reached <= faceCount) firstTriangle[reached++] = at / 3;
       if (!normal) normals.set(computeVertexNormals(positions, indices));
       const attributes: Record<string, number> = {
         POSITION: accessor(positions, 'VEC3'),
@@ -945,14 +975,14 @@ function asset(
         );
       // Each subset with a material is a primitive of its own, over the same vertex streams. A face belongs to the
       // first subset that lists it; the faces left keep the mesh's material.
-      const taken = new Uint8Array(counts.length),
+      const taken = new Uint8Array(faceCount),
         subsets: USDMeshSubset[] = [];
       for (const subset of subsetsOf.get(path) ?? []) {
         if ((attrs(subset, 'elementType') ?? 'face') !== 'face') continue;
         if (!specs[subset + '.material:binding'] && attrs(subset, 'familyName') !== 'materialBind') continue;
         const list: number[] = [];
         for (const face of Array.from(numeric(attrs(subset, 'indices') ?? []))) {
-          if (!Number.isSafeInteger(face) || face < 0 || face >= counts.length) fail('subset face outside mesh');
+          if (!Number.isSafeInteger(face) || face < 0 || face >= faceCount) fail('subset face outside mesh');
           if (taken[face]) continue;
           taken[face] = 1;
           for (let t = firstTriangle[face] * 3; t < firstTriangle[face + 1] * 3; t++) list.push(t);
@@ -962,7 +992,7 @@ function asset(
       let rest = indices;
       if (subsets.length) {
         const left: number[] = [];
-        for (let face = 0; face < counts.length; face++)
+        for (let face = 0; face < faceCount; face++)
           if (!taken[face]) for (let t = firstTriangle[face] * 3; t < firstTriangle[face + 1] * 3; t++) left.push(t);
         rest = Uint32Array.from(left);
       }
@@ -975,7 +1005,7 @@ function asset(
       const mesh = doc.meshes.length;
       doc.meshes.push({ primitives });
       node.mesh = mesh;
-      if (vertexOf) sceneMeshes.push({ path, node: id, mesh, vertexOf });
+      if (vertexOf) sceneMeshes.push({ path, node: id, mesh, vertexOf, shape });
       meshes.push({
         path,
         positions,

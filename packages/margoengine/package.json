@@ -2390,6 +2390,10 @@
       "types": "./dist/usdz/anim.d.ts",
       "import": "./dist/usdz/anim.js"
     },
+    "./usdz/subdiv": {
+      "types": "./dist/usdz/subdiv.d.ts",
+      "import": "./dist/usdz/subdiv.js"
+    },
     "./vfx": {
       "types": "./dist/vfx.d.ts",
       "import": "./dist/vfx.js"

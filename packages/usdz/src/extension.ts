@@ -25,6 +25,38 @@ export interface LayerRead {
   issues: USDIssue[];
   signal?: AbortSignal;
 }
+/** An authored mesh, as the shape hook gets it. */
+export interface MeshRead {
+  specs: Specs;
+  path: string;
+  points: ArrayLike<number>;
+  counts: ArrayLike<number>;
+  faces: ArrayLike<number>;
+  /** True for a left-handed mesh. */
+  flip: boolean;
+  maxTriangles: number;
+  /** An attribute of this mesh, at the stage's first time. */
+  value(name: string): unknown;
+  /** An attribute of any prim. */
+  attr(path: string, name: string): unknown;
+  soft(message: string): void;
+}
+/** A mesh's new faces. Streams of the authored mesh reach them through `corners`. */
+export interface MeshShape {
+  points: Float32Array;
+  counts: Uint32Array;
+  faces: Uint32Array;
+  /** The authored face behind each face, in rising order. */
+  face: Uint32Array;
+  /** Normals per corner. Without them, authored normals come through `corners`. */
+  normals?: Float32Array;
+  /** A stream per authored point, per new point. Absent when the points did not change. */
+  spread?(stream: ArrayLike<number>, width: number): Float32Array;
+  /** Joint influences per authored point, per new point, `width` to a point. */
+  influences?(joints: Uint16Array, weights: Float32Array, width: number): { joints: Uint16Array; weights: Float32Array };
+  /** An authored stream as one value per corner of the new faces. */
+  corners(stream: ArrayLike<number>, width: number, indices: ArrayLike<number> | undefined, interpolation: string | undefined): Float32Array;
+}
 /** A mesh of the scene, as the scene hook gets it. */
 export interface SceneMesh {
   /** Prim path. */
@@ -33,8 +65,10 @@ export interface SceneMesh {
   node: number;
   /** Index of its mesh in the document. */
   mesh: number;
-  /** The authored point behind each expanded vertex. */
+  /** The point behind each expanded vertex. */
   vertexOf: Uint32Array;
+  /** Set when an extension changed the mesh's faces. */
+  shape?: MeshShape;
 }
 /** What the scene hook gets once every prim has its node. */
 export interface SceneRead {
@@ -56,6 +90,8 @@ export interface SceneRead {
 export interface ExtensionHooks extends USDExtension {
   /** Turns the root layer into one flat spec map, in place of reading it as a single static layer. */
   compose?(read: LayerRead): Specs;
+  /** New faces for a mesh, or nothing to keep its own. */
+  shape?(read: MeshRead): MeshShape | undefined;
   /** Adds to the finished scene: skins, clips and the like. */
   scene?(read: SceneRead): void;
   /** Keeps a prim that starts invisible but has a visible sample later, so this extension can show it then. */

@@ -9,8 +9,9 @@ import { parseUSD } from './any.js';
 import { composition } from './compose.js';
 import { skeletons } from './skel.js';
 import { animation } from './anim.js';
+import { subdivision } from './subdiv.js';
 
-const known: Record<string, (options?: never) => USDExtension> = { compose: composition, skel: skeletons, anim: animation };
+const known: Record<string, (options?: never) => USDExtension> = { compose: composition, skel: skeletons, anim: animation, subdiv: subdivision };
 serve(async ({ url, input, options: sent }: { url?: string; input?: ArrayBuffer | string; options: USDOptions }) => {
   const options: USDOptions = {
     ...sent,

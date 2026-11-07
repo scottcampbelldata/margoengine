@@ -1,0 +1,69 @@
+#usda 1.0
+(
+    defaultPrim = "Cases"
+    metersPerUnit = 1
+    upAxis = "Y"
+)
+def Xform "Cases"
+{
+    def Mesh "Plain"
+    {
+        int[] faceVertexCounts = [4, 4, 4, 4, 4, 4]
+        int[] faceVertexIndices = [0, 1, 3, 2, 2, 3, 5, 4, 4, 5, 7, 6, 6, 7, 1, 0, 1, 7, 5, 3, 6, 0, 2, 4]
+        point3f[] points = [(-1, -1, 1), (1, -1, 1), (-1, 1, 1), (1, 1, 1), (-1, 1, -1), (1, 1, -1), (-1, -1, -1), (1, -1, -1)]
+    }
+    def Mesh "SemiSharp"
+    {
+        int[] creaseIndices = [0, 1, 3, 2, 4, 5, 2, 4]
+        int[] creaseLengths = [4, 2, 2]
+        float[] creaseSharpnesses = [0.5, 1.5, 2.5]
+        int[] faceVertexCounts = [4, 4, 4, 4, 4, 4]
+        int[] faceVertexIndices = [0, 1, 3, 2, 2, 3, 5, 4, 4, 5, 7, 6, 6, 7, 1, 0, 1, 7, 5, 3, 6, 0, 2, 4]
+        point3f[] points = [(-1, -1, 1), (1, -1, 1), (-1, 1, 1), (1, 1, 1), (-1, 1, -1), (1, 1, -1), (-1, -1, -1), (1, -1, -1)]
+    }
+    def Mesh "PerEdge"
+    {
+        int[] creaseIndices = [0, 1, 3, 2]
+        int[] creaseLengths = [4]
+        float[] creaseSharpnesses = [0.25, 3, 10]
+        int[] faceVertexCounts = [4, 4, 4, 4, 4, 4]
+        int[] faceVertexIndices = [0, 1, 3, 2, 2, 3, 5, 4, 4, 5, 7, 6, 6, 7, 1, 0, 1, 7, 5, 3, 6, 0, 2, 4]
+        point3f[] points = [(-1, -1, 1), (1, -1, 1), (-1, 1, 1), (1, 1, 1), (-1, 1, -1), (1, 1, -1), (-1, -1, -1), (1, -1, -1)]
+    }
+    def Mesh "Corners"
+    {
+        int[] cornerIndices = [0, 3, 5]
+        float[] cornerSharpnesses = [0.7, 2, 10]
+        int[] faceVertexCounts = [4, 4, 4, 4, 4, 4]
+        int[] faceVertexIndices = [0, 1, 3, 2, 2, 3, 5, 4, 4, 5, 7, 6, 6, 7, 1, 0, 1, 7, 5, 3, 6, 0, 2, 4]
+        point3f[] points = [(-1, -1, 1), (1, -1, 1), (-1, 1, 1), (1, 1, 1), (-1, 1, -1), (1, 1, -1), (-1, -1, -1), (1, -1, -1)]
+    }
+    def Mesh "OpenCorners"
+    {
+        int[] faceVertexCounts = [4, 4, 4, 4, 3, 5]
+        int[] faceVertexIndices = [0, 1, 4, 3, 1, 2, 5, 4, 3, 4, 7, 6, 4, 5, 8, 7, 6, 7, 9, 7, 8, 10, 11, 9]
+        point3f[] points = [(0, 0, 0), (1, 0, 0.2), (2, 0, 0), (0, 1, 0.3), (1, 1, 1), (2, 1, 0.1), (0, 2, 0), (1, 2, 0.4), (2, 2, 0), (1, 3, 0), (3, 3, 0), (2, 4, 0.5)]
+    }
+    def Mesh "OpenEdges"
+    {
+        token interpolateBoundary = "edgeOnly"
+        int[] faceVertexCounts = [4, 4, 4, 4]
+        int[] faceVertexIndices = [0, 1, 4, 3, 1, 2, 5, 4, 3, 4, 7, 6, 4, 5, 8, 7]
+        point3f[] points = [(0, 0, 0), (1, 0, 0.2), (2, 0, 0), (0, 1, 0.3), (1, 1, 1), (2, 1, 0.1), (0, 2, 0), (1, 2, 0.4), (2, 2, 0)]
+    }
+    def Mesh "Tetra"
+    {
+        int[] faceVertexCounts = [3, 3, 3, 3]
+        int[] faceVertexIndices = [0, 2, 1, 0, 1, 3, 1, 2, 3, 2, 0, 3]
+        point3f[] points = [(0, 0, 0), (2, 0, 0), (1, 0, 2), (1, 2, 1)]
+    }
+    def Mesh "CreaseMeetsCorner"
+    {
+        int[] creaseIndices = [0, 1, 0, 2, 0, 4]
+        int[] creaseLengths = [2, 2, 2]
+        float[] creaseSharpnesses = [1.5, 0.6, 3]
+        int[] faceVertexCounts = [4, 4, 4, 4, 4, 4]
+        int[] faceVertexIndices = [0, 1, 3, 2, 2, 3, 5, 4, 4, 5, 7, 6, 6, 7, 1, 0, 1, 7, 5, 3, 6, 0, 2, 4]
+        point3f[] points = [(-1, -1, 1), (1, -1, 1), (-1, 1, 1), (1, 1, 1), (-1, 1, -1), (1, 1, -1), (-1, -1, -1), (1, -1, -1)]
+    }
+}

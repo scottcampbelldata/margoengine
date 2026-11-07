@@ -237,6 +237,41 @@ def Mesh "Late"
     },
   );
   assert.deepEqual(played, { moved: true, appears: true, leaves: true, warnings: [], gpuErrors: [] });
+  // A real subdivided mesh draws refined on the GPU, and refining changes what it draws.
+  const refined = await page.evaluate(async (stage) => {
+    const { Engine } = await import('/packages/core/dist/index.js'),
+      { engineRuntime } = await import('/packages/core/dist/extension.js'),
+      { parseUSDFiles } = await import('/packages/usdz/dist/compose.js'),
+      { subdivision } = await import('/packages/usdz/dist/subdiv.js');
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 256;
+    canvas.style.cssText = 'width:256px;height:256px';
+    document.body.append(canvas);
+    const engine = await Engine.create(canvas, {
+        backend: 'webgpu',
+        capacity: 64,
+        camera: { position: [3, 3, 4], target: [0, 0, 0] },
+      }),
+      gpuErrors = [];
+    engineRuntime(engine).gpu.addEventListener('uncapturederror', (event) => gpuErrors.push(event.error.message));
+    const frame = async (extensions) => {
+      const asset = await parseUSDFiles('stage.usda', () => new TextEncoder().encode(stage.replace('metersPerUnit = 0.01', 'metersPerUnit = 1')), { extensions }),
+        model = await asset.create(engine);
+      engine.render({ culling: false });
+      const image = canvas.toDataURL();
+      model.destroy();
+      return image;
+    };
+    try {
+      const cage = await frame([]),
+        smooth = await frame([subdivision({ level: 3 })]);
+      return { differs: cage !== smooth, gpuErrors };
+    } finally {
+      engine.dispose();
+      canvas.remove();
+    }
+  }, await readFile('packages/usdz/tests/fixtures/real/usd-wg/test_assets/schemaTests/usdGeom/meshes/subdiv_catmullClark/subdiv_catmullClark.usda', 'utf8'));
+  assert.deepEqual(refined, { differs: true, gpuErrors: [] });
   assert.deepEqual(errors, []);
   await writeFile('test-results/modern-usdz.json', JSON.stringify({ hardware: browser.hardware, ...result }, null, 2));
   console.log('USDZ texture packing, real WebGPU pixels, bitmap teardown and file-picker demo passed');

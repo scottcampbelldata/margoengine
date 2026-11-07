@@ -2,7 +2,8 @@
 
 `usd-wg/` holds the composition scenes of the Alliance for OpenUSD working group's assets repository,
 https://github.com/usd-wg/assets, commit 091bb5c6f8eb665ad4cf9d6c10025cecc07eda88, under the Apache License 2.0 (`usd-wg/LICENSE`).
-Only `.usda` files of `test_assets/foundation/stage_composition`, `test_assets/_common` and `test_assets/References` are
+Only `.usda` files of `test_assets/foundation/stage_composition`, `test_assets/_common`, `test_assets/References`,
+`test_assets/schemaTests/usdGeom/meshes/subdiv_catmullClark` and `full_assets/SubdivisionSurfaces/Pyramid/geo.usda` are
 copied, unchanged, except that `_common/teapot.usda` is left out for its size; nothing here references it.
 
 `../openusd.json` is what OpenUSD 26.08 reads from these files and from `../fuzz` (`tests/oracle/truth.py`, run in Blender

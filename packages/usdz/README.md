@@ -25,7 +25,7 @@ Standard USDZ is an uncompressed, aligned archive. Deflate support accepts a bro
 
 Vertex colors read through a `UsdPrimvarReader` of `displayColor` or `displayOpacity` load as `mesh.colors` (four floats per vertex) and glTF COLOR_0, a constant `inputs:opacity` or the base colour map's alpha gives `BLEND`, or `MASK` with `inputs:opacityThreshold`; so a file from `exportUSDZ` keeps its paint and alpha. A separate opacity map and a reader of any other primvar are refused.
 
-Without the entries below this is a static mesh subset of one flattened layer. A prim may reference a class or other prim of the same layer (`references = </Path>`, what `exportUSDZ` writes for a shared geometry), and what it authors wins; class prims are not drawn. Other composition is refused. A mesh's `GeomSubset`s with materials are primitives of their own (`mesh.subsets`), a texture reads the primvar its `UsdPrimvarReader` names, every `xformOp` of the schema is read (`rotateX`, all six Euler orders, `orient`, suffixes such as `xformOp:translate:pivot` and `!invert!`), guide and proxy meshes are left out, and a mesh with no material shows its `displayColor`. Physical Apple AR Quick Look round trips are untested.
+Without the entries below this is a static mesh subset of one flattened layer: subdivided meshes load as cages. A prim may reference a class or other prim of the same layer (`references = </Path>`, what `exportUSDZ` writes for a shared geometry), and what it authors wins; class prims are not drawn. Other composition is refused. A mesh's `GeomSubset`s with materials are primitives of their own (`mesh.subsets`), a texture reads the primvar its `UsdPrimvarReader` names, every `xformOp` of the schema is read (`rotateX`, all six Euler orders, `orient`, suffixes such as `xformOp:translate:pivot` and `!invert!`), guide and proxy meshes are left out, and a mesh with no material shows its `displayColor`. Physical Apple AR Quick Look round trips are untested.
 
 ## Composition
 
@@ -97,3 +97,25 @@ engine.start();
 ```
 
 `animation()` has no options. Each prim's ops are evaluated as a stage does, held past both ends and linear between samples, then split into translation, rotation and scale keys. A move two keys can carry stays two keys. One they cannot, such as a rotation after a scale, gets a key on every time code, and a turn wider than 45 degrees between keys gets more, so spins keep their turns. Visibility plays through `KHR_node_visibility` and `KHR_animation_pointer`, which is why `Animation` needs `pointerChannels`; a prim that starts invisible and shows later stays in the scene, hidden until then. Shear has no node form: the nearest rotation and scale play and `asset.issues` says so. Time-sampled `points` do not play.
+
+## Subdivision, holes and concave polygons
+
+`subdivision()` from `margoengine/usdz/subdiv` refines meshes by their `subdivisionScheme`: `catmullClark` (USD's default), `loop` and `bilinear`. It honours `creaseIndices`, `creaseLengths`, `creaseSharpnesses`, `cornerIndices`, `cornerSharpnesses`, `interpolateBoundary` and `faceVaryingLinearInterpolation`, leaves out `holeIndices` faces, and splits concave polygons into triangles. A `.usdz` also needs `composition()`; `loadUSDFiles` composes by itself.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {loadUSDZ} from 'margoengine/usdz';
+import {composition} from 'margoengine/usdz/compose';
+import {subdivision} from 'margoengine/usdz/subdiv';
+
+const canvas=document.createElement('canvas');document.body.append(canvas);
+const engine=await Engine.create(canvas,{backend:'webgpu',capacity:100000});
+const pawn=await loadUSDZ(engine,'/pawn.usdz',{extensions:[composition(),subdivision({level:2})]});
+engine.start();
+```
+
+`subdivision(options)` takes `level`, how many times each face is split, a whole number from 0 to 6, default 2. Each level gives four faces for one. A stage that would pass `maxTriangles` gets a lower level for all its meshes, and `asset.issues` says which. Level 0 keeps the cage but still leaves out holes and splits concave polygons.
+
+USD's schema default is `catmullClark`, so a polygon model that forgets `subdivisionScheme = "none"` is smoothed: that is what the file asks for. Refined meshes get normals of their own, as the schema says, and an edge that stays sharp keeps a hard normal. Primvars, UVs, display colours, material subsets, joint influences and blend shape offsets follow the refined faces; a point keeps its 8 strongest influences. Without this entry a subdivided mesh loads as its cage, with an issue.
+
+`loop` takes triangles only; other faces refine as `catmullClark`, with an issue. `triangleSubdivisionRule = "smooth"` refines by the standard rule, with an issue. A face-varying value that repeats at a point joins the faces it touches: equal numbers count as one value, indexed or not.

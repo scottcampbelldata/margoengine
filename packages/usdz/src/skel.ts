@@ -193,6 +193,10 @@ function scene(read: SceneRead): void {
       });
     }
     if (cut) read.soft(`${mesh.path} has more than ${MOST_INFLUENCES} influences on a point; the strongest are kept and scaled`);
+    // A refined point takes the influences of the points it comes from, in proportion.
+    const refined = !constant ? mesh.shape?.influences?.(picked, amount, sets * 4) : undefined,
+      finalJoints = refined?.joints ?? picked,
+      finalWeights = refined?.weights ?? amount;
     const count = mesh.vertexOf.length,
       attributes = doc.meshes![mesh.mesh].primitives.map((p) => p.attributes!);
     for (let set = 0; set < sets; set++) {
@@ -201,8 +205,8 @@ function scene(read: SceneRead): void {
       for (let v = 0; v < count; v++) {
         const from = ((constant ? 0 : mesh.vertexOf[v]) * sets + set) * 4;
         for (let d = 0; d < 4; d++) {
-          joints[v * 4 + d] = picked[from + d];
-          strength[v * 4 + d] = amount[from + d];
+          joints[v * 4 + d] = finalJoints[from + d];
+          strength[v * 4 + d] = finalWeights[from + d];
         }
       }
       const j = read.accessor(joints, 'VEC4'),
@@ -225,17 +229,18 @@ function scene(read: SceneRead): void {
     if (!names?.length || !prims.length) return;
     if (names.length !== prims.length) return read.soft(`skel:blendShapes of ${mesh.path} do not match its targets`);
     const count = mesh.vertexOf.length,
-      points = 1 + mesh.vertexOf.reduce((most, p) => Math.max(most, p), 0);
+      points = mesh.shape ? (value(mesh.path, 'points')?.length ?? 0) / 3 : 1 + mesh.vertexOf.reduce((most, p) => Math.max(most, p), 0);
     /** Per-point offsets spread over the mesh's expanded vertices. */
     const spread = (offsets: number[], sparse: number[] | undefined) => {
-      const perPoint = new Float32Array(points * 3),
+      const authored = new Float32Array(points * 3),
         length = offsets.length / 3;
       for (let i = 0; i < length; i++) {
         const point = sparse ? sparse[i] : i;
         if (point >= points) continue;
-        for (let d = 0; d < 3; d++) perPoint[point * 3 + d] = offsets[i * 3 + d];
+        for (let d = 0; d < 3; d++) authored[point * 3 + d] = offsets[i * 3 + d];
       }
-      const out = new Float32Array(count * 3);
+      const perPoint = mesh.shape?.spread?.(authored, 3) ?? authored,
+        out = new Float32Array(count * 3);
       for (let v = 0; v < count; v++)
         for (let d = 0; d < 3; d++) out[v * 3 + d] = perPoint[mesh.vertexOf[v] * 3 + d];
       return out;

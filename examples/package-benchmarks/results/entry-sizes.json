@@ -1,5 +1,5 @@
 {
-  "commit": "93bf3c3e6",
+  "commit": "6b8029dff",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -1738,6 +1738,10 @@
       ".": {
         "raw": 21723,
         "gzip": 7943
+      },
+      "./outline": {
+        "raw": 4782,
+        "gzip": 2268
       }
     },
     "@margoengine/pixel": {
@@ -2534,28 +2538,32 @@
     },
     "@margoengine/usdz": {
       ".": {
-        "raw": 28228,
-        "gzip": 11372
+        "raw": 28832,
+        "gzip": 11621
       },
       "./worker": {
-        "raw": 31119,
-        "gzip": 12425
+        "raw": 31719,
+        "gzip": 12666
       },
       "./compose": {
-        "raw": 45702,
-        "gzip": 17537
+        "raw": 46311,
+        "gzip": 17791
       },
       "./skel": {
-        "raw": 19284,
-        "gzip": 7808
+        "raw": 19427,
+        "gzip": 7882
       },
       "./anim": {
         "raw": 14699,
         "gzip": 6180
       },
+      "./subdiv": {
+        "raw": 11511,
+        "gzip": 4673
+      },
       "dist/workers/usdz.js": {
-        "raw": 267422,
-        "gzip": 89075
+        "raw": 295830,
+        "gzip": 99644
       }
     },
     "@margoengine/vfx": {
@@ -2995,9 +3003,9 @@
       "brotli": 69572
     },
     "packages/usdz/dist/workers/usdz.js": {
-      "raw": 264391,
-      "gzip": 88835,
-      "brotli": 76567
+      "raw": 292399,
+      "gzip": 99366,
+      "brotli": 85637
     },
     "packages/loaders/dist/workers/usd.js": {
       "raw": 21469,

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10156710,
+  "total": 10175111,
   "history": [
     {
       "date": "2026-10-24",
@@ -3140,6 +3140,12 @@
       "commit": "bd7f3149f",
       "reason": "physics2d/outline: new entry",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "6b8029dff",
+      "reason": "usdz: new entry /subdiv, and the shape hook the base reader calls",
+      "grew": 4
     }
   ],
   "items": {
@@ -3734,12 +3740,13 @@
     "@margoengine/tween/stagger": 1435,
     "@margoengine/ui": 28221,
     "@margoengine/ui/react": 28301,
-    "@margoengine/usdz": 11508,
-    "@margoengine/usdz dist/workers/usdz.js": 90080,
+    "@margoengine/usdz": 11970,
+    "@margoengine/usdz dist/workers/usdz.js": 102634,
     "@margoengine/usdz/anim": 6436,
     "@margoengine/usdz/compose": 18064,
     "@margoengine/usdz/skel": 7987,
-    "@margoengine/usdz/worker": 12590,
+    "@margoengine/usdz/subdiv": 4929,
+    "@margoengine/usdz/worker": 13046,
     "@margoengine/vfx": 17135,
     "@margoengine/vfx/base": 10992,
     "@margoengine/vfx/curves": 1816,
