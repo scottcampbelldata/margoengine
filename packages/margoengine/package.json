@@ -1630,6 +1630,10 @@
       "types": "./dist/navmesh/tiles.d.ts",
       "import": "./dist/navmesh/tiles.js"
     },
+    "./navmesh/agents": {
+      "types": "./dist/navmesh/agents.d.ts",
+      "import": "./dist/navmesh/agents.js"
+    },
     "./net": {
       "types": "./dist/net.d.ts",
       "import": "./dist/net.js"

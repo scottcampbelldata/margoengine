@@ -5,7 +5,7 @@
 // the overlaps of the polygon edges on it. Tiling a voxel build is the long-standing practice; the design here is
 // our own, from the sources named in docs/clean-room.md.
 import { MargoError } from '@margoengine/math/errors';
-import type { NavLink, NavMesh, NavSurface, OffMeshLinkOptions, Vec3 } from './index.js';
+import type { NavFilter, NavLink, NavMesh, NavSurface, OffMeshLinkOptions, Vec3 } from './index.js';
 import {
   failed,
   solve,
@@ -15,7 +15,17 @@ import {
   type NavigationOptions,
   type NavObstacle,
 } from './pipeline.js';
-import { CorridorSearch, copy, cross, distance, point, routeThrough, type Link, type NavRoute } from './search.js';
+import {
+  CorridorSearch,
+  checkFilter,
+  copy,
+  cross,
+  distance,
+  point,
+  routeThrough,
+  type Link,
+  type NavRoute,
+} from './search.js';
 
 /** Options of {@link TiledNavMesh}: the build settings of `./build`, and the tiling. */
 export interface TiledNavMeshOptions extends NavigationOptions {
@@ -103,6 +113,8 @@ export class TiledNavMesh implements NavSurface {
   private readonly owners: (Tile | null)[] = [];
   private locals = new Int32Array(1024);
   private costs = new Float64Array(1024).fill(1);
+  private polygonAreas = new Uint8Array(1024);
+  private filtered = new Float64Array(0);
   private readonly free: number[] = [];
   private count = 0;
   private linkTotal = 0;
@@ -359,11 +371,14 @@ export class TiledNavMesh implements NavSurface {
     const id = this.free.length ? (this.free.pop() as number) : this.count++;
     if (id >= this.locals.length) {
       const locals = new Int32Array(id * 2),
-        costs = new Float64Array(id * 2).fill(1);
+        costs = new Float64Array(id * 2).fill(1),
+        areas = new Uint8Array(id * 2);
       locals.set(this.locals);
       costs.set(this.costs);
+      areas.set(this.polygonAreas);
       this.locals = locals;
       this.costs = costs;
+      this.polygonAreas = areas;
     }
     return id;
   }
@@ -380,6 +395,7 @@ export class TiledNavMesh implements NavSurface {
       const id = (ids[p] = this.allocate());
       this.owners[id] = tile;
       this.locals[id] = p;
+      this.polygonAreas[id] = mesh.polygonArea(p);
       this.centers[id] = mesh.polygonCenter(p);
     }
     for (let p = 0; p < count; p++) {
@@ -472,6 +488,11 @@ export class TiledNavMesh implements NavSurface {
     this.owner(index);
     return this.adjacency[index];
   }
+  /** Area number of polygon `index`, for route filters. */
+  polygonArea(index: number): number {
+    this.owner(index);
+    return this.polygonAreas[index];
+  }
   /** Height of polygon `index`'s plane at (x, z). */
   heightAt(index: number, x: number, z: number): number {
     return (this.owner(index).mesh as NavMesh).heightAt(this.locals[index], x, z);
@@ -542,18 +563,27 @@ export class TiledNavMesh implements NavSurface {
     return best;
   }
   /** Waypoints from `start` to `end`, including both, or null when an end is off the mesh or no route connects them. */
-  path(start: Vec3, end: Vec3): Vec3[] | null {
-    return this.route(start, end)?.points ?? null;
+  path(start: Vec3, end: Vec3, filter?: NavFilter): Vec3[] | null {
+    return this.route(start, end, filter)?.points ?? null;
   }
   /** {@link TiledNavMesh.path} with the off-mesh crossings marked, as `NavMesh.route`. */
-  route(start: Vec3, end: Vec3): NavRoute | null {
+  route(start: Vec3, end: Vec3, filter?: NavFilter): NavRoute | null {
     this.check();
     const from = this.locate(start),
-      to = this.locate(end);
-    if (from < 0 || to < 0) return null;
+      to = this.locate(end),
+      costs = filter ? this.applyFilter(filter) : this.costs;
+    if (from < 0 || to < 0 || !(costs[to] < Infinity)) return null;
     if (from === to) return { points: [copy(start), copy(end)], offMesh: [] };
-    const corridor = this.search.find(from, to, start, end, this.count, this.adjacency, this.costs);
+    const corridor = this.search.find(from, to, start, end, this.count, this.adjacency, costs);
     return corridor && routeThrough(corridor, start, end);
+  }
+  private applyFilter(filter: NavFilter): Float64Array {
+    checkFilter(filter);
+    if (this.filtered.length < this.count) this.filtered = new Float64Array(this.costs.length);
+    const costs = this.filtered,
+      areas = this.polygonAreas;
+    for (let p = 0; p < this.count; p++) costs[p] = this.costs[p] * (filter[areas[p]] ?? 1);
+    return costs;
   }
   /**
    * Adds an off-mesh link (a jump, a ladder); it is put back after a tile under it rebuilds, and sleeps while an end

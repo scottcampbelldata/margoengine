@@ -37,6 +37,16 @@ export function point(value: Vec3): void {
     throw new RangeError('Point must be finite [x, y, z]; pass numbers.');
 }
 
+/**
+ * Checks a route filter. A* finds the cheapest route only while its straight line estimate stays a lower bound of the
+ * cost (Hart, Nilsson, Raphael 1968, Theorem 1), so no multiplier may fall below 1.
+ */
+export function checkFilter(filter: ArrayLike<number>): void {
+  for (let i = 0; i < filter.length; i++)
+    if (!(filter[i] >= 1))
+      throw new RangeError('A route filter cost must not fall below 1; use 1 or more, or Infinity to forbid an area.');
+}
+
 /** A* state reused by every path call; the heap holds one entry per improved polygon cost. */
 export class CorridorSearch {
   private g = new Float64Array(0);

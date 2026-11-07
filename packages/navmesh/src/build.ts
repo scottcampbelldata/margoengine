@@ -5,7 +5,7 @@ import { MargoError } from '@margoengine/math/errors';
 import type { NavMesh } from './index.js';
 import { generate, turn, type Built, type NavigationOptions } from './pipeline.js';
 
-export type { NavigationOptions, NavObstacle } from './pipeline.js';
+export type { NavArea, NavigationOptions, NavObstacle } from './pipeline.js';
 
 /**
  * Builds a {@link NavMesh} from a triangle soup: voxelises the walkable triangles, filters by agent height, climb

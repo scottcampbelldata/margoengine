@@ -3,7 +3,7 @@
 // and dynamic obstacles with ORCA, stay on the walkable polygons and cross off-mesh links. Kept out of NavMesh so an
 // app that only queries paths does not bundle it.
 import { MargoError } from '@margoengine/math/errors';
-import type { NavSurface, Vec3 } from './index.js';
+import type { NavFilter, NavSurface, Vec3 } from './index.js';
 import { avoid, type Agent } from './orca.js';
 
 /** Where a crowd agent is in its journey. */
@@ -25,6 +25,10 @@ export interface CrowdAgentOptions {
   slowDownDistance?: number;
   /** Anything to keep with the agent (a character, an entity id). */
   userData?: unknown;
+  /** The mesh this agent walks on, for a body of another size than the crowd's mesh (default the crowd's). */
+  navMesh?: NavSurface;
+  /** What it may walk on: cost per area number (default all the same). */
+  filter?: NavFilter;
 }
 
 /** Options of {@link Crowd}. Every field has a default. */
@@ -95,6 +99,12 @@ export class CrowdAgent {
   polygon: number;
   /** @internal mesh version the path was planned on (-1: plan again). */
   planned = -1;
+  /** @internal mesh version the agent last stood on. */
+  seen: number;
+  /** The mesh it walks on. */
+  readonly surface: NavSurface;
+  /** Its cost per area number, if any. */
+  readonly filter: NavFilter | undefined;
   /** @internal the ORCA disc. */
   readonly disc: {
     id: number;
@@ -113,9 +123,13 @@ export class CrowdAgent {
     options: CrowdAgentOptions,
     position: Vec3,
     polygon: number,
+    surface: NavSurface,
   ) {
     this.position = [position[0], position[1], position[2]];
     this.polygon = polygon;
+    this.surface = surface;
+    this.seen = surface.version;
+    this.filter = options.filter;
     this.radius = positive(options.radius, 0.4, 'Agent radius');
     this.maxSpeed = positive(options.maxSpeed, 3.5, 'Agent maxSpeed', true);
     this.maxAcceleration = positive(options.maxAcceleration, 8, 'Agent maxAcceleration');
@@ -155,7 +169,7 @@ export class CrowdAgent {
   /** Places the agent at `position` (moved onto the mesh) and replans. */
   teleport(position: Vec3): this {
     this.check();
-    const placed = this.crowd.place(point(position, 'Agent position'));
+    const placed = this.crowd.place(point(position, 'Agent position'), this.surface);
     this.position[0] = placed.point[0];
     this.position[1] = placed.point[1];
     this.position[2] = placed.point[2];
@@ -195,8 +209,6 @@ export class Crowd {
   private readonly timeHorizon: number;
   private nextId = 1;
   private disposed = false;
-  /** The mesh version the agents last stood on. */
-  private seen: number;
   private readonly output = new Float64Array(2);
   private readonly neighbors: Agent[] = [];
   private readonly obstacleDiscs: Agent[] = [];
@@ -217,12 +229,11 @@ export class Crowd {
     if (!Number.isInteger(this.maxNeighbors) || this.maxNeighbors < 0 || this.maxNeighbors > 4096)
       throw new RangeError('Crowd maxNeighbors must be an integer from 0 to 4096');
     this.timeHorizon = positive(options.timeHorizon, 2, 'Crowd timeHorizon');
-    this.seen = navMesh.version;
   }
 
   /** @internal a point moved onto the mesh, with its polygon. */
-  place(position: Vec3): { point: Vec3; polygon: number } {
-    const placed = this.navMesh.closestPoint(position);
+  place(position: Vec3, surface: NavSurface): { point: Vec3; polygon: number } {
+    const placed = surface.closestPoint(position);
     if (!placed) throw new RangeError('Position has no walkable point nearby; place agents on the navmesh.');
     return placed;
   }
@@ -230,8 +241,9 @@ export class Crowd {
   /** Adds an agent at `options.position` (moved onto the mesh). */
   addAgent(options: CrowdAgentOptions): CrowdAgent {
     if (this.disposed) throw new MargoError('disposed', 'Crowd is disposed; create a new Crowd.');
-    const placed = this.place(point(options?.position, 'Agent position'));
-    const agent = new CrowdAgent(this, this.nextId++, options, placed.point, placed.polygon);
+    const surface = options?.navMesh ?? this.navMesh,
+      placed = this.place(point(options?.position, 'Agent position'), surface);
+    const agent = new CrowdAgent(this, this.nextId++, options, placed.point, placed.polygon, surface);
     this.agents.push(agent);
     return agent;
   }
@@ -280,19 +292,15 @@ export class Crowd {
     if (this.disposed) throw new MargoError('disposed', 'Crowd is disposed; create a new Crowd.');
     if (!(dt >= 0) || !Number.isFinite(dt)) throw new RangeError('Crowd update needs a finite dt of 0 or more seconds');
     if (dt === 0) return;
-    const mesh = this.navMesh,
-      version = mesh.version;
     // A rebuilt tile renumbers its polygons and may have closed over an agent: stand each one on the mesh again.
-    if (version !== this.seen) {
-      this.seen = version;
-      for (const agent of this.agents) {
-        if (agent.state === 'offmesh') continue;
-        const placed = this.place(agent.position);
-        agent.position[0] = placed.point[0];
-        agent.position[1] = placed.point[1];
-        agent.position[2] = placed.point[2];
-        agent.polygon = placed.polygon;
-      }
+    for (const agent of this.agents) {
+      if (agent.seen === agent.surface.version || agent.state === 'offmesh') continue;
+      agent.seen = agent.surface.version;
+      const placed = this.place(agent.position, agent.surface);
+      agent.position[0] = placed.point[0];
+      agent.position[1] = placed.point[1];
+      agent.position[2] = placed.point[2];
+      agent.polygon = placed.polygon;
     }
     // 1. Obstacles as one-sided ORCA discs, then each agent's plan and preferred velocity.
     const obstacles = this.obstacleDiscs;
@@ -310,7 +318,8 @@ export class Crowd {
       });
     }
     for (const agent of this.agents) {
-      if (agent.target && agent.state !== 'arrived' && agent.planned !== version) this.plan(agent, version);
+      if (agent.target && agent.state !== 'arrived' && agent.planned !== agent.surface.version)
+        this.plan(agent, agent.surface.version);
       this.steer(agent, dt);
     }
     // 2. Avoidance: every agent picks its velocity from the same snapshot, then all move.
@@ -335,8 +344,8 @@ export class Crowd {
 
   private plan(agent: CrowdAgent, version: number): void {
     agent.planned = version;
-    const target = this.navMesh.closestPoint(agent.target!),
-      route = target && this.navMesh.route(agent.position, target.point);
+    const target = agent.surface.closestPoint(agent.target!),
+      route = target && agent.surface.route(agent.position, target.point, agent.filter);
     if (!route) {
       agent.state = 'unreachable';
       agent.path = [];
@@ -450,7 +459,13 @@ export class Crowd {
 
   private move(agent: CrowdAgent, vx: number, vz: number, dt: number): void {
     const p = agent.position,
-      mesh = this.navMesh;
+      mesh = agent.surface,
+      filter = agent.filter;
+    // Ground the agent's filter forbids is as good as no mesh, so it slides along the border like a wall.
+    const stand = (x: number, z: number) => {
+      const found = mesh.locate([x, p[1], z]);
+      return found >= 0 && filter && !((filter[mesh.polygonArea(found)] ?? 1) < Infinity) ? -1 : found;
+    };
     if (agent.state === 'offmesh') {
       // On a link: straight to the landing point, height included, without checking the mesh in between.
       const c = agent.path[agent.corner],
@@ -471,14 +486,14 @@ export class Crowd {
     // Try the full move, then each axis alone (sliding along a wall), else stay.
     let nx = p[0] + vx * dt,
       nz = p[2] + vz * dt,
-      polygon = mesh.locate([nx, p[1], nz]);
+      polygon = stand(nx, nz);
     if (polygon < 0) {
-      polygon = mesh.locate([nx, p[1], p[2]]);
+      polygon = stand(nx, p[2]);
       if (polygon >= 0) {
         nz = p[2];
         vz = 0;
       } else {
-        polygon = mesh.locate([p[0], p[1], nz]);
+        polygon = stand(p[0], nz);
         if (polygon >= 0) {
           nx = p[0];
           vx = 0;

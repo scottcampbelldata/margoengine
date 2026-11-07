@@ -17,7 +17,7 @@ export class Crowd {
     readonly navMesh: NavSurface;
     readonly agents: CrowdAgent[];
     constructor(navMesh: NavSurface, options?: CrowdOptions);
-    place(position: Vec3): {
+    place(position: Vec3, surface: NavSurface): {
         point: Vec3;
         polygon: number;
     };
@@ -47,6 +47,9 @@ export class CrowdAgent {
     links: number[];
     polygon: number;
     planned: number;
+    seen: number;
+    readonly surface: NavSurface;
+    readonly filter: NavFilter | undefined;
     readonly disc: {
         id: number;
         position: [number, number];
@@ -55,7 +58,7 @@ export class CrowdAgent {
         radius: number;
         maxSpeed: number;
     };
-    constructor(crowd: Crowd, id: number, options: CrowdAgentOptions, position: Vec3, polygon: number);
+    constructor(crowd: Crowd, id: number, options: CrowdAgentOptions, position: Vec3, polygon: number, surface: NavSurface);
     get valid(): boolean;
     setTarget(target: Vec3): this;
     stop(): this;
@@ -72,6 +75,8 @@ export interface CrowdAgentOptions {
     arrivalDistance?: number;
     slowDownDistance?: number;
     userData?: unknown;
+    navMesh?: NavSurface;
+    filter?: NavFilter;
 }
 
 export type CrowdAgentState = 'idle' | 'moving' | 'offmesh' | 'arrived' | 'unreachable';
@@ -93,6 +98,8 @@ export interface CrowdOptions {
     timeHorizon?: number;
 }
 
+export type NavFilter = ArrayLike<number>;
+
 export type NavLink = Readonly<Link>;
 
 export class NavMesh implements NavSurface {
@@ -105,6 +112,8 @@ export class NavMesh implements NavSurface {
     polygonCenter(index: number): Vec3;
     setAreaCost(index: number, cost: number): this;
     areaCost(index: number): number;
+    setPolygonArea(index: number, area: number): this;
+    polygonArea(index: number): number;
     heightAt(index: number, x: number, z: number): number;
     closestPoint(position: Vec3): {
         point: Vec3;
@@ -113,8 +122,8 @@ export class NavMesh implements NavSurface {
     addOffMeshLink(start: Vec3, end: Vec3, options?: OffMeshLinkOptions): number;
     removeOffMeshLink(id: number): boolean;
     locate(position: Vec3): number;
-    path(start: Vec3, end: Vec3): Vec3[] | null;
-    route(start: Vec3, end: Vec3): NavRoute | null;
+    path(start: Vec3, end: Vec3, filter?: NavFilter): Vec3[] | null;
+    route(start: Vec3, end: Vec3, filter?: NavFilter): NavRoute | null;
 }
 
 export interface NavRoute {
@@ -130,7 +139,8 @@ export interface NavSurface {
         polygon: number;
     } | null;
     heightAt(index: number, x: number, z: number): number;
-    route(start: Vec3, end: Vec3): NavRoute | null;
+    route(start: Vec3, end: Vec3, filter?: NavFilter): NavRoute | null;
+    polygonArea(index: number): number;
 }
 
 export interface OffMeshLinkOptions {

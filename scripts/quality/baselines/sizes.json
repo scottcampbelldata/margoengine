@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10299101,
+  "total": 10337887,
   "history": [
     {
       "date": "2026-10-24",
@@ -3356,6 +3356,12 @@
       "commit": "9c3545c7",
       "reason": "new entry @margoengine/sky/weather-fx (WeatherFX)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "8acf66b36",
+      "reason": "new optional entry @margoengine/navmesh/agents; polygon areas and route filters in the root",
+      "grew": 4
     }
   ],
   "items": {
@@ -3759,9 +3765,10 @@
     "@margoengine/mesh-edit/sculpt-view": 790,
     "@margoengine/mesh-edit/weights": 4033,
     "@margoengine/mixer": 6926,
-    "@margoengine/navmesh": 7408,
-    "@margoengine/navmesh/build": 12341,
-    "@margoengine/navmesh/tiles": 14140,
+    "@margoengine/navmesh": 7694,
+    "@margoengine/navmesh/agents": 15490,
+    "@margoengine/navmesh/build": 12727,
+    "@margoengine/navmesh/tiles": 14638,
     "@margoengine/net": 1371,
     "@margoengine/netcode": 12865,
     "@margoengine/netcode/generate": 5154,

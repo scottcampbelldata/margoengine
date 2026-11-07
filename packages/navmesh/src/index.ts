@@ -1,5 +1,15 @@
 import type { Vec3 } from '@margoengine/math';
-import { CorridorSearch, copy, cross, distance, point, routeThrough, type Link, type NavRoute } from './search.js';
+import {
+  CorridorSearch,
+  checkFilter,
+  copy,
+  cross,
+  distance,
+  point,
+  routeThrough,
+  type Link,
+  type NavRoute,
+} from './search.js';
 
 export type { Vec3 };
 export type { NavRoute };
@@ -14,6 +24,12 @@ export interface OffMeshLinkOptions {
   cost?: number;
 }
 
+/**
+ * What an agent may walk on: its cost multiplier per polygon area number (1 or more, `Infinity` for ground it cannot
+ * enter; a number not listed costs 1). It multiplies the polygon's area cost.
+ */
+export type NavFilter = ArrayLike<number>;
+
 /** What a {@link Crowd} needs of the surface its agents walk on: a {@link NavMesh} or a tiled mesh. */
 export interface NavSurface {
   /** Counts changes that can change a route, so a crowd knows to plan again. */
@@ -21,7 +37,8 @@ export interface NavSurface {
   locate(position: Vec3): number;
   closestPoint(position: Vec3): { point: Vec3; polygon: number } | null;
   heightAt(index: number, x: number, z: number): number;
-  route(start: Vec3, end: Vec3): NavRoute | null;
+  route(start: Vec3, end: Vec3, filter?: NavFilter): NavRoute | null;
+  polygonArea(index: number): number;
 }
 interface Polygon {
   vertices: readonly number[];
@@ -40,6 +57,10 @@ export class NavMesh implements NavSurface {
   private readonly edges: Float64Array;
   private readonly search = new CorridorSearch();
   private readonly adjacency: Link[][];
+  /** Area number per polygon. */
+  private readonly areas: Uint8Array;
+  /** Per polygon cost of the route being planned with a filter. */
+  private filtered: Float64Array | null = null;
   /** Area cost multiplier per polygon: 1 by default, Infinity when blocked. */
   private readonly costs: Float64Array;
   private nextLink = 1;
@@ -157,6 +178,7 @@ export class NavMesh implements NavSurface {
     this.search.reserve(count, linkCount);
     this.adjacency = this.polygons.map((p) => p.links);
     this.costs = new Float64Array(count).fill(1);
+    this.areas = new Uint8Array(count);
   }
   /** Number of polygons. */
   get polygonCount(): number {
@@ -204,6 +226,26 @@ export class NavMesh implements NavSurface {
   areaCost(index: number): number {
     this.polygon(index);
     return this.costs[index];
+  }
+  /**
+   * Sets the area number of polygon `index`, 0 to 255, for route filters: what kind of ground it is. `./build` sets it
+   * from its `areas` boxes.
+   * @throws RangeError for an index out of range or another number.
+   */
+  setPolygonArea(index: number, area: number): this {
+    this.polygon(index);
+    if (!Number.isInteger(area) || area < 0 || area > 255)
+      throw new RangeError('Polygon area must be a whole number from 0 to 255.');
+    if (this.areas[index] !== area) {
+      this.areas[index] = area;
+      this.changes++;
+    }
+    return this;
+  }
+  /** Area number of polygon `index` (0 by default). */
+  polygonArea(index: number): number {
+    this.polygon(index);
+    return this.areas[index];
   }
   /** Height of polygon `index`'s plane at (x, z). */
   heightAt(index: number, x: number, z: number): number {
@@ -285,6 +327,14 @@ export class NavMesh implements NavSurface {
     if (found) this.changes++;
     return found;
   }
+  /** Area costs with `filter` applied, in a buffer kept for the next route. */
+  private filter(filter: NavFilter): Float64Array {
+    checkFilter(filter);
+    const costs = (this.filtered ??= new Float64Array(this.costs.length)),
+      { areas } = this;
+    for (let p = 0; p < costs.length; p++) costs[p] = this.costs[p] * (filter[areas[p]] ?? 1);
+    return costs;
+  }
   private linkCount(): number {
     let links = 0;
     for (const polygon of this.polygons) links += polygon.links.length;
@@ -329,20 +379,21 @@ export class NavMesh implements NavSurface {
    * off the mesh or no route connects them.
    * @throws RangeError when a point is not a finite 3D point.
    */
-  path(start: Vec3, end: Vec3): Vec3[] | null {
-    return this.route(start, end)?.points ?? null;
+  path(start: Vec3, end: Vec3, filter?: NavFilter): Vec3[] | null {
+    return this.route(start, end, filter)?.points ?? null;
   }
   /**
    * {@link NavMesh.path} with the off-mesh crossings marked: the waypoints, and the indices where a segment crosses
-   * an off-mesh link. Area costs steer the search; a blocked end polygon has no route.
+   * an off-mesh link. Area costs and `filter` steer the search; a blocked end polygon has no route.
    * @throws RangeError when a point is not a finite 3D point.
    */
-  route(start: Vec3, end: Vec3): NavRoute | null {
+  route(start: Vec3, end: Vec3, filter?: NavFilter): NavRoute | null {
     const from = this.locate(start),
-      to = this.locate(end);
-    if (from < 0 || to < 0 || !(this.costs[to] < Infinity)) return null;
+      to = this.locate(end),
+      costs = filter ? this.filter(filter) : this.costs;
+    if (from < 0 || to < 0 || !(costs[to] < Infinity)) return null;
     if (from === to) return { points: [copy(start), copy(end)], offMesh: [] };
-    const corridor = this.search.find(from, to, start, end, this.polygons.length, this.adjacency, this.costs);
+    const corridor = this.search.find(from, to, start, end, this.polygons.length, this.adjacency, costs);
     return corridor && routeThrough(corridor, start, end);
   }
 }

@@ -62,6 +62,11 @@ export interface NavigationOptions {
    * are removed before erosion, so the mesh keeps `walkableRadius` clear of them. Rebuild to move one. Default none.
    */
   obstacles?: readonly NavObstacle[];
+  /**
+   * Boxes of marked ground (water, a road, lava), world units: floor cells under a box take its `area` number, later
+   * boxes over earlier ones, and the polygons there report it (`polygonArea`), for `route` filters. Default none.
+   */
+  areas?: readonly NavArea[];
 }
 
 /** An axis-aligned box carved out of the walkable area ({@link NavigationOptions.obstacles}), world units. */
@@ -70,6 +75,12 @@ export interface NavObstacle {
   min: readonly [number, number, number];
   /** Highest corner [x, y, z]. */
   max: readonly [number, number, number];
+}
+
+/** A box of marked ground ({@link NavigationOptions.areas}), world units. */
+export interface NavArea extends NavObstacle {
+  /** Area number, 1 to 255 (0 is ground no box marks). */
+  area: number;
 }
 
 const DEFAULTS: Required<NavigationOptions> = {
@@ -89,6 +100,7 @@ const DEFAULTS: Required<NavigationOptions> = {
   detailSampleMaxError: 1,
   buildBvTree: true,
   obstacles: [],
+  areas: [],
 };
 const VOXEL_BUDGET = 16_000_000;
 const FIX = 'check the geometry is walkable at these settings (cs, walkableSlopeAngle)';
@@ -156,14 +168,19 @@ export function validate(
   const config = { ...DEFAULTS, ...given } as Required<NavigationOptions>;
   if (!Array.isArray(config.obstacles))
     throw new RangeError('Invalid navigation obstacles: give an array of {min: [x, y, z], max: [x, y, z]} boxes');
-  for (const box of config.obstacles) {
+  if (!Array.isArray(config.areas))
+    throw new RangeError('Invalid navigation areas: give an array of {min: [x, y, z], max: [x, y, z], area} boxes');
+  for (const box of [...config.obstacles, ...config.areas]) {
     const corner = (v: unknown) =>
       Array.isArray(v) && v.length === 3 && v.every((c) => typeof c === 'number' && Number.isFinite(c));
     if (!box || !corner(box.min) || !corner(box.max) || box.min.some((c: number, i: number) => c > box.max[i]))
       throw new RangeError('Invalid navigation obstacle: give {min: [x, y, z], max: [x, y, z]} with min <= max');
   }
+  for (const { area } of config.areas)
+    if (!Number.isInteger(area) || area < 1 || area > 255)
+      throw new RangeError('Invalid navigation area: area must be a whole number from 1 to 255');
   for (const key of Object.keys(DEFAULTS) as (keyof NavigationOptions)[]) {
-    if (key === 'obstacles') continue;
+    if (key === 'obstacles' || key === 'areas') continue;
     const value = config[key];
     if (
       key === 'buildBvTree'
@@ -732,6 +749,21 @@ export function polygonise(
         }
   }
 
+  // Marked ground: the same reach as an obstacle, later boxes over earlier ones.
+  const area = new Uint8Array(total);
+  for (const box of config.areas) {
+    const x0 = Math.max(0, Math.ceil((box.min[0] - ox) / cs - 0.5) - cx),
+      x1 = Math.min(width - 1, Math.floor((box.max[0] - ox) / cs - 0.5) - cx),
+      z0 = Math.max(0, Math.ceil((box.min[2] - oz) / cs - 0.5) - cz),
+      z1 = Math.min(depth - 1, Math.floor((box.max[2] - oz) / cs - 0.5) - cz);
+    for (let z = z0; z <= z1; z++)
+      for (let x = x0; x <= x1; x++)
+        for (let s = head[z * width + x]; s >= 0; s = next[s]) {
+          const floor = oy + top[s] * ch;
+          if (floor >= box.min[1] - climb * ch && floor <= box.max[1]) area[s] = box.area;
+        }
+  }
+
   // Links between open spans of neighbouring cells: tops within a step (plus the slope's own rise) and room to
   // pass. Only mutual links are kept, so region borders look the same from both sides.
   const link = new Int32Array(total * 4);
@@ -856,9 +888,11 @@ export function polygonise(
     relink();
   }
 
-  // 4. Monotone regions. A run is a maximal +x chain of linked spans in one row. A run continues the region below
-  // when that region is the only one it touches, it is the only run touching that region, and wherever both rows
-  // have a cell of the region in the same column those cells are linked (no slit inside a region).
+  // 4. Monotone regions. A run is a maximal +x chain of linked spans of one area in one row. A run continues the region
+  // below when that region is the only one it touches, it is the only run touching that region, and wherever both rows
+  // have a cell of the region in the same column those cells are linked (no slit inside a region). A region holds one
+  // area: a neighbour of another area counts as a gap in the rows, as a wall would.
+  const sameArea = (a: number, b: number) => b >= 0 && area[a] === area[b];
   const region = new Int32Array(total).fill(-1);
   interface Region {
     spans: number[];
@@ -875,9 +909,9 @@ export function polygonise(
     const runs: number[][] = [];
     for (let x = 0; x < width; x++)
       for (let s = head[z * width + x]; s >= 0; s = next[s]) {
-        if (!open[s] || link[4 * s] >= 0) continue;
+        if (!open[s] || sameArea(s, link[4 * s])) continue;
         const run = [s];
-        for (let v = link[4 * s + 2]; v >= 0; v = link[4 * v + 2]) run.push(v);
+        for (let v = s; sameArea(v, link[4 * v + 2]); ) run.push((v = link[4 * v + 2]));
         runs.push(run);
       }
     const touching = new Map<number, number>(),
@@ -886,14 +920,15 @@ export function polygonise(
       let only = -1;
       for (const s of run) {
         const n = link[4 * s + 3];
-        if (n < 0) continue;
+        if (!sameArea(s, n)) continue;
         const r = region[n];
         if (only === -1) only = r;
         else if (only !== r) only = -2;
       }
       belowOf.push(only);
       if (only >= 0) touching.set(only, (touching.get(only) ?? 0) + 1);
-      else if (only === -2) for (const s of run) if (link[4 * s + 3] >= 0) touching.set(region[link[4 * s + 3]], 2);
+      else if (only === -2)
+        for (const s of run) if (sameArea(s, link[4 * s + 3])) touching.set(region[link[4 * s + 3]], 2);
     }
     runs.forEach((run, i) => {
       let id = belowOf[i];
@@ -901,7 +936,7 @@ export function polygonise(
         const r = regions[id];
         for (const s of run) {
           const n = link[4 * s + 3];
-          if (spanX[s] >= r.x0 && spanX[s] <= r.x1 && (n < 0 || region[n] !== id)) {
+          if (spanX[s] >= r.x0 && spanX[s] <= r.x1 && (!sameArea(s, n) || region[n] !== id)) {
             id = -1;
             break;
           }
@@ -932,7 +967,7 @@ export function polygonise(
       for (const s of lower) {
         if (spanX[s] < u0 || spanX[s] > u1) continue;
         const n = link[4 * s + 1];
-        if (n < 0 || region[n] !== upperId) return 0;
+        if (!sameArea(s, n) || region[n] !== upperId) return 0;
         links++;
       }
       return links;
@@ -946,7 +981,7 @@ export function polygonise(
         above = false;
       for (const s of r.last) {
         const n = link[4 * s + 1];
-        if (n < 0) continue;
+        if (!sameArea(s, n)) continue;
         const q = regions[region[n]];
         if (region[n] === id || q.firstRow !== r.lastRow + 1) continue;
         const score = fits(r.last, q.first, region[n]);
@@ -958,7 +993,7 @@ export function polygonise(
       }
       for (const s of r.first) {
         const n = link[4 * s + 3];
-        if (n < 0) continue;
+        if (!sameArea(s, n)) continue;
         const q = regions[region[n]];
         if (region[n] === id || q.lastRow !== r.firstRow - 1) continue;
         const score = fits(q.last, r.first, id);
@@ -1310,8 +1345,9 @@ export function polygonise(
       }
     return true;
   };
-  const polygons: number[][] = [];
-  for (const contour of contours.values()) {
+  const polygons: number[][] = [],
+    polygonAreas: number[] = [];
+  for (const [id, contour] of contours) {
     const corners = triangulate(
       contour.map((v) => vx[v]),
       contour.map((v) => vz[v]),
@@ -1362,6 +1398,7 @@ export function polygonise(
       }
     }
     polygons.push(...pieces);
+    for (let i = 0; i < pieces.length; i++) polygonAreas.push(area[regions[id].spans[0]]);
   }
   if (!polygons.length) return 'no walkable polygon could be built';
   if (polygons.length > 4096 || vx.length > 100_000)
@@ -1386,5 +1423,6 @@ export function polygonise(
   } catch (error) {
     return failed(`the polygons were rejected (${(error as Error).message})`);
   }
+  polygonAreas.forEach((value, p) => value && mesh.setPolygonArea(p, value));
   return { mesh, vertices, polygons: indexed, config, maxRise };
 }

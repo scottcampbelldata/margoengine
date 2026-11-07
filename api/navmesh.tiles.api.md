@@ -39,14 +39,15 @@ export class TiledNavMesh implements NavSurface {
     tile(x: number, z: number): NavTile | null;
     polygonCenter(index: number): Vec3;
     polygonLinks(index: number): readonly NavLink[];
+    polygonArea(index: number): number;
     heightAt(index: number, x: number, z: number): number;
     locate(position: Vec3): number;
     closestPoint(position: Vec3): {
         point: Vec3;
         polygon: number;
     } | null;
-    path(start: Vec3, end: Vec3): Vec3[] | null;
-    route(start: Vec3, end: Vec3): NavRoute | null;
+    path(start: Vec3, end: Vec3, filter?: NavFilter): Vec3[] | null;
+    route(start: Vec3, end: Vec3, filter?: NavFilter): NavRoute | null;
     addOffMeshLink(start: Vec3, end: Vec3, options?: OffMeshLinkOptions): number;
     removeOffMeshLink(id: number): boolean;
     dispose(): void;
@@ -104,6 +105,12 @@ interface Link {
     end?: Vec3;
 }
 
+interface NavArea extends NavObstacle {
+    area: number;
+}
+
+type NavFilter = ArrayLike<number>;
+
 type NavLink = Readonly<Link>;
 
 class NavMesh implements NavSurface {
@@ -116,6 +123,8 @@ class NavMesh implements NavSurface {
     polygonCenter(index: number): Vec3;
     setAreaCost(index: number, cost: number): this;
     areaCost(index: number): number;
+    setPolygonArea(index: number, area: number): this;
+    polygonArea(index: number): number;
     heightAt(index: number, x: number, z: number): number;
     closestPoint(position: Vec3): {
         point: Vec3;
@@ -124,8 +133,8 @@ class NavMesh implements NavSurface {
     addOffMeshLink(start: Vec3, end: Vec3, options?: OffMeshLinkOptions): number;
     removeOffMeshLink(id: number): boolean;
     locate(position: Vec3): number;
-    path(start: Vec3, end: Vec3): Vec3[] | null;
-    route(start: Vec3, end: Vec3): NavRoute | null;
+    path(start: Vec3, end: Vec3, filter?: NavFilter): Vec3[] | null;
+    route(start: Vec3, end: Vec3, filter?: NavFilter): NavRoute | null;
 }
 
 interface NavObstacle {
@@ -146,7 +155,8 @@ interface NavSurface {
         polygon: number;
     } | null;
     heightAt(index: number, x: number, z: number): number;
-    route(start: Vec3, end: Vec3): NavRoute | null;
+    route(start: Vec3, end: Vec3, filter?: NavFilter): NavRoute | null;
+    polygonArea(index: number): number;
 }
 
 interface NavigationOptions {
@@ -166,6 +176,7 @@ interface NavigationOptions {
     detailSampleMaxError?: number;
     buildBvTree?: boolean;
     obstacles?: readonly NavObstacle[];
+    areas?: readonly NavArea[];
 }
 
 interface OffMeshLinkOptions {

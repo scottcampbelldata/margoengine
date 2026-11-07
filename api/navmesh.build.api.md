@@ -6,6 +6,10 @@
 import { Vec3 } from "@margoengine/core";
 import { Vec3Like } from "@margoengine/math";
 
+export interface NavArea extends NavObstacle {
+    area: number;
+}
+
 export interface NavObstacle {
     min: readonly [number, number, number];
     max: readonly [number, number, number];
@@ -36,6 +40,7 @@ export interface NavigationOptions {
     detailSampleMaxError?: number;
     buildBvTree?: boolean;
     obstacles?: readonly NavObstacle[];
+    areas?: readonly NavArea[];
 }
 
 export function buildNavMesh(positions: ArrayLike<number>, indices: ArrayLike<number>, options?: NavigationOptions): NavMesh;
@@ -52,6 +57,8 @@ interface Link {
     end?: Vec3;
 }
 
+type NavFilter = ArrayLike<number>;
+
 type NavLink = Readonly<Link>;
 
 class NavMesh implements NavSurface {
@@ -64,6 +71,8 @@ class NavMesh implements NavSurface {
     polygonCenter(index: number): Vec3;
     setAreaCost(index: number, cost: number): this;
     areaCost(index: number): number;
+    setPolygonArea(index: number, area: number): this;
+    polygonArea(index: number): number;
     heightAt(index: number, x: number, z: number): number;
     closestPoint(position: Vec3): {
         point: Vec3;
@@ -72,8 +81,8 @@ class NavMesh implements NavSurface {
     addOffMeshLink(start: Vec3, end: Vec3, options?: OffMeshLinkOptions): number;
     removeOffMeshLink(id: number): boolean;
     locate(position: Vec3): number;
-    path(start: Vec3, end: Vec3): Vec3[] | null;
-    route(start: Vec3, end: Vec3): NavRoute | null;
+    path(start: Vec3, end: Vec3, filter?: NavFilter): Vec3[] | null;
+    route(start: Vec3, end: Vec3, filter?: NavFilter): NavRoute | null;
 }
 
 interface NavRoute {
@@ -89,7 +98,8 @@ interface NavSurface {
         polygon: number;
     } | null;
     heightAt(index: number, x: number, z: number): number;
-    route(start: Vec3, end: Vec3): NavRoute | null;
+    route(start: Vec3, end: Vec3, filter?: NavFilter): NavRoute | null;
+    polygonArea(index: number): number;
 }
 
 interface OffMeshLinkOptions {

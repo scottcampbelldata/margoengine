@@ -79,6 +79,7 @@ The generator voxelises the walkable triangles (slope below `walkableSlopeAngle`
 | `borderSize` | 0 | voxels; accepted, no effect on a single mesh |
 | `buildBvTree` | true | spatial index for endpoint snapping |
 | `obstacles` | [] | `{min, max}` world-space boxes carved out of the walkable area |
+| `areas` | [] | `{min, max, area}` world-space boxes of marked ground, area numbers 1 to 255, for route filters (`./agents`) |
 
 `path` snaps an end that is off the mesh to the nearest walkable point within `walkableRadius + 4` cells across and `walkableHeight + walkableClimb + 2` voxels up or down; an end standing on the mesh is used as given. Both ends at the same point give a one-point path. Limits: 3,000,000 position values, 6,000,000 indices, `ceil(xSize / cs) * ceil(zSize / cs)` at most 16,000,000 cells, and the NavMesh limits on the result (4096 polygons, 100,000 vertices: raise `cs` or `maxEdgeLen` for bigger levels). `create` is async for compatibility and rejects for invalid input; a level with nothing walkable rejects with a `MargoError` of code `failed`.
 
@@ -117,6 +118,44 @@ crowd.addAgent({position: [1, 0, 1]}).setTarget([60, 0, 60]);
 - **What rebuilds.** `addObstacle`, `moveObstacle`, `removeObstacle`, `addGeometry` and `removeGeometry` mark the tiles they reach; `update(maxTiles)` rebuilds the waiting tiles, oldest first, and returns how many. A tile still waiting keeps its old polygons, so routes never see a half-built world.
 - **Same walkable area.** A tile sees past its edge by `walkableRadius + 2` cells before it keeps its own cells, so the area does not depend on the tiling, and any run of changes gives the tiles a fresh build would.
 - **Polygon numbers** change when a tile rebuilds: keep positions, not numbers. Off-mesh links are put back after a rebuild, and sleep while an end has no polygon under it. `tile(x, z)` and `tileList()` show each tile's own `NavMesh`.
+
+## Agent types and filters (`./agents`)
+
+```ts
+import {Crowd} from 'margoengine/navmesh';
+import {NavAgents} from 'margoengine/navmesh/agents';
+
+// A 30 x 30 m floor with a lake and a road across it.
+const positions = [0, 0, 0, 30, 0, 0, 30, 0, 30, 0, 0, 30], indices = [0, 2, 1, 0, 3, 2];
+const agents = new NavAgents(positions, indices, {
+  cs: 0.2, ch: 0.1,
+  areas: [
+    {min: [10, -1, 0], max: [20, 1, 26], area: 'water'},
+    {min: [0, -1, 26], max: [30, 1, 30], area: 'road'},
+  ],
+  types: {
+    soldier: {radius: 0.4, height: 1.8, areas: {water: Infinity}},
+    monster: {radius: 1.5, height: 3, climb: 0.8, maxSpeed: 5, areas: {water: 3}},
+    truck: {radius: 1.5, height: 3, maxSlope: 15, areas: {ground: 4, water: Infinity}},
+    fish: {radius: 0.4, areas: {ground: Infinity, road: Infinity}},
+  },
+});
+
+console.log(agents.meshCount); // 2: one mesh per size, a filter per type
+console.log(agents.path('soldier', [5, 0, 5], [25, 0, 5])); // round the lake
+console.log(agents.path('fish', [12, 0, 5], [18, 0, 20])); // stays in it
+
+const crowd = new Crowd(agents.mesh('soldier'));
+const guard = agents.addAgent(crowd, 'soldier', {position: [5, 0, 5]});
+const beast = agents.addAgent(crowd, 'monster', {position: [5, 0, 8]}); // its own mesh, same crowd
+guard.setTarget([25, 0, 5]);
+beast.setTarget([25, 0, 5]);
+crowd.update(1 / 60);
+```
+
+A type gives, in world units, `radius` (0.5), `height` (2), `climb` (0.4), `maxSlope` (45 degrees), `maxSpeed` (3.5), and `areas`, its cost per area name: a multiplier of 1 or more, or `Infinity` for ground it cannot enter. An area it does not name costs 1, and `ground` is everything no box marks. Types of one size share a mesh. The other options are those of `./build`, with `tileSize` to tile each mesh (`./tiles`).
+
+The same pieces work without `NavAgents`: `./build` and `./tiles` take `areas: [{min, max, area}]` with area numbers 1 to 255; `mesh.polygonArea(i)` and `mesh.setPolygonArea(i, area)` read and set them; `route(start, end, filter)` and `path(start, end, filter)` take the cost per area number; and `crowd.addAgent({navMesh, filter})` puts one agent on its own mesh and ground.
 
 Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 
