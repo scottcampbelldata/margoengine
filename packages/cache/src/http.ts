@@ -54,3 +54,12 @@ export async function transact(
     t.onerror = t.onabort = () => no(t.error ?? new DOMException('Transaction aborted', 'AbortError'));
   });
 }
+
+/**
+ * The network fetch of a cache made without one: `globalThis.fetch` as it is when the cache is made. Read later, a page
+ * that then sets `globalThis.fetch = cache.fetch` made the cache call itself without end and no request ever left.
+ */
+export function defaultFetch(): typeof globalThis.fetch {
+  const base = globalThis.fetch;
+  return (input, init) => (base ?? globalThis.fetch)(input, init);
+}

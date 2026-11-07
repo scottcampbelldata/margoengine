@@ -1,5 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-import { freshUntil } from './http.js';
+import { defaultFetch, freshUntil } from './http.js';
 /** Options for `new AssetCache(...)`. A negative or NaN `maxBytes` or `timeout` throws a RangeError. */
 export interface AssetCacheOptions {
   /** IndexedDB database name, one per app or asset set. Default `'margo-assets'`. */
@@ -12,7 +12,7 @@ export interface AssetCacheOptions {
   persist?: boolean;
   /** A stale file is served from the cache when revalidating takes longer than this (ms). Default 5000. */
   timeout?: number;
-  /** Network fetch underneath, for example one that adds credentials. Default `globalThis.fetch`. */
+  /** Network fetch underneath, for example one that adds credentials. Default `globalThis.fetch` as it is at construction, so setting `globalThis.fetch` to this one later is safe. */
   fetch?: typeof fetch;
   /**
    * How long a stored file is used without revalidating. `'http'`: `Cache-Control: max-age`, else `Expires`, less the
@@ -157,7 +157,7 @@ export class AssetCache {
       throw new RangeError('AssetCache maxBytes and timeout must be non-negative');
     this.maxBytes = maxBytes;
     this.timeout = timeout;
-    this.network = fetch ?? ((input, init) => globalThis.fetch(input, init));
+    this.network = fetch ?? defaultFetch();
     this.keys = keys;
     this.maxAgeOnly = freshness === 'max-age';
     this.eviction = eviction;

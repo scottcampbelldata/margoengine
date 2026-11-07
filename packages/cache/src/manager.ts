@@ -22,7 +22,7 @@ export interface LoadingBytes {
 
 /** Options for `new LoadingManager(...)`; the callbacks can also be set later as properties. */
 export interface LoadingManagerOptions {
-  /** Fetch underneath, for example `@margoengine/cache`'s `cache.fetch`. Default `globalThis.fetch`. */
+  /** Fetch underneath, for example `@margoengine/cache`'s `cache.fetch`. Default `globalThis.fetch` as it is at construction, so setting `globalThis.fetch` to this one later is safe. */
   fetch?: LoadingFetch;
   /** See `LoadingManager.onStart`. */
   onStart?: LoadingManager['onStart'];
@@ -76,7 +76,9 @@ export class LoadingManager {
   constructor({ fetch, onStart, onProgress, onLoad, onError }: LoadingManagerOptions = {}) {
     if (fetch !== undefined && typeof fetch !== 'function')
       throw new TypeError('LoadingManager fetch is not a function; pass a fetch-compatible function');
-    this.network = fetch ?? ((input, init) => globalThis.fetch(input, init));
+    // globalThis.fetch as it is now: read later, `globalThis.fetch = x.fetch` would make this call itself without end.
+    const base = globalThis.fetch;
+    this.network = fetch ?? ((input, init) => (base ?? globalThis.fetch)(input, init));
     Object.assign(this, { onStart, onProgress, onLoad, onError });
   }
 

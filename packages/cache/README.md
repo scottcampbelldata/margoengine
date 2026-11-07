@@ -68,7 +68,9 @@ console.log(ranges.stats, await ranges.usage()); // {hits, revalidated, offline,
 ```
 
 Progressive streaming runs its requests in a worker with the global `fetch`, so it reaches the cache through a service
-worker. Route every request for a streamed file to the RangeCache (it also answers whole-file requests from its blocks):
+worker. Route every request for a streamed file to the RangeCache (it also answers whole-file requests from its blocks).
+Where code fetches on the main thread, `globalThis.fetch = ranges.fetch` works as well: a cache, `LoadingManager` or `Prefetcher`
+made without `fetch` keeps the `globalThis.fetch` of the moment it was made, so it never calls itself.
 
 ```js
 // sw.js (module service worker)

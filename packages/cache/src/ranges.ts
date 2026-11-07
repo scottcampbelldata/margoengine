@@ -1,5 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-import { byteRange, contentRange, freshUntil, transact } from './http.js';
+import { byteRange, contentRange, defaultFetch, freshUntil, transact } from './http.js';
 
 /** Options for `new RangeCache(...)`. A negative or NaN `maxBytes` or `timeout`, or a `block` under 1, throws a RangeError. */
 export interface RangeCacheOptions {
@@ -13,7 +13,7 @@ export interface RangeCacheOptions {
   block?: number;
   /** Stored blocks are served when revalidating takes longer than this (ms). Default 5000. */
   timeout?: number;
-  /** Network fetch underneath. Default `globalThis.fetch`. */
+  /** Network fetch underneath. Default `globalThis.fetch` as it is at construction, so setting `globalThis.fetch` to this one later is safe. */
   fetch?: typeof fetch;
 }
 /** Counts since construction. `hits` includes `revalidated` and `offline`. */
@@ -110,7 +110,7 @@ export class RangeCache {
     this.maxBytes = maxBytes;
     this.block = block;
     this.timeout = timeout;
-    this.network = fetch ?? ((input, init) => globalThis.fetch(input, init));
+    this.network = fetch ?? defaultFetch();
     this.db = this.open(name, `${version}\n${block}`).catch(() => null);
   }
 

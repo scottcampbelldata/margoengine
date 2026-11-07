@@ -3,7 +3,7 @@ import { margoError } from '../../shared/errors.js';
 
 /** Options for `new Prefetcher(...)`. A `concurrency` under 1 or a negative `idleTimeout` throws a RangeError. */
 export interface PrefetcherOptions {
-  /** Fetch for each file, normally an AssetCache's `fetch` so the bytes are stored. Default `globalThis.fetch`. */
+  /** Fetch for each file, normally an AssetCache's `fetch` so the bytes are stored. Default `globalThis.fetch` as it is at construction, so setting `globalThis.fetch` to this one later is safe. */
   fetch?: typeof fetch;
   /** Files fetched at once. Default 2. */
   concurrency?: number;
@@ -79,7 +79,9 @@ export class Prefetcher {
   constructor({ fetch, concurrency = 2, idle = true, idleTimeout = 2000, signal }: PrefetcherOptions = {}) {
     if (!(concurrency >= 1) || !(idleTimeout >= 0))
       throw new RangeError('Prefetcher concurrency must be at least 1 and idleTimeout non-negative');
-    this.network = fetch ?? ((input, init) => globalThis.fetch(input, init));
+    // globalThis.fetch as it is now: read later, `globalThis.fetch = x.fetch` would make this call itself without end.
+    const base = globalThis.fetch;
+    this.network = fetch ?? ((input, init) => (base ?? globalThis.fetch)(input, init));
     this.concurrency = concurrency;
     this.idle = idle;
     this.idleTimeout = idleTimeout;
