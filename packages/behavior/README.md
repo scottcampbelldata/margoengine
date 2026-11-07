@@ -307,6 +307,48 @@ highest, so a point that cannot win never pays for its ray. The answer is the on
 scores go to the candidate collected first. `explainQuery(option)` runs everything and returns every candidate with its
 score and the first condition it failed, for drawing in a debug view.
 
+## Goal planner
+
+Give agents goals and actions and let them work out the steps. Goals and actions never name each other, so a new action
+joins every plan it helps without touching the rest.
+
+```ts
+import { type GoapAction, GoapAgent, planActions } from 'margoengine/behavior/goap';
+
+const actions: GoapAction[] = [
+  { name: 'Attack', preconditions: { Armed: true, At: 'target' }, effects: { TargetDead: true } },
+  { name: 'DrawWeapon', preconditions: { Holstered: true }, effects: { Armed: true } },
+  { name: 'PickupPipe', preconditions: { At: 'pipe' }, effects: { Armed: true } },
+  { name: 'GotoPipe', cost: 2, effects: { At: 'pipe' } },
+  { name: 'GotoTarget', cost: 2, effects: { At: 'target' } },
+];
+
+const plan = planActions({ Armed: false, Holstered: false, At: 'door' }, { TargetDead: true }, actions);
+plan?.actions.map((action) => action.name); // ['GotoPipe', 'PickupPipe', 'GotoTarget', 'Attack']
+
+const agent = new GoapAgent(
+  [
+    { name: 'Kill', desired: { TargetDead: true }, relevance: 2 },
+    { name: 'Survive', desired: { Safe: true }, relevance: (state) => (state.Danger ? 5 : 0) },
+  ],
+  [...actions, { name: 'Flee', effects: { Safe: true } }],
+  { state: { Armed: false, Holstered: true, At: 'door' } },
+);
+agent.update(1 / 60); // every tick
+agent.state.Danger = true; // a sensor; the next update drops the plan and flees
+```
+
+A symbol's value is a boolean, a string or a finite number, and a symbol that is not set matches nothing, `false`
+included. `planActions` returns the cheapest sequence, or `null` when there is none within `maxNodes` (10,000). An action
+can take `available(state)`, a test no action could make true, run once per plan: keep it cheap, and move anything slow
+to a sensor that writes a symbol.
+
+`GoapAgent` plans only when it must: the most relevant goal changed or now holds, an action returned `'failure'`, or the
+next action's preconditions broke before it started. `run(state, delta)` does the work and returns `'running'`,
+`'success'` or `'failure'`; success writes the action's `effects` to `agent.state`. On failure, write a symbol saying
+why, or the next plan will try the same thing. A goal with no plan falls through to the next and is not tried again
+until the state changes.
+
 Errors name their fix: a bad argument throws `TypeError` or `RangeError` (`Agent maxSpeed must be a finite number of
 0 or more`), a call that is not valid right now throws `MargoError` with code `state` (ticking from inside a handler),
 `disposed` (after `dispose()`) or `failed` (a rejected task). `using tree = new BehaviorTree(...)` halts it at the end

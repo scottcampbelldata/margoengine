@@ -1,6 +1,6 @@
 {
-  "commit": "b1180f8b5",
-  "dirty": true,
+  "commit": "75dc10d1a",
+  "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
     "raw": 57071,
@@ -122,6 +122,10 @@
       "./eqs": {
         "raw": 5075,
         "gzip": 1965
+      },
+      "./goap": {
+        "raw": 4638,
+        "gzip": 1901
       }
     },
     "@margoengine/biomes": {
@@ -1760,26 +1764,30 @@
     },
     "@margoengine/net": {
       ".": {
-        "raw": 3033,
-        "gzip": 1259
+        "raw": 4357,
+        "gzip": 1729
       },
       "./delay": {
         "raw": 3640,
         "gzip": 1295
       },
       "./fields": {
-        "raw": 6705,
-        "gzip": 2646
+        "raw": 6812,
+        "gzip": 2680
+      },
+      "./timeline": {
+        "raw": 2983,
+        "gzip": 1239
       }
     },
     "@margoengine/netcode": {
       ".": {
-        "raw": 38940,
-        "gzip": 12490
+        "raw": 38705,
+        "gzip": 12445
       },
       "./rollback": {
-        "raw": 8876,
-        "gzip": 3181
+        "raw": 8910,
+        "gzip": 3196
       },
       "./websocket": {
         "raw": 1975,
@@ -1790,12 +1798,12 @@
         "gzip": 756
       },
       "./node": {
-        "raw": 17082,
-        "gzip": 6201
+        "raw": 17116,
+        "gzip": 6212
       },
       "./rooms": {
-        "raw": 15492,
-        "gzip": 5249
+        "raw": 15526,
+        "gzip": 5264
       },
       "./generate": {
         "raw": 16662,
@@ -1834,8 +1842,8 @@
         "gzip": 19145
       },
       "./next": {
-        "raw": 85631,
-        "gzip": 49094
+        "raw": 97222,
+        "gzip": 57331
       }
     },
     "@margoengine/physics2d": {
