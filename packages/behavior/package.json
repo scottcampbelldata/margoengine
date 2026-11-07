@@ -1,7 +1,7 @@
 {
   "name": "@margoengine/behavior",
   "version": "1.0.0",
-  "description": "Game AI: behaviour trees with a typed blackboard and async tasks, utility-AI scoring, steering and flocking behaviours, perception (./perception), environment queries (./eqs), and a goal planner (./goap).",
+  "description": "Game AI: behaviour trees with a typed blackboard and async tasks, utility-AI scoring, steering and flocking behaviours, perception (./perception), environment queries (./eqs), a goal planner (./goap), and smart objects (./smart-objects).",
   "keywords": [
     "margoengine",
     "webgpu",
@@ -47,6 +47,10 @@
     "./goap": {
       "types": "./dist/goap.d.ts",
       "import": "./dist/goap.js"
+    },
+    "./smart-objects": {
+      "types": "./dist/smart-objects.d.ts",
+      "import": "./dist/smart-objects.js"
     }
   },
   "files": [

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10504994,
+  "total": 10507023,
   "history": [
     {
       "date": "2026-10-24",
@@ -3554,6 +3554,12 @@
       "commit": "1cf37e2d0",
       "reason": "netcode interest entry, new optional entry @margoengine/netcode/interest",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "7b70a3a8d",
+      "reason": "new optional entry @margoengine/behavior/smart-objects",
+      "grew": 1
     }
   ],
   "items": {
@@ -3584,6 +3590,7 @@
     "@margoengine/behavior/eqs": 2221,
     "@margoengine/behavior/goap": 2157,
     "@margoengine/behavior/perception": 3773,
+    "@margoengine/behavior/smart-objects": 2029,
     "@margoengine/behavior/steering": 3827,
     "@margoengine/biomes": 16819,
     "@margoengine/biomes dist/workers/biomes.js": 50739,

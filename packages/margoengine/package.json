@@ -150,6 +150,10 @@
       "types": "./dist/behavior/goap.d.ts",
       "import": "./dist/behavior/goap.js"
     },
+    "./behavior/smart-objects": {
+      "types": "./dist/behavior/smart-objects.d.ts",
+      "import": "./dist/behavior/smart-objects.js"
+    },
     "./biomes": {
       "types": "./dist/biomes.d.ts",
       "import": "./dist/biomes.js"

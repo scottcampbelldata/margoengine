@@ -1,6 +1,6 @@
 {
-  "commit": "8ac2569ae",
-  "dirty": true,
+  "commit": "7b70a3a8d",
+  "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
     "raw": 57071,
@@ -126,6 +126,10 @@
       "./goap": {
         "raw": 4638,
         "gzip": 1901
+      },
+      "./smart-objects": {
+        "raw": 4499,
+        "gzip": 1773
       }
     },
     "@margoengine/biomes": {
@@ -1782,8 +1786,8 @@
     },
     "@margoengine/netcode": {
       ".": {
-        "raw": 38705,
-        "gzip": 12445
+        "raw": 38798,
+        "gzip": 12465
       },
       "./rollback": {
         "raw": 8910,
@@ -1798,12 +1802,16 @@
         "gzip": 756
       },
       "./node": {
-        "raw": 17116,
+        "raw": 17118,
         "gzip": 6212
       },
       "./rooms": {
         "raw": 15526,
         "gzip": 5264
+      },
+      "./interest": {
+        "raw": 5662,
+        "gzip": 2260
       },
       "./generate": {
         "raw": 16662,

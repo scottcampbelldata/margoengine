@@ -349,6 +349,62 @@ next action's preconditions broke before it started. `run(state, delta)` does th
 why, or the next plan will try the same thing. A goal with no plan falls through to the next and is not tried again
 until the state changes.
 
+## Smart objects
+
+World objects say what they can be used for, so an agent needs no code per object: drop a new bench in the level and
+every agent can use it.
+
+```ts
+import { SmartObject, SmartObjects } from 'margoengine/behavior/smart-objects';
+
+const world = new SmartObjects();
+world.add(
+  new SmartObject({
+    id: 'bench',
+    position: [10, 0, 0],
+    uses: [
+      {
+        name: 'sit',
+        advertises: { rest: 0.6 },
+        slots: [{ offset: [-1, 0, 0], facing: [0, 0, 1] }, { offset: [1, 0, 0], facing: [0, 0, 1] }],
+        run: (agent, bench, delta) => 'success', // play the animation, return 'running' until it ends
+      },
+    ],
+  }),
+);
+world.add(
+  new SmartObject({
+    id: 'door',
+    position: [4, 0, 2],
+    state: { broken: true },
+    uses: [
+      { name: 'open', advertises: { exit: 1 }, available: (door) => !door.state.broken },
+      { name: 'repair', advertises: { work: 1 }, available: (door) => door.state.broken === true },
+    ],
+  }),
+);
+
+const agent = { position: [0, 0, 0], needs: { rest: 0.9, work: 0.2 } };
+const offer = world.best(agent); // the use that meets its needs best, or null
+if (offer) {
+  const claim = world.claim(offer, agent); // hold the place before walking, so two agents do not head for one seat
+  claim?.position(); // where to go
+  // ...walk there, then every tick:
+  claim?.update(1 / 60); // 'running', 'success' or 'failure'
+}
+world.offers(agent, { use: 'sit', radius: 20 }); // told to sit: every free seat in reach, nearest first
+```
+
+An offer scores the sum over needs of need times `advertises`, divided by `1 + attenuation * distance`, so a nearby
+snack can beat a far feast (`attenuation` defaults to 0.1; 0 never fades). An `advertises` value can be a function of
+the agent, for personality. `available` hides a use for now, usually by reading the object's own `state`. Each slot
+holds one agent, the claim takes the free slot nearest it, and `exclusive: true` waits until nobody is on the object and
+blocks the rest while held.
+
+A claim follows its object. On `'success'` the agent's needs fall by what was advertised, and on `'success'` or
+`'failure'` the place is released. `release()` gives it back early and `using` works. `world.remove(id)` ends the
+object's claims, so check `claim.active`.
+
 Errors name their fix: a bad argument throws `TypeError` or `RangeError` (`Agent maxSpeed must be a finite number of
 0 or more`), a call that is not valid right now throws `MargoError` with code `state` (ticking from inside a handler),
 `disposed` (after `dispose()`) or `failed` (a rejected task). `using tree = new BehaviorTree(...)` halts it at the end
