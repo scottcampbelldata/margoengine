@@ -275,7 +275,8 @@ test('an entry another run prunes after the listing counts as not stored', (t) =
     race = (read, statted) => {
       fs.readdirSync = (folder, ...rest) => [...list(folder, ...rest), 'gone.json'];
       if (statted)
-        fs.statSync = (file, ...rest) => (String(file).endsWith('gone.json') ? { mtimeMs: Date.now() + 1000 } : stat(file, ...rest));
+        fs.statSync = (file, ...rest) =>
+          String(file).endsWith('gone.json') ? { mtimeMs: Date.now() + 1000 } : stat(file, ...rest);
       syncBuiltinESMExports();
       try {
         return read();
@@ -339,7 +340,10 @@ test('a prune takes an entry off its name before deleting it, so no reader opens
   for (let key = 0; key < 12; key++) store.put({ step: 'step', key: `k${key}`, passed: true });
   assert.equal(store.candidates('step').length, 8);
   assert.ok(deleted.length > 12, 'temp names and pruned entries were deleted');
-  assert.deepEqual(deleted.filter((path) => path.endsWith('.json')), []);
+  assert.deepEqual(
+    deleted.filter((path) => path.endsWith('.json')),
+    [],
+  );
   const folder = join(store.dir, 'steps', readdirSync(join(store.dir, 'steps'))[0]);
   assert.equal(readdirSync(folder).length, 8, 'nothing is left under a moved name');
 });
@@ -408,6 +412,51 @@ test('asking for serving changes nothing: every step still runs', (t) => {
   const row = runStep(t, shadow, root, marker);
   assert.equal(row.cache.hit, false);
   assert.equal(readFileSync(join(root, 'ran.txt'), 'utf8'), 'yes');
+});
+
+test('an output another run evicts between asking and opening counts as not stored', (t) => {
+  const base = temp(t),
+    store = new ResultStore(join(base, 'store')),
+    folder = join(base, 'out');
+  mkdirSync(folder);
+  writeFileSync(join(folder, 'a.txt'), 'a');
+  const packed = store.storeOutput('later', folder),
+    { existsSync: exists } = fs;
+  rmSync(packed);
+  fs.existsSync = (path) => String(path) === packed || exists(path);
+  syncBuiltinESMExports();
+  t.after(() => {
+    fs.existsSync = exists;
+    syncBuiltinESMExports();
+  });
+  assert.equal(store.restoreOutput('later', join(base, 'back')), false);
+});
+
+test('an eviction another run blocks leaves the output for the next one; other errors still throw', (t) => {
+  const base = temp(t),
+    store = new ResultStore(join(base, 'store'), { capBytes: 1 }),
+    folder = join(base, 'out');
+  mkdirSync(folder);
+  writeFileSync(join(folder, 'a.txt'), 'a');
+  const { renameSync: move } = fs,
+    refusing = (code, run) => {
+      fs.renameSync = () => {
+        throw Object.assign(new Error(code), { code });
+      };
+      syncBuiltinESMExports();
+      try {
+        return run();
+      } finally {
+        fs.renameSync = move;
+        syncBuiltinESMExports();
+      }
+    },
+    packed = refusing('EPERM', () => store.storeOutput('held', folder));
+  assert.equal(existsSync(packed), true, 'it stays for now');
+  assert.ok(refusing('EBUSY', () => store.evict()) > 0, 'and still counts toward the cap');
+  assert.throws(() => refusing('EIO', () => store.evict()), { code: 'EIO' });
+  assert.equal(store.evict(), 0, 'the next eviction takes it');
+  assert.equal(existsSync(packed), false);
 });
 
 test('a stored output comes back byte for byte, and the store keeps to its cap, oldest out', (t) => {

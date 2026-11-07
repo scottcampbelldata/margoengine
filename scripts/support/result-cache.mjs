@@ -517,6 +517,25 @@ function lockHolds(text, repository) {
 // is no longer stored, the same as one never stored. Anything but a missing file still throws.
 /** When a stored entry was written, or undefined once another run has pruned it. */
 const modified = (file) => statSync(file, { throwIfNoEntry: false })?.mtimeMs;
+/**
+ * Deletes a stored file. While Windows deletes a file, opening that name fails with EPERM, which a reader cannot tell from
+ * a real refusal. So the file leaves its name first, in one step, and only a name no reader lists is deleted. Windows can
+ * refuse the move (EPERM, EBUSY) while another lane moves the same file, and that lane may have won (ENOENT). A refused
+ * file is only over the limit, not wrong: it stays until the next prune.
+ * @returns False when the file stayed. Anything else still throws.
+ */
+function retire(file) {
+  try {
+    const gone = `${file}.${process.pid}.${randomBytes(4).toString('hex')}.tmp`;
+    renameSync(file, gone);
+    rmSync(gone, { force: true });
+    return true;
+  } catch (error) {
+    if (error.code === 'ENOENT') return true;
+    if (error.code === 'EPERM' || error.code === 'EBUSY') return false;
+    throw error;
+  }
+}
 /** A stored entry, or undefined once another run has pruned it. */
 function readEntry(file) {
   try {
@@ -589,19 +608,7 @@ export class ResultStore {
       .map((name) => ({ name, at: modified(join(folder, name)) ?? 0 }))
       .sort((a, b) => b.at - a.at)
       .slice(CANDIDATES_PER_STEP)
-      .forEach(({ name }) => {
-        // While Windows deletes a file, opening that name fails with EPERM, which a reader cannot tell from a real refusal.
-        // So the entry leaves its name first, in one step, and only a name no reader lists is deleted. Windows can refuse
-        // the move (EPERM, EBUSY) while another lane moves the same file, and that lane may have won (ENOENT). The entry is
-        // only over the count, not wrong: it stays until the next put prunes this step. Anything else still throws.
-        try {
-          const gone = join(folder, `${name}.${process.pid}.${randomBytes(4).toString('hex')}.tmp`);
-          renameSync(join(folder, name), gone);
-          rmSync(gone, { force: true });
-        } catch (error) {
-          if (error.code !== 'ENOENT' && error.code !== 'EPERM' && error.code !== 'EBUSY') throw error;
-        }
-      });
+      .forEach(({ name }) => retire(join(folder, name)));
   }
   /** Marks a key as never to be served again. */
   poison(key, why) {
@@ -632,8 +639,10 @@ export class ResultStore {
   /** Clears `folder` and writes the stored output back. Returns false when the key holds none. */
   restoreOutput(key, folder) {
     const file = join(this.dir, 'dist', `${key}.gz`);
-    if (!existsSync(file) || this.isPoisoned(key)) return false;
-    const bytes = gunzipSync(readFileSync(file)),
+    if (this.isPoisoned(key)) return false;
+    const packed = readStored(file);
+    if (!packed) return false;
+    const bytes = gunzipSync(packed),
       length = bytes.readUInt32LE(0),
       header = JSON.parse(bytes.subarray(4, 4 + length).toString());
     rmSync(folder, { recursive: true, force: true });
@@ -662,14 +671,22 @@ export class ResultStore {
     let total = files.reduce((sum, { size }) => sum + size, 0);
     for (const { path, size } of files) {
       if (total <= this.capBytes) break;
-      rmSync(path, { force: true });
-      total -= size;
+      if (retire(path)) total -= size;
     }
     return total;
   }
 }
 
 const pick = (stat) => ({ at: stat.mtimeMs, size: stat.size });
+/** A stored output's bytes, or undefined once another run has evicted it. */
+function readStored(file) {
+  try {
+    return readFileSync(file);
+  } catch (error) {
+    if (error.code === 'ENOENT') return undefined;
+    throw error;
+  }
+}
 
 function listFiles(folder, prefix = '') {
   const out = [];
