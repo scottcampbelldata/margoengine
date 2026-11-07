@@ -54,5 +54,11 @@ export const cases = [
   { name: 'style-blue', scene: 'style-blue', kind: 'shadows', core: 0.8, near: 0.03, difference: 0.03, channel: 2, options: { ...hard, look: { intensity: 0.8, color: [0.1, 0.3, 0.6] } } },
   { name: 'style-virtual', scene: 'style-red', kind: 'virtual', core: 0.5, near: 0.03, difference: 0.03, options: { distance: 8, filter: 'hard', casterMargin: 2, bias: 0.001, normalBias: 0.002, look: { intensity: 0.8, color: [0.1, 0.3, 0.6] } } },
   { name: 'style-control', scene: 'style-red', kind: 'shadows', core: 0.5, far: 0.2, difference: 0.03, options: hard },
+  // Rays against the plant's own triangles, as Cycles', so what is left is its pixel filter over the frame's one sample a pixel.
+  // A sun of 0.04 takes 64 rays: their noise is 1 / (2 sqrt(64)) of a pixel at worst, 0.06, and the mean over the ground far less.
+  // The control traces an empty tree over the same map: no shadow may stay, or the map is drawing it.
+  { name: 'rays-hard', scene: 'plant', kind: 'shadows', minShadow: 2000, iou: 0.9, difference: 0.03, options: { ...hard, traced: { rays: 1, bias: 0.001 } } },
+  { name: 'rays-soft', scene: 'soft', kind: 'shadows', minShadow: 2000, iou: 0.9, difference: 0.03, options: { ...hard, traced: { rays: 64, lightSize: 0.04, bias: 0.001 } } },
+  { name: 'rays-control', scene: 'plant', kind: 'shadows', minShadow: 2000, below: 0.2, control: 'empty', options: { ...hard, traced: { rays: 1, bias: 0.001 } } },
   { name: 'alpha-control', scene: 'alpha', kind: 'shadows', minShadow: 1000, below: 0.78, control: 'solid', options: panels },
 ];

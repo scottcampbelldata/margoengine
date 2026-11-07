@@ -12,6 +12,8 @@ import {varianceFilter} from '/packages/shadows/dist/vsm.js';
 import {transmission} from '/packages/shadows/dist/transmission.js';
 import {distanceShadows} from '/packages/shadows/dist/distance.js';
 import {shadowStyle} from '/packages/shadows/dist/style.js';
+import {rayTracedFilter} from '/packages/shadows/dist/rt.js';
+import {MeshBVH,worldTriangles} from '/packages/bvh/dist/index.js';
 import {Terrain} from '/packages/terrain/dist/index.js';
 const canvas=document.querySelector('canvas'),errors=[];
 const scenes=await (await fetch('/packages/shadows/test/outside/scenes.json')).json();
@@ -82,6 +84,8 @@ window.check={
       options={...options,effects:[distanceShadows({heights,columns:width,rows:height,origin:[-scene.extent/2,-scene.extent/2],size:[scene.extent,scene.extent],heightScale:scene.heightScale,...options.far})]};
     }
     if(options.look)options={...options,effects:[shadowStyle(options.look)]};
+    // control 'empty': a tree with nothing over the ground, so a shadow that stays came from the map, and the check must fail.
+    if(options.traced){const {vertices,indices}=control==='empty'?{vertices:new Float32Array([50,50,50,51,50,50,50,50,51]),indices:new Uint32Array([0,1,2])}:worldTriangles(engine,[model]);options={...options,filter:rayTracedFilter(engine,MeshBVH.build({positions:vertices,indices}),options.traced)};}
     if(options.variance)options={...options,filter:varianceFilter(options.variance)};
     effect=c.attach(engine,options);
     if(ground)effect.add(ground,{castShadow:false});

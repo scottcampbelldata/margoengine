@@ -2118,6 +2118,10 @@
       "types": "./dist/shadows/style.d.ts",
       "import": "./dist/shadows/style.js"
     },
+    "./shadows/rt": {
+      "types": "./dist/shadows/rt.d.ts",
+      "import": "./dist/shadows/rt.js"
+    },
     "./sky": {
       "types": "./dist/sky.d.ts",
       "import": "./dist/sky.js"

@@ -69,6 +69,10 @@
     "./style": {
       "types": "./dist/style.d.ts",
       "import": "./dist/style.js"
+    },
+    "./rt": {
+      "types": "./dist/rt.d.ts",
+      "import": "./dist/rt.js"
     }
   },
   "files": [
@@ -76,7 +80,13 @@
     "NOTICE"
   ],
   "peerDependencies": {
+    "@margoengine/bvh": "^1.0.0",
     "@margoengine/core": "^1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@margoengine/bvh": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@margoengine/math": "^1.0.0"

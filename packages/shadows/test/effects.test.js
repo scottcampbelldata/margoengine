@@ -29,10 +29,10 @@ test('an effect multiplies the sun in both shadow classes', () => {
     assert.ok(code.includes('fn shadowReach()->f32'));
   }
 });
-test('each effect has four bindings from EFFECT_BINDING', () => {
+test('each effect has eight bindings from EFFECT_BINDING', () => {
   assert.deepEqual(
     effectEntries([effect, effect]).map((e) => e.binding),
-    [EFFECT_BINDING, EFFECT_BINDING + 1, EFFECT_BINDING + 4, EFFECT_BINDING + 5],
+    [EFFECT_BINDING, EFFECT_BINDING + 1, EFFECT_BINDING + 8, EFFECT_BINDING + 9],
   );
 });
 test('a filter effect replaces the named filters', () => {

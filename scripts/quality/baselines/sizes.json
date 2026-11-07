@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10147992,
+  "total": 10154186,
   "history": [
     {
       "date": "2026-10-24",
@@ -3128,6 +3128,12 @@
       "commit": "c783d6150",
       "reason": "shadows gains the optional style entry",
       "grew": 2
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "c50e057e8",
+      "reason": "shadows gains the optional rt entry; bvh gains forShader",
+      "grew": 1
     }
   ],
   "items": {
@@ -3654,6 +3660,7 @@
     "@margoengine/shadows": 18738,
     "@margoengine/shadows/distance": 2421,
     "@margoengine/shadows/light-function": 1921,
+    "@margoengine/shadows/rt": 6194,
     "@margoengine/shadows/style": 799,
     "@margoengine/shadows/transmission": 1027,
     "@margoengine/shadows/virtual": 15956,

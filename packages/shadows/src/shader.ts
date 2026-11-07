@@ -5,8 +5,10 @@
  * 2x2 bilinear comparison), the cheapest edge.
  */
 export type ShadowFilter = 'soft' | 'pcf' | 'hard';
-/** The first binding of `effects`; each effect has four from there. Past Shadows' and the other lighting effects' own. */
+/** The first binding of `effects`. Past Shadows' and the other lighting effects' own. */
 export const EFFECT_BINDING = 40;
+/** Bindings each effect has from there: a tree of `@margoengine/bvh/gpu` and its settings take six. */
+const EFFECT_STRIDE = 8;
 /** What a {@link ShadowEffect} sees of a frame. Borrowed: use it synchronously. */
 export interface ShadowEffectFrame<Context = unknown> {
   /** The frame's WebGPU pass context; no pass is open on its encoder. */
@@ -30,7 +32,7 @@ export interface ShadowEffectMap {
  * models and materials included, then takes it. WebGPU only; resource names start `shadowFx`.
  */
 export interface ShadowEffect<Context = unknown> {
-  /** WGSL declarations for bind group `group`, resources named `shadowFx...` from binding `binding` up (four at most). */
+  /** WGSL declarations for bind group `group`, resources named `shadowFx...` from binding `binding` up (eight at most). */
   wgsl(group: number, binding: number): string;
   /**
    * With `colored`, a WGSL `vec3f` for the light reaching a receiver from a tint caster, over `through` (the tint map's
@@ -52,7 +54,7 @@ export interface ShadowEffect<Context = unknown> {
 }
 /** A {@link ShadowEffect} that replaces the edge filter: `filter` takes it in place of a name. */
 export interface ShadowFilterEffect<Context = unknown> extends ShadowEffect<Context> {
-  /** WGSL that returns visibility, 0 to 1, in place of the named filters, with `uv`, `layer` and `reference` in scope. */
+  /** WGSL that returns visibility, 0 to 1, in place of the named filters, with `uv`, `layer`, `reference`, `position` and `normal` in scope. */
   readonly body: string;
 }
 // Each filter's last step, after the cascade lookup (layer) and receiver-plane bias shared by all three.
@@ -192,7 +194,7 @@ fn shadowTint(position:vec3f,normal:vec3f)->vec3f {
 }
 /** The effects' declarations. */
 export const effectDeclarations = (group: number, effects: readonly ShadowEffect[]): string =>
-  effects.map((effect, i) => effect.wgsl(group, EFFECT_BINDING + i * 4)).join('');
+  effects.map((effect, i) => effect.wgsl(group, EFFECT_BINDING + i * EFFECT_STRIDE)).join('');
 /** The effects' factors, each with its leading `*`. */
 export const effectCalls = (effects: readonly ShadowEffect[]): string =>
   effects.map((effect) => (effect.call ? '*' + effect.call : '')).join('');
@@ -204,7 +206,7 @@ export const effectLight = (effects: readonly ShadowEffect[], visibility: string
 /** The effects' bind group entries. */
 export const effectEntries = (effects: readonly ShadowEffect[]): GPUBindGroupEntry[] =>
   effects.flatMap((effect, i) =>
-    (effect.resources?.() ?? []).map((resource, k) => ({ binding: EFFECT_BINDING + i * 4 + k, resource })),
+    (effect.resources?.() ?? []).map((resource, k) => ({ binding: EFFECT_BINDING + i * EFFECT_STRIDE + k, resource })),
   );
 /** `options.effects`, checked. */
 export const validEffects = (effects: unknown): readonly ShadowEffect[] => {

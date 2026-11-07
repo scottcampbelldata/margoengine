@@ -28,6 +28,7 @@ export class GPUMeshBVH {
     readonly params: GPUBuffer;
     readonly bvh: MeshBVH | null;
     static create(target: GPUTarget, bvh: MeshBVH): Promise<GPUMeshBVH>;
+    static forShader(target: GPUTarget, bvh: MeshBVH): GPUMeshBVH;
     static follow(target: GPUTarget, followed: GPUFollowedVertices): Promise<GPUMeshBVH>;
     private constructor();
     get disposed(): boolean;

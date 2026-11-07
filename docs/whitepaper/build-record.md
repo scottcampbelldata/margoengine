@@ -72,7 +72,8 @@ Batches 1 to 3 are phase 1. Batches 19 and 21 are partly done, each with one job
 | [36](#batch-36-gltf-pro) | gltf-pro | 1 | 1 | 0 | 0 | 0 |
 | [37](#batch-37-oit) | oit | 6 | 5 | 1 | 0 | 0 |
 | [38](#batch-38-gltf) | gltf | 6 | 6 | 0 | 0 | 0 |
-| Total | | 202 | 193 | 3 | 4 | 2 |
+| [49](#batch-49-shadows) | shadows | 8 | 7 | 0 | 1 | 0 |
+| Total | | 210 | 200 | 3 | 5 | 2 |
 
 ## Batch 1: fixes (part 1 of 3)
 
@@ -1545,3 +1546,26 @@ Two jobs Scott approved on 2026-11-07. A core bug fix for `engine.stats`, and th
 - **Pushes moved too:** 128 at 1.5 m/s on Knight at 8 / 10 / 16 passes: 3 / 3 / 2 do not end still and none fall, from 8 / 6 / 8.
 - **Existing tests changed:** Mage and Seed-san join the strict figure test and the test gains a foot bound, 0.002 m, tighter than anything there; no tolerance rose. With the rod motor back four figures fail it; on reported velocities the new quiet test fails.
 - **Size:** `@margoengine/ragdoll/balance` grew for the knee spring and the hips' reading and its budget was raised for it: an optional entry; core and stage do not change.
+
+## Batch 49: shadows
+
+Eight jobs for `@margoengine/shadows`, each proved on real glTF models or real elevation against Blender Cycles, a path tracer that shares no code with Margo.
+
+| # | Job | Status | Commit | Entry | Claim |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Shadows from alpha cutouts | SKIPPED, already cast in every shadow pass; proof added | `2fbadfd7b` | - | - |
+| 2 | Custom casters in virtual shadow maps | DONE | `6f18d5115` | `/virtual` | LIM-301 |
+| 3 | Cloud shadows and light functions | DONE | `188f54053` | `/light-function` | LIM-305 |
+| 4 | Variance shadow maps | DONE | `f5bd3ec76` | `/vsm` | LIM-306 |
+| 5 | Light through leaves | DONE | `24b842bc7` | `/transmission` | LIM-311 |
+| 6 | Far shadows | DONE | `2034782fa` | `/distance` | LIM-314 |
+| 7 | Intensity and colour | DONE | `43aefc4b2` | `/style` | LIM-317 |
+| 8 | Ray traced shadows, no hardware path as WebGPU has none | DONE | this commit | `/rt` | LIM-318 |
+
+- **Bugs fixed:** terrain's lighting layout table, now read from the WGSL (`packages/terrain/test/lighting-layout.test.js`); voxels read a field only `Shadows` has, now `shadowReach()` (`packages/shadows/test/virtual-custom-browser.mjs`); a leaf shadowed its own back (`packages/shadows/test/transmission-browser.mjs`); a far march stopped short over long cells (`packages/shadows/test/distance-browser.mjs`); the physics row of `scripts/lazy-files.js` held a string where patterns go, which stopped the size records (`tests/sizes-page.test.js`).
+- **Proved:** Rainier past `distance` 30 from the field alone, overlap 0.85 and mean difference 0.016, 0 without the field. The far penumbra is the disc's share within 0.003 at three distances. A styled plant against two Cycles suns, one that casts nothing: 0.283 against 0.287 in red, 0.684 against 0.684 in blue. Rays on the plant, overlap 0.97 hard and 0.97 soft with 64 rays, 0 with an empty tree. Numbers for jobs 2 to 5 are in their claims.
+- **Limits:** one GPU, an RTX A6000, for all of it. No timing for any job: each waits for the quiet pass. Far shadows cast only what the field holds. Alpha masks are not in the ray tree. Transmission textures are not read.
+- **Sources:** Max 1988 on horizon maps is paywalled and was not read; job 6 is built from Stewart 1996, read in full, and says so in `docs/clean-room.md`. Job 7 has no paper. For job 8 the Woop paper is the bvh package's existing citation, and only its first pages were read again.
+- **Hardware:** job 8 uses no ray queries because no browser has them: gpuweb's two proposals are open pull requests.
+- **Slips:** job 6's first ship stopped at the size records on the `lazy-files.js` bug, which came in from main; nothing reached main. Job 5's claim was renumbered from 309 to 311 by a second rebase in its ship.
+- **Gate:** lint, hygiene, verify, the tests of what changed and the shadows GPU checks, each push from one script that stops at the first failing step.

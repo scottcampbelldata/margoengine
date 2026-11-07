@@ -125,6 +125,15 @@ test('positions of any stride and precision upload as three floats a vertex', as
   assert.equal(new Float32Array(wide.positions.data)[0], Math.fround(0.1));
 });
 
+test('a tree for a shader uploads at once, with no pipeline, and its own ray calls refuse', async () => {
+  const device = fakeDevice(),
+    bvh = MeshBVH.build({ positions: new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]), indices: [0, 1, 2] }),
+    gpu = GPUMeshBVH.forShader(device, bvh);
+  assert.deepEqual(gpu.bindings(3).map((entry) => entry.binding), [3, 4, 5, 6, 7]);
+  assert.equal(new Uint32Array(gpu.params.data)[2], 1);
+  await assert.rejects(gpu.raycast([{ origin: [0, 0, 1], direction: [0, 0, -1] }]), { code: 'state' });
+  gpu.dispose();
+});
 test('update sends a refit tree again', async () => {
   const device = fakeDevice(),
     source = { positions: new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]), indices: [0, 1, 2] },

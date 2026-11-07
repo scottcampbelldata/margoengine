@@ -408,7 +408,7 @@ console.log(blocked.faceIndex[0]); // -1, a miss
 
 `raycast` reads the answers back: `distance` (Infinity for a miss), `faceIndex` (-1 for a miss), `barycoord` (three weights a ray) and `frontFace`. It takes ray objects, or a `Float32Array` of `GPU_RAY_FLOATS` floats a ray (origin xyz, near, direction xyz, far) with a finite `far`; `packRays(rays, {near, far})` makes one. To keep everything on the GPU, `encodeTrace(encoder, rayBuffer, hitBuffer, count, {mode, side})` adds a trace to your encoder and writes `GPU_HIT_WORDS` words a ray: distance, face index with the front flag in bit 31, and the weights of vertices b and c.
 
-To trace inside your own shader, paste `bvhWGSL({group, binding})` into it and bind `gpu.bindings(binding)`:
+To trace inside your own shader, paste `bvhWGSL({group, binding})` into it and bind `gpu.bindings(binding)`. `GPUMeshBVH.forShader(device, bvh)` makes such a tree at once, with no compute pipeline; its own ray calls then throw:
 
 ```ts
 import {bvhWGSL} from 'margoengine/bvh/gpu';

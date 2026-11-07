@@ -359,8 +359,8 @@ export class GPUMeshBVH {
   /** The CPU tree it came from; null for a tree built on the GPU. */
   readonly bvh: MeshBVH | null;
   #followed: boolean;
-  #pipeline: GPUComputePipeline;
-  #tree: GPUBindGroup;
+  #pipeline: GPUComputePipeline | null;
+  #tree: GPUBindGroup | null;
   #traces = new Map<string, GPUBuffer>();
   #disposed = false;
 
@@ -368,6 +368,14 @@ export class GPUMeshBVH {
   static async create(target: GPUTarget, bvh: MeshBVH): Promise<GPUMeshBVH> {
     const device = deviceOf(target);
     return new GPUMeshBVH(device, bvh, await tracePipeline(device));
+  }
+
+  /**
+   * Uploads `bvh` for walking in your own shader through {@link bvhWGSL}, at once and with no compute pipeline: the tree's own
+   * ray calls throw. Throws a RangeError if it does not fit the device's storage limits.
+   */
+  static forShader(target: GPUTarget, bvh: MeshBVH): GPUMeshBVH {
+    return new GPUMeshBVH(deviceOf(target), bvh, null);
   }
 
   /** @internal A tree whose positions stay in a GPU buffer the caller writes. */
@@ -379,7 +387,7 @@ export class GPUMeshBVH {
   private constructor(
     device: GPUDevice,
     bvh: MeshBVH | null,
-    pipeline: GPUComputePipeline,
+    pipeline: GPUComputePipeline | null,
     followed: GPUFollowedVertices | null = null,
   ) {
     this.device = device;
@@ -416,11 +424,13 @@ export class GPUMeshBVH {
       16,
       GPUBufferUsage.UNIFORM,
     );
-    this.#tree = device.createBindGroup({
-      label: 'bvh tree',
-      layout: pipeline.getBindGroupLayout(0),
-      entries: this.bindings(),
-    });
+    this.#tree =
+      pipeline &&
+      device.createBindGroup({
+        label: 'bvh tree',
+        layout: pipeline.getBindGroupLayout(0),
+        entries: this.bindings(),
+      });
   }
 
   get disposed(): boolean {
@@ -469,14 +479,16 @@ export class GPUMeshBVH {
       x = Math.min(groups, max),
       y = Math.ceil(groups / x);
     if (y > max) throw new RangeError(`${count} rays are more than one dispatch holds; trace them in parts.`);
+    const pipeline = this.#pipeline;
+    if (!pipeline) throw new MargoError('state', 'This tree is for your own shader; make one with GPUMeshBVH.create to trace rays.');
     const pass = encoder.beginComputePass({ label: 'bvh trace' });
-    pass.setPipeline(this.#pipeline);
+    pass.setPipeline(pipeline);
     pass.setBindGroup(0, this.#tree);
     pass.setBindGroup(
       1,
       this.device.createBindGroup({
         label: 'bvh rays',
-        layout: this.#pipeline.getBindGroupLayout(1),
+        layout: pipeline.getBindGroupLayout(1),
         entries: [
           { binding: 0, resource: { buffer: rays } },
           { binding: 1, resource: { buffer: hits } },

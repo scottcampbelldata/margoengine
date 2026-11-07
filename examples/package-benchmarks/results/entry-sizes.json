@@ -1,5 +1,5 @@
 {
-  "commit": "c783d6150",
+  "commit": "93bf3c3e6",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -242,8 +242,8 @@
         "gzip": 5857
       },
       "./gpu": {
-        "raw": 13421,
-        "gzip": 5132
+        "raw": 13584,
+        "gzip": 5186
       },
       "./scene": {
         "raw": 8423,
@@ -262,8 +262,8 @@
         "gzip": 12527
       },
       "./gpu-build": {
-        "raw": 52428,
-        "gzip": 18672
+        "raw": 52592,
+        "gzip": 18721
       },
       "./alpha": {
         "raw": 43038,
@@ -2218,12 +2218,12 @@
     },
     "@margoengine/shadows": {
       ".": {
-        "raw": 55743,
-        "gzip": 18383
+        "raw": 55753,
+        "gzip": 18390
       },
       "./virtual": {
-        "raw": 45629,
-        "gzip": 15491
+        "raw": 45639,
+        "gzip": 15525
       },
       "./light-function": {
         "raw": 3643,
@@ -2244,6 +2244,10 @@
       "./style": {
         "raw": 834,
         "gzip": 543
+      },
+      "./rt": {
+        "raw": 15383,
+        "gzip": 5938
       }
     },
     "@margoengine/sky": {
@@ -2866,9 +2870,9 @@
       "brotli": 26250
     },
     "packages/shadows/dist/index.js": {
-      "raw": 55743,
-      "gzip": 18383,
-      "brotli": 16279
+      "raw": 55753,
+      "gzip": 18390,
+      "brotli": 16250
     },
     "packages/xr/dist/index.js": {
       "raw": 19428,

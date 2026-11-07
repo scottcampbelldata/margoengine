@@ -182,7 +182,7 @@ engine.start();
 
 The mask lies across the light and travels along it. Its right is world up crossed with the sun, and image up is world up as the sun sees it. It adds one sampled texture and one sampler to every receiver, and gltf-pro's richest materials already use all 16 sampled textures of a stage, so such a material names the limit in an error; `cloudShadows` adds one uniform buffer and no texture.
 
-The `effects` array is fixed at construction. With none, the receivers' shaders and the frame are unchanged. An effect is any object with `wgsl(group, binding)` and `call` or `style`, four bindings from 40, resources named `shadowFx...`: see `ShadowEffect` in the types.
+The `effects` array is fixed at construction. With none, the receivers' shaders and the frame are unchanged. An effect is any object with `wgsl(group, binding)` and `call` or `style`, eight bindings from 40, resources named `shadowFx...`: see `ShadowEffect` in the types.
 
 ## Variance shadow maps
 
@@ -293,6 +293,37 @@ style.options.intensity = 0.4;
 | `color` | [0, 0, 0] | The colour a full shadow takes the light towards, linear RGB, each 0 to 1. Live. |
 
 A point keeps `mix(floor, 1, visibility)` of the light per channel, where `floor` is `1 - intensity + intensity * color`. It works with `Shadows` and `VirtualShadows`, one per shadows object, and each shadows object is one light.
+
+## Ray traced shadows
+
+`@margoengine/shadows/rt` replaces the map filter with rays against a BVH of the scene: each lit pixel asks the tree whether the sun is in sight. Edges are exact, with no texels and no bias to tune against a map, and a sun of some size gives a true penumbra.
+
+```ts
+import {EngineKernel, box} from 'margoengine/core';
+import {MeshBVH, worldTriangles} from 'margoengine/bvh';
+import {Shadows} from 'margoengine/shadows';
+import {rayTracedFilter} from 'margoengine/shadows/rt';
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend: 'webgpu'});
+const caster = engine.createMesh().setGeometry(box(1, 1, 1)).setPosition([0, 1, 0]);
+const ground = engine.createMesh().setGeometry(box(20, 0.1, 20));
+const {vertices, indices} = worldTriangles(engine, [caster]);
+const bvh = MeshBVH.build({positions: vertices, indices});
+const shadows = Shadows.attach(engine, {filter: rayTracedFilter(engine, bvh, {lightSize: 0.02, rays: 32})});
+shadows.add(ground, {castShadow: false});
+engine.start();
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `rays` | 16 | Rays per lit pixel, 1 to 256. One is enough for a sun of no size. Live. |
+| `lightSize` | 0 | Tangent of the sun's angular radius, as `lightSize` of `Shadows`. 0 is an exact hard edge. Live. |
+| `bias` | 0.001 | World units a ray starts off its surface, along the normal. Live. |
+| `far` | 1e6 | World units a ray goes towards the sun. Live. |
+| `fallback` | `'soft'` | The map filter answered where a fragment shader cannot read storage buffers. Then add the casters to the shadows too. |
+
+WebGPU has no ray queries yet, so no hardware path is used: the rays walk the tree in the fragment shader, on any GPU, and cost follows rays times lit pixels. When browsers expose ray queries this entry is where they go.
+
+Only the tree casts, in the pose it was built. After moving what it holds, call `bvh.refit()` and then `filter.refit()`, for the same triangles. Alpha masks are not in the tree, so a cutout casts its whole triangles. Shadows end where the map's reach ends. `Shadows` only: `VirtualShadows` keeps its named filters.
 
 ## Virtual shadow maps
 
