@@ -4,6 +4,8 @@
 
 ### Networking
 
+- `@margoengine/netcode/interest`: `InterestManager` sends each client only the entities near it, by accumulated priority, within a byte budget per snapshot. The `view` of `GameServer` now also gets the state the client confirmed.
+- `GameClient.join` no longer waits for ever when its first ping is lost.
 - `@margoengine/net/timeline`: one home for time-ordered snapshots. `SnapshotBuffer`, and `GameClient`, `LagCompensation` and angle fields in `@margoengine/netcode`, all sit on it. `GameClient` takes an `AdaptiveDelay` as `interpolationDelay`. `@margoengine/net` no longer asks for core as a peer.
 - `LagCompensation.at` at a recorded tick no longer holds a shape that only the next tick has, so a shot cannot hit something that did not exist yet.
 - `@margoengine/net/fields`: `FieldBuffer` interpolates scale, colour in linear light, looping animation time and any other named field alongside the pose.

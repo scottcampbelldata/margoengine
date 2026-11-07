@@ -1718,6 +1718,10 @@
       "types": "./dist/netcode/rooms.d.ts",
       "import": "./dist/netcode/rooms.js"
     },
+    "./netcode/interest": {
+      "types": "./dist/netcode/interest.d.ts",
+      "import": "./dist/netcode/interest.js"
+    },
     "./netcode/generate": {
       "types": "./dist/netcode/generate.d.ts",
       "import": "./dist/netcode/generate.js"

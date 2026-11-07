@@ -213,6 +213,67 @@ const hit = lag.raycast(100.5, [1, -5], [0, 1]);
 console.log(hit?.id, hit?.distance); // 7 4.5
 ```
 
+## Interest management and bandwidth budgets
+
+`InterestManager` (its own entry, `@margoengine/netcode/interest`) is a ready-made `view` for `GameServer`: each client gets only the entities within `radius` of its player, the most important first, and no snapshot message goes over `budget` bytes. What it leaves out never reaches that client, so a cheat cannot read it from the wire.
+
+```ts
+import { defineGame, defineSchema, GameClient, GameServer, LoopbackNetwork } from 'margoengine/netcode';
+import { InterestManager } from 'margoengine/netcode/interest';
+
+const schema = defineSchema({
+  types: {
+    Input: { x: 'f32' },
+    Box: { x: 'f32', y: 'f32', spin: 'f32' },
+    State: { boxes: { type: 'map', of: 'Box', maxSize: 1024 } },
+  },
+} as const);
+const game = defineGame({
+  schema,
+  state: 'State',
+  input: 'Input',
+  tickRate: 30,
+  initial: () => {
+    const boxes = new Map<number, { x: number; y: number; spin: number }>();
+    for (let i = 0; i < 500; i++) boxes.set(1000 + i, { x: i % 25, y: Math.floor(i / 25), spin: 0 });
+    return { boxes };
+  },
+  join: (state, id) => void state.boxes.set(id, { x: 12, y: 10, spin: 0 }),
+  leave: (state, id) => void state.boxes.delete(id),
+  step(state) {
+    for (const box of state.boxes.values()) box.spin += 0.1;
+  },
+});
+
+const interest = new InterestManager(game, {
+  collections: { boxes: { position: (box) => [box.x, box.y] } },
+  radius: 8,
+  budget: 400, // bytes per snapshot: 12,000 B/s at 30 snapshots a second
+});
+const network = new LoopbackNetwork({ latency: 30 });
+const now = () => network.time;
+const server = new GameServer(game, { now, view: interest.view });
+network.listen().onconnection = (connection) => server.accept(connection);
+const joining = GameClient.join(game, network.connect(), { now, input: () => ({ x: 0 }) });
+let client: Awaited<typeof joining> | undefined;
+joining.then((joined) => (client = joined));
+for (let frame = 0; frame < 120; frame++) {
+  network.advance(1000 / 60);
+  if (network.time >= (server.tick + 1) * game.tickMs) server.step();
+  client?.update();
+  await null;
+}
+console.log('client holds', client?.authoritative.boxes.size, 'of', server.state.boxes.size);
+console.log(interest.stats(client?.player ?? 0)); // { inScope, sent, deferred, removed, bytes, over }
+```
+
+- **Who is in scope:** the exact circle (or sphere, for 3-number positions) of `radius` around the player's own entity, or around `focus(state, player)` for a camera. A hashed grid only speeds the search, so `cell` never changes the result. An entity stays in scope until `leaveRadius` (default `radius` x 1.1), so one on the edge does not flicker. `always` adds entities at any distance (team mates, objectives) and `visible` hides ones inside the circle (behind a wall, stealthed). Other fields of the state, and maps you do not list, go to everyone whole.
+- **Who goes first:** a priority accumulator per client. Each snapshot every entity with something new adds its `priority` (default `radius / distance`, 1 at the edge up to 16 close by); the highest go first, those sent go back to 0, those left out keep theirs, so nothing starves. An entity too big for the bytes left is skipped for a smaller one behind it.
+- **The budget:** counts the whole message, the 21 bytes of envelope included, and `stats(player).bytes` never reads less than the real size. `budget` may be a function of the player and is read on every snapshot, so it can follow what the link does. For a rate, divide bytes per second by snapshots per second. The own entity and the fields not managed always go; if they alone pass the budget, `stats(player).over` says by how much.
+- **What the client sees:** an entity held back keeps the value it last got and stays on screen; it never goes back to an older one in normal running. A value sent is repeated until the client confirms it, because a snapshot is a delta against what the client confirmed. That is what makes loss harmless, and it means that under a tight budget a moving entity updates about once per round trip plus one snapshot. With bytes to spare and nothing waiting, repeats are brought up to date at once.
+
+`view` also gets the state the client confirmed as a third argument, so a `view` of your own can see what would cost nothing to send.
+
 ## Transports and the Node server
 
 Each transport is its own entry, so an app loads only the one it uses.

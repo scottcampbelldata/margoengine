@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10502478,
+  "total": 10504994,
   "history": [
     {
       "date": "2026-10-24",
@@ -3548,6 +3548,12 @@
       "commit": "8ac2569ae",
       "reason": "new optional entry @margoengine/weather/puddles (Puddles: wet ground, puddles and rain rings in core's mesh shader); nothing else grows",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "1cf37e2d0",
+      "reason": "netcode interest entry, new optional entry @margoengine/netcode/interest",
+      "grew": 1
     }
   ],
   "items": {
@@ -3972,6 +3978,7 @@
     "@margoengine/net/timeline": 1495,
     "@margoengine/netcode": 12819,
     "@margoengine/netcode/generate": 5154,
+    "@margoengine/netcode/interest": 2516,
     "@margoengine/netcode/node": 6457,
     "@margoengine/netcode/rollback": 3437,
     "@margoengine/netcode/rooms": 5505,

@@ -8,6 +8,8 @@ export const ENVELOPE_VERSION = 1;
 export const MAX_INPUTS_PER_MESSAGE = 32;
 /** Most bytes of one encoded input. */
 export const MAX_INPUT_BYTES = 1024;
+/** Most bytes of a snapshot message around its data: the kind and four 32-bit varints. */
+export const SNAPSHOT_HEADER_BYTES = 21;
 
 /** One envelope message. Ticks are unsigned 32-bit; tick 0 is the state before the first step. */
 export type Envelope =

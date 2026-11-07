@@ -208,7 +208,7 @@ export interface GameServerOptions<State, Input> {
     history?: number;
     maxInputAhead?: number;
     validateInput?(input: Input, player: number, state: State): boolean;
-    view?(state: State, player: number): State;
+    view?(state: State, player: number, baseline?: State): State;
     limits?: RateLimits;
     timeout?: number;
     now?: () => number;

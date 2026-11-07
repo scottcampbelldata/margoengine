@@ -30,8 +30,12 @@ export interface GameServerOptions<State, Input> {
    * `stats.rejectedInputs`). The schema already checked its types and ranges.
    */
   validateInput?(input: Input, player: number, state: State): boolean;
-  /** The part of the state player `player` may see (interest management, hidden information); default all of it. */
-  view?(state: State, player: number): State;
+  /**
+   * The part of the state player `player` may see (interest management, hidden information); default all of it.
+   * `baseline` is the state that client confirmed, undefined when the snapshot goes in full: what equals it costs no
+   * bytes. `InterestManager.view` from `@margoengine/netcode/interest` is one, with a byte budget.
+   */
+  view?(state: State, player: number, baseline?: State): State;
   /** Per-client limits; a client over them is closed with `CloseCode.rateLimit`. */
   limits?: RateLimits;
   /** Milliseconds of silence after which a client is closed with `CloseCode.timeout` (default 10,000). */
@@ -342,8 +346,8 @@ export class GameServer<State, Input> {
       view = this.options.view;
     for (const peer of this.peers) {
       if (!peer.playing) continue;
-      const seen = view ? (game.schema.clone(game.stateType, view(state, peer.player)) as State) : state;
       const baseline = peer.ack > 0 && peer.ack > tick - this.keep ? peer.sent.get(peer.ack) : undefined;
+      const seen = view ? (game.schema.clone(game.stateType, view(state, peer.player, baseline)) as State) : state;
       const data =
         baseline === undefined
           ? view
