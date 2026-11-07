@@ -225,8 +225,12 @@ const ASSETS = [
     'test fixtures: conformance files of https://github.com/KhronosGroup/glTF-Test-Assets-Interactivity, commit f99d9b6 (CC-BY-4.0, The Khronos Group)',
   ],
   [
+    'packages/physics2d/tests/fixtures/outline/NOTICE.md',
+    'test fixture: one PNG of https://github.com/googlefonts/noto-emoji, commit 99701e0 (Apache-2.0, Google)',
+  ],
+  [
     'packages/gltf-pro/tests/fixtures/physics/NOTICE.md',
-    'test fixtures: the KHR_physics_rigid_bodies sample files of https://github.com/visgl/luma.gl/tree/master/examples/gltf/physics/assets (MIT, vis.gl contributors)',
+    'test fixtures: the KHR_physics_rigid_bodies sample files of https://github.com/visgl/luma.gl/tree/master/examples/gltf/physics/assets (MIT, vis.gl contributors); seven more samples of https://github.com/eoineoineoin/glTF_Physics state no licence, so they are named there and never stored here',
   ],
   [
     'packages/gltf-pro/tests/fixtures/lights/NOTICE.md',

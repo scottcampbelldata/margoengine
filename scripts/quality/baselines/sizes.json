@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10154186,
+  "total": 10156710,
   "history": [
     {
       "date": "2026-10-24",
@@ -3134,6 +3134,12 @@
       "commit": "c50e057e8",
       "reason": "shadows gains the optional rt entry; bvh gains forShader",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "bd7f3149f",
+      "reason": "physics2d/outline: new entry",
+      "grew": 1
     }
   ],
   "items": {
@@ -3544,6 +3550,7 @@
     "@margoengine/oit/vfx": 486,
     "@margoengine/physics": 18804,
     "@margoengine/physics2d": 8199,
+    "@margoengine/physics2d/outline": 2524,
     "@margoengine/pixel": 4664,
     "@margoengine/pixel/palette": 4341,
     "@margoengine/pixel/render3d": 3866,

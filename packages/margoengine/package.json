@@ -1646,6 +1646,10 @@
       "types": "./dist/physics2d.d.ts",
       "import": "./dist/physics2d.js"
     },
+    "./physics2d/outline": {
+      "types": "./dist/physics2d/outline.d.ts",
+      "import": "./dist/physics2d/outline.js"
+    },
     "./pixel": {
       "types": "./dist/pixel.d.ts",
       "import": "./dist/pixel.js"

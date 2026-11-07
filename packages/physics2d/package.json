@@ -34,6 +34,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./outline": {
+      "types": "./dist/outline.d.ts",
+      "import": "./dist/outline.js"
     }
   },
   "files": [
@@ -41,6 +45,9 @@
     "LICENSE",
     "NOTICE"
   ],
+  "dependencies": {
+    "@margoengine/geometry": "^1.0.0"
+  },
   "peerDependencies": {
     "@margoengine/core": "^1.0.0",
     "@dimforge/rapier2d-compat": ">=0.14.0 <1"

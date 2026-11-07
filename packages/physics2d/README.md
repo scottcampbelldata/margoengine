@@ -42,3 +42,36 @@ Queries (`raycast`, `overlapPoint`, `overlapShape`, `castShape`) see every colli
 Apache-2.0. Optional, tree-shakable package; core peer: ^1.0.0, Rapier peer optional: `npm i @margoengine/physics2d @dimforge/rapier2d-compat`.
 
 Build and unit tests: npm test --workspace @margoengine/physics2d
+
+## Colliders from a sprite's alpha (`@margoengine/physics2d/outline`)
+
+`outlineColliders(image, options)` turns the alpha of an image into colliders that follow what is drawn, holes and hollows included, so a ball can rest in a cup. `image` is RGBA8 straight alpha, row by row from the top: `ImageData` fits.
+
+```ts
+import { Physics2D } from '@margoengine/physics2d';
+import { outlineColliders } from '@margoengine/physics2d/outline';
+
+// Any drawing works; drawImage a sprite here.
+const context = new OffscreenCanvas(64, 64).getContext('2d')!;
+context.arc(32, 32, 24, 0, Math.PI * 2);
+context.fill();
+const imageData = context.getImageData(0, 0, 64, 64);
+
+await Physics2D.load();
+const physics = new Physics2D(null, { gravity: [0, 980] });
+const colliders = outlineColliders(imageData, { friction: 0.4 });
+physics.addBody(null, { type: 'fixed', colliders });
+```
+
+Pass `sprite` and the colliders land on the sprite's pivot and scale, and its `rect` picks the frame of an atlas: `physics.addBody(sprite, {colliders: outlineColliders(imageData, {sprite})})`. `traceOutlines(image, options)` gives the outlines alone, in pixels from the top left of the traced area, each with its holes.
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| `threshold` | 128 | Alpha from 1 to 255 that counts as solid; the edge is placed between pixels by their alpha |
+| `tolerance` | 1 | Farthest the thinned outline may stray from the traced one, in pixels; 0 keeps every point off a straight line |
+| `minArea` | 4 | Outlines and holes under this many square pixels are left out |
+| `rect` | whole image | `[x, y, width, height]` in pixels |
+| `sprite` | none | Places the colliders, as `addBody(sprite)` places a fitted box |
+| `edges` | false | False gives filled convex `polygon` colliders; true gives one closed `polyline` per outline and hole, for fixed terrain |
+
+Any other collider setting (`friction`, `restitution`, `sensor`, `density` and the rest) goes on every collider. Limits are in [docs/limits.md](../../docs/limits.md).

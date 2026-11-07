@@ -2906,6 +2906,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Stage physics (`@margoengine/stage/physics`, 2026-11-05) | One world per stage. The first call downloads Rapier (see its row in the sizes page) and waits for its Wasm. A dynamic concave mesh gets a convex hull, so its hollows are filled. The shape is picked once from the geometry and the scale at `addBody`. | A stage call has to work with no setup; decomposing a mesh costs far more than a hull, so it is opt-in. | A ball rests on the hull, not in the hollow; a mesh rescaled later keeps its collider. | Pass `colliders` to name the shape, such as `{shape: 'convexDecomposition'}`; add the body again after rescaling. |
 | Physics colliders (`PhysicsCollider`, `voxels` and `halfSpace` shapes, 2026-11-07) | By the solver: `voxels` needs a solver that has them, Rapier 0.17.1 or later, and `physics.supportsShape('voxels')` says so; today's solver stops on a ball at a voxel edge, so `@margoengine/voxel/physics` meshes the chunks near balls. By method: `boundingRadius` is null for a shape it would have to walk. A hand-built `custom` collider leaves with Rapier. `setMassProperties` sets density 0 on the colliders it finds, and a collider added later counts unless it has `massless`. | A wrapper keeps every dependent off the solver's own objects, so the solver can change under them. | The `voxels` and `halfSpace` shapes and `massless` are part of what Margo's own solver must carry. |
 | Bodies below the root (nested meshes and `follow`, 2026-11-07) | By method: a body has a position and a rotation, so scale from a parent that shears a part is not represented; a body is fitted at the world scale it had when added. Only a core `Mesh` can sit below a root. `follow` needs a `kinematicPosition` body on a core `Mesh`, and a mesh that jumps in one step moves its body at the speed that takes, pushing what it meets as hard. The sort that writes parents first is an insertion sort, which costs most with many nested bodies in reverse order: not measured. | Parents first is what makes a child's local pose right in the same frame. | Measured speed with thousands of nested bodies. |
+| Colliders from alpha (`@margoengine/physics2d/outline`, 2026-11-07) | By method: samples sit on pixel centres, so a hard corner is cut by up to about 0.7 pixel. Thinning works on each loop alone and may make a loop cross itself or a neighbour when `tolerance` is near the width of a thin part; lower it then. Filled pieces come from a greedy merge, so their number is not the fewest; a sprite with many corners gives many colliders, and `edges: true` gives one per loop. The outline is taken once: a sprite's frames need one trace each. | Alpha is what the artist drew, and a convex piece is what a solver can fill. | Time on large images: not measured. |
 | Stage model viewer (`@margoengine/stage/viewer`, 2026-11-05) | WebGPU only, as gltf-pro. One model per viewer; the model must have geometry. A 'cascaded' floor is a plain box 40 model sizes wide, so its far edge shows as a horizon line against the backdrop; 'contact' has no such line. Lamp, shadow and floor values were picked by eye on one model (flight helmet), not measured against a reference. | One call has to fit any model, so sizes come from `model.bounds` at load. An animated model does not resize them, and the contact shadow is cached (`static`) unless `shadow: {static: false}`. | A model that grows or moves keeps its first shadow and framing; a horizon line with 'cascaded'. | Pass `environment`, `background`, `shadow` and `tonemap` to override, `false` to remove a part. Real-GPU check: `npm run test:gpu --workspace packages/stage`. |
 | Headless stage (`@margoengine/headless/stage`, 2026-11-05) | No camera controls and no frame loop: `step(delta)` advances time and runs `onTick` and `engine.onFrame` callbacks. Stages alive at once share one `gpu`. In Node, proved on the `webgpu` binding 0.6.2 on Windows (D3D12 and WARP); a textured glTF does not load there (docs/known-bugs.md). | `installGPU` changes globals, so a second implementation at once would replace the first's. The frame loop belongs to core, so the stage keeps its own list of `onFrame` callbacks. | A callback registered before the stage exists, on an engine made by hand, does not run. | Use `stage.onTick` and `stage.step`. Dispose stages on one `gpu` before using another. |
 | Image comparison (`@margoengine/headless/compare`, 2026-11-05) | CPU only. Images must be one size. `decodePNG` ignores colour profiles and gamma, and cuts 16-bit samples to 8. SSIM runs on luma, so a change of hue at equal brightness is seen only by the pixel count. | Tests compare a few images, so the plain code is enough, and it runs anywhere. Both measures run in `compareImages` because each misses what the other sees. | A 4K image takes CPU time on every comparison: both passes run in JavaScript, and this has not been timed. | Compare at the size you render your tests, and tune `threshold`, `maxRatio` and `minSSIM` to your scene. |
@@ -9301,6 +9302,30 @@ Queries (`raycast`, `overlapPoint`, `overlapShape`, `castShape`) see every colli
 Apache-2.0. Optional, tree-shakable package; core peer: ^1.0.0, Rapier peer optional: `npm i @margoengine/physics2d @dimforge/rapier2d-compat`.
 
 Build and unit tests: npm test --workspace @margoengine/physics2d
+
+## Colliders from a sprite's alpha (`@margoengine/physics2d/outline`)
+
+`outlineColliders(image, options)` turns the alpha of an image into colliders that follow what is drawn, holes and hollows included, so a ball can rest in a cup. `image` is RGBA8 straight alpha, row by row from the top: `ImageData` fits.
+
+```ts
+import { Physics2D } from '@margoengine/physics2d';
+import { outlineColliders } from '@margoengine/physics2d/outline';
+
+// Any drawing works; drawImage a sprite here.
+const context = new OffscreenCanvas(64, 64).getContext('2d')!;
+context.arc(32, 32, 24, 0, Math.PI * 2);
+context.fill();
+const imageData = context.getImageData(0, 0, 64, 64);
+
+await Physics2D.load();
+const physics = new Physics2D(null, { gravity: [0, 980] });
+const colliders = outlineColliders(imageData, { friction: 0.4 });
+physics.addBody(null, { type: 'fixed', colliders });
+```
+
+Pass `sprite` and the colliders land on the sprite's pivot and scale, and its `rect` picks the frame of an atlas: `physics.addBody(sprite, {colliders: outlineColliders(imageData, {sprite})})`. `traceOutlines(image, options)` gives the outlines alone, in pixels from the top left of the traced area, each with its holes.
+
+[README continues: https://margoengine.com/llms/packages/physics2d.md]
 
 === @margoengine/ragdoll (packages/ragdoll/README.md) ===
 

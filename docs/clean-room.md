@@ -187,6 +187,14 @@ carry the same citation as a one-line comment in the code.
 | EX7 | Godot SpriteFrames and TileSet text resources, TileMapLayer.set_cell flips | exporters/src/godot-2d.ts | Godot's public TSCN/TRES format documentation and class reference |
 | EX8 | Unity TextureImporter meta, AnimationClip, Tilemap and TileBase use | exporters/src/unity-2d.ts | Unity's public manual and scripting reference |
 
+### physics2d
+
+| id | formula | file | source |
+| --- | --- | --- | --- |
+| PH1 | Marching squares: 16 cases by a 4-bit index, a point on each crossed grid edge by linear interpolation, either choice in the two saddle cases gives closed contours | physics2d/src/outline.ts | **Read:** the Contouring part of chapter 6 of *The VTK Book* (W. Schroeder, K. Martin, B. Lorensen; the book's online text, not the toolkit's source), through a summary with short quotes; the Wikipedia article "Marching squares" for the saddle rule by the mean of the four corners. **Not read:** C. Maple, "Geometric Design and Space Planning Using the Marching Squares and Marching Cube Algorithms", GMAG 2003, DOI 10.1109/GMAG.2003.1219671, behind the publisher's paywall; only its abstract and citation were seen. The linking of segments into loops by grid edge is our own |
+| PH2 | Line thinning: split a chain at its farthest vertex while that distance is over the tolerance | physics2d/src/outline.ts | **Read:** J. Hershberger and J. Snoeyink, "Speeding Up the Douglas-Peucker Line-Simplification Algorithm", UBC TR-92-07, 1992, sections 1 and 2 with Algorithm 1 (the rest of the paper is its faster method, not used here), which gives the method in full and states it equals the paper's Method 2. **Not read:** D. Douglas and T. Peucker, *The Canadian Cartographer* 10(2), 1973, 112-122, DOI 10.3138/FM57-6770-U75U-7727: the publisher refused and no open copy was found; a Hull repository copy of Whyatt and Wade's 1988 tutorial sits behind a bot check and was left alone. Cutting a closed loop at two far-apart points is our own |
+| PH3 | Convex pieces: ear clipping, then a greedy merge across each diagonal that leaves both ends convex | physics2d/src/outline.ts | Ear clipping as in geometry's triangulate. The merge is credited to S. Hertel and K. Mehlhorn, "Fast triangulation of simple polygons", FCT 1983, LNCS 158, and its bound of four times the fewest pieces, by secondary descriptions only (the CGAL manual's prose, seen through a search summary). **Not read:** that paper; the 1985 journal version at pure.mpg.de sits behind a bot check and the publisher's copy refused; the scanned chapter of Mehlhorn's *Data Structures and Algorithms 3* on his page has no extractable text and no page renderer was on this machine. The merge here is written from the rule as stated, makes no claim of that bound, and is greedy where the published order may differ |
+
 ### sprites
 
 | id | formula | file | source |
