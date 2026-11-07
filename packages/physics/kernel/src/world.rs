@@ -46,6 +46,8 @@ pub struct Header {
     /// A body sleeps under this kinetic energy per unit of mass, in J/kg, held for this many seconds.
     pub sleep_energy: f32,
     pub sleep_time: f32,
+    /// Rows of hulls, vertices, half-edges and faces handed out so far.
+    pub hull_rows: [u32; 4],
 }
 
 const HEADER_BYTES: u32 = ((core::mem::size_of::<Header>() + 15) & !15) as u32;
@@ -61,7 +63,7 @@ impl World {
             return None;
         }
         let mut arena = Arena::new();
-        let capacity = capacities(bodies, colliders, colliders.max(16));
+        let capacity = capacities(bodies, colliders, colliders.max(16), [0; 4]);
         let (offsets, bytes) = offsets(HEADER_BYTES, &capacity)?;
         if !arena.ensure(bytes as usize) {
             return None;
@@ -93,6 +95,7 @@ impl World {
                 islands: 0,
                 sleep_energy: SLEEP_ENERGY_DEFAULT,
                 sleep_time: 0.5,
+                hull_rows: [0; 4],
             });
         }
         Some(world)
@@ -133,7 +136,7 @@ impl World {
         if bodies > MAX_BODIES || colliders > MAX_COLLIDERS {
             return false;
         }
-        self.grow(capacities(bodies.max(old[0]), colliders.max(old[1]), old[3]))
+        self.grow(capacities(bodies.max(old[0]), colliders.max(old[1]), old[3], [old[7], old[8], old[9], old[10]]))
     }
 
     /// Moves every column up to its place in the larger layout, last column first, so nothing is overwritten before it
@@ -309,6 +312,10 @@ impl World {
                 *self.f(COLLIDER_A + k).add(at) = size[k];
                 *self.f(COLLIDER_X + k).add(at) = position[k];
             }
+            if shape == SHAPE_HULL {
+                *self.u(COLLIDER_HULL).add(at) = size[0] as u32;
+                *self.f(COLLIDER_A).add(at) = 0.0;
+            }
             for k in 0..4 {
                 *self.f(COLLIDER_ROTATION_X + k).add(at) = rotation[k];
             }
@@ -386,7 +393,7 @@ mod tests {
             for column in 0..COLUMNS {
                 assert_eq!(header.offsets[column] % 16, 0, "column {column} with {bodies} bodies");
                 assert!(header.offsets[column] >= HEADER_BYTES);
-                assert!(header.offsets[column] + bodies * 4 <= header.bytes);
+                assert!(header.offsets[column] + header.capacity[COLUMN_ROWS[column] as usize] * 4 <= header.bytes);
             }
         }
     }
@@ -394,12 +401,14 @@ mod tests {
     #[test]
     fn reserve_keeps_every_row_at_its_index() {
         let mut world = World::new(5, 5).unwrap();
+        assert!(world.reserve_hull(5, 5, 5, 5));
         for row in 0..5 {
             for column in 0..COLUMNS {
                 unsafe { *world.u(column).add(row) = (column * 100 + row) as u32 };
             }
         }
         assert!(world.reserve(1000, 1000));
+        assert!(world.reserve_hull(1000, 1000, 1000, 1000));
         assert_eq!(world.header().capacity[0], 1000);
         for row in 0..5 {
             for column in 0..COLUMNS {

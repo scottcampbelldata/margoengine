@@ -63,20 +63,57 @@ interface KernelExports extends WebAssembly.Exports {
     density: number,
   ): number;
   collider_remove(collider: number): number;
+  hull_begin(vertices: number, faces: number, edges: number): number;
+  hull_end(vertices: number, faces: number, edges: number): number;
+  hull_next(rows: number): number;
 }
 
 /** How a body moves: `dynamic` by forces, `kinematicPosition` to a target, `kinematicVelocity` at its velocity. */
 export type KernelBodyKind = 'fixed' | 'dynamic' | 'kinematicPosition' | 'kinematicVelocity';
 
-/** Shapes the kernel holds today. Sizes: a ball's radius; a box's half extents; a capsule's radius and half core length. */
-export type KernelShape = 'ball' | 'box' | 'capsule';
+/**
+ * Shapes the kernel holds today. Sizes: a ball's radius; a box's half extents; a capsule's radius and half core length; a
+ * hull's row from {@link KernelWorld.addHull}.
+ */
+export type KernelShape = 'ball' | 'box' | 'capsule' | 'hull';
 
 /** How many numbers each shape's size takes, and its value in the `colliderShape` column. */
 const shapes: Readonly<Record<KernelShape, readonly [number, number]>> = {
   ball: [0, 1],
   box: [1, 3],
   capsule: [2, 2],
+  hull: [3, 1],
 };
+
+/** What each refusal of `hull_end` means, with the fix. */
+const hullErrors: Readonly<Record<number, string>> = {
+  [-1]: 'A hull needs at least 4 vertices and 4 faces; memory may also be out',
+  [-2]: 'A face names a vertex that does not exist, or has under 3 vertices; check the indices',
+  [-3]: 'A face is not flat; split it or move its vertices onto one plane',
+  [-4]: 'The faces do not close into one surface; each edge must join exactly two faces, running opposite ways',
+  [-5]: 'The shape is not convex, or a face runs clockwise from outside; turn the face or build the convex hull',
+  [-6]: 'Two neighbouring faces lie in one plane; merge them, as contact clipping sees only one face at a time',
+  [-7]: 'A face has over 64 edges; split it',
+};
+
+/** A point of a manifold. */
+export interface KernelContactPoint {
+  /** Midway between the two surfaces when the point was found, in world space. */
+  position: [number, number, number];
+  /** The gap along the normal in metres, negative when the shapes overlap. */
+  separation: number;
+  /** Names the features that made the point, and stays the same while they do. */
+  id: number;
+}
+
+/** The manifold of one pair of colliders. */
+export interface KernelContact {
+  colliderA: number;
+  colliderB: number;
+  /** Unit vector from A to B, shared by every point. */
+  normal: [number, number, number];
+  points: KernelContactPoint[];
+}
 
 /** Options of {@link KernelWorld.addCollider}. */
 export interface KernelColliderOptions {
@@ -136,6 +173,7 @@ export class KernelWorld {
   readonly columns: Record<string, KernelColumn> = {};
   private readonly api: KernelExports;
   private layout = -1;
+  private hullRows = 0;
 
   /**
    * @param bodies Body rows to start with (default 1024); `reserve` adds more.
@@ -187,6 +225,33 @@ export class KernelWorld {
       rows = this.api.world_pair_rows(),
       out: [number, number][] = [];
     for (let row = 0; row < rows; row++) if (pairA[row] !== 0xffffffff) out.push([pairA[row], pairB[row]]);
+    return out;
+  }
+  /**
+   * Every pair with contact points, after the last step. A point may lie a little apart: anything the step could reach
+   * counts, so its `separation` can be above zero.
+   */
+  contacts(): KernelContact[] {
+    const c = this.columns,
+      rows = this.api.world_pair_rows(),
+      out: KernelContact[] = [];
+    for (let row = 0; row < rows; row++) {
+      const count = c.pairContacts[row];
+      if (c.pairA[row] === 0xffffffff || count === 0) continue;
+      const points: KernelContactPoint[] = [];
+      for (let at = row * 4; at < row * 4 + count; at++)
+        points.push({
+          position: [c.contactX[at], c.contactY[at], c.contactZ[at]],
+          separation: c.contactSeparation[at],
+          id: c.contactId[at],
+        });
+      out.push({
+        colliderA: c.pairA[row],
+        colliderB: c.pairB[row],
+        normal: [c.pairNormalX[row], c.pairNormalY[row], c.pairNormalZ[row]],
+        points,
+      });
+    }
     return out;
   }
   /** Bodies a step walks: the moving ones. Sleeping and fixed bodies are on no list, so they cost a step nothing. */
@@ -297,7 +362,8 @@ export class KernelWorld {
   /**
    * Adds a collider to a body and works out the body's mass, centre and inertia again. Grows the world when the rows run
    * out, so read views from `columns` after this call.
-   * @param size A ball's `[radius]`, a box's `[halfX, halfY, halfZ]`, a capsule's `[radius, halfLength]` along local Y.
+   * @param size A ball's `[radius]`, a box's `[halfX, halfY, halfZ]`, a capsule's `[radius, halfLength]` along local Y, a
+   * hull's `[row]`.
    * @returns The collider's row.
    * @throws RangeError for a dead body, an unknown shape, or a size, pose or density the kernel cannot use.
    */
@@ -309,7 +375,10 @@ export class KernelWorld {
     if (!Number.isInteger(body) || body < 0 || body >= flags.length || !(flags[body] & 1))
       throw new RangeError(`Row ${body} holds no body; use a row addBody returned.`);
     const [code, numbers] = spec;
-    if (size.length !== numbers || !size.every((value) => value > 0 && Number.isFinite(value)))
+    if (shape === 'hull') {
+      if (size.length !== 1 || !Number.isInteger(size[0]) || size[0] < 0 || size[0] >= this.hullRows)
+        throw new RangeError(`A hull collider needs [row], a row addHull returned (got ${size.join(', ')}).`);
+    } else if (size.length !== numbers || !size.every((value) => value > 0 && Number.isFinite(value)))
       throw new RangeError(`A ${shape} needs ${numbers} finite sizes above zero (got ${size.join(', ')}).`);
     if (!(density >= 0) || !Number.isFinite(density))
       throw new RangeError(`Density must be finite and not negative; 1000 is water (got ${density}).`);
@@ -340,6 +409,43 @@ export class KernelWorld {
       this.reserve(this.capacity, this.colliderCapacity * 2);
       row = add();
     }
+    return row;
+  }
+  /**
+   * Adds a convex polyhedron that colliders can share, for {@link KernelWorld.addCollider} with shape `hull`. Rows stay for
+   * the world's life, and a snapshot carries them. Read views from `columns` after this call.
+   * @param vertices Points in the hull's frame.
+   * @param faces Each face's vertex indices, counter-clockwise seen from outside. Neighbouring faces must not lie in one
+   * plane, and a face holds at most 64 edges.
+   * @returns The hull's row.
+   * @throws RangeError for a shape that is not a closed convex polyhedron with flat faces, naming what is wrong.
+   */
+  addHull(vertices: readonly (readonly [number, number, number])[], faces: readonly (readonly number[])[]): number {
+    const { api } = this,
+      edges = faces.reduce((sum, face) => sum + face.length, 0);
+    if (!vertices.every((vertex) => vertex.length === 3 && vertex.every(Number.isFinite)))
+      throw new RangeError('A hull vertex must be three finite numbers; check what fed it.');
+    if (!api.hull_begin(vertices.length, faces.length, edges))
+      throw new RangeError(`Memory cannot hold a hull of ${vertices.length} vertices; free another world, or simplify the hull.`);
+    if (api.world_layout() !== this.layout) this.bind();
+    const c = this.columns,
+      [v0, e0, f0] = [api.hull_next(0), api.hull_next(1), api.hull_next(2)];
+    vertices.forEach(([x, y, z], i) => {
+      c.vertexX[v0 + i] = x;
+      c.vertexY[v0 + i] = y;
+      c.vertexZ[v0 + i] = z;
+    });
+    let edge = 0;
+    faces.forEach((face, f) => {
+      c.faceEdge[f0 + f] = edge;
+      for (const index of face) {
+        if (!Number.isInteger(index) || index < 0) throw new RangeError(`A hull face index must be a whole number; use a place in the vertex list (got ${index}).`);
+        c.edgeOrigin[e0 + edge++] = index;
+      }
+    });
+    const row = api.hull_end(vertices.length, faces.length, edges);
+    if (row < 0) throw new RangeError(`This hull was refused; fix what this says: ${hullErrors[row]}.`);
+    this.hullRows = row + 1;
     return row;
   }
   /**
@@ -435,6 +541,7 @@ export class KernelWorld {
     if (!api.world_ensure(bytes)) throw new RangeError(`Memory cannot hold a snapshot of ${bytes} bytes; free another world, or use a smaller one.`);
     new Uint8Array(api.memory.buffer, base, bytes).set(snapshot);
     this.bind();
+    this.hullRows = api.world_capacity(7);
     return this;
   }
   /**

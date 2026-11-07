@@ -268,6 +268,28 @@ world.wake(body);
 world.columns.linearX[body] = 2;
 ```
 
+Each step then finds contact points between the near pairs of boxes and hulls: `world.contacts()` returns one manifold a pair, up to four points that share a normal from the first collider to the second. A `hull` is any closed convex polyhedron, added once with `world.addHull(vertices, faces)` and shared by every collider that names its row; its mass, centre and inertia come from the faces. Points follow the separating axis test: the touching faces are clipped against each other, so a box resting on a box has all four corners from its first step. Bodies do not push each other yet: that is job 4 of this batch.
+
+```ts
+import {KernelWorld, loadKernel} from 'margoengine/physics/next';
+
+await loadKernel();
+const world = new KernelWorld();
+world.setGravity(0, 0, 0);
+const pyramid = world.addHull(
+  [[1, 0, 1], [1, 0, -1], [-1, 0, -1], [-1, 0, 1], [0, 1, 0]],
+  [[3, 2, 1, 0], [0, 1, 4], [1, 2, 4], [2, 3, 4], [3, 0, 4]],
+);
+const floor = world.addBody('fixed');
+world.addCollider(floor, 'box', [5, 0.5, 5], {density: 0});
+const body = world.addBody('dynamic');
+world.addCollider(body, 'hull', [pyramid]);
+world.columns.positionY[body] = 0.49;
+world.step(1 / 60);
+const [contact] = world.contacts();
+console.log(contact.normal, contact.points.length); // [0, 1, 0] 4
+```
+
 `Physics` and `PhysicsBody` from this entry keep the names of the root entry, on the own solver, so moving to it is one import. `Physics.load()` needs no peer; a mesh is optional, and an engine moves its meshes as the root entry does, with the same fixed step and interpolation.
 
 ```ts

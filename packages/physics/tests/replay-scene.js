@@ -14,6 +14,26 @@ const GRAVITY = [
   [0, 0, 0],
 ];
 
+/** Every coordinate is exact in f32. */
+const OCTAHEDRON = [
+  [1, 0, 0],
+  [-1, 0, 0],
+  [0, 1, 0],
+  [0, -1, 0],
+  [0, 0, 1],
+  [0, 0, -1],
+];
+const OCTAHEDRON_FACES = [
+  [0, 2, 4],
+  [2, 1, 4],
+  [1, 3, 4],
+  [3, 0, 4],
+  [2, 0, 5],
+  [1, 2, 5],
+  [3, 1, 5],
+  [0, 3, 5],
+];
+
 class Stream {
   constructor(seed) {
     this.state = seed;
@@ -49,14 +69,15 @@ export function kernelScene(KernelWorld, steps = REPLAY_STEPS, visit = () => {})
     world = new KernelWorld(1, 1),
     c = world.columns,
     rows = [],
-    hashes = [];
+    hashes = [],
+    hull = world.addHull(OCTAHEDRON, OCTAHEDRON_FACES);
   const spawn = () => {
     const kind = ['dynamic', 'dynamic', 'dynamic', 'dynamic', 'dynamic', 'fixed', 'kinematicPosition', 'kinematicVelocity'][
         random.below(8)
       ],
       row = world.addBody(kind),
       density = kind === 'dynamic' ? 1 + random.below(8) : 0;
-    switch (random.below(4)) {
+    switch (random.below(5)) {
       case 0:
         world.addCollider(row, 'ball', [random.size()], { density });
         break;
@@ -65,6 +86,9 @@ export function kernelScene(KernelWorld, steps = REPLAY_STEPS, visit = () => {})
         break;
       case 2:
         world.addCollider(row, 'capsule', [random.size(), random.size()], { density });
+        break;
+      case 3:
+        world.addCollider(row, 'hull', [hull], { density });
         break;
       default:
         world.addCollider(row, 'box', [random.size(), random.size(), random.size()], { density });

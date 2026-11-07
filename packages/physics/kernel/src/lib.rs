@@ -6,12 +6,15 @@
 
 pub mod api;
 pub mod broad;
+pub mod hull;
 pub mod integrate;
 pub mod island;
 pub mod layout;
 pub mod mass;
 pub mod math;
 pub mod memory;
+pub mod narrow;
+pub mod sat;
 pub mod world;
 
 #[cfg(target_arch = "wasm32")]

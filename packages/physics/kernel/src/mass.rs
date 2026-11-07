@@ -64,7 +64,7 @@ fn add_rotated(sum: &mut Sym, q: Q, moments: V3) {
 }
 
 /// The parallel axis term of a point mass at `d`: m (|d|^2 E - d d^T).
-fn add_offset(sum: &mut Sym, mass: f32, d: V3) {
+pub(crate) fn add_offset(sum: &mut Sym, mass: f32, d: V3) {
     sum.xx += mass * (d.y * d.y + d.z * d.z);
     sum.yy += mass * (d.x * d.x + d.z * d.z);
     sum.zz += mass * (d.x * d.x + d.y * d.y);
@@ -142,7 +142,7 @@ impl World {
             let c = collider as usize;
             let solid = self.collider_solid(c);
             mass += solid.mass;
-            moment_sum = moment_sum.add(self.v(COLLIDER_X, c).scale(solid.mass));
+            moment_sum = moment_sum.add(self.solid_center(c).scale(solid.mass));
             collider = unsafe { *self.u(COLLIDER_NEXT).add(c) };
         }
         let center = if mass > 0.0 { moment_sum.scale(1.0 / mass) } else { v3(0.0, 0.0, 0.0) };
@@ -152,8 +152,8 @@ impl World {
         while collider != NONE {
             let c = collider as usize;
             let solid = self.collider_solid(c);
-            add_rotated(&mut inertia, self.q(COLLIDER_ROTATION_X, c), solid.moments);
-            add_offset(&mut inertia, solid.mass, self.v(COLLIDER_X, c).sub(center));
+            add_rotated(&mut inertia, self.solid_frame(c), solid.moments);
+            add_offset(&mut inertia, solid.mass, self.solid_center(c).sub(center));
             collider = unsafe { *self.u(COLLIDER_NEXT).add(c) };
         }
         let (mut moments, frame) = principal(inertia);
@@ -175,8 +175,31 @@ impl World {
         match unsafe { *self.u(COLLIDER_SHAPE).add(c) } {
             SHAPE_BALL => solid_ball(size.x, density),
             SHAPE_BOX => solid_box(size, density),
+            SHAPE_HULL => {
+                let hull = self.uu(COLLIDER_HULL, c) as usize;
+                Solid { mass: self.s(HULL_VOLUME, hull) * density, moments: self.v(HULL_MOMENT_X, hull).scale(density) }
+            }
             _ => solid_capsule(size.x, size.y, density),
         }
+    }
+
+    /// A collider's centre of mass in its body's frame: only a hull's is not at the collider's origin.
+    fn solid_center(&self, c: usize) -> V3 {
+        let place = self.v(COLLIDER_X, c);
+        if self.uu(COLLIDER_SHAPE, c) == SHAPE_HULL {
+            let center = self.v(HULL_CENTER_X, self.uu(COLLIDER_HULL, c) as usize);
+            return place.add(self.q(COLLIDER_ROTATION_X, c).rotate(center));
+        }
+        place
+    }
+
+    /// The frame a collider's principal moments lie along, in its body's frame.
+    fn solid_frame(&self, c: usize) -> Q {
+        let turn = self.q(COLLIDER_ROTATION_X, c);
+        if self.uu(COLLIDER_SHAPE, c) == SHAPE_HULL {
+            return turn.mul(self.q(HULL_FRAME_X, self.uu(COLLIDER_HULL, c) as usize));
+        }
+        turn
     }
 }
 

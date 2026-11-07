@@ -14,8 +14,15 @@ pub enum Rows {
     Table,
     /// One row a body too, but dense lists: an index here is a place in a list, not a body, so freeing a row leaves them.
     BodyList,
+    /// Four rows a pair: the points of its manifold, pair row times four plus the point.
+    Contact,
+    /// Convex polyhedra, and the rows of their vertices, half-edges and faces, held for the world's life.
+    Hull,
+    HullVertex,
+    HullEdge,
+    HullFace,
 }
-pub const ROW_CLASSES: usize = 6;
+pub const ROW_CLASSES: usize = 11;
 
 macro_rules! columns {
     ($($name:ident $kind:ident $rows:ident,)*) => {
@@ -130,6 +137,8 @@ columns! {
     COLLIDER_ROTATION_Z f32 Collider,
     COLLIDER_ROTATION_W f32 Collider,
     COLLIDER_DENSITY f32 Collider,
+    // The hull row of a SHAPE_HULL collider.
+    COLLIDER_HULL u32 Collider,
     // Broad phase. State bits, the next in the pending chain, the first of its pairs.
     COLLIDER_STATE u32 Collider,
     COLLIDER_PENDING u32 Collider,
@@ -173,6 +182,11 @@ columns! {
     // The pairs with an awake body, densely, and each pair's place in that list, NONE when it is not there.
     ACTIVE_PAIRS u32 Pair,
     PAIR_SLOT u32 Pair,
+    // The pair's manifold: points in use, and the shared normal, from the first collider to the second, in world space.
+    PAIR_CONTACTS u32 Pair,
+    PAIR_NORMAL_X f32 Pair,
+    PAIR_NORMAL_Y f32 Pair,
+    PAIR_NORMAL_Z f32 Pair,
     // Open addressing: a pair's row plus one, zero when empty.
     PAIR_TABLE u32 Table,
     // Awake bodies, densely.
@@ -182,6 +196,62 @@ columns! {
     ISLAND_START u32 BodyList,
     ISLAND_COUNT u32 BodyList,
     ISLAND_READY u32 BodyList,
+    // A manifold's points. An anchor is the point on each surface, from its body's centre of mass in its body's frame.
+    // Separation is along the normal, negative when the shapes overlap. The id names the features that made the point.
+    CONTACT_ANCHOR_A_X f32 Contact,
+    CONTACT_ANCHOR_A_Y f32 Contact,
+    CONTACT_ANCHOR_A_Z f32 Contact,
+    CONTACT_ANCHOR_B_X f32 Contact,
+    CONTACT_ANCHOR_B_Y f32 Contact,
+    CONTACT_ANCHOR_B_Z f32 Contact,
+    CONTACT_SEPARATION f32 Contact,
+    CONTACT_ID u32 Contact,
+    // The point in world space, midway between the surfaces, when it was found.
+    CONTACT_X f32 Contact,
+    CONTACT_Y f32 Contact,
+    CONTACT_Z f32 Contact,
+    // A hull: where its rows start and how many it has; an interior point; the box around it; volume, and the principal
+    // moments per unit of density with their frame, about its centroid.
+    HULL_FIRST_VERTEX u32 Hull,
+    HULL_VERTICES u32 Hull,
+    HULL_FIRST_EDGE u32 Hull,
+    HULL_EDGES u32 Hull,
+    HULL_FIRST_FACE u32 Hull,
+    HULL_FACES u32 Hull,
+    HULL_CENTER_X f32 Hull,
+    HULL_CENTER_Y f32 Hull,
+    HULL_CENTER_Z f32 Hull,
+    HULL_BOX_X f32 Hull,
+    HULL_BOX_Y f32 Hull,
+    HULL_BOX_Z f32 Hull,
+    HULL_HALF_X f32 Hull,
+    HULL_HALF_Y f32 Hull,
+    HULL_HALF_Z f32 Hull,
+    HULL_RADIUS f32 Hull,
+    HULL_VOLUME f32 Hull,
+    HULL_MOMENT_X f32 Hull,
+    HULL_MOMENT_Y f32 Hull,
+    HULL_MOMENT_Z f32 Hull,
+    HULL_FRAME_X f32 Hull,
+    HULL_FRAME_Y f32 Hull,
+    HULL_FRAME_Z f32 Hull,
+    HULL_FRAME_W f32 Hull,
+    VERTEX_X f32 HullVertex,
+    VERTEX_Y f32 HullVertex,
+    VERTEX_Z f32 HullVertex,
+    // The head of the chain of half-edges leaving a vertex, used while a hull is built.
+    VERTEX_CHAIN u32 HullVertex,
+    // Half-edges, all indices from the hull's first row. A face's edges run counter-clockwise seen from outside.
+    EDGE_ORIGIN u32 HullEdge,
+    EDGE_NEXT u32 HullEdge,
+    EDGE_TWIN u32 HullEdge,
+    EDGE_FACE u32 HullEdge,
+    EDGE_CHAIN u32 HullEdge,
+    FACE_EDGE u32 HullFace,
+    FACE_NORMAL_X f32 HullFace,
+    FACE_NORMAL_Y f32 HullFace,
+    FACE_NORMAL_Z f32 HullFace,
+    FACE_OFFSET f32 HullFace,
 }
 
 /// Rows every column of a class is padded to, so each column stays on a 16-byte boundary.
@@ -206,22 +276,29 @@ pub fn offsets(start: u32, capacity: &[u32; ROW_CLASSES]) -> Option<([u32; COLUM
     Some((out, at as u32))
 }
 
-/// The rows of every class for `bodies` and `colliders`, keeping the pairs a world already has room for.
-pub fn capacities(bodies: u32, colliders: u32, pairs: u32) -> [u32; ROW_CLASSES] {
-    [bodies, colliders, colliders * 2, pairs, (pairs * 2).next_power_of_two(), bodies]
+/// Points a manifold holds.
+pub const MANIFOLD: usize = 4;
+
+/// The rows of every class for `bodies`, `colliders` and `pairs`, keeping the hull rows a world already has room for.
+pub fn capacities(bodies: u32, colliders: u32, pairs: u32, hulls: [u32; 4]) -> [u32; ROW_CLASSES] {
+    let [hull, vertices, edges, faces] = hulls;
+    [bodies, colliders, colliders * 2, pairs, (pairs * 2).next_power_of_two(), bodies, pairs * MANIFOLD as u32, hull, vertices, edges, faces]
 }
 
 /// Most bodies and colliders one world holds.
 pub const MAX_BODIES: u32 = 1 << 22;
 pub const MAX_COLLIDERS: u32 = 1 << 22;
-/// Pairs the broad phase can hold; its table then fills 2^30 slots.
+/// Pairs the broad phase can hold; its table then fills 2^30 slots and its points 2^31 rows.
 pub const MAX_PAIRS: u32 = 1 << 29;
+/// Edges of a hull's largest face: the clipper's buffers are sized by it.
+pub const MAX_FACE_EDGES: u32 = 64;
 
 // Values of the COLLIDER_SHAPE column. A, B, C hold the size: a ball's radius; a box's half extents; a capsule's radius
-// and half the length of its core along local Y.
+// and half the length of its core along local Y. A hull has its row in COLLIDER_HULL and no size.
 pub const SHAPE_BALL: u32 = 0;
 pub const SHAPE_BOX: u32 = 1;
 pub const SHAPE_CAPSULE: u32 = 2;
+pub const SHAPE_HULL: u32 = 3;
 
 // Bits of the FLAGS column.
 pub const ALIVE: u32 = 1;

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10448987,
+  "total": 10460915,
   "history": [
     {
       "date": "2026-10-24",
@@ -3470,6 +3470,12 @@
       "commit": "346520d0e",
       "reason": "fbx imports gltf-pro/model and exporters/gltf in place of the two roots; new entry exporters/gltf",
       "grew": 3
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "ef4d831b5",
+      "reason": "physics/next: the own kernel gains hulls and the narrow phase, batch 124 job 1",
+      "grew": 1
     }
   ],
   "items": {
@@ -3901,7 +3907,7 @@
     "@margoengine/oit/moments": 4197,
     "@margoengine/oit/vfx": 486,
     "@margoengine/physics": 19679,
-    "@margoengine/physics/next": 27444,
+    "@margoengine/physics/next": 39372,
     "@margoengine/physics2d": 8199,
     "@margoengine/physics2d/outline": 2524,
     "@margoengine/pixel": 4664,

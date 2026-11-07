@@ -119,6 +119,7 @@ impl World {
         let h = dt / substeps as f32;
         self.begin_step(dt);
         self.broad_update(dt);
+        self.narrow_phase(dt);
         self.update_islands(dt);
         for substep in 0..substeps {
             self.integrate_velocities(h);

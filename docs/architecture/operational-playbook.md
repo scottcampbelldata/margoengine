@@ -207,7 +207,7 @@ Known kernel gaps:
 
 ### 1.7 Physics kernel
 
-A second Rust kernel, the own rigid-body solver, is being built behind `@margoengine/physics/next`. Rapier stays the default until the switch. It shares the transform kernel's pattern, not its code.
+A second Rust kernel, the own rigid-body solver, is being built behind `@margoengine/physics/next`. Rapier stays the default until the switch. It shares the transform kernel's pattern, not its code. Its narrow phase runs once a step, before islands, over pairs with an awake body: manifolds of up to four points live in rows of the world, so a snapshot carries them, and hulls are rows too, held for the world's life.
 
 | File | Role |
 | --- | --- |

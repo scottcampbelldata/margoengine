@@ -46,7 +46,7 @@ export interface KernelLoadOptions {
     signal?: AbortSignal;
 }
 
-export type KernelShape = 'ball' | 'box' | 'capsule';
+export type KernelShape = 'ball' | 'box' | 'capsule' | 'hull';
 
 export class KernelWorld {
     readonly columns: Record<string, KernelColumn>;
@@ -55,6 +55,7 @@ export class KernelWorld {
     get colliderCapacity(): number;
     get pairCount(): number;
     pairs(): [number, number][];
+    contacts(): KernelContact[];
     get awakeCount(): number;
     get islandCount(): number;
     get sleepEnergy(): number;
@@ -72,6 +73,7 @@ export class KernelWorld {
     addBody(kind: KernelBodyKind): number;
     removeBody(body: number): boolean;
     addCollider(body: number, shape: KernelShape, size: readonly number[], options?: KernelColliderOptions): number;
+    addHull(vertices: readonly (readonly [number, number, number])[], faces: readonly (readonly number[])[]): number;
     removeCollider(collider: number): boolean;
     updateMass(body: number): this;
     setPose(body: number, position: Vec3, rotation: Quat, wake?: boolean): this;
@@ -402,6 +404,19 @@ type CompoundPart = ({
     offset?: Vec3;
     rotation?: Quat;
 };
+
+interface KernelContact {
+    colliderA: number;
+    colliderB: number;
+    normal: [number, number, number];
+    points: KernelContactPoint[];
+}
+
+interface KernelContactPoint {
+    position: [number, number, number];
+    separation: number;
+    id: number;
+}
 
 interface PhysicsAttachment {
     beforeStep?(dt: number): void;

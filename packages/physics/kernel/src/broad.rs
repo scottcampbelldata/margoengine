@@ -56,7 +56,7 @@ impl World {
         let at = self.uu(COLLIDER_BODY, c) as usize;
         let flags = self.flags(at);
         let rotation = self.q(ROTATION_X, at);
-        let center = self.v(POSITION_X, at).add(rotation.rotate(self.v(COLLIDER_X, c)));
+        let mut center = self.v(POSITION_X, at).add(rotation.rotate(self.v(COLLIDER_X, c)));
         let turn = rotation.mul(self.q(COLLIDER_ROTATION_X, c));
         let (a, b, d) = (self.s(COLLIDER_A, c), self.s(COLLIDER_B, c), self.s(COLLIDER_C, c));
         let (extent, radius) = match self.uu(COLLIDER_SHAPE, c) {
@@ -66,6 +66,15 @@ impl World {
                 let y = turn.rotate(v3(0.0, b, 0.0)).abs();
                 let z = turn.rotate(v3(0.0, 0.0, d)).abs();
                 (x.add(y).add(z), sqrt(a * a + b * b + d * d))
+            }
+            SHAPE_HULL => {
+                let hull = self.uu(COLLIDER_HULL, c) as usize;
+                let half = self.v(HULL_HALF_X, hull);
+                let x = turn.rotate(v3(half.x, 0.0, 0.0)).abs();
+                let y = turn.rotate(v3(0.0, half.y, 0.0)).abs();
+                let z = turn.rotate(v3(0.0, 0.0, half.z)).abs();
+                center = center.add(turn.rotate(self.v(HULL_BOX_X, hull)));
+                (x.add(y).add(z), self.s(HULL_RADIUS, hull))
             }
             _ => {
                 let core = turn.rotate(v3(0.0, b, 0.0)).abs();
@@ -439,7 +448,8 @@ impl World {
     fn grow_pairs(&mut self) -> bool {
         let capacity = self.header().capacity;
         let rows = capacity[3] * 2;
-        if rows > MAX_PAIRS || !self.grow(capacities(capacity[0], capacity[1], rows)) {
+        let hulls = [capacity[7], capacity[8], capacity[9], capacity[10]];
+        if rows > MAX_PAIRS || !self.grow(capacities(capacity[0], capacity[1], rows, hulls)) {
             return false;
         }
         for slot in 0..self.header().capacity[4] as usize {
@@ -481,6 +491,7 @@ impl World {
         self.set_u(PAIR_A, at, a);
         self.set_u(PAIR_B, at, b);
         self.set_u(PAIR_FLAGS, at, 0);
+        self.set_u(PAIR_CONTACTS, at, 0);
         self.set_u(PAIR_NEXT_A, at, first_a);
         self.set_u(PAIR_PREVIOUS_A, at, NONE);
         self.set_u(PAIR_NEXT_B, at, first_b);

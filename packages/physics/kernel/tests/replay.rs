@@ -48,12 +48,16 @@ fn add_collider(w: &mut World, body: u32, shape: u32, size: [f32; 3], position: 
     }
 }
 
-fn spawn(w: &mut World, random: &mut Stream, rows: &mut Vec<u32>) {
+const OCTAHEDRON: [[f32; 3]; 6] = [[1.0, 0.0, 0.0], [-1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, -1.0, 0.0], [0.0, 0.0, 1.0], [0.0, 0.0, -1.0]];
+const OCTAHEDRON_FACES: [&[u32]; 8] =
+    [&[0, 2, 4], &[2, 1, 4], &[1, 3, 4], &[3, 0, 4], &[2, 0, 5], &[1, 2, 5], &[3, 1, 5], &[0, 3, 5]];
+
+fn spawn(w: &mut World, random: &mut Stream, rows: &mut Vec<u32>, hull: f32) {
     let kind = [DYNAMIC, DYNAMIC, DYNAMIC, DYNAMIC, DYNAMIC, FIXED, KINEMATIC_POSITION, KINEMATIC_VELOCITY][random.below(8) as usize];
     let row = add_body(w, kind);
     let density = if kind == DYNAMIC { (1 + random.below(8)) as f32 } else { 0.0 };
     let o = [0.0; 3];
-    match random.below(4) {
+    match random.below(5) {
         0 => {
             let size = [random.size(), 0.0, 0.0];
             add_collider(w, row, SHAPE_BALL, size, o, IDENTITY, density);
@@ -66,6 +70,7 @@ fn spawn(w: &mut World, random: &mut Stream, rows: &mut Vec<u32>) {
             let size = [random.size(), random.size(), 0.0];
             add_collider(w, row, SHAPE_CAPSULE, size, o, IDENTITY, density);
         }
+        3 => add_collider(w, row, SHAPE_HULL, [hull, 0.0, 0.0], o, IDENTITY, density),
         _ => {
             let size = [random.size(), random.size(), random.size()];
             add_collider(w, row, SHAPE_BOX, size, o, IDENTITY, density);
@@ -96,8 +101,9 @@ fn scene() -> Vec<u32> {
     let mut w = World::new(1, 1).unwrap();
     let mut rows = Vec::new();
     let mut hashes = Vec::new();
+    let hull = w.add_hull(&OCTAHEDRON, &OCTAHEDRON_FACES) as f32;
     for _ in 0..48 {
-        spawn(&mut w, &mut random, &mut rows);
+        spawn(&mut w, &mut random, &mut rows, hull);
     }
     for i in 0..STEPS {
         if i % 512 == 0 {
@@ -122,7 +128,7 @@ fn scene() -> Vec<u32> {
             rows.swap_remove(at);
         }
         if i % 101 == 0 && rows.len() < 96 {
-            spawn(&mut w, &mut random, &mut rows);
+            spawn(&mut w, &mut random, &mut rows, hull);
         }
         let pick = rows[random.below(rows.len() as u32) as usize];
         let at = pick as usize;
