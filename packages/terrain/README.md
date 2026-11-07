@@ -208,7 +208,61 @@ none more than without it, by rules and by painted weights.
 
 Resolution is a multiple of four from 8-256; levels range from 1-12. The default is 64 cells and six rings, with doubled cell spacing per level. Geometry buffers are allocated once and reused as the camera moves. Layer slope is `1-normal.y` in 0..1; height is world Y. Rules blend smoothly around their thresholds and fall back to layer zero if none match. Terrain uses GGX directional lighting and the scene's reversed depth.
 
-`shadows.add(terrain,{static:true})` registers depth rendering and reception; moving clipmap origins invalidates its static shadow cache. `clustered.add(terrain)` adds local PBR lights. Call `terrain.invalidate()` after changing height texture contents. Raycasts/foot IK should use your retained height data or collision BVH; rendering performs no GPU height readback. The clipmap does not add physics or streaming. `dispose()`/`destroy()` releases textures and geometry. `clipmapGrid()` is exported for custom grid consumers.
+`shadows.add(terrain,{static:true})` registers depth rendering and reception; moving clipmap origins invalidates its static shadow cache. `clustered.add(terrain)` adds local PBR lights. Call `terrain.invalidate()` after changing height texture contents. For picking, foot placement and game logic, ask `@margoengine/terrain/query` (below); rendering itself performs no GPU height readback. The clipmap does not add physics or streaming. `dispose()`/`destroy()` releases textures and geometry. `clipmapGrid()` is exported for custom grid consumers.
+
+## Height and ray queries: `@margoengine/terrain/query`
+
+`TerrainQuery` answers the height, the normal and a ray's first hit on the surface the clipmap's vertex shader samples
+(bilinear between texels, texel 0 at `origin`, the last at `origin + size`, times `heightScale` plus `heightOffset`),
+on the CPU, so picking, foot placement and game logic need no BVH of the ground. Build it from the heights you upload
+(`new TerrainQuery(heights, columns, rows, terrain.options)`; it keeps the array, no copy), or read a live terrain's
+heightmap back once with `await TerrainQuery.read(engine, terrain, {signal})` (the heightmap needs
+`GPUTextureUsage.COPY_SRC`; `r32float`, `rgba16float` and `rgba8unorm` are read as the shader reads them).
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Terrain} from 'margoengine/terrain';
+import {TerrainQuery} from 'margoengine/terrain/query';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const columns = 65, heights = new Float32Array(columns * columns).map((_, i) => Math.sin(i % columns / 6) * 0.1);
+const terrain = Terrain.attach(engine, {
+  size: [128, 128], origin: [-64, -64], heightScale: 20,
+  layers: Array.from({length: 4}, () => ({height: [-100, 100] as [number, number], slope: [0, 1] as [number, number], scale: 0.25})),
+  textures(device) {
+    const heightmap = device.createTexture({size: [columns, columns], format: 'r32float', usage: 6});
+    device.queue.writeTexture({texture: heightmap}, heights, {bytesPerRow: columns * 4}, [columns, columns]);
+    const layers = device.createTexture({size: [1, 1, 4], format: 'rgba8unorm-srgb', usage: 6});
+    device.queue.writeTexture({texture: layers}, new Uint8Array(16).fill(128), {bytesPerRow: 4, rowsPerImage: 1}, [1, 1, 4]);
+    return {heightmap, layers};
+  },
+});
+const ground = new TerrainQuery(heights, columns, columns, terrain.options);
+const y = ground.height(10, -5);                       // world Y, or undefined outside the map
+const up = ground.normal(10, -5);                      // unit shading normal, as the vertex shader works it out
+const hit = ground.raycast([0, 50, 0], [0.2, -1, 0.1]); // {distance, position, normal} or null
+console.log(y, up, hit?.position);
+```
+
+- `height(x, z)` is the bilinear height; `normal(x, z, out?)` uses the vertex shader's central differences one texel
+  either way (a terrain with its own `normalmap` shades with that instead). Both return undefined outside the map's
+  rectangle, where the terrain draws nothing.
+- `raycast(origin, direction, maxDistance?, out?)` returns the first point where the ray meets the surface, from above or
+  below, inside the map, or null. Each cell's bilinear patch is hit exactly (the height along a ray is quadratic in its
+  distance), and an implicit min-max quadtree over the cells (Tevs, Ihrke and Seidel's maximum mipmaps, 2008) skips
+  ground the ray passes over. The hit has `@margoengine/animator`'s `GroundHit` shape, so
+  `raycast: (o, d) => ground.raycast(o, d)` plants a `FootIK` leg as it is; pass `out` to reuse one hit object.
+- After changing `heights` in place (a sculpt, a crater), call `ground.refresh(x, z, width, depth)` over the changed
+  samples; it rebuilds the tree there. Without it a raised cell is skipped.
+- The clipmap draws the surface as triangles at its own cell spacing, morphing between rings, so a drawn point lies
+  within that triangulation's error of the query's answer (none at texels the finest ring's vertices sit on).
+- Memory: the heights you pass plus a min-max tree of two thirds of their count in floats (2.8 MB for a 1,025 x 1,025 map).
+
+Checked on the CPU by `test/query.test.js` (rays against a brute-force march, heights and normals against the shader's
+formulas) and on a real GPU by `test/query.browser.mjs` (in `test:gpu`), on real elevation (the Mount Rainier tile in
+`packages/shadows/test/fixtures`, 256 x 256 texels, 3.9 km of relief): `TerrainQuery.read` returns every texel as
+uploaded (r32float and rgba8unorm exactly, rgba16float within half precision), the terrain's own WGSL `height` run on
+the GPU at 3,584 points matches `height` to 2.6 mm, and 512 rays cast onto the mountain all hit, each within 2.3 mm of
+the shader's height at the hit (Radeon 680M; the bound from float32 rounding is 4.9 mm).
 
 ## Screen-space reflections
 

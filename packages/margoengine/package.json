@@ -2538,6 +2538,10 @@
       "types": "./dist/terrain.d.ts",
       "import": "./dist/terrain.js"
     },
+    "./terrain/query": {
+      "types": "./dist/terrain/query.d.ts",
+      "import": "./dist/terrain/query.js"
+    },
     "./text": {
       "types": "./dist/text.d.ts",
       "import": "./dist/text.js"

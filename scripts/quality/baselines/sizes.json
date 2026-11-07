@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10665656,
+  "total": 10669076,
   "history": [
     {
       "date": "2026-10-24",
@@ -3776,6 +3776,12 @@
       "commit": "1eae0d3f4",
       "reason": "physics/next: events, sensors, groups, contact filter, dominance and disabling",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "2ab476fd1",
+      "reason": "new entry @margoengine/terrain/query, about 3.6 KB gzip",
+      "grew": 1
     }
   ],
   "items": {
@@ -4412,6 +4418,7 @@
     "@margoengine/taa": 12187,
     "@margoengine/taa/upscale": 7093,
     "@margoengine/terrain": 12874,
+    "@margoengine/terrain/query": 3420,
     "@margoengine/text": 16406,
     "@margoengine/text/msdf": 4516,
     "@margoengine/text/rich": 11403,

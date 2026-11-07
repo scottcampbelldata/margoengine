@@ -1,8 +1,8 @@
 {
-  "commit": "aec2cb7d4",
-  "dirty": false,
+  "commit": "2ab476fd1",
+  "dirty": true,
   "browser": "msedge 157.0.4341.42 headless",
-  "adapter": "nvidia ampere",
+  "adapter": "amd rdna-2",
   "method": "Vite production build of tests/fixtures/basic-scene (base ./, es2022), served by vite preview (its own on-the-fly gzip); transferred = Playwright requestfinished sizes (encoded body + response headers); raw, gzip and brotli of the same built files at zlib defaults",
   "files": [
     {

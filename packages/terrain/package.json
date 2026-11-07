@@ -31,13 +31,17 @@
     "build": "node ../../scripts/build-optional.js terrain",
     "test": "npm run build && node --test test/*.test.js",
     "prepack": "npm --prefix ../.. run build:packages",
-    "test:gpu": "cd ../.. && node packages/terrain/test/wetness.browser.mjs && node packages/terrain/test/edge.browser.mjs && node packages/terrain/test/bump.browser.mjs && node packages/terrain/test/crest.browser.mjs"
+    "test:gpu": "cd ../.. && node packages/terrain/test/wetness.browser.mjs && node packages/terrain/test/edge.browser.mjs && node packages/terrain/test/bump.browser.mjs && node packages/terrain/test/crest.browser.mjs && node packages/terrain/test/query.browser.mjs"
   },
   "sideEffects": false,
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./query": {
+      "types": "./dist/query.d.ts",
+      "import": "./dist/query.js"
     }
   },
   "files": [

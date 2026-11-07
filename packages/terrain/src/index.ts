@@ -243,6 +243,13 @@ export class Terrain implements EnginePlugin {
   invalidate(): void {
     this.shadowVersion++;
   }
+  /**
+   * The heightmap texture the `textures` factory returned, while attached (undefined before and after disposal; a new
+   * one after device restoration). Terrain owns it. `TerrainQuery.read` (`@margoengine/terrain/query`) reads it back.
+   */
+  get heightmap(): GPUTexture | undefined {
+    return this.textures?.heightmap;
+  }
   setup(engine: Engine): void {
     if (this.disposed || !engine.gpu)
       throw new MargoError(
