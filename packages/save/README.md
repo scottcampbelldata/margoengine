@@ -271,6 +271,94 @@ The result is a storage like any other, so `SaveSlots` runs over it. With both c
 A write costs two reads, a write and a read back, and a key takes twice the room. The CRC finds accidents; it is no
 signature, and someone editing a save can make a matching one.
 
+## Cloud saves
+
+`remoteStorage` from `@margoengine/save/remote` keeps saves on an HTTP server: GET, PUT and DELETE on
+`${url}/${encodeURIComponent(key)}`, and GET on `url` for a JSON array of keys. A read remembers the key's ETag and a
+write sends it as `If-Match`, so the server finds a save another device made in between, and `conflict` says what happens
+then. `remoteHandler` is the other half: a server over any storage, as a function from a `Request` to a `Response`.
+
+```ts
+import { memoryStorage } from 'margoengine/save';
+import { remoteHandler, remoteStorage } from 'margoengine/save/remote';
+
+const server = remoteHandler(memoryStorage(), { base: '/saves' });
+const fetch = async (input: RequestInfo | URL, init?: RequestInit) => server(new Request(input, init)); // or the network
+const url = 'https://game.example/saves';
+const bytes = (text: string) => new TextEncoder().encode(text);
+
+const phone = remoteStorage({ url, fetch });
+const laptop = remoteStorage({ url, fetch });
+await phone.write('slot-1', bytes('level 1'));
+await laptop.read('slot-1');
+await phone.write('slot-1', bytes('level 2'));
+
+await laptop.write('slot-1', bytes('level 1, with a side quest')).catch((error) => console.log(error.code)); // 'state'
+
+const merging = remoteStorage({
+  url,
+  fetch,
+  conflict: ({ local, remote }) => (remote && remote.length > (local?.length ?? 0) ? remote : local), // keeps the longer
+});
+await merging.write('slot-1', bytes('level 2 and more'));
+console.log(new TextDecoder().decode((await phone.read('slot-1'))!)); // level 2 and more
+```
+
+| `conflict` | When the server's save is not the one this client last saw |
+| --- | --- |
+| `'error'` (default) | The write rejects with `MargoError` `'state'` and nothing changes. Read the key, then save again. |
+| `'local'` | This write goes over it. |
+| `'remote'` | The server's stays, and this write is dropped. |
+| a function | Gets `{key, local, remote}` and returns the bytes to keep, or null for none. `local` is null for a delete and `remote` for a save deleted elsewhere. |
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| `url` | none | The folder of saves. |
+| `fetch` | `globalThis.fetch` | How requests go out. |
+| `headers` | none | Sent with each request. A function runs for each attempt, for a token that expires. |
+| `timeout` | `30000` | Milliseconds for one attempt. |
+| `retries` | `3` | Further attempts after a network failure, a timeout, a 408, a 429 or a 5xx, waiting as `Retry-After` says, up to a minute; longer, the call fails. |
+
+A write that lost its answer and tried again gets a 412 from its own earlier write; the bytes on the server are then the
+same, and it counts as done. A device that has never read a key cannot write over it: read first on a new device.
+
+On Node, the handler needs a few lines around it:
+
+```ts
+import { createServer } from 'node:http';
+import { Readable } from 'node:stream';
+import { fileStorage } from 'margoengine/save/node';
+import { remoteHandler, remoteStorage } from 'margoengine/save/remote';
+
+const handle = remoteHandler(fileStorage('./cloud-saves'), {
+  base: '/saves',
+  origin: 'https://game.example', // the page's origin, for CORS; leave it out for the same origin
+  authorize: (request) => request.headers.get('authorization') === 'Bearer secret', // yours to write
+});
+const server = createServer(async (request, response) => {
+  const body = request.method === 'PUT' ? { body: Readable.toWeb(request) as ReadableStream, duplex: 'half' } : {};
+  const answer = await handle(new Request(`http://${request.headers.host}${request.url}`, { method: request.method, headers: request.headers as HeadersInit, ...body } as RequestInit));
+  response.writeHead(answer.status, Object.fromEntries(answer.headers));
+  response.end(Buffer.from(await answer.arrayBuffer()));
+});
+await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+
+const { port } = server.address() as { port: number };
+const storage = remoteStorage({ url: `http://127.0.0.1:${port}/saves`, headers: { authorization: 'Bearer secret' } });
+await storage.write('slot-1', new Uint8Array([1, 2, 3]));
+console.log(await storage.keys()); // ['slot-1']
+await storage.delete('slot-1');
+server.close();
+```
+
+With no `authorize`, anyone who reaches the handler can read and write every save, so a public server needs it. Other
+options: `allowHeaders` for CORS and `maxBytes`, default 64 MiB. Any other server works when it sends strong ETags and
+honours `If-Match` and `If-None-Match`, and `keys()` needs its JSON list. Apache with mod_dav was tested: it sends no ETag
+with a PUT, so a GET follows, and for about a second after a change it gives a weak tag, so a second write inside that
+second is refused.
+
+`safeStorage(remoteStorage(...))` and `SaveSlots` run over it.
+
 ## Validation and migrations
 
 `validateSave(document, {components, strictComponents})` never throws and lists every problem with its path and fix
@@ -299,6 +387,6 @@ browsers and Node 18+); `decodeSave(bytes)` reads either. Storage adapters share
 A full Web Storage or a failed transaction throws `MargoError` `'failed'` and keeps the previous save; a missing
 API throws `'unsupported'`. `saveGame` never writes an invalid document.
 
-Apache-2.0. Optional, tree-shakable package. Only `/engine` uses core, as an optional peer (`/slots` and `/safe` need none of them), with `@margoengine/gltf-pro` and `@margoengine/animation` loaded when a save holds a model.
+Apache-2.0. Optional, tree-shakable package. Only `/engine` uses core, as an optional peer (`/slots`, `/safe` and `/remote` need none of them), with `@margoengine/gltf-pro` and `@margoengine/animation` loaded when a save holds a model.
 
-Build and unit tests: npm test --workspace @margoengine/save. Real GPU, models, thumbnails and IndexedDB: npm run test:gpu --workspace @margoengine/save
+Build and unit tests: npm test --workspace @margoengine/save. Real GPU, models, thumbnails, IndexedDB and cross-origin fetch: npm run test:gpu --workspace @margoengine/save

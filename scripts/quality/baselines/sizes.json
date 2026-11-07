@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10642026,
+  "total": 10645437,
   "history": [
     {
       "date": "2026-10-24",
@@ -3734,6 +3734,18 @@
       "commit": "c44d21f67",
       "reason": "components builds glTF cameras from Blender camera tags and views the scene camera",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "5c419aa9c",
+      "reason": "new entry save/remote: remoteStorage and remoteHandler; save/node escapes capitals in file names",
+      "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "3b5f421f6",
+      "reason": "new entry save/remote: remoteStorage and remoteHandler; save/node escapes capitals in file names",
+      "grew": 1
     }
   ],
   "items": {
@@ -4276,6 +4288,7 @@
     "@margoengine/save": 6952,
     "@margoengine/save/engine": 8438,
     "@margoengine/save/node": 1405,
+    "@margoengine/save/remote": 3411,
     "@margoengine/save/safe": 2102,
     "@margoengine/save/slots": 5741,
     "@margoengine/scatter": 19252,

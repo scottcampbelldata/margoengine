@@ -5,6 +5,7 @@
 ### Networking
 
 - `@margoengine/netcode/hitboxes`: `HitboxRewind` rewinds boxes and capsules that turn, as `LagCompensation` does spheres.
+- `@margoengine/save/remote`: `remoteStorage` keeps saves on any HTTP server with ETags, with a conflict policy of `error`, `local`, `remote` or your own merge, and `remoteHandler` is a server for it over any storage. `fileStorage` keeps keys that differ only by case apart.
 - `@margoengine/save/safe`: `safeStorage` keeps two checked copies of each save, so a failed or torn write never loses the last good one. `fileStorage` no longer fails a save on Windows while the same save is being read, and fsyncs the folder after a rename; `indexedDBStorage` writes with strict durability.
 - `@margoengine/save/slots`: `SaveSlots` gives named slots with a record for the load screen, thumbnails, an autosave ring and a timer, over any storage; `captureThumbnail` takes a small picture of a canvas.
 - `@margoengine/save/engine`: `captureScene` and `restoreScene` save and restore a running scene, its meshes, glTF models, camera, lighting and plugin state, with no mapping to write. `@margoengine/gltf-pro`: `PBRModel.selectedVariant` and `ownedMeshes`.

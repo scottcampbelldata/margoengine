@@ -2178,3 +2178,25 @@ each piece paid for only when imported. Nothing is timed.
 - **Gate:** lint, hygiene, verify, the behavior tests and the claims test per job, with `check:readmes`, api-conventions,
   package-lock-sync, `check:parity` and the api quality gate. After a move of main the ship reran the package tests, the
   claims test, lint and hygiene, and verify when the move touched what these entries use.
+
+## Lane N batch 115: save
+
+Four jobs for `@margoengine/save`, on this PC with the full check per job; each is a new optional entry, and core and stage are untouched. The batch's aim is that a game gets a whole save system without writing one: a running scene saved with no mapping, a load screen with autosaves, saves that survive a bad write, and saves that follow a player between devices.
+
+| # | Job | Status | Commit | Entry | Claim |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Engine scene binding | DONE | `3ab28e97` | `/engine` | LIM-411 |
+| 2 | Save slots | DONE | `08c69ef1` | `/slots` | LIM-413 |
+| 3 | Integrity and safe writes | DONE | `12f10998` | `/safe` | LIM-414 |
+| 4 | Remote storage adapter | DONE | this commit | `/remote` | LIM-418 |
+
+- **Bugs fixed:** `fileStorage` failed 186 of 200 writes on Windows while a read of the same key ran, as a rename over an open file is refused (`2afc0b89`, `packages/save/tests/file-storage.test.js`). It never fsynced the folder after a rename, so a crash could undo a finished save (`ad5f1158`, same test file). `indexedDBStorage` wrote with default durability (`4cfefc6b`, `packages/save/tests/save.test.js`). `fileStorage` wrote keys that differ only by case to one file on a folding disk, and could not write a key holding `*` on Windows (the commit before this one, same test file). Each test was seen failing first. Found while building job 2, before it landed: a failed read of a slot's record restarted its generation, which could have overwritten the live files.
+- **Proved on real things:** job 1 by Knight.glb and MaterialsVariantsShoe.glb through gzip and real IndexedDB into a new engine, 0 bytes of the frame different. Job 2 by a real WebGPU frame as a thumbnail through real IndexedDB, real localStorage and a page reload, a mean error of about 3 of 255 against the frame. Job 3 by 12 real kills of a process writing real files, on Windows NTFS, and by hand on macOS APFS and Linux ext4, and by a damaged newest copy in real IndexedDB and localStorage, with the browser's own `durability` read back as `strict`. Job 4 by real Chromium through real CORS against `node:http`, and by hand against Apache 2.4.67 with mod_dav on the Mac.
+- **Stand-in:** job 1's hierarchies, plugins and failures run on a stand-in renderer. Job 2's failed writes, job 3's prefixes, torn and reordered writes, and job 4's lost answers, 429 and 503 are stand-in storages or a scripted fetch. Batch meshes in job 1 never occurred on a real model.
+- **Not proved:** power loss. Only a process crash was tested, so that an fsync orders the disk is the system's promise.
+- **What Apache taught:** it sends no ETag with a PUT and a weak tag for about a second after a change, so a client that refused every weak tag could not work with it. A weak tag is now asked for again before a write, and refused only if it is still weak.
+- **Sources:** Pillai et al. (OSDI 2014): body in full, references in part. Koopman (DSN 2002) and Terry et al. (SOSP 1995) in full. RFC 9110: sections 8.8.1, 8.8.3, 10.2.3, 13.1 to 13.1.2, 13.2, 15.5.13, not the whole. Fetch Standard section 3.3 and Indexed Database 3.0 section 2.7 and its IDL, through a summarising fetch only. The paper's ALICE tool, Apache's source and every other tool's source were not read. Job 1 and job 2 have no outside source beyond the specs named in `docs/clean-room.md`.
+- **Limits:** rows in `docs/limits.md`. CRC-32 finds accidents and is no signature. Two processes on one key are not coordinated by slots, safe writes or `remoteHandler`. `keys()` needs a JSON list, which a WebDAV server does not give. Nothing here was timed.
+- **Sizes:** new entries `/engine` 8,438 B, `/slots` 5,741 B, `/safe` 2,102 B, `/remote` 3,411 B; `/node` grew from 939 B to 1,405 B for the turn queue and the folder fsync.
+- **Slips:** job 1's first land stopped twice, on two throw messages with no fix and a wrong folder in its GPU script; job 3's first land stopped at check:readmes on an example's type, and job 4's at the fixed-wait rule on the Apache script's unmarked wait. A file was briefly written to `/tmp` in job 1 and removed. `gltf-pro`'s README line for job 1 came in with job 2. Stale claim numbers were redone once in job 1.
+- **Gate:** lint, hygiene, verify, the save tests, test:gpu, check:readmes and check:readme-run for each job; the short rule after a rebase that touched nothing this uses.

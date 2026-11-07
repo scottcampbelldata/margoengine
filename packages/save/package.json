@@ -43,6 +43,10 @@
       "types": "./dist/slots.d.ts",
       "import": "./dist/slots.js"
     },
+    "./remote": {
+      "types": "./dist/remote.d.ts",
+      "import": "./dist/remote.js"
+    },
     "./safe": {
       "types": "./dist/safe.d.ts",
       "import": "./dist/safe.js"
@@ -83,6 +87,6 @@
     "build": "node ../../scripts/build-optional.js save",
     "test": "npm run build && node --test tests/*.test.js",
     "prepack": "npm run build",
-    "test:gpu": "cd ../.. && node packages/save/tests/browser/engine-check.mjs && node packages/save/tests/browser/slots-check.mjs && node packages/save/tests/browser/safe-check.mjs"
+    "test:gpu": "cd ../.. && node packages/save/tests/browser/engine-check.mjs && node packages/save/tests/browser/slots-check.mjs && node packages/save/tests/browser/safe-check.mjs && node packages/save/tests/browser/remote-check.mjs"
   }
 }

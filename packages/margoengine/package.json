@@ -2170,6 +2170,10 @@
       "types": "./dist/save/slots.d.ts",
       "import": "./dist/save/slots.js"
     },
+    "./save/remote": {
+      "types": "./dist/save/remote.d.ts",
+      "import": "./dist/save/remote.js"
+    },
     "./save/safe": {
       "types": "./dist/save/safe.d.ts",
       "import": "./dist/save/safe.js"
