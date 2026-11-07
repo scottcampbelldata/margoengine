@@ -32,6 +32,7 @@
     "test:browser": "npm run build && node scripts/test-browser.js",
     "prepack": "npm run build",
     "test:probes:browser": "npm run build && node scripts/test-browser.js --probe-samples",
+    "test:blend:browser": "npm run build && node scripts/test-browser.js --page=blend",
     "test:gpu:mirror": "cd ../.. && node scripts/env-mirror-gpu-check.js",
     "test:gpu:fog-all": "cd ../.. && node scripts/fog-all-gpu-check.js"
   },
@@ -64,6 +65,10 @@
     "./exr-write": {
       "types": "./dist/exr-write.d.ts",
       "import": "./dist/exr-write.js"
+    },
+    "./blend": {
+      "types": "./dist/blend.d.ts",
+      "import": "./dist/blend.js"
     }
   },
   "files": [

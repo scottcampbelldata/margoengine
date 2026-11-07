@@ -242,6 +242,28 @@ light (terrain takes the core-style patch like EnvironmentLighting); core meshes
 environment fills in where nothing was drawn); GPU-culled
 (`CulledMeshes`) parts use the main camera's culling in the capture. WebGPU only.
 
+## Blending two environments
+
+`@margoengine/environment/blend` fades between two environments, for example day to night or indoor to outdoor, with matching image-based lighting. `blend.environment` is an ordinary `Environment` holding `(1 - t) x from + t x to` in its source cube, every prefiltered specular mip and its SH, so `EnvironmentLighting`, `EnvironmentBackground` and `LightProbes` light and draw with it unchanged:
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Environment, EnvironmentBackground, EnvironmentLighting, loadEnvironmentImage} from 'margoengine/environment';
+import {EnvironmentBlend} from 'margoengine/environment/blend';
+const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
+const day = await Environment.attach(engine, await loadEnvironmentImage('/day.hdr'), {name: 'day'});
+const night = await Environment.attach(engine, await loadEnvironmentImage('/night.hdr'), {name: 'night', intensity: 0.4});
+const blend = await EnvironmentBlend.attach(engine, day, night, {t: 0});
+EnvironmentLighting.attach(engine, blend.environment);
+EnvironmentBackground.attach(engine, blend.environment);
+engine.onFrame((_, delta) => (blend.t = Math.min(1, blend.t + delta / 10))); // a ten second fade
+engine.start();
+```
+
+How it works. Prefiltering and SH projection are linear in the radiance, so blending the two sources' results equals processing the blended image (up to rgba16float rounding) and no prefiltering runs per change: setting `t` renders one full-screen triangle per output mip and face that reads each source at the same direction and roughness (two texture reads per texel), and blends the SH on the CPU (each source's SH turned by its `rotation` with `rotateSH`, an exact quadrature, and weighted by its `intensity`). Each source's `rotation` and `intensity` are baked into the blend, so `blend.environment.rotation` and `.intensity` stay free for the whole. The output takes the larger of the two sources' `size`, `specularSize` and `specularMips` (or `size`, `specularSize`, `specularMips` options); a smaller source is read at the matching mip. Bind groups made from `blend.environment` stay valid through every reblend. `set(from, to, t)` swaps the sources (dusk to night after day to dusk); call `update()` after changing a source's `rotation` or `intensity` or after `refresh()`ing a source. `engine.use(blend)` (or `attach`) restores both sources and the output after a device loss and blends again; `dispose()` frees the output only.
+
+Limits: a linear crossfade of radiance, not a time-of-day model (use `@margoengine/sky` for a sun that moves); the output keeps a full source cube and prefiltered cube of its own (the memory of a third environment); the background shows the blended cube, not either source's equirect; the output's BRDF LUT uses `brdfSize` and `brdfSamples` (Environment defaults unless set). Real-GPU check: `npm run test:blend:browser` (every cube and specular mip and the SH equal the weighted sources within rgba16float rounding at t 0, 0.25 and 1; a source turned a quarter turn with intensity 2 lands texel for texel; mixed sizes; a device restore blends again).
+
 ## Mirrors, glass and cube cameras
 
 Optional entries that render the scene a second time through another camera, into their own HDR target, before the
@@ -541,6 +563,7 @@ Five bindings, any group and binding numbers. `iblLayoutEntries(firstBinding)` a
 | `VolumetricFog(options)` (`/volumetric`) | `density` (0.02 per m), `heightFalloff` (0), `height` (0), `color` (albedo, [1, 1, 1]), `anisotropy` (0.5), `ambient` (engine ambient), `noise` (0), `noiseScale` (8 m), `wind` ([0, 0, 0] m/s), `range` (100 m), `grid` ([160, 90, 64]), `temporal` (0.9), `shadows`, `lights`, `depth` |
 | `ColorOutput(options)` | `gamut` (`'p3'`), `hdr` (true), `peak` (4, 1..16), `force` (false); name `'color-output'` |
 | `Reflector(options)`, `Refractor(options)` (`/reflector`, `/refractor`) | `width`, `height` (1), `parent`, `color` (white), `resolution` (1), `clipBias` (0), `roughness` (0), `normalMap`, `distortion` (0.03), `normalRepeat` ([1, 1]), `normalScroll` ([0, 0]), `layers` (all), `exclude`, `autoUpdate` (true), `passes` (`scenePasses`), `order` (1), `name` (`'reflector-N'`, `'refractor-N'`) |
+| `EnvironmentBlend.create(target, from, to, options)` (`/blend`) | `t` (0), `size`, `specularSize`, `specularMips` (the larger source's), `brdfSize` (128), `brdfSamples` (512), `name` (`'environment-blend'`) |
 | `CubeCamera(options)` (`/cube-camera`) | `size` (256, power of two 8..2048), `position` ([0, 0, 0]), `near` (0.05), `far` (1000), `mips` (false), `facesPerFrame` (0), `layers` (all), `exclude`, `passes` (`scenePasses`), `name` (`'cube-camera-N'`) |
 
 ## Limits
@@ -554,6 +577,8 @@ Two portability measures are deliberate: the specular prefilter samples the cube
 `npm test` in `packages/environment` runs Node checks: every binary16 value round trip; 20 EXR fixtures written by the reference OpenEXR library (NONE, RLE, ZIPS, ZIP and PIZ, each with HALF RGBA, FLOAT RGB, HALF Y and a mixed HALF/FLOAT/UINT layout) decoding bit-exactly; an independent in-test EXR writer (including raw-fallback chunks, decreasing Y and stored, fixed and dynamic deflate blocks); real files `BrightRings.exr` (ZIP) and `AllHalfValues.exr` (PIZ, every half value) from the OpenEXR test images (sources in `tests/fixtures/NOTICE.md`) and the Margo-made `sun_sky.hdr` (written by `scripts/make-hdr-fixture.js`), matched against reference digests; HDR adaptive, flat and old-style runs in both orientations; truncation and random-corruption fuzzing; `tests/hdr.test.js`: all eight Radiance scan orders, RGB output, bounds before allocation, FORMAT and XYZE refusals, located damage, Margo Voxel Studio's own HDR fixtures and a 600-file generated corpus whose SHA-256 digest Studio's decoder produced; CPU SH; and SSR safety. `tests/scene.test.js` checks the scene pieces on a mock GPU: `EnvironmentLighting` and `Fog` patch core's shader as left by shadows, sky, clustered and the HDR captures, leave it untouched when not ready, on another device or disposed, follow device restores and rebuild bind entries on `environment.version`; a real glTF-pro model gets lit and fogged pipelines for opaque and blended primitives and returns to the unpatched pipelines when removed; `ColorBackground` writes exact sRGB or linear values, allocates nothing in steady frames or on resize and releases its uniform; and UltraHDR parsing (attribute and element metadata, corruption fuzzing) and gain-map math against the formula.
 
 `tests/probes.test.js` checks LightProbes on a mock GPU: validation and buffer layout, the ambient patch on core's shader variants (with and without an environment, terrain, clustered) and on a glTF-pro model, the bake's capture shader (rebound frame, linear output, no fog, every clustered light), its submits and dispatches, the opt-in bounded filter's bindings and atomic validation, and the CPU irradiance mirror. `npm run test:probes:browser` checks the bounded filter on a real GPU: constant HDR energy, an independent spherical integral for a directional environment including every cube seam, a rendered colored room against full-source GGX, and byte-identical sharp level 0 / volume SH. It writes `test-results/probe-samples-browser.json`. The broader real-GPU checks are `examples/package-benchmarks/probes-gpu.mjs` (README section above). `tests/probes-live.test.js` checks live capture on the mock GPU: validation, one face per frame with the prefilter on the sixth, the face budget across probes, both priorities, `refresh()` promises, a bake during live capture, pooled resources and device restoration; `examples/package-benchmarks/probes-live-gpu.mjs` measures its latency and GPU cost on a real GPU (Live capture, above).
+
+`tests/blend.test.js` checks `rotateSH` against direct evaluation at random directions and angles and the blend's argument checks; `npm run test:blend:browser` checks the blend on a real GPU (section above) and writes `test-results/blend-browser.json`.
 
 `tests/mirror.test.js` checks Reflector, Refractor and CubeCamera on a mock GPU: captures run only the scene passes and the full frame graph comes back, the mirror camera lands mirror points x-flipped on its near plane and clips what is behind, the glass clips what is in front, excluded and off-layer meshes are hidden only during a capture, and every cube face matches the standard WebGPU addressing after its x flip, culled against its own face. The real-GPU check is `scripts/env-mirror-gpu-check.js` (above).
 

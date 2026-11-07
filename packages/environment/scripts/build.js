@@ -20,6 +20,7 @@ for (const [entry, emptyOutDir] of [
   ['exr-write', false],
   ['main', false],
   ['loaders', false],
+  ['blend', false],
 ])
   await build({
     root,

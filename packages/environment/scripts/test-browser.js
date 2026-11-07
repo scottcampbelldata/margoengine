@@ -35,20 +35,18 @@ try {
     if (response.status() >= 400 && !response.url().endsWith('/favicon.ico'))
       errors.push(`${response.status()} ${response.url()}`);
   });
+  // --page=<name>: tests/<name>.html exposing window.runTests (one page per optional entry).
+  const named = process.argv.find((arg) => arg.startsWith('--page='))?.slice(7);
   const probeSamples = process.argv.includes('--probe-samples');
-  await page.goto(`${server.resolvedUrls.local[0]}tests/${probeSamples ? 'probe-samples' : 'environment'}.html`);
-  await page.waitForFunction(
-    (sampled) => typeof window[sampled ? 'runProbeSampleTests' : 'runEnvironmentTests'] === 'function',
-    probeSamples,
-  );
-  const report = await page.evaluate(
-    (sampled) => window[sampled ? 'runProbeSampleTests' : 'runEnvironmentTests'](),
-    probeSamples,
-  );
+  const name = named ?? (probeSamples ? 'probe-samples' : 'environment');
+  const run = named ? 'runTests' : probeSamples ? 'runProbeSampleTests' : 'runEnvironmentTests';
+  await page.goto(`${server.resolvedUrls.local[0]}tests/${name}.html`);
+  await page.waitForFunction((fn) => typeof window[fn] === 'function', run);
+  const report = await page.evaluate((fn) => window[fn](), run);
   report.browser = browser.version();
   assert.deepEqual(errors, []);
   await writeFile(
-    resolve(results, probeSamples ? 'probe-samples-browser.json' : 'environment-browser.json'),
+    resolve(results, `${name}-browser.json`),
     JSON.stringify(report, null, 2),
   );
   console.log(JSON.stringify(report, null, 2));
