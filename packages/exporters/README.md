@@ -854,6 +854,24 @@ Level nodes sit outside the scene, copy their node's transform and skin, and fol
 
 `skipped` lists the primitives left as they were: Draco ones, ones with no position, points, lines, strips and fans, and, with `reason: 'too-large'`, a primitive past the simplifier's 200,000 vertices or faces, which is welded but not simplified. Meshopt buffers are refused: optimize first, then compress. `weldVertices(arrays, indices, vertexCount)` is the weld on its own, and `margo-convert` uses it.
 
+## glTF on its own (`@margoengine/exporters/gltf`)
+
+`exportGLTF` and `exportGLB` without the rest of the root. The root's OBJ path can load `@margoengine/decoders/image`, so a bundler that follows it copies the Basis transcoder into your build even if you never export a texture. This entry reaches no decoder.
+
+```ts
+import {exportGLB} from 'margoengine/exporters/gltf';
+
+const glb = exportGLB({nodes: [{
+  name: 'Triangle',
+  geometry: {
+    positions: new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]),
+    normals: new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1]),
+    indices: new Uint32Array([0, 1, 2]),
+  },
+}]});
+console.log(glb.byteLength);
+```
+
 ## Reading JPEG pixels (`@margoengine/exporters/jpeg-read`)
 
 `decodeJPEG` turns JPEG bytes into RGBA pixels with no canvas, in Node or a worker. Writers that repack images use it; `@margoengine/fbx/pbr` packs metal and rough maps with it.

@@ -1,5 +1,5 @@
 import type { EngineKernel } from '@margoengine/core';
-import type { PBRModel } from '@margoengine/gltf-pro';
+import type { PBRModel } from '@margoengine/gltf-pro/model';
 import { modelFromPrepared, type PreparedGLTF } from '@margoengine/gltf-pro/worker';
 import { canUseWorker, movable, runWorker } from '../../shared/worker.js';
 import type { FBXOptions } from './index.js';

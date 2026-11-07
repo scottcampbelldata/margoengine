@@ -477,8 +477,8 @@ the entry: `PbrMaterial` is core's material and pulls in no other package.
 - **Through `margoengine/react`:** a page emits no Draco or Basis file. `Model`, `Fbx`, `Animation` and the `materials`
   components reach those decoders, so they are separate entries (`margoengine/react/gltf-pro`, `/fbx`, `/animation`,
   `/materials`); Vite copies a `new URL` file when it reads a module, before tree-shaking.
-- **Through a kit or `materials`, `animation`:** no Draco or Basis file either. Only the root of `@margoengine/gltf-pro`
+- **Through a kit or `materials`, `animation`, `fbx`:** no Draco or Basis file either. Only the root of `@margoengine/gltf-pro`
   names the decoders; packages that draw models use `@margoengine/gltf-pro/model`, and `loadGLTF` is imported from
-  `margoengine/gltf-pro`, not from `margoengine/game`, `/web` or `/viz`. `@margoengine/fbx` still imports the root.
+  `margoengine/gltf-pro`, not from `margoengine/game`, `/web` or `/viz`.
 - Still on the controls index: `PointerLock` (from `@margoengine/react/controls`), because `@margoengine/controls` has no
   pointer-lock entry; a page that does not use it never emits it.

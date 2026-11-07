@@ -1,4 +1,4 @@
-import { exportGLB } from '@margoengine/exporters';
+import { exportGLB } from '@margoengine/exporters/gltf';
 import { parseDocument } from './document.js';
 import { context, buildScene } from './scene.js';
 import { attachMaterials } from './material.js';

@@ -806,6 +806,10 @@
       "types": "./dist/exporters/capture.d.ts",
       "import": "./dist/exporters/capture.js"
     },
+    "./exporters/gltf": {
+      "types": "./dist/exporters/gltf.d.ts",
+      "import": "./dist/exporters/gltf.js"
+    },
     "./exporters/jpeg-read": {
       "types": "./dist/exporters/jpeg-read.d.ts",
       "import": "./dist/exporters/jpeg-read.js"

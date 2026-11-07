@@ -103,6 +103,8 @@ test('margoengine/react puts no Wasm in a build, and a model page gets it from i
   assert.deepEqual(await emitted("import { createMesh } from 'margoengine/materials'; export { createMesh };"), []);
   assert.deepEqual(await emitted("import { Animation } from 'margoengine/animation'; export { Animation };"), []);
   assert.deepEqual(await emitted("import { PBRModel } from 'margoengine/gltf-pro/model'; export { PBRModel };"), []);
+  assert.deepEqual(await emitted("import { loadFBX } from 'margoengine/fbx'; export { loadFBX };"), []);
+  assert.deepEqual(await emitted("import { exportGLB } from 'margoengine/exporters/gltf'; export { exportGLB };"), []);
   assert.notDeepEqual(await emitted("import { loadGLTF } from 'margoengine/gltf-pro'; export { loadGLTF };"), []);
 });
 

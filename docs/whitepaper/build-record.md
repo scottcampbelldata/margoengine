@@ -1267,6 +1267,7 @@ An audit of the finished batches against their job text listed 70 gaps for the H
 | Batch 81 geometry cache | PC2 and MDD readers, a real cache played | DONE | `d47fd042a` | LIM-355 |
 | B82 | LIM-211 and LIM-213 on real CMU takes | DONE | `95f3e4a63` | LIM-211, LIM-213 |
 | test-readers-fbx | The sixth test reader: exportFBX read from its bytes, and by Blender | DONE | this commit | - |
+| fbx-model | fbx imports gltf-pro/model, no decoder files in a page | DONE | this commit | - |
 
 ## LAZ: one LAS reader, and every point format on a real file
 

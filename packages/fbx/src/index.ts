@@ -1,5 +1,5 @@
 import type { EngineKernel } from '@margoengine/core';
-import { parseGLTF, type PBRModel } from '@margoengine/gltf-pro';
+import { parseGLTF, type PBRModel } from '@margoengine/gltf-pro/model';
 import { readResponse } from '../../shared/loading.js';
 import { convert } from './convert.js';
 import type { FBXExtension } from './extension.js';

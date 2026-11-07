@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10431371,
+  "total": 10448987,
   "history": [
     {
       "date": "2026-10-24",
@@ -3464,6 +3464,12 @@
       "commit": "1bcc9dba3",
       "reason": "new optional entry @margoengine/behavior/perception",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "346520d0e",
+      "reason": "fbx imports gltf-pro/model and exporters/gltf in place of the two roots; new entry exporters/gltf",
+      "grew": 3
     }
   ],
   "items": {
@@ -3659,6 +3665,7 @@
     "@margoengine/exporters/collect": 10836,
     "@margoengine/exporters/dae": 12699,
     "@margoengine/exporters/draco": 185946,
+    "@margoengine/exporters/gltf": 17616,
     "@margoengine/exporters/godot": 10258,
     "@margoengine/exporters/godot-2d": 3416,
     "@margoengine/exporters/godot-addon": 1609,
@@ -4180,8 +4187,8 @@
     "leak @margoengine/controls/walk -> @margoengine/bvh": 1,
     "leak @margoengine/creative -> @margoengine/vfx/base": 1,
     "leak @margoengine/creative/particles -> @margoengine/vfx/base": 1,
-    "leak @margoengine/fbx -> @margoengine/exporters": 1,
-    "leak @margoengine/fbx -> @margoengine/gltf-pro": 1,
+    "leak @margoengine/fbx -> @margoengine/exporters/gltf": 1,
+    "leak @margoengine/fbx -> @margoengine/gltf-pro/model": 1,
     "leak @margoengine/fbx/export -> @margoengine/exporters/collect": 1,
     "leak @margoengine/fbx/worker -> @margoengine/gltf-pro/worker": 1,
     "leak @margoengine/inspector -> @margoengine/lines": 1,
