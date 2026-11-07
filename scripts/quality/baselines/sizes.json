@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 9934637,
+  "total": 9946571,
   "history": [
     {
       "date": "2026-10-24",
@@ -2942,6 +2942,12 @@
       "commit": "db3f78531",
       "reason": "exportOBJ holds images waiting for writeTextures, in the shared scene code every writer bundles",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "303be0e9e",
+      "reason": "new entry @margoengine/cutscene/render and audio in @margoengine/headless/video",
+      "grew": 2
     }
   ],
   "items": {
@@ -3068,6 +3074,7 @@
     "@margoengine/culling/parts": 15027,
     "@margoengine/culling/shadows": 20972,
     "@margoengine/cutscene": 7115,
+    "@margoengine/cutscene/render": 8171,
     "@margoengine/cutscene/shots": 3336,
     "@margoengine/decoders": 492515,
     "@margoengine/decoders/bc": 3890,
@@ -3199,7 +3206,7 @@
     "@margoengine/headless/ffmpeg": 1434,
     "@margoengine/headless/formats": 5809,
     "@margoengine/headless/stage": 3306,
-    "@margoengine/headless/video": 5641,
+    "@margoengine/headless/video": 6801,
     "@margoengine/html": 5013,
     "@margoengine/input": 5414,
     "@margoengine/input/interactions": 1614,

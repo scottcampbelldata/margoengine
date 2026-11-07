@@ -206,6 +206,70 @@ naming the fix. Shots fire `enter` and `exit` like clips, and nested timelines c
 memory, so a follow camera sits exactly at its offset: for damped follow in play, use `@margoengine/cinematic` and
 bring it in as a `live` camera.
 
+## Render to video
+
+`@margoengine/cutscene/render` renders a cutscene at a fixed frame rate to a WebM or MP4 file with WebCodecs, for
+trailers. Time is the render's own, so a slow machine makes the same frames as a fast one. It needs
+`@margoengine/headless`, and the engine must sit on a `createHeadlessCanvas` canvas of the video's size, in a browser
+or worker: Node has no WebCodecs.
+
+```ts
+import { Camera, Engine, PbrMaterial, box } from 'margoengine/core';
+import { Cutscene } from 'margoengine/cutscene';
+import { renderCutscene } from 'margoengine/cutscene/render';
+import { createHeadlessCanvas, installGPU } from 'margoengine/headless';
+
+installGPU({ gpu: navigator.gpu });
+const engine = await Engine.create(createHeadlessCanvas({ width: 1280, height: 720 }), { backend: 'webgpu' });
+const cube = engine.createMesh().setGeometry(box()).setMaterial(new PbrMaterial({ color: '#e8d44d' }));
+const trailer = new Cutscene({
+  format: 'margo-cutscene',
+  version: 1,
+  duration: 4,
+  tracks: [
+    { type: 'camera', id: 'cam', keys: [{ time: 0, position: [0, 1, 5], target: [0, 0, 0] }] },
+    { type: 'transform', id: 'spin', target: 'cube', keys: [{ time: 0, position: [-1, 0, 0] }, { time: 4, position: [1, 0, 0] }] },
+    { type: 'audio', id: 'music', clips: [{ start: 0, duration: 4, sound: 'theme', fadeOut: 1 }] },
+  ],
+});
+const theme = await new AudioContext().decodeAudioData(await (await fetch('theme.ogg')).arrayBuffer());
+
+const video = await renderCutscene(engine, trailer, {
+  format: 'mp4',
+  fps: 60,
+  camera: new Camera(),
+  sounds: { theme },
+  apply(state) {
+    cube.setPosition(state.transforms.cube.position!);
+  },
+  onProgress: (done, total) => console.log(`${done} of ${total}`),
+});
+const url = URL.createObjectURL(new Blob([video.bytes], { type: video.mimeType }));
+```
+
+| Option | Meaning | Default |
+| --- | --- | --- |
+| `apply(state, frame)` | Puts a frame's state on your scene; may be async | required |
+| `camera` | Renders through this camera, set from `state.camera` before `apply` | the engine's, left to `apply` |
+| `fps` | Frames per second; frame `i` shows `from + i / fps`, and the last starts before `to` | `30` |
+| `from`, `to` | The span to render, seconds | the whole cutscene |
+| `sounds` | The sounds the audio tracks name, as `AudioBuffer`s or the same shape | none: the file has no sound |
+| `sampleRate`, `audioBitrate` | Of the sound | `48000`, `128000` |
+| `format`, `codec`, `bitrate`, `keyFrameInterval`, `webCodecs` | As `encodeVideo` of `@margoengine/headless/video` | as there |
+| `tracks` | Custom track types, for a document you pass as data | none |
+| `onProgress(done, total)` | After each frame | none |
+| `signal` | Stops the render; the promise rejects with its reason | none |
+
+Pass a `CutscenePlayer` in place of the cutscene and it fires every instant in order as the frames go by, so listeners
+can spawn things and the frames show them. The result is `encodeVideo`'s, with `audioCodec` when the file has sound:
+Opus in WebM, and AAC or else Opus in MP4.
+
+`mixCutsceneAudio(cutscene, sounds, { sampleRate?, channels?, from?, to? })` is the mix on its own, plain samples from
+plain code, so it runs in Node. It holds every audio clip, in nested timelines too, with its volume, fades, offset and
+nested speed. The mix is a sum with no limiter: `peak` above 1 means it will clip, so lower the clips' `volume`. A clip
+naming a sound `sounds` does not hold is a `RangeError`. `cutsceneFrames(cutscene, { fps?, from?, to? })` gives each
+frame's time and state with no engine, for a pipeline of your own.
+
 ## Custom tracks
 
 `shotTrack()` is a `CutsceneTrackType`, and you can write your own for anything a document should hold: pass types in

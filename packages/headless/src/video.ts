@@ -2,7 +2,7 @@
 // containers are in video-mux.ts. No node: imports: Node has no WebCodecs, so @margoengine/headless/ffmpeg covers it.
 import type { Camera, Engine } from '@margoengine/core';
 import { encodePNG, readPixels, type HeadlessPixels } from './index.js';
-import { muxMP4, muxWebM, type VideoSample } from './video-mux.js';
+import { muxMP4, muxWebM, type SoundTrack, type VideoSample } from './video-mux.js';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
 
 /** Where a frame sits in a sequence. */
@@ -93,6 +93,20 @@ export async function* imageSequence(
 export interface WebCodecsBinding {
   VideoEncoder: typeof VideoEncoder;
   VideoFrame: typeof VideoFrame;
+  /** Needed only with the `audio` option. */
+  AudioEncoder?: typeof AudioEncoder;
+  /** Needed only with the `audio` option. */
+  AudioData?: typeof AudioData;
+}
+
+/** Sound to put in the file with the frames. */
+export interface VideoAudio {
+  /** Samples from -1 to 1, one array per channel, one or two channels of one length. */
+  channels: readonly Float32Array[];
+  /** Samples per second. */
+  sampleRate: number;
+  /** Bits per second. Default 128000. */
+  bitrate?: number;
 }
 
 /** Options of {@link encodeVideo}. */
@@ -108,6 +122,8 @@ export interface EncodeVideoOptions {
   bitrate?: number;
   /** Seconds between key frames, which is how finely a player can seek. Default 2. */
   keyFrameInterval?: number;
+  /** Sound for the file: Opus in WebM, and AAC or else Opus in MP4. Default none. */
+  audio?: VideoAudio;
   /** Where `VideoEncoder` and `VideoFrame` come from. Default `globalThis`. */
   webCodecs?: WebCodecsBinding;
   /** Stops encoding; the promise rejects with the signal's reason. Default none. */
@@ -127,6 +143,8 @@ export interface EncodedVideo {
   frames: number;
   /** Seconds. */
   duration: number;
+  /** The sound codec used, when the file has sound. */
+  audioCodec?: 'opus' | 'aac';
 }
 
 const CODECS = {
@@ -161,9 +179,90 @@ const copyBytes = (source: AllowSharedBufferSource): Uint8Array =>
     ? new Uint8Array(source.buffer, source.byteOffset, source.byteLength).slice()
     : new Uint8Array(source).slice();
 
+const SOUND_CODECS = {
+    webm: [['opus', 'opus']],
+    mp4: [
+      ['mp4a.40.2', 'aac'],
+      ['opus', 'opus'],
+    ],
+  } as const,
+  SOUND_BLOCK = 0.5; // Seconds of sound in one AudioData.
+
+/** Encodes sound with WebCodecs into the form the containers take. */
+async function encodeSound(
+  { channels, sampleRate, bitrate = 128_000 }: VideoAudio,
+  format: 'webm' | 'mp4',
+  { AudioEncoder: Encoder, AudioData: Data }: WebCodecsBinding,
+  signal: AbortSignal | undefined,
+): Promise<SoundTrack> {
+  if (!Encoder || !Data) throw fault('unsupported', 'The audio option needs AudioEncoder', 'headless');
+  if (channels.length !== 1 && channels.length !== 2) throw rangeError('Audio takes one or two channels', 'headless');
+  const length = channels[0].length;
+  if (!length || channels.some((channel) => channel.length !== length))
+    throw rangeError('Audio channels must be one length, above 0', 'headless');
+  if (!(sampleRate > 0) || !Number.isFinite(sampleRate)) throw rangeError('Invalid audio sampleRate', 'headless');
+  if (!(bitrate > 0) || !Number.isFinite(bitrate)) throw rangeError('Invalid audio bitrate', 'headless');
+  const base = { sampleRate, numberOfChannels: channels.length, bitrate };
+  let chosen: AudioEncoderConfig | undefined, codec: 'opus' | 'aac' | undefined;
+  for (const [candidate, name] of SOUND_CODECS[format])
+    if ((await Encoder.isConfigSupported({ ...base, codec: candidate })).supported) {
+      chosen = { ...base, codec: candidate };
+      codec = name;
+      break;
+    }
+  if (!chosen || !codec) throw fault('unsupported', 'No audio codec is available for this format', 'headless');
+  const samples: VideoSample[] = [];
+  let description: Uint8Array | undefined,
+    failure: unknown,
+    failed = false;
+  const encoder = new Encoder({
+    output(chunk, metadata) {
+      const data = new Uint8Array(chunk.byteLength);
+      chunk.copyTo(data);
+      samples.push({ data, timestamp: chunk.timestamp, duration: chunk.duration ?? 0, key: true });
+      const decoder = metadata?.decoderConfig;
+      if (decoder?.description) description = copyBytes(decoder.description);
+    },
+    error(error) {
+      failure = error;
+      failed = true;
+    },
+  });
+  try {
+    encoder.configure(chosen);
+    const step = Math.round(SOUND_BLOCK * sampleRate);
+    for (let start = 0; start < length; start += step) {
+      signal?.throwIfAborted();
+      if (failed) throw failure;
+      const count = Math.min(step, length - start),
+        planes = new Float32Array(count * channels.length);
+      channels.forEach((channel, i) => planes.set(channel.subarray(start, start + count), i * count));
+      const data = new Data({
+        format: 'f32-planar',
+        sampleRate,
+        numberOfFrames: count,
+        numberOfChannels: channels.length,
+        timestamp: Math.round((start * 1e6) / sampleRate),
+        data: planes,
+      });
+      try {
+        encoder.encode(data);
+      } finally {
+        data.close();
+      }
+    }
+    await encoder.flush();
+    if (failed) throw failure;
+  } finally {
+    if (encoder.state !== 'closed') encoder.close();
+  }
+  if (codec === 'aac' && !description) throw fault('failed', 'The encoder gave no AAC description', 'headless');
+  return { codec, sampleRate, channels: channels.length, description, samples };
+}
+
 /**
  * Encodes frames to a WebM or MP4 file in memory with WebCodecs. Frames are all one size, and alpha is dropped. Frames
- * are asked for only as the encoder keeps up, so {@link renderFrames} can feed it directly.
+ * are asked for only as the encoder keeps up, so {@link renderFrames} can feed it directly. `audio` adds a sound track.
  */
 export async function encodeVideo(
   frames: AsyncIterable<HeadlessPixels> | Iterable<HeadlessPixels>,
@@ -173,6 +272,7 @@ export async function encodeVideo(
     codec,
     bitrate,
     keyFrameInterval = 2,
+    audio,
     webCodecs = globalThis as unknown as WebCodecsBinding,
     signal,
   }: EncodeVideoOptions = {},
@@ -274,14 +374,16 @@ export async function encodeVideo(
   const { codec: used, width, height } = config!;
   if (used.startsWith('avc1') && !description)
     throw fault('failed', 'The encoder gave no H.264 description', 'headless');
-  const track = { codec: used, width, height, fps, description, colorSpace };
+  const track = { codec: used, width, height, fps, description, colorSpace },
+    sound = audio ? await encodeSound(audio, format, webCodecs, signal) : undefined;
   return {
-    bytes: (format === 'webm' ? muxWebM(track, samples) : muxMP4(track, samples)) as Uint8Array<ArrayBuffer>,
+    bytes: (format === 'webm' ? muxWebM(track, samples, sound) : muxMP4(track, samples, sound)) as Uint8Array<ArrayBuffer>,
     mimeType: `video/${format}; codecs="${used}"`,
     codec: used,
     width,
     height,
     frames: samples.length,
     duration: stamp(count) / 1e6,
+    ...(sound ? { audioCodec: sound.codec } : {}),
   };
 }

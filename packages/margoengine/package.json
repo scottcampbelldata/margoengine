@@ -530,6 +530,10 @@
       "types": "./dist/cutscene/shots.d.ts",
       "import": "./dist/cutscene/shots.js"
     },
+    "./cutscene/render": {
+      "types": "./dist/cutscene/render.d.ts",
+      "import": "./dist/cutscene/render.js"
+    },
     "./decoders": {
       "types": "./dist/decoders.d.ts",
       "import": "./dist/decoders.js"

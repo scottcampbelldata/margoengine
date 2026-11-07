@@ -22,6 +22,17 @@ export interface VideoTrack {
   colorSpace?: VideoColorSpaceInit;
 }
 
+/** An encoded sound stream beside the video. Sample times are microseconds. */
+export interface SoundTrack {
+  /** `'opus'`, or `'aac'` in MP4 only. */
+  codec: 'opus' | 'aac';
+  sampleRate: number;
+  channels: number;
+  /** The encoder's configuration: `OpusHead` for Opus when it gives one, the AudioSpecificConfig for AAC. */
+  description?: Uint8Array;
+  samples: readonly VideoSample[];
+}
+
 const concat = (parts: readonly Uint8Array[]): Uint8Array => {
   const out = new Uint8Array(parts.reduce((sum, part) => sum + part.length, 0));
   let at = 0;
@@ -77,6 +88,25 @@ function av1Configuration({ codec, description }: VideoTrack): Uint8Array {
   );
 }
 
+/** Samples Opus decoders drop at the start: from the encoder's `OpusHead` (little-endian at byte 10), else 0. */
+function opusPreSkip({ description }: SoundTrack): number {
+  const head = description;
+  if (!head || head.length < 12 || String.fromCharCode(...head.subarray(0, 8)) !== 'OpusHead') return 0;
+  return head[10] | (head[11] << 8);
+}
+
+/** The `OpusHead` a WebM track holds (RFC 7845): the encoder's, or a plain one for one or two channels. */
+function opusHead(sound: SoundTrack): Uint8Array {
+  if (opusPreSkip(sound) || sound.description?.length) return sound.description!;
+  const head = new Uint8Array(19);
+  head.set(text('OpusHead'));
+  const view = new DataView(head.buffer);
+  head[8] = 1;
+  head[9] = sound.channels;
+  view.setUint32(12, sound.sampleRate, true);
+  return head;
+}
+
 // Matroska
 
 const elementId = (id: number): Uint8Array => bigEndian(id, id > 0xffffff ? 4 : id > 0xffff ? 3 : id > 0xff ? 2 : 1);
@@ -111,11 +141,14 @@ const EBML = 0x1a45dfa3,
   MOST_BLOCK_OFFSET = 30_000; // A block's time is a signed 16-bit offset from its cluster, in milliseconds.
 
 /** A WebM file: header, one cluster per key frame, then cues for seeking. Timestamps are whole milliseconds. */
-export function muxWebM(track: VideoTrack, samples: readonly VideoSample[]): Uint8Array {
+export function muxWebM(track: VideoTrack, samples: readonly VideoSample[], sound?: SoundTrack): Uint8Array {
   const family = track.codec.split('.')[0],
     colour = colourCodes(track.colorSpace),
     ms = (time: number) => Math.round(time / 1000),
-    end = samples.reduce((most, sample) => Math.max(most, sample.timestamp + sample.duration), 0),
+    end = [...samples, ...(sound?.samples ?? [])].reduce(
+      (most, sample) => Math.max(most, sample.timestamp + sample.duration),
+      0,
+    ),
     info = element(
       INFO,
       unsigned(0x2ad7b1, 1_000_000),
@@ -147,19 +180,52 @@ export function muxWebM(track: VideoTrack, samples: readonly VideoSample[]): Uin
           ),
         ),
       ),
+      ...(sound
+        ? [
+            element(
+              0xae,
+              unsigned(0xd7, 2),
+              unsigned(0x73c5, 2),
+              unsigned(0x83, 2),
+              unsigned(0x9c, 0),
+              element(0x86, text('A_OPUS')),
+              element(0x63a2, opusHead(sound)),
+              // Nanoseconds: what decoders drop at the start, and how far back a seek must begin (80 ms, RFC 7845).
+              unsigned(0x56aa, Math.round((opusPreSkip(sound) * 1e9) / 48_000)),
+              unsigned(0x56bb, 80_000_000),
+              element(0xe1, float(0xb5, sound.sampleRate), unsigned(0x9f, sound.channels)),
+            ),
+          ]
+        : []),
     ),
-    groups: { time: number; key: boolean; blocks: Uint8Array[] }[] = [];
+    groups: { time: number; key: boolean; blocks: Uint8Array[] }[] = [],
+    block = (group: { time: number; blocks: Uint8Array[] }, number: number, time: number, sample: VideoSample) => {
+      const head = new Uint8Array(4);
+      head[0] = 0x80 | number;
+      new DataView(head.buffer).setInt16(1, time - group.time);
+      head[3] = sample.key ? 0x80 : 0;
+      group.blocks.push(element(0xa3, head, sample.data));
+    };
+  // Sound goes in between the frames in time order; a stretch of sound past the last frame gets clusters of its own.
+  const sounds = sound?.samples ?? [];
+  let heard = 0;
+  const hear = (until: number) => {
+    for (; heard < sounds.length && ms(sounds[heard].timestamp) < until; heard++) {
+      const time = ms(sounds[heard].timestamp);
+      let group = groups.at(-1);
+      if (!group || time - group.time > MOST_BLOCK_OFFSET) groups.push((group = { time, key: false, blocks: [] }));
+      block(group, 2, time, sounds[heard]);
+    }
+  };
   for (const sample of samples) {
     const time = ms(sample.timestamp);
+    hear(time);
     let group = groups.at(-1);
     if (!group || sample.key || time - group.time > MOST_BLOCK_OFFSET)
       groups.push((group = { time, key: sample.key, blocks: [] }));
-    const head = new Uint8Array(4);
-    head[0] = 0x81; // Track 1
-    new DataView(head.buffer).setInt16(1, time - group.time);
-    head[3] = sample.key ? 0x80 : 0;
-    group.blocks.push(element(0xa3, head, sample.data));
+    block(group, 1, time, sample);
   }
+  hear(Number.POSITIVE_INFINITY);
   const clusters = groups.map(({ time, blocks }) => element(CLUSTER, unsigned(0xe7, time), ...blocks)),
     // Positions are 8 bytes wide so the seek head has one size whatever it points at.
     seekHead = (info: number, tracks: number, cues: number) =>
@@ -277,8 +343,99 @@ function runs(values: readonly number[]): [number, number][] {
   return out;
 }
 
-/** A progressive MP4: `moov` first so playback can start before the end arrives, all samples in one chunk. */
-export function muxMP4(track: VideoTrack, samples: readonly VideoSample[]): Uint8Array {
+/** The sample entry of a sound: `Opus` with `dOps` (Encapsulation of Opus in ISOBMFF), or `mp4a` with `esds`. */
+function soundEntry(sound: SoundTrack): Uint8Array {
+  const head = [
+    new Uint8Array(6),
+    u16(1), // data_reference_index
+    new Uint8Array(8),
+    u16(sound.channels),
+    u16(16),
+    u32(0),
+    u32(sound.sampleRate * 0x10000),
+  ];
+  if (sound.codec === 'opus')
+    return box(
+      'Opus',
+      ...head,
+      box(
+        'dOps',
+        Uint8Array.of(0, sound.channels),
+        u16(opusPreSkip(sound)),
+        u32(sound.sampleRate),
+        u16(0),
+        Uint8Array.of(0),
+      ),
+    );
+  // ISO/IEC 14496-1 descriptors; every length here fits one byte.
+  const descriptor = (tag: number, ...payload: Uint8Array[]) => {
+      const body = concat(payload);
+      return concat([Uint8Array.of(tag, body.length), body]);
+    },
+    config = descriptor(
+      4,
+      Uint8Array.of(0x40, 0x15), // MPEG-4 audio; an audio stream
+      new Uint8Array(3),
+      u32(0),
+      u32(0),
+      descriptor(5, sound.description!),
+    );
+  return box(
+    'mp4a',
+    ...head,
+    fullBox('esds', 0, 0, descriptor(3, u16(2), Uint8Array.of(0), config, descriptor(6, Uint8Array.of(2)))),
+  );
+}
+
+/** The `trak` of a sound. Its time unit is one sample. */
+function soundTrak(sound: SoundTrack, position: number, milliseconds: number): Uint8Array {
+  const { samples, sampleRate } = sound,
+    ticks = (time: number) => Math.round((time * sampleRate) / 1e6),
+    last = samples.at(-1)!,
+    end = ticks(last.timestamp + last.duration),
+    durations = samples.map((sample, i) => (samples[i + 1] ? ticks(samples[i + 1].timestamp) : end) - ticks(sample.timestamp));
+  const rows = runs(durations);
+  return box(
+    'trak',
+    fullBox(
+      'tkhd',
+      0,
+      3, // Enabled, in the movie
+      u32(0),
+      u32(0),
+      u32(2),
+      u32(0),
+      u32(milliseconds),
+      new Uint8Array(12),
+      u16(0x100), // Full volume
+      u16(0),
+      UNITY_MATRIX,
+      u32(0),
+      u32(0),
+    ),
+    box(
+      'mdia',
+      fullBox('mdhd', 0, 0, u32(0), u32(0), u32(sampleRate), u32(end), u16(0x55c4), u16(0)),
+      fullBox('hdlr', 0, 0, u32(0), text('soun'), new Uint8Array(12), text('Margo Engine\0')),
+      box(
+        'minf',
+        fullBox('smhd', 0, 0, u32(0)),
+        box('dinf', fullBox('dref', 0, 0, u32(1), fullBox('url ', 0, 1))),
+        box(
+          'stbl',
+          fullBox('stsd', 0, 0, u32(1), soundEntry(sound)),
+          fullBox('stts', 0, 0, u32(rows.length), ...rows.flatMap(([count, value]) => [u32(count), u32(value)])),
+          fullBox('stsc', 0, 0, u32(1), u32(1), u32(samples.length), u32(1)),
+          fullBox('stsz', 0, 0, u32(0), u32(samples.length), ...samples.map((sample) => u32(sample.data.length))),
+          fullBox('co64', 0, 0, u32(1), u64(position)),
+        ),
+      ),
+    ),
+  );
+}
+
+/** A progressive MP4: `moov` first so playback can start before the end arrives, each track's samples in one chunk. */
+export function muxMP4(track: VideoTrack, samples: readonly VideoSample[], sound?: SoundTrack): Uint8Array {
   const family = track.codec.split('.')[0],
     timescale = Math.round(track.fps * 1000),
     ticks = (time: number) => Math.round((time * timescale) / 1e6),
@@ -288,7 +445,11 @@ export function muxMP4(track: VideoTrack, samples: readonly VideoSample[]): Uint
     end = samples.reduce((most, sample) => Math.max(most, ticks(sample.timestamp + sample.duration)), 0),
     durations = decoded.map((time, i) => (decoded[i + 1] ?? end) - time),
     offsets = shown.map((time, i) => time - decoded[i]),
-    milliseconds = Math.round((end / timescale) * 1000),
+    heard = sound?.samples.at(-1),
+    milliseconds = Math.max(
+      Math.round((end / timescale) * 1000),
+      heard ? Math.round((heard.timestamp + heard.duration) / 1000) : 0,
+    ),
     keys = samples.flatMap((sample, i) => (sample.key ? [i + 1] : [])),
     timeToSample = runs(durations),
     offsetRuns = runs(offsets),
@@ -320,7 +481,7 @@ export function muxMP4(track: VideoTrack, samples: readonly VideoSample[]): Uint
           new Uint8Array(10),
           UNITY_MATRIX,
           new Uint8Array(24),
-          u32(2),
+          u32(sound ? 3 : 2),
         ),
         box(
           'trak',
@@ -359,10 +520,18 @@ export function muxMP4(track: VideoTrack, samples: readonly VideoSample[]): Uint
             ),
           ),
         ),
+        ...(sound ? [soundTrak(sound, position + bytes, milliseconds)] : []),
       ),
     bytes = samples.reduce((sum, sample) => sum + sample.data.length, 0),
+    soundBytes = (sound?.samples ?? []).reduce((sum, sample) => sum + sample.data.length, 0),
     // The 64-bit `mdat` header and `co64` keep one path for every size; the position never changes moov's size.
-    header = concat([u32(1), text('mdat'), u64(bytes + 16)]),
+    header = concat([u32(1), text('mdat'), u64(bytes + soundBytes + 16)]),
     position = ftyp.length + moov(0).length + header.length;
-  return concat([ftyp, moov(position), header, ...samples.map((sample) => sample.data)]);
+  return concat([
+    ftyp,
+    moov(position),
+    header,
+    ...samples.map((sample) => sample.data),
+    ...(sound?.samples ?? []).map((sample) => sample.data),
+  ]);
 }

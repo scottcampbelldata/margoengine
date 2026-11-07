@@ -810,6 +810,7 @@ Sequencer, Godot AnimationPlayer, Theatre.js, GSAP, three.js, Babylon and the li
 | Easing | `@margoengine/tween`'s easings (Penner's equations, CSS Easing Functions Level 1 cubic-bezier) |
 | Instants and ordering | Our own design: half-open clip spans, instants sorted once by time, kind and document order |
 | Virtual camera shots (`cutscene/shots`) | Our own design from the public idea of cutting between named cameras on a timeline; the view blend is spherical linear interpolation of a direction (K. Shoemake, 1985) with its length blended apart; custom track types are ours. No source of Unity Cinemachine or Unreal Sequencer was read |
+| Render to video (`cutscene/render`) | Fixed-step rendering through `@margoengine/headless/video`; the sound track follows RFC 7845 (Ogg Opus, for `OpusHead`), RFC 9559 and the WebM guidelines, Encapsulation of Opus in ISO Base Media (opus-codec.org) and ISO/IEC 14496-1, 14496-3 and 14496-14 for `esds`; the mix is plain sums and straight-line resampling |
 
 ## Save and load: `@margoengine/save`
 

@@ -11,6 +11,7 @@ export interface EncodeVideoOptions {
     codec?: string;
     bitrate?: number;
     keyFrameInterval?: number;
+    audio?: VideoAudio;
     webCodecs?: WebCodecsBinding;
     signal?: AbortSignal;
 }
@@ -23,6 +24,7 @@ export interface EncodedVideo {
     height: number;
     frames: number;
     duration: number;
+    audioCodec?: 'opus' | 'aac';
 }
 
 export interface FrameTiming {
@@ -54,12 +56,20 @@ export interface SequenceFile {
     bytes: Uint8Array<ArrayBuffer>;
 }
 
+export interface VideoAudio {
+    channels: readonly Float32Array[];
+    sampleRate: number;
+    bitrate?: number;
+}
+
 export interface WebCodecsBinding {
     VideoEncoder: typeof VideoEncoder;
     VideoFrame: typeof VideoFrame;
+    AudioEncoder?: typeof AudioEncoder;
+    AudioData?: typeof AudioData;
 }
 
-export function encodeVideo(frames: AsyncIterable<HeadlessPixels> | Iterable<HeadlessPixels>, { format, fps, codec, bitrate, keyFrameInterval, webCodecs, signal }?: EncodeVideoOptions): Promise<EncodedVideo>;
+export function encodeVideo(frames: AsyncIterable<HeadlessPixels> | Iterable<HeadlessPixels>, { format, fps, codec, bitrate, keyFrameInterval, audio, webCodecs, signal }?: EncodeVideoOptions): Promise<EncodedVideo>;
 
 export function imageSequence(frames: AsyncIterable<HeadlessPixels> | Iterable<HeadlessPixels>, { prefix, digits }?: ImageSequenceOptions): AsyncGenerator<SequenceFile, void, void>;
 

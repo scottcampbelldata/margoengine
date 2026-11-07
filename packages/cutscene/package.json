@@ -1,7 +1,7 @@
 {
   "name": "@margoengine/cutscene",
   "version": "1.0.0",
-  "description": "Cutscene timelines: camera, transform, property, animation, audio, subtitle and event tracks, nested timelines, scrubbing, a player that fires events in order, and virtual camera shots with blends.",
+  "description": "Cutscene timelines: camera, transform, property, animation, audio, subtitle and event tracks, nested timelines, scrubbing, a player that fires events in order, virtual camera shots with blends, and rendering to a video file.",
   "keywords": [
     "margoengine",
     "webgpu",
@@ -33,6 +33,10 @@
     "./shots": {
       "types": "./dist/shots.d.ts",
       "import": "./dist/shots.js"
+    },
+    "./render": {
+      "types": "./dist/render.d.ts",
+      "import": "./dist/render.js"
     }
   },
   "files": [
@@ -50,6 +54,19 @@
   "scripts": {
     "build": "node ../../scripts/build-optional.js cutscene",
     "test": "npm run build && node --test tests/*.test.js",
+    "test:gpu": "npm run build && node tests/render-browser.mjs",
     "prepack": "npm run build"
+  },
+  "peerDependencies": {
+    "@margoengine/core": "^1.0.0",
+    "@margoengine/headless": "^1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@margoengine/core": {
+      "optional": true
+    },
+    "@margoengine/headless": {
+      "optional": true
+    }
   }
 }
