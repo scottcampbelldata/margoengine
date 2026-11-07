@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10528991,
+  "total": 10529493,
   "history": [
     {
       "date": "2026-10-24",
@@ -3614,6 +3614,12 @@
       "commit": "9245f8968",
       "reason": "new optional entry @margoengine/weather/audio (WeatherAudio: rain, wind and thunder through @margoengine/audio); nothing else grows",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "a0bf6defb",
+      "reason": "netcode: reconnection and held seats in ./rooms (batch 114 job 4)",
+      "grew": 1
     }
   ],
   "items": {
@@ -4044,7 +4050,7 @@
     "@margoengine/netcode/interest": 2516,
     "@margoengine/netcode/node": 6457,
     "@margoengine/netcode/rollback": 3437,
-    "@margoengine/netcode/rooms": 5505,
+    "@margoengine/netcode/rooms": 6007,
     "@margoengine/netcode/smoothing": 1758,
     "@margoengine/netcode/webrtc": 998,
     "@margoengine/netcode/websocket": 1076,

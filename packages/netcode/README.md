@@ -536,6 +536,71 @@ setTimeout(() => {
 }, 300);
 ```
 
+### Reconnection and held seats
+
+Set `reconnectWindow` on a room and a client whose link drops keeps its seat for that many milliseconds. `onDrop` runs at once, and `onLeave` only if the time runs out. The seat counts against `maxClients`, an empty room with a held seat stays alive, and the same `RoomClient` comes back, so `idOf` and `userData` hold. The client keeps `room.reconnectionToken` and hands it to `RoomsClient.reconnect` on a new connection; the whole state follows.
+
+```ts
+import { defineSchema, LoopbackNetwork } from '@margoengine/netcode';
+import { Room, RoomsClient, RoomServer, type RoomClient } from '@margoengine/netcode/rooms';
+
+const schema = defineSchema({
+  types: {
+    Player: { online: 'bool' },
+    State: { players: { type: 'map', of: 'Player', maxSize: 8 } },
+  },
+} as const);
+interface State {
+  players: Map<number, { online: boolean }>;
+}
+
+class Table extends Room<State> {
+  schema = schema;
+  stateType = 'State';
+  reconnectWindow = 30_000; // a dropped player has 30 seconds to come back
+  onCreate() {
+    this.setState({ players: new Map() });
+  }
+  onJoin(client: RoomClient) {
+    this.state.players.set(this.idOf(client), { online: true });
+  }
+  onDrop(client: RoomClient) {
+    this.state.players.get(this.idOf(client))!.online = false;
+  }
+  onReconnect(client: RoomClient) {
+    this.state.players.get(this.idOf(client))!.online = true;
+  }
+  onLeave(client: RoomClient) {
+    this.state.players.delete(this.idOf(client));
+  }
+}
+
+const network = new LoopbackNetwork({ latency: 10 });
+const rooms = new RoomServer().define('table', Table);
+network.listen().onconnection = (connection) => rooms.accept(connection);
+const connections: ReturnType<LoopbackNetwork['connect']>[] = [];
+const client = new RoomsClient(async () => {
+  connections.push(network.connect());
+  return connections.at(-1)!;
+});
+const options = { schema, stateType: 'State' };
+const tick = setInterval(() => network.advance(10), 5);
+
+const first = await client.joinOrCreate<State>('table', {}, options);
+connections[0].close(1006, 'link lost');
+await new Promise((resolve) => setTimeout(resolve, 100));
+const back = await client.reconnect<State>(first.reconnectionToken, options); // keep the token in sessionStorage
+console.log('same seat:', back.sessionId === first.sessionId);
+clearInterval(tick);
+rooms.close();
+```
+
+- `reconnectWindow` defaults to 0: no seats are held, no token is sent and everything behaves as it did. `room.dropped` lists the clients being waited for.
+- A token works once; each reconnect gives a new one. It holds 128 random bits from `crypto.getRandomValues`, and whoever has it can take the seat, so keep it private to the player.
+- No seat is kept after a clean `leave()`, a kick, a protocol or rate-limit close, or a hook that threw: the seat is for a link that was lost.
+- A client that comes back before the server noticed the loss takes over: its old connection closes with `CloseCode.removed`, and neither `onDrop` nor `onLeave` runs.
+- A seat is held for the client that had it. Reserving a seat ahead for a player who has not joined yet (for example from a matchmaker) is not built.
+
 ## One schema, generated code
 
 `@margoengine/netcode/generate` turns a schema into a standalone TypeScript module: an interface per struct and

@@ -15,7 +15,8 @@ export interface JoinOptions<S> {
 export class JoinedRoom<State = unknown> {
     readonly roomId: string;
     readonly sessionId: string;
-    constructor(connection: Connection, schema: UntypedSchema, stateType: string, roomId: string, sessionId: string);
+    readonly reconnectionToken: string;
+    constructor(connection: Connection, schema: UntypedSchema, stateType: string, roomId: string, sessionId: string, reconnectionToken: string);
     get state(): State;
     onStateChange(handler: (state: State) => void): () => void;
     onMessage<T = unknown>(type: string, handler: (message: T) => void): () => void;
@@ -34,6 +35,7 @@ export abstract class Room<State = unknown> {
     maxClients: number;
     autoDispose: boolean;
     maxMessageBytes: number;
+    reconnectWindow: number;
     maxMessagesPerSecond: number | undefined;
     messageBurst: number | undefined;
     roomId: string;
@@ -43,6 +45,8 @@ export abstract class Room<State = unknown> {
     report: (error: unknown) => void;
     get state(): State;
     get locked(): boolean;
+    get dropped(): RoomClient[];
+    get empty(): boolean;
     idOf(client: RoomClient): number;
     setState(state: State): void;
     setPatchRate(ms: number): void;
@@ -60,18 +64,22 @@ export abstract class Room<State = unknown> {
     onAuth(_client: RoomClient, _options: RoomOptions): unknown;
     onJoin(_client: RoomClient, _options: RoomOptions): void | Promise<void>;
     onLeave(_client: RoomClient, _consented: boolean): void | Promise<void>;
+    onDrop(_client: RoomClient): void | Promise<void>;
+    onReconnect(_client: RoomClient): void | Promise<void>;
     onDispose(): void | Promise<void>;
     admit(connection: Connection, sessionId: string, options: RoomOptions): Promise<'joined' | 'refused' | 'failed'>;
+    resume(connection: Connection, secret: string): Promise<'joined' | 'refused' | 'failed'>;
     release(): void;
 }
 
 export type RoomClass = new () => Room<unknown>;
 
 export class RoomClient {
-    readonly connection: Connection;
+    connection: Connection;
     readonly sessionId: string;
     userData: unknown;
     auth: unknown;
+    secret: string;
     constructor(sessionId: string,
     connection: Connection, limit: number);
     send(type: string, message?: unknown): void;
@@ -111,6 +119,7 @@ export class RoomsClient {
     create<S>(name: string, options: RoomOptions, join: JoinOptions<S>): Promise<JoinedRoom<S>>;
     join<S>(name: string, options: RoomOptions, join: JoinOptions<S>): Promise<JoinedRoom<S>>;
     joinById<S>(roomId: string, options: RoomOptions, join: JoinOptions<S>): Promise<JoinedRoom<S>>;
+    reconnect<S>(token: string, join: JoinOptions<S>): Promise<JoinedRoom<S>>;
 }
 
 // Not exported from this entry, but used by the exports above:
@@ -177,7 +186,7 @@ type FieldValue<T, F> = F extends 'bool' ? boolean : F extends NumberKind ? numb
 
 type Infer<S extends SchemaShape, N extends TypeName<S>> = StructValue<S['types'], S['types'][N]>;
 
-const METHODS: readonly ['create', 'join', 'joinOrCreate', 'joinById'];
+const METHODS: readonly ['create', 'join', 'joinOrCreate', 'joinById', 'reconnect'];
 
 type NormalizedField = {
     type: NumberKind;

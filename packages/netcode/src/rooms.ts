@@ -14,7 +14,16 @@ const JOIN = 48,
   STATE = 58,
   PATCH = 59,
   MESSAGE = 60;
-const METHODS = ['create', 'join', 'joinOrCreate', 'joinById'] as const;
+const METHODS = ['create', 'join', 'joinOrCreate', 'joinById', 'reconnect'] as const;
+// A seat is not kept for a client the server sent away, or for one that broke the rules.
+const FINAL_CLOSES: ReadonlySet<number> = new Set([
+  CloseCode.normal,
+  CloseCode.protocol,
+  CloseCode.rateLimit,
+  CloseCode.mismatch,
+  CloseCode.removed,
+  CloseCode.error,
+]);
 /** How a client asks for a room. */
 export type JoinMethod = (typeof METHODS)[number];
 const encoder = new TextEncoder(),
@@ -51,10 +60,12 @@ export class RoomClient {
   userData: unknown = undefined;
   /** What `onAuth` returned. */
   auth: unknown = undefined;
+  /** @internal The secret that brings this client back to its seat, '' when the room keeps no seats. */
+  secret = '';
   /** @internal */
   constructor(
     sessionId: string,
-    /** @internal */ readonly connection: Connection,
+    /** @internal */ public connection: Connection,
     private readonly limit: number,
   ) {
     this.sessionId = sessionId;
@@ -113,6 +124,12 @@ export abstract class Room<State = unknown> {
   /** Largest message (either way) in bytes (default 4096). */
   maxMessageBytes = 4096;
   /**
+   * Milliseconds a dropped client keeps its seat (default 0: none). While the seat is held `onDrop` has run, it counts
+   * against `maxClients` and the room stays alive; `RoomsClient.reconnect` brings the same `RoomClient` back and
+   * `onReconnect` runs, or the time runs out and `onLeave` runs as for any leave.
+   */
+  reconnectWindow = 0;
+  /**
    * Messages per second a client may send on average (default: the RoomServer's `limits.messagesPerSecond`, 120). A
    * client past it, once its burst is spent, is closed with `CloseCode.rateLimit`.
    */
@@ -125,6 +142,9 @@ export abstract class Room<State = unknown> {
   roomName = '';
   /** The clients in the room, in join order. */
   readonly clients: RoomClient[] = [];
+  /** Clients that dropped and may still come back, with the timer of each. */
+  private held = new Map<RoomClient, ReturnType<typeof setTimeout>>();
+  private secrets = new Map<string, RoomClient>();
   private current: State | undefined;
   private sent = new Map<RoomClient, Uint8Array>();
   private handlers = new Map<string, (client: RoomClient, message: unknown) => void>();
@@ -147,7 +167,15 @@ export abstract class Room<State = unknown> {
   }
   /** Whether the room accepts no more joins (locked by hand, or full). */
   get locked(): boolean {
-    return this.lockedByHand || this.clients.length >= this.maxClients;
+    return this.lockedByHand || this.clients.length + this.held.size >= this.maxClients;
+  }
+  /** Clients whose seat is held for them to come back. */
+  get dropped(): RoomClient[] {
+    return [...this.held.keys()];
+  }
+  /** @internal No client in the room and no seat held. */
+  get empty(): boolean {
+    return !this.clients.length && !this.held.size;
   }
   /** A small integer id for `client`, unique in this room (handy as a map key in the state). */
   idOf(client: RoomClient): number {
@@ -260,8 +288,15 @@ export abstract class Room<State = unknown> {
   }
   /** Called when `client` has joined. If it throws, the client is closed with `CloseCode.error` and `onLeave` runs. */
   onJoin(_client: RoomClient, _options: RoomOptions): void | Promise<void> {}
-  /** Called when `client` left: `consented` is true when it called `leave()` itself. */
+  /**
+   * Called when `client` left for good: `consented` is true when it called `leave()` itself. With a `reconnectWindow`
+   * a dropped client gets here only when the time ran out.
+   */
   onLeave(_client: RoomClient, _consented: boolean): void | Promise<void> {}
+  /** Called when `client` dropped and its seat is held for `reconnectWindow`. An error goes to `rooms.onerror`. */
+  onDrop(_client: RoomClient): void | Promise<void> {}
+  /** Called when a dropped `client` is back in its seat; it then gets the whole state. As `onJoin` if it throws. */
+  onReconnect(_client: RoomClient): void | Promise<void> {}
   /** Called once when the room is disposed. */
   onDispose(): void | Promise<void> {}
 
@@ -285,24 +320,62 @@ export abstract class Room<State = unknown> {
     this.ids.set(client, this.nextId++);
     this.buckets.set(client, { tokens: this.messageBurst ?? 60, at: performance.now() });
     this.clients.push(client);
-    connection.onmessage = (data) => this.receive(client, data);
-    // The RoomServer's own close handler (it counts open connections) runs first.
-    const before = connection.onclose;
-    connection.onclose = (code, reason) => {
-      before?.(code, reason);
-      this.drop(client, code === CloseCode.normal).catch((error) => this.report(error));
-    };
-    const w = new Writer(64);
-    w.u8(JOINED);
-    text(w, this.roomId);
-    text(w, sessionId);
-    w.u32((this.schema as UntypedSchema).hash);
-    connection.send(w.done(), 'reliable');
+    this.seat(client, connection);
     try {
       await this.onJoin(client, options);
       this.patch();
     } catch (error) {
       this.fail(client, error, 'onJoin failed');
+      return 'failed';
+    }
+    return 'joined';
+  }
+
+  /** Puts `client` on `connection`, with a new secret, and tells the other end. */
+  private seat(client: RoomClient, connection: Connection): void {
+    client.connection = connection;
+    connection.onmessage = (data) => this.receive(client, data);
+    // The RoomServer's own close handler (it counts open connections) runs first.
+    const before = connection.onclose;
+    connection.onclose = (code, reason) => {
+      before?.(code, reason);
+      if (client.connection === connection)
+        this.drop(client, code === CloseCode.normal, code).catch((error) => this.report(error));
+    };
+    this.secrets.delete(client.secret);
+    client.secret = this.reconnectWindow > 0 ? randomSecret() : '';
+    if (client.secret) this.secrets.set(client.secret, client);
+    const w = new Writer(64);
+    w.u8(JOINED);
+    text(w, this.roomId);
+    text(w, client.sessionId);
+    w.u32((this.schema as UntypedSchema).hash);
+    text(w, client.secret && `${this.roomId}.${client.secret}`);
+    connection.send(w.done(), 'reliable');
+  }
+
+  /**
+   * @internal Brings the client of `secret` back on `connection`. A client still seated is one whose old connection
+   * died without the server noticing yet: the new connection takes over from it.
+   */
+  async resume(connection: Connection, secret: string): Promise<'joined' | 'refused' | 'failed'> {
+    const client = this.secrets.get(secret);
+    if (!client || this.disposed || !connection.open) return 'refused';
+    const timer = this.held.get(client),
+      old = client.connection;
+    this.sent.delete(client);
+    if (timer !== undefined) {
+      clearTimeout(timer);
+      this.held.delete(client);
+      this.clients.push(client);
+    }
+    this.seat(client, connection);
+    if (timer === undefined) old.close(CloseCode.removed, 'reconnected on a new connection');
+    try {
+      await this.onReconnect(client);
+      this.patch();
+    } catch (error) {
+      this.fail(client, error, 'onReconnect failed');
       return 'failed';
     }
     return 'joined';
@@ -354,15 +427,33 @@ export abstract class Room<State = unknown> {
     }
   }
 
-  private async drop(client: RoomClient, consented: boolean): Promise<void> {
+  private async drop(client: RoomClient, consented: boolean, code: number): Promise<void> {
     const i = this.clients.indexOf(client);
     if (i < 0) return;
     this.clients.splice(i, 1);
     this.sent.delete(client);
+    if (client.secret && !this.disposed && !FINAL_CLOSES.has(code)) {
+      const timer = setTimeout(
+        () => this.expire(client, consented).catch((error) => this.report(error)),
+        this.reconnectWindow,
+      );
+      (timer as { unref?(): void }).unref?.();
+      this.held.set(client, timer);
+      await this.onDrop(client);
+      return;
+    }
+    await this.expire(client, consented);
+  }
+
+  /** `client` is gone for good. */
+  private async expire(client: RoomClient, consented: boolean): Promise<void> {
+    clearTimeout(this.held.get(client));
+    this.held.delete(client);
+    this.secrets.delete(client.secret);
     try {
       await this.onLeave(client, consented);
     } finally {
-      if (!this.clients.length && this.autoDispose) this.release();
+      if (this.empty && this.autoDispose) this.release();
     }
   }
 
@@ -372,6 +463,7 @@ export abstract class Room<State = unknown> {
     this.disposed = true;
     if (this.patchTimer !== undefined) clearInterval(this.patchTimer);
     if (this.simulationTimer !== undefined) clearInterval(this.simulationTimer);
+    for (const client of [...this.held.keys()]) this.expire(client, false).catch((error) => this.report(error));
     this.onEmpty?.();
     try {
       const done = this.onDispose();
@@ -601,6 +693,14 @@ export class RoomServer {
       if (!(error instanceof RangeError || error instanceof SyntaxError || error instanceof TypeError)) throw error;
       return connection.close(CloseCode.protocol, (error as Error).message);
     }
+    if (method === 'reconnect') {
+      const token = String(options.token),
+        dot = token.indexOf('.'),
+        seat = this.live.get(token.slice(0, dot)),
+        result = seat ? await seat.resume(connection, token.slice(dot + 1)) : 'refused';
+      if (result === 'refused') this.refuse(connection, 'the seat is gone; join the room again');
+      return;
+    }
     if (!this.classes.has(name) && method !== 'joinById') return this.refuse(connection, `no room named '${name}'`);
     const find = (): Room | undefined =>
       method === 'joinById'
@@ -631,7 +731,7 @@ export class RoomServer {
     const result = await room.admit(connection, `${randomId()}${(++this.sessions).toString(36)}`, options);
     if (result === 'refused') {
       this.refuse(connection, 'the room refused the join');
-      if (!room.clients.length && room.autoDispose) room.release();
+      if (room.empty && room.autoDispose) room.release();
     }
   }
 
@@ -647,6 +747,9 @@ export class RoomServer {
   }
 }
 
+const randomSecret = (): string =>
+  [...crypto.getRandomValues(new Uint8Array(16))].map((b) => b.toString(16).padStart(2, '0')).join('');
+
 const randomId = (): string => {
   const bytes = crypto.getRandomValues(new Uint8Array(6));
   return [...bytes]
@@ -661,6 +764,11 @@ export class JoinedRoom<State = unknown> {
   readonly roomId: string;
   /** This client's seat id. */
   readonly sessionId: string;
+  /**
+   * What `RoomsClient.reconnect` takes to come back to this seat, '' when the room keeps no seats. Good once: a
+   * reconnect gives a new one. Keep it private to this player: whoever holds it can take the seat.
+   */
+  readonly reconnectionToken: string;
   private current: State | undefined;
   private readonly stateHandlers = new Set<(state: State) => void>();
   private readonly messageHandlers = new Map<string, Set<(message: unknown) => void>>();
@@ -672,9 +780,11 @@ export class JoinedRoom<State = unknown> {
     private readonly stateType: string,
     roomId: string,
     sessionId: string,
+    reconnectionToken: string,
   ) {
     this.roomId = roomId;
     this.sessionId = sessionId;
+    this.reconnectionToken = reconnectionToken;
     connection.onmessage = (data) => this.receive(data);
     connection.onclose = (code) => {
       for (const handler of this.leaveHandlers) handler(code);
@@ -825,6 +935,13 @@ export class RoomsClient {
   joinById<S>(roomId: string, options: RoomOptions, join: JoinOptions<S>): Promise<JoinedRoom<S>> {
     return this.open('joinById', '', roomId, options, join);
   }
+  /**
+   * Goes back to a held seat with the `reconnectionToken` of a dropped {@link JoinedRoom}, while the room's
+   * `reconnectWindow` lasts. The room's whole state follows. Rejects with MargoError `failed` once the seat is gone.
+   */
+  reconnect<S>(token: string, join: JoinOptions<S>): Promise<JoinedRoom<S>> {
+    return this.open('reconnect', '', '', { token }, join);
+  }
 
   private async open<S>(
     method: JoinMethod,
@@ -859,14 +976,15 @@ export class RoomsClient {
           if (kind !== JOINED) throw r.fail(`has kind ${kind}, not a join reply`);
           const id = readText(r, 64),
             session = readText(r, 64),
-            hash = r.u32();
+            hash = r.u32(),
+            token = readText(r, 128);
           r.end();
           if (hash !== untyped.hash) {
             connection.close(CloseCode.mismatch, 'schema differs');
             return fail('Room state schema differs from the server; use the same schema on both ends');
           }
           signal?.removeEventListener('abort', abort);
-          resolve(new JoinedRoom<S>(connection, untyped, stateType, id, session));
+          resolve(new JoinedRoom<S>(connection, untyped, stateType, id, session, token));
         } catch (error) {
           connection.close(CloseCode.protocol, (error as Error).message.slice(0, 120));
           fail(`Room join failed: ${(error as Error).message}`);
