@@ -4,6 +4,7 @@
 // lets one pass's friction take a whole step's kick.
 use crate::layout::*;
 use crate::math::*;
+use crate::solver::soft;
 use crate::world::World;
 
 /// World change from a world torque-like vector: I^-1 v, worked in the principal frame `frame`.
@@ -121,9 +122,20 @@ impl World {
         self.broad_update(dt);
         self.narrow_phase(dt);
         self.update_islands(dt);
+        self.prepare_contacts();
+        // A soft constraint stiffer than a quarter of the substep rate shakes a pile the passes cannot settle (measured).
+        let (hertz, damping) = (self.header().contact_hertz, self.header().contact_damping);
+        let hertz = if hertz * h > 0.25 { 0.25 / h } else { hertz };
+        let stiffness = soft(hertz, damping, h);
         for substep in 0..substeps {
             self.integrate_velocities(h);
+            self.warm_start();
+            for _ in 0..self.header().iterations {
+                self.solve_contacts(h, stiffness, true, substep as usize);
+            }
             self.integrate_poses(h, substep + 1 == substeps);
+            self.solve_contacts(h, stiffness, false, substep as usize);
+            self.solve_impacts();
         }
         self.header_mut().steps += 1;
     }

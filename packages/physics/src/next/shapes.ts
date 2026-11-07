@@ -9,12 +9,8 @@ const PI = 3.141592653589793;
 /** The shapes the own solver holds so far, by the name their options use. */
 const served: Readonly<Record<string, KernelShape>> = { box: 'box', sphere: 'ball', capsule: 'capsule' };
 
-/** Settings that only mean something once bodies touch, with the value that asks for nothing. */
+/** Settings the own solver does not hold yet, with the value that asks for nothing. */
 const contactSettings = [
-  ['friction', undefined],
-  ['restitution', undefined],
-  ['frictionCombine', undefined],
-  ['restitutionCombine', undefined],
   ['sensor', false],
   ['collisionGroups', undefined],
   ['solverGroups', undefined],
@@ -75,7 +71,7 @@ export function kernelCollider(
     if (options[name] !== undefined && options[name] !== none)
       throw new MargoError(
         'unsupported',
-        `The ${name} setting needs contacts, which the own solver does not have yet; leave it out or use @margoengine/physics.`,
+        `The ${name} setting is not in the own solver yet; leave it out or use @margoengine/physics.`,
       );
   const fitted = (): Float32Array => {
       if (!fit.geometry) throw new TypeError(`A ${options.shape} collider without explicit size needs a mesh with geometry`);
@@ -116,6 +112,10 @@ export function kernelCollider(
       position: [offset[0] + center[0], offset[1] + center[1], offset[2] + center[2]],
       rotation: options.rotation,
       density,
+      friction: options.friction,
+      restitution: options.restitution,
+      frictionCombine: options.frictionCombine,
+      restitutionCombine: options.restitutionCombine,
     },
   };
 }

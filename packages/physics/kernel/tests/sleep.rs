@@ -91,17 +91,24 @@ fn check(w: &World) {
 /// Two of this file's balls touch, by plain sphere maths and without asking the kernel: the gap at the pose the step found
 /// contacts in, against the margin and what each ball can cover in the step. A contact group is objects in direct or
 /// indirect touching contact (Erleben 2005, 2.3.4), so a pair the broad phase holds is not yet an edge.
-fn balls_touch(w: &World, a: usize, b: usize) -> bool {
+fn balls_touch(w: &World, speeds: &[f32], a: usize, b: usize) -> bool {
     let between = w.v(PREVIOUS_X, a).sub(w.v(PREVIOUS_X, b));
+    between.dot(between).sqrt() - 1.0 <= MARGIN + (speeds[a] + speeds[b]) * DT
+}
+
+/// A step, and how fast each ball was going when it began: the speeds contacts were found with, before the solver acted.
+fn stepped(w: &mut World) -> Vec<f32> {
     let speed = |body: usize| {
         let (linear, angular) = (w.v(LINEAR_X, body), w.v(ANGULAR_X, body));
         linear.dot(linear).sqrt() + angular.dot(angular).sqrt() * 0.5
     };
-    between.dot(between).sqrt() - 1.0 <= MARGIN + (speed(a) + speed(b)) * DT
+    let speeds = (0..w.header().rows as usize).map(speed).collect();
+    w.step(DT);
+    speeds
 }
 
 /// Islands by a plain depth-first search over awake dynamic bodies and the touching pairs between them, as sets of bodies.
-fn components(w: &World) -> BTreeSet<BTreeSet<u32>> {
+fn components(w: &World, speeds: &[f32]) -> BTreeSet<BTreeSet<u32>> {
     let mut edges: BTreeMap<u32, Vec<u32>> = BTreeMap::new();
     let dynamic = |body: usize| w.flags(body) & KIND == DYNAMIC;
     for slot in 0..w.header().awake {
@@ -112,7 +119,7 @@ fn components(w: &World) -> BTreeSet<BTreeSet<u32>> {
     }
     for slot in 0..w.header().active_pairs {
         let (a, b) = w.pair_bodies(w.uu(ACTIVE_PAIRS, slot as usize));
-        if dynamic(a) && dynamic(b) && balls_touch(w, a, b) {
+        if dynamic(a) && dynamic(b) && balls_touch(w, speeds, a, b) {
             edges.entry(a as u32).or_default().push(b as u32);
             edges.entry(b as u32).or_default().push(a as u32);
         }
@@ -174,10 +181,10 @@ fn islands_are_the_connected_groups_of_random_scenes() {
             }
             w.set_v(LINEAR_X, at, velocity);
         }
-        w.step(DT);
+        let speeds = stepped(&mut w);
         check(&w);
         let found = islands(&w);
-        assert_eq!(found, components(&w));
+        assert_eq!(found, components(&w, &speeds));
         sizes.extend(found.iter().map(|group| group.len()));
     }
     assert!(sizes.iter().any(|&size| size >= 3), "scenes must hold real groups: {sizes:?}");
@@ -322,7 +329,7 @@ fn a_force_keeps_a_body_awake() {
 #[test]
 fn a_body_that_may_not_sleep_keeps_its_island_awake() {
     let mut w = free_world(2);
-    let (a, b) = (ball(&mut w, DYNAMIC, -0.2), ball(&mut w, DYNAMIC, 0.2));
+    let (a, b) = (ball(&mut w, DYNAMIC, -0.5), ball(&mut w, DYNAMIC, 0.5));
     let flags = w.flags(a as usize) & !CAN_SLEEP;
     w.set_u(FLAGS, a as usize, flags);
     for _ in 0..100 {
@@ -334,7 +341,7 @@ fn a_body_that_may_not_sleep_keeps_its_island_awake() {
 #[test]
 fn an_island_sleeps_only_when_all_its_bodies_are_ready() {
     let mut w = free_world(3);
-    let (a, b, c) = (ball(&mut w, DYNAMIC, 0.0), ball(&mut w, DYNAMIC, 0.7), ball(&mut w, DYNAMIC, 1.4));
+    let (a, b, c) = (ball(&mut w, DYNAMIC, 0.0), ball(&mut w, DYNAMIC, 1.0), ball(&mut w, DYNAMIC, 2.0));
     w.set_v(ANGULAR_X, c as usize, v3(0.0, 1.0, 0.0));
     for _ in 0..120 {
         w.step(DT);
@@ -352,7 +359,7 @@ fn an_island_sleeps_only_when_all_its_bodies_are_ready() {
 #[test]
 fn a_moving_body_wakes_the_whole_island_it_reaches() {
     let mut w = free_world(102);
-    let chain: Vec<u32> = (0..100).map(|i| ball(&mut w, DYNAMIC, i as f32 * 0.7)).collect();
+    let chain: Vec<u32> = (0..100).map(|i| ball(&mut w, DYNAMIC, i as f32)).collect();
     for _ in 0..40 {
         w.step(DT);
     }
@@ -372,15 +379,16 @@ fn a_moving_body_wakes_the_whole_island_it_reaches() {
         assert!(steps < 30);
     }
     assert!(chain.iter().all(|&b| !asleep(&w, b)));
+    let speeds = stepped(&mut w);
     check(&w);
-    assert_eq!(islands(&w), components(&w));
+    assert_eq!(islands(&w), components(&w, &speeds));
 }
 
 #[test]
 fn a_moving_kinematic_body_keeps_what_it_touches_awake_and_a_still_one_does_not() {
     let mut w = free_world(2);
     let dynamic = ball(&mut w, DYNAMIC, 0.0);
-    let kinematic = ball(&mut w, KINEMATIC_VELOCITY, 0.8);
+    let kinematic = ball(&mut w, KINEMATIC_VELOCITY, 1.0);
     for _ in 0..40 {
         w.step(DT);
     }
@@ -404,7 +412,7 @@ fn a_moving_kinematic_body_keeps_what_it_touches_awake_and_a_still_one_does_not(
 fn removing_a_sleeper_or_changing_its_colliders_wakes_its_island() {
     let setup = || {
         let mut w = free_world(3);
-        let (a, b) = (ball(&mut w, DYNAMIC, 0.0), ball(&mut w, DYNAMIC, 0.7));
+        let (a, b) = (ball(&mut w, DYNAMIC, 0.0), ball(&mut w, DYNAMIC, 1.0));
         for _ in 0..40 {
             w.step(DT);
         }
@@ -497,10 +505,10 @@ fn sleepers_in_a_random_churn_keep_every_list_true() {
                 }
                 _ => {}
             }
-            w.step(DT);
+            let speeds = stepped(&mut w);
             if bodies == 1 {
                 check(&w);
-                assert_eq!(islands(&w), components(&w), "step {step}");
+                assert_eq!(islands(&w), components(&w, &speeds), "step {step}");
             }
             trace.push((w.header().awake, w.header().active_pairs, w.header().islands));
         }

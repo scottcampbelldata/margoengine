@@ -65,6 +65,14 @@ pub extern "C" fn world_set_substeps(substeps: u32) {
     world().header_mut().substeps = substeps;
 }
 #[unsafe(no_mangle)]
+pub extern "C" fn world_set_iterations(iterations: u32) {
+    world().header_mut().iterations = iterations;
+}
+#[unsafe(no_mangle)]
+pub extern "C" fn world_iterations() -> u32 {
+    world().header().iterations
+}
+#[unsafe(no_mangle)]
 pub extern "C" fn world_steps() -> u32 {
     world().header().steps
 }

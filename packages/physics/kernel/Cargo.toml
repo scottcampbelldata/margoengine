@@ -15,3 +15,7 @@ codegen-units = 1
 panic = "abort"
 overflow-checks = false
 strip = "symbols"
+
+# The proofs run minutes of simulated time; floats are the same at any level, as Rust never reorders them.
+[profile.test]
+opt-level = 2

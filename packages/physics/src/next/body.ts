@@ -291,7 +291,7 @@ export class PhysicsBody {
     return 0;
   }
   set additionalSolverIterations(passes: number) {
-    if (passes !== 0) throw later('additionalSolverIterations', 'contacts');
+    if (passes !== 0) throw later('additionalSolverIterations', 'joints and articulations');
   }
   /** Not served yet: reads false, and true throws. */
   get ccd(): boolean {
@@ -307,7 +307,7 @@ export class PhysicsBody {
     return true;
   }
   set enabled(value: boolean) {
-    if (!value) throw later('Disabling a body', 'contacts');
+    if (!value) throw later('Disabling a body', 'contact events');
   }
   /** Stops all turning, on every world axis, or frees it again. */
   lockRotations(locked = true): this {

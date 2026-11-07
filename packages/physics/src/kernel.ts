@@ -18,6 +18,8 @@ interface KernelExports extends WebAssembly.Exports {
   world_gravity(axis: number): number;
   world_set_substeps(substeps: number): void;
   world_substeps(): number;
+  world_set_iterations(iterations: number): void;
+  world_iterations(): number;
   world_steps(): number;
   world_step(dt: number): number;
   world_layout(): number;
@@ -104,6 +106,8 @@ export interface KernelContactPoint {
   separation: number;
   /** Names the features that made the point, and stays the same while they do. */
   id: number;
+  /** What the solver pushed with along the normal in the last substep, in newton seconds. */
+  normalImpulse: number;
 }
 
 /** The manifold of one pair of colliders. */
@@ -115,6 +119,10 @@ export interface KernelContact {
   points: KernelContactPoint[];
 }
 
+/** How two colliders mix a value. When their rules differ the pair takes the higher: max, multiply, min, average. */
+export type KernelCombine = 'average' | 'min' | 'multiply' | 'max';
+const combines: readonly KernelCombine[] = ['average', 'min', 'multiply', 'max'];
+
 /** Options of {@link KernelWorld.addCollider}. */
 export interface KernelColliderOptions {
   /** Place in the body's frame (default the origin). */
@@ -123,6 +131,14 @@ export interface KernelColliderOptions {
   rotation?: readonly [number, number, number, number];
   /** In kg/m^3 (default 1000, water). 0 adds no mass. */
   density?: number;
+  /** Coulomb friction, 0 or more: a block slides above the slope whose tangent this is (default 0.5). */
+  friction?: number;
+  /** Share of its approach speed a contact gives back, 0 to 1 (default 0). */
+  restitution?: number;
+  /** How a pair mixes its two frictions (default 'average'). */
+  frictionCombine?: KernelCombine;
+  /** How a pair mixes its two restitutions (default 'average'). */
+  restitutionCombine?: KernelCombine;
 }
 
 /** Bits of the `flags` column (kernel/src/layout.rs). */
@@ -244,6 +260,7 @@ export class KernelWorld {
           position: [c.contactX[at], c.contactY[at], c.contactZ[at]],
           separation: c.contactSeparation[at],
           id: c.contactId[at],
+          normalImpulse: c.contactNormalImpulse[at],
         });
       out.push({
         colliderA: c.pairA[row],
@@ -309,7 +326,7 @@ export class KernelWorld {
     return this.api.world_steps() >>> 0;
   }
   /**
-   * Equal pieces each step is split into (default 4). Forces reach every piece; impulses land once, before the first.
+   * Equal pieces each step is split into (default 8). Forces reach every piece; impulses land once, before the first.
    * @throws RangeError unless it is a whole number from 1 up.
    */
   get substeps(): number {
@@ -317,8 +334,17 @@ export class KernelWorld {
   }
   set substeps(substeps: number) {
     if (!Number.isInteger(substeps) || substeps < 1 || substeps > 0xffff)
-      throw new RangeError(`Substeps must be a whole number from 1 to 65535; use 4 unless you measured (got ${substeps}).`);
+      throw new RangeError(`Substeps must be a whole number from 1 to 65535; use 8 unless you measured (got ${substeps}).`);
     this.api.world_set_substeps(substeps);
+  }
+  /** Solver passes in each substep (default 2). More holds a tall stack stiffer, at that much more solver time. */
+  get iterations(): number {
+    return this.api.world_iterations();
+  }
+  set iterations(iterations: number) {
+    if (!Number.isInteger(iterations) || iterations < 1 || iterations > 0xffff)
+      throw new RangeError(`Iterations must be a whole number from 1 to 65535; use 2 unless you measured (got ${iterations}).`);
+    this.api.world_set_iterations(iterations);
   }
   /** Gravity as `[x, y, z]`, in m/s^2 (default `[0, -9.81, 0]`, read back as f32). */
   get gravity(): [number, number, number] {
@@ -368,7 +394,15 @@ export class KernelWorld {
    * @throws RangeError for a dead body, an unknown shape, or a size, pose or density the kernel cannot use.
    */
   addCollider(body: number, shape: KernelShape, size: readonly number[], options: KernelColliderOptions = {}): number {
-    const { position = [0, 0, 0], rotation = [0, 0, 0, 1], density = 1000 } = options,
+    const {
+        position = [0, 0, 0],
+        rotation = [0, 0, 0, 1],
+        density = 1000,
+        friction = 0.5,
+        restitution = 0,
+        frictionCombine = 'average',
+        restitutionCombine = 'average',
+      } = options,
       spec = Object.hasOwn(shapes, shape) ? shapes[shape] : undefined,
       { flags } = this.columns;
     if (!spec) throw new RangeError(`Unknown shape ${String(shape)}; use one of ${Object.keys(shapes).join(', ')}.`);
@@ -382,6 +416,14 @@ export class KernelWorld {
       throw new RangeError(`A ${shape} needs ${numbers} finite sizes above zero (got ${size.join(', ')}).`);
     if (!(density >= 0) || !Number.isFinite(density))
       throw new RangeError(`Density must be finite and not negative; 1000 is water (got ${density}).`);
+    if (!(friction >= 0) || !Number.isFinite(friction))
+      throw new RangeError(`Friction must be finite and not negative; 0.5 is a common start (got ${friction}).`);
+    if (!(restitution >= 0 && restitution <= 1))
+      throw new RangeError(`Restitution must be from 0 to 1, as a contact cannot give back more than it took (got ${restitution}).`);
+    const frictionRule = combines.indexOf(frictionCombine),
+      restitutionRule = combines.indexOf(restitutionCombine);
+    if (frictionRule < 0 || restitutionRule < 0)
+      throw new RangeError(`Unknown combine rule; use one of ${combines.join(', ')}.`);
     if (![...position, ...rotation].every(Number.isFinite))
       throw new RangeError('A collider pose must be finite; check what fed it.');
     const [qx, qy, qz, qw] = rotation,
@@ -409,6 +451,11 @@ export class KernelWorld {
       this.reserve(this.capacity, this.colliderCapacity * 2);
       row = add();
     }
+    // After the add: a world that grew has new views.
+    const { colliderFriction, colliderRestitution, colliderCombine } = this.columns;
+    colliderFriction[row] = friction;
+    colliderRestitution[row] = restitution;
+    colliderCombine[row] = frictionRule | (restitutionRule << 2);
     return row;
   }
   /**

@@ -6,7 +6,6 @@
 // An impulse carries as a world vector and is split along the new normal, so a turning normal hands normal impulse to the
 // tangent and back, and the sum stays what the bodies last felt. An impulse is a force times a substep, so when the
 // substep changes length it scales with it.
-use crate::integrate::{apply_inverse_inertia, lock};
 use crate::layout::*;
 use crate::math::*;
 use crate::narrow::{Manifold, Point};
@@ -138,46 +137,5 @@ impl World {
         self.set_s(CONTACT_SEPARATION, at, point.separation);
         self.set_u(CONTACT_ID, at, point.id);
         self.set_v(CONTACT_X, at, point.on_a.add(point.on_b).scale(0.5));
-    }
-
-    /// One impulse at a point `arm` from a body's centre of mass, on an awake dynamic body, through its locks.
-    #[inline(always)]
-    pub fn apply_impulse(&mut self, at: usize, impulse: V3, arm: V3) {
-        let flags = self.flags(at);
-        if flags & KIND != DYNAMIC || flags & SLEEPING != 0 {
-            return;
-        }
-        let mut linear = impulse.scale(self.s(INVERSE_MASS, at));
-        let frame = self.q(ROTATION_X, at).mul(self.q(INERTIA_FRAME_X, at));
-        let mut turn = apply_inverse_inertia(self.v(INVERSE_INERTIA_X, at), frame, arm.cross(impulse));
-        if flags & LOCK_LINEAR != 0 {
-            linear = lock(linear, flags / LOCK_LINEAR_X);
-        }
-        if flags & LOCK_ANGULAR != 0 {
-            turn = lock(turn, flags / LOCK_ANGULAR_X);
-        }
-        self.set_v(LINEAR_X, at, self.v(LINEAR_X, at).add(linear));
-        self.set_v(ANGULAR_X, at, self.v(ANGULAR_X, at).add(turn));
-    }
-
-    /// Gives every touching pair of the active list the impulses its points carry, at the anchors, from A to B.
-    pub fn warm_start(&mut self) {
-        for i in 0..self.header().active_pairs as usize {
-            let row = self.uu(ACTIVE_PAIRS, i) as usize;
-            let count = self.uu(PAIR_CONTACTS, row) as usize;
-            if count == 0 {
-                continue;
-            }
-            let (a, b) = self.pair_bodies(row as u32);
-            let normal = self.v(PAIR_NORMAL_X, row);
-            let (rotation_a, rotation_b) = (self.q(ROTATION_X, a), self.q(ROTATION_X, b));
-            for k in 0..count {
-                let at = row * MANIFOLD + k;
-                let impulse = normal.scale(self.s(CONTACT_NORMAL_IMPULSE, at)).add(self.v(CONTACT_TANGENT_X, at));
-                let (arm_a, arm_b) = (rotation_a.rotate(self.v(CONTACT_ANCHOR_A_X, at)), rotation_b.rotate(self.v(CONTACT_ANCHOR_B_X, at)));
-                self.apply_impulse(a, impulse.scale(-1.0), arm_a);
-                self.apply_impulse(b, impulse, arm_b);
-            }
-        }
     }
 }

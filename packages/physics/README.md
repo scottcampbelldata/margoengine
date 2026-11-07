@@ -248,7 +248,7 @@ for (let i = 0; i < 60; i++) world.step(1 / 60);
 console.log(world.columns.positionY[body], world.hash); // the hash is equal in every browser and in Node
 ```
 
-Read views from `world.columns` each time: `reserve` and `addBody` can replace them. Each world is its own Wasm instance. Gravity defaults to `[0, -9.81, 0]` (`world.setGravity(x, y, z)`) and each step runs 4 substeps (`world.substeps`). A force in `forceX` and the columns beside it stays until you clear it and reaches every substep; an impulse in `impulseX` lands once, before the first. A body's mass, centre of mass and inertia come from its colliders; write `additionalMass` and call `world.updateMass(body)` to add weight, which is spread as the colliders are, so it scales the inertia too. A dynamic body with no mass does not fall. `world.removeBody(body)` and `world.removeCollider(box)` free their rows, and a later add takes the last one freed; a collider's row comes back after the next step.
+Read views from `world.columns` each time: `reserve` and `addBody` can replace them. Each world is its own Wasm instance. Gravity defaults to `[0, -9.81, 0]` (`world.setGravity(x, y, z)`) and each step runs 8 substeps (`world.substeps`) of 2 solver passes (`world.iterations`). A force in `forceX` and the columns beside it stays until you clear it and reaches every substep; an impulse in `impulseX` lands once, before the first. A body's mass, centre of mass and inertia come from its colliders; write `additionalMass` and call `world.updateMass(body)` to add weight, which is spread as the colliders are, so it scales the inertia too. A dynamic body with no mass does not fall. `world.removeBody(body)` and `world.removeCollider(box)` free their rows, and a later add takes the last one freed; a collider's row comes back after the next step.
 
 Each step finds pairs: `world.pairCount`, and `world.pairs()` for the collider rows, the lower first. A pair means two fat boxes overlap, where a fat box holds everything the step can reach plus 0.04 m, so a pair is near, not yet touching. Colliders of one body or of two fixed bodies are no pair. A step can grow the world, so read views after it, and call `world.touch(body)` after writing a fixed or sleeping body's pose by hand.
 
@@ -268,7 +268,7 @@ world.wake(body);
 world.columns.linearX[body] = 2;
 ```
 
-Each step then finds contact points between the near pairs of every shape: `world.contacts()` returns one manifold a pair, up to four points that share a normal from the first collider to the second. A `hull` is any closed convex polyhedron, added once with `world.addHull(vertices, faces)` and shared by every collider that names its row; its mass, centre and inertia come from the faces. Points follow the separating axis test: the touching faces are clipped against each other, so a box resting on a box has all four corners from its first step. A ball or capsule against anything goes by distance (GJK), and by the expanding polytope when its core is inside; a capsule lying along a face or another capsule gets two points. Bodies do not push each other yet: that is job 4 of this batch.
+Each step then finds contact points between the near pairs of every shape: `world.contacts()` returns one manifold a pair, up to four points that share a normal from the first collider to the second. A `hull` is any closed convex polyhedron, added once with `world.addHull(vertices, faces)` and shared by every collider that names its row; its mass, centre and inertia come from the faces. Points follow the separating axis test: the touching faces are clipped against each other, so a box resting on a box has all four corners from its first step. A ball or capsule against anything goes by distance (GJK), and by the expanding polytope when its core is inside; a capsule lying along a face or another capsule gets two points.
 
 ```ts
 import {KernelWorld, loadKernel} from 'margoengine/physics/next';
@@ -306,7 +306,36 @@ console.log(body.position[1]);         // fallen about 4.9 m in the second
 physics.dispose();
 ```
 
-It holds `box`, `sphere` and `capsule` colliders, bodies of every kind, forces, impulses, velocities, damping, locks, kinematic targets, gravity, sleeping and the `beforestep` and `afterstep` events. Bodies do not collide yet. A call that needs what is still to come throws a `MargoError` with code `unsupported` naming what it waits for: other shapes, `setType`, `setMassProperties`, inertia of its own, `ccd`, `follow`, `dominance`, disabling a body, `contactFilter`, friction, restitution and every other contact setting, joints, queries, character controllers, `addModel`, `touching`, `contactPoints`, contact events and `debugRender`. `body.sleep()` and impulses take effect at the next step.
+It holds `box`, `sphere` and `capsule` colliders, bodies of every kind, forces, impulses, velocities, damping, locks, kinematic targets, gravity, sleeping and the `beforestep` and `afterstep` events. Bodies collide, with friction, restitution and the four combine rules, and `physics.touching(a, b)` and `physics.contactPoints(body)` read the contacts of the last step. Contact events, sensors and groups are not served yet. A call that needs what is still to come throws a `MargoError` with code `unsupported` naming what it waits for: other shapes, `setType`, `setMassProperties`, inertia of its own, `ccd`, `follow`, `dominance`, disabling a body, `contactFilter`, friction, restitution and every other contact setting, joints, queries, character controllers, `addModel`, `touching`, `contactPoints`, contact events and `debugRender`. `body.sleep()` and impulses take effect at the next step.
+
+Each step is 8 substeps of 2 solver passes by default (`physics.substeps`, `physics.iterations`). `friction` defaults to 0.5, `restitution` to 0, and each combine rule to `average`; when two colliders ask for different rules the pair takes the higher, `max`, `multiply`, `min`, `average`. `collider.setFriction` and `collider.setRestitution` take effect at the next step.
+
+```ts
+import {Physics} from 'margoengine/physics/next';
+
+await Physics.load();
+const physics = new Physics(null);
+const floor = physics.addBody(null, {
+  type: 'fixed',
+  colliders: {shape: 'box', halfExtents: [10, 0.5, 10], restitution: 0.5, restitutionCombine: 'max'},
+  position: [0, -0.5, 0],
+});
+const ball = physics.addBody(null, {
+  position: [0, 2.5, 0],
+  colliders: {shape: 'sphere', radius: 0.5, density: 1, friction: 0.8},
+});
+let top = 0;
+for (let i = 0; i < 45; i++) physics.step();      // down and off the floor again
+for (let i = 0; i < 30; i++) {
+  physics.step();
+  if (ball.position[1] > top) top = ball.position[1];
+}
+console.log(top);                                 // about 1: the radius, and 0.5 squared of the 2 m drop
+for (let i = 0; i < 600; i++) physics.step();
+console.log(physics.touching(ball, floor));       // true
+console.log(physics.contactPoints(ball).length);  // 1
+physics.dispose();
+```
 
 A world is one block of memory, so a snapshot is one copy. `world.snapshot()` returns its bytes and `world.restore(bytes)` puts every row, pair and timer back, into a world of any size. A snapshot reads only in the kernel build that wrote it, and it covers the `KernelWorld`: a `Physics` object also holds bodies and meshes, so its restore comes with `/snapshot`.
 

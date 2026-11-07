@@ -121,6 +121,17 @@ columns! {
     ISLAND_ID u32 Body,
     // The next body of a sleeping island's ring.
     ISLAND_NEXT u32 Body,
+    // What the contact solver moves a body by, written once a step: inverse mass along each world axis and the world inverse
+    // inertia, both zero for anything but an awake dynamic body, with locked axes taken out.
+    SOLVE_MASS_X f32 Body,
+    SOLVE_MASS_Y f32 Body,
+    SOLVE_MASS_Z f32 Body,
+    SOLVE_INERTIA_XX f32 Body,
+    SOLVE_INERTIA_XY f32 Body,
+    SOLVE_INERTIA_XZ f32 Body,
+    SOLVE_INERTIA_YY f32 Body,
+    SOLVE_INERTIA_YZ f32 Body,
+    SOLVE_INERTIA_ZZ f32 Body,
     // Colliders: a shape in its body's frame.
     COLLIDER_BODY u32 Collider,
     COLLIDER_NEXT u32 Collider,
@@ -139,6 +150,10 @@ columns! {
     COLLIDER_DENSITY f32 Collider,
     // The hull row of a SHAPE_HULL collider.
     COLLIDER_HULL u32 Collider,
+    // Surface: friction, bounce, and how each mixes with another collider's, two bits for friction then two for bounce.
+    COLLIDER_FRICTION f32 Collider,
+    COLLIDER_RESTITUTION f32 Collider,
+    COLLIDER_COMBINE u32 Collider,
     // Broad phase. State bits, the next in the pending chain, the first of its pairs.
     COLLIDER_STATE u32 Collider,
     COLLIDER_PENDING u32 Collider,
@@ -189,6 +204,13 @@ columns! {
     PAIR_NORMAL_Z f32 Pair,
     // The feature that made the manifold, for the coherence of the next step.
     PAIR_FEATURE u32 Pair,
+    // The solver's view of a pair for this step: the surfaces mixed, the first tangent, and the pairs it will solve, densely.
+    PAIR_FRICTION f32 Pair,
+    PAIR_RESTITUTION f32 Pair,
+    PAIR_TANGENT_X f32 Pair,
+    PAIR_TANGENT_Y f32 Pair,
+    PAIR_TANGENT_Z f32 Pair,
+    SOLVE_PAIRS u32 Pair,
     // Open addressing: a pair's row plus one, zero when empty.
     PAIR_TABLE u32 Table,
     // Awake bodies, densely.
@@ -221,6 +243,19 @@ columns! {
     CONTACT_DRIFT_X f32 Contact,
     CONTACT_DRIFT_Y f32 Contact,
     CONTACT_DRIFT_Z f32 Contact,
+    // The solver's view of a point for this step: arms from each centre of mass in world space, and effective masses along
+    // the normal and the two tangents. An approach speed, and the list of points struck in this substep, densely.
+    CONTACT_ARM_A_X f32 Contact,
+    CONTACT_ARM_A_Y f32 Contact,
+    CONTACT_ARM_A_Z f32 Contact,
+    CONTACT_ARM_B_X f32 Contact,
+    CONTACT_ARM_B_Y f32 Contact,
+    CONTACT_ARM_B_Z f32 Contact,
+    CONTACT_NORMAL_MASS f32 Contact,
+    CONTACT_TANGENT_MASS f32 Contact,
+    CONTACT_OTHER_MASS f32 Contact,
+    CONTACT_APPROACH f32 Contact,
+    IMPACTS u32 Contact,
     // A hull: where its rows start and how many it has; an interior point; the box around it; volume, and the principal
     // moments per unit of density with their frame, about its centroid.
     HULL_FIRST_VERTEX u32 Hull,
@@ -310,6 +345,12 @@ pub const SHAPE_BALL: u32 = 0;
 pub const SHAPE_BOX: u32 = 1;
 pub const SHAPE_CAPSULE: u32 = 2;
 pub const SHAPE_HULL: u32 = 3;
+
+// How two colliders mix a surface property: a pair takes the larger number of its two.
+pub const COMBINE_AVERAGE: u32 = 0;
+pub const COMBINE_MIN: u32 = 1;
+pub const COMBINE_MULTIPLY: u32 = 2;
+pub const COMBINE_MAX: u32 = 3;
 
 // Bits of the FLAGS column.
 pub const ALIVE: u32 = 1;

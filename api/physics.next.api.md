@@ -38,9 +38,29 @@ export interface KernelColliderOptions {
     position?: readonly [number, number, number];
     rotation?: readonly [number, number, number, number];
     density?: number;
+    friction?: number;
+    restitution?: number;
+    frictionCombine?: KernelCombine;
+    restitutionCombine?: KernelCombine;
 }
 
 export type KernelColumn = Float32Array | Uint32Array;
+
+export type KernelCombine = 'average' | 'min' | 'multiply' | 'max';
+
+export interface KernelContact {
+    colliderA: number;
+    colliderB: number;
+    normal: [number, number, number];
+    points: KernelContactPoint[];
+}
+
+export interface KernelContactPoint {
+    position: [number, number, number];
+    separation: number;
+    id: number;
+    normalImpulse: number;
+}
 
 export interface KernelLoadOptions {
     signal?: AbortSignal;
@@ -68,6 +88,8 @@ export class KernelWorld {
     get steps(): number;
     get substeps(): number;
     set substeps(substeps: number);
+    get iterations(): number;
+    set iterations(iterations: number);
     get gravity(): [number, number, number];
     setGravity(x: number, y: number, z: number): this;
     addBody(kind: KernelBodyKind): number;
@@ -110,6 +132,8 @@ export class Physics implements EnginePlugin, BodyOwner {
     get pendingTime(): number;
     get substeps(): number;
     set substeps(substeps: number);
+    get iterations(): number;
+    set iterations(iterations: number);
     get solverIterations(): number;
     set solverIterations(passes: number);
     get colliderCount(): number;
@@ -142,8 +166,8 @@ export class Physics implements EnginePlugin, BodyOwner {
     projectPoint(): never;
     intersectPoint(): never;
     intersectShape(): never;
-    touching(): never;
-    contactPoints(): never;
+    touching(a: PhysicsBody, b: PhysicsBody): boolean;
+    contactPoints(body: PhysicsBody): [number, number, number][];
     debugRender(): never;
     dispose(): void;
     [Symbol.dispose]: () => void;
@@ -239,8 +263,10 @@ export class PhysicsCollider {
     } | null;
     radius(): number;
     halfHeight(): number;
-    friction(): never;
-    restitution(): never;
+    friction(): number;
+    setFriction(friction: number): this;
+    restitution(): number;
+    setRestitution(restitution: number): this;
     collisionGroups(): never;
     solverGroups(): never;
 }
@@ -258,6 +284,7 @@ export interface PhysicsOptions {
     timeScale?: number;
     paused?: boolean;
     substeps?: number;
+    iterations?: number;
     solverIterations?: number;
     name?: string;
 }
@@ -404,19 +431,6 @@ type CompoundPart = ({
     offset?: Vec3;
     rotation?: Quat;
 };
-
-interface KernelContact {
-    colliderA: number;
-    colliderB: number;
-    normal: [number, number, number];
-    points: KernelContactPoint[];
-}
-
-interface KernelContactPoint {
-    position: [number, number, number];
-    separation: number;
-    id: number;
-}
 
 interface PhysicsAttachment {
     beforeStep?(dt: number): void;

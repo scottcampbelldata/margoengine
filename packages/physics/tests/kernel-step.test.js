@@ -39,6 +39,7 @@ test('a projectile keeps its horizontal speed and meets the parabola', async () 
   const body = ball(world),
     { positionX, positionY, linearX, linearY } = world.columns;
   world.setGravity(0, -10, 0);
+  world.substeps = 4;
   linearX[body] = 8;
   linearY[body] = 6;
   for (let i = 0; i < 60; i++) world.step(1 / 60);
@@ -130,7 +131,7 @@ test('settings read back, and values that would put a NaN in the state are refus
   assert.deepEqual(world.gravity, [0, Math.fround(-9.81), 0]);
   world.setGravity(1, 2, 3);
   assert.deepEqual(world.gravity, [1, 2, 3]);
-  assert.equal(world.substeps, 4);
+  assert.equal(world.substeps, 8);
   world.substeps = 2;
   assert.equal(world.substeps, 2);
   for (const bad of [0, -1, 1.5, Number.NaN]) assert.throws(() => (world.substeps = bad), RangeError);

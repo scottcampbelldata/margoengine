@@ -5,7 +5,7 @@ import type { ColliderShape } from '../collider.js';
 import type { PhysicsBody } from './body.js';
 
 const notYet = (what: string): MargoError =>
-  new MargoError('unsupported', `${what} needs contacts, which the own solver does not have yet; use @margoengine/physics.`);
+  new MargoError('unsupported', `${what} is not in the own solver yet; use @margoengine/physics.`);
 
 /** A collider on a {@link PhysicsBody}: what `body.colliders` hands you. */
 export class PhysicsCollider {
@@ -76,13 +76,36 @@ export class PhysicsCollider {
   halfHeight(): number {
     return this.columns().colliderB[this.handle];
   }
-  /** Not served yet: throws. */
-  friction(): never {
-    throw notYet('friction');
+  friction(): number {
+    return this.columns().colliderFriction[this.handle];
   }
-  /** Not served yet: throws. */
-  restitution(): never {
-    throw notYet('restitution');
+  /**
+   * Sets the friction from the next step on, and wakes the body, as a sleeper would stay on a slope it can no longer hold.
+   * @throws RangeError unless `friction` is finite and not negative.
+   */
+  setFriction(friction: number): this {
+    if (!(friction >= 0) || !Number.isFinite(friction))
+      throw new RangeError(`Friction must be finite and not negative; 0.5 is a common start (got ${friction}).`);
+    this.columns().colliderFriction[this.handle] = friction;
+    this.wake();
+    return this;
+  }
+  restitution(): number {
+    return this.columns().colliderRestitution[this.handle];
+  }
+  /**
+   * Sets the restitution from the next step on.
+   * @throws RangeError unless `restitution` is from 0 to 1.
+   */
+  setRestitution(restitution: number): this {
+    if (!(restitution >= 0 && restitution <= 1))
+      throw new RangeError(`Restitution must be from 0 to 1, as a contact cannot give back more than it took (got ${restitution}).`);
+    this.columns().colliderRestitution[this.handle] = restitution;
+    this.wake();
+    return this;
+  }
+  private wake(): void {
+    if (this.body.type === 'dynamic') this.kernel.wake(this.body.row);
   }
   /** Not served yet: throws. */
   collisionGroups(): never {

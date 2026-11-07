@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10490095,
+  "total": 10496251,
   "history": [
     {
       "date": "2026-10-24",
@@ -3530,6 +3530,12 @@
       "commit": "46495267d",
       "reason": "physics/next: the four-point reduction and its persistence join the kernel, batch 124 job 4; the entry's JavaScript does not change",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "24ea7c286",
+      "reason": "physics/next to 57,331 B: the soft-step contact solver joins the kernel, which deflates 36,272 to 41,095 B, and the entry gains friction, restitution, iterations, touching and contactPoints, batch 124 job 5",
+      "grew": 1
     }
   ],
   "items": {
@@ -3965,7 +3971,7 @@
     "@margoengine/oit/moments": 4197,
     "@margoengine/oit/vfx": 486,
     "@margoengine/physics": 19679,
-    "@margoengine/physics/next": 52895,
+    "@margoengine/physics/next": 59051,
     "@margoengine/physics2d": 8199,
     "@margoengine/physics2d/outline": 2524,
     "@margoengine/pixel": 4664,

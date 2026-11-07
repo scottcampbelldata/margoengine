@@ -17,6 +17,7 @@ pub mod math;
 pub mod memory;
 pub mod narrow;
 pub mod sat;
+pub mod solver;
 pub mod world;
 
 #[cfg(target_arch = "wasm32")]

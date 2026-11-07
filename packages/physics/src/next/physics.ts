@@ -3,7 +3,7 @@
 import { MargoError } from '@margoengine/math/errors';
 import type { EngineKernel, EnginePlugin, Mesh } from '@margoengine/core';
 import type { BodyOptions, BodyType } from '../body.js';
-import { KernelWorld, loadKernel, type KernelLoadOptions } from '../kernel.js';
+import { KernelWorld, loadKernel, type KernelContactPoint, type KernelLoadOptions } from '../kernel.js';
 import { checkVec, type Quat, type Vec3 } from '../math.js';
 import { colliderGeometry } from '../mesh-fit.js';
 import type { ColliderOptions, ShapeOptions } from '../shapes.js';
@@ -26,15 +26,17 @@ export interface PhysicsOptions {
   timeScale?: number;
   /** Start paused (default false). */
   paused?: boolean;
-  /** Equal pieces each step is split into; forces reach every piece and impulses land once (default 4). */
+  /** Equal pieces each step is split into; forces reach every piece and impulses land once (default 8). */
   substeps?: number;
+  /** Solver passes in each substep (default 2). */
+  iterations?: number;
   /** The old name of `substeps`, kept for one release. */
   solverIterations?: number;
   /** Plugin name (default 'physics'). */
   name?: string;
 }
 
-/** Events a Physics world emits so far: the contact events come with contacts. */
+/** Events a Physics world emits so far. Contact events are not served yet; `touching` and `contactPoints` read contacts after a step. */
 export interface PhysicsEventMap {
   /** Before each fixed step, with the step length. Drive kinematic bodies here. */
   beforestep: number;
@@ -57,13 +59,15 @@ function callListener(this: never, listener: (event: never) => void): void {
 const attachmentSync = (attachment: PhysicsAttachment): void => attachment.afterSync?.();
 const later = (what: string, when: string): MargoError =>
   new MargoError('unsupported', `${what} is not in the own solver yet; it comes with ${when}. Use @margoengine/physics until then.`);
+/** A point the shapes reached: overlapping, or pushed on. A speculative point ahead of a body is neither. */
+const pressing = (point: KernelContactPoint): boolean => point.separation <= 0 || point.normalImpulse > 0;
 const bits = (enabled: readonly [boolean, boolean, boolean]): number =>
   (enabled[0] ? 0 : 1) | (enabled[1] ? 0 : 2) | (enabled[2] ? 0 : 4);
 
 /**
  * Rigid-body physics on Margo's own solver as a Margo Engine plugin. The same names as `Physics` from the root entry, with
- * a fixed timestep, an accumulator and interpolation. Bodies fall, turn and sleep; they do not touch yet, so a call that
- * needs contacts, joints or queries throws `unsupported`. A preview, removed when it becomes the root.
+ * a fixed timestep, an accumulator and interpolation. Bodies fall, turn, collide and sleep; a call that needs joints or
+ * queries throws `unsupported`. A preview, removed when it becomes the root.
  */
 export class Physics implements EnginePlugin, BodyOwner {
   readonly name: string;
@@ -106,7 +110,7 @@ export class Physics implements EnginePlugin, BodyOwner {
    */
   constructor(engine: EngineKernel | null, options: PhysicsOptions = {}) {
     if ('rapier' in options) throw new TypeError('The own solver takes no rapier option; leave it out.');
-    if ('contactFilter' in options) throw later('contactFilter', 'contacts');
+    if ('contactFilter' in options) throw later('contactFilter', 'contact events');
     this.name = options.name ?? 'physics';
     this.fixedTimestep = options.fixedTimestep ?? 1 / 60;
     this.maxSubsteps = options.maxSubsteps ?? 4;
@@ -122,6 +126,7 @@ export class Physics implements EnginePlugin, BodyOwner {
     this.world.setGravity(...gravity);
     const substeps = options.substeps ?? options.solverIterations;
     if (substeps !== undefined) this.world.substeps = substeps;
+    if (options.iterations !== undefined) this.world.iterations = options.iterations;
     this.meshes = new MeshSync(this.world.columns, (body) => this.removeBody(body));
     if (engine)
       try {
@@ -160,12 +165,19 @@ export class Physics implements EnginePlugin, BodyOwner {
   get pendingTime(): number {
     return this.accumulator;
   }
-  /** Equal pieces each step is split into (default 4). */
+  /** Equal pieces each step is split into (default 8). */
   get substeps(): number {
     return this.kernel.substeps;
   }
   set substeps(substeps: number) {
     this.kernel.substeps = substeps;
+  }
+  /** Solver passes in each substep (default 2). */
+  get iterations(): number {
+    return this.kernel.iterations;
+  }
+  set iterations(iterations: number) {
+    this.kernel.iterations = iterations;
   }
   /** The old name of {@link Physics.substeps}, kept for one release. */
   get solverIterations(): number {
@@ -251,7 +263,7 @@ export class Physics implements EnginePlugin, BodyOwner {
       throw new MargoError('state', 'This mesh already has a physics body; remove it first or use the existing body.');
     if (options.ccd) throw later('ccd', 'continuous collision');
     if (options.follow) throw later('follow', 'the character and vehicle batch');
-    if (options.dominance) throw later('dominance', 'contacts');
+    if (options.dominance) throw later('dominance', 'contact events');
     const start = mesh ? meshPose(mesh, this.engine) : null,
       position = options.position ?? start?.position ?? [0, 0, 0],
       rotation: Quat = options.rotation ?? start?.rotation ?? [0, 0, 0, 1];
@@ -368,7 +380,7 @@ export class Physics implements EnginePlugin, BodyOwner {
    * @throws MargoError (`unsupported`) for a contact event: it could never fire yet.
    */
   on<K extends keyof PhysicsEventMap>(type: K, listener: (event: PhysicsEventMap[K]) => void): () => void {
-    if (type !== 'beforestep' && type !== 'afterstep') throw later(`The ${String(type)} event`, 'contacts');
+    if (type !== 'beforestep' && type !== 'afterstep') throw later(`The ${String(type)} event`, 'contact events');
     if (this.disposed) return noop;
     let set = this.listeners.get(type);
     if (!set) this.listeners.set(type, (set = new Set()));
@@ -426,17 +438,31 @@ export class Physics implements EnginePlugin, BodyOwner {
   intersectShape(): never {
     throw later('intersectShape', 'queries');
   }
-  /** Not served yet: throws. */
-  touching(): never {
-    throw later('touching', 'contacts');
+  /** Whether two bodies' colliders touch as of the last step. A point still ahead of a moving body does not count. */
+  touching(a: PhysicsBody, b: PhysicsBody): boolean {
+    for (const contact of this.kernel.contacts()) {
+      const one = this.bodyOfCollider(contact.colliderA),
+        other = this.bodyOfCollider(contact.colliderB);
+      if (((one === a && other === b) || (one === b && other === a)) && contact.points.some(pressing)) return true;
+    }
+    return false;
   }
-  /** Not served yet: throws. */
-  contactPoints(): never {
-    throw later('contactPoints', 'contacts');
+
+  /**
+   * Where the solver pushes on this body as of the last step: one world position [x, y, z] per contact point, so a box
+   * flat on a floor has its four corners. A point two colliders share comes once for each.
+   */
+  contactPoints(body: PhysicsBody): [number, number, number][] {
+    const points: [number, number, number][] = [];
+    for (const contact of this.kernel.contacts())
+      if (this.bodyOfCollider(contact.colliderA) === body || this.bodyOfCollider(contact.colliderB) === body)
+        for (const point of contact.points) if (pressing(point)) points.push(point.position);
+    return points;
   }
+
   /** Not served yet: throws. */
   debugRender(): never {
-    throw later('debugRender', 'contacts');
+    throw later('debugRender', 'the debug entry');
   }
 
   /** Frees every body and the world. Detaches from the engine if attached. */

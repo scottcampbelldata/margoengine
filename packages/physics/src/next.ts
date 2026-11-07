@@ -10,6 +10,9 @@ export type {
   KernelBodyKind,
   KernelColliderOptions,
   KernelColumn,
+  KernelCombine,
+  KernelContact,
+  KernelContactPoint,
   KernelLoadOptions,
   KernelShape,
 } from './kernel.js';

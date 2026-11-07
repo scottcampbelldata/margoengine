@@ -50,6 +50,17 @@ pub struct Header {
     pub hull_rows: [u32; 4],
     /// The substep the carried impulses were made for, zero before the first step.
     pub contact_substep: f32,
+    /// Contact stiffness: the soft constraint's frequency in hertz and its damping ratio. How fast a depth may be pushed out,
+    /// in m/s, and the depth left alone, in metres.
+    pub contact_hertz: f32,
+    pub contact_damping: f32,
+    pub contact_max_push: f32,
+    pub contact_slop: f32,
+    /// Biased passes in a substep.
+    pub iterations: u32,
+    /// Pairs the solver works on in this step, and points struck in this substep.
+    pub solving: u32,
+    pub impacts: u32,
 }
 
 const HEADER_BYTES: u32 = ((core::mem::size_of::<Header>() + 15) & !15) as u32;
@@ -83,7 +94,7 @@ impl World {
                 collider_rows: 0,
                 free_collider: NONE,
                 steps: 0,
-                substeps: 4,
+                substeps: 8,
                 gravity: [0.0, -9.81, 0.0],
                 layout: 0,
                 endpoints: 0,
@@ -99,6 +110,13 @@ impl World {
                 sleep_time: 0.5,
                 hull_rows: [0; 4],
                 contact_substep: 0.0,
+                contact_hertz: 120.0,
+                contact_damping: 10.0,
+                contact_max_push: 3.0,
+                contact_slop: 0.0002,
+                iterations: 2,
+                solving: 0,
+                impacts: 0,
             });
         }
         Some(world)
@@ -323,6 +341,9 @@ impl World {
                 *self.f(COLLIDER_ROTATION_X + k).add(at) = rotation[k];
             }
             *self.f(COLLIDER_DENSITY).add(at) = density;
+            *self.f(COLLIDER_FRICTION).add(at) = 0.5;
+            *self.f(COLLIDER_RESTITUTION).add(at) = 0.0;
+            *self.u(COLLIDER_COMBINE).add(at) = 0;
             *self.u(COLLIDER_PAIRS).add(at) = NONE;
             // At the end of the body's chain, so colliders add up in the order they were given.
             *self.u(COLLIDER_NEXT).add(at) = NONE;

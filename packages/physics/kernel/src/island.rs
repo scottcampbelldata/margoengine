@@ -13,6 +13,10 @@ use crate::layout::*;
 use crate::math::*;
 use crate::world::{NONE, World};
 
+/// Energy this small a part of the threshold is a solver's rounding, not a body gathering speed: a body that touches others
+/// always has some, and must still be able to sleep.
+const NOISE: f32 = 1e-6;
+
 impl World {
     /// True when `body` is on the awake list.
     #[inline(always)]
@@ -150,7 +154,7 @@ impl World {
             self.set_s(SLEEP_TIME, at, time);
             return false;
         }
-        if energy > self.s(SLEEP_ENERGY, at) {
+        if energy > self.s(SLEEP_ENERGY, at) && energy > threshold * NOISE {
             // It gained energy across the window, however slowly: a new window starts from here.
             self.set_s(SLEEP_TIME, at, 0.0);
             self.set_s(SLEEP_ENERGY, at, energy);

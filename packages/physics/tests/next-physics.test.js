@@ -22,14 +22,11 @@ test('a call that is not served yet says so, and what to use', () => {
     () => physics.projectPoint(),
     () => physics.intersectPoint(),
     () => physics.intersectShape(),
-    () => physics.touching(),
-    () => physics.contactPoints(),
     () => physics.debugRender(),
     () => physics.on('contactstart', () => {}),
     () => physics.addBody(null, { ccd: true }),
     () => physics.addBody(null, { dominance: 1 }),
     () => physics.addBody(null, { colliders: { shape: 'cylinder', radius: 1, halfHeight: 1 } }),
-    () => physics.addBody(null, { colliders: { shape: 'sphere', radius: 1, friction: 0.5 } }),
     () => physics.addBody(null, { colliders: { shape: 'sphere', radius: 1, sensor: true } }),
     () => body.setType('fixed'),
     () => body.setMassProperties(),
@@ -50,13 +47,14 @@ test('a call that is not served yet says so, and what to use', () => {
   physics.dispose();
 });
 
-test('defaults match the root entry: density 1, substeps 4', () => {
+test('defaults: density 1, 8 substeps of 2 passes', () => {
   const physics = new Physics(null),
     body = physics.addBody(null, { colliders: { shape: 'box', halfExtents: [0.5, 0.5, 0.5] } });
   assert.equal(body.mass, 1);
-  assert.equal(physics.substeps, 4);
+  assert.equal(physics.substeps, 8);
+  assert.equal(physics.iterations, 2);
   physics.substeps = 2;
-  assert.equal(new Physics(null, { substeps: 8 }).substeps, 8);
+  assert.equal(new Physics(null, { substeps: 4 }).substeps, 4);
   assert.equal(new Physics(null, { solverIterations: 3 }).substeps, 3, 'the old name is kept for a release');
   assert.equal(physics.solverIterations, 2);
   physics.dispose();

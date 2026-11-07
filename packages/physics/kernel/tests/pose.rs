@@ -95,5 +95,7 @@ fn a_body_that_wakes_a_moved_sleeper_inside_a_step_finds_it_at_its_new_place() {
     w.set_v(LINEAR_X, moving as usize, v3(0.0, 0.25, 0.0));
     w.step(DT);
     assert!(!asleep(&w, sleeper));
-    assert_eq!(w.v(POSITION_X, sleeper as usize), v3(50.0, 0.0, 0.0));
+    // The overlap now pushes it a little down; before contacts it stayed put. Its old place, far off, is what must not return.
+    let at = w.v(POSITION_X, sleeper as usize);
+    assert!(at.x == 50.0 && at.z == 0.0 && at.y.abs() < 0.1, "{at:?}");
 }

@@ -192,6 +192,7 @@ fn warm_starting_applies_the_carried_impulses_at_the_anchors() {
     assert_eq!(normal.y, up, "the normal runs from A to B, floor to ball when the floor is A");
     w.set_s(CONTACT_NORMAL_IMPULSE, 0, 3.0);
     w.set_v(CONTACT_TANGENT_X, 0, v3(1.0, 0.0, 0.0).scale(up));
+    w.prepare_contacts();
     w.warm_start();
     let inverse_mass = w.s(INVERSE_MASS, at);
     assert!(near(w.v(LINEAR_X, at), v3(inverse_mass, 3.0 * inverse_mass, 0.0)), "{:?}", w.v(LINEAR_X, at));
@@ -214,6 +215,7 @@ fn warm_starting_two_bodies_pushes_them_apart_with_equal_momentum() {
     detect(&mut w, DT);
     assert_eq!(w.uu(PAIR_CONTACTS, 0), 1);
     w.set_s(CONTACT_NORMAL_IMPULSE, 0, 2.0);
+    w.prepare_contacts();
     w.warm_start();
     let momentum = |body: u32| w.v(LINEAR_X, body as usize).scale(1.0 / w.s(INVERSE_MASS, body as usize));
     assert!(near(momentum(a).add(momentum(b)), v3(0.0, 0.0, 0.0)));
@@ -230,6 +232,7 @@ fn locks_and_sleepers_hold_against_a_warm_start() {
     w.set_u(FLAGS, at, w.flags(at) | (LOCK_LINEAR_X << 1) | LOCK_ANGULAR);
     w.set_v(LINEAR_X, at, v3(0.0, 0.0, 0.0));
     w.set_s(CONTACT_NORMAL_IMPULSE, 0, 3.0);
+    w.prepare_contacts();
     w.warm_start();
     assert_eq!(w.v(LINEAR_X, at).y, 0.0, "locked along Y");
     assert_eq!(w.v(ANGULAR_X, at), v3(0.0, 0.0, 0.0));
