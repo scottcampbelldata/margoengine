@@ -36,6 +36,9 @@ What happens to a model (`.glb` or `.gltf` with its external files):
 - **Merge** (web presets). Static, unskinned meshes that share a material and attribute layout become one primitive,
   baked into world space. Safe means: no animation on the node or an ancestor, no morph targets, no node extensions,
   and the mesh used by one node only (shared meshes stay instanced).
+- **Reorder** (every preset). Triangles in the order the GPU's vertex cache and early depth test read fastest, then
+  vertices in order of first use, from `@margoengine/geometry/optimize`. A `BLEND` primitive keeps its triangle order, which
+  decides how it layers. The pass counts as `reorderedPrimitives`; `reorder: false` in a preset's `model` turns it off.
 - **Quantise** (web presets, KHR_mesh_quantization). Positions to 16-bit with the mesh bounds folded into the node
   transform (one scale on all axes, so normals stay correct; a node with children or animation gets a child node for
   the mesh), normals and tangents to 8 bits, texture coordinates in 0..1 to 16 bits, colours and skin weights to 8

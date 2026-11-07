@@ -54,6 +54,7 @@ import {
   GLTFAsset,
   checkDocument,
   container,
+  triangleOrder,
   loadAsset,
   closeImages,
   retainImages,
@@ -5321,6 +5322,7 @@ export async function parseGLTFAsync(
       options.maxDownloadBytes,
       options.maxNodes,
     );
+  if (options.optimize) asset.reorder = await triangleOrder();
   // The Draco module (and its decoder) loads only for files that use KHR_draco_mesh_compression.
   if (hasDraco(asset))
     await (await import('./compression.js')).decompressPrimitives(asset, {

@@ -4,6 +4,7 @@
 // counts in `stats`. Written from the glTF 2.0 specification and the KHR_mesh_quantization extension text.
 import { createHash } from 'node:crypto';
 import { weldVertices } from '@margoengine/exporters/optimize';
+import { optimizeOverdraw, optimizeVertexCache, vertexFetchRemap } from '@margoengine/geometry/optimize';
 import { countOf, withoutDegenerate } from './gltf-io.js';
 
 /** @typedef {import('./gltf-io.js').Model} Model */
@@ -53,6 +54,7 @@ export function newStats() {
     dedupedImages: 0,
     dedupedMeshes: 0,
     mergedPrimitives: 0,
+    reorderedPrimitives: 0,
     quantizedAttributes: 0,
     imageBytesBefore: 0,
     imageBytesAfter: 0,
@@ -470,6 +472,39 @@ export function weld(model, stats) {
       Object.fromEntries(Object.entries(t).map(([name, a]) => [name, gatherFrom(a)])),
     );
     geo.indices = { values: finalIndices, width: 1, componentType: 5125, normalized: false, type: 'SCALAR' };
+  }
+}
+
+// ------------------------------------------------------------------------------------------------ reorder
+
+/**
+ * Puts indexed triangle primitives in the order a GPU reads fastest: triangles for the vertex cache and early depth
+ * rejection, then vertices in order of first use (every attribute and morph target move together). A `BLEND` primitive
+ * keeps its triangle order, which decides how it layers. Vertices no triangle uses are dropped.
+ * @param {Model} model @param {ModelStats} stats
+ */
+export function reorder(model, stats) {
+  const materials = model.json.materials ?? [];
+  for (const prim of primitives(model)) {
+    const geo = /** @type {Geo} */ (prim.$geo);
+    if ((prim.mode ?? 4) !== 4 || !geo.indices?.values.length || !geo.attributes.POSITION) continue;
+    if (materials[prim.material]?.alphaMode === 'BLEND') continue;
+    const n = vertexCount(geo),
+      order = optimizeOverdraw(optimizeVertexCache(geo.indices.values, n), geo.attributes.POSITION.values),
+      remap = vertexFetchRemap(order, n);
+    let used = 0;
+    for (let v = 0; v < n; v++) if (remap[v] !== 0xffffffff) used++;
+    const gather = (/** @type {Attr} */ a) => {
+      const w = a.width,
+        values = new /** @type {any} */ (a.values.constructor)(used * w);
+      for (let v = 0; v < n; v++)
+        if (remap[v] !== 0xffffffff) for (let k = 0; k < w; k++) values[remap[v] * w + k] = a.values[v * w + k];
+      return { ...a, values };
+    };
+    geo.attributes = Object.fromEntries(Object.entries(geo.attributes).map(([name, a]) => [name, gather(a)]));
+    geo.targets = geo.targets.map((t) => Object.fromEntries(Object.entries(t).map(([name, a]) => [name, gather(a)])));
+    geo.indices = { ...geo.indices, values: order.map((v) => remap[v]), componentType: 5125 };
+    stats.reorderedPrimitives++;
   }
 }
 

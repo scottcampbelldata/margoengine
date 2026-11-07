@@ -148,6 +148,9 @@ function pack(asset: GLTFAsset, p: GLTFPrimitive): PreparedGeometry {
       normals[z + 1] += ny;
       normals[z + 2] += nz;
     }
+  // After the summed normals, whose rounding follows the file's order. Blended triangles layer in the file's order.
+  if (asset.reorder && per === 3 && asset.doc.materials?.[p.material as number]?.alphaMode !== 'BLEND')
+    indices = asset.reorder(indices, positions, count);
   const uv0 = a.TEXCOORD_0 === undefined ? null : read('TEXCOORD_0', a.TEXCOORD_0, 'VEC2'),
     uv1 = a.TEXCOORD_1 === undefined ? null : read('TEXCOORD_1', a.TEXCOORD_1, 'VEC2'),
     later = usesLaterUV(asset.doc, p),

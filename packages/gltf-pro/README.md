@@ -164,6 +164,11 @@ refraction output. Native transmission uses scalar volume thickness; imported
 `KHR_materials_volume.thicknessTexture` is sampled by the explicit
 `@margoengine/materials` installation route.
 
+`loadGLTF(engine, url, {optimize: true})` runs the import step of `@margoengine/geometry/optimize` on each opaque primitive
+as it packs: the same triangles in the order the vertex cache and early depth test read fastest, with `BLEND` primitives
+left in the file's order. It needs `@margoengine/geometry`, takes load time, and keeps a load on the main thread. A
+file built with `margo-convert` is already in this order, so leave it off there.
+
 The optional `/worker` entry exposes `loadGLTFInWorker` and `parseGLTFInWorker`. Ordinary assets parse and pack in a worker. Automatic Draco/KTX2 inputs transfer their source buffers back before codec work, then decode on the GPU-owning thread; custom decoders or `fetch` keep the entire load there. The `/progressive` loader exposes `ready` and `complete`; compressed assets use the normal async loader before publishing a model, and its `textures` option streams KTX2 mip levels ("Texture mip streaming" below). `maxDownloadBytes`, `maxNodes`, allowed resource URLs and abort signals remain enforced; `maxDownloadBytes` counts the root JSON/GLB file together with its fetched and data-URI resources.
 
 In a multi-view frame, a model draws only the nodes in the view's layers, and each view keeps its own camera uniforms

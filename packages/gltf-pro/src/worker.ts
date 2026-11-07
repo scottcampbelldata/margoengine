@@ -94,14 +94,14 @@ async function finishPrepared(
 const workerURL = () => new URL(/* @vite-ignore */ './workers/gltf.js?no-inline', import.meta.url);
 /**
  * loadGLTF with fetching, JSON parsing, accessor decoding, vertex packing and image decoding in a worker. Same model as
- * loadGLTF. Runs on this thread instead when Workers are unavailable or Draco, meshopt or KTX2 `decoders` or `fetch` are passed.
+ * loadGLTF. Runs on this thread instead when Workers are unavailable, when Draco, meshopt or KTX2 `decoders` or `fetch` are passed, or with `optimize`.
  */
 export async function loadGLTFInWorker(
   instance: EngineKernel,
   url: string | URL,
   options: GLTFLoadOptions = {},
 ): Promise<PBRModel> {
-  if (!canUseWorker() || decoding(options)) return loadGLTF(instance, url, options);
+  if (!canUseWorker() || decoding(options) || options.optimize) return loadGLTF(instance, url, options);
   return finishPrepared(
     instance,
     await runWorker<PreparedGLTF>(

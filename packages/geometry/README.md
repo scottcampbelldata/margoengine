@@ -205,7 +205,7 @@ console.log(point.position, point.normal, point.uv, point.color, point.triangle,
 
 ## Mesh optimisation
 
-`@margoengine/geometry/optimize` is the step engines run at import: the same triangles and vertices, in an order the GPU
+`@margoengine/geometry/optimize` is the step engines run at import, and it runs in `margo-convert` by default and in `loadGLTF` with `optimize: true`: the same triangles and vertices, in an order the GPU
 reads faster. An opaque mesh draws the same picture.
 
 ```ts

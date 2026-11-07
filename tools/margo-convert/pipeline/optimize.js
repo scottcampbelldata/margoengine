@@ -1,7 +1,7 @@
 // @ts-check
 // The model optimiser: read a GLB or .gltf, run the passes a preset asks for, write a GLB.
 import { readModel, writeModel, Unsupported } from './gltf-io.js';
-import { dedupe, measure, mergeMeshes, newStats, prune, quantize, weld } from './passes.js';
+import { dedupe, measure, mergeMeshes, newStats, prune, quantize, reorder, weld } from './passes.js';
 import { processModelTextures } from './textures.js';
 
 /** @typedef {import('./passes.js').ModelStats} ModelStats */
@@ -15,6 +15,7 @@ import { processModelTextures } from './textures.js';
  * @property {boolean} [dedupe] Merge identical images, textures, materials and meshes.
  * @property {boolean} [weld] Merge identical vertices and drop degenerate triangles.
  * @property {boolean} [merge] Merge static meshes that share a material into one primitive.
+ * @property {boolean} [reorder] Put triangles and vertices in the order a GPU reads fastest. Default true.
  * @property {QuantizeOptions|false} [quantize] Quantise vertex attributes (KHR_mesh_quantization).
  * @property {boolean} [meshopt] Compress with EXT_meshopt_compression (a reader needs the extension).
  */
@@ -60,6 +61,7 @@ export async function optimizeModel(bytes, options, io = {}) {
   if (options.merge) mergeMeshes(model, stats);
   if (options.prune !== false) prune(model, stats, { emptyNodes: options.pruneEmptyNodes });
   if (options.dedupe !== false) dedupe(model, stats);
+  if (options.reorder !== false) reorder(model, stats);
   if (options.quantize) quantize(model, options.quantize, stats);
   if (io.textures) await processModelTextures(model, io.textures.preset, io.textures.sharp, stats);
   const after = measure(model);

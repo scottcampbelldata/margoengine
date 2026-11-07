@@ -397,6 +397,8 @@ export class GLTFAsset {
   get remainingDecodedBytes(): number {
     return this.maxBytes * 4 - this.decoded;
   }
+  /** @internal The triangle order of the `optimize` option, for primitives packed from here on. */
+  reorder?: (indices: Uint32Array, positions: ArrayLike<number>, count: number) => Uint32Array;
   /** @internal Account for retained decoded data, including topology without an accessor. */
   reserveDecodedBytes(byteLength: number): void {
     integer(byteLength, 'decoded byte length');
@@ -905,6 +907,18 @@ export interface AssetOptions {
   maxDownloadBytes?: number;
   /** Most glTF nodes the file may have, each one a core mesh (default 100,000; up to core's 8,388,608 entities). */
   maxNodes?: number;
+  /**
+   * Reorders each opaque primitive's triangles for the GPU's vertex cache and for early depth rejection, as
+   * `@margoengine/geometry/optimize` does (needs that package). Same triangles, same picture, more time spent loading.
+   * `BLEND` primitives keep the file's order, which decides how they layer. Default false: most exporters already
+   * order their meshes, and `margo-convert` does it once, offline.
+   */
+  optimize?: boolean;
+}
+/** @internal The triangle order `optimize` asks for, loaded only then. */
+export async function triangleOrder(): Promise<NonNullable<GLTFAsset['reorder']>> {
+  const { optimizeOverdraw, optimizeVertexCache } = await import('@margoengine/geometry/optimize');
+  return (indices, positions, count) => optimizeOverdraw(optimizeVertexCache(indices, count), positions);
 }
 /** Fetch (url) or parse (input) a glTF, decode compressed geometry and images. External URIs resolve against url, else the page. */
 export async function loadAsset(
@@ -923,6 +937,7 @@ export async function loadAsset(
     fetch: get = globalThis.fetch,
     maxDownloadBytes,
     maxNodes,
+    optimize,
     allowedURLs,
   } = config;
   const prepare = typeof inputOrPrepare === 'function' ? inputOrPrepare : undefined;
@@ -980,6 +995,7 @@ export async function loadAsset(
   }
   const asset = new GLTFAsset(doc, buffers, binary, await withMaterials(doc, decoders), limit, maxNodes);
   asset.baseURL = base?.href;
+  if (optimize) asset.reorder = await triangleOrder();
   if (deferCompression && asyncCompression(doc))
     return { asset, images, deferred: true, baseURL: base?.href, downloadedBytes: total };
   const sources = ktxSources(doc),

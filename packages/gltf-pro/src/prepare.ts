@@ -61,10 +61,11 @@ export async function prepareGLTF(
   maxDownloadBytes?: number,
   maxNodes?: number,
   allowedURLs?: readonly string[],
+  optimize?: boolean,
 ): Promise<PreparedGLTF> {
   const { asset, images, deferred, baseURL, downloadedBytes } = await loadAsset(
     url,
-    { buffers, maxDownloadBytes, maxNodes, allowedURLs },
+    { buffers, maxDownloadBytes, maxNodes, allowedURLs, optimize },
     input,
     {},
     true,

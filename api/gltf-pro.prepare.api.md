@@ -22,7 +22,7 @@ export interface PreparedGLTF {
 
 export function prepareAsset(asset: GLTFAsset, images: GLTFImage[]): PreparedGLTF;
 
-export function prepareGLTF(url: string | URL | undefined, input?: string | object | ArrayBuffer | ArrayBufferView, buffers?: Array<ArrayBuffer | ArrayBufferView>, maxDownloadBytes?: number, maxNodes?: number, allowedURLs?: readonly string[]): Promise<PreparedGLTF>;
+export function prepareGLTF(url: string | URL | undefined, input?: string | object | ArrayBuffer | ArrayBufferView, buffers?: Array<ArrayBuffer | ArrayBufferView>, maxDownloadBytes?: number, maxNodes?: number, allowedURLs?: readonly string[], optimize?: boolean): Promise<PreparedGLTF>;
 
 // Not exported from this entry, but used by the exports above:
 
@@ -64,6 +64,7 @@ class GLTFAsset {
     readonly buffers: Uint8Array[];
     baseURL?: string;
     get remainingDecodedBytes(): number;
+    reorder?: (indices: Uint32Array, positions: ArrayLike<number>, count: number) => Uint32Array;
     reserveDecodedBytes(byteLength: number): void;
     constructor(doc: GLTFDocument, buffers: Array<ArrayBuffer | ArrayBufferView>, binary?: Uint8Array, hooks?: GLTFDecoderHooks, maxBytes?: number, maxNodes?: number);
     view(id: unknown): Uint8Array;

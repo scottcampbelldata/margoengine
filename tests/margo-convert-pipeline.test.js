@@ -11,6 +11,8 @@ import { join, resolve } from 'node:path';
 import { meshoptDecodeGltfBuffer } from '@margoengine/decoders/meshopt';
 import { parseGLTFAsync } from '@margoengine/gltf-pro';
 import { encodeTriangles, encodeVertexBuffer } from '@margoengine/exporters/meshopt';
+import { analyzeVertexCache } from '@margoengine/geometry/optimize';
+import { readModel } from '../tools/margo-convert/pipeline/gltf-io.js';
 import { optimizeModel } from '../tools/margo-convert/pipeline/optimize.js';
 import { build, sha256 } from '../tools/margo-convert/pipeline/build.js';
 import { PRESET_NAMES, PRESETS, preset } from '../tools/margo-convert/pipeline/presets.js';
@@ -215,6 +217,63 @@ test('a Draco model is passed through untouched with the reason', { timeout: 30_
     result = await optimizeModel(input, preset('web').model);
   assert.match(result.skipped ?? '', /KHR_draco_mesh_compression/);
   assert.equal(result.glb, input);
+});
+
+test('reorder puts opaque triangles in cache order and leaves a BLEND primitive in the order of the file', async () => {
+  const n = 24,
+    positions = new Float32Array((n + 1) * (n + 1) * 3),
+    corners = [],
+    next = random(9);
+  for (let y = 0; y <= n; y++) for (let x = 0; x <= n; x++) positions.set([x, y, 0], (y * (n + 1) + x) * 3);
+  for (let y = 0; y < n; y++)
+    for (let x = 0; x < n; x++) {
+      const a = y * (n + 1) + x;
+      corners.push([a, a + 1, a + n + 2], [a, a + n + 2, a + n + 1]);
+    }
+  for (let i = corners.length - 1; i > 0; i--) {
+    const j = Math.floor(next() * (i + 1));
+    [corners[i], corners[j]] = [corners[j], corners[i]];
+  }
+  const indices = Uint32Array.from(corners.flat()),
+    blob = Buffer.concat([Buffer.from(positions.buffer), Buffer.from(indices.buffer)]),
+    gltf = {
+      asset: { version: '2.0' },
+      scene: 0,
+      scenes: [{ nodes: [0] }],
+      nodes: [{ mesh: 0 }],
+      materials: [{ name: 'solid' }, { name: 'glass', alphaMode: 'BLEND' }],
+      meshes: [
+        {
+          primitives: [
+            { attributes: { POSITION: 0 }, indices: 1, material: 0 },
+            { attributes: { POSITION: 0 }, indices: 1, material: 1 },
+          ],
+        },
+      ],
+      accessors: [
+        { bufferView: 0, componentType: 5126, count: positions.length / 3, type: 'VEC3', min: [0, 0, 0], max: [n, n, 0] },
+        { bufferView: 1, componentType: 5125, count: indices.length, type: 'SCALAR' },
+      ],
+      bufferViews: [
+        { buffer: 0, byteLength: positions.byteLength },
+        { buffer: 0, byteOffset: positions.byteLength, byteLength: indices.byteLength },
+      ],
+      buffers: [{ byteLength: blob.length, uri: `data:application/octet-stream;base64,${blob.toString('base64')}` }],
+    },
+    bytes = new TextEncoder().encode(JSON.stringify(gltf)),
+    options = { prune: false, dedupe: false, weld: false },
+    { glb, stats } = await optimizeModel(bytes, options),
+    plain = await optimizeModel(bytes, { ...options, reorder: false }),
+    read = (file) => readModel(file).json.meshes[0].primitives.map((p) => p.$geo.indices.values),
+    [solid, glass] = read(glb),
+    [before] = read(plain.glb);
+  assert.equal(stats.reorderedPrimitives, 1);
+  assert.equal(plain.stats.reorderedPrimitives, 0);
+  const count = positions.length / 3,
+    missesBefore = analyzeVertexCache(before, count).acmr,
+    missesAfter = analyzeVertexCache(solid, count).acmr;
+  assert.ok(missesAfter < 0.5 * missesBefore, `ACMR ${missesBefore} to ${missesAfter}`);
+  assert.deepEqual(Array.from(glass), Array.from(indices));
 });
 
 test('every preset is defined with the documented fields', () => {
