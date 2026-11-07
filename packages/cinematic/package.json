@@ -41,6 +41,10 @@
     "./group": {
       "types": "./dist/group.d.ts",
       "import": "./dist/group.js"
+    },
+    "./noise": {
+      "types": "./dist/noise.d.ts",
+      "import": "./dist/noise.js"
     }
   },
   "files": [

@@ -338,6 +338,10 @@
       "types": "./dist/cinematic/group.d.ts",
       "import": "./dist/cinematic/group.js"
     },
+    "./cinematic/noise": {
+      "types": "./dist/cinematic/noise.d.ts",
+      "import": "./dist/cinematic/noise.js"
+    },
     "./clustered": {
       "types": "./dist/clustered.d.ts",
       "import": "./dist/clustered.js"

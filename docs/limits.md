@@ -13,7 +13,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-311). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-312). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -249,6 +249,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Framing composer (`@margoengine/cinematic/composer`, 2026-11-07) | Enforced: `softZone` at least `deadZone`, `screen` within 0..1. By method: it turns the camera and never moves it, so a subject past what a turn can reach (straight overhead) stops 0.001 radians short of the pole. It ignores `pose.roll`. Lookahead is a smoothed velocity times a time, so it trails a change of direction and overshoots a stop. Not measured: no timed number. | LIM-307 |
 | Dolly tracks (`@margoengine/cinematic/dolly`, 2026-11-07) | Enforced: a track of some length, `damping` above 0, `window` above 0. By method: the cart goes to the nearest point of the track, so a track that passes close to itself needs a `window`, and a subject that leaves the window drags the cart to the window's edge. The windowed search takes 33 samples and refines the best, so a window holding two close passes finds one. Not measured: no timed number. | LIM-308 |
 | Group framing (`@margoengine/cinematic/group`, 2026-11-07) | Enforced: `padding` below 0.5, distance and field of view limits in order. By method: the fit is exact for the current members, but the shot eases at `damping`, so a member that bolts is outside the padding until the shot catches up. A member's `weight` moves the centre and does not change the fit; weight 0 drops it at once, with a step the damping smooths. `fits` turns false when the limits stop the shot. Not measured: no timed number. | LIM-309 |
+| Noise profiles (`@margoengine/cinematic/noise`, 2026-11-07) | Enforced: band frequency above 0, amplitude 0 or more, `gain` and `speed` 0 or more. By method: a band's value stays within its amplitude; half its power lies below its frequency and half above, spread over about an octave each way, so a band near or above half the frame rate aliases. Position noise follows the camera's axes before its roll. Noise added after a confiner can leave the volume, so a confiner goes last. Stand-in: the amplitudes of the three presets were chosen by eye; only their frequency bands follow published ranges. Not measured: no timed number, and no comparison with recorded camera motion. | LIM-312 |
 
 ## Copies of a model
 

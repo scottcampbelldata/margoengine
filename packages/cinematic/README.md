@@ -203,6 +203,39 @@ brain.add({position: [0, 8, 14], target: [0, 1, 0], fov: 45, stages: [group]});
 
 A member is a mesh, a point, a function or `{target, radius, weight}`. `radius` is a sphere that stays in view; `weight` pulls the centre, and 0 leaves the member out. `group.members` can change at any time. `group.fits` is false when the limits stop the shot, and `group.center` can feed a `FramingComposer`: `new FramingComposer(() => group.center)`.
 
+## Noise profiles
+
+`CameraNoise` makes a camera feel held, carried or driven. A profile is plain data, so it can live in a JSON file: bands of smooth noise on each axis, each with a `frequency` in hertz, the middle of its power, and an `amplitude` that is the most it can add. It is a stage and goes after the stages that aim:
+
+```ts
+import {CameraBrain} from 'margoengine/cinematic/brain';
+import {CameraNoise, handheld, type NoiseProfile} from 'margoengine/cinematic/noise';
+const brain = new CameraBrain();
+const shaky = new CameraNoise(handheld, {gain: 1.5, seed: 7});
+brain.add({name: 'documentary', position: [0, 2, 6], target: [0, 1, 0], stages: [shaky]});
+
+const boat: NoiseProfile = {
+  position: {y: [{frequency: 0.2, amplitude: 0.3}]},
+  rotation: {roll: [{frequency: 0.15, amplitude: 0.05}], pitch: [{frequency: 0.2, amplitude: 0.02}]},
+};
+brain.add({name: 'deck', position: [0, 3, 6], target: [0, 2, 0], stages: [new CameraNoise(boat)]});
+console.log(brain.update(1 / 60).position);
+```
+
+| Export | What it is |
+| --- | --- |
+| `handheld` | Slow sway of the arms and a little hand tremor near 8 Hz. |
+| `walking` | The step up and down near 2 Hz, the sway of each leg at half that. |
+| `vehicle` | Body bounce near 1 to 2 Hz and the buzz of the wheels near 12 Hz. |
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `gain` | `1` | Scales every amplitude. Change it at any time, or tween it to fade the noise. |
+| `speed` | `1` | Scales every frequency. Tie it to a vehicle's speed. |
+| `seed` | `0` | The same seed gives the same motion. |
+
+`position` moves along the camera's own axes in world units; `rotation` is `pitch`, `yaw` and `roll` in radians. The motion is a function of time, so it does not change with the frame rate; set `noise.time` to replay a moment. The amplitudes of the presets were chosen by eye and their frequencies follow published ranges, so treat them as starting points. Keep a band below half the frame rate. For one short hit, use `Cinematic.shake`.
+
 Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/cinematic
