@@ -66,9 +66,22 @@ function bodyAt(source, from) {
 }
 
 /**
+ * Whether a loop body reads a list item by its counter, `eyes[i]` or `views.at(i)`: each pass then draws something
+ * else (one eye, one view), so the loop walks the list and waits for nothing. Writing by the counter, `times[i] = `,
+ * does not count: a wait loop may record each frame it waits through.
+ */
+function walks(body, counter) {
+  const read = new RegExp(
+    String.raw`\[\s*${counter}\s*\](?!\s*(?:[-+*/%&|^]|\*\*|<<|>>>?|\?\?|&&|\|\|)?=(?!=))|\.at\(\s*${counter}\s*\)`,
+  );
+  return read.test(body);
+}
+
+/**
  * The fixed waits in `source`: [{ line, kind, text }]. `frames`: a counted loop of 2 or more whose body draws or
  * waits for a frame (a body that times itself with performance.now() is a measurement, and one that renders with a
- * non-zero delta steps time; both pass). `ms`: a sleep of
+ * non-zero delta steps time; one that reads a list item by its counter walks the list, one eye or view a pass; all
+ * three pass). `ms`: a sleep of
  * MIN_SLEEP_MS or more. A `fixed-wait: <reason>` comment on the line or the line above allows either. `async
  * predicate`: a waitForFunction that cannot wait; no comment allows it.
  */
@@ -83,7 +96,7 @@ export function fixedWaits(source) {
       n = lineOf(m.index);
     // Frames that advance time (a delta other than 0) step a simulation or animation; those are counts by design.
     const steps = /delta\s*:\s*(?!0\s*[,}])[^,}\s]/.test(body);
-    if (FRAME_WORK.test(body) && !steps && !/performance\.now\(\)/.test(body) && !allowed(n))
+    if (FRAME_WORK.test(body) && !steps && !walks(body, m[1]) && !/performance\.now\(\)/.test(body) && !allowed(n))
       found.push({ line: n, kind: 'frames', text: lines[n - 1].trim() });
   }
   for (const m of source.matchAll(SLEEP)) {

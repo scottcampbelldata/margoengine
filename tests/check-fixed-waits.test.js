@@ -24,6 +24,20 @@ test('a counted loop of frames is a fixed wait; a frame loop that waits for a co
   assert.deepEqual(kinds('for (let i = 0; i < 20; i++) { const t = performance.now(); engine.render(); }'), []);
 });
 
+// Regression (2026-11-07): tests/modern-xr-passes.ts drew one reference render per eye in `for (let i = 0; i < 2; i++)
+// { const view = eyes()[i]; engine.render(...) }`, and the check read that walk over two eyes as a two-frame wait.
+test('a counted loop that reads a list item by its counter walks the list; recording each frame does not', () => {
+  assert.deepEqual(
+    kinds('for (let i = 0; i < 2; i++) {\n  const view = eyes()[i];\n  engine.render({ views: [cam(view)] });\n}'),
+    [],
+  );
+  assert.deepEqual(kinds('for (let e = 0; e < 2; e++) engine.render({ views: [views.at(e)] });'), []);
+  assert.deepEqual(kinds('for (let i = 0; i < 20; i++) { engine.render(); times[i] = now(); }'), ['1:frames']);
+  assert.deepEqual(kinds('for (let i = 0; i < 20; i++) { engine.render(); seen[i] += 1; }'), ['1:frames']);
+  assert.deepEqual(kinds('for (let i = 0; i < 20; i++) { engine.render(); log(i); }'), ['1:frames']);
+  assert.deepEqual(kinds('for (let i = 0; i < 20; i++) { engine.render(); if (list[j] === i) break; }'), ['1:frames']);
+});
+
 test('a sleep of 50 ms or more is a fixed wait; a short poll interval is not', () => {
   assert.deepEqual(kinds('await page.waitForTimeout(500);'), ['1:ms']);
   assert.deepEqual(kinds('await new Promise((r) => setTimeout(r, 300));'), ['1:ms']);
