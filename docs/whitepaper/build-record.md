@@ -1911,7 +1911,7 @@ through `packages/tiles/tests/tiles-browser.ts` (16 checks); jobs 2, 4, 7 and 8 
 | 5 | GPU memory budget | DONE | `61939f68` | root `budget` option | LIM-363 |
 | 6 | Terrain and imagery overlays | DONE | `49b6fec2` | `/terrain` | LIM-364 |
 | 7 | Orthographic cameras in the renderer | DONE | `ce48e93f` | root, read from `camera.matrix` | LIM-370 |
-| 8 | Hosted tileset sign-in and attribution | DONE | this commit | `/ion`, root `TilesRenderer.onUpdate` | LIM-373 |
+| 8 | Hosted tileset sign-in and attribution | DONE | `f0491373` | `/ion`, root `TilesRenderer.onUpdate` | LIM-374 |
 
 Fixes in the same batch: `74e05c36` (README check: an LFS pointer is told by its first line, not its size;
 regression `tests/run-readme-examples.test.js`), `1c2b04bc` (the tiles README examples run on real Cesium samples, and a
@@ -1950,7 +1950,7 @@ byte-identical; regression `packages/tiles/tests/terrain.test.js`).
   `2139b6cc7`, not lane H). A batch rebase met main's LIM-354 to 358, so ours (354 to 359) became 359 to 364;
   the renumbering script refused the overlapping shift and the five tiles limits rows were renumbered by hand, so the
   commit messages of jobs 2 to 6 still name the old numbers. Job 7's claim was written as LIM-368 and landed as LIM-370
-  after main took 368 and 369; job 8 wrote LIM-371 and landed as LIM-373. Job 8's first landing died on a
+  after main took 368 and 369; job 8 wrote LIM-371 and landed as LIM-374 (its commit message says LIM-373, the number before the last rebase). Job 8's first landing died on a
   connection reset at fetch, before any check; its second stopped at api:check, the rebase having kept main's
   api-surface row for tiles, so the record was regenerated and the landing run again whole. The orthographic draft predated the list-3 format commit and was reapplied on it; the
   first run failed on tests whose stand-in engines have no `camera.matrix`, so a missing matrix now reads as perspective.
