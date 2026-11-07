@@ -67,6 +67,7 @@ export interface WebCodecsBinding {
     VideoFrame: typeof VideoFrame;
     AudioEncoder?: typeof AudioEncoder;
     AudioData?: typeof AudioData;
+    AudioDecoder?: typeof AudioDecoder;
 }
 
 export function encodeVideo(frames: AsyncIterable<HeadlessPixels> | Iterable<HeadlessPixels>, { format, fps, codec, bitrate, keyFrameInterval, audio, webCodecs, signal }?: EncodeVideoOptions): Promise<EncodedVideo>;

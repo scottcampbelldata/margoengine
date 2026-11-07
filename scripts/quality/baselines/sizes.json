@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10690856,
+  "total": 10691342,
   "history": [
     {
       "date": "2026-10-24",
@@ -3818,6 +3818,12 @@
       "commit": "8074c9655",
       "reason": "physics/next: convex hulls from points (Quickhull in the entry), a face of 256 edges in the kernel",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "009a2af3f",
+      "reason": "headless/video measures an AAC encoder's lead-in and writes an MP4 edit list, so the sound starts on time",
+      "grew": 1
     }
   ],
   "items": {
@@ -4118,7 +4124,7 @@
     "@margoengine/headless/ffmpeg": 1434,
     "@margoengine/headless/formats": 5809,
     "@margoengine/headless/stage": 3306,
-    "@margoengine/headless/video": 6801,
+    "@margoengine/headless/video": 7287,
     "@margoengine/html": 5013,
     "@margoengine/input": 5414,
     "@margoengine/input/interactions": 1614,

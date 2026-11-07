@@ -4,14 +4,11 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
+import { waitReady, watchPage } from './page-ready.mjs';
 
 const context = await openBrowser({ startPath: '/packages/cutscene/tests/editor-browser.html', port: 5344 }),
-  { page } = context,
-  pageErrors = [];
-page.on('pageerror', (e) => pageErrors.push(e.message));
-page.on('console', (m) => {
-  if (m.type() === 'error') pageErrors.push(m.text());
-});
+  { page } = context;
+let pageErrors = [];
 const near = (a, b, limit, what) => assert.ok(Math.abs(a - b) <= limit, `${what}: ${a} is not ${b} within ${limit}`);
 const panel = (name, ...args) => page.evaluate(([n, a]) => window.panel[n](...a), [name, args]);
 const box = async (selector) => {
@@ -29,7 +26,8 @@ const drag = async (from, to, y) => {
   await page.mouse.up();
 };
 try {
-  await page.waitForFunction(() => window.ready, null, { timeout: 60_000 });
+  pageErrors = await watchPage(page);
+  await waitReady(page, pageErrors);
   const left = await origin(),
     ruler = await box('.mtl-ruler');
 

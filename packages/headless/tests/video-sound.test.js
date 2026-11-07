@@ -120,7 +120,12 @@ test('WebM with sound: an Opus track with its header and blocks of both tracks i
   // SimpleBlocks: id A3, a one-byte size here, then the track number with its marker bit, time and flags.
   const order = [];
   for (let i = 0; i + 6 < bytes.length; i++)
-    if (bytes[i] === 0xa3 && (bytes[i + 2] === 0x81 || bytes[i + 2] === 0x82) && bytes[i + 1] >= 0x85 && bytes[i + 1] <= 0x87)
+    if (
+      bytes[i] === 0xa3 &&
+      (bytes[i + 2] === 0x81 || bytes[i + 2] === 0x82) &&
+      bytes[i + 1] >= 0x85 &&
+      bytes[i + 1] <= 0x87
+    )
       order.push(bytes[i + 2] === 0x81 ? 'v' : 'a');
   // Sound blocks of half a second each at 0 and 0.5 s; frames at 0, 0.5 and 1 s. A frame goes first at a tie.
   assert.deepEqual(order, ['v', 'a', 'v', 'a', 'v']);
@@ -134,11 +139,14 @@ test('the sound goes to the encoder as planes of half a second, stamped by its s
   const audio = sound(1.25, 48_000, 2);
   audio.channels[1].fill(0.75);
   await encodeVideo([frame(1)], { fps: 2, audio, webCodecs: binding });
-  assert.deepEqual(log.audio.map((one) => [one.timestamp, one.numberOfFrames]), [
-    [0, 24_000],
-    [500_000, 24_000],
-    [1_000_000, 12_000],
-  ]);
+  assert.deepEqual(
+    log.audio.map((one) => [one.timestamp, one.numberOfFrames]),
+    [
+      [0, 24_000],
+      [500_000, 24_000],
+      [1_000_000, 12_000],
+    ],
+  );
   assert.equal(log.audio[2].data[0], 0.25);
   assert.equal(log.audio[2].data[12_000], 0.75);
   assert.equal(log.audio[0].format, 'f32-planar');
@@ -206,7 +214,10 @@ test('MP4 with sound, AAC: a second track whose offset lands on its samples', as
   assert.equal(view.getUint32(entry.start + 24), 48_000 * 0x10000, 'rate');
   const esds = boxes(bytes, entry.start + 28, entry.end)[0];
   assert.equal(esds.type, 'esds');
-  assert.ok(Buffer.from(bytes.subarray(esds.start, esds.end)).includes(Buffer.from([5, 2, 0x11, 0x90])), 'AudioSpecificConfig');
+  assert.ok(
+    Buffer.from(bytes.subarray(esds.start, esds.end)).includes(Buffer.from([5, 2, 0x11, 0x90])),
+    'AudioSpecificConfig',
+  );
   const co64 = child(bytes, stbl, 'co64'),
     offset = Number(view.getBigUint64(co64.start + 8));
   assert.equal(offset, mdat.start + 2, 'after the two one-byte frames');
@@ -214,12 +225,141 @@ test('MP4 with sound, AAC: a second track whose offset lands on its samples', as
   assert.equal(mdat.end, bytes.length);
   // Two chunks of 24,000 samples: one run in the time table.
   const stts = child(bytes, stbl, 'stts');
-  assert.deepEqual([view.getUint32(stts.start + 4), view.getUint32(stts.start + 8), view.getUint32(stts.start + 12)], [1, 2, 24_000]);
+  assert.deepEqual(
+    [view.getUint32(stts.start + 4), view.getUint32(stts.start + 8), view.getUint32(stts.start + 12)],
+    [1, 2, 24_000],
+  );
+});
+
+/**
+ * An AAC stand-in that, as real AAC encoders do, puts `lead` silent samples before the sound and says nothing of them:
+ * chunks of 1024 samples of channel 0 as float bytes, stamped from 0. Its decoder reads the floats back.
+ */
+function leadingCodecs(lead) {
+  const { binding } = codecs();
+  class AudioEncoder {
+    state = 'configured';
+    static isConfigSupported = async () => ({ supported: true });
+    constructor({ output }) {
+      this.output = output;
+    }
+    configure(config) {
+      this.config = config;
+      this.heard = [...new Float32Array(lead)];
+    }
+    encode(data) {
+      this.heard.push(...data.data.subarray(0, data.numberOfFrames));
+    }
+    async flush() {
+      const { sampleRate } = this.config;
+      for (let at = 0; at < this.heard.length; at += 1024) {
+        const floats = Float32Array.from({ length: 1024 }, (_, i) => this.heard[at + i] ?? 0);
+        this.output(
+          {
+            byteLength: floats.byteLength,
+            timestamp: Math.round((at * 1e6) / sampleRate),
+            duration: Math.round((1024 * 1e6) / sampleRate),
+            floats,
+            copyTo: (out) => out.set(new Uint8Array(floats.buffer)),
+          },
+          at
+            ? undefined
+            : {
+                decoderConfig: {
+                  codec: 'mp4a.40.2',
+                  sampleRate,
+                  numberOfChannels: 1,
+                  description: Uint8Array.of(0x11, 0x88),
+                },
+              },
+        );
+      }
+      this.heard = [];
+    }
+    close() {
+      this.state = 'closed';
+    }
+  }
+  class AudioDecoder {
+    state = 'configured';
+    constructor({ output }) {
+      this.output = output;
+    }
+    configure() {}
+    decode(chunk) {
+      this.output({ numberOfFrames: chunk.floats.length, copyTo: (out) => out.set(chunk.floats), close() {} });
+    }
+    async flush() {}
+    close() {
+      this.state = 'closed';
+    }
+  }
+  return { ...binding, AudioEncoder, AudioDecoder };
+}
+
+/** The sound track's edit list as `{ segment, mediaTime }`, or undefined when it has none. */
+function soundEdit(bytes) {
+  const moov = boxes(bytes).find((one) => one.type === 'moov'),
+    sound = boxes(bytes, moov.start, moov.end).filter((one) => one.type === 'trak')[1],
+    edts = child(bytes, sound, 'edts');
+  if (!edts) return undefined;
+  const elst = child(bytes, edts, 'elst'),
+    view = new DataView(bytes.buffer, bytes.byteOffset);
+  assert.equal(view.getUint32(elst.start + 4), 1, 'one edit');
+  return {
+    segment: view.getUint32(elst.start + 8),
+    mediaTime: view.getInt32(elst.start + 12),
+    rate: view.getUint16(elst.start + 16),
+  };
+}
+
+test('MP4 with AAC: the encoder lead-in is measured and cut by an edit list, so the sound starts on time', async () => {
+  for (const lead of [2112, 1024, 0]) {
+    const video = await encodeVideo([frame(1), frame(2)], {
+      format: 'mp4',
+      codec: 'vp09.00.10.08',
+      fps: 2,
+      audio: { channels: [Float32Array.from({ length: 48_000 }, (_, i) => Math.sin(i / 7))], sampleRate: 48_000 },
+      webCodecs: leadingCodecs(lead),
+    });
+    assert.equal(video.audioCodec, 'aac');
+    const edit = soundEdit(video.bytes);
+    if (!lead) {
+      assert.equal(edit, undefined, 'no lead-in, no edit list');
+      continue;
+    }
+    // 48,000 + lead samples in chunks of 1024; the edit starts after the lead and runs to the end, in milliseconds.
+    const end = Math.ceil((48_000 + lead) / 1024) * 1024;
+    assert.deepEqual(
+      edit,
+      { segment: Math.round(((end - lead) / 48_000) * 1000), mediaTime: lead, rate: 1 },
+      `lead ${lead}`,
+    );
+  }
+});
+
+test('MP4 with AAC and no AudioDecoder has no edit list, as before', async () => {
+  const { AudioDecoder, ...binding } = leadingCodecs(2112);
+  assert.ok(AudioDecoder);
+  const video = await encodeVideo([frame(1)], {
+    format: 'mp4',
+    codec: 'vp09.00.10.08',
+    fps: 2,
+    audio: sound(1, 48_000, 1),
+    webCodecs: binding,
+  });
+  assert.equal(soundEdit(video.bytes), undefined);
 });
 
 test('MP4 falls back to Opus with a dOps box when AAC is missing', async () => {
   const { binding } = codecs({ supported: (codec) => codec === 'opus' });
-  const video = await encodeVideo([frame(1)], { format: 'mp4', codec: 'vp09.00.10.08', fps: 2, audio: sound(1, 48_000, 1), webCodecs: binding });
+  const video = await encodeVideo([frame(1)], {
+    format: 'mp4',
+    codec: 'vp09.00.10.08',
+    fps: 2,
+    audio: sound(1, 48_000, 1),
+    webCodecs: binding,
+  });
   assert.equal(video.audioCodec, 'opus');
   assert.ok(includes(video.bytes, 'dOps'));
 });
@@ -239,7 +379,10 @@ test('bad sound is refused, a missing encoder names itself, and an encoder failu
   await assert.rejects(run({ channels: [new Float32Array(4), new Float32Array(5)], sampleRate: 48_000 }), /one length/);
   await assert.rejects(run({ channels: [new Float32Array(4)], sampleRate: 0 }), /sampleRate/);
   await assert.rejects(run({ ...sound(), bitrate: -1 }), /bitrate/);
-  await assert.rejects(run(sound(), { VideoEncoder: binding.VideoEncoder, VideoFrame: binding.VideoFrame }), /needs AudioEncoder/);
+  await assert.rejects(
+    run(sound(), { VideoEncoder: binding.VideoEncoder, VideoFrame: binding.VideoFrame }),
+    /needs AudioEncoder/,
+  );
   await assert.rejects(run(sound(), codecs({ supported: () => false }).binding), /No audio codec/);
   await assert.rejects(run(sound(), codecs({ audioFail: true }).binding), /encoder broke/);
 });

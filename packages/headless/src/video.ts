@@ -84,7 +84,11 @@ export async function* imageSequence(
 ): AsyncGenerator<SequenceFile, void, void> {
   let index = 0;
   for await (const frame of frames) {
-    yield { index, name: `${prefix}${String(index).padStart(digits, '0')}.png`, bytes: (await encodePNG(frame)) as Uint8Array<ArrayBuffer> };
+    yield {
+      index,
+      name: `${prefix}${String(index).padStart(digits, '0')}.png`,
+      bytes: (await encodePNG(frame)) as Uint8Array<ArrayBuffer>,
+    };
     index++;
   }
 }
@@ -97,6 +101,11 @@ export interface WebCodecsBinding {
   AudioEncoder?: typeof AudioEncoder;
   /** Needed only with the `audio` option. */
   AudioData?: typeof AudioData;
+  /**
+   * Lets an AAC track start on time: the encoder's lead-in is measured through it and cut by the file's edit list.
+   * Without it the sound plays late by that lead-in (2112 samples, 44 ms at 48 kHz, from Chromium's AAC on macOS).
+   */
+  AudioDecoder?: typeof AudioDecoder;
 }
 
 /** Sound to put in the file with the frames. */
@@ -188,13 +197,106 @@ const SOUND_CODECS = {
   } as const,
   SOUND_BLOCK = 0.5; // Seconds of sound in one AudioData.
 
+const PROBE = 8192, // Samples of noise in the lead-in probe.
+  LEAD_IN = 4096; // The longest lead-in looked for: AAC encoders put 1024 to 2112 samples first.
+
+/**
+ * Samples an encoder made with `config` puts before the sound it is given. WebCodecs reports no such count, and AAC
+ * encoders add one (2112 on Chromium's macOS AAC), so it is measured: seeded noise goes through an encoder and a decoder
+ * like the real ones, and the lead-in is the shift at which the decoded copy lines up best with the noise. 0 when the
+ * binding has no AudioDecoder.
+ */
+async function encoderLeadIn(
+  config: AudioEncoderConfig,
+  { AudioEncoder: Encoder, AudioData: Data, AudioDecoder: Decoder }: WebCodecsBinding,
+): Promise<number> {
+  if (!Encoder || !Data || !Decoder) return 0;
+  const noise = new Float32Array(PROBE),
+    channels = config.numberOfChannels;
+  for (let i = 0, seed = 1; i < PROBE; i++) {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    noise[i] = (seed / 2 ** 32 - 0.5) * 0.6;
+  }
+  const chunks: EncodedAudioChunk[] = [],
+    heard: Float32Array[] = [];
+  let decoderConfig: AudioDecoderConfig | undefined,
+    failure: unknown,
+    failed = false;
+  const fail = (error: unknown) => {
+    failure = error;
+    failed = true;
+  };
+  const encoder = new Encoder({
+    output(chunk, metadata) {
+      chunks.push(chunk);
+      if (metadata?.decoderConfig) decoderConfig = metadata.decoderConfig;
+    },
+    error: fail,
+  });
+  try {
+    encoder.configure(config);
+    const planes = new Float32Array(PROBE * channels);
+    for (let c = 0; c < channels; c++) planes.set(noise, c * PROBE);
+    const data = new Data({
+      format: 'f32-planar',
+      sampleRate: config.sampleRate,
+      numberOfFrames: PROBE,
+      numberOfChannels: channels,
+      timestamp: 0,
+      data: planes,
+    });
+    try {
+      encoder.encode(data);
+    } finally {
+      data.close();
+    }
+    await encoder.flush();
+  } finally {
+    if (encoder.state !== 'closed') encoder.close();
+  }
+  if (failed) throw failure;
+  if (!decoderConfig) throw fault('failed', 'The audio encoder gave no decoder configuration', 'headless');
+  const decoder = new Decoder({
+    output(audio) {
+      const plane = new Float32Array(audio.numberOfFrames);
+      audio.copyTo(plane, { planeIndex: 0, format: 'f32-planar' });
+      heard.push(plane);
+      audio.close();
+    },
+    error: fail,
+  });
+  try {
+    decoder.configure(decoderConfig);
+    for (const chunk of chunks) decoder.decode(chunk);
+    await decoder.flush();
+  } finally {
+    if (decoder.state !== 'closed') decoder.close();
+  }
+  if (failed) throw failure;
+  const out = new Float32Array(heard.reduce((sum, plane) => sum + plane.length, 0)),
+    span = PROBE - LEAD_IN;
+  heard.reduce((at, plane) => (out.set(plane, at), at + plane.length), 0);
+  let best = 0,
+    most = -Infinity;
+  for (let lag = 0; lag <= LEAD_IN && lag + span <= out.length; lag++) {
+    let sum = 0;
+    for (let i = 0; i < span; i++) sum += noise[i] * out[i + lag];
+    if (sum > most) {
+      most = sum;
+      best = lag;
+    }
+  }
+  return best;
+}
+
 /** Encodes sound with WebCodecs into the form the containers take. */
 async function encodeSound(
   { channels, sampleRate, bitrate = 128_000 }: VideoAudio,
   format: 'webm' | 'mp4',
-  { AudioEncoder: Encoder, AudioData: Data }: WebCodecsBinding,
+  binding: WebCodecsBinding,
   signal: AbortSignal | undefined,
 ): Promise<SoundTrack> {
+  const { AudioEncoder: Encoder, AudioData: Data } = binding;
   if (!Encoder || !Data) throw fault('unsupported', 'The audio option needs AudioEncoder', 'headless');
   if (channels.length !== 1 && channels.length !== 2) throw rangeError('Audio takes one or two channels', 'headless');
   const length = channels[0].length;
@@ -257,7 +359,9 @@ async function encodeSound(
     if (encoder.state !== 'closed') encoder.close();
   }
   if (codec === 'aac' && !description) throw fault('failed', 'The encoder gave no AAC description', 'headless');
-  return { codec, sampleRate, channels: channels.length, description, samples };
+  // Opus states its own lead-in (the OpusHead pre-skip); AAC has nowhere to, so it is measured.
+  const leadIn = codec === 'aac' ? await encoderLeadIn(chosen, binding) : 0;
+  return { codec, sampleRate, channels: channels.length, description, samples, ...(leadIn ? { leadIn } : {}) };
 }
 
 /**
@@ -377,7 +481,9 @@ export async function encodeVideo(
   const track = { codec: used, width, height, fps, description, colorSpace },
     sound = audio ? await encodeSound(audio, format, webCodecs, signal) : undefined;
   return {
-    bytes: (format === 'webm' ? muxWebM(track, samples, sound) : muxMP4(track, samples, sound)) as Uint8Array<ArrayBuffer>,
+    bytes: (format === 'webm'
+      ? muxWebM(track, samples, sound)
+      : muxMP4(track, samples, sound)) as Uint8Array<ArrayBuffer>,
     mimeType: `video/${format}; codecs="${used}"`,
     codec: used,
     width,

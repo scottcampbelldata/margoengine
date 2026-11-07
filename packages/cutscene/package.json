@@ -70,7 +70,7 @@
   "scripts": {
     "build": "node ../../scripts/build-optional.js cutscene",
     "test": "npm run build && node --test tests/*.test.js",
-    "test:gpu": "npm run build && node tests/render-browser.mjs && node tests/vfx-browser.mjs && node tests/editor-browser.mjs",
+    "test:gpu": "npm run build && cd ../.. && node packages/cutscene/tests/render-browser.mjs && node packages/cutscene/tests/vfx-browser.mjs && node packages/cutscene/tests/editor-browser.mjs",
     "prepack": "npm run build"
   },
   "peerDependencies": {

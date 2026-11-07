@@ -5,16 +5,14 @@
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
+import { waitReady, watchPage } from './page-ready.mjs';
 
 const context = await openBrowser({ startPath: '/packages/cutscene/tests/render-browser.html', port: 5341 }),
-  { page } = context,
-  pageErrors = [];
-page.on('pageerror', (e) => pageErrors.push(e.message));
-page.on('console', (m) => {
-  if (m.type() === 'error') pageErrors.push(m.text());
-});
+  { page } = context;
+let pageErrors = [];
 try {
-  await page.waitForFunction(() => window.ready, null, { timeout: 60_000 });
+  pageErrors = await watchPage(page);
+  await waitReady(page, pageErrors);
   for (const format of ['webm', 'mp4']) {
     const { file, ...result } = await page.evaluate((name) => window.check(name), format);
     if (process.env.MARGO_KEEP_VIDEO) await writeFile(`${process.env.MARGO_KEEP_VIDEO}.${format}`, Uint8Array.from(file));

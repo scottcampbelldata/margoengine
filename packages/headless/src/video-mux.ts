@@ -31,6 +31,8 @@ export interface SoundTrack {
   /** The encoder's configuration: `OpusHead` for Opus when it gives one, the AudioSpecificConfig for AAC. */
   description?: Uint8Array;
   samples: readonly VideoSample[];
+  /** Samples the encoder put before the sound, which an MP4 edit list cuts. AAC only: Opus states its own pre-skip. */
+  leadIn?: number;
 }
 
 const concat = (parts: readonly Uint8Array[]): Uint8Array => {
@@ -389,11 +391,13 @@ function soundEntry(sound: SoundTrack): Uint8Array {
 
 /** The `trak` of a sound. Its time unit is one sample. */
 function soundTrak(sound: SoundTrack, position: number, milliseconds: number): Uint8Array {
-  const { samples, sampleRate } = sound,
+  const { samples, sampleRate, leadIn = 0 } = sound,
     ticks = (time: number) => Math.round((time * sampleRate) / 1e6),
     last = samples.at(-1)!,
     end = ticks(last.timestamp + last.duration),
-    durations = samples.map((sample, i) => (samples[i + 1] ? ticks(samples[i + 1].timestamp) : end) - ticks(sample.timestamp));
+    durations = samples.map(
+      (sample, i) => (samples[i + 1] ? ticks(samples[i + 1].timestamp) : end) - ticks(sample.timestamp),
+    );
   const rows = runs(durations);
   return box(
     'trak',
@@ -413,6 +417,24 @@ function soundTrak(sound: SoundTrack, position: number, milliseconds: number): U
       u32(0),
       u32(0),
     ),
+    // ISO/IEC 14496-12 edit list: the presentation starts `leadIn` samples into the media, so the sound plays on time.
+    ...(leadIn
+      ? [
+          box(
+            'edts',
+            fullBox(
+              'elst',
+              0,
+              0,
+              u32(1),
+              u32(Math.round(((end - leadIn) / sampleRate) * 1000)),
+              u32(leadIn),
+              u16(1),
+              u16(0),
+            ),
+          ),
+        ]
+      : []),
     box(
       'mdia',
       fullBox('mdhd', 0, 0, u32(0), u32(0), u32(sampleRate), u32(end), u16(0x55c4), u16(0)),

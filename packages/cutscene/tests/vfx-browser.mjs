@@ -3,16 +3,14 @@
 // Reaches six times of a cutscene by playing and by seeking, and compares the particle buffer and the picture read back.
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../scripts/browser.js';
+import { waitReady, watchPage } from './page-ready.mjs';
 
 const context = await openBrowser({ startPath: '/packages/cutscene/tests/vfx-browser.html', port: 5342 }),
-  { page } = context,
-  pageErrors = [];
-page.on('pageerror', (e) => pageErrors.push(e.message));
-page.on('console', (m) => {
-  if (m.type() === 'error') pageErrors.push(m.text());
-});
+  { page } = context;
+let pageErrors = [];
 try {
-  await page.waitForFunction(() => window.ready, null, { timeout: 60_000 });
+  pageErrors = await watchPage(page);
+  await waitReady(page, pageErrors);
   const { errors, played, sought } = await page.evaluate(() => window.check());
   assert.deepEqual(errors, [], 'no validation errors');
   assert.deepEqual(pageErrors, []);
