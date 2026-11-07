@@ -156,7 +156,10 @@ test('a resume after a resume: the new token works, and the counts add up', asyn
 });
 
 test('half-open: the page notices the silence, comes back, and the server replaces the old socket', async (t) => {
-  const s = await start(t, { clientTimeout: 60_000 }),
+  // Heartbeats well below the page's serverTimeout, as the docs ask. With the default 5,000 the server says nothing
+  // while it makes the first chunks; under load that took over 300 ms, and the page gave up before its view (see the
+  // heartbeat test 'a world slower than serverTimeout').
+  const s = await start(t, { clientTimeout: 60_000, heartbeatInterval: 50 }),
     { client, log } = page(s.url, { serverTimeout: 300 });
   await ready(client);
   s.proxy.freeze();

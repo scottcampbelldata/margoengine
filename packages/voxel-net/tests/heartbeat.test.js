@@ -3,7 +3,10 @@
 import assert from 'node:assert/strict';
 import { fork } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer, request } from 'node:http';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import test from 'node:test';
 import { VoxelWorld } from '@margoengine/voxel';
 import { VoxelBot } from '../dist/bot.js';
@@ -158,6 +161,37 @@ test('every message restarts the wait', async (t) => {
   await until(() => page.closes.length, 'onClose after the messages stopped');
   const after = performance.now() - last;
   assert.ok(after >= serverTimeout * 0.9, `closed ${after} ms after the last message`);
+});
+
+// Regression (2026-11-07): resume-client's half-open test paired serverTimeout 300 with the default heartbeatInterval
+// of 5,000, so only the generator's speed kept the page on before its view; under the 8-way verify load the first
+// chunks took longer and the page closed with SERVER_SILENT_CODE. The world is held here, so the slow world is
+// certain and nothing depends on the machine: a server far above the page's timeout loses it, one well below keeps it.
+test('a world slower than serverTimeout: heartbeats below it keep the page on until its view comes', async (t) => {
+  const serverTimeout = 300,
+    world = { generator: new URL('./held-generator.js', import.meta.url), spawn: () => [0, 0] },
+    quiet = await start(t, { ...world, heartbeatInterval: 60_000, clientTimeout: 120_000 }),
+    beating = await start(t, { ...world, heartbeatInterval: 50, clientTimeout: 60_000 }),
+    dir = mkdtempSync(join(tmpdir(), 'voxel-net-held-'));
+  process.env.VOXEL_NET_HELD_DIR = dir; // read by the generator threads, which start with the first job
+  t.after(() => {
+    delete process.env.VOXEL_NET_HELD_DIR;
+    rmSync(dir, { recursive: true, force: true });
+  });
+  const lost = connect(quiet.url, { serverTimeout });
+  await until(() => lost.closes.length, 'the page left a server that says nothing');
+  assert.equal(lost.closes[0].code, SERVER_SILENT_CODE);
+  assert.equal(lost.client.loaded, false, 'before its view');
+  const kept = connect(beating.url, { serverTimeout });
+  // Five timeouts' worth of heartbeats, counted, with the world still held.
+  await until(() => kept.client.stats.received.heartbeat >= 30 || kept.closes.length, '30 heartbeats');
+  assert.deepEqual(kept.closes, []);
+  assert.equal(kept.client.loaded, false, 'the world was still held');
+  writeFileSync(join(dir, 'release'), '');
+  await until(() => (kept.client.loaded && kept.client.spawned) || kept.closes.length, 'the view');
+  assert.deepEqual(kept.closes, []);
+  assert.deepEqual(kept.errors, []);
+  kept.client.close();
 });
 
 test('a client that stops responding is dropped and its slot, counts and chunks freed', async (t) => {
