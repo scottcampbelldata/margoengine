@@ -141,7 +141,7 @@ A device is `'keyboard'` (the key, mouse and pointer bindings), `'keyboard:<sche
 import {Input} from 'margoengine/input';
 import {Gyro} from 'margoengine/input/motion';
 
-declare const button: HTMLButtonElement;
+const button = document.createElement('button');
 const input = new Input({
   aimX: [{type: 'pointer', axis: 'x', scale: 0.01}, {type: 'control', id: 'gyro', axis: 'yaw'}],
   steer: [{type: 'key', code: 'KeyD'}, {type: 'control', id: 'gyro', axis: 'steer'}],
@@ -212,7 +212,7 @@ await replay.finished;
 import {Input} from 'margoengine/input';
 import {Pen} from 'margoengine/input/pen';
 
-declare const canvas: HTMLCanvasElement;
+const canvas = document.querySelector('canvas')!;
 const input = new Input({
   size: [{type: 'control', id: 'pen', axis: 'pressure'}],
   lean: [{type: 'control', id: 'pen', axis: 'tiltX'}],
@@ -239,7 +239,7 @@ tick();
 
 ```ts
 import {Gestures} from 'margoengine/input';
-declare const canvas: HTMLCanvasElement;
+const canvas = document.querySelector('canvas')!;
 let zoom = 1;
 using gestures = new Gestures(canvas, {swipeDistance: 60});
 gestures.on('pinch', (e) => (zoom *= e.scale!));

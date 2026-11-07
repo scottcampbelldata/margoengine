@@ -210,9 +210,14 @@ for (let frame = 0; frame < 60; frame++) {
 On a character, joints and collider nodes are glTF node indices:
 
 ```ts
-import type { Animator } from 'margoengine/animator';
+import {Engine} from 'margoengine/core';
+import {loadGLTF} from 'margoengine/gltf-pro';
+import {Animation} from 'margoengine/animation';
+import {Animator} from 'margoengine/animator';
 import { addSpringBones } from 'margoengine/rigging/springs';
-declare const animator: Animator; // of a loaded model
+const engine = await Engine.create(document.querySelector('canvas')!);
+const model = await loadGLTF(engine, '/hero.glb');
+const animator = Animator.attach(Animation.attach(model), {initial: 'walk', states: {walk: 'Walk'}});
 const hair = addSpringBones(animator, {
   chains: [
     { joints: [15, 16, 17], stiffness: 1.5, drag: 0.4, gravity: 0.3, center: 8 }, // measured against the head
@@ -265,8 +270,8 @@ VRM 1.0 avatars from any tool that writes them. `readVRM` takes a `.vrm` file's 
 import { loadGLTF } from 'margoengine/gltf-pro';
 import { Animation } from 'margoengine/animation';
 import { addVRM, readVRM } from 'margoengine/rigging/vrm';
-import type { Engine } from 'margoengine';
-declare const engine: Engine;
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
 const url = 'Seed-san.vrm';
 const avatar = readVRM(new Uint8Array(await (await fetch(url)).arrayBuffer()));
 console.log(avatar.meta.name, avatar.meta.authors, avatar.meta.commercialUsage); // what its author allows
@@ -286,7 +291,7 @@ Pass an `Animator` from `margoengine/animator` as `animator` and the avatar runs
 
 ```ts
 import { createVRM, readVRM, writeVRM } from 'margoengine/rigging/vrm';
-declare const rigged: Uint8Array; // any .glb with a skin
+const rigged = new Uint8Array(await (await fetch('/rigged.glb')).arrayBuffer()); // any .glb with a skin
 const out = writeVRM(
   rigged,
   createVRM({
@@ -397,9 +402,15 @@ The result gives `joints`, `humanoid` (each bone's index, by name), `pose` (the 
 Linear skinning collapses elbows, knees and shoulders. A corrective is a blend shape sculpted to fix that, and this entry drives it from the joint's rotation: full at the pose you sculpted it for, off at rest. `addCorrectives` runs after the pose and after any IK added before it.
 
 ```ts
-import type { Animator } from 'margoengine/animator';
+import {Engine} from 'margoengine/core';
+import {loadGLTF} from 'margoengine/gltf-pro';
+import {Animation} from 'margoengine/animation';
+import {Animator} from 'margoengine/animator';
 import { addCorrectives } from 'margoengine/rigging/correctives';
-declare const animator: Animator; // on a model with an elbow at node 12 and a morph target 3 on the mesh at node 2
+const engine = await Engine.create(document.querySelector('canvas')!);
+const model = await loadGLTF(engine, '/hero.glb');
+const animator = Animator.attach(Animation.attach(model), {initial: 'walk', states: {walk: 'Walk'}});
+// On a model with an elbow at node 12 and a morph target 3 on the mesh at node 2.
 const s = Math.sin(1);
 const elbow = addCorrectives(animator, {
   shapes: [{ node: 2, target: 3, joint: 12, pose: [s, 0, 0, Math.cos(1)], curve: 'smooth' }], // full at two radians
@@ -483,8 +494,8 @@ Puts a tracked face on a character. Face trackers report the same 52 values from
 import { loadGLTF } from 'margoengine/gltf-pro';
 import { Animation } from 'margoengine/animation';
 import { addFace } from 'margoengine/rigging/face';
-import type { Engine } from 'margoengine';
-declare const engine: Engine;
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
 const animation = new Animation(await loadGLTF(engine, 'character.glb'));
 const face = addFace(animation, { mirror: true }); // a selfie camera: swap sides
 console.log(face.matched, face.missing); // which of the 52 this model can show
@@ -499,10 +510,14 @@ A frame is a record of names to values, or a list of `{ categoryName, score }`, 
 
 ```ts
 import { addFace } from 'margoengine/rigging/face';
-import type { VRMHandle } from 'margoengine/rigging/vrm';
-import type { Animator } from 'margoengine/animator';
-declare const animation: Animator['animation'];
-declare const avatar: VRMHandle;
+import { addVRM, readVRM } from 'margoengine/rigging/vrm';
+import { Animation } from 'margoengine/animation';
+import { loadGLTF } from 'margoengine/gltf-pro';
+import { Engine } from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const url = '/avatar.vrm';
+const animation = Animation.attach(await loadGLTF(engine, url));
+const avatar = addVRM(animation, readVRM(new Uint8Array(await (await fetch(url)).arrayBuffer())));
 addFace(animation, { map: { jawOpen: 'Mouth_Open', eyeBlinkLeft: ['Blink_L', 'Lash_L'] } });
 addFace(animation, { vrm: avatar }); // or a VRM avatar: drives its preset expressions
 ```

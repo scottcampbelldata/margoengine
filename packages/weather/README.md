@@ -8,10 +8,10 @@ Weather as a state that changes over time, on top of `@margoengine/sky`'s rain, 
 import { WeatherMachine, applyWetness, hailSettings, skyWeather, windAt } from 'margoengine/weather';
 import { Hail } from 'margoengine/weather/hail';
 import { Weather } from 'margoengine/sky/weather';
-import type { Engine } from 'margoengine';
+import {Engine} from 'margoengine/core';
 
-declare const engine: Engine;
-declare const road: { roughness: number }; // any material with a numeric roughness
+const engine = await Engine.create(document.querySelector('canvas')!);
+const road = { roughness: 0.6 }; // any material with a numeric roughness
 
 const weather = new WeatherMachine('clear', { seed: 7 });
 const rain = Weather.attach(engine, { fadeSeconds: 0 }); // the machine does the easing

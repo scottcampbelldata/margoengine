@@ -8,8 +8,8 @@ WebGPU external video textures from HTMLVideoElement or VideoFrame, imported wit
 import {Video} from 'margoengine/video';
 import {Engine} from 'margoengine/core';
 const engine = await Engine.create(document.querySelector('canvas')!);
-declare const videoElement: HTMLVideoElement;
-declare const audioContext: AudioContext;
+const videoElement = document.querySelector('video')!;
+const audioContext = new AudioContext();
 const surface = Video.attach(engine, videoElement, {rect: [0.1,0.1,0.8,0.8], audio: audioContext});
 const bins = surface.sampleFrequency();
 ```

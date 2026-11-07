@@ -12,6 +12,7 @@ import {
   packageMarkdown,
   parseErrors,
   readmeExamples,
+  standIns,
   tally,
   writeExamples,
 } from '../scripts/support/readme-types.mjs';
@@ -121,4 +122,17 @@ test('the check covers every package and runs in verify, the step every landing 
   );
   assert.ok(packageMarkdown(join(root, 'packages/tween')).length);
   assert.ok(PARALLEL.flat().includes('npm run check:readmes'));
+});
+
+// About 170 `declare const` lines passed the type check while their examples could not run as pasted.
+test('a declared stand-in in an example is found, and no package README or guide holds one', () => {
+  const fence = '```';
+  assert.deepEqual(
+    standIns(`${fence}ts\nimport {a} from 'b';\n  declare const mesh: Mesh;\ndeclare function use(): void;\n${fence}\n`),
+    ['declare const mesh: Mesh;', 'declare function use(): void;'],
+  );
+  assert.deepEqual(standIns(`Passes declare const in prose.\n${fence}sh\ndeclare const x: 1;\n${fence}\n`), []);
+  for (const { name, folder } of workspacePackages())
+    for (const { document, markdown } of packageMarkdown(folder))
+      assert.deepEqual(standIns(markdown), [], `${name} ${document}`);
 });

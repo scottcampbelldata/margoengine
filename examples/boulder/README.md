@@ -36,9 +36,15 @@ fails if a character cannot reach them.
 4. The CCD chains put the bones on the poses the solvers cleared.
 
 ```ts
+import { Engine } from '@margoengine/core';
+import { loadGLTF } from '@margoengine/gltf-pro';
+import { Animation } from '@margoengine/animation';
 import { addLookAt, Animator } from '@margoengine/animator';
 
-declare const animator: Animator, look: Parameters<typeof addLookAt>[1], solveLimbs: () => void;
+const engine = await Engine.create(document.querySelector('canvas')!);
+const animator = Animator.attach(Animation.attach(await loadGLTF(engine, '/climber.glb')), { initial: 'climb', states: { climb: 'Climb' } });
+const look = { joints: [8], target: [0, 1.6, 2] as [number, number, number] };
+const solveLimbs = () => { /* the CCD chains of the next step */ };
 // Solvers run in the order they were added.
 addLookAt(animator, look);
 animator.addSolver(solveLimbs);

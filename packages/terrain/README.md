@@ -119,11 +119,20 @@ drawn as they are. `@margoengine/biomes/view` draws seasons this way. Without `t
 are unchanged, whatever the layers say.
 
 ```ts
-import type { EngineKernel } from 'margoengine/core';
 import { Terrain } from 'margoengine/terrain';
-declare const engine: EngineKernel;
-// Your heightmap, layers and weights textures, as above.
-declare const make: (device: GPUDevice) => { heightmap: GPUTexture; layers: GPUTexture; weights: GPUTexture[] };
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
+// Your heightmap, layers and weights textures, as above; here small demo maps.
+function make(device: GPUDevice) {
+  const heightmap = device.createTexture({ size: [4, 4], format: 'r32float', usage: 6 });
+  device.queue.writeTexture({ texture: heightmap }, new Float32Array(16), { bytesPerRow: 16 }, [4, 4]);
+  const layers = device.createTexture({ size: [1, 1, 4], format: 'rgba8unorm-srgb', usage: 6 });
+  const colours = [60, 120, 40, 255, 110, 110, 100, 255, 120, 90, 60, 255, 240, 245, 255, 255];
+  device.queue.writeTexture({ texture: layers }, new Uint8Array(colours), { bytesPerRow: 4, rowsPerImage: 1 }, [1, 1, 4]);
+  const weight = device.createTexture({ size: [1, 1], format: 'rgba8unorm', usage: 6 });
+  device.queue.writeTexture({ texture: weight }, new Uint8Array([255, 0, 0, 0]), { bytesPerRow: 4 }, [1, 1]);
+  return { heightmap, layers, weights: [weight, weight] };
+}
 Terrain.attach(engine, {
   size: [512, 512],
   layers: [0, 1, 2, 3].map((i) => ({ height: [-1e6, 1e6], slope: [0, 1], scale: 0.25, tint: i === 0 })),

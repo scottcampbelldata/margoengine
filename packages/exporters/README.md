@@ -350,11 +350,12 @@ on this PC, `examples/package-benchmarks/results/pixel-art-native.json`):
 | Unity 6 (glTFast) | filters come from the glTF samplers; the exact profile (`unity`) already enforces Point with no mips | `createUnityPixelArtPostprocessor` (`unity-pixel-art`) for loose PNGs |
 
 ```ts
-import {exportGLB, type GeometryData, type TextureData} from 'margoengine/exporters';
+import {exportGLB} from 'margoengine/exporters';
 import {createUnrealPixelArtScript} from 'margoengine/exporters/unreal-pixel-art';
 import {createUnityPixelArtPostprocessor} from 'margoengine/exporters/unity-pixel-art';
 
-declare const geometry: GeometryData, pixels: TextureData;
+const geometry = {positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], normals: [0, 0, 1, 0, 0, 1, 0, 0, 1], uvs: [0, 0, 1, 0, 0, 1]};
+const pixels = {image: new Uint8Array(await (await fetch('/tiles.png')).arrayBuffer()), mimeType: 'image/png' as const};
 const tiles = exportGLB({nodes: [{geometry, material: {baseColorTexture: pixels}}]}, {pixelArt: {mipmaps: 'nearest'}});
 // Unreal: run after the Interchange import, then call apply_pixel_art("/Game/Tiles").
 const unrealPython = createUnrealPixelArtScript({mipmaps: 'nearest'});
@@ -947,7 +948,7 @@ The image bytes are stored unchanged under `texturePrefix` (default `textures/`)
 import { exportUSDZ } from 'margoengine/exporters/usdz';
 import type { TextureData } from 'margoengine/exporters';
 
-declare const albedoPNG: Uint8Array;
+const albedoPNG = new Uint8Array(await (await fetch('/albedo.png')).arrayBuffer());
 const albedo: TextureData = { image: albedoPNG, mimeType: 'image/png', name: 'albedo' };
 const usdz = exportUSDZ({
   nodes: [

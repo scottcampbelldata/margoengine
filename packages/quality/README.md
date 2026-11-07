@@ -56,7 +56,7 @@ watchQuality();
 ```ts
 import {applyQualityTier, watchResolution} from 'margoengine/quality';
 import {Engine} from 'margoengine/core';
-declare const canvas: HTMLCanvasElement;
+const canvas = document.querySelector('canvas')!;
 applyQualityTier(); // light or phone tier
 const engine = await Engine.create(canvas, {backend: 'webgpu'});
 using resolution = watchResolution({budget: 12, min: 0.6}); // restores full resolution when disposed
@@ -80,7 +80,7 @@ import {SSAO} from 'margoengine/post/ssao';
 import {Shadows} from 'margoengine/shadows';
 import {featureKnobs, optionKnob, watchFeatures} from 'margoengine/quality/features';
 import {TAAUpscale} from 'margoengine/taa/upscale';
-declare const canvas: HTMLCanvasElement;
+const canvas = document.querySelector('canvas')!;
 const engine = await Engine.create(canvas, {backend: 'webgpu'});
 const shadows = Shadows.attach(engine, {distance: 120});
 const ssao = SSAO.attach(engine);
@@ -131,7 +131,7 @@ import {Engine} from 'margoengine/core';
 import {applyQualityTier, paceEngine} from 'margoengine/quality';
 import {watchFeatures, featureKnobs} from 'margoengine/quality/features';
 import {watchPower} from 'margoengine/quality/power';
-declare const canvas: HTMLCanvasElement;
+const canvas = document.querySelector('canvas')!;
 applyQualityTier();
 const engine = await Engine.create(canvas, {backend: 'webgpu'});
 paceEngine(engine);
@@ -252,7 +252,7 @@ redrawAfterRestore(engine, () => engine.render({delta: 0})); // only for apps th
 ```ts
 import {Engine} from 'margoengine/core';
 import {supersample, supersampleBlob} from 'margoengine/quality/ssaa';
-declare const canvas: HTMLCanvasElement;
+const canvas = document.querySelector('canvas')!;
 const engine = await Engine.create(canvas, {backend: 'webgpu'});
 
 const image = await supersample(engine, {samples: 16});

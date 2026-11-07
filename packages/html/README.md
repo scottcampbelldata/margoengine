@@ -7,10 +7,11 @@ World-space DOM anchors reuse labels' projection, frustum clipping, inherited vi
 ```ts
 import {HTML} from 'margoengine/html';
 import {Engine} from 'margoengine/core';
-import type {Mesh} from 'margoengine/core';
-declare const mesh: Mesh;
+import {createMesh} from 'margoengine/materials';
+import {box} from 'margoengine/core';
 const engine = await Engine.create(document.querySelector('canvas')!);
-declare const element: HTMLElement;
+const mesh = engine.createMesh().setGeometry(box());
+const element = document.createElement('div');
 const html = HTML.attach(engine);
 html.add(element, {mesh, offset: [0,1,0]});
 ```

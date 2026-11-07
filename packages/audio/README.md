@@ -9,14 +9,15 @@ Build from source with `npm run build` in `packages/audio`.
 ```ts
 import {AudioListener, Audio, PositionalAudio, AudioVoicePool, AudioAnalyser} from 'margoengine/audio';
 import {Engine} from 'margoengine/core';
-import type {Mesh} from 'margoengine/core';
-declare const truck: Mesh;
-declare const timeline: {seconds: number; playing: boolean; speed: number};
-declare const meter: HTMLElement;
-declare const x: number;
-declare const y: number;
-declare const z: number;
+import {createMesh} from 'margoengine/materials';
+import {box} from 'margoengine/core';
+const timeline = {seconds: 0, playing: true, speed: 1};
+const meter = document.createElement('div');
+const x = 0;
+const y = 0;
+const z = 0;
 const engine = await Engine.create(document.querySelector('canvas')!);
+const truck = engine.createMesh().setGeometry(box());
 
 const listener = AudioListener.attach(engine, {volume: 0.8}); // follows engine.camera every frame; resumes on the first click or key press
 

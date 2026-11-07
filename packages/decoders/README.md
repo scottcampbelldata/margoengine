@@ -10,7 +10,7 @@ Build from source with `npm run build` in `packages/decoders`.
 import {DracoDecoder, KTX2Decoder} from 'margoengine/decoders';
 import {Engine} from 'margoengine/core';
 const engine = await Engine.create(document.querySelector('canvas')!);
-declare const bytes: Uint8Array;
+const bytes = new Uint8Array(await (await fetch('/mesh.drc')).arrayBuffer());
 
 const draco = new DracoDecoder({workerLimit: 4});
 const ktx2 = new KTX2Decoder({device: engine.gpu!, workerLimit: 4});
@@ -43,7 +43,7 @@ stream the module will not read, the TypeScript decoder runs instead.
 
 ```ts
 import {MeshoptSIMDDecoder, meshoptDecodeGltfBufferSIMD} from 'margoengine/decoders/meshopt-simd';
-declare const bytes: Uint8Array;
+const bytes = new Uint8Array(await (await fetch('/meshopt.bin')).arrayBuffer());
 
 await MeshoptSIMDDecoder.ready;
 const positions = meshoptDecodeGltfBufferSIMD(bytes, 1000, 12, 'ATTRIBUTES');
@@ -61,8 +61,8 @@ needs it. `jxlTextureFile` turns the result into a `TextureFile`.
 
 ```ts
 import {JXLDecoder, jxlTextureFile, uploadTexture} from 'margoengine/decoders/jxl';
-declare const device: GPUDevice;
-declare const file: ArrayBuffer;
+const device = await (await navigator.gpu.requestAdapter())!.requestDevice();
+const file = await (await fetch('/texture.jxl')).arrayBuffer();
 
 using decoder = new JXLDecoder();
 const image = await decoder.decode(file);
@@ -82,8 +82,8 @@ bytes a texel on the GPU and a pass on the calling thread, so ship KTX2 for anyt
 
 ```ts
 import {parsePVR, uploadTexture} from 'margoengine/decoders/pvr';
-declare const device: GPUDevice;
-declare const bytes: Uint8Array;
+const device = await (await navigator.gpu.requestAdapter())!.requestDevice();
+const bytes = new Uint8Array(await (await fetch('/texture.pvr')).arrayBuffer());
 
 const texture = uploadTexture(device, parsePVR(bytes));
 ```
@@ -99,7 +99,7 @@ this entry brings Google's full build, in its own worker pool; nothing loads it 
 
 ```ts
 import {DracoPointsDecoder} from 'margoengine/decoders/draco-points';
-declare const file: ArrayBuffer;
+const file = await (await fetch('/points.drc')).arrayBuffer();
 
 using decoder = new DracoPointsDecoder();
 const {pointCount, indices, attributes} = await decoder.decode(file);
@@ -189,7 +189,7 @@ inflater (the one EXR uses); it does not load the Draco or Basis decoders.
 
 ```ts
 import {decodePNG} from 'margoengine/decoders/png';
-declare const pngBytes: Uint8Array;
+const pngBytes = new Uint8Array(await (await fetch('/image.png')).arrayBuffer());
 
 const {width, height, data} = decodePNG(pngBytes);
 ```
@@ -232,8 +232,10 @@ Broken files throw `MargoError` `failed` naming the problem; a non-`Uint8Array` 
 import {parseTGA} from 'margoengine/decoders/tga';
 import {parseTIFF} from 'margoengine/decoders/tiff';
 import {parseDDS, uploadTexture} from 'margoengine/decoders/dds';
-declare const device: GPUDevice;
-declare const tgaBytes: Uint8Array, tiffBytes: Uint8Array, ddsBytes: Uint8Array;
+const device = await (await navigator.gpu.requestAdapter())!.requestDevice();
+const tgaBytes = new Uint8Array(await (await fetch('/image.tga')).arrayBuffer());
+const tiffBytes = new Uint8Array(await (await fetch('/image.tiff')).arrayBuffer());
+const ddsBytes = new Uint8Array(await (await fetch('/texture.dds')).arrayBuffer());
 
 const decal = parseTGA(tgaBytes); // {width, height, data: RGBA8}
 const heightMap = parseTIFF(tiffBytes); // rgba8unorm or rgba32float
@@ -262,7 +264,7 @@ layouts, and a header whose line size is too short for its width, throw `MargoEr
 ```ts
 import {parsePCX} from 'margoengine/decoders/pcx';
 
-declare const skinBytes: Uint8Array;
+const skinBytes = new Uint8Array(await (await fetch('/skin.pcx')).arrayBuffer());
 const skin = parsePCX(skinBytes); // {width, height, data: RGBA8}
 console.log(skin.width, skin.height);
 ```
@@ -281,8 +283,9 @@ Zstandard, and adds an opaque alpha to 8-, 16- and 32-bit RGB files, because Web
 
 ```ts
 import {KTX2LayerDecoder} from 'margoengine/decoders/ktx2-layers';
-declare const device: GPUDevice;
-declare const skyBytes: Uint8Array, terrainBytes: Uint8Array;
+const device = await (await navigator.gpu.requestAdapter())!.requestDevice();
+const skyBytes = new Uint8Array(await (await fetch('/sky.ktx2')).arrayBuffer());
+const terrainBytes = new Uint8Array(await (await fetch('/terrain.ktx2')).arrayBuffer());
 
 const decoder = new KTX2LayerDecoder({device});
 
@@ -318,8 +321,9 @@ alpha is 1.
 ```ts
 import {Environment} from 'margoengine/environment';
 import {KTX2HDRDecoder, toEnvironmentImage} from 'margoengine/decoders/ktx2-hdr';
-declare const engine: {gpu: GPUDevice} & Parameters<typeof Environment.create>[0];
-declare const bytes: Uint8Array;
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const bytes = new Uint8Array(await (await fetch('/environment.ktx2')).arrayBuffer());
 
 // As a texture: BC6H on a desktop GPU.
 const decoder = new KTX2HDRDecoder({device: engine.gpu!});
@@ -344,9 +348,9 @@ worker transcode as a whole file, so its bytes are that level's bytes in the who
 
 ```ts
 import {KTX2Streamer} from 'margoengine/decoders/ktx2-stream';
-declare const device: GPUDevice;
-declare function useTexture(texture: GPUTexture): void;
-declare const pixelsOnScreen: number;
+const device = await (await navigator.gpu.requestAdapter())!.requestDevice();
+const useTexture = (texture: GPUTexture) => console.log('sharpest level now', texture.width, 'wide');
+const pixelsOnScreen = 512;
 
 const streamer = new KTX2Streamer({device, budgetBytes: 128 * 1024 * 1024});
 const rock = await streamer.open('/rock.ktx2');
@@ -376,8 +380,8 @@ the CPU reads them to codebook indices and the GPU expands those.
 
 ```ts
 import {KTX2GPUDecoder} from 'margoengine/decoders/ktx2-gpu';
-declare const device: GPUDevice;
-declare const file: ArrayBuffer;
+const device = await (await navigator.gpu.requestAdapter())!.requestDevice();
+const file = await (await fetch('/texture.ktx2')).arrayBuffer();
 
 const decoder = new KTX2GPUDecoder({device});
 const texture = await decoder.createTexture(file);

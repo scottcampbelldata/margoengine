@@ -810,7 +810,12 @@ import {boxGeometry} from '@margoengine/geometry';
 import {Material, Texture, createInstancedMesh, packAtlas} from '@margoengine/materials';
 import {Matrix4} from '@margoengine/math/matrix4';
 
-declare const images: ImageData[];
+const images = ['#c08040', '#4080c0'].map((colour) => {
+  const context = new OffscreenCanvas(64, 64).getContext('2d')!;
+  context.fillStyle = colour;
+  context.fillRect(0, 0, 64, 64);
+  return context.getImageData(0, 0, 64, 64);
+});
 const atlas = packAtlas(images);
 const crates = createInstancedMesh(engine, boxGeometry(0.5, 0.5, 0.5), new Material({map: new Texture(atlas.image)}), 1000);
 const matrix = new Matrix4();

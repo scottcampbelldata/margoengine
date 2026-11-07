@@ -57,8 +57,8 @@ import { PbrMaterial, Texture, createMesh } from 'margoengine/materials';
 import { planeGeometry } from 'margoengine/geometry';
 import { Shadows } from 'margoengine/shadows';
 
-declare const canvas: HTMLCanvasElement;
-declare const leafImage: ImageBitmap;
+const canvas = document.querySelector('canvas')!;
+const leafImage = await createImageBitmap(await (await fetch('/leafImage.png')).blob());
 const engine = await Engine.create(canvas);
 engine.createMesh().setGeometry(box(10, 0.1, 10));
 const leaf = createMesh(engine, planeGeometry(2, 2), new PbrMaterial({ map: new Texture(leafImage), alphaTest: 0.5 }));
@@ -165,7 +165,7 @@ Memory at the default pool size is 134,218,752 B (two 64 MiB pools and an 8 KiB 
 ```ts
 import {Engine} from 'margoengine/core';
 import {Shadows} from 'margoengine/shadows';
-declare const canvas: HTMLCanvasElement;
+const canvas = document.querySelector('canvas')!;
 const engine = await Engine.create(canvas, {backend: 'webgpu'});
 Shadows.attach(engine, {cadence: [1, 1, 2, 4]});
 ```

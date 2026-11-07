@@ -6,7 +6,7 @@ Numeric property interpolation and easing; `update` steps the existing tracks in
 
 ```ts
 import {Tween, easeInOutCubic} from 'margoengine/tween';
-declare const object: {opacity: number};
+const object = {opacity: 0};
 const timeline = new Tween();
 const cancel = timeline.to(object, 'opacity', 1, {duration: 0.5, easing: easeInOutCubic});
 timeline.update(1 / 60);
@@ -18,7 +18,7 @@ Times are seconds. delay, onComplete, zero-duration tracks and cancellation are 
 
 ```ts
 import {Tween, Timeline, Spring, easeOutBack, cubicBezier, parseHexColor, toHexColor, slerpArray, catmullRomPath} from 'margoengine/tween';
-declare const light: {intensity: number}, door: {angle: number}, camera: {position: number[]}, node: {rotation: number[]};
+const light = {intensity: 1}, door = {angle: 0}, camera = {position: [0, 0, 5]}, node = {rotation: [0, 0, 0, 1]};
 const tween = new Tween();
 tween.to(light, 'intensity', 3, {duration: 1, repeat: Infinity, yoyo: true, easing: cubicBezier(0.25, 0.1, 0.25, 1)});
 const colour = parseHexColor('#ff0000');

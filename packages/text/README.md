@@ -100,8 +100,8 @@ from `font`), `images`, `position` (default the origin), `linkColor` (default `#
 import {Engine} from 'margoengine/core';
 import {TextRenderer} from 'margoengine/text';
 import {RichText} from 'margoengine/text/rich';
-declare const canvas: HTMLCanvasElement;
-declare const star: ImageBitmap;
+const canvas = document.querySelector('canvas')!;
+const star = await createImageBitmap(await (await fetch('/star.png')).blob());
 const engine = await Engine.create(canvas);
 const renderer = TextRenderer.attach(engine);
 const rich = new RichText({

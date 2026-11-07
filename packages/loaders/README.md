@@ -13,12 +13,13 @@ Build from source with `npm run build` in `packages/loaders`.
 ```ts
 import {Engine} from 'margoengine/core';
 import {load, parse3MF, parsePLY, createMeshes, toGeometry} from 'margoengine/loaders';
-import type {Mesh} from 'margoengine/core';
-declare const signal: AbortSignal;
-declare const mesh: Mesh;
+import {createMesh} from 'margoengine/materials';
+import {box} from 'margoengine/core';
+const signal = AbortSignal.timeout(30_000);
 const canvas = document.querySelector('canvas')!;
 
 const engine = await Engine.create(canvas);
+const mesh = engine.createMesh().setGeometry(box());
 
 // Fetch with a size limit and an AbortSignal, then parse. Limits go to the parser too.
 const model = await load('/parts/bracket.3mf', parse3MF, {signal, maxBytes: 64 << 20, maxTriangles: 2_000_000});
@@ -112,7 +113,7 @@ Helpers: `toGeometry` (core `Geometry`, flat or smooth normals when missing, per
 
 ```ts
 import {parseSTL, toGeometry} from 'margoengine/loaders';
-declare const signal: AbortSignal;
+const signal = AbortSignal.timeout(30_000);
 
 const bytes = await (await fetch('/parts/bracket.stl', {signal})).arrayBuffer();
 const mesh = parseSTL(bytes, {signal});          // weld: true shares corners that have equal positions
@@ -172,16 +173,16 @@ Root `npm run modern:test:interop` checks round trips, units, transforms, visibi
 Install `@margoengine/gltf-pro` alongside loaders to use this entry. The decode/root entry does not import it.
 
 ```ts
+import fs from 'node:fs';
+import {dirname, join} from 'node:path';
 import {parseUSDZ} from 'margoengine/loaders';
 import {createPBRMeshes} from 'margoengine/loaders/render';
 import {Engine} from 'margoengine/core';
 const engine = await Engine.create(document.querySelector('canvas')!);
-declare const bytes: Uint8Array;
+const bytes = new Uint8Array(await (await fetch('/model.usdz')).arrayBuffer());
 
-import fs from 'node:fs';
-import {dirname, join} from 'node:path';
-declare const file: string;
-declare const modelUrl: string;
+const file = '/models/ship.glb';
+const modelUrl = '/models/ship.glb';
 const source = await parseUSDZ(bytes);
 const model = createPBRMeshes(engine, source, {
   baseColorFactor: [1, 1, 1, 1], // linear material multiplier; default white
@@ -230,7 +231,7 @@ Pass `fetch: manager.fetch` from `@margoengine/cache/manager`'s `LoadingManager`
 ```ts
 import {loadOBJ} from 'margoengine/loaders/mtl';
 import {Engine} from 'margoengine/core';
-declare const signal: AbortSignal;
+const signal = AbortSignal.timeout(30_000);
 const engine = await Engine.create(document.querySelector('canvas')!);
 
 const {mesh, warnings, dispose} = await loadOBJ(engine, 'https://example.com/models/chair.obj', {signal});
@@ -245,7 +246,7 @@ import {parseMTL, parseOBJ} from 'margoengine/loaders';
 import {createMTLMaterials, createOBJMesh} from 'margoengine/loaders/mtl';
 import {Engine} from 'margoengine/core';
 const engine = await Engine.create(document.querySelector('canvas')!);
-declare const bytes: Uint8Array;
+const bytes = new Uint8Array(await (await fetch('/crate.mtl')).arrayBuffer());
 
 const objUrl = '/models/crate.obj';
 const resolve = async (path: string) => new Uint8Array(await (await fetch(new URL(path, new URL(objUrl, location.href)))).arrayBuffer());
@@ -335,8 +336,9 @@ for (const path of paths) {
 ```ts
 import {parseDAE, daeCameraView, daeEngineLights} from 'margoengine/loaders';
 import {Clustered} from 'margoengine/clustered';
-import type {EngineKernel} from 'margoengine/core';
-declare const engine: EngineKernel, text: string;
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const text = await (await fetch('/text.txt')).text();
 const dae = parseDAE(text);
 if (dae.cameras.length) Object.assign(engine.camera, daeCameraView(dae, 0, {aspect: 16 / 9}));
 const {sun, ambient, local} = daeEngineLights(dae);
@@ -367,8 +369,9 @@ To play a rig on the GPU, `bindDAESkin(dae, instance?)` gives the animation pack
 import {parseDAE, bindDAESkin, daeKeyframeClip, morphDAE, poseDAE} from 'margoengine/loaders';
 import {Skeleton, Skin, createKeyframeClip, applyKeyframeClip, segmentTime} from 'margoengine/animation';
 import {Material, createMesh} from 'margoengine/materials';
-import type {EngineKernel} from 'margoengine/core';
-declare const engine: EngineKernel, text: string;
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const text = await (await fetch('/text.txt')).text();
 const dae = parseDAE(text);
 const binding = bindDAESkin(dae); // the first skinned instance
 const skeleton = new Skeleton(binding.bones, binding.inverseBindMatrices);
@@ -721,7 +724,7 @@ for (const item of animation.frame(12.5)) // fractions blend between keyframes
 ```ts
 import { readXMLTree } from 'margoengine/loaders/xml';
 import {parseTMX, tmxLayerQuads} from 'margoengine/loaders';
-declare const bytes: Uint8Array;
+const bytes = new Uint8Array(await (await fetch('/map.tmx')).arrayBuffer());
 
 const root = readXMLTree('<scene name="yard"><item name="crate"/></scene>', 'Scene file');
 const robot = root.children[0];

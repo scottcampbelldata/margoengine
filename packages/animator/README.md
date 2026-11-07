@@ -242,8 +242,14 @@ root motion work on it. `dispose()` (or `using`) removes the Animator.
 `addLayer({clip, weight, mask, blend: 'override'})` blends the masked bones toward the clip's pose by `weight` (an upper-body wave or aim over a walk), where the default `blend: 'additive'` adds the clip's difference from its reference pose. `time` (seconds, read every frame) plays a layer on its own clock; by default a layer follows the state's time. `weight` and `time` may change every frame, for example from `@margoengine/tween`.
 
 ```ts
-import type { Animator } from 'margoengine/animator';
-declare const animator: Animator, upperBody: number[]; // glTF node indices of the spine, arms and head
+import {Engine} from 'margoengine/core';
+import {loadGLTF} from 'margoengine/gltf-pro';
+import {Animation} from 'margoengine/animation';
+import {Animator} from 'margoengine/animator';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const model = await loadGLTF(engine, '/hero.glb');
+const animator = Animator.attach(Animation.attach(model), {initial: 'walk', states: {walk: 'Walk'}});
+const upperBody = [3, 4, 5, 6, 7]; // glTF node indices of the spine, arms and head
 const wave = { clip: 'Wave', weight: 0, mask: upperBody, blend: 'override' as const, time: 0 };
 const removeWave = animator.addLayer(wave);
 wave.weight = 1; // then advance wave.time from your frame loop; removeWave() when done

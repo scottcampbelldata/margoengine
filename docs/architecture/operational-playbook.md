@@ -722,7 +722,7 @@ Known rendering gaps:
 | API and parity | `npm run api:check`, `npm run check:parity` | Generated API and parity contracts remain current. |
 | Unit tests | root and package tests | Functional and regression evidence. |
 | Documentation | `npm run docs:links`, generated-site checks | Links and generated public material remain coherent. |
-| README examples | `npm run check:readmes`, a step of `verify` | Every `ts`, `tsx` and `js` example of every package README and guide compiles against the built packages, each as its own module. An error off `scripts/support/readme-types-known.json` fails, and so does a fixed entry left on it; the list only shrinks and must be empty before release. |
+| README examples | `npm run check:readmes`, a step of `verify` | Every `ts`, `tsx` and `js` example of every package README and guide compiles against the built packages, each as its own module. An error off `scripts/support/readme-types-known.json` fails, and so does a fixed entry left on it; the list only shrinks and must be empty before release.. No example may `declare` a value: such a line passes the compiler and holds nothing at run time, so the check refuses it |
 | Current proofs | `npm run proofs -- --current` | Ongoing golden-output guarantees match stored outputs. |
 | Fresh checkout | `npm run check:fresh-clone` | Validation and current proofs do not depend on local history or artifacts. |
 | Site and visual checks | site build, `visual:check`, compatibility visual budget | Built demos render against the correct per-hardware evidence. |

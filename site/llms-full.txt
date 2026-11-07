@@ -2166,7 +2166,12 @@ import {boxGeometry} from '@margoengine/geometry';
 import {Material, Texture, createInstancedMesh, packAtlas} from '@margoengine/materials';
 import {Matrix4} from '@margoengine/math/matrix4';
 
-declare const images: ImageData[];
+const images = ['#c08040', '#4080c0'].map((colour) => {
+  const context = new OffscreenCanvas(64, 64).getContext('2d')!;
+  context.fillStyle = colour;
+  context.fillRect(0, 0, 64, 64);
+  return context.getImageData(0, 0, 64, 64);
+});
 const atlas = packAtlas(images);
 const crates = createInstancedMesh(engine, boxGeometry(0.5, 0.5, 0.5), new Material({map: new Texture(atlas.image)}), 1000);
 const matrix = new Matrix4();
@@ -4185,9 +4190,10 @@ Vector2, Vector3, Vector4, Quaternion, Euler, Matrix3, Matrix4, Color, Box3, OBB
 ```ts
 import {Vector3, Quaternion, Euler, Color} from 'margoengine/math';
 import {Engine} from 'margoengine/core';
-import type {Mesh} from 'margoengine/core';
-declare const mesh: Mesh;
+import {createMesh} from 'margoengine/materials';
+import {box} from 'margoengine/core';
 const engine = await Engine.create(document.querySelector('canvas')!);
+const mesh = engine.createMesh().setGeometry(box());
 const position = new Vector3(0, 1, 0).addScaledVector(new Vector3(1, 0, 0), 2);
 mesh.setPosition(position.toArray()).setQuaternion(new Quaternion().setFromEuler(new Euler(0, Math.PI / 4, 0)).toArray());
 engine.camera.position = new Vector3().copy(mesh.position).add(new Vector3(0, 2, 5)).toArray();
@@ -4260,7 +4266,7 @@ watchQuality();
 ```ts
 import {applyQualityTier, watchResolution} from 'margoengine/quality';
 import {Engine} from 'margoengine/core';
-declare const canvas: HTMLCanvasElement;
+const canvas = document.querySelector('canvas')!;
 applyQualityTier(); // light or phone tier
 const engine = await Engine.create(canvas, {backend: 'webgpu'});
 using resolution = watchResolution({budget: 12, min: 0.6}); // restores full resolution when disposed
@@ -4824,12 +4830,13 @@ Build from source with `npm run build` in `packages/loaders`.
 ```ts
 import {Engine} from 'margoengine/core';
 import {load, parse3MF, parsePLY, createMeshes, toGeometry} from 'margoengine/loaders';
-import type {Mesh} from 'margoengine/core';
-declare const signal: AbortSignal;
-declare const mesh: Mesh;
+import {createMesh} from 'margoengine/materials';
+import {box} from 'margoengine/core';
+const signal = AbortSignal.timeout(30_000);
 const canvas = document.querySelector('canvas')!;
 
 const engine = await Engine.create(canvas);
+const mesh = engine.createMesh().setGeometry(box());
 
 // Fetch with a size limit and an AbortSignal, then parse. Limits go to the parser too.
 const model = await load('/parts/bracket.3mf', parse3MF, {signal, maxBytes: 64 << 20, maxTriangles: 2_000_000});
@@ -4868,8 +4875,7 @@ Every parser returns the same `LoadedGeometry`:
 | `parseGCode` (`/gcode`) | See [G-code](#g-code) |
 | `parseVDB` (`/vdb`, async) | See [VDB volumes](#vdb-volumes) |
 | `parseMaterialX` (`/materialx`) | See [MaterialX](#materialx) |
-| `parseLottie` (`/lottie`) | See [Lottie](#lottie) |
-| `parseNRRD` (`/nrrd`, async) | See [NRRD volumes](#nrrd-vol
+| `parseLottie` (`/lottie`) | See [
 
 [README continues: https://margoengine.com/llms/packages/loaders.md]
 
@@ -4887,7 +4893,7 @@ Build from source with `npm run build` in `packages/decoders`.
 import {DracoDecoder, KTX2Decoder} from 'margoengine/decoders';
 import {Engine} from 'margoengine/core';
 const engine = await Engine.create(document.querySelector('canvas')!);
-declare const bytes: Uint8Array;
+const bytes = new Uint8Array(await (await fetch('/mesh.drc')).arrayBuffer());
 
 const draco = new DracoDecoder({workerLimit: 4});
 const ktx2 = new KTX2Decoder({device: engine.gpu!, workerLimit: 4});
@@ -4920,7 +4926,7 @@ stream the module will not read, the TypeScript decoder runs instead.
 
 ```ts
 import {MeshoptSIMDDecoder, meshoptDecodeGltfBufferSIMD} from 'margoengine/decoders/meshopt-simd';
-declare const bytes: Uint8Array;
+const bytes = new Uint8Array(await (await fetch('/meshopt.bin')).arrayBuffer());
 
 await MeshoptSIMDDecoder.ready;
 const positions = meshoptDecodeGltfBufferSIMD(bytes, 1000, 12, 'ATTRIBUTES');
@@ -4938,20 +4944,13 @@ needs it. `jxlTextureFile` turns the result into a `TextureFile`.
 
 ```ts
 import {JXLDecoder, jxlTextureFile, uploadTexture} from 'margoengine/decoders/jxl';
-declare const device: GPUDevice;
-declare const file: ArrayBuffer;
+const device = await (await navigator.gpu.requestAdapter())!.requestDevice();
+const file = await (await fetch('/texture.jxl')).arrayBuffer();
 
 using decoder = new JXLDecoder();
 const image = await decoder.decode(file);
 const texture = uploadTexture(device, jxlTextureFile(image));
 ```
-
-`readJXLHeader(bytes)` reads the size, bit depth, alpha, orientation and colour encoding without decoding. `decode` takes `signal`,
-`maxPixels` (default 2^26) and `transfer`; `new JXLDecoder({browser: false})` always uses the Wasm, and `decoderPath` names another
-folder for `jxl_oxide_wasm_bg.wasm`. `image.decoder` says which ran. Bit depths above 8 come out as 8, an animation gives its first
-frame, a file with an ICC profile and no XYB comes out as stored, and CMYK files are refused (`docs/limits.md`).
-
-## PVR (`@margoengine/decoders/pvr`)
 
 [README continues: https://margoengine.com/llms/packages/decoders.md]
 
@@ -5248,13 +5247,13 @@ option as `cache.fetch`, and every file a loader requests through it counts as o
 external buffers, `mtllib` files and textures the loader resolves next to it.
 
 ```ts
-import type {EngineKernel} from 'margoengine/core';
 import {AssetCache} from 'margoengine/cache';
 import {LoadingManager} from 'margoengine/cache/manager';
 import {loadGLTF} from 'margoengine/gltf-pro';
 import {loadOBJ} from 'margoengine/loaders/mtl';
-declare const engine: EngineKernel;
-declare const dropped: Map<string, File>; // files dropped on the page, by name
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const dropped = new Map<string, File>(); // filled by your drop handler: files dropped on the page, by name
 ```
 
 [README continues: https://margoengine.com/llms/packages/cache.md]
@@ -5782,10 +5781,10 @@ Weather as a state that changes over time, on top of `@margoengine/sky`'s rain, 
 import { WeatherMachine, applyWetness, hailSettings, skyWeather, windAt } from 'margoengine/weather';
 import { Hail } from 'margoengine/weather/hail';
 import { Weather } from 'margoengine/sky/weather';
-import type { Engine } from 'margoengine';
+import {Engine} from 'margoengine/core';
 
-declare const engine: Engine;
-declare const road: { roughness: number }; // any material with a numeric roughness
+const engine = await Engine.create(document.querySelector('canvas')!);
+const road = { roughness: 0.6 }; // any material with a numeric roughness
 
 const weather = new WeatherMachine('clear', { seed: 7 });
 const rain = Weather.attach(engine, { fadeSeconds: 0 }); // the machine does the easing
@@ -6106,11 +6105,12 @@ Build from source with `npm run build` in `packages/points`.
 ```ts
 import {Engine} from 'margoengine/core';
 import {PointsPlugin, PointCloud, SpriteBatch, atlasRect} from 'margoengine/points';
-import type {Mesh} from 'margoengine/core';
-declare const mesh: Mesh;
+import {createMesh} from 'margoengine/materials';
+import {box} from 'margoengine/core';
 const canvas = document.querySelector('canvas')!;
 
 const engine = await Engine.create(canvas);
+const mesh = engine.createMesh().setGeometry(box());
 const points = PointsPlugin.attach(engine, {pointBudget: 2_000_000});
 
 // Any {positions, colors?, normals?} works, including the point-cloud output of @margoengine/loaders.
@@ -6146,7 +6146,7 @@ canvas.addEventListener('click', event => {
 - **Shapes and shading.** Square points cover exactly `size x size` pixels. Round points are an antialiased disc with an extra pixel of quad. A `map` (any `GPUTexture`, or an `ImageBitmap`, canvas, image, video or `ImageData` that the plugin uploads as `rgba8unorm-srgb`) is sampled across the point, with `alphaTest` or blending. `shading: 'sphere'` lights each point as a sphere impostor and writes its curved depth with `frag_depth`. `edl: true` adds eye-dome lighting: points also write their view depth into an `r32float` target and a full-screen pass multiplies the color by `exp(-32 * strength * mean(max(0, log2 d - log2 d_neighbor)))` over 8 neighbors `edlRadius` pixels away (Boucheny's eye-dome lighting; background neighbors count as 0).
 - **Depth.** Points test against the scene with reversed-Z `greater-equal` and opaque points write depth, so they hide behind meshes and occlude each other. Transparent materials blend without writing depth.
 - **Engine views.** Point sizes and level of detail follow the view being drawn. `pick(x, y)` picks through the canvas view under the point with that view's camera; `pick(x, y, {view: id})` through a named one (`RenderView.id`). A view not drawn for a frame is forgotten.
-- **Orthographic cameras.** Everything is read from `camera.matrix`, so any projection whose clip w is constant (such as `CameraProjection` from `@margoengine/cameras`) works without a dependency on it: world-unit sizes use the matrix's pixels per world unit and stay the same at every depth, sphere impostors write linear depth, eye-dome lighting
+- **Orthographic cameras.** Everything is read from `camera.matrix`, so any projection whose clip w is constant (such as `CameraProjection` from `@margoengine/cameras`) works without a dependency on it: world-unit sizes use the matrix's pixels per world unit and stay the same
 
 [README continues: https://margoengine.com/llms/packages/points.md]
 
@@ -6233,6 +6233,7 @@ sprite covers the pixel. They need a single-sample colour target and a single-sa
 runs in Node and an app that only draws still frames does not ship it.
 
 ```ts
+import { EngineKernel } from 'margoengine/core';
 import { SpriteLayer } from 'margoengine/sprites';
 import { frameGrid, SpriteAnimation } from 'margoengine/sprites/animation';
 ```
@@ -6538,12 +6539,13 @@ Build from source with `npm run build` in `packages/labels`.
 ```ts
 import {LabelRenderer} from 'margoengine/labels';
 import {Engine} from 'margoengine/core';
-import type {Mesh} from 'margoengine/core';
-declare const pump: Mesh;
-declare const screen: Mesh;
-declare const makeButton: () => HTMLElement;
-declare const isBlocked: (from: readonly number[], to: readonly number[]) => boolean;
+import {createMesh} from 'margoengine/materials';
+import {box} from 'margoengine/core';
+const makeButton = () => Object.assign(document.createElement('button'), {textContent: 'Open'});
+const isBlocked = (from: readonly number[], to: readonly number[]) => to[1] < from[1] - 10; // your own ray test
 const engine = await Engine.create(document.querySelector('canvas')!);
+const pump = engine.createMesh().setGeometry(box());
+const screen = engine.createMesh().setGeometry(box());
 
 const labels = LabelRenderer.attach(engine);
 
@@ -6575,9 +6577,7 @@ engine.removePlugin(labels.name); // or engine.dispose(): removes every element 
 - **Orthographic cameras.** When `camera.matrix` has a constant clip w (for example with `CameraProjection` from `@margoengine/cameras`, which the package does not depend on), the viewer gets `perspective: none` and the camera element `orthographicCSSTransform(matrix, width, height, backend)`: the clip matrix scaled to CSS pixels around the viewport centre, Y flipped, with Z scaled like Y so CSS depth sorting follows the camera. Objects in front of the near plane are hidden. 2D labels need nothing special; `distanceScale` uses the distance at which a perspective camera with the same fov shows the same zoom, so labels grow when zooming in and do not change with depth. `isOrthographic(matrix)` is exported.
 - **Minimal DOM writes.** Every style property is cached per element and written only when its string changes; `renderer.writes` reports how many writes the last update made (0 on a static frame).
 - **Engine views.** `new LabelRenderer({view})` (or `labels.view = {camera, viewport, pixels?}`) places labels through that view's camera inside its rectangle, clipped to it; hook coordinates are then relative to the view's corner. One renderer per view.
-- **Occlusion hook.** Depth-buffer occlusion is not built in. `occlude(label, {x, y, depth, distance, world})` on the renderer or a label returns true to hide that label this frame; the per-label hook overrides the renderer one.
-
-## API
+- **Occlusion hook.** Depth-buffer occlusion is not built in. `occlude(la
 
 [README continues: https://margoengine.com/llms/packages/labels.md]
 
@@ -6592,10 +6592,11 @@ World-space DOM anchors reuse labels' projection, frustum clipping, inherited vi
 ```ts
 import {HTML} from 'margoengine/html';
 import {Engine} from 'margoengine/core';
-import type {Mesh} from 'margoengine/core';
-declare const mesh: Mesh;
+import {createMesh} from 'margoengine/materials';
+import {box} from 'margoengine/core';
 const engine = await Engine.create(document.querySelector('canvas')!);
-declare const element: HTMLElement;
+const mesh = engine.createMesh().setGeometry(box());
+const element = document.createElement('div');
 const html = HTML.attach(engine);
 html.add(element, {mesh, offset: [0,1,0]});
 ```
@@ -6618,8 +6619,8 @@ WebGPU external video textures from HTMLVideoElement or VideoFrame, imported wit
 import {Video} from 'margoengine/video';
 import {Engine} from 'margoengine/core';
 const engine = await Engine.create(document.querySelector('canvas')!);
-declare const videoElement: HTMLVideoElement;
-declare const audioContext: AudioContext;
+const videoElement = document.querySelector('video')!;
+const audioContext = new AudioContext();
 const surface = Video.attach(engine, videoElement, {rect: [0.1,0.1,0.8,0.8], audio: audioContext});
 const bins = surface.sampleFrequency();
 ```
@@ -7271,8 +7272,8 @@ equations or images.
 ```ts
 import { VoxelPathTracer, type VoxelTraceScene } from 'margoengine/voxel-pathtracer';
 import {Engine} from 'margoengine/core';
-declare const voxels: Uint8Array;
-declare const signal: AbortSignal;
+const voxels = new Uint8Array(await (await fetch('/house.voxels')).arrayBuffer());
+const signal = AbortSignal.timeout(30_000);
 const engine = await Engine.create(document.querySelector('canvas')!);
 
 const scene: VoxelTraceScene = {
@@ -7317,8 +7318,8 @@ import { sphereCells, connectedCells } from 'margoengine/voxel-edit/edit';
 import { pickRay, raycastGrid } from 'margoengine/voxel-edit/pick';
 import { meshGrid } from 'margoengine/voxel-edit/mesh';
 import {Engine} from 'margoengine/core';
-declare const ndcX: number;
-declare const ndcY: number;
+const ndcX = 0;
+const ndcY = 0;
 const engine = await Engine.create(document.querySelector('canvas')!);
 
 const model: VoxelGrid = { size: [32, 32, 32], voxels: new Uint8Array(32 * 32 * 32) };
@@ -8186,7 +8187,7 @@ Numeric property interpolation and easing; `update` steps the existing tracks in
 
 ```ts
 import {Tween, easeInOutCubic} from 'margoengine/tween';
-declare const object: {opacity: number};
+const object = {opacity: 0};
 const timeline = new Tween();
 const cancel = timeline.to(object, 'opacity', 1, {duration: 0.5, easing: easeInOutCubic});
 timeline.update(1 / 60);
@@ -8198,7 +8199,7 @@ Times are seconds. delay, onComplete, zero-duration tracks and cancellation are 
 
 ```ts
 import {Tween, Timeline, Spring, easeOutBack, cubicBezier, parseHexColor, toHexColor, slerpArray, catmullRomPath} from 'margoengine/tween';
-declare const light: {intensity: number}, door: {angle: number}, camera: {position: number[]}, node: {rotation: number[]};
+const light = {intensity: 1}, door = {angle: 0}, camera = {position: [0, 0, 5]}, node = {rotation: [0, 0, 0, 1]};
 const tween = new Tween();
 tween.to(light, 'intensity', 3, {duration: 1, repeat: Infinity, yoyo: true, easing: cubicBezier(0.25, 0.1, 0.25, 1)});
 const colour = parseHexColor('#ff0000');
@@ -8520,11 +8521,11 @@ same view. It uses core's `camera.project` and `camera.up` hooks.
 ```ts
 import {Engine} from 'margoengine/core';
 import {CameraProjection} from 'margoengine/cameras';
-import type {PBRModel} from 'margoengine/gltf-pro';
-declare const model: PBRModel;
+import {loadGLTF} from 'margoengine/gltf-pro';
 const canvas = document.querySelector('canvas')!;
 
 const engine = await Engine.create(canvas, {camera: {position: [0, 40, 0], target: [0, 0, 0]}}); // straight down
+const model = await loadGLTF(engine, '/model.glb');
 const projection = CameraProjection.attach(engine); // orthographic, framed like the perspective view at the target
 
 projection.mode = 'perspective';             // toggle at any time; vertical views keep working
@@ -8825,9 +8826,10 @@ Visible core and PBR selection outlines using Jump Flood Algorithm distance fiel
 ```ts
 import {Selection} from 'margoengine/selection';
 import {Engine} from 'margoengine/core';
-import type {Mesh} from 'margoengine/core';
-declare const mesh: Mesh;
+import {createMesh} from 'margoengine/materials';
+import {box} from 'margoengine/core';
 const engine = await Engine.create(document.querySelector('canvas')!);
+const mesh = engine.createMesh().setGeometry(box());
 const selection = Selection.attach(engine, {algorithm: 'jfa', width: 3, color: [1,0.5,0]});
 selection.set([mesh]);
 ```
@@ -8837,8 +8839,8 @@ selection.set([mesh]);
 ```ts
 import {Picking} from 'margoengine/selection';
 import {Engine} from 'margoengine/core';
-declare const x: number;
-declare const y: number;
+const x = 0;
+const y = 0;
 const engine = await Engine.create(document.querySelector('canvas')!);
 const picking = Picking.attach(engine);
 const mesh = await engine.pick(x, y);
@@ -8890,14 +8892,15 @@ Build from source with `npm run build` in `packages/audio`.
 ```ts
 import {AudioListener, Audio, PositionalAudio, AudioVoicePool, AudioAnalyser} from 'margoengine/audio';
 import {Engine} from 'margoengine/core';
-import type {Mesh} from 'margoengine/core';
-declare const truck: Mesh;
-declare const timeline: {seconds: number; playing: boolean; speed: number};
-declare const meter: HTMLElement;
-declare const x: number;
-declare const y: number;
-declare const z: number;
+import {createMesh} from 'margoengine/materials';
+import {box} from 'margoengine/core';
+const timeline = {seconds: 0, playing: true, speed: 1};
+const meter = document.createElement('div');
+const x = 0;
+const y = 0;
+const z = 0;
 const engine = await Engine.create(document.querySelector('canvas')!);
+const truck = engine.createMesh().setGeometry(box());
 
 const listener = AudioListener.attach(engine, {volume: 0.8}); // follows engine.camera every frame; resumes on the first click or key press
 
@@ -9560,7 +9563,7 @@ Bounded snapshot interpolation for position, quaternion and velocity, with cappe
 
 ```ts
 import {SnapshotBuffer, createSnapshot} from 'margoengine/net';
-declare const renderTimeSeconds: number;
+const renderTimeSeconds = performance.now() / 1000;
 const buffer = new SnapshotBuffer(32);
 const output = createSnapshot();
 // buffer.push(timeSeconds, position, quaternion, velocity)
@@ -9662,11 +9665,11 @@ await server.listen(8787, '0.0.0.0');
 // Client (browser): the world fills from the server; lighting and the renderer follow world.onChunk as usual.
 import { connectVoxelNet, Keys } from 'margoengine/voxel-net';
 import {Engine} from 'margoengine/core';
-declare const yaw: number;
-declare const pitch: number;
-declare const x: number;
-declare const y: number;
-declare const z: number;
+const yaw = 0;
+const pitch = 0;
+const x = 0;
+const y = 0;
+const z = 0;
 const engine = await Engine.create(document.querySelector('canvas')!);
 const world = new VoxelWorld({ blocks });
 const drawBox = (...pose: unknown[]) => console.log(...pose); // your renderer
@@ -9707,6 +9710,8 @@ client.edit(x, y, z, 0); // shown at once; the server confirms it or sends the c
   it decodes only the chunks within one chunk of itself.
 - **File store** (`./file-store`, Node): `new FileChunkStore(dir)` is a `ChunkStore` with one deflated file per chunk; pass
   it as the server's `store` and edits survive a restart.
+
+## Connections, login and saved edits
 
 [README continues: https://margoengine.com/llms/packages/voxel-net.md]
 

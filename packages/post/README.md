@@ -548,7 +548,7 @@ small gaps where an object meets the ground. Options: `distance` (0.4), `thickne
 ```ts
 import {Engine} from 'margoengine/core';
 import {ContactShadows} from 'margoengine/post/contact-shadows';
-declare const canvas: HTMLCanvasElement;
+const canvas = document.querySelector('canvas')!;
 const engine = await Engine.create(canvas, {backend: 'webgpu'});
 ContactShadows.attach(engine, {distance: 0.3});
 ```
@@ -567,7 +567,7 @@ the drawing size and are replaced on resize (`onResize`). WebGPU only.
 ```ts
 import { Engine } from 'margoengine/core';
 import { SceneTargets } from 'margoengine/post/mrt';
-declare const canvas: HTMLCanvasElement;
+const canvas = document.querySelector('canvas')!;
 const engine = await Engine.create(canvas);
 const targets = SceneTargets.attach(engine, {
   outputs: {
@@ -591,7 +591,7 @@ into it; add gltf-pro models and materials meshes with `depth.add(model)`, but n
 import { Engine } from 'margoengine/core';
 import { Texture, WgslMaterial } from 'margoengine/materials';
 import { DepthTexture } from 'margoengine/post/depth';
-declare const canvas: HTMLCanvasElement;
+const canvas = document.querySelector('canvas')!;
 const engine = await Engine.create(canvas);
 const depth = DepthTexture.attach(engine);
 const water = new WgslMaterial({

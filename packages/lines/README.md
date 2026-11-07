@@ -111,7 +111,7 @@ helper; animation deformation is not reflected in these synchronous helpers.
 ```ts
 import {Engine} from 'margoengine/core';
 import {Lines, Line} from 'margoengine/lines';
-declare const canvas: HTMLCanvasElement;
+const canvas = document.querySelector('canvas')!;
 const engine = await Engine.create(canvas);
 const lines = Lines.attach(engine);
 lines.add(new Line({positions: [-2, 0, 1, 2, 0, 1], width: 6, color: '#ff4040', depthWrite: true}));
@@ -128,7 +128,7 @@ A depth-writing line takes two draws, so its edge stays smooth: the part at leas
 import {Engine, box} from 'margoengine/core';
 import {Lines} from 'margoengine/lines';
 import {Trail} from 'margoengine/lines/trail';
-declare const canvas: HTMLCanvasElement;
+const canvas = document.querySelector('canvas')!;
 const engine = await Engine.create(canvas);
 const lines = Lines.attach(engine);
 const missile = engine.createMesh().setGeometry(box(0.2, 0.2, 1));
@@ -167,7 +167,7 @@ Any `LineMaterial` option applies too. The far end is cut exactly at the limit, 
 ```ts
 import {Engine} from 'margoengine/core';
 import {LineBatch, LineBatches} from 'margoengine/lines/batch';
-declare const canvas: HTMLCanvasElement;
+const canvas = document.querySelector('canvas')!;
 const engine = await Engine.create(canvas);
 const batches = LineBatches.attach(engine);
 
@@ -211,7 +211,7 @@ Segments are independent: square ends, so those that share a point overlap at th
 ```ts
 import {Engine} from 'margoengine/core';
 import {Line, Lines} from 'margoengine/lines';
-declare const canvas: HTMLCanvasElement;
+const canvas = document.querySelector('canvas')!;
 const engine = await Engine.create(canvas);
 const lines = Lines.attach(engine);
 
@@ -234,7 +234,7 @@ lines.add(new Line({
 ```ts
 import {Engine} from 'margoengine/core';
 import {Line, Lines} from 'margoengine/lines';
-declare const canvas: HTMLCanvasElement;
+const canvas = document.querySelector('canvas')!;
 const engine = await Engine.create(canvas);
 const lines = Lines.attach(engine);
 
@@ -258,7 +258,7 @@ import {Engine, box} from 'margoengine/core';
 import {Lines} from 'margoengine/lines';
 import {EdgesHelper} from 'margoengine/lines/edges';
 import {HiddenLine} from 'margoengine/lines/hidden';
-declare const canvas: HTMLCanvasElement;
+const canvas = document.querySelector('canvas')!;
 const engine = await Engine.create(canvas);
 const lines = Lines.attach(engine);
 const geometry = box(2, 1, 1);
@@ -280,7 +280,7 @@ Underneath it is a line with `behind: true`, which turns the depth test around. 
 ```ts
 import {Engine} from 'margoengine/core';
 import {ArrowHelper, Lines, PlaneHelper} from 'margoengine/lines';
-declare const canvas: HTMLCanvasElement;
+const canvas = document.querySelector('canvas')!;
 const engine = await Engine.create(canvas);
 const lines = Lines.attach(engine);
 
@@ -321,7 +321,7 @@ intersection) instead of any. Lines cast no shadows, so there is no `clipShadows
 ```ts
 import {Engine} from 'margoengine/core';
 import {Lines, Line, LineMaterial} from 'margoengine/lines';
-declare const canvas: HTMLCanvasElement;
+const canvas = document.querySelector('canvas')!;
 const engine = await Engine.create(canvas);
 const lines = Lines.attach(engine);
 // Keep only the part of the line above y = 0.5.
@@ -367,7 +367,7 @@ import {Engine, box} from 'margoengine/core';
 import {Lines, Line} from 'margoengine/lines';
 import {LinePicking} from 'margoengine/lines/pick';
 import {Picking} from 'margoengine/selection';
-declare const canvas: HTMLCanvasElement;
+const canvas = document.querySelector('canvas')!;
 const engine = await Engine.create(canvas);
 const lines = Lines.attach(engine);
 const path = lines.add(new Line({positions: [-2, 0, 0, 0, 1, 0, 2, 0, 0], width: 6}));

@@ -17,8 +17,8 @@ equations or images.
 ```ts
 import { VoxelPathTracer, type VoxelTraceScene } from 'margoengine/voxel-pathtracer';
 import {Engine} from 'margoengine/core';
-declare const voxels: Uint8Array;
-declare const signal: AbortSignal;
+const voxels = new Uint8Array(await (await fetch('/house.voxels')).arrayBuffer());
+const signal = AbortSignal.timeout(30_000);
 const engine = await Engine.create(document.querySelector('canvas')!);
 
 const scene: VoxelTraceScene = {

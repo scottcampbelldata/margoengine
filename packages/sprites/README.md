@@ -79,10 +79,12 @@ sprite covers the pixel. They need a single-sample colour target and a single-sa
 runs in Node and an app that only draws still frames does not ship it.
 
 ```ts
+import { EngineKernel } from 'margoengine/core';
 import { SpriteLayer } from 'margoengine/sprites';
 import { frameGrid, SpriteAnimation } from 'margoengine/sprites/animation';
 
-declare const layer: SpriteLayer;
+const engine = await EngineKernel.create(document.querySelector('canvas')!, { exactSize: [64, 32] });
+const layer = SpriteLayer.attach(engine, { atlas: { width: 32, height: 32, data: new Uint8Array(32 * 32 * 4).fill(255) } });
 const hero = layer.add({ x: 10, y: 7, rect: [0, 0, 8, 8] });
 const animation = new SpriteAnimation({
   clips: {

@@ -32,10 +32,11 @@ Base GPU allocations are approximately 128 bytes per splat (384 MB at three mill
 `cloud.setFog(fog)` fogs the cloud with `@margoengine/environment`'s `Fog` or any object with its fields (`color`, `near`, `far`, `density`, `heightFalloff`, `height`, `enabled`), read every frame with Fog's maths. Each splat's colour fades toward the fog colour by the fog at its centre, in the projection pass and in linear before the display encoding; opacity is unchanged. The package does not import environment. `fog.enabled = false` clears it without recompiling; `cloud.setFog(null)` (the default) draws exactly as before.
 
 ```ts
-import type {EngineKernel} from 'margoengine/core';
 import {Fog} from 'margoengine/environment';
-import type {Splats} from 'margoengine/splats';
-declare const engine: EngineKernel, cloud: Splats; // from the first example
+import {Splats, parseSplat} from 'margoengine/splats';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const cloud = Splats.attach(engine, parseSplat(await (await fetch('/capture.splat')).arrayBuffer()));
 cloud.setFog(Fog.attach(engine, {color: '#8090a0', density: 0.02}));
 ```
 

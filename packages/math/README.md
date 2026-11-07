@@ -7,9 +7,10 @@ Vector2, Vector3, Vector4, Quaternion, Euler, Matrix3, Matrix4, Color, Box3, OBB
 ```ts
 import {Vector3, Quaternion, Euler, Color} from 'margoengine/math';
 import {Engine} from 'margoengine/core';
-import type {Mesh} from 'margoengine/core';
-declare const mesh: Mesh;
+import {createMesh} from 'margoengine/materials';
+import {box} from 'margoengine/core';
 const engine = await Engine.create(document.querySelector('canvas')!);
+const mesh = engine.createMesh().setGeometry(box());
 const position = new Vector3(0, 1, 0).addScaledVector(new Vector3(1, 0, 0), 2);
 mesh.setPosition(position.toArray()).setQuaternion(new Quaternion().setFromEuler(new Euler(0, Math.PI / 4, 0)).toArray());
 engine.camera.position = new Vector3().copy(mesh.position).add(new Vector3(0, 2, 5)).toArray();

@@ -248,8 +248,8 @@ A texture may read `TEXCOORD_0` to `TEXCOORD_3`, as Blender writes them for a ma
 
 ```ts
 import {loadGLTF} from 'margoengine/gltf-pro';
-import type {Engine} from 'margoengine';
-declare const engine: Engine;
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
 const model = await loadGLTF(engine, '/models/FourUV.glb');
 // TEXCOORD_2 then TEXCOORD_3 of each vertex, present only when a material reads either.
 console.log(model.primitives[0].uvs);
@@ -264,11 +264,12 @@ console.log(model.primitives[0].uvs);
 ```ts
 import {parseGLTF} from 'margoengine/gltf-pro';
 import {extendedMaterials} from 'margoengine/gltf-pro/extended';
-import type {Engine} from 'margoengine';
-declare const engine: Engine;
-declare const doc: object;
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const doc = await (await fetch('/model.gltf')).json();
+const buffers = [new Uint8Array(await (await fetch('/model.bin')).arrayBuffer())];
 // The default loaders need none of this; the synchronous parser takes the decoder by hand.
-const model = parseGLTF(engine, doc, [], [], {materials: extendedMaterials});
+const model = parseGLTF(engine, doc, buffers, [], {materials: extendedMaterials});
 console.log(model.primitives[0].material.extended?.scatter);
 ```
 
@@ -283,11 +284,12 @@ The text read is the draft of Khronos glTF pull request 2453 (Status "Draft") as
 ```ts
 import {parseGLTF} from 'margoengine/gltf-pro';
 import {extendedMaterials} from 'margoengine/gltf-pro/extended';
-import type {Engine} from 'margoengine';
-declare const engine: Engine;
-declare const doc: object;
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const doc = await (await fetch('/model.gltf')).json();
+const buffers = [new Uint8Array(await (await fetch('/model.bin')).arrayBuffer())];
 // The default loaders need none of this; the synchronous parser takes the decoder by hand.
-const model = parseGLTF(engine, doc, [], [], {materials: extendedMaterials});
+const model = parseGLTF(engine, doc, buffers, [], {materials: extendedMaterials});
 console.log(model.primitives[0].material.extended?.bump);
 ```
 
@@ -525,7 +527,10 @@ Promise-based loading API.
 
 ```ts
 import {type MaterialExtension, type PBRModel} from 'margoengine/gltf-pro';
-declare const model: PBRModel;
+import {Engine} from 'margoengine/core';
+import {loadGLTF} from 'margoengine/gltf-pro';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const model = await loadGLTF(engine, '/model.glb');
 const tint: MaterialExtension = {
   factors: new Float32Array([1, 0.5, 0.25, 1]),
   wgsl: 's.base *= materialFactors[0];'

@@ -128,10 +128,11 @@ sRGB-encoded and a fully fogged particle matches the fogged background. VFX does
 `fog.enabled = false` clears it without recompiling; `effect.setFog(null)` (the default) draws exactly as before.
 
 ```ts
-import type {EngineKernel} from 'margoengine/core';
 import {Fog} from 'margoengine/environment';
-import type {VFX} from 'margoengine/vfx';
-declare const engine: EngineKernel, sparks: VFX; // from the first example
+import {VFX} from 'margoengine/vfx';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const sparks = VFX.attach(engine, {capacity: 10_000, rate: 1_000, position: [0, 1, 0], velocity: [0, 5, 0]});
 const fog = Fog.attach(engine, {color: '#8090a0', near: 5, far: 60});
 sparks.setFog(fog);
 ```
@@ -154,10 +155,10 @@ first frame, or set `softness` to 0); a depth texture that cannot be sampled or 
 depth is 0 (nothing drawn) the particle is left alone.
 
 ```ts
-import type {EngineKernel} from 'margoengine/core';
 import {DepthTexture} from 'margoengine/post/depth';
 import {VFX} from 'margoengine/vfx';
-declare const engine: EngineKernel; // from the first example
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
 const depth = DepthTexture.attach(engine);
 // Steam that thins out over the last 0.5 m before the floor and walls.
 const steam = VFX.attach(engine, {

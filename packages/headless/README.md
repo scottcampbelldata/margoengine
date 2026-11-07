@@ -97,10 +97,11 @@ engine.dispose();
 `encodeVideo` makes a WebM or MP4 file with WebCodecs, in a browser or worker, or anywhere you pass `webCodecs`:
 
 ```ts
-import { Engine } from '@margoengine/core';
+import { Engine, box } from '@margoengine/core';
 import { encodeVideo, renderFrames } from '@margoengine/headless/video';
 
-declare const engine: Engine; // on a headless canvas
+const engine = await Engine.create(document.querySelector('canvas')!); // in a browser, which has WebCodecs
+engine.createMesh().setGeometry(box());
 
 const video = await encodeVideo(renderFrames(engine, { frames: 90 }), { format: 'mp4' });
 const url = URL.createObjectURL(new Blob([video.bytes], { type: video.mimeType }));
@@ -110,11 +111,16 @@ Node has no WebCodecs, so `@margoengine/headless/ffmpeg` (Node only) pipes the f
 is downloaded, and it runs without a shell:
 
 ```ts
-import { Engine } from '@margoengine/core';
+import { Engine, box, Camera } from '@margoengine/core';
 import { renderFrames } from '@margoengine/headless/video';
 import { encodeWithFFmpeg } from '@margoengine/headless/ffmpeg';
+import { createHeadlessCanvas, installGPU } from '@margoengine/headless';
+import { create } from 'webgpu';
 
-declare const engine: Engine; // on a headless canvas
+using installed = installGPU({ gpu: create([]) });
+const engine = await Engine.create(createHeadlessCanvas({ width: 512, height: 512 }), { backend: 'webgpu' });
+engine.createMesh().setGeometry(box());
+engine.render({ camera: new Camera({ position: [2, 2, 3], target: [0, 0, 0] }) });
 
 await encodeWithFFmpeg(renderFrames(engine, { frames: 90 }), { output: 'turntable.mp4' });
 ```
@@ -137,11 +143,15 @@ file bytes, made by any tool, and says whether a picture still matches its refer
 ```ts
 import assert from 'node:assert/strict';
 import { readFile, writeFile } from 'node:fs/promises';
-import { encodePNG, readPixels } from '@margoengine/headless';
+import { encodePNG, readPixels, createHeadlessCanvas, installGPU } from '@margoengine/headless';
 import { compareImages } from '@margoengine/headless/compare';
-import { Engine } from '@margoengine/core';
+import { Engine, box, Camera } from '@margoengine/core';
+import { create } from 'webgpu';
 
-declare const engine: Engine; // on a headless canvas, with the scene drawn
+using installed = installGPU({ gpu: create([]) });
+const engine = await Engine.create(createHeadlessCanvas({ width: 512, height: 512 }), { backend: 'webgpu' });
+engine.createMesh().setGeometry(box());
+engine.render({ camera: new Camera({ position: [2, 2, 3], target: [0, 0, 0] }) });
 
 const result = await compareImages(await readPixels(engine), await readFile('reference.png'));
 if (!result.pass) await writeFile('difference.png', await encodePNG(result.image));
@@ -165,13 +175,19 @@ loads a codec: JPEG and lossless WebP are written in plain code, so they work in
 
 ```ts
 import { writeFile } from 'node:fs/promises';
-import { readPixels } from '@margoengine/headless';
+import { readPixels, createHeadlessCanvas, installGPU } from '@margoengine/headless';
 import { encodeEXR, encodeJPEG, encodeWebP, readTexture } from '@margoengine/headless/formats';
-import { Engine } from '@margoengine/core';
-import type { PostStack } from '@margoengine/post/stack';
+import { Engine, box, Camera } from '@margoengine/core';
+import { PostStack } from '@margoengine/post/stack';
+import { Bloom } from '@margoengine/post/bloom';
+import { create } from 'webgpu';
 
-declare const engine: Engine; // on a headless canvas, with the scene drawn
-declare const stack: PostStack; // attached to the engine, with an HDR effect
+using installed = installGPU({ gpu: create([]) });
+const engine = await Engine.create(createHeadlessCanvas({ width: 512, height: 512 }), { backend: 'webgpu' });
+engine.createMesh().setGeometry(box());
+engine.render({ camera: new Camera({ position: [2, 2, 3], target: [0, 0, 0] }) });
+const stack = PostStack.attach(engine, [new Bloom({ strength: 0.6 })]);
+engine.render({ camera: new Camera({ position: [2, 2, 3], target: [0, 0, 0] }) });
 
 const pixels = await readPixels(engine);
 await writeFile('preview.jpg', encodeJPEG(pixels, { quality: 85 }));

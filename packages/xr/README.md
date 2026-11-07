@@ -56,7 +56,7 @@ when the session ends. Not yet tried on an AR headset or phone; tested against t
 import { Engine, box } from 'margoengine/core';
 import { XR, HitTest } from 'margoengine/xr';
 
-declare const canvas: HTMLCanvasElement;
+const canvas = document.querySelector('canvas')!;
 const engine = await Engine.create(canvas, { backend: 'webgpu' });
 const reticle = engine.createMesh().setGeometry(box(0.2, 0.01, 0.2));
 const xr = await XR.create(engine);

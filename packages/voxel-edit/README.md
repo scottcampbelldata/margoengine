@@ -12,8 +12,8 @@ import { sphereCells, connectedCells } from 'margoengine/voxel-edit/edit';
 import { pickRay, raycastGrid } from 'margoengine/voxel-edit/pick';
 import { meshGrid } from 'margoengine/voxel-edit/mesh';
 import {Engine} from 'margoengine/core';
-declare const ndcX: number;
-declare const ndcY: number;
+const ndcX = 0;
+const ndcY = 0;
 const engine = await Engine.create(document.querySelector('canvas')!);
 
 const model: VoxelGrid = { size: [32, 32, 32], voxels: new Uint8Array(32 * 32 * 32) };

@@ -9,12 +9,13 @@ Build from source with `npm run build` in `packages/labels`.
 ```ts
 import {LabelRenderer} from 'margoengine/labels';
 import {Engine} from 'margoengine/core';
-import type {Mesh} from 'margoengine/core';
-declare const pump: Mesh;
-declare const screen: Mesh;
-declare const makeButton: () => HTMLElement;
-declare const isBlocked: (from: readonly number[], to: readonly number[]) => boolean;
+import {createMesh} from 'margoengine/materials';
+import {box} from 'margoengine/core';
+const makeButton = () => Object.assign(document.createElement('button'), {textContent: 'Open'});
+const isBlocked = (from: readonly number[], to: readonly number[]) => to[1] < from[1] - 10; // your own ray test
 const engine = await Engine.create(document.querySelector('canvas')!);
+const pump = engine.createMesh().setGeometry(box());
+const screen = engine.createMesh().setGeometry(box());
 
 const labels = LabelRenderer.attach(engine);
 

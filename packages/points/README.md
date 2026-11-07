@@ -9,11 +9,12 @@ Build from source with `npm run build` in `packages/points`.
 ```ts
 import {Engine} from 'margoengine/core';
 import {PointsPlugin, PointCloud, SpriteBatch, atlasRect} from 'margoengine/points';
-import type {Mesh} from 'margoengine/core';
-declare const mesh: Mesh;
+import {createMesh} from 'margoengine/materials';
+import {box} from 'margoengine/core';
 const canvas = document.querySelector('canvas')!;
 
 const engine = await Engine.create(canvas);
+const mesh = engine.createMesh().setGeometry(box());
 const points = PointsPlugin.attach(engine, {pointBudget: 2_000_000});
 
 // Any {positions, colors?, normals?} works, including the point-cloud output of @margoengine/loaders.
@@ -176,7 +177,7 @@ frame, no recompile). More than 6 planes throw a RangeError, a malformed plane o
 ```ts
 import {Engine} from 'margoengine/core';
 import {PointsPlugin, PointCloud} from 'margoengine/points';
-declare const canvas: HTMLCanvasElement;
+const canvas = document.querySelector('canvas')!;
 const engine = await Engine.create(canvas);
 const points = PointsPlugin.attach(engine);
 // Section a scan: keep x <= 2 and z >= 0.

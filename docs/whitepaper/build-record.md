@@ -1205,11 +1205,12 @@ An audit of the finished batches against their job text listed 70 gaps for the H
 | README examples | README examples set up what they use: 289 errors to 17, ragdoll and rigging left | DONE | `297014232` | - |
 | 3MF loaded | export3MF takes a textured model loaded in an engine, as STL does | DONE | `bec3f89d1` | LIM-269 |
 | README ragdoll | Ragdoll README examples set up what they use: 17 errors to 1 | DONE | `d80e1cbba` | - |
-| Texture 1 | WebP reading | DONE | this commit | LIM-285 |
-| Texture 2 | BC on the CPU, DDS array size 0 | DONE | this commit | LIM-285 |
-| Texture 3 | decodeImage, KTX2 in Node | DONE | this commit | LIM-285 |
-| Texture 4 | exportOBJ and compressTextures on held textures | DONE | this commit | LIM-285 |
-| README 1 | last README error, Skeleton in rigging types | DONE | this commit | - |
+| Texture 1 | WebP reading | DONE | `2c950e3a5` | LIM-285 |
+| Texture 2 | BC on the CPU, DDS array size 0 | DONE | `ef1057cd1` | LIM-285 |
+| Texture 3 | decodeImage, KTX2 in Node | DONE | `8969ed132` | LIM-285 |
+| Texture 4 | exportOBJ and compressTextures on held textures | DONE | `7f23a4c4a` | LIM-285 |
+| README 1 | last README error, Skeleton in rigging types | DONE | `3cd3d347d` | - |
+| README stand-ins | README examples run as pasted | DONE | this commit | - |
 
 ## LAZ: one LAS reader, and every point format on a real file
 

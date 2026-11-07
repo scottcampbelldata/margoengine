@@ -70,9 +70,9 @@ worker.onmessage = ({ data }) => world.addChunk(0, 1, 0, VoxelChunk.unpack(data)
 
 ```ts
 import { BlockTypes, VoxelWorld, connectStairs, doubleSlabState, slabState, stairState, waterlogState } from 'margoengine/voxel';
-declare const x: number;
-declare const y: number;
-declare const z: number;
+const x = 0;
+const y = 0;
+const z = 0;
 
 const blocks = new BlockTypes();
 const world = new VoxelWorld({ blocks });
@@ -105,13 +105,13 @@ player body.
 import { BlockTypes, VoxelWorld } from 'margoengine/voxel';
 import { raycastVoxels, sweepBox, VoxelCharacter } from 'margoengine/voxel/query';
 import {Engine} from 'margoengine/core';
-declare const vx: number;
-declare const dt: number;
-declare const vy: number;
-declare const vz: number;
-declare const forwardX: number;
-declare const forwardZ: number;
-declare const sprint: boolean;
+const vx = 0;
+const dt = 1 / 60;
+const vy = 0;
+const vz = 0;
+const forwardX = 0;
+const forwardZ = 1;
+const sprint = false;
 const engine = await Engine.create(document.querySelector('canvas')!);
 
 const blocks = new BlockTypes();
@@ -174,9 +174,9 @@ largest possible chunk (262,148 bytes), and anything malformed throws a `RangeEr
 import { encodeChunk, decodeChunk, encodeBlockChanges, applyBlockChanges, EntityCodec } from 'margoengine/voxel/codec';
 import { IndexedDBChunkStore, MemoryChunkStore } from 'margoengine/voxel/stream';
 import { BlockTypes, VoxelChunk, VoxelWorld } from 'margoengine/voxel';
-declare const cx: number;
-declare const cy: number;
-declare const cz: number;
+const cx = 0;
+const cy = 0;
+const cz = 0;
 
 const blocks = new BlockTypes();
 const world = new VoxelWorld({ blocks }), otherWorld = new VoxelWorld({ blocks });
@@ -301,11 +301,13 @@ Sky and block light in the chunks' light bytes, by breadth-first flood fill on t
 ```ts
 import { VoxelLighting, MAX_LIGHT } from 'margoengine/voxel/light';
 import {Engine} from 'margoengine/core';
-import type {VoxelWorld} from 'margoengine/voxel';
-declare const world: VoxelWorld;
-declare const x: number;
-declare const y: number;
-declare const z: number;
+import {BlockTypes, VoxelWorld} from 'margoengine/voxel';
+const blocks = new BlockTypes();
+blocks.define('stone');
+const world = new VoxelWorld({ blocks });
+const x = 0;
+const y = 0;
+const z = 0;
 const engine = await Engine.create(document.querySelector('canvas')!);
 
 const lighting = VoxelLighting.attach(world, { budget: 4096 }); // also lights the chunks already loaded
@@ -415,14 +417,16 @@ import { PbrMaterial, createMesh } from 'margoengine/materials';
 import { Physics } from 'margoengine/physics';
 import { VoxelPhysics } from 'margoengine/voxel/physics';
 import {Engine} from 'margoengine/core';
-import type {Mesh} from 'margoengine/core';
-import type {VoxelWorld} from 'margoengine/voxel';
-declare const world: VoxelWorld;
-declare const mesh: Mesh;
-declare const x: number;
-declare const y: number;
-declare const z: number;
+import {BlockTypes, VoxelWorld} from 'margoengine/voxel';
+import {box} from 'margoengine/core';
+const blocks = new BlockTypes();
+blocks.define('stone');
+const world = new VoxelWorld({ blocks });
+const x = 0;
+const y = 0;
+const z = 0;
 const engine = await Engine.create(document.querySelector('canvas')!);
+const mesh = engine.createMesh().setGeometry(box());
 
 await RAPIER.init();
 const ball = createMesh(engine, sphereGeometry(0.5, 16, 8), new PbrMaterial()).root;
@@ -568,8 +572,10 @@ generator, `noiseTerrain`, and `serveVoxelGenerator` for your own.
 ```ts
 import { IndexedDBChunkStore, VoxelStreamer } from 'margoengine/voxel/stream';
 import {Engine} from 'margoengine/core';
-import type {VoxelWorld} from 'margoengine/voxel';
-declare const world: VoxelWorld;
+import {BlockTypes, VoxelWorld} from 'margoengine/voxel';
+const blocks = new BlockTypes();
+blocks.define('stone');
+const world = new VoxelWorld({ blocks });
 const engine = await Engine.create(document.querySelector('canvas')!);
 
 const streamer = VoxelStreamer.attach(engine, {
@@ -667,9 +673,9 @@ import { BlockTextures, VoxelRenderer } from 'margoengine/voxel/render';
 import { VoxelLighting } from 'margoengine/voxel/light';
 import { BlockTypes, VoxelWorld } from 'margoengine/voxel';
 import {Engine} from 'margoengine/core';
-declare const x: number;
-declare const y: number;
-declare const z: number;
+const x = 0;
+const y = 0;
+const z = 0;
 const canvas = document.querySelector('canvas')!;
 const engine = await Engine.create(canvas);
 const blocks = new BlockTypes();
@@ -764,9 +770,9 @@ import { Sky } from 'margoengine/sky';
 import { BlockTypes, VoxelWorld } from 'margoengine/voxel';
 import { BlockTextures, VoxelRenderer } from 'margoengine/voxel/render';
 import {Engine} from 'margoengine/core';
-declare const x: number;
-declare const y: number;
-declare const z: number;
+const x = 0;
+const y = 0;
+const z = 0;
 const engine = await Engine.create(document.querySelector('canvas')!);
 
 const world = new VoxelWorld({ blocks: new BlockTypes() });

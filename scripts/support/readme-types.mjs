@@ -55,6 +55,18 @@ export function readmeExamples(markdown) {
   return examples.map((code) => `${code}\nexport {};\n`);
 }
 
+/**
+ * The stand-ins of a Markdown text: every `declare` of a value in its examples, as trimmed lines. Such a line satisfies
+ * the compiler but holds nothing at run time, so the example it serves does not run as pasted.
+ */
+export function standIns(markdown) {
+  const found = [];
+  for (const [, code] of markdown.matchAll(/```(?:tsx?|js)\r?\n([\s\S]*?)```/g))
+    for (const [line] of code.matchAll(/^[ \t]*declare\s+(?:const|let|var|function|class)\b.*$/gm))
+      found.push(line.trim());
+  return found;
+}
+
 /** The README and guides (docs/*.md) of a package folder: [{ document, markdown }]; `readme` first. */
 export function packageMarkdown(folder) {
   const found = [];

@@ -122,9 +122,12 @@ Milky glass and jade come from `KHR_materials_volume_scatter` (draft, Khronos pu
 
 ```ts
 import {transmission} from 'margoengine/materials';
-import type {PBRModel} from 'margoengine/gltf-pro';
-declare const model: PBRModel;
-declare const opaqueColor: GPUTextureView;
+import {Engine} from 'margoengine/core';
+import {loadGLTF} from 'margoengine/gltf-pro';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const model = await loadGLTF(engine, '/model.glb');
+// The opaque scene, drawn here by your own pass before this primitive.
+const opaqueColor = engine.gpu!.createTexture({size: [1024, 1024], format: 'rgba16float', usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING}).createView();
 for (const primitive of model.primitives)
   primitive.extension = transmission({
     opaqueColor,
@@ -182,8 +185,8 @@ vertex's tile index.
 
 ```ts
 import {padTileGrid, remapTileUVs} from 'margoengine/materials/atlas';
-declare const tileset: {data: Uint8Array; width: number; height: number};
-declare const uvs: Float32Array, tileOfVertex: Uint32Array;
+const tileset = {data: new Uint8Array(64 * 64 * 4).fill(255), width: 64, height: 64}; // 4 x 4 tiles of 16 pixels
+const uvs = new Float32Array([0.25, 0.25, 0.5, 0.25, 0.5, 0.5]), tileOfVertex = new Uint32Array([5, 5, 5]);
 const grid = padTileGrid(tileset, {tileWidth: 16, tileHeight: 16, padding: 2});
 const padded = remapTileUVs(uvs, tileOfVertex, grid, {width: tileset.width, height: tileset.height});
 ```
@@ -415,7 +418,7 @@ rows at once:
 import { Engine } from 'margoengine/core';
 import { Material, createInstancedMesh } from 'margoengine/materials';
 import { boxGeometry } from 'margoengine/geometry';
-declare const canvas: HTMLCanvasElement;
+const canvas = document.querySelector('canvas')!;
 const engine = await Engine.create(canvas);
 const boxes = createInstancedMesh(engine, boxGeometry(1, 1, 1), new Material({ color: '#4080c0' }), 1000);
 const matrices = new Float32Array(1000 * 16);
@@ -711,8 +714,8 @@ import { ContactShadows } from '@margoengine/staging';
 import { PbrMaterial, createMesh, loadTexture } from '@margoengine/materials';
 import { planeGeometry } from '@margoengine/geometry';
 import {Engine} from '@margoengine/core';
-declare const x: number;
-declare const y: number;
+const x = 0;
+const y = 0;
 const engine = await Engine.create(document.querySelector('canvas')!);
 
 Picking.attach(engine);
@@ -744,7 +747,7 @@ import { PbrMaterial, createMesh, loadTexture } from 'margoengine/materials';
 import { alphaHash } from 'margoengine/materials/alpha-hash';
 import { planeGeometry } from 'margoengine/geometry';
 import { TAA } from 'margoengine/taa';
-declare const canvas: HTMLCanvasElement;
+const canvas = document.querySelector('canvas')!;
 const engine = await Engine.create(canvas);
 const hair = new PbrMaterial({ map: await loadTexture('/strands.png'), side: 'double', features: [alphaHash()] });
 const card = createMesh(engine, planeGeometry(1, 1), hair);
@@ -778,7 +781,7 @@ import { Engine } from 'margoengine/core';
 import { PbrMaterial, createMesh, loadTexture } from 'margoengine/materials';
 import { stochasticTiling } from 'margoengine/materials/stochastic';
 import { planeGeometry } from 'margoengine/geometry';
-declare const canvas: HTMLCanvasElement;
+const canvas = document.querySelector('canvas')!;
 const engine = await Engine.create(canvas);
 const repeat = { wrapS: 'repeat', wrapT: 'repeat' } as const;
 const floor = new PbrMaterial({
@@ -820,7 +823,7 @@ import { eye } from 'margoengine/materials/eye';
 import { hair } from 'margoengine/materials/hair';
 import { skin } from 'margoengine/materials/skin';
 import { sphereGeometry } from 'margoengine/geometry';
-declare const canvas: HTMLCanvasElement;
+const canvas = document.querySelector('canvas')!;
 const engine = await Engine.create(canvas);
 const ball = sphereGeometry(0.012, 64, 48); // an eyeball 24 mm across
 createMesh(engine, ball, new PbrMaterial({ color: [0.3, 0.17, 0.08, 1], features: [hair({ direction: [0, -1, 0] })] }));
@@ -894,7 +897,7 @@ import { Engine } from 'margoengine/core';
 import { PbrMaterial, createMesh, loadTexture } from 'margoengine/materials';
 import { objectNormal } from 'margoengine/materials/object-normal';
 import { sphereGeometry } from 'margoengine/geometry';
-declare const canvas: HTMLCanvasElement;
+const canvas = document.querySelector('canvas')!;
 const engine = await Engine.create(canvas);
 const normalMap = await loadTexture('/scan-normals.png', { colorSpace: 'linear' });
 const scan = new PbrMaterial({ normalMap, features: [objectNormal({ up: 'z' })] });
@@ -1031,7 +1034,7 @@ import { LambertMaterial, PbrMaterial, ShadowCatcherMaterial, createMesh, loadTe
 import { boxGeometry, planeGeometry, sphereGeometry } from 'margoengine/geometry';
 import { Shadows } from 'margoengine/shadows';
 import {WgslMaterial} from 'margoengine/materials';
-declare const canvas: HTMLCanvasElement;
+const canvas = document.querySelector('canvas')!;
 const engine = await Engine.create(canvas);
 const [bricks, bricksHeight, rock] = await Promise.all(
   ['/bricks.png', '/bricks-height.png', '/rock.png'].map((url) => loadTexture(url)),
@@ -1250,7 +1253,7 @@ import { Engine } from 'margoengine/core';
 import { Material } from 'margoengine/materials';
 import { BatchedMesh } from 'margoengine/materials/batched';
 import { boxGeometry, sphereGeometry } from 'margoengine/geometry';
-declare const canvas: HTMLCanvasElement;
+const canvas = document.querySelector('canvas')!;
 const engine = await Engine.create(canvas);
 const batch = BatchedMesh.attach(engine, new Material({ roughness: 0.5 }), { maxItems: 1000, maxVertices: 200_000 });
 const crate = batch.add(boxGeometry(1, 1, 1), { color: '#c08040' });
@@ -1283,7 +1286,7 @@ contact shadows, local shadows).
 import { Engine } from 'margoengine/core';
 import { Material, createMesh } from 'margoengine/materials';
 import { torusKnotGeometry } from 'margoengine/geometry';
-declare const canvas: HTMLCanvasElement;
+const canvas = document.querySelector('canvas')!;
 const engine = await Engine.create(canvas, { features: ['clip-distances'] }); // where the adapter has it
 const material = new Material({ color: '#e0a040', doubleSided: true, clippingPlanes: [[0, -1, 0, 0.5]] });
 createMesh(engine, torusKnotGeometry(), material); // everything above y = 0.5 is cut away

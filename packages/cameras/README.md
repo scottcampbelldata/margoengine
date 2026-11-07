@@ -9,11 +9,11 @@ same view. It uses core's `camera.project` and `camera.up` hooks.
 ```ts
 import {Engine} from 'margoengine/core';
 import {CameraProjection} from 'margoengine/cameras';
-import type {PBRModel} from 'margoengine/gltf-pro';
-declare const model: PBRModel;
+import {loadGLTF} from 'margoengine/gltf-pro';
 const canvas = document.querySelector('canvas')!;
 
 const engine = await Engine.create(canvas, {camera: {position: [0, 40, 0], target: [0, 0, 0]}}); // straight down
+const model = await loadGLTF(engine, '/model.glb');
 const projection = CameraProjection.attach(engine); // orthographic, framed like the perspective view at the target
 
 projection.mode = 'perspective';             // toggle at any time; vertical views keep working
@@ -75,8 +75,8 @@ import {Raycaster} from 'margoengine/bvh';
 import {Engine} from 'margoengine/core';
 import {boxGeometry} from 'margoengine/geometry';
 import {Material, createMesh} from 'margoengine/materials';
-declare const x: number;
-declare const y: number;
+const x = 0;
+const y = 0;
 const engine = await Engine.create(document.querySelector('canvas')!);
 
 const material = new Material({color: '#8d99a6', doubleSided: true});
@@ -120,8 +120,8 @@ mask shares a bit with its own. Core does the filtering while it collects instan
 import {ALL_LAYERS, layerMask, setCameraLayers, setRenderLayers, withLayers} from 'margoengine/cameras/layers';
 import {Reflector} from 'margoengine/environment/reflector';
 import {loadGLTF} from 'margoengine/gltf-pro';
-import {Engine, type Camera} from 'margoengine/core';
-declare const top: Camera;
+import {Camera, Engine} from 'margoengine/core';
+const top = new Camera({position: [0, 20, 0], target: [0, 0, 0]});
 const engine = await Engine.create(document.querySelector('canvas')!);
 
 const helpers = await loadGLTF(engine, '/helpers.glb');
@@ -296,8 +296,8 @@ and resamples it as a Panini or a fisheye picture, in a `PostStack`. WebGPU, per
 import {PostStack} from 'margoengine/post';
 import {WideAngle} from 'margoengine/cameras/panini';
 import {Engine} from 'margoengine/core';
-declare const px: number;
-declare const py: number;
+const px = 0;
+const py = 0;
 const canvas = document.querySelector('canvas')!;
 const engine = await Engine.create(canvas);
 

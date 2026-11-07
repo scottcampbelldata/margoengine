@@ -20,11 +20,11 @@ await server.listen(8787, '0.0.0.0');
 // Client (browser): the world fills from the server; lighting and the renderer follow world.onChunk as usual.
 import { connectVoxelNet, Keys } from 'margoengine/voxel-net';
 import {Engine} from 'margoengine/core';
-declare const yaw: number;
-declare const pitch: number;
-declare const x: number;
-declare const y: number;
-declare const z: number;
+const yaw = 0;
+const pitch = 0;
+const x = 0;
+const y = 0;
+const z = 0;
 const engine = await Engine.create(document.querySelector('canvas')!);
 const world = new VoxelWorld({ blocks });
 const drawBox = (...pose: unknown[]) => console.log(...pose); // your renderer

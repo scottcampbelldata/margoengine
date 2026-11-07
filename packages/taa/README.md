@@ -66,7 +66,7 @@ TAA.attach(engine, {stochastic: true});
 ```ts
 import {Engine} from 'margoengine/core';
 import {TAAUpscale} from 'margoengine/taa/upscale';
-declare const canvas: HTMLCanvasElement;
+const canvas = document.querySelector('canvas')!;
 const engine = await Engine.create(canvas, {backend: 'webgpu'});
 const upscale = TAAUpscale.attach(engine, {scale: 0.67, sharpen: 0.2});
 upscale.options.scale = 0.5; // options are read every frame, so a ResolutionScaler can drive this

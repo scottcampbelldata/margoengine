@@ -63,13 +63,13 @@ option as `cache.fetch`, and every file a loader requests through it counts as o
 external buffers, `mtllib` files and textures the loader resolves next to it.
 
 ```ts
-import type {EngineKernel} from 'margoengine/core';
 import {AssetCache} from 'margoengine/cache';
 import {LoadingManager} from 'margoengine/cache/manager';
 import {loadGLTF} from 'margoengine/gltf-pro';
 import {loadOBJ} from 'margoengine/loaders/mtl';
-declare const engine: EngineKernel;
-declare const dropped: Map<string, File>; // files dropped on the page, by name
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const dropped = new Map<string, File>(); // filled by your drop handler: files dropped on the page, by name
 
 const cache = new AssetCache({name: 'plant-viewer'});
 const manager = new LoadingManager({
