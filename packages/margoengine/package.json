@@ -1642,6 +1642,10 @@
       "types": "./dist/navmesh/debug.d.ts",
       "import": "./dist/navmesh/debug.js"
     },
+    "./navmesh/voxel": {
+      "types": "./dist/navmesh/voxel.d.ts",
+      "import": "./dist/navmesh/voxel.js"
+    },
     "./navmesh/tiles": {
       "types": "./dist/navmesh/tiles.d.ts",
       "import": "./dist/navmesh/tiles.js"

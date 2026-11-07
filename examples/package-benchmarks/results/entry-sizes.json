@@ -1,5 +1,5 @@
 {
-  "commit": "fade1424e",
+  "commit": "6d32962e3",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -1724,6 +1724,10 @@
       "./debug": {
         "raw": 3215,
         "gzip": 1499
+      },
+      "./voxel": {
+        "raw": 43000,
+        "gzip": 15564
       },
       "./tiles": {
         "raw": 41023,

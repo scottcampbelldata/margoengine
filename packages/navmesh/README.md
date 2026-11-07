@@ -2,7 +2,7 @@
 
 Import `margoengine/navmesh` from the `margoengine` package, or `@margoengine/navmesh` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
-Dependency-free navigation: A* chooses a polygon corridor, the funnel algorithm pulls it taut, reciprocal ORCA selects collision-avoiding agent velocities in XZ, a `Crowd` manager walks agents along routes with area costs, off-mesh links and obstacles, `@margoengine/navmesh/build` generates the walkable polygons from level triangles, `@margoengine/navmesh/tiles` cuts big worlds into tiles that rebuild at run time, `@margoengine/navmesh/codec` bakes meshes to bytes, `@margoengine/navmesh/links` finds the jumps a level allows, `@margoengine/navmesh/hierarchy` keeps long routes cheap, and `@margoengine/navmesh/debug` draws it all.
+Dependency-free navigation: A* chooses a polygon corridor, the funnel algorithm pulls it taut, reciprocal ORCA selects collision-avoiding agent velocities in XZ, a `Crowd` manager walks agents along routes with area costs, off-mesh links and obstacles, `@margoengine/navmesh/build` generates the walkable polygons from level triangles, `@margoengine/navmesh/tiles` cuts big worlds into tiles that rebuild at run time, `@margoengine/navmesh/codec` bakes meshes to bytes, `@margoengine/navmesh/links` finds the jumps a level allows, `@margoengine/navmesh/hierarchy` keeps long routes cheap, `@margoengine/navmesh/debug` draws it all, and `@margoengine/navmesh/voxel` builds straight from voxel chunks.
 
 ```ts
 import {NavMesh} from 'margoengine/navmesh';
@@ -282,6 +282,32 @@ console.log(positions.length / 6, colors.length);
 ```
 
 `NavDebug` draws a `NavMesh` or `TiledNavMesh`: shared edges, outlines (tile lines among them, so tiles show), and off-mesh links as arcs; a `crowd` adds a ring per agent coloured by state (idle grey, moving green, off-mesh amber, arrived blue, unreachable red), its velocity and the rest of its route. `showRoute(route)` shows one route, and `null` clears it. Options: `lift` (0.05 world units off the ground), `width` (1.5 CSS pixels) and `colors`, which takes `inner`, `outline`, `link`, `route` and `agents` by state as linear `[r, g, b]`. `meshLines`, `routeLines` and `crowdLines` return `{positions, colors}` as segment pairs: pass them to `new Line({mode: 'segments', positions, colors})`. `dispose` takes the lines away; `using` works.
+
+## Navmesh from voxel worlds (`./voxel`)
+
+```ts
+import {BlockTypes, VoxelWorld} from 'margoengine/voxel';
+import {VoxelNavMesh} from 'margoengine/navmesh/voxel';
+
+const blocks = new BlockTypes();
+const stone = blocks.define('stone', {});
+const world = new VoxelWorld({blocks, minY: -32, maxY: 95});
+for (let x = 0; x < 64; x++) for (let z = 0; z < 64; z++) world.setBlock(x, 0, z, stone);
+
+// No triangles: tiles read the chunks. Sizes in cells, as in `./build`.
+const mesh = new VoxelNavMesh(world, {walkableRadius: 1, walkableHeight: 8, walkableClimb: 2, tileSize: 32});
+console.log(mesh.path([5, 1, 5], [60, 1, 60]));
+
+// Blocks change: the tiles that see them wait for update, as many a frame as you allow.
+for (let z = 0; z < 60; z++) for (let y = 1; y < 4; y++) world.setBlock(32, y, z, stone);
+mesh.update(4);
+mesh.update();
+console.log(mesh.path([5, 1, 5], [60, 1, 5])); // round the new wall
+
+mesh.dispose(); // stops listening to the world
+```
+
+`VoxelNavMesh` is a `TiledNavMesh`: routes, off-mesh links, `update`, a `Crowd`, `./debug` and `./hierarchy` all work on it. Its options are those of `./tiles`, with `cs` 0.5 and `ch` 0.25 by default, each one block over a whole number, and `solid(type, state)` to choose what is ground and what bumps a walker, by default `BlockType.solid`: pass `(type) => type.solid || type.liquid` for a walker that wades. A slab or stair counts as the half blocks it fills, and unloaded chunks are air. Chunks that load or unload mark their tiles too.
 
 Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 

@@ -2338,7 +2338,7 @@
     "package": "@margoengine/navmesh",
     "version": "1.0.0",
     "published": false,
-    "description": "Convex polygon navigation with A*, funnel paths and ORCA avoidance; navmesh generation from triangles (./build) tiled meshes that rebuild at run time (./tiles), baked files (./codec), jump links (./links), long routes (./hierarchy) and debug draw (./debug).",
+    "description": "Convex polygon navigation with A*, funnel paths and ORCA avoidance; navmesh generation from triangles (./build) tiled meshes that rebuild at run time (./tiles), baked files (./codec), jump links (./links), long routes (./hierarchy), debug draw (./debug) and voxel worlds (./voxel).",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "navmesh",
     "install": "npm install @margoengine/core@1.0.0 @margoengine/navmesh@1.0.0",

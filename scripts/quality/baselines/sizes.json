@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10367092,
+  "total": 10383123,
   "history": [
     {
       "date": "2026-10-24",
@@ -3398,6 +3398,12 @@
       "commit": "727a36ac1",
       "reason": "new optional entry @margoengine/navmesh/debug",
       "grew": 2
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "212863285",
+      "reason": "new optional entry @margoengine/navmesh/voxel",
+      "grew": 1
     }
   ],
   "items": {
@@ -3809,6 +3815,7 @@
     "@margoengine/navmesh/hierarchy": 4250,
     "@margoengine/navmesh/links": 4288,
     "@margoengine/navmesh/tiles": 15113,
+    "@margoengine/navmesh/voxel": 16031,
     "@margoengine/net": 1371,
     "@margoengine/netcode": 12865,
     "@margoengine/netcode/generate": 5154,
