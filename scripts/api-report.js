@@ -3,7 +3,8 @@
 // types those declarations reference but the entry does not export. One report per entry in api/, like API Extractor's
 // .api.md. `npm run api:check` (default) fails with a diff when a report changed; `npm run api:update` rewrites them and
 // docs/api-surface.md. `--package=<name>` and optional `--entry=<subpath>` limit checking and updates to one package
-// or entry. Needs the selected declarations to be built first. Uses TypeScript 7's checker through its
+// or entry; the program still loads every package's declarations, because another package's `declare module` changes
+// this package's symbols, so a scoped report is the same text the full run writes. Needs `npm run build:packages`. Uses TypeScript 7's checker through its
 // `typescript/unstable/sync` API (no extra dependency); that API is marked unstable, so a TypeScript bump may need edits.
 import { API, SymbolFlags } from 'typescript/unstable/sync';
 import { SyntaxKind } from 'typescript/unstable/ast';
@@ -38,14 +39,13 @@ for (const dir of readdirSync(join(root, 'packages')).sort(byText)) {
   const file = join(root, 'packages', dir, 'package.json');
   if (!existsSync(file)) continue;
   const manifest = JSON.parse(readFileSync(file, 'utf8'));
-  const selected = packageMatchesApiReportScope(packageSelector, dir, manifest.name);
   // margoengine/<x> aliases re-export @margoengine/<x>, which has its own report (scripts/umbrella.mjs).
   const entries = Object.entries(manifest.exports ?? {})
     .filter(([subpath]) => !isUmbrellaAlias(manifest.name, subpath))
     .map(([subpath, target]) => {
       const types = typeof target === 'string' ? target.replace(/\.js$/, '.d.ts') : target.types;
       const dts = join(root, 'packages', dir, types);
-      if (selected && !existsSync(dts))
+      if (!existsSync(dts))
         throw new Error(`${manifest.name} "${subpath}": ${types} missing; run npm run build:packages`);
       const suffix = subpath === '.' ? '' : '.' + subpath.slice(2).replaceAll('/', '-');
       return {
@@ -80,7 +80,8 @@ const ownerOf = (path) => {
   return name === 'typescript' || a === '@typescript' ? undefined : name;
 };
 
-// One program over every entry.
+// One program over every entry, scoped or not: a scoped program without the other packages missed their `declare module`
+// merges, so `--package=core` dropped a class from api/core.extension.api.md that the full run keeps.
 const temp = mkdtempSync(join(tmpdir(), 'margo-api-'));
 writeFileSync(
   join(temp, 'tsconfig.json'),
@@ -94,7 +95,7 @@ writeFileSync(
       skipLibCheck: true,
       noEmit: true,
     },
-    files: (scopedPackage ? [scopedPackage] : packages).flatMap((pkg) => pkg.entries.map((entry) => entry.dts)),
+    files: packages.flatMap((pkg) => pkg.entries.map((entry) => entry.dts)),
   }),
 );
 const api = new API({ cwd: root });
@@ -366,11 +367,10 @@ if (update) {
     const old = readFileSync(path, 'utf8').replaceAll('\r\n', '\n');
     if (old !== text) problems.push(`api/${file} changed:\n${diff(old, text)}`);
   }
-  if (scopedPackage) {
-    const surfacePath = join(root, 'docs', 'api-surface.md');
-    const oldSurface = readFileSync(surfacePath, 'utf8').replaceAll('\r\n', '\n');
-    if (oldSurface !== summary) problems.push(`docs/api-surface.md changed:\n${diff(oldSurface, summary)}`);
-  }
+  // Both modes compare the summary: the full check once skipped it, so a scoped update that wrote a wrong row passed.
+  const surfacePath = join(root, 'docs', 'api-surface.md');
+  const oldSurface = existsSync(surfacePath) ? readFileSync(surfacePath, 'utf8').replaceAll('\r\n', '\n') : '';
+  if (oldSurface !== summary) problems.push(`docs/api-surface.md changed:\n${diff(oldSurface, summary)}`);
   if (problems.length) {
     console.error(problems.join('\n\n'));
     const updateCommand = scopedPackage
