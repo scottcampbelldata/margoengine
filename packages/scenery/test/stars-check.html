@@ -1,0 +1,92 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Scenery Milky Way check</title><style>body{margin:0}canvas{display:block;width:256px;height:192px}</style></head><body><canvas width="256" height="192"></canvas>
+<script type="module">
+// MilkyWay on a real GPU, read back from Bloom's HDR scene capture: on and off (brightness 0), so the difference is the
+// band alone. Each sampled pixel must hold the radiance milkyWayBrightness puts at its direction times the pixel's
+// solid angle; nothing below the horizon, by day or behind a mesh. Driven by scenery-check.mjs (stars).
+import {Engine,PbrMaterial,box} from '/packages/core/dist/index.js';
+import {sceneSamples} from '/packages/core/dist/quality.js';
+import {Bloom} from '/packages/post/dist/bloom.js';
+import {invertMatrixStable} from '/packages/math/dist/mat4.js';
+import {degrees} from '/packages/sky/dist/sun.js';
+import {MilkyWay,galacticCoordinates,milkyWayBrightness} from '/packages/scenery/dist/stars.js';
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
+if(new URLSearchParams(location.search).get('samples')==='1')globalThis.margoLow=1;
+const W=256,H=192,rad=Math.PI/180;
+const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,0,0],target:[0,0,-1],fov:40,near:0.1,far:1000}}),device=engine.gpu,errors=[];
+engine.stop();
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const post=Bloom.attach(engine,{strength:0,threshold:1,exposure:0});
+// From 30 degrees south on a June night the galactic centre stands near the zenith.
+const observer={latitude:degrees(-30),longitude:degrees(20)},date=new Date('2026-06-20T22:00:00Z');
+const band=MilkyWay.attach(engine,{...observer,date,brightness:200,extinction:0,clouds:0});
+const module=device.createShaderModule({code:'@group(0) @binding(0) var image:texture_2d<f32>;@group(0) @binding(1) var<storage,read_write> result:array<vec4f>;@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u){let s=textureDimensions(image);if(any(id.xy>=s)){return;}result[id.y*s.x+id.x]=textureLoad(image,vec2i(id.xy),0);}'});
+const pipeline=device.createComputePipeline({layout:'auto',compute:{module,entryPoint:'main'}});
+async function read(texture){
+ const bytes=texture.width*texture.height*16,output=device.createBuffer({size:bytes,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),staging=device.createBuffer({size:bytes,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+ const encoder=device.createCommandEncoder(),pass=encoder.beginComputePass();pass.setPipeline(pipeline);
+ pass.setBindGroup(0,device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:texture.createView()},{binding:1,resource:{buffer:output}}]}));
+ pass.dispatchWorkgroups(Math.ceil(texture.width/8),Math.ceil(texture.height/8));pass.end();encoder.copyBufferToBuffer(output,0,staging,0,bytes);device.queue.submit([encoder.finish()]);
+ await staging.mapAsync(GPUMapMode.READ);const data=new Float32Array(staging.getMappedRange()).slice();staging.unmap();output.destroy();staging.destroy();return data;
+}
+const frame=async()=>{engine.render({delta:0});await device.queue.onSubmittedWorkDone();return read(post.sceneTexture);};
+// The band alone: a frame with it, less one with brightness 0.
+const bandOnly=async()=>{const on=await frame();band.options.brightness=0;const off=await frame();band.options.brightness=200;return on.map((v,i)=>v-off[i]);};
+const lum=(f,p)=>f[p]+f[p+1]+f[p+2];
+// The world direction through a pixel centre (x, y in pixels, may be fractional).
+const ray=(x,y)=>{
+ const inv=invertMatrixStable(engine.camera.matrix,new Float64Array(16)),nx=x/W*2-1,ny=1-y/H*2,p=[0,1,2,3].map(r=>inv[r]*nx+inv[4+r]*ny+inv[8+r]*1e-6+inv[12+r]);
+ const d=[p[0]/p[3],p[1]/p[3],p[2]/p[3]],n=Math.hypot(...d);return d.map(v=>v/n);
+};
+const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+// What the band must give a pixel: brightness x 10^(-0.4 x 20.5) per square arcsecond, times the pixel's solid angle,
+// times the model, with the bulge's tint (summed over the three channels).
+const expected=(x,y)=>{
+ const d=ray(x+0.5,y+0.5);if(d[1]<=0)return 0;
+ const dx=ray(x+1,y+0.5).map((v,i)=>v-ray(x,y+0.5)[i]),dy=ray(x+0.5,y+1).map((v,i)=>v-ray(x+0.5,y)[i]),omega=Math.hypot(...cross(dx,dy));
+ const {l,b}=galacticCoordinates(d,date,observer),ls=l>180?l-360:l,warm=Math.exp(-(ls*ls+b*b)/450);
+ return 200*10**(-0.4*20.5)/(Math.PI/648000)**2*omega*milkyWayBrightness(l,b)*(3-0.16*warm);
+};
+const aim=(d,fov)=>{engine.camera.fov=fov;engine.camera.target=d;};
+window.check={samples:sceneSamples,
+ async run(){
+  device.pushErrorScope('validation');
+  const out={};
+  // The galactic centre's direction, from its J2000 place through the sky matrix.
+  const {skyMatrix}=await import('/packages/sky/dist/astro.js'),m=skyMatrix(date,observer),ra=266.40499*rad,dec=-28.93617*rad;
+  const j=[Math.cos(dec)*Math.cos(ra),Math.cos(dec)*Math.sin(ra),Math.sin(dec)],centre=[0,1,2].map(r=>m[r*3]*j[0]+m[r*3+1]*j[1]+m[r*3+2]*j[2]);
+  out.centreElevation=Math.asin(centre[1])/rad;
+  // Two fields: on the centre, and 60 degrees away from it toward the zenith's far side, at 40 and 90 degrees of view.
+  let worst=0,measured=0,brightest=0,faintest=Infinity;
+  for(const [target,fov] of [[centre,40],[centre,90],[[centre[0],centre[1]*0.5,centre[2]-0.9],60]]){
+   aim(target,fov);await waitForPipelines(frame);const f=await bandOnly();
+   for(let y=8;y<H-8;y+=23)for(let x=8;x<W-8;x+=31){
+    // Pixels of 0.01 and more, where the half-float sky under the band (quantised to its own value) is under 0.1%.
+    const want=expected(x,y),got=lum(f,(y*W+x)*4);if(want<0.01)continue;
+    worst=Math.max(worst,Math.abs(got/want-1));measured++;brightest=Math.max(brightest,got);faintest=Math.min(faintest,got);
+   }
+  }
+  out.radiance={worst,measured,brightest,faintest};
+  // The star clouds: on, the field's mean stays near the smooth band's, and the pixels spread.
+  aim(centre,40);band.options.clouds=0;const smooth=await bandOnly();band.options.clouds=1;const cloudy=await bandOnly();band.options.clouds=0;
+  let a=0,b=0,spread=0;for(let p=0;p<smooth.length;p+=4){a+=lum(smooth,p);b+=lum(cloudy,p);spread=Math.max(spread,Math.abs(lum(cloudy,p)/Math.max(1e-9,lum(smooth,p))-1));}
+  out.clouds={mean:b/a,spread};
+  // Below the horizon nothing: looking level toward the centre's bearing, no band below the middle row.
+  aim([centre[0],0,centre[2]],40);const level=await bandOnly();
+  let above=0,below=0;for(let y=0;y<H;y++)for(let x=0;x<W;x++){const v=lum(level,(y*W+x)*4);if(v>0){if(y<H/2-1)above++;else if(y>H/2+1)below++;}}
+  out.horizon={above,below};
+  // Behind a mesh nothing: a cube 3 m out toward the left of the view.
+  aim(centre,40);await frame();const mesh=engine.createMesh().setGeometry(box(1,1,1)).setMaterial(new PbrMaterial({color:'#000000',roughness:1}));
+  mesh.setPosition(ray(W*0.25,H*0.5).map(v=>v*3));
+  await waitForPipelines(frame);const hidden=await bandOnly(),cx=Math.round(W*0.25),cy=Math.round(H*0.5);
+  out.occluded={behind:Math.abs(lum(hidden,(cy*W+cx)*4)),open:lum(hidden,(cy*W+Math.round(W*0.75))*4)};
+  mesh.dispose();
+  // By day nothing.
+  band.options.date=new Date('2026-06-20T10:00:00Z');const day=await bandOnly(),dayNight=band.night();band.options.date=date;
+  let dayDrawn=0;for(let p=0;p<day.length;p+=4)if(lum(day,p)!==0)dayDrawn++;
+  out.day={drawn:dayDrawn,night:dayNight};
+  (window.shots??={}).stars={smooth,cloudy};
+  const error=await device.popErrorScope();
+  return {...out,error:error?.message??null,errors:errors.splice(0)};
+ }};
+window.ready=true;
+</script></body></html>

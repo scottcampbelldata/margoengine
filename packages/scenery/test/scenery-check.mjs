@@ -15,7 +15,9 @@ const checks = {
     assert.equal(r.error, null);
     assert.deepEqual(r.errors, []);
     for (const name of ['noon', 'goldenHour', 'overcast', 'dawn'])
-      console.log(`  presets ${samples}x ${name}: ground ${show(r[name].ground)}, wall ${show(r[name].wall)}, sky ${show(r[name].sky)}`);
+      console.log(
+        `  presets ${samples}x ${name}: ground ${show(r[name].ground)}, wall ${show(r[name].wall)}, sky ${show(r[name].sky)}`,
+      );
     // Noon: the brightest ground, under a blue sky (Rayleigh: blue over green over red).
     for (const name of ['goldenHour', 'overcast', 'dawn'])
       assert.ok(sum(r.noon.ground) > sum(r[name].ground), `noon ground brightest, not ${name}`);
@@ -66,7 +68,10 @@ const checks = {
     // within 0.02, the reach of the block's depth across the centre texel and of half-float colour.
     for (const name of names) {
       const want = Math.exp(-expected[name] * 1403);
-      assert.ok(Math.abs(r[name].transmittance - want) < 0.02, `${name} transmittance ${r[name].transmittance}, want ${want}`);
+      assert.ok(
+        Math.abs(r[name].transmittance - want) < 0.02,
+        `${name} transmittance ${r[name].transmittance}, want ${want}`,
+      );
     }
     // set() switches a running scene to the picture of one attached fresh, and dispose removes every plugin it added.
     r.switched.ground.forEach((x, i) =>
@@ -76,6 +81,30 @@ const checks = {
     assert.equal(r.plugins.after, r.plugins.before);
     console.log(
       `ok scenes ${samples}x: ground on screen ${names.map((n) => mean(r[n].ground).toFixed(0)).join(', ')}; fog transmittance ${names.map((n) => r[n].transmittance.toFixed(3)).join(', ')}`,
+    );
+    return r;
+  },
+  async stars(page, samples) {
+    const r = await page.evaluate(() => window.check.run());
+    assert.equal(r.error, null);
+    assert.deepEqual(r.errors, []);
+    console.log(
+      `  stars ${samples}x: centre elevation ${r.centreElevation.toFixed(1)}, ${r.radiance.measured} pixels within ${(100 * r.radiance.worst).toFixed(2)}% (${r.radiance.faintest.toPrecision(3)} to ${r.radiance.brightest.toPrecision(3)}), clouds mean ${r.clouds.mean.toFixed(3)} spread ${r.clouds.spread.toFixed(2)}, horizon ${r.horizon.above} above ${r.horizon.below} below, behind a mesh ${r.occluded.behind} (open ${r.occluded.open.toPrecision(3)}), by day ${r.day.drawn}`,
+    );
+    assert.ok(r.centreElevation > 60, 'the galactic centre stands high');
+    // Each sampled pixel holds the band's radiance times its solid angle: within 1% (0.32% measured on a Radeon 680M),
+    // the reach of half-float colour and of float32 rays.
+    assert.ok(r.radiance.measured >= 60, `${r.radiance.measured} pixels measured`);
+    assert.ok(r.radiance.worst < 0.01, `worst ${r.radiance.worst}`);
+    assert.ok(r.radiance.brightest > 10 * r.radiance.faintest, 'the band stands out of the sky beside it');
+    // Star clouds change the field pixel by pixel but keep its light within 15%.
+    assert.ok(Math.abs(r.clouds.mean - 1) < 0.15, `clouds mean ${r.clouds.mean}`);
+    assert.ok(r.clouds.spread > 0.2, `clouds spread ${r.clouds.spread}`);
+    assert.ok(r.horizon.above > 1000 && r.horizon.below === 0, `horizon ${JSON.stringify(r.horizon)}`);
+    assert.ok(r.occluded.behind === 0 && r.occluded.open > 0, `occluded ${JSON.stringify(r.occluded)}`);
+    assert.deepEqual(r.day, { drawn: 0, night: 0 });
+    console.log(
+      `ok stars ${samples}x: radiance within ${(100 * r.radiance.worst).toFixed(2)}% over ${r.radiance.measured} pixels; clouds mean ${r.clouds.mean.toFixed(3)}`,
     );
     return r;
   },

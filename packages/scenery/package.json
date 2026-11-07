@@ -45,6 +45,10 @@
     "./scenes": {
       "types": "./dist/scenes.d.ts",
       "import": "./dist/scenes.js"
+    },
+    "./stars": {
+      "types": "./dist/stars.d.ts",
+      "import": "./dist/stars.js"
     }
   },
   "files": [

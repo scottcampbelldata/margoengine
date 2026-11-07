@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10620226,
+  "total": 10624988,
   "history": [
     {
       "date": "2026-10-24",
@@ -3698,6 +3698,12 @@
       "commit": "b0ba69cba",
       "reason": "new entry save/engine: captureScene and restoreScene; gltf-pro selectedVariant and ownedMeshes",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "3ab28e97d",
+      "reason": "new entry @margoengine/scenery/stars, 4458 B gzip",
+      "grew": 1
     }
   ],
   "items": {
@@ -4249,6 +4255,7 @@
     "@margoengine/scenery/presets": 1233,
     "@margoengine/scenery/scenes": 17810,
     "@margoengine/scenery/sky": 474,
+    "@margoengine/scenery/stars": 4762,
     "@margoengine/sciviz": 36802,
     "@margoengine/sciviz/bricks": 14265,
     "@margoengine/sciviz/colormaps": 4427,
