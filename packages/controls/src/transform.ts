@@ -27,6 +27,9 @@ import {
 import { basis, intersectPlane, project, ray, type Basis } from './view.js';
 import { viewSize } from '../../shared/view-rect.js';
 
+/** Distance along a ray from `origin` in unit `direction` to the nearest scene surface, null for none. */
+export type GizmoOccluder = (origin: readonly number[], direction: readonly number[]) => number | null;
+
 /** The frame the gizmo axes follow: `world` (the default) or the attached object's `local` axes. */
 export type TransformSpace = 'world' | 'local';
 /**
@@ -64,6 +67,12 @@ export interface TransformControlsOptions {
   showDelta?: boolean;
   /** Hide the parts of the gizmo behind scene geometry instead of drawing on top. Default false. */
   occlude?: boolean;
+  /**
+   * With `occlude`, the distance along a ray to the nearest scene surface, null for none, so a handle behind it cannot be
+   * grabbed or hovered. Picking is on the CPU and has no scene depth: pass a ray cast of your own, such as `@margoengine/bvh`.
+   * Default none: a hidden handle can still be grabbed.
+   */
+  occluder?: GizmoOccluder;
   /** Element to listen on. Defaults to the engine canvas. */
   element?: ControlElement;
   /**
@@ -163,9 +172,11 @@ export class TransformControls extends EventDispatcher {
   showDelta: boolean;
   /**
    * Hide the parts of the gizmo behind scene geometry instead of drawing on top. Default false. Only the drawing
-   * changes: picking is on the CPU and has no scene depth, so a hidden handle can still be grabbed.
+   * changes unless `occluder` is set: picking is on the CPU and has no scene depth, so a hidden handle can still be grabbed.
    */
   occlude: boolean;
+  /** With `occlude`, tells picking how far the scene is along a ray, so a handle behind it takes no pointer. Default none. */
+  occluder: GizmoOccluder | undefined;
   /** Attached mesh, or null. With several attached, the active one: its axes are the `local` frame. */
   object: Mesh | null = null;
   /** Hovered or dragged handle. */
@@ -203,6 +214,7 @@ export class TransformControls extends EventDispatcher {
     this.flipAxes = options.flipAxes ?? false;
     this.showDelta = options.showDelta ?? true;
     this.occlude = options.occlude ?? false;
+    this.occluder = options.occluder;
     this.view = options.view ?? null;
     this.pluginName = `margoengine-controls:transform:${++counter}`;
     const order = options.order ?? 1000;
@@ -513,7 +525,16 @@ export class TransformControls extends EventDispatcher {
     x -= s.x;
     y -= s.y;
     if (x < 0 || y < 0 || x >= s.width || y >= s.height) return null;
-    return pickHandle(buildGizmo(f), s.b, f.origin, x, y, s.width, s.height);
+    const handle = pickHandle(buildGizmo(f), s.b, f.origin, x, y, s.width, s.height);
+    return handle && this.behindScene(s.b, f, x, y, s.width, s.height) ? null : handle;
+  }
+  /** True when the scene is nearer along the pointer's ray than the near side of the gizmo. */
+  private behindScene(b: Basis, f: GizmoFrame, x: number, y: number, width: number, height: number): boolean {
+    if (!this.occlude || !this.occluder) return false;
+    const { origin, direction } = ray(b, x, y, width, height),
+      hit = this.occluder(origin, direction),
+      centre = f.origin.map((value, i) => value - origin[i]);
+    return hit !== null && hit < centre[0] * direction[0] + centre[1] * direction[1] + centre[2] * direction[2] - f.size;
   }
   /** The camera basis and the view's rectangle on the element in CSS pixels (core viewports are fractions unless `pixels`). */
   private screen(): { b: Basis; x: number; y: number; width: number; height: number } | null {

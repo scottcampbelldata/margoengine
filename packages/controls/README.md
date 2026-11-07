@@ -315,7 +315,8 @@ drag; a drag moves the same way whichever way its arrow points. During a drag th
 start (with a small marker) for a move and for an axis or plane scale, and a swept wedge from the grab point for a turn
 on an axis or view ring, which follows snapping and winds past a full turn. A uniform scale and a free turn draw none.
 With `occlude`, handles behind scene geometry are hidden by the scene's depth buffer instead of drawing on top, so the
-part of each arrow inside the object is hidden too.
+part of each arrow inside the object is hidden too. Picking is on the CPU and has no scene depth, so pass `occluder` as well
+to stop a hidden handle taking the pointer: it gets a ray and returns the distance to the nearest surface, or null.
 
 ```ts
 import {Engine, box} from 'margoengine/core';
@@ -527,7 +528,7 @@ any of them.
 | `translationSnap`, `rotationSnap` (radians), `scaleSnap` | Transform | `null` |
 | `heldSnap` (steps used while Ctrl or Meta is held and no snap is set), `keys` (shortcut key codes) | Transform | 0.25, 15 degrees, 0.1; W E R Q + - Escape |
 | `showX`, `showY`, `showZ`, `visible`, `enabled` | Transform | `true` |
-| `flipAxes`, `showDelta`, `occlude` | Transform | `false`, `true`, `false`; see Gizmo arrows, drag lines and occlusion |
+| `flipAxes`, `showDelta`, `occlude`, `occluder` | Transform | `false`, `true`, `false`, none; see Gizmo arrows, drag lines and occlusion |
 | `element`, `order` | Transform | engine canvas, `1000` |
 | `view` (one of `engine.views`: its camera, pointers inside its rectangle, drawn only there) | Transform | `null` (engine camera, whole element) |
 
@@ -536,7 +537,7 @@ any of them.
 - Orbit, map, first-person, pointer-lock and walk controls do not roll (see above). Without `enableRoll`, trackball rotation cannot pass over the poles.
 - Orthographic cameras come from @margoengine/cameras (dolly becomes ortho zoom there; pan and the gizmo read the orthographic height from `camera.matrix`).
 - `attachMany` sizes each object along its own axes: under `world` space or another object's axes, a non-uniform stretch on a turned object gives its axes their share of the stretch instead of a shear.
-- With `occlude`, a handle hidden behind geometry can still be grabbed: picking is on the CPU and has no scene depth. A parent with non-uniform scale and rotation shears its children; `TransformControls` drags use the parent's rotation without the shear.
+- With `occlude` and no `occluder`, a handle hidden behind geometry can still be grabbed: picking is on the CPU and has no scene depth. A parent with non-uniform scale and rotation shears its children; `TransformControls` drags use the parent's rotation without the shear.
 - `DragControls` moves a model whole: `recursive` and `transformGroup` follow core mesh children, not the nodes of a model. Skinned models are grabbed in their bind pose (see @margoengine/bvh).
 
 ## Tests

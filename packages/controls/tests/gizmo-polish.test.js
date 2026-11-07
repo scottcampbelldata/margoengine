@@ -310,3 +310,27 @@ test('occlude: off by default; on, WebGPU tests read-only scene depth and WebGL2
   gizmo.dispose();
   engine.dispose();
 });
+
+test('with occlude and an occluder, a handle behind the scene takes no pointer', async () => {
+  let surface = 2;
+  const seen = [],
+    occluder = (origin, direction) => (seen.push([origin, direction]), surface),
+    { canvas, engine, gizmo, mesh } = await rig([0, 0, 10], { flipAxes: false, occlude: true, occluder }),
+    [x, y] = pixel(engine.camera, [0.5 * gizmo.frame().size, 0, 0]);
+  assert.equal(gizmo.pick(x, y), null, 'a wall 2 units from the eye, the gizmo 10');
+  closeVec(seen[0][0], [0, 0, 10], 1e-9, 'the ray starts at the eye');
+  assert.ok(seen[0][1][2] < -0.9, 'and looks at the gizmo');
+  pointer(canvas, 'pointerdown', x, y);
+  assert.equal(gizmo.dragging, false, 'a hidden handle cannot be grabbed');
+  surface = 100;
+  assert.equal(gizmo.pick(x, y), 'X', 'the scene is behind the gizmo');
+  surface = null;
+  assert.equal(gizmo.pick(x, y), 'X', 'the ray hits nothing');
+  surface = 2;
+  gizmo.occlude = false;
+  assert.equal(gizmo.pick(x, y), 'X', 'occlude off, the handle draws on top and takes the pointer');
+  gizmo.occlude = true;
+  gizmo.occluder = undefined;
+  assert.equal(gizmo.pick(x, y), 'X', 'no occluder: the old behaviour');
+  assert.equal(mesh.position.x, 0);
+});

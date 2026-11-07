@@ -6,6 +6,8 @@
 import { EngineKernel, Mesh, RenderView } from "@margoengine/core";
 import { PassContext } from "@margoengine/core/extension";
 
+export type GizmoOccluder = (origin: readonly number[], direction: readonly number[]) => number | null;
+
 export type HandleName = 'X' | 'Y' | 'Z' | 'XY' | 'YZ' | 'XZ' | 'XYZ' | 'E' | 'XYZE';
 
 export class TransformControls extends EventDispatcher {
@@ -27,6 +29,7 @@ export class TransformControls extends EventDispatcher {
     flipAxes: boolean;
     showDelta: boolean;
     occlude: boolean;
+    occluder: GizmoOccluder | undefined;
     object: Mesh | null;
     axis: HandleName | null;
     dragging: boolean;
@@ -92,6 +95,7 @@ export interface TransformControlsOptions {
     flipAxes?: boolean;
     showDelta?: boolean;
     occlude?: boolean;
+    occluder?: GizmoOccluder;
     element?: ControlElement;
     view?: RenderView;
     order?: number;

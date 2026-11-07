@@ -563,6 +563,7 @@ export class TransformControls extends EventDispatcher {
     flipAxes: boolean;
     showDelta: boolean;
     occlude: boolean;
+    occluder: GizmoOccluder | undefined;
     object: Mesh | null;
     axis: HandleName | null;
     dragging: boolean;
@@ -628,6 +629,7 @@ export interface TransformControlsOptions {
     flipAxes?: boolean;
     showDelta?: boolean;
     occlude?: boolean;
+    occluder?: GizmoOccluder;
     element?: ControlElement;
     view?: RenderView;
     order?: number;
@@ -691,6 +693,8 @@ interface ControlDocument extends EventTargetLike {
     createElement?: Document['createElement'];
     readonly body?: Pick<HTMLElement, 'append'>;
 }
+
+type GizmoOccluder = (origin: readonly number[], direction: readonly number[]) => number | null;
 
 type InputEventListener = {
     handleEvent(event: Event): void;

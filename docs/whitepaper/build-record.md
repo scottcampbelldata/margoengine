@@ -1245,6 +1245,7 @@ An audit of the finished batches against their job text listed 70 gaps for the H
 | test-readers | Five of the six test readers read the file under test; fbx waits | DONE | `4131fd1e1` | - |
 | spawn-einval | Python test scripts never start the Windows app alias; a failed probe fails | DONE | this commit | - |
 | B38 | A loft of sections with holes: holes pair by order, caps leave them open | DONE | this commit | - |
+| B27 | TransformControls occluder: a hidden handle takes no pointer | DONE | this commit | - |
 
 ## LAZ: one LAS reader, and every point format on a real file
 
