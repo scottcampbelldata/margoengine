@@ -60,7 +60,7 @@ export function place(
 ): Placement {
   const known = memo.get(key);
   if (known) return known;
-  ctx.budget.work(64);
+  ctx.budget.sample(64);
   const model = ctx.models.get(key)!,
     local = fbxLocalTransform(model, read(key)),
     parts = decomposeTRS(local),
@@ -137,7 +137,7 @@ const uniform = (s: readonly number[]): boolean =>
 
 /** A TRS in the converted axes of a matrix in the file's, charged as work: animation calls this per sample. */
 export function converted(ctx: SceneContext, m: ArrayLike<number>): TRS {
-  ctx.budget.work(64);
+  ctx.budget.sample(64);
   return decomposeTRS(multiply(multiply(ctx.basis, m), ctx.basisInverse));
 }
 

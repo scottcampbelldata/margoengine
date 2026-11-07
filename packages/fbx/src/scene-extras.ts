@@ -76,14 +76,16 @@ function camera(ctx: SceneContext, source: FBXNode, name: string): CameraData {
     far = read('FarPlane', 4000) * unit,
     znear = near > 0 ? near : 1e-3 * unit;
   if (read('CameraProjectionType', 0) === 1) {
-    const span = read('OrthoZoom', 1) * unit;
+    // The widest side of the view in metres, whatever the file's unit: Blender writes and reads it so at either scale.
+    const span = read('OrthoZoom', 1),
+      wide = aspect > 0 ? aspect : 1;
     if (!(span > 0)) throw new RangeError('Invalid FBX camera zoom; re-export the file, it looks damaged');
     return {
       type: 'orthographic',
       name,
       orthographic: {
-        xmag: span / 2,
-        ymag: span / 2 / (aspect > 0 ? aspect : 1),
+        xmag: (span / 2) * Math.min(wide, 1),
+        ymag: span / 2 / Math.max(wide, 1),
         znear,
         zfar: far > znear ? far : znear * 1e6,
       },

@@ -102,7 +102,7 @@ export async function parseDocument(input: ArrayBuffer | ArrayBufferView, signal
   const binary = binaryMagic.every((value, index) => bytes[index] === value);
   const parsed = binary ? await parseBinary(bytes, budget) : parseASCII(bytes, budget);
   const { roots, version } = parsed;
-  if (!Number.isInteger(version) || version < 7400 || version > 7700) invalid(`unsupported version ${version}`);
+  if (!Number.isInteger(version) || version < 7100 || version > 7700) invalid(`unsupported version ${version}`);
   const objects = new Map<bigint, FBXNode>(),
     connections: FBXConnection[] = [];
   for (const root of roots) {

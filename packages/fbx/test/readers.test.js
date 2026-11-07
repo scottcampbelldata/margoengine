@@ -265,7 +265,7 @@ test('ASCII counts, incomplete syntax, versions, and unsafe integers reject pred
     ascii.replace('*9', '*1'),
     ascii.replace('0,0,0,1', '0 0,0,1'),
     ascii.replace('"Mesh"', '"Mesh'),
-    ascii.replace('7400', '7300'),
+    ascii.replace('7400', '7000'),
     ascii.replace('Model: 2,', 'Model: 9223372036854775808,'),
   ]) {
     await assert.rejects(parseDocument(encode(text)), /Invalid FBX/);
@@ -298,7 +298,11 @@ test('cumulative decoded allocation limits apply across compressed arrays', asyn
 
 test('supported version endpoints and malformed compressed payloads are explicit', async () => {
   assert.equal((await parseDocument(encode(ascii.replace('7400', '7700')))).version, 7700);
-  for (const version of [7300, 7701]) {
+  for (const version of [7100, 7300]) {
+    assert.equal((await parseDocument(binary(roots(), version))).version, version);
+    assert.equal((await parseDocument(encode(ascii.replace('7400', String(version))))).version, version);
+  }
+  for (const version of [7000, 7701]) {
     await assert.rejects(parseDocument(binary(roots(), version)), /unsupported version/);
     await assert.rejects(parseDocument(encode(ascii.replace('7400', String(version)))), /unsupported version/);
   }

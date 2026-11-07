@@ -107,6 +107,9 @@ test('scene allocation, work and global morph thresholds reject before the next 
   const work = new SceneBudget();
   work.work(128_000_000);
   assert.throws(() => work.work(1), /scene work budget/);
+  // Mocap's samples have their own budget: a build's quadratic work never gets their room.
+  work.sample(1_024_000_000);
+  assert.throws(() => work.sample(1), /scene work budget/);
   const morph = new SceneBudget();
   morph.morph(64 * 1024 * 1024);
   assert.throws(() => morph.morph(1), /morph byte budget/);

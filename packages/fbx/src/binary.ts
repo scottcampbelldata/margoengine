@@ -24,7 +24,7 @@ export async function parseBinary(
     return value;
   }
   const version = u32();
-  if (version < 7400 || version > 7700) invalid(`unsupported version ${version}`);
+  if (version < 7100 || version > 7700) invalid(`unsupported version ${version}`);
   const wide = version >= 7500,
     headerBytes = wide ? 25 : 13;
   function field(limit: number): number {

@@ -182,13 +182,29 @@ test('per-polygon normals split shared control points on hard edges', () => {
   close(result.primitives[0].geometry.normals, [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 1, 0]);
 });
 
-test('self-intersecting same-sign-turn star polygons are rejected', () => {
+test('a polygon that crosses itself still draws, as in the tool that wrote it', () => {
   const positions = Array.from({ length: 5 }, (_, i) => [
     Math.cos((i * 2 * Math.PI) / 5),
     Math.sin((i * 2 * Math.PI) / 5),
     0,
   ]).flat();
-  assert.throws(() => buildGeometry(mesh(positions, [0, 2, 4, 1, -4])), /crosses itself/);
+  const star = buildGeometry(mesh(positions, [0, 2, 4, 1, -4]));
+  assert.equal(star.primitives[0].geometry.indices.length, 9);
+  // A bowtie sums to no area, and its two halves are still there.
+  const bowtie = buildGeometry(mesh([0, 0, 0, 1, 1, 0, 0, 1, 0, 1, 0, 0], [0, 1, 2, -4]));
+  assert.equal(bowtie.primitives[0].geometry.indices.length, 6);
+});
+
+test('a UV index of -1 is a corner the set leaves out: it sits at the origin', () => {
+  const uv = layer('LayerElementUV', 'ByPolygonVertex', 'IndexToDirect', 'UV', [0.5, 0.25], 'UVIndex', [0, -1, 0]);
+  const { uvs } = buildGeometry(mesh([0, 0, 0, 1, 0, 0, 0, 1, 0], [0, 1, -3], [uv])).primitives[0].geometry;
+  close(uvs, [0.5, 0.75, 0, 1, 0.5, 0.75]);
+});
+
+test('a repeated corner is skipped, and a polygon with no area adds nothing', () => {
+  const positions = [0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 2, 0, 0];
+  assert.equal(buildGeometry(mesh(positions, [0, 1, 1, -3])).primitives[0].geometry.indices.length, 3);
+  assert.equal(buildGeometry(mesh(positions, [0, 1, -3, 0, 1, -5])).primitives[0].geometry.indices.length, 3);
 });
 
 test('a zero tangent, or one along the normal, becomes a unit vector across the normal', () => {
@@ -223,8 +239,8 @@ test('malformed geometry and unbounded expansion reject predictably', () => {
   assert.throws(() => buildGeometry(mesh([0, 0, 0, 1, 0, 0, 0, 1, 0], [0, 1, 2])), /terminator/);
   assert.throws(() => buildGeometry(mesh([0, 0, 0, 1, 0, 0, 0, 1, 0], [0, 1, -4])), /control point/);
   assert.throws(
-    () => buildGeometry(mesh([0, 0, 0, 1, 1, 0, 0, 1, 0, 1, 0, 0], [0, 1, 2, -4])),
-    /zero area|crosses itself/,
+    () => buildGeometry(mesh([0, 0, 0, 1, 0, 0, 2, 0, 0], [0, 1, -3])),
+    /contains no triangles/,
   );
   assert.throws(() => buildGeometry(mesh({ length: 3_000_003 }, [0, 1, -3])), /geometry budget exceeded/);
   assert.throws(

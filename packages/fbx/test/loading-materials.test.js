@@ -200,15 +200,46 @@ test('external PNG and JPEG resolve relative paths and pass the abort signal to 
   assert.deepEqual(embeddedImage(result, 1).bytes, new Uint8Array(JPEG));
 });
 
+test('an image the server does not have leaves the model, and the material names it', async (t) => {
+  t.mock.method(globalThis, 'fetch', async () => new Response('missing', { status: 404 }));
+  const glb = await convertFBX(fixture({ textures: [{ path: 'missing.png' }] }), {
+    resourcePath: 'https://assets.example/',
+  });
+  const { doc } = readGLB(glb);
+  assert.equal(doc.images, undefined);
+  assert.deepEqual(doc.materials[0].extras.fbxMissingTextures, ['missing.png']);
+});
+
+test('a full path from the writer\'s PC looks beside the file, by its file name', async () => {
+  const asked = [];
+  const glb = await convertFBX(fixture({ textures: [{ path: 'C:\\Users\\artist\\scene\\wood.png' }] }), {
+    resourcePath: 'https://assets.example/models/',
+    fetch: async (url) => {
+      asked.push(String(url));
+      return new Response(PNG);
+    },
+  });
+  assert.deepEqual(asked, ['https://assets.example/models/wood.png']);
+  assert.equal(readGLB(glb).doc.images.length, 1);
+});
+
+test('an image in a format the base reader cannot use leaves the model, and the material names it', async () => {
+  const glb = await convertFBX(fixture({ textures: [{ path: 'wood.tga' }] }), {
+    resourcePath: 'https://assets.example/',
+    fetch: async () => new Response(new Uint8Array(64)),
+  });
+  assert.equal(readGLB(glb).doc.materials[0].extras.fbxMissingTextures.length, 1);
+});
+
 test('native texture loading rejects HTTP failures and non-HTTP resources', async (t) => {
   let requests = 0;
   t.mock.method(globalThis, 'fetch', async () => {
     requests++;
-    return new Response('missing', { status: 404 });
+    return new Response('broken', { status: 500 });
   });
   await assert.rejects(
-    convertFBX(fixture({ textures: [{ path: 'missing.png' }] }), { resourcePath: 'https://assets.example/' }),
-    /FBX texture request failed: HTTP 404/,
+    convertFBX(fixture({ textures: [{ path: 'broken.png' }] }), { resourcePath: 'https://assets.example/' }),
+    /FBX texture request failed: HTTP 500/,
   );
   assert.equal(requests, 1);
   await assert.rejects(

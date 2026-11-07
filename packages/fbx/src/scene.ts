@@ -25,6 +25,7 @@ import type { ExtensionHooks } from './extension.js';
 export class SceneBudget {
   private bytes = 0;
   private steps = 0;
+  private samples = 0;
   private morphBytes = 0;
   constructor(private readonly signal?: AbortSignal) {}
   reserve(bytes: number): void {
@@ -42,6 +43,15 @@ export class SceneBudget {
         'FBX scene work budget exceeded; simplify or split the scene, the import limits are listed in the README',
       );
     this.steps += steps;
+  }
+  /** Work of one animation sample. Real mocap needs far more of it than a scene's build, and it holds nothing. */
+  sample(steps: number): void {
+    this.signal?.throwIfAborted();
+    if (steps > 1_024_000_000 - this.samples)
+      throw new RangeError(
+        'FBX scene work budget exceeded; simplify or split the scene, the import limits are listed in the README',
+      );
+    this.samples += steps;
   }
   morph(bytes: number): void {
     if (!Number.isSafeInteger(bytes) || bytes < 0 || bytes > 64 * 1024 * 1024 - this.morphBytes)
@@ -85,7 +95,7 @@ export interface SceneContext {
   layers: boolean;
 }
 
-/** One animation sample against the 128,000,000 steps of a scene: about 2,000,000 samples, a few seconds of work. */
+/** One animation sample against the 1,024,000,000 sample steps of a scene: about 16,000,000 samples, a minute or two. */
 const SAMPLE_WORK = 64;
 
 export function context(
@@ -173,7 +183,7 @@ export function localParts(
 ) {
   // A sample's matrices are gone by the next one, so animation is charged as work alone: mocap takes millions of steps
   // and holds none of them. Building a node once also pays for the pivot chain and its property scans.
-  if (sampling) ctx.budget.work(SAMPLE_WORK);
+  if (sampling) ctx.budget.sample(SAMPLE_WORK);
   else {
     ctx.budget.reserve(8192);
     ctx.budget.work(4096 + model.children.length * 32 + (findChild(model, 'Properties70')?.children.length ?? 0) * 32);
@@ -405,7 +415,8 @@ export function buildScene(ctx: SceneContext): void {
       }
     }
   }
-  let kept = vertices > 0;
+  // A clip file has a skeleton and curves but no mesh: Unity's `Name@Clip.fbx` files are this.
+  let kept = vertices > 0 || (ctx.models.size > 0 && [...ctx.document.objects.values()].some((n) => n.name === 'AnimationCurve'));
   for (const extension of ctx.extensions) if (extension.scene?.(ctx)) kept = true;
   if (!kept) throw new RangeError('FBX has no mesh geometry; clean up the source model before export');
 }

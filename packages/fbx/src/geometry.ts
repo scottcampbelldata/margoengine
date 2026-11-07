@@ -84,37 +84,32 @@ function layerIndex(layer: Layer, cp: number, corner: number, polygon: number): 
   return integer(mapped, layer.values.length / layer.size, `${layer.label} index`);
 }
 
+const unmapped = (layer: Layer, corner: number): boolean =>
+  layer.reference !== 'Direct' && layer.mapping === 'ByPolygonVertex' && layer.indices[corner] === -1;
+
 type Point = [number, number];
 const cross = (a: Point, b: Point, c: Point): number => (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
-function intersects(a: Point, b: Point, c: Point, d: Point, eps: number): boolean {
-  const values = [cross(a, b, c), cross(a, b, d), cross(c, d, a), cross(c, d, b)].map((v) =>
-    Math.abs(v) <= eps ? 0 : Math.sign(v),
-  );
-  if (values[0] * values[1] < 0 && values[2] * values[3] < 0) return true;
-  const on = (p: Point, x: Point, y: Point) =>
-    p[0] >= Math.min(x[0], y[0]) &&
-    p[0] <= Math.max(x[0], y[0]) &&
-    p[1] >= Math.min(x[1], y[1]) &&
-    p[1] <= Math.max(x[1], y[1]);
-  return (
-    (!values[0] && on(c, a, b)) ||
-    (!values[1] && on(d, a, b)) ||
-    (!values[2] && on(a, c, d)) ||
-    (!values[3] && on(b, c, d))
-  );
-}
-
-/** Returns original polygon-corner indices, never newly inserted vertices. */
+/**
+ * Corners of a polygon as triangles. Real files hold polygons with a corner repeated, with no area, or crossing
+ * themselves, and every tool keeps them and draws what it can: a repeat is skipped, no area gives no triangles, and a
+ * polygon the ears run out on goes on from its next corner.
+ */
 function triangulate(
-  corners: number[],
+  given: number[],
   controlPoints: number[],
   positions: ArrayLike<number>,
   charge: (amount?: number) => void,
 ): number[] {
-  const n = corners.length;
-  if (n < 3) throw new RangeError('FBX polygon needs at least three vertices');
-  if (n > MAX_POLYGON) budget();
-  charge(n);
+  if (given.length > MAX_POLYGON) budget();
+  charge(given.length);
+  const samePlace = (a: number, b: number): boolean => {
+    const p = controlPoints[a] * 3,
+      q = controlPoints[b] * 3;
+    return positions[p] === positions[q] && positions[p + 1] === positions[q + 1] && positions[p + 2] === positions[q + 2];
+  };
+  const corners = given.filter((corner, i) => !samePlace(corner, given[(i + given.length - 1) % given.length])),
+    n = corners.length;
+  if (n < 3) return [];
   let nx = 0,
     ny = 0,
     nz = 0;
@@ -126,10 +121,26 @@ function triangulate(
     ny += (positions[a + 2] - positions[b + 2]) * (positions[a] + positions[b]);
     nz += (positions[a] - positions[b]) * (positions[a + 1] + positions[b + 1]);
   }
+  // A crossing polygon can sum to no area and still have corners to draw: its strongest corner gives the plane.
+  if (!Math.hypot(nx, ny, nz))
+    for (let i = 0; i < n; i++) {
+      const a = controlPoints[corners[i]] * 3,
+        b = controlPoints[corners[(i + 1) % n]] * 3,
+        c = controlPoints[corners[(i + 2) % n]] * 3,
+        ux = positions[b] - positions[a],
+        uy = positions[b + 1] - positions[a + 1],
+        uz = positions[b + 2] - positions[a + 2],
+        vx = positions[c] - positions[b],
+        vy = positions[c + 1] - positions[b + 1],
+        vz = positions[c + 2] - positions[b + 2],
+        x = uy * vz - uz * vy,
+        y = uz * vx - ux * vz,
+        z = ux * vy - uy * vx;
+      if (Math.hypot(x, y, z) > Math.hypot(nx, ny, nz)) [nx, ny, nz] = [x, y, z];
+    }
   const axis =
     Math.abs(nx) > Math.abs(ny) ? (Math.abs(nx) > Math.abs(nz) ? 0 : 2) : Math.abs(ny) > Math.abs(nz) ? 1 : 2;
-  if (!Math.hypot(nx, ny, nz))
-    throw new RangeError('FBX polygon has zero area; clean up the source model before export');
+  if (!Math.hypot(nx, ny, nz)) return [];
   const points: Point[] = corners.map((c) => {
     const p = controlPoints[c] * 3;
     return axis === 0
@@ -149,8 +160,7 @@ function triangulate(
     eps = extent * extent * Number.EPSILON * 64;
   let area = 0;
   for (let i = 1; i < n - 1; i++) area += cross(points[0], points[i], points[i + 1]);
-  if (Math.abs(area) <= eps) throw new RangeError('FBX polygon has zero area; clean up the source model before export');
-  const winding = Math.sign(area);
+  const winding = Math.sign(area) || 1;
   let convex = true,
     turn = 0;
   for (let i = 0; i < n; i++) {
@@ -160,10 +170,6 @@ function triangulate(
       value = cross(a, b, c);
     if (Math.abs(value) <= eps || Math.sign(value) !== winding) convex = false;
     turn += Math.atan2(value, (b[0] - a[0]) * (c[0] - b[0]) + (b[1] - a[1]) * (c[1] - b[1]));
-    if (a[0] === b[0] && a[1] === b[1])
-      throw new RangeError(
-        'FBX polygon has repeated adjacent vertices; bake or remove it in your 3D tool before export',
-      );
   }
   // A star can have same-sign turns; one complete turn is required for the convex fast path.
   if (convex && Math.abs(Math.abs(turn) - 2 * Math.PI) < 1e-6) {
@@ -171,13 +177,6 @@ function triangulate(
     for (let i = 1; i < n - 1; i++) out.push(corners[0], corners[i], corners[i + 1]);
     return out;
   }
-  for (let i = 0; i < n; i++)
-    for (let j = i + 1; j < n; j++) {
-      if (j === i + 1 || (i === 0 && j === n - 1)) continue;
-      charge();
-      if (intersects(points[i], points[(i + 1) % n], points[j], points[(j + 1) % n], eps))
-        throw new RangeError('FBX polygon crosses itself; bake or remove it in your 3D tool before export');
-    }
   const ring = Array.from({ length: n }, (_, i) => i),
     out: number[] = [];
   while (ring.length > 3) {
@@ -214,12 +213,14 @@ function triangulate(
         break;
       }
     }
-    if (!clipped)
-      throw new RangeError('FBX polygon cannot be triangulated; bake or remove it in your 3D tool before export');
+    if (!clipped) {
+      const [ai, bi, ci] = ring;
+      out.push(corners[ai], corners[bi], corners[ci]);
+      ring.splice(1, 1);
+    }
   }
   if (ring.length === 3 && Math.abs(cross(points[ring[0]], points[ring[1]], points[ring[2]])) > eps)
     out.push(...ring.map((i) => corners[i]));
-  if (!out.length) throw new RangeError('FBX polygon has zero area; clean up the source model before export');
   return out;
 }
 
@@ -301,6 +302,7 @@ export function buildGeometry(node: FBXNode, all = false): BuiltGeometry {
   if (!triangles.length)
     throw new RangeError('FBX geometry contains no triangles; remove the empty mesh or add faces in your 3D tool');
   const generated = new Float64Array(count * 3);
+  let kept = 0;
   for (let i = 0; i < triangles.length; i += 3) {
     const a = cp[triangles[i]] * 3,
       b = cp[triangles[i + 1]] * 3,
@@ -314,18 +316,23 @@ export function buildGeometry(node: FBXNode, all = false): BuiltGeometry {
     const nx = uy * vz - uz * vy,
       ny = uz * vx - ux * vz,
       nz = ux * vy - uy * vx;
-    if (!Math.hypot(nx, ny, nz))
-      throw new RangeError('FBX triangle has zero area; clean up the source model before export');
+    if (!Math.hypot(nx, ny, nz)) continue;
     for (const v of [a, b, c]) {
       generated[v] += nx;
       generated[v + 1] += ny;
       generated[v + 2] += nz;
     }
+    triangles[kept++] = triangles[i];
+    triangles[kept++] = triangles[i + 1];
+    triangles[kept++] = triangles[i + 2];
   }
+  triangles.length = kept;
+  if (!kept) throw new RangeError('FBX geometry contains no triangles; remove the empty mesh or add faces in your 3D tool');
   const builders = new Map<number, Builder>();
   let vertexCount = 0;
-  for (const corner of triangles) {
-    const control = cp[corner],
+  for (let at = 0; at < triangles.length; at++) {
+    const corner = triangles[at],
+      control = cp[corner],
       poly = cornerPolygon[corner];
     let materialIndex = materialMapping === 'NoMappingInformation' ? -1 : 0;
     if (materials) {
@@ -350,7 +357,8 @@ export function buildGeometry(node: FBXNode, all = false): BuiltGeometry {
       builders.set(materialIndex, builder);
     }
     const ni = normal ? layerIndex(normal, control, corner, poly) : -1,
-      ui = uvs.map(({ layer: uv }) => layerIndex(uv, control, corner, poly));
+      // Index -1 is a corner the UV set leaves out: it sits at the origin, as in the tool that wrote it.
+      ui = uvs.map(({ layer: uv }) => (unmapped(uv, corner) ? -1 : layerIndex(uv, control, corner, poly)));
     const ci = colors.map(({ layer: color }) => layerIndex(color, control, corner, poly)),
       ti = tangent ? layerIndex(tangent, control, corner, poly) : -1,
       bi = binormal ? layerIndex(binormal, control, corner, poly) : -1;
@@ -374,14 +382,31 @@ export function buildGeometry(node: FBXNode, all = false): BuiltGeometry {
       ny = generated[control * 3 + 1];
       nz = generated[control * 3 + 2];
     }
+    // The two halves of a crossing polygon can cancel at a shared corner: the corner then faces as its triangle does.
+    if (!Math.hypot(nx, ny, nz)) {
+      const first = at - (at % 3),
+        a = cp[triangles[first]] * 3,
+        b = cp[triangles[first + 1]] * 3,
+        c = cp[triangles[first + 2]] * 3,
+        ux = positions[b] - positions[a],
+        uy = positions[b + 1] - positions[a + 1],
+        uz = positions[b + 2] - positions[a + 2],
+        vx = positions[c] - positions[a],
+        vy = positions[c + 1] - positions[a + 1],
+        vz = positions[c + 2] - positions[a + 2];
+      nx = uy * vz - uz * vy;
+      ny = uz * vx - ux * vz;
+      nz = ux * vy - uy * vx;
+    }
     const length = Math.hypot(nx, ny, nz);
-    if (!length) throw new RangeError('FBX generated normal has zero length; clean up the source model before export');
     nx /= length;
     ny /= length;
     nz /= length;
     builder.normals.push(nx, ny, nz);
     uvs.forEach(({ layer: uv }, set) =>
-      builder.uvs[set].push(finite(uv.values[ui[set] * 2], 'UVs'), 1 - finite(uv.values[ui[set] * 2 + 1], 'UVs')),
+      ui[set] < 0
+        ? builder.uvs[set].push(0, 1)
+        : builder.uvs[set].push(finite(uv.values[ui[set] * 2], 'UVs'), 1 - finite(uv.values[ui[set] * 2 + 1], 'UVs')),
     );
     colors.forEach(({ layer: color }, set) => {
       for (let k = 0; k < 4; k++) {

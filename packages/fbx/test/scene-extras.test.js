@@ -210,6 +210,18 @@ test('a camera whose view cannot be worked out is an error, with the fix', async
   await assert.rejects(read(fbx([cameraAttribute(...orthographic)])), /camera zoom/);
 });
 
+test('the orthographic zoom is metres at any file unit, across the wider side of the view', async () => {
+  const orthographic = (...more) => cameraAttribute('P: "CameraProjectionType", "enum", "", "", 1', number('OrthoZoom', 8), ...more),
+    of = async (text) => (await read(text)).cameras[0].orthographic;
+  // Blender's default export is a centimetre file, and it still writes an 8 metre view as 8.
+  const wide = await of(fbx([orthographic(number('AspectWidth', 2), number('AspectHeight', 1))]));
+  assert.equal(wide.xmag, 4);
+  assert.equal(wide.ymag, 2);
+  const tall = await of(fbx([orthographic(number('AspectWidth', 1), number('AspectHeight', 2))]));
+  assert.equal(tall.xmag, 2);
+  assert.equal(tall.ymag, 4);
+});
+
 test('light defaults, attenuation range and a cone wider than glTF allows', async () => {
   const unset = await read(fbx([lightAttribute()]));
   assert.deepEqual(unset.extensions.KHR_lights_punctual.lights[0], {
