@@ -241,15 +241,12 @@ export class RagdollBalance {
     this.upperMass = this.upper.reduce((sum, part) => sum + part.body.mass, 0);
     this.upperShare = this.upperMass / this.total;
     this.height = dot(this.hipsOverFeet, this.up);
-    this.massPoints = bones.map((part) => {
-      const at = part.body.raw.localCom();
-      return [at.x, at.y, at.z];
-    });
+    this.massPoints = bones.map((part) => part.body.centerOfMass);
     const massHeight = dot(minus(this.massCentre().position, centre), this.up);
     this.gravity = within(options.gravity, 9.81, 0.01, 1000, 'gravity');
     const legInertia = LEG_INERTIA * this.total * (left.thigh + left.shin) ** 2;
-    const passes = Math.max(0, SOLVER_PASSES - ragdoll.physics.world.numSolverIterations);
-    for (const part of bones) this.solverPasses(part, passes);
+    const passes = Math.max(0, SOLVER_PASSES - ragdoll.physics.solverIterations);
+    for (const part of bones) part.body.additionalSolverIterations = passes;
     for (const { foot, lower } of this.legs) for (const part of [foot, lower]) motors.addSteadying(part, legInertia);
     for (const one of this.legs) {
       one.kneeCap = this.total * this.gravity * Math.min(one.thigh, one.shin);
@@ -445,11 +442,6 @@ export class RagdollBalance {
         multiplyQuaternions(conjugateQuaternion(leg.upper.body.rotation), leg.lower.body.rotation),
       );
     return 2 * Math.atan2(dot(turn, axis), turn[3]);
-  }
-
-  /** Sets the solver passes a bone's island gets on top of the world's. Rapier's own call: the physics package has no wrapper. */
-  private solverPasses(part: RagdollPart, passes: number): void {
-    (part.body.raw as unknown as { setAdditionalSolverIterations(passes: number): void }).setAdditionalSolverIterations(passes);
   }
 
   /** True for a bone of a stance leg, which {@link carryWeight} holds. */
@@ -758,7 +750,7 @@ export class RagdollBalance {
     this.wanted.fill(0);
     this.settle();
     for (const { part, shape } of this.soles) this.ragdoll.setShape(part, shape);
-    for (const part of this.ragdoll.bones) this.solverPasses(part, 0);
+    for (const part of this.ragdoll.bones) part.body.additionalSolverIterations = 0;
     for (const { foot, lower } of this.legs) for (const part of [foot, lower]) this.motors.addSteadying(part);
   }
   declare [Symbol.dispose]: () => void;

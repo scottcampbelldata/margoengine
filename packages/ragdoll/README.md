@@ -2,14 +2,13 @@
 
 Import `margoengine/ragdoll` from the `margoengine` package, or `@margoengine/ragdoll` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
-Ragdolls for animated characters, on `@margoengine/physics` (Rapier). Give it the hips of a skeleton and it builds one
+Ragdolls for animated characters, on `@margoengine/physics`. Give it the hips of a skeleton and it builds one
 capsule body per bone, joined at the bone origins with swing and twist limits. While the character is animated the
 bodies follow the bones as kinematic hit boxes that push the world; `activate()` makes it limp, keeping the momentum the
 animation gave each bone; `deactivate(seconds)` blends the bones back to the animation. Core and physics stay the same
 size: an app that does not import this package ships none of it.
 
 ```ts
-import RAPIER from '@dimforge/rapier3d-compat';
 import { EngineKernel } from 'margoengine/core';
 import { loadGLTF } from 'margoengine/gltf-pro';
 import { Animation } from 'margoengine/animation';
@@ -17,9 +16,9 @@ import { Animator } from 'margoengine/animator';
 import { Physics } from 'margoengine/physics';
 import { Ragdoll } from 'margoengine/ragdoll';
 
-await RAPIER.init();
+await Physics.load();
 const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!);
-const physics = new Physics(engine, { rapier: RAPIER });
+const physics = new Physics(engine);
 physics.addBody(null, { type: 'fixed', colliders: { shape: 'box', halfExtents: [20, 0.1, 20] } });
 const model = await loadGLTF(engine, '/hero.glb'); // a skinned character with a Run clip
 Animator.attach(Animation.attach(model), { initial: 'run', states: { run: 'Run' } });
@@ -74,7 +73,7 @@ const custom = Ragdoll.attach(physics, {
 | Joint | Meaning |
 | --- | --- |
 | `{type: 'cone', swing, twist}` | A ball joint. The bone stays inside a cone of half angle `swing` radians around its rest direction and twists about its own axis between `twist[0]` and `twist[1]` radians. Shoulders, hips, spine, neck. Defaults `swing` π/4, `twist` [-π/6, π/6]. |
-| `{type: 'hinge', axis, limits}` | One axis of rotation, `axis` in the bone's local frame, turning between `limits` radians from the rest pose. Knees, elbows. Default `limits` [-3π/4, 0]. Uses Rapier's revolute joint with both frames aligned at rest (Rapier 0.21 or later). |
+| `{type: 'hinge', axis, limits}` | One axis of rotation, `axis` in the bone's local frame, turning between `limits` radians from the rest pose. Knees, elbows. Default `limits` [-3π/4, 0]. Built as a revolute joint with both frames lined up at rest. |
 | `{type: 'free'}` | A ball joint with no limits. |
 
 Cone limits are measured by splitting the joint's rotation from rest into a swing of the bone axis and a twist about
@@ -136,23 +135,22 @@ Each part has its own `limp` and `weight`, so a second limb can go limp while th
 
 Bones take any positive scale, even or uneven; zero and mirrored bones are refused. Lengths and shapes are read in world units, so a stretched bone gets a longer body. Under an uneven scale a child's world rotation is not its parent's times its own, so each part keeps `bind`, the difference, measured when the bone goes limp: the pose does not jump. Errors follow the package conventions: a `TypeError` or `RangeError` naming
 the fix for bad options, and a `MargoError` with code `disposed` after `dispose()`, `attached` for a second ragdoll on
-one skeleton or the wrong engine, and `unsupported` for a hinge on a Rapier build without joint frames.
+one skeleton or the wrong engine, and `unsupported` for a hinge on a solver without joint frames.
 
 ## Powered ragdolls (`margoengine/ragdoll/powered`)
 
 `addRagdollMotors(ragdoll, options)` gives every joint a motor that pulls its bone toward the pose the animation gives it, while the bone is physical. The character keeps moving, a hit bends it, and the motors take the pose back, instead of it only going limp.
 
 ```ts
-import RAPIER from '@dimforge/rapier3d-compat';
 import { EngineKernel } from 'margoengine/core';
 import { loadGLTF } from 'margoengine/gltf-pro';
 import { Physics } from 'margoengine/physics';
 import { Ragdoll } from 'margoengine/ragdoll';
 import { addRagdollMotors } from 'margoengine/ragdoll/powered';
 
-await RAPIER.init();
+await Physics.load();
 const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!);
-const physics = new Physics(engine, { rapier: RAPIER });
+const physics = new Physics(engine);
 physics.addBody(null, { type: 'fixed', colliders: { shape: 'box', halfExtents: [20, 0.1, 20] } });
 const model = await loadGLTF(engine, '/hero.glb');
 const bone = (name: string) => model.nodes.find((node) => node.name === name)!;
@@ -200,15 +198,14 @@ Skeletons put small bodies between big limbs, and a solver cannot hold a strong 
 import { Ragdoll } from 'margoengine/ragdoll';
 import { addGetUp } from 'margoengine/ragdoll/getup';
 import { Animation } from 'margoengine/animation';
-import RAPIER from '@dimforge/rapier3d-compat';
 import { EngineKernel } from 'margoengine/core';
 import { loadGLTF } from 'margoengine/gltf-pro';
 import { Physics } from 'margoengine/physics';
 import { Animator } from 'margoengine/animator';
 
-await RAPIER.init();
+await Physics.load();
 const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!);
-const physics = new Physics(engine, { rapier: RAPIER });
+const physics = new Physics(engine);
 physics.addBody(null, { type: 'fixed', colliders: { shape: 'box', halfExtents: [20, 0.1, 20] } });
 const model = await loadGLTF(engine, '/hero.glb');
 const bone = (name: string) => model.nodes.find((node) => node.name === name)!;
@@ -248,15 +245,14 @@ No facing convention is needed: only the turn about the up axis is free, and wha
 
 ```ts
 import { Ragdoll } from 'margoengine/ragdoll';
-import RAPIER from '@dimforge/rapier3d-compat';
 import { EngineKernel } from 'margoengine/core';
 import { loadGLTF } from 'margoengine/gltf-pro';
 import { Physics } from 'margoengine/physics';
 import { fitRagdollShapes } from 'margoengine/ragdoll/hulls';
 
-await RAPIER.init();
+await Physics.load();
 const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!);
-const physics = new Physics(engine, { rapier: RAPIER });
+const physics = new Physics(engine);
 physics.addBody(null, { type: 'fixed', colliders: { shape: 'box', halfExtents: [20, 0.1, 20] } });
 const model = await loadGLTF(engine, '/hero.glb');
 const bone = (name: string) => model.nodes.find((node) => node.name === name)!;
@@ -284,19 +280,18 @@ A profile is a ragdoll as plain JSON: bones by name, joints and limits, sizes, m
 
 ```ts
 import { Ragdoll } from 'margoengine/ragdoll';
-import RAPIER from '@dimforge/rapier3d-compat';
 import { EngineKernel } from 'margoengine/core';
 import { loadGLTF } from 'margoengine/gltf-pro';
 import { Physics } from 'margoengine/physics';
 import { humanoidProfile, ragdollOptions, saveRagdollProfile } from 'margoengine/ragdoll/profile';
 
-await RAPIER.init();
+await Physics.load();
 const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!);
-const physics = new Physics(engine, { rapier: RAPIER });
+const physics = new Physics(engine);
 physics.addBody(null, { type: 'fixed', colliders: { shape: 'box', halfExtents: [20, 0.1, 20] } });
 const model = await loadGLTF(engine, '/hero.glb');
 const otherModel = await loadGLTF(engine, '/guard.glb');
-const otherPhysics = new Physics(engine, { rapier: RAPIER });
+const otherPhysics = new Physics(engine);
 
 // Anatomical ranges, hinged knees and elbows, published mass shares.
 const ragdoll = Ragdoll.attach(physics, ragdollOptions(humanoidProfile(model.nodes, { mass: 82 }), model.nodes));
@@ -321,15 +316,14 @@ const again = Ragdoll.attach(otherPhysics, ragdollOptions(JSON.parse(saved), oth
 import { Ragdoll } from 'margoengine/ragdoll';
 import { addRagdollBalance } from 'margoengine/ragdoll/balance';
 import { addRagdollMotors } from 'margoengine/ragdoll/powered';
-import RAPIER from '@dimforge/rapier3d-compat';
 import { EngineKernel } from 'margoengine/core';
 import { loadGLTF } from 'margoengine/gltf-pro';
 import { Physics } from 'margoengine/physics';
 import { humanoidProfile, ragdollOptions } from 'margoengine/ragdoll/profile';
 
-await RAPIER.init();
+await Physics.load();
 const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!);
-const physics = new Physics(engine, { rapier: RAPIER });
+const physics = new Physics(engine);
 physics.addBody(null, { type: 'fixed', colliders: { shape: 'box', halfExtents: [20, 0.1, 20] } });
 const model = await loadGLTF(engine, '/hero.glb');
 const bone = (name: string) => model.nodes.find((node) => node.name === name)!;

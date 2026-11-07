@@ -97,7 +97,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/transitions | `.` 2 |  |  | 4,201 |
 | @margoengine/tween | `.` 50, `./stagger` 8, `./motion-path` 7, `./scroll` 4, `./custom-ease` 6 | 16 |  | 5,422 |
 | @margoengine/ui | `.` 97, `./react` 23 | 62 |  | 27,399 |
-| @margoengine/usdz | `.` 11, `./worker` 2, `./compose` 7, `./skel` 1, `./anim` 1, `./subdiv` 2, `./lux` 4 | 62 |  | 11,621 |
+| @margoengine/usdz | `.` 11, `./worker` 2, `./compose` 7, `./skel` 1, `./anim` 1, `./subdiv` 2, `./lux` 4 | 62 |  | 11,652 |
 | @margoengine/vfx | `.` 9, `./base` 9, `./obstacles` 1, `./wrap` 1, `./sort` 1, `./texture` 1, `./soft` 1, `./curves` 3, `./emitter` 2 | 63 |  | 16,708 |
 | @margoengine/video | `.` 2 |  |  | 2,094 |
 | @margoengine/viewcube | `.` 5 |  |  | 3,394 |

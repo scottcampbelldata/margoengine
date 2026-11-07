@@ -752,32 +752,20 @@ export class Ragdoll implements EnginePlugin {
     const [min, max] = spec.limits ?? [-Math.PI * 0.75, 0];
     if (!(min <= max && min >= -Math.PI && max <= Math.PI))
       throw new RangeError('Ragdoll hinge limits need [min, max] within -π to π; pass radians.');
-    const joint = physics.addJoint(parent, child, {
-      type: 'revolute',
-      axis: [1, 0, 0],
-      anchorA,
-      anchorB: [0, 0, 0],
-    });
-    // Rapier's revolute joint turns about each frame's x axis: align both frames with the hinge at rest, so the rest
-    // pose measures angle 0 and the limits read from it.
-    const raw = joint.raw as unknown as {
-      setLocalFrame1?(anchor: object, rotation: object): void;
-      setLocalFrame2?(anchor: object, rotation: object): void;
-    };
-    if (typeof raw.setLocalFrame1 !== 'function' || typeof raw.setLocalFrame2 !== 'function') {
-      joint.remove();
-      throw new MargoError(
-        'unsupported',
-        "Ragdoll hinges need Rapier's ImpulseJoint.setLocalFrame1; upgrade @dimforge/rapier3d-compat to 0.21 or later.",
-      );
-    }
+    // A revolute joint turns about each frame's x axis: align both frames with the hinge at rest, so the rest pose
+    // measures angle 0 and the limits read from it.
     const unit = [axis[0] / length, axis[1] / length, axis[2] / length],
       frameB = arc([1, 0, 0], unit, new Float64Array(4)),
-      frameA = mul(rest, frameB, new Float64Array(4));
-    const rotation = (q: Float64Array) => ({ x: q[0], y: q[1], z: q[2], w: q[3] });
-    raw.setLocalFrame1({ x: anchor[0], y: anchor[1], z: anchor[2] }, rotation(frameA));
-    raw.setLocalFrame2({ x: 0, y: 0, z: 0 }, rotation(frameB));
-    joint.setLimits(min, max);
+      frameA = mul(rest, frameB, new Float64Array(4)),
+      quaternion = (q: Float64Array) => [q[0], q[1], q[2], q[3]] as const;
+    const joint = physics.addJoint(parent, child, {
+      type: 'revolute',
+      frameA: quaternion(frameA),
+      frameB: quaternion(frameB),
+      anchorA,
+      anchorB: [0, 0, 0],
+      limits: [min, max],
+    });
     return { joint, cone: null, spec: { type: 'hinge', axis: [unit[0], unit[1], unit[2]], limits: [min, max] } };
   }
 

@@ -1,12 +1,12 @@
 // @margoengine/ragdoll/hulls: bones fitted to a real skinned mesh, measured by ray silhouettes against the mesh itself in
-// a stepping Rapier world. Knight.glb is a real character; Fox.glb is a real one at another scale.
+// a stepping solver world. Knight.glb is a real character; Fox.glb is a real one at another scale.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Ragdoll } from '../dist/index.js';
 import { fitRagdollShapes } from '../dist/hulls.js';
-import { realRig, skip } from './rig.js';
+import { realRig } from './rig.js';
 
-const rtest = (name, fn) => test(name, { skip, timeout: 60_000 }, fn);
+const rtest = (name, fn) => test(name, { timeout: 60_000 }, fn);
 const KNIGHT = 'kaykit/adventurers/characters/Knight.glb';
 
 /** The model's triangles in bind pose, as a fixed trimesh body the rays can compare with. */

@@ -165,10 +165,18 @@ export type JointOptions = (JointBase & {
     damping?: number;
 }) | (JointBase & {
     type: 'revolute' | 'prismatic';
-    axis: Vec3;
     limits?: readonly [number, number];
     motor?: MotorOptions;
-})
+} & ({
+    axis: Vec3;
+    frameA?: undefined;
+    frameB?: undefined;
+}
+ | {
+    axis?: undefined;
+    frameA: Quat;
+    frameB: Quat;
+}))
  | (JointBase & {
     type: 'generic';
     frameA?: Quat;
@@ -232,6 +240,8 @@ export class Physics implements EnginePlugin, BodyOwner {
     set gravity(value: Vec3);
     get alpha(): number;
     get pendingTime(): number;
+    get solverIterations(): number;
+    set solverIterations(passes: number);
     get colliderCount(): number;
     get bodyCount(): number;
     setup(engine: EngineKernel): void;
@@ -270,6 +280,7 @@ export class Physics implements EnginePlugin, BodyOwner {
     intersectPoint(point: Vec3, options?: QueryFilter): PhysicsBody[];
     intersectShape(shape: ShapeOptions, position: Vec3, rotation?: Quat, options?: QueryFilter): PhysicsBody[];
     touching(a: PhysicsBody, b: PhysicsBody): boolean;
+    contactPoints(body: PhysicsBody): [number, number, number][];
     debugRender(): {
         vertices: Float32Array;
         colors: Float32Array;
@@ -325,6 +336,10 @@ export class PhysicsBody {
         inertia?: Vec3;
         inertiaFrame?: Quat;
     }): this;
+    get appliedForce(): [number, number, number];
+    get appliedTorque(): [number, number, number];
+    get additionalSolverIterations(): number;
+    set additionalSolverIterations(passes: number);
     get gravityScale(): number;
     set gravityScale(value: number);
     get ccd(): boolean;
@@ -459,6 +474,9 @@ export interface RapierModule {
     EventQueue: new (autoDrain: boolean) => EventQueue;
     Ray: new (origin: Vector, direction: Vector) => Ray;
     HalfSpace: new (normal: Vector) => Shape;
+    ImpulseJoint?: {
+        prototype: Partial<ImpulseJoint>;
+    };
     ShapeType: Record<string, number | string>;
     TriMeshFlags?: {
         FIX_INTERNAL_EDGES?: number;
@@ -871,6 +889,10 @@ interface RayColliderIntersection {
 
 interface RigidBody {
     readonly handle: number;
+    userForce(): Vector;
+    userTorque(): Vector;
+    additionalSolverIterations(): number;
+    setAdditionalSolverIterations(passes: number): void;
     userData?: unknown;
     isValid(): boolean;
     translation(): Vector;
@@ -983,7 +1005,10 @@ interface World {
     intersectionPair(colliderA: Collider, colliderB: Collider): boolean;
     contactPair(colliderA: Collider, colliderB: Collider, callback: (manifold: {
         numContacts(): number;
+        numSolverContacts(): number;
+        solverContactPoint(index: number): Vector | null;
     }, flipped: boolean) => void): void;
+    contactPairsWith(collider: Collider, callback: (other: Collider) => void): void;
     debugRender(): {
         vertices: Float32Array;
         colors: Float32Array;

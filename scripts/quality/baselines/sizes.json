@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10177332,
+  "total": 10178162,
   "history": [
     {
       "date": "2026-10-24",
@@ -3152,6 +3152,12 @@
       "commit": "63916e9a7",
       "reason": "usdz lights and cameras entry",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "cfd5a2361",
+      "reason": "physics: joint frames, solver passes, applied forces and contactPoints, the calls ragdoll took from the solver",
+      "grew": 1
     }
   ],
   "items": {
@@ -3560,7 +3566,7 @@
     "@margoengine/oit/meshes": 747,
     "@margoengine/oit/moments": 4197,
     "@margoengine/oit/vfx": 486,
-    "@margoengine/physics": 18804,
+    "@margoengine/physics": 19679,
     "@margoengine/physics2d": 8199,
     "@margoengine/physics2d/outline": 2524,
     "@margoengine/pixel": 4664,
@@ -3609,7 +3615,7 @@
     "@margoengine/quality/ssaa": 2241,
     "@margoengine/quality/warm": 1536,
     "@margoengine/ragdoll": 7368,
-    "@margoengine/ragdoll/balance": 5740,
+    "@margoengine/ragdoll/balance": 5695,
     "@margoengine/ragdoll/getup": 1994,
     "@margoengine/ragdoll/hulls": 2007,
     "@margoengine/ragdoll/powered": 3402,

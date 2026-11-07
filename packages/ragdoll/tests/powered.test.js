@@ -1,13 +1,13 @@
-// @margoengine/ragdoll/powered: motors drive a real rig along a real clip in a stepping Rapier world, hits knock it off
+// @margoengine/ragdoll/powered: motors drive a real rig along a real clip in a stepping solver world, hits knock it off
 // the pose and it comes back, torque caps, limits, fading and clean removal.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { conjugateQuaternion as conj, multiplyQuaternions as mul } from '../../math/dist/quat.js';
 import { Ragdoll } from '../dist/index.js';
 import { addRagdollMotors } from '../dist/powered.js';
-import { realRig, skip } from './rig.js';
+import { realRig } from './rig.js';
 
-const rtest = (name, fn) => test(name, { skip, timeout: 60_000 }, fn);
+const rtest = (name, fn) => test(name, { timeout: 60_000 }, fn);
 const WALKER = 'kaykit/adventurers/animations/Rig_Medium/Rig_Medium_MovementBasic.glb';
 const apart = (a, b) => 2 * Math.acos(Math.min(1, Math.abs(a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3])));
 const relative = (ragdoll, part) => mul(conj(ragdoll.bones[part.parent].body.rotation), part.body.rotation);

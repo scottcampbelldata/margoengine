@@ -296,6 +296,23 @@ export class PhysicsBody {
     raw.recomputeMassPropertiesFromColliders();
     return this;
   }
+  /** Force in newtons left on the body by `addForce`, until `resetForces`. */
+  get appliedForce(): [number, number, number] {
+    return tuple(this.check().userForce());
+  }
+  /** Torque in newton metres left on the body by `addTorque`, until `resetForces`. */
+  get appliedTorque(): [number, number, number] {
+    return tuple(this.check().userTorque());
+  }
+  /** Solver passes the island of this body takes on top of the world's `solverIterations` (default 0). */
+  get additionalSolverIterations(): number {
+    return this.check().additionalSolverIterations();
+  }
+  set additionalSolverIterations(passes: number) {
+    if (!Number.isInteger(passes) || passes < 0)
+      throw new RangeError('Additional solver iterations must be a whole number of at least 0; pass extra passes.');
+    this.check().setAdditionalSolverIterations(passes);
+  }
   get gravityScale(): number {
     return this.check().gravityScale();
   }

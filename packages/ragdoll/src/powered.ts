@@ -162,8 +162,7 @@ export class RagdollMotors {
         return [0, 1, 2].map((k) => origin[k] + (reach[k] * part.length) / 2);
       }),
       centres = parts.map((part) => {
-        const at = part.body.raw.localCom(),
-          from = rotateByQuaternion([at.x, at.y, at.z], part.body.rotation),
+        const from = rotateByQuaternion(part.body.centerOfMass, part.body.rotation),
           origin = part.body.position;
         return [0, 1, 2].map((k) => origin[k] + from[k]);
       });
@@ -193,8 +192,8 @@ export class RagdollMotors {
       return total;
     };
     const real = (part: RagdollPart): number => {
-        const inertia = part.body.raw.principalInertia();
-        return (inertia.x + inertia.y + inertia.z) / 3;
+        const [x, y, z] = part.body.principalInertia;
+        return (x + y + z) / 3;
       },
       rod = (part: RagdollPart): number => (part.body.mass * part.length * part.length) / 12;
     for (let i = 1; i < count; i++) {

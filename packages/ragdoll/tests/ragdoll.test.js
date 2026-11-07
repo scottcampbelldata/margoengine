@@ -2,28 +2,16 @@
 // twist and hinge limits, blending back to the animation, and coded errors.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { pathToFileURL, fileURLToPath } from 'node:url';
 import { Engine, TransformStore } from '@margoengine/core/extension';
 import { Physics } from '@margoengine/physics';
 import { Ragdoll } from '../dist/index.js';
 import { realRig } from './rig.js';
 
-const rapierDir = process.env.MARGOENGINE_RAPIER
-  ? resolve(process.env.MARGOENGINE_RAPIER)
-  : fileURLToPath(new URL('../../../node_modules/@dimforge/rapier3d-compat/', import.meta.url));
-const rapierEntry = resolve(rapierDir, 'dist/rapier.mjs');
-let RAPIER = null;
-if (existsSync(rapierEntry)) {
-  RAPIER = (await import(pathToFileURL(rapierEntry).href)).default;
-  const warn = console.warn;
-  console.warn = () => {};
-  await RAPIER.init();
-  console.warn = warn;
-}
-const skip = RAPIER ? false : 'Rapier not found: set MARGOENGINE_RAPIER to run the ragdoll tests';
-const rtest = (name, fn) => test(name, { skip, timeout: 60_000 }, fn);
+const warn = console.warn;
+console.warn = () => {};
+await Physics.load();
+console.warn = warn;
+const rtest = (name, fn) => test(name, { timeout: 60_000 }, fn);
 
 const near = (actual, expected, tolerance, label) =>
   assert.ok(Math.abs(actual - expected) <= tolerance, `${label}: ${actual} is not ${expected} within ${tolerance}`);
@@ -49,7 +37,7 @@ async function scene({ gravity = [0, -9.81, 0] } = {}) {
     undefined,
     null,
   );
-  const physics = Physics.attach(engine, { rapier: RAPIER, gravity });
+  const physics = Physics.attach(engine, { gravity });
   return { engine, physics };
 }
 /** A small humanoid: model > hips > spine > head > head end, and two legs of thigh > shin > foot > toe. */

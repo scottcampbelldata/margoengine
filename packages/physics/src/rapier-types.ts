@@ -76,6 +76,10 @@ export interface ColliderDesc {
 }
 export interface RigidBody {
   readonly handle: number;
+  userForce(): Vector;
+  userTorque(): Vector;
+  additionalSolverIterations(): number;
+  setAdditionalSolverIterations(passes: number): void;
   userData?: unknown;
   isValid(): boolean;
   translation(): Vector;
@@ -295,8 +299,12 @@ export interface World {
   contactPair(
     colliderA: Collider,
     colliderB: Collider,
-    callback: (manifold: { numContacts(): number }, flipped: boolean) => void,
+    callback: (
+      manifold: { numContacts(): number; numSolverContacts(): number; solverContactPoint(index: number): Vector | null },
+      flipped: boolean,
+    ) => void,
   ): void;
+  contactPairsWith(collider: Collider, callback: (other: Collider) => void): void;
   debugRender(): { vertices: Float32Array; colors: Float32Array };
 }
 /** The initialized Rapier namespace. Only the surface this package uses is required. */
@@ -305,6 +313,7 @@ export interface RapierModule {
   EventQueue: new (autoDrain: boolean) => EventQueue;
   Ray: new (origin: Vector, direction: Vector) => Ray;
   HalfSpace: new (normal: Vector) => Shape;
+  ImpulseJoint?: { prototype: Partial<ImpulseJoint> };
   ShapeType: Record<string, number | string>;
   TriMeshFlags?: { FIX_INTERNAL_EDGES?: number };
   Collider?: { prototype: Partial<Collider> };

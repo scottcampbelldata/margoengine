@@ -1,8 +1,6 @@
-// A real rig for the ragdoll tests: a glTF file from the repository on a running Animator and a stepping Rapier world.
+// A real rig for the ragdoll tests: a glTF file from the repository on a running Animator and a stepping solver world.
 // Only the renderer is a stub; the skeleton, the skin data and the clips are the file's.
-import { existsSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { readFileSync } from 'node:fs';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
 import { GLTFAsset, PBRModel } from '../../gltf-pro/dist/index.js';
 import { Animation } from '../../animation/dist/index.js';
@@ -10,19 +8,10 @@ import { Animator } from '../../animator/dist/index.js';
 import { Physics } from '@margoengine/physics';
 import { GLB_BIN, GLB_JSON, glbChunks } from '../../shared/glb.js';
 
-const rapierDir = process.env.MARGOENGINE_RAPIER
-  ? resolve(process.env.MARGOENGINE_RAPIER)
-  : fileURLToPath(new URL('../../../node_modules/@dimforge/rapier3d-compat/', import.meta.url));
-const rapierEntry = resolve(rapierDir, 'dist/rapier.mjs');
-export let RAPIER = null;
-if (existsSync(rapierEntry)) {
-  RAPIER = (await import(pathToFileURL(rapierEntry).href)).default;
-  const warn = console.warn;
-  console.warn = () => {};
-  await RAPIER.init();
-  console.warn = warn;
-}
-export const skip = RAPIER ? false : 'Rapier not found: set MARGOENGINE_RAPIER to run the ragdoll tests';
+const warn = console.warn;
+console.warn = () => {};
+await Physics.load();
+console.warn = warn;
 
 /** The document and binary chunk of a GLB under examples/assets, without its images. */
 export function glb(path) {
@@ -69,7 +58,7 @@ export async function realRig(path, { states, initial, gravity = [0, -9.81, 0], 
       render() {},
       dispose() {},
     }),
-    physics = Physics.attach(engine, { rapier: RAPIER, gravity }),
+    physics = Physics.attach(engine, { gravity }),
     model = new PBRModel(engine, new GLTFAsset(asset.doc, [asset.bin])),
     animation = new Animation(model);
   engine.use({ name: animation.name, setup() {} });

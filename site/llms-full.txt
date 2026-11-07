@@ -427,7 +427,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 | --- | --- |
 | [`@margoengine/physics`](packages/physics/README.md) | Rigid-body physics for Margo Engine on Rapier: fixed-step engine plugin with interpolation, colliders, joints, queries, events and a character controller. |
 | [`@margoengine/physics2d`](packages/physics2d/README.md) | 2D rigid-body physics for Margo Engine on Rapier: fixed-step plugin with interpolation, sprite-driven bodies, joints, queries, events, a character controller and tile map colliders. |
-| [`@margoengine/ragdoll`](packages/ragdoll/README.md) | Ragdolls on Rapier physics: capsule bodies from a skeleton, cone and hinge joint limits, kinematic hit boxes, going limp and blending back to the animation. |
+| [`@margoengine/ragdoll`](packages/ragdoll/README.md) | Ragdolls on Margo physics: capsule bodies from a skeleton, cone and hinge joint limits, kinematic hit boxes, going limp and blending back to the animation. |
 | [`@margoengine/navmesh`](packages/navmesh/README.md) | Convex polygon navigation with A*, funnel paths and ORCA avoidance; navmesh generation from triangles (./build). |
 | [`@margoengine/ecs`](packages/ecs/README.md) | Typed-array packed sparse-set entity component storage. |
 | [`@margoengine/fsm`](packages/fsm/README.md) | Hierarchical state transitions with cross-fade progress. |
@@ -2906,6 +2906,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Stage physics (`@margoengine/stage/physics`, 2026-11-05) | One world per stage. The first call downloads Rapier (see its row in the sizes page) and waits for its Wasm. A dynamic concave mesh gets a convex hull, so its hollows are filled. The shape is picked once from the geometry and the scale at `addBody`. | A stage call has to work with no setup; decomposing a mesh costs far more than a hull, so it is opt-in. | A ball rests on the hull, not in the hollow; a mesh rescaled later keeps its collider. | Pass `colliders` to name the shape, such as `{shape: 'convexDecomposition'}`; add the body again after rescaling. |
 | Physics colliders (`PhysicsCollider`, `voxels` and `halfSpace` shapes, 2026-11-07) | By the solver: `voxels` needs a solver that has them, Rapier 0.17.1 or later, and `physics.supportsShape('voxels')` says so; today's solver stops on a ball at a voxel edge, so `@margoengine/voxel/physics` meshes the chunks near balls. By method: `boundingRadius` is null for a shape it would have to walk. A hand-built `custom` collider leaves with Rapier. `setMassProperties` sets density 0 on the colliders it finds, and a collider added later counts unless it has `massless`. | A wrapper keeps every dependent off the solver's own objects, so the solver can change under them. | The `voxels` and `halfSpace` shapes and `massless` are part of what Margo's own solver must carry. |
 | Bodies below the root (nested meshes and `follow`, 2026-11-07) | By method: a body has a position and a rotation, so scale from a parent that shears a part is not represented; a body is fitted at the world scale it had when added. Only a core `Mesh` can sit below a root. `follow` needs a `kinematicPosition` body on a core `Mesh`, and a mesh that jumps in one step moves its body at the speed that takes, pushing what it meets as hard. The sort that writes parents first is an insertion sort, which costs most with many nested bodies in reverse order: not measured. | Parents first is what makes a child's local pose right in the same frame. | Measured speed with thousands of nested bodies. |
+| Joint frames and solver figures (`frameA`, `frameB`, `contactPoints`, 2026-11-07) | By the solver: frames on a revolute or prismatic joint need Rapier 0.20 or later. By method: `contactPoints` reads the last step, one entry per solver point, so a point two colliders share comes twice; a frame is taken as given, so pass a unit quaternion. | Frames let limits count from a rest pose, and these figures keep ragdoll off the solver's own objects, so the solver can change under it. | An older solver refuses frames with a `MargoError` of code `unsupported`; a frame that is no quaternion throws `RangeError`. | Give an `axis` in place of frames, or upgrade `@dimforge/rapier3d-compat`. |
 | Colliders from alpha (`@margoengine/physics2d/outline`, 2026-11-07) | By method: samples sit on pixel centres, so a hard corner is cut by up to about 0.7 pixel. Thinning works on each loop alone and may make a loop cross itself or a neighbour when `tolerance` is near the width of a thin part; lower it then. Filled pieces come from a greedy merge, so their number is not the fewest; a sprite with many corners gives many colliders, and `edges: true` gives one per loop. The outline is taken once: a sprite's frames need one trace each. | Alpha is what the artist drew, and a convex piece is what a solver can fill. | Time on large images: not measured. |
 | Stage model viewer (`@margoengine/stage/viewer`, 2026-11-05) | WebGPU only, as gltf-pro. One model per viewer; the model must have geometry. A 'cascaded' floor is a plain box 40 model sizes wide, so its far edge shows as a horizon line against the backdrop; 'contact' has no such line. Lamp, shadow and floor values were picked by eye on one model (flight helmet), not measured against a reference. | One call has to fit any model, so sizes come from `model.bounds` at load. An animated model does not resize them, and the contact shadow is cached (`static`) unless `shadow: {static: false}`. | A model that grows or moves keeps its first shadow and framing; a horizon line with 'cascaded'. | Pass `environment`, `background`, `shadow` and `tonemap` to override, `false` to remove a part. Real-GPU check: `npm run test:gpu --workspace packages/stage`. |
 | Headless stage (`@margoengine/headless/stage`, 2026-11-05) | No camera controls and no frame loop: `step(delta)` advances time and runs `onTick` and `engine.onFrame` callbacks. Stages alive at once share one `gpu`. In Node, proved on the `webgpu` binding 0.6.2 on Windows (D3D12 and WARP); a textured glTF does not load there (docs/known-bugs.md). | `installGPU` changes globals, so a second implementation at once would replace the first's. The frame loop belongs to core, so the stage keeps its own list of `onFrame` callbacks. | A callback registered before the stage exists, on an engine made by hand, does not run. | Use `stage.onTick` and `stage.step`. Dispose stages on one `gpu` before using another. |
@@ -9335,14 +9336,13 @@ Pass `sprite` and the colliders land on the sprite's pivot and scale, and its `r
 
 Import `margoengine/ragdoll` from the `margoengine` package, or `@margoengine/ragdoll` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
-Ragdolls for animated characters, on `@margoengine/physics` (Rapier). Give it the hips of a skeleton and it builds one
+Ragdolls for animated characters, on `@margoengine/physics`. Give it the hips of a skeleton and it builds one
 capsule body per bone, joined at the bone origins with swing and twist limits. While the character is animated the
 bodies follow the bones as kinematic hit boxes that push the world; `activate()` makes it limp, keeping the momentum the
 animation gave each bone; `deactivate(seconds)` blends the bones back to the animation. Core and physics stay the same
 size: an app that does not import this package ships none of it.
 
 ```ts
-import RAPIER from '@dimforge/rapier3d-compat';
 import { EngineKernel } from 'margoengine/core';
 import { loadGLTF } from 'margoengine/gltf-pro';
 import { Animation } from 'margoengine/animation';
@@ -9350,9 +9350,9 @@ import { Animator } from 'margoengine/animator';
 import { Physics } from 'margoengine/physics';
 import { Ragdoll } from 'margoengine/ragdoll';
 
-await RAPIER.init();
+await Physics.load();
 const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!);
-const physics = new Physics(engine, { rapier: RAPIER });
+const physics = new Physics(engine);
 physics.addBody(null, { type: 'fixed', colliders: { shape: 'box', halfExtents: [20, 0.1, 20] } });
 const model = await loadGLTF(engine, '/hero.glb'); // a skinned character with a Run clip
 Animator.attach(Animation.attach(model), { initial: 'run', states: { run: 'Run' } });
@@ -9407,7 +9407,7 @@ const custom = Ragdoll.attach(physics, {
 | Joint | Meaning |
 | --- | --- |
 | `{type: 'cone', swing, twist}` | A ball joint. The bone stays inside a cone of half angle `swing` radians around its rest direction and twists about its own axis between `twist[0]` and `twist[1]` radians. Shoulders, hips, spine, neck. Defaults `swing` π/4, `twist` [-π/6, π/6]. |
-| `{type: 'hinge', axis, limits}` | One axis of rotation, `axis` in the bone's local frame, turning between `limits` radians from the rest pose. Knees, elbows. Default `limits` [-3π/4, 0]. Uses Rapier's revolute joint with both frames aligned at rest (Rapier 0.21 or later). |
+| `{type: 'hinge', axis, limits}` | One axis of rotation, `axis` in the bone's local frame, turning between `limits` radians from the rest pose. Knees, elbows. Default `limits` [-3π/4, 0]. Built as a revolute joint with both frames lined up at rest. |
 | `{type: 'free'}` | A ball joint with no limits. |
 
 [README continues: https://margoengine.com/llms/packages/ragdoll.md]

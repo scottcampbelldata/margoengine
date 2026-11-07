@@ -322,6 +322,15 @@ export class Physics implements EnginePlugin, BodyOwner {
   get pendingTime(): number {
     return this.accumulator;
   }
+  /** Solver passes per step for every island; a body can ask for more with `additionalSolverIterations`. */
+  get solverIterations(): number {
+    return this.world.numSolverIterations;
+  }
+  set solverIterations(passes: number) {
+    if (!Number.isInteger(passes) || passes < 1)
+      throw new RangeError('Solver iterations must be a whole number of at least 1; pass the passes a step takes.');
+    this.world.numSolverIterations = passes;
+  }
   /** How many colliders the world holds. */
   get colliderCount(): number {
     return this.byHandle.size;
@@ -883,6 +892,12 @@ export class Physics implements EnginePlugin, BodyOwner {
     this.joints.add(joint);
     if (options.contactsEnabled !== undefined) raw.setContactsEnabled(options.contactsEnabled);
     if (options.type === 'revolute' || options.type === 'prismatic') {
+      // The descriptor takes one axis, not two frames: as for a generic joint, the frames go on the made joint.
+      if (options.frameA) {
+        const { anchorA = [0, 0, 0], anchorB = [0, 0, 0], frameA, frameB } = options;
+        raw.setLocalFrame1(vec(anchorA), quat(frameA));
+        raw.setLocalFrame2(vec(anchorB), quat(frameB));
+      }
       if (options.limits) joint.setLimits(options.limits[0], options.limits[1]);
       if (options.motor) joint.setMotor(options.motor);
     }
@@ -1154,6 +1169,25 @@ export class Physics implements EnginePlugin, BodyOwner {
         if (touching) return true;
       }
     return false;
+  }
+
+  /**
+   * Where the solver pushes on this body as of the last step: one world position [x, y, z] per solver contact point, so
+   * a box flat on a floor has its four corners. Sensors have none, and a point two colliders share comes once for each.
+   */
+  contactPoints(body: PhysicsBody): [number, number, number][] {
+    const world = this.world,
+      points: [number, number, number][] = [];
+    for (const { raw } of body.colliders)
+      world.contactPairsWith(raw, (other) =>
+        world.contactPair(raw, other, (manifold) => {
+          for (let i = 0; i < manifold.numSolverContacts(); i++) {
+            const point = manifold.solverContactPoint(i);
+            if (point) points.push(tuple(point));
+          }
+        }),
+      );
+    return points;
   }
 
   /**

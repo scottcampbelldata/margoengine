@@ -1,11 +1,11 @@
 // Partial ragdolls: one limb or the upper body physical while the rest keeps animating, on a real rig and clip in a
-// stepping Rapier world.
+// stepping solver world.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Ragdoll } from '../dist/index.js';
-import { realRig, skip } from './rig.js';
+import { realRig } from './rig.js';
 
-const rtest = (name, fn) => test(name, { skip, timeout: 60_000 }, fn);
+const rtest = (name, fn) => test(name, { timeout: 60_000 }, fn);
 const WALKER = 'kaykit/adventurers/animations/Rig_Medium/Rig_Medium_MovementBasic.glb';
 const local = (rig, node) => {
   const t = rig.engine.store.transforms,

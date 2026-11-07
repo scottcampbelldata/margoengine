@@ -1,4 +1,4 @@
-// @margoengine/ragdoll/getup: a real rig falls in a stepping Rapier world, the clip that fits how it lies is chosen, the
+// @margoengine/ragdoll/getup: a real rig falls in a stepping solver world, the clip that fits how it lies is chosen, the
 // character moves to the body, and the bones blend into the clip without a pop.
 // Stand-in: no asset in the repository has a get-up clip, so these clips are the rig's own Death_A (ends on its back) and
 // Death_B (ends on its front), played backward.
@@ -6,9 +6,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Ragdoll } from '../dist/index.js';
 import { addGetUp } from '../dist/getup.js';
-import { realRig, skip } from './rig.js';
+import { realRig } from './rig.js';
 
-const rtest = (name, fn) => test(name, { skip, timeout: 60_000 }, fn);
+const rtest = (name, fn) => test(name, { timeout: 60_000 }, fn);
 const GENERAL = 'kaykit/adventurers/animations/Rig_Medium/Rig_Medium_General.glb';
 
 /** `clip` played backward, as a new clip of `animation` called `name`. */

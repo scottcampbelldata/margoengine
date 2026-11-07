@@ -57,10 +57,16 @@ export type JointOptions =
   | (JointBase & { type: 'spring'; restLength: number; stiffness: number; damping?: number })
   | (JointBase & {
       type: 'revolute' | 'prismatic';
-      axis: Vec3;
       limits?: readonly [number, number];
       motor?: MotorOptions;
-    })
+    } & (
+        | { axis: Vec3; frameA?: undefined; frameB?: undefined }
+        /**
+         * The joint's frame on each body, given in place of `axis`: it turns or slides along each frame's x axis. Line
+         * the two up at rest and the rest pose reads 0, whatever the bodies' own frames. Rapier 0.20 or later.
+         */
+        | { axis?: undefined; frameA: Quat; frameB: Quat }
+      ))
   /**
    * Six degrees of freedom you choose from, measured from the joint's frame on body A to its frame on body B: `locked`
    * axes do not move, a `limits` axis stays in its range, any other axis is free. `frameA` and `frameB` turn each frame
@@ -260,10 +266,21 @@ export function createJointData(R: RapierModule, options: JointOptions): JointDa
       return R.JointData.spherical(vec(anchorA), vec(anchorB));
     case 'revolute':
     case 'prismatic': {
-      checkVec(options.axis, 'Joint axis');
-      const length = Math.hypot(...options.axis);
+      const { frameA, frameB } = options;
+      if (frameA || frameB) {
+        if (!frameA || !frameB || options.axis)
+          throw new TypeError('A joint takes an axis, or frameA and frameB together; pass one or the other.');
+        for (const frame of [frameA, frameB])
+          if (frame.length !== 4 || !frame.every(Number.isFinite) || !Math.hypot(...frame))
+            throw new RangeError('Joint frames must be four finite numbers, not all zero; pass a quaternion [x, y, z, w].');
+        if (typeof R.ImpulseJoint?.prototype.setLocalFrame1 !== 'function')
+          throw new MargoError('unsupported', 'Joint frames need Rapier 0.20 or later; upgrade @dimforge/rapier3d-compat.');
+      }
+      const given: Vec3 | undefined = options.axis ?? (frameA ? [1, 0, 0] : undefined);
+      checkVec(given, 'Joint axis');
+      const length = Math.hypot(...given);
       if (!length) throw new RangeError('Joint axis must be nonzero');
-      const axis = vec([options.axis[0] / length, options.axis[1] / length, options.axis[2] / length]);
+      const axis = vec([given[0] / length, given[1] / length, given[2] / length]);
       if (options.limits) {
         const [min, max] = options.limits;
         if (!Number.isFinite(min) || !Number.isFinite(max) || min > max)

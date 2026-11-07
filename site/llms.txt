@@ -130,7 +130,7 @@ Import the stage for a canvas, camera, controls and loading in a few lines (`imp
 
 - [@margoengine/physics](https://margoengine.com/llms/packages/physics.md): Rigid-body physics for Margo Engine on Rapier: fixed-step engine plugin with interpolation, colliders, joints, queries, events and a character controller.
 - [@margoengine/physics2d](https://margoengine.com/llms/packages/physics2d.md): 2D rigid-body physics for Margo Engine on Rapier: fixed-step plugin with interpolation, sprite-driven bodies, joints, queries, events, a character controller and tile…
-- [@margoengine/ragdoll](https://margoengine.com/llms/packages/ragdoll.md): Ragdolls on Rapier physics: capsule bodies from a skeleton, cone and hinge joint limits, kinematic hit boxes, going limp and blending back to the animation.
+- [@margoengine/ragdoll](https://margoengine.com/llms/packages/ragdoll.md): Ragdolls on Margo physics: capsule bodies from a skeleton, cone and hinge joint limits, kinematic hit boxes, going limp and blending back to the animation.
 - [@margoengine/navmesh](https://margoengine.com/llms/packages/navmesh.md): Convex polygon navigation with A*, funnel paths and ORCA avoidance; navmesh generation from triangles (./build).
 - [@margoengine/ecs](https://margoengine.com/llms/packages/ecs.md): Typed-array packed sparse-set entity component storage.
 - [@margoengine/fsm](https://margoengine.com/llms/packages/fsm.md): Hierarchical state transitions with cross-fade progress.

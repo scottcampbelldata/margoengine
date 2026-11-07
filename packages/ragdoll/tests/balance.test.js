@@ -1,4 +1,4 @@
-// @margoengine/ragdoll/balance: a powered ragdoll on the real Knight rig, on a floor in a stepping Rapier world, pushed by
+// @margoengine/ragdoll/balance: a powered ragdoll on the real Knight rig, on a floor in a stepping solver world, pushed by
 // setting the upper body moving. The controller is an assist, and these tests read what it gave.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -8,9 +8,9 @@ import { fitRagdollShapes } from '../dist/hulls.js';
 import { addRagdollMotors } from '../dist/powered.js';
 import { humanoidProfile, ragdollOptions } from '../dist/profile.js';
 import { conjugateQuaternion, multiplyQuaternions, rotateByQuaternion as rotate } from '@margoengine/math/quat';
-import { realRig, skip } from './rig.js';
+import { realRig } from './rig.js';
 
-const rtest = (name, fn) => test(name, { skip, timeout: 60_000 }, fn);
+const rtest = (name, fn) => test(name, { timeout: 60_000 }, fn);
 const bones = (rig) => ({
   hips: rig.node('hips'),
   spine: rig.node('spine'),
@@ -95,7 +95,7 @@ rtest('without it the character folds up; with it the same character settles, st
 // A motor holds a limb against its weight from where the limb's mass lies. As a rod along each bone, Knight's neck reckoned
 // 0.0028 kg m2 against 0.96, its cap lost to the weight of the head, and the head fell to its cone limit.
 for (const name of ['Knight', 'Barbarian', 'Ranger', 'Rogue', 'Mage'])
-  test(`${name}'s motors hold up its head with no balance to help`, { skip, timeout: 60_000 }, async () => {
+  test(`${name}'s motors hold up its head with no balance to help`, { timeout: 60_000 }, async () => {
     const [path, map, mass] = kin(name),
       rig = await realRig(path);
     rig.frames(1);
@@ -119,7 +119,7 @@ for (const name of ['Knight', 'Barbarian', 'Ranger', 'Rogue', 'Mage'])
 // asked for, on its own legs, with no step after the first second. The command is stance 0.97 of the height over the feet.
 const HELD_HEIGHT = 0.398;
 for (const ulps of [1, 4, 16])
-  test(`it settles on its own legs with its hull points ${ulps} rounding steps off`, { skip, timeout: 300_000 }, async () => {
+  test(`it settles on its own legs with its hull points ${ulps} rounding steps off`, { timeout: 300_000 }, async () => {
     const failures = [];
     for (let seed = 1; seed <= 8; seed++) {
       const { rig, ragdoll, keeper, hips } = await standing({ rounding: { ulps, seed } }),
@@ -215,7 +215,7 @@ const figures = {
 
 async function figure([path, boneMap, mass], rounding, passes) {
   const rig = await realRig(path);
-  if (passes) rig.physics.world.numSolverIterations = passes;
+  if (passes) rig.physics.solverIterations = passes;
   rig.frames(1);
   const map = boneMap(rig),
     ragdoll = Ragdoll.attach(rig.physics, ragdollOptions(humanoidProfile(rig.model.nodes, { bones: map, mass }), rig.model.nodes));
@@ -236,7 +236,7 @@ const FOOT_SLIDE = 0.002;
 // hips wandered 0.0038 m where they read 0.0005, with every other bound still met.
 const HIPS_DRIFT = 0.005;
 for (const [name, entry] of Object.entries(figures))
-  test(`${name} settles on its own legs, whatever the rounding of its hull points`, { skip, timeout: 300_000 }, async () => {
+  test(`${name} settles on its own legs, whatever the rounding of its hull points`, { timeout: 300_000 }, async () => {
     const failures = [];
     for (const ulps of [1, 4, 16])
       for (let seed = 1; seed <= 8; seed++) {
@@ -299,7 +299,7 @@ async function creep(entry, passes, rounding) {
   return read;
 }
 for (const [name, entry] of Object.entries({ Knight: kin('Knight'), ...figures }))
-  test(`${name} at 16 solver passes reads no worse than at 10`, { skip, timeout: 120_000 }, async () => {
+  test(`${name} at 16 solver passes reads no worse than at 10`, { timeout: 120_000 }, async () => {
     for (const seed of [1, 2, 3]) {
       const rounding = { ulps: 4, seed },
         ten = await creep(entry, 10, rounding),
@@ -315,7 +315,7 @@ for (const [name, entry] of Object.entries({ Knight: kin('Knight'), ...figures }
 // The controller reads how the hips moved from where they went. What a body reports at the end of a step is what the solver's
 // last pass left: Seed-san's hips reported 0.02 m/s one way while moving 0.008 m/s the other, and at 10 passes the height's
 // spring rang on that at half the frame rate, 0.026 m/s, for as long as it stood.
-test('Seed-san stands quiet at 10 solver passes, whatever the rounding of its hull points', { skip, timeout: 120_000 }, async () => {
+test('Seed-san stands quiet at 10 solver passes, whatever the rounding of its hull points', { timeout: 120_000 }, async () => {
   const failures = [];
   for (const ulps of [1, 4, 16])
     for (let seed = 1; seed <= 8; seed++) {
@@ -337,7 +337,7 @@ test('Seed-san stands quiet at 10 solver passes, whatever the rounding of its hu
 
 // What steadies the solver reckons with rods, while the motors' gains come from where the mass lies. The same added inertia from
 // the true figure shook RiggedFigure at 0.009 m/s at 20 passes, on 85 of 96 roundings, where rods read 0.0007.
-test('RiggedFigure stands quiet at 20 solver passes, whatever the rounding of its hull points', { skip, timeout: 120_000 }, async () => {
+test('RiggedFigure stands quiet at 20 solver passes, whatever the rounding of its hull points', { timeout: 120_000 }, async () => {
   const failures = [];
   for (const ulps of [1, 4, 16])
     for (let seed = 1; seed <= 8; seed++) {
@@ -361,7 +361,6 @@ test('RiggedFigure stands quiet at 20 solver passes, whatever the rounding of it
 // four were kept changed with the slightest turn: the foot dropped on a point left out and the body shook.
 rtest('a foot stands on a flat sole of four corners, every one of them in the solver, and dispose puts its hull back', async () => {
   const { rig, ragdoll, keeper, feet } = await standing(),
-    world = rig.physics.world,
     parts = feet.map((foot) => ragdoll.part(foot));
   for (const part of parts) {
     const heights = [];
@@ -374,16 +373,7 @@ rtest('a foot stands on a flat sole of four corners, every one of them in the so
   }
   rig.frames(120);
   for (const part of parts) {
-    const collider = part.body.raw.collider(0);
-    const corners = new Set();
-    world.contactPairsWith(collider, (other) =>
-      world.contactPair(collider, other, (manifold) => {
-        for (let i = 0; i < manifold.numSolverContacts(); i++) {
-          const { x, z } = manifold.solverContactPoint(i);
-          corners.add(`${x.toFixed(3)} ${z.toFixed(3)}`);
-        }
-      }),
-    );
+    const corners = new Set(rig.physics.contactPoints(part.body).map(([x, , z]) => `${x.toFixed(3)} ${z.toFixed(3)}`));
     assert.equal(corners.size, 4, 'and the solver has all four');
   }
   keeper.dispose();
@@ -402,14 +392,14 @@ rtest('a foot stands on a flat sole of four corners, every one of them in the so
 rtest('it holds its torques as forces: they leave with dispose and with a bone gone kinematic, and leave a force of yours alone', async () => {
   const { rig, ragdoll, keeper, feet } = await standing(),
     foot = ragdoll.part(feet[0]).body,
-    torque = () => Math.hypot(...Object.values(foot.raw.userTorque()));
+    torque = () => Math.hypot(...foot.appliedTorque);
   rig.frames(120);
   assert.ok(torque() > 0, 'the ankle holds a torque while it stands');
   foot.addForce([3, 0, 0]);
   rig.frames(2);
   keeper.dispose();
   assert.equal(torque() < 1e-4, true, `dispose takes the torque off (${torque()} N m)`);
-  assert.ok(Math.abs(foot.raw.userForce().x - 3) < 1e-4, 'and leaves the force of yours');
+  assert.ok(Math.abs(foot.appliedForce[0] - 3) < 1e-4, 'and leaves the force of yours');
   rig.dispose();
 
   const second = await standing(),
@@ -419,27 +409,27 @@ rtest('it holds its torques as forces: they leave with dispose and with a bone g
   second.rig.frames(2);
   second.keeper.dispose();
   second.ragdoll.activate();
-  assert.ok(Math.hypot(...Object.values(body.raw.userTorque())) < 1e-4, 'nothing is left to come back with the body');
+  assert.ok(Math.hypot(...body.appliedTorque) < 1e-4, 'nothing is left to come back with the body');
   second.rig.dispose();
 });
 
 rtest('what it adds to the solver stays on the character and goes with dispose', async () => {
   const plain = await standing({ balance: false }),
     foot = (ragdoll) => ragdoll.bones.find((part) => part.node.name === 'foot.l').body,
-    inertia = (body) => body.raw.principalInertia().x;
+    inertia = (body) => body.principalInertia[0];
   plain.rig.frames(1);
   const alone = inertia(foot(plain.ragdoll));
   plain.rig.dispose();
   const { rig, ragdoll, keeper } = await standing(),
-    passes = rig.physics.world.numSolverIterations;
+    passes = rig.physics.solverIterations;
   rig.frames(1);
   assert.ok(inertia(foot(ragdoll)) > alone * 2, 'the foot is harder to spin while it balances');
-  assert.ok(foot(ragdoll).raw.additionalSolverIterations() > 0, 'and its island gets more solver passes');
+  assert.ok(foot(ragdoll).additionalSolverIterations > 0, 'and its island gets more solver passes');
   keeper.dispose();
   rig.frames(1);
   assert.ok(Math.abs(inertia(foot(ragdoll)) - alone) < 1e-6 * alone, 'dispose puts the inertia back');
-  assert.equal(foot(ragdoll).raw.additionalSolverIterations(), 0, 'and the passes');
-  assert.equal(rig.physics.world.numSolverIterations, passes, 'the world is never touched');
+  assert.equal(foot(ragdoll).additionalSolverIterations, 0, 'and the passes');
+  assert.equal(rig.physics.solverIterations, passes, 'the world is never touched');
   rig.dispose();
 });
 

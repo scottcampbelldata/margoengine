@@ -978,8 +978,8 @@ Gaea, World Machine, Houdini and the like) was read; facts about them come only 
 ## Ragdolls: `@margoengine/ragdoll`
 
 Written clean room from the public descriptions below. No source code of ragdoll systems or engines (Unity, Unreal,
-Godot, PhysX, Havok, Jolt, Bullet, three.js, Babylon and the like) was read. Rapier is the physics library underneath;
-only its published API (`setBodyType`, the joint frames of `ImpulseJoint`) is used.
+Godot, PhysX, Havok, Jolt, Bullet, three.js, Babylon and the like) was read. Rapier is the physics library underneath for now;
+ragdoll reaches it only through the public `@margoengine/physics` API.
 
 | Area | Source |
 | --- | --- |

@@ -1,13 +1,13 @@
 // @margoengine/ragdoll/profile: a tuned ragdoll saved as JSON and rebuilt on a fresh copy of the real rig, and the humanoid
-// preset on real rigs in a stepping Rapier world.
+// preset on real rigs in a stepping solver world.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Ragdoll } from '../dist/index.js';
 import { fitRagdollShapes } from '../dist/hulls.js';
 import { humanoidProfile, ragdollOptions, saveRagdollProfile } from '../dist/profile.js';
-import { realRig, skip } from './rig.js';
+import { realRig } from './rig.js';
 
-const rtest = (name, fn) => test(name, { skip, timeout: 60_000 }, fn);
+const rtest = (name, fn) => test(name, { timeout: 60_000 }, fn);
 const KNIGHT = 'kaykit/adventurers/characters/Knight.glb';
 const kaykit = (rig) => ({
   hips: rig.node('hips'),
@@ -66,7 +66,7 @@ rtest('a tuned ragdoll comes back the same on a fresh rig through JSON, and two 
     assert.ok(Math.abs(copy.body.mass - part.body.mass) < 1e-6);
   });
   // Two loads of one profile are the same ragdoll. The tuned one is not compared: it swapped colliders while live, so
-  // Rapier holds them under other handles and solves its contacts in another order.
+  // The solver holds them under other handles and solves its contacts in another order.
   for (const [rig, ragdoll] of [
     [third, twin],
     [second, again],
