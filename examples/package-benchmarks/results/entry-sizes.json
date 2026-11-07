@@ -1,5 +1,5 @@
 {
-  "commit": "fbfc52155",
+  "commit": "c3b202d52",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -956,12 +956,12 @@
     },
     "@margoengine/fsm": {
       ".": {
-        "raw": 2984,
-        "gzip": 1222
+        "raw": 4128,
+        "gzip": 1596
       },
       "./parallel": {
-        "raw": 5374,
-        "gzip": 1981
+        "raw": 6538,
+        "gzip": 2351
       }
     },
     "@margoengine/geometry": {

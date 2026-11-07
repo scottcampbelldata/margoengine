@@ -2579,7 +2579,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-322). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-323). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -2823,6 +2823,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Focus tracking (`@margoengine/cinematic/lens`, 2026-11-07) | Enforced: rates above 0, `minFocus` above 0, `screenHeight` above 0 and at most 1. By method: focus comes from a known point, so it does not see what stands in front of the subject; for that use `Autofocus` of `@margoengine/dof/autofocus`, which reads the depth. `size` is one height: the field of view takes no account of a subject's shape. A `minFocus` at or below the lens's focal length makes `DOF` throw. Stand-in: the GPU proof uses two generated flat cards at f/0.2, wider than any real lens, so the blur is many pixels. Not measured: no timed number. | LIM-316 |
 | Parallel regions (`@margoengine/fsm/parallel`, 2026-11-07) | Enforced: at least one region; stopped regions refuse `send`, `update` and `raise`; `send` and `stop` from a region's own hook throw (use `raise` and `forward`); 10,000 raised events in one delivery throw, as hooks that raise each other never end. By method: a transition cannot cross regions or enter one from outside, and a region starts at its `initial` or where it stopped; there is no join, so nothing fires by itself when all regions finish; a `forward` while the holding machine is entering the regions throws, as that machine refuses a recursive transition. Events waiting when the regions stop, or when a hook throws, are dropped. Stand-in: the proof charts are generated, not from a shipped game. Not measured: no timed number. | LIM-321 |
 | History states (`history` and `initial` of `@margoengine/fsm`, 2026-11-07) | Enforced: a state's `initial` is one of its descendants; `history` is `'shallow'` or `'deep'`. By method: the memory counts when a state is entered, so a transition to a parent the machine is still inside uses `initial`; `history` is a property of the state, not a separate target, so every entry through that state uses it, including through a parent's `initial`, where SCXML and Sismic would use the default; parallel regions inside do not come back unless they have `{history: true}`. Stand-in: the proof charts are generated, not from a shipped game. Not measured: no timed number. | LIM-322 |
+| Delayed transitions (`after` of `@margoengine/fsm`, 2026-11-07) | Enforced: `after` is finite and above 0, a transition has `event` or `after` but not both; over 100,000 delayed transitions in one `update` throw, so a long `delta` with very short delays in a loop ends in an error. By method: time is the sum of `delta`, so a paused game pauses delays; a declined guard is asked again on each update, not once as a delayed event would be; a hook that changes state inside a split `delta` ends that piece; a delay shorter than the rounding of `clock` (about 1e-16 of it) does not count. Stand-in: the proof charts are generated, not from a shipped game. Not measured: no timed number. | LIM-323 |
 
 ## Copies of a model
 
@@ -9592,44 +9593,40 @@ console.log(machine.state); // 'ranged'; with history: 'shallow', 'melee', as co
 - Each state with `history` keeps its own memory, and a state remembered by a parent uses its own on the way in.
 - Parallel regions inside remembered states start again at their `initial`, unless the regions have `{history: true}`.
 
+## Delayed transitions
+
+Give a transition `after` in place of `event` and `update` takes it by itself once the machine has spent that many seconds in `from`. No timers to write, and none to cancel.
+
+```ts
+import {StateMachine} from 'margoengine/fsm';
+
+const machine = new StateMachine({
+  attack: {},
+  windup: {parent: 'attack'},
+  swing: {parent: 'attack'},
+  recover: {},
+  ready: {}
+}, 'windup', {}, [
+  {from: 'windup', to: 'swing', after: 0.2},
+  {from: 'attack', to: 'recover', after: 0.5, duration: 0.1},
+  {from: 'recover', to: 'ready', after: 0.3}
+]);
+machine.update(0.6);
+console.log(machine.state); // 'recover'
+```
+
+- The time counts from entering `from`. A parent keeps counting while the machine moves between its children, as `attack` does above; leaving `from` cancels the wait, and coming back starts it again.
+- A delay that ends inside a long `delta` splits it, so the machine does not depend on the frame rate: `update(0.6)` ends where 36 updates of 1/60 do, and the next state's delay counts from the moment the last one ended. Update hooks get the pieces of `delta`, which add up to the whole.
+- A guard that declines is asked again on every update until it passes, or the machine leaves `from`.
+- Inner states go first when delays end together.
+- A delayed transition that leaves its `from` active, such as one from a parent to its child, waits again from that moment. So `{from: 'patrol', to: 'look', after: 5}` runs every five seconds while inside `patrol`.
+- `machine.clock` is the machine's running time and `machine.entered` holds when each active state began.
+
 ## Parallel regions (`margoengine/fsm/parallel`)
 
 Run independent states at once, such as what a character's legs do and what its weapon does. Each region is an ordinary machine with one active state of its own; they share a context and hear the same events. Two machines side by side would do until a guard in one reads the other, or a hook in one tells the other: `ParallelRegions` settles those.
 
 ```ts
-import {ParallelRegions} from 'margoengine/fsm/parallel';
-
-const regions: ParallelRegions<object> = new ParallelRegions({
-  movement: {
-    states: {idle: {}, run: {}},
-    initial: 'idle',
-    transitions: [{from: 'idle', to: 'run', event: 'move'}, {from: 'run', to: 'idle', event: 'halt'}]
-  },
-  weapon: {
-    states: {ready: {}, firing: {}},
-    initial: 'ready',
-    transitions: [{
-      from: 'ready', to: 'firing', event: 'fire',
-      guard: () => !regions.matches('movement', 'run')
-    }]
-  }
-}, {});
-
-regions.start();
-regions.send('fire');
-regions.update(1 / 60);
-console.log(regions.active); // {movement: 'idle', weapon: 'firing'}
-```
-
-- `send(event)` reaches every region and returns true when one took it. All regions choose first and then all move, so a guard sees the same states whichever region it sits in, and the order of the regions changes nothing but the order hooks run in.
-- `raise(event)` is for hooks: the event waits until the running delivery ends, then goes to every region, in the order raised. `send` from a hook throws. `forward: (event) => machine.send(event)` gets a raised event no region took.
-- `active` gives each region's state, `matches(region, state)` tests one, parents included, and `machines` holds each region's `StateMachine`, for `blend` and the like.
-- Regions enter in the order written and leave in reverse. `stop()` leaves them, and `start()` begins at each `initial` again, or where each stopped with `{history: true}`.
-
-Put regions in a state of another machine with `asState()`. Entering that state starts them, leaving stops them, and an event reaches them first: the outer machine's transitions on the same event only run when no region took it. Regions nest the same way.
-
-```ts
-import {StateMachine} from 'margoengine/fsm';
 import {ParallelRegions} from 'margoengine/fsm/parallel';
 ```
 

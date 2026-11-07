@@ -1,4 +1,6 @@
 import { MargoError } from '@margoengine/math/errors';
+// More delayed transitions than this in one update means a chain of very short delays; the caller's delta is at fault.
+const MAX_FIRED = 100000;
 /** One state of a {@link StateMachine}; `C` is the shared context passed to every hook. */
 export interface State<C> {
   /** Name of the parent state; ancestors stay entered while moving between their children. */
@@ -23,14 +25,20 @@ export interface State<C> {
    */
   plan?: (event: string) => (() => void) | null;
 }
-/** Event-driven edge between two states. */
+/** Edge between two states, taken on an event or after a delay. */
 export interface Transition {
   /** Source state; also matches while a descendant of it is active. */
   from: string;
   /** Target state. */
   to: string;
-  /** Event name passed to `StateMachine.send`; must be non-empty. */
-  event: string;
+  /** Event name passed to `StateMachine.send`; must be non-empty. Give this or `after`, not both. */
+  event?: string;
+  /**
+   * Seconds in `from` after which `StateMachine.update` takes this transition by itself; finite and above 0. Give this
+   * or `event`, not both. The time counts from entering `from`, so moving between its children does not restart it,
+   * and leaving it cancels it. A guard that declines is asked again on every update until it passes.
+   */
+  after?: number;
   /** Cross-fade time in seconds; finite and >= 0. Default 0 (no cross-fade). */
   duration?: number;
   /** Return false to decline the transition. */
@@ -45,11 +53,16 @@ export class StateMachine<C> {
   previous: string | null = null;
   /** Seconds since the last state change. */
   elapsed = 0;
+  /** Seconds this machine has run, from every `update`. */
+  clock = 0;
+  /** Value of `clock` when each active state was entered, by state name, for delayed transitions. */
+  readonly entered = new Map<string, number>();
   /** What each state with `history` remembers, by state name. Delete a key, or clear it, to forget. */
   readonly memory = new Map<string, string>();
   private duration = 0;
   private changing = false;
   private readonly paths = new Map<string, readonly string[]>();
+  private readonly timed: readonly Transition[];
   /**
    * Build the machine and enter `initial` (and its ancestors).
    * @throws TypeError for an unknown parent, a hierarchy cycle, an unknown initial state, a state's `initial` that is
@@ -84,14 +97,21 @@ export class StateMachine<C> {
       if (
         !this.paths.has(transition.from) ||
         !this.paths.has(transition.to) ||
-        !transition.event ||
+        !transition.event === (transition.after === undefined) ||
+        !(transition.after === undefined || (Number.isFinite(transition.after) && transition.after > 0)) ||
         !Number.isFinite(transition.duration ?? 0) ||
         (transition.duration ?? 0) < 0
       )
-        throw new TypeError('Invalid transition; give from and to as existing state names');
+        throw new TypeError(
+          'Invalid transition; give from and to as existing state names, and either event or an after above 0',
+        );
+    this.timed = transitions.filter((transition) => transition.after !== undefined);
     this.state = initial;
     this.state = this.resolve(initial);
-    for (const name of this.paths.get(this.state)!) states[name].enter?.(context);
+    for (const name of this.paths.get(this.state)!) {
+      this.entered.set(name, 0);
+      states[name].enter?.(context);
+    }
   }
   /** Cross-fade progress in [0, 1]; 1 when no cross-fade is running. */
   get blend(): number {
@@ -155,13 +175,17 @@ export class StateMachine<C> {
           if (i === from.length - 1) this.memory.delete(from[i]);
           else this.memory.set(from[i], state.history === 'deep' ? this.state : from[i + 1]);
         }
+        this.entered.delete(from[i]);
         state.exit?.(this.context);
       }
       this.previous = duration > 0 ? this.state : null;
       this.state = next;
       this.duration = duration;
       this.elapsed = 0;
-      for (let i = common; i < to.length; i++) this.states[to[i]].enter?.(this.context);
+      for (let i = common; i < to.length; i++) {
+        this.entered.set(to[i], this.clock);
+        this.states[to[i]].enter?.(this.context);
+      }
     } finally {
       this.changing = false;
     }
@@ -176,12 +200,35 @@ export class StateMachine<C> {
     }
   }
   /**
-   * Advance the cross-fade timer by `delta` seconds and run the active path's update hooks; stops if a hook changes state.
+   * Advance the machine by `delta` seconds: the cross-fade timer, the active path's update hooks, and delayed
+   * transitions. A delay that ends inside `delta` splits it: hooks get the time up to that moment, the transition runs,
+   * and the rest goes to the new state, so one long update ends where many short ones do. Stops the hooks of a path if
+   * a hook changes state.
    * @throws RangeError when `delta` is negative or not finite.
+   * @throws MargoError `'state'` when delayed transitions fire over 100,000 times in one update.
    */
   update(delta: number): void {
     if (!Number.isFinite(delta) || delta < 0)
       throw new RangeError('Invalid state delta; pass a finite, non-negative number of seconds');
+    let left = delta,
+      fired = this.fire(0);
+    do {
+      const due = this.nextDue();
+      if (due - this.clock < left) {
+        const step = due - this.clock;
+        this.clock = due;
+        left -= step;
+        this.advance(step);
+      } else {
+        const step = left;
+        this.clock += step;
+        left = 0;
+        this.advance(step);
+      }
+      fired = this.fire(fired);
+    } while (left > 0);
+  }
+  private advance(delta: number): void {
     this.elapsed += delta;
     if (this.previous && this.elapsed >= this.duration) this.previous = null;
     const path = this.paths.get(this.state)!;
@@ -189,5 +236,41 @@ export class StateMachine<C> {
       if (this.state !== path.at(-1)) break;
       this.states[path[i]].update?.(this.context, delta);
     }
+  }
+  // The next time a delay ends on the active path. One already over, held by its guard, does not stop the clock.
+  private nextDue(): number {
+    let due = Infinity;
+    for (const transition of this.timed) {
+      const entered = this.entered.get(transition.from);
+      if (entered === undefined) continue;
+      const end = entered + transition.after!;
+      if (end > this.clock && end < due) due = end;
+    }
+    return due;
+  }
+  // Takes every delayed transition that is due, innermost first. Each waits again if its state stays active, so one
+  // from a parent to its own child fires once per wait. Returns the count so far.
+  private fire(count: number): number {
+    if (!this.timed.length) return count;
+    for (;;) {
+      const transition = this.dueTransition();
+      if (!transition) return count;
+      if (++count > MAX_FIRED)
+        throw new MargoError('state', 'Delayed transitions fire without end; use longer delays or a shorter delta');
+      this.goto(transition.to, transition.duration ?? 0);
+      if (this.entered.has(transition.from)) this.entered.set(transition.from, this.clock);
+    }
+  }
+  private dueTransition(): Transition | null {
+    const path = this.paths.get(this.state)!;
+    for (let i = path.length - 1; i >= 0; i--)
+      for (const transition of this.timed)
+        if (
+          transition.from === path[i] &&
+          this.clock >= this.entered.get(path[i])! + transition.after! &&
+          (!transition.guard || transition.guard())
+        )
+          return transition;
+    return null;
   }
 }

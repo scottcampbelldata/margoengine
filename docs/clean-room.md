@@ -868,6 +868,7 @@ Written clean room from the published work below. No source of a statechart libr
 | Hierarchy, parallel regions, `in(S)` guards (`fsm`, `fsm/parallel`) | D. Harel, "Statecharts: a visual formalism for complex systems", Science of Computer Programming 8(3), 1987 |
 | Choosing before moving, inner transitions before outer ones, entry and exit order, raised events waiting for the end of a step (`fsm/parallel`) | W3C, "State Chart XML (SCXML): State Machine Notation for Control Abstraction", Recommendation, 2015: sections 3.1.3, 3.13, 4.2 and Appendix D (entry and exit order) |
 | Shallow and deep history, recorded on exit, default before the first visit (`history`, `initial`) | Harel 1987, as above, for H and H*; SCXML sections 3.1.4, 3.10 and `exitStates` in Appendix D. History as a property of the state rather than a target of its own is our own |
+| Delayed transitions (`after`) | Harel 1987, as above, for timeouts on a state; SCXML section 6.2 for delay and Appendix D for the end of a step. Splitting a step at the moment a delay ends is the event-scheduling of discrete event simulation, as in any textbook on it; asking a guard again each update is our own |
 
 ## Save and load: `@margoengine/save`
 

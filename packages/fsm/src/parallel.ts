@@ -150,12 +150,14 @@ export class ParallelRegions<C> {
     this.drain();
   }
   /**
-   * Update every region in order, as `StateMachine.update` does.
+   * Update every region in order, as `StateMachine.update` does. An update is a delivery: a hook uses `raise`.
    * @throws MargoError `'state'` when stopped. @throws RangeError when `delta` is negative or not finite.
    */
   update(delta: number): void {
     this.assertRunning();
-    for (const machine of this.list) machine.update(delta);
+    this.deliver(() => {
+      for (const machine of this.list) machine.update(delta);
+    });
   }
   /**
    * The state that runs these regions inside another machine: entering it starts them, leaving it stops them, and an

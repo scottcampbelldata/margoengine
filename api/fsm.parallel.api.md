@@ -49,6 +49,8 @@ class StateMachine<C> {
     state: string;
     previous: string | null;
     elapsed: number;
+    clock: number;
+    readonly entered: Map<string, number>;
     readonly memory: Map<string, string>;
     constructor(states: Readonly<Record<string, State<C>>>, initial: string, context: C, transitions?: readonly Transition[]);
     get blend(): number;
@@ -62,7 +64,8 @@ class StateMachine<C> {
 interface Transition {
     from: string;
     to: string;
-    event: string;
+    event?: string;
+    after?: number;
     duration?: number;
     guard?: () => boolean;
 }

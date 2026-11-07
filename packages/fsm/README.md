@@ -48,6 +48,35 @@ console.log(machine.state); // 'ranged'; with history: 'shallow', 'melee', as co
 - Each state with `history` keeps its own memory, and a state remembered by a parent uses its own on the way in.
 - Parallel regions inside remembered states start again at their `initial`, unless the regions have `{history: true}`.
 
+## Delayed transitions
+
+Give a transition `after` in place of `event` and `update` takes it by itself once the machine has spent that many seconds in `from`. No timers to write, and none to cancel.
+
+```ts
+import {StateMachine} from 'margoengine/fsm';
+
+const machine = new StateMachine({
+  attack: {},
+  windup: {parent: 'attack'},
+  swing: {parent: 'attack'},
+  recover: {},
+  ready: {}
+}, 'windup', {}, [
+  {from: 'windup', to: 'swing', after: 0.2},
+  {from: 'attack', to: 'recover', after: 0.5, duration: 0.1},
+  {from: 'recover', to: 'ready', after: 0.3}
+]);
+machine.update(0.6);
+console.log(machine.state); // 'recover'
+```
+
+- The time counts from entering `from`. A parent keeps counting while the machine moves between its children, as `attack` does above; leaving `from` cancels the wait, and coming back starts it again.
+- A delay that ends inside a long `delta` splits it, so the machine does not depend on the frame rate: `update(0.6)` ends where 36 updates of 1/60 do, and the next state's delay counts from the moment the last one ended. Update hooks get the pieces of `delta`, which add up to the whole.
+- A guard that declines is asked again on every update until it passes, or the machine leaves `from`.
+- Inner states go first when delays end together.
+- A delayed transition that leaves its `from` active, such as one from a parent to its child, waits again from that moment. So `{from: 'patrol', to: 'look', after: 5}` runs every five seconds while inside `patrol`.
+- `machine.clock` is the machine's running time and `machine.entered` holds when each active state began.
+
 ## Parallel regions (`margoengine/fsm/parallel`)
 
 Run independent states at once, such as what a character's legs do and what its weapon does. Each region is an ordinary machine with one active state of its own; they share a context and hear the same events. Two machines side by side would do until a guard in one reads the other, or a hook in one tells the other: `ParallelRegions` settles those.

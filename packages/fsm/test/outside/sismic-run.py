@@ -21,9 +21,16 @@ def state(node, memory):
     transitions = []
     for t in node['transitions']:
         target = t['to'] + '_h' if t['to'] in memory else t['to']
-        rule = {'target': target, 'event': t['event']}
+        rule = {'target': target}
+        tests = []
+        if 'after' in t:
+            tests.append('after(%d)' % t['after'])
+        else:
+            rule['event'] = t['event']
         if t.get('active'):
-            rule['guard'] = "active('%s')" % t['active']
+            tests.append("active('%s')" % t['active'])
+        if tests:
+            rule['guard'] = ' and '.join(tests)
         transitions.append(rule)
     if transitions:
         out['transitions'] = transitions
@@ -56,7 +63,10 @@ def run(chart):
     interpreter.execute()
     trace = [atoms(interpreter, statechart)]
     for step in chart['script']:
-        interpreter.queue(step)
+        if step == 'tick':
+            interpreter.clock.time += 1
+        else:
+            interpreter.queue(step)
         interpreter.execute()
         trace.append(atoms(interpreter, statechart))
     return trace

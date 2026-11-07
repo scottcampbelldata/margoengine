@@ -39,6 +39,7 @@ console.log(
     parallel: total((state) => state.parallel),
     shallow: total((state) => state.history === 'shallow'),
     deep: total((state) => state.history === 'deep'),
+    delayed: total((state) => state.transitions.some((transition) => transition.after)),
   }),
 );
 if (differ) process.exit(1);

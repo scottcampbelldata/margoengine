@@ -1,5 +1,5 @@
 // Seeded statecharts and scripts, written once as plain data so that Margo and an outside interpreter run the same thing.
-// A chart: { root: { name, children, initial, parallel, transitions } }. A script: events and ticks of one second.
+// A chart: { root: { name, children, initial, parallel, history, transitions } }. A script: events and ticks of one second.
 // `traces.json` holds what Sismic did with these charts, so `outside.test.js` replays it with no Python installed.
 import { StateMachine } from '../../dist/index.js';
 import { ParallelRegions } from '../../dist/parallel.js';
@@ -69,6 +69,15 @@ function wire(next, machineRoot, top) {
       if (next(100) < 25) transition.active = top[next(top.length)].name;
       source.transitions.push(transition);
     }
+    // One delay per state at most: two ending together in one state is a choice Sismic refuses.
+    if (next(100) < 45) {
+      const target = states[next(states.length)];
+      if (target !== source && !below(source, target) && !below(target, source) && !target.region) {
+        const transition = { to: target.name, after: 1 + next(4) };
+        if (next(100) < 25) transition.active = top[next(top.length)].name;
+        source.transitions.push(transition);
+      }
+    }
   }
   for (const state of states)
     if (state.parallel)
@@ -112,7 +121,7 @@ export function makeChart(seed) {
   wire(next, root, everyState(root));
   remember(next, root, false);
   const script = [];
-  for (let i = 0; i < SCRIPT_LENGTH; i++) script.push(EVENTS[next(EVENTS.length)]);
+  for (let i = 0; i < SCRIPT_LENGTH; i++) script.push(next(100) < 40 ? 'tick' : EVENTS[next(EVENTS.length)]);
   return { root, script };
 }
 
@@ -138,7 +147,7 @@ function machineOf(top, states, byName, runners) {
       transitions.push({
         from: state.name,
         to: transition.to,
-        event: transition.event,
+        ...(transition.after ? { after: transition.after } : { event: transition.event }),
         ...(transition.active ? { guard: () => runners.isActive(transition.active) } : {}),
       });
     }
@@ -178,7 +187,8 @@ export function runMargo({ root, script }) {
       .join(' ');
   const trace = [atoms()];
   for (const step of script) {
-    machine.send(step);
+    if (step === 'tick') machine.update(1);
+    else machine.send(step);
     trace.push(atoms());
   }
   return trace;
