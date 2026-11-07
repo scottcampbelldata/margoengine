@@ -1,0 +1,88 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Scenery aurora check</title><style>body{margin:0}canvas{display:block;width:256px;height:192px}</style></head><body><canvas width="256" height="192"></canvas>
+<script type="module">
+// Aurora on a real GPU, read back from Bloom's HDR scene capture: the 64-step march against auroraColumn's 4,000-step
+// column over blocks of pixels, the green below and the red above, the curtains moving with time and the same at the
+// same time, and nothing below the horizon, behind a mesh or by day. Driven by scenery-check.mjs (aurora).
+import {Engine,PbrMaterial,box} from '/packages/core/dist/index.js';
+import {sceneSamples} from '/packages/core/dist/quality.js';
+import {Bloom} from '/packages/post/dist/bloom.js';
+import {invertMatrixStable} from '/packages/math/dist/mat4.js';
+import {AURORA_LINES,Aurora,auroraColumn} from '/packages/scenery/dist/aurora.js';
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
+if(new URLSearchParams(location.search).get('samples')==='1')globalThis.margoLow=1;
+const W=256,H=192,rad=Math.PI/180;
+const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,0,0],target:[0,0.6,-1],fov:60,near:0.1,far:1000}}),device=engine.gpu,errors=[];
+engine.stop();
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const post=Bloom.attach(engine,{strength:0,threshold:1,exposure:0});
+const sky={options:{},nightFactor:1},options={brightness:200,sky,speed:0};
+const aurora=Aurora.attach(engine,options);
+const module=device.createShaderModule({code:'@group(0) @binding(0) var image:texture_2d<f32>;@group(0) @binding(1) var<storage,read_write> result:array<vec4f>;@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u){let s=textureDimensions(image);if(any(id.xy>=s)){return;}result[id.y*s.x+id.x]=textureLoad(image,vec2i(id.xy),0);}'});
+const pipeline=device.createComputePipeline({layout:'auto',compute:{module,entryPoint:'main'}});
+async function read(texture){
+ const bytes=texture.width*texture.height*16,output=device.createBuffer({size:bytes,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),staging=device.createBuffer({size:bytes,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+ const encoder=device.createCommandEncoder(),pass=encoder.beginComputePass();pass.setPipeline(pipeline);
+ pass.setBindGroup(0,device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:texture.createView()},{binding:1,resource:{buffer:output}}]}));
+ pass.dispatchWorkgroups(Math.ceil(texture.width/8),Math.ceil(texture.height/8));pass.end();encoder.copyBufferToBuffer(output,0,staging,0,bytes);device.queue.submit([encoder.finish()]);
+ await staging.mapAsync(GPUMapMode.READ);const data=new Float32Array(staging.getMappedRange()).slice();staging.unmap();output.destroy();staging.destroy();return data;
+}
+const frame=async()=>{engine.render({delta:0});await device.queue.onSubmittedWorkDone();return read(post.sceneTexture);};
+// The aurora alone: a frame with it, less one at intensity 0.
+const only=async()=>{const on=await frame();options.intensity=0;const off=await frame();options.intensity=undefined;return on.map((v,i)=>v-off[i]);};
+const lum=(f,p)=>f[p]+f[p+1]+f[p+2];
+const ray=(x,y)=>{
+ const inv=invertMatrixStable(engine.camera.matrix,new Float64Array(16)),nx=x/W*2-1,ny=1-y/H*2,p=[0,1,2,3].map(r=>inv[r]*nx+inv[4+r]*ny+inv[8+r]*1e-6+inv[12+r]);
+ const d=[p[0]/p[3],p[1]/p[3],p[2]/p[3]],n=Math.hypot(...d);return d.map(v=>v/n);
+};
+const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+// What a pixel must hold: each line's column (kR) times its colour and luminance on the stars' scale, times the
+// pixel's solid angle.
+const scale=200/10.8e4/(Math.PI/648000)**2;
+const expected=(x,y)=>{
+ const d=ray(x+0.5,y+0.5),dx=ray(x+1,y+0.5).map((v,i)=>v-ray(x,y+0.5)[i]),dy=ray(x+0.5,y+1).map((v,i)=>v-ray(x+0.5,y)[i]),omega=Math.hypot(...cross(dx,dy));
+ const c=auroraColumn([0,0,0],d,aurora.time,options),out=[0,0,0];
+ [AURORA_LINES.green,AURORA_LINES.red,AURORA_LINES.blue].forEach((l,k)=>{for(let j=0;j<3;j++)out[j]+=c[k]*l.color[j]*l.luminance*scale*omega;});
+ return out;
+};
+const aim=(elevation,fov)=>{engine.camera.fov=fov;engine.camera.target=[0,Math.sin(elevation*rad),-Math.cos(elevation*rad)];};
+window.check={samples:sceneSamples,
+ async run(){
+  device.pushErrorScope('validation');
+  const out={};
+  // Blocks of 8 x 8 pixels on the brightest places of the view, GPU sum against the column's.
+  aim(40,60);await waitForPipelines(frame);const f=await only();
+  const peaks=[];
+  for(let y=4;y<H-12;y+=8)for(let x=4;x<W-12;x+=8){let s=0;for(let j=0;j<8;j++)for(let i=0;i<8;i++)s+=lum(f,((y+j)*W+x+i)*4);peaks.push({x,y,s});}
+  peaks.sort((a,b)=>b.s-a.s);
+  let worst=0;const blocks=[];
+  for(const b of peaks.slice(0,6)){
+   let want=0,green=0,red=0;for(let j=0;j<8;j++)for(let i=0;i<8;i++){const e=expected(b.x+i,b.y+j);want+=e[0]+e[1]+e[2];red+=f[((b.y+j)*W+b.x+i)*4];green+=f[((b.y+j)*W+b.x+i)*4+1];}
+   worst=Math.max(worst,Math.abs(b.s/want-1));blocks.push({x:b.x,y:b.y,got:b.s,want});
+  }
+  out.blocks={worst,blocks,total:peaks.reduce((s,b)=>s+b.s,0)};
+  // Colour with height: the red share of the light at 15 to 25 degrees against 45 to 55 degrees, looking north.
+  aim(20,10);const lowF=await only();aim(50,10);const highF=await only();
+  const share=(g)=>{let r=0,gr=0;for(let p=0;p<g.length;p+=4){r+=g[p];gr+=g[p+1];}return {red:r,green:gr};};
+  out.height={low:share(lowF),high:share(highF)};
+  // Time: the same picture at the same time, another 20 s on.
+  aim(40,60);const t0=await only(),again=await only();aurora.time=20;const t1=await only();aurora.time=0;
+  let same=0,moved=0,sum=0;for(let p=0;p<t0.length;p+=4){same=Math.max(same,Math.abs(lum(t0,p)-lum(again,p)));moved+=Math.abs(lum(t1,p)-lum(t0,p));sum+=lum(t0,p);}
+  out.time={same,moved:moved/sum};
+  // Below the horizon nothing: looking level north, no light below the middle row.
+  aim(0,40);const level=await only();
+  let above=0,below=0;for(let y=0;y<H;y++)for(let x=0;x<W;x++){const v=lum(level,(y*W+x)*4);if(v>0){if(y<H/2-1)above++;else if(y>H/2+1)below++;}}
+  out.horizon={above,below};
+  // Behind a mesh nothing: a cube 3 m out on the brightest block.
+  aim(40,60);await frame();const top=peaks[0],cx=top.x+4,cy=top.y+4;
+  const mesh=engine.createMesh().setGeometry(box(1,1,1)).setMaterial(new PbrMaterial({color:'#000000',roughness:1}));mesh.setPosition(ray(cx,cy).map(v=>v*3));
+  await waitForPipelines(frame);const hidden=await only();mesh.dispose();
+  out.occluded={behind:Math.abs(lum(hidden,(cy*W+cx)*4)),open:top.s/64};
+  // By day (the sky's night 0) nothing.
+  sky.nightFactor=0;const day=await only();sky.nightFactor=1;
+  let dayDrawn=0;for(let p=0;p<day.length;p+=4)if(lum(day,p)!==0)dayDrawn++;
+  out.day=dayDrawn;
+  const error=await device.popErrorScope();
+  return {...out,error:error?.message??null,errors:errors.splice(0)};
+ }};
+window.ready=true;
+</script></body></html>

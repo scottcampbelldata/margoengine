@@ -1,4 +1,3 @@
-/// <reference lib="esnext.disposable" preserve="true" />
 // The Milky Way's band on the night sky, in its true place for a date and place, to go with the catalogue stars of
 // `AstroSky` (`@margoengine/sky/astro`), which this entry does not draw again. The band is worked out per pixel on the
 // GPU, so it is sharp at any resolution: a world direction is turned back into J2000 by `skyMatrix`, then into galactic
@@ -7,15 +6,7 @@
 // shaped after the all-sky photometry of Mellinger (PASP 121, 2009). It is given in V magnitudes per square arcsecond
 // and scaled with the same magnitude-0 brightness as AstroSky's stars, so band and stars keep their real ratio.
 import type { EngineKernel } from '@margoengine/core';
-import {
-  engineRuntime,
-  type Engine,
-  type EnginePlugin,
-  type FrameGraph,
-  type PassContext,
-} from '@margoengine/core/extension';
-import { MargoError } from '@margoengine/math/errors';
-import { invertMatrixStable } from '@margoengine/math/mat4';
+import { engineRuntime } from '@margoengine/core/extension';
 import {
   skyMatrix,
   sunPosition,
@@ -24,11 +15,7 @@ import {
   type AstroSkyTarget,
   type Observer,
 } from '@margoengine/sky/astro';
-import { Backdrop, backdropVertex } from './backdrop.js';
-import { viewSize } from '../../shared/view-rect.js';
-
-declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
-type Context = Extract<PassContext, { backend: 'webgpu' }>;
+import { SkyLayer, backdropVertex, type Context } from './backdrop.js';
 
 // The equatorial (ICRS, J2000) to galactic rotation of the Hipparcos catalogue, row-major: the north galactic pole at
 // RA 192.85948, Dec 27.12825 and the centre at galactic longitude 0.
@@ -185,20 +172,14 @@ fn ray(n:vec2f)->vec3f {let p=u.inverse*vec4f(n,0.000001,1.0);return normalize(p
  * const astro = AstroSky.attach(engine, { latitude: degrees(35), longitude: degrees(-110), sky, catalog });
  * const band = MilkyWay.attach(engine, { astro });
  */
-export class MilkyWay implements EnginePlugin {
+export class MilkyWay extends SkyLayer {
   readonly name = 'scenery:milky-way';
-  private readonly backdrop = new Backdrop();
-  private readonly values = new Float32Array(40);
-  private readonly scratch = new Float64Array(52);
-  private readonly inverse = new Float32Array(16);
-  private readonly since: Date;
-  private uniform?: GPUBuffer;
-  private engine?: Engine;
-  private disposed = false;
+  private readonly since = new Date();
 
   constructor(readonly options: MilkyWayOptions) {
+    // After the sky (2), before AstroSky's stars (2.5), fog (5) and weather (6).
+    super('MilkyWay', 2.4, new Float32Array(40), shader);
     validate(options);
-    this.since = new Date();
   }
 
   static attach(engine: EngineKernel, options: MilkyWayOptions): MilkyWay {
@@ -238,41 +219,14 @@ export class MilkyWay implements EnginePlugin {
     validate(this.options);
   }
 
-  setup(engine: Engine): void {
-    if (this.disposed || !engine.gpu)
-      throw new MargoError(
-        this.disposed ? 'disposed' : 'unsupported',
-        'MilkyWay requires WebGPU; attach a new MilkyWay to a WebGPU engine',
-      );
-    this.engine = engine;
-    this.uniform = engine.gpu.createBuffer({
-      size: this.values.byteLength,
-      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    });
-  }
-
-  registerPasses(graph: FrameGraph): void {
-    graph.add({
-      name: 'scenery:milky-way',
-      // After the sky (2), before AstroSky's stars (2.5), fog (5) and weather (6).
-      order: 2.4,
-      execute: (c) => {
-        if (c.backend === 'webgpu') this.draw(c);
-      },
-    });
-  }
-
-  private draw(c: Context): void {
+  protected frame(c: Context): boolean {
     const o = this.options,
       a = o.astro?.options,
       night = this.night();
-    if (night <= 0) return;
-    if (!invertMatrixStable(c.camera.matrix, this.inverse, this.scratch))
-      throw new MargoError('state', 'Invalid MilkyWay camera; give the camera a finite, invertible projection');
+    if (night <= 0) return false;
     const v = this.values,
       observer = this.observer(),
       m = skyMatrix(this.date, observer, observer);
-    v.set(this.inverse, 0);
     for (let r = 0; r < 3; r++) for (let k = 0; k < 3; k++) v[16 + r * 4 + k] = m[r * 3 + k];
     v.set(c.camera.position, 28);
     // A magnitude-0 star's brightness times 10^(-0.4 S) is the radiance of one square arcsecond: per steradian here.
@@ -281,33 +235,6 @@ export class MilkyWay implements EnginePlugin {
     v[34] = o.extinction ?? a?.extinction ?? 0.2;
     v[35] = o.clouds ?? 1;
     v[37] = o.seed ?? 1;
-    const [width, tall] = viewSize(c) as [number, number];
-    v[38] = 2 / width;
-    v[39] = 2 / tall;
-    this.backdrop.draw(c, shader, this.uniform!, v as Float32Array<ArrayBuffer>);
-  }
-
-  private release(): void {
-    this.uniform?.destroy();
-    this.uniform = undefined;
-    this.backdrop.release();
-  }
-
-  onDeviceRestored(engine: Engine): void {
-    this.release();
-    this.setup(engine);
-  }
-
-  dispose(): void {
-    if (this.disposed) return;
-    this.disposed = true;
-    this.engine?.removePlugin(this.name);
-    this.release();
-    this.engine = undefined;
-  }
-
-  declare [Symbol.dispose]: () => void;
-  [(Symbol.dispose ?? Symbol()) as symbol](): void {
-    this.dispose();
+    return true;
   }
 }

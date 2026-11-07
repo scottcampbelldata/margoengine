@@ -2222,6 +2222,10 @@
       "types": "./dist/scenery/stars.d.ts",
       "import": "./dist/scenery/stars.js"
     },
+    "./scenery/aurora": {
+      "types": "./dist/scenery/aurora.d.ts",
+      "import": "./dist/scenery/aurora.js"
+    },
     "./sciviz": {
       "types": "./dist/sciviz.d.ts",
       "import": "./dist/sciviz.js"

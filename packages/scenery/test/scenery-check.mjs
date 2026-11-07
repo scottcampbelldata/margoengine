@@ -108,6 +108,32 @@ const checks = {
     );
     return r;
   },
+  async aurora(page, samples) {
+    const r = await page.evaluate(() => window.check.run());
+    assert.equal(r.error, null);
+    assert.deepEqual(r.errors, []);
+    const redShare = (v) => v.red / v.green;
+    console.log(
+      `  aurora ${samples}x: blocks ${r.blocks.blocks.map((b) => (b.got / b.want).toFixed(3)).join(', ')}; red over green at 20 degrees ${redShare(r.height.low).toFixed(3)}, at 50 ${redShare(r.height.high).toFixed(3)}; same time ${r.time.same}, 20 s on ${r.time.moved.toFixed(2)}; horizon ${r.horizon.above} above ${r.horizon.below} below; behind a mesh ${r.occluded.behind} (open ${r.occluded.open.toPrecision(3)}); by day ${r.day}`,
+    );
+    // The 64-step march gives each bright 8 x 8 block the light of the 4,000-step column within 5%.
+    assert.ok(r.blocks.total > 0 && r.blocks.blocks.length === 6);
+    assert.ok(r.blocks.worst < 0.05, `worst block ${r.blocks.worst}`);
+    // Green low, red high: the red share of the light at 50 degrees at least three times that at 20.
+    assert.ok(
+      Number.isFinite(redShare(r.height.high)) && redShare(r.height.high) > 3 * redShare(r.height.low),
+      'redder higher up',
+    );
+    assert.ok(r.height.low.green > r.height.low.red, 'green below');
+    // The same picture at the same time; 20 s on, the folds and rays have moved at least a fifth of the light.
+    assert.equal(r.time.same, 0);
+    assert.ok(r.time.moved > 0.2, `moved ${r.time.moved}`);
+    assert.ok(r.horizon.above > 1000 && r.horizon.below === 0, `horizon ${JSON.stringify(r.horizon)}`);
+    assert.ok(r.occluded.behind === 0 && r.occluded.open > 0, `occluded ${JSON.stringify(r.occluded)}`);
+    assert.equal(r.day, 0);
+    console.log(`ok aurora ${samples}x: blocks within ${(100 * r.blocks.worst).toFixed(2)}% of the column`);
+    return r;
+  },
 };
 const names = process.argv.slice(2).length ? process.argv.slice(2) : Object.keys(checks);
 const context = await openBrowser({ startPath: `/packages/scenery/test/${names[0]}-check.html`, port: 'free' }),

@@ -49,6 +49,10 @@
     "./stars": {
       "types": "./dist/stars.d.ts",
       "import": "./dist/stars.js"
+    },
+    "./aurora": {
+      "types": "./dist/aurora.d.ts",
+      "import": "./dist/aurora.js"
     }
   },
   "files": [

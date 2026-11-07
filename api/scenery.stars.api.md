@@ -4,10 +4,10 @@
 
 ```ts
 import { EngineKernel } from "@margoengine/core";
-import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
+import { Engine, EnginePlugin, FrameGraph, PassContext } from "@margoengine/core/extension";
 import { AstroOptions, AstroSky, AstroSkyTarget, Observer } from "@margoengine/sky/astro";
 
-export class MilkyWay implements EnginePlugin {
+export class MilkyWay extends SkyLayer {
     readonly options: MilkyWayOptions;
     readonly name = "scenery:milky-way";
     constructor(options: MilkyWayOptions);
@@ -15,11 +15,7 @@ export class MilkyWay implements EnginePlugin {
     get date(): Date;
     night(): number;
     onPreUpdate(): void;
-    setup(engine: Engine): void;
-    registerPasses(graph: FrameGraph): void;
-    onDeviceRestored(engine: Engine): void;
-    dispose(): void;
-    [Symbol.dispose]: () => void;
+    protected frame(c: Context): boolean;
 }
 
 export interface MilkyWayOptions extends Partial<Observer>, AstroOptions {
@@ -39,4 +35,22 @@ export function galacticCoordinates(direction: readonly [number, number, number]
 };
 
 export function milkyWayBrightness(l: number, b: number): number;
+
+// Not exported from this entry, but used by the exports above:
+
+type Context = Extract<PassContext, {
+    backend: 'webgpu';
+}>;
+
+abstract class SkyLayer implements EnginePlugin {
+    protected readonly values: Float32Array<ArrayBuffer>;
+    abstract readonly name: string;
+    protected constructor(label: string, order: number, values: Float32Array<ArrayBuffer>, code: string);
+    protected abstract frame(c: Context): boolean;
+    setup(engine: Engine): void;
+    registerPasses(graph: FrameGraph): void;
+    onDeviceRestored(engine: Engine): void;
+    dispose(): void;
+    [Symbol.dispose]: () => void;
+}
 ```

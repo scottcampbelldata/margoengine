@@ -1,6 +1,6 @@
 {
-  "commit": "4aba1891d",
-  "dirty": false,
+  "commit": "f00e2cd59",
+  "dirty": true,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
     "raw": 57071,
@@ -1902,8 +1902,8 @@
         "gzip": 19145
       },
       "./next": {
-        "raw": 134574,
-        "gzip": 80589
+        "raw": 134466,
+        "gzip": 80518
       }
     },
     "@margoengine/physics2d": {
@@ -2272,8 +2272,8 @@
         "gzip": 6728
       },
       "./node": {
-        "raw": 2270,
-        "gzip": 1149
+        "raw": 2377,
+        "gzip": 1221
       },
       "./engine": {
         "raw": 22479,
@@ -2282,6 +2282,10 @@
       "./slots": {
         "raw": 15193,
         "gzip": 5485
+      },
+      "./remote": {
+        "raw": 7213,
+        "gzip": 3155
       },
       "./safe": {
         "raw": 3769,
@@ -2334,8 +2338,12 @@
         "gzip": 17291
       },
       "./stars": {
-        "raw": 9870,
-        "gzip": 4506
+        "raw": 10128,
+        "gzip": 4589
+      },
+      "./aurora": {
+        "raw": 11959,
+        "gzip": 5610
       }
     },
     "@margoengine/sciviz": {

@@ -2200,3 +2200,49 @@ Four jobs for `@margoengine/save`, on this PC with the full check per job; each 
 - **Sizes:** new entries `/engine` 8,438 B, `/slots` 5,741 B, `/safe` 2,102 B, `/remote` 3,411 B; `/node` grew from 939 B to 1,405 B for the turn queue and the folder fsync.
 - **Slips:** job 1's first land stopped twice, on two throw messages with no fix and a wrong folder in its GPU script; job 3's first land stopped at check:readmes on an example's type, and job 4's at the fixed-wait rule on the Apache script's unmarked wait. A file was briefly written to `/tmp` in job 1 and removed. `gltf-pro`'s README line for job 1 came in with job 2. Stale claim numbers were redone once in job 1.
 - **Gate:** lint, hygiene, verify, the save tests, test:gpu, check:readmes and check:readme-run for each job; the short rule after a rebase that touched nothing this uses.
+
+## Lane I batch 60: scenery
+
+Five jobs for `@margoengine/scenery` on the Beelink (lane I, work list 3): four new optional entries, one job already
+built. Core and stage are untouched; the sky entries use `@margoengine/sky/astro` through its public API. GPU work is
+proved on a Radeon 680M through `packages/scenery/test/scenery-check.mjs`, at 4x and 1x MSAA. Nothing is timed.
+
+| # | Job | Status | Commit | Entry | Claim |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Day presets | DONE | `bd51f9a5` | `/presets` (`dayPreset`, `applyDayPreset`, `dayLight`) | LIM-407 |
+| 2 | Full scene presets | DONE | `aa3e9273` | `/scenes` (`PresetScene`) | LIM-409 |
+| 3 | Real moon and stars | SKIPPED | | exists as `@margoengine/sky/astro` (`AstroSky`: moon phase from a date, Yale Bright Star Catalogue stars, batch 57 job 5) | |
+| 4 | Starfield and Milky Way | DONE | `fb34f391` | `/stars` (`MilkyWay`): the band only, AstroSky draws the stars | LIM-412 |
+| 5 | Aurora | DONE | this commit | `/aurora` (`Aurora`) | LIM-419 |
+
+- **Built from:** day presets after the CIE standard overcast sky and the sky package's own sun; fog from visibility by
+  Koschmieder's law; the Milky Way in galactic coordinates by the Hipparcos rotation (ESA 1997), its shape after
+  Mellinger 2009, its brightness in V magnitudes per square arcsecond on AstroSky's star scale; the aurora from the
+  oxygen 557.7 and 630.0 nm lines and the N2+ 427.8 nm band (Chamberlain 1961, Omholt 1971, Rees 1989), rayleighs
+  (Hunten, Roach and Chamberlain 1956), CIE 1931 colours. Rows S55 to S58 in `docs/clean-room.md`.
+- **Proved:** presets: noon's ground brightest under a blue sky, golden hour and dawn walls at least twice as warm,
+  overcast 0.20 of noon. Scenes: fog transmittance within 0.001 of exp(-density x distance) at four visibilities. Milky
+  Way: 152 pixels at 40, 60 and 90 degrees of view within 0.32% of the model. Aurora: the six brightest 8 x 8 blocks
+  within 0.26% of a 4,000-step CPU column, redder higher up (15.3 against 0.21), moving with time, the same at the same
+  time. The sky layers draw nothing below the horizon, behind a mesh or by day.
+- **Sizes:** new `/presets` 977 B gzip, `/scenes` 17,291, `/stars` 4,506 (4,589 after job 5), `/aurora`
+  5,610 (the two share `SkyLayer`). `@margoengine/scenery` now depends on `@margoengine/math`, `post` and `tonemap`.
+- **Bugs fixed with tests:** the Milky Way first blended by straight alpha, as AstroSky's points do: on a half-float
+  target a faint band's alpha fell into half precision's subnormals and lost up to 6% of its light; the sky layers now
+  add their light (`packages/scenery/src/backdrop.ts`, held to 1% by the stars GPU check). The aurora's first shader
+  raised a negative number to a power (NaN on the GPU, where JavaScript gives a number) and used the WGSL keyword
+  `patch`; the aurora GPU check compares every block against the CPU and caught both.
+- **Corpus:** jobs 1, 2 and 4 added WGSL without recording it in the webgl2-compat corpus, which verify on main caught
+  (`packages/webgl2-compat/test/corpus.test.js`); `1368f520` recorded the scenery checks' 7 modules, and job 5 adds the
+  aurora's in its own commit. The corpus test is now in this lane's landing checks.
+- **Limits:** one GPU; the band is a model, not a photograph; the aurora's field lines are vertical, its arcs run world
+  east-west and it lights nothing. Rows in docs/limits.md.
+- **Slips:** the first two job 1 landings stopped on rebase conflicts in the shared records; the landing script was
+  rebuilt to make the records on newest main inside the landing lock. Job 4's first push lost the race and landed by
+  the short rule. Job 5's landing first stopped at api:check (main's entry sizes for `@margoengine/save` were stale and
+  this lane's records step ran api:update before entry-sizes; reordered), then at the quality gate's copied-code check
+  (the plugin set-up repeated across files); the Milky Way and the aurora now share it as `SkyLayer` in
+  `packages/scenery/src/backdrop.ts`.
+- **Gate:** per job: rebase, build:packages, api:check, `npm run quality`, lint, hygiene, the scenery and stage tests,
+  the umbrella and API convention tests, the scenery GPU checks under the GPU lock, the claims, llms, lock-sync,
+  sizes-page and fixed-waits tests; `npm run verify` for job 2 (the lock file) and on the newest main with job 5.

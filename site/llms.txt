@@ -220,7 +220,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/voxel-pathtracer API](https://margoengine.com/llms/api/voxel-pathtracer.md): 2 entry points
 - [@margoengine/voxel-edit API](https://margoengine.com/llms/api/voxel-edit.md): 14 entry points
 - [@margoengine/water API](https://margoengine.com/llms/api/water.md): 1 entry point
-- [@margoengine/scenery API](https://margoengine.com/llms/api/scenery.md): 5 entry points
+- [@margoengine/scenery API](https://margoengine.com/llms/api/scenery.md): 6 entry points
 - [@margoengine/scatter API](https://margoengine.com/llms/api/scatter.md): 3 entry points
 - [@margoengine/road API](https://margoengine.com/llms/api/road.md): 1 entry point
 - [@margoengine/tilemap API](https://margoengine.com/llms/api/tilemap.md): 4 entry points

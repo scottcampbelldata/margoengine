@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10645437,
+  "total": 10651303,
   "history": [
     {
       "date": "2026-10-24",
@@ -3746,6 +3746,12 @@
       "commit": "3b5f421f6",
       "reason": "new entry save/remote: remoteStorage and remoteHandler; save/node escapes capitals in file names",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "f00e2cd59",
+      "reason": "new entry @margoengine/scenery/aurora, 5610 B gzip; /stars shares SkyLayer",
+      "grew": 1
     }
   ],
   "items": {
@@ -4298,6 +4304,7 @@
     "@margoengine/scene/bulk": 1764,
     "@margoengine/scene/mesh": 2119,
     "@margoengine/scenery": 474,
+    "@margoengine/scenery/aurora": 5866,
     "@margoengine/scenery/presets": 1233,
     "@margoengine/scenery/scenes": 17810,
     "@margoengine/scenery/sky": 474,

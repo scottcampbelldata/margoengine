@@ -165,5 +165,45 @@ fades from the centre, the bulge, and the Great Rift's dust from Aquila to Sagit
 real star clouds. On a Radeon 680M every sampled pixel held the model's radiance within 0.32% at 40, 60 and 90 degrees
 of view.
 
+## Aurora
+
+`@margoengine/scenery/aurora` adds animated northern lights: curtains in arcs running east-west north of the world
+origin, folding and rippling, green below and red above.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Aurora} from 'margoengine/scenery/aurora';
+
+const canvas = document.querySelector<HTMLCanvasElement>('canvas')!;
+const engine = await Engine.create(canvas, {backend: 'webgpu'});
+const aurora = Aurora.attach(engine, {intensity: 100, red: 0.5}); // a bright display with red tops
+engine.start();
+aurora.options.speed = 4; // livelier folds
+aurora.time = 0; // jump back to the start
+```
+
+The light is three published auroral emissions: the oxygen green line (557.7 nm, from O(1S), whose 0.74 s lifetime
+lets it shine down to about 100 km; brightest near 110 km), the oxygen red line (630.0 nm, from O(1D), whose 110 s
+lifetime gets it quenched by collisions below about 150 to 200 km, so it glows above them, broad about 230 km) and
+the blue band of the nitrogen ion (427.8 nm, a little below the green). Each has a Chapman-shaped height profile
+(`auroraProfile`, sharp below the peak), its colour from the CIE 1931 colour-matching functions in linear sRGB, and
+its luminance per kilorayleigh (`AURORA_LINES`). The curtains hang along the field (vertical here), each a thin
+sheet (`thickness`, default 1.5 km) on a folded line, with rays about 3 km apart drifting along it; `arcs` arcs
+(default 3) lie `spacing` km apart (default 40) from `distance` km north (default 150; north is -Z), each fainter.
+
+`intensity` is the 557.7 nm column straight up through the brightest curtain in kR (default 30; the International
+Brightness Coefficient grades I to IV are 1, 10, 100 and 1000 kR); `red` and `blue` are the other lines over it
+(defaults 0.2 and 0.3: a green aurora; 1 and more for a red one). The light shares the magnitude-0 `brightness` of
+`AstroSky`'s stars and `MilkyWay`'s band (default 4) and each pixel's solid angle, so 1 kR of green looks as bright as
+sky of 21.9 V magnitudes per square arcsecond. Each pixel marches 64 steps through the shell from 80 to 450 km over a
+round Earth, only where the arcs can be; `auroraColumn(origin, direction, time, options)` integrates the same model
+finely on the CPU. `speed` scales the motion (folds travel along the arcs at 1 and 3 km/s; 0 holds them), `time`
+is the aurora's clock and `seed` its pattern. With `sky` it fades in with the sky's `nightFactor`; it is drawn only
+where nothing else was and never through the Earth. Invalid options throw `TypeError` or `RangeError`; WebGPU only.
+
+On a Radeon 680M at 4x and 1x MSAA, the six brightest 8 x 8 pixel blocks of a view held the light of the CPU column
+within 0.26%; the red share of the light at 50 degrees was 15.3 against 0.21 at 20 degrees. The shapes of the arcs,
+folds and rays are a Margo model, not a measured display; the field lines are vertical (as near the magnetic pole).
+
 This ESM package includes strict TypeScript declarations, requires core 1.0.0 and `@margoengine/sky` (the scenes entry also `@margoengine/post` and `@margoengine/tonemap`), and supported
 WebGPU hardware on HTTPS or localhost. Apache-2.0 licensed.
