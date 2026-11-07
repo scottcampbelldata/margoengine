@@ -237,6 +237,39 @@ The side of a leaf away from the sun also keeps its glow under any `Shadows` or 
 
 `leaves.effect` spreads the light behind every tint caster of those shadows, so coloured glass in the same `Shadows` fades with distance too. It reads the tint depth directly, which a device at the compatibility level cannot do.
 
+## Far shadows
+
+`@margoengine/shadows/distance` shades the ground past the end of the cascades or virtual pages from a height field, so a mountain still throws its shadow across a valley far beyond `distance`. There is no depth pass: the sun's horizon is found for every cell of the field by one GPU march when the sun moves, and a lit pixel past the reach reads one bilinear pair from a storage buffer.
+
+```ts
+import {EngineKernel, box} from 'margoengine/core';
+import {Shadows} from 'margoengine/shadows';
+import {distanceShadows} from 'margoengine/shadows/distance';
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend: 'webgpu'});
+const columns = 256, rows = 256, heights = new Float32Array(columns * rows);
+for (let i = 0; i < heights.length; i++) heights[i] = 120 * Math.max(0, Math.sin((i % columns) / 40));
+const far = distanceShadows({heights, columns, rows, origin: [-2000, -2000], size: [4000, 4000]});
+const shadows = Shadows.attach(engine, {distance: 300, effects: [far]});
+shadows.add(engine.createMesh().setGeometry(box(4000, 1, 4000)), {castShadow: false});
+engine.start();
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `heights` | required | `columns` x `rows` heights, row by row from the minimum corner. Edit it and call `far.invalidate()` to march it again. |
+| `columns`, `rows` | required | Cells along X and Z, 2 or more. |
+| `size` | required | World XZ extent of the field, each above 0. |
+| `origin` | [0, 0] | World XZ of the minimum corner. |
+| `heightScale` | 1 | World Y per height unit. |
+| `heightOffset` | 0 | World Y added to every height. |
+| `fade` | 0.1 | Share of the reach, above 0 to 1, over which far shadows fade in before it ends. Live. |
+| `strength` | 1 | How much of the far shadow applies, 0 to 1. Live. |
+| `sunSize` | 0.0093 | The sun's angular diameter in radians. A point keeps the share of the disc above its horizon, so the edge widens with the ridge's distance. Live. |
+| `bias` | 0 | World units a receiver lifts over the field, to cover the field's coarseness. Live. |
+| `sunStep` | 0.25 | Degrees the sun must move before the field is marched again, 0 or more. Live. |
+
+It works with `Shadows` and `VirtualShadows`, on every receiver. Only what is in the field casts here: a building past the reach casts nothing unless its height is in `heights`. Outside the field nothing is shaded. Y is up.
+
 ## Virtual shadow maps
 
 `margoengine/shadows/virtual` is a second, optional entry for one directional light: `VirtualShadows` keeps the texel density a camera needs at every distance, in small pages of depth, and renders only the pages that are seen and have changed. Importing it costs `Shadows` users nothing; the root entry does not reach it.

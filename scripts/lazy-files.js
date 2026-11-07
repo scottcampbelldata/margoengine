@@ -107,7 +107,7 @@ export const LAZY_FILES = [
     label: '@margoengine/physics',
     kind: 'Chunk',
     measure: 'bundle',
-    external: [...core, '@dimforge/rapier3d-compat'],
+    external: [...core, /^@dimforge\/rapier3d-compat$/],
     when: '`addPhysics(stage)` or `addBody(stage, mesh)` (`margoengine/stage/physics`), first call',
   },
   {

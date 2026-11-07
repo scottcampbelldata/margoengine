@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10135617,
+  "total": 10138038,
   "history": [
     {
       "date": "2026-10-24",
@@ -3098,6 +3098,12 @@
       "commit": "b146185f4",
       "reason": "new optional entry @margoengine/cinematic/confine",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "f1af890a3",
+      "reason": "shadows gains the optional distance entry",
+      "grew": 1
     }
   ],
   "items": {
@@ -3621,6 +3627,7 @@
     "@margoengine/shader/subgroups": 3517,
     "@margoengine/shader/utils": 7295,
     "@margoengine/shadows": 18738,
+    "@margoengine/shadows/distance": 2421,
     "@margoengine/shadows/light-function": 1921,
     "@margoengine/shadows/transmission": 1027,
     "@margoengine/shadows/virtual": 15442,

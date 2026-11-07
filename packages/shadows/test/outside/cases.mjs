@@ -40,5 +40,11 @@ export const cases = [
   { name: 'leaf-through', scene: 'leaf', kind: 'shadows', core: 0.1, near: 0.01, difference: 0.03, options: { ...hard, colored: true, size: 0.05 } },
   { name: 'leaf-straight', scene: 'leaf', kind: 'shadows', core: 0.1, far: 0.04, difference: 0.03, options: { ...hard, colored: true } },
   { name: 'cup-through', scene: 'cup', kind: 'shadows', core: 0.1, near: 0.05, difference: 0.03, options: { ...cup, colored: true, scale: 0.47, size: 0.015 } },
+  // The same mountain past the cascades: a `distance` of 30 ends them long before the ground the camera sees, 170 units off.
+  // The field is the tile's own grid, so its edge is the terrain's to within a cell, as in rainier-shadows. The control has no
+  // far shadows and sees none.
+  { name: 'rainier-far', scene: 'rainier', kind: 'shadows', minShadow: 2000, iou: 0.75, difference: 0.05, options: { distance: 30, filter: 'hard', casterMargin: 10, far: { bias: 0.1, sunSize: 0 } } },
+  { name: 'rainier-far-virtual', scene: 'rainier', kind: 'virtual', minShadow: 2000, iou: 0.75, difference: 0.05, options: { distance: 30, filter: 'hard', casterMargin: 10, far: { bias: 0.1, sunSize: 0 } } },
+  { name: 'rainier-far-control', scene: 'rainier', kind: 'shadows', minShadow: 2000, below: 0.2, options: { distance: 30, filter: 'hard', casterMargin: 10 } },
   { name: 'alpha-control', scene: 'alpha', kind: 'shadows', minShadow: 1000, below: 0.78, control: 'solid', options: panels },
 ];

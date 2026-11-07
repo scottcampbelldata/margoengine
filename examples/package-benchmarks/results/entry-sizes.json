@@ -1,5 +1,5 @@
 {
-  "commit": "d383010ad",
+  "commit": "f1af890a3",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -330,6 +330,14 @@
       "./group": {
         "raw": 4218,
         "gzip": 1845
+      },
+      "./noise": {
+        "raw": 3012,
+        "gzip": 1356
+      },
+      "./confine": {
+        "raw": 2959,
+        "gzip": 1358
       }
     },
     "@margoengine/clustered": {
@@ -1086,8 +1094,8 @@
         "gzip": 3214
       },
       "./physics": {
-        "raw": 22519,
-        "gzip": 8990
+        "raw": 22419,
+        "gzip": 8959
       },
       "./interactivity": {
         "raw": 49400,
@@ -1718,14 +1726,14 @@
     },
     "@margoengine/physics": {
       ".": {
-        "raw": 50331,
-        "gzip": 16705
+        "raw": 51006,
+        "gzip": 16988
       }
     },
     "@margoengine/physics2d": {
       ".": {
-        "raw": 21049,
-        "gzip": 7664
+        "raw": 21723,
+        "gzip": 7943
       }
     },
     "@margoengine/pixel": {
@@ -2006,8 +2014,8 @@
         "gzip": 1944
       },
       "./physics": {
-        "raw": 15605,
-        "gzip": 6004
+        "raw": 15390,
+        "gzip": 5911
       },
       "./xr": {
         "raw": 8394,
@@ -2224,6 +2232,10 @@
       "./transmission": {
         "raw": 1430,
         "gzip": 771
+      },
+      "./distance": {
+        "raw": 4919,
+        "gzip": 2165
       }
     },
     "@margoengine/sky": {
@@ -2364,8 +2376,8 @@
         "gzip": 2224
       },
       "./physics": {
-        "raw": 2262,
-        "gzip": 1202
+        "raw": 2107,
+        "gzip": 1148
       },
       "./scene": {
         "raw": 7450,
@@ -2867,9 +2879,9 @@
       "brotli": 9639
     },
     "packages/physics/dist/index.js": {
-      "raw": 50331,
-      "gzip": 16705,
-      "brotli": 14830
+      "raw": 51006,
+      "gzip": 16988,
+      "brotli": 15052
     },
     "packages/save/dist/index.js": {
       "raw": 19849,

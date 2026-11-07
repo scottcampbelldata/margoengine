@@ -27,6 +27,7 @@
     "test": "node --test test/*.test.js ../../tests/modern-game.test.js ../../tests/modern-shadow-texture-transform.test.js",
     "test:gpu": "cd ../.. && node packages/shadows/test/lit-faces-browser.mjs",
     "test:gpu:colored": "cd ../.. && node packages/shadows/test/colored-browser.mjs",
+    "test:gpu:distance": "cd ../.. && node packages/shadows/test/distance-browser.mjs",
     "test:gpu:cutout-casters": "cd ../.. && node packages/shadows/test/cutout-casters-browser.mjs",
     "test:gpu:light-function": "cd ../.. && node packages/shadows/test/light-function-browser.mjs",
     "test:gpu:outside": "cd ../.. && node packages/shadows/test/outside/check.mjs",
@@ -60,6 +61,10 @@
     "./transmission": {
       "types": "./dist/transmission.d.ts",
       "import": "./dist/transmission.js"
+    },
+    "./distance": {
+      "types": "./dist/distance.d.ts",
+      "import": "./dist/distance.js"
     }
   },
   "files": [

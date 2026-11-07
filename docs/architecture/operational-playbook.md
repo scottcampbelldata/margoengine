@@ -557,6 +557,8 @@ plant leaves keep 0.34 of the light through them, 0.06 without the fix; `check.m
 translucent BSDF 0.0023 on the plant, 0.05 for light going straight on, 0.04 and 0.004 on the Teacup. RTX A6000. Missing: other
 GPUs, transmission textures, more than one scatter.
 
+Past `shadowReach()` the depth maps end, and `distanceShadows` takes over from a height field. A compute pass marches each cell towards the sun and keeps the highest plane `height - d * tan(elevation)` and its distance `d`, so one `vec2f` per cell answers for that sun: a receiver below the plane is behind the ridge. The light is the segment of the sun's disc above that horizon, with `d * sunSize` as the disc's height. The storage buffer costs no sampled texture, and gltf-pro already uses all 16 per stage. The march reruns only after the sun moves `sunStep` degrees. Each step spans the shorter cell side, so the step count scales with the cell's aspect. Evidence: `check.mjs`, real Rainier elevation with `distance` 30, overlap 0.85 and mean difference 0.016 against Cycles on both shadow classes, overlap 0 without it; `packages/shadows/test/distance-browser.mjs`, the disc share within 0.003 of the formula at three distances. RTX A6000. Missing: other GPUs, and any timing.
+
 `LodInstances` (`@margoengine/culling/lod`) tests each instance against the frustum and picks its level in one compute pass:
 the level is the first whose limit the world sphere's radius in pixels reaches. Instances append to their level's list by
 atomic add, and the counts are copied to each level's indirect arguments, so core draws each list through `Batch.redirect`. On

@@ -14,6 +14,11 @@ const inputs = readSizesInputs(),
 const { document } = new JSDOM(sizesPage(inputs)).window;
 const number = (cell) => Number(cell.textContent.replaceAll(',', ''));
 
+test('every lazy file names what it leaves out as patterns, or entry-sizes.mjs cannot measure it', () => {
+  for (const { file, measure, external } of LAZY_FILES)
+    if (measure === 'bundle') assert.ok(external.every((pattern) => pattern instanceof RegExp), file);
+});
+
 test('sizes page lists every catalog package with numbers from the same measured commit', () => {
   assert.match(sizes.commit, /^[0-9a-f]{7,}$/);
   assert.equal(typeof sizes.dirty, 'boolean');

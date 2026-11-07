@@ -1,0 +1,44 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Shadows: far shadows</title><style>body{margin:0;background:#000}canvas{display:block;width:64px;height:64px}</style></head><body><canvas width="64" height="64"></canvas>
+<script type="module">
+// A wall in a height field, seen past the cascades. distance-browser.mjs asserts.
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
+import {Engine,box} from '/packages/core/dist/index.js';
+import {Shadows} from '/packages/shadows/dist/index.js';
+import {distanceShadows} from '/packages/shadows/dist/distance.js';
+const canvas=document.querySelector('canvas'),errors=[];
+const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[0,100,0.01],target:[0,0,0],fov:0.02,near:0.5,far:3000}}),device=engine.gpu;
+engine.stop();
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+engine.lighting.radiance.set([8,8,8,0]);
+const frames=async(n)=>{device.pushErrorScope('validation');for(let i=0;i<n;i++){engine.render();await device.queue.onSubmittedWorkDone();}const e=await device.popErrorScope();if(e)errors.push(e.message);};
+const reader=new OffscreenCanvas(1,1).getContext('2d',{willReadFrequently:true});
+const middle=()=>{engine.render();reader.drawImage(canvas,32,32,1,1,0,0,1,1);return reader.getImageData(0,0,1,1).data[1];};
+const plate=engine.createMesh().setGeometry(box(2000,1,2000)).setPosition([0,-0.5,0]);
+let shadows,far;
+window.check={
+  async start({field,toLight,options}){
+    shadows?.dispose();
+    const {columns,rows,size,origin,walls}=field,heights=new Float32Array(columns*rows);
+    for(const [column,row,height] of walls)heights[row*columns+column]=height;
+    const length=Math.hypot(...toLight);
+    engine.lighting.direction.set(toLight.map(v=>v/length));
+    far=distanceShadows({heights,columns,rows,size,origin,...options});
+    shadows=Shadows.attach(engine,{resolution:256,distance:30,filter:'hard',effects:[far]});
+    shadows.add(plate,{castShadow:false});
+    await waitForPipelines(()=>frames(1));await frames(2);
+    return errors;
+  },
+  async sun(toLight){const length=Math.hypot(...toLight);engine.lighting.direction.set(toLight.map(v=>v/length));await frames(2);},
+  async level(strength){far.options.strength=strength;await frames(1);const v=middle();far.options.strength=1;return v;},
+  async flatten(invalidate){far.options.heights.fill(0);if(invalidate)far.invalidate();await frames(2);},
+  // Green at a ground point with the far shadow and without it, from `height` up: past the reach unless told otherwise.
+  async read(x,z,height=100){
+    engine.camera.position=[x,height,z+0.01];engine.camera.target=[x,0,z];
+    far.options.strength=1;await frames(1);const shaded=middle();
+    far.options.strength=0;await frames(1);const open=middle();
+    far.options.strength=1;
+    return {shaded,open,errors};
+  },
+};
+window.ready=true;
+</script></body></html>
