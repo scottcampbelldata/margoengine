@@ -8,7 +8,7 @@ export interface Region<C> {
   /** State the region starts in. */
   initial: string;
   /** The region's transitions. Default none. */
-  transitions?: readonly Transition[];
+  transitions?: readonly Transition<C>[];
 }
 /** Options of {@link ParallelRegions}. */
 export interface ParallelOptions {
@@ -49,33 +49,29 @@ export class ParallelRegions<C> {
    * @throws TypeError without a region, for an unknown `initial`, or for what `StateMachine` refuses.
    */
   constructor(
-    regions: Readonly<Record<string, Region<C>>>,
+    readonly definition: Readonly<Record<string, Region<C>>>,
     readonly context: C,
-    options: ParallelOptions = {},
+    readonly options: ParallelOptions = {},
   ) {
-    const names = Object.keys(regions);
+    const names = Object.keys(definition);
     if (!names.length) throw new TypeError('ParallelRegions has no regions; name at least one region');
-    const machines: Record<string, StateMachine<C>> = {};
-    for (const name of names) {
-      const { states, initial, transitions } = regions[name];
+    this.list = names.map((name) => {
+      const { states, initial, transitions } = definition[name];
       if (!Object.hasOwn(states, initial))
         throw new TypeError(`Unknown initial state of region ${name}; name one of the region's states`);
-      machines[name] = new StateMachine({ ...states, [STOPPED]: {} }, STOPPED, context, transitions);
-    }
-    this.machines = machines;
-    this.list = names.map((name) => machines[name]);
-    this.starts = names.map((name) => regions[name].initial);
+      return new StateMachine({ ...states, [STOPPED]: {} }, STOPPED, context, transitions);
+    });
+    // By entries, so a region may be called __proto__ when a document names it so.
+    this.machines = Object.fromEntries(names.map((name, index) => [name, this.list[index]]));
+    this.starts = names.map((name) => definition[name].initial);
     this.forward = options.forward;
     this.history = options.history ?? false;
   }
   /** The current state of each region, by name; null for all while stopped. */
   get active(): Record<string, string | null> {
-    const active: Record<string, string | null> = {};
-    for (const name of Object.keys(this.machines)) {
-      const { state } = this.machines[name];
-      active[name] = state === STOPPED ? null : state;
-    }
-    return active;
+    return Object.fromEntries(
+      Object.entries(this.machines).map(([name, { state }]) => [name, state === STOPPED ? null : state]),
+    );
   }
   /**
    * True while `region` is in `state` or a child of it. For a guard in another region, as in Harel's `in(S)`.
@@ -169,6 +165,7 @@ export class ParallelRegions<C> {
       exit: () => this.stop(),
       update: (_context, delta) => this.update(delta),
       plan: (event) => this.plan(event),
+      regions: this,
     };
   }
   private assertRunning(): void {

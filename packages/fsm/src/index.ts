@@ -1,4 +1,5 @@
 import { MargoError } from '@margoengine/math/errors';
+import type { ParallelRegions } from './parallel.js';
 // More delayed transitions than this in one update means a chain of very short delays; the caller's delta is at fault.
 const MAX_FIRED = 100000;
 /** One state of a {@link StateMachine}; `C` is the shared context passed to every hook. */
@@ -24,9 +25,11 @@ export interface State<C> {
    * state's own transitions, so what is nested wins. Return the action that carries the event out, or null to pass.
    */
   plan?: (event: string) => (() => void) | null;
+  /** The regions this state runs, set by `ParallelRegions.asState`, for saving and tracing. */
+  regions?: ParallelRegions<C>;
 }
-/** Edge between two states, taken on an event or after a delay. */
-export interface Transition {
+/** Edge between two states, taken on an event or after a delay; `C` is the shared context the guard gets. */
+export interface Transition<C = unknown> {
   /** Source state; also matches while a descendant of it is active. */
   from: string;
   /** Target state. */
@@ -42,7 +45,7 @@ export interface Transition {
   /** Cross-fade time in seconds; finite and >= 0. Default 0 (no cross-fade). */
   duration?: number;
   /** Return false to decline the transition. */
-  guard?: () => boolean;
+  guard?: (context: C) => boolean;
 }
 
 /** Hierarchical state transitions retain common ancestors and expose cross-fade progress. */
@@ -62,7 +65,7 @@ export class StateMachine<C> {
   private duration = 0;
   private changing = false;
   private readonly paths = new Map<string, readonly string[]>();
-  private readonly timed: readonly Transition[];
+  private readonly timed: readonly Transition<C>[];
   /**
    * Build the machine and enter `initial` (and its ancestors).
    * @throws TypeError for an unknown parent, a hierarchy cycle, an unknown initial state, a state's `initial` that is
@@ -70,9 +73,9 @@ export class StateMachine<C> {
    */
   constructor(
     readonly states: Readonly<Record<string, State<C>>>,
-    initial: string,
+    readonly initial: string,
     readonly context: C,
-    readonly transitions: readonly Transition[] = [],
+    readonly transitions: readonly Transition<C>[] = [],
   ) {
     for (const key of Object.keys(states)) {
       const path: string[] = [];
@@ -131,7 +134,7 @@ export class StateMachine<C> {
       const nested = this.states[path[i]].plan?.(event);
       if (nested) return nested;
       for (const transition of this.transitions)
-        if (transition.event === event && transition.from === path[i] && (!transition.guard || transition.guard()))
+        if (transition.event === event && transition.from === path[i] && (!transition.guard || transition.guard(this.context)))
           return () => this.goto(transition.to, transition.duration ?? 0);
     }
     return null;
@@ -261,14 +264,14 @@ export class StateMachine<C> {
       if (this.entered.has(transition.from)) this.entered.set(transition.from, this.clock);
     }
   }
-  private dueTransition(): Transition | null {
+  private dueTransition(): Transition<C> | null {
     const path = this.paths.get(this.state)!;
     for (let i = path.length - 1; i >= 0; i--)
       for (const transition of this.timed)
         if (
           transition.from === path[i] &&
           this.clock >= this.entered.get(path[i])! + transition.after! &&
-          (!transition.guard || transition.guard())
+          (!transition.guard || transition.guard(this.context))
         )
           return transition;
     return null;

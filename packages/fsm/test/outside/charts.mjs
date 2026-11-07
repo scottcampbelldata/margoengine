@@ -1,8 +1,7 @@
 // Seeded statecharts and scripts, written once as plain data so that Margo and an outside interpreter run the same thing.
 // A chart: { root: { name, children, initial, parallel, history, transitions } }. A script: events and ticks of one second.
 // `traces.json` holds what Sismic did with these charts, so `outside.test.js` replays it with no Python installed.
-import { StateMachine } from '../../dist/index.js';
-import { ParallelRegions } from '../../dist/parallel.js';
+import { loadMachine } from '../../dist/document.js';
 
 export const CHART_COUNT = 150;
 export const SCRIPT_LENGTH = 40;
@@ -125,63 +124,64 @@ export function makeChart(seed) {
   return { root, script };
 }
 
-function machineOf(top, states, byName, runners) {
-  const table = {},
+function regionDocument(top, initial, guards) {
+  const states = {},
     transitions = [];
   const add = (state, parent) => {
-    const entry = parent ? { parent: parent.name } : {};
+    const entry = {};
+    if (parent) entry.parent = parent.name;
     if (state.initial) entry.initial = state.initial;
     if (state.history) entry.history = state.history;
     if (state.parallel) {
-      const regions = {};
-      for (const region of state.children) {
-        const inner = machineOf(region, [region], byName, runners);
-        regions[region.name] = { ...inner, initial: region.name };
-      }
-      const running = new ParallelRegions(regions, {});
-      runners.set(state.name, running);
-      Object.assign(entry, running.asState());
+      entry.regions = {};
+      for (const region of state.children) entry.regions[region.name] = regionDocument([region], region.name, guards);
     }
-    table[state.name] = entry;
-    for (const transition of state.transitions) {
-      transitions.push({
-        from: state.name,
-        to: transition.to,
-        ...(transition.after ? { after: transition.after } : { event: transition.event }),
-        ...(transition.active ? { guard: () => runners.isActive(transition.active) } : {}),
-      });
+    states[state.name] = entry;
+    for (const { to, event, after, active } of state.transitions) {
+      const transition = { from: state.name, to };
+      if (after) transition.after = after;
+      else transition.event = event;
+      if (active) {
+        guards.add(active);
+        transition.guard = `active ${active}`;
+      }
+      transitions.push(transition);
     }
     if (!state.parallel) for (const child of state.children) add(child, state);
   };
-  for (const state of states) add(state, null);
-  return { states: table, transitions };
+  for (const state of top) add(state, null);
+  return transitions.length ? { states, initial, transitions } : { states, initial };
 }
 
-/** Margo's run of a chart: its active leaves, sorted and joined, after the start and after every step. */
-export function runMargo({ root, script }) {
-  const byName = new Map(everyState(root).map((state) => [state.name, state])),
-    runners = new Map();
-  const leaves = (machine, into) => {
-    into.push(machine.state);
-    for (const name of Object.keys(machine.states))
-      if (runners.has(name) && machine.matches(name))
-        for (const inner of Object.values(runners.get(name).machines)) leaves(inner, into);
-    return into;
-  };
-  let machine = null;
-  const active = (name, current) => {
-    if (current.matches(name)) return true;
-    for (const key of Object.keys(current.states))
-      if (runners.has(key) && current.matches(key))
-        for (const inner of Object.values(runners.get(key).machines)) if (active(name, inner)) return true;
-    return false;
-  };
-  runners.isActive = (name) => name === 'root' || active(name, machine);
-  const { states, transitions } = machineOf(root, root.children, byName, runners);
-  // Nothing is active until the constructor returns, and guards only run after that.
-  machine = new StateMachine(states, root.initial, {}, transitions);
+/** The chart as a machine document, and the state names its guards ask about. */
+export function chartDocument({ root }) {
+  const guards = new Set();
+  return { document: { version: 1, ...regionDocument(root.children, root.initial, guards) }, guards: [...guards] };
+}
+
+function runningRegions(machine) {
+  const found = [];
+  for (const name of Object.keys(machine.states)) {
+    const { regions } = machine.states[name];
+    if (regions && machine.matches(name)) found.push(...Object.values(regions.machines));
+  }
+  return found;
+}
+function collect(machine, into) {
+  into.push(machine.state);
+  for (const region of runningRegions(machine)) collect(region, into);
+  return into;
+}
+
+/**
+ * Runs a chart's script on a machine and gives the active leaves, sorted and joined, after the start and every step.
+ * `swap` may replace the machine after each step.
+ */
+export function traceOf(first, { root, script }, swap = (machine) => machine) {
+  const byName = new Map(everyState(root).map((state) => [state.name, state]));
+  let machine = first;
   const atoms = () =>
-    leaves(machine, [])
+    collect(machine, [])
       .filter((name) => !byName.get(name).children.length)
       .sort()
       .join(' ');
@@ -190,6 +190,20 @@ export function runMargo({ root, script }) {
     if (step === 'tick') machine.update(1);
     else machine.send(step);
     trace.push(atoms());
+    machine = swap(machine);
   }
   return trace;
+}
+/** True while `name` is active anywhere in the machine, for the guards of a chart. */
+traceOf.active = (machine, name) =>
+  name === 'root' || machine.matches(name) || runningRegions(machine).some((region) => traceOf.active(region, name));
+
+/** Margo's run of a chart, through its document. */
+export function runMargo(chart) {
+  const { document, guards: names } = chartDocument(chart),
+    guards = {};
+  let machine = null;
+  for (const name of names) guards[`active ${name}`] = () => traceOf.active(machine, name);
+  machine = loadMachine(document, {}, { guards });
+  return traceOf(machine, chart);
 }

@@ -29,6 +29,10 @@
     "./parallel": {
       "types": "./dist/parallel.d.ts",
       "import": "./dist/parallel.js"
+    },
+    "./document": {
+      "types": "./dist/document.d.ts",
+      "import": "./dist/document.js"
     }
   },
   "files": [

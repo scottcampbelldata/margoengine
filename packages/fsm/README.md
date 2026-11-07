@@ -130,6 +130,48 @@ machine.send('die'); // the regions stop
 
 A transition cannot cross from one region to another or into a region from outside: a region starts at its `initial`, and a transition out of the regions belongs to the state that holds them. `machine.plan(event)` is the choosing half of `send`, which a nested machine uses through the `plan` hook of `State`; `machine.matches(state)` tests the active path.
 
+## Machines as data (`margoengine/fsm/document`)
+
+Keep a machine in a JSON file, as the animator keeps its graph, so a tool can write it and a designer can change it. Everything a machine has fits: hierarchy, `initial`, `history`, `after`, cross-fades and parallel regions. Functions do not fit in JSON, so hooks and guards are names, and you hand over the functions when loading. Guards get the context.
+
+```ts
+import {loadMachine, saveMachine, validateMachine, type MachineDocument} from 'margoengine/fsm/document';
+
+const document: MachineDocument = {
+  version: 1,
+  initial: 'patrol',
+  states: {
+    patrol: {enter: 'shout'},
+    chase: {update: 'run'},
+    both: {regions: {
+      legs: {states: {up: {}, down: {}}, initial: 'up', transitions: [{from: 'up', to: 'down', event: 'duck'}]}
+    }}
+  },
+  transitions: [
+    {from: 'patrol', to: 'chase', event: 'see', guard: 'awake', duration: 0.2},
+    {from: 'chase', to: 'patrol', after: 5}
+  ]
+};
+const guard = {awake: true};
+const bindings = {
+  hooks: {shout: () => console.log('who goes there'), run: (_context: typeof guard, delta: number) => console.log(delta)},
+  guards: {awake: (context: typeof guard) => context.awake}
+};
+
+console.log(validateMachine(document, bindings)); // []
+const machine = loadMachine(document, guard, bindings);
+machine.send('see');
+const text = JSON.stringify(saveMachine(machine, bindings));
+const again = loadMachine(JSON.parse(text), guard, bindings);
+```
+
+- `validateMachine(value, bindings?)` takes anything, such as what `JSON.parse` gave, and lists every problem with its place, `[{path: 'transitions[2].to', message: '...'}]`, or nothing. Unknown keys are problems, so a typing slip does not pass quietly. With `bindings` each name must also have its function.
+- `loadMachine(document, context, bindings?)` builds the machine, or throws a `TypeError` listing every problem. A raised event no region takes goes to the machine holding the regions.
+- `saveMachine(machine, bindings?)` gives the document of any machine, also one built by hand: it finds each function's name in `bindings`, and throws a `TypeError` for one that has none. It saves the definition, not where the machine is now: for that see below.
+- A state with regions takes no hooks in a document; put them on its parent.
+
+Guards in `StateMachine` get the context too: `guard: (context) => context.awake`.
+
 Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/fsm

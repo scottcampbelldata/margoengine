@@ -11,19 +11,21 @@ export interface State<C> {
     exit?: (context: C) => void;
     update?: (context: C, delta: number) => void;
     plan?: (event: string) => (() => void) | null;
+    regions?: ParallelRegions<C>;
 }
 
 export class StateMachine<C> {
     readonly states: Readonly<Record<string, State<C>>>;
+    readonly initial: string;
     readonly context: C;
-    readonly transitions: readonly Transition[];
+    readonly transitions: readonly Transition<C>[];
     state: string;
     previous: string | null;
     elapsed: number;
     clock: number;
     readonly entered: Map<string, number>;
     readonly memory: Map<string, string>;
-    constructor(states: Readonly<Record<string, State<C>>>, initial: string, context: C, transitions?: readonly Transition[]);
+    constructor(states: Readonly<Record<string, State<C>>>, initial: string, context: C, transitions?: readonly Transition<C>[]);
     get blend(): number;
     matches(name: string): boolean;
     plan(event: string): (() => void) | null;
@@ -32,12 +34,43 @@ export class StateMachine<C> {
     update(delta: number): void;
 }
 
-export interface Transition {
+export interface Transition<C = unknown> {
     from: string;
     to: string;
     event?: string;
     after?: number;
     duration?: number;
-    guard?: () => boolean;
+    guard?: (context: C) => boolean;
+}
+
+// Not exported from this entry, but used by the exports above:
+
+interface ParallelOptions {
+    history?: boolean;
+    forward?: (event: string) => void;
+}
+
+class ParallelRegions<C> {
+    readonly definition: Readonly<Record<string, Region<C>>>;
+    readonly context: C;
+    readonly options: ParallelOptions;
+    readonly machines: Readonly<Record<string, StateMachine<C>>>;
+    running: boolean;
+    constructor(definition: Readonly<Record<string, Region<C>>>, context: C, options?: ParallelOptions);
+    get active(): Record<string, string | null>;
+    matches(region: string, state: string): boolean;
+    start(): void;
+    stop(): void;
+    plan(event: string): (() => void) | null;
+    send(event: string): boolean;
+    raise(event: string): void;
+    update(delta: number): void;
+    asState(): State<C>;
+}
+
+interface Region<C> {
+    states: Readonly<Record<string, State<C>>>;
+    initial: string;
+    transitions?: readonly Transition<C>[];
 }
 ```

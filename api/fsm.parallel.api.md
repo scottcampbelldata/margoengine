@@ -9,10 +9,12 @@ export interface ParallelOptions {
 }
 
 export class ParallelRegions<C> {
+    readonly definition: Readonly<Record<string, Region<C>>>;
     readonly context: C;
+    readonly options: ParallelOptions;
     readonly machines: Readonly<Record<string, StateMachine<C>>>;
     running: boolean;
-    constructor(regions: Readonly<Record<string, Region<C>>>, context: C, options?: ParallelOptions);
+    constructor(definition: Readonly<Record<string, Region<C>>>, context: C, options?: ParallelOptions);
     get active(): Record<string, string | null>;
     matches(region: string, state: string): boolean;
     start(): void;
@@ -27,7 +29,7 @@ export class ParallelRegions<C> {
 export interface Region<C> {
     states: Readonly<Record<string, State<C>>>;
     initial: string;
-    transitions?: readonly Transition[];
+    transitions?: readonly Transition<C>[];
 }
 
 // Not exported from this entry, but used by the exports above:
@@ -40,19 +42,21 @@ interface State<C> {
     exit?: (context: C) => void;
     update?: (context: C, delta: number) => void;
     plan?: (event: string) => (() => void) | null;
+    regions?: ParallelRegions<C>;
 }
 
 class StateMachine<C> {
     readonly states: Readonly<Record<string, State<C>>>;
+    readonly initial: string;
     readonly context: C;
-    readonly transitions: readonly Transition[];
+    readonly transitions: readonly Transition<C>[];
     state: string;
     previous: string | null;
     elapsed: number;
     clock: number;
     readonly entered: Map<string, number>;
     readonly memory: Map<string, string>;
-    constructor(states: Readonly<Record<string, State<C>>>, initial: string, context: C, transitions?: readonly Transition[]);
+    constructor(states: Readonly<Record<string, State<C>>>, initial: string, context: C, transitions?: readonly Transition<C>[]);
     get blend(): number;
     matches(name: string): boolean;
     plan(event: string): (() => void) | null;
@@ -61,12 +65,12 @@ class StateMachine<C> {
     update(delta: number): void;
 }
 
-interface Transition {
+interface Transition<C = unknown> {
     from: string;
     to: string;
     event?: string;
     after?: number;
     duration?: number;
-    guard?: () => boolean;
+    guard?: (context: C) => boolean;
 }
 ```
