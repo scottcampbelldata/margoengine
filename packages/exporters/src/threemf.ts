@@ -191,7 +191,7 @@ export async function export3MF(
   const scale = 1 / UNITS[unit],
     zUp = upAxis === 'y',
     fallback = normalizeMaterial({}),
-    items = drawables(collect(source instanceof Uint8Array ? sceneOfGLB(source).scene : source, options)),
+    items = drawables(collect(source instanceof Uint8Array ? sceneOfGLB(source).scene : source, options, undefined, 'shape')),
     materials = new Map<string, number>(),
     objects: string[] = [],
     groups: string[] = [],

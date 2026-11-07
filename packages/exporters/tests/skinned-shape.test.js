@@ -4,7 +4,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { loadGLTF } from '@margoengine/gltf-pro';
+import { parse3MF } from '@margoengine/loaders';
 import { exportDAE, exportOBJ, exportPLY, exportSTL } from '../dist/index.js';
+import { export3MF } from '../dist/threemf.js';
 import { loadedPBREngine } from '../../../tests/support/loaded-pbr-fixtures.js';
 
 /** Coordinates as they are, for tests that read them. */
@@ -181,6 +183,24 @@ async function glbImage(path, index) {
     bin = 20 + length + 8;
   return bytes.subarray(bin + (view.byteOffset ?? 0), bin + (view.byteOffset ?? 0) + view.byteLength);
 }
+
+for (const path of ['khronos/Fox/Fox.glb', 'robot-expressive.glb'])
+  test(`regression: 3MF takes the textured ${path} as STL does, skin and all, in both forms`, async () => {
+    const { engine } = await load(path),
+      expected = readSTL(exportSTL(engine, { ...raw, binary: true })),
+      // 3MF drops a triangle whose corners weld together; STL keeps it.
+      solid = expected.faces.filter(({ corners }) => new Set(corners.map(String)).size === 3).length;
+    for (const assembly of [true, false]) {
+      const file = await export3MF(engine, { upAxis: 'z', unit: 'meter', assembly }),
+        { positions, indices } = await parse3MF(file, { units: 'file' }),
+        points = [];
+      for (let i = 0; i < positions.length; i += 3) points.push([positions[i], positions[i + 1], positions[i + 2]]);
+      const [got, want] = [box(points), box(expected.points)];
+      assert.equal(indices.length / 3, solid, 'the same triangles');
+      for (const side of ['min', 'max'])
+        for (let k = 0; k < 3; k++) assert.ok(Math.abs(got[side][k] - want[side][k]) < 1e-4, `${path} ${side} ${k}`);
+    }
+  });
 
 test('Fox as OBJ: its shape and UVs without asking for more, its own texture bytes with textures: true', async () => {
   const { engine } = await load('khronos/Fox/Fox.glb'),
