@@ -38,6 +38,10 @@
     "./engine": {
       "types": "./dist/engine.d.ts",
       "import": "./dist/engine.js"
+    },
+    "./slots": {
+      "types": "./dist/slots.d.ts",
+      "import": "./dist/slots.js"
     }
   },
   "files": [
@@ -75,6 +79,6 @@
     "build": "node ../../scripts/build-optional.js save",
     "test": "npm run build && node --test tests/*.test.js",
     "prepack": "npm run build",
-    "test:gpu": "cd ../.. && node packages/save/tests/browser/engine-check.mjs"
+    "test:gpu": "cd ../.. && node packages/save/tests/browser/engine-check.mjs && node packages/save/tests/browser/slots-check.mjs"
   }
 }

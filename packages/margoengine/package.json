@@ -2162,6 +2162,10 @@
       "types": "./dist/save/engine.d.ts",
       "import": "./dist/save/engine.js"
     },
+    "./save/slots": {
+      "types": "./dist/save/slots.d.ts",
+      "import": "./dist/save/slots.js"
+    },
     "./scatter": {
       "types": "./dist/scatter.d.ts",
       "import": "./dist/scatter.js"

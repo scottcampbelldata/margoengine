@@ -261,6 +261,8 @@ after the `addLighting()` effects are composed in (materials' Lambert and Phong
 put their own BRDF in clustered's light loop there); returning `code` changes
 nothing.
 
+`model.selectVariant(index)` picks a `KHR_materials_variants` look, and `model.selectedVariant` reads it back (`undefined` for the file's default). `model.ownedMeshes` is every mesh the model built, with its root and nodes; a mesh you parented to a node is yours and is not in it.
+
 ### More than two UV sets
 
 A texture may read `TEXCOORD_0` to `TEXCOORD_3`, as Blender writes them for a material on its third or fourth UV map. Only a primitive whose material (or a `KHR_materials_variants` mapping) reads set 2 or 3 pays: it gets a second vertex buffer, `primitive.uvs`, four floats a vertex, and its own shader. A file that merely carries those attributes loads as before. The 80-byte vertex stays as it is.

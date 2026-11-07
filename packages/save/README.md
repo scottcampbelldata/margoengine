@@ -174,6 +174,67 @@ to the scene. `components(mesh)` adds your own data, and `onEntity(mesh, entity,
 
 Geometry is written into the save, so a large static mesh is better as a glTF model, which saves as a URL.
 
+## Save slots
+
+`@margoengine/save/slots` puts a load screen over any storage. A slot holds a save, a small record of what it is and a
+thumbnail, and `list()` reads the records alone, so a load screen opens without reading one save.
+
+```ts
+import { memoryStorage, type SaveDocument } from 'margoengine/save';
+import { SaveSlots } from 'margoengine/save/slots';
+
+const game = (title: string): SaveDocument => ({ format: 'margo-save', version: 1, meta: { title }, entities: [] });
+
+const slots = new SaveSlots(memoryStorage()); // or indexedDBStorage(), fileStorage('./saves')
+await slots.save('slot-1', game('Chapter 2'), { playTime: 754, meta: { level: 3 } });
+for (let i = 0; i < 5; i++) await slots.autosave(game(`Autosave ${i}`)); // a ring of 3, oldest first
+
+for (const slot of await slots.list()) console.log(slot.id, slot.title, new Date(slot.savedAt), slot.meta);
+
+const newest = await slots.latest(); // what a Continue button loads, autosaves included
+const loaded = newest && (await slots.load(newest.id)); // as loadGame: pass migrations here
+console.log(loaded?.meta?.title); // Autosave 4
+```
+
+For a thumbnail, take the canvas right after a frame, in the same task: a WebGPU canvas keeps its picture only until the
+frame is shown. `slots.thumbnail(id)` gives it back as a Blob.
+
+```ts
+import { Engine, box } from 'margoengine/core';
+import { memoryStorage } from 'margoengine/save';
+import { captureScene } from 'margoengine/save/engine';
+import { SaveSlots, captureThumbnail } from 'margoengine/save/slots';
+
+const engine = await Engine.create(document.createElement('canvas'));
+engine.createMesh().setGeometry(box());
+const slots = new SaveSlots(memoryStorage());
+
+engine.render();
+const thumbnail = await captureThumbnail(engine.canvas, { width: 320 }); // WebP where the browser has it, else PNG
+await slots.save('slot-1', captureScene(engine, { meta: { title: 'Chapter 2' } }), { thumbnail });
+
+const picture = await slots.thumbnail('slot-1');
+if (picture) document.body.append(Object.assign(new Image(), { src: URL.createObjectURL(picture) }));
+```
+
+`autosaveEvery(milliseconds, capture, { onError })` runs the ring on a timer: `capture` returns the document, or null
+to skip a turn in a menu or a cutscene, and the result has `stop()` and works with `using`. An autosave never touches a
+player's slot, and `auto-` ids are refused in `save` and as the target of `copy`.
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| `namespace` | `'slot'` | Keeps profiles apart in one storage. |
+| `autosaves` | `3` | How many autosaves take turns. |
+| `now` | `Date.now` | The clock for `savedAt`. |
+| `compress`, `validate` | as `saveGame` | Passed to each save. |
+
+Also `info(id)`, `copy(from, to)` and `delete(id)`. Writes run one at a time, in call order, and every call takes
+`signal`.
+
+A slot's files carry a generation in their keys, and writing its record is the one step that switches to them. A failed
+write or a crash before that leaves the old slot whole, with some unused files that the next save clears. A record that
+cannot be read shows in `list()` with `damaged: true`, and `save` or `delete` replaces it.
+
 ## Validation and migrations
 
 `validateSave(document, {components, strictComponents})` never throws and lists every problem with its path and fix
@@ -202,6 +263,6 @@ browsers and Node 18+); `decodeSave(bytes)` reads either. Storage adapters share
 A full Web Storage or a failed transaction throws `MargoError` `'failed'` and keeps the previous save; a missing
 API throws `'unsupported'`. `saveGame` never writes an invalid document.
 
-Apache-2.0. Optional, tree-shakable package. Only `/engine` uses core, as an optional peer, with `@margoengine/gltf-pro` and `@margoengine/animation` loaded when a save holds a model.
+Apache-2.0. Optional, tree-shakable package. Only `/engine` uses core, as an optional peer (`/slots` needs none of them), with `@margoengine/gltf-pro` and `@margoengine/animation` loaded when a save holds a model.
 
-Build and unit tests: npm test --workspace @margoengine/save. Real GPU, models and IndexedDB: npm run test:gpu --workspace @margoengine/save
+Build and unit tests: npm test --workspace @margoengine/save. Real GPU, models, thumbnails and IndexedDB: npm run test:gpu --workspace @margoengine/save

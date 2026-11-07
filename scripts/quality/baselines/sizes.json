@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10624988,
+  "total": 10630724,
   "history": [
     {
       "date": "2026-10-24",
@@ -3704,6 +3704,12 @@
       "commit": "3ab28e97d",
       "reason": "new entry @margoengine/scenery/stars, 4458 B gzip",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "348248e3b",
+      "reason": "new entry save/slots: SaveSlots and captureThumbnail",
+      "grew": 1
     }
   ],
   "items": {
@@ -4243,8 +4249,9 @@
     "@margoengine/rigging/vrm": 10526,
     "@margoengine/road": 1171,
     "@margoengine/save": 6952,
-    "@margoengine/save/engine": 8443,
+    "@margoengine/save/engine": 8438,
     "@margoengine/save/node": 939,
+    "@margoengine/save/slots": 5741,
     "@margoengine/scatter": 19252,
     "@margoengine/scatter/paint": 1507,
     "@margoengine/scatter/tiles": 3415,
