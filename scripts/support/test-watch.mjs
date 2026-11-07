@@ -61,10 +61,51 @@ export class HangWatch {
   }
 }
 
-/** Ends this runner and the test processes it started. */
+/**
+ * Stops every process below `root` and waits on each one's handle, so its files and working folder are free on return.
+ * Prints how many it stopped; exits 3 if one outlives the wait. Skips its own process, which is below `root` too.
+ */
+const stopScript = (root) => `
+$below = @{}
+foreach ($p in Get-CimInstance Win32_Process) { $below[[int]$p.ParentProcessId] += @([int]$p.ProcessId) }
+$ids = New-Object System.Collections.ArrayList
+$next = New-Object System.Collections.Queue
+$next.Enqueue(${root})
+while ($next.Count) {
+  foreach ($id in $below[[int]$next.Dequeue()]) {
+    if ($id -ne $PID -and -not $ids.Contains($id)) { [void]$ids.Add($id); $next.Enqueue($id) }
+  }
+}
+$found = @(foreach ($id in $ids) { Get-Process -Id $id -ErrorAction SilentlyContinue })
+foreach ($p in $found) { try { $p.Kill() } catch {} }
+foreach ($p in $found) { [void]$p.WaitForExit(20000) }
+$found.Count
+if (@($found | Where-Object { -not $_.HasExited }).Count) { exit 3 }
+`;
+
+/**
+ * Ends this runner and the test processes it started, the runner last: whoever waits on the run may remove the run's
+ * folder the moment it ends. `taskkill /T` on this process could not promise that: the runner died while taskkill was
+ * still running in the run's folder, and Windows refuses to remove a process's working folder. So the runner stops its
+ * children, waits, then exits, and the killer works from another folder so it never holds that one.
+ */
 function endRun() {
-  if (process.platform === 'win32') spawnSync('taskkill', ['/pid', String(process.pid), '/T', '/F'], { stdio: 'ignore' });
-  else process.kill(process.pid, 'SIGTERM');
+  if (process.platform !== 'win32') {
+    process.kill(process.pid, 'SIGTERM');
+    return;
+  }
+  const { status, stdout, stderr, error } = spawnSync(
+    'powershell',
+    ['-NoProfile', '-NonInteractive', '-Command', stopScript(process.pid)],
+    { cwd: process.env.SystemRoot, encoding: 'utf8', timeout: 60000, windowsHide: true },
+  );
+  writeSync(
+    2,
+    status === 0
+      ? `HUNG RUN ENDED: ${stdout.trim()} child processes stopped and gone\n`
+      : `HUNG RUN: child processes may still be alive (status ${status}): ${error?.message ?? stderr}\n`,
+  );
+  process.exit(1);
 }
 
 export default async function* watch(source) {

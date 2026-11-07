@@ -2,7 +2,7 @@
 // the step prints only when it ends and `--test-timeout` cannot reach a blocked process.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import test from 'node:test';
@@ -92,6 +92,43 @@ test('a real hang is named and ends the run, children included', () => {
       assert.notEqual(status, 0, 'a hung run fails');
       assert.match(stderr, expected);
     }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// The run once ended before its killer did, and the killer's working folder was the run's: rmSync failed with EPERM, about
+// 1 run in 200 under load. The line below is printed only after every child is confirmed gone, so its absence is the bug.
+test('a hung run ends last: its children and grandchildren are gone when it reports its end', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'margo-test-watch-')),
+    env = { ...process.env, MARGO_TEST_SILENCE_SECONDS: '2', NODE_TEST_CONTEXT: undefined },
+    alive = (pid) => {
+      try {
+        process.kill(pid, 0);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+  try {
+    writeFileSync(
+      join(dir, 'tree.test.js'),
+      "import { spawn } from 'node:child_process';\nimport { writeFileSync } from 'node:fs';\nimport test from 'node:test';\n" +
+        "test('holds a child', () => {\n" +
+        "  const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });\n" +
+        "  writeFileSync('pids.json', JSON.stringify([process.pid, child.pid]));\n  for (;;);\n});\n",
+    );
+    const reporter = new URL('../scripts/support/test-watch.mjs', import.meta.url).href,
+      { status, stderr, error } = spawnSync(
+        process.execPath,
+        ['--test', `--test-reporter=${reporter}`, '--test-reporter-destination=stderr', 'tree.test.js'],
+        { cwd: dir, encoding: 'utf8', timeout: 60000, env },
+      ),
+      pids = JSON.parse(readFileSync(join(dir, 'pids.json'), 'utf8'));
+    assert.equal(error, undefined);
+    assert.notEqual(status, 0, 'a hung run fails');
+    assert.deepEqual(pids.filter(alive), [], 'nothing the run started outlives it');
+    if (process.platform === 'win32') assert.match(stderr, /HUNG RUN ENDED: \d+ child processes stopped and gone/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

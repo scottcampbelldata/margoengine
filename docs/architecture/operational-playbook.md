@@ -823,6 +823,9 @@ current proofs. A chain failure terminates the other process trees. Serial mode 
 The unit test step gives each test 300 s (`TEST_TIMEOUT_MS`, against 32 s for the longest measured), and
 `scripts/support/test-watch.mjs` watches from the runner's process: a test file silent for 360 s, through a blocked event
 loop or a process that stays alive after its tests, prints `HUNG TEST:` with the file and test and ends the run.
+On Windows the runner ends last: it stops every process below it, waits on each one's handle, prints `HUNG RUN ENDED:`
+and exits, so a caller may remove the run's folder as soon as the run ends. On other systems the run ends by SIGTERM,
+and the test holds there that its children are gone; that path has not been run on the Mac or Linux yet.
 
 `scripts/check-merge.mjs` classifies the actual changed files and runs only checks the change can affect. It expands
 package dependents transitively and chooses full validation when shared/core/build/check infrastructure changes, a
