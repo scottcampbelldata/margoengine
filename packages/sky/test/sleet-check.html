@@ -1,0 +1,57 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Sky sleet check</title><style>body{margin:0}canvas{display:block;width:256px;height:192px}</style></head><body><canvas width="256" height="192"></canvas>
+<script type="module">
+// Sleet on a real GPU, read back from Bloom's HDR scene capture: its rain and its snow against each drawn alone.
+// Driven by features-check.mjs.
+import {Engine,PbrMaterial,box} from '/packages/core/dist/index.js';
+import {sceneSamples} from '/packages/core/dist/quality.js';
+import {Bloom} from '/packages/post/dist/bloom.js';
+import {Sky} from '/packages/sky/dist/index.js';
+import {Weather} from '/packages/sky/dist/weather.js';
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
+if(new URLSearchParams(location.search).get('samples')==='1')globalThis.margoLow=1;
+const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,1.5,0],target:[0,1.5,-10],near:0.1,far:2000}}),device=engine.gpu,errors=[];
+engine.stop();
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const post=Bloom.attach(engine,{strength:0,threshold:1,exposure:0});
+const sky=new Sky({hours:11,timeScale:0});engine.use(sky);
+engine.createMesh().setGeometry(box(400,0.2,400)).setMaterial(new PbrMaterial({color:'#4a4a4a',roughness:0.9}));
+const weather=new Weather({intensity:0,fadeSeconds:0});engine.use(weather);
+const module=device.createShaderModule({code:'@group(0) @binding(0) var image:texture_2d<f32>;@group(0) @binding(1) var<storage,read_write> result:array<vec4f>;@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u){let s=textureDimensions(image);if(any(id.xy>=s)){return;}result[id.y*s.x+id.x]=textureLoad(image,vec2i(id.xy),0);}'});
+const pipeline=device.createComputePipeline({layout:'auto',compute:{module,entryPoint:'main'}});
+async function read(texture){
+ const bytes=texture.width*texture.height*16,output=device.createBuffer({size:bytes,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),staging=device.createBuffer({size:bytes,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+ const encoder=device.createCommandEncoder(),pass=encoder.beginComputePass();pass.setPipeline(pipeline);
+ pass.setBindGroup(0,device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:texture.createView()},{binding:1,resource:{buffer:output}}]}));
+ pass.dispatchWorkgroups(Math.ceil(texture.width/8),Math.ceil(texture.height/8));pass.end();encoder.copyBufferToBuffer(output,0,staging,0,bytes);device.queue.submit([encoder.finish()]);
+ await staging.mapAsync(GPUMapMode.READ);const data=new Float32Array(staging.getMappedRange()).slice();staging.unmap();output.destroy();staging.destroy();return data;
+}
+// Every frame at weather time 0 (delta 0), so each kind's particles stand where they would in sleet.
+const frame=async()=>{engine.render({delta:0});await device.queue.onSubmittedWorkDone();return read(post.sceneTexture);};
+const set=(options)=>Object.assign(weather.options,{lightning:undefined,snowShare:undefined},options);
+window.check={samples:sceneSamples,
+ async run(){
+  device.pushErrorScope('validation');
+  set({precipitation:'rain',intensity:0});await waitForPipelines(frame);const bare=await frame();
+  // Sleet at 0.6 with half of it snow; alone: rain at 0.3 on the same seed, snow at 0.3 on the snow's own seed.
+  set({precipitation:'sleet',intensity:0.6,snowShare:0.5});await waitForPipelines(frame);const sleet=await frame();
+  set({precipitation:'rain',intensity:0.3});await waitForPipelines(frame);const rain=await frame();
+  set({precipitation:'snow',intensity:0.3,lightning:{rate:0,seed:1+0x51ed27}});await waitForPipelines(frame);const snow=await frame();
+  // Where only the rain alone changed the frame, sleet must equal it (worst: the largest relative step where it does
+  // not); where only the snow did, likewise; where neither did, sleet must leave the frame as it was.
+  const differs=(a,b,p)=>a[p]!==b[p]||a[p+1]!==b[p+1]||a[p+2]!==b[p+2];
+  const out={rainOnly:0,snowOnly:0,both:0,rainMismatch:0,snowMismatch:0,extra:0,worst:0};
+  const step=(a,b,p)=>{let w=0;for(let k=0;k<3;k++)w=Math.max(w,Math.abs(a[p+k]-b[p+k])/Math.max(Math.abs(b[p+k]),6.1e-5));return w;};
+  for(let p=0;p<bare.length;p+=4){
+   const r=differs(rain,bare,p),s=differs(snow,bare,p);
+   if(r&&s)out.both++;
+   else if(r){out.rainOnly++;if(differs(sleet,rain,p)){out.rainMismatch++;out.worst=Math.max(out.worst,step(sleet,rain,p));}}
+   else if(s){out.snowOnly++;if(differs(sleet,snow,p)){out.snowMismatch++;out.worst=Math.max(out.worst,step(sleet,snow,p));}}
+   else if(differs(sleet,bare,p))out.extra++;
+  }
+  (window.shots??={}).sleet={bare,sleet,rain,snow};
+  const error=await device.popErrorScope();
+  return {...out,error:error?.message??null,errors:errors.splice(0)};
+ }};
+window.shot=(name,key)=>{const f=window.shots[name][key],o=new Array(f.length);for(let p=0;p<f.length;p++)o[p]=(p%4===3)?255:Math.round(255*Math.min(1,Math.pow(f[p]/(1+f[p]),1/2.2)));return o;};
+window.ready=true;
+</script></body></html>

@@ -60,7 +60,7 @@ A `WeatherState` is nine numbers: `rain`, `snow`, `hail` (0..1), `wind` (m/s), `
 
 ## Limits
 
-- The sky's `Weather` draws one precipitation at a time. During a rain-to-snow blend the heavier one is drawn and the switch happens where they are equal; sleet is shown as whichever of the two is heavier. Hail is drawn alongside either.
+- While rain and snow both fall (a rain-to-snow blend, or the `sleet` preset) `skyWeather` gives the sky's `Weather` `precipitation: 'sleet'`, their sum as `intensity` (at most 1) and the snow's part of it as `snowShare`, so the rain thins as the snow thickens; the sky draws each kind with its share. Hail is drawn alongside either.
 - Hail stones are camera-facing streaks with no lighting or shadows and no splash where they land. The box around the camera is at most 400 m across; stones outside it do not exist.
 - The presets and the climate chain are design choices, not weather data. Wind speed is a mean at one height with simple noise, not a boundary-layer model.
 - `cloud` and `fog` are numbers for you to feed to your sky and fog; this package does not draw clouds or fog.

@@ -163,6 +163,22 @@ const checks = {
     console.log(`ok weather-fx ${samples}x: cover, map, splashes, lens`);
     return r;
   },
+  async sleet(page, samples) {
+    const r = await page.evaluate(() => window.check.run());
+    console.log(`  sleet ${samples}x ${JSON.stringify(r)}`);
+    assert.equal(r.error, null);
+    assert.deepEqual(r.errors, []);
+    // Sleet is the rain drawn alone and the snow drawn alone: where only one of them touched the frame, sleet matches
+    // it, and it touches nothing either leaves alone.
+    assert.ok(r.rainOnly > 100 && r.snowOnly > 100, `both kinds drawn: ${JSON.stringify(r)}`);
+    // A flake too faint to move the bare frame by a half-float step can still tip the rain's own value by one step
+    // (2^-10 relative, the 10-bit mantissa of the HDR target): no pixel may differ by more, and few by that.
+    assert.ok(r.worst <= 2 ** -10, `sleet off by more than one half-float step: ${JSON.stringify(r)}`);
+    assert.ok(r.rainMismatch + r.snowMismatch <= 0.01 * (r.rainOnly + r.snowOnly), `too many steps: ${JSON.stringify(r)}`);
+    assert.equal(r.extra, 0, `sleet drew elsewhere: ${JSON.stringify(r)}`);
+    console.log(`ok sleet ${samples}x: ${r.rainOnly} rain and ${r.snowOnly} snow pixels match each kind alone (${r.rainMismatch + r.snowMismatch} by one half-float step)`);
+    return r;
+  },
   async hillaire(page, samples) {
     const r = await page.evaluate(() => window.check.run());
     const show = (v) => v.map((x) => x.toPrecision(4)).join(', ');

@@ -43,8 +43,10 @@ export interface WeatherLightningOptions {
  * value of the wrong shape TypeError.
  */
 export interface WeatherOptions {
-  /** `'rain'` streaks, `'snow'` flakes, or `'none'`. Default `'rain'`. */
-  precipitation?: 'rain' | 'snow' | 'none';
+  /** `'rain'` streaks, `'snow'` flakes, `'sleet'` (both at once, by `snowShare`), or `'none'`. Default `'rain'`. */
+  precipitation?: 'rain' | 'snow' | 'sleet' | 'none';
+  /** With `'sleet'`: the share of the precipitation that falls as snow, 0 to 1; the rest is rain. Default 0.5. */
+  snowShare?: number;
   /** Target amount, 0 (dry) to 1 (storm). The visible {@link Weather.amount} eases to it over `fadeSeconds`. Default 0.5. */
   intensity?: number;
   /** Seconds the amount takes to move across its whole range, 0 or more (0 jumps). Default 4. */
@@ -233,9 +235,11 @@ function validate(o: WeatherOptions): void {
     o.precipitation !== undefined &&
     o.precipitation !== 'rain' &&
     o.precipitation !== 'snow' &&
+    o.precipitation !== 'sleet' &&
     o.precipitation !== 'none'
   )
-    throw new TypeError('Weather precipitation must be "rain", "snow" or "none"; pass one of them');
+    throw new TypeError('Weather precipitation must be "rain", "snow", "sleet" or "none"; pass one of them');
+  if (o.snowShare !== undefined) number(o.snowShare, 'snowShare', 0, 1);
   if (o.intensity !== undefined) number(o.intensity, 'intensity', 0, 1);
   if (o.fadeSeconds !== undefined) number(o.fadeSeconds, 'fadeSeconds', 0, 3600);
   if (o.radius !== undefined) number(o.radius, 'radius', 2, 200);
@@ -288,6 +292,10 @@ export class Weather implements EnginePlugin {
   occlusion?: WeatherOcclusion;
   private coverEntries?: GPUBindGroupEntry[];
   private readonly overlay = new ParticleOverlay();
+  // Sleet draws its snow as a second overlay with its own uniform: one uploaded buffer holds one draw's values.
+  private readonly snowOverlay = new ParticleOverlay();
+  private snowUniform?: GPUBuffer;
+  private readonly snowValues = new Float32Array(44);
   private engine?: Engine;
   private uniform?: GPUBuffer;
   private flashUniform?: GPUBuffer;
@@ -335,6 +343,11 @@ export class Weather implements EnginePlugin {
   /** Snow lying on the ground, 0..1: builds under snow (about 2 minutes) and melts slowly (about 5 minutes). */
   get snowCover(): number {
     return this.snow;
+  }
+  /** Share of the precipitation that is rain, 0 to 1: 1 for rain, 0 for snow and none, `1 - snowShare` for sleet. */
+  get rainShare(): number {
+    const kind = this.options.precipitation ?? 'rain';
+    return kind === 'rain' ? 1 : kind === 'sleet' ? 1 - (this.options.snowShare ?? 0.5) : 0;
   }
   /** Seconds of weather time so far (the sum of the deltas given to `onPreUpdate`). */
   get elapsed(): number {
@@ -459,11 +472,14 @@ export class Weather implements EnginePlugin {
               this.level + Math.sign(target - this.level) * Math.min(Math.abs(target - this.level), delta / fade),
             ),
           );
-    // First-order approach to a target: rain wets, snow settles, both with their own drying and melting.
+    // First-order approach to a target: rain wets, snow settles, both with their own drying and melting, each by its
+    // share of the precipitation (sleet does both).
     const approach = (value: number, goal: number, up: number, down: number) =>
-      value + (goal - value) * (1 - Math.exp(-delta / (goal > value ? up : down)));
-    this.wet = approach(this.wet, precipitation === 'rain' ? Math.min(1, this.level * 1.5) : 0, 20, 90);
-    this.snow = approach(this.snow, precipitation === 'snow' ? this.level : 0, 120, 300);
+        value + (goal - value) * (1 - Math.exp(-delta / (goal > value ? up : down))),
+      rain = this.rainShare,
+      snow = precipitation === 'none' ? 0 : 1 - rain;
+    this.wet = approach(this.wet, rain > 0 ? Math.min(1, this.level * 1.5) * rain : 0, 20, 90);
+    this.snow = approach(this.snow, snow > 0 ? this.level * snow : 0, 120, 300);
     this.storm(delta);
     this.advance(delta);
   }
@@ -539,8 +555,29 @@ export class Weather implements EnginePlugin {
     const o = this.options,
       kind = o.precipitation ?? 'rain';
     if (kind === 'none' || this.level <= 0.001) return;
-    const d = defaults[kind],
-      count = Math.ceil((o.particles ?? d.particles) * this.level);
+    if (kind !== 'sleet') return this.drawKind(c, kind, 1, this.overlay, this.uniform!, this.values);
+    // Sleet: rain and snow at once, each with its share of the particles; the snow on its own hash seed.
+    const share = o.snowShare ?? 0.5;
+    this.drawKind(c, 'rain', 1 - share, this.overlay, this.uniform!, this.values);
+    this.snowUniform ??= c.device.createBuffer({
+      size: this.snowValues.byteLength,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+    this.drawKind(c, 'snow', share, this.snowOverlay, this.snowUniform, this.snowValues, 0x51ed27);
+  }
+
+  private drawKind(
+    c: WeatherPassContext,
+    kind: 'rain' | 'snow',
+    share: number,
+    overlay: ParticleOverlay,
+    uniform: GPUBuffer,
+    v: Float32Array,
+    salt = 0,
+  ): void {
+    const o = this.options,
+      d = defaults[kind],
+      count = Math.ceil((o.particles ?? d.particles) * this.level * share);
     if (count === 0) return;
     const radius = o.radius ?? 25,
       height = o.height ?? 20,
@@ -549,8 +586,7 @@ export class Weather implements EnginePlugin {
       fall = snow ? 1.2 : 9,
       color = o.color ?? d.color,
       brightness = o.brightness ?? 1,
-      [width, tall] = viewSize(c) as [number, number],
-      v = this.values;
+      [width, tall] = viewSize(c) as [number, number];
     v.set(c.camera.matrix, 0);
     v.set(c.camera.position, 16);
     v[19] = 0;
@@ -574,7 +610,7 @@ export class Weather implements EnginePlugin {
     v[35] = 0;
     v[36] = +snow;
     v[37] = snow ? 0.012 : 0.035;
-    new Uint32Array(v.buffer)[38] = (this.options.lightning?.seed ?? 1) >>> 0;
+    new Uint32Array(v.buffer)[38] = ((this.options.lightning?.seed ?? 1) + salt) >>> 0;
     v[39] = Math.min(1, this.flashLevel);
     v[40] = wind[0];
     v[41] = fall;
@@ -588,8 +624,8 @@ export class Weather implements EnginePlugin {
           { binding: 1, resource: { buffer: cover.buffer } },
           { binding: 2, resource: cover.view },
         ];
-      this.overlay.draw(c, cover.shader(shader), this.uniform!, v as Float32Array<ArrayBuffer>, count, this.coverEntries);
-    } else this.overlay.draw(c, shader, this.uniform!, v as Float32Array<ArrayBuffer>, count);
+      overlay.draw(c, cover.shader(shader), uniform, v as Float32Array<ArrayBuffer>, count, this.coverEntries);
+    } else overlay.draw(c, shader, uniform, v as Float32Array<ArrayBuffer>, count);
   }
 
   private drawFlash(c: WeatherPassContext): void {
@@ -635,7 +671,9 @@ export class Weather implements EnginePlugin {
     this.flashUniform?.destroy();
     this.uniform = this.flashUniform = undefined;
     this.overlay.release();
-    this.coverEntries = undefined;
+    this.snowOverlay.release();
+    this.snowUniform?.destroy();
+    this.snowUniform = this.coverEntries = undefined;
     this.flashPipeline = this.flashBind = undefined;
     this.flashKey = '';
   }

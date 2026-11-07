@@ -37,7 +37,7 @@ const sky = Sky.attach(engine, {model: 'bruneton', clouds: {coverage: 0.4}}, {br
 | `/reflection` | `reflectionTexture` | 0.8 kB |
 | `/lighting` | `lighting` (engine sun/moon light, ambient) | 1.0 kB |
 | `/sun` | typed angles, `setSun` / `setAmbient` over core's light, `sunlitSky`, `sunPath` (not a `Sky` feature) | 2.1 kB |
-| `/weather` | `Weather`, its own plugin (not a `Sky` feature): rain, snow, lightning, thunder timing | 5.7 kB |
+| `/weather` | `Weather`, its own plugin (not a `Sky` feature): rain, snow, sleet, lightning, thunder timing | 5.9 kB |
 | `/volumetric-clouds` | `VolumetricClouds`, its own plugin: ray-marched 3D clouds you can fly through | 7.3 kB |
 | `/cloud-shadows` | `volumetricCloudShadows`, a shadow effect for `@margoengine/shadows` | 3.2 kB |
 | `/aerial` | `AerialPerspective`, its own plugin: distant surfaces take the air's colour | 6.5 kB |
@@ -565,7 +565,8 @@ Options are read every frame from `weather.options`; change them live. `intensit
 
 | Option | Default | Meaning |
 | --- | --- | --- |
-| `precipitation` | `'rain'` | `'rain'`, `'snow'` or `'none'` |
+| `precipitation` | `'rain'` | `'rain'`, `'snow'`, `'sleet'` (both at once) or `'none'` |
+| `snowShare` | 0.5 | with `'sleet'`, the share that falls as snow, 0 to 1 |
 | `intensity` | 0.5 | target amount, 0 to 1 |
 | `fadeSeconds` | 4 | seconds across the whole range; 0 jumps |
 | `wind` | `[0, 0]` | metres per second, world X and Z: rain slants, snow drifts |
@@ -577,6 +578,19 @@ Options are read every frame from `weather.options`; change them live. `intensit
 Particle colour is a fixed linear RGB, so scale `brightness` with the light of the scene (above, `1 - sky.nightFactor`).
 A flake or streak smaller than a pixel dims instead of sparkling. Rain falls at 9 m/s and snow at 1.2 m/s with a
 gentle sway.
+
+`precipitation: 'sleet'` draws rain and snow together, `snowShare` (default 0.5) of it as snow and the rest as rain:
+each kind gets that share of its particles at the eased amount, its own colour, opacity and fall, and its own hash
+seed, so the two never stand on the same spots. Surfaces wet and snow settles by the same shares (`wetness` toward the
+rain's, `snowCover` toward the snow's), and `weather.rainShare` says how much of it is rain.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Weather} from 'margoengine/sky/weather';
+const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
+const weather = Weather.attach(engine, {precipitation: 'sleet', snowShare: 0.3, intensity: 0.7});
+weather.options.snowShare = 0.8; // colder: mostly snow now
+```
 
 Lightning (`lightning: {}` for the defaults) strikes as a Poisson process: `rate` strikes a minute (default 6) at
 intensity 1, rising from nothing at `threshold` (default 0.6), at a random distance between `minDistance` (300 m) and

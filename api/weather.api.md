@@ -33,8 +33,9 @@ export interface ScheduleStep extends TransitionOptions {
 }
 
 export interface SkyWeatherSettings {
-    precipitation: 'rain' | 'snow' | 'none';
+    precipitation: 'rain' | 'snow' | 'sleet' | 'none';
     intensity: number;
+    snowShare: number;
     fadeSeconds: number;
     wind: [number, number];
     lightning: {

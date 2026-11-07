@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10337887,
+  "total": 10338233,
   "history": [
     {
       "date": "2026-10-24",
@@ -3362,6 +3362,12 @@
       "commit": "8acf66b36",
       "reason": "new optional entry @margoengine/navmesh/agents; polygon areas and route filters in the root",
       "grew": 4
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "0d2b7904",
+      "reason": "sky/weather: precipitation 'sleet' draws rain and snow together (a second overlay and uniform), +196 B",
+      "grew": 1
     }
   ],
   "items": {
@@ -3923,7 +3929,7 @@
     "@margoengine/sky/shafts": 7139,
     "@margoengine/sky/sun": 2379,
     "@margoengine/sky/volumetric-clouds": 7571,
-    "@margoengine/sky/weather": 5843,
+    "@margoengine/sky/weather": 6189,
     "@margoengine/sky/weather-fx": 5533,
     "@margoengine/splats": 25646,
     "@margoengine/splats/data": 17665,

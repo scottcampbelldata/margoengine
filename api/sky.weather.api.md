@@ -36,6 +36,7 @@ export class Weather implements EnginePlugin {
     get flash(): number;
     get wetness(): number;
     get snowCover(): number;
+    get rainShare(): number;
     get elapsed(): number;
     onLightning(listener: (strike: LightningStrike) => void): () => void;
     onThunder(listener: (strike: LightningStrike) => void): () => void;
@@ -65,7 +66,8 @@ export interface WeatherOcclusion {
 }
 
 export interface WeatherOptions {
-    precipitation?: 'rain' | 'snow' | 'none';
+    precipitation?: 'rain' | 'snow' | 'sleet' | 'none';
+    snowShare?: number;
     intensity?: number;
     fadeSeconds?: number;
     wind?: readonly [number, number];

@@ -489,6 +489,7 @@ The own solver's kernel (`packages/physics/kernel`, Rust, no dependencies). Noth
 | S41 | rain cover map: occluders drawn top-down with an orthographic projection over the weather's box, snapped to its texel grid, depth 0 a kilometre over the camera; a particle below the decoded height of its texel is dropped | sky/src/weather-fx.ts, sky/src/rain-cover.ts | a depth map from another view, as a shadow map (Williams 1978, "Casting Curved Shadows on Curved Surfaces", SIGGRAPH), here from above; the rest is Margo's |
 | S42 | splash slots: each lands once a period at a hashed place on the topmost surface the map holds, a crown ring and four droplets on parabolic arcs | sky/src/weather-fx.ts | Margo-own: hashed placement as the weather's own particles (PCG, Jarzynski and Olano 2020) |
 | S43 | lens wetness approaching the rain's amount (4 s) in the open by the map at the camera and drying (25 s) under cover; drops on a hashed schedule, one in three running down | sky/src/weather-fx.ts | Margo-own; first-order approach as the weather's own wetness |
+| S44 | sleet: the weather's own rain and snow drawn together, each with its share of the particle count, the snow on a salted hash seed; wetness and snow cover approach their goals times their shares; `skyWeather` turns rain and snow amounts into a total and a snow share | sky/src/weather.ts, weather/src/drive.ts | Margo-own |
 
 ### splats
 

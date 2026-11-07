@@ -627,6 +627,11 @@ buffer read by `firstInstance`, so the draws share one bind group. `Weather` rea
 changes. A one-thread compute step keeps the lens wetness on the GPU. Evidence: `features-check.mjs` weather-fx on a
 Radeon 680M at 4x and 1x. Missing: other GPUs, timing, cover finer than a texel.
 
+Sleet (`precipitation: 'sleet'`, 2026-11-07) is two `ParticleOverlay` draws in the weather's pass, rain then snow,
+each with its own uniform buffer (one uploaded buffer holds one draw's values within a submit) and the snow on its own
+hash seed, so the two never share spots. Evidence: `features-check.mjs` sleet on a Radeon 680M at 4x and 1x against
+each kind drawn alone. Missing: other GPUs, timing.
+
 A `ShadowFilterEffect` replaces the named filters' last step in `shadowVisibility`, after the cascade pick and the receiver
 plane. `varianceFilter` turns the depth map into two moments, blurs them by two separable passes when the map changes, and
 bounds the lit share with Chebyshev's inequality. A filter's shader must keep `shadowSampler` read, in a branch never taken,

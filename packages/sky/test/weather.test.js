@@ -187,7 +187,7 @@ test('invalid options name the problem and the fix', () => {
       (e) => e instanceof type && text.test(e.message),
       JSON.stringify(options),
     );
-  rejects({ precipitation: 'hail' }, TypeError, /"rain", "snow" or "none"/);
+  rejects({ precipitation: 'hail' }, TypeError, /"rain", "snow", "sleet" or "none"/);
   rejects({ intensity: 2 }, RangeError, /intensity must be a number from 0 to 1/);
   rejects({ intensity: NaN }, RangeError, /finite/);
   rejects({ intensity: '1' }, RangeError, /intensity/);

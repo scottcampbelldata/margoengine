@@ -500,11 +500,11 @@ test('skyWeather maps a state to the sky Weather settings', () => {
   assert.ok(storm.lightning.rate > 6 && storm.lightning.threshold === 0);
   assert.equal(skyWeather(WEATHER_PRESETS.snow).precipitation, 'snow');
   assert.equal(skyWeather(WEATHER_PRESETS.clear).precipitation, 'none');
-  assert.equal(
-    skyWeather(WEATHER_PRESETS.sleet).precipitation === 'rain' ||
-      skyWeather(WEATHER_PRESETS.sleet).precipitation === 'snow',
-    true,
-  );
+  // Sleet falls as both: the sky Weather draws each with its share, here half and half of 0.8 in all.
+  const sleet = skyWeather(WEATHER_PRESETS.sleet);
+  assert.deepEqual([sleet.precipitation, sleet.snowShare, sleet.intensity], ['sleet', 0.5, 0.8]);
+  assert.equal(rain.snowShare, 0);
+  assert.equal(skyWeather(WEATHER_PRESETS.snow).snowShare, 1);
   assert.deepEqual(skyWeather(WEATHER_PRESETS.rain, [3, -4]).wind, [3, -4]);
   // Wind blowing toward +X (direction pi/2) gives positive x and about zero z.
   const east = skyWeather({ ...WEATHER_PRESETS.rain, windDirection: Math.PI / 2, wind: 10 }).wind;

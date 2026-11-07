@@ -6,10 +6,12 @@ import type { WindField } from './wind.js';
 
 /** The part of `@margoengine/sky`'s `WeatherOptions` that a state decides. */
 export interface SkyWeatherSettings {
-  /** The heavier of rain and snow, or `'none'`. */
-  precipitation: 'rain' | 'snow' | 'none';
-  /** Intensity of that precipitation, 0..1. */
+  /** Rain or snow, `'sleet'` while both fall, or `'none'`. */
+  precipitation: 'rain' | 'snow' | 'sleet' | 'none';
+  /** Intensity of that precipitation, 0..1: for sleet, rain and snow together. */
   intensity: number;
+  /** Share of the precipitation that is snow, 0..1: what the sky Weather draws as snow in sleet. */
+  snowShare: number;
   /** Always 0: the machine already blends, so the sky's own easing is switched off. */
   fadeSeconds: number;
   /** Horizontal wind `[x, z]` in metres per second. */
@@ -20,19 +22,22 @@ export interface SkyWeatherSettings {
 
 /**
  * Settings for `@margoengine/sky`'s Weather from a state: assign them with `Object.assign(weather.options, skyWeather(state))`.
- * The sky Weather draws one kind of precipitation at a time, so during a rain-to-snow blend the heavier one is shown and
- * the switch happens where they are equal. `wind` is the horizontal wind at the camera from `field`, or the state's mean
+ * While rain and snow both fall (a rain-to-snow blend, or the sleet preset) it is `'sleet'`: the sky Weather draws each
+ * kind with its own share, so the rain thins as the snow thickens. `wind` is the horizontal wind at the camera from `field`, or the state's mean
  * wind when no field is given. Lightning needs `state.lightning` above 0; its rate is up to 12 strikes a minute.
  */
 export function skyWeather(state: WeatherState, wind?: readonly [number, number]): SkyWeatherSettings {
   const heavier = state.snow > state.rain ? 'snow' : 'rain',
-    amount = Math.max(state.rain, state.snow);
+    both = state.rain > 0.001 && state.snow > 0.001,
+    total = state.rain + state.snow,
+    amount = both ? Math.min(1, total) : Math.max(state.rain, state.snow);
   const w: [number, number] = wind
     ? [wind[0], wind[1]]
     : [Math.sin(state.windDirection) * state.wind, Math.cos(state.windDirection) * state.wind];
   return {
-    precipitation: amount > 0.001 ? heavier : 'none',
+    precipitation: amount > 0.001 ? (both ? 'sleet' : heavier) : 'none',
     intensity: amount,
+    snowShare: total > 0 ? state.snow / total : 0,
     fadeSeconds: 0,
     wind: w,
     // The storm threshold is set to 0 so any intensity can produce lightning; the state's activity sets the rate.
