@@ -29,7 +29,7 @@ Without the entries below this is a static mesh subset of one flattened layer. A
 
 ## Composition
 
-`composition()` from `margoengine/usdz/compose` opens real production files and Apple's samples, not only flattened ones: sublayers, references, payloads, inherits, specializes and variant sets, across any mix of text and binary layers, with list edits, layer offsets, `timeCodesPerSecond` scaling, relationship and connection paths carried through each arc, and instances expanded in place.
+`composition()` from `margoengine/usdz/compose` opens real production files and Apple's samples, not only flattened ones: sublayers, references, payloads, inherits, specializes and variant sets, across any mix of text and binary layers, with list edits, layer offsets, `timeCodesPerSecond` scaling, relationship and connection paths carried through each arc, and instances expanded in place. Strength order follows the Composition chapter of the AOUSD USD Core Specification v1.1.0. A time scale at or below 0 is a composition error there: the offset counts as the default and `issues` lists `invalid-offset`.
 
 ```ts
 import {Engine} from 'margoengine/core';

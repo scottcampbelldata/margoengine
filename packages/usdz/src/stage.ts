@@ -1,7 +1,8 @@
-// USD composition: layer stacks, then a tree of sites for each prim, strongest first, by the LIVRPS order of the public
-// USD glossary (local, inherits, variants, references, payloads, specializes). What comes out is one flat spec map of
-// the same shape a single static layer gives. Every behaviour here is checked against OpenUSD's own reading of the same
-// files, not against a writer of ours.
+// USD composition: layer stacks, then a tree of sites for each prim, strongest first, built from the Composition chapter
+// of the AOUSD USD Core Specification v1.1.0 (local, inherits, variants, references, payloads, specializes). What comes
+// out is one flat spec map of the same shape a single static layer gives. The result is compared with what OpenUSD
+// reports for the same files, not with a writer of ours. Anything the specification does not settle says so where it
+// sits; docs/clean-room.md names each source.
 import type { ArcItem, ListOp, Specs, TimeSamples } from './crate.js';
 
 /** Time in a layer to time in the stage: `scale * t + offset`. */
@@ -50,12 +51,19 @@ interface Node {
   parent?: Node;
   /** Variant sets already settled here, by name. */
   settled: Set<string>;
-  /** An implied class on the very site it came from: it carries the class on upward and adds no opinions. */
-  inert?: boolean;
+  /** Implied by a class arc in a stack this one brought in, not authored here: weaker than an authored arc of equal depth. */
+  implied?: boolean;
+  /** One object shared by a specializes arc and the arcs it implies: the specification keeps them together. */
+  family?: object;
+  /**
+   * Namespace depth of the stage prim this arc first reached, set on the stage's own trees. Seen on OpenUSD, and the
+   * specification's "deeper in namespace" does not say which namespace: this is what orders specializes arcs.
+   */
+  reached?: number;
 }
 /** What composition could not do. It goes on, as OpenUSD does, and the caller may read these. */
 export interface ComposeIssue {
-  code: 'missing-layer' | 'missing-default-prim' | 'cycle' | 'unsupported-layer';
+  code: 'missing-layer' | 'missing-default-prim' | 'cycle' | 'unsupported-layer' | 'invalid-offset';
   message: string;
 }
 export interface ComposeOptions {
@@ -179,7 +187,13 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
   const codesPerSecond = (layer: Layer) => {
     const fields = layer.specs['/']?.fields ?? {};
     const value = fields.timeCodesPerSecond ?? fields.framesPerSecond ?? 24;
-    return typeof value === 'number' && value ? value : 24;
+    return typeof value === 'number' ? value : 24;
+  };
+  /** A scale at or below 0, or one a zero rate makes endless, is a composition error: the offset counts as the default. */
+  const checked = (offset: Offset, where: string): Offset => {
+    if (offset.scale > 0 && Number.isFinite(offset.scale)) return offset;
+    issue('invalid-offset', `time scale ${offset.scale} at ${where} is not above 0; the default offset is used`);
+    return IDENTITY;
   };
   function stackOf(id: string): Stack | undefined {
     const known = stacks.get(id);
@@ -202,7 +216,8 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
         const next = layerOf(sub);
         if (!next) return issue('missing-layer', `could not open layer ${sub}`);
         const rate = codesPerSecond(layer) / codesPerSecond(next);
-        walk(next, after(offset, after(offsets[i] ?? IDENTITY, { offset: 0, scale: rate })), [...seen, sub]);
+        const own = checked(offsets[i] ?? IDENTITY, sub);
+        walk(next, after(offset, checked(after(own, { offset: 0, scale: rate }), sub)), [...seen, sub]);
       });
     };
     walk(root, IDENTITY, [id]);
@@ -239,13 +254,18 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
   function attach(parent: Node, node: Node) {
     node.parent = parent;
     parent.children.push(node);
-    parent.children.sort((a, b) => ORDER[a.kind] - ORDER[b.kind] || b.depth - a.depth || a.order - b.order);
+    parent.children.sort(
+      (a, b) => ORDER[a.kind] - ORDER[b.kind] || b.depth - a.depth || +!!a.implied - +!!b.implied || a.order - b.order,
+    );
   }
   /** A copy of a tree under new steps and a new offset, for a site reached by an arc. */
   function graft(tree: Node, kind: ArcKind, depth: number, order: number, steps: Step[], offset: Offset): Node {
+    const families = new Map<object, object>();
     const copy = (node: Node, top: boolean): Node => {
       const out: Node = {
         ...node,
+        reached: undefined,
+        family: node.family && (families.get(node.family) ?? families.set(node.family, {}).get(node.family)),
         kind: top ? kind : node.kind,
         depth: top ? depth : node.depth,
         order: top ? order : node.order,
@@ -298,7 +318,6 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
           settled: new Set(),
         };
         for (const c of node.children) {
-          if (c.inert) continue;
           const k = descend(c);
           k.parent = out;
           out.children.push(k);
@@ -313,6 +332,13 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
     if (settle) {
       implied(root, depth);
       settleVariants(root, depth, stripVariants(path), stack === rootStack);
+      if (stack === rootStack) {
+        const stamp = (node: Node) => {
+          node.reached ??= depth;
+          node.children.forEach(stamp);
+        };
+        stamp(root);
+      }
     }
     building.delete(key);
     trees.set(key, root);
@@ -342,27 +368,31 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
     const far = codesPerSecond(stack.root),
       near = codesPerSecond(entry.layer),
       internal = !item.assetPath,
-      own = { offset: item.offset, scale: item.scale },
+      own = checked({ offset: item.offset, scale: item.scale }, target),
       // Within one stack each layer's own offset already places its opinions.
-      time = internal ? own : after(entry.offset, after(own, { offset: 0, scale: near / far }));
+      time = internal ? own : after(entry.offset, checked(after(own, { offset: 0, scale: near / far }), target));
     const site = tree(stack, target, false);
     attach(
       node,
       graft(site, kind, depth, order, [{ from: target, to: stripVariants(node.path), open: internal }, ...node.steps], after(node.offset, time)),
     );
   }
-  function placeClass(node: Node, depth: number, kind: 'inherit' | 'specialize', target: string, order: number) {
+  function placeClass(node: Node, depth: number, kind: 'inherit' | 'specialize', target: string, order: number, implied = false) {
     const path = stripVariants(target);
-    if (under(stripVariants(node.path), path) || under(path, stripVariants(node.path))) return;
+    if (under(stripVariants(node.path), path) || under(path, stripVariants(node.path))) return undefined;
     // One node holds a class site once: the arc that reached it first keeps it.
-    if (node.children.some((c) => c.stack === node.stack && stripVariants(c.path) === path)) return;
+    const held = node.children.find((c) => c.stack === node.stack && stripVariants(c.path) === path);
+    if (held) return held;
     const key = node.stack.id + '\0' + path;
-    if (building.has(key) || building.has(key + '\0v')) return issue('cycle', `class cycle at ${target}`);
+    if (building.has(key) || building.has(key + '\0v')) {
+      issue('cycle', `class cycle at ${target}`);
+      return undefined;
+    }
     const site = tree(node.stack, path, false);
-    attach(
-      node,
-      graft(site, kind, depth, order, [{ from: path, to: stripVariants(node.path), open: true }, ...node.steps], node.offset),
-    );
+    const placed = graft(site, kind, depth, order, [{ from: path, to: stripVariants(node.path), open: true }, ...node.steps], node.offset);
+    placed.implied = implied;
+    attach(node, placed);
+    return placed;
   }
   function expand(top: Node, node: Node, depth: number) {
     const { stack, path } = node;
@@ -380,23 +410,56 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
   }
   /** Every node, strongest first; specializes come after everything else. */
   function strength(top: Node): Node[] {
+    const siteOf = (node: Node) => node.stack.id + '\0' + node.path,
+      authored = new Set<string>();
+    const mark = (node: Node) => {
+      if (node.implied) return;
+      authored.add(siteOf(node));
+      node.children.forEach(mark);
+    };
+    mark(top);
     const out: Node[] = [],
-      late: { depth: number; level: number; nodes: Node[] }[] = [];
-    const walk = (node: Node, list: Node[], level: number) => {
-      if (node.inert) return;
+      groups = new Map<object, { depth: number; rank: number; members: { level: number; nodes: Node[] }[] }>();
+    let rank = 0;
+    const walk = (node: Node, list: Node[], level: number, inImplied: boolean) => {
+      const through = inImplied || !!node.implied;
+      // Seen on OpenUSD; the specification does not say: a site an authored arc reaches gives no opinions through an implied arc.
+      if (through && authored.has(siteOf(node))) return;
       list.push(node);
       for (const c of node.children) {
         if (c.kind === 'specialize') {
-          const nodes: Node[] = [];
-          late.push({ depth: c.depth, level, nodes });
-          walk(c, nodes, level + 1);
-        } else walk(c, list, level + 1);
+          const nodes: Node[] = [],
+            family = c.family ?? c;
+          let group = groups.get(family);
+          if (!group) groups.set(family, (group = { depth: c.reached ?? c.depth, rank: Infinity, members: [] }));
+          // Strength Ordering, Specializes: an arc ranks by how it came in, the opinions it implies go with it.
+          if (!c.implied) {
+            group.depth = c.reached ?? c.depth;
+            group.rank = rank++;
+          }
+          group.members.push({ level, nodes });
+          walk(c, nodes, level + 1, through);
+        } else walk(c, list, level + 1, through);
       }
     };
-    walk(top, out, 0);
-    // Every specializes arc ends up below the whole prim: deeper arcs first, then the ones nearest the root.
-    late.sort((a, b) => b.depth - a.depth || a.level - b.level);
-    return [...out, ...late.flatMap((item) => item.nodes)];
+    walk(top, out, 0, false);
+    const late = [...groups.values()].sort((a, b) => b.depth - a.depth || a.rank - b.rank);
+    const all = [...out],
+      seen = new Map<string, number>();
+    for (const group of late)
+      for (const item of group.members.sort((a, b) => a.level - b.level))
+        for (const node of item.nodes) {
+          const site = siteOf(node),
+            at = seen.get(site);
+          // Seen on OpenUSD; the specification does not say: a class site met again counts once, through the later arc.
+          if (node.kind === 'specialize' && at !== undefined) {
+            all[at] = node;
+            continue;
+          }
+          seen.set(site, all.length);
+          all.push(node);
+        }
+    return all;
   }
   /** Picks each variant set's selection from the strongest opinion in the whole tree, then follows the variant. */
   function settleVariants(top: Node, depth: number, primPath: string, atRoot: boolean) {
@@ -444,32 +507,49 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
       implied(top, depth);
     }
   }
-  /** Inherits under a reference also look in the referencing stack, at the class's path there. */
+  /**
+   * Core Specification, Composition Arcs, Inherits: an authored class arc implies one in every upstream layer stack that
+   * brought its stack in, on the prim that brought it, at the arc's path through the namespace mappings on the way. A hop
+   * inside one stack that leaves the path as it was would name the site already held, so the mapping just goes on upward.
+   */
   function implied(top: Node, depth: number) {
-    const visit = (node: Node) => {
-      for (const c of node.children.slice()) visit(c);
-      if (!node.parent || node.kind === 'inherit' || node.kind === 'specialize') return;
-      for (const c of node.children.slice()) {
-        if (c.kind !== 'inherit' && c.kind !== 'specialize') continue;
-        const near = node.parent,
-          step = node.steps[0 + (node.steps.length - near.steps.length - 1)],
-          from = stripVariants(c.path);
-        const classPath = classSource(c, node);
-        const mapped = step && under(classPath, step.from) ? step.to + classPath.slice(step.from.length) : classPath;
-        if (near.stack === c.stack && mapped === from) {
-          if (near.children.some((n) => n.stack === c.stack && stripVariants(n.path) === mapped)) continue;
-          attach(near, { ...c, depth: c.depth, children: [], settled: new Set(), steps: [{ from: mapped, to: stripVariants(near.path), open: true }, ...near.steps], inert: true });
-          continue;
-        }
-        placeImplied(near, depth, c.kind as 'inherit' | 'specialize', mapped, c.order);
+    /** `path`, authored at `site`, as the prim that first leads into another stack names it, with that prim's node. */
+    const upstream = (site: Node, path: string): [Node, string] | undefined => {
+      let at = site,
+        out = path;
+      while (at.parent) {
+        const near = at.parent,
+          step = at.steps[at.steps.length - near.steps.length - 1];
+        const before = out;
+        if (step && under(out, step.from)) out = step.to + out.slice(step.from.length);
+        if (near.stack !== at.stack || out !== before) return [near, out];
+        at = near;
       }
+      return undefined;
+    };
+    /** Places arc on near and on every stack above it, and the same for the class arcs that class has in turn. */
+    const lift = (near: Node, arc: Node, path: string) => {
+      const kind = arc.kind as 'inherit' | 'specialize',
+        placed = placeClass(near, depth, kind, path, near.children.length, true);
+      if (!placed) return;
+      arc.family ??= {};
+      if (placed.implied) placed.family ??= arc.family;
+      for (const c of arc.children)
+        if (c.kind === 'inherit' || c.kind === 'specialize') lift(placed, c, stripVariants(c.path));
+      const up = upstream(near, path);
+      if (up) lift(up[0], placed, up[1]);
+    };
+    // Strongest first, so implied arcs of equal depth keep the order of the arcs that imply them.
+    const visit = (node: Node) => {
+      if (node.kind !== 'inherit' && node.kind !== 'specialize')
+        for (const c of node.children.slice()) {
+          if (c.kind !== 'inherit' && c.kind !== 'specialize') continue;
+          const up = upstream(node, stripVariants(c.path));
+          if (up) lift(up[0], c, up[1]);
+        }
+      for (const c of node.children.slice()) visit(c);
     };
     visit(top);
-  }
-  /** The class prim's path for this prim, in the namespace of the site it was inherited at. */
-  const classSource = (node: Node, _owner: Node) => stripVariants(node.path);
-  function placeImplied(near: Node, depth: number, kind: 'inherit' | 'specialize', path: string, order: number) {
-    placeClass(near, depth, kind, path, order);
   }
 
   const rootStack = stackOf(rootId)!;

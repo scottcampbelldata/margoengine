@@ -51,12 +51,13 @@ are still open.
 - **Needed to close:** decide whether this model stays. If it does, add those parts to `NO_CROSSING`, fix what the check
   then reports and rebuild the GLB. If another model replaces it, this entry goes with the old model.
 
-### USD composition: order of `specializes` arcs of equal depth
+### USD composition: stress stages that mix classes, variants and repeated sites
 
-- **What:** a stage that reaches one class through `specializes` from several layers can take a value from the wrong one. No real file in the corpus shows it; 55 of 150 generated stress stages do.
-- **Repro:** compose `packages/usdz/tests/fixtures/open-difference/root.usda` with `composition()`. `/Q/c.v3` is 814 and OpenUSD says 630.
-- **Cause:** `strength` in `packages/usdz/src/stage.ts` orders those arcs by depth, then by how near the root they sit. OpenUSD compares the strength of each arc's origin, which this tree does not keep once it is copied to child prims.
-- **Needed to close:** keep an origin on each class node through `graft` and `tree`, and sort by it.
+- **What:** 46 of 150 generated stress stages still differ from OpenUSD in a property of some prim (55 of 150 before the rebuild from the Core Specification). They nest classes, variants and references far past real files, and repeat one class through several layers. No real file in the corpus shows it.
+- **Repro:** compose `packages/usdz/tests/fixtures/open-difference/root.usda` with `composition()`. `/Q/b/c/c/c/a/c/a.v0` is 961 and OpenUSD says 642.
+- **Measured:** the opinion lists from OpenUSD's public `GetPrimStack` call and ours differ in the place or the count of class sites that one stage reaches twice, mostly beside variants. Two stages that matched before the rebuild (46 and 109) differ now; they are among the 46.
+- **Not confirmed:** the cause. The AOUSD USD Core Specification v1.1.0 does not say what happens when two arcs reach one site, nor which namespace "deeper" means once an arc has crossed a reference. Margo's two rules for this in `packages/usdz/src/stage.ts` come from watching OpenUSD on test stages, are marked there as seen and not specified, and may not be the whole rule. Earlier text here named one cause as fact; that came from memory of OpenUSD's internals and is withdrawn.
+- **Needed to close:** an answer from the specification (an erratum request to the AOUSD issue tracker is the route), or more black-box stages that pin the rule down. Never OpenUSD's source.
 
 ## Blocked on hardware we do not have
 

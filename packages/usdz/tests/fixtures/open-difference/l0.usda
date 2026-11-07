@@ -4,111 +4,163 @@
 )
 class "C"
 {
-    custom double v0 = 630
-    custom double v1 = 530
-    custom double v3 = 630
+    custom double v0 = 642
+    custom double v1 = 543
+    custom double v3.timeSamples = { 0: 26, 7: 71 }
+    def "a"
+    {
+        custom double v2.timeSamples = { 1: 8, 6: 30 }
+        custom double v3 = 468
+        def "a"
+        {
+            custom double v1.timeSamples = { 3: 15, 8: 29 }
+        }
+        over "b"
+        {
+            custom double v0 = 909
+            custom double v1.timeSamples = { 2: 53, 5: 38 }
+            custom double v2 = 709
+            custom double v3 = None
+            add rel r = [</M/a>]
+        }
+    }
 }
 def "Shared"
 {
-    custom double v0.timeSamples = { 2: 3, 4: 39 }
-    custom double v1 = 510
-    custom double v3.timeSamples = { 0: 80, 8: 9 }
-    append rel r = [</Shared>]
+    custom double v1.timeSamples = { 3: 52, 9: 34 }
+    custom double v2.timeSamples = { 3: 25, 5: 30 }
     over "a"
     {
-        custom double v1 = 758
-        custom double v2.timeSamples = { 2: 63, 9: 83 }
-        custom double v3 = 790
+        custom double v2 = 668
+        custom double v3 = 264
+        add rel r = [</C/b>]
     }
-    def "c"
-    {
-        custom double v0 = None
-        custom double v1 = 639
-        custom double v2 = 943
-        prepend rel r = [</C/b>]
-    }
-}
-def "M" (
-    append inherits = </C/a>
-)
-{
-    custom double v2 = 707
-    add rel r = [</Shared>]
-    def "a" (
-        specializes = </C>
+    over "c" (
         variantSets = "vs"
+        variants = { string vs = "y" }
     )
     {
-        custom double v1.timeSamples = { 2: 80, 5: 85 }
-        over "b" (
-            inherits = </C/a>
-        )
-        {
-            custom double v0 = 650
-            custom double v1 = 759
-            custom double v3 = 850
-        }
+        custom double v0 = 43
+        custom double v2 = 799
+        custom double v3 = 242
         variantSet "vs" = {
             "x" {
-                custom double v2 = 78
+                custom double v0.timeSamples = { 1: 21, 8: 8 }
+                custom double v1 = 31
+                custom double v2.timeSamples = { 3: 49, 4: 4 }
+                custom double v3 = 562
+                custom rel r = [</Shared>]
                 def "c"
                 {
-                    custom double v0 = 363
-                    custom double v2.timeSamples = { 0: 46, 9: 81 }
-                    custom double v3 = 836
+                    custom double v0 = 251
+                    add rel r = [</C/b>]
                 }
             }
             "y" {
-                custom double v0 = 403
-                custom double v1 = 681
-                custom double v2 = 738
-                custom double v3 = 906
-                def "c"
-                {
-                    custom double v0 = 57
-                    custom double v2 = 858
-                }
-            }
-        }
-    }
-}
-over "Y" (
-    references = </Shared>
-)
-{
-    custom double v2 = 264
-    custom double v3 = 183
-    def "a" (
-        inherits = </C>
-        variantSets = "vs"
-    )
-    {
-        custom double v1 = 497
-        custom double v3 = 965
-        delete rel r = [</M/a>]
-        variantSet "vs" = {
-            "x" {
-                custom double v0 = 341
-                custom double v1 = 427
-                custom double v3 = 257
-                def "a" (
-                    specializes = </C>
-                )
-                {
-                    custom double v0 = 882
-                    custom double v1 = 816
-                    custom double v2.timeSamples = { 1: 52, 9: 67 }
-                    custom double v3 = 620
-                }
-            }
-            "y" {
-                custom double v0 = None
-                custom double v3 = 994
+                custom double v0 = 164
+                custom double v1 = 261
+                custom double v2 = 887
+                custom double v3 = 572
                 def "a"
                 {
-                    custom double v1 = 384
+                    custom double v0 = 461
+                    custom double v1 = 668
+                    custom double v3 = 346
                 }
             }
         }
+    }
+}
+def "M"
+{
+    custom double v0 = 153
+    custom double v1 = 501
+    custom double v2.timeSamples = { 2: 81, 9: 88 }
+    custom double v3 = None
+    add rel r = [</Shared>]
+    over "c" (
+        inherits = </C>
+        specializes = </C/a>
+        variantSets = "vs"
+        variants = { string vs = "y" }
+    )
+    {
+        custom double v0 = 724
+        custom double v1 = 992
+        custom double v2.timeSamples = { 0: 36, 8: 4 }
+        custom double v3 = 594
+        custom rel r = [</Y>]
+        over "a" (
+            specializes = </C>
+            variantSets = "vs"
+            variants = { string vs = "y" }
+        )
+        {
+            custom double v1 = 473
+            custom double v2 = 943
+            custom double v3 = 829
+            variantSet "vs" = {
+                "x" {
+                    custom double v0 = 841
+                    custom double v1 = 631
+                }
+                "y" {
+                    custom double v2 = 742
+                    custom double v3 = 54
+                }
+            }
+        }
+        def "b" (
+            prepend inherits = </C/a>
+        )
+        {
+            custom double v0 = 823
+            custom double v1.timeSamples = { 3: 71, 7: 61 }
+            custom double v2 = 931
+            custom double v3 = 506
+        }
+        variantSet "vs" = {
+            "x" {
+                custom double v0.timeSamples = { 3: 79, 5: 70 }
+                custom double v1 = 59
+                custom double v2 = 673
+                custom double v3.timeSamples = { 0: 72, 6: 86 }
+            }
+            "y" {
+                custom double v0 = 154
+                custom double v1 = 535
+                custom double v2 = 95
+            }
+        }
+    }
+}
+def "Y" (
+    inherits = </C>
+)
+{
+    custom double v0 = 19
+    def "a" (
+        prepend inherits = </C>
+        specializes = </C>
+    )
+    {
+        custom double v2.timeSamples = { 2: 58, 9: 66 }
+        custom double v3 = 68
+        custom rel r = [</M/a>]
+    }
+    over "b" (
+        append inherits = </C>
+        references = </Shared>
+    )
+    {
+        custom double v0 = 792
+        custom double v2 = 772
+    }
+    def "c" (
+        prepend inherits = </C>
+    )
+    {
+        custom double v1 = 101
+        custom double v3 = 188
     }
 }

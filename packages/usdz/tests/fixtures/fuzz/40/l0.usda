@@ -1,0 +1,114 @@
+#usda 1.0
+(
+    defaultPrim = "M"
+)
+class "C"
+{
+    custom double v0 = 630
+    custom double v1 = 530
+    custom double v3 = 630
+}
+def "Shared"
+{
+    custom double v0.timeSamples = { 2: 3, 4: 39 }
+    custom double v1 = 510
+    custom double v3.timeSamples = { 0: 80, 8: 9 }
+    append rel r = [</Shared>]
+    over "a"
+    {
+        custom double v1 = 758
+        custom double v2.timeSamples = { 2: 63, 9: 83 }
+        custom double v3 = 790
+    }
+    def "c"
+    {
+        custom double v0 = None
+        custom double v1 = 639
+        custom double v2 = 943
+        prepend rel r = [</C/b>]
+    }
+}
+def "M" (
+    append inherits = </C/a>
+)
+{
+    custom double v2 = 707
+    add rel r = [</Shared>]
+    def "a" (
+        specializes = </C>
+        variantSets = "vs"
+    )
+    {
+        custom double v1.timeSamples = { 2: 80, 5: 85 }
+        over "b" (
+            inherits = </C/a>
+        )
+        {
+            custom double v0 = 650
+            custom double v1 = 759
+            custom double v3 = 850
+        }
+        variantSet "vs" = {
+            "x" {
+                custom double v2 = 78
+                def "c"
+                {
+                    custom double v0 = 363
+                    custom double v2.timeSamples = { 0: 46, 9: 81 }
+                    custom double v3 = 836
+                }
+            }
+            "y" {
+                custom double v0 = 403
+                custom double v1 = 681
+                custom double v2 = 738
+                custom double v3 = 906
+                def "c"
+                {
+                    custom double v0 = 57
+                    custom double v2 = 858
+                }
+            }
+        }
+    }
+}
+over "Y" (
+    references = </Shared>
+)
+{
+    custom double v2 = 264
+    custom double v3 = 183
+    def "a" (
+        inherits = </C>
+        variantSets = "vs"
+    )
+    {
+        custom double v1 = 497
+        custom double v3 = 965
+        delete rel r = [</M/a>]
+        variantSet "vs" = {
+            "x" {
+                custom double v0 = 341
+                custom double v1 = 427
+                custom double v3 = 257
+                def "a" (
+                    specializes = </C>
+                )
+                {
+                    custom double v0 = 882
+                    custom double v1 = 816
+                    custom double v2.timeSamples = { 1: 52, 9: 67 }
+                    custom double v3 = 620
+                }
+            }
+            "y" {
+                custom double v0 = None
+                custom double v3 = 994
+                def "a"
+                {
+                    custom double v1 = 384
+                }
+            }
+        }
+    }
+}
