@@ -29,6 +29,15 @@ test('no two limit claims say the same thing', () => {
   }
 });
 
+// A keep-both in a rebase once brought back two rows under new numbers with their old figures, so the text differed.
+test('no two limit claims open with the same name', () => {
+  const seen = new Map();
+  for (const [, id, text] of claims.matchAll(/^\| LIM-(\d+) \| ([^|:]{1,60}): /gm)) {
+    assert.ok(!seen.has(text), `LIM-${id} repeats the name of LIM-${seen.get(text)}: ${text}`);
+    seen.set(text, id);
+  }
+});
+
 test('docs/limits.md names the last limit claim', () => {
   const [, last] = /LIM-001 to LIM-(\d+)/.exec(limits);
   assert.equal(Number(last), Math.max(...ids));
