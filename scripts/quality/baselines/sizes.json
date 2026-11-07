@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10055613,
+  "total": 10056969,
   "history": [
     {
       "date": "2026-10-24",
@@ -3002,6 +3002,12 @@
       "commit": "d709529b6",
       "reason": "New entry @margoengine/cutscene/vfx and VFX.reset for seeks.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "463a15c6c",
+      "reason": "drawShadow casters in VirtualShadows and the shadowReach helper",
+      "grew": 2
     }
   ],
   "items": {
@@ -3518,7 +3524,7 @@
     "@margoengine/shader/subgroups": 3517,
     "@margoengine/shader/utils": 7295,
     "@margoengine/shadows": 17879,
-    "@margoengine/shadows/virtual": 14601,
+    "@margoengine/shadows/virtual": 15442,
     "@margoengine/sky": 16975,
     "@margoengine/sky/base": 7004,
     "@margoengine/sky/bruneton": 2557,
@@ -3562,7 +3568,7 @@
     "@margoengine/stats/report": 1378,
     "@margoengine/taa": 12187,
     "@margoengine/taa/upscale": 7093,
-    "@margoengine/terrain": 12359,
+    "@margoengine/terrain": 12874,
     "@margoengine/text": 16406,
     "@margoengine/text/msdf": 4516,
     "@margoengine/text/rich": 11403,

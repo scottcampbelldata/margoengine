@@ -1,4 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
+import { lightingLayout } from './lighting-layout.js';
 import type { EngineKernel } from '@margoengine/core';
 import {
   engineRuntime,
@@ -484,30 +485,6 @@ export class Terrain implements EnginePlugin {
   private surface(): boolean {
     return this.options.layers.some((layer) => (layer.bump ?? 0) > 0 || (layer.macro ?? 0) > 0);
   }
-  /** The lighting group's layout entries for `entries` (shadow maps, comparison samplers, buffers). */
-  private lightingLayout(device: GPUDevice, entries: GPUBindGroupEntry[]): GPUBindGroupLayout {
-    return device.createBindGroupLayout({
-      entries: entries.map((entry) => {
-        const binding = entry.binding,
-          visibility = GPUShaderStage.FRAGMENT;
-        if (binding === 2 || binding === 15 || binding === 29)
-          return {
-            binding,
-            visibility,
-            texture: { sampleType: 'depth' as const, viewDimension: '2d-array' as const },
-          };
-        if (binding === 3 || binding === 16 || binding === 30)
-          return { binding, visibility, sampler: { type: 'comparison' as const } };
-        return {
-          binding,
-          visibility,
-          buffer: {
-            type: binding >= 5 && binding !== 14 ? ('read-only-storage' as const) : ('uniform' as const),
-          },
-        };
-      }),
-    });
-  }
   private drawRings(c: TerrainPassContext): void {
     const code = this.shader();
     const key = c.descriptor.multisample?.count + ':' + c.format + ':' + c.descriptor.depthStencil!.format + code;
@@ -521,7 +498,7 @@ export class Terrain implements EnginePlugin {
     if (!pipeline) {
       const module = c.device.createShaderModule({ code }),
         layouts = [this.layout!];
-      if (entries.length) layouts.push(this.lightingLayout(c.device, entries));
+      if (entries.length) layouts.push(c.device.createBindGroupLayout({ entries: lightingLayout(code, entries) }));
       pipeline = c.device.createRenderPipeline({
         layout: c.device.createPipelineLayout({ bindGroupLayouts: layouts }),
         vertex: {
@@ -631,7 +608,7 @@ export class Terrain implements EnginePlugin {
     if (!pipeline) {
       const module = c.device.createShaderModule({ code }),
         layouts = [this.layout!];
-      if (entries.length) layouts.push(this.lightingLayout(c.device, entries));
+      if (entries.length) layouts.push(c.device.createBindGroupLayout({ entries: lightingLayout(code, entries) }));
       pipeline = c.device.createRenderPipeline({
         layout: c.device.createPipelineLayout({ bindGroupLayouts: layouts }),
         vertex: {

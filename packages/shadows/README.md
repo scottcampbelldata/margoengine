@@ -157,7 +157,20 @@ Options and defaults: `poolSize` 4096 (texels a side of the page pool, 32 x 32 p
 
 A frame draws the camera's view at half size per axis to find the pages it needs, one frame late; a page not yet resident reads the next coarser level, so a new view starts softer and sharpens, with no holes. Once the view settles a still scene renders no pages. A caster that moves redraws the resident pages its bounds reach; a caster whose bounds the effect cannot know (a node that is not a core mesh, a dynamic, instanced or displaced primitive) redraws every resident page every frame. `invalidate()` redraws them all; so does a change of light direction.
 
-Sources with their own `drawShadow` (terrain, scatter, voxels, VAT, culling) cannot cast here: their uniforms are per cascade, and a page needs its own matrix. `add` throws a `TypeError` naming the fix: add them with `{castShadow:false}` to receive, or use `Shadows`, which they cast into.
+Sources with their own `drawShadow` (terrain, scatter, voxels, culled parts, VAT crowds, imposters, raw meshes) cast here as they cast into `Shadows`, with no change on their side:
+
+```ts
+import { Engine, box } from 'margoengine/core';
+import { Scatter } from 'margoengine/scatter';
+import { VirtualShadows } from 'margoengine/shadows/virtual';
+const canvas = document.querySelector('canvas')!;
+const engine = await Engine.create(canvas, { backend: 'webgpu' });
+const rocks = Scatter.attach(engine, box(1, 2, 1), { count: 200, area: [24, 24] });
+const pages = VirtualShadows.attach(engine, { distance: 800 });
+pages.add(rocks, { static: true }); // redrawn when its version changes, or call pages.invalidate()
+```
+
+Such a source keeps one uniform per cascade, so its pages go to the GPU four at a time in submits of their own: `prepareShadow` gets the four page matrices, `drawShadow` runs with `cascade` 0 to 3. Add a still source with `static: true`, and it costs nothing once its pages are drawn. Without it, it redraws every resident page every frame, a submit per four pages, because the effect cannot know where it reaches. These submits run before the frame's own, so what a source computes on the frame's encoder (scatter's camera cull, say) reaches its shadow one frame late.
 
 Memory at the default pool size is 134,218,752 B (two 64 MiB pools and an 8 KiB page table; `memoryBytes` reports it). WebGPU only, directional light only.
 

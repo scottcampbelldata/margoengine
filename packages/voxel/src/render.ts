@@ -117,10 +117,10 @@ fn voxelPlace(w0:u32,w1:u32,c:u32,t:f32)->vec3f {
 ${tileShader}`;
 // Sky visibility of the sun: without a shadow map the sun reaches a face as far as the open sky does. With one
 // (`shadows.add(voxels)`), the map decides inside its range and sky visibility fades back in over the last tenth of it;
-// this reads the shadows package's own uniform (shadowFrame.view and splits.w, its receivers' "outside" test).
+// this reads the shadows package's own uniform (shadowFrame.view and its reach, its receivers' "outside" test; VirtualShadows names that reach shadowReach()).
 const SUN = 'fn voxelSun(p:vec3f,sky:f32)->f32 {return sky*sky;}',
-  SHADOWED_SUN =
-    'fn voxelSun(p:vec3f,sky:f32)->f32 {let d=-(shadowFrame.view*vec4f(p,1.0)).z;return mix(1.0,sky*sky,smoothstep(0.9*shadowFrame.splits.w,shadowFrame.splits.w,d));}';
+  shadowedSun = (reach: string) =>
+    `fn voxelSun(p:vec3f,sky:f32)->f32 {let d=-(shadowFrame.view*vec4f(p,1.0)).z;return mix(1.0,sky*sky,smoothstep(0.9*${reach},${reach},d));}`;
 
 // The lit part of both beauty shaders (quads and bevel triangles): frame uniform, surface, sun, ambient and the PBR
 // direct term. `f.glow` is the block light colour and time, `f.ambient.w` the daylight. MODE: 0 opaque, 1 cutout (alpha
@@ -1583,7 +1583,8 @@ export class VoxelRenderer implements EnginePlugin {
   // A composed shader with the lightmap and the shadowed sun.
   #finish(text: string): string {
     const baked = this.#lightmap ? this.#lightmap.shader(text) : text;
-    return baked.includes('var<uniform> shadowFrame') ? baked.replace(SUN, SHADOWED_SUN) : baked;
+    if (!baked.includes('var<uniform> shadowFrame')) return baked;
+    return baked.replace(SUN, shadowedSun(baked.includes('fn shadowReach') ? 'shadowReach()' : 'shadowFrame.splits.w'));
   }
 
   // The number naming a composition in pipeline keys. The effect objects are part of the name: two effects with the same

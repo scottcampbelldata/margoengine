@@ -223,6 +223,10 @@ Checked on a real GPU (NVIDIA RTX A6000, Edge 155; `examples/package-benchmarks/
 mirror (24,929 pixels, none outside the projected mirror bounds by more than 6 px) and red at the mirrored centre,
 at 4x and 1x MSAA. A terrain is reflected only on screen and, being a dielectric, reflects 4-10% at most view angles.
 
+## Shadows
+
+`shadows.add(terrain, {static: true})` casts and receives, in `Shadows` and in `VirtualShadows` alike; give either a `distance` that reaches as far as the camera sees. Any lighting effect may bind what it declares in its WGSL: the lighting group's layout is read from there.
+
 ## Terrain as an occluder
 
 A hill can hide GPU-culled parts: `parts.addOccluder(terrain)` (`CulledParts` from `margoengine/culling/parts`, in

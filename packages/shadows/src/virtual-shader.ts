@@ -36,7 +36,7 @@ const filters: Record<ShadowFilter, string> = {
   return textureSampleCompareLevel(shadowMap,shadowSampler,found.xy,reference);`,
 };
 const frame =
-  'struct ShadowFrame {view:mat4x4f,right:vec4f,up:vec4f,forward:vec4f,settings:vec4f,info:vec4f,levels:array<vec4f,16>,inverse:mat4x4f,nearest:array<vec4f,4>}';
+  'struct ShadowFrame {view:mat4x4f,right:vec4f,up:vec4f,forward:vec4f,settings:vec4f,info:vec4f,levels:array<vec4f,16>,inverse:mat4x4f,nearest:array<vec4f,4>}\nfn shadowReach()->f32 {return shadowFrame.info.w;}';
 const soft = /* wgsl */ `const shadowGolden=mat2x2f(-0.737368878,0.675490294,-0.675490294,-0.737368878);
 fn shadowNoise(position:vec3f)->f32 {
   let eye=shadowFrame.view*vec4f(position,1);let pixel=eye.xy/max(-eye.z,0.000001)*shadowFrame.settings.w;

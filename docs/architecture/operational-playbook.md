@@ -519,6 +519,15 @@ ground with Blender Cycles, each side giving the ground's light with the model o
 code decides the answer. Evidence: overlap 0.98 on DiffuseTransmissionPlant and 0.91 on AlphaBlendModeTest's masks, 0.31 with
 the masks off. Missing: other GPUs.
 
+`VirtualShadows` takes `drawShadow` sources: a source keeps one uniform per cascade slot and writes it with
+`queue.writeBuffer`, which runs before the submit that follows it, so pages go four at a time, each batch in its own
+encoder and submit, and the sources need no change. Feedback runs after the pages, because a custom receiver draws there
+with slot 0 and the camera's matrix. Voxels read `shadowReach()` where the shadow pass defines it, as `VirtualShadows` does,
+since `splits` is a field of the cascades' uniform alone; terrain reads its lighting group's layout from the WGSL the effects declared, since a table of
+binding numbers fitted only `Shadows`. Evidence: `packages/shadows/test/virtual-custom-browser.mjs`, overlap 0.97, 0.95 and
+0.95 with `Shadows` for culled parts, scatter and voxels; real Mount Rainier elevation against Blender Cycles, overlap 0.88
+(`Shadows`) and 0.81 (`VirtualShadows`), 0 with the terrain not casting, RTX A6000. Missing: other GPUs.
+
 `LodInstances` (`@margoengine/culling/lod`) tests each instance against the frustum and picks its level in one compute pass:
 the level is the first whose limit the world sphere's radius in pixels reaches. Instances append to their level's list by
 atomic add, and the counts are copied to each level's indirect arguments, so core draws each list through `Batch.redirect`. On

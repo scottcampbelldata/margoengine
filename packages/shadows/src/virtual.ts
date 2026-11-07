@@ -119,14 +119,17 @@ interface Draw {
   radius: number;
 }
 const emptyPrimitives: readonly ShadowPrimitive[] = [];
+// A `drawShadow` source keeps this many uniforms, one per cascade of `Shadows`, and writes one with queue.writeBuffer for
+// each draw: all writes land before a submit runs, so only this many pages can share a submit.
+const SLOTS = 4;
 const shaderKey = (filter: string, group: number) => group * 8 + (filter === 'soft' ? 0 : filter === 'pcf' ? 2 : 4);
 /**
  * A directional virtual shadow map: one depth page pool mapped through a page table over a clipmap of light-space levels
  * around the camera, so resolution follows what the camera sees and still pages stay cached. The optional sibling of
  * `Shadows`, with the same `attach`, `add` and receiver hooks; importing `@margoengine/shadows` alone pays nothing for it.
- * Casters are core meshes and sources with `shadowPrimitives`; a source that only has `drawShadow` can receive
- * (`castShadow: false`) but cannot cast here, because it keeps per-cascade uniforms and a page needs its own matrix.
- * WebGPU only.
+ * Casters are core meshes, sources with `shadowPrimitives`, and sources with `drawShadow` (terrain, scatter, voxels,
+ * culled parts, VAT crowds): those keep one uniform per cascade, so their pages go to the GPU four at a time, each page in
+ * a cascade slot, in submits of their own. WebGPU only.
  * @throws RangeError when an option is out of range or the pool exceeds the device limits; TypeError for an invalid
  * source.
  * @throws MargoError `'unsupported'` on a WebGL engine or when another plugin replaced the core PBR shader,
@@ -175,6 +178,19 @@ export class VirtualShadows implements EnginePlugin {
   private casters: Draw[] = [];
   private readonly receivers: Draw[] = [];
   private readonly customReceivers: ShadowSource[] = [];
+  /** This frame's `drawShadow` casters that stay put (cached in the still pool) and that redraw every frame. */
+  private readonly customStill: ShadowSource[] = [];
+  private readonly customMoving: ShadowSource[] = [];
+  /** The matrices of the pages in one submit, 16 floats each, as `prepareShadow` takes a cascade's. */
+  private readonly batchMatrices = new Float32Array(64);
+  private readonly batchSlots = new Int32Array(SLOTS);
+  /** The batch's `drawShadow` contexts, one per cascade slot, each borrowing its matrix. */
+  private readonly batchContexts = Array.from({ length: SLOTS }, (_, cascade) => ({
+    context: undefined as unknown as VirtualPassContext,
+    pass: undefined as unknown as GPURenderPassEncoder,
+    matrix: this.batchMatrices.subarray(cascade * 16, cascade * 16 + 16),
+    cascade,
+  }));
   /** Core meshes nobody added still receive, so feedback draws them too. */
   private readonly loose = new Map<Mesh, Source>();
   private feedbackDepth?: GPUTexture;
@@ -245,9 +261,10 @@ export class VirtualShadows implements EnginePlugin {
     return this.engine;
   }
   /**
-   * Adds `source` (a core mesh, gltf-pro model, materials mesh or other source) as a caster and, for sources with their
-   * own lighting (`addLighting`), a receiver. `castShadow: false` keeps it out of the map; `receiveShadow: false` leaves
-   * its lighting unshadowed. `static` keeps its pages cached until it changes. Returns the remover.
+   * Adds `source` (a core mesh, gltf-pro model, materials mesh, terrain, scatter, voxels or other source) as a caster and,
+   * for sources with their own lighting (`addLighting`), a receiver. `castShadow: false` keeps it out of the map;
+   * `receiveShadow: false` leaves its lighting unshadowed. `static` keeps its pages cached until it changes; a `drawShadow`
+   * source without it redraws every resident page every frame. Returns the remover.
    */
   add(
     source: ShadowSource | MeshHandle,
@@ -273,10 +290,6 @@ export class VirtualShadows implements EnginePlugin {
     const custom = !('id' in runtime) && !('shadowPrimitives' in runtime);
     if (custom && typeof (runtime as ShadowSource).drawShadow !== 'function')
       throw new TypeError('Invalid shadow source; pass a mesh, group or object with shadowPrimitives.');
-    if (custom && castShadow)
-      throw new TypeError(
-        'A drawShadow source cannot cast into virtual shadows; give it shadowPrimitives, add it with castShadow: false, or use Shadows',
-      );
     if (
       this.engine &&
       'shadowPrimitives' in runtime &&
@@ -556,7 +569,7 @@ export class VirtualShadows implements EnginePlugin {
       }
     }
     this.receivers.length = 0;
-    this.customReceivers.length = 0;
+    this.customReceivers.length = this.customStill.length = this.customMoving.length = 0;
     for (const r of this.sources) this.collect(r, serial, section);
     const loose = this.loose;
     for (const mesh of this.engine!.meshes.values()) {
@@ -577,6 +590,7 @@ export class VirtualShadows implements EnginePlugin {
     }
     if (!('id' in source) && !('shadowPrimitives' in source)) {
       if (r.receive) this.customReceivers.push(source);
+      if (r.cast) (r.static ? this.customStill : this.customMoving).push(source);
       return;
     }
     const primitives = this.primitives(r);
@@ -767,6 +781,8 @@ export class VirtualShadows implements EnginePlugin {
    */
   private changes(serial: number): void {
     const pages = this.pages!;
+    // A custom caster's reach is its own business: every resident page.
+    if (this.customMoving.length) pages.touchAll();
     for (let i = 0; i < this.casters.length; i++) {
       const d = this.casters[i],
         p = d.p;
@@ -946,6 +962,7 @@ export class VirtualShadows implements EnginePlugin {
     values[32] = range;
     values[33] = PAGE_TEXELS / (o.poolSize ?? 4096);
     values[34] = levels;
+    values[35] = distance;
     c.device.queue.writeBuffer(this.uniform!, 0, values as Float32Array<ArrayBuffer>);
     const serial = ++this.serial,
       section = sectionState(c);
@@ -977,9 +994,13 @@ export class VirtualShadows implements EnginePlugin {
     this.stats.levelPages = Array.from(pages.requested);
     this.stats.overflow = pages.overflow;
     this.stats.pagesRendered = 0;
-    this.feedback(c);
     this.stats.casterDraws = 0;
-    this.drawPages(c, origin, range);
+    if (this.customStill.length || this.customMoving.length) this.drawPagesInBatches(c, origin, range);
+    else this.drawPages(c, origin, range);
+    // After the pages: a custom receiver draws here with slot 0, whose uniform the last page batch wrote.
+    const draws = this.stats.casterDraws;
+    this.feedback(c);
+    this.stats.casterDraws = draws;
     if ((o.filter ?? 'soft') === 'soft' && this.nearestStale) this.nearest(c);
   }
   /** Reduces each level's mapped pages to the level's nearest depth for the PCSS search, when pages changed. */
@@ -1006,23 +1027,7 @@ export class VirtualShadows implements EnginePlugin {
     c.encoder.copyBufferToBuffer(this.nearestBuffer!, 0, this.uniform!, 464, 64);
     this.nearestStale = false;
   }
-  /**
-   * The frame's page work, two render passes at most. Stale pages clear and draw their still casters into the still pool.
-   * In the sampled pool, a page that changed or that a moving caster reaches now or reached last frame takes the still
-   * page back, and the moving casters that reach it draw over it.
-   */
-  private drawPages(c: VirtualPassContext, origin: number, range: number): void {
-    const pages = this.pages!,
-      device = c.device,
-      section = sectionState(c),
-      stale = pages.stale,
-      touched = pages.touched,
-      before = pages.touchedBefore,
-      capacity = pages.capacity;
-    const depth = (view: GPUTextureView): GPURenderPassDescriptor => ({
-      colorAttachments: [],
-      depthStencilAttachment: { view, depthLoadOp: 'load', depthStoreOp: 'store' },
-    });
+  private pagePipelines(device: GPUDevice): void {
     const module = device.createShaderModule;
     this.clearPipeline ??= device.createRenderPipeline({
       layout: 'auto',
@@ -1041,13 +1046,32 @@ export class VirtualShadows implements EnginePlugin {
         entries: [{ binding: 0, resource: this.cachedView! }],
       });
     }
+  }
+  /**
+   * The frame's page work, two render passes at most. Stale pages clear and draw their still casters into the still pool.
+   * In the sampled pool, a page that changed or that a moving caster reaches now or reached last frame takes the still
+   * page back, and the moving casters that reach it draw over it.
+   */
+  private drawPages(c: VirtualPassContext, origin: number, range: number): void {
+    const pages = this.pages!,
+      device = c.device,
+      section = sectionState(c),
+      stale = pages.stale,
+      touched = pages.touched,
+      before = pages.touchedBefore,
+      capacity = pages.capacity;
+    const depth = (view: GPUTextureView): GPURenderPassDescriptor => ({
+      colorAttachments: [],
+      depthStencilAttachment: { view, depthLoadOp: 'load', depthStoreOp: 'store' },
+    });
+    this.pagePipelines(device);
     let pass: GPURenderPassEncoder | undefined;
     try {
       for (let slot = 0; slot < capacity; slot++) {
         if (!stale[slot] || !pages.isUsed(slot)) continue;
         pass ??= c.encoder.beginRenderPass(depth(this.cachedView!));
         this.pageTarget(pass, slot, origin, range);
-        pass.setPipeline(this.clearPipeline);
+        pass.setPipeline(this.clearPipeline!);
         pass.draw(3);
         for (let i = 0; i < this.casters.length; i++) {
           const d = this.casters[i];
@@ -1062,7 +1086,7 @@ export class VirtualShadows implements EnginePlugin {
         this.nearestStale = true;
         pass ??= c.encoder.beginRenderPass(depth(this.entries[1].resource as GPUTextureView));
         this.pageTarget(pass, slot, origin, range);
-        pass.setPipeline(this.copyPipeline);
+        pass.setPipeline(this.copyPipeline!);
         pass.setBindGroup(0, this.copyGroup!);
         pass.draw(3);
         if (touched[slot]) {
@@ -1082,18 +1106,107 @@ export class VirtualShadows implements EnginePlugin {
     }
     pass?.end();
   }
+  /**
+   * `drawPages` with `drawShadow` casters. Such a source writes its uniform for `cascade` as it draws, so a page takes a
+   * slot and four pages go in each submit, on an encoder of their own: queue writes and submits run in order, where one
+   * encoder would see only the last write. These submits run before the frame's own, so what a source computes on the
+   * frame's encoder reaches its shadow a frame late.
+   */
+  private drawPagesInBatches(c: VirtualPassContext, origin: number, range: number): void {
+    const pages = this.pages!,
+      stale = pages.stale,
+      touched = pages.touched,
+      before = pages.touchedBefore;
+    this.pageBatches(c, origin, range, this.cachedView!, this.customStill, true, (slot) => !!stale[slot]);
+    this.pageBatches(c, origin, range, this.entries[1].resource as GPUTextureView, this.customMoving, false, (slot) => {
+      const due = !!(stale[slot] || touched[slot] || before[slot]);
+      return due;
+    });
+  }
+  private pageBatches(
+    c: VirtualPassContext,
+    origin: number,
+    range: number,
+    target: GPUTextureView,
+    custom: readonly ShadowSource[],
+    still: boolean,
+    due: (slot: number) => boolean,
+  ): void {
+    const pages = this.pages!,
+      device = c.device,
+      section = sectionState(c),
+      slots = this.batchSlots,
+      capacity = pages.capacity;
+    this.pagePipelines(device);
+    let count = 0;
+    const flush = () => {
+      if (!count) return;
+      const encoder = device.createCommandEncoder(),
+        // The frame's context with this batch's encoder: a source records its compute work on it and checks it.
+        context = Object.create(c, { encoder: { value: encoder } }) as VirtualPassContext,
+        matrices = this.batchMatrices;
+      for (const source of custom) source.prepareShadow?.({ context, matrices, cascades: count } as never);
+      const pass = encoder.beginRenderPass({
+        colorAttachments: [],
+        depthStencilAttachment: { view: target, depthLoadOp: 'load', depthStoreOp: 'store' },
+      });
+      try {
+        for (let i = 0; i < count; i++) {
+          const slot = slots[i],
+            drawn = this.batchContexts[i];
+          this.pageTarget(pass, slot, origin, range);
+          if (still) {
+            pass.setPipeline(this.clearPipeline!);
+            pass.draw(3);
+          } else {
+            this.nearestStale = true;
+            pass.setPipeline(this.copyPipeline!);
+            pass.setBindGroup(0, this.copyGroup!);
+            pass.draw(3);
+          }
+          if (still || pages.touched[slot]) {
+            for (let k = 0; k < this.casters.length; k++) {
+              const d = this.casters[k];
+              if (d.still === still && this.reaches(d, slot)) this.draw(pass, d, this.pageCamera, section);
+            }
+            drawn.context = context;
+            drawn.pass = pass;
+            for (const source of custom) source.drawShadow?.(drawn as never);
+            if (still || !pages.stale[slot]) this.stats.pagesRendered++;
+          }
+        }
+      } catch (error) {
+        try {
+          pass.end();
+        } catch {}
+        throw error;
+      }
+      pass.end();
+      device.queue.submit([encoder.finish()]);
+      if (!still) for (let i = 0; i < count; i++) pages.stale[slots[i]] = 0;
+      count = 0;
+    };
+    for (let slot = 0; slot < capacity; slot++) {
+      if (!due(slot) || !pages.isUsed(slot)) continue;
+      this.pageTarget(undefined, slot, origin, range);
+      this.batchMatrices.set(this.pageCamera, count * 16);
+      slots[count++] = slot;
+      if (count === SLOTS) flush();
+    }
+    flush();
+  }
   /** An unknown radius (NaN) reaches every page. */
   private reaches(d: Draw, slot: number): boolean {
     return d.radius !== d.radius || this.pages!.reaches(slot, d.x, d.y, d.radius);
   }
   /** Points `pass` at the page's rectangle (the same in both pools) and sets `pageCamera` to its matrix. */
-  private pageTarget(pass: GPURenderPassEncoder, slot: number, origin: number, range: number): void {
+  private pageTarget(pass: GPURenderPassEncoder | undefined, slot: number, origin: number, range: number): void {
     const pages = this.pages!,
       address = pages.address(slot, this.address),
       x = (slot % pages.poolPages) * PAGE_TEXELS,
       y = Math.floor(slot / pages.poolPages) * PAGE_TEXELS;
-    pass.setViewport(x, y, PAGE_TEXELS, PAGE_TEXELS, 0, 1);
-    pass.setScissorRect(x, y, PAGE_TEXELS, PAGE_TEXELS);
+    pass?.setViewport(x, y, PAGE_TEXELS, PAGE_TEXELS, 0, 1);
+    pass?.setScissorRect(x, y, PAGE_TEXELS, PAGE_TEXELS);
     pageMatrix(
       this.pageCamera,
       this.right,
@@ -1155,6 +1268,7 @@ export class VirtualShadows implements EnginePlugin {
     for (const r of this.sources) r.removeLighting?.();
     this.sources.length = 0;
     this.casters.length = this.receivers.length = this.customReceivers.length = 0;
+    this.customStill.length = this.customMoving.length = 0;
     this.loose.clear();
     this.lightingOwners.clear();
     this.release();

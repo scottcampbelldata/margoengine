@@ -70,12 +70,46 @@ scene.render.image_settings.file_format = 'OPEN_EXR'
 scene.render.image_settings.color_depth = '32'
 scene.world = None
 
-path = os.path.join(root, spec['model'])
-bpy.ops.import_scene.gltf(filepath=path)
-model = [o for o in scene.objects if o.type == 'MESH']
-modes = glb_materials(path)
+white = bpy.data.materials.new('white')
+tree = white.node_tree
+tree.nodes.clear()
+surface = tree.nodes.new('ShaderNodeBsdfDiffuse')
+surface.inputs['Color'].default_value = (0.8, 0.8, 0.8, 1)
+tree.links.new(surface.outputs[0], tree.nodes.new('ShaderNodeOutputMaterial').inputs['Surface'])
+
+
+def terrarium():
+    # A Terrarium elevation tile (metres = red * 256 + green + blue / 256 - 32768) as a grid mesh, row 0 of the file at -z.
+    image = bpy.data.images.load(os.path.join(root, spec['terrain']))
+    image.colorspace_settings.name = 'Non-Color'
+    width, height = image.size
+    pixels = list(image.pixels)
+    extent = spec['extent']
+    scale = spec['heightScale']
+    vertices = []
+    for j in range(height):
+        for i in range(width):
+            o = ((height - 1 - j) * width + i) * 4
+            metres = round(pixels[o] * 255) * 256 + round(pixels[o + 1] * 255) + round(pixels[o + 2] * 255) / 256 - 32768
+            vertices.append(tuple(axes(((i / (width - 1) - 0.5) * extent, metres * scale, (j / (height - 1) - 0.5) * extent))))
+    faces = [(j * width + i, j * width + i + 1, (j + 1) * width + i + 1, (j + 1) * width + i)
+             for j in range(height - 1) for i in range(width - 1)]
+    mesh = bpy.data.meshes.new('terrain')
+    mesh.from_pydata(vertices, [], faces)
+    mesh.materials.append(white)
+    land = bpy.data.objects.new('terrain', mesh)
+    scene.collection.objects.link(land)
+    return land
+
+
+land = terrarium() if 'terrain' in spec else None
+path = os.path.join(root, spec['model']) if 'model' in spec else None
+if path:
+    bpy.ops.import_scene.gltf(filepath=path)
+model = [o for o in scene.objects if o.type == 'MESH' and o is not land]
+modes = glb_materials(path) if path else {}
 for material in bpy.data.materials:
-    if material.node_tree:
+    if material.node_tree and material is not white:
         plain(material, modes)
 scale = spec.get('scale', 1)
 offset = spec.get('offset', [0, 0, 0])
@@ -85,23 +119,20 @@ for o in scene.objects:
         o.location = o.location * scale + axes(offset)
 bpy.context.view_layer.update()
 corners = [o.matrix_world @ Vector(c) for o in model for c in o.bound_box]
-print('BOUNDS gltf axes',
-      [round(min(c[0] for c in corners), 3), round(min(c[2] for c in corners), 3), round(min(-c[1] for c in corners), 3)],
-      [round(max(c[0] for c in corners), 3), round(max(c[2] for c in corners), 3), round(max(-c[1] for c in corners), 3)])
+if corners:
+    print('BOUNDS gltf axes',
+          [round(min(c[0] for c in corners), 3), round(min(c[2] for c in corners), 3), round(min(-c[1] for c in corners), 3)],
+          [round(max(c[0] for c in corners), 3), round(max(c[2] for c in corners), 3), round(max(-c[1] for c in corners), 3)])
 
-half = spec['ground']['size'] / 2
-y = spec['ground']['y']
-mesh = bpy.data.meshes.new('ground')
-mesh.from_pydata([(-half, -half, y), (half, -half, y), (half, half, y), (-half, half, y)], [], [(0, 1, 2, 3)])
-ground = bpy.data.objects.new('ground', mesh)
-scene.collection.objects.link(ground)
-white = bpy.data.materials.new('white')
-tree = white.node_tree
-tree.nodes.clear()
-surface = tree.nodes.new('ShaderNodeBsdfDiffuse')
-surface.inputs['Color'].default_value = (0.8, 0.8, 0.8, 1)
-tree.links.new(surface.outputs[0], tree.nodes.new('ShaderNodeOutputMaterial').inputs['Surface'])
-mesh.materials.append(white)
+ground = None
+if 'ground' in spec:
+    half = spec['ground']['size'] / 2
+    y = spec['ground']['y']
+    mesh = bpy.data.meshes.new('ground')
+    mesh.from_pydata([(-half, -half, y), (half, -half, y), (half, half, y), (-half, half, y)], [], [(0, 1, 2, 3)])
+    ground = bpy.data.objects.new('ground', mesh)
+    scene.collection.objects.link(ground)
+    mesh.materials.append(white)
 
 sun = bpy.data.lights.new('sun', 'SUN')
 sun.energy = 1
@@ -148,6 +179,18 @@ def write(tag, values):
     image.file_format = 'PNG'
     image.save()
 
+
+if land:
+    # A land shadows itself: the same render with its shadow rays off is the light without shadows.
+    shadowed = render('with')
+    land.visible_shadow = False
+    clear = render('without')
+    write('visibility', [min(1, a / b) if b > 1e-6 else 1 for a, b in zip(shadowed, clear)])
+    # A slope turned from the sun holds no light to shadow, so the ratio means nothing there: it is left out as a model
+    # pixel is. Flat facets here and smooth normals in the engine also turn away at slightly different places.
+    top = max(clear)
+    write('mask', [1 if b < 0.015 * top else 0 for b in clear])
+    sys.exit(0)
 
 # The model casts but the camera does not see it, so every pixel shows the ground.
 for o in model:

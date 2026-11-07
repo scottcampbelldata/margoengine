@@ -160,6 +160,10 @@ const ASSETS = [
     'packages/shadows/test/outside/reference.py',
     'Shadow reference pictures in packages/shadows/test/fixtures/outside: rendered by Blender Cycles from the Khronos models above (their licences apply), made by this script',
   ],
+  [
+    'packages/shadows/test/fixtures/rainier-terrarium.png',
+    'Mount Rainier elevation, Terrarium tile 10/165/360 from the Terrain Tiles on AWS open data set (Mapzen); United States 3DEP and global GMTED2010 and SRTM terrain data courtesy of the U.S. Geological Survey',
+  ],
   ['examples/assets/kaykit/LICENSE-adventurers.txt', 'KayKit Adventurers (Kay Lousberg, CC0)'],
   ['examples/assets/kaykit/LICENSE-character-animations.txt', 'KayKit Character Animations (Kay Lousberg, CC0)'],
   ['examples/assets/kaykit/LICENSE-dungeon.txt', 'KayKit Dungeon (Kay Lousberg, CC0)'],

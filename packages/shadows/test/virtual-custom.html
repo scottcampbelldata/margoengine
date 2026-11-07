@@ -1,0 +1,56 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>VirtualShadows: drawShadow casters</title><style>body{margin:0;background:#000}canvas{display:block;width:384px;height:384px}</style></head><body><canvas width="384" height="384"></canvas>
+<script type="module">
+// Sources with `drawShadow` over a floor: culled parts, scatter and voxels. virtual-custom-browser.mjs compares each one's
+// shadow in VirtualShadows with its shadow in Shadows, whose cascades it has always cast into.
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
+import {Engine,PbrMaterial,box} from '/packages/core/dist/index.js';
+import {Shadows} from '/packages/shadows/dist/index.js';
+import {VirtualShadows} from '/packages/shadows/dist/virtual.js';
+import {CulledParts} from '/packages/culling/dist/parts.js';
+import {Scatter} from '/packages/scatter/dist/index.js';
+import {BlockTypes,VoxelWorld} from '/packages/voxel/dist/index.js';
+import {BlockTextures,VoxelRenderer} from '/packages/voxel/dist/render.js';
+const canvas=document.querySelector('canvas'),errors=[];
+const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[0,34,16],target:[0,0,0],fov:50,near:0.1,far:300}}),device=engine.gpu;
+engine.stop();
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+engine.lighting.direction.set([-0.5,0.8,0.33]);
+engine.lighting.radiance.set([3,3,3,0]);
+const floor=engine.createMesh().setGeometry(box(80,0.2,80)).setPosition([0,-0.1,0]);
+const frames=async(n)=>{device.pushErrorScope('validation');for(let i=0;i<n;i++){engine.render();await device.queue.onSubmittedWorkDone();}const e=await device.popErrorScope();if(e)errors.push(e.message);};
+const grid=(n,step,y)=>{const out=[];for(let i=0;i<n;i++)for(let j=0;j<n;j++)out.push(1,0,0,0,0,1,0,0,0,0,1,0,(i-(n-1)/2)*step,y,(j-(n-1)/2)*step,1);return new Float32Array(out);};
+const pixel=(r,g,b,a=255)=>({width:16,height:16,data:Uint8Array.from({length:16*16*4},(_,i)=>[r,g,b,a][i%4])});
+const sources={
+  parts:()=>CulledParts.attach(engine,[{geometry:box(1.5,5,1.5),material:new PbrMaterial({color:'#ffffff'}),transforms:grid(4,5,2.5),capacity:32}],{culling:'none'}),
+  scatter:()=>Scatter.attach(engine,box(1.2,5,1.2),{count:200,area:[24,24],scale:[1,1],lod:[300,301,302],color:[0.8,0.8,0.8]}),
+  voxels:async()=>{
+    const blocks=new BlockTypes(),stone=blocks.define('stone',{textures:0});
+    const world=new VoxelWorld({blocks});
+    world.addChunk(0,0,0);world.addChunk(-1,0,0);world.addChunk(0,0,-1);world.addChunk(-1,0,-1);
+    for(const key of [[0,0],[-1,0],[0,-1],[-1,-1]])world.getChunk(key[0],0,key[1]).fillLight(0xf0);
+    const cells=[];for(let x=-8;x<8;x+=4)for(let z=-8;z<8;z+=4)for(let y=0;y<6;y++)cells.push([x,y,z,stone]);
+    world.setBlocks(cells.flat());
+    const v=VoxelRenderer.attach(engine,{world,textures:new BlockTextures({size:16,images:[pixel(255,255,255),pixel(0,0,0)]})});
+    for(let i=0;i<200&&!(!world.dirty.size&&v.stats.pending===0&&v.stats.draws>0&&!v.stats.compiling);i++){await frames(1);await new Promise(r=>setTimeout(r,10));}
+    return v;
+  },
+};
+let effect,source;
+window.check={
+  // Shows `name` cast by `kind`; `still` adds it as static. Returns the effect's stats.
+  async show(name,kind,still){
+    effect?.dispose();effect=undefined;source?.dispose?.();source=undefined;
+    if(name){source=await sources[name]();await waitForPipelines(()=>frames(1));await frames(2);}
+    const options={filter:'hard',distance:100};
+    if(kind==='shadows')effect=Shadows.attach(engine,{...options,resolution:4096,cascades:1,casterMargin:60,bias:0.0002});
+    if(kind==='virtual')effect=VirtualShadows.attach(engine,{...options,casterMargin:60,bias:0.01});
+    if(effect){effect.add(floor,{castShadow:false});if(name)effect.add(source,{static:!!still});}
+    await waitForPipelines(()=>frames(1));await frames(kind==='virtual'?40:4);
+    return {errors,stats:effect?.stats};
+  },
+  // Moves the camera's look a little: pages come and go, and the source draws them afresh.
+  async pan(x){engine.camera.target=[x,0,0];engine.camera.position=[x,34,16];await frames(30);return errors;},
+  async stillFrames(n){const counts=[];for(let i=0;i<n;i++){await frames(1);counts.push(effect.stats.pagesRendered);}return counts;},
+};
+window.ready=true;
+</script></body></html>

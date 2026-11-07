@@ -2,10 +2,12 @@
 <script type="module">
 // The scene of scenes.json as Margo draws it: a white ground, a real glTF model, the sun alone (no ambient). check.mjs
 // reads each frame and divides it by the frame with no shadows, which is the same quantity reference.py takes from Cycles.
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
 import {Engine,box} from '/packages/core/dist/index.js';
 import {loadGLTF} from '/packages/gltf-pro/dist/index.js';
 import {Shadows} from '/packages/shadows/dist/index.js';
 import {VirtualShadows} from '/packages/shadows/dist/virtual.js';
+import {Terrain} from '/packages/terrain/dist/index.js';
 const canvas=document.querySelector('canvas'),errors=[];
 const scenes=await (await fetch('/packages/shadows/test/outside/scenes.json')).json();
 const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[0,2,1],target:[0,0,0],fov:50,near:0.05,far:100}}),device=engine.gpu;
@@ -13,19 +15,42 @@ engine.stop();
 device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
 engine.lighting.radiance.set([0.5,0.5,0.5,0]);
 let ground,model,effect,scene;
+// A Terrarium elevation tile's heights: metres = red * 256 + green + blue / 256 - 32768, read with no colour management.
+const terrarium=async(url)=>{
+  const bitmap=await createImageBitmap(await (await fetch(url)).blob(),{colorSpaceConversion:'none',premultiplyAlpha:'none'});
+  const c=new OffscreenCanvas(bitmap.width,bitmap.height).getContext('2d',{willReadFrequently:true});c.drawImage(bitmap,0,0);
+  const d=c.getImageData(0,0,bitmap.width,bitmap.height).data,out=new Float32Array(bitmap.width*bitmap.height);
+  for(let i=0;i<out.length;i++)out[i]=d[i*4]*256+d[i*4+1]+d[i*4+2]/256-32768;
+  return {width:bitmap.width,height:bitmap.height,heights:out};
+};
+const land=async(s)=>{
+  const {width,height,heights}=await terrarium('/'+s.terrain),half=s.extent/2;
+  const layer=(lo,hi)=>({height:[-1e6,1e6],slope:[lo,hi],scale:1});
+  return Terrain.attach(engine,{origin:[-half,-half],size:[s.extent,s.extent],heightScale:s.heightScale,cellSize:1,resolution:256,levels:2,
+    layers:[layer(0,0.25),layer(0.25,0.5),layer(0.5,0.75),layer(0.75,1)],
+    textures(gpu){
+      const heightmap=gpu.createTexture({size:[width,height],format:'r32float',usage:6}),layers=gpu.createTexture({size:[1,1,4],format:'rgba8unorm-srgb',usage:6});
+      gpu.queue.writeTexture({texture:heightmap},heights,{bytesPerRow:width*4,rowsPerImage:height},[width,height]);
+      gpu.queue.writeTexture({texture:layers},new Uint8Array(16).fill(231),{bytesPerRow:4,rowsPerImage:1},[1,1,4]);
+      return {heightmap,layers};
+    }});
+};
 const frames=async(n)=>{device.pushErrorScope('validation');for(let i=0;i<n;i++){engine.render();await device.queue.onSubmittedWorkDone();}const e=await device.popErrorScope();if(e)errors.push(e.message);};
 window.check={
   // Loads a scene without shadows.
   async scene(name){
     const s=scene=scenes[name],length=Math.hypot(...s.toLight);
     effect?.dispose();effect=undefined;model?.dispose();ground?.dispose?.();
-    ground=engine.createMesh().setGeometry(box(s.ground.size,0.02,s.ground.size)).setPosition([0,s.ground.y-0.01,0]);
-    model=await loadGLTF(engine,'/'+s.model);
-    model.root.setScale([s.scale??1,s.scale??1,s.scale??1]);
-    if(s.offset)model.root.setPosition(s.offset);
+    if(s.terrain){ground=undefined;model=await land(s);}
+    else{
+      ground=engine.createMesh().setGeometry(box(s.ground.size,0.02,s.ground.size)).setPosition([0,s.ground.y-0.01,0]);
+      model=await loadGLTF(engine,'/'+s.model);
+      model.root.setScale([s.scale??1,s.scale??1,s.scale??1]);
+      if(s.offset)model.root.setPosition(s.offset);
+    }
     engine.lighting.direction.set(s.toLight.map(v=>v/length));
-    Object.assign(engine.camera,s.camera);
-    await frames(2);
+    Object.assign(engine.camera,{near:0.05,far:100},s.camera);
+    await waitForPipelines(()=>frames(1));await frames(2);
     return errors;
   },
   // control 'solid': the model's casters without their masks, so the check must fail (cases.mjs).
@@ -33,9 +58,10 @@ window.check={
     effect?.dispose();
     const c=kind==='virtual'?VirtualShadows:Shadows;
     effect=c.attach(engine,options);
-    effect.add(ground,{castShadow:false});
+    if(ground)effect.add(ground,{castShadow:false});
     const masks=scene.masksOnly?model.shadowPrimitives.filter(p=>p.cutoff>0):model.shadowPrimitives;
-    if(control==='solid')effect.add({shadowPrimitives:masks.map(p=>({...p,alphaTexture:undefined,alphaSampler:undefined,cutoff:0}))});
+    if(scene.terrain)effect.add(model,{static:true,castShadow:control!=='nocast'});
+    else if(control==='solid')effect.add({shadowPrimitives:masks.map(p=>({...p,alphaTexture:undefined,alphaSampler:undefined,cutoff:0}))});
     else effect.add(scene.masksOnly?{shadowPrimitives:masks}:model);
     await frames(kind==='virtual'?30:3);
     return errors;

@@ -85,7 +85,8 @@ try {
         out[o + 1] = hidden ? 0 : theirs * 255;
         out[o + 2] = hidden ? 0 : Math.abs(ours - theirs) * 255;
         out[o + 3] = 255;
-        if (hidden) continue;
+        // No sun here in the engine's own frame: light over no light is no measurement, as in the reference's mask.
+        if (hidden || base <= 0.004) continue;
         count++;
         difference += Math.abs(ours - theirs);
         const a = ours < 0.5,

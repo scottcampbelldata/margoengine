@@ -13,5 +13,13 @@
     "camera": { "position": [0, 6.5, 5], "target": [0, 0, 1.6], "fov": 72 },
     "ground": { "size": 30, "y": 0 },
     "size": 512
+  },
+  "rainier": {
+    "terrain": "packages/shadows/test/fixtures/rainier-terrarium.png",
+    "extent": 270,
+    "heightScale": 0.01,
+    "toLight": [-0.8, 0.3, 0.35],
+    "camera": { "position": [0, 200, 60], "target": [0, 0, 0], "fov": 50, "near": 1, "far": 1000 },
+    "size": 512
   }
 }
