@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10520894,
+  "total": 10522608,
   "history": [
     {
       "date": "2026-10-24",
@@ -3590,6 +3590,12 @@
       "commit": "84b605cd8",
       "reason": "@margoengine/weather/hail: lit stones and splash chips (lit and splashes options)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "ad570c7e4",
+      "reason": "new optional entry @margoengine/weather/drive (WeatherDrive: cloud and fog from the state into sky, clouds and fog); nothing else grows",
+      "grew": 1
     }
   ],
   "items": {
@@ -4286,6 +4292,7 @@
     "@margoengine/voxel/vox": 12969,
     "@margoengine/water": 20185,
     "@margoengine/weather": 5230,
+    "@margoengine/weather/drive": 1714,
     "@margoengine/weather/hail": 5489,
     "@margoengine/weather/puddles": 4070,
     "@margoengine/weather/regions": 2504,

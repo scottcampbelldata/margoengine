@@ -1,0 +1,51 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Drive browser check</title><style>body{margin:0}canvas{display:block;width:256px;height:192px}</style></head><body><canvas></canvas>
+<script type="module">
+// Real-GPU proof for @margoengine/weather/drive: the real Sky (cloud sheet), VolumetricClouds and environment Fog take
+// what WeatherDrive writes from a WeatherMachine, with no validation error, and draw it: overcast covers the sky that
+// clear leaves open, and the fog preset fogs the ground that clear leaves clear.
+import {Engine,PbrMaterial,box} from '/packages/core/dist/index.js';
+import {sceneSamples} from '/packages/core/dist/quality.js';
+import {Bloom} from '/packages/post/dist/bloom.js';
+import {Sky} from '/packages/sky/dist/index.js';
+import {VolumetricClouds} from '/packages/sky/dist/volumetric-clouds.js';
+import {Fog} from '/packages/environment/dist/index.js';
+import {WeatherMachine} from '/packages/weather/dist/index.js';
+import {WeatherDrive} from '/packages/weather/dist/drive.js';
+if(new URLSearchParams(location.search).get('samples')==='1')globalThis.margoLow=1;
+const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,2,0],target:[0,8,-30],near:0.1,far:5000}}),device=engine.gpu,errors=[];
+engine.stop();
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const post=Bloom.attach(engine,{strength:0,threshold:100,exposure:0});
+engine.createMesh().setGeometry(box(400,0.2,400)).setMaterial(new PbrMaterial({color:'#506040',roughness:0.9})).setPosition([0,-0.1,-150]);
+const sky=Sky.attach(engine,{hours:12,clouds:{coverage:0.45}});
+const clouds=VolumetricClouds.attach(engine,{sky,depth:()=>post.depthTexture,evolution:0});
+const fog=Fog.attach(engine,{color:'#c0c4c8'});
+const weather=new WeatherMachine('clear');
+const drive=WeatherDrive.attach(engine,{weather,sky,clouds,fog,advance:false});
+const module=device.createShaderModule({code:'@group(0) @binding(0) var image:texture_2d<f32>;@group(0) @binding(1) var<storage,read_write> result:array<vec4f>;@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u){let s=textureDimensions(image);if(any(id.xy>=s)){return;}result[id.y*s.x+id.x]=textureLoad(image,vec2i(id.xy),0);}'});
+const pipeline=device.createComputePipeline({layout:'auto',compute:{module,entryPoint:'main'}});
+async function read(texture){
+ const bytes=texture.width*texture.height*16,output=device.createBuffer({size:bytes,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),staging=device.createBuffer({size:bytes,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+ const encoder=device.createCommandEncoder(),pass=encoder.beginComputePass();pass.setPipeline(pipeline);
+ pass.setBindGroup(0,device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:texture.createView()},{binding:1,resource:{buffer:output}}]}));
+ pass.dispatchWorkgroups(Math.ceil(texture.width/8),Math.ceil(texture.height/8));pass.end();encoder.copyBufferToBuffer(output,0,staging,0,bytes);device.queue.submit([encoder.finish()]);
+ await staging.mapAsync(GPUMapMode.READ);const data=new Float32Array(staging.getMappedRange()).slice();staging.unmap();output.destroy();staging.destroy();return data;
+}
+async function shot(){for(let k=0;k<3;k++){engine.render({delta:0});await device.queue.onSubmittedWorkDone();}return read(post.sceneTexture);}
+// Pixels whose colour moved by more than 2 percent of their light, in the top (sky) and bottom (ground) thirds.
+function moved(a,b){const W=post.sceneTexture.width,H=post.sceneTexture.height;let sky=0,ground=0;for(let y=0;y<H;y++)for(let x=0;x<W;x++){const p=(y*W+x)*4,la=a[p]+a[p+1]+a[p+2],lb=b[p]+b[p+1]+b[p+2];if(Math.abs(la-lb)>0.02*Math.max(la,1e-3)){if(y<H/3)sky++;else if(y>H*2/3)ground++;}}return {sky,ground,third:W*Math.floor(H/3)};}
+window.check={samples:sceneSamples,
+ async run(){
+  const out={};device.pushErrorScope('validation');
+  const clear=await shot();out.clearSettings=drive.settings;out.clearFog=fog.density;
+  weather.set('overcast');const overcast=await shot();out.overcast=moved(clear,overcast);out.overcastCoverage=clouds.options.coverage;out.sheet=sky.options.clouds.coverage;
+  weather.set('clear');const again=await shot();out.back=moved(clear,again);
+  weather.set({fog:1,cloud:0.05});const foggy=await shot();out.fog=moved(clear,foggy);out.fogDensity=fog.density;
+  drive.dispose();
+  const error=await device.popErrorScope();
+  out.validation=error?.message??null;out.errors=errors.splice(0);
+  return out;
+ }
+};
+window.ready=true;
+</script></body></html>

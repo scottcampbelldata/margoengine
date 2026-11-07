@@ -36,4 +36,4 @@ export {
   wetRoughness,
   type SurfaceResponse,
 } from './surface.js';
-export { fogDensity, hailSettings, skyWeather, windAt, type HailSettings, type SkyWeatherSettings } from './drive.js';
+export { fogDensity, hailSettings, skyWeather, windAt, type HailSettings, type SkyWeatherSettings } from './sky-settings.js';

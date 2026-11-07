@@ -1,75 +1,210 @@
-// Turning a weather state into the settings of the pieces that draw and sound it: `@margoengine/sky`'s Weather (rain,
-// snow, lightning), this package's Hail, and a fog density. Plain functions over plain objects, so they work with any
-// engine and are easy to test.
+// The weather drawn from its state with no wiring by hand: `WeatherDrive` reads a weather (a `WeatherMachine`, or
+// `WeatherRegions` sampled at the camera) every frame and writes its numbers into whatever draws it: the sky's cloud
+// sheet and fog, `VolumetricClouds`, `@margoengine/environment`'s `Fog` and `VolumetricFog`, the sky's rain and snow and
+// this package's `Hail`. Each target is duck-typed, so this entry imports none of those packages.
+import { MargoError } from '@margoengine/math/errors';
+import { fogDensity, hailSettings, skyWeather, windAt } from './sky-settings.js';
 import type { WeatherState } from './state.js';
 import type { WindField } from './wind.js';
 
-/** The part of `@margoengine/sky`'s `WeatherOptions` that a state decides. */
-export interface SkyWeatherSettings {
-  /** Rain or snow, `'sleet'` while both fall, or `'none'`. */
-  precipitation: 'rain' | 'snow' | 'sleet' | 'none';
-  /** Intensity of that precipitation, 0..1: for sleet, rain and snow together. */
-  intensity: number;
-  /** Share of the precipitation that is snow, 0..1: what the sky Weather draws as snow in sleet. */
-  snowShare: number;
-  /** Always 0: the machine already blends, so the sky's own easing is switched off. */
-  fadeSeconds: number;
-  /** Horizontal wind `[x, z]` in metres per second. */
-  wind: [number, number];
-  /** Lightning settings, or `undefined` when the state has no lightning (assign it to remove storms). */
-  lightning: { rate: number; threshold: number } | undefined;
+/** The weather to follow: a `WeatherMachine`, or anything with a `state` (and optionally `update`, `wind` and `time`). */
+export interface DriveSource {
+  /** The weather now. */
+  readonly state: WeatherState;
+  /** Steps the weather; called with each frame's delta when `advance` is on. */
+  update?(delta: number): unknown;
+  /** Its wind field, sampled at the camera for the wind of rain, snow and hail. */
+  readonly wind?: WindField;
+  /** Seconds of weather time, for the wind field. */
+  readonly time?: number;
+}
+
+/** The sky (`Sky` from `@margoengine/sky`): its cloud sheet and its fog. */
+export interface SkyTarget {
+  readonly options: {
+    clouds?: { coverage?: number; speed?: number; height?: number };
+    fog?: { density?: number; falloff?: 'exp' | 'exp2' };
+  };
+}
+/** A cloud layer (`VolumetricClouds` from `@margoengine/sky/volumetric-clouds`). */
+export interface CloudLayerTarget {
+  readonly options: { coverage?: number; density?: number; wind?: readonly [number, number] };
+}
+/** Scene fog with a squared falloff (`Fog` from `@margoengine/environment`). */
+export interface SceneFogTarget {
+  density: number;
+}
+/** A fog volume (`VolumetricFog` from `@margoengine/environment`): extinction per metre. */
+export interface FogVolumeTarget {
+  readonly options: { density?: number };
+}
+/** Rain and snow (`Weather` from `@margoengine/sky/weather`). */
+export interface PrecipitationTarget {
+  readonly options: object;
+}
+
+/** {@link WeatherDrive} settings, read every frame from `drive.options`. */
+export interface DriveOptions {
+  /** The weather to follow. */
+  weather: DriveSource;
+  /** Step the weather with each frame's delta (call its `update` yourself when false). Default true. */
+  advance?: boolean;
+  /** The sky: when it has them, its cloud sheet's coverage and its fog's density. */
+  sky?: SkyTarget;
+  /** Volumetric cloud layers: coverage, density and wind. */
+  clouds?: CloudLayerTarget | readonly CloudLayerTarget[];
+  /** Scene fog (squared falloff): its density. */
+  fog?: SceneFogTarget;
+  /** Fog volumes: their extinction. */
+  fogVolumes?: FogVolumeTarget | readonly FogVolumeTarget[];
+  /** The sky's rain and snow: `skyWeather` of the state. */
+  precipitation?: PrecipitationTarget;
+  /** Hail: `hailSettings` of the state. */
+  hail?: PrecipitationTarget;
+  /** Where to sample the wind (the camera); default the origin. Set it each frame, or give `listener`. */
+  position?: readonly [number, number, number];
+  /** Something whose `position` is the camera, read each frame (an engine's `camera`). */
+  listener?: { readonly position: ArrayLike<number> };
+  /** Wind aloft over the wind at the ground, for the cloud drift. Default 3. */
+  windAloft?: number;
+}
+
+/** The numbers the drive writes for a state; exported so you can drive anything else the same way. */
+export interface DriveSettings {
+  /** Cloud cover for a cloud sheet or layer, 0..1. */
+  coverage: number;
+  /** Volumetric cloud extinction per metre: 0.02 fair-weather, rising to 0.08 in storms. */
+  cloudDensity: number;
+  /** Cloud drift `[x, z]` in metres per second. */
+  cloudWind: [number, number];
+  /** Fog extinction per metre (`fogDensity`), for an exponential fog or a fog volume. */
+  extinction: number;
+  /** The density of a squared-falloff fog that leaves the same 5 percent of contrast at the same distance. */
+  squaredDensity: number;
 }
 
 /**
- * Settings for `@margoengine/sky`'s Weather from a state: assign them with `Object.assign(weather.options, skyWeather(state))`.
- * While rain and snow both fall (a rain-to-snow blend, or the sleet preset) it is `'sleet'`: the sky Weather draws each
- * kind with its own share, so the rain thins as the snow thickens. `wind` is the horizontal wind at the camera from `field`, or the state's mean
- * wind when no field is given. Lightning needs `state.lightning` above 0; its rate is up to 12 strikes a minute.
+ * The settings a state gives. Cloud coverage is `cloud`; layer density rises from 0.02 by 0.06 times the strongest
+ * of rain, snow, hail and lightning (cumulus is about 0.02 to 0.1 per metre); clouds drift with the mean wind times
+ * `windAloft`. Fog: `fogDensity`, an extinction sigma, for which contrast falls to 5 percent at 3 / sigma; a fog of
+ * `1 - exp(-(d * k)^2)` reaches that at the same distance when k = sigma / sqrt(3).
  */
-export function skyWeather(state: WeatherState, wind?: readonly [number, number]): SkyWeatherSettings {
-  const heavier = state.snow > state.rain ? 'snow' : 'rain',
-    both = state.rain > 0.001 && state.snow > 0.001,
-    total = state.rain + state.snow,
-    amount = both ? Math.min(1, total) : Math.max(state.rain, state.snow);
-  const w: [number, number] = wind
-    ? [wind[0], wind[1]]
-    : [Math.sin(state.windDirection) * state.wind, Math.cos(state.windDirection) * state.wind];
+export function driveSettings(state: WeatherState, windAloft = 3): DriveSettings {
+  const extinction = fogDensity(state),
+    storm = Math.max(state.rain, state.snow, state.hail, state.lightning),
+    k = state.wind * windAloft;
   return {
-    precipitation: amount > 0.001 ? (both ? 'sleet' : heavier) : 'none',
-    intensity: amount,
-    snowShare: total > 0 ? state.snow / total : 0,
-    fadeSeconds: 0,
-    wind: w,
-    // The storm threshold is set to 0 so any intensity can produce lightning; the state's activity sets the rate.
-    lightning: state.lightning > 0.001 && state.rain > 0.05 ? { rate: 12 * state.lightning, threshold: 0 } : undefined,
+    coverage: state.cloud,
+    cloudDensity: 0.02 + 0.06 * storm,
+    cloudWind: [Math.sin(state.windDirection) * k, Math.cos(state.windDirection) * k],
+    extinction,
+    squaredDensity: extinction / Math.sqrt(3),
   };
 }
 
-/** The part of {@link HailOptions} that a state decides. */
-export interface HailSettings {
-  /** Hail intensity, 0..1. */
-  intensity: number;
-  /** Horizontal wind `[x, z]` in metres per second. */
-  wind: [number, number];
-}
+const list = <T>(value: T | readonly T[] | undefined): readonly T[] =>
+  value === undefined ? [] : Array.isArray(value) ? (value as readonly T[]) : [value as T];
 
-/** Settings for a Hail from a state; `wind` as for {@link skyWeather}. */
-export function hailSettings(state: WeatherState, wind?: readonly [number, number]): HailSettings {
-  return { intensity: state.hail, wind: skyWeather(state, wind).wind };
+/** Throws for an invalid field of `o`. */
+export function validateDrive(o: DriveOptions): void {
+  if (typeof o !== 'object' || o === null)
+    throw new TypeError('WeatherDrive options must be an object; pass {weather}');
+  if (typeof o.weather !== 'object' || o.weather === null || typeof o.weather.state !== 'object')
+    throw new TypeError('WeatherDrive weather needs a state; pass a WeatherMachine');
+  if (o.advance !== undefined && typeof o.advance !== 'boolean')
+    throw new TypeError('WeatherDrive advance must be true or false');
+  if (
+    o.windAloft !== undefined &&
+    (typeof o.windAloft !== 'number' || !Number.isFinite(o.windAloft) || o.windAloft < 0 || o.windAloft > 20)
+  )
+    throw new RangeError('WeatherDrive windAloft must be a number from 0 to 20; pass a finite value in range');
+  for (const [name, target] of [
+    ['sky', o.sky],
+    ['precipitation', o.precipitation],
+    ['hail', o.hail],
+    ...list(o.clouds).map((c) => ['clouds', c] as const),
+    ...list(o.fogVolumes).map((c) => ['fogVolumes', c] as const),
+  ] as const)
+    if (target !== undefined && (typeof target !== 'object' || target === null || typeof target.options !== 'object'))
+      throw new TypeError(`WeatherDrive ${name} needs an object with options; pass the attached effect`);
+  if (o.fog !== undefined && (typeof o.fog !== 'object' || o.fog === null || typeof o.fog.density !== 'number'))
+    throw new TypeError('WeatherDrive fog needs a numeric density; pass an environment Fog');
 }
 
 /**
- * Fog density (per metre) for a state, for `@margoengine/sky`'s fog or any exponential fog: from 0.0002 (clear, visible to
- * about 10 km) at fog 0 to 0.02 (visible to about 150 m) at fog 1, interpolated in log space so each step of `fog` feels
- * like the same change. Rain and snow thicken it a little.
+ * Writes a weather's state into the sky, clouds, fog, rain and hail each frame. `WeatherDrive.attach(engine, options)`
+ * runs it as an engine plugin (and steps the weather); without an engine call `update(delta)` yourself.
+ * @throws TypeError / RangeError on invalid options; MargoError `'disposed'` after `dispose()`.
+ * @example
+ * WeatherDrive.attach(engine, {weather: machine, sky, clouds, listener: engine.camera});
  */
-export function fogDensity(state: WeatherState): number {
-  const thickness = Math.min(1, state.fog + 0.15 * Math.max(state.rain, state.snow, state.hail));
-  return 0.0002 * (0.02 / 0.0002) ** thickness;
-}
+export class WeatherDrive {
+  readonly name: string = 'weather-drive';
+  private disposed = false;
+  private engine?: { removePlugin(name: string): void };
+  private last?: DriveSettings;
 
-/** Horizontal wind `[x, z]` at world position `(x, z)` and time `t` from a field, for {@link skyWeather}. */
-export function windAt(field: WindField, x: number, y: number, z: number, t: number): [number, number] {
-  const v = field.sample(x, y, z, t);
-  return [v[0], v[2]];
+  constructor(readonly options: DriveOptions) {
+    validateDrive(options);
+  }
+
+  /** Adds the drive to an engine (anything with `use`); it then runs before every frame. */
+  static attach(engine: { use(plugin: object): unknown }, options: DriveOptions): WeatherDrive {
+    const drive = new WeatherDrive(options);
+    engine.use(drive);
+    return drive;
+  }
+
+  /** What was written last, or undefined before the first update. */
+  get settings(): DriveSettings | undefined {
+    return this.last;
+  }
+
+  /** Steps the weather (with `advance`) and writes its state into every target. */
+  update(delta = 0): DriveSettings {
+    if (this.disposed) throw new MargoError('disposed', 'WeatherDrive is disposed; attach a new WeatherDrive');
+    const o = this.options;
+    validateDrive(o);
+    if (typeof delta !== 'number' || !Number.isFinite(delta) || delta < 0)
+      throw new RangeError('Invalid WeatherDrive delta; pass a finite delta of 0 or more seconds.');
+    if (o.advance ?? true) o.weather.update?.(delta);
+    const state = o.weather.state,
+      s = driveSettings(state, o.windAloft ?? 3);
+    if (o.sky) {
+      const sky = o.sky.options;
+      if (sky.clouds) sky.clouds.coverage = s.coverage;
+      if (sky.fog) sky.fog.density = Math.min(1, sky.fog.falloff === 'exp' ? s.extinction : s.squaredDensity);
+    }
+    for (const layer of list(o.clouds))
+      Object.assign(layer.options, { coverage: s.coverage, density: s.cloudDensity, wind: s.cloudWind });
+    if (o.fog) o.fog.density = s.squaredDensity;
+    for (const volume of list(o.fogVolumes)) volume.options.density = s.extinction;
+    if (o.precipitation || o.hail) {
+      const p = o.listener?.position ?? o.position ?? [0, 0, 0],
+        wind = o.weather.wind ? windAt(o.weather.wind, p[0], p[1], p[2], o.weather.time ?? 0) : undefined;
+      if (o.precipitation) Object.assign(o.precipitation.options, skyWeather(state, wind));
+      if (o.hail) Object.assign(o.hail.options, hailSettings(state, wind));
+    }
+    return (this.last = s);
+  }
+
+  /** Engine plugin hooks. */
+  setup(engine: { removePlugin(name: string): void }): void {
+    if (this.disposed) throw new MargoError('disposed', 'WeatherDrive is disposed; attach a new WeatherDrive');
+    this.engine = engine;
+  }
+  onPreUpdate(delta: number): void {
+    this.update(delta);
+  }
+
+  /** Stops driving; the targets keep their last values. */
+  dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
+    this.engine?.removePlugin(this.name);
+    this.engine = undefined;
+  }
+  [Symbol.dispose](): void {
+    this.dispose();
+  }
 }

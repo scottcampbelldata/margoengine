@@ -7,6 +7,7 @@
 // water stands on the ground and not on walls, and rain rings it.
 // snow: the snow WGSL matches its JavaScript twin; no cover changes nothing, full cover whitens the ground and not a
 // wall, the snow lifts a surface by its depth on screen, and it chains with puddles.
+// drive: WeatherDrive puts a machine's cloud and fog into the real Sky, VolumetricClouds and environment Fog.
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
@@ -66,6 +67,16 @@ const checks = {
     assert.ok(Math.abs(r.edgeDeep - r.expectedDeep) <= 1.5, `snowed edge ${r.edgeDeep} vs ${r.expectedDeep}`);
     assert.ok(r.edgeBare - r.edgeDeep >= 5, `the snow lifts the edge by ${r.edgeBare - r.edgeDeep} rows`);
     return `snow maths worst ${r.maths.worst}, ground white ${r.groundWhite}/${r.groundPixels}, edge ${r.edgeBare} -> ${r.edgeDeep} (expected ${r.expectedBare.toFixed(1)} -> ${r.expectedDeep.toFixed(1)})`;
+  },
+  drive(r) {
+    assert.equal(r.clearSettings.coverage, 0.05);
+    assert.equal(r.sheet, 0.9, "the sky's cloud sheet takes the overcast cover");
+    assert.equal(r.overcastCoverage, 0.9, 'the cloud layer takes it');
+    assert.ok(r.overcast.sky > 0.3 * r.overcast.third, `overcast covers the sky: ${r.overcast.sky} of ${r.overcast.third}`);
+    assert.equal(r.back.sky + r.back.ground, 0, 'back to clear draws the clear frame again');
+    assert.ok(r.fogDensity > 10 * r.clearFog, `fog density ${r.fogDensity} against ${r.clearFog}`);
+    assert.ok(r.fog.ground > 0.5 * r.fog.third, `fog over the ground: ${r.fog.ground} of ${r.fog.third}`);
+    return `drive overcast ${r.overcast.sky}/${r.overcast.third} sky pixels, fog ${r.fog.ground}/${r.fog.third} ground pixels`;
   },
 };
 const wanted = process.argv.slice(2).length ? process.argv.slice(2) : Object.keys(checks);

@@ -147,6 +147,38 @@ wind, ground wetness and snow follow the place; `arrival(front, x, z)` gives the
 
 `skyWeather(state, wind?)` returns the sky `Weather` settings for a state: `Object.assign(weather.options, skyWeather(state))`. `hailSettings` does the same for `Hail`. `fogDensity(state)` gives an exponential-fog density per metre (0.0002 clear to 0.02 thick).
 
+### Clouds and fog from the state, automatically
+
+`WeatherDrive` from `margoengine/weather/drive` does that wiring for you every frame: it steps the weather and writes
+its cloud and fog into the sky's cloud sheet and fog, `VolumetricClouds` layers, `@margoengine/environment`'s `Fog` and
+`VolumetricFog`, and its rain, snow and hail into the sky's `Weather` and `Hail`. Give it only the targets you have.
+
+```ts
+import { WeatherMachine } from 'margoengine/weather';
+import { WeatherDrive } from 'margoengine/weather/drive';
+import { Engine } from 'margoengine/core';
+import { Sky } from 'margoengine/sky';
+import { VolumetricClouds } from 'margoengine/sky/volumetric-clouds';
+import { Fog } from 'margoengine/environment';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const weather = new WeatherMachine('partlyCloudy');
+// Attach the drive first, so the targets draw this frame's numbers.
+const drive = WeatherDrive.attach(engine, { weather });
+const sky = Sky.attach(engine, { hours: 15, clouds: { coverage: 0.45 } });
+drive.options.sky = sky;
+drive.options.clouds = VolumetricClouds.attach(engine, { sky });
+drive.options.fog = Fog.attach(engine, { color: '#c0c4c8' });
+weather.transitionTo('storm', { seconds: 120 }); // clouds close in and the fog thickens on their own
+```
+
+Cloud cover is the state's `cloud`; a cloud layer's density rises from 0.02 to 0.08 per metre with the strongest of
+rain, snow, hail and lightning, and it drifts with the wind times `windAloft` (3). Fog: an exponential fog and a fog
+volume get `fogDensity` as their extinction; a squared fog (environment `Fog`, the sky's default fog) gets that over
+the square root of 3, which leaves the same 5 percent of contrast at the same distance. A sky's cloud sheet and fog are
+set only when the sky has them. The wind for rain and hail is the machine's wind field at `listener.position` (or
+`position`). With `advance: false` you step the weather yourself. `driveSettings(state)` gives the numbers alone.
+
 ## Hail
 
 `Hail.attach(engine, options)` (from `margoengine/weather/hail`, WebGPU only) draws stones that fall at `fallSpeed` (default 18 m/s), hit the ground at `groundY`, bounce twice (`restitution` 0.2) and stop. Every position is a closed-form function of time and the stone's index, so only one uniform block is uploaded per frame; stones are depth-tested against the scene and fade at the edge of the box that follows the camera. Options: `intensity`, `fadeSeconds`, `wind`, `groundY`, `radius`, `height`, `particles` (6,000 at intensity 1), `fallSpeed`, `restitution`, `stoneRadius`, `color`, `brightness`, `opacity`, `seed`, `lit` and `splashes`; all are read each frame from `hail.options` and validated.
@@ -169,7 +201,8 @@ Stones are lit (`lit`, default true) as small ice balls by the engine's light (`
 - Region fronts are straight and move at a constant speed, cells are circles at a constant velocity; none bends,
   stalls or forms by itself. They are authoring shapes, not a forecast model.
 - The presets and the climate chain are design choices, not weather data. Wind speed is a mean at one height with simple noise, not a boundary-layer model.
-- `cloud` and `fog` are numbers for you to feed to your sky and fog; this package does not draw clouds or fog.
+- This package draws no clouds or fog of its own: `WeatherDrive` feeds `cloud` and `fog` to the sky's and the
+  environment's.
 - Hail needs WebGPU; on a WebGL engine `attach` throws `MargoError` `'unsupported'`. Everything else runs anywhere, Node included.
 
 Apache-2.0. Optional, tree-shakable package; no core dependency in the root entry (only `./hail`, `./puddles` and `./snow` import core).

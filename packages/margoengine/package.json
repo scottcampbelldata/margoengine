@@ -2782,6 +2782,10 @@
       "types": "./dist/weather/regions.d.ts",
       "import": "./dist/weather/regions.js"
     },
+    "./weather/drive": {
+      "types": "./dist/weather/drive.d.ts",
+      "import": "./dist/weather/drive.js"
+    },
     "./webgl": {
       "types": "./dist/webgl.d.ts",
       "import": "./dist/webgl.js"
