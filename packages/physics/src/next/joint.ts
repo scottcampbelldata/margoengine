@@ -1,7 +1,7 @@
 // A joint on the own solver: the names of ../joints.ts, written straight into the kernel's joint columns. No `Math`: a value
 // that needs a square root goes through the kernel, so a joint set up in one browser is the joint set up in another.
 import { MargoError } from '@margoengine/math/errors';
-import type { JointOptions, JointType, MotorOptions } from '../joints.js';
+import type { JointOptions, JointType, MotorOptions, RotationMotorOptions } from '../joints.js';
 import { JOINT_CONE, JOINT_CONTACTS, JOINT_LIMIT, JOINT_LOCK, JOINT_MOTOR_FORCE, JOINT_MOTOR_ON, type KernelWorld } from '../kernel.js';
 import { checkVec, type Quat, type Vec3 } from '../math.js';
 import type { PhysicsBody } from './body.js';
@@ -177,9 +177,41 @@ export class PhysicsJoint {
     this.wake();
     return this;
   }
-  /** Not served yet: throws. */
-  setRotationMotor(): never {
-    throw later('setRotationMotor', 'spherical motors');
+  /**
+   * A spherical joint's spring toward `rotation`, a unit quaternion [x, y, z, w] of `bodyB` in the frame of `bodyA`. The
+   * joint's frame on `bodyA` moves onto the target and three motors drive the turn left to 0, so it reads true near half a
+   * turn, where the vector part of a rotation no longer tells rotations apart. `targetVelocity` is the target's own spin,
+   * rad/s in its frame.
+   * @throws TypeError on any other joint type, RangeError for a rotation that is not a unit quaternion.
+   */
+  setRotationMotor(rotation: Quat, motor: RotationMotorOptions = {}): this {
+    if (this.removed) throw new MargoError('state', 'Joint was removed; create a new one with physics.addJoint.');
+    if (this.type !== 'spherical') throw new TypeError('Rotation motors need a spherical joint; use setMotor on a hinge.');
+    const [x, y, z, w] = rotation;
+    const squared = x * x + y * y + z * z + w * w;
+    if (!(squared > 0.998 && squared < 1.002))
+      throw new RangeError('Rotation motors need a unit quaternion [x, y, z, w]; normalize the rotation.');
+    const cap = motor.maxForce ?? Infinity;
+    if (!(cap >= 0)) throw new RangeError('Motor maxForce must be 0 or more; pass newtons or newton metres.');
+    const { row } = this,
+      columns = this.owner.kernel.columns,
+      spin = motor.targetVelocity;
+    columns.jointFrameAX[row] = x;
+    columns.jointFrameAY[row] = y;
+    columns.jointFrameAZ[row] = z;
+    columns.jointFrameAW[row] = w;
+    for (let k = 0; k < 3; k++) {
+      const axis = TURN + k,
+        force = JOINT_MOTOR_FORCE << axis;
+      columns[`jointTarget${axis}`][row] = 0;
+      columns[`jointSpeed${axis}`][row] = spin?.[k] ?? 0;
+      columns[`jointStiffness${axis}`][row] = motor.stiffness ?? 1;
+      columns[`jointDamping${axis}`][row] = motor.damping ?? 0;
+      columns[`jointCap${axis}`][row] = cap;
+      columns.jointFlags[row] = (columns.jointFlags[row] & ~force) | (JOINT_MOTOR_ON << axis) | (motor.model === 'force' ? force : 0);
+    }
+    this.wake();
+    return this;
   }
   /** Not served yet: throws. */
   setAxisLimits(): never {
@@ -191,11 +223,14 @@ export class PhysicsJoint {
   }
   /** Turns the motor off. */
   clearMotor(): this {
-    const axis = this.unit(),
+    const spherical = this.type === 'spherical' && !this.removed,
+      first = spherical ? TURN : this.unit(),
       { row } = this,
       columns = this.owner.kernel.columns;
-    columns.jointFlags[row] &= ~(JOINT_MOTOR_ON << axis);
-    columns[`jointMotor${axis}`][row] = 0;
+    for (let axis = first; axis < first + (spherical ? 3 : 1); axis++) {
+      columns.jointFlags[row] &= ~(JOINT_MOTOR_ON << axis);
+      columns[`jointMotor${axis}`][row] = 0;
+    }
     this.wake();
     return this;
   }

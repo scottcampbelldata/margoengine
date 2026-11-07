@@ -177,7 +177,6 @@ test('wrong input says what to pass', () => {
     () => physics.addJoint(a, b, { type: 'generic' }),
     () => physics.addJoint(a, b, { type: 'rope', length: 1 }),
     () => physics.addJoint(a, b, { type: 'spring', restLength: 1, stiffness: 1 }),
-    () => joint.setRotationMotor(),
     () => joint.setAxisLimits(),
     () => joint.setAxisMotor(),
   ])
@@ -257,5 +256,114 @@ test('a cone twists freely without a twist, and refuses what it cannot be', () =
   assert.throws(() => physics.addJoint(top, rod, { type: 'cone', swing: 1, axis: [0, 0, 0] }), /nonzero/);
   assert.throws(() => joint.setLimits(-1, 1), /revolute or prismatic/);
   assert.equal(physics.addJoint(top, rod, { type: 'revolute', axis: [0, 1, 0] }).cone, null);
+  physics.dispose();
+});
+
+/** A rod of `mass` kg and length 1 m on a spherical joint at the world origin, reaching along +x, centre at 0.5 m. */
+function ballRod(physics, mass = 2) {
+  const anchor = physics.addBody(null, { type: 'fixed', colliders: [] }),
+    rod = physics.addBody(null, { colliders: { shape: 'box', halfExtents: [0.5, 0.05, 0.05], offset: [0.5, 0, 0], mass } });
+  return { rod, joint: physics.addJoint(anchor, rod, { type: 'spherical' }), inertia: (mass * 1) / 3 };
+}
+const turned = (q) => 2 * Math.acos(Math.min(1, Math.abs(q[3])));
+const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const rotate = (q, v) => {
+  const u = q.slice(0, 3),
+    t = cross(u, v).map((x) => x * 2),
+    s = cross(u, t);
+  return v.map((x, i) => x + q[3] * t[i] + s[i]);
+};
+const about = (axis, angle) => [...axis.map((v) => v * Math.sin(angle / 2)), Math.cos(angle / 2)];
+const between = (a, b) => 2 * Math.acos(Math.min(1, Math.abs(a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3])));
+
+test('a rotation motor turns a spherical joint to its target, at the frequency its gains give', () => {
+  const physics = new Physics(null);
+  physics.gravity = [0, 0, 0];
+  const { rod, joint, inertia } = ballRod(physics),
+    target = about([0.6, 0, 0.8], 1),
+    w = 2 * Math.PI * 2;
+  joint.setRotationMotor(target, { model: 'force', stiffness: inertia * w * w, damping: 2 * inertia * w });
+  for (let i = 0; i < 19; i++) physics.step();
+  near(between(rod.rotation, target), 0.114, 0.03, 'a critically damped spring at 2 Hz, after 19 steps');
+  for (let i = 0; i < 29; i++) physics.step();
+  near(between(rod.rotation, target), 0, 0.01, 'there after 0.8 s');
+  joint.clearMotor();
+  rod.setAngularVelocity([0, 0, 1]);
+  rod.setLinearVelocity(cross([0, 0, 1], rotate(rod.rotation, [0.5, 0, 0])));
+  const before = rod.rotation;
+  for (let i = 0; i < 30; i++) physics.step();
+  near(between(rod.rotation, before), 0.5, 0.02, 'cleared: the joint turns freely at 1 rad/s for 0.5 s');
+  physics.dispose();
+});
+
+test('a rotation motor reaches a target near half a turn, where the sine of the angle says nothing', () => {
+  const physics = new Physics(null);
+  physics.gravity = [0, 0, 0];
+  const { rod, joint, inertia } = ballRod(physics),
+    w = 2 * Math.PI * 2,
+    gains = { model: 'force', stiffness: inertia * w * w, damping: 2 * inertia * w };
+  rod.setRotation(about([0, 1, 0], 3));
+  const target = about([0, 1, 0], 3.1);
+  for (let i = 0; i < 90; i++) {
+    joint.setRotationMotor(target, gains);
+    physics.step();
+  }
+  near(between(rod.rotation, target), 0, 0.01, 'held at 3.1 rad');
+  physics.dispose();
+});
+
+test('a rotation motor follows a target that spins, without lag, given its spin', () => {
+  // A critically damped spring chasing 2 rad/s lags 2 v / w, 0.32 rad. Told the spin it lags nothing: the target moves in
+  // jumps of a step, so what is left is at most that jump, 0.033 rad.
+  const lag = (targetVelocity) => {
+    const physics = new Physics(null);
+    physics.gravity = [0, 0, 0];
+    const { rod, joint, inertia } = ballRod(physics),
+      w = 2 * Math.PI * 2,
+      gains = { model: 'force', stiffness: inertia * w * w, damping: 2 * inertia * w, targetVelocity };
+    for (let i = 0; i < 120; i++) {
+      joint.setRotationMotor(about([0, 0, 1], (2 * i) / 60), gains);
+      physics.step();
+    }
+    const off = between(rod.rotation, about([0, 0, 1], (2 * 120) / 60));
+    physics.dispose();
+    return off;
+  };
+  assert.ok(lag([0, 0, 2]) < 2 / 60, `told the spin: ${lag([0, 0, 2])}`);
+  near(lag(undefined), (2 * 2) / (4 * Math.PI) + 1 / 60, 0.02, 'not told');
+});
+
+test('maxForce caps a motor at the torque it names, on a ball joint and on a hinge', () => {
+  // A rod of 2 kg straight out: the torque of its weight about the joint is m g d = 2 * 9.81 * 0.5, 9.81 N m.
+  for (const hinge of [false, true]) {
+    const held = (cap) => {
+      const physics = new Physics(null, { gravity: [0, -9.81, 0] }),
+        anchor = physics.addBody(null, { type: 'fixed', colliders: [] }),
+        rod = physics.addBody(null, { colliders: { shape: 'box', halfExtents: [0.5, 0.05, 0.05], offset: [0.5, 0, 0], mass: 2 } }),
+        gains = { model: 'force', stiffness: 4000, damping: 400, maxForce: cap },
+        joint = hinge
+          ? physics.addJoint(anchor, rod, { type: 'revolute', axis: [0, 0, 1], motor: { targetPosition: 0, ...gains } })
+          : physics.addJoint(anchor, rod, { type: 'spherical' });
+      if (!hinge) joint.setRotationMotor([0, 0, 0, 1], gains);
+      let angle = 0;
+      for (let i = 0; i < 120; i++) {
+        physics.step();
+        angle = Math.max(angle, turned(rod.rotation));
+      }
+      physics.dispose();
+      return angle;
+    };
+    assert.ok(held(12) < 0.05, `${hinge ? 'hinge' : 'ball'}: 12 N m holds 9.81 N m (${held(12)})`);
+    assert.ok(held(7) > 0.5, `${hinge ? 'hinge' : 'ball'}: 7 N m does not (${held(7)})`);
+  }
+  const physics = new Physics(null),
+    { joint } = ballRod(physics);
+  assert.throws(() => joint.setRotationMotor([0, 0, 0, 2]), { name: 'RangeError', message: /unit quaternion/ });
+  assert.throws(() => joint.setRotationMotor([0, 0, 0, 1], { maxForce: -1 }), { name: 'RangeError' });
+  const hinge = physics.addJoint(physics.addBody(null, { colliders: [] }), physics.addBody(null, { colliders: [] }), {
+    type: 'revolute',
+    axis: [0, 0, 1],
+  });
+  assert.throws(() => hinge.setRotationMotor([0, 0, 0, 1]), { name: 'TypeError', message: /spherical joint/ });
   physics.dispose();
 });

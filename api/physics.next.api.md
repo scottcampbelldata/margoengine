@@ -365,7 +365,7 @@ export class PhysicsJoint {
         twist: [number, number] | null;
     } | null;
     setMotor(motor: MotorOptions): this;
-    setRotationMotor(): never;
+    setRotationMotor(rotation: Quat, motor?: RotationMotorOptions): this;
     setAxisLimits(): never;
     setAxisMotor(): never;
     clearMotor(): this;

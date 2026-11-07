@@ -901,3 +901,82 @@ fn a_door_on_a_hinge_falls_onto_a_floor_and_rests() {
     let at = w.v(POSITION_X, row);
     assert!((at.y - 0.05).abs() < 0.01, "the door lies at {at:?}");
 }
+
+fn rotation_motor(w: &mut World, joint: u32, target: Q, stiffness: f32, damping: f32, cap: f32) {
+    let row = joint as usize;
+    w.set_q(JOINT_FRAME_A_X, row, target);
+    for k in 3..6 {
+        set_motor(w, joint, k, 0.0, 0.0, stiffness, damping);
+        w.set_u(JOINT_FLAGS, row, w.uu(JOINT_FLAGS, row) | JOINT_MOTOR_FORCE << k);
+        w.set_s(JOINT_CAP_0 + k, row, cap);
+    }
+}
+fn angle_between(a: Q, b: Q) -> f64 {
+    let dot = (a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w).abs() as f64;
+    2.0 * dot.min(1.0).acos()
+}
+
+#[test]
+fn a_rotation_motor_is_critically_damped_at_its_gains() {
+    // A rod out along X on a ball joint, turned 1 rad about Z toward its target: one degree of freedom, inertia I + m d^2.
+    // Implicit Euler of a critically damped spring scales each root by r = 1 / (1 + w h), so after n substeps
+    // x = x0 (1 + n (1 - r)) r^n.
+    let mut w = world(4);
+    w.header_mut().gravity = [0.0, 0.0, 0.0];
+    let pivot = anchor(&mut w);
+    let (mass, inertia, reach) = (2.0f32, 0.04f32, 0.5f32);
+    let rod = point(&mut w, v3(reach, 0.0, 0.0), mass, inertia);
+    let joint = spherical(&mut w, pivot, rod, v3(0.0, 0.0, 0.0), v3(-reach, 0.0, 0.0));
+    let about_joint = (inertia + mass * reach * reach) as f64;
+    let frequency = 2.0 * std::f64::consts::PI * 2.0;
+    let target = Q { x: 0.0, y: 0.0, z: 0.5f32.sin(), w: 0.5f32.cos() };
+    rotation_motor(&mut w, joint, target, (about_joint * frequency * frequency) as f32, (2.0 * about_joint * frequency) as f32, f32::INFINITY);
+    let h = DT as f64 / 8.0;
+    let r = 1.0 / (1.0 + frequency * h);
+    let mut done = 0;
+    for steps in [10u32, 19, 30] {
+        run(&mut w, steps - done);
+        done = steps;
+        let n = steps as f64 * 8.0;
+        let want = (1.0 + n * (1.0 - r)) * r.powf(n);
+        let got = angle_between(w.q(ROTATION_X, rod as usize), target);
+        println!("rotation motor after {steps} steps: {got:.5} of closed form {want:.5}");
+        assert!((got - want).abs() < 0.004, "{got} against {want}");
+    }
+}
+
+#[test]
+fn a_rotation_motor_turns_a_rod_about_a_slanted_line_to_its_target() {
+    let mut w = world(4);
+    w.header_mut().gravity = [0.0, 0.0, 0.0];
+    let pivot = anchor(&mut w);
+    let rod = point(&mut w, v3(0.5, 0.0, 0.0), 2.0, 0.04);
+    let joint = spherical(&mut w, pivot, rod, v3(0.0, 0.0, 0.0), v3(-0.5, 0.0, 0.0));
+    let target = Q { x: 0.6 * 0.5f32.sin(), y: 0.0, z: 0.8 * 0.5f32.sin(), w: 0.5f32.cos() };
+    rotation_motor(&mut w, joint, target, 400.0, 40.0, f32::INFINITY);
+    run(&mut w, 60);
+    let off = angle_between(w.q(ROTATION_X, rod as usize), target);
+    println!("slanted rotation motor after 1 s: {off:.6}");
+    assert!(off < 1e-3, "{off}");
+}
+
+#[test]
+fn a_rotation_motor_cap_is_a_torque_about_the_joint() {
+    // A rod of 2 kg straight out: the torque of its weight about the joint is 9.81 N m.
+    for (cap, holds) in [(12.0f32, true), (7.0, false)] {
+        let mut w = world(4);
+        let pivot = anchor(&mut w);
+        let rod = point(&mut w, v3(0.5, 0.0, 0.0), 2.0, 0.17);
+        let joint = spherical(&mut w, pivot, rod, v3(0.0, 0.0, 0.0), v3(-0.5, 0.0, 0.0));
+        rotation_motor(&mut w, joint, Q::IDENTITY, 4000.0, 400.0, cap);
+        let mut most: f64 = 0.0;
+        for _ in 0..120 {
+            w.step(DT);
+            most = most.max(angle_between(w.q(ROTATION_X, rod as usize), Q::IDENTITY));
+        }
+        println!("cap {cap}: turned {most:.4}");
+        assert_eq!(most < 0.05, holds, "cap {cap} turned {most}");
+        assert_eq!(most > 0.5, !holds, "cap {cap} turned {most}");
+    }
+}
+

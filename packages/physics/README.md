@@ -308,7 +308,7 @@ physics.dispose();
 
 It holds `box`, `sphere` and `capsule` colliders, bodies of every kind, forces, impulses, velocities, damping, locks, kinematic targets, gravity, sleeping and the `beforestep` and `afterstep` events. Bodies collide, with friction, restitution and the four combine rules, and `physics.touching(a, b)` and `physics.contactPoints(body)` read the contacts of the last step. Contact events, sensors and groups are not served yet. A call that needs what is still to come throws a `MargoError` with code `unsupported` naming what it waits for: other shapes, `setType`, `setMassProperties`, inertia of its own, `ccd`, `follow`, `dominance`, disabling a body, `contactFilter`, friction, restitution and every other contact setting, joints, queries, character controllers, `addModel`, `touching`, `contactPoints`, contact events and `debugRender`. `body.sleep()` and impulses take effect at the next step.
 
-`physics.addJoint(bodyA, bodyB, options)` holds the root entry's `fixed`, `spherical`, `revolute` and `prismatic` joints, with `limits`, `motor`, `axis` or `frameA` and `frameB`, `contactsEnabled`, `joint.setLimits`, `setMotor`, `clearMotor`, `remove`, and the same errors. A joint keeps its two bodies from colliding unless `contactsEnabled` is true, and leaves with either body. The `rope`, `spring` and `generic` kinds and `setRotationMotor` throw `unsupported` until they come.
+`physics.addJoint(bodyA, bodyB, options)` holds the root entry's `fixed`, `spherical`, `revolute` and `prismatic` joints, with `limits`, `motor`, `axis` or `frameA` and `frameB`, `contactsEnabled`, `joint.setLimits`, `setMotor`, `setRotationMotor`, `clearMotor`, `remove`, and the same errors. A joint keeps its two bodies from colliding unless `contactsEnabled` is true, and leaves with either body. The `rope`, `spring` and `generic` kinds throw `unsupported` until they come.
 
 ```ts
 import {Physics} from 'margoengine/physics/next';
@@ -358,6 +358,30 @@ physics.dispose();
 ```
 
 Every limit, a cone's and a hinge's, stops its axis dead at the edge and holds any load there. An axis that starts past its edge, or is held there by a floor, is pushed back as a contact pushes out of a depth, so a limb that cannot reach its cone comes to rest where it lies. That push has the strength of the limb's own mass: a very light hand under an arm stays where the arm leaves it.
+
+`joint.setRotationMotor(rotation, options)` drives a `spherical` joint toward a rotation of `bodyB` in `bodyA`'s frame, as on the root entry, and reads true near half a turn: the joint's frame on `bodyA` moves onto the target, so what is left to drive stays small. With `model: 'force'` a limb of inertia I about the joint moves like a spring of frequency w for `stiffness` I w^2 and `damping` 2 I w, `maxForce` caps the torque, and `targetVelocity` is the target's own spin, so a moving target is followed without lag.
+
+```ts
+import {Physics} from 'margoengine/physics/next';
+
+await Physics.load();
+const physics = new Physics(null, {gravity: [0, 0, 0]});
+const shoulder = physics.addBody(null, {type: 'fixed', colliders: []});
+const arm = physics.addBody(null, {
+  colliders: {shape: 'box', halfExtents: [0.5, 0.05, 0.05], offset: [0.5, 0, 0], mass: 2},
+});
+const joint = physics.addJoint(shoulder, arm, {type: 'spherical'});
+const w = 2 * Math.PI * 2, inertia = 2 / 3;       // 2 Hz; a 2 kg rod of 1 m about its end
+joint.setRotationMotor([0, 0, Math.sin(0.5), Math.cos(0.5)], {
+  model: 'force',
+  stiffness: inertia * w * w,
+  damping: 2 * inertia * w,
+});
+for (let i = 0; i < 60; i++) physics.step();
+console.log(arm.rotation);                        // turned 1 rad about Z
+joint.clearMotor();
+physics.dispose();
+```
 
 Locks along a chain are solved exactly, so a chain of 50 holds a 1000 to 1 end mass. A branch or a closed loop settles pass by pass, so it holds under its own weight and gives way a little under a far heavier body: the numbers are in `docs/limits.md`.
 
