@@ -1,9 +1,7 @@
-// The measurement runs in a fresh process (support/capsule-allocation-probe.mjs): other tests install overrides that
-// make the solver's calls megamorphic, and the flags below must be set before V8 starts.
+// The measurement runs in a fresh process (support/capsule-allocation-probe.mjs, started by support/allocation-probe.js).
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
 import { test } from 'node:test';
-import { fileURLToPath } from 'node:url';
+import { runAllocationProbe } from './support/allocation-probe.js';
 
 // Results written to tuples ([0, 0, 0] points) still allocate about 12 B per call; the README says to reuse typed arrays.
 // The public evaluate() and segmentClearance() return a fractional number, which is a heap allocation by itself; the
@@ -13,24 +11,9 @@ import { fileURLToPath } from 'node:url';
 // kernel allocated nothing; the test's own driver did. Each window called run() again, so it started in the
 // interpreter and boxed every fractional input it computed until on-stack replacement landed, and on a loaded machine
 // the compiler threads delivered that code some 6,000 iterations in. The probe now runs each driver until it has
-// Turbofan code before measuring, and --no-concurrent-recompilation compiles on the main thread the moment a function
-// earns it, so the tier a window measures depends on the calls run, never on the machine's load.
-const probe = () =>
-  JSON.parse(
-    execFileSync(
-      process.execPath,
-      [
-        '--expose-gc',
-        '--allow-natives-syntax',
-        '--no-concurrent-recompilation',
-        fileURLToPath(new URL('./support/capsule-allocation-probe.mjs', import.meta.url)),
-      ],
-      { encoding: 'utf8', timeout: 240_000 },
-    ),
-  );
-
+// Turbofan code before measuring, with --no-concurrent-recompilation (support/kernel-windows.mjs).
 test('capsule solves and segment kernels allocate nothing per call', { timeout: 300_000 }, (t) => {
-  for (const { name, clean, windows, status } of probe()) {
+  for (const { name, clean, windows, status } of runAllocationProbe('capsule')) {
     // Bit 64 of %GetOptimizationStatus: the driver runs Turbofan code, so the windows measured the kernel's steady state.
     assert.ok(status & 64, `${name}: the driver never reached Turbofan (status ${status})`);
     assert.ok(clean, `${name}: every window of 20,000 allocated: ${JSON.stringify(windows)}`);

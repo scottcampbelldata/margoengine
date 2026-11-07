@@ -1610,18 +1610,20 @@ Scott asked for a static report to be proved or disproved: `Engine.retain` chang
 
 ## Three allocation tests that failed verify on the Beelink
 
-Three jobs Scott approved on 2026-11-07 ("Fix those packages"): `npm run verify` failed on clean `main` on the Beelink (Node 24.18.0, V8 13.6) on three allocation tests.
+Jobs Scott approved on 2026-11-07 ("Fix those packages"): `npm run verify` failed on clean `main` on the Beelink (Node 24.18.0, V8 13.6) on three allocation tests.
 
 | # | Job | Status | Commit | Entry | Claim |
 | --- | --- | --- | --- | --- | --- |
 | 1 | `smoothDamp` allocated with plain and typed arrays mixed | DONE | `fix(tween)` | tween | - |
 | 2 | capsule allocation test measured its own driver | DONE | `fix(kinematics-constraints)` | - | - |
 | 3 | cascade tier probe over its limit under the shared flags | DONE | `fix(frame-alloc)` | - | - |
+| 4 | hull allocation test measured its own driver (found by the landing run) | DONE | `fix(kinematics-constraints)`, second | - | - |
 
 - **Root cause, job 1:** a real allocation. Once the store sites of `smoothDamp` had seen a plain `[0, 0, 0]` (small integers, turned into doubles by the first fractional store) beside typed arrays, Turbofan compiled them as generic stores that boxed every number: 96 B per call. The new values go to Float64Array scratch and one store loop per array kind copies them out. A new test mixes every kind of out, velocity and target.
 - **Root cause, job 2:** the test's driver, not the kernel. Each window called the driver again, which started in the interpreter and boxed the inputs it computed until on-stack replacement landed, some 6,000 iterations on a loaded machine. The probe runs in its own process with `--no-concurrent-recompilation` and waits for the driver's Turbofan code.
+- **Root cause, job 4:** the same driver garbage as job 2 in `hull-allocation.test.js`, which read 66 KB per window against 64 KB in a verify run after passing in the one before. Both tests now share one probe helper in `packages/kinematics-constraints/tests/support/`.
 - **Root cause, job 3:** the probe's driver, not `@margoengine/shadows`. It read near and far from its camera object to pass them to `cascadeSplits`, which V8 13's Maglev does not inline, so both were boxed for the call: 32 B. Under `--no-concurrent-recompilation` the windows ran the driver loop's on-stack replacement code, which boxes them on every call; the 242 B measured before that flag came from the loop's later Maglev code, which read them once per window. The probe passes them as they are: 241.5 B against 256, in both modes.
 - **Also found:** the damp test's windows could all run in Maglev on a loaded machine (V8 13's Maglev calls `Math.sqrt` with boxed numbers), so it now waits for Turbofan's code, as `tests/support/late-frame-probe.mjs` does.
-- **Proved:** CPU tests. Job 1's two tests fail on the old code at 96 B per call and pass on the fix, also with `--concurrent-recompilation-delay=1000`. Jobs 2 and 3: a temporary allocation in `closestPointsBetweenSegments` and in `fitCascades` fails each test. No limit, tolerance or flag changed.
+- **Proved:** CPU tests. Job 1's two tests fail on the old code at 96 B per call and pass on the fix, also with `--concurrent-recompilation-delay=1000`. Jobs 2 to 4: a temporary allocation in `closestPointsBetweenSegments`, `fitCascades` and `segmentClearanceInto` fails each test. No limit, tolerance or flag changed.
 - **Size:** the tween root grew 37 B gzip for job 1, accepted in the sizes baseline with its reason; core and stage do not change.
 - **Gate:** lint, hygiene, verify and the tests of what changed, the push from one script that stops at the first failing step. No GPU test: no GPU code changed.
