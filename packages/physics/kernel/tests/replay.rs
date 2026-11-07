@@ -105,25 +105,32 @@ fn scene() -> Vec<u32> {
     for _ in 0..48 {
         spawn(&mut w, &mut random, &mut rows, hull);
     }
-    for i in 0..16usize {
+    for i in 0..20usize {
         let a = rows[random.below(rows.len() as u32) as usize];
         let b = rows[random.below(rows.len() as u32) as usize];
         if a == b {
             continue;
         }
-        let joint = w.add_joint(a, b, [7, 7 | (6 << 3), 6 | (7 << 3), 63][i % 4]).unwrap();
+        let cone = 7 | JOINT_CONE | JOINT_LIMIT << 4 | JOINT_LIMIT << 3;
+        let joint = w.add_joint(a, b, if i < 16 { [7, 7 | (6 << 3), 6 | (7 << 3), 63][i % 4] } else { cone }).unwrap();
         let at = joint as usize;
         w.set_s(JOINT_ANCHOR_A_X, at, random.value() / 4.0);
         w.set_s(JOINT_ANCHOR_A_Y, at, random.value() / 4.0);
         w.set_s(JOINT_ANCHOR_B_Z, at, random.value() / 4.0);
-        if i % 4 == 1 {
+        if i >= 16 {
+            w.set_s(JOINT_MIN_3, at, -0.4);
+            w.set_s(JOINT_MAX_3, at, 0.4);
+            w.set_s(JOINT_MIN_4, at, f32::NEG_INFINITY);
+            w.set_s(JOINT_MIN_5, at, 0.3);
+            w.set_s(JOINT_MAX_5, at, 0.8);
+        } else if i % 4 == 1 {
             let (x, z) = (random.value(), random.value());
             w.set_joint_axis(joint, v3(x, 1.0, z));
             w.set_u(JOINT_FLAGS, at, w.uu(JOINT_FLAGS, at) | JOINT_LIMIT << 3);
             w.set_s(JOINT_MIN_3, at, -1.0);
             w.set_s(JOINT_MAX_3, at, 1.0);
         }
-        if i % 8 == 1 {
+        if i < 16 && i % 8 == 1 {
             w.set_u(JOINT_FLAGS, at, w.uu(JOINT_FLAGS, at) | JOINT_MOTOR_ON << 3);
             w.set_s(JOINT_TARGET_3, at, 0.5);
             w.set_s(JOINT_STIFFNESS_3, at, 50.0);

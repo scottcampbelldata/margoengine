@@ -221,3 +221,41 @@ test('joints replay bit for bit through a snapshot', () => {
   assert.equal(physics.kernel.hash, end);
   physics.dispose();
 });
+
+test('a cone stops a swing at its edge and a twist at its limit', () => {
+  const physics = new Physics(null);
+  physics.gravity = [0, 0, 0];
+  const top = physics.addBody(null, { type: 'fixed', colliders: [] }),
+    rod = physics.addBody(null, { position: [0, -0.5, 0], colliders: { shape: 'box', halfExtents: [0.05, 0.5, 0.05], density: 10 } }),
+    joint = physics.addJoint(top, rod, { type: 'cone', anchorB: [0, 0.5, 0], axis: [0, -1, 0], swing: 0.5, twist: [-0.4, 0.4] });
+  assert.deepEqual(joint.cone.twist.map((value) => Math.round(value * 100) / 100), [-0.4, 0.4]);
+  rod.setLinearVelocity([3, 0, 0]);
+  rod.setAngularVelocity([0, 0, 6]);
+  for (let i = 0; i < 120; i++) physics.step();
+  near(2 * Math.abs(Math.atan2(rod.rotation[2], rod.rotation[3])), 0.5, 1e-3, 'swing');
+  near(rod.angularVelocity[2], 0, 1e-3, 'rest on the edge');
+  const spun = physics.addBody(null, { position: [3, -0.5, 0], colliders: { shape: 'box', halfExtents: [0.05, 0.5, 0.05], density: 10 } });
+  physics.addJoint(top, spun, { type: 'cone', anchorA: [3, 0, 0], anchorB: [0, 0.5, 0], axis: [0, -1, 0], swing: 0.5, twist: [-0.4, 0.4] });
+  spun.setAngularVelocity([0, 4, 0]);
+  for (let i = 0; i < 120; i++) physics.step();
+  near(2 * Math.abs(Math.atan2(spun.rotation[1], spun.rotation[3])), 0.4, 1e-3, 'twist');
+  near(spun.angularVelocity[1], 0, 1e-3, 'rest on the limit');
+  physics.dispose();
+});
+
+test('a cone twists freely without a twist, and refuses what it cannot be', () => {
+  const physics = new Physics(null);
+  physics.gravity = [0, 0, 0];
+  const top = physics.addBody(null, { type: 'fixed', colliders: [] }),
+    rod = physics.addBody(null, { position: [0, -0.5, 0], colliders: { shape: 'box', halfExtents: [0.05, 0.5, 0.05], density: 10 } }),
+    joint = physics.addJoint(top, rod, { type: 'cone', anchorB: [0, 0.5, 0], axis: [0, -1, 0], swing: [0.3, 0.8] });
+  assert.equal(joint.cone.twist, null);
+  rod.setAngularVelocity([0, 1, 0]);
+  for (let i = 0; i < 120; i++) physics.step();
+  near(rod.angularVelocity[1], 1, 1e-3, 'free twist');
+  assert.throws(() => physics.addJoint(top, rod, { type: 'cone', swing: 0 }), /swing above 0/);
+  assert.throws(() => physics.addJoint(top, rod, { type: 'cone', swing: 1, axis: [0, 0, 0] }), /nonzero/);
+  assert.throws(() => joint.setLimits(-1, 1), /revolute or prismatic/);
+  assert.equal(physics.addJoint(top, rod, { type: 'revolute', axis: [0, 1, 0] }).cone, null);
+  physics.dispose();
+});

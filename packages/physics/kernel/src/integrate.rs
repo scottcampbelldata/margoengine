@@ -137,15 +137,15 @@ impl World {
             let passes = self.header().iterations;
             // Only a settling pass teaches the warm start what a joint carries.
             if passes < 2 {
-                self.solve_joints(h, Pass::Settle);
+                self.solve_joints(h, stiffness, Pass::Settle);
             }
             for pass in 1..=passes {
-                self.solve_joints(h, if pass == passes { Pass::Push } else { Pass::Settle });
+                self.solve_joints(h, stiffness, if pass == passes { Pass::Push } else { Pass::Settle });
                 self.solve_contacts(h, stiffness, true, substep as usize);
             }
             self.integrate_poses(h, substep + 1 == substeps);
             self.refresh_joints();
-            self.solve_joints(h, Pass::Relax);
+            self.solve_joints(h, stiffness, Pass::Relax);
             self.solve_contacts(h, stiffness, false, substep as usize);
             self.solve_impacts();
         }

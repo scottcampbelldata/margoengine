@@ -2,27 +2,66 @@
 // that needs a square root goes through the kernel, so a joint set up in one browser is the joint set up in another.
 import { MargoError } from '@margoengine/math/errors';
 import type { JointOptions, JointType, MotorOptions } from '../joints.js';
-import { JOINT_CONTACTS, JOINT_LIMIT, JOINT_LOCK, JOINT_MOTOR_FORCE, JOINT_MOTOR_ON, type KernelWorld } from '../kernel.js';
-import { checkVec, type Quat } from '../math.js';
+import { JOINT_CONE, JOINT_CONTACTS, JOINT_LIMIT, JOINT_LOCK, JOINT_MOTOR_FORCE, JOINT_MOTOR_ON, type KernelWorld } from '../kernel.js';
+import { checkVec, type Quat, type Vec3 } from '../math.js';
 import type { PhysicsBody } from './body.js';
 
 const later = (what: string, when: string): MargoError =>
   new MargoError('unsupported', `${what} is not in the own solver yet; it comes with ${when}. Use @margoengine/physics until then.`);
 
+/**
+ * A ball joint held inside a cone, the joint of a shoulder or a hip. Frame X on `bodyB` stays within `swing` of frame X on
+ * `bodyA`, and `bodyB` turns about it within `twist`. Past its edge a cone pushes back as a contact does, so a limb a floor
+ * holds outside its cone comes to rest there.
+ */
+export interface ConeJointOptions {
+  type: 'cone';
+  /** Where the joint holds `bodyA`, in that body's frame (default the origin). */
+  anchorA?: Vec3;
+  /** Where the joint holds `bodyB`, in that body's frame (default the origin). */
+  anchorB?: Vec3;
+  /** The middle of the cone, in the frame of both bodies at rest (default X). Takes the place of `frameA` and `frameB`. */
+  axis?: Vec3;
+  /** The joint's frame on `bodyA`, whose X is the middle of the cone. */
+  frameA?: Quat;
+  /** The joint's frame on `bodyB`. */
+  frameB?: Quat;
+  /** The widest swing in radians, or `[aboutY, aboutZ]` for an ellipse of the frame's Y and Z turns. */
+  swing: number | readonly [number, number];
+  /** Radians about frame X, as `[min, max]`; a joint without one twists freely. */
+  twist?: readonly [number, number];
+  /** Lets the two bodies collide (default false). */
+  contactsEnabled?: boolean;
+}
+
+/** What `physics.addJoint` takes on the own solver: the root's joints and the cone. */
+export type NextJointOptions = JointOptions | ConeJointOptions;
+
 /** The axis limits and motors of a hinge and of a slider work on: about frame X, along frame X. */
 const TURN = 3,
   SLIDE = 0;
+/** A cone's rows: the twist, the swing's distance past its edge, and the columns of the axis it has no row for hold the ellipse. */
+const TWIST = 3,
+  SWING = 4,
+  ELLIPSE = 5;
 const LINEAR = 7,
   ANGULAR = 7 << 3;
-const locks: Readonly<Partial<Record<JointType, number>>> = {
+const locks: Readonly<Partial<Record<JointType | 'cone', number>>> = {
   fixed: JOINT_LOCK * (LINEAR | ANGULAR),
   spherical: JOINT_LOCK * LINEAR,
   revolute: JOINT_LOCK * (LINEAR | (6 << 3)),
   prismatic: JOINT_LOCK * (6 | ANGULAR),
+  cone: JOINT_LOCK * LINEAR | JOINT_CONE | (JOINT_LIMIT << SWING),
 };
 
 function checkLimits(min: number, max: number): void {
   if (!Number.isFinite(min) || !Number.isFinite(max) || min > max) throw new RangeError('Joint limits need finite min <= max');
+}
+function swingLimits(swing: number | readonly [number, number]): readonly [number, number] {
+  const [y, z] = typeof swing === 'number' ? [swing, swing] : swing;
+  if (!(y > 0 && z > 0 && Number.isFinite(y) && Number.isFinite(z)))
+    throw new RangeError('A cone needs a swing above 0; pass radians, or [aboutY, aboutZ].');
+  return [y, z];
 }
 function checkFrame(frame: Quat): void {
   if (frame.length !== 4 || !frame.every(Number.isFinite) || !frame.some((value) => value !== 0))
@@ -43,7 +82,7 @@ export class PhysicsJoint {
     private readonly owner: JointOwner,
     /** The joint's row in the kernel's joint columns. */
     readonly row: number,
-    readonly type: JointType,
+    readonly type: JointType | 'cone',
     readonly bodyA: PhysicsBody,
     readonly bodyB: PhysicsBody,
   ) {}
@@ -90,6 +129,35 @@ export class PhysicsJoint {
       { row } = this,
       columns = this.owner.kernel.columns;
     return columns.jointFlags[row] & (JOINT_LIMIT << axis) ? [columns[`jointMin${axis}`][row], columns[`jointMax${axis}`][row]] : null;
+  }
+  /** A cone's limits: its swing and, with `twist` given, its twist. With no `twist` the joint twists freely. */
+  setCone(swing: number | readonly [number, number], twist?: readonly [number, number]): this {
+    if (this.removed) throw new MargoError('state', 'Joint was removed; create a new one with physics.addJoint.');
+    if (this.type !== 'cone') throw new TypeError('setCone needs a cone joint');
+    const [y, z] = swingLimits(swing),
+      { row } = this,
+      columns = this.owner.kernel.columns;
+    if (twist) checkLimits(twist[0], twist[1]);
+    columns[`jointMin${SWING}`][row] = -Infinity;
+    columns[`jointMax${SWING}`][row] = 0;
+    columns[`jointMin${ELLIPSE}`][row] = y;
+    columns[`jointMax${ELLIPSE}`][row] = z;
+    columns[`jointMin${TWIST}`][row] = twist ? twist[0] : 0;
+    columns[`jointMax${TWIST}`][row] = twist ? twist[1] : 0;
+    columns.jointFlags[row] = twist ? columns.jointFlags[row] | (JOINT_LIMIT << TWIST) : columns.jointFlags[row] & ~(JOINT_LIMIT << TWIST);
+    this.wake();
+    return this;
+  }
+  /** A cone's limits as `setCone` took them, the swing as `[aboutY, aboutZ]`. */
+  get cone(): { swing: [number, number]; twist: [number, number] | null } | null {
+    if (this.type !== 'cone' || this.removed) return null;
+    const { row } = this,
+      columns = this.owner.kernel.columns,
+      twisted = columns.jointFlags[row] & (JOINT_LIMIT << TWIST);
+    return {
+      swing: [columns[`jointMin${ELLIPSE}`][row], columns[`jointMax${ELLIPSE}`][row]],
+      twist: twisted ? [columns[`jointMin${TWIST}`][row], columns[`jointMax${TWIST}`][row]] : null,
+    };
   }
   /** Drives the joint's axis: toward `targetVelocity`, or as a spring toward `targetPosition`. */
   setMotor(motor: MotorOptions): this {
@@ -153,13 +221,13 @@ export class PhysicsJoint {
  * Puts a joint on two bodies in the kernel.
  * @throws MargoError (`unsupported`) for a kind the own solver does not hold yet.
  */
-export function createJoint(owner: JointOwner, bodyA: PhysicsBody, bodyB: PhysicsBody, options: JointOptions): PhysicsJoint {
+export function createJoint(owner: JointOwner, bodyA: PhysicsBody, bodyB: PhysicsBody, options: NextJointOptions): PhysicsJoint {
   const { type, anchorA = [0, 0, 0], anchorB = [0, 0, 0] } = options,
     locked = locks[type];
   if (type === 'generic') throw later('The generic joint', 'the shapes and queries batch');
   if (type === 'rope' || type === 'spring') throw later(`The ${type} joint`, 'rope and spring joints');
   if (locked === undefined)
-    throw new TypeError(`Unknown joint type ${String(type)}; use fixed, spherical, revolute, prismatic, rope, spring or generic.`);
+    throw new TypeError(`Unknown joint type ${String(type)}; use fixed, spherical, revolute, prismatic, cone, rope, spring or generic.`);
   checkVec(anchorA, 'anchorA');
   checkVec(anchorB, 'anchorB');
   const { frameA, frameB } = options as { frameA?: Quat; frameB?: Quat };
@@ -172,6 +240,17 @@ export function createJoint(owner: JointOwner, bodyA: PhysicsBody, bodyB: Physic
       if (axis[0] === 0 && axis[1] === 0 && axis[2] === 0) throw new RangeError('Joint axis must be nonzero');
     }
     if (limits) checkLimits(limits[0], limits[1]);
+  }
+  if (type === 'cone') {
+    const { axis, swing, twist } = options;
+    if ((frameA || frameB) && (!frameA || !frameB || axis))
+      throw new TypeError('A joint takes an axis, or frameA and frameB together; pass one or the other.');
+    if (axis) {
+      checkVec(axis, 'Joint axis');
+      if (axis[0] === 0 && axis[1] === 0 && axis[2] === 0) throw new RangeError('Joint axis must be nonzero');
+    }
+    swingLimits(swing);
+    if (twist) checkLimits(twist[0], twist[1]);
   }
   if (frameA) checkFrame(frameA);
   if (frameB) checkFrame(frameB);
@@ -191,6 +270,10 @@ export function createJoint(owner: JointOwner, bodyA: PhysicsBody, bodyB: Physic
     if (axis) kernel.setJointAxis(row, axis);
     if (limits) joint.setLimits(limits[0], limits[1]);
     if (motor) joint.setMotor(motor);
+  }
+  if (type === 'cone') {
+    if (options.axis) kernel.setJointAxis(row, options.axis);
+    joint.setCone(options.swing, options.twist);
   }
   return joint;
 }

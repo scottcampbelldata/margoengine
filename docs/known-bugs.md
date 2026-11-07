@@ -320,6 +320,7 @@ does not own. Each entry says exactly what is needed to close it.
 - **Cause:** the cone limit pass turns the bone back toward its limit from outside the solver, each step, into the floor that put it there; the solver pushes it out, and the two exchange energy for ever. Hinges use Rapier's own limits and do not do this.
 - **Tried, measured on the same falls:** skipping the correction on touching limbs settles it (under 0.1 m/s) but a spine ended 2.3 rad past its limit. A fifth of the correction on touching limbs left 0.2 to 0.65 m/s and 0.5 to 1.6 rad. Pulling the joint back with its motor, inside the solver, settled it (under 0.2 m/s) but left bones 1.1 to 1.9 rad past their limits and tore a pinned joint test apart by 3 cm. Each trades a moving limb for a broken pose, so none shipped.
 - **Needed to close:** a cone limit as a real solver constraint, with stiffness that does not depend on the limb's own inertia, so a wrist under a body holds as well as a thigh. Rapier has per axis limits on a generic joint, which make a pyramid rather than a cone.
+- **Status:** the own solver has that constraint: `physics/next`'s `cone` joint, whose proof is `a_limb_a_floor_holds_past_its_cone_rests` in `packages/physics/kernel/tests/joints.rs` (at rest, 0.02 rad past the cone). `@margoengine/ragdoll` still runs on the root entry, so this repro stands until the ragdoll moves onto the own solver in batch 128, which closes this entry.
 
 ### A solver motor on a loaded joint slides what stands on the ground
 

@@ -32,6 +32,18 @@ export type BodyType = 'dynamic' | 'fixed' | 'kinematicPosition' | 'kinematicVel
 
 export type ColliderOptions = ShapeOptions & ColliderSettings;
 
+export interface ConeJointOptions {
+    type: 'cone';
+    anchorA?: Vec3;
+    anchorB?: Vec3;
+    axis?: Vec3;
+    frameA?: Quat;
+    frameB?: Quat;
+    swing: number | readonly [number, number];
+    twist?: readonly [number, number];
+    contactsEnabled?: boolean;
+}
+
 export type JointDof = 'linX' | 'linY' | 'linZ' | 'angX' | 'angY' | 'angZ';
 
 export type JointOptions = (JointBase & {
@@ -169,6 +181,8 @@ export interface MotorOptions {
     maxForce?: number;
 }
 
+export type NextJointOptions = JointOptions | ConeJointOptions;
+
 export class Physics implements EnginePlugin, BodyOwner {
     readonly name: string;
     fixedTimestep: number;
@@ -212,7 +226,7 @@ export class Physics implements EnginePlugin, BodyOwner {
     detach(attachment: PhysicsAttachment): boolean;
     on<K extends keyof PhysicsEventMap>(type: K, listener: (event: PhysicsEventMap[K]) => void): () => void;
     addModel(): never;
-    addJoint(bodyA: PhysicsBody, bodyB: PhysicsBody, options: JointOptions): PhysicsJoint;
+    addJoint(bodyA: PhysicsBody, bodyB: PhysicsBody, options: NextJointOptions): PhysicsJoint;
     removeJoint(joint: PhysicsJoint): void;
     createCharacterController(): never;
     removeController(): never;
@@ -334,17 +348,22 @@ export interface PhysicsEventMap {
 
 export class PhysicsJoint {
     readonly row: number;
-    readonly type: JointType;
+    readonly type: JointType | 'cone';
     readonly bodyA: PhysicsBody;
     readonly bodyB: PhysicsBody;
     constructor(owner: JointOwner,
-    row: number, type: JointType, bodyA: PhysicsBody, bodyB: PhysicsBody);
+    row: number, type: JointType | 'cone', bodyA: PhysicsBody, bodyB: PhysicsBody);
     get valid(): boolean;
     markRemoved(): void;
     get anchorA(): [number, number, number];
     get anchorB(): [number, number, number];
     setLimits(min: number, max: number): this;
     get limits(): [number, number] | null;
+    setCone(swing: number | readonly [number, number], twist?: readonly [number, number]): this;
+    get cone(): {
+        swing: [number, number];
+        twist: [number, number] | null;
+    } | null;
     setMotor(motor: MotorOptions): this;
     setRotationMotor(): never;
     setAxisLimits(): never;

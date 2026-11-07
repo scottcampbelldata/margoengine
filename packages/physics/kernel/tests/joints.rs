@@ -684,6 +684,195 @@ fn one_pass_a_substep_still_holds_a_grid() {
     assert!(worst < 0.02, "a joint opened by {worst} m");
 }
 
+/// A ball joint with a cone: swing limits about frame Y and Z, a twist range about frame X, and frame X along `axis`.
+fn cone(w: &mut World, a: u32, b: u32, on_a: V3, on_b: V3, axis: V3, swing: (f32, f32), twist: (f32, f32)) -> u32 {
+    let joint = w.add_joint(a, b, LOCK_LINEAR_ROWS | JOINT_CONE | JOINT_LIMIT << 3 | JOINT_LIMIT << 4).unwrap();
+    set_anchor(w, joint, on_a, on_b);
+    w.set_joint_axis(joint, axis);
+    let row = joint as usize;
+    w.set_s(JOINT_MIN_3, row, twist.0);
+    w.set_s(JOINT_MAX_3, row, twist.1);
+    w.set_s(JOINT_MIN_4, row, f32::NEG_INFINITY);
+    w.set_s(JOINT_MIN_5, row, swing.0);
+    w.set_s(JOINT_MAX_5, row, swing.1);
+    joint
+}
+
+/// A rod of one metre hanging from a fixed point along `tilt`, a unit vector, its bob at the far end.
+fn rod_on_a_cone(w: &mut World, swing: (f32, f32), twist: (f32, f32)) -> (u32, u32) {
+    let top = anchor(w);
+    let rod = point(w, v3(0.0, -0.5, 0.0), 1.0, 0.1);
+    let joint = cone(w, top, rod, v3(0.0, 0.0, 0.0), v3(0.0, 0.5, 0.0), v3(0.0, -1.0, 0.0), swing, twist);
+    (rod, joint)
+}
+
+/// How far a rod from the origin has swung from straight down, in radians.
+fn swung(w: &World, rod: u32) -> (f64, f64) {
+    let v = w.q(ROTATION_X, rod as usize).rotate(v3(0.0, -1.0, 0.0));
+    let (x, y, z) = (v.x as f64, v.y as f64, v.z as f64);
+    ((x * x + z * z).sqrt().atan2(-y), x.atan2(z))
+}
+
+#[test]
+fn a_cone_stops_a_swing_at_its_edge() {
+    // Thrown out along each direction, a rod comes to rest on the circle of the cone, wherever it hits.
+    for (x, z) in [(1.0f32, 0.0f32), (0.0, 1.0), (0.6, 0.8), (-0.8, 0.6)] {
+        let mut w = world(4);
+        w.header_mut().gravity = [0.0; 3];
+        let (rod, _) = rod_on_a_cone(&mut w, (0.5, 0.5), (-1.0, 1.0));
+        w.set_v(LINEAR_X, rod as usize, v3(3.0 * x, 0.0, 3.0 * z));
+        w.set_v(ANGULAR_X, rod as usize, v3(-6.0 * z, 0.0, 6.0 * x));
+        let mut most = 0.0f64;
+        for _ in 0..240 {
+            w.step(DT);
+            most = most.max(swung(&w, rod).0);
+        }
+        println!("cone at {x} {z}: most {most:.4}, ends at {:.4}", swung(&w, rod).0);
+        assert!(most < 0.51, "swung to {most} past 0.5");
+        assert!(most > 0.49, "stopped short at {most}");
+        assert!((swung(&w, rod).0 - 0.5).abs() < 0.001, "came off the edge to {}", swung(&w, rod).0);
+    }
+}
+
+#[test]
+fn a_cone_of_two_limits_is_an_ellipse() {
+    // Limits of 0.3 about frame Y and 0.8 about frame Z. With frame X down, the swing that lies along frame Z's turn moves
+    // the tip along frame Y, and the edge of the ellipse is reached at each limit along its own axis.
+    for (kick, limit) in [(v3(0.0, 0.0, 6.0), 0.8f64), (v3(6.0, 0.0, 0.0), 0.3)] {
+        let mut w = world(4);
+        w.header_mut().gravity = [0.0; 3];
+        let (rod, joint) = rod_on_a_cone(&mut w, (0.3, 0.8), (-1.0, 1.0));
+        let frame = w.q(JOINT_FRAME_A_X, joint as usize);
+        println!("frame Y {:?} Z {:?}", frame.rotate(v3(0.0, 1.0, 0.0)), frame.rotate(v3(0.0, 0.0, 1.0)));
+        w.set_v(ANGULAR_X, rod as usize, kick);
+        w.set_v(LINEAR_X, rod as usize, kick.cross(v3(0.0, -0.5, 0.0)));
+        let mut most = 0.0f64;
+        for _ in 0..240 {
+            w.step(DT);
+            most = most.max(swung(&w, rod).0);
+        }
+        println!("ellipse: most {most:.4} against {limit}");
+        assert!((most - limit).abs() < 0.01, "swung to {most}, limit {limit}");
+    }
+}
+
+#[test]
+fn a_cone_limits_twist_with_or_without_a_swing() {
+    // Spun about its own length, straight or tilted inside its cone, the rod stops at the twist limit.
+    for tilt in [0.0f32, 0.45] {
+        let mut w = world(4);
+        w.header_mut().gravity = [0.0; 3];
+        let (rod, joint) = rod_on_a_cone(&mut w, (0.5, 0.5), (-0.4, 0.4));
+        let turned = Q { x: 0.0, y: 0.0, z: sinish(tilt / 2.0), w: cosish(tilt / 2.0) };
+        w.set_pose(rod, turned.rotate(v3(0.0, -0.5, 0.0)), turned, false);
+        w.set_v(ANGULAR_X, rod as usize, turned.rotate(v3(0.0, -4.0, 0.0)));
+        run(&mut w, 120);
+        let frame_a = w.q(JOINT_FRAME_A_X, joint as usize);
+        let frame_b = w.q(ROTATION_X, rod as usize).mul(w.q(JOINT_FRAME_B_X, joint as usize));
+        let q = frame_a.conjugate().mul(frame_b);
+        let twist = 2.0 * atan2(q.x, q.w);
+        let spin = w.v(ANGULAR_X, rod as usize);
+        println!("tilt {tilt}: twist stops at {twist:.4}, spin {:.5}", sqrt(spin.dot(spin)));
+        assert!((twist.abs() - 0.4).abs() < 0.002, "twisted to {twist}");
+        // Tilted, the stop takes only the spin along the bisector, and the rest swings on: the rod is free to.
+        assert!(tilt > 0.0 || sqrt(spin.dot(spin)) < 0.01, "still spinning");
+    }
+}
+
+#[test]
+fn a_hinge_stops_dead_on_its_limit() {
+    // A rod thrown round a hinge at its end, into a stop. The limit's row must see the hinge's locks: alone it moves the free
+    // body, the locks take most of that back, and what the warm start then remembers sent the rod off the stop at a quarter
+    // of its speed.
+    let mut w = world(4);
+    w.header_mut().gravity = [0.0; 3];
+    let top = anchor(&mut w);
+    let rod = point(&mut w, v3(0.5, 0.0, 0.0), 1.0, 0.1);
+    let joint = revolute(&mut w, top, rod, v3(0.0, 0.0, 0.0), v3(-0.5, 0.0, 0.0), v3(0.0, 0.0, 1.0));
+    set_limit(&mut w, joint, 3, -0.5, 0.5);
+    w.set_v(ANGULAR_X, rod as usize, v3(0.0, 0.0, 6.0));
+    w.set_v(LINEAR_X, rod as usize, v3(0.0, 3.0, 0.0));
+    run(&mut w, 30);
+    let turn = |w: &World| {
+        let q = w.q(ROTATION_X, rod as usize);
+        2.0 * atan2(q.z, q.w)
+    };
+    let (angle, spin) = (turn(&w), w.v(ANGULAR_X, rod as usize).z);
+    println!("hinge stop: at {angle:.5}, spin {spin:.5}");
+    assert!((angle - 0.5).abs() < 1e-3, "the rod is at {angle}");
+    assert!(spin.abs() < 1e-3, "the rod left the stop at {spin} rad/s");
+}
+
+/// How far frame X of a joint's body B stands from the middle of its cone on body A, in radians.
+fn off_centre(w: &World, a: u32, b: u32, centre: V3) -> f64 {
+    let (from, to) = (w.q(ROTATION_X, a as usize).rotate(centre), w.q(ROTATION_X, b as usize).rotate(v3(1.0, 0.0, 0.0)));
+    let (from, to) = ([from.x as f64, from.y as f64, from.z as f64], [to.x as f64, to.y as f64, to.z as f64]);
+    (from[0] * to[0] + from[1] * to[1] + from[2] * to[2]).clamp(-1.0, 1.0).acos()
+}
+
+#[test]
+fn a_light_link_holds_a_heavy_one_on_its_cones() {
+    // A wall, a link of a hundredth of the mass, and a full link at its end, each joint a cone of 0.2: the light link's limit
+    // carries the heavy one, and how well must not depend on the light link's own inertia.
+    for (mass, inertia) in [(1.0f32, 0.1f32), (0.01, 0.001)] {
+        let mut w = world(4);
+        let wall = anchor(&mut w);
+        let light = point(&mut w, v3(0.25, 0.0, 0.0), mass, inertia);
+        let heavy = point(&mut w, v3(0.75, 0.0, 0.0), 1.0, 0.1);
+        let along = v3(1.0, 0.0, 0.0);
+        cone(&mut w, wall, light, v3(0.0, 0.0, 0.0), v3(-0.25, 0.0, 0.0), along, (0.2, 0.2), (-0.3, 0.3));
+        cone(&mut w, light, heavy, v3(0.25, 0.0, 0.0), v3(-0.25, 0.0, 0.0), along, (0.2, 0.2), (-0.3, 0.3));
+        run(&mut w, 600);
+        let (near, far) = (off_centre(&w, wall, light, along), off_centre(&w, light, heavy, along));
+        let v = w.v(LINEAR_X, heavy as usize);
+        println!("light link {mass}: off centre {near:.4} and {far:.4}, end speed {:.5}", sqrt(v.dot(v)));
+        assert!(near < 0.21 && far < 0.21, "the cones gave way to {near} and {far}");
+    }
+}
+
+#[test]
+fn a_limb_a_floor_holds_past_its_cone_rests() {
+    // docs/known-bugs.md, "A limp ragdoll keeps moving": a heavy body on a floor with a limb whose two cones point down through
+    // the floor, so the cones and the floor cannot both hold. Everything must come to rest, and the push out of a limit must not
+    // depend on the limb: a hand of a hundredth of the density rests as a full one does.
+    for density in [300.0f32, 3.0] {
+        let mut w = world(16);
+        let floor = w.add_body(FIXED).unwrap();
+        w.add_collider(floor, SHAPE_BOX, [20.0, 0.5, 20.0], [0.0; 3], IDENTITY, 0.0).unwrap();
+        place(&mut w, floor, v3(0.0, -0.5, 0.0));
+        let torso = w.add_body(DYNAMIC).unwrap();
+        w.add_collider(torso, SHAPE_BOX, [0.5, 0.15, 0.3], [0.0; 3], IDENTITY, 500.0).unwrap();
+        place(&mut w, torso, v3(0.0, 0.15, 0.0));
+        let upper = w.add_body(DYNAMIC).unwrap();
+        w.add_collider(upper, SHAPE_BOX, [0.25, 0.05, 0.05], [0.0; 3], IDENTITY, 300.0).unwrap();
+        place(&mut w, upper, v3(0.75, 0.05, 0.0));
+        let hand = w.add_body(DYNAMIC).unwrap();
+        w.add_collider(hand, SHAPE_BOX, [0.1, 0.03, 0.05], [0.0; 3], IDENTITY, density).unwrap();
+        place(&mut w, hand, v3(1.1, 0.03, 0.0));
+        // Both cones point 40 degrees below the line of the limb, and allow 20.
+        let down = v3(cosish(0.7), -sinish(0.7), 0.0);
+        let straight = Q { x: 0.0, y: 0.0, z: 0.0, w: 1.0 };
+        let shoulder = cone(&mut w, torso, upper, v3(0.5, -0.1, 0.0), v3(-0.25, 0.0, 0.0), down, (0.35, 0.35), (-0.3, 0.3));
+        w.set_q(JOINT_FRAME_B_X, shoulder as usize, straight);
+        let wrist = cone(&mut w, upper, hand, v3(0.25, -0.02, 0.0), v3(-0.1, 0.0, 0.0), down, (0.35, 0.35), (-0.3, 0.3));
+        w.set_q(JOINT_FRAME_B_X, wrist as usize, straight);
+        let mut fastest = 0.0f32;
+        for step in 0..600 {
+            w.step(DT);
+            if step >= 300 {
+                for b in [torso, upper, hand] {
+                    let v = w.v(LINEAR_X, b as usize);
+                    fastest = fastest.max(sqrt(v.dot(v)));
+                }
+            }
+        }
+        let (past_shoulder, past_wrist) = (off_centre(&w, torso, upper, down) - 0.35, off_centre(&w, upper, hand, down) - 0.35);
+        println!("limb, hand density {density}: fastest after 5 s {fastest:.5} m/s, past the limit {past_shoulder:.3} and {past_wrist:.3} rad");
+        assert!(fastest < 0.1, "still moving at {fastest} m/s");
+        assert!(past_wrist < 0.6, "the wrist stands {past_wrist} rad past its cone");
+    }
+}
+
 fn sinish(angle: f32) -> f32 {
     (angle as f64).sin() as f32
 }

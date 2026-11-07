@@ -15,6 +15,14 @@
 // feedback is the error itself, and that grows at any share (the derivation is in docs/clean-room.md, row PK24). A soft
 // row has its own way out, the gamma term below, which is why contacts can remember everything.
 //
+// A limit stops and starts, so it is a row of its own, in two halves. Up to its edge it is rigid, and a gap still open lets
+// the axis close it within this substep and no more, so it stops a swing dead and holds any load. Past its edge it pushes as
+// a contact does, a spring and damper in implicit form (Catto 2011) with the contact's frequency, so a limit and a floor
+// that cannot both hold come to rest instead of trading a rigid push for ever. Its stiffness is per unit of effective mass:
+// a wrist pushes out as fast as a thigh. Being soft it remembers all it gives, as a contact does. Its row is the Schur
+// complement of the joint's own locks: on the free body alone the locks would take most of each impulse back, the passes would
+// not settle that in a substep, and what the warm start then remembered sent a rod off its stop at a quarter of its speed.
+//
 // A motor or spring is a force, so it is a soft row and is not relaxed: gamma = 1 / (h (c + h k)), bias = h k gamma C, and
 //
 //   impulse = -(Cdot + bias + gamma impulse_so_far) / (K + gamma)
@@ -27,13 +35,16 @@
 // no longer tells rotations apart.
 use crate::layout::*;
 use crate::math::*;
-use crate::solver::Moving;
+use crate::solver::{Moving, Soft};
 use crate::world::{NONE, World};
 
 const AXES: [V3; 3] = [v3(1.0, 0.0, 0.0), v3(0.0, 1.0, 0.0), v3(0.0, 0.0, 1.0)];
 const TAU: f32 = 2.0 * PI;
 /// Anchors closer than this have no line between them.
 const COINCIDENT: f32 = 1e-6;
+/// A swing's sine under this has no direction to read, and cos^2(swing / 2) under this leaves the twist undefined.
+const NO_SWING: f32 = 1e-6;
+const NO_TWIST: f32 = 1e-4;
 
 /// What a pass over the joints is for. See the head of this file.
 #[derive(Clone, Copy, PartialEq)]
@@ -84,10 +95,11 @@ struct View {
 }
 
 /// Doubles at the words of JOINT_SCRATCH after the view: a joint's inverse block, its link to the joint before, its right
-/// side, and what the pushing pass gave each limit.
+/// side, and for each limit how its locks lean on it and what it moves with them holding.
 const LINK: usize = 36;
 const RIGHT: usize = 72;
-const PUSHED: usize = 78;
+const LEAN: usize = 78;
+const EASE: usize = 114;
 
 /// How many lock rows, and their axes.
 #[inline]
@@ -514,7 +526,40 @@ impl World {
             at[4] = turn.y;
             at[5] = turn.z;
         }
+        if flags & JOINT_CONE != 0 {
+            self.cone_rows(row, axes, frame_a, frame_b, q, &mut rows, &mut at);
+        }
         View { rows, at }
+    }
+
+    /// A cone's two rows. Frame B's turn in frame A splits into a twist about X and a swing that takes X to where frame B's X
+    /// points (Dobrowolski 2015), so q = swing twist and the twist's angle is 2 atan2(q.x, q.w). Twist's rate is the relative
+    /// spin along the bisector over cos(swing / 2), as d theta = (a1 + a2) . w / (2 (x^2 + w^2)). The swing stays inside an
+    /// ellipse of its rotation vector, (r_y / limit_y)^2 + (r_z / limit_z)^2 <= 1: its row runs along the gradient, and what
+    /// it measures is the first-order distance past the edge, negative inside. The limit in rows does the rest.
+    #[allow(clippy::too_many_arguments)]
+    fn cone_rows(&self, row: usize, axes: [V3; 3], frame_a: Q, frame_b: Q, q: Q, rows: &mut [Row; 6], at: &mut [f32; 6]) {
+        let (a1, a2) = (axes[0], frame_b.rotate(AXES[0]));
+        let bisector = a1.add(a2).scale(1.0 / (2.0 * (q.x * q.x + q.w * q.w).max(NO_TWIST)));
+        rows[3] = Row { d: v3(0.0, 0.0, 0.0), ta: bisector, tb: bisector };
+        at[3] = 2.0 * atan2(q.x, q.w);
+        let across = frame_a.unrotate(a2);
+        let sine = sqrt(across.y * across.y + across.z * across.z);
+        if sine < NO_SWING && across.x > 0.0 {
+            // Dead centre: inside any limit, along any line.
+            at[4] = -1.0;
+            return;
+        }
+        let swing = atan2(sine, across.x);
+        // Straight back the line is lost too: any line across will do, and the row turns the axis out of it.
+        let (y, z) = if sine < NO_SWING { (0.0, swing) } else { (-across.z * swing / sine, across.y * swing / sine) };
+        let (limit_y, limit_z) = (self.s(JOINT_MIN_5, row), self.s(JOINT_MAX_5, row));
+        let (over_y, over_z) = (y / (limit_y * limit_y), z / (limit_z * limit_z));
+        let size = sqrt(over_y * over_y + over_z * over_z);
+        let (line_y, line_z) = (over_y / size, over_z / size);
+        let line = axes[1].scale(line_y).add(axes[2].scale(line_z));
+        rows[4] = Row { d: v3(0.0, 0.0, 0.0), ta: line, tb: line };
+        at[4] = (y * over_y + z * over_z - 1.0) / (2.0 * size);
     }
 
     /// Each substep, before the solve: every joint's rows from the bodies' poses, and the factors of each path: block
@@ -536,6 +581,30 @@ impl World {
             }
             let via = self.uu(SOLVE_VIA, i);
             let doubles = self.doubles(row);
+            let flags = self.uu(JOINT_FLAGS, row);
+            if flags & (JOINT_LIMIT * 63) != 0 {
+                // What each limit moves with the joint's own locks holding: the Schur complement of its locks in the block.
+                let own = invert(&mut k.clone(), m);
+                for q in 0..6 {
+                    if flags & (JOINT_LIMIT << q) == 0 {
+                        continue;
+                    }
+                    let mut across = [0.0f64; 6];
+                    for r in 0..m {
+                        across[r] = view.rows[axes[r]].give(&view.rows[q], &body_a, &body_b) as f64;
+                    }
+                    let mut ease = view.rows[q].give(&view.rows[q], &body_a, &body_b) as f64;
+                    for r in 0..m {
+                        let mut lean = 0.0;
+                        for s in 0..m {
+                            lean += own[r][s] * across[s];
+                        }
+                        unsafe { *doubles.add(LEAN + q * 6 + r) = lean };
+                        ease -= lean * across[r];
+                    }
+                    unsafe { *doubles.add(EASE + q) = ease };
+                }
+            }
             if via != NONE {
                 let before = self.uu(SOLVE_JOINTS, i - 1) as usize;
                 let (n, axes_before) = lock_rows(self.uu(JOINT_FLAGS, before));
@@ -602,7 +671,7 @@ impl World {
     }
 
     /// One pass over the joints.
-    pub fn solve_joints(&mut self, h: f32, pass: Pass) {
+    pub fn solve_joints(&mut self, h: f32, stiffness: Soft, pass: Pass) {
         let most = self.header().joint_max_push;
         let solving = self.header().joint_solving as usize;
         let mut first = 0;
@@ -616,7 +685,7 @@ impl World {
                 let row = self.uu(SOLVE_JOINTS, i) as usize;
                 let flags = self.uu(JOINT_FLAGS, row);
                 if flags & (JOINT_LIMIT * 63 | JOINT_MOTOR_ON * 63) != 0 {
-                    self.soft_rows(row, flags, h, rate, most, pass);
+                    self.soft_rows(row, flags, h, stiffness, most, pass);
                 }
             }
             self.solve_path(first, last, rate, most, pass);
@@ -625,7 +694,7 @@ impl World {
     }
 
     /// A joint's motors and limits, one row at a time: they stop and start, which a factored path cannot.
-    fn soft_rows(&mut self, row: usize, flags: u32, h: f32, rate: f32, most: f32, pass: Pass) {
+    fn soft_rows(&mut self, row: usize, flags: u32, h: f32, stiffness: Soft, most: f32, pass: Pass) {
         let view = self.view(row);
         let (a, b) = (self.uu(JOINT_A, row) as usize, self.uu(JOINT_B, row) as usize);
         let (mut body_a, mut body_b) = (self.moving(a), self.moving(b));
@@ -638,7 +707,7 @@ impl World {
         }
         for k in 0..6 {
             if flags & (JOINT_LIMIT << k) != 0 {
-                self.limit_row(row, k, &view.rows[k], view.at[k], h, rate, most, pass, &mut body_a, &mut body_b);
+                self.limit_row(row, k, &view, h, stiffness, most, pass, &mut body_a, &mut body_b);
             }
         }
         self.settle(a, &body_a);
@@ -741,42 +810,41 @@ impl World {
         self.set_s(JOINT_MOTOR_0 + k, row, total);
     }
 
-    /// A limit on one axis, against its nearer end: a one-way rigid row. A gap still open lets the axis close it within
-    /// this substep and no more, as a speculative contact does. What the row has given this substep is what it remembers
-    /// plus what the pushing pass gave, so the relaxing pass can take a push back though nothing remembers it.
+    /// A limit on one axis, against its nearer end: a one-way row, rigid up to its edge and soft past it. It reads the speed
+    /// its joint's locks leave it and moves what they let it move, and the path solve that follows adds their share.
     #[inline]
     #[allow(clippy::too_many_arguments)]
-    fn limit_row(&mut self, row: usize, k: usize, axis: &Row, at: f32, h: f32, rate: f32, most: f32, pass: Pass, a: &mut Moving, b: &mut Moving) {
-        let give = axis.give(axis, a, b);
+    fn limit_row(&mut self, row: usize, k: usize, view: &View, h: f32, stiffness: Soft, most: f32, pass: Pass, a: &mut Moving, b: &mut Moving) {
+        let (axis, at) = (&view.rows[k], view.at[k]);
+        let doubles = self.doubles(row);
+        let give = unsafe { *doubles.add(EASE + k) } as f32;
         if !(give > 0.0) {
             return;
         }
         let (low, high) = (self.s(JOINT_MIN_0 + k, row), self.s(JOINT_MAX_0 + k, row));
         // +1 pushes up from the lower end, -1 down from the upper one.
         let (side, gap) = if at - low < high - at { (1.0, at - low) } else { (-1.0, high - at) };
-        let pushed = if pass == Pass::Relax { side * unsafe { *self.doubles(row).add(PUSHED + k) as f32 } } else { 0.0 };
         let carried = self.s(JOINT_IMPULSE_0 + k, row) * side;
-        let given = carried + pushed;
-        let pressed = if given > 0.0 { given } else { 0.0 };
-        let speed = axis.speed(a, b) * side;
-        let bias = if gap > 0.0 {
-            gap / h
+        let pressed = if carried > 0.0 { carried } else { 0.0 };
+        let (m, axes) = lock_rows(self.uu(JOINT_FLAGS, row));
+        let mut along = axis.speed(a, b) as f64;
+        for r in 0..m {
+            along -= unsafe { *doubles.add(LEAN + k * 6 + r) } * view.rows[axes[r]].speed(a, b) as f64;
+        }
+        let speed = along as f32 * side;
+        let (bias, mass_scale, impulse_scale) = if gap > 0.0 {
+            (gap / h, 1.0, 0.0)
         } else if pass == Pass::Push {
-            let push = rate * gap;
-            if push > -most { push } else { -most }
+            let push = stiffness.bias_rate * gap;
+            (if push > -most { push } else { -most }, stiffness.mass_scale, stiffness.impulse_scale)
         } else {
-            0.0
+            (0.0, 1.0, 0.0)
         };
-        let total = pressed - (speed + bias) / give;
+        let total = pressed - mass_scale * (speed + bias) / give - impulse_scale * pressed;
         let total = if total > 0.0 { total } else { 0.0 };
         // A relaxing pass only takes back, as for a contact.
         let total = if pass == Pass::Relax && gap > 0.0 && total > pressed { pressed } else { total };
-        axis.push(a, b, (total - given) * side);
-        if pass == Pass::Push {
-            unsafe { *self.doubles(row).add(PUSHED + k) = ((total - given) * side) as f64 };
-        } else {
-            let kept = total - pushed;
-            self.set_s(JOINT_IMPULSE_0 + k, row, if kept > 0.0 { kept * side } else { 0.0 });
-        }
+        axis.push(a, b, (total - carried) * side);
+        self.set_s(JOINT_IMPULSE_0 + k, row, total * side);
     }
 }

@@ -333,6 +333,32 @@ hinge.clearMotor();
 physics.dispose();
 ```
 
+A `cone` joint is the joint of a shoulder or a hip, and only the own solver has it. Its body's frame X stays within `swing` of the other's, as one angle or `[aboutY, aboutZ]` for an ellipse, and turns about that line within `twist` (leave it out to twist freely). `axis` is the middle of the cone, X by default, or give `frameA` and `frameB`. `joint.setCone(swing, twist)` changes it and `joint.cone` reads it.
+
+```ts
+import {Physics} from 'margoengine/physics/next';
+
+await Physics.load();
+const physics = new Physics(null);
+const chest = physics.addBody(null, {type: 'fixed', colliders: []});
+const arm = physics.addBody(null, {
+  position: [0.3, 0, 0],
+  colliders: {shape: 'capsule', radius: 0.05, halfHeight: 0.25},
+});
+const shoulder = physics.addJoint(chest, arm, {
+  type: 'cone',
+  anchorB: [-0.3, 0, 0],
+  axis: [1, 0, 0],                      // the middle of the cone
+  swing: [0.4, 1.2],                    // radians about frame Y and Z
+  twist: [-0.5, 0.5],
+});
+for (let i = 0; i < 120; i++) physics.step();
+console.log(shoulder.cone);             // {swing: [0.4, 1.2], twist: [-0.5, 0.5]}
+physics.dispose();
+```
+
+Every limit, a cone's and a hinge's, stops its axis dead at the edge and holds any load there. An axis that starts past its edge, or is held there by a floor, is pushed back as a contact pushes out of a depth, so a limb that cannot reach its cone comes to rest where it lies. That push has the strength of the limb's own mass: a very light hand under an arm stays where the arm leaves it.
+
 Locks along a chain are solved exactly, so a chain of 50 holds a 1000 to 1 end mass. A branch or a closed loop settles pass by pass, so it holds under its own weight and gives way a little under a far heavier body: the numbers are in `docs/limits.md`.
 
 Each step is 8 substeps of 2 solver passes by default (`physics.substeps`, `physics.iterations`). `friction` defaults to 0.5, `restitution` to 0, and each combine rule to `average`; when two colliders ask for different rules the pair takes the higher, `max`, `multiply`, `min`, `average`. `collider.setFriction` and `collider.setRestitution` take effect at the next step.

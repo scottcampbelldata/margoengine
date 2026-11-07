@@ -431,7 +431,7 @@ pub const MAX_BODIES: u32 = 1 << 22;
 pub const MAX_COLLIDERS: u32 = 1 << 22;
 /// Words of JOINT_SCRATCH a joint takes: 64 for its rows and measures, then doubles, 36 of inverse, 36 of link, 6 of right side,
 /// 6 of what the pushing pass gave.
-pub const JOINT_WORDS: u32 = 64 + 2 * (36 + 36 + 6 + 6);
+pub const JOINT_WORDS: u32 = 64 + 2 * (36 + 36 + 6 + 36 + 6);
 /// Most joints one world holds.
 pub const MAX_JOINTS: u32 = 1 << 22;
 /// Pairs the broad phase can hold; its table then fills 2^30 slots and its points 2^31 rows.
@@ -492,5 +492,7 @@ pub const JOINT_MOTOR_FORCE: u32 = 1 << 18;
 pub const JOINT_ALIVE: u32 = 1 << 24;
 /// The two bodies may collide with each other.
 pub const JOINT_CONTACTS: u32 = 1 << 25;
+/// A cone: the first turning axis is the twist about frame X, the second how far past its swing limit frame B's X stands.
+pub const JOINT_CONE: u32 = 1 << 26;
 /// The first axis is the line between the anchors, and what it measures is their distance: a rope's limit, a spring's motor.
 pub const JOINT_DISTANCE: u32 = 1 << 27;

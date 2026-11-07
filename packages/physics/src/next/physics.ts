@@ -3,14 +3,13 @@
 import { MargoError } from '@margoengine/math/errors';
 import type { EngineKernel, EnginePlugin, Mesh } from '@margoengine/core';
 import type { BodyOptions, BodyType } from '../body.js';
-import type { JointOptions } from '../joints.js';
 import { KernelWorld, loadKernel, type KernelContactPoint, type KernelLoadOptions } from '../kernel.js';
 import { checkVec, type Quat, type Vec3 } from '../math.js';
 import { colliderGeometry } from '../mesh-fit.js';
 import type { ColliderOptions, ShapeOptions } from '../shapes.js';
 import { PhysicsBody, checkRotation, type BodyOwner } from './body.js';
 import { PhysicsCollider } from './collider.js';
-import { PhysicsJoint, createJoint } from './joint.js';
+import { type NextJointOptions, PhysicsJoint, createJoint } from './joint.js';
 import { kernelCollider, shapeServed } from './shapes.js';
 import { MeshSync, meshPose } from './sync.js';
 
@@ -407,7 +406,7 @@ export class Physics implements EnginePlugin, BodyOwner {
    * @throws MargoError (`state`) unless both bodies belong to this world and are two bodies.
    * @throws MargoError (`unsupported`) for a kind the own solver does not hold yet.
    */
-  addJoint(bodyA: PhysicsBody, bodyB: PhysicsBody, options: JointOptions): PhysicsJoint {
+  addJoint(bodyA: PhysicsBody, bodyB: PhysicsBody, options: NextJointOptions): PhysicsJoint {
     if (!this.bodies.has(bodyA) || !this.bodies.has(bodyB))
       throw new MargoError('state', 'Both bodies must belong to this physics world; add them with physics.addBody first.');
     if (bodyA === bodyB)
