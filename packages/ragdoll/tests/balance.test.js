@@ -208,6 +208,10 @@ async function figure([path, boneMap, mass], rounding, passes) {
 // Feet that stand stay where they stand: a solver motor on a knee slid them 0.045 m in five seconds on RiggedFigure and 0.007 m
 // on Seed-san and Mage, with a body otherwise at rest and friction nowhere near its limit.
 const FOOT_SLIDE = 0.002;
+// Hips that stand stay over those feet, within 0.5 percent of their height. A stance knee's torque is capped by the body's
+// weight on the leg's shorter lever: capped by the limb's own inertia instead, Mage's knee ran short of what it carries and its
+// hips wandered 0.0038 m where they read 0.0005, with every other bound still met.
+const HIPS_DRIFT = 0.005;
 for (const [name, entry] of Object.entries(figures))
   test(`${name} settles on its own legs, whatever the rounding of its hull points`, { skip, timeout: 300_000 }, async () => {
     const failures = [];
@@ -244,7 +248,7 @@ for (const [name, entry] of Object.entries(figures))
         const still = Math.hypot(...speed) / mass;
         if (keeper.state === 'fallen') fail('it fell');
         if (keeper.steps !== steps) fail(`${keeper.steps - steps} steps after frame 60`);
-        if (drift >= (0.05 / 0.406) * size) fail(`hips drifted ${drift} m`);
+        if (drift >= HIPS_DRIFT * size) fail(`hips drifted ${drift} m`);
         if (slide >= FOOT_SLIDE) fail(`a foot slid ${slide} m`);
         if (Math.max(...heights) - Math.min(...heights) >= (0.02 / 0.406) * size) fail('its hips did not hold their height');
         if (still >= 0.02) fail(`centre of mass at ${still} m/s`);

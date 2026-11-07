@@ -1444,9 +1444,9 @@ Scott's order of 2026-11-07, one at a time, each pushed before the next.
 | # | Job | Status | Commit | Entry | Claim |
 | --- | --- | --- | --- | --- | --- |
 | 1 | 16 solver passes no worse than 10 | DONE | 0caee8194 | `/balance` | LIM-248 |
-| 1b | RiggedFigure slid more at 8 passes after item 1 | DONE | this commit | `/balance` | LIM-248 |
-| 2 | Seed-san's creep | DONE | this commit | `/balance` | LIM-248 |
-| 5 | Mage's shake, and Mage in the strict test | DONE | this commit | `/balance` | LIM-248 |
+| 1b | RiggedFigure slid more at 8 passes after item 1 | DONE | `82ead69e5` | `/balance` | LIM-248 |
+| 2 | Seed-san's creep | DONE | `82ead69e5` | `/balance` | LIM-248 |
+| 5 | Mage's shake, and Mage in the strict test | DONE | `82ead69e5` | `/balance` | LIM-248 |
 
 **Item 1, worst of 24 roundings, hips drift over five seconds at 8 / 10 / 16 passes (before: one rounding, centre of mass m/s at 8 / 10 / 16).**
 
