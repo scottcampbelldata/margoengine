@@ -504,6 +504,44 @@ yet. A new plan replaces a working one only with priority: `plan.record` holds t
 decomposition, and `compareRecords(a, b)` compares them, so a recovery animation is not cut short by a lesser plan. For a
 partial plan, split it in the domain: a method that only walks while the enemy is far, and one that attacks when near.
 
+## Context steering
+
+Behaviours say what they would like and fear in every direction instead of each deciding, so two of them cannot cancel
+out into a stall: the lowest danger masks the interest, and the strongest interest left is the heading.
+
+```ts
+import { ContextSteering, avoid, chase } from 'margoengine/behavior/context';
+import { Steering, integrate } from 'margoengine/behavior/steering';
+
+const targets = [{ position: [6, 0, 0] }, { position: [0, 0, 12] }];
+const obstacles = [{ position: [2.5, 0, 0], radius: 1 }];
+const agent = { position: [0, 0, 0], velocity: [0, 0, 0], maxSpeed: 4 };
+
+const context = new ContextSteering({ resolution: 16, memory: 0.3 })
+  .add(chase(targets)) // the arrays are read on every update
+  .add(avoid(obstacles, { clearance: 3 }))
+  .add((interest, danger, self) => {
+    interest.write(Math.PI / 2, 0.2, Math.PI / 4); // your own: heading in radians, value, spread
+  });
+
+const { direction, strength, danger } = context.decide(agent);
+direction; // unit heading on the ground; strength is the share of top speed; danger above 0 means the least bad way
+
+// Or as one behaviour of a Steering, beside anything else.
+const steering = new Steering().add((self, out) => void context.steer(self, out));
+integrate(agent, steering.compute(agent), 1 / 60);
+```
+
+A `ContextMap` is a ring of slots, one per heading, from +X toward +Z. `write` keeps the higher of old and new, so a
+second obstacle behind the first adds no danger, and `spread` falls off linearly, or stays full with `flat`. The chosen
+heading lands between slots, so 8 slots steer as true as 256 on a smooth peak; next to a masked slot it stays on its
+slot, so it cannot drift into danger.
+
+`blur` runs a 1, 2, 1 pass over the interest to soften spikes. `memory` keeps a share of the last update's interest,
+so a pull that peaks for a moment does not turn the agent. `slack` lets danger within that much of the lowest count as the
+lowest, so a faint hint does not mask a good heading. `context.interest` and `context.danger` hold the last maps, for
+drawing.
+
 Errors name their fix: a bad argument throws `TypeError` or `RangeError` (`Agent maxSpeed must be a finite number of
 0 or more`), a call that is not valid right now throws `MargoError` with code `state` (ticking from inside a handler),
 `disposed` (after `dispose()`) or `failed` (a rejected task). `using tree = new BehaviorTree(...)` halts it at the end

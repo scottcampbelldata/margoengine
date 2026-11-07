@@ -1,6 +1,6 @@
 {
-  "commit": "3ab28e97d",
-  "dirty": true,
+  "commit": "e22cbb195",
+  "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
     "raw": 57071,
@@ -138,6 +138,10 @@
       "./htn": {
         "raw": 4322,
         "gzip": 1721
+      },
+      "./context": {
+        "raw": 3194,
+        "gzip": 1402
       }
     },
     "@margoengine/biomes": {
@@ -2264,16 +2268,24 @@
     },
     "@margoengine/save": {
       ".": {
-        "raw": 19743,
-        "gzip": 6701
+        "raw": 19791,
+        "gzip": 6728
       },
       "./node": {
-        "raw": 1345,
-        "gzip": 683
+        "raw": 2270,
+        "gzip": 1149
       },
       "./engine": {
-        "raw": 22483,
-        "gzip": 8187
+        "raw": 22479,
+        "gzip": 8182
+      },
+      "./slots": {
+        "raw": 15193,
+        "gzip": 5485
+      },
+      "./safe": {
+        "raw": 3769,
+        "gzip": 1846
       }
     },
     "@margoengine/scatter": {
@@ -3180,9 +3192,9 @@
       "brotli": 16889
     },
     "packages/save/dist/index.js": {
-      "raw": 19853,
-      "gzip": 6743,
-      "brotli": 6072
+      "raw": 19901,
+      "gzip": 6771,
+      "brotli": 6101
     },
     "packages/decoders/dist/decoder.worker.js": {
       "raw": 17211,

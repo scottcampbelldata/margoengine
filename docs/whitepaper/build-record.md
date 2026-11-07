@@ -2116,3 +2116,65 @@ Eight jobs for `@margoengine/netcode`, on this PC with the full check per job; e
 - **Limits:** rows in `docs/limits.md`, Platform. `server.py` of the WebTransport proof overrides a private settings method of aioquic to announce what Chromium asks for; it is test-only and not shipped. Chromium reported a `maxDatagramSize` of 1,211 B on loopback, so a bigger snapshot takes the stream. No speed is measured; the encode cost of `InterestManager` is in the quiet pass.
 - **Slips:** job 1's first land stopped at the API quality gate. Job 3's first land stopped at verify on three rule tests (bounded teardown, marked waits, generated notices), job 4's on a marked wait, and job 8's on the result cache bug; each was fixed and the full check run again. Main moved during each full check, so jobs 2 to 7 landed by the short rule after the full check passed on the parent. Job 2 left a stale README limit, fixed in job 3's commit.
 - **Gate:** lint, hygiene, verify, the net and netcode tests, check:readmes and check:readme-run for each job; the browser proof for job 5.
+
+## Lane C batch 94: behavior
+
+Seven jobs for `@margoengine/behavior`, on this PC with the full check per job. Each is a new optional entry, and core
+and stage are untouched. The batch's aim is an agent that notices, chooses a place, plans and moves on its own, with
+each piece paid for only when imported. Nothing is timed.
+
+| # | Job | Status | Commit | Entry | Claim |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Perception | DONE | `99a709ab` | `/perception` | LIM-368 |
+| 2 | Environment queries | DONE | `a054d2ba` | `/eqs` | LIM-371 |
+| 3 | Goal planner | DONE | `8ac2569a` | `/goap` | LIM-382 |
+| 4 | Smart objects | DONE | `578fc611` | `/smart-objects` | LIM-385 |
+| 5 | Flow fields | DONE | `8f725ece` | `/flowfield` | LIM-392 |
+| 6 | Task network planner | DONE | `78421466` | `/htn` | LIM-404 |
+| 7 | Context steering | DONE | this commit | `/context` | the next claim after LIM-404 on the day |
+
+- **Bugs fixed:** one in the checks. `npm run verify` ended with `ENOENT` in `ResultStore.evict` when two lanes evicted at
+  once. Another lane fixed that first, in `fd7bd7f0`, so the `fix(scripts)` commit just before this one holds what was
+  left of the same kind: outputs deleted under their own name, and `restoreOutput` opening a file it had only asked
+  about, with two tests in `tests/result-cache.test.js`. Also in the checks: `heapWindows` took the cost of reading the
+  heap size from one read, and a read that caught about 210 KB shifted all five windows of a run to about -118 B per
+  call, failing `tests/frame-alloc.test.js` once. It is now the median of five reads; a `fix(tests)` commit just before
+  this one holds it, and an injected read gives the failed run's numbers without the fix. What that read caught is not
+  known. No bug of this package reached main. Bugs in unlanded drafts, each
+  caught by a test that ships with its job: flow field line of sight flagged 59 of 900 open cells, since a ring's corner read side cells of its own ring
+  before they were tested ("open ground is all line of sight"); two goals in one cell seeded it twice and could overrun
+  the heap ("two goals in one cell seed it once"); fast units jumped walls ("no speed jumps a wall"). The goal planner's
+  goal that holds by itself now ends the plan ("a goal the world satisfies by itself").
+- **Draft claims the tests corrected:** the flow field draft said 10% from the true distance. First order fast marching
+  measures 10.3% just past 5 cells, 21% one cell out and under 3% past 40, so the test and the claim state that; that
+  test had never landed, and nothing that landed was loosened. The context draft said `memory` stops flip-flops. A plain
+  blend does stop a pull that peaks for a moment, which is the case in the chapter, but two pulls that swap every update
+  with equal averages still swap. The test now holds the first case and `docs/limits.md` records the second.
+- **Proved:** the tests of each entry. Goal planner: cost and reachability against an exhaustive forward search on 500
+  random domains. Task network planner: the plan plain recursive decomposition finds first on 500 random domains, and
+  the five step plan of Humphreys 2013. Flow fields: strictly downhill flow on a random grid, a sampled line for every
+  flagged cell, a stamp's undo restoring the field exactly, and 10,000 units through one gap. Context steering: blended
+  seek and flee stalling on the scene where context steering moves, and no heading into an obstacle at 64 turns.
+- **Stand-in:** every scene, domain and grid is generated or written in a test. No real level, game domain or map was
+  used.
+- **Sources:** rows in `docs/clean-room.md` under Game AI. Read in full: Walsh 2015, Isla and Blumberg 2002, Jack 2013,
+  Orkin 2004 and 2005, Fikes and Nilsson SRI TN 43 of 1970, Kallmann and Thalmann 1998, Emerson 2013, Humphreys 2013,
+  Fray 2015. Read in part: Forbus and Wright 2001 (to section 4.1), Orkin 2006 (its differences from STRIPS), Treuille et
+  al. 2006 (section 4.3). Not read: the 1971 journal paper of Fikes and Nilsson, Orkin 2003, Nau et al. on SHOP, Erol et
+  al., Tsitsiklis 1995, Johnson 2017, Pentheny.
+- **Limits:** rows in `docs/limits.md`. No planner, field or steering time is measured; flow field timing is listed for
+  the quiet pass. The planners take one agent at a time, the field is one flat grid rebuilt whole on each change, and
+  smart object offers look at every object.
+- **Slips:** job 1 had a partial doc run and two failed gates from the order of records, and was not reverified after
+  its last rebase. Job 2's first ship was stopped by a false alarm of a guard, caused by a fetch during the ship, and a
+  failed sed cost one more verify. Job 3's first ship stopped at `check:readmes` after a full verify, since an untyped
+  array of actions in the README did not type-check; nothing was pushed, and that check now runs before the commit. Job
+  6's first ship stopped in verify on a fixed wait another lane had added under `packages/weather`; that lane fixed it
+  in `34dd3b7a`, and the rerun passed on top of the fix. Job 7's first ship stopped in verify on the eviction bug above, and its second at a rebase, since main had that fix by then, and its third in the second verify of a ship, on the heap read above. Its fourth stopped on the WGSL corpus test,
+  since `@margoengine/scenery` had gained shaders on main; that lane recorded them in `1368f520`. While looking, the
+  whole corpus recorder was started by mistake and stopped within minutes, with its GPU slot given back and nothing
+  kept. Nothing that
+  failed was pushed.
+- **Gate:** lint, hygiene, verify, the behavior tests and the claims test per job, with `check:readmes`, api-conventions,
+  package-lock-sync, `check:parity` and the api quality gate. After a move of main the ship reran the package tests, the
+  claims test, lint and hygiene, and verify when the move touched what these entries use.

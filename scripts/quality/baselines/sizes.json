@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10633292,
+  "total": 10634950,
   "history": [
     {
       "date": "2026-10-24",
@@ -3716,6 +3716,12 @@
       "commit": "a933d988b",
       "reason": "new entry save/safe: safeStorage; save/node takes turns on a file and fsyncs the folder",
       "grew": 2
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "e22cbb195",
+      "reason": "new optional entry @margoengine/behavior/context",
+      "grew": 1
     }
   ],
   "items": {
@@ -3743,6 +3749,7 @@
     "@margoengine/animator/warping": 4883,
     "@margoengine/audio": 7716,
     "@margoengine/behavior": 8897,
+    "@margoengine/behavior/context": 1658,
     "@margoengine/behavior/eqs": 2221,
     "@margoengine/behavior/flowfield": 2656,
     "@margoengine/behavior/goap": 2157,
