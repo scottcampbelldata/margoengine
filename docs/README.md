@@ -165,7 +165,7 @@ node --test tests/catalog.test.js
 | [`@margoengine/physics`](../packages/physics/README.md) | Rigid-body physics for Margo Engine on Rapier: fixed-step engine plugin with interpolation, colliders, joints, queries, events and a character controller. |
 | [`@margoengine/physics2d`](../packages/physics2d/README.md) | 2D rigid-body physics for Margo Engine on Rapier: fixed-step plugin with interpolation, sprite-driven bodies, joints, queries, events, a character controller and tile map colliders. |
 | [`@margoengine/ragdoll`](../packages/ragdoll/README.md) | Ragdolls on Margo physics: capsule bodies from a skeleton, cone and hinge joint limits, kinematic hit boxes, going limp and blending back to the animation. |
-| [`@margoengine/navmesh`](../packages/navmesh/README.md) | Convex polygon navigation with A*, funnel paths and ORCA avoidance; navmesh generation from triangles (./build) and tiled meshes that rebuild at run time (./tiles). |
+| [`@margoengine/navmesh`](../packages/navmesh/README.md) | Convex polygon navigation with A*, funnel paths and ORCA avoidance; navmesh generation from triangles (./build) tiled meshes that rebuild at run time (./tiles) and baked files (./codec). |
 | [`@margoengine/ecs`](../packages/ecs/README.md) | Typed-array packed sparse-set entity component storage. |
 | [`@margoengine/fsm`](../packages/fsm/README.md) | Hierarchical state machines with history, delayed transitions, parallel regions, JSON documents, snapshots and traces. |
 | [`@margoengine/behavior`](../packages/behavior/README.md) | Game AI: behaviour trees with a typed blackboard and async tasks, utility-AI scoring, and steering and flocking behaviours. |

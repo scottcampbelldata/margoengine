@@ -33,6 +33,27 @@ export interface TiledNavMeshOptions extends NavigationOptions {
   tileSize?: number;
   /** Start with every tile waiting for {@link TiledNavMesh.update} instead of building them now. Default false. */
   deferred?: boolean;
+  /**
+   * Corner the tile lattice grows from, world units; lets a mesh start with no triangles (`new TiledNavMesh([], [],
+   * {origin, deferred: true})`) and take geometry later. Default the level's lowest corner.
+   */
+  origin?: readonly [number, number, number];
+}
+
+/** @internal What `./codec` saves of a {@link TiledNavMesh}. */
+export interface TiledState {
+  settings: NavigationOptions & { tileSize: number };
+  origin: readonly [number, number, number];
+  nextId: number;
+  tiles: { x: number; z: number; rise: number; mesh: NavMesh }[];
+  /** Tiles waiting for `update`, by column and row. */
+  pending: [number, number][];
+  links: { id: number; start: Vec3; end: Vec3; cost: number; bidirectional: boolean }[];
+  /** Null when the level was left out: the mesh loads fixed. */
+  level: {
+    obstacles: { id: number; box: NavObstacle }[];
+    geometry: { id: number; points: Float32Array; triangles: Uint32Array }[];
+  } | null;
 }
 
 /** One tile of a {@link TiledNavMesh}. */
@@ -121,6 +142,8 @@ export class TiledNavMesh implements NavSurface {
   private changes = 0;
   private nextId = 1;
   private disposed = false;
+  /** Loaded without its level: nothing can rebuild. */
+  private fixed = false;
 
   /**
    * Cuts a level into tiles and builds them.
@@ -130,18 +153,21 @@ export class TiledNavMesh implements NavSurface {
    * @throws MargoError `failed` when nothing is walkable, unless `deferred`.
    */
   constructor(positions: ArrayLike<number>, indices: ArrayLike<number>, options: TiledNavMeshOptions = {}) {
-    const { tileSize = 64, deferred = false, ...build } = options ?? {};
+    const { tileSize = 64, deferred = false, origin, ...build } = options ?? {};
     if (!Number.isInteger(tileSize) || tileSize < 8 || tileSize > 1024)
       throw new RangeError('Tile size must be a whole number of cells from 8 to 1024');
-    const input = validate(positions, indices, build, false);
+    if (origin !== undefined && !(origin.length === 3 && origin.every((v) => Number.isFinite(v))))
+      throw new RangeError('Tile origin must be finite [x, y, z]; pass three numbers.');
+    const empty = origin !== undefined && positions?.length === 0 && indices?.length === 0,
+      input = validate(empty ? [0, 0, 0, 1, 0, 0, 0, 0, 1] : positions, empty ? [0, 1, 2] : indices, build, false);
     this.tileSize = tileSize;
     this.config = input.config;
-    this.origin = [input.min[0], input.min[1], input.min[2]];
+    this.origin = origin ? [origin[0], origin[1], origin[2]] : [input.min[0], input.min[1], input.min[2]];
     this.span = tileSize * input.config.cs;
     // The filters mark the grid's outer ring as a ledge, and erosion reaches walkableRadius + 1 cells in from it.
     this.margin = Math.ceil(input.config.walkableRadius) + 2;
     for (const box of input.config.obstacles) this.obstacles.set(this.nextId++, box);
-    this.addParsed(input.points, input.triangles);
+    if (!empty) this.addParsed(input.points, input.triangles);
     if (deferred) return;
     this.update();
     if (!this.polygonCount) failed('no tile has a walkable polygon');
@@ -149,6 +175,12 @@ export class TiledNavMesh implements NavSurface {
 
   private check(): void {
     if (this.disposed) throw new MargoError('disposed', 'TiledNavMesh is disposed; create a new one.');
+  }
+  /** {@link TiledNavMesh.check}, for what changes the level. */
+  private checkLevel(): void {
+    this.check();
+    if (this.fixed)
+      throw new MargoError('state', 'This mesh was baked without its level; bake it with geometry: true to change it.');
   }
   private tileAt(x: number, z: number): Tile | undefined {
     return this.tiles.get(`${x},${z}`);
@@ -176,7 +208,7 @@ export class TiledNavMesh implements NavSurface {
         if (tile) this.dirty.add(tile);
       }
   }
-  private addParsed(points: Float32Array, triangles: Uint32Array): number {
+  private addParsed(points: Float32Array, triangles: Uint32Array, id = this.nextId++): number {
     const geometry: Geometry = { points, triangles, tiles: new Map() },
       reach = this.margin * this.config.cs,
       [ox, , oz] = this.origin;
@@ -208,7 +240,6 @@ export class TiledNavMesh implements NavSurface {
           list.push(t);
         }
     }
-    const id = this.nextId++;
     this.geometries.set(id, geometry);
     return id;
   }
@@ -219,13 +250,13 @@ export class TiledNavMesh implements NavSurface {
    * @throws RangeError for invalid geometry.
    */
   addGeometry(positions: ArrayLike<number>, indices: ArrayLike<number>): number {
-    this.check();
+    this.checkLevel();
     const { points, triangles } = validate(positions, indices, {}, false);
     return this.addParsed(points, triangles);
   }
   /** Removes a mesh by the id {@link TiledNavMesh.addGeometry} returned; false when there is none. */
   removeGeometry(id: number): boolean {
-    this.check();
+    this.checkLevel();
     const geometry = this.geometries.get(id);
     if (!geometry) return false;
     this.geometries.delete(id);
@@ -241,7 +272,7 @@ export class TiledNavMesh implements NavSurface {
    * @throws RangeError for a box that is not `{min, max}` with min <= max.
    */
   addObstacle(box: NavObstacle): number {
-    this.check();
+    this.checkLevel();
     validate([0, 0, 0, 1, 0, 0, 0, 0, 1], [0, 1, 2], { obstacles: [box] }, false);
     const id = this.nextId++;
     this.obstacles.set(id, box);
@@ -250,7 +281,7 @@ export class TiledNavMesh implements NavSurface {
   }
   /** Moves an obstacle; false when there is none. The tiles of both places rebuild. */
   moveObstacle(id: number, box: NavObstacle): boolean {
-    this.check();
+    this.checkLevel();
     if (!this.obstacles.has(id)) return false;
     validate([0, 0, 0, 1, 0, 0, 0, 0, 1], [0, 1, 2], { obstacles: [box] }, false);
     this.removeObstacle(id);
@@ -260,7 +291,7 @@ export class TiledNavMesh implements NavSurface {
   }
   /** Removes an obstacle (an opened door); false when there is none. */
   removeObstacle(id: number): boolean {
-    this.check();
+    this.checkLevel();
     const box = this.obstacles.get(id);
     if (!box) return false;
     this.obstacles.delete(id);
@@ -653,6 +684,55 @@ export class TiledNavMesh implements NavSurface {
       this.adjacency[polygon] = kept;
     }
     link.from = link.to = -1;
+  }
+  /** @internal Everything `./codec` saves, with the level when `level` is set. */
+  snapshot(level: boolean): TiledState {
+    this.check();
+    const { obstacles: _, ...settings } = this.config,
+      tiles: TiledState['tiles'] = [];
+    for (const { x, z, mesh, rise } of this.tiles.values()) if (mesh) tiles.push({ x, z, rise, mesh });
+    return {
+      settings: { ...settings, tileSize: this.tileSize },
+      origin: this.origin,
+      nextId: this.nextId,
+      tiles,
+      pending: [...this.dirty].map((tile) => [tile.x, tile.z]),
+      links: [...this.offMesh].map(([id, { start, end, cost, bidirectional }]) => ({
+        id,
+        start,
+        end,
+        cost,
+        bidirectional,
+      })),
+      level: level
+        ? {
+            obstacles: [...this.obstacles].map(([id, box]) => ({ id, box })),
+            geometry: [...this.geometries].map(([id, { points, triangles }]) => ({ id, points, triangles })),
+          }
+        : null,
+    };
+  }
+  /** @internal Fills a mesh made empty from a {@link TiledNavMesh.snapshot}; ids stay as they were. */
+  restore(state: TiledState): void {
+    if (state.level) {
+      for (const { id, box } of state.level.obstacles) this.obstacles.set(id, box);
+      for (const { id, points, triangles } of state.level.geometry) this.addParsed(points, triangles, id);
+      this.dirty.clear();
+    } else this.fixed = true;
+    for (const { x, z, mesh, rise } of state.tiles) this.install(this.ensureTile(x, z), mesh, rise);
+    if (state.level)
+      for (const [x, z] of state.pending) {
+        const tile = this.tileAt(x, z);
+        if (tile) this.dirty.add(tile);
+      }
+    for (const { id, start, end, cost, bidirectional } of state.links) {
+      const link: OffMesh = { start, end, bidirectional, cost, from: -1, to: -1 };
+      this.offMesh.set(id, link);
+      this.attach(id, link);
+    }
+    this.nextId = state.nextId;
+    this.search.reserve(this.count, this.linkTotal);
+    this.changes++;
   }
   /** Drops the tiles. Idempotent. */
   dispose(): void {

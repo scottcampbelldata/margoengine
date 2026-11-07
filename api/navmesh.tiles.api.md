@@ -50,6 +50,8 @@ export class TiledNavMesh implements NavSurface {
     route(start: Vec3, end: Vec3, filter?: NavFilter): NavRoute | null;
     addOffMeshLink(start: Vec3, end: Vec3, options?: OffMeshLinkOptions): number;
     removeOffMeshLink(id: number): boolean;
+    snapshot(level: boolean): TiledState;
+    restore(state: TiledState): void;
     dispose(): void;
     [Symbol.dispose]: () => void;
 }
@@ -57,6 +59,40 @@ export class TiledNavMesh implements NavSurface {
 export interface TiledNavMeshOptions extends NavigationOptions {
     tileSize?: number;
     deferred?: boolean;
+    origin?: readonly [number, number, number];
+}
+
+export interface TiledState {
+    settings: NavigationOptions & {
+        tileSize: number;
+    };
+    origin: readonly [number, number, number];
+    nextId: number;
+    tiles: {
+        x: number;
+        z: number;
+        rise: number;
+        mesh: NavMesh;
+    }[];
+    pending: [number, number][];
+    links: {
+        id: number;
+        start: Vec3;
+        end: Vec3;
+        cost: number;
+        bidirectional: boolean;
+    }[];
+    level: {
+        obstacles: {
+            id: number;
+            box: NavObstacle;
+        }[];
+        geometry: {
+            id: number;
+            points: Float32Array;
+            triangles: Uint32Array;
+        }[];
+    } | null;
 }
 
 // Not exported from this entry, but used by the exports above:

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10338233,
+  "total": 10356285,
   "history": [
     {
       "date": "2026-10-24",
@@ -3368,6 +3368,12 @@
       "commit": "0d2b7904",
       "reason": "sky/weather: precipitation 'sleet' draws rain and snow together (a second overlay and uniform), +196 B",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "23bb64502",
+      "reason": "new optional entry @margoengine/navmesh/codec; tiled origin option",
+      "grew": 3
     }
   ],
   "items": {
@@ -3772,9 +3778,10 @@
     "@margoengine/mesh-edit/weights": 4033,
     "@margoengine/mixer": 6926,
     "@margoengine/navmesh": 7694,
-    "@margoengine/navmesh/agents": 15490,
+    "@margoengine/navmesh/agents": 15964,
     "@margoengine/navmesh/build": 12727,
-    "@margoengine/navmesh/tiles": 14638,
+    "@margoengine/navmesh/codec": 17103,
+    "@margoengine/navmesh/tiles": 15113,
     "@margoengine/net": 1371,
     "@margoengine/netcode": 12865,
     "@margoengine/netcode/generate": 5154,

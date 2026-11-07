@@ -2,7 +2,7 @@
 
 Import `margoengine/navmesh` from the `margoengine` package, or `@margoengine/navmesh` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
-Dependency-free navigation: A* chooses a polygon corridor, the funnel algorithm pulls it taut, reciprocal ORCA selects collision-avoiding agent velocities in XZ, a `Crowd` manager walks agents along routes with area costs, off-mesh links and obstacles, `@margoengine/navmesh/build` generates the walkable polygons from level triangles, and `@margoengine/navmesh/tiles` cuts big worlds into tiles that rebuild at run time.
+Dependency-free navigation: A* chooses a polygon corridor, the funnel algorithm pulls it taut, reciprocal ORCA selects collision-avoiding agent velocities in XZ, a `Crowd` manager walks agents along routes with area costs, off-mesh links and obstacles, `@margoengine/navmesh/build` generates the walkable polygons from level triangles, `@margoengine/navmesh/tiles` cuts big worlds into tiles that rebuild at run time, and `@margoengine/navmesh/codec` bakes meshes to bytes.
 
 ```ts
 import {NavMesh} from 'margoengine/navmesh';
@@ -114,6 +114,7 @@ crowd.addAgent({position: [1, 0, 1]}).setTarget([60, 0, 60]);
 | --- | --- | --- |
 | `tileSize` | 64 | cells along a tile's side, 8 to 1024; smaller tiles rebuild faster and make more polygons |
 | `deferred` | false | build nothing yet: every tile waits for `update`, so a big world can load over several frames |
+| `origin` | the level's lowest corner | `[x, y, z]` the tile lattice grows from; with it a mesh can start empty: `new TiledNavMesh([], [], {origin, deferred: true})`, then `addGeometry` |
 
 - **What rebuilds.** `addObstacle`, `moveObstacle`, `removeObstacle`, `addGeometry` and `removeGeometry` mark the tiles they reach; `update(maxTiles)` rebuilds the waiting tiles, oldest first, and returns how many. A tile still waiting keeps its old polygons, so routes never see a half-built world.
 - **Same walkable area.** A tile sees past its edge by `walkableRadius + 2` cells before it keeps its own cells, so the area does not depend on the tiling, and any run of changes gives the tiles a fresh build would.
@@ -156,6 +157,38 @@ crowd.update(1 / 60);
 A type gives, in world units, `radius` (0.5), `height` (2), `climb` (0.4), `maxSlope` (45 degrees), `maxSpeed` (3.5), and `areas`, its cost per area name: a multiplier of 1 or more, or `Infinity` for ground it cannot enter. An area it does not name costs 1, and `ground` is everything no box marks. Types of one size share a mesh. The other options are those of `./build`, with `tileSize` to tile each mesh (`./tiles`).
 
 The same pieces work without `NavAgents`: `./build` and `./tiles` take `areas: [{min, max, area}]` with area numbers 1 to 255; `mesh.polygonArea(i)` and `mesh.setPolygonArea(i, area)` read and set them; `route(start, end, filter)` and `path(start, end, filter)` take the cost per area number; and `crowd.addAgent({navMesh, filter})` puts one agent on its own mesh and ground.
+
+## Bake once, load fast (`./codec`)
+
+```ts
+import {buildNavMesh} from 'margoengine/navmesh/build';
+import {decodeNavMesh, decodeTiledNavMesh, encodeNavMesh, encodeTiledNavMesh} from 'margoengine/navmesh/codec';
+import {TiledNavMesh} from 'margoengine/navmesh/tiles';
+
+const positions = [0, 0, 0, 64, 0, 0, 64, 0, 64, 0, 0, 64], indices = [0, 2, 1, 0, 3, 2];
+
+// Offline: build, then write the bytes to a file. At run time: read them, no build.
+const bytes = encodeNavMesh(buildNavMesh(positions, indices, {cs: 0.25, ch: 0.1}));
+const mesh = decodeNavMesh(bytes);
+console.log(mesh.path([1, 0, 1], [60, 0, 60]));
+
+// Tiles: `geometry: true` keeps the level, so the loaded mesh still rebuilds.
+const world = new TiledNavMesh(positions, indices, {cs: 0.25, ch: 0.1, tileSize: 64});
+const loaded = decodeTiledNavMesh(encodeTiledNavMesh(world, {geometry: true}));
+loaded.addObstacle({min: [30, 0, 30], max: [33, 3, 31]});
+loaded.update();
+
+// Without it the file is smaller and the mesh is fixed: routes and off-mesh links work, level changes throw.
+const fixed = decodeTiledNavMesh(encodeTiledNavMesh(world));
+console.log(fixed.polygonCount);
+```
+
+`encodeNavMesh` keeps vertices, polygons, areas, area costs and off-mesh links. `encodeTiledNavMesh` keeps the settings, each tile's polygons, tiles still waiting for `update`, off-mesh links (sleeping ones too), and with `geometry` (default false) the level's triangles and obstacles under the ids they had. A file that is cut, damaged, of another version or of the other kind throws a `MargoError` of code `failed`; anything but a `Uint8Array` throws `TypeError`.
+
+The format, little-endian: a 16 byte header (`MNAV`, u16 version 1, u16 kind: 0 for a mesh, 1 for tiles, u32 payload size, u32 CRC-32 of the payload), then the payload. Whole numbers are varints, seven bits a byte, low first; signed ones are zigzag; coordinates and costs are f64.
+
+- A mesh: vertex count and vertices; polygon count, and for each its vertex count, vertex numbers and area byte; the polygons whose cost is not 1, as number and cost; then the links as start, end, cost and a two-way byte.
+- Tiles: settings as sized JSON, the origin, the next id; tiles as x, z, rise and a mesh without links; waiting tiles as x, z; links as id, start, end, cost and a two-way byte; then a byte for the level and, when set, obstacles as id, min, max, and geometry as id, sized f32 positions and sized u32 indices.
 
 Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 

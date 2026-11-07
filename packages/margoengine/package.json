@@ -1626,6 +1626,10 @@
       "types": "./dist/navmesh/build.d.ts",
       "import": "./dist/navmesh/build.js"
     },
+    "./navmesh/codec": {
+      "types": "./dist/navmesh/codec.d.ts",
+      "import": "./dist/navmesh/codec.js"
+    },
     "./navmesh/tiles": {
       "types": "./dist/navmesh/tiles.d.ts",
       "import": "./dist/navmesh/tiles.js"
