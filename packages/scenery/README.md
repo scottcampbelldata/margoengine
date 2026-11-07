@@ -43,5 +43,48 @@ The low-level `SkyMoonPass` (`@margoengine/scenery/sky-moon`) and the Night Cita
 removed when the three sky implementations were merged into `@margoengine/sky`. Use `Sky` directly for custom
 night skies, and Sky's `fog` (`falloff: 'exp'`, `height`, `color`) for the citadel's height haze.
 
+## Day presets
+
+`@margoengine/scenery/presets` holds four times of day, `noon`, `goldenHour`, `overcast` and `dawn`, as options for
+`Sky` from `@margoengine/sky`, with the light that goes with each. The sun's colour and strength are not stored: the
+sky works them out from its own air (`sunlight` in `@margoengine/sky`), so the light always matches the sky drawn.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Sky} from 'margoengine/sky';
+import {applyDayPreset, dayLight, dayPreset} from 'margoengine/scenery/presets';
+
+const canvas = document.querySelector<HTMLCanvasElement>('canvas')!;
+const engine = await Engine.create(canvas, {backend: 'webgpu'});
+const sky = Sky.attach(engine, dayPreset('goldenHour'));
+engine.start();
+applyDayPreset(sky, 'overcast'); // switch a running sky
+console.log(dayLight('noon').intensity); // the sun strength the sky drives into the engine light
+```
+
+- `dayPreset(name)` returns fresh `SkyOptions`: the sun placed by `sunDirection` with the clock held
+  (`timeScale: 0`), `turbidity`, a cloud sheet when the preset has cloud, the backdrop `exposure`, and `lighting`
+  with the direct sun strength overhead and a diffuse floor (`ambient.day`, and `[0.01, 0.015, 0.03]` by night). Use the
+  root `Sky`, which has the clouds and lighting features these need. Pass a name or a `DayPreset` object.
+- `applyDayPreset(sky, name)` writes a preset into a running sky's `options` (read every frame), removes a cloud sheet
+  the preset has none of and keeps the rest (fog, night, model).
+- `dayLight(name)` is the sun the sky drives on the first frame (`direction`, `color` with its largest channel 1,
+  `intensity`) and the diffuse floor, for a scene that lights itself.
+- `DAY_PRESETS` holds the frozen values and `dayPresetNames` the names. Copy one to make your own:
+  `dayPreset({...DAY_PRESETS.noon, elevation: 50})`. Unknown names and out-of-range values throw `RangeError`.
+
+| Preset | Sun (azimuth, elevation) | Turbidity | Clouds | Sky exposure | Sun strength overhead | Sun it gives |
+| --- | --- | --- | --- | --- | --- | --- |
+| `noon` | 0 (south), 70 | 2.2 | none | 0 | 5 | 4.98, nearly white |
+| `goldenHour` | 270 (west), 5 | 3 | 0.2 | +0.5 | 5 | 3.10, (1, 0.57, 0.14) |
+| `overcast` | 20, 45 | 6 | 1 | -2.5 | 0.5 | 0.49, (1, 0.98, 0.91) |
+| `dawn` | 90 (east), 1 | 2.6 | 0.1 | +1 | 5 | 1.39, (1, 0.23, 0.005) |
+
+Azimuth 0 is +Z, 90 is +X, as `@margoengine/sky/sun`. Overcast follows the CIE standard overcast sky: the cloud hides
+the sun's disc, and its sky is 2.5 stops darker, which also dims the light the sky gives the scene, so its ground gets
+about a fifth of the clear noon ground's light (measured on a Radeon 680M; daylight measurements give about 10 to 25 klux
+against about 100 klux). These are looks, not a measured site: the cloud sheet is the sky's 2D sheet and nothing casts
+cloud shadows; scene exposure is `Tonemap`'s (`@margoengine/tonemap`).
+
 This ESM package includes strict TypeScript declarations, requires core 1.0.0 and `@margoengine/sky`, and supported
 WebGPU hardware on HTTPS or localhost. Apache-2.0 licensed.

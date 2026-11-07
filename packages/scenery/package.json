@@ -24,8 +24,9 @@
     "access": "public"
   },
   "scripts": {
-    "test": "node --test ../../tests/deep-render-scenery.test.js",
-    "prepack": "npm --prefix ../.. run build:packages"
+    "test": "node --test ../../tests/deep-render-scenery.test.js test/*.test.js",
+    "prepack": "npm --prefix ../.. run build:packages",
+    "test:gpu": "cd ../.. && node packages/scenery/test/scenery-check.mjs"
   },
   "sideEffects": false,
   "exports": {
@@ -36,6 +37,10 @@
     "./sky": {
       "types": "./dist/sky.d.ts",
       "import": "./dist/sky.js"
+    },
+    "./presets": {
+      "types": "./dist/presets.d.ts",
+      "import": "./dist/presets.js"
     }
   },
   "files": [

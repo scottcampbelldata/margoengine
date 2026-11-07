@@ -1,0 +1,55 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Scenery day presets check</title><style>body{margin:0}canvas{display:block;width:128px;height:96px}</style></head><body><canvas></canvas>
+<script type="module">
+// The four day presets on a real GPU, read from Bloom's HDR scene capture: a grey ground lit by the preset's sun and
+// sky light, a wall facing the sun and the sky backdrop away from it. Driven by scenery-check.mjs.
+import {Engine,PbrMaterial,box} from '/packages/core/dist/index.js';
+import {sceneSamples} from '/packages/core/dist/quality.js';
+import {Bloom} from '/packages/post/dist/bloom.js';
+import {Sky} from '/packages/sky/dist/index.js';
+import {DAY_PRESETS,applyDayPreset,dayPreset,dayPresetNames} from '/packages/scenery/dist/presets.js';
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
+if(new URLSearchParams(location.search).get('samples')==='1')globalThis.margoLow=1;
+const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,2,0],target:[0,0,-0.5],fov:20,near:0.5,far:200000}}),device=engine.gpu,errors=[];
+engine.stop();
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const post=Bloom.attach(engine,{strength:0,threshold:1,exposure:0});
+// A wall 30 m north of the camera, facing it (+Z); for the wall reading the sun is turned to +Z at its own height.
+engine.createMesh().setGeometry(box(400,20,0.2)).setMaterial(new PbrMaterial({color:'#808080',roughness:1})).setPosition([0,0,-30]);
+engine.createMesh().setGeometry(box(4000,0.2,4000)).setMaterial(new PbrMaterial({color:'#808080',roughness:1})).setPosition([0,-0.1,0]);
+const module=device.createShaderModule({code:'@group(0) @binding(0) var image:texture_2d<f32>;@group(0) @binding(1) var<storage,read_write> result:array<vec4f>;@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u){let s=textureDimensions(image);if(any(id.xy>=s)){return;}result[id.y*s.x+id.x]=textureLoad(image,vec2i(id.xy),0);}'});
+const pipeline=device.createComputePipeline({layout:'auto',compute:{module,entryPoint:'main'}});
+async function frame(){
+ engine.render({delta:0});
+ const texture=post.sceneTexture,w=texture.width,h=texture.height,bytes=w*h*16;
+ const output=device.createBuffer({size:bytes,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),staging=device.createBuffer({size:bytes,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+ const encoder=device.createCommandEncoder(),pass=encoder.beginComputePass();pass.setPipeline(pipeline);
+ pass.setBindGroup(0,device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:texture.createView()},{binding:1,resource:{buffer:output}}]}));
+ pass.dispatchWorkgroups(Math.ceil(w/8),Math.ceil(h/8));pass.end();encoder.copyBufferToBuffer(output,0,staging,0,bytes);device.queue.submit([encoder.finish()]);
+ await staging.mapAsync(GPUMapMode.READ);const v=new Float32Array(staging.getMappedRange()).slice();staging.unmap();output.destroy();staging.destroy();
+ return {w,h,at:(x,y)=>Array.from(v.subarray((y*w+x)*4,(y*w+x)*4+3))};
+}
+const centre=(f)=>f.at(f.w>>1,f.h>>1);
+// The ground below the camera, the sky 30 degrees up (over the wall) on the side away from the sun, and a wall facing the sun.
+async function look(sky){
+ engine.camera.position=[0,2,0];engine.camera.target=[0,0,0.5];await frame();const g=centre(await frame());
+ const d=sky.options.sunDirection,l=Math.hypot(d[0],d[2])||1,e=30*Math.PI/180;
+ engine.camera.target=[-d[0]/l*Math.cos(e)*100,2+Math.sin(e)*100,-d[2]/l*Math.cos(e)*100];await frame();const s=centre(await frame());
+ sky.options.sunDirection=[0,d[1],Math.hypot(d[0],d[2])];engine.camera.target=[0,2,-30];await frame();const w=centre(await frame());
+ sky.options.sunDirection=d;
+ return {ground:g,sky:s,wall:w};
+}
+window.check={samples:sceneSamples,
+ async run(changes={}){
+  device.pushErrorScope('validation');const out={};
+  for(const name of dayPresetNames){
+   const sky=Sky.attach(engine,dayPreset({...DAY_PRESETS[name],...changes[name]}));void sky.reflectionTexture;await waitForPipelines(frame);
+   out[name]=await look(sky);sky.dispose();
+  }
+  // A running sky switched from overcast to golden hour.
+  const sky=Sky.attach(engine,dayPreset('overcast'));await look(sky);applyDayPreset(sky,'goldenHour');
+  out.switched=await look(sky);sky.dispose();
+  const error=await device.popErrorScope();
+  return {...out,error:error?.message??null,errors:errors.splice(0)};
+ }};
+window.ready=true;
+</script></body></html>

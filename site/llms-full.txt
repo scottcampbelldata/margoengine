@@ -2600,7 +2600,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-406). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-407). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -2652,6 +2652,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Hillaire sky (`@margoengine/sky/hillaire`, 2026-11-07) | By method: single scattering plus Hillaire 2020's multiple scattering table, no clouds or shadows in the air; the 192 x 108 sky-view table is read bilinearly, so the horizon row blends sky and ground over one texel; the planet's centre is under the camera; the sun's disc has no limb darkening and is held at 65,504 (half-float range) against its true radiance of about 300,000 at illuminance 20. It does not light the scene (no engine sun, ambient or reflection map). Above 100 km each pixel marches 32 steps. Proved on one GPU, a Radeon 680M, by the colours physics gives (blue noon, orange sunset, ozone's twilight), not against a reference renderer. |
 | Ground albedo feedback (`groundAlbedo` on the Bruneton `Sky`, 2026-11-07) | Enforced: one number or linear RGB from 0 to 1, Bruneton model only (Preetham ignores it). By method: one Lambertian albedo for the whole ground, no texture, no snow sparkle or other directional reflection; the ground's light is gathered at 32 directions per scattering density texel and a 64-entry irradiance table over the sun's elevation, as coarse as the rest of the table; the ground lit by order n - 2 feeds order n (Bruneton and Neyret 2008), and light past the fourth order, from the ground or the air, is left out as before. Proved on a Radeon 680M (LIM-375); no reference sky compared. | The Bruneton tables hold the air only; the ground is a boundary term. | A ground of mixed snow and forest takes one mean value; the brightening does not follow where the snow lies. | Use the mean albedo of the ground the view sees; `HillaireSky`'s `atmosphere.groundAlbedo` takes every order (Hillaire 2020's multiple scattering table), also as one value. |
 | Planet presets (`@margoengine/sky/presets`, 2026-11-07) | Enforced: Mars's dust optical depth from 0 to 10. By method: each world is the Hillaire model's air, so Rayleigh, one Mie (dust) layer with one phase function and an ozone-like absorbing tent; Mars's dust has one asymmetry for every colour, so the blue glow around the setting sun that its wavelength-dependent forward scattering gives is not drawn; no water-ice clouds, no dust layer above the gas's scale height. The dust's green and blue single scattering albedo are Margo's reading of published curves (LIM-378). Worlds with air too thick for the 40-step tables (Venus, Titan) have no preset. | The Hillaire tables hold one Mie layer; a thick atmosphere needs more steps than they take. | A Martian sunset is a dim reddish sun in a bright halo, not blue. | Give your own `atmosphere`, per channel where needed; for thick worlds a custom sky. |
+| Day presets (`@margoengine/scenery/presets`, 2026-11-07) | By method: four fixed looks (noon, golden hour, overcast, dawn) for the Preetham `Sky` with its 2D cloud sheet; the sun's colour comes from the sky's transmittance, but the overcast dimming of direct sun and sky light is a preset value (sun strength 0.5, sky 2.5 stops darker), not a cloud model; no cloud shadows; diffuse floors are Margo design values (LIM-407). | The root `Sky` has no cloud transmittance for the engine light, so a preset sets it. | Overcast is a grey, even light about a fifth of noon's; under a partly cloudy preset the sun is never hidden. | Copy a `DAY_PRESETS` entry and change its values, or add `@margoengine/sky/volumetric-clouds` and `cloud-shadows`. |
 | Light shafts (`@margoengine/sky/shafts`, 2026-11-07) | By method: screen space (Mitchell 2007), so only what is on screen occludes: a mountain or cloud off screen casts no shaft, a sun off screen still casts them from its place beyond the edge, and they fade out as the sun passes 75 degrees off the view axis; none from behind the camera or with an orthographic camera; the moon casts none. The mask is half size and reads the first sample of multisampled depth; the clouds in it are marched `cloudSamples` (12) times per texel with the clouds' own field, no haze, and from above the layer the clouds occlude nothing. Each pixel takes `samples` (48) filtered reads, so cost follows pixels (about 12 ms per frame at 256 x 192 with Bloom on a Radeon 680M, diagnostic). On a display target the light is blended after the display transform, an approximation. Proved on one GPU, a Radeon 680M, by behaviour (angle, hole, linearity, clouds). |
 | Rain splashes, wet lens and cover (`@margoengine/sky/weather-fx`, 2026-11-07) | By method: the cover is one top-down depth map over the weather's box (`resolution` 256 a side, 0.2 m texels at the default 25 m half-width), so cover finer than a texel is lost and only the topmost surface counts (no rain under an overhang that a higher roof does not cover); occluders are drawn in their rest shapes (no skinning, morphs, instancing or displacement) and alpha-masked leaves cover whole. Splashes are camera-facing sprites on the topmost surface, lens drops shade the frame rather than refract it, snow makes neither, and the lens wets by the map at the camera's own place. The map is drawn every frame, so its cost follows the occluders' triangles. Proved on one GPU, a Radeon 680M, by behaviour (cover, map heights, splashes, lens). |
 | Sleet (`precipitation: 'sleet'` in `@margoengine/sky/weather`, 2026-11-07) | By method: rain and snow are two draws of the weather's particles, each with its `snowShare` of the count and its own fall, sway and look, so a particle is wholly rain or wholly snow (no wet, half-melted flakes) and one share holds over the whole box (no rain below a melting height). Under `WeatherFX` both are kept off under cover; snow still makes no splashes or lens drops. Proved on one GPU, a Radeon 680M, against each kind drawn alone. |
@@ -7752,8 +7753,37 @@ The low-level `SkyMoonPass` (`@margoengine/scenery/sky-moon`) and the Night Cita
 removed when the three sky implementations were merged into `@margoengine/sky`. Use `Sky` directly for custom
 night skies, and Sky's `fog` (`falloff: 'exp'`, `height`, `color`) for the citadel's height haze.
 
-This ESM package includes strict TypeScript declarations, requires core 1.0.0 and `@margoengine/sky`, and supported
-WebGPU hardware on HTTPS or localhost. Apache-2.0 licensed.
+## Day presets
+
+`@margoengine/scenery/presets` holds four times of day, `noon`, `goldenHour`, `overcast` and `dawn`, as options for
+`Sky` from `@margoengine/sky`, with the light that goes with each. The sun's colour and strength are not stored: the
+sky works them out from its own air (`sunlight` in `@margoengine/sky`), so the light always matches the sky drawn.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Sky} from 'margoengine/sky';
+import {applyDayPreset, dayLight, dayPreset} from 'margoengine/scenery/presets';
+
+const canvas = document.querySelector<HTMLCanvasElement>('canvas')!;
+const engine = await Engine.create(canvas, {backend: 'webgpu'});
+const sky = Sky.attach(engine, dayPreset('goldenHour'));
+engine.start();
+applyDayPreset(sky, 'overcast'); // switch a running sky
+console.log(dayLight('noon').intensity); // the sun strength the sky drives into the engine light
+```
+
+- `dayPreset(name)` returns fresh `SkyOptions`: the sun placed by `sunDirection` with the clock held
+  (`timeScale: 0`), `turbidity`, a cloud sheet when the preset has cloud, the backdrop `exposure`, and `lighting`
+  with the direct sun strength overhead and a diffuse floor (`ambient.day`, and `[0.01, 0.015, 0.03]` by night). Use the
+  root `Sky`, which has the clouds and lighting features these need. Pass a name or a `DayPreset` object.
+- `applyDayPreset(sky, name)` writes a preset into a running sky's `options` (read every frame), removes a cloud sheet
+  the preset has none of and keeps the rest (fog, night, model).
+- `dayLight(name)` is the sun the sky drives on the first frame (`direction`, `color` with its largest channel 1,
+  `intensity`) and the diffuse floor, for a scene that lights itself.
+- `DAY_PRESETS` holds the frozen values and `dayPresetNames` the names. Copy one to make your own:
+  `dayPreset({...DAY_PRESETS.noon, elevation: 50})`. Unknown names and out-of-range values throw `RangeError`.
+
+[README continues: https://margoengine.com/llms/packages/scenery.md]
 
 === @margoengine/scatter (packages/scatter/README.md) ===
 

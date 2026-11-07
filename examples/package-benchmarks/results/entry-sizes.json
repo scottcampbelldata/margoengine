@@ -1,6 +1,6 @@
 {
-  "commit": "54ad70507",
-  "dirty": false,
+  "commit": "b48fb2e0a",
+  "dirty": true,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
     "raw": 57071,
@@ -1845,6 +1845,10 @@
         "raw": 9547,
         "gzip": 3361
       },
+      "./hitboxes": {
+        "raw": 3851,
+        "gzip": 1578
+      },
       "./interest": {
         "raw": 5662,
         "gzip": 2260
@@ -1886,8 +1890,8 @@
         "gzip": 19145
       },
       "./next": {
-        "raw": 127405,
-        "gzip": 75369
+        "raw": 128349,
+        "gzip": 75605
       }
     },
     "@margoengine/physics2d": {
@@ -2296,6 +2300,10 @@
       "./sky": {
         "raw": 290,
         "gzip": 219
+      },
+      "./presets": {
+        "raw": 2019,
+        "gzip": 977
       }
     },
     "@margoengine/sciviz": {

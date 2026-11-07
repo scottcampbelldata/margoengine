@@ -2182,6 +2182,10 @@
       "types": "./dist/scenery/sky.d.ts",
       "import": "./dist/scenery/sky.js"
     },
+    "./scenery/presets": {
+      "types": "./dist/scenery/presets.d.ts",
+      "import": "./dist/scenery/presets.js"
+    },
     "./sciviz": {
       "types": "./dist/sciviz.d.ts",
       "import": "./dist/sciviz.js"
