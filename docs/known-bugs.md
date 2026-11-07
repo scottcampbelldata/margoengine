@@ -756,16 +756,29 @@ machine, diagnostic; numbers and method in [whitepaper/boxes-vs-threejs.md](whit
 
 ### createInstancedMesh draws 50,000 boxes slower than three.js
 
-- **What:** `@margoengine/materials` `createInstancedMesh` boxes at 50,000: GPU 0.539 ms against three's WebGL2
-  `InstancedMesh` 0.467 ms and WebGPU 0.361 ms (run of 2026-11-05, diagnostic). `CulledInstances` draws the same scene in
-  0.284 ms. At 10,000 Margo now leads (0.111 against 0.127 and 0.141 ms, perf-history entry 51).
-- **Fixed part:** gltf-pro now fetches and passes only what the finished shader reads (0.615 to 0.546 ms, perf-history
-  entry 50).
-- **Cause of the rest: not found.** Ruled out by measurement on the same page: the fragment stage (a shader returning the
-  vertex colour: 0.539 ms), the vertex colour fetch (0.547 ms), the outputs between the stages (0.546 ms) and, in the first
-  measurement of this entry, texture reads and the node x instance matrix product. The time is in the vertex stage or
-  before it. **Next to test:** the 80-byte vertex stride and the 96-byte instance stride, against a compact position and
-  normal stream.
+- **Status:** BLOCKED on a GPU-alone hunt. The cause is not found. It needs the GPU to itself, so the numbers below are all
+  diagnostic: they were taken with other lanes on the machine.
+- **What:** `@margoengine/materials` `createInstancedMesh`, 50,000 boxes, GPU time per frame: Margo 0.536 ms (0.525 to 0.554
+  across runs) against three's WebGPU `InstancedMesh` 0.32 to 0.34 ms (0.319 to 0.341). `CulledInstances` draws the same scene
+  in 0.305 ms. At 10,000 Margo leads (0.111 against 0.127 and 0.141 ms, perf-history entry 51).
+- **Repro:** the 50,000 box scene of [whitepaper/boxes-vs-threejs.md](whitepaper/boxes-vs-threejs.md), steps in
+  [whitepaper/reproduce.md](whitepaper/reproduce.md), Margo `createInstancedMesh` against three's WebGPU build run in its own
+  folder.
+- **Fixed part:** gltf-pro fetches and passes only what the finished shader reads (0.615 to 0.546 ms, perf-history entry 50).
+- **Ruled out in a raw WebGPU pass:** all within one 0.0655 ms timer quantum: vertex stride 80 against 32 bytes, instance
+  stride 96 against 64, uint16 against uint32 indices, instance data from storage against attributes.
+- **Ruled out in the real bench, by rewriting the shader at `createShaderModule`:** the `f.model` multiply, the normal cross
+  products, the mirror sign, the discard lines and the `depth24plus-stencil8` format: 0.533 to 0.541 ms against 0.536 ms. How far to
+  trust this: the patterns to replace were seen in a dump of the shader, but the rewritten shader was not read back, so these
+  five rest on the replacement having taken effect. A hunt should confirm that first.
+- **Ruled out earlier, on the same page:** a fragment stage returning the vertex colour (0.539 ms), the vertex colour fetch
+  (0.547 ms), the outputs between the stages (0.546 ms), texture reads and the node x instance matrix product. The first of
+  these came before the fetch trimming and covers the shader's cost as it stood then.
+- **Still untested:** the cost of fragment lighting as the shader stands today; how many boxes the culled path really draws,
+  which decides whether 0.305 ms compares like with like; the instance attribute count (6 against 2 in the culled pipeline);
+  and `DynamicInstances` on a moving frame.
+- **Needed to close:** a GPU-alone run of those four, starting with reading back the rewritten shader, then the fix in the
+  package that owns the cause, or a measured reason recorded as an accepted difference.
 
 ### Moving instances spend more CPU than three's WebGL2 renderer
 
