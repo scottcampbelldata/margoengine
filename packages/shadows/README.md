@@ -65,6 +65,9 @@ const leaf = createMesh(engine, planeGeometry(2, 2), new PbrMaterial({ map: new 
 leaf.root.setPosition([0, 2, 0]);
 Shadows.attach(engine).add(leaf); // the shadow has the leaf's outline, not the quad's
 ```
+
+`npm run test:gpu:outside --workspace packages/shadows` holds this against Blender Cycles, a path tracer that shares no code with Margo: the real DiffuseTransmissionPlant and AlphaBlendModeTest models, the ground's light with the model over the ground's light without it. `test/outside/reference.py` makes the references and `test/outside/cases.mjs` holds the bounds; the check needs no Blender.
+
  A caster primitive with `displacement` (materials meshes with a `displacementMap`) is drawn displaced along its normals, as its beauty pass is, and redraws every frame so live scale and bias edits show. No duplicate core geometry is created. `shadows.add(clipmapTerrain)` uses its GPU height sampling for depth and its lighting hook for reception. Custom sources can implement `drawShadow(ShadowContext)`.
 
 A custom source may also implement `prepareShadow(ShadowPrepareContext)`. Shadows calls it once per frame, before any

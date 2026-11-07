@@ -152,6 +152,10 @@ const ASSETS = [
     'examples/assets/khronos-samples/README.md',
     'Collada, KHR_animation_pointer and transparency test models: AnimatedColorsCube, GlassVaseFlowers, TransmissionTest (CC0 1.0, Khronos glTF-Sample-Assets), DiffuseTransmissionPlant (CC BY 4.0 and CC0 1.0, same source), Cesium Man `.dae` and texture (CC BY 4.0, Cesium); URLs, pinned commits and sha256 there',
   ],
+  [
+    'packages/shadows/test/outside/reference.py',
+    'Shadow reference pictures in packages/shadows/test/fixtures/outside: rendered by Blender Cycles from the Khronos models above (their licences apply), made by this script',
+  ],
   ['examples/assets/kaykit/LICENSE-adventurers.txt', 'KayKit Adventurers (Kay Lousberg, CC0)'],
   ['examples/assets/kaykit/LICENSE-character-animations.txt', 'KayKit Character Animations (Kay Lousberg, CC0)'],
   ['examples/assets/kaykit/LICENSE-dungeon.txt', 'KayKit Dungeon (Kay Lousberg, CC0)'],

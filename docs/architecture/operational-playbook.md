@@ -514,6 +514,11 @@ selected imposters with the same fragment shader at the same depth. A pixel of a
 it holds no depth, and once landed on the eye, in front of any wall. Evidence: `packages/lod/test/imposter-outline-check.mjs`
 on the RTX A6000. Missing: other GPUs.
 
+Shadow outlines have an outside reference: `packages/shadows/test/outside` compares a real glTF model's shadow on a white
+ground with Blender Cycles, each side giving the ground's light with the model over its light without it, so no Margo
+code decides the answer. Evidence: overlap 0.98 on DiffuseTransmissionPlant and 0.91 on AlphaBlendModeTest's masks, 0.31 with
+the masks off. Missing: other GPUs.
+
 `LodInstances` (`@margoengine/culling/lod`) tests each instance against the frustum and picks its level in one compute pass:
 the level is the first whose limit the world sphere's radius in pixels reaches. Instances append to their level's list by
 atomic add, and the counts are copied to each level's indirect arguments, so core draws each list through `Batch.redirect`. On

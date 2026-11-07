@@ -1,0 +1,17 @@
+{
+  "plant": {
+    "model": "examples/assets/khronos-samples/DiffuseTransmissionPlant.glb",
+    "toLight": [-0.5, 1, 0.3],
+    "camera": { "position": [0.2, 1.7, 1.0], "target": [0.2, 0, 0], "fov": 50 },
+    "ground": { "size": 6, "y": 0 },
+    "size": 512
+  },
+  "alpha": {
+    "model": "examples/assets/khronos/AlphaBlendModeTest/AlphaBlendModeTest.glb",
+    "masksOnly": true,
+    "toLight": [-0.2, 0.9, -0.7],
+    "camera": { "position": [0, 6.5, 5], "target": [0, 0, 1.6], "fov": 72 },
+    "ground": { "size": 30, "y": 0 },
+    "size": 512
+  }
+}
