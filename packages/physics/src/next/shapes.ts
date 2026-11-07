@@ -3,11 +3,12 @@ import { MargoError } from '@margoengine/math/errors';
 import type { KernelColliderOptions, KernelShape } from '../kernel.js';
 import { checkVec, type Vec3 } from '../math.js';
 import { bounds, geometryPositions, type ColliderGeometry, type ColliderOptions, type ShapeOptions } from '../shapes.js';
+import { buildHull } from './hull.js';
 
 const PI = 3.141592653589793;
 
 /** The shapes the own solver holds so far, by the name their options use. */
-const served: Readonly<Record<string, KernelShape>> = { box: 'box', sphere: 'ball', capsule: 'capsule' };
+const served: Readonly<Record<string, KernelShape>> = { box: 'box', sphere: 'ball', capsule: 'capsule', convexHull: 'hull' };
 
 /** What the kernel needs for one collider. */
 export interface KernelCollider {
@@ -22,8 +23,9 @@ export function shapeServed(shape: ShapeOptions['shape']): boolean {
   return Object.hasOwn(served, shape);
 }
 
-function volume(shape: KernelShape, size: readonly number[]): number {
+function volume(shape: KernelShape, size: readonly number[], hullVolume: (row: number) => number): number {
   if (shape === 'box') return 8 * size[0] * size[1] * size[2];
+  if (shape === 'hull') return hullVolume(size[0]);
   const [radius, halfLength = 0] = size;
   return PI * radius * radius * ((4 / 3) * radius + 2 * halfLength);
 }
@@ -43,20 +45,29 @@ function fittedSphere(points: Float32Array, center: number[]): number[] {
   return [radius];
 }
 
+/** What building a collider needs from its world: a hull's row for its faces, and a hull row's volume. */
+export interface HullRows {
+  addHull(vertices: readonly (readonly [number, number, number])[], faces: readonly (readonly number[])[]): number;
+  hullVolume(row: number): number;
+}
+
 /**
- * Turns collider options into kernel arguments. Box and sphere sizes left out are fitted to `fit`, as the Rapier entry does.
+ * Turns collider options into kernel arguments. Box and sphere sizes left out are fitted to `fit`, as the Rapier entry does,
+ * and a convex hull without points or geometry is the hull of the mesh.
  * @throws MargoError (`unsupported`) for a shape the own solver does not hold yet.
  * @throws TypeError when a size is left out and there is no geometry to fit.
+ * @throws RangeError for hull points that span no volume.
  */
 export function kernelCollider(
   options: ColliderOptions,
   fit: { geometry: ColliderGeometry | null; scale: Vec3 },
+  hulls: HullRows,
 ): KernelCollider {
   const shape = shapeServed(options.shape) ? served[options.shape] : undefined;
   if (!shape)
     throw new MargoError(
       'unsupported',
-      `The ${options.shape} shape is not in the own solver yet; use box, sphere or capsule, or @margoengine/physics.`,
+      `The ${options.shape} shape is not in the own solver yet; use box, sphere, capsule or convexHull, or @margoengine/physics.`,
     );
   const fitted = (): Float32Array => {
       if (!fit.geometry) throw new TypeError(`A ${options.shape} collider without explicit size needs a mesh with geometry`);
@@ -81,13 +92,17 @@ export function kernelCollider(
       size = fittedSphere(points, center);
     } else size = [options.radius];
   } else if (options.shape === 'capsule') size = [options.radius, options.halfHeight];
-  else throw new TypeError(`Unknown shape ${options.shape}; use box, sphere or capsule.`);
+  else if (options.shape === 'convexHull') {
+    const points = options.points ?? (options.geometry ? geometryPositions(options.geometry, fit.scale) : fitted()),
+      { vertices, faces } = buildHull(points);
+    size = [hulls.addHull(vertices, faces)];
+  } else throw new TypeError(`Unknown shape ${options.shape}; use box, sphere, capsule or convexHull.`);
   const offset = options.offset ?? [0, 0, 0];
   checkVec(offset, 'Collider offset');
   const density = options.massless
     ? 0
     : options.mass !== undefined
-      ? options.mass / volume(shape, size)
+      ? options.mass / volume(shape, size, hulls.hullVolume)
       : (options.density ?? 1);
   return {
     name: options.shape,

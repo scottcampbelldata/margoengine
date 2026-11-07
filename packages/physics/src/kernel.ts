@@ -134,8 +134,8 @@ const hullErrors: Readonly<Record<number, string>> = {
   [-3]: 'A face is not flat; split it or move its vertices onto one plane',
   [-4]: 'The faces do not close into one surface; each edge must join exactly two faces, running opposite ways',
   [-5]: 'The shape is not convex, or a face runs clockwise from outside; turn the face or build the convex hull',
-  [-6]: 'Two neighbouring faces lie in one plane; merge them, as contact clipping sees only one face at a time',
-  [-7]: 'A face has over 64 edges; split it',
+  [-6]: 'Two neighbouring faces lie in one plane; merge them, as contact clipping sees only one face at a time, or build it with convexHull',
+  [-7]: 'A face has over 256 edges; pass fewer points around it',
 };
 
 /** A point of a manifold. */
@@ -542,7 +542,7 @@ export class KernelWorld {
    * the world's life, and a snapshot carries them. Read views from `columns` after this call.
    * @param vertices Points in the hull's frame.
    * @param faces Each face's vertex indices, counter-clockwise seen from outside. Neighbouring faces must not lie in one
-   * plane, and a face holds at most 64 edges.
+   * plane, and a face holds at most 256 edges. `convexHull` builds such faces from points.
    * @returns The hull's row.
    * @throws RangeError for a shape that is not a closed convex polyhedron with flat faces, naming what is wrong.
    */

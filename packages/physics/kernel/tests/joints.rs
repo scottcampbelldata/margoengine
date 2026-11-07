@@ -415,19 +415,19 @@ fn worst_gap(w: &World, joints: &[u32]) -> f32 {
     worst
 }
 
-#[test]
-fn a_branching_tree_with_a_heavy_hub_holds_together() {
+/// The tree below, its hub started `shift` along X, and the widest any joint opened in 10 s.
+fn tree_gap(shift: f32) -> f32 {
     // A hub joins four arms, so no path runs through it and the arms settle against each other pass by pass.
     let mut w = world(64);
     let top = anchor(&mut w);
-    let hub = point(&mut w, v3(0.0, -1.0, 0.0), 100.0, 10.0);
+    let hub = point(&mut w, v3(shift, -1.0, 0.0), 100.0, 10.0);
     let mut joints = vec![spherical(&mut w, top, hub, v3(0.0, 0.0, 0.0), v3(0.0, 1.0, 0.0))];
     for arm in 0..3 {
         let side = v3([1.0, -1.0, 0.0][arm], 0.0, [0.0, 0.0, 1.0][arm]);
         let mut above = hub;
         let mut on_above = side.scale(0.5);
         for link in 0..8 {
-            let at = v3(0.0, -1.0, 0.0).add(side.scale(0.5 + 0.5 * link as f32 + 0.25));
+            let at = v3(shift, -1.0, 0.0).add(side.scale(0.5 + 0.5 * link as f32 + 0.25));
             let body = point(&mut w, at, 1.0, 0.02);
             joints.push(spherical(&mut w, above, body, on_above, side.scale(-0.25)));
             above = body;
@@ -439,8 +439,25 @@ fn a_branching_tree_with_a_heavy_hub_holds_together() {
         w.step(DT);
         worst = worst.max(worst_gap(&w, &joints));
     }
+    worst
+}
+
+#[test]
+fn a_branching_tree_with_a_heavy_hub_holds_together() {
+    let worst = tree_gap(0.0);
     println!("tree: worst anchor gap {worst:.5} m");
     assert!(worst < 0.02, "a joint opened by {worst} m");
+}
+
+#[test]
+fn the_tree_holds_from_any_start_a_rounding_away() {
+    // The widest gap is the peak of a swing that rounding steers: batch 125 saw it move from 6.66 to 7.25 mm when only how K
+    // is factored changed, and a micrometre's shift of the hub moves it as far. So the bound must hold for every start.
+    for shift in [1e-6f32, -1e-6, 1e-5, -1e-5, 1e-4, -1e-4, 3e-4, -3e-4] {
+        let worst = tree_gap(shift);
+        println!("tree, hub shifted {shift}: worst anchor gap {worst:.5} m");
+        assert!(worst < 0.02, "shifted {shift}, a joint opened by {worst} m");
+    }
 }
 
 #[test]

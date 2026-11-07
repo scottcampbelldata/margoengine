@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10687943,
+  "total": 10690856,
   "history": [
     {
       "date": "2026-10-24",
@@ -3812,6 +3812,12 @@
       "commit": "f7a17519d",
       "reason": "xr/layers: new optional entry, layers, haptics, video and locomotion",
       "grew": 2
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "8074c9655",
+      "reason": "physics/next: convex hulls from points (Quickhull in the entry), a face of 256 edges in the kernel",
+      "grew": 1
     }
   ],
   "items": {
@@ -4265,7 +4271,7 @@
     "@margoengine/oit/moments": 4197,
     "@margoengine/oit/vfx": 486,
     "@margoengine/physics": 19679,
-    "@margoengine/physics/next": 86240,
+    "@margoengine/physics/next": 89153,
     "@margoengine/physics2d": 8199,
     "@margoengine/physics2d/outline": 2524,
     "@margoengine/pixel": 4664,

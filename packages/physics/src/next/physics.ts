@@ -19,7 +19,7 @@ import type { ColliderOptions, ShapeOptions } from '../shapes.js';
 import { PhysicsBody, checkRotation, type BodyOwner } from './body.js';
 import { PhysicsCollider } from './collider.js';
 import { type NextJointOptions, PhysicsJoint, createJoint } from './joint.js';
-import { kernelCollider, shapeServed } from './shapes.js';
+import { kernelCollider, shapeServed, type HullRows } from './shapes.js';
 import { MeshSync, meshPose } from './sync.js';
 
 /** Options for creating a Physics world; every field has a default. */
@@ -136,6 +136,20 @@ export class Physics implements EnginePlugin, BodyOwner {
   private readonly joints = new Set<PhysicsJoint>();
   private readonly byMesh = new Map<Mesh, PhysicsBody>();
   private readonly byRow = new Map<number, PhysicsCollider>();
+  // A hull's rows stay for the world's life, so colliders built from the same points share one.
+  private readonly hullRows = new Map<string, number>();
+  private readonly hulls: HullRows = {
+    addHull: (vertices, faces) => {
+      const key = JSON.stringify([vertices, faces]);
+      let row = this.hullRows.get(key);
+      if (row === undefined) {
+        row = this.kernel.addHull(vertices, faces);
+        this.hullRows.set(key, row);
+      }
+      return row;
+    },
+    hullVolume: (row) => this.kernel.columns.hullVolume[row],
+  };
   private readonly attachments = new Set<PhysicsAttachment>();
   private readonly listeners = new Map<keyof PhysicsEventMap, Set<(event: never) => void>>();
   // Gathered into a reused array; a step run from inside a listener gathers into its own.
@@ -449,13 +463,16 @@ export class Physics implements EnginePlugin, BodyOwner {
   /** @internal use `body.addCollider`. */
   addCollider(body: PhysicsBody, options: ColliderOptions): PhysicsCollider {
     const { mesh } = body,
-      fitted = (options.shape === 'box' && !options.halfExtents) || (options.shape === 'sphere' && options.radius === undefined),
+      fitted =
+        (options.shape === 'box' && !options.halfExtents) ||
+        (options.shape === 'sphere' && options.radius === undefined) ||
+        (options.shape === 'convexHull' && !options.points && !options.geometry),
       fit =
         mesh && fitted
           ? colliderGeometry(mesh, body.fitScale)
           : { geometry: null, scale: mesh ? ([mesh.scale.x, mesh.scale.y, mesh.scale.z] as const) : ([1, 1, 1] as const) };
     if (body.fitScale && mesh?.geometry) fit.scale = body.fitScale;
-    const { name, shape, size, options: placed } = kernelCollider(options, fit),
+    const { name, shape, size, options: placed } = kernelCollider(options, fit, this.hulls),
       row = this.kernel.addCollider(body.row, shape, size, placed),
       collider = new PhysicsCollider(this.kernel, row, body, name);
     if (options.collisionGroups !== undefined) this.kernel.columns.colliderGroups[row] = options.collisionGroups;

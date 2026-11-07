@@ -16,7 +16,9 @@ pub const HULL_NOT_CONVEX: i32 = -5;
 pub const HULL_COPLANAR_FACES: i32 = -6;
 pub const HULL_FACE_TOO_LARGE: i32 = -7;
 
-/// Two neighbouring faces closer than this cosine, about 0.8 degrees, count as one plane.
+/// Two neighbouring faces closer than this cosine, about 0.8 degrees, whose corners all lie within half of FLAT of each
+/// other's plane, are one plane split in two, and merged they stay flat. A crease that small between faces too wide to be
+/// one flat face is a real crease: a hull of random points has them.
 const COPLANAR: f32 = 0.9999;
 /// How far a vertex may stray from a plane, as a share of the hull's size.
 const FLAT: f32 = 1e-4;
@@ -336,7 +338,10 @@ impl World {
             self.set_u(EDGE_TWIN, e0 + e, found);
             self.set_u(EDGE_TWIN, e0 + found as usize, e as u32);
             let (a, b) = (self.uu(EDGE_FACE, e0 + e) as usize, self.uu(EDGE_FACE, e0 + found as usize) as usize);
-            if self.v(FACE_NORMAL_X, f0 + a).dot(self.v(FACE_NORMAL_X, f0 + b)) > COPLANAR {
+            if self.v(FACE_NORMAL_X, f0 + a).dot(self.v(FACE_NORMAL_X, f0 + b)) > COPLANAR
+                && self.face_within(f0, e0, v0, nf, ne, b, a, 0.5 * FLAT * size)
+                && self.face_within(f0, e0, v0, nf, ne, a, b, 0.5 * FLAT * size)
+            {
                 return HULL_COPLANAR_FACES;
             }
         }
@@ -374,6 +379,15 @@ impl World {
         self.set_s(HULL_RADIUS, at, sqrt(radius));
         self.header_mut().hull_rows = [row + 1, first_vertex + vertices, first_edge + edges, first_face + faces];
         row as i32
+    }
+
+    /// True when every corner of face `f` lies within `band` of the plane of face `of`.
+    #[allow(clippy::too_many_arguments)]
+    fn face_within(&self, f0: usize, e0: usize, v0: usize, faces: usize, edges: usize, f: usize, of: usize, band: f32) -> bool {
+        let (normal, offset) = (self.v(FACE_NORMAL_X, f0 + of), self.s(FACE_OFFSET, f0 + of));
+        let start = self.uu(FACE_EDGE, f0 + f) as usize;
+        let end = if f + 1 < faces { self.uu(FACE_EDGE, f0 + f + 1) as usize } else { edges };
+        (start..end).all(|e| (normal.dot(self.vertex_of(v0, e0 + e)) - offset).abs() <= band)
     }
 
     #[inline(always)]

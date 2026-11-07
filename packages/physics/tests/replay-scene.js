@@ -259,6 +259,12 @@ export function physicsScene(Physics, steps = REPLAY_STEPS) {
     );
   };
   for (let i = 0; i < 32; i++) spawn();
+  // Hulls built from points in the step's own TypeScript, so a browser that rounded them differently would part ways.
+  for (let i = 0; i < 4; i++) {
+    const points = [];
+    for (let k = 0; k < 40; k++) points.push(...vector(0.6));
+    bodies.push(physics.addBody(null, { position: vector(2), linearVelocity: vector(), colliders: { shape: 'convexHull', points } }));
+  }
   for (let i = 0; i < steps; i++) {
     if (i % 512 === 0) {
       physics.gravity = GRAVITY[(i / 512) % 4];

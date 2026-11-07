@@ -69,6 +69,11 @@ export interface ContactForceEvent {
     force: number;
 }
 
+export interface HullFaces {
+    vertices: [number, number, number][];
+    faces: number[][];
+}
+
 export type JointDof = 'linX' | 'linY' | 'linZ' | 'angX' | 'angY' | 'angZ';
 
 export type JointOptions = (JointBase & {
@@ -494,6 +499,9 @@ export type ShapeOptions = {
 };
 
 export function collisionGroups(memberships: number | readonly number[], filter?: number | readonly number[]): number;
+
+export { buildHull as convexHull };
+function buildHull(input: ArrayLike<number>): HullFaces;
 
 export function loadKernel({ signal }?: KernelLoadOptions): Promise<void>;
 

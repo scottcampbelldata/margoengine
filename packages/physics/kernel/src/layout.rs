@@ -450,8 +450,9 @@ pub const JOINT_WORDS: u32 = 64 + 2 * (36 + 36 + 6 + 36 + 6 + 4);
 pub const MAX_JOINTS: u32 = 1 << 22;
 /// Pairs the broad phase can hold; its table then fills 2^30 slots and its points 2^31 rows.
 pub const MAX_PAIRS: u32 = 1 << 29;
-/// Edges of a hull's largest face: the clipper's buffers are sized by it.
-pub const MAX_FACE_EDGES: u32 = 64;
+/// Edges of a hull's largest face: the clipper's buffers are sized by it, and left unwritten until used. 256 holds the cap of
+/// a 256-sided cylinder in one face; contact ids give a face's edges 8 bits.
+pub const MAX_FACE_EDGES: u32 = 256;
 
 // Values of the COLLIDER_SHAPE column. A, B, C hold the size: a ball's radius; a box's half extents; a capsule's radius
 // and half the length of its core along local Y. A hull has its row in COLLIDER_HULL and no size.

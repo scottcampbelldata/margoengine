@@ -148,19 +148,19 @@ fn a_bad_hull_is_refused_and_leaves_nothing_behind() {
     // The cube's top split in two: Gregorius 2015 says such a mesh loses points, so it must be merged first.
     let split: [&[u32]; 7] = [CUBE_FACES[0], CUBE_FACES[1], &[2, 6, 7], &[2, 7, 3], CUBE_FACES[3], CUBE_FACES[4], CUBE_FACES[5]];
     assert_eq!(w.add_hull(&CUBE, &split), HULL_COPLANAR_FACES);
-    // A face too large for the clipper: a prism of 65 sides, its circle drawn by exact rotations.
+    // A face too large for the clipper: a prism of 257 sides, its circle drawn by exact rotations.
     let mut ring = Vec::new();
-    for i in 0..65 {
-        let turn = Q::from_rotation_vector(v3(0.0, i as f32 * 2.0 * std::f32::consts::PI / 65.0, 0.0));
+    for i in 0..257 {
+        let turn = Q::from_rotation_vector(v3(0.0, i as f32 * 2.0 * std::f32::consts::PI / 257.0, 0.0));
         let v = turn.rotate(v3(1.0, 0.0, 0.0));
         ring.push([v.x, 1.0, v.z]);
         ring.push([v.x, -1.0, v.z]);
     }
-    let top: Vec<u32> = (0..65).rev().map(|i| i * 2).collect();
-    let bottom: Vec<u32> = (0..65).map(|i| i * 2 + 1).collect();
+    let top: Vec<u32> = (0..257).rev().map(|i| i * 2).collect();
+    let bottom: Vec<u32> = (0..257).map(|i| i * 2 + 1).collect();
     let mut sides = Vec::new();
-    for i in 0..65u32 {
-        let j = (i + 1) % 65;
+    for i in 0..257u32 {
+        let j = (i + 1) % 257;
         sides.push(vec![i * 2, i * 2 + 1, j * 2 + 1, j * 2]);
     }
     let mut faces: Vec<&[u32]> = vec![&top, &bottom];
@@ -168,6 +168,24 @@ fn a_bad_hull_is_refused_and_leaves_nothing_behind() {
     assert_eq!(w.add_hull(&ring, &faces), HULL_FACE_TOO_LARGE);
     assert_eq!(w.header().hull_rows[0], 0);
     assert_eq!(w.add_hull(&CUBE, &CUBE_FACES), 0, "a refused hull leaves its rows free");
+}
+
+#[test]
+fn a_hull_with_a_real_crease_under_the_coplanar_angle_is_taken() {
+    let mut w = World::new(4, 4).unwrap();
+    // A real crease under 0.8 degrees between faces too wide to be one flat face, as a hull of random points has: the top
+    // rises 0.005 to a ridge, 0.29 degrees, and its far edges lie 0.01 off each other's plane, 29 times FLAT.
+    let rise = 1.005;
+    let ridged = [
+        [-1.0, -1.0, -1.0], [1.0, -1.0, -1.0], [-1.0, 1.0, -1.0], [1.0, 1.0, -1.0],
+        [-1.0, -1.0, 1.0], [1.0, -1.0, 1.0], [-1.0, 1.0, 1.0], [1.0, 1.0, 1.0],
+        [0.0, rise, -1.0], [0.0, rise, 1.0],
+    ];
+    let ridge: [&[u32]; 7] = [
+        &[1, 3, 7, 5], &[0, 4, 6, 2], &[2, 6, 9, 8], &[8, 9, 7, 3], &[0, 1, 5, 4], &[4, 5, 7, 9, 6], &[0, 2, 8, 3, 1],
+    ];
+    let row = w.add_hull(&ridged, &ridge);
+    assert!(row >= 0, "a hull with a real crease is refused with {row}");
 }
 
 #[test]

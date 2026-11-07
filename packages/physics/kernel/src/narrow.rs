@@ -9,6 +9,7 @@ use crate::layout::*;
 use crate::math::*;
 use crate::sat::{Feature, Pose, closest_on_segments, sat_coherent};
 use crate::world::World;
+use core::mem::MaybeUninit;
 
 /// A clipped polygon's most vertices: a largest face, plus one for each side plane of another.
 const CLIP: usize = 2 * MAX_FACE_EDGES as usize;
@@ -70,8 +71,19 @@ struct ClipVertex {
 /// An edge that runs along a side plane after clipping, marked so that a later cut names it apart from a polygon edge.
 const ALONG_PLANE: u32 = 1 << 8;
 
+/// Room for a clipped polygon. Left unwritten, as a face may hold 256 edges and a cleared buffer would cost every contact the
+/// largest face's worth of stores; only the first `count` are ever read.
+type Buffer<T> = [MaybeUninit<T>; CLIP];
+
+/// The first `count` entries of a buffer, which the caller wrote.
+#[inline(always)]
+fn written<T>(buffer: &Buffer<T>, count: usize) -> &[T] {
+    debug_assert!(count <= CLIP);
+    unsafe { core::slice::from_raw_parts(buffer.as_ptr() as *const T, count) }
+}
+
 /// Clips `input` against the plane `normal . x <= offset`, by Sutherland and Hodgman, and returns how many vertices are left.
-fn clip(input: &[ClipVertex], output: &mut [ClipVertex; CLIP], normal: V3, offset: f32, plane: u32) -> usize {
+fn clip(input: &[ClipVertex], output: &mut Buffer<ClipVertex>, normal: V3, offset: f32, plane: u32) -> usize {
     let mut count = 0;
     let mut previous = input[input.len() - 1];
     let mut distance_previous = normal.dot(previous.p) - offset;
@@ -83,11 +95,11 @@ fn clip(input: &[ClipVertex], output: &mut [ClipVertex; CLIP], normal: V3, offse
             let id = ID_CLIPPED | (plane << 16) | previous.edge;
             // Going in, the rest of the old edge leaves this point; going out, the new edge runs along the plane.
             let edge = if distance <= 0.0 { previous.edge } else { ALONG_PLANE | plane };
-            output[count] = ClipVertex { p, id, edge };
+            output[count] = MaybeUninit::new(ClipVertex { p, id, edge });
             count += 1;
         }
         if distance <= 0.0 && count < CLIP {
-            output[count] = vertex;
+            output[count] = MaybeUninit::new(vertex);
             count += 1;
         }
         previous = vertex;
@@ -185,15 +197,14 @@ fn face_contact(reference: &Poly, incident: &Poly, rel: Pose, face: usize, limit
             chosen = f;
         }
     }
-    let zero = ClipVertex { p: v3(0.0, 0.0, 0.0), id: 0, edge: 0 };
-    let mut first = [zero; CLIP];
-    let mut second = [zero; CLIP];
+    let mut first: Buffer<ClipVertex> = [const { MaybeUninit::uninit() }; CLIP];
+    let mut second: Buffer<ClipVertex> = [const { MaybeUninit::uninit() }; CLIP];
     let mut count = 0;
     let start = incident.first(chosen);
     let mut e = start;
     loop {
         let vertex = incident.origin(e);
-        first[count] = ClipVertex { p: rel.apply(incident.vertex(vertex)), id: vertex as u32, edge: count as u32 };
+        first[count] = MaybeUninit::new(ClipVertex { p: rel.apply(incident.vertex(vertex)), id: vertex as u32, edge: count as u32 });
         count += 1;
         e = incident.next(e);
         if e == start {
@@ -211,9 +222,9 @@ fn face_contact(reference: &Poly, incident: &Poly, rel: Pose, face: usize, limit
         let length = sqrt(side.dot(side));
         let side = side.scale(1.0 / length);
         count = if plane & 1 == 0 {
-            clip(&first[..count], &mut second, side, side.dot(a), plane)
+            clip(written(&first, count), &mut second, side, side.dot(a), plane)
         } else {
-            clip(&second[..count], &mut first, side, side.dot(a), plane)
+            clip(written(&second, count), &mut first, side, side.dot(a), plane)
         };
         plane += 1;
         e = next;
@@ -221,19 +232,19 @@ fn face_contact(reference: &Poly, incident: &Poly, rel: Pose, face: usize, limit
             break;
         }
     }
-    let polygon = if plane & 1 == 0 { &first } else { &second };
-    let mut points = [Point { on_a: n, on_b: n, separation: 0.0, id: 0 }; CLIP];
+    let polygon = written(if plane & 1 == 0 { &first } else { &second }, count);
+    let mut points: Buffer<Point> = [const { MaybeUninit::uninit() }; CLIP];
     let mut kept = 0;
-    for vertex in polygon.iter().take(count) {
+    for vertex in polygon {
         let separation = n.dot(vertex.p) - offset;
         if separation <= limit {
-            points[kept] = Point { on_a: vertex.p.sub(n.scale(separation)), on_b: vertex.p, separation, id: vertex.id };
+            points[kept] = MaybeUninit::new(Point { on_a: vertex.p.sub(n.scale(separation)), on_b: vertex.p, separation, id: vertex.id });
             kept += 1;
         }
     }
     out.normal = n;
     let held = out.held;
-    reduce(&points, kept, n, &held[..out.held_count], out);
+    reduce(written(&points, kept), kept, n, &held[..out.held_count], out);
 }
 
 /// A manifold between two polyhedra, in world space. `pose_a` and `pose_b` are the shapes' frames.

@@ -5,6 +5,8 @@ export { PhysicsBody } from './next/body.js';
 export { PhysicsCollider } from './next/collider.js';
 export { PhysicsJoint } from './next/joint.js';
 export { collisionGroups } from './shapes.js';
+export { buildHull as convexHull } from './next/hull.js';
+export type { HullFaces } from './next/hull.js';
 export type { ConeJointOptions, NextJointOptions } from './next/joint.js';
 export type { CollisionEvent, CollisionEventType, ContactForceEvent, PhysicsEventMap, PhysicsOptions } from './next/physics.js';
 export type { BodyOptions, BodyType } from './body.js';

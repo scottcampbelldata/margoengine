@@ -306,7 +306,26 @@ console.log(body.position[1]);         // fallen about 4.9 m in the second
 physics.dispose();
 ```
 
-It holds `box`, `sphere` and `capsule` colliders, bodies of every kind, forces, impulses, velocities, damping, locks, kinematic targets, gravity, sleeping and the `beforestep` and `afterstep` events. Bodies collide, with friction, restitution and the four combine rules, and `physics.touching(a, b)` and `physics.contactPoints(body)` read the contacts of the last step. Contact and intersection events, sensors, `collisionGroups`, `solverGroups`, `contactFilter`, `dominance` and `enabled` on bodies and colliders work as on the root entry, with the same names. A call that needs what is still to come throws a `MargoError` with code `unsupported` naming what it waits for: other shapes and `addModel`, `setType`, `setMassProperties`, inertia of its own, `additionalSolverIterations` and the `generic` joint with the shapes and queries batch, `ccd` with continuous collision, queries, `follow` and character controllers, and `debugRender`. `body.sleep()` and impulses take effect at the next step.
+It holds `box`, `sphere`, `capsule` and `convexHull` colliders, bodies of every kind, forces, impulses, velocities, damping, locks, kinematic targets, gravity, sleeping and the `beforestep` and `afterstep` events. Bodies collide, with friction, restitution and the four combine rules, and `physics.touching(a, b)` and `physics.contactPoints(body)` read the contacts of the last step. Contact and intersection events, sensors, `collisionGroups`, `solverGroups`, `contactFilter`, `dominance` and `enabled` on bodies and colliders work as on the root entry, with the same names. A call that needs what is still to come throws a `MargoError` with code `unsupported` naming what it waits for: the other shapes and `addModel`, `setType`, `setMassProperties`, inertia of its own, `additionalSolverIterations` and the `generic` joint with the shapes and queries batch, `ccd` with continuous collision, queries, `follow` and character controllers, and `debugRender`. `body.sleep()` and impulses take effect at the next step.
+
+A `convexHull` takes `points` (flat x, y, z numbers), or `geometry`, or the body's mesh when it has neither, scaled with the mesh, as on the root entry. The solver builds it by Quickhull: points inside, repeats and points within 2.5e-5 of the hull's size of a face are dropped, triangles in one plane become one face of up to 256 corners, and colliders built from the same points share one hull. `convexHull(points)` returns the `vertices` and `faces` it builds, for drawing or checking; it throws a `RangeError` naming the fix for fewer than four points or points that span no volume.
+
+```ts
+import {Physics, convexHull} from 'margoengine/physics/next';
+
+await Physics.load();
+const physics = new Physics(null);
+physics.addBody(null, {type: 'fixed', position: [0, -0.5, 0], colliders: {shape: 'box', halfExtents: [20, 0.5, 20]}});
+const points = [];
+for (let i = 0; i < 12; i++) {
+  const t = (i / 12) * 2 * Math.PI;
+  points.push(Math.cos(t), -0.5, Math.sin(t), 0.5 * Math.cos(t), 0.5, 0.5 * Math.sin(t));
+}
+const rock = physics.addBody(null, {position: [0, 3, 0], colliders: {shape: 'convexHull', points, density: 2}});
+for (let i = 0; i < 180; i++) physics.step();
+console.log(rock.position[1].toFixed(2), convexHull(points).faces.length); // 0.50 14: resting on its wide face
+physics.dispose();
+```
 
 After each step a pair that began or stopped touching fires `contactstart` or `contactend`, or `intersectionstart` or `intersectionend` when either collider is a sensor, with both bodies, meshes and colliders. A sensor sees overlaps and pushes nothing, and it sees kinematic and fixed bodies too. Two fixed bodies never meet, sensor or not. A collider stays quiet with `events: false` when the other side has it too. A pair of sleepers says nothing, and neither does a body removed while it touches, as on the root entry. `collisionGroups` keeps a pair apart; `solverGroups` lets it be seen and fire events without being solved. `contactFilter(a, b)` runs inside the step for each candidate pair of bodies: it may read the world and must not change it, so a step run from it throws, and false lets the pair pass and keeps its sensor events quiet. A body of higher `dominance` is a wall to a dynamic body of lower dominance, in contacts only, and floors still hold it. `body.enabled = false` takes a body out of the world: it keeps its pose and speed, nothing wakes it, its touches end and what rested on it falls, and its joints rest until it comes back, awake. `collider.setEnabled(false)` does the same for one collider, which keeps its mass.
 
