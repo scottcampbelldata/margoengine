@@ -45,6 +45,10 @@
     "./eviction": {
       "types": "./dist/eviction.d.ts",
       "import": "./dist/eviction.js"
+    },
+    "./bundles": {
+      "types": "./dist/bundles.d.ts",
+      "import": "./dist/bundles.js"
     }
   },
   "files": [

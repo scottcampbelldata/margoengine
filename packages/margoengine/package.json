@@ -306,6 +306,10 @@
       "types": "./dist/cache/eviction.d.ts",
       "import": "./dist/cache/eviction.js"
     },
+    "./cache/bundles": {
+      "types": "./dist/cache/bundles.d.ts",
+      "import": "./dist/cache/bundles.js"
+    },
     "./cameras": {
       "types": "./dist/cameras.d.ts",
       "import": "./dist/cameras.js"

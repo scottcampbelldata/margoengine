@@ -263,6 +263,47 @@ console.log(tile.status, await tiles.usage()); // usage() reads the totals too: 
   goes to the network. Use a new `name` to go back.
 - Works with `keys: varyKeys()`, `HashedAssets` and `LoadingManager`.
 
+## Asset bundles with dependencies
+
+`margoengine/cache/bundles` loads a level and the shared assets it needs as one unit. A manifest names each bundle's
+files with their SHA-256 and the bundles it depends on; files are stored by content hash (through `HashedAssets`), so a
+file two bundles share is downloaded and stored once, and a new release downloads only the files whose hash changed.
+
+```ts
+import {AssetCache} from 'margoengine/cache';
+import {AssetBundles} from 'margoengine/cache/bundles';
+import {hashBytes} from 'margoengine/cache/hashed';
+import {loadGLTF} from 'margoengine/gltf-pro';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
+
+// Build the manifest when you publish; here it is made from the files themselves.
+const hash = async (url: string) => hashBytes(await (await fetch(url)).arrayBuffer());
+const manifest = {
+  version: '2026.11',
+  bundles: {
+    shared: {files: {'/shared/rock.glb': await hash('/shared/rock.glb')}},
+    level1: {files: {'/level1/map.glb': await hash('/level1/map.glb')}, deps: ['shared']},
+  },
+};
+const bundles = new AssetBundles(new AssetCache({name: 'game'}), manifest);
+await bundles.load('level1', {onProgress: ({loaded, total}) => console.log(`${loaded}/${total} files`)});
+const level = await loadGLTF(engine, '/level1/map.glb', {fetch: bundles.fetch}); // offline from now on
+const {changed} = await bundles.update(manifest); // the next release's manifest: [] here, nothing changed
+console.log(level.bounds, changed);
+```
+
+- `load(name, {signal, onProgress, concurrency})` fetches (or finds stored) every file of the bundle and its
+  dependencies, dependencies first and 4 at a time by default, checks each against its hash and waits for the cache
+  writes. A file with other bytes (MargoError `'failed'`, its copy dropped) or an HTTP error status fails the load;
+  files already stored stay stored.
+- `update(manifest)` drops the stored files whose hash changed or that are gone and returns `{dropped, changed}`:
+  the bundles whose files, or whose dependencies' files, changed. An invalid manifest throws and the old one stays.
+- `order(name)` and `files(name)` list what a load covers. Relative file URLs resolve against `base` (default the
+  page). A missing dependency, a cycle, one URL with two hashes or a hash that is not SHA-256 hex throws a TypeError.
+- `bundles.fetch` answers a listed file from its hashed copy, so loaders resolve a .gltf's buffers and images through
+  it; unlisted URLs pass through to the cache.
+
 ## Limits
 
 - Keyed by URL unless `keys: varyKeys()` is set (above); `RangeCache` is keyed by URL only.
