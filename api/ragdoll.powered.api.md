@@ -23,6 +23,8 @@ export interface RagdollMotorOptions {
 export class RagdollMotors {
     error: number;
     constructor(ragdoll: Ragdoll, options: RagdollMotorOptions);
+    addSteadying(part: RagdollPart, inertia?: number): void;
+    limbInertia(bone: Mesh | RagdollPart): number;
     get strength(): number;
     set strength(value: number);
     get root(): number;
@@ -30,6 +32,7 @@ export class RagdollMotors {
     fade(to: number, seconds: number): this;
     setTarget(bone: Mesh | RagdollPart, rotation: readonly number[] | null): this;
     setStrength(bone: Mesh | RagdollPart, value: number): this;
+    standing(bone: Mesh | RagdollPart, on: boolean): void;
     hit(bone: Mesh | RagdollPart, impulse: readonly [number, number, number], options?: RagdollHitOptions): this;
     dispose(): void;
     [Symbol.dispose]: () => void;

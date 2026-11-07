@@ -7,7 +7,7 @@ import { addRagdollBalance } from '../dist/balance.js';
 import { fitRagdollShapes } from '../dist/hulls.js';
 import { addRagdollMotors } from '../dist/powered.js';
 import { humanoidProfile, ragdollOptions } from '../dist/profile.js';
-import { rotateByQuaternion as rotate } from '@margoengine/math/quat';
+import { conjugateQuaternion, multiplyQuaternions, rotateByQuaternion as rotate } from '@margoengine/math/quat';
 import { realRig, skip } from './rig.js';
 
 const rtest = (name, fn) => test(name, { skip, timeout: 60_000 }, fn);
@@ -91,6 +91,29 @@ rtest('without it the character folds up; with it the same character settles, st
   assert.equal(keeper.steps, settled, 'no step unasked');
   rig.dispose();
 });
+
+// A motor holds a limb against its weight from where the limb's mass lies. As a rod along each bone, Knight's neck reckoned
+// 0.0028 kg m2 against 0.96, its cap lost to the weight of the head, and the head fell to its cone limit.
+for (const name of ['Knight', 'Barbarian', 'Ranger', 'Rogue', 'Mage'])
+  test(`${name}'s motors hold up its head with no balance to help`, { skip, timeout: 60_000 }, async () => {
+    const [path, map, mass] = kin(name),
+      rig = await realRig(path);
+    rig.frames(1);
+    const nodes = map(rig),
+      ragdoll = Ragdoll.attach(rig.physics, ragdollOptions(humanoidProfile(rig.model.nodes, { bones: nodes, mass }), rig.model.nodes));
+    fitRagdollShapes(ragdoll, rig.model);
+    addRagdollMotors(ragdoll, { frequency: 8 });
+    ragdoll.activate();
+    const head = ragdoll.part(nodes.head),
+      neck = ragdoll.bones[head.parent],
+      turn = () => multiplyQuaternions(conjugateQuaternion(neck.body.rotation), head.body.rotation),
+      start = turn();
+    rig.frames(60);
+    const change = multiplyQuaternions(turn(), conjugateQuaternion(start)),
+      angle = 2 * Math.acos(Math.min(1, Math.abs(change[3])));
+    assert.ok(angle < 0.02, `the head turned ${angle} rad`);
+    rig.dispose();
+  });
 
 // A character that settles settles whatever the rounding of its hull points: it stands where it stood, at the height it was
 // asked for, on its own legs, with no step after the first second. The command is stance 0.97 of the height over the feet.
@@ -307,6 +330,28 @@ test('Seed-san stands quiet at 10 solver passes, whatever the rounding of its hu
         most = Math.max(most, Math.hypot(...momentum) / mass);
       }
       if (most >= 0.005) failures.push(`${ulps} steps, seed ${seed}: ${most} m/s`);
+      rig.dispose();
+    }
+  assert.deepEqual(failures, []);
+});
+
+// What steadies the solver reckons with rods, while the motors' gains come from where the mass lies. The same added inertia from
+// the true figure shook RiggedFigure at 0.009 m/s at 20 passes, on 85 of 96 roundings, where rods read 0.0007.
+test('RiggedFigure stands quiet at 20 solver passes, whatever the rounding of its hull points', { skip, timeout: 120_000 }, async () => {
+  const failures = [];
+  for (const ulps of [1, 4, 16])
+    for (let seed = 1; seed <= 8; seed++) {
+      const { rig, ragdoll } = await figure(figures.RiggedFigure, { ulps, seed }, 20);
+      rig.frames(240);
+      let was = ragdoll.bones.map(({ body }) => [...body.position]),
+        most = 0;
+      for (let frame = 0; frame < 120; frame++) {
+        rig.frames(1);
+        const now = ragdoll.bones.map(({ body }) => [...body.position]);
+        now.forEach((at, i) => (most = Math.max(most, Math.hypot(at[0] - was[i][0], at[1] - was[i][1], at[2] - was[i][2]) * 60)));
+        was = now;
+      }
+      if (most >= 0.005) failures.push(`${ulps} steps, seed ${seed}: a bone at ${most} m/s`);
       rig.dispose();
     }
   assert.deepEqual(failures, []);

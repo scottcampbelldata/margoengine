@@ -1447,6 +1447,15 @@ Scott's order of 2026-11-07, one at a time, each pushed before the next.
 | 1b | RiggedFigure slid more at 8 passes after item 1 | DONE | `82ead69e5` | `/balance` | LIM-248 |
 | 2 | Seed-san's creep | DONE | `82ead69e5` | `/balance` | LIM-248 |
 | 5 | Mage's shake, and Mage in the strict test | DONE | `82ead69e5` | `/balance` | LIM-248 |
+| 3 | Rod motors: real inertia in the gains and caps | DONE, ANKLE BAND REJECTED | this commit | `/powered`, `/balance` | LIM-248 |
+
+**Item 3, rod motors.** Gains and caps now come from each body's real centre of mass and inertia. Head turned after one second with motors alone, before and after: Knight 0.831 / 0.003 rad, Barbarian 0.528 / 0.002, Ranger 0.783 / 0.002, Rogue 0.807 / 0.000, Mage 0.185 / 0.005. RiggedFigure 0.055 / 0.049 and Seed-san 0.014 / 0.056 are the two whose rod figure was already at or above the real one (ratio 1.09 and 30.6): RiggedFigure's reading is its body folding, 0.000 with the hips pinned, and Seed-san's motor is softer by that ratio, a steady 0.080 rad pinned against 0.030.
+
+- **An ankle band was tried and not landed.** A stance ankle's motor share growing with foot tilt, band 0.08 rad, read best in a sweep of 48 roundings. Tested on 48 others at 8, 10, 16 and 20 passes on all seven figures, bones over 0.005 m/s out of 1,344 runs: landed 6, band 0.15 36, 0.10 35, 0.08 24, 0.06 37, with Mage at 0.0411 m/s where landed read 0.0025. No physics picks a band and none held, so it was tuning to noise.
+- **What landed instead has no new constant.** A foot on the floor hangs from nothing, so the reason for real inertia does not reach it: it keeps the gains it already had, and a swinging foot keeps its motor. On the same 1,344 runs: 6 over, against landed 6. On 2,688 fresh runs: 8 over against 10, and one Seed-san foot at 0.0020 m where landed read 0.0010 (known-bugs.md).
+- **Steadying stays on rods.** Real inertia there reads 101 of 2,688 over, RiggedFigure 85 of 96 at 20 passes at 0.009 m/s; the earlier reading of 0.040 m/s at 10 passes was on the build with the band.
+- **Tests added:** five head tests and one RiggedFigure test. Mutation proof: rod gains fail 17 of 34 tests, the limb's gains on a standing foot fail 4, real steadying fails 1.
+- **Mage in the strict test:** hips drift 0.0003 m at 8, 10 and 16 passes, inside the 0.0005 m of the landed build.
 
 **Item 1, worst of 24 roundings, hips drift over five seconds at 8 / 10 / 16 passes (before: one rounding, centre of mass m/s at 8 / 10 / 16).**
 

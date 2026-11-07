@@ -173,7 +173,7 @@ motors.fade(0, 1.5); // weaken over a second and a half: a slow collapse
 | `frequency` | `6` | How fast a motor closes on its target, as a natural frequency in hertz. |
 | `damping` | `1` | Damping ratio: 1 settles without overshoot, less rings. |
 | `strength` | `1` | Share of the pull, 0 (limp) to 1. |
-| `maxAcceleration` | `400` | Largest angular acceleration a motor may give the limb it carries, rad/s². Each joint's torque cap is this times the limb's inertia about the joint. Less gives floppier limbs; 400 is what the hands and feet of a real walk clip need. |
+| `maxAcceleration` | `400` | Largest angular acceleration a motor may give the limb it carries, rad/s². Each joint's torque cap is this times the limb's inertia about the joint, read from where the limb's mass lies. Less gives floppier limbs; 400 is what the hands and feet of a real walk clip need. |
 | `root` | `0` | Share of a spring from the world to the root bone, toward where the animation puts it. |
 
 | Member | Meaning |
@@ -190,7 +190,7 @@ Joint motors are equal and opposite torques on two bodies, so they keep a pose b
 
 A motor's target stops at the joint's limits, so it never pulls against a limit it would have to pass. The default cone of π/4 is tighter than most clips: give a ragdoll that follows a clip wider limits, or `{type: 'free'}`, or the clip is clipped. The target's own spin is fed to the motor, so a moving pose is tracked without the lag a spring alone has.
 
-Skeletons put small bodies between big limbs, and a solver cannot hold a strong motor against a body hundreds of times lighter. `addRagdollMotors` adds mass up to an eighth of each body's heaviest neighbour and inertia up to a tenth of the heaviest limb it carries, and `dispose()` takes it off.
+Skeletons put small bodies between big limbs, and a solver cannot hold a strong motor against a body hundreds of times lighter. `addRagdollMotors` adds mass up to an eighth of each body's heaviest neighbour and inertia up to a tenth of the heaviest limb it carries, reckoning each body as a rod along its bone because that is what suits the solver, and `dispose()` takes it off. The motors themselves work from where the mass really lies, so a heavy head on a short neck holds with nothing added: Knight's head moves 0.003 rad in its first second where a rod per body let it fall 0.83 rad to its cone limit.
 
 ## Getting up (`margoengine/ragdoll/getup`)
 

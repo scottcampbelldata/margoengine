@@ -91,14 +91,11 @@ function arc(a: ArrayLike<number>, b: ArrayLike<number>): number[] {
 }
 /** The acceleration a motor's cap allows by default: see RagdollMotorOptions.maxAcceleration. */
 const MOTOR_ACCELERATION = 400;
-/** What RagdollMotors keeps a bone within, of what it carries: its MASS_RATIO and INERTIA_RATIO. */
-const MOTOR_MASS_RATIO = 8,
-  MOTOR_INERTIA_RATIO = 10;
 /** Frequency in rad/s of the hold on the hips' height, and of the pull of the centre of mass over the feet. */
 const HEIGHT_FREQUENCY = 12,
   LEAN_FREQUENCY = 6;
-/** Frequency in rad/s of the solver motor on a joint the rod motors cannot hold. */
-const JOINT_FREQUENCY = 30;
+/** Frequency in rad/s of the motor that keeps a swinging foot level. */
+const FOOT_FREQUENCY = 30;
 /** Frequency in rad/s of the spring on a stance knee at its full strength, and the radians off its bend it needs to reach that. */
 const KNEE_FREQUENCY = 50,
   KNEE_BAND = 0.15;
@@ -147,10 +144,6 @@ export class RagdollBalance {
   private floor: number;
   /** From the right ankle to the left at rest. */
   private readonly stanceLine: Vec3;
-  /** Inertia of a foot about the ankle, for its motor in the air. */
-  private readonly footInertia: number;
-  /** The inertia to give each bone's solver motor; 0 for a bone the rod motors hold. */
-  private readonly real: readonly number[];
   private readonly upperMass: number;
   /** Each bone's centre of mass in its own frame. */
   private readonly massPoints: readonly Vec3[];
@@ -257,15 +250,10 @@ export class RagdollBalance {
     const legInertia = LEG_INERTIA * this.total * (left.thigh + left.shin) ** 2;
     const passes = Math.max(0, SOLVER_PASSES - ragdoll.physics.world.numSolverIterations);
     for (const part of bones) this.solverPasses(part, passes);
-    for (const { foot, lower } of this.legs) for (const part of [foot, lower]) this.addInertia(part, legInertia);
-    this.footInertia = this.realInertia(left.foot);
-    this.real = bones.map((part, i) => {
-      if (!i) return 0;
-      return this.limbInertia(part) * MOTOR_ACCELERATION < this.limbWeight(part) ? this.realInertia(part) : 0;
-    });
+    for (const { foot, lower } of this.legs) for (const part of [foot, lower]) motors.addSteadying(part, legInertia);
     for (const one of this.legs) {
       one.kneeCap = this.total * this.gravity * Math.min(one.thigh, one.shin);
-      one.kneeInertia = this.limbInertia(one.lower);
+      one.kneeInertia = motors.limbInertia(one.lower);
     }
     this.natural = Math.sqrt(this.gravity / massHeight);
     this.stepTime = within(options.stepTime, 0.28, 0.05, 2, 'stepTime');
@@ -410,36 +398,28 @@ export class RagdollBalance {
   }
 
   /**
-   * Motors whose caps come from a rod per body cannot hold a limb whose mass lies past its bone (a head on a short neck:
-   * Knight's rod inertia is 0.003 kg m² against 0.96 real, so its cap of 1.1 N m loses to up to 12 N m of weight). These joints
-   * get a solver motor from the limb's real inertia, and a swinging foot one that keeps it level. A stance knee has its torque
-   * from {@link carryWeight} and only a spring beside it, with no damper and growing with how far the knee is off its bend: a
-   * solver motor on a knee the body's weight goes through slid the feet along the floor, a body at rest included, in proportion
-   * to its damping and stiffness (RiggedFigure 0.045 m in five seconds). Without the spring a thrown leg lands loose and
-   * the character stumbles on. The listeners run in the order they were added, so this comes after the rod motors' own step
-   * and replaces it.
+   * A stance knee and ankle have their torques from {@link carryWeight}. A solver motor on a joint the body's weight goes through
+   * slides the feet along the floor, a body at rest included, in proportion to its damping and stiffness: RiggedFigure 0.045 m
+   * in five seconds through its knees, Knight 0.003 m through its ankles. So a stance knee has only a spring, with no damper
+   * and growing with how far it is off its bend, and a stance ankle keeps the rod figure's gains, see
+   * {@link RagdollMotors.standing}. Without the spring a thrown leg lands loose and the character stumbles on. A swinging foot
+   * gets a motor that keeps it level. The listeners run in the order they were added, so these come after the rod motors'
+   * own step and replace it.
    */
   private holdJoints(): void {
-    const bones = this.ragdoll.bones,
-      strength = this.motors.strength,
-      motor = (inertia: number) => ({
-        model: 'force' as const,
-        stiffness: inertia * JOINT_FREQUENCY * JOINT_FREQUENCY * strength,
-        damping: 2 * inertia * JOINT_FREQUENCY * Math.sqrt(strength),
-        maxForce: inertia * MOTOR_ACCELERATION * strength,
-      });
-    bones.forEach((part, i) => {
-      const inertia = this.real[i];
-      if (inertia <= 0 || part.spec?.type === 'hinge' || this.legs.some((leg) => leg.foot === part)) return;
-      const a = part.animated,
-        target = multiplyQuaternions([a[3], a[4], a[5], a[6]], conjugateQuaternion(part.bind));
-      part.joint!.setRotationMotor(target as [number, number, number, number], motor(inertia));
-    });
+    const strength = this.motors.strength;
     for (const leg of this.legs) {
+      this.motors.standing(leg.foot, !leg.swing);
       if (leg.swing) {
+        const inertia = this.motors.limbInertia(leg.foot);
         leg.foot.joint!.setRotationMotor(
           multiplyQuaternions(conjugateQuaternion(leg.lower.body.rotation), leg.footRest) as [number, number, number, number],
-          motor(this.real[bones.indexOf(leg.foot)] || this.footInertia),
+          {
+            model: 'force',
+            stiffness: inertia * FOOT_FREQUENCY * FOOT_FREQUENCY * strength,
+            damping: 2 * inertia * FOOT_FREQUENCY * Math.sqrt(strength),
+            maxForce: inertia * MOTOR_ACCELERATION * strength,
+          },
         );
         continue;
       }
@@ -472,73 +452,9 @@ export class RagdollBalance {
     (part.body.raw as unknown as { setAdditionalSolverIterations(passes: number): void }).setAdditionalSolverIterations(passes);
   }
 
-  /** Gives a bone `inertia` on top of what the motors added to it, which a call to set them would replace. */
-  private addInertia(part: RagdollPart, inertia: number): void {
-    const bones = this.ragdoll.bones,
-      children = bones.filter((bone) => bones[bone.parent] === part),
-      heaviest = Math.max(bones[part.parent]?.mass ?? 0, ...children.map((bone) => bone.mass)),
-      limb = Math.max(0, ...children.map((bone) => this.limbInertia(bone))),
-      total = inertia + limb / MOTOR_INERTIA_RATIO;
-    part.body.setAdditionalMass(Math.max(0, heaviest / MOTOR_MASS_RATIO - part.mass), [total, total, total]);
-  }
-
   /** True for a bone of a stance leg, which {@link carryWeight} holds. */
   private planted(part: RagdollPart): boolean {
     return this.legs.some((leg) => !leg.swing && (part === leg.upper || part === leg.lower || part === leg.foot));
-  }
-
-  /** Inertia of a bone and what hangs from it about its joint, as the motors reckon it: a rod per body. */
-  private limbInertia(top: RagdollPart): number {
-    const bones = this.ragdoll.bones,
-      origin = top.body.position,
-      from = bones.indexOf(top);
-    let total = 0;
-    for (let i = from; i < bones.length; i++) {
-      let j = i;
-      while (j > from) j = bones[j].parent;
-      if (j !== from) continue;
-      const part = bones[i],
-        reach = rotateByQuaternion(part.axis, part.body.rotation),
-        centre = add(part.body.position, times(reach, part.length / 2));
-      total += part.body.mass * ((part.length * part.length) / 12 + dot(minus(centre, origin), minus(centre, origin)));
-    }
-    return total;
-  }
-
-  /** Inertia of a bone and what hangs from it about its joint, from where their mass really lies. */
-  private realInertia(top: RagdollPart): number {
-    const bones = this.ragdoll.bones,
-      origin = top.body.position,
-      from = bones.indexOf(top);
-    let total = 0;
-    for (let i = from; i < bones.length; i++) {
-      let j = i;
-      while (j > from) j = bones[j].parent;
-      if (j !== from) continue;
-      const body = bones[i].body,
-        centre = add(body.position, rotateByQuaternion(this.massPoints[i], body.rotation)),
-        own = body.raw.principalInertia();
-      total += body.mass * dot(minus(centre, origin), minus(centre, origin)) + (own.x + own.y + own.z) / 3;
-    }
-    return total;
-  }
-
-  /** The largest moment the weight of a bone and what hangs from it can have about its joint, N m. */
-  private limbWeight(top: RagdollPart): number {
-    const bones = this.ragdoll.bones,
-      from = bones.indexOf(top),
-      moment: Vec3 = [0, 0, 0];
-    let mass = 0;
-    for (let i = from; i < bones.length; i++) {
-      let j = i;
-      while (j > from) j = bones[j].parent;
-      if (j !== from) continue;
-      const body = bones[i].body,
-        centre = add(body.position, rotateByQuaternion(this.massPoints[i], body.rotation));
-      mass += body.mass;
-      for (let k = 0; k < 3; k++) moment[k] += body.mass * (centre[k] - top.body.position[k]);
-    }
-    return size(moment) * this.gravity;
   }
 
   /** How far the sole of a foot reaches from the ankle: the points of its collider near its lowest point. */
@@ -813,6 +729,7 @@ export class RagdollBalance {
     this.carried = 0;
     for (const leg of this.legs) {
       leg.swing = null;
+      this.motors.standing(leg.foot, false);
       for (const part of [leg.upper, leg.lower, leg.foot]) this.motors.setTarget(part, null);
     }
   }
@@ -842,7 +759,7 @@ export class RagdollBalance {
     this.settle();
     for (const { part, shape } of this.soles) this.ragdoll.setShape(part, shape);
     for (const part of this.ragdoll.bones) this.solverPasses(part, 0);
-    for (const { foot, lower } of this.legs) for (const part of [foot, lower]) this.addInertia(part, 0);
+    for (const { foot, lower } of this.legs) for (const part of [foot, lower]) this.motors.addSteadying(part);
   }
   declare [Symbol.dispose]: () => void;
   [(Symbol.dispose ?? Symbol()) as symbol](): void {

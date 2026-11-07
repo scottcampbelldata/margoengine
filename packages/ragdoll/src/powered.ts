@@ -119,8 +119,11 @@ export class RagdollMotors {
   private readonly omega: number;
   private readonly zeta: number;
   private readonly parts: readonly RagdollPart[];
-  /** Inertia of each limb about its joint, kg m². */
+  /** Inertia of each limb about its joint, kg m²: from where its mass lies, and as a rod per body. */
   private readonly limbs: Float64Array;
+  private readonly rods: Float64Array;
+  /** The inertia each motor's gains come from: the limb's, or the rod figure's for a foot on the floor, see {@link standing}. */
+  private readonly gains: Float64Array;
   private readonly acceleration: number;
   /** The limb's own share of the strength, set by {@link setStrength}. */
   private readonly limb: Float64Array;
@@ -153,12 +156,19 @@ export class RagdollMotors {
     this.acceleration = above(options.maxAcceleration ?? 400, 'Ragdoll motor maxAcceleration');
     const parts = (this.parts = ragdoll.bones),
       count = parts.length,
-      centres = parts.map((part) => {
+      rods = parts.map((part) => {
         const reach = rotateByQuaternion(part.axis, part.body.rotation),
           origin = part.body.position;
         return [0, 1, 2].map((k) => origin[k] + (reach[k] * part.length) / 2);
+      }),
+      centres = parts.map((part) => {
+        const at = part.body.raw.localCom(),
+          from = rotateByQuaternion([at.x, at.y, at.z], part.body.rotation),
+          origin = part.body.position;
+        return [0, 1, 2].map((k) => origin[k] + from[k]);
       });
     this.limbs = new Float64Array(count);
+    this.rods = new Float64Array(count);
     this.limb = new Float64Array(count).fill(1);
     this.lost = new Float64Array(count);
     this.heal = new Float64Array(count);
@@ -169,42 +179,54 @@ export class RagdollMotors {
     this.waited = new Float64Array(count);
     this.gap = new Float64Array(count);
     this.seen = new Uint8Array(count);
-    // Each limb's inertia about its joint: a rod per body, moved to the joint by the parallel axis theorem.
-    const about = (joint: number): number => {
+    // Each limb's inertia about its joint, by the parallel axis theorem: from where the mass really lies for the motors,
+    // which must hold it against its weight, and as a rod per body for what steadies the solver (see addSteadying).
+    const about = (joint: number, at: readonly number[][], own: (part: RagdollPart) => number): number => {
       const origin = parts[joint].body.position;
       let total = 0;
       for (let i = joint; i < count; i++) {
         if (!this.within(i, joint)) continue;
         const part = parts[i],
-          d = Math.hypot(centres[i][0] - origin[0], centres[i][1] - origin[1], centres[i][2] - origin[2]);
-        total += part.body.mass * ((part.length * part.length) / 12 + d * d);
+          d = Math.hypot(at[i][0] - origin[0], at[i][1] - origin[1], at[i][2] - origin[2]);
+        total += part.body.mass * d * d + own(part);
       }
       return total;
     };
-    for (let i = 1; i < count; i++) this.limbs[i] = about(i);
-    this.steady();
+    const real = (part: RagdollPart): number => {
+        const inertia = part.body.raw.principalInertia();
+        return (inertia.x + inertia.y + inertia.z) / 3;
+      },
+      rod = (part: RagdollPart): number => (part.body.mass * part.length * part.length) / 12;
+    for (let i = 1; i < count; i++) {
+      this.limbs[i] = about(i, centres, real);
+      this.rods[i] = about(i, rods, rod);
+    }
+    this.gains = this.limbs.slice();
+    for (const part of parts) this.addSteadying(part);
     this.off = ragdoll.physics.on('beforestep', (dt) => this.step(dt));
   }
 
   /**
    * Skeletons put small bodies between big limbs (a chest node between two arms, a foot under a shin), and an iterative
    * solver cannot hold a strong motor against a body hundreds of times lighter: on RiggedFigure the character flew apart.
-   * Each body gets the extra mass and inertia that keep it within MASS_RATIO and INERTIA_RATIO of what it carries.
+   * Each body gets the extra mass and inertia that keep it within MASS_RATIO and INERTIA_RATIO of what it carries, and
+   * `inertia` on top. This is what suits the solver, not a limb's true inertia, so it reckons with rods: the same ratio on the
+   * true figures shook RiggedFigure at 0.009 m/s at 20 passes, on 85 of 96 hull roundings.
+   * @internal for `@margoengine/ragdoll/balance`.
    */
-  private steady(): void {
-    const parts = this.parts;
-    parts.forEach((part, i) => {
-      let heaviest = part.parent === -1 ? 0 : parts[part.parent].body.mass,
-        limb = 0;
-      for (let j = i + 1; j < parts.length; j++)
-        if (parts[j].parent === i) {
-          heaviest = Math.max(heaviest, parts[j].body.mass);
-          limb = Math.max(limb, this.limbs[j]);
-        }
-      const mass = Math.max(0, heaviest / MASS_RATIO - part.body.mass),
-        inertia = limb / INERTIA_RATIO;
-      if (mass > 0 || inertia > 0) part.body.setAdditionalMass(mass, [inertia, inertia, inertia]);
-    });
+  addSteadying(part: RagdollPart, inertia = 0): void {
+    const parts = this.parts,
+      i = parts.indexOf(part);
+    let heaviest = part.parent === -1 ? 0 : parts[part.parent].mass,
+      limb = 0;
+    for (let j = i + 1; j < parts.length; j++)
+      if (parts[j].parent === i) {
+        heaviest = Math.max(heaviest, parts[j].mass);
+        limb = Math.max(limb, this.rods[j]);
+      }
+    const mass = Math.max(0, heaviest / MASS_RATIO - part.mass),
+      total = inertia + limb / INERTIA_RATIO;
+    part.body.setAdditionalMass(mass, [total, total, total]);
   }
 
   /** True when bone `i` is `top` or hangs under it. Parents come first in the list. */
@@ -221,6 +243,11 @@ export class RagdollMotors {
       index = this.parts.findIndex((part) => part.node === target);
     if (index < 0) throw new RangeError('That node is not a bone of this ragdoll; pass one of ragdoll.bones.');
     return index;
+  }
+
+  /** Inertia of `bone` and all that hangs from it about its joint, kg m², from where their mass lay when the motors were added. */
+  limbInertia(bone: Mesh | RagdollPart): number {
+    return this.limbs[this.index(bone)];
   }
 
   /** Share of the motors' pull, 0 (limp) to 1. Setting it stops a running {@link fade}. */
@@ -272,6 +299,17 @@ export class RagdollMotors {
     return this;
   }
   /**
+   * Tells the motor of `bone` whether the floor carries that bone. Inertia sets a motor's gains so that it can hold a limb
+   * against its weight, and a foot on the floor hangs from nothing: the floor holds it, and what its ankle carries is the
+   * balance's. The limb's own inertia there slid Knight's feet 0.003 m, and a share of it growing with the foot's tilt shook
+   * Mage at 0.041 m/s at 8 passes, so a standing foot keeps the rod figure's gains.
+   * @internal for `@margoengine/ragdoll/balance`.
+   */
+  standing(bone: Mesh | RagdollPart, on: boolean): void {
+    const i = this.index(bone);
+    this.gains[i] = (on ? this.rods : this.limbs)[i];
+  }
+  /**
    * A hit: applies `impulse` (N s, world) to `bone` and weakens it, the bones under it and the bones above it up to
    * the root, so the blow travels through the body before the motors take the pose back.
    */
@@ -314,15 +352,16 @@ export class RagdollMotors {
       }
       running[i] = 1;
       const a = part.animated,
+        inertia = this.gains[i],
         set = this.targets.get(i),
         rotation = set ? [set[0], set[1], set[2], set[3]] : bodyTurn(part),
         // Force based, with gains from the whole limb's inertia: an acceleration based motor sees only the two bodies at
         // the joint, not what hangs from them.
         motor = {
           model: 'force' as const,
-          stiffness: this.limbs[i] * omega * omega * share,
-          damping: 2 * zeta * this.limbs[i] * omega * Math.sqrt(share),
-          maxForce: this.limbs[i] * this.acceleration * share,
+          stiffness: inertia * omega * omega * share,
+          damping: 2 * zeta * inertia * omega * Math.sqrt(share),
+          maxForce: inertia * this.acceleration * share,
         };
       const spec = part.spec!;
       if (spec.type === 'hinge') {
