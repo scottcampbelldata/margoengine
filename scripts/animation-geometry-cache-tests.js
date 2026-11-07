@@ -58,7 +58,7 @@ try {
         });
     const player = await GeometryCachePlayer.attach(engine, stream(), { loop: false, ahead: 8 });
     await player.done;
-    const p = player.model.primitives[0];
+    let p = player.model.primitives[0];
     const read = async () => {
       const size = (p.vertices.length / 20) * 80,
         out = device.createBuffer({ size, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ }),
@@ -117,14 +117,51 @@ try {
     const swaps = player.stats.swaps,
       indexCount = p.indices.length;
     player.dispose();
+
+    // A real PC2 file, written by a published Blender add-on, with the triangles of its mesh.
+    const { parsePointCache } = await import('/packages/animation/dist/point-cache.js'),
+      fixture = (name) => fetch(`/packages/animation/tests/fixtures/${name}`),
+      truth = await (await fixture('ball.frames.json')).json(),
+      cache = parsePointCache(new Uint8Array(await (await fixture('ball.pc2')).arrayBuffer())),
+      real = await GeometryCachePlayer.attach(
+        engine,
+        encodeGeometryCache(cache.rate, [
+          { frameCount: cache.frameCount, positions: cache.positions, indices: new Uint32Array(truth.indices) },
+        ]),
+        { loop: false },
+      );
+    await real.done;
+    p = real.model.primitives[0];
+    let realWorst = 0,
+      realPixels = 0;
+    for (const frame of [0, 3, 7]) {
+      real.playing = true;
+      real.seek(frame / cache.rate);
+      engine.render({ culling: false, delta: 0 });
+      real.playing = false;
+      const values = await read(),
+        want = truth.frames[frame];
+      for (let v = 0; v < truth.count; v++) {
+        realWorst = Math.max(
+          realWorst,
+          Math.abs(values[v * 20] - want[v * 3]),
+          Math.abs(values[v * 20 + 1] - want[v * 3 + 2]),
+          Math.abs(values[v * 20 + 2] + want[v * 3 + 1]),
+        );
+      }
+      realPixels = Math.max(realPixels, coverage());
+    }
+    real.dispose();
     const error = await device.popErrorScope();
-    return { worst, checks, swaps, indexCount, pixels, validation: error?.message ?? null };
+    return { worst, checks, swaps, indexCount, pixels, realWorst, realPixels, validation: error?.message ?? null };
   });
   console.log(JSON.stringify(result));
   assert.deepEqual(errors, []);
   assert.equal(result.validation, null);
   assert.ok(result.checks > 10000, 'the frames were compared');
   assert.ok(result.worst < 1e-5, `GPU vertices differ from the file by ${result.worst}`);
+  assert.ok(result.realWorst < 1e-5, `the real cache differs from Blender's frames by ${result.realWorst}`);
+  assert.ok(result.realPixels > 100, `the real cache should cover pixels, covered ${result.realPixels}`);
   assert.equal(result.swaps, 1, 'one change of mesh');
   assert.equal(result.indexCount, 39 * 39 * 6, 'the new triangles are in place');
   assert.ok(result.pixels[0] > 300, `the first grid should cover pixels, covered ${result.pixels[0]}`);

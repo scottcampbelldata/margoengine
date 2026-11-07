@@ -603,6 +603,20 @@ const file = encodeGeometryCache(30, [{frameCount: 2, positions, indices: new Ui
 for await (const chunk of readGeometryCache(file)) console.log(chunk.firstFrame, chunk.vertexCount);
 ```
 
+A cache from a DCC tool is usually a PC2 or MDD file. `parsePointCache` from `@margoengine/animation/point-cache` reads both. They hold vertices and no triangles, so give it the triangles of the mesh it was baked from:
+
+```ts
+import {encodeGeometryCache} from 'margoengine/animation/geometry-cache';
+import {parsePointCache} from 'margoengine/animation/point-cache';
+
+const bytes = new Uint8Array(await (await fetch('/flag.pc2')).arrayBuffer());
+const cache = parsePointCache(bytes, {fps: 24});
+const indices = new Uint32Array(cache.vertexCount - 2).map((_, n) => n); // use your mesh's own triangles here
+const file = encodeGeometryCache(cache.rate, [{frameCount: cache.frameCount, positions: cache.positions, indices}]);
+```
+
+`fps` (default 24) is for PC2, which does not say; an MDD file's own times win. `zUp: true` turns a Z-up file to Y-up as `(x, z, -y)`; Blender's MDD add-on writes Z-up and its PC2 add-on Y-up by default. `maxFloats` (default 2^28) refuses a larger file. Alembic is not read: it has no published file specification to build from. The result fits the player as it is, so the file above goes straight to `GeometryCachePlayer.attach`.
+
 The format is little endian. A 16 byte header holds the magic `MGCH`, version 1, frames per second (f32) and the total
 frames (0 if unknown). Chunks follow, each a 64 byte header and its payload.
 

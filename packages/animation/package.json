@@ -81,6 +81,10 @@
     "./geometry-cache": {
       "types": "./dist/geometry-cache.d.ts",
       "import": "./dist/geometry-cache.js"
+    },
+    "./point-cache": {
+      "types": "./dist/point-cache.d.ts",
+      "import": "./dist/point-cache.js"
     }
   },
   "files": [
