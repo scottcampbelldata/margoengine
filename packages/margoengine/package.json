@@ -1850,6 +1850,10 @@
       "types": "./dist/rigging/vrm.d.ts",
       "import": "./dist/rigging/vrm.js"
     },
+    "./rigging/autorig": {
+      "types": "./dist/rigging/autorig.d.ts",
+      "import": "./dist/rigging/autorig.js"
+    },
     "./rigging/voxel-weights": {
       "types": "./dist/rigging/voxel-weights.d.ts",
       "import": "./dist/rigging/voxel-weights.js"

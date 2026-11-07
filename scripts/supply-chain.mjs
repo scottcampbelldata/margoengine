@@ -132,7 +132,7 @@ const ASSETS = [
   ],
   [
     'examples/assets/ATTRIBUTION.md',
-    'demo models: RobotExpressive (CC0), FlightHelmet (CC0), Tokyo diorama (Apache-2.0)',
+    'demo models: RobotExpressive (CC0), FlightHelmet (CC0), Tokyo diorama (Apache-2.0); test mesh: MakeHuman base mesh (CC0)',
   ],
   [
     'examples/assets/vrm/README.md',

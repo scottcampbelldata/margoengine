@@ -349,6 +349,49 @@ console.log(weights.toInfluences(), unreached); // JOINTS_0 and WEIGHTS_0
 
 The result also gives `grid`, `voxels` and `unreached`: vertices no bone reached through the solid, such as a hat that floats clear of the head, which take the same falloff from straight-line distances. Where a hole lets the outside into the mesh, the fill grows from the bones through voxels with surface on at least four of the six axis directions. Pick bone heat for clean, closed meshes: it is faster and its weights flow along the surface.
 
+## Automatic rig (`margoengine/rigging/autorig`)
+
+Places a humanoid skeleton inside a mesh nobody rigged, then weights it. Give it a figure standing in a T or A pose, in any units, turned any way about `up`; the mesh may be broken or in many parts. Joints carry VRM humanoid names, so `margoengine/rigging/retarget` reads them as they are, and `joints` and `weights` go straight to `margoengine/exporters/skin`. Here the figure is made of boxes, so the example runs by itself:
+
+```ts
+import { autoRig } from 'margoengine/rigging/autorig';
+
+const positions: number[] = [];
+const indices: number[] = [];
+const box = (x0: number, y0: number, z0: number, x1: number, y1: number, z1: number) => {
+  const first = positions.length / 3;
+  for (const z of [z0, z1]) for (const y of [y0, y1]) for (const x of [x0, x1]) positions.push(x, y, z);
+  for (const [a, b, c, d] of [[0, 2, 3, 1], [4, 5, 7, 6], [0, 1, 5, 4], [2, 6, 7, 3], [0, 4, 6, 2], [1, 3, 7, 5]])
+    indices.push(first + a, first + b, first + c, first + a, first + c, first + d);
+};
+box(-0.17, 0.85, -0.1, 0.17, 1.42, 0.1); // trunk
+box(-0.06, 1.4, -0.05, 0.06, 1.5, 0.05); // neck
+box(-0.1, 1.48, -0.1, 0.1, 1.74, 0.1); // head
+for (const side of [-1, 1]) {
+  box(side * 0.1 - 0.06, 0.05, -0.06, side * 0.1 + 0.06, 0.9, 0.06); // leg
+  box(side * 0.1 - 0.06, 0, -0.06, side * 0.1 + 0.06, 0.08, 0.2); // foot
+  const [near, far] = [side * 0.15, side * 0.85].sort((p, q) => p - q);
+  box(near, 1.32, -0.04, far, 1.4, 0.04); // arm
+}
+
+const rig = await autoRig({ positions, indices });
+console.log(rig.joints[rig.humanoid.leftHand].position, rig.forward); // on +x, facing +z
+console.log(rig.weights?.toInfluences()); // JOINTS_0 and WEIGHTS_0
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `resolution` | `128` | Voxels along the longest side, 32 to 384. Thin arms need more. |
+| `up` | `[0, 1, 0]` | The mesh's up direction. |
+| `forward` | read from the feet | The way the figure faces, which says which side is its left. |
+| `closing` | `1` | Closes gaps up to this many voxels before filling, joining parts that nearly touch. |
+| `symmetric` | `true` | Evens left and right joints across the body's centre when they already nearly agree. |
+| `weights` | `'voxel'` | `'voxel'` weights with `voxelWeights`; with `'none'`, pass `joints` to `boneHeatWeights` or any other solver. |
+| `weld` | `1e-6` | Welding tolerance as a fraction of the mesh's size. |
+| `signal` | none | Cancels the fit between stages and the weights between bones. |
+
+The result gives `joints`, `humanoid` (each bone's index, by name), `pose` (the same skeleton as local transforms), `weights`, `forward`, `facingFound` and `voxels`. When `facingFound` is false the feet showed no clear front, +z was assumed and left and right may be swapped: pass `forward`. A figure with no head, two feet and two hands to find fails with a `MargoError` of code `failed`. Fingers are not placed. On real files the joints land about 2 to 4 percent of the figure's height from where people put them; the limits are in [docs/limits.md](../../docs/limits.md).
+
 ## Corrective shapes (`margoengine/rigging/correctives`)
 
 Linear skinning collapses elbows, knees and shoulders. A corrective is a blend shape sculpted to fix that, and this entry drives it from the joint's rotation: full at the pose you sculpted it for, off at rest. `addCorrectives` runs after the pose and after any IK added before it.

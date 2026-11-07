@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 9103965,
+  "total": 9114591,
   "history": [
     {
       "date": "2026-10-24",
@@ -2894,6 +2894,12 @@
       "commit": "4ce63d605",
       "reason": "FBX layers, inherit types and more real file support (batch 43 jobs 2 to 4)",
       "grew": 4
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "e2b1acafa",
+      "reason": "automatic rig from mesh: new entry @margoengine/rigging/autorig",
+      "grew": 1
     }
   ],
   "items": {
@@ -3352,6 +3358,7 @@
     "@margoengine/react/voxel": 2200,
     "@margoengine/react/xr": 3818,
     "@margoengine/rigging": 7870,
+    "@margoengine/rigging/autorig": 10627,
     "@margoengine/rigging/correctives": 2242,
     "@margoengine/rigging/face": 2363,
     "@margoengine/rigging/hulls": 2759,
@@ -3359,7 +3366,7 @@
     "@margoengine/rigging/retarget": 2862,
     "@margoengine/rigging/springs": 5069,
     "@margoengine/rigging/transfer": 3680,
-    "@margoengine/rigging/voxel-weights": 5535,
+    "@margoengine/rigging/voxel-weights": 5534,
     "@margoengine/rigging/vrm": 10526,
     "@margoengine/road": 1171,
     "@margoengine/save": 6952,

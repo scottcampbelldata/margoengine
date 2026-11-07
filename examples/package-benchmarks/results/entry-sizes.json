@@ -1,5 +1,5 @@
 {
-  "commit": "4ce63d605",
+  "commit": "e2b1acafa",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -1959,9 +1959,13 @@
         "raw": 26092,
         "gzip": 10219
       },
+      "./autorig": {
+        "raw": 25365,
+        "gzip": 10317
+      },
       "./voxel-weights": {
-        "raw": 13161,
-        "gzip": 5279
+        "raw": 13139,
+        "gzip": 5278
       },
       "./correctives": {
         "raw": 4452,

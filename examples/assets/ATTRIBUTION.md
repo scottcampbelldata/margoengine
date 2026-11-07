@@ -26,6 +26,7 @@ the image tools already installed in this workspace and validates the GLB
 
 ## Tests and benchmarks
 
+- `autorig/makehuman-base.obj`: the base mesh of [MakeHuman](https://github.com/makehumancommunity/makehuman) (`makehuman/data/3dobjs/base.obj`, master), CC0 1.0, unchanged. The automatic rig's real unrigged mesh; its `joint-` helper groups mark where its authors put the joints.
 - `scifi-helmet.glb`: [SciFiHelmet from Khronos glTF Sample Assets](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/SciFiHelmet).
   Model by Michael Pavlovic, glTF conversion by Norbert Nopper, CC0 1.0. Packed from `khronos/SciFiHelmet/` with
   1024-pixel JPEG maps by `node scripts/build-scifi-helmet.mjs`. See [its credits](scifi-helmet-CREDITS.md).
