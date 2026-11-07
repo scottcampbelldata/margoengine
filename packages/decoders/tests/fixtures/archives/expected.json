@@ -1,0 +1,46 @@
+{
+  "text.multi.bz2": {
+    "bytes": 225004,
+    "sha256": "9b7d79f7b742849475f468c5bae778a9508101dee1f9d77042bfae80bcd1ce00"
+  },
+  "runs.9.bz2": {
+    "bytes": 885678,
+    "sha256": "92848221f6d79f1c4c90a67ff43a6556e3158d839d661463daf9c462ad117073"
+  },
+  "zeros.9.bz2": {
+    "bytes": 2500000,
+    "sha256": "382ec408afd51de29f84bd9d5b43cdfebe2f89532950e0259fdfb2271894b6de"
+  },
+  "floats.1.bz2": {
+    "bytes": 1600000,
+    "sha256": "3e7ad4812a318414293fe11e9bc65999b2c21a75844f716718c07bf3c3a85f11"
+  },
+  "floats.crc32.xz": {
+    "bytes": 1600000,
+    "sha256": "3e7ad4812a318414293fe11e9bc65999b2c21a75844f716718c07bf3c3a85f11"
+  },
+  "floats.crc64.xz": {
+    "bytes": 1600000,
+    "sha256": "3e7ad4812a318414293fe11e9bc65999b2c21a75844f716718c07bf3c3a85f11"
+  },
+  "floats.sha.xz": {
+    "bytes": 1600000,
+    "sha256": "3e7ad4812a318414293fe11e9bc65999b2c21a75844f716718c07bf3c3a85f11"
+  },
+  "floats.none.xz": {
+    "bytes": 1600000,
+    "sha256": "3e7ad4812a318414293fe11e9bc65999b2c21a75844f716718c07bf3c3a85f11"
+  },
+  "text.lc2.xz": {
+    "bytes": 225000,
+    "sha256": "28961612a13fd58f370caa822737f227f33ee0f2d6f64ae29d9af28e666f6aa5"
+  },
+  "floats.lzma": {
+    "bytes": 1600000,
+    "sha256": "3e7ad4812a318414293fe11e9bc65999b2c21a75844f716718c07bf3c3a85f11"
+  },
+  "text.lc.lzma": {
+    "bytes": 225000,
+    "sha256": "28961612a13fd58f370caa822737f227f33ee0f2d6f64ae29d9af28e666f6aa5"
+  }
+}

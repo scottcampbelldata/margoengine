@@ -2,6 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { deflateSync } from 'node:zlib';
+import { readFileSync } from 'node:fs';
 import { parseVTKXML } from '../dist/vtk-xml.js';
 import { LoaderError } from '../dist/common.js';
 
@@ -271,7 +272,7 @@ test('bad files are named errors', async () => {
   await refuses(parseVTKXML(text('<VTKFile type="PolyData"/>')), 'syntax');
   await refuses(parseVTKXML(text('<VTKFile type="PolyData"><PolyData/></VTKFile>')), 'syntax');
   await refuses(parseVTKXML(text('<VTKFile type="PolyData" header_type="UInt16"/>')), 'header');
-  await refuses(parseVTKXML(text('<VTKFile type="PolyData" compressor="vtkLZMADataCompressor"/>')), 'unsupported');
+  await refuses(parseVTKXML(text('<VTKFile type="PolyData" compressor="vtkOtherCompressor"/>')), 'unsupported');
   await refuses(parseVTKXML(poly('', counts)), 'syntax');
   await refuses(parseVTKXML(poly(points([0, 0]), counts)), 'syntax');
   await refuses(parseVTKXML(poly(points(['a', 0, 0, 1, 0, 0, 0, 1, 0]), counts)), 'syntax');
@@ -299,4 +300,23 @@ test('sizes are checked before work, and an abort stops the read', async () => {
   const controller = new AbortController();
   controller.abort();
   await refuses(parseVTKXML(poly('', counts), { signal: controller.signal }), 'aborted');
+});
+
+test('real LZMA files from VTK 9.7.2, inline and appended, read the same numbers as the ascii twin', async () => {
+  const read = (name) => parseVTKXML(readFileSync(new URL(`./fixtures/${name}`, import.meta.url))),
+    plain = await read('sphere-ascii.vtp');
+  assert.equal(plain.positions.length, 1122 * 3);
+  for (const name of ['sphere-lzma.vtp', 'sphere-lzma-appended.vtp']) {
+    const packed = await read(name);
+    assert.deepEqual([...packed.positions], [...plain.positions], name);
+    assert.deepEqual([...packed.indices], [...plain.indices], name);
+  }
+});
+
+test('a broken LZMA block is a named error', async () => {
+  const file = Buffer.from(readFileSync(new URL('./fixtures/sphere-lzma-appended.vtp', import.meta.url))),
+    data = file.indexOf('<AppendedData'),
+    at = file.indexOf('_', data) + 40;
+  file[at] ^= 0xff;
+  await refuses(parseVTKXML(file), 'zip');
 });

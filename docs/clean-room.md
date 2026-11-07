@@ -1076,3 +1076,11 @@ the test itself, with quarter turns done by moving pixels forward rather than by
 Written from the WebGPU specification (GPUCanvasContext, the 256-byte `copyTextureToBuffer` row alignment, the flag values
 of `GPUBufferUsage` and its siblings) and the W3C PNG specification. No other project's headless code or binding source
 was read. The real-GPU test compares the bytes with a screenshot of the same scene on a page canvas.
+
+## bzip2 and xz: `@margoengine/decoders/bzip2`, `/xz`
+
+Written from Igor Pavlov's LZMA specification (2015), Lasse Collin and Igor Pavlov's *The .xz File Format* version 1.2.1,
+Joe Tsai's bzip2 format notes, and Burrows and Wheeler, *A Block-sorting Lossless Data Compression Algorithm* (DEC SRC
+Research Report 124, 1994). No source of libbzip2, liblzma, XZ Utils, the LZMA SDK or any other decoder was read. The two
+real libraries ran only as black boxes, through Python's `bz2` and `lzma` modules, to write the test files in
+`packages/decoders/tests/fixtures/archives`; VTK and pynrrd ran the same way to write the loader fixtures.

@@ -465,7 +465,7 @@ console.log(data);
 - `dims` holds the spatial axes, the first fastest. A leading non-spatial axis (an RGB `kinds` entry, or `none` in `space directions`) is `components`; axes after the spatial ones, such as time, are `frames`. A sample sits at `(((t * nz + z) * ny + y) * nx + x) * components + c`.
 - `bounds` is the box in true proportions from 0. `matrix` takes a voxel index to the file's `space`, with its origin, rotation and flips: use it to line a scan up with other data.
 - `resolve` gets the path as the header writes it, tidied of `.` and `..`. It is your code: keep it inside the folder you trust.
-- `maxSamples` (default 536,870,912) stops a huge declared size before anything is allocated, and gzip data cannot inflate past what the header declares. `bzip2` data and the `block` type are refused with code `unsupported`.
+- `maxSamples` (default 536,870,912) stops a huge declared size before anything is allocated, and gzip data cannot inflate past what the header declares. `bzip2` data needs `@margoengine/decoders` and stops at the same size. The `block` type has no array form and is an `unsupported` error.
 
 ## LDraw
 
@@ -538,7 +538,7 @@ console.log(positions.length, indices);
 - **Encodings.** ascii, binary and appended arrays, raw or base64, either byte order, 32 or 64-bit headers, and zlib or LZ4 blocks. Several pieces in a file are merged.
 - **Cells.** Polygons and strips become triangles over the file's points, and polylines become `lines`. Volume cells are reduced to the faces only one cell owns, their outer surface; `surface: 'all'` keeps every face. `triangleCells` names the cell each triangle came from, so a cell field can colour them.
 - **Data.** Every array is in `pointData` or `cellData` by name. `Normals`, `TCoords` and a 3 or 4 component `UInt8` `Scalars` array also fill `normals`, `uvs` and `colors`.
-- **Not read.** Other dataset types, such as image and structured grids, and LZMA blocks are `unsupported` errors. The legacy text format is `parseVTK`.
+- **Not read.** Other dataset types, such as image and structured grids, are `unsupported` errors. The legacy text format is `parseVTK`. LZMA blocks (`vtkLZMADataCompressor`) need `@margoengine/decoders`.
 
 ## Rhino 3DM
 

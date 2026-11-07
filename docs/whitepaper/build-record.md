@@ -1249,9 +1249,10 @@ An audit of the finished batches against their job text listed 70 gaps for the H
 | B27 | TransformControls occluder: a hidden handle takes no pointer | DONE | `89b05d6e5` | - |
 | readme-run | README examples run in Node or a real page; a new failure fails | DONE | `6efdd9284` | - |
 | GPU checks | 22 loose scripts/*-gpu-check.js run once and wired into check:gpu-packages, ssao held in LOOSE_CHECKS; five had rotted | DONE | `e06175cb7` | - |
-| B24 | Wide-angle cube capture, `/wide-cube` | DONE | this commit | LIM-321 |
-| B29 | Flat trails, `normal` on `Trail` | DONE | this commit | LIM-083 |
-| B30 | Triangle order at import, `optimize` and `reorder` | DONE | this commit | LIM-322 |
+| B24 | Wide-angle cube capture, `/wide-cube` | DONE | `f68d5c96d` | LIM-321 |
+| B29 | Flat trails, `normal` on `Trail` | DONE | `6d7d62bee` | LIM-083 |
+| B30 | Triangle order at import, `optimize` and `reorder` | DONE | `a786cd9d4` | LIM-322 |
+| B35 | bzip2 and xz decoders; NRRD bzip2, VTK XML LZMA | DONE | this commit | LIM-330 |
 
 ## LAZ: one LAS reader, and every point format on a real file
 

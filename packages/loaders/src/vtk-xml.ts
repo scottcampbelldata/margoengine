@@ -143,7 +143,7 @@ function lz4(block: Uint8Array, size: number): Uint8Array {
 interface Context {
   little: boolean;
   width: number;
-  compressor?: 'zlib' | 'lz4';
+  compressor?: 'zlib' | 'lz4' | 'lzma';
   /** Raw appended data, or the text of base64 appended data, and where it starts. */
   appended?: Uint8Array;
   appendedText?: string;
@@ -182,12 +182,29 @@ async function payload(source: Source, context: Context): Promise<Uint8Array> {
     const size = i === blocks - 1 && last ? last : block,
       part = data.subarray(from, from + sizes[i]);
     out.set(
-      compressor === 'lz4' ? lz4(part, size) : await inflate(part, size, `block ${i}`, context.signal, 'deflate', F),
+      compressor === 'lz4'
+        ? lz4(part, size)
+        : compressor === 'lzma'
+          ? await unxz(part, size, i)
+          : await inflate(part, size, `block ${i}`, context.signal, 'deflate', F),
       to,
     );
     from += sizes[i];
     to += size;
   }
+  return out;
+}
+
+/** An LZMA block, which VTK writes as an `.xz` stream and `@margoengine/decoders` undoes, loaded only for a file that needs it. */
+async function unxz(part: Uint8Array, size: number, block: number): Promise<Uint8Array> {
+  const { decodeXz } = await import('@margoengine/decoders/xz');
+  let out: Uint8Array;
+  try {
+    out = decodeXz(part, { maxBytes: size });
+  } catch (error) {
+    throw new LoaderError(F, 'zip', `block ${block}: ${(error as Error).message}`);
+  }
+  if (out.length !== size) throw new LoaderError(F, 'zip', `block ${block} holds ${out.length} bytes, not ${size}`);
   return out;
 }
 
@@ -449,7 +466,7 @@ function splitAppended(bytes: Uint8Array): { xml: string; appended?: Uint8Array;
 
 /**
  * Reads a VTK XML file, the output of ParaView and most simulation tools: `.vtp` PolyData and `.vtu` unstructured grids
- * with ascii, binary and appended arrays (raw or base64), either byte order, 32 or 64-bit headers and zlib or LZ4
+ * with ascii, binary and appended arrays (raw or base64), either byte order, 32 or 64-bit headers and zlib, LZ4 or LZMA
  * blocks. Polygons and strips become triangles over the file's points, polylines become `lines`, and volume cells are
  * reduced to the faces only one cell owns (their outer surface). `Normals`, `TCoords` and a 3 or 4 component `UInt8`
  * `Scalars` array fill `normals`, `uvs` and `colors`; every array is in `pointData` or `cellData`.
@@ -458,7 +475,7 @@ function splitAppended(bytes: Uint8Array): { xml: string; appended?: Uint8Array;
  * @param options The shared size limits, which faces to keep and an AbortSignal.
  * @returns The merged geometry and its data arrays.
  * @throws LoaderError with code `header`, `syntax`, `truncated`, `range`, `limit`, `zip`, `aborted` or `unsupported`
- * (other dataset types, LZMA blocks).
+ * (other dataset types).
  *
  * @example
  * ```ts
@@ -490,6 +507,7 @@ export async function parseVTKXML(input: BinaryInput, options: VTKXMLOptions = {
   let compressor: Context['compressor'];
   if (named === 'vtkZLibDataCompressor') compressor = 'zlib';
   else if (named === 'vtkLZ4DataCompressor') compressor = 'lz4';
+  else if (named === 'vtkLZMADataCompressor') compressor = 'lzma';
   else if (named) throw new LoaderError(F, 'unsupported', `compressor "${named.slice(0, 32)}" is not read`);
   const context: Context = {
     little: order !== 'BigEndian',

@@ -1,0 +1,3 @@
+Written by outside encoders, not by Margo: Python 3.15's bz2 (libbzip2) and lzma (liblzma) modules, on data Margo's test
+script made (repeated text, runs of bytes, zeros, floats). No third-party content. expected.json holds the length and the
+SHA-256 of what each one decodes to.

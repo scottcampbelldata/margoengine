@@ -25,6 +25,8 @@ export const external = [
   '@margoengine/decoders',
   '@margoengine/decoders/bc',
   '@margoengine/decoders/brotli',
+  '@margoengine/decoders/bzip2',
+  '@margoengine/decoders/xz',
   '@margoengine/decoders/image',
   '@margoengine/decoders/meshopt',
   '@margoengine/decoders/texture',

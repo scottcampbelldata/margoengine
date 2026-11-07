@@ -2,6 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { gzipSync } from 'node:zlib';
+import { readFileSync } from 'node:fs';
 import { parseNRRD } from '../dist/nrrd.js';
 import { LoaderError } from '../dist/common.js';
 
@@ -175,7 +176,7 @@ test('bad files are named errors', async () => {
   await refuses(parseNRRD(text(head(['type: quaternion', ...ok.slice(1)]))), 'header');
   await refuses(parseNRRD(text(head(['type: block', ...ok.slice(1)]))), 'unsupported');
   await refuses(parseNRRD(text(head(['type: short', ...ok.slice(1)]))), 'header');
-  await refuses(parseNRRD(text(head([...ok.slice(0, 3), 'encoding: bzip2']))), 'unsupported');
+  await refuses(parseNRRD(text(head([...ok.slice(0, 3), 'encoding: bzip2']) + 'not bzip2')), 'zip');
   await refuses(parseNRRD(text(head([...ok.slice(0, 3), 'encoding: zstd']))), 'header');
   await refuses(parseNRRD(text(head(['type: uchar', 'dimension: 17', 'sizes: 1', 'encoding: raw']))), 'range');
   await refuses(parseNRRD(text(head(['type: uchar', 'dimension: 2', 'sizes: 2', 'encoding: raw']))), 'syntax');
@@ -207,4 +208,20 @@ test('a header past the limit stops, and an abort stops the read', async () => {
   const controller = new AbortController();
   controller.abort();
   await refuses(parseNRRD(text('NRRD0004\n'), { signal: controller.signal }), 'aborted');
+});
+
+test('a real bzip2 volume from pynrrd reads the same samples as its raw twin', async () => {
+  const read = (name) => parseNRRD(readFileSync(new URL(`./fixtures/${name}`, import.meta.url))),
+    packed = await read('volume-bzip2.nrrd'),
+    plain = await read('volume-raw.nrrd');
+  assert.equal(packed.data.length, 24 * 16 * 8);
+  assert.deepEqual([...packed.data], [...plain.data]);
+  assert.deepEqual(packed.sizes, plain.sizes);
+});
+
+test('bzip2 data cannot grow past what the header declares', async () => {
+  const body = readFileSync(new URL('./fixtures/volume-bzip2.nrrd', import.meta.url)),
+    at = body.indexOf('\n\n') + 2,
+    short = head(['type: float', 'dimension: 1', 'sizes: 8', 'encoding: bzip2', 'endian: little']);
+  await refuses(parseNRRD(join(short, body.subarray(at))), 'zip');
 });

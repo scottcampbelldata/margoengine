@@ -54,6 +54,14 @@
       "types": "./dist/brotli.d.ts",
       "import": "./dist/brotli.js"
     },
+    "./bzip2": {
+      "types": "./dist/bzip2.d.ts",
+      "import": "./dist/bzip2.js"
+    },
+    "./xz": {
+      "types": "./dist/xz.d.ts",
+      "import": "./dist/xz.js"
+    },
     "./image": {
       "types": "./dist/image.d.ts",
       "import": "./dist/image.js"

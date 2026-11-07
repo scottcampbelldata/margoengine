@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10282427,
+  "total": 10213392,
   "history": [
     {
       "date": "2026-10-24",
@@ -3308,6 +3308,12 @@
       "commit": "4717cbfd",
       "reason": "tiles/i3dm: i3dm instanced content drawn through gltf-pro instancing, own entry; root gains the i3dm option and Tileset.fetchBytes",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "a786cd9d4",
+      "reason": "new optional entries for bzip2 and xz, loaded only by a file that needs them",
+      "grew": 2
     }
   ],
   "items": {
@@ -4049,6 +4055,8 @@
     "margoengine": 308,
     "margoengine/game": 996,
     "margoengine/viz": 800,
-    "margoengine/web": 577
+    "margoengine/web": 577,
+    "@margoengine/decoders/bzip2": 2168,
+    "@margoengine/decoders/xz": 4182
   }
 }

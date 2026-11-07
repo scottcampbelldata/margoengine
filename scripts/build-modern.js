@@ -168,6 +168,8 @@ async function buildPackage(name) {
           '@margoengine/lines',
           '@margoengine/decoders',
           '@margoengine/decoders/brotli',
+          '@margoengine/decoders/bzip2',
+          '@margoengine/decoders/xz',
           '@margoengine/decoders/meshopt',
           '@margoengine/decoders/texture',
           '@margoengine/decoders/ktx2-stream',

@@ -83,7 +83,7 @@ for (const [type, names] of [
 ] as const)
   for (const name of names.split(',')) TYPES[name] = type;
 
-const ENCODINGS: Record<string, 'raw' | 'ascii' | 'hex' | 'gzip'> = Object.assign(Object.create(null), {
+const ENCODINGS: Record<string, 'raw' | 'ascii' | 'hex' | 'gzip' | 'bzip2'> = Object.assign(Object.create(null), {
   raw: 'raw',
   txt: 'ascii',
   text: 'ascii',
@@ -91,7 +91,19 @@ const ENCODINGS: Record<string, 'raw' | 'ascii' | 'hex' | 'gzip'> = Object.assig
   hex: 'hex',
   gz: 'gzip',
   gzip: 'gzip',
+  bz2: 'bzip2',
+  bzip2: 'bzip2',
 });
+
+/** bzip2 data, which `@margoengine/decoders` undoes, loaded only for a file that needs it. */
+async function bunzip(body: Uint8Array, size: number): Promise<Uint8Array> {
+  const { decodeBzip2 } = await import('@margoengine/decoders/bzip2');
+  try {
+    return decodeBzip2(body, { maxBytes: size });
+  } catch (error) {
+    throw new LoaderError(F, 'zip', (error as Error).message);
+  }
+}
 
 const SPACES: Record<string, string> = Object.assign(Object.create(null), {
   ras: 'right-anterior-superior',
@@ -305,7 +317,7 @@ function readHex(text: string, length: number): Uint8Array<ArrayBuffer> {
 
 interface Encoded {
   type: NRRDType;
-  encoding: 'raw' | 'ascii' | 'hex' | 'gzip';
+  encoding: 'raw' | 'ascii' | 'hex' | 'gzip' | 'bzip2';
   swapped: boolean;
   lineSkip: number;
   byteSkip: number;
@@ -325,6 +337,7 @@ async function decode(file: Uint8Array, out: NRRDData, offset: number, count: nu
   if (encoding === 'hex') raw = readHex(latin1(body, byteSkip), length);
   else {
     if (encoding === 'gzip') body = await inflate(body, length + byteSkip, 'the data', how.signal, 'gzip', F);
+    else if (encoding === 'bzip2') body = await bunzip(body, length + Math.max(byteSkip, 0));
     const start = byteSkip < 0 ? body.length - length : byteSkip;
     if (start < 0 || start + length > body.length)
       throw new LoaderError(F, 'truncated', `the data has ${body.length} bytes, expected ${length}`);
@@ -418,7 +431,7 @@ function layout(
  * @param input The file's bytes.
  * @param options A resolver for detached data, the sample limit and an AbortSignal.
  * @returns The samples in the file's own type and where they sit.
- * @throws LoaderError with code `header`, `syntax`, `truncated`, `range`, `limit`, `aborted` or `unsupported` (bzip2,
+ * @throws LoaderError with code `header`, `syntax`, `truncated`, `range`, `limit`, `aborted`, `zip` or `unsupported` (
  * the block type, or detached data without `resolve`).
  *
  * @example
@@ -445,8 +458,6 @@ export async function parseNRRD(input: BinaryInput, options: NRRDOptions = {}): 
   const type = TYPES[fields.type.toLowerCase()];
   if (!type) throw new LoaderError(F, 'header', `unknown type "${fields.type.slice(0, 32)}"`);
   const named = fields.encoding.toLowerCase();
-  if (named === 'bz2' || named === 'bzip2')
-    throw new LoaderError(F, 'unsupported', 'bzip2 data is not read; save the file as raw or gzip');
   const encoding = ENCODINGS[named];
   if (!encoding) throw new LoaderError(F, 'header', `unknown encoding "${fields.encoding.slice(0, 32)}"`);
   const dimension = integer(fields.dimension, 'dimension', 0);

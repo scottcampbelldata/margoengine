@@ -178,6 +178,32 @@ A stream that breaks the format, ends early or passes `maxBytes` throws a `Margo
 dictionary ships in this entry (about 60 KB compressed in the bundle) and unpacks the first time a stream refers to it. The
 tests read every quality, window size and mode of the reference encoder (`node:zlib`).
 
+## bzip2 and xz (`@margoengine/decoders/bzip2`, `/xz`)
+
+`decodeBzip2(bytes)` reads `.bz2` data, `decodeXz(bytes)` reads `.xz` data and `decodeLzma(bytes)` the older `.lzma` form, on the
+calling thread. Browsers have no way to undo either. `@margoengine/loaders/nrrd` reads `encoding: bzip2` volumes with the
+first, and `@margoengine/loaders/vtk-xml` reads `vtkLZMADataCompressor` blocks with the second.
+
+```ts
+import { decodeBzip2 } from '@margoengine/decoders/bzip2';
+import { decodeXz } from '@margoengine/decoders/xz';
+
+const bz2 = new Uint8Array(await (await fetch('/volume.raw.bz2')).arrayBuffer()),
+  xz = new Uint8Array(await (await fetch('/points.bin.xz')).arrayBuffer());
+const volume = decodeBzip2(bz2, { maxBytes: 1 << 28 });
+const points = decodeXz(xz);
+```
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| `maxBytes` | 2^30 (1 GiB) | Largest output; a stream that would pass it throws, so a small file cannot fill memory. |
+
+Concatenated streams read as one. Every bzip2 block and stream CRC is checked. In `.xz`, the CRC32s of the headers, index and
+footer are checked, and each block's own CRC32, CRC64 or SHA-256. `.lzma` has no
+check, so damage shows only as a broken stream. Only the LZMA2 filter is read: BCJ and delta filters throw `unsupported`, and so
+do bzip2's randomised blocks, which nothing has written since 1999. A stream that breaks the format, ends early or passes
+`maxBytes` throws a `MargoError` with code `failed`. The tests read files from the outside libbzip2 and liblzma.
+
 ## PNG (`@margoengine/decoders/png`)
 
 `decodePNG(bytes, {maxPixels?, bitDepth?})` reads any valid PNG (W3C PNG Specification, Third Edition) to

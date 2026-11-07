@@ -622,6 +622,14 @@
       "types": "./dist/decoders/brotli.d.ts",
       "import": "./dist/decoders/brotli.js"
     },
+    "./decoders/bzip2": {
+      "types": "./dist/decoders/bzip2.d.ts",
+      "import": "./dist/decoders/bzip2.js"
+    },
+    "./decoders/xz": {
+      "types": "./dist/decoders/xz.d.ts",
+      "import": "./dist/decoders/xz.js"
+    },
     "./decoders/image": {
       "types": "./dist/decoders/image.d.ts",
       "import": "./dist/decoders/image.js"
