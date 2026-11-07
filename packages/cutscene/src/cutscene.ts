@@ -9,12 +9,14 @@ import {
   type AudioClip,
   BASIC_EASINGS,
   type CameraKey,
+  type ClipBase,
   type CutsceneDocument,
   type EaseSpec,
   type SubtitleClip,
   type TimelineClip,
   type TimelineSpec,
   type Track,
+  type TrackCheck,
   parseCutscene,
 } from './document.js';
 
@@ -28,7 +30,8 @@ export const EASING_NAMES: ReadonlySet<string> = new Set([
   ),
 ]);
 const STEP: Ease = (u) => (u < 1 ? 0 : 1);
-const easing = (spec: EaseSpec | undefined): Ease => {
+/** The easing function of a spec the document validator accepted. */
+export const easing = (spec: EaseSpec | undefined): Ease => {
   if (spec === undefined || spec === 'linear') return tween.linear;
   if (spec === 'step') return STEP;
   if (spec === 'smoothstep') return tween.easeSmoothstep;
@@ -95,6 +98,8 @@ export interface CutsceneState {
   subtitles: SubtitleState[];
   /** Name of the last marker at or before `time` (top-level timeline), or null. */
   marker: string | null;
+  /** What custom tracks set, under the name each documents. Absent when none did. */
+  extras?: Record<string, unknown>;
 }
 
 /** An instant the player fires: a custom event, a marker, or a clip starting (`enter`) or ending (`exit`). */
@@ -106,14 +111,47 @@ export interface CutsceneEvent {
   name: string;
   /** Path of the track (`intro/sfx` inside a nested timeline); empty for a top-level marker. */
   track: string;
-  /** Type of that track (`'marker'` for markers). */
-  type: Track['type'] | 'marker';
+  /** Type of that track (`'marker'` for markers; a custom track's own type). */
+  type: Track['type'] | 'marker' | (string & {});
   /** A custom event's data. */
   data?: unknown;
   /** The clip of an `enter` or `exit`. */
-  clip?: AnimationClip | AudioClip | SubtitleClip | TimelineClip;
+  clip?: AnimationClip | AudioClip | SubtitleClip | TimelineClip | ClipBase;
   /** Position in the document's event order, ties broken by it. */
   order: number;
+}
+
+/** An instant of a custom track, on its own timeline's time. */
+export interface TrackInstant {
+  time: number;
+  kind: 'event' | 'enter' | 'exit';
+  name: string;
+  data?: unknown;
+  /** The clip of an `enter` or `exit`; a nested window then cuts it as it cuts a built-in clip. */
+  clip?: ClipBase;
+}
+
+/**
+ * A track type of your own, or one of an optional entry (`shotTrack()` of `@margoengine/cutscene/shots`). Pass it in
+ * the `tracks` option of `Cutscene` or `CutscenePlayer`. It runs after the built-in tracks, in document order, so it
+ * reads their `transforms` and `camera`. `evaluate` must keep the rule of `Cutscene.evaluate`: the same time gives the
+ * same state.
+ */
+export interface CutsceneTrackType {
+  /** The value of `type` on its tracks. */
+  type: string;
+  /** Reports every problem of a track through `check`. Must not throw. */
+  validate(track: Record<string, unknown>, check: TrackCheck): void;
+  /** The track's instants, for the player to fire. Default none. */
+  instants?(track: Record<string, unknown>): readonly TrackInstant[];
+  /** Sets what the track does at `time` on its own timeline. `path` is the track's path. */
+  evaluate(track: Record<string, unknown>, time: number, state: CutsceneState, path: string): void;
+}
+
+/** Options of {@link Cutscene}. */
+export interface CutsceneOptions {
+  /** Custom track types the document may use. Default none. */
+  tracks?: readonly CutsceneTrackType[];
 }
 
 const RANK = { exit: 0, marker: 1, event: 2, enter: 3 } as const;
@@ -172,7 +210,7 @@ const catmull = (
 };
 
 /** World +Y made perpendicular to the view and rotated by `roll` about it (Rodrigues' rotation formula). */
-function rolledUp(position: readonly number[], target: readonly number[], roll: number): [number, number, number] {
+export function rolledUp(position: readonly number[], target: readonly number[], roll: number): [number, number, number] {
   let fx = target[0] - position[0],
     fy = target[1] - position[1],
     fz = target[2] - position[2];
@@ -214,7 +252,10 @@ interface Compiled {
   instants: CutsceneEvent[];
 }
 
-function compile(document: CutsceneDocument): Map<TimelineSpec, Compiled> {
+function compile(
+  document: CutsceneDocument,
+  types: ReadonlyMap<string, CutsceneTrackType>,
+): Map<TimelineSpec, Compiled> {
   const all = new Map<TimelineSpec, Compiled>();
   const make = (spec: TimelineSpec): Compiled => {
     let compiled = all.get(spec);
@@ -260,6 +301,14 @@ function compile(document: CutsceneDocument): Map<TimelineSpec, Compiled> {
             type: 'event',
             ...(event.data === undefined ? {} : { data: event.data }),
           });
+      else if (types.has(track.type))
+        for (const { clip, ...instant } of types.get(track.type)!.instants?.(track as never) ?? [])
+          out.push({
+            ...instant,
+            track: path,
+            type: track.type,
+            ...(clip ? { clip, span: [clip.start, clip.start + clip.duration] as [number, number] } : {}),
+          });
       else if (
         track.type === 'animation' ||
         track.type === 'audio' ||
@@ -303,6 +352,53 @@ function compile(document: CutsceneDocument): Map<TimelineSpec, Compiled> {
   return all;
 }
 
+/** A camera track's keys at time `t`. */
+export function cameraAt(
+  keys: readonly CameraKey[],
+  eases: readonly Ease[],
+  path: 'catmull-rom' | 'linear',
+  t: number,
+  track: string,
+): CameraState {
+  const { i, j, u } = segment(keys, eases, t);
+  const a = keys[i],
+    b = keys[j];
+  let position: number[], target: number[];
+  if (i === j) {
+    position = [...a.position];
+    target = [...a.target];
+  } else if (path === 'linear') {
+    position = lerp(a.position, b.position, u);
+    target = lerp(a.target, b.target, u);
+  } else {
+    // Neighbours stop at cuts and at the ends, so a shot's spline never bends toward another shot.
+    const p0 = i > 0 && !a.cut ? keys[i - 1] : a,
+      p3 = j + 1 < keys.length && !keys[j + 1].cut ? keys[j + 1] : b;
+    position = catmull(p0.position, a.position, b.position, p3.position, u);
+    target = catmull(p0.target, a.target, b.target, p3.target, u);
+  }
+  const fa = a.fov ?? 60,
+    fb = b.fov ?? 60,
+    ra = a.roll ?? 0,
+    rb = b.roll ?? 0,
+    roll = ra + (rb - ra) * u;
+  return {
+    position: position as [number, number, number],
+    target: target as [number, number, number],
+    fov: fa + (fb - fa) * u,
+    roll,
+    up: rolledUp(position, target, roll),
+    track,
+  };
+}
+
+/** A custom track reached at this time, run once the built-in tracks are done. */
+interface Later {
+  track: Track;
+  local: number;
+  path: string;
+}
+
 /**
  * A validated, compiled cutscene. `evaluate(t)` gives the full state at any time as a pure function of the document
  * and `t`; `eventsBetween(from, to)` gives the instants passed between two times, in order. Build one from a
@@ -314,10 +410,12 @@ export class Cutscene {
   /** Every instant of the cutscene, sorted (time, then exit, marker, event, enter, then document order). */
   readonly instants: readonly CutsceneEvent[];
   private readonly compiled: Map<TimelineSpec, Compiled>;
+  private readonly types: ReadonlyMap<string, CutsceneTrackType>;
   /** @throws TypeError naming the first problem in the document and its fix. */
-  constructor(document: CutsceneDocument | string | unknown) {
-    this.document = parseCutscene(document, EASING_NAMES);
-    this.compiled = compile(this.document);
+  constructor(document: CutsceneDocument | string | unknown, options: CutsceneOptions = {}) {
+    this.types = new Map((options.tracks ?? []).map((type) => [type.type, type]));
+    this.document = parseCutscene(document, EASING_NAMES, this.types);
+    this.compiled = compile(this.document, this.types);
     this.instants = Object.freeze(this.compiled.get(this.document)!.instants);
   }
   /** Length of the top-level timeline, seconds. */
@@ -346,7 +444,10 @@ export class Cutscene {
     const markers = this.document.markers ?? [];
     const m = before(markers, time);
     if (m >= 0) state.marker = markers[m].name;
-    this.timeline(this.document, time, '', state);
+    const custom: Later[] = [];
+    this.timeline(this.document, time, '', state, custom);
+    for (const { track, local, path } of custom)
+      this.types.get(track.type)!.evaluate(track as never, local, state, path);
     return state;
   }
   /**
@@ -367,7 +468,7 @@ export class Cutscene {
     if (a < b) return all.filter((e) => e.time >= a && (e.time < b || (b === end && e.time === end)));
     return all.filter((e) => e.time <= a && (e.time > b || (b === 0 && e.time === 0))).reverse();
   }
-  private timeline(spec: TimelineSpec, t: number, prefix: string, state: CutsceneState): void {
+  private timeline(spec: TimelineSpec, t: number, prefix: string, state: CutsceneState, custom: Later[]): void {
     const compiled = this.compiled.get(spec)!;
     for (const track of spec.tracks) {
       if (track.muted) continue;
@@ -375,7 +476,7 @@ export class Cutscene {
       switch (track.type) {
         case 'camera':
           if (!state.camera)
-            state.camera = this.camera(track.keys, compiled.eases.get(track)!, track.path ?? 'catmull-rom', t, path);
+            state.camera = cameraAt(track.keys, compiled.eases.get(track)!, track.path ?? 'catmull-rom', t, path);
           break;
         case 'transform': {
           const channels = compiled.channels.get(track)!,
@@ -455,55 +556,23 @@ export class Cutscene {
             if (!(t >= clip.start && t < clip.start + clip.duration)) continue;
             const child = this.document.timelines![clip.timeline];
             const local = Math.min(child.duration, (clip.offset ?? 0) + (t - clip.start) * (clip.speed ?? 1));
-            this.timeline(child, local, `${path}/`, state);
+            this.timeline(child, local, `${path}/`, state, custom);
           }
           break;
         case 'event':
           break;
+        default:
+          custom.push({ track, local: t, path });
       }
     }
-  }
-  private camera(
-    keys: readonly CameraKey[],
-    eases: readonly Ease[],
-    path: 'catmull-rom' | 'linear',
-    t: number,
-    track: string,
-  ): CameraState {
-    const { i, j, u } = segment(keys, eases, t);
-    const a = keys[i],
-      b = keys[j];
-    let position: number[], target: number[];
-    if (i === j) {
-      position = [...a.position];
-      target = [...a.target];
-    } else if (path === 'linear') {
-      position = lerp(a.position, b.position, u);
-      target = lerp(a.target, b.target, u);
-    } else {
-      // Neighbours stop at cuts and at the ends, so a shot's spline never bends toward another shot.
-      const p0 = i > 0 && !a.cut ? keys[i - 1] : a,
-        p3 = j + 1 < keys.length && !keys[j + 1].cut ? keys[j + 1] : b;
-      position = catmull(p0.position, a.position, b.position, p3.position, u);
-      target = catmull(p0.target, a.target, b.target, p3.target, u);
-    }
-    const fa = a.fov ?? 60,
-      fb = b.fov ?? 60,
-      ra = a.roll ?? 0,
-      rb = b.roll ?? 0,
-      roll = ra + (rb - ra) * u;
-    return {
-      position: position as [number, number, number],
-      target: target as [number, number, number],
-      fov: fa + (fb - fa) * u,
-      roll,
-      up: rolledUp(position, target, roll),
-      track,
-    };
   }
 }
 
 /** The state of `document` at time `t`; builds a {@link Cutscene} each call, so keep one for repeated use. */
-export function evaluate(document: CutsceneDocument | string | unknown, t: number): CutsceneState {
-  return new Cutscene(document).evaluate(t);
+export function evaluate(
+  document: CutsceneDocument | string | unknown,
+  t: number,
+  options?: CutsceneOptions,
+): CutsceneState {
+  return new Cutscene(document, options).evaluate(t);
 }

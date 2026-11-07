@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 9119128,
+  "total": 9122757,
   "history": [
     {
       "date": "2026-10-24",
@@ -2906,6 +2906,12 @@
       "commit": "71ce2fac1",
       "reason": "oit/exact entry, TransparentPass shared base, gltf-pro coverage hook",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "e9f6a26f9",
+      "reason": "new entry @margoengine/cutscene/shots: virtual camera shots with blends",
+      "grew": 2
     }
   ],
   "items": {
@@ -3031,7 +3037,8 @@
     "@margoengine/culling/models": 9657,
     "@margoengine/culling/parts": 15027,
     "@margoengine/culling/shadows": 20972,
-    "@margoengine/cutscene": 6822,
+    "@margoengine/cutscene": 7115,
+    "@margoengine/cutscene/shots": 3336,
     "@margoengine/decoders": 492515,
     "@margoengine/decoders/brotli": 68932,
     "@margoengine/decoders/dds": 3029,

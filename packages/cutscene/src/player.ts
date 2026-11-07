@@ -3,7 +3,7 @@
 // needs comes from `cutscene.evaluate(time)`, so a player that seeks, scrubs, reverses or skips shows exactly what one
 // that played straight to the same time shows; only the events differ (seeking fires none, skipping fires them all).
 import { MargoError } from '@margoengine/math/errors';
-import { Cutscene, type CutsceneEvent, type CutsceneState } from './cutscene.js';
+import { Cutscene, type CutsceneEvent, type CutsceneState, type CutsceneTrackType } from './cutscene.js';
 import type { CutsceneDocument } from './document.js';
 
 /** Options of {@link CutscenePlayer}. Every field has a default. */
@@ -14,6 +14,8 @@ export interface CutscenePlayerOptions {
   loop?: boolean;
   /** Start time, seconds (default 0). */
   time?: number;
+  /** Custom track types the document may use (default none). Ignored when you pass a built {@link Cutscene}. */
+  tracks?: readonly CutsceneTrackType[];
 }
 
 /** What {@link CutscenePlayer.on} listens to: an instant kind, `'finish'`, or `'*'` for every instant. */
@@ -44,8 +46,8 @@ export class CutscenePlayer {
     [];
   private streams = new Set<(event: CutsceneEvent | null) => void>();
   /** @throws TypeError for an invalid document; RangeError for a bad speed or time. */
-  constructor(cutscene: Cutscene | CutsceneDocument | string, options: CutscenePlayerOptions = {}) {
-    this.cutscene = cutscene instanceof Cutscene ? cutscene : new Cutscene(cutscene);
+  constructor(cutscene: Cutscene | CutsceneDocument | string | unknown, options: CutscenePlayerOptions = {}) {
+    this.cutscene = cutscene instanceof Cutscene ? cutscene : new Cutscene(cutscene, { tracks: options.tracks });
     this.speed = options.speed ?? 1;
     if (!Number.isFinite(this.speed))
       throw new RangeError('Cutscene speed must be a finite number; use a negative one to reverse');

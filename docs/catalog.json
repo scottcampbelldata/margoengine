@@ -2015,7 +2015,7 @@
     "package": "@margoengine/cutscene",
     "version": "1.0.0",
     "published": false,
-    "description": "Cutscene timelines: camera, transform, property, animation, audio, subtitle and event tracks, nested timelines, scrubbing and a player that fires events in order.",
+    "description": "Cutscene timelines: camera, transform, property, animation, audio, subtitle and event tracks, nested timelines, scrubbing, a player that fires events in order, and virtual camera shots with blends.",
     "requirements": "See the package guide for requirements",
     "keywords": "cutscene",
     "install": "npm install @margoengine/cutscene@1.0.0",

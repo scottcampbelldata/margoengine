@@ -809,6 +809,7 @@ Sequencer, Godot AnimationPlayer, Theatre.js, GSAP, three.js, Babylon and the li
 | Roll | Rodrigues' rotation formula (standard linear algebra) |
 | Easing | `@margoengine/tween`'s easings (Penner's equations, CSS Easing Functions Level 1 cubic-bezier) |
 | Instants and ordering | Our own design: half-open clip spans, instants sorted once by time, kind and document order |
+| Virtual camera shots (`cutscene/shots`) | Our own design from the public idea of cutting between named cameras on a timeline; the view blend is spherical linear interpolation of a direction (K. Shoemake, 1985) with its length blended apart; custom track types are ours. No source of Unity Cinemachine or Unreal Sequencer was read |
 
 ## Save and load: `@margoengine/save`
 

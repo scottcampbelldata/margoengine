@@ -526,6 +526,10 @@
       "types": "./dist/cutscene.d.ts",
       "import": "./dist/cutscene.js"
     },
+    "./cutscene/shots": {
+      "types": "./dist/cutscene/shots.d.ts",
+      "import": "./dist/cutscene/shots.js"
+    },
     "./decoders": {
       "types": "./dist/decoders.d.ts",
       "import": "./dist/decoders.js"

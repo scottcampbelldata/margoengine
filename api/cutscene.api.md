@@ -94,7 +94,7 @@ export interface CueEvent {
 export class Cutscene {
     readonly document: CutsceneDocument;
     readonly instants: readonly CutsceneEvent[];
-    constructor(document: CutsceneDocument | string | unknown);
+    constructor(document: CutsceneDocument | string | unknown, options?: CutsceneOptions);
     get duration(): number;
     evaluate(t: number): CutsceneState;
     eventsBetween(from: number, to: number): CutsceneEvent[];
@@ -111,9 +111,9 @@ export interface CutsceneEvent {
     kind: 'event' | 'marker' | 'enter' | 'exit';
     name: string;
     track: string;
-    type: Track['type'] | 'marker';
+    type: Track['type'] | 'marker' | (string & {});
     data?: unknown;
-    clip?: AnimationClip | AudioClip | SubtitleClip | TimelineClip;
+    clip?: AnimationClip | AudioClip | SubtitleClip | TimelineClip | ClipBase;
     order: number;
 }
 
@@ -122,11 +122,15 @@ export interface CutsceneIssue {
     message: string;
 }
 
+export interface CutsceneOptions {
+    tracks?: readonly CutsceneTrackType[];
+}
+
 export class CutscenePlayer {
     readonly cutscene: Cutscene;
     speed: number;
     loop: boolean;
-    constructor(cutscene: Cutscene | CutsceneDocument | string, options?: CutscenePlayerOptions);
+    constructor(cutscene: Cutscene | CutsceneDocument | string | unknown, options?: CutscenePlayerOptions);
     get time(): number;
     get playing(): boolean;
     get duration(): number;
@@ -155,6 +159,7 @@ export interface CutscenePlayerOptions {
     speed?: number;
     loop?: boolean;
     time?: number;
+    tracks?: readonly CutsceneTrackType[];
 }
 
 export interface CutsceneState {
@@ -166,6 +171,14 @@ export interface CutsceneState {
     audio: AudioState[];
     subtitles: SubtitleState[];
     marker: string | null;
+    extras?: Record<string, unknown>;
+}
+
+export interface CutsceneTrackType {
+    type: string;
+    validate(track: Record<string, unknown>, check: TrackCheck): void;
+    instants?(track: Record<string, unknown>): readonly TrackInstant[];
+    evaluate(track: Record<string, unknown>, time: number, state: CutsceneState, path: string): void;
 }
 
 export const EASING_NAMES: ReadonlySet<string>;
@@ -244,6 +257,32 @@ export interface TimelineTrack {
 
 export type Track = CameraTrack | TransformTrack | PropertyTrack | AnimationTrack | AudioTrack | SubtitleTrack | EventTrack | TimelineTrack;
 
+export interface TrackCheck {
+    path: string;
+    end: number;
+    add(path: string, message: string): void;
+    time(value: unknown, path: string): boolean;
+    ease(value: unknown, path: string): void;
+    list(value: unknown, path: string): Record<string, unknown>[] | null;
+    ordered(list: Record<string, unknown>[], path: string, field: string): void;
+    target(): void;
+    clips(check: (clip: Record<string, unknown>, path: string) => void): Record<string, unknown>[] | null;
+    positive(clip: Record<string, unknown>, key: string, path: string, zero?: boolean): void;
+    cameraKeys(value: unknown, path: string): void;
+}
+
+export interface TrackInstant {
+    time: number;
+    kind: 'event' | 'enter' | 'exit';
+    name: string;
+    data?: unknown;
+    clip?: ClipBase;
+}
+
+export interface TrackValidator {
+    validate(track: Record<string, unknown>, check: TrackCheck): void;
+}
+
 export interface TransformKey {
     time: number;
     position?: Vec3;
@@ -268,9 +307,9 @@ export interface TransformTrack {
 
 export { Vec3 } from "@margoengine/core";
 
-export function evaluate(document: CutsceneDocument | string | unknown, t: number): CutsceneState;
+export function evaluate(document: CutsceneDocument | string | unknown, t: number, options?: CutsceneOptions): CutsceneState;
 
-export function parseCutscene(input: string | unknown, easings?: ReadonlySet<string>): CutsceneDocument;
+export function parseCutscene(input: string | unknown, easings?: ReadonlySet<string>, types?: ReadonlyMap<string, TrackValidator>): CutsceneDocument;
 
-export function validateCutscene(input: unknown, easings?: ReadonlySet<string>): CutsceneIssue[];
+export function validateCutscene(input: unknown, easings?: ReadonlySet<string>, types?: ReadonlyMap<string, TrackValidator>): CutsceneIssue[];
 ```

@@ -1,7 +1,7 @@
 {
   "name": "@margoengine/cutscene",
   "version": "1.0.0",
-  "description": "Cutscene timelines: camera, transform, property, animation, audio, subtitle and event tracks, nested timelines, scrubbing and a player that fires events in order.",
+  "description": "Cutscene timelines: camera, transform, property, animation, audio, subtitle and event tracks, nested timelines, scrubbing, a player that fires events in order, and virtual camera shots with blends.",
   "keywords": [
     "margoengine",
     "webgpu",
@@ -29,6 +29,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./shots": {
+      "types": "./dist/shots.d.ts",
+      "import": "./dist/shots.js"
     }
   },
   "files": [

@@ -29,6 +29,8 @@ export {
   type TimelineSpec,
   type TimelineTrack,
   type Track,
+  type TrackCheck,
+  type TrackValidator,
   type TransformKey,
   type TransformTrack,
   type Vec3,
@@ -41,8 +43,11 @@ export {
   type AudioState,
   type CameraState,
   type CutsceneEvent,
+  type CutsceneOptions,
   type CutsceneState,
+  type CutsceneTrackType,
   type SubtitleState,
+  type TrackInstant,
   type TransformState,
 } from './cutscene.js';
 export { CutscenePlayer, type CutscenePlayerEvent, type CutscenePlayerOptions } from './player.js';

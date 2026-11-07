@@ -130,6 +130,108 @@ await reader; // the stream ends when the player finishes
 A listener that seeks or skips takes over: the rest of that step's instants are not fired. `update` from inside a
 listener throws `MargoError` `'state'`. `using player = new CutscenePlayer(...)` disposes it at the end of the scope.
 
+## Virtual camera shots
+
+`@margoengine/cutscene/shots` adds a `shot` track: name your cameras once, then write the edit as shots that cut or
+blend from one to the next, instead of keying raw camera transforms. Both cameras keep moving through a blend.
+
+```ts
+import { CutscenePlayer } from 'margoengine/cutscene';
+import { shotOf, shotTrack, type ShotTrack } from 'margoengine/cutscene/shots';
+
+const edit: ShotTrack = {
+  type: 'shot',
+  id: 'edit',
+  cameras: {
+    wide: { position: [0, 3, 12], target: [0, 1, 0], fov: 50 },
+    dolly: {
+      keys: [
+        { time: 0, position: [-6, 1.5, 4], target: [0, 1, 0] },
+        { time: 4, position: [-2, 1.5, 4], target: [0, 1, 0], fov: 35 },
+      ],
+    },
+    chase: { follow: 'hero', position: [0, 2, 5], lookAt: 'hero', lookOffset: [0, 1, 0] },
+    game: { live: 'game' },
+  },
+  clips: [
+    { start: 0, duration: 2, camera: 'game' },
+    { start: 2, duration: 3, camera: 'wide', blendIn: 1.5 },
+    { start: 5, duration: 4, camera: 'dolly' },
+    { start: 9, duration: 3, camera: 'chase', blendIn: 1, blend: 'orbit', ease: 'easeInOutCubic' },
+    { start: 12, duration: 2, camera: 'game', blendIn: 1 },
+  ],
+};
+const heroPosition = [0, 0, 0];
+const gameCamera = { position: [0, 2, 8], target: [0, 1, 0], fov: 60 };
+const player = new CutscenePlayer(
+  { format: 'margo-cutscene', version: 1, duration: 14, tracks: [edit] },
+  {
+    tracks: [
+      shotTrack({
+        locate: (name) => (name === 'hero' ? { position: heroPosition } : undefined),
+        live: { game: () => gameCamera },
+      }),
+    ],
+  },
+);
+void player.play();
+player.update(1 / 60);
+const { camera } = player.state; // Apply it as any camera track's state: position, target, fov, up.
+const shot = shotOf(player.state); // { camera: 'game', weight: 1, track: 'edit' }
+```
+
+| Camera field | Meaning | Default |
+| --- | --- | --- |
+| `keys`, `path` | A camera move, the keys of a camera track with time 0 at the start of the shot | none, `'catmull-rom'` |
+| `live` | A camera of the running game, from the `live` option, read at every evaluate, so a cutscene blends out of play and back | none |
+| `position`, `target` | A fixed camera | `[0, 0, 0]`, needed unless `lookAt` is set |
+| `follow`, `followRotation` | `position` is measured from this object, in its own axes when `followRotation` is true | none, `false` |
+| `lookAt`, `lookOffset` | Aims at this object, plus the offset | none, `[0, 0, 0]` |
+| `fov`, `roll` | Degrees and radians | `60`, `0` |
+
+| Shot field | Meaning | Default |
+| --- | --- | --- |
+| `camera` | Key of the camera | required |
+| `blendIn` | Seconds of blend from the shot before, up to the shot's `duration`; 0 is a cut | `0` |
+| `ease` | Shape of the blend, any key `ease` | `'smoothstep'` |
+| `blend` | `'direct'` moves the camera straight across and turns the view. `'orbit'` swings it around the point looked at, for two cameras on one subject | `'direct'` |
+| `speed`, `offset` | Rate of the camera's move and seconds into it at the start of the shot | `1`, `0` |
+
+Shots follow each other and may not overlap; in a gap the last one holds, and before the first the first shows. A
+blend starts exactly on the old camera and ends exactly on the new one, and the view turns at even speed rather than
+the target sliding, so the target never passes through the camera. A shot track sets `state.camera` in place of any
+camera track, and the first unmuted shot track wins. Objects come from the document's transform tracks first, wherever
+those tracks sit, then from `locate`; a shot needing an object or a live camera nothing provides throws a `RangeError`
+naming the fix. Shots fire `enter` and `exit` like clips, and nested timelines cut them the same way. A shot has no
+memory, so a follow camera sits exactly at its offset: for damped follow in play, use `@margoengine/cinematic` and
+bring it in as a `live` camera.
+
+## Custom tracks
+
+`shotTrack()` is a `CutsceneTrackType`, and you can write your own for anything a document should hold: pass types in
+the `tracks` option of `Cutscene` or `CutscenePlayer`, and a document using a type you did not pass is refused. A type
+gives `validate(track, check)`, `evaluate(track, time, state, path)` and optionally `instants(track)`. It runs after
+the built-in tracks, reads what they set, and puts its own results in `state.extras`.
+
+```ts
+import { Cutscene, type CutsceneTrackType } from 'margoengine/cutscene';
+
+const weather: CutsceneTrackType = {
+  type: 'weather',
+  validate(track, { path, add }) {
+    if (typeof track.rain !== 'number') add(`${path}.rain`, 'must be a number');
+  },
+  evaluate(track, time, state) {
+    (state.extras ??= {}).rain = (track.rain as number) * time;
+  },
+};
+const scene = new Cutscene(
+  { format: 'margo-cutscene', version: 1, duration: 2, tracks: [{ type: 'weather', id: 'storm', rain: 0.5 }] },
+  { tracks: [weather] },
+);
+const rain = scene.evaluate(1).extras?.rain; // 0.5
+```
+
 ## Saving and validating
 
 ```ts

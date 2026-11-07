@@ -193,6 +193,32 @@ export interface CutsceneDocument extends TimelineSpec {
   timelines?: Record<string, TimelineSpec>;
 }
 
+/** What a custom track type's `validate` gets: the helpers the built-in tracks are checked with. */
+export interface TrackCheck {
+  /** The track's path in the document (`tracks[2]`). */
+  path: string;
+  /** Length of the timeline holding the track, seconds. */
+  end: number;
+  /** Report a problem at `path`, with its fix. */
+  add(path: string, message: string): void;
+  /** Check a time on this timeline; false when it was reported. */
+  time(value: unknown, path: string): boolean;
+  /** Check an {@link EaseSpec}; `undefined` passes. */
+  ease(value: unknown, path: string): void;
+  /** Check that a list holds objects, and count them against {@link MAX_CUTSCENE_ITEMS}; null when it was reported. */
+  list(value: unknown, path: string): Record<string, unknown>[] | null;
+  /** Check that a list is sorted by `field`. */
+  ordered(list: Record<string, unknown>[], path: string, field: string): void;
+  /** Check `track.target`. */
+  target(): void;
+  /** Check `track.clips` as spans of the timeline, calling `check` on each; returns them, or null when reported. */
+  clips(check: (clip: Record<string, unknown>, path: string) => void): Record<string, unknown>[] | null;
+  /** Check an optional number on a clip: above 0, or 0 and above when `zero` (default true). */
+  positive(clip: Record<string, unknown>, key: string, path: string, zero?: boolean): void;
+  /** Check a list of {@link CameraKey}s and that it is not empty. */
+  cameraKeys(value: unknown, path: string): void;
+}
+
 /** One problem found by {@link validateCutscene}: where (`tracks[2].keys[0].time`) and what to change. */
 export interface CutsceneIssue {
   path: string;
@@ -213,12 +239,22 @@ const vec = (value: unknown, length: number): boolean =>
 /** Names accepted for {@link EaseSpec} besides the `ease*` names of `@margoengine/tween`. */
 export const BASIC_EASINGS = ['linear', 'step', 'smoothstep'] as const;
 
+/** The part of a custom track type the validator uses. */
+export interface TrackValidator {
+  validate(track: Record<string, unknown>, check: TrackCheck): void;
+}
+
 /**
  * Check a cutscene document without building it. Returns every problem found, each with its path and the fix; an
- * empty array means it is valid. `easings` lists the extra easing names allowed (the player passes tween's).
+ * empty array means it is valid. `easings` lists the extra easing names allowed (the player passes tween's), and
+ * `types` the custom track types allowed, by their `type`.
  * Never throws, whatever the input.
  */
-export function validateCutscene(input: unknown, easings: ReadonlySet<string> = new Set()): CutsceneIssue[] {
+export function validateCutscene(
+  input: unknown,
+  easings: ReadonlySet<string> = new Set(),
+  types: ReadonlyMap<string, TrackValidator> = new Map(),
+): CutsceneIssue[] {
   const issues: CutsceneIssue[] = [];
   const add = (path: string, message: string): void => {
     if (issues.length < 1000) issues.push({ path, message });
@@ -301,6 +337,22 @@ export function validateCutscene(input: unknown, easings: ReadonlySet<string> = 
       });
       if (markers) ordered(markers, at('markers'), 'time');
     }
+    const cameraKeys = (value: unknown, path: string): void => {
+      const keys = list(value, path);
+      if (keys && !keys.length) add(path, 'must hold at least one key');
+      keys?.forEach((key, i) => {
+        const p = `${path}[${i}]`;
+        time(key.time, `${p}.time`);
+        if (!vec(key.position, 3)) add(`${p}.position`, 'must be [x, y, z] with finite numbers');
+        if (!vec(key.target, 3)) add(`${p}.target`, 'must be [x, y, z] with finite numbers');
+        if ('fov' in key && !(finite(key.fov) && key.fov > 0 && key.fov < 180))
+          add(`${p}.fov`, 'must be degrees between 0 and 180');
+        if ('roll' in key && !finite(key.roll)) add(`${p}.roll`, 'must be a finite number of radians');
+        if ('cut' in key && typeof key.cut !== 'boolean') add(`${p}.cut`, 'must be true or false');
+        ease(key.ease, `${p}.ease`);
+      });
+      if (keys) ordered(keys, path, 'time');
+    };
     const tracks = list(spec.tracks, at('tracks'));
     if (!tracks) return;
     const ids = new Set<string>();
@@ -315,7 +367,7 @@ export function validateCutscene(input: unknown, easings: ReadonlySet<string> = 
         if (typeof track.target !== 'string' || !track.target)
           add(`${path}.target`, 'must name the object, a non-empty string');
       };
-      const clips = (check: (clip: Record<string, unknown>, p: string) => void): void => {
+      const clips = (check: (clip: Record<string, unknown>, p: string) => void): Record<string, unknown>[] | null => {
         const all = list(track.clips, `${path}.clips`);
         all?.forEach((clip, i) => {
           const p = `${path}.clips[${i}]`;
@@ -327,31 +379,18 @@ export function validateCutscene(input: unknown, easings: ReadonlySet<string> = 
           check(clip, p);
         });
         if (all) ordered(all, `${path}.clips`, 'start');
+        return all;
       };
       const positive = (clip: Record<string, unknown>, key: string, p: string, zero = true): void => {
         if (key in clip && !(finite(clip[key]) && (zero ? (clip[key] as number) >= 0 : (clip[key] as number) > 0)))
           add(`${p}.${key}`, `must be a finite number ${zero ? 'of 0 or more' : 'above 0'}`);
       };
       switch (track.type) {
-        case 'camera': {
+        case 'camera':
           if ('path' in track && track.path !== 'catmull-rom' && track.path !== 'linear')
             add(`${path}.path`, "must be 'catmull-rom' or 'linear'");
-          const keys = list(track.keys, `${path}.keys`);
-          if (keys && !keys.length) add(`${path}.keys`, 'must hold at least one key');
-          keys?.forEach((key, i) => {
-            const p = `${path}.keys[${i}]`;
-            time(key.time, `${p}.time`);
-            if (!vec(key.position, 3)) add(`${p}.position`, 'must be [x, y, z] with finite numbers');
-            if (!vec(key.target, 3)) add(`${p}.target`, 'must be [x, y, z] with finite numbers');
-            if ('fov' in key && !(finite(key.fov) && key.fov > 0 && key.fov < 180))
-              add(`${p}.fov`, 'must be degrees between 0 and 180');
-            if ('roll' in key && !finite(key.roll)) add(`${p}.roll`, 'must be a finite number of radians');
-            if ('cut' in key && typeof key.cut !== 'boolean') add(`${p}.cut`, 'must be true or false');
-            ease(key.ease, `${p}.ease`);
-          });
-          if (keys) ordered(keys, `${path}.keys`, 'time');
+          cameraKeys(track.keys, `${path}.keys`);
           break;
-        }
         case 'transform': {
           target();
           const keys = list(track.keys, `${path}.keys`);
@@ -446,11 +485,16 @@ export function validateCutscene(input: unknown, easings: ReadonlySet<string> = 
             positive(clip, 'offset', p);
           });
           break;
-        default:
-          add(
-            `${path}.type`,
-            `unknown track type ${JSON.stringify(track.type)}; use camera, transform, property, animation, audio, subtitle, event or timeline`,
-          );
+        default: {
+          const custom = typeof track.type === 'string' ? types.get(track.type) : undefined;
+          if (custom)
+            custom.validate(track, { path, end, add, time, ease, list, ordered, target, clips, positive, cameraKeys });
+          else
+            add(
+              `${path}.type`,
+              `unknown track type ${JSON.stringify(track.type)}; use camera, transform, property, animation, audio, subtitle, event or timeline, or pass its custom track type in the tracks option`,
+            );
+        }
       }
     });
   };
@@ -504,7 +548,11 @@ const deepFreeze = <T>(value: T): T => {
  * document cannot change under a player and `evaluate` stays a pure function of it and the time.
  * @throws TypeError naming the first problem's path and fix, or for text that is not JSON.
  */
-export function parseCutscene(input: string | unknown, easings?: ReadonlySet<string>): CutsceneDocument {
+export function parseCutscene(
+  input: string | unknown,
+  easings?: ReadonlySet<string>,
+  types?: ReadonlyMap<string, TrackValidator>,
+): CutsceneDocument {
   let value: unknown;
   try {
     value = typeof input === 'string' ? JSON.parse(input) : JSON.parse(JSON.stringify(input));
@@ -513,7 +561,7 @@ export function parseCutscene(input: string | unknown, easings?: ReadonlySet<str
       `Cutscene is not valid JSON (${(error as Error).message}); save it with JSON.stringify(document)`,
     );
   }
-  const issues = validateCutscene(value, easings);
+  const issues = validateCutscene(value, easings, types);
   if (issues.length)
     throw new TypeError(
       `Invalid cutscene; fix ${issues[0].path || 'the document'}: ${issues[0].message}${issues.length > 1 ? ` (and ${issues.length - 1} more; see validateCutscene)` : ''}`,

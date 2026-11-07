@@ -14,7 +14,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-284). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-285). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -218,6 +218,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Pen input (`@margoengine/input/pen`, 2026-11-05) | Not measured with real hardware: tested with synthetic pointer events. Values are what the browser reports: a pen or driver without pressure gives 0.5 while touching, and without tilt gives 0 (upright). Action values are the latest reading, once per tick; only `take()` has the full rate. One pen at a time: two pens on one element share its readings. | The Pointer Events specification sets those fallback values, and a page cannot tell them from real readings. | A mouse-like stylus paints at an even half pressure. | Offer a fixed-size brush option. Paint from `take()`, not from action values. |
 | `ArcballGizmo`, double-click focus and arcball keys (2026-11-05) | By method: the gizmo draws and takes no input, so the rings cannot be grabbed one at a time. Focus moves the view centre and keeps the turn and distance; with no `pick` the point lies on the plane through the target. Touch has no double-tap gesture of its own: focus needs the browser's `dblclick`. | Picking the scene needs @margoengine/bvh, which `/arcball` does not load. | A double-click on a far object without `pick` centres the plane point, not the object. | Set `pick` with a `Raycaster` and `rayAt`, as the README shows. |
 | Moving platforms for `WalkControls` (`carry`, 2026-11-05) | By method: only the floor carries. A moving wall pushes the walker out but gives it no speed, a tilting floor turns the heading about +Y and leaves the pitch, and one more transform pass runs per update so colliders are this frame's. | A wall has no contact the walker keeps between frames, and a walker stays upright by design. | The pass costs a little on scenes with no moving floor. | `carry: false` skips the pass and keeps last frame's matrices. |
+| Virtual camera shots (`@margoengine/cutscene/shots`, 2026-11-06) | Enforced: shots may not overlap, `blendIn` is at most the shot's length, and the first shot cannot blend, as nothing comes before it. By method: a shot has no memory, so `follow` and `lookAt` sit exactly on their object with no damping, and blending between cameras looking opposite ways turns about the world's up. A live camera is read at every evaluate, so a shot of one is the one thing here that is not a pure function of the time. Not measured: speed. |
 
 ## Copies of a model
 
