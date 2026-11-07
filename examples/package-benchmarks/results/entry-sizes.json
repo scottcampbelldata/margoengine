@@ -1,6 +1,6 @@
 {
-  "commit": "ad570c7e4",
-  "dirty": true,
+  "commit": "97cd41aff",
+  "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
     "raw": 57071,
@@ -130,6 +130,10 @@
       "./smart-objects": {
         "raw": 4499,
         "gzip": 1773
+      },
+      "./flowfield": {
+        "raw": 6107,
+        "gzip": 2400
       }
     },
     "@margoengine/biomes": {

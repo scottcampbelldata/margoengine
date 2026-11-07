@@ -405,6 +405,46 @@ A claim follows its object. On `'success'` the agent's needs fall by what was ad
 `'failure'` the place is released. `release()` gives it back early and `using` works. `world.remove(id)` ends the
 object's claims, so check `claim.active`.
 
+## Flow fields
+
+One field steers any number of units to a goal, for RTS crowds: the work is per cell, so each extra unit costs one
+lookup.
+
+```ts
+import { FlowField, WALL } from 'margoengine/behavior/flowfield';
+
+const field = new FlowField({
+  size: [128, 128], // cells along x and z
+  cell: 1,
+  cost: (x, z) => (x > 60 && x < 62 && z < 100 ? WALL : z > 110 ? 4 : 1), // 1 clear, up to 254 slow, 255 a wall
+});
+field.setGoal([120, 0, 20]);
+
+field.direction([5, 0, 20]); // unit heading on the ground, or zeros at the goal, on a wall, or cut off
+field.reachable([5, 0, 20]); // an island test, as cheap as a lookup
+
+// A whole crowd at once, as arrays; ECS component fields fit as they are.
+const units = { x: new Float32Array(5000).fill(5), z: new Float32Array(5000).fill(20) };
+field.steer(units, 5000, 6, 1 / 60); // count, speed, delta; returns how many moved
+
+const undo = field.stamp(80, 10, 4, 4, WALL); // a building lands; the field rebuilds
+undo(); // and it goes
+
+field.setGoal([
+  [120, 0, 20],
+  [10, 0, 120],
+]); // several goals: each unit heads for its cheapest
+```
+
+Three fields hold it: `cost`, `integration` (travel cost to the goal, by fast marching, so distances are round and there
+is no diamond around the goal) and `flow` (the neighbour to step to). Cells with a clear straight line to a single goal
+are flagged in `lineOfSight`, and units there head exactly at the goal. Slow ground ends that line, so a unit follows the
+flow around it. After writing `field.cost` yourself, call `field.rebuild()`.
+
+`steer` moves a cell at most per step, so no speed jumps a wall, and a step into a wall keeps the part along it, so units
+slide. It steers and nothing more: units do not avoid each other, so add `separation` from `./steering` or physics for
+that. Build one field per goal and per movement type.
+
 Errors name their fix: a bad argument throws `TypeError` or `RangeError` (`Agent maxSpeed must be a finite number of
 0 or more`), a call that is not valid right now throws `MargoError` with code `state` (ticking from inside a handler),
 `disposed` (after `dispose()`) or `failed` (a rejected task). `using tree = new BehaviorTree(...)` halts it at the end

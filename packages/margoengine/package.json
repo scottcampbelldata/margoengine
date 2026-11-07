@@ -154,6 +154,10 @@
       "types": "./dist/behavior/smart-objects.d.ts",
       "import": "./dist/behavior/smart-objects.js"
     },
+    "./behavior/flowfield": {
+      "types": "./dist/behavior/flowfield.d.ts",
+      "import": "./dist/behavior/flowfield.js"
+    },
     "./biomes": {
       "types": "./dist/biomes.d.ts",
       "import": "./dist/biomes.js"
