@@ -61,7 +61,7 @@ The exporter uses Blender native bulk reads and bundled NumPy, with Python 3.11+
 
 Supported materials: direct Principled BSDF; constant metallic/roughness; constant or direct sRGB image base color and emission; tangent-space Non-Color normal maps; constant alpha or the base image's alpha; active UV map; repeat/clamp wrapping and linear/nearest filtering. Embedded images use RGBA8 PNG. Each image is limited to 4096 × 4096, all decoded images to 256 MiB, the file to 256 MiB, and the manifest to 1 MiB. Export writes atomically, so a failed export preserves an existing asset.
 
-Any other surface material is baked at export (next section). Unsupported inputs fail by material/object name: transmission, variable IOR, coat, sheen, subsurface (constant or linked), volume and displacement outputs, HDR textures/emission, and any material that needs baking when baking is off. Geometry Nodes mesh outputs/mesh instances are evaluated; curves, points and volumes must be converted to meshes first. Live link is a subsequent milestone. Emission stays separate from optional tone mapping.
+Any other surface material is baked at export (next section). Transmission, IOR, coat, sheen and subsurface export as glTF material extensions (see Extended Principled inputs). Unsupported inputs fail by material/object name: linked (textured) transmission, IOR, coat, sheen or subsurface, a coat with an IOR other than 1.5, a tint or a normal map, specular and anisotropy other than the defaults, volume and displacement outputs, HDR textures/emission, and any material that needs baking when baking is off. Geometry Nodes mesh outputs/mesh instances are evaluated; curves, points and volumes must be converted to meshes first. Live link is a subsequent milestone. Emission stays separate from optional tone mapping.
 
 ## Node materials: baked at export
 
@@ -75,6 +75,20 @@ bpy.ops.export_scene.margo(filepath="//scene.margo", bake_size=1024)
 ```
 
 `bake_size` is the side of each baked image in pixels: 16 to 4096, default 1024; `0` turns baking off, so such a material fails by name as before. Each baked material is baked once per mesh that uses it (its UV layout); the mesh needs an active UV map and must be a real object in the view layer. A real Blender 5.2.3 LTS export of a procedural Principled material matches its node maths at every texel within the sampling and rounding bound (LIM-401; `tests/bake.test.js`).
+
+## Extended Principled inputs: transmission, IOR, coat, sheen and subsurface
+
+The exporter writes the Principled BSDF's constant transmission, IOR, coat, sheen and subsurface as glTF material extensions: `KHR_materials_transmission` (Transmission Weight), `KHR_materials_ior` (IOR, when not 1.5), `KHR_materials_clearcoat` (Coat Weight and Coat Roughness), `KHR_materials_sheen` (Sheen Tint times Sheen Weight, Sheen Roughness), and for subsurface `KHR_materials_diffuse_transmission` (Subsurface Weight, the base colour) into a scattering volume, `KHR_materials_volume` plus the draft `KHR_materials_volume_scatter`: the base colour is the multiple-scattering albedo and Subsurface Radius times Subsurface Scale each channel's mean free path. `loadMargo` draws such a file with the plain PBR shader, which ignores them; `@margoengine/blender/pbr-ext` loads it with glTF Pro's physical material shader, which draws them:
+
+```ts
+import {createStage} from 'margoengine';
+import {loadMargoPBR} from 'margoengine/blender/pbr-ext';
+const stage = await createStage('#scene', {backend:'webgpu',capacity:4096});
+const model = await loadMargoPBR(stage.engine, '/pbr-ext.margo'); // the test scene in tests/fixtures
+window.addEventListener('pagehide', () => { model.dispose(); stage.dispose(); }, {once:true});
+```
+
+`parseMargoPBR(engine, bytes)` does the same from bytes; `margoMaterialExtensions` lists what the add-on writes. The physical shader's WGSL loads only with this entry. A real Blender 5.2.3 LTS export carries Blender's values (LIM-408; `tests/pbr-ext.test.js`), and on the GPU its glass plane shows the backdrop behind it.
 
 ## Characters: armatures, skins, shape keys and actions
 

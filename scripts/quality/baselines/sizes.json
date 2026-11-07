@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10577067,
+  "total": 10589322,
   "history": [
     {
       "date": "2026-10-24",
@@ -3674,6 +3674,12 @@
       "commit": "b48fb2e0a",
       "reason": "new entry @margoengine/scenery/presets, 977 B gzip",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "b75d2f233",
+      "reason": "blender/pbr-ext: new optional entry, loads .margo with glTF Pro's physical material shader",
+      "grew": 2
     }
   ],
   "items": {
@@ -3737,6 +3743,7 @@
     "@margoengine/blender": 4000,
     "@margoengine/blender/anim": 5097,
     "@margoengine/blender/components": 14727,
+    "@margoengine/blender/pbr-ext": 12254,
     "@margoengine/bvh": 23398,
     "@margoengine/bvh/alpha": 16873,
     "@margoengine/bvh/bake": 2583,
@@ -4413,6 +4420,7 @@
     "leak @margoengine/blender -> @margoengine/gltf-pro/model": 1,
     "leak @margoengine/blender/anim -> @margoengine/gltf-pro/model": 1,
     "leak @margoengine/blender/components -> @margoengine/gltf-pro/model": 1,
+    "leak @margoengine/blender/pbr-ext -> @margoengine/gltf-pro/model": 1,
     "leak @margoengine/controls -> @margoengine/bvh": 1,
     "leak @margoengine/controls/drag -> @margoengine/bvh": 1,
     "leak @margoengine/controls/third-person -> @margoengine/bvh": 1,

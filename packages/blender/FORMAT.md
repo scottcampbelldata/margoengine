@@ -47,6 +47,8 @@ The manifest uses glTF 2.0 conventions for `asset`, `nodes`, `scenes`, `scene`, 
 
 Nodes use TRS (quaternion xyzw) or an affine, non-sheared column-major matrix. They may reference meshes and use children with the existing PBR hierarchy rules. The exporter flattens evaluated world transforms to root-level TRS. Object metadata is `extras.margo: {id: string, properties: {...}}`; runtime handles are allocated independently.
 
+Materials may carry the glTF material extensions `KHR_materials_transmission`, `KHR_materials_ior`, `KHR_materials_clearcoat`, `KHR_materials_sheen`, `KHR_materials_diffuse_transmission`, `KHR_materials_volume` and `KHR_materials_volume_scatter` (draft), listed in the manifest's `extensionsUsed`, never `extensionsRequired`, so a reader that ignores them still draws the base PBR material. `@margoengine/blender/pbr-ext` draws them.
+
 ## PBR vertices: 20 Float32 values, 80 bytes (flags `0`)
 
 | Float offsets | Meaning |

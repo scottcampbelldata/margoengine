@@ -670,8 +670,71 @@ try {
   );
   results.push({ baked: { left, right, painted, plain } });
 
+  // Extended Principled inputs (real Blender 5.2.3 export): with @margoengine/blender/pbr-ext the glass plane
+  // (transmission 1) shows the green backdrop behind it; plain loadMargo draws the same plane as white plastic.
+  await page.route("**/pbr-ext.margo", async (route) =>
+    route.fulfill({
+      body: await readFile("packages/blender/tests/fixtures/pbr-ext.margo"),
+      contentType: "application/octet-stream",
+    }),
+  );
+  const glassShots = await page.evaluate(async () => {
+    const { Engine } = await import("/packages/core/dist/index.js");
+    const { loadMargo } = await import("/packages/blender/dist/index.js");
+    const { loadMargoPBR } = await import("/packages/blender/dist/pbr-ext.js");
+    const { waitForPipelines } = await import("/scripts/support/gpu-ready.js");
+    const shots = {};
+    for (const [name, load] of [["plain", loadMargo], ["physical", loadMargoPBR]]) {
+      const canvas = document.createElement("canvas");
+      canvas.style.cssText = "width:256px;height:256px";
+      document.body.append(canvas);
+      const engine = await Engine.create(canvas, {
+        backend: "webgpu",
+        capacity: 16,
+        camera: { position: [-2, 2, 0.001], target: [-2, 0, 0] },
+      });
+      engine.camera.up = [0, 0, -1];
+      engine.gpu.pushErrorScope("validation");
+      const model = await load(engine, "/pbr-ext.margo");
+      await waitForPipelines(async () => {
+        engine.render({ culling: false });
+        await engine.gpu.queue.onSubmittedWorkDone();
+      });
+      shots[name] = {
+        image: canvas.toDataURL(),
+        validation: (await engine.gpu.popErrorScope())?.message ?? null,
+      };
+      model.destroy();
+      engine.dispose();
+      canvas.remove();
+    }
+    return shots;
+  });
+  const glass = {};
+  for (const name of ["plain", "physical"]) {
+    assert.equal(glassShots[name].validation, null, name);
+    const bytes = Buffer.from(glassShots[name].image.split(",")[1], "base64");
+    await writeFile(`test-results/blender/pbr-ext-${name}.png`, bytes);
+    const image = await decodePNG(bytes),
+      sum = [0, 0, 0];
+    let count = 0;
+    for (let y = Math.round(0.45 * image.height); y < Math.round(0.55 * image.height); y++)
+      for (let x = Math.round(0.45 * image.width); x < Math.round(0.55 * image.width); x++, count++)
+        for (let c = 0; c < 3; c++) sum[c] += image.data[(y * image.width + x) * 4 + c];
+    glass[name] = sum.map((s) => s / count);
+  }
+  assert.ok(
+    glass.physical[1] > glass.physical[0] + 30 && glass.physical[1] > glass.physical[2] + 30,
+    `the glass does not show the green backdrop through it: ${glass.physical}`,
+  );
+  assert.ok(
+    Math.abs(glass.plain[0] - glass.plain[1]) < 30,
+    `plain loadMargo should draw the glass as white plastic: ${glass.plain}`,
+  );
+  results.push({ glass });
+
   for (let i = 0; i < results.length; i++) {
-    if (results[i].animated || results[i].components || results[i].baked) continue;
+    if (results[i].animated || results[i].components || results[i].baked || results[i].glass) continue;
     const screenshot = Buffer.from(
         results[i].screenshot.split(",")[1],
         "base64",

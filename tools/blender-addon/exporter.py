@@ -8,7 +8,7 @@ import bpy
 import numpy as np
 from mathutils import Matrix, Vector
 from .animation import animated, export_animated
-from .bake import bake_material
+from .bake import bake_material, principled
 from .writer import png, write
 
 
@@ -121,7 +121,8 @@ def export_scene(context, path, bake_size=1024):
         if shader.type != "BSDF_PRINCIPLED":
             failure(material, f"the surface is a {shader.bl_label} node, not a direct Principled BSDF", bake=True)
         supported = {"Base Color", "Metallic", "Roughness", "Alpha", "Normal", "Emission Color", "Emission Strength"}
-        defaults = {"IOR": 1.5, "Transmission Weight": 0, "Coat Weight": 0, "Sheen Weight": 0, "Subsurface Weight": 0, "Anisotropic IOR Level": 0, "Specular IOR Level": 0.5, "Specular Tint": (1, 1, 1, 1), "Coat Tint": (1, 1, 1, 1)}
+        # Transmission, IOR, coat, sheen and subsurface map to glTF material extensions (extended() below).
+        defaults = {"Anisotropic IOR Level": 0, "Specular IOR Level": 0.5, "Specular Tint": (1, 1, 1, 1)}
         for socket in shader.inputs:
             if socket.is_linked and socket.name not in supported:
                 failure(material, f"unsupported linked input {socket.name}")
@@ -172,7 +173,46 @@ def export_scene(context, path, bake_size=1024):
         if any(v < 0 or v > 1 for v in factor):
             failure(material, "HDR emission is unsupported; emissive factors must be in [0,1]")
         result["emissiveFactor"] = factor
+        extensions = extended(material, shader)
+        if extensions:
+            result["extensions"] = extensions
         result["name"] = material.name
+        return result
+
+    def extended(material, shader):
+        """The glTF material extensions of a Principled BSDF's transmission, IOR, coat, sheen and subsurface (constants;
+        a linked input of these already failed). Blender's Principled BSDF and glTF's extensions share one model: the
+        same IOR, a transmission weight, a coat layer of IOR 1.5, a sheen tint and roughness. Subsurface becomes
+        diffuse transmission into a scattering volume (KHR_materials_volume_scatter, a draft): the base colour is the
+        multiple-scattering albedo and the radius, times the scale, each channel's mean free path."""
+        value = lambda name: shader.inputs[name].default_value
+        result = {}
+        ior = value("IOR")
+        if not 1 <= ior <= 10:
+            failure(material, "IOR must be between 1 and 10")
+        if abs(ior - 1.5) > 1e-5:
+            result["KHR_materials_ior"] = {"ior": ior}
+        if value("Transmission Weight") > 0:
+            result["KHR_materials_transmission"] = {"transmissionFactor": value("Transmission Weight")}
+        if value("Coat Weight") > 0:
+            if abs(value("Coat IOR") - 1.5) > 1e-5 or any(abs(c - 1) > 1e-5 for c in value("Coat Tint")[:3]):
+                failure(material, "a coat needs Coat IOR 1.5 and a white Coat Tint, as glTF's clearcoat has")
+            if shader.inputs["Coat Normal"].is_linked:
+                failure(material, "a coat normal map is unsupported; the coat uses the surface normal")
+            result["KHR_materials_clearcoat"] = {"clearcoatFactor": value("Coat Weight"), "clearcoatRoughnessFactor": value("Coat Roughness")}
+        if value("Sheen Weight") > 0:
+            weight = value("Sheen Weight")
+            result["KHR_materials_sheen"] = {"sheenColorFactor": [min(1, c * weight) for c in value("Sheen Tint")[:3]], "sheenRoughnessFactor": value("Sheen Roughness")}
+        if value("Subsurface Weight") > 0:
+            radius = [r * value("Subsurface Scale") * unit_scale for r in value("Subsurface Radius")]
+            if min(radius) <= 0:
+                failure(material, "subsurface needs a positive radius and scale in every channel")
+            # One attenuation distance d with colours exp(-d / r) gives each channel extinction 1 / r.
+            distance = max(radius)
+            albedo = list(value("Base Color"))[:3]
+            result["KHR_materials_diffuse_transmission"] = {"diffuseTransmissionFactor": value("Subsurface Weight"), "diffuseTransmissionColorFactor": albedo}
+            result["KHR_materials_volume"] = {"thicknessFactor": distance, "attenuationDistance": distance, "attenuationColor": [math.exp(-distance / r) for r in radius]}
+            result["KHR_materials_volume_scatter"] = {"multiscatterColorFactor": albedo, "scatterAnisotropy": value("Subsurface Anisotropy")}
         return result
 
     needs = {}
@@ -208,6 +248,10 @@ def export_scene(context, path, bake_size=1024):
                 failure(material, "HDR emission is unsupported; baked emission must stay in [0,1]")
             result["emissiveTexture"] = {"index": baked_texture(bake["emission"], True)}
             result["emissiveFactor"] = [1, 1, 1]
+        shader = principled(material)[1]
+        extensions = extended(material, shader) if shader else {}
+        if extensions:
+            result["extensions"] = extensions
         # Texels no face covers (gaps between UV islands) are never drawn, so they do not make the material blend.
         covered = bake["base"][..., 3][bake["coverage"]] if bake["base"] is not None else None
         alpha = covered.min() if covered is not None and covered.size else pbr["baseColorFactor"][3]
@@ -427,4 +471,7 @@ def export_scene(context, path, bake_size=1024):
         raise ValueError("Too many exported objects")
     meshes = [node_of.meshes.get(i, {}) for i in range(len(geometry))]
     document = {"nodes": nodes, "meshes": meshes, "materials": materials, "textures": textures, "samplers": samplers, "scenes": [{"nodes": roots}], "scene": 0, **fields}
+    used = sorted({name for material in materials for name in material.get("extensions", {})})
+    if used:
+        document["extensionsUsed"] = used
     return write(path, document, geometry, images, animation)

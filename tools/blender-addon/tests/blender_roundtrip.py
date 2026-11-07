@@ -65,15 +65,18 @@ size = export_scene(bpy.context, asset)
 bpy.ops.export_scene.gltf(filepath=str(output / "native.glb"), export_format="GLB", export_tangents=True)
 assert asset.read_bytes() == (export_scene(bpy.context, output / "repeat.margo") and (output / "repeat.margo").read_bytes())
 previous = asset.read_bytes()
-shader.inputs["Transmission Weight"].default_value = 0.5
+# glTF's clearcoat has IOR 1.5, so another coat IOR fails by name instead of exporting a different coat.
+shader.inputs["Coat Weight"].default_value = 0.5
+shader.inputs["Coat IOR"].default_value = 1.8
 try:
     export_scene(bpy.context, asset)
 except ValueError as error:
-    assert "Transmission" in str(error)
+    assert "Coat IOR" in str(error)
 else:
-    raise AssertionError("Unsupported transmission was silently exported")
+    raise AssertionError("An unsupported coat IOR was silently exported")
 assert asset.read_bytes() == previous
-shader.inputs["Transmission Weight"].default_value = 0
+shader.inputs["Coat Weight"].default_value = 0
+shader.inputs["Coat IOR"].default_value = 1.5
 modifier = obj.modifiers.new("Evaluated subdivision", "SUBSURF")
 modifier.subdivision_type = "SIMPLE"
 modifier.levels = 1

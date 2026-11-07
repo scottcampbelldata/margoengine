@@ -38,6 +38,10 @@
     "./components": {
       "types": "./dist/components.d.ts",
       "import": "./dist/components.js"
+    },
+    "./pbr-ext": {
+      "types": "./dist/pbr-ext.d.ts",
+      "import": "./dist/pbr-ext.js"
     }
   },
   "scripts": {

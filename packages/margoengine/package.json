@@ -274,6 +274,10 @@
       "types": "./dist/blender/components.d.ts",
       "import": "./dist/blender/components.js"
     },
+    "./blender/pbr-ext": {
+      "types": "./dist/blender/pbr-ext.d.ts",
+      "import": "./dist/blender/pbr-ext.js"
+    },
     "./bvh": {
       "types": "./dist/bvh.d.ts",
       "import": "./dist/bvh.js"
