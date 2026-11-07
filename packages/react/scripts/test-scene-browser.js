@@ -69,7 +69,7 @@ try {
         assert.equal(physics.fbxExplicitColliders, 1);
         assert.equal(physics.ballColliders, 1);
         result.checks.push({
-          name: 'physics: real Rapier, geometry/bounds-derived FBX cuboid and explicit cuboid/ball collider children',
+          name: 'physics: the real solver, geometry/bounds-derived FBX cuboid and explicit cuboid/ball collider children',
           ...physics,
         });
       } else {

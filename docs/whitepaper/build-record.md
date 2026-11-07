@@ -1548,6 +1548,30 @@ Two jobs Scott approved on 2026-11-07. A core bug fix for `engine.stats`, and th
 - **Existing tests changed:** Mage and Seed-san join the strict figure test and the test gains a foot bound, 0.002 m, tighter than anything there; no tolerance rose. With the rod motor back four figures fail it; on reported velocities the new quiet test fails.
 - **Size:** `@margoengine/ragdoll/balance` grew for the knee spring and the hips' reading and its budget was raised for it: an optional entry; core and stage do not change.
 
+## Batch 122: physics P0, prep with Rapier still in place
+
+Five jobs that take every package off Rapier's own objects while Rapier still runs, so Margo's own solver can replace it in one commit. Nothing an app has breaks: `raw`, `physics.world`, `physics.rapier` and the `rapier` option stay in the physics packages until the switch.
+
+| # | Job | Status | Commit | Entry | Claim |
+| --- | --- | --- | --- | --- | --- |
+| 1 | `Physics.load()` and the React loader | DONE | `fddce13e6` | `physics`, `physics2d`, `stage/physics`, `react/physics`, `gltf-pro/physics` | - |
+| 2 | `PhysicsCollider`, `voxels` and `halfSpace` shapes, `voxel/physics` on them | DONE | `4b0f67a7b` | `physics`, `voxel/physics`, `gltf-pro/physics` | limits row Physics colliders |
+| 3 | Bodies on nested meshes and `follow` | DONE | `02dcab857` | `physics` | limits row Bodies below the root |
+| 4 | Colliders from a sprite's alpha | DONE | `3ecd92bc4` | `physics2d/outline` | limits row Colliders from alpha |
+| 5 | Joint `frameA` and `frameB`, ragdoll off `raw` | DONE | `4779c15fc` | `physics`, `ragdoll` | limits row Joint frames and solver figures |
+| - | `tests/physics-neutral.test.js`, this record | DONE | this commit | - | - |
+
+- **Proof asked for:** `tests/physics-neutral.test.js` runs in verify. No file under `packages/` outside the two physics packages names Rapier, apart from five listed files that say what an app installs today or guard the lazy import, each with its reason, and none reaches the solver through `raw`, `world` or `rapier`. An entry that stops matching fails, so the list only shrinks. It fails on one stray mention: it caught a test title in `packages/react/scripts/test-scene-browser.js`, changed here.
+- **Scope of that proof:** it reads `packages/`. `tools/create-margo` and `examples/package-benchmarks` still name Rapier, as the install line of the templates and in the benchmarks that measure it; no file there reaches `raw`, `physics.world` or `physics.rapier`. Those lines change with the switch. Inside the physics packages only `src` is meant to hold the solver, but their tests and READMEs name it too.
+- **Bugs fixed:** a body added before its parent lagged a frame: `packages/physics/tests/nested.test.js`. A frame that was no quaternion would have gone to the solver unchecked: `packages/physics/tests/frames.test.js`.
+- **Existing tests changed:** ragdoll's tests read the same figures through the public calls, and the assert of four corners under each foot is unchanged. Their `skip` path went with the import that needed it, so they now fail where the solver is missing: 88 pass, 0 skipped. Tests of voxel, glTF, stage and React moved the same way in jobs 1 to 3. No tolerance or time budget rose.
+- **Proved on real files:** the seven glTF_Physics samples through `packages/gltf-pro/tests/physics.test.js` on the final code, 30 pass, 0 fail, 0 skipped, with the samples set; a real Noto Emoji doughnut whose hole holds a ball; ragdoll on its real rigs.
+- **Stand-in or missing:** the seven samples state no licence at commit 9dc61cb3, so they stay out of the repository and their 10 tests skip without them; the recipe is in `packages/gltf-pro/tests/fixtures/physics/NOTICE.md`. The 11th gltf-pro skip is not physics: the tower capture of the splat tests.
+- **Sources not read:** Douglas-Peucker 1973 (the method comes from Hershberger and Snoeyink TR-92-07), Hertel-Mehlhorn, Maple 2003 past its abstract, and Whyatt and Wade: `docs/clean-room.md` says which and why.
+- **Size:** `@margoengine/physics` grew to 19,104 B gzip for job 5, and its budget with it: an optional entry; core and stage do not change.
+- **Unmeasured:** no speed was taken; none of this changes what the solver does each step.
+- **Gate:** lint, hygiene, verify, the tests of physics, ragdoll, gltf-pro, voxel, react and stage, the GPU tests of physics, gltf-pro extensions and react, the push from one script that stops at the first failing step. The first gate of job 5 stopped at verify on the installed Rapier types, where a solver contact point can be null; nothing was pushed.
+
 ## Batch 49: shadows
 
 Eight jobs for `@margoengine/shadows`, each proved on real glTF models or real elevation against Blender Cycles, a path tracer that shares no code with Margo.
