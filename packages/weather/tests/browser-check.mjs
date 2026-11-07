@@ -1,7 +1,8 @@
 // Real-GPU proof (run from the repository root after building packages, one GPU job at a time):
 //   node packages/weather/tests/browser-check.mjs [hail] [puddles] [snow] ...   (no name runs every check)
 // hail: hail draws on a real GPU, moves with time, repeats exactly for the same time and seed, leaves no trace when
-// off, and the WGSL surface functions match the JavaScript ones.
+// off, lit stones turn their bright side to the sun, splash chips burst where stones land, and the WGSL surface
+// functions match the JavaScript ones.
 // puddles: the puddle WGSL matches its JavaScript twin, and on core meshes dry ground is untouched, wet ground darkens,
 // water stands on the ground and not on walls, and rain rings it.
 // snow: the snow WGSL matches its JavaScript twin; no cover changes nothing, full cover whitens the ground and not a
@@ -23,7 +24,13 @@ const checks = {
       r.surface.cases >= 200 && r.surface.worst < 2e-5,
       `WGSL surface functions differ from JavaScript by ${r.surface.worst}`,
     );
-    return `hail ${r.hailChanged} pixels, moves ${r.movesWithTime}, surface worst ${r.surface.worst}`;
+    // A ball lit from the camera's side shows its lit half; from behind, only the ambient light and a thin rim.
+    assert.ok(r.litFront > 1.5 * r.litBack, `lit stones: ${r.litFront} toward the sun against ${r.litBack} away`);
+    // Flat stones ignore the sun; the scene behind them changes a little with it, so their light moves only by that.
+    assert.ok(Math.abs(r.flatFront / r.flatBack - 1) < 0.15, `flat stones: ${r.flatFront} and ${r.flatBack}`);
+    assert.ok(r.splashChanged > 30, `splash chips: ${r.splashChanged} pixels`);
+    assert.ok(r.splashLow > 0.8 * r.splashChanged, `chips stay near the ground: ${r.splashLow} of ${r.splashChanged} low`);
+    return `hail lit ${(r.litFront / r.litBack).toFixed(2)}x, flat ${(r.flatFront / r.flatBack).toFixed(3)}, chips ${r.splashChanged}; ${r.hailChanged} pixels, moves ${r.movesWithTime}, surface worst ${r.surface.worst}`;
   },
   puddles(r) {
     // Float32 against double: the relief and level carry about 1e-7 of error, which the 0.02-wide shore turns into at

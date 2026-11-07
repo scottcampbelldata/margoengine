@@ -149,12 +149,16 @@ wind, ground wetness and snow follow the place; `arrival(front, x, z)` gives the
 
 ## Hail
 
-`Hail.attach(engine, options)` (from `margoengine/weather/hail`, WebGPU only) draws stones that fall at `fallSpeed` (default 18 m/s), hit the ground at `groundY`, bounce twice (`restitution` 0.2) and stop. Every position is a closed-form function of time and the stone's index, so only one uniform block is uploaded per frame; stones are depth-tested against the scene and fade at the edge of the box that follows the camera. Options: `intensity`, `fadeSeconds`, `wind`, `groundY`, `radius`, `height`, `particles` (6,000 at intensity 1), `fallSpeed`, `restitution`, `stoneRadius`, `color`, `brightness`, `opacity`, `seed`; all are read each frame from `hail.options` and validated. `stoneState(tau, options)` is the same height and speed formula in JavaScript. Without an engine, `new Hail(options)` and `update(delta)` still ease `amount`.
+`Hail.attach(engine, options)` (from `margoengine/weather/hail`, WebGPU only) draws stones that fall at `fallSpeed` (default 18 m/s), hit the ground at `groundY`, bounce twice (`restitution` 0.2) and stop. Every position is a closed-form function of time and the stone's index, so only one uniform block is uploaded per frame; stones are depth-tested against the scene and fade at the edge of the box that follows the camera. Options: `intensity`, `fadeSeconds`, `wind`, `groundY`, `radius`, `height`, `particles` (6,000 at intensity 1), `fallSpeed`, `restitution`, `stoneRadius`, `color`, `brightness`, `opacity`, `seed`, `lit` and `splashes`; all are read each frame from `hail.options` and validated.
+
+Stones are lit (`lit`, default true) as small ice balls by the engine's light (`engine.lighting`: the sun's direction, strength and colour, and the ambient light): Lambert diffuse on the side toward the sun, a glint of it, and the far side in the stone's own shadow, lit only by the ambient; `lit: false` keeps the flat `color`. Where a stone first lands, `splashes` ice chips (4, at most 8) burst out at 0.6 to 1.8 m/s and 1 to 2.5 m/s upward and fall back under gravity, fading over `SPLASH_SECONDS` (0.35 s); like the stones they are a closed-form function of time, drawn in the same instanced draw. `stoneState(tau, options)` is the same height and speed formula in JavaScript. Without an engine, `new Hail(options)` and `update(delta)` still ease `amount`.
 
 ## Limits
 
 - While rain and snow both fall (a rain-to-snow blend, or the `sleet` preset) `skyWeather` gives the sky's `Weather` `precipitation: 'sleet'`, their sum as `intensity` (at most 1) and the snow's part of it as `snowShare`, so the rain thins as the snow thickens; the sky draws each kind with its share. Hail is drawn alongside either.
-- Hail stones are camera-facing streaks with no lighting or shadows and no splash where they land. The box around the camera is at most 400 m across; stones outside it do not exist.
+- Lit hail stones are shaded as balls by the engine's one sun and its ambient light: they cast no shadows and are not
+  shaded by the scene's shadows (a stone under a roof is lit as in the open); a splash is four chips per stone, not a
+  bounce off the surface it hits. The box around the camera is at most 400 m across; stones outside it do not exist.
 - Puddles stand in the low spots of a procedural relief, not of your geometry, and on every flat core mesh, roofs
   included: there is no cover (water stands under a roof too) and no flow. They draw on core meshes, not glTF-pro
   models or other packages' own shaders. Rings tilt the normal only; the water has no depth, refraction or reflection

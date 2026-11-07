@@ -1,7 +1,7 @@
 // The hail stone's path in JavaScript (the same formulas as the shader): fall, two bounces, rest.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { hailCycle, stoneState } from '../dist/hail.js';
+import { SPLASH_SECONDS, hailCycle, stoneState, validateHail } from '../dist/hail.js';
 
 const near = (a, b, tolerance = 1e-9) => assert.ok(Math.abs(a - b) <= tolerance, `${a} vs ${b}`);
 const random = (seed) => () => {
@@ -51,4 +51,13 @@ test('property: a stone is never below the ground or above its start or first bo
       previous = now;
     }
   }
+});
+
+test('lit and splashes options are checked', () => {
+  validateHail({ lit: false, splashes: 0 });
+  validateHail({ splashes: 8 });
+  assert.throws(() => validateHail({ splashes: 9 }), RangeError);
+  assert.throws(() => validateHail({ splashes: 1.5 }), /whole number/);
+  assert.throws(() => validateHail({ lit: 1 }), TypeError);
+  assert.ok(SPLASH_SECONDS > 0 && SPLASH_SECONDS < 1);
 });

@@ -22,6 +22,7 @@ async function read(texture){
  await staging.mapAsync(GPUMapMode.READ);const data=new Float32Array(staging.getMappedRange()).slice();staging.unmap();output.destroy();staging.destroy();return data;
 }
 async function shot(delta=1/60){engine.render({delta});await device.queue.onSubmittedWorkDone();return read(post.sceneTexture);}
+const gain=(a,b)=>{let sum=0;for(let p=0;p<a.length;p+=4)sum+=Math.max(0,b[p]+b[p+1]+b[p+2]-a[p]-a[p+1]-a[p+2]);return sum;};
 const changed=(a,b)=>{let n=0;for(let p=0;p<a.length;p+=4)if(Math.abs(a[p]-b[p])+Math.abs(a[p+1]-b[p+1])+Math.abs(a[p+2]-b[p+2])>1e-4)n++;return n;};
 // The surface functions on the GPU: a grid of (roughness, normalY, wetness, snow cover) through weather_surface.
 async function surface(){
@@ -41,7 +42,7 @@ window.check={
  async run(){
   const out={};device.pushErrorScope('validation');
   const clear=await shot();
-  const hail=new Hail({intensity:1,fadeSeconds:0,particles:20000,opacity:1,brightness:3,wind:[4,0],seed:5});
+  const hail=new Hail({intensity:1,fadeSeconds:0,particles:20000,opacity:1,brightness:3,wind:[4,0],seed:5,splashes:0});
   engine.use(hail);
   await shot();const a=await shot(1/60);
   out.pixels=clear.length/4;out.hailChanged=changed(clear,a);
@@ -54,6 +55,18 @@ window.check={
   hail.options.height=30;
   hail.options.intensity=0;await shot();out.zero=changed(clear,await shot());
   hail.options.intensity=1;await shot();
+  // Lighting: the stones' light over the scene with the sun on the camera's side of them and behind them. Lit stones
+  // turn their bright side to a sun behind the camera; flat ones give nearly the same light either way.
+  hail.options.wind=[0,0];hail.options.splashes=0;
+  const L=engine.lighting.direction,keep=[...L];
+  async function stoneLight(sun){L.set(sun);hail.options.intensity=0;const base=await shot(0);hail.options.intensity=1;const lit=await shot(0);return gain(base,lit);}
+  hail.options.lit=true;out.litFront=await stoneLight([0,0.3,1,3]);out.litBack=await stoneLight([0,0.3,-1,3]);
+  hail.options.lit=false;out.flatFront=await stoneLight([0,0.3,1,3]);out.flatBack=await stoneLight([0,0.3,-1,3]);
+  L.set(keep);hail.options.lit=true;
+  // Splashes: chips where stones land, at the same moment with and without them.
+  const plain=await shot(0);hail.options.splashes=4;const chips=await shot(0);out.splashChanged=changed(plain,chips);
+  let nearGround=0;const W=post.sceneTexture.width;for(let p=0;p<plain.length;p+=4)if(Math.abs(plain[p]-chips[p])+Math.abs(plain[p+1]-chips[p+1])+Math.abs(plain[p+2]-chips[p+2])>1e-4&&Math.floor(p/4/W)>post.sceneTexture.height*0.45)nearGround++;
+  out.splashLow=nearGround;
   hail.dispose();await shot();out.afterDispose=changed(clear,await shot());
   out.surface=await surface();
   const error=await device.popErrorScope();

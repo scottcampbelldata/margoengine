@@ -41,7 +41,11 @@ export interface HailOptions {
     brightness?: number;
     opacity?: number;
     seed?: number;
+    lit?: boolean;
+    splashes?: number;
 }
+
+export const SPLASH_SECONDS = 0.35;
 
 export function hailCycle(o?: HailOptions): number;
 

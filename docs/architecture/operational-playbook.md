@@ -666,6 +666,12 @@ replaced has no such line, and the snow there is colour and grain only. One 48-b
 Evidence: `browser-check.mjs` snow on a Radeon 680M at 4x and 1x (the plate's edge rises where the camera projects
 it, snow with puddles on one shader). Missing: other GPUs, timing, the slit on split-normal meshes.
 
+Hail lighting and splashes (2026-11-07): `Hail` reads `engine.lighting` each frame into its uniform (now 240 bytes) and
+shades each stone in its fragment stage as a ball, its normal built from the place across the streak; splash chips are
+extra instances of the same `ParticleOverlay` draw (stones times one plus `splashes`), each a closed-form ballistic path
+from its stone's first landing. Evidence: `browser-check.mjs` hail on a Radeon 680M (lit 9.5 times brighter toward the
+sun than away, flat unchanged by it, chips near the ground). Missing: other GPUs, timing, scene shadows on stones.
+
 AstroSky (`@margoengine/sky/astro`, 2026-11-07) is a `ParticleOverlay` draw at frame graph order 2.5, after the sky's
 pass and before fog: one storage buffer of three vec4 a point (the J2000 vector and magnitude, colour, proper motion a
 Julian year; the seven planets the last points, rewritten each frame), the sky matrix (precession, nutation, sidereal

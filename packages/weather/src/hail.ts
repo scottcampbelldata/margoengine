@@ -17,6 +17,9 @@ import { viewSize } from '../../shared/view-rect.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 type HailPassContext = Extract<PassContext, { backend: 'webgpu' }>;
 
+/** Seconds an ice chip of a splash flies. */
+export const SPLASH_SECONDS = 0.35;
+
 /** Gravity in metres per second squared, used for the bounces. */
 export const GRAVITY = 9.81;
 
@@ -50,19 +53,34 @@ export interface HailOptions {
   opacity?: number;
   /** Seed of the stone placement; the same seed and times give the same storm. Default 1. */
   seed?: number;
+  /**
+   * Light the stones as small ice balls by the engine's sun and ambient light (`engine.lighting`): the side toward the
+   * sun bright with a glint, the far side in its own shadow. False draws them in flat `color` as before. Default true.
+   */
+  lit?: boolean;
+  /** Ice chips that burst from each stone where it first lands, 0..8; each flies out and falls back in about a third of a second. Default 4. */
+  splashes?: number;
 }
 
 const shader = /* wgsl */ `
 struct Hail {
  camera:mat4x4f, eye:vec4f, volume:vec4f, motion:vec4f, colour:vec4f, screen:vec4f, params:vec4f, extra:vec4f,
+ light:vec4f, radiance:vec4f, ambient:vec4f, splash:vec4f,
 }
 @group(0) @binding(0) var<uniform> h:Hail;
-struct Out {@builtin(position) position:vec4f,@location(0) uv:vec2f,@location(1) alpha:f32}
+struct Out {@builtin(position) position:vec4f,@location(0) uv:vec2f,@location(1) alpha:f32,@location(2) across:vec3f,@location(3) view:vec3f}
 fn pcg(v:u32)->u32 {let s=v*747796405u+2891336453u;let x=((s>>((s>>28u)+4u))^s)*277803737u;return (x>>22u)^x;}
 fn rnd(i:u32,cycle:u32,k:u32)->f32 {return f32(pcg(pcg(i*4u+k+bitcast<u32>(h.params.y))^(cycle*2654435761u))>>8u)*5.9604645e-8;}
 const corners=array<vec2f,6>(vec2f(-1,-1),vec2f(1,-1),vec2f(-1,1),vec2f(-1,1),vec2f(1,-1),vec2f(1,1));
-const culled=Out(vec4f(2,2,2,1),vec2f(0),0.0);
-@vertex fn vertex(@builtin(vertex_index) vi:u32,@builtin(instance_index) ii:u32)->Out {
+const culled=Out(vec4f(2,2,2,1),vec2f(0),0.0,vec3f(0),vec3f(0));
+// A stone's place in the box around the camera: its start drifted by the wind and wrapped to the box; .y is how near
+// the box's edge it is (0 at the centre, 0.5 at the edge).
+fn place(start:vec2f,drift:f32)->vec3f {
+ let size=h.volume.xyz;let wind=vec2f(h.motion.x,h.motion.z);
+ let rel=fract((start+wind*drift-h.eye.xz)/size.xz)-0.5;
+ return vec3f(h.eye.x+rel.x*size.x,max(abs(rel.x),abs(rel.y)),h.eye.z+rel.y*size.z);
+}
+@vertex fn vertex(@builtin(vertex_index) vi:u32,@builtin(instance_index) index:u32)->Out {
  let corner=corners[vi];
  let size=h.volume.xyz;
  let ground=h.volume.w;
@@ -70,44 +88,67 @@ const culled=Out(vec4f(2,2,2,1),vec2f(0),0.0);
  let e=h.motion.w;
  let g=h.params.w;
  let L=h.params.z;
+ let stones=u32(h.splash.x);
+ let chips=max(1u,u32(h.splash.y));
+ // Instances past the stones are the chips: chip j of stone ii.
+ let chip=index>=stones;
+ let ii=select(index,(index-stones)/chips,chip);
  // Each stone repeats a cycle of L seconds (fall, two bounces, a short rest) at its own phase; a new cycle takes a new place.
  let x=rnd(ii,0u,0u)+h.params.x/L;
  let cyc=u32(floor(x));
  let tau=fract(x)*L;
  let tf=size.y/fall;
- let vb1=e*fall;
- let tb1=2.0*vb1/g;
- let vb2=e*vb1;
- let tb2=2.0*vb2/g;
- var y=ground;
- var vy=0.0;
- var drift=min(tau,tf);
- if(tau<tf){y=ground+size.y-fall*tau;vy=-fall;}
- else{
-  let s1=tau-tf;
-  drift+=0.3*(tau-tf);
-  if(s1<tb1){y=ground+vb1*s1-0.5*g*s1*s1;vy=vb1-g*s1;}
+ let start=vec2f(rnd(ii,cyc,1u),rnd(ii,cyc,2u))*size.xz;
+ var q:vec3f;var velocity:vec3f;var radius:f32;var edge:f32;var life=1.0;
+ if(chip){
+  // A chip flies out from where its stone first lands and falls back under gravity for h.splash.z seconds.
+  let j=(index-stones)%chips;
+  let s=tau-tf;
+  if(s<0.0||s>h.splash.z){return culled;}
+  let angle=6.2831853*(f32(j)+rnd(ii,cyc,8u+j))/f32(chips);
+  let out=(0.6+1.2*rnd(ii,cyc,16u+j))*vec2f(cos(angle),sin(angle));
+  let up=1.0+1.5*rnd(ii,cyc,24u+j);
+  let y=ground+up*s-0.5*g*s*s;
+  if(y<ground){return culled;}
+  let p=place(start,tf);
+  q=vec3f(p.x+out.x*s,y,p.z+out.y*s);
+  velocity=vec3f(out.x,up-g*s,out.y);
+  edge=p.y;
+  radius=h.screen.w*0.4*(0.6+0.8*rnd(ii,cyc,32u+j));
+  life=1.0-s/h.splash.z;
+ }else{
+  let vb1=e*fall;
+  let tb1=2.0*vb1/g;
+  let vb2=e*vb1;
+  let tb2=2.0*vb2/g;
+  var y=ground;
+  var vy=0.0;
+  var drift=min(tau,tf);
+  if(tau<tf){y=ground+size.y-fall*tau;vy=-fall;}
   else{
-   let s2=s1-tb1;
-   if(s2<tb2){y=ground+vb2*s2-0.5*g*s2*s2;vy=vb2-g*s2;}
-   else{return culled;}
+   let s1=tau-tf;
+   drift+=0.3*(tau-tf);
+   if(s1<tb1){y=ground+vb1*s1-0.5*g*s1*s1;vy=vb1-g*s1;}
+   else{
+    let s2=s1-tb1;
+    if(s2<tb2){y=ground+vb2*s2-0.5*g*s2*s2;vy=vb2-g*s2;}
+    else{return culled;}
+   }
   }
+  let p=place(start,drift);
+  q=vec3f(p.x,y,p.z);
+  edge=p.y;
+  let moving=select(0.3,1.0,tau<tf);
+  velocity=vec3f(h.motion.x*moving,vy,h.motion.z*moving);
+  radius=h.screen.w*(0.6+0.8*rnd(ii,0u,3u));
  }
- let wind=vec2f(h.motion.x,h.motion.z);
- let startXZ=vec2f(rnd(ii,cyc,1u),rnd(ii,cyc,2u))*size.xz;
- let rel=fract((startXZ+wind*drift-h.eye.xz)/size.xz)-0.5;
- let q=vec3f(h.eye.x+rel.x*size.x,y,h.eye.z+rel.y*size.z);
- let edge=max(abs(rel.x),abs(rel.y));
  let nearDistance=length(q-h.eye.xyz);
- let fade=(1.0-smoothstep(0.7,1.0,edge*2.0))*smoothstep(0.5,2.5,nearDistance);
- let moving=select(0.3,1.0,tau<tf);
- let velocity=vec3f(wind.x*moving,vy,wind.y*moving);
+ let fade=(1.0-smoothstep(0.7,1.0,edge*2.0))*smoothstep(0.5,2.5,nearDistance)*life;
  let tail=q-velocity*h.extra.x;
  let vp=h.screen.xy;
  let a=h.camera*vec4f(q,1);
  let b=h.camera*vec4f(tail,1);
  if(a.w<0.1||b.w<0.1){return culled;}
- let radius=h.screen.w*(0.6+0.8*rnd(ii,0u,3u));
  let halfWidth=max(radius*h.screen.z/a.w,h.extra.y);
  let pa=a.xy/a.w*vp*0.5;
  let pb=b.xy/b.w*vp*0.5;
@@ -120,16 +161,32 @@ const culled=Out(vec4f(2,2,2,1),vec2f(0),0.0);
  let base=select(pb+dir*halfWidth,pa-dir*halfWidth,head);
  let ndc=(base+normal*corner.x*halfWidth)*2.0/vp;
  let c=select(b,a,head);
- var out:Out;
- out.position=vec4f(ndc*c.w,c.z,c.w);
- out.uv=vec2f(corner.x,select(0.0,1.0,head));
+ var o:Out;
+ o.position=vec4f(ndc*c.w,c.z,c.w);
+ o.uv=vec2f(corner.x,select(0.0,1.0,head));
  // A stone smaller than a pixel fades instead of sparkling.
- out.alpha=fade*min(1.0,radius*h.screen.z/a.w/h.extra.y)*(0.7+0.3*rnd(ii,0u,3u));
- return out;
+ o.alpha=fade*min(1.0,radius*h.screen.z/a.w/h.extra.y)*(0.7+0.3*rnd(ii,0u,3u));
+ // The ball's normal across the streak: the world direction of the quad's width, and toward the eye.
+ let toEye=normalize(h.eye.xyz-q);
+ let side=cross(toEye,select(vec3f(0,1,0),velocity/max(length(velocity),1e-6),length(velocity)>0.001));
+ o.across=select(normalize(cross(toEye,vec3f(1,0,0))),side/max(length(side),1e-6),length(side)>0.001);
+ o.view=toEye;
+ return o;
 }
 @fragment fn fragment(i:Out)->@location(0) vec4f {
  let a=i.alpha*h.colour.w*(1.0-i.uv.x*i.uv.x);
- return vec4f(h.colour.rgb*(1.0+h.extra.z*6.0),a);
+ var shade=vec3f(1.0+h.extra.z*6.0);
+ if(h.extra.w>0.5){
+  // Lit: the ball's normal from the place across the streak; Lambert diffuse from the sun plus the ambient light, so the
+  // side away from the sun lies in the stone's own shadow, and a Blinn-Phong glint of the sun on the ice.
+  let n=normalize(i.across*i.uv.x+i.view*sqrt(max(0.0,1.0-i.uv.x*i.uv.x)));
+  let l=normalize(h.light.xyz);
+  let sun=h.radiance.rgb*h.light.w;
+  let diffuse=max(dot(n,l),0.0);
+  let glint=pow(max(dot(n,normalize(l+i.view)),0.0),40.0)*0.6;
+  shade=h.ambient.rgb*h.radiance.w+sun*(diffuse/3.14159265+glint)+vec3f(h.extra.z*6.0);
+ }
+ return vec4f(h.colour.rgb*shade,a);
 }`;
 
 const number = (value: unknown, name: string, min: number, max: number): void => {
@@ -153,6 +210,12 @@ export function validateHail(o: HailOptions): void {
   if (o.brightness !== undefined) number(o.brightness, 'brightness', 0, 1e6);
   if (o.opacity !== undefined) number(o.opacity, 'opacity', 0, 1);
   if (o.seed !== undefined) number(o.seed, 'seed', -2147483648, 4294967295);
+  if (o.splashes !== undefined) {
+    number(o.splashes, 'splashes', 0, 8);
+    if (!Number.isInteger(o.splashes))
+      throw new RangeError('Hail splashes must be a whole number from 0 to 8; pass 0 to turn them off');
+  }
+  if (o.lit !== undefined && typeof o.lit !== 'boolean') throw new TypeError('Hail lit must be true or false');
   if (o.wind !== undefined) {
     if (!Array.isArray(o.wind) || o.wind.length !== 2)
       throw new TypeError('Hail wind needs [x, z] in metres per second; pass an array of two numbers');
@@ -209,7 +272,7 @@ export class Hail implements EnginePlugin {
   private readonly overlay = new ParticleOverlay();
   private engine?: Engine;
   private uniform?: GPUBuffer;
-  private readonly values = new Float32Array(44);
+  private readonly values = new Float32Array(60);
   private disposed = false;
   private clock = 0;
   private level = 0;
@@ -326,8 +389,19 @@ export class Hail implements EnginePlugin {
     v[40] = 0.014; // streak: seconds of motion drawn behind a stone
     v[41] = Math.max(0.75, tall / 1080); // smallest half width in pixels
     v[42] = Math.min(1, this.lift);
-    v[43] = 0;
-    this.overlay.draw(c, shader, this.uniform!, v as Float32Array<ArrayBuffer>, count);
+    v[43] = (o.lit ?? true) ? 1 : 0;
+    // Lit stones take the scene's light: core's sun direction and strength, its colour, the ambient strength and colour.
+    const light = this.engine?.lighting,
+      chips = o.splashes ?? 4;
+    v.set(light?.direction ?? [3, 5, 4, 3], 44);
+    v.set(light?.radiance ?? [1, 1, 1, 0.15], 48);
+    v.set(light?.ambient ?? [1, 1, 1], 52);
+    v[55] = 0;
+    v[56] = count;
+    v[57] = chips;
+    v[58] = SPLASH_SECONDS;
+    v[59] = 0;
+    this.overlay.draw(c, shader, this.uniform!, v as Float32Array<ArrayBuffer>, count * (1 + chips));
   }
 
   private release(): void {
