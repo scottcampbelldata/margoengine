@@ -1212,6 +1212,7 @@ An audit of the finished batches against their job text listed 70 gaps for the H
 | README 1 | last README error, Skeleton in rigging types | DONE | `3cd3d347d` | - |
 | README stand-ins | README examples run as pasted | DONE | `831d00371` | - |
 | B20 | Kits and materials emit no Draco or Basis file | DONE | this commit | - |
+| B23 | engine.pick in a loop documented, pickMany is the batch | DONE | this commit | - |
 
 ## LAZ: one LAS reader, and every point format on a real file
 

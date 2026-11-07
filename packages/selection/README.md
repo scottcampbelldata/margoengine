@@ -37,6 +37,8 @@ The center wins. For an empty center, orthogonal neighbors win before diagonals,
 
 ## Many points at once
 
+A plain loop of `engine.pick`, awaited or under `Promise.all`, costs one readback a point and this package cannot merge them: core's queue answers overlapping picks one at a time and calls `onPick` for the next only when the last has finished, so a plugin never sees two at once. Merging them would be a core change.
+
 `picking.pickMany(points)` answers many canvas CSS pixels from one GPU readback, where a loop of `engine.pick` waits for one
 readback each. It answers what `engine.pick` answers, as `PickHit`s, in
 order, with null for a miss or a point off the canvas. All points read the scene as it is at the call's turn in the pick
