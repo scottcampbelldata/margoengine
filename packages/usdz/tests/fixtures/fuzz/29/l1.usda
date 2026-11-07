@@ -1,0 +1,63 @@
+#usda 1.0
+(
+    defaultPrim = "M"
+)
+class "C"
+{
+    custom double v1 = 350
+    custom rel r = [</Y>]
+}
+def "Shared"
+{
+    custom double v0 = 841
+    custom double v2.timeSamples = { 1: 63, 9: 80 }
+    custom double v3 = 144
+    over "b"
+    {
+        custom double v2.timeSamples = { 1: 58, 5: 56 }
+    }
+    def "c" (
+        variantSets = "vs"
+        variants = { string vs = "x" }
+    )
+    {
+        custom double v0 = 791
+        custom double v1.timeSamples = { 0: 32, 8: 11 }
+        custom double v3.timeSamples = { 0: 81, 9: 19 }
+        variantSet "vs" = {
+            "x" {
+                custom double v0 = 916
+                custom double v1 = 981
+                custom double v2 = 394
+                custom double v3 = 837
+            }
+            "y" {
+                custom double v1 = 195
+                custom double v3 = 697
+            }
+        }
+    }
+}
+def "M"
+{
+    custom double v1 = 345
+    custom double v2 = 327
+    custom double v3 = None
+}
+def "Y" (
+    prepend inherits = </C>
+    specializes = </C>
+)
+{
+    custom double v0 = 830
+    custom double v1 = 237
+    custom double v2 = 689
+    custom double v3.timeSamples = { 3: 18, 9: 85 }
+    def "b" (
+        prepend inherits = </C>
+    )
+    {
+        custom double v0 = 672
+        custom double v1 = 296
+    }
+}

@@ -1,0 +1,157 @@
+#usda 1.0
+(
+    defaultPrim = "M"
+)
+class "C"
+{
+    custom double v0 = 637
+    custom double v1.timeSamples = { 3: 83, 9: 40 }
+    custom double v3.timeSamples = { 1: 67, 8: 15 }
+}
+def "Shared"
+{
+    custom double v0 = 996
+    custom double v2 = 795
+    custom double v3.timeSamples = { 0: 13, 9: 16 }
+}
+def "M" (
+    prepend references = @./l0.usda@</M/a> (offset = 10)
+)
+{
+    custom double v1 = 510
+    custom double v2 = 887
+    add rel r = [</Shared>]
+    def "b" (
+        append inherits = </C/a>
+    )
+    {
+        custom double v0 = 676
+        custom double v2 = 82
+        custom double v3 = 884
+        append rel r = [</C/b>]
+        over "a" (
+            inherits = </C>
+            append references = @./l0.usda@</M>
+        )
+        {
+            custom double v0 = 144
+            custom double v1.timeSamples = { 2: 5, 6: 66 }
+            custom double v2 = 916
+        }
+        def "b" (
+            references = </Shared>
+        )
+        {
+        }
+    }
+    def "c" (
+        specializes = </C>
+        variantSets = "vs"
+        variants = { string vs = "x" }
+    )
+    {
+        custom double v1 = 645
+        custom double v2 = None
+        custom double v3 = 98
+        custom rel r = [</C/b>]
+        over "b" (
+            append references = @./l0.usda@</M>
+            references = </Shared>
+        )
+        {
+            custom double v1 = 183
+            custom double v2 = None
+        }
+        def "c" (
+            payload = @./l0.usda@ (offset = 10)
+        )
+        {
+            custom double v0 = 365
+            custom double v1 = 283
+            custom double v2 = None
+            custom double v3 = 786
+            prepend rel r = [</Shared>]
+        }
+        variantSet "vs" = {
+            "x" {
+                custom double v0 = 836
+                custom double v1 = 214
+                custom double v2 = 453
+                custom double v3 = 717
+            }
+            "y" {
+                custom double v0 = 381
+                custom double v1 = None
+                custom double v2 = 789
+                def "c" (
+                    prepend inherits = </C/a>
+                    variantSets = "vs"
+                    variants = { string vs = "y" }
+                )
+                {
+                    custom double v1 = 137
+                    custom double v2.timeSamples = { 0: 48, 6: 53 }
+                    prepend rel r = [</M/a>]
+                    variantSet "vs" = {
+                        "x" {
+                            custom double v1.timeSamples = { 3: 91, 7: 59 }
+                            custom double v2 = 42
+                            add rel r = [</C/b>]
+                            def "c" (
+                                prepend references = @./l0.usda@</M/a>
+                            )
+                            {
+                                custom double v0 = 835
+                            }
+                        }
+                        "y" {
+                            custom double v1.timeSamples = { 3: 81, 5: 81 }
+                            custom double v2 = 173
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+over "Y" (
+    payload = @./l0.usda@</M> (offset = 3; scale = 2)
+    references = </M>
+)
+{
+    custom double v0 = None
+    custom double v2 = 902
+    custom double v3.timeSamples = { 2: 90, 8: 57 }
+    add rel r = [</M/a>]
+    def "b" (
+        references = @./l0.usda@</M> (offset = 10)
+    )
+    {
+        custom double v0 = 376
+        custom double v1 = 630
+    }
+    def "c" (
+        variantSets = "vs"
+        variants = { string vs = "x" }
+    )
+    {
+        custom double v1 = 377
+        custom double v2 = 368
+        variantSet "vs" = {
+            "x" {
+                custom double v0 = 25
+                custom double v2.timeSamples = { 1: 96, 7: 77 }
+                custom double v3 = 579
+                def "b"
+                {
+                    custom double v1 = 993
+                    custom double v2.timeSamples = { 1: 84, 9: 58 }
+                }
+            }
+            "y" {
+                custom double v0 = 792
+                custom double v1 = 174
+            }
+        }
+    }
+}

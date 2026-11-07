@@ -183,6 +183,10 @@ const ASSETS = [
   ['tools/create-margo/templates/game/public/pete-LICENSE.txt', 'game starter character (Kay Lousberg, KayKit, CC0)'],
   ['packages/environment/tests/fixtures/NOTICE.md', 'test fixtures: OpenEXR test images (BSD-3-Clause)'],
   [
+    'packages/usdz/tests/fixtures/real/NOTICE.md',
+    'test fixtures: USD composition scenes of https://github.com/usd-wg/assets, commit 091bb5c6 (Apache-2.0, Alliance for OpenUSD working group), with what OpenUSD 26.08 reads from them',
+  ],
+  [
     'packages/fbx/test/fixtures/README.md',
     'test fixtures: original FBX scenes exported for this project by Blender 5.3 from the scripts beside them (CC0 1.0)',
   ],

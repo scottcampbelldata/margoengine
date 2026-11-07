@@ -1,0 +1,181 @@
+#usda 1.0
+(
+    defaultPrim = "M"
+)
+class "C"
+{
+    custom double v3.timeSamples = { 0: 61, 7: 4 }
+    over "b"
+    {
+        custom double v0 = 513
+        custom double v1 = None
+        custom double v3 = 144
+        over "b" (
+            variantSets = "vs"
+        )
+        {
+            custom double v0.timeSamples = { 3: 95, 9: 30 }
+            variantSet "vs" = {
+                "x" {
+                    custom double v0 = 692
+                    custom double v1.timeSamples = { 3: 23, 6: 92 }
+                    custom double v2 = 855
+                    custom double v3 = 959
+                    def "c" (
+                        variantSets = "vs"
+                        variants = { string vs = "x" }
+                    )
+                    {
+                        custom double v0.timeSamples = { 0: 33, 4: 55 }
+                        custom double v2 = 858
+                        custom double v3 = 742
+                        variantSet "vs" = {
+                            "x" {
+                                custom double v0 = None
+                                def "a" (
+                                    variantSets = "vs"
+                                )
+                                {
+                                    custom double v1 = 793
+                                    variantSet "vs" = {
+                                        "x" {
+                                            custom double v0 = 146
+                                            custom double v1 = 837
+                                            custom double v2.timeSamples = { 1: 24, 5: 70 }
+                                            def "a"
+                                            {
+                                                custom double v0 = 928
+                                                custom double v1 = None
+                                                custom double v2 = 433
+                                                prepend rel r = [</Shared>]
+                                            }
+                                        }
+                                        "y" {
+                                            custom double v1 = 35
+                                            custom double v2.timeSamples = { 0: 26, 6: 74 }
+                                        }
+                                    }
+                                }
+                            }
+                            "y" {
+                                custom double v0.timeSamples = { 3: 3, 5: 68 }
+                                custom double v1 = 997
+                                custom double v2.timeSamples = { 0: 9, 9: 28 }
+                                custom double v3.timeSamples = { 0: 68, 8: 16 }
+                                custom rel r = [</Y>]
+                                def "a"
+                                {
+                                    custom double v0 = 79
+                                    custom double v1 = 462
+                                    custom double v2.timeSamples = { 0: 47, 4: 51 }
+                                    custom rel r = [</M/a>]
+                                }
+                            }
+                        }
+                    }
+                }
+                "y" {
+                    custom double v1 = 331
+                    custom double v2 = 557
+                    add rel r = [</Shared>]
+                    def "c"
+                    {
+                        custom double v1 = None
+                        custom double v3 = None
+                    }
+                }
+            }
+        }
+        def "c"
+        {
+            custom double v2.timeSamples = { 0: 43, 9: 67 }
+        }
+    }
+}
+def "Shared" (
+    variantSets = "vs"
+)
+{
+    custom double v0 = 114
+    custom double v1.timeSamples = { 0: 34, 7: 6 }
+    def "c"
+    {
+        custom double v0.timeSamples = { 1: 35, 7: 86 }
+        custom double v2 = None
+        custom double v3 = 643
+    }
+    variantSet "vs" = {
+        "x" {
+            custom double v0.timeSamples = { 3: 70, 6: 66 }
+            custom double v3.timeSamples = { 1: 72, 5: 85 }
+            append rel r = [</M/a>]
+            def "b" (
+                variantSets = "vs"
+                variants = { string vs = "x" }
+            )
+            {
+                custom double v0 = 505
+                custom double v1 = None
+                variantSet "vs" = {
+                    "x" {
+                        custom double v0 = 942
+                        custom double v1 = 413
+                        custom double v2 = 52
+                        custom double v3 = 294
+                    }
+                    "y" {
+                        custom double v0 = 410
+                        custom double v2.timeSamples = { 3: 93, 4: 6 }
+                        def "b"
+                        {
+                            custom double v1 = 475
+                            custom double v2.timeSamples = { 2: 60, 6: 18 }
+                            custom double v3 = 708
+                        }
+                    }
+                }
+            }
+        }
+        "y" {
+            custom double v2 = 340
+            custom double v3 = 625
+        }
+    }
+}
+def "M" (
+    references = </Shared>
+)
+{
+    custom double v0 = None
+    custom double v1 = 597
+    custom double v3 = 845
+}
+over "Y" (
+    inherits = </C>
+    specializes = </C>
+    references = </Shared>
+    variantSets = "vs"
+)
+{
+    custom double v0 = 987
+    custom double v1 = 887
+    custom double v2 = 489
+    variantSet "vs" = {
+        "x" {
+            custom double v0.timeSamples = { 3: 16, 4: 80 }
+        }
+        "y" {
+            custom double v0 = 665
+            custom double v2 = None
+            custom double v3 = 40
+            custom rel r = [</Shared>]
+            def "a" (
+                specializes = </C>
+                references = @./l0.usda@</M/a>
+            )
+            {
+                custom double v0 = 161
+            }
+        }
+    }
+}

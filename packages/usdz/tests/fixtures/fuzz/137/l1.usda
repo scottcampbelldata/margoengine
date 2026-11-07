@@ -1,0 +1,109 @@
+#usda 1.0
+(
+    defaultPrim = "M"
+    subLayers = [@./l0.usda@ (offset = 5)]
+)
+class "C"
+{
+    custom double v0 = 904
+    def "b"
+    {
+        custom double v0 = 915
+        custom double v3 = 570
+        over "b"
+        {
+            custom double v0 = 837
+            custom double v1 = 63
+            custom double v2 = 559
+            custom double v3 = 861
+        }
+        over "c" (
+            variantSets = "vs"
+            variants = { string vs = "x" }
+        )
+        {
+            custom double v0 = 840
+            custom double v1.timeSamples = { 3: 60, 8: 65 }
+            custom double v2 = 210
+            custom double v3 = 831
+            variantSet "vs" = {
+                "x" {
+                    custom double v0 = 552
+                    custom double v2 = 843
+                    custom double v3 = 142
+                }
+                "y" {
+                    custom double v2 = 81
+                    custom double v3 = None
+                }
+            }
+        }
+    }
+    over "c"
+    {
+        custom double v0 = 879
+        append rel r = [</C/b>]
+        over "a"
+        {
+            custom double v1.timeSamples = { 1: 62, 8: 30 }
+            custom double v2.timeSamples = { 2: 9, 8: 68 }
+            custom double v3 = 392
+            delete rel r = [</C/b>]
+        }
+        def "b"
+        {
+            custom double v0 = 679
+            custom double v1 = 578
+            custom double v2 = 207
+            custom double v3 = 484
+        }
+    }
+}
+def "Shared"
+{
+    custom double v0 = 605
+    custom double v1 = 365
+    custom double v2 = 686
+    custom double v3 = 513
+    def "b"
+    {
+        custom double v0 = 636
+        custom double v2.timeSamples = { 1: 39, 8: 84 }
+        custom double v3 = None
+    }
+}
+def "M" (
+    append inherits = </C>
+    variantSets = "vs"
+)
+{
+    custom double v1 = None
+    custom double v3 = 173
+    variantSet "vs" = {
+        "x" {
+            custom double v0 = 586
+            custom double v1 = 628
+            custom double v3 = 36
+            prepend rel r = [</Shared>]
+        }
+        "y" {
+            custom double v0 = 547
+            custom double v2 = 350
+        }
+    }
+}
+over "Y" (
+    prepend references = @./l0.usda@</M/a>
+)
+{
+    custom double v2 = 552
+    append rel r = [</Shared>]
+    over "c" (
+        specializes = </C>
+        references = </M>
+    )
+    {
+        custom double v2 = 712
+        custom double v3 = 696
+    }
+}

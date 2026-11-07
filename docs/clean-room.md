@@ -196,6 +196,7 @@ carry the same citation as a one-line comment in the code.
 | EX3 | Animated PNG chunks (acTL, fcTL, fdAT, sequence numbers, delays, dispose and blend ops) | exporters/src/apng.ts | W3C PNG specification, third edition |
 | EX4 | Lossless WebP encoding (VP8L header, colour indexing, subtract green, predictor modes, LZ77 prefix coding, code-length codes) and the animated container (VP8X, ANIM, ANMF) | exporters/src/webp.ts | RFC 9649 WebP Lossless Bitstream Specification; WebP Container Specification |
 | EX5 | Length-limited canonical prefix codes | exporters/src/prefix-codes.ts | Huffman 1952; canonical order as RFC 9649 defines it. Over-long trees are rebuilt with a raised count floor |
+| UZ1 | USD composition: layer stacks, list edits, arc strength, implied classes, variant selection, path mapping | usdz/src/stage.ts, usdz/src/layer.ts | OpenUSD's public documentation (Composition Arcs, LIVRPS strength order, the USD Glossary) and behaviour observed by running OpenUSD on test stages; its source was not read |
 
 ### fbx
 

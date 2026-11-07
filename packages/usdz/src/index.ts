@@ -9,7 +9,8 @@ import {
   LoaderError,
 } from '@margoengine/loaders/common';
 import { readUSDA, type USDPrim, type USDValue } from '@margoengine/loaders/usd';
-import { parseCrate, type Specs } from './crate.js';
+import { parseCrate, type Specs, type TimeSamples } from './crate.js';
+import type { ExtensionHooks, USDExtension, USDIssue } from './extension.js';
 import type { GLTFDocument, GLTFMaterial, GLTFNode } from '../../shared/gltf.js';
 import { multiplyMatrices } from '@margoengine/math/mat4';
 
@@ -27,7 +28,10 @@ export interface USDOptions {
   maxDepth?: number;
   /** Aborts parsing, fetching and texture decoding. */
   signal?: AbortSignal;
+  /** Optional parts of the import, from this package's entries, such as `composition()` of `/compose`. */
+  extensions?: readonly USDExtension[];
 }
+export type { USDExtension, USDIssue };
 /** One triangulated mesh from the layer, in the stage's units and up axis (glTF: metres, Y up). */
 export interface USDMesh {
   /** Prim path in the layer, e.g. `/Root/Chair`. */
@@ -49,6 +53,17 @@ export interface USDMesh {
   /** Triangle corner indices into the vertex streams. */
   indices: Uint32Array;
   /** Index into `document.materials`; a mesh with no binding gets a neutral grey one. */
+  material: number;
+  /** GeomSubsets with a material of their own: each is a primitive of the mesh. `material` above covers the faces left. */
+  subsets?: USDMeshSubset[];
+}
+/** The faces of a mesh under one GeomSubset. */
+export interface USDMeshSubset {
+  /** The subset's prim path. */
+  path: string;
+  /** Triangle corner indices into the mesh's vertex streams. */
+  indices: Uint32Array;
+  /** Index into `document.materials`. */
   material: number;
 }
 type ImageSource = {
@@ -185,10 +200,29 @@ function asciiSpecs(text: string, maxDepth: number, signal?: AbortSignal): Specs
   layer.roots.forEach(visit);
   return specs;
 }
-function parseLayer(input: string | BinaryInput, options: USDOptions): Specs {
+/** The hook of each extension that has `name`. */
+const hooks = (options: USDOptions) => (options.extensions ?? []) as readonly ExtensionHooks[];
+function parseLayer(
+  input: string | BinaryInput,
+  options: USDOptions,
+  id: string,
+  entries: Map<string, Uint8Array>,
+  issues: USDIssue[],
+): Specs {
   const limits = budget(options),
     data = typeof input === 'string' ? new TextEncoder().encode(input) : bytes(input);
   if (data.length > limits.maxBytes) fail('layer exceeds byte budget');
+  const composer = hooks(options).find((hook) => hook.compose);
+  if (composer)
+    return composer.compose!({
+      id,
+      data,
+      entries,
+      maxBytes: limits.maxBytes,
+      maxDepth: limits.maxDepth,
+      issues,
+      signal: options.signal,
+    });
   let specs: Specs;
   if (new TextDecoder().decode(data.subarray(0, 8)) === 'PXR-USDC') {
     if (data.length < 88) fail('truncated Crate bootstrap');
@@ -218,51 +252,94 @@ function parseLayer(input: string | BinaryInput, options: USDOptions): Specs {
   return specs;
 }
 const multiply = (a: number[], b: number[]): number[] => multiplyMatrices(a, b, new Array<number>(16));
-function compose(path: string, specs: Specs): number[] {
-  const order = specs[path + '.xformOpOrder']?.fields.default ?? specs[path]?.fields.xformOpOrder ?? [];
+/** A rotation of `degrees` about axis 0, 1 or 2. */
+function axisRotation(axis: number, degrees: number): number[] {
+  const a = (axis + 1) % 3,
+    b = (axis + 2) % 3,
+    rad = (degrees * Math.PI) / 180,
+    c = Math.cos(rad),
+    s = Math.sin(rad),
+    m = identity();
+  m[a * 4 + a] = c;
+  m[b * 4 + b] = c;
+  m[a * 4 + b] = s;
+  m[b * 4 + a] = -s;
+  return m;
+}
+/** The matrix of one xformOp, by the UsdGeomXformOp schema. `kind` is the op's type, such as `rotateZXY`. */
+function opMatrix(kind: string, value: unknown): number[] {
+  const op = identity();
+  if (kind === 'transform') {
+    const matrix = numeric(value, 16);
+    for (let i = 0; i < 16; i++) op[i] = matrix[i];
+    if (op[3] || op[7] || op[11] || op[15] !== 1) fail('non-affine transform');
+  } else if (kind === 'translate') {
+    const v = numeric(value, 3);
+    for (let i = 0; i < 3; i++) op[12 + i] = v[i];
+  } else if (kind === 'scale') {
+    const v = numeric(value, 3);
+    for (let i = 0; i < 3; i++) op[i * 5] = v[i];
+  } else if (kind === 'orient') {
+    const [w, x, y, z] = Array.from(numeric(value, 4)),
+      n = Math.hypot(w, x, y, z) || 1,
+      [qw, qx, qy, qz] = [w / n, x / n, y / n, z / n];
+    op[0] = 1 - 2 * (qy * qy + qz * qz);
+    op[1] = 2 * (qx * qy + qw * qz);
+    op[2] = 2 * (qx * qz - qw * qy);
+    op[4] = 2 * (qx * qy - qw * qz);
+    op[5] = 1 - 2 * (qx * qx + qz * qz);
+    op[6] = 2 * (qy * qz + qw * qx);
+    op[8] = 2 * (qx * qz + qw * qy);
+    op[9] = 2 * (qy * qz - qw * qx);
+    op[10] = 1 - 2 * (qx * qx + qy * qy);
+  } else if (/^rotate[XYZ]$/.test(kind)) {
+    if (typeof value !== 'number' || !Number.isFinite(value)) fail('expected numeric stream');
+    return axisRotation('XYZ'.indexOf(kind[6]), value);
+  } else if (/^rotate[XYZ]{3}$/.test(kind)) {
+    // The name lists the axes in the order they turn; the value is always the X, Y and Z angles.
+    const angles = numeric(value, 3);
+    let rotation = identity();
+    for (const letter of kind.slice(6)) {
+      const axis = 'XYZ'.indexOf(letter);
+      rotation = multiply(axisRotation(axis, angles[axis]), rotation);
+    }
+    return rotation;
+  } else fail('unsupported transform ' + kind);
+  return op;
+}
+/** An affine matrix's inverse; an op that cannot be inverted is the identity's, as nothing can be undone. */
+function invert(m: number[]): number[] {
+  const [a, b, c, , d, e, f, , g, h, i] = m,
+    co = [e * i - f * h, c * h - b * i, b * f - c * e, f * g - d * i, a * i - c * g, c * d - a * f, d * h - e * g, b * g - a * h, a * e - b * d],
+    det = a * co[0] + b * co[3] + c * co[6];
+  if (!det) fail('singular transform');
+  const out = identity();
+  for (let col = 0; col < 3; col++) for (let row = 0; row < 3; row++) out[col * 4 + row] = co[col * 3 + row] / det;
+  for (let row = 0; row < 3; row++)
+    out[12 + row] = -(out[row] * m[12] + out[4 + row] * m[13] + out[8 + row] * m[14]);
+  return out;
+}
+/** A prim's local matrix from its ordered ops. `get` reads an op's value at the time wanted. */
+function compose(order: unknown, get: (name: string) => unknown): number[] {
+  if (order === undefined) return identity();
   if (!Array.isArray(order) || order.some((op) => typeof op !== 'string')) fail('invalid xformOpOrder');
-  const get = (name: string) => specs[path + '.' + name]?.fields.default;
   let out = identity();
-  for (const name of order) {
-    const value = get(name),
-      op = identity();
-    if (name === '!resetXformStack!') fail('reset transform stacks are unsupported');
-    if (name === 'xformOp:transform') {
-      const matrix = numeric(value, 16);
-      for (let i = 0; i < 16; i++) op[i] = matrix[i];
-      if (op[3] || op[7] || op[11] || op[15] !== 1) fail('non-affine transform');
-    } else if (name === 'xformOp:translate') {
-      const v = numeric(value, 3);
-      for (let i = 0; i < 3; i++) op[12 + i] = v[i];
-    } else if (name === 'xformOp:scale') {
-      const v = numeric(value, 3);
-      for (let i = 0; i < 3; i++) {
-        if (!v[i]) fail('singular transform');
-        op[i * 5] = v[i];
-      }
-    } else if (name === 'xformOp:rotateXYZ') {
-      const angles = numeric(value, 3);
-      let rotation = identity();
-      for (let axis = 0; axis < 3; axis++) {
-        const a = (axis + 1) % 3,
-          b = (axis + 2) % 3,
-          rad = (angles[axis] * Math.PI) / 180,
-          c = Math.cos(rad),
-          s = Math.sin(rad),
-          m = identity();
-        m[a * 4 + a] = c;
-        m[b * 4 + b] = c;
-        m[a * 4 + b] = s;
-        m[b * 4 + a] = -s;
-        rotation = multiply(m, rotation);
-      }
-      out = multiply(out, rotation);
-      continue;
-    } else fail('unsupported transform ' + name);
-    out = multiply(out, op);
+  for (const entry of order as string[]) {
+    if (entry === '!resetXformStack!') fail('reset transform stacks are unsupported');
+    const inverse = entry.startsWith('!invert!'),
+      name = inverse ? entry.slice(8) : entry,
+      value = get(name);
+    if (!name.startsWith('xformOp:')) fail('unsupported transform ' + name);
+    // An op with no value has no effect, as a stage reads it.
+    if (value === undefined) continue;
+    const op = opMatrix(name.split(':')[1], value);
+    out = multiply(out, inverse ? invert(op) : op);
   }
   return out;
 }
+/** True for the value of a `normal3f[]`, or another vector list, and not of a single vector or a list of numbers. */
+const normalList = (value: unknown, type: unknown) =>
+  Array.isArray(value) && value.length % 3 === 0 && typeof type === 'string' && /3[fdh]\[\]$/.test(type);
 /** A parsed USD scene: typed mesh streams plus a glTF document ready for `create()`. Parse with `parseUSDA`, `parseUSDC` or `parseUSDZ`. */
 export class USDAsset {
   constructor(
@@ -271,6 +348,8 @@ export class USDAsset {
     readonly meshes: USDMesh[],
     private readonly sources: ImageSource[],
     private readonly entries: Map<string, Uint8Array>,
+    /** What the import had to leave out, such as a layer it could not open. Empty for a clean file. */
+    readonly issues: USDIssue[] = [],
   ) {}
   /** Attaches the scene to `engine` as a PBR model; texture ownership passes to the model. Pass `signal` to cancel texture decoding. */
   async create(engine: EngineKernel, { signal }: { signal?: AbortSignal } = {}): Promise<PBRModel> {
@@ -337,7 +416,22 @@ export class USDAsset {
     }
   }
 }
-function asset(specs: Specs, entries: Map<string, Uint8Array>, root: string, options: USDOptions): USDAsset {
+/** Builds the asset from a composed spec map, whose asset paths are already ids of `entries`. */
+export function assetFromSpecs(
+  specs: Specs,
+  entries: Map<string, Uint8Array>,
+  options: USDOptions,
+  issues: USDIssue[] = [],
+): USDAsset {
+  return asset(specs, entries, undefined, options, issues);
+}
+function asset(
+  specs: Specs,
+  entries: Map<string, Uint8Array>,
+  root: string | undefined,
+  options: USDOptions,
+  issues: USDIssue[],
+): USDAsset {
   const limits = budget(options),
     buffers: ArrayBufferView[] = [],
     meshes: USDMesh[] = [],
@@ -355,13 +449,42 @@ function asset(specs: Specs, entries: Map<string, Uint8Array>, root: string, opt
       scenes: [{ nodes: [0] }],
       scene: 0,
     };
-  const attrs = (path: string, name: string) => specs[path + '.' + name]?.fields.default;
+  /** A property at the stage's first time: its first sample when it has samples, else its default. */
+  const attrs = (path: string, name: string): unknown => {
+    const fields = specs[path + '.' + name]?.fields;
+    const samples = fields?.timeSamples as TimeSamples | undefined;
+    return samples?.times.length ? (samples.values[0] ?? undefined) : fields?.default;
+  };
+  /** Composed files open with what can be read: a part that cannot be is left out and listed. A single static layer is refused whole, as before. */
+  const composed = root === undefined,
+    soft = (message: string) => {
+      if (!composed) fail(message);
+      if (!issues.some((i) => i.message === message)) issues.push({ code: 'unsupported', message });
+    };
   const firstPath = (value: unknown): string | undefined => {
     if (value === undefined) return;
     if (!Array.isArray(value) || (value.length && typeof value[0] !== 'string')) fail('invalid relationship target');
     return (value as string[])[0];
   };
-  const connection = (path: string, name: string) => firstPath(specs[path + '.' + name]?.fields.connectionPaths);
+  /** The shader output an input is fed from, through any Material or NodeGraph interface on the way. */
+  const connection = (path: string, name: string): string | undefined => {
+    let target = firstPath(specs[path + '.' + name]?.fields.connectionPaths);
+    for (let hops = 0; target && hops < 32; hops++) {
+      const dot = target.lastIndexOf('.'),
+        prim = target.slice(0, dot),
+        next = firstPath(specs[target]?.fields.connectionPaths);
+      if (attrs(prim, 'info:id') !== undefined || !next) return target;
+      target = next;
+    }
+    return target;
+  };
+  /** An input's value, read through an interface a connection leads to. */
+  const input = (path: string, name: string): unknown => {
+    const target = connection(path, name);
+    if (!target) return attrs(path, name);
+    const dot = target.lastIndexOf('.');
+    return attrs(target.slice(0, dot), target.slice(dot + 1));
+  };
   /**
    * A UsdUVTexture's wrap modes and, when its `st` comes through a UsdTransform2d, that transform as
    * KHR_texture_transform. UsdTransform2d (UsdPreviewSurface spec) maps st to scale, then a counter-clockwise rotation
@@ -395,13 +518,32 @@ function asset(specs: Specs, entries: Map<string, Uint8Array>, root: string, opt
     const target = connection(path, name);
     if (!target) return;
     const shader = target.split('.outputs:')[0];
-    if (attrs(shader, 'info:id') !== 'UsdUVTexture') fail('unsupported texture shader');
-    const file = attrs(shader, 'inputs:file');
-    if (typeof file !== 'string') fail('missing texture asset');
+    if (attrs(shader, 'info:id') !== 'UsdUVTexture') {
+      if (attrs(shader, 'info:id') !== undefined && !/^UsdPrimvarReader/.test(String(attrs(shader, 'info:id'))))
+        soft('unsupported texture shader ' + String(attrs(shader, 'info:id')));
+      else if (!composed) fail('unsupported texture shader');
+      return;
+    }
+    const file = input(shader, 'inputs:file');
+    if (typeof file !== 'string') {
+      soft('missing texture asset');
+      return;
+    }
+    if (composed && !entries.has(file)) {
+      soft('missing texture ' + file);
+      return;
+    }
     const channel = target.split('.outputs:')[1],
       index = 'rgba'.indexOf(channel);
-    if (index < 0 && channel !== 'rgb') fail('unsupported texture channel');
-    return { path: pathName(file, root), channel: Math.max(0, index), placement: placement(shader) };
+    if (index < 0 && channel !== 'rgb') {
+      soft('unsupported texture channel');
+      return;
+    }
+    return {
+      path: root === undefined ? file : pathName(file, root),
+      channel: Math.max(0, index),
+      placement: placement(shader),
+    };
   };
   /**
    * The fallback of the UsdPrimvarReader feeding `name`, when one does. Only the display primvars mean anything to a
@@ -410,7 +552,10 @@ function asset(specs: Specs, entries: Map<string, Uint8Array>, root: string, opt
   const display = (path: string, name: string, varname: string, width: number): number[] | undefined => {
     const shader = connection(path, name)?.split('.outputs:')[0];
     if (!shader || attrs(shader, 'info:id') !== `UsdPrimvarReader_float${width === 1 ? '' : width}`) return;
-    if (attrs(shader, 'inputs:varname') !== varname) fail('unsupported primvar reader on ' + name);
+    if (input(shader, 'inputs:varname') !== varname) {
+      soft('unsupported primvar reader on ' + name);
+      return;
+    }
     const fallback = attrs(shader, 'inputs:fallback');
     if (fallback === undefined) return new Array<number>(width).fill(0);
     return width === 1 ? [scalar(fallback)] : Array.from(numeric(fallback, width));
@@ -432,32 +577,57 @@ function asset(specs: Specs, entries: Map<string, Uint8Array>, root: string, opt
     return { index, extensions: { KHR_texture_transform: where.transform } };
   };
   const materialIds = new Map<string, number>(),
-    // Per material: the fallback colour and opacity of the display primvars it reads.
-    displays = new Map<number, { color?: number[]; opacity?: number[] }>();
+    // Per material: the fallback colour and opacity of the display primvars it reads, and the primvar its maps sample.
+    displays = new Map<number, { color?: number[]; opacity?: number[]; uv?: string }>();
+  /** The primvar a texture reads, through its UsdTransform2d when it has one. */
+  const uvPrimvar = (shader: string): string | undefined => {
+    let node = connection(shader, 'inputs:st')?.split('.outputs:')[0];
+    if (node && attrs(node, 'info:id') === 'UsdTransform2d') node = connection(node, 'inputs:in')?.split('.outputs:')[0];
+    const name = node && input(node, 'inputs:varname');
+    return typeof name === 'string' ? name : undefined;
+  };
   function material(path: string): number {
     let binding: string | undefined;
-    for (let owner = path; owner && !binding; owner = owner.slice(0, owner.lastIndexOf('/')))
-      binding = firstPath(specs[owner + '.material:binding']?.fields.targetPaths);
-    const shader = binding ? connection(binding, 'outputs:surface')?.split('.outputs:')[0] : undefined;
-    if (binding && !shader) fail('unresolved material binding');
-    if (shader && attrs(shader, 'info:id') !== 'UsdPreviewSurface') fail('unsupported surface shader');
-    const key = shader ?? '';
+    // The nearest binding wins, unless one above it says it is stronger than what is below it.
+    for (let owner = path; owner; owner = owner.slice(0, owner.lastIndexOf('/'))) {
+      const rel = specs[owner + '.material:binding']?.fields,
+        target = firstPath(rel?.targetPaths);
+      // A target that is no prim of the stage binds nothing, as a stage reads it.
+      if (target && (!composed || specs[target]) && (!binding || rel?.bindMaterialAs === 'strongerThanDescendants'))
+        binding = target;
+    }
+    let shader = binding ? connection(binding, 'outputs:surface')?.split('.outputs:')[0] : undefined;
+    if (binding && !shader) {
+      soft('unresolved material binding');
+      shader = undefined;
+    }
+    if (shader && attrs(shader, 'info:id') !== 'UsdPreviewSurface') {
+      soft(`unsupported surface shader ${String(attrs(shader, 'info:id'))} at ${shader}`);
+      shader = undefined;
+    }
+    // A mesh with no material shows its display colour, so its colour stream needs a white base.
+    const painted = !binding && specs[path + '.primvars:displayColor'] !== undefined;
+    const key = shader ?? binding ?? (painted ? '#display' : '');
     if (materialIds.has(key)) return materialIds.get(key)!;
-    const rgb = numeric(shader ? (attrs(shader, 'inputs:diffuseColor') ?? [0.18, 0.18, 0.18]) : [0.7, 0.7, 0.7], 3),
-      opacity = scalar(shader ? (attrs(shader, 'inputs:opacity') ?? 1) : 1),
-      roughness = scalar(shader ? (attrs(shader, 'inputs:roughness') ?? 0.5) : 0.5),
-      metallic = scalar(shader ? (attrs(shader, 'inputs:metallic') ?? 0) : 0),
-      threshold = scalar(shader ? (attrs(shader, 'inputs:opacityThreshold') ?? 0) : 0),
-      color = shader ? display(shader, 'inputs:diffuseColor', 'displayColor', 3) : undefined,
+    // A factor outside 0 to 1 is refused in a static layer; a composed file keeps the nearest value it can use.
+    const factor = (value: unknown) =>
+      composed && typeof value === 'number' && Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : scalar(value);
+    const rgb = numeric(shader ? (input(shader, 'inputs:diffuseColor') ?? [0.18, 0.18, 0.18]) : [0.7, 0.7, 0.7], 3),
+      opacity = factor(shader ? (input(shader, 'inputs:opacity') ?? 1) : 1),
+      roughness = factor(shader ? (input(shader, 'inputs:roughness') ?? 0.5) : 0.5),
+      metallic = factor(shader ? (input(shader, 'inputs:metallic') ?? 0) : 0),
+      threshold = factor(shader ? (input(shader, 'inputs:opacityThreshold') ?? 0) : 0),
+      color = shader ? display(shader, 'inputs:diffuseColor', 'displayColor', 3) : painted ? [0.5, 0.5, 0.5] : undefined,
       vertexOpacity = shader ? display(shader, 'inputs:opacity', 'displayOpacity', 1) : undefined;
     const p: NonNullable<GLTFMaterial['pbrMetallicRoughness']> = {
-        baseColorFactor: [scalar(rgb[0]), scalar(rgb[1]), scalar(rgb[2]), opacity],
+        baseColorFactor: [factor(rgb[0]), factor(rgb[1]), factor(rgb[2]), opacity],
         roughnessFactor: roughness,
         metallicFactor: metallic,
       },
       definition: GLTFMaterial = {
         pbrMetallicRoughness: p,
         doubleSided: true,
+        ...(binding ? { name: binding } : {}),
       },
       /** glTF's alpha mode for a surface that is not opaque: USD cuts it out at a threshold above 0, else blends. */
       seeThrough = () => {
@@ -479,14 +649,14 @@ function asset(specs: Specs, entries: Map<string, Uint8Array>, root: string, opt
       }
       // glTF holds opacity in the base colour's alpha, so an opacity map has to be that texture's own.
       if (alpha) {
-        if (alpha.path !== diffuse?.path || alpha.channel !== 3) fail('unsupported opacity texture');
-        seeThrough();
+        if (alpha.path !== diffuse?.path || alpha.channel !== 3) soft('unsupported opacity texture');
+        else seeThrough();
       }
       if (normal) definition.normalTexture = image({ path: normal.path }, normal.placement);
       if (rough || metal) {
         // One packed glTF texture: both maps must be sampled the same way.
         if (rough && metal && JSON.stringify(rough.placement) !== JSON.stringify(metal.placement))
-          fail('unsupported roughness and metallic textures with different transforms or wrap modes');
+          soft('unsupported roughness and metallic textures with different transforms or wrap modes');
         p.metallicRoughnessTexture = image(
           {
             roughness: rough && { path: rough.path, channel: rough.channel },
@@ -503,7 +673,8 @@ function asset(specs: Specs, entries: Map<string, Uint8Array>, root: string, opt
     const id = doc.materials.length;
     doc.materials.push(definition);
     materialIds.set(key, id);
-    displays.set(id, { color, opacity: vertexOpacity });
+    const mapped = shader && ['inputs:diffuseColor', 'inputs:normal', 'inputs:roughness', 'inputs:metallic'].map((name) => connection(shader!, name)?.split('.outputs:')[0]).find((node) => node && attrs(node, 'info:id') === 'UsdUVTexture');
+    displays.set(id, { color, opacity: vertexOpacity, uv: mapped ? uvPrimvar(mapped) : undefined });
     return id;
   }
   function accessor(data: Float32Array | Uint32Array, type: string): number {
@@ -532,8 +703,12 @@ function asset(specs: Specs, entries: Map<string, Uint8Array>, root: string, opt
         };
   };
   const metadata = specs['/']?.fields ?? {},
-    unit = metadata.metersPerUnit ?? 0.01,
-    axis = metadata.upAxis ?? 'Y';
+    unit = metadata.metersPerUnit ?? 0.01;
+  let axis = metadata.upAxis ?? 'Y';
+  if (composed && axis !== 'Y' && axis !== 'Z') {
+    soft('unsupported up axis ' + String(axis));
+    axis = 'Y';
+  }
   if (
     typeof unit !== 'number' ||
     !Number.isFinite(unit) ||
@@ -551,7 +726,16 @@ function asset(specs: Specs, entries: Map<string, Uint8Array>, root: string, opt
     base[9] = unit;
   }
   doc.nodes.push({ name: 'USD', matrix: base, children: [] });
-  const nodeIds = new Map<string, number>([['/', 0]]);
+  const nodeIds = new Map<string, number>([['/', 0]]),
+    purposes = new Map<string, string>(),
+    subsetsOf = new Map<string, string[]>();
+  for (const path in specs)
+    if (specs[path].specType === 6 && specs[path].fields.typeName === 'GeomSubset') {
+      const owner = path.slice(0, path.lastIndexOf('/')),
+        list = subsetsOf.get(owner);
+      if (list) list.push(path);
+      else subsetsOf.set(owner, [path]);
+    }
   let totalVertices = 0,
     totalTriangles = 0,
     polygonWork = 0;
@@ -562,21 +746,30 @@ function asset(specs: Specs, entries: Map<string, Uint8Array>, root: string, opt
         parentId = nodeIds.get(parent);
       if (parentId === undefined) continue;
       if (spec.fields.active === false || attrs(path, 'visibility') === 'invisible') continue;
+      const type = spec.fields.typeName;
+      // Shading prims and subsets are read through what uses them; they place nothing in the scene.
+      if (type === 'Material' || type === 'Shader' || type === 'NodeGraph' || type === 'GeomSubset') continue;
       const node: GLTFNode & { children: number[] } = {
           name: path.split('/').at(-1),
-          matrix: compose(path, specs),
+          matrix: compose(attrs(path, 'xformOpOrder') ?? spec.fields.xformOpOrder, (name) => attrs(path, name)),
           children: [],
         },
         id = doc.nodes.length;
       doc.nodes.push(node);
       doc.nodes[parentId].children!.push(id);
       nodeIds.set(path, id);
-      if (spec.fields.typeName !== 'Mesh') continue;
+      // Purpose comes down from the nearest prim that authors one. Guides and proxies are not part of the render.
+      const purpose = (attrs(path, 'purpose') as string | undefined) ?? 'default',
+        inherited = purpose === 'default' ? (purposes.get(parent) ?? 'default') : purpose;
+      purposes.set(path, inherited);
+      if (type !== 'Mesh' || inherited === 'guide' || inherited === 'proxy') continue;
       if (
         (attrs(path, 'subdivisionScheme') ?? 'catmullClark') !== 'none' ||
         (attrs(path, 'holeIndices') as ArrayLike<number> | undefined)?.length
       )
-        fail('subdivision and hole faces are unsupported');
+        soft('subdivision and hole faces are unsupported');
+      // A mesh with no points draws nothing; a stage skips it too.
+      if (composed && !(attrs(path, 'points') as ArrayLike<number> | undefined)?.length) continue;
       const points = numeric(attrs(path, 'points')),
         counts = numeric(attrs(path, 'faceVertexCounts')),
         faces = numeric(attrs(path, 'faceVertexIndices'));
@@ -585,8 +778,8 @@ function asset(specs: Specs, entries: Map<string, Uint8Array>, root: string, opt
         corners = 0;
       for (let i = 0; i < counts.length; i++) {
         const count = counts[i];
-        if (!Number.isSafeInteger(count) || count < 3) fail('invalid face count');
-        triangles += count - 2;
+        if (!Number.isSafeInteger(count) || count < 0 || (count < 3 && !composed)) fail('invalid face count');
+        if (count >= 3) triangles += count - 2;
         corners += count;
       }
       if (corners !== faces.length) fail('topology counts mismatch');
@@ -596,17 +789,24 @@ function asset(specs: Specs, entries: Map<string, Uint8Array>, root: string, opt
       for (let i = 0; i < faces.length; i++)
         if (!Number.isSafeInteger(faces[i]) || faces[i] < 0 || faces[i] >= points.length / 3)
           fail('face index outside points');
-      const normalValue = attrs(path, 'normals'),
-        uvValue = attrs(path, 'primvars:st'),
+      // A normals primvar beats the normals attribute. What is not a list of vectors is no normals at all.
+      const normalName = specs[path + '.primvars:normals'] ? 'primvars:normals' : 'normals',
+        normalAttribute = attrs(path, normalName),
+        normalValue = composed && !normalList(normalAttribute, specs[path + '.' + normalName]?.fields.typeName) ? undefined : normalAttribute,
+        normalIndices = attrs(path, normalName + ':indices') as ArrayLike<number> | undefined,
+        materialId = material(path),
+        reads = displays.get(materialId)!,
+        uvName = [reads.uv, 'st', 'UVMap', 'uv', 'st0', 'st_0', 'map1'].find((name) => name && specs[path + '.primvars:' + name]),
+        uvValue = uvName ? attrs(path, 'primvars:' + uvName) : undefined,
         normal = normalValue === undefined ? undefined : numeric(normalValue),
         uv = uvValue === undefined ? undefined : numeric(uvValue),
-        uvIndices = attrs(path, 'primvars:st:indices') as ArrayLike<number> | undefined,
+        uvProperty = 'primvars:' + uvName,
+        uvIndices = attrs(path, uvProperty + ':indices') as ArrayLike<number> | undefined,
         positions = new Float32Array(triangles * 9),
         normals = new Float32Array(triangles * 9),
         uvs = uv ? new Float32Array(triangles * 6) : undefined,
         indices = new Uint32Array(triangles * 3),
-        materialId = material(path),
-        reads = displays.get(materialId)!,
+        firstTriangle = new Uint32Array(counts.length + 1),
         colors = reads.color || reads.opacity ? new Float32Array(triangles * 12) : undefined,
         tint = reads.color && displayStream(path, 'displayColor', reads.color, 3),
         fade = reads.opacity && displayStream(path, 'displayOpacity', reads.opacity, 1);
@@ -635,8 +835,9 @@ function asset(specs: Specs, entries: Map<string, Uint8Array>, root: string, opt
         fail('invalid orientation');
       for (let f = 0; f < counts.length; f++) {
         const count = counts[f];
+        firstTriangle[f] = at / 3;
         // shortcut: triangles and convex planar polygons, tessellate concave polygons before loading.
-        if (count > 3) {
+        if (count > 3 && !composed) {
           if (count > 1024) fail('polygon exceeds validation limit');
           if ((polygonWork += count * count) > 10_000_000) fail('polygon validation work exceeds limit');
           const a = faces[cursor] * 3,
@@ -684,14 +885,16 @@ function asset(specs: Specs, entries: Map<string, Uint8Array>, root: string, opt
               vertex = faces[corner];
             for (let d = 0; d < 3; d++) positions[at * 3 + d] = points[vertex * 3 + d];
             if (normal) {
-              const n = sample(normal, 3, corner, vertex, f, 'normals');
+              const n = normalIndices
+                ? normalIndices[sample(normalIndices, 1, corner, vertex, f, normalName)]
+                : sample(normal, 3, corner, vertex, f, normalName);
               if (n * 3 + 2 >= normal.length) fail('normal index outside stream');
               for (let d = 0; d < 3; d++) normals[at * 3 + d] = normal[n * 3 + d];
             }
             if (uv && uvs) {
               const u = uvIndices
-                ? uvIndices[sample(uvIndices, 1, corner, vertex, f, 'primvars:st')]
-                : sample(uv, 2, corner, vertex, f, 'primvars:st');
+                ? uvIndices[sample(uvIndices, 1, corner, vertex, f, uvProperty)]
+                : sample(uv, 2, corner, vertex, f, uvProperty);
               if (!Number.isSafeInteger(u) || u < 0 || u * 2 + 1 >= uv.length) fail('UV index outside stream');
               uvs[at * 2] = uv[u * 2];
               uvs[at * 2 + 1] = uv[u * 2 + 1];
@@ -717,6 +920,7 @@ function asset(specs: Specs, entries: Map<string, Uint8Array>, root: string, opt
           }
         cursor += count;
       }
+      firstTriangle[counts.length] = at / 3;
       if (!normal) normals.set(computeVertexNormals(positions, indices));
       const attributes: Record<string, number> = {
         POSITION: accessor(positions, 'VEC3'),
@@ -729,16 +933,37 @@ function asset(specs: Specs, entries: Map<string, Uint8Array>, root: string, opt
           Float32Array.from(uvs, (x, i) => (i % 2 ? 1 - x : x)),
           'VEC2',
         );
+      // Each subset with a material is a primitive of its own, over the same vertex streams. A face belongs to the
+      // first subset that lists it; the faces left keep the mesh's material.
+      const taken = new Uint8Array(counts.length),
+        subsets: USDMeshSubset[] = [];
+      for (const subset of subsetsOf.get(path) ?? []) {
+        if ((attrs(subset, 'elementType') ?? 'face') !== 'face') continue;
+        if (!specs[subset + '.material:binding'] && attrs(subset, 'familyName') !== 'materialBind') continue;
+        const list: number[] = [];
+        for (const face of Array.from(numeric(attrs(subset, 'indices') ?? []))) {
+          if (!Number.isSafeInteger(face) || face < 0 || face >= counts.length) fail('subset face outside mesh');
+          if (taken[face]) continue;
+          taken[face] = 1;
+          for (let t = firstTriangle[face] * 3; t < firstTriangle[face + 1] * 3; t++) list.push(t);
+        }
+        if (list.length) subsets.push({ path: subset, indices: Uint32Array.from(list), material: material(subset) });
+      }
+      let rest = indices;
+      if (subsets.length) {
+        const left: number[] = [];
+        for (let face = 0; face < counts.length; face++)
+          if (!taken[face]) for (let t = firstTriangle[face] * 3; t < firstTriangle[face + 1] * 3; t++) left.push(t);
+        rest = Uint32Array.from(left);
+      }
+      const primitives = subsets.map((subset) => ({
+        attributes,
+        indices: accessor(subset.indices, 'SCALAR'),
+        material: subset.material,
+      }));
+      if (rest.length) primitives.push({ attributes, indices: accessor(rest, 'SCALAR'), material: materialId });
       const mesh = doc.meshes.length;
-      doc.meshes.push({
-        primitives: [
-          {
-            attributes,
-            indices: accessor(indices, 'SCALAR'),
-            material: materialId,
-          },
-        ],
-      });
+      doc.meshes.push({ primitives });
       node.mesh = mesh;
       meshes.push({
         path,
@@ -748,23 +973,29 @@ function asset(specs: Specs, entries: Map<string, Uint8Array>, root: string, opt
         colors,
         indices,
         material: materialId,
+        ...(subsets.length ? { subsets } : {}),
       });
     }
   if (!meshes.length) fail('no renderable meshes');
   for (const source of sources)
     for (const name of [source.path, source.roughness?.path, source.metallic?.path])
       if (name && !entries.has(name)) fail('missing texture ' + name);
-  return new USDAsset(doc, buffers, meshes, sources, entries);
+  return new USDAsset(doc, buffers, meshes, sources, entries, issues);
+}
+function read(input: string | BinaryInput, entries: Map<string, Uint8Array>, id: string, options: USDOptions): USDAsset {
+  const issues: USDIssue[] = [],
+    specs = parseLayer(input, options, id, entries, issues);
+  return asset(specs, entries, hooks(options).some((hook) => hook.compose) ? undefined : id, options, issues);
 }
 /** Parses a USDA (text) layer, as a string or UTF-8 bytes. Throws `LoaderError` (format `USD`) for malformed or unsupported input. */
 export function parseUSDA(input: string | BinaryInput, options: USDOptions = {}): USDAsset {
-  return asset(parseLayer(input, options), new Map(), 'scene.usda', options);
+  return read(input, new Map(), 'scene.usda', options);
 }
 /** Parses a binary USDC (Crate 0.4 to 0.12) layer. Throws `LoaderError` (format `USD`) for malformed or unsupported input. */
 export function parseUSDC(input: BinaryInput, options: USDOptions = {}): USDAsset {
   const data = bytes(input);
   if (new TextDecoder().decode(data.subarray(0, 8)) !== 'PXR-USDC') fail('expected Crate magic');
-  return asset(parseLayer(data, options), new Map(), 'scene.usdc', options);
+  return read(data, new Map(), 'scene.usdc', options);
 }
 /** Parses a USDZ archive: the first entry is the root layer and its textures are read from the archive. Throws `LoaderError` (format `USD`) for malformed input. */
 export async function parseUSDZ(input: BinaryInput, options: USDOptions = {}): Promise<USDAsset> {
@@ -794,7 +1025,7 @@ export async function parseUSDZ(input: BinaryInput, options: USDOptions = {}): P
   );
   if (!root || !/\.(usd|usda|usdc)$/i.test(root.name)) fail('first archive entry must be the root USD layer');
   const name = pathName(root.name);
-  return asset(parseLayer(entries.get(name)!, options), entries, name, options);
+  return read(entries.get(name)!, entries, name, options);
 }
 /** Fetches a `.usdz` with a streaming byte limit, parses it and attaches it to `engine`. Pass `signal` to cancel. Returns the PBR model; call `destroy()` to free it. */
 export async function loadUSDZ(engine: EngineKernel, url: string | URL, options: USDOptions = {}): Promise<PBRModel> {

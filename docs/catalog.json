@@ -425,6 +425,7 @@
     "imports": "import { USDAsset } from '@margoengine/usdz';",
     "exports": [
       "USDAsset",
+      "assetFromSpecs",
       "loadUSDZ",
       "parseUSDA",
       "parseUSDC",

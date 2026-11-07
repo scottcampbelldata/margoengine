@@ -1,0 +1,71 @@
+#usda 1.0
+(
+    defaultPrim = "M"
+    subLayers = [@./l0.usda@ (offset = 4)]
+)
+class "C"
+{
+    custom double v0 = 335
+    custom double v2 = 880
+    custom double v3.timeSamples = { 3: 10, 4: 90 }
+    append rel r = [</C/b>]
+    def "b"
+    {
+        custom double v0.timeSamples = { 1: 9, 4: 76 }
+        custom double v1 = 526
+        custom double v3 = 188
+        def "b"
+        {
+            custom double v2 = 251
+            custom double v3 = 548
+            add rel r = [</C/b>]
+        }
+    }
+    def "c"
+    {
+        custom double v0 = 435
+        custom double v1.timeSamples = { 2: 84, 5: 38 }
+        custom double v3 = 760
+    }
+}
+def "Shared"
+{
+    custom double v0 = 540
+    custom double v3 = 420
+    delete rel r = [</C/b>]
+    def "a"
+    {
+        custom double v0 = 492
+        custom double v1 = None
+        custom double v3.timeSamples = { 3: 1, 5: 66 }
+    }
+    over "b"
+    {
+        custom double v0 = 172
+        custom double v1.timeSamples = { 1: 19, 9: 57 }
+        custom double v2 = 901
+        custom double v3 = 892
+        prepend rel r = [</M/a>]
+    }
+}
+def "M"
+{
+    custom double v2 = 809
+    custom double v3 = 290
+    custom rel r = [</M/a>]
+}
+def "Y" (
+    append inherits = </C>
+)
+{
+    custom double v1 = 362
+    custom double v2.timeSamples = { 3: 25, 8: 13 }
+    def "a" (
+        prepend references = @./l0.usda@</M/a> (offset = 10)
+    )
+    {
+        custom double v1 = 58
+        custom double v3 = 364
+        delete rel r = [</C/b>]
+    }
+}

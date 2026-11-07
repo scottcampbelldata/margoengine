@@ -1,0 +1,169 @@
+#usda 1.0
+(
+    defaultPrim = "M"
+)
+class "C" (
+    variantSets = "vs"
+    variants = { string vs = "x" }
+)
+{
+    custom double v0 = 615
+    custom double v1 = 819
+    over "b"
+    {
+        custom double v0.timeSamples = { 3: 97, 4: 36 }
+        custom double v1 = 47
+        custom double v2 = 283
+        over "a"
+        {
+            custom double v0 = None
+            custom double v2 = 259
+            custom double v3 = 99
+        }
+        def "b"
+        {
+            custom double v0 = 684
+            custom double v2 = 587
+            custom double v3 = 609
+        }
+        over "c" (
+            variantSets = "vs"
+            variants = { string vs = "x" }
+        )
+        {
+            custom double v1 = 282
+            custom double v2 = 585
+            custom rel r = [</C/b>]
+            variantSet "vs" = {
+                "x" {
+                    custom double v0 = 228
+                    custom double v2.timeSamples = { 0: 4, 7: 64 }
+                    custom rel r = [</C/b>]
+                }
+                "y" {
+                    custom double v0 = 661
+                    custom double v1 = 571
+                }
+            }
+        }
+    }
+    def "c"
+    {
+        custom double v1 = None
+        custom double v2.timeSamples = { 2: 1, 8: 21 }
+        custom double v3 = 760
+        prepend rel r = [</C/b>]
+    }
+    variantSet "vs" = {
+        "x" {
+            custom double v0 = None
+            custom double v1.timeSamples = { 0: 26, 8: 90 }
+        }
+        "y" {
+            custom double v0 = 841
+            def "a"
+            {
+                custom double v1.timeSamples = { 0: 54, 8: 76 }
+            }
+        }
+    }
+}
+def "Shared" (
+    variantSets = "vs"
+    variants = { string vs = "x" }
+)
+{
+    custom double v3 = None
+    variantSet "vs" = {
+        "x" {
+            custom double v0 = 561
+        }
+        "y" {
+            custom double v0 = 938
+            custom double v1 = None
+            custom double v2 = 269
+            custom double v3 = 88
+        }
+    }
+}
+def "M" (
+    inherits = </C/a>
+)
+{
+    custom double v0 = 195
+    custom double v2 = 969
+    custom double v3 = 674
+    def "a" (
+        references = </Shared>
+        variantSets = "vs"
+        variants = { string vs = "x" }
+    )
+    {
+        custom double v0 = None
+        custom double v1.timeSamples = { 2: 53, 4: 25 }
+        custom double v2 = 226
+        over "b"
+        {
+            custom double v0 = 183
+            custom double v1 = 691
+            custom double v3 = 836
+            custom rel r = [</C/b>]
+        }
+        def "c"
+        {
+            custom double v1 = None
+            custom double v3 = 435
+        }
+        variantSet "vs" = {
+            "x" {
+                custom double v2 = 862
+                prepend rel r = [</C/b>]
+            }
+            "y" {
+                custom double v0 = 39
+                custom double v1 = None
+                custom double v2 = 977
+                custom double v3 = 890
+            }
+        }
+    }
+}
+def "Y" (
+    variantSets = "vs"
+    variants = { string vs = "x" }
+)
+{
+    custom double v0.timeSamples = { 2: 14, 4: 33 }
+    custom double v2 = 155
+    def "a"
+    {
+        custom double v0 = 889
+        custom double v3.timeSamples = { 0: 25, 8: 7 }
+        append rel r = [</Shared>]
+    }
+    over "b" (
+        inherits = </C>
+    )
+    {
+        custom double v0 = None
+    }
+    variantSet "vs" = {
+        "x" {
+            custom double v0.timeSamples = { 1: 44, 7: 31 }
+            custom double v1 = 565
+            custom double v2.timeSamples = { 1: 55, 4: 64 }
+        }
+        "y" {
+            custom double v1 = 705
+            custom double v3.timeSamples = { 0: 51, 9: 55 }
+            def "b" (
+                inherits = </C>
+                specializes = </C>
+            )
+            {
+                custom double v1 = 845
+                custom double v2 = 853
+            }
+        }
+    }
+}

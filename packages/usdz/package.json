@@ -34,6 +34,10 @@
     "./worker": {
       "types": "./dist/worker.d.ts",
       "import": "./dist/worker.js"
+    },
+    "./compose": {
+      "types": "./dist/compose.d.ts",
+      "import": "./dist/compose.js"
     }
   },
   "scripts": {

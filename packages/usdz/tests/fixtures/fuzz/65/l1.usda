@@ -1,0 +1,88 @@
+#usda 1.0
+(
+    defaultPrim = "M"
+)
+class "C" (
+    variantSets = "vs"
+)
+{
+    custom double v0 = 294
+    custom double v3 = 862
+    variantSet "vs" = {
+        "x" {
+            custom double v0 = 939
+            custom double v1 = 991
+            prepend rel r = [</C/b>]
+            def "c" (
+                variantSets = "vs"
+                variants = { string vs = "x" }
+            )
+            {
+                custom rel r = [</C/b>]
+                variantSet "vs" = {
+                    "x" {
+                        custom double v0 = 514
+                        custom double v1 = 619
+                    }
+                    "y" {
+                        custom double v1 = 547
+                        custom double v2 = 416
+                        custom double v3 = 66
+                    }
+                }
+            }
+        }
+        "y" {
+            custom double v0 = 717
+            custom double v1 = 857
+        }
+    }
+}
+def "Shared"
+{
+    custom double v0 = 695
+    custom double v1 = 259
+    custom double v3 = 238
+    def "a"
+    {
+        custom double v1.timeSamples = { 1: 4, 8: 60 }
+        custom double v2 = 510
+        custom double v3 = 462
+    }
+    over "b"
+    {
+        custom double v1.timeSamples = { 2: 72, 8: 35 }
+    }
+    over "c"
+    {
+        custom double v1.timeSamples = { 1: 22, 9: 32 }
+        custom double v2.timeSamples = { 0: 12, 7: 69 }
+        custom double v3 = 467
+        prepend rel r = [</Shared>]
+    }
+}
+def "M"
+{
+    custom double v1 = 124
+    custom double v2.timeSamples = { 3: 64, 8: 18 }
+    custom double v3 = 240
+}
+def "Y"
+{
+    custom double v1 = None
+    custom double v2 = 855
+    def "b"
+    {
+        custom double v0 = None
+        custom double v2 = 453
+        custom double v3 = None
+    }
+    def "c" (
+        prepend references = @./l0.usda@
+    )
+    {
+        custom double v0 = 613
+        custom double v1 = 301
+        custom double v3 = 333
+    }
+}

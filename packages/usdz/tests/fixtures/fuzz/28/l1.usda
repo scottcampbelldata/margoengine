@@ -1,0 +1,95 @@
+#usda 1.0
+(
+    defaultPrim = "M"
+)
+class "C"
+{
+    custom double v1 = 504
+    over "a"
+    {
+        custom double v0 = 704
+        custom double v1 = 965
+        custom double v2 = 298
+        add rel r = [</M/a>]
+        def "a"
+        {
+            custom double v0 = 721
+            custom double v2 = 686
+            custom double v3.timeSamples = { 0: 28, 6: 11 }
+        }
+    }
+    over "b"
+    {
+        custom double v1 = 276
+        custom double v2.timeSamples = { 2: 29, 8: 81 }
+        custom double v3 = 65
+        custom rel r = [</M/a>]
+        def "a" (
+            variantSets = "vs"
+        )
+        {
+            custom double v0 = 200
+            custom double v2 = 81
+            variantSet "vs" = {
+                "x" {
+                    custom double v0.timeSamples = { 0: 15, 6: 33 }
+                    custom double v3 = 223
+                    custom rel r = [</M/a>]
+                    def "b"
+                    {
+                        custom double v0 = 999
+                        custom double v1 = 799
+                        custom double v3 = 7
+                    }
+                }
+                "y" {
+                    custom double v1.timeSamples = { 3: 2, 7: 44 }
+                }
+            }
+        }
+    }
+    over "c"
+    {
+        custom double v0.timeSamples = { 3: 56, 5: 89 }
+        custom double v1 = 463
+        custom double v2.timeSamples = { 2: 86, 4: 18 }
+        over "c"
+        {
+            custom double v0 = 863
+            custom double v2 = 726
+            custom double v3 = 482
+        }
+    }
+}
+def "Shared"
+{
+    custom double v0 = 972
+    custom double v1 = 254
+    custom double v2 = None
+}
+def "M" (
+    variantSets = "vs"
+)
+{
+    custom double v0 = 218
+    custom double v2.timeSamples = { 2: 45, 4: 80 }
+    custom double v3 = 442
+    variantSet "vs" = {
+        "x" {
+            custom double v0.timeSamples = { 3: 64, 4: 35 }
+            custom double v2 = 324
+            custom double v3.timeSamples = { 0: 26, 4: 91 }
+        }
+        "y" {
+            custom double v3 = 698
+        }
+    }
+}
+over "Y" (
+    append references = @./l0.usda@</M/a>
+)
+{
+    custom double v1 = 153
+    custom double v2 = 704
+    append rel r = [</M/a>]
+}

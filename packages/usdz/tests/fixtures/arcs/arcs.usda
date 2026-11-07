@@ -1,0 +1,51 @@
+#usda 1.0
+(
+    subLayers = [
+        @sub.usda@ (offset = 5; scale = 2)
+    ]
+)
+
+def Xform "X" (
+    customData = {
+        int a = 1
+        dictionary b = {
+            string c = "d"
+        }
+    }
+    prepend inherits = </Class>
+    prepend payload = @bar.usda@
+    prepend references = @foo.usda@</P> (offset = 2; scale = 3)
+    variants = {
+        string vs = "a"
+    }
+    prepend variantSets = "vs"
+)
+{
+    custom float[] arr
+    float[] arr.timeSamples = {
+        1: [1.5, 2.5],
+        2: [3.5],
+    }
+    custom float blocked = None
+    custom double3 d3
+    double3 d3.timeSamples = {
+        3: (1.5, 2.5, 3.5),
+        4: (1, 2, 3),
+    }
+    custom string[] empty = []
+    custom quatf[] rot = [(0.5, 1, 2, 3)]
+    custom quatf tq
+    quatf tq.timeSamples = {
+        1: (0.5, 1, 2, 3),
+        2.5: (1, 0, 0, 0),
+    }
+    variantSet "vs" = {
+        "a" {
+            def Scope "inner"
+            {
+            }
+
+        }
+    }
+}
+

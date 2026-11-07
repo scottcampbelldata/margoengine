@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10068329,
+  "total": 10099580,
   "history": [
     {
       "date": "2026-10-24",
@@ -3014,6 +3014,12 @@
       "commit": "f56b46a3c",
       "reason": "New entry @margoengine/cutscene/editor.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "e89e68899",
+      "reason": "usdz: new entry /compose reads USD composition; base entry gains the shared asset walk",
+      "grew": 5
     }
   ],
   "items": {
@@ -3594,9 +3600,10 @@
     "@margoengine/tween/stagger": 1435,
     "@margoengine/ui": 28221,
     "@margoengine/ui/react": 28301,
-    "@margoengine/usdz": 9314,
-    "@margoengine/usdz dist/workers/usdz.js": 72539,
-    "@margoengine/usdz/worker": 10380,
+    "@margoengine/usdz": 11508,
+    "@margoengine/usdz dist/workers/usdz.js": 81913,
+    "@margoengine/usdz/compose": 17472,
+    "@margoengine/usdz/worker": 12590,
     "@margoengine/vfx": 17135,
     "@margoengine/vfx/base": 10992,
     "@margoengine/vfx/curves": 1816,
@@ -3714,6 +3721,7 @@
     "leak @margoengine/ui -> @margoengine/text": 1,
     "leak @margoengine/ui/react -> @margoengine/text": 1,
     "leak @margoengine/usdz -> @margoengine/gltf-pro/model": 1,
+    "leak @margoengine/usdz/compose -> @margoengine/gltf-pro/model": 1,
     "leak @margoengine/usdz/worker -> @margoengine/gltf-pro/worker": 1,
     "margoengine": 308,
     "margoengine/game": 996,

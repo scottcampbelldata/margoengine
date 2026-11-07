@@ -4,9 +4,16 @@ import { GLTFAsset } from '@margoengine/gltf-pro/asset';
 import { prepareAsset } from '@margoengine/gltf-pro/prepare';
 import { fetchBytes } from '@margoengine/loaders/common';
 import { serve } from '../../shared/worker.js';
-import { parseUSDZ, type USDOptions } from './index.js';
+import { parseUSDZ, type USDExtension, type USDOptions } from './index.js';
 import { parseUSD } from './any.js';
-serve(async ({ url, input, options }: { url?: string; input?: ArrayBuffer | string; options: USDOptions }) => {
+import { composition } from './compose.js';
+
+const known: Record<string, (options?: never) => USDExtension> = { compose: composition };
+serve(async ({ url, input, options: sent }: { url?: string; input?: ArrayBuffer | string; options: USDOptions }) => {
+  const options: USDOptions = {
+    ...sent,
+    extensions: (sent.extensions as ({ name: string; options?: never } & USDExtension)[] | undefined)?.map(({ name, options }) => known[name](options)),
+  };
   const usd = url
     ? await parseUSDZ(await fetchBytes(url, { maxBytes: options.maxBytes ?? 64 * 1024 * 1024 }), options)
     : await parseUSD(input!, options);

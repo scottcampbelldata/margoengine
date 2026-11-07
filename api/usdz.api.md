@@ -11,7 +11,9 @@ export class USDAsset {
     readonly document: GLTFDocument;
     readonly buffers: ArrayBufferView[];
     readonly meshes: USDMesh[];
-    constructor(document: GLTFDocument, buffers: ArrayBufferView[], meshes: USDMesh[], sources: ImageSource[], entries: Map<string, Uint8Array>);
+    readonly issues: USDIssue[];
+    constructor(document: GLTFDocument, buffers: ArrayBufferView[], meshes: USDMesh[], sources: ImageSource[], entries: Map<string, Uint8Array>,
+    issues?: USDIssue[]);
     create(engine: EngineKernel, { signal }?: {
         signal?: AbortSignal;
     }): Promise<PBRModel>;
@@ -20,12 +22,28 @@ export class USDAsset {
     }): Promise<ImageBitmap[]>;
 }
 
+export interface USDExtension {
+    readonly name: string;
+}
+
+export interface USDIssue {
+    code: string;
+    message: string;
+}
+
 export interface USDMesh {
     path: string;
     positions: Float32Array;
     normals: Float32Array;
     uvs?: Float32Array;
     colors?: Float32Array;
+    indices: Uint32Array;
+    material: number;
+    subsets?: USDMeshSubset[];
+}
+
+export interface USDMeshSubset {
+    path: string;
     indices: Uint32Array;
     material: number;
 }
@@ -37,7 +55,10 @@ export interface USDOptions {
     maxTriangles?: number;
     maxDepth?: number;
     signal?: AbortSignal;
+    extensions?: readonly USDExtension[];
 }
+
+export function assetFromSpecs(specs: Specs, entries: Map<string, Uint8Array>, options: USDOptions, issues?: USDIssue[]): USDAsset;
 
 export function loadUSDZ(engine: EngineKernel, url: string | URL, options?: USDOptions): Promise<PBRModel>;
 
@@ -326,4 +347,9 @@ type ImageSource = {
     roughnessValue?: number;
     metallicValue?: number;
 };
+
+type Specs = Record<string, {
+    specType: number;
+    fields: Record<string, unknown>;
+}>;
 ```

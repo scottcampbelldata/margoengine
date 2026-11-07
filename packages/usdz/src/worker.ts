@@ -3,10 +3,14 @@ import type { PBRModel } from '@margoengine/gltf-pro';
 import { modelFromPrepared, type PreparedGLTF } from '@margoengine/gltf-pro/worker';
 import { fetchBytes, type BinaryInput } from '@margoengine/loaders/common';
 import { canUseWorker, movable, runWorker } from '../../shared/worker.js';
-import type { USDOptions } from './index.js';
+import type { USDExtension, USDOptions } from './index.js';
 // The main-thread fallback loads the parser lazily, so the worker entry stays small.
 const workerURL = () => new URL(/* @vite-ignore */ './workers/usdz.js?no-inline', import.meta.url);
-const job = ({ signal: _signal, fetch: _fetch, ...limits }: USDOptions) => limits;
+// Extensions cross to the worker as their name and plain options; the worker makes its own copy of each.
+const job = ({ signal: _signal, fetch: _fetch, extensions, ...limits }: USDOptions) => ({
+  ...limits,
+  extensions: extensions?.map(({ name, options }: USDExtension & { options?: unknown }) => ({ name, options })),
+});
 /**
  * parseUSDZ / parseUSDC / parseUSDA (by content: ZIP, Crate magic, else text) plus `create`, with parsing and texture
  * decoding in a worker; same model as on the main thread. A whole ArrayBuffer input moves to the worker and is detached

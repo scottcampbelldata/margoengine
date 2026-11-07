@@ -1,5 +1,5 @@
 {
-  "commit": "f56b46a3c",
+  "commit": "e89e68899",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -2482,16 +2482,20 @@
     },
     "@margoengine/usdz": {
       ".": {
-        "raw": 22099,
-        "gzip": 9046
+        "raw": 27708,
+        "gzip": 11172
       },
       "./worker": {
-        "raw": 24977,
-        "gzip": 10080
+        "raw": 30598,
+        "gzip": 12223
+      },
+      "./compose": {
+        "raw": 44210,
+        "gzip": 16963
       },
       "dist/workers/usdz.js": {
-        "raw": 219065,
-        "gzip": 71213
+        "raw": 242831,
+        "gzip": 79527
       }
     },
     "@margoengine/vfx": {
@@ -2931,9 +2935,9 @@
       "brotli": 69584
     },
     "packages/usdz/dist/workers/usdz.js": {
-      "raw": 216498,
-      "gzip": 71022,
-      "brotli": 61408
+      "raw": 240008,
+      "gzip": 79297,
+      "brotli": 68715
     },
     "packages/loaders/dist/workers/usd.js": {
       "raw": 21469,

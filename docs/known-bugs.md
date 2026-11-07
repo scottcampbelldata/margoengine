@@ -51,6 +51,13 @@ are still open.
 - **Needed to close:** decide whether this model stays. If it does, add those parts to `NO_CROSSING`, fix what the check
   then reports and rebuild the GLB. If another model replaces it, this entry goes with the old model.
 
+### USD composition: order of `specializes` arcs of equal depth
+
+- **What:** a stage that reaches one class through `specializes` from several layers can take a value from the wrong one. No real file in the corpus shows it; 55 of 150 generated stress stages do.
+- **Repro:** compose `packages/usdz/tests/fixtures/open-difference/root.usda` with `composition()`. `/Q/c.v3` is 814 and OpenUSD says 630.
+- **Cause:** `strength` in `packages/usdz/src/stage.ts` orders those arcs by depth, then by how near the root they sit. OpenUSD compares the strength of each arc's origin, which this tree does not keep once it is copied to child prims.
+- **Needed to close:** keep an origin on each class node through `graft` and `tree`, and sort by it.
+
 ## Blocked on hardware we do not have
 
 These features pass their tests against the published specifications, but the only real check is a device the project

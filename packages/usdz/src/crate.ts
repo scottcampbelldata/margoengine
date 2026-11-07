@@ -2,6 +2,27 @@
 // with TfFastCompression (chunked LZ4 blocks) and Usd integer coding. Output matches the USDA spec map shape.
 import { LoaderError } from '@margoengine/loaders/common';
 export type Specs = Record<string, { specType: number; fields: Record<string, unknown> }>;
+/** A list edit as authored: an explicit list, or items to add, remove and reorder. Only the full reading keeps these. */
+export interface ListOp<T> {
+  explicit?: T[];
+  add?: T[];
+  prepend?: T[];
+  append?: T[];
+  delete?: T[];
+  order?: T[];
+}
+/** An attribute's samples, by time code, in file order. A blocked sample is `null`. */
+export interface TimeSamples {
+  times: number[];
+  values: unknown[];
+}
+/** One reference or payload as authored. An empty `assetPath` is a prim of the same layer stack. */
+export interface ArcItem {
+  assetPath: string;
+  primPath: string;
+  offset: number;
+  scale: number;
+}
 function fail(message: string): never {
   // Malformed input is a LoaderError, like every other loader; the code is taken from the wording.
   const code = /unsupported|reset transform|non-affine/.test(message)
@@ -144,7 +165,9 @@ const SHAPES: Record<number, [number, string]> = {
 for (let t = 19; t <= 30; t++) SHAPES[t] = [Math.floor((t - 19) / 4) + 2, ['f64', 'f32', 'f16', 'i32'][(t - 19) % 4]];
 const WIDTH: Record<string, number> = { u8: 1, f16: 2, i32: 4, u32: 4, f32: 4, i64: 8, u64: 8, f64: 8 };
 const UNSUPPORTED = new Set([35, 45, 46, 47, 55]),
-  SKIPPED = new Set([31, 36, 37, 38, 39, 49, 51, 52, 53, 54]);
+  SKIPPED = new Set([31, 36, 37, 38, 39, 49, 51, 52, 53, 54]),
+  // Crate's quaternions hold the imaginary part first; text USD and this reader hold the real part first.
+  QUATERNIONS = new Set([16, 17, 18]);
 
 /** `count` items read one by one: each read is bounds checked, so a huge count fails before it allocates. */
 function repeat<T>(count: number, item: () => T): T[] {
@@ -153,7 +176,11 @@ function repeat<T>(count: number, item: () => T): T[] {
   return out;
 }
 
-export function parseCrate(data: Uint8Array, maxBytes: number, maxDepth = 64): Specs {
+/**
+ * Reads a Crate layer. `full` keeps what composition needs (list edits, arcs, variants, time samples, prims of every
+ * specifier); without it those are refused, as the static reader has no use for them.
+ */
+export function parseCrate(data: Uint8Array, maxBytes: number, maxDepth = 64, full = false): Specs {
   const view = new DataView(data.buffer, data.byteOffset, data.byteLength),
     [major, minor] = [data[8], data[9]];
   if (major !== 0 || minor < 4 || minor > 12) fail('unsupported Crate version');
@@ -252,7 +279,9 @@ export function parseCrate(data: Uint8Array, maxBytes: number, maxDepth = 64): S
           ? '/'
           : elements[here] < 0
             ? parent + '.' + element
-            : (parent === '/' ? '' : parent) + '/' + element;
+            : element.startsWith('{')
+              ? parent + element
+              : (parent === '/' ? '' : parent) + '/' + element;
       set(here, path);
       const child = jumps[here] > 0 || jumps[here] === -1,
         sibling = jumps[here] >= 0;
@@ -299,9 +328,66 @@ export function parseCrate(data: Uint8Array, maxBytes: number, maxDepth = 64): S
     for (const bit of [2, 4, 32, 64, 8, 16]) lists.push(header & bit ? repeat(u64(), item) : undefined);
     const [explicit, added, prepended, appended, deleted] = lists,
       removed = new Set(deleted);
+    if (full) {
+      const op: ListOp<T> = {};
+      if (header & 1) op.explicit = explicit ?? [];
+      if (added) op.add = added;
+      if (prepended) op.prepend = prepended;
+      if (appended) op.append = appended;
+      if (deleted) op.delete = deleted;
+      if (lists[5]) op.order = lists[5];
+      return op;
+    }
     return header & 1
       ? (explicit ?? [])
       : [...(prepended ?? []), ...(appended ?? []), ...(added ?? [])].filter((v) => !removed.has(v));
+  };
+  /** Runs `read`, then puts the read position back. */
+  const aside = <T>(read: () => T): T => {
+    const here = p,
+      out = read();
+    seek(here);
+    return out;
+  };
+  /** A value held by a jump: an int64 distance from the jump's start to the rep, which the next item follows. */
+  function held(): unknown {
+    const from = p,
+      distance = Number(view.getBigInt64(take(8), true));
+    seek(from + distance);
+    const rep = view.getBigUint64(take(8), true);
+    return aside(() => value(rep));
+  }
+  function dictionary(): Record<string, unknown> {
+    const out: Record<string, unknown> = Object.create(null);
+    for (let i = 0, count = u64(); i < count; i++) {
+      const key = string(u32());
+      out[key] = held();
+    }
+    return out;
+  }
+  function timeSamples(): TimeSamples {
+    // The times are a held value; after their rep a second jump leads to the count and the value reps.
+    const times = held() as number[];
+    const second = p,
+      jump = Number(view.getBigInt64(take(8), true));
+    seek(second + jump);
+    const count = u64();
+    if (count !== times.length) fail('time samples do not match their times');
+    const values = repeat(count, () => {
+      const rep = view.getBigUint64(take(8), true);
+      return aside(() => value(rep));
+    });
+    return { times, values };
+  }
+  const arc = (payload: boolean): ArcItem => {
+    const assetPath = string(u32()),
+      index = view.getInt32(take(4), true),
+      // The empty path has a table index but no entry that names it.
+      primPath = paths[index] ?? '',
+      offset = view.getFloat64(take(8), true),
+      scale = view.getFloat64(take(8), true);
+    if (!payload) dictionary();
+    return { assetPath, primPath, offset, scale };
   };
   function value(rep: bigint): unknown {
     const type = Number((rep >> 48n) & 0xffn),
@@ -309,6 +395,45 @@ export function parseCrate(data: Uint8Array, maxBytes: number, maxDepth = 64): S
       inline = !!((rep >> 62n) & 1n),
       compressed = !!((rep >> 61n) & 1n),
       payload = Number(rep & 0xffffffffffffn);
+    if (full) {
+      if (type === 51) return null; // a value block
+      if (type === 31) {
+        if (inline) return Object.create(null);
+        seek(payload);
+        return dictionary();
+      }
+      if (type === 45) {
+        const out: Record<string, string> = Object.create(null);
+        if (inline) return out;
+        seek(payload);
+        for (let i = 0, count = u64(); i < count; i++) {
+          const key = string(u32());
+          out[key] = string(u32());
+        }
+        return out;
+      }
+      if (type === 46) {
+        seek(payload);
+        return timeSamples();
+      }
+      if (type === 35 || type === 55) {
+        seek(payload);
+        return listOp(() => arc(type === 55));
+      }
+      if (type === 47) {
+        seek(payload);
+        return { explicit: [arc(true)] };
+      }
+      if (type === 49) {
+        seek(payload);
+        return repeat(u64(), () => {
+          const offset = view.getFloat64(take(8), true);
+          return { offset, scale: view.getFloat64(take(8), true) };
+        });
+      }
+      if (type === 36 || type === 37 || type === 38 || type === 39 || type === 52 || type === 53 || type === 54) return undefined;
+      if (type >= 57) return undefined;
+    }
     if (UNSUPPORTED.has(type)) fail('composition, animation or unsupported Crate value');
     if (SKIPPED.has(type)) return undefined;
     if (inline) {
@@ -332,6 +457,8 @@ export function parseCrate(data: Uint8Array, maxBytes: number, maxDepth = 64): S
       if (type === 40 || type === 41) return [];
       return payload;
     }
+    // An array with no payload is empty: there is nothing in the file to seek to.
+    if (array && !payload) return [];
     seek(payload);
     if (type === 40 || type === 41) return repeat(u64(), () => (type === 40 ? pathAt(u32()) : token(u32())));
     if (type === 50) return repeat(u64(), () => string(u32()));
@@ -350,10 +477,20 @@ export function parseCrate(data: Uint8Array, maxBytes: number, maxDepth = 64): S
     const [size, kind] = shape;
     if (!array) {
       const v = scalars(kind, size);
+      if (QUATERNIONS.has(type)) v.unshift(v.pop()!);
       return size === 1 ? (type === 1 ? !!v[0] : v[0]) : v;
     }
     const count = minor < 7 ? u32() : u64();
-    if (!compressed) return scalars(kind, count * size);
+    if (!compressed) {
+      const v = scalars(kind, count * size);
+      if (QUATERNIONS.has(type))
+        for (let i = 0; i < v.length; i += 4) {
+          const real = v[i + 3];
+          v.copyWithin(i + 1, i, i + 3);
+          v[i] = real;
+        }
+      return v;
+    }
     if (kind === 'i32' || kind === 'u32') return ints(count).map((v) => (kind === 'u32' ? v >>> 0 : v));
     if (kind === 'i64' || kind === 'u64') return ints(count, true);
     const code = String.fromCharCode(data[take(1)]);
@@ -390,11 +527,11 @@ export function parseCrate(data: Uint8Array, maxBytes: number, maxDepth = 64): S
       const field = fieldSets[f];
       if (field < 0) break;
       if (field >= fieldCount) fail('field index outside table');
-      if (BLOCKED.includes(fieldNames[field])) fail('composition and animation are unsupported');
+      if (!full && BLOCKED.includes(fieldNames[field])) fail('composition and animation are unsupported');
       const v = value(reps.getBigUint64(field * 8, true));
       if (v !== undefined) fields[fieldNames[field]] = v;
     }
-    if (specTypes[i] === 6 && fields.specifier !== undefined && fields.specifier !== 0) continue;
+    if (!full && specTypes[i] === 6 && fields.specifier !== undefined && fields.specifier !== 0) continue;
     specs[pathAt(specPaths[i])] = { specType: specTypes[i], fields };
   }
   return specs;

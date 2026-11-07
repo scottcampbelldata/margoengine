@@ -2322,6 +2322,10 @@
       "types": "./dist/usdz/worker.d.ts",
       "import": "./dist/usdz/worker.js"
     },
+    "./usdz/compose": {
+      "types": "./dist/usdz/compose.d.ts",
+      "import": "./dist/usdz/compose.js"
+    },
     "./vfx": {
       "types": "./dist/vfx.d.ts",
       "import": "./dist/vfx.js"

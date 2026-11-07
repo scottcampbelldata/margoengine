@@ -13,6 +13,10 @@ export function parseUSDInWorker(engine: EngineKernel, input: string | BinaryInp
 
 // Not exported from this entry, but used by the exports above:
 
+interface USDExtension {
+    readonly name: string;
+}
+
 interface USDOptions {
     fetch?: typeof fetch;
     maxBytes?: number;
@@ -20,5 +24,6 @@ interface USDOptions {
     maxTriangles?: number;
     maxDepth?: number;
     signal?: AbortSignal;
+    extensions?: readonly USDExtension[];
 }
 ```

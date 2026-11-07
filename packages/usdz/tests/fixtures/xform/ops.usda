@@ -1,0 +1,49 @@
+#usda 1.0
+def Xform "rx" { float xformOp:rotateX = 30
+ uniform token[] xformOpOrder = ["xformOp:rotateX"]
+}
+def Xform "ry" { float xformOp:rotateY = 40
+ uniform token[] xformOpOrder = ["xformOp:rotateY"]
+}
+def Xform "rz" { float xformOp:rotateZ = 50
+ uniform token[] xformOpOrder = ["xformOp:rotateZ"]
+}
+def Xform "xyz" { float3 xformOp:rotateXYZ = (10, 20, 30)
+ uniform token[] xformOpOrder = ["xformOp:rotateXYZ"]
+}
+def Xform "xzy" { float3 xformOp:rotateXZY = (10, 20, 30)
+ uniform token[] xformOpOrder = ["xformOp:rotateXZY"]
+}
+def Xform "yxz" { float3 xformOp:rotateYXZ = (10, 20, 30)
+ uniform token[] xformOpOrder = ["xformOp:rotateYXZ"]
+}
+def Xform "yzx" { float3 xformOp:rotateYZX = (10, 20, 30)
+ uniform token[] xformOpOrder = ["xformOp:rotateYZX"]
+}
+def Xform "zxy" { float3 xformOp:rotateZXY = (10, 20, 30)
+ uniform token[] xformOpOrder = ["xformOp:rotateZXY"]
+}
+def Xform "zyx" { float3 xformOp:rotateZYX = (10, 20, 30)
+ uniform token[] xformOpOrder = ["xformOp:rotateZYX"]
+}
+def Xform "orient" { quatf xformOp:orient = (0.5, 0.5, -0.5, 0.5)
+ uniform token[] xformOpOrder = ["xformOp:orient"]
+}
+def Xform "pivot" {
+ double3 xformOp:translate = (1, 2, 3)
+ double3 xformOp:translate:pivot = (4, 5, 6)
+ float3 xformOp:scale = (2, 3, 4)
+ float xformOp:rotateZ:spin = 25
+ uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:translate:pivot", "xformOp:rotateZ:spin", "xformOp:scale", "!invert!xformOp:translate:pivot"]
+}
+def Xform "matrix" {
+ matrix4d xformOp:transform:base = ( (2, 0, 0, 0), (0, 0, 3, 0), (0, -1, 0, 0), (7, 8, 9, 1) )
+ float3 xformOp:scale = (0, 1, 1)
+ uniform token[] xformOpOrder = ["xformOp:transform:base", "xformOp:scale"]
+}
+def Mesh "M" {
+ int[] faceVertexCounts = [3]
+ int[] faceVertexIndices = [0, 1, 2]
+ point3f[] points = [(0, 0, 0), (1, 0, 0), (0, 1, 0)]
+ uniform token subdivisionScheme = "none"
+}
