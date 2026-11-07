@@ -609,13 +609,14 @@ A cache from a DCC tool is usually a PC2 or MDD file. `parsePointCache` from `@m
 import {encodeGeometryCache} from 'margoengine/animation/geometry-cache';
 import {parsePointCache} from 'margoengine/animation/point-cache';
 
-const bytes = new Uint8Array(await (await fetch('/flag.pc2')).arrayBuffer());
+const bytes = new Uint8Array(await (await fetch('/ball.pc2')).arrayBuffer()); // written by Blender's PC2 add-on
 const cache = parsePointCache(bytes, {fps: 24});
-const indices = new Uint32Array(cache.vertexCount - 2).map((_, n) => n); // use your mesh's own triangles here
+// A fan over the points stands in here: use the triangles of the mesh the cache was baked from.
+const indices = new Uint32Array(3 * (cache.vertexCount - 2)).map((_, n) => (n % 3 ? Math.floor(n / 3) + (n % 3) : 0));
 const file = encodeGeometryCache(cache.rate, [{frameCount: cache.frameCount, positions: cache.positions, indices}]);
 ```
 
-`fps` (default 24) is for PC2, which does not say; an MDD file's own times win. `zUp: true` turns a Z-up file to Y-up as `(x, z, -y)`; Blender's MDD add-on writes Z-up and its PC2 add-on Y-up by default. `maxFloats` (default 2^28) refuses a larger file. Alembic is not read: it has no published file specification to build from. The result fits the player as it is, so the file above goes straight to `GeometryCachePlayer.attach`.
+`fps` (default 24) is for PC2, which does not say; an MDD file's own times win. `zUp: true` turns a Z-up file to Y-up as `(x, z, -y)`; Blender's MDD add-on writes Z-up and its PC2 add-on Y-up by default. `maxFloats` (default 2^28) refuses a larger file. A header that asks for more than the file holds is refused as a cut file or no point cache at all, before the limit: MDD has no magic, so any other file reads as an MDD header. Alembic is not read: it has no published file specification to build from. The result fits the player as it is, so the file above goes straight to `GeometryCachePlayer.attach`.
 
 The format is little endian. A 16 byte header holds the magic `MGCH`, version 1, frames per second (f32) and the total
 frames (0 if unknown). Chunks follow, each a 64 byte header and its payload.

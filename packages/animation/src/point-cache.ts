@@ -37,10 +37,16 @@ function floats(view: DataView, at: number, count: number, little: boolean): Flo
   return out;
 }
 
-function sizes(frames: number, vertices: number, limit: number): number {
+/**
+ * The float count a header claims, checked against `room`, the bytes the file holds for them, before `limit`: an MDD
+ * file has no magic, so any other file reads as an MDD header, and the limit's advice fits only a real file.
+ */
+function sizes(frames: number, vertices: number, limit: number, room: number): number {
   if (!Number.isInteger(frames) || !Number.isInteger(vertices) || frames < 1 || vertices < 1)
     throw bad('has no frames or no vertices');
   const count = frames * vertices * 3;
+  if (count * 4 > room)
+    throw bad(`is cut off or is not a PC2 or MDD file: its header asks for ${frames} frames of ${vertices} vertices, more than it holds`);
   if (count > limit) throw new MargoError('failed', `Point cache holds ${count} floats, over maxFloats ${limit}; raise maxFloats or export fewer frames`);
   return count;
 }
@@ -53,9 +59,8 @@ function readPC2(view: DataView, fps: number, limit: number): PointCache {
     step = view.getFloat32(24, true),
     frameCount = view.getInt32(28, true);
   if (version !== 1) throw new MargoError('unsupported', `PC2 version ${version} is not read; export version 1`);
-  const count = sizes(frameCount, vertexCount, limit);
+  const count = sizes(frameCount, vertexCount, limit, view.byteLength - PC2_HEADER);
   if (!(step > 0)) throw bad('has a sample rate of 0 or less');
-  if (view.byteLength < PC2_HEADER + count * 4) throw bad('stops before its last frame');
   const times = new Float32Array(frameCount);
   for (let n = 0; n < frameCount; n++) times[n] = (start + n * step) / fps;
   return {
@@ -72,9 +77,8 @@ function readMDD(view: DataView, fps: number, limit: number): PointCache {
   if (view.byteLength < MDD_HEADER) throw bad('stops inside its header');
   const frameCount = view.getInt32(0, false),
     vertexCount = view.getInt32(4, false),
-    count = sizes(frameCount, vertexCount, limit),
-    first = MDD_HEADER + frameCount * 4;
-  if (view.byteLength < first + count * 4) throw bad('stops before its last frame');
+    first = MDD_HEADER + frameCount * 4,
+    count = sizes(frameCount, vertexCount, limit, view.byteLength - first);
   const times = floats(view, MDD_HEADER, frameCount, false),
     span = times[frameCount - 1]! - times[0]!;
   for (let n = 1; n < frameCount; n++) if (!(times[n]! > times[n - 1]!)) throw bad('has times that do not rise');

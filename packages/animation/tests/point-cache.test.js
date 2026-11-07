@@ -75,3 +75,15 @@ test('a cut, empty, unknown or oversized file is refused with a code', () => {
   code(still, 'failed');
   assert.throws(() => parsePointCache(pc2, { fps: 0 }), RangeError);
 });
+
+test('a file that is no point cache is refused as one, not as a cache too large for maxFloats', () => {
+  // A web page answered for a missing .pc2 reads as an MDD header of about 10^9 frames of 10^9 vertices: the readme run
+  // saw "Point cache holds 3418670067845590500 floats, over maxFloats; raise maxFloats", advice no setting could follow.
+  const page = new TextEncoder().encode('<!DOCTYPE html><html><head><title>Not found</title></head><body></body></html>');
+  assert.throws(
+    () => parsePointCache(page),
+    (error) => error.code === 'failed' && !/maxFloats/.test(error.message) && /not a PC2 or MDD file/.test(error.message),
+  );
+  // A real file over the limit still names the limit.
+  assert.throws(() => parsePointCache(fixture('ball.pc2'), { maxFloats: 10 }), /over maxFloats 10/);
+});
