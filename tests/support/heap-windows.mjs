@@ -13,8 +13,13 @@ import { GCProfiler, getHeapStatistics } from 'node:v8';
 export function heapWindows(run, calls = 1000, windows = 5) {
   const heap = () => getHeapStatistics().used_heap_size;
   heap();
-  const r0 = heap(),
-    read = heap() - r0,
+  // The median of several reads: this one figure comes off every window, so one read that caught something else would
+  // shift them all alike, and a frame that allocates could pass.
+  const reads = Array.from({ length: 5 }, () => {
+      const start = heap();
+      return heap() - start;
+    }).sort((a, b) => a - b),
+    read = reads[2],
     bytes = [];
   let collected = 0;
   while (bytes.length < windows) {

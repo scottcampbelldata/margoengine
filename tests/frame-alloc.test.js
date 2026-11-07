@@ -212,6 +212,39 @@ try {
   for (const b of bytes) assert.ok(b >= 16 && b <= 256, `${bytes.join(', ')} B per call (${host})`);
 });
 
+// Regression: a read that caught about 210 KB of something else came off all five windows of a run, which then read
+// about -118 B per call, 210 under the 92 B every other run gives. Run by run the windows stayed a fixed step apart.
+test('one heap read that catches something else does not shift every window', { timeout: 60_000 }, () => {
+  const windows = JSON.stringify(new URL('./support/heap-windows.mjs', import.meta.url).href),
+    out = execFileSync(
+      process.execPath,
+      [
+        '--expose-gc',
+        '--single-threaded-gc',
+        '--no-concurrent-recompilation',
+        '--max-semi-space-size=16',
+        '--input-type=module',
+        '-e',
+        `import v8 from 'node:v8';
+import { syncBuiltinESMExports } from 'node:module';
+const real = v8.getHeapStatistics;
+let reads = 0;
+v8.getHeapStatistics = () => {
+  const statistics = real();
+  if (++reads >= 3) statistics.used_heap_size += 210000;
+  return statistics;
+};
+syncBuiltinESMExports();
+const { heapWindows } = await import(${windows});
+let kept;
+console.log(JSON.stringify(heapWindows((calls) => { for (let i = 0; i < calls; i++) kept = new Array(1).fill(i); })));`,
+      ],
+      { encoding: 'utf8', timeout: 50_000 },
+    ),
+    bytes = JSON.parse(out);
+  for (const b of bytes) assert.ok(b >= 16 && b <= 256, `${bytes.join(', ')} B per call (${host})`);
+});
+
 test('hypot gives Math.hypot bit for bit (V8) without allocating', () => {
   let seed = 7;
   const random = () => {
