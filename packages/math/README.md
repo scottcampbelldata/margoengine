@@ -111,6 +111,10 @@ console.log(light.r, light.g, light.b);
 const upload = probe.toArray(new Float32Array(27));
 ```
 
+`rotate(quaternion)` turns the stored light in place, so a probe baked on a moving object follows it without projecting again.
+The quaternion need not be unit length; a zero or non-finite one throws a `RangeError`. Bands 0 and 1 stay exact and band 2 is
+rebuilt from five fixed directions, so a turn and its inverse return the same coefficients within 1e-12.
+
 Capsules (`Capsule`, also `@margoengine/math/capsule`): every point within `radius` of the segment `start` to `end`, the usual
 collider of a character. `new Capsule()` stands 2 tall on the origin with radius 0.5; `axis` is the `Line3` between the ends.
 Queries: `containsPoint`, `distanceToPoint` (0 inside), `clampPoint`, `getBoundingBox`, `getBoundingSphere`, `intersectsSphere`,

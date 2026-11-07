@@ -383,8 +383,10 @@ engine.start();
 ## Arcball gizmo, focus and keyboard
 
 `ArcballGizmo.attach(arcball)` draws the ball the pointer drags: rings about the world axes and an outline, centred on the
-target, with the far half of each ring dimmed. It shows during a gesture, or all the time with `autoHide: false`, and it
-takes no input. A double-click moves the view centre to the point under the pointer without changing the turn or the
+target, with the far half of each ring dimmed. It shows during a gesture, or all the time with `autoHide: false`. With
+`autoHide: false` a ring can be grabbed: a left drag that starts within 8 pixels of a ring's near half turns the view about
+that ring's axis only, keeping the grabbed point under the pointer; a press anywhere else is the usual free turn. Touch
+always turns freely. A double-click moves the view centre to the point under the pointer without changing the turn or the
 distance; with no `pick`, or when `pick` returns null, that point is on the plane through the target. `focus(point)` does
 the same from code. With `enableDamping` the view glides there. `listenToKeyEvents(window)` turns on the keyboard: arrows
 turn the view by `keyRotateStep`, Shift + arrows pan by `keyPanStep` (the camera goes the way the arrow points), Q and E roll, + and - zoom and Home resets. Every

@@ -513,6 +513,12 @@ export class SH3 {
     scale(s: number): this;
     lerp(sh: SH3, t: number): this;
     equals(sh: SH3, epsilon?: number): boolean;
+    rotate(rotation: {
+        x: number;
+        y: number;
+        z: number;
+        w: number;
+    }): this;
     addAmbient(color: ColorLike): this;
     addSample(direction: Vec3Like, color: ColorLike, weight?: number): this;
     getAt<T extends ColorLike>(direction: Vec3Like, out: T): T;

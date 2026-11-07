@@ -41,6 +41,7 @@ export class ArcballControls extends Controls {
         RIGHT: number | null;
     };
     state: 'none' | 'rotate' | 'pan' | 'dolly' | 'touch-rotate' | 'touch-dolly-pan';
+    handle: ArcballHandle | null;
     constructor(source: Camera | EngineKernel, element?: ControlElement | null, options?: ArcballControlsOptions);
     protected get kind(): string;
     protected bind(element: ControlElement): Array<[EventTargetLike, string, InputEventListener, AddEventListenerOptions?]>;
@@ -98,6 +99,16 @@ export interface ArcballGizmoTarget {
     } | null;
     readonly camera: EngineKernel['camera'];
     readonly state: string;
+    handle?: {
+        begin(x: number, y: number): boolean;
+        move(x: number, y: number): void;
+    } | null;
+    rotate?(axis: readonly number[], angle: number): void;
+}
+
+export interface ArcballHandle {
+    begin(x: number, y: number): boolean;
+    move(x: number, y: number): void;
 }
 
 export type ArcballPick = (x: number, y: number) => readonly number[] | null;

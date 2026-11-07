@@ -22,6 +22,15 @@ const Y00 = 0.282094791773878,
   Y2C = 0.54627421529604;
 
 const basis = new Float64Array(9);
+const HALF = Math.SQRT1_2;
+// Five directions whose band 2 values are independent, for SH3.rotate.
+const BAND2: readonly Vec3Like[] = [
+  { x: 1, y: 0, z: 0 },
+  { x: 0, y: 0, z: 1 },
+  { x: HALF, y: HALF, z: 0 },
+  { x: HALF, y: 0, z: HALF },
+  { x: 0, y: HALF, z: HALF },
+];
 
 /**
  * The 9 basis values at `direction` into `out` (default a new Float64Array), in the coefficient order of {@link SH3}.
@@ -108,6 +117,65 @@ export class SH3 {
     for (let i = 0; i < 27; i++) if (!(Math.abs(this.coefficients[i] - sh.coefficients[i]) <= epsilon)) return false;
     return true;
   }
+  /**
+   * Turns the light by the unit quaternion `rotation`, so a probe follows a moved object with no second projection: what
+   * shone from `d` now shines from the rotated `d`. Band 0 stays, band 1 is the rotated vector, and band 2 is solved
+   * from five fixed directions (Sloan 2008, "Stupid Spherical Harmonics Tricks", which gives this reading of a rotation).
+   * @throws RangeError for a zero or non-finite quaternion.
+   */
+  rotate(rotation: { x: number; y: number; z: number; w: number }): this {
+    const { x, y, z, w } = rotation,
+      length = Math.hypot(x, y, z, w);
+    if (!(length > 0) || length === Infinity)
+      throw new RangeError(`SH rotation (${x}, ${y}, ${z}, ${w}) must be finite and not zero; pass a unit quaternion`);
+    const qx = x / length,
+      qy = y / length,
+      qz = z / length,
+      qw = w / length,
+      turn = (v: Vec3Like): Vec3Like => {
+        const tx = 2 * (qy * v.z - qz * v.y),
+          ty = 2 * (qz * v.x - qx * v.z),
+          tz = 2 * (qx * v.y - qy * v.x);
+        return {
+          x: v.x + qw * tx + qy * tz - qz * ty,
+          y: v.y + qw * ty + qz * tx - qx * tz,
+          z: v.z + qw * tz + qx * ty - qy * tx,
+        };
+      },
+      c = this.coefficients;
+    for (let channel = 0; channel < 3; channel++) {
+      // Band 1 is a vector: Y1 * (c1 y + c2 z + c3 x).
+      const v = turn({ x: c[9 + channel], y: c[3 + channel], z: c[6 + channel] });
+      c[3 + channel] = v.y;
+      c[6 + channel] = v.z;
+      c[9 + channel] = v.x;
+    }
+    // The light at each rotated direction equals the old light at the direction itself: five equations, five unknowns.
+    const rows = BAND2.map((direction) => {
+      const old = shBasis(direction),
+        row = Array.from(shBasis(turn(direction)).subarray(4, 9));
+      for (let channel = 0; channel < 3; channel++) {
+        let sum = 0;
+        for (let k = 4; k < 9; k++) sum += old[k] * c[k * 3 + channel];
+        row.push(sum);
+      }
+      return row;
+    });
+    for (let i = 0; i < 5; i++) {
+      let pivot = i;
+      for (let r = i + 1; r < 5; r++) if (Math.abs(rows[r][i]) > Math.abs(rows[pivot][i])) pivot = r;
+      [rows[i], rows[pivot]] = [rows[pivot], rows[i]];
+      for (let r = 0; r < 5; r++) {
+        if (r === i) continue;
+        const factor = rows[r][i] / rows[i][i];
+        for (let k = i; k < 8; k++) rows[r][k] -= factor * rows[i][k];
+      }
+    }
+    for (let i = 0; i < 5; i++)
+      for (let channel = 0; channel < 3; channel++) c[(4 + i) * 3 + channel] = rows[i][5 + channel] / rows[i][i];
+    return this;
+  }
+
   /** Adds light of the same radiance from every direction. */
   addAmbient(color: ColorLike): this {
     const c = this.coefficients,

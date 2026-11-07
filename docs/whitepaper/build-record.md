@@ -1211,10 +1211,12 @@ An audit of the finished batches against their job text listed 70 gaps for the H
 | Texture 4 | exportOBJ and compressTextures on held textures | DONE | `7f23a4c4a` | LIM-285 |
 | README 1 | last README error, Skeleton in rigging types | DONE | `3cd3d347d` | - |
 | README stand-ins | README examples run as pasted | DONE | `831d00371` | - |
-| B20 | Kits and materials emit no Draco or Basis file | DONE | this commit | - |
-| B23 | engine.pick in a loop documented, pickMany is the batch | DONE | this commit | - |
-| B26 | PipelineCompiles.trackNext, limit said first | DONE | this commit | - |
-| B37 | cull phase limit documented | DONE | this commit | - |
+| B20 | Kits and materials emit no Draco or Basis file | DONE | `2915f56a2` | - |
+| B23 | engine.pick in a loop documented, pickMany is the batch | DONE | `69ae59107` | - |
+| B26 | PipelineCompiles.trackNext, limit said first | DONE | `2157dbe73` | - |
+| B37 | cull phase limit documented | DONE | `ca45d8bb3` | - |
+| B28 | 13/7 Arcball gizmo | DONE | this commit | LIM limits row |
+| B39 | 8/5 Spherical harmonics | DONE | this commit | LIM-048 |
 
 ## LAZ: one LAS reader, and every point format on a real file
 

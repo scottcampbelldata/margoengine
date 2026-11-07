@@ -61,6 +61,13 @@ interface Tracked {
   touch: boolean;
 }
 
+/** A drag `ArcballControls` hands over when it starts on something else than the ball. */
+export interface ArcballHandle {
+  /** The pointer went down at element pixels `x`, `y`; true takes the drag. */
+  begin(x: number, y: number): boolean;
+  /** The pointer of a taken drag moved. */
+  move(x: number, y: number): void;
+}
 /**
  * Free rotation of the camera around `camera.target` with Shoemake's arcball: the pointer's start and current points
  * are lifted onto a virtual ball (`arcballPoint`) and the view turns by the rotation between them, about any axis, so
@@ -129,6 +136,9 @@ export class ArcballControls extends Controls {
   };
   /** The active gesture. */
   state: 'none' | 'rotate' | 'pan' | 'dolly' | 'touch-rotate' | 'touch-dolly-pan' = 'none';
+  /** Takes a rotate drag that starts on a handle, such as a ring of `ArcballGizmo`, which sets it. Default null. */
+  handle: ArcballHandle | null = null;
+  private onHandle = false;
 
   private readonly projectionOption: ArcballProjection | null | undefined;
   // Pending motion, consumed by update(): a camera turn about a world axis through the target, a world shift of
@@ -509,6 +519,7 @@ export class ArcballControls extends Controls {
     this.cursor = { x: at.x, y: at.y };
     // Taking hold stops a coasting spin.
     if (gesture === 'rotate') this.spinAngle = 0;
+    this.onHandle = gesture === 'rotate' && !!this.handle?.begin(at.x, at.y);
     this.begin(gesture);
   };
 
@@ -525,7 +536,8 @@ export class ArcballControls extends Controls {
     const state = this.state,
       last = this.last;
     if (state === 'rotate' || state === 'touch-rotate') {
-      this.drag(last.x, last.y, at.x, at.y);
+      if (this.onHandle && state === 'rotate') this.handle?.move(at.x, at.y);
+      else this.drag(last.x, last.y, at.x, at.y);
       this.last = { x: at.x, y: at.y, spread: 0 };
     } else if (state === 'pan') {
       this.pan((at.x - last.x) * this.panSpeed, (at.y - last.y) * this.panSpeed);

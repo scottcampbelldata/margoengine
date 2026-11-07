@@ -160,3 +160,36 @@ test('reads and writes Color objects', () => {
   assert.ok(color instanceof Color);
   near(color.r, 1);
 });
+
+// A probe on a turned object had to be projected again.
+test('rotate: light from d shines from the rotated d, in every band', () => {
+  const quarter = { x: 0, y: Math.SQRT1_2, z: 0, w: Math.SQRT1_2 }; // +90 degrees about y: +z goes to +x
+  const sh = new SH3()
+    .addAmbient({ r: 0.1, g: 0.2, b: 0.3 })
+    .addSample({ x: 0, y: 0, z: 1 }, { r: 3, g: 2, b: 1 })
+    .addSample({ x: 0.3, y: 0.8, z: -0.2 }, { r: 0, g: 1, b: 2 });
+  const turned = sh.clone().rotate(quarter);
+  const before = { r: 0, g: 0, b: 0 },
+    after = { r: 0, g: 0, b: 0 };
+  for (const [d, r] of [
+    [{ x: 0, y: 0, z: 1 }, { x: 1, y: 0, z: 0 }],
+    [{ x: 1, y: 0, z: 0 }, { x: 0, y: 0, z: -1 }],
+    [{ x: 0, y: 1, z: 0 }, { x: 0, y: 1, z: 0 }],
+    [{ x: 0.6, y: 0, z: 0.8 }, { x: 0.8, y: 0, z: -0.6 }],
+  ]) {
+    sh.getAt(d, before);
+    turned.getAt(r, after);
+    for (const c of ['r', 'g', 'b']) assert.ok(Math.abs(before[c] - after[c]) < 1e-12, `${c} ${before[c]} ${after[c]}`);
+  }
+});
+
+test('rotate: a full turn and a turn and back give the same light, any quaternion length, and a bad one is refused', () => {
+  const sh = new SH3().addSample({ x: 1, y: 2, z: 3 }, { r: 1, g: 2, b: 3 }),
+    a = 0.7,
+    q = { x: 0.5 * Math.sin(a), y: 0.5 * Math.sin(a), z: Math.SQRT1_2 * Math.sin(a), w: Math.cos(a) },
+    back = { x: -q.x * 3, y: -q.y * 3, z: -q.z * 3, w: q.w * 3 },
+    twice = sh.clone().rotate(q).rotate(back);
+  sh.coefficients.forEach((value, i) => assert.ok(Math.abs(value - twice.coefficients[i]) < 1e-12, `coefficient ${i}`));
+  assert.throws(() => sh.rotate({ x: 0, y: 0, z: 0, w: 0 }), RangeError);
+  assert.throws(() => sh.rotate({ x: NaN, y: 0, z: 0, w: 1 }), RangeError);
+});

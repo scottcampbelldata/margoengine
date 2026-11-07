@@ -14,6 +14,21 @@ class Canvas extends FakeElement {
   }
 }
 const STEP = Math.PI / 36;
+// Element pixels of a world point, from the camera's own frame, written apart from the gizmo's.
+const project = (gizmo, p, [cx, cy], half) => {
+  const { position, target, fov } = gizmo.controls.camera,
+    f = norm(sub3(target, position)),
+    right = norm(cross3(f, gizmo.controls.camera.up ?? [0, 1, 0])),
+    up = cross3(right, f),
+    v = sub3(p, position),
+    k = half / (dot3(v, f) * Math.tan((fov * Math.PI) / 360));
+  return { x: cx + dot3(v, right) * k, y: cy - dot3(v, up) * k };
+};
+const sub3 = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+const dot3 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const cross3 = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const norm = (v) => v.map((x) => x / Math.hypot(...v));
+const heightAfterTilt = (distance) => distance * Math.sin(0.5);
 const rig = () => {
   const el = new FakeElement(),
     cam = camera(),
@@ -188,6 +203,52 @@ test('gizmo: follows the target and the distance; needs an engine; removes its p
   const bare = new ArcballControls(camera(), new FakeElement());
   assert.throws(() => new ArcballGizmo(bare), TypeError);
   bare.dispose();
+  control.dispose();
+  engine.dispose();
+});
+
+// The rings drew and took no input: a drag on one was the ball's free turn.
+test('gizmo: a drag on a ring turns about its axis alone and the point stays under the pointer', async () => {
+  const { engine, control } = await onEngine(),
+    el = control.domElement ?? control.element,
+    gizmo = ArcballGizmo.attach(control, { autoHide: false }),
+    cam = engine.camera,
+    centre = [el.clientWidth / 2, el.clientHeight / 2],
+    r = el.clientHeight / 2,
+    distance = Math.hypot(...cam.position);
+  // Seen from +Z the ring about Y is edge on through the centre, so tilt the view up first to open it.
+  control.rotate([1, 0, 0], -0.5);
+  control.update(1);
+  // Its near point, straight below the centre of the screen.
+  const at = gizmo.prims()[1].points.map((p) => p).filter((p) => p[2] > 0).sort((a, b) => b[2] - a[2])[0],
+    { x, y } = project(gizmo, at, centre, r);
+  pointer(el, 'pointerdown', x, y);
+  assert.equal(control.state, 'rotate');
+  pointer(el, 'pointermove', x + 40, y);
+  pointer(el, 'pointerup', x + 40, y);
+  for (let i = 0; i < 4; i++) control.update(1);
+  close(Math.hypot(...cam.position), distance, 1e-6, 'the distance holds');
+  // A turn about Y keeps the eye's height.
+  close(cam.position[1], heightAfterTilt(distance), 1e-6, 'the height holds');
+  const moved = project(gizmo, at, centre, r);
+  close(moved.x, x + 40, 2, 'the grabbed point follows the pointer');
+  gizmo.dispose();
+  assert.equal(control.handle, null);
+  control.dispose();
+  engine.dispose();
+});
+
+test('gizmo: with autoHide nothing is drawn to grab, and off the rings the ball turns freely', async () => {
+  const { engine, control } = await onEngine(),
+    gizmo = ArcballGizmo.attach(control),
+    y0 = engine.camera.position[1];
+  const el = control.domElement ?? control.element;
+  pointer(el, 'pointerdown', 400, 300);
+  pointer(el, 'pointermove', 400, 340);
+  pointer(el, 'pointerup', 400, 340);
+  for (let i = 0; i < 4; i++) control.update(1);
+  assert.notEqual(engine.camera.position[1], y0, 'a vertical drag on the ball tilts');
+  gizmo.dispose();
   control.dispose();
   engine.dispose();
 });
