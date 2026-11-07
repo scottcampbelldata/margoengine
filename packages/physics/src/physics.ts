@@ -193,6 +193,9 @@ export class Physics implements EnginePlugin, BodyOwner {
   private lastAlpha = 1;
   private disposed = false;
   private readonly bodies = new Set<PhysicsBody>();
+  private readonly followers = new Set<PhysicsBody>();
+  // Bodies on child meshes, gathered during a sync and written parents first. Reused, so a sync allocates nothing.
+  private readonly nested: PhysicsBody[] = [];
   private readonly byMesh = new Map<Mesh, PhysicsBody>();
   private readonly byHandle = new Map<number, PhysicsCollider>();
   private readonly joints = new Set<PhysicsJoint>();
@@ -319,6 +322,10 @@ export class Physics implements EnginePlugin, BodyOwner {
   get pendingTime(): number {
     return this.accumulator;
   }
+  /** How many colliders the world holds. */
+  get colliderCount(): number {
+    return this.byHandle.size;
+  }
   get bodyCount(): number {
     return this.bodies.size;
   }
@@ -366,6 +373,7 @@ export class Physics implements EnginePlugin, BodyOwner {
     this.emit('beforestep', dt);
     if (this.disposed) return;
     world.timestep = dt;
+    this.followers.forEach(this.followMesh);
     this.attachments.forEach(this.attachmentStep);
     world.step(this.queue!, this.hooks!);
     this.stepCount++;
@@ -384,6 +392,33 @@ export class Physics implements EnginePlugin, BodyOwner {
   }
   private readonly attachmentStep = (attachment: PhysicsAttachment): void =>
     attachment.beforeStep?.(this.fixedTimestep);
+  private readonly followPosition = { x: 0, y: 0, z: 0 };
+  private readonly followRotation = { x: 0, y: 0, z: 0, w: 1 };
+  private readonly followMesh = (body: PhysicsBody): void => {
+    if (body.type !== 'kinematicPosition') return;
+    const mesh = body.mesh as CoreMesh;
+    try {
+      mesh.check();
+    } catch {
+      this.removeBody(body);
+      return;
+    }
+    const runtime = meshRuntime(mesh),
+      m = worldMatrix(runtime.engine.store, runtime.id, this.parentScratch),
+      q = this.parentRotation,
+      p = this.followPosition,
+      r = this.followRotation;
+    matrixRotation(m, q);
+    p.x = m[12];
+    p.y = m[13];
+    p.z = m[14];
+    r.x = q[0];
+    r.y = q[1];
+    r.z = q[2];
+    r.w = q[3];
+    body.raw.setNextKinematicTranslation(p);
+    body.raw.setNextKinematicRotation(r);
+  };
   private readonly snapshotBody = (body: PhysicsBody): void => {
     if (body.type === 'fixed') return;
     const p = body.pose;
@@ -406,16 +441,37 @@ export class Physics implements EnginePlugin, BodyOwner {
     if (!Number.isFinite(alpha))
       throw new RangeError('Interpolation alpha must be a finite number; pass a value from 0 to 1.');
     this.syncAlpha = this.interpolate ? Math.min(1, Math.max(0, alpha)) : 1;
+    const nested = this.nested;
+    nested.length = 0;
     this.bodies.forEach(this.syncBody);
+    // A child's local pose is measured from its parent's, so each parent is written first: insertion sort by depth.
+    for (let i = 1; i < nested.length; i++) {
+      const body = nested[i];
+      let j = i - 1;
+      for (; j >= 0 && nested[j].depth > body.depth; j--) nested[j + 1] = nested[j];
+      nested[j + 1] = body;
+    }
+    for (let i = 0; i < nested.length; i++) this.writeBody(nested[i]);
+    nested.length = 0;
     this.attachments.forEach(attachmentSync);
   }
   // A stable callback avoids creating a Set iterator during every synchronization.
   private readonly syncBody = (body: PhysicsBody): void => {
-    const out = this.scratch,
-      lerp = this.syncAlpha;
     const mesh = body.mesh;
+    // The mesh drives a follower, so nothing goes back to it.
+    if (!mesh || (body.follow && body.type === 'kinematicPosition')) return;
+    const depth = depthOf(mesh);
     // A resting body on a child mesh is still rewritten: its parent may have moved, and the body keeps its world pose.
-    if (!mesh || (body.type === 'fixed' && !body.dirty) || (body.restWritten && parentOf(mesh) === -1)) return;
+    if ((body.type === 'fixed' && !body.dirty) || (body.restWritten && depth === 0)) return;
+    if (depth) {
+      body.depth = depth;
+      this.nested.push(body);
+    } else this.writeBody(body);
+  };
+  private writeBody(body: PhysicsBody): void {
+    const out = this.scratch,
+      lerp = this.syncAlpha,
+      mesh = body.mesh!;
     try {
       mesh.check();
     } catch {
@@ -501,7 +557,7 @@ export class Physics implements EnginePlugin, BodyOwner {
       p[4] === p[11] &&
       p[5] === p[12] &&
       p[6] === p[13];
-  };
+  }
   /** World pose (in place) to the pose relative to `parent`: inverse parent matrix on the position, inverse parent rotation on the quaternion. */
   private toLocal(store: TransformStoreLike, parent: number, position: number[], rotation: number[]): void {
     const m = worldMatrix(store, parent, this.parentScratch),
@@ -572,6 +628,11 @@ export class Physics implements EnginePlugin, BodyOwner {
     )[type];
     if (!factory)
       throw new TypeError(`Unknown body type ${type}; use dynamic, fixed, kinematicPosition or kinematicVelocity.`);
+    if (options.follow) {
+      if (type !== 'kinematicPosition')
+        throw new TypeError("A body with follow must be a 'kinematicPosition' body; the mesh is what moves it.");
+      if (!(mesh instanceof CoreMesh)) throw new TypeError('A body with follow needs a core Mesh to follow.');
+    }
     const desc = R.RigidBodyDesc[factory]();
     const position =
       options.position ??
@@ -612,6 +673,10 @@ export class Physics implements EnginePlugin, BodyOwner {
     const raw = world.createRigidBody(desc);
     const body = new PhysicsBody(this, raw, mesh, type);
     body.userData = options.userData;
+    if (options.follow) {
+      body.follow = true;
+      this.followers.add(body);
+    }
     if (worldPose) body.fitScale = matrixScale(worldPose, [1, 1, 1]) as [number, number, number];
     // A pose taken from the mesh is already on the mesh; writing it back would only round a child's transform.
     if (mesh && !options.position && !options.rotation) body.dirty = false;
@@ -762,7 +827,7 @@ export class Physics implements EnginePlugin, BodyOwner {
       (options.shape === 'convexDecomposition' && !options.vertices && !options.geometry);
     const fit =
       mesh && needsGeometry
-        ? colliderGeometry(mesh)
+        ? colliderGeometry(mesh, body.fitScale)
         : {
             geometry: null,
             scale: mesh ? ([mesh.scale.x, mesh.scale.y, mesh.scale.z] as const) : ([1, 1, 1] as const),
@@ -798,6 +863,7 @@ export class Physics implements EnginePlugin, BodyOwner {
     for (const attachment of [...this.attachments]) attachment.bodyRemoved?.(body);
     for (const collider of body.colliders) this.byHandle.delete(collider.handle);
     this.bodies.delete(body);
+    this.followers.delete(body);
     if (body.mesh) this.byMesh.delete(body.mesh);
     this.world.removeRigidBody(body.raw);
     body.markRemoved();
@@ -1131,6 +1197,16 @@ export class Physics implements EnginePlugin, BodyOwner {
 
 const attachmentSync = (attachment: PhysicsAttachment): void => attachment.afterSync?.();
 
+/** How many parents are above `mesh`. */
+function depthOf(mesh: Mesh): number {
+  const runtime = meshRuntime(mesh) as unknown as { id?: number; engine?: { store?: { parents?: ArrayLike<number> } } },
+    parents = runtime.engine?.store?.parents;
+  if (!parents || runtime.id === undefined) return 0;
+  let depth = 0;
+  for (let node = parents[runtime.id]; node !== -1 && depth < 65; node = parents[node]) depth++;
+  return depth;
+}
+
 function parentOf(mesh: Mesh): number {
   const runtime = meshRuntime(mesh) as unknown as { id?: number; engine?: { store?: { parents?: ArrayLike<number> } } };
   const parents = runtime.engine?.store?.parents;
@@ -1150,9 +1226,9 @@ function primitiveGeometry(mesh: Mesh): ColliderGeometry | null {
 }
 
 /** Fit a geometry-free root to its static descendants without altering the hierarchy. */
-function colliderGeometry(mesh: Mesh): { geometry: ColliderGeometry; scale: Vec3 } {
+function colliderGeometry(mesh: Mesh, worldScale?: Vec3): { geometry: ColliderGeometry; scale: Vec3 } {
   const direct = primitiveGeometry(mesh);
-  if (direct) return { geometry: direct, scale: [mesh.scale.x, mesh.scale.y, mesh.scale.z] };
+  if (direct) return { geometry: direct, scale: worldScale ?? [mesh.scale.x, mesh.scale.y, mesh.scale.z] };
   const root = meshRuntime(mesh),
     engine = root.engine;
   if (!engine.meshes || !engine.store.tick)
@@ -1178,10 +1254,20 @@ function colliderGeometry(mesh: Mesh): { geometry: ColliderGeometry; scale: Vec3
 
   const vertices = new Float32Array(vertexCount * 3),
     indices = new Uint32Array(indexCount);
-  const [qx, qy, qz, qw] = eulerToQuat(mesh.rotation.x, mesh.rotation.y, mesh.rotation.z);
-  const px = mesh.position.x,
+  // The body sits at the root's world pose: for a root below another mesh, that is not its local one.
+  let [qx, qy, qz, qw] = eulerToQuat(mesh.rotation.x, mesh.rotation.y, mesh.rotation.z),
+    px = mesh.position.x,
     py = mesh.position.y,
     pz = mesh.position.z;
+  if (engine.store.parents[root.id] !== -1) {
+    const m = worldMatrix(engine.store, root.id, new Float64Array(16)),
+      q = [0, 0, 0, 1];
+    matrixRotation(m, q);
+    [qx, qy, qz, qw] = q;
+    px = m[12];
+    py = m[13];
+    pz = m[14];
+  }
   let vertexOffset = 0,
     indexOffset = 0;
   for (const { node, positions, indices: sourceIndices } of sources) {

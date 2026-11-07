@@ -41,6 +41,12 @@ export interface BodyOptions {
   enabledTranslations?: readonly [boolean, boolean, boolean];
   /** Mass added on top of what the colliders contribute. */
   additionalMass?: number;
+  /**
+   * `kinematicPosition` bodies on a core mesh: the mesh drives the body. Before each step the body takes the mesh's
+   * world pose as its target, at any depth of the hierarchy, and nothing is written back: a moving or animated part of a
+   * model that pushes what it touches. Default false.
+   */
+  follow?: boolean;
   dominance?: number;
   userData?: unknown;
 }
@@ -67,6 +73,10 @@ export class PhysicsBody {
   slept = false;
   /** @internal World scale captured for a body attached to a child mesh. */
   fitScale?: [number, number, number];
+  /** @internal The mesh drives this body; see {@link BodyOptions.follow}. */
+  follow = false;
+  /** @internal Parents above the mesh at the last sync, so a parent's body is written before its child's. */
+  depth = 0;
   /** @internal */
   dirty = true;
   private removed = false;

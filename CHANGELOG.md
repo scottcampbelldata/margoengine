@@ -4,6 +4,7 @@
 
 ### Physics
 
+- Bodies work on meshes at any depth of a hierarchy: parents are written before their children, so a body added before its parent no longer lags a frame, a nested glTF node is fitted at its world scale, and a geometry-free root below another mesh keeps its parts where they are. `{type: 'kinematicPosition', follow: true}` makes a mesh drive its body, for a moving part of a model that pushes what it meets. `physics.colliderCount` counts the world's colliders.
 - `body.colliders`, events and query hits now hand you a `PhysicsCollider`: `shape` replaces `shapeType()`, `valid` replaces `isValid()`, and the setters and getters keep their names. New shapes `voxels` and `halfSpace`, and the options `massless` and `fixInternalEdges`, cover what `custom` was needed for. `PhysicsBody` gains `centerOfMass`, `principalInertia`, `inertiaFrame` and `setMassProperties`, and `PhysicsJoint` gains `anchorA` and `anchorB`. The voxel, glTF and interactivity packages use these and no longer reach the solver's own objects.
 - `await Physics.load()` and `await Physics2D.load()` get the solver ready once per app, and `new Physics(engine)` then needs no options. The stage, React and `applyGLTFPhysics` load it by themselves, so their `rapier` options went, and the Rapier peer moved from `@margoengine/react` and `@margoengine/stage` to `@margoengine/physics` and `@margoengine/physics2d`, which keep it as an optional peer you install beside them. The `rapier` option of `Physics` still works.
 

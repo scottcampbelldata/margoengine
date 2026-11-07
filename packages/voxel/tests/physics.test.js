@@ -502,7 +502,7 @@ rtest('colliders follow the radius rule: near moving bodies, loaded chunks only,
   });
   physics.step();
   assert.deepEqual(keys(voxels), ['-1,0,0', '0,0,0', '1,0,0'], 'the body chunk and its loaded neighbours');
-  assert.equal(physics.world.colliders.len(), 4, 'three chunk colliders and the body');
+  assert.equal(physics.colliderCount, 4, 'three chunk colliders and the body');
   let builds = calls.builds;
   for (let i = 0; i < 10; i++) {
     body.setPosition([i & 1 ? 31.99 : 32.01, 16, 16]); // on the chunk 0 | 1 border
@@ -528,7 +528,7 @@ rtest('colliders follow the radius rule: near moving bodies, loaded chunks only,
   physics.step();
   assert.equal(voxels.colliders.size, 0, 'fixed bodies do not count; no moving body, no colliders');
   physics.step(); // dropped colliders stay disabled for one step, so their contacts end with events
-  assert.equal(physics.world.colliders.len(), 1);
+  assert.equal(physics.colliderCount, 1);
   physics.dispose();
   const wide = setup({ radius: 2, budget: Infinity }, [0, 0, 0]);
   for (let cx = -3; cx <= 3; cx++) fill(wide.world, cx * 32, cx * 32 + 32, 0, 1, 0, 32, stone);
@@ -925,10 +925,10 @@ rtest('dispose removes every collider and stops following edits and steps', () =
   ballBody(physics, 0.4, [-35.5, 1.5, 0.5]); // meshes in chunk x -2 and its neighbours
   physics.step();
   assert.ok(Object.values(kinds(voxels)).includes('mesh') && Object.values(kinds(voxels)).includes('voxels'));
-  assert.ok(physics.world.colliders.len() > 2 + voxels.colliders.size, 'mesh chunks keep a disabled voxel collider');
+  assert.ok(physics.colliderCount > 2 + voxels.colliders.size, 'mesh chunks keep a disabled voxel collider');
   voxels.dispose();
   assert.equal(voxels.colliders.size, 0);
-  assert.equal(physics.world.colliders.len(), 2, 'only the body colliders are left');
+  assert.equal(physics.colliderCount, 2, 'only the body colliders are left');
   const before = { ...calls };
   world.setBlock(3, 0, 3, 0);
   world.setBlock(-36, 0, 0, 0);

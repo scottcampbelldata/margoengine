@@ -24,6 +24,7 @@ export interface BodyOptions {
     enabledRotations?: readonly [boolean, boolean, boolean];
     enabledTranslations?: readonly [boolean, boolean, boolean];
     additionalMass?: number;
+    follow?: boolean;
     dominance?: number;
     userData?: unknown;
 }
@@ -231,6 +232,7 @@ export class Physics implements EnginePlugin, BodyOwner {
     set gravity(value: Vec3);
     get alpha(): number;
     get pendingTime(): number;
+    get colliderCount(): number;
     get bodyCount(): number;
     setup(engine: EngineKernel): void;
     onPreUpdate(delta: number): void;
@@ -285,6 +287,8 @@ export class PhysicsBody {
     restWritten: boolean;
     slept: boolean;
     fitScale?: [number, number, number];
+    follow: boolean;
+    depth: number;
     dirty: boolean;
     constructor(owner: BodyOwner, raw: RigidBody, mesh: Mesh | null, type: BodyType);
     get type(): BodyType;
