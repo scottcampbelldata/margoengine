@@ -412,3 +412,37 @@ fn only_touching_pairs_join_an_island() {
     w.step(1.0 / 60.0);
     assert_eq!(w.header().islands, 1);
 }
+
+#[test]
+fn a_round_shape_with_its_core_on_the_surface_of_a_box_still_touches_it() {
+    // The core sits exactly on a face, an edge or a corner, so the origin lies on the surface of the difference and nothing
+    // lies beyond the triangle GJK ends on. A sensor sliding through a box at 0.1 m a step lost its overlap there.
+    let half = [0.5, 1.0, 1.0];
+    for sign in [-1.0, 1.0] {
+        for (axis, at) in [(0, v3(0.5 * sign, 0.0, 0.0)), (1, v3(0.0, sign, 0.0)), (2, v3(0.0, 0.0, sign))] {
+            let m = manifold((SHAPE_BOX, half, v3(0.0, 0.0, 0.0), I), (SHAPE_BALL, [0.3, 0.0, 0.0], at, I));
+            assert_eq!(m.count, 1, "a ball on face {axis} {sign}");
+            assert!((m.points[0].separation + 0.3).abs() < 1e-5, "{}", m.points[0].separation);
+            let along = [m.normal.x, m.normal.y, m.normal.z];
+            assert!((along[axis] - sign).abs() < 1e-5, "out of the face: {along:?}");
+        }
+        let at = v3(0.5 * sign, 0.0, 0.0);
+        let m = manifold((SHAPE_BOX, half, v3(0.0, 0.0, 0.0), I), (SHAPE_CAPSULE, [0.3, 0.4, 0.0], at, I));
+        assert!(m.count >= 1, "a capsule on a face {sign}");
+        assert!((m.points[0].separation + 0.3).abs() < 1e-5, "{}", m.points[0].separation);
+        assert!((m.normal.x - sign).abs() < 1e-5, "out of the face: {:?}", m.normal);
+    }
+    // A hair inside or outside the face, where a solid from both sides of the triangle turned a face inward and read 0.45 m.
+    for step in -16..=16 {
+        let x = 0.5 + step as f32 * 6e-8;
+        let m = manifold((SHAPE_BOX, half, v3(0.0, 0.0, 0.0), I), (SHAPE_CAPSULE, [0.3, 0.4, 0.0], v3(x, 0.0, 0.0), I));
+        assert!(m.count >= 1, "a capsule at {x}");
+        assert!((m.points[0].separation + 0.3).abs() < 2e-5, "at {x}: {}", m.points[0].separation);
+        assert!((m.normal.x - 1.0).abs() < 1e-5, "at {x}: {:?}", m.normal);
+    }
+    for at in [v3(0.5, 1.0, 0.0), v3(0.5, 0.0, 1.0), v3(0.5, 1.0, 1.0), v3(-0.5, -1.0, -1.0)] {
+        let m = manifold((SHAPE_BOX, half, v3(0.0, 0.0, 0.0), I), (SHAPE_BALL, [0.3, 0.0, 0.0], at, I));
+        assert_eq!(m.count, 1, "a ball on {at:?}");
+        assert!((m.points[0].separation + 0.3).abs() < 1e-5, "{}", m.points[0].separation);
+    }
+}

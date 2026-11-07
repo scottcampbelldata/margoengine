@@ -376,19 +376,14 @@ fn seed(a: &impl Convex, b: &impl Convex, start: &Distance, polytope: &mut Polyt
         polytope.count = 3;
     }
     if polytope.count == 3 {
-        // Both sides of the triangle, so the origin is inside what they make even when it lies on the triangle.
+        // The origin lies on the triangle, so the triangle and its taller side make a solid with the origin on a face. One apex
+        // and not one each side: their line can miss the triangle, and the solid then has a dent whose faces point inward. On
+        // the surface of the difference, a shape with its core on a face of the other, one side has no height at all.
         let (p, q, r) = (polytope.vertices[0].w, polytope.vertices[1].w, polytope.vertices[2].w);
         let n = q.sub(p).cross(r.sub(p));
         let (up, down) = (vertex(a, b, n), vertex(a, b, n.scale(-1.0)));
-        polytope.vertices[3] = up;
-        polytope.vertices[4] = down;
-        polytope.count = 5;
-        let inside = p.add(q).add(r).add(up.w).add(down.w).scale(0.2);
-        let mut made = true;
-        for (i, j, k) in [(0, 1, 3), (1, 2, 3), (2, 0, 3), (0, 1, 4), (1, 2, 4), (2, 0, 4)] {
-            made &= polytope.add(i, j, k, inside);
-        }
-        return made;
+        polytope.vertices[3] = if n.dot(up.w.sub(p)) < n.dot(p.sub(down.w)) { down } else { up };
+        polytope.count = 4;
     }
     let (p, q, r, s) = (polytope.vertices[0].w, polytope.vertices[1].w, polytope.vertices[2].w, polytope.vertices[3].w);
     let inside = p.add(q).add(r).add(s).scale(0.25);
