@@ -1,6 +1,6 @@
 {
-  "commit": "d36044b0f",
-  "dirty": false,
+  "commit": "ffcc1e84b",
+  "dirty": true,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
     "raw": 57071,
@@ -2694,6 +2694,10 @@
       "./query": {
         "raw": 7254,
         "gzip": 3164
+      },
+      "./layers-pbr": {
+        "raw": 6736,
+        "gzip": 2563
       }
     },
     "@margoengine/text": {

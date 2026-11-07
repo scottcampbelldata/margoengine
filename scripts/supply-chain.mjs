@@ -177,6 +177,10 @@ const ASSETS = [
     'Shadow reference pictures in packages/shadows/test/fixtures/outside: rendered by Blender Cycles from the Khronos models above (their licences apply), made by this script',
   ],
   [
+    'packages/terrain/test/fixtures/aerial-rocks-02',
+    'Terrain material test textures: Aerial Rocks 02 by Rob Tuytel (Poly Haven, CC0 1.0), the 1k JPEG colour, nor_gl, arm and disp maps byte for byte from https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/aerial_rocks_02/ (aerial_rocks_02_diff_1k.jpg 785,923 bytes, SHA-256 708373b2af7fd07ac8de1500556006aaf904c41a99985a849cacc78874f38eac; aerial_rocks_02_nor_gl_1k.jpg 1,177,932 bytes, SHA-256 6df5263ba6c30e9343ee324d87078b926024d710b0b349025083600369df8d25; aerial_rocks_02_arm_1k.jpg 211,113 bytes, SHA-256 de3ffa2b107d3b9144979a1f683028c74ec86823b2b8eefe16bf5bb9a655ad0c; aerial_rocks_02_disp_1k.jpg 111,007 bytes, SHA-256 f8df3ed278b28255935d90ef0927cae075445a3a761890df79d3c70b468210ef; downloaded 2026-11-07)',
+  ],
+  [
     'packages/shadows/test/fixtures/rainier-terrarium.png',
     'Mount Rainier elevation, Terrarium tile 10/165/360 from the Terrain Tiles on AWS open data set (Mapzen); United States 3DEP and global GMTED2010 and SRTM terrain data courtesy of the U.S. Geological Survey',
   ],

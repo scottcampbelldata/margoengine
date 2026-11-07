@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10680846,
+  "total": 10683665,
   "history": [
     {
       "date": "2026-10-24",
@@ -3800,6 +3800,12 @@
       "commit": "d36044b0f",
       "reason": "xr/ar: new optional entry, AR planes, depth and light estimation",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "ffcc1e84b",
+      "reason": "new entry @margoengine/terrain/layers-pbr, about 2.7 KB gzip",
+      "grew": 1
     }
   ],
   "items": {
@@ -4437,6 +4443,7 @@
     "@margoengine/taa": 12187,
     "@margoengine/taa/upscale": 7093,
     "@margoengine/terrain": 12874,
+    "@margoengine/terrain/layers-pbr": 2819,
     "@margoengine/terrain/query": 3420,
     "@margoengine/text": 16406,
     "@margoengine/text/msdf": 4516,

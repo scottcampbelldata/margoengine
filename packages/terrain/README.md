@@ -264,6 +264,73 @@ uploaded (r32float and rgba8unorm exactly, rgba16float within half precision), t
 the GPU at 3,584 points matches `height` to 2.6 mm, and 512 rays cast onto the mountain all hit, each within 2.3 mm of
 the shader's height at the hit (Radeon 680M; the bound from float32 rounding is 4.9 mm).
 
+## Full PBR layer materials: `@margoengine/terrain/layers-pbr`
+
+`TerrainMaterials.attach(engine, terrain, options)` gives every layer its own normal map, ambient occlusion,
+roughness and height, sampled triplanar at the layer's `scale` like its colour, so rock, mud and snow read as
+materials up close. Its `textures` factory returns two 2D array textures with one layer per terrain layer
+(`rgba8unorm` or `rgba16float`), made at attachment and again after device restoration:
+
+- `normals`: tangent-space normals, XYZ encoded 0..1 with +Y up (the OpenGL convention, Poly Haven's `nor_gl`; flip
+  green for a DirectX map).
+- `surface`: R ambient occlusion, G roughness (glTF's ORM order, Poly Haven's `arm`), B unused, A height 0..1 (a
+  `disp` map).
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Terrain} from 'margoengine/terrain';
+import {TerrainMaterials} from 'margoengine/terrain/layers-pbr';
+const engine = await Engine.create(document.querySelector('canvas')!);
+// Four 1 x 1 layers here; use your layers' full-size, mipmapped maps.
+function array(device: GPUDevice, rgba: number[]) {
+  const texture = device.createTexture({size: [1, 1, 4], format: 'rgba8unorm', usage: 6});
+  device.queue.writeTexture({texture}, new Uint8Array([...rgba, ...rgba, ...rgba, ...rgba]), {bytesPerRow: 4, rowsPerImage: 1}, [1, 1, 4]);
+  return texture;
+}
+const terrain = Terrain.attach(engine, {
+  size: [128, 128], origin: [-64, -64], heightScale: 20,
+  layers: [0, 1, 2, 3].map(() => ({height: [-100, 100] as [number, number], slope: [0, 1] as [number, number], scale: 0.25})),
+  textures(device) {
+    const heightmap = device.createTexture({size: [2, 2], format: 'r32float', usage: 6});
+    device.queue.writeTexture({texture: heightmap}, new Float32Array(4), {bytesPerRow: 8}, [2, 2]);
+    const layers = device.createTexture({size: [1, 1, 4], format: 'rgba8unorm-srgb', usage: 6});
+    device.queue.writeTexture({texture: layers}, new Uint8Array(16).fill(150), {bytesPerRow: 4, rowsPerImage: 1}, [1, 1, 4]);
+    return {heightmap, layers};
+  },
+});
+TerrainMaterials.attach(engine, terrain, {
+  heightBlend: 0.5,                              // 0 crossfades by weight; 1 lets the higher surface win
+  layers: [{normal: 1, occlusion: 1, roughness: 1}], // per layer, the rest take these defaults
+  textures: (device) => ({normals: array(device, [128, 128, 255, 255]), surface: array(device, [255, 230, 0, 128])}),
+});
+engine.start();
+```
+
+- Normals: each projection's tangent-space normal becomes the slope of a height over that projection's plane; the
+  three are blended by the triplanar weights as one gradient and tilt the shading normal as a surface gradient
+  (Mikkelsen's "Surface Gradient-Based Bump Mapping Framework", 2020), so cliffs need no tangents and the three
+  projections agree. `normal` (0 to 2, default 1) scales the tilt. It stacks with `bump`.
+- Roughness replaces the terrain's `roughness` per pixel, times the layer's `roughness` (0 to 2, default 1), clamped
+  to 0.02..1; shadows and clustered lights use it and the tilted normal. AO, times `occlusion` (0 to 1, default 1),
+  darkens the terrain's own ambient term only, not image-based light another effect adds.
+- Height blending: where layers' weights overlap (rules or painted weights), each weight is scaled by
+  2^(8 x `heightBlend` x (height - 1)), so stones stand out of mud and snow fills the hollows first (after Mishkinis,
+  "Advanced Terrain Texture Splatting", 2013). `heightBlend: 0` keeps the terrain's own crossfade.
+- Where no layer's rule applies (the terrain falls back to layer 0's colour) the vertex normal and the terrain's
+  roughness are used. SSR's capture (`ssr.add(terrain)`) takes the blended colour but the terrain's own normal and
+  roughness.
+- Attach it before any effect that replaces the terrain's lit shader; it patches the layer loop and the fragment.
+- Cost per pixel: each showing layer adds three samples of `surface` and up to three of `normals` (one triplanar axis
+  on most ground, all three on cliffs); with height rules every layer's `surface` is sampled, with painted weights
+  only those that show. About 40 ALU operations a layer more.
+
+Checked on a real GPU by `test/layers-pbr.browser.mjs` (in `test:gpu`), on flat ground seen from above (Radeon 680M):
+flat maps draw exactly the terrain's own pixels (0 of 255 apart) with rules, painted weights and `bump`; a normal tilted
+toward +U lights the ground from +X (luma 146 against 62 from -X, the plain terrain 123 from both), one toward +V (green
+up) from -Z; AO 0 removes the ambient light (151 to 0); roughness 0.1 draws the overhead sun's highlight (254 against
+147); full height blending gives the highest of four equal layers the ground; and Poly Haven's CC0 Aerial Rocks 02 maps
+(`test/fixtures/aerial-rocks-02`) give a low-sun close-up 1.6 times the luminance spread of its colour alone.
+
 ## Screen-space reflections
 
 `Terrain` takes SSR's capture hook (`@margoengine/post/ssr`): `ssr.add(terrain)` draws its own normal, layer colour and

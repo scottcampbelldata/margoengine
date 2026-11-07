@@ -591,6 +591,15 @@ binding numbers fitted only `Shadows`. Evidence: `packages/shadows/test/virtual-
 0.95 with `Shadows` for culled parts, scatter and voxels; real Mount Rainier elevation against Blender Cycles, overlap 0.86
 (`Shadows`) and 0.81 (`VirtualShadows`), 0 with the terrain not casting, RTX A6000. Missing: other GPUs.
 
+Terrain layer materials (`@margoengine/terrain/layers-pbr`, 2026-11-07) are a lighting effect in the same group, at
+bindings 90 to 92: they patch the layer loop (a height-blend factor on each weight, then the layer's normal and surface
+samples) and wrap the fragment so the per-pixel roughness is written into the input before any later lighting code reads
+it; the tilted normal is a surface gradient from the three projections' volume gradients (Mikkelsen 2020), so no tangents
+exist and shadows and clustered lights see the same `n`. SSR's capture keeps the geometric normal and terrain roughness.
+Evidence: `packages/terrain/test/layers-pbr.browser.mjs`, flat maps 0 of 255 from the terrain's own shading with rules,
+painted weights and bump; tilts lit from the right side on both axes; real CC0 rock maps 1.6 times the luminance spread of
+colour alone; Radeon 680M. Missing: other GPUs, cost timed.
+
 Both shadow classes take `effects`: objects that declare WGSL at bindings 40 and up (four each), give a factor that
 `shadowLit` multiplies the sun by, and update once a frame after the depth passes. With none the shader text is what it was,
 which the golden GPU proofs pin. `cloudShadows` runs the sky's cloud remap and erosion along the ray to the sun, with the
