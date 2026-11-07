@@ -378,8 +378,13 @@ function splitConcave(counts: Uint32Array, faces: Uint32Array, points: ArrayLike
       keep();
       continue;
     }
-    split = true;
+    // A face that crosses itself has no inside to clip, and the clipper leaves part of it out: it stays a fan, as without this entry.
     const triangles = triangulate(flat);
+    if (triangles.length < (n - 2) * 3) {
+      keep();
+      continue;
+    }
+    split = true;
     for (let t = 0; t < triangles.length; t += 3) {
       outCounts.push(3);
       outSource.push(source[f]);

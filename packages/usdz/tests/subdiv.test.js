@@ -186,6 +186,26 @@ test('a concave polygon becomes triangles that cover it, turning its own way', a
   assert.ok(Math.abs(Math.abs(area(back.meshes[0])) - 7) < 1e-6);
 });
 
+test('a face that crosses itself keeps all its triangles, as real photogrammetry needs', async () => {
+  const asset = await text(
+    `#usda 1.0
+(
+    metersPerUnit = 1
+    upAxis = "Y"
+)
+def Mesh "Cross"
+{
+    uniform token subdivisionScheme = "none"
+    int[] faceVertexCounts = [4, 4]
+    int[] faceVertexIndices = [0, 1, 2, 3, 4, 5, 6, 7]
+    point3f[] points = [(0, 0, 0), (2, 2, 0), (2, 0, 0), (0, 3, 0), (3, 0, 0), (5, 0, 0), (4, 1, 0), (5, 2, 0)]
+}`,
+    [subdivision()],
+  );
+  // The first crosses itself, the second is concave and splits: each stays two triangles.
+  assert.equal(triangles(asset.meshes[0]), 4);
+});
+
 test('values on a split polygon stay with their corners', async () => {
   const asset = await text(ARROW('texCoord2f[] primvars:st = [(0, 0), (1, 0), (1, 0.25), (0.25, 0.25), (0.25, 1), (0, 1)] (interpolation = "vertex")'), [subdivision()]),
     { positions, uvs } = asset.meshes[0];
