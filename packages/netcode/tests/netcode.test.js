@@ -1,6 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { CloseCode, encodeEnvelope, GameClient, LoopbackNetwork, ENVELOPE_VERSION } from '../dist/index.js';
+import {
+  CloseCode,
+  decodeEnvelope,
+  encodeEnvelope,
+  GameClient,
+  GameServer,
+  LoopbackNetwork,
+  ENVELOPE_VERSION,
+} from '../dist/index.js';
 import { AdaptiveDelay } from '@margoengine/net/delay';
 import { arena, game, schema } from './arena.js';
 
@@ -245,4 +253,27 @@ test('players leave at the next tick; game messages travel both ways', async () 
   }
   world.network.advance(100);
   assert.ok(!a.open);
+});
+
+test('client: a join survives a lost first ping', async () => {
+  const network = new LoopbackNetwork({ latency: 20 }),
+    now = () => network.time,
+    server = new GameServer(game, { now });
+  network.listen().onconnection = (connection) => server.accept(connection);
+  const connection = network.connect(),
+    send = connection.send.bind(connection);
+  let dropped = 0;
+  connection.send = (bytes, channel) => {
+    if (decodeEnvelope(bytes).kind === 'ping' && !dropped++) return;
+    send(bytes, channel);
+  };
+  let client;
+  GameClient.join(game, connection, { now, input: () => ({ x: 0, y: 0, boost: false }) }).then((c) => (client = c));
+  for (let frame = 0; frame < 120 && !client; frame++) {
+    network.advance(1000 / 60);
+    if (network.time >= (server.tick + 1) * game.tickMs) server.step();
+    await null;
+  }
+  assert.equal(dropped > 0, true);
+  assert.ok(client, 'the client joined within 2 s of game time');
 });

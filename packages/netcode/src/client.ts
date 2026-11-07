@@ -270,6 +270,8 @@ export class GameClient<State, Input> {
         this.connection.close(CloseCode.protocol, `unexpected ${message.kind}`);
         return;
     }
+    // Pings are unreliable and update() does not run yet, so a lost first ping is sent again from here.
+    if (this.ready && this.player && !this.clock.synced && now - this.lastPing >= this.pingEvery) this.ping(now);
     if (this.ready && this.player && this.clock.synced && this.predictedState !== undefined) {
       const ready = this.ready;
       this.ready = null;
