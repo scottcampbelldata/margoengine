@@ -18,6 +18,8 @@ export interface TriSurface {
   points: MutableVec3[];
   tris: SurfaceTri[];
   sharp: Set<string>;
+  /** Cosine of the sharp angle: a line of sharp edges that turns further than this at a vertex has a corner there. */
+  corner?: number;
 }
 
 /** Which edges a pass may touch: both ends are checked. Default every edge. */
@@ -100,13 +102,14 @@ function vertexFaces(surface: TriSurface): number[][] {
   return out;
 }
 
-const sameUV = (p: readonly number[], q: readonly number[]): boolean =>
+export const sameUV = (p: readonly number[], q: readonly number[]): boolean =>
   Math.abs(p[0] - q[0]) < 1e-9 && Math.abs(p[1] - q[1]) < 1e-9;
 
 /** Mark open edges, edges with a dihedral angle above `sharpAngle` (radians), and optionally UV seams. */
 export function markSharpEdges(surface: TriSurface, sharpAngle: number, seams: boolean): void {
   const { points, tris, sharp } = surface,
     cos = Math.cos(sharpAngle);
+  surface.corner = cos;
   for (const [key, faces] of edgeFaces(tris)) {
     if (faces.length !== 2) {
       sharp.add(key);
@@ -129,26 +132,38 @@ export function markSharpEdges(surface: TriSurface, sharpAngle: number, seams: b
 
 const classOfCount = (count: number): number => (count === 0 ? 0 : count === 2 ? 1 : 2);
 
+/** Whether a line of sharp edges from `p` through `v` to `q` turns at `v` by more than the sharp angle. */
+function turnsAt({ points, corner = -1 }: TriSurface, p: number, v: number, q: number): boolean {
+  const incoming = sub(points[v], points[p]),
+    outgoing = sub(points[q], points[v]);
+  return dot(incoming, outgoing) < corner * Math.hypot(...incoming) * Math.hypot(...outgoing);
+}
+
 /** The class of one vertex from the faces around it, for a pass that must not visit the whole surface. */
 function vertexClass(surface: TriSurface, around: readonly number[], v: number): number {
   if (!surface.sharp.size) return 0;
   const seen = new Set<number>();
   for (const f of around) for (const w of surface.tris[f]?.v ?? []) if (w !== v) seen.add(w);
-  let count = 0;
-  for (const w of seen) if (surface.sharp.has(edgeKey(v, w))) count++;
-  return classOfCount(count);
+  const line = [...seen].filter((w) => surface.sharp.has(edgeKey(v, w)));
+  return line.length === 2 && turnsAt(surface, line[0], v, line[1]) ? 2 : classOfCount(line.length);
 }
 
 /** 0 for a free vertex, 1 on a line of sharp edges, 2 at a corner of them or the end of one. */
 function vertexClasses(surface: TriSurface): Uint8Array {
   const count = new Uint16Array(surface.points.length),
-    out = new Uint8Array(surface.points.length);
+    ends = new Int32Array(surface.points.length * 2),
+    out = new Uint8Array(surface.points.length),
+    link = (v: number, w: number) => {
+      if (count[v] < 2) ends[v * 2 + count[v]] = w;
+      count[v]++;
+    };
   for (const key of surface.sharp) {
     const [a, b] = key.split(':').map(Number);
-    count[a]++;
-    count[b]++;
+    link(a, b);
+    link(b, a);
   }
-  for (let v = 0; v < out.length; v++) out[v] = classOfCount(count[v]);
+  for (let v = 0; v < out.length; v++)
+    out[v] = count[v] === 2 && turnsAt(surface, ends[v * 2], v, ends[v * 2 + 1]) ? 2 : classOfCount(count[v]);
   return out;
 }
 
@@ -258,6 +273,8 @@ export function collapseShortEdges(
       nb = of(b),
       common = [...na].filter((x) => nb.has(x));
     if (common.length !== shared.length) continue;
+    // A triangle with its other two edges open would fold onto one line: the patch it ends would vanish.
+    if (common.some((c) => faces.get(edgeKey(a, c))?.length === 1 && faces.get(edgeKey(b, c))?.length === 1)) continue;
     const target: MutableVec3 =
         classA === 0 && classB === 0
           ? ([0, 1, 2].map((k) => (points[a][k] + points[b][k]) / 2) as MutableVec3)
