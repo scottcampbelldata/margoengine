@@ -235,6 +235,42 @@ A slot's files carry a generation in their keys, and writing its record is the o
 write or a crash before that leaves the old slot whole, with some unused files that the next save clears. A record that
 cannot be read shows in `list()` with `damaged: true`, and `save` or `delete` replaces it.
 
+## Safe writes
+
+`safeStorage` from `@margoengine/save/safe` wraps any storage so a failed or torn write never loses the last good save,
+and damage is found on read. Each key keeps two copies, `key~a` and `key~b`, each with a generation and a CRC-32. A write
+only ever goes over the copy that is not the newest good one, and is read back to check it. A read gives the newest good
+copy.
+
+```ts
+import { loadGame, memoryStorage, saveGame, type SaveDocument } from 'margoengine/save';
+import { safeStorage } from 'margoengine/save/safe';
+
+const disk = memoryStorage(); // or indexedDBStorage(), fileStorage('./saves')
+const storage = safeStorage(disk, { onRecover: ({ key, reason }) => console.warn(key, 'fell back:', reason) });
+const game = (title: string): SaveDocument => ({ format: 'margo-save', version: 1, meta: { title }, entities: [] });
+
+await saveGame(storage, 'slot-1', game('older'));
+await saveGame(storage, 'slot-1', game('newer'));
+
+await disk.write('slot-1~b', new Uint8Array(10)); // what a torn write leaves
+const save = await loadGame(storage, 'slot-1');
+console.log(save?.meta?.title); // older
+console.log(await storage.check('slot-1')); // { ok: true, good: 1, bad: 1, generation: 1 }
+```
+
+The result is a storage like any other, so `SaveSlots` runs over it. With both copies bad a read rejects with `MargoError`
+`'failed'`; `check(key)` reports without changing anything, and the next write goes over the bad copy.
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| `verify` | `true` | Reads each write back and compares it; a mismatch rejects, and the last good save stands. |
+| `legacy` | `false` | Reads a save from before this wrapper, stored plainly under `key`, unchecked. The next write moves it over. Off, such a save is refused. |
+| `onRecover` | none | Called with `{key, copy, reason}` when a read passes over a bad copy. |
+
+A write costs two reads, a write and a read back, and a key takes twice the room. The CRC finds accidents; it is no
+signature, and someone editing a save can make a matching one.
+
 ## Validation and migrations
 
 `validateSave(document, {components, strictComponents})` never throws and lists every problem with its path and fix
@@ -263,6 +299,6 @@ browsers and Node 18+); `decodeSave(bytes)` reads either. Storage adapters share
 A full Web Storage or a failed transaction throws `MargoError` `'failed'` and keeps the previous save; a missing
 API throws `'unsupported'`. `saveGame` never writes an invalid document.
 
-Apache-2.0. Optional, tree-shakable package. Only `/engine` uses core, as an optional peer (`/slots` needs none of them), with `@margoengine/gltf-pro` and `@margoengine/animation` loaded when a save holds a model.
+Apache-2.0. Optional, tree-shakable package. Only `/engine` uses core, as an optional peer (`/slots` and `/safe` need none of them), with `@margoengine/gltf-pro` and `@margoengine/animation` loaded when a save holds a model.
 
 Build and unit tests: npm test --workspace @margoengine/save. Real GPU, models, thumbnails and IndexedDB: npm run test:gpu --workspace @margoengine/save
