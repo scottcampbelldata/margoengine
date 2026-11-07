@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10634950,
+  "total": 10641628,
   "history": [
     {
       "date": "2026-10-24",
@@ -3722,6 +3722,12 @@
       "commit": "e22cbb195",
       "reason": "new optional entry @margoengine/behavior/context",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "fd0a5e8fb",
+      "reason": "physics/next: rank-revealing joint solve, limiters and range refusal in the kernel",
+      "grew": 1
     }
   ],
   "items": {
@@ -4173,7 +4179,7 @@
     "@margoengine/oit/moments": 4197,
     "@margoengine/oit/vfx": 486,
     "@margoengine/physics": 19679,
-    "@margoengine/physics/next": 76329,
+    "@margoengine/physics/next": 83007,
     "@margoengine/physics2d": 8199,
     "@margoengine/physics2d/outline": 2524,
     "@margoengine/pixel": 4664,

@@ -72,6 +72,8 @@ pub struct Header {
     pub joint_share: f32,
     pub joint_loose_share: f32,
     pub joint_max_push: f32,
+    /// The row of the body that left the range a step can work in, or NONE. No step runs after it.
+    pub lost: u32,
 }
 
 const HEADER_BYTES: u32 = ((core::mem::size_of::<Header>() + 15) & !15) as u32;
@@ -135,6 +137,7 @@ impl World {
                 joint_share: 1.0,
                 joint_loose_share: 0.2,
                 joint_max_push: 3.0,
+                lost: NONE,
             });
         }
         Some(world)

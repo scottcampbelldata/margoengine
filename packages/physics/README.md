@@ -310,6 +310,8 @@ It holds `box`, `sphere` and `capsule` colliders, bodies of every kind, forces, 
 
 `physics.addJoint(bodyA, bodyB, options)` holds the root entry's `fixed`, `spherical`, `revolute` and `prismatic` joints, with `limits`, `motor`, `axis` or `frameA` and `frameB`, `contactsEnabled`, `joint.setLimits`, `setMotor`, `setRotationMotor`, `clearMotor`, `remove`, and the same errors. A joint keeps its two bodies from colliding unless `contactsEnabled` is true, and leaves with either body. The `rope`, `spring` and `generic` kinds throw `unsupported` until they come.
 
+A joint that cannot be met stays calm rather than exact: a chain pulled straight between two walls and a little too short holds under 1 m/s, and an open joint closes at 3 m/s plus what the turning carries its anchors, so a body you move by hand comes back over several steps and does not jump past what is in the way. `docs/limits.md` gives what each limit costs. `world.step` and `physics.step` throw `MargoError` with code `failed` when a body goes past 1e15 in position or speed, which a true path can do: a bead free on a spinning rail flies out exponentially. The world keeps its last state and steps no more, so restore a snapshot or build it again with the joint limited.
+
 ```ts
 import {Physics} from 'margoengine/physics/next';
 

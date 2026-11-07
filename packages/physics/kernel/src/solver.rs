@@ -70,6 +70,16 @@ impl Sym {
     }
 }
 
+impl Sym {
+    /// a . (this b) in doubles.
+    #[inline]
+    pub fn between(&self, a: V3, b: V3) -> f64 {
+        let (ax, ay, az, bx, by, bz) = (a.x as f64, a.y as f64, a.z as f64, b.x as f64, b.y as f64, b.z as f64);
+        let (xx, xy, xz, yy, yz, zz) = (self.xx as f64, self.xy as f64, self.xz as f64, self.yy as f64, self.yz as f64, self.zz as f64);
+        ax * (xx * bx + xy * by + xz * bz) + ay * (xy * bx + yy * by + yz * bz) + az * (xz * bx + yz * by + zz * bz)
+    }
+}
+
 /// What the solver needs of a body, held while it works on a pair.
 #[derive(Clone, Copy)]
 pub struct Moving {

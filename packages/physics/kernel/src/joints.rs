@@ -15,6 +15,42 @@
 // feedback is the error itself, and that grows at any share (the derivation is in docs/clean-room.md, row PK24). A soft
 // row has its own way out, the gamma term below, which is why contacts can remember everything.
 //
+// Memory is only a guess, and the solve's own measure says when it is a bad one. A pass over the rows descends
+// f(p) = 1/2 p^T K p + p^T J v, the energy an impulse p adds, with K = J M^-1 J^T, and the memory m stands at f(m) where a cold
+// start stands at 0. A load that is right has its minimum at 1. An impact is no load: a limit that caught a swing holds the
+// swing's whole impulse, and handing that back returns the swing. Rows that ask the impossible hold more still, in directions
+// J^T m nearly cancels, which nothing corrects as they move nothing: once the rows turn that is a kick, the kick turns the
+// rows faster, and speeds run away. So a warm start that would add more than one push's energy to its island is taken only as
+// far as f's minimum along m, and the rest is forgotten. That is what the search limits, and only the memory: the passes
+// still solve the rows, so a limit that forgets starts its substep cold. On the proof scenes it acts once per catch of a
+// stop and nowhere else, and each figure in tests/joints.rs reads the same with it off. No paper does this: the search is
+// the exact minimum of a quadratic along a line, the rule Buss 2009 uses for its Jacobian transpose step, and its use on a
+// warm start is ours.
+//
+// Rows can depend on each other: a body held by more locks than it has freedoms, or a chain pulled straight. The factors drop
+// such a row, as Baraff 1996 says K is singular there, and that takes a test that can see it: K in doubles from the f32
+// rows, the largest pivot first, as a pivot taken in order can leave a Schur complement of any size (Higham 1990, section 2),
+// and a stop once what is left is under the rounding of the rows themselves, his test (4.3).
+//
+// Close to such a pose the rows are not dependent yet, and the exact solve needs speeds of 1 / angle to close what they ask.
+// A push is a Gauss-Newton step, and there its first order model holds only for a small turn: Buss and Kim 2005's two links
+// pulled nearly straight, the same pose as an arm reaching for what it cannot reach. Their section 4 bounds such a step by
+// gamma = min(1, N / M) gamma_max, N what is asked and M what the parts would each move, which M far over N shows cancelling.
+// Here N is what a path asks, M the fastest any of its bodies would go at its centre plus its arm, gamma_max is TURN, and in a
+// substep a body's turn may rise by no more than gamma, nor its centre by more than gamma of its arm, which turns a row as a
+// spin does. A rise, as a push that takes back a limit's kick slows its body and has nothing to cut. Only the pushing pass is
+// cut, so speeds stay exact, and what is cut stays in the error for the next substep. They damp each singular direction
+// apart; a path has no decomposition, so the whole push is cut, and the useful part of it waits too, which is the cost they
+// name for a plain clamp. TURN is measured: at pi / 4, the paper's value, a taut chain reaches 39 m/s, and at 0.1 it starts
+// to cut the chain of fifty. At 0.2 it cuts nothing in tests/joints.rs, a turn whose rows are out by 2 percent of their arm.
+//
+// A lock's position bias is capped too, at joint_max_push and what the turning carries its anchors. Pairs are found once a
+// step, over the motion the step expects, so a body a push moved further than that would land past what should stop it, as in
+// a_stretched_joint_does_not_jump_a_body_past_a_wall. A gap that wide takes more substeps to close, which on the proof
+// scenes means 5 rows of 6,960 in the limb, and the figures do not move. It is Buss and Kim's ClampMag, and the turning term
+// is their D_max,i = d_i + D_max: a cap under what the end moves anyway loses to it, as rows that turn open r (h w)^2 / 2 a
+// substep, which r w h covers up to a turn of 2 radians.
+//
 // A limit stops and starts, so it is a row of its own, in two halves. Up to its edge it is rigid, and a gap still open lets
 // the axis close it within this substep and no more, so it stops a swing dead and holds any load. Past its edge it pushes as
 // a contact does, a spring and damper in implicit form (Catto 2011) with the contact's frequency, so a limit and a floor
@@ -45,6 +81,12 @@ const COINCIDENT: f32 = 1e-6;
 /// A swing's sine under this has no direction to read, and cos^2(swing / 2) under this leaves the twist undefined.
 const NO_SWING: f32 = 1e-6;
 const NO_TWIST: f32 = 1e-4;
+/// A pivot under this part of its row's size is rounding: the rows are f32. Higham 1990's stop (4.3) with a tolerance of the
+/// data's unit roundoff, on a matrix scaled to a unit diagonal, as linear and turning rows do not share a unit.
+const DEPENDENT: f64 = f32::EPSILON as f64;
+/// The most a push turns a body in one substep where nothing cancels, in radians: Buss and Kim 2005's gamma max. See the head
+/// of this file for why it is not theirs.
+const TURN: f32 = 0.2;
 
 /// What a pass over the joints is for. See the head of this file.
 #[derive(Clone, Copy, PartialEq)]
@@ -76,6 +118,11 @@ impl Row {
     fn give(&self, o: &Row, a: &Moving, b: &Moving) -> f32 {
         self.d.mul(o.d).dot(a.mass.add(b.mass)) + self.ta.dot(a.inertia.mul(o.ta)) + self.tb.dot(b.inertia.mul(o.tb))
     }
+    /// `give` in doubles, for the factors: a row that depends on others shows only under the rounding of f32.
+    #[inline]
+    fn give_exactly(&self, o: &Row, a: &Moving, b: &Moving) -> f64 {
+        scaled(self.d, o.d, a.mass) + scaled(self.d, o.d, b.mass) + a.inertia.between(self.ta, o.ta) + b.inertia.between(self.tb, o.tb)
+    }
     #[inline(always)]
     fn push(&self, a: &mut Moving, b: &mut Moving, p: f32) {
         a.linear = a.linear.sub(a.mass.mul(self.d).scale(p));
@@ -85,6 +132,12 @@ impl Row {
     }
 }
 
+/// a . (m b) in doubles, for m a diagonal.
+#[inline(always)]
+fn scaled(a: V3, b: V3, m: V3) -> f64 {
+    a.x as f64 * b.x as f64 * m.x as f64 + a.y as f64 * b.y as f64 * m.y as f64 + a.z as f64 * b.z as f64 * m.z as f64
+}
+
 /// A joint as it stands at the start of a substep, kept in its JOINT_SCRATCH rows.
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -92,14 +145,18 @@ struct View {
     rows: [Row; 6],
     /// What each axis measures.
     at: [f32; 6],
+    /// How long the arm on each body is.
+    arms: [f32; 2],
 }
 
 /// Doubles at the words of JOINT_SCRATCH after the view: a joint's inverse block, its link to the joint before, its right
-/// side, and for each limit how its locks lean on it and what it moves with them holding.
+/// side, then its impulses, and for each limit how its locks lean on it and what it moves with them holding. A joint that
+/// leads its island's warm start adds what that is worth, what it is worth once applied, and the mass it was worked out on.
 const LINK: usize = 36;
 const RIGHT: usize = 72;
 const LEAN: usize = 78;
 const EASE: usize = 114;
+const WORTH: usize = 120;
 
 /// How many lock rows, and their axes.
 #[inline]
@@ -114,23 +171,28 @@ fn lock_rows(flags: u32) -> (usize, [usize; 6]) {
     (count, rows)
 }
 
-/// The inverse of the leading `m` by `m` of a symmetric matrix, by Gauss-Jordan without pivoting, as a sum of positive
-/// semi-definite terms has none to find. A row that depends on the others carries no impulse.
-fn invert(k: &mut [[f64; 6]; 6], m: usize) -> [[f64; 6]; 6] {
+/// The inverse of the leading `m` by `m` of a symmetric positive semi-definite matrix, by Gauss-Jordan on the row with the most
+/// left of its `size`, the diagonal it started from: complete pivoting on the scaled matrix, which Higham 1990 proves stable for
+/// a rank this small. A row with less than DEPENDENT of it left depends on the others, and carries no impulse.
+fn invert(k: &mut [[f64; 6]; 6], m: usize, size: &[f64; 6]) -> [[f64; 6]; 6] {
     let mut inverse = [[0.0; 6]; 6];
-    let mut size = [0.0; 6];
+    let mut taken = [false; 6];
     for p in 0..m {
         inverse[p][p] = 1.0;
-        size[p] = k[p][p];
     }
-    let mut dropped = [false; 6];
-    for p in 0..m {
-        let pivot = k[p][p];
-        if !(pivot > size[p] * 1e-12) {
-            dropped[p] = true;
-            continue;
+    for _ in 0..m {
+        let (mut p, mut most) = (m, DEPENDENT);
+        for r in 0..m {
+            if !taken[r] && k[r][r] > most * size[r] {
+                p = r;
+                most = k[r][r] / size[r];
+            }
         }
-        let scale = 1.0 / pivot;
+        if p == m {
+            break;
+        }
+        taken[p] = true;
+        let scale = 1.0 / k[p][p];
         for c in 0..m {
             k[p][c] *= scale;
             inverse[p][c] *= scale;
@@ -146,7 +208,7 @@ fn invert(k: &mut [[f64; 6]; 6], m: usize) -> [[f64; 6]; 6] {
         }
     }
     for p in 0..m {
-        if dropped[p] {
+        if !taken[p] {
             for c in 0..m {
                 inverse[p][c] = 0.0;
                 inverse[c][p] = 0.0;
@@ -451,6 +513,31 @@ impl World {
             }
         }
         self.header_mut().joint_solving = solving as u32;
+        // The first joint listed on each island keeps its sums for the warm start.
+        let moves = |w: &World, body: usize| w.flags(body) & KIND == DYNAMIC && w.is_awake(body);
+        for i in 0..solving {
+            let row = self.uu(SOLVE_JOINTS, i) as usize;
+            for body in [self.uu(JOINT_A, row) as usize, self.uu(JOINT_B, row) as usize] {
+                if moves(self, body) {
+                    self.set_u(ISLAND_LEAD, self.uu(ISLAND_ID, body) as usize, NONE);
+                }
+            }
+        }
+        for i in 0..solving {
+            let row = self.uu(SOLVE_JOINTS, i) as usize;
+            let (a, b) = (self.uu(JOINT_A, row) as usize, self.uu(JOINT_B, row) as usize);
+            let body = if moves(self, a) { a } else { b };
+            let mut lead = NONE;
+            if moves(self, body) {
+                let island = self.uu(ISLAND_ID, body) as usize;
+                lead = self.uu(ISLAND_LEAD, island);
+                if lead == NONE {
+                    lead = row as u32;
+                    self.set_u(ISLAND_LEAD, island, lead);
+                }
+            }
+            self.set_u(SOLVE_LEAD, i, lead);
+        }
     }
 
     #[inline(always)]
@@ -529,7 +616,7 @@ impl World {
         if flags & JOINT_CONE != 0 {
             self.cone_rows(row, axes, frame_a, frame_b, q, &mut rows, &mut at);
         }
-        View { rows, at }
+        View { rows, at, arms: [sqrt(arm_a.dot(arm_a)), sqrt(arm_b.dot(arm_b))] }
     }
 
     /// A cone's two rows. Frame B's turn in frame A splits into a twist about X and a swing that takes X to where frame B's X
@@ -576,24 +663,28 @@ impl World {
             let mut k = [[0.0f64; 6]; 6];
             for r in 0..m {
                 for s in 0..m {
-                    k[r][s] = view.rows[axes[r]].give(&view.rows[axes[s]], &body_a, &body_b) as f64;
+                    k[r][s] = view.rows[axes[r]].give_exactly(&view.rows[axes[s]], &body_a, &body_b);
                 }
+            }
+            let mut size = [0.0f64; 6];
+            for r in 0..m {
+                size[r] = k[r][r];
             }
             let via = self.uu(SOLVE_VIA, i);
             let doubles = self.doubles(row);
             let flags = self.uu(JOINT_FLAGS, row);
             if flags & (JOINT_LIMIT * 63) != 0 {
                 // What each limit moves with the joint's own locks holding: the Schur complement of its locks in the block.
-                let own = invert(&mut k.clone(), m);
+                let own = invert(&mut k.clone(), m, &size);
                 for q in 0..6 {
                     if flags & (JOINT_LIMIT << q) == 0 {
                         continue;
                     }
                     let mut across = [0.0f64; 6];
                     for r in 0..m {
-                        across[r] = view.rows[axes[r]].give(&view.rows[q], &body_a, &body_b) as f64;
+                        across[r] = view.rows[axes[r]].give_exactly(&view.rows[q], &body_a, &body_b);
                     }
-                    let mut ease = view.rows[q].give(&view.rows[q], &body_a, &body_b) as f64;
+                    let mut ease = view.rows[q].give_exactly(&view.rows[q], &body_a, &body_b);
                     for r in 0..m {
                         let mut lean = 0.0;
                         for s in 0..m {
@@ -619,7 +710,7 @@ impl World {
                     let (linear, turn) = side(self, before, &view_before.rows[axes_before[r]]);
                     for s in 0..m {
                         let (other, other_turn) = side(self, row, &view.rows[axes[s]]);
-                        link[r][s] = (linear.mul(other).dot(body.mass) + turn.dot(body.inertia.mul(other_turn))) as f64;
+                        link[r][s] = scaled(linear, other, body.mass) + body.inertia.between(turn, other_turn);
                     }
                 }
                 // L = B^T D^-1 of the joint before, and K -= L B.
@@ -643,7 +734,7 @@ impl World {
                     }
                 }
             }
-            let inverse = invert(&mut k, m);
+            let inverse = invert(&mut k, m, &size);
             for r in 0..m {
                 for s in 0..m {
                     unsafe { *doubles.add(r * 6 + s) = inverse[r][s] };
@@ -652,15 +743,95 @@ impl World {
         }
     }
 
-    /// Each substep: the impulses the joints carry, before anything is solved.
+    /// Each substep: the impulses the joints carry, before anything is solved. Motors first: they are forces, and what the
+    /// rest is worth is judged with them applied. See the head of this file.
     pub fn warm_start_joints(&mut self) {
+        let solving = self.header().joint_solving as usize;
+        self.carry(JOINT_MOTOR_0);
+        for i in 0..solving {
+            let lead = self.uu(SOLVE_LEAD, i);
+            if lead != NONE {
+                let worth = self.doubles(lead as usize);
+                unsafe {
+                    *worth.add(WORTH) = 0.0;
+                    *worth.add(WORTH + 1) = 0.0;
+                    *worth.add(WORTH + 2) = 0.0;
+                }
+            }
+        }
+        self.tally_memory(WORTH);
+        self.carry(JOINT_IMPULSE_0);
+        self.tally_memory(WORTH + 1);
+        let most = self.header().joint_max_push as f64;
+        for i in 0..solving {
+            let lead = self.uu(SOLVE_LEAD, i);
+            if lead == NONE {
+                continue;
+            }
+            let worth = self.doubles(lead as usize);
+            // f(a) = before a + (after - before) a^2 / 2, as what the memory did to its own rows is p^T K p.
+            let (before, after, mass) = unsafe { (*worth.add(WORTH), *worth.add(WORTH + 1), *worth.add(WORTH + 2)) };
+            let curve = after - before;
+            if !(before + 0.5 * curve > 0.5 * mass * most * most) {
+                continue;
+            }
+            let keep = if before < 0.0 { (-before / curve) as f32 } else { 0.0 };
+            let row = self.uu(SOLVE_JOINTS, i) as usize;
+            let view = self.view(row);
+            let (a, b) = (self.uu(JOINT_A, row) as usize, self.uu(JOINT_B, row) as usize);
+            let (mut body_a, mut body_b) = (self.moving(a), self.moving(b));
+            for k in 0..6 {
+                let carried = self.s(JOINT_IMPULSE_0 + k, row);
+                if carried != 0.0 {
+                    view.rows[k].push(&mut body_a, &mut body_b, (keep - 1.0) * carried);
+                    self.set_s(JOINT_IMPULSE_0 + k, row, carried * keep);
+                }
+            }
+            self.settle(a, &body_a);
+            self.settle(b, &body_b);
+        }
+    }
+
+    /// Adds to each island's sum at `slot` what its memory reads against the bodies' speeds now.
+    fn tally_memory(&mut self, slot: usize) {
+        for i in 0..self.header().joint_solving as usize {
+            let lead = self.uu(SOLVE_LEAD, i);
+            if lead == NONE {
+                continue;
+            }
+            let row = self.uu(SOLVE_JOINTS, i) as usize;
+            let view = self.view(row);
+            let (a, b) = (self.uu(JOINT_A, row) as usize, self.uu(JOINT_B, row) as usize);
+            let (body_a, body_b) = (self.moving(a), self.moving(b));
+            let mut sum = 0.0f64;
+            for k in 0..6 {
+                let carried = self.s(JOINT_IMPULSE_0 + k, row);
+                if carried != 0.0 {
+                    sum += carried as f64 * view.rows[k].speed(&body_a, &body_b) as f64;
+                }
+            }
+            let worth = self.doubles(lead as usize);
+            unsafe { *worth.add(slot) += sum };
+            if slot == WORTH {
+                for body in [a, b] {
+                    let inverse = self.s(INVERSE_MASS, body);
+                    if self.flags(body) & KIND == DYNAMIC && inverse > 0.0 {
+                        unsafe { *worth.add(WORTH + 2) += 1.0 / inverse as f64 };
+                    }
+                }
+            }
+        }
+    }
+
+    /// Applies the impulses in six columns from `column`.
+    fn carry(&mut self, column: usize) {
         for i in 0..self.header().joint_solving as usize {
             let row = self.uu(SOLVE_JOINTS, i) as usize;
             let view = self.view(row);
             let (a, b) = (self.uu(JOINT_A, row) as usize, self.uu(JOINT_B, row) as usize);
             let (mut body_a, mut body_b) = (self.moving(a), self.moving(b));
             for k in 0..6 {
-                let impulse = self.s(JOINT_IMPULSE_0 + k, row) + self.s(JOINT_MOTOR_0 + k, row);
+                let impulse = self.s(column + k, row);
                 if impulse != 0.0 {
                     view.rows[k].push(&mut body_a, &mut body_b, impulse);
                 }
@@ -688,7 +859,7 @@ impl World {
                     self.soft_rows(row, flags, h, stiffness, most, pass);
                 }
             }
-            self.solve_path(first, last, rate, most, pass);
+            self.solve_path(first, last, rate, most, h, pass);
             first = last + 1;
         }
     }
@@ -715,7 +886,8 @@ impl World {
     }
 
     /// Solves the locks of the path from list place `first` to `last` exactly: forward, then back, then the impulses.
-    fn solve_path(&mut self, first: usize, last: usize, rate: f32, most: f32, pass: Pass) {
+    fn solve_path(&mut self, first: usize, last: usize, rate: f32, most: f32, h: f32, pass: Pass) {
+        let mut asked = 0.0f32;
         for i in first..=last {
             let row = self.uu(SOLVE_JOINTS, i) as usize;
             let (m, axes) = lock_rows(self.uu(JOINT_FLAGS, row));
@@ -724,6 +896,10 @@ impl World {
             let doubles = self.doubles(row);
             let before = if i > first { self.doubles(self.uu(SOLVE_JOINTS, i - 1) as usize) } else { doubles };
             let n = if i > first { lock_rows(self.uu(JOINT_FLAGS, self.uu(SOLVE_JOINTS, i - 1) as usize)).0 } else { 0 };
+            // The arms and not the gap, or a wide gap would raise its own cap. See the head of this file.
+            let most = most + view.arms[0] * sqrt(body_a.angular.dot(body_a.angular)) + view.arms[1] * sqrt(body_b.angular.dot(body_b.angular));
+            let lever = view.arms[0] + view.arms[1];
+            let mut largest = 0.0f32;
             for r in 0..m {
                 let k = axes[r];
                 let bias = if pass == Pass::Push { rate * view.at[k] } else { 0.0 };
@@ -734,21 +910,25 @@ impl World {
                 } else {
                     bias
                 };
-                let mut right = -(view.rows[k].speed(&body_a, &body_b) + bias) as f64;
+                let ask = view.rows[k].speed(&body_a, &body_b) + bias;
+                let size = if ask < 0.0 { -ask } else { ask };
+                let size = if k < 3 { size } else { size * lever };
+                if size > largest {
+                    largest = size;
+                }
+                let mut right = -ask as f64;
                 for c in 0..n {
                     right -= unsafe { *doubles.add(LINK + r * 6 + c) * *before.add(RIGHT + c) };
                 }
                 unsafe { *doubles.add(RIGHT + r) = right };
             }
+            asked += largest;
         }
         let mut next = [0.0f64; 6];
         for i in (first..=last).rev() {
             let row = self.uu(SOLVE_JOINTS, i) as usize;
-            let (m, axes) = lock_rows(self.uu(JOINT_FLAGS, row));
-            let view = self.view(row);
+            let m = lock_rows(self.uu(JOINT_FLAGS, row)).0;
             let doubles = self.doubles(row);
-            let (a, b) = (self.uu(JOINT_A, row) as usize, self.uu(JOINT_B, row) as usize);
-            let (mut body_a, mut body_b) = (self.moving(a), self.moving(b));
             let mut x = [0.0f64; 6];
             for r in 0..m {
                 let mut sum = 0.0;
@@ -766,8 +946,21 @@ impl World {
                 x[r] = sum;
             }
             for r in 0..m {
+                unsafe { *doubles.add(RIGHT + r) = x[r] };
+            }
+            next = x;
+        }
+        let share = if pass == Pass::Push { self.push_share(first, last, asked, h) } else { 1.0 };
+        for i in (first..=last).rev() {
+            let row = self.uu(SOLVE_JOINTS, i) as usize;
+            let (m, axes) = lock_rows(self.uu(JOINT_FLAGS, row));
+            let view = self.view(row);
+            let doubles = self.doubles(row);
+            let (a, b) = (self.uu(JOINT_A, row) as usize, self.uu(JOINT_B, row) as usize);
+            let (mut body_a, mut body_b) = (self.moving(a), self.moving(b));
+            for r in 0..m {
                 let k = axes[r];
-                let p = x[r] as f32;
+                let p = unsafe { *doubles.add(RIGHT + r) } as f32 * share;
                 view.rows[k].push(&mut body_a, &mut body_b, p);
                 if pass != Pass::Push {
                     self.set_s(JOINT_IMPULSE_0 + k, row, self.s(JOINT_IMPULSE_0 + k, row) + p);
@@ -775,8 +968,52 @@ impl World {
             }
             self.settle(a, &body_a);
             self.settle(b, &body_b);
-            next = x;
         }
+    }
+
+    /// What a joint's impulses, kept in RIGHT, would add to each of its bodies, with the arm on each.
+    fn gains(&self, row: usize) -> [(V3, V3, f32); 2] {
+        let (m, axes) = lock_rows(self.uu(JOINT_FLAGS, row));
+        let view = self.view(row);
+        let doubles = self.doubles(row);
+        let (mut body_a, mut body_b) = (self.moving(self.uu(JOINT_A, row) as usize), self.moving(self.uu(JOINT_B, row) as usize));
+        let still = v3(0.0, 0.0, 0.0);
+        (body_a.linear, body_a.angular, body_b.linear, body_b.angular) = (still, still, still, still);
+        for r in 0..m {
+            view.rows[axes[r]].push(&mut body_a, &mut body_b, unsafe { *doubles.add(RIGHT + r) } as f32);
+        }
+        [(body_a.linear, body_a.angular, view.arms[0]), (body_b.linear, body_b.angular, view.arms[1])]
+    }
+
+    /// How much of a path's push to take. See the head of this file. A body between two joints gains from both.
+    fn push_share(&self, first: usize, last: usize, asked: f32, h: f32) -> f32 {
+        let (mut top, mut turn) = (0.0f32, 0.0f32);
+        let mut carried = (v3(0.0, 0.0, 0.0), v3(0.0, 0.0, 0.0), 0.0f32);
+        for i in first..=last {
+            let row = self.uu(SOLVE_JOINTS, i) as usize;
+            let gains = self.gains(row);
+            let from = if i > first { self.uu(SOLVE_VIA, i) } else { NONE };
+            let onward = if i < last { self.uu(SOLVE_VIA, i + 1) } else { NONE };
+            for (gain, body) in gains.iter().zip([self.uu(JOINT_A, row), self.uu(JOINT_B, row)]) {
+                if body == onward {
+                    carried = *gain;
+                } else {
+                    let whole = if body == from { (gain.0.add(carried.0), gain.1.add(carried.1), gain.2.max(carried.2)) } else { *gain };
+                    let spin = sqrt(whole.1.dot(whole.1));
+                    top = top.max(sqrt(whole.0.dot(whole.0)) + whole.2 * spin);
+                    let now = self.v(ANGULAR_X, body as usize);
+                    let then = now.add(whole.1);
+                    turn = turn.max(sqrt(then.dot(then)) - sqrt(now.dot(now)));
+                    if whole.2 > 0.0 {
+                        let now = self.v(LINEAR_X, body as usize);
+                        let then = now.add(whole.0);
+                        turn = turn.max((sqrt(then.dot(then)) - sqrt(now.dot(now))) / whole.2);
+                    }
+                }
+            }
+        }
+        let room = if top > asked { TURN * asked / top } else { TURN };
+        if h * turn > room { room / (h * turn) } else { 1.0 }
     }
 
     /// A motor on one axis: a soft row toward its target and target speed, capped at its most force over this substep.

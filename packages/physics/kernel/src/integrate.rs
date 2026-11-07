@@ -6,7 +6,12 @@ use crate::joints::Pass;
 use crate::layout::*;
 use crate::math::*;
 use crate::solver::soft;
-use crate::world::World;
+use crate::world::{NONE, World};
+
+/// A position or speed past this leaves a step nothing to work with: their squares and the rows built from them reach the
+/// end of f32 within the step. A true path can get here, as a bead on a spinning rail flies out exponentially, so a step
+/// refuses it. Nothing bends the value.
+pub const RANGE: f32 = 1e15;
 
 /// World change from a world torque-like vector: I^-1 v, worked in the principal frame `frame`.
 #[inline(always)]
@@ -117,6 +122,9 @@ impl World {
     /// Advances the world by `dt` in `substeps` equal pieces. Pairs are found once a step, over the motion the whole step
     /// is expected to make.
     pub fn step(&mut self, dt: f32) {
+        if self.header().lost != NONE {
+            return;
+        }
         let substeps = self.header().substeps;
         let h = dt / substeps as f32;
         self.begin_step(dt);
@@ -150,6 +158,22 @@ impl World {
             self.solve_impacts();
         }
         self.header_mut().steps += 1;
+        self.check_range();
+    }
+
+    /// Notes the first awake body past RANGE, or not a number at all.
+    fn check_range(&mut self) {
+        for slot in 0..self.header().awake as usize {
+            let at = self.uu(AWAKE, slot) as usize;
+            for v in [self.v(POSITION_X, at), self.v(LINEAR_X, at), self.v(ANGULAR_X, at)] {
+                for x in [v.x, v.y, v.z] {
+                    if !(x < RANGE && x > -RANGE) {
+                        self.header_mut().lost = at as u32;
+                        return;
+                    }
+                }
+            }
+        }
     }
 
     /// Keeps the pose the step starts from, finds each centre of mass, lands impulses, works out kinematic velocities.

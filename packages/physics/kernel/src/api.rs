@@ -94,6 +94,11 @@ pub extern "C" fn world_step(dt: f32) -> u32 {
     world().step(dt);
     world().header().failed
 }
+/// The row of the body that left the range a step can work in, or -1.
+#[unsafe(no_mangle)]
+pub extern "C" fn world_lost() -> i32 {
+    world().header().lost as i32
+}
 /// Counts layout changes: when it moves, JS binds its views again.
 #[unsafe(no_mangle)]
 pub extern "C" fn world_layout() -> u32 {

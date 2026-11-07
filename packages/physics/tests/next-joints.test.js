@@ -68,6 +68,24 @@ test('a motor cap holds the torque, and a force motor does not scale with the bo
   physics.dispose();
 });
 
+test('a body that leaves the numbers stops the world and says why', () => {
+  // r'' = w^2 r on a free rail: the true path grows without end, and no answer past the end of f32 is right.
+  const physics = new Physics(null, { gravity: [0, 0, 0] }),
+    hub = physics.addBody(null, { type: 'kinematicVelocity', angularVelocity: [0, 8, 0], colliders: [] }),
+    bead = physics.addBody(null, { position: [1, 0, 0], angularVelocity: [0, 8, 0], colliders: { shape: 'sphere', radius: 0.1 } });
+  physics.addJoint(hub, bead, { type: 'prismatic', axis: [1, 0, 0], contactsEnabled: false });
+  let steps = 0;
+  assert.throws(
+    () => {
+      for (; steps < 5000; steps++) physics.step();
+    },
+    (error) => error.code === 'failed' && /went past 1e15/.test(error.message) && /limit the joint/.test(error.message),
+  );
+  assert.ok(steps > 10 && steps < 5000, `stopped after ${steps} steps`);
+  assert.ok(bead.position.every(Number.isFinite), 'the last state is a number');
+  assert.throws(() => physics.step(), /went past 1e15/);
+});
+
 test('prismatic joints respect limits and position motors', () => {
   const physics = new Physics(null),
     rail = physics.addBody(null, { type: 'fixed', position: [0, 5, 0], colliders: [] }),

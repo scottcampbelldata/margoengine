@@ -22,6 +22,7 @@ interface KernelExports extends WebAssembly.Exports {
   world_iterations(): number;
   world_steps(): number;
   world_step(dt: number): number;
+  world_lost(): number;
   world_layout(): number;
   world_pairs(): number;
   world_pair_rows(): number;
@@ -598,6 +599,8 @@ export class KernelWorld {
    * Advances the world by `dt` seconds, in {@link KernelWorld.substeps} equal pieces. Finding new pairs can grow the world,
    * so read views from `columns` after this call.
    * @throws RangeError unless `dt` is finite and above zero, or when memory cannot hold the pairs found.
+   * @throws MargoError (`failed`) when a body went past 1e15 in position or speed: the world keeps its last state and steps no
+   * more. {@link KernelWorld.restore} an earlier snapshot, or build the world again with what drove the body limited.
    */
   step(dt: number): this {
     if (!(dt > 0) || !Number.isFinite(dt))
@@ -605,6 +608,12 @@ export class KernelWorld {
     const failed = this.api.world_step(dt);
     if (this.api.world_layout() !== this.layout) this.bind();
     if (failed) throw new RangeError('Memory cannot hold the pairs of this world; spread the colliders out or use fewer.');
+    const lost = this.api.world_lost();
+    if (lost >= 0)
+      throw new MargoError(
+        'failed',
+        `Body row ${lost} went past 1e15 in position or speed, where a step has no numbers left to work with. A true path can do this: a bead free on a spinning rail flies out exponentially. This world has stopped; limit the joint that drives the body, then restore a snapshot or build the world again.`,
+      );
     return this;
   }
   /** Bytes of the world, and of a {@link KernelWorld.snapshot}. */

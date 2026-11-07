@@ -224,6 +224,7 @@ columns! {
     AWAKE u32 BodyList,
     // Islands of this step: bodies in runs, one run an island; each run's start, length, and whether all its bodies are ready.
     ISLAND_BODIES u32 BodyList,
+    ISLAND_LEAD u32 BodyList,
     ISLAND_START u32 BodyList,
     ISLAND_COUNT u32 BodyList,
     ISLAND_READY u32 BodyList,
@@ -388,6 +389,8 @@ columns! {
     JOINT_SEEN u32 Joint,
     // The joints this step solves, densely, in paths: a row with a body in SOLVE_VIA goes on from the row before through it.
     SOLVE_JOINTS u32 JointList,
+    // The joint whose scratch keeps the sums of this one's island, for the warm start; NONE with no body to move.
+    SOLVE_LEAD u32 JointList,
     SOLVE_VIA u32 JointList,
     // The share of its error each listed joint closes in a biased pass.
     SOLVE_SHARE f32 JointList,
@@ -431,7 +434,7 @@ pub const MAX_BODIES: u32 = 1 << 22;
 pub const MAX_COLLIDERS: u32 = 1 << 22;
 /// Words of JOINT_SCRATCH a joint takes: 64 for its rows and measures, then doubles, 36 of inverse, 36 of link, 6 of right side,
 /// 6 of what the pushing pass gave.
-pub const JOINT_WORDS: u32 = 64 + 2 * (36 + 36 + 6 + 36 + 6);
+pub const JOINT_WORDS: u32 = 64 + 2 * (36 + 36 + 6 + 36 + 6 + 4);
 /// Most joints one world holds.
 pub const MAX_JOINTS: u32 = 1 << 22;
 /// Pairs the broad phase can hold; its table then fills 2^30 slots and its points 2^31 rows.
