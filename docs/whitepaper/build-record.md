@@ -1627,3 +1627,26 @@ Jobs Scott approved on 2026-11-07 ("Fix those packages"): `npm run verify` faile
 - **Proved:** CPU tests. Job 1's two tests fail on the old code at 96 B per call and pass on the fix, also with `--concurrent-recompilation-delay=1000`. Jobs 2 to 4: a temporary allocation in `closestPointsBetweenSegments`, `fitCascades` and `segmentClearanceInto` fails each test. No limit, tolerance or flag changed.
 - **Size:** the tween root grew 37 B gzip for job 1, accepted in the sizes baseline with its reason; core and stage do not change.
 - **Gate:** lint, hygiene, verify and the tests of what changed, the push from one script that stops at the first failing step. No GPU test: no GPU code changed.
+
+## Lane B batch 44: USD
+
+Seven jobs for `@margoengine/usdz`, so real production stages open: composition, rigs, clips, subdivision, lights, reset stacks and MaterialX. Each proved on real files against OpenUSD 26.08 or Blender, run from their own folders as black boxes.
+
+| # | Job | Status | Commit | Entry | Claim |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Composition | DONE | `551451bc0`, correction `90167952d` | `/compose` | LIM-303 |
+| 2 | UsdSkel skins and blend shapes | DONE | `d2291049d` | `/skel` | LIM-310 |
+| 3 | Time-sampled animation | DONE | `c2538923c` | `/anim` | LIM-315 |
+| 4 | Subdivision, holes, concave polygons | DONE | `f60d3b4a4` | `/subdiv` | LIM-319 |
+| 5 | UsdLux lights and cameras | DONE | `b9290a54d` | `/lux` | LIM-320 |
+| 6 | Reset transform stacks | DONE, UNPROVEN on real files | `14bd02883`, fix `1b5384a47` | root | LIM-324 |
+| 7 | MaterialX in USD | DONE | this commit | `/materialx` | LIM-331 |
+
+- **Proved:** job 1, 424 of 443 real files match OpenUSD (9 before), stress 104 of 150 (95 before). Job 2, 12 real stages, worst 2.7e-4 of span; HumanFemale 1.26e-3 from the cap of 8 influences. Job 3, 33 of 35 stages within 1e-4 on time codes (0 before). Job 4, 862 of 862 real meshes match Blender at level 2, UV 68 of 68 one-winding meshes. Job 5, 55 of 55 files, 46 of 46 lights, 44 of 44 cameras, worst 7.00e-8. Job 7, 58 of 58 materials of 39 real files read as OpenUSD reads them, 441 of 443 real files now match (424 before), 30 of 31 real materials compile on the GPU.
+- **Stand-in:** job 6 has one stage OpenUSD's API wrote: 24 of 24 prims, 15 resetting, at 9 times, none of the 546 real files resets, so before and after on real files is 0 of 0. RealityKit in job 7 has no real file. Real images of job 7 are not stored; a small picture stands in on the GPU.
+- **Bugs fixed:** the static USD reader kept ops before the last reset (`packages/loaders/tests/usdz.test.js`). `/subdiv` lost part of a face that crosses itself, 14 faces in 4 Apple files and the HumanFemale buttons, as its clipper gives fewer triangles there; such a face stays a fan (`packages/usdz/tests/subdiv.test.js`). MaterialX refused `0.5 0.5` vectors of a real file, found `constructor` as a shader or type through Object's members, and did not know the specification's new colour space names (`packages/loaders/tests/materialx.test.js`). An include of a `.mtlx` was never fetched, and an unlit image with no `default` took the shader's default where the specification says zero; both found in the job 7 draft, before it landed (`packages/usdz/tests/materialx.test.js`).
+- **Draft rebuilt from the specifications in job 7:** the slot tables had come from an older loader table and the shader registry. Read against the published tables, `gltf_pbr` gained `alpha_mode`, `alpha_cutoff` and its other extensions, OpenPBR its thin film in micrometres, Standard Surface `coat_affect_color`, `coat_affect_roughness` and the coat's tint on emission, both `transmission_depth` as a medium; `multiply` takes zero for `in1`; `gltf_image` went, as no published document here describes it.
+- **Limits:** `docs/limits.md`, one row per job. For job 7: no renderer oracle, so looks are by method; `uvoffset` and real world sizes unapplied, the specification gives no formula; OpenPBR emission over 1000 is Margo's convention; opacity images, RealityKit's `no_flip_v`, and looks and variants of a `.mtlx` are not read; `surface_unlit` has no node material.
+- **Unmeasured:** no timing for any job; each waits for the quiet pass.
+- **Clean room:** the inert rule of job 1 had no published text and was removed. Memory was used for debugging in job 1, then replaced, and UZ1 says so. Search snippets of a third-party USD crate appeared and were never opened. In job 4 a remembered Blender behaviour (the UV winding split) was a guess, confirmed only black box; it touches the oracle comparison and no Margo code.
+- **Gate:** lint, hygiene, verify, the tests of usdz and loaders, the usdz GPU checks, each push from one script that stops at the first failing step. Landings of jobs 1 to 4 and 6 stopped on record conflicts, job 2 and job 6 failed verify once each on a stale limits range and a README type error; nothing failed reached main.

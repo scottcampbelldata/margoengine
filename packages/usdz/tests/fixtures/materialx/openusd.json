@@ -1,0 +1,2132 @@
+{
+"defaults": {
+"ND_UsdPreviewSurface_surfaceshader": {
+"clearcoat": 0.0,
+"clearcoatRoughness": 0.009999999776482582,
+"diffuseColor": [
+0.18000000715255737,
+0.18000000715255737,
+0.18000000715255737
+],
+"displacement": 0.0,
+"emissiveColor": [
+0.0,
+0.0,
+0.0
+],
+"ior": 1.5,
+"metallic": 0.0,
+"normal": [
+0.0,
+0.0,
+1.0
+],
+"occlusion": 1.0,
+"opacity": 1.0,
+"opacityMode": 0,
+"opacityThreshold": 0.0,
+"roughness": 0.5,
+"specularColor": [
+0.0,
+0.0,
+0.0
+],
+"useSpecularWorkflow": 0
+},
+"ND_gltf_pbr_surfaceshader": {
+"alpha": 1.0,
+"alpha_cutoff": 0.5,
+"alpha_mode": 0,
+"anisotropy_rotation": 0.0,
+"anisotropy_strength": 0.0,
+"attenuation_color": [
+1.0,
+1.0,
+1.0
+],
+"attenuation_distance": null,
+"base_color": [
+1.0,
+1.0,
+1.0
+],
+"clearcoat": 0.0,
+"clearcoat_normal": null,
+"clearcoat_roughness": 0.0,
+"emissive": [
+0.0,
+0.0,
+0.0
+],
+"emissive_strength": 1.0,
+"ior": 1.5,
+"iridescence": 0.0,
+"iridescence_ior": 1.2999999523162842,
+"iridescence_thickness": 100.0,
+"metallic": 1.0,
+"normal": null,
+"occlusion": 1.0,
+"roughness": 1.0,
+"sheen_color": [
+0.0,
+0.0,
+0.0
+],
+"sheen_roughness": 0.0,
+"specular": 1.0,
+"specular_color": [
+1.0,
+1.0,
+1.0
+],
+"tangent": null,
+"thickness": 0.0,
+"transmission": 0.0
+},
+"ND_open_pbr_surface_surfaceshader": {
+"base_color": [
+0.800000011920929,
+0.800000011920929,
+0.800000011920929
+],
+"base_diffuse_roughness": 0.0,
+"base_metalness": 0.0,
+"base_weight": 1.0,
+"coat_color": [
+1.0,
+1.0,
+1.0
+],
+"coat_darkening": 1.0,
+"coat_ior": 1.600000023841858,
+"coat_roughness": 0.0,
+"coat_roughness_anisotropy": 0.0,
+"coat_weight": 0.0,
+"emission_color": [
+1.0,
+1.0,
+1.0
+],
+"emission_luminance": 0.0,
+"fuzz_color": [
+1.0,
+1.0,
+1.0
+],
+"fuzz_roughness": 0.5,
+"fuzz_weight": 0.0,
+"geometry_coat_normal": null,
+"geometry_coat_tangent": null,
+"geometry_normal": null,
+"geometry_opacity": 1.0,
+"geometry_tangent": null,
+"geometry_thin_walled": false,
+"specular_color": [
+1.0,
+1.0,
+1.0
+],
+"specular_ior": 1.5,
+"specular_roughness": 0.30000001192092896,
+"specular_roughness_anisotropy": 0.0,
+"specular_weight": 1.0,
+"subsurface_color": [
+0.800000011920929,
+0.800000011920929,
+0.800000011920929
+],
+"subsurface_radius": 1.0,
+"subsurface_radius_scale": [
+1.0,
+0.5,
+0.25
+],
+"subsurface_scatter_anisotropy": 0.0,
+"subsurface_weight": 0.0,
+"thin_film_ior": 1.399999976158142,
+"thin_film_thickness": 0.5,
+"thin_film_weight": 0.0,
+"transmission_color": [
+1.0,
+1.0,
+1.0
+],
+"transmission_depth": 0.0,
+"transmission_dispersion_abbe_number": 20.0,
+"transmission_dispersion_scale": 0.0,
+"transmission_scatter": [
+0.0,
+0.0,
+0.0
+],
+"transmission_scatter_anisotropy": 0.0,
+"transmission_weight": 0.0
+},
+"ND_standard_surface_surfaceshader": {
+"base": 1.0,
+"base_color": [
+0.800000011920929,
+0.800000011920929,
+0.800000011920929
+],
+"coat": 0.0,
+"coat_IOR": 1.5,
+"coat_affect_color": 0.0,
+"coat_affect_roughness": 0.0,
+"coat_anisotropy": 0.0,
+"coat_color": [
+1.0,
+1.0,
+1.0
+],
+"coat_normal": null,
+"coat_rotation": 0.0,
+"coat_roughness": 0.10000000149011612,
+"diffuse_roughness": 0.0,
+"emission": 0.0,
+"emission_color": [
+1.0,
+1.0,
+1.0
+],
+"metalness": 0.0,
+"normal": null,
+"opacity": [
+1.0,
+1.0,
+1.0
+],
+"sheen": 0.0,
+"sheen_color": [
+1.0,
+1.0,
+1.0
+],
+"sheen_roughness": 0.30000001192092896,
+"specular": 1.0,
+"specular_IOR": 1.5,
+"specular_anisotropy": 0.0,
+"specular_color": [
+1.0,
+1.0,
+1.0
+],
+"specular_rotation": 0.0,
+"specular_roughness": 0.20000000298023224,
+"subsurface": 0.0,
+"subsurface_anisotropy": 0.0,
+"subsurface_color": [
+1.0,
+1.0,
+1.0
+],
+"subsurface_radius": [
+1.0,
+1.0,
+1.0
+],
+"subsurface_scale": 1.0,
+"tangent": null,
+"thin_film_IOR": 1.5,
+"thin_film_thickness": 0.0,
+"thin_walled": false,
+"transmission": 0.0,
+"transmission_color": [
+1.0,
+1.0,
+1.0
+],
+"transmission_depth": 0.0,
+"transmission_dispersion": 0.0,
+"transmission_extra_roughness": 0.0,
+"transmission_scatter": [
+0.0,
+0.0,
+0.0
+],
+"transmission_scatter_anisotropy": 0.0
+},
+"ND_surface_unlit": {
+"emission": 1.0,
+"emission_color": [
+1.0,
+1.0,
+1.0
+],
+"opacity": 1.0,
+"transmission": 0.0,
+"transmission_color": [
+1.0,
+1.0,
+1.0
+]
+}
+},
+"files": {
+"usd-wg/full_assets/OpenChessSet/assets/Bishop/Bishop_look.usd": {},
+"usd-wg/full_assets/OpenChessSet/assets/Bishop/Bishop_mat.mtlx": {
+"/MaterialX/Materials/M_Bishop_B": {
+"id": "ND_standard_surface_surfaceshader",
+"inputs": {
+"base_color": {
+"node": "ND_image_color3",
+"output": "out",
+"prim": "diffuse2"
+},
+"metalness": {
+"node": "ND_image_float",
+"output": "out",
+"prim": "metallic2"
+},
+"normal": {
+"node": "ND_normalmap_vector2",
+"output": "out",
+"prim": "mtlxnormalmap4"
+},
+"specular_roughness": {
+"node": "ND_image_float",
+"output": "out",
+"prim": "roughness2"
+}
+},
+"shader": "Bishop_B"
+},
+"/MaterialX/Materials/M_Bishop_W": {
+"id": "ND_standard_surface_surfaceshader",
+"inputs": {
+"base_color": {
+"node": "ND_image_color3",
+"output": "out",
+"prim": "diffuse3"
+},
+"metalness": {
+"node": "ND_image_float",
+"output": "out",
+"prim": "metallic3"
+},
+"normal": {
+"node": "ND_normalmap_vector2",
+"output": "out",
+"prim": "mtlxnormalmap5"
+},
+"specular_roughness": {
+"node": "ND_image_float",
+"output": "out",
+"prim": "roughness3"
+}
+},
+"shader": "Bishop_W"
+}
+},
+"usd-wg/full_assets/OpenChessSet/assets/Chessboard/Chessboard_look.usd": {},
+"usd-wg/full_assets/OpenChessSet/assets/Chessboard/Chessboard_mat.mtlx": {
+"/MaterialX/Materials/M_Chessboard": {
+"id": "ND_standard_surface_surfaceshader",
+"inputs": {
+"base_color": {
+"node": "ND_image_color3",
+"output": "out",
+"prim": "mtlximage13"
+},
+"metalness": {
+"node": "ND_image_float",
+"output": "out",
+"prim": "mtlximage16"
+},
+"normal": {
+"node": "ND_normalmap_vector2",
+"output": "out",
+"prim": "mtlxnormalmap12"
+},
+"specular_roughness": {
+"node": "ND_image_float",
+"output": "out",
+"prim": "mtlximage17"
+}
+},
+"shader": "Chessboard"
+}
+},
+"usd-wg/full_assets/OpenChessSet/assets/King/King_look.usd": {},
+"usd-wg/full_assets/OpenChessSet/assets/King/King_mat.mtlx": {
+"/MaterialX/Materials/M_King_B": {
+"id": "ND_standard_surface_surfaceshader",
+"inputs": {
+"base_color": {
+"node": "ND_image_color3",
+"output": "out",
+"prim": "mtlximage1"
+},
+"metalness": {
+"node": "ND_image_float",
+"output": "out",
+"prim": "mtlximage2"
+},
+"normal": {
+"node": "ND_normalmap_vector2",
+"output": "out",
+"prim": "mtlxnormalmap1"
+},
+"specular_roughness": {
+"node": "ND_image_float",
+"output": "out",
+"prim": "mtlximage4"
+},
+"subsurface": {
+"node": "ND_image_float",
+"output": "out",
+"prim": "mtlximage3"
+},
+"subsurface_color": {
+"node": "ND_image_color3",
+"output": "out",
+"prim": "mtlximage1"
+},
+"subsurface_radius": {
+"node": "ND_image_color3",
+"output": "out",
+"prim": "mtlximage1"
+},
+"subsurface_scale": {
+"value": 0.003000000026077032
+}
+},
+"shader": "King_B"
+},
+"/MaterialX/Materials/M_King_W": {
+"id": "ND_standard_surface_surfaceshader",
+"inputs": {
+"base_color": {
+"node": "ND_image_color3",
+"output": "out",
+"prim": "mtlximage7"
+},
+"metalness": {
+"node": "ND_image_float",
+"output": "out",
+"prim": "mtlximage10"
+},
+"normal": {
+"node": "ND_normalmap_vector2",
+"output": "out",
+"prim": "mtlxnormalmap11"
+},
+"specular_roughness": {
+"node": "ND_image_float",
+"output": "out",
+"prim": "mtlximage11"
+},
+"subsurface": {
+"node": "ND_image_float",
+"output": "out",
+"prim": "mtlximage8"
+},
+"subsurface_color": {
+"node": "ND_image_color3",
+"output": "out",
+"prim": "mtlximage7"
+},
+"subsurface_radius": {
+"node": "ND_image_color3",
+"output": "out",
+"prim": "mtlximage7"
+},
+"subsurface_scale": {
+"value": 0.003000000026077032
+}
+},
+"shader": "King_W"
+}
+},
+"usd-wg/full_assets/OpenChessSet/assets/Knight/Knight_look.usd": {},
+"usd-wg/full_assets/OpenChessSet/assets/Knight/Knight_mat.mtlx": {
+"/MaterialX/Materials/M_Knight_B": {
+"id": "ND_standard_surface_surfaceshader",
+"inputs": {
+"base_color": {
+"node": "ND_image_color3",
+"output": "out",
+"prim": "diffuse4"
+},
+"normal": {
+"node": "ND_normalmap_vector2",
+"output": "out",
+"prim": "normalmap"
+},
+"specular_roughness": {
+"node": "ND_image_float",
+"output": "out",
+"prim": "roughness4"
+}
+},
+"shader": "Knight_B"
+},
+"/MaterialX/Materials/M_Knight_W": {
+"id": "ND_standard_surface_surfaceshader",
+"inputs": {
+"base_color": {
+"node": "ND_image_color3",
+"output": "out",
+"prim": "diffuse5"
+},
+"normal": {
+"node": "ND_normalmap_vector2",
+"output": "out",
+"prim": "normalmap"
+},
+"specular_roughness": {
+"node": "ND_image_float",
+"output": "out",
+"prim": "roughness5"
+}
+},
+"shader": "Knight_W"
+}
+},
+"usd-wg/full_assets/OpenChessSet/assets/Pawn/Pawn_look.usd": {},
+"usd-wg/full_assets/OpenChessSet/assets/Pawn/Pawn_mat.mtlx": {
+"/MaterialX/Materials/M_Pawn_Body_B": {
+"id": "ND_standard_surface_surfaceshader",
+"inputs": {
+"base_color": {
+"node": "ND_image_color3",
+"output": "out",
+"prim": "diffuse9"
+},
+"metalness": {
+"node": "ND_image_float",
+"output": "out",
+"prim": "metallic9"
+},
+"normal": {
+"node": "ND_normalmap_vector2",
+"output": "out",
+"prim": "mtlxnormalmap13"
+},
+"specular_roughness": {
+"node": "ND_image_float",
+"output": "out",
+"prim": "roughness9"
+}
+},
+"shader": "Pawn_Body_B"
+},
+"/MaterialX/Materials/M_Pawn_Body_W": {
+"id": "ND_standard_surface_surfaceshader",
+"inputs": {
+"base_color": {
+"node": "ND_image_color3",
+"output": "out",
+"prim": "diffuse8"
+},
+"metalness": {
+"node": "ND_image_float",
+"output": "out",
+"prim": "metallic8"
+},
+"normal": {
+"node": "ND_normalmap_vector2",
+"output": "out",
+"prim": "mtlxnormalmap10"
+},
+"specular_roughness": {
+"node": "ND_image_float",
+"output": "out",
+"prim": "roughness8"
+}
+},
+"shader": "Pawn_Body_W"
+},
+"/MaterialX/Materials/M_Pawn_Top_B": {
+"id": "ND_standard_surface_surfaceshader",
+"inputs": {
+"base_color": {
+"value": [
+1.0,
+1.0,
+1.0
+]
+},
+"normal": {
+"node": "ND_normalmap_vector2",
+"output": "out",
+"prim": "mtlxnormalmap14"
+},
+"specular_roughness": {
+"node": "ND_image_float",
+"output": "out",
+"prim": "mtlximage19"
+},
+"transmission": {
+"value": 1.0
+},
+"transmission_color": {
+"value": [
+0.2994999885559082,
+0.5,
+0.4502759873867035
+]
+}
+},
+"shader": "Pawn_Top_B"
+},
+"/MaterialX/Materials/M_Pawn_Top_W": {
+"id": "ND_standard_surface_surfaceshader",
+"inputs": {
+"base_color": {
+"value": [
+1.0,
+1.0,
+1.0
+]
+},
+"normal": {
+"node": "ND_normalmap_vector2",
+"output": "out",
+"prim": "mtlxnormalmap15"
+},
+"specular_roughness": {
+"node": "ND_image_float",
+"output": "out",
+"prim": "mtlximage21"
+},
+"transmission": {
+"value": 1.0
+},
+"transmission_color": {
+"value": [
+1.0,
+1.0,
+0.828000009059906
+]
+}
+},
+"shader": "Pawn_Top_W"
+}
+},
+"usd-wg/full_assets/OpenChessSet/assets/Queen/Queen_look.usd": {},
+"usd-wg/full_assets/OpenChessSet/assets/Queen/Queen_mat.mtlx": {
+"/MaterialX/Materials/M_Queen_B": {
+"id": "ND_standard_surface_surfaceshader",
+"inputs": {
+"base_color": {
+"node": "ND_image_color3",
+"output": "out",
+"prim": "diffuse"
+},
+"metalness": {
+"node": "ND_image_float",
+"output": "out",
+"prim": "metallic"
+},
+"normal": {
+"node": "ND_normalmap_vector2",
+"output": "out",
+"prim": "mtlxnormalmap2"
+},
+"specular_roughness": {
+"node": "ND_image_float",
+"output": "out",
+"prim": "roughness"
+},
+"subsurface": {
+"node": "ND_image_float",
+"output": "out",
+"prim": "sss"
+},
+"subsurface_color": {
+"node": "ND_image_color3",
+"output": "out",
+"prim": "diffuse"
+},
+"subsurface_radius": {
+"node": "ND_image_color3",
+"output": "out",
+"prim": "diffuse"
+},
+"subsurface_scale": {
+"value": 0.003000000026077032
+}
+},
+"shader": "Queen_B"
+},
+"/MaterialX/Materials/M_Queen_W": {
+"id": "ND_standard_surface_surfaceshader",
+"inputs": {
+"base_color": {
+"node": "ND_image_color3",
+"output": "out",
+"prim": "diffuse1"
+},
+"metalness": {
+"node": "ND_image_float",
+"output": "out",
+"prim": "metallic1"
+},
+"normal": {
+"node": "ND_normalmap_vector2",
+"output": "out",
+"prim": "mtlxnormalmap3"
+},
+"specular_roughness": {
+"node": "ND_image_float",
+"output": "out",
+"prim": "roughness1"
+},
+"subsurface": {
+"node": "ND_image_float",
+"output": "out",
+"prim": "sss1"
+},
+"subsurface_color": {
+"node": "ND_image_color3",
+"output": "out",
+"prim": "diffuse1"
+},
+"subsurface_radius": {
+"node": "ND_image_color3",
+"output": "out",
+"prim": "diffuse1"
+},
+"subsurface_scale": {
+"value": 0.0010000000474974513
+}
+},
+"shader": "Queen_W"
+}
+},
+"usd-wg/full_assets/OpenChessSet/assets/Rook/Rook_look.usd": {},
+"usd-wg/full_assets/OpenChessSet/assets/Rook/Rook_mat.mtlx": {
+"/MaterialX/Materials/M_Rook_B": {
+"id": "ND_standard_surface_surfaceshader",
+"inputs": {
+"base_color": {
+"node": "ND_image_color3",
+"output": "out",
+"prim": "diffuse6"
+},
+"metalness": {
+"node": "ND_image_float",
+"output": "out",
+"prim": "metallic6"
+},
+"normal": {
+"node": "ND_normalmap_vector2",
+"output": "out",
+"prim": "mtlxnormalmap8"
+},
+"specular_roughness": {
+"node": "ND_image_float",
+"output": "out",
+"prim": "roughness6"
+}
+},
+"shader": "Rook_B"
+},
+"/MaterialX/Materials/M_Rook_W": {
+"id": "ND_standard_surface_surfaceshader",
+"inputs": {
+"base_color": {
+"node": "ND_image_color3",
+"output": "out",
+"prim": "diffuse7"
+},
+"metalness": {
+"node": "ND_image_float",
+"output": "out",
+"prim": "metallic7"
+},
+"normal": {
+"node": "ND_normalmap_vector2",
+"output": "out",
+"prim": "mtlxnormalmap9"
+},
+"specular_roughness": {
+"node": "ND_image_float",
+"output": "out",
+"prim": "roughness7"
+}
+},
+"shader": "Rook_W"
+}
+},
+"usd-wg/full_assets/StandardShaderBall/example_materials/bubblegum.mtlx": {
+"/MaterialX/Materials/bubblegum": {
+"id": "ND_standard_surface_surfaceshader",
+"inputs": {
+"specular": {
+"value": 0.382999986410141
+},
+"specular_IOR": {
+"value": 1.5839999914169312
+},
+"specular_color": {
+"value": [
+1.0,
+1.0,
+1.0
+]
+},
+"specular_roughness": {
+"value": 0.17599999904632568
+},
+"subsurface": {
+"value": 1.0
+},
+"subsurface_color": {
+"value": [
+1.0,
+0.2199999988079071,
+0.49300000071525574
+]
+},
+"subsurface_radius": {
+"value": [
+1.0,
+0.0,
+0.06800000369548798
+]
+},
+"subsurface_scale": {
+"value": 0.032499998807907104
+}
+},
+"shader": "mtlxstandard_surface1"
+}
+},
+"usd-wg/full_assets/StandardShaderBall/example_materials/bubblegum_openpbr.mtlx": {
+"/MaterialX/Materials/bubblegum": {
+"id": "ND_open_pbr_surface_surfaceshader",
+"inputs": {
+"specular_ior": {
+"value": 1.5839999914169312
+},
+"specular_roughness": {
+"value": 0.17599999904632568
+},
+"specular_weight": {
+"value": 0.382999986410141
+},
+"subsurface_color": {
+"value": [
+1.0,
+0.2199999988079071,
+0.49300000071525574
+]
+},
+"subsurface_radius": {
+"value": 0.032499998807907104
+},
+"subsurface_radius_scale": {
+"value": [
+1.0,
+0.0,
+0.06800000369548798
+]
+},
+"subsurface_weight": {
+"value": 1.0
+}
+},
+"shader": "open_pbr_surface"
+}
+},
+"usd-wg/full_assets/StandardShaderBall/example_materials/glass.mtlx": {
+"/MaterialX/Materials/glass": {
+"id": "ND_standard_surface_surfaceshader",
+"inputs": {
+"base": {
+"value": 0.0
+},
+"opacity": {
+"value": [
+1.0,
+1.0,
+1.0
+]
+},
+"specular": {
+"value": 1.0
+},
+"specular_IOR": {
+"value": 1.5410699844360352
+},
+"specular_color": {
+"value": [
+1.0,
+1.0,
+1.0
+]
+},
+"specular_roughness": {
+"value": 0.016249999403953552
+},
+"transmission": {
+"value": 1.0
+},
+"transmission_color": {
+"value": [
+0.9419999718666077,
+1.0,
+0.9883999824523926
+]
+},
+"transmission_depth": {
+"value": 0.0
+},
+"transmission_dispersion": {
+"value": 0.0
+},
+"transmission_extra_roughness": {
+"value": 0.0
+},
+"transmission_scatter": {
+"value": [
+0.0,
+0.0,
+0.0
+]
+},
+"transmission_scatter_anisotropy": {
+"value": 0.0
+}
+},
+"shader": "mtlxstandard_surface1"
+}
+},
+"usd-wg/full_assets/StandardShaderBall/example_materials/glass_openpbr.mtlx": {
+"/MaterialX/Materials/glass": {
+"id": "ND_open_pbr_surface_surfaceshader",
+"inputs": {
+"base_weight": {
+"value": 0.0
+},
+"specular_ior": {
+"value": 1.5410699844360352
+},
+"specular_roughness": {
+"value": 0.016249999403953552
+},
+"transmission_color": {
+"value": [
+0.9419999718666077,
+1.0,
+0.9883999824523926
+]
+},
+"transmission_weight": {
+"value": 1.0
+}
+},
+"shader": "open_pbr_surface"
+}
+},
+"usd-wg/full_assets/StandardShaderBall/example_materials/gold.mtlx": {
+"/MaterialX/Materials/gold": {
+"id": "ND_standard_surface_surfaceshader",
+"inputs": {
+"base": {
+"value": 1.0
+},
+"base_color": {
+"value": [
+0.9107509851455688,
+0.7939919829368591,
+0.40591898560523987
+]
+},
+"metalness": {
+"value": 1.0
+},
+"specular": {
+"value": 1.0
+},
+"specular_color": {
+"value": [
+0.9953479766845703,
+0.9837570190429688,
+0.7657250165939331
+]
+},
+"specular_roughness": {
+"value": 0.009999999776482582
+}
+},
+"shader": "mtlxstandard_surface1"
+}
+},
+"usd-wg/full_assets/StandardShaderBall/example_materials/gold_openpbr.mtlx": {
+"/MaterialX/Materials/gold": {
+"id": "ND_open_pbr_surface_surfaceshader",
+"inputs": {
+"base_color": {
+"value": [
+0.9107509851455688,
+0.7939919829368591,
+0.40591898560523987
+]
+},
+"base_metalness": {
+"value": 1.0
+},
+"specular_color": {
+"value": [
+0.9953479766845703,
+0.9837570190429688,
+0.7657250165939331
+]
+},
+"specular_roughness": {
+"value": 0.009999999776482582
+}
+},
+"shader": "open_pbr_surface"
+}
+},
+"usd-wg/full_assets/StandardShaderBall/example_materials/plastic.mtlx": {
+"/MaterialX/Materials/plastic": {
+"id": "ND_standard_surface_surfaceshader",
+"inputs": {
+"base": {
+"value": 1.0
+},
+"base_color": {
+"value": [
+0.20988400280475616,
+0.5620909929275513,
+0.765999972820282
+]
+},
+"specular_roughness": {
+"value": 0.15000000596046448
+}
+},
+"shader": "mtlxstandard_surface1"
+}
+},
+"usd-wg/full_assets/StandardShaderBall/example_materials/plastic_openpbr.mtlx": {
+"/MaterialX/Materials/plastic": {
+"id": "ND_open_pbr_surface_surfaceshader",
+"inputs": {
+"base_color": {
+"value": [
+0.20988400280475616,
+0.5620909929275513,
+0.765999972820282
+]
+},
+"specular_roughness": {
+"value": 0.15000000596046448
+}
+},
+"shader": "open_pbr_surface"
+}
+},
+"usd-wg/full_assets/StandardShaderBall/layers/environment.usda": {
+"/standard_shader_ball_scene/materials/back": {
+"id": "ND_open_pbr_surface_surfaceshader",
+"inputs": {
+"base_color": {
+"node": "ND_image_color3",
+"output": "out",
+"prim": "mtlximage1"
+},
+"specular_weight": {
+"value": 0.0
+}
+},
+"shader": "open_pbr_surface1"
+},
+"/standard_shader_ball_scene/materials/box_base": {
+"id": "ND_open_pbr_surface_surfaceshader",
+"inputs": {
+"base_color": {
+"node": "ND_image_color3",
+"output": "out",
+"prim": "mtlximage1"
+},
+"specular_weight": {
+"value": 0.0
+}
+},
+"shader": "open_pbr_surface1"
+},
+"/standard_shader_ball_scene/materials/front": {
+"id": "ND_open_pbr_surface_surfaceshader",
+"inputs": {
+"base_color": {
+"node": "ND_image_color3",
+"output": "out",
+"prim": "mtlximage1"
+},
+"specular_weight": {
+"value": 0.0
+}
+},
+"shader": "open_pbr_surface1"
+},
+"/standard_shader_ball_scene/materials/ground": {
+"id": "ND_open_pbr_surface_surfaceshader",
+"inputs": {
+"base_color": {
+"node": "ND_image_color3",
+"output": "out",
+"prim": "mtlximage1"
+},
+"specular_weight": {
+"value": 0.0
+}
+},
+"shader": "open_pbr_surface1"
+},
+"/standard_shader_ball_scene/materials/left": {
+"id": "ND_open_pbr_surface_surfaceshader",
+"inputs": {
+"base_color": {
+"node": "ND_image_color3",
+"output": "out",
+"prim": "mtlximage1"
+},
+"specular_weight": {
+"value": 0.0
+}
+},
+"shader": "open_pbr_surface1"
+},
+"/standard_shader_ball_scene/materials/right": {
+"id": "ND_open_pbr_surface_surfaceshader",
+"inputs": {
+"base_color": {
+"node": "ND_image_color3",
+"output": "out",
+"prim": "mtlximage1"
+},
+"specular_weight": {
+"value": 0.0
+}
+},
+"shader": "open_pbr_surface1"
+},
+"/standard_shader_ball_scene/materials/top": {
+"id": "ND_open_pbr_surface_surfaceshader",
+"inputs": {
+"base_color": {
+"node": "ND_image_color3",
+"output": "out",
+"prim": "mtlximage1"
+},
+"specular_weight": {
+"value": 0.0
+}
+},
+"shader": "open_pbr_surface1"
+}
+},
+"usd-wg/full_assets/StandardShaderBall/layers/example_materials.usda": {},
+"usd-wg/full_assets/StandardShaderBall/layers/shaderball.usda": {
+"/standard_shader_ball_scene/materials/neutral": {
+"id": "ND_open_pbr_surface_surfaceshader",
+"inputs": {
+"emission_color": {
+"node": "ND_convert_vector3_color3",
+"output": "out",
+"prim": "mtlxconvert1"
+},
+"emission_luminance": {
+"node": "ND_extract_vector3",
+"output": "out",
+"prim": "mtlxextract1"
+},
+"specular_roughness": {
+"value": 0.0
+},
+"specular_weight": {
+"value": 0.0
+}
+},
+"shader": "open_pbr_surface1"
+},
+"/standard_shader_ball_scene/materials/sss_bars": {
+"id": "ND_open_pbr_surface_surfaceshader",
+"inputs": {
+"base_color": {
+"node": "ND_image_color3",
+"output": "out",
+"prim": "mtlximage1"
+},
+"base_diffuse_roughness": {
+"value": 0.800000011920929
+},
+"specular_weight": {
+"value": 0.0
+}
+},
+"shader": "open_pbr_surface1"
+},
+"/standard_shader_ball_scene/materials/uvgrid": {
+"id": "ND_open_pbr_surface_surfaceshader",
+"inputs": {
+"base_color": {
+"node": "ND_image_color3",
+"output": "out",
+"prim": "mtlximage1"
+},
+"specular_weight": {
+"value": 0.0
+}
+},
+"shader": "open_pbr_surface1"
+}
+},
+"usd-wg/intent-vfx/assets/simpleAsset/mtl.usd": {
+"/simpleAsset/mtl/proxy_material": {
+"id": "ND_standard_surface_surfaceshader",
+"inputs": {
+"base": {
+"value": 1.0
+},
+"base_color": {
+"value": [
+0.800000011920929,
+0.800000011920929,
+0.800000011920929
+]
+},
+"coat": {
+"value": 0.0
+},
+"coat_IOR": {
+"value": 1.5
+},
+"coat_affect_color": {
+"value": 0.0
+},
+"coat_affect_roughness": {
+"value": 0.0
+},
+"coat_anisotropy": {
+"value": 0.0
+},
+"coat_color": {
+"value": [
+1.0,
+1.0,
+1.0
+]
+},
+"coat_rotation": {
+"value": 0.0
+},
+"coat_roughness": {
+"value": 0.10000000149011612
+},
+"diffuse_roughness": {
+"value": 0.0
+},
+"emission": {
+"value": 0.0
+},
+"emission_color": {
+"value": [
+1.0,
+1.0,
+1.0
+]
+},
+"metalness": {
+"value": 0.0
+},
+"opacity": {
+"value": [
+1.0,
+1.0,
+1.0
+]
+},
+"sheen": {
+"value": 0.0
+},
+"sheen_color": {
+"value": [
+1.0,
+1.0,
+1.0
+]
+},
+"sheen_roughness": {
+"value": 0.30000001192092896
+},
+"specular": {
+"value": 1.0
+},
+"specular_IOR": {
+"value": 1.5
+},
+"specular_anisotropy": {
+"value": 0.0
+},
+"specular_color": {
+"value": [
+1.0,
+1.0,
+1.0
+]
+},
+"specular_rotation": {
+"value": 0.0
+},
+"specular_roughness": {
+"value": 0.20000000298023224
+},
+"subsurface": {
+"value": 0.0
+},
+"subsurface_anisotropy": {
+"value": 0.0
+},
+"subsurface_color": {
+"value": [
+1.0,
+1.0,
+1.0
+]
+},
+"subsurface_radius": {
+"value": [
+1.0,
+1.0,
+1.0
+]
+},
+"subsurface_scale": {
+"value": 1.0
+},
+"thin_film_IOR": {
+"value": 1.5
+},
+"thin_film_thickness": {
+"value": 0.0
+},
+"thin_walled": {
+"value": false
+},
+"transmission": {
+"value": 0.0
+},
+"transmission_color": {
+"value": [
+1.0,
+1.0,
+1.0
+]
+},
+"transmission_depth": {
+"value": 0.0
+},
+"transmission_dispersion": {
+"value": 0.0
+},
+"transmission_extra_roughness": {
+"value": 0.0
+},
+"transmission_scatter": {
+"value": [
+0.0,
+0.0,
+0.0
+]
+},
+"transmission_scatter_anisotropy": {
+"value": 0.0
+}
+},
+"shader": "proxy_shader_mtlx"
+},
+"/simpleAsset/mtl/render_material": {
+"id": "ND_standard_surface_surfaceshader",
+"inputs": {
+"base": {
+"value": 1.0
+},
+"base_color": {
+"value": [
+0.800000011920929,
+0.800000011920929,
+0.800000011920929
+]
+},
+"coat": {
+"value": 0.0
+},
+"coat_IOR": {
+"value": 1.5
+},
+"coat_affect_color": {
+"value": 0.0
+},
+"coat_affect_roughness": {
+"value": 0.0
+},
+"coat_anisotropy": {
+"value": 0.0
+},
+"coat_color": {
+"value": [
+1.0,
+1.0,
+1.0
+]
+},
+"coat_rotation": {
+"value": 0.0
+},
+"coat_roughness": {
+"value": 0.10000000149011612
+},
+"diffuse_roughness": {
+"value": 0.0
+},
+"emission": {
+"value": 0.0
+},
+"emission_color": {
+"value": [
+1.0,
+1.0,
+1.0
+]
+},
+"metalness": {
+"value": 0.0
+},
+"opacity": {
+"value": [
+1.0,
+1.0,
+1.0
+]
+},
+"sheen": {
+"value": 0.0
+},
+"sheen_color": {
+"value": [
+1.0,
+1.0,
+1.0
+]
+},
+"sheen_roughness": {
+"value": 0.30000001192092896
+},
+"specular": {
+"value": 1.0
+},
+"specular_IOR": {
+"value": 1.5
+},
+"specular_anisotropy": {
+"value": 0.0
+},
+"specular_color": {
+"value": [
+1.0,
+1.0,
+1.0
+]
+},
+"specular_rotation": {
+"value": 0.0
+},
+"specular_roughness": {
+"value": 0.20000000298023224
+},
+"subsurface": {
+"value": 0.0
+},
+"subsurface_anisotropy": {
+"value": 0.0
+},
+"subsurface_color": {
+"value": [
+1.0,
+1.0,
+1.0
+]
+},
+"subsurface_radius": {
+"value": [
+1.0,
+1.0,
+1.0
+]
+},
+"subsurface_scale": {
+"value": 1.0
+},
+"thin_film_IOR": {
+"value": 1.5
+},
+"thin_film_thickness": {
+"value": 0.0
+},
+"thin_walled": {
+"value": false
+},
+"transmission": {
+"value": 0.0
+},
+"transmission_color": {
+"value": [
+1.0,
+1.0,
+1.0
+]
+},
+"transmission_depth": {
+"value": 0.0
+},
+"transmission_dispersion": {
+"value": 0.0
+},
+"transmission_extra_roughness": {
+"value": 0.0
+},
+"transmission_scatter": {
+"value": [
+0.0,
+0.0,
+0.0
+]
+},
+"transmission_scatter_anisotropy": {
+"value": 0.0
+}
+},
+"shader": "render_shader_mtlx"
+}
+},
+"usd-wg/intent-vfx/assets/teapot/mtl.usd": {
+"/teapot/mtl/default_material": {
+"id": "ND_standard_surface_surfaceshader",
+"inputs": {
+"base": {
+"value": 1.0
+},
+"base_color": {
+"value": [
+0.800000011920929,
+0.800000011920929,
+0.800000011920929
+]
+},
+"coat": {
+"value": 0.0
+},
+"coat_IOR": {
+"value": 1.5
+},
+"coat_affect_color": {
+"value": 0.0
+},
+"coat_affect_roughness": {
+"value": 0.0
+},
+"coat_anisotropy": {
+"value": 0.0
+},
+"coat_color": {
+"value": [
+1.0,
+1.0,
+1.0
+]
+},
+"coat_rotation": {
+"value": 0.0
+},
+"coat_roughness": {
+"value": 0.10000000149011612
+},
+"diffuse_roughness": {
+"value": 0.0
+},
+"emission": {
+"value": 0.0
+},
+"emission_color": {
+"value": [
+1.0,
+1.0,
+1.0
+]
+},
+"metalness": {
+"value": 0.0
+},
+"opacity": {
+"value": [
+1.0,
+1.0,
+1.0
+]
+},
+"sheen": {
+"value": 0.0
+},
+"sheen_color": {
+"value": [
+1.0,
+1.0,
+1.0
+]
+},
+"sheen_roughness": {
+"value": 0.30000001192092896
+},
+"specular": {
+"value": 1.0
+},
+"specular_IOR": {
+"value": 1.5
+},
+"specular_anisotropy": {
+"value": 0.0
+},
+"specular_color": {
+"value": [
+1.0,
+1.0,
+1.0
+]
+},
+"specular_rotation": {
+"value": 0.0
+},
+"specular_roughness": {
+"value": 0.20000000298023224
+},
+"subsurface": {
+"value": 0.0
+},
+"subsurface_anisotropy": {
+"value": 0.0
+},
+"subsurface_color": {
+"value": [
+1.0,
+1.0,
+1.0
+]
+},
+"subsurface_radius": {
+"value": [
+1.0,
+1.0,
+1.0
+]
+},
+"subsurface_scale": {
+"value": 1.0
+},
+"thin_film_IOR": {
+"value": 1.5
+},
+"thin_film_thickness": {
+"value": 0.0
+},
+"thin_walled": {
+"value": false
+},
+"transmission": {
+"value": 0.0
+},
+"transmission_color": {
+"value": [
+1.0,
+1.0,
+1.0
+]
+},
+"transmission_depth": {
+"value": 0.0
+},
+"transmission_dispersion": {
+"value": 0.0
+},
+"transmission_extra_roughness": {
+"value": 0.0
+},
+"transmission_scatter": {
+"value": [
+0.0,
+0.0,
+0.0
+]
+},
+"transmission_scatter_anisotropy": {
+"value": 0.0
+}
+},
+"shader": "default_shader_mtlx"
+}
+},
+"usd-wg/test_assets/ColorSpaceTests/MaterialX/mtlx_by_reference.usda": {
+"/MaterialX/Materials/orange_squares_8x6_lin_rec709": {
+"id": "ND_surface_unlit",
+"inputs": {
+"emission_color": {
+"node": "ND_switch_color3",
+"output": "out",
+"prim": "switches"
+}
+},
+"shader": "surf_unlit1"
+}
+},
+"usd-wg/test_assets/ColorSpaceTests/MaterialX/orange_squares_8x6_lin_rec709.mtlx": {
+"/MaterialX/Materials/orange_squares_8x6_lin_rec709": {
+"id": "ND_surface_unlit",
+"inputs": {
+"emission_color": {
+"node": "ND_switch_color3",
+"output": "out",
+"prim": "switches"
+}
+},
+"shader": "surf_unlit1"
+}
+},
+"usd-wg/test_assets/ColorSpaceTests/MaterialX/orange_squares_8x6_lin_rec709.usda": {
+"/MaterialX/Materials/orange_squares_8x6": {
+"id": "ND_surface_unlit",
+"inputs": {
+"emission_color": {
+"node": "ND_switch_color3",
+"output": "out",
+"prim": "switches"
+}
+},
+"shader": "surf_unlit1"
+}
+},
+"usd-wg/test_assets/ColorSpaceTests/MaterialX/orange_squares_8x6_lin_rec709_csapi.usda": {
+"/MaterialX/Materials/orange_squares_8x6": {
+"id": "ND_surface_unlit",
+"inputs": {
+"emission_color": {
+"node": "ND_switch_color3",
+"output": "out",
+"prim": "switches"
+}
+},
+"shader": "surf_unlit1"
+}
+},
+"usd-wg/test_assets/MaterialXTest/basic.usda": {
+"/MaterialX/Materials/USD_Plastic": {
+"id": "ND_UsdPreviewSurface_surfaceshader",
+"inputs": {
+"diffuseColor": {
+"value": [
+0.10470402240753174,
+0.2418828159570694,
+0.8180000185966492
+]
+},
+"ior": {
+"value": 1.5
+},
+"roughness": {
+"value": 0.3246753215789795
+}
+},
+"shader": "SR_plastic"
+}
+},
+"usd-wg/test_assets/MaterialXTest/basicTextured.usda": {
+"/MaterialX/Materials/Tiled_Brass": {
+"id": "ND_standard_surface_surfaceshader",
+"inputs": {
+"base": {
+"value": 1.0
+},
+"base_color": {
+"value": [
+1.0,
+1.0,
+1.0
+]
+},
+"coat": {
+"value": 1.0
+},
+"coat_color": {
+"node": "ND_tiledimage_color3",
+"output": "out",
+"prim": "image_color"
+},
+"coat_roughness": {
+"node": "ND_tiledimage_float",
+"output": "out",
+"prim": "image_roughness"
+},
+"metalness": {
+"value": 1.0
+},
+"specular": {
+"value": 0.0
+},
+"specular_roughness": {
+"node": "ND_tiledimage_float",
+"output": "out",
+"prim": "image_roughness"
+}
+},
+"shader": "SR_brass1"
+},
+"/MaterialX/Materials/USD_Plastic": {
+"id": "ND_UsdPreviewSurface_surfaceshader",
+"inputs": {
+"diffuseColor": {
+"value": [
+0.10470402240753174,
+0.2418828159570694,
+0.8180000185966492
+]
+},
+"ior": {
+"value": 1.5
+},
+"roughness": {
+"value": 0.3246753215789795
+}
+},
+"shader": "SR_plastic"
+}
+},
+"usd-wg/test_assets/MaterialXTest/basicTextured_flatten.usda": {
+"/MaterialX/Materials/Tiled_Brass": {
+"id": "ND_standard_surface_surfaceshader",
+"inputs": {
+"base": {
+"value": 1.0
+},
+"base_color": {
+"value": [
+1.0,
+1.0,
+1.0
+]
+},
+"coat": {
+"value": 1.0
+},
+"coat_color": {
+"node": "ND_tiledimage_color3",
+"output": "out",
+"prim": "image_color"
+},
+"coat_roughness": {
+"node": "ND_tiledimage_float",
+"output": "out",
+"prim": "image_roughness"
+},
+"metalness": {
+"value": 1.0
+},
+"specular": {
+"value": 0.0
+},
+"specular_roughness": {
+"node": "ND_tiledimage_float",
+"output": "out",
+"prim": "image_roughness"
+}
+},
+"shader": "ND_standard_surface_surfaceshader"
+},
+"/MaterialX/Materials/USD_Plastic": {
+"id": "ND_UsdPreviewSurface_surfaceshader",
+"inputs": {
+"diffuseColor": {
+"value": [
+0.10470402240753174,
+0.2418828159570694,
+0.8180000185966492
+]
+},
+"ior": {
+"value": 1.5
+},
+"roughness": {
+"value": 0.3246753215789795
+}
+},
+"shader": "ND_UsdPreviewSurface_surfaceshader"
+}
+},
+"usd-wg/test_assets/MaterialXTest/basic_flatten.usda": {
+"/MaterialX/Materials/USD_Plastic": {
+"id": "ND_UsdPreviewSurface_surfaceshader",
+"inputs": {
+"diffuseColor": {
+"value": [
+0.10470402240753174,
+0.2418828159570694,
+0.8180000185966492
+]
+},
+"ior": {
+"value": 1.5
+},
+"roughness": {
+"value": 0.3246753215789795
+}
+},
+"shader": "ND_UsdPreviewSurface_surfaceshader"
+}
+},
+"usd-wg/test_assets/MaterialXTest/standard_surface_brass_tiled.mtlx": {
+"/MaterialX/Materials/Tiled_Brass": {
+"id": "ND_standard_surface_surfaceshader",
+"inputs": {
+"base": {
+"value": 1.0
+},
+"base_color": {
+"value": [
+1.0,
+1.0,
+1.0
+]
+},
+"coat": {
+"value": 1.0
+},
+"coat_color": {
+"node": "ND_tiledimage_color3",
+"output": "out",
+"prim": "image_color"
+},
+"coat_roughness": {
+"node": "ND_tiledimage_float",
+"output": "out",
+"prim": "image_roughness"
+},
+"metalness": {
+"value": 1.0
+},
+"specular": {
+"value": 0.0
+},
+"specular_roughness": {
+"node": "ND_tiledimage_float",
+"output": "out",
+"prim": "image_roughness"
+}
+},
+"shader": "SR_brass1"
+}
+},
+"usd-wg/test_assets/MaterialXTest/usd_preview_surface_plastic.mtlx": {
+"/MaterialX/Materials/USD_Plastic": {
+"id": "ND_UsdPreviewSurface_surfaceshader",
+"inputs": {
+"diffuseColor": {
+"value": [
+0.10470402240753174,
+0.2418828159570694,
+0.8180000185966492
+]
+},
+"ior": {
+"value": 1.5
+},
+"roughness": {
+"value": 0.3246753215789795
+}
+},
+"shader": "SR_plastic"
+}
+},
+"usd-wg/test_assets/TextureCoordinateTest/TextureCoordinateTest.mtlx": {
+"/MaterialX/Materials/BackPlaneMat": {
+"id": "ND_standard_surface_surfaceshader",
+"inputs": {
+"base": {
+"value": 1.0
+},
+"base_color": {
+"value": [
+0.1600000113248825,
+0.1600000113248825,
+0.1600000113248825
+]
+},
+"specular_roughness": {
+"value": 1.0
+}
+},
+"shader": "BackPlaneMat_Surface"
+},
+"/MaterialX/Materials/BottomLeftMat": {
+"id": "ND_standard_surface_surfaceshader",
+"inputs": {
+"base": {
+"value": 1.0
+},
+"base_color": {
+"node": "ND_image_color3",
+"output": "out",
+"prim": "TextureCoordinateTemplate_Image"
+},
+"specular_roughness": {
+"value": 1.0
+}
+},
+"shader": "BottomLeftMat_Surface"
+},
+"/MaterialX/Materials/BottomRightMat": {
+"id": "ND_standard_surface_surfaceshader",
+"inputs": {
+"base": {
+"value": 1.0
+},
+"base_color": {
+"node": "ND_image_color3",
+"output": "out",
+"prim": "TextureCoordinateTemplate_Image"
+},
+"specular_roughness": {
+"value": 1.0
+}
+},
+"shader": "BottomRightMat_Surface"
+},
+"/MaterialX/Materials/TopLeftMat": {
+"id": "ND_standard_surface_surfaceshader",
+"inputs": {
+"base": {
+"value": 1.0
+},
+"base_color": {
+"node": "ND_image_color3",
+"output": "out",
+"prim": "TextureCoordinateTemplate_Image"
+},
+"specular_roughness": {
+"value": 1.0
+}
+},
+"shader": "TopLeftMat_Surface"
+},
+"/MaterialX/Materials/TopRightMat": {
+"id": "ND_standard_surface_surfaceshader",
+"inputs": {
+"base": {
+"value": 1.0
+},
+"base_color": {
+"node": "ND_image_color3",
+"output": "out",
+"prim": "TextureCoordinateTemplate_Image"
+},
+"specular_roughness": {
+"value": 1.0
+}
+},
+"shader": "TopRightMat_Surface"
+}
+},
+"usd-wg/test_assets/TextureCoordinateTest/TextureCoordinateTestMaterialX.usda": {
+"/Asset/Materials/MaterialX/Materials/BackPlaneMat": {
+"id": "ND_standard_surface_surfaceshader",
+"inputs": {
+"base": {
+"value": 1.0
+},
+"base_color": {
+"value": [
+0.1600000113248825,
+0.1600000113248825,
+0.1600000113248825
+]
+},
+"specular_roughness": {
+"value": 1.0
+}
+},
+"shader": "BackPlaneMat_Surface"
+},
+"/Asset/Materials/MaterialX/Materials/BottomLeftMat": {
+"id": "ND_standard_surface_surfaceshader",
+"inputs": {
+"base": {
+"value": 1.0
+},
+"base_color": {
+"node": "ND_image_color3",
+"output": "out",
+"prim": "TextureCoordinateTemplate_Image"
+},
+"specular_roughness": {
+"value": 1.0
+}
+},
+"shader": "BottomLeftMat_Surface"
+},
+"/Asset/Materials/MaterialX/Materials/BottomRightMat": {
+"id": "ND_standard_surface_surfaceshader",
+"inputs": {
+"base": {
+"value": 1.0
+},
+"base_color": {
+"node": "ND_image_color3",
+"output": "out",
+"prim": "TextureCoordinateTemplate_Image"
+},
+"specular_roughness": {
+"value": 1.0
+}
+},
+"shader": "BottomRightMat_Surface"
+},
+"/Asset/Materials/MaterialX/Materials/TopLeftMat": {
+"id": "ND_standard_surface_surfaceshader",
+"inputs": {
+"base": {
+"value": 1.0
+},
+"base_color": {
+"node": "ND_image_color3",
+"output": "out",
+"prim": "TextureCoordinateTemplate_Image"
+},
+"specular_roughness": {
+"value": 1.0
+}
+},
+"shader": "TopLeftMat_Surface"
+},
+"/Asset/Materials/MaterialX/Materials/TopRightMat": {
+"id": "ND_standard_surface_surfaceshader",
+"inputs": {
+"base": {
+"value": 1.0
+},
+"base_color": {
+"node": "ND_image_color3",
+"output": "out",
+"prim": "TextureCoordinateTemplate_Image"
+},
+"specular_roughness": {
+"value": 1.0
+}
+},
+"shader": "TopRightMat_Surface"
+}
+}
+}
+}

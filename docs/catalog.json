@@ -426,6 +426,7 @@
     "exports": [
       "USDAsset",
       "assetFromSpecs",
+      "foreignReader",
       "loadUSDZ",
       "parseUSDA",
       "parseUSDC",

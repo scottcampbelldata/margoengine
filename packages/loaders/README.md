@@ -671,6 +671,8 @@ console.log(data.length, dims, bounds); // fig.volume(data, { dims, bounds }) in
 
 `parseMaterialX` from `@margoengine/loaders/materialx` reads `.mtlx` documents, version 1.38 and later, and `toGraph` turns a material into the graph that `nodeMaterial()` of `@margoengine/materials` takes.
 
+`materialXDocument(parts)` builds a document from nodes and materials that came from elsewhere, which is how `margoengine/usdz/materialx` hands a USD network to `toGraph`.
+
 ```ts
 import { parseMaterialX } from '@margoengine/loaders/materialx';
 import { nodeMaterial } from '@margoengine/materials';

@@ -1,0 +1,197 @@
+<?xml version="1.0"?>
+<materialx version="1.39" colorspace="lin_displayp3">
+  <texcoord name="tex1" type="vector2" />
+  <extract name="ext_x" type="float">
+    <input name="in" type="vector2" nodename="tex1" />
+    <input name="index" type="integer" value="0" />
+  </extract>
+  <extract name="ext_y" type="float">
+    <input name="in" type="vector2" nodename="tex1" />
+    <input name="index" type="integer" value="1" />
+  </extract>
+  <multiply name="mul_x" type="float">
+    <input name="in1" type="float" nodename="ext_x" />
+    <input name="in2" type="float" value="10" />
+  </multiply>
+  <multiply name="mul_y" type="float">
+    <input name="in1" type="float" nodename="ext_y" />
+    <input name="in2" type="float" value="8" />
+  </multiply>
+  <switch name="border_top" type="color3">
+    <input name="which" type="float" nodename="mul_x" />
+    <input name="in1" type="color3" value="1, 1, 1" colorspace="none" />
+    <input name="in2" type="color3" value="0.031896, 0.031896, 0.031896" colorspace="none" />
+    <input name="in3" type="color3" value="0.127438, 0.127438, 0.127438" colorspace="none" />
+    <input name="in4" type="color3" value="0.031896, 0.031896, 0.031896" colorspace="none" />
+    <input name="in5" type="color3" value="0.127438, 0.127438, 0.127438" colorspace="none" />
+    <input name="in6" type="color3" value="0.031896, 0.031896, 0.031896" colorspace="none" />
+    <input name="in7" type="color3" value="0.127438, 0.127438, 0.127438" colorspace="none" />
+    <input name="in8" type="color3" value="0.031896, 0.031896, 0.031896" colorspace="none" />
+    <input name="in9" type="color3" value="0.127438, 0.127438, 0.127438" colorspace="none" />
+    <input name="in10" type="color3" value="0.5, 0.5, 0.5" colorspace="none" />
+  </switch>
+  <switch name="border_bot" type="color3">
+    <input name="which" type="float" nodename="mul_x" />
+    <input name="in1" type="color3" value="0.18, 0.18, 0.18" colorspace="none" />
+    <input name="in2" type="color3" value="0.127438, 0.127438, 0.127438" colorspace="none" />
+    <input name="in3" type="color3" value="0.031896, 0.031896, 0.031896" colorspace="none" />
+    <input name="in4" type="color3" value="0.127438, 0.127438, 0.127438" colorspace="none" />
+    <input name="in5" type="color3" value="0.031896, 0.031896, 0.031896" colorspace="none" />
+    <input name="in6" type="color3" value="0.127438, 0.127438, 0.127438" colorspace="none" />
+    <input name="in7" type="color3" value="0.031896, 0.031896, 0.031896" colorspace="none" />
+    <input name="in8" type="color3" value="0.127438, 0.127438, 0.127438" colorspace="none" />
+    <input name="in9" type="color3" value="0.031896, 0.031896, 0.031896" colorspace="none" />
+    <input name="in10" type="color3" value="0, 0, 0" colorspace="none" />
+  </switch>
+  <switch name="row1" type="color3">
+    <input name="which" type="float" nodename="mul_x" />
+    <input name="in1" type="color3" value="0.031896, 0.031896, 0.031896" colorspace="none" />
+    <input name="in2" type="color3" value="0.784313, 0.39216, 0.196076" colorspace="srgb_texture" />
+    <input name="in3" type="color3" value="0.577579, 0.12744, 0.0318954" colorspace="lin_rec709" />
+    <input name="in4" type="color3" value="0.779186, 0.392031, 0.20887" colorspace="g22_rec709" />
+    <input name="in5" type="color3" value="0.73716, 0.318381, 0.147482" colorspace="g18_rec709" />
+    <input name="in6" type="color3" value="0.398892, 0.157752, 0.0536138" colorspace="acescg" />
+    <input name="in7" type="color3" value="0.398892, 0.157752, 0.0536138" colorspace="lin_ap1" />
+    <input name="in8" type="color3" value="0.658522, 0.431959, 0.264483" colorspace="g22_ap1" />
+    <input name="in9" type="color3" value="0.695066, 0.391901, 0.220088" colorspace="adobergb" />
+    <input name="in10" type="color3" value="0.031896, 0.031896, 0.031896" colorspace="none" />
+  </switch>
+  <switch name="row2" type="color3">
+    <input name="which" type="float" nodename="mul_x" />
+    <input name="in1" type="color3" value="0.127438, 0.127438, 0.127438" colorspace="none" />
+    <input name="in2" type="color3" value="0.449346, 0.12744, 0.0358282" colorspace="lin_adobergb" />
+    <input name="in3" type="color3" value="0.733815, 0.413301, 0.24304" colorspace="srgb_displayp3" />
+    <input name="in4" type="color3" value="0.497662, 0.142382, 0.0481343" colorspace="lin_displayp3" />
+    <input name="in5" type="color3" value="0.577579, 0.12744, 0.0318954" colorspace="none" />
+    <input name="in6" type="color3" value="0.795557, 0.423849, 0.237987" colorspace="rec709_display" />
+    <input name="in7" type="color3" value="0.398892, 0.157752, 0.0536138" colorspace="lin_ap1_scene" />
+    <input name="in8" type="color3" value="0.577579, 0.12744, 0.0318954" colorspace="lin_rec709_scene" />
+    <input name="in9" type="color3" value="0.497662, 0.142382, 0.0481343" colorspace="lin_p3d65_scene" />
+    <input name="in10" type="color3" value="0.127438, 0.127438, 0.127438" colorspace="none" />
+  </switch>
+  <switch name="row3" type="color3">
+    <input name="which" type="float" nodename="mul_x" />
+    <input name="in1" type="color3" value="0.031896, 0.031896, 0.031896" colorspace="none" />
+    <input name="in2" type="color3" value="0.449346, 0.12744, 0.0358282" colorspace="lin_adobergb_scene" />
+    <input name="in3" type="color3" value="0.784313, 0.39216, 0.196076" colorspace="srgb_rec709_scene" />
+    <input name="in4" type="color3" value="0.779186, 0.392031, 0.20887" colorspace="g22_rec709_scene" />
+    <input name="in5" type="color3" value="0.73716, 0.318381, 0.147482" colorspace="g18_rec709_scene" />
+    <input name="in6" type="color3" value="0.658522, 0.431959, 0.264483" colorspace="g22_ap1_scene" />
+    <input name="in7" type="color3" value="0.733815, 0.413301, 0.24304" colorspace="srgb_p3d65_scene" />
+    <input name="in8" type="color3" value="0.695066, 0.391901, 0.220088" colorspace="g22_adobergb_scene" />
+    <input name="in9" type="color3" value="0.497662, 0.142382, 0.0481343" />
+    <input name="in10" type="color3" value="0.031896, 0.031896, 0.031896" colorspace="none" />
+  </switch>
+  <switch name="row4" type="color3">
+    <input name="which" type="float" nodename="mul_x" />
+    <input name="in1" type="color3" value="0.127438, 0.127438, 0.127438" colorspace="none" />
+    <input name="in2" type="color3" nodename="row4_lin_ap1_scene" />
+    <input name="in3" type="color3" nodename="row4_lin_p3d65_scene" />
+    <input name="in4" type="color3" nodename="row4_srgb_rec709_scene" />
+    <input name="in5" type="color3" nodename="row4_g18_rec709_scene" />
+    <input name="in6" type="color3" nodename="row4_g22_ap1_scene" />
+    <input name="in7" type="color3" nodename="row4_srgb_p3d65_scene" />
+    <input name="in8" type="color3" nodename="row4_none" />
+    <input name="in9" type="color3" nodename="row4_untagged_lin_displayp3" />
+    <input name="in10" type="color3" value="0.127438, 0.127438, 0.127438" colorspace="none" />
+  </switch>
+  <image name="row4_lin_ap1_scene" type="color3">
+    <input name="file" type="filename" value="textures/lin_ap1_scene.hdr" colorspace="lin_ap1_scene" />
+  </image>
+  <image name="row4_lin_p3d65_scene" type="color3">
+    <input name="file" type="filename" value="textures/lin_p3d65_scene.hdr" colorspace="lin_p3d65_scene" />
+  </image>
+  <image name="row4_srgb_rec709_scene" type="color3">
+    <input name="file" type="filename" value="textures/srgb_rec709_scene.hdr" colorspace="srgb_rec709_scene" />
+  </image>
+  <image name="row4_g18_rec709_scene" type="color3">
+    <input name="file" type="filename" value="textures/g18_rec709_scene.hdr" colorspace="g18_rec709_scene" />
+  </image>
+  <image name="row4_g22_ap1_scene" type="color3" colorspace="g22_ap1_scene">
+    <input name="file" type="filename" value="textures/g22_ap1_scene.hdr" />
+  </image>
+  <image name="row4_srgb_p3d65_scene" type="color3" colorspace="srgb_p3d65_scene">
+    <input name="file" type="filename" value="textures/srgb_p3d65_scene.hdr" />
+  </image>
+  <image name="row4_none" type="color3" colorspace="none">
+    <input name="file" type="filename" value="textures/none.hdr" />
+  </image>
+  <image name="row4_untagged_lin_displayp3" type="color3">
+    <input name="file" type="filename" value="textures/lin_displayp3.hdr" />
+  </image>
+  <nodegraph name="NG_row7" colorspace="srgb_displayp3">
+    <input name="ng_input" type="float" nodename="mul_x" />
+    <switch name="row7" type="color3">
+      <input name="which" type="float" interfacename="ng_input" />
+      <input name="in1" type="color3" value="0.031896, 0.031896, 0.031896" colorspace="none" />
+      <input name="in2" type="color3" value="0.398892, 0.157752, 0.0536138" colorspace="lin_ap1_scene" />
+      <input name="in3" type="color3" value="0.497662, 0.142382, 0.0481343" colorspace="lin_p3d65_scene" />
+      <input name="in4" type="color3" value="0.784313, 0.39216, 0.196076" colorspace="srgb_rec709_scene" />
+      <input name="in5" type="color3" value="0.73716, 0.318381, 0.147482" colorspace="g18_rec709_scene" />
+      <input name="in6" type="color3" value="0.658522, 0.431959, 0.264483" colorspace="g22_ap1_scene" />
+      <input name="in7" type="color3" value="0.733815, 0.413301, 0.24304" colorspace="srgb_p3d65_scene" />
+      <input name="in8" type="color3" value="0.577579, 0.12744, 0.0318954" colorspace="none" />
+      <input name="in9" type="color3" value="0.733815, 0.413301, 0.24304" />
+      <input name="in10" type="color3" value="0.031896, 0.031896, 0.031896" colorspace="none" />
+    </switch>
+    <output name="ng_output" type="color3" nodename="row7" />
+  </nodegraph>
+  <nodegraph name="NG_row8" colorspace="srgb_displayp3">
+    <input name="ng_input" type="float" nodename="mul_x" />
+    <switch name="row8" type="color3">
+      <input name="which" type="float" interfacename="ng_input" />
+      <input name="in1" type="color3" value="0.127438, 0.127438, 0.127438" colorspace="none" />
+      <input name="in2" type="color3" nodename="row8_srgb_texture" />
+      <input name="in3" type="color3" nodename="row8_g22_rec709" />
+      <input name="in4" type="color3" nodename="row8_acescg" />
+      <input name="in5" type="color3" nodename="row8_g22_ap1" />
+      <input name="in6" type="color3" nodename="row8_adobergb" />
+      <input name="in7" type="color3" nodename="row8_srgb_displayp3" />
+      <input name="in8" type="color3" nodename="row8_none" />
+      <input name="in9" type="color3" nodename="row8_untagged_srgb_displayp3" />
+      <input name="in10" type="color3" value="0.127438, 0.127438, 0.127438" colorspace="none" />
+    </switch>
+    <output name="ng_output" type="color3" nodename="row8" />
+    <image name="row8_srgb_texture" type="color3">
+      <input name="file" type="filename" value="textures/srgb_texture.hdr" colorspace="srgb_texture" />
+    </image>
+    <image name="row8_g22_rec709" type="color3">
+      <input name="file" type="filename" value="textures/g22_rec709.hdr" colorspace="g22_rec709" />
+    </image>
+    <image name="row8_acescg" type="color3">
+      <input name="file" type="filename" value="textures/acescg.hdr" colorspace="acescg" />
+    </image>
+    <image name="row8_g22_ap1" type="color3">
+      <input name="file" type="filename" value="textures/g22_ap1.hdr" colorspace="g22_ap1" />
+    </image>
+    <image name="row8_adobergb" type="color3">
+      <input name="file" type="filename" value="textures/adobergb.hdr" colorspace="adobergb" />
+    </image>
+    <image name="row8_srgb_displayp3" type="color3">
+      <input name="file" type="filename" value="textures/srgb_displayp3.hdr" colorspace="srgb_displayp3" />
+    </image>
+    <image name="row8_none" type="color3">
+      <input name="file" type="filename" value="textures/none.hdr" colorspace="none" />
+    </image>
+    <image name="row8_untagged_srgb_displayp3" type="color3">
+      <input name="file" type="filename" value="textures/srgb_displayp3.hdr" />
+    </image>
+  </nodegraph>
+  <switch name="switches" type="color3">
+    <input name="which" type="float" nodename="mul_y" />
+    <input name="in1" type="color3" nodename="border_top" />
+    <input name="in2" type="color3" nodename="row1" />
+    <input name="in3" type="color3" nodename="row2" />
+    <input name="in4" type="color3" nodename="row3" />
+    <input name="in5" type="color3" nodename="row4" />
+    <input name="in6" type="color3" output="ng_output" nodegraph="NG_row7" />
+    <input name="in7" type="color3" output="ng_output" nodegraph="NG_row8" />
+    <input name="in8" type="color3" nodename="border_bot" />
+  </switch>
+  <surface_unlit name="surf_unlit1" type="surfaceshader">
+    <input name="emission_color" type="color3" nodename="switches" />
+  </surface_unlit>
+  <surfacematerial name="orange_squares_8x6_lin_rec709" type="material">
+    <input name="surfaceshader" type="surfaceshader" nodename="surf_unlit1" />
+  </surfacematerial>
+</materialx>

@@ -1,0 +1,574 @@
+#usda 1.0
+(
+    metersPerUnit = 0.01
+    upAxis = "Y"
+    defaultPrim = "Plane"
+    renderSettingsPrimPath = "/RenderSettings"
+
+    customLayerData = {
+        # This gets added by usdcat when converting the .mtlx file to OpenUSD, however, neither
+        # the old or new colorSpace name works in Storm. Need to add it separately below.
+        # string colorSpace = "lin_displayp3"
+        string colorSpace = "lin_p3d65_scene"
+    }
+)
+
+def RenderSettings "RenderSettings" {
+    uniform token renderingColorSpace = "lin_rec709_scene"
+}
+
+def Xform "Plane"
+{
+    def Mesh "PlaneMesh" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        float3[] extent = [(-1, -1, 0), (1, 1, 0)]
+        point3f[] points = [
+            (-1, -1, 0), (1, -1, 0), (1, 1, 0), (-1, 1, 0)
+        ]
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+         texCoord2f[] primvars:st = [(0, 1), (1, 1), (1, 0), (0, 0)] ( 
+            interpolation = "varying"
+        )
+
+        rel material:binding = </MaterialX/Materials/orange_squares_8x6>
+    }
+}
+
+def "MaterialX"
+{
+    def "Materials"
+    {
+        def Material "orange_squares_8x6" (
+            prepend apiSchemas = ["MaterialXConfigAPI"]
+        )
+        {
+            string config:mtlx:version = "1.39"
+            float inputs:emission
+            color3f inputs:emission_color
+            float inputs:opacity
+            float inputs:transmission
+            color3f inputs:transmission_color
+            token outputs:mtlx:surface.connect = </MaterialX/Materials/orange_squares_8x6/surf_unlit1.outputs:surface>
+
+            def Shader "surf_unlit1" (
+                prepend references = </MaterialX/Shaders/surf_unlit1>
+            )
+            {
+                float inputs:emission.connect = </MaterialX/Materials/orange_squares_8x6.inputs:emission>
+                color3f inputs:emission_color.connect = </MaterialX/Materials/orange_squares_8x6/NodeGraphs/switches.outputs:out>
+                float inputs:opacity.connect = </MaterialX/Materials/orange_squares_8x6.inputs:opacity>
+                float inputs:transmission.connect = </MaterialX/Materials/orange_squares_8x6.inputs:transmission>
+                color3f inputs:transmission_color.connect = </MaterialX/Materials/orange_squares_8x6.inputs:transmission_color>
+            }
+
+            def "NodeGraphs" (
+                prepend references = </MaterialX/NodeGraphs>
+            )
+            {
+            }
+        }
+    }
+
+    def "Shaders"
+    {
+        def Shader "surf_unlit1"
+        {
+            uniform token info:id = "ND_surface_unlit"
+            token outputs:surface
+        }
+    }
+
+    def NodeGraph "NodeGraphs" (
+            prepend apiSchemas = ["ColorSpaceAPI"]
+    )
+    {
+        # Note: This doesn't work, may not use MtlX names with ColorSpaceAPI.
+        # uniform token colorSpace:name = "lin_displayp3"
+        uniform token colorSpace:name = "lin_p3d65_scene"
+
+        def Shader "tex1"
+        {
+            uniform token info:id = "ND_texcoord_vector2"
+            float2 outputs:out
+        }
+
+        def Shader "ext_x"
+        {
+            uniform token info:id = "ND_extract_vector2"
+            float2 inputs:in.connect = </MaterialX/NodeGraphs/tex1.outputs:out>
+            int inputs:index = 0
+            float outputs:out
+        }
+
+        def Shader "ext_y"
+        {
+            uniform token info:id = "ND_extract_vector2"
+            float2 inputs:in.connect = </MaterialX/NodeGraphs/tex1.outputs:out>
+            int inputs:index = 1
+            float outputs:out
+        }
+
+        def Shader "mul_x"
+        {
+            uniform token info:id = "ND_multiply_float"
+            float inputs:in1.connect = </MaterialX/NodeGraphs/ext_x.outputs:out>
+            float inputs:in2 = 10
+            float outputs:out
+        }
+
+        def Shader "mul_y"
+        {
+            uniform token info:id = "ND_multiply_float"
+            float inputs:in1.connect = </MaterialX/NodeGraphs/ext_y.outputs:out>
+            float inputs:in2 = 8
+            float outputs:out
+        }
+
+        def Shader "border_top"
+        {
+            uniform token info:id = "ND_switch_color3"
+            color3f inputs:in1 = (1, 1, 1) (
+                #colorSpace = "data"
+                # Data is not supported yet in MtlX ShaderGen.
+                colorSpace = "none"
+            )
+            color3f inputs:in2 = (0.031896, 0.031896, 0.031896) (
+                colorSpace = "none"
+            )
+            color3f inputs:in3 = (0.127438, 0.127438, 0.127438) (
+                colorSpace = "none"
+            )
+            color3f inputs:in4 = (0.031896, 0.031896, 0.031896) (
+                colorSpace = "none"
+            )
+            color3f inputs:in5 = (0.127438, 0.127438, 0.127438) (
+                colorSpace = "none"
+            )
+            color3f inputs:in6 = (0.031896, 0.031896, 0.031896) (
+                colorSpace = "none"
+            )
+            color3f inputs:in7 = (0.127438, 0.127438, 0.127438) (
+                colorSpace = "none"
+            )
+            color3f inputs:in8 = (0.031896, 0.031896, 0.031896) (
+                colorSpace = "none"
+            )
+            color3f inputs:in9 = (0.127438, 0.127438, 0.127438) (
+                colorSpace = "none"
+            )
+            color3f inputs:in10 = (0.5, 0.5, 0.5) (
+                colorSpace = "none"
+            )
+            float inputs:which.connect = </MaterialX/NodeGraphs/mul_x.outputs:out>
+            color3f outputs:out
+        }
+
+        def Shader "border_bot"
+        {
+            uniform token info:id = "ND_switch_color3"
+            color3f inputs:in1 = (0.18, 0.18, 0.18) (
+                colorSpace = "none"
+            )
+            color3f inputs:in2 = (0.127438, 0.127438, 0.127438) (
+                colorSpace = "none"
+            )
+            color3f inputs:in3 = (0.031896, 0.031896, 0.031896) (
+                colorSpace = "none"
+            )
+            color3f inputs:in4 = (0.127438, 0.127438, 0.127438) (
+                colorSpace = "none"
+            )
+            color3f inputs:in5 = (0.031896, 0.031896, 0.031896) (
+                colorSpace = "none"
+            )
+            color3f inputs:in6 = (0.127438, 0.127438, 0.127438) (
+                colorSpace = "none"
+            )
+            color3f inputs:in7 = (0.031896, 0.031896, 0.031896) (
+                colorSpace = "none"
+            )
+            color3f inputs:in8 = (0.127438, 0.127438, 0.127438) (
+                colorSpace = "none"
+            )
+            color3f inputs:in9 = (0.031896, 0.031896, 0.031896) (
+                colorSpace = "none"
+            )
+            color3f inputs:in10 = (0, 0, 0) (
+                colorSpace = "none"
+            )
+            float inputs:which.connect = </MaterialX/NodeGraphs/mul_x.outputs:out>
+            color3f outputs:out
+        }
+
+        def Shader "row1"
+        {
+            uniform token info:id = "ND_switch_color3"
+            color3f inputs:in1 = (0.031896, 0.031896, 0.031896) (
+                colorSpace = "none"
+            )
+            color3f inputs:in2 = (0.784313, 0.39216, 0.196076) (
+                colorSpace = "srgb_texture"
+            )
+            color3f inputs:in3 = (0.577579, 0.12744, 0.0318954) (
+                colorSpace = "lin_rec709"
+            )
+            color3f inputs:in4 = (0.779186, 0.392031, 0.20887) (
+                colorSpace = "g22_rec709"
+            )
+            color3f inputs:in5 = (0.73716, 0.318381, 0.147482) (
+                colorSpace = "g18_rec709"
+            )
+            color3f inputs:in6 = (0.398892, 0.157752, 0.0536138) (
+                colorSpace = "acescg"
+            )
+            color3f inputs:in7 = (0.398892, 0.157752, 0.0536138) (
+                colorSpace = "lin_ap1"
+            )
+            color3f inputs:in8 = (0.658522, 0.431959, 0.264483) (
+                colorSpace = "g22_ap1"
+            )
+            color3f inputs:in9 = (0.695066, 0.391901, 0.220088) (
+                colorSpace = "adobergb"
+            )
+            color3f inputs:in10 = (0.031896, 0.031896, 0.031896) (
+                colorSpace = "none"
+            )
+            float inputs:which.connect = </MaterialX/NodeGraphs/mul_x.outputs:out>
+            color3f outputs:out
+        }
+
+        def Shader "row2"
+        {
+            uniform token info:id = "ND_switch_color3"
+            color3f inputs:in1 = (0.127438, 0.127438, 0.127438) (
+                colorSpace = "none"
+            )
+            color3f inputs:in2 = (0.449346, 0.12744, 0.0358282) (
+                colorSpace = "lin_adobergb"
+            )
+            color3f inputs:in3 = (0.733815, 0.413301, 0.24304) (
+                colorSpace = "srgb_displayp3"
+            )
+            color3f inputs:in4 = (0.497662, 0.142382, 0.0481343)
+                # Should inherit lin_p3d65_scene from the MaterialX document color space.
+            color3f inputs:in5 = (0.577579, 0.12744, 0.0318954) (
+                colorSpace = "none"
+            )
+            color3f inputs:in6 = (0.795557, 0.423849, 0.237987) (
+                colorSpace = "rec709_display"
+            )
+            color3f inputs:in7 = (0.398892, 0.157752, 0.0536138) (
+                colorSpace = "lin_ap1_scene"
+            )
+            color3f inputs:in8 = (0.577579, 0.12744, 0.0318954) (
+                colorSpace = "lin_rec709_scene"
+            )
+            color3f inputs:in9 = (0.497662, 0.142382, 0.0481343) (
+                colorSpace = "lin_p3d65_scene"
+            )
+            color3f inputs:in10 = (0.127438, 0.127438, 0.127438) (
+                colorSpace = "none"
+            )
+            float inputs:which.connect = </MaterialX/NodeGraphs/mul_x.outputs:out>
+            color3f outputs:out
+        }
+
+        def Shader "row3"
+        {
+            uniform token info:id = "ND_switch_color3"
+            color3f inputs:in1 = (0.031896, 0.031896, 0.031896) (
+                colorSpace = "none"
+            )
+            color3f inputs:in2 = (0.449346, 0.12744, 0.0358282) (
+                colorSpace = "lin_adobergb_scene"
+            )
+            color3f inputs:in3 = (0.784313, 0.39216, 0.196076) (
+                colorSpace = "srgb_rec709_scene"
+            )
+            color3f inputs:in4 = (0.779186, 0.392031, 0.20887) (
+                colorSpace = "g22_rec709_scene"
+            )
+            color3f inputs:in5 = (0.73716, 0.318381, 0.147482) (
+                colorSpace = "g18_rec709_scene"
+            )
+            color3f inputs:in6 = (0.658522, 0.431959, 0.264483) (
+                colorSpace = "g22_ap1_scene"
+            )
+            color3f inputs:in7 = (0.733815, 0.413301, 0.24304) (
+                colorSpace = "srgb_p3d65_scene"
+            )
+            color3f inputs:in8 = (0.695066, 0.391901, 0.220088) (
+                colorSpace = "g22_adobergb_scene"
+            )
+            color3f inputs:in9 = (0.497662, 0.142382, 0.0481343)
+                # Should inherit lin_p3d65_scene from the MaterialX document color space.
+            color3f inputs:in10 = (0.031896, 0.031896, 0.031896) (
+                colorSpace = "none"
+            )
+            float inputs:which.connect = </MaterialX/NodeGraphs/mul_x.outputs:out>
+            color3f outputs:out
+        }
+
+        def Shader "row4"
+        {
+            uniform token info:id = "ND_switch_color3"
+            color3f inputs:in1 = (0.127438, 0.127438, 0.127438) (
+                colorSpace = "none"
+            )
+            color3f inputs:in2.connect = </MaterialX/NodeGraphs/row4_lin_ap1_scene.outputs:out>
+            color3f inputs:in3.connect = </MaterialX/NodeGraphs/row4_lin_p3d65_scene.outputs:out>
+            color3f inputs:in4.connect = </MaterialX/NodeGraphs/row4_srgb_rec709_scene.outputs:out>
+            color3f inputs:in5.connect = </MaterialX/NodeGraphs/row4_g18_rec709_scene.outputs:out>
+            color3f inputs:in6.connect = </MaterialX/NodeGraphs/row4_g22_ap1_scene.outputs:out>
+            color3f inputs:in7.connect = </MaterialX/NodeGraphs/row4_srgb_p3d65_scene.outputs:out>
+            color3f inputs:in8.connect = </MaterialX/NodeGraphs/row4_none.outputs:out>
+            color3f inputs:in9.connect = </MaterialX/NodeGraphs/row4_untagged_lin_displayp3.outputs:out>
+            color3f inputs:in10 = (0.127438, 0.127438, 0.127438) (
+                colorSpace = "none"
+            )
+            float inputs:which.connect = </MaterialX/NodeGraphs/mul_x.outputs:out>
+            color3f outputs:out
+        }
+
+        def Shader "row4_lin_ap1_scene"
+        {
+            uniform token info:id = "ND_image_color3"
+            asset inputs:file = @textures/lin_ap1_scene.hdr@ (
+                colorSpace = "lin_ap1_scene"
+            )
+            color3f outputs:out
+        }
+
+        def Shader "row4_lin_p3d65_scene"
+        {
+            uniform token info:id = "ND_image_color3"
+            asset inputs:file = @textures/lin_p3d65_scene.hdr@ (
+                colorSpace = "lin_p3d65_scene"
+            )
+            color3f outputs:out
+        }
+
+        def Shader "row4_srgb_rec709_scene"
+        {
+            uniform token info:id = "ND_image_color3"
+            asset inputs:file = @textures/srgb_rec709_scene.hdr@ (
+                colorSpace = "srgb_rec709_scene"
+            )
+            color3f outputs:out
+        }
+
+        def Shader "row4_g18_rec709_scene"
+        {
+            uniform token info:id = "ND_image_color3"
+            asset inputs:file = @textures/g18_rec709_scene.hdr@ (
+                colorSpace = "g18_rec709_scene"
+            )
+            color3f outputs:out
+        }
+
+        def Shader "row4_g22_ap1_scene"
+        {
+            uniform token info:id = "ND_image_color3"
+            asset inputs:file = @textures/g22_ap1_scene.hdr@ (
+                colorSpace = "g22_ap1_scene"
+            )
+            color3f outputs:out
+        }
+
+        def Shader "row4_srgb_p3d65_scene"
+        {
+            uniform token info:id = "ND_image_color3"
+            asset inputs:file = @textures/srgb_p3d65_scene.hdr@ (
+                colorSpace = "srgb_p3d65_scene"
+            )
+            color3f outputs:out
+        }
+
+        def Shader "row4_none"
+        {
+            uniform token info:id = "ND_image_color3"
+            asset inputs:file = @textures/none.hdr@ (
+                colorSpace = "none"
+            )
+            color3f outputs:out
+        }
+
+        def Shader "row4_untagged_lin_displayp3"
+        {
+            uniform token info:id = "ND_image_color3"
+            asset inputs:file = @textures/lin_displayp3.hdr@
+            color3f outputs:out
+        }
+
+        def NodeGraph "NG_row7" (
+            prepend apiSchemas = ["NodeGraphNodeAPI", "ColorSpaceAPI"]
+        )
+        {
+            uniform token colorSpace:name = "srgb_p3d65_scene"
+            float inputs:ng_input.connect = </MaterialX/NodeGraphs/mul_x.outputs:out>
+            color3f outputs:ng_output.connect = </MaterialX/NodeGraphs/NG_row7/row7.outputs:out>
+
+            def Shader "row7" (
+                prepend apiSchemas = ["NodeGraphNodeAPI"]
+            )
+            {
+                uniform token info:id = "ND_switch_color3"
+                color3f inputs:in1 = (0.031896, 0.031896, 0.031896) (
+                    colorSpace = "none"
+                )
+                color3f inputs:in2 = (0.398892, 0.157752, 0.0536138) (
+                    colorSpace = "lin_ap1_scene"
+                )
+                color3f inputs:in3 = (0.497662, 0.142382, 0.0481343) (
+                    colorSpace = "lin_p3d65_scene"
+                )
+                color3f inputs:in4 = (0.784313, 0.39216, 0.196076) (
+                    colorSpace = "srgb_rec709_scene"
+                )
+                color3f inputs:in5 = (0.73716, 0.318381, 0.147482) (
+                    colorSpace = "g18_rec709_scene"
+                )
+                color3f inputs:in6 = (0.658522, 0.431959, 0.264483) (
+                    colorSpace = "g22_ap1_scene"
+                )
+                color3f inputs:in7 = (0.733815, 0.413301, 0.24304) (
+                    colorSpace = "srgb_p3d65_scene"
+                )
+                color3f inputs:in8 = (0.577579, 0.12744, 0.0318954) (
+                    colorSpace = "none"
+                )
+                color3f inputs:in9 = (0.733815, 0.413301, 0.24304)
+                    # Should inherit lin_p3d65_scene from the MaterialX document color space.
+                color3f inputs:in10 = (0.031896, 0.031896, 0.031896) (
+                    colorSpace = "none"
+                )
+                float inputs:which.connect = </MaterialX/NodeGraphs/NG_row7.inputs:ng_input>
+                color3f outputs:out
+            }
+        }
+
+        def NodeGraph "NG_row8" (
+            prepend apiSchemas = ["NodeGraphNodeAPI", "ColorSpaceAPI"]
+        )
+        {
+            uniform token colorSpace:name = "srgb_p3d65_scene"
+            float inputs:ng_input.connect = </MaterialX/NodeGraphs/mul_x.outputs:out>
+            color3f outputs:ng_output.connect = </MaterialX/NodeGraphs/NG_row8/row8.outputs:out>
+
+            def Shader "row8" (
+                prepend apiSchemas = ["NodeGraphNodeAPI"]
+            )
+            {
+                uniform token info:id = "ND_switch_color3"
+                color3f inputs:in1 = (0.127438, 0.127438, 0.127438) (
+                    colorSpace = "none"
+                )
+                color3f inputs:in2.connect = </MaterialX/NodeGraphs/NG_row8/row8_srgb_texture.outputs:out>
+                color3f inputs:in3.connect = </MaterialX/NodeGraphs/NG_row8/row8_g22_rec709.outputs:out>
+                color3f inputs:in4.connect = </MaterialX/NodeGraphs/NG_row8/row8_acescg.outputs:out>
+                color3f inputs:in5.connect = </MaterialX/NodeGraphs/NG_row8/row8_g22_ap1.outputs:out>
+                color3f inputs:in6.connect = </MaterialX/NodeGraphs/NG_row8/row8_adobergb.outputs:out>
+                color3f inputs:in7.connect = </MaterialX/NodeGraphs/NG_row8/row8_srgb_displayp3.outputs:out>
+                color3f inputs:in8.connect = </MaterialX/NodeGraphs/NG_row8/row8_none.outputs:out>
+                color3f inputs:in9.connect = </MaterialX/NodeGraphs/NG_row8/row8_untagged_srgb_displayp3.outputs:out>
+                color3f inputs:in10 = (0.127438, 0.127438, 0.127438) (
+                    colorSpace = "none"
+                )
+                float inputs:which.connect = </MaterialX/NodeGraphs/NG_row8.inputs:ng_input>
+                color3f outputs:out
+            }
+
+            def Shader "row8_srgb_texture"
+            {
+                uniform token info:id = "ND_image_color3"
+                # Using CSAPI here does not work.
+                # asset inputs:file = @textures/srgb_texture.hdr@
+                # uniform token inputs:file:colorSpace:name = "srgb_rec709_scene"
+                asset inputs:file = @textures/srgb_texture.hdr@ (
+                    colorSpace = "srgb_texture"
+                )
+                color3f outputs:out
+            }
+
+            def Shader "row8_g22_rec709"
+            {
+                uniform token info:id = "ND_image_color3"
+                asset inputs:file = @textures/g22_rec709.hdr@ (
+                    colorSpace = "g22_rec709"
+                )
+                color3f outputs:out
+            }
+
+            def Shader "row8_acescg"
+            {
+                uniform token info:id = "ND_image_color3"
+                asset inputs:file = @textures/acescg.hdr@ (
+                    colorSpace = "acescg"
+                )
+                color3f outputs:out
+            }
+
+            def Shader "row8_g22_ap1"
+            {
+                uniform token info:id = "ND_image_color3"
+                asset inputs:file = @textures/g22_ap1.hdr@ (
+                    colorSpace = "g22_ap1"
+                )
+                color3f outputs:out
+            }
+
+            def Shader "row8_adobergb"
+            {
+                uniform token info:id = "ND_image_color3"
+                asset inputs:file = @textures/adobergb.hdr@ (
+                    colorSpace = "adobergb"
+                )
+                color3f outputs:out
+            }
+
+            def Shader "row8_srgb_displayp3"
+            {
+                uniform token info:id = "ND_image_color3"
+                asset inputs:file = @textures/srgb_displayp3.hdr@ (
+                    colorSpace = "srgb_displayp3"
+                )
+                color3f outputs:out
+            }
+
+            def Shader "row8_none"
+            {
+                uniform token info:id = "ND_image_color3"
+                asset inputs:file = @textures/none.hdr@ (
+                    colorSpace = "none"
+                )
+                color3f outputs:out
+            }
+
+            def Shader "row8_untagged_srgb_displayp3"
+            {
+                uniform token info:id = "ND_image_color3"
+                asset inputs:file = @textures/srgb_displayp3.hdr@ 
+                color3f outputs:out
+            }
+        }
+
+        def Shader "switches"
+        {
+            uniform token info:id = "ND_switch_color3"
+            color3f inputs:in1.connect = </MaterialX/NodeGraphs/border_top.outputs:out>
+            color3f inputs:in2.connect = </MaterialX/NodeGraphs/row1.outputs:out>
+            color3f inputs:in3.connect = </MaterialX/NodeGraphs/row2.outputs:out>
+            color3f inputs:in4.connect = </MaterialX/NodeGraphs/row3.outputs:out>
+            color3f inputs:in5.connect = </MaterialX/NodeGraphs/row4.outputs:out>
+            color3f inputs:in6.connect = </MaterialX/NodeGraphs/NG_row7.outputs:ng_output>
+            color3f inputs:in7.connect = </MaterialX/NodeGraphs/NG_row8.outputs:ng_output>
+            color3f inputs:in8.connect = </MaterialX/NodeGraphs/border_bot.outputs:out>
+            float inputs:which.connect = </MaterialX/NodeGraphs/mul_y.outputs:out>
+            color3f outputs:out
+        }
+    }
+}
+

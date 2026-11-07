@@ -299,6 +299,16 @@ const SURFACES: Record<string, SurfaceMap> = {
     transmission: ['transmission', 0],
     ior: ['ior', 1.5],
   },
+  realitykit_pbr_surfaceshader: {
+    color: ['baseColor', [0.18, 0.18, 0.18]],
+    metal: ['metallic', 0],
+    roughness: ['roughness', 0.5],
+    normal: 'normal',
+    coat: ['clearcoat', 0],
+    coatRoughness: ['clearcoatRoughness', 0.01],
+    transmission: ['transmission', 0],
+    ior: ['ior', 1.5],
+  },
   UsdPreviewSurface: {
     color: ['diffuseColor', [0.18, 0.18, 0.18]],
     metal: ['metallic', 0],
@@ -649,19 +659,27 @@ export function parseMaterialX(input: BinaryInput | string): MaterialXDocument {
   const materials = Object.values(nodes)
     .filter((node) => node.category === 'surfacematerial')
     .map((node) => ({ name: node.name, shader: surface(node) }));
-  const doc: MaterialXDocument = {
-    version: root.attributes.version ?? '',
-    nodes,
-    graphs,
-    materials,
-    assignments,
-    includes,
-    toGraph(name, options = {}) {
-      const material = name === undefined ? materials[0] : materials.find((item) => item.name === name);
-      if (!material) return Promise.reject(new LoaderError(F, 'range', `no material ${name ?? 'in the document'}`));
-      return convert(doc, material, options);
-    },
-  };
+  const doc = materialXDocument({ version: root.attributes.version ?? '', nodes, graphs, materials, assignments, includes });
   if (root.attributes.colorspace !== undefined) doc.colorspace = root.attributes.colorspace;
+  return doc;
+}
+
+/** A document from parts, for a network that came from elsewhere, such as a USD stage. `nodes` have a null prototype. */
+export function materialXDocument(
+  parts: Partial<Omit<MaterialXDocument, 'toGraph'>> & Pick<MaterialXDocument, 'nodes' | 'materials'>,
+): MaterialXDocument {
+  const { materials } = parts,
+    doc: MaterialXDocument = {
+      version: '',
+      graphs: table<MaterialXNodeGraph>(),
+      assignments: [],
+      includes: [],
+      ...parts,
+      toGraph(name, options = {}) {
+        const material = name === undefined ? materials[0] : materials.find((item) => item.name === name);
+        if (!material) return Promise.reject(new LoaderError(F, 'range', `no material ${name ?? 'in the document'}`));
+        return convert(doc, material, options);
+      },
+    };
   return doc;
 }

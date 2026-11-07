@@ -11,8 +11,9 @@ import { skeletons } from './skel.js';
 import { animation } from './anim.js';
 import { subdivision } from './subdiv.js';
 import { lights } from './lux.js';
+import { materialX } from './materialx.js';
 
-const known: Record<string, (options?: never) => USDExtension> = { compose: composition, skel: skeletons, anim: animation, subdiv: subdivision, lux: lights };
+const known: Record<string, (options?: never) => USDExtension> = { compose: composition, skel: skeletons, anim: animation, subdiv: subdivision, lux: lights, materialx: materialX };
 serve(async ({ url, input, options: sent }: { url?: string; input?: ArrayBuffer | string; options: USDOptions }) => {
   const options: USDOptions = {
     ...sent,

@@ -54,6 +54,10 @@
     "./lux": {
       "types": "./dist/lux.d.ts",
       "import": "./dist/lux.js"
+    },
+    "./materialx": {
+      "types": "./dist/materialx.d.ts",
+      "import": "./dist/materialx.js"
     }
   },
   "scripts": {

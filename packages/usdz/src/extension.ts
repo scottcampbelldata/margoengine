@@ -1,4 +1,4 @@
-import type { GLTFDocument } from '../../shared/gltf.js';
+import type { GLTFDocument, GLTFMaterial } from '../../shared/gltf.js';
 import type { Specs } from './crate.js';
 
 /**
@@ -24,6 +24,8 @@ export interface LayerRead {
   maxDepth: number;
   issues: USDIssue[];
   signal?: AbortSignal;
+  /** Reads a file that is not a USD layer, through the extensions that know one. */
+  foreign?(read: ForeignLayer): Specs | undefined;
 }
 /** An authored mesh, as the shape hook gets it. */
 export interface MeshRead {
@@ -88,10 +90,63 @@ export interface SceneRead {
   /** Lists something that could not be used; the file still opens. */
   soft(message: string): void;
 }
+/** A file of a stage that is not a USD layer, as the layer hook gets it. */
+export interface ForeignLayer {
+  id: string;
+  data: Uint8Array;
+  /** Another file, by id, when it is there. */
+  file(id: string): Uint8Array | undefined;
+  issues: USDIssue[];
+}
+/** How a texture is sampled. */
+export interface USDImagePlacement {
+  /** As KHR_texture_transform, on the document's uvs. */
+  transform?: { offset: [number, number]; rotation: number; scale: [number, number] };
+  wrapS: number;
+  wrapT: number;
+}
+/** An image of the document: one file, or two packed as a glTF metal and rough texture. */
+export interface USDImage {
+  path?: string;
+  /** The file's colours are linear, where a base colour texture is read as sRGB. */
+  linearColor?: boolean;
+  roughness?: { path: string; channel: number };
+  metallic?: { path: string; channel: number };
+  roughnessValue?: number;
+  metallicValue?: number;
+}
+/** A bound material, as the surface hook gets it. */
+export interface SurfaceRead {
+  specs: Specs;
+  document: GLTFDocument;
+  /** The Material prim. */
+  path: string;
+  /** A property of a prim, at the stage's first time. */
+  attr(path: string, name: string): unknown;
+  /** What feeds a property, through any interface on the way. */
+  connection(path: string, name: string): string | undefined;
+  /** True when the file can be read. */
+  has(file: string): boolean;
+  /** Adds a texture and gives its glTF texture info. */
+  image(source: USDImage, where: USDImagePlacement): { index: number; extensions?: Record<string, unknown>; scale?: number };
+  soft(message: string): void;
+}
+/** A material the surface hook made. */
+export interface USDSurface {
+  material: GLTFMaterial;
+  /** The primvar its textures read. */
+  uv?: string;
+  /** Kept on the material's `extras.materialX`. */
+  network?: unknown;
+}
 /** What an extension does: each hook runs at its step of the import. */
 export interface ExtensionHooks extends USDExtension {
   /** Turns the root layer into one flat spec map, in place of reading it as a single static layer. */
   compose?(read: LayerRead): Specs;
+  /** The specs of a file that is not a USD layer, or nothing when it is not this extension's. */
+  layer?(read: ForeignLayer): Specs | undefined;
+  /** A glTF material for a bound Material, or nothing to read it as UsdPreviewSurface. */
+  surface?(read: SurfaceRead): USDSurface | undefined;
   /** New faces for a mesh, or nothing to keep its own. */
   shape?(read: MeshRead): MeshShape | undefined;
   /** Adds to the finished scene: skins, clips and the like. */

@@ -294,19 +294,7 @@ interface GLTFTextureTransform {
   texCoord?: number;
 }
 
-type ImageSource = {
-    path?: string;
-    roughness?: {
-        path: string;
-        channel: number;
-    };
-    metallic?: {
-        path: string;
-        channel: number;
-    };
-    roughnessValue?: number;
-    metallicValue?: number;
-};
+type ImageSource = USDImage;
 
 type Specs = Record<string, {
     specType: number;
@@ -330,6 +318,21 @@ class USDAsset {
 
 interface USDExtension {
     readonly name: string;
+}
+
+interface USDImage {
+    path?: string;
+    linearColor?: boolean;
+    roughness?: {
+        path: string;
+        channel: number;
+    };
+    metallic?: {
+        path: string;
+        channel: number;
+    };
+    roughnessValue?: number;
+    metallicValue?: number;
 }
 
 interface USDIssue {

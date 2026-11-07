@@ -1094,7 +1094,7 @@ Each is described with its cause and guard in
 
 ### toGraph of MaterialX is not yet compared with a MaterialX render
 
-- **What:** `@margoengine/loaders/materialx` read one real file, an ambientCG `open_pbr_surface` material kept outside the repository, and its test compiles a graph through `nodeMaterial()`. No material was rendered and compared with a MaterialX viewer, and the shader defaults were not checked line by line against each published definition.
+- **What:** `@margoengine/loaders/materialx` read one real file, an ambientCG `open_pbr_surface` material kept outside the repository, and its test compiles a graph through `nodeMaterial()`. `@margoengine/usdz/materialx` now reads 19 real `.mtlx` files, their networks match OpenUSD, and the shader defaults were checked against the tables of the Physically Based Shading Nodes document. Still no material was rendered and compared with a MaterialX viewer.
 - **Repro:** convert a material from the MaterialX sample library, render it on a sphere and compare with MaterialXView.
 - **Cause:** no reference renderer or sample library in the repository.
 - **Needed to close:** add sample documents to `THIRD-PARTY-NOTICES.md` with reference renders, and compare them.

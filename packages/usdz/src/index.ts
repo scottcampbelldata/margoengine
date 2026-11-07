@@ -10,8 +10,9 @@ import {
 } from '@margoengine/loaders/common';
 import { readUSDA, type USDPrim, type USDValue } from '@margoengine/loaders/usd';
 import { parseCrate, type Specs, type TimeSamples } from './crate.js';
-import type { ExtensionHooks, SceneMesh, USDExtension, USDIssue } from './extension.js';
+import type { ExtensionHooks, ForeignLayer, SceneMesh, USDExtension, USDImage, USDImagePlacement, USDIssue } from './extension.js';
 import type { GLTFDocument, GLTFMaterial, GLTFNode } from '../../shared/gltf.js';
+import { LinearToSRGB } from '@margoengine/math/color';
 import { multiplyMatrices } from '@margoengine/math/mat4';
 
 /** Parse limits and loading hooks for the USD readers. Every limit is checked while parsing; a breach throws a `LoaderError` with code `limit`. */
@@ -66,13 +67,7 @@ export interface USDMeshSubset {
   /** Index into `document.materials`. */
   material: number;
 }
-type ImageSource = {
-  path?: string;
-  roughness?: { path: string; channel: number };
-  metallic?: { path: string; channel: number };
-  roughnessValue?: number;
-  metallicValue?: number;
-};
+type ImageSource = USDImage;
 type USDDocument = Required<
   Pick<
     GLTFDocument,
@@ -93,11 +88,7 @@ type USDDocument = Required<
 /** glTF sampler wrap modes for UsdUVTexture's `wrapS`/`wrapT`; `black` and `useMetadata` keep glTF's default (repeat). */
 const WRAP: Record<string, number> = { repeat: 10497, mirror: 33648, clamp: 33071 };
 /** Where a texture is sampled: KHR_texture_transform values (glTF uv space, v down) and glTF wrap modes. */
-interface Placement {
-  transform?: { offset: [number, number]; rotation: number; scale: [number, number] };
-  wrapS: number;
-  wrapT: number;
-}
+type Placement = USDImagePlacement;
 const identity = () => [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
 function fail(message: string): never {
   // Malformed input is a LoaderError, like every other loader; the code is taken from the wording.
@@ -202,6 +193,17 @@ function asciiSpecs(text: string, maxDepth: number, signal?: AbortSignal): Specs
 }
 /** The hook of each extension that has `name`. */
 const hooks = (options: USDOptions) => (options.extensions ?? []) as readonly ExtensionHooks[];
+/** Reads a file that is no USD layer through the extensions that know one. */
+export function foreignReader(options: USDOptions): (read: ForeignLayer) => Specs | undefined {
+  const readers = hooks(options).filter((hook) => hook.layer);
+  return (read) => {
+    for (const reader of readers) {
+      const specs = reader.layer!(read);
+      if (specs) return specs;
+    }
+    return undefined;
+  };
+}
 function parseLayer(
   input: string | BinaryInput,
   options: USDOptions,
@@ -222,6 +224,7 @@ function parseLayer(
       maxDepth: limits.maxDepth,
       issues,
       signal: options.signal,
+      foreign: foreignReader(options),
     });
   let specs: Specs;
   if (new TextDecoder().decode(data.subarray(0, 8)) === 'PXR-USDC') {
@@ -343,6 +346,19 @@ function compose(order: unknown, get: (name: string) => unknown): number[] {
 /** True for the value of a `normal3f[]`, or another vector list, and not of a single vector or a list of numbers. */
 const normalList = (value: unknown, type: unknown) =>
   Array.isArray(value) && value.length % 3 === 0 && typeof type === 'string' && /3[fdh]\[\]$/.test(type);
+/** An image of linear colours as sRGB bytes, which is how a glTF base colour texture is read. */
+async function encoded(image: ImageBitmap): Promise<ImageBitmap> {
+  const canvas = new OffscreenCanvas(image.width, image.height),
+    context = canvas.getContext('2d', { colorSpace: 'srgb' })!;
+  context.drawImage(image, 0, 0);
+  image.close();
+  const pixels = context.getImageData(0, 0, canvas.width, canvas.height),
+    table = Uint8ClampedArray.from({ length: 256 }, (_, i) => Math.round(LinearToSRGB(i / 255) * 255));
+  for (let i = 0; i < pixels.data.length; i += 4)
+    for (let c = 0; c < 3; c++) pixels.data[i + c] = table[pixels.data[i + c]];
+  context.putImageData(pixels, 0, 0);
+  return createImageBitmap(canvas);
+}
 /** A parsed USD scene: typed mesh streams plus a glTF document ready for `create()`. Parse with `parseUSDA`, `parseUSDC` or `parseUSDZ`. */
 export class USDAsset {
   constructor(
@@ -377,7 +393,7 @@ export class USDAsset {
     try {
       for (const source of this.sources) {
         signal?.throwIfAborted();
-        if (source.path) images.push(await decode(source.path));
+        if (source.path) images.push(source.linearColor ? await encoded(await decode(source.path)) : await decode(source.path));
         else {
           const rough = source.roughness ? await decode(source.roughness.path) : undefined;
           let metal: ImageBitmap | undefined;
@@ -579,7 +595,8 @@ function asset(
     if (!doc.extensionsUsed.includes('KHR_texture_transform')) doc.extensionsUsed.push('KHR_texture_transform');
     return { index, extensions: { KHR_texture_transform: where.transform } };
   };
-  const materialIds = new Map<string, number>(),
+  const surfacer = hooks(options).find((hook) => hook.surface),
+    materialIds = new Map<string, number>(),
     // Per material: the fallback colour and opacity of the display primvars it reads, and the primvar its maps sample.
     displays = new Map<number, { color?: number[]; opacity?: number[]; uv?: string }>();
   /** The primvar a texture reads, through its UsdTransform2d when it has one. */
@@ -598,6 +615,25 @@ function asset(
       // A target that is no prim of the stage binds nothing, as a stage reads it.
       if (target && (!composed || specs[target]) && (!binding || rel?.bindMaterialAs === 'strongerThanDescendants'))
         binding = target;
+    }
+    if (binding && surfacer) {
+      if (materialIds.has(binding)) return materialIds.get(binding)!;
+      const made = surfacer.surface!({
+        specs,
+        document: doc,
+        path: binding,
+        attr: attrs,
+        connection,
+        has: (file) => entries.has(file),
+        image,
+        soft,
+      });
+      if (made) {
+        const id = doc.materials.push(made.network ? { ...made.material, extras: { materialX: made.network } } : made.material) - 1;
+        materialIds.set(binding, id);
+        displays.set(id, { uv: made.uv });
+        return id;
+      }
     }
     let shader = binding ? connection(binding, 'outputs:surface')?.split('.outputs:')[0] : undefined;
     if (binding && !shader) {

@@ -5,7 +5,7 @@ import type { PBRModel } from '@margoengine/gltf-pro/model';
 import { fetchBytes, LoaderError, readZipDirectory, readZipEntry } from '@margoengine/loaders/common';
 import { parseCrate, type Specs } from './crate.js';
 import type { ExtensionHooks, LayerRead, USDExtension, USDIssue } from './extension.js';
-import { assetFromSpecs, type USDAsset, type USDOptions } from './index.js';
+import { assetFromSpecs, foreignReader, type USDAsset, type USDOptions } from './index.js';
 import { readTextLayer } from './layer.js';
 import { composeStage, type ComposeIssue } from './stage.js';
 
@@ -49,7 +49,12 @@ function compose(
       if (cache.has(id)) return cache.get(id);
       const data = id === read.id ? read.data : lookup(id);
       if (!data) missing?.add(id);
-      const specs = data && readLayer(data, read);
+      const file = (other: string) => {
+        const bytes = lookup(other);
+        if (!bytes) missing?.add(other);
+        return bytes;
+      };
+      const specs = data && (readLayer(data, read) ?? read.foreign?.({ id, data, file, issues: read.issues }));
       if (data && !specs) read.issues.push({ code: 'unsupported-layer', message: `${id} is not a USD layer this reader knows` });
       cache.set(id, specs);
       return specs;
@@ -143,7 +148,7 @@ export async function composeUSDFiles(root: string, read: USDFileReader, options
     const missing = new Set<string>();
     issues.length = 0;
     specs = compose(
-      { id: rootId, data: rootData, entries: files, maxBytes, maxDepth, issues, signal: options.signal },
+      { id: rootId, data: rootData, entries: files, maxBytes, maxDepth, issues, signal: options.signal, foreign: foreignReader(options) },
       options,
       (id) => files.get(aliases.get(id) ?? id),
       missing,

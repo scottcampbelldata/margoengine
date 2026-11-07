@@ -60,6 +60,8 @@ export interface USDOptions {
 
 export function assetFromSpecs(specs: Specs, entries: Map<string, Uint8Array>, options: USDOptions, issues?: USDIssue[]): USDAsset;
 
+export function foreignReader(options: USDOptions): (read: ForeignLayer) => Specs | undefined;
+
 export function loadUSDZ(engine: EngineKernel, url: string | URL, options?: USDOptions): Promise<PBRModel>;
 
 export function parseUSDA(input: string | BinaryInput, options?: USDOptions): USDAsset;
@@ -69,6 +71,13 @@ export function parseUSDC(input: BinaryInput, options?: USDOptions): USDAsset;
 export function parseUSDZ(input: BinaryInput, options?: USDOptions): Promise<USDAsset>;
 
 // Not exported from this entry, but used by the exports above:
+
+interface ForeignLayer {
+    id: string;
+    data: Uint8Array;
+    file(id: string): Uint8Array | undefined;
+    issues: USDIssue[];
+}
 
 interface GLTFAccessor extends GLTFProperty {
   bufferView?: number;
@@ -334,8 +343,16 @@ interface GLTFTextureTransform {
   texCoord?: number;
 }
 
-type ImageSource = {
+type ImageSource = USDImage;
+
+type Specs = Record<string, {
+    specType: number;
+    fields: Record<string, unknown>;
+}>;
+
+interface USDImage {
     path?: string;
+    linearColor?: boolean;
     roughness?: {
         path: string;
         channel: number;
@@ -346,10 +363,5 @@ type ImageSource = {
     };
     roughnessValue?: number;
     metallicValue?: number;
-};
-
-type Specs = Record<string, {
-    specType: number;
-    fields: Record<string, unknown>;
-}>;
+}
 ```

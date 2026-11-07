@@ -25,7 +25,7 @@ export interface ArcItem {
 }
 function fail(message: string): never {
   // Malformed input is a LoaderError, like every other loader; the code is taken from the wording.
-  const code = /unsupported|reset transform|non-affine/.test(message)
+  const code = /unsupported|non-affine/.test(message)
     ? 'unsupported'
     : /limit|budget|exceeds|too many/.test(message)
       ? 'limit'

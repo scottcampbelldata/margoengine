@@ -175,3 +175,38 @@ console.log(marker?.extras); // { usdPath: '/Crane/Marker' }
 ```
 
 A glTF node always follows its parent, so the node of such a prim hangs from the stage's root node, under the unit and up axis of the stage, and not from its parent's node. What is below it stays with it. Walking node names no longer gives its path, so `node.extras.usdPath` holds it; `USDAsset.meshes` keep their paths, and `PBRModel` hands the extras on. Visibility still comes down from the prims above it: with `/anim`, a parent's `visibility` samples are merged into the node's own.
+
+## MaterialX
+
+`materialX()` from `margoengine/usdz/materialx` reads MaterialX in USD. A `.mtlx` file opens as a layer, as OpenUSD lays it out (`/MaterialX/Materials/<name>`, `/MaterialX/Shaders`, `/MaterialX/NodeGraphs`), and a material bound through `outputs:mtlx:surface` comes in as a glTF PBR material with its textures. Where a material has both, the MaterialX surface wins over `outputs:surface`. A USD layer overrides a `.mtlx` by setting inputs on the Material prim.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {installNodeMaterial} from 'margoengine/materials';
+import {parseUSDFiles} from 'margoengine/usdz/compose';
+import {materialGraph,materialX} from 'margoengine/usdz/materialx';
+
+const canvas=document.createElement('canvas');document.body.append(canvas);
+const engine=await Engine.create(canvas,{backend:'webgpu',capacity:100000});
+const read=async(id:string)=>{
+  const response=await fetch('/chess/'+id);
+  return response.ok?new Uint8Array(await response.arrayBuffer()):undefined;
+};
+const asset=await parseUSDFiles('chess_set.usda',read,{extensions:[materialX()]});
+const model=await asset.create(engine);
+engine.start();
+// The whole network as a node material, where a PBR material cannot hold it.
+const network=await materialGraph(asset,0);
+if(network){
+  installNodeMaterial(model,network.graph);
+  console.log(network.skipped);
+}
+```
+
+`materialX()` has no options. Surface shaders: `standard_surface`, `open_pbr_surface`, `UsdPreviewSurface`, `gltf_pbr`, `surface_unlit`, and RealityKit's `realitykit_pbr_surfaceshader` and `realitykit_unlit_surfaceshader` by Apple's published definitions. Each input and default comes from the tables of the MaterialX Physically Based Shading Nodes document. What a shader sets lands in `KHR_materials_clearcoat`, `_emissive_strength`, `_ior`, `_specular`, `_transmission`, `_volume`, `_sheen`, `_iridescence`, `_unlit`, and for `gltf_pbr` also `_anisotropy` and `_dispersion`.
+
+A network is reduced to what a PBR material holds. Constants fold through `constant`, `dot`, `convert`, `extract`, `separate`, `combine`, `multiply`, `add`, `subtract`, `mix` and `switch` by the formulas of the Standard Nodes document. An image survives `multiply` by a constant as a factor, `extract` as a channel, and `normalmap` as a normal texture with its scale. `image`, `tiledimage`, `UsdUVTexture` and `RealityKitTexture2D` read address modes, a named primvar through `geompropvalue` or `UsdPrimvarReader`, and `uvtiling`. An unreadable image gives its `default`, which is zero when unset. Anything else is listed in `asset.issues`, and the input keeps its default.
+
+Colour spaces go by the specification's names, old and new: `srgb_texture`, `srgb_rec709_scene`, `lin_rec709`, `lin_rec709_scene`, `data`, `none`, and USD's `sRGB` and `raw`. They follow the nearest enclosing scope, and an included document takes the working colour space of the one that includes it. A base colour image that is linear is encoded to sRGB as it decodes, as a glTF slot wants it. Any other named space is read unconverted and listed.
+
+`materialGraph(asset, material, options)` takes a material's index or prim path and gives the whole network as a node material graph for `nodeMaterial()` or `installNodeMaterial()` of `margoengine/materials`, with what it left out in `skipped`. Pass `options.texture` to supply images, as for `toGraph` of `margoengine/loaders/materialx`; without it they are listed. It gives `undefined` for a material with no MaterialX network. The network travels on the material's `extras.materialX`, so it survives the worker of `margoengine/usdz/worker` with `{name: 'materialx'}`.

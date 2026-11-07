@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10196688,
+  "total": 10231187,
   "history": [
     {
       "date": "2026-10-24",
@@ -3218,6 +3218,12 @@
       "commit": "c3b4c38c",
       "reason": "fix(tween): smoothDamp writes through Float64Array scratch with one store loop for plain arrays and one for typed arrays, so a mix of array kinds no longer boxes every stored number (96 B per call); adds 37 B gzip to the tween root",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "aaeb06fe0",
+      "reason": "usdz reads MaterialX in USD",
+      "grew": 5
     }
   ],
   "items": {
@@ -3292,6 +3298,7 @@
     "@margoengine/cameras/origin": 1514,
     "@margoengine/cameras/panini": 3289,
     "@margoengine/cameras/physical": 1349,
+    "@margoengine/cameras/wide-cube": 4031,
     "@margoengine/cinematic": 2076,
     "@margoengine/cinematic/brain": 3262,
     "@margoengine/cinematic/composer": 2173,
@@ -3815,14 +3822,15 @@
     "@margoengine/tween/stagger": 1435,
     "@margoengine/ui": 28221,
     "@margoengine/ui/react": 28301,
-    "@margoengine/usdz": 11970,
-    "@margoengine/usdz dist/workers/usdz.js": 102634,
+    "@margoengine/usdz": 12708,
+    "@margoengine/usdz dist/workers/usdz.js": 116081,
     "@margoengine/usdz/anim": 6436,
-    "@margoengine/usdz/compose": 18064,
+    "@margoengine/usdz/compose": 19101,
     "@margoengine/usdz/lux": 2221,
+    "@margoengine/usdz/materialx": 7905,
     "@margoengine/usdz/skel": 7987,
     "@margoengine/usdz/subdiv": 4929,
-    "@margoengine/usdz/worker": 13046,
+    "@margoengine/usdz/worker": 13771,
     "@margoengine/vfx": 17135,
     "@margoengine/vfx/base": 10992,
     "@margoengine/vfx/curves": 1816,
@@ -3945,7 +3953,6 @@
     "margoengine": 308,
     "margoengine/game": 996,
     "margoengine/viz": 800,
-    "margoengine/web": 577,
-    "@margoengine/cameras/wide-cube": 4031
+    "margoengine/web": 577
   }
 }

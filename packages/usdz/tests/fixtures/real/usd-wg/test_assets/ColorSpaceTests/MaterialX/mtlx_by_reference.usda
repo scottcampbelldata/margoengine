@@ -1,0 +1,37 @@
+#usda 1.0
+(
+    metersPerUnit = 0.01
+    upAxis = "Y"
+    defaultPrim = "Plane"
+    renderSettingsPrimPath = "/RenderSettings"
+)
+
+def RenderSettings "RenderSettings" {
+    uniform token renderingColorSpace = "lin_rec709_scene"
+}
+
+def Xform "Plane"
+{
+    def Mesh "PlaneMesh" (
+        prepend apiSchemas = ["MaterialBindingAPI"]
+    )
+    {
+        float3[] extent = [(-1, -1, 0), (1, 1, 0)]
+        point3f[] points = [
+            (-1, -1, 0), (1, -1, 0), (1, 1, 0), (-1, 1, 0)
+        ]
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+         texCoord2f[] primvars:st = [(0, 1), (1, 1), (1, 0), (0, 0)] ( 
+            interpolation = "varying"
+        )
+
+        rel material:binding = </MaterialX/Materials/orange_squares_8x6_lin_rec709>
+    }
+}
+
+def Scope "MaterialX" (
+    references = @orange_squares_8x6_lin_rec709.mtlx@</MaterialX>
+)
+{
+}

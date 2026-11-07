@@ -184,7 +184,7 @@ const ASSETS = [
   ['packages/environment/tests/fixtures/NOTICE.md', 'test fixtures: OpenEXR test images (BSD-3-Clause)'],
   [
     'packages/usdz/tests/fixtures/real/NOTICE.md',
-    'test fixtures: USD composition scenes and two subdivision meshes of https://github.com/usd-wg/assets, commit 091bb5c6 (Apache-2.0, Alliance for OpenUSD working group), with what OpenUSD 26.08 reads from them; RiggedSimple, RiggedFigure and BoxAnimated of the same commit (CC-BY-4.0, Cesium); AnimatedTriangle and InterpolationTest of the same commit (CC0)',
+    'test fixtures: USD composition scenes, two subdivision meshes and MaterialX documents of https://github.com/usd-wg/assets, commit 091bb5c6 (Apache-2.0, Alliance for OpenUSD working group; Open Chess Set and Standard Shader Ball documents CC BY 4.0), with what OpenUSD 26.08 reads from them; RiggedSimple, RiggedFigure and BoxAnimated of the same commit (CC-BY-4.0, Cesium); AnimatedTriangle and InterpolationTest of the same commit (CC0)',
   ],
   [
     'packages/fsm/test/outside/traces.json',

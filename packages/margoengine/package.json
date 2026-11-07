@@ -2414,6 +2414,10 @@
       "types": "./dist/usdz/lux.d.ts",
       "import": "./dist/usdz/lux.js"
     },
+    "./usdz/materialx": {
+      "types": "./dist/usdz/materialx.d.ts",
+      "import": "./dist/usdz/materialx.js"
+    },
     "./vfx": {
       "types": "./dist/vfx.d.ts",
       "import": "./dist/vfx.js"

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { readFile, writeFile } from 'node:fs/promises';
+import { readdir, readFile, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { openBrowser } from './browser.js';
 
 const data = Array.from(await readFile('test-results/usdz-textured.usdz'));
@@ -328,6 +329,136 @@ def Camera "Shot"
     uniform token[] xformOpOrder = ["xformOp:translate"]
 }`);
   assert.deepEqual(lit, { sun: true, camera: true, gpuErrors: [] });
+  // Every material of the real .mtlx files compiles as a node material on the GPU, and changes the picture. Their images
+  // are not stored here, so one small picture stands in for each.
+  const documents = [];
+  const walk = async (folder) => {
+    for (const item of await readdir(folder, { withFileTypes: true })) {
+      const at = join(folder, item.name);
+      if (item.isDirectory()) await walk(at);
+      else if (item.name.endsWith('.mtlx')) documents.push({ name: item.name, text: await readFile(at, 'utf8') });
+    }
+  };
+  await walk('packages/usdz/tests/fixtures/real/usd-wg');
+  const networks = await page.evaluate(async (documents) => {
+    const { Engine } = await import('/packages/core/dist/index.js'),
+      { engineRuntime } = await import('/packages/core/dist/extension.js'),
+      { parseUSDFiles } = await import('/packages/usdz/dist/compose.js'),
+      { materialX, materialGraph } = await import('/packages/usdz/dist/materialx.js'),
+      { installNodeMaterial } = await import('/packages/materials/dist/index.js');
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 128;
+    canvas.style.cssText = 'width:128px;height:128px';
+    document.body.append(canvas);
+    const engine = await Engine.create(canvas, { backend: 'webgpu', capacity: 64, camera: { position: [0, 0, 3], target: [0, 0, 0] } }),
+      gpu = engineRuntime(engine).gpu,
+      gpuErrors = [];
+    gpu.addEventListener('uncapturederror', (event) => gpuErrors.push(event.error.message));
+    const paint = new OffscreenCanvas(2, 2),
+      brush = paint.getContext('2d');
+    brush.fillStyle = 'rgb(128, 128, 128)';
+    brush.fillRect(0, 0, 2, 2);
+    const png = new Uint8Array(await (await paint.convertToBlob({ type: 'image/png' })).arrayBuffer()),
+      map = gpu.createTexture({ size: [2, 2], format: 'rgba8unorm', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST });
+    gpu.queue.writeTexture({ texture: map }, new Uint8Array(16).fill(200), { bytesPerRow: 8 }, [2, 2]);
+    const stage = (file, material) => `#usda 1.0
+(
+    metersPerUnit = 1
+    upAxis = "Y"
+)
+def Scope "MaterialX" (references = @./${file}@</MaterialX>) {}
+def Mesh "M" (prepend apiSchemas = ["MaterialBindingAPI"])
+{
+    rel material:binding = </MaterialX/Materials/${material}>
+    uniform token subdivisionScheme = "none"
+    int[] faceVertexCounts = [4]
+    int[] faceVertexIndices = [0, 1, 2, 3]
+    point3f[] points = [(-1, -1, 0), (1, -1, 0), (1, 1, 0), (-1, 1, 0)]
+    texCoord2f[] primvars:st = [(0, 0), (1, 0), (1, 1), (0, 1)] (interpolation = "vertex")
+}`;
+    let compiled = 0,
+      changed = 0;
+    const refused = [],
+      skipped = [],
+      unchanged = [];
+    try {
+      for (const { name, text } of documents)
+        for (const [, material] of text.matchAll(/<surfacematerial\s+name="([^"]+)"/g)) {
+          const reader = (id) => (id === 'stage.usda' ? new TextEncoder().encode(stage(name, material)) : id.endsWith('.mtlx') ? new TextEncoder().encode(text) : png),
+            asset = await parseUSDFiles('stage.usda', reader, { extensions: [materialX()] }),
+            model = await asset.create(engine),
+            frame = () => {
+              engine.render({ culling: false });
+              return canvas.toDataURL();
+            };
+          try {
+            const before = frame(),
+              network = await materialGraph(asset, '/MaterialX/Materials/' + material, { texture: () => ({ view: map.createView() }) });
+            if (!network) throw new Error('no network');
+            for (const item of network.skipped) skipped.push(item.input);
+            using installed = installNodeMaterial(model, network.graph);
+            await gpu.queue.onSubmittedWorkDone();
+            compiled++;
+            if (frame() !== before) changed++;
+            else if (network.graph.nodes.some((node) => node.type === 'texture')) unchanged.push(material);
+          } catch (error) {
+            refused.push(name + ' ' + material + ': ' + String(error.message ?? error).slice(0, 120));
+          }
+          model.destroy();
+        }
+      // A base colour image that says it is linear reaches glTF's sRGB slot encoded: 128 of 255 linear is 188.
+      const stored = await parseUSDFiles(
+          'stage.usda',
+          (id) =>
+            id === 'stage.usda'
+              ? new TextEncoder().encode(`#usda 1.0
+def Material "Look"
+{
+    token outputs:mtlx:surface.connect = </Look/S.outputs:surface>
+    def Shader "S"
+    {
+        uniform token info:id = "ND_standard_surface_surfaceshader"
+        color3f inputs:base_color.connect = </Look/Map.outputs:out>
+        token outputs:surface
+    }
+    def Shader "Map"
+    {
+        uniform token info:id = "ND_image_color3"
+        asset inputs:file = @map.png@ (colorSpace = "lin_rec709")
+        color3f outputs:out
+    }
+}
+def Mesh "M" (prepend apiSchemas = ["MaterialBindingAPI"])
+{
+    rel material:binding = </Look>
+    int[] faceVertexCounts = [3]
+    int[] faceVertexIndices = [0, 1, 2]
+    point3f[] points = [(0, 0, 0), (1, 0, 0), (0, 1, 0)]
+}`)
+              : png,
+          { extensions: [materialX()] },
+        ),
+        [picture] = await stored.images(),
+        reading = new OffscreenCanvas(picture.width, picture.height).getContext('2d');
+      reading.drawImage(picture, 0, 0);
+      const encodedValue = reading.getImageData(0, 0, 1, 1).data[0];
+      picture.close();
+      map.destroy();
+      return { compiled, changed, refused, unchanged, skipped: [...new Set(skipped)], encodedValue, gpuErrors };
+    } finally {
+      engine.dispose();
+      canvas.remove();
+    }
+  }, documents);
+  console.log('MaterialX networks', JSON.stringify(networks));
+  assert.deepEqual(networks.gpuErrors, []);
+  assert.equal(networks.encodedValue, 188);
+  // surface_unlit has no node material yet (docs/limits.md); it still opens as an unlit glTF material.
+  assert.deepEqual(networks.refused.map((line) => line.split(': ').at(-1)), ['surface shader surface_unlit is not converted']);
+  assert.equal(networks.compiled, 30);
+  // A network of constants may draw as its PBR material does; one with images must not.
+  assert.deepEqual(networks.unchanged, []);
+  assert.ok(networks.changed > 0);
   assert.deepEqual(errors, []);
   await writeFile('test-results/modern-usdz.json', JSON.stringify({ hardware: browser.hardware, ...result }, null, 2));
   console.log('USDZ texture packing, real WebGPU pixels, bitmap teardown and file-picker demo passed');

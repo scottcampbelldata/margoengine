@@ -83,6 +83,8 @@ export interface MaterialXTextureRequest {
     filter?: string;
 }
 
+export function materialXDocument(parts: Partial<Omit<MaterialXDocument, 'toGraph'>> & Pick<MaterialXDocument, 'nodes' | 'materials'>): MaterialXDocument;
+
 export function parseMaterialX(input: BinaryInput | string): MaterialXDocument;
 
 // Not exported from this entry, but used by the exports above:
