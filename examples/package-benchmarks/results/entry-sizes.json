@@ -1,5 +1,5 @@
 {
-  "commit": "c3b202d52",
+  "commit": "3d602fd58",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -1278,20 +1278,20 @@
     },
     "@margoengine/loaders": {
       ".": {
-        "raw": 149061,
-        "gzip": 52074
+        "raw": 149074,
+        "gzip": 52082
       },
       "./worker": {
-        "raw": 22264,
-        "gzip": 8505
+        "raw": 22277,
+        "gzip": 8511
       },
       "./common": {
         "raw": 7963,
         "gzip": 3161
       },
       "./usd": {
-        "raw": 20175,
-        "gzip": 7715
+        "raw": 20188,
+        "gzip": 7721
       },
       "./font": {
         "raw": 15368,
@@ -1398,8 +1398,8 @@
         "gzip": 1305
       },
       "dist/workers/usd.js": {
-        "raw": 21709,
-        "gzip": 8368
+        "raw": 21722,
+        "gzip": 8369
       }
     },
     "@margoengine/lod": {
@@ -2542,24 +2542,24 @@
     },
     "@margoengine/usdz": {
       ".": {
-        "raw": 28904,
-        "gzip": 11652
+        "raw": 29010,
+        "gzip": 11717
       },
       "./worker": {
-        "raw": 31791,
-        "gzip": 12700
+        "raw": 31902,
+        "gzip": 12772
       },
       "./compose": {
-        "raw": 46383,
-        "gzip": 17826
+        "raw": 46491,
+        "gzip": 17887
       },
       "./skel": {
         "raw": 19427,
         "gzip": 7882
       },
       "./anim": {
-        "raw": 14699,
-        "gzip": 6180
+        "raw": 15016,
+        "gzip": 6319
       },
       "./subdiv": {
         "raw": 11511,
@@ -2570,8 +2570,8 @@
         "gzip": 1965
       },
       "dist/workers/usdz.js": {
-        "raw": 299488,
-        "gzip": 101283
+        "raw": 299918,
+        "gzip": 101453
       }
     },
     "@margoengine/vfx": {
@@ -3011,14 +3011,14 @@
       "brotli": 69572
     },
     "packages/usdz/dist/workers/usdz.js": {
-      "raw": 296057,
-      "gzip": 100993,
-      "brotli": 86953
+      "raw": 296471,
+      "gzip": 101172,
+      "brotli": 86988
     },
     "packages/loaders/dist/workers/usd.js": {
-      "raw": 21469,
-      "gzip": 8341,
-      "brotli": 7497
+      "raw": 21482,
+      "gzip": 8340,
+      "brotli": 7491
     },
     "packages/bvh/dist/bvh.worker.js": {
       "raw": 7081,

@@ -25,7 +25,7 @@ Standard USDZ is an uncompressed, aligned archive. Deflate support accepts a bro
 
 Vertex colors read through a `UsdPrimvarReader` of `displayColor` or `displayOpacity` load as `mesh.colors` (four floats per vertex) and glTF COLOR_0, a constant `inputs:opacity` or the base colour map's alpha gives `BLEND`, or `MASK` with `inputs:opacityThreshold`; so a file from `exportUSDZ` keeps its paint and alpha. A separate opacity map and a reader of any other primvar are refused.
 
-Without the entries below this is a static mesh subset of one flattened layer: subdivided meshes load as cages. A prim may reference a class or other prim of the same layer (`references = </Path>`, what `exportUSDZ` writes for a shared geometry), and what it authors wins; class prims are not drawn. Other composition is refused. A mesh's `GeomSubset`s with materials are primitives of their own (`mesh.subsets`), a texture reads the primvar its `UsdPrimvarReader` names, every `xformOp` of the schema is read (`rotateX`, all six Euler orders, `orient`, suffixes such as `xformOp:translate:pivot` and `!invert!`), guide and proxy meshes are left out, and a mesh with no material shows its `displayColor`. Physical Apple AR Quick Look round trips are untested.
+Without the entries below this is a static mesh subset of one flattened layer: subdivided meshes load as cages. A prim may reference a class or other prim of the same layer (`references = </Path>`, what `exportUSDZ` writes for a shared geometry), and what it authors wins; class prims are not drawn. Other composition is refused. A mesh's `GeomSubset`s with materials are primitives of their own (`mesh.subsets`), a texture reads the primvar its `UsdPrimvarReader` names, every `xformOp` of the schema is read (`rotateX`, all six Euler orders, `orient`, suffixes such as `xformOp:translate:pivot` and `!invert!`), `!resetXformStack!` is honoured (see [Reset transform stacks](#reset-transform-stacks)), guide and proxy meshes are left out, and a mesh with no material shows its `displayColor`. Physical Apple AR Quick Look round trips are untested.
 
 ## Composition
 
@@ -142,3 +142,36 @@ engine.start();
 `lights()` has no options. A light's luminance is `intensity * 2^exposure * color`, with `colorTemperature` when enabled, by the LightAPI schema. A lamp gives that luminance times the area it shows along its axis, in candela, and `normalize` divides by its whole surface; sizes count the transform stack's scale. A distant light gives lux from the disc `angle` fills, and with `normalize` the luminance itself. `shaping:cone:angle` under 90 makes a spot, with `shaping:cone:softness` setting its inner angle. A glTF colour stops at 1, so a stronger black body colour moves into `intensity`.
 
 A dome light has no punctual form. It is listed in `asset.issues`, and `domeLight(asset)` gives its `path`, `file`, `intensity` and `color` for an `Environment` from `margoengine/environment`. `blackbody(kelvin)` is exported too.
+
+## Reset transform stacks
+
+A prim whose `xformOpOrder` holds `!resetXformStack!` lands where it was authored, whatever its parents do: its parents' transforms are left out, moving ones included, and every op up to the last reset is ignored. It needs no entry or option, in any reader of this package. `/anim` plays what comes after the reset and nothing before it.
+
+```ts
+import {parseUSDA} from 'margoengine/usdz';
+
+const asset=parseUSDA(`#usda 1.0
+(
+    metersPerUnit = 1
+    upAxis = "Y"
+)
+def Xform "Crane"
+{
+    double3 xformOp:translate = (10, 0, 0)
+    uniform token[] xformOpOrder = ["xformOp:translate"]
+    def Mesh "Marker"
+    {
+        double3 xformOp:translate = (1, 2, 3)
+        uniform token[] xformOpOrder = ["!resetXformStack!", "xformOp:translate"]
+        uniform token subdivisionScheme = "none"
+        point3f[] points = [(0, 0, 0), (1, 0, 0), (0, 1, 0)]
+        int[] faceVertexCounts = [3]
+        int[] faceVertexIndices = [0, 1, 2]
+    }
+}
+`);
+const marker=asset.document.nodes?.find((node)=>node.name==='Marker');
+console.log(marker?.extras); // { usdPath: '/Crane/Marker' }
+```
+
+A glTF node always follows its parent, so the node of such a prim hangs from the stage's root node, under the unit and up axis of the stage, and not from its parent's node. What is below it stays with it. Walking node names no longer gives its path, so `node.extras.usdPath` holds it; `USDAsset.meshes` keep their paths, and `PBRModel` hands the extras on. Visibility still comes down from the prims above it: with `/anim`, a parent's `visibility` samples are merged into the node's own.

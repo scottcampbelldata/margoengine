@@ -319,13 +319,16 @@ function invert(m: number[]): number[] {
     out[12 + row] = -(out[row] * m[12] + out[4 + row] * m[13] + out[8 + row] * m[14]);
   return out;
 }
+/** The token of `xformOpOrder` that stops a prim inheriting its parent's transform. */
+const RESET = '!resetXformStack!';
+/** The ops that place a prim: everything up to the last reset is ignored, by the UsdGeomXformable schema. */
+const counted = (order: string[]) => order.slice(order.lastIndexOf(RESET) + 1);
 /** A prim's local matrix from its ordered ops. `get` reads an op's value at the time wanted. */
 function compose(order: unknown, get: (name: string) => unknown): number[] {
   if (order === undefined) return identity();
   if (!Array.isArray(order) || order.some((op) => typeof op !== 'string')) fail('invalid xformOpOrder');
   let out = identity();
-  for (const entry of order as string[]) {
-    if (entry === '!resetXformStack!') fail('reset transform stacks are unsupported');
+  for (const entry of counted(order as string[])) {
     const inverse = entry.startsWith('!invert!'),
       name = inverse ? entry.slice(8) : entry,
       value = get(name);
@@ -728,7 +731,8 @@ function asset(
   doc.nodes.push({ name: 'USD', matrix: base, children: [] });
   const nodeIds = new Map<string, number>([['/', 0]]),
     purposes = new Map<string, string>(),
-    subsetsOf = new Map<string, string[]>();
+    subsetsOf = new Map<string, string[]>(),
+    detached = new Set<string>();
   for (const path in specs)
     if (specs[path].specType === 6 && specs[path].fields.typeName === 'GeomSubset') {
       const owner = path.slice(0, path.lastIndexOf('/')),
@@ -765,7 +769,13 @@ function asset(
         },
         id = doc.nodes.length;
       doc.nodes.push(node);
-      doc.nodes[parentId].children!.push(id);
+      // A reset leaves the parent's transform behind, moving or not, so the node hangs from the stage's own node.
+      const resets = (opOrder(path) as string[] | undefined)?.includes(RESET);
+      doc.nodes[resets ? 0 : parentId].children!.push(id);
+      if (resets) {
+        node.extras = { usdPath: path };
+        detached.add(path);
+      }
       nodeIds.set(path, id);
       // Purpose comes down from the nearest prim that authors one. Guides and proxies are not part of the render.
       const purpose = (attrs(path, 'purpose') as string | undefined) ?? 'default',
@@ -1026,9 +1036,10 @@ function asset(
       accessor,
       opOrder: (path) => {
         const order = path === '/' ? undefined : opOrder(path);
-        return Array.isArray(order) ? (order as string[]) : undefined;
+        return Array.isArray(order) ? counted(order as string[]) : undefined;
       },
       transform,
+      detached,
       soft,
     });
   for (const source of sources)

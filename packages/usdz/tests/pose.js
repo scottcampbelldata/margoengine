@@ -120,9 +120,13 @@ export function vertices(asset, id, { world, animated, data }) {
 /** The node of the prim at `path`, by the names on the way down. */
 export function nodeAt(asset, path) {
   const { nodes } = asset.document;
-  let id = 0;
+  let id = 0,
+    at = '';
   for (const name of path.split('/').slice(1)) {
-    id = nodes[id].children?.find((child) => nodes[child].name === name);
+    at += '/' + name;
+    // A prim that resets the transform stack hangs from the root and says where it came from.
+    const moved = nodes.findIndex((node) => node.extras?.usdPath === at);
+    id = moved >= 0 ? moved : nodes[id].children?.find((child) => nodes[child].name === name);
     if (id === undefined) return undefined;
   }
   return id;

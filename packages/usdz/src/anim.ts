@@ -171,18 +171,33 @@ function transforms(read: SceneRead): void {
   visibility(read, secondsOf);
 }
 
+/** The sample in force at `time`: the first one before it starts. */
+function held({ times, values }: TimeSamples, time: number): unknown {
+  let at = 0;
+  while (at + 1 < times.length && times[at + 1] <= time) at++;
+  return values[at];
+}
 /** Visibility holds from sample to sample. A hidden node hides what is below it, as `invisible` does on a stage. */
 function visibility(read: SceneRead, secondsOf: (times: number[]) => number[]): void {
   const clip = clipOf(read),
-    doc = read.document;
+    doc = read.document,
+    samplesOf = (path: string) => {
+      const samples = read.specs[path + '.visibility']?.fields.timeSamples as TimeSamples | undefined;
+      return samples?.times.length ? samples : undefined;
+    };
   for (const [path, id] of read.nodes) {
-    const samples = read.specs[path + '.visibility']?.fields.timeSamples as TimeSamples | undefined;
-    if (!samples?.times.length) continue;
-    const shown = Uint8Array.from(samples.values, (v) => (v === 'invisible' ? 0 : 1));
-    if (shown.every((v) => v === shown[0])) continue;
+    const lists = [samplesOf(path)];
+    // A reset leaves the transform behind, not the visibility: the node has lost the parents that would hide it.
+    if (read.detached.has(path))
+      for (let at = path.lastIndexOf('/'); at > 0; at = path.lastIndexOf('/', at - 1)) lists.push(samplesOf(path.slice(0, at)));
+    const heard = lists.filter((list) => list !== undefined);
+    if (!heard.length) continue;
+    const times = [...new Set(heard.flatMap((list) => [...list.times]))].sort((a, b) => a - b),
+      shown = Uint8Array.from(times, (time) => (heard.some((list) => held(list, time) === 'invisible') ? 0 : 1));
+    if (shown.every(Boolean)) continue;
     const node = doc.nodes![id];
     node.extensions = { ...node.extensions, KHR_node_visibility: { visible: shown[0] === 1 } };
-    clip.pointer(`/nodes/${id}/extensions/KHR_node_visibility/visible`, secondsOf([...samples.times]), shown);
+    clip.pointer(`/nodes/${id}/extensions/KHR_node_visibility/visible`, secondsOf(times), shown);
     for (const name of ['KHR_node_visibility', 'KHR_animation_pointer'])
       if (!(doc.extensionsUsed ??= []).includes(name)) doc.extensionsUsed.push(name);
   }

@@ -79,10 +79,12 @@ export interface SceneRead {
   meshes: SceneMesh[];
   /** Adds a buffer and an accessor over it, and returns the accessor's index. */
   accessor(data: Float32Array | Uint32Array | Uint16Array | Uint8Array, type: string): number;
-  /** A prim's xformOpOrder, when it authors one. */
+  /** The ops of a prim's xformOpOrder that place it, when it authors one: what comes after its last reset. */
   opOrder(path: string): string[] | undefined;
   /** A prim's local matrix from its ordered ops, with `get` reading each op's value. */
   transform(path: string, get: (name: string) => unknown): number[];
+  /** Prims that reset the transform stack. Their nodes hang from the stage's node, not their parent's. */
+  detached: ReadonlySet<string>;
   /** Lists something that could not be used; the file still opens. */
   soft(message: string): void;
 }
