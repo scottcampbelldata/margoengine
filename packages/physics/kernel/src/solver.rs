@@ -15,8 +15,13 @@
 // Friction comes first, from the normal impulse so far, in a circular cone: the tangent impulse is one vector, cut back to
 // mu times the normal impulse. It is anchored: `drift` holds how far the two surfaces have slid since the point last
 // stuck, and the biased solve pulls that back, so a block on a slope holds its place instead of creeping (the sticky
-// anchors of Solver2D's TGS_Sticky, and Muller et al. 2020's static friction by position, here in a soft constraint of the
-// same form as the normal). A cone that saturates lets go and the drift starts again.
+// anchors of Solver2D's TGS_Sticky). Muller et al. 2020 hold static friction by position too, but cancel one substep's slip
+// and let go when the multiplier passes the cone; here the slip adds up and is pulled back by a soft constraint of the same
+// form as the normal. A cone that saturates keeps the anchor at its edge: the drift scales by the same cut, so a sliding
+// block pulls it along and one that stops holds from there.
+//
+// The first point of a manifold turns each substep, as within a substep the first point sees the whole load: from a fixed
+// first point a heavy box on a light one walks (`a_heavy_box_stands_on_a_light_one`).
 //
 // Restitution follows Muller et al. 2020: a point struck in this substep notes its approach speed, and after relaxing is
 // solved to -e times that speed. Slower than two substeps of gravity is rest, not a bounce.

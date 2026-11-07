@@ -79,7 +79,13 @@ fn a_box_at_rest_does_not_drift_in_ten_seconds() {
         let mut w = world(2);
         floor(&mut w);
         let body = block(&mut w, [0.5, 0.5, 0.5], v3(0.0, 0.5, 0.0), 1.0, sleep);
-        for _ in 0..60 {
+        // A box set down at rest is under the threshold from its first step, so its first window of 0.5 s is enough: energy
+        // that rises only by rounding must not start a second one (`NOISE` in island.rs; without it this sleeps at 60).
+        for _ in 0..30 {
+            w.step(DT);
+        }
+        assert_eq!(w.flags(body as usize) & SLEEPING != 0, sleep, "asleep when its first window ends, and only if it may");
+        for _ in 0..30 {
             w.step(DT);
         }
         let settled = w.v(POSITION_X, body as usize);
@@ -128,7 +134,8 @@ fn a_pyramid_of_twenty_rows_stands_for_thirty_seconds_under_a_millimetre() {
 #[test]
 fn a_heavy_box_stands_on_a_light_one() {
     // The light box is a metre cube of density 1 on the floor; the sag is the load over the contact's stiffness, which
-    // follows the light box's mass (Catto 2011), so it grows with the ratio.
+    // follows the light box's mass (Catto 2011), so it grows with the ratio. The 1:1000 row also holds the manifold's turning
+    // first point: solved from a fixed first point, the heavy box walks 3.3 mm in x and 3.8 mm in z.
     for sleep in [true, false] {
         for (ratio, sag) in [(1.0f32, 0.001f32), (100.0, 0.006), (1000.0, 0.05)] {
             let mut w = world(4);

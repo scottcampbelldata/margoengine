@@ -198,8 +198,8 @@ pub struct Distance {
     pub count: usize,
 }
 
-/// Squared relative gap between the descent's lower and upper bounds at which it stops: 5e-7 of the distance, a few f32
-/// roundings. Their tolerances of 1e-8 to 1e-16 are for doubles.
+/// Their equation 10, v.v - v.w <= eps^2 v.v: as v.w / |v| bounds the distance from below, this stops at a gap of 1e-6 of the
+/// distance, a few f32 roundings. Their tolerances of 1e-8 to 1e-16 are for doubles.
 const RELATIVE: f32 = 1e-6;
 /// Squared distance, relative to the simplex's size, that counts as touching: their equation 9 at f32.
 const TOUCHING: f32 = 1e-11;
