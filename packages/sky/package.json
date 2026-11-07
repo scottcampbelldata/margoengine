@@ -87,6 +87,10 @@
       "types": "./dist/shafts.d.ts",
       "import": "./dist/shafts.js"
     },
+    "./astro": {
+      "types": "./dist/astro.d.ts",
+      "import": "./dist/astro.js"
+    },
     "./weather-fx": {
       "types": "./dist/weather-fx.d.ts",
       "import": "./dist/weather-fx.js"

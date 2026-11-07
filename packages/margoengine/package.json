@@ -2270,6 +2270,10 @@
       "types": "./dist/sky/shafts.d.ts",
       "import": "./dist/sky/shafts.js"
     },
+    "./sky/astro": {
+      "types": "./dist/sky/astro.d.ts",
+      "import": "./dist/sky/astro.js"
+    },
     "./sky/weather-fx": {
       "types": "./dist/sky/weather-fx.d.ts",
       "import": "./dist/sky/weather-fx.js"

@@ -1,0 +1,105 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Sky astro check</title><style>body{margin:0}canvas{display:block;width:256px;height:192px}</style></head><body><canvas width="256" height="192"></canvas>
+<script type="module">
+// AstroSky on a real GPU with the real Bright Star Catalogue, read back from Bloom's HDR scene capture: each star lands
+// where the maths puts it with the light it should have, nothing below the horizon or by day, and the moon's lit limb
+// faces the sun. Driven by features-check.mjs.
+import {Engine} from '/packages/core/dist/index.js';
+import {sceneSamples} from '/packages/core/dist/quality.js';
+import {Bloom} from '/packages/post/dist/bloom.js';
+import {Sky} from '/packages/sky/dist/index.js';
+import {AstroSky,fetchBrightStarCatalog,skyMatrix,refract,julianDay,moonPosition,sunPosition,starColor} from '/packages/sky/dist/astro.js';
+import {degrees} from '/packages/sky/dist/sun.js';
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
+if(new URLSearchParams(location.search).get('samples')==='1')globalThis.margoLow=1;
+const W=256,H=192,rad=Math.PI/180;
+const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,0,0],target:[0,0,-1],fov:40,near:0.1,far:1000}}),device=engine.gpu,errors=[];
+engine.stop();
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const post=Bloom.attach(engine,{strength:0,threshold:1,exposure:0});
+const observer={latitude:degrees(52),longitude:degrees(0)};
+const sky=new Sky({timeScale:0,night:{starTwinkleIntensity:0}});
+const catalog=await fetchBrightStarCatalog('/packages/sky/test/fixtures/bsc5/catalog.gz');
+const astro=new AstroSky({...observer,date:new Date('2026-01-15T22:00:00Z'),timeScale:0,sky,catalog,planets:false,extinction:0,brightness:200});
+// The astro sky first, so the sky reads this frame's sun and moon.
+engine.use(astro);engine.use(sky);
+const module=device.createShaderModule({code:'@group(0) @binding(0) var image:texture_2d<f32>;@group(0) @binding(1) var<storage,read_write> result:array<vec4f>;@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u){let s=textureDimensions(image);if(any(id.xy>=s)){return;}result[id.y*s.x+id.x]=textureLoad(image,vec2i(id.xy),0);}'});
+const pipeline=device.createComputePipeline({layout:'auto',compute:{module,entryPoint:'main'}});
+async function read(texture){
+ const bytes=texture.width*texture.height*16,output=device.createBuffer({size:bytes,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),staging=device.createBuffer({size:bytes,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+ const encoder=device.createCommandEncoder(),pass=encoder.beginComputePass();pass.setPipeline(pipeline);
+ pass.setBindGroup(0,device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:texture.createView()},{binding:1,resource:{buffer:output}}]}));
+ pass.dispatchWorkgroups(Math.ceil(texture.width/8),Math.ceil(texture.height/8));pass.end();encoder.copyBufferToBuffer(output,0,staging,0,bytes);device.queue.submit([encoder.finish()]);
+ await staging.mapAsync(GPUMapMode.READ);const data=new Float32Array(staging.getMappedRange()).slice();staging.unmap();output.destroy();staging.destroy();return data;
+}
+const frame=async()=>{engine.render({delta:0});await device.queue.onSubmittedWorkDone();return read(post.sceneTexture);};
+// Aim the camera at a compass bearing (degrees from north toward east) and elevation.
+const aim=(bearing,elevation,fov)=>{const b=bearing*rad,e=elevation*rad;engine.camera.fov=fov;engine.camera.target=[Math.sin(b)*Math.cos(e),Math.sin(e),-Math.cos(b)*Math.cos(e)];};
+// Pixel coordinates (pixel centres at +0.5) of a world direction, or null behind the camera.
+const project=(d)=>{const m=engine.camera.matrix,c=[0,1,2,3].map(r=>m[r]*d[0]+m[4+r]*d[1]+m[8+r]*d[2]+m[12+r]);if(c[3]<=0)return null;return [(c[0]/c[3]*0.5+0.5)*W,(0.5-c[1]/c[3]*0.5)*H];};
+// Where AstroSky draws a catalogue star: its J2000 place moved by its proper motion, the sky matrix, the refraction.
+const starAt=(i,date)=>{
+ const years=(julianDay(date)-2451545)/365.25,m=skyMatrix(date,observer),p=[0,1,2].map(k=>catalog.positions[i*3+k]+catalog.motions[i*3+k]*years),n=Math.hypot(...p);
+ let d=[0,1,2].map(r=>(m[r*3]*p[0]+m[r*3+1]*p[1]+m[r*3+2]*p[2])/n);const h=refract(Math.asin(d[1])/rad),level=Math.hypot(d[0],d[2]);
+ if(h<=0)return {h};d=[d[0]/level*Math.cos(h*rad),Math.sin(h*rad),d[2]/level*Math.cos(h*rad)];return {h,d};
+};
+const lum=(f,p)=>f[p]+f[p+1]+f[p+2];
+window.check={samples:sceneSamples,
+ async run(){
+  device.pushErrorScope('validation');
+  const out={};
+  // Stars: on with brightness 200, off with 0; the difference is the stars alone. Six fields, and only the stars to
+  // magnitude 4.5 (the limiting magnitude, with no extinction), so enough bright stars stand alone.
+  let worst=0,energyWorst=0,measured=0,drawn=0,skyMax=0;astro.options.limitingMagnitude=4.5;
+  for(const [bearing,elevation] of [[180,45],[90,40],[270,40],[0,40],[135,65],[315,65]]){
+   aim(bearing,elevation,40);await waitForPipelines(frame);
+   const on=await frame();astro.options.brightness=0;const off=await frame();astro.options.brightness=200;
+   const date=astro.date,shown=[];
+   for(let i=0;i<catalog.count;i++){if(catalog.magnitudes[i]>4.5)continue;const s=starAt(i,date);if(!s.d)continue;const q=project(s.d);if(q&&q[0]>-8&&q[0]<W+8&&q[1]>-8&&q[1]<H+8)shown.push({i,q});}
+   for(let p=0;p<on.length;p+=4)if(lum(on,p)!==lum(off,p))drawn++;
+   for(const s of shown){
+    const [x,y]=s.q,mag=catalog.magnitudes[s.i];
+    // Bright, away from the edges, and no other drawn star within 10 px (its 4 px reach plus the 6 px window).
+    if(mag>4||x<8||y<8||x>W-8||y>H-8||shown.some(t=>t!==s&&Math.hypot(t.q[0]-x,t.q[1]-y)<10))continue;
+    let sum=0,sx=0,sy=0;
+    for(let py=Math.floor(y)-6;py<=Math.floor(y)+6;py++)for(let px=Math.floor(x)-6;px<=Math.floor(x)+6;px++){const p=(py*W+px)*4,v=lum(on,p)-lum(off,p);skyMax=Math.max(skyMax,lum(off,p));sum+=v;sx+=v*(px+0.5);sy+=v*(py+0.5);}
+    const c=starColor(catalog.colors[s.i]),expected=200*10**(-0.4*mag)*sky.nightFactor*(c[0]+c[1]+c[2]);
+    worst=Math.max(worst,Math.hypot(sx/sum-x,sy/sum-y));energyWorst=Math.max(energyWorst,Math.abs(sum/expected-1));measured++;
+   }
+   (window.shots??={})['astro'+bearing+'-'+elevation]={on,off};
+  }
+  astro.options.limitingMagnitude=undefined;
+  out.stars={measured,worst,energyWorst,drawn,skyMax,night:sky.nightFactor};
+  // The horizon: looking level, nothing below the centre row by more than a point's reach (4 px).
+  aim(90,0,40);const level=await frame();astro.options.brightness=0;const levelOff=await frame();astro.options.brightness=200;
+  let above=0,below=0;
+  for(let py=0;py<H;py++)for(let px=0;px<W;px++){const p=(py*W+px)*4;if(lum(level,p)!==lum(levelOff,p)){if(py<H/2)above++;else if(py>=H/2+4)below++;}}
+  out.horizon={above,below};
+  // By day nothing.
+  astro.options.date=new Date('2026-01-15T12:00:00Z');aim(180,45,40);const day=await frame();astro.options.brightness=0;const dayOff=await frame();astro.options.brightness=200;
+  let dayDrawn=0;for(let p=0;p<day.length;p+=4)if(lum(day,p)!==lum(dayOff,p))dayDrawn++;
+  out.day={drawn:dayDrawn,night:sky.nightFactor};
+  // The moon: an hour by hour search from 2026-01-01 for a dark sky, the moon high and near half, and a sunward limb more
+  // than 45 degrees from where the sky's old fixed lighting put it.
+  let when,moon,sun;
+  for(let k=0;k<24*60&&!when;k++){
+   const t=new Date(Date.UTC(2026,0,1)+k*3600000),m=moonPosition(t,observer),s=sunPosition(t,observer);
+   if(m.elevation.degrees<30||s.elevation.degrees>-15||Math.abs(m.illumination-0.5)>0.2)continue;
+   const md=m.direction,sd=s.direction,dot=sd[0]*md[0]+sd[1]*md[1]+sd[2]*md[2],toward=[0,1,2].map(i=>sd[i]-md[i]*dot),
+    old=[md[1]*0-md[2]*1,md[2]*0-md[0]*0,md[0]*1-md[1]*0],n1=Math.hypot(...toward),n2=Math.hypot(...old);
+   if(Math.acos((toward[0]*old[0]+toward[1]*old[1]+toward[2]*old[2])/(n1*n2))>Math.PI/4){when=t;moon=m;sun=s;}
+  }
+  astro.options.date=when;
+  const md=moon.direction;aim(Math.atan2(md[0],-md[2])/rad,moon.elevation.degrees,2);
+  const lit=await frame(),centre=project(md),dot=sun.direction.reduce((a,v,i)=>a+v*md[i],0),
+   toward=project(md.map((v,i)=>v+(sun.direction[i]-v*dot)*0.001)),radius=moon.angularRadius.degrees/2*H;
+  let sx=0,sy=0,sum=0;
+  for(let py=0;py<H;py++)for(let px=0;px<W;px++){const dx=px+0.5-centre[0],dy=py+0.5-centre[1];if(Math.hypot(dx,dy)>radius*0.9)continue;const v=lum(lit,(py*W+px)*4);sum+=v;sx+=v*dx;sy+=v*dy;}
+  const want=Math.atan2(toward[1]-centre[1],toward[0]-centre[0]),got=Math.atan2(sy/sum,sx/sum);
+  out.moon={date:when.toISOString(),illumination:moon.illumination,radius,angle:Math.abs(((got-want)/rad+540)%360-180),offset:Math.hypot(sx,sy)/sum};
+  (window.shots??={}).astro={level,lit};
+  const error=await device.popErrorScope();
+  return {...out,error:error?.message??null,errors:errors.splice(0)};
+ }};
+window.shot=(name,key)=>{const f=window.shots[name][key],o=new Array(f.length);for(let p=0;p<f.length;p++)o[p]=(p%4===3)?255:Math.round(255*Math.min(1,Math.pow(f[p]/(1+f[p]),1/2.2)));return o;};
+window.ready=true;
+</script></body></html>

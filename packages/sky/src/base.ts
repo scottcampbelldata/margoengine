@@ -85,6 +85,8 @@ export interface SkyNightOptions {
   moonSize?: number;
   /** -1 new, 0 half, 1 full; clamped. Default 0.85. */
   moonPhase?: number;
+  /** Turn the lit limb toward the sky's sun, as the real moon's (set by `AstroSky`). Default false: a fixed side. */
+  moonLitBySun?: boolean;
   glowIntensity?: number;
   starIntensity?: number;
   /** Twinkle amplitude; zero holds stars steady. Default 1. */

@@ -179,6 +179,33 @@ const checks = {
     console.log(`ok sleet ${samples}x: ${r.rainOnly} rain and ${r.snowOnly} snow pixels match each kind alone (${r.rainMismatch + r.snowMismatch} by one half-float step)`);
     return r;
   },
+  async astro(page, samples) {
+    const r = await page.evaluate(() => window.check.run());
+    console.log(`  astro ${samples}x ${JSON.stringify(r)}`);
+    assert.equal(r.error, null);
+    assert.deepEqual(r.errors, []);
+    // Each bright, isolated catalogue star's light is centred where skyMatrix, its proper motion and the refraction put
+    // it: the centroid of a Gaussian of sigma 1 px sampled at pixel centres is within 0.01 px of its centre, so 0.1 px
+    // leaves room for half-float storage. Its summed light is brightness x 10^(-0.4 m) x the night (7.5 or more for a
+    // star to magnitude 4 at brightness 200): the sky lost under it is a sky channel times its alpha, 1/64 of its
+    // brightest channel on this float target (under 0.1%), and rounding each of the 169 pixels to half floats in both
+    // frames moves the sum by at most 2^-11 x (2 x 169 x 0.3 + 7.5) = 0.053 (0.71%) for a sky under 0.3: 1%.
+    assert.ok(r.stars.measured >= 10, `stars measured: ${JSON.stringify(r.stars)}`);
+    assert.ok(r.stars.skyMax < 0.3, `sky under the stars: ${JSON.stringify(r.stars)}`);
+    assert.ok(r.stars.worst < 0.1, `star off its place: ${JSON.stringify(r.stars)}`);
+    assert.ok(r.stars.energyWorst < 0.01, `star light: ${JSON.stringify(r.stars)}`);
+    // Nothing below the horizon, beyond a point's 4 px reach; stars above it.
+    assert.ok(r.horizon.above > 0 && r.horizon.below === 0, `horizon: ${JSON.stringify(r.horizon)}`);
+    // By day, none.
+    assert.equal(r.day.drawn, 0, `day: ${JSON.stringify(r.day)}`);
+    // The moon's light leans toward the sun: within 10 degrees on screen, at a date where the sky's old fixed side was
+    // more than 45 degrees away.
+    assert.ok(r.moon.angle < 10 && r.moon.offset > 1, `moon: ${JSON.stringify(r.moon)}`);
+    console.log(
+      `ok astro ${samples}x: ${r.stars.measured} stars within ${r.stars.worst.toFixed(3)} px and ${(100 * r.stars.energyWorst).toFixed(1)}% light, horizon, day, moon limb ${r.moon.angle.toFixed(1)} deg`,
+    );
+    return r;
+  },
   async hillaire(page, samples) {
     const r = await page.evaluate(() => window.check.run());
     const show = (v) => v.map((x) => x.toPrecision(4)).join(', ');

@@ -2332,8 +2332,8 @@
     },
     "@margoengine/sky": {
       ".": {
-        "raw": 46408,
-        "gzip": 16687
+        "raw": 46779,
+        "gzip": 16810
       },
       "./base": {
         "raw": 17541,
@@ -2352,8 +2352,8 @@
         "gzip": 2216
       },
       "./night": {
-        "raw": 4571,
-        "gzip": 2267
+        "raw": 4942,
+        "gzip": 2422
       },
       "./fog": {
         "raw": 4083,
@@ -2394,6 +2394,10 @@
       "./shafts": {
         "raw": 17828,
         "gzip": 6883
+      },
+      "./astro": {
+        "raw": 20395,
+        "gzip": 9495
       },
       "./weather-fx": {
         "raw": 13664,
@@ -2970,9 +2974,9 @@
       "brotli": 6003
     },
     "packages/scenery/dist/sky.js": {
-      "raw": 23092,
-      "gzip": 9241,
-      "brotli": 8240
+      "raw": 23463,
+      "gzip": 9363,
+      "brotli": 8361
     },
     "packages/creative/dist/particles.js": {
       "raw": 43160,

@@ -32,7 +32,9 @@ fn stylizedNight(r:vec3f,footprint:f32)->vec3f {
  // The disc goes down first, lit and dark parts alike; earthshine keeps the dark part a dim moon rather than a hole.
  var cover=0.0;
  if(cosine>0.0){
-  let right=normalize(cross(moon.xyz,select(vec3f(0,1,0),vec3f(0,0,1),abs(moon.y)>0.99)));
+  var right=normalize(cross(moon.xyz,select(vec3f(0,1,0),vec3f(0,0,1),abs(moon.y)>0.99)));
+  // moonLitBySun (flag 2): the lit limb faces the sun across the sky, as the real moon's does.
+  if(frame.sunlight.w>1.5){let s=frame.sun.xyz-moon.xyz*dot(frame.sun.xyz,moon.xyz);if(dot(s,s)>1e-8){right=normalize(s);}}
   let disc=vec2f(dot(r,right),dot(r,cross(right,moon.xyz)))/frame.nightMoonColor.w;let radius=dot(disc,disc);
   // A 0.02 floor on the limb term lets the filtered rim just outside the disc take the lighting just inside it.
   let limb=sqrt(max(0.0004,1.0-radius));let lit=disc.x*sqrt(max(0.0,1.0-params.x*params.x))+limb*params.x;
@@ -52,6 +54,8 @@ fn stylizedNight(r:vec3f,footprint:f32)->vec3f {
         finiteVector(color, 3, 'Sky color');
         if (color.some((v) => v < 0)) throw new RangeError('Sky colors must be non-negative');
       }
+    if (n.moonLitBySun !== undefined && typeof n.moonLitBySun !== 'boolean')
+      throw new TypeError('Sky night moonLitBySun must be true or false');
     if (n.moonDirection !== undefined) {
       finiteVector(n.moonDirection, 3, 'Moon direction');
       if (!Math.hypot(...n.moonDirection)) throw new RangeError('Moon direction must be nonzero');
@@ -78,5 +82,6 @@ fn stylizedNight(r:vec3f,footprint:f32)->vec3f {
     v[57] = Math.max(0, n.glowIntensity ?? 1.2);
     v[58] = Math.max(0, n.starIntensity ?? 0.8);
     v[59] = time;
+    if (n.moonLitBySun) v[63] = 2;
   },
 };

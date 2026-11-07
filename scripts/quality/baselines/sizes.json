@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10366577,
+  "total": 10394144,
   "history": [
     {
       "date": "2026-10-24",
@@ -3410,6 +3410,12 @@
       "commit": "e94d18caf",
       "reason": "new entry @margoengine/animation/point-cache: PC2 and MDD readers",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "7da3f1c5e",
+      "reason": "new optional entry @margoengine/sky/astro: Meeus sun, moon and nutation, Standish planets, BSC5 reader and the star overlay, 9,495 B measured",
+      "grew": 1
     }
   ],
   "items": {
@@ -3421,6 +3427,7 @@
     "@margoengine/animation/interactivity": 24902,
     "@margoengine/animation/lod": 2768,
     "@margoengine/animation/morph-gpu": 3265,
+    "@margoengine/animation/point-cache": 1241,
     "@margoengine/animation/pointer": 7146,
     "@margoengine/animation/sampling": 2798,
     "@margoengine/animation/skeleton-utils": 8891,
@@ -3963,6 +3970,7 @@
     "@margoengine/shadows/vsm": 2046,
     "@margoengine/sky": 16975,
     "@margoengine/sky/aerial": 6719,
+    "@margoengine/sky/astro": 9780,
     "@margoengine/sky/base": 7004,
     "@margoengine/sky/bruneton": 2557,
     "@margoengine/sky/cloud-shadows": 3448,
@@ -4162,7 +4170,6 @@
     "margoengine": 308,
     "margoengine/game": 996,
     "margoengine/viz": 800,
-    "margoengine/web": 577,
-    "@margoengine/animation/point-cache": 1241
+    "margoengine/web": 577
   }
 }

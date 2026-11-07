@@ -128,6 +128,7 @@ interface SkyNightOptions {
     moonDirection?: Vec3;
     moonSize?: number;
     moonPhase?: number;
+    moonLitBySun?: boolean;
     glowIntensity?: number;
     starIntensity?: number;
     starTwinkleIntensity?: number;

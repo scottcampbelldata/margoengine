@@ -632,6 +632,17 @@ each with its own uniform buffer (one uploaded buffer holds one draw's values wi
 hash seed, so the two never share spots. Evidence: `features-check.mjs` sleet on a Radeon 680M at 4x and 1x against
 each kind drawn alone. Missing: other GPUs, timing.
 
+AstroSky (`@margoengine/sky/astro`, 2026-11-07) is a `ParticleOverlay` draw at frame graph order 2.5, after the sky's
+pass and before fog: one storage buffer of three vec4 a point (the J2000 vector and magnitude, colour, proper motion a
+Julian year; the seven planets the last points, rewritten each frame), the sky matrix (precession, nutation, sidereal
+time, latitude) in its uniform, refraction and air-mass extinction in the vertex shader, and each point at the far plane
+so only open sky shows it. It reads the sky's `nightFactor` in its pass, after the sky's own pass has set it, so day
+and night switch on the same frame. Straight alpha subtracts the sky times the alpha, so on a float target the alpha is
+the brightest channel over 64 and the star's light is added within 0.1%. The night shader's moon takes its lit limb
+toward the sun when `moonLitBySun` puts 2 in the night's enabled slot. Evidence: Meeus' worked examples in
+`astro.test.js`; `features-check.mjs` astro on a Radeon 680M at 4x and 1x for star places and light, the horizon, day
+and the moon's limb. Missing: other GPUs, timing.
+
 A `ShadowFilterEffect` replaces the named filters' last step in `shadowVisibility`, after the cascade pick and the receiver
 plane. `varianceFilter` turns the depth map into two moments, blurs them by two separable passes when the map changes, and
 bounds the lit share with Chebyshev's inequality. A filter's shader must keep `shadowSampler` read, in a branch never taken,

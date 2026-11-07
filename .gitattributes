@@ -40,3 +40,7 @@ examples/assets/parity-clip.webm filter=lfs diff=lfs merge=lfs -text
 # WGSL corpus of @margoengine/webgl2-compat: the manifest pins the SHA-256 of the decompressed sources
 packages/webgl2-compat/test/corpus/manifest.json text eol=lf
 packages/webgl2-compat/test/corpus/*.br binary
+
+# The Yale Bright Star Catalogue (CDS V/50), kept byte for byte as the archive serves it; its NOTICE.md gives the hashes
+packages/sky/test/fixtures/bsc5/catalog.gz binary
+packages/sky/test/fixtures/bsc5/ReadMe -text

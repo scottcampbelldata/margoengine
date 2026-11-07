@@ -28,14 +28,14 @@ const sky = Sky.attach(engine, {model: 'bruneton', clouds: {coverage: 0.4}}, {br
 
 | Entry | Enables | min+gzip, entry alone |
 | --- | --- | --- |
-| `@margoengine/sky/base` | clock, sun/moon discs, transmittance, default night gradient, `lights`, `nightFactor` | 5.0 kB |
+| `@margoengine/sky/base` | clock, sun/moon discs, transmittance, default night gradient, `lights`, `nightFactor` | 6.9 kB |
 | `/preetham` | Preetham day model (the default `model`) | 0.7 kB |
-| `/bruneton` | Bruneton day model and its precomputed tables (about 1.3 MB of GPU memory) | 2.2 kB |
-| `/clouds` | `clouds` | 0.9 kB |
-| `/night` | stylized `night` (stars, phased moon) | 1.3 kB |
-| `/fog` | `fog` | 1.7 kB |
-| `/reflection` | `reflectionTexture` | 0.8 kB |
-| `/lighting` | `lighting` (engine sun/moon light, ambient) | 1.0 kB |
+| `/bruneton` | Bruneton day model and its precomputed tables (about 1.3 MB of GPU memory) | 2.3 kB |
+| `/clouds` | `clouds` | 2.2 kB |
+| `/night` | stylized `night` (stars, phased moon) | 2.4 kB |
+| `/fog` | `fog` | 2.0 kB |
+| `/reflection` | `reflectionTexture` | 1.1 kB |
+| `/lighting` | `lighting` (engine sun/moon light, ambient) | 3.8 kB |
 | `/sun` | typed angles, `setSun` / `setAmbient` over core's light, `sunlitSky`, `sunPath` (not a `Sky` feature) | 2.1 kB |
 | `/weather` | `Weather`, its own plugin (not a `Sky` feature): rain, snow, sleet, lightning, thunder timing | 5.9 kB |
 | `/volumetric-clouds` | `VolumetricClouds`, its own plugin: ray-marched 3D clouds you can fly through | 7.3 kB |
@@ -43,11 +43,12 @@ const sky = Sky.attach(engine, {model: 'bruneton', clouds: {coverage: 0.4}}, {br
 | `/aerial` | `AerialPerspective`, its own plugin: distant surfaces take the air's colour | 6.5 kB |
 | `/hillaire` | `HillaireSky`, its own plugin: a physical sky with ozone from the ground to space | 6.6 kB |
 | `/shafts` | `LightShafts`, its own plugin: god rays past geometry and through cloud gaps | 6.9 kB |
+| `/astro` | `AstroSky`, its own plugin: the real sun, moon, planets and catalogue stars for a date and place | 9.5 kB |
 | `/weather-fx` | `WeatherFX`, its own plugin: no rain under roofs, splashes, a wet lens | 5.3 kB |
 
 Each entry is compressed on its own ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)),
-so sums overstate a combined bundle: the root `Sky` is 10.2 kB with all of them, against 13.7 kB
-summed. `addSky(stage)` (base, night) sums to about 6.3 kB and Night Citadel (base, night, fog, reflection) to about 8.9 kB. Recorded traces (`test/fixtures/traces.json`) pin the root `Sky`'s GPU work, WGSL and uploads; with fewer features,
+so sums overstate a combined bundle: the root `Sky` is 16.8 kB with all of them, against 21.5 kB
+summed. `addSky(stage)` (base, night) sums to about 9.3 kB and Night Citadel (base, night, fog, reflection) to about 12.4 kB. Recorded traces (`test/fixtures/traces.json`) pin the root `Sky`'s GPU work, WGSL and uploads; with fewer features,
 the shaders leave out the unused functions and branches, and the GPU work, uploads and rendered pixels are the
 same as the root's for that configuration (`test/split.test.js`, and on a real GPU `test/browser-check.mjs`).
 An option or `model` whose feature is missing throws a `TypeError` naming the entry to import. Without a day model
@@ -427,7 +428,8 @@ sky.options.night!.moonPhase = -0.2;
 Those are the defaults. Colours are non-negative linear RGB; `moonDirection` is normalized; `moonSize` is an
 angular radius in radians between 0 and π/2; `moonPhase` clamps to −1 (new) … 1 (full); glow, star and twinkle
 intensities and `hazeDensity` clamp to zero or above (zero twinkle holds stars steady, zero haze removes the
-gradient). The stylized night shows where the sun is below the horizon, blended by `nightFactor` at dusk, and
+gradient). `moonLitBySun: true` (default false; `AstroSky` sets it) turns the lit side toward the sky's sun, as the real
+moon's is, instead of a fixed side. The stylized night shows where the sun is below the horizon, blended by `nightFactor` at dusk, and
 its colours are written as given, also on display targets (the physical day sky is tonemapped there). It
 replaces the separate preset moon; leave `lighting.moon` unset with it.
 
@@ -531,6 +533,62 @@ Sky.attach(engine, {hours: 12, environment: true});
 It updates before rendering, including paused manual renders. To switch local
 lights and emissive batches together, set `lights.intensityScale =
 instances.emissiveIntensity = () => sky.nightFactor` using clustered and scatter.
+
+## Astronomical sky: the real sun, moon, planets and stars
+
+`AstroSky` from `@margoengine/sky/astro` puts the sun, the moon (its orbit, phase and size), the seven planets and the
+stars of a catalogue where they are for a date, a time and a place on the Earth. It drives a `Sky`: the sun's
+direction, and with a `night` option the moon's direction, phase and size, with its lit limb toward the sun. It draws
+the stars and planets as points on the sky, refracted by the air near the horizon, dimmed by the air mass and faded in
+with the sky's night. The stars come from the Yale Bright Star Catalogue (CDS V/50 `catalog.gz`, 9,096 stars to about
+magnitude 6.5), read as the archive serves it.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Sky} from 'margoengine/sky';
+import {degrees} from 'margoengine/sky/sun';
+import {AstroSky, fetchBrightStarCatalog} from 'margoengine/sky/astro';
+const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
+const sky = Sky.attach(engine, {night: {}, timeScale: 0});
+const astro = AstroSky.attach(engine, {
+  latitude: degrees(51.48), longitude: degrees(0), // Greenwich
+  date: new Date('2026-08-12T22:30:00Z'), timeScale: 60, sky,
+});
+astro.options.catalog = await fetchBrightStarCatalog('catalog.gz'); // from CDS V/50, served beside your page
+console.log(astro.moon.illumination, astro.planets.find((p) => p.name === 'jupiter')!.elevation.degrees);
+```
+
+Options are read every frame from `astro.options`:
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `latitude`, `longitude` | required | where on the Earth, as `degrees(...)`; longitude east positive |
+| `date` | now | the moment shown; assign it to jump. `astro.date` is the running clock |
+| `timeScale` | 1 | sky seconds per real second (0 holds the moment) |
+| `sky` | none | the `Sky` to drive; with `night` set, its moon too |
+| `catalog` | none | stars from `parseBrightStarCatalog` or `fetchBrightStarCatalog`; it switches the sky's own procedural stars off |
+| `planets` | true | draw Mercury to Neptune as points |
+| `brightness` | 4 | a magnitude 0 star's light, in the scene's linear units |
+| `limitingMagnitude` | 6.5 | the faintest drawn, after the air's extinction |
+| `extinction` | 0.2 | magnitudes lost per air mass |
+| `pointSize` | 1 | each point's spread in pixels; it does not change the brightness |
+| `refraction` | true | lift each body by the refraction of standard air |
+| `deltaT` | `deltaT(date)` | terrestrial minus universal time, seconds |
+
+The maths is there on its own, for any engine or none: `sunPosition`, `moonPosition` and `planetPositions` take a
+`Date` and an observer and give the apparent right ascension and declination, the distance, and the `azimuth`,
+`elevation` and world `direction` as `@margoengine/sky/sun` uses them (pass `azimuth` and `elevation` to `setSun`);
+the moon adds `illumination`, `phaseAngle`, `waxing` and `angularRadius`, a planet its `magnitude`. `skyMatrix` turns
+J2000 vectors into world directions for the moment and place, `julianDay`, `deltaT`, `greenwichSiderealTime`,
+`nutation`, `precessionMatrix` and `refract` are the steps underneath, and `starColor` gives a star's colour from its
+B-V index.
+
+The sun follows Meeus' low-accuracy method (about 0.01 degree), the moon his full series of chapter 47 (about 10
+arcseconds) with its parallax from the observer, the planets Standish's Keplerian elements from JPL (valid 1800 to 2050,
+tens of arcseconds), and stars their J2000 places moved by their proper motion, then precession and nutation to the
+date. Aberration (up to 20.5 arcseconds) is not applied, Saturn's magnitude leaves out its rings, and the planets are
+points, not discs. Each star is a Gaussian 1 px (`pointSize`) wide that keeps its light at any size: on a float target the
+sky behind it loses 1/64 of the star's alpha, so its light is added within 0.1%; on an 8-bit canvas it replaces the sky by its alpha, and no pixel goes past 1.
 
 ## Weather: rain, snow and lightning
 

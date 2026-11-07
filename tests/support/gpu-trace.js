@@ -55,9 +55,14 @@ export function tracedGPU() {
     x.entries.map((e) => e.binding + '=' + of(e.resource.buffer ?? e.resource.texture ?? e.resource, key)).join(',');
   wrap(d, 'createBindGroup', (x) => [`group(${entries(x)})`, `group(${entries(x, 'short')})`]);
   const write = d.queue.writeBuffer;
-  d.queue.writeBuffer = (b, offset, v) => {
-    commands.push(['write', b, offset, sha(bytes(v))]);
-    write(b, offset, v);
+  // As WebGPU: dataOffset and size count elements of a typed array; the hash is of the bytes actually written.
+  d.queue.writeBuffer = (b, offset, v, dataOffset, size) => {
+    const unit = v.BYTES_PER_ELEMENT ?? 1,
+      all = bytes(v),
+      start = (dataOffset ?? 0) * unit,
+      written = all.subarray(start, size === undefined ? all.length : start + size * unit);
+    commands.push(['write', b, offset, sha(written)]);
+    write(b, offset, v, dataOffset, size);
   };
   d.queue.writeTexture = (t, data) => commands.push(['writeTexture', t.texture, sha(bytes(data))]);
   const pass = {
