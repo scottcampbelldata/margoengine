@@ -36,6 +36,7 @@ export {
   type PointsContent,
   type InstancesContent,
   type CompositeContent,
+  type DracoPointsData,
   type ComponentType,
   type ElementType,
 } from './formats.js';

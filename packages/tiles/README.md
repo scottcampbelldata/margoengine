@@ -38,8 +38,8 @@ The renderer updates selection every frame from `engine.camera`. `tiles.dispose(
 | Refinement | `REPLACE` (children drawn only once every visible child is ready, so no holes and no overlap) and `ADD` |
 | Implicit tiling | `QUADTREE` and `OCTREE`, `subtreeLevels`, `availableLevels` (or the 1.0 extension's `maximumLevel`), binary and JSON subtree files, constant and bitstream availability, child subtrees, `{level}` `{x}` `{y}` `{z}` templates |
 | External tilesets | content that is tileset JSON becomes the tile's child; its transforms continue from the tile |
-| Content | glTF and GLB, b3dm (with `RTC_CENTER` and the batch table), pnts (`POSITION`, `POSITION_QUANTIZED`, `RGBA`, `RGB`, `RGB565`, `NORMAL`, `NORMAL_OCT16P`, `BATCH_ID`, `CONSTANT_RGBA`), cmpt (nested), i3dm (`POSITION`, `POSITION_QUANTIZED`, `NORMAL_UP` / `NORMAL_RIGHT` and their oct-encoded forms, `SCALE`, `SCALE_NON_UNIFORM`, `EAST_NORTH_UP`, `RTC_CENTER`, embedded or external glTF; drawn with `i3dm` from `margoengine/tiles/i3dm`) |
-| Metadata | `schema` / `schemaUri`, `metadata` on the tileset, tiles and contents, `groups`; `tileset.properties(entity)` fills in schema defaults |
+| Content | glTF and GLB, b3dm (with `RTC_CENTER` and the batch table), pnts (`POSITION`, `POSITION_QUANTIZED`, `RGBA`, `RGB`, `RGB565`, `NORMAL`, `NORMAL_OCT16P`, `BATCH_ID`, `CONSTANT_RGBA`, Draco-compressed with `dracoPoints` from `margoengine/tiles/metadata`), cmpt (nested), i3dm (`POSITION`, `POSITION_QUANTIZED`, `NORMAL_UP` / `NORMAL_RIGHT` and their oct-encoded forms, `SCALE`, `SCALE_NON_UNIFORM`, `EAST_NORTH_UP`, `RTC_CENTER`, embedded or external glTF; drawn with `i3dm` from `margoengine/tiles/i3dm`) |
+| Metadata | `schema` / `schemaUri`, `metadata` on the tileset, tiles and contents, `groups`; `tileset.properties(entity)` fills in schema defaults; glTF `EXT_structural_metadata` property tables and `EXT_mesh_features` feature IDs with `readStructuralMetadata` from `margoengine/tiles/metadata` |
 
 ## Selection
 
@@ -63,6 +63,7 @@ Each update measures every visible tile's screen-space error, `geometricError x 
 | `loadModel` (renderer) | gltf-pro's `parseGLTFAsync` | Your own glTF loader. |
 | `pointBudget` (renderer) | 2,000,000 | Budget of the points plugin made for pnts tiles. |
 | `i3dm` (renderer) | none | The i3dm drawer from `margoengine/tiles/i3dm`; without it an i3dm tile fails with code `unsupported`. |
+| `dracoPoints` (renderer) | none | The Draco pnts decoder from `margoengine/tiles/metadata`; without it a Draco pnts tile fails with code `unsupported`. |
 
 ## Coordinates and precision
 
@@ -100,6 +101,33 @@ engine.start();
 
 Each instance is placed as the specification says: tile transform x `RTC_CENTER` x instance (position, `NORMAL_RIGHT` and `NORMAL_UP` as the x and y axes, or the east-north-up frame at the instance with `EAST_NORTH_UP`, then the scale) x the glTF's y-up to z-up turn. All of it is float64; the model root sits at the mean instance position, so the float32 instance rows stay within the tile's own size. An external glTF (`gltfFormat` 0) is fetched with the tileset's `fetch`, relative to the tile's content URL. `instanceMatrices` and `instanceCenter` are exported for your own renderer.
 
+## Metadata and Draco points
+
+`margoengine/tiles/metadata` reads the binary metadata of 3D Tiles 1.1 content and decodes Draco-compressed point clouds. Tilesets without them never load it.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { TilesRenderer } from 'margoengine/tiles';
+import { dracoPoints, readStructuralMetadata } from 'margoengine/tiles/metadata';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+// Draco-compressed pnts (3DTILES_draco_point_compression) decode in workers, with Draco's own decoder, on first use.
+const tiles = await TilesRenderer.load(engine, '3d-tiles/TilesetWithRequestVolume/city/tileset.json', { dracoPoints });
+engine.start();
+
+// Feature properties of a glTF tile (EXT_structural_metadata and EXT_mesh_features); here a real Cesium sample.
+const gltf = await (await fetch('3d-tiles/EXT_structural_metadata/ComplexTypes/ComplexTypes.gltf')).arrayBuffer();
+const metadata = readStructuralMetadata(new Uint8Array(gltf));
+// A picked vertex (mesh 0, primitive 0, vertex 5, say from a raycast hit) leads to its feature and its properties.
+const feature = metadata.feature(0, 0, 5);
+console.log(feature?.id, feature?.properties);
+console.log(metadata.propertyTables[0].get(1, 'example_variable_length_ARRAY_STRING')); // ['One', 'Two']
+```
+
+`readStructuralMetadata(bytes)` takes a GLB, glTF JSON (data URIs, or `buffer: (index, uri) => bytes` for external buffers) or a tile's `content.gltf`. Property tables read every type of the 3D Tiles Metadata binary table format: `SCALAR`, `VECn`, `MATn` (column-major), `STRING`, `BOOLEAN` (bits) and `ENUM` (as the value's name), fixed and variable-length arrays with any offset type, `normalized` integers, then `offset` and `scale` (the table's override first), and `noData` read as the `default`. `table.get(row, name)` and `table.row(row)` read one feature; a row out of range reads as `undefined`. Feature ID sets come per mesh primitive, with their IDs per vertex for attribute and implicit sets. A malformed table throws a `TypeError` or `RangeError` naming it; nothing reads out of bounds.
+
+`dracoPoints(content)` turns Draco pnts into ordinary point content: `POSITION`, `RGBA` or `RGB`, `NORMAL` and `BATCH_ID` from the Draco buffer, and the batch table properties the extension names. For your own renderer, call it from the `Tileset` content factory; a third argument takes any decoder with `decode(bytes)`.
+
 ## Without the engine
 
 `Tileset` is engine-free: give it a view each frame and a content factory, and it does the rest. This is how the tests drive it, and how to stream tiles into your own renderer or a server-side job.
@@ -121,7 +149,9 @@ The content parsers (`parseB3dm`, `parsePnts`, `parseI3dm`, `parseCmpt`, `parseC
 ## Limits
 
 - i3dm batch tables are read (`content.batchTable`) but per-instance picking and per-instance colours are not wired to them; an i3dm external glTF resolves against the tile's first content URL.
-- S2 bounding volumes, Draco-compressed pnts and binary metadata property tables are not read.
+- S2 bounding volumes are not read.
+- Metadata: feature ID textures are named, not read (sample the texture yourself); property textures, property attributes and a `schemaUri` schema in glTF are not read; 64-bit integers become doubles (exact to 2^53); feature IDs of a Draco-compressed glTF primitive are not read; picking a vertex is yours (a raycast hit), the tables then give its feature.
+- Draco pnts decode in Web Workers (`@margoengine/decoders/draco-points`), so not in Node without a decoder of your own.
 - A tile whose glTF requires KHR_techniques_webgl (archived GLSL shaders, such as the billboard level of Cesium's TilesetWithTreeBillboards) fails with code `unsupported`, as glTF says a loader must; the rest of the tileset draws.
 - Memory is counted as the bytes of each tile's content file, not the GPU memory its model takes.
 - Orthographic cameras need `Tileset.update` with `orthographicHeight`; the renderer reads a perspective camera.

@@ -33,6 +33,10 @@
     "./i3dm": {
       "types": "./dist/i3dm.d.ts",
       "import": "./dist/i3dm.js"
+    },
+    "./metadata": {
+      "types": "./dist/metadata.d.ts",
+      "import": "./dist/metadata.js"
     }
   },
   "files": [
@@ -49,13 +53,17 @@
   "peerDependencies": {
     "@margoengine/core": "^1.0.0",
     "@margoengine/gltf-pro": "^1.0.0",
-    "@margoengine/points": "^1.0.0"
+    "@margoengine/points": "^1.0.0",
+    "@margoengine/decoders": "^1.0.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/gltf-pro": {
       "optional": true
     },
     "@margoengine/points": {
+      "optional": true
+    },
+    "@margoengine/decoders": {
       "optional": true
     }
   },

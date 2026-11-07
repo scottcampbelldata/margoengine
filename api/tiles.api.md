@@ -55,6 +55,13 @@ export interface ContentJSON {
     group?: number;
 }
 
+export interface DracoPointsData {
+    readonly bytes: Uint8Array;
+    readonly properties: Readonly<Record<string, number>>;
+    readonly batchProperties?: Readonly<Record<string, number>>;
+    readonly length: number;
+}
+
 export type ElementType = 'SCALAR' | 'VEC2' | 'VEC3' | 'VEC4';
 
 export class FeatureTable {
@@ -142,6 +149,7 @@ export interface PointsContent {
     readonly featureTable: FeatureTable;
     readonly batchTable?: BatchTable;
     readonly byteLength: number;
+    readonly draco?: DracoPointsData;
 }
 
 export type Priority = readonly [group: number, key: number];
@@ -252,6 +260,7 @@ export interface TilesRendererOptions extends Omit<TilesetOptions, 'content'> {
     loadModel?: (engine: EngineKernel, gltf: Uint8Array, signal: AbortSignal) => Promise<TilesModel>;
     pointBudget?: number;
     i3dm?: TilesInstancesDrawer;
+    dracoPoints?: (content: PointsContent, signal: AbortSignal) => Promise<PointsContent>;
 }
 
 export interface TilesView {

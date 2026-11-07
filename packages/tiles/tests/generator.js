@@ -453,3 +453,19 @@ export function groveTileset({ n = 5, spacing = 40, lon = -75.6, lat = 40.04, ur
   files.set('tileset.json', encoder.encode(JSON.stringify(tileset)));
   return { files, tileset, rtc, offsets };
 }
+
+/**
+ * A pnts around a Draco point cloud (3DTILES_draco_point_compression): `properties` maps feature table semantics and
+ * `batch` batch table properties to Draco attribute IDs. The Draco bytes are the caller's; this wrapper is a stand-in.
+ */
+export function dracoPnts(drc, { length, properties, batch, batchLength } = {}) {
+  const featureJSON = { POINTS_LENGTH: length, extensions: { '3DTILES_draco_point_compression': { properties, byteOffset: 0, byteLength: drc.byteLength } } };
+  for (const name of Object.keys(properties)) featureJSON[name] = { byteOffset: 0 };
+  let batchJSON = null;
+  if (batch) {
+    featureJSON.BATCH_LENGTH = batchLength ?? length;
+    batchJSON = { extensions: { '3DTILES_draco_point_compression': { properties: batch } } };
+    for (const name of Object.keys(batch)) batchJSON[name] = { byteOffset: 0, componentType: 'FLOAT', type: 'SCALAR' };
+  }
+  return wrap('pnts', 28, featureJSON, drc, batchJSON, null, new Uint8Array(0));
+}

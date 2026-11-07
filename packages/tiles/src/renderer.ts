@@ -5,7 +5,7 @@
 // float64 frame matrix; see the README's "Coordinates and precision".
 import type { EngineKernel, EnginePlugin, Mesh, Vec3 } from '@margoengine/core';
 import { MargoError } from '@margoengine/math/errors';
-import type { InstancesContent, TileContent } from './formats.js';
+import type { InstancesContent, PointsContent, TileContent } from './formats.js';
 import {
   type TileMatrix,
   Y_UP_TO_Z_UP,
@@ -82,6 +82,11 @@ export interface TilesRendererOptions extends Omit<TilesetOptions, 'content'> {
    * code `unsupported` and the rest of the tileset still draws.
    */
   i3dm?: TilesInstancesDrawer;
+  /**
+   * Decodes Draco-compressed pnts (3DTILES_draco_point_compression): pass `dracoPoints` from
+   * `@margoengine/tiles/metadata`. Without it such a tile fails with code `unsupported`.
+   */
+  dracoPoints?: (content: PointsContent, signal: AbortSignal) => Promise<PointsContent>;
 }
 
 interface PointsHost {
@@ -110,6 +115,7 @@ export class TilesRenderer implements EnginePlugin {
   private readonly loadModel: NonNullable<TilesRendererOptions['loadModel']>;
   private readonly pointBudget: number;
   private readonly i3dm?: TilesInstancesDrawer;
+  private readonly dracoPoints?: TilesRendererOptions['dracoPoints'];
   private host?: TilesContentHost;
   private points?: Promise<{ host: PointsHost; PointCloud: new (options: object) => object }>;
   private readonly planes = new Float64Array(24);
@@ -139,6 +145,7 @@ export class TilesRenderer implements EnginePlugin {
     this.origin = options.origin;
     this.pointBudget = options.pointBudget ?? 2_000_000;
     this.i3dm = options.i3dm;
+    this.dracoPoints = options.dracoPoints;
     this.loadModel =
       options.loadModel ??
       (async (engine, gltf, signal) => {
@@ -251,6 +258,15 @@ export class TilesRenderer implements EnginePlugin {
         };
       }
       case 'pnts': {
+        if (content.draco) {
+          if (!this.dracoPoints)
+            throw new MargoError(
+              'unsupported',
+              "Draco-compressed pnts needs its decoder: import { dracoPoints } from '@margoengine/tiles/metadata' and pass { dracoPoints } to TilesRenderer.load",
+            );
+          content = await this.dracoPoints(content, signal);
+          signal.throwIfAborted();
+        }
         const { host, PointCloud } = await (this.points ??= this.loadPoints(engine));
         const anchor = engine.createMesh();
         this.place(anchor, this.contentMatrix(tile, content.rtcCenter, false));

@@ -40,6 +40,13 @@ interface CompositeContent {
     readonly byteLength: number;
 }
 
+interface DracoPointsData {
+    readonly bytes: Uint8Array;
+    readonly properties: Readonly<Record<string, number>>;
+    readonly batchProperties?: Readonly<Record<string, number>>;
+    readonly length: number;
+}
+
 class FeatureTable {
     readonly json: Record<string, unknown>;
     readonly binary: Uint8Array;
@@ -101,6 +108,7 @@ interface PointsContent {
     readonly featureTable: FeatureTable;
     readonly batchTable?: BatchTable;
     readonly byteLength: number;
+    readonly draco?: DracoPointsData;
 }
 
 type Refine = 'ADD' | 'REPLACE';

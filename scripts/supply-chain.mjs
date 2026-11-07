@@ -158,7 +158,7 @@ const ASSETS = [
   ],
   [
     'examples/assets/3d-tiles/NOTICE.md',
-    '3D Tiles test tilesets: TilesetWithTreeBillboards (i3dm, CC0 1.0) and the city of TilesetWithRequestVolume (b3dm, CC BY 3.0, Cesium) from https://github.com/CesiumGS/3d-tiles-samples; commit and sha256 there',
+    '3D Tiles test tilesets: TilesetWithTreeBillboards (i3dm, CC0 1.0), the city of TilesetWithRequestVolume (b3dm, CC BY 3.0, Cesium) and two EXT_structural_metadata glTF samples (CC0 1.0) from https://github.com/CesiumGS/3d-tiles-samples; commit and sha256 there',
   ],
   [
     'packages/shadows/test/outside/reference.py',

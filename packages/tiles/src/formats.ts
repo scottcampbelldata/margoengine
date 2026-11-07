@@ -184,6 +184,22 @@ export interface PointsContent {
   readonly featureTable: FeatureTable;
   readonly batchTable?: BatchTable;
   readonly byteLength: number;
+  /**
+   * Set for Draco-compressed points (3DTILES_draco_point_compression): the compressed semantics are not decoded yet
+   * (`positions` is empty); `dracoPoints` from `@margoengine/tiles/metadata` decodes them.
+   */
+  readonly draco?: DracoPointsData;
+}
+
+/** The compressed part of Draco pnts: the Draco buffer and the attribute ID of each compressed semantic. */
+export interface DracoPointsData {
+  readonly bytes: Uint8Array;
+  /** Feature table semantic (POSITION, RGBA, RGB, NORMAL, BATCH_ID) to Draco attribute ID. */
+  readonly properties: Readonly<Record<string, number>>;
+  /** Batch table property to Draco attribute ID. */
+  readonly batchProperties?: Readonly<Record<string, number>>;
+  /** POINTS_LENGTH. */
+  readonly length: number;
 }
 
 /** glTF content: a GLB (or glTF JSON) to draw, with the b3dm wrapper's RTC_CENTER and batch table when present. */
@@ -346,18 +362,50 @@ function checkGLB(body: Uint8Array, where: string): Uint8Array {
   return glb;
 }
 
+/** The 3DTILES_draco_point_compression part of pnts, checked against the feature table binary. */
+function dracoData(header: Header, length: number): DracoPointsData | undefined {
+  const ext = (header.featureTable.json.extensions as Record<string, unknown> | undefined)?.[
+    '3DTILES_draco_point_compression'
+  ] as { properties?: Record<string, number>; byteOffset?: number; byteLength?: number } | undefined;
+  if (!ext) return undefined;
+  const { properties, byteOffset, byteLength } = ext,
+    binary = header.featureTable.binary;
+  if (!properties || typeof properties !== 'object' || !Object.values(properties).every(Number.isInteger))
+    throw new TypeError('3DTILES_draco_point_compression needs properties: semantic to Draco attribute ID');
+  if (
+    !Number.isInteger(byteOffset) ||
+    !Number.isInteger(byteLength) ||
+    byteOffset! < 0 ||
+    byteLength! <= 0 ||
+    byteOffset! + byteLength! > binary.byteLength
+  )
+    throw new RangeError(
+      `3DTILES_draco_point_compression byteOffset ${byteOffset} and byteLength ${byteLength} pass the ${binary.byteLength}-byte feature table binary; the file is truncated or corrupt`,
+    );
+  const batchExt = (header.batchTableJSON.extensions as Record<string, unknown> | undefined)?.[
+    '3DTILES_draco_point_compression'
+  ] as { properties?: Record<string, number> } | undefined;
+  return {
+    bytes: binary.subarray(byteOffset!, byteOffset! + byteLength!),
+    properties,
+    batchProperties: batchExt?.properties,
+    length,
+  };
+}
+
 /** Parses Point Cloud content: POSITION or POSITION_QUANTIZED, RGBA / RGB / RGB565, NORMAL / NORMAL_OCT16P, BATCH_ID. */
 export function parsePnts(bytes: Uint8Array): PointsContent {
   const header = readHeader(bytes, 'pnts', 28),
     table = header.featureTable,
     n = count(table, 'POINTS_LENGTH', 'pnts');
-  if (table.json.extensions && (table.json.extensions as Record<string, unknown>)['3DTILES_draco_point_compression'])
-    throw new TypeError(
-      'Draco-compressed pnts (3DTILES_draco_point_compression) is not supported; convert the points to uncompressed pnts or glTF',
-    );
+  const draco = dracoData(header, n),
+    compressed = (name: string) => draco?.properties[name] !== undefined,
+    property = (name: string, size: number, type: ComponentType) =>
+      compressed(name) ? undefined : table.property(name, n, size, type);
   let positions: Float32Array;
-  const raw = table.property('POSITION', n, 3, 'FLOAT');
+  const raw = property('POSITION', 3, 'FLOAT');
   if (raw) positions = Float32Array.from(raw);
+  else if (compressed('POSITION')) positions = new Float32Array(0);
   else {
     const q = table.property('POSITION_QUANTIZED', n, 3, 'UNSIGNED_SHORT');
     const offset = vec3(table.global('QUANTIZED_VOLUME_OFFSET', 'FLOAT', 3), 'QUANTIZED_VOLUME_OFFSET'),
@@ -370,9 +418,9 @@ export function parsePnts(bytes: Uint8Array): PointsContent {
     for (let i = 0; i < n * 3; i++) positions[i] = offset[i % 3] + (q[i] / 65535) * scale[i % 3];
   }
   let colors: Uint8Array | undefined;
-  const rgba = table.property('RGBA', n, 4, 'UNSIGNED_BYTE'),
-    rgb = rgba ? undefined : table.property('RGB', n, 3, 'UNSIGNED_BYTE'),
-    rgb565 = rgba || rgb ? undefined : table.property('RGB565', n, 1, 'UNSIGNED_SHORT');
+  const rgba = property('RGBA', 4, 'UNSIGNED_BYTE'),
+    rgb = rgba ? undefined : property('RGB', 3, 'UNSIGNED_BYTE'),
+    rgb565 = rgba || rgb ? undefined : property('RGB565', 1, 'UNSIGNED_SHORT');
   if (rgba) colors = Uint8Array.from(rgba);
   else if (rgb || rgb565) {
     colors = new Uint8Array(n * 4);
@@ -391,23 +439,22 @@ export function parsePnts(bytes: Uint8Array): PointsContent {
     }
   }
   let normals: Float32Array | undefined;
-  const normal = table.property('NORMAL', n, 3, 'FLOAT');
+  const normal = property('NORMAL', 3, 'FLOAT');
   if (normal) normals = Float32Array.from(normal);
   else {
-    const oct = table.property('NORMAL_OCT16P', n, 2, 'UNSIGNED_BYTE');
+    const oct = property('NORMAL_OCT16P', 2, 'UNSIGNED_BYTE');
     if (oct) {
       normals = new Float32Array(n * 3);
       for (let i = 0; i < n; i++) octDecode(oct[i * 2], oct[i * 2 + 1], 255, normals, i * 3);
     }
   }
-  const batch = table.property(
+  const batch = property(
     'BATCH_ID',
-    n,
     1,
     (table.json.BATCH_ID as { componentType?: ComponentType })?.componentType ?? 'UNSIGNED_SHORT',
   );
   const constant = table.global('CONSTANT_RGBA', 'UNSIGNED_BYTE', 4);
-  const batchLength = batch ? count(table, 'BATCH_LENGTH', 'pnts') : n;
+  const batchLength = batch || compressed('BATCH_ID') ? count(table, 'BATCH_LENGTH', 'pnts') : n;
   return {
     type: 'pnts',
     positions,
@@ -422,6 +469,7 @@ export function parsePnts(bytes: Uint8Array): PointsContent {
     featureTable: table,
     batchTable: batchTable(header, batchLength),
     byteLength: header.byteLength,
+    draco,
   };
 }
 

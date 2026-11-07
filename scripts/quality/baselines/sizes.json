@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10394144,
+  "total": 10399114,
   "history": [
     {
       "date": "2026-10-24",
@@ -3416,6 +3416,12 @@
       "commit": "7da3f1c5e",
       "reason": "new optional entry @margoengine/sky/astro: Meeus sun, moon and nutation, Standish planets, BSC5 reader and the star overlay, 9,495 B measured",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "1c2b04bcf",
+      "reason": "tiles/metadata: EXT_structural_metadata tables and Draco pnts (batch 47 job 2)",
+      "grew": 1
     }
   ],
   "items": {
@@ -4028,6 +4034,7 @@
     "@margoengine/tilemap/tiled": 4264,
     "@margoengine/tiles": 14561,
     "@margoengine/tiles/i3dm": 1629,
+    "@margoengine/tiles/metadata": 4970,
     "@margoengine/tonemap": 11059,
     "@margoengine/toon": 1701,
     "@margoengine/transitions": 4303,
