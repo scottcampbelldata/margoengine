@@ -5,6 +5,7 @@
 #![cfg_attr(target_arch = "wasm32", no_std)]
 
 pub mod api;
+pub mod broad;
 pub mod integrate;
 pub mod layout;
 pub mod mass;

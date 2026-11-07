@@ -81,11 +81,13 @@ impl World {
         unsafe { *self.u(FLAGS).add(at) }
     }
 
-    /// Advances the world by `dt` in `substeps` equal pieces.
+    /// Advances the world by `dt` in `substeps` equal pieces. Pairs are found once a step, over the motion the whole step
+    /// is expected to make.
     pub fn step(&mut self, dt: f32) {
         let substeps = self.header().substeps;
         let h = dt / substeps as f32;
         self.begin_step(dt);
+        self.broad_update(dt);
         for substep in 0..substeps {
             self.integrate_velocities(h);
             self.integrate_poses(h, substep + 1 == substeps);

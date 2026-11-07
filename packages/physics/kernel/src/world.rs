@@ -24,6 +24,18 @@ pub struct Header {
     pub steps: u32,
     pub substeps: u32,
     pub gravity: [f32; 3],
+    /// Counts every change of layout, so JS knows to bind its views again.
+    pub layout: u32,
+    /// Endpoints in each sorted list.
+    pub endpoints: u32,
+    /// The head of the chain of colliders the next step must look at.
+    pub pending: u32,
+    /// Pairs alive; rows handed out so far; the first freed one to hand out again.
+    pub pairs: u32,
+    pub pair_rows: u32,
+    pub free_pair: u32,
+    /// Set when memory could not hold a new pair.
+    pub failed: u32,
 }
 
 const HEADER_BYTES: u32 = ((core::mem::size_of::<Header>() + 15) & !15) as u32;
@@ -39,8 +51,8 @@ impl World {
             return None;
         }
         let mut arena = Arena::new();
-        let capacity = [bodies, colliders];
-        let (offsets, bytes) = offsets(HEADER_BYTES, &capacity);
+        let capacity = capacities(bodies, colliders, colliders.max(16));
+        let (offsets, bytes) = offsets(HEADER_BYTES, &capacity)?;
         if !arena.ensure(bytes as usize) {
             return None;
         }
@@ -59,6 +71,13 @@ impl World {
                 steps: 0,
                 substeps: 4,
                 gravity: [0.0, -9.81, 0.0],
+                layout: 0,
+                endpoints: 0,
+                pending: NONE,
+                pairs: 0,
+                pair_rows: 0,
+                free_pair: NONE,
+                failed: 0,
             });
         }
         Some(world)
@@ -88,42 +107,42 @@ impl World {
     }
 
     /// Grows to at least these rows. Rows keep their index and every value, and no later step can depend on capacity:
-    /// nothing iterates over a whole column. The new layout is built above the old block, then copied down to the base,
-    /// so offsets stay relative to the base and JS rebuilds its views once.
+    /// nothing iterates over a whole column.
     pub fn reserve(&mut self, bodies: u32, colliders: u32) -> bool {
+        let old = self.header().capacity;
+        if bodies > MAX_BODIES || colliders > MAX_COLLIDERS {
+            return false;
+        }
+        self.grow(capacities(bodies.max(old[0]), colliders.max(old[1]), old[3]))
+    }
+
+    /// Moves every column up to its place in the larger layout, last column first, so nothing is overwritten before it
+    /// moves and no second copy of the world is needed. Offsets stay relative to the base; JS binds its views again.
+    pub fn grow(&mut self, capacity: [u32; ROW_CLASSES]) -> bool {
         let old_capacity = self.header().capacity;
-        let capacity = [bodies.max(old_capacity[0]), colliders.max(old_capacity[1])];
         if capacity == old_capacity {
             return true;
         }
-        if capacity[0] > MAX_BODIES || capacity[1] > MAX_COLLIDERS {
-            return false;
-        }
-        let (new_offsets, bytes) = offsets(HEADER_BYTES, &capacity);
-        let old_bytes = self.header().bytes;
-        if !self.arena.ensure(old_bytes as usize + bytes as usize) {
+        let Some((new_offsets, bytes)) = offsets(HEADER_BYTES, &capacity) else { return false };
+        if !self.arena.ensure(bytes as usize) {
             return false;
         }
         let base = self.arena.base;
-        unsafe {
-            let staging = base.add(old_bytes as usize);
-            core::ptr::write_bytes(staging, 0, bytes as usize);
-            let old_offsets = self.header().offsets;
-            for column in 0..COLUMNS {
-                let rows = old_capacity[COLUMN_ROWS[column] as usize] as usize;
-                core::ptr::copy_nonoverlapping(
-                    base.add(old_offsets[column] as usize),
-                    staging.add(new_offsets[column] as usize),
-                    rows * 4,
-                );
+        let old_offsets = self.header().offsets;
+        for column in (0..COLUMNS).rev() {
+            let class = COLUMN_ROWS[column] as usize;
+            let (rows, new_rows) = (old_capacity[class] as usize, padded(capacity[class]) as usize);
+            unsafe {
+                let to = base.add(new_offsets[column] as usize);
+                core::ptr::copy(base.add(old_offsets[column] as usize), to, rows * 4);
+                core::ptr::write_bytes(to.add(rows * 4), 0, (new_rows - rows) * 4);
             }
-            let header = HEADER_BYTES as usize;
-            core::ptr::copy(staging.add(header), base.add(header), bytes as usize - header);
         }
         let header = self.header_mut();
         header.bytes = bytes;
         header.capacity = capacity;
         header.offsets = new_offsets;
+        header.layout = header.layout.wrapping_add(1);
         true
     }
 
@@ -177,7 +196,7 @@ impl World {
         let mut collider = unsafe { *self.u(FIRST_COLLIDER).add(at) };
         while collider != NONE {
             let next = unsafe { *self.u(COLLIDER_NEXT).add(collider as usize) };
-            self.free_collider_row(collider);
+            self.retire_collider(collider);
             collider = next;
         }
         unsafe {
@@ -190,14 +209,41 @@ impl World {
         true
     }
 
-    fn free_collider_row(&mut self, collider: u32) {
+    /// A collider leaves its body now; the next step drops it from the broad phase and frees its row, so removing many
+    /// costs one pass over the lists.
+    fn retire_collider(&mut self, collider: u32) {
         let at = collider as usize;
         unsafe {
             *self.u(COLLIDER_BODY).add(at) = NONE;
             *self.u(COLLIDER_GENERATION).add(at) += 1;
-            *self.u(COLLIDER_NEXT).add(at) = self.header().free_collider;
+            *self.u(COLLIDER_STATE).add(at) |= REMOVED;
         }
-        self.header_mut().free_collider = collider;
+        self.mark_pending(collider);
+    }
+
+    /// Puts a collider on the chain the next step looks at, once.
+    pub fn mark_pending(&mut self, collider: u32) {
+        let at = collider as usize;
+        unsafe {
+            let state = self.u(COLLIDER_STATE).add(at);
+            if *state & PENDING == 0 {
+                *state |= PENDING;
+                *self.u(COLLIDER_PENDING).add(at) = self.header().pending;
+                self.header_mut().pending = collider;
+            }
+        }
+    }
+
+    /// Says a body's pose was written by hand: a fixed body's box is looked at again by the next step.
+    pub fn touch_body(&mut self, body: u32) {
+        if !self.body_alive(body) {
+            return;
+        }
+        let mut collider = unsafe { *self.u(FIRST_COLLIDER).add(body as usize) };
+        while collider != NONE {
+            self.mark_pending(collider);
+            collider = unsafe { *self.u(COLLIDER_NEXT).add(collider as usize) };
+        }
     }
 
     /// Adds a collider to a live body and recomputes its mass. None when the rows are used up or the body is not alive.
@@ -230,6 +276,7 @@ impl World {
                 *self.f(COLLIDER_ROTATION_X + k).add(at) = rotation[k];
             }
             *self.f(COLLIDER_DENSITY).add(at) = density;
+            *self.u(COLLIDER_PAIRS).add(at) = NONE;
             // At the end of the body's chain, so colliders add up in the order they were given.
             *self.u(COLLIDER_NEXT).add(at) = NONE;
             let first = self.u(FIRST_COLLIDER).add(body as usize);
@@ -243,11 +290,13 @@ impl World {
                 *self.u(COLLIDER_NEXT).add(last as usize) = row;
             }
         }
+        self.mark_pending(row);
         self.update_mass(body);
         Some(row)
     }
 
-    /// Removes a collider from its body and recomputes the body's mass; false when the row holds no collider.
+    /// Removes a collider from its body and recomputes the body's mass; false when the row holds no collider. Its row
+    /// comes back after the next step.
     pub fn remove_collider(&mut self, collider: u32) -> bool {
         if collider >= self.header().collider_rows {
             return false;
@@ -270,7 +319,7 @@ impl World {
                 *self.u(COLLIDER_NEXT).add(row as usize) = next;
             }
         }
-        self.free_collider_row(collider);
+        self.retire_collider(collider);
         self.update_mass(body);
         true
     }

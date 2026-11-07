@@ -76,8 +76,27 @@ pub extern "C" fn body_add(kind: u32) -> i32 {
     world().add_body(kind).map_or(-1, |row| row as i32)
 }
 #[unsafe(no_mangle)]
-pub extern "C" fn world_step(dt: f32) {
+pub extern "C" fn world_step(dt: f32) -> u32 {
     world().step(dt);
+    world().header().failed
+}
+/// Counts layout changes: when it moves, JS binds its views again.
+#[unsafe(no_mangle)]
+pub extern "C" fn world_layout() -> u32 {
+    world().header().layout
+}
+#[unsafe(no_mangle)]
+pub extern "C" fn world_pairs() -> u32 {
+    world().header().pairs
+}
+/// Pair rows handed out so far: pair columns hold rows below this, freed ones with NONE in PAIR_A.
+#[unsafe(no_mangle)]
+pub extern "C" fn world_pair_rows() -> u32 {
+    world().header().pair_rows
+}
+#[unsafe(no_mangle)]
+pub extern "C" fn body_touch(body: u32) {
+    world().touch_body(body);
 }
 #[unsafe(no_mangle)]
 pub extern "C" fn body_remove(body: u32) -> u32 {

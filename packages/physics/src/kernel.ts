@@ -18,7 +18,11 @@ interface KernelExports extends WebAssembly.Exports {
   world_set_substeps(substeps: number): void;
   world_substeps(): number;
   world_steps(): number;
-  world_step(dt: number): void;
+  world_step(dt: number): number;
+  world_layout(): number;
+  world_pairs(): number;
+  world_pair_rows(): number;
+  body_touch(body: number): void;
   body_add(kind: number): number;
   body_remove(body: number): number;
   body_update_mass(body: number): void;
@@ -97,13 +101,15 @@ export type KernelColumn = Float32Array | Uint32Array;
 
 /**
  * One simulated world in its own Wasm instance. Column views alias the kernel's memory: reading a pose is a typed-array
- * read, with no call and no copy. `reserve` replaces every view, so read them from `columns` each time, never keep one.
+ * read, with no call and no copy. Growth, which a step can cause, replaces every view, so read them from `columns` each
+ * time and never keep one.
  * Everything a step can change lives in one block, so {@link KernelWorld.snapshot} is one copy.
  */
 export class KernelWorld {
   /** Every column by name, for example `columns.positionX[body]`. */
   readonly columns: Record<string, KernelColumn> = {};
   private readonly api: KernelExports;
+  private layout = -1;
 
   /**
    * @param bodies Body rows to start with (default 1024); `reserve` adds more.
@@ -126,6 +132,7 @@ export class KernelWorld {
     const { api } = this,
       { buffer } = api.memory,
       base = api.world_base();
+    this.layout = api.world_layout();
     kernelColumns.forEach(([name, kind, rows], column) => {
       const at = base + api.world_offset(column),
         length = api.world_capacity(rows);
@@ -140,6 +147,21 @@ export class KernelWorld {
   /** Rows of collider columns. */
   get colliderCapacity(): number {
     return this.api.world_capacity(1);
+  }
+  /** Pairs of colliders whose fat boxes overlap, after the last step. */
+  get pairCount(): number {
+    return this.api.world_pairs();
+  }
+  /**
+   * Every pair as two collider rows, the lower first, after the last step. A pair is near, not yet touching: a fat box
+   * holds what the coming step can reach, plus a margin. Colliders of one body and of two fixed bodies are no pair.
+   */
+  pairs(): [number, number][] {
+    const { pairA, pairB } = this.columns,
+      rows = this.api.world_pair_rows(),
+      out: [number, number][] = [];
+    for (let row = 0; row < rows; row++) if (pairA[row] !== 0xffffffff) out.push([pairA[row], pairB[row]]);
+    return out;
   }
   /** Steps taken so far. */
   get steps(): number {
@@ -189,7 +211,8 @@ export class KernelWorld {
     return row;
   }
   /**
-   * Removes a body and its colliders. Its row comes back from a later {@link KernelWorld.addBody}, last freed first.
+   * Removes a body and its colliders. Its row comes back from a later {@link KernelWorld.addBody}, last freed first; the
+   * colliders' rows after the next step.
    * @returns false when the row holds no body.
    */
   removeBody(body: number): boolean {
@@ -243,7 +266,7 @@ export class KernelWorld {
     return row;
   }
   /**
-   * Removes a collider and works out its body's mass again.
+   * Removes a collider and works out its body's mass again. Its row comes back after the next step.
    * @returns false when the row holds no collider.
    */
   removeCollider(collider: number): boolean {
@@ -258,13 +281,24 @@ export class KernelWorld {
     return this;
   }
   /**
-   * Advances the world by `dt` seconds, in {@link KernelWorld.substeps} equal pieces.
-   * @throws RangeError unless `dt` is finite and above zero.
+   * Says a body's pose was written by hand. Moving bodies are looked at every step anyway; a fixed body is not, so call
+   * this after writing the pose of one.
+   */
+  touch(body: number): this {
+    this.api.body_touch(body);
+    return this;
+  }
+  /**
+   * Advances the world by `dt` seconds, in {@link KernelWorld.substeps} equal pieces. Finding new pairs can grow the world,
+   * so read views from `columns` after this call.
+   * @throws RangeError unless `dt` is finite and above zero, or when memory cannot hold the pairs found.
    */
   step(dt: number): this {
     if (!(dt > 0) || !Number.isFinite(dt))
       throw new RangeError(`A step must be finite and above zero; a usual step is 1 / 60 (got ${dt}).`);
-    this.api.world_step(dt);
+    const failed = this.api.world_step(dt);
+    if (this.api.world_layout() !== this.layout) this.bind();
+    if (failed) throw new RangeError('Memory cannot hold the pairs of this world; spread the colliders out or use fewer.');
     return this;
   }
   /** Bytes of the world, and of a {@link KernelWorld.snapshot}. */

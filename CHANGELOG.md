@@ -4,7 +4,7 @@
 
 ### Physics
 
-- `@margoengine/physics/next`, a preview of Margo's own solver: a Rust kernel in WebAssembly with its world and memory views, bodies that move under gravity, forces and impulses, `substeps` (default 4), and `addCollider` for balls, boxes and capsules, which work out a body's mass, centre and inertia. Rapier stays the default.
+- `@margoengine/physics/next`, a preview of Margo's own solver: a Rust kernel in WebAssembly with its world and memory views, bodies that move under gravity, forces and impulses, `substeps` (default 4), and `addCollider` for balls, boxes and capsules, which work out a body's mass, centre and inertia, and sweep and prune with `world.pairs()`. Rapier stays the default.
 - Revolute and prismatic joints take `frameA` and `frameB` in place of `axis`, so limits count from the rest pose. `physics.solverIterations`, `body.additionalSolverIterations`, `body.appliedForce`, `body.appliedTorque` and `physics.contactPoints(body)` read what used to need the solver's own objects, and `@margoengine/ragdoll` now runs on the public Physics API alone: `Physics.load()` replaces passing `rapier`.
 - `@margoengine/physics2d/outline`: `outlineColliders` and `traceOutlines` make colliders from a sprite's alpha, holes and hollows included.
 - Bodies work on meshes at any depth of a hierarchy: parents are written before their children, so a body added before its parent no longer lags a frame, a nested glTF node is fitted at its world scale, and a geometry-free root below another mesh keeps its parts where they are. `{type: 'kinematicPosition', follow: true}` makes a mesh drive its body, for a moving part of a model that pushes what it meets. `physics.colliderCount` counts the world's colliders.

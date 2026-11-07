@@ -56,6 +56,7 @@ test('freed rows come back last in, first out, and hold nothing of the old row',
   assert.equal(world.columns.positionX[b], 0);
   assert.equal(world.columns.inverseMass[b], 0);
   assert.equal(world.columns.generation[b], generation + 1);
+  world.step(1 / 60);
   assert.equal(world.addCollider(b, 'ball', [1]), collider);
   assert.equal(world.columns.colliderGeneration[collider], colliderGeneration + 1);
 });

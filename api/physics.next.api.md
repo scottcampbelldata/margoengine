@@ -24,6 +24,8 @@ export class KernelWorld {
     constructor(bodies?: number, colliders?: number);
     get capacity(): number;
     get colliderCapacity(): number;
+    get pairCount(): number;
+    pairs(): [number, number][];
     get steps(): number;
     get substeps(): number;
     set substeps(substeps: number);
@@ -34,6 +36,7 @@ export class KernelWorld {
     addCollider(body: number, shape: KernelShape, size: readonly number[], options?: KernelColliderOptions): number;
     removeCollider(collider: number): boolean;
     updateMass(body: number): this;
+    touch(body: number): this;
     step(dt: number): this;
     get bytes(): number;
     get hash(): number;

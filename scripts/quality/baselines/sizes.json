@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10243012,
+  "total": 10297253,
   "history": [
     {
       "date": "2026-10-24",
@@ -3326,6 +3326,12 @@
       "commit": "095050f46",
       "reason": "B32 quad pairing in remesh (+967 B) and B36 instanced LDraw parts (+157 B): both new options a job asks for, reached only through their own entries",
       "grew": 2
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "b0054b947",
+      "reason": "own physics kernel gains the sweep and prune broad phase",
+      "grew": 1
     }
   ],
   "items": {
@@ -3746,7 +3752,7 @@
     "@margoengine/oit/moments": 4197,
     "@margoengine/oit/vfx": 486,
     "@margoengine/physics": 19679,
-    "@margoengine/physics/next": 9006,
+    "@margoengine/physics/next": 13870,
     "@margoengine/physics2d": 8199,
     "@margoengine/physics2d/outline": 2524,
     "@margoengine/pixel": 4664,

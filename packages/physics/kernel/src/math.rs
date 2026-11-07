@@ -49,6 +49,19 @@ impl V3 {
     pub fn dot(self, o: V3) -> f32 {
         self.x * o.x + self.y * o.y + self.z * o.z
     }
+    /// Each component's size.
+    #[inline(always)]
+    pub fn abs(self) -> V3 {
+        v3(self.x.abs(), self.y.abs(), self.z.abs())
+    }
+    #[inline(always)]
+    pub fn min(self, o: V3) -> V3 {
+        v3(if o.x < self.x { o.x } else { self.x }, if o.y < self.y { o.y } else { self.y }, if o.z < self.z { o.z } else { self.z })
+    }
+    #[inline(always)]
+    pub fn max(self, o: V3) -> V3 {
+        v3(if o.x > self.x { o.x } else { self.x }, if o.y > self.y { o.y } else { self.y }, if o.z > self.z { o.z } else { self.z })
+    }
     #[inline(always)]
     pub fn cross(self, o: V3) -> V3 {
         v3(self.y * o.z - self.z * o.y, self.z * o.x - self.x * o.z, self.x * o.y - self.y * o.x)
