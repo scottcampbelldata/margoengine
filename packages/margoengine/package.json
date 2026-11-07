@@ -1542,6 +1542,10 @@
       "types": "./dist/oit/exact.d.ts",
       "import": "./dist/oit/exact.js"
     },
+    "./oit/moments": {
+      "types": "./dist/oit/moments.d.ts",
+      "import": "./dist/oit/moments.js"
+    },
     "./physics": {
       "types": "./dist/physics.d.ts",
       "import": "./dist/physics.js"

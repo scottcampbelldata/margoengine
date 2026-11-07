@@ -3,7 +3,8 @@
 Import `margoengine/oit` from the `margoengine` package, or `@margoengine/oit` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Order-independent transparency for glTF Pro BLEND primitives and `@margoengine/materials` transparent meshes:
-weighted blended OIT (McGuire and Bavoil, JCGT 2013) by default, or exact per-pixel layers from
+weighted blended OIT (McGuire and Bavoil, JCGT 2013) by default, [moments](#moments-momentoit) from
+`margoengine/oit/moments` for a closer result, or exact per-pixel layers from
 [`margoengine/oit/exact`](#exact-layers-exactoit). Overlapping transparent parts (a translucent CAD housing over
 translucent and opaque gears) no longer pop as the camera orbits, because nothing depends on draw order any more. Core
 meshes are opaque; `addMesh` from `margoengine/oit/meshes` draws one see-through. WebGPU only.
@@ -96,6 +97,60 @@ Limits:
 - Colour is held in half floats: at most 65,504, 11 bits of precision.
 - It needs storage buffers in fragment shaders, so WebGPU only, and not compatibility mode: `setup` throws
   `'unsupported'` there; use `OIT`.
+- Transmission, custom blending and depth overrides keep the sorted path, as for `OIT`.
+
+## Moments (`MomentOIT`)
+
+`margoengine/oit/moments` sits between the two others: fixed memory like `OIT`, and much closer to the right answer once
+layers pile up, because a near layer really does dim what lies behind it.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {MomentOIT} from 'margoengine/oit/moments';
+import {Material, createMesh} from 'margoengine/materials';
+import {boxGeometry} from 'margoengine/geometry';
+const engine = await Engine.create(document.querySelector('canvas')!);
+
+const oit = MomentOIT.attach(engine);
+const glass = createMesh(engine, boxGeometry(1, 1, 1), new Material({color: '#9cc3e6', opacity: 0.4, transparent: true, doubleSided: true}));
+oit.add(glass);
+glass.root.setPosition([0, 0, 3]);
+oit.fit();                                                 // after moving models far: measures them again
+```
+
+How it works (Muenstermann, Krumpen, Klein and Peters, I3D 2018): the first draw of each model adds up, per pixel, the
+optical depth `-ln(1 - alpha)` of its layers and four power moments of their log-warped depth. The second draw shades
+each fragment and scales it by the transmittance in front of it, recovered from the moments by the Hamburger bound
+(Peters and Klein 2015). A composite then normalises the sum and lays it over the scene at the coverage
+`1 - exp(-optical depth)`. Every target is `rgba16float` or `r16float`, which blend on every WebGPU device, so no feature
+is needed; the bias is 5e-5 and a CPU model of random layers puts half sums within 0.5 of 255 of float sums at that bias.
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `depthRange` | the box round the added models | `[near, far]` view depth the moments resolve, 0 < near < far. Layers outside blend as if at the end they passed. |
+| `order` | 8 | Frame graph order, as for `OIT`. |
+
+Measured on an RTX A6000 (`npm run test:gpu --workspace packages/oit`), worst channel, 0-255, against sorted blending
+worked out by hand, at 1x and 4x MSAA:
+
+| Scene | Moments | Weighted |
+| --- | --- | --- |
+| Four layers at alphas 0.5, 0.4, 0.6, 0.5 | 6.24 | 13.26 |
+| Two dense layers at alpha 0.9 | 2.81 | 71.81 |
+| One layer | under 1.5 | under 1.5 |
+
+Adding models in another order moved no pixel in these runs. Time is not measured yet.
+
+Limits:
+
+- It is an approximation: a layer dims itself a little (a quarter of its own optical depth, the paper's overestimation)
+  and close layers blur together, so results sit between `OIT` and `ExactOIT`. Total coverage is exact.
+- Precision follows the range. The default box is measured once, reading every vertex, on the first frame after `add` or
+  `fit`: a model moved far from there falls outside and loses depth order until `fit()` runs (in the check, the error
+  more than doubles). Wide boxes with close layers cost accuracy too: on the CPU model a range 7 times the layers' depth
+  gave 16 where a close one gave 6.5 with a bias of 5e-4. `depthRange` sets it by hand.
+- Every model draws twice, and the second draw reads two more textures, which lowers the 16-texture budget of a material
+  to 14. Memory: 18 bytes per pixel, plus 72 under 4x MSAA.
 - Transmission, custom blending and depth overrides keep the sorted path, as for `OIT`.
 
 ## Hashed alpha

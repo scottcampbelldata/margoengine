@@ -8,6 +8,7 @@ import { Material, Texture, createMesh } from '../../materials/dist/index.js';
 import { OIT } from '../dist/index.js';
 import { addMesh } from '../dist/meshes.js';
 import { ExactOIT } from '../dist/exact.js';
+import { MomentOIT } from '../dist/moments.js';
 import { animatedTriangle } from '../../../tests/support/gltf-pro-fixture.js';
 
 // Opaque, BLEND, BLEND + transmission (keeps the sorted path) and BLEND + clearcoat (physical variant).
@@ -303,4 +304,48 @@ test('ExactOIT refuses settings it cannot keep', () => {
   for (const layers of [0, 33, 1.5, Number.NaN]) assert.throws(() => new ExactOIT({ layers }), RangeError);
   for (const pool of [0, -1, Number.POSITIVE_INFINITY]) assert.throws(() => new ExactOIT({ pool }), RangeError);
   assert.throws(() => new ExactOIT({ order: 0 }), RangeError);
+});
+
+test('MomentOIT: BLEND primitives draw twice, into the moments and then shaded by them, and a composite lays that over the scene', async () => {
+  const { engine, model, view, frame, id } = await scene(4),
+    oit = MomentOIT.attach(engine);
+  assert.throws(() => new MomentOIT().add(model), /attach/);
+  oit.add(model);
+  const log = frame(0),
+    list = passes(log).slice(2);
+  assert.deepEqual(
+    list.map((p) => p.label),
+    ['oit:moments', 'oit:shade', 'oit:composite'],
+  );
+  const readOnly = { view: id(view.c.depth), depthReadOnly: true, stencilReadOnly: true };
+  assert.equal(list[0].colorAttachments.length, 2);
+  assert.equal(list[1].colorAttachments.length, 1);
+  assert.deepEqual(list[0].depthStencilAttachment, readOnly);
+  assert.deepEqual(list[1].depthStencilAttachment, readOnly);
+  assert.equal(draws(log), 7, 'opaque + transmission (tint, then lit), then two BLEND primitives in each of two passes');
+  const formats = of(log, 'texture')
+    .map((e) => e[2])
+    .filter((t) => t.label?.startsWith('oit:'))
+    .map((t) => [t.format, t.sampleCount]);
+  assert.deepEqual(formats, [
+    ['rgba16float', 1],
+    ['r16float', 1],
+    ['rgba16float', 1],
+    ['rgba16float', 4],
+    ['r16float', 4],
+    ['rgba16float', 4],
+  ]);
+  const before = frame(1);
+  assert.equal(of(before, 'texture').filter((e) => e[2].label?.startsWith('oit:')).length, 0, 'targets are kept');
+  oit.dispose();
+  assert.equal(
+    passes(frame(2)).some((p) => p.label?.startsWith('oit:')),
+    false,
+    'dispose restores sorted blending',
+  );
+});
+
+test('MomentOIT refuses a depth range it cannot warp', () => {
+  for (const depthRange of [[0, 1], [2, 1], [1, 1], [-1, 2], [1, Number.POSITIVE_INFINITY]])
+    assert.throws(() => new MomentOIT({ depthRange }), RangeError);
 });

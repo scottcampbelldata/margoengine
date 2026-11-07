@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 9122757,
+  "total": 9126964,
   "history": [
     {
       "date": "2026-10-24",
@@ -2912,6 +2912,12 @@
       "commit": "e9f6a26f9",
       "reason": "new entry @margoengine/cutscene/shots: virtual camera shots with blends",
       "grew": 2
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "cc0242874",
+      "reason": "oit/moments entry",
+      "grew": 1
     }
   ],
   "items": {
@@ -3296,6 +3302,7 @@
     "@margoengine/oit": 3199,
     "@margoengine/oit/exact": 4537,
     "@margoengine/oit/meshes": 747,
+    "@margoengine/oit/moments": 4207,
     "@margoengine/physics": 16756,
     "@margoengine/physics2d": 7920,
     "@margoengine/pixel": 4664,

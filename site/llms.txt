@@ -66,7 +66,7 @@ Import the stage for a canvas, camera, controls and loading in a few lines (`imp
 - [@margoengine/sky](https://margoengine.com/llms/packages/sky.md): Procedural atmospheric skies, clouds, sun, moon, stars and weather (rain, snow, lightning).
 - [@margoengine/weather](https://margoengine.com/llms/packages/weather.md): Weather over time: a state machine with presets that blends rain, snow, hail, wind and lightning; a deterministic wind field; wet and snowy surface hooks in JavaScript…
 - [@margoengine/toon](https://margoengine.com/llms/packages/toon.md): Stepped diffuse shading and inverted-hull outlines.
-- [@margoengine/oit](https://margoengine.com/llms/packages/oit.md): Order-independent transparency for gltf-pro BLEND primitives and materials transparent meshes: weighted blending, or exact per-pixel layer lists, with no popping…
+- [@margoengine/oit](https://margoengine.com/llms/packages/oit.md): Order-independent transparency for gltf-pro BLEND primitives and materials transparent meshes: weighted blending, moment-based blending, or exact per-pixel layer lists…
 - [@margoengine/lod](https://margoengine.com/llms/packages/lod.md): Level of detail with hysteresis and screen-size switching for thousands of instances, plus GPU-baked octahedral imposters drawn in one instanced call per atlas.
 - [@margoengine/culling](https://margoengine.com/llms/packages/culling.md): GPU-driven static instances: frustum and Hi-Z occlusion culling in compute, order-preserving compaction and indirect draws, no per-part CPU work per frame.
 - [@margoengine/points](https://margoengine.com/llms/packages/points.md): Large point clouds (PointCloud, PointsMaterial) and instanced sprites (SpriteBatch, SpriteMaterial) for Margo Engine, WebGPU.
@@ -194,7 +194,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/sky API](https://margoengine.com/llms/api/sky.md): 11 entry points
 - [@margoengine/weather API](https://margoengine.com/llms/api/weather.md): 2 entry points
 - [@margoengine/toon API](https://margoengine.com/llms/api/toon.md): 1 entry point
-- [@margoengine/oit API](https://margoengine.com/llms/api/oit.md): 3 entry points
+- [@margoengine/oit API](https://margoengine.com/llms/api/oit.md): 4 entry points
 - [@margoengine/lod API](https://margoengine.com/llms/api/lod.md): 4 entry points
 - [@margoengine/culling API](https://margoengine.com/llms/api/culling.md): 7 entry points
 - [@margoengine/points API](https://margoengine.com/llms/api/points.md): 9 entry points

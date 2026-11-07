@@ -1001,7 +1001,7 @@
     "package": "@margoengine/oit",
     "version": "1.0.0",
     "published": false,
-    "description": "Order-independent transparency for gltf-pro BLEND primitives and materials transparent meshes: weighted blending, or exact per-pixel layer lists, with no popping between overlapping transparent parts.",
+    "description": "Order-independent transparency for gltf-pro BLEND primitives and materials transparent meshes: weighted blending, moment-based blending, or exact per-pixel layer lists, with no popping between overlapping transparent parts.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "oit",
     "install": "npm install @margoengine/core@1.0.0 @margoengine/oit@1.0.0",
