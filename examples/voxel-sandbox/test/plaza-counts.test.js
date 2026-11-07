@@ -120,7 +120,14 @@ function cellsNear(shard, c, count) {
   throw new Error(`Only ${found.length} cells near ${[x, y, z]}`);
 }
 // Stamps an ore in both worlds, as the generator would have.
-function stamp(shard, clients, cell, state) {
+// Puts `state` at `cell` in the server's world and in each client's copy. It waits until every client holds the cell's
+// chunk first: setBlock adds a chunk that is missing, and the server's copy arriving after that finds one already there.
+async function stamp(shard, clients, cell, state) {
+  const [cx, cy, cz] = cell.map((v) => v >> 5);
+  assert.ok(
+    await drive(clients, () => clients.every((c) => c.world.getChunk(cx, cy, cz))),
+    `every client holds chunk ${cx},${cy},${cz}`,
+  );
   shard.server.world.setBlock(...cell, state);
   for (const c of clients) c.world.setBlock(...cell, state);
 }
@@ -143,7 +150,7 @@ test('one player: digging an ore counts and tells the page; placing without a co
   assert.equal(shard.server.world.getBlock(...spot), 0);
   assert.equal(tinOf(a), 0);
 
-  stamp(shard, [a], ore, TIN);
+  await stamp(shard, [a], ore, TIN);
   assert.ok(a.client.edit(...ore, 0));
   assert.ok(await drive([a], () => tinOf(a) === 1), 'the dig came back as a count');
   assert.equal(shard.server.world.getBlock(...ore), 0);
@@ -163,7 +170,7 @@ test('a placed rare block breaks for its owner only; another player is refused a
     a = await player(shard, url, '203.0.113.1'),
     b = await player(shard, url, '203.0.113.2'),
     [ore, spot] = cellsNear(shard, a, 2);
-  stamp(shard, [a, b], ore, TIN);
+  await stamp(shard, [a, b], ore, TIN);
   a.client.edit(...ore, 0);
   assert.ok(await drive([a, b], () => tinOf(a) === 1));
   a.client.edit(...spot, TIN);
@@ -181,13 +188,45 @@ test('a placed rare block breaks for its owner only; another player is refused a
   b.client.close();
 });
 
+test('stamp waits for a client still loading: every chunk in a client world is one the server sent', async (t) => {
+  const { shard, url } = await startShard(t),
+    a = await player(shard, url, '203.0.113.1'),
+    [ore] = cellsNear(shard, a, 1),
+    [cx, cy, cz] = ore.map((v) => v >> 5),
+    // Connected, and nothing received yet: the late tab of the race seen under load.
+    conn = await connectWebSocket(url, { headers: { 'X-Real-IP': '203.0.113.2' } }),
+    world = new VoxelWorld({ blocks }),
+    client = new VoxelNetClient(
+      world,
+      { send: (d) => conn.send(d), close: () => conn.close() },
+      { view: 2, name: 'Amber Lantern' },
+    ),
+    late = { client, conn, world },
+    errors = [];
+  let fromServer = false;
+  conn.onmessage = (d) => client.receive(d);
+  client.onError = (error) => errors.push(error);
+  // A chunk the client put in its world is one whose message it had already counted; one setBlock made is not.
+  world.onChunk((x, y, z, chunk) => {
+    if (chunk && x === cx && y === cy && z === cz && client.stats.chunks > 0) fromServer = true;
+  });
+  assert.equal(world.getChunk(cx, cy, cz), undefined);
+  await stamp(shard, [a, late], ore, TIN);
+  assert.equal(world.getBlock(...ore) & 0xffff, TIN);
+  assert.ok(await drive([late], () => errors.length > 0 || fromServer), 'the server sent the chunk, or it failed');
+  assert.deepEqual(errors, []);
+  assert.equal(fromServer, true);
+  a.client.close();
+  client.close();
+});
+
 test('same address, same counts, on every tab; another address has its own', async (t) => {
   const { shard, url } = await startShard(t),
     a = await player(shard, url, '203.0.113.1'),
     tab = await player(shard, url, '203.0.113.1'),
     other = await player(shard, url, '203.0.113.2'),
     [ore] = cellsNear(shard, a, 1);
-  stamp(shard, [a, tab, other], ore, TIN);
+  await stamp(shard, [a, tab, other], ore, TIN);
   a.client.edit(...ore, 0);
   assert.ok(await drive([a, tab, other], () => tinOf(a) === 1 && tinOf(tab) === 1), 'both tabs told');
   await wait(100);
@@ -267,7 +306,7 @@ test('a clean restart keeps counts, owners and dug cells, and the same address g
     a = await player(first.shard, first.url, '203.0.113.1'),
     [ore1, ore2, spot] = cellsNear(first.shard, a, 3);
   for (const ore of [ore1, ore2]) {
-    stamp(first.shard, [a], ore, TIN);
+    await stamp(first.shard, [a], ore, TIN);
     const want = tinOf(a) + 1;
     a.client.edit(...ore, 0);
     assert.ok(await drive([a], () => tinOf(a) === want));
@@ -297,7 +336,7 @@ test('a crash: at most the last save of counts is lost, a placed block the old s
     first = await startShard(t, { dataDir: dir, countsSaveMs: 30 }),
     a = await player(first.shard, first.url, '203.0.113.1'),
     [ore, spot] = cellsNear(first.shard, a, 2);
-  stamp(first.shard, [a], ore, TIN);
+  await stamp(first.shard, [a], ore, TIN);
   a.client.edit(...ore, 0);
   assert.ok(await drive([a], () => tinOf(a) === 1));
   a.client.edit(...spot, TIN);
@@ -327,7 +366,7 @@ test('a rollback gives back what it removes, keeps what it restores, and dug cel
     cells = cellsNear(shard, a, 3),
     [ore, keep, gone] = cells,
     area = { cx: keep[0] >> 5, cz: keep[2] >> 5 };
-  stamp(shard, [a], ore, TIN);
+  await stamp(shard, [a], ore, TIN);
   a.client.edit(...ore, 0);
   assert.ok(await drive([a], () => tinOf(a) === 1));
   a.client.edit(...keep, TIN);
@@ -375,7 +414,7 @@ test('a full world: every player has its counts, the next is refused, and a find
   assert.notEqual(await closed, 1000, 'the world is full');
   const [a] = players,
     [ore] = cellsNear(shard, a, 1);
-  stamp(shard, players, ore, TIN);
+  await stamp(shard, players, ore, TIN);
   a.client.edit(...ore, 0);
   assert.ok(await drive(players, () => tinOf(a) === 1));
   for (const c of players) c.client.close();
@@ -388,7 +427,7 @@ test('a world end sends each player its last counts before 1001; the counts die 
     b = await player(shard, url, '203.0.113.2'),
     [ore] = cellsNear(shard, a, 1),
     identity = server(shard, a).identity;
-  stamp(shard, [a, b], ore, TIN);
+  await stamp(shard, [a, b], ore, TIN);
   a.client.edit(...ore, 0);
   assert.ok(await drive([a, b], () => tinOf(a) === 1));
   assert.ok(
@@ -440,7 +479,7 @@ test('nothing the client gets, and nothing the shard logs or hands the router, h
     seen.push(Buffer.from(d).toString('latin1'));
     a.client.receive(d);
   };
-  stamp(shard, [a], ore, TIN);
+  await stamp(shard, [a], ore, TIN);
   a.client.edit(...ore, 0);
   assert.ok(await drive([a], () => tinOf(a) === 1));
   const handed = JSON.stringify({ world: shard.world, found: shard.found }),
@@ -457,7 +496,7 @@ test('a test stops its shard before removing its folder, so the shard writes its
     const { shard, url } = await startShard(inner, { dataDir: dir }),
       a = await player(shard, url, '203.0.113.1'),
       [ore] = cellsNear(shard, a, 1);
-    stamp(shard, [a], ore, TIN);
+    await stamp(shard, [a], ore, TIN);
     a.client.edit(...ore, 0);
     assert.ok(await drive([a], () => tinOf(a) === 1));
     a.client.close();
