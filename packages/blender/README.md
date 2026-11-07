@@ -61,7 +61,20 @@ The exporter uses Blender native bulk reads and bundled NumPy, with Python 3.11+
 
 Supported materials: direct Principled BSDF; constant metallic/roughness; constant or direct sRGB image base color and emission; tangent-space Non-Color normal maps; constant alpha or the base image's alpha; active UV map; repeat/clamp wrapping and linear/nearest filtering. Embedded images use RGBA8 PNG. Each image is limited to 4096 × 4096, all decoded images to 256 MiB, the file to 256 MiB, and the manifest to 1 MiB. Export writes atomically, so a failed export preserves an existing asset.
 
-Unsupported inputs fail by material/object name: procedural node graphs, textured metallic/roughness, transmission, variable IOR, coat, sheen, subsurface, HDR textures/emission and custom texture mappings. Geometry Nodes mesh outputs/mesh instances are evaluated; curves, points and volumes must be converted to meshes first. Node graph baking and live link are subsequent milestones. Emission stays separate from optional tone mapping.
+Any other surface material is baked at export (next section). Unsupported inputs fail by material/object name: transmission, variable IOR, coat, sheen, subsurface (constant or linked), volume and displacement outputs, HDR textures/emission, and any material that needs baking when baking is off. Geometry Nodes mesh outputs/mesh instances are evaluated; curves, points and volumes must be converted to meshes first. Live link is a subsequent milestone. Emission stays separate from optional tone mapping.
+
+## Node materials: baked at export
+
+A material outside the direct subset above (a procedural node graph, textured metallic or roughness, an image through a custom mapping, or another surface shader such as Diffuse BSDF or a Mix Shader) is baked with Cycles on the CPU when it is exported: each Principled input that is linked (base colour, alpha, metallic, roughness, normal, emission) bakes to an image on the object's active UV map, packed as glTF expects (roughness in green, metallic in blue), and the constants stay factors. Another surface shader bakes Cycles' diffuse colour and roughness passes (and its normal and emission when it has them) and exports as a dielectric. The images are ordinary embedded PNG textures, so the engine needs no extra code or bytes. Baking leaves the scene as it was: render engine, selection, nodes and images.
+
+```python
+import bpy
+
+# In Blender's Python console or a script: the File > Export > Margo dialog has the same Bake size option.
+bpy.ops.export_scene.margo(filepath="//scene.margo", bake_size=1024)
+```
+
+`bake_size` is the side of each baked image in pixels: 16 to 4096, default 1024; `0` turns baking off, so such a material fails by name as before. Each baked material is baked once per mesh that uses it (its UV layout); the mesh needs an active UV map and must be a real object in the view layer. A real Blender 5.2.3 LTS export of a procedural Principled material matches its node maths at every texel within the sampling and rounding bound (LIM-401; `tests/bake.test.js`).
 
 ## Characters: armatures, skins, shape keys and actions
 
@@ -131,7 +144,7 @@ npm run modern:test:interop:packages
 npm run measure:size
 ```
 
-Set `MARGO_BLENDER` to a Blender executable when running `modern:test:blender` to install/enable/export/disable the packaged ZIP in a disposable background profile, then generate and check real exporter fixtures (including the animated rig of `tools/blender-addon/tests/blender_anim.py`, whose committed output and Blender truth `tests/anim.test.js` checks on every run). Without it (as in the CI workflow), the run checks the Python-written fixture, rendered textured pixels, shared GPU geometry, shadow/SSAO compatibility, device restoration and rollback. The Python tests also verify the checked-in fixture matches the writer. The package is optional and decode-only imports discard the PBR renderer.
+Set `MARGO_BLENDER` to a Blender executable when running `modern:test:blender` to install/enable/export/disable the packaged ZIP in a disposable background profile, then generate and check real exporter fixtures (including the animated rig of `tools/blender-addon/tests/blender_anim.py`, whose committed output and Blender truth `tests/anim.test.js` checks on every run, and a fresh bake of `tools/blender-addon/tests/blender_bake.py` checked against its node maths). Without it (as in the CI workflow), the run checks the Python-written fixture, rendered textured pixels, shared GPU geometry, shadow/SSAO compatibility, device restoration and rollback. The Python tests also verify the checked-in fixture matches the writer. The package is optional and decode-only imports discard the PBR renderer.
 
 The package checks compile packed consumers and the first README example under strict NodeNext and Bundler resolution. Isolation tests build both core-only and core + stage entries without Blender/PBR modules. Browser tests track every buffer created by `loadMargo` and require exactly one `destroy()` per buffer when the stage unmounts.
 

@@ -10,3 +10,6 @@
 - `components.margo`: exported for this project by Blender 5.2.3 LTS from
   `tools/blender-addon/tests/blender_components.py`: a level whose objects carry `margo:` component tags (Apache-2.0, as
   this repository). Regenerate the same way and copy the file here.
+- `bake.margo`: exported for this project by Blender 5.2.3 LTS from `tools/blender-addon/tests/blender_bake.py`: a
+  procedural Principled material and a Diffuse BSDF baked to 32 x 32 images at export, beside a direct Principled
+  plane (Apache-2.0, as this repository). Regenerate the same way and copy the file here.

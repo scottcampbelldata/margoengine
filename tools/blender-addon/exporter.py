@@ -1,4 +1,4 @@
-"""Static evaluated meshes and the supported Principled BSDF subset."""
+"""Static evaluated meshes, the direct Principled BSDF subset and baked node materials."""
 from array import array
 import hashlib
 import math
@@ -8,17 +8,29 @@ import bpy
 import numpy as np
 from mathutils import Matrix, Vector
 from .animation import animated, export_animated
+from .bake import bake_material
 from .writer import png, write
 
 
-def export_scene(context, path):
+class NeedsBake(ValueError):
+    """A node graph the direct Principled subset cannot carry; baking turns it into images."""
+
+
+def export_scene(context, path, bake_size=1024):
+    """Writes the visible scene to `path` and returns the file size. Materials outside the direct Principled subset
+    (procedural node graphs, textured metallic or roughness, other shaders) are baked with Cycles to bake_size x
+    bake_size images on each object's active UV map; bake_size=0 turns baking off, so they fail by name instead."""
+    if bake_size and not 16 <= bake_size <= 4096:
+        raise ValueError("bake_size must be 0 (off) or 16 to 4096 pixels")
     # Blender Z-up to Margo/glTF Y-up; a proper rotation preserves winding.
     basis = Matrix(((1, 0, 0, 0), (0, 0, 1, 0), (0, -1, 0, 0), (0, 0, 0, 1)))
     nodes, geometry, materials, textures, images, samplers = [], [], [], [], [], []
     material_ids, texture_ids, mesh_ids, mesh_cache = {}, {}, {}, {}
+    baked = {}  # (material key, original mesh name) -> bake_material() result
 
-    def failure(material, detail):
-        raise ValueError(f"Material '{material.name}': {detail}")
+    def failure(material, detail, bake=False):
+        hint = "; it needs baking, so export with baking on" if bake else ""
+        raise (NeedsBake if bake else ValueError)(f"Material '{material.name}': {detail}{hint}")
 
     def pixels(image):
         width, height = image.size
@@ -32,7 +44,8 @@ def export_scene(context, path):
             raise ValueError(f"Image '{image.name}': non-finite pixels")
         return width, height, values
 
-    def texture(image, node, color=False):
+    def texture(image, node, color=False, dry=False):
+        """The texture index of an image node's image; `dry` only validates (for the bake pre-pass)."""
         color_space = image.colorspace_settings.name
         if color and color_space != "sRGB" or not color and color_space not in {"Non-Color", "Raw"}:
             raise ValueError(f"Image '{image.name}': use {'sRGB' if color else 'Non-Color'} color space")
@@ -41,6 +54,8 @@ def export_scene(context, path):
             return texture_ids[key]
         if node.extension not in {"REPEAT", "EXTEND"} or node.interpolation not in {"Linear", "Closest"}:
             raise ValueError(f"Image '{image.name}': unsupported wrapping/filtering")
+        if dry:
+            return -1
         width, height, values = pixels(image)
         rgba = bytearray(width * height * 4)
         for y in range(height):
@@ -60,94 +75,162 @@ def export_scene(context, path):
         textures.append({"source": image_id, "sampler": sampler})
         return texture_ids[key]
 
+    def baked_texture(values, color):
+        """An embedded PNG of a baked float image (Blender's bottom-up rows), sRGB-encoded when it holds colour."""
+        height, width = values.shape[:2]
+        rgba = np.clip(values[::-1], 0, 1)
+        if color:
+            rgb = rgba[..., :3]
+            rgba[..., :3] = np.where(rgb <= 0.0031308, rgb * 12.92, 1.055 * np.power(rgb, 1 / 2.4) - 0.055)
+        images.append(png(width, height, np.round(rgba * 255).astype(np.uint8).tobytes()))
+        samplers.append({"wrapS": 10497, "wrapT": 10497, "magFilter": 9729, "minFilter": 9729})
+        textures.append({"source": len(images) - 1, "sampler": len(samplers) - 1})
+        return len(textures) - 1
+
     def image_node(material, socket):
         if len(socket.links) != 1:
             failure(material, f"unsupported links on {socket.name}")
         link = socket.links[0]
         node = link.from_node
         if node.type != "TEX_IMAGE" or not node.image or node.projection != "FLAT" or link.from_socket.name != "Color":
-            failure(material, f"{socket.name} must use a direct Image Texture Color output")
+            failure(material, f"{socket.name} must use a direct Image Texture Color output", bake=True)
         vector = node.inputs["Vector"]
         if vector.is_linked:
             source = vector.links[0]
             if source.from_node.type != "TEX_COORD" or source.from_socket.name != "UV":
-                failure(material, "texture mapping must use the active UV map")
+                failure(material, "texture mapping must use the active UV map", bake=True)
         return node
 
-    def material_id(material):
-        key = (material.name_full, material.library.filepath if material.library else "") if material else None
-        if key in material_ids:
-            return material_ids[key]
+    def material_key(material):
+        return (material.name_full, material.library.filepath if material.library else "") if material else None
+
+    def direct(material, dry=False):
+        """The glTF material of a direct Principled BSDF; raises NeedsBake for a node graph it cannot carry."""
         result = {"doubleSided": True, "pbrMetallicRoughness": {"baseColorFactor": [0.8, 0.8, 0.8, 1], "metallicFactor": 0, "roughnessFactor": 0.5}}
-        if material:
-            if bpy.app.version < (5, 0, 0) and not material.use_nodes:
-                failure(material, "enable nodes and use Principled BSDF")
-            outputs = [n for n in material.node_tree.nodes if n.type == "OUTPUT_MATERIAL" and n.is_active_output]
-            if len(outputs) != 1 or not outputs[0].inputs["Surface"].is_linked:
-                failure(material, "missing active surface output")
-            output = outputs[0]
-            shader = output.inputs["Surface"].links[0].from_node
-            if shader.type != "BSDF_PRINCIPLED" or output.inputs["Volume"].is_linked or output.inputs["Displacement"].is_linked:
-                failure(material, "only a direct Principled surface without volume/displacement is supported")
-            supported = {"Base Color", "Metallic", "Roughness", "Alpha", "Normal", "Emission Color", "Emission Strength"}
-            defaults = {"IOR": 1.5, "Transmission Weight": 0, "Coat Weight": 0, "Sheen Weight": 0, "Subsurface Weight": 0, "Anisotropic IOR Level": 0, "Specular IOR Level": 0.5, "Specular Tint": (1, 1, 1, 1), "Coat Tint": (1, 1, 1, 1)}
-            for socket in shader.inputs:
-                if socket.is_linked and socket.name not in supported:
-                    failure(material, f"unsupported linked input {socket.name}")
-                if socket.name in defaults:
-                    expected = defaults[socket.name]
-                    value = socket.default_value
-                    matches = abs(value - expected) < 1e-5 if isinstance(expected, (int, float)) else all(abs(a - b) < 1e-5 for a, b in zip(value, expected))
-                    if not matches:
-                        failure(material, f"unsupported {socket.name}; expected {expected}")
-            pbr = result["pbrMetallicRoughness"]
-            base = shader.inputs["Base Color"]
-            # Principled RGB is linear; viewport diffuse_color can differ on imported materials.
-            pbr["baseColorFactor"] = list(base.default_value)
-            pbr["baseColorFactor"][3] = shader.inputs["Alpha"].default_value
-            for name, factor_key in (("Metallic", "metallicFactor"), ("Roughness", "roughnessFactor")):
-                socket = shader.inputs[name]
-                if socket.is_linked:
-                    failure(material, f"textured {name} requires baking to a packed metallic-roughness map; v1 exports constants")
-                pbr[factor_key] = socket.default_value
-            if base.is_linked:
-                node = image_node(material, base)
-                pbr["baseColorTexture"] = {"index": texture(node.image, node, color=True)}
-                pbr["baseColorFactor"][:3] = [1, 1, 1]
-            alpha = shader.inputs["Alpha"]
-            if alpha.is_linked:
-                link = alpha.links[0]
-                if not base.is_linked or link.from_node != base.links[0].from_node or link.from_socket.name != "Alpha":
-                    failure(material, "Alpha must come from the base color image")
-                pbr["baseColorFactor"][3] = 1
-            if alpha.is_linked or pbr["baseColorFactor"][3] < 1:
-                result["alphaMode"] = "BLEND"
-            normal = shader.inputs["Normal"]
-            if normal.is_linked:
-                normal_node = normal.links[0].from_node
-                if normal_node.type != "NORMAL_MAP" or normal_node.space != "TANGENT" or normal_node.uv_map or normal_node.inputs["Strength"].is_linked:
-                    failure(material, "Normal requires tangent-space Normal Map using the active UV map")
-                image = image_node(material, normal_node.inputs["Color"])
-                result["normalTexture"] = {"index": texture(image.image, image), "scale": normal_node.inputs["Strength"].default_value}
-            emission = shader.inputs["Emission Color"]
-            strength = shader.inputs["Emission Strength"]
-            if strength.is_linked:
-                failure(material, "Emission Strength must be constant")
-            factor = [v * strength.default_value for v in emission.default_value[:3]]
-            if emission.is_linked:
-                node = image_node(material, emission)
-                result["emissiveTexture"] = {"index": texture(node.image, node, color=True)}
-                factor = [strength.default_value] * 3
-            if any(v < 0 or v > 1 for v in factor):
-                failure(material, "HDR emission is unsupported; emissive factors must be in [0,1]")
-            result["emissiveFactor"] = factor
-            result["name"] = material.name
+        if not material:
+            return result
+        if bpy.app.version < (5, 0, 0) and not material.use_nodes:
+            failure(material, "enable nodes and use Principled BSDF")
+        outputs = [n for n in material.node_tree.nodes if n.type == "OUTPUT_MATERIAL" and n.is_active_output]
+        if len(outputs) != 1 or not outputs[0].inputs["Surface"].is_linked:
+            failure(material, "missing active surface output")
+        output = outputs[0]
+        shader = output.inputs["Surface"].links[0].from_node
+        if output.inputs["Volume"].is_linked or output.inputs["Displacement"].is_linked:
+            failure(material, "only a surface without volume/displacement is supported")
+        if shader.type != "BSDF_PRINCIPLED":
+            failure(material, f"the surface is a {shader.bl_label} node, not a direct Principled BSDF", bake=True)
+        supported = {"Base Color", "Metallic", "Roughness", "Alpha", "Normal", "Emission Color", "Emission Strength"}
+        defaults = {"IOR": 1.5, "Transmission Weight": 0, "Coat Weight": 0, "Sheen Weight": 0, "Subsurface Weight": 0, "Anisotropic IOR Level": 0, "Specular IOR Level": 0.5, "Specular Tint": (1, 1, 1, 1), "Coat Tint": (1, 1, 1, 1)}
+        for socket in shader.inputs:
+            if socket.is_linked and socket.name not in supported:
+                failure(material, f"unsupported linked input {socket.name}")
+            if socket.name in defaults:
+                expected = defaults[socket.name]
+                value = socket.default_value
+                matches = abs(value - expected) < 1e-5 if isinstance(expected, (int, float)) else all(abs(a - b) < 1e-5 for a, b in zip(value, expected))
+                if not matches:
+                    failure(material, f"unsupported {socket.name}; expected {expected}")
+        pbr = result["pbrMetallicRoughness"]
+        base = shader.inputs["Base Color"]
+        # Principled RGB is linear; viewport diffuse_color can differ on imported materials.
+        pbr["baseColorFactor"] = list(base.default_value)
+        pbr["baseColorFactor"][3] = shader.inputs["Alpha"].default_value
+        for name, factor_key in (("Metallic", "metallicFactor"), ("Roughness", "roughnessFactor")):
+            socket = shader.inputs[name]
+            if socket.is_linked:
+                failure(material, f"textured {name} needs a packed metallic-roughness map", bake=True)
+            pbr[factor_key] = socket.default_value
+        if base.is_linked:
+            node = image_node(material, base)
+            pbr["baseColorTexture"] = {"index": texture(node.image, node, color=True, dry=dry)}
+            pbr["baseColorFactor"][:3] = [1, 1, 1]
+        alpha = shader.inputs["Alpha"]
+        if alpha.is_linked:
+            link = alpha.links[0]
+            if not base.is_linked or link.from_node != base.links[0].from_node or link.from_socket.name != "Alpha":
+                failure(material, "Alpha must come from the base color image", bake=True)
+            pbr["baseColorFactor"][3] = 1
+        if alpha.is_linked or pbr["baseColorFactor"][3] < 1:
+            result["alphaMode"] = "BLEND"
+        normal = shader.inputs["Normal"]
+        if normal.is_linked:
+            normal_node = normal.links[0].from_node
+            if normal_node.type != "NORMAL_MAP" or normal_node.space != "TANGENT" or normal_node.uv_map or normal_node.inputs["Strength"].is_linked:
+                failure(material, "Normal requires tangent-space Normal Map using the active UV map", bake=True)
+            image = image_node(material, normal_node.inputs["Color"])
+            result["normalTexture"] = {"index": texture(image.image, image, dry=dry), "scale": normal_node.inputs["Strength"].default_value}
+        emission = shader.inputs["Emission Color"]
+        strength = shader.inputs["Emission Strength"]
+        if strength.is_linked:
+            failure(material, "Emission Strength must be constant", bake=True)
+        factor = [v * strength.default_value for v in emission.default_value[:3]]
+        if emission.is_linked:
+            node = image_node(material, emission)
+            result["emissiveTexture"] = {"index": texture(node.image, node, color=True, dry=dry)}
+            factor = [strength.default_value] * 3
+        if any(v < 0 or v > 1 for v in factor):
+            failure(material, "HDR emission is unsupported; emissive factors must be in [0,1]")
+        result["emissiveFactor"] = factor
+        result["name"] = material.name
+        return result
+
+    needs = {}
+
+    def needs_baking(material):
+        """True when only baking can export `material`; any other error is left for the export itself to raise."""
+        key = material_key(material)
+        if key not in needs:
+            try:
+                direct(material, dry=True)
+                needs[key] = False
+            except NeedsBake:
+                needs[key] = True
+            except ValueError:
+                needs[key] = False
+        return needs[key]
+
+    def baked_material(material, bake):
+        """The glTF material of a bake_material() result: its images as embedded textures, its constants as factors."""
+        factors = bake["factors"]
+        pbr = {"baseColorFactor": list(factors["base"]), "metallicFactor": factors["metallic"], "roughnessFactor": factors["roughness"]}
+        result = {"doubleSided": True, "pbrMetallicRoughness": pbr, "emissiveFactor": list(factors["emissive"]), "name": material.name}
+        if bake["base"] is not None:
+            pbr["baseColorTexture"] = {"index": baked_texture(bake["base"], True)}
+            pbr["baseColorFactor"] = [1, 1, 1, 1]
+        if bake["metal_rough"] is not None:
+            pbr["metallicRoughnessTexture"] = {"index": baked_texture(bake["metal_rough"], False)}
+            pbr["metallicFactor"] = pbr["roughnessFactor"] = 1
+        if bake["normal"] is not None:
+            result["normalTexture"] = {"index": baked_texture(bake["normal"], False), "scale": 1}
+        if bake["emission"] is not None:
+            if bake["emission"][..., :3].max() > 1 + 1 / 255:
+                failure(material, "HDR emission is unsupported; baked emission must stay in [0,1]")
+            result["emissiveTexture"] = {"index": baked_texture(bake["emission"], True)}
+            result["emissiveFactor"] = [1, 1, 1]
+        # Texels no face covers (gaps between UV islands) are never drawn, so they do not make the material blend.
+        covered = bake["base"][..., 3][bake["coverage"]] if bake["base"] is not None else None
+        alpha = covered.min() if covered is not None and covered.size else pbr["baseColorFactor"][3]
+        if alpha < 1 - 0.5 / 255:
+            result["alphaMode"] = "BLEND"
+        return result
+
+    def material_id(material, owner=None):
+        """The material index of `material` on the object `owner`; a baked material is per mesh (its UV layout)."""
+        key = material_key(material)
+        bake_key = (key, owner.original.data.name) if owner is not None and material else None
+        if bake_key not in baked:
+            bake_key = None
+        id_key = ("baked",) + bake_key if bake_key else key
+        if id_key in material_ids:
+            return material_ids[id_key]
+        result = baked_material(material, baked[bake_key]) if bake_key else direct(material)
         for value in result["pbrMetallicRoughness"]["baseColorFactor"] + [result["pbrMetallicRoughness"]["metallicFactor"], result["pbrMetallicRoughness"]["roughnessFactor"]]:
             if not math.isfinite(value) or not 0 <= value <= 1:
                 raise ValueError("PBR material factors must be finite and in [0,1]")
-        material_ids[key] = len(materials)
+        material_ids[id_key] = len(materials)
         materials.append(result)
-        return material_ids[key]
+        return material_ids[id_key]
 
     def pack(obj, mesh, slots, extra=None, rest=None):
         """Corner-split, deduplicated primitives per material slot; `extra` adds per-loop columns kept with each vertex."""
@@ -217,8 +300,9 @@ def export_scene(context, path):
             unique = corners[first[order]]
             vertices = np.ascontiguousarray(unique[:, :stride // 4])
             mat = slots[slot] if slot < len(slots) else None
-            mid = material_id(mat)
-            if materials[mid].get("pbrMetallicRoughness", {}).get("baseColorTexture") or materials[mid].get("normalTexture") or materials[mid].get("emissiveTexture"):
+            mid = material_id(mat, obj)
+            pbr = materials[mid]["pbrMetallicRoughness"]
+            if pbr.get("baseColorTexture") or pbr.get("metallicRoughnessTexture") or materials[mid].get("normalTexture") or materials[mid].get("emissiveTexture"):
                 if not uv_layer:
                     raise ValueError(f"Object '{obj.name}': textured material requires an active UV map")
             bounds = vertices[:, :3].min(axis=0).tolist() + vertices[:, :3].max(axis=0).tolist()
@@ -273,12 +357,36 @@ def export_scene(context, path):
             result[key] = value
         return result
 
+    def exported(instance):
+        """True for a visible mesh instance, the only kind the export writes."""
+        obj = instance.object
+        visible = instance.parent.original if instance.is_instance and instance.parent else obj.original
+        return obj.type == "MESH" and instance.show_self and visible.visible_get(view_layer=context.view_layer)
+
+    if bake_size:
+        # Bake first: baking changes the scene, so it never runs while the depsgraph's instances are iterated.
+        pending = {}
+        for instance in depsgraph.object_instances:
+            if not exported(instance):
+                continue
+            obj = instance.object
+            used = np.zeros(len(obj.data.polygons), dtype=np.int32)
+            obj.data.polygons.foreach_get("material_index", used)
+            for index in np.unique(used).tolist():
+                material = obj.material_slots[index].material if index < len(obj.material_slots) else None
+                if material and needs_baking(material):
+                    # Bake the original material: the evaluated copy is rebuilt from it whenever the scene updates.
+                    pending.setdefault((material_key(material), obj.original.data.name), (obj.original, material.original))
+        for key, (owner, material) in pending.items():
+            baked[key] = bake_material(context, owner, material, bake_size)
+        if pending:
+            depsgraph = context.evaluated_depsgraph_get()
+
     node_of = NodeOf()
     moving = []
     for instance in depsgraph.object_instances:
         obj = instance.object
-        visible = instance.parent.original if instance.is_instance and instance.parent else obj.original
-        if obj.type != "MESH" or not instance.show_self or not visible.visible_get(view_layer=context.view_layer):
+        if not exported(instance):
             continue
         if animated(obj.original):
             if instance.is_instance:

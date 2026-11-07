@@ -80,6 +80,34 @@ if (process.env.MARGO_BLENDER) {
     ],
     { stdio: "inherit" },
   );
+  execFileSync(
+    process.env.MARGO_BLENDER,
+    [
+      "--background",
+      "--factory-startup",
+      "--python-exit-code",
+      "1",
+      "--python",
+      "tools/blender-addon/tests/blender_bake.py",
+      "--",
+      "test-results/blender/bake",
+    ],
+    { stdio: "inherit" },
+  );
+  const { bakeErrors } = await import("../packages/blender/tests/bake-truth.js");
+  const fresh = await bakeErrors(
+    decodeMargo(await readFile("test-results/blender/bake/bake.margo")),
+  );
+  for (const channel of ["r", "g", "b"])
+    assert.ok(
+      fresh.errors[channel] <= fresh.bounds.color,
+      `Blender's fresh bake differs from the node maths in ${channel}: ${JSON.stringify(fresh)}`,
+    );
+  for (const channel of ["roughness", "metallic"])
+    assert.ok(
+      fresh.errors[channel] <= fresh.bounds.linear,
+      `Blender's fresh bake differs from the node maths in ${channel}: ${JSON.stringify(fresh)}`,
+    );
   const { margoComponents } =
     await import("../packages/blender/dist/components.js");
   assert.deepEqual(
@@ -566,8 +594,84 @@ try {
   assert.deepEqual(components.cleaned, ["Sun", "Pad"]);
   results.push({ components });
 
+  // Node graph baking (real Blender 5.2.3 export): the baked base colour and metallic-roughness images draw. Seen
+  // from straight above, the procedural plane's baked red (u) rises from left to right, the baked Diffuse BSDF
+  // draws blue like its colour (0.2, 0.5, 0.8) and the direct Principled plane red-brown like (0.6, 0.3, 0.1).
+  await page.route("**/bake.margo", async (route) =>
+    route.fulfill({
+      body: await readFile("packages/blender/tests/fixtures/bake.margo"),
+      contentType: "application/octet-stream",
+    }),
+  );
+  const bakedShots = await page.evaluate(async () => {
+    const { Engine } = await import("/packages/core/dist/index.js");
+    const { loadMargo } = await import("/packages/blender/dist/index.js");
+    const { waitForPipelines } = await import("/scripts/support/gpu-ready.js");
+    const canvas = document.createElement("canvas");
+    canvas.style.cssText = "width:256px;height:256px";
+    document.body.append(canvas);
+    const engine = await Engine.create(canvas, {
+      backend: "webgpu",
+      capacity: 16,
+    });
+    engine.gpu.pushErrorScope("validation");
+    const model = await loadMargo(engine, "/bake.margo");
+    const shots = {};
+    // Blender x -3, 0 and 3 (Procedural, Painted, Plain); Blender +Y (the planes' +v) is the engine's -Z.
+    for (const [name, x] of [["Procedural", -3], ["Painted", 0], ["Plain", 3]]) {
+      engine.camera.position = [x, 2.5, 0];
+      engine.camera.target = [x, 0, 0];
+      engine.camera.up = [0, 0, -1];
+      await waitForPipelines(async () => {
+        engine.render({ culling: false });
+        await engine.gpu.queue.onSubmittedWorkDone();
+      });
+      shots[name] = canvas.toDataURL();
+    }
+    const validation = (await engine.gpu.popErrorScope())?.message ?? null;
+    model.destroy();
+    engine.dispose();
+    canvas.remove();
+    return { shots, validation };
+  });
+  assert.equal(bakedShots.validation, null);
+  const shot = async (name) => {
+    const bytes = Buffer.from(bakedShots.shots[name].split(",")[1], "base64");
+    await writeFile(`test-results/blender/bake-${name}.png`, bytes);
+    return decodePNG(bytes);
+  };
+  /** Mean RGB of the shot over a box given in fractions of its width and height. */
+  const mean = (image, x0, x1, y0, y1) => {
+    const sum = [0, 0, 0];
+    let count = 0;
+    for (let y = Math.round(y0 * image.height); y < Math.round(y1 * image.height); y++)
+      for (let x = Math.round(x0 * image.width); x < Math.round(x1 * image.width); x++, count++)
+        for (let c = 0; c < 3; c++) sum[c] += image.data[(y * image.width + x) * 4 + c];
+    return sum.map((s) => s / count);
+  };
+  // The 2 m plane fills the middle 69% of a 60-degree view from 2.5 m, so x = 0.35 and 0.65 of the width are
+  // u = 0.28 and 0.72 on it.
+  const procedural = await shot("Procedural"),
+    left = mean(procedural, 0.33, 0.37, 0.45, 0.55),
+    right = mean(procedural, 0.63, 0.67, 0.45, 0.55);
+  assert.ok(
+    right[0] > left[0] + 20,
+    `the baked base colour's red does not rise with u: left ${left}, right ${right}`,
+  );
+  const painted = mean(await shot("Painted"), 0.45, 0.55, 0.45, 0.55),
+    plain = mean(await shot("Plain"), 0.45, 0.55, 0.45, 0.55);
+  assert.ok(
+    painted[2] > painted[1] && painted[1] > painted[0],
+    `the baked Diffuse BSDF does not draw blue: ${painted}`,
+  );
+  assert.ok(
+    plain[0] > plain[1] && plain[1] > plain[2],
+    `the direct Principled plane does not draw red-brown: ${plain}`,
+  );
+  results.push({ baked: { left, right, painted, plain } });
+
   for (let i = 0; i < results.length; i++) {
-    if (results[i].animated || results[i].components) continue;
+    if (results[i].animated || results[i].components || results[i].baked) continue;
     const screenshot = Buffer.from(
         results[i].screenshot.split(",")[1],
         "base64",

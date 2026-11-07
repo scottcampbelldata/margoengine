@@ -20,7 +20,7 @@ class PackageTests(unittest.TestCase):
             with ZipFile(destination) as archive:
                 prefix = packager.manifest["id"] + "/"
                 self.assertEqual(set(archive.namelist()), {prefix + name for name in (
-                    "blender_manifest.toml", "__init__.py", "exporter.py", "animation.py", "writer.py", "LICENSE", "NOTICE")})
+                    "blender_manifest.toml", "__init__.py", "exporter.py", "animation.py", "bake.py", "writer.py", "LICENSE", "NOTICE")})
                 self.assertIsNone(archive.testzip())
                 manifest = tomllib.loads(archive.read(prefix + "blender_manifest.toml").decode())
                 tree = ast.parse(archive.read(prefix + "__init__.py"))
@@ -31,7 +31,7 @@ class PackageTests(unittest.TestCase):
                 self.assertLessEqual(len(manifest["tagline"]), 64)
                 for name in ("LICENSE", "NOTICE"):
                     self.assertEqual(archive.read(prefix + name), (root.parents[1] / name).read_bytes())
-                for name in ("__init__.py", "exporter.py", "writer.py"):
+                for name in ("__init__.py", "exporter.py", "bake.py", "writer.py"):
                     compile(archive.read(prefix + name), name, "exec")
 
 
