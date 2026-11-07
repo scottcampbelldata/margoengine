@@ -11,6 +11,7 @@ import {VolumetricClouds} from '/packages/sky/dist/volumetric-clouds.js';
 import {Fog} from '/packages/environment/dist/index.js';
 import {WeatherMachine} from '/packages/weather/dist/index.js';
 import {WeatherDrive} from '/packages/weather/dist/drive.js';
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
 if(new URLSearchParams(location.search).get('samples')==='1')globalThis.margoLow=1;
 const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,2,0],target:[0,8,-30],near:0.1,far:5000}}),device=engine.gpu,errors=[];
 engine.stop();
@@ -31,7 +32,9 @@ async function read(texture){
  pass.dispatchWorkgroups(Math.ceil(texture.width/8),Math.ceil(texture.height/8));pass.end();encoder.copyBufferToBuffer(output,0,staging,0,bytes);device.queue.submit([encoder.finish()]);
  await staging.mapAsync(GPUMapMode.READ);const data=new Float32Array(staging.getMappedRange()).slice();staging.unmap();output.destroy();staging.destroy();return data;
 }
-async function shot(){for(let k=0;k<3;k++){engine.render({delta:0});await device.queue.onSubmittedWorkDone();}return read(post.sceneTexture);}
+async function frame(){engine.render({delta:0});await device.queue.onSubmittedWorkDone();}
+// Ready when two frames in a row start no pipeline (the clouds and fog compile theirs on first use).
+async function shot(){await waitForPipelines(frame);return read(post.sceneTexture);}
 // Pixels whose colour moved by more than 2 percent of their light, in the top (sky) and bottom (ground) thirds.
 function moved(a,b){const W=post.sceneTexture.width,H=post.sceneTexture.height;let sky=0,ground=0;for(let y=0;y<H;y++)for(let x=0;x<W;x++){const p=(y*W+x)*4,la=a[p]+a[p+1]+a[p+2],lb=b[p]+b[p+1]+b[p+2];if(Math.abs(la-lb)>0.02*Math.max(la,1e-3)){if(y<H/3)sky++;else if(y>H*2/3)ground++;}}return {sky,ground,third:W*Math.floor(H/3)};}
 window.check={samples:sceneSamples,
