@@ -1218,3 +1218,4 @@ The following remain technical gaps, not permission to weaken a check:
 29. GPU Basis transcoding (`@margoengine/decoders/ktx2-gpu`) equals the Wasm transcoder byte for byte on the RTX A6000 only, and
 30. The own physics kernel is proved bit-equal on one Windows x86-64 PC only: no run in Safari, on ARM or on a second machine, and it has no timing against Rapier yet. The range check runs once a step, so a run away of more than 23 orders of magnitude inside one step would reach a NaN: none seen in 200 random webs of 10,000 steps.
     its load time against a cold Wasm transcoder is not measured.
+31. Voxel far levels (`@margoengine/voxel/lod`, a scaled `VoxelRenderer`) are proved on the M6 Mac mini (Metal) only: scale 2 against scale 1 drew the same image; frame cost at kilometre view distances is not measured on any GPU.

@@ -2782,6 +2782,10 @@
       "types": "./dist/voxel/lightmap.d.ts",
       "import": "./dist/voxel/lightmap.js"
     },
+    "./voxel/lod": {
+      "types": "./dist/voxel/lod.d.ts",
+      "import": "./dist/voxel/lod.js"
+    },
     "./voxel-edit": {
       "types": "./dist/voxel-edit.d.ts",
       "import": "./dist/voxel-edit.js"

@@ -50,6 +50,7 @@ export class VoxelRenderer implements EnginePlugin {
     readonly textures: BlockTextures;
     private constructor();
     static attach(engine: EngineKernel, options: VoxelRendererOptions): VoxelRenderer;
+    get scale(): number;
     get daylight(): number;
     set daylight(value: number);
     get blockLightColor(): Vec3;
@@ -97,6 +98,7 @@ export interface VoxelRendererOptions {
     fancyLeaves?: boolean;
     bevel?: VoxelBevel;
     lightmap?: VoxelLightmap;
+    scale?: number;
 }
 
 export interface VoxelRendererStats {

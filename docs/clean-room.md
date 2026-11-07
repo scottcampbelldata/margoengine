@@ -595,6 +595,7 @@ The own solver's kernel (`packages/physics/kernel`, Rust, no dependencies). Noth
 | VX12 | BFS flood fill of sky and block light, levels 0-15, step cost 1 + opacity | voxel/src/light.ts | Margo-own: breadth-first flood fill (textbook); 4-bit levels are a common block-game design |
 | VX13 | baked light x diffuse replaces sun + ambient on charted fragments | voxel/src/lightmap.ts | Margo-own: Margo design choice |
 | VX14 | MATL keys to block options, direct mapping | voxel/src/vox.ts | MagicaVoxel .vox MATL chunk description (ephtracy/voxel-model format notes): file-format semantics |
+| VX15 | far levels: octree of coarse chunks split when the eye is nearer than `radius` child sizes (Chebyshev), level cells 2^L blocks, coarse column height rounded to the nearest cell; scaled renderer: camera times scale(s), inverse rows over s, frustum planes (n, d / s) | voxel/src/lod.ts, voxel/src/render.ts | Margo-own: distance-based quadtree/octree level of detail is textbook (Luebke et al. 2003, "Level of Detail for 3D Graphics"); the matrix and plane scaling is linear algebra |
 
 ### voxel-pathtracer
 

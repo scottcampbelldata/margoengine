@@ -869,3 +869,67 @@ destroyed (upload it again on a new device). A hash index finds a fragment's cha
 
 GPU check (physical GPU, under the shared lock): `node packages/voxel/tests/bevel-browser-check.mjs`: bevel silhouettes,
 texture layers 256 and 2047, maps, glass and liquid sorting, four views, lightmaps, bevel replay, shadows and AO.
+
+## Far levels of detail (`@margoengine/voxel/lod`)
+
+`VoxelLod` keeps coarse copies of the terrain around the eye so the view reaches kilometres for about the cost of the
+streamed chunks: level L is a `VoxelWorld` whose cell covers 2^L blocks a side, drawn by a `VoxelRenderer` with
+`scale: 2^L` and lit by its own `VoxelLighting`. Each level adds a ring of about the same number of nodes (a node is one
+of its 32-cubed chunks), so every level doubles the view distance at the same cost.
+
+```ts
+import { BlockTypes, VoxelWorld } from 'margoengine/voxel';
+import { VoxelLighting } from 'margoengine/voxel/light';
+import { noiseTerrainLod, VoxelLod } from 'margoengine/voxel/lod';
+import { BlockTextures, VoxelRenderer } from 'margoengine/voxel/render';
+import { VoxelStreamer } from 'margoengine/voxel/stream';
+import { Engine } from 'margoengine/core';
+
+const engine = await Engine.create(document.querySelector('canvas')!, { camera: { far: 20000 } });
+const blocks = new BlockTypes();
+for (const name of ['stone', 'dirt', 'grass', 'sand', 'log']) blocks.define(name);
+blocks.define('water', { shape: 'liquid', liquid: true, solid: false, layer: 'translucent' });
+blocks.define('leaves', { layer: 'cutout' });
+const world = new VoxelWorld({ blocks });
+const textures = await BlockTextures.load(['stone.png']);
+const terrain = { seed: 7 };
+VoxelStreamer.attach(engine, { world, generator: terrain, distance: 8 });
+const lighting = VoxelLighting.attach(world);
+VoxelRenderer.attach(engine, { world, textures });
+
+const lod = new VoxelLod({ world, generate: noiseTerrainLod(terrain), levels: 4, radius: 8 }); // 4,096 blocks
+const far = lod.levels.map((level) => ({
+  light: VoxelLighting.attach(level.world),
+  renderer: VoxelRenderer.attach(engine, { world: level.world, textures, scale: level.scale, workers: 1 }),
+}));
+engine.onFrame(() => {
+  lod.update(engine.camera.position); // at most `budget` (8) nodes generated a frame, nearest first
+  lighting.update();
+  for (const { light } of far) light.update();
+});
+lod.stats; // {nodes: [per level], pending}
+```
+
+- **Nodes.** A node of level L >= 2 splits into its 8 children when the eye is nearer than `radius` child sizes
+  (Chebyshev distance to its box); the top level holds the nodes within `radius` of its own size. Level 1 never splits:
+  it fills everything inside the level-2 ring, its cells over chunks the real world has loaded left empty (a node is
+  masked again when one of its 8 chunks loads or unloads), so the real chunks and the coarse ones never overlap and an
+  unloaded chunk shows its coarse copy instead of a hole. Keep `2 * radius` above the streamer's `distance` + 1 so the
+  streamed chunks stay inside level 1. The faces a level shows against an empty neighbour (the finer level's area, a
+  masked chunk) are meshed, which closes the seams like a skirt.
+- **Changes.** A node no longer wanted stays until no missing node overlaps it, so a level change or a split never
+  opens a hole; meanwhile both may show. New ground at the horizon comes in over a few frames.
+- **Generators.** `generate(chunk, x, y, z, scale, {blocks})` fills node (x, y, z) of a level: cell (i, j, k) covers
+  blocks from ((32 x + i) scale, ...). `noiseTerrainLod(options)` takes `noiseTerrain`'s options and gives the same
+  ground and sea, each coarse column the ground height at its centre block rounded to the nearest whole cell (within half
+  a cell of the real surface there; the tests check it against `noiseTerrain`). It leaves out caves and trees.
+- **Scaled renderers.** `VoxelRenderer` option `scale` (a power of two, 1 to 4,096) draws a world whose cells are that
+  many blocks: the camera, its inverse, the eye and the culling planes go to cell units, so meshing, textures (one tile
+  over a coarse cell), AO and light work unchanged. A scaled renderer takes no lighting effects, casts no shadows and
+  joins no capture (`MargoError` `'unsupported'`); screen-space passes that read depth see the right distances.
+- **Errors.** `TypeError` for a wrong world, generator, eye or option type, `RangeError` for options out of range.
+
+GPU check (`node packages/voxel/tests/lod-browser-check.mjs`, in `test:gpu`): a world drawn at scale 2 from twice the
+eye, near and far gives the same image as at scale 1 (0 of 29,823 drawn pixels differ on the M6 Mac mini, Metal), and four
+levels of `noiseTerrainLod` draw terrain to the horizon from 90 blocks up with no validation error. Node generation runs
+on the main thread (about a millisecond a node; `budget` caps it per frame); frame cost at kilometre views is unmeasured.

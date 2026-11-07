@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10717937,
+  "total": 10726088,
   "history": [
     {
       "date": "2026-10-24",
@@ -3848,6 +3848,12 @@
       "commit": "d1affab1e",
       "reason": "new entry @margoengine/terrain/sculpt; Terrain.weights getter on the root entry",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "5c2eec616",
+      "reason": "voxel/render: scale option for far levels of detail (camera, inverse, eye and planes in cell units; refuses effects, shadows and capture when scaled); voxel/lod: new far chunk levels entry",
+      "grew": 2
     }
   ],
   "items": {
@@ -4562,10 +4568,11 @@
     "@margoengine/voxel/generate": 4426,
     "@margoengine/voxel/light": 8638,
     "@margoengine/voxel/lightmap": 2762,
+    "@margoengine/voxel/lod": 7228,
     "@margoengine/voxel/mesher": 8312,
     "@margoengine/voxel/physics": 10072,
     "@margoengine/voxel/query": 3821,
-    "@margoengine/voxel/render": 24125,
+    "@margoengine/voxel/render": 25048,
     "@margoengine/voxel/stream": 13408,
     "@margoengine/voxel/vox": 12969,
     "@margoengine/water": 20185,

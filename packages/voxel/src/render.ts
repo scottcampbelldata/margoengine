@@ -292,6 +292,12 @@ export interface VoxelRendererOptions {
   bevel?: VoxelBevel;
   /** Initial {@link VoxelRenderer.lightmap}. Default none. */
   lightmap?: VoxelLightmap;
+  /**
+   * Blocks per cell of `world`: a power of two, 1 to 4,096. Above 1 the world is a coarse copy (a far level of
+   * `@margoengine/voxel/lod`): cell (x, y, z) covers blocks `scale` x to `scale` (x + 1) and so on, textures stretch
+   * over it, and the renderer takes no lighting effect, casts no shadow and joins no capture. Default 1.
+   */
+  scale?: number;
 }
 
 /**
@@ -645,6 +651,8 @@ export class VoxelRenderer implements EnginePlugin {
   /** The cascades of the last shadow map drawn: chunks changing outside them leave the map as it is. */
   #shadowFrusta: Frustum[] = [];
   #blockLight: [number, number, number] = [1, 0.82, 0.6];
+  #scale = 1;
+  #planes = new Float32Array(24);
 
   private constructor(options: VoxelRendererOptions) {
     if (!options || typeof options !== 'object')
@@ -658,6 +666,7 @@ export class VoxelRenderer implements EnginePlugin {
       fancyLeaves = true,
       bevel,
       lightmap,
+      scale = 1,
     } = options;
     if (typeof world?.getChunk !== 'function' || !(world.dirty instanceof Set) || !Array.isArray(world.blocks?.table))
       throw new TypeError('VoxelRenderer world must be a VoxelWorld; pass {world: new VoxelWorld({blocks})}');
@@ -669,6 +678,12 @@ export class VoxelRenderer implements EnginePlugin {
     if (!Number.isInteger(maxQuadBytes) || maxQuadBytes < PAGE_BYTES)
       throw new RangeError(`VoxelRenderer maxQuadBytes ${maxQuadBytes} is not a whole number of at least 768 bytes`);
     if (typeof fancyLeaves !== 'boolean') throw new TypeError('VoxelRenderer fancyLeaves must be true or false');
+    isNumber(scale, 'scale', 'pass a power of two, such as 8');
+    if (!Number.isInteger(scale) || scale < 1 || scale > 4096 || (scale & (scale - 1)) !== 0)
+      throw new RangeError(
+        `VoxelRenderer scale ${scale} is not a power of two from 1 to 4096; pass 1, 2, 4, 8 and so on`,
+      );
+    this.#scale = scale;
     this.world = world;
     this.textures = textures;
     this.#maxPages = Math.floor(maxQuadBytes / PAGE_BYTES);
@@ -698,6 +713,11 @@ export class VoxelRenderer implements EnginePlugin {
       throw error;
     }
     return renderer;
+  }
+
+  /** Blocks per cell of the world (option `scale`): 1, or a far level's power of two. */
+  get scale(): number {
+    return this.#scale;
   }
 
   /** Scale of the sky light (ambient light from the open sky), 0 (night) to 1 (day) and above. Live. Default 1. */
@@ -754,6 +774,7 @@ export class VoxelRenderer implements EnginePlugin {
   /** Sets the native PBR material capture hook used by SSR/SSGI. Returns an identity-safe remover. */
   setCapture(hook: VoxelCapture): () => void {
     if (this.#disposed) throw new MargoError('disposed', 'VoxelRenderer is disposed; attach a new one');
+    this.#unscaled('capture');
     if (
       !hook ||
       typeof hook.declarations !== 'function' ||
@@ -925,6 +946,7 @@ export class VoxelRenderer implements EnginePlugin {
       throw new TypeError(
         'VoxelRenderer lighting effects need pbr(group) and bindings(); pass Shadows, Clustered, Fog or EnvironmentLighting',
       );
+    this.#unscaled('lighting effects');
     const owner = (effect as { owner?: unknown }).owner;
     if (owner && this.#engine && owner !== this.#engine)
       throw new MargoError(
@@ -945,7 +967,8 @@ export class VoxelRenderer implements EnginePlugin {
    */
   drawShadow({ context, pass, matrix, cascade }: VoxelShadowContext): boolean {
     const gpu = this.#gpu;
-    if (this.#disposed || !gpu || gpu.device !== context.device || !this.#chunks.size) return false;
+    if (this.#disposed || !gpu || gpu.device !== context.device || !this.#chunks.size || this.#scale !== 1)
+      return false;
     const s = this.#shadowState(gpu);
     if (!s.ready) return false;
     const frustum = (this.#shadowFrusta[cascade] ??= new Frustum()).setFromProjectionMatrix({ elements: matrix });
@@ -1136,7 +1159,8 @@ export class VoxelRenderer implements EnginePlugin {
   #prepare(c: Context): void {
     const gpu = this.#device(c.device),
       { device } = gpu,
-      eye: Vec3 = [c.camera.position[0], c.camera.position[1], c.camera.position[2]];
+      k = 1 / this.#scale,
+      eye: Vec3 = [c.camera.position[0] * k, c.camera.position[1] * k, c.camera.position[2] * k];
     this.#time += c.delta;
     this.#materials(gpu);
     const view = blockTextureView(this.textures, device);
@@ -1157,6 +1181,10 @@ export class VoxelRenderer implements EnginePlugin {
     if (!invertMatrix(c.camera.matrix, this.#inverse)) return;
     f.set(c.camera.matrix);
     f.set(this.#inverse, 16);
+    // A scaled world draws in cell units: camera times scale(s) and its inverse, eye / s, planes (n, d / s).
+    if (k !== 1) for (let i = 0; i < 12; i++) (f[i] *= this.#scale), (f[16 + i + ((i / 3) | 0)] *= k);
+    this.#planes.set(c.camera.planes);
+    for (let i = 3; i < 24; i += 4) this.#planes[i] *= k;
     f.set(eye, 32);
     f.set(lighting.direction, 36);
     f.set(lighting.radiance, 40);
@@ -1509,6 +1537,14 @@ export class VoxelRenderer implements EnginePlugin {
     return (this.#ordered ??= [...this.#chunks.values()].sort((a, b) => a.y - b.y || a.z - b.z || a.x - b.x));
   }
 
+  #unscaled(what: string): void {
+    if (this.#scale !== 1)
+      throw new MargoError(
+        'unsupported',
+        `VoxelRenderer with scale ${this.#scale} takes no ${what}; use a scale 1 renderer`,
+      );
+  }
+
   #chunkBox(chunk: Chunk): { min: Vec3Like; max: Vec3Like } {
     const box = this.#box;
     box.min.x = chunk.x;
@@ -1622,7 +1658,7 @@ export class VoxelRenderer implements EnginePlugin {
 
   // Frustum cull per chunk into the indirect arguments, the translucent chunks sorted back to front, stats.
   #cull(c: Context, gpu: Gpu, eye: Vec3): void {
-    const frustum = this.#frustum.fromArray(c.camera.planes),
+    const frustum = this.#frustum.fromArray(this.#planes),
       args = this.#args,
       list = this.#translucent,
       stats = this.#stats,
