@@ -1,7 +1,9 @@
 // The shared kernel parts (packages/physics/kernel-common) against brute force: sweep and prune finds exactly the
 // overlapping pairs of random boxes in 2 and 3 dimensions as they move, are added and removed; the union-find islands
-// are the connected components a graph search finds.
+// are the connected components a graph search finds; the colouring never puts two constraints that write one body in one
+// colour and visits in the order it promises.
 use margoengine_physics_kernel_common::broad::{Bounds, SweepPrune};
+use margoengine_physics_kernel_common::colour::{COLOURS, Colouring, NONE, float_key};
 use margoengine_physics_kernel_common::island::{UnionFind, sleep_tick};
 
 struct Random(u64);
@@ -173,4 +175,71 @@ fn a_sleep_timer_adds_up_while_slow_and_restarts_when_fast() {
     let t = sleep_tick(t, 0.04, 0.05, 0.25);
     assert_eq!(t, 0.5);
     assert_eq!(sleep_tick(t, 0.06, 0.05, 0.25), 0.0);
+}
+
+#[test]
+fn no_colour_holds_two_constraints_that_write_one_body() {
+    let mut random = Random(7);
+    let mut colouring = Colouring::default();
+    for round in 0..20 {
+        let bodies = 1 + round * 37;
+        let count = 3 * bodies;
+        let pick = |random: &mut Random| {
+            let x = (random.next() * (bodies as f32 + 2.0)) as u32;
+            if x >= bodies as u32 { NONE } else { x }
+        };
+        // A constraint joins two different bodies.
+        let writes: Vec<[u32; 2]> = (0..count)
+            .map(|_| {
+                let (a, b) = (pick(&mut random), pick(&mut random));
+                [a, if a == b { NONE } else { b }]
+            })
+            .collect();
+        let keys: Vec<u32> = (0..count).map(|_| float_key(random.range(-50.0, 50.0))).collect();
+        colouring.build(bodies, &writes, &keys);
+        // Every constraint once.
+        let mut seen = vec![false; count];
+        for &i in &colouring.order {
+            assert!(!seen[i as usize]);
+            seen[i as usize] = true;
+        }
+        assert!(seen.iter().all(|&s| s));
+        for k in 0..COLOURS {
+            let visit = &colouring.order[colouring.starts[k] as usize..colouring.starts[k + 1] as usize];
+            let mut taken = vec![false; bodies];
+            for &i in visit {
+                for x in writes[i as usize] {
+                    if x != NONE {
+                        assert!(!taken[x as usize], "round {round}: body {x} written twice in visit {k}");
+                        taken[x as usize] = true;
+                    }
+                }
+            }
+            // Key order inside a colour, constraint order among equal keys.
+            for pair in visit.windows(2) {
+                let (a, b) = (pair[0] as usize, pair[1] as usize);
+                assert!(keys[a] < keys[b] || (keys[a] == keys[b] && a < b));
+            }
+        }
+    }
+}
+
+#[test]
+fn constraints_on_one_body_fill_the_colours_then_the_overflow_and_the_last_colour_comes_first() {
+    // Twenty constraints all writing body 0: one a colour, the first sixteen by key, the last four in the overflow.
+    let writes = vec![[0u32, NONE]; 20];
+    let keys: Vec<u32> = (0..20).map(|i| float_key(-(i as f32))).collect();
+    let mut colouring = Colouring::default();
+    colouring.build(1, &writes, &keys);
+    assert_eq!(colouring.used(), 16);
+    assert_eq!(colouring.overflow(), 4);
+    // Lowest key first: constraint 19 takes colour 0, 4 colour 15, and colour 15 is visited first.
+    assert_eq!(colouring.order[..16], (4..20).collect::<Vec<u32>>()[..]);
+    assert_eq!(colouring.order[16..], [3, 2, 1, 0]);
+    // A constraint that writes nothing (both bodies only read) never blocks and goes to colour 0, visited last.
+    let mut colouring = Colouring::default();
+    colouring.build(2, &[[0, 1], [NONE, NONE], [1, NONE]], &[float_key(0.0); 3]);
+    assert_eq!(colouring.used(), 2);
+    assert_eq!(colouring.order, [2, 0, 1]);
+    assert!(float_key(-1.0) < float_key(-0.5) && float_key(-0.5) < float_key(0.0) && float_key(0.0) < float_key(2.0));
 }

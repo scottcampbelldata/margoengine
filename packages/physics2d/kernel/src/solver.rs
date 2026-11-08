@@ -38,7 +38,13 @@
 // this step, the last worked out once a body integrates instead of twice on every visit. A contact's visit reads two of
 // those and its own 128-byte record; the world's large body records are read and written once a substep, and around the
 // joint passes. The same operations in the same order: every bit as before (tests/bits.rs).
+//
+// The passes visit the contacts colour by colour (kernel-common colour.rs): no two contacts of a colour write the same
+// body, so the visits inside a colour do not wait on each other, and the contacts are coloured from the top of the scene
+// down along gravity, so the order of a sweep follows the pile, not the order its bodies were made in. Joints go first,
+// one at a time, as before.
 use alloc::vec::Vec;
+use margoengine_physics_kernel_common::colour::{Colouring, NONE, float_key};
 
 use crate::joint::{self, Pass};
 use crate::math::{Rot, V2};
@@ -141,6 +147,12 @@ pub struct Scratch {
     ids: Vec<u32>,
     slot: Vec<u32>,
     start: Vec<Rot>,
+    /// The colouring of the contacts, the bodies each writes, their keys, and the lists the contacts are put in colour order in.
+    colouring: Colouring,
+    writes: Vec<[u32; 2]>,
+    keys: Vec<u32>,
+    sorted: Vec<Constraint>,
+    sorted_bounces: Vec<Bounce>,
     pub(crate) paths: joint::Paths,
 }
 
@@ -318,6 +330,30 @@ pub fn solve(world: &mut World, dt: f32) {
         bounces.push(bounce);
     }
     world.counts.constraints = constraints.len() as u64;
+    // Colour order: the passes below visit the contacts colour by colour, the overflow last. Inside a colour no two
+    // contacts write the same body, so the visits are independent of each other. The contacts are coloured from the top
+    // of the scene down along gravity (the key: g . p of the first point, lowest first; see colour.rs), p taken from the
+    // first moving body's centre so a scene far from the origin keys as one at it.
+    let (gx, gy) = (settings.gravity.x as f64, settings.gravity.y as f64);
+    let origin = ids.first().map_or([0.0; 2], |&id| world.bodies[id as usize].exact_center);
+    let scratch = &mut world.scratch;
+    scratch.writes.clear();
+    scratch.writes.extend(constraints.iter().map(writes));
+    scratch.keys.clear();
+    scratch.keys.extend(constraints.iter().map(|c| {
+        let centre = world.bodies[ids[c.a as usize] as usize].exact_center;
+        let p = c.points[0].anchor_a;
+        float_key((gx * (centre[0] - origin[0] + p.x as f64) + gy * (centre[1] - origin[1] + p.y as f64)) as f32)
+    }));
+    scratch.colouring.build(bodies.len(), &scratch.writes, &scratch.keys);
+    scratch.sorted.clear();
+    scratch.sorted.extend(scratch.colouring.order.iter().map(|&i| constraints[i as usize]));
+    scratch.sorted_bounces.clear();
+    scratch.sorted_bounces.extend(scratch.colouring.order.iter().map(|&i| bounces[i as usize]));
+    core::mem::swap(&mut constraints, &mut scratch.sorted);
+    core::mem::swap(&mut bounces, &mut scratch.sorted_bounces);
+    world.counts.colours = scratch.colouring.used() as u64;
+    world.counts.overflow = scratch.colouring.overflow() as u64;
     let joints = !world.joints.is_empty();
 
     let g = settings.gravity;
@@ -426,6 +462,13 @@ pub fn solve(world: &mut World, dt: f32) {
 #[inline]
 fn sqrt_product(a: f32, b: f32) -> f32 {
     crate::math::sqrt(a * b)
+}
+
+/// The solver bodies contact `c` writes, `NONE` for one it only reads (static, kinematic): what `store` writes.
+fn writes(c: &Constraint) -> [u32; 2] {
+    let a = if c.inv_mass_a > 0.0 || c.inv_i_a > 0.0 { c.a } else { NONE };
+    let b = if c.inv_mass_b > 0.0 || c.inv_i_b > 0.0 { c.b } else { NONE };
+    [a, b]
 }
 
 #[inline(always)]

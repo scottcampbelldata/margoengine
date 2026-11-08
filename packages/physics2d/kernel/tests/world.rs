@@ -1,5 +1,5 @@
 // The 2D world and solver against the scenes of Catto's Solver2D post (2024) and closed forms: a 20-row pyramid rests
-// and sleeps, a card house stands, a 1:100 stack holds with the sag its springs give in closed form, a pyramid 10 km
+// and sleeps, built bottom up or top down, a card house stands, a 1:100 stack holds with the sag its springs give in closed form, a pyramid 10 km
 // from the origin behaves as one at it, friction holds below tan t = mu and slides above, restitution bounces, and two
 // worlds built alike step alike bit for bit.
 //
@@ -82,6 +82,29 @@ fn a_pyramid_of_twenty_rows_rests_and_sleeps() {
     // As stiff as the stiffer reference and asleep sooner than either; nothing creeps once the springs hold.
     assert!(top <= 0.02911, "top drop {top} m, Box2D v3's is 0.02911 m");
     assert!(most < 0.03, "a box moved {most} m");
+    assert!(creep < 0.01, "creep {creep} m");
+    assert!(asleep.is_some_and(|t| t <= 0.92), "asleep at {asleep:?}, Rapier 2D sleeps at 0.92 s");
+}
+
+#[test]
+fn a_pyramid_of_twenty_rows_built_top_down_rests_as_one_built_bottom_up() {
+    // The solve order follows height along gravity, not the order the bodies were made in. Before the colouring, the
+    // contacts went in the order they were found, and this pile, its top row made first, dropped 29.41 mm and slept at
+    // 0.88 s where the same pile made bottom up dropped 28.41 mm and slept at 0.75 s.
+    let rows = 20;
+    let mut world = World::default();
+    ground(&mut world, V2::ZERO, 40.0);
+    let mut boxes = Vec::new();
+    for row in (0..rows).rev() {
+        let count = rows - row;
+        for i in 0..count {
+            boxes.push(boxed(&mut world, v2(i as f32 - 0.5 * (count as f32 - 1.0), 0.5 + row as f32), 0.5, 0.5, 1.0, 0.6));
+        }
+    }
+    let (_, asleep, creep) = settle_from(&mut world, &boxes, 10.0);
+    let top = (rows as f64 - 0.5 - world.bodies[boxes[0] as usize].exact_center[1]) as f32;
+    println!("pyramid 20 built top down: top drop {:.2} mm, creep after 1 s {:.3} mm, asleep at {asleep:?} s", top * 1e3, creep * 1e3);
+    assert!(top <= 0.02911, "top drop {top} m, Box2D v3's is 0.02911 m");
     assert!(creep < 0.01, "creep {creep} m");
     assert!(asleep.is_some_and(|t| t <= 0.92), "asleep at {asleep:?}, Rapier 2D sleeps at 0.92 s");
 }
@@ -317,19 +340,23 @@ fn a_pyramid_of_a_hundred_rows_keeps_its_warm_start_and_sags_as_the_references()
     let boxes = pyramid(&mut world, V2::ZERO, rows);
     let start: Vec<V2> = boxes.iter().map(|&b| world.bodies[b as usize].xf.p).collect();
     let row30: usize = (0..30).map(|r| rows - r).sum();
-    let mut worst_cold = 0;
+    let (mut worst_cold, mut colours, mut overflow) = (0, 0, 0);
     for step in 0..300 {
         world.step(DT);
         if step >= 60 {
             worst_cold = worst_cold.max(world.counts.cold_points);
         }
+        colours = colours.max(world.counts.colours);
+        overflow = overflow.max(world.counts.overflow);
     }
     let top = top_drop(&world, &boxes, rows, V2::ZERO);
     let outward = (row30..row30 + rows - 30)
         .map(|k| (world.bodies[boxes[k] as usize].xf.p.x - start[k].x) * start[k].x.signum())
         .sum::<f32>()
         / (rows - 30) as f32;
-    println!("pyramid 100 at 5 s: top drop {:.1} mm, row 30 mean outward {:.1} mm, most cold points a step after 1 s {worst_cold}", top * 1e3, outward * 1e3);
+    println!("pyramid 100 at 5 s: top drop {:.1} mm, row 30 mean outward {:.1} mm, most cold points a step after 1 s {worst_cold}, most colours {colours}, overflow {overflow}", top * 1e3, outward * 1e3);
+    // Every contact found a colour: the pile's graph needs 8 of the 16.
+    assert_eq!(overflow, 0);
     assert!(top <= 0.735, "top drop {top} m");
     assert!(outward <= 0.1, "row 30 outward {outward} m");
     assert!(worst_cold <= 10, "{worst_cold} points lost their warm start in one step");

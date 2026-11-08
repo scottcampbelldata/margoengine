@@ -2026,13 +2026,45 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
 - **Rerun:** `cargo test --release --manifest-path packages/physics2d/kernel/Cargo.toml --test bits -- --include-ignored
   --nocapture` at both commits, in turns.
 
+### 86. Own 2D physics solver: contacts solved colour by colour, from the top down (new order, accuracy; the loss stays open)
+
+- **Before (`c4a06b727`):** the passes visited the contacts in the order the broad phase found them, so the order of a
+  sweep followed the order the bodies were made in. The 20-row pyramid made bottom up dropped 28.41 mm and slept at
+  0.75 s; the same pile made top down dropped 29.41 mm and slept at 0.88 s, past Box2D v3's 29.11 mm.
+- **Change:** `packages/physics/kernel-common/src/colour.rs` colours the contacts greedily, first fit (Welsh and Powell
+  1967; Catto, "Solver2D" and "SIMD Matters", 2024, as descriptions): 16 colours, one bit a body a colour, a body a
+  contact only reads (static, kinematic) never blocks, the rest to an overflow solved last one at a time. The contacts
+  are coloured in height order along gravity, top first (a stable radix sort of a key from g . p), and the colours are
+  visited from the last to the first. `packages/physics2d/kernel/src/solver.rs` puts its contact records in that order
+  once a step; every pass then runs in it. Joints stay first, one at a time. `Counts::colours` and `Counts::overflow`.
+- **Why that order, measured:** on pyramids of 10, 15, 20, 25, 30 and 40 rows, each built bottom up and top down, five
+  orders were tried (found order; body index up and down; height up and down; each with the colours forward and
+  backward). Height top first with the colours backward dropped least and slept soonest at every size, built either way;
+  height top first with the colours forward dropped most. The mechanism is not proven; the figures are.
+- **Accuracy (native, 10 s):** 20 rows built bottom up: top 28.26 mm, asleep 0.73 s; built top down 28.35 mm, 0.73 s
+  (`tests/world.rs`, the new top-down test fails on the parent). Top drop by size, bottom up / top down, parent then this
+  commit: 10 rows 7.00 / 7.40 to 7.11 / 7.02 mm; 15 rows 15.92 / 16.48 to 15.97 / 15.71; 25 rows 44.39 / 45.32 to
+  44.13 / 43.62; 30 rows 64.27 / 65.43 to 63.43 / 62.91; 40 rows 114.53 / 115.98 to 112.53 / 111.72; asleep at 40 rows
+  1.18 / 1.13 s to 1.03 / 1.02 s. The 100-row pyramid: top 684 mm by 5 s and by 10 s (728 before; Box2D v3 726, Rapier
+  2D 735; 687 mm at 10 s with sleep off), row 30 spreading 48 mm (77 before; 70, 64), at most 8 points a step losing
+  their warm start after 1 s (6 before), 8 colours, no overflow. The 1:100 stack 52.29 mm (closed form 52.63), the
+  joint grid 3.96 mm and the chains unchanged. Bits re-pinned (`tests/bits.rs`; the joint grid has no contacts and kept
+  its hash).
+- **Time (paired, native, parent and this commit's test binaries in turns, 12 rounds, per-round minimums of 40 steps
+  after 60, busy machine, diagnostic):** solve 5.02 ms median against 5.00 (colouring and sort included), step 6.49
+  against 6.58. Colour order alone did not shorten the scalar solve: with no visit waiting on the one before it, the
+  solve takes the same time, so a visit is bound by its own arithmetic (about 28 ns; 14,950 contacts, 4 substeps,
+  3 passes), not by the chain entry 85 named. Four lanes are next.
+- **Rerun:** `cargo test --release --manifest-path packages/physics2d/kernel/Cargo.toml --test world -- --nocapture`;
+  the time as entry 85.
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).
 
 - **Own 2D physics, the 100-row pyramid: 6.7 ms a step against Box2D v3's 1.02 ms (entry 83).** Native, busy machine,
-  diagnostic. The broad phase is fixed; the solver takes 5.1 ms of the step; compact solver bodies (entry 85) left it
-  near 7 ms. Rerun: as entries 83 and 85.
+  diagnostic. The broad phase is fixed; the solver takes 5.0 ms of the step; compact solver bodies (entry 85) and colour
+  order (entry 86) left it near 6.5 ms. Rerun: as entries 83 and 85.
 
 - **Own convex decomposition against Rapier's V-HACD (entry 81).** 1.1 to 17.3 s where Rapier takes 0.1 to 0.3 s on five
   meshes of 72 to 2,304 triangles, with fewer or as many parts. Cause: 500 tree-search iterations per cut with a hull per

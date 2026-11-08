@@ -279,6 +279,9 @@ pub struct Counts {
     pub constraints: u64,
     pub block: u64,
     pub sequential: u64,
+    /// Colours the contacts took (no two contacts of a colour write the same body), and contacts that fit in none.
+    pub colours: u64,
+    pub overflow: u64,
     pub islands: u64,
     pub awake_bodies: u64,
 }

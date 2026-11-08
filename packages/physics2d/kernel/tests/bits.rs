@@ -1,7 +1,7 @@
 // Pinned bits: suite scenes stepped 120 times, every body's exact centre, rotation and velocities and every step's work
 // counts folded into one FNV-1a hash. A change that must not move a bit (a new memory layout, a faster loop) keeps these
-// hashes; a change that moves results re-pins them in its own commit and re-measures every bar. Pinned 2026-11-08 at the
-// solver before the compact solver bodies (perf history entry 85).
+// hashes; a change that moves results re-pins them in its own commit and re-measures every bar. Re-pinned 2026-11-08 when
+// the contacts went to colour order (perf history entry 86); the compact solver bodies before it kept every bit (85).
 use margoengine_physics2d_kernel::joint::{JointDef, JointKind};
 use margoengine_physics2d_kernel::math::{Rot, V2, v2};
 use margoengine_physics2d_kernel::shape::Core;
@@ -35,7 +35,7 @@ fn run(mut world: World) -> u64 {
             h.add((b.angular_velocity.to_bits() as u64) << 32 | b.awake as u64);
         }
         let c = world.counts;
-        for x in [c.pairs, c.manifolds, c.cold_points, c.constraints, c.block, c.sequential, c.islands, c.awake_bodies] {
+        for x in [c.pairs, c.manifolds, c.cold_points, c.constraints, c.block, c.sequential, c.colours, c.overflow, c.islands, c.awake_bodies] {
             h.add(x);
         }
     }
@@ -122,7 +122,7 @@ fn mixed() -> World {
 fn suite_scenes_step_to_their_pinned_bits() {
     let got = [run(pyramid(100)), run(joint_grid()), run(mixed())];
     println!("pinned bits: {:#018x} {:#018x} {:#018x}", got[0], got[1], got[2]);
-    assert_eq!(got, [0x467f_2501_232a_dcc3, 0x2122_d3ba_bb99_7111, 0xd63e_3577_cfbc_6921], "the 100-row pyramid, the joint grid, the mixed scene");
+    assert_eq!(got, [0x9ffe_fc83_c3a9_9be4, 0x95a4_7530_df18_0011, 0x9acb_6847_1fbe_6ba0], "the 100-row pyramid, the joint grid, the mixed scene");
 }
 
 #[test]
