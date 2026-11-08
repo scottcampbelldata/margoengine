@@ -1,0 +1,166 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Terrain on the WebGL2 compatibility layer</title>
+</head>
+<body style="margin:0">
+<canvas style="width:320px;height:240px"></canvas>
+<script type="module">
+// One terrain scene per page load, ?mode=native|compat&case=clipmap|weights|rvt, in exact-pixel mode (exactSize, one
+// sample). On the layer every GL call the page makes is counted (WebGL2RenderingContext's methods wrapped before
+// install), so the driver reads the frame's cost as GL calls and draws; the driver compares the canvas with the native
+// one (test/compat.browser.mjs).
+import { Engine } from '/packages/core/dist/index.js';
+import { install } from '/packages/webgl2-compat/dist/index.js';
+import { Terrain } from '/packages/terrain/dist/index.js';
+import { waitForPipelines } from '/scripts/support/gpu-ready.js';
+
+const q = new URLSearchParams(location.search);
+const mode = q.get('mode') ?? 'native',
+  name = q.get('case') ?? 'clipmap';
+const errors = [];
+addEventListener('error', (e) => errors.push(String(e.message)));
+addEventListener('unhandledrejection', (e) => errors.push(String(e.reason?.message ?? e.reason)));
+
+const calls = { total: 0, draws: 0 };
+if (mode === 'compat') {
+  const proto = WebGL2RenderingContext.prototype;
+  for (const key of Object.getOwnPropertyNames(proto)) {
+    const d = Object.getOwnPropertyDescriptor(proto, key);
+    if (typeof d.value !== 'function' || key === 'constructor') continue;
+    const draw = key.startsWith('draw');
+    const f = d.value;
+    proto[key] = function (...args) {
+      calls.total++;
+      if (draw) calls.draws++;
+      return f.apply(this, args);
+    };
+  }
+}
+
+// Rolling hills and a ridge, 129 x 129 heights over 256 m.
+const n = 129,
+  heights = new Float32Array(n * n);
+for (let z = 0; z < n; z++)
+  for (let x = 0; x < n; x++)
+    heights[z * n + x] =
+      0.12 * Math.sin(x * 0.11) * Math.cos(z * 0.09) + 0.08 * Math.sin((x + z) * 0.05) + 0.25 * Math.exp(-(((x - 80) / 18) ** 2));
+// Four 8 x 8 layer pictures: two-tone checks of sand, grass, rock and snow, so a shifted texel shows.
+function layerTexture(gpu) {
+  const tones = [
+      [[196, 170, 120], [176, 150, 104]],
+      [[86, 140, 60], [70, 118, 48]],
+      [[128, 120, 112], [104, 98, 92]],
+      [[236, 238, 242], [210, 214, 222]],
+    ],
+    data = new Uint8Array(8 * 8 * 4 * 4);
+  tones.forEach((pair, l) => {
+    for (let y = 0; y < 8; y++)
+      for (let x = 0; x < 8; x++) data.set([...pair[(x + y) % 2], 255], ((l * 8 + y) * 8 + x) * 4);
+  });
+  const texture = gpu.createTexture({ size: [8, 8, 4], format: 'rgba8unorm-srgb', usage: 6 });
+  gpu.queue.writeTexture({ texture }, data, { bytesPerRow: 32, rowsPerImage: 8 }, [8, 8, 4]);
+  return texture;
+}
+const rules = [
+  { height: [-1e5, 1e5], slope: [0, 1], scale: 0.5 },
+  { height: [-1e5, 14], slope: [0, 0.3], scale: 0.4 },
+  { height: [-1e5, 1e5], slope: [0.35, 1], scale: 0.3 },
+  { height: [22, 1e5], slope: [0, 0.4], scale: 0.25 },
+];
+function textures(gpu, extra) {
+  const heightmap = gpu.createTexture({ size: [n, n], format: 'r32float', usage: 6 });
+  gpu.queue.writeTexture({ texture: heightmap }, heights, { bytesPerRow: n * 4 }, [n, n]);
+  return { heightmap, layers: layerTexture(gpu), ...extra?.(gpu) };
+}
+// Painted weights (a band per layer across the map) and a round hole.
+function painted(gpu) {
+  const side = 32,
+    w = new Uint8Array(side * side * 4),
+    hole = new Uint8Array(side * side * 4);
+  for (let y = 0; y < side; y++)
+    for (let x = 0; x < side; x++) {
+      const band = Math.min(3, Math.floor((x / side) * 4));
+      w[(y * side + x) * 4 + band] = 255;
+      hole.set([(x - 20) ** 2 + (y - 12) ** 2 < 9 ? 0 : 255, 0, 0, 255], (y * side + x) * 4);
+    }
+  const weights = gpu.createTexture({ size: [side, side], format: 'rgba8unorm', usage: 6 }),
+    holes = gpu.createTexture({ size: [side, side], format: 'rgba8unorm', usage: 6 });
+  gpu.queue.writeTexture({ texture: weights }, w, { bytesPerRow: side * 4 }, [side, side]);
+  gpu.queue.writeTexture({ texture: holes }, hole, { bytesPerRow: side * 4 }, [side, side]);
+  return { weights: [weights, weights], holes };
+}
+const cases = {
+  clipmap: (engine) => Terrain.attach(engine, base((gpu) => textures(gpu))),
+  weights: (engine) => Terrain.attach(engine, base((gpu) => textures(gpu, painted))),
+  async rvt(engine) {
+    const terrain = Terrain.attach(engine, base((gpu) => textures(gpu)));
+    const { TerrainVirtualTexture } = await import('/packages/terrain/dist/rvt.js');
+    return TerrainVirtualTexture.attach(engine, terrain, { texel: 0.1, size: 512, levels: 5 });
+  },
+};
+function base(texturesOf) {
+  return {
+    origin: [-128, -128],
+    size: [256, 256],
+    heightScale: 100,
+    cellSize: 1,
+    resolution: 64,
+    levels: 6,
+    layers: rules,
+    textures: texturesOf,
+  };
+}
+
+async function main() {
+  const canvas = document.querySelector('canvas');
+  if (mode === 'compat') {
+    const result = await install({ force: true });
+    if (!result.installed) throw new Error('install() did not install: ' + result.reason);
+  }
+  const engine = await Engine.create(canvas, {
+    backend: 'webgpu',
+    exactSize: [320, 240],
+    camera: { position: [-60, 45, -90], target: [10, 8, 20], near: 0.5, far: 1000 },
+  });
+  engine.lighting.direction.set([0.4, 0.8, 0.3, 3]);
+  const rvt = name === 'rvt' ? await cases[name](engine) : (cases[name](engine), undefined);
+  const device = () => engine.gpu;
+  // Texels the virtual texture baked over all frames, so the driver sees that the bake ran on both sides.
+  let baked = 0,
+    last = 0;
+  const frame = async () => {
+    engine.render({ delta: 0 });
+    last = rvt?.baked ?? 0;
+    baked += last;
+    await device().queue.onSubmittedWorkDone();
+  };
+  window.check = {
+    info: () => ({ vendor: device().adapterInfo?.vendor ?? null, errors: errors.splice(0), gl: device().gl ? device().gl.getError() : 0 }),
+    /**
+     * Frames until every pipeline is in place and a virtual texture's last frame baked nothing (its cache is whole),
+     * then one frame's GL calls, GL draws and engine draws, and the texels a virtual texture baked over all of them.
+     */
+    async cost() {
+      await waitForPipelines(frame, { ready: () => !rvt || (baked > 0 && last === 0) });
+      const total = calls.total,
+        draws = calls.draws;
+      engine.render({ delta: 0 });
+      const cost = { calls: calls.total - total, glDraws: calls.draws - draws, drawCalls: engine.stats.drawCalls };
+      baked += rvt?.baked ?? 0;
+      await device().queue.onSubmittedWorkDone();
+      cost.baked = baked;
+      return cost;
+    },
+  };
+  window.ready = true;
+}
+main().catch((e) => {
+  errors.push(String(e?.stack ?? e));
+  window.check = { info: () => ({ errors }) };
+  window.ready = true;
+});
+</script>
+</body>
+</html>

@@ -472,6 +472,13 @@ camera with a line, a point cloud, terrain and bloom, on the RTX A6000 with a st
 into a stand-in XRWebGLLayer over a real WebGL framebuffer: `xr.route` is 'engine' and both eyes match the native route
 with no pixel over 2 (2026-11-07, RTX A6000, Chromium). Missing: a real headset.
 
+**Terrain on the layer (2026-11-08).** The clipmap terrain (`@margoengine/terrain`) and its runtime virtual texture run
+on the layer with no route of their own: their passes are draws, which the layer translates unchanged. Evidence:
+`packages/terrain/test/compat.browser.mjs` in terrain's `test:gpu` draws rules only, painted weights with a hole, and the
+virtual texture natively and on the layer in exact-pixel mode; no pixel differs by more than 1 of 255, and a frame of six
+clipmap levels is 6 GL draws and 48 GL calls (Radeon 680M, ANGLE on Direct3D 11, Edge 157). Missing: frame time on the
+layer, other GPUs and back ends, and the terrain entries with compute passes (`sculpt`, `deform`, `displace`).
+
 `install()` returns without changes when real WebGPU has an adapter, unless forced. Otherwise it probes WebGL2,
 requires highp fragment floats/ints and `EXT_color_buffer_float`, defines a `CompatGPU` at `navigator.gpu`, patches
 only `getContext('webgpu')`, and installs missing WebGPU flag constants. `uninstall()` reverses those changes. Lower

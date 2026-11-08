@@ -798,6 +798,46 @@ without). Every pixel that changes lies on the box's foot (within the fade's rea
 same bytes. With noise 0 the fade's top is the same row across the face (spread 1), with noise 1 it wanders over 10
 rows. Cost not timed.
 
+## On the WebGL2 compatibility layer
+
+Where the browser has no WebGPU, install the layer (`margoengine/webgl2-compat`) before `Engine.create` and the
+clipmap terrain draws with nothing else changed: the same options, the same textures factory, the same pixels. The
+root entry and `rvt` have no compute pass, so they need no route of their own there: this package holds no WebGL2
+code and a page with WebGPU downloads nothing extra.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {install} from 'margoengine/webgl2-compat';
+import {Terrain} from 'margoengine/terrain';
+await install(); // changes nothing where WebGPU has an adapter; else navigator.gpu draws through WebGL2
+const engine = await Engine.create(document.querySelector('canvas')!, {camera: {position: [0, 20, -40], target: [0, 0, 0]}});
+Terrain.attach(engine, {
+  size: [64, 64], origin: [-32, -32], heightScale: 4,
+  layers: [0, 1, 2, 3].map(() => ({height: [-100, 100] as [number, number], slope: [0, 1] as [number, number], scale: 1})),
+  textures(device) {
+    const heightmap = device.createTexture({size: [2, 2], format: 'r32float', usage: 6});
+    device.queue.writeTexture({texture: heightmap}, new Float32Array([0, 1, 1, 0]), {bytesPerRow: 8}, [2, 2]);
+    const layers = device.createTexture({size: [1, 1, 4], format: 'rgba8unorm-srgb', usage: 6});
+    device.queue.writeTexture({texture: layers}, new Uint8Array(16).fill(160), {bytesPerRow: 4, rowsPerImage: 1}, [1, 1, 4]);
+    return {heightmap, layers};
+  },
+});
+engine.start();
+```
+
+Checked on a real GPU by `test/compat.browser.mjs` (in `test:gpu`, Radeon 680M, ANGLE on Direct3D 11, Edge 157,
+2026-11-08): a 129 x 129 heightmap of hills and a ridge with four checked layers, drawn natively and on the layer
+(`install({force: true})`) in exact-pixel mode, in three cases: layer rules alone; painted weights with a hole; and a
+runtime virtual texture (`@margoengine/terrain/rvt`), which bakes the same 1,310,720 texels on both. In every case no
+pixel differs by more than 1 of 255 (the layer roadmap allows 0.1% of pixels over 2 and a mean of 0.25). Cost on the
+layer, counted, not timed: a frame of six clipmap levels is 6 engine draws, 6 GL draws and 48 GL calls (50 with the
+virtual texture).
+
+- Checked on the layer: the root entry (rules, painted weights, holes) and `rvt`. Not run there yet: `layers-pbr`,
+  `stream`, `sculpt`, `deform` and `displace` (the last three have compute passes, which the layer runs on its own
+  tiers), `blend`, the SSR capture, shadows and the occluder pass.
+- Frame times on the layer are not measured; only one GPU and one ANGLE back end ran it.
+
 ## Screen-space reflections
 
 `Terrain` takes SSR's capture hook (`@margoengine/post/ssr`): `ssr.add(terrain)` draws its own normal, layer colour and
