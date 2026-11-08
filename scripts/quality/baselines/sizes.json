@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10902223,
+  "total": 10902867,
   "history": [
     {
       "date": "2026-10-24",
@@ -4046,6 +4046,12 @@
       "commit": "632ebec4e",
       "reason": "new entry @margoengine/terrain/rvt; colorSource() on the root entry",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "1895c5caf",
+      "reason": "NRRD gzip frames RFC 1952 members itself (CRC-32 trailer match) so data after the last member is ignored, fixing a Node 24 refusal",
+      "grew": 1
     }
   ],
   "items": {
@@ -4390,7 +4396,7 @@
     "@margoengine/loaders/md2": 2265,
     "@margoengine/loaders/mocap": 2146,
     "@margoengine/loaders/mtl": 8186,
-    "@margoengine/loaders/nrrd": 6362,
+    "@margoengine/loaders/nrrd": 7006,
     "@margoengine/loaders/nurbs": 2763,
     "@margoengine/loaders/pdb": 2464,
     "@margoengine/loaders/render": 3148,

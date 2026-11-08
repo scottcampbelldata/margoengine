@@ -240,6 +240,23 @@ test('gzip data past what the header needs is ignored, and decoding stops at the
   await refuses(parseNRRD(join(head(['type: uchar', 'dimension: 1', 'sizes: 3', 'encoding: gzip']), gzipSync(Buffer.from([7, 8])))), 'truncated');
 });
 
+// Regression: the runtime's gzip decoder refused bytes after the last member and dropped the output of that step, so a
+// valid stream followed by other data read as corrupt. Members are now framed by the reader itself (RFC 1952 2.2).
+test('gzip members are read in turn, data after the last is ignored, and a damaged member is refused', async () => {
+  const fields = (n) => ['type: uchar', 'dimension: 1', `sizes: ${n}`, 'encoding: gzip'];
+  const two = join(head(fields(2)), gzipSync(Buffer.from([7])), gzipSync(Buffer.from([8])), 'trailing text');
+  assert.deepEqual([...(await parseNRRD(two)).data], [7, 8]);
+  const big = Buffer.alloc(300000);
+  for (let i = 0, x = 1; i < big.length; i++) big[i] = (x = (x * 1103515245 + 12345) >>> 0) >>> 24;
+  const spans = await parseNRRD(join(head(fields(big.length + 1)), gzipSync(big, { level: 0 }), gzipSync(Buffer.from([9])), 'junk'));
+  assert.deepEqual(Buffer.from(spans.data.subarray(0, big.length)), big);
+  assert.equal(spans.data[big.length], 9);
+  const damaged = gzipSync(Buffer.from([7]));
+  damaged[damaged.length - 8] ^= 1;
+  await refuses(parseNRRD(join(head(fields(2)), damaged, gzipSync(Buffer.from([8])))), 'zip');
+  await refuses(parseNRRD(join(head(fields(2)), 'not gzip')), 'zip');
+});
+
 test('raw, hex and ascii data past what the header needs is ignored', async () => {
   const fields = ['type: uchar', 'dimension: 1', 'sizes: 2'];
   const raw = await parseNRRD(join(head([...fields, 'encoding: raw']), Buffer.from([7, 8, 9, 10])));

@@ -1,5 +1,6 @@
 // NRRD volumes (NRRD0001 to NRRD0005): the header, the raw, ascii, hex and gzip encodings, and detached data files.
 import { LoaderError, type AssetResolver } from './types.js';
+import { crc32 } from '../../shared/crc32.js';
 import { findLineEnd, latin1, resolvePath, throwIfAborted, toBytes, type BinaryInput } from './util.js';
 
 const F = 'NRRD';
@@ -514,45 +515,89 @@ function readHex(text: string, length: number): Uint8Array<ArrayBuffer> {
   return out;
 }
 
+const u32le = (b: Uint8Array, o: number) => (b[o] | (b[o + 1] << 8) | (b[o + 2] << 16) | (b[o + 3] << 24)) >>> 0;
+
 /**
- * The first `size` bytes of gzip data. The compressed bytes go in a step at a time and decoding stops once `size`
- * bytes are out: the rest of the stream, and anything after it, is ignored (section 5, "Data file contents remaining
- * after all data has been read should be ignored"), and a small file cannot inflate to more than it needs.
+ * The first `size` bytes of gzip data. Each member (RFC 1952 2.2) is framed here and its DEFLATE data inflated a step
+ * at a time, stopping once `size` bytes are out: the rest of the stream, and anything after the last member, is ignored
+ * (section 5, "Data file contents remaining after all data has been read should be ignored"), and a small file cannot
+ * inflate to more than it needs. The runtime's 'gzip' decoder is not used: it refuses bytes after the last member and
+ * can drop the output of the step that holds them, so a valid stream followed by other data would not read.
  */
 async function gunzip(body: Uint8Array, size: number, signal?: AbortSignal): Promise<Uint8Array> {
   if (typeof DecompressionStream !== 'function')
     throw new LoaderError(F, 'unsupported', 'DecompressionStream is not available in this runtime');
+  const out = new Uint8Array(size),
+    corrupt = (detail: string) => new LoaderError(F, 'zip', `the data has corrupt gzip data (${detail})`);
+  let at = 0,
+    length = 0;
+  while (length < size) {
+    // After the first member, anything that is not another member is data past the stream, ignored.
+    if (at > 0 && (at + 1 >= body.length || body[at] !== 0x1f || body[at + 1] !== 0x8b)) break;
+    if (body[at] !== 0x1f || body[at + 1] !== 0x8b) throw corrupt('no gzip header');
+    const flags = body[at + 3];
+    if (body[at + 2] !== 8 || flags & 0xe0) throw corrupt('the method is not deflate or reserved flags are set');
+    let p = at + 10;
+    // FEXTRA (its length, then the field), FNAME and FCOMMENT (each up to a NUL), then FHCRC.
+    if (flags & 4) p += 2 + (body[p] | (body[p + 1] << 8));
+    for (const flag of [8, 16]) {
+      if (!(flags & flag)) continue;
+      while (p < body.length && body[p] !== 0) p++;
+      p++;
+    }
+    if (flags & 2) {
+      if ((crc32(body.subarray(at, p)) & 0xffff) !== (body[p] | (body[p + 1] << 8))) throw corrupt('the header fails its CRC-16');
+      p += 2;
+    }
+    if (p >= body.length) throw corrupt('the stream ends early');
+    const from = length;
+    length = await inflateMember(body.subarray(p), out, length, signal);
+    if (length >= size) break;
+    // The member ended before the samples did: find its trailer, the CRC-32 and size of what it gave.
+    const crc = crc32(out.subarray(from, length)),
+      isize = (length - from) % 2 ** 32;
+    let end = p;
+    while (end + 8 <= body.length && !(u32le(body, end) === crc && u32le(body, end + 4) === isize)) end++;
+    if (end + 8 > body.length) throw corrupt('a member has no matching CRC-32 and size trailer');
+    at = end + 8;
+  }
+  return out.subarray(0, length);
+}
+
+/**
+ * Inflates the DEFLATE data at the start of `data` into `out` from `length`, until `out` is full or the stream ends,
+ * and returns the new length. Bytes after the end of the stream (the gzip trailer, what follows) make the decoder
+ * fail once its output is given; the caller's trailer check tells that apart from damaged data.
+ */
+async function inflateMember(data: Uint8Array, out: Uint8Array, length: number, signal?: AbortSignal): Promise<number> {
   let fed = 0;
   const input = new ReadableStream<Uint8Array>(
     {
       pull(controller) {
-        if (fed >= body.length) controller.close();
-        else controller.enqueue(body.subarray(fed, (fed += FEED)));
+        if (fed >= data.length) controller.close();
+        else controller.enqueue(data.subarray(fed, (fed += FEED)));
       },
     },
     { highWaterMark: 0 },
   );
   const reader = input
-      .pipeThrough(new DecompressionStream('gzip') as unknown as ReadableWritablePair<Uint8Array, Uint8Array>)
-      .getReader(),
-    out = new Uint8Array(size);
-  let length = 0;
+    .pipeThrough(new DecompressionStream('deflate-raw') as unknown as ReadableWritablePair<Uint8Array, Uint8Array>)
+    .getReader();
   try {
-    while (length < size) {
+    while (length < out.length) {
       throwIfAborted(signal, F);
       const { done, value } = await reader.read();
       if (done) break;
-      const take = Math.min(value.length, size - length);
+      const take = Math.min(value.length, out.length - length);
       out.set(value.subarray(0, take), length);
       length += take;
     }
   } catch (error) {
     if (error instanceof LoaderError) throw error;
-    throw new LoaderError(F, 'zip', `the data has corrupt gzip data (${(error as Error)?.message ?? error})`);
   } finally {
     void reader.cancel().catch(() => {});
   }
-  return out.subarray(0, length);
+  return length;
 }
 
 interface Encoded {
