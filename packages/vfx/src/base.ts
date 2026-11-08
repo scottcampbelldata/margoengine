@@ -112,6 +112,8 @@ export interface VFXOptions {
   fields?: VFXFields;
   /** Births on the surface of an animated (skinned or morphed) mesh, following its pose. Needs `skinned` from `@margoengine/vfx/skinned`. */
   skinned?: VFXSkinned;
+  /** Blend each lifetime atlas frame into the next. Needs `flipbook` from `@margoengine/vfx/flipbook` and a texture atlas whose frames are `'lifetime'`. */
+  flipbook?: VFXFlipbook;
 }
 /**
  * What the skinned emitter reads of a primitive: an entry of `model.primitives` from `@margoengine/gltf-pro`, with a
@@ -139,6 +141,12 @@ export interface VFXSkinned {
   /** World units per second along the posed face normal, -1000..1000 (negative flies inward). Default 0. */
   speed?: number;
 }
+/**
+ * Blend successive frames of a lifetime atlas: the vertex stage passes this frame, the next (the last frame holds)
+ * and the fraction between them, and the fragment stage samples both cells and mixes. Pass `{}`. Needs a `texture`
+ * whose atlas frames are `'lifetime'`, and the `flipbook` feature.
+ */
+export interface VFXFlipbook {}
 /** A point that pulls particles towards it (or pushes them away with a negative strength). */
 export interface VFXAttractor {
   position: Vec3;
@@ -342,7 +350,8 @@ export interface VFXTexture {
 /**
  * The `atlas` of a particle texture: `columns` x `rows` equal frames, numbered left to right from the top row. With
  * `frames: 'random'` each particle shows one frame picked at random when it spawns (debris that uses parts of a block
- * texture); with `'lifetime'` it steps through every frame in order from spawn to death (a flipbook).
+ * texture); with `'lifetime'` it steps through every frame in order from spawn to death. `@margoengine/vfx/flipbook`
+ * blends each of those frames into the next; without it the step is instant.
  */
 export interface ParticleAtlas {
   /** Frames across, 1 to the texture width. */
@@ -405,7 +414,17 @@ export interface VFXExtension<T> {
   create?(state: VFXState, value: T, owned: OwnedResources): VFXRuntime;
 }
 /** Added features, in the order their patches apply. */
-const extensions = ['ribbons', 'mesh', 'events', 'lit', 'depthCollide', 'stretch', 'fields', 'skinned'] as const;
+const extensions = [
+  'ribbons',
+  'mesh',
+  'events',
+  'lit',
+  'depthCollide',
+  'stretch',
+  'fields',
+  'skinned',
+  'flipbook',
+] as const;
 /** One compute dispatch of the slot-order passes. */
 type Step = [GPUComputePipeline, GPUBindGroup];
 /**
@@ -470,6 +489,7 @@ export interface VFXFeatures {
   stretch?: VFXExtension<VFXStretch>;
   fields?: VFXExtension<VFXFields>;
   skinned?: VFXExtension<VFXSkinned>;
+  flipbook?: VFXExtension<VFXFlipbook>;
 }
 let nextId = 0;
 /**

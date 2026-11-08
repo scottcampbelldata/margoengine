@@ -90,6 +90,9 @@ interface VFXFields {
     field?: VFXVectorField;
 }
 
+interface VFXFlipbook {
+}
+
 interface VFXLightSource {
     pbr(group: number): {
         readonly declarations: string;
@@ -158,6 +161,7 @@ interface VFXOptions {
     stretch?: VFXStretch;
     fields?: VFXFields;
     skinned?: VFXSkinned;
+    flipbook?: VFXFlipbook;
 }
 
 interface VFXRibbons {

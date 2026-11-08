@@ -133,11 +133,15 @@ interface VFXFeatures {
     stretch?: VFXExtension<VFXStretch>;
     fields?: VFXExtension<VFXFields>;
     skinned?: VFXExtension<VFXSkinned>;
+    flipbook?: VFXExtension<VFXFlipbook>;
 }
 
 interface VFXFields {
     attractors?: readonly VFXAttractor[];
     field?: VFXVectorField;
+}
+
+interface VFXFlipbook {
 }
 
 interface VFXLightSource {
@@ -208,6 +212,7 @@ interface VFXOptions {
     stretch?: VFXStretch;
     fields?: VFXFields;
     skinned?: VFXSkinned;
+    flipbook?: VFXFlipbook;
 }
 
 interface VFXRibbons {

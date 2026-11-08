@@ -21,6 +21,8 @@
 // move as the CPU steps them; without the feature they stay at rest.
 // Skinned: births lie on the posed triangles (placed by the transform), fly along the posed normals and split by
 // bind-pose area; with no deformer yet they lie on the bind pose.
+// Flipbook: two particles held halfway between atlas frames (including a row wrap) match the CPU mix of the two
+// solid cells times the life fade, within 2 of 255. Removing the mix fails this.
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
@@ -144,6 +146,14 @@ try {
     clean(r, name);
     assert.deepEqual(r.mismatches, [], name);
     console.log(`ok ${name}: ${r.born} births, ${r.counts.join(' / ')} by triangle`);
+  }
+  {
+    const name = 'flipbook',
+      r = await page.evaluate(() => window.checkFlipbook());
+    report.results[name] = r;
+    clean(r, name);
+    assert.deepEqual(r.mismatches, [], name);
+    console.log(`ok ${name}: ${r.got.map((p) => p.join(',')).join(' | ')}`);
   }
   assert.deepEqual(pageErrors, []);
   await mkdir('test-results', { recursive: true });

@@ -2994,6 +2994,10 @@
       "types": "./dist/vfx/skinned.d.ts",
       "import": "./dist/vfx/skinned.js"
     },
+    "./vfx/flipbook": {
+      "types": "./dist/vfx/flipbook.d.ts",
+      "import": "./dist/vfx/flipbook.js"
+    },
     "./video": {
       "types": "./dist/video.d.ts",
       "import": "./dist/video.js"

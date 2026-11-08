@@ -1,6 +1,6 @@
 <!doctype html><html><head><meta charset="utf-8"/><title>VFX features check</title></head><body>
 <script type="module">
-// Real-GPU checks of the features added after the first seven (ribbons and later), run by features-check.mjs. Each
+// Real-GPU checks of the features added after the first seven (ribbons and later, including flipbook), run by features-check.mjs. Each
 // check simulates real frames of a real VFX effect with fixed steps and reads back the picture (and buffers where a
 // check needs them), comparing against what the test computes from the options.
 import {VFX} from '/packages/vfx/dist/index.js';
@@ -79,7 +79,7 @@ window.checkRibbons=async({samples=1,interval=0,reborn=false,heads=false}={})=>{
 };
 // Particle records written straight into the buffer: [x, y, z, life, vx, vy, vz, size] and [r, g, b, a, birth angle,
 // spin, initial life, 0] per particle, in the split layout (gpuState in the README).
-const records=(list,n)=>{const out=new Float32Array(n*16);list.forEach((p,i)=>{out.set([...p.at,4,...(p.velocity??[0,0,0]),p.size],i*8);out.set([...p.color,1,p.angle??0,0,4,0],n*8+i*8);});return out;};
+const records=(list,n)=>{const out=new Float32Array(n*16);list.forEach((p,i)=>{out.set([...p.at,p.life??4,...(p.velocity??[0,0,0]),p.size],i*8);out.set([...p.color,1,p.angle??0,0,p.maxLife??4,0],n*8+i*8);});return out;};
 const hash=v=>{let x=v>>>0;x=Math.imul(x^(x>>>16),0x7feb352d)>>>0;x=Math.imul(x^(x>>>15),0x846ca68b)>>>0;return(x^(x>>>16))>>>0;};
 const turn=(v,a,t)=>{const c=Math.cos(t),s=Math.sin(t),d=a[0]*v[0]+a[1]*v[1]+a[2]*v[2],x=[a[1]*v[2]-a[2]*v[1],a[2]*v[0]-a[0]*v[2],a[0]*v[1]-a[1]*v[0]];return v.map((e,i)=>e*c+x[i]*s+a[i]*d*(1-c));};
 const box=(hx,hy,hz)=>({positions:[-hx,-hy,-hz,hx,-hy,-hz,hx,hy,-hz,-hx,hy,-hz,-hx,-hy,hz,hx,-hy,hz,hx,hy,hz,-hx,hy,hz],
@@ -349,6 +349,35 @@ window.checkSkinned=async({kind='pose',offset=160}={})=>{
  const share=counts[1]/born,sigma=Math.sqrt(0.75*0.25/born);
  if(born<1900||Math.abs(share-0.75)>5*sigma)mismatches.push({what:'births',born,counts});
  return {error,errors:errors.splice(0),mismatches:mismatches.slice(0,8),born,counts};
+};
+/**
+ * Flipbook: a 2 x 2 lifetime atlas of solid red, green, blue and white. Two particles are held between frames (age
+ * 0.125 and 0.375 of a 4-frame sheet, so positions 0.5 and 1.5). Each centre pixel must be the linear mix of the two
+ * cells times the life fade, over black, within 2 of 255. The second particle's next cell wraps onto the next row.
+ */
+window.checkFlipbook=async()=>{
+ const n=2,cols=2,rows=2,count=cols*rows,w=8,h=8;
+ const colors=[[255,0,0],[0,255,0],[0,0,255],[255,255,255]];
+ const data=new Uint8Array(w*h*4);
+ for(let frame=0;frame<count;frame++){
+  const cx=frame%cols,cy=Math.floor(frame/cols),cw=w/cols,ch=h/rows;
+  for(let y=0;y<ch;y++)for(let x=0;x<cw;x++){const i=((cy*ch+y)*w+cx*cw+x)*4;data.set(colors[frame],i);data[i+3]=255;}
+ }
+ const lives=[{life:3.5,maxLife:4,at:[-2,0,0]},{life:2.5,maxLife:4,at:[2,0,0]}];
+ const effect=new VFX({...still,capacity:n,velocity:[0,0,0],size:2,texture:{width:w,height:h,data,atlas:{columns:cols,rows,frames:'lifetime'}},flipbook:{}});
+ const {image,error}=await run(effect,{frames:0,dt:0,samples:1,setup:()=>device.queue.writeBuffer(effect.gpuState.particles,0,records(lives.map(p=>({at:p.at,size:2,color:[1,1,1],life:p.life,maxLife:p.maxLife})),n))});
+ effect.dispose();
+ const wantOf=(life,maxLife)=>{
+  const pos=Math.max(1-life/maxLife,0)*count,frame=Math.min(Math.floor(pos),count-1),next=Math.min(frame+1,count-1),blend=pos-frame,alpha=Math.min(Math.max(life/maxLife,0),1);
+  return [0,1,2].map(k=>Math.round((((1-blend)*colors[frame][k]+blend*colors[next][k])/255)*alpha*255));
+ };
+ const at=(px,py)=>[...image.subarray((py*size+px)*4,(py*size+px)*4+3)],mismatches=[],got=[],want=[];
+ lives.forEach((p,i)=>{
+  const [px,py]=pixel(p.at[0],p.at[1]),g=at(px,py),w=wantOf(p.life,p.maxLife);
+  got.push(g);want.push(w);
+  if(Math.max(...g.map((v,k)=>Math.abs(v-w[k])))>2)mismatches.push({i,px,py,got:g,want:w});
+ });
+ return {error,errors:errors.splice(0),mismatches,got,want};
 };
 window.ready=true;
 </script></body></html>

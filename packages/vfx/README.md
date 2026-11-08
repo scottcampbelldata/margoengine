@@ -43,7 +43,8 @@ and make the same GPU calls:
 - `texture: {width, height, data, atlas: {columns, rows, frames}}` treats the texture as `columns` x `rows` equal
   frames, numbered left to right from the top row. `frames: 'random'` gives each particle one frame picked when it
   spawns (block-break debris showing pieces of the block's texture); `'lifetime'` steps each particle through every
-  frame in order from spawn to death (a flipbook). Sampling stays half a texel inside the frame, so linear filtering
+  frame in order from spawn to death (a flipbook). `@margoengine/vfx/flipbook` blends each frame into the next;
+  without it the step is instant. Sampling stays half a texel inside the frame, so linear filtering
   never shows a neighbouring frame, and the billboard triangle grows to hold the whole square frame. Without `atlas`
   the WGSL and GPU calls are unchanged.
 
@@ -212,12 +213,12 @@ from 0.010 to 0.031 ms at 100,000; the draw is unchanged.
 
 ### Load only what you use
 
-`VFX` from `@margoengine/vfx` (about 14.1 kB min+gzip) carries every feature. An effect that uses none of them can
+`VFX` from `@margoengine/vfx` (27,335 B min+gzip) carries every feature. An effect that uses none of them can
 import the same class from `@margoengine/vfx/base` (about 8.3 kB); add features as a second argument from their own
 entries: `/obstacles` (1.1 kB alone), `/wrap` (0.2 kB), `/sort` (1.1 kB), `/texture` (1.5 kB; it exports
-`textureFeature`, passed as `{texture: textureFeature}`), `/curves` (1.6 kB), `/emitter` (2.4 kB), `/soft` (1.3 kB), `/ribbons` (2.6 kB, the quality gate's figure), `/mesh` (3.2 kB, the same), `/events` (2.3 kB, the same), `/lit` (1.7 kB, the same), `/depth-collide` (2.0 kB, the same), `/stretch` (0.8 kB, the same), `/fields` (1.8 kB, the same) and `/skinned` (2.1 kB, the same). Sizes are vite library builds with bare imports external,
+`textureFeature`, passed as `{texture: textureFeature}`), `/curves` (1.6 kB), `/emitter` (2.4 kB), `/soft` (1.3 kB), `/ribbons` (2.6 kB, the quality gate's figure), `/mesh` (3.2 kB, the same), `/events` (2.3 kB, the same), `/lit` (1.7 kB, the same), `/depth-collide` (2.0 kB, the same), `/stretch` (0.8 kB, the same), `/fields` (1.8 kB, the same), `/skinned` (2.1 kB, the same) and `/flipbook` (0.9 kB, 911 B min+gzip, the quality gate's figure). Sizes are vite library builds with bare imports external,
 each entry compressed on its own ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)), so a
-bundle that combines them adds less: the whole root is 14.1 kB. `node examples/package-benchmarks/vfx-size.mjs` measures base-plus-feature bundles
+bundle that combines them adds less: the whole root is 27,335 B. `node examples/package-benchmarks/vfx-size.mjs` measures base-plus-feature bundles
 (`results/vfx-size.json`, at an earlier commit, `76af7a0`).
 
 ```ts
@@ -526,3 +527,37 @@ later. Births take only the pose: they do not inherit the surface's own motion. 
 (real GPU) emits 2,000 particles from a posed two-triangle primitive, with and without an offset into the deformer's
 buffer and with no deformer yet, and checks that every birth lies on a posed triangle and flies along its normal, and
 that the births split by bind-pose area.
+
+### Flipbook frame blending
+
+`flipbook` blends a lifetime atlas instead of stepping from one cell to the next. The vertex stage passes this frame,
+the next frame (the last frame holds, so it does not wrap) and the fraction between them; the fragment stage samples
+both cells, still half a texel in, and mixes them. It needs `texture` with an atlas whose `frames` are `'lifetime'`
+(a random frame has no fraction). Pass `{}`.
+
+```ts
+import {EngineKernel} from 'margoengine/core';
+import {VFX} from 'margoengine/vfx/base';
+import {textureFeature} from 'margoengine/vfx/texture';
+import {flipbook} from 'margoengine/vfx/flipbook';
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
+// Four solid frames, 4 x 4 texels each, blended across each spark's life.
+const w = 8, frames = new Uint8Array(w * w * 4);
+const cell = [255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 255, 255];
+for (let i = 0; i < 4; i++) {
+  const x0 = (i % 2) * 4, y0 = (i >> 1) * 4;
+  for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) frames.set(cell.slice(i * 4, i * 4 + 4), ((y0 + y) * w + x0 + x) * 4);
+}
+VFX.attach(engine, {
+  capacity: 256, rate: 40, size: 0.2, lifetime: [1, 1], color: [1, 1, 1, 1],
+  texture: {width: w, height: w, data: frames, atlas: {columns: 2, rows: 2, frames: 'lifetime'}},
+  flipbook: {},
+}, {texture: textureFeature, flipbook});
+engine.start();
+```
+
+On WebGPU the mix is in the billboard fragment shader. On the WebGL2 route the same shader translates to GLSL ES 3.00
+(`mix` of the two cell samples) and the route's draw wrapper still drops instances past the frame's count; a pixel
+comparison on that layer was not run. `node packages/vfx/test/features-check.mjs` (real GPU) holds two particles
+halfway between frames of a 2 x 2 solid atlas, one of them wrapping onto the next row, and checks each centre pixel
+against the same mix computed on the CPU.

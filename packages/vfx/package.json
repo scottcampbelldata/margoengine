@@ -101,6 +101,10 @@
     "./skinned": {
       "types": "./dist/skinned.d.ts",
       "import": "./dist/skinned.js"
+    },
+    "./flipbook": {
+      "types": "./dist/flipbook.d.ts",
+      "import": "./dist/flipbook.js"
     }
   },
   "files": [
