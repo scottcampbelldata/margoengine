@@ -110,6 +110,34 @@ export interface VFXOptions {
   stretch?: VFXStretch;
   /** Point attractors and a 3D vector field added to each particle's acceleration. Needs `fields` from `@margoengine/vfx/fields`. */
   fields?: VFXFields;
+  /** Births on the surface of an animated (skinned or morphed) mesh, following its pose. Needs `skinned` from `@margoengine/vfx/skinned`. */
+  skinned?: VFXSkinned;
+}
+/**
+ * What the skinned emitter reads of a primitive: an entry of `model.primitives` from `@margoengine/gltf-pro`, with a
+ * deformer such as `Animation` from `@margoengine/animation` attached.
+ */
+export interface VFXSkinnedPrimitive {
+  /** The bind pose, 20 floats a vertex, position first. Read at attach. */
+  readonly vertices: Float32Array;
+  /** Triangles, three vertex indices each. Read at attach. */
+  readonly indices: ArrayLike<number>;
+  /** The buffer the deformer writes the posed vertices to (80 bytes each). Read every frame; until set, the bind pose. */
+  readonly deformed?: GPUBuffer;
+  /** Bytes before the primitive's first vertex in `deformed`. Default 0. */
+  readonly deformedOffset?: number;
+}
+/**
+ * Births on an animated mesh: each birth picks a triangle by its bind-pose area (so a stretched limb does not emit
+ * more) and a uniform point of it in this frame's pose, placed by `transform` (the emitter's `position` is not used; `emissionExtent` still jitters it), and flies along
+ * the posed face's normal times `speed` on top of `velocity` and `spread`. Not with `emitter`. Needs the `skinned` feature.
+ */
+export interface VFXSkinned {
+  primitive: VFXSkinnedPrimitive;
+  /** The mesh's world matrix, 16 numbers column-major (the node's world transform). Read every frame. Default identity. */
+  transform?: ArrayLike<number>;
+  /** World units per second along the posed face normal, -1000..1000 (negative flies inward). Default 0. */
+  speed?: number;
 }
 /** A point that pulls particles towards it (or pushes them away with a negative strength). */
 export interface VFXAttractor {
@@ -377,7 +405,7 @@ export interface VFXExtension<T> {
   create?(state: VFXState, value: T, owned: OwnedResources): VFXRuntime;
 }
 /** Added features, in the order their patches apply. */
-const extensions = ['ribbons', 'mesh', 'events', 'lit', 'depthCollide', 'stretch', 'fields'] as const;
+const extensions = ['ribbons', 'mesh', 'events', 'lit', 'depthCollide', 'stretch', 'fields', 'skinned'] as const;
 /** One compute dispatch of the slot-order passes. */
 type Step = [GPUComputePipeline, GPUBindGroup];
 /**
@@ -441,6 +469,7 @@ export interface VFXFeatures {
   depthCollide?: VFXExtension<VFXDepthCollide>;
   stretch?: VFXExtension<VFXStretch>;
   fields?: VFXExtension<VFXFields>;
+  skinned?: VFXExtension<VFXSkinned>;
 }
 let nextId = 0;
 /**

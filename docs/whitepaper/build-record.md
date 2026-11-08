@@ -2818,3 +2818,34 @@ sample). Nothing is timed.
   overwrote main's LIM-496 and dropped its clean-room row, and a second rebase shifted our claim twice and left a gap.
   Root tests caught both before any push. The landing script now fails before the push if any row of main in the claims,
   limits or clean-room tables is removed or changed, or if the LIM numbers skip or repeat.
+
+## Lane N batch 78: vfx (part 1)
+
+Eight jobs for `@margoengine/vfx` on the dev PC (lane N, work list 1): eight new optional entries, each carried by the
+root `VFX`. Core and stage are untouched. GPU work is proved on an RTX A6000 through
+`packages/vfx/test/features-check.mjs` and `lit-check.mjs` (in `test:gpu`), by reading back pictures and particle
+buffers of generated scenes against the same frames worked on the CPU; each check was mutation-tested once. Nothing is
+timed.
+
+| # | Job | Status | Commit | Entry | Claim |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Ribbons and trails | DONE | `e65e1fa2b` | `/ribbons` | LIM-485 |
+| 2 | Mesh particles | DONE | `e9ed472d0` | `/mesh` | LIM-489 |
+| 3 | Sub-emitters and GPU events | DONE | `724280fcb` | `/events` | LIM-492 |
+| 4 | Lit particles | DONE | `47df34b84` | `/lit` | LIM-496 |
+| 5 | Depth buffer collision | DONE | `b368bc1bd` | `/depth-collide` | LIM-505 |
+| 6 | Velocity-stretched billboards | DONE | `2543ac436` | `/stretch` | LIM-508 |
+| 7 | Vector fields and attractors | DONE | `2e9d64d10` | `/fields` | LIM-509 |
+| 8 | Skinned mesh emitters | DONE | the commit that adds this section | `/skinned` | LIM-510 |
+
+- **Built from:** Reeves 1983 throughout; prefix-sum compaction for GPU events (Blelloch 1990); wrap lighting (Green
+  2004) on the clustered BRDF; screen-space depth tests with a thickness (McGuire and Mara 2014); Plummer-softened
+  attractors (1911) and trilinear grids; area-weighted surface sampling (Osada et al. 2002). Rows in the vfx part of
+  `docs/clean-room.md`. (The commit messages of jobs 5 to 7 may name claim numbers from before a rebase; the docs hold
+  the right ones.)
+- **Proved:** each entry's picture or particle buffer matches the CPU result on one GPU, at 1x and 4x MSAA where it
+  draws; each check fails under one named mutation (claims rows above).
+- **Not proved:** time on any GPU; other GPUs; the WebGL2 compatibility route for these entries.
+- **Bugs found:** a test-only canvas read race in `lit-check.html` (fixed); the `fields` edit had to target the force
+  sum so it works with `obstacles` (caught before landing); a skinned birth would have added the emitter's default
+  `position` on top of the mesh `transform` (caught by the GPU check, regression in `skinned.test.js`).

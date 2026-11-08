@@ -97,6 +97,10 @@
     "./fields": {
       "types": "./dist/fields.d.ts",
       "import": "./dist/fields.js"
+    },
+    "./skinned": {
+      "types": "./dist/skinned.d.ts",
+      "import": "./dist/skinned.js"
     }
   },
   "files": [

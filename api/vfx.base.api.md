@@ -159,6 +159,7 @@ export interface VFXFeatures {
     depthCollide?: VFXExtension<VFXDepthCollide>;
     stretch?: VFXExtension<VFXStretch>;
     fields?: VFXExtension<VFXFields>;
+    skinned?: VFXExtension<VFXSkinned>;
 }
 
 export interface VFXFields {
@@ -233,6 +234,7 @@ export interface VFXOptions {
     depthCollide?: VFXDepthCollide;
     stretch?: VFXStretch;
     fields?: VFXFields;
+    skinned?: VFXSkinned;
 }
 
 export interface VFXRibbons {
@@ -254,6 +256,19 @@ export interface VFXRuntime {
     key?(group: number): string;
     shade?(code: string, group: number): string;
     bind?(pass: GPURenderPassEncoder, pipeline: GPURenderPipeline, group: number): void;
+}
+
+export interface VFXSkinned {
+    primitive: VFXSkinnedPrimitive;
+    transform?: ArrayLike<number>;
+    speed?: number;
+}
+
+export interface VFXSkinnedPrimitive {
+    readonly vertices: Float32Array;
+    readonly indices: ArrayLike<number>;
+    readonly deformed?: GPUBuffer;
+    readonly deformedOffset?: number;
 }
 
 export interface VFXState {

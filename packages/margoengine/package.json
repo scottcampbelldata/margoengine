@@ -2922,6 +2922,10 @@
       "types": "./dist/vfx/fields.d.ts",
       "import": "./dist/vfx/fields.js"
     },
+    "./vfx/skinned": {
+      "types": "./dist/vfx/skinned.d.ts",
+      "import": "./dist/vfx/skinned.js"
+    },
     "./video": {
       "types": "./dist/video.d.ts",
       "import": "./dist/video.js"

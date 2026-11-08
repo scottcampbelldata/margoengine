@@ -215,7 +215,7 @@ from 0.010 to 0.031 ms at 100,000; the draw is unchanged.
 `VFX` from `@margoengine/vfx` (about 14.1 kB min+gzip) carries every feature. An effect that uses none of them can
 import the same class from `@margoengine/vfx/base` (about 8.3 kB); add features as a second argument from their own
 entries: `/obstacles` (1.1 kB alone), `/wrap` (0.2 kB), `/sort` (1.1 kB), `/texture` (1.5 kB; it exports
-`textureFeature`, passed as `{texture: textureFeature}`), `/curves` (1.6 kB), `/emitter` (2.4 kB), `/soft` (1.3 kB), `/ribbons` (2.6 kB, the quality gate's figure), `/mesh` (3.2 kB, the same), `/events` (2.3 kB, the same), `/lit` (1.7 kB, the same), `/depth-collide` (2.0 kB, the same), `/stretch` (0.8 kB, the same) and `/fields` (1.8 kB, the same). Sizes are vite library builds with bare imports external,
+`textureFeature`, passed as `{texture: textureFeature}`), `/curves` (1.6 kB), `/emitter` (2.4 kB), `/soft` (1.3 kB), `/ribbons` (2.6 kB, the quality gate's figure), `/mesh` (3.2 kB, the same), `/events` (2.3 kB, the same), `/lit` (1.7 kB, the same), `/depth-collide` (2.0 kB, the same), `/stretch` (0.8 kB, the same), `/fields` (1.8 kB, the same) and `/skinned` (2.1 kB, the same). Sizes are vite library builds with bare imports external,
 each entry compressed on its own ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)), so a
 bundle that combines them adds less: the whole root is 14.1 kB. `node examples/package-benchmarks/vfx-size.mjs` measures base-plus-feature bundles
 (`results/vfx-size.json`, at an earlier commit, `76af7a0`).
@@ -491,3 +491,38 @@ and size and both strengths can change every frame. With `obstacles` the flow be
 in it, as it does with gravity. `node packages/vfx/test/features-check.mjs` (real GPU) reads back particles under an
 attractor and a repeller, and in a linear field inside the cell centres, in the band at the box's edge and outside it,
 against the same frames stepped on the CPU.
+
+### Skinned mesh emitters
+
+`skinned` emits from an animated character: each birth picks a triangle of a skinned or morphed primitive by its
+bind-pose area (a stretched limb does not emit more than at rest) and a uniform point of it in this frame's pose, and
+flies along the posed face's normal times `speed` on top of `velocity` and `spread`. Each frame the posed vertices are
+copied from the deformer's output (`primitive.deformed` at `deformedOffset`, both read every frame, so a re-packed
+batch is followed); until a deformer writes, births use the bind pose. `transform` (16 numbers, column-major, read
+every frame) places the mesh in the world; the emitter's `position` is not used with `skinned`, and it cannot be
+combined with `emitter`.
+
+```ts
+import {EngineKernel} from 'margoengine/core';
+import {loadGLTF} from 'margoengine/gltf-pro';
+import {Animation} from 'margoengine/animation';
+import {VFX} from 'margoengine/vfx/base';
+import {skinned} from 'margoengine/vfx/skinned';
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
+const model = await loadGLTF(engine, '/RobotExpressive.glb');
+Animation.attach(model).play('Walking');
+const body = model.primitives[0]!;
+// Embers rising off the robot as it walks.
+VFX.attach(engine, {
+  capacity: 8192, rate: 600, spread: 0.2, gravity: [0, 0.5, 0], size: 0.01, lifetime: [0.5, 1.5],
+  color: [1, 0.5, 0.1, 1], intensity: 3,
+  skinned: {primitive: body, transform: body.node.matrix, speed: 0.3},
+}, {skinned});
+engine.start();
+```
+
+The copy is recorded when the particles simulate, so a deformer that dispatches later in the same frame shows a frame
+later. Births take only the pose: they do not inherit the surface's own motion. `node packages/vfx/test/features-check.mjs`
+(real GPU) emits 2,000 particles from a posed two-triangle primitive, with and without an offset into the deformer's
+buffer and with no deformer yet, and checks that every birth lies on a posed triangle and flies along its normal, and
+that the births split by bind-pose area.

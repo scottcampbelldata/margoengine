@@ -153,6 +153,7 @@ interface VFXOptions {
     depthCollide?: VFXDepthCollide;
     stretch?: VFXStretch;
     fields?: VFXFields;
+    skinned?: VFXSkinned;
 }
 
 interface VFXRibbons {
@@ -174,6 +175,19 @@ interface VFXRuntime {
     key?(group: number): string;
     shade?(code: string, group: number): string;
     bind?(pass: GPURenderPassEncoder, pipeline: GPURenderPipeline, group: number): void;
+}
+
+interface VFXSkinned {
+    primitive: VFXSkinnedPrimitive;
+    transform?: ArrayLike<number>;
+    speed?: number;
+}
+
+interface VFXSkinnedPrimitive {
+    readonly vertices: Float32Array;
+    readonly indices: ArrayLike<number>;
+    readonly deformed?: GPUBuffer;
+    readonly deformedOffset?: number;
 }
 
 interface VFXState {

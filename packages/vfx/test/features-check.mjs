@@ -19,6 +19,8 @@
 // across, horizontally and vertically, at 1x and 4x MSAA; factor 0 is the round disc.
 // Fields: particles under two attractors, or in a linear vector field (inside, in the edge band, outside the box),
 // move as the CPU steps them; without the feature they stay at rest.
+// Skinned: births lie on the posed triangles (placed by the transform), fly along the posed normals and split by
+// bind-pose area; with no deformer yet they lie on the bind pose.
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
@@ -134,6 +136,14 @@ try {
     clean(r, name);
     assert.deepEqual(r.mismatches, [], name);
     console.log(`ok ${name}: first velocity ${r.got[0].v.map((v) => v.toFixed(4))}`);
+  }
+  for (const options of [{ kind: 'pose' }, { kind: 'pose', offset: 0 }, { kind: 'rest' }]) {
+    const name = `skinned ${JSON.stringify(options)}`,
+      r = await page.evaluate((o) => window.checkSkinned(o), options);
+    report.results[name] = r;
+    clean(r, name);
+    assert.deepEqual(r.mismatches, [], name);
+    console.log(`ok ${name}: ${r.born} births, ${r.counts.join(' / ')} by triangle`);
   }
   assert.deepEqual(pageErrors, []);
   await mkdir('test-results', { recursive: true });

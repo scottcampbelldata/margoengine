@@ -306,5 +306,49 @@ window.checkFields=async({kind='attract'}={})=>{
  });
  return {error,errors:errors.splice(0),mismatches,got,want};
 };
+/**
+ * Skinned emitters, read back from the particle buffer. A primitive of two triangles with bind-pose areas 1 and 3; its
+ * "deformed" output (written here as a deformer would, 80 bytes a vertex after `offset` bytes of other data) poses
+ * them elsewhere, turned and stretched. One step of 0.1 s at 20,000 births a second gives 2,000 particles with speed 2,
+ * no spread and no gravity. Every particle, moved back by its velocity times the step, must lie on one posed triangle
+ * (placed by `transform`, a translation by [0, 1, 0]) within 1e-4, inside it, with velocity 2 x that triangle's unit
+ * normal; the second triangle must take 3/4 of the births (within 5 standard deviations). 'rest': no deformer yet, so
+ * births lie on the bind pose.
+ */
+window.checkSkinned=async({kind='pose',offset=160}={})=>{
+ const dt=0.1,speed=2,n=4096,mismatches=[];
+ const rest=[[0,0,0],[2,0,0],[0,1,0],[0,0,1],[3,0,1],[0,2,1]];
+ const posed=[[1,0,-2],[1,0,-4],[1,1,-2],[0,0,2],[0,-3,5],[2,0,2]];
+ const indices=new Uint32Array([0,1,2,3,4,5]);
+ const vertices=new Float32Array(rest.length*20);rest.forEach((v,i)=>vertices.set(v,i*20));
+ const out=new Float32Array(offset/4+posed.length*20).fill(7);posed.forEach((v,i)=>{out.fill(0,offset/4+i*20,offset/4+i*20+20);out.set(v,offset/4+i*20);});
+ const deformed=kind==='rest'?undefined:device.createBuffer({size:out.byteLength,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC|GPUBufferUsage.COPY_DST});
+ if(deformed)device.queue.writeBuffer(deformed,0,out);
+ const transform=[1,0,0,0,0,1,0,0,0,0,1,0,0,1,0,1];
+ const effect=new VFX({...still,capacity:n,rate:20000,velocity:[0,0,0],lifetime:[100,100],skinned:{primitive:{vertices,indices,deformed,deformedOffset:offset},transform,speed}});
+ const {buffers:[p],error}=await run(effect,{frames:0,dt,read:()=>[effect.gpuState.particles]});
+ effect.dispose();deformed?.destroy();
+ const shape=(kind==='rest'?rest:posed).map(v=>[v[0],v[1]+1,v[2]]);
+ const sub=(a,b)=>a.map((x,i)=>x-b[i]),cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]],dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+ const tris=[0,1].map(t=>{const [a,b,c]=[shape[t*3],shape[t*3+1],shape[t*3+2]],m=cross(sub(b,a),sub(c,a)),l=Math.hypot(...m);return {a,b,c,n:m.map(x=>x/l),m};});
+ const counts=[0,0];let born=0;
+ for(let i=0;i<n;i++){
+  if(p[i*8+3]<=0)continue;born++;
+  const v=[...p.subarray(i*8+4,i*8+7)],at=sub([...p.subarray(i*8,i*8+3)],v.map(x=>x*dt));
+  // The triangle the point lies in: on its plane and with all three barycentric weights >= 0.
+  const k=tris.findIndex(({a,b,c,n,m})=>{
+   if(Math.abs(dot(sub(at,a),n))>1e-4)return false;
+   const w=[cross(sub(b,at),sub(c,at)),cross(sub(c,at),sub(a,at)),cross(sub(a,at),sub(b,at))].map(x=>dot(x,m)/dot(m,m));
+   return w.every(x=>x>=-1e-4);
+  });
+  if(k<0){mismatches.push({i,what:'not on a posed triangle',at});continue;}
+  counts[k]++;
+  if(v.some((x,j)=>Math.abs(x-speed*tris[k].n[j])>1e-4))mismatches.push({i,what:'velocity',v,want:tris[k].n.map(x=>x*speed)});
+ }
+ // Births by bind-pose area: a binomial share of 3/4.
+ const share=counts[1]/born,sigma=Math.sqrt(0.75*0.25/born);
+ if(born<1900||Math.abs(share-0.75)>5*sigma)mismatches.push({what:'births',born,counts});
+ return {error,errors:errors.splice(0),mismatches:mismatches.slice(0,8),born,counts};
+};
 window.ready=true;
 </script></body></html>

@@ -21,7 +21,7 @@ For the second account. Start now.
 | E | post and effects | 75 | toon | 4 | todo |
 | E | post and effects | 76 | transitions | 4 | todo |
 | E | post and effects | 77 | creative | 5 | todo |
-| E | post and effects | 78 | vfx | 8 | list 1 (dev PC) |
+| E | post and effects | 78 | vfx | 8 | done |
 | E | post and effects | 79 | vfx | 3 | list 1 (dev PC) |
 | F | voxels, then 2D | 95 | voxel | 8 | done |
 | F | voxels, then 2D | 96 | voxel | 1 | done |
