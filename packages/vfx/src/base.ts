@@ -98,6 +98,30 @@ export interface VFXOptions {
   emitter?: VFXEmitter;
   /** A ribbon behind each particle through its last positions, for smoke and magic trails. Needs `ribbons` from `@margoengine/vfx/ribbons`. */
   ribbons?: VFXRibbons;
+  /** Draw each particle as a small lit triangle mesh instead of a billboard. Needs `mesh` from `@margoengine/vfx/mesh`. */
+  mesh?: VFXMeshParticles;
+}
+/**
+ * A mesh drawn for every particle in place of its billboard, opaque and depth written, scaled so its farthest vertex from
+ * the mesh origin is half the particle `size` away, in the particle colour lit by one directional light. The geometry and
+ * `align` are read at attach; `light`, `lightColor` and `ambient` every frame (change them on the same object). Needs the
+ * `mesh` feature.
+ */
+export interface VFXMeshParticles {
+  /** Vertex positions as xyz triples around the mesh origin, finite, not all at the origin. */
+  positions: ArrayLike<number>;
+  /** Triangle corner indices, a multiple of 3 (1 to 65,536 triangles), counter-clockwise from outside; omit when `positions` is a triangle list. */
+  indices?: ArrayLike<number>;
+  /** One xyz normal per vertex; omitted, each triangle uses its face normal (flat shading). */
+  normals?: ArrayLike<number>;
+  /** `'random'`: each particle tumbles about its own random axis by its spin (`angularVelocity`); `'velocity'`: the mesh's +y follows the particle's motion and the spin turns it about that line. Default `'random'`. */
+  align?: 'random' | 'velocity';
+  /** Direction towards the light in world space, not zero. Default [0.4, 1, 0.3]. */
+  light?: readonly [number, number, number];
+  /** Linear RGB of the light, each 0..16. Default [1, 1, 1]. */
+  lightColor?: readonly [number, number, number];
+  /** Light that reaches faces turned away, 0..1. Default 0.35. */
+  ambient?: number;
 }
 /**
  * A ribbon behind each particle: a camera-facing strip through the particle and its last `points - 1` recorded
@@ -232,7 +256,7 @@ export interface VFXExtension<T> {
   create?(state: VFXState, value: T, owned: OwnedResources): VFXRuntime;
 }
 /** Added features, in the order their patches apply. */
-const extensions = ['ribbons'] as const;
+const extensions = ['ribbons', 'mesh'] as const;
 /** One compute dispatch of the slot-order passes. */
 type Step = [GPUComputePipeline, GPUBindGroup];
 /**
@@ -290,6 +314,7 @@ export interface VFXFeatures {
     ): { entries: GPUBindGroupEntry[]; write(queue: GPUQueue, emitter: VFXEmitter): void };
   };
   ribbons?: VFXExtension<VFXRibbons>;
+  mesh?: VFXExtension<VFXMeshParticles>;
 }
 let nextId = 0;
 /**
@@ -494,7 +519,8 @@ export class VFX implements EnginePlugin {
     // Before attachment there is nothing to clear, and attaching adds initialCount itself.
     if (!this.device) return this;
     this.burstCount = this.options.initialCount ?? 0;
-    for (const buffer of [this.particles!, this.alive!]) this.device.queue.writeBuffer(buffer, 0, new Uint8Array(buffer.size));
+    for (const buffer of [this.particles!, this.alive!])
+      this.device.queue.writeBuffer(buffer, 0, new Uint8Array(buffer.size));
     for (const buffer of [this.indirect!, this.visible!])
       this.device.queue.writeBuffer(buffer, 0, new Uint32Array([3, 0, 0, 0, 0]));
     return this;
@@ -848,8 +874,8 @@ export class VFX implements EnginePlugin {
     return [pipeline, group];
   }
   private draw(c: Context): void {
-    if (this.transparency.hook) return;
-    if (!this.runtimes.some((r) => r.hides?.())) this.billboards(c);
+    // An order-independent pass takes the billboards only; added features' own draws (meshes, ribbons) stay here.
+    if (!this.transparency.hook && !this.runtimes.some((r) => r.hides?.())) this.billboards(c);
     for (const r of this.runtimes) r.draw?.(c);
   }
   private billboards(c: Context): void {
@@ -875,7 +901,7 @@ export class VFX implements EnginePlugin {
   }
   /** Draws the particles into `hook`'s pass, depth tested and not written. */
   drawTransparent(c: Context, hook: SurfaceTransparency): void {
-    if (!this.visible) return;
+    if (!this.visible || this.runtimes.some((r) => r.hides?.())) return;
     const [pipeline, group] = this.prepare(c, hook),
       pass = surfacePass(c.device, hook, pipeline, group);
     if (this.route) pass.draw(3, this.capacity);

@@ -9,6 +9,7 @@ import { curves } from './curves.js';
 import { emitter } from './emitter.js';
 import { soft } from './soft.js';
 import { ribbons } from './ribbons.js';
+import { mesh } from './mesh.js';
 export type {
   VFXOptions,
   VFXObstacle,
@@ -19,10 +20,11 @@ export type {
   VFXFeatures,
   FogLike,
   VFXRibbons,
+  VFXMeshParticles,
 } from './base.js';
-const features = { obstacles, wrap, sort, texture: textureFeature, curves, emitter, soft, ribbons };
+const features = { obstacles, wrap, sort, texture: textureFeature, curves, emitter, soft, ribbons, mesh };
 /**
- * GPU particles with every optional feature (obstacles, wrap, sort, texture, curves, emitter, soft, ribbons). Effects that use none of them load
+ * GPU particles with every optional feature (obstacles, wrap, sort, texture, curves, emitter, soft, ribbons, mesh). Effects that use none of them load
  * less with `VFX` from `@margoengine/vfx/base`, adding only the feature entries they use.
  */
 export class VFX extends VFXBase {

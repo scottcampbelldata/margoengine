@@ -2850,6 +2850,10 @@
       "types": "./dist/vfx/ribbons.d.ts",
       "import": "./dist/vfx/ribbons.js"
     },
+    "./vfx/mesh": {
+      "types": "./dist/vfx/mesh.d.ts",
+      "import": "./dist/vfx/mesh.js"
+    },
     "./video": {
       "types": "./dist/video.d.ts",
       "import": "./dist/video.js"

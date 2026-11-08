@@ -99,6 +99,17 @@ export interface VFXFeatures {
         };
     };
     ribbons?: VFXExtension<VFXRibbons>;
+    mesh?: VFXExtension<VFXMeshParticles>;
+}
+
+export interface VFXMeshParticles {
+    positions: ArrayLike<number>;
+    indices?: ArrayLike<number>;
+    normals?: ArrayLike<number>;
+    align?: 'random' | 'velocity';
+    light?: readonly [number, number, number];
+    lightColor?: readonly [number, number, number];
+    ambient?: number;
 }
 
 export type VFXObstacle = {
@@ -138,6 +149,7 @@ export interface VFXOptions {
     curves?: VFXCurves;
     emitter?: VFXEmitter;
     ribbons?: VFXRibbons;
+    mesh?: VFXMeshParticles;
 }
 
 export interface VFXRibbons {

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11053203,
+  "total": 11058477,
   "history": [
     {
       "date": "2026-10-24",
@@ -4214,6 +4214,12 @@
       "commit": "e5dea170e",
       "reason": "splats SPZ and SOG writers (encodeSpz, encodeSog), loaded by import() on first call; the size records count lazy chunks in the entry",
       "grew": 4
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "82a670e50",
+      "reason": "vfx mesh: new optional mesh entry (instanced lit triangle mesh per particle, one indirect draw over the billboards' list); root VFX carries it with the other features; base gains the mesh option type and keeps added-feature draws outside OIT; effects without mesh record the same GPU work (trace fixtures)",
+      "grew": 2
     }
   ],
   "items": {
@@ -4919,10 +4925,11 @@
     "@margoengine/usdz/skel": 7987,
     "@margoengine/usdz/subdiv": 4929,
     "@margoengine/usdz/worker": 13771,
-    "@margoengine/vfx": 19020,
+    "@margoengine/vfx": 20845,
     "@margoengine/vfx/base": 11336,
     "@margoengine/vfx/curves": 1816,
     "@margoengine/vfx/emitter": 2656,
+    "@margoengine/vfx/mesh": 3449,
     "@margoengine/vfx/obstacles": 1364,
     "@margoengine/vfx/ribbons": 2854,
     "@margoengine/vfx/soft": 1551,

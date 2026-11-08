@@ -14,13 +14,14 @@ const unit=2*10*Math.tan(20*Math.PI/180)/size,world=(px,py)=>[(px+0.5-size/2)*un
 const pixel=(x,y)=>[Math.floor(x/unit+size/2),Math.floor(size/2-y/unit)];
 window.unit=unit;
 /**
- * Runs `frames` simulation steps of `dt` (calling `before(frame)` first), then one more step with the draw, at
+ * Runs `setup()` after the effect's own setup (to write particle records), then `frames` simulation steps of `dt` (calling `before(frame)` first), then one more step with the draw, at
  * `samples` x MSAA, over a cleared black target and a depth cleared to 0 (reversed Z: nothing drawn). Returns the RGBA8
  * picture and any validation error.
  */
-async function run(effect,{frames,dt=0.1,samples=1,before=()=>{},read=[]}){
+async function run(effect,{frames,dt=0.1,samples=1,before=()=>{},setup=()=>{},read=[]}){
  device.pushErrorScope('validation');
  effect.setup({gpu:device,stats:{drawCalls:0},removePlugin(){}});
+ setup();
  const target=(format,count,usage)=>device.createTexture({size:[size,size],format,sampleCount:count,usage});
  const color=target('rgba8unorm',samples,GPUTextureUsage.RENDER_ATTACHMENT|(samples===1?GPUTextureUsage.COPY_SRC:0)),
   resolved=samples>1?target('rgba8unorm',1,GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.COPY_SRC):color,
@@ -75,6 +76,51 @@ window.checkRibbons=async({samples=1,interval=0,reborn=false,heads=false}={})=>{
   if(d>3)mismatches.push({px,x,k,want,got});
  }
  return {error,errors:errors.splice(0),checked:rows.length,largest,beyond,mismatches:mismatches.slice(0,8),head,tail:along.at(-1)};
+};
+// Particle records written straight into the buffer: [x, y, z, life, vx, vy, vz, size] and [r, g, b, a, birth angle,
+// spin, initial life, 0] per particle, in the split layout (gpuState in the README).
+const records=(list,n)=>{const out=new Float32Array(n*16);list.forEach((p,i)=>{out.set([...p.at,4,...(p.velocity??[0,0,0]),p.size],i*8);out.set([...p.color,1,p.angle??0,0,4,0],n*8+i*8);});return out;};
+const hash=v=>{let x=v>>>0;x=Math.imul(x^(x>>>16),0x7feb352d)>>>0;x=Math.imul(x^(x>>>15),0x846ca68b)>>>0;return(x^(x>>>16))>>>0;};
+const turn=(v,a,t)=>{const c=Math.cos(t),s=Math.sin(t),d=a[0]*v[0]+a[1]*v[1]+a[2]*v[2],x=[a[1]*v[2]-a[2]*v[1],a[2]*v[0]-a[0]*v[2],a[0]*v[1]-a[1]*v[0]];return v.map((e,i)=>e*c+x[i]*s+a[i]*d*(1-c));};
+const box=(hx,hy,hz)=>({positions:[-hx,-hy,-hz,hx,-hy,-hz,hx,hy,-hz,-hx,hy,-hz,-hx,-hy,hz,hx,-hy,hz,hx,hy,hz,-hx,hy,hz],
+ indices:[4,5,6,4,6,7,1,0,3,1,3,2,5,1,2,5,2,6,0,4,7,0,7,3,7,6,2,7,2,3,0,1,5,0,5,4]});
+/**
+ * Mesh particles, with records written straight into the buffer and a step of 0 s. 'front': an axis-aligned cube lit
+ * head-on shows its front face in the particle colour, as wide as the projection of the face, and a second cube drawn
+ * after it but behind it stays hidden where they overlap (depth is written). 'random': a cube turned by its birth angle
+ * about the axis its hash picks shows, at its centre, the shade of the face the CPU finds facing the camera. 'velocity':
+ * a long box follows its velocity along +x, so it is wide and flat on screen.
+ */
+window.checkMesh=async({samples=1,kind='front'}={})=>{
+ const n=4,a=0.25,color=[0.8,0.4,0.2],sqrt3=Math.sqrt(3),list=[],mesh={...box(1,1,1),light:[0,0,1],ambient:a};
+ if(kind==='front')list.push({at:[0,0,0],size:2*sqrt3,color},{at:[1,0.5,-4],size:2*sqrt3,color:[0,1,0]});
+ else if(kind==='random')list.push({at:[0,0,0],size:2*sqrt3,color,angle:1.234});
+ else{Object.assign(mesh,box(0.25,1,0.25),{align:'velocity'});list.push({at:[0,0,0],size:2*Math.hypot(0.25,1,0.25),color,velocity:[1,0,0]});}
+ const effect=new VFX({...still,capacity:n,velocity:[0,0,0],mesh});
+ const {image,error}=await run(effect,{frames:0,dt:0,samples,setup:()=>device.queue.writeBuffer(effect.gpuState.particles,0,records(list,n))});
+ effect.dispose();
+ const at=(px,py)=>[...image.subarray((py*size+px)*4,(py*size+px)*4+3)],near=(got,want)=>Math.max(...got.map((g,i)=>Math.abs(g-want[i]))),c=size/2,mismatches=[];
+ const expect=(px,py,want,what)=>{const got=at(px,py);if(near(got,want)>1)mismatches.push({px,py,what,want,got});};
+ const lit=k=>color.map(v=>Math.round(255*v*(a+(1-a)*k)));
+ if(kind==='front'){
+  // The front face (z = 1) spans 1 / 9 / tan(20 deg) of the half screen.
+  const half=1/9/Math.tan(20*Math.PI/180)*c;
+  for(const [dx,dy] of [[0,0],[-half+2,0],[half-2,0],[0,-half+2],[0,half-2],[half-3,half-3]])expect(Math.floor(c+dx),Math.floor(c+dy),lit(1),'front face');
+  for(const [dx,dy] of [[-half-2,0],[0,-half-2],[0,half+2]])expect(Math.floor(c+dx),Math.floor(c+dy),[0,0,0],'outside');
+  // Where the green cube behind would show if depth were not written: inside the front face, up and to the right.
+  expect(Math.floor(c+half-4),Math.floor(c-half+4),lit(1),'the cube behind stays hidden');
+ }else if(kind==='random'){
+  const h=hash(new Uint32Array(new Float32Array([1.234]).buffer)[0]),z=(h&0xffff)/32767.5-1,lon=(h>>>16)/65536*2*Math.PI,s=Math.sqrt(Math.max(0,1-z*z));
+  const axis=[s*Math.cos(lon),z,s*Math.sin(lon)],facing=Math.max(...[[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]].map(v=>turn(v,axis,1.234)[2]));
+  expect(c,c,lit(facing),'the face towards the camera');
+  if(Math.abs(facing-1)<0.05)mismatches.push({what:'the turn must show a tilted face',facing});
+ }else{
+  const half=1/9.75/Math.tan(20*Math.PI/180)*c,thin=0.25/9.75/Math.tan(20*Math.PI/180)*c;
+  expect(Math.floor(c+half-3),c,lit(1),'long along x');expect(Math.floor(c-half+3),c,lit(1),'long along x');
+  expect(c,Math.floor(c-thin-3),[0,0,0],'thin along y');expect(c,Math.floor(c+thin+3),[0,0,0],'thin along y');
+  expect(Math.floor(c+half+3),c,[0,0,0],'ends at its length');
+ }
+ return {error,errors:errors.splice(0),mismatches};
 };
 window.ready=true;
 </script></body></html>

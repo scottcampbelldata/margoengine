@@ -73,6 +73,10 @@
     "./ribbons": {
       "types": "./dist/ribbons.d.ts",
       "import": "./dist/ribbons.js"
+    },
+    "./mesh": {
+      "types": "./dist/mesh.d.ts",
+      "import": "./dist/mesh.js"
     }
   },
   "files": [

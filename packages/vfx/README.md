@@ -215,7 +215,7 @@ from 0.010 to 0.031 ms at 100,000; the draw is unchanged.
 `VFX` from `@margoengine/vfx` (about 14.1 kB min+gzip) carries every feature. An effect that uses none of them can
 import the same class from `@margoengine/vfx/base` (about 8.3 kB); add features as a second argument from their own
 entries: `/obstacles` (1.1 kB alone), `/wrap` (0.2 kB), `/sort` (1.1 kB), `/texture` (1.5 kB; it exports
-`textureFeature`, passed as `{texture: textureFeature}`), `/curves` (1.6 kB), `/emitter` (2.4 kB), `/soft` (1.3 kB) and `/ribbons` (2.6 kB, the quality gate's figure). Sizes are vite library builds with bare imports external,
+`textureFeature`, passed as `{texture: textureFeature}`), `/curves` (1.6 kB), `/emitter` (2.4 kB), `/soft` (1.3 kB), `/ribbons` (2.6 kB, the quality gate's figure) and `/mesh` (3.2 kB, the quality gate's figure). Sizes are vite library builds with bare imports external,
 each entry compressed on its own ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)), so a
 bundle that combines them adds less: the whole root is 14.1 kB. `node examples/package-benchmarks/vfx-size.mjs` measures base-plus-feature bundles
 (`results/vfx-size.json`, at an earlier commit, `76af7a0`).
@@ -285,3 +285,42 @@ softened or drawn in an order-independent pass, and `interval`, `width` and `hea
 `points` is fixed at attach. `node packages/vfx/test/features-check.mjs` (real GPU) flies a particle at a known speed and
 checks its ribbon's alpha along the centre row against the fades computed in the test, at 1x and 4x MSAA, every frame
 and every second frame, and that a particle born again never joins its old ribbon.
+
+### Mesh particles
+
+`mesh` draws every particle as a small triangle mesh instead of a billboard: debris, leaves, shell casings, coins. The
+mesh is scaled so its farthest vertex from the mesh origin sits half the particle `size` away, takes the particle colour,
+and is lit by one directional light (`light`, the direction towards it, default `[0.4, 1, 0.3]`; `lightColor`, linear
+RGB, default white) plus `ambient` (0 to 1, default 0.35) on faces turned away. `align: 'random'` (the default) tumbles
+each particle about its own random axis by its spin (`angularVelocity`); `align: 'velocity'` points the mesh's +y along
+the particle's motion, so long shapes fly nose first. Without `normals` each triangle is shaded flat by its face normal
+(counter-clockwise triangles face outwards).
+
+```ts
+import {EngineKernel} from 'margoengine/core';
+import {VFX} from 'margoengine/vfx/base';
+import {mesh} from 'margoengine/vfx/mesh';
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
+// Tumbling stone chips: a cube of 12 triangles for each particle.
+const h = 1;
+const cube = {
+  positions: [-h,-h,-h, h,-h,-h, h,h,-h, -h,h,-h, -h,-h,h, h,-h,h, h,h,h, -h,h,h],
+  indices: [4,5,6, 4,6,7, 1,0,3, 1,3,2, 5,1,2, 5,2,6, 0,4,7, 0,7,3, 7,6,2, 7,2,3, 0,1,5, 0,5,4],
+};
+const chips = VFX.attach(engine, {
+  capacity: 5_000, rate: 500, position: [0, 0.5, 0], velocity: [0, 4, 0], spread: 2, size: 0.15,
+  lifetime: [2, 3], angularVelocity: 6, turbulence: 0, color: [0.55, 0.5, 0.45, 1],
+  mesh: {...cube, align: 'random', light: [0.3, 1, 0.5], ambient: 0.3},
+}, {mesh});
+engine.start();
+```
+
+The meshes are drawn instanced in one indirect draw over the billboards' own list of on-screen particles (the GPU
+copies its count into the draw's arguments, no read-back), opaque, back faces culled and depth written, so they hide
+each other and anything drawn later behind them; their alpha is ignored and they are not fogged, softened or drawn in an
+order-independent pass. Up to 65,536 triangles a mesh; every corner runs for every drawn particle, so keep meshes small
+(a 12-triangle cube for 100,000 particles is 3.6 million vertices a frame). The geometry and `align` are read at attach;
+`light`, `lightColor` and `ambient` are read every frame from the same object. `node packages/vfx/test/features-check.mjs`
+(real GPU) checks a cube lit head-on for its exact lit colour and width and that it hides a cube behind it, at 1x and
+4x MSAA, a cube turned by its random axis for the shade of the face turned to the camera, and a long box following its
+velocity.

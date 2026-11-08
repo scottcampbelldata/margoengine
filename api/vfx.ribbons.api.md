@@ -63,6 +63,16 @@ interface VFXExtension<T> {
     create?(state: VFXState, value: T, owned: OwnedResources): VFXRuntime;
 }
 
+interface VFXMeshParticles {
+    positions: ArrayLike<number>;
+    indices?: ArrayLike<number>;
+    normals?: ArrayLike<number>;
+    align?: 'random' | 'velocity';
+    light?: readonly [number, number, number];
+    lightColor?: readonly [number, number, number];
+    ambient?: number;
+}
+
 type VFXObstacle = {
     kind: 'sphere';
     center: Vec3;
@@ -100,6 +110,7 @@ interface VFXOptions {
     curves?: VFXCurves;
     emitter?: VFXEmitter;
     ribbons?: VFXRibbons;
+    mesh?: VFXMeshParticles;
 }
 
 interface VFXRibbons {

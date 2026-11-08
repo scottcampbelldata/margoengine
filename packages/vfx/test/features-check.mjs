@@ -4,6 +4,9 @@
 // Ribbons: a particle flying at a known speed leaves a ribbon whose alpha along its centre row matches the head-to-tail
 // and width fades computed here, at 1x and 4x MSAA, recording every frame or every second frame; a particle that dies
 // and is born again starts a new ribbon that never reaches back into its old life.
+// Mesh particles: a cube lit head-on shows its front face in the lit particle colour, exactly as wide as the face's
+// projection, and hides a cube behind it (depth written), at 1x and 4x MSAA; a cube turned by its birth angle about its
+// hashed axis shows the shade of the face the test finds turned to the camera; a long box follows its velocity.
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
@@ -39,7 +42,22 @@ try {
       assert.deepEqual(r.mismatches, [], name);
       assert.equal(r.beyond, 0, `${name}: nothing is drawn past the head`);
     }
-    console.log(`ok ${name}: ${r.checked} pixels, largest difference ${r.largest.toFixed(2)}/255, tail ${r.tail.toFixed(2)}`);
+    console.log(
+      `ok ${name}: ${r.checked} pixels, largest difference ${r.largest.toFixed(2)}/255, tail ${r.tail.toFixed(2)}`,
+    );
+  }
+  for (const options of [
+    { kind: 'front', samples: 1 },
+    { kind: 'front', samples: 4 },
+    { kind: 'random', samples: 1 },
+    { kind: 'velocity', samples: 1 },
+  ]) {
+    const name = `mesh ${JSON.stringify(options)}`,
+      r = await page.evaluate((o) => window.checkMesh(o), options);
+    report.results[name] = r;
+    clean(r, name);
+    assert.deepEqual(r.mismatches, [], name);
+    console.log(`ok ${name}`);
   }
   assert.deepEqual(pageErrors, []);
   await mkdir('test-results', { recursive: true });
