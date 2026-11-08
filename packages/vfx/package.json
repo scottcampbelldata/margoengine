@@ -85,6 +85,10 @@
     "./lit": {
       "types": "./dist/lit.d.ts",
       "import": "./dist/lit.js"
+    },
+    "./depth-collide": {
+      "types": "./dist/depth-collide.d.ts",
+      "import": "./dist/depth-collide.js"
     }
   },
   "files": [

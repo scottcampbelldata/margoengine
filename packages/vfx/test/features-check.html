@@ -185,5 +185,53 @@ window.checkLit=async({samples=1,wrap=0.5,angle=0,sun=[1,0,1]}={})=>{
  }
  return {error,errors:errors.splice(0),checked,largest,mismatches:mismatches.slice(0,8)};
 };
+/**
+ * Depth collision, read back from the particle buffer. A depth texture (depth32float, reversed Z) is drawn once from
+ * quads with the test's camera; one particle 0.2 across flies -z at 5 units/s from z = 1 in steps of 0.1 s, with bounce
+ * 0.5 and thickness 0.5. The CPU steps the same frames against the quads' planes: from the second step on, before the
+ * move, a particle whose centre lies within thickness behind the surface under it (along the eye ray), or less than its
+ * radius in front, has its velocity into the surface reflected times bounce and is moved a radius in front of the plane.
+ * 'wall': a plane at z = 0 facing the camera. 'slope': the plane x + z = 0, so the bounce turns the particle +x.
+ * 'edge': a quad at z = 0 ending at x = 0 in front of a wall at z = -3, the particle half a pixel inside its edge: the
+ * normal must come from the neighbour on the same surface. 'behind': the particle starts at z = -1.5, behind the wall by
+ * more than the thickness, and flies on. 'off': the wall without the feature: it flies through.
+ */
+const depthOf=(quads)=>{
+ const texture=device.createTexture({size:[size,size],format:'depth32float',usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING});
+ const corners=quads.flatMap(q=>[q[0],q[1],q[2],q[0],q[2],q[3]]),data=new Float32Array(16+corners.length*4);
+ data.set(camera.matrix);corners.forEach((c,i)=>data.set([...c,1],16+i*4));
+ const buffer=device.createBuffer({size:data.byteLength,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST});device.queue.writeBuffer(buffer,0,data);
+ const module=device.createShaderModule({code:'struct S {m:mat4x4f,p:array<vec4f>}\n@group(0) @binding(0) var<storage,read> s:S;\n@vertex fn v(@builtin(vertex_index) i:u32)->@builtin(position) vec4f {return s.m*s.p[i];}'});
+ const pipeline=device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'v'},depthStencil:{format:'depth32float',depthWriteEnabled:true,depthCompare:'greater'}});
+ const encoder=device.createCommandEncoder(),pass=encoder.beginRenderPass({colorAttachments:[],depthStencilAttachment:{view:texture.createView(),depthLoadOp:'clear',depthClearValue:0,depthStoreOp:'store'}});
+ pass.setPipeline(pipeline);pass.setBindGroup(0,device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer}}]}));pass.draw(corners.length);pass.end();
+ device.queue.submit([encoder.finish()]);buffer.destroy();
+ return texture;
+};
+window.checkDepthCollide=async({kind='wall'}={})=>{
+ const n=4,dt=0.1,bounce=0.5,thickness=0.5,radius=0.1,eye=[0,0,10],frames=3,mismatches=[];
+ const edgeX=-0.5*unit,wall=[[-5,-5,0],[5,-5,0],[5,5,0],[-5,5,0]],far=[[-50,-50,-3],[50,-50,-3],[50,50,-3],[-50,50,-3]];
+ const scene={wall:[wall],off:[wall],behind:[wall],slope:[[[-5,-5,5],[5,-5,-5],[5,5,-5],[-5,5,5]]],edge:[[[-5,-5,0],[0,-5,0],[0,5,0],[-5,5,0]],far]}[kind];
+ // The plane under the particle on the CPU: the slope's normal is (1, 0, 1) / sqrt 2, every other plane faces +z.
+ const plane=kind==='slope'?{n:[Math.SQRT1_2,0,Math.SQRT1_2],k:0}:{n:[0,0,1],k:0};
+ const start=[kind==='edge'?edgeX:0,0,kind==='behind'?-1.5:1];
+ const texture=depthOf(scene);
+ const effect=new VFX({...still,capacity:n,velocity:[0,0,0],bounce,depth:()=>texture,...(kind==='off'?{}:{depthCollide:{thickness}})});
+ const {buffers:[p],error}=await run(effect,{frames,dt,setup:()=>device.queue.writeBuffer(effect.gpuState.particles,0,records([{at:start,size:2*radius,color:[1,1,1],velocity:[0,0,-5]}],n)),read:()=>[effect.gpuState.particles]});
+ effect.dispose();texture.destroy();
+ const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2],sub=(a,b)=>a.map((v,i)=>v-b[i]);
+ let at=[...start],v=[0,0,-5];
+ for(let step=1;step<=frames+1;step++){
+  if(step>1&&kind!=='off'){
+   const ray=sub(at,eye).map((x,_,a)=>x/Math.hypot(...a)),t=(plane.k-dot(plane.n,eye))/dot(plane.n,ray),s=eye.map((e,i)=>e+ray[i]*t),gap=dot(sub(at,s),ray);
+   if(gap>-radius&&gap<thickness){const into=dot(v,plane.n);if(into<0)v=v.map((x,i)=>x-(1+bounce)*into*plane.n[i]);const h=dot(sub(at,s),plane.n);at=at.map((x,i)=>x+plane.n[i]*Math.max(0,radius-h));}
+  }
+  at=at.map((x,i)=>x+v[i]*dt);
+ }
+ const got={at:[...p.subarray(0,3)],v:[...p.subarray(4,7)]},near=(a,b)=>a.every((x,i)=>Math.abs(x-b[i])<=2e-3);
+ if(!near(got.at,at))mismatches.push({what:'position',got:got.at,want:at});
+ if(!near(got.v,v))mismatches.push({what:'velocity',got:got.v,want:v});
+ return {error,errors:errors.splice(0),mismatches,got,want:{at,v}};
+};
 window.ready=true;
 </script></body></html>

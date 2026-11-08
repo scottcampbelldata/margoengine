@@ -215,7 +215,7 @@ from 0.010 to 0.031 ms at 100,000; the draw is unchanged.
 `VFX` from `@margoengine/vfx` (about 14.1 kB min+gzip) carries every feature. An effect that uses none of them can
 import the same class from `@margoengine/vfx/base` (about 8.3 kB); add features as a second argument from their own
 entries: `/obstacles` (1.1 kB alone), `/wrap` (0.2 kB), `/sort` (1.1 kB), `/texture` (1.5 kB; it exports
-`textureFeature`, passed as `{texture: textureFeature}`), `/curves` (1.6 kB), `/emitter` (2.4 kB), `/soft` (1.3 kB), `/ribbons` (2.6 kB, the quality gate's figure), `/mesh` (3.2 kB, the same), `/events` (2.3 kB, the same) and `/lit` (1.7 kB, the same). Sizes are vite library builds with bare imports external,
+`textureFeature`, passed as `{texture: textureFeature}`), `/curves` (1.6 kB), `/emitter` (2.4 kB), `/soft` (1.3 kB), `/ribbons` (2.6 kB, the quality gate's figure), `/mesh` (3.2 kB, the same), `/events` (2.3 kB, the same), `/lit` (1.7 kB, the same) and `/depth-collide` (2.0 kB, the same). Sizes are vite library builds with bare imports external,
 each entry compressed on its own ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)), so a
 bundle that combines them adds less: the whole root is 14.1 kB. `node examples/package-benchmarks/vfx-size.mjs` measures base-plus-feature bundles
 (`results/vfx-size.json`, at an earlier commit, `76af7a0`).
@@ -394,3 +394,37 @@ keep their own fade, and mesh particles their own light. `node packages/vfx/test
 compares every third pixel of a sun-lit particle with the wrap-lit ball shading at any spin and at 1x and 4x MSAA;
 `node packages/vfx/test/lit-check.mjs` checks a real engine's clustered point light, a shadow caster and both again
 in an `ExactOIT` pass against the same light computed on the CPU.
+
+### Depth buffer collision
+
+`depthCollide` makes particles bounce off anything drawn on screen, with no colliders to set up: each frame, before
+the simulation, every particle on last frame's draw list is projected with last frame's camera onto last frame's
+scene depth (the `depth` option, as for `softness`). A particle that meets the surface under it, within `thickness`
+(world units, default 0.5) behind it or less than its radius in front, has the part of its velocity going into the
+surface reflected and scaled by the effect's `bounce`, and moves out until it is a radius in front. The surface
+normal comes from the depth of the neighbouring pixels, each axis taking the neighbour nearer in depth, so a particle
+at an object's edge is not bent by the wall behind it.
+
+```ts
+import {EngineKernel} from 'margoengine/core';
+import {VFX} from 'margoengine/vfx/base';
+import {depthCollide} from 'margoengine/vfx/depth-collide';
+import {DepthTexture} from 'margoengine/post/depth';
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
+const depth = DepthTexture.attach(engine);
+// Sparks that bounce off the floor, the walls and every prop in view.
+const sparks = VFX.attach(engine, {
+  capacity: 8192, rate: 600, position: [0, 2, 0], velocity: [0, 2, 0], spread: 4, size: 0.04, bounce: 0.4,
+  lifetime: [1, 2], color: [1, 0.7, 0.3, 1], intensity: 3, depth: () => depth.texture,
+  depthCollide: {thickness: 0.3},
+}, {depthCollide});
+engine.start();
+```
+
+Only what the camera saw can be hit: a particle off screen, or behind something nearer (more than `thickness`
+behind the surface in front of it), flies on, and a particle fast enough to cross a thin object between two frames
+can pass through it. Collisions start the frame after the depth texture exists and use the frame before's depth, so
+attach `DepthTexture` at its default order (-5, after the particles simulate). One small dispatch a frame over the
+listed particles; with `thickness` and `bounce` read every frame. `node packages/vfx/test/features-check.mjs` (real
+GPU) reads back a particle bouncing off a wall and a 45 degree slope, at an object's edge in front of a far wall,
+behind a wall, and without the feature, against the same frames stepped on the CPU.

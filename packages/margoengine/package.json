@@ -2902,6 +2902,10 @@
       "types": "./dist/vfx/lit.d.ts",
       "import": "./dist/vfx/lit.js"
     },
+    "./vfx/depth-collide": {
+      "types": "./dist/vfx/depth-collide.d.ts",
+      "import": "./dist/vfx/depth-collide.js"
+    },
     "./video": {
       "types": "./dist/video.d.ts",
       "import": "./dist/video.js"

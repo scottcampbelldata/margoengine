@@ -12,6 +12,9 @@
 // fewer free slots give fewer children; children never give children; the same frames give the same bytes.
 // Lit: a particle lit by the sun shows, at every pixel of its disc, the wrap-lit ball shading computed here, at any
 // birth angle and at 1x and 4x MSAA.
+// Depth collide: a particle flying into a depth texture drawn from quads bounces off a wall and a slope with the
+// velocity and position the CPU steps, takes its normal from its own surface at an edge, and flies on behind a wall
+// (past the thickness) or without the feature.
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
@@ -100,6 +103,14 @@ try {
     assert.ok(r.checked >= 1200, `${name}: ${r.checked} pixels compared`);
     assert.deepEqual(r.mismatches, [], name);
     console.log(`ok ${name}: ${r.checked} pixels, largest difference ${r.largest.toFixed(2)}/255`);
+  }
+  for (const kind of ['wall', 'slope', 'edge', 'behind', 'off']) {
+    const name = `depth collide ${kind}`,
+      r = await page.evaluate((o) => window.checkDepthCollide(o), { kind });
+    report.results[name] = r;
+    clean(r, name);
+    assert.deepEqual(r.mismatches, [], name);
+    console.log(`ok ${name}: velocity ${r.got.v.map((v) => v.toFixed(3))}`);
   }
   assert.deepEqual(pageErrors, []);
   await mkdir('test-results', { recursive: true });

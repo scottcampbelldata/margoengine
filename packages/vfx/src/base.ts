@@ -104,6 +104,18 @@ export interface VFXOptions {
   events?: VFXEvents;
   /** Billboards lit by the sun, clustered point and spot lights and sun shadows, as round particles. Needs `lit` from `@margoengine/vfx/lit`. */
   lit?: VFXLit;
+  /** Particles bounce off whatever was drawn last frame, from the scene `depth`. Needs `depthCollide` from `@margoengine/vfx/depth-collide`. */
+  depthCollide?: VFXDepthCollide;
+}
+/**
+ * Collisions with the scene depth: each frame, before the simulation, a particle on last frame's draw list that meets
+ * the surface drawn under it last frame (within `thickness` behind it, or less than its radius in front) has its
+ * velocity into the surface reflected and scaled by the effect's `bounce`, and moves out to a radius in front. Needs
+ * the `depth` option (the scene depth, as for `softness`) and the `depthCollide` feature.
+ */
+export interface VFXDepthCollide {
+  /** How far behind a surface, in world units, a particle still counts as touching it (and not as hidden behind it), > 0. Default 0.5. */
+  thickness?: number;
 }
 /**
  * Where lit particles get their light from: `Clustered` from `@margoengine/clustered` or `Shadows` from
@@ -321,7 +333,7 @@ export interface VFXExtension<T> {
   create?(state: VFXState, value: T, owned: OwnedResources): VFXRuntime;
 }
 /** Added features, in the order their patches apply. */
-const extensions = ['ribbons', 'mesh', 'events', 'lit'] as const;
+const extensions = ['ribbons', 'mesh', 'events', 'lit', 'depthCollide'] as const;
 /** One compute dispatch of the slot-order passes. */
 type Step = [GPUComputePipeline, GPUBindGroup];
 /**
@@ -382,6 +394,7 @@ export interface VFXFeatures {
   mesh?: VFXExtension<VFXMeshParticles>;
   events?: VFXExtension<VFXEvents>;
   lit?: VFXExtension<VFXLit>;
+  depthCollide?: VFXExtension<VFXDepthCollide>;
 }
 let nextId = 0;
 /**
@@ -549,7 +562,10 @@ export class VFX implements EnginePlugin {
       const value = o[key],
         feature = this.features[key] as VFXExtension<unknown> | undefined;
       if (value === undefined) continue;
-      if (!feature) throw new TypeError(`VFX ${key} needs ${key} from @margoengine/vfx/${key}: pass {${key}}`);
+      if (!feature)
+        throw new TypeError(
+          `VFX ${key} needs ${key} from @margoengine/vfx/${key.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase())}: pass {${key}}`,
+        );
       feature.validate(value, o);
     }
   }

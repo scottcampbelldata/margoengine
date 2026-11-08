@@ -62,6 +62,10 @@ export interface VFXCurves {
     }[];
 }
 
+export interface VFXDepthCollide {
+    thickness?: number;
+}
+
 export type VFXEmitter = {
     shape: 'sphere';
     radius?: number;
@@ -146,6 +150,7 @@ export interface VFXFeatures {
     mesh?: VFXExtension<VFXMeshParticles>;
     events?: VFXExtension<VFXEvents>;
     lit?: VFXExtension<VFXLit>;
+    depthCollide?: VFXExtension<VFXDepthCollide>;
 }
 
 export interface VFXLightSource {
@@ -212,6 +217,7 @@ export interface VFXOptions {
     mesh?: VFXMeshParticles;
     events?: VFXEvents;
     lit?: VFXLit;
+    depthCollide?: VFXDepthCollide;
 }
 
 export interface VFXRibbons {
