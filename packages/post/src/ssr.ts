@@ -15,7 +15,13 @@ import { applyView, viewLoadOp } from '../../shared/view-rect.js';
 import { MaterialClear, partialMaterialView } from './material-clear.js';
 import { currentFrame, retire, uniformGroups, writeUniform } from '../../shared/frame-resources.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
-declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number; STORAGE_BINDING: number };
+declare const GPUTextureUsage: {
+  RENDER_ATTACHMENT: number;
+  TEXTURE_BINDING: number;
+  STORAGE_BINDING: number;
+  COPY_SRC: number;
+  COPY_DST: number;
+};
 type PostPassContext = Extract<PassContext, { backend: 'webgpu' }>;
 /** SSR settings, read every frame from `ssr.options`; out of range throws RangeError. */
 export interface SSROptions {
@@ -29,6 +35,10 @@ export interface SSROptions {
   steps?: number;
   /** False skips the reflection passes. Default true; also `ssr.enabled`. */
   enabled?: boolean;
+  /** Rough reflections: surfaces rougher than half of `maxRoughness`, where the mirror ray fades out, trace one ray per
+   * pixel per frame along a sampled GGX microfacet normal, averaged over frames by a reprojected history with a
+   * neighbourhood clamp, instead of keeping only the environment. Default false (deterministic frames). */
+  stochastic?: boolean;
 }
 /** The capture hook SSR gives models (gltf-pro's `PBRCapture`, terrain's `TerrainCapture`, water's `WaterCapture`;
  * declared here so post imports none of them). For code with gltf-pro's PBR `Surface`, `declarations` holds
@@ -132,6 +142,96 @@ const guarded = (code: string) =>
     'c=max(vec3f(0),c+f*(m.rgb*reflected-e.rgb));',
     'let q=select(vec3f(1),c/e.rgb,e.rgb>vec3f(1e-6));c=max(vec3f(0),c+f*min(1.0,min(q.x,min(q.y,q.z)))*(m.rgb*reflected-e.rgb));',
   );
+// Stochastic rough reflections. Trace: on pixels rougher than half of maxRoughness, one ray per pixel per frame along a
+// GGX microfacet normal sampled from the distribution of visible normals (E. Heitz, "Sampling the GGX Distribution of
+// Visible Normals", JCGT 7(4), 2018) in an orthonormal basis around the normal (T. Duff et al., "Building an
+// Orthonormal Basis, Revisited", JCGT 6(1), 2017), random numbers from the pixel and frame by pcg3d (M. Jarzynski and
+// M. Olano, "Hash Functions for GPU Rendering", JCGT 9(3), 2020). Output: hit radiance times the mirror path's fades
+// (rgb) and the fades (a), zero on a miss, so the average over frames is the share of the lobe the screen holds.
+const roughTraceShader =
+  vertex +
+  `
+struct U {inverse:mat4x4f,matrix:mat4x4f,a:vec4f,b:vec4f}
+struct R {previous:mat4x4f,c:vec4f}
+@group(0) @binding(0) var<uniform> u:U;
+@group(0) @binding(1) var<uniform> rr:R;
+@group(0) @binding(2) var scene:texture_2d<f32>;
+@group(0) @binding(3) var depth:texture_depth_2d;
+@group(0) @binding(4) var hiz:texture_2d<f32>;
+@group(0) @binding(5) var specular:texture_2d<f32>;
+@group(0) @binding(6) var weight:texture_2d<f32>;
+@group(0) @binding(7) var normals:texture_2d<f32>;
+${traceFunctions}
+fn pcg3d(seed:vec3u)->vec3u {var v=seed*1664525u+1013904223u;v.x+=v.y*v.z;v.y+=v.z*v.x;v.z+=v.x*v.y;v^=v>>vec3u(16u);
+v.x+=v.y*v.z;v.y+=v.z*v.x;v.z+=v.x*v.y;return v;}
+@fragment fn fragment(@builtin(position) frag:vec4f)->@location(0) vec4f {
+let q=vec2i(frag.xy);let e=textureLoad(specular,q,0);let rough=e.a;let m=textureLoad(weight,q,0);let d=textureLoad(depth,q,0);
+var out=vec4f(0);
+if(m.a>0.5&&rough>u.a.z*0.5&&d>0.0){
+let px=vec2f(q)+0.5;let p=world(px,d);let v=normalize(world(px,1.0)-p);
+let n=normalize(textureLoad(normals,q,0).xyz*2.0-1.0);
+let sg=select(-1.0,1.0,n.z>=0.0);let ba=-1.0/(sg+n.z);let bb=n.x*n.y*ba;
+let t1=vec3f(1.0+sg*n.x*n.x*ba,sg*bb,-sg*n.x);let b1=vec3f(bb,sg+n.y*n.y*ba,-n.y);
+let a=max(rough*rough,0.002);let ve=vec3f(dot(v,t1),dot(v,b1),max(dot(v,n),1e-4));
+let vh=normalize(vec3f(a*ve.x,a*ve.y,ve.z));let l2=dot(vh.xy,vh.xy);
+let ta=select(vec3f(1,0,0),vec3f(-vh.y,vh.x,0)/sqrt(l2),l2>0.0);let tb=cross(vh,ta);
+let xi=vec2f(pcg3d(vec3u(vec2u(q),u32(rr.c.x))).xy)*(1.0/4294967296.0);
+let radius=sqrt(xi.x);let phi=6.2831853*xi.y;let blend=0.5*(1.0+vh.z);
+let p1=radius*cos(phi);let p2=mix(sqrt(max(0.0,1.0-p1*p1)),radius*sin(phi),blend);
+let nh=p1*ta+p2*tb+sqrt(max(0.0,1.0-p1*p1-p2*p2))*vh;let ne=normalize(vec3f(a*nh.x,a*nh.y,max(nh.z,0.0)));
+let r=reflect(-v,t1*ne.x+b1*ne.y+n*ne.z);let toward=dot(r,v);
+if(dot(r,n)>0.0&&toward<0.5){
+${march}if(hit){
+let h=o+dir*t;let hq=vec2i(h.xy);let hp=world(vec2f(hq)+0.5,textureLoad(depth,hq,0));let hn=textureLoad(normals,hq,0).xyz*2.0-1.0;
+let f=(1.0-smoothstep(0.0,0.5,toward))*(1.0-smoothstep(0.0,0.3,dot(hn,r)))
+*clamp(min(min(h.x,u.a.x-h.x),min(h.y,u.a.y-h.y))/(0.08*min(u.a.x,u.a.y)),0.0,1.0)*(1.0-smoothstep(0.8*u.b.x,u.b.x,distance(p,hp)));
+out=vec4f(f*textureLoad(scene,hq,0).rgb,f);
+}}}}
+return out;
+}`;
+// Resolve: the history reprojected through last frame's camera (the surface's own motion), clamped to the mean plus or
+// minus one standard deviation of this frame's 3x3 neighbourhood (variance clipping, M. Salvi, "An Excursion in
+// Temporal Supersampling", GDC 2016), blended with this frame's sample by max(1 / (frames + 1), 1 / 16).
+const roughResolveShader =
+  vertex +
+  `
+struct U {inverse:mat4x4f,matrix:mat4x4f,a:vec4f,b:vec4f}
+struct R {previous:mat4x4f,c:vec4f}
+@group(0) @binding(0) var<uniform> u:U;
+@group(0) @binding(1) var<uniform> rr:R;
+@group(0) @binding(2) var noisy:texture_2d<f32>;
+@group(0) @binding(3) var history:texture_2d<f32>;
+@group(0) @binding(4) var depth:texture_depth_2d;
+@group(0) @binding(5) var bilinear:sampler;
+@fragment fn fragment(@builtin(position) frag:vec4f)->@location(0) vec4f {
+let q=vec2i(frag.xy);let size=vec2i(u.a.xy);let now=textureLoad(noisy,q,0);var m1=vec4f(0);var m2=vec4f(0);
+for(var y=-1;y<=1;y++){for(var x=-1;x<=1;x++){let k=textureLoad(noisy,clamp(q+vec2i(x,y),vec2i(0),size-1),0);m1+=k;m2+=k*k;}}
+m1/=9.0;m2/=9.0;let sigma=sqrt(max(m2-m1*m1,vec4f(0)));
+let d=textureLoad(depth,q,0);let px=vec2f(q)+0.5;
+let w=u.inverse*vec4f(px.x/u.a.x*2.0-1.0,1.0-px.y/u.a.y*2.0,d,1.0);let c=rr.previous*vec4f(w.xyz/w.w,1.0);
+let uv=vec2f(c.x/c.w*0.5+0.5,0.5-c.y/c.w*0.5);
+let old=clamp(textureSampleLevel(history,bilinear,uv,0.0),m1-sigma,m1+sigma);
+if(rr.c.z<0.5||d<=0.0||c.w<=0.0||any(uv<vec2f(0))||any(uv>vec2f(1))){return now;}
+return mix(old,now,rr.c.y);
+}`;
+// The composite adds the resolved rough reflections where the mirror path fades out by roughness, so the two meet:
+// c + s (weight x radiance - share x IBL specular), s = smoothstep(maxRoughness / 2, maxRoughness, roughness).
+const roughComposite = (code: string, models: boolean) =>
+  code
+    .replace(
+      '@group(0) @binding(8) var normals:texture_2d<f32>;',
+      '@group(0) @binding(8) var normals:texture_2d<f32>;\n@group(0) @binding(9) var roughs:texture_2d<f32>;',
+    )
+    .replace(
+      /\nreturn vec4f\((toDisplay\(c\)|c),s\.a\);/,
+      `
+if(u.b.w>0.5&&m.a>0.5&&rough>u.a.z*0.5&&d>0.0){let g=textureLoad(roughs,q,0);let ws=smoothstep(u.a.z*0.5,u.a.z,rough);${
+        models
+          ? 'let k=select(vec3f(1),c/e.rgb,e.rgb>vec3f(1e-6));c=max(vec3f(0),c+ws*min(1.0,min(k.x,min(k.y,k.z)))*(m.rgb*g.rgb-g.a*e.rgb));'
+          : 'c=max(vec3f(0),c+ws*(m.rgb*g.rgb-g.a*e.rgb));'
+      }}
+return vec4f($1,s.a);`,
+    );
 const formats: GPUTextureFormat[] = ['rgba16float', 'rgb10a2unorm', 'rgb10a2unorm'],
   blurLevels = 5,
   targets = formats.map((format) => ({ format }));
@@ -220,6 +320,21 @@ export class SSR implements EnginePlugin {
     },
   };
   private readonly values = new Float32Array(40);
+  // Stochastic rough reflections: trace and resolve pipelines, their uniform (last frame's camera, seed, blend, history
+  // valid), the noisy, resolved and history textures, and how many frames the history holds.
+  private roughTrace?: GPURenderPipeline;
+  private roughResolve?: GPURenderPipeline;
+  private roughUniform?: GPUBuffer;
+  private roughTraceGroups?: { get(copy?: GPUBufferBinding): GPUBindGroup };
+  private roughResolveGroups?: { get(copy?: GPUBufferBinding): GPUBindGroup };
+  private roughViews: GPUTextureView[] = [];
+  private roughTextures: GPUTexture[] = [];
+  private roughPasses: GPURenderPassDescriptor[] = [];
+  private roughFrames = 0;
+  private roughSeed = 0;
+  private stochastic = false;
+  private readonly previous = new Float32Array(16);
+  private readonly roughValues = new Float32Array(20);
   private readonly workspace = new Float64Array(52);
   private readonly inverse = this.values.subarray(0, 16);
   constructor(readonly options: SSROptions = {}) {
@@ -264,10 +379,11 @@ export class SSR implements EnginePlugin {
       !Number.isInteger(s) ||
       s < 1 ||
       s > 256 ||
-      (o.enabled !== undefined && typeof o.enabled !== 'boolean')
+      (o.enabled !== undefined && typeof o.enabled !== 'boolean') ||
+      (o.stochastic !== undefined && typeof o.stochastic !== 'boolean')
     )
       throw new RangeError(
-        'Invalid SSR options; maxRoughness must be in (0, 1], thickness and maxDistance above 0, steps 1-256.',
+        'Invalid SSR options; maxRoughness must be in (0, 1], thickness and maxDistance above 0, steps 1-256, stochastic a boolean.',
       );
   }
   setup(engine: Engine): void {
@@ -398,11 +514,13 @@ export class SSR implements EnginePlugin {
   }
   private stage(c: PostPassContext, input: GPUTextureView, output: StageOutput): void {
     const models = this.models.size > 0,
-      key = output.format + output.multisample.count + output.hdr + models,
-      code = output.hdr ? linearComposite : compositeShader;
+      rough = this.stochastic,
+      key = output.format + output.multisample.count + output.hdr + models + rough,
+      code = output.hdr ? linearComposite : compositeShader,
+      shader = models ? guarded(code) : code;
     if (this.key !== key) {
       this.key = key;
-      this.composite = render(c.device, models ? guarded(code) : code, output.format, {
+      this.composite = render(c.device, rough ? roughComposite(shader, models) : shader, output.format, {
         multisample: output.multisample,
       });
       this.input = undefined;
@@ -419,8 +537,34 @@ export class SSR implements EnginePlugin {
           this.depthView!,
           this.hiz!,
           ...this.material,
+          ...(rough ? [this.roughViews[1]] : []),
         ]),
       );
+      if (rough) {
+        const device = c.device;
+        this.roughTrace ??= render(device, roughTraceShader, 'rgba16float');
+        this.roughResolve ??= render(device, roughResolveShader, 'rgba16float');
+        this.roughTraceGroups = uniformGroups(this.uniform!, (uniform) =>
+          bind(device, this.roughTrace!, [
+            uniform,
+            { buffer: this.roughUniform! },
+            input,
+            this.depthView!,
+            this.hiz!,
+            ...this.material,
+          ]),
+        );
+        this.roughResolveGroups = uniformGroups(this.uniform!, (uniform) =>
+          bind(device, this.roughResolve!, [
+            uniform,
+            { buffer: this.roughUniform! },
+            this.roughViews[0],
+            this.roughViews[2],
+            this.depthView!,
+            this.sampler!,
+          ]),
+        );
+      }
     }
     if (this.enabled)
       for (let i = 0; i < blurLevels; i++) {
@@ -430,6 +574,7 @@ export class SSR implements EnginePlugin {
         pass.draw(3);
         pass.end();
       }
+    if (this.enabled && rough) this.traceRough(c);
     this.compositeAttachment.view = output.view;
     this.compositeAttachment.loadOp = viewLoadOp(c, 'clear');
     const pass = c.encoder.beginRenderPass(this.compositePass);
@@ -439,12 +584,43 @@ export class SSR implements EnginePlugin {
     pass.draw(3);
     pass.end();
   }
+  /** Rough reflections for this frame: the noisy trace, the resolve against the history, then the resolve becomes the
+   * next frame's history. The history restarts after a resize, a switch of `stochastic` or `enabled`. */
+  private traceRough(c: PostPassContext): void {
+    const r = this.roughValues;
+    r.set(this.roughFrames ? this.previous : this.values.subarray(16, 32));
+    r[16] = this.roughSeed = (this.roughSeed + 1) >>> 0;
+    r[17] = Math.max(1 / (this.roughFrames + 1), 1 / 16);
+    r[18] = +(this.roughFrames > 0);
+    c.device.queue.writeBuffer(this.roughUniform!, 0, r as Float32Array<ArrayBuffer>);
+    this.previous.set(this.values.subarray(16, 32));
+    this.roughFrames++;
+    for (const [pipeline, groups, pass] of [
+      [this.roughTrace!, this.roughTraceGroups!, this.roughPasses[0]],
+      [this.roughResolve!, this.roughResolveGroups!, this.roughPasses[1]],
+    ] as const) {
+      const encoder = c.encoder.beginRenderPass(pass);
+      encoder.setPipeline(pipeline);
+      encoder.setBindGroup(0, groups.get(this.slice));
+      encoder.draw(3);
+      encoder.end();
+    }
+    const size = [this.width, this.height];
+    c.encoder.copyTextureToTexture({ texture: this.roughTextures[1] }, { texture: this.roughTextures[2] }, size);
+  }
   private resize(c: PostPassContext): void {
     // This view draws in the frame: what it releases waits while another view's commands still need it.
     currentFrame(c.device, c.view ?? c);
     const target = this.host!.target!,
       // Own 1x depth at 4x, and at 1x once models are added: a capture writes depth, and water samples the stack's.
       own = target.samples === 4 || this.models.size > 0;
+    const rough = this.enabled && (this.options.stochastic ?? false);
+    if (rough !== this.stochastic) {
+      // Rough reflections switched (or SSR re-enabled with them): new targets, a new composite and an empty history.
+      this.stochastic = rough;
+      this.width = 0;
+      this.key = '';
+    }
     if (this.width === c.width && this.height === c.height && this.target === target && this.owned === own) return;
     this.release();
     this.width = c.width;
@@ -496,6 +672,18 @@ export class SSR implements EnginePlugin {
       this.blurPasses.push({ colorAttachments: [{ view, loadOp: 'clear', storeOp: 'store' }] });
       if (i) this.blurGroups[i] = bind(device, this.downsample!, [this.blurViews[i - 1], this.sampler!]);
     }
+    if (this.stochastic) {
+      // Noisy trace, resolved and history (rgba16float): radiance times fades, and the fades.
+      this.roughUniform ??= device.createBuffer({ size: 80, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+      this.roughTextures = [attachment, attachment | GPUTextureUsage.COPY_SRC, sampled | GPUTextureUsage.COPY_DST].map(
+        (usage) => texture([c.width, c.height], 'rgba16float', usage),
+      );
+      this.roughViews = this.roughTextures.map((t) => t.createView());
+      this.roughPasses = [0, 1].map((i) => ({
+        colorAttachments: [{ view: this.roughViews[i], loadOp: 'clear', storeOp: 'store' }],
+      }));
+      this.roughFrames = 0;
+    }
   }
   private release(): void {
     for (const t of this.textures) retire(this.device!, t);
@@ -510,6 +698,11 @@ export class SSR implements EnginePlugin {
     this.blurGroups = [];
     this.blurPasses = [];
     this.extra = [];
+    this.roughTextures = [];
+    this.roughViews = [];
+    this.roughPasses = [];
+    this.roughTraceGroups = this.roughResolveGroups = undefined;
+    this.roughFrames = 0;
     this.depthView = this.ownDepth = this.hiz = this.blur = undefined;
     this.compositeGroups = undefined;
     this.clearPass = undefined;
@@ -519,6 +712,9 @@ export class SSR implements EnginePlugin {
   onDeviceRestored(engine: Engine): void {
     this.release();
     retire(this.device!, this.uniform);
+    retire(this.device!, this.roughUniform);
+    this.roughUniform = this.roughTrace = this.roughResolve = undefined;
+    this.stochastic = false;
     this.replay = this.composite = undefined;
     this.replayKey = this.base = undefined;
     this.key = '';
@@ -533,8 +729,9 @@ export class SSR implements EnginePlugin {
     this.engine?.removePlugin(this.name);
     this.release();
     retire(this.device!, this.uniform);
-    this.uniform = undefined;
-    this.replay = this.composite = undefined;
+    retire(this.device!, this.roughUniform);
+    this.uniform = this.roughUniform = undefined;
+    this.replay = this.composite = this.roughTrace = this.roughResolve = undefined;
     this.engine = undefined;
     stack?.dispose();
   }

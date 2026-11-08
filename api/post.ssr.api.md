@@ -39,6 +39,7 @@ export interface SSROptions {
     maxDistance?: number;
     steps?: number;
     enabled?: boolean;
+    stochastic?: boolean;
 }
 
 // Not exported from this entry, but used by the exports above:

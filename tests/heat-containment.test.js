@@ -331,6 +331,19 @@ test('split steps cover the whole suite: both bevel sample counts, each chain pa
     ['voxel/test:gpu#1', 'voxel/test:gpu#2', 'voxel/test:gpu#3', 'voxel/test:gpu#4'],
   );
   assert.equal(splitSteps({ label: 'x y', command: 'npm run a || node b.mjs', dir: 'x' }).length, 1);
+  // Post's browser checks: one step each, so a hot machine cools between them.
+  assert.deepEqual(
+    splitSteps(byId('post/test:gpu')).map((s) => s.command.replace('cd ../.. && node packages/post/test/', '')),
+    [
+      'image-browser.mjs',
+      'outline-browser.mjs',
+      'contact-shadows-browser.mjs',
+      'sss-browser.mjs',
+      'material-decals-browser.mjs',
+      'decals-cull-browser.mjs',
+      'ssr-rough-browser.mjs',
+    ],
+  );
 });
 
 test('profiles are chosen by name, are checked, and hold no machine names or home paths', () => {

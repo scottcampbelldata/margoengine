@@ -167,6 +167,7 @@ test('SSR.attach runs alone in its own PostStack; options are validated', async 
     { steps: 0 },
     { steps: 1.5 },
     { enabled: 1 },
+    { stochastic: 1 },
   ])
     assert.throws(() => new SSR(options), RangeError);
   const effect = new SSR();
@@ -190,6 +191,58 @@ test('disabled SSR skips the replay, Hi-Z and blur and passes the input through'
     1 + 3,
     'composite plus the stack final depth copies and resolve',
   );
+});
+
+test('stochastic rough reflections: a GGX-sampled trace and a reprojected resolve before the composite, history copied', async () => {
+  const h = harness(1),
+    ssr = new SSR({ stochastic: true });
+  h.engine.use(new PostStack([ssr]));
+  const log = h.gpu.record(() => h.frame());
+  const codes = modules(log),
+    trace = codes.find((code) => code.includes('fn pcg3d(')),
+    resolve = codes.find((code) => code.includes('var history:texture_2d<f32>')),
+    composite = codes.find((code) => code.includes('var roughs:texture_2d<f32>'));
+  assert.ok(trace && resolve && composite, 'trace, resolve and the rough composite');
+  // Rough pixels only (above half of maxRoughness), sampled along a visible GGX normal, faded like the mirror path.
+  assert.match(trace, /rough>u\.a\.z\*0\.5/);
+  assert.match(trace, /let ne=normalize\(vec3f\(a\*nh\.x,a\*nh\.y,max\(nh\.z,0\.0\)\)\)/);
+  assert.match(resolve, /clamp\(textureSampleLevel\(history,bilinear,uv,0\.0\),m1-sigma,m1\+sigma\)/);
+  assert.match(
+    composite,
+    /let ws=smoothstep\(u\.a\.z\*0\.5,u\.a\.z,rough\);c=max\(vec3f\(0\),c\+ws\*\(m\.rgb\*g\.rgb-g\.a\*e\.rgb\)\);/,
+  );
+  assert.match(composite, /return vec4f\(toDisplay\(c\),s\.a\);\s*\}$/);
+  assert.equal(log.filter((e) => e[0] === 'copyTextureToTexture').length, 1, 'the resolve becomes the history');
+  const uniforms = (l) => l.filter((e) => e[0] === 'writeBuffer' && e[3].length === 80 * 2).map((e) => e[3]);
+  const floats = (hex) => new Float32Array(new Uint8Array(Buffer.from(hex, 'hex')).buffer);
+  const [first] = uniforms(log).map(floats);
+  assert.deepEqual([first[16], first[17], first[18]], [1, 1, 0], 'seed 1, blend 1, no history yet');
+  await null; // the next frame
+  const steady = h.gpu.record(() => h.frame());
+  assert.equal(
+    steady.filter((e) => /^(texture|buffer|module|group|renderPipeline|computePipeline|view|sampler)$/.test(e[0]))
+      .length,
+    0,
+    'steady frames create no GPU objects',
+  );
+  const [second] = uniforms(steady).map(floats);
+  assert.deepEqual([second[16], second[17], second[18]], [2, 0.5, 1], 'seed 2, blend 1/2, history valid');
+  for (let i = 0; i < 20; i++) {
+    await null;
+    h.frame();
+  }
+  const [later] = uniforms(h.gpu.record(() => h.frame())).map(floats);
+  assert.equal(later[17], 1 / 16, 'the blend floor');
+  // Off again: the deterministic composite and no rough passes.
+  ssr.options.stochastic = false;
+  await null;
+  const off = h.gpu.record(() => h.frame());
+  assert.equal(off.filter((e) => e[0] === 'copyTextureToTexture').length, 0);
+  assert.ok(!modules(off).some((code) => code.includes('var roughs:')));
+  ssr.dispose();
+  h.engine.removePlugin('post:stack');
+  await null;
+  assert.deepEqual(h.live(), []);
 });
 
 // gltf-pro models (opaque, MASK, BLEND, unlit, physical clearcoat) and an instanced materials mesh on a real core Engine;

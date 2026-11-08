@@ -327,6 +327,7 @@ export interface SSROptions {
     maxDistance?: number;
     steps?: number;
     enabled?: boolean;
+    stochastic?: boolean;
 }
 
 export class SceneFade implements EnginePlugin {

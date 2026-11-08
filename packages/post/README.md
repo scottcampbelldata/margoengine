@@ -135,6 +135,23 @@ ssr.enabled = false; // pass-through, no recompiles
   ray for perspective and orthographic (`@margoengine/cameras`) projections alike.
 - **Roughness.** Surfaces rougher than `maxRoughness` are skipped; reflections fade out from half of it. The hit colour
   comes from a half-resolution mip chain of the scene, at a level that grows with roughness² and hit distance.
+- **Rough reflections (`stochastic: true`).** Instead of skipping them, surfaces rougher than half of `maxRoughness`
+  trace one ray per pixel per frame along a microfacet normal sampled from the GGX distribution of visible normals
+  (Heitz 2018), and a resolve pass averages the rays over frames: last frame's result, reprojected through last frame's
+  camera onto this pixel's surface point, is clamped to the mean plus or minus one standard deviation of this frame's
+  3x3 neighbourhood and blended with this frame's sample by `max(1 / (frames + 1), 1 / 16)`. The composite adds it as
+  `s · (weight · radiance − hitShare · iblSpecular)`, `s` rising from 0 at half of `maxRoughness` to 1 at it while the
+  mirror path fades out, so the two meet without a seam. Off by default, which keeps frames deterministic and makes
+  exactly the GPU calls SSR made before.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {SSR} from 'margoengine/post/ssr';
+const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
+const ssr = SSR.attach(engine, {maxRoughness: 0.6, stochastic: true}); // rough floors reflect too, denoised over frames
+ssr.options.stochastic = false;                                         // back to the deterministic mirror path
+```
+
 - **Fades.** Rays toward the camera, hits on back faces (hit normal along the ray), hits near the screen edge and hits
   near `maxDistance` fade out.
 - **IBL fallback without double counting.** With `EnvironmentLighting` the replay computes the IBL specular the scene
@@ -147,7 +164,7 @@ ssr.enabled = false; // pass-through, no recompiles
   term the model was lit with. Checked on a real GPU: a mirror floor under a uniform grey environment loses its grey
   reflection where the red box is reflected (green channel falls to the box's own), for a core floor, a glTF plane and
   a materials mesh alike, and a box above the view leaves the frame unchanged.
-- **Temporal.** Deterministic (no noise), so frames are stable without TAA; with TAA wrapping the stack the jittered
+- **Temporal.** Without `stochastic`, deterministic (no noise), so frames are stable without TAA; with TAA wrapping the stack the jittered
   camera is used throughout and TAA's history smooths reflection edges.
 - **Alpha and bindings.** Keeps the scene alpha (TransparentCanvas). SSR runs in its own passes (the composite samples 7 textures),
   so it adds nothing to the mesh shader's 16-texture budget.
@@ -166,7 +183,11 @@ ssr.enabled = false; // pass-through, no recompiles
   ([probes-gpu.json](../../examples/package-benchmarks/results/probes-gpu.json)). A clearcoat's own (hemisphere) reflection is not replaced; fog is not applied to the replaced
   term (core meshes alike). Materials `basic`/`normal`/`matcap` meshes reflect by their roughness like `standard` ones. With SSAO before it, a creased pixel's IBL specular was already darkened by AO, so a hit
   removes slightly more than was left (clamped at zero). Specular from other ambient plugins (sky's ambient patch) is
-  not replaced.
+  not replaced. With `stochastic`: one history per SSR, so a second view in the same frame (split screen) reprojects
+  against the first view's history; the history follows surfaces, not reflections, so a moving camera smears rough
+  reflections for a few frames (the clamp limits it); 1 ray per pixel with a 1/16 blend floor leaves some noise
+  (mean change from one still frame to the next 0.15/255 against 1.28/255 at the second frame); three more
+  `rgba16float` targets (24 B/pixel); GPU cost not measured.
 
 ## Ground-truth ambient occlusion: `GTAO`
 

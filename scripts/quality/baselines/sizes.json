@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10766540,
+  "total": 10770341,
   "history": [
     {
       "date": "2026-10-24",
@@ -3896,6 +3896,12 @@
       "commit": "7c3dc68df",
       "reason": "batch 118 job 2: new entry sciviz/formats",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "621c97103",
+      "reason": "post/ssr: stochastic rough reflections with a temporal resolve (batch 70 job 5)",
+      "grew": 2
     }
   ],
   "items": {
@@ -4366,7 +4372,7 @@
     "@margoengine/points/pick": 5274,
     "@margoengine/points/potree": 17694,
     "@margoengine/points/surfels": 14851,
-    "@margoengine/post": 40110,
+    "@margoengine/post": 42058,
     "@margoengine/post/afterimage": 5619,
     "@margoengine/post/bloom": 6716,
     "@margoengine/post/contact-shadows": 6389,
@@ -4385,7 +4391,7 @@
     "@margoengine/post/smaa": 6244,
     "@margoengine/post/ssao": 9601,
     "@margoengine/post/ssgi": 11862,
-    "@margoengine/post/ssr": 11404,
+    "@margoengine/post/ssr": 13257,
     "@margoengine/post/sss": 7201,
     "@margoengine/post/stack": 4001,
     "@margoengine/procedural": 12972,
