@@ -25,6 +25,7 @@ export class Terrain implements EnginePlugin {
     addLighting(effect: TerrainLighting): () => void;
     invalidate(): void;
     get heightmap(): GPUTexture | undefined;
+    get weights(): readonly GPUTexture[] | undefined;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
     setCapture(hook: TerrainCapture): () => void;

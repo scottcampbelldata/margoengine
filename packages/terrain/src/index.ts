@@ -250,6 +250,10 @@ export class Terrain implements EnginePlugin {
   get heightmap(): GPUTexture | undefined {
     return this.textures?.heightmap;
   }
+  /** The painted weight textures the factory returned (as given, a texture may repeat), while attached; else undefined. */
+  get weights(): readonly GPUTexture[] | undefined {
+    return this.textures?.weights;
+  }
   setup(engine: Engine): void {
     if (this.disposed || !engine.gpu)
       throw new MargoError(

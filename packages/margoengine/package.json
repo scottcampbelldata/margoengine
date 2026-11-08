@@ -2558,6 +2558,10 @@
       "types": "./dist/terrain/stream.d.ts",
       "import": "./dist/terrain/stream.js"
     },
+    "./terrain/sculpt": {
+      "types": "./dist/terrain/sculpt.d.ts",
+      "import": "./dist/terrain/sculpt.js"
+    },
     "./text": {
       "types": "./dist/text.d.ts",
       "import": "./dist/text.js"

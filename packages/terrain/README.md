@@ -388,6 +388,74 @@ streamed terrain draws exactly the pixels of a plain `Terrain` given that window
 budget (16,384 texels: 17 frames for the first four tiles), and a stream disposed mid-load aborts it and rejects
 `ready` with MargoError `'disposed'` (Radeon 680M). Cost not timed.
 
+## Sculpt and paint brushes: `@margoengine/terrain/sculpt`
+
+`await TerrainSculpt.attach(engine, terrain, options?)` adds GPU brushes to any terrain, for in-game editors and level
+tools: `raise`, `lower`, `smooth`, `flatten` and `paint` (layer weights), with undo and redo. The heightmap must be
+`r32float` and the weight textures (for `paint`) `rgba8unorm`, created with usage 15 (`TEXTURE_BINDING |
+STORAGE_BINDING | COPY_SRC | COPY_DST`); attaching reads them back once into the CPU copies `heights` and `weights`.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Terrain} from 'margoengine/terrain';
+import {TerrainSculpt} from 'margoengine/terrain/sculpt';
+import {TerrainQuery} from 'margoengine/terrain/query';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const n = 257, heights = new Float32Array(n * n);
+const terrain = Terrain.attach(engine, {
+  size: [256, 256], origin: [-128, -128], heightScale: 1,
+  layers: [0, 1, 2, 3].map(() => ({height: [-100, 100] as [number, number], slope: [0, 1] as [number, number], scale: 0.25})),
+  textures(device) {
+    const heightmap = device.createTexture({size: [n, n], format: 'r32float', usage: 15});
+    device.queue.writeTexture({texture: heightmap}, heights, {bytesPerRow: n * 4}, [n, n]);
+    const weight = device.createTexture({size: [n, n], format: 'rgba8unorm', usage: 15});
+    device.queue.writeTexture({texture: weight}, new Uint8Array(n * n * 4).map((_, i) => (i % 4 ? 0 : 255)), {bytesPerRow: n * 4}, [n, n]);
+    const layers = device.createTexture({size: [1, 1, 4], format: 'rgba8unorm-srgb', usage: 6});
+    device.queue.writeTexture({texture: layers}, new Uint8Array(16).fill(140), {bytesPerRow: 4, rowsPerImage: 1}, [1, 1, 4]);
+    return {heightmap, layers, weights: [weight, weight]};
+  },
+});
+const sculpt = await TerrainSculpt.attach(engine, terrain, {radius: 12, strength: 0.5});
+const ground = new TerrainQuery(sculpt.heights, sculpt.columns, sculpt.rows, terrain.options);
+sculpt.onChange((c) => { if (c.weights === undefined) ground.refresh(c.u, c.v, c.width, c.depth); });
+{
+  using stroke = sculpt.stroke({brush: 'raise', amount: 4});  // one undo step
+  for (let x = -40; x <= 40; x += 4) sculpt.dab(x, 0);
+}
+sculpt.dab(0, 20, {brush: 'paint', layer: 2, radius: 16});   // a dab is a stroke of its own
+sculpt.dab(10, 10, {brush: 'flatten', height: 2});
+await sculpt.undo();                                          // the flatten
+await sculpt.flush();                                         // heights and the query hold every finished stroke
+console.log(ground.height(0, 0));
+engine.start();
+```
+
+- Brushes: `raise` and `lower` move heights by `amount` world units (default a tenth of `radius`) times the brush
+  weight; `smooth` moves them toward the 5 x 5 binomial blur of the ground under the brush (Burt and Adelson's
+  [1 4 6 4 1] filter), `flatten` toward `height` (default the height under the stroke's first dab), `paint` the
+  weights toward `layer` (the other layers fall, so the shares still add up). The weight is `strength` (0 to 1,
+  default 0.5) times the falloff of the distance over `radius` (world units, default 8): `smooth` (default) is
+  Wendland's (1 - t)^4 (4t + 1), `linear` and `constant` as named.
+- Each dab is one compute pass over the texels under the brush (a copy with a 2 texel border is read, the terrain's
+  texture written), on the GPU, at once; the terrain's shadow is invalidated.
+- `stroke(options?)` groups dabs into one undo step (`using`, or call `end()`); `undoLimit` strokes are kept (default
+  32), each as the changed rectangle's values before and after it, so `undo()` and `redo()` are exact. A new stroke
+  clears the redo steps. Await `undo()` before the next dab.
+- `heights` and `weights` follow the GPU when a stroke's rectangle has been read back (`await flush()`); `onChange`
+  reports each rectangle they take, for a `TerrainQuery` built on `heights` (refresh it there).
+- After device restoration the CPU copies, edits included, are written into the terrain's new textures.
+- Memory: the CPU copies (4 bytes a texel each), the scratch copy of the largest dab, and per kept stroke its
+  rectangle's values twice.
+
+Checked on a real GPU by `test/sculpt.browser.mjs` (in `test:gpu`) on the Mount Rainier tile (256 x 256 texels 100 m
+apart) with painted weights (Radeon 680M): raise, lower, smooth and flatten dabs match the brush formulas worked on the
+CPU to 0.14 mm inside the brush and leave every texel outside it exactly as it was; a 30-dab smoothing stroke cuts the
+ground's squared Laplacian there by 96%; full-strength paint sets the layer exactly and soft paint is within one 8-bit
+step of the formula; after every stroke the CPU copy equals the GPU read back and a `TerrainQuery` refreshed from
+`onChange` (height and a ray cast) answers the raised ground; undoing all 8 strokes gives back the original heightmap,
+weights and picture exactly, and redoing them the edited ones; a heightmap without storage usage is refused. Cost not
+timed.
+
 ## Screen-space reflections
 
 `Terrain` takes SSR's capture hook (`@margoengine/post/ssr`): `ssr.add(terrain)` draws its own normal, layer colour and

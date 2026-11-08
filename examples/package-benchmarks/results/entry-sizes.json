@@ -1,6 +1,6 @@
 {
-  "commit": "d695f656a",
-  "dirty": false,
+  "commit": "d1affab1e",
+  "dirty": true,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
     "raw": 57071,
@@ -2692,8 +2692,8 @@
     },
     "@margoengine/terrain": {
       ".": {
-        "raw": 39194,
-        "gzip": 12530
+        "raw": 39238,
+        "gzip": 12537
       },
       "./query": {
         "raw": 7254,
@@ -2704,8 +2704,12 @@
         "gzip": 2563
       },
       "./stream": {
-        "raw": 36239,
-        "gzip": 11747
+        "raw": 36283,
+        "gzip": 11753
+      },
+      "./sculpt": {
+        "raw": 10872,
+        "gzip": 4617
       }
     },
     "@margoengine/text": {

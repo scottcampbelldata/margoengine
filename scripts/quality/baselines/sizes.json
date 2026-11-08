@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10713064,
+  "total": 10717937,
   "history": [
     {
       "date": "2026-10-24",
@@ -3842,6 +3842,12 @@
       "commit": "d695f656a",
       "reason": "xr/interaction: new optional entry, grab, ray UI and sockets",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "d1affab1e",
+      "reason": "new entry @margoengine/terrain/sculpt; Terrain.weights getter on the root entry",
+      "grew": 1
     }
   ],
   "items": {
@@ -4482,6 +4488,7 @@
     "@margoengine/terrain": 12874,
     "@margoengine/terrain/layers-pbr": 2819,
     "@margoengine/terrain/query": 3420,
+    "@margoengine/terrain/sculpt": 4873,
     "@margoengine/terrain/stream": 12100,
     "@margoengine/text": 16406,
     "@margoengine/text/msdf": 4516,
