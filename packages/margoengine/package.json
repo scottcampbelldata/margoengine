@@ -850,6 +850,10 @@
       "types": "./dist/environment/fog-volumes.d.ts",
       "import": "./dist/environment/fog-volumes.js"
     },
+    "./environment/studio": {
+      "types": "./dist/environment/studio.d.ts",
+      "import": "./dist/environment/studio.js"
+    },
     "./exporters": {
       "types": "./dist/exporters.d.ts",
       "import": "./dist/exporters.js"

@@ -24,6 +24,7 @@ for (const [entry, emptyOutDir] of [
   ['ground', false],
   ['gi', false],
   ['fog-volumes', false],
+  ['studio', false],
 ])
   await build({
     root,
