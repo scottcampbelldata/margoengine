@@ -420,7 +420,7 @@ impl World {
 
     /// A height field's rows and columns of cells, or None for a mesh of triangle rows.
     #[inline(always)]
-    fn grid_size(&self, mesh: usize) -> Option<(u32, u32)> {
+    pub(crate) fn grid_size(&self, mesh: usize) -> Option<(u32, u32)> {
         let columns = self.uu(MESH_COLUMNS, mesh);
         if columns == 0 {
             return None;
@@ -465,7 +465,7 @@ impl World {
 
     /// The cells of height field `mesh` under the box from `low` to `high` in its frame along x and z: the first and last
     /// row and column. None when the box misses the grid.
-    fn grid_cells(&self, mesh: usize, rows: u32, columns: u32, low: V3, high: V3) -> Option<[u32; 4]> {
+    pub(crate) fn grid_cells(&self, mesh: usize, rows: u32, columns: u32, low: V3, high: V3) -> Option<[u32; 4]> {
         let (v0, stride) = (self.uu(MESH_FIRST_VERTEX, mesh) as usize, rows as usize + 1);
         let (c0, c1) = cell_span(columns, |c| self.s(MESH_VERTEX_X, v0 + stride * c as usize), low.x, high.x)?;
         let (r0, r1) = cell_span(rows, |r| self.s(MESH_VERTEX_Z, v0 + r as usize), low.z, high.z)?;
@@ -474,7 +474,7 @@ impl World {
 
     /// Whether a height field cell's heights reach from `low` to `high`.
     #[inline(always)]
-    fn cell_reaches(&self, mesh: usize, rows: u32, r: u32, c: u32, low: f32, high: f32) -> bool {
+    pub(crate) fn cell_reaches(&self, mesh: usize, rows: u32, r: u32, c: u32, low: f32, high: f32) -> bool {
         let (v0, stride) = (self.uu(MESH_FIRST_VERTEX, mesh) as usize, rows as usize + 1);
         let at = v0 + r as usize + stride * c as usize;
         let h = [self.s(MESH_VERTEX_Y, at), self.s(MESH_VERTEX_Y, at + 1), self.s(MESH_VERTEX_Y, at + stride), self.s(MESH_VERTEX_Y, at + stride + 1)];

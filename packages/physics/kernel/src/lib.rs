@@ -7,6 +7,7 @@
 pub mod api;
 pub mod broad;
 pub mod bvh;
+pub mod cast;
 pub mod compound;
 pub mod contact;
 pub mod events;

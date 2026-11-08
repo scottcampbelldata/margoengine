@@ -1,6 +1,6 @@
 // What a collider's options mean to the kernel. On the step path, as a game can add colliders in its step: no `Math`.
 import { MargoError } from '@margoengine/math/errors';
-import type { KernelColliderOptions, KernelCompoundPart, KernelShape } from '../kernel.js';
+import type { KernelColliderOptions, KernelCompoundPart, KernelQueryShape, KernelShape } from '../kernel.js';
 import { checkVec, type Vec3 } from '../math.js';
 import { bounds, geometryPositions, type ColliderGeometry, type ColliderOptions, type CompoundPart, type ShapeOptions } from '../shapes.js';
 import { buildHull } from './hull.js';
@@ -219,4 +219,26 @@ export function kernelCollider(
       restitutionCombine: options.restitutionCombine,
     },
   };
+}
+
+/**
+ * A query shape for `shapeCast` and `intersectShape`: a sphere, box, capsule or convexHull with its size given.
+ * @throws MargoError `unsupported` for another shape or one sized from a mesh; RangeError for hull points that span no
+ * volume.
+ */
+export function queryShape(options: ShapeOptions, hulls: HullRows): KernelQueryShape {
+  if (options.shape === 'sphere' && options.radius !== undefined) return { shape: 'ball', size: [options.radius] };
+  if (options.shape === 'box' && options.halfExtents) {
+    checkVec(options.halfExtents, 'Box halfExtents');
+    return { shape: 'box', size: [...options.halfExtents] };
+  }
+  if (options.shape === 'capsule') return { shape: 'capsule', size: [options.radius, options.halfHeight] };
+  if (options.shape === 'convexHull' && options.points) {
+    const { vertices, faces } = buildHull(options.points);
+    return { shape: 'hull', size: [hulls.addHull(vertices, faces)] };
+  }
+  throw new MargoError(
+    'unsupported',
+    `A ${String(options?.shape)} query shape is not in the own solver yet; cast or overlap a sphere, box, capsule or convexHull with its size or points given, or use @margoengine/physics.`,
+  );
 }

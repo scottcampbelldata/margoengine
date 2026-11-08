@@ -20,6 +20,7 @@ import {
   QUERY_ONLY_FIXED,
   QUERY_ONLY_KINEMATIC,
   type KernelRayHit,
+  type KernelShapeCastHit,
   type KernelLoadOptions,
   type KernelShape,
 } from '../kernel.js';
@@ -29,7 +30,7 @@ import type { ColliderOptions, ShapeOptions } from '../shapes.js';
 import { PhysicsBody, checkRotation, type BodyOwner } from './body.js';
 import { PhysicsCollider } from './collider.js';
 import { type NextJointOptions, PhysicsJoint, createJoint } from './joint.js';
-import { kernelCollider, shapeServed, type HullRows } from './shapes.js';
+import { kernelCollider, queryShape, shapeServed, type HullRows } from './shapes.js';
 import { MeshSync, meshPose } from './sync.js';
 
 /** Options for creating a Physics world; every field has a default. */
@@ -138,6 +139,32 @@ export interface RaycastHit {
   point: [number, number, number];
   /** Outward surface normal, world space; zero for a hit at distance 0 inside a solid shape. */
   normal: [number, number, number];
+}
+
+/** Options of `Physics.shapeCast`: the query filter plus Rapier's `ShapeCastOptions`. */
+export interface PhysicsShapeCastOptions extends QueryFilter {
+  /** Default unbounded. */
+  maxDistance?: number;
+  /** Stop this far short of touching (default 0). */
+  targetDistance?: number;
+  /** A cast that starts in contact hits at distance 0 even when it moves out (default true); false lets such a cast go on. */
+  stopAtPenetration?: boolean;
+  /** A hit at the start gets its normal and points (default true); false leaves them zero. */
+  computeImpactGeometryOnPenetration?: boolean;
+}
+/** A shape cast's first touch: the ray hit's fields on the collider hit, plus the point and normal on the cast shape. */
+export interface ShapeCastHit extends RaycastHit {
+  queryPoint: [number, number, number];
+  queryNormal: [number, number, number];
+}
+/** The point of a collider nearest a query point, whether the query point is inside it, and how far it is. */
+export interface PointProjection {
+  body: PhysicsBody;
+  mesh: Mesh | null;
+  collider: PhysicsCollider;
+  point: [number, number, number];
+  inside: boolean;
+  distance: number;
 }
 
 /** @internal A helper that steps, syncs and is disposed with a world. */
@@ -706,21 +733,105 @@ export class Physics implements EnginePlugin, BodyOwner {
       for (let i = 0; i < hits.length; i++) if (!options.stop(hits[i]!)) return hits.slice(0, i + 1);
     return hits;
   }
-  /** Not served yet: throws. */
-  shapeCast(): never {
-    throw later('shapeCast', 'queries');
+  private castHit(hit: KernelShapeCastHit): ShapeCastHit | null {
+    const collider = this.byRow.get(hit.collider);
+    return collider
+      ? {
+          body: collider.body,
+          mesh: collider.body.mesh,
+          collider,
+          distance: hit.distance,
+          point: hit.point,
+          normal: hit.normal,
+          queryPoint: hit.queryPoint,
+          queryNormal: hit.queryNormal,
+        }
+      : null;
   }
-  /** Not served yet: throws. */
-  projectPoint(): never {
-    throw later('projectPoint', 'queries');
+  private live(): void {
+    if (this.disposed) throw new MargoError('disposed', 'Physics is disposed; create a new Physics.');
   }
-  /** Not served yet: throws. */
-  intersectPoint(): never {
-    throw later('intersectPoint', 'queries');
+  /**
+   * Sweeps a convex shape (sphere, box, capsule or convexHull, with its size given) from `position` and `rotation` along
+   * `direction` and returns the first collider it touches, or null. `distance` is along the direction's unit. Queries see
+   * the poses of the last step, as Rapier's do.
+   * @throws RangeError for a position, rotation or direction that is not finite, or a zero direction; MargoError
+   * `unsupported` for another query shape.
+   */
+  shapeCast(shape: ShapeOptions, position: Vec3, rotation: Quat, direction: Vec3, options: PhysicsShapeCastOptions = {}): ShapeCastHit | null {
+    checkVec(position, 'Shape position');
+    checkRotation(rotation);
+    checkVec(direction, 'Cast direction');
+    this.live();
+    const query = queryShape(shape, this.hulls),
+      cast = {
+        max: options.maxDistance ?? Infinity,
+        target: options.targetDistance ?? 0,
+        stop: options.stopAtPenetration ?? true,
+        geometry: options.computeImpactGeometryOnPenetration ?? true,
+      },
+      words = this.filterWords(options);
+    if (options.predicate) {
+      let best: ShapeCastHit | null = null;
+      for (const raw of this.kernel.shapeCastAll(query, position, rotation, direction, cast, ...words)) {
+        const hit = this.castHit(raw);
+        if (hit && options.predicate(hit.body, hit.collider) && (!best || hit.distance < best.distance)) best = hit;
+      }
+      return best;
+    }
+    const raw = this.kernel.shapeCast(query, position, rotation, direction, cast, ...words);
+    return raw ? this.castHit(raw) : null;
   }
-  /** Not served yet: throws. */
-  intersectShape(): never {
-    throw later('intersectShape', 'queries');
+  /**
+   * The point on any collider nearest `point`, or null when no collider is seen. Inside a shape with `solid` true (the
+   * default) the point itself; with `solid` false the nearest point of its surface. Inside, `inside` is true and
+   * `distance` 0 either way, as on the root entry.
+   * @throws RangeError for a point that is not three finite numbers.
+   */
+  projectPoint(point: Vec3, options: QueryFilter & { solid?: boolean } = {}): PointProjection | null {
+    checkVec(point, 'Point');
+    this.live();
+    const solid = options.solid ?? true,
+      words = this.filterWords(options);
+    const raws = options.predicate ? this.kernel.projectPointAll(point, solid, ...words) : [this.kernel.projectPoint(point, solid, ...words)];
+    let best: PointProjection | null = null;
+    for (const raw of raws) {
+      const collider = raw && this.byRow.get(raw.collider);
+      if (!raw || !collider || (options.predicate && !options.predicate(collider.body, collider))) continue;
+      const distance = raw.inside ? 0 : raw.distance,
+        hit = { body: collider.body, mesh: collider.body.mesh, collider, point: raw.point, inside: raw.inside, distance };
+      if (!best || distance < best.distance || (distance === best.distance && hit.inside && !best.inside)) best = hit;
+    }
+    return best;
+  }
+  /**
+   * The bodies whose colliders hold `point`, in the order they were added. A trimesh or height field holds no point.
+   * @throws RangeError for a point that is not three finite numbers.
+   */
+  intersectPoint(point: Vec3, options: QueryFilter = {}): PhysicsBody[] {
+    checkVec(point, 'Point');
+    this.live();
+    return this.bodiesOf(this.kernel.intersectPoint(point, ...this.filterWords(options)), options.predicate);
+  }
+  /**
+   * The bodies whose colliders overlap a convex shape (as `shapeCast` takes) at `position` and `rotation`, in the order
+   * they were added.
+   * @throws RangeError for a position or rotation that is not finite; MargoError `unsupported` for another query shape.
+   */
+  intersectShape(shape: ShapeOptions, position: Vec3, rotation: Quat = [0, 0, 0, 1], options: QueryFilter = {}): PhysicsBody[] {
+    checkVec(position, 'Shape position');
+    checkRotation(rotation);
+    this.live();
+    const query = queryShape(shape, this.hulls);
+    return this.bodiesOf(this.kernel.intersectShape(query, position, rotation, ...this.filterWords(options)), options.predicate);
+  }
+  private bodiesOf(rows: readonly number[], predicate: QueryFilter['predicate']): PhysicsBody[] {
+    const found = new Set<PhysicsBody>();
+    for (const row of rows) {
+      const collider = this.byRow.get(row);
+      if (collider && (!predicate || predicate(collider.body, collider))) found.add(collider.body);
+    }
+    return [...found];
   }
   /**
    * Whether two bodies' colliders touch as of the last step. A point still ahead of a moving body does not count. It walks

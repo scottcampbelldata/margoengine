@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11096693,
+  "total": 11120193,
   "history": [
     {
       "date": "2026-10-24",
@@ -4244,6 +4244,12 @@
       "commit": "724280fcb",
       "reason": "environment/blend: blend two environments (new entry)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "73a162862",
+      "reason": "physics/next shape casts, point projections and overlaps on every shape (kernel cast.rs, van den Bergen 2004 GJK ray casting with closest-point steps, projections by region, GJK overlaps; meshes, height fields and voxel grids share one walk with them): kernel 104,802 to 125,310 B deflated. Waste checked with a named build: the three tree walks and two grid scans were merged into one, 1.6 KB off; the rest is the new query code, each function needed by a served option.",
+      "grew": 1
     }
   ],
   "items": {
@@ -4702,7 +4708,7 @@
     "@margoengine/oit/moments": 5512,
     "@margoengine/oit/vfx": 486,
     "@margoengine/physics": 19679,
-    "@margoengine/physics/next": 137085,
+    "@margoengine/physics/next": 160585,
     "@margoengine/physics2d": 8199,
     "@margoengine/physics2d/outline": 2524,
     "@margoengine/pixel": 4664,

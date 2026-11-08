@@ -210,6 +210,12 @@ export class KernelWorld {
     propagateVoxel(a: number, b: number, at: readonly [number, number, number], shift: readonly [number, number, number]): void;
     raycast(origin: readonly number[], direction: readonly number[], max: number, solid: boolean, flags: number, groups: number, collider: number, body: number): KernelRayHit | null;
     raycastAll(origin: readonly number[], direction: readonly number[], max: number, solid: boolean, flags: number, groups: number, collider: number, body: number): KernelRayHit[];
+    shapeCast(shape: KernelQueryShape, position: readonly number[], rotation: readonly number[], direction: readonly number[], cast: KernelCastOptions, flags: number, groups: number, collider: number, body: number): KernelShapeCastHit | null;
+    shapeCastAll(shape: KernelQueryShape, position: readonly number[], rotation: readonly number[], direction: readonly number[], cast: KernelCastOptions, flags: number, groups: number, collider: number, body: number): KernelShapeCastHit[];
+    projectPoint(point: readonly number[], solid: boolean, flags: number, groups: number, collider: number, body: number): KernelProjection | null;
+    projectPointAll(point: readonly number[], solid: boolean, flags: number, groups: number, collider: number, body: number): KernelProjection[];
+    intersectPoint(point: readonly number[], flags: number, groups: number, collider: number, body: number): number[];
+    intersectShape(shape: KernelQueryShape, position: readonly number[], rotation: readonly number[], flags: number, groups: number, collider: number, body: number): number[];
     removeCollider(collider: number): boolean;
     addJoint(a: number, b: number, flags: number): number;
     removeJoint(joint: number): boolean;
@@ -296,10 +302,12 @@ export class Physics implements EnginePlugin, BodyOwner {
     raycastAll(origin: Vec3, direction: Vec3, options?: PhysicsRaycastOptions & {
         stop?: (hit: RaycastHit) => boolean;
     }): RaycastHit[];
-    shapeCast(): never;
-    projectPoint(): never;
-    intersectPoint(): never;
-    intersectShape(): never;
+    shapeCast(shape: ShapeOptions, position: Vec3, rotation: Quat, direction: Vec3, options?: PhysicsShapeCastOptions): ShapeCastHit | null;
+    projectPoint(point: Vec3, options?: QueryFilter & {
+        solid?: boolean;
+    }): PointProjection | null;
+    intersectPoint(point: Vec3, options?: QueryFilter): PhysicsBody[];
+    intersectShape(shape: ShapeOptions, position: Vec3, rotation?: Quat, options?: QueryFilter): PhysicsBody[];
     touching(a: PhysicsBody, b: PhysicsBody): boolean;
     contactPoints(body: PhysicsBody): [number, number, number][];
     debugRender(): never;
@@ -666,6 +674,13 @@ interface JointOwner {
     removeJoint(joint: PhysicsJoint): void;
 }
 
+interface KernelCastOptions {
+    max: number;
+    target: number;
+    stop: boolean;
+    geometry: boolean;
+}
+
 interface KernelCompoundPart {
     shape: 'ball' | 'box' | 'capsule' | 'hull';
     size: readonly number[];
@@ -677,11 +692,49 @@ interface KernelHeightfieldOptions {
     fixInternalEdges?: boolean;
 }
 
+interface KernelProjection {
+    collider: number;
+    inside: boolean;
+    point: [number, number, number];
+    distance: number;
+}
+
+interface KernelQueryShape {
+    shape: 'ball' | 'box' | 'capsule' | 'hull';
+    size: readonly number[];
+}
+
+interface KernelShapeCastHit {
+    collider: number;
+    distance: number;
+    point: [number, number, number];
+    normal: [number, number, number];
+    queryPoint: [number, number, number];
+    queryNormal: [number, number, number];
+    started: boolean;
+}
+
 interface PhysicsAttachment {
     beforeStep?(dt: number): void;
     afterSync?(): void;
     bodyRemoved?(body: PhysicsBody): void;
     dispose(): void;
+}
+
+interface PhysicsShapeCastOptions extends QueryFilter {
+    maxDistance?: number;
+    targetDistance?: number;
+    stopAtPenetration?: boolean;
+    computeImpactGeometryOnPenetration?: boolean;
+}
+
+interface PointProjection {
+    body: PhysicsBody;
+    mesh: Mesh | null;
+    collider: PhysicsCollider;
+    point: [number, number, number];
+    inside: boolean;
+    distance: number;
 }
 
 type Quat = readonly [number, number, number, number];
@@ -692,6 +745,11 @@ interface Rotation extends Vector {
 
 interface Shape {
     readonly type: number;
+}
+
+interface ShapeCastHit extends RaycastHit {
+    queryPoint: [number, number, number];
+    queryNormal: [number, number, number];
 }
 
 type Vec3 = readonly [number, number, number];

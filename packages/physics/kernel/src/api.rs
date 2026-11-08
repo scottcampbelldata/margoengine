@@ -2,7 +2,10 @@
 #![cfg(target_arch = "wasm32")]
 use crate::layout::*;
 use crate::math::{Q, V3, sqrt, v3};
+use crate::cast::{Cast, CastOptions, Projection, Shape};
+use crate::hull::BoxData;
 use crate::query::{Filter, RayHit};
+use crate::sat::Pose;
 use crate::world::World;
 
 static mut WORLD: Option<World> = None;
@@ -386,6 +389,198 @@ pub extern "C" fn query_ray_all(ox: f32, oy: f32, oz: f32, dx: f32, dy: f32, dz:
         if let Some(hit) = w.ray_collider(c, origin, dir, max, solid != 0) {
             if count >= skip as usize && count - (skip as usize) < QUERY_HITS {
                 write_hit(count - skip as usize, c as u32, hit, origin, dir);
+            }
+            count += 1;
+        }
+        true
+    });
+    count as i32
+}
+
+fn write_words(at: usize, words: &[u32]) {
+    let base = core::ptr::addr_of_mut!(QUERY) as *mut u32;
+    for (i, &word) in words.iter().enumerate() {
+        // SAFETY: one thread; callers keep at + words.len() inside the buffer's 8 QUERY_HITS words.
+        unsafe { *base.add(at + i) = word };
+    }
+}
+
+/// A query shape and its pose from plain words; None for a pose that is not finite or a turn of zero length.
+#[allow(clippy::too_many_arguments)]
+fn shape_args(kind: u32, a: f32, b: f32, c: f32, hull: u32, x: f32, y: f32, z: f32, qx: f32, qy: f32, qz: f32, qw: f32) -> Option<(Shape, Pose)> {
+    let q = Q { x: qx, y: qy, z: qz, w: qw };
+    let l = qx * qx + qy * qy + qz * qz + qw * qw;
+    if !(x.is_finite() && y.is_finite() && z.is_finite() && l > 0.0 && l < f32::INFINITY && a.is_finite() && b.is_finite() && c.is_finite()) {
+        return None;
+    }
+    Some((Shape { kind, size: v3(a, b, c), hull }, Pose { p: v3(x, y, z), q: q.normalized() }))
+}
+
+/// Sixteen words of a cast hit: collider, distance, the point and normal on the collider, the point and normal on the
+/// query shape, two spare.
+fn write_cast(k: usize, collider: u32, hit: Cast) {
+    let n = hit.normal;
+    let words = [
+        collider,
+        hit.t.to_bits(),
+        hit.on_target.x.to_bits(),
+        hit.on_target.y.to_bits(),
+        hit.on_target.z.to_bits(),
+        n.x.to_bits(),
+        n.y.to_bits(),
+        n.z.to_bits(),
+        hit.on_query.x.to_bits(),
+        hit.on_query.y.to_bits(),
+        hit.on_query.z.to_bits(),
+        (-n.x).to_bits(),
+        (-n.y).to_bits(),
+        (-n.z).to_bits(),
+        hit.started as u32,
+        0,
+    ];
+    write_words(16 * k, &words);
+}
+
+/// The nearest shape cast hit into the query buffer (sixteen words, see `write_cast`): 1, 0 for none, -1 for words that
+/// are not finite, a zero direction or a kind a query shape cannot be. `options`: 1 stops at a start in contact, 2 works
+/// out the touch's geometry then.
+#[allow(clippy::too_many_arguments)]
+#[unsafe(no_mangle)]
+pub extern "C" fn query_shape_cast(
+    kind: u32, a: f32, b: f32, c: f32, hull: u32, x: f32, y: f32, z: f32, qx: f32, qy: f32, qz: f32, qw: f32, dx: f32, dy: f32, dz: f32, max: f32, target: f32, options: u32, flags: u32,
+    groups: u32, collider: u32, body: u32,
+) -> i32 {
+    let Some((shape, pose, dir, o, filter)) = cast_args(kind, a, b, c, hull, x, y, z, qx, qy, qz, qw, dx, dy, dz, max, target, options, flags, groups, collider, body) else { return -1 };
+    match world().cast_shape(shape, pose, dir, &o, &filter) {
+        Some((c, hit)) => {
+            write_cast(0, c, hit);
+            1
+        }
+        None => 0,
+    }
+}
+
+#[allow(clippy::too_many_arguments, clippy::type_complexity)]
+fn cast_args(
+    kind: u32, a: f32, b: f32, c: f32, hull: u32, x: f32, y: f32, z: f32, qx: f32, qy: f32, qz: f32, qw: f32, dx: f32, dy: f32, dz: f32, max: f32, target: f32, options: u32, flags: u32,
+    groups: u32, collider: u32, body: u32,
+) -> Option<(Shape, Pose, V3, CastOptions, Filter)> {
+    let (shape, pose) = shape_args(kind, a, b, c, hull, x, y, z, qx, qy, qz, qw)?;
+    let (_, dir, filter) = ray_args(x, y, z, dx, dy, dz, flags, groups, collider, body)?;
+    let mut data = BoxData::new();
+    world().solid(shape, pose, &mut data)?;
+    if max.is_nan() || !(target >= 0.0 && target < f32::INFINITY) {
+        return None;
+    }
+    Some((shape, pose, dir, CastOptions { max, target, stop: options & 1 != 0, geometry: options & 2 != 0 }, filter))
+}
+
+/// Every collider's shape cast hit, in row order: hits `skip` onwards go into the buffer (up to 128), and the count of all
+/// hits comes back, or -1 as `query_shape_cast` refuses.
+#[allow(clippy::too_many_arguments)]
+#[unsafe(no_mangle)]
+pub extern "C" fn query_shape_cast_all(
+    kind: u32, a: f32, b: f32, c: f32, hull: u32, x: f32, y: f32, z: f32, qx: f32, qy: f32, qz: f32, qw: f32, dx: f32, dy: f32, dz: f32, max: f32, target: f32, options: u32, flags: u32,
+    groups: u32, collider: u32, body: u32, skip: u32,
+) -> i32 {
+    let Some((shape, pose, dir, o, filter)) = cast_args(kind, a, b, c, hull, x, y, z, qx, qy, qz, qw, dx, dy, dz, max, target, options, flags, groups, collider, body) else { return -1 };
+    let w = world();
+    let mut count = 0usize;
+    w.each_queried(&filter, &mut |c| {
+        if let Some(hit) = w.cast_collider(c, shape, pose, dir, &o) {
+            if count >= skip as usize && count - (skip as usize) < QUERY_HITS / 2 {
+                write_cast(count - skip as usize, c as u32, hit);
+            }
+            count += 1;
+        }
+        true
+    });
+    count as i32
+}
+
+/// Eight words of a projection: collider, inside, point x y z, distance (0 inside a solid shape), two spare.
+fn write_projection(k: usize, collider: u32, hit: Projection, from: V3, solid: bool) {
+    let (p, d) = (hit.point, hit.point.sub(from));
+    let distance = if hit.inside && solid { 0.0 } else { sqrt(d.dot(d)) };
+    write_words(8 * k, &[collider, hit.inside as u32, p.x.to_bits(), p.y.to_bits(), p.z.to_bits(), distance.to_bits(), 0, 0]);
+}
+
+/// The collider point nearest `(x, y, z)` into the query buffer (see `write_projection`): 1, 0 for none, -1 for a
+/// point that is not finite.
+#[allow(clippy::too_many_arguments)]
+#[unsafe(no_mangle)]
+pub extern "C" fn query_project_point(x: f32, y: f32, z: f32, solid: u32, flags: u32, groups: u32, collider: u32, body: u32) -> i32 {
+    if !(x.is_finite() && y.is_finite() && z.is_finite()) {
+        return -1;
+    }
+    match world().project_point(v3(x, y, z), solid != 0, &Filter { flags, groups, collider, body }) {
+        Some((c, hit)) => {
+            write_projection(0, c, hit, v3(x, y, z), solid != 0);
+            1
+        }
+        None => 0,
+    }
+}
+
+/// Every collider's nearest point to `(x, y, z)`, in row order, paged as `query_ray_all`.
+#[allow(clippy::too_many_arguments)]
+#[unsafe(no_mangle)]
+pub extern "C" fn query_project_point_all(x: f32, y: f32, z: f32, solid: u32, flags: u32, groups: u32, collider: u32, body: u32, skip: u32) -> i32 {
+    if !(x.is_finite() && y.is_finite() && z.is_finite()) {
+        return -1;
+    }
+    let (w, p) = (world(), v3(x, y, z));
+    let mut count = 0usize;
+    w.each_queried(&Filter { flags, groups, collider, body }, &mut |c| {
+        if let Some(hit) = w.project_collider(c, p, solid != 0) {
+            if count >= skip as usize && count - (skip as usize) < QUERY_HITS {
+                write_projection(count - skip as usize, c as u32, hit, p, solid != 0);
+            }
+            count += 1;
+        }
+        true
+    });
+    count as i32
+}
+
+/// Every collider that holds `(x, y, z)`, in row order, one word each from the buffer's start (paged by 2048).
+#[allow(clippy::too_many_arguments)]
+#[unsafe(no_mangle)]
+pub extern "C" fn query_point_all(x: f32, y: f32, z: f32, flags: u32, groups: u32, collider: u32, body: u32, skip: u32) -> i32 {
+    if !(x.is_finite() && y.is_finite() && z.is_finite()) {
+        return -1;
+    }
+    let (w, p) = (world(), v3(x, y, z));
+    let mut count = 0usize;
+    w.each_queried(&Filter { flags, groups, collider, body }, &mut |c| {
+        if w.holds_point(c, p) {
+            if count >= skip as usize && count - (skip as usize) < 8 * QUERY_HITS {
+                write_words(count - skip as usize, &[c as u32]);
+            }
+            count += 1;
+        }
+        true
+    });
+    count as i32
+}
+
+/// Every collider a query shape at a pose overlaps, in row order, one word each (paged by 2048); -1 as
+/// `query_shape_cast` refuses its shape or pose.
+#[allow(clippy::too_many_arguments)]
+#[unsafe(no_mangle)]
+pub extern "C" fn query_shape_all(
+    kind: u32, a: f32, b: f32, c: f32, hull: u32, x: f32, y: f32, z: f32, qx: f32, qy: f32, qz: f32, qw: f32, flags: u32, groups: u32, collider: u32, body: u32, skip: u32,
+) -> i32 {
+    let Some((shape, pose)) = shape_args(kind, a, b, c, hull, x, y, z, qx, qy, qz, qw) else { return -1 };
+    let w = world();
+    if w.solid(shape, pose, &mut BoxData::new()).is_none() {
+        return -1;
+    }
+    let mut count = 0usize;
+    w.each_queried(&Filter { flags, groups, collider, body }, &mut |c| {
+        if w.overlaps(c, shape, pose) {
+            if count >= skip as usize && count - (skip as usize) < 8 * QUERY_HITS {
+                write_words(count - skip as usize, &[c as u32]);
             }
             count += 1;
         }

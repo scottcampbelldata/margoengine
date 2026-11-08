@@ -1337,7 +1337,7 @@ The following remain technical gaps, not permission to weaken a check:
     row class of VOXEL_WORD (four cells a word, a byte each: filled and six neighbour bits) and VOXEL_ columns on the mesh
     row, so ROW_CLASSES is 19 and the world's bytes, not its poses, changed. Contacts are cell boxes through the convex
     routines, a part per cell, with Catto's ghost rule on exposed faces. Proved: `kernel/tests/voxel.rs` (five tests
-    fail with the rule switched off) and `tests/next-voxels.test.js` against Rapier 0.21. Missing: shape casts, a tree
+    fail with the rule switched off) and `tests/next-voxels.test.js` against Rapier 0.21. Missing: a tree
     or run-length walk for very large grids, and any browser run beyond the replay's hash.
 41. `render_snippet` (`@margoengine/mcp/render`, `packages/mcp/tests/render-gpu-check.mjs`, in `test:gpu`) is proved on the
     RTX A6000 (Windows, D3D12 through `webgpu` 0.6.2) only: a box drawn and fitted shows green in the centre and an
@@ -1355,7 +1355,17 @@ The following remain technical gaps, not permission to weaken a check:
     Gems ch. 7), meshes by their tree, height fields and voxel grids by cell walks. Proved: `kernel/tests/query.rs`
     (closed forms, each walk against brute force, f64 references for far and grazing rays; mutations of the walks fail
     it) and `tests/next-queries.test.js` against Rapier 0.21. Missing: a tree over colliders for the world ray (each
-    collider is tested), shape casts, point queries, and any browser run.
+    collider is tested) and any browser run; shape casts and point queries are item 46.
 45. Tonemap's grading, custom curves, metering modes and local exposure (`@margoengine/tonemap`, `/grade`, `/custom`,
     `/local`) are proved against CPU oracles of their maths on the M6 Mac mini (Metal) only, on synthetic sources and
     simple lit scenes; GPU time of the new passes, other GPUs and photographed HDR scenes are not measured.
+46. The own physics kernel's shape casts, point projections and overlaps (batch 126, queries job, `kernel/src/cast.rs`,
+    exports `query_shape_cast`, `query_shape_cast_all`, `query_project_point`, `query_project_point_all`,
+    `query_point_all` and `query_shape_all`): no new columns, so the world's bytes and poses
+    are as before; hits go through the static query buffer, paged. A cast is van den Bergen's GJK ray cast (2004,
+    Algorithm 3), then his closest-point steps from a lower bound on the gap, so a hit is never stepped past; meshes,
+    height fields and voxel grids share one walk (`each_part`) with overlaps and projections. Proved:
+    `kernel/tests/cast.rs` (closed forms, bisected GJK distance, walks against brute force, the stop options) and
+    `tests/next-shape-queries.test.js` against Rapier 0.21 and an exact f64 reference of the Minkowski difference.
+    Missing: a tree over colliders (each collider is tested), mesh, height field, voxel and compound query shapes,
+    and any browser run. Rapier faults found are in docs/rapier-parity.md Q-07 and Q-09.

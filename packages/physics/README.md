@@ -306,7 +306,7 @@ console.log(body.position[1]);         // fallen about 4.9 m in the second
 physics.dispose();
 ```
 
-It holds `box`, `sphere`, `capsule`, `convexHull`, `trimesh`, `heightfield`, `compound` and `voxels` colliders, bodies of every kind, forces, impulses, velocities, damping, locks, kinematic targets, gravity, sleeping and the `beforestep` and `afterstep` events. Bodies collide, with friction, restitution and the four combine rules, and `physics.touching(a, b)` and `physics.contactPoints(body)` read the contacts of the last step, walking only the asking body's pairs: `touching` allocates nothing, and a call costs that body's contacts, not the world's. Contact and intersection events, sensors, `collisionGroups`, `solverGroups`, `contactFilter`, `dominance` and `enabled` on bodies and colliders work as on the root entry, with the same names. `body.setType`, `setAdditionalMass` (with inertia of its own), `setMassProperties`, `collider.setDensity` and `additionalSolverIterations` work as on the root entry, with the same names and errors. A call that needs what is still to come throws a `MargoError` with code `unsupported` naming what it waits for: the other shapes and `addModel` with the shapes and queries batch, `ccd` with continuous collision, `shapeCast`, `projectPoint`, `intersectPoint` and `intersectShape`, `follow` and character controllers, and `debugRender`. `body.sleep()` and impulses take effect at the next step.
+It holds `box`, `sphere`, `capsule`, `convexHull`, `trimesh`, `heightfield`, `compound` and `voxels` colliders, bodies of every kind, forces, impulses, velocities, damping, locks, kinematic targets, gravity, sleeping and the `beforestep` and `afterstep` events. Bodies collide, with friction, restitution and the four combine rules, and `physics.touching(a, b)` and `physics.contactPoints(body)` read the contacts of the last step, walking only the asking body's pairs: `touching` allocates nothing, and a call costs that body's contacts, not the world's. Contact and intersection events, sensors, `collisionGroups`, `solverGroups`, `contactFilter`, `dominance` and `enabled` on bodies and colliders work as on the root entry, with the same names. `body.setType`, `setAdditionalMass` (with inertia of its own), `setMassProperties`, `collider.setDensity` and `additionalSolverIterations` work as on the root entry, with the same names and errors. A call that needs what is still to come throws a `MargoError` with code `unsupported` naming what it waits for: the other shapes and `addModel` with the shapes and queries batch, `ccd` with continuous collision, `follow` and character controllers, and `debugRender`. `body.sleep()` and impulses take effect at the next step.
 
 `raycast` and `raycastAll` work on every shape the entry holds, with the root entry's names and options (`maxDistance`, `solid`, `groups`, `exclude`, `excludeSensors`, `excludeFixed`, `excludeKinematic`, `excludeDynamic`, `predicate`), plus Rapier's flags the root does not name: `excludeCollider`, `excludeSolids`, `onlyDynamic`, `onlyKinematic` and `onlyFixed`. `raycastAll` lists one hit a collider, nearest first, and `stop` ends the list early. Rays see the poses of the last step, as Rapier's do. A ray that starts inside a solid shape hits at distance 0 with a zero normal; with `solid: false` it hits where it leaves, the normal facing the ray.
 
@@ -324,6 +324,26 @@ const all = physics.raycastAll([0, 10, 0], [0, -1, 0]);
 console.log(all.length);               // 2: the ball, then the floor
 const floor = physics.raycast([0, 10, 0], [0, -1, 0], {exclude: ball});
 console.log(floor?.normal);            // [0, 1, 0]
+physics.dispose();
+```
+
+`shapeCast`, `projectPoint`, `intersectPoint` and `intersectShape` work on every shape the entry holds, with the root entry's names and the same filter options. The query shape is a `sphere`, `box`, `capsule` or `convexHull` with its size given; another shape throws a `MargoError` with code `unsupported`. `shapeCast` takes Rapier's cast options: `maxDistance` (default unbounded), `targetDistance` (stop this far short of touching, default 0), `stopAtPenetration` (default true: a cast that starts in contact hits at distance 0; false: one that starts in contact and moves out of it goes on) and `computeImpactGeometryOnPenetration` (default true: such a hit gets its normal and points; false leaves them zero). A hit gives the point and outward normal on the collider hit, and `queryPoint` and `queryNormal` on the cast shape. `projectPoint` takes `solid` (default true: a point inside a shape projects to itself, `inside` true, distance 0; false: to the nearest point of its surface). A trimesh or height field never holds a point.
+
+```ts
+import {Physics} from 'margoengine/physics/next';
+
+await Physics.load();
+const physics = new Physics(null, {gravity: [0, 0, 0]});
+const wall = physics.addBody(null, {type: 'fixed', position: [5, 0, 0], colliders: {shape: 'box', halfExtents: [0.5, 2, 2]}});
+physics.step();                        // queries see the last step's poses
+const hit = physics.shapeCast({shape: 'sphere', radius: 0.5}, [0, 0, 0], [0, 0, 0, 1], [1, 0, 0]);
+console.log(hit?.body === wall, hit?.distance.toFixed(2), hit?.normal); // true '4.00' [-1, 0, 0]
+const short = physics.shapeCast({shape: 'sphere', radius: 0.5}, [0, 0, 0], [0, 0, 0, 1], [1, 0, 0], {targetDistance: 0.25});
+console.log(short?.distance.toFixed(2)); // '3.75'
+const nearest = physics.projectPoint([2, 1, 0]);
+console.log(nearest?.point, nearest?.distance.toFixed(2)); // [4.5, 1, 0] '2.50'
+console.log(physics.intersectPoint([5, 0, 0]).length);   // 1: the wall
+console.log(physics.intersectShape({shape: 'box', halfExtents: [1, 1, 1]}, [3.6, 0, 0]).length); // 1
 physics.dispose();
 ```
 

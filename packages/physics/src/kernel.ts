@@ -132,6 +132,12 @@ interface KernelExports extends WebAssembly.Exports {
   query_buffer(): number;
   query_ray(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, max: number, solid: number, flags: number, groups: number, collider: number, body: number): number;
   query_ray_all(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, max: number, solid: number, flags: number, groups: number, collider: number, body: number, skip: number): number;
+  query_shape_cast(...words: number[]): number;
+  query_shape_cast_all(...words: number[]): number;
+  query_project_point(x: number, y: number, z: number, solid: number, flags: number, groups: number, collider: number, body: number): number;
+  query_project_point_all(x: number, y: number, z: number, solid: number, flags: number, groups: number, collider: number, body: number, skip: number): number;
+  query_point_all(x: number, y: number, z: number, flags: number, groups: number, collider: number, body: number, skip: number): number;
+  query_shape_all(...words: number[]): number;
   hull_count(): number;
   mesh_count(): number;
 }
@@ -324,6 +330,44 @@ export const QUERY_EXCLUDE_FIXED = 1,
   QUERY_ONLY_FIXED = 128;
 /** Hits the kernel's query buffer holds at once; `raycastAll` pages through more. */
 const QUERY_HITS = 256;
+/** A query shape of {@link KernelWorld.shapeCast} and {@link KernelWorld.intersectShape}: a convex kernel shape and its
+ * `addCollider` size (a hull names its `addHull` row). */
+export interface KernelQueryShape {
+  shape: 'ball' | 'box' | 'capsule' | 'hull';
+  size: readonly number[];
+}
+/** How far a cast goes, how far short of touching it stops, and what a start in contact means (Rapier's `ShapeCastOptions`). */
+export interface KernelCastOptions {
+  max: number;
+  target: number;
+  /** A start in contact is a hit even when the cast leads out of it. */
+  stop: boolean;
+  /** A start in contact gets its normal and points. */
+  geometry: boolean;
+}
+/** A shape cast's first touch, world space: the collider row, the distance along the direction's unit, the point and
+ * outward normal on the collider, the point and normal on the cast shape, and whether it touched at the start. */
+export interface KernelShapeCastHit {
+  collider: number;
+  distance: number;
+  point: [number, number, number];
+  normal: [number, number, number];
+  queryPoint: [number, number, number];
+  queryNormal: [number, number, number];
+  started: boolean;
+}
+/** A collider's point nearest a query point (inside a solid shape the point itself), and how far it is. */
+export interface KernelProjection {
+  collider: number;
+  inside: boolean;
+  point: [number, number, number];
+  distance: number;
+}
+const QUERY_KINDS = { ball: 0, box: 1, capsule: 2, hull: 3 } as const;
+const castBits = (cast: KernelCastOptions): number => (cast.stop ? 1 : 0) | (cast.geometry ? 2 : 0);
+const CAST_REFUSED =
+    'A shape query needs a finite position, a nonzero rotation, a finite nonzero direction, a target distance of 0 or more and a ball, box, capsule or hull row; pass those.',
+  POINT_REFUSED = 'A point query needs a finite point; pass three finite numbers.';
 
 /** How two colliders mix a value. When their rules differ the pair takes the higher: max, multiply, min, average. */
 export type KernelCombine = 'average' | 'min' | 'multiply' | 'max';
@@ -1006,6 +1050,116 @@ export class KernelWorld {
       skip += page;
     }
     return hits;
+  }
+  /**
+   * The nearest first touch of a query shape cast from a pose along a direction, among the colliders the filter words
+   * let through, or null. `shape` is a kernel shape kind and its numbers as a collider's (`addCollider`'s `size`; a hull
+   * names its `addHull` row). `distance` is along the direction's unit; the cast goes up to `max` and stops `target` short.
+   * `stop` makes a start in contact a hit even on its way out; `geometry` works out its normal and points.
+   * @throws RangeError for a pose, direction or shape the kernel cannot cast.
+   */
+  shapeCast(
+    shape: KernelQueryShape,
+    position: readonly number[],
+    rotation: readonly number[],
+    direction: readonly number[],
+    cast: KernelCastOptions,
+    flags: number,
+    groups: number,
+    collider: number,
+    body: number,
+  ): KernelShapeCastHit | null {
+    const found = this.api.query_shape_cast(...this.shapeWords(shape, position, rotation), direction[0]!, direction[1]!, direction[2]!, cast.max, cast.target, castBits(cast), flags, groups, collider, body);
+    if (found < 0) throw new RangeError(CAST_REFUSED);
+    return found ? this.readCast(0) : null;
+  }
+  /** Each collider's shape cast hit, in row order (not sorted), as {@link KernelWorld.shapeCast}. */
+  shapeCastAll(
+    shape: KernelQueryShape,
+    position: readonly number[],
+    rotation: readonly number[],
+    direction: readonly number[],
+    cast: KernelCastOptions,
+    flags: number,
+    groups: number,
+    collider: number,
+    body: number,
+  ): KernelShapeCastHit[] {
+    const hits: KernelShapeCastHit[] = [],
+      words = this.shapeWords(shape, position, rotation);
+    for (let skip = 0, total = 1; skip < total; ) {
+      total = this.api.query_shape_cast_all(...words, direction[0]!, direction[1]!, direction[2]!, cast.max, cast.target, castBits(cast), flags, groups, collider, body, skip);
+      if (total < 0) throw new RangeError(CAST_REFUSED);
+      const page = total - skip < QUERY_HITS / 2 ? total - skip : QUERY_HITS / 2;
+      for (let i = 0; i < page; i++) hits.push(this.readCast(i));
+      skip += page;
+    }
+    return hits;
+  }
+  /**
+   * The collider point nearest `point` among the colliders the filter words let through, or null; inside a solid shape
+   * (`solid` true) the point itself.
+   * @throws RangeError for a point that is not finite.
+   */
+  projectPoint(point: readonly number[], solid: boolean, flags: number, groups: number, collider: number, body: number): KernelProjection | null {
+    const found = this.api.query_project_point(point[0]!, point[1]!, point[2]!, solid ? 1 : 0, flags, groups, collider, body);
+    if (found < 0) throw new RangeError(POINT_REFUSED);
+    return found ? this.readProjection(0) : null;
+  }
+  /** Each collider's nearest point to `point`, in row order, as {@link KernelWorld.projectPoint}. */
+  projectPointAll(point: readonly number[], solid: boolean, flags: number, groups: number, collider: number, body: number): KernelProjection[] {
+    const hits: KernelProjection[] = [];
+    for (let skip = 0, total = 1; skip < total; ) {
+      total = this.api.query_project_point_all(point[0]!, point[1]!, point[2]!, solid ? 1 : 0, flags, groups, collider, body, skip);
+      if (total < 0) throw new RangeError(POINT_REFUSED);
+      const page = total - skip < QUERY_HITS ? total - skip : QUERY_HITS;
+      for (let i = 0; i < page; i++) hits.push(this.readProjection(i));
+      skip += page;
+    }
+    return hits;
+  }
+  /** The collider rows that hold `point`, in row order. @throws RangeError for a point that is not finite. */
+  intersectPoint(point: readonly number[], flags: number, groups: number, collider: number, body: number): number[] {
+    return this.rows((skip) => this.api.query_point_all(point[0]!, point[1]!, point[2]!, flags, groups, collider, body, skip), POINT_REFUSED);
+  }
+  /** The collider rows a query shape at a pose overlaps, in row order. @throws RangeError as {@link KernelWorld.shapeCast}. */
+  intersectShape(shape: KernelQueryShape, position: readonly number[], rotation: readonly number[], flags: number, groups: number, collider: number, body: number): number[] {
+    const words = this.shapeWords(shape, position, rotation);
+    return this.rows((skip) => this.api.query_shape_all(...words, flags, groups, collider, body, skip), CAST_REFUSED);
+  }
+  private rows(call: (skip: number) => number, refused: string): number[] {
+    const rows: number[] = [];
+    for (let skip = 0, total = 1; skip < total; ) {
+      total = call(skip);
+      if (total < 0) throw new RangeError(refused);
+      const page = total - skip < 8 * QUERY_HITS ? total - skip : 8 * QUERY_HITS,
+        words = new Uint32Array(this.api.memory.buffer, this.api.query_buffer(), page);
+      for (let i = 0; i < page; i++) rows.push(words[i]!);
+      skip += page;
+    }
+    return rows;
+  }
+  private shapeWords(shape: KernelQueryShape, p: readonly number[], q: readonly number[]): [number, number, number, number, number, number, number, number, number, number, number, number] {
+    const s = shape.size;
+    return [QUERY_KINDS[shape.shape], shape.shape === 'hull' ? 0 : s[0]!, s[1] ?? 0, s[2] ?? 0, shape.shape === 'hull' ? s[0]! : 0, p[0]!, p[1]!, p[2]!, q[0]!, q[1]!, q[2]!, q[3]!];
+  }
+  private readCast(i: number): KernelShapeCastHit {
+    const words = new Uint32Array(this.api.memory.buffer, this.api.query_buffer() + 64 * i, 16),
+      f = new Float32Array(words.buffer, words.byteOffset, 16);
+    return {
+      collider: words[0]!,
+      distance: f[1]!,
+      point: [f[2]!, f[3]!, f[4]!],
+      normal: [f[5]!, f[6]!, f[7]!],
+      queryPoint: [f[8]!, f[9]!, f[10]!],
+      queryNormal: [f[11]!, f[12]!, f[13]!],
+      started: words[14] === 1,
+    };
+  }
+  private readProjection(i: number): KernelProjection {
+    const words = new Uint32Array(this.api.memory.buffer, this.api.query_buffer() + 32 * i, 8),
+      f = new Float32Array(words.buffer, words.byteOffset, 8);
+    return { collider: words[0]!, inside: words[1] === 1, point: [f[2]!, f[3]!, f[4]!], distance: f[5]! };
   }
   private readHit(i: number): KernelRayHit {
     const words = new Uint32Array(this.api.memory.buffer, this.api.query_buffer() + 32 * i, 8),

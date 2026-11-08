@@ -61,7 +61,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/net | `.` 3, `./delay` 2, `./fields` 5, `./timeline` 5 |  |  | 1,729 |
 | @margoengine/netcode | `.` 48, `./rollback` 4, `./websocket` 2, `./webrtc` 3, `./node` 6, `./rooms` 11, `./smoothing` 2, `./webtransport` 7, `./signal` 6, `./extrapolate` 2, `./relay` 7, `./hitboxes` 5, `./interest` 4, `./generate` 2 | 105 | 1 | 12,534 |
 | @margoengine/oit | `.` 2, `./meshes` 2, `./exact` 4, `./moments` 3, `./depth` 3, `./vfx` 3 | 19 |  | 3,690 |
-| @margoengine/physics | `.` 48, `./next` 39 | 40 |  | 19,195 |
+| @margoengine/physics | `.` 48, `./next` 39 | 47 |  | 19,195 |
 | @margoengine/physics2d | `.` 30, `./outline` 6 | 21 |  | 7,943 |
 | @margoengine/pixel | `.` 13, `./palette` 15, `./render3d` 8 |  |  | 4,408 |
 | @margoengine/points | `.` 55, `./las` 21, `./laz` 7, `./e57` 13, `./copc` 4, `./octree` 11, `./surfels` 4, `./potree` 5, `./pick` 5 | 78 |  | 23,939 |
