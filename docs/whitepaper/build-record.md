@@ -2330,3 +2330,67 @@ README runner's known-failure list; they now load the package's real fixtures an
   blender tests and the add-on's Python tests, the claims, llms, lock-sync, sizes-page and fixed-waits tests, the
   blender GPU checks under the GPU lock; `npm run verify` for jobs 6 and 8 (job 8 changes `scripts/`), which is also the
   verify on the newest main after the last push.
+
+## Lane C batch 116: xr
+
+Seven jobs for `@margoengine/xr`, on this PC with the full check per job, done by two helpers in turn (the first did
+jobs 1 and 2). Each feature is a new optional entry, and core and stage are untouched. The batch's aim is XR that a
+three.js user would not miss: device runs, every package pass in both eyes, controller and hand models, AR room
+understanding, layers and locomotion, the WebGL2 route and an interaction toolkit. No headset, AR phone or OpenXR
+runtime is attached to this PC, so every check runs on a stand-in session. Nothing is timed.
+
+| # | Job | Status | Commit | Entry | Claim |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Headset and device runs | DONE | `149697078` | `/device-check` | LIM-421 |
+| 2 | Package passes and post in XR | DONE | `53e412339` | root (`createXREngine`) | LIM-424 |
+| 3 | Controller and hand models | DONE | `87a13ad3a` | `/models` | LIM-427 |
+| 4 | Plane detection, depth and light estimation | DONE | `ffcc1e84b` | `/ar` | LIM-429 |
+| 5 | Layers, haptics, video and locomotion | DONE | `a7a08de44` | `/layers` | LIM-431 |
+| 6 | WebGL XR | SKIPPED | `e0e6494da` | none | LIM-433 |
+| 7 | Interaction toolkit | DONE | `d1affab1e` | `/interaction` | LIM-436 |
+
+- **Job 6 skipped:** XR through the WebGL2 layer was already built (`installXR()` in `@margoengine/webgl2-compat/xr`,
+  LIM-151). What was not checked was job 2's engine route there; `e0e6494da` adds that check to the layer's
+  `test/xr-browser.mjs` (`?route=engine`, with a line from `@margoengine/lines`): both eyes match the native engine route
+  with no pixel over 2, so no code was needed.
+- **Bugs fixed:** one in the checks. `scripts/check-fixed-waits.mjs` read every counted loop that draws as a fixed wait,
+  so a loop rendering one reference image per eye failed it, and job 2's GPU test was rewritten to get past it. A body
+  that reads a list item by its counter now counts as a walk; writing by the counter and any other use still count as
+  a wait. `0261ea69a` (`fix(scripts)`), with "a counted loop that reads a list item by its counter walks the list" in
+  `tests/check-fixed-waits.test.js`, seen failing without the fix. The same false positive held a loop per colour
+  channel in `scripts/material-dispersion-gpu-check.js` and one per square in `scripts/post-looks-gpu-check.js`; both
+  baseline counts went down by one. A second, found in job 7's verify: two symlink tests that `e09a08713` added for
+  macOS made their junctions in the temp folder, and on this Windows 11 PC (build 26300) no folder can be made through
+  a junction that sits there (EEXIST or ENOENT, from Node, cmd and .NET alike), so both failed. `2c3245dd9`
+  (`fix(tests)`) moves the links into the git-ignored `test-results/`; both tests were seen failing before and pass
+  after, and still split the link spelling from the real one. No bug of this package reached main. Bugs in unlanded drafts, each caught by a
+  test that ships with its job: `Locomotion` turned about stale feet after a teleport and put the floor back at 0, so a
+  second teleport on raised ground climbed again ("no climb on level ground"); the plane triangulation's comment and
+  output winding disagreed (now every face looks up +y in `triangulate` itself); the light estimate's harmonics stayed
+  in the probe's space (now turned by the probe's orientation, as the Lighting Estimation API says they are relative to
+  it); `ARLight` left core's ambient strength at 0.15 under the room's average light; the controller models and the
+  toolkit read buttons as xr-standard whatever the mapping. The teleport arc draft test had the parabola wrong (0.4 for
+  0.2); the code was right and the expectation was corrected, nothing loosened.
+- **Proved:** the tests of each entry, in Node with stand-in sessions, inputs, bindings and devices. Real WebGPU only for
+  jobs 2 and 6: `tests/modern-xr-passes.ts` in `modern:test:xr:browser` and `packages/webgl2-compat/test/xr-browser.mjs`,
+  both on the RTX A6000 in Chromium with a stand-in session. Every claim says stand-in.
+- **Stand-in:** no real headset, AR device, controller, hand, plane, depth sensor or light probe was used.
+- **Sources:** rows in `docs/clean-room.md`. Read for this batch: WebXR Device API sections 6.2 (getOffsetReferenceSpace)
+  and 10.1 (XRInputSource), the WebXR Gamepads Module section 3, the WebXR Hand Input Module sections 3 and 4, the WebXR
+  Anchors Module in full, the Plane Detection Module, the Depth Sensing Module's CPU sections, the Lighting Estimation
+  API's probe and estimate sections, the WebXR/WebGPU binding's layer sections, and by the first helper the Layers
+  Module except 6.1 to 6.3 and 6.9, Gamepad haptics and Gamepad Extensions. Not read: the rest of the Device API, the
+  GPU depth and reflection cube map sections, Meisters 1975 (ear clipping, built from its description).
+- **Limits:** rows in `docs/limits.md`. Composition layers need the browser's own XRGPUBinding with 'layers'; depth is
+  CPU only; the light sets one sun and the ambient; hands are spheres and cylinders; grabs pick by sphere.
+- **Size:** new entries `/models` 2,952 B, `/ar` 2,572 B, `/layers` 3,686 B, `/interaction` 2,165 B gzip
+  measured; the root grew to 8,705 B for `onFrame`, `setLayers`, `useReferenceSpace` and `layerBinding` (budget 8,631
+  to 8,967 B).
+- **Slips:** job 1's prep stopped once on the helper's own guard's false alarm, and the first helper ran `npx
+  --version` once (it printed a version and fetched nothing). Job 3's first ship stopped in verify because `site/llms.txt` was built before the API reports it counts;
+  the ship script now builds it after them, and the rerun passed. Job 7's first ship stopped in verify on the two
+  symlink tests above; the rerun passed on top of their fix. The second helper typed `git stash list` once (it
+  lists, changes nothing). Nothing that failed was pushed.
+- **Gate:** lint, hygiene, verify, `check:readmes`, `check:readme-run --packages=xr`, the claims test, the xr tests and
+  the xr GPU test per job (and the layer's XR GPU test for job 6). After a move of main the ship reran the records, the
+  api and quality gates, the claims, llms and lock tests, the xr tests and the GPU test.
