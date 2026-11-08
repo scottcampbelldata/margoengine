@@ -1,6 +1,6 @@
 // Manifolds against independent answers: the distance between two shapes from dense samples of their core outlines,
 // and the overlap depth checked by moving one shape out along the normal by the reported depth.
-use margoengine_physics2d_kernel::manifold::collide;
+use margoengine_physics2d_kernel::manifold::{collide, collide_coherent, reference_flip};
 use margoengine_physics2d_kernel::math::{Rot, V2, Xf, v2};
 use margoengine_physics2d_kernel::shape::Core;
 
@@ -135,4 +135,30 @@ fn rounded_corners_meet_at_one_point_and_a_lying_capsule_at_two() {
     let m = collide(&ground, Xf::IDENTITY, &capsule, Xf { p: v2(0.0, 0.749), q: Rot::from_pair(1.0, tilt) }, 0.05);
     assert_eq!(m.count, 2);
     assert!(m.points[0].separation < 0.0 || m.points[1].separation < 0.0);
+}
+
+#[test]
+fn a_box_rocking_on_a_box_keeps_its_point_ids_through_level() {
+    // A unit box resting 2 mm into a unit box below, tilting from -0.01 to 0.01 rad, each manifold built from the last:
+    // as it passes level the two faces' separations cross, and the reference face, with it every id, must not change
+    // (each point would lose its warm start), nor may a clipped end be renamed.
+    let below = Core::rect(0.5, 0.5, V2::ZERO, 1.0, 0.0, 0.0).unwrap();
+    let above = Core::rect(0.5, 0.5, V2::ZERO, 1.0, 0.0, 0.0).unwrap();
+    let rest = Xf { p: v2(0.0, 0.0), q: Rot::IDENTITY };
+    let mut last = None;
+    let mut previous: Option<[u32; 2]> = None;
+    for step in 0..=400 {
+        let angle = -0.01 + 0.02 * step as f32 / 400.0;
+        let xf = Xf { p: v2(0.1, 1.0 - 0.002), q: Rot::from_pair(angle.cos(), angle.sin()) };
+        let m = collide_coherent(&below, rest, &above, xf, 0.02, last);
+        assert_eq!(m.count, 2, "step {step}");
+        let ids = [m.points[0].id, m.points[1].id];
+        if let Some(old) = previous {
+            for id in ids {
+                assert!(old.contains(&id), "step {step}, angle {angle}: id {id:#x} is not among the last {old:x?}");
+            }
+        }
+        previous = Some(ids);
+        last = reference_flip(&m);
+    }
 }

@@ -1987,6 +1987,23 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
 - **Rerun:** `cargo test --release --manifest-path packages/physics2d/kernel/Cargo.toml --test broad -- --include-ignored
   --nocapture`.
 
+### 84. Own 2D physics contacts: the 100-row pyramid sags as Box2D and Rapier do (accuracy fix, equal work)
+
+- **Before (`f564b5990`):** a pair's reference face was A's unless B's separated more by 0.5 mm, and a clipped point was
+  named by the side plane that cut it. Boxes tilting against each other by 0.002 rad swing the two faces' separations by
+  millimetres, so 400 to 700 pairs of the 100-row pyramid's 14,000 flipped face a step and 1,100 to 1,800 points
+  restarted from zero impulse, each a small drop onto the box below. The pile kept rocking, its top fell 878 mm by 5 s
+  (906 by 10 s) and row 30 wedged 391 mm outward.
+- **Change:** `packages/physics2d/kernel/src/manifold.rs`, `collide_coherent` (Gregorius, GDC 2015; the 3D kernel's
+  `sat_coherent`): last step's reference face stands while the two faces' separations lie within one slop (5 mm; 10 mm
+  gave the same figures), a kept face that fails the closest-feature test hands over to the fresh choice before the
+  single point, and a clipped point keeps the id of the incident end it replaces. One compare a pair; no extra work.
+- **Accuracy (`tests/world.rs`, native):** top drop 731 mm at 5 s and 728 mm at 10 s against Box2D v3.2's 726 and Rapier
+  2D's 735 (black-box runs, 10 s); row 30 mean outward 79 mm at 5 s, 77 at 10 s (Box2D 70, Rapier 64). Points losing
+  their warm start (`Counts::cold_points`, a point with no id in a last manifold that pushed): at most 6 a step after 1 s,
+  against 1,441. The 20-row pyramid: top 28.41 mm (28.37 before), asleep at 0.75 s, unchanged.
+- **Rerun:** `cargo test --release --manifest-path packages/physics2d/kernel/Cargo.toml --test world -- --nocapture`.
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).

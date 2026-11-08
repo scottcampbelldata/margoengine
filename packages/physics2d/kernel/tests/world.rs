@@ -305,3 +305,32 @@ fn two_worlds_built_alike_step_alike_bit_for_bit() {
     };
     assert_eq!(run(), run());
 }
+
+#[test]
+fn a_pyramid_of_a_hundred_rows_keeps_its_warm_start_and_sags_as_the_references() {
+    // Box2D v3.2 drops the top 726 mm and Rapier 2D 735 mm; their row 30 spreads 70 and 64 mm (black-box runs,
+    // the same scene through their APIs, 2026-11-08). Before the reference face kept its choice, 400 to 700
+    // pairs flipped face a step and 1,100 to 1,800 points restarted from zero impulse: the top fell 902 mm by 5 s and
+    // row 30 wedged 311 mm apart.
+    let rows = 100;
+    let mut world = World::new(Settings::default());
+    let boxes = pyramid(&mut world, V2::ZERO, rows);
+    let start: Vec<V2> = boxes.iter().map(|&b| world.bodies[b as usize].xf.p).collect();
+    let row30: usize = (0..30).map(|r| rows - r).sum();
+    let mut worst_cold = 0;
+    for step in 0..300 {
+        world.step(DT);
+        if step >= 60 {
+            worst_cold = worst_cold.max(world.counts.cold_points);
+        }
+    }
+    let top = top_drop(&world, &boxes, rows, V2::ZERO);
+    let outward = (row30..row30 + rows - 30)
+        .map(|k| (world.bodies[boxes[k] as usize].xf.p.x - start[k].x) * start[k].x.signum())
+        .sum::<f32>()
+        / (rows - 30) as f32;
+    println!("pyramid 100 at 5 s: top drop {:.1} mm, row 30 mean outward {:.1} mm, most cold points a step after 1 s {worst_cold}", top * 1e3, outward * 1e3);
+    assert!(top <= 0.735, "top drop {top} m");
+    assert!(outward <= 0.1, "row 30 outward {outward} m");
+    assert!(worst_cold <= 10, "{worst_cold} points lost their warm start in one step");
+}

@@ -11,7 +11,7 @@ use margoengine_physics_kernel_common::tree::Tree;
 use margoengine_physics_kernel_common::island::{UnionFind, sleep_tick};
 
 use crate::joint::{Joint, JointDef};
-use crate::manifold::{Manifold, collide};
+use crate::manifold::{Manifold, collide_coherent, reference_flip};
 use crate::mass::mass_of;
 use crate::math::{Rot, V2, Xf, sqrt, v2};
 use crate::shape::{Core, LINEAR_SLOP, ShapeError};
@@ -275,6 +275,9 @@ pub struct Counts {
     pub compared: u64,
     pub pairs: u64,
     pub manifolds: u64,
+    /// Manifold points that found no id in the contact's last manifold while that manifold pushed (a point with a
+    /// normal impulse): each starts from zero impulse, losing its warm start.
+    pub cold_points: u64,
     /// Contacts solved, and of their two-point normal solves, how many took the block and how many fell back.
     pub constraints: u64,
     pub block: u64,
@@ -542,7 +545,7 @@ impl World {
 
     /// New manifolds for the contacts with an awake body; each new point takes the impulses of the old point with its id.
     fn narrow_phase(&mut self) {
-        let mut built = 0u64;
+        let (mut built, mut cold) = (0u64, 0u64);
         for contact in self.contacts.iter_mut() {
             let (sa, sb) = (&self.shapes[contact.a as usize], &self.shapes[contact.b as usize]);
             let (ba, bb) = (&self.bodies[sa.body as usize], &self.bodies[sb.body as usize]);
@@ -564,15 +567,22 @@ impl World {
                 m.normal = m.normal.neg();
                 m
             } else {
-                collide(&sa.core, xa, &sb.core, xb, SPECULATIVE)
+                // Last step's reference face is kept within the hysteresis, so resting points keep their ids.
+                collide_coherent(&sa.core, xa, &sb.core, xb, SPECULATIVE, reference_flip(&contact.manifold))
             };
             let (mut normal, mut tangent) = ([0.0f32; 2], [0.0f32; 2]);
+            let pushed = contact.normal_impulse[..contact.manifold.count].iter().any(|&i| i != 0.0);
             for (k, point) in manifold.points[..manifold.count].iter().enumerate() {
+                let mut found = false;
                 for j in 0..contact.manifold.count {
                     if contact.manifold.points[j].id == point.id {
                         normal[k] = contact.normal_impulse[j];
                         tangent[k] = contact.tangent_impulse[j];
+                        found = true;
                     }
+                }
+                if !found && pushed {
+                    cold += 1;
                 }
             }
             contact.manifold = manifold;
@@ -580,6 +590,7 @@ impl World {
             contact.tangent_impulse = tangent;
         }
         self.counts.manifolds = built;
+        self.counts.cold_points = cold;
     }
 
     /// Islands of dynamic bodies joined by touching contacts. An island any awake body is in, or that an awake body

@@ -802,12 +802,6 @@ Measured but not fixed. Their history, sources and rerun commands are in
   records. Fix planned with the 2D Wasm layout (batch 127, part 6): compact solver bodies, then the contacts in
   colour groups solved several at a time with SIMD.
 
-- **Own 2D physics: the 100-row pyramid's top drops 906 mm where Box2D v3 drops 726 and Rapier 2D 735**
-  (`packages/physics2d/kernel`): repro as the speed entry above, the ignored `sag` test in a probe. Measured so far: the
-  drop comes in the first second and is set by the contact springs: at 60 Hz everywhere it is 168 mm at 1 s, at two
-  passes 190 mm at 10 s; at one pass the pile then spreads outward (row 30 by 479 mm at 10 s, 8 mm at two passes), which
-  anchored friction cuts only to 351 mm. Cause not yet found; the 20-row pyramid and every bar are unaffected.
-
 - **Own convex decomposition builds 5 to 120 times slower than Rapier's V-HACD** (`@margoengine/physics/decomposition`,
   perf history entry 81): repro `node packages/physics/scripts/decomposition-vs-rapier.mjs` after the physics build;
   cause, measured: the paper's tree search cuts and hulls every trial piece (60 percent of the time in Quickhull), in

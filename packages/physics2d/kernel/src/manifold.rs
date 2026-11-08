@@ -12,6 +12,10 @@ use crate::shape::{Core, LINEAR_SLOP, MAX_VERTICES};
 
 /// How far a face's separation may sit under the true distance and still count as the closest feature.
 const FACE_TOLERANCE: f32 = 0.1 * LINEAR_SLOP;
+/// How close the two faces' separations must be for a pair to keep last step's reference face. Boxes resting on boxes tilt
+/// by thousandths of a radian, which swings the separations by millimetres; within one slop the old choice stands, so the
+/// points keep their ids and their warm start (Gregorius, "Robust Contact Creation for Physics Simulations", GDC 2015).
+const FACE_HYSTERESIS: f32 = LINEAR_SLOP;
 
 #[derive(Clone, Copy, PartialEq, Debug, Default)]
 pub struct ManifoldPoint {
@@ -135,6 +139,18 @@ fn closest(a: &Placed, b: &Placed) -> (f32, V2, V2, u32) {
 
 /// The manifold of `a` at `xa` and `b` at `xb`, keeping points whose separation is at most `speculative`.
 pub fn collide(a: &Core, xa: Xf, b: &Core, xb: Xf, speculative: f32) -> Manifold {
+    collide_coherent(a, xa, b, xb, speculative, None)
+}
+
+/// Whether a manifold's points were clipped from B's face (`Some(true)`), from A's (`Some(false)`), or neither.
+pub fn reference_flip(m: &Manifold) -> Option<bool> {
+    let id = m.points[0].id;
+    if m.count == 0 || id & (1 << 30) != 0 { None } else { Some(id >> 31 != 0) }
+}
+
+/// As `collide`, given `last`, the previous manifold's `reference_flip`: while the two faces separate within
+/// FACE_HYSTERESIS of each other, the last reference face is kept.
+pub fn collide_coherent(a: &Core, xa: Xf, b: &Core, xb: Xf, speculative: f32, last: Option<bool>) -> Manifold {
     let mut manifold = Manifold::default();
     // Work in A's frame.
     let pa = place(a, Xf::IDENTITY);
@@ -146,28 +162,42 @@ pub fn collide(a: &Core, xa: Xf, b: &Core, xb: Xf, speculative: f32) -> Manifold
     if face - radii > speculative {
         return manifold;
     }
-    // The reference face: A's unless B's separates clearly more, so a resting pair keeps one choice.
-    let flip = face_b.0 > face_a.0 + FACE_TOLERANCE;
-    let reference = if flip { face_b } else { face_a };
-    let (owner, other, owner_radius, other_radius) =
-        if flip { (&pb, &pa, b.radius, a.radius) } else { (&pa, &pb, a.radius, b.radius) };
-    if face > 0.0 || reference.1 == usize::MAX {
+    // The reference face: A's unless B's separates clearly more, so a resting pair keeps one choice; within the
+    // hysteresis the last step's choice stands.
+    let fresh = face_b.0 > face_a.0 + FACE_TOLERANCE;
+    let mut flip = match last {
+        Some(f) if (face_b.0 - face_a.0).abs() <= FACE_HYSTERESIS => f,
+        _ => fresh,
+    };
+    if face > 0.0 || face_a.1 == usize::MAX && face_b.1 == usize::MAX {
         // Apart (or two circles): the exact distance decides.
         let (distance, on_a, on_b, id) = closest(&pa, &pb);
         if distance - radii > speculative {
             return manifold;
         }
         // The face's two points stand only when the face is the closest feature: its separation is the distance, and
-        // its clipped points reach it (a vertex just past the end of a short face passes the first test alone).
-        let mut face_is_closest = reference.1 != usize::MAX && reference.0 >= distance - FACE_TOLERANCE;
-        if face_is_closest {
-            clip(&mut manifold, owner, other, reference.1, flip, owner_radius, other_radius, speculative);
-            let least = manifold.points[..manifold.count].iter().map(|p| p.separation).fold(f32::INFINITY, f32::min);
-            face_is_closest = least <= distance - radii + FACE_TOLERANCE;
-            if !face_is_closest {
-                manifold = Manifold::default();
+        // its clipped points reach it (a vertex just past the end of a short face passes the first test alone). When
+        // the kept face fails and the fresh choice is the other face, that one is tried before the single point.
+        let mut face_is_closest = false;
+        for choice in [flip, fresh] {
+            let reference = if choice { face_b } else { face_a };
+            let (owner, other, owner_radius, other_radius) =
+                if choice { (&pb, &pa, b.radius, a.radius) } else { (&pa, &pb, a.radius, b.radius) };
+            face_is_closest = reference.1 != usize::MAX && reference.0 >= distance - FACE_TOLERANCE;
+            if face_is_closest {
+                clip(&mut manifold, owner, other, reference.1, choice, owner_radius, other_radius, speculative);
+                let least = manifold.points[..manifold.count].iter().map(|p| p.separation).fold(f32::INFINITY, f32::min);
+                face_is_closest = least <= distance - radii + FACE_TOLERANCE;
+                if !face_is_closest {
+                    manifold = Manifold::default();
+                }
+            }
+            flip = choice;
+            if face_is_closest || choice == fresh {
+                break;
             }
         }
+        let reference = if flip { face_b } else { face_a };
         if !face_is_closest {
             let normal = if distance > 0.0 {
                 on_b.sub(on_a).scale(1.0 / distance)
@@ -184,6 +214,9 @@ pub fn collide(a: &Core, xa: Xf, b: &Core, xb: Xf, speculative: f32) -> Manifold
             return manifold;
         }
     } else {
+        let reference = if flip { face_b } else { face_a };
+        let (owner, other, owner_radius, other_radius) =
+            if flip { (&pb, &pa, b.radius, a.radius) } else { (&pa, &pb, a.radius, b.radius) };
         clip(&mut manifold, owner, other, reference.1, flip, owner_radius, other_radius, speculative);
     }
     // Back to world space; the normal always runs from A to B.
@@ -230,8 +263,9 @@ pub(crate) fn clip(m: &mut Manifold, owner: &Placed, other: &Placed, edge: usize
                 let cut = points[0].lerp(points[1], d0 / (d0 - d1));
                 let k = if d0 < 0.0 { 0 } else { 1 };
                 points[k] = cut;
-                // A clipped end is named by the reference side that cut it.
-                ends[k] = 2 + side;
+                // A clipped end keeps the id of the incident end it stands in for: the same contact as the reference
+                // face's side moves, so its impulse carries over (ids stay 0 and 1, unique).
+                let _ = side;
             }
         }
     }
