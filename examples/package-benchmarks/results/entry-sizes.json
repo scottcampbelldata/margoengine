@@ -1,5 +1,5 @@
 {
-  "commit": "df2b33dfd",
+  "commit": "1c113c35a",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -10,8 +10,8 @@
   "packages": {
     "@margoengine/animation": {
       ".": {
-        "raw": 70910,
-        "gzip": 22427
+        "raw": 71149,
+        "gzip": 22520
       },
       "./vat": {
         "raw": 21202,
@@ -26,8 +26,8 @@
         "gzip": 7094
       },
       "./interactivity": {
-        "raw": 71467,
-        "gzip": 24176
+        "raw": 73839,
+        "gzip": 24531
       },
       "./skeleton-utils": {
         "raw": 25061,
@@ -46,8 +46,8 @@
         "gzip": 4904
       },
       "./dqs": {
-        "raw": 8312,
-        "gzip": 3217
+        "raw": 10674,
+        "gzip": 3536
       },
       "./instanced-skin": {
         "raw": 25752,
@@ -1712,8 +1712,12 @@
     },
     "@margoengine/mcp": {
       ".": {
-        "raw": 21834,
-        "gzip": 8408
+        "raw": 22113,
+        "gzip": 8532
+      },
+      "./porting": {
+        "raw": 7108,
+        "gzip": 3275
       }
     },
     "@margoengine/mesh-edit": {
@@ -1906,12 +1910,12 @@
     },
     "@margoengine/physics": {
       ".": {
-        "raw": 59051,
-        "gzip": 19165
+        "raw": 59310,
+        "gzip": 19195
       },
       "./next": {
-        "raw": 175274,
-        "gzip": 103878
+        "raw": 180412,
+        "gzip": 106442
       }
     },
     "@margoengine/physics2d": {
@@ -2060,6 +2064,10 @@
       "./sss": {
         "raw": 19493,
         "gzip": 6974
+      },
+      "./anamorphic": {
+        "raw": 18457,
+        "gzip": 6295
       },
       "./material-decals": {
         "raw": 22715,
@@ -3303,9 +3311,9 @@
       "brotli": 9703
     },
     "packages/physics/dist/index.js": {
-      "raw": 59051,
-      "gzip": 19165,
-      "brotli": 16941
+      "raw": 59310,
+      "gzip": 19195,
+      "brotli": 16949
     },
     "packages/save/dist/index.js": {
       "raw": 19901,

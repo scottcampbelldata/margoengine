@@ -642,6 +642,41 @@ sss.options.profile = [1, 0.85, 0.7]; // marble: options are read every frame
   scatters less than `radius` asks. The mask is yours to supply; a material's `subsurface` value does not mark pixels
   by itself. One `rgba16float` texture at the frame size. GPU cost not measured yet. WebGPU only.
 
+## Anamorphic streaks: `Anamorphic`
+
+`@margoengine/post/anamorphic` (6,295 B min+gzip, its own entry; it carries the stack) draws the cinema lens look:
+bright points and highlights throw thin horizontal streaks of light, tinted blue by default. An HDR `PostStack` effect:
+put it before `Bloom` or `Tonemap`.
+
+```ts
+import {createStage} from 'margoengine';
+import {PostStack} from 'margoengine/post/stack';
+import {Anamorphic} from 'margoengine/post/anamorphic';
+import {Tonemap} from 'margoengine/tonemap';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+const streaks = new Anamorphic({threshold: 2, intensity: 0.6});
+PostStack.attach(stage.engine, [streaks, new Tonemap()]);
+streaks.options.tint = [1, 0.8, 0.6]; // warm streaks: options are read every frame
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `threshold` | `1.5` | Linear brightness (largest channel) where streaks start, with a soft knee of half of it below |
+| `intensity` | `0.5` | Streak strength, 0 to 10 |
+| `tint` | `[0.4, 0.6, 1]` | Linear RGB colour the streak light is multiplied by, each 0 to 1 |
+| `passes` | `5` | Spreading passes, 1 to 6: streaks reach 2 (3^passes - 1) half-width texels each side (5: 968 px) |
+| `enabled` | `true` | False passes frames through |
+
+- **Method.** A bright pass keeps the light above `threshold` (soft knee) at half width and a quarter of the height,
+  taking the brightest of each four rows so a one-pixel light is never lost. Then `passes` horizontal passes of 9 taps
+  each, pass k spaced 3^k texels apart with weights exp(-|i|/2): a chain of growing sparse kernels whose product is one
+  smooth falloff. The composite adds the streaks times `intensity` and `tint`, sampled bilinearly back to full size.
+- **Checked on a real GPU** (`packages/post/test/anamorphic-browser.mjs`, M6 Mac mini, Metal, Chromium): one small
+  white box in a dark frame, threshold 0.4: its row brightens out to both frame edges, rows 24 px or more above and
+  below are unchanged to the bit, and a threshold above everything equals the effect disabled exactly.
+- **Limits.** Horizontal only; one colour per streak (no rainbow split); streaks are about 4 px tall. Two quarter-size
+  and one full-size `rgba16float` targets. GPU cost not measured yet. WebGPU only.
+
 ## Multiple render targets: `SceneTargets`
 
 `@margoengine/post/mrt` draws the scene's surfaces into several named textures in one pass. Each output is a built-in

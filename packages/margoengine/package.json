@@ -1966,6 +1966,10 @@
       "types": "./dist/post/sss.d.ts",
       "import": "./dist/post/sss.js"
     },
+    "./post/anamorphic": {
+      "types": "./dist/post/anamorphic.d.ts",
+      "import": "./dist/post/anamorphic.js"
+    },
     "./post/material-decals": {
       "types": "./dist/post/material-decals.d.ts",
       "import": "./dist/post/material-decals.js"

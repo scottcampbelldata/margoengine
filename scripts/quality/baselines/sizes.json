@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10854575,
+  "total": 10861126,
   "history": [
     {
       "date": "2026-10-24",
@@ -3998,6 +3998,12 @@
       "commit": "4f748988e",
       "reason": "new entry @margoengine/mcp/porting: the port_to_margo porting guide tool (batch 119 job 1)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "ea0583ff2",
+      "reason": "post/anamorphic: new optional entry, anamorphic streaks",
+      "grew": 1
     }
   ],
   "items": {
@@ -4471,6 +4477,7 @@
     "@margoengine/points/surfels": 14851,
     "@margoengine/post": 42058,
     "@margoengine/post/afterimage": 5619,
+    "@margoengine/post/anamorphic": 6551,
     "@margoengine/post/bloom": 7005,
     "@margoengine/post/contact-shadows": 6389,
     "@margoengine/post/decals": 5499,
