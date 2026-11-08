@@ -510,6 +510,11 @@ impl World {
         limit
     }
 
+    /// The farthest a collider's surface lies from its body's centre of mass, for the CCD pass.
+    pub(crate) fn collider_reach_of(&self, c: usize) -> f32 {
+        self.collider_reach(c)
+    }
+
     /// The farthest a collider's surface lies from its body's centre of mass.
     fn collider_reach(&self, c: usize) -> f32 {
         let at = self.uu(COLLIDER_BODY, c) as usize;

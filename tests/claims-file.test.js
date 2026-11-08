@@ -53,6 +53,25 @@ test('docs/limits.md names the last limit claim', () => {
   assert.equal(Number(last), Math.max(...ids));
 });
 
+// A lane's renumbering once rewrote "(LIM-494)" on every line of docs/limits.md, so the shape queries row named the
+// ground projected environment's claim (LIM-498). A row whose name ends in its claim number names that claim.
+test('a docs/limits.md row tagged with a claim number names that claim', () => {
+  const names = new Map([...claims.matchAll(/^\| LIM-(\d+) \| ([^|]+) \|/gm)].map((m) => [m[1], m[2].toLowerCase()]));
+  for (const line of limits.replace(/\r\n/g, '\n').split('\n')) {
+    const cell = /^\| ([^|]+?) \|/.exec(line)?.[1],
+      id = cell && /\(LIM-(\d+)\)\s*$/.exec(cell)?.[1];
+    if (!id) continue;
+    const name = cell
+      .replace(/\s*\(LIM-\d+\)\s*$/, '')
+      .replace(/\s*\([^()]*\)\s*$/, '')
+      .trim();
+    assert.ok(
+      names.get(id)?.startsWith(name.toLowerCase()),
+      `docs/limits.md "${name}" is tagged LIM-${id}, a claim about something else`,
+    );
+  }
+});
+
 // docs/limits.md is merged as often. A keep-both in a rebase once left two copies of each of 14 rows ("WebGPU first",
 // the FBX, OBJ and exporter rows among them), one copy with a stale size or without another lane's sentence.
 test('no table in docs/limits.md holds two rows for one limit', () => {

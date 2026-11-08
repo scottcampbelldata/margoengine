@@ -224,7 +224,7 @@ impl Prims for MeshRows {
             let v = *column.add(i) as usize;
             v3(*self.x.add(v), *self.y.add(v), *self.z.add(v))
         };
-        let (a, b, c) = unsafe { (corner(self.a), corner(self.b), corner(self.c)) };
+        let (a, b, c) = (corner(self.a), corner(self.b), corner(self.c));
         (a.min(b).min(c), a.max(b).max(c))
     }
 }

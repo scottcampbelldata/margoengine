@@ -629,6 +629,10 @@ pub const DISABLED: u32 = 1 << 11;
 /// A kinematic body still for the sleep window: it reads asleep, as Rapier's does, though it stays on the awake list, since a
 /// script may give it speed at any time. It moves and wakes nothing while still, so this changes no result.
 pub const RESTING: u32 = 1 << 12;
+/// Continuous collision on (Rapier's `ccd_enabled`), see ccd.rs.
+pub const CCD: u32 = 1 << 13;
+/// Set by the last step's CCD pass on the bodies it checked: CCD on and moved further than thick (`is_ccd_active`).
+pub const CCD_ACTIVE: u32 = 1 << 14;
 
 // Bits of the COLLIDER_FLAGS column.
 /// Sees overlaps and pushes nothing.

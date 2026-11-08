@@ -175,6 +175,7 @@ impl World {
             }
             self.solve_impacts();
         }
+        self.ccd_pass();
         self.gather_events();
         self.header_mut().steps += 1;
         self.check_range();

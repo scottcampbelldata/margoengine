@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11169874,
+  "total": 11182371,
   "history": [
     {
       "date": "2026-10-24",
@@ -4304,6 +4304,12 @@
       "commit": "68d00498d",
       "reason": "depth collision: new entry @margoengine/vfx/depth-collide, carried by the root VFX with every feature",
       "grew": 2
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "29a3e544a",
+      "reason": "physics/next continuous collision (kernel ccd.rs: conservative advancement after each step, Mirtich 1996 and Catto 2013, against every collider whose fat box meets the path; a part touching at the start held at half the piece thickness; a body stopped on a moving kinematic or non-CCD body rides with it): kernel 129,777 to 137,435 B deflated. Every piece is needed: the sweep loop, the contact axis over candidate normals, the held depth, the ride and the rest-of-step sweep each fix a failure with its own regression test in kernel/tests/ccd.rs.",
+      "grew": 1
     }
   ],
   "items": {
@@ -4764,7 +4770,7 @@
     "@margoengine/oit/moments": 5512,
     "@margoengine/oit/vfx": 486,
     "@margoengine/physics": 19679,
-    "@margoengine/physics/next": 160585,
+    "@margoengine/physics/next": 173082,
     "@margoengine/physics2d": 8199,
     "@margoengine/physics2d/outline": 2524,
     "@margoengine/pixel": 4664,

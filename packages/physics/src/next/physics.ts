@@ -494,7 +494,6 @@ export class Physics implements EnginePlugin, BodyOwner {
       throw new TypeError(`Unknown body type ${type}; use dynamic, fixed, kinematicPosition or kinematicVelocity.`);
     if (mesh && this.byMesh.has(mesh))
       throw new MargoError('state', 'This mesh already has a physics body; remove it first or use the existing body.');
-    if (options.ccd) throw later('ccd', 'continuous collision');
     if (options.follow) throw later('follow', 'the character and vehicle batch');
     const start = mesh ? meshPose(mesh, this.engine) : null,
       position = options.position ?? start?.position ?? [0, 0, 0],
@@ -514,6 +513,7 @@ export class Physics implements EnginePlugin, BodyOwner {
     if (options.gravityScale !== undefined) columns.gravityScale[row] = options.gravityScale;
     if (options.dominance !== undefined) columns.dominance[row] = options.dominance;
     if (options.canSleep !== undefined) kernel.setCanSleep(row, options.canSleep);
+    if (options.ccd) kernel.setCcd(row, true);
     if (options.additionalMass !== undefined) columns.additionalMass[row] = options.additionalMass;
     const angular = options.lockRotations ? 7 : options.enabledRotations ? bits(options.enabledRotations) : 0,
       linear = options.lockTranslations ? 7 : options.enabledTranslations ? bits(options.enabledTranslations) : 0;

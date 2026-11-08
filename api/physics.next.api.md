@@ -189,6 +189,8 @@ export class KernelWorld {
     isSleeping(body: number): boolean;
     wake(body: number): this;
     sleep(body: number): this;
+    setCcd(body: number, enabled: boolean): this;
+    isCcdActive(body: number): boolean;
     setCanSleep(body: number, canSleep: boolean): this;
     get steps(): number;
     get substeps(): number;
@@ -368,6 +370,7 @@ export class PhysicsBody {
     set additionalSolverIterations(passes: number);
     get ccd(): boolean;
     set ccd(enabled: boolean);
+    get ccdActive(): boolean;
     get enabled(): boolean;
     set enabled(value: boolean);
     lockRotations(locked?: boolean): this;

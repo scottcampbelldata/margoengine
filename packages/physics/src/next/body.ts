@@ -3,7 +3,7 @@
 import { MargoError } from '@margoengine/math/errors';
 import type { Mesh } from '@margoengine/core';
 import type { BodyType } from '../body.js';
-import { BODY_DISABLED, type KernelWorld } from '../kernel.js';
+import { BODY_CCD, BODY_DISABLED, type KernelWorld } from '../kernel.js';
 import { checkVec, type Quat, type Vec3 } from '../math.js';
 import type { ColliderOptions } from '../shapes.js';
 import type { PhysicsCollider } from './collider.js';
@@ -17,9 +17,6 @@ export interface BodyOwner {
   /** The body was placed by hand or changed type: its mesh is written at the next sync, awake or not. */
   moved(body: PhysicsBody): void;
 }
-
-const later = (what: string, when: string): MargoError =>
-  new MargoError('unsupported', `${what} is not in the own solver yet; it comes with ${when}. Use @margoengine/physics until then.`);
 
 /** @throws RangeError unless `rotation` is four finite numbers that are not all zero. */
 export function checkRotation(rotation: Quat): void {
@@ -340,13 +337,20 @@ export class PhysicsBody {
       throw new RangeError('Additional solver iterations must be a whole number from 0 to 4294967295; pass extra passes.');
     this.columns.extraPasses[this.row] = passes;
   }
-  /** Not served yet: reads false, and true throws. */
+  /**
+   * Continuous collision (default false), Rapier's `enableCcd`: a fast dynamic body is swept from where each step starts
+   * to where it ends and put back to its first touch, so it cannot pass through a thin wall.
+   */
   get ccd(): boolean {
     this.world();
-    return false;
+    return (this.columns.flags[this.row] & BODY_CCD) !== 0;
   }
   set ccd(enabled: boolean) {
-    if (enabled) throw later('ccd', 'continuous collision');
+    this.world().setCcd(this.row, enabled);
+  }
+  /** True when the last step's CCD pass checked this body: CCD is on and it moved further than it is thick. */
+  get ccdActive(): boolean {
+    return this.world().isCcdActive(this.row);
   }
   /** False takes the body out of the world: it keeps its pose and speed, touches nothing and its joints rest. */
   get enabled(): boolean {

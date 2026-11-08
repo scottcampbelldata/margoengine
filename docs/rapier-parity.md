@@ -81,7 +81,7 @@ Batch order, parity first (reasons in [Order](#order)): 126, 127, 128, 138, 139,
 | P-27 | `friction_model` `Simplified` and `Coulomb` | no | per-point Coulomb with anchored static friction | MISSING (choice), 138.2 | Wasm | Wasm |
 | P-28 | `contact_clustering` (3D manifolds with near normals merged) | no | one manifold a pair | MISSING, 138.2 | Wasm | Wasm |
 | P-29 | `contact_recycling`, recycle distance | no | warm start by ids, narrow phase every step | MISSING, 138.2 | Wasm | Wasm |
-| P-30 | `min_ccd_dt`, `max_ccd_substeps` (0 turns CCD off) | no | none | BUILDING 126 (CCD); options MISSING if 126 leaves them out, 140.5 | Wasm | Wasm |
+| P-30 | `min_ccd_dt`, `max_ccd_substeps` (0 turns CCD off) | no | none: CCD (126.8) takes one sweep a step | MISSING, 140.5 | Wasm | Wasm |
 | P-31 | profiling timers (`timingStep`, broad, narrow, solver, CCD, islands, user changes) | no | none | MISSING, 138.6 | Wasm | Wasm |
 
 ## Rigid bodies
@@ -96,8 +96,8 @@ Batch order, parity first (reasons in [Order](#order)): 126, 127, 128, 138, 139,
 | RB-06 | `linear_damping`, `angular_damping` | yes | yes | DONE: `kernel/tests/integrate.rs` `damping_decays_by_the_implicit_factor_and_towards_the_exponential` | Wasm | Wasm |
 | RB-07 | `can_sleep`, `sleeping` at start | yes | yes | DONE: `kernel-sleep.test.js` "sleep asks, wake reaches the whole island, setCanSleep holds it up" | Wasm | Wasm |
 | RB-08 | `RigidBodyActivation` per body: linear threshold, angular threshold, time until sleep | no | world-level `setSleep(energy, time)` | PARTIAL: world DONE: `kernel-sleep.test.js` "the thresholds read back and bad ones are refused"; per body MISSING, 138.3 | Wasm | Wasm |
-| RB-09 | `ccd_enabled` | `ccd` | throws | BUILDING 126 | Wasm | Wasm |
-| RB-10 | `soft_ccd_prediction` | no | none | BUILDING 126 (speculative margin); option MISSING if left out, 140.5 | Wasm | Wasm |
+| RB-09 | `ccd_enabled` | `ccd` | `ccd` on `addBody` and `body.ccd` | DONE (126.8): `kernel/tests/ccd.rs`, `tests/next-ccd.test.js` (1,000 bullets at 300 m/s through no wall, mesh or height field; a slow body the same bits with and without) | Wasm | Wasm |
+| RB-10 | `soft_ccd_prediction` | no | none: speculative contacts reach as far as the body moves in a step | MISSING, 140.5 | Wasm | Wasm |
 | RB-11 | `additional_mass` | `additionalMass` | yes | DONE: `kernel-collider.test.js` "additional mass scales the inertia" | Wasm | Wasm |
 | RB-12 | `additional_mass_properties` (mass, centre, principal inertia, frame) | `setMassProperties` | yes | DONE: `next-bodies.test.js` "setMassProperties: mass alone scales the inertia, every figure given is the body exactly" | Wasm | Wasm |
 | RB-13 | `lock_translations`, `lock_rotations`, `enabled_translations`, `enabled_rotations`, `LockedAxes` | yes | yes | DONE: `kernel/tests/integrate.rs` `locks_hold_a_body_on_its_world_axes` | Wasm | Wasm |
@@ -198,7 +198,7 @@ Batch order, parity first (reasons in [Order](#order)): 126, 127, 128, 138, 139,
 | E-10 | `modify_solver_contacts`: normal, friction, restitution, tangent velocity, anchors, distance, persistent manifold `user_data` (Rust only; JS has no such hook) | no | none | MISSING, 140.4 | Wasm | Wasm |
 | E-11 | `update_as_oneway_platform` | no | none | MISSING, 140.4 (3D and 2D) | Wasm | Wasm |
 | E-12 | conveyor belt by tangent velocity | no | none | MISSING, 140.4 | Wasm | Wasm |
-| E-13 | CCD sensor crossings start and stop events | no | none | MISSING if 126 leaves it out, 140.5 | Wasm | Wasm |
+| E-13 | CCD sensor crossings start and stop events | no | none: the sweep skips sensors | MISSING, 140.5 | Wasm | Wasm |
 | E-14 | soft body tear events | no | none | MISSING, 146.1 | Wasm | Wasm |
 
 ## Joints
@@ -238,10 +238,10 @@ Batch order, parity first (reasons in [Order](#order)): 126, 127, 128, 138, 139,
 
 | Row | Rapier | Root today | Own solver | Status | WebGPU | WebGL2 |
 | --- | --- | --- | --- | --- | --- | --- |
-| CC-01 | bullet CCD against every body kind | `ccd` | none | BUILDING 126 | Wasm | Wasm |
-| CC-02 | fast non-bullet bodies swept against fixed colliders by default | Rapier's | partial: a fast ball stops on a floor | PARTIAL: DONE for the floor case: `kernel/tests/solver.rs` `a_fast_ball_stops_on_the_floor_without_passing_through`; general case BUILDING 126 | Wasm | Wasm |
+| CC-01 | bullet CCD against every body kind | `ccd` | conservative advancement after each step against every collider whose fat box meets the path: fixed, kinematic, dynamic and sleeping bodies, every shape, compounds piece by piece; a body stopped on a kinematic body, or a dynamic one without `ccd`, rides with it for the rest of the step | DONE (126.8): `kernel/tests/ccd.rs` (1,000 turning bullets at a box wall, a mesh and a height field; a ball sliding fast on a floor the same bits as without `ccd`; a stopped bullet carried by a kinematic wall; 200 spinning bullets at a wall coming at them), `tests/next-ccd.test.js` (1,000 balls, boxes and capsules at 300 m/s: none reaches the middle plane of a 2 cm wall, a mesh or a height field; 200 spinning bullets at a kinematic wall coming at 20 m/s and at a free dynamic plate: none ends a step past its middle);Rapier's result for 129: Rapier 0.21 with `ccd` on, as a black box through the root entry, on the same 1,000 shots: 974 balls, 189 boxes and 2 capsules end a step with their centre past the far face of the 2 cm box wall (they stop at the touch, then the next step carries them into the wall and its contacts push them out on the far side); 4 boxes pass the two-triangle mesh; none pass the height field; loss for 129: the sweep tests every collider's fat box, with no tree | Wasm | Wasm |
+| CC-02 | fast non-bullet bodies swept against fixed colliders by default | Rapier's | speculative contacts as far ahead as each body can move in a step, the sweep only with `ccd`, as in Rapier | DONE (126.8): `kernel/tests/solver.rs` `a_fast_ball_stops_on_the_floor_without_passing_through`; `tests/next-ccd.test.js` shows that without `ccd` fast turning boxes can pass a thin wall | Wasm | Wasm |
 | CC-03 | soft CCD (predictive contacts ahead) | no | none | BUILDING 126 | Wasm | Wasm |
-| CC-04 | `is_ccd_active` | no | none | MISSING if 126 leaves it out, 140.5 | Wasm | Wasm |
+| CC-04 | `is_ccd_active` | no | `body.ccdActive` | DONE (126.8): `tests/next-ccd.test.js` (true on a step the sweep checked a fast body, false once it is slow, never on a slow body) | Wasm | Wasm |
 
 ## Scene queries
 

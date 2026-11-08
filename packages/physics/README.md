@@ -306,7 +306,7 @@ console.log(body.position[1]);         // fallen about 4.9 m in the second
 physics.dispose();
 ```
 
-It holds `box`, `sphere`, `capsule`, `convexHull`, `trimesh`, `heightfield`, `compound` and `voxels` colliders, bodies of every kind, forces, impulses, velocities, damping, locks, kinematic targets, gravity, sleeping and the `beforestep` and `afterstep` events. Bodies collide, with friction, restitution and the four combine rules, and `physics.touching(a, b)` and `physics.contactPoints(body)` read the contacts of the last step, walking only the asking body's pairs: `touching` allocates nothing, and a call costs that body's contacts, not the world's. Contact and intersection events, sensors, `collisionGroups`, `solverGroups`, `contactFilter`, `dominance` and `enabled` on bodies and colliders work as on the root entry, with the same names. `body.setType`, `setAdditionalMass` (with inertia of its own), `setMassProperties`, `collider.setDensity` and `additionalSolverIterations` work as on the root entry, with the same names and errors. A call that needs what is still to come throws a `MargoError` with code `unsupported` naming what it waits for: the other shapes and `addModel` with the shapes and queries batch, `ccd` with continuous collision, `follow` and character controllers, and `debugRender`. `body.sleep()` and impulses take effect at the next step.
+It holds `box`, `sphere`, `capsule`, `convexHull`, `trimesh`, `heightfield`, `compound` and `voxels` colliders, bodies of every kind, forces, impulses, velocities, damping, locks, kinematic targets, gravity, sleeping and the `beforestep` and `afterstep` events. Bodies collide, with friction, restitution and the four combine rules, and `physics.touching(a, b)` and `physics.contactPoints(body)` read the contacts of the last step, walking only the asking body's pairs: `touching` allocates nothing, and a call costs that body's contacts, not the world's. Contact and intersection events, sensors, `collisionGroups`, `solverGroups`, `contactFilter`, `dominance` and `enabled` on bodies and colliders work as on the root entry, with the same names. `body.setType`, `setAdditionalMass` (with inertia of its own), `setMassProperties`, `collider.setDensity` and `additionalSolverIterations` work as on the root entry, with the same names and errors. A call that needs what is still to come throws a `MargoError` with code `unsupported` naming what it waits for: the other shapes and `addModel` with the shapes and queries batch, `follow` and character controllers, and `debugRender`. `body.sleep()` and impulses take effect at the next step.
 
 `raycast` and `raycastAll` work on every shape the entry holds, with the root entry's names and options (`maxDistance`, `solid`, `groups`, `exclude`, `excludeSensors`, `excludeFixed`, `excludeKinematic`, `excludeDynamic`, `predicate`), plus Rapier's flags the root does not name: `excludeCollider`, `excludeSolids`, `onlyDynamic`, `onlyKinematic` and `onlyFixed`. `raycastAll` lists one hit a collider, nearest first, and `stop` ends the list early. Rays see the poses of the last step, as Rapier's do. A ray that starts inside a solid shape hits at distance 0 with a zero normal; with `solid: false` it hits where it leaves, the normal facing the ray.
 
@@ -344,6 +344,22 @@ const nearest = physics.projectPoint([2, 1, 0]);
 console.log(nearest?.point, nearest?.distance.toFixed(2)); // [4.5, 1, 0] '2.50'
 console.log(physics.intersectPoint([5, 0, 0]).length);   // 1: the wall
 console.log(physics.intersectShape({shape: 'box', halfExtents: [1, 1, 1]}, [3.6, 0, 0]).length); // 1
+physics.dispose();
+```
+
+`ccd: true` on `addBody`, or `body.ccd = true`, turns on continuous collision for a body (default off), as Rapier's `enableCcd`: after each step a dynamic body that moved further than its thinnest piece is thick is swept from where the step began to where it ended and put back to its first touch, its velocity kept, so a fast thin body cannot pass a wall, a mesh or a height field. A slow body moves exactly as it would without it. `body.ccdActive` is true when the last step's sweep checked the body.
+
+```ts
+import {Physics} from 'margoengine/physics/next';
+
+await Physics.load();
+const physics = new Physics(null, {gravity: [0, 0, 0]});
+physics.addBody(null, {type: 'fixed', position: [10, 0, 0], colliders: {shape: 'box', halfExtents: [0.01, 2, 2]}});
+const bullet = physics.addBody(null, {linearVelocity: [300, 0, 0], colliders: {shape: 'sphere', radius: 0.02}, ccd: true});
+physics.step();
+console.log(bullet.ccdActive, bullet.position[0].toFixed(2)); // true '5.00'
+for (let i = 0; i < 3; i++) physics.step();
+console.log(bullet.position[0].toFixed(2)); // '9.97': stopped on the wall, not through it
 physics.dispose();
 ```
 

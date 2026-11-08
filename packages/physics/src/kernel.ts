@@ -156,6 +156,9 @@ export const COLLIDER_SENSOR = 1;
 export const COLLIDER_OFF = 2;
 /** Bit of the `flags` column: the body is out of the world. */
 export const BODY_DISABLED = 1 << 11;
+/** Bits of the `flags` column: continuous collision on, and whether the last step's CCD pass checked the body. */
+export const BODY_CCD = 1 << 13,
+  BODY_CCD_ACTIVE = 1 << 14;
 /** An event's first word: the first collider's row under this mask, the sensor bit, and the top bit when it started. */
 export const EVENT_COLLIDER = (1 << 30) - 1;
 export const EVENT_SENSOR = 1 << 30;
@@ -623,6 +626,20 @@ export class KernelWorld {
   sleep(body: number): this {
     this.api.body_sleep(body);
     return this;
+  }
+  /**
+   * Sets continuous collision on a body (default off), Rapier's `enableCcd`: after each step a dynamic body that moved
+   * further than its thinnest piece is thick is swept from its start pose to its end pose against the colliders its path
+   * box meets, and put back to its first touch, its velocity kept.
+   */
+  setCcd(body: number, enabled: boolean): this {
+    const { flags } = this.columns;
+    flags[body] = enabled ? flags[body] | BODY_CCD : flags[body] & ~BODY_CCD;
+    return this;
+  }
+  /** True when the last step's CCD pass checked the body: CCD is on and it moved further than it is thick. */
+  isCcdActive(body: number): boolean {
+    return ((this.columns.flags[body] ?? 0) & BODY_CCD_ACTIVE) !== 0;
   }
   /** Sets whether a body may sleep (default true). A body that may not keeps everything it touches awake. */
   setCanSleep(body: number, canSleep: boolean): this {

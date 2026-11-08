@@ -1396,3 +1396,14 @@ The following remain technical gaps, not permission to weaken a check:
     `tests/next-shape-queries.test.js` against Rapier 0.21 and an exact f64 reference of the Minkowski difference.
     Missing: a tree over colliders (each collider is tested), mesh, height field, voxel and compound query shapes,
     and any browser run. Rapier faults found are in docs/rapier-parity.md Q-07 and Q-09.
+47. The own physics kernel's continuous collision (batch 126, CCD job, `kernel/src/ccd.rs`, `World::ccd_pass`
+    after the substeps and before the events): two bits of the body flags, `CCD` (1 << 13) and `CCD_ACTIVE`
+    (1 << 14), no new columns, so the world's bytes and every pose without CCD are as before (replay hashes
+    unchanged). A CCD body that moved further than it is thick is swept by conservative advancement (Mirtich
+    1996; Catto 2013) on a lower bound of the gap, so the time found is never past a touch, and put back there
+    with its velocity kept, or carried by the kinematic or non-CCD body it met for the rest of the step. A part
+    touching at the step's start holds the body no deeper than half its thickness instead of reading as a touch
+    at time 0: the drafted rule froze a fast ball sliding on a floor and let a wall that carried a bullet pass
+    it, and both have regression tests. Proved: `kernel/tests/ccd.rs` and `tests/next-ccd.test.js` (1,000
+    bullets and moving walls, with Rapier 0.21's counts for the record). Missing: a tree over colliders for the sweep (it tests every fat box),
+    Rapier's CCD substeps, smallest CCD step, soft CCD and CCD sensor events (batch 140.5), and any browser run.

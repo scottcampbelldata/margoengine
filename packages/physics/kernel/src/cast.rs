@@ -184,7 +184,7 @@ fn shifted(s: &Solid, by: V3) -> Solid {
 }
 
 /// A solid without its radius, and the radius: a ball's centre, a capsule's segment.
-fn core(s: &Solid) -> (Solid, f32) {
+pub(crate) fn core(s: &Solid) -> (Solid, f32) {
     match *s {
         Solid::Round { p, q, r } => (Solid::Round { p, q, r: 0.0 }, r),
         other => (other, 0.0),
@@ -429,7 +429,7 @@ fn poly_closest(poly: &Poly, p: V3) -> V3 {
 }
 
 /// The box that holds a convex shape, from its six axis support points.
-fn bounds(s: &impl Convex) -> (V3, V3) {
+pub(crate) fn bounds(s: &impl Convex) -> (V3, V3) {
     let (x, y, z) = (v3(1.0, 0.0, 0.0), v3(0.0, 1.0, 0.0), v3(0.0, 0.0, 1.0));
     let high = v3(s.support(x).x, s.support(y).y, s.support(z).z);
     let low = v3(s.support(x.scale(-1.0)).x, s.support(y.scale(-1.0)).y, s.support(z.scale(-1.0)).z);
@@ -490,7 +490,7 @@ impl World {
         })
     }
 
-    fn shape_of(&self, c: usize) -> Shape {
+    pub(crate) fn shape_of(&self, c: usize) -> Shape {
         Shape { kind: self.uu(COLLIDER_SHAPE, c), size: self.v(COLLIDER_A, c), hull: self.uu(COLLIDER_HULL, c) }
     }
 
@@ -544,7 +544,7 @@ impl World {
     /// Calls `visit` with each part of mesh, height field or voxel grid `mesh` that may meet the box `reach` in its frame,
     /// until it returns false: the filled voxel cells and the height field triangles under the box, and the triangles in
     /// the leaves of the mesh tree whose node boxes `node` lets through.
-    fn each_part(&self, mesh: usize, (low, high): (V3, V3), node: &dyn Fn(V3, V3) -> bool, visit: &mut dyn FnMut(Solid) -> bool) {
+    pub(crate) fn each_part(&self, mesh: usize, (low, high): (V3, V3), node: &dyn Fn(V3, V3) -> bool, visit: &mut dyn FnMut(Solid) -> bool) {
         if self.is_voxels(mesh) {
             let mut data = BoxData::new();
             let poly = box_poly(self.v(VOXEL_SIZE_X, mesh).scale(0.5), &mut data);
