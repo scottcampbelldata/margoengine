@@ -67,6 +67,14 @@ mod imp {
         f32x4_pmax(a, b)
     }
     #[inline(always)]
+    pub fn transpose(r: [F; 4]) -> [F; 4] {
+        let t0 = i32x4_shuffle::<0, 4, 1, 5>(r[0], r[1]);
+        let t1 = i32x4_shuffle::<0, 4, 1, 5>(r[2], r[3]);
+        let t2 = i32x4_shuffle::<2, 6, 3, 7>(r[0], r[1]);
+        let t3 = i32x4_shuffle::<2, 6, 3, 7>(r[2], r[3]);
+        [i64x2_shuffle::<0, 2>(t0, t1), i64x2_shuffle::<1, 3>(t0, t1), i64x2_shuffle::<0, 2>(t2, t3), i64x2_shuffle::<1, 3>(t2, t3)]
+    }
+    #[inline(always)]
     pub fn and(a: M, b: M) -> M {
         v128_and(a, b)
     }
@@ -153,6 +161,16 @@ mod imp {
         unsafe { _mm_max_ps(b, a) }
     }
     #[inline(always)]
+    pub fn transpose(r: [F; 4]) -> [F; 4] {
+        unsafe {
+            let t0 = _mm_unpacklo_ps(r[0], r[1]);
+            let t1 = _mm_unpacklo_ps(r[2], r[3]);
+            let t2 = _mm_unpackhi_ps(r[0], r[1]);
+            let t3 = _mm_unpackhi_ps(r[2], r[3]);
+            [_mm_movelh_ps(t0, t1), _mm_movehl_ps(t1, t0), _mm_movelh_ps(t2, t3), _mm_movehl_ps(t3, t2)]
+        }
+    }
+    #[inline(always)]
     pub fn and(a: M, b: M) -> M {
         unsafe { _mm_and_ps(a, b) }
     }
@@ -227,6 +245,9 @@ mod imp {
     pub fn pmax(a: F, b: F) -> F {
         map(a, b, |x, y| if x < y { y } else { x })
     }
+    pub fn transpose(r: [F; 4]) -> [F; 4] {
+        [0, 1, 2, 3].map(|i| [r[0][i], r[1][i], r[2][i], r[3][i]])
+    }
     pub fn and(a: M, b: M) -> M {
         [0, 1, 2, 3].map(|k| a[k] && b[k])
     }
@@ -298,6 +319,12 @@ impl F4 {
     #[inline(always)]
     pub fn pmax(self, o: F4) -> F4 {
         F4(imp::pmax(self.0, o.0))
+    }
+    /// Rows to columns: lane i of result j is lane j of row i. Moves only, so every bit is kept; four structures of four
+    /// floats loaded whole become four lanes of each field (Catto, "SIMD Matters", 2024, describes gathering bodies so).
+    #[inline(always)]
+    pub fn transpose(rows: [F4; 4]) -> [F4; 4] {
+        imp::transpose(rows.map(|r| r.0)).map(F4)
     }
 }
 

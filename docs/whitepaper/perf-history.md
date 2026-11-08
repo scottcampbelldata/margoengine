@@ -2143,12 +2143,32 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
 - **Rerun:** `cargo test --release --manifest-path packages/physics2d/kernel/Cargo.toml --test manifold_exact --
   --include-ignored --nocapture` (exactness and the paired A/B), then the browser run with `BOX2D_WASM` (reproduce.md).
 
+### 90. Own 2D physics: bodies gathered 16 bytes at a time and two blocks visited together, every bit the same (paired Wasm, 3.28 to 3.10 ms)
+
+- **Change:** the solver's bodies are 32 bytes on 16-byte bounds (a pad after the angular speed), so the four-lane
+  solve (`solver/wide.rs`) loads each half of four bodies whole and turns them into lanes with `F4::transpose`
+  (`kernel-common/src/lanes.rs`: moves only, Wasm `i32x4.shuffle`, SSE2 unpack and move), and stores them back the
+  same way. Inside a colour two blocks are visited together, friction point by point for both, then each normal solve:
+  their dependency chains overlap. They write different bodies, so the order between them changes nothing.
+- **Why this and not more lanes:** a probe of the Wasm build by phase (instrumented copy, Node) showed the passes are
+  not memory bound (the 30-row pyramid costs the same per contact as the 100-row one in every phase) but latency
+  bound: about 260 vector operations a block visit in about 235 cycles. Four blocks at a time was slower (0 of 12
+  rounds against two: register spills).
+- **Same output:** the pinned hashes of `tests/bits.rs` hold natively (lanes on and off) and in the Wasm build;
+  `F4::transpose` is checked bit for bit, NaN payloads and -0 included (`tests/manifold_exact.rs`).
+- **Paired (two Wasm builds in one Node process in turns, a fresh 100-row pyramid per round, fastest of 40 steps after
+  60, 12 rounds, both builds passing the pinned hashes; busy machine):** gather alone 3.417 to 3.261 ms (10 of 12
+  rounds), pairs on top 3.201 to 3.050 (12 of 12), both against entry 89's build 3.281 to 3.097 (11 of 12).
+- **Rerun:** build the wasm-check module of each commit (`cargo build --release --target wasm32-unknown-unknown` with
+  `RUSTFLAGS=-C target-feature=+simd128` in `packages/physics2d/kernel/wasm-check`) and time them in turns in one
+  process, or run the browser comparison (reproduce.md).
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).
 
 - **Own 2D physics, the 100-row pyramid: 3.6 to 3.7 ms a step in Wasm against Box2D v3's Wasm 1.5 to 1.6 ms (entries
-  83, 85 to 89).** One page, the engines taking turns, busy machine, diagnostic (entry 89). Natively the step is now the
+  83, 85 to 90; entry 90 took about 6 percent more off, paired).** One page, the engines taking turns, busy machine, diagnostic (entry 89). Natively the step is now the
   solver 2.1 ms (Box2D's own profile: 0.8 to 1.0, eight lanes), the narrow phase 0.77 (0.13 to 0.18), the broad phase
   0.23 (0.10 to 0.20). Rapier 2D's Wasm takes 8.2 to 8.6 ms in the same page. Rerun: entry 89.
 

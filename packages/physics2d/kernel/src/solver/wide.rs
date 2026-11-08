@@ -2,8 +2,10 @@
 // contacts of a colour write the same body, so four visits at once give what four visits one after another give; every
 // lane does the scalar solve's operations in the scalar solve's order (solver.rs), branches turned into compares and
 // selects, so the two agree bit for bit (tests/bits.rs runs both). A colour's contacts sit in blocks of four, field by
-// field; a block's last lanes may be empty. Bodies are gathered by scalar loads and written back only for the lanes that
-// hold a contact and write that body.
+// field; a block's last lanes may be empty. Bodies are gathered 16 bytes at a time (each half of a 32-byte body)
+// and turned into lanes by a transpose, and written back the same way, only for the lanes that hold a contact and write
+// that body. Two blocks of one colour are visited together, step by step, so their chains overlap (they write different
+// bodies, so the order between them changes nothing).
 use alloc::vec::Vec;
 
 use margoengine_physics_kernel_common::lanes::{F4, M4};
@@ -63,6 +65,8 @@ struct Motion4 {
 #[derive(Default)]
 pub(super) struct Blocks {
     pub(super) blocks: Vec<Block>,
+    /// Where each pushed colour's blocks end.
+    pub(super) ends: Vec<usize>,
 }
 
 impl Blocks {
@@ -132,6 +136,7 @@ impl Blocks {
                 pushed: [M4::from_bits(pushed0), M4::from_bits(pushed1)],
             });
         }
+        self.ends.push(self.blocks.len());
     }
 
     /// Writes the impulses and pushed bits of the blocks from `first` on back to `constraints`, the contacts `push` put
@@ -155,22 +160,29 @@ impl Blocks {
     }
 }
 
+/// The velocities of four bodies: each body's first 16 bytes (v, w, pad) loaded whole, then turned into lanes.
 #[inline(always)]
 fn gather(bodies: &[SolverBody], at: &[u32; 4]) -> Motion4 {
-    let b = at.map(|k| &bodies[k as usize]);
-    Motion4 { vx: F4::new(b.map(|b| b.v.x)), vy: F4::new(b.map(|b| b.v.y)), w: F4::new(b.map(|b| b.w)) }
+    let rows = at.map(|k| {
+        let b = &bodies[k as usize];
+        F4::new([b.v.x, b.v.y, b.w, b.pad])
+    });
+    let [vx, vy, w, _] = F4::transpose(rows);
+    Motion4 { vx, vy, w }
 }
 
-/// Writes the velocities back to the bodies of the lanes in `write`.
+/// Writes the velocities back to the bodies of the lanes in `write`, 16 bytes a body (the pad written as 0).
 #[inline(always)]
 fn scatter(bodies: &mut [SolverBody], at: &[u32; 4], m: Motion4, write: u32) {
-    let (vx, vy, w) = (m.vx.get(), m.vy.get(), m.w.get());
+    let rows = F4::transpose([m.vx, m.vy, m.w, F4::splat(0.0)]);
     for k in 0..4 {
         if write >> k & 1 == 1 {
+            let [x, y, w, pad] = rows[k].get();
             let body = &mut bodies[at[k] as usize];
-            body.v.x = vx[k];
-            body.v.y = vy[k];
-            body.w = w[k];
+            body.v.x = x;
+            body.v.y = y;
+            body.w = w;
+            body.pad = pad;
         }
     }
 }
@@ -243,40 +255,70 @@ fn row(spring: (F4, F4, F4), s: F4, biased: bool, inv_h: F4, max_push: F4) -> (F
 }
 
 /// One pass over the blocks: friction and normal, in the pass's order. Returns (block solves, sequential fallbacks).
-pub(super) fn solve(bodies: &mut [SolverBody], blocks: &mut [Block], biased: bool, inv_h: f32, max_push: f32, springs: &Springs) -> (u64, u64) {
+/// Inside a colour two blocks are visited together, step by step, so their independent chains overlap; they write
+/// different bodies, so this gives what one after the other gives.
+pub(super) fn solve(bodies: &mut [SolverBody], blocks: &mut Blocks, biased: bool, inv_h: f32, max_push: f32, springs: &Springs) -> (u64, u64) {
     let (inv_h, max_push) = (F4::splat(inv_h), F4::splat(max_push));
     // Each spring's impulse scale over its mass scale, the block solve's diagonal term, once a pass: the same division
     // the scalar solve makes on every visit, so the same bits.
     let lanes = |s: &Soft| (F4::splat(s.bias_rate), F4::splat(s.mass_scale), F4::splat(s.impulse_scale), F4::splat(s.impulse_scale / s.mass_scale));
     let (q, e) = (lanes(&springs.quarter), lanes(&springs.eighth));
     let (mut block_count, mut sequential_count) = (0u64, 0u64);
-    for c in blocks.iter_mut() {
-        let (mut ma, mut mb) = (gather(bodies, &c.a), gather(bodies, &c.b));
-        let gaps = gaps(bodies, c);
-        if biased {
-            friction(c, &mut ma, &mut mb);
+    let mut begin = 0;
+    for &end in &blocks.ends {
+        let mut i = begin;
+        while i + 1 < end {
+            let (x, y) = blocks.blocks.split_at_mut(i + 1);
+            let (b, s) = visit(bodies, [&mut x[i], &mut y[0]], biased, inv_h, max_push, q, e);
+            block_count += b;
+            sequential_count += s;
+            i += 2;
         }
-        let spring = (F4::select(c.eighth, e.0, q.0), F4::select(c.eighth, e.1, q.1), F4::select(c.eighth, e.2, q.2));
-        let ratio = F4::select(c.eighth, e.3, q.3);
-        let (b, s) = normal(c, &mut ma, &mut mb, gaps, biased, inv_h, max_push, spring, ratio);
-        block_count += b;
-        sequential_count += s;
-        if !biased {
-            friction(c, &mut ma, &mut mb);
+        if i < end {
+            let (b, s) = visit(bodies, [&mut blocks.blocks[i]], biased, inv_h, max_push, q, e);
+            block_count += b;
+            sequential_count += s;
         }
-        scatter(bodies, &c.a, ma, c.write_a);
-        scatter(bodies, &c.b, mb, c.write_b);
+        begin = end;
     }
     (block_count, sequential_count)
+}
+
+type Lanes4 = (F4, F4, F4, F4);
+
+#[allow(clippy::too_many_arguments)]
+#[inline(always)]
+fn visit<const N: usize>(bodies: &mut [SolverBody], mut cs: [&mut Block; N], biased: bool, inv_h: F4, max_push: F4, q: Lanes4, e: Lanes4) -> (u64, u64) {
+    let mut ma: [Motion4; N] = core::array::from_fn(|j| gather(bodies, &cs[j].a));
+    let mut mb: [Motion4; N] = core::array::from_fn(|j| gather(bodies, &cs[j].b));
+    let g: [[F4; 2]; N] = core::array::from_fn(|j| gaps(bodies, cs[j]));
+    if biased {
+        friction_n(&mut cs, &mut ma, &mut mb);
+    }
+    let (mut blocks, mut sequential) = (0u64, 0u64);
+    normal_n(&mut cs, &mut ma, &mut mb, g, biased, inv_h, max_push, q, e, &mut blocks, &mut sequential);
+    if !biased {
+        friction_n(&mut cs, &mut ma, &mut mb);
+    }
+    for j in 0..N {
+        scatter(bodies, &cs[j].a, ma[j], cs[j].write_a);
+        scatter(bodies, &cs[j].b, mb[j], cs[j].write_b);
+    }
+    (blocks, sequential)
 }
 
 /// `gap`: each point's separation now, from how far each body moved and turned this step.
 #[inline(always)]
 fn gaps(bodies: &[SolverBody], c: &Block) -> [F4; 2] {
-    let a = c.a.map(|k| &bodies[k as usize]);
-    let b = c.b.map(|k| &bodies[k as usize]);
-    let (amx, amy, ac, as_) = (F4::new(a.map(|b| b.moved.x)), F4::new(a.map(|b| b.moved.y)), F4::new(a.map(|b| b.turn.c)), F4::new(a.map(|b| b.turn.s)));
-    let (bmx, bmy, bc, bs) = (F4::new(b.map(|b| b.moved.x)), F4::new(b.map(|b| b.moved.y)), F4::new(b.map(|b| b.turn.c)), F4::new(b.map(|b| b.turn.s)));
+    // Each body's second 16 bytes (moved, turn) loaded whole, then turned into lanes.
+    let half = |at: &[u32; 4]| {
+        F4::transpose(at.map(|k| {
+            let b = &bodies[k as usize];
+            F4::new([b.moved.x, b.moved.y, b.turn.c, b.turn.s])
+        }))
+    };
+    let [amx, amy, ac, as_] = half(&c.a);
+    let [bmx, bmy, bc, bs] = half(&c.b);
     let gap = |p: &PointLanes| {
         // turn.apply(v) = (c vx - s vy, s vx + c vy)
         let (rax, ray) = (ac * p.rax - as_ * p.ray, as_ * p.rax + ac * p.ray);
@@ -288,23 +330,55 @@ fn gaps(bodies: &[SolverBody], c: &Block) -> [F4; 2] {
 }
 
 #[inline(always)]
-fn friction(c: &mut Block, ma: &mut Motion4, mb: &mut Motion4) {
-    let (tx, ty) = (c.ny, -c.nx);
+fn friction_n<const N: usize>(cs: &mut [&mut Block; N], ma: &mut [Motion4; N], mb: &mut [Motion4; N]) {
     for i in 0..2 {
-        let m = if i == 0 { c.live } else { c.live.and(c.two) };
-        let p = c.points[i];
-        let (bx, by) = speed_at(mb, p.rbx, p.rby);
-        let (ax, ay) = speed_at(ma, p.rax, p.ray);
-        let vt = tx * (bx - ax) + ty * (by - ay);
-        let limit = c.friction * p.normal_impulse;
-        let low = -limit;
-        // clamp(x, -limit, limit): x below the low end becomes it, then x above the high end becomes it.
-        let x = p.tangent_impulse - p.tangent_mass * vt;
-        let x = F4::select(x.lt(low), low, x);
-        let total = F4::select(x.gt(limit), limit, x);
-        let applied = total - p.tangent_impulse;
-        c.points[i].tangent_impulse = F4::select(m, total, p.tangent_impulse);
-        apply(c, ma, mb, &p, tx * applied, ty * applied, m);
+        for j in 0..N {
+            friction_point(cs[j], &mut ma[j], &mut mb[j], i);
+        }
+    }
+}
+
+#[inline(always)]
+fn friction_point(c: &mut Block, ma: &mut Motion4, mb: &mut Motion4, i: usize) {
+    let (tx, ty) = (c.ny, -c.nx);
+    let m = if i == 0 { c.live } else { c.live.and(c.two) };
+    let p = c.points[i];
+    let (bx, by) = speed_at(mb, p.rbx, p.rby);
+    let (ax, ay) = speed_at(ma, p.rax, p.ray);
+    let vt = tx * (bx - ax) + ty * (by - ay);
+    let limit = c.friction * p.normal_impulse;
+    let low = -limit;
+    // clamp(x, -limit, limit): x below the low end becomes it, then x above the high end becomes it.
+    let x = p.tangent_impulse - p.tangent_mass * vt;
+    let x = F4::select(x.lt(low), low, x);
+    let total = F4::select(x.gt(limit), limit, x);
+    let applied = total - p.tangent_impulse;
+    c.points[i].tangent_impulse = F4::select(m, total, p.tangent_impulse);
+    apply(c, ma, mb, &p, tx * applied, ty * applied, m);
+}
+
+#[allow(clippy::too_many_arguments)]
+#[inline(always)]
+fn normal_n<const N: usize>(
+    cs: &mut [&mut Block; N],
+    ma: &mut [Motion4; N],
+    mb: &mut [Motion4; N],
+    g: [[F4; 2]; N],
+    biased: bool,
+    inv_h: F4,
+    max_push: F4,
+    q: Lanes4,
+    e: Lanes4,
+    blocks: &mut u64,
+    sequential: &mut u64,
+) {
+    for j in 0..N {
+        let c = &mut *cs[j];
+        let spring = (F4::select(c.eighth, e.0, q.0), F4::select(c.eighth, e.1, q.1), F4::select(c.eighth, e.2, q.2));
+        let ratio = F4::select(c.eighth, e.3, q.3);
+        let (b, s) = normal(c, &mut ma[j], &mut mb[j], g[j], biased, inv_h, max_push, spring, ratio);
+        *blocks += b;
+        *sequential += s;
     }
 }
 

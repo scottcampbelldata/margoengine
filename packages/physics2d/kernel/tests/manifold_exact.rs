@@ -193,3 +193,20 @@ fn pmin_and_pmax_are_the_compare_and_select() {
         }
     }
 }
+
+#[test]
+fn transpose_moves_rows_to_columns_and_keeps_every_bit() {
+    // The four-lane solve gathers bodies with it: lane i of column j is lane j of row i, NaN payloads and -0 kept.
+    let rows = [
+        [1.0f32, -0.0, f32::from_bits(0x7fc0_1234), 4.0],
+        [5.0, 6.0, f32::INFINITY, -8.5],
+        [9.0, 1e-40, 11.0, 12.0],
+        [-13.0, 14.0, 15.0, f32::NEG_INFINITY],
+    ];
+    let columns = F4::transpose(rows.map(F4::new)).map(F4::get);
+    for i in 0..4 {
+        for j in 0..4 {
+            assert_eq!(columns[j][i].to_bits(), rows[i][j].to_bits(), "row {i} lane {j}");
+        }
+    }
+}

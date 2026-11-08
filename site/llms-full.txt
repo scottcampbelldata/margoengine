@@ -4049,7 +4049,8 @@ Measured but not fixed. Their history, sources and rerun commands are in
   same. Left, native, by phase: the solver 2.1 ms (Box2D's own profile 0.8 to 1.0 with eight AVX2 lanes), the narrow
   phase 0.77 (0.13 to 0.18), the broad phase 0.23 (0.10 to 0.20). In one page (entry 89) Margo's Wasm steps it in 3.58
   to 3.74 ms, Box2D v3's Wasm in 1.53 to 1.62 and Rapier 2D's Wasm in 8.18 to 8.56 (Edge 157, Firefox 157). Next: the
-  solver's contact rows and passes, then the narrow phase's clip and the loop around it.
+  solver's contact rows and passes (entry 90 took about 6 percent off the Wasm step, paired: whole-body loads and two
+  blocks at a time; the passes are latency bound, not memory bound), then the narrow phase's clip and the loop around it.
 
 - **Own convex decomposition builds 5 to 120 times slower than Rapier's V-HACD** (`@margoengine/physics/decomposition`,
   perf history entry 81): repro `node packages/physics/scripts/decomposition-vs-rapier.mjs` after the physics build;

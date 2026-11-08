@@ -34,7 +34,7 @@
 // 1:100 stack keeps the quarter's small sag (tests/world.rs).
 //
 // The solver works on its own compact copy of the bodies (Catto, "Solver2D", 2024, and "SIMD Matters", 2024, as
-// descriptions of the layout): 28 bytes each, the velocity, the turn, the offset moved this step and the rotation turned
+// descriptions of the layout): 32 bytes each, the velocity, the turn, a pad, the offset moved this step and the rotation turned
 // this step, the last worked out once a body integrates instead of twice on every visit. A contact's visit reads two of
 // those and its own 128-byte record; the world's large body records are read and written once a substep, and around the
 // joint passes. The same operations in the same order: every bit as before (tests/bits.rs).
@@ -131,9 +131,12 @@ struct Bounce {
 /// A body as the solver sees it. `moved` is how far its centre of mass has moved this step and `turn` the rotation it
 /// has turned, its rotation now times the inverse of the one at the step's start.
 #[derive(Clone, Copy, Debug)]
+#[repr(C, align(16))]
 struct SolverBody {
     v: V2,
     w: f32,
+    /// Unused: it makes the velocity half 16 bytes, so the four-lane solve loads and stores it whole.
+    pad: f32,
     moved: V2,
     turn: Rot,
 }
@@ -175,6 +178,7 @@ fn place(world: &World, bodies: &mut Vec<SolverBody>, ids: &mut Vec<u32>, slot: 
         bodies.push(SolverBody {
             v: body.linear_velocity,
             w: body.angular_velocity,
+            pad: 0.0,
             moved: V2::ZERO,
             turn: body.xf.q.mul(inverse(body.xf.q)),
         });
@@ -365,6 +369,7 @@ pub fn solve(world: &mut World, dt: f32) {
     let single = if lanes { starts[COLOURS] as usize } else { 0 };
     let mut blocks = core::mem::take(&mut scratch.blocks);
     blocks.blocks.clear();
+    blocks.ends.clear();
     if lanes {
         for k in 0..COLOURS {
             blocks.push(&constraints[starts[k] as usize..starts[k + 1] as usize]);
@@ -406,7 +411,7 @@ pub fn solve(world: &mut World, dt: f32) {
                 joint::solve(world, &mut paths, &Pass { biased: true, ..joint_pass });
                 read_velocities(world, &mut bodies, &ids);
             }
-            let (b, s) = wide::solve(&mut bodies, &mut blocks.blocks, true, inv_h, max_push, &wide_springs);
+            let (b, s) = wide::solve(&mut bodies, &mut blocks, true, inv_h, max_push, &wide_springs);
             block += b;
             sequential += s;
             for c in constraints[single..].iter_mut() {
@@ -429,7 +434,7 @@ pub fn solve(world: &mut World, dt: f32) {
                 joint::solve(world, &mut paths, &joint_pass);
                 read_velocities(world, &mut bodies, &ids);
             }
-            let (b, s) = wide::solve(&mut bodies, &mut blocks.blocks, false, inv_h, max_push, &wide_springs);
+            let (b, s) = wide::solve(&mut bodies, &mut blocks, false, inv_h, max_push, &wide_springs);
             block += b;
             sequential += s;
             for c in constraints[single..].iter_mut() {
@@ -671,8 +676,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn a_visit_reads_two_28_byte_bodies_and_a_128_byte_contact() {
-        assert_eq!(core::mem::size_of::<SolverBody>(), 28);
+    fn a_visit_reads_two_32_byte_bodies_and_a_128_byte_contact() {
+        // 32 bytes on 16-byte bounds: the four-lane solve loads each half (v, w, pad; moved, turn) whole.
+        assert_eq!(core::mem::size_of::<SolverBody>(), 32);
+        assert_eq!(core::mem::align_of::<SolverBody>(), 16);
         assert_eq!(core::mem::size_of::<Constraint>(), 128);
     }
 }
