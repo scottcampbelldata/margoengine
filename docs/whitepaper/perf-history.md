@@ -2302,6 +2302,14 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
   one extra frame. That is the simulated work, not a loss to file. Busy machine, diagnostic.
 - **Rerun:** `node packages/netcode/scripts/rival-bench.mjs`.
 
+### 99. Save migration fuzz round trip (diagnostic)
+
+- **Measurement:** 200 documents from seed 167. Migrate version 1 to 2 (rename `health` to `vitals`, add `max: 10`),
+  validate, encode, decode, parse, migrate again. The two documents must be deep-equal. No rival package does this.
+- **Result:** 87,234 bytes, 0.086 ms each, 0 failures. Busy machine, one run, diagnostic. The test
+  `packages/save/tests/migration-fuzz.test.js` locks seed 167 and 40 further documents.
+- **Rerun:** `node packages/save/scripts/fuzz-roundtrip.mjs`.
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).

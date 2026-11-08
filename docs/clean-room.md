@@ -1199,6 +1199,7 @@ idb and the like) was read.
 | --- | --- |
 | Overrides | RFC 7386, "JSON Merge Patch" (objects merge, null removes, other values replace) |
 | Document format | ECMA-404 / RFC 8259 JSON; our own entity, reference (`{"$ref": id}`) and prefab layout |
+| Migration fuzz (batch 167) | No rival package. Seeded version-1 documents are migrated, encoded and decoded by the public API. The generator is Margo's own (`packages/save/scripts/fuzz-roundtrip.mjs`). |
 | Compression | RFC 1952 gzip, through the WHATWG Compression Streams standard (`CompressionStream`, `DecompressionStream`) |
 | Web Storage adapter | The HTML Standard, Web Storage (`getItem`, `setItem`, `removeItem`, `key`, `length`); RFC 4648 base64 |
 | IndexedDB adapter | W3C Indexed Database API 3.0 (open and upgradeneeded, object stores, readonly and readwrite transactions, requests) |

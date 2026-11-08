@@ -16,6 +16,7 @@ time is the fastest round. These numbers were taken on a busy machine and are di
 | `@margoengine/fsm` | 10,000 transitions of a two-state toggle | 1.443 ms | XState 5.33.4, 27.935 ms | win |
 | `@margoengine/tween` | 10,000 linear tweens, one 16 ms step | 0.371 ms | tween.js 25.0.0, 1.018 ms | win |
 | `@margoengine/netcode` | 180 frames, two peers, rollback against a forward-only run | 0.0176 ms/frame (rollback), 0.0086 ms/frame (forward) | no JavaScript rollback rival | published |
+| `@margoengine/save` | 200 seeded migration round trips | 0.086 ms each, 87,234 bytes, 0 failures | no rival package | published |
 
 The flock checksums after that step were 31517.19 (Margo) and 31516.70 (Yuka). Both moved from the same grid. They are
 not bit-equal: Yuka keeps a neighbourhood per vehicle and Margo uses one uniform grid. The behaviours are the ones in
@@ -46,3 +47,8 @@ that changes every frame) takes 0.0176 ms/frame. The last counted round resimula
 (166 rollbacks each). The extra time per resimulated frame, using each round's own count, is 2.403 microseconds at
 the minimum. The rollback run is slower because it simulates those extra frames, not because a rolled frame costs
 many times a forward step. Busy machine, diagnostic. Rerun: `node packages/netcode/scripts/rival-bench.mjs`.
+
+The save row has no rival package. Two hundred documents from seed 167 (version 1, entities, parents, components and
+`$ref`) are migrated to version 2, validated, encoded, decoded, parsed and migrated again. The two results match and
+validation is empty. One run on a busy machine: 87,234 bytes, 0.086 ms each. The same generator is locked by
+`packages/save/tests/migration-fuzz.test.js`. Rerun: `node packages/save/scripts/fuzz-roundtrip.mjs`.
