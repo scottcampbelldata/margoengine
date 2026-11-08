@@ -54,12 +54,17 @@ export async function textureBrowserChecks(page) {
       [0, 0, 1, 1],
       [0, 0, -1, -1],
     ]) {
-      const actual = textureQuad('normal'),
-        reference = textureQuad('normal');
+      // A zero tangent has no direction: gltf-pro packs it with sign 0 and the shader takes the frame from the UV
+      // derivatives, as for a primitive without tangents (0d128071b), so its reference has none. A tangent along the
+      // normal keeps its sign and the shader picks a direction across the normal: (0, 1, 0) for this quad.
+      const zero = tangent.slice(0, 3).every((value) => value === 0),
+        actual = textureQuad('normal'),
+        reference = textureQuad('normal', undefined, zero ? { tangents: false } : {});
       for (const [fixture, frame] of [
         [actual, tangent],
-        [reference, [0, 1, 0, tangent[3]]],
+        [reference, zero ? null : [0, 1, 0, tangent[3]]],
       ]) {
+        if (!frame) continue;
         const index = fixture.doc.meshes[0].primitives[0].attributes.TANGENT;
         for (let i = 0; i < 4; i++) fixture.buffers[index].set(frame, i * 4);
       }

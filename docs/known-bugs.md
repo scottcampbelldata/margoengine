@@ -83,6 +83,21 @@ are still open.
   vertex-inputs.ts +691), the rest shared, core, controls and environment, spread over documented feature commits.
 - **Needed to close:** bring the page back under 120,000 B without dropping features. The budget stays.
 
+### Zero extra skin influences change one coordinate by 1 ulp on Metal
+
+- **What:** `modern:test:extensions` stops in `scripts/animation-influences-browser-tests.js` on the M6 Mac mini (Metal,
+  2026-11-07): `Zero extra influences changed four-bone output`. The tentacle rig skinned with JOINTS_1 and WEIGHTS_1
+  all zero differs from the same rig without them in 1 of 60 output floats, by 1 ulp (vertex 0 position x,
+  -0.5798871517181396 against -0.5798870921134949). The check wants the same bits (`Object.is`).
+- **Repro:** `npm run build:packages`, then `MARGO_GPU_SLOTS=2 node scripts/gpu-lock.mjs run --owner=<you> -- node
+  scripts/animation-influences-browser-tests.js`.
+- **Ruled out:** the CPU packing (`packages/animation/src/index.ts` divides each weight by the same sum on both paths);
+  the term order of the blend. Summing the extra four apart, and skipping them with a branch when their weights are all
+  zero, in both `deformationShader8` and the batched `linearBlend`, left the same value, so the 1 ulp comes from
+  somewhere else in the eight-influence path (its morph step, its pipeline or the Metal compiler's fused multiply-adds).
+- **Needed to close:** read back the four- and eight-influence pipelines' intermediate values for vertex 0 on Metal,
+  find the first that differs and make that step the same arithmetic; the check stays bit for bit.
+
 ### SSAO's orthographic picture moves with the eye
 
 - **What:** `scripts/ssao-gpu-check.js` fails on main: moving an orthographic eye along its view from 6 m to 0.6 m changes the
