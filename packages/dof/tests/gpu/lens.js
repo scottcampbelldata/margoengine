@@ -93,6 +93,18 @@ window.check = {
     if (taa) TAA.attach(engine, { depth: () => dof.depthTexture });
     await settle(frames);
   },
+  // A near box at [x, y], through a lens with cat's eye and anamorphic squeeze (and blades, for the shape lookup).
+  async optics(x, y, catEye, anamorphic, blades, size = 0.1) {
+    await start([[x, y, 7, size]]);
+    DOF.attach(engine, {
+      focalDistance: 20,
+      focalLength: 0.1,
+      aperture: 0.5,
+      maxRadius: 16,
+      lens: new DOFLens({ catEye, anamorphic, blades }),
+    });
+    await settle(4);
+  },
   // More frames of the current case.
   more: (frames) => settle(frames),
   // Two boxes at one depth, above and below the middle.

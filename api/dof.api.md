@@ -48,7 +48,7 @@ interface DOFApertureImage {
 class DOFLens {
     tilt: number;
     tiltDirection: readonly [number, number];
-    constructor({ blades, bladeRotation, tilt, tiltDirection, aperture }?: DOFLensOptions);
+    constructor({ blades, bladeRotation, tilt, tiltDirection, aperture, catEye, anamorphic }?: DOFLensOptions);
     shaders(source: DOFLensShaders): DOFLensShaders;
     write(values: Float32Array, camera: {
         fov: number;
@@ -63,6 +63,8 @@ interface DOFLensOptions {
     tilt?: number;
     tiltDirection?: readonly [number, number];
     aperture?: DOFApertureImage;
+    catEye?: number;
+    anamorphic?: number;
 }
 
 interface DOFLensShaders {

@@ -407,3 +407,35 @@ test('temporal DOF gathers at half size with turning taps and a half maxRadius, 
   dof.dispose();
   assert.ok(h.resources.filter((r) => r.width !== undefined).every((r) => r.destroyed));
 });
+
+test('DOFLens catEye and anamorphic: validated, baked into every gather, and combined with blades and temporal', () => {
+  for (const options of [
+    { catEye: -0.1 },
+    { catEye: 1.6 },
+    { anamorphic: 0.9 },
+    { anamorphic: 5 },
+    { anamorphic: NaN },
+  ])
+    assert.throws(() => new DOFLens(options), RangeError);
+  const open = { width: 1, height: 1, data: [255, 255, 255, 255] };
+  assert.throws(() => new DOFLens({ aperture: open, catEye: 0.5 }), RangeError);
+  assert.throws(() => new DOFLens({ aperture: open, anamorphic: 2 }), RangeError);
+  for (const blades of [undefined, 6])
+    for (const temporal of [false, true]) {
+      const h = gpuHarness();
+      DOF.attach(h.engine, { focalDistance: 5, temporal, lens: new DOFLens({ blades, catEye: 1, anamorphic: 2 }) });
+      h.frame();
+      const codes = shaderCodes(h),
+        bokeh = codes.find((code) => code.includes('nearOffset')),
+        coarse = codes.find((code) => code.includes('coarse:texture_storage_2d'));
+      for (const code of [bokeh, coarse]) {
+        assert.ok(code.includes('fn barrel(pixel:vec2i)') && code.includes('farWeight+=w;'));
+        assert.ok(code.includes('vec2f(cos(angle)/2.000000,sin(angle))'), 'far taps squeezed across');
+      }
+      // Near taps keep the whole disk; each foreground disk is tested as its oval, weighed by squeeze over shared area.
+      assert.ok(bokeh.includes('return vec2f(s.x*2.000000,s.y);'));
+      assert.ok(bokeh.includes('length(vec2f(nearOffset)*vec2f(2.000000,1.0))<=radius'));
+      assert.ok(bokeh.includes('*2.000000*eye(-vec2f(nearOffset)/radius,pixel)/lensArea(pixel);'));
+      assert.equal(bokeh.includes('shape(atan2(f32(nearOffset.y),f32(nearOffset.x)*2.000000))'), blades !== undefined);
+    }
+});

@@ -17,6 +17,17 @@ export interface DOFLensOptions {
    * screen. Fixed at construction; not with `blades`. Default: none.
    */
   aperture?: DOFApertureImage;
+  /**
+   * Optical vignetting: towards the frame's edges the bokeh is clipped by a second circle, the lens barrel, into a
+   * cat's eye whose long side runs around the frame. The clipping circle's offset at the frame corners, in bokeh radii,
+   * 0 to 1.5; it grows linearly from 0 at the centre. Fixed at construction; not with `aperture`. Default 0.
+   */
+  catEye?: number;
+  /**
+   * Anamorphic squeeze: the bokeh is an oval this many times taller than wide (1.33, 1.5 and 2 are common anamorphic
+   * lenses), 1 to 4. Fixed at construction; not with `aperture`. Default 1, round.
+   */
+  anamorphic?: number;
 }
 /** The shaders a {@link DOFLens} rewrites. */
 export interface DOFLensShaders {
@@ -216,6 +227,62 @@ fn spiral(i:u32,n:f32)->vec2f {`,
   };
 }
 
+/**
+ * Cat's eye and anamorphic bokeh. Anamorphic: the far taps shrink across by the squeeze (they stay even over the
+ * oval), the near taps keep the whole disk and test each foreground disk's oval, and a near weight grows by the squeeze
+ * as the oval holds that many times fewer taps. Cat's eye: a tap counts when its bokeh-space offset also lies in the
+ * barrel circle, offset by `catEye` times the pixel's place in the frame (1 at the corners); a near weight is divided by
+ * the area the two circles share, so a covered pixel stays covered.
+ */
+function opticsShaders(out: DOFLensShaders, catEye: number, squeeze: number): DOFLensShaders {
+  if (!catEye && squeeze === 1) return out;
+  const a = squeeze.toFixed(6),
+    functions = `fn barrel(pixel:vec2i)->vec2f {let size=vec2f(textureDimensions(coc));return ${catEye.toFixed(6)}*(vec2f(pixel)+0.5-size*0.5)/(0.5*length(size));}
+fn eye(v:vec2f,pixel:vec2i)->f32 {return select(0.0,1.0,length(v-barrel(pixel))<=1.0);}
+fn lensArea(pixel:vec2i)->f32 {let d=min(length(barrel(pixel)),1.99);return (2.0*acos(d*0.5)-0.5*d*sqrt(4.0-d*d))/3.14159265;}
+fn spiral(i:u32,n:f32)->vec2f {`,
+    far = (code: string, sizes: number[]) =>
+      editAll(
+        sizes.reduce(
+          (c, n) =>
+            editAll(
+              c,
+              `let farPixel=clamp(pixel+vec2i(round(spiral(i,${n}.0)*center.x)),vec2i(0),limit);`,
+              `let farTap=spiral(i,${n}.0);let farPixel=clamp(pixel+vec2i(round(farTap*center.x)),vec2i(0),limit);`,
+              1,
+            ),
+          editAll(
+            editAll(code, 'fn spiral(i:u32,n:f32)->vec2f {', functions, 1),
+            'vec2f(cos(angle),sin(angle))',
+            `vec2f(cos(angle)/${a},sin(angle))`,
+            1,
+          ),
+        ),
+        '{farColor+=textureLoad(scene,farPixel,0).rgb;farWeight+=1.0;}',
+        '{let w=eye(-farTap,pixel);farColor+=textureLoad(scene,farPixel,0).rgb*w;farWeight+=w;}',
+        sizes.length,
+      );
+  let bokeh = far(out.bokehShader, [64, 32, 16]);
+  bokeh = editAll(
+    bokeh,
+    'fn disk(i:u32)->vec2f {return spiral(i,64.0);}',
+    `fn disk(i:u32)->vec2f {let s=spiral(i,64.0);return vec2f(s.x*${a},s.y);}`,
+    1,
+  );
+  // A polygon's boundary is looked up at the angle of the offset unsqueezed.
+  bokeh = bokeh
+    .split('radius*shape(f32(i)*2.39996323)')
+    .join(`radius*shape(atan2(f32(nearOffset.y),f32(nearOffset.x)*${a}))`);
+  bokeh = editAll(bokeh, 'length(vec2f(nearOffset))<=radius', `length(vec2f(nearOffset)*vec2f(${a},1.0))<=radius`, 1);
+  bokeh = editAll(
+    bokeh,
+    'let weight=p.lens.w*p.lens.w/max(radius*radius,1.0);',
+    `let weight=p.lens.w*p.lens.w/max(radius*radius,1.0)*${a}*eye(-vec2f(nearOffset)/radius,pixel)/lensArea(pixel);`,
+    1,
+  );
+  return { ...out, coarseShader: far(out.coarseShader, [64]), bokehShader: bokeh };
+}
+
 function edit(source: string, edits: readonly [string, string][]): string {
   return edits.reduce((code, [from, to]) => {
     if (code.split(from).length !== 2)
@@ -238,12 +305,29 @@ export class DOFLens {
   private readonly blades?: number;
   private readonly bladeRotation: number;
   private readonly mask?: Float32Array;
+  private readonly catEye: number;
+  private readonly anamorphic: number;
 
-  constructor({ blades, bladeRotation = 0, tilt = 0, tiltDirection = [0, 1], aperture }: DOFLensOptions = {}) {
+  constructor({
+    blades,
+    bladeRotation = 0,
+    tilt = 0,
+    tiltDirection = [0, 1],
+    aperture,
+    catEye = 0,
+    anamorphic = 1,
+  }: DOFLensOptions = {}) {
     if (blades !== undefined && (!Number.isInteger(blades) || blades < 3 || blades > 16))
       throw new RangeError('Invalid DOFLens blades; use a whole number from 3 to 16');
     if (aperture !== undefined && blades !== undefined)
       throw new RangeError('Invalid DOFLens; give blades or an aperture image, not both');
+    if (!(catEye >= 0 && catEye <= 1.5)) throw new RangeError('Invalid DOFLens catEye; use bokeh radii from 0 to 1.5');
+    if (!(anamorphic >= 1 && anamorphic <= 4))
+      throw new RangeError('Invalid DOFLens anamorphic; use a squeeze from 1 to 4');
+    if (aperture !== undefined && (catEye || anamorphic !== 1))
+      throw new RangeError('Invalid DOFLens; catEye and anamorphic do not combine with an aperture image');
+    this.catEye = catEye;
+    this.anamorphic = anamorphic;
     if (aperture !== undefined) this.mask = apertureMask(aperture);
     if (!Number.isFinite(bladeRotation)) throw new RangeError('Invalid DOFLens bladeRotation; use finite radians');
     this.blades = blades;
@@ -262,7 +346,7 @@ export class DOFLens {
     const out = { ...source, cocShader: edit(source.cocShader, [[CIRCLE, TILTED]]) };
     if (this.mask) return apertureShaders(out, this.mask);
     const n = this.blades;
-    if (n === undefined) return out;
+    if (n === undefined) return opticsShaders(out, this.catEye, this.anamorphic);
     // Scaling each tap by the polygon's boundary at its angle keeps the taps uniform over the polygon.
     const sector = (2 * Math.PI) / n,
       inner = Math.cos(Math.PI / n),
@@ -279,7 +363,7 @@ fn spiral(i:u32,n:f32)->vec2f {`,
       ['pow((nearMax+1.0)/p.lens.w,2.0)', `pow((nearMax+1.0)/(p.lens.w*${inner}),2.0)`],
       ['length(vec2f(nearOffset))<=radius', 'length(vec2f(nearOffset))<=radius*shape(f32(i)*2.39996323)'],
     ]);
-    return out;
+    return opticsShaders(out, this.catEye, this.anamorphic);
   }
   /** Writes the tilt per clip unit into the free uniform slots 9 and 10. Called by `DOF` every frame. */
   write(

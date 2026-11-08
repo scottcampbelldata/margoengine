@@ -155,6 +155,7 @@ carry the same citation as a one-line comment in the code.
 | D-06 | Aperture image bokeh: transmission mask, taps spread over the mirrored shape by farthest-point sampling, near weight over the mean transmission | dof/src/lens.ts | Margo-own: Margo design (explained in comments); farthest-point sampling as in Eldar et al., "The farthest point strategy for progressive image sampling", IEEE TIP 1997 |
 | D-07 | Focal length from field of view and film gauge | dof/src/index.ts | Pinhole projection geometry: tan(fov / 2) = gauge / (2 f); the same relation as `fovToLens` in cameras |
 | D-08 | Temporal DOF: half-resolution gather (2x2 mean, nearest depth), taps turned by the golden angle per frame, bilinear join by the pixel's own blur or near coverage | dof/src/shaders.ts, dof/src/index.ts | Margo-own: Margo design; golden-angle turns as in Vogel 1979 (D-04) |
+| D-09 | Cat's eye (two-circle mechanical vignetting) and anamorphic oval bokeh; near weight over the shared area of two unit circles | dof/src/lens.ts | Mechanical vignetting as the overlap of the aperture and the barrel opening seen off axis (Hecht, Optics, 5th ed., 2017, ch. 5 on stops and vignetting); circle-circle intersection area is plane geometry; the rest Margo-own |
 
 ### environment
 

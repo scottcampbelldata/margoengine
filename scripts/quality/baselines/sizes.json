@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11272881,
+  "total": 11273385,
   "history": [
     {
       "date": "2026-10-24",
@@ -4436,6 +4436,12 @@
       "commit": "ee86b87e2",
       "reason": "dof: temporal DOF, half-resolution gather with turning taps for TAA (batch 74 job 3)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "252d7d387",
+      "reason": "dof/lens: cat's eye and anamorphic bokeh (batch 74 job 4)",
+      "grew": 1
     }
   ],
   "items": {
@@ -4622,7 +4628,7 @@
     "@margoengine/decoders/xz": 4182,
     "@margoengine/dof": 9297,
     "@margoengine/dof/autofocus": 2154,
-    "@margoengine/dof/lens": 3025,
+    "@margoengine/dof/lens": 3529,
     "@margoengine/ecs": 4554,
     "@margoengine/ecs/changes": 882,
     "@margoengine/ecs/engine": 2064,

@@ -118,6 +118,26 @@ engine.start();
   part, so detail finer than about 1/16 of the bokeh's diameter is lost. Near and far bokeh show the image the same way
   up (a real lens flips one of them). `blades` and `aperture` do not combine.
 
+## Cat's eye and anamorphic bokeh
+
+```ts
+import {Engine} from 'margoengine/core';
+import {DOF} from 'margoengine/dof';
+import {DOFLens} from 'margoengine/dof/lens';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+// catEye: the barrel circle's offset at the frame corners, in bokeh radii (0 to 1.5); anamorphic: oval squeeze (1 to 4).
+const lens = new DOFLens({catEye: 0.8, anamorphic: 1.5});
+DOF.attach(engine, {focalDistance: 6, focalLength: 0.05, aperture: 1.4, lens});
+engine.start();
+```
+
+- Optical vignetting clips each bokeh towards the frame's edges by a second circle, the lens barrel, offset outwards
+  in proportion to the pixel's distance from the centre, so corner bokeh turn into cat's eyes whose long side runs
+  around the frame; the centre stays round.
+- `anamorphic` makes every bokeh an oval that many times taller than wide, as an anamorphic lens's do. Both combine with
+  `blades`, tilt and `temporal`, not with an `aperture` image. Fixed at construction.
+
 ## Cost
 
 GPU time of the DOF passes (CoC, wide-disk 2x2-block gather, bokeh), Intel Arc 140V laptop iGPU, Edge 155, DamagedHelmet scene (the earlier test model) with environment light in a `PostStack` [DOF, Tonemap], median of 6 alternating old/new rounds x 90 frames (`examples/package-benchmarks/gates/dof.mjs`, `results/gates-dof.json`). "Before" is the 64-tap full-resolution gather of `5b9dbbd`.

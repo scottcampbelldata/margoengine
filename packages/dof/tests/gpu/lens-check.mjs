@@ -84,6 +84,45 @@ try {
   assert.ok(Math.abs(flatTop.width - flatBottom.width) <= 2, 'no tilt: both boxes blur alike');
   assert.ok(flatTop.width > topBox.width + 5, 'no tilt: the top box is out of focus');
 
+  // Anamorphic: a 2x squeeze halves the near disk's width and keeps its height (the box itself is about 18 px across,
+  // its blur 15 px further each way, so 48 px becomes about 18 + 15 = 33 px wide).
+  const optics = async (...args) => {
+    await page.evaluate((a) => window.check.optics(...a), args);
+    return shot();
+  };
+  const oval = bright(await optics(0, 0, 0, 2));
+  console.log('anamorphic', JSON.stringify(oval));
+  assert.ok(Math.abs(oval.height - round.height) <= 2, 'the oval keeps the disk height');
+  assert.ok(oval.width <= round.width - 10 && oval.width >= 26, `the oval is narrower, got ${oval.width}`);
+  const polygon = bright(await optics(0, 0, 0, 2, 6));
+  assert.ok(Math.abs(polygon.height - oval.height) <= 6 && polygon.width < round.width - 8, 'six blades squeezed too');
+  // Cat's eye: a box towards the top-right corner, measured along the diagonal (radial) and across it (tangential).
+  const spans = (image) => {
+    const along = [Infinity, -Infinity],
+      across = [Infinity, -Infinity];
+    for (let y = 0; y < image.height; y++)
+      for (let x = 0; x < image.width; x++)
+        if (image.data[(y * image.width + x) * 4] > 12) {
+          const r = (x - y) / Math.SQRT2,
+            t = (x + y) / Math.SQRT2;
+          along[0] = Math.min(along[0], r);
+          along[1] = Math.max(along[1], r);
+          across[0] = Math.min(across[0], t);
+          across[1] = Math.max(across[1], t);
+        }
+    return { radial: along[1] - along[0], tangential: across[1] - across[0] };
+  };
+  const plainCorner = spans(await optics(0.9, 0.9, 0, 1, undefined, 0.03)),
+    eyeCorner = spans(await optics(0.9, 0.9, 1.5, 1, undefined, 0.03)),
+    eyeMiddle = bright(await optics(0, 0, 1.5, 1));
+  console.log('cat eye', JSON.stringify({ plainCorner, eyeCorner, eyeMiddle }));
+  assert.ok(Math.abs(plainCorner.radial - plainCorner.tangential) <= 3, 'without cat eye the corner disk is round');
+  // The box sits 0.65 of the way to the corner, so the barrel circle is 0.97 radii off: the shared lens is 1.03 radii
+  // wide along the radius and 1.75 long across it, about 23 and 34 px with the 5.5 px box's own 7.8 px diagonal.
+  assert.ok(eyeCorner.radial <= eyeCorner.tangential * 0.85, 'the cat eye is narrow across the radius');
+  assert.ok(eyeCorner.radial <= plainCorner.radial - 8, 'narrower than the plain disk there');
+  assert.ok(Math.abs(eyeMiddle.width - round.width) <= 2, 'and round at the frame centre');
+
   // Temporal DOF: the half-resolution gather against the full one. Mean absolute difference over all channels of the
   // 512 x 512 frame; the box in focus (the middle 40 x 40) must be untouched, byte for byte.
   const diff = (a, b, x0 = 0, y0 = 0, x1 = a.width, y1 = a.height) => {
