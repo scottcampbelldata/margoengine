@@ -8,6 +8,8 @@ export class FakeElement {
     this.dataset = {};
     this.className = '';
     this.styleWrites = 0;
+    this.attributes = {};
+    this.attributeWrites = 0;
     this.fixedRect = null;
     const element = this;
     this.style = new Proxy(
@@ -62,6 +64,13 @@ export class FakeElement {
       top: parent.top + (parseFloat(this.style.top) || 0),
     };
   }
+  setAttribute(name, value) {
+    this.attributes[name] = String(value);
+    this.attributeWrites++;
+  }
+  getAttribute(name) {
+    return this.attributes[name] ?? null;
+  }
   descendants() {
     return this.children.flatMap((child) => [child, ...child.descendants()]);
   }
@@ -73,6 +82,11 @@ export class FakeDocument {
   }
   createElement(tag) {
     return new FakeElement(this, tag);
+  }
+  createElementNS(namespace, tag) {
+    const element = new FakeElement(this, tag);
+    element.namespaceURI = namespace;
+    return element;
   }
 }
 

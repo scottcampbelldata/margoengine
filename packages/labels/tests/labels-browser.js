@@ -1,6 +1,7 @@
 import { Engine, PbrMaterial, box } from '@margoengine/core';
 import { engineRuntime, meshRuntime } from '@margoengine/core/extension';
 import { LabelRenderer, cssPointToWorld } from '@margoengine/labels';
+import { Callouts } from '@margoengine/labels/callouts';
 import { projectPoint } from '@margoengine/math/mat4';
 import { webglRenderer } from '@margoengine/webgl';
 
@@ -207,8 +208,34 @@ async function scenario(backend) {
     `${backend}: a CSS3D panel through the near plane is cut there (hit inside its far half, not its near half)`,
   );
 
+  // Callouts: a label moved off its point gets a line from the projected point to the nearest point of its box, as
+  // the browser laid the box out.
+  const callouts = new Callouts();
+  labels.layout = callouts;
+  const note = labels.add(tag('note'), { position: [-0.5, -0.5, 0], screenOffset: [-70, 45] });
+  engine.render();
+  const line = callouts.svg.querySelector('line'),
+    rootBox = root.getBoundingClientRect(),
+    noteBox = note.element.getBoundingClientRect(),
+    from = pagePoint(engine, [-0.5, -0.5, 0]);
+  const value = (name) => Number(line.getAttribute(name));
+  const start = [rootBox.left + value('x1'), rootBox.top + value('y1')],
+    end = [rootBox.left + value('x2'), rootBox.top + value('y2')],
+    nearest = [
+      Math.min(Math.max(from[0], noteBox.left), noteBox.right),
+      Math.min(Math.max(from[1], noteBox.top), noteBox.bottom),
+    ];
+  measurements.calloutStartError = Math.hypot(start[0] - from[0], start[1] - from[1]);
+  measurements.calloutEndError = Math.hypot(end[0] - nearest[0], end[1] - nearest[1]);
+  assert(callouts.lines === 1 && getComputedStyle(line).display !== 'none', `${backend}: no callout line drawn`);
+  assert(measurements.calloutStartError <= 1, `${backend}: callout line starts ${start} vs point ${from}`);
+  assert(measurements.calloutEndError <= 1, `${backend}: callout line ends ${end} vs box ${nearest}`);
+  checks.push(
+    `${backend}: a callout line runs from the projected point to the nearest point of the label box within 1 px`,
+  );
+
   // Dispose cleans the DOM.
-  const elements = [label.element, farLabel.element, nearLabel.element, panel, tilted];
+  const elements = [label.element, farLabel.element, nearLabel.element, panel, tilted, note.element, callouts.svg];
   if (device) {
     const error = await device.popErrorScope();
     if (error) gpuErrors.push(error.message);

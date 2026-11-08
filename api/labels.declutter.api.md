@@ -86,6 +86,7 @@ abstract class Item {
 
 class Label extends Item {
     anchor: [number, number];
+    screenOffset: [number, number];
     frustumCulling: boolean;
     distanceScale: DistanceScale | null;
     sort: boolean;
@@ -126,6 +127,7 @@ interface LabelOptions {
     offset?: Vec3;
     offsetSpace?: 'local' | 'world';
     anchor?: readonly [number, number];
+    screenOffset?: readonly [number, number];
     pointerEvents?: 'none' | 'auto';
     frustumCulling?: boolean;
     followVisibility?: boolean;
@@ -172,6 +174,7 @@ type LabelView = Pick<RenderView, 'camera' | 'viewport' | 'pixels'>;
 interface LayoutContext {
     readonly width: number;
     readonly height: number;
+    readonly root: HTMLElement;
     size(label: Label): readonly [number, number];
     hide(label: Label): void;
     place(label: Label, anchor: readonly [number, number]): void;

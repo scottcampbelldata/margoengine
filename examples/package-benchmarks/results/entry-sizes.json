@@ -1,5 +1,5 @@
 {
-  "commit": "8beea73cf",
+  "commit": "f42415490",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -774,8 +774,8 @@
     },
     "@margoengine/dof": {
       ".": {
-        "raw": 29948,
-        "gzip": 9026
+        "raw": 30309,
+        "gzip": 9126
       },
       "./lens": {
         "raw": 8374,
@@ -1346,12 +1346,16 @@
     },
     "@margoengine/labels": {
       ".": {
-        "raw": 13456,
-        "gzip": 5290
+        "raw": 13677,
+        "gzip": 5346
       },
       "./declutter": {
-        "raw": 2781,
-        "gzip": 1256
+        "raw": 2817,
+        "gzip": 1269
+      },
+      "./callouts": {
+        "raw": 3170,
+        "gzip": 1347
       }
     },
     "@margoengine/lighting2d": {

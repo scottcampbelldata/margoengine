@@ -235,9 +235,9 @@
     </section>
     <section id="labels">
       <h2><a href="#labels">@margoengine/labels: label layouts and options</a></h2>
-      <p class="messages"><code>priority must be a number</code> <code>place(label, anchor) takes two finite numbers</code> <code>padding must be a finite number of CSS pixels, 0 or more</code> <code>cell must be a finite number of CSS pixels, 1 or more</code> <code>positions must be [x, y] anchors of two finite numbers</code></p>
-      <p><strong>Cause.</strong> A label or a label layout got a value it cannot use: a priority that is not a number, an anchor that is not two finite numbers, or a <code>Declutter</code> padding, cell or position list out of range.</p>
-      <p><strong>Fix.</strong> Pass <code>priority</code> as a number (higher is kept first; <code>Infinity</code> is allowed), anchors as <code>[x, y]</code> fractions of the element such as <code>[0, 1]</code>, and <code>Declutter</code> options such as <code>{padding: 4, positions: eightPositions}</code>.</p>
+      <p class="messages"><code>priority must be a number</code> <code>place(label, anchor) takes two finite numbers</code> <code>padding must be a finite number of CSS pixels, 0 or more</code> <code>cell must be a finite number of CSS pixels, 1 or more</code> <code>positions must be [x, y] anchors of two finite numbers</code> <code>screenOffset must be two finite numbers</code> <code>width must be a finite number of CSS pixels, 0 or more</code> <code>dot must be a finite number of CSS pixels, 0 or more</code> <code>minLength must be a finite number of CSS pixels, 0 or more</code></p>
+      <p><strong>Cause.</strong> A label or a label layout got a value it cannot use: a priority that is not a number, an anchor that is not two finite numbers, a <code>Declutter</code> padding, cell or position list out of range, a <code>screenOffset</code> that is not two finite numbers, or a <code>Callouts</code> width, dot or minLength below 0.</p>
+      <p><strong>Fix.</strong> Pass <code>priority</code> as a number (higher is kept first; <code>Infinity</code> is allowed), anchors as <code>[x, y]</code> fractions of the element such as <code>[0, 1]</code>, <code>Declutter</code> options such as <code>{padding: 4, positions: eightPositions}</code>, <code>screenOffset</code> as CSS pixels such as <code>[60, -40]</code>, and <code>Callouts</code> options such as <code>{width: 1, dot: 2, minLength: 2}</code>.</p>
     </section>
     <section id="ui">
       <h2><a href="#ui">@margoengine/ui: widgets, layout, themes and input</a></h2>

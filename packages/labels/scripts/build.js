@@ -18,7 +18,11 @@ await build({
     emptyOutDir: true,
     target: 'es2022',
     lib: {
-      entry: { index: resolve(root, 'src/index.ts'), declutter: resolve(root, 'src/declutter.ts') },
+      entry: {
+        index: resolve(root, 'src/index.ts'),
+        declutter: resolve(root, 'src/declutter.ts'),
+        callouts: resolve(root, 'src/callouts.ts'),
+      },
       formats: ['es'],
       fileName: (_, name) => name + '.js',
     },

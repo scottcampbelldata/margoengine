@@ -119,8 +119,8 @@ export class Declutter implements LabelLayout {
         [w0, h0] = context.size(label),
         w = w0 * label.scale,
         h = h0 * label.scale,
-        x = label.screen.x,
-        y = label.screen.y;
+        x = label.screen.x + label.screenOffset[0],
+        y = label.screen.y + label.screenOffset[1];
       let placed = false;
       for (let p = -1; p < this.positions.length && !placed; p++) {
         const [ax, ay] = p < 0 ? label.anchor : this.positions[p];

@@ -742,10 +742,14 @@ export const entries = [
       'padding must be a finite number of CSS pixels, 0 or more',
       'cell must be a finite number of CSS pixels, 1 or more',
       'positions must be [x, y] anchors of two finite numbers',
+      'screenOffset must be two finite numbers',
+      'width must be a finite number of CSS pixels, 0 or more',
+      'dot must be a finite number of CSS pixels, 0 or more',
+      'minLength must be a finite number of CSS pixels, 0 or more',
     ],
     cause:
-      'A label or a label layout got a value it cannot use: a priority that is not a number, an anchor that is not two finite numbers, or a `Declutter` padding, cell or position list out of range.',
-    fix: 'Pass `priority` as a number (higher is kept first; `Infinity` is allowed), anchors as `[x, y]` fractions of the element such as `[0, 1]`, and `Declutter` options such as `{padding: 4, positions: eightPositions}`.',
+      'A label or a label layout got a value it cannot use: a priority that is not a number, an anchor that is not two finite numbers, a `Declutter` padding, cell or position list out of range, a `screenOffset` that is not two finite numbers, or a `Callouts` width, dot or minLength below 0.',
+    fix: 'Pass `priority` as a number (higher is kept first; `Infinity` is allowed), anchors as `[x, y]` fractions of the element such as `[0, 1]`, `Declutter` options such as `{padding: 4, positions: eightPositions}`, `screenOffset` as CSS pixels such as `[60, -40]`, and `Callouts` options such as `{width: 1, dot: 2, minLength: 2}`.',
   },
   {
     id: 'ui',

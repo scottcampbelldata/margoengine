@@ -44,6 +44,8 @@ export interface LayoutContext {
   /** Size of the view rectangle in CSS pixels; label `screen` coordinates are relative to its corner. */
   readonly width: number;
   readonly height: number;
+  /** The overlay root the labels sit in, with its corner at the view's corner; for layouts that draw (`Callouts`). */
+  readonly root: HTMLElement;
   /**
    * The element's size in CSS pixels before distance scaling, measured once (`offsetWidth`, `offsetHeight`) and
    * kept until `label.remeasure()`. Multiply by `label.scale` for its size on screen.
@@ -56,7 +58,8 @@ export interface LayoutContext {
 }
 /**
  * Arranges the labels that passed culling and occlusion before they are drawn, for example to remove overlaps
- * (`Declutter` from `@margoengine/labels/declutter`). Called once per update with the labels in the order added.
+ * (`Declutter` from `@margoengine/labels/declutter`). Called once per update with the labels in the order added,
+ * also with none, so a layout can clear what it drew.
  */
 export interface LabelLayout {
   arrange(labels: readonly Label[], context: LayoutContext): void;
@@ -73,6 +76,11 @@ export interface LabelOptions {
   offsetSpace?: 'local' | 'world';
   /** Which point of the element sits on the anchor, as fractions of its size. Default [0.5, 0.5] (center). */
   anchor?: readonly [number, number];
+  /**
+   * Moves the element this many CSS pixels from its projected point, x right and y down, for a callout with a leader
+   * line (`Callouts` from `@margoengine/labels/callouts`). Default [0, 0].
+   */
+  screenOffset?: readonly [number, number];
   /** 'none' lets pointer events pass through to the canvas (default); 'auto' makes the label interactive. */
   pointerEvents?: 'none' | 'auto';
   /** Hide when outside the view frustum. Default true. Labels behind the camera are always hidden. */
@@ -192,6 +200,8 @@ abstract class Item {
 /** A 2D HTML label pinned to a projected world point. */
 export class Label extends Item {
   anchor: [number, number];
+  /** CSS pixels the element is moved from its projected point, x right and y down. */
+  screenOffset: [number, number];
   frustumCulling: boolean;
   distanceScale: DistanceScale | null;
   sort: boolean;
@@ -219,6 +229,10 @@ export class Label extends Item {
     this.offsetValue = checkVec(options.offset ?? [0, 0, 0], 'offset');
     this.offsetSpace = options.offsetSpace ?? 'local';
     this.anchor = [options.anchor?.[0] ?? 0.5, options.anchor?.[1] ?? 0.5];
+    const offset = options.screenOffset ?? [0, 0];
+    if (!offset || !Number.isFinite(offset[0]) || !Number.isFinite(offset[1]))
+      throw rangeError('screenOffset must be two finite numbers', 'labels');
+    this.screenOffset = [offset[0], offset[1]];
     this.frustumCulling = options.frustumCulling ?? true;
     this.distanceScale = options.distanceScale ?? null;
     this.sort = options.sort ?? true;
@@ -331,6 +345,7 @@ export class LabelRenderer implements EnginePlugin {
   private readonly layoutContext = {
     width: 0,
     height: 0,
+    root: null as unknown as HTMLElement,
     size: (label: Label): readonly [number, number] => this.measure(label),
     hide: (label: Label): void => {
       label.layoutHidden = true;
@@ -524,10 +539,11 @@ export class LabelRenderer implements EnginePlugin {
       shown.push(label);
     }
     const layout = this.layout;
-    if (layout && shown.length) {
+    if (layout) {
       const context = this.layoutContext;
       context.width = width;
       context.height = height;
+      context.root = root;
       layout.arrange(shown, context);
     }
     for (const label of shown) {
@@ -538,8 +554,8 @@ export class LabelRenderer implements EnginePlugin {
       }
       const anchor = label.layoutAnchor ?? label.anchor,
         key = label.placement,
-        x = Math.round(label.screen.x * 100) / 100,
-        y = Math.round(label.screen.y * 100) / 100,
+        x = Math.round((label.screen.x + label.screenOffset[0]) * 100) / 100,
+        y = Math.round((label.screen.y + label.screenOffset[1]) * 100) / 100,
         ax = anchor[0],
         ay = anchor[1],
         scaled = label.distanceScale !== null ? 1 : 0,
