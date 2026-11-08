@@ -9,12 +9,14 @@ import { Engine, EnginePlugin, FrameGraph, Mesh } from "@margoengine/core/extens
 export interface ModelOutlineOptions {
     outline?: number;
     color?: readonly [number, number, number];
+    smooth?: boolean;
     models?: readonly ModelLike[];
 }
 
 export class ModelOutlines implements EnginePlugin {
     readonly name = "toon:models";
-    constructor({ outline, color, models }?: ModelOutlineOptions);
+    smooth: boolean;
+    constructor({ outline, color, smooth, models }?: ModelOutlineOptions);
     static attach(engine: EngineKernel, options?: ModelOutlineOptions): ModelOutlines;
     get outline(): number;
     set outline(v: number);
@@ -26,6 +28,8 @@ export class ModelOutlines implements EnginePlugin {
     dispose(): void;
     [Symbol.dispose]: () => void;
 }
+
+export function positionRings(vertices: Float32Array, stride?: number): Uint32Array;
 
 // Not exported from this entry, but used by the exports above:
 

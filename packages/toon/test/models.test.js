@@ -124,3 +124,57 @@ test('model outlines follow every model on the engine by default, live options, 
   outlines.dispose();
   assert.ok(h.resources.filter((r) => r.destroy).every((r) => r.destroyed));
 });
+
+test('position rings link every copy of a vertex at one position, round to itself', async () => {
+  const { positionRings } = await import('../dist/models.js');
+  // A cube's corner split three ways by its hard edges, a lone vertex, and -0 matching 0.
+  const v = new Float32Array(5 * 20);
+  [
+    [1, 1, 1],
+    [1, 1, 1],
+    [0, 2, 0],
+    [1, 1, 1],
+    [-0, 2, 0],
+  ].forEach((p, i) => v.set(p, i * 20));
+  assert.deepEqual([...positionRings(v)], [1, 3, 4, 0, 2]);
+  assert.deepEqual([...positionRings(new Float32Array(20))], [0]);
+});
+
+test('smooth outlines bind the vertices drawn and their rings; a buffer without STORAGE draws plain', () => {
+  const h = harness(),
+    STORAGE = 128,
+    deformed = { label: 'skinned', usage: STORAGE | 32 },
+    model = fakeModel(h, [
+      { id: 1, deformed, deformedOffset: 256 },
+      { id: 2, buffers: { vertex: { label: 'no storage', usage: 32 }, index: {} } },
+    ]),
+    outlines = new ModelOutlines({ models: [model] }),
+    groups = [];
+  const create = h.engine.gpu.createBindGroup;
+  h.engine.gpu.createBindGroup = (descriptor) => {
+    groups.push(descriptor);
+    return create(descriptor);
+  };
+  h.engine.use(outlines);
+  const passes = recordPasses(h);
+  h.frame();
+  const calls = passes[0].calls,
+    ring = groups.find((g) => g.entries[1]?.resource.buffer && g.entries[0].resource.buffer === deformed);
+  assert.ok(ring, 'group 1 binds the deformed vertices');
+  assert.equal(ring.entries[0].resource.offset, 256);
+  assert.equal(ring.entries[0].resource.size, 60 * 4);
+  assert.deepEqual(
+    calls.filter((c) => c[0] === 'pipeline').map((c) => c[1].layout.bindGroupLayouts.length),
+    [2, 1],
+    'smooth pipeline for the storage buffer, plain for the other',
+  );
+  assert.equal(calls.filter((c) => c[0] === 'group' && c[1] === 1).length, 1);
+  outlines.smooth = false;
+  h.frame();
+  assert.deepEqual(
+    passes[1].calls.filter((c) => c[0] === 'pipeline').map((c) => c[1].layout.bindGroupLayouts.length),
+    [1],
+  );
+  outlines.dispose();
+  assert.ok(h.resources.filter((r) => r.destroy).every((r) => r.destroyed));
+});

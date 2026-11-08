@@ -2,7 +2,9 @@
 // Inverted-hull outlines for loaded glTF-pro models and @margoengine/materials meshes: each triangle primitive is drawn a
 // second time with its back faces pushed out along the world normal (Raskar & Cohen, "Image Precision Silhouette
 // Edges", I3D 1999), from the vertices its deformer wrote this frame (`deformed`), so skinned and morphed characters
-// keep their outline in every pose; instanced primitives draw one hull per instance.
+// keep their outline in every pose; instanced primitives draw one hull per instance. Seam-free (`smooth`): copies of a
+// vertex at one position (split by a hard edge or a UV seam) are linked in a ring (rings.ts) and each pushes out
+// along the average of every copy's normal, read from the same vertices, so the hull stays closed at creases.
 import type { EngineKernel } from '@margoengine/core';
 import {
   engineRuntime,
@@ -18,6 +20,8 @@ import { hiddenInTree } from '../../shared/visibility.js';
 import { applyView, inView } from '../../shared/view-rect.js';
 import { retire, uniformGroups, writeUniform } from '../../shared/frame-resources.js';
 import { beginScenePass } from '../../shared/scene-pass.js';
+import { positionRings } from './rings.js';
+export { positionRings } from './rings.js';
 declare const GPUBufferUsage: { STORAGE: number; UNIFORM: number; COPY_DST: number };
 declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
@@ -28,6 +32,12 @@ export interface ModelOutlineOptions {
   outline?: number;
   /** Outline colour, linear RGB 0..1. Default [0.015, 0.015, 0.015]. Live as `color`. */
   color?: readonly [number, number, number];
+  /**
+   * Seam-free: every copy of a vertex at one position pushes out along their average normal, so hard-edged meshes get
+   * an unbroken outline. Default true. Live as `smooth`. Needs vertex buffers with STORAGE usage (gltf-pro's and
+   * animation's have it); a primitive without draws as `smooth: false`.
+   */
+  smooth?: boolean;
   /** The models to outline (glTF-pro `PBRModel`s or materials meshes). Default: every model attached to the engine. */
   models?: readonly ModelLike[];
 }
@@ -37,13 +47,35 @@ const code = `
 struct Style {camera:mat4x4f,style:vec4f}
 @group(0) @binding(0) var<uniform> u:Style;
 @group(0) @binding(1) var<storage,read> draws:array<mat4x4f>;
-@vertex fn vertex(@location(0) position:vec3f,@location(1) normal:vec3f,@builtin(instance_index) slot:u32)->@builtin(position) vec4f{
-  let m=draws[slot];let a=m[0].xyz;let b=m[1].xyz;let c=m[2].xyz;
+@vertex fn vertex(@location(0) position:vec3f,@location(1) own:vec3f,@builtin(instance_index) slot:u32,@builtin(vertex_index) index:u32)->@builtin(position) vec4f{
+  let normal=NORMAL;let m=draws[slot];let a=m[0].xyz;let b=m[1].xyz;let c=m[2].xyz;
   let n=mat3x3f(cross(b,c),cross(c,a),cross(a,b))*normal*sign(dot(a,cross(b,c)));
   let l=length(n);let p=m*vec4f(position,1)+vec4f(select(vec3f(0),n/l,l>0)*u.style.w,0);
   return u.camera*p;
 }
 @fragment fn fragment()->@location(0) vec4f{return vec4f(u.style.rgb,1);}`;
+// The smooth variant: the primitive's own 80-byte vertices (deformed ones when skinned) and its position rings. A
+// ring longer than 64 copies stops there; normals summing to nothing (two faces back to back) keep the vertex's own.
+const smoothCode =
+  code.replace('NORMAL', 'smoothed(index,own)') +
+  `
+@group(1) @binding(0) var<storage,read> vertices:array<f32>;
+@group(1) @binding(1) var<storage,read> ring:array<u32>;
+fn smoothed(index:u32,own:vec3f)->vec3f{
+  var sum=own;var k=ring[index];var steps=0u;
+  loop{if(k==index||steps>=64u){break;}let o=k*20u;sum+=vec3f(vertices[o+4u],vertices[o+5u],vertices[o+6u]);k=ring[k];steps++;}
+  return select(own,sum,dot(sum,sum)>1e-8);
+}`;
+const plainCode = code.replace('NORMAL', 'own');
+/** A primitive's ring buffer and the group binding it with the vertices it was last drawn from. */
+interface Smoothing {
+  ring: GPUBuffer;
+  vertices: Float32Array;
+  group?: GPUBindGroup;
+  source?: GPUBuffer;
+  offset: number;
+  seen: number;
+}
 
 /** A run of consecutive draw rows of one primitive; `mirrored` rows flip winding, so the hull culls back faces. */
 interface Run {
@@ -85,6 +117,11 @@ export class ModelOutlines implements EnginePlugin {
   private width: number;
   private rgb: [number, number, number];
   private readonly only?: readonly ModelLike[];
+  /** Seam-free outlines (see the option). */
+  smooth: boolean;
+  private readonly smoothing = new Map<ModelPrimitiveLike, Smoothing>();
+  private frame = 0;
+  private ringLayout?: GPUBindGroupLayout;
   private readonly values = new Float32Array(20);
   private rows = new Float32Array(16 * 16);
   private readonly runs: Run[] = [];
@@ -93,7 +130,8 @@ export class ModelOutlines implements EnginePlugin {
   private storage?: GPUBuffer;
   private layout?: GPUBindGroupLayout;
   private groups?: { get(copy?: GPUBufferBinding): GPUBindGroup };
-  private pipelines?: [GPURenderPipeline, GPURenderPipeline];
+  /** Plain front-culling, plain mirrored, smooth, smooth mirrored. */
+  private pipelines?: GPURenderPipeline[];
   private key = '';
   private readonly colorAttachment: GPURenderPassColorAttachment = {
     view: undefined as unknown as GPUTextureView,
@@ -104,13 +142,14 @@ export class ModelOutlines implements EnginePlugin {
     view: undefined as unknown as GPUTextureView,
   };
   private disposed = false;
-  constructor({ outline = 0.025, color = [0.015, 0.015, 0.015], models }: ModelOutlineOptions = {}) {
+  constructor({ outline = 0.025, color = [0.015, 0.015, 0.015], smooth = true, models }: ModelOutlineOptions = {}) {
     checked(outline, color);
     if (models !== undefined && (!Array.isArray(models) || !models.every(isModel)))
       throw new TypeError('ModelOutlines models must be loaded models; pass the PBRModels loadGLTF returned');
     this.width = outline;
     this.rgb = [color[0], color[1], color[2]];
     this.only = models && [...models];
+    this.smooth = !!smooth;
   }
   static attach(engine: EngineKernel, options: ModelOutlineOptions = {}): ModelOutlines {
     const effect = new ModelOutlines(options);
@@ -200,6 +239,12 @@ export class ModelOutlines implements EnginePlugin {
           { binding: 1, visibility: GPUShaderStage.VERTEX, buffer: { type: 'read-only-storage' } },
         ],
       });
+      this.ringLayout = device.createBindGroupLayout({
+        entries: [
+          { binding: 0, visibility: GPUShaderStage.VERTEX, buffer: { type: 'read-only-storage' } },
+          { binding: 1, visibility: GPUShaderStage.VERTEX, buffer: { type: 'read-only-storage' } },
+        ],
+      });
       this.uniform = device.createBuffer({ size: 80, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     }
     if (!this.storage || this.storage.size < rows * 64) {
@@ -224,9 +269,11 @@ export class ModelOutlines implements EnginePlugin {
       samples = c.descriptor.multisample?.count ?? 1,
       key = c.format + ':' + samples + ':' + depth.format + ':' + depth.depthCompare;
     if (this.key !== key) {
-      const module = device.createShaderModule({ code }),
-        layout = device.createPipelineLayout({ bindGroupLayouts: [this.layout] }),
-        pipeline = (cullMode: GPUCullMode): GPURenderPipeline =>
+      const plain = device.createShaderModule({ code: plainCode }),
+        smooth = device.createShaderModule({ code: smoothCode }),
+        plainLayout = device.createPipelineLayout({ bindGroupLayouts: [this.layout] }),
+        smoothLayout = device.createPipelineLayout({ bindGroupLayouts: [this.layout, this.ringLayout!] }),
+        pipeline = (cullMode: GPUCullMode, module: GPUShaderModule, layout: GPUPipelineLayout): GPURenderPipeline =>
           device.createRenderPipeline({
             layout,
             vertex: {
@@ -248,12 +295,18 @@ export class ModelOutlines implements EnginePlugin {
             multisample: c.descriptor.multisample,
           });
       // Front-facing triangles are culled; a mirrored row turns its winding round, so its own pipeline culls back.
-      this.pipelines = [pipeline('front'), pipeline('back')];
+      this.pipelines = [
+        pipeline('front', plain, plainLayout),
+        pipeline('back', plain, plainLayout),
+        pipeline('front', smooth, smoothLayout),
+        pipeline('back', smooth, smoothLayout),
+      ];
       this.key = key;
     }
   }
   private draw(c: Context): void {
     const rows = this.collect(c);
+    this.frame++;
     if (!rows) return;
     this.prepare(c, rows);
     const device = c.device,
@@ -269,20 +322,61 @@ export class ModelOutlines implements EnginePlugin {
     let bound: GPURenderPipeline | undefined;
     for (const run of this.runs) {
       const p = run.primitive,
-        pipeline = this.pipelines![+run.mirrored];
+        group = this.smooth ? this.ringGroup(device, p) : undefined,
+        pipeline = this.pipelines![(group ? 2 : 0) + +run.mirrored];
       if (pipeline !== bound) pass.setPipeline((bound = pipeline));
+      if (group) pass.setBindGroup(1, group);
       pass.setVertexBuffer(0, p.deformed ?? p.buffers!.vertex, (p.deformed && p.deformedOffset) || 0);
       pass.setIndexBuffer(p.buffers!.index, 'uint32');
       pass.drawIndexed(p.indices.length, run.count, 0, 0, run.first);
     }
     pass.end();
+    // Rings of primitives no longer drawn go after 120 frames.
+    if (this.frame % 120 === 0)
+      for (const [p, s] of this.smoothing)
+        if (s.seen < this.frame - 120) {
+          retire(device, s.ring);
+          this.smoothing.delete(p);
+        }
+  }
+  /** Group 1 of the smooth pipelines for `p`: its vertices of this frame and its rings, baked on first use. */
+  private ringGroup(device: GPUDevice, p: ModelPrimitiveLike): GPUBindGroup | undefined {
+    const source = p.deformed ?? p.buffers!.vertex,
+      offset = (p.deformed && p.deformedOffset) || 0;
+    if (!(source.usage & GPUBufferUsage.STORAGE)) return undefined;
+    let s = this.smoothing.get(p);
+    if (!s || s.vertices !== p.vertices) {
+      if (s) retire(device, s.ring);
+      const ring = positionRings(p.vertices),
+        buffer = device.createBuffer({
+          size: Math.max(4, ring.byteLength),
+          usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+        });
+      device.queue.writeBuffer(buffer, 0, ring as Uint32Array<ArrayBuffer>);
+      this.smoothing.set(p, (s = { ring: buffer, vertices: p.vertices, offset: 0, seen: 0 }));
+    }
+    s.seen = this.frame;
+    if (s.source !== source || s.offset !== offset || !s.group) {
+      s.group = device.createBindGroup({
+        layout: this.ringLayout!,
+        entries: [
+          { binding: 0, resource: { buffer: source, offset, size: p.vertices.byteLength } },
+          { binding: 1, resource: { buffer: s.ring } },
+        ],
+      });
+      s.source = source;
+      s.offset = offset;
+    }
+    return s.group;
   }
   private release(): void {
     if (this.engine?.gpu) {
       retire(this.engine.gpu, this.uniform);
       retire(this.engine.gpu, this.storage);
     }
-    this.uniform = this.storage = this.layout = this.groups = this.pipelines = undefined;
+    if (this.engine?.gpu) for (const s of this.smoothing.values()) retire(this.engine.gpu, s.ring);
+    this.smoothing.clear();
+    this.uniform = this.storage = this.layout = this.ringLayout = this.groups = this.pipelines = undefined;
     this.key = '';
   }
   onDeviceRestored(engine: Engine): void {

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11344529,
+  "total": 11345229,
   "history": [
     {
       "date": "2026-10-24",
@@ -4586,6 +4586,12 @@
       "commit": "e4d53ffe2",
       "reason": "new entry @margoengine/toon/models (ModelOutlines, batch 75 job 1)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "8c1bb2c08",
+      "reason": "seam-free outlines (smooth) grow @margoengine/toon/models, batch 75 job 2",
+      "grew": 1
     }
   ],
   "items": {
@@ -5304,7 +5310,7 @@
     "@margoengine/tonemap/grade": 1808,
     "@margoengine/tonemap/local": 2386,
     "@margoengine/toon": 1665,
-    "@margoengine/toon/models": 3792,
+    "@margoengine/toon/models": 4492,
     "@margoengine/transitions": 4303,
     "@margoengine/tween": 5759,
     "@margoengine/tween/custom-ease": 2002,

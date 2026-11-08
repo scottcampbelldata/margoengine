@@ -22,7 +22,9 @@ const timer = setTimeout(() => {
 }, 120_000);
 const WIDTH = 1.5,
   // About 3.2 px a world unit at the Fox's distance (512 px, 60 degree field of view, 140 units away).
-  REACH = Math.ceil(WIDTH * 3.5) + 2;
+  REACH = Math.ceil(WIDTH * 3.5) + 2,
+  // The box: about 74 px a world unit (2 units across, 7 away); width 0.1 smoothed is 0.1 / sqrt(3) a side, 4.3 px.
+  BAND = 2;
 const shot = async (share, width) => {
   const { errors } = await page.evaluate(([s, w]) => window.check.run(s, w), [share, width]);
   assert.deepEqual(errors, [], `pose ${share}, width ${width}`);
@@ -106,6 +108,26 @@ try {
   console.log(JSON.stringify({ moved, off }));
   assert.ok(moved > 500, `the clip moves the Fox: ${moved} pixels`);
   assert.ok(off > 50, `an outline of the other pose would be caught: ${off} pixels off`);
+  // Seam-free: a hard-edged box's hull faces part at its edges without smooth, leaving notches in the ring; with
+  // smooth every copy of a corner moves the same way, so the band of BAND px round the silhouette is all outline.
+  const box = async (width, smooth) => {
+    const { errors } = await page.evaluate(([w, s]) => window.check.box(w, s), [width, smooth]);
+    assert.deepEqual(errors, [], `box ${width} ${smooth}`);
+    return decodePNG(await page.locator('canvas').screenshot());
+  };
+  const plain = await box(0, true),
+    mask = silhouette(plain),
+    near = distance(mask, plain.width, plain.height),
+    holes = {};
+  for (const smooth of [false, true]) {
+    const lined = await box(0.1, smooth);
+    let n = 0;
+    for (let i = 0; i < mask.length; i++) if (!mask[i] && near[i] <= BAND && !green(lined, i)) n++;
+    holes[smooth] = n;
+  }
+  console.log(JSON.stringify({ box: mask.reduce((a, b) => a + b, 0), holes }));
+  assert.ok(holes.false > 100, `hard edges part the hull without smooth: ${holes.false} pixels`);
+  assert.equal(holes.true, 0, 'smooth closes the ring');
   assert.deepEqual(pageErrors, []);
   console.log('toon models-check: ok');
 } finally {
