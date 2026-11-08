@@ -108,6 +108,20 @@ are still open.
 - **Needed to close:** decide whether this model stays. If it does, add those parts to `NO_CROSSING`, fix what the check
   then reports and rebuild the GLB. If another model replaces it, this entry goes with the old model.
 
+### Boulder draws differently on the WebGL2 layer, and visual:compat has no entry for it
+
+- **What:** `npm run visual:compat` fails on `boulder`: the WebGL2 capture differs from the native WebGPU one on 1.78%
+  of pixels by more than 2 of 255 (mean 0.473, max 79), while two native captures are identical. The differences are
+  spread over the textured climbing walls and the grey side wall, not at object edges. The demo has no entry in
+  `scripts/support/visual-compat-expected.json` (it replaced the Light Keeper, whose entry went with it).
+- **Repro:** `npm run visual:compat -- --only=boulder` (RTX A6000, Edge 157.0.4341.42, 2026-11-07); the report is
+  `test-results/visual-compat/index.html` with `boulder.diff.png`.
+- **Cause, not yet found:** the same numbers on the commit before the core instance-row and writePoses commits and
+  after them, so those commits are ruled out. The spread over textured surfaces points at texture sampling or shadow
+  filtering in `@margoengine/webgl2-compat`, which is where the next look goes.
+- **Needed to close:** the cause fixed in the package that owns it with a regression test, or recorded with
+  `--write` as an explained difference, as the other demos that differ are.
+
 ### USD composition: stress stages that mix classes, variants and repeated sites
 
 - **What:** 46 of 150 generated stress stages still differ from OpenUSD in a property of some prim (55 of 150 before the rebuild from the Core Specification). They nest classes, variants and references far past real files, and repeat one class through several layers. No real file in the corpus shows it.

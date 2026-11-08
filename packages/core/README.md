@@ -8,7 +8,7 @@ Desktop scenes use 4× MSAA with a canvas DPR cap of 1; phones use single-sample
 
 `engine.pick(x, y)` updates scene state without forcing a color frame. One readback runs at a time and overlapping calls wait their turn, so a loop of picks costs one readback a point; `pickMany` of `@margoengine/selection` answers many points from one. For cached forward-pass IDs, instance culling in a 3×3 micro frustum and neighbor resolution, attach the optional `Picking` plugin from `@margoengine/selection`. On a canvas without client size (an `OffscreenCanvas` in a worker) pick coordinates are canvas pixels.
 
-Static scenes cost little per frame: the kernel recomputes only entities whose position, rotation, scale, parent, bounds or visibility changed (and their descendants); the engine reuses last frame's instance list unless the mesh set, a geometry or material assignment, a material's values or the layers changed; a mesh that culling or `visible` shows or hides moves one row of its batch (shown: the batch's next row; hidden: the batch's last row takes its place), a moved mesh rewrites its own row, and the WebGPU renderer uploads only the changed rows, one `writeBuffer` for each run of neighbouring rows. On an Intel Arc 140V laptop the kernel part made the kernel 2.6-4x cheaper and let 50,000 CAD parts orbit at 92 FPS instead of 49 (CAD measurements, before the row change). An orbiting camera no longer re-collects every frame: with 50,000 boxes and 500 culling flips a frame, the frame does 50,000 byte compares, 1,000 map lookups, 12,000 float copies and uploads 48 KB in at most 500 writes, where it did 100,000 lookups, 1.2 million float copies and a 4.8 MB upload (counted in `tests/core-instance-cache.test.js`; not timed yet). Several cameras on one scene flip most rows, and then cost what a full collection costs. Draw order among the instances of one geometry follows these row moves, so it changes after a flip; opaque pixels are the same except for two core meshes at exactly the same depth. Contract for `@margoengine/core/extension` users: the per-geometry instance buffers (`engine.geometryBuffers(geometry).instance`) belong to core and are read-only for packages (bind them, never write them; use your own buffer, as `@margoengine/selection`'s micro pick pass does), and `store.matrices` is kernel output (change transforms through the mesh, never by writing world matrices). GPU culling of core meshes (`@margoengine/culling`'s `CulledMeshes`) uses one hook: passes see the frame's batches as `context.batches`, and a package may set `batch.redirect = {instances, args}` for the frame; every core draw of that batch (main pass and replays) then reads the package's compacted instance records and `drawIndexedIndirect` arguments instead of core's buffer and count. Core still uploads into its own instance buffer, which stays the read-only source the package culls from. `engine.start({culling: false})` skips core's CPU frustum test in the built-in loop (as `render({culling: false})` does for one frame) when a package culls on the GPU.
+Static scenes cost little per frame: the kernel recomputes only entities whose position, rotation, scale, parent, bounds or visibility changed (and their descendants); the engine reuses last frame's instance list unless the mesh set, a geometry or material assignment, a material's values or the layers changed; a mesh that culling or `visible` shows or hides moves one row of its batch (shown: the batch's next row; hidden: the batch's last row takes its place), a moved mesh rewrites its own row, and the WebGPU renderer uploads only the changed rows, one `writeBuffer` for each run of neighbouring rows. On an Intel Arc 140V laptop the kernel part made the kernel 2.6-4x cheaper and let 50,000 CAD parts orbit at 92 FPS instead of 49 (CAD measurements, before the row change). An orbiting camera no longer re-collects every frame: with 50,000 boxes and 500 culling flips a frame, the frame does 50,000 byte compares, 1,000 map lookups, 12,000 float copies and uploads 48 KB in at most 500 writes, where it did 100,000 lookups, 1.2 million float copies and a 4.8 MB upload (counted in `tests/core-instance-cache.test.js`; not timed yet). Several cameras on one scene flip most rows, and then cost what a full collection costs. Draw order among the instances of one geometry follows these row moves, so it changes after a flip; opaque pixels are the same except for two core meshes at exactly the same depth. Contract for `@margoengine/core/extension` users: the per-geometry instance buffers (`engine.geometryBuffers(geometry).instance`) belong to core and are read-only for packages (bind them, never write them, except a package that claims a batch and uploads its changed rows with `uploadRows`, see "Bulk poses and instance rows"; use your own buffer, as `@margoengine/selection`'s micro pick pass does), and `store.matrices` is kernel output (change transforms through the mesh, never by writing world matrices). GPU culling of core meshes (`@margoengine/culling`'s `CulledMeshes`) uses one hook: passes see the frame's batches as `context.batches`, and a package may set `batch.redirect = {instances, args}` for the frame; every core draw of that batch (main pass and replays) then reads the package's compacted instance records and `drawIndexedIndirect` arguments instead of core's buffer and count. Core still uploads into its own instance buffer, which stays the read-only source the package culls from. `engine.start({culling: false})` skips core's CPU frustum test in the built-in loop (as `render({culling: false})` does for one frame) when a package culls on the GPU.
 
 Entity capacity grows on demand: `Engine.create(canvas, {capacity})` sets the initial number of slots (default 1,024) and `createMesh` doubles the transform store when it is full, up to 8,388,608 (2^23). Growing re-creates the kernel at the same Wasm address, re-binds every `store` view and `mesh.matrix`, and recomputes every entity once on the next tick; a growth that cannot allocate throws and leaves the store unchanged. Store views and `mesh.matrix` taken before a `createMesh` may be stale afterwards (detached, or aliasing the new layout): re-read them, never keep them. Memory per slot: 344 B of kernel columns plus 7 B of flags (351 B; 352 MB of Wasm memory at 1,048,576 slots) and 5 B in the engine; each drawn instance adds 96 B on the CPU and 96 B on the GPU.
 
@@ -48,6 +48,61 @@ Back faces of single-sided materials (`doubleSided: false`) are culled by the GP
 `mesh.receiveShadow = false` (default true) keeps a mesh's direct light unshadowed by `@margoengine/shadows` and clustered local shadows while it still casts; the next frame re-collects instances. Core marks it by adding 0.25 to the instance's doubleSided factor (float 22), so every `< 0.5` single-sided test reads it unchanged; the shadow packages patch core's shader for it only while some mesh opts out.
 
 The canvas is opaque. For a transparent canvas over HTML and CSS, attach `TransparentCanvas` from `@margoengine/environment`; core needs no option.
+
+## When an allocation fails
+
+`mesh.setGeometry()` allocates a geometry's GPU buffers the first time a mesh uses it, and larger instance storage as more
+meshes share it. If that throws, for example `GPU buffer limit` from a geometry bigger than `maxBufferSize`, nothing has
+changed: the error reaches you, the mesh keeps the geometry it had and keeps drawing it, every other mesh draws as before,
+and calling again once there is room works. `engine.createMesh()` does the same when the transform store cannot grow.
+
+Growing keeps the old buffers until the new ones exist, so for that moment a batch holds both. A `Renderer` passed as
+`fallback` must do the same: `add` on a geometry it already holds replaces the storage, new first, and a throw keeps the
+old one. WebGPU reports a real out-of-memory later, as a device error on the next frame, not as a throw from this call.
+
+`scene.dispose()` and `engine.dispose()` finish even when a plugin's `dispose` throws, then throw the first error.
+`rebootDevice()` tells every plugin through `onDeviceRestored` the same way.
+
+A `rebootDevice()` that fails leaves the engine and the canvas on the device they had, so on a healthy device the page
+keeps drawing and you can try again. The canvas moves to the new device only once every geometry is rebuilt on it.
+
+## Camera for one render
+
+`engine.render({camera: anotherCamera, delta: 0})` draws the implicit scene through that camera. The camera supplied to `Engine.create` remains `engine.camera`; its fit animation does not advance during the alternate render. Before returning, core restores the primary camera's frustum, visible instances and batches, including when a pass throws. `engine.stats` keeps the counts of the frame it drew: an app that passes its own camera every frame reads what is on screen, package draws included. A pick changes neither count. Plugins receive one pre-update callback per call. A later ordinary render or pick uses the primary camera.
+
+Alternate renders must be sequential, outside a running frame pass. For several cameras in one frame use views (below). Camera-dependent plugins that read `engine.camera` in their update callbacks still follow the primary camera. Use `delta: 0` for additional views so simulation is not advanced again. Projection aspect follows the canvas; an offscreen capture with another aspect needs an explicit `Camera.project` override.
+
+## Views and scenes
+
+Several cameras in one frame: split screen, a four-view layout, a minimap. Each view is a camera and a rectangle,
+fractions of the canvas by default (`pixels: true` for drawing-buffer pixels); the camera aspect follows the rectangle.
+
+```ts
+const top = new Camera({ position: [0, 20, 0], target: [0, 0, 0] });
+top.up = [0, 0, -1];                               // straight down needs another screen-up
+const front = new Camera({ position: [0, 0, 20] });
+const side = new Camera({ position: [20, 0, 0] });
+engine.views = [
+  { camera: top, viewport: [0, 0, 0.5, 0.5], clear: { color: '#20242a' } },
+  { camera: front, viewport: [0.5, 0, 0.5, 0.5] },
+  { camera: side, viewport: [0, 0.5, 0.5, 0.5] },
+  { camera: engine.camera, viewport: [0.5, 0.5, 0.5, 0.5] },
+];                                                 // the frame loop draws these instead of the full-canvas view
+engine.render({ views: engine.views, delta: 0 });  // or draw them yourself
+const hit = await engine.pick(400, 300);           // CSS pixel; picks through the view under it
+```
+
+- Views draw in order; the first clears colour, later ones keep it (`clear: {color, depth}` per view). Plugins update
+  once per scene and each camera advances once per frame. Partial rectangles clear with a draw inside the rectangle.
+- `PassContext.view` (`id`, `camera`, `viewport`, `scissor`, `index`, `count`, `clear`, `layers`) tells passes which
+  view they draw; `draw()` uses its rectangles by default and effects key per-view history on `id`.
+- `target: {color, depth?}` draws a view into textures (sized by the texture) instead of the canvas. `color` is
+  1-sample; `depth`, if given, has the scene's depth format and sample count (core draws into it; another format throws).
+- `layers` draws only the meshes whose render layers (`@margoengine/cameras/layers`) share a bit; default the camera's.
+- Scenes: `engine.createScene()` makes a scene with its own meshes (`scene.createMesh()`), lighting, `background` and
+  plugins (`scene.use(plugin)`); a view draws it with `scene`. `engine.scene` is the default scene; while a scene is
+  drawn or set up, `engine.lighting`, `plugins`, `stats` and `createMesh` are that scene's. `scene.dispose()` removes it.
+- Which packages are view-aware: [multi-view-roadmap.md](../../docs/multi-view-roadmap.md).
 
 ## Bulk poses and instance rows (extension)
 
@@ -121,61 +176,6 @@ engine.use({
 });
 engine.start();
 ```
-
-## When an allocation fails
-
-`mesh.setGeometry()` allocates a geometry's GPU buffers the first time a mesh uses it, and larger instance storage as more
-meshes share it. If that throws, for example `GPU buffer limit` from a geometry bigger than `maxBufferSize`, nothing has
-changed: the error reaches you, the mesh keeps the geometry it had and keeps drawing it, every other mesh draws as before,
-and calling again once there is room works. `engine.createMesh()` does the same when the transform store cannot grow.
-
-Growing keeps the old buffers until the new ones exist, so for that moment a batch holds both. A `Renderer` passed as
-`fallback` must do the same: `add` on a geometry it already holds replaces the storage, new first, and a throw keeps the
-old one. WebGPU reports a real out-of-memory later, as a device error on the next frame, not as a throw from this call.
-
-`scene.dispose()` and `engine.dispose()` finish even when a plugin's `dispose` throws, then throw the first error.
-`rebootDevice()` tells every plugin through `onDeviceRestored` the same way.
-
-A `rebootDevice()` that fails leaves the engine and the canvas on the device they had, so on a healthy device the page
-keeps drawing and you can try again. The canvas moves to the new device only once every geometry is rebuilt on it.
-
-## Camera for one render
-
-`engine.render({camera: anotherCamera, delta: 0})` draws the implicit scene through that camera. The camera supplied to `Engine.create` remains `engine.camera`; its fit animation does not advance during the alternate render. Before returning, core restores the primary camera's frustum, visible instances and batches, including when a pass throws. `engine.stats` keeps the counts of the frame it drew: an app that passes its own camera every frame reads what is on screen, package draws included. A pick changes neither count. Plugins receive one pre-update callback per call. A later ordinary render or pick uses the primary camera.
-
-Alternate renders must be sequential, outside a running frame pass. For several cameras in one frame use views (below). Camera-dependent plugins that read `engine.camera` in their update callbacks still follow the primary camera. Use `delta: 0` for additional views so simulation is not advanced again. Projection aspect follows the canvas; an offscreen capture with another aspect needs an explicit `Camera.project` override.
-
-## Views and scenes
-
-Several cameras in one frame: split screen, a four-view layout, a minimap. Each view is a camera and a rectangle,
-fractions of the canvas by default (`pixels: true` for drawing-buffer pixels); the camera aspect follows the rectangle.
-
-```ts
-const top = new Camera({ position: [0, 20, 0], target: [0, 0, 0] });
-top.up = [0, 0, -1];                               // straight down needs another screen-up
-const front = new Camera({ position: [0, 0, 20] });
-const side = new Camera({ position: [20, 0, 0] });
-engine.views = [
-  { camera: top, viewport: [0, 0, 0.5, 0.5], clear: { color: '#20242a' } },
-  { camera: front, viewport: [0.5, 0, 0.5, 0.5] },
-  { camera: side, viewport: [0, 0.5, 0.5, 0.5] },
-  { camera: engine.camera, viewport: [0.5, 0.5, 0.5, 0.5] },
-];                                                 // the frame loop draws these instead of the full-canvas view
-engine.render({ views: engine.views, delta: 0 });  // or draw them yourself
-const hit = await engine.pick(400, 300);           // CSS pixel; picks through the view under it
-```
-
-- Views draw in order; the first clears colour, later ones keep it (`clear: {color, depth}` per view). Plugins update
-  once per scene and each camera advances once per frame. Partial rectangles clear with a draw inside the rectangle.
-- `PassContext.view` (`id`, `camera`, `viewport`, `scissor`, `index`, `count`, `clear`, `layers`) tells passes which
-  view they draw; `draw()` uses its rectangles by default and effects key per-view history on `id`.
-- `target: {color, depth?}` draws a view into textures (sized by the texture) instead of the canvas. `color` is
-  1-sample; `depth`, if given, has the scene's depth format and sample count (core draws into it; another format throws).
-- `layers` draws only the meshes whose render layers (`@margoengine/cameras/layers`) share a bit; default the camera's.
-- Scenes: `engine.createScene()` makes a scene with its own meshes (`scene.createMesh()`), lighting, `background` and
-  plugins (`scene.use(plugin)`); a view draws it with `scene`. `engine.scene` is the default scene; while a scene is
-  drawn or set up, `engine.lighting`, `plugins`, `stats` and `createMesh` are that scene's. `scene.dispose()` removes it.
-- Which packages are view-aware: [multi-view-roadmap.md](../../docs/multi-view-roadmap.md).
 
 ## Pixel-perfect rendering
 

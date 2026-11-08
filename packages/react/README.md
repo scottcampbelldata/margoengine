@@ -770,7 +770,7 @@ in a real WebGPU browser. The adapter uses standard hooks, never `react-reconcil
 
 What the numbers mean, by scope. None of them is "the size of your app":
 
-- **Core and stage together:** 23,013 B gzip (`npm run measure:size`, the entry measurement; the build fails at 25,000 B).
+- **Core and stage together:** 23,626 B gzip (`npm run measure:size`, the entry measurement; the build fails at 25,000 B).
   It does not include React, this package or any optional package.
 - **A Vite React page with the cube and orbit controls:** 102,335 B gzip of JavaScript, 70% of it React and React DOM
   (measured, table in limits.md). `PbrMaterial` is core's material and pulls in no other package. A textured `<Model>`

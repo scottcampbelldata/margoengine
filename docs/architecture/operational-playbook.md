@@ -145,20 +145,35 @@ atomic.
 Public transform setters validate before writing directly into Wasm-backed arrays. Translation, scale, quaternion,
 parent, and visibility setters make no per-entity tick calls. Euler writes call `kernel_sync_rotation`; a multi-axis
 `.set` synchronizes once. Quaternion writes normalize without array iteration or `map`, then update Euler lanes in JS.
+`Engine.writePoses(ids, poses, count)` (extension surface) is the bulk form of `setPosition` plus `setQuaternion`: it
+checks every row (a live slot by the `active` column, values finite as float32, a nonzero quaternion) before writing any,
+then writes the same bits, as both go through one `storeQuaternion`. It looks no mesh up, so its callers drop ids of
+disposed meshes. `@margoengine/physics/next` writes its awake root bodies through it, one call a sync.
 
 Each rendered frame:
 
 1. Runs plugin pre-update, resize, and camera update.
 2. Copies 24 camera-plane floats into the store.
 3. Calls `kernel_tick` once per drawn view, plus the main camera after a multi-view frame where required.
-4. Performs a full instance collection after structural, scene, layer, or material changes, or when visibility differs
-   from the last collection.
-5. Otherwise finds sticky changed bytes, clears them, copies only those 16-float matrices into instance storage, and
-   expands each batch's dirty range.
-6. Uploads each dirty batch range once.
+4. Performs a full instance collection after structural, scene, layer, or material changes (every row then counts as
+   changed).
+5. Otherwise scans one visibility byte per slot against the last frame's: a mesh shown takes its batch's next row, a mesh
+   hidden gives its row to the batch's last row (24 floats moved, the moved mesh's slot updated from row float 23); then
+   finds sticky changed bytes, clears them and copies only those matrices into their rows. Each changed row sets its bit
+   in the batch's `rows` bitset and counts in `dirty`. The batch's `mask` counts its drawn rows that need back faces
+   (double-sided or mirrored, read from the row itself), so hiding or unmirroring the last such row puts the batch back on
+   the back-culled pipeline (`tests/core-material-setters.test.js`).
+6. Uploads each batch's changed rows once (`uploadRows`: one `writeBuffer` for each run of neighbouring set bits, clamped
+   to `count`, no sort and no allocation).
 
 There is no per-entity Wasm call during a normal tick and no kernel allocation in tick. Host work still scans one
-visibility byte per slot and copies each changed matrix. The cost of `kernel_sync_rotation` has not been isolated.
+visibility byte per slot and copies each changed row. A culling flip costs 2 map lookups, 24 floats and 96 uploaded bytes;
+at 50,000 boxes with 500 flips a frame that is 1,000 lookups and 48 KB instead of a full collection's 100,000 lookups and
+4.8 MB (counted in `tests/core-instance-cache.test.js`, which also proves on 200 random frames of flips and moves that the
+uploaded rows equal the instance rows and the drawn set is exact). Row order inside a batch therefore depends on the order
+of flips, which changes draw order among one geometry's instances: identical opaque pixels except an exact depth tie. Several
+cameras on one scene flip most rows and then cost what a full collection costs. The WebGL2 renderer still uploads
+`[0, count * 24)` every frame. The cost of `kernel_sync_rotation` has not been isolated.
 
 `@margoengine/stats/phases` times these steps from outside core: step 3 is its `tick`, steps 4 and 5 are its `cull`,
 and it reads the frustum test as part of `tick`, because the test runs inside `kernel_tick`. It wraps `store.tick`,
@@ -1126,7 +1141,7 @@ count phrases against `docs/catalog.json`. It does not validate every size, timi
 cite generated records and retain evidence status. An older WebGL preview-size inconsistency demonstrates why this
 scope matters. So does the audit of 2026-11-06: the 44 B of `Engine.renderTarget` reached `README.md`, `site/index.html` and
 `docs/limits.md`, while 11 other files kept 22,815 B or older, `claims.md` among them, and a replace of the current figure had
-rewritten the dated 22,189 B of the 2026-10-30 cleanup in `docs/limits.md`. Core alone read 21,134 B there; it is 21,586 B.
+rewritten the dated 22,189 B of the 2026-10-30 cleanup in `docs/limits.md`. Core alone read 21,134 B there; it is 21,285 B.
 
 The benchmarking protocol uses AC power, a shared GPU-resource lock, a whole-machine idle gate, warmup, repeated
 measurements, between-case load checks, fixed browser/canvas conditions, and a spread validity limit. Defaults at the
@@ -1279,3 +1294,11 @@ The following remain technical gaps, not permission to weaken a check:
     mass, centre, inertia and rest against Rapier 0.21 (`tests/next-compound.test.js`). Fixed with it: removing a
     collider now wakes what touched it (`kernel/tests/sleep.rs`), as Rapier does. Missing: cylinder and cone parts, rays
     and casts, a tree over many children, and any browser run beyond the replay's hash.
+
+38. Stable instance rows with changed-row uploads and `Engine.writePoses` (2026-11-07) are proved by deterministic counts
+    (`tests/core-instance-cache.test.js`, `tests/core-write-poses.test.js`, `packages/physics/tests/next-sync.test.js`)
+    and pixels: on Edge 157, which has no committed profile, `npm run visual:check` passed all 81 views against a local
+    profile captured from the commit before them (4 runs, not committed), and `npm run visual:compat` failed only on
+    `boulder` and `khronos-LightsPunctualLamp`, with the same numbers before them (`docs/known-bugs.md`). Missing: a timed run (the machines were busy; the
+    plan is `bench parity boxes-10000` with culling on, and an orbit of 50,000 CAD parts), and the cost of a frame where
+    several cameras view one scene.

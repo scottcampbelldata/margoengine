@@ -61,4 +61,4 @@ A click on a skinned character misses until picking uses the deformed vertices. 
 
 ## What this version does not port
 
-Float, sparkles, scroll-story cameras, and caustics are extras. Component names do not have to match Drei. The complete version is the five subpaths above. Each disposes what it creates. None of them enter the core plus stage measurement (23,013 B gzip; the limit is 25,000 B).
+Float, sparkles, scroll-story cameras, and caustics are extras. Component names do not have to match Drei. The complete version is the five subpaths above. Each disposes what it creates. None of them enter the core plus stage measurement (23,626 B gzip; the limit is 25,000 B).

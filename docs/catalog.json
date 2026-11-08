@@ -59,7 +59,6 @@
     "install": "npm install @margoengine/core@1.0.0",
     "imports": "import { Engine, box, PbrMaterial } from '@margoengine/core';",
     "exports": [
-      "CADCameraControls",
       "Camera",
       "Engine",
       "EngineKernel",

@@ -292,6 +292,8 @@ for (const name of packages) {
 // that configures the canvas last, so a failed one cannot strand it on a dead device, took it to 21,561 B, and CSS `#rgb`
 // colours (`hexColor` in packages/shared/clear-color.js) took it to 21,586 B. The 21,504 B this
 // comment named before was a slip of arithmetic: `21 * 1024 + 512` enforced 22,016 B from 2026-10-27 until this line.
+// 2026-11-07: CADCameraControls moved to @margoengine/stage (core 21,586 -> 20,672 B), which made room under this same cap
+// for stable instance rows with changed-row uploads (+382 B) and Engine.writePoses (+231 B): core 21,285 B. Not raised.
 const CORE_ONLY_CEILING = 21_587;
 assert.ok(sizes.core.gzip < CORE_ONLY_CEILING, `Core exceeds ${CORE_ONLY_CEILING} B gzip: ${sizes.core.gzip}`);
 assert.ok(sizes.core.gzip + sizes.gltf.gzip < 30 * 1024, 'Core + glTF exceed 30 KiB gzip');

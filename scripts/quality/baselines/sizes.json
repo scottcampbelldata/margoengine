@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10881803,
+  "total": 10883936,
   "history": [
     {
       "date": "2026-10-24",
@@ -4028,6 +4028,12 @@
       "commit": "61800b11f",
       "reason": "bvh: watertight edge function (bvhEdge) in the ray-triangle WGSL, shared by gpu, gpu-build and shadows/rt",
       "grew": 3
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "548b32d7e",
+      "reason": "core speed (2026-11-07): CADCameraControls moved from core into the stage; stable instance rows with uploadRows and Engine.writePoses in core/extension under the unchanged core cap; physics/next writes awake bodies through writePoses",
+      "grew": 2
     }
   ],
   "items": {
@@ -4164,7 +4170,7 @@
     "@margoengine/controls/transform": 12121,
     "@margoengine/controls/walk": 14349,
     "@margoengine/core": 21630,
-    "@margoengine/core/extension": 20735,
+    "@margoengine/core/extension": 21951,
     "@margoengine/creative": 19177,
     "@margoengine/creative/grass": 6122,
     "@margoengine/creative/particles": 759,
@@ -4317,12 +4323,12 @@
     "@margoengine/gltf-pro/scene": 1471,
     "@margoengine/gltf-pro/splats": 2100,
     "@margoengine/gltf-pro/worker": 68901,
-    "@margoengine/gltf/auto": 14521,
+    "@margoengine/gltf/auto": 14481,
     "@margoengine/gltf/instancing": 1985,
     "@margoengine/gltf/meshopt": 1205,
     "@margoengine/gltf/quantized": 1385,
     "@margoengine/gltf/scene-data": 1782,
-    "@margoengine/gltf/textured": 6565,
+    "@margoengine/gltf/textured": 6532,
     "@margoengine/headless": 2864,
     "@margoengine/headless/compare": 3074,
     "@margoengine/headless/ffmpeg": 1434,
@@ -4657,7 +4663,7 @@
     "@margoengine/sprites/animation": 1387,
     "@margoengine/sprites/aseprite": 4595,
     "@margoengine/sprites/atlas": 649,
-    "@margoengine/stage": 2240,
+    "@margoengine/stage": 3230,
     "@margoengine/stage/effects": 727,
     "@margoengine/stage/environment": 747,
     "@margoengine/stage/gltf": 1621,
