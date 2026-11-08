@@ -96,6 +96,23 @@ export interface VFXOptions {
   curves?: VFXCurves;
   /** Where births start and which way `speed` pushes them: a sphere, a cone or the surface of a triangle mesh. The shape (and a mesh) is read at attach; the numbers each frame. Needs the `emitter` feature. */
   emitter?: VFXEmitter;
+  /** A ribbon behind each particle through its last positions, for smoke and magic trails. Needs `ribbons` from `@margoengine/vfx/ribbons`. */
+  ribbons?: VFXRibbons;
+}
+/**
+ * A ribbon behind each particle: a camera-facing strip through the particle and its last `points - 1` recorded
+ * positions, fading from the particle's own opacity at the head to 0 at the tail. `points` is read at attach; the rest
+ * every frame. Needs the `ribbons` feature.
+ */
+export interface VFXRibbons {
+  /** Points along the ribbon, the particle included, an integer 2..64. Default 16. Fixed at attach. */
+  points?: number;
+  /** Seconds between recorded points, 0..1; 0 records one every frame. Default 1/60. */
+  interval?: number;
+  /** Width in world units, > 0. Default the particle `size`. */
+  width?: number;
+  /** Draw the particles' billboards as well as their ribbons. Default true. */
+  heads?: boolean;
 }
 /**
  * Size, opacity and colour over a particle's life, from birth (0) to death (1). Needs the `curves` feature; set at
@@ -174,7 +191,48 @@ export interface ParticleAtlas {
   frames: 'random' | 'lifetime';
 }
 /** Features add each GPU object they create here at once, so a setup that fails part-way still releases it. */
-type OwnedResources = { destroy(): void }[];
+export type OwnedResources = { destroy(): void }[];
+/** What an added feature builds on: the effect's buffers and its simulation module. */
+export interface VFXState {
+  device: GPUDevice;
+  capacity: number;
+  uniform: GPUBuffer;
+  particles: GPUBuffer;
+  alive: GPUBuffer;
+  visible: GPUBuffer;
+  indirect: GPUBuffer;
+  /** The simulation module, with every feature's patch in it, for extra entry points. */
+  module: GPUShaderModule;
+  options: VFXOptions;
+  /** The engine's frame statistics: a feature's own draw adds to `drawCalls`. */
+  stats: { drawCalls: number };
+}
+
+/** The GPU side of an added feature, made at attach and again after device restoration. */
+export interface VFXRuntime {
+  /** Entries added to the simulation's bind group. */
+  compute?: GPUBindGroupEntry[];
+  /** Entries added to the billboard's bind group. */
+  render?: GPUBindGroupEntry[];
+  /** Per frame, before the simulation pass is recorded. */
+  write?(c: Context): void;
+  /** Extra dispatches at the end of the simulation pass. */
+  run?(pass: GPUComputePassEncoder): void;
+  /** Its own draw, after the billboards. */
+  draw?(c: Context): void;
+  /** True while the billboards are not drawn: the feature draws the particles itself. */
+  hides?(): boolean;
+}
+/** A feature beyond the first seven (ribbons and later). The shape is internal: pass the entry's export. */
+export interface VFXExtension<T> {
+  /** Checks the option at construction and every frame. Values fixed at attach are checked by the runtime. */
+  validate(value: T, options: VFXOptions): void;
+  simulation?(code: string, value: T): string;
+  billboard?(code: string, value: T): string;
+  create?(state: VFXState, value: T, owned: OwnedResources): VFXRuntime;
+}
+/** Added features, in the order their patches apply. */
+const extensions = ['ribbons'] as const;
 /** One compute dispatch of the slot-order passes. */
 type Step = [GPUComputePipeline, GPUBindGroup];
 /**
@@ -231,6 +289,7 @@ export interface VFXFeatures {
       owned: OwnedResources,
     ): { entries: GPUBindGroupEntry[]; write(queue: GPUQueue, emitter: VFXEmitter): void };
   };
+  ribbons?: VFXExtension<VFXRibbons>;
 }
 let nextId = 0;
 /**
@@ -276,6 +335,7 @@ export class VFX implements EnginePlugin {
   private emitterShape?: string;
   private readonly transparency = transparencySlot();
   private sorter?: ReturnType<NonNullable<VFXFeatures['sort']>['create']>;
+  private runtimes: VFXRuntime[] = [];
   /** On the WebGL2 layer, once loaded: the simulation as point draws on the GPU and the draw without a read-back (./compat.js). */
   private route?: { kernels: import('./compat.js').SimulationRoute; billboard(code: string): string; binding: number };
   private owned: OwnedResources = [];
@@ -393,6 +453,13 @@ export class VFX implements EnginePlugin {
     } else if (this.emitterShape)
       throw new TypeError('VFX emitter was set at attach and cannot be removed; attach a new VFX to drop it');
     if (o.obstacles) this.features.obstacles!.write(o.obstacles, this.extraValues);
+    for (const key of extensions) {
+      const value = o[key],
+        feature = this.features[key] as VFXExtension<unknown> | undefined;
+      if (value === undefined) continue;
+      if (!feature) throw new TypeError(`VFX ${key} needs ${key} from @margoengine/vfx/${key}: pass {${key}}`);
+      feature.validate(value, o);
+    }
   }
   /** The fog the particles are drawn in (see `setFog`), or null. */
   get fog(): FogLike | null {
@@ -469,6 +536,14 @@ export class VFX implements EnginePlugin {
       this.billboard = f.curves!.patch(this.billboard, o.curves);
       this.curveRuntime = f.curves!.create(this.device, this.owned);
     }
+    // Added features in their fixed order; validate() has checked that each one used is given.
+    const added = extensions.flatMap((key): [VFXExtension<unknown>, unknown][] =>
+      o[key] === undefined ? [] : [[f[key] as VFXExtension<unknown>, o[key]]],
+    );
+    for (const [feature, value] of added) {
+      if (feature.simulation) simulation = feature.simulation(simulation, value);
+      if (feature.billboard) this.billboard = feature.billboard(this.billboard, value);
+    }
     this.alive = buffer(size * 4, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC);
     this.indirect = buffer(20, GPUBufferUsage.STORAGE | GPUBufferUsage.INDIRECT | GPUBufferUsage.COPY_SRC);
     // respawn receives the births scan's sum (unused); births and drawn hold one count, then offset, per workgroup.
@@ -503,12 +578,36 @@ export class VFX implements EnginePlugin {
           }),
         ];
       };
+    this.runtimes = added.flatMap(([feature, value]) =>
+      feature.create
+        ? [
+            feature.create(
+              {
+                device: this.device!,
+                capacity: this.capacity,
+                uniform: u,
+                particles: this.particles!,
+                alive: this.alive!,
+                visible: this.visible!,
+                indirect: this.indirect!,
+                module,
+                options: o,
+                stats: this.engine!.stats,
+              },
+              value,
+              this.owned,
+            ),
+          ]
+        : [],
+    );
+    const computeEntries = this.runtimes.flatMap((r) => r.compute ?? []);
     [this.simulation, this.computeGroup] = step(
       'main',
       [u, this.particles!, drawn, 0, this.indirect!, births, 0, 0, 0, listed],
       [
         ...(o.obstacles ? [{ binding: 6, resource: { buffer: this.extra! } }] : []),
         ...(this.emitterRuntime?.entries ?? []),
+        ...computeEntries,
       ],
     );
     // Slot order (shader.ts): deaths and the births scan before main; the drawn scan and compact after it.
@@ -550,6 +649,7 @@ export class VFX implements EnginePlugin {
           [
             ...(o.obstacles ? [{ binding: 6, resource: { buffer: this.extra! } }] : []),
             ...(this.emitterRuntime?.entries ?? []),
+            ...computeEntries,
           ],
           this.owned,
         ),
@@ -627,6 +727,7 @@ export class VFX implements EnginePlugin {
     }
     if (o.curves) this.curveRuntime!.write(c.device.queue, o.curves);
     if (o.emitter) this.emitterRuntime!.write(c.device.queue, o.emitter);
+    for (const r of this.runtimes) r.write?.(c);
     if (!this.route) c.encoder.clearBuffer(this.indirect!, 4, 4);
     const pass = c.encoder.beginComputePass(),
       groups = Math.ceil(this.capacity / 256),
@@ -648,6 +749,7 @@ export class VFX implements EnginePlugin {
       step(compact, groups);
     }
     this.sorter?.run(pass);
+    for (const r of this.runtimes) r.run?.(pass);
     pass.end();
   }
   /** The pipeline and group 0 of a draw into the frame, or with `hook` into its pass. */
@@ -735,6 +837,7 @@ export class VFX implements EnginePlugin {
           })),
           ...this.spriteEntries,
           ...(this.curveRuntime?.entries ?? []),
+          ...this.runtimes.flatMap((r) => r.render ?? []),
           ...(fog ? [{ binding: 5, resource: { buffer: this.fogBuffer! } }] : []),
           ...(samples ? this.softRuntime!.entries : []),
           ...(this.route ? [{ binding: this.route.binding, resource: { buffer: this.visible! } }] : []),
@@ -746,6 +849,10 @@ export class VFX implements EnginePlugin {
   }
   private draw(c: Context): void {
     if (this.transparency.hook) return;
+    if (!this.runtimes.some((r) => r.hides?.())) this.billboards(c);
+    for (const r of this.runtimes) r.draw?.(c);
+  }
+  private billboards(c: Context): void {
     const [pipeline, group] = this.prepare(c);
     this.attachment.view = c.color;
     this.depthAttachment.view = c.depth;
@@ -799,6 +906,8 @@ export class VFX implements EnginePlugin {
     this.spriteEntries = [];
     this.curveRuntime = this.emitterRuntime = undefined;
     this.extra = this.sorter = this.route = undefined;
+    this.runtimes = [];
+
     this.uniform = this.particles = this.alive = this.indirect = this.visible = this.respawn = undefined;
     this.computeGroup = this.births = this.listing = undefined;
     this.renderGroups.clear();

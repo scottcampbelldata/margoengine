@@ -2842,6 +2842,10 @@
       "types": "./dist/vfx/emitter.d.ts",
       "import": "./dist/vfx/emitter.js"
     },
+    "./vfx/ribbons": {
+      "types": "./dist/vfx/ribbons.d.ts",
+      "import": "./dist/vfx/ribbons.js"
+    },
     "./video": {
       "types": "./dist/video.d.ts",
       "import": "./dist/video.js"

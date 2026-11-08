@@ -1,0 +1,80 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>VFX features check</title></head><body>
+<script type="module">
+// Real-GPU checks of the features added after the first seven (ribbons and later), run by features-check.mjs. Each
+// check simulates real frames of a real VFX effect with fixed steps and reads back the picture (and buffers where a
+// check needs them), comparing against what the test computes from the options.
+import {VFX} from '/packages/vfx/dist/index.js';
+import {Camera} from '/packages/core/dist/extension.js';
+const adapter=await navigator.gpu.requestAdapter({powerPreference:'high-performance'}),device=await adapter.requestDevice(),errors=[];
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const size=256;
+const camera=new Camera({position:[0,0,10],target:[0,0,0],fov:40,near:0.1,far:100});camera.update(1,true);
+// World units per pixel on the z = 0 plane, and the world point at a pixel centre there.
+const unit=2*10*Math.tan(20*Math.PI/180)/size,world=(px,py)=>[(px+0.5-size/2)*unit,(size/2-py-0.5)*unit];
+const pixel=(x,y)=>[Math.floor(x/unit+size/2),Math.floor(size/2-y/unit)];
+window.unit=unit;
+/**
+ * Runs `frames` simulation steps of `dt` (calling `before(frame)` first), then one more step with the draw, at
+ * `samples` x MSAA, over a cleared black target and a depth cleared to 0 (reversed Z: nothing drawn). Returns the RGBA8
+ * picture and any validation error.
+ */
+async function run(effect,{frames,dt=0.1,samples=1,before=()=>{},read=[]}){
+ device.pushErrorScope('validation');
+ effect.setup({gpu:device,stats:{drawCalls:0},removePlugin(){}});
+ const target=(format,count,usage)=>device.createTexture({size:[size,size],format,sampleCount:count,usage});
+ const color=target('rgba8unorm',samples,GPUTextureUsage.RENDER_ATTACHMENT|(samples===1?GPUTextureUsage.COPY_SRC:0)),
+  resolved=samples>1?target('rgba8unorm',1,GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.COPY_SRC):color,
+  depth=target('depth32float',samples,GPUTextureUsage.RENDER_ATTACHMENT),
+  pixels=device.createBuffer({size:size*size*4,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+ const context=(encoder)=>({backend:'webgpu',device,delta:dt,camera,width:size,height:size,format:'rgba8unorm',color:color.createView(),depth:depth.createView(),descriptor:{multisample:{count:samples},depthStencil:{format:'depth32float'}},encoder});
+ for(let i=0;i<frames;i++){before(i);const encoder=device.createCommandEncoder();effect.simulate(context(encoder));device.queue.submit([encoder.finish()]);}
+ before(frames);
+ const encoder=device.createCommandEncoder();
+ encoder.beginRenderPass({colorAttachments:[{view:color.createView(),loadOp:'clear',storeOp:'store',clearValue:[0,0,0,0]}],depthStencilAttachment:{view:depth.createView(),depthLoadOp:'clear',depthStoreOp:'store',depthClearValue:0}}).end();
+ const c=context(encoder);effect.simulate(c);effect.draw(c);
+ if(samples>1)encoder.beginRenderPass({colorAttachments:[{view:color.createView(),resolveTarget:resolved.createView(),loadOp:'load',storeOp:'store'}]}).end();
+ encoder.copyTextureToBuffer({texture:resolved},{buffer:pixels,bytesPerRow:size*4},[size,size]);
+ const copies=read.map(b=>{const copy=device.createBuffer({size:b.size,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});encoder.copyBufferToBuffer(b,0,copy,0,b.size);return copy;});
+ device.queue.submit([encoder.finish()]);
+ await Promise.all([pixels.mapAsync(GPUMapMode.READ),...copies.map(b=>b.mapAsync(GPUMapMode.READ))]);
+ const image=new Uint8Array(pixels.getMappedRange().slice(0)),buffers=copies.map(b=>new Float32Array(b.getMappedRange().slice(0)));
+ const error=await device.popErrorScope();
+ for(const t of [color,resolved,depth])t.destroy();pixels.destroy();copies.forEach(b=>b.destroy());
+ return {image,buffers,error:error?.message??null};
+}
+window.run=run;
+const still={rate:0,gravity:[0,0,0],spread:0,turbulence:0,ground:-100,color:[1,1,1,1]};
+/**
+ * Ribbons: one particle born at x = -2 flies +x at 3 units/s; after the frames its ribbon of `points` (with heads off)
+ * runs back through the recorded positions. Along the row through y = 0 the red channel (white over black) must be the
+ * life fade x the head-to-tail fade (1 - k / (points - 1)) x the width falloff (1 - e^2), with k the point index
+ * the pixel lies at (the newest record is the particle's own position, one per `interval`). `reborn`: the particle dies
+ * after 0.55 s and a burst brings it back at frame 7; its ribbon must start at its new birth, never reach back into the
+ * old life (which lies to the right of the new head).
+ */
+window.checkRibbons=async({samples=1,interval=0,reborn=false,heads=false}={})=>{
+ const points=8,width=0.4,speed=3,dt=0.1,frames=9,life=reborn?0.55:100;
+ const effect=new VFX({...still,capacity:4,position:[-2,0,0],velocity:[speed,0,0],size:0.05,lifetime:[life,life],ribbons:{points,interval,width,heads}});
+ effect.burst(1);
+ const {image,error}=await run(effect,{frames,dt,samples,before:(f)=>{if(reborn&&f===6)effect.burst(1);}});
+ effect.dispose();
+ // Steps made: frames + 1. Positions after step j (1-based) of a life born at step b: -2 + speed * dt * (j - b + 1).
+ const steps=frames+1,born=reborn?7:1,head=-2+speed*dt*(steps-born+1),age=(steps-born+1)*dt,fade=(life-age)/life;
+ // With interval 0 every step records; with 0.2 every second step from the first. The newest record is at the head.
+ const recorded=[];for(let j=born;j<=steps;j++)if(interval===0||(j-1)%2===0)recorded.push(-2+speed*dt*(j-born+1));
+ const along=[head,...recorded.reverse()].slice(0,points);
+ const rows=[],mismatches=[];let largest=0,beyond=0;
+ for(let px=0;px<size;px++){
+  const [x]=world(px,0),py=pixel(0,0)[1],[,y]=world(px,py),e=y/(width/2);
+  let k=-1;for(let i=0;i+1<along.length;i++){const a=along[i],b=along[i+1];if(x<=a&&x>=b&&a>b){k=i+(a-x)/(a-b);break;}}
+  const got=image[(py*size+px)*4];
+  if(x>head+2*unit){beyond=Math.max(beyond,got);continue;}
+  // Skip pixels within a pixel of a ribbon end, where coverage is partial.
+  if(k<0||x>head-unit||x<along.at(-1)+unit)continue;
+  const want=255*fade*(1-k/(points-1))*(1-e*e),d=Math.abs(got-want);largest=Math.max(largest,d);rows.push(got);
+  if(d>3)mismatches.push({px,x,k,want,got});
+ }
+ return {error,errors:errors.splice(0),checked:rows.length,largest,beyond,mismatches:mismatches.slice(0,8),head,tail:along.at(-1)};
+};
+window.ready=true;
+</script></body></html>

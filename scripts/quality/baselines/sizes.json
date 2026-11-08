@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11026422,
+  "total": 11031505,
   "history": [
     {
       "date": "2026-10-24",
@@ -4190,6 +4190,12 @@
       "commit": "21bec500b",
       "reason": "new entry @margoengine/sprites/skeletal (2D skeletal animation)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "df099a70d",
+      "reason": "vfx ribbons: new optional ribbons entry (ring of recorded positions, own record dispatch and strip draw); root VFX carries it with the other features; base grows for the added-feature hook (patches, dispatches and draws of later entries); effects without ribbons record the same GPU work (trace fixtures)",
+      "grew": 3
     }
   ],
   "items": {
@@ -4894,11 +4900,12 @@
     "@margoengine/usdz/skel": 7987,
     "@margoengine/usdz/subdiv": 4929,
     "@margoengine/usdz/worker": 13771,
-    "@margoengine/vfx": 17135,
-    "@margoengine/vfx/base": 10992,
+    "@margoengine/vfx": 19020,
+    "@margoengine/vfx/base": 11336,
     "@margoengine/vfx/curves": 1816,
     "@margoengine/vfx/emitter": 2656,
     "@margoengine/vfx/obstacles": 1364,
+    "@margoengine/vfx/ribbons": 2854,
     "@margoengine/vfx/soft": 1551,
     "@margoengine/vfx/sort": 1356,
     "@margoengine/vfx/texture": 1527,

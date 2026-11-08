@@ -98,6 +98,7 @@ export interface VFXFeatures {
             write(queue: GPUQueue, emitter: VFXEmitter): void;
         };
     };
+    ribbons?: VFXExtension<VFXRibbons>;
 }
 
 export type VFXObstacle = {
@@ -136,6 +137,14 @@ export interface VFXOptions {
     texture?: VFXTexture;
     curves?: VFXCurves;
     emitter?: VFXEmitter;
+    ribbons?: VFXRibbons;
+}
+
+export interface VFXRibbons {
+    points?: number;
+    interval?: number;
+    width?: number;
+    heads?: boolean;
 }
 
 export interface VFXTexture {
@@ -189,5 +198,36 @@ class VFX implements EnginePlugin {
     dispose(): void;
     [Symbol.dispose]: () => void;
     destroy(): void;
+}
+
+interface VFXExtension<T> {
+    validate(value: T, options: VFXOptions): void;
+    simulation?(code: string, value: T): string;
+    billboard?(code: string, value: T): string;
+    create?(state: VFXState, value: T, owned: OwnedResources): VFXRuntime;
+}
+
+interface VFXRuntime {
+    compute?: GPUBindGroupEntry[];
+    render?: GPUBindGroupEntry[];
+    write?(c: Context): void;
+    run?(pass: GPUComputePassEncoder): void;
+    draw?(c: Context): void;
+    hides?(): boolean;
+}
+
+interface VFXState {
+    device: GPUDevice;
+    capacity: number;
+    uniform: GPUBuffer;
+    particles: GPUBuffer;
+    alive: GPUBuffer;
+    visible: GPUBuffer;
+    indirect: GPUBuffer;
+    module: GPUShaderModule;
+    options: VFXOptions;
+    stats: {
+        drawCalls: number;
+    };
 }
 ```

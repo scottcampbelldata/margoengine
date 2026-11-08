@@ -52,6 +52,13 @@ type VFXEmitter = {
     speed?: number;
 };
 
+interface VFXExtension<T> {
+    validate(value: T, options: VFXOptions): void;
+    simulation?(code: string, value: T): string;
+    billboard?(code: string, value: T): string;
+    create?(state: VFXState, value: T, owned: OwnedResources): VFXRuntime;
+}
+
 interface VFXFeatures {
     obstacles?: {
         patch(simulation: string): string;
@@ -94,6 +101,7 @@ interface VFXFeatures {
             write(queue: GPUQueue, emitter: VFXEmitter): void;
         };
     };
+    ribbons?: VFXExtension<VFXRibbons>;
 }
 
 type VFXObstacle = {
@@ -105,6 +113,66 @@ type VFXObstacle = {
     center: Vec3;
     halfSize: Vec3;
 };
+
+interface VFXOptions {
+    capacity?: number;
+    initialCount?: number;
+    rate?: number;
+    position?: Vec3;
+    velocity?: Vec3;
+    spread?: number;
+    gravity?: Vec3;
+    color?: readonly [number, number, number, number];
+    size?: number;
+    lifetime?: readonly [number, number];
+    ground?: number;
+    bounce?: number;
+    turbulence?: number;
+    frequency?: number;
+    angularVelocity?: number;
+    emissionExtent?: Vec3;
+    intensity?: number;
+    obstacles?: readonly VFXObstacle[];
+    wrap?: boolean;
+    sort?: boolean;
+    softness?: number;
+    depth?: () => GPUTexture | undefined;
+    texture?: VFXTexture;
+    curves?: VFXCurves;
+    emitter?: VFXEmitter;
+    ribbons?: VFXRibbons;
+}
+
+interface VFXRibbons {
+    points?: number;
+    interval?: number;
+    width?: number;
+    heads?: boolean;
+}
+
+interface VFXRuntime {
+    compute?: GPUBindGroupEntry[];
+    render?: GPUBindGroupEntry[];
+    write?(c: Context): void;
+    run?(pass: GPUComputePassEncoder): void;
+    draw?(c: Context): void;
+    hides?(): boolean;
+}
+
+interface VFXState {
+    device: GPUDevice;
+    capacity: number;
+    uniform: GPUBuffer;
+    particles: GPUBuffer;
+    alive: GPUBuffer;
+    visible: GPUBuffer;
+    indirect: GPUBuffer;
+    module: GPUShaderModule;
+    options: VFXOptions;
+    stats: {
+        drawCalls: number;
+    };
+}
 
 interface VFXTexture {
     width: number;

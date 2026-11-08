@@ -17,6 +17,10 @@ export interface FogLike {
   readonly enabled?: boolean;
 }
 
+export type OwnedResources = {
+    destroy(): void;
+}[];
+
 export interface ParticleAtlas {
     columns: number;
     rows: number;
@@ -77,6 +81,13 @@ export type VFXEmitter = {
     speed?: number;
 };
 
+export interface VFXExtension<T> {
+    validate(value: T, options: VFXOptions): void;
+    simulation?(code: string, value: T): string;
+    billboard?(code: string, value: T): string;
+    create?(state: VFXState, value: T, owned: OwnedResources): VFXRuntime;
+}
+
 export interface VFXFeatures {
     obstacles?: {
         patch(simulation: string): string;
@@ -119,6 +130,7 @@ export interface VFXFeatures {
             write(queue: GPUQueue, emitter: VFXEmitter): void;
         };
     };
+    ribbons?: VFXExtension<VFXRibbons>;
 }
 
 export type VFXObstacle = {
@@ -157,6 +169,38 @@ export interface VFXOptions {
     texture?: VFXTexture;
     curves?: VFXCurves;
     emitter?: VFXEmitter;
+    ribbons?: VFXRibbons;
+}
+
+export interface VFXRibbons {
+    points?: number;
+    interval?: number;
+    width?: number;
+    heads?: boolean;
+}
+
+export interface VFXRuntime {
+    compute?: GPUBindGroupEntry[];
+    render?: GPUBindGroupEntry[];
+    write?(c: Context): void;
+    run?(pass: GPUComputePassEncoder): void;
+    draw?(c: Context): void;
+    hides?(): boolean;
+}
+
+export interface VFXState {
+    device: GPUDevice;
+    capacity: number;
+    uniform: GPUBuffer;
+    particles: GPUBuffer;
+    alive: GPUBuffer;
+    visible: GPUBuffer;
+    indirect: GPUBuffer;
+    module: GPUShaderModule;
+    options: VFXOptions;
+    stats: {
+        drawCalls: number;
+    };
 }
 
 export interface VFXTexture {
@@ -171,10 +215,6 @@ export interface VFXTexture {
 type Context = Extract<PassContext, {
     backend: 'webgpu';
 }>;
-
-type OwnedResources = {
-    destroy(): void;
-}[];
 
 interface SurfaceTransparency {
   surface(group: number): string;

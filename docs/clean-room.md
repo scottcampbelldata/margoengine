@@ -1256,3 +1256,12 @@ Joe Tsai's bzip2 format notes, and Burrows and Wheeler, *A Block-sorting Lossles
 Research Report 124, 1994). No source of libbzip2, liblzma, XZ Utils, the LZMA SDK or any other decoder was read. The two
 real libraries ran only as black boxes, through Python's `bz2` and `lzma` modules, to write the test files in
 `packages/decoders/tests/fixtures/archives`; VTK and pynrrd ran the same way to write the loader fixtures.
+
+## Particle features: `@margoengine/vfx`
+
+Written clean room from the papers and books below. No source code of particle systems (Unreal Niagara and Cascade,
+Unity VFX Graph and Shuriken, Godot particles, three.js and Babylon particle systems, PopcornFX and the like) was read.
+
+| Feature | Source |
+| --- | --- |
+| Ribbons and trails (`vfx/ribbons`) | W. T. Reeves, "Particle Systems: A Technique for Modeling a Class of Fuzzy Objects", SIGGRAPH 1983 (particles drawn as streaks along their motion); T. Akenine-Moller, E. Haines, N. Hoffman et al., *Real-Time Rendering*, 4th ed., 2018, axial billboards (a strip turned about its own axis toward the eye by a cross product). The ring of records per slot, the birth-angle life stamp and the binary search for a life's records are Margo's own |

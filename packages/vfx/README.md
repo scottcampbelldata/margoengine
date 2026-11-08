@@ -212,10 +212,10 @@ from 0.010 to 0.031 ms at 100,000; the draw is unchanged.
 
 ### Load only what you use
 
-`VFX` from `@margoengine/vfx` (about 14.1 kB min+gzip) carries all seven features. An effect that uses none of them can
+`VFX` from `@margoengine/vfx` (about 14.1 kB min+gzip) carries every feature. An effect that uses none of them can
 import the same class from `@margoengine/vfx/base` (about 8.3 kB); add features as a second argument from their own
 entries: `/obstacles` (1.1 kB alone), `/wrap` (0.2 kB), `/sort` (1.1 kB), `/texture` (1.5 kB; it exports
-`textureFeature`, passed as `{texture: textureFeature}`), `/curves` (1.6 kB), `/emitter` (2.4 kB) and `/soft` (1.3 kB). Sizes are vite library builds with bare imports external,
+`textureFeature`, passed as `{texture: textureFeature}`), `/curves` (1.6 kB), `/emitter` (2.4 kB), `/soft` (1.3 kB) and `/ribbons` (2.6 kB, the quality gate's figure). Sizes are vite library builds with bare imports external,
 each entry compressed on its own ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)), so a
 bundle that combines them adds less: the whole root is 14.1 kB. `node examples/package-benchmarks/vfx-size.mjs` measures base-plus-feature bundles
 (`results/vfx-size.json`, at an earlier commit, `76af7a0`).
@@ -251,3 +251,37 @@ application restoration hooks. Restoration reseeds particles rather than preserv
 their previous positions and ages.
 
 `gpuState` exposes the current particle, indirect, draw-list (`alive`, the draw order) and `visible` buffers for tests/custom integrations. Each particle has 16 floats (64 bytes), split in two halves so the per-frame update reads and writes only the first: particle i's position/life and velocity/size are floats `8i..8i+7`; its color and rotation (birth angle, angular velocity, initial life, unused) are floats `8n+8i..8n+8i+7` (n = capacity). The drawn angle is birth angle + angular velocity x (initial life - remaining life). `indirect` is five 32-bit words whose second word counts live particles; `visible` holds the draw's `drawIndirect` arguments (vertex count 3, then the number of on-screen particles listed at the start of `alive`). The current particle buffer is stable across frames and observes later updates; it is replaced after device restoration. `dispose()`/`destroy()` releases owned buffers. Device restoration recreates simulation resources. Attach multiple emitters independently; none enter the core/stage bundle.
+
+### Ribbons and trails
+
+`ribbons` leaves a ribbon behind every particle, for smoke, magic and tracer trails: a strip through the particle and
+its last positions, turned to face the camera, fading from the particle's own opacity at the head to nothing at the tail
+and softly across its width. The `ribbons` feature records every live particle's position each `interval` seconds
+(default 1/60; 0 records every frame) into a ring of `points - 1` records per particle (`points`, the particle included,
+2 to 64, default 16), so a ribbon covers about `(points - 1) x interval` seconds of flight. `width` (world units) defaults
+to the particle `size`; `heads: false` draws the ribbons without the billboards. Each record is stamped with the
+particle's life, so a particle that dies and is born again starts a new ribbon instead of joining the old one, and a
+young particle's ribbon is as long as its life so far.
+
+```ts
+import {EngineKernel} from 'margoengine/core';
+import {VFX} from 'margoengine/vfx/base';
+import {ribbons} from 'margoengine/vfx/ribbons';
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
+// Magic sparks that leave half-second trails, drawn without their heads.
+const trails = VFX.attach(engine, {
+  capacity: 2_000, rate: 400, position: [0, 1, 0], velocity: [0, 2, 0], spread: 2, size: 0.05,
+  lifetime: [1, 2], gravity: [0, -1, 0], turbulence: 2, color: [0.4, 0.7, 1, 1], intensity: 3,
+  ribbons: {points: 31, interval: 1 / 60, width: 0.04, heads: false},
+}, {ribbons});
+engine.start();
+```
+
+Ribbons draw after the billboards in a pass of their own, alpha blended and depth tested (not written), one triangle
+strip of `2 x points` vertices for every slot in slot order, so the same frames give the same pixels. The ring takes
+`capacity x (points - 1) x 16` bytes, at most 64 MB (`capacity x (points - 1)` up to 4,194,304); every slot runs the
+ribbon's vertices each frame, live or not, so ribbons suit thousands of particles, not a million. Ribbons are not fogged,
+softened or drawn in an order-independent pass, and `interval`, `width` and `heads` may change every frame while
+`points` is fixed at attach. `node packages/vfx/test/features-check.mjs` (real GPU) flies a particle at a known speed and
+checks its ribbon's alpha along the centre row against the fades computed in the test, at 1x and 4x MSAA, every frame
+and every second frame, and that a particle born again never joins its old ribbon.
