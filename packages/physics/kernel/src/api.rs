@@ -269,3 +269,27 @@ pub extern "C" fn hull_next(class: u32) -> u32 {
 pub extern "C" fn collider_remove(collider: u32) -> u32 {
     world().remove_collider(collider) as u32
 }
+/// Makes room for a triangle mesh of this size, whose rows JS then writes through its views; 0 when memory cannot.
+#[unsafe(no_mangle)]
+pub extern "C" fn mesh_begin(vertices: u32, triangles: u32) -> u32 {
+    world().begin_mesh(vertices, triangles) as u32
+}
+/// Finishes the mesh written after `mesh_begin`: its row, or a negative MESH_ code. `flags` holds MESH_ bits.
+#[unsafe(no_mangle)]
+pub extern "C" fn mesh_end(vertices: u32, triangles: u32, flags: u32) -> i32 {
+    world().end_mesh(vertices, triangles, flags)
+}
+/// Where the next mesh's rows start: 0 vertices, 1 triangles, 2 tree nodes.
+#[unsafe(no_mangle)]
+pub extern "C" fn mesh_next(class: u32) -> u32 {
+    world().header().mesh_rows[class as usize + 1]
+}
+/// Hulls and meshes handed out so far: a collider may name rows below these.
+#[unsafe(no_mangle)]
+pub extern "C" fn hull_count() -> u32 {
+    world().header().hull_rows[0]
+}
+#[unsafe(no_mangle)]
+pub extern "C" fn mesh_count() -> u32 {
+    world().header().mesh_rows[0]
+}

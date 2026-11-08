@@ -73,6 +73,8 @@ impl Feature {
 const FACE_BIAS: f32 = 1e-3;
 /// Edges closer to parallel than this sine squared give no axis: their faces' normals cover the case.
 const PARALLEL: f32 = 1e-6;
+/// Two face normals of one edge this close to opposite are a flat shape's two sides.
+const ANTIPODAL: f32 = -0.999_999;
 
 /// The face of `a` that lies farthest from `b`, and how far. `rel` is `b` in `a`'s frame.
 fn query_faces(a: &Poly, b: &Poly, rel: Pose) -> (usize, f32) {
@@ -105,6 +107,23 @@ fn arcs_cross(a: V3, b: V3, c: V3, d: V3, bxa: V3, dxc: V3) -> bool {
     cba * dba < 0.0 && adc * bdc < 0.0 && cba * bdc > 0.0
 }
 
+/// The arc an edge's two face normals draw on the unit sphere, as one or two pieces. A flat shape's two sides face n and -n,
+/// so the arc of each of its edges is half a great circle, whose ends span no plane: it is cut in two at `out`, the edge's
+/// outward perpendicular in the face, so each piece is a quarter circle with a plane of its own.
+#[inline(always)]
+fn edge_arc(n1: V3, n2: V3, out: V3) -> ([V3; 3], usize) {
+    if n1.dot(n2) < ANTIPODAL { ([n1, out, n2], 2) } else { ([n1, n2, n2], 1) }
+}
+
+/// The outward perpendicular in face `f` of the edge from `p` to `q`: faces run counter-clockwise from outside, so the edge
+/// cross the face normal points out of the face.
+#[inline(always)]
+fn outward(p: V3, q: V3, normal: V3) -> V3 {
+    let side = q.sub(p).cross(normal);
+    let squared = side.dot(side);
+    if squared > 0.0 { side.scale(1.0 / sqrt(squared)) } else { side }
+}
+
 /// The edge pair with the largest separation, in `a`'s frame. None when no pair makes a Minkowski face.
 fn query_edges(a: &Poly, b: &Poly, rel: Pose) -> Option<(usize, usize, V3, f32)> {
     let mut best = None;
@@ -119,18 +138,28 @@ fn query_edges(a: &Poly, b: &Poly, rel: Pose) -> Option<(usize, usize, V3, f32)>
         // Normals of B's faces, negated: the Minkowski difference holds B turned inside out.
         let c = rel.q.rotate(b.normal(b.face(eb))).scale(-1.0);
         let d = rel.q.rotate(b.normal(b.face(tb))).scale(-1.0);
-        let dxc = d.cross(c);
+        let (arc_b, pieces_b) = edge_arc(c, d, outward(pb, qb, c.scale(-1.0)).scale(-1.0));
         for ea in 0..a.edges {
             let ta = a.twin(ea);
             if ta < ea {
                 continue;
             }
             let (na, nb) = (a.normal(a.face(ea)), a.normal(a.face(ta)));
-            let bxa = nb.cross(na);
-            if !arcs_cross(na, nb, c, d, bxa, dxc) {
-                continue;
-            }
             let (pa, qa) = (a.vertex(a.origin(ea)), a.vertex(a.origin(a.next(ea))));
+            // A closed hull's arcs are one piece each, and take the test as it always was.
+            let (arc_a, pieces_a) = edge_arc(na, nb, outward(pa, qa, na));
+            let mut crossed = None;
+            for i in 0..pieces_a {
+                let (x, y) = (arc_a[i], arc_a[i + 1]);
+                let yx = y.cross(x);
+                for j in 0..pieces_b {
+                    let (z, w) = (arc_b[j], arc_b[j + 1]);
+                    if crossed.is_none() && arcs_cross(x, y, z, w, yx, w.cross(z)) {
+                        crossed = Some(x.add(y));
+                    }
+                }
+            }
+            let Some(middle) = crossed else { continue };
             let direction_a = qa.sub(pa);
             let axis = direction_a.cross(direction_b);
             let squared = axis.dot(axis);
@@ -138,7 +167,10 @@ fn query_edges(a: &Poly, b: &Poly, rel: Pose) -> Option<(usize, usize, V3, f32)>
                 continue;
             }
             let mut n = axis.scale(1.0 / sqrt(squared));
-            if n.dot(pa.sub(a.center)) < 0.0 {
+            // The axis points away from A. A flat A has no inside to point away from: there the Minkowski face's normal
+            // is where the arcs cross, on the piece of A's arc that crossed, so the axis points that way.
+            let away = if pieces_a == 2 { n.dot(middle) } else { n.dot(pa.sub(a.center)) };
+            if away < 0.0 {
                 n = n.scale(-1.0);
             }
             let distance = n.dot(pb.sub(pa));

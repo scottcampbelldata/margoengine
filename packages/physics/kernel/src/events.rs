@@ -60,10 +60,19 @@ impl World {
         for i in 0..self.header().active_pairs as usize {
             let row = self.uu(ACTIVE_PAIRS, i) as usize;
             let flags = self.uu(PAIR_FLAGS, row);
+            if flags & PAIR_IS_PART != 0 {
+                continue;
+            }
             let mut now = flags & PAIR_OVERLAP != 0;
-            for k in 0..self.uu(PAIR_CONTACTS, row) as usize {
-                let at = row * MANIFOLD + k;
-                now = now || self.s(CONTACT_SEPARATION, at) <= 0.0 || self.s(CONTACT_NORMAL_IMPULSE, at) > 0.0;
+            // A mesh pair speaks for its parts.
+            let mut part = row as u32;
+            while part != NONE {
+                let p = part as usize;
+                for k in 0..self.uu(PAIR_CONTACTS, p) as usize {
+                    let at = p * MANIFOLD + k;
+                    now = now || self.s(CONTACT_SEPARATION, at) <= 0.0 || self.s(CONTACT_NORMAL_IMPULSE, at) > 0.0;
+                }
+                part = self.uu(PAIR_CHILD, p);
             }
             if now != (flags & PAIR_TOUCHING != 0) {
                 self.set_u(PAIR_FLAGS, row, flags ^ PAIR_TOUCHING);

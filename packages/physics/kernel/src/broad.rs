@@ -76,6 +76,15 @@ impl World {
                 center = center.add(turn.rotate(self.v(HULL_BOX_X, hull)));
                 (x.add(y).add(z), self.s(HULL_RADIUS, hull))
             }
+            SHAPE_TRIMESH => {
+                let mesh = self.uu(COLLIDER_HULL, c) as usize;
+                let half = self.v(MESH_HALF_X, mesh);
+                let x = turn.rotate(v3(half.x, 0.0, 0.0)).abs();
+                let y = turn.rotate(v3(0.0, half.y, 0.0)).abs();
+                let z = turn.rotate(v3(0.0, 0.0, half.z)).abs();
+                center = center.add(turn.rotate(self.v(MESH_BOX_X, mesh)));
+                (x.add(y).add(z), self.s(MESH_RADIUS, mesh))
+            }
             _ => {
                 let core = turn.rotate(v3(0.0, b, 0.0)).abs();
                 (core.add(v3(a, a, a)), a + b)
@@ -449,14 +458,14 @@ impl World {
         let capacity = self.header().capacity;
         let rows = capacity[3] * 2;
         let hulls = [capacity[7], capacity[8], capacity[9], capacity[10]];
-        if rows > MAX_PAIRS || !self.grow(capacities(capacity[0], capacity[1], rows, hulls, capacity[11])) {
+        if rows > MAX_PAIRS || !self.grow(capacities(capacity[0], capacity[1], rows, hulls, capacity[11], mesh_capacity(&capacity))) {
             return false;
         }
         for slot in 0..self.header().capacity[4] as usize {
             self.set_u(PAIR_TABLE, slot, 0);
         }
         for row in 0..self.header().pair_rows {
-            if self.uu(PAIR_A, row as usize) != NONE {
+            if self.uu(PAIR_A, row as usize) != NONE && self.uu(PAIR_FLAGS, row as usize) & PAIR_IS_PART == 0 {
                 self.table_insert(row);
             }
         }
@@ -473,20 +482,10 @@ impl World {
         {
             return;
         }
-        let free = self.header().free_pair;
-        let row = if free != NONE {
-            self.header_mut().free_pair = self.uu(PAIR_NEXT_A, free as usize);
-            free
-        } else {
-            if self.header().pair_rows == self.header().capacity[3] && !self.grow_pairs() {
-                self.header_mut().failed = 1;
-                return;
-            }
-            let row = self.header().pair_rows;
-            self.header_mut().pair_rows = row + 1;
-            row
-        };
+        let Some(row) = self.take_pair_row() else { return };
         let at = row as usize;
+        self.set_u(PAIR_PART, at, NONE);
+        self.set_u(PAIR_CHILD, at, NONE);
         let (first_a, first_b) = (self.uu(COLLIDER_PAIRS, a as usize), self.uu(COLLIDER_PAIRS, b as usize));
         self.set_u(PAIR_A, at, a);
         self.set_u(PAIR_B, at, b);
@@ -508,6 +507,23 @@ impl World {
         if self.uu(AWAKE_SLOT, body_a) != NONE || self.uu(AWAKE_SLOT, body_b) != NONE {
             self.activate_pair(row);
         }
+    }
+
+    /// A pair row: the last one freed, else the next new one, growing the rows when they are used up. None when memory
+    /// cannot, which the world records.
+    pub fn take_pair_row(&mut self) -> Option<u32> {
+        let free = self.header().free_pair;
+        if free != NONE {
+            self.header_mut().free_pair = self.uu(PAIR_NEXT_A, free as usize);
+            return Some(free);
+        }
+        if self.header().pair_rows == self.header().capacity[3] && !self.grow_pairs() {
+            self.header_mut().failed = 1;
+            return None;
+        }
+        let row = self.header().pair_rows;
+        self.header_mut().pair_rows = row + 1;
+        Some(row)
     }
 
     /// Sets `row`'s link back along `collider`'s list to `previous`.
@@ -542,6 +558,7 @@ impl World {
     /// Removes a pair. The table closes the gap by moving back any entry the gap would cut off from its hash.
     pub fn remove_pair(&mut self, row: u32) {
         self.pair_leaves(row as usize);
+        self.free_parts(row as usize);
         self.deactivate_pair(row);
         let at = row as usize;
         let (a, b) = (self.uu(PAIR_A, at), self.uu(PAIR_B, at));

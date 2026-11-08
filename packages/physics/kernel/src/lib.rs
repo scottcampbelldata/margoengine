@@ -6,6 +6,7 @@
 
 pub mod api;
 pub mod broad;
+pub mod bvh;
 pub mod contact;
 pub mod events;
 pub mod gjk;
@@ -17,6 +18,7 @@ pub mod layout;
 pub mod mass;
 pub mod math;
 pub mod memory;
+pub mod mesh;
 pub mod narrow;
 pub mod sat;
 pub mod solver;

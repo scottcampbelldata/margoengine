@@ -80,6 +80,10 @@ pub struct Header {
     pub filtering: u32,
     /// The most extra passes an island of this step asks for: each substep runs `iterations` plus this many passes.
     pub extra_passes: u32,
+    /// Rows of meshes, vertices, triangles and tree nodes handed out so far.
+    pub mesh_rows: [u32; 4],
+    /// Parts that lost their points in this narrow phase, which then frees them.
+    pub stale_parts: u32,
 }
 
 const HEADER_BYTES: u32 = ((core::mem::size_of::<Header>() + 15) & !15) as u32;
@@ -98,7 +102,7 @@ impl World {
             return None;
         }
         let mut arena = Arena::new();
-        let capacity = capacities(bodies, colliders, colliders.max(16), [0; 4], 0);
+        let capacity = capacities(bodies, colliders, colliders.max(16), [0; 4], 0, [0; 4]);
         let (offsets, bytes) = offsets(HEADER_BYTES, &capacity)?;
         if !arena.ensure(bytes as usize) {
             return None;
@@ -154,6 +158,8 @@ impl World {
                 events: 0,
                 filtering: 0,
                 extra_passes: 0,
+                mesh_rows: [0; 4],
+                stale_parts: 0,
             });
         }
         Some(world)
@@ -194,7 +200,7 @@ impl World {
         if bodies > MAX_BODIES || colliders > MAX_COLLIDERS {
             return false;
         }
-        self.grow(capacities(bodies.max(old[0]), colliders.max(old[1]), old[3], [old[7], old[8], old[9], old[10]], old[11]))
+        self.grow(capacities(bodies.max(old[0]), colliders.max(old[1]), old[3], hull_capacity(&old), old[11], mesh_capacity(&old)))
     }
 
     /// Moves every column up to its place in the larger layout, last column first, so nothing is overwritten before it
@@ -372,7 +378,7 @@ impl World {
                 *self.f(COLLIDER_A + k).add(at) = size[k];
                 *self.f(COLLIDER_X + k).add(at) = position[k];
             }
-            if shape == SHAPE_HULL {
+            if shape == SHAPE_HULL || shape == SHAPE_TRIMESH {
                 *self.u(COLLIDER_HULL).add(at) = size[0] as u32;
                 *self.f(COLLIDER_A).add(at) = 0.0;
             }
@@ -467,6 +473,7 @@ mod tests {
     fn reserve_keeps_every_row_at_its_index() {
         let mut world = World::new(5, 5).unwrap();
         assert!(world.reserve_hull(5, 5, 5, 5));
+        assert!(world.reserve_mesh(5, 5, 5, 5));
         assert!(world.grow_joints());
         for row in 0..5 {
             for column in 0..COLUMNS {
@@ -475,6 +482,7 @@ mod tests {
         }
         assert!(world.reserve(1000, 1000));
         assert!(world.reserve_hull(1000, 1000, 1000, 1000));
+        assert!(world.reserve_mesh(1000, 1000, 1000, 1000));
         assert!(world.grow_joints());
         assert_eq!(world.header().capacity[0], 1000);
         for row in 0..5 {

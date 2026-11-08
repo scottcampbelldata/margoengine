@@ -306,7 +306,7 @@ console.log(body.position[1]);         // fallen about 4.9 m in the second
 physics.dispose();
 ```
 
-It holds `box`, `sphere`, `capsule` and `convexHull` colliders, bodies of every kind, forces, impulses, velocities, damping, locks, kinematic targets, gravity, sleeping and the `beforestep` and `afterstep` events. Bodies collide, with friction, restitution and the four combine rules, and `physics.touching(a, b)` and `physics.contactPoints(body)` read the contacts of the last step. Contact and intersection events, sensors, `collisionGroups`, `solverGroups`, `contactFilter`, `dominance` and `enabled` on bodies and colliders work as on the root entry, with the same names. `body.setType`, `setAdditionalMass` (with inertia of its own), `setMassProperties`, `collider.setDensity` and `additionalSolverIterations` work as on the root entry, with the same names and errors. A call that needs what is still to come throws a `MargoError` with code `unsupported` naming what it waits for: the other shapes and `addModel` with the shapes and queries batch, `ccd` with continuous collision, queries, `follow` and character controllers, and `debugRender`. `body.sleep()` and impulses take effect at the next step.
+It holds `box`, `sphere`, `capsule`, `convexHull` and `trimesh` colliders, bodies of every kind, forces, impulses, velocities, damping, locks, kinematic targets, gravity, sleeping and the `beforestep` and `afterstep` events. Bodies collide, with friction, restitution and the four combine rules, and `physics.touching(a, b)` and `physics.contactPoints(body)` read the contacts of the last step. Contact and intersection events, sensors, `collisionGroups`, `solverGroups`, `contactFilter`, `dominance` and `enabled` on bodies and colliders work as on the root entry, with the same names. `body.setType`, `setAdditionalMass` (with inertia of its own), `setMassProperties`, `collider.setDensity` and `additionalSolverIterations` work as on the root entry, with the same names and errors. A call that needs what is still to come throws a `MargoError` with code `unsupported` naming what it waits for: the other shapes and `addModel` with the shapes and queries batch, `ccd` with continuous collision, queries, `follow` and character controllers, and `debugRender`. `body.sleep()` and impulses take effect at the next step.
 
 `setType` keeps the pose, colliders and joints: a body made fixed stops, and its touches with other fixed bodies end; one made `kinematicPosition` holds its pose until given a target; a dynamic or kinematic body keeps its velocity. With `wakeUp` (default true) a body made dynamic or kinematic wakes now; a sleeper otherwise, or one made fixed, reads asleep until the next step, which wakes it and what it touches whatever `wakeUp` said, as on the root entry (measured). A kinematic body still for the sleep window reads asleep, as on Rapier, and a target wakes it. `setAdditionalMass(mass, inertia)` puts the mass at the centre of mass the body has now, so alone it leaves the inertia as it is, and replaces an earlier call, `setMassProperties` and the `additionalMass` option, which spreads its mass as the colliders are. `setMassProperties` sets the colliders' density to 0, and colliders added later add their own mass. `additionalSolverIterations` (any whole number from 0 to 4294967295, Rapier's 32 bits, on both entries) gives the body's island that many passes more: it runs as a world of that many passes would, bit for bit, and the other islands are left alone.
 
@@ -324,6 +324,22 @@ crate.setType('dynamic');
 for (let i = 0; i < 60; i++) physics.step();
 console.log(crate.mass.toFixed(2), crate.position[1].toFixed(2)); // 12.00 0.50: on the floor it was touching
 physics.dispose();
+```
+
+A `trimesh` takes `vertices` (flat x, y, z numbers) and `indices` (three a triangle, counter-clockwise seen from its front), or `geometry`, or the body's mesh, as on the root entry. It is a surface: both sides collide, and it adds no mass, so it belongs on fixed and kinematic bodies or with `setMassProperties`. Each triangle a shape touches holds its own contact normal, so a box in a corner keeps the floor and the wall. `fixInternalEdges: true` keeps contacts on the seams between triangles to the normals the surface allows, so a ball or a box slides across a flat run of triangles without catching on their inner edges; it is off by default, as in Rapier. `KernelWorld.addTrimesh(vertices, indices, {fixInternalEdges})` and `trianglesAcross(vertices, indices)` are the kernel's view of the same.
+
+```js
+import {Physics} from 'margoengine/physics/next';
+
+await Physics.load();
+const physics = new Physics(null);
+// A 4 m square of ground from two triangles, and a ball dropped onto it.
+const vertices = [-2, 0, -2, -2, 0, 2, 2, 0, -2, 2, 0, 2];
+const indices = [0, 1, 2, 2, 1, 3];
+physics.addBody(null, {type: 'fixed', colliders: {shape: 'trimesh', vertices, indices, fixInternalEdges: true}});
+const ball = physics.addBody(null, {position: [0.3, 2, 0.2], colliders: {shape: 'sphere', radius: 0.5}});
+for (let i = 0; i < 120; i++) physics.step();
+console.log(ball.position[1].toFixed(2)); // 0.50: resting on the mesh
 ```
 
 A `convexHull` takes `points` (flat x, y, z numbers), or `geometry`, or the body's mesh when it has neither, scaled with the mesh, as on the root entry. The solver builds it by Quickhull: points inside, repeats and points within 2.5e-5 of the hull's size of a face are dropped, triangles in one plane become one face of up to 256 corners, and colliders built from the same points share one hull. `convexHull(points)` returns the `vertices` and `faces` it builds, for drawing or checking; it throws a `RangeError` naming the fix for fewer than four points or points that span no volume.

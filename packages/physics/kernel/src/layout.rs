@@ -26,8 +26,13 @@ pub enum Rows {
     JointList,
     /// JOINT_WORDS rows a joint: what a substep keeps of it.
     JointScratch,
+    /// Triangle meshes, and the rows of their vertices, triangles and tree nodes, held for the world's life.
+    Mesh,
+    MeshVertex,
+    MeshTriangle,
+    MeshNode,
 }
-pub const ROW_CLASSES: usize = 14;
+pub const ROW_CLASSES: usize = 18;
 
 macro_rules! columns {
     ($($name:ident $kind:ident $rows:ident,)*) => {
@@ -424,6 +429,49 @@ columns! {
     SOLVE_SHARE f32 JointList,
     // Rows, measures and factors of the solving joints.
     JOINT_SCRATCH f32 JointScratch,
+    // A pair of a triangle mesh holds no points itself: each triangle that touches has a part, a pair row of its own off
+    // the broad phase's lists, chained from the pair. A part names its triangle; the chain ends in NONE.
+    PAIR_PART u32 Pair,
+    PAIR_CHILD u32 Pair,
+    // A triangle mesh: where its rows start and how many it has, MESH_ bits, the box around it and the radius about the
+    // box's centre that holds it.
+    MESH_FIRST_VERTEX u32 Mesh,
+    MESH_VERTICES u32 Mesh,
+    MESH_FIRST_TRIANGLE u32 Mesh,
+    MESH_TRIANGLES u32 Mesh,
+    MESH_FIRST_NODE u32 Mesh,
+    MESH_NODES u32 Mesh,
+    MESH_FLAGS u32 Mesh,
+    MESH_BOX_X f32 Mesh,
+    MESH_BOX_Y f32 Mesh,
+    MESH_BOX_Z f32 Mesh,
+    MESH_HALF_X f32 Mesh,
+    MESH_HALF_Y f32 Mesh,
+    MESH_HALF_Z f32 Mesh,
+    MESH_RADIUS f32 Mesh,
+    MESH_VERTEX_X f32 MeshVertex,
+    MESH_VERTEX_Y f32 MeshVertex,
+    MESH_VERTEX_Z f32 MeshVertex,
+    // A triangle's corners, counter-clockwise seen from its front, as indices from the mesh's first vertex; the triangle
+    // across each edge (A to B, B to C, C to A) from the mesh's first triangle, NONE for an open edge; two bits an edge of
+    // EDGE_ classes; and the tree's order of triangles.
+    TRIANGLE_A u32 MeshTriangle,
+    TRIANGLE_B u32 MeshTriangle,
+    TRIANGLE_C u32 MeshTriangle,
+    TRIANGLE_ACROSS_0 u32 MeshTriangle,
+    TRIANGLE_ACROSS_1 u32 MeshTriangle,
+    TRIANGLE_ACROSS_2 u32 MeshTriangle,
+    TRIANGLE_EDGES u32 MeshTriangle,
+    TRIANGLE_ORDER u32 MeshTriangle,
+    // The tree's nodes: a box, then the first child and 0, or a leaf's first place in TRIANGLE_ORDER and its count.
+    NODE_MIN_X f32 MeshNode,
+    NODE_MIN_Y f32 MeshNode,
+    NODE_MIN_Z f32 MeshNode,
+    NODE_MAX_X f32 MeshNode,
+    NODE_MAX_Y f32 MeshNode,
+    NODE_MAX_Z f32 MeshNode,
+    NODE_FIRST u32 MeshNode,
+    NODE_COUNT u32 MeshNode,
 }
 
 /// Rows every column of a class is padded to, so each column stays on a 16-byte boundary.
@@ -451,10 +499,43 @@ pub fn offsets(start: u32, capacity: &[u32; ROW_CLASSES]) -> Option<([u32; COLUM
 /// Points a manifold holds.
 pub const MANIFOLD: usize = 4;
 
-/// The rows of every class for `bodies`, `colliders` and `pairs`, keeping the hull rows a world already has room for.
-pub fn capacities(bodies: u32, colliders: u32, pairs: u32, hulls: [u32; 4], joints: u32) -> [u32; ROW_CLASSES] {
+/// The rows of every class for `bodies`, `colliders` and `pairs`, keeping the hull and mesh rows a world already has room
+/// for.
+pub fn capacities(bodies: u32, colliders: u32, pairs: u32, hulls: [u32; 4], joints: u32, meshes: [u32; 4]) -> [u32; ROW_CLASSES] {
     let [hull, vertices, edges, faces] = hulls;
-    [bodies, colliders, colliders * 2, pairs, (pairs * 2).next_power_of_two(), bodies, pairs * MANIFOLD as u32, hull, vertices, edges, faces, joints, joints, joints * JOINT_WORDS]
+    let [mesh, mesh_vertices, triangles, nodes] = meshes;
+    [
+        bodies,
+        colliders,
+        colliders * 2,
+        pairs,
+        (pairs * 2).next_power_of_two(),
+        bodies,
+        pairs * MANIFOLD as u32,
+        hull,
+        vertices,
+        edges,
+        faces,
+        joints,
+        joints,
+        joints * JOINT_WORDS,
+        mesh,
+        mesh_vertices,
+        triangles,
+        nodes,
+    ]
+}
+
+/// The hull rows of a capacity.
+#[inline]
+pub fn hull_capacity(c: &[u32; ROW_CLASSES]) -> [u32; 4] {
+    [c[7], c[8], c[9], c[10]]
+}
+
+/// The mesh rows of a capacity.
+#[inline]
+pub fn mesh_capacity(c: &[u32; ROW_CLASSES]) -> [u32; 4] {
+    [c[14], c[15], c[16], c[17]]
 }
 
 /// Most bodies and colliders one world holds.
@@ -477,6 +558,16 @@ pub const SHAPE_BALL: u32 = 0;
 pub const SHAPE_BOX: u32 = 1;
 pub const SHAPE_CAPSULE: u32 = 2;
 pub const SHAPE_HULL: u32 = 3;
+/// A triangle mesh: its row in COLLIDER_HULL, no size, no volume. It touches every other shape but a mesh.
+pub const SHAPE_TRIMESH: u32 = 4;
+
+/// MESH_FLAGS: contacts on a triangle's inner edges keep to the normals the surface allows (fixInternalEdges).
+pub const MESH_FIX_EDGES: u32 = 1;
+/// TRIANGLE_EDGES, two bits an edge: open (no triangle across), convex, concave, or flat.
+pub const EDGE_OPEN: u32 = 0;
+pub const EDGE_CONVEX: u32 = 1;
+pub const EDGE_CONCAVE: u32 = 2;
+pub const EDGE_FLAT: u32 = 3;
 
 // How two colliders mix a surface property: a pair takes the larger number of its two.
 pub const COMBINE_AVERAGE: u32 = 0;
@@ -521,6 +612,8 @@ pub const PAIR_OVERLAP: u32 = 2;
 /// In this step's solve the first body, or the second, is a wall to the other.
 pub const PAIR_A_RULES: u32 = 4;
 pub const PAIR_B_RULES: u32 = 8;
+/// A part of a mesh pair: off the broad phase's lists, solved like any pair, silent in events.
+pub const PAIR_IS_PART: u32 = 16;
 
 // Top bits of an event's first word, over the collider's row.
 pub const EVENT_STARTED: u32 = 1 << 31;

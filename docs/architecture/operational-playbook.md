@@ -1256,3 +1256,10 @@ The following remain technical gaps, not permission to weaken a check:
     in `.ci/logs/`. Not covered locally: the Node 22.12, 22.x and Node 24.18 runs of `node-compat` and `node22-tests` (one
     Node, 26.12, is installed), the Linux and macOS biomes digests, and the on-demand Browser checks workflow's
     SwiftShader runs.
+35. The own physics kernel's triangle meshes (batch 126 job 2, `kernel/src/mesh.rs`, `bvh.rs`): the tree is checked
+    against brute force (`kernel/tests/bvh.rs`, and a box on a bumpy mesh gets the same parts and points as one mesh a
+    triangle), the edge rule against closed cases and slides (`kernel/tests/mesh.rs`), the separating axis test of a flat
+    triangle against every axis on 20,000 random poses (`kernel/tests/sat.rs`), and the physics-refs trimesh scenes pass
+    in Node (flat slides, 1,000 boxes on St Helens, 11 broken meshes). Missing: rays and shape casts against a mesh (job
+    6), a mesh against a mesh, any browser run of a mesh scene beyond the replay's hash, and speed parity: the build is
+    65 ms against Rapier's 43 ms and a step of the box pile 1.52 ms median against 1.14 (`docs/limits.md`), for batch 129.

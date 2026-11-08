@@ -20,7 +20,7 @@ const ID_FLIP: u32 = 1 << 31;
 const ID_CLIPPED: u32 = 1 << 30;
 const ID_EDGES: u32 = 1 << 29;
 // Round shapes: one point, or the two ends of what a capsule shares with a face or another capsule.
-const ID_END: u32 = 1 << 28;
+pub(crate) const ID_END: u32 = 1 << 28;
 /// A capsule lies along a face or another capsule when the cosine between the normals is past this, about 2.6 degrees.
 const PARALLEL: f32 = 0.999;
 /// Centres closer than this have no direction between them.
@@ -185,7 +185,7 @@ pub fn reduce(points: &[Point], count: usize, normal: V3, held: &[u32], out: &mu
 /// A face contact (Gregorius 2015): the face of `reference` is the reference face, the most anti-parallel face of
 /// `incident` is clipped against its side planes, points below `limit` stay and move onto the reference face. Results are
 /// in `reference`'s frame, with the normal from `reference` to `incident` and `on_a` on the reference.
-fn face_contact(reference: &Poly, incident: &Poly, rel: Pose, face: usize, limit: f32, out: &mut Manifold) {
+pub(crate) fn face_contact(reference: &Poly, incident: &Poly, rel: Pose, face: usize, limit: f32, out: &mut Manifold) {
     let n = reference.normal(face);
     let offset = reference.plane(face);
     let local = rel.q.unrotate(n);
@@ -287,10 +287,10 @@ pub fn collide_polys(a: &Poly, pose_a: Pose, b: &Poly, pose_b: Pose, limit: f32,
 
 /// A round shape: a ball is a point with a radius, a capsule a segment with one (Gregorius 2015), in world space.
 #[derive(Clone, Copy)]
-struct Round {
-    p: V3,
-    q: V3,
-    radius: f32,
+pub(crate) struct Round {
+    pub p: V3,
+    pub q: V3,
+    pub radius: f32,
 }
 
 /// Any unit vector square to `v`.
@@ -375,7 +375,7 @@ fn collide_rounds(a: Round, b: Round, limit: f32, out: &mut Manifold) {
 /// A round shape and a polyhedron. The core goes to GJK: shallow, its distance to the polyhedron gives the point; deep,
 /// with the core inside, the expanding polytope gives the way out (Gregorius 2015 uses a SAT there; this kernel takes the
 /// plan's route, which also serves shapes with no faces). Normal from the round shape to the polyhedron, in world space.
-fn collide_round_poly(round: Round, poly: &Poly, pose: Pose, limit: f32, out: &mut Manifold) {
+pub(crate) fn collide_round_poly(round: Round, poly: &Poly, pose: Pose, limit: f32, out: &mut Manifold) {
     out.count = 0;
     let core = Segment { p: pose.unapply(round.p), q: pose.unapply(round.q) };
     let posed = Posed { shape: poly, pose: Pose { p: v3(0.0, 0.0, 0.0), q: Q::IDENTITY } };
@@ -477,6 +477,11 @@ impl World {
 
     /// A box or hull collider as a polyhedron; a box keeps its numbers in `data`.
     #[inline(always)]
+    pub(crate) fn poly_of(&self, c: usize, data: &mut BoxData) -> Poly {
+        self.poly(c, data)
+    }
+
+    #[inline(always)]
     fn poly(&self, c: usize, data: &mut BoxData) -> Poly {
         match self.uu(COLLIDER_SHAPE, c) {
             SHAPE_HULL => self.hull_poly(self.uu(COLLIDER_HULL, c) as usize),
@@ -513,12 +518,22 @@ impl World {
                 let center = self.v(HULL_CENTER_X, hull);
                 self.s(HULL_RADIUS, hull) + sqrt(center.dot(center))
             }
+            SHAPE_TRIMESH => {
+                let mesh = self.uu(COLLIDER_HULL, c) as usize;
+                let center = self.v(MESH_BOX_X, mesh);
+                self.s(MESH_RADIUS, mesh) + sqrt(center.dot(center))
+            }
             _ => x + y,
         };
         sqrt(offset.dot(offset)) + radius
     }
 
     /// A ball or capsule collider in world space.
+    #[inline(always)]
+    pub(crate) fn round_of(&self, c: usize) -> Round {
+        self.round(c)
+    }
+
     #[inline(always)]
     fn round(&self, c: usize) -> Round {
         let pose = self.collider_pose(c);
@@ -568,9 +583,14 @@ impl World {
         self.header_mut().substep_ratio = ratio;
         for i in 0..self.header().active_pairs as usize {
             let row = self.uu(ACTIVE_PAIRS, i) as usize;
+            let flags = self.uu(PAIR_FLAGS, row) & !PAIR_OVERLAP;
+            // A part is its mesh pair's to fill.
+            if flags & PAIR_IS_PART != 0 {
+                continue;
+            }
             let (a, b) = (self.uu(PAIR_A, row) as usize, self.uu(PAIR_B, row) as usize);
             let (body_a, body_b) = (self.uu(COLLIDER_BODY, a) as usize, self.uu(COLLIDER_BODY, b) as usize);
-            let flags = self.uu(PAIR_FLAGS, row) & !PAIR_OVERLAP;
+            let meshed = self.uu(COLLIDER_SHAPE, a) == SHAPE_TRIMESH || self.uu(COLLIDER_SHAPE, b) == SHAPE_TRIMESH;
             let sensor = (self.uu(COLLIDER_FLAGS, a) | self.uu(COLLIDER_FLAGS, b)) & COLLIDER_SENSOR != 0;
             // Scripted bodies pass through each other: nothing can push them. A sensor still sees them.
             let scripted = self.flags(body_a) & KIND != DYNAMIC && self.flags(body_b) & KIND != DYNAMIC;
@@ -583,14 +603,22 @@ impl World {
             if sensor || !groups_meet(self.uu(COLLIDER_SOLVER_GROUPS, a), self.uu(COLLIDER_SOLVER_GROUPS, b)) {
                 manifold.held_count = 0;
                 manifold.feature = 0;
-                self.collide(a, b, 0.0, &mut manifold);
-                let overlaps = manifold.points[..manifold.count].iter().any(|point| point.separation <= 0.0);
+                let overlaps = if meshed {
+                    self.mesh_overlaps(a, b)
+                } else {
+                    self.collide(a, b, 0.0, &mut manifold);
+                    manifold.points[..manifold.count].iter().any(|point| point.separation <= 0.0)
+                };
                 self.set_u(PAIR_FLAGS, row, if overlaps { flags | PAIR_OVERLAP } else { flags });
                 self.drop_contacts(row, body_a, body_b);
                 continue;
             }
             self.set_u(PAIR_FLAGS, row, flags);
             let limit = self.contact_limit(a, b, dt);
+            if meshed {
+                self.mesh_pair(row, a, b, limit, ratio);
+                continue;
+            }
             manifold.held_count = self.uu(PAIR_CONTACTS, row) as usize;
             for k in 0..manifold.held_count {
                 manifold.held[k] = self.uu(CONTACT_ID, row * MANIFOLD + k);
@@ -603,5 +631,6 @@ impl World {
             }
             self.store_manifold(row, body_a, body_b, &manifold, ratio);
         }
+        self.sweep_parts();
     }
 }

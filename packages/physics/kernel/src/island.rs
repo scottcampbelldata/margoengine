@@ -26,6 +26,19 @@ impl World {
             self.set_s(SLEEP_TIME, a, 0.0);
             self.set_s(SLEEP_TIME, b, 0.0);
         }
+        // A mesh pair's points are its parts': they go too, and the next narrow phase frees them.
+        if self.uu(PAIR_FLAGS, row) & PAIR_IS_PART == 0 {
+            let mut part = self.uu(PAIR_CHILD, row);
+            while part != NONE {
+                if self.uu(PAIR_CONTACTS, part as usize) != 0 {
+                    self.set_u(PAIR_CONTACTS, part as usize, 0);
+                    self.set_s(SLEEP_TIME, a, 0.0);
+                    self.set_s(SLEEP_TIME, b, 0.0);
+                    self.header_mut().stale_parts += 1;
+                }
+                part = self.uu(PAIR_CHILD, part as usize);
+            }
+        }
     }
 
     /// A pair leaves the broad phase, with a body that may already be gone.
@@ -66,8 +79,28 @@ impl World {
         self.header_mut().awake = last;
     }
 
-    /// Puts a pair on the list of pairs a step looks at.
+    /// Puts a pair on the list of pairs a step looks at, with its parts.
     pub fn activate_pair(&mut self, row: u32) {
+        self.list_pair(row);
+        let mut part = self.uu(PAIR_CHILD, row as usize);
+        while part != NONE {
+            self.list_pair(part);
+            part = self.uu(PAIR_CHILD, part as usize);
+        }
+    }
+
+    /// Takes a pair off that list, with its parts.
+    pub fn deactivate_pair(&mut self, row: u32) {
+        self.unlist_pair(row);
+        let mut part = self.uu(PAIR_CHILD, row as usize);
+        while part != NONE {
+            self.unlist_pair(part);
+            part = self.uu(PAIR_CHILD, part as usize);
+        }
+    }
+
+    /// Puts one row on the active list.
+    pub fn list_pair(&mut self, row: u32) {
         if self.uu(PAIR_SLOT, row as usize) == NONE {
             let slot = self.header().active_pairs;
             self.set_u(ACTIVE_PAIRS, slot as usize, row);
@@ -76,8 +109,8 @@ impl World {
         }
     }
 
-    /// Takes a pair off that list; the last one takes its slot.
-    pub fn deactivate_pair(&mut self, row: u32) {
+    /// Takes one row off the active list; the last one takes its slot.
+    pub fn unlist_pair(&mut self, row: u32) {
         let slot = self.uu(PAIR_SLOT, row as usize);
         if slot != NONE {
             let last = self.header().active_pairs - 1;

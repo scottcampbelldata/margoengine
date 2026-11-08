@@ -10,6 +10,7 @@ import {
   EVENT_SENSOR,
   KernelWorld,
   loadKernel,
+  PAIR_IS_PART,
   type KernelContactPoint,
   type KernelLoadOptions,
 } from '../kernel.js';
@@ -149,6 +150,7 @@ export class Physics implements EnginePlugin, BodyOwner {
       return row;
     },
     hullVolume: (row) => this.kernel.columns.hullVolume[row],
+    addTrimesh: (vertices, indices, fixInternalEdges) => this.kernel.addTrimesh(vertices, indices, { fixInternalEdges }),
   };
   private readonly attachments = new Set<PhysicsAttachment>();
   private readonly listeners = new Map<keyof PhysicsEventMap, Set<(event: never) => void>>();
@@ -349,12 +351,27 @@ export class Physics implements EnginePlugin, BodyOwner {
   private gatherForces(events: (CollisionEvent | ContactForceEvent)[], dt: number): void {
     if (!this.listeners.get('contactforce')?.size) return;
     const kernel = this.kernel,
-      { solvePairs, pairForce, pairA, pairB } = kernel.columns,
+      { solvePairs, pairForce, pairA, pairB, pairFlags } = kernel.columns,
       count = kernel.solvingPairs;
+    // A mesh pair is solved as one part a triangle: its event sums them, as one pair of colliders felt one push.
+    let meshed: Map<number, number> | null = null;
+    for (let i = 0; i < count; i++) {
+      const row = solvePairs[i];
+      if (!(pairFlags[row] & PAIR_IS_PART)) continue;
+      meshed ??= new Map();
+      const key = pairA[row] * 0x400000 + pairB[row];
+      meshed.set(key, (meshed.get(key) ?? 0) + pairForce[row]);
+    }
     for (let i = 0; i < count; i++) {
       const row = solvePairs[i],
-        impulse = pairForce[row],
-        colliderA = this.byRow.get(pairA[row]),
+        key = pairA[row] * 0x400000 + pairB[row];
+      let impulse = pairForce[row];
+      if (meshed && pairFlags[row] & PAIR_IS_PART) {
+        impulse = meshed.get(key) ?? 0;
+        // The first part of the pair speaks; the rest are in its sum.
+        meshed.delete(key);
+      }
+      const colliderA = this.byRow.get(pairA[row]),
         colliderB = this.byRow.get(pairB[row]);
       if (!(impulse > 0) || !colliderA || !colliderB) continue;
       const bodyA = colliderA.body,

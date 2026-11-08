@@ -211,6 +211,8 @@ impl World {
                 let hull = self.uu(COLLIDER_HULL, c) as usize;
                 Solid { mass: self.s(HULL_VOLUME, hull) * density, moments: self.v(HULL_MOMENT_X, hull).scale(density) }
             }
+            // A surface has no volume, so no mass, as a Rapier trimesh gives a dynamic body none.
+            SHAPE_TRIMESH => Solid { mass: 0.0, moments: v3(0.0, 0.0, 0.0) },
             _ => solid_capsule(size.x, size.y, density),
         }
     }

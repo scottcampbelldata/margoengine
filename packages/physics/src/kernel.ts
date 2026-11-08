@@ -106,6 +106,11 @@ interface KernelExports extends WebAssembly.Exports {
   hull_begin(vertices: number, faces: number, edges: number): number;
   hull_end(vertices: number, faces: number, edges: number): number;
   hull_next(rows: number): number;
+  mesh_begin(vertices: number, triangles: number): number;
+  mesh_end(vertices: number, triangles: number, flags: number): number;
+  mesh_next(rows: number): number;
+  hull_count(): number;
+  mesh_count(): number;
 }
 
 /** Bits of the `jointFlags` column, each shifted by the axis it is for: 0 to 2 along frame A, 3 to 5 about it. */
@@ -125,15 +130,17 @@ export const BODY_DISABLED = 1 << 11;
 /** An event's first word: the first collider's row under this mask, the sensor bit, and the top bit when it started. */
 export const EVENT_COLLIDER = (1 << 30) - 1;
 export const EVENT_SENSOR = 1 << 30;
+/** Bit of the `pairFlags` column: a part of a mesh pair, one triangle's manifold. */
+export const PAIR_IS_PART = 16;
 
 /** How a body moves: `dynamic` by forces, `kinematicPosition` to a target, `kinematicVelocity` at its velocity. */
 export type KernelBodyKind = 'fixed' | 'dynamic' | 'kinematicPosition' | 'kinematicVelocity';
 
 /**
  * Shapes the kernel holds today. Sizes: a ball's radius; a box's half extents; a capsule's radius and half core length; a
- * hull's row from {@link KernelWorld.addHull}.
+ * hull's row from {@link KernelWorld.addHull}; a mesh's row from {@link KernelWorld.addTrimesh}.
  */
-export type KernelShape = 'ball' | 'box' | 'capsule' | 'hull';
+export type KernelShape = 'ball' | 'box' | 'capsule' | 'hull' | 'trimesh';
 
 /** How many numbers each shape's size takes, and its value in the `colliderShape` column. */
 const shapes: Readonly<Record<KernelShape, readonly [number, number]>> = {
@@ -141,7 +148,84 @@ const shapes: Readonly<Record<KernelShape, readonly [number, number]>> = {
   box: [1, 3],
   capsule: [2, 2],
   hull: [3, 1],
+  trimesh: [4, 1],
 };
+
+/** What each refusal of `mesh_end` means, with the fix. */
+const meshErrors: Readonly<Record<number, string>> = {
+  [-1]: 'A triangle mesh needs at least 3 vertices and one triangle',
+  [-2]: 'A triangle names a vertex that does not exist; check the indices',
+  [-3]: 'A vertex is not finite; check what fed it',
+  [-4]: 'The triangle found across an edge does not exist',
+};
+
+/** Options of {@link KernelWorld.addTrimesh}. */
+export interface KernelTrimeshOptions {
+  /**
+   * Keeps contacts on a triangle's inner edges to the normals the surface allows, so shapes slide over the seams between
+   * triangles without catching (Rapier's `TriMeshFlags.FIX_INTERNAL_EDGES`). Default false, as in Rapier.
+   */
+  fixInternalEdges?: boolean;
+}
+
+/**
+ * The triangle across each edge of each triangle (edge k runs from corner k to corner k + 1), or -1 for an open edge. Edges
+ * meet by corner position, so a mesh split at texture seams still joins; an edge three or more triangles share is open.
+ */
+export function trianglesAcross(vertices: ArrayLike<number>, indices: ArrayLike<number>): Int32Array {
+  const count = indices.length / 3,
+    out = new Int32Array(indices.length).fill(-1),
+    bits = new Float32Array(3),
+    words = new Uint32Array(bits.buffer),
+    places = new Map<string, number>(),
+    weld = new Int32Array(vertices.length / 3).fill(-1);
+  // Each corner by its place: one name per distinct position, so edges compare as two small numbers.
+  const place = (index: number): number => {
+    let p = weld[index];
+    if (p < 0) {
+      bits[0] = vertices[3 * index];
+      bits[1] = vertices[3 * index + 1];
+      bits[2] = vertices[3 * index + 2];
+      const key = `${words[0]},${words[1]},${words[2]}`;
+      p = places.get(key) ?? places.size;
+      places.set(key, p);
+      weld[index] = p;
+    }
+    return p;
+  };
+  for (let i = 0; i < weld.length; i++) place(i);
+  const span = places.size,
+    seen = new Map<number, number>(),
+    shared: number[] = [];
+  const edge = (t: number, k: number): number => {
+    const a = weld[indices[3 * t + k]],
+      b = weld[indices[3 * t + ((k + 1) % 3)]];
+    return a === b ? -1 : a < b ? a * span + b : b * span + a;
+  };
+  for (let t = 0; t < count; t++)
+    for (let k = 0; k < 3; k++) {
+      const key = edge(t, k);
+      if (key < 0) continue;
+      const other = seen.get(key);
+      if (other === undefined) seen.set(key, 3 * t + k);
+      else if (other >= 0) {
+        out[3 * t + k] = (other / 3) | 0;
+        out[other] = t;
+        seen.set(key, -1);
+      } else if (other === -1) {
+        // A third triangle on one edge: no side is the surface's, so the edge is open for all of them.
+        seen.set(key, -2);
+        shared.push(key);
+      }
+    }
+  if (shared.length)
+    for (let t = 0; t < count; t++)
+      for (let k = 0; k < 3; k++) {
+        const key = edge(t, k);
+        if (key >= 0 && seen.get(key) === -2) out[3 * t + k] = -1;
+      }
+  return out;
+}
 
 /** What each refusal of `hull_end` means, with the fix. */
 const hullErrors: Readonly<Record<number, string>> = {
@@ -249,6 +333,7 @@ export class KernelWorld {
   private stepping = false;
   private filter: ((a: number, b: number) => boolean) | null = null;
   private hullRows = 0;
+  private meshRows = 0;
   /** Sleepers whose kind changed: they wake before the next step, as Rapier's do. */
   private wakeAtStep: number[] = [];
 
@@ -307,12 +392,15 @@ export class KernelWorld {
     const { pairA, pairB } = this.columns,
       rows = this.api.world_pair_rows(),
       out: [number, number][] = [];
-    for (let row = 0; row < rows; row++) if (pairA[row] !== 0xffffffff) out.push([pairA[row], pairB[row]]);
+    const { pairFlags } = this.columns;
+    for (let row = 0; row < rows; row++)
+      if (pairA[row] !== 0xffffffff && !(pairFlags[row] & PAIR_IS_PART)) out.push([pairA[row], pairB[row]]);
     return out;
   }
   /**
    * Every pair with contact points, after the last step. A point may lie a little apart: anything the step could reach
-   * counts, so its `separation` can be above zero.
+   * counts, so its `separation` can be above zero. A mesh pair gives one entry for each triangle it touches, each with
+   * its own normal.
    */
   contacts(): KernelContact[] {
     const c = this.columns,
@@ -490,7 +578,7 @@ export class KernelWorld {
    * Adds a collider to a body and works out the body's mass, centre and inertia again. Grows the world when the rows run
    * out, so read views from `columns` after this call.
    * @param size A ball's `[radius]`, a box's `[halfX, halfY, halfZ]`, a capsule's `[radius, halfLength]` along local Y, a
-   * hull's `[row]`.
+   * hull's `[row]`, a triangle mesh's `[row]` (no volume, so no mass).
    * @returns The collider's row.
    * @throws RangeError for a dead body, an unknown shape, or a size, pose or density the kernel cannot use.
    */
@@ -513,6 +601,9 @@ export class KernelWorld {
     if (shape === 'hull') {
       if (size.length !== 1 || !Number.isInteger(size[0]) || size[0] < 0 || size[0] >= this.hullRows)
         throw new RangeError(`A hull collider needs [row], a row addHull returned (got ${size.join(', ')}).`);
+    } else if (shape === 'trimesh') {
+      if (size.length !== 1 || !Number.isInteger(size[0]) || size[0] < 0 || size[0] >= this.meshRows)
+        throw new RangeError(`A trimesh collider needs [row], a row addTrimesh returned (got ${size.join(', ')}).`);
     } else if (size.length !== numbers || !size.every((value) => value > 0 && Number.isFinite(value)))
       throw new RangeError(`A ${shape} needs ${numbers} finite sizes above zero (got ${size.join(', ')}).`);
     if (!(density >= 0) || !Number.isFinite(density))
@@ -594,6 +685,54 @@ export class KernelWorld {
     const row = api.hull_end(vertices.length, faces.length, edges);
     if (row < 0) throw new RangeError(`This hull was refused; fix what this says: ${hullErrors[row]}.`);
     this.hullRows = row + 1;
+    return row;
+  }
+  /**
+   * Adds a triangle mesh that colliders can share, for {@link KernelWorld.addCollider} with shape `trimesh`: the kernel
+   * sorts its edges and builds a tree over its triangles (binned SAH, Wald 2007). Rows stay for the world's life, and a
+   * snapshot carries them. Read views from `columns` after this call.
+   * @param vertices Flat x, y, z numbers in the mesh's frame.
+   * @param indices Three vertex indices a triangle, counter-clockwise seen from its front. Both sides collide.
+   * @returns The mesh's row.
+   * @throws RangeError for indices or numbers the kernel cannot use, naming what is wrong.
+   */
+  addTrimesh(vertices: ArrayLike<number>, indices: ArrayLike<number>, options: KernelTrimeshOptions = {}): number {
+    const { api } = this,
+      { fixInternalEdges = false } = options,
+      count = vertices.length / 3,
+      triangles = indices.length / 3;
+    if (!Number.isInteger(count) || !Number.isInteger(triangles))
+      throw new RangeError(`A trimesh takes three numbers a vertex and three indices a triangle (got ${vertices.length} and ${indices.length}); pass whole vertices and whole triangles.`);
+    for (let i = 0; i < indices.length; i++) {
+      const index = indices[i];
+      if (!Number.isInteger(index) || index < 0 || index >= count)
+        throw new RangeError(`Trimesh index ${i} is ${index}; use a place in the vertex list, from 0 to ${count - 1}.`);
+    }
+    // The edges' neighbours serve only the internal edge rule, so a mesh without it skips finding them.
+    const across = fixInternalEdges ? trianglesAcross(vertices, indices) : null;
+    if (!api.mesh_begin(count, triangles))
+      throw new RangeError(`Memory cannot hold a trimesh of ${triangles} triangles; free another world, or simplify the mesh.`);
+    if (api.world_layout() !== this.layout) this.bind();
+    const c = this.columns,
+      [v0, t0] = [api.mesh_next(0), api.mesh_next(1)],
+      links = [c.triangleAcross0, c.triangleAcross1, c.triangleAcross2];
+    for (let i = 0; i < count; i++) {
+      c.meshVertexX[v0 + i] = vertices[3 * i];
+      c.meshVertexY[v0 + i] = vertices[3 * i + 1];
+      c.meshVertexZ[v0 + i] = vertices[3 * i + 2];
+    }
+    for (let t = 0; t < triangles; t++) {
+      c.triangleA[t0 + t] = indices[3 * t];
+      c.triangleB[t0 + t] = indices[3 * t + 1];
+      c.triangleC[t0 + t] = indices[3 * t + 2];
+      for (let k = 0; k < 3; k++) {
+        const other = across ? across[3 * t + k] : -1;
+        links[k][t0 + t] = other < 0 ? 0xffffffff : other;
+      }
+    }
+    const row = api.mesh_end(count, triangles, fixInternalEdges ? 1 : 0);
+    if (row < 0) throw new RangeError(`This trimesh was refused; fix what this says: ${meshErrors[row]}.`);
+    this.meshRows = row + 1;
     return row;
   }
   /**
@@ -761,7 +900,9 @@ export class KernelWorld {
     if (!api.world_ensure(bytes)) throw new RangeError(`Memory cannot hold a snapshot of ${bytes} bytes; free another world, or use a smaller one.`);
     new Uint8Array(api.memory.buffer, base, bytes).set(snapshot);
     this.bind();
-    this.hullRows = api.world_capacity(7);
+    // Rows handed out, not rows of room: a collider must not name a row no hull or mesh was written to.
+    this.hullRows = api.hull_count();
+    this.meshRows = api.mesh_count();
     return this;
   }
   /**

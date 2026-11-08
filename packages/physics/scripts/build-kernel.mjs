@@ -90,9 +90,21 @@ export const wasmBase64: string = '${compressed.toString('base64')}';
   console.log(`physics kernel: ${wasm.length} B raw, ${compressed.length} B deflated`);
 }
 
-function columnTable() {
-  const classes = [...new Set(kernelColumns().map((column) => column.rows))];
-  return kernelColumns().map(({ name, kind, rows }) => [name, kind === 'f32' ? 'f' : 'u', classes.indexOf(rows)]);
+/** The row classes in the order of the `Rows` enum of kernel/src/layout.rs: a class's number is its place there. */
+export function kernelRowClasses() {
+  const source = readFileSync(resolve(kernel, 'src/layout.rs'), 'utf8');
+  const body = /^pub enum Rows \{([\s\S]*?)^\}/m.exec(source)[1];
+  return [...body.matchAll(/^\s*([A-Z]\w*),/gm)].map(([, name]) => name);
+}
+
+/** Each column with its class as the kernel numbers it, which `world_capacity` takes. */
+export function columnTable() {
+  const classes = kernelRowClasses();
+  return kernelColumns().map(({ name, kind, rows }) => {
+    const index = classes.indexOf(rows);
+    assert(index >= 0, `Column ${name} names a row class ${rows} that the Rows enum lacks`);
+    return [name, kind === 'f32' ? 'f' : 'u', index];
+  });
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) build();

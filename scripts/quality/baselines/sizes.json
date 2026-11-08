@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10824408,
+  "total": 10839406,
   "history": [
     {
       "date": "2026-10-24",
@@ -3962,6 +3962,12 @@
       "commit": "3b43b9e4a",
       "reason": "oit: ExactOIT merges equal nodes at 4x MSAA; MomentOIT moves to three trigonometric moments with half rounding (three targets, wrapping zone, margoHalf)",
       "grew": 2
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "2b83cb41f",
+      "reason": "batch 126 job 2: triangle meshes in the own physics kernel (BVH, mesh parts, internal edge rule)",
+      "grew": 1
     }
   ],
   "items": {
@@ -4415,7 +4421,7 @@
     "@margoengine/oit/moments": 5512,
     "@margoengine/oit/vfx": 486,
     "@margoengine/physics": 19679,
-    "@margoengine/physics/next": 91997,
+    "@margoengine/physics/next": 106995,
     "@margoengine/physics2d": 8199,
     "@margoengine/physics2d/outline": 2524,
     "@margoengine/pixel": 4664,

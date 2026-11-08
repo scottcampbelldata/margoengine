@@ -232,7 +232,7 @@ impl World {
         if need == [old[7], old[8], old[9], old[10]] {
             return true;
         }
-        self.grow(capacities(old[0], old[1], old[3], need, old[11]))
+        self.grow(capacities(old[0], old[1], old[3], need, old[11], mesh_capacity(&old)))
     }
 
     /// Makes room for one more hull. The caller then writes VERTEX_ columns, FACE_EDGE with each face's first index into

@@ -406,3 +406,43 @@ fn a_step_writes_the_manifold_into_the_pair_with_anchors_on_each_surface() {
     w.step(1.0 / 60.0);
     assert_eq!(w.uu(PAIR_CONTACTS, row), 0);
 }
+
+#[test]
+fn a_flat_triangle_takes_the_edge_axes_a_closed_hull_would() {
+    // A triangle's two faces face n and -n, so the arc of each of its edges is half a great circle whose ends span no
+    // plane. The arc test once never fired for it, and a box crossing a triangle's edge was pushed out along a face,
+    // deeper than it was in.
+    use margoengine_physics_kernel::mesh::{TriData, triangle_normal};
+    let (p, q, r) = (v3(-1.0, 0.0, -0.5), v3(0.3, 0.1, 1.2), v3(1.1, -0.2, -0.7));
+    let data = TriData::new(p, q, r, triangle_normal(p, q, r).unwrap());
+    let tri = data.poly();
+    let mut box_data = BoxData::new();
+    let boxy = box_poly(v3(0.5, 0.3, 0.4), &mut box_data);
+    let mut w = World::new(4, 4).unwrap();
+    let tetra = w.add_hull(&TETRA, &TETRA_FACES) as usize;
+    let others = [boxy, w.hull_poly(tetra)];
+    let mut random = Random(0xFACE);
+    let (mut touching, mut edges) = (0, 0);
+    for round in 0..20_000 {
+        let other = others[round % 2];
+        let rel = Pose { p: v3(random.range(-1.5, 1.5), random.range(-1.0, 1.0), random.range(-1.5, 1.5)), q: random.turn() };
+        let (a, b, rel) = if round % 4 < 2 { (tri, other, rel) } else { (other, tri, rel) };
+        let expected = brute_separation(&a, &b, rel);
+        match sat(&a, &b, rel, 0.04) {
+            None => assert!(expected > 0.04 - 1e-4, "round {round}: sat separated, brute {expected}"),
+            Some((feature, found)) => {
+                touching += 1;
+                if matches!(feature, Feature::Edges(..)) {
+                    edges += 1;
+                }
+                if expected <= 0.0 {
+                    assert!((found - expected).abs() < 2.5e-3, "round {round}: {found} against {expected}");
+                } else {
+                    assert!(found <= expected + 1e-4, "round {round}: {found} above the true largest {expected}");
+                }
+            }
+        }
+    }
+    println!("triangle: {touching} touching, {edges} by edges");
+    assert!(edges > 100, "edge pairs must win where they are the answer, won {edges} times");
+}

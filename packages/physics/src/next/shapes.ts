@@ -8,7 +8,13 @@ import { buildHull } from './hull.js';
 const PI = 3.141592653589793;
 
 /** The shapes the own solver holds so far, by the name their options use. */
-const served: Readonly<Record<string, KernelShape>> = { box: 'box', sphere: 'ball', capsule: 'capsule', convexHull: 'hull' };
+const served: Readonly<Record<string, KernelShape>> = {
+  box: 'box',
+  sphere: 'ball',
+  capsule: 'capsule',
+  convexHull: 'hull',
+  trimesh: 'trimesh',
+};
 
 /** What the kernel needs for one collider. */
 export interface KernelCollider {
@@ -26,6 +32,7 @@ export function shapeServed(shape: ShapeOptions['shape']): boolean {
 function volume(shape: KernelShape, size: readonly number[], hullVolume: (row: number) => number): number {
   if (shape === 'box') return 8 * size[0] * size[1] * size[2];
   if (shape === 'hull') return hullVolume(size[0]);
+  if (shape === 'trimesh') return 0;
   const [radius, halfLength = 0] = size;
   return PI * radius * radius * ((4 / 3) * radius + 2 * halfLength);
 }
@@ -45,10 +52,11 @@ function fittedSphere(points: Float32Array, center: number[]): number[] {
   return [radius];
 }
 
-/** What building a collider needs from its world: a hull's row for its faces, and a hull row's volume. */
+/** What building a collider needs from its world: a hull's row for its faces, a hull row's volume, a mesh's row. */
 export interface HullRows {
   addHull(vertices: readonly (readonly [number, number, number])[], faces: readonly (readonly number[])[]): number;
   hullVolume(row: number): number;
+  addTrimesh(vertices: Float32Array, indices: Uint32Array, fixInternalEdges: boolean): number;
 }
 
 /**
@@ -67,7 +75,7 @@ export function kernelCollider(
   if (!shape)
     throw new MargoError(
       'unsupported',
-      `The ${options.shape} shape is not in the own solver yet; use box, sphere, capsule or convexHull, or @margoengine/physics.`,
+      `The ${options.shape} shape is not in the own solver yet; use box, sphere, capsule, convexHull or trimesh, or @margoengine/physics.`,
     );
   const fitted = (): Float32Array => {
       if (!fit.geometry) throw new TypeError(`A ${options.shape} collider without explicit size needs a mesh with geometry`);
@@ -96,10 +104,24 @@ export function kernelCollider(
     const points = options.points ?? (options.geometry ? geometryPositions(options.geometry, fit.scale) : fitted()),
       { vertices, faces } = buildHull(points);
     size = [hulls.addHull(vertices, faces)];
-  } else throw new TypeError(`Unknown shape ${options.shape}; use box, sphere, capsule or convexHull.`);
+  } else if (options.shape === 'trimesh') {
+    const source = options.geometry ?? (options.vertices ? null : fit.geometry),
+      vertices = options.vertices ? Float32Array.from(options.vertices) : source ? geometryPositions(source, fit.scale) : fitted(),
+      indexSource = options.indices ?? source?.indices;
+    if (!indexSource) throw new TypeError('A trimesh needs indices; pass indices or a geometry that has them.');
+    if (!indexSource.length || indexSource.length % 3 || vertices.length % 3)
+      throw new RangeError('A trimesh needs whole triangles; pass three indices per triangle and three numbers per vertex.');
+    for (let i = 0; i < vertices.length; i++)
+      if (!Number.isFinite(vertices[i])) throw new RangeError('Trimesh vertices must be finite Float32 values.');
+    if (options.mass !== undefined || options.density !== undefined)
+      throw new RangeError(
+        'A trimesh has no volume, so no mass or density; give the body its mass with setMassProperties, or use convexHull or convexDecomposition.',
+      );
+    size = [hulls.addTrimesh(vertices, Uint32Array.from(indexSource), options.fixInternalEdges ?? false)];
+  } else throw new TypeError(`Unknown shape ${options.shape}; use box, sphere, capsule, convexHull or trimesh.`);
   const offset = options.offset ?? [0, 0, 0];
   checkVec(offset, 'Collider offset');
-  const density = options.massless
+  const density = options.massless || shape === 'trimesh'
     ? 0
     : options.mass !== undefined
       ? options.mass / volume(shape, size, hulls.hullVolume)

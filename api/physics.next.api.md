@@ -151,7 +151,11 @@ export interface KernelLoadOptions {
     signal?: AbortSignal;
 }
 
-export type KernelShape = 'ball' | 'box' | 'capsule' | 'hull';
+export type KernelShape = 'ball' | 'box' | 'capsule' | 'hull' | 'trimesh';
+
+export interface KernelTrimeshOptions {
+    fixInternalEdges?: boolean;
+}
 
 export class KernelWorld {
     readonly columns: Record<string, KernelColumn>;
@@ -188,6 +192,7 @@ export class KernelWorld {
     removeBody(body: number): boolean;
     addCollider(body: number, shape: KernelShape, size: readonly number[], options?: KernelColliderOptions): number;
     addHull(vertices: readonly (readonly [number, number, number])[], faces: readonly (readonly number[])[]): number;
+    addTrimesh(vertices: ArrayLike<number>, indices: ArrayLike<number>, options?: KernelTrimeshOptions): number;
     removeCollider(collider: number): boolean;
     addJoint(a: number, b: number, flags: number): number;
     removeJoint(joint: number): boolean;
@@ -511,6 +516,8 @@ export { buildHull as convexHull };
 function buildHull(input: ArrayLike<number>): HullFaces;
 
 export function loadKernel({ signal }?: KernelLoadOptions): Promise<void>;
+
+export function trianglesAcross(vertices: ArrayLike<number>, indices: ArrayLike<number>): Int32Array;
 
 // Not exported from this entry, but used by the exports above:
 
