@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10998511,
+  "total": 10999817,
   "history": [
     {
       "date": "2026-10-24",
@@ -4136,6 +4136,12 @@
       "commit": "9cb13c06d",
       "reason": "billboard entry is new; sprites root unchanged",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "03f409bd5",
+      "reason": "sprites root gains filter: 'linear' with mipmaps",
+      "grew": 1
     }
   ],
   "items": {
@@ -4770,7 +4776,7 @@
     "@margoengine/splines/frames": 2039,
     "@margoengine/splines/knots": 3478,
     "@margoengine/splines/mesh": 3213,
-    "@margoengine/sprites": 5059,
+    "@margoengine/sprites": 6365,
     "@margoengine/sprites/animation": 1387,
     "@margoengine/sprites/aseprite": 4595,
     "@margoengine/sprites/atlas": 649,

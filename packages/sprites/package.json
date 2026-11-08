@@ -60,6 +60,7 @@
     "test": "npm run build && node --test tests/*.test.js",
     "test:gpu": "cd ../.. && node packages/sprites/tests/browser-check.mjs",
     "prepack": "npm run build",
-    "test:gpu:billboard": "cd ../.. && node packages/sprites/tests/billboard-check.mjs"
+    "test:gpu:billboard": "cd ../.. && node packages/sprites/tests/billboard-check.mjs",
+    "test:gpu:smooth": "cd ../.. && node packages/sprites/tests/smooth-check.mjs"
   }
 }

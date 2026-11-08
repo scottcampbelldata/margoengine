@@ -55,6 +55,8 @@ coin.visible = false;
 | `ySort` | false | Among equal `z`, sorts by `y`, then by add order; read each frame |
 | `target` | frame's colour | A texture, or a function returning one, to draw into instead |
 | `clear` | `[0, 0, 0, 0]` | With `target`: the clear colour, or false to draw over it |
+| `filter` | `'nearest'` | `'linear'` filters smoothly for HD art: premultiplied, in linear light, with mipmaps |
+| `mipmaps` | true | With `filter: 'linear'`: a full mip chain, so sprites drawn small do not shimmer |
 | `normals` | none | `{atlas, target, clear}`: a second colour target for 2D lighting |
 | `order` | 10 | Frame-graph order, after the scene at 0 |
 | `layers` | 1 | Render-layer bits; a view with `layers` that shares none skips this layer |
@@ -72,6 +74,30 @@ A plain `GPUTexture` belonged to the lost device: the next frame throws `MargoEr
 
 Normals write `n * 0.5 + 0.5` from a same-size normal atlas, turned and flipped with the sprite, with alpha 1 where a
 sprite covers the pixel. They need a single-sample colour target and a single-sample normal target of the same size.
+
+### Smooth sprites
+
+`filter: 'linear'` is for HD art drawn at any scale and angle. The layer keeps its own copy of the atlas, decoded from
+sRGB and premultiplied by alpha, with mipmaps, so filtering and mip averages happen in linear light and a transparent
+texel's colour never bleeds into an edge. Turn `snap` off too for smooth sub-pixel motion.
+
+```ts
+import { EngineKernel } from 'margoengine/core';
+import { SpriteLayer } from 'margoengine/sprites';
+
+const engine = await EngineKernel.create(document.querySelector('canvas')!);
+// A 2 x 2 atlas: white, transparent, transparent, white.
+const data = new Uint8Array([255, 255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 255, 255, 255, 255]);
+const layer = SpriteLayer.attach(engine, { atlas: { width: 2, height: 2, data }, filter: 'linear', snap: false });
+const ball = layer.add({ x: 40.25, y: 30.5, scaleX: 24, scaleY: 24, rotation: 0.3 });
+engine.start();
+ball.x += 0.1; // moves by a tenth of a pixel
+```
+
+- Each cell is sampled half a texel inside its rectangle, so level 0 never reads the next cell. Smaller mip levels
+  average across cells: leave a gutter of a few texels around cells drawn very small, or set `mipmaps: false`.
+- The copy is made once. After changing a `GPUTexture` atlas's contents, call `setAtlas` with it again.
+- Normals stay exact-pixel.
 
 ## Billboards
 

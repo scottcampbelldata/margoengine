@@ -1,5 +1,5 @@
 {
-  "commit": "9cb13c06d",
+  "commit": "8f5761806",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -2670,8 +2670,8 @@
     },
     "@margoengine/sprites": {
       ".": {
-        "raw": 12439,
-        "gzip": 4803
+        "raw": 16704,
+        "gzip": 6109
       },
       "./animation": {
         "raw": 2342,

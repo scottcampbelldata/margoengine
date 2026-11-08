@@ -83,7 +83,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/sky | `.` 12, `./base` 13, `./preetham` 1, `./bruneton` 1, `./clouds` 1, `./night` 1, `./fog` 1, `./reflection` 1, `./lighting` 1, `./weather` 9, `./sun` 19, `./volumetric-clouds` 7, `./cloud-shadows` 5, `./aerial` 6, `./hillaire` 5, `./shafts` 4, `./astro` 25, `./weather-fx` 5, `./presets` 4 | 105 |  | 17,694 |
 | @margoengine/splats | `.` 21, `./depth` 2, `./lod` 8, `./lighting` 5, `./set` 3, `./edit` 5, `./data` 19 | 27 | 1 | 26,319 |
 | @margoengine/splines | `.` 3, `./closest` 4, `./frames` 8, `./knots` 5, `./mesh` 9, `./fit` 3 | 20 |  | 1,597 |
-| @margoengine/sprites | `.` 14, `./animation` 6, `./aseprite` 13, `./atlas` 3, `./billboard` 8 | 8 |  | 4,803 |
+| @margoengine/sprites | `.` 14, `./animation` 6, `./aseprite` 13, `./atlas` 3, `./billboard` 8 | 8 |  | 6,109 |
 | @margoengine/stage | `.` 23, `./gltf` 3, `./sky` 1, `./particles` 1, `./effects` 1, `./environment` 2, `./shadows` 1, `./xr` 3, `./viewer` 4, `./physics` 4, `./scene` 4 | 23 |  | 2,974 |
 | @margoengine/staging | `.` 4 | 2 |  | 8,036 |
 | @margoengine/stats | `.` 3, `./beacon` 3, `./compile` 5, `./leaks` 4, `./phases` 4, `./report` 6 | 11 |  | 4,853 |

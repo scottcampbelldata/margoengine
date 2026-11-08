@@ -3,6 +3,7 @@ import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type Engine, type EnginePlugin, type PassContext } from '@margoengine/core/extension';
 import { atlasTexture } from '../../shared/atlas-texture.js';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
+import { generateMipmaps } from '../../shared/mipmaps.js';
 import { applyView, checkLayers, ViewStates } from '../../shared/view-rect.js';
 import { packSprites, sortSprites, Sprite, SPRITE_FLOATS, type SpriteCamera, type SpriteOptions } from './sprite.js';
 export {
@@ -17,6 +18,7 @@ export {
 } from './sprite.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; STORAGE: number };
+declare const GPUTextureUsage: { TEXTURE_BINDING: number; RENDER_ATTACHMENT: number };
 declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };
 type SpritesPassContext = Extract<PassContext, { backend: 'webgpu' }>;
 
@@ -59,6 +61,14 @@ export interface SpriteLayerOptions {
   target?: SpriteTarget;
   /** With `target`: the colour `[r, g, b, a]` (0 to 1) to clear it to first, or false to draw over it. Default `[0, 0, 0, 0]`. */
   clear?: readonly [number, number, number, number] | false;
+  /**
+   * `'nearest'` (default) reads whole texels with no filtering, for exact pixels. `'linear'` filters for smooth HD art:
+   * the layer keeps its own premultiplied, sRGB-decoded copy of the atlas with mipmaps, so edges carry no fringe and
+   * small sprites do not shimmer. Fixed.
+   */
+  filter?: 'nearest' | 'linear';
+  /** With `filter: 'linear'`, builds a full mip chain for the atlas. Default true. */
+  mipmaps?: boolean;
   /** Writes normals to a second colour target. Needs a single-sample colour target. Default none. */
   normals?: SpriteNormals;
   /** Frame-graph order. Runs after the scene (0); 40 draws after a Tonemap. Default 10. */
@@ -71,12 +81,13 @@ export interface SpriteLayerOptions {
   name?: string;
 }
 
-const shader = (normals: boolean) => /* wgsl */ `
+const shader = (normals: boolean, smooth: boolean) => /* wgsl */ `
 struct Sprite{p:vec2f,s:vec2f,pivot:vec2f,turn:f32,tint:u32,rect:vec4f}
-@group(0) @binding(0) var<uniform> size:vec2f;
+@group(0) @binding(0) var<uniform> size:vec4f;
 @group(0) @binding(1) var<storage,read> sprites:array<Sprite>;
 @group(0) @binding(2) var atlas:texture_2d<f32>;
 ${normals ? '@group(0) @binding(3) var bumps:texture_2d<f32>;' : ''}
+${smooth ? `@group(0) @binding(4) var filtered:sampler;\n${srgb}` : ''}
 struct Varying{
   @builtin(position) position:vec4f,
   @location(0) texel:vec2f,
@@ -93,7 +104,7 @@ struct Varying{
   let y=sin(s.turn);
   let p=s.p+vec2f(q.x*x-q.y*y,q.x*y+q.y*x);
   var v:Varying;
-  v.position=vec4f(p/size*vec2f(2,-2)+vec2f(-1,1),0,1);
+  v.position=vec4f(p/size.xy*vec2f(2,-2)+vec2f(-1,1),0,1);
   v.texel=s.rect.xy+s.rect.zw*c;
   v.low=min(s.rect.xy,s.rect.xy+s.rect.zw);
   v.high=max(s.rect.xy,s.rect.xy+s.rect.zw)-1;
@@ -107,14 +118,39 @@ ${
     : '@fragment fn fragmentMain(v:Varying)->@location(0) vec4f'
 }{
   let t=vec2i(clamp(floor(v.texel),v.low,v.high));
-  let color=textureLoad(atlas,t,0)*v.tint;
-  if(color.a==0){discard;}
+  ${
+    smooth
+      ? `// Premultiplied linear texels, kept half a texel inside the rectangle so the next cell does not bleed in.
+  let f=textureSample(atlas,filtered,clamp(v.texel,v.low+0.5,v.high+0.5)/vec2f(textureDimensions(atlas)));
+  let linear=f*vec4f(decode(v.tint.rgb)*v.tint.a,v.tint.a);
+  if(linear.a==0){discard;}
+  let color=select(vec4f(encode(linear.rgb/linear.a)*linear.a,linear.a),linear,size.z>0);`
+      : `let color=textureLoad(atlas,t,0)*v.tint;
+  if(color.a==0){discard;}`
+  }
   ${
     normals
       ? `let n=textureLoad(bumps,t,0).xyz*2-1;
   return Output(color,vec4f(vec3f(v.axes.xy*n.x+v.axes.zw*n.y,n.z)*0.5+0.5,1));`
       : 'return color;'
   }
+}`;
+
+const srgb = /* wgsl */ `fn decode(c:vec3f)->vec3f{return select(pow((c+0.055)/1.055,vec3f(2.4)),c/12.92,c<=vec3f(0.04045));}
+fn encode(c:vec3f)->vec3f{return select(1.055*pow(c,vec3f(1/2.4))-0.055,c*12.92,c<=vec3f(0.0031308));}`;
+// Copies any atlas into the layer's filtered texture: sRGB bytes decoded, colour multiplied by alpha, so filtering and
+// mip averages happen in linear light on premultiplied texels (T. Porter and T. Duff, Compositing Digital Images, 1984).
+const premultiply = /* wgsl */ `
+override decoded:bool=false;
+@group(0) @binding(0) var source:texture_2d<f32>;
+${srgb}
+@vertex fn vertexMain(@builtin(vertex_index) i:u32)->@builtin(position) vec4f{
+  let p=array(vec2f(-1,-1),vec2f(3,-1),vec2f(-1,3));
+  return vec4f(p[i],0,1);
+}
+@fragment fn fragmentMain(@builtin(position) p:vec4f)->@location(0) vec4f{
+  let c=textureLoad(source,vec2i(p.xy),0);
+  return vec4f(select(decode(c.rgb),c.rgb,decoded)*c.a,c.a);
 }`;
 
 interface ViewState {
@@ -150,6 +186,9 @@ export class SpriteLayer implements EnginePlugin {
   private readonly target?: SpriteTarget;
   private readonly clear: number[] | false;
   private readonly normals?: SpriteNormals;
+  private readonly smooth: boolean;
+  private readonly mipmaps: boolean;
+  private readonly mipCache = new Map<unknown, unknown>();
   private atlas: SpriteAtlas;
   private engine?: Engine;
   private removePass?: () => void;
@@ -159,6 +198,7 @@ export class SpriteLayer implements EnginePlugin {
   private stale = false;
   private layout?: GPUBindGroupLayout;
   private module?: GPUShaderModule;
+  private sampler?: GPUSampler;
   private readonly pipelines = new Map<string, GPURenderPipeline>();
   private buffer?: GPUBuffer;
   private data: Float32Array<ArrayBuffer>;
@@ -191,6 +231,8 @@ export class SpriteLayer implements EnginePlugin {
       order = options.order ?? 10;
     if (!Number.isInteger(capacity) || capacity < 1) throw rangeError('Invalid sprite capacity', 'sprite-options');
     if (!Number.isFinite(order)) throw rangeError('Invalid sprite order', 'sprite-options');
+    if (options.filter !== undefined && options.filter !== 'nearest' && options.filter !== 'linear')
+      throw rangeError('Invalid sprite filter', 'sprite-options');
     if (options.clear && (options.clear.length !== 4 || !options.clear.every(Number.isFinite)))
       throw rangeError('Invalid sprite clear', 'sprite-options');
     this.atlas = options.atlas;
@@ -200,6 +242,8 @@ export class SpriteLayer implements EnginePlugin {
     this.target = options.target;
     this.clear = options.clear === false ? false : [...(options.clear ?? [0, 0, 0, 0])];
     this.normals = options.normals;
+    this.smooth = options.filter === 'linear';
+    this.mipmaps = options.mipmaps ?? true;
     this.order = order;
     this.layerMask = checkLayers(options.layers ?? 1, 'SpriteLayer layers');
     this.name = options.name ?? `sprites-${++layerCount}`;
@@ -266,7 +310,8 @@ export class SpriteLayer implements EnginePlugin {
     if (delta > 0) this.states.prune();
   }
   onDeviceRestored(): void {
-    this.stale = !!this.colorAtlas && !this.colorAtlas.owned && typeof this.atlas !== 'function';
+    // A caller's plain GPUTexture went with the device; bytes, bitmaps and functions come back by themselves.
+    this.stale = !!this.colorAtlas && typeof this.atlas !== 'function' && 'createView' in this.atlas;
     this.release();
   }
   dispose(): void {
@@ -291,7 +336,8 @@ export class SpriteLayer implements EnginePlugin {
     this.dropAtlas(this.colorAtlas);
     this.dropAtlas(this.normalAtlas);
     this.buffer?.destroy();
-    this.colorAtlas = this.normalAtlas = this.buffer = this.layout = this.module = this.device = undefined;
+    this.colorAtlas = this.normalAtlas = this.buffer = this.layout = this.module = this.device = this.sampler = undefined;
+    this.mipCache.clear();
     this.targetTexture = this.normalTexture = undefined;
     this.targetView = this.normalView = undefined;
     this.pipelines.clear();
@@ -304,7 +350,7 @@ export class SpriteLayer implements EnginePlugin {
       this.device = device;
     }
     if (this.stale) throw fault('state', 'Sprite atlas lost with the device; call setAtlas', 'sprite-state');
-    this.colorAtlas ??= atlasTexture(device, this.atlas, () => rangeError('Invalid sprite pixels', 'sprite-options'));
+    this.colorAtlas ??= this.smooth ? this.filtered(device) : this.loadAtlas(device);
     if (this.normals && !this.normalAtlas) {
       this.normalAtlas = atlasTexture(device, this.normals.atlas, () =>
         rangeError('Invalid sprite pixels', 'sprite-options'),
@@ -323,21 +369,76 @@ export class SpriteLayer implements EnginePlugin {
       });
       this.layout = device.createBindGroupLayout({
         entries: [
-          { binding: 0, visibility: GPUShaderStage.VERTEX, buffer: { type: 'uniform' } },
+          { binding: 0, visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } },
           { binding: 1, visibility: GPUShaderStage.VERTEX, buffer: { type: 'read-only-storage' } },
-          texture(2),
+          this.smooth
+            ? { binding: 2, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' as const } }
+            : texture(2),
           ...(this.normals ? [texture(3)] : []),
+          ...(this.smooth
+            ? [{ binding: 4, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' as const } }]
+            : []),
         ],
       });
-      this.module = device.createShaderModule({ label: 'sprites', code: shader(!!this.normals) });
+      this.module = device.createShaderModule({ label: 'sprites', code: shader(!!this.normals, this.smooth) });
+      if (this.smooth)
+        this.sampler = device.createSampler({ magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear' });
     }
+  }
+  private loadAtlas(device: GPUDevice): OwnedAtlas {
+    return atlasTexture(device, this.atlas, () => rangeError('Invalid sprite pixels', 'sprite-options'));
+  }
+  /** The premultiplied, linear-light copy of the atlas that `filter: 'linear'` samples, with its mip chain. */
+  private filtered(device: GPUDevice): OwnedAtlas {
+    const source = this.loadAtlas(device),
+      { width, height, format } = source.texture,
+      levels = this.mipmaps ? Math.floor(Math.log2(Math.max(width, height))) + 1 : 1,
+      texture = device.createTexture({
+        label: 'sprites filtered atlas',
+        size: [width, height],
+        format: 'rgba8unorm-srgb',
+        mipLevelCount: levels,
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT,
+      }),
+      module = device.createShaderModule({ label: 'sprites premultiply', code: premultiply }),
+      pipeline = device.createRenderPipeline({
+        label: 'sprites premultiply',
+        layout: 'auto',
+        vertex: { module, entryPoint: 'vertexMain' },
+        fragment: {
+          module,
+          entryPoint: 'fragmentMain',
+          // A float or sRGB source already reads as linear.
+          constants: { decoded: format.endsWith('-srgb') || format.includes('float') ? 1 : 0 },
+          targets: [{ format: 'rgba8unorm-srgb' }],
+        },
+      }),
+      encoder = device.createCommandEncoder(),
+      pass = encoder.beginRenderPass({
+        colorAttachments: [{ view: texture.createView({ mipLevelCount: 1 }), loadOp: 'clear', storeOp: 'store' }],
+      });
+    pass.setPipeline(pipeline);
+    pass.setBindGroup(
+      0,
+      device.createBindGroup({
+        layout: pipeline.getBindGroupLayout(0),
+        entries: [{ binding: 0, resource: source.texture.createView() }],
+      }),
+    );
+    pass.draw(3);
+    pass.end();
+    device.queue.submit([encoder.finish()]);
+    generateMipmaps(device, texture, levels, this.mipCache);
+    if (source.owned) source.texture.destroy();
+    return { texture, owned: true };
   }
   private pipeline(device: GPUDevice, format: GPUTextureFormat, samples: number, normal?: GPUTextureFormat) {
     const key = `${format}/${samples}/${normal ?? ''}`;
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
+      // The filtered path writes premultiplied colour.
       const blend: GPUBlendState = {
-        color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha' },
+        color: { srcFactor: this.smooth ? 'one' : 'src-alpha', dstFactor: 'one-minus-src-alpha' },
         alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' },
       };
       pipeline = device.createRenderPipeline({
@@ -442,9 +543,12 @@ export class SpriteLayer implements EnginePlugin {
     }
     const pipeline = this.pipeline(device, format, samples, normalFormat),
       state = this.states.get(c);
-    if (state.values[0] !== width || state.values[1] !== height) {
+    // Targets that store linear light (sRGB and float formats) take the filtered colour as it is; 8-bit ones encoded.
+    const linear = format.endsWith('-srgb') || format.includes('float') ? 1 : 0;
+    if (state.values[0] !== width || state.values[1] !== height || state.values[2] !== linear) {
       state.values[0] = width;
       state.values[1] = height;
+      state.values[2] = linear;
       device.queue.writeBuffer(state.uniform, 0, state.values);
     }
     if (state.generation !== this.generation) {
@@ -456,6 +560,7 @@ export class SpriteLayer implements EnginePlugin {
           { binding: 1, resource: { buffer: this.buffer! } },
           { binding: 2, resource: this.colorAtlas!.texture.createView() },
           ...(this.normalAtlas ? [{ binding: 3, resource: this.normalAtlas.texture.createView() }] : []),
+          ...(this.sampler ? [{ binding: 4, resource: this.sampler }] : []),
         ],
       });
     }

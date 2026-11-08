@@ -159,3 +159,9 @@ test('SpriteLayer: options are checked, sprites come and go, a sprite belongs to
     (error) => error.code === 'disposed',
   );
 });
+
+test('filter: nearest or linear, anything else names its fix', () => {
+  assert.throws(() => layer({ filter: 'bilinear' }), { name: 'RangeError', message: /Invalid sprite filter/ });
+  assert.doesNotThrow(() => layer({ filter: 'linear', mipmaps: false }));
+  assert.doesNotThrow(() => layer({ filter: 'nearest' }));
+});

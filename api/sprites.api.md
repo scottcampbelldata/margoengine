@@ -69,6 +69,8 @@ export interface SpriteLayerOptions {
     ySort?: boolean;
     target?: SpriteTarget;
     clear?: readonly [number, number, number, number] | false;
+    filter?: 'nearest' | 'linear';
+    mipmaps?: boolean;
     normals?: SpriteNormals;
     order?: number;
     layers?: number;
