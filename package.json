@@ -262,6 +262,7 @@
     "modern:test:scene-helpers": "node scripts/scene-helper-tests.js",
     "test:kernel": "cargo test --locked --manifest-path packages/kernel/Cargo.toml",
     "test:physics-kernel": "cargo test --locked --manifest-path packages/physics/kernel/Cargo.toml",
+    "test:physics2d-kernel": "cargo test --locked --manifest-path packages/physics2d/kernel/Cargo.toml",
     "build:physics-kernel": "node packages/physics/scripts/build-kernel.mjs",
     "fuzz": "node scripts/fuzz/run.js",
     "modern:test:bundlers": "node scripts/bundler-matrix.mjs"

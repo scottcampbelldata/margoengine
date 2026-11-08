@@ -332,8 +332,8 @@ The root entry never exposed these, so no Margo user loses them at the switch; t
 | Row | Rapier | Root today (`physics2d`) | Own solver | Status | WebGPU | WebGL2 |
 | --- | --- | --- | --- | --- | --- | --- |
 | T-01 | 2D bodies, types, forces, damping, sleep, locks | yes | none | PLANNED 127 | Wasm | Wasm |
-| T-02 | `ball`, `cuboid`, `capsule`, `segment`, `convex_polygon`, `polyline` | `circle`, `box`, `capsule`, `segment`, `polygon`, `polyline` | none | PLANNED 127 | Wasm | Wasm |
-| T-03 | `triangle`, `round_triangle`, `round_cuboid`, `round_convex_polygon` | no | none | MISSING, 143.1 | Wasm | Wasm |
+| T-02 | `ball`, `cuboid`, `capsule`, `segment`, `convex_polygon`, `polyline` | `circle`, `box`, `capsule`, `segment`, `polygon`, `polyline` | the kernel's shapes, mass and contacts, native only (`physics2d/kernel/tests/shapes.rs`, `manifold.rs`); no world yet | BUILDING 127 | Wasm | Wasm |
+| T-03 | `triangle`, `round_triangle`, `round_cuboid`, `round_convex_polygon` | no | every kernel polygon takes a radius, with exact mass (`physics2d/kernel/tests/shapes.rs`); no world yet | BUILDING 127 (was 143.1) | Wasm | Wasm |
 | T-04 | 2D `heightfield`, `halfspace`, `compound`, `voxels`, `convex_decomposition` | no | none | MISSING, 143.2 | Wasm | Wasm |
 | T-05 | `oriented_polyline` (one-sided) | no | none | MISSING, 143.1 | Wasm | Wasm |
 | T-06 | 2D fixed, revolute, prismatic, rope and spring joints with limits and motors | yes | none | PLANNED 127 | Wasm | Wasm |
@@ -541,7 +541,7 @@ Counted from the rows on 2026-11-08 by `node scripts/check-rapier-parity.mjs`, o
 
 | Part | Rows | DONE | PARTIAL | BUILDING | PLANNED 127 to 131 | MISSING, now owned | N/A |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1, Rapier parity | 252 | 85 | 19 | 0 | 14 | 130 | 4 |
+| 1, Rapier parity | 252 | 85 | 19 | 2 | 13 | 129 | 4 |
 | 2, beyond Rapier | 83 | 0 | 0 | 0 | 4 (extended later) | 79 | 0 |
 
 Margo already does more than Rapier in 15 rows (M-01 to M-15). The missing parity rows are owned by four extra jobs added to batches 127 and 128 (3D debug drawing, 2D events and filters, the multibody API, multibody inverse kinematics) and by batches 138 to 146. Part 2 is owned by batches 147 to 158 (60 jobs; the parity batches 138 to 146 hold 52 jobs, plus the four extra jobs in 127 and 128); 4 of its rows extend what batch 131 already plans; 1 (X-79) extends parity job 142.2, and 1 (X-88) is parity job 141.7.
