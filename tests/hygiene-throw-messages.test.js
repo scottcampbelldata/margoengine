@@ -2,7 +2,7 @@
 // `bad value ${x}; pass a number` and `'bad ' + x + '; pass a number'` were counted as naming no fix.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { countNoFix } from '../scripts/support/throw-messages.js';
+import { countMissingHelp, countNoFix } from '../scripts/support/throw-messages.js';
 
 test('a fix after an interpolated variable is read', () => {
   assert.equal(countNoFix('throw new RangeError(`bad value ${x}; pass a number`);'), 0);
@@ -42,4 +42,22 @@ test('only the message argument counts, not later arguments', () => {
 test('a message that is only a variable is not counted', () => {
   assert.equal(countNoFix('throw new Error(message);'), 0);
   assert.equal(countNoFix("throw new MargoError(code, 'bad');"), 0);
+});
+
+// Regression: the help-link count read a fault, typeError or rangeError call up to the first ")" followed by ";", so
+// a message holding "(...);" ended the call early, its anchor was never read and the throw was counted as naming no fix.
+test('a help anchor after a message holding ");" is read', () => {
+  const help = new Set(['terrain', 'BAD_SIZE']);
+  assert.equal(countMissingHelp("throw typeError('size (in metres); pass a number above 0', 'terrain');", help), 0);
+  assert.equal(countMissingHelp("throw rangeError(`level (${n}); use 0 to 20`, 'terrain');", help), 0);
+  assert.equal(countMissingHelp("throw fault('BAD_SIZE', 'size (in metres); pass a number', 'terrain');", help), 0);
+  assert.equal(countMissingHelp("throw fault('BAD_SIZE', 'size (in metres); pass a number');", help), 0);
+});
+
+test('a missing or unknown help anchor is still counted', () => {
+  const help = new Set(['terrain']);
+  assert.equal(countMissingHelp("throw typeError('size (in metres); pass a number');", help), 1);
+  assert.equal(countMissingHelp("throw typeError('size; pass a number', 'nowhere');", help), 1);
+  assert.equal(countMissingHelp("throw fault('NO_ENTRY', 'size (in metres); pass a number');", help), 1);
+  assert.equal(countMissingHelp("throw rangeError(`bad ${f(a, 'terrain')}`);", help), 1); // a call's argument is code
 });

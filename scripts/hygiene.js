@@ -35,7 +35,7 @@ import { createRequire } from 'node:module';
 import { dirname, join, relative, resolve } from 'node:path';
 import { parseSync } from 'rolldown/utils';
 import { entries as errorHelp } from './errors/entries.js';
-import { countNoFix } from './support/throw-messages.js';
+import { countMissingHelp, countNoFix } from './support/throw-messages.js';
 import { isUmbrellaAlias } from './umbrella.mjs';
 
 const root = resolve(import.meta.dirname, '..');
@@ -283,14 +283,11 @@ if (!quick) {
       const throws = [...text.matchAll(/\bthrow new (\w+)\(/g)].map((m) => m[1]);
       const bare = throws.filter((t) => t === 'Error').length;
       add(dir, 'errors', throws.length, Math.max(0, bare - (allowlist.errors?.[file]?.count ?? 0)));
-      let noFix = countNoFix(text); // reads the whole message, including text after an interpolated variable
-      // A short message linked to its help entry names its fix there: fault(code, message[, anchor]),
-      // typeError(message, anchor) and rangeError(message, anchor) from packages/shared/errors.js, with an anchor
-      // that site/errors.html has (scripts/errors/entries.js). A link to a missing entry counts as naming no fix.
-      for (const m of text.matchAll(
-        /\bthrow (?:fault\(\s*'(\w+)'|(?:typeError|rangeError)\()[^;]*?(?:,\s*'([\w-]+)')?,?\s*\)\s*;/g,
-      ))
-        if (!help.has(m[2] ?? m[1])) noFix++;
+      // countNoFix reads the whole message, including text after an interpolated variable. A short message linked to
+      // its help entry names its fix there: fault(code, message[, anchor]), typeError(message, anchor) and
+      // rangeError(message, anchor) from packages/shared/errors.js, with an anchor that site/errors.html has
+      // (scripts/errors/entries.js). A link to a missing entry counts as naming no fix.
+      const noFix = countNoFix(text) + countMissingHelp(text, help);
       if (bare || noFix) throwSites[file] = { bare, noFix };
     }
   }

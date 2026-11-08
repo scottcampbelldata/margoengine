@@ -101,3 +101,60 @@ export function countNoFix(text) {
   }
   return noFix;
 }
+
+/**
+ * Count throws in `text` that send their fix to a help entry the site does not have: fault(code, message[, anchor]),
+ * typeError(message, anchor) and rangeError(message, anchor) from packages/shared/errors.js. A call with no anchor, or
+ * an anchor missing from `help`, counts.
+ * @param {string} text Source text.
+ * @param {Set<string>} help The ids of the entries site/errors.html has.
+ */
+export function countMissingHelp(text, help) {
+  let missing = 0;
+  // The arguments are read by the same string-aware reader as the message, so a ")" or ";" inside the message text
+  // does not end the call (a regex up to the first ");" once lost the anchor of `'size (in m); pass a number'`).
+  const literal = (arg, word) => new RegExp(`^'(${word})'$`).exec(arg.trim())?.[1];
+  for (const m of text.matchAll(/\bthrow (fault|typeError|rangeError)\(/g)) {
+    const args = callArguments(text, m.index + m[0].length).filter((arg) => arg.trim());
+    let anchor;
+    if (m[1] === 'fault') {
+      const code = literal(args[0] ?? '', '\\w+');
+      if (!code) continue; // the code is not a literal: nothing to look up
+      anchor = (args.length > 2 && literal(args[args.length - 1], '[\\w-]+')) || code;
+    } else anchor = args.length > 1 ? literal(args[args.length - 1], '[\\w-]+') : undefined;
+    if (!help.has(anchor)) missing++;
+  }
+  return missing;
+}
+
+/**
+ * The source text of each top-level argument of the call whose arguments start at `start` (just after its `(`).
+ * Strings, templates, comments and brackets are stepped over, so commas and parentheses inside them do not split.
+ * @param {string} text Source text.
+ * @param {number} start Index just after the call's opening parenthesis.
+ */
+function callArguments(text, start) {
+  const args = [];
+  let i = start,
+    from = start,
+    depth = 0;
+  while (i < text.length) {
+    const c = text[i];
+    if (c === '"' || c === "'" || c === '`') i = readString(text, i + 1, c, []);
+    else if (c === '/' && text[i + 1] === '/') while (i < text.length && text[i] !== '\n') i++;
+    else if (c === '/' && text[i + 1] === '*') {
+      const close = text.indexOf('*/', i + 2);
+      i = close === -1 ? text.length : close + 2;
+    } else if (depth === 0 && (c === ',' || c === ')')) {
+      args.push(text.slice(from, i));
+      if (c === ')') return args;
+      from = ++i;
+    } else {
+      if (OPEN.includes(c)) depth++;
+      else if (CLOSE.includes(c)) depth--;
+      i++;
+    }
+  }
+  args.push(text.slice(from, i));
+  return args;
+}

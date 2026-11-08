@@ -151,3 +151,114 @@ for (const file of ['docs/whitepaper/claims.md', 'docs/limits.md', 'docs/clean-r
       'a cell was dropped or a pipe in a formula was left bare: restore the cells, never pad',
     );
   });
+
+// A lane's docs helper once looked for the last claim with a pattern that matched the empty string at the top of the
+// page, so LIM-502 and S67 landed on line 2, above the page text and every table header; the next jobs put their rows
+// after those, and the cell count above took the stray rows for a table of their own. A table is a header row, then its
+// separator row, then body rows: rows before the header, rows with no header and separator, and a second separator
+// are rows outside their table.
+function strayRows(text) {
+  const stray = [],
+    isSeparator = (line) => /^\|(\s*:?-+:?\s*\|)+\s*$/.test(line);
+  let fence = false,
+    block = [];
+  const flush = () => {
+    const first = block.findIndex(([, line]) => isSeparator(line)),
+      header = first - 1;
+    block.forEach(([n, line], k) => {
+      if (first < 0 || k < header || (k > first && isSeparator(line)) || (first === 0 && k === 0))
+        stray.push(`line ${n}: ${line.slice(0, 60)}`);
+    });
+    block = [];
+  };
+  text
+    .replace(/\r\n/g, '\n')
+    .split('\n')
+    .forEach((line, i) => {
+      if (/^\s*(```|~~~)/.test(line)) fence = !fence;
+      if (!fence && line.startsWith('|')) block.push([i + 1, line]);
+      else flush();
+    });
+  flush();
+  return stray;
+}
+
+test('the stray-row finder sees rows above a header and rows with no table', () => {
+  assert.deepEqual(strayRows('| A | B |\n| --- | --- |\n| 1 | 2 |\n'), []);
+  assert.deepEqual(strayRows('# T\n| 9 | x |\n\nText.\n\n| A | B |\n| --- | --- |\n| 1 | 2 |\n'), [
+    'line 2: | 9 | x |',
+  ]);
+  assert.deepEqual(strayRows('| 9 | x |\n| A | B |\n| --- | --- |\n| 1 | 2 |\n'), ['line 1: | 9 | x |']);
+  assert.deepEqual(strayRows('| A | B |\n| --- | --- |\n| 1 | 2 |\n\n| 3 | 4 |\n'), ['line 5: | 3 | 4 |']);
+  assert.deepEqual(strayRows('| A |\n| --- |\n| 1 |\n| --- |\n'), ['line 4: | --- |']);
+  assert.deepEqual(strayRows('```\n| 1 |\n```\n'), []);
+});
+
+for (const file of ['docs/whitepaper/claims.md', 'docs/limits.md', 'docs/clean-room.md'])
+  test(`every table row in ${file} sits in a table, under its header`, () => {
+    assert.deepEqual(
+      strayRows(readFileSync(file, 'utf8')),
+      [],
+      'a row sits outside its table: move it into the table it belongs to, in number order',
+    );
+  });
+
+test('every limit claim row sits in the design envelope table of claims.md', () => {
+  const section = claims.split(/^## /m).find((s) => s.startsWith('Design envelope'));
+  assert.equal((section.match(/^\| LIM-\d+ \|/gm) ?? []).length, ids.length, 'a LIM row sits outside its section');
+});
+
+// Lane renumbering helpers once rewrote "(LIM-n)" inside rows of docs/limits.md that other jobs had written, so the
+// WebGL2 compatibility layer's terrain row cited the dynamic GI claim (LIM-504) and the anti-aliased splats row cited
+// mesh to terrain blending (LIM-502). A row names its subject in its first cell, by package (`@margoengine/terrain`)
+// or else by API (`Splats.antialias`); every claim it cites names that package (or a file under packages/<name>/) or
+// that API too. A row that names neither is not checked, and two claims of one package can still be swapped unseen.
+function subjects(text, apis) {
+  const packages = new Set(
+    [...text.matchAll(/@margoengine\/([a-z0-9-]+)|\bpackages\/([a-z0-9-]+)\//g)].map(
+      (m) => `@margoengine/${m[1] ?? m[2]}`,
+    ),
+  );
+  if (packages.size || !apis) return packages;
+  return new Set([...text.matchAll(/`([A-Za-z_]\w*)/g)].map((m) => m[1]));
+}
+
+function wrongCitations(limitsText, claimsText) {
+  const rows = new Map(
+    [...claimsText.replace(/\r\n/g, '\n').matchAll(/^\| LIM-(\d+) \|(.*)$/gm)].map((m) => [m[1], m[2]]),
+  );
+  const wrong = [];
+  for (const line of limitsText.replace(/\r\n/g, '\n').split('\n')) {
+    const cell = /^\| ([^|]+?) \|/.exec(line)?.[1];
+    if (!cell) continue;
+    const want = subjects(cell, true);
+    if (!want.size) continue;
+    for (const [, id] of line.replace(/LIM-001 to LIM-\d+/g, '').matchAll(/LIM-(\d+)/g)) {
+      const claim = rows.get(id) ?? '',
+        have = [...want][0].startsWith('@') ? subjects(claim) : new Set(claim.match(/\w+/g));
+      if (![...want].some((s) => have.has(s))) wrong.push(`"${cell.slice(0, 50)}" cites LIM-${id}`);
+    }
+  }
+  return wrong;
+}
+
+test('the citation check sees a limits row citing another subject', () => {
+  const c =
+    '| LIM-001 | Blend: `Blend` in `@margoengine/terrain/blend` |\n| LIM-002 | GI: `GI` in `@margoengine/environment` |\n';
+  assert.deepEqual(wrongCitations('| Terrain blend (`@margoengine/terrain/blend`) | x (LIM-001). |\n', c), []);
+  assert.deepEqual(wrongCitations('| Terrain blend (`@margoengine/terrain`) | x (LIM-002). |\n', c), [
+    '"Terrain blend (`@margoengine/terrain`)" cites LIM-002',
+  ]);
+  assert.deepEqual(wrongCitations('| Blending (`Blend.attach`) | x (LIM-002). |\n', c), [
+    '"Blending (`Blend.attach`)" cites LIM-002',
+  ]);
+  assert.deepEqual(wrongCitations('| Browsers | x (LIM-002). |\n', c), []);
+});
+
+test('every claim a docs/limits.md row cites is about its subject', () => {
+  assert.deepEqual(
+    wrongCitations(limits, claims),
+    [],
+    'a limits row cites a claim about something else: cite the claim of its own package or API',
+  );
+});
