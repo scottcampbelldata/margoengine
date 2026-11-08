@@ -6,7 +6,8 @@ import { build } from 'vite';
 
 const decoderStub = fileURLToPath(new URL('./worker-decoder-stub.js', import.meta.url)),
   poolStub = fileURLToPath(new URL('./worker-pool-stub.js', import.meta.url)),
-  emptyStub = fileURLToPath(new URL('./worker-empty-stub.js', import.meta.url));
+  emptyStub = fileURLToPath(new URL('./worker-empty-stub.js', import.meta.url)),
+  biomesSrc = fileURLToPath(new URL('../packages/biomes/src/', import.meta.url));
 
 // Parser workers: each src/<name>.worker.ts becomes a self-contained classic worker, dist/workers/<name>.js. A package
 // starts it with new URL('./workers/<name>.js?no-inline', import.meta.url), which the app's bundler copies as an asset,
@@ -28,6 +29,11 @@ export async function buildWorkers(root) {
           { find: /^@margoengine\/biomes\/workers$/, replacement: poolStub },
           // Nor does it get a GPU device (its options name none), so it never loads the GPU kernels.
           { find: /^@margoengine\/biomes\/gpu$/, replacement: emptyStub },
+          // Nor makes digests (no worker job asks for one) or default biomes (the page sends its world's biomes).
+          { find: /^@margoengine\/biomes\/(digest|presets)$/, replacement: emptyStub },
+          // Its other entries come from the sources, as its relative imports do: one copy of each module in the file
+          // (and one object per hook), where the built entries would add a second copy of the shared modules.
+          { find: /^@margoengine\/biomes\/([a-z0-9-]+)$/, replacement: `${biomesSrc}$1.ts` },
           // A file with Gaussian splats goes back to the page before anything reads them (gltf-pro's asyncCompression).
           { find: /^@margoengine\/splats(\/data)?$/, replacement: emptyStub },
         ],

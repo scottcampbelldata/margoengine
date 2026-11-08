@@ -1,10 +1,10 @@
 {
-  "commit": "7a86183eb",
+  "commit": "813ff006f",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
     "raw": 58443,
-    "gzip": 23590,
+    "gzip": 23626,
     "limit": 25000
   },
   "packages": {
@@ -235,7 +235,7 @@
       },
       "./workers": {
         "raw": 6154,
-        "gzip": 2778
+        "gzip": 2779
       },
       "./gpu": {
         "raw": 62457,
@@ -258,8 +258,8 @@
         "gzip": 3210
       },
       "dist/workers/biomes.js": {
-        "raw": 142484,
-        "gzip": 51552
+        "raw": 131232,
+        "gzip": 48618
       }
     },
     "@margoengine/blender": {
@@ -577,17 +577,17 @@
     "@margoengine/core": {
       ".": {
         "raw": 51214,
-        "gzip": 21258
+        "gzip": 21285
       },
       "./extension": {
-        "raw": 51313,
-        "gzip": 21323
+        "raw": 51315,
+        "gzip": 21311
       }
     },
     "@margoengine/creative": {
       ".": {
-        "raw": 61586,
-        "gzip": 19100
+        "raw": 62200,
+        "gzip": 19154
       },
       "./particles": {
         "raw": 1028,
@@ -606,16 +606,16 @@
         "gzip": 7019
       },
       "./grass": {
-        "raw": 16111,
-        "gzip": 5944
+        "raw": 16377,
+        "gzip": 5961
       },
       "./planet": {
-        "raw": 20730,
-        "gzip": 7011
+        "raw": 20958,
+        "gzip": 7027
       },
       "./stars": {
-        "raw": 6033,
-        "gzip": 2653
+        "raw": 6153,
+        "gzip": 2665
       }
     },
     "@margoengine/culling": {
@@ -2748,8 +2748,8 @@
     },
     "@margoengine/stage": {
       ".": {
-        "raw": 7314,
-        "gzip": 2966
+        "raw": 7318,
+        "gzip": 2974
       },
       "./gltf": {
         "raw": 2922,
@@ -3651,9 +3651,9 @@
       "brotli": 2690
     },
     "packages/biomes/dist/workers/biomes.js": {
-      "raw": 141164,
-      "gzip": 51413,
-      "brotli": 44937
+      "raw": 129928,
+      "gzip": 48474,
+      "brotli": 42638
     },
     "packages/voxel/dist/workers/light.js": {
       "raw": 27623,

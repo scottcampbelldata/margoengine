@@ -2,8 +2,10 @@
 // worker threads running the built worker script (dist/workers/biomes.js, the file browsers load); every digest equals
 // the same world on the main thread, after paint writes, updates and placement changes too; an aborted job leaves the
 // queue and a retry gives the same bytes; a crashed worker rejects its job with MargoError 'failed' and the next job
-// runs on a fresh replica.
+// runs on a fresh replica. The worker file holds one copy of each module and leaves out the digest and presets
+// entries.
 import test from 'node:test';
+import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { BiomeWorld, defineBiome } from '../dist/index.js';
 import { BiomePlacement } from '../dist/placement.js';
@@ -299,4 +301,15 @@ test('stands: worker placements are the main thread bytes', { timeout: 240000 },
   }
   assert.ok(total > 0);
   remote.dispose();
+});
+
+test('the worker file holds one copy of each module, without the digest and presets entries', () => {
+  // Regression: the package-name imports (toolkit, splines, relief, erosion) resolved to dist, which added a second
+  // copy of the integer helpers (and a second object per hook); the worker never makes a digest, and the page sends its
+  // world's biomes, so the default ones are dead weight.
+  const code = readFileSync(new URL('../dist/workers/biomes.js', import.meta.url), 'utf8'),
+    count = (text) => code.split(text).length - 1;
+  assert.equal(count('isqrt needs an integer'), 1, 'one copy of fixed.ts');
+  assert.equal(count('Biome digests need Web Crypto'), 0, 'no digest entry');
+  assert.equal(count('procedural:fern'), 0, 'no presets');
 });

@@ -3086,3 +3086,47 @@ untouched (23,590 B gzip together after the batch).
 - **Limits and unmeasured:** rows in `docs/limits.md` for each job. Additive, multiply and transmission surfaces are
   not fogged; sphere probes are centred where they are created; the GPU cost of every job's option is not timed;
   nothing was run on another machine.
+
+## Lane I batch 63: biomes
+
+Six jobs for `@margoengine/biomes` on the Beelink (lane I, work list 3): three new optional entries, one skipped, one
+waiting on lane J and a smaller worker file. Core and stage are untouched. Nothing is timed.
+
+| # | Job | Status | Commit | Entry | Claim |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Erosion in the relief | SKIPPED | | `/erosion` exists (`erode`, `erodeRelief`) | |
+| 2 | Flowing rivers in the view | WAITS for lane J batch 66 | | | |
+| 3 | Road and settlement layout | DONE | `b4b690d1b` | `/settlements` (`layoutSettlements`) | LIM-524 |
+| 4 | Rule graph for placement | DONE | `f564b5990` | `/graph` (`definePlacementGraph`, `evaluateGraph`) | LIM-539 |
+| 5 | Ecosystem growth simulation | DONE | `5c20844dc` | `/ecosystem` (`growEcosystem`, `plantsFromTile`) | LIM-544 |
+| 6 | Smaller worker file | PARTIAL | this commit | `dist/workers/biomes.js` (no new entry) | none |
+
+- **Job 2:** waits for lane J batch 66 jobs 2 and 8 (water flow maps and flowing rivers): water has no flow source or
+  flow map yet, so the view has nothing to drive. Redo it as a flow option of `/view` once those land.
+- **Built from:** least-cost roads on the site grid (S73); a topological-order density graph (S77); an individual
+  forest gap model after Botkin, Janak and Wallis 1972 and Pacala et al. 1996, with shading by taller overlapping
+  crowns only (Weiner 1990, Bella 1971) and Clark's 2Dt dispersal kernel (Clark et al. 1999) (S80). Rows in
+  `docs/clean-room.md`.
+- **Proved:** in Node (packages/biomes/tests). Ecosystem: founders fill a plot and close its canopy, a dense stand
+  thins itself, tolerant seedlings outlive intolerant ones under a canopy, the same start gives the same forest. Worker:
+  51,332 B to 48,403 B gzip (level 9), 141,164 B to 129,928 B raw, by leaving out the digest and presets entries the
+  worker never uses and resolving the package's own entries to their sources, so the file holds one copy of each
+  module; a test counts one copy of the integer helpers and none of the digest or presets code.
+- **Job 6 is partial:** the design's 18 kB is not reached. Trial builds: without the optional parts (splines, erosion,
+  graph, zones, multinoise) the file would be 38,153 B; reaching about 18 kB would also take placement, the view and
+  cover tile functions out, which every view with objects needs. A classic IIFE worker cannot split with `import()`;
+  part scripts loaded by `importScripts` from URLs the page sends would work without the app's bundler, but are not
+  built.
+- **Not updated:** the "Biome worker file" row of `docs/limits.md` still gives 43,778 B and calls digest and presets
+  unused; the shared-rows guard refuses any change to an existing row, so its update waits for the manager.
+- **Limits:** rows in `docs/limits.md`; the ecosystem is CPU only, not calibrated to a real forest, time per
+  plant-year unmeasured.
+- **Slips:** job 3 landing 1 failed the root tests (errors-page: literal messages must be listed in
+  `scripts/errors/entries.js`); landing 2 stopped at the shared-rows guard (the lane `rows.cjs` re-added a clean-room
+  row with a taken S id). Never pushed; `rows.cjs` now renumbers S ids and `tests/claims-file.test.js` fails on a
+  repeated id in one table. The claims-check landing's no-overlap fast retry pushed `bb2de19b2` onto a broken main
+  (`357872866`, support-async-calls) without root tests on that base; the land script now builds and runs all root
+  tests in every retry round. Job 4 landing 1 failed `tests/umbrella.test.js`: the script made the umbrella entry after
+  `build:packages`; it now runs `scripts/umbrella.mjs` before every build. Job 5 landing 1 stopped at the guard: main
+  had taken LIM-540 and S78 with no text conflict, so the rebase kept our ids; renumbered to LIM-541 and S79 by hand, and the push race's rebase moved them to LIM-544 and S80 through `rows.cjs`.
+  Never pushed.

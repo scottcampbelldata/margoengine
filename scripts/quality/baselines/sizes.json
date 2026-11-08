@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11299854,
+  "total": 11296832,
   "history": [
     {
       "date": "2026-10-24",
@@ -4544,7 +4544,7 @@
     "@margoengine/behavior/smart-objects": 2029,
     "@margoengine/behavior/steering": 3827,
     "@margoengine/biomes": 16819,
-    "@margoengine/biomes dist/workers/biomes.js": 53099,
+    "@margoengine/biomes dist/workers/biomes.js": 50077,
     "@margoengine/biomes/cover": 3341,
     "@margoengine/biomes/digest": 894,
     "@margoengine/biomes/disturbance": 5771,
