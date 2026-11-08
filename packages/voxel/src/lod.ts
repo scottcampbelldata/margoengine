@@ -287,6 +287,11 @@ export class VoxelLod {
     }
     this.#remask.clear();
   }
+
+  /** {@link VoxelLod.dispose}, for `using`. */
+  [Symbol.dispose](): void {
+    this.dispose();
+  }
 }
 
 const TERRAIN = ['stone', 'dirt', 'grass', 'sand', 'water'] as const;

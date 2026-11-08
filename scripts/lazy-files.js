@@ -302,6 +302,14 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/voxel',
+    file: 'packages/voxel/dist/workers/light.js',
+    label: 'workers/light.js',
+    kind: 'Worker',
+    measure: 'file',
+    when: 'Creating a `VoxelLightWorker` (`@margoengine/voxel/light-worker`): one worker holding a copy of the world, until `dispose()`',
+  },
+  {
+    package: '@margoengine/voxel',
     file: 'packages/voxel/dist/workers/mesher.js',
     label: 'workers/mesher.js',
     kind: 'Worker',

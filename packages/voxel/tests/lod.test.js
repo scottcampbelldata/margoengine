@@ -87,6 +87,19 @@ test('level 1 leaves the cells of loaded real chunks empty and fills them again 
   assert.equal(level1.getChunk(0, 0, 0), undefined);
 });
 
+// Regression (2026-11-07): VoxelLod had dispose() but no [Symbol.dispose](), so `using` did not work (api-conventions).
+test('a VoxelLod declared with using drops its nodes at the end of the block', () => {
+  const world = new VoxelWorld({ blocks: terrainBlocks() });
+  let level1;
+  {
+    using lod = new VoxelLod({ world, generate: solid, levels: 2, radius: 4, minY: 0, maxY: 63, budget: Infinity });
+    lod.update([16, 16, 16]);
+    level1 = lod.levels[0].world;
+    assert.equal(level1.getChunk(0, 0, 0).get(3, 3, 3), 1);
+  }
+  assert.equal(level1.getChunk(0, 0, 0), undefined);
+});
+
 test('moving the eye one node a frame never opens a hole, and settles to one node per point', () => {
   const world = new VoxelWorld({ blocks: terrainBlocks() }),
     lod = new VoxelLod({ world, generate: solid, levels: 3, radius: 3, minY: 0, maxY: 31, budget: 3 });

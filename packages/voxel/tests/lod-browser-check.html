@@ -27,7 +27,8 @@ async function settle(renderers,update=()=>{}){
  for(let i=0;i<6000&&stable<4;i++){update();await frame();
   stable=renderers.every((r)=>!r.world.dirty.size&&!r.stats.pending&&!r.stats.compiling&&(r.stats.draws||!r.stats.chunks))?stable+1:0;}
  if(stable<4)throw new Error('renderers did not settle');
- for(let i=0;i<3;i++)await frame();engine.render({delta:0});return readCanvas();
+ // Read in the task that drew: once presented, a WebGPU canvas's texture may read back blank.
+ engine.render({delta:0});return readCanvas();
 }
 // (1) The same world at scale 1 and 2.
 const world=new VoxelWorld({blocks});

@@ -13,6 +13,7 @@ export class VoxelLod {
     get stats(): VoxelLodStats;
     update(eye: Vec3): number;
     dispose(): void;
+    [Symbol.dispose](): void;
 }
 
 export type VoxelLodGenerate = (chunk: VoxelChunk, x: number, y: number, z: number, scale: number, context: VoxelGenerateContext) => void;
