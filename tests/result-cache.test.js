@@ -161,8 +161,14 @@ test('a repository reached through a symlink still owns the reads, in either spe
 
 test('a folder made in the temp folder is covered, whichever spelling of the temp folder made it', (t) => {
   const { root } = fixture(t);
+  // The link lives in test-results/, not in the temp folder: Windows 11 (build 26300) refuses to make a folder through
+  // a junction that sits in the temp folder (EEXIST), whatever it points at, and allows it elsewhere.
+  const links = resolve(import.meta.dirname, '../test-results');
+  mkdirSync(links, { recursive: true });
+  const holder = mkdtempSync(join(links, 'result-cache-link-'));
+  t.after(() => rmSync(holder, { recursive: true, force: true }));
   const real = fs.realpathSync(temp(t)),
-    linkedTemp = join(temp(t), 'linked-temp');
+    linkedTemp = join(holder, 'linked-temp');
   symlinkSync(real, linkedTemp, 'junction');
   const step = `import { mkdirSync } from 'node:fs';
     mkdirSync(${JSON.stringify(join(linkedTemp, 'through-link'))}); mkdirSync(${JSON.stringify(join(real, 'real'))});`;

@@ -15,8 +15,12 @@ test('stage compaction packages shared chunks and preserves module identities', 
 // macOS os.tmpdir() is /var/folders/..., a link to /private/var/folders/..., and the bundler names importers by their
 // real path. An explicit link puts the same split on any system.
 test('stage compaction finds the shared helpers when the checkout is reached through a symlink', async (t) => {
+  // The link lives in test-results/, not in the temp folder: Windows 11 (build 26300) refuses to make a folder through
+  // a junction that sits in the temp folder (EEXIST or ENOENT), whatever it points at, and allows it elsewhere.
+  const links = resolve(import.meta.dirname, '../test-results');
+  await mkdir(links, { recursive: true });
   const real = await mkdtemp(join(tmpdir(), 'margo-compact-real-')),
-    holder = await mkdtemp(join(tmpdir(), 'margo-compact-link-')),
+    holder = await mkdtemp(join(links, 'margo-compact-link-')),
     root = join(holder, 'checkout');
   t.after(() => Promise.all([real, holder].map((dir) => rm(dir, { recursive: true, force: true }))));
   await symlink(real, root, 'junction');
