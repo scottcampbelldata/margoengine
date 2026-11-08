@@ -38,6 +38,16 @@ test('no two limit claims open with the same name', () => {
   }
 });
 
+// A keep-both in a rebase once dropped the voxel block ticks row (LIM-457) and the next lane took over its neighbour's
+// number; seven other numbers had gone the same quiet way. A claim that ends stays as a retired row, so every number from
+// LIM-001 to the last one is present and a dropped row shows up as a gap.
+test('limit claims run from LIM-001 to the last with no number missing', () => {
+  const have = new Set(ids),
+    missing = [];
+  for (let id = 1; id <= Math.max(...ids); id++) if (!have.has(id)) missing.push(`LIM-${String(id).padStart(3, '0')}`);
+  assert.deepEqual(missing, [], 'a row was dropped: put it back, or keep its number as a retired row');
+});
+
 test('docs/limits.md names the last limit claim', () => {
   const [, last] = /LIM-001 to LIM-(\d+)/.exec(limits);
   assert.equal(Number(last), Math.max(...ids));
