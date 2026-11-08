@@ -13,12 +13,21 @@ import { build } from 'vite';
 const root = resolve(import.meta.dirname, '..');
 const react = join(root, 'packages/react');
 
-test('every react-server entry of the React package starts with "use client"', () => {
+test('every react-server entry of the React package starts with "use client", but the JSX runtimes', () => {
   const exports = JSON.parse(readFileSync(join(react, 'package.json'), 'utf8')).exports;
   const entries = Object.entries(exports).filter(([key]) => key !== './package.json');
   assert.ok(entries.length >= 5);
   for (const [key, value] of entries) {
     const file = join(react, typeof value === 'string' ? value : value['react-server']);
+    // A JSX runtime runs inside every server component compiled with it, so on the server it is React's runtime.
+    if (key === './jsx-runtime' || key === './jsx-dev-runtime') {
+      assert.match(
+        readFileSync(file, 'utf8'),
+        /^\/\/ Generated[^\n]*\nexport \{ [\w, ]+ \} from 'react\/jsx-(dev-)?runtime';\n$/,
+        `${key} (${file}) must be React's own JSX runtime`,
+      );
+      continue;
+    }
     assert.match(readFileSync(file, 'utf8'), /^['"]use client['"];?/, `${key} (${file}) must start with 'use client'`);
   }
 });

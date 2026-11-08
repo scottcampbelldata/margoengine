@@ -58,6 +58,18 @@ function ShapeGeometry({
   }, [scene.engine, registry, kind, key]);
   return null;
 }
+/** Props of the `SphereGeometry` and `PlaneGeometry` children; `args` are those of `@margoengine/geometry`. */
+export interface ShapeGeometryProps<K extends ShapeKind> extends ErrorProps {
+  args?: Parameters<GeometryApi[K]>;
+}
+/** Sphere geometry for the enclosing `<Mesh>` (`<sphereGeometry>` after `extend({ SphereGeometry })`). */
+export function SphereGeometry({ args = [], onError }: ShapeGeometryProps<'sphereGeometry'>) {
+  return <ShapeGeometry kind="sphereGeometry" args={args as number[]} onError={onError} />;
+}
+/** Plane geometry for the enclosing `<Mesh>` (`<planeGeometry>` after `extend({ PlaneGeometry })`). */
+export function PlaneGeometry({ args = [], onError }: ShapeGeometryProps<'planeGeometry'>) {
+  return <ShapeGeometry kind="planeGeometry" args={args as number[]} onError={onError} />;
+}
 interface ShapeProps extends MeshProps, ErrorProps, PbrMaterialProps {
   castShadow?: boolean;
 }

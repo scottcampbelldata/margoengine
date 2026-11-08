@@ -94,6 +94,7 @@ mock.module('@margoengine/core/extension', {
           createdMeshes: [],
           geometryReferences: new Map(),
           plugins: new Map(),
+          lighting: { direction: new Float32Array(4), radiance: new Float32Array(4) },
           createMesh() {
             assert.equal(this.disposed, false);
             const mesh = new EngineMesh(this);
@@ -314,6 +315,86 @@ test('namespace JSX aliases build the same nested scene and release it when Stag
     engine.createdMeshes.every((node) => node.disposals === 1 && node.parent === null && node.children.size === 0),
   );
   view.unmount();
+});
+async function loadMargoTsx(source, development) {
+  const { code } = await transformWithOxc(source, 'react-example.tsx', {
+    jsx: { runtime: 'automatic', importSource: '@margoengine/react', development },
+  });
+  // The compiler imports the runtime entry by its bare name; resolveEntries maps it to the built file.
+  assert.ok(code.includes(development ? '@margoengine/react/jsx-dev-runtime' : '@margoengine/react/jsx-runtime'));
+  const resolved = (await import('./entries.js'))
+    .resolveEntries(code)
+    .replace(/from "react"/g, `from "${import.meta.resolve('react')}"`);
+  return import(`data:text/javascript;base64,${Buffer.from(resolved).toString('base64')}`);
+}
+for (const development of [false, true])
+  test(`jsxImportSource @margoengine/react draws R3F lowercase tags and extend() tags (${development ? 'dev' : 'production'} runtime)`, async () => {
+    const { App } = await loadMargoTsx(
+      `
+      import { Canvas, extend, BoxGeometry } from '@margoengine/react';
+      import { forwardRef, useImperativeHandle } from 'react';
+      const Tagged = forwardRef(function Tagged({ value }, ref) {
+        useImperativeHandle(ref, () => ({ value }), [value]);
+        return <boxGeometry args={[value, value, value]} />;
+      });
+      extend({ Tagged, line: BoxGeometry });
+      export function App({ meshRef, taggedRef }) {
+        return <>
+          <svg><line x1="0" y1="0" x2="1" y2="1" /><group /></svg>
+          <Canvas>
+            <group position={[0, 1, 0]}>
+              <mesh ref={meshRef} position={[1, 2, 3]} rotation={[0, 1, 0]}>
+                <boxGeometry args={[2, 3, 4]} />
+                <meshStandardMaterial color="#123456" roughness={0.2} metalness={0.7} />
+              </mesh>
+              <mesh><tagged ref={taggedRef} value={5} /></mesh>
+              <mesh><line args={[6, 7, 8]} /></mesh>
+            </group>
+            <directionalLight position={[1, 2, 3]} intensity={4} />
+          </Canvas>
+        </>;
+      }
+    `,
+      development,
+    );
+    const meshRef = React.createRef(),
+      taggedRef = React.createRef();
+    const view = render(React.createElement(StrictMode, null, React.createElement(App, { meshRef, taggedRef })));
+    await act(async () => {});
+    const engine = instances.at(-1),
+      nodes = [...engine.meshes.values()];
+    assert.equal(nodes.length, 4, 'one group and three meshes');
+    const group = nodes.find((node) => !node.parent),
+      [box, tagged, line] = nodes.filter((node) => node.parent);
+    assert.deepEqual(group.position, [0, 1, 0]);
+    assert.ok([box, tagged, line].every((node) => node.parent === group));
+    assert.deepEqual(box.position, [1, 2, 3]);
+    assert.deepEqual(box.rotation, [0, 1, 0]);
+    assert.deepEqual(box.geometry.args, [2, 3, 4]);
+    assert.equal(box.material.color, '#123456');
+    assert.equal(box.material.roughness, 0.2);
+    assert.equal(box.material.metalness, 0.7);
+    assert.equal(meshRef.current, box, 'a ref on <mesh> is the engine mesh');
+    assert.deepEqual(tagged.geometry.args, [5, 5, 5]);
+    assert.equal(taggedRef.current.value, 5, 'a ref on an extended tag reaches its component');
+    assert.deepEqual(line.geometry.args, [6, 7, 8], 'an extended tag may share a DOM name inside the Canvas');
+    assert.deepEqual(
+      [...engine.lighting.direction],
+      [1, 2, 3, 4],
+      '<directionalLight position> is the direction towards it',
+    );
+    // Outside the Canvas the same tags stay DOM elements, and nothing Margo is left in the DOM inside it.
+    assert.equal(view.container.querySelectorAll('svg > line, svg > group').length, 2);
+    assert.equal(view.container.querySelectorAll('canvas ~ mesh, canvas ~ group, canvas ~ line').length, 0);
+    view.unmount();
+    assert.equal(engine.meshes.size, 0);
+  });
+test('extend() names the fix when a value is not a component', async () => {
+  const { extend } = await import('../dist/index.js');
+  assert.throws(
+    () => extend({ Broken: 5 }),
+    (error) => error instanceof TypeError && /pass the component itself/.test(error.message),
+  );
 });
 test('Stage waits for a ready, live context stage before rendering or configuring it', async () => {
   const engine = { camera: {}, disposed: false },

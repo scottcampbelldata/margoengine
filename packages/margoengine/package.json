@@ -2122,6 +2122,14 @@
       "types": "./dist/react/helpers.d.ts",
       "import": "./dist/react/helpers.js"
     },
+    "./react/jsx-runtime": {
+      "types": "./dist/react/jsx-runtime.d.ts",
+      "import": "./dist/react/jsx-runtime.js"
+    },
+    "./react/jsx-dev-runtime": {
+      "types": "./dist/react/jsx-dev-runtime.d.ts",
+      "import": "./dist/react/jsx-dev-runtime.js"
+    },
     "./rigging": {
       "types": "./dist/rigging.d.ts",
       "import": "./dist/rigging.js"

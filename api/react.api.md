@@ -7,7 +7,7 @@ import { Camera, EngineKernel, EngineOptions, FrameCallback, Geometry, Mesh, Ren
 import { EnginePlugin } from "@margoengine/core/extension";
 import { ColorInput } from "@margoengine/math";
 import { Stage } from "@margoengine/stage";
-import { CSSProperties, ReactNode } from "react";
+import { CSSProperties, ElementType, ReactNode, RefAttributes } from "react";
 
 export function BoxGeometry({ args }: {
     args?: Vec3;
@@ -41,6 +41,12 @@ export interface CenterProps extends MeshProps {
     disableX?: boolean;
     disableY?: boolean;
     disableZ?: boolean;
+}
+
+export interface DirectionalLightProps {
+    position?: Vec3;
+    color?: ColorInput;
+    intensity?: number;
 }
 
 export function GeometryResource({ geometry }: {
@@ -87,6 +93,16 @@ export interface MargoContextValue {
     gl: EngineKernel | null;
     readonly clock: number;
     invalidate(): void;
+}
+
+export interface MargoElements {
+    mesh: MeshProps & RefAttributes<MeshRef>;
+    group: MeshProps & RefAttributes<MeshRef>;
+    boxGeometry: {
+        args?: Vec3;
+    };
+    meshStandardMaterial: PbrMaterialProps;
+    directionalLight: DirectionalLightProps;
 }
 
 export interface MargoPointerEvent {
@@ -174,6 +190,8 @@ function BoxGeometry({ args }: {
 }): null;
 
 export function clearLoader<T>(load: Loader<T>, url?: string): void;
+
+export function extend(table: Record<string, ElementType>): void;
 
 export { Mesh as group };
 const Mesh: import("react").ForwardRefExoticComponent<MeshProps & import("react").RefAttributes<MeshHandle>>;

@@ -128,8 +128,8 @@ Same tree shape, different spelling. Full table in `docs/react-from-r3f.md`.
 | rapier `<Physics>`, `<RigidBody>` | same names, `@margoengine/react/physics` |
 | `<Canvas shadows>` | `<Shadows />` child |
 
-Differences that matter: no JSX intrinsics (`<mesh>` is a DOM tag); no `extend()` (use `engine.use(plugin)` or an
-effect); no event bubbling and no raycaster; WebGPU first; real-world metres and glTF conventions; stable mesh refs
+Differences that matter: JSX intrinsics (`<mesh>`) and `extend()` need `jsxImportSource: '@margoengine/react'`, and
+`extend` takes React components; no event bubbling and no raycaster; WebGPU first; real-world metres and glTF conventions; stable mesh refs
 through StrictMode and Suspense; optional features are subpaths you install.
 
 ## 7. Browsers without WebGPU
@@ -166,6 +166,6 @@ type-checked from packed tarballs), `modern:test:bundlers`. Guides: `docs/react-
 - Not on npm yet (tarballs only).
 - WebGPU only for React click events, PBR, IBL, shadows, post; WebGL2 is a basic preview (`engine.pick` needs its `/pick` entry there).
 - `Box`, `Sphere`, `Plane` take colour only (no textures); use a glTF `Model`.
-- No lowercase JSX tags, no `extend()`, no event bubbling: R3F code needs a rename pass, not a drop-in swap.
+- Lowercase JSX tags and `extend()` need `jsxImportSource: '@margoengine/react'` (2026-11-07); `extend` takes React components, not engine classes. No event bubbling.
 - Next.js example builds with `--webpack`; Turbopack is covered by the bundler matrix, not the example script.
 - `Model`, `Fbx`, `Animation` and the `materials` components have their own entries (`margoengine/react/gltf-pro` and so on), so a page without them builds with no Basis or Draco `.wasm`.

@@ -118,7 +118,62 @@ import * as Margo from 'margoengine/react';
 </Margo.Canvas>;
 ```
 
-React treats bare lowercase tags such as `<mesh>` and `<group>` as DOM elements, even when their names are imported. Namespace members such as `<Margo.mesh>` and `<Margo.group>` (or uppercase import bindings) invoke these components. All existing PascalCase exports remain available.
+React treats bare lowercase tags such as `<mesh>` and `<group>` as DOM elements, even when their names are imported. Namespace members such as `<Margo.mesh>` and `<Margo.group>` (or uppercase import bindings) invoke these components. All existing PascalCase exports remain available. To keep react-three-fiber's bare tags, compile with Margo's JSX runtime (next section).
+
+### Lowercase tags and extend
+
+Set `jsxImportSource` to `@margoengine/react` (or `margoengine/react`) and bare tags draw Margo components inside a
+`<Canvas>`, so react-three-fiber code moves over without renames. Per file, put the pragma comment on top as below; for
+the whole app, set `"jsxImportSource": "@margoengine/react"` in `tsconfig.json` (`compilerOptions`, with
+`"jsx": "react-jsx"`) or in your bundler's JSX options. The runtime is React's own: every other element is exactly what
+`react/jsx-runtime` makes, and nothing changes outside a Canvas, so an SVG `<line>` stays an SVG line.
+
+```tsx
+/** @jsxImportSource @margoengine/react */
+import { Canvas, extend } from '@margoengine/react';
+import { SphereGeometry } from '@margoengine/react/geometry';
+
+// <sphereGeometry> from here on: each key, first letter lowercased, becomes a tag.
+extend({ SphereGeometry });
+declare module '@margoengine/react' {
+  interface MargoElements {
+    sphereGeometry: import('react').ComponentProps<typeof SphereGeometry>;
+  }
+}
+
+export function App() {
+  return (
+    <Canvas style={{ height: 400 }}>
+      <directionalLight position={[3, 5, 4]} intensity={3} />
+      <group position={[0, 1, 0]}>
+        <mesh rotation={[0, 0.5, 0]}>
+          <boxGeometry args={[1, 1, 1]} />
+          <meshStandardMaterial color="#84d6bd" />
+        </mesh>
+        <mesh position={[2, 0, 0]}>
+          <sphereGeometry args={[0.5, 32, 16]} />
+          <meshStandardMaterial color="#e0a458" roughness={0.3} />
+        </mesh>
+      </group>
+    </Canvas>
+  );
+}
+```
+
+| Tag | Margo component | Notes |
+| --- | --- | --- |
+| `<mesh>`, `<group>` | `Mesh`, `Group` | Same props, `ref` is the engine mesh. |
+| `<boxGeometry args>` | `BoxGeometry` | |
+| `<meshStandardMaterial>` | `PbrMaterial` | `color`, `roughness`, `metalness`. |
+| `<directionalLight position>` | `Sun` | Shines from `position` towards the origin (default `[0, 1, 0]`); `intensity` defaults to 3, the `Sun` default. |
+| anything else | `extend({ Name: Component })` | Values are React components, for example `SphereGeometry` and `PlaneGeometry` from `/geometry` or `AmbientLight` from `/environment`. |
+
+`extend` takes React components, not engine classes as react-three-fiber's does: wrap an engine object in a component
+(an effect that creates and disposes it) and extend with that. The tags are shared by the page, and a later `extend` of
+the same tag replaces it. Add the prop types of your tags by augmenting `MargoElements`, as above. Under the
+`react-server` condition (Next.js server components) the runtime is React's unchanged: write Margo tags in client
+components, below the `<Canvas>`. A tag `extend` never named, such as `<pointLight>`, is still a DOM element and the
+development hint below names the component to use.
 
 ### Which primitive style?
 

@@ -15,6 +15,7 @@ const manifest = JSON.parse(await readFile(join(packageRoot, 'package.json'), 'u
 const specifier = (subpath) => '@margoengine/react' + (subpath === '.' ? '' : subpath.slice(1));
 // Every entry's runtime names. Each binding has one home: the root holds those that need no optional package, and a
 // binding that needs @margoengine/<name> is in @margoengine/react/<name> (2026-10-27).
+const runtimes = ['./jsx-runtime', './jsx-dev-runtime'];
 const expected = {
   '.': [
     'BoxGeometry',
@@ -32,6 +33,7 @@ const expected = {
     'Sun',
     'boxGeometry',
     'clearLoader',
+    'extend',
     'group',
     'mesh',
     'meshStandardMaterial',
@@ -55,7 +57,9 @@ const expected = {
   './shadows': ['ContactShadows', 'Shadows'],
   './sky': ['Sky'],
   './text': ['Text'],
-  './geometry': ['Box', 'Plane', 'Sphere'],
+  './geometry': ['Box', 'Plane', 'PlaneGeometry', 'Sphere', 'SphereGeometry'],
+  './jsx-runtime': ['Fragment', 'jsx', 'jsxs'],
+  './jsx-dev-runtime': ['Fragment', 'jsxDEV'],
   './materials': ['BatchedItem', 'BatchedMesh', 'MeshTransmissionMaterial'],
   './post': [
     'Afterimage',
@@ -152,11 +156,18 @@ test('package exports preserve independent public runtime and declaration paths 
     // the plain entry, which carries no module-level directive to warn about.
     assert.deepEqual(Object.keys(entry), ['types', 'react-server', 'import']);
     assert.equal(entry['react-server'], `./dist/rsc/${filename}.js`);
+    // A JSX runtime is React's own on the server (scripts/react-server-entries.js): every server component calls it.
+    if (runtimes.includes(subpath))
+      assert.match(
+        await readFile(join(packageRoot, entry['react-server']), 'utf8'),
+        new RegExp(`^//.*\\nexport \\{ [\\w, ]+ \\} from 'react/${filename}';\\n$`),
+      );
     // Next.js rejects `export *` in a client boundary: the server entry names every export of the plain entry.
-    assert.match(
-      await readFile(join(packageRoot, entry['react-server']), 'utf8'),
-      new RegExp(`^'use client';\\n(?://.*\\n)*export \\{ [\\w, ]+ \\} from '\\.\\./${filename}\\.js';\\n$`),
-    );
+    else
+      assert.match(
+        await readFile(join(packageRoot, entry['react-server']), 'utf8'),
+        new RegExp(`^'use client';\\n(?://.*\\n)*export \\{ [\\w, ]+ \\} from '\\.\\./${filename}\\.js';\\n$`),
+      );
     assert.deepEqual(
       Object.keys(await import(pathToFileURL(join(packageRoot, entry['react-server'])).href)),
       Object.keys(await import(pathToFileURL(join(packageRoot, entry.import)).href)),
@@ -179,9 +190,10 @@ test('package exports preserve independent public runtime and declaration paths 
   for (const group of ['dependencies', 'peerDependencies', 'optionalDependencies'])
     for (const name of Object.keys(manifest[group] ?? {}))
       assert.equal(name === 'three' || name === 'react-reconciler', false);
-  // One home per binding: no name is exported by two entries (margoengine/react re-exports them all).
+  // One home per binding: no name is exported by two entries (margoengine/react re-exports them all). The JSX
+  // runtimes are compiler targets, not bindings, and margoengine/react leaves them out (scripts/umbrella.mjs).
   const homes = new Map();
-  for (const [subpath, names] of Object.entries(expected))
+  for (const [subpath, names] of Object.entries(expected).filter(([key]) => !runtimes.includes(key)))
     for (const name of names) {
       assert.equal(homes.get(name), undefined, `${name} is exported by ${homes.get(name)} and ${subpath}`);
       homes.set(name, subpath);
@@ -207,6 +219,7 @@ test("only the react-server entries carry 'use client'", async () => {
   assert.deepEqual(
     directives.sort(),
     Object.keys(expected)
+      .filter((subpath) => !runtimes.includes(subpath))
       .map((subpath) => `rsc/${subpath === '.' ? 'index' : subpath.slice(2)}.js`)
       .sort(),
   );

@@ -6,3 +6,4 @@ export * from './hooks.js';
 export * from './views.js';
 export { Sun, type SunProps } from './sun.js';
 export { Center, type CenterProps } from './center.js';
+export { extend, type MargoElements, type DirectionalLightProps } from './intrinsics.js';

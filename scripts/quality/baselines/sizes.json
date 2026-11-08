@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10781319,
+  "total": 10786857,
   "history": [
     {
       "date": "2026-10-24",
@@ -3908,6 +3908,12 @@
       "commit": "33c9316b6",
       "reason": "new entry @margoengine/voxel/light-rgb: coloured block light (VoxelColorLight bundles VoxelLighting and VoxelWorld for its channel copies)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "57f031b0c",
+      "reason": "react: JSX runtime entries and extend (batch 117 job 1)",
+      "grew": 3
     }
   ],
   "items": {
@@ -4417,7 +4423,7 @@
     "@margoengine/ragdoll/hulls": 2007,
     "@margoengine/ragdoll/powered": 3402,
     "@margoengine/ragdoll/profile": 2404,
-    "@margoengine/react": 8317,
+    "@margoengine/react": 8811,
     "@margoengine/react/animation": 3015,
     "@margoengine/react/controls": 4346,
     "@margoengine/react/devtools": 1008,
@@ -4732,6 +4738,8 @@
     "margoengine": 308,
     "margoengine/game": 996,
     "margoengine/viz": 800,
-    "margoengine/web": 577
+    "margoengine/web": 577,
+    "@margoengine/react/jsx-dev-runtime": 2522,
+    "@margoengine/react/jsx-runtime": 2522
   }
 }

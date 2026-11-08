@@ -1,9 +1,11 @@
 # Coming from react-three-fiber
 
 This maps the react-three-fiber (R3F) and drei names found in their public documentation to `@margoengine/react`. The
-tree has the same shape (a `Canvas` with components and hooks inside), but there is no custom reconciler: lowercase JSX
-tags such as `<mesh>` are still DOM elements, so you write `<Mesh>` (or `import * as Margo` and write `<Margo.mesh>`).
-Geometry and material are child components, as in R3F.
+tree has the same shape (a `Canvas` with components and hooks inside), but there is no custom reconciler. Lowercase JSX
+tags such as `<mesh>` are DOM elements in plain React; compile with `jsxImportSource: '@margoengine/react'` and they draw
+Margo components inside a `Canvas` (`<mesh>`, `<group>`, `<boxGeometry>`, `<meshStandardMaterial>`, `<directionalLight>`
+built in, more through `extend`; see "Lowercase tags and extend" in the package README). Without it, write `<Mesh>` (or
+`import * as Margo` and write `<Margo.mesh>`). Geometry and material are child components, as in R3F.
 
 ## Names
 
@@ -44,8 +46,9 @@ Geometry and material are child components, as in R3F.
   components from `@margoengine/react/<package>` (`/controls`, `/shadows`, `/post`, `/gltf-pro`, ...) and install that
   package; each loads when its component mounts, so an app only ships what it uses. `<Canvas shadows>` is
   `<Shadows />` from `@margoengine/react/shadows`.
-- **No `extend()`.** Use native plugins through `useEngine()` and `engine.use(plugin)`, or write a component with
-  `useEffect`.
+- **`extend()` takes components.** `extend({ SphereGeometry })` (with Margo's JSX runtime) gives `<sphereGeometry>`, but
+  the values are React components, not engine classes. For an engine plugin, write a component that calls
+  `engine.use(plugin)` in an effect (`useEngine()`), and extend with that.
 
 ## A scene, side by side
 

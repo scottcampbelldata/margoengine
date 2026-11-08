@@ -2883,6 +2883,7 @@
       "Sun",
       "boxGeometry",
       "clearLoader",
+      "extend",
       "group",
       "mesh",
       "meshStandardMaterial",

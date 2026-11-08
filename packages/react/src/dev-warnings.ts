@@ -38,7 +38,7 @@ export function warnLowercaseTags(root: ParentNode): boolean {
   hint(
     'state',
     `tag:${tag}`,
-    `<${tag}> is a DOM element in React, not a Margo component, so it draws nothing; use ${component}, or the namespace form <Margo.${tag}> (import * as Margo from '@margoengine/react').`,
+    `<${tag}> is a DOM element in React, not a Margo component, so it draws nothing; use ${component}, the namespace form <Margo.${tag}> (import * as Margo from '@margoengine/react'), or compile the file with jsxImportSource '@margoengine/react' so lowercase tags draw ("Lowercase tags and extend" in the @margoengine/react README).`,
   );
   return true;
 }
@@ -49,6 +49,6 @@ export function warnPickingWithoutWebGPU(): void {
     'unsupported',
     'pick:webgl2',
     'onClick, onPointerOver and onPointerOut never fire on the WebGL2 fallback without webglPicking, because engine.pick needs WebGPU; ' +
-      "use loadFallback={() => import('margoengine/webgl/pick')}, handle input on the canvas element yourself, or show fallbackContent without WebGPU (see \"Pointer events and picking\" in the @margoengine/react README).",
+      'use loadFallback={() => import(\'margoengine/webgl/pick\')}, handle input on the canvas element yourself, or show fallbackContent without WebGPU (see "Pointer events and picking" in the @margoengine/react README).',
   );
 }

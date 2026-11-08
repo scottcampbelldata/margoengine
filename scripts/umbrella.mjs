@@ -137,11 +137,18 @@ export function importMap(root = repository, base = 'https://cdn.jsdelivr.net/np
  * The @margoengine/react subpaths margoengine/react leaves out, each still its own margoengine/react/<name>. Physics
  * needs Rapier, a third-party library the app installs itself. The others reach gltf-pro and so the Draco and Basis
  * decoders: Vite copies a module's `new URL(..., import.meta.url)` file when it reads the module, before tree-shaking,
- * so re-exporting them here put the Wasm in the build of every page, whatever the page used.
+ * so re-exporting them here put the Wasm in the build of every page, whatever the page used. The JSX runtimes are what
+ * a compiler imports for `jsxImportSource`, not bindings, and their `Fragment` would clash with React's.
  */
-export const REACT_SEPARATE = ['physics', 'gltf-pro', 'fbx', 'animation', 'materials'].map(
-  (name) => `@margoengine/react/${name}`,
-);
+export const REACT_SEPARATE = [
+  'physics',
+  'gltf-pro',
+  'fbx',
+  'animation',
+  'materials',
+  'jsx-runtime',
+  'jsx-dev-runtime',
+].map((name) => `@margoengine/react/${name}`);
 
 /**
  * The @margoengine entries one alias re-exports: its own, except margoengine/react, the one install, which has every

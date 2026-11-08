@@ -15,11 +15,19 @@ export interface BoxProps extends ShapeProps {
 
 export const Plane: import("react").ForwardRefExoticComponent<PlaneProps & import("react").RefAttributes<import("@margoengine/core").Mesh>>;
 
+export function PlaneGeometry({ args, onError }: ShapeGeometryProps<'planeGeometry'>): import("react").JSX.Element;
+
 export interface PlaneProps extends ShapeProps {
     args?: Parameters<GeometryApi['planeGeometry']>;
 }
 
+export interface ShapeGeometryProps<K extends ShapeKind> extends ErrorProps {
+    args?: Parameters<GeometryApi[K]>;
+}
+
 export const Sphere: import("react").ForwardRefExoticComponent<SphereProps & import("react").RefAttributes<import("@margoengine/core").Mesh>>;
+
+export function SphereGeometry({ args, onError }: ShapeGeometryProps<'sphereGeometry'>): import("react").JSX.Element;
 
 export interface SphereProps extends ShapeProps {
     args?: Parameters<GeometryApi['sphereGeometry']>;
@@ -65,6 +73,8 @@ interface PointerHandlers {
     onPointerOver?: (event: MargoPointerEvent) => void;
     onPointerOut?: (event: MargoPointerEvent) => void;
 }
+
+type ShapeKind = 'boxGeometry' | 'sphereGeometry' | 'planeGeometry';
 
 interface ShapeProps extends MeshProps, ErrorProps, PbrMaterialProps {
     castShadow?: boolean;
