@@ -331,6 +331,63 @@ up) from -Z; AO 0 removes the ambient light (151 to 0); roughness 0.1 draws the 
 147); full height blending gives the highest of four equal layers the ground; and Poly Haven's CC0 Aerial Rocks 02 maps
 (`test/fixtures/aerial-rocks-02`) give a low-sun close-up 1.6 times the luminance spread of its colour alone.
 
+## Height streaming: `@margoengine/terrain/stream`
+
+`TerrainStream.attach(engine, options)` makes a `Terrain` whose heightmap, and painted weights, stream in tiles around
+the camera, so a world can be far bigger than one heightmap. The terrain draws a window of `window` x `window` tiles
+(default 4) centred on the engine camera; `load(x, z, signal)` returns tile (x, z)'s heights (`tileTexels` squared
+float32 samples, rows along +Z) and, with `weights: n`, its n weight byte arrays, or null where there is no data.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {TerrainStream} from 'margoengine/terrain/stream';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const stream = TerrainStream.attach(engine, {
+  tileSize: 256, tileTexels: 256, window: 4, heightScale: 1,   // 1 m texels; a 1,024 x 1,024 window
+  layers: [0, 1, 2, 3].map(() => ({height: [-1e4, 1e4] as [number, number], slope: [0, 1] as [number, number], scale: 0.1})),
+  colors(device) {
+    const texture = device.createTexture({size: [1, 1, 4], format: 'rgba8unorm-srgb', usage: 6});
+    device.queue.writeTexture({texture}, new Uint8Array(16).fill(140), {bytesPerRow: 4, rowsPerImage: 1}, [1, 1, 4]);
+    return texture;
+  },
+  async load(x, z, signal) {
+    const response = await fetch(`/tiles/${x}/${z}.f32`, {signal});   // your tile server
+    return response.ok ? {heights: new Float32Array(await response.arrayBuffer())} : null;
+  },
+});
+engine.start();
+await stream.ready();                                  // every tile of the first window is in
+stream.onChange((change) => console.log(change));      // bands uploaded, or the window moved (`shifted`)
+```
+
+- The window moves a whole tile when the camera is more than 0.75 of a tile from its centre, so ground at least
+  `(window / 2 - 0.75) * tileSize` from the camera on each axis is always in it; the terrain draws nothing past the
+  window, as past any heightmap. Tiles leaving it have their loads aborted (`signal`).
+- No hitches: the kept texels scroll by two GPU texture copies through a scratch texture (no CPU upload), exposed
+  tiles show `fill` (default 0) until they load, and loaded tiles go in as bands of rows within `budget` texels a frame
+  (default 65,536), the nearest tile first, with `concurrency` loads in flight (default 4). This is the incremental
+  clipmap update of Tanner, Migdal and Jones (1998) and Losasso and Hoppe (2004), scrolled instead of wrapped
+  toroidally so the terrain's shader is unchanged.
+- A tile's samples sit at the same world positions in every window (sample k of tile x at
+  `origin + (x * tileTexels + k) * tileSize / tileTexels`), so the ground does not move when the window does; adjacent
+  tiles share no samples and the surface is bilinear across their seam.
+- `heights` and `weights` are the window's CPU copies, kept in place; `origin`, `tile` (the window's minimum tile) and
+  `version` follow it. For queries, build `new TerrainQuery(stream.heights, stream.columns, stream.columns,
+  stream.terrain.options)` and on each `onChange` refresh it over the band, or rebuild it when `shifted`.
+- `ready(signal?)` resolves once the current window is all in (uploads go in as frames are drawn) and rejects with a
+  tile's load error; a failed tile keeps `fill` until it leaves the window. `options.signal` aborts every load.
+  `dispose()` aborts the loads and disposes the terrain.
+- Memory: the window's heightmap, a scratch copy and the CPU copy, 4 bytes a texel each (12 MB at 1,024 x 1,024), plus
+  three times 4 bytes a texel per weight texture. The window must fit the device's 2D texture limit.
+
+Checked on a real GPU by `test/stream.browser.mjs` (in `test:gpu`) on nine adjacent Terrarium tiles around Mount
+Rainier (`test/fixtures/terrarium-10`, Terrain Tiles on AWS), 256 x 256 each with weights made from their heights,
+in a 2 x 2 window: through moves along +X, +Z, -X and -Z, a move inside the margin and teleports off the data and back,
+the CPU copy, the GPU heightmap read back and the weights hold exactly the mosaic's texels for the expected tiles, the
+streamed terrain draws exactly the pixels of a plain `Terrain` given that window whole, no frame uploads more than the
+budget (16,384 texels: 17 frames for the first four tiles), and a stream disposed mid-load aborts it and rejects
+`ready` with MargoError `'disposed'` (Radeon 680M). Cost not timed.
+
 ## Screen-space reflections
 
 `Terrain` takes SSR's capture hook (`@margoengine/post/ssr`): `ssr.add(terrain)` draws its own normal, layer colour and

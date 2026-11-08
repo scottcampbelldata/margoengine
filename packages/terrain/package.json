@@ -31,7 +31,7 @@
     "build": "node ../../scripts/build-optional.js terrain",
     "test": "npm run build && node --test test/*.test.js",
     "prepack": "npm --prefix ../.. run build:packages",
-    "test:gpu": "cd ../.. && node packages/terrain/test/wetness.browser.mjs && node packages/terrain/test/edge.browser.mjs && node packages/terrain/test/bump.browser.mjs && node packages/terrain/test/crest.browser.mjs && node packages/terrain/test/query.browser.mjs && node packages/terrain/test/layers-pbr.browser.mjs"
+    "test:gpu": "cd ../.. && node packages/terrain/test/wetness.browser.mjs && node packages/terrain/test/edge.browser.mjs && node packages/terrain/test/bump.browser.mjs && node packages/terrain/test/crest.browser.mjs && node packages/terrain/test/query.browser.mjs && node packages/terrain/test/layers-pbr.browser.mjs && node packages/terrain/test/stream.browser.mjs"
   },
   "sideEffects": false,
   "exports": {
@@ -46,6 +46,10 @@
     "./layers-pbr": {
       "types": "./dist/layers-pbr.d.ts",
       "import": "./dist/layers-pbr.js"
+    },
+    "./stream": {
+      "types": "./dist/stream.d.ts",
+      "import": "./dist/stream.js"
     }
   },
   "files": [

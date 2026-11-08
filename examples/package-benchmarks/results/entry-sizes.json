@@ -1,6 +1,6 @@
 {
-  "commit": "9a117e8fd",
-  "dirty": false,
+  "commit": "a7d0ca037",
+  "dirty": true,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
     "raw": 57071,
@@ -1236,8 +1236,8 @@
         "gzip": 2615
       },
       "./video": {
-        "raw": 15954,
-        "gzip": 6550
+        "raw": 17317,
+        "gzip": 7031
       },
       "./ffmpeg": {
         "raw": 2162,
@@ -2056,6 +2056,10 @@
       "./contact-shadows": {
         "raw": 17611,
         "gzip": 6330
+      },
+      "./sss": {
+        "raw": 19460,
+        "gzip": 6945
       }
     },
     "@margoengine/procedural": {
@@ -2698,6 +2702,10 @@
       "./layers-pbr": {
         "raw": 6736,
         "gzip": 2563
+      },
+      "./stream": {
+        "raw": 36239,
+        "gzip": 11747
       }
     },
     "@margoengine/text": {

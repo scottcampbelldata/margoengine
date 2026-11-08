@@ -2554,6 +2554,10 @@
       "types": "./dist/terrain/layers-pbr.d.ts",
       "import": "./dist/terrain/layers-pbr.js"
     },
+    "./terrain/stream": {
+      "types": "./dist/terrain/stream.d.ts",
+      "import": "./dist/terrain/stream.js"
+    },
     "./text": {
       "types": "./dist/text.d.ts",
       "import": "./dist/text.js"
