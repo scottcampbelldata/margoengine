@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11296832,
+  "total": 11298054,
   "history": [
     {
       "date": "2026-10-24",
@@ -4508,6 +4508,12 @@
       "commit": "7a86183eb",
       "reason": "new entry @margoengine/voxel-edit/rig",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "f3a2257ae",
+      "reason": "html WebGL2 occlusion queries (batch 106 job 2)",
+      "grew": 1
     }
   ],
   "items": {
@@ -4817,7 +4823,7 @@
     "@margoengine/headless/formats": 5809,
     "@margoengine/headless/stage": 3306,
     "@margoengine/headless/video": 7287,
-    "@margoengine/html": 6008,
+    "@margoengine/html": 7230,
     "@margoengine/input": 5414,
     "@margoengine/input/interactions": 1614,
     "@margoengine/input/motion": 1806,

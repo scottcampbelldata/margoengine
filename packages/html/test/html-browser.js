@@ -1,4 +1,4 @@
-import { Engine, PbrMaterial, box } from '@margoengine/core';
+import { Engine, PbrMaterial, box as cube } from '@margoengine/core';
 import { HTML } from '@margoengine/html';
 import { webglRenderer } from '@margoengine/webgl';
 
@@ -46,9 +46,9 @@ async function scenario(backend) {
     device = engine.gpu;
   device?.addEventListener('uncapturederror', (event) => gpuErrors.push(event.error.message));
   device?.pushErrorScope('validation');
-  engine
+  const box = engine
     .createMesh()
-    .setGeometry(box())
+    .setGeometry(cube())
     .setMaterial(new PbrMaterial({ color: [0.9, 0.2, 0.1] }));
 
   // Job 1: smooth partial occlusion. Duration 0, so the opacity is the visible share of the 4 x 4 grid itself.
@@ -56,19 +56,19 @@ async function scenario(backend) {
   const behind = fade.add(tag(), { position: [0, 0, -1] }),
     edge = fade.add(tag(), { position: EDGE }),
     clear = fade.add(tag(), { position: [2, 0, -1] });
-  if (backend === 'webgpu') {
+  {
     measurements.fadeFrames = await until(
       engine,
       () => !behind.onScreen && edge.onScreen && edge.element.style.opacity === '0.5' && clear.onScreen,
       'fade: behind hidden, edge at 0.5, clear shown',
     );
-  } else await until(engine, () => true, 'a frame');
+  }
   measurements.fade = {
     behind: [behind.onScreen, behind.element.style.opacity],
     edge: [edge.onScreen, edge.element.style.opacity],
     clear: [clear.onScreen, clear.element.style.opacity],
   };
-  if (backend === 'webgpu') {
+  {
     assert(!behind.onScreen, `${backend}: an anchor wholly behind the box stays shown`);
     assert(
       edge.onScreen && edge.element.style.opacity === '0.5',
@@ -80,6 +80,18 @@ async function scenario(backend) {
     );
   }
   fade.dispose();
+
+  // Job 2: the hard test on both backends (WebGL2 by occlusion queries): behind hidden, beside shown, and shown again
+  // once the box moves out of the way.
+  const hard = HTML.attach(engine, { name: 'html-hard' });
+  const covered = hard.add(tag(), { position: [0, 0, -1] }),
+    beside = hard.add(tag(), { position: [2, 0, -1] });
+  measurements.hardFrames = await until(engine, () => !covered.onScreen && beside.onScreen, 'hard: behind hidden');
+  box.setPosition([0, 3, 0]);
+  measurements.uncoverFrames = await until(engine, () => covered.onScreen && beside.onScreen, 'hard: shown once clear');
+  box.setPosition([0, 0, 0]);
+  checks.push(`${backend}: hard occlusion hides an anchor behind the box and shows it again when the box moves away`);
+  hard.dispose();
   if (device) {
     const error = await device.popErrorScope();
     if (error) gpuErrors.push(error.message);

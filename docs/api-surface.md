@@ -41,7 +41,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/gltf | `.` 8, `./auto` 3, `./instancing` 1, `./meshopt` 1, `./quantized` 1, `./scene-data` 6, `./textured` 4 | 186 |  | 6,698 |
 | @margoengine/gltf-pro | `.` 50, `./model` 50, `./asset` 2, `./scene` 8, `./extended` 3, `./instancing` 3, `./prepare` 3, `./progressive` 6, `./splats` 2, `./lights` 10, `./physics` 9, `./interactivity` 10, `./metadata` 13, `./coordinates` 3, `./worker` 4 | 808 | 3 | 66,429 |
 | @margoengine/headless | `.` 11, `./video` 12, `./ffmpeg` 4, `./stage` 3, `./compare` 11, `./formats` 9 | 8 |  | 2,615 |
-| @margoengine/html | `.` 8 |  |  | 5,752 |
+| @margoengine/html | `.` 8 |  |  | 6,999 |
 | @margoengine/input | `.` 13, `./interactions` 6, `./players` 6, `./motion` 3, `./replay` 6, `./pen` 3 | 12 |  | 5,220 |
 | @margoengine/inspector | `.` 12, `./frame` 16, `./history` 2, `./snapshot` 6, `./resources` 2 | 1 |  | 9,058 |
 | @margoengine/kinematics-constraints | `.` 21, `./swept` 5, `./sdf` 5 | 10 |  | 11,567 |

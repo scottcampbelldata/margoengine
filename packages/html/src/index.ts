@@ -104,6 +104,63 @@ function fadeOptions(fade: HTMLOptions['fade']): Fade | undefined {
     );
   return { radius, samples, duration };
 }
+// WebGL2 occlusion (the preview backend draws straight to the canvas, whose depth cannot be sampled): one point per
+// depth test, drawn after the scene with colour and depth writes off inside an ANY_SAMPLES_PASSED query (WebGL 2.0 and
+// OpenGL ES 3.0 occlusion queries). The camera matrix is the renderer's own, so the point lands at the scene's depth.
+const glVertex = `#version 300 es
+uniform mat4 camera;uniform vec3 world;uniform vec2 offset;uniform float bias;
+void main(){vec4 p=camera*vec4(world,1.0);p.xy+=offset*p.w;p.z-=2.0*bias*p.w;gl_Position=p;gl_PointSize=1.0;}`;
+const glFragment = `#version 300 es
+precision lowp float;out vec4 color;void main(){color=vec4(0.0);}`;
+interface GLSlot {
+  queries: WebGLQuery[];
+  /** Tests this round actually drew (a sample off the view is not drawn and counts as clear). */
+  drawn: boolean[];
+  pending: boolean;
+  record?: Record;
+  x: number;
+  y: number;
+  z: number;
+}
+interface GLState {
+  gl: WebGL2RenderingContext;
+  program: WebGLProgram;
+  vao: WebGLVertexArrayObject;
+  camera: WebGLUniformLocation | null;
+  world: WebGLUniformLocation | null;
+  offset: WebGLUniformLocation | null;
+  bias: WebGLUniformLocation | null;
+  slots: (GLSlot | undefined)[];
+}
+function glState(gl: WebGL2RenderingContext): GLState {
+  const program = gl.createProgram()!,
+    vertex = gl.createShader(gl.VERTEX_SHADER)!,
+    fragment = gl.createShader(gl.FRAGMENT_SHADER)!;
+  gl.shaderSource(vertex, glVertex);
+  gl.shaderSource(fragment, glFragment);
+  gl.compileShader(vertex);
+  gl.compileShader(fragment);
+  gl.attachShader(program, vertex);
+  gl.attachShader(program, fragment);
+  gl.linkProgram(program);
+  gl.deleteShader(vertex);
+  gl.deleteShader(fragment);
+  if (!gl.getProgramParameter(program, gl.LINK_STATUS) && !gl.isContextLost())
+    throw margoError(
+      'failed',
+      `HTML could not build its WebGL2 occlusion shaders (${gl.getProgramInfoLog(program)}); pass depth: false to draw without occlusion`,
+    );
+  return {
+    gl,
+    program,
+    vao: gl.createVertexArray()!,
+    camera: gl.getUniformLocation(program, 'camera'),
+    world: gl.getUniformLocation(program, 'world'),
+    offset: gl.getUniformLocation(program, 'offset'),
+    bias: gl.getUniformLocation(program, 'bias'),
+    slots: [],
+  };
+}
 /** DOM projection from labels, with asynchronous rendered-depth occlusion for 2D anchors. */
 export class HTML extends LabelRenderer {
   private runtime?: Engine;
@@ -128,6 +185,7 @@ export class HTML extends LabelRenderer {
   private radius?: GPUBuffer;
   private readonly radiusValues = new Float32Array(4);
   private delta = 0;
+  private glOcclusion?: GLState;
   constructor(private readonly settings: HTMLOptions = {}) {
     super({ ...settings, name: settings.name ?? 'html', order: 1000 });
     const capacity = settings.capacity ?? 1024,
@@ -252,7 +310,10 @@ export class HTML extends LabelRenderer {
       name: this.name + ':depth',
       order: 1001,
       execute: (c) => {
-        if (c.backend === 'webgpu' && this.pipeline && !this.pending) this.sample(c);
+        if (c.backend === 'webgpu') {
+          if (this.pipeline && !this.pending) this.sample(c);
+        } else if (this.settings.depth !== false && !c.gl.isContextLost())
+          this.query(c.gl, c.camera.matrix, c.view?.viewport);
       },
     });
   }
@@ -345,7 +406,102 @@ export class HTML extends LabelRenderer {
       }
     });
   }
+  /**
+   * WebGL2: reads every finished query round, then draws a new round for each anchor that has none in flight. Results
+   * become available a frame or more later (WebGL 2.0 never makes them available in the frame that issued them).
+   */
+  private query(gl: WebGL2RenderingContext, camera: Float32Array | number[], viewport?: readonly number[]): void {
+    let state = this.glOcclusion;
+    if (state && state.gl !== gl) this.releaseGL();
+    state = this.glOcclusion ??= glState(gl);
+    const fade = this.fade,
+      side = fade ? fade.samples : 1,
+      tests = side * side,
+      near = fade ? Math.max(4, fade.radius) : 4,
+      canvas = this.runtime?.canvas,
+      cssWidth = canvas ? canvas.clientWidth || canvas.width : 1,
+      cssHeight = canvas ? canvas.clientHeight || canvas.height : 1,
+      [vx, vy, vw, vh] = viewport ?? [0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight],
+      // The labels' points are CSS pixels in the view; the view is drawing-buffer pixels.
+      width = (vw * cssWidth) / gl.drawingBufferWidth,
+      height = (vh * cssHeight) / gl.drawingBufferHeight,
+      radius = fade?.radius ?? 0,
+      bias = this.settings.depthBias ?? 0.0001;
+    let drawing = false;
+    for (let i = 0; i < this.capacity; i++) {
+      const record = this.slots[i];
+      let slot = state.slots[i];
+      if (slot?.pending) {
+        let ready = true;
+        for (let k = 0; k < tests && ready; k++)
+          ready = !slot.drawn[k] || !!gl.getQueryParameter(slot.queries[k], gl.QUERY_RESULT_AVAILABLE);
+        if (!ready) continue;
+        slot.pending = false;
+        if (record && slot.record === record) {
+          let covered = 0;
+          for (let k = 0; k < tests; k++)
+            if (slot.drawn[k] && !gl.getQueryParameter(slot.queries[k], gl.QUERY_RESULT)) covered++;
+          const fresh =
+            Math.abs(slot.x - record.x) + Math.abs(slot.y - record.y) < near && Math.abs(slot.z - record.z) < 0.001;
+          if (fade) record.target = fresh ? 1 - covered / tests : 1;
+          else record.hidden = fresh && covered > 0;
+        }
+      }
+      if (!record || !record.label.visible || !record.label.screen.inFront || !record.label.screen.inFrustum) continue;
+      if (!slot) {
+        slot = state.slots[i] = { queries: [], drawn: [], pending: false, x: 0, y: 0, z: 0 };
+        for (let k = 0; k < tests; k++) slot.queries.push(gl.createQuery()!);
+      }
+      if (!drawing) {
+        drawing = true;
+        gl.viewport(vx, gl.drawingBufferHeight - vy - vh, vw, vh);
+        gl.useProgram(state.program);
+        gl.bindVertexArray(state.vao);
+        gl.colorMask(false, false, false, false);
+        gl.depthMask(false);
+        gl.enable(gl.DEPTH_TEST);
+        gl.depthFunc(gl.LESS);
+        gl.uniformMatrix4fv(state.camera, false, camera);
+        gl.uniform1f(state.bias, bias);
+      }
+      const world = record.label.world;
+      gl.uniform3f(state.world, world[0], world[1], world[2]);
+      for (let k = 0; k < tests; k++) {
+        // The same grid as the WebGPU shader: cell centres over [-radius, radius] on each axis, in CSS pixels.
+        const ox = side > 1 ? (((k % side) + 0.5) * 2) / side - 1 : 0,
+          oy = side > 1 ? ((Math.floor(k / side) + 0.5) * 2) / side - 1 : 0,
+          sx = record.x + ox * radius,
+          sy = record.y + oy * radius;
+        slot.drawn[k] = sx >= 0 && sx < width && sy >= 0 && sy < height;
+        if (!slot.drawn[k]) continue;
+        gl.beginQuery(gl.ANY_SAMPLES_PASSED, slot.queries[k]);
+        gl.uniform2f(state.offset, ((ox * radius) / width) * 2, (-(oy * radius) / height) * 2);
+        gl.drawArrays(gl.POINTS, 0, 1);
+        gl.endQuery(gl.ANY_SAMPLES_PASSED);
+      }
+      slot.pending = true;
+      slot.record = record;
+      slot.x = record.x;
+      slot.y = record.y;
+      slot.z = record.z;
+    }
+    if (drawing) {
+      gl.colorMask(true, true, true, true);
+      gl.depthMask(true);
+      gl.bindVertexArray(null);
+      gl.useProgram(null);
+    }
+  }
+  private releaseGL(): void {
+    const state = this.glOcclusion;
+    this.glOcclusion = undefined;
+    if (!state || state.gl.isContextLost()) return;
+    for (const slot of state.slots) for (const query of slot?.queries ?? []) state.gl.deleteQuery(query);
+    state.gl.deleteVertexArray(state.vao);
+    state.gl.deleteProgram(state.program);
+  }
   private release(): void {
+    this.releaseGL();
     this.generation++;
     this.pending = false;
     this.shared?.release();

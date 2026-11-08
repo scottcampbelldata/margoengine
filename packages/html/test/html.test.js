@@ -254,3 +254,140 @@ test('HTML fade with duration 0 follows each result and a stale result shows the
     dom.window.close();
   }
 });
+
+/** A WebGL2 context that answers occlusion queries: `passed(query)` says whether the point of that query was drawn. */
+function fakeGL() {
+  let next = 1;
+  const gl = {
+    VERTEX_SHADER: 1,
+    FRAGMENT_SHADER: 2,
+    LINK_STATUS: 3,
+    QUERY_RESULT_AVAILABLE: 4,
+    QUERY_RESULT: 5,
+    ANY_SAMPLES_PASSED: 6,
+    DEPTH_TEST: 7,
+    LESS: 8,
+    POINTS: 0,
+    drawingBufferWidth: 128,
+    drawingBufferHeight: 96,
+    available: true,
+    passed: () => true,
+    draws: 0,
+    deleted: 0,
+    offsets: [],
+    state: {},
+    isContextLost: () => false,
+    createProgram: () => ({}),
+    createShader: () => ({}),
+    shaderSource() {},
+    compileShader() {},
+    attachShader() {},
+    deleteShader() {},
+    linkProgram() {},
+    getProgramParameter: () => true,
+    getProgramInfoLog: () => '',
+    createVertexArray: () => ({}),
+    getUniformLocation: (program, name) => name,
+    createQuery: () => ({ id: next++ }),
+    getQueryParameter: (query, name) => (name === 4 ? gl.available : gl.passed(query) ? 1 : 0),
+    viewport() {},
+    useProgram() {},
+    bindVertexArray() {},
+    colorMask: (...mask) => (gl.state.colorMask = mask),
+    depthMask: (mask) => (gl.state.depthMask = mask),
+    enable() {},
+    depthFunc() {},
+    uniformMatrix4fv() {},
+    uniform1f() {},
+    uniform3f() {},
+    uniform2f: (location, x, y) => gl.offsets.push([x, y]),
+    beginQuery() {},
+    endQuery() {},
+    drawArrays: () => gl.draws++,
+    deleteQuery: () => gl.deleted++,
+    deleteVertexArray() {},
+    deleteProgram() {},
+  };
+  return gl;
+}
+function webgl2Overlay(options) {
+  const h = optionalGPU(),
+    dom = new JSDOM('<body><canvas width="128" height="96"></canvas></body>'),
+    gl = fakeGL();
+  h.engine.canvas = dom.window.document.querySelector('canvas');
+  h.engine.gpu = undefined;
+  h.engine.backend = 'webgl2';
+  h.context.backend = 'webgl2';
+  h.context.gl = gl;
+  const overlay = new HTML(options);
+  h.engine.use(overlay);
+  const frame = async () => {
+    h.frame();
+    await new Promise((resolve) => setImmediate(resolve));
+  };
+  return { h, dom, gl, overlay, frame };
+}
+
+test('HTML occludes on WebGL2 with occlusion queries a frame later and stops while results are pending', async () => {
+  const { dom, gl, overlay, frame } = webgl2Overlay({ capacity: 2 });
+  const label = overlay.add(dom.window.document.createElement('span'), { position: [0, 0, 0.5] });
+  try {
+    gl.passed = () => false;
+    await frame();
+    assert.equal(gl.draws, 1, 'One point per anchor');
+    assert.deepEqual(gl.state, { colorMask: [true, true, true, true], depthMask: true }, 'Writes restored');
+    await frame();
+    assert.equal(label.onScreen, true, 'The query is read in the next frame, after the labels were placed');
+    await frame();
+    assert.equal(label.onScreen, false, 'Covered point: hidden');
+    gl.passed = () => true;
+    await frame();
+    await frame();
+    assert.equal(label.onScreen, true, 'Clear again: shown');
+    gl.available = false;
+    const before = gl.draws;
+    await frame();
+    await frame();
+    assert.equal(gl.draws, before, 'No new round while one is in flight');
+    gl.available = true;
+    await frame();
+    assert.equal(gl.draws, before + 1);
+    label.visible = false;
+    await frame();
+    await frame();
+    assert.equal(gl.draws, before + 1, 'A hidden anchor draws no query');
+  } finally {
+    overlay.dispose();
+    dom.window.close();
+  }
+  assert.equal(gl.deleted, 1, 'Dispose deletes the queries');
+});
+
+test('HTML fade on WebGL2 draws the WebGPU grid, one query a test, and fades by the clear share', async () => {
+  const { dom, gl, overlay, frame } = webgl2Overlay({ capacity: 1, fade: { samples: 2, radius: 4, duration: 0 } });
+  const label = overlay.add(dom.window.document.createElement('span'), { position: [0, 0, 0.5] });
+  try {
+    gl.passed = (query) => query.id !== 1;
+    await frame();
+    assert.equal(gl.draws, 4);
+    // Cell centres at -2 and +2 CSS px on a 128 x 96 view, in clip units; y up.
+    assert.deepEqual(gl.offsets.slice(0, 4), [
+      [-4 / 128, 4 / 96],
+      [4 / 128, 4 / 96],
+      [-4 / 128, -4 / 96],
+      [4 / 128, -4 / 96],
+    ]);
+    await frame();
+    await frame();
+    assert.equal(label.element.style.opacity, '0.75', 'One test of four covered');
+  } finally {
+    overlay.dispose();
+    dom.window.close();
+  }
+  const { dom: dom2, gl: gl2, overlay: off, frame: frame2 } = webgl2Overlay({ depth: false });
+  off.add(dom2.window.document.createElement('span'), { position: [0, 0, 0.5] });
+  await frame2();
+  assert.equal(gl2.draws, 0, 'depth: false draws no queries');
+  off.dispose();
+  dom2.window.close();
+});
