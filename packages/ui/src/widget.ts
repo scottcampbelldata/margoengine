@@ -2,7 +2,7 @@
 import { rangeError, typeError } from '../../shared/errors.js';
 import type { Rgba } from './color.js';
 import type { DrawList } from './draw.js';
-import { validateStyle, type LayoutNode, type LayoutStyle, type Rect } from './layout.js';
+import { edges, validateStyle, type LayoutNode, type LayoutStyle, type Rect } from './layout.js';
 import type { Theme, ThemeColors } from './theme.js';
 import type { Ui } from './ui.js';
 
@@ -340,8 +340,11 @@ export class Widget implements LayoutNode {
   /** The wheel turned over this widget (`dy` in UI units, positive scrolls down). Return true if it was used. */
   wheel(dy: number): boolean {
     if (this._style.overflow !== 'scroll') return false;
-    const before = this.scrollY;
-    this.scrollY = Math.max(0, Math.min(Math.max(0, this.contentHeight - this.rect.height), this.scrollY + dy));
+    // The children scroll inside the padding: the view is the box less its top and bottom padding, as arrange clamps it.
+    const [top, , bottom] = edges(this._style.padding),
+      view = Math.max(0, this.rect.height - top - bottom),
+      before = this.scrollY;
+    this.scrollY = Math.max(0, Math.min(Math.max(0, this.contentHeight - view), this.scrollY + dy));
     if (this.scrollY !== before) this.invalidate();
     return this.scrollY !== before;
   }

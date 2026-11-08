@@ -1,11 +1,12 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import { Label, Panel } from './basic.js';
-import { Inventory, List } from './collections.js';
+import { Inventory, List, type ListItem } from './collections.js';
 import { Button, Slider, Toggle } from './controls.js';
 import { handleKeyDown, type Detach } from './dom.js';
 import { ProgressBar } from './meters.js';
 import { Dialog, Toast, Tooltip } from './overlays.js';
 import type { Ui } from './ui.js';
+import { VirtualList } from './virtual.js';
 import type { Widget } from './widget.js';
 
 /** Options for {@link attachMirror}. */
@@ -150,6 +151,25 @@ export function attachMirror(ui: Ui, target: HTMLElement, options: MirrorOptions
         text: w.label,
         container: false,
       };
+    if (w instanceof VirtualList)
+      return { tag: 'div', attrs: { role: 'listbox', 'aria-label': w.label || 'List' }, container: true };
+    // A virtual list mirrors only its built rows; each says where it stands in the whole list (WAI-ARIA 1.2 setsize, posinset).
+    if (w.role === 'option' && w.parent instanceof VirtualList) {
+      const row = w as ListItem;
+      return {
+        tag: 'div',
+        attrs: {
+          role: 'option',
+          tabindex: w.active ? '0' : null,
+          'aria-selected': String(row.selected),
+          'aria-disabled': w.active ? null : 'true',
+          'aria-setsize': String(w.parent.count),
+          'aria-posinset': String(row.index + 1),
+        },
+        text: w.label,
+        container: false,
+      };
+    }
     if (w instanceof Inventory)
       return { tag: 'div', attrs: { role: 'group', 'aria-label': w.label || 'Inventory' }, container: true };
     if (w.parent instanceof Inventory)

@@ -23,6 +23,8 @@ export type { ButtonOptions, ButtonVariant, ToggleOptions, SliderOptions } from 
 export { ProgressBar, HealthBar } from './meters.js';
 export type { ProgressBarOptions, HealthBarOptions, MeterVariant } from './meters.js';
 export { List, Inventory, Menu } from './collections.js';
+export { VirtualList } from './virtual.js';
+export type { VirtualListOptions } from './virtual.js';
 export type { ListOptions, ListEntry, InventoryOptions, InventoryItem, MenuOptions, MenuItem } from './collections.js';
 export { Dialog, Toast, Tooltip } from './overlays.js';
 export type { DialogOptions, DialogButton, ToastOptions, ToastKind } from './overlays.js';

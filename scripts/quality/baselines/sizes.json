@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11247611,
+  "total": 11249870,
   "history": [
     {
       "date": "2026-10-24",
@@ -4388,6 +4388,12 @@
       "commit": "4d7267a81",
       "reason": "new entry @margoengine/taa/sharpen (Sharpen, batch 73 job 4)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "17f5d4afa",
+      "reason": "ui VirtualList",
+      "grew": 2
     }
   ],
   "items": {
@@ -5096,8 +5102,8 @@
     "@margoengine/tween/motion-path": 1263,
     "@margoengine/tween/scroll": 1198,
     "@margoengine/tween/stagger": 1435,
-    "@margoengine/ui": 31836,
-    "@margoengine/ui/react": 31880,
+    "@margoengine/ui": 32966,
+    "@margoengine/ui/react": 33009,
     "@margoengine/ui/world": 9277,
     "@margoengine/usdz": 12708,
     "@margoengine/usdz dist/workers/usdz.js": 116081,

@@ -12,6 +12,7 @@ import {
   Slider,
   Toggle,
   UiRenderer,
+  VirtualList,
   attachMirror,
   browserTextScale,
 } from '../dist/index.js';
@@ -396,4 +397,35 @@ test('browserTextScale follows the browser font size and textScale auto uses it'
   assert.equal(browserTextScale(doc), 3);
   doc.documentElement.style.fontSize = '4px';
   assert.equal(browserTextScale(doc), 0.5);
+});
+
+test('a virtual list mirrors as a listbox of its built rows, each with its place in the whole list', async () => {
+  const { doc, list } = await setup((ui) => {
+    const list = new VirtualList({
+      count: 5000,
+      row: (i) => `Entry ${i}`,
+      height: 150,
+      anchor: 'top-left',
+      label: 'Log',
+      selected: 2,
+    });
+    ui.add(list);
+    return { list };
+  });
+  const box = q(doc, '[role=listbox]');
+  assert.equal(box.getAttribute('aria-label'), 'Log');
+  const options = qa(box, '[role=option]');
+  assert.equal(options.length, list.range[1] - list.range[0], 'only the built rows');
+  assert.ok(options.length < 20);
+  assert.deepEqual(
+    options.slice(0, 3).map((o) => [o.textContent, o.getAttribute('aria-posinset'), o.getAttribute('aria-setsize')]),
+    [
+      ['Entry 0', '1', '5000'],
+      ['Entry 1', '2', '5000'],
+      ['Entry 2', '3', '5000'],
+    ],
+  );
+  assert.equal(options[2].getAttribute('aria-selected'), 'true');
+  options[0].dispatchEvent(new doc.defaultView.MouseEvent('click', { bubbles: true }));
+  assert.equal(list.selected, 0);
 });

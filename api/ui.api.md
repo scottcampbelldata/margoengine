@@ -727,6 +727,30 @@ export type Unsubscribe = (() => void) & {
     [Symbol.dispose](): void;
 };
 
+export class VirtualList extends Panel {
+    constructor(options?: VirtualListOptions);
+    get count(): number;
+    set count(value: number);
+    get rowHeight(): number;
+    get selected(): number;
+    get range(): readonly [number, number];
+    refresh(): void;
+    select(index: number, emit?: boolean): void;
+    scrollToIndex(index: number): void;
+    focusIndex(index: number, source?: InputSource): boolean;
+    leave(row: Widget, command: 'up' | 'down'): boolean;
+    tick(dt: number): boolean;
+}
+
+export interface VirtualListOptions extends PanelOptions {
+    count?: number;
+    rowHeight?: number;
+    row?: (index: number) => string | ListEntry;
+    overscan?: number;
+    selected?: number;
+    onSelect?: (event: UiEvent) => void;
+}
+
 export class Widget implements LayoutNode {
     readonly id: string;
     readonly children: Widget[];

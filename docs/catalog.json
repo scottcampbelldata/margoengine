@@ -2155,6 +2155,7 @@
       "UI_ACTIONS",
       "Ui",
       "UiRenderer",
+      "VirtualList",
       "Widget",
       "arrange",
       "attachInput",

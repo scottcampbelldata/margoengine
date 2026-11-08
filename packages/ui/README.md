@@ -142,6 +142,7 @@ ui.update(1 / 60); // wide enough now: one line
 | `ProgressBar` | meter with its value written in it | `value`, `max`, `text`, `variant`, `display` |
 | `HealthBar` | progress bar for hit points, with a damage trail | `value`, `max` |
 | `List` | scrolling list of selectable rows | `items`, `selected`, `onSelect` |
+| `VirtualList` | list that builds only the rows in view, for thousands of entries | `count`, `row`, `rowHeight`, `onSelect` |
 | `Inventory` | grid of item slots; drag, or pick up and put down | `columns`, `slots`, `items`, `onMove`, `onUse` |
 | `Menu` | titled column of buttons | `title`, `items` |
 
@@ -179,6 +180,35 @@ console.log(answer);
 
 Status never relies on colour alone: bars write their value inside, toasts carry a symbol and a word for screen readers,
 and a switch moves its knob.
+
+### Virtual lists
+
+```ts
+import { Ui, VirtualList } from '@margoengine/ui';
+
+const ui = new Ui();
+const entries = Array.from({ length: 50_000 }, (_, i) => ({ time: i * 0.25, text: `Event ${i}` }));
+const log = new VirtualList({
+  count: entries.length,
+  row: (i) => ({ label: entries[i].text, detail: `${entries[i].time.toFixed(2)} s` }),
+  height: 240,
+  width: 360,
+  anchor: 'top-left',
+  margin: 16,
+  onSelect: (e) => console.log('picked', e.index),
+});
+ui.add(log);
+ui.update(0);
+console.log(log.range); // [0, 10]: the 6 rows in view and 4 more, the only widgets built
+log.scrollToIndex(40_000); // jump; the rows around it are built on the next update
+```
+
+A `VirtualList` asks `row(index)` only for the rows in view plus `overscan` (default 4) on each side, and stands two
+spacers in for the rest, so scrolling, the scroll bar range and the wheel behave as in a full list while a
+hundred-thousand-row log costs what a screenful does. Every row has the same `rowHeight` (default 44). Arrow keys and
+the d-pad move through all rows, scrolling and building as they go. Set `count` when rows are added or removed, and
+call `refresh()` when their data changes. A focused row that scrolls out of the built range gives up the focus.
+The screen reader mirror reads it as a listbox of the built rows, each telling its place in the whole list.
 
 ## Theming
 
@@ -501,5 +531,6 @@ after that load. An unchanged UI uploads nothing; it is drawn again each frame b
 - Shaping is the browser's, one word at a time: a run never crosses a space, so no join or ligature forms across
   words. Only labels and wrapped text follow the text direction: toggles, slider values, list details and rows of
   widgets keep left-to-right placement (no mirrored layout).
+- A `VirtualList` has one row height; rows of different heights need a `List`.
 - Layout is single-pass flexbox. A wrapping row breaks lines by its children's base sizes, so a child that would grow
   never pulls the next one up; columns do not wrap, and lines always stack down from the top (no `align-content`).

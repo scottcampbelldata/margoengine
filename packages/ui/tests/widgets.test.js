@@ -494,3 +494,18 @@ test('every widget id is unique unless given, and ui.find searches every layer',
   ui.modalLayer.children[0].close();
   return dialogPromise;
 });
+
+test('a padded scrolling List wheeled to the end shows its last row whole, above the bottom padding', () => {
+  // Regression: wheel() clamped the scroll by the whole box height, not the box less its padding, so the last row
+  // stayed cut off at the bottom by twice the padding.
+  const ui = makeUi(),
+    list = new List({ items: Array.from({ length: 30 }, (_, i) => `Row ${i}`), height: 200, anchor: 'top-left' });
+  ui.add(list);
+  ui.update(0);
+  list.wheel(1e9);
+  ui.update(0);
+  const last = list.children.at(-1),
+    padding = 4;
+  near(last.rect.y + last.rect.height, list.rect.y + list.rect.height - padding, 'the last row ends at the padding');
+  assert.equal(list.wheel(10), false, 'already at the end');
+});

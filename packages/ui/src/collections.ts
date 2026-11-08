@@ -4,6 +4,11 @@ import { Label, Panel, type PanelOptions } from './basic.js';
 import { Button, type ButtonOptions } from './controls.js';
 import { Widget, type ColorRef, type DrawContext, type UiCommand, type UiEvent, type WidgetOptions } from './widget.js';
 
+/** What a row tells when it is chosen: a {@link List} or a virtual list. */
+export interface ListOwner {
+  select(index: number, emit: boolean): void;
+}
+
 /** One row of a {@link List}. A plain string is the same as `{ label: string }`. */
 export interface ListEntry {
   label: string;
@@ -15,10 +20,11 @@ export interface ListEntry {
   disabled?: boolean;
 }
 
-class ListItem extends Widget {
+/** @internal A selectable row of a list. */
+export class ListItem extends Widget {
   selected = false;
   constructor(
-    readonly list: List,
+    readonly list: ListOwner,
     readonly index: number,
     readonly entry: ListEntry,
   ) {
