@@ -1294,6 +1294,10 @@
       "types": "./dist/labels.d.ts",
       "import": "./dist/labels.js"
     },
+    "./labels/declutter": {
+      "types": "./dist/labels/declutter.d.ts",
+      "import": "./dist/labels/declutter.js"
+    },
     "./lighting2d": {
       "types": "./dist/lighting2d.d.ts",
       "import": "./dist/lighting2d.js"

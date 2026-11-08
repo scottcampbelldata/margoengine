@@ -42,11 +42,19 @@ export class Label extends Item {
     distanceScale: DistanceScale | null;
     sort: boolean;
     occlude: OccludeHook | null;
+    scale: number;
+    readonly placedAnchor: [number, number];
+    measured: [number, number] | null;
+    layoutHidden: boolean;
+    layoutAnchor: [number, number] | null;
     readonly screen: ScreenPoint;
     readonly world: [number, number, number];
     readonly placement: Float64Array<ArrayBuffer>;
     offsetSpace: 'local' | 'world';
     constructor(owner: LabelRenderer, element: HTMLElement, options: LabelOptions);
+    get priority(): number;
+    set priority(value: number);
+    remeasure(): this;
     get position(): Vec3;
     get offset(): Vec3;
     setMesh(mesh: Mesh | null): this;
@@ -62,6 +70,10 @@ export interface LabelInfo {
     readonly world: Vec3;
 }
 
+export interface LabelLayout {
+    arrange(labels: readonly Label[], context: LayoutContext): void;
+}
+
 export interface LabelOptions {
     mesh?: Mesh | null;
     position?: Vec3;
@@ -73,6 +85,7 @@ export interface LabelOptions {
     followVisibility?: boolean;
     distanceScale?: DistanceScale;
     sort?: boolean;
+    priority?: number;
     occlude?: OccludeHook;
     visible?: boolean;
 }
@@ -81,6 +94,7 @@ export class LabelRenderer implements EnginePlugin {
     readonly name: string;
     root: HTMLDivElement | null;
     occlude: OccludeHook | null;
+    layout: LabelLayout | null;
     writes: number;
     static attach(engine: EngineKernel, options?: LabelRendererOptions): LabelRenderer;
     view: LabelView | null;
@@ -103,10 +117,19 @@ export interface LabelRendererOptions {
     occlude?: OccludeHook;
     name?: string;
     order?: number;
+    layout?: LabelLayout | null;
     view?: LabelView;
 }
 
 export type LabelView = Pick<RenderView, 'camera' | 'viewport' | 'pixels'>;
+
+export interface LayoutContext {
+    readonly width: number;
+    readonly height: number;
+    size(label: Label): readonly [number, number];
+    hide(label: Label): void;
+    place(label: Label, anchor: readonly [number, number]): void;
+}
 
 export type OccludeHook = (label: Label, info: LabelInfo) => boolean;
 

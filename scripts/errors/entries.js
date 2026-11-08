@@ -733,6 +733,21 @@ export const entries = [
     fix: 'Read the message: it names the fix. Pass the arguments the tool lists (call tools/list), use list_packages for package names, and start the server with --root <folder> where the folder has typescript and the @margoengine packages in node_modules (npm install typescript margoengine). Branch on error.code: argument and range are for the caller to fix, unsupported means install TypeScript, failed means retry with a shorter snippet (or reinstall @margoengine/mcp when the porting guides cannot be read). port_to_margo takes a class name or a task in name, and from only as one of the libraries its schema lists.',
   },
   {
+    id: 'labels',
+    title: '@margoengine/labels: label layouts and options',
+    kind: 'family',
+    messages: [
+      'priority must be a number',
+      'place(label, anchor) takes two finite numbers',
+      'padding must be a finite number of CSS pixels, 0 or more',
+      'cell must be a finite number of CSS pixels, 1 or more',
+      'positions must be [x, y] anchors of two finite numbers',
+    ],
+    cause:
+      'A label or a label layout got a value it cannot use: a priority that is not a number, an anchor that is not two finite numbers, or a `Declutter` padding, cell or position list out of range.',
+    fix: 'Pass `priority` as a number (higher is kept first; `Infinity` is allowed), anchors as `[x, y]` fractions of the element such as `[0, 1]`, and `Declutter` options such as `{padding: 4, positions: eightPositions}`.',
+  },
+  {
     id: 'ui',
     title: '@margoengine/ui: widgets, layout, themes and input',
     kind: 'family',

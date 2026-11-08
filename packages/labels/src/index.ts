@@ -7,6 +7,8 @@ export type {
   LabelInfo,
   OccludeHook,
   DistanceScale,
+  LabelLayout,
+  LayoutContext,
 } from './renderer.js';
 export {
   lookAtView,

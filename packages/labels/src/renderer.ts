@@ -11,6 +11,7 @@ import {
   type Vec3,
 } from './projection.js';
 import { hiddenInTree } from '../../shared/visibility.js';
+import { rangeError } from '../../shared/errors.js';
 import { createScreenPoint, isOrthographic, projectPoint, type ScreenPoint } from '@margoengine/math/mat4';
 
 /** Where a label sits this frame: its screen position, depth, distance from the camera and world anchor. */
@@ -29,6 +30,32 @@ export interface LabelInfo {
 export type OccludeHook = (label: Label, info: LabelInfo) => boolean;
 /** Scales a label by distance: a reference distance, optionally clamped between min and max scale. */
 export type DistanceScale = number | { reference: number; min?: number; max?: number };
+
+/**
+ * What a {@link LabelLayout} gets each update: the view size, each label's measured size, and the two decisions it
+ * can make. The renderer applies them in the same update, before any label is drawn.
+ */
+export interface LayoutContext {
+  /** Size of the view rectangle in CSS pixels; label `screen` coordinates are relative to its corner. */
+  readonly width: number;
+  readonly height: number;
+  /**
+   * The element's size in CSS pixels before distance scaling, measured once (`offsetWidth`, `offsetHeight`) and
+   * kept until `label.remeasure()`. Multiply by `label.scale` for its size on screen.
+   */
+  size(label: Label): readonly [number, number];
+  /** Hides the label this update; `label.onScreen` reads false. */
+  hide(label: Label): void;
+  /** Places the label with another anchor this update; its own `anchor` is kept for the next one. */
+  place(label: Label, anchor: readonly [number, number]): void;
+}
+/**
+ * Arranges the labels that passed culling and occlusion before they are drawn, for example to remove overlaps
+ * (`Declutter` from `@margoengine/labels/declutter`). Called once per update with the labels in the order added.
+ */
+export interface LabelLayout {
+  arrange(labels: readonly Label[], context: LayoutContext): void;
+}
 
 /** Options of a label: the mesh or position it follows, its offset, anchor, culling, occlusion and visibility. */
 export interface LabelOptions {
@@ -51,6 +78,8 @@ export interface LabelOptions {
   distanceScale?: DistanceScale;
   /** Take part in depth sorting (z-index). Default true. */
   sort?: boolean;
+  /** Rank for a {@link LabelLayout}: a decluttering layout keeps higher priorities first. Default 0. */
+  priority?: number;
   occlude?: OccludeHook;
   visible?: boolean;
 }
@@ -83,6 +112,8 @@ export interface LabelRendererOptions {
   name?: string;
   /** Frame-pass order. Default 1000, after the scene and other overlays. */
   order?: number;
+  /** Arranges the visible labels each update, for example `new Declutter()`; see {@link LabelRenderer.layout}. */
+  layout?: LabelLayout | null;
   /** Engine view the labels belong to; see {@link LabelRenderer.view}. Default the engine camera and whole canvas. */
   view?: LabelView;
 }
@@ -99,6 +130,10 @@ const write = (element: HTMLElement, cache: StyleCache, property: string, value:
   (element.style as unknown as Record<string, string>)[property] = value;
 };
 const px = (value: number): string => `${Math.round(value * 100) / 100}px`;
+const checkPriority = (value: number): number => {
+  if (typeof value !== 'number' || Number.isNaN(value)) throw rangeError('priority must be a number', 'labels');
+  return value;
+};
 const checkVec = (value: Vec3, name: string): Vec3 => {
   if (!value || value.length < 3 || ![value[0], value[1], value[2]].every(Number.isFinite))
     throw new RangeError(`${name} must be three finite numbers`);
@@ -147,6 +182,16 @@ export class Label extends Item {
   distanceScale: DistanceScale | null;
   sort: boolean;
   occlude: OccludeHook | null;
+  private priorityValue: number;
+  /** Distance scale applied at the last update; 1 without `distanceScale`. */
+  scale = 1;
+  /** Anchor used at the last update: `anchor`, or the one a layout placed the label with. */
+  readonly placedAnchor: [number, number] = [0.5, 0.5];
+  /** @internal Size measured for layouts, CSS pixels before scaling; null until measured. */
+  measured: [number, number] | null = null;
+  /** @internal Layout decision of the current update: hidden, or placed with another anchor. */
+  layoutHidden = false;
+  /** @internal */ layoutAnchor: [number, number] | null = null;
   /** Projected position at the last update. */
   readonly screen: ScreenPoint = createScreenPoint();
   /** World anchor at the last update. */
@@ -165,8 +210,21 @@ export class Label extends Item {
     this.frustumCulling = options.frustumCulling ?? true;
     this.distanceScale = options.distanceScale ?? null;
     this.sort = options.sort ?? true;
+    this.priorityValue = checkPriority(options.priority ?? 0);
     this.occlude = options.occlude ?? null;
     element.style.pointerEvents = options.pointerEvents ?? 'none';
+  }
+  /** Rank for a {@link LabelLayout}; higher is kept first. */
+  get priority(): number {
+    return this.priorityValue;
+  }
+  set priority(value: number) {
+    this.priorityValue = checkPriority(value);
+  }
+  /** Measures the element again at the next update, after its content or style changed its size. */
+  remeasure(): this {
+    this.measured = null;
+    return this;
   }
   get position(): Vec3 {
     return this.positionValue;
@@ -241,6 +299,8 @@ export class LabelRenderer implements EnginePlugin {
   /** Overlay root; created in setup, removed on dispose. */
   root: HTMLDivElement | null = null;
   occlude: OccludeHook | null;
+  /** Arranges the visible labels each update (for example `new Declutter()`); null places each label on its own. */
+  layout: LabelLayout | null;
   private readonly order: number;
   private readonly options: LabelRendererOptions;
   private engine: EngineKernel | null = null;
@@ -254,6 +314,20 @@ export class LabelRenderer implements EnginePlugin {
   private readonly cssView = new Float64Array(16);
   private readonly point = createScreenPoint();
   private readonly visibleLabels: Label[] = [];
+  private readonly shownLabels: Label[] = [];
+  private readonly layoutContext = {
+    width: 0,
+    height: 0,
+    size: (label: Label): readonly [number, number] => this.measure(label),
+    hide: (label: Label): void => {
+      label.layoutHidden = true;
+    },
+    place: (label: Label, anchor: readonly [number, number]): void => {
+      if (!anchor || !Number.isFinite(anchor[0]) || !Number.isFinite(anchor[1]))
+        throw rangeError('place(label, anchor) takes two finite numbers', 'labels');
+      label.layoutAnchor = [anchor[0], anchor[1]];
+    },
+  };
   private readonly world: [number, number, number] = [0, 0, 0];
   private left = 0;
   private top = 0;
@@ -277,6 +351,7 @@ export class LabelRenderer implements EnginePlugin {
     this.name = options.name ?? 'margoengine-labels';
     this.order = options.order ?? 1000;
     this.occlude = options.occlude ?? null;
+    this.layout = options.layout ?? null;
   }
 
   setup(engine: EngineKernel): void {
@@ -355,8 +430,10 @@ export class LabelRenderer implements EnginePlugin {
       store = runtime.store,
       matrices = store.matrices;
     this.syncRoot(canvas, x * sx, y * sy, width, height);
-    const visible = this.visibleLabels;
+    const visible = this.visibleLabels,
+      shown = this.shownLabels;
     visible.length = 0;
+    shown.length = 0;
     const [ex, ey, ez] = camera.position,
       m = camera.matrix;
     // Orthographic: size does not change with distance, so distanceScale uses the distance at which a perspective
@@ -412,17 +489,13 @@ export class LabelRenderer implements EnginePlugin {
           show = false;
       }
       label.onScreen = show;
+      label.layoutHidden = false;
+      label.layoutAnchor = null;
       if (!show) {
         this.set(label.element, label.cache, 'display', 'none');
         continue;
       }
-      const key = label.placement,
-        x = Math.round(screen!.x * 100) / 100,
-        y = Math.round(screen!.y * 100) / 100,
-        ax = label.anchor[0],
-        ay = label.anchor[1];
-      let scaled = 0,
-        factor = 0;
+      let factor = 1;
       if (label.distanceScale !== null) {
         const options =
           typeof label.distanceScale === 'number' ? { reference: label.distanceScale } : label.distanceScale;
@@ -433,8 +506,33 @@ export class LabelRenderer implements EnginePlugin {
               Math.max(options.min ?? 0, options.reference / Math.max(zoomDistance || label.distance, 1e-6)),
             ) * 1e4,
           ) / 1e4;
-        scaled = 1;
       }
+      label.scale = factor;
+      shown.push(label);
+    }
+    const layout = this.layout;
+    if (layout && shown.length) {
+      const context = this.layoutContext;
+      context.width = width;
+      context.height = height;
+      layout.arrange(shown, context);
+    }
+    for (const label of shown) {
+      if (label.layoutHidden) {
+        label.onScreen = false;
+        this.set(label.element, label.cache, 'display', 'none');
+        continue;
+      }
+      const anchor = label.layoutAnchor ?? label.anchor,
+        key = label.placement,
+        x = Math.round(label.screen.x * 100) / 100,
+        y = Math.round(label.screen.y * 100) / 100,
+        ax = anchor[0],
+        ay = anchor[1],
+        scaled = label.distanceScale !== null ? 1 : 0,
+        factor = scaled ? label.scale : 0;
+      label.placedAnchor[0] = ax;
+      label.placedAnchor[1] = ay;
       // The transform text depends only on these numbers: format and compare it again only when one changed.
       if (key[0] !== x || key[1] !== y || key[2] !== scaled || key[3] !== factor || key[4] !== ax || key[5] !== ay) {
         key[0] = x;
@@ -538,6 +636,12 @@ export class LabelRenderer implements EnginePlugin {
     this.dispose();
   }
 
+  private measure(label: Label): readonly [number, number] {
+    if (label.measured) return label.measured;
+    // A hidden element measures 0: show it for the reading. The update then writes its final display.
+    this.set(label.element, label.cache, 'display', '');
+    return (label.measured = [label.element.offsetWidth || 0, label.element.offsetHeight || 0]);
+  }
   private set(element: HTMLElement, cache: StyleCache, property: string, value: string): void {
     if (cache[property] === value) return;
     write(element, cache, property, value);
