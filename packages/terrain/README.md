@@ -508,6 +508,52 @@ ground under its hole be lit exactly as with no roof, while a slanted sun shades
 occluder writes no depth; a cut sent with `upload` draws as one made before attaching. The node tests check the
 bindings and that the colour, shadow and occluder shaders each declare and test the mask, and that queries skip holes.
 
+## Erosion: `erode` from `@margoengine/biomes/erosion`
+
+Weathered ground needs no terrain entry of its own: `erode(grid, options)` in `@margoengine/biomes/erosion` erodes
+any height grid (integer millimetres, so the same heights and options give the same bytes on every machine): thermal
+erosion slides material down slopes steeper than the angle of repose (`talus`, default 35 degrees) into scree, and
+hydraulic erosion lets every cell's water run to an outlet, cutting gullies where a flow can carry more than it holds
+and dropping the excess where its slope eases, in fans at the foot of slopes. It is deterministic: noise you generate
+from a seed erodes to the same ground every time. Convert a terrain's heights to millimetres, erode, and upload:
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Terrain} from 'margoengine/terrain';
+import {erode} from 'margoengine/biomes/erosion';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const n = 129, size = 1280, heightScale = 400;          // 10 m cells, heights 0..1 times 400 m
+let seed = 7;
+const random = () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 2 ** 32;
+const heights = new Float32Array(n * n).map((_, i) =>
+  Math.max(0, 1 - Math.hypot(i % n - 64, Math.floor(i / n) - 64) / 50) + random() * 0.01);
+const eroded = erode(
+  {height: Int32Array.from(heights, (h) => Math.round(h * heightScale * 1000)), nx: n, nz: n, step: (size / (n - 1)) * 1000},
+  {iterations: 64, talus: 35, capacity: 0.05},
+);
+const weathered = Float32Array.from(eroded.height, (mm) => mm / 1000 / heightScale);
+Terrain.attach(engine, {
+  size: [size, size], origin: [-size / 2, -size / 2], heightScale, cellSize: 5,
+  layers: [0, 1, 2, 3].map(() => ({height: [-1e4, 1e4] as [number, number], slope: [0, 1] as [number, number], scale: 0.05})),
+  textures(device) {
+    const heightmap = device.createTexture({size: [n, n], format: 'r32float', usage: 6});
+    device.queue.writeTexture({texture: heightmap}, weathered, {bytesPerRow: n * 4}, [n, n]);
+    const layers = device.createTexture({size: [1, 1, 4], format: 'rgba8unorm-srgb', usage: 6});
+    device.queue.writeTexture({texture: layers}, new Uint8Array(16).fill(140), {bytesPerRow: 4, rowsPerImage: 1}, [1, 1, 4]);
+    return {heightmap, layers};
+  },
+});
+engine.start();
+```
+
+`eroded.wear` and `eroded.deposit` (mm a cell) make good painted weights: rock where it wore, gravel or mud where it
+filled. On a 1.3 km cone of 10 m cells with seeded noise (run on the CPU, 2026-11-07): 64 rounds took the steepest
+slope from tan 1.19 to 0.89 toward the talus slope's 0.70 (scree), hydraulic erosion alone (`thermal: 0, capacity:
+0.05`) raised the relief across the slope (height spread around rings of the cone) from 0.86 m to 6.6 m (gullies), with the defaults the
+foot of the cone took 6.4 m of deposit on average against 0.07 m on the far plain (fans), and two runs gave the same
+bytes. It runs on the CPU (in a worker if you like); a GPU port would be a second erosion with float results that
+differ by GPU.
+
 ## Screen-space reflections
 
 `Terrain` takes SSR's capture hook (`@margoengine/post/ssr`): `ssr.add(terrain)` draws its own normal, layer colour and
