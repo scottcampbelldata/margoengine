@@ -2600,7 +2600,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-561). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-562). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -2812,6 +2812,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Grid pathfinding (`@margoengine/tilemap/path`, 2026-11-08) | Up to `maxCells` (default 1,000,000) cells searched per call; arrays of the grid's size (about 21 B per cell) made per call. | A tile map is a grid, so a plain heap search over its cells needs no navigation mesh. | By method: one search per call on the calling thread (no incremental or hierarchical search, no jump point pruning); costs are per cell entered, not per edge; a staggered map's left and right cells in one row are two steps apart. Time not measured. | For big open worlds use `@margoengine/navmesh`; for many units to one goal reuse one `flowField`. |
 | Field of view and fog of war (`@margoengine/tilemap/fov`, 2026-11-08) | One scan of up to `max(width, height)` rows per octant per viewer on the calling thread; a mask of `width * height` bytes per call (or the `into` mask), `FogOfWar` keeps two. | Shadowcasting visits only the cells that light can still reach, so a closed room costs its own cells. | By method: sight is from the viewer's cell centre and not symmetric; orthogonal and isometric grids only (staggered and hexagonal refused); no partial light or light levels; the fog image is one pixel per cell, drawn by the caller. Time not measured. | For light levels use `@margoengine/voxel/light-rgb` or a lighting pass; for hex fog test cells with `@margoengine/tilemap/hex` lines. |
 | Pixel-art scaling (`@margoengine/pixel/scale`, 2026-11-08) | One pass a canvas view (or one into `target`), 4 texel reads a pixel for `'sharp-bilinear'` and up to 20 for `'edge'`; the picture covers whole screen pixels. | Covering each screen pixel by its share of each texel keeps art pixels flat and even at any size. | By method: two texels a side are mixed, so below 1 times the picture is not averaged over all it covers; `'edge'` below 2 times draws as `'sharp-bilinear'`; colours mix as stored (sRGB values), not in linear light; texels past the edge repeat the edge. Time not measured. | Draw the art at the size you need below 1 times. |
+| CRT look (`@margoengine/pixel/crt`, 2026-11-08) | One pass a canvas view (or one into `target`), 9 texel reads a pixel. | Working from the art's own rows keeps one scanline per art pixel at any screen size. | By method: a stylised look, not a model of a real tube (no beam spread with brightness, no persistence, no interlace, no colour bleed); one grille pattern (three columns); the art row under each pixel is taken whole, not mixed with the next; colours as stored, not in linear light. Time not measured. | For a measured tube model use a dedicated post pass. |
 
 
 | Limit | Starts at | Why | What you see | Escape hatch |

@@ -143,6 +143,40 @@ The picture covers whole screen pixels: `fitRect(width, height, viewWidth, viewH
 `'edge'` needs room for the doubled picture: below 2 times it draws as `'sharp-bilinear'`. Colours mix as stored, not
 in linear light. `scale2x(image)` is the CPU form of the doubling, to export sprites at twice the size.
 
+## CRT look
+
+`margoengine/pixel/crt` draws a low-res picture as an old tube screen would show it: the glass bows out, each art row
+is a beam bright in its middle with darker gaps between rows, an aperture grille passes red, green and blue in turn
+across the screen columns, and glow adds a soft blur of the picture on top. It is worked out from the art's own rows,
+so the lines stay one per art pixel at any screen size.
+
+```ts
+import {EngineKernel} from 'margoengine/core';
+import {LayerCompositor} from 'margoengine/pixel';
+import {CRT} from 'margoengine/pixel/crt';
+const canvas = document.querySelector('canvas')!;
+const engine = await EngineKernel.create(canvas, {backend: 'webgpu', exactSize: [960, 720]});
+const compositor = LayerCompositor.attach(engine, {camera: {width: 256, height: 192}});
+const art = compositor.addLayer({visible: false}); // sprites and maps draw here
+const crt = CRT.attach(engine, {source: art.target, curvature: 0.1, scanlines: 0.6});
+engine.render({delta: 1 / 60});
+crt.glow = 0.4; // every look setting is read each frame
+```
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| `source`, `target`, `fit`, `layers` | as `PixelScale` | The picture, where it goes and how it fills the view |
+| `curvature` | `0.08` | How much the glass bends, 0 (flat) to 0.5; outside the glass is black |
+| `scanlines` | `0.5` | How dark the gaps between art rows get, 0 to 1 |
+| `mask` | `0.2` | How much the grille dims the two colours a screen column does not pass, 0 to 1 |
+| `glow` | `0.25` | How much of a 3 x 3 blur of the art is added, 0 to 1 |
+| `brightness` | `1.2` | Multiplies the beam to win back what the lines and grille take, 0 to 4 |
+| `order` | `35` | Frame-graph order, after a compositor (30) |
+| `name` | `crt-1`, ... | Plugin name, unique per scene |
+
+With every effect at 0 and `brightness` 1 the CRT is plain nearest sampling. The grille needs about 3 screen pixels a
+column to read as one; below that it shows as a faint pattern.
+
 ## Palettes and dithering
 
 `margoengine/pixel/palette` reduces a low-res picture to a palette: one pass from a layer into another, with each pixel becoming exactly one palette colour. Matching is in Oklab or plain sRGB. Ordered Bayer 2, 4 and 8 and a 64 x 64 blue-noise tile dither before matching. `swap` draws other colours for the same matches.

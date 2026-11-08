@@ -1914,6 +1914,10 @@
       "types": "./dist/pixel/scale.d.ts",
       "import": "./dist/pixel/scale.js"
     },
+    "./pixel/crt": {
+      "types": "./dist/pixel/crt.d.ts",
+      "import": "./dist/pixel/crt.js"
+    },
     "./points": {
       "types": "./dist/points.d.ts",
       "import": "./dist/points.js"
