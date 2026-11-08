@@ -984,6 +984,8 @@ Known rendering gaps:
 
 **Splat lighting (2026-11-08).** `@margoengine/splats/lighting` adds two shaders: a compute pass at order -6.5 scales the projected colours by core's diffuse terms with a per-splat normal from the smallest covariance eigenvector, and a depth-only `drawShadow` for `@margoengine/shadows` that rasterises each splat's ellipse in the light's clip space (0.3 texel^2 dilation) with stochastic per-texel coverage. Evidence: `packages/splats/test/gpu/check.mjs` on a Radeon 680M (relit colours against the CPU formula; a synthetic disc and a real capture shadow a ground box); missing: splats receiving shadows, a specular term, frame time.
 
+**Splat brush (2026-11-08).** `@margoengine/splats/edit` adds one compute shader with every operation behind a uniform switch: select, erase and paint test each splat's projected centre against a pixel region, and a pick runs two submissions (atomic min of an order-preserving view-depth key, then of the indices at that key; one submission would see only the second pass's uniform, as queue writes land before the command buffer runs). `Splats.read` copies positions, colours and SH back for export and restoration, reading again when a `write` lands during the read. Evidence: `packages/splats/test/gpu/check.mjs` on a Radeon 680M; missing: stroke cost on a 3,000,000-splat cloud.
+
 ## 4. Quality architecture
 
 ### 4.1 Gate map

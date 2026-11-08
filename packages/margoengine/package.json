@@ -2498,6 +2498,10 @@
       "types": "./dist/splats/set.d.ts",
       "import": "./dist/splats/set.js"
     },
+    "./splats/edit": {
+      "types": "./dist/splats/edit.d.ts",
+      "import": "./dist/splats/edit.js"
+    },
     "./splats/data": {
       "types": "./dist/splats/data.d.ts",
       "import": "./dist/splats/data.js"

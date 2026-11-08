@@ -4,6 +4,7 @@
 // cloud hides what later passes draw behind it, on a synthetic splat and on a real capture (raccoon, Niantic SPZ sample).
 // ./set: two overlapping copies of the capture sorted as one set draw what one merged cloud draws; as two clouds they do not.
 // ./lighting: relit colours match core's diffuse terms; a synthetic disc and the real capture shadow a ground mesh.
+// ./edit: GPU picks take the nearest splat; select, erase and paint change exactly the region's splats, read back.
 // ./lod: a hierarchy of the real capture fully refined draws as the plain cloud; a 16.7 M-splat stand-in streams in a 2 M budget.
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../../scripts/browser.js';
@@ -241,6 +242,83 @@ try {
     // The sun is 31 degrees off vertical, so the shadow sits beside the cloud (at the centre) and nothing else changes.
     assert.ok(offset > 10, `the shadow lands beside the cloud, ${offset} px from it`);
     assert.ok(spread < 80, `only the shadow changes, ${spread} px across`);
+  }
+  // ./edit, synthetic grid: picking takes the nearest splat at a pixel (64, in front of 36 and 65), honours the
+  // threshold and finds nothing on the background; erase, select (replace, add, subtract) and paint change exactly the
+  // splats whose projected centres are in the region, on the GPU, and commit reads them back.
+  {
+    const near = [0.1, 0.1, 0.5],
+      grid = (i) => [-0.7 + (i % 8) * 0.2, -0.7 + Math.floor(i / 8) * 0.2, 0],
+      steps = [
+        ['pick', near],
+        ['pick', near, 0.99],
+        ['pickAt', 2, 2],
+        ['pick', grid(0)],
+        ['erase', { world: near, radius: 0.5 }],
+        ['draw'],
+        ['pick', near],
+        ['select', { half: 'left' }],
+        ['select', { world: grid(36), radius: 4 }, 'add'],
+        ['select', { world: grid(0), radius: 4 }, 'subtract'],
+        ['selection'],
+        ['erase', 'selection'],
+        ['paint', { half: 'right' }, [0, 1, 0], 1],
+        ['commit'],
+      ];
+    const r = await page.evaluate((o) => window.check.brush(o), { steps, points: [grid(1), grid(7), grid(0)] }),
+      [nearest, strict, background, corner, , behind, , , , selected, , , committed] = r.out;
+    report['edit picks'] = { nearest, strict, background, corner, behind, frame: r.frame };
+    assert.equal(nearest, 64, 'the pick takes the nearest splat at the pixel, not the lowest index');
+    assert.equal(strict, -1, 'no splat reaches opacity 0.99 at the pixel');
+    assert.equal(background, -1, 'nothing at the corner');
+    assert.equal(corner, 0, 'the corner splat');
+    assert.equal(behind, 36, 'after erasing the front splat the grid splat behind it is nearest');
+    const left = Array.from({ length: 64 }, (_, i) => i).filter((i) => i % 8 < 4 && i !== 0);
+    assert.deepEqual(selected, [...left, 36, 65].sort((a, b) => a - b), 'select replace, add and subtract');
+    for (let i = 0; i < 66; i++) {
+      const got = committed.colors.slice(i * 4, i * 4 + 4),
+        erased = i === 64 || selected.includes(i),
+        green = !erased && i < 64 && i % 8 >= 4;
+      const want = erased ? [...r.input.slice(i * 4, i * 4 + 3), 0] : green ? [0, 1, 0, r.input[i * 4 + 3]] : r.input.slice(i * 4, i * 4 + 4);
+      assert.deepEqual(got, want.map(Math.fround), `splat ${i} after erase and paint`);
+    }
+    const img = await decodePNG(Buffer.from(r.url.split(',')[1], 'base64')),
+      at = ([x, y]) => [...img.data.subarray((Math.floor(y) * img.width + Math.floor(x)) * 4, (Math.floor(y) * img.width + Math.floor(x)) * 4 + 3)];
+    const [gone, painted, kept] = r.points.map(at);
+    report['edit image'] = { gone, painted, kept };
+    assert.ok(gone[0] < 40 && painted[1] > 150 && painted[0] < 60 && kept[0] > 150, `erased, painted and kept splats draw so: ${gone} ${painted} ${kept}`);
+  }
+  // ./edit, SH cloud: paint sets the DC term to the blended colour and fades the higher bands by the strength.
+  {
+    const r = await page.evaluate((o) => window.check.brush(o), { sh: true, steps: [['paint', 'all', [0, 0, 1], 0.5], ['commit']] }),
+      { colors, sh } = r.out[1];
+    let worst = 0;
+    for (let i = 0; i < 66; i++)
+      for (let k = 0; k < 3; k++) {
+        const c = r.input[i * 4 + k],
+          want = c + (k === 2 ? 1 - c : -c) * 0.5;
+        worst = Math.max(worst, Math.abs(colors[i * 4 + k] - want), Math.abs(0.5 + 0.2820947918 * sh[i * 12 + k] - want));
+        for (let j = 1; j < 4; j++) worst = Math.max(worst, Math.abs(sh[i * 12 + j * 3 + k] - 0.05));
+      }
+    report['edit sh'] = { worst };
+    assert.ok(worst < 1e-5, `SH paint matches the formula, worst ${worst}`);
+  }
+  // ./edit, real capture: a pick at the centre finds a splat; a brush there erases what it selects, and only that.
+  {
+    const r = await page.evaluate((o) => window.check.brush(o), {
+        capture: true,
+        steps: [['pickCentre'], ['selectCentre', 12], ['selection'], ['erase', 'selection'], ['commit']],
+      }),
+      [index, , selected, , committed] = r.out;
+    let wrong = 0;
+    for (let i = 0; i < r.input.length / 4; i++) {
+      const want = selected.includes(i) ? 0 : r.input[i * 4 + 3];
+      if (committed.colors[i * 4 + 3] !== Math.fround(want)) wrong++;
+    }
+    report['edit capture'] = { index, selected: selected.length, wrong };
+    assert.ok(index >= 0, 'a splat at the centre of the capture');
+    assert.ok(selected.length > 20 && selected.length < r.input.length / 8, `the brush selects a patch: ${selected.length}`);
+    assert.equal(wrong, 0, 'exactly the selected splats are erased');
   }
   const errors = await page.evaluate(() => window.check.errors);
   console.log(JSON.stringify(report));

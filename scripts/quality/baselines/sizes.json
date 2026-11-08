@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10982379,
+  "total": 10986235,
   "history": [
     {
       "date": "2026-10-24",
@@ -4118,6 +4118,12 @@
       "commit": "c10202e34",
       "reason": "post/blur: new optional entry, Gaussian and box blur",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "0f4f13f95",
+      "reason": "splats/edit: GPU picking and brush editing entry; root gains Splats.read",
+      "grew": 1
     }
   ],
   "items": {
@@ -4741,6 +4747,7 @@
     "@margoengine/splats": 26702,
     "@margoengine/splats/data": 17665,
     "@margoengine/splats/depth": 2119,
+    "@margoengine/splats/edit": 3856,
     "@margoengine/splats/lighting": 3606,
     "@margoengine/splats/lod": 24753,
     "@margoengine/splats/set": 23563,

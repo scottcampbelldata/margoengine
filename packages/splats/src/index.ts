@@ -28,7 +28,15 @@ export {
 } from './ply.js';
 export { parseSpz, parseSog, type ParseSpzOptions, type ParseSogOptions, type SogFiles } from './compressed.js';
 export { cropSplats, filterSplats, transformSplats, mergeSplats, decimateSplats, type SplatRegion } from './edit.js';
-declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; COPY_SRC: number; STORAGE: number; INDEX: number };
+declare const GPUBufferUsage: {
+  UNIFORM: number;
+  COPY_DST: number;
+  COPY_SRC: number;
+  STORAGE: number;
+  INDEX: number;
+  MAP_READ: number;
+};
+declare const GPUMapMode: { READ: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 let nextId = 0;
 /**
@@ -68,6 +76,7 @@ export class Splats implements EnginePlugin {
   private compatSort?: { pipeline: GPUComputePipeline; group: GPUBindGroup };
   private renders = new Map<string, { pipeline: GPURenderPipeline; group: GPUBindGroup }>();
   private disposed = false;
+  private writes = 0;
   private readonly transparency = transparencySlot();
   // Reused each frame: the draw pass descriptor and the pipeline record for the current target formats.
   private readonly attachment: GPURenderPassColorAttachment = { view: undefined!, loadOp: 'load', storeOp: 'store' };
@@ -158,6 +167,7 @@ export class Splats implements EnginePlugin {
       throw new RangeError(`Splats ${first} to ${first + n - 1} are outside this cloud of ${this.count}; keep first + count within the cloud`);
   }
   private upload(first: number, n: number, all: boolean): this {
+    this.writes++;
     const [positions, covariances, colors, sh] = this.inputs,
       q = this.device?.queue,
       k = this.coefficients;
@@ -167,6 +177,51 @@ export class Splats implements EnginePlugin {
     if (all) q.writeBuffer(covariances, first * 32, this.covariances as Float32Array<ArrayBuffer>, first * 8, n * 8);
     if (all && k) q.writeBuffer(sh, first * k * 12, this.sh as Float32Array<ArrayBuffer>, first * k * 3, n * k * 3);
     return this;
+  }
+  /**
+   * The cloud as data, after any edits made on the GPU (`@margoengine/splats/edit`): when attached, opacities, colours
+   * and SH are read back from the GPU into the copy kept for device restoration first. For export (`encodeSplat`,
+   * `encodeSpz`, `encodeSog`) and to keep GPU edits through a device loss.
+   * @throws MargoError `'disposed'` after `dispose()`; the GPU's error when the device is lost during the read.
+   */
+  async read(): Promise<SplatData> {
+    this.range(0, 0);
+    const d = this.device,
+      [positions, , colors, sh] = this.inputs;
+    // A write or clear during the read reaches both copies after the GPU copy was taken: read again.
+    for (let writes = -1; d && positions && writes !== this.writes; ) {
+      writes = this.writes;
+      const parts: Array<[GPUBuffer, Float32Array]> = [
+          [positions, this.positions],
+          [colors, this.colors],
+          [sh, this.sh],
+        ],
+        e = d.createCommandEncoder(),
+        staging = parts.map(([b, a]) => {
+          const s = d.createBuffer({ size: a.byteLength, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST });
+          e.copyBufferToBuffer(b, 0, s, 0, a.byteLength);
+          return s;
+        });
+      d.queue.submit([e.finish()]);
+      try {
+        await Promise.all(staging.map((s) => s.mapAsync(GPUMapMode.READ)));
+        if (writes === this.writes) staging.forEach((s, k) => parts[k][1].set(new Float32Array(s.getMappedRange())));
+      } finally {
+        for (const s of staging) s.destroy();
+      }
+    }
+    const n = this.count,
+      data: SplatData = {
+        positions: new Float32Array(n * 3),
+        covariances: new Float32Array(n * 6),
+        colors: this.colors.slice(),
+      };
+    for (let i = 0; i < n; i++) {
+      data.positions.set(this.positions.subarray(i * 4, i * 4 + 3), i * 3);
+      data.covariances.set(this.covariances.subarray(i * 8, i * 8 + 6), i * 6);
+    }
+    if (this.coefficients) data.sphericalHarmonics = this.sh.slice();
+    return data;
   }
   /** The fog the splats are drawn in (see `setFog`), or null. */
   get fog(): FogLike | null {
@@ -230,10 +285,12 @@ export class Splats implements EnginePlugin {
     };
     this.uniform = buffer(192, GPUBufferUsage.UNIFORM);
     this.index = buffer(24, GPUBufferUsage.INDEX, new Uint32Array([0, 1, 2, 2, 1, 3]));
-    const positions = buffer(this.positions.byteLength, GPUBufferUsage.STORAGE, this.positions),
+    // Positions, colours and SH can be read back (`read`) after GPU edits such as ./edit's brush.
+    const editable = GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
+      positions = buffer(this.positions.byteLength, editable, this.positions),
       covariances = buffer(this.covariances.byteLength, GPUBufferUsage.STORAGE, this.covariances),
-      colors = buffer(this.colors.byteLength, GPUBufferUsage.STORAGE, this.colors),
-      sh = buffer(this.sh.byteLength, GPUBufferUsage.STORAGE, this.sh);
+      colors = buffer(this.colors.byteLength, editable, this.colors),
+      sh = buffer(this.sh.byteLength, editable, this.sh);
     this.inputs = [positions, covariances, colors, sh];
     this.projected = buffer(this.count * 32, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC);
     this.evaluated = buffer(this.count * 16, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC);
@@ -475,13 +532,22 @@ export class Splats implements EnginePlugin {
   }
   /**
    * The cloud's GPU buffers, for entries that draw or edit it: `sorted` keys, projected `ellipses`, evaluated `colors`
-   * (rgb, opacity) and the inputs `positions` (xyz, opacity) and `covariances` (two vec4f per splat).
+   * (rgb, opacity) and the inputs `positions` (xyz, opacity), `covariances` (two vec4f per splat), `inputColors` (rgb,
+   * opacity) and `sh` (SH coefficients, RGB interleaved; 4 unused floats without SH).
    */
-  get gpuState(): { sorted: GPUBuffer; ellipses: GPUBuffer; colors: GPUBuffer; positions: GPUBuffer; covariances: GPUBuffer } {
+  get gpuState(): {
+    sorted: GPUBuffer;
+    ellipses: GPUBuffer;
+    colors: GPUBuffer;
+    positions: GPUBuffer;
+    covariances: GPUBuffer;
+    inputColors: GPUBuffer;
+    sh: GPUBuffer;
+  } {
     if (!this.projected || !this.evaluated || !this.keys.length)
       throw new MargoError('state', 'Splats are not attached; attach them to an engine first');
-    const [positions, covariances] = this.inputs;
-    return { sorted: this.keys[0], ellipses: this.projected, colors: this.evaluated, positions, covariances };
+    const [positions, covariances, inputColors, sh] = this.inputs;
+    return { sorted: this.keys[0], ellipses: this.projected, colors: this.evaluated, positions, covariances, inputColors, sh };
   }
   private release(): void {
     for (const b of this.buffers) b.destroy();

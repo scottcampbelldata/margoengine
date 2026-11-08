@@ -12,6 +12,7 @@ import { SplatLighting } from '../../dist/lighting.js';
 import { Shadows } from '../../../shadows/dist/index.js';
 import { SplatDepth } from '../../dist/depth.js';
 import { SplatLod, buildSplatLod } from '../../dist/lod.js';
+import { SplatBrush } from '../../dist/brush.js';
 
 const errors = [];
 addEventListener('error', (e) => errors.push(e.message));
@@ -392,5 +393,78 @@ window.check.splatShadow = async (o) => {
   if (o.cast) shadows.add(lit);
   await waitForPipelines(draw);
   return { url: canvas.toDataURL('image/png') };
+};
+// ./edit: an 8 x 8 grid of small red splats at z 0 (x and y from -0.7 to 0.7, none at 0), a blue splat in front of the
+// grid splat at (0.1, 0.1) (index 64) and one behind it (65); or the real capture. Runs the brush steps of `o.steps`
+// and returns each step's result, the pixel of a world point, and the image after the steps.
+window.check.brush = async (o) => {
+  engine?.dispose();
+  canvas?.remove();
+  canvas = document.body.appendChild(document.createElement('canvas'));
+  canvas.style.cssText = 'width:256px;height:256px;display:block';
+  let data,
+    camera = { position: [0, 0, 4], target: [0, 0, 0], near: 0.05, far: 100 };
+  if (o.capture) {
+    data = await loadCapture();
+    const n = data.positions.length / 3,
+      at = [0, 0, 0];
+    for (let i = 0; i < n; i++) for (let k = 0; k < 3; k++) at[k] += data.positions[i * 3 + k] / n;
+    camera = { position: [at[0] - 2.5, at[1], at[2]], target: at, near: 0.05, far: 100 };
+  } else {
+    const n = 66,
+      sh = o.sh ? new Float32Array(n * 12) : undefined;
+    data = { positions: new Float32Array(n * 3), covariances: new Float32Array(n * 6), colors: new Float32Array(n * 4) };
+    for (let i = 0; i < n; i++) {
+      const grid = i < 64,
+        p = grid ? [-0.7 + (i % 8) * 0.2, -0.7 + Math.floor(i / 8) * 0.2, 0] : [0.1, 0.1, i === 64 ? 0.5 : -0.5];
+      data.positions.set(p, i * 3);
+      data.covariances.set([0.0009, 0, 0, 0.0009, 0, 0.0009], i * 6);
+      data.colors.set(i === 64 ? [0, 0, 1, 0.95] : [1, 0, 0, 0.95], i * 4);
+      // SH: DC of the same colour (c = 0.5 + 0.2820948 dc) and a band-1 term of 0.1 on every channel.
+      if (sh) for (let k = 0; k < 12; k++) sh[i * 12 + k] = k < 3 ? (data.colors[i * 4 + k] - 0.5) / 0.2820948 : 0.1;
+    }
+    if (sh) data.sphericalHarmonics = sh;
+  }
+  engine = await Engine.create(canvas, { backend: 'webgpu', preserveDrawingBuffer: true, camera });
+  engine.gpu.addEventListener('uncapturederror', (e) => errors.push(e.error.message));
+  let matrix;
+  engine.use({
+    name: 'matrix',
+    setup() {},
+    registerPasses(graph) {
+      graph.add({ name: 'matrix', order: 0, execute: (c) => (matrix = c.camera.matrix.slice()) });
+    },
+  });
+  const cloud = Splats.attach(engine, data),
+    brush = SplatBrush.attach(engine, cloud);
+  await waitForPipelines(draw);
+  const [w, h] = brush.frame,
+    pixel = (p) => {
+      const c = [0, 1, 3].map((r) => matrix[r] * p[0] + matrix[4 + r] * p[1] + matrix[8 + r] * p[2] + matrix[12 + r]);
+      return [((c[0] / c[2] + 1) / 2) * w, ((1 - c[1] / c[2]) / 2) * h];
+    },
+    out = [];
+  for (const [op, ...args] of o.steps) {
+    const a = args.map((v) => {
+      if (v?.half) return { x: v.half === 'left' ? 0 : w / 2, y: 0, width: w / 2, height: h };
+      if (!v?.world) return v;
+      const [x, y] = pixel(v.world);
+      return v.radius === undefined ? v.world : { x, y, radius: v.radius };
+    });
+    if (op === 'pick') out.push(await brush.pick(...pixel(a[0]), a[1]));
+    else if (op === 'pickCentre') out.push(await brush.pick(w / 2, h / 2));
+    else if (op === 'selectCentre') out.push(brush.select({ x: w / 2, y: h / 2, radius: a[0] }) === brush);
+    else if (op === 'pickAt') out.push(await brush.pick(a[0], a[1]));
+    else if (op === 'selection') out.push([...(await brush.selection())]);
+    else if (op === 'commit') {
+      const d = await brush.commit();
+      out.push({ colors: [...d.colors], sh: d.sphericalHarmonics ? [...d.sphericalHarmonics] : null });
+    } else if (op === 'draw') await draw();
+    else if (op === 'select') out.push(brush.select(a[0], a[1]) === brush);
+    else if (op === 'erase') out.push(brush.erase(a[0]) === brush);
+    else if (op === 'paint') out.push(brush.paint(a[0], a[1], a[2]) === brush);
+  }
+  await draw();
+  return { out, frame: [w, h], points: (o.points ?? []).map(pixel), input: [...data.colors], url: canvas.toDataURL('image/png'), count: cloud.count };
 };
 window.ready = true;

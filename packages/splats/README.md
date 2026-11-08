@@ -233,3 +233,39 @@ engine.start();
   texels). By default a splat blocks each texel with the probability of its opacity there (stochastic transparency),
   so overlapping splats shade as their combined opacity, noisy per texel and smoothed by the shadow filter;
   `threshold` (0 to 1, live) instead blocks where one splat's opacity reaches it, without noise.
+
+## Picking and brush editing (`./edit`)
+
+`SplatBrush` picks, selects, erases and paints splats on the GPU, for clean-up tools. Regions are in pixels of the
+frame the cloud last drew (`brush.frame`), from the top-left corner:
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Splats} from 'margoengine/splats';
+import {parsePly} from 'margoengine/splats/data';
+import {SplatBrush} from 'margoengine/splats/edit';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const cloud = Splats.attach(engine, parsePly(await (await fetch('/raccoon-v2.ply')).arrayBuffer()));
+const brush = SplatBrush.attach(engine, cloud);
+engine.render({delta: 0}); // the brush works on a drawn frame
+const [width, height] = brush.frame;
+const hit = await brush.pick(width / 2, height / 2); // the nearest splat at the pixel, or -1
+brush.select({x: width / 2, y: height / 2, radius: 30}); // replace the selection
+brush.select({x: 0, y: 0, width: 40, height: 40}, 'add'); // or 'subtract'
+brush.erase('selection'); // opacity 0, as Splats.clear
+brush.paint({x: width / 4, y: height / 2, radius: 20}, [0.8, 0.1, 0.1], 0.5); // linear RGB, strength
+const edited = await brush.commit(); // the edited cloud as SplatData, for export
+console.log(hit, (await brush.selection()).length, edited.colors.length);
+engine.start();
+```
+
+- One compute dispatch per operation over every splat, against the ellipses the cloud projected for the last
+  frame: a splat is in a region when its projected centre is and it was drawn. Picking takes the nearest splat whose
+  own opacity at the pixel (its Gaussian falloff times its opacity) reaches `threshold` (default 0.1).
+- Edits change the cloud's GPU buffers at once and show from the next frame. `commit()` (`cloud.read()`) copies them
+  into the cloud's data, which `Splats.write`, export and device restoration use: a device loss before a commit
+  drops the edits since the last one.
+- Painting blends the colour by `strength` and keeps opacity; on a cloud with spherical harmonics it sets the DC term
+  to the blended colour and fades the higher bands by the same strength.
+- The selection lives on the GPU (4 bytes per splat); `selection()` reads it back as indices. A restored device
+  starts with an empty selection.

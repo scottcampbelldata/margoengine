@@ -100,6 +100,7 @@ class Splats implements EnginePlugin {
     get coefficients(): number;
     write(first: number, data: SplatData): this;
     clear(first: number, count: number): this;
+    read(): Promise<SplatData>;
     get fog(): FogLike | null;
     setFog(fog: FogLike | null): this;
     static attach(instance: EngineKernel, data: SplatData): Splats;
@@ -114,6 +115,8 @@ class Splats implements EnginePlugin {
         colors: GPUBuffer;
         positions: GPUBuffer;
         covariances: GPUBuffer;
+        inputColors: GPUBuffer;
+        sh: GPUBuffer;
     };
     onDeviceRestored(engine: Engine): void;
     dispose(): void;

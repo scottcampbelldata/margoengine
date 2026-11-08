@@ -50,6 +50,10 @@
       "types": "./dist/set.d.ts",
       "import": "./dist/set.js"
     },
+    "./edit": {
+      "types": "./dist/brush.d.ts",
+      "import": "./dist/brush.js"
+    },
     "./data": {
       "types": "./dist/data.d.ts",
       "import": "./dist/data.js"
