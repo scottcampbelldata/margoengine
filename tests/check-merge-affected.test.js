@@ -7,6 +7,7 @@ import { resolve } from 'node:path';
 import test from 'node:test';
 import {
   GPU_STEPS,
+  KERNEL_STEPS,
   PLAIN_STEPS,
   SCOPED_STEPS,
   describe,
@@ -400,10 +401,13 @@ test('every check:merge step is either narrowed GPU work or plain; a new step ha
   const names = steps.map(stepName);
   for (const name of names)
     assert.ok(
-      GPU_STEPS.includes(name) || PLAIN_STEPS.includes(name) || SCOPED_STEPS.includes(name),
+      GPU_STEPS.includes(name) ||
+        PLAIN_STEPS.includes(name) ||
+        SCOPED_STEPS.includes(name) ||
+        KERNEL_STEPS.includes(name),
       `classify ${name} in scripts/check-merge.mjs`,
     );
-  for (const name of [...GPU_STEPS, ...PLAIN_STEPS, ...SCOPED_STEPS])
+  for (const name of [...GPU_STEPS, ...PLAIN_STEPS, ...SCOPED_STEPS, ...KERNEL_STEPS])
     assert.ok(names.includes(name), `${name} is not a check:merge step`);
   assert.equal(manifest.scripts['check:merge'], 'node scripts/check-merge.mjs');
   assert.equal(manifest.scripts['check:merge:full'], 'node scripts/check-merge.mjs --full');
@@ -414,7 +418,7 @@ test('a documents-only change skips every GPU step, the example types and the bu
   assert.equal(decision.mode, 'affected');
   for (const { command, skip } of planned) {
     const name = stepName(command);
-    if (GPU_STEPS.includes(name) || ['modern:test:bundlers', 'check:examples-types'].includes(name))
+    if (GPU_STEPS.includes(name) || ['modern:test:bundlers', 'check:examples-types', ...KERNEL_STEPS].includes(name))
       assert.ok(skip, `${command} should be skipped`);
     else assert.equal(skip, undefined, `${command} should run`);
   }
@@ -515,7 +519,10 @@ test('check:readme-run: every example in the full run, narrowed only on an affec
   for (const file of ['scripts/run-readme-examples.mjs', 'scripts/support/readme-run-known.json'])
     assert.deepEqual(step(planFor([file]).planned), whole, file);
   // A package: its examples and its dependents'. A README: its own.
-  assert.match(step(planFor(['packages/dof/src/index.ts']).planned).command, /^npm run check:readme-run -- --packages=.*\bdof\b/);
+  assert.match(
+    step(planFor(['packages/dof/src/index.ts']).planned).command,
+    /^npm run check:readme-run -- --packages=.*\bdof\b/,
+  );
   assert.equal(step(planFor(['packages/dof/README.md']).planned).command, 'npm run check:readme-run -- --packages=dof');
   assert.ok(step(planFor(['docs/known-bugs.md']).planned).skip, 'no example can change');
   // The full check after the push only: the gates before it are lint, hygiene, verify and the package tests.

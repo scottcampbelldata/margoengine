@@ -25,6 +25,8 @@
 // builds or imports, or a file it runs changed (scripts/support/affected-packages.mjs); the full run keeps both whole.
 // check:readme-run, on the GPU, runs the same packages' examples as the tarball test, every example when
 // a file it runs changed, and every example in the full run, the check after a push. It is in no gate before the push.
+// check:rust-kernels (scripts/rust-kernel-tests.mjs, CPU only) runs `cargo test` of each package with a Rust kernel whose
+// own files changed (its kernel folder included), every kernel when its script changed, and every kernel in the full run.
 // The mode and the reason are printed first and written to test-results/check-merge.json. A step that fails while the
 // Windows event log shows a GPU driver reset (scripts/support/driver-resets.mjs, bug 25) runs once more; the reset is
 // printed and recorded with the step, and a second failure fails the run. A run that passed only that way says so: a
@@ -72,6 +74,7 @@ import {
   wgslPackages,
 } from './support/affected-gpu.mjs';
 import { exampleClosure, matrixClosure, packageScopes } from './support/affected-packages.mjs';
+import { changedKernelDirs, rustKernels } from './rust-kernel-tests.mjs';
 import { changedUmbrellaReader, umbrellaChangeIsReexportOnly } from './support/umbrella-change.mjs';
 import { PARALLEL, plantStale, SERIAL } from './verify.mjs';
 
@@ -91,10 +94,18 @@ export const GPU_STEPS = [
 /** Steps known to need no GPU narrowing; a step in neither list fails the unit test so someone decides. */
 export const PLAIN_STEPS = ['verify', 'check:fresh-clone', 'build:site', 'check:quickstart'];
 /** Package-level steps narrowed by packageScopes; check:readme-run is the one of them that uses the GPU. */
-export const SCOPED_STEPS = ['check:examples-types', 'modern:test:packages', 'modern:test:bundlers', 'check:readme-run'];
+export const SCOPED_STEPS = [
+  'check:examples-types',
+  'modern:test:packages',
+  'modern:test:bundlers',
+  'check:readme-run',
+];
+
+/** Steps narrowed to the packages whose own files changed (scripts/rust-kernel-tests.mjs): the Rust kernel tests. */
+export const KERNEL_STEPS = ['check:rust-kernels'];
 
 /** Steps that never drive the GPU: no heat watch. */
-export const NO_GPU_STEPS = ['verify', 'check:fresh-clone'];
+export const NO_GPU_STEPS = ['verify', 'check:fresh-clone', 'check:rust-kernels'];
 /** Steps that watch the heat themselves, per test (scripts/gpu-package-tests.mjs), so check:merge does not watch them. */
 export const SELF_WATCHED_STEPS = ['check:gpu-packages'];
 /** True when check:merge itself watches `name`'s heat on a heat profile: every step but the two lists above. */
@@ -118,7 +129,7 @@ export function changedFiles(cwd = root, base = 'origin/main') {
  * Commands to run, in order: [{ command, skip?: reason }]. `decision` is analyse()'s result; `mode: 'full'` keeps every
  * step as written. `tests` are gpu-package-tests plan() entries; `workspaces` the package graph.
  */
-export function planSteps({ steps, decision, tests, workspaces, testId, scope }) {
+export function planSteps({ steps, decision, tests, workspaces, testId, scope, kernels = [] }) {
   if (decision.mode === 'full') return steps.map((command) => ({ command }));
   const hit = new Set(decision.hits);
   return steps.flatMap((command) => {
@@ -148,6 +159,15 @@ export function planSteps({ steps, decision, tests, workspaces, testId, scope })
         if (hit.has('wgsl')) return [{ command }];
         const dirs = wgslPackages(workspaces, decision.affected);
         return dirs.length ? [{ command: `${command} -- --packages=${dirs.join(',')}` }] : skip(none);
+      }
+      // The Rust kernel tests of the packages whose own files changed (a kernel folder is its package's); all of them
+      // when the step's own script changed. A dependency's change cannot reach a kernel: the crates import no package.
+      case 'check:rust-kernels': {
+        if (hit.has('rust-kernels')) return [{ command }];
+        const dirs = changedKernelDirs(kernels, decision.changed ?? []);
+        return dirs.length
+          ? [{ command: `${command} -- --packages=${dirs.join(',')}` }]
+          : skip('no package with a Rust kernel changed');
       }
       case 'check:examples-types':
         if (!scope || scope.examples.all) return [{ command }];
@@ -210,6 +230,7 @@ export async function planContext(dir = root) {
     browserFiles: scan(dir, ['tests/modern.html'], workspaces).files,
     matrix: matrixClosure(dir, workspaces),
     examples: exampleClosure(dir, workspaces),
+    kernels: rustKernels(workspaces, dir),
   };
 }
 
@@ -221,9 +242,9 @@ export function planFiles(ctx, files, env = {}) {
 }
 
 function planDecision(ctx, decision, files) {
-  const { steps, workspaces, tests, testId, browserFiles, matrix, examples } = ctx;
+  const { steps, workspaces, tests, testId, browserFiles, matrix, examples, kernels } = ctx;
   const scope = packageScopes({ decision, files, workspaces, browserFiles, closure: matrix, examples });
-  return { decision, scope, planned: planSteps({ steps, decision, tests, workspaces, testId, scope }) };
+  return { decision, scope, planned: planSteps({ steps, decision, tests, workspaces, testId, scope, kernels }) };
 }
 
 /**
@@ -594,6 +615,8 @@ export const STEP_AFTER = {
   'check:quickstart': ['verify'],
   // Reads verify's build; it must not run beside a build of dist.
   'check:readme-run': ['verify'],
+  // cargo builds and tests the crates on its own; it reads nothing another step makes.
+  'check:rust-kernels': [],
   'modern:test:packages': ['verify'],
   'modern:test:bundlers': ['modern:test:packages'],
   ...Object.fromEntries(GPU_STEPS.map((step) => [step, ['build:site']])),

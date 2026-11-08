@@ -392,7 +392,7 @@ const filesOnly = (print) => ({ packages: new Set(), files: new Set(print?.files
 /**
  * Footprints of every step, keyed by id: `visual/<demo id>`, `views`, `depth`, `no-webgpu`, `gpu/<dir>/<script>`
  * (a package's browser or gpu test script), `gpu/root/<script>` (a root suite), and, by the files they reach only,
- * `wgsl` (check:wgsl whole), `packages` (modern:test:packages whole), `bundlers` (modern:test:bundlers runs), `examples-types` (check:examples-types runs), `readme-run` (check:readme-run whole), and
+ * `wgsl` (check:wgsl whole), `packages` (modern:test:packages whole), `bundlers` (modern:test:bundlers runs), `examples-types` (check:examples-types runs), `readme-run` (check:readme-run whole), `rust-kernels` (check:rust-kernels whole), and
  * `verify`, `fresh-clone`, `site`, `quickstart` (steps that always run; the id only places a file). Every visual demo
  * also holds the visual check's own files (visual-regression.js and the site build it names), and every GPU test the
  * runner's files other than RUNNER. `tests` is plan() of scripts/gpu-package-tests.mjs; `verify` the verify.mjs
@@ -453,6 +453,7 @@ export function buildFootprints({ root, workspaces, tests, scripts, verify = [],
   out.bundlers = filesOnly(steps['modern:test:bundlers']);
   out['examples-types'] = filesOnly(steps['check:examples-types']);
   out['readme-run'] = filesOnly(steps['check:readme-run']);
+  out['rust-kernels'] = filesOnly(steps['check:rust-kernels']);
   out.verify = filesOnly(steps.verify);
   out['fresh-clone'] = filesOnly(steps['check:fresh-clone']);
   out.site = filesOnly(steps['build:site']);

@@ -1081,7 +1081,8 @@ Known rendering gaps:
 | Async hygiene | support async call test | Async helpers in tests/scripts are awaited or returned. |
 | TypeScript checker transport | `tests/typescript-api-transport.test.js` | `scripts/hygiene.js` and `scripts/api-report.js` start tsgo through `typescript/unstable/async` (stdio, waits for the process); no tracked file uses `typescript/unstable/sync`, whose Windows client gives tsgo a fixed ~5 s to open a named pipe and failed `npm run quality` under verify's load on 2026-11-07. |
 | Node compatibility | CI matrix and proof-golden tests | Minimum and supported Node APIs and proof results stay compatible. |
-| Rust kernel | `npm run test:kernel` | Native kernel invariants. |
+| Rust kernel | `npm run test:kernel`, in local CI's CPU set | Native kernel invariants. |
+| Physics kernels | `npm run test:physics-kernel` and `npm run test:physics2d-kernel` (about 75 s and 3 s on the dev PC, 2026-11-08), each a step of local CI's CPU set on every `main` commit (hard limits 30 and 15 minutes); and `npm run check:rust-kernels` (`scripts/rust-kernel-tests.mjs`, CPU only, 20 minutes a crate), a step of `check:merge` that runs `cargo test` of each package with a Rust kernel whose own files changed (its `kernel/` folder counts as the package), every kernel when its script changed and in the full check. Not in `verify` | The 3D and 2D solvers' Rust tests that LIM-518 to LIM-522 and other claims cite. Until 2026-11-08 they ran in no check. `tests/rust-kernel-tests.test.js` holds the npm scripts and the step to the same cargo command. On the dev PC the npm scripts fail with "'cargo' is not recognized" from a shell that inherits the machine PATH: its entry `C:\Program Files\GitHub CLI"` carries a stray quote, and cmd.exe, npm's script shell, then reads every later entry (cargo's among them) as one quoted name. The PATH is 1,777 characters inside npm, far under cmd's 8,191, so length is not the cause. Local CI strips quotes from the PATH it hands its steps; `check:rust-kernels` starts cargo without a shell. The machine fix is to remove the quote from the system PATH. |
 | Class fields | `tests/class-fields.test.js` | Packages on the shared tsconfig declare no bare class fields; `@margoengine/materials` is the one named exception. |
 | Browser choice | `tests/browser-selection.test.js` | `MARGO_BROWSER` names edge, chrome, chromium, firefox or webkit, and each maps to its launcher. |
 
@@ -1335,9 +1336,9 @@ The following remain technical gaps, not permission to weaken a check:
     - CPU set at 08:00, 12:00, 14:00, 16:00, 18:00, 20:00 and 22:00 on the newest `origin/main` (skipped when that commit
       was already checked): `build:packages`, `lint`, `typecheck`, `hygiene`, `check-engines --run=repo`, every chain of
       `verify`'s stage 2 (API reports, quality, parity table, sandboxes, root unit tests, docs links, README checks, size,
-      proofs) and `test:kernel`.
+      proofs), `test:kernel`, `test:physics-kernel` and `test:physics2d-kernel` (since 2026-11-08).
     - Full set at 10:00: the CPU set (reused from an earlier run on the same commit), then every `check:merge:steps` step
-      after `verify`, one at a time, each through the GPU lock as one shared slot (exclusive for its timing tests). No GPU
+      after `verify` but `check:rust-kernels` (its kernels are in the CPU set), one at a time, each through the GPU lock as one shared slot (exclusive for its timing tests). No GPU
       step starts from 12:00 to 20:00 (benchmarks); one that would is recorded as deferred.
     - Weekly quiet hour, Sunday 06:00 to 07:00: waits up to 20 minutes for the whole machine under 10 percent CPU, else
       records "not quiet"; then, holding the GPU alone, Margo's two columns of the physics comparison harness (defaults

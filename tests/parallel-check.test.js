@@ -11,6 +11,7 @@ import {
   PLAIN_STEPS,
   runStepsParallel,
   SCOPED_STEPS,
+  KERNEL_STEPS,
   stepJobs,
   TIMING_JOB,
 } from '../scripts/check-merge.mjs';
@@ -328,7 +329,7 @@ test('check:merge steps: each placed, nothing lost, verify alone, timing last an
       .filter((j) => j.id !== TIMING_JOB)
       .map((j) => j.id)
       .sort(),
-    [...GPU_STEPS, ...PLAIN_STEPS, ...SCOPED_STEPS].filter((s) => s !== 'verify').sort(),
+    [...GPU_STEPS, ...PLAIN_STEPS, ...SCOPED_STEPS, ...KERNEL_STEPS].filter((s) => s !== 'verify').sort(),
   );
   const timing = jobs.find((j) => j.id === TIMING_JOB);
   assert.equal(timing.exclusive, true);
