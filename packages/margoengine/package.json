@@ -270,6 +270,10 @@
       "types": "./dist/biomes/settlements.d.ts",
       "import": "./dist/biomes/settlements.js"
     },
+    "./biomes/graph": {
+      "types": "./dist/biomes/graph.d.ts",
+      "import": "./dist/biomes/graph.js"
+    },
     "./blender": {
       "types": "./dist/blender.d.ts",
       "import": "./dist/blender.js"

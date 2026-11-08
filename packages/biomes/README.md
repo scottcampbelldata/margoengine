@@ -57,7 +57,7 @@ with the terrain.
 | [Worlds, tiles and climate](docs/worlds-and-climate.md) | `BiomeWorld.create` options, tiles and tile parts, every layer, how the climate is made, the G1 speed numbers, region fields, the reference world R16 |
 | [Biomes, presets, painting and editing](docs/biomes-and-painting.md) | `defineBiome`, envelopes, Whittaker and Holdridge, multi-noise maps, the presets, painting, clearings, Koppen labels, `BiomeEditor` with undo |
 | [Drawing a world as terrain](docs/terrain-view.md) | `BiomeView` options, materials, the sea and river water, trees and grass, shadows, the forest floor and far trees |
-| [Trees, shrubs, rocks and props](docs/placement.md) | `BiomePlacement`: clusters, stands, the hard core, shade, sizes, exclusions, the record layout, `/stats` |
+| [Trees, shrubs, rocks and props](docs/placement.md) | `BiomePlacement`: clusters, stands, the hard core, shade, sizes, exclusions, the record layout, `/stats`; `/graph`: rule graphs that shape where each species grows |
 | [Workers](docs/workers.md) | tiles and objects on Web Workers, caching, what a placement reads from its neighbours |
 | [Same seed, same bytes, everywhere](docs/determinism.md) | the integer toolkit (`/toolkit`) behind byte-identical output |
 | [Files in and out](docs/files.md) | `/io`: heightmaps, weight maps, biome masks, layer dumps, `saveWorld` and `loadWorld` |
@@ -73,7 +73,7 @@ and the reference world `R16`), `/relief` (the procedural landscape; `BiomeWorld
 height, the default), `/digest` (canonical bytes and SHA-256, loaded by `world.digest`), `/zones` (Whittaker and
 Holdridge classifiers), `/multinoise` (nearest-point classifier over axes you choose), `/koppen` (Koppen-Geiger labels), `/toolkit` (the integer helpers), `/placement` (stored
 objects), `/stats` (point-pattern statistics), `/erosion` (thermal and hydraulic erosion; `BiomeWorld.create` loads it only for a relief
-with `erosion`), `/disturbance` (fire, flood and succession), `/settlements` (village sites, a road network that follows the terrain, lanes and house lots), `/splines` (roads and paths; `BiomeWorld.create` loads it only for a carved
+with `erosion`), `/disturbance` (fire, flood and succession), `/settlements` (village sites, a road network that follows the terrain, lanes and house lots), `/graph` (placement rule graphs), `/splines` (roads and paths; `BiomeWorld.create` loads it only for a carved
 height), `/gpu` (the device kernels; loaded only for a world that
 may compute on a device), `/io` (heightmap, weight and mask files, layer dumps), `/view`,
 `/objects` (stored objects and detail drawn through scatter) and `/editor`. The lazily loaded ones come through the

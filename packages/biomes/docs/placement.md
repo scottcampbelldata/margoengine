@@ -73,3 +73,48 @@ renderers sample the terrain.
 The statistics behind the quality gates are the `/stats` entry: K, L, pair correlation, G, F and J with edge
 corrections, global envelope tests (studentised maximum deviation and extreme rank length), Kolmogorov-Smirnov and
 Anderson-Darling tests and quantile regression.
+
+## Rule graphs
+
+`@margoengine/biomes/graph` lets an artist shape where each species grows beyond its `suitability` ranges: a graph of
+rule nodes, as plain JSON, whose outputs multiply species densities. Load the entry, then pass the graph to
+`BiomePlacement.attach` (or `update({ graph })`). Workers load the entry themselves.
+
+```js
+import { BiomeWorld } from '@margoengine/biomes';
+import { BiomePlacement } from '@margoengine/biomes/placement';
+import { definePlacementGraph, evaluateGraph } from '@margoengine/biomes/graph';
+
+const world = await BiomeWorld.create({ seed: 1, size: [1024, 1024] });
+const graph = definePlacementGraph({
+  nodes: [
+    { id: 'valley', op: 'range', field: 'height', range: [null, 120] },
+    { id: 'wet', op: 'range', field: 'waterDistance', range: [null, 80] },
+    { id: 'patches', op: 'noise', scale: 60, seed: 4 },
+    { id: 'clumps', op: 'curve', input: 'patches', points: [[0.4, 0], [0.6, 1]] },
+    { id: 'groves', op: 'multiply', inputs: ['valley', 'wet', 'clumps'] },
+    { id: 'dry', op: 'invert', input: 'wet' },
+  ],
+  outputs: { 'temperate/oak': 'groves', hazel: 'dry' },
+});
+const placement = BiomePlacement.attach(world, { graph });
+const tile = await placement.tile(1, 1);
+// A node's value over a world tile, 0..255 a cell: a preview, or a mask for envelopes and paint masks.
+world.writeLayer('mask/groves', 1, 1, evaluateGraph(graph, 'groves', await world.tile(1, 1)));
+```
+
+| Op | Settings | Value |
+| --- | --- | --- |
+| `constant` | `value` | the value |
+| `range` | `field`, `range`, `blend?` | 1 inside `[min, max]` (null for an open side) on a climate or terrain field (`ClimateEnvelope` names and units, plus `curvature`), a Wendland band across each bound |
+| `noise` | `scale` (m), `seed?` | world-anchored value noise |
+| `multiply`, `min`, `max`, `add` | `inputs` (2 to 16) | product, minimum, maximum, sum capped at 1 |
+| `subtract` | `inputs` (2) | first less second, at least 0 |
+| `invert` | `input` | 1 less the input |
+| `curve` | `input`, `points` | piecewise linear through `[x, y]` points, flat past the ends |
+| `blend` | `inputs` (2), `by` | the first where `by` is 0, the second where it is 1 |
+
+Every value is 0..1. An output selector is `'<biome>/<species>'`, a species id or `'#tag'`; a species' density is
+multiplied by every output that selects it, read at each candidate before the spacing rounds, on Q16.16 integers, so a
+graph gives the same objects on every machine, in workers and on the GPU path. A selector that selects nothing, a cycle,
+a missing input or a bad setting throws. A graph only lowers densities and leaves detail species (grass, flowers) alone.

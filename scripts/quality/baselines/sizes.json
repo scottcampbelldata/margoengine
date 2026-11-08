@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11273385,
+  "total": 11280418,
   "history": [
     {
       "date": "2026-10-24",
@@ -4442,6 +4442,12 @@
       "commit": "252d7d387",
       "reason": "dof/lens: cat's eye and anamorphic bokeh (batch 74 job 4)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "6560302db",
+      "reason": "biomes graph: placement rule graphs (new entry /graph); the placement entry and worker gain the graph hook and the worker the graph code",
+      "grew": 3
     }
   ],
   "items": {
@@ -4478,7 +4484,7 @@
     "@margoengine/behavior/smart-objects": 2029,
     "@margoengine/behavior/steering": 3827,
     "@margoengine/biomes": 16819,
-    "@margoengine/biomes dist/workers/biomes.js": 50739,
+    "@margoengine/biomes dist/workers/biomes.js": 53099,
     "@margoengine/biomes/cover": 3341,
     "@margoengine/biomes/digest": 894,
     "@margoengine/biomes/disturbance": 5771,
@@ -4486,12 +4492,13 @@
     "@margoengine/biomes/erosion": 3202,
     "@margoengine/biomes/far": 3745,
     "@margoengine/biomes/gpu": 22366,
+    "@margoengine/biomes/graph": 4246,
     "@margoengine/biomes/hydrology": 5138,
     "@margoengine/biomes/io": 4137,
     "@margoengine/biomes/koppen": 1231,
     "@margoengine/biomes/multinoise": 3748,
     "@margoengine/biomes/objects": 4246,
-    "@margoengine/biomes/placement": 13208,
+    "@margoengine/biomes/placement": 13635,
     "@margoengine/biomes/presets": 2024,
     "@margoengine/biomes/region": 4672,
     "@margoengine/biomes/relief": 4553,

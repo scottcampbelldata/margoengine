@@ -31,6 +31,8 @@ import { type BiomeDefinition, type Dimension, fieldDimension, type SpeciesRule 
 import { placementReach, STRATA } from './reach.js';
 import { standAt, type Stands, standsOf, TICK } from './stands.js';
 import { placementBridges, worldGPU, type CandidateSource } from './gpu-placement-flow-internal.js';
+import { type GraphFactor, graphHook } from './graph-hook.js';
+import type { PlacementGraph } from './graph.js';
 
 /** Perfect plasticity cells: 32 m, world-anchored, inside every tile size. */
 const PPA_SHIFT = 13; // 2^13 ticks = 32 m
@@ -76,6 +78,11 @@ export interface PlacementOptions {
   readonly conflicts?: Readonly<Record<string, number>>;
   /** Roads, rivers and buildings where nothing is placed. Default none. */
   readonly exclusions?: readonly Exclusion[];
+  /**
+   * A placement rule graph (`@margoengine/biomes/graph`, loaded first): each species' density is multiplied by every
+   * graph output that selects it, read at each candidate. Default none.
+   */
+  readonly graph?: PlacementGraph;
 }
 
 /** One species of the world's palette: a biome's species rule with what placement made of it. */
@@ -201,6 +208,7 @@ interface Spec extends PlacedSpecies {
   readonly r: number; // reference crown radius, ticks
   readonly shade: number; // Q16
   readonly dims: readonly Dimension[];
+  readonly graph?: GraphFactor; // density factor from the rule graph, Q16
   readonly size: number; // 0 none, 1 reverse-j, 2 weibull
   readonly sa: number; // reverse-j: rate a (Q16 per unit u); weibull: shape (Q16)
   readonly sb: number; // reverse-j: u min (Q16); weibull: scale (Q16)
@@ -507,6 +515,17 @@ function planOf(biomes: readonly BiomeDefinition[], options: PlacementOptions): 
     for (const b of specs)
       if (a.layer === b.layer) within = Math.max(within, factor[a.index * n + b.index]);
       else across = Math.max(across, factor[a.index * n + b.index]);
+  if (options.graph !== undefined) {
+    if (!graphHook.factors)
+      throw fault(
+        'state',
+        "A placement with a graph needs the graph entry; await import('@margoengine/biomes/graph') first",
+        'biomes',
+      );
+    graphHook.factors(options.graph, specs).forEach((g, i) => {
+      (specs[i] as { graph?: GraphFactor }).graph = g;
+    });
+  }
   return { specs, strata, factor, within, across, rounds, details: [...details.values()] };
 }
 
@@ -1082,6 +1101,7 @@ class Run {
               p = qmul(p, wendland(clampInt(divFloor((dist + (d.width >> 1)) * ONE, d.width), 0, ONE)));
               if (!p) break;
             }
+            if (p && sp.graph) p = qmul(p, sp.graph(f.layers, k, x, z));
             if (!p) continue;
             const ex = excluded(this.shapes, x, z, e);
             if (ex === 2) continue;
@@ -1493,10 +1513,10 @@ export class BiomePlacement implements Disposable {
   }
 
   /** Replaces exclusions or spacing; every tile they reach is placed again on its next request. */
-  update(changes: Pick<PlacementOptions, 'exclusions' | 'conflicts'>): void {
+  update(changes: Pick<PlacementOptions, 'exclusions' | 'conflicts' | 'graph'>): void {
     this.#live();
     if (typeof changes !== 'object' || changes === null)
-      throw typeError('BiomePlacement update takes { exclusions?, conflicts? }', 'biomes');
+      throw typeError('BiomePlacement update takes { exclusions?, conflicts?, graph? }', 'biomes');
     const options = { ...this.#options, ...changes },
       shapes = shapesOf(options.exclusions, [this.#world.bounds[0], this.#world.bounds[1]]);
     this.#plan = this.#replan(options);

@@ -129,6 +129,10 @@
     "./settlements": {
       "types": "./dist/settlements.d.ts",
       "import": "./dist/settlements.js"
+    },
+    "./graph": {
+      "types": "./dist/graph.d.ts",
+      "import": "./dist/graph.js"
     }
   },
   "files": [

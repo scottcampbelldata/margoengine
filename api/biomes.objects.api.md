@@ -76,7 +76,7 @@ class BiomePlacement implements Disposable {
         readonly density: number;
     }[];
     get reach(): number;
-    update(changes: Pick<PlacementOptions, 'exclusions' | 'conflicts'>): void;
+    update(changes: Pick<PlacementOptions, 'exclusions' | 'conflicts' | 'graph'>): void;
     onChange(listener: (rect: Rect) => void): () => void;
     tile(x: number, z: number, options?: {
         readonly signal?: AbortSignal;
@@ -338,6 +338,55 @@ type Exclusion = {
     readonly verge?: number;
 };
 
+type GraphField = 'temperature' | 'coldest' | 'warmest' | 'gdd5' | 'season' | 'treeline' | 'rainfall' | 'moistureIndex' | 'moisture' | 'height' | 'slope' | 'exposure' | 'soil' | 'waterDistance' | 'curvature';
+
+type GraphNode =
+{
+    readonly id: string;
+    readonly op: 'constant';
+    readonly value: number;
+}
+ | {
+    readonly id: string;
+    readonly op: 'range';
+    readonly field: GraphField;
+    readonly range: Range;
+    readonly blend?: number;
+}
+ | {
+    readonly id: string;
+    readonly op: 'noise';
+    readonly scale: number;
+    readonly seed?: number;
+}
+ | {
+    readonly id: string;
+    readonly op: 'multiply' | 'min' | 'max' | 'add';
+    readonly inputs: readonly string[];
+}
+ | {
+    readonly id: string;
+    readonly op: 'subtract';
+    readonly inputs: readonly [string, string];
+}
+ | {
+    readonly id: string;
+    readonly op: 'invert';
+    readonly input: string;
+}
+ | {
+    readonly id: string;
+    readonly op: 'curve';
+    readonly input: string;
+    readonly points: readonly (readonly [number, number])[];
+}
+ | {
+    readonly id: string;
+    readonly op: 'blend';
+    readonly inputs: readonly [string, string];
+    readonly by: string;
+};
+
 interface GroundLayer {
     readonly material: string;
     readonly slope?: Range;
@@ -459,10 +508,16 @@ interface PlacedTile {
     forEachInstance(visit: (instance: InstanceView) => void): void;
 }
 
+interface PlacementGraph {
+    readonly nodes: readonly GraphNode[];
+    readonly outputs: Readonly<Record<string, string>>;
+}
+
 interface PlacementOptions {
     readonly rounds?: number;
     readonly conflicts?: Readonly<Record<string, number>>;
     readonly exclusions?: readonly Exclusion[];
+    readonly graph?: PlacementGraph;
 }
 
 type Range = readonly [min: number | null, max: number | null];

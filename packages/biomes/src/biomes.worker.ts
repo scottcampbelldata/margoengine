@@ -102,7 +102,10 @@ async function run(m: Message): Promise<unknown> {
       });
       if (state.user.length) world.writeLayers(state.user);
       placements.clear();
-      for (const p of state.placements) placements.set(p.pid, BiomePlacement.attach(world, p.options));
+      for (const p of state.placements) {
+        if (p.options.graph) await import('./graph.js'); // the worker's own placement reads this copy's hook
+        placements.set(p.pid, BiomePlacement.attach(world, p.options));
+      }
       return null;
     }
     case 'write':
@@ -118,9 +121,11 @@ async function run(m: Message): Promise<unknown> {
       return null;
     }
     case 'placement':
+      if ((m.options as PlacementOptions).graph) await import('./graph.js'); // the worker's own placement reads this copy's hook
       placements.set(m.pid as number, BiomePlacement.attach(world!, m.options as PlacementOptions));
       return null;
     case 'placement-update':
+      if ((m.changes as PlacementOptions).graph) await import('./graph.js'); // the worker's own placement reads this copy's hook
       placements.get(m.pid as number)!.update(m.changes as Parameters<BiomePlacement['update']>[0]);
       return null;
     case 'placement-dispose':
