@@ -2291,6 +2291,17 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
 - **Rerun:** `node packages/tween/scripts/rival-bench.mjs`. The linear halfway rule is
   `packages/tween/test/linear-oracle.test.js`. Citation in clean-room.md.
 
+### 98. Rollback resimulation, no JavaScript rival (diagnostic)
+
+- **Measurement:** two peers, the README fighter, 180 frames. Forward-only: latency 0, steady input. Rollback: latency
+  40 ms, input alternating each frame. The clock includes the loopback advance. Paired turns, fastest of 7 rounds.
+  A round that never rolls back exits 1. GGPO is C++ and Colyseus is not rollback, so there is no JavaScript rival.
+- **Result:** forward 0.0086 ms/frame, rollback run 0.0176 ms/frame. Last round: 346 resimulated frames across both
+  peers, 166 rollbacks each, deepest 2, no stalls, waits or desyncs. Extra per resimulated frame 2.403 microseconds
+  (that round's own count). The rollback run costs about twice a forward run because almost every frame resimulates
+  one extra frame. That is the simulated work, not a loss to file. Busy machine, diagnostic.
+- **Rerun:** `node packages/netcode/scripts/rival-bench.mjs`.
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).

@@ -1030,7 +1030,9 @@ Written clean room from the papers and specifications below. No source of a netw
 ## Game networking: `@margoengine/netcode`
 
 Written clean room from the articles, talks and specifications below. No source code of networking libraries or
-engines (Colyseus, Photon, Mirror, GGPO, Rapier, Unity Netcode, Unreal and the like) was read.
+engines (Colyseus, Photon, Mirror, GGPO, Rapier, Unity Netcode, Unreal and the like) was read. The batch 167 timing
+publishes rollback resimulation on Margo's own loopback. GGPO is C++ and Colyseus is not a rollback library, so no
+JavaScript package was timed against it.
 
 | Area | Source |
 | --- | --- |
