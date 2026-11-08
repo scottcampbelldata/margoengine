@@ -16,7 +16,7 @@ const html = HTML.attach(engine);
 html.add(element, {mesh, offset: [0,1,0]});
 ```
 
-WebGPU defaults to a shared sampleable depth target, also used by water. Pass depth: () => effect.depthTexture with SSAO/DOF, or depth: false to disable GPU occlusion. On the WebGL2 preview backend (`@margoengine/webgl`), whose canvas depth cannot be sampled, the same tests run as occlusion queries: after the scene, one point a test is drawn at the anchor with colour and depth writes off inside an `ANY_SAMPLES_PASSED` query, and the result is read when the browser makes it available, a frame or more later. A round of queries is in flight per anchor at a time; `fade` there costs `samples` x `samples` points and queries an anchor, so keep it small (`samples: 2`) with many anchors. Capacity defaults to 1024 anchors, maximum 4096. Depth results arrive asynchronously and stale results after substantial motion are ignored; there can be a frame of visibility latency. depthBias is reversed-Z depth, not world units. CSS3D objects are projected but not sampled for depth. dispose removes the overlay and owned elements.
+WebGPU defaults to a shared sampleable depth target, also used by water. Pass depth: () => effect.depthTexture with SSAO/DOF, or depth: false to disable GPU occlusion. On the WebGL2 preview backend (`@margoengine/webgl`), whose canvas depth cannot be sampled, the same tests run as occlusion queries: after the scene, one point a test is drawn at the anchor with colour and depth writes off inside an `ANY_SAMPLES_PASSED` query, and the result is read when the browser makes it available, a frame or more later. A round of queries is in flight per anchor at a time; `fade` there costs `samples` x `samples` points and queries an anchor, so keep it small (`samples: 2`) with many anchors. Capacity defaults to 1024 anchors, maximum 1,048,576 (`capacity`); storage starts at 64 slots and doubles as anchors are added, and each frame's depth work runs to the highest slot in use, not to the capacity. Depth results arrive asynchronously and stale results after substantial motion are ignored; there can be a frame of visibility latency. depthBias is reversed-Z depth, not world units. CSS3D objects are projected but not sampled for depth. dispose removes the overlay and owned elements.
 
 ## Smooth partial occlusion
 
@@ -57,6 +57,23 @@ const surface = textures.add(panel, {width: 2, height: 1});
 `add` moves the element into an invisible holder at the top left of the page (opacity 0, no pointer events), where it keeps its layout, focus and events. The size defaults to the element's CSS size at 100 CSS pixels a world unit, the texture to `devicePixelRatio` texture pixels a CSS pixel (`pixelRatio`, 0.25 to 4). Two rasterizers draw the element: `'element-image'`, the HTML-in-canvas `drawElementImage` where the browser has it (the default there), and `'foreign-object'`, the element's tree with its computed styles inlined into an SVG `foreignObject` image, everywhere else. The texture is drawn again when the element changes (a mutation, input, focus or hover, or an HTML-in-canvas paint event); call `surface.invalidate()` after a change none of these shows, such as a loaded font. While the pointer is over a quad, the holder moves so that the element's point under the pointer is the hit point on the quad; off every quad it moves back out of the way.
 
 With `'foreign-object'`, fonts and images the element uses must be same-origin data the SVG image can embed (data URLs); the browser loads nothing from inside it. Scene geometry in front of a quad hides it on screen but does not stop the pointer reaching the element. `textures.dispose()` removes the holders and the elements in them.
+
+## Many anchors
+
+One overlay takes up to 1,048,576 anchors. Its point, result and readback buffers start at 64 slots and double as anchors are added (re-made at the next depth test, never while a read is in flight), a removed anchor's slot is taken again first, and the per-frame depth work, WebGL2 queries included, runs to the highest slot in use.
+
+```ts
+import {HTML} from 'margoengine/html';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
+// 10,000 map pins in one overlay: past the old 4,096 limit.
+const pins = HTML.attach(engine, {capacity: 10_000});
+for (let i = 0; i < 10_000; i++) {
+  const pin = document.createElement('div');
+  pin.textContent = String(i);
+  pins.add(pin, {position: [(i % 100) - 50, 0, Math.floor(i / 100) - 50]});
+}
+```
 
 Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 

@@ -391,3 +391,72 @@ test('HTML fade on WebGL2 draws the WebGPU grid, one query a test, and fades by 
   off.dispose();
   dom2.window.close();
 });
+
+test('HTML takes more than 4,096 anchors: slots and GPU buffers grow by doubling, the work runs to the used slots', async () => {
+  const h = optionalGPU(),
+    dom = new JSDOM('<body><canvas width="128" height="96"></canvas></body>');
+  h.engine.canvas = dom.window.document.querySelector('canvas');
+  assert.throws(
+    () => new HTML({ capacity: 1_048_577 }),
+    /capacity; pass a whole number of anchors from 1 to 1,048,576/,
+  );
+  assert.throws(() => new HTML({ capacity: 2.5 }), /capacity/);
+  assert.doesNotThrow(() => new HTML({ capacity: 1_048_576 }).dispose());
+  const buffers = [],
+    create = h.engine.gpu.createBuffer;
+  h.engine.gpu.createBuffer = (descriptor) => {
+    const buffer = create(descriptor);
+    buffers.push(buffer);
+    return buffer;
+  };
+  const dispatches = [],
+    begin = h.context.encoder.beginComputePass;
+  h.context.encoder.beginComputePass = (descriptor) => {
+    const pass = begin(descriptor);
+    pass.dispatchWorkgroups = (x) => dispatches.push(x);
+    return pass;
+  };
+  const overlay = new HTML({ capacity: 10_000 });
+  h.engine.use(overlay);
+  const frame = async () => {
+    h.frame();
+    await new Promise((resolve) => setImmediate(resolve));
+  };
+  const live = () => buffers.filter((b) => !b.destroyed).map((b) => b.size);
+  try {
+    // At start: 64 slots, not 10,000 (16 bytes of points and 4 of results each).
+    assert.deepEqual(live(), [64 * 16, 64 * 4, 64 * 4]);
+    const document = dom.window.document,
+      labels = [];
+    for (let i = 0; i < 5_000; i++)
+      labels.push(overlay.add(document.createElement('span'), { position: [((i % 100) - 50) / 100, 0, 0.5] }));
+    await frame();
+    // 5,000 slots fit in 64 doubled to 8,192; one dispatch of ceil(5000 / 64) groups.
+    assert.deepEqual(live(), [8_192 * 16, 8_192 * 4, 8_192 * 4]);
+    assert.deepEqual(dispatches, [Math.ceil(5_000 / 64)]);
+    assert.equal(labels[4_999].onScreen, true);
+    // A freed slot is taken again before a new one; the buffers do not move.
+    overlay.remove(labels[10]);
+    overlay.remove(labels[3]);
+    const again = overlay.add(document.createElement('span'), { position: [0, 0, 0.5] });
+    overlay.add(document.createElement('span'), { position: [0, 0, 0.5] });
+    overlay.add(document.createElement('span'), { position: [0, 0, 0.5] });
+    await frame();
+    assert.deepEqual(live(), [8_192 * 16, 8_192 * 4, 8_192 * 4]);
+    assert.equal(dispatches.at(-1), Math.ceil(5_001 / 64), 'Slots 3 and 10 reused, one new slot 5,000');
+    assert.equal(again.onScreen, true);
+    // Up to the capacity, never past it.
+    for (let i = 5_001; i < 10_000; i++) overlay.add(document.createElement('span'), { position: [0, 0, 0.5] });
+    assert.throws(() => overlay.add(document.createElement('span')), /capacity/);
+    await frame();
+    assert.deepEqual(live(), [10_000 * 16, 10_000 * 4, 10_000 * 4], 'The last doubling stops at the capacity');
+    assert.equal(dispatches.at(-1), Math.ceil(10_000 / 64));
+  } finally {
+    overlay.dispose();
+    dom.window.close();
+  }
+  assert.ok(
+    buffers.every((b) => b.destroyed),
+    'Dispose destroys every buffer, grown ones too',
+  );
+});

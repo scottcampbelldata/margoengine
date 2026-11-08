@@ -3175,3 +3175,52 @@ and sets row 97 of `docs/work-lists/list-2.md` to done.
 - **Limits and unmeasured:** rows in `docs/limits.md` for each job. Shared editing keeps one value per cell (the later
   stroke wins), keeps every operation seen with no compaction and ships no transport; GPU cost of the brushes and bulk
   edits is not measured beyond the checks; nothing was run on another machine.
+
+## Lane H batch 106: html
+
+Four jobs for `@margoengine/html` on the Beelink (Radeon 680M, Chromium 157), each landed as one commit: two in the
+root entry, one new optional entry and one capacity change. Core and stage are untouched (23,626 B gzip together after
+the batch).
+
+| # | Job | Status | Commit | Entry | Claim |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Smooth partial occlusion | DONE | f00b169f0 | `HTML` `fade` option | LIM-550 |
+| 2 | Occlusion on WebGL2 | DONE | e8dd163b5 | `HTML` on `@margoengine/webgl` | LIM-552 |
+| 3 | DOM drawn into the scene | DONE | ff3903e25 | `@margoengine/html/texture` (`HTMLTexture`) | LIM-556 |
+| 4 | More than 4,096 anchors | DONE | this commit | `HTML` `capacity` up to 1,048,576 | LIM-559 |
+
+- **Built from:** `docs/clean-room.md` rows S82 (Reeves, Salesin and Cook 1987, percentage-closer filtering), S83
+  (WebGL 2.0 and OpenGL ES 3.0 occlusion queries), S85 (WICG HTML-in-Canvas explainer, SVG 2 `foreignObject`, WebGPU
+  `copyExternalImageToTexture`, CSSOM View `elementFromPoint`) and S86 (table doubling, Cormen et al.). Nothing from
+  another engine was read.
+- **Proved (real GPU, this Beelink):** `npm run test:browser --workspace @margoengine/html`: on WebGPU and WebGL2 an
+  anchor behind a box hidden, one beside it shown, shown again once the box moves, and the fade anchor on the box edge
+  at exactly 0.5; on WebGPU with both rasterizers (`drawElementImage` and `foreignObject`) an element's and its
+  button's colours on the quad, a box in front, `elementFromPoint` and a press at the projected button, the canvas
+  off the quad, a redraw on change and none in 10 idle frames; on both backends 4,200 anchors in one overlay with the
+  4,199 behind the box hidden. Node tests: `packages/html/test/html.test.js` and `texture.test.js`.
+- **Sizes (gzip, B):** `@margoengine/html` 5,013 to 7,231 over the batch (fade 739, WebGL2 queries 966, growable slots
+  1); new `/texture` 4,779. The `margoengine/web` kit, which holds html, is restated at 94,241 B in
+  `docs/guides/kits.md` (from 91,456 B, just past the test's 3 percent: html's 2,218 B over the batch and earlier
+  growth of the kit on main).
+- **Bugs fixed before landing, with regression tests:** job 3's draft named a WGSL variable `smooth`, a reserved word
+  the fake GPU accepted and the browser refused (`texture.test.js` checks the shader's names against the WGSL reserved
+  list); it uploaded the `foreignObject` SVG image straight to WebGPU, which counts it as cross-origin (now drawn into
+  a 2D canvas first), and parked the holder off screen, where the browser takes no HTML-in-canvas snapshot (now at the
+  viewport's top left); the draft's `layoutsubtree` opt-in was the old explainer's, now `content="drawable"` and
+  `drawable` with drawing in the paint event (all three covered by `html-browser.js`).
+- **Slips:** job 1's first landing failed root tests on `setTimeout` waits in `html-browser.js`
+  (`tests/check-fixed-waits.test.js`), replaced by frame-by-frame readiness. Job 2: quality duplicates (a WebGL program
+  build matching ui) and quality api (an error message without its fix), fixed in the commit; a second landing started
+  by mistake with a shell `&` beside the real one in the same worktree recorded entry sizes and the basic scene on
+  different commits (sizes-page failed, never pushed). Job 3's first landing failed two root tests, both its own: a
+  fixed count of idle frames in the browser check (now marked as the check itself) and `shared/math.js` reaching
+  `@margoengine/math`, which html does not declare (the hit now solves the quad plane's homography, no inverse); never
+  pushed. Job 3's commit message says LIM-555 and S84, but a lost push race renumbered them to LIM-556 and S85; the
+  rows are right.
+- **Shared row changed with manager approval:** job 1's limits row said "WebGPU only", which job 2 made false; job 3
+  corrected it. Lane H's shared-rows guard took a one-row, per-run allowance naming that row, valid only with
+  "row updated with manager approval" in the commit message; any other changed or removed row still fails (tested).
+- **Limits and unmeasured:** rows in `docs/limits.md` for each job. HTML drawn into the scene is WebGPU only, and scene
+  geometry in front of a quad does not stop the pointer reaching the element; `foreignObject` loads nothing from
+  inside the image. Slots never shrink. Cost per frame is not measured for any job.

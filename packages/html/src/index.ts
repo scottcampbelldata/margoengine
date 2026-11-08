@@ -26,6 +26,7 @@ declare const GPUMapMode: { READ: number };
  */
 export interface HTMLOptions extends LabelRendererOptions {
   depth?: false | (() => GPUTexture | undefined);
+  /** Most anchors at once, 1 to 1,048,576 (default 1024). Storage starts at 64 slots and doubles as anchors are added. */
   capacity?: number;
   depthBias?: number;
   /**
@@ -161,13 +162,22 @@ function glState(gl: WebGL2RenderingContext): GLState {
     slots: [],
   };
 }
+/** Most anchors one HTML overlay takes: 2^20 points are 16 MiB of storage and 16,384 workgroups of 64. */
+const MAX_CAPACITY = 1_048_576;
 /** DOM projection from labels, with asynchronous rendered-depth occlusion for 2D anchors. */
 export class HTML extends LabelRenderer {
   private runtime?: Engine;
   private readonly records = new Map<Label, Record>();
-  private slots: (Record | undefined)[];
-  private readonly values: Float32Array;
+  private readonly slots: (Record | undefined)[] = [];
+  /** Point data of every slot up to `allocated`; grows by doubling as anchors are added. */
+  private values: Float32Array;
   private readonly capacity: number;
+  /** Slots with storage on the CPU, and on the GPU (the GPU buffers grow at the next depth sample). */
+  private allocated: number;
+  private gpuSlots = 0;
+  /** One past the highest slot ever used: per-frame work runs to here, not to `capacity`. */
+  private used = 0;
+  private readonly free: number[] = [];
   private shared?: ReturnType<typeof acquireDepth>;
   private source?: () => GPUTexture | undefined;
   private input?: GPUBuffer;
@@ -190,10 +200,9 @@ export class HTML extends LabelRenderer {
     super({ ...settings, name: settings.name ?? 'html', order: 1000 });
     const capacity = settings.capacity ?? 1024,
       bias = settings.depthBias ?? 0.0001;
+    if (!Number.isInteger(capacity) || capacity < 1 || capacity > MAX_CAPACITY)
+      throw new RangeError('Invalid HTML capacity; pass a whole number of anchors from 1 to 1,048,576');
     if (
-      !Number.isInteger(capacity) ||
-      capacity < 1 ||
-      capacity > 4096 ||
       !Number.isFinite(bias) ||
       bias < 0 ||
       bias > 0.05 ||
@@ -204,8 +213,9 @@ export class HTML extends LabelRenderer {
       );
     this.fade = fadeOptions(settings.fade);
     this.capacity = capacity;
-    this.values = new Float32Array(capacity * 4);
-    this.slots = new Array(capacity);
+    this.allocated = Math.min(capacity, 64);
+    this.values = new Float32Array(this.allocated * 4);
+    for (let i = 0; i < this.values.length; i += 4) this.values[i] = this.values[i + 1] = -1;
   }
   static override attach(engine: EngineKernel, options: HTMLOptions = {}): HTML {
     const overlay = new HTML(options);
@@ -214,8 +224,11 @@ export class HTML extends LabelRenderer {
   }
   override add(element: HTMLElement, options: LabelOptions = {}): Label {
     if (this.disposed) throw margoError('disposed', 'HTML is disposed; create a new HTML renderer');
-    const index = this.slots.findIndex((record) => !record);
-    if (index < 0) throw new RangeError('HTML anchor capacity exceeded; raise capacity or remove anchors');
+    // Freed slots first, lowest last freed; then the next new one.
+    const index = this.free.length ? this.free.pop()! : this.used;
+    if (index >= this.capacity) throw new RangeError('HTML anchor capacity exceeded; raise capacity or remove anchors');
+    if (index === this.used) this.used++;
+    if (index >= this.allocated) this.grow(index + 1);
     const label = super.add(element, {
       ...options,
       occlude: (item, info) => {
@@ -243,9 +256,21 @@ export class HTML extends LabelRenderer {
     this.slots[index] = record;
     return label;
   }
+  private grow(slots: number): void {
+    let allocated = this.allocated;
+    while (allocated < slots) allocated *= 2;
+    allocated = Math.min(allocated, this.capacity);
+    const values = new Float32Array(allocated * 4);
+    values.set(this.values);
+    for (let i = this.allocated * 4; i < values.length; i += 4) values[i] = values[i + 1] = -1;
+    this.values = values;
+    this.allocated = allocated;
+  }
   override remove(item: Label | CSS3DObject): void {
     const record = this.records.get(item as Label);
     if (record) {
+      this.free.push(record.index);
+      this.free.sort((a, b) => b - a);
       this.slots[record.index] = undefined;
       this.records.delete(item as Label);
       this.values.set([-1, -1, 0, 0], record.index * 4);
@@ -263,21 +288,21 @@ export class HTML extends LabelRenderer {
     if (!engine.gpu || this.settings.depth === false) return;
     this.shared = this.settings.depth ? undefined : acquireDepth(engine);
     this.source = this.settings.depth || this.shared!.texture;
-    this.input = engine.gpu.createBuffer({
-      size: this.values.byteLength,
-      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-    });
-    this.output = engine.gpu.createBuffer({
-      size: this.capacity * 4,
-      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
-    });
-    this.read = engine.gpu.createBuffer({
-      size: this.capacity * 4,
-      usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
-    });
+    this.buffers(engine.gpu);
     if (this.fade)
       this.radius = engine.gpu.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.pipeline = compute(engine.gpu, this.fade ? fadeShader(this.fade.samples) : shader);
+  }
+  /** Point, result and readback buffers for `allocated` slots. Only called while no depth read is in flight. */
+  private buffers(device: GPUDevice): void {
+    this.input?.destroy();
+    this.output?.destroy();
+    this.read?.destroy();
+    const slots = (this.gpuSlots = this.allocated);
+    this.input = device.createBuffer({ size: slots * 16, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+    this.output = device.createBuffer({ size: slots * 4, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC });
+    this.read = device.createBuffer({ size: slots * 4, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+    this.depthGroup = undefined;
   }
   onPreUpdate(delta: number): void {
     this.delta += delta;
@@ -326,13 +351,15 @@ export class HTML extends LabelRenderer {
         'HTML requires viewport-sized scene depth; pass a depth texture that matches the canvas, or depth: false',
       );
     if (!this.records.size) return;
-    for (let i = 0; i < this.capacity; i++)
+    if (this.gpuSlots !== this.allocated) this.buffers(c.device);
+    const used = this.used;
+    for (let i = 0; i < used; i++)
       if (!this.slots[i] || !this.slots[i]!.label.visible || !this.slots[i]!.label.screen.inFrustum) {
         const at = i * 4;
         this.values[at] = this.values[at + 1] = -1;
         this.values[at + 2] = this.values[at + 3] = 0;
       }
-    c.device.queue.writeBuffer(this.input!, 0, this.values as Float32Array<ArrayBuffer>);
+    c.device.queue.writeBuffer(this.input!, 0, this.values as Float32Array<ArrayBuffer>, 0, used * 4);
     if (this.fade) {
       // The square's half side in drawing-buffer pixels, kept to its CSS size as the canvas scale changes.
       const canvas = this.runtime!.canvas,
@@ -355,11 +382,11 @@ export class HTML extends LabelRenderer {
       this.depthGroup = group(c.device, this.pipeline!, entries);
       this.sampledDepth = depth;
     }
-    dispatch(c, this.pipeline!, this.depthGroup, Math.ceil(this.capacity / 64));
+    dispatch(c, this.pipeline!, this.depthGroup, Math.ceil(used / 64));
     const read = this.read!,
       generation = this.generation,
       requests = this.depthRequests;
-    for (let i = 0; i < this.capacity; i++) {
+    for (let i = 0; i < used; i++) {
       const record = this.slots[i];
       if (!record) {
         requests[i] = undefined;
@@ -372,19 +399,19 @@ export class HTML extends LabelRenderer {
       request.y = record.y;
       request.z = record.z;
     }
-    requests.length = this.capacity;
-    c.encoder.copyBufferToBuffer(this.output!, 0, read, 0, this.capacity * 4);
+    requests.length = used;
+    c.encoder.copyBufferToBuffer(this.output!, 0, read, 0, used * 4);
     this.pending = true;
     queueMicrotask(async () => {
       try {
         await read.mapAsync(GPUMapMode.READ);
         if (this.disposed || generation !== this.generation) return;
-        const result = new Uint32Array(read.getMappedRange()),
+        const result = new Uint32Array(read.getMappedRange(0, used * 4)),
           fade = this.fade,
           // A result is fresh while the anchor stays within 4 CSS pixels (or the faded square) of where it was taken.
           near = fade ? Math.max(4, fade.radius) : 4,
           tests = fade ? fade.samples * fade.samples : 1;
-        for (let i = 0; i < this.capacity; i++) {
+        for (let i = 0; i < used; i++) {
           const request = requests[i];
           if (!request || this.slots[i] !== request.record) continue;
           const record = request.record,
@@ -428,7 +455,7 @@ export class HTML extends LabelRenderer {
       radius = fade?.radius ?? 0,
       bias = this.settings.depthBias ?? 0.0001;
     let drawing = false;
-    for (let i = 0; i < this.capacity; i++) {
+    for (let i = 0; i < this.used; i++) {
       const record = this.slots[i];
       let slot = state.slots[i];
       if (slot?.pending) {
@@ -511,6 +538,7 @@ export class HTML extends LabelRenderer {
     this.read?.destroy();
     this.radius?.destroy();
     this.input = this.output = this.read = this.radius = undefined;
+    this.gpuSlots = 0;
     this.pipeline = undefined;
     this.sampledDepth = this.depthGroup = undefined;
   }
@@ -529,7 +557,7 @@ export class HTML extends LabelRenderer {
     this.release();
     super.dispose();
     this.records.clear();
-    this.slots.fill(undefined);
+    this.slots.length = 0;
     this.runtime = undefined;
   }
   declare [Symbol.dispose]: () => void;

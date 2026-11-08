@@ -93,6 +93,19 @@ async function scenario(backend) {
   box.setPosition([0, 0, 0]);
   checks.push(`${backend}: hard occlusion hides an anchor behind the box and shows it again when the box moves away`);
   hard.dispose();
+
+  // Job 4: more than 4,096 anchors. 4,199 behind the box and one beside it, slot 4,199: all occluded but that one.
+  const many = HTML.attach(engine, { name: 'html-many', capacity: 5_000 });
+  const crowd = [];
+  for (let i = 0; i < 4_199; i++) crowd.push(many.add(tag(), { position: [((i % 61) - 30) / 200, 0, -1] }));
+  const last = many.add(tag(), { position: [2, 0, -1] });
+  measurements.manyFrames = await until(
+    engine,
+    () => last.onScreen && crowd.every((anchor) => !anchor.onScreen),
+    'many: 4,199 anchors behind the box hidden, the 4,200th beside it shown',
+  );
+  checks.push(`${backend}: 4,200 anchors in one overlay, the 4,199 behind the box hidden and the one beside it shown`);
+  many.dispose();
   if (device) {
     const error = await device.popErrorScope();
     if (error) gpuErrors.push(error.message);
