@@ -1,6 +1,7 @@
 // The lowercase tags of @margoengine/react/jsx-runtime on a real GPU: a page compiled with jsxImportSource
 // '@margoengine/react' draws <mesh>, <group>, <boxGeometry>, <meshStandardMaterial>, <directionalLight> and an extend()
-// tag, checked by the colours of its screenshot. Takes the GPU lock.
+// tag, checked by the colours of its screenshot; then real mouse clicks check that pointer events bubble. Takes the GPU
+// lock.
 //   npm run test:browser:tags --workspace @margoengine/react
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
@@ -58,6 +59,38 @@ try {
   assert.ok(!dominant(gap, 0) && !dominant(gap, 2), `nothing is drawn between them, got ${gap}`);
   assert.equal(await page.locator('#app mesh, #app group, #app sphereGeometry').count(), 0, 'no tag reached the DOM');
   result.checks.push({ name: 'Lowercase tags and an extend() tag draw on a real engine', box, sphere, gap });
+
+  // Bubbling with real clicks: GPU picking finds the hit mesh, then the event climbs to its parents.
+  await shot('bubbling', (i) => dominant(sample(i, 0.3, 0.5), 0) && dominant(sample(i, 0.7, 0.5), 2));
+  const bounds = await page.locator('#app canvas').boundingBox();
+  const at = (x) => [bounds.x + x * bounds.width, bounds.y + 0.5 * bounds.height];
+  // The entries logged since the last call, waiting for `count` of them; hover entries (over, enter) count only when
+  // `hover` is set, since a click moves the mouse first and hovering over a new mesh is not what a click step checks.
+  const events = async (count, hover = false) => {
+    await page.waitForFunction(
+      ([n, hover]) => window.tags.state.events.filter((entry) => hover || !/ (over|enter)$/.test(entry)).length >= n,
+      [count, hover],
+      { timeout: 10_000 },
+    );
+    // A further event, had one been sent, would come within a few frames.
+    const frames = await page.evaluate(() => window.tags.state.frames);
+    await page.waitForFunction((n) => window.tags.state.frames >= n + 10, frames, { timeout: 10_000 });
+    const entries = await page.evaluate(() => window.tags.state.events.splice(0));
+    return entries.filter((entry) => hover || !/ (over|enter)$/.test(entry));
+  };
+  await page.mouse.move(...at(0.3));
+  const hover = await events(4, true);
+  assert.deepEqual(hover, ['box over', 'group over', 'group enter', 'box enter'], 'over bubbles, enter goes outside in');
+  await page.mouse.click(...at(0.3));
+  const boxClick = await events(2);
+  assert.deepEqual(boxClick, ['box click true', 'group click on child'], 'a click on the box bubbles to its group');
+  await page.mouse.click(...at(0.7));
+  const sphereClick = await events(1);
+  assert.deepEqual(sphereClick, ['sphere click'], 'stopPropagation keeps the click at the sphere');
+  await page.mouse.click(...at(0.5));
+  const empty = await events(2);
+  assert.deepEqual(empty, ['group missed pointerup', 'canvas missed pointerup'], 'a click on nothing is missed');
+  result.checks.push({ name: 'Pointer events bubble on a real engine', hover, boxClick, sphereClick, empty });
 
   await page.evaluate(() => window.tags.unmount());
   assert.deepEqual(await page.evaluate(() => window.tags.state.errors), []);

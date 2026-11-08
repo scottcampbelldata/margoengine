@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10786857,
+  "total": 10787898,
   "history": [
     {
       "date": "2026-10-24",
@@ -3914,6 +3914,12 @@
       "commit": "57f031b0c",
       "reason": "react: JSX runtime entries and extend (batch 117 job 1)",
       "grew": 3
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "d0d0ebfd6",
+      "reason": "react: pointer events bubble, every handler (batch 117 job 2)",
+      "grew": 1
     }
   ],
   "items": {
@@ -4423,7 +4429,7 @@
     "@margoengine/ragdoll/hulls": 2007,
     "@margoengine/ragdoll/powered": 3402,
     "@margoengine/ragdoll/profile": 2404,
-    "@margoengine/react": 8811,
+    "@margoengine/react": 9852,
     "@margoengine/react/animation": 3015,
     "@margoengine/react/controls": 4346,
     "@margoengine/react/devtools": 1008,

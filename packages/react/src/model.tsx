@@ -2,7 +2,8 @@ import { useRef, useState, type ReactNode } from 'react';
 import type { EngineKernel, Mesh as MeshHandle } from '@margoengine/core';
 import type { Vec3 } from '@margoengine/core/extension';
 import type { PBRModel, PBRMaterial } from '@margoengine/gltf-pro';
-import { useScene, useCommit, useResourceEffect, zero, one, ModelContext, type PointerHandlers } from './internal.js';
+import { useScene, useCommit, useResourceEffect, zero, one, ModelContext, type PointerHandlers, type Listeners } from './internal.js';
+import { liveHandlers } from './events.js';
 import { retainAsset, type ModelFormat } from './assets.js';
 import { instantiateModel, modelAsset, preloadModel, type FormatLoader } from './model-assets.js';
 import { modelPicking } from './picking.js';
@@ -106,22 +107,12 @@ export function ModelResource({
       const map = format === 'fbx' ? assetCache.fbx : assetCache.models;
       const asset = modelAsset(assetCache, props.src, format, load),
         releaseAsset = retainAsset(assetCache, props.src, asset, map);
-      const handlers: PointerHandlers = {
-        get onClick() {
-          return latest.current.onClick;
-        },
-        get onPointerOver() {
-          return latest.current.onPointerOver;
-        },
-        get onPointerOut() {
-          return latest.current.onPointerOut;
-        },
-      };
+      let handlers: Listeners | undefined;
       const ids = new Set<number>();
       setModel(null);
       const release = () => {
         if (!current) return;
-        for (const id of ids) if (pointerHandlers.get(id) === handlers) pointerHandlers.delete(id);
+        for (const id of ids) if (handlers && pointerHandlers.get(id) === handlers) pointerHandlers.delete(id);
         ids.clear();
         resources.models.delete(current);
         for (const models of resources.lighting.values()) {
@@ -162,6 +153,8 @@ export function ModelResource({
         resources.picking ??= modelPicking;
         resources.models.add(loaded);
         for (const [effect, models] of resources.lighting) models.set(loaded, loaded.addLighting(effect));
+        // One record for every node, with the root as `currentTarget`, so an event bubbles through the model once.
+        handlers = liveHandlers(latest, loaded.root);
         for (const node of [loaded.root, ...loaded.nodes, ...loaded.primitives.map((primitive) => primitive.node)])
           if (node) {
             ids.add(node.id);

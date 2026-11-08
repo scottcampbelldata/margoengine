@@ -64,10 +64,13 @@ enforces it.
 (`<Margo.mesh>`, `<Margo.group>`, `<Margo.boxGeometry>`, `<Margo.meshStandardMaterial>`) because a bare `<mesh>` is a DOM
 element in React.
 
-**Events:** `onClick`, `onPointerOver`, `onPointerOut` on `Mesh`, `Model`, `Box`, `Sphere`, `Plane`. These come from GPU
-picking, not a raycaster: asynchronous (a frame or two), nearest mesh wins, no bubbling, a click is at most 3 CSS px of
-movement, primary button only, WebGPU only. Handlers get `nativeEvent`, `object`/`mesh`/`target`, `x`, `y`, `clientX`,
-`clientY`.
+**Events:** `onClick`, `onDoubleClick`, `onContextMenu`, `onPointerDown`, `onPointerUp`, `onPointerMove`,
+`onPointerOver`, `onPointerOut`, `onPointerEnter`, `onPointerLeave`, `onWheel` and `onPointerMissed` on `Mesh`, `Model`,
+`Box`, `Sphere`, `Plane`, `RigidBody`, `TransformControls` and the XR `Controller`; `onPointerMissed` on the Canvas.
+These come from GPU picking, not a raycaster: asynchronous (a frame or two), nearest mesh wins, then the event bubbles
+through its parents until `stopPropagation()`; a click is at most 3 CSS px of movement, primary button only; WebGPU,
+or the WebGL2 preview with `webglPicking`. Handlers get `type`, `nativeEvent`, `object`/`mesh`/`target`,
+`currentTarget`/`eventObject`, `x`, `y`, `clientX`, `clientY`, `delta`, `stopPropagation()` and pointer capture.
 
 **Models and assets:** `Model`/`Gltf` with `materials` overrides (`baseColor`, `roughness`, `metalness`, `emissive`,
 `normalScale`, `occlusionStrength`, `alphaCutoff`, `doubleSided`), `castShadow`, `receiveShadow`, `onLoad`, `onError`.

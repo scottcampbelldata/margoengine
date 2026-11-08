@@ -75,6 +75,10 @@ mock.module('@margoengine/core/extension', {
           backend: options.backend === 'auto' ? 'webgpu' : options.backend,
           next: 0,
           meshes: new Map(),
+          // The kernel's parent column, read by the pointer events to bubble: -1 for a root.
+          store: {
+            parents: new Proxy([], { get: (_, id) => engine.meshes.get(Number(id))?.parent?.id ?? -1 }),
+          },
           plugins: new Map(),
           callbacks: new Set(),
           picks: [],
@@ -544,19 +548,25 @@ test('canvas serializes picking, coalesces pointermove bursts and preserves queu
   await pointer(canvas, 'pointermove', 3, 3);
   assert.equal(coordinates.length, 1);
   assert.equal(peak, 1);
+  // A click picks at the press and at the release (it goes to what both hit), in the order they were sent.
   await act(async () => pending.shift()(node));
   assert.deepEqual(coordinates[1], [10, 10]);
   assert.equal(overs, 0);
   await act(async () => pending.shift()(node));
-  assert.deepEqual(coordinates[2], [20, 20]);
+  assert.deepEqual(coordinates[2], [10, 10]);
+  assert.equal(clicks, 0);
+  await act(async () => pending.shift()(node));
+  assert.deepEqual(coordinates[3], [20, 20]);
   assert.equal(clicks, 1);
   await act(async () => pending.shift()(node));
-  assert.deepEqual(coordinates[3], [3, 3]);
+  assert.deepEqual(coordinates[4], [20, 20]);
+  await act(async () => pending.shift()(node));
+  assert.deepEqual(coordinates[5], [3, 3]);
   assert.equal(clicks, 2);
   await act(async () => pending.shift()(node));
   assert.equal(peak, 1);
   assert.equal(overs, 1);
-  assert.equal(coordinates.length, 4);
+  assert.equal(coordinates.length, 6);
 });
 
 test('canvas skips picking without handlers and on an unsupported WebGL backend', async () => {

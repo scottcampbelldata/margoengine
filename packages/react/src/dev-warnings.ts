@@ -48,7 +48,7 @@ export function warnPickingWithoutWebGPU(): void {
   hint(
     'unsupported',
     'pick:webgl2',
-    'onClick, onPointerOver and onPointerOut never fire on the WebGL2 fallback without webglPicking, because engine.pick needs WebGPU; ' +
+    'Pointer handlers (onClick, onPointerDown, onPointerOver and the rest) never fire on the WebGL2 fallback without webglPicking, because engine.pick needs WebGPU; ' +
       'use loadFallback={() => import(\'margoengine/webgl/pick\')}, handle input on the canvas element yourself, or show fallbackContent without WebGPU (see "Pointer events and picking" in the @margoengine/react README).',
   );
 }

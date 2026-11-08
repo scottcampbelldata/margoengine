@@ -73,7 +73,7 @@ export interface PhysicsProps extends PhysicsOptions {
     onError?: (error: unknown) => void;
 }
 
-export function RigidBody({ children, position, rotation, scale, onClick, onPointerOver, onPointerOut, ...options }: RigidBodyProps): import("react").JSX.Element;
+export function RigidBody({ children, position, rotation, scale, ...props }: RigidBodyProps): import("react").JSX.Element;
 
 export type RigidBodyColliders = ColliderOptions | readonly ColliderOptions[] | AutomaticColliderMode | false;
 
@@ -109,15 +109,24 @@ type ColliderBaseProps = Omit<Extract<ColliderOptions, {
     onError?: (error: unknown) => void;
 };
 
-interface MargoPointerEvent {
-    nativeEvent: PointerEvent;
+interface MargoPointerEvent<E extends MouseEvent = PointerEvent> {
+    type: string;
+    nativeEvent: E;
     object: MeshHandle;
     mesh: MeshHandle;
     target: MeshHandle;
+    currentTarget: MeshHandle;
+    eventObject: MeshHandle;
     clientX: number;
     clientY: number;
     x: number;
     y: number;
+    delta: number;
+    readonly stopped: boolean;
+    stopPropagation(): void;
+    setPointerCapture(): void;
+    releasePointerCapture(): void;
+    hasPointerCapture(): boolean;
 }
 
 interface MeshProps extends PointerHandlers {
@@ -131,9 +140,18 @@ interface MeshProps extends PointerHandlers {
 }
 
 interface PointerHandlers {
-    onClick?: (event: MargoPointerEvent) => void;
+    onClick?: (event: MargoPointerEvent<MouseEvent>) => void;
+    onDoubleClick?: (event: MargoPointerEvent<MouseEvent>) => void;
+    onContextMenu?: (event: MargoPointerEvent<MouseEvent>) => void;
+    onPointerDown?: (event: MargoPointerEvent) => void;
+    onPointerUp?: (event: MargoPointerEvent) => void;
+    onPointerMove?: (event: MargoPointerEvent) => void;
     onPointerOver?: (event: MargoPointerEvent) => void;
     onPointerOut?: (event: MargoPointerEvent) => void;
+    onPointerEnter?: (event: MargoPointerEvent) => void;
+    onPointerLeave?: (event: MargoPointerEvent) => void;
+    onWheel?: (event: MargoPointerEvent<WheelEvent>) => void;
+    onPointerMissed?: (event: MouseEvent) => void;
 }
 
 type Triple = readonly [number, number, number];

@@ -91,6 +91,10 @@ mock.module('@margoengine/core/extension', {
           options,
           camera: { ...options.camera },
           meshes: new Map(),
+          // The kernel's parent column, read by the pointer events to bubble: -1 for a root.
+          store: {
+            parents: new Proxy([], { get: (_, id) => engine.meshes.get(Number(id))?.parent?.id ?? -1 }),
+          },
           createdMeshes: [],
           geometryReferences: new Map(),
           plugins: new Map(),

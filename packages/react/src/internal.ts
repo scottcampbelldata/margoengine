@@ -30,22 +30,58 @@ export type ShadowsLoader = () => Promise<typeof ShadowsModule>;
 // Optional model behaviours share the instance that this mount owns. The URL
 // cache keeps source data only; animation state is never shared between mounts.
 export const ModelContext = createContext<PBRModel | null | undefined>(undefined);
-/** Pointer event passed to React handlers, with the hit point and mesh. */
-export interface MargoPointerEvent {
-  nativeEvent: PointerEvent;
+/**
+ * Pointer event passed to React handlers. It goes to the hit mesh first, then to each parent with handlers, as a DOM
+ * event bubbles, until a handler calls `stopPropagation()`.
+ */
+export interface MargoPointerEvent<E extends MouseEvent = PointerEvent> {
+  /** The DOM event name: `click`, `pointerdown`, `pointerover`, `wheel` and so on. */
+  type: string;
+  nativeEvent: E;
+  /** The hit mesh (for a click, the mesh under the release). */
   object: MeshHandle;
   mesh: MeshHandle;
   target: MeshHandle;
+  /** The mesh whose handler runs now: the hit mesh or the parent the event bubbled to (a model's root for a model). */
+  currentTarget: MeshHandle;
+  eventObject: MeshHandle;
   clientX: number;
   clientY: number;
+  /** Canvas CSS pixels from its top left corner. */
   x: number;
   y: number;
+  /** CSS pixels the pointer travelled since the press (0 for events outside a press). */
+  delta: number;
+  /** True once a handler called `stopPropagation()`. */
+  readonly stopped: boolean;
+  /** Stops the event at this mesh: no parent hears it. */
+  stopPropagation(): void;
+  /** Sends this pointer's later events to this mesh without picking, until the release or `releasePointerCapture`. */
+  setPointerCapture(): void;
+  releasePointerCapture(): void;
+  hasPointerCapture(): boolean;
 }
-/** Pointer event props accepted by mesh components. */
+/** Pointer event props accepted by mesh components; every one bubbles to the mesh's parents except enter and leave. */
 export interface PointerHandlers {
-  onClick?: (event: MargoPointerEvent) => void;
+  onClick?: (event: MargoPointerEvent<MouseEvent>) => void;
+  onDoubleClick?: (event: MargoPointerEvent<MouseEvent>) => void;
+  onContextMenu?: (event: MargoPointerEvent<MouseEvent>) => void;
+  onPointerDown?: (event: MargoPointerEvent) => void;
+  onPointerUp?: (event: MargoPointerEvent) => void;
+  onPointerMove?: (event: MargoPointerEvent) => void;
   onPointerOver?: (event: MargoPointerEvent) => void;
   onPointerOut?: (event: MargoPointerEvent) => void;
+  /** Fires on this mesh only, when the pointer comes over it or any mesh below it. */
+  onPointerEnter?: (event: MargoPointerEvent) => void;
+  /** Fires on this mesh only, when the pointer leaves it and every mesh below it. */
+  onPointerLeave?: (event: MargoPointerEvent) => void;
+  onWheel?: (event: MargoPointerEvent<WheelEvent>) => void;
+  /** A click on the canvas that did not reach this mesh: it hit nothing, or another mesh outside this one. */
+  onPointerMissed?: (event: MouseEvent) => void;
+}
+/** The handlers one mount registers for its meshes; `owner` is the `currentTarget` they see (a model's root). */
+export interface Listeners extends PointerHandlers {
+  owner?: MeshHandle;
 }
 export interface Frames {
   elapsed: number;
@@ -61,7 +97,7 @@ export interface Scene {
   /** Turns the Canvas shadows on until the returned function is called; load imports the package. */
   requestShadows: (load: ShadowsLoader) => () => void;
   cameraOverrides: Set<() => void>;
-  pointerHandlers: Map<number, PointerHandlers>;
+  pointerHandlers: Map<number, Listeners>;
   frames: Frames;
   assetCache: AssetCache;
   /** The engine scene meshes are created in: a `<Scene>`'s, or null for the default scene. */

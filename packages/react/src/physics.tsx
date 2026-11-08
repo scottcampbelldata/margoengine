@@ -12,6 +12,7 @@ import type {
   PhysicsJoint,
 } from '@margoengine/physics';
 import { Mesh, type MeshProps } from './components.js';
+import { splitPointerHandlers } from './events.js';
 import { useScene, useCommit, useResourceEffect, type Scene, type Registry } from './internal.js';
 import { descendants, worldPose, setWorldPose, type Triple, type Quaternion } from './scene-transform.js';
 import { rotateByQuaternion } from '@margoengine/math/quat';
@@ -149,11 +150,9 @@ export function RigidBody({
   position,
   rotation,
   scale,
-  onClick,
-  onPointerOver,
-  onPointerOut,
-  ...options
+  ...props
 }: RigidBodyProps) {
+  const [events, options] = splitPointerHandlers(props);
   const binding = useMemo<BodyState>(() => ({ requests: new Set(), refresh: () => {} }), []);
   return (
     <BodyContext.Provider value={binding}>
@@ -161,9 +160,7 @@ export function RigidBody({
         position={position}
         rotation={rotation}
         scale={scale}
-        onClick={onClick}
-        onPointerOver={onPointerOver}
-        onPointerOut={onPointerOut}
+        {...events}
       >
         <BodyBinding {...options} transform={{ position, rotation, scale }} />
         {children}

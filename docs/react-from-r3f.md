@@ -12,7 +12,7 @@ built in, more through `extend`; see "Lowercase tags and extend" in the package 
 | R3F or drei | Margo | Notes |
 | --- | --- | --- |
 | `<Canvas>` | `<Canvas>` | `frameloop="always" \| "demand"`, `shadows`, `camera`, `onCreated`, `onError`. |
-| `<mesh>`, `<group>` | `<Mesh>`, `<Group>` | `position`, `rotation`, `scale`, `castShadow`, `onClick`, `onPointerOver`, `onPointerOut`, `ref`. |
+| `<mesh>`, `<group>` | `<Mesh>`, `<Group>` | `position`, `rotation`, `scale`, `castShadow`, every pointer handler (`onClick`, `onPointerDown`, `onPointerOver`, ...), `ref`. |
 | `<boxGeometry args>` | `<BoxGeometry args>` | `Box`, `Sphere` and `Plane` bundle geometry and material for the common case. |
 | `<meshStandardMaterial>` | `<PbrMaterial>` | glTF metallic-roughness: `color`, `roughness`, `metalness`. |
 | `<directionalLight>` | `<Sun direction color intensity>` | `direction` points towards the light. |
@@ -38,9 +38,12 @@ built in, more through `extend`; see "Lowercase tags and extend" in the package 
 
 - **Units and conventions.** Real-world units (metres) and glTF conventions: Y up, right-handed, metallic-roughness
   materials.
-- **Events.** `event.object` is the mesh that was hit; a click is a pointer-up with at most three CSS pixels of movement.
-  There is no event bubbling through a scene graph of React elements, and no separate raycaster: picking is a GPU read of
-  the pixel.
+- **Events.** The same handler names (`onClick`, `onDoubleClick`, `onContextMenu`, `onPointerDown`, `onPointerUp`,
+  `onPointerMove`, `onPointerOver`, `onPointerOut`, `onPointerEnter`, `onPointerLeave`, `onWheel`, `onPointerMissed`),
+  and events bubble from the hit mesh through its parents until `event.stopPropagation()`. `event.object` and
+  `event.target` are the mesh that was hit, `event.eventObject` the mesh whose handler runs. There is no separate
+  raycaster: picking is a GPU read of the pixel, so only the nearest mesh is hit (no `event.intersections` list), and a
+  handler runs a frame or two after the DOM event. A click is a pointer-up with at most three CSS pixels of movement.
 - **Refs.** A mesh ref is a stable handle; it never points at a disposed mesh across Strict Mode or Suspense.
 - **Optional features are subpaths.** Controls, shadows, post effects and loaders are optional packages: import their
   components from `@margoengine/react/<package>` (`/controls`, `/shadows`, `/post`, `/gltf-pro`, ...) and install that

@@ -204,26 +204,68 @@ need a material component other than the standard one (as above) or a geometry o
 
 ### Pointer events and picking
 
-`onClick`, `onPointerOver` and `onPointerOut` on `Mesh`, `Model`, `Box`, `Sphere` and `Plane` come from GPU picking, not
-from the DOM. These rules come from the code in `src/components.tsx` and apply to every handler:
+Pointer handlers on `Mesh`, `Model`, `Box`, `Sphere`, `Plane`, `RigidBody`, `TransformControls` and the XR
+`Controller` come from GPU picking, not from the DOM: `onClick`, `onDoubleClick`, `onContextMenu`, `onPointerDown`,
+`onPointerUp`, `onPointerMove`, `onPointerOver`, `onPointerOut`, `onPointerEnter`, `onPointerLeave`, `onWheel` and
+`onPointerMissed`. The Canvas takes `onPointerMissed` too. These rules come from the code in `src/events.ts` and apply to
+every handler:
 
 - **Picking is asynchronous.** The pointer event asks the GPU which mesh is under the pixel, and the handler runs after
-  the answer, a frame or two later. Code and tests that read the state your handler sets must wait for it. Clicks keep
-  their order. A burst of hover events collapses to the latest one.
+  the answer, a frame or two later. Code and tests that read the state your handler sets must wait for it. Presses,
+  releases and clicks keep their order. A burst of moves, or of wheel turns, collapses to the latest one.
 - **The mesh in front gets the event.** If two meshes overlap under the pointer, the one drawn nearest the camera is
-  hit. A child that overlaps its parent wins over the parent. A mesh in front with no handlers blocks the mesh behind
-  it: nothing fires.
-- **Events do not bubble.** A `Group` or parent `Mesh` does not receive the click of its children. Put the handler on
-  the mesh that is drawn, and use one handler function for several meshes if they share behaviour.
-- **An orbit drag is not a click.** A click needs the pointer to move no more than 3 CSS pixels between press and
-  release, and only the primary button counts.
+  hit. A child that overlaps its parent wins over the parent. A mesh in front with no handlers still takes the hit, and
+  the event bubbles from it.
+- **Events bubble, as DOM events do.** The event goes to the hit mesh, then to each parent `Mesh`, `Group` or model
+  with handlers, until a handler calls `event.stopPropagation()`. `target` is the hit mesh, `currentTarget` (also
+  `eventObject`) the mesh whose handler runs; inside a model it is the model's root, and the model hears an event once.
+  `onPointerOver` and `onPointerOut` bubble. `onPointerEnter` and `onPointerLeave` do not: they fire once on each mesh
+  the pointer comes into or leaves, counting the meshes below it, so moving between two children of a group gives the
+  group out and over, never leave and enter.
+- **A click goes to what the press and the release both hit**: the nearest mesh both hit, or their nearest shared
+  parent, with the release's hit as `target`. It needs the pointer to move no more than 3 CSS pixels between press and
+  release (an orbit drag is not a click), and only the primary button counts. `onPointerMissed` on a mesh fires for a
+  click that did not reach it; on the Canvas, for a click that hit no mesh.
+- **Pointer capture.** `event.setPointerCapture()` in `onPointerDown` sends the pointer's later events to that mesh
+  without picking, until the release or `event.releasePointerCapture()`, as for a drag handle.
 - **On the WebGL2 fallback.** Handlers fire when the engine has `webglPicking`, and the plain way to give it that is
   `<Canvas loadFallback={() => import('margoengine/webgl/pick')}>`: that entry holds the renderer and the picking. With a
-  `fallback` prop, attach it yourself in `onCreated`. Only core meshes are picked there. Without it no handler fires:
-  in development the Canvas prints one `MargoError` (code `unsupported`) the first time a handler is registered, and
-  nothing in a production build.
-- **Handlers get** `nativeEvent`, `object` (also `mesh` and `target`: the hit mesh), `x` and `y` (canvas pixels) and
-  `clientX` and `clientY`.
+  `fallback` prop, attach it yourself in `onCreated`. Only core meshes are picked there. Without it no handler fires,
+  and nothing counts as missed: in development the Canvas prints one `MargoError` (code `unsupported`) the first time a
+  handler is registered, and nothing in a production build.
+- **Handlers get** `type` (the DOM event name), `nativeEvent`, `object` (also `mesh` and `target`: the hit mesh),
+  `currentTarget` and `eventObject`, `x` and `y` (canvas pixels), `clientX` and `clientY`, `delta` (CSS pixels moved
+  since the press), `stopPropagation()`, `stopped`, and `setPointerCapture()`, `releasePointerCapture()` and
+  `hasPointerCapture()`.
+
+A group that hears the clicks of its parts, a part that keeps its own, and a click on empty space:
+
+```tsx
+import { useState } from 'react';
+import { Canvas, Mesh } from '@margoengine/react';
+import { Box, Sphere } from '@margoengine/react/geometry';
+
+export function Bubbling() {
+  const [log, setLog] = useState('nothing yet');
+  return (
+    <>
+      <p>{log}</p>
+      <Canvas style={{ height: 400 }} onPointerMissed={() => setLog('missed')}>
+        <Mesh onClick={(event) => setLog(event.target === event.currentTarget ? "the group itself" : "group heard a click on a part")}>
+          <Box position={[-1, 0, 0]} />
+          <Sphere
+            position={[1, 0, 0]}
+            onClick={(event) => {
+              event.stopPropagation();
+              setLog('the sphere kept its click');
+            }}
+          />
+        </Mesh>
+      </Canvas>
+    </>
+  );
+}
+```
 
 In a Playwright test, click and then wait for the state:
 

@@ -10,6 +10,7 @@ import type {
   XRInputPose,
 } from '@margoengine/xr';
 import { Mesh, type MeshProps } from './components.js';
+import { splitPointerHandlers } from './events.js';
 import { useScene, useResourceEffect } from './internal.js';
 import { setWorldPose } from './scene-transform.js';
 import { MargoError } from '@margoengine/math/errors';
@@ -186,20 +187,11 @@ export function Controller({
   position,
   rotation,
   scale,
-  onClick,
-  onPointerOver,
-  onPointerOut,
-  ...props
+  ...all
 }: ControllerProps) {
+  const [events, props] = splitPointerHandlers(all);
   return (
-    <Mesh
-      position={position}
-      rotation={rotation}
-      scale={scale}
-      onClick={onClick}
-      onPointerOver={onPointerOver}
-      onPointerOut={onPointerOut}
-    >
+    <Mesh position={position} rotation={rotation} scale={scale} {...events}>
       <ControllerBinding {...props} />
       {children}
     </Mesh>

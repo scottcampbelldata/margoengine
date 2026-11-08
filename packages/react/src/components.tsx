@@ -43,8 +43,10 @@ import {
   type Resources,
   type Frames,
   type PointerHandlers,
+  type Listeners,
   type ShadowsLoader,
 } from './internal.js';
+import { attachPointerEvents, hasPointerHandlers, liveHandlers } from './events.js';
 export type { MargoPointerEvent, PointerHandlers } from './internal.js';
 import { warnLowercaseTags, warnPickingWithoutWebGPU } from './dev-warnings.js';
 import { ownerHook } from './dev-names.js';
@@ -89,6 +91,11 @@ export interface CanvasProps extends EngineOptions {
   powerPreference?: EngineOptions['powerPreference'];
   onCreated?: (stage: StageFacade) => void;
   onError?: (error: unknown) => void;
+  /**
+   * A click on the canvas that hit no mesh. Needs picking (WebGPU, or `webglPicking` on the WebGL2 preview); without
+   * it nothing is known to be missed and this never fires. Default: none.
+   */
+  onPointerMissed?: (event: MouseEvent) => void;
   frameloop?: 'always' | 'demand';
   /**
    * Caps the canvas pixel ratio below the engine's own limit of 2, for example `1` on a laptop that struggles at
@@ -181,11 +188,13 @@ export function MargoCanvas({
   maxDpr,
   onCreated,
   onError,
+  onPointerMissed,
 }: CanvasProps) {
   const canvas = useRef<HTMLCanvasElement>(null),
     queue = useRef<Promise<void>>(Promise.resolve()),
     created = useRef(onCreated),
     errorHandler = useRef(onError),
+    missedHandler = useRef(onPointerMissed),
     fallbackLoader = useRef(loadFallback),
     compatLoader = useRef(loadCompat);
   const [stage, setStage] = useState<StageFacade | null>(null),
@@ -207,11 +216,11 @@ export function MargoCanvas({
   const engine = stage?.engine as unknown as Engine | null;
   const cameraOverrides = useMemo(() => new Set<() => void>(), [engine]);
   const pointerHandlers = useMemo(() => {
-    const handlers = new Map<number, PointerHandlers>();
+    const handlers = new Map<number, Listeners>();
     if (envReadable && process.env.NODE_ENV !== 'production' && engine?.backend === 'webgl2') {
       const set = handlers.set.bind(handlers);
       handlers.set = (id, value) => {
-        if ((value.onClick || value.onPointerOver || value.onPointerOut) && !hasPick(engine)) warnPickingWithoutWebGPU();
+        if (hasPointerHandlers(value) && !hasPick(engine)) warnPickingWithoutWebGPU();
         return set(id, value);
       };
     }
@@ -240,6 +249,7 @@ export function MargoCanvas({
     engineMode = useRef(frameloop);
   created.current = onCreated;
   errorHandler.current = onError;
+  missedHandler.current = onPointerMissed;
   fallbackLoader.current = loadFallback;
   compatLoader.current = loadCompat;
   cameraOptions.current = camera;
@@ -376,133 +386,25 @@ export function MargoCanvas({
   }, [engine, frameloop, frames]);
   useEffect(() => {
     if (!engine || engine.disposed) return;
-    const element = engine.canvas;
-    let active = true,
-      hover: EngineMesh | null = null,
-      hoverRequest = 0;
-    let down: { id: number; x: number; y: number; movement: number } | null = null;
-    type PickRequest = { x: number; y: number; receive: (mesh: EngineMesh | null) => void };
-    let picking = false,
-      pendingHover: PickRequest | null = null;
-    const clicks: PickRequest[] = [];
-    const coordinates = (event: PointerEvent) => {
-      const bounds = element.getBoundingClientRect();
-      return { x: event.clientX - bounds.left, y: event.clientY - bounds.top };
-    };
-    const dispatch = (kind: keyof PointerHandlers, mesh: EngineMesh, event: PointerEvent) => {
-      if (engine.disposed || engine.meshes.get(mesh.id) !== mesh) return;
-      const object = mesh as unknown as MeshHandle;
-      pointerHandlers.get(mesh.id)?.[kind]?.({
-        nativeEvent: event,
-        object,
-        mesh: object,
-        target: object,
-        clientX: event.clientX,
-        clientY: event.clientY,
-        ...coordinates(event),
-      });
-    };
-    const move = (event: PointerEvent) => {
-      if (!down || down.id !== event.pointerId) return;
-      down.movement += Math.hypot(event.clientX - down.x, event.clientY - down.y);
-      down.x = event.clientX;
-      down.y = event.clientY;
-    };
+    // Pick only when the backend can and some handler, or the Canvas onPointerMissed, wants the answer.
     const canPick = () => {
       if (!hasPick(engine)) return false;
-      for (const handlers of pointerHandlers.values())
-        if (handlers.onClick || handlers.onPointerOver || handlers.onPointerOut) return true;
+      if (missedHandler.current) return true;
+      for (const handlers of pointerHandlers.values()) if (hasPointerHandlers(handlers)) return true;
       return false;
     };
-    const nextPick = () => {
-      if (picking || !active || engine.disposed) return;
-      const request = clicks.shift() ?? pendingHover;
-      if (!request) return;
-      if (request === pendingHover) pendingHover = null;
-      picking = true;
-      // One request at a time: clicks keep their order and a burst of hovers collapses to the latest.
-      void Promise.resolve()
-        .then(async () => {
-          if (!active || engine.disposed || !canPick()) return null;
-          if (resources.models.size) await resources.picking?.prepare(engine, resources, frames);
-          return active && !engine.disposed ? engine.pick(request.x, request.y) : null;
-        })
-        .then((mesh) => {
-          if (active && !engine.disposed) request.receive(mesh);
-        })
-        .catch((error) => {
-          if (active && !engine.disposed) engine.onError(error);
-        })
-        .finally(() => {
-          picking = false;
-          nextPick();
-        });
-    };
-    const pick = (kind: 'click' | 'hover', event: PointerEvent, receive: (mesh: EngineMesh | null) => void) => {
-      if (!canPick()) {
-        receive(null);
-        return;
-      }
-      const request = { ...coordinates(event), receive };
-      if (kind === 'click') clicks.push(request);
-      else pendingHover = request;
-      nextPick();
-    };
-    const pointerdown = (event: PointerEvent) => {
-      if (event.button !== 0 || event.isPrimary === false) return;
-      down = { id: event.pointerId, x: event.clientX, y: event.clientY, movement: 0 };
-    };
-    const pointerup = (event: PointerEvent) => {
-      if (!down || down.id !== event.pointerId) return;
-      move(event);
-      const clicked = down.movement <= 3;
-      down = null;
-      if (clicked)
-        pick('click', event, (mesh) => {
-          if (mesh) dispatch('onClick', mesh, event);
-        });
-    };
-    const pointermove = (event: PointerEvent) => {
-      move(event);
-      const request = ++hoverRequest;
-      pick('hover', event, (mesh) => {
-        if (request !== hoverRequest || hover === mesh) return;
-        const previous = hover;
-        hover = mesh;
-        if (previous) dispatch('onPointerOut', previous, event);
-        if (mesh) dispatch('onPointerOver', mesh, event);
-      });
-    };
-    const pointerleave = (event: PointerEvent) => {
-      ++hoverRequest;
-      pendingHover = null;
-      down = null;
-      const previous = hover;
-      hover = null;
-      if (previous) dispatch('onPointerOut', previous, event);
-    };
-    const pointercancel = (event: PointerEvent) => {
-      if (down?.id === event.pointerId) down = null;
-      pointerleave(event);
-    };
-    element.addEventListener('pointerdown', pointerdown);
-    element.addEventListener('pointerup', pointerup);
-    element.addEventListener('pointermove', pointermove);
-    element.addEventListener('pointerleave', pointerleave);
-    element.addEventListener('pointercancel', pointercancel);
+    const detach = attachPointerEvents(
+      engine,
+      engine.canvas,
+      pointerHandlers,
+      resources,
+      frames,
+      canPick,
+      () => missedHandler.current,
+    );
     return () => {
-      active = false;
-      ++hoverRequest;
-      down = null;
-      hover = null;
-      pendingHover = null;
-      clicks.length = 0;
+      detach();
       resources.picking?.release(engine);
-      element.removeEventListener('pointerdown', pointerdown);
-      element.removeEventListener('pointerup', pointerup);
-      element.removeEventListener('pointermove', pointermove);
-      element.removeEventListener('pointerleave', pointerleave);
-      element.removeEventListener('pointercancel', pointercancel);
     };
   }, [engine, pointerHandlers, resources, frames]);
   useCommit(() => {
@@ -684,9 +586,7 @@ export const Mesh = forwardRef<MeshRef, MeshProps>(function Mesh(
     receiveShadow = true,
     layers,
     children,
-    onClick,
-    onPointerOver,
-    onPointerOut,
+    ...events
   },
   ref,
 ) {
@@ -734,15 +634,20 @@ export const Mesh = forwardRef<MeshRef, MeshProps>(function Mesh(
       mesh.dispose();
     };
   }, [engine, world, parent, registry]);
+  // The record reads the current props, so a new handler function needs no re-registration; it is registered while the
+  // mesh has any handler at all.
+  const latestEvents = useRef<PointerHandlers>(events);
+  latestEvents.current = events;
+  const listening = hasPointerHandlers(events);
   useCommit(() => {
     const mesh = registry.current;
-    if (!mesh || !(onClick || onPointerOver || onPointerOut)) return;
-    const handlers = { onClick, onPointerOver, onPointerOut };
+    if (!mesh || !listening) return;
+    const handlers = liveHandlers(latestEvents);
     pointerHandlers.set(mesh.id, handlers);
     return () => {
       if (pointerHandlers.get(mesh.id) === handlers) pointerHandlers.delete(mesh.id);
     };
-  }, [registry, node, pointerHandlers, onClick, onPointerOver, onPointerOut]);
+  }, [registry, node, pointerHandlers, listening]);
   useCommit(() => {
     const mesh = registry.current;
     if (mesh) {

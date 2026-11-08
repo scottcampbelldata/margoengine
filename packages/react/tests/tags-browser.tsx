@@ -12,8 +12,9 @@ declare module '@margoengine/react' {
     sphereGeometry: import('react').ComponentProps<typeof SphereGeometry>;
   }
 }
-type Mode = 'tags';
-const state = { frames: 0, errors: [] as string[] };
+type Mode = 'tags' | 'bubbling';
+const state = { frames: 0, errors: [] as string[], events: [] as string[] };
+const log = (entry: string) => state.events.push(entry);
 function Count() {
   useFrame(() => {
     state.frames++;
@@ -27,6 +28,7 @@ function App({ mode }: { mode: Mode }) {
         backend="webgpu"
         camera={{ position: [0, 0, 7], target: [0, 0, 0] }}
         onError={(error) => state.errors.push(String(error))}
+        onPointerMissed={(event) => log(`canvas missed ${event.type}`)}
       >
         <Count />
         {mode === 'tags' && (
@@ -44,6 +46,37 @@ function App({ mode }: { mode: Mode }) {
             </group>
           </>
         )}
+        {mode === 'bubbling' && (
+          <>
+            <directionalLight position={[0, 0, 5]} intensity={3} />
+            <group
+              onClick={(event) => log(`group click on ${event.target === event.currentTarget ? 'group' : 'child'}`)}
+              onPointerOver={() => log('group over')}
+              onPointerEnter={() => log('group enter')}
+              onPointerMissed={(event) => log(`group missed ${event.type}`)}
+            >
+              <mesh
+                position={[-2.2, 0, 0]}
+                onClick={(event) => log(`box click ${event.target === event.currentTarget}`)}
+                onPointerOver={() => log('box over')}
+                onPointerEnter={() => log('box enter')}
+              >
+                <boxGeometry args={[1.8, 1.8, 1.8]} />
+                <meshStandardMaterial color="#ff2020" roughness={0.6} />
+              </mesh>
+              <mesh
+                position={[2.2, 0, 0]}
+                onClick={(event) => {
+                  log('sphere click');
+                  event.stopPropagation();
+                }}
+              >
+                <sphereGeometry args={[1, 32, 16]} />
+                <meshStandardMaterial color="#2040ff" roughness={0.6} />
+              </mesh>
+            </group>
+          </>
+        )}
       </Canvas>
     </StrictMode>
   );
@@ -55,6 +88,7 @@ const harness = {
     root?.unmount();
     root = createRoot(document.querySelector('#app')!);
     state.frames = 0;
+    state.events.length = 0;
     root.render(<App mode={mode} />);
   },
   unmount() {

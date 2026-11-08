@@ -7,6 +7,7 @@ import type {
   ControlEvent,
 } from '@margoengine/controls';
 import { Mesh, type MeshProps } from './components.js';
+import { splitPointerHandlers } from './events.js';
 import { useScene, useCommit, useLiveRef, assignRef, report, type Registry } from './internal.js';
 import { optionalPeer } from './optional.js';
 
@@ -251,9 +252,7 @@ export const TransformControls = forwardRef<GizmoControls, TransformControlsProp
       position={options.position}
       rotation={options.rotation}
       scale={options.scale}
-      onClick={options.onClick}
-      onPointerOver={options.onPointerOver}
-      onPointerOut={options.onPointerOut}
+      {...splitPointerHandlers(options)[0]}
     >
       <TransformBinding options={options} controlRef={ref} />
       {children}

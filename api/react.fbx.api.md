@@ -14,15 +14,24 @@ export type FbxProps = ModelProps;
 
 // Not exported from this entry, but used by the exports above:
 
-interface MargoPointerEvent {
-    nativeEvent: PointerEvent;
+interface MargoPointerEvent<E extends MouseEvent = PointerEvent> {
+    type: string;
+    nativeEvent: E;
     object: MeshHandle;
     mesh: MeshHandle;
     target: MeshHandle;
+    currentTarget: MeshHandle;
+    eventObject: MeshHandle;
     clientX: number;
     clientY: number;
     x: number;
     y: number;
+    delta: number;
+    readonly stopped: boolean;
+    stopPropagation(): void;
+    setPointerCapture(): void;
+    releasePointerCapture(): void;
+    hasPointerCapture(): boolean;
 }
 
 interface MaterialOverride {
@@ -50,8 +59,17 @@ interface ModelProps extends PointerHandlers {
 }
 
 interface PointerHandlers {
-    onClick?: (event: MargoPointerEvent) => void;
+    onClick?: (event: MargoPointerEvent<MouseEvent>) => void;
+    onDoubleClick?: (event: MargoPointerEvent<MouseEvent>) => void;
+    onContextMenu?: (event: MargoPointerEvent<MouseEvent>) => void;
+    onPointerDown?: (event: MargoPointerEvent) => void;
+    onPointerUp?: (event: MargoPointerEvent) => void;
+    onPointerMove?: (event: MargoPointerEvent) => void;
     onPointerOver?: (event: MargoPointerEvent) => void;
     onPointerOut?: (event: MargoPointerEvent) => void;
+    onPointerEnter?: (event: MargoPointerEvent) => void;
+    onPointerLeave?: (event: MargoPointerEvent) => void;
+    onWheel?: (event: MargoPointerEvent<WheelEvent>) => void;
+    onPointerMissed?: (event: MouseEvent) => void;
 }
 ```
