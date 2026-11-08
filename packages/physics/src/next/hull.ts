@@ -59,6 +59,37 @@ export function root(value: number): number {
 /** The absolute value, exact in every engine, as the step path takes nothing from `Math`. */
 const abs = (x: number): number => (x < 0 ? -x : x);
 
+/** The unit roundoff of doubles, 2^-53, written out as the power operator is off the step path. */
+const EPSILON = 1.1102230246251565e-16;
+/** Shewchuk's ORIENT3D stage A factor for doubles, (7e + 56e^2) (Shewchuk 1997, long paper, Table 3). */
+const ORIENT3D_A = (7 + 56 * EPSILON) * EPSILON;
+
+/**
+ * Whether `w` lies above the plane of `u` and `v`, all three taken from one corner: the sign of the volume they span,
+ * trusted only past its rounding bound. Rounding can give points in one plane, common in mesh data, a volume of either
+ * sign; a volume within the bound counts as none. The bound is Shewchuk's stage A filter for ORIENT3D, (7e + 56e^2)
+ * times the permanent of the same expansion (Shewchuk 1997, "Adaptive Precision Floating-Point Arithmetic and Fast
+ * Robust Geometric Predicates", Table 3), which covers the rounding of the corner differences as well.
+ */
+export function beyond(
+  ux: number,
+  uy: number,
+  uz: number,
+  vx: number,
+  vy: number,
+  vz: number,
+  wx: number,
+  wy: number,
+  wz: number,
+): boolean {
+  const volume = (uy * vz - uz * vy) * wx + (uz * vx - ux * vz) * wy + (ux * vy - uy * vx) * wz,
+    permanent =
+      abs(wx) * (abs(uy * vz) + abs(uz * vy)) +
+      abs(wy) * (abs(uz * vx) + abs(ux * vz)) +
+      abs(wz) * (abs(ux * vy) + abs(uy * vx));
+  return volume > ORIENT3D_A * permanent;
+}
+
 const degenerate = (): RangeError =>
   new RangeError(
     'The hull could not close because these points are nearly degenerate; remove near-duplicate points or pass fewer, wider-spread points.',
@@ -162,13 +193,7 @@ export function buildHull(input: ArrayLike<number>): HullFaces {
       wx = p[j] - p[a],
       wy = p[j + 1] - p[a + 1],
       wz = p[j + 2] - p[a + 2];
-    // Rounding can give points in one plane, common in mesh data, a volume of either sign; a volume within rounding of
-    // its products counts as none. Each product rounds by a few ulp of its size and their sizes sum to at most the product
-    // of the three L1 lengths, so 45 ulp of that is a wide bound (own derivation; filtering a sign by its error bound is
-    // Shewchuk 1997).
-    const volume = (uy * vz - uz * vy) * wx + (uz * vx - ux * vz) * wy + (ux * vy - uy * vx) * wz,
-      bound = (abs(ux) + abs(uy) + abs(uz)) * (abs(vx) + abs(vy) + abs(vz)) * (abs(wx) + abs(wy) + abs(wz)) * 5e-15;
-    return volume > bound;
+    return beyond(ux, uy, uz, vx, vy, vz, wx, wy, wz);
   };
   const assign = (faces: readonly number[], i: number): void => {
     let owner = -1,

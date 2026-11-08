@@ -262,3 +262,40 @@ test('a hull without points is the hull of the given geometry, scaled with the m
   assert.ok(Math.abs(body.mass - 8) < 1e-5, `mass ${body.mass}`);
   physics.dispose();
 });
+
+// The seen test is Shewchuk's ORIENT3D stage A filter (1997, Table 3): (7e + 56e^2) times the permanent. The bound it
+// replaced, 5e-15 times the product of the three L1 lengths, called a point 2e-15 above a face spanned by 4 by 4 in
+// plane not above it, though its volume of 3.2e-14 is exact (every other product is zero); the paper bounds it by 2.5e-29.
+test('a point a hair above a face counts as above it, and rounding noise never does', async () => {
+  const { beyond } = await import('../src/next/hull.ts');
+  assert.equal(beyond(4, 0, 0, 0, 4, 0, 3, 3, 2e-15), true, 'an exact volume of 3.2e-14 is above the bound');
+  assert.equal(beyond(0, 4, 0, 4, 0, 0, 3, 3, 2e-15), false, 'the same corners the other way round are below');
+  assert.equal(beyond(4, 0, 0, 0, 4, 0, 3, 3, 0), false, 'a point in the plane is not above');
+  // Near coplanar points on a grid of 2^-20, so each coordinate and each difference is exact and the exact volume is a
+  // BigInt; the products round. The filter may call a volume none, but a sign it gives must be the exact one.
+  const r = random(126),
+    grid = 2 ** 20,
+    span = 2 ** 31,
+    pick = () => Math.round((r() * 2 - 1) * span),
+    exactVolume = (u, v, w) =>
+      (u[1] * v[2] - u[2] * v[1]) * w[0] + (u[2] * v[0] - u[0] * v[2]) * w[1] + (u[0] * v[1] - u[1] * v[0]) * w[2];
+  let decided = 0;
+  for (let n = 0; n < 20000; n++) {
+    const u = [pick(), pick(), pick()],
+      v = [pick(), pick(), pick()],
+      s = r(),
+      t = r(),
+      w = u.map((x, k) => Math.round(s * x + t * v[k]) + ((n % 3) - 1) * (n % 7 === 0 ? 1 : 0)),
+      volume = exactVolume(u.map(BigInt), v.map(BigInt), w.map(BigInt)),
+      [a, b, c] = [u, v, w].map((q) => q.map((x) => x / grid));
+    if (beyond(...a, ...b, ...c)) {
+      assert.ok(volume > 0n, `case ${n}: called above with an exact volume of ${volume}`);
+      decided++;
+    }
+    if (beyond(...b, ...a, ...c)) {
+      assert.ok(volume < 0n, `case ${n}: called below with an exact volume of ${volume}`);
+      decided++;
+    }
+  }
+  assert.ok(decided > 0, 'some near coplanar cases are decided');
+});
