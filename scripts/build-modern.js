@@ -202,6 +202,8 @@ async function buildPackage(name) {
   await buildWorkers(resolve(`packages/${name}`));
   await tsc(name);
   await restoreWorkerUrls(output);
+  if (Object.values(manifest.exports).some((value) => value['react-server']))
+    await writeServerEntries(resolve(`packages/${name}`));
 }
 await buildInDependencyOrder(
   packageOrder(manifests).filter((name) => !only || only.includes(name)),

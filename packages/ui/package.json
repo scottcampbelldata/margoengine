@@ -31,6 +31,7 @@
     },
     "./react": {
       "types": "./dist/react.d.ts",
+      "react-server": "./dist/rsc/react.js",
       "import": "./dist/react.js"
     }
   },

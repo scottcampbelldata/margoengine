@@ -330,7 +330,9 @@ function Respawn() {
 
 Create `UiRoot` where the engine is known (in a child of `@margoengine/react`'s `<Canvas>`, call `useEngine()` and pass it as
 `engine`). Pass `ui={yourUi}` to share one `Ui` with plain code. Widgets join their parent in mount order, so show and hide a
-widget with `visible` rather than by mounting it conditionally if its place in the order matters. Props only a constructor
+widget with `visible` rather than by mounting it conditionally if its place in the order matters. A Next.js server component may import these components: the `react-server` export condition maps
+`@margoengine/ui/react` to a `'use client'` boundary, while every other bundler loads a plain module with no directive (so
+Vite and Rollup print no warning for it). Props only a constructor
 reads (a slider's `min` and `max`, an inventory's `columns` and `slots`) recreate the widget when they change.
 
 ## Options

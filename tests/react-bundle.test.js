@@ -32,6 +32,43 @@ test('every react-server entry of the React package starts with "use client", bu
   }
 });
 
+// Vite and Rollup warn (MODULE_LEVEL_DIRECTIVE) for every bundled file that starts with a directive, so a plain entry
+// of any package carries none; an entry React server components need reaches 'use client' through its "react-server"
+// file. @margoengine/ui/react once began with 'use client' and every app bundling it got the warning (2026-11-07).
+test('no plain package entry starts with a module-level directive; every react-server entry is a client boundary', () => {
+  let checked = 0;
+  for (const dir of readdirSync(join(root, 'packages'))) {
+    let manifest;
+    try {
+      manifest = JSON.parse(readFileSync(join(root, 'packages', dir, 'package.json'), 'utf8'));
+    } catch {
+      continue;
+    }
+    for (const [key, value] of Object.entries(manifest.exports ?? {})) {
+      if (typeof value !== 'object' || !value.import) continue;
+      let text;
+      try {
+        text = readFileSync(join(root, 'packages', dir, value.import), 'utf8');
+      } catch {
+        continue;
+      }
+      checked++;
+      assert.doesNotMatch(
+        text,
+        /^\s*['"]use (client|server)['"]/,
+        `${manifest.name} ${key}: the plain entry starts with a directive; move it to a "react-server" entry (scripts/react-server-entries.js)`,
+      );
+      if (value['react-server'] && !/jsx-(dev-)?runtime/.test(key))
+        assert.match(
+          readFileSync(join(root, 'packages', dir, value['react-server']), 'utf8'),
+          /^['"]use client['"];?/,
+          `${manifest.name} ${key}: the react-server entry must start with 'use client'`,
+        );
+    }
+  }
+  assert.ok(checked > 100, `${checked} entries checked`);
+});
+
 test('the dist of the React package is free of side effects on import', () => {
   assert.equal(JSON.parse(readFileSync(join(react, 'package.json'), 'utf8')).sideEffects, false);
 });

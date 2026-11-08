@@ -1,4 +1,5 @@
-'use client';
+// No 'use client' here: bundlers warn for a module-level directive, so the "react-server" entry
+// (dist/rsc/react.js, written by scripts/react-server-entries.js) is the client boundary for server components.
 import type { EngineKernel } from '@margoengine/core';
 import {
   createContext,

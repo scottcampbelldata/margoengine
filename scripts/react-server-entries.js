@@ -1,4 +1,5 @@
-// The React Server Components entries of @margoengine/react: for each package entry dist/<name>.js, a dist/rsc/<name>.js
+// The React Server Components entries of @margoengine/react (every entry) and of any other package entry whose exports
+// map names a "react-server" file (@margoengine/ui/react): for each, beside dist/<name>.js, a dist/rsc/<name>.js
 // that starts with 'use client' and re-exports the entry's runtime names one by one. package.json maps the
 // "react-server" export condition there, so a server component can render Canvas straight from the package, while every
 // other bundler loads the plain entry, which carries no module-level directive (Vite and Rollup warn once per bundled
@@ -44,6 +45,8 @@ export const JSX_RUNTIMES = {
 export async function writeServerEntries(root) {
   const manifest = JSON.parse(await readFile(join(root, 'package.json'), 'utf8'));
   for (const [subpath, entry] of Object.entries(manifest.exports)) {
+    // Every React entry is a client boundary; another package opts an entry in by naming its "react-server" file.
+    if (!entry['react-server'] && manifest.name !== '@margoengine/react') continue;
     const name = entry.import.replace(/^\.\/dist\//, '').replace(/\.js$/, '');
     if (entry['react-server'] !== `./dist/rsc/${name}.js`)
       throw new Error(`${manifest.name} ${subpath}: "react-server" must be ./dist/rsc/${name}.js`);

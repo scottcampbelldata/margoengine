@@ -1,5 +1,6 @@
 import { buildWorkers } from './build-workers.js';
 import { packageDeclarations } from './package-declarations.js';
+import { writeServerEntries } from './react-server-entries.js';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
@@ -59,3 +60,4 @@ execFileSync(
   { stdio: 'inherit' },
 );
 await packageDeclarations(root);
+if (Object.values(manifest.exports).some((value) => value['react-server'])) await writeServerEntries(root);
