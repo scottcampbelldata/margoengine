@@ -336,6 +336,11 @@ does not own. Each entry says exactly what is needed to close it.
   1.009e-6 m between 0.5 and 2.5 s against its 1e-6 bar, and the 1:100 and 1:1000 stacks sag 31.6 and 311 mm (14.4 and 137);
   a fifth (48 Hz) keeps the slope but leaves the pile at 0.37 m/s with sleeping off. A second relaxing pass costs a third more
   passes at equal cost and still rocks at 30 rows. The sixth is one line: the cap in `World::step` (`integrate.rs`) taken as 1/6 under 2 passes.
+- **Cause, round 2 (2026-11-08):** the residual is the one velocity pass itself. Taking the push out of the velocities (split
+  impulse) left 0.59 m/s, a separate position row on pseudo velocities 0.18 m/s and lost the slope bar, and a friction anchor at
+  a sixth of the rate with the normal at a quarter 0.35 m/s (all sleep off at 30 s, main 0.28). The references' 5 mm slop alone
+  leaves 0.58 m/s; their 30 Hz stiffness rests the pile but sags the 1:100 and 1:1000 stacks 55.6 and 555 mm. Rapier 0.21 rests
+  the same pile at the same 8 passes in 0.90 s (1.6e-4 m/s at 30 s with sleeping off), Box2D v3 in 1.02 s.
 - **Needed to close:** a solve that settles a deep pile in one pass a substep at a quarter of the rate without a softer contact,
   for example a position pass whose push never reaches the velocities (split impulses), measured against every bar; or a
   decision by Scott to trade the equal-cost sag for the settled pile.
