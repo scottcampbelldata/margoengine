@@ -28,9 +28,18 @@
 // warm start is ours.
 //
 // Rows can depend on each other: a body held by more locks than it has freedoms, or a chain pulled straight. The factors drop
-// such a row, as Baraff 1996 says K is singular there, and that takes a test that can see it: K in doubles from the f32
-// rows, the largest pivot first, as a pivot taken in order can leave a Schur complement of any size (Higham 1990, section 2),
-// and a stop once what is left is under the rounding of the rows themselves, his test (4.3).
+// such a row, as Baraff 1996 says K is singular there, and that takes a test that can see it. K is never formed. With
+// F F^T = M^-1 per body, K = A^T A for A = F^T J^T, and the R of Householder QR of A with column pivoting is K's Cholesky
+// factor with complete pivoting (Higham 1990, section 5.2). Along a path A is block banded, so each joint's front holds only
+// the rows of A its columns reach: what the joint before left free on the body they share, at most six, and the six of its
+// other body. Its pivot is the column with the most of its own length left, and a column with under n u of its squared
+// length left depends on the others: Higham's stop (4.3) with his n u, on the matrix scaled to a unit diagonal, n the rows
+// of the path and u f32's epsilon, as the rows are f32. Eliminating K itself joint by joint cannot see it: his Lemma 2.1
+// puts W^T E W into each Schur complement, W = K11^-1 K12, and with no pivoting across joints W has any size. A slider 13 m
+// from a kinematic body, a spherical joint 43 m long and a slider to a second kinematic body, 13 rows on 12 freedoms, left a
+// pivot of 4e-7 of its row where rationals give exactly 0, and a web of joints spun a body at 4.8e6 rad/s. Reflections
+// round a column by the doubles' share of its own length, times 1 + |W| (his Theorem 5.2) and not its square, and that row
+// now reads 1e-32 of its size.
 //
 // Close to such a pose the rows are not dependent yet, and the exact solve needs speeds of 1 / angle to close what they ask.
 // A push is a Gauss-Newton step, and there its first order model holds only for a small turn: Buss and Kim 2005's two links
@@ -82,8 +91,8 @@ const COINCIDENT: f32 = 1e-6;
 /// A swing's sine under this has no direction to read, and cos^2(swing / 2) under this leaves the twist undefined.
 const NO_SWING: f32 = 1e-6;
 const NO_TWIST: f32 = 1e-4;
-/// A pivot under this part of its row's size is rounding: the rows are f32. Higham 1990's stop (4.3) with a tolerance of the
-/// data's unit roundoff, on a matrix scaled to a unit diagonal, as linear and turning rows do not share a unit.
+/// A pivot under this part of its row's size, times the rows of its path, is rounding: the rows are f32. Higham 1990's stop
+/// (4.3) at n u, on a matrix scaled to a unit diagonal, as linear and turning rows do not share a unit.
 const DEPENDENT: f64 = f32::EPSILON as f64;
 /// The most a push turns a body in one substep where nothing cancels, in radians: Buss and Kim 2005's gamma max. See the head
 /// of this file for why it is not theirs.
@@ -217,6 +226,158 @@ fn invert(k: &mut [[f64; 6]; 6], m: usize, size: &[f64; 6]) -> [[f64; 6]; 6] {
         }
     }
     inverse
+}
+
+/// a . b over six doubles.
+#[inline(always)]
+fn dot6(a: &[f64; 6], b: &[f64; 6]) -> f64 {
+    a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3] + a[4] * b[4] + a[5] * b[5]
+}
+
+/// A body's F, F F^T = M^-1: the root of each inverse mass and the lower Cholesky factor of its inverse inertia, so a row's
+/// column of A = F^T J^T on the body is F^T j. A pivot at zero or under is a turn the body cannot make.
+struct Root {
+    linear: [f64; 3],
+    turning: [[f64; 3]; 3],
+}
+
+impl Root {
+    fn of(body: &Moving) -> Root {
+        let linear = [sqrt64(body.mass.x as f64), sqrt64(body.mass.y as f64), sqrt64(body.mass.z as f64)];
+        let mut l = [[0.0f64; 3]; 3];
+        for j in 0..3 {
+            let mut d = body.inertia.between(AXES[j], AXES[j]);
+            for k in 0..j {
+                d -= l[j][k] * l[j][k];
+            }
+            if d > 0.0 {
+                l[j][j] = sqrt64(d);
+                for i in j + 1..3 {
+                    let mut e = body.inertia.between(AXES[i], AXES[j]);
+                    for k in 0..j {
+                        e -= l[i][k] * l[j][k];
+                    }
+                    l[i][j] = e / l[j][j];
+                }
+            }
+        }
+        Root { linear, turning: l }
+    }
+
+    /// F^T of `sign` times a row's linear and turning parts on this body.
+    fn column(&self, d: V3, t: V3, sign: f64) -> [f64; 6] {
+        let (d, t) = ([d.x as f64 * sign, d.y as f64 * sign, d.z as f64 * sign], [t.x as f64 * sign, t.y as f64 * sign, t.z as f64 * sign]);
+        let l = &self.turning;
+        [
+            self.linear[0] * d[0],
+            self.linear[1] * d[1],
+            self.linear[2] * d[2],
+            l[0][0] * t[0] + l[1][0] * t[1] + l[2][0] * t[2],
+            l[1][1] * t[1] + l[2][1] * t[2],
+            l[2][2] * t[2],
+        ]
+    }
+}
+
+/// What one joint's factor hands the next on its path: its pivot rows and the directions still free, each as it reads on the
+/// body the two share.
+struct Handed {
+    pivots: [[f64; 6]; 6],
+    taken: usize,
+    carry: [[f64; 6]; 6],
+    carried: usize,
+}
+
+/// The rows of A that a joint's columns reach, in an orthonormal basis the reflections turn: what each row reads in each
+/// column, and its part on the body the path goes on through.
+struct Front {
+    rows: usize,
+    at: [[f64; 6]; 12],
+    onward: [[f64; 6]; 12],
+}
+
+/// The reflection that takes column `c` of `x` below row `p` onto row p alone, applied to `width` columns from `from` of `x`
+/// and to every column of `also`, rows p to `rows`. Its sign is the one that does not cancel.
+#[inline(never)]
+fn reflect(x: &mut [[f64; 6]; 12], also: Option<&mut [[f64; 6]; 12]>, p: usize, rows: usize, c: usize, left: f64, from: usize, width: usize) {
+    let length = sqrt64(left);
+    let alpha = if x[p][c] > 0.0 { -length } else { length };
+    let mut v = [0.0f64; 12];
+    for r in p..rows {
+        v[r] = x[r][c];
+    }
+    v[p] -= alpha;
+    let mut vv = 0.0;
+    for r in p..rows {
+        vv += v[r] * v[r];
+    }
+    let apply = |y: &mut [[f64; 6]; 12], k: usize| {
+        let mut sum = 0.0;
+        for r in p..rows {
+            sum += v[r] * y[r][k];
+        }
+        let f = 2.0 * sum / vv;
+        for r in p..rows {
+            y[r][k] -= f * v[r];
+        }
+    };
+    for k in from..width {
+        apply(x, k);
+    }
+    if let Some(y) = also {
+        for k in 0..6 {
+            apply(y, k);
+        }
+    }
+}
+
+impl Front {
+    /// A body's own six rows: the columns as they read on it.
+    fn fresh(&mut self, on: &[[f64; 6]; 6], m: usize, onward: bool) {
+        for k in 0..6 {
+            let at = self.rows;
+            for c in 0..m {
+                self.at[at][c] = on[c][k];
+            }
+            self.onward[at] = [0.0; 6];
+            if onward {
+                self.onward[at][k] = 1.0;
+            }
+            self.rows += 1;
+        }
+    }
+
+    fn reflect(&mut self, p: usize, c: usize, left: f64, m: usize) {
+        reflect(&mut self.at, Some(&mut self.onward), p, self.rows, c, left, 0, m);
+    }
+
+    /// The pivot rows as they read on the onward body, and the rows left over turned among themselves, by QR of their onward
+    /// parts, so that at most six of them read on it at all. The rest move only bodies the path has passed.
+    fn hand_on(&mut self, taken: usize) -> Handed {
+        let mut handed = Handed { pivots: [[0.0; 6]; 6], taken, carry: [[0.0; 6]; 6], carried: 0 };
+        for p in 0..taken {
+            handed.pivots[p] = self.onward[p];
+        }
+        let rows = self.rows;
+        for q in 0..6 {
+            let p = taken + q;
+            if p >= rows {
+                break;
+            }
+            let mut left = 0.0;
+            for r in p..rows {
+                left += self.onward[r][q] * self.onward[r][q];
+            }
+            if left > 0.0 {
+                reflect(&mut self.onward, None, p, rows, q, left, q, 6);
+            }
+        }
+        handed.carried = if rows - taken < 6 { rows - taken } else { 6 };
+        for q in 0..handed.carried {
+            handed.carry[q] = self.onward[taken + q];
+        }
+        handed
+    }
 }
 
 impl World {
@@ -651,33 +812,46 @@ impl World {
         at[4] = (y * over_y + z * over_z - 1.0) / (2.0 * size);
     }
 
-    /// Each substep, before the solve: every joint's rows from the bodies' poses, and the factors of each path: block
-    /// Cholesky of its block tridiagonal matrix J M^-1 J^T, which solves the locks of a chain exactly in one sweep. Gauss-Seidel
-    /// moves a load only one joint a pass, so a light chain under a heavy end would stretch for seconds before it held.
+    /// Each substep, before the solve: every joint's rows from the bodies' poses, and the factors of each path, which solve the
+    /// locks of a chain exactly in one sweep. Gauss-Seidel moves a load only one joint a pass, so a light chain under a heavy
+    /// end would stretch for seconds before it held. See the head of this file for how the factors are made.
+    #[inline(never)]
     pub fn refresh_joints(&mut self) {
-        for i in 0..self.header().joint_solving as usize {
+        let solving = self.header().joint_solving as usize;
+        let mut handed = Handed { pivots: [[0.0; 6]; 6], taken: 0, carry: [[0.0; 6]; 6], carried: 0 };
+        let mut tolerance = DEPENDENT;
+        for i in 0..solving {
+            if self.uu(SOLVE_VIA, i) == NONE {
+                // Higham 1990's stop (4.3) at n u, n the order of the path's matrix.
+                let mut rows = lock_rows(self.uu(JOINT_FLAGS, self.uu(SOLVE_JOINTS, i) as usize)).0;
+                let mut j = i + 1;
+                while j < solving && self.uu(SOLVE_VIA, j) != NONE {
+                    rows += lock_rows(self.uu(JOINT_FLAGS, self.uu(SOLVE_JOINTS, j) as usize)).0;
+                    j += 1;
+                }
+                tolerance = DEPENDENT * rows as f64;
+            }
             let row = self.uu(SOLVE_JOINTS, i) as usize;
             let view = self.joint_view(row);
             unsafe { *(self.f(JOINT_SCRATCH).add(row * JOINT_WORDS as usize) as *mut View) = view };
             let (a, b) = (self.uu(JOINT_A, row) as usize, self.uu(JOINT_B, row) as usize);
             let (body_a, body_b) = (self.moving(a), self.moving(b));
             let (m, axes) = lock_rows(self.uu(JOINT_FLAGS, row));
-            let mut k = [[0.0f64; 6]; 6];
-            for r in 0..m {
-                for s in 0..m {
-                    k[r][s] = view.rows[axes[r]].give_exactly(&view.rows[axes[s]], &body_a, &body_b);
-                }
-            }
-            let mut size = [0.0f64; 6];
-            for r in 0..m {
-                size[r] = k[r][r];
-            }
-            let via = self.uu(SOLVE_VIA, i);
             let doubles = self.doubles(row);
             let flags = self.uu(JOINT_FLAGS, row);
             if flags & (JOINT_LIMIT * 63) != 0 {
                 // What each limit moves with the joint's own locks holding: the Schur complement of its locks in the block.
-                let own = invert(&mut k.clone(), m, &size);
+                let mut k = [[0.0f64; 6]; 6];
+                for r in 0..m {
+                    for s in 0..m {
+                        k[r][s] = view.rows[axes[r]].give_exactly(&view.rows[axes[s]], &body_a, &body_b);
+                    }
+                }
+                let mut size = [0.0f64; 6];
+                for r in 0..m {
+                    size[r] = k[r][r];
+                }
+                let own = invert(&mut k, m, &size);
                 for q in 0..6 {
                     if flags & (JOINT_LIMIT << q) == 0 {
                         continue;
@@ -698,49 +872,92 @@ impl World {
                     unsafe { *doubles.add(EASE + q) = ease };
                 }
             }
-            if via != NONE {
-                let before = self.uu(SOLVE_JOINTS, i - 1) as usize;
-                let (n, axes_before) = lock_rows(self.uu(JOINT_FLAGS, before));
-                let view_before = self.view(before);
-                let body = self.moving(via as usize);
-                // Each joint's row as it reads on the body they share.
-                let side = |w: &World, joint: usize, row: &Row| {
-                    if w.uu(JOINT_B, joint) == via { (row.d, row.tb) } else { (row.d.scale(-1.0), row.ta.scale(-1.0)) }
-                };
-                let mut link = [[0.0f64; 6]; 6];
-                for r in 0..n {
-                    let (linear, turn) = side(self, before, &view_before.rows[axes_before[r]]);
-                    for s in 0..m {
-                        let (other, other_turn) = side(self, row, &view.rows[axes[s]]);
-                        link[r][s] = scaled(linear, other, body.mass) + body.inertia.between(turn, other_turn);
-                    }
-                }
-                // L = B^T D^-1 of the joint before, and K -= L B.
-                let inverse = self.doubles(before);
-                for s in 0..m {
-                    for r in 0..n {
-                        let mut sum = 0.0;
-                        for c in 0..n {
-                            sum += link[c][s] * unsafe { *inverse.add(r * 6 + c) };
-                        }
-                        unsafe { *doubles.add(LINK + s * 6 + r) = sum };
-                    }
-                }
-                for s in 0..m {
-                    for t in 0..m {
-                        let mut sum = 0.0;
-                        for r in 0..n {
-                            sum += unsafe { *doubles.add(LINK + s * 6 + r) } * link[r][t];
-                        }
-                        k[s][t] -= sum;
-                    }
+            let via = self.uu(SOLVE_VIA, i);
+            let onward = if i + 1 < solving { self.uu(SOLVE_VIA, i + 1) } else { NONE };
+            // Columns of A = F^T J^T, one per lock row, as they read on each body.
+            let (root_a, root_b) = (Root::of(&body_a), Root::of(&body_b));
+            let (mut on_a, mut on_b, mut size) = ([[0.0f64; 6]; 6], [[0.0f64; 6]; 6], [0.0f64; 6]);
+            for c in 0..m {
+                let lock = &view.rows[axes[c]];
+                on_a[c] = root_a.column(lock.d, lock.ta, -1.0);
+                on_b[c] = root_b.column(lock.d, lock.tb, 1.0);
+                for k in 0..6 {
+                    size[c] += on_a[c][k] * on_a[c][k] + on_b[c][k] * on_b[c][k];
                 }
             }
-            let inverse = invert(&mut k, m, &size);
-            for r in 0..m {
-                for s in 0..m {
-                    unsafe { *doubles.add(r * 6 + s) = inverse[r][s] };
+            for k in 0..36 {
+                unsafe { *doubles.add(LINK + k) = 0.0 };
+            }
+            let mut front = Front { rows: 0, at: [[0.0; 6]; 12], onward: [[0.0; 6]; 12] };
+            if via == NONE {
+                front.fresh(&on_a, m, a as u32 == onward);
+                front.fresh(&on_b, m, b as u32 == onward);
+            } else {
+                // The joint before left its pivot rows and what is still free of the body they share. The joint after goes on
+                // through the other body, as a body inside a path holds two locking joints.
+                let (shared, other, other_body) = if a as u32 == via { (&on_a, &on_b, b) } else { (&on_b, &on_a, a) };
+                for p in 0..handed.taken {
+                    for c in 0..m {
+                        unsafe { *doubles.add(LINK + p * 6 + c) = dot6(&handed.pivots[p], &shared[c]) };
+                    }
                 }
+                for q in 0..handed.carried {
+                    let at = front.rows;
+                    for c in 0..m {
+                        front.at[at][c] = dot6(&handed.carry[q], &shared[c]);
+                    }
+                    front.onward[at] = [0.0; 6];
+                    front.rows += 1;
+                }
+                front.fresh(other, m, other_body as u32 == onward);
+            }
+            // Householder QR with column pivoting, on the column with the most of its own size left.
+            let mut pivot = [6usize; 6];
+            let mut order = [0usize; 6];
+            let mut taken = 0;
+            while taken < m && taken < front.rows {
+                let (mut best, mut most, mut left) = (m, tolerance, 0.0);
+                for c in 0..m {
+                    if pivot[c] != 6 {
+                        continue;
+                    }
+                    let mut length = 0.0;
+                    for r in taken..front.rows {
+                        length += front.at[r][c] * front.at[r][c];
+                    }
+                    if length > most * size[c] {
+                        best = c;
+                        most = length / size[c];
+                        left = length;
+                    }
+                }
+                if best == m {
+                    break;
+                }
+                front.reflect(taken, best, left, m);
+                pivot[best] = taken;
+                order[taken] = best;
+                taken += 1;
+            }
+            // R^-1, from pivot places to rows: column p solves R x = e_p by back substitution. A dropped row stays zero.
+            for k in 0..36 {
+                unsafe { *doubles.add(k) = 0.0 };
+            }
+            for p in 0..taken {
+                let mut x = [0.0f64; 6];
+                for q in (0..=p).rev() {
+                    let mut sum = if q == p { 1.0 } else { 0.0 };
+                    for k in q + 1..=p {
+                        sum -= front.at[q][order[k]] * x[order[k]];
+                    }
+                    x[order[q]] = sum / front.at[q][order[q]];
+                }
+                for c in 0..m {
+                    unsafe { *doubles.add(c * 6 + p) = x[c] };
+                }
+            }
+            if onward != NONE {
+                handed = front.hand_on(taken);
             }
         }
     }
@@ -930,6 +1147,7 @@ impl World {
             let most = most + view.arms[0] * sqrt(body_a.angular.dot(body_a.angular)) + view.arms[1] * sqrt(body_b.angular.dot(body_b.angular));
             let lever = view.arms[0] + view.arms[1];
             let mut largest = 0.0f32;
+            let mut b = [0.0f64; 6];
             for r in 0..m {
                 let k = axes[r];
                 let ask = if bias {
@@ -949,11 +1167,19 @@ impl World {
                 if size > largest {
                     largest = size;
                 }
+                // R^T y = b: what the joint before already holds of this row comes off first.
                 let mut right = -ask as f64;
-                for c in 0..n {
-                    right -= unsafe { *doubles.add(LINK + r * 6 + c) * *before.add(RIGHT + c) };
+                for p in 0..n {
+                    right -= unsafe { *doubles.add(LINK + p * 6 + r) * *before.add(RIGHT + p) };
                 }
-                unsafe { *doubles.add(RIGHT + r) = right };
+                b[r] = right;
+            }
+            for p in 0..m {
+                let mut y = 0.0;
+                for r in 0..m {
+                    y += unsafe { *doubles.add(r * 6 + p) } * b[r];
+                }
+                unsafe { *doubles.add(RIGHT + p) = y };
             }
             asked += largest;
         }
@@ -962,19 +1188,25 @@ impl World {
             let row = self.uu(SOLVE_JOINTS, i) as usize;
             let m = lock_rows(self.uu(JOINT_FLAGS, row)).0;
             let doubles = self.doubles(row);
+            // R x = y: what the joint after takes comes off, then R^-1.
+            let mut z = [0.0f64; 6];
+            for p in 0..m {
+                let mut sum = unsafe { *doubles.add(RIGHT + p) };
+                if i < last {
+                    let after = self.uu(SOLVE_JOINTS, i + 1) as usize;
+                    let (n, _) = lock_rows(self.uu(JOINT_FLAGS, after));
+                    let link = self.doubles(after);
+                    for c in 0..n {
+                        sum -= unsafe { *link.add(LINK + p * 6 + c) } * next[c];
+                    }
+                }
+                z[p] = sum;
+            }
             let mut x = [0.0f64; 6];
             for r in 0..m {
                 let mut sum = 0.0;
-                for c in 0..m {
-                    sum += unsafe { *doubles.add(r * 6 + c) * *doubles.add(RIGHT + c) };
-                }
-                if i < last {
-                    let after = self.uu(SOLVE_JOINTS, i + 1) as usize;
-                    let (p, _) = lock_rows(self.uu(JOINT_FLAGS, after));
-                    let link = self.doubles(after);
-                    for c in 0..p {
-                        sum -= unsafe { *link.add(LINK + c * 6 + r) } * next[c];
-                    }
+                for p in 0..m {
+                    sum += unsafe { *doubles.add(r * 6 + p) } * z[p];
                 }
                 x[r] = sum;
             }

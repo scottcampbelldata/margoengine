@@ -163,9 +163,10 @@ fn a_stretched_joint_does_not_jump_a_body_past_a_wall() {
     assert!(x < -0.5, "reached {x}");
 }
 
-/// A random web of every kind of joint, as the replay scene makes: the fastest any body went in `steps` and the fastest any
-/// spun, each not a number once a value stopped being one.
-fn web(seed: u32, steps: u32) -> (f32, f32) {
+/// A random web of every kind of joint, as the replay scene makes: the fastest any body went in `steps`, the fastest any
+/// spun and the widest any joint stood open after a step, across its slide for a slider, each not a number once a value
+/// stopped being one.
+fn web(seed: u32, steps: u32) -> (f32, f32, f32) {
     let mut state = seed;
     let mut next = move || {
         state ^= state << 13;
@@ -174,7 +175,7 @@ fn web(seed: u32, steps: u32) -> (f32, f32) {
         state
     };
     let mut w = World::new(64, 64).unwrap();
-    let mut rows = Vec::new();
+    let (mut rows, mut joints) = (Vec::new(), Vec::new());
     for _ in 0..48 {
         let kind = [DYNAMIC, DYNAMIC, DYNAMIC, DYNAMIC, DYNAMIC, FIXED, KINEMATIC_POSITION, KINEMATIC_VELOCITY][(next() % 8) as usize];
         let body = w.add_body(kind).unwrap();
@@ -203,13 +204,14 @@ fn web(seed: u32, steps: u32) -> (f32, f32) {
         let flags = if i % 4 == 1 { flags | JOINT_LIMIT << 3 } else { flags };
         let on_a = v3(((next() % 2049) as i32 - 1024) as f32 / 1024.0, ((next() % 2049) as i32 - 1024) as f32 / 1024.0, 0.0);
         let row = joint(&mut w, a, b, flags, on_a, v3(0.0, 0.0, 0.0)) as usize;
+        joints.push(row);
         if i % 4 == 1 {
             w.set_s(JOINT_MIN_3, row, -1.0);
             w.set_s(JOINT_MAX_3, row, 1.0);
         }
     }
     w.header_mut().substeps = 1;
-    let (mut top, mut spin) = (0.0f32, 0.0f32);
+    let (mut top, mut spin, mut open) = (0.0f32, 0.0f32, 0.0f32);
     for i in 0..steps {
         for &row in &rows {
             let at = row as usize;
@@ -229,6 +231,19 @@ fn web(seed: u32, steps: u32) -> (f32, f32) {
             }
         }
         w.step(DT);
+        for &row in &joints {
+            let (a, b) = (w.uu(JOINT_A, row) as usize, w.uu(JOINT_B, row) as usize);
+            let on = |body: usize, anchor: V3| w.v(POSITION_X, body).add(w.q(ROTATION_X, body).rotate(anchor));
+            let mut gap = on(b, w.v(JOINT_ANCHOR_B_X, row)).sub(on(a, w.v(JOINT_ANCHOR_A_X, row)));
+            if w.uu(JOINT_FLAGS, row) & JOINT_LOCK == 0 {
+                let slide = w.q(ROTATION_X, a).rotate(v3(1.0, 0.0, 0.0));
+                gap = gap.sub(slide.scale(slide.dot(gap)));
+            }
+            let gap = sqrt(gap.dot(gap));
+            if !(gap <= open) {
+                open = gap;
+            }
+        }
         for &row in &rows {
             let s = speed(&w, row);
             if !(s <= top) {
@@ -241,7 +256,7 @@ fn web(seed: u32, steps: u32) -> (f32, f32) {
             }
         }
     }
-    (top, spin)
+    (top, spin, open)
 }
 
 #[test]
@@ -249,13 +264,31 @@ fn a_web_of_joints_stays_in_the_numbers() {
     // Joints between bodies metres apart, with fixed ends, spinning ends and closed loops, none of it satisfiable. A body fixed
     // to a kinematic turn of 1.29 rad a step at 30 m has a true speed of 2,300 m/s. What the joints remembered used to run
     // this to not a number on most seeds.
-    let mut worst = 0.0f32;
+    let (mut worst, mut widest) = (0.0f32, 0.0f32);
     for seed in 1..=60 {
-        let (top, _) = web(seed, 2000);
+        let (top, _, open) = web(seed, 2000);
         assert!(top < 1e5, "seed {seed} reached {top} m/s");
         worst = worst.max(top);
+        widest = widest.max(open);
     }
-    println!("fastest in the webs: {worst:.0} m/s");
+    println!("fastest in the webs: {worst:.0} m/s, widest joint: {widest:.2} m");
+}
+
+#[test]
+fn a_path_with_more_locks_than_freedoms_drops_the_row_that_depends() {
+    // Seed 1: a slider from a kinematicVelocity body to body 11, a spherical joint 43 m long to body 30 and a slider from body
+    // 30 to a kinematicPosition body, 13 lock rows on 12 freedoms, so one row depends on the others at every step. Eliminating
+    // J M^-1 J^T joint by joint left it a pivot of 4e-7 of its size where rationals give 0, the exact solve of that rounding
+    // gave 14,424 m/s at step 335 and 4,782,492 rad/s at step 336, and a joint stood 232 m open. Seed 35: 15 rows on 12
+    // freedoms, 370,728 rad/s at step 577. The scene's kinematic turns carry an arm of 0.125 m at about 18,400 rad/s, and it
+    // puts every body back inside a 32 m cube each step with anchors at most 1.42 m off a centre, so a joint opened wider than
+    // 56.85 m was opened by the solve.
+    for (seed, steps) in [(1, 400), (35, 600)] {
+        let (top, spin, open) = web(seed, steps);
+        println!("web {seed}: fastest {top:.0} m/s, top spin {spin:.0} rad/s, widest joint {open:.2} m");
+        assert!(spin < 18_400.0, "seed {seed}: a body spun at {spin} rad/s");
+        assert!(open < 56.85, "seed {seed}: a joint stood {open} m open");
+    }
 }
 
 #[test]
@@ -265,7 +298,7 @@ fn a_cut_push_still_takes_back_the_speed_along_the_locks() {
     // taking back included, and handed a neighbour 457,390 rad/s; contacts passed it on and a body landed 1,100 m from its
     // joints. The scene's own motion, a kinematic turn of 77 rad/s at up to 30 m, carries an anchor at 2,300 m/s, which
     // turns an arm of 0.125 m at no more than about 18,400 rad/s. Before the fix the web reached 162,278 rad/s.
-    let (top, spin) = web(45, 2000);
+    let (top, spin, _) = web(45, 2000);
     println!("web 45: fastest {top:.0} m/s, top spin {spin:.0} rad/s");
     assert!(spin < 18_400.0, "a body spun at {spin} rad/s");
 }
