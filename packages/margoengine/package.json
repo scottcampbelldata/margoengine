@@ -2806,6 +2806,10 @@
       "types": "./dist/voxel/light-worker.d.ts",
       "import": "./dist/voxel/light-worker.js"
     },
+    "./voxel/light-rgb": {
+      "types": "./dist/voxel/light-rgb.d.ts",
+      "import": "./dist/voxel/light-rgb.js"
+    },
     "./voxel-edit": {
       "types": "./dist/voxel-edit.d.ts",
       "import": "./dist/voxel-edit.js"

@@ -13,7 +13,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-446). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-447). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -38,6 +38,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Voxel slabs and stairs | Measured (Node on the RTX A6000 desktop, `npm run bench -- voxel`): meshing the 128-chunk bench terrain takes 85.5-86.1 ms with slabs and stairs on two thirds of its surface (`mesh-128-shaped-chunks`; 78.2-79.2 ms before waterlogging, same quads and bytes) against 39.8-41.0 ms without them (the same as before slabs existed, compared in one process; 106,971 quads), and 99.2 ms with water, double slabs, waterlogged slabs and stairs and corner stairs there (`mesh-128-mixed-shape-chunks`). | Their faces, cube faces and liquid faces beside them are meshed per quarter face with half-block AO and light; a chunk with solid ones gets one more physics triangle mesh. | Half-block shapes only: no slopes, no slabs of two materials in one cell (a double slab is one block id), and a waterlogged cell holds only its type's `waterlog` liquid as a full source (no flowing level). VOX files have no shapes, so `.vox` imports are whole blocks. | Whole blocks where shapes are not needed; leave `TraceModel.shapes` out to trace whole cells. |
 | Far voxel levels (`@margoengine/voxel/lod`, 2026-11-07) | Enforced: 1 to 12 levels, `radius` 2 to 32 nodes, `scale` a power of two to 4,096. By method: a level-L cell is 2^L blocks, so detail under a cell is gone (a tree, a one-block wall) and a coarse surface is within half a cell of the real one; `noiseTerrainLod` leaves out caves and trees; edits to the real world show in far levels only where its chunks are loaded; nodes generate on the main thread, `budget` a frame; the streamed chunks must stay inside level 1 (`2 * radius` above the streamer's `distance` + 1) or the two overlap; while a level changes, old and new nodes may both show for a few frames; a scaled renderer takes no lighting effects, shadows or capture. Frame cost at kilometre views is unmeasured. |
 | Voxel light in a worker (`@margoengine/voxel/light-worker`, 2026-11-07) | By method: the worker holds a second copy of every loaded chunk's blocks and light; light arrives a frame or more after a change; the page still packs each loaded chunk once and copies the light of changed chunks back (32 KiB each); one worker per world, not with `VoxelLighting` on the same world. |
+| Coloured block light (`@margoengine/voxel/light-rgb`, 2026-11-07) | Enforced: colours 0..1, `extent` multiples of 32 up to 1,024. By method: three copies of every loaded chunk (blocks and light) and three floods per change; coloured light only inside the box around the camera (default 128 x 64 x 128 blocks); the renderer's own block light should be switched off (`blockLightColor` [0, 0, 0]) or it adds on top; a level is rounded per channel, so dim colours lose hue; not on scaled renderers. |
 
 ## Rendering
 

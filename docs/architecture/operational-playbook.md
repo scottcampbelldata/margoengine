@@ -1217,11 +1217,12 @@ The following remain technical gaps, not permission to weaken a check:
 27. Dual quaternion skinning has no frame-time measurement and no run on a GPU other than the RTX A6000.
 28. Bone-texture crowds have no frame-time measurement and no run on a GPU other than the RTX A6000.
 29. GPU Basis transcoding (`@margoengine/decoders/ktx2-gpu`) equals the Wasm transcoder byte for byte on the RTX A6000 only, and
-30. The own physics kernel is proved bit-equal on one Windows x86-64 PC only: no run in Safari, on ARM or on a second machine, and it has no timing against Rapier yet. The range check runs once a step, so a run away of more than 23 orders of magnitude inside one step would reach a NaN: none seen in 200 random webs of 10,000 steps.
     its load time against a cold Wasm transcoder is not measured.
+30. The own physics kernel is proved bit-equal on one Windows x86-64 PC only: no run in Safari, on ARM or on a second machine, and it has no timing against Rapier yet. The range check runs once a step, so a run away of more than 23 orders of magnitude inside one step would reach a NaN: none seen in 200 random webs of 10,000 steps.
 31. Voxel far levels (`@margoengine/voxel/lod`, a scaled `VoxelRenderer`) are proved on the M6 Mac mini (Metal) only: scale 2 against scale 1 drew the same image; frame cost at kilometre view distances is not measured on any GPU.
 32. The own physics solver's body kinds, own mass and extra passes (LIM-438) are proved in Node and by the replay in Chromium and
     Firefox; nothing of it is timed against Rapier yet (batch 129). Sleep reads through `setType` and of still kinematic bodies
     (a RESTING flag: they stay on the awake list) are held to the root entry's measured reads in `next-bodies.test.js`; an island
     still wakes at the call rather than at the step, an accepted difference in `docs/limits.md`. A kinematicPosition body at its
     target is exactly still (`kernel/tests/sleep.rs`), so what rests on it sleeps.
+33. Coloured voxel block light (`@margoengine/voxel/light-rgb`, a `VoxelRenderer` lighting effect sampling a wrapping 3D texture) is proved on the M6 Mac mini (Metal) only: a dark room is red by a red torch and blue by a blue lamp with it, black without; its frame cost and the upload cost when the camera crosses chunks are not measured.

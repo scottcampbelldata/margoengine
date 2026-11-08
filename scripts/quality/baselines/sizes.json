@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10770341,
+  "total": 10781319,
   "history": [
     {
       "date": "2026-10-24",
@@ -3902,6 +3902,12 @@
       "commit": "621c97103",
       "reason": "post/ssr: stochastic rough reflections with a temporal resolve (batch 70 job 5)",
       "grew": 2
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "33c9316b6",
+      "reason": "new entry @margoengine/voxel/light-rgb: coloured block light (VoxelColorLight bundles VoxelLighting and VoxelWorld for its channel copies)",
+      "grew": 1
     }
   ],
   "items": {
@@ -4620,6 +4626,7 @@
     "@margoengine/voxel/codec": 9368,
     "@margoengine/voxel/generate": 4426,
     "@margoengine/voxel/light": 8638,
+    "@margoengine/voxel/light-rgb": 10978,
     "@margoengine/voxel/light-worker": 6341,
     "@margoengine/voxel/lightmap": 2762,
     "@margoengine/voxel/lod": 7228,

@@ -1,0 +1,47 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Voxel coloured light browser check</title><style>body{margin:0}canvas{display:block;width:320px;height:240px}</style></head><body><canvas></canvas>
+<script type="module">
+// Real-GPU proof of @margoengine/voxel/light-rgb, driven by light-rgb-browser-check.mjs: a closed stone room lit only
+// by a red torch at one end and a blue lamp at the other, drawn with the renderer's own block light switched off
+// (blockLightColor [0, 0, 0]): without VoxelColorLight the floor is black; with it, the floor by the torch is red, by
+// the lamp blue, and the WGSL compiles and binds on this GPU.
+import {Engine} from '/packages/core/dist/index.js';
+import {engineRuntime} from '/packages/core/dist/extension.js';
+import {BlockTypes,VoxelWorld} from '/packages/voxel/dist/index.js';
+import {VoxelLighting} from '/packages/voxel/dist/light.js';
+import {VoxelColorLight} from '/packages/voxel/dist/light-rgb.js';
+import {BlockTextures,VoxelRenderer} from '/packages/voxel/dist/render.js';
+const canvas=document.querySelector('canvas'),errors=[];
+const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[32,30,6],target:[32,1,34],near:0.1,far:200}});
+const device=()=>engineRuntime(engine).gpu;device().addEventListener('uncapturederror',(e)=>errors.push(e.error.message));
+const white={width:16,height:16,data:new Uint8Array(1024).fill(220)};
+const textures=new BlockTextures({images:[white]});
+const blocks=new BlockTypes();blocks.define('stone',{textures:0});
+const TORCH=blocks.define('torch',{textures:0,light:14});const LAMP=blocks.define('lamp',{textures:0,light:14});
+const world=new VoxelWorld({blocks}),edits=[];
+for(let cz=0;cz<2;cz++)for(let cx=0;cx<2;cx++)for(let cy=0;cy<2;cy++)world.addChunk(cx,cy,cz);
+for(let z=0;z<64;z++)for(let x=0;x<64;x++)for(let y=0;y<40;y++)
+ if(x===0||z===0||y===0||x===63||z===63||y===39)edits.push(x,y,z,1);
+edits.push(16,1,40,TORCH,48,1,40,LAMP);world.setBlocks(edits);
+const lighting=VoxelLighting.attach(world,{budget:Infinity});lighting.update();
+const voxels=VoxelRenderer.attach(engine,{world,textures,workers:2});voxels.blockLightColor=[0,0,0];voxels.daylight=0;
+const rgb=VoxelColorLight.attach(engine,{world,colors:{torch:[1,0.1,0],lamp:[0,0.2,1]},budget:Infinity});
+const readCanvas=()=>{const c=new OffscreenCanvas(canvas.width,canvas.height).getContext('2d');c.drawImage(canvas,0,0);return c.getImageData(0,0,canvas.width,canvas.height).data;};
+const frame=async()=>{rgb.update();engine.render({delta:0});await device().queue.onSubmittedWorkDone();await new Promise((r)=>setTimeout(r,1));};
+async function settle(){let stable=0;for(let i=0;i<4000&&stable<4;i++){await frame();stable=!world.dirty.size&&!voxels.stats.pending&&!voxels.stats.compiling&&voxels.stats.draws?stable+1:0;}
+ if(stable<4)throw new Error('renderer did not settle');
+ // Read in the task that drew: once presented, a WebGPU canvas's texture may read back blank.
+ rgb.update();engine.render({delta:0});return readCanvas();}
+// Mean colour of the pixels within r of where the world point p lands on screen.
+const project=(p)=>{const m=engine.camera.matrix,v=[0,1,2,3].map((r)=>m[r]*p[0]+m[4+r]*p[1]+m[8+r]*p[2]+m[12+r]);return [(v[0]/v[3]*0.5+0.5)*canvas.width,(0.5-v[1]/v[3]*0.5)*canvas.height];};
+const mean=(image,p,r=6)=>{const [cx,cy]=project(p),s=[0,0,0];let n=0;
+ for(let y=Math.round(cy-r);y<=cy+r;y++)for(let x=Math.round(cx-r);x<=cx+r;x++){const o=(y*canvas.width+x)*4;for(let c=0;c<3;c++)s[c]+=image[o+c];n++;}return s.map((v)=>v/n);};
+window.check={
+ errors:()=>errors,
+ async run(){
+  const dark=await settle();const off=[mean(dark,[16.5,1,36]),mean(dark,[48.5,1,36])];
+  const remove=rgb.add(voxels);const lit=await settle();const on=[mean(lit,[16.5,1,36]),mean(lit,[48.5,1,36])];
+  remove();return {off,on,stats:voxels.stats};
+ },
+};
+window.ready=true;
+</script></body></html>

@@ -1,5 +1,5 @@
 {
-  "commit": "150b5e4fb",
+  "commit": "33c9316b6",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -2984,6 +2984,10 @@
       "./light-worker": {
         "raw": 17190,
         "gzip": 6085
+      },
+      "./light-rgb": {
+        "raw": 30118,
+        "gzip": 10658
       },
       "dist/workers/light.js": {
         "raw": 27961,

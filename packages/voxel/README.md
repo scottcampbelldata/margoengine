@@ -891,7 +891,8 @@ for (const name of ['stone', 'dirt', 'grass', 'sand', 'log']) blocks.define(name
 blocks.define('water', { shape: 'liquid', liquid: true, solid: false, layer: 'translucent' });
 blocks.define('leaves', { layer: 'cutout' });
 const world = new VoxelWorld({ blocks });
-const textures = await BlockTextures.load(['stone.png']);
+// One plain 16 x 16 layer; or await BlockTextures.load(['stone.png']).
+const textures = new BlockTextures({ images: [{ width: 16, height: 16, data: new Uint8Array(1024).fill(200) }] });
 const terrain = { seed: 7 };
 VoxelStreamer.attach(engine, { world, generator: terrain, distance: 8 });
 const lighting = VoxelLighting.attach(world);
@@ -950,7 +951,8 @@ const engine = await Engine.create(document.querySelector('canvas')!);
 const blocks = new BlockTypes();
 const stone = blocks.define('stone');
 const world = new VoxelWorld({ blocks });
-const textures = await BlockTextures.load(['stone.png']);
+// One plain 16 x 16 layer; or await BlockTextures.load(['stone.png']).
+const textures = new BlockTextures({ images: [{ width: 16, height: 16, data: new Uint8Array(1024).fill(200) }] });
 const lighting = VoxelLightWorker.attach(world); // instead of VoxelLighting.attach(world)
 VoxelRenderer.attach(engine, { world, textures });
 engine.onFrame(() => lighting.update()); // posts this frame's changes, writes the light that came back
@@ -975,3 +977,58 @@ Measured with Node on the M6 Mac mini while other lanes ran (diagnostic; `node -
 packages/voxel/tests/light-worker-benchmark.test.js` prints yours): removing a 32 x 32 stone roof over a 39-deep room (89,088 cells) took 4.5-8.4 ms
 of `VoxelLighting.update()` on the page; with `VoxelLightWorker` the page spent 0.12-0.37 ms posting the edits and
 0.01-0.03 ms writing the 18 chunks back.
+
+
+## Coloured block light (`@margoengine/voxel/light-rgb`)
+
+`VoxelColorLight` gives block light a colour: each emitter's `light` level splits into red, green and blue levels by
+its colour, each channel floods like `VoxelLighting`'s block light, and a `VoxelRenderer` lighting effect adds the
+coloured light per pixel.
+
+```ts
+import { BlockTypes, VoxelWorld } from 'margoengine/voxel';
+import { VoxelLighting } from 'margoengine/voxel/light';
+import { VoxelColorLight } from 'margoengine/voxel/light-rgb';
+import { BlockTextures, VoxelRenderer } from 'margoengine/voxel/render';
+import { Engine } from 'margoengine/core';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const blocks = new BlockTypes();
+const stone = blocks.define('stone');
+const lava = blocks.define('lava', { shape: 'liquid', liquid: true, solid: false, light: 15 });
+const lamp = blocks.define('lamp', { light: 14 });
+const world = new VoxelWorld({ blocks });
+// One plain 16 x 16 layer; or await BlockTextures.load(['stone.png']).
+const textures = new BlockTextures({ images: [{ width: 16, height: 16, data: new Uint8Array(1024).fill(200) }] });
+const lighting = VoxelLighting.attach(world); // sky light and the renderer's light bytes
+const voxels = VoxelRenderer.attach(engine, { world, textures });
+voxels.blockLightColor = [0, 0, 0]; // the coloured light replaces the single-channel block light
+const colored = VoxelColorLight.attach(engine, { world, colors: { lava: [1, 0.35, 0.05], lamp: [0.3, 0.6, 1] } });
+colored.add(voxels);
+engine.onFrame(() => {
+  lighting.update();
+  colored.update(); // floods up to `budget` cells a channel, uploads what changed near the camera
+});
+world.setBlock(0, 64, 0, lamp);
+colored.update();
+colored.levels(0, 65, 0); // [3, 7, 13]: the lamp's [4, 8, 14] one cell away
+colored.setColor('lamp', [0.2, 1, 0.3]); // live
+```
+
+- **Levels.** A type's channel level is its `light` times that channel of its colour, rounded (types not in `colors`
+  are white: all three at `light`). Each channel is a copy of the world's blocks lit by `VoxelLighting`, so costs,
+  opacity, slabs and stairs are exactly block light's; the tests check every channel against `VoxelLighting` with the
+  emitters' levels set to that channel. Colours mix where lights overlap, each channel the brighter of the two.
+- **On the GPU.** The levels of the cells within `extent` blocks around the camera (default 128 x 64 x 128, 4 MiB)
+  sit in an `rgba8unorm` 3D texture that wraps, so moving the camera uploads only the chunks that come into range.
+  The effect takes the cells around the point half a cell in front of each pixel's face, open cells only (one
+  trilinear fetch of level x open and open), and adds the base colour times the renderer's level-to-brightness curve
+  times `strength`. Beyond the box there is no coloured light.
+- **Cost.** Three copies of every loaded chunk's blocks and light, and three floods per change.
+- **Errors.** `TypeError` for a wrong engine, world or option type, `RangeError` for colours outside 0..1, an `extent`
+  that is not three multiples of 32 up to 1,024, or `setColor` of an undefined type; `MargoError` `'disposed'` after
+  `dispose()`.
+
+GPU check (`node packages/voxel/tests/light-rgb-browser-check.mjs`, in `test:gpu`): a closed room with a red torch and
+a blue lamp, the renderer's block light off, is black without the effect and red by the torch, blue by the lamp with it
+(M6 Mac mini, Metal).
