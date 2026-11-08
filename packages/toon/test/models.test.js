@@ -94,9 +94,9 @@ test('model outlines draw the deformed vertices, one hull per instance, and skip
     ['front', 'back'],
   );
   assert.equal(bound[0].depthStencil.depthWriteEnabled, false);
-  // Width and colour reach the uniform: camera (16 floats), rgb, width.
-  const uniform = h.bufferWrites.find((w) => w.bytes === 80);
-  assert.deepEqual([...new Float32Array(uniform.buffer.data, 64, 4)], [0, 1, 0, 0.5]);
+  // Each draw row: world matrix (16 floats), then its style, rgb and width.
+  const rows = h.bufferWrites.find((w) => w.bytes === 5 * 80);
+  assert.deepEqual([...new Float32Array(rows.buffer.data, 64, 4)], [0, 1, 0, 0.5]);
   outlines.dispose();
 });
 
@@ -177,4 +177,38 @@ test('smooth outlines bind the vertices drawn and their rings; a buffer without 
   );
   outlines.dispose();
   assert.ok(h.resources.filter((r) => r.destroy).every((r) => r.destroyed));
+});
+
+test('per-material width and colour by name, a material without a line, and vertex colours flagged', () => {
+  const h = harness(),
+    model = fakeModel(h, [
+      { id: 1, material: { settings: [0, 0, 0], name: 'hair' } },
+      { id: 2, material: { settings: [0, 0, 0], name: 'eyes' } },
+      { id: 3, material: { settings: [0, 0, 0], name: 'skin' } },
+    ]),
+    outlines = new ModelOutlines({
+      models: [model],
+      outline: 0.1,
+      color: [0, 0, 1],
+      materials: { hair: { outline: 0.3, color: [1, 0, 0] }, eyes: { outline: 0 } },
+      vertexColors: true,
+    });
+  h.engine.use(outlines);
+  const passes = recordPasses(h);
+  h.frame();
+  assert.equal(passes[0].calls.filter((c) => c[0] === 'draw').length, 2, "'eyes' has no line");
+  const rows = h.bufferWrites.find((w) => w.bytes === 2 * 80),
+    style = (k) => [...new Float32Array(rows.buffer.data, k * 80 + 64, 4)].map((v) => Math.round(v * 100) / 100);
+  assert.deepEqual(style(0), [1, 0, 0, 0.3], 'hair: its own width and colour');
+  assert.deepEqual(style(1), [0, 0, 1, 0.1], 'skin: the defaults');
+  const frame = h.bufferWrites.find((w) => w.bytes === 80 && w.buffer.size === 80);
+  assert.equal(new Float32Array(frame.buffer.data, 64, 1)[0], 1, 'vertex colours on');
+  assert.throws(() => (outlines.materials = { hair: { outline: 11 } }), RangeError);
+  assert.throws(() => (outlines.materials = { hair: null }), TypeError);
+  // Every material at 0: nothing to draw, no pass.
+  outlines.outline = 0;
+  outlines.materials = {};
+  h.frame();
+  assert.equal(passes.length, 1);
+  outlines.dispose();
 });

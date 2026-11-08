@@ -676,6 +676,7 @@ The own solver's kernel (`packages/physics/kernel`, Rust, no dependencies). Noth
 | --- | --- | --- | --- |
 | P34 | Inverted-hull outline | toon/src/index.ts | Raskar & Cohen 1999 (back-face hull silhouettes) |
 | TN1 | Inverted-hull outline on deformed model vertices, normal by the cofactor matrix | toon/src/models.ts | Raskar & Cohen 1999 (back-face hull silhouettes); normals by the transpose of the inverse, as cofactors |
+| TN3 | Outline style per material name and per vertex (colour times RGB, width times alpha) | toon/src/models.ts | Margo-own |
 | TN2 | Seam-free hull: copies of a vertex at one position linked in a ring, each pushed along the mean of their normals | toon/src/rings.ts, toon/src/models.ts | Margo-own (welding by position and averaging normals, textbook mesh processing); the 64-copy cap is Margo's |
 | C-07 | Inverted-hull outline | toon/src/index.ts | Raskar & Cohen, "Image Precision Silhouette Edges", I3D 1999 (back faces pushed out); defaults Margo's |
 

@@ -10,23 +10,33 @@ export interface ModelOutlineOptions {
     outline?: number;
     color?: readonly [number, number, number];
     smooth?: boolean;
+    materials?: Readonly<Record<string, OutlineStyle>>;
+    vertexColors?: boolean;
     models?: readonly ModelLike[];
 }
 
 export class ModelOutlines implements EnginePlugin {
     readonly name = "toon:models";
     smooth: boolean;
-    constructor({ outline, color, smooth, models }?: ModelOutlineOptions);
+    vertexColors: boolean;
+    constructor({ outline, color, smooth, materials, vertexColors, models }?: ModelOutlineOptions);
     static attach(engine: EngineKernel, options?: ModelOutlineOptions): ModelOutlines;
     get outline(): number;
     set outline(v: number);
     get color(): readonly [number, number, number];
     set color(v: readonly [number, number, number]);
+    get materials(): Readonly<Record<string, OutlineStyle>>;
+    set materials(v: Readonly<Record<string, OutlineStyle>>);
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
     [Symbol.dispose]: () => void;
+}
+
+export interface OutlineStyle {
+    outline?: number;
+    color?: readonly [number, number, number];
 }
 
 export function positionRings(vertices: Float32Array, stride?: number): Uint32Array;

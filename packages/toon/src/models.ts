@@ -26,6 +26,13 @@ declare const GPUBufferUsage: { STORAGE: number; UNIFORM: number; COPY_DST: numb
 declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 
+/** A material's outline: either field left out takes the {@link ModelOutlines} value. */
+export interface OutlineStyle {
+  /** Thickness in world units, 0-10 (0: no line on this material). */
+  outline?: number;
+  /** Linear RGB 0..1. */
+  color?: readonly [number, number, number];
+}
 /** Options of {@link ModelOutlines}. */
 export interface ModelOutlineOptions {
   /** Outline thickness in world units, 0-10 (0 hides it). Default 0.025, as `Toon`. Live as `outline`. */
@@ -38,22 +45,36 @@ export interface ModelOutlineOptions {
    * animation's have it); a primitive without draws as `smooth: false`.
    */
   smooth?: boolean;
+  /**
+   * Width and colour by material name (the glTF material's `name`), over `outline` and `color`; an entry's `outline`
+   * 0 leaves that material without a line. Live as `materials`.
+   */
+  materials?: Readonly<Record<string, OutlineStyle>>;
+  /**
+   * Vertex colours (COLOR_0) style the line: its colour is multiplied by the vertex's RGB and its width by the
+   * vertex's alpha, so one mesh can thin and tint its line where it is painted. Default false. Live as `vertexColors`.
+   */
+  vertexColors?: boolean;
   /** The models to outline (glTF-pro `PBRModel`s or materials meshes). Default: every model attached to the engine. */
   models?: readonly ModelLike[];
 }
 
-// camera: view projection; style: rgb colour and width. A draw row is the primitive's world matrix (node x instance).
+// camera: view projection; flags.x: vertex colours style the line. A draw row is the primitive's world matrix (node x
+// instance) and its material's style, rgb colour and width.
 const code = `
-struct Style {camera:mat4x4f,style:vec4f}
-@group(0) @binding(0) var<uniform> u:Style;
-@group(0) @binding(1) var<storage,read> draws:array<mat4x4f>;
-@vertex fn vertex(@location(0) position:vec3f,@location(1) own:vec3f,@builtin(instance_index) slot:u32,@builtin(vertex_index) index:u32)->@builtin(position) vec4f{
-  let normal=NORMAL;let m=draws[slot];let a=m[0].xyz;let b=m[1].xyz;let c=m[2].xyz;
+struct Frame {camera:mat4x4f,flags:vec4f}
+struct Draw {model:mat4x4f,style:vec4f}
+struct Out {@builtin(position) clip:vec4f,@location(0) color:vec3f}
+@group(0) @binding(0) var<uniform> u:Frame;
+@group(0) @binding(1) var<storage,read> draws:array<Draw>;
+@vertex fn vertex(@location(0) position:vec3f,@location(1) own:vec3f,@location(2) tint:vec4f,@builtin(instance_index) slot:u32,@builtin(vertex_index) index:u32)->Out{
+  let normal=NORMAL;let d=draws[slot];let m=d.model;let a=m[0].xyz;let b=m[1].xyz;let c=m[2].xyz;
+  let paint=select(vec4f(1),tint,u.flags.x>0);
   let n=mat3x3f(cross(b,c),cross(c,a),cross(a,b))*normal*sign(dot(a,cross(b,c)));
-  let l=length(n);let p=m*vec4f(position,1)+vec4f(select(vec3f(0),n/l,l>0)*u.style.w,0);
-  return u.camera*p;
+  let l=length(n);let p=m*vec4f(position,1)+vec4f(select(vec3f(0),n/l,l>0)*d.style.w*paint.a,0);
+  return Out(u.camera*p,d.style.rgb*paint.rgb);
 }
-@fragment fn fragment()->@location(0) vec4f{return vec4f(u.style.rgb,1);}`;
+@fragment fn fragment(i:Out)->@location(0) vec4f{return vec4f(i.color,1);}`;
 // The smooth variant: the primitive's own 80-byte vertices (deformed ones when skinned) and its position rings. A
 // ring longer than 64 copies stops there; normals summing to nothing (two faces back to back) keep the vertex's own.
 const smoothCode =
@@ -119,11 +140,14 @@ export class ModelOutlines implements EnginePlugin {
   private readonly only?: readonly ModelLike[];
   /** Seam-free outlines (see the option). */
   smooth: boolean;
+  /** Vertex colours style the line (see the option). */
+  vertexColors: boolean;
+  private styles: Readonly<Record<string, OutlineStyle>> = {};
   private readonly smoothing = new Map<ModelPrimitiveLike, Smoothing>();
   private frame = 0;
   private ringLayout?: GPUBindGroupLayout;
   private readonly values = new Float32Array(20);
-  private rows = new Float32Array(16 * 16);
+  private rows = new Float32Array(16 * 20);
   private readonly runs: Run[] = [];
   private readonly scratch = new Float32Array(16);
   private uniform?: GPUBuffer;
@@ -142,7 +166,14 @@ export class ModelOutlines implements EnginePlugin {
     view: undefined as unknown as GPUTextureView,
   };
   private disposed = false;
-  constructor({ outline = 0.025, color = [0.015, 0.015, 0.015], smooth = true, models }: ModelOutlineOptions = {}) {
+  constructor({
+    outline = 0.025,
+    color = [0.015, 0.015, 0.015],
+    smooth = true,
+    materials = {},
+    vertexColors = false,
+    models,
+  }: ModelOutlineOptions = {}) {
     checked(outline, color);
     if (models !== undefined && (!Array.isArray(models) || !models.every(isModel)))
       throw new TypeError('ModelOutlines models must be loaded models; pass the PBRModels loadGLTF returned');
@@ -150,6 +181,8 @@ export class ModelOutlines implements EnginePlugin {
     this.rgb = [color[0], color[1], color[2]];
     this.only = models && [...models];
     this.smooth = !!smooth;
+    this.vertexColors = !!vertexColors;
+    this.materials = materials;
   }
   static attach(engine: EngineKernel, options: ModelOutlineOptions = {}): ModelOutlines {
     const effect = new ModelOutlines(options);
@@ -172,6 +205,21 @@ export class ModelOutlines implements EnginePlugin {
     checked(this.width, v);
     this.rgb = [v[0], v[1], v[2]];
   }
+  /** Width and colour by material name, over `outline` and `color`. */
+  get materials(): Readonly<Record<string, OutlineStyle>> {
+    return this.styles;
+  }
+  set materials(v: Readonly<Record<string, OutlineStyle>>) {
+    if (!v || typeof v !== 'object') throw new TypeError('ModelOutlines materials must be an object of styles by name');
+    const styles: Record<string, OutlineStyle> = {};
+    for (const [name, style] of Object.entries(v)) {
+      if (!style || typeof style !== 'object')
+        throw new TypeError(`ModelOutlines material '${name}' needs a style object; pass {outline, color}`);
+      checked(style.outline ?? 0, style.color ?? [0, 0, 0]);
+      styles[name] = { outline: style.outline, color: style.color && [style.color[0], style.color[1], style.color[2]] };
+    }
+    this.styles = styles;
+  }
   setup(engine: Engine): void {
     if (this.disposed || !engine.gpu)
       throw new MargoError(
@@ -187,7 +235,7 @@ export class ModelOutlines implements EnginePlugin {
       order: 1.25,
       joins: true,
       execute: (c) => {
-        if (c.backend === 'webgpu' && this.width > 0) this.draw(c);
+        if (c.backend === 'webgpu') this.draw(c);
       },
     });
   }
@@ -198,16 +246,18 @@ export class ModelOutlines implements EnginePlugin {
     for (const plugin of this.engine!.plugins.values()) if (isModel(plugin)) list.push(plugin);
     return list;
   }
-  private add(primitive: ModelPrimitiveLike, m: ArrayLike<number>): void {
+  private add(primitive: ModelPrimitiveLike, m: ArrayLike<number>, color: ArrayLike<number>, width: number): void {
     const runs = this.runs,
       slot = runs.length ? runs[runs.length - 1].first + runs[runs.length - 1].count : 0,
       mirrored = determinant(m) < 0;
-    if (slot * 16 + 16 > this.rows.length) {
+    if (slot * 20 + 20 > this.rows.length) {
       const rows = new Float32Array(this.rows.length * 2);
       rows.set(this.rows);
       this.rows = rows;
     }
-    this.rows.set(m as ArrayLike<number>, slot * 16);
+    this.rows.set(m as ArrayLike<number>, slot * 20);
+    this.rows.set(color, slot * 20 + 16);
+    this.rows[slot * 20 + 19] = width;
     const last = runs[runs.length - 1];
     if (last && last.primitive === primitive && last.mirrored === mirrored) last.count++;
     else runs.push({ primitive, first: slot, count: 1, mirrored });
@@ -220,11 +270,16 @@ export class ModelOutlines implements EnginePlugin {
       for (const p of model.primitives) {
         const topology = (p as { topology?: string }).topology;
         if (!p.buffers || topology || hiddenInTree(e.store, p.node.id) || !inView(c, p.node)) continue;
+        const name = (p.material as { name?: string }).name,
+          style = name !== undefined && Object.hasOwn(this.styles, name) ? this.styles[name] : undefined,
+          width = style?.outline ?? this.width,
+          color = style?.color ?? this.rgb;
+        if (!(width > 0)) continue;
         const node = p.node.matrix as ArrayLike<number>;
-        if (!p.instances) this.add(p, node);
+        if (!p.instances) this.add(p, node, color, width);
         else
           for (let k = 0; k < p.instances.count; k++)
-            this.add(p, instanceMatrix(node, p.instances.data, k, this.scratch));
+            this.add(p, instanceMatrix(node, p.instances.data, k, this.scratch), color, width);
       }
     }
     const last = this.runs[this.runs.length - 1];
@@ -247,10 +302,10 @@ export class ModelOutlines implements EnginePlugin {
       });
       this.uniform = device.createBuffer({ size: 80, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     }
-    if (!this.storage || this.storage.size < rows * 64) {
+    if (!this.storage || this.storage.size < rows * 80) {
       retire(device, this.storage);
       this.storage = device.createBuffer({
-        size: Math.max(rows, 16) * 64,
+        size: Math.max(rows, 16) * 80,
         usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
       });
       const storage = this.storage,
@@ -285,6 +340,7 @@ export class ModelOutlines implements EnginePlugin {
                   attributes: [
                     { shaderLocation: 0, offset: 0, format: 'float32x3' },
                     { shaderLocation: 1, offset: 16, format: 'float32x3' },
+                    { shaderLocation: 2, offset: 64, format: 'float32x4' },
                   ],
                 },
               ],
@@ -312,10 +368,9 @@ export class ModelOutlines implements EnginePlugin {
     const device = c.device,
       v = this.values;
     v.set(c.camera.matrix);
-    v.set(this.rgb, 16);
-    v[19] = this.width;
+    v[16] = +this.vertexColors;
     const copy = writeUniform(device, this.uniform!, v as Float32Array<ArrayBuffer>, c.view ?? c);
-    device.queue.writeBuffer(this.storage!, 0, this.rows as Float32Array<ArrayBuffer>, 0, rows * 16);
+    device.queue.writeBuffer(this.storage!, 0, this.rows as Float32Array<ArrayBuffer>, 0, rows * 20);
     const pass = beginScenePass(c, this.colorAttachment, this.depthAttachment);
     applyView(pass, c);
     pass.setBindGroup(0, this.groups!.get(copy));

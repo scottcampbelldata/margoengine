@@ -33,31 +33,44 @@ const show = (shown) => {
   engine.camera.position = shown === model ? [110, 50, 60] : [4, 3, 5];
   engine.camera.target = shown === model ? [0, 35, 0] : [0, 0, 0];
 };
-const outline = (width, smooth) => {
+// style: options set on the outlines after the run's own (materials, vertexColors); each run starts from none.
+const outline = (width, smooth, style = {}) => {
   if (width && !outlines) outlines = ModelOutlines.attach(engine, { outline: width, color: [0, 1, 0] });
   if (!width && outlines) {
     outlines.dispose();
     outlines = undefined;
   }
-  if (outlines) outlines.smooth = smooth;
+  if (outlines) Object.assign(outlines, { smooth, materials: {}, vertexColors: false }, style);
 };
 window.check = {
-  async box(width, smooth) {
+  // paint: an RGBA vertex colour for every vertex of a new box (COLOR_0), or none.
+  async box(width, smooth, style, paint) {
     engine.gpu.pushErrorScope('validation');
-    box ??= createMesh(engine, boxGeometry(2, 2, 2), new Material({ color: '#ffffff' }));
+    if (paint || box?.painted) {
+      box?.dispose();
+      box = undefined;
+    }
+    if (!box) {
+      const geometry = boxGeometry(2, 2, 2);
+      if (paint) geometry.colors = Array.from({ length: geometry.positions.length / 3 }, () => paint).flat();
+      box = createMesh(engine, geometry, new Material({ color: '#ffffff' }));
+      box.painted = !!paint;
+    }
     show(box);
-    outline(width, smooth);
+    outline(width, smooth, style);
     await settle();
     const error = await engine.gpu.popErrorScope();
     if (error) errors.push(error.message);
     return { errors: errors.splice(0) };
   },
   // share: where in the clip; width: outline in world units (0: no ModelOutlines attached).
-  async run(share, width, smooth = true) {
+  /** The Fox's material name, for a style by name. */
+  material: () => model.primitives[0].material.name,
+  async run(share, width, smooth = true, style) {
     engine.gpu.pushErrorScope('validation');
     show(model);
     animation.seek(animation.clips[0].duration * share);
-    outline(width, smooth);
+    outline(width, smooth, style);
     await settle();
     const error = await engine.gpu.popErrorScope();
     if (error) errors.push(error.message);
