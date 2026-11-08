@@ -156,6 +156,173 @@ pub fn ray_capsule(o: V3, d: V3, h: f32, r: f32, max: f32, solid: bool) -> Optio
     interval_hit(enter, enter_n, leave, leave_n, max, solid)
 }
 
+/// A ray against a cylinder along y of radius `r` and half height `h`: the slab between the caps met with the infinite
+/// side cylinder, one interval as the cylinder is convex.
+pub fn ray_cylinder(o: V3, d: V3, r: f32, h: f32, max: f32, solid: bool) -> Option<RayHit> {
+    let up = v3(0.0, 1.0, 0.0);
+    let (mut enter, mut enter_n, mut leave, mut leave_n) = (f32::NEG_INFINITY, ZERO, f32::INFINITY, ZERO);
+    if d.y == 0.0 {
+        if o.y < -h || o.y > h {
+            return None;
+        }
+    } else {
+        let inv = 1.0 / d.y;
+        let (s0, s1) = ((-h - o.y) * inv, (h - o.y) * inv);
+        (enter, enter_n, leave, leave_n) = if inv >= 0.0 { (s0, up.scale(-1.0), s1, up) } else { (s1, up, s0, up.scale(-1.0)) };
+    }
+    let (flat_o, flat_d) = (v3(o.x, 0.0, o.z), v3(d.x, 0.0, d.z));
+    if flat_d.dot(flat_d) == 0.0 {
+        if flat_o.dot(flat_o) > r * r {
+            return None;
+        }
+    } else {
+        let (c0, c1) = round_roots(flat_o, flat_d, r)?;
+        let radial = |t: f32| {
+            let p = o.add(d.scale(t));
+            v3(p.x / r, 0.0, p.z / r)
+        };
+        if c0 > enter {
+            (enter, enter_n) = (c0, radial(c0));
+        }
+        if c1 < leave {
+            (leave, leave_n) = (c1, radial(c1));
+        }
+    }
+    interval_hit(enter, enter_n, leave, leave_n, max, solid)
+}
+
+/// A ray against a cone along y, apex at y = `h`, base disk of radius `r` at y = -h: the half-space above the base met with
+/// the solid nappe x^2 + z^2 <= k^2 (h - y)^2, h - y >= 0, k = r / 2h. Along the ray the nappe's quadratic is
+/// a t^2 + 2 b t + c <= 0; where a > 0 the set between the roots lies on one nappe, where a < 0 the two outer half-lines lie
+/// on the two nappes, and the sign of h - y along the ray picks this one.
+pub fn ray_cone(o: V3, d: V3, r: f32, h: f32, max: f32, solid: bool) -> Option<RayHit> {
+    // From a far start the quadratic's terms grow with the distance squared and cancel. Solving from the point of the
+    // line nearest the cone's centre keeps them at the cone's own size (Haines, Gunther and Akenine-Moller 2019, Ray
+    // Tracing Gems ch. 7); the shift is added back to both ends.
+    let dd = d.dot(d);
+    let shift = if dd > 0.0 { -o.dot(d) / dd } else { 0.0 };
+    let (enter, enter_n, leave, leave_n) = cone_interval(o.add(d.scale(shift)), d, r, h)?;
+    interval_hit(enter + shift, enter_n, leave + shift, leave_n, max, solid)
+}
+
+/// The interval of the line from `o` along `d` through the cone of `ray_cone`, with the normals at its ends.
+#[inline(always)]
+fn cone_interval(o: V3, d: V3, r: f32, h: f32) -> Option<(f32, V3, f32, V3)> {
+    let up = v3(0.0, 1.0, 0.0);
+    let (mut enter, mut enter_n, mut leave, mut leave_n) = (f32::NEG_INFINITY, ZERO, f32::INFINITY, ZERO);
+    if d.y == 0.0 {
+        if o.y < -h {
+            return None;
+        }
+    } else {
+        let t = (-h - o.y) / d.y;
+        if d.y > 0.0 {
+            (enter, enter_n) = (t, up.scale(-1.0));
+        } else {
+            (leave, leave_n) = (t, up.scale(-1.0));
+        }
+    }
+    // The nappe's side of the apex: h - y >= 0, a half-line of the ray (or all of it, or none, along a level ray).
+    let w0 = h - o.y;
+    let (mut low, mut high) = (f32::NEG_INFINITY, f32::INFINITY);
+    if d.y == 0.0 {
+        if w0 < 0.0 {
+            return None;
+        }
+    } else if d.y > 0.0 {
+        high = w0 / d.y;
+    } else {
+        low = w0 / d.y;
+    }
+    let k2 = (r / (2.0 * h)) * (r / (2.0 * h));
+    let a = d.x * d.x + d.z * d.z - k2 * d.y * d.y;
+    let b = o.x * d.x + o.z * d.z + k2 * w0 * d.y;
+    let c = o.x * o.x + o.z * o.z - k2 * w0 * w0;
+    // The ray's interval inside the double cone that lies on the nappe's side.
+    let (n0, n1) = if a == 0.0 {
+        if b == 0.0 {
+            if c > 0.0 {
+                return None;
+            }
+            (f32::NEG_INFINITY, f32::INFINITY)
+        } else if b > 0.0 {
+            (f32::NEG_INFINITY, -c / (2.0 * b))
+        } else {
+            (-c / (2.0 * b), f32::INFINITY)
+        }
+    } else {
+        let disc = b * b - a * c;
+        if disc < 0.0 {
+            if a > 0.0 {
+                return None;
+            }
+            (f32::NEG_INFINITY, f32::INFINITY)
+        } else {
+            let q = -b - if b >= 0.0 { sqrt(disc) } else { -sqrt(disc) };
+            let (t0, t1) = if q == 0.0 { (0.0, 0.0) } else { (q / a, c / q) };
+            let (t0, t1) = if t0 <= t1 { (t0, t1) } else { (t1, t0) };
+            if a > 0.0 {
+                (t0, t1)
+            } else if d.y > 0.0 {
+                // Rising, the ray leaves the nappe's side at `high`: the lower half-line.
+                (f32::NEG_INFINITY, t0)
+            } else {
+                (t1, f32::INFINITY)
+            }
+        }
+    };
+    let (n0, n1) = (n0.max(low), n1.min(high));
+    if n0 > n1 {
+        return None;
+    }
+    let side = |t: f32| {
+        let p = o.add(d.scale(t));
+        let n = v3(p.x, k2 * (h - p.y), p.z);
+        let l = n.dot(n);
+        if l > 0.0 { n.scale(1.0 / sqrt(l)) } else { up }
+    };
+    if n0 > enter {
+        (enter, enter_n) = (n0, side(n0));
+    }
+    if n1 < leave {
+        (leave, leave_n) = (n1, side(n1));
+    }
+    Some((enter, enter_n, leave, leave_n))
+}
+
+/// A ray against a cylinder or cone with a border, through the GJK ray cast of `cast_convex`, its direction made unit and
+/// its distances scaled back. From inside a hollow one, the cast runs back from beyond the far side to find the exit. The
+/// normal is read in closed form, from the core's point nearest the hit (the profile projection): GJK's own direction is
+/// held only to the square root of its relative stop, a few 1e-4 on a curve.
+fn ray_rounded(o: V3, d: V3, shape: crate::revolve::Revolved, border: f32, max: f32, solid: bool) -> Option<RayHit> {
+    use crate::cast::{CastOptions, Solid, cast_convex};
+    let l = sqrt(d.dot(d));
+    if l == 0.0 {
+        return None;
+    }
+    let r = d.scale(1.0 / l);
+    let target = Solid::Revolved { shape, border, pose: crate::sat::Pose { p: ZERO, q: Q::IDENTITY } };
+    let point = |p: V3| Solid::Round { p, q: p, r: 0.0 };
+    let options = |max: f32| CastOptions { max, target: 0.0, stop: true, geometry: true };
+    // The surface's outward normal at a point on it: from the core's nearest point, a border away.
+    let outward = |p: V3, fallback: V3| {
+        let n = p.sub(shape.project(p, 0.0).0);
+        let squared = n.dot(n);
+        if squared > 0.0 { n.scale(1.0 / sqrt(squared)) } else { fallback }
+    };
+    let hit = cast_convex(&point(o), &target, r, &options(max * l))?;
+    if !hit.started {
+        return Some(RayHit { t: hit.t / l, normal: outward(o.add(r.scale(hit.t)), hit.normal) });
+    }
+    if solid {
+        return Some(RayHit { t: 0.0, normal: ZERO });
+    }
+    let beyond = sqrt(o.dot(o)) + 2.0 * shape.reach(border);
+    let back = cast_convex(&point(o.add(r.scale(beyond))), &target, r.scale(-1.0), &options(beyond))?;
+    let t = (beyond - back.t) / l;
+    if t <= max { Some(RayHit { t, normal: outward(o.add(d.scale(t)), back.normal).scale(-1.0) }) } else { None }
+}
+
 /// A ray against a box of half extents `h` centred at the origin, by slabs.
 pub fn ray_box(o: V3, d: V3, h: V3, max: f32, solid: bool) -> Option<RayHit> {
     let (os, ds, hs) = ([o.x, o.y, o.z], [d.x, d.y, d.z], [h.x, h.y, h.z]);
@@ -333,6 +500,11 @@ impl World {
             SHAPE_BALL => ray_ball(o, d, size.x, max, solid),
             SHAPE_BOX => ray_box(o, d, size, max, solid),
             SHAPE_CAPSULE => ray_capsule(o, d, size.y, size.x, max, solid),
+            SHAPE_CYLINDER | SHAPE_CONE if size.z > 0.0 => {
+                ray_rounded(o, d, crate::revolve::Revolved { cone: shape == SHAPE_CONE, r: size.x, h: size.y }, size.z, max, solid)
+            }
+            SHAPE_CYLINDER => ray_cylinder(o, d, size.x, size.y, max, solid),
+            SHAPE_CONE => ray_cone(o, d, size.x, size.y, max, solid),
             SHAPE_HULL => ray_poly(&self.hull_poly(self.uu(COLLIDER_HULL, c) as usize), o, d, max, solid),
             SHAPE_TRIMESH => {
                 let mesh = self.uu(COLLIDER_HULL, c) as usize;

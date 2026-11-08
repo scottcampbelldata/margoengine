@@ -752,9 +752,9 @@ export class Physics implements EnginePlugin, BodyOwner {
     if (this.disposed) throw new MargoError('disposed', 'Physics is disposed; create a new Physics.');
   }
   /**
-   * Sweeps a convex shape (sphere, box, capsule or convexHull, with its size given) from `position` and `rotation` along
-   * `direction` and returns the first collider it touches, or null. `distance` is along the direction's unit. Queries see
-   * the poses of the last step, as Rapier's do.
+   * Sweeps a convex shape (sphere, box, capsule, cylinder, cone or convexHull, with its size given) from `position` and
+   * `rotation` along `direction` and returns the first collider it touches, or null. `distance` is along the direction's
+   * unit. Queries see the poses of the last step, as Rapier's do.
    * @throws RangeError for a position, rotation or direction that is not finite, or a zero direction; MargoError
    * `unsupported` for another query shape.
    */

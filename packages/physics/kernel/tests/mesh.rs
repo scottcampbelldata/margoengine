@@ -214,6 +214,27 @@ fn a_capsule_slides_over_inner_edges_without_catching() {
 }
 
 #[test]
+fn cylinders_and_cones_slide_over_inner_edges_without_catching() {
+    // Upright on the cap, on the side line along the slide, and a cone on its base; each with and without a border.
+    let side = [0.707_106_8, 0.0, 0.0, 0.707_106_8];
+    for (shape, size, rest, rotation) in [
+        (SHAPE_CYLINDER, [0.4, 0.3, 0.0], 0.3, [0.0, 0.0, 0.0, 1.0]),
+        (SHAPE_CYLINDER, [0.4, 0.3, 0.05], 0.35, [0.0, 0.0, 0.0, 1.0]),
+        (SHAPE_CYLINDER, [0.3, 0.4, 0.0], 0.3, side),
+        (SHAPE_CONE, [0.4, 0.3, 0.0], 0.3, [0.0, 0.0, 0.0, 1.0]),
+        (SHAPE_CONE, [0.4, 0.3, 0.05], 0.35, [0.0, 0.0, 0.0, 1.0]),
+    ] {
+        let (variance, lift, spin) = slide(shape, size, rest, rotation, MESH_FIX_EDGES);
+        println!("{shape} {size:?}: variance {variance:e}, lift {lift:e}, spin {spin:e}");
+        assert!(variance < 1e-4, "{shape} {size:?} speed variance {variance}");
+        assert!(lift < 1e-2, "{shape} {size:?} lift {lift}");
+        assert!(spin < 1e-2, "{shape} {size:?} spin {spin}");
+    }
+    let (loose, _, _) = slide(SHAPE_CYLINDER, [0.4, 0.3, 0.0], 0.3, [0.0, 0.0, 0.0, 1.0], 0);
+    println!("cylinder without the rule: variance {loose:e}");
+}
+
+#[test]
 fn a_box_in_a_corner_keeps_the_floor_and_the_wall() {
     // A floor and a wall at x = 1 meeting in a concave edge; gravity pulls the box down and into the wall.
     let mut w = World::new(4, 4).unwrap();

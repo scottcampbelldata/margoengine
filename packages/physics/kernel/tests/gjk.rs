@@ -129,6 +129,78 @@ fn degenerate_simplices_give_numbers_not_nan() {
     assert!((closest.squared - 0.25).abs() < 1e-5, "{closest:?}");
 }
 
+/// A needle: one vertex far out, two crowded near the origin's foot on the plane, the simplex GJK builds on a curved shape
+/// near a touch. The closest point must carry an error on the scale of the distance, not of the far vertex: a sum of
+/// coordinates times vertices, or a plane offset or areas read from the far vertex, rounds at about 1e-7 of its size, tilts
+/// the direction by that over the distance, and stalls the descent (the support along the tilted direction is a vertex
+/// it already has).
+#[test]
+fn a_needle_simplex_gives_its_closest_point_to_the_rounding_of_the_distance() {
+    let mut random = Random(0x7EED);
+    let mut worst = 0.0f64;
+    for round in 0..20_000 {
+        let normal = random.point(1.0);
+        let normal = normal.scale(1.0 / normal.dot(normal).sqrt());
+        let e1 = normal.cross(if normal.x.abs() < 0.6 { v3(1.0, 0.0, 0.0) } else { v3(0.0, 1.0, 0.0) });
+        let e1 = e1.scale(1.0 / e1.dot(e1).sqrt());
+        let e2 = normal.cross(e1);
+        let foot = normal.scale(random.range(1e-4, 1e-3));
+        let (long, short) = (random.range(0.5, 1.5), random.range(1e-3, 1e-2));
+        let s = [
+            foot.add(e1.scale(long)),
+            foot.sub(e1.scale(short * random.range(0.5, 1.0))).add(e2.scale(short * random.range(0.5, 1.0))),
+            foot.sub(e1.scale(short * random.range(0.5, 1.0))).sub(e2.scale(short * random.range(0.5, 1.0))),
+            v3(0.0, 0.0, 0.0),
+        ];
+        // The foot of the rounded vertices' plane, in doubles.
+        let (a, b, c) = (d(s[0]), d(s[1]), d(s[2]));
+        let n = cross(sub(b, a), sub(c, a));
+        let h = dot(b, n) / dot(n, n);
+        let exact = [n[0] * h, n[1] * h, n[2] * h];
+        let closest = signed_volumes(&s, 3);
+        assert_eq!(closest.count, 3, "round {round}: {closest:?}");
+        let error = dot(sub(d(closest.point), exact), sub(d(closest.point), exact)).sqrt() / dot(exact, exact).sqrt();
+        worst = worst.max(error);
+        assert!(error < 1e-4, "round {round}: {:?} against {exact:?}", closest.point);
+    }
+    println!("largest error over the distance: {worst:e}");
+}
+
+/// A ball a small gap off a cylinder or cone with a border, at any turn: the gap is known in closed form (the ball's
+/// centre on the outward normal of the surface point nearest it), and GJK must read it to a hundredth of a micrometre
+/// over a gap of a tenth of a millimetre. Both supports are curved, so GJK's simplex is a needle near the touch.
+#[test]
+fn gjk_reads_a_small_gap_between_curved_shapes() {
+    use margoengine_physics_kernel::cast::Solid;
+    use margoengine_physics_kernel::revolve::Revolved;
+    let mut random = Random(0xC0DE);
+    let mut worst = 0.0f32;
+    for round in 0..4000 {
+        let shape = Revolved { cone: round % 2 == 0, r: random.range(0.1, 1.0), h: random.range(0.1, 1.0) };
+        let border = if round % 4 < 2 { 0.0 } else { random.range(0.02, 0.3) };
+        let pose = Pose { p: random.point(2.0), q: random.turn() };
+        let outside = random.point(1.0);
+        let outside = outside.scale(3.0 / outside.dot(outside).sqrt());
+        let (surface, inside) = shape.project(outside, border);
+        assert!(!inside);
+        let out = outside.sub(surface);
+        let out = out.scale(1.0 / out.dot(out).sqrt());
+        let (gap, radius) = (random.range(1e-4, 1e-3), random.range(0.05, 0.5));
+        let centre = pose.apply(surface.add(out.scale(gap + radius)));
+        let ball = Solid::Round { p: centre, q: centre, r: radius };
+        let solid = Solid::Revolved { shape, border, pose };
+        let found = gjk(&ball, &solid, v3(1.0, 0.0, 0.0), f32::INFINITY);
+        let error = (found.distance - gap).abs();
+        worst = worst.max(error);
+        assert!(!found.overlap && error < 1e-5, "round {round}: {} against {gap}, {shape:?} border {border}", found.distance);
+        // The normal comes from the closest point of the difference, and is the surface's.
+        let normal = found.v.scale(1.0 / found.distance);
+        let tilt = normal.sub(pose.q.rotate(out));
+        assert!(tilt.dot(tilt) < 4e-4, "round {round}: {normal:?} against {:?}", pose.q.rotate(out));
+    }
+    println!("largest gap error: {worst:e}");
+}
+
 /// Squared distance between two polyhedra, from every pair of triangle and edge, in doubles.
 fn brute_distance(a: &Poly, pa: Pose, b: &Poly, pb: Pose) -> f64 {
     let triangles = |poly: &Poly, pose: Pose| {

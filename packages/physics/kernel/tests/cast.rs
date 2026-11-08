@@ -60,6 +60,7 @@ fn moved(s: &Solid, by: V3) -> Solid {
         Solid::Round { p, q, r } => Solid::Round { p: p.add(by), q: q.add(by), r },
         Solid::Poly { poly, pose } => Solid::Poly { poly, pose: Pose { p: pose.p.add(by), q: pose.q } },
         Solid::Triangle([a, b, c]) => Solid::Triangle([a.add(by), b.add(by), c.add(by)]),
+        Solid::Revolved { shape, border, pose } => Solid::Revolved { shape, border, pose: Pose { p: pose.p.add(by), q: pose.q } },
     }
 }
 
@@ -168,6 +169,49 @@ fn random_convex_casts_meet_the_bisected_distance() {
             (None, None) => {}
             (g, w) => {
                 // A graze: the nearest approach sits within rounding of the margin.
+                let near = brute(&a, &b, r, 12.0, margin + 1e-3).is_some() && brute(&a, &b, r, 12.0, (margin - 1e-3).max(0.0)).is_none();
+                assert!(near, "case {k}: {g:?} against {w:?}");
+            }
+        }
+    }
+    assert!(hits > 400, "too few hits to mean anything: {hits}");
+}
+
+/// A cylinder or cone of random size, half of them with a border.
+fn random_revolved(rng: &mut Rng, at: V3) -> Solid {
+    let shape = margoengine_physics_kernel::revolve::Revolved { cone: rng.next() < 0.5, r: rng.range(0.1, 1.0), h: rng.range(0.1, 1.0) };
+    let border = if rng.next() < 0.5 { rng.range(0.02, 0.3) } else { 0.0 };
+    Solid::Revolved { shape, border, pose: Pose { p: at, q: rng.turn() } }
+}
+
+#[test]
+fn random_casts_with_cylinders_and_cones_meet_the_bisected_distance() {
+    let mut rng = Rng(33);
+    let mut hits = 0;
+    for k in 0..1500 {
+        let mut da = BoxData::new();
+        let start = v3(rng.range(-4.0, 4.0), rng.range(-4.0, 4.0), rng.range(-4.0, 4.0));
+        let a = if k % 2 == 0 { random_revolved(&mut rng, start) } else { random_solid(&mut rng, &mut da, start) };
+        let b = random_revolved(&mut rng, ZERO);
+        let r = if k % 3 == 0 { ZERO.sub(start) } else { rng.unit() };
+        let r = r.scale(1.0 / len(r));
+        let margin = if k % 4 == 0 { 0.3 } else { 0.0 };
+        let got = cast_convex(&a, &b, r, &CastOptions { max: 12.0, target: margin, ..PLAIN });
+        let want = brute(&a, &b, r, 12.0, margin);
+        match (got, want) {
+            (Some(g), Some(w)) => {
+                assert!((g.t - w).abs() < 2e-3 * (1.0 + w), "case {k}: {g:?} against {w}");
+                let gap = distance(&moved(&a, r.scale(g.t)), &b);
+                let apart = len(g.on_query.sub(g.on_target));
+                assert!(gap <= margin + 1e-4 || (apart - margin).abs() < 1e-5, "case {k}: {gap} apart at the touch: {g:?}");
+                if !g.started {
+                    assert!((len(g.on_query.sub(g.on_target)) - margin).abs() < 5e-3, "case {k}: {g:?}");
+                    assert!((len(g.normal) - 1.0).abs() < 1e-4 && g.normal.dot(r) <= 1e-4, "case {k}: {g:?}");
+                }
+                hits += 1;
+            }
+            (None, None) => {}
+            (g, w) => {
                 let near = brute(&a, &b, r, 12.0, margin + 1e-3).is_some() && brute(&a, &b, r, 12.0, (margin - 1e-3).max(0.0)).is_none();
                 assert!(near, "case {k}: {g:?} against {w:?}");
             }

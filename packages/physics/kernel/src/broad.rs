@@ -10,6 +10,7 @@
 // results do not depend on its size.
 use crate::layout::*;
 use crate::math::*;
+use crate::revolve::Revolved;
 use crate::world::{NONE, World};
 
 /// How far a fat box reaches past what the step can reach, in metres: boxes stay put until a body has moved this far, and
@@ -84,6 +85,14 @@ impl World {
                 let z = turn.rotate(v3(0.0, 0.0, half.z)).abs();
                 center = center.add(turn.rotate(self.v(MESH_BOX_X, mesh)));
                 (x.add(y).add(z), self.s(MESH_RADIUS, mesh))
+            }
+            SHAPE_CYLINDER | SHAPE_CONE => {
+                // Exact along each world axis: the axis's component there sets how far the caps and rims reach.
+                let shape = Revolved { cone: self.uu(COLLIDER_SHAPE, c) == SHAPE_CONE, r: a, h: b };
+                let axis = turn.rotate(v3(0.0, 1.0, 0.0));
+                let ((lx, hx), (ly, hy), (lz, hz)) = (shape.span(axis.x), shape.span(axis.y), shape.span(axis.z));
+                center = center.add(v3(lx + hx, ly + hy, lz + hz).scale(0.5));
+                (v3(hx - lx, hy - ly, hz - lz).scale(0.5).add(v3(d, d, d)), shape.reach(d))
             }
             _ => {
                 let core = turn.rotate(v3(0.0, b, 0.0)).abs();

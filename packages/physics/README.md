@@ -182,7 +182,7 @@ A body on a part below the root is fitted at that part's world scale. A skinned 
 
 `physics.addBody(mesh | null, options)`: `type` (`'dynamic'`, `'fixed'`, `'kinematicPosition'`, `'kinematicVelocity'`), `position`, `rotation` (quaternion; both default to the mesh), `colliders` (one or an array; `[]` for none), `linearVelocity`, `angularVelocity`, `linearDamping`, `angularDamping`, `gravityScale`, `ccd`, `canSleep`, `sleeping`, `lockRotations`, `lockTranslations`, `enabledRotations`, `enabledTranslations`, `additionalMass`, `dominance`, `follow`, `userData`.
 
-Colliders: `shape` is `'box'` (`halfExtents`), `'sphere'` (`radius`), `'capsule'`, `'cylinder'` and `'cone'` (`halfHeight`, `radius`, Y axis), `'convexHull'` (`geometry` or `points`), `'trimesh'` (`geometry` or `vertices` and `indices`; `fixInternalEdges: true` lets a ball cross shared edges without catching), `'heightfield'` (`rows`, `columns`, `(rows + 1) * (columns + 1)` column-major `heights`, `scale` as the total size, centered on the body; `fixInternalEdges: true` as for a trimesh), `'compound'` (`parts`), `'convexDecomposition'` (`geometry` or `vertices` and `indices`), `'voxels'` (`cells`, an `Int32Array` of x, y, z cell coordinates, and `size`, one cell's size, default `[1, 1, 1]`), `'halfSpace'` (`normal`, out of the solid, default up) or `'custom'` (`desc`: a Rapier `ColliderDesc` you built, for what this wrapper does not cover; it leaves with Rapier; it keeps its own translation unless `offset` is given, and its contacts raise the same events as any other collider of the body). Plus `offset`, `rotation`, `friction`, `restitution`, `frictionCombine` and `restitutionCombine` (`'average'`, `'min'`, `'multiply'`, `'max'`), `density` or `mass`, `massless` (adds no mass or inertia and skips working them out, for the static pieces of a fixed body), `sensor`, `collisionGroups`, `solverGroups`, `events`, `enabled`.
+Colliders: `shape` is `'box'` (`halfExtents`), `'sphere'` (`radius`), `'capsule'`, `'cylinder'` and `'cone'` (`halfHeight`, `radius`, Y axis; `borderRadius`, default 0, rounds the edges: Rapier's `roundCylinder` and `roundCone`), `'convexHull'` (`geometry` or `points`), `'trimesh'` (`geometry` or `vertices` and `indices`; `fixInternalEdges: true` lets a ball cross shared edges without catching), `'heightfield'` (`rows`, `columns`, `(rows + 1) * (columns + 1)` column-major `heights`, `scale` as the total size, centered on the body; `fixInternalEdges: true` as for a trimesh), `'compound'` (`parts`), `'convexDecomposition'` (`geometry` or `vertices` and `indices`), `'voxels'` (`cells`, an `Int32Array` of x, y, z cell coordinates, and `size`, one cell's size, default `[1, 1, 1]`), `'halfSpace'` (`normal`, out of the solid, default up) or `'custom'` (`desc`: a Rapier `ColliderDesc` you built, for what this wrapper does not cover; it leaves with Rapier; it keeps its own translation unless `offset` is given, and its contacts raise the same events as any other collider of the body). Plus `offset`, `rotation`, `friction`, `restitution`, `frictionCombine` and `restitutionCombine` (`'average'`, `'min'`, `'multiply'`, `'max'`), `density` or `mass`, `massless` (adds no mass or inertia and skips working them out, for the static pieces of a fixed body), `sensor`, `collisionGroups`, `solverGroups`, `events`, `enabled`.
 
 Joints, `physics.addJoint(bodyA, bodyB, options)`: `type` `'fixed'` (`frameA`, `frameB` rotations), `'spherical'`, `'revolute'` or `'prismatic'` (`axis`, or `frameA` and `frameB` together; `limits`, `motor`), `'rope'` (`length`), `'spring'` (`restLength`, `stiffness`, `damping` default 0) or `'generic'` (below). All take `anchorA` and `anchorB` in each body's local frame and `contactsEnabled`. Motors take `targetVelocity`, `targetPosition`, `stiffness`, `damping` and `model` (`'acceleration'` or `'force'`).
 
@@ -425,7 +425,7 @@ for (let i = 0; i < 120; i++) physics.step();
 console.log(ball.position[1].toFixed(2)); // 0.50: resting on the field
 ```
 
-A `compound` takes the root entry's `parts`: boxes, spheres, capsules and convex hulls, each with its own `offset` and `rotation` in the collider's frame, never fitted to the mesh. It is one collider, as in Rapier: one handle, one pair and one set of events against each other collider, and one `density` (or `mass`, spread by volume) for every part. Each part that touches keeps its own contact points and warm start, and parts are culled by their own boxes, so the gaps between them are empty. Its mass, centre and inertia match Rapier's for the same parts (a test holds them to 1e-5) and are the same bits as the parts added as colliders of their own. `cylinder` and `cone` parts throw `unsupported` until the own solver has those shapes; `boundingRadius` is null, as on the root entry. `KernelWorld.addCompound(body, parts, options)` is the kernel's view of it.
+A `compound` takes the root entry's `parts`: boxes, spheres, capsules, cylinders, cones and convex hulls, each with its own `offset` and `rotation` in the collider's frame, never fitted to the mesh. It is one collider, as in Rapier: one handle, one pair and one set of events against each other collider, and one `density` (or `mass`, spread by volume) for every part. Each part that touches keeps its own contact points and warm start, and parts are culled by their own boxes, so the gaps between them are empty. Its mass, centre and inertia match Rapier's for the same parts (a test holds them to 1e-5) and are the same bits as the parts added as colliders of their own. `boundingRadius` is null, as on the root entry. `KernelWorld.addCompound(body, parts, options)` is the kernel's view of it.
 
 ```js
 import {Physics} from 'margoengine/physics/next';
@@ -487,6 +487,21 @@ for (let i = 0; i < 12; i++) {
 const rock = physics.addBody(null, {position: [0, 3, 0], colliders: {shape: 'convexHull', points, density: 2}});
 for (let i = 0; i < 180; i++) physics.step();
 console.log(rock.position[1].toFixed(2), convexHull(points).faces.length); // 0.50 14: resting on its wide face
+physics.dispose();
+```
+
+A `cylinder` and a `cone` stand along their local Y, `halfHeight` each way, a cone's apex at the top. `borderRadius` rounds every edge with a border outside `radius` and `halfHeight`, Rapier's `roundCylinder` and `roundCone`, and `collider.borderRadius()` reads it back. A round shape weighs its border too, where Rapier weighs only its core, so give `mass` to match a Rapier scene's weights. A cap or base on a floor holds a full manifold, so the shape stands; rays, `shapeCast` and point queries meet the exact surface.
+
+```ts
+import {Physics} from 'margoengine/physics/next';
+
+await Physics.load();
+const physics = new Physics(null);
+physics.addBody(null, {type: 'fixed', position: [0, -0.5, 0], colliders: {shape: 'box', halfExtents: [20, 0.5, 20]}});
+const can = physics.addBody(null, {position: [0, 2, 0], colliders: {shape: 'cylinder', radius: 0.3, halfHeight: 0.5, borderRadius: 0.05}});
+const cone = physics.addBody(null, {position: [2, 2, 0], colliders: {shape: 'cone', radius: 0.4, halfHeight: 0.3}});
+for (let i = 0; i < 180; i++) physics.step();
+console.log(can.position[1].toFixed(2), cone.position[1].toFixed(2)); // 0.55 0.30: on its rounded cap, on its base
 physics.dispose();
 ```
 

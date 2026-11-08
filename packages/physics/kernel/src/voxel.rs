@@ -393,6 +393,27 @@ impl World {
         let mut data = BoxData::new();
         let poly = box_poly(half, &mut data);
         let shape = self.uu(COLLIDER_SHAPE, other);
+        if crate::narrow::is_revolved(shape) {
+            // A cylinder or cone: the cell as a solid box through `smooth`, snapped to the face the rule names.
+            let mut smooth_data = BoxData::new();
+            let Some(solid) = self.solid(self.shape_of(other), self.collider_pose(other), &mut smooth_data) else { return };
+            let cell_solid = crate::cast::Solid::Poly { poly, pose: cell };
+            crate::smooth::collide_solids(&cell_solid, &solid, limit, out);
+            if out.count > 0 {
+                match voxel_verdict(pose.q.unrotate(out.normal), self.cell_byte(mesh, index)) {
+                    None => out.count = 0,
+                    Some((false, _)) => {}
+                    Some((true, face)) => {
+                        let (core_o, border) = crate::cast::core(&solid);
+                        crate::smooth::clip_along(&cell_solid, 0.0, &core_o, border, cell.q.rotate(poly.normal(face)), limit, out);
+                    }
+                }
+            }
+            if other_is_a {
+                crate::mesh::flip(out);
+            }
+            return;
+        }
         let round = shape == SHAPE_BALL || shape == SHAPE_CAPSULE;
         // The other shape is read once: its pose, round form and polyhedron serve the test and the snap.
         let mut other_data = BoxData::new();

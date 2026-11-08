@@ -170,14 +170,15 @@ export type KernelBodyKind = 'fixed' | 'dynamic' | 'kinematicPosition' | 'kinema
 
 /**
  * Shapes the kernel holds today. Sizes: a ball's radius; a box's half extents; a capsule's radius and half core length; a
- * hull's row from {@link KernelWorld.addHull}; a mesh's row from {@link KernelWorld.addTrimesh} or
+ * cylinder's or cone's radius, half height along local Y and border radius (0 for none; a cone's apex is at +Y); a hull's
+ * row from {@link KernelWorld.addHull}; a mesh's row from {@link KernelWorld.addTrimesh} or
  * {@link KernelWorld.addHeightfield}.
  */
-export type KernelShape = 'ball' | 'box' | 'capsule' | 'hull' | 'trimesh';
+export type KernelShape = 'ball' | 'box' | 'capsule' | 'cylinder' | 'cone' | 'hull' | 'trimesh';
 
 /** One convex child of {@link KernelWorld.addCompound}: a shape and size as {@link KernelWorld.addCollider} takes them. */
 export interface KernelCompoundPart {
-  shape: 'ball' | 'box' | 'capsule' | 'hull';
+  shape: 'ball' | 'box' | 'capsule' | 'cylinder' | 'cone' | 'hull';
   size: readonly number[];
   /** Place in the compound's frame (default its origin). */
   position?: readonly [number, number, number];
@@ -192,6 +193,8 @@ const shapes: Readonly<Record<KernelShape, readonly [number, number]>> = {
   capsule: [2, 2],
   hull: [3, 1],
   trimesh: [4, 1],
+  cylinder: [6, 3],
+  cone: [7, 3],
 };
 /** The `colliderShape` value of a compound (layout.rs SHAPE_COMPOUND). */
 export const SHAPE_COMPOUND = 5;
@@ -336,7 +339,7 @@ const QUERY_HITS = 256;
 /** A query shape of {@link KernelWorld.shapeCast} and {@link KernelWorld.intersectShape}: a convex kernel shape and its
  * `addCollider` size (a hull names its `addHull` row). */
 export interface KernelQueryShape {
-  shape: 'ball' | 'box' | 'capsule' | 'hull';
+  shape: 'ball' | 'box' | 'capsule' | 'cylinder' | 'cone' | 'hull';
   size: readonly number[];
 }
 /** How far a cast goes, how far short of touching it stops, and what a start in contact means (Rapier's `ShapeCastOptions`). */
@@ -366,10 +369,10 @@ export interface KernelProjection {
   point: [number, number, number];
   distance: number;
 }
-const QUERY_KINDS = { ball: 0, box: 1, capsule: 2, hull: 3 } as const;
+const QUERY_KINDS = { ball: 0, box: 1, capsule: 2, hull: 3, cylinder: 6, cone: 7 } as const;
 const castBits = (cast: KernelCastOptions): number => (cast.stop ? 1 : 0) | (cast.geometry ? 2 : 0);
 const CAST_REFUSED =
-    'A shape query needs a finite position, a nonzero rotation, a finite nonzero direction, a target distance of 0 or more and a ball, box, capsule or hull row; pass those.',
+    'A shape query needs a finite position, a nonzero rotation, a finite nonzero direction, a target distance of 0 or more and a ball, box, capsule, cylinder, cone or hull row; pass those.',
   POINT_REFUSED = 'A point query needs a finite point; pass three finite numbers.';
 
 /** How two colliders mix a value. When their rules differ the pair takes the higher: max, multiply, min, average. */
@@ -718,7 +721,8 @@ export class KernelWorld {
    * Adds a collider to a body and works out the body's mass, centre and inertia again. Grows the world when the rows run
    * out, so read views from `columns` after this call.
    * @param size A ball's `[radius]`, a box's `[halfX, halfY, halfZ]`, a capsule's `[radius, halfLength]` along local Y, a
-   * hull's `[row]`, a triangle mesh's `[row]` (no volume, so no mass).
+   * cylinder's or cone's `[radius, halfHeight, borderRadius]` along local Y (border 0 for a sharp one), a hull's `[row]`,
+   * a triangle mesh's `[row]` (no volume, so no mass).
    * @returns The collider's row.
    * @throws RangeError for a dead body, an unknown shape, or a size, pose or density the kernel cannot use.
    */
@@ -738,7 +742,7 @@ export class KernelWorld {
    * Adds a compound collider: convex children welded into one collider, with one row, one pair against each other
    * collider and one set of events, as Rapier's compound shape is. Its density is every child's. The body's mass, centre and
    * inertia are worked out again, so read views from `columns` after this call.
-   * @param parts At least one ball, box, capsule or hull, each placed in the compound's frame.
+   * @param parts At least one ball, box, capsule, cylinder, cone or hull, each placed in the compound's frame.
    * @returns The compound's row. Its children have rows of their own, off the broad phase, that nothing else names.
    * @throws RangeError for a dead body, no parts, a part the kernel cannot use, or a size, pose or density it cannot use.
    */
@@ -752,7 +756,8 @@ export class KernelWorld {
     for (const part of parts) {
       const shape: string = part?.shape,
         spec = shape !== 'trimesh' && Object.hasOwn(shapes, shape) ? shapes[shape as KernelShape] : undefined;
-      if (!spec) throw new RangeError(`A compound part is a ball, box, capsule or hull (got ${String(part?.shape)}); pass one of those.`);
+      if (!spec)
+        throw new RangeError(`A compound part is a ball, box, capsule, cylinder, cone or hull (got ${String(part?.shape)}); pass one of those.`);
       this.checkSize(part.shape, part.size);
       this.checkPose(part.position ?? [0, 0, 0], part.rotation ?? [0, 0, 0, 1]);
       codes.push(spec[0]);
@@ -792,6 +797,9 @@ export class KernelWorld {
     } else if (shape === 'trimesh') {
       if (size.length !== 1 || !Number.isInteger(size[0]) || size[0] < 0 || size[0] >= this.meshRows)
         throw new RangeError(`A trimesh collider needs [row], a row addTrimesh returned (got ${size.join(', ')}).`);
+    } else if (shape === 'cylinder' || shape === 'cone') {
+      if (!Array.isArray(size) || size.length !== 3 || !size.every(Number.isFinite) || !(size[0] > 0 && size[1] > 0 && size[2] >= 0))
+        throw new RangeError(`A ${shape} needs [radius, halfHeight, borderRadius], the first two above zero and the border 0 or more (got ${String(size)}).`);
     } else if (!Array.isArray(size) || size.length !== numbers || !size.every((value) => value > 0 && Number.isFinite(value)))
       throw new RangeError(`A ${shape} needs ${numbers} finite sizes above zero (got ${String(size)}).`);
   }

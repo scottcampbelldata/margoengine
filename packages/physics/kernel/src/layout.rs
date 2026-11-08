@@ -589,6 +589,12 @@ pub const SHAPE_TRIMESH: u32 = 4;
 /// off its body's chain, and each child's COLLIDER_NEXT the next (NONE ends it). A child keeps its pose in the body's
 /// frame and its own fat box; the compound's box holds them all. No size of its own.
 pub const SHAPE_COMPOUND: u32 = 5;
+/// A cylinder along local Y, its origin at half height: A its radius, B its half height, C its border radius (Rapier's
+/// `cylinder` and `roundCylinder`, the border outside A and B).
+pub const SHAPE_CYLINDER: u32 = 6;
+/// A cone along local Y, its apex at +B and its base disk of radius A at -B, C its border radius (Rapier's `cone` and
+/// `roundCone`).
+pub const SHAPE_CONE: u32 = 7;
 
 /// MESH_FLAGS: contacts on a triangle's inner edges keep to the normals the surface allows (fixInternalEdges).
 pub const MESH_FIX_EDGES: u32 = 1;

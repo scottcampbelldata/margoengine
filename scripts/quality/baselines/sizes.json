@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11206676,
+  "total": 11222038,
   "history": [
     {
       "date": "2026-10-24",
@@ -4340,6 +4340,12 @@
       "commit": "610b03baf",
       "reason": "skinned emitters: new entry @margoengine/vfx/skinned, carried by the root VFX with every feature",
       "grew": 2
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "e396b29ea",
+      "reason": "physics/next cylinder and cone, sharp and round (kernel revolve.rs and smooth.rs: closed-form support points, cap and side line manifolds, mass and inertia integrals over the rounded profile, closed-form rays and the GJK border margin; gjk.rs needle simplex numerics): kernel 137,435 to 151,744 B deflated (Lane Q commit ca91b1f8e included). Every piece is needed: Rapier has cylinder, cone, roundCylinder and roundCone, and each part has its regression test in kernel/tests/revolve.rs, gjk.rs and cast.rs.",
+      "grew": 1
     }
   ],
   "items": {
@@ -4800,7 +4806,7 @@
     "@margoengine/oit/moments": 5512,
     "@margoengine/oit/vfx": 486,
     "@margoengine/physics": 19679,
-    "@margoengine/physics/next": 173082,
+    "@margoengine/physics/next": 188444,
     "@margoengine/physics2d": 8199,
     "@margoengine/physics2d/outline": 2524,
     "@margoengine/pixel": 4664,

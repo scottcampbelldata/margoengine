@@ -127,10 +127,12 @@ export type CompoundPart = ({
     shape: 'cylinder';
     halfHeight: number;
     radius: number;
+    borderRadius?: number;
 } | {
     shape: 'cone';
     halfHeight: number;
     radius: number;
+    borderRadius?: number;
 } | {
     shape: 'convexHull';
     points: ArrayLike<number>;
@@ -387,6 +389,7 @@ export class PhysicsCollider {
     halfExtents(): Vector | null;
     radius(): number;
     halfHeight(): number;
+    borderRadius(): number;
     vertices(): Float32Array;
     indices(): Uint32Array | undefined;
     containsPoint(point: Vector): boolean;
@@ -494,6 +497,8 @@ export interface RapierModule {
         capsule(halfHeight: number, radius: number): ColliderDesc;
         cylinder(halfHeight: number, radius: number): ColliderDesc;
         cone(halfHeight: number, radius: number): ColliderDesc;
+        roundCylinder(halfHeight: number, radius: number, borderRadius: number): ColliderDesc;
+        roundCone(halfHeight: number, radius: number, borderRadius: number): ColliderDesc;
         convexHull(points: Float32Array): ColliderDesc | null;
         trimesh(vertices: Float32Array, indices: Uint32Array, flags?: number): ColliderDesc;
         voxels?(cells: Int32Array, size: Vector): ColliderDesc;
@@ -585,14 +590,18 @@ export type ShapeOptions = {
     shape: 'capsule';
     halfHeight: number;
     radius: number;
-} | {
+}
+ | {
     shape: 'cylinder';
     halfHeight: number;
     radius: number;
-} | {
+    borderRadius?: number;
+}
+ | {
     shape: 'cone';
     halfHeight: number;
     radius: number;
+    borderRadius?: number;
 } | {
     shape: 'convexHull';
     geometry?: ColliderGeometry;
@@ -742,6 +751,7 @@ interface Collider {
     halfExtents(): Vector | null;
     radius(): number;
     halfHeight(): number;
+    roundRadius(): number | undefined;
     vertices(): Float32Array;
     indices(): Uint32Array | undefined;
     density(): number;

@@ -40,14 +40,15 @@ export class PhysicsCollider {
   }
   /**
    * Radius of a sphere around {@link PhysicsCollider.translationWrtParent} that holds the shape: the radius of a sphere, the
-   * reach of a capsule, the corner distance of a box. Null for the other shapes, which would have to walk their geometry,
-   * as on the Rapier entry.
+   * reach of a capsule, the corner distance of a box, the rim's distance of a cylinder or cone plus its border. Null for the
+   * other shapes, which would have to walk their geometry, as on the Rapier entry.
    */
   get boundingRadius(): number | null {
     const { colliderA, colliderB, colliderC } = this.columns(),
       a = this.handle;
     if (this.shape === 'box') return Math.hypot(colliderA[a], colliderB[a], colliderC[a]);
     if (this.shape === 'capsule') return colliderA[a] + colliderB[a];
+    if (this.shape === 'cylinder' || this.shape === 'cone') return Math.hypot(colliderA[a], colliderB[a]) + colliderC[a];
     return this.shape === 'sphere' ? colliderA[a] : null;
   }
   isSensor(): boolean {
@@ -99,13 +100,17 @@ export class PhysicsCollider {
       a = this.handle;
     return this.shape === 'box' ? { x: colliderA[a], y: colliderB[a], z: colliderC[a] } : null;
   }
-  /** Radius of a sphere or capsule. */
+  /** Radius of a sphere, capsule, cylinder or cone. */
   radius(): number {
     return this.columns().colliderA[this.handle];
   }
-  /** Half the length along Y of a capsule. */
+  /** Half the length along Y of a capsule, cylinder or cone. */
   halfHeight(): number {
     return this.columns().colliderB[this.handle];
+  }
+  /** Border radius of a cylinder or cone, 0 for a sharp one (Rapier's `roundRadius`). */
+  borderRadius(): number {
+    return this.shape === 'cylinder' || this.shape === 'cone' ? this.columns().colliderC[this.handle] : 0;
   }
   friction(): number {
     return this.columns().colliderFriction[this.handle];

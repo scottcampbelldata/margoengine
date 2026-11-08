@@ -21,6 +21,7 @@ use crate::gjk::{Convex, Distance, epa, gjk};
 use crate::hull::BoxData;
 use crate::layout::*;
 use crate::math::*;
+use crate::revolve::Revolved;
 use crate::sat::Pose;
 use crate::world::{NONE, World};
 
@@ -107,6 +108,7 @@ impl World {
         match self.uu(COLLIDER_SHAPE, c) {
             SHAPE_BALL | SHAPE_CAPSULE => size.x,
             SHAPE_BOX => size.x.min(size.y).min(size.z),
+            SHAPE_CYLINDER | SHAPE_CONE => Revolved { cone: self.uu(COLLIDER_SHAPE, c) == SHAPE_CONE, r: size.x, h: size.y }.thickness(size.z),
             SHAPE_HULL => {
                 let hull = self.uu(COLLIDER_HULL, c) as usize;
                 let (poly, center) = (self.hull_poly(hull), self.v(HULL_CENTER_X, hull));
@@ -240,10 +242,15 @@ impl World {
             && crate::events::groups_meet(self.uu(COLLIDER_SOLVER_GROUPS, a), self.uu(COLLIDER_SOLVER_GROUPS, b))
     }
     /// How far a turn about its body's centre of mass can move a collider's surface: its reach less a ball's or capsule's
-    /// radius, since a round shape's support along any axis is its core's plus the radius, whatever the turn.
+    /// radius, or a cylinder's or cone's border, since a round shape's support along any axis is its core's plus the
+    /// radius, whatever the turn.
     fn turning_reach(&self, c: usize) -> f32 {
-        let round = matches!(self.uu(COLLIDER_SHAPE, c), SHAPE_BALL | SHAPE_CAPSULE);
-        self.collider_reach_of(c) - if round { self.s(COLLIDER_A, c) } else { 0.0 }
+        let round = match self.uu(COLLIDER_SHAPE, c) {
+            SHAPE_BALL | SHAPE_CAPSULE => self.s(COLLIDER_A, c),
+            SHAPE_CYLINDER | SHAPE_CONE => self.s(COLLIDER_C, c),
+            _ => 0.0,
+        };
+        self.collider_reach_of(c) - round
     }
 
     /// The first time, from 0 to `until`, that piece `c` moving by `mine` touches collider `other` moving by `theirs`, or
@@ -306,8 +313,8 @@ impl World {
         let mut offer = |piece: &Solid, target: &Solid, frame: Q, piece0: &Solid, target0: &Solid, frame0: Q| {
             let bound = |p: &Solid, t: &Solid, n: V3| p.support(n.scale(-1.0)).dot(n) - t.support(n).dot(n);
             let at_start = gjk(piece0, target0, v3(0.0, 0.0, 0.0), f32::INFINITY);
-            let between = at_start.on_a.sub(at_start.on_b);
-            let length = sqrt(between.dot(between));
+            let between = at_start.v;
+            let length = at_start.distance;
             let apart = !at_start.overlap && length > TOUCH && bound(piece0, target0, between.scale(1.0 / length)) > TOUCH;
             let held = if apart {
                 None
@@ -336,8 +343,8 @@ impl World {
                     if d.overlap {
                         (0.0, kept)
                     } else {
-                        let between = d.on_a.sub(d.on_b);
-                        let length = sqrt(between.dot(between));
+                        let between = d.v;
+                        let length = d.distance;
                         let (mut gap, mut axis) = (-1.0f32, v3(0.0, 0.0, 0.0));
                         if length > 0.0 {
                             let fresh = between.scale(1.0 / length);
@@ -403,8 +410,7 @@ fn contact_axis(piece: &Solid, target: &Solid, at_start: &Distance) -> Option<V3
             best = Some((n, g));
         }
     };
-    let between = at_start.on_a.sub(at_start.on_b);
-    let length = sqrt(between.dot(between));
+    let (between, length) = (at_start.v, at_start.distance);
     if !at_start.overlap && length > 0.0 {
         consider(between.scale(1.0 / length));
     }
@@ -418,7 +424,7 @@ fn contact_axis(piece: &Solid, target: &Solid, at_start: &Distance) -> Option<V3
     if rp > 0.0 || rt > 0.0 {
         let d = gjk(&core_p, &core_t, v3(0.0, 0.0, 0.0), f32::INFINITY);
         if !d.overlap && d.distance > 0.0 {
-            consider(d.on_a.sub(d.on_b).scale(1.0 / d.distance));
+            consider(d.v.scale(1.0 / d.distance));
         }
     }
     for (s, sign) in [(target, 1.0f32), (piece, -1.0)] {
@@ -436,6 +442,11 @@ fn contact_axis(piece: &Solid, target: &Solid, at_start: &Distance) -> Option<V3
                     consider(m);
                     consider(m.scale(-1.0));
                 }
+            }
+            Solid::Revolved { pose, .. } => {
+                let axis = pose.q.rotate(v3(0.0, 1.0, 0.0));
+                consider(axis.scale(sign));
+                consider(axis.scale(-sign));
             }
             Solid::Round { .. } => {}
         }

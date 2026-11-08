@@ -1423,3 +1423,14 @@ The following remain technical gaps, not permission to weaken a check:
     it, and both have regression tests. Proved: `kernel/tests/ccd.rs` and `tests/next-ccd.test.js` (1,000
     bullets and moving walls, with Rapier 0.21's counts for the record). Missing: a tree over colliders for the sweep (it tests every fat box),
     Rapier's CCD substeps, smallest CCD step, soft CCD and CCD sensor events (batch 140.5), and any browser run.
+48. The own physics kernel's cylinders and cones (batch 126, job 5, `kernel/src/revolve.rs`, `kernel/src/smooth.rs`,
+    `SHAPE_CYLINDER` 6 and `SHAPE_CONE` 7, size A radius, B half height, C border): no new columns. GJK numerics changed
+    for every shape: a needle simplex's area vectors come from its two shorter edges (Kahan 2014) and its plane
+    offsets and volumes from the vertex nearest the origin; the closest point is the projection point itself, not
+    the lambda-weighted sum, whose error floor (van den Bergen 2004, sec. 4.3) stalled GJK on curved shapes; the
+    distance keeps its search vector `v`, and contact and cast normals now use it (on_a minus on_b was up to 0.30 rad
+    off near a touch). A sharp cone's ray is solved from the point of the line nearest its centre (Haines et al.
+    2019): a far start had cancelled to 6.7e-3 m at 107 m. Replay hashes regenerated (native and Wasm agree).
+    Proved: `kernel/tests/gjk.rs` (needle simplex, small gap between curved shapes), `kernel/tests/revolve.rs`,
+    `kernel/tests/cast.rs` and `tests/next-revolved.test.js` against Rapier 0.21 and an exact f64 surface.
+    Missing: round boxes, triangles and hulls (S-10b, batch 139.2), and any browser run.

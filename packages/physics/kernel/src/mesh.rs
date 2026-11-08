@@ -24,7 +24,10 @@ use crate::hull::Poly;
 use crate::layout::*;
 use crate::math::*;
 use crate::narrow::{Manifold, Point, Round, collide_polys, collide_round_poly, face_contact, ID_END};
+use crate::cast::{Solid, core};
+use crate::narrow::is_revolved;
 use crate::sat::Pose;
+use crate::smooth::{clip_along, collide_solids};
 use crate::world::{NONE, World};
 
 // What `end_mesh` says when it refuses, as negative rows.
@@ -498,8 +501,13 @@ impl World {
         let tri = data.poly();
         let shape = self.uu(COLLIDER_SHAPE, other);
         let round = shape == SHAPE_BALL || shape == SHAPE_CAPSULE;
+        let mut smooth_data = crate::hull::BoxData::new();
+        let smooth = if is_revolved(shape) { self.solid(self.shape_of(other), self.collider_pose(other), &mut smooth_data) } else { None };
+        let world_tri = Solid::Triangle([pose.apply(corners[0]), pose.apply(corners[1]), pose.apply(corners[2])]);
         // Every routine below gives the normal from the triangle to the other shape, `on_a` on the triangle.
-        if round {
+        if let Some(solid) = smooth {
+            collide_solids(&world_tri, &solid, limit, out);
+        } else if round {
             let r = self.round_of(other);
             collide_round_poly(r, &tri, pose, limit, out);
             flip(out);
@@ -529,7 +537,14 @@ impl World {
                 Verdict::Skip => out.count = 0,
                 Verdict::Snap => {
                     let face = if n.dot(front) < 0.0 { 1 } else { 0 };
-                    if round {
+                    if let Some(solid) = smooth {
+                        // The side of the face is the side the shape's centre is on: along a normal that grazes the
+                        // plane, a cylinder whose rim dips a hair under it would read the back face, and its far cap.
+                        let (core_o, border) = core(&solid);
+                        let centre = pose.unapply(self.collider_pose(other).p).sub(corners[0]).dot(front);
+                        let along = pose.q.rotate(if centre >= 0.0 { front } else { front.scale(-1.0) });
+                        clip_along(&world_tri, 0.0, &core_o, border, along, limit, out);
+                    } else if round {
                         snap_round(self.round_of(other), &tri, face, pose, limit, out);
                     } else {
                         let mut box_data = crate::hull::BoxData::new();

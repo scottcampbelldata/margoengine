@@ -158,7 +158,7 @@ export interface KernelRayHit {
     point: [number, number, number];
 }
 
-export type KernelShape = 'ball' | 'box' | 'capsule' | 'hull' | 'trimesh';
+export type KernelShape = 'ball' | 'box' | 'capsule' | 'cylinder' | 'cone' | 'hull' | 'trimesh';
 
 export interface KernelTrimeshOptions {
     fixInternalEdges?: boolean;
@@ -416,6 +416,7 @@ export class PhysicsCollider {
     } | null;
     radius(): number;
     halfHeight(): number;
+    borderRadius(): number;
     friction(): number;
     setFriction(friction: number): this;
     restitution(): number;
@@ -524,14 +525,18 @@ export type ShapeOptions = {
     shape: 'capsule';
     halfHeight: number;
     radius: number;
-} | {
+}
+ | {
     shape: 'cylinder';
     halfHeight: number;
     radius: number;
-} | {
+    borderRadius?: number;
+}
+ | {
     shape: 'cone';
     halfHeight: number;
     radius: number;
+    borderRadius?: number;
 } | {
     shape: 'convexHull';
     geometry?: ColliderGeometry;
@@ -654,10 +659,12 @@ type CompoundPart = ({
     shape: 'cylinder';
     halfHeight: number;
     radius: number;
+    borderRadius?: number;
 } | {
     shape: 'cone';
     halfHeight: number;
     radius: number;
+    borderRadius?: number;
 } | {
     shape: 'convexHull';
     points: ArrayLike<number>;
@@ -685,7 +692,7 @@ interface KernelCastOptions {
 }
 
 interface KernelCompoundPart {
-    shape: 'ball' | 'box' | 'capsule' | 'hull';
+    shape: 'ball' | 'box' | 'capsule' | 'cylinder' | 'cone' | 'hull';
     size: readonly number[];
     position?: readonly [number, number, number];
     rotation?: readonly [number, number, number, number];
@@ -703,7 +710,7 @@ interface KernelProjection {
 }
 
 interface KernelQueryShape {
-    shape: 'ball' | 'box' | 'capsule' | 'hull';
+    shape: 'ball' | 'box' | 'capsule' | 'cylinder' | 'cone' | 'hull';
     size: readonly number[];
 }
 

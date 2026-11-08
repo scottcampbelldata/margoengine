@@ -80,6 +80,10 @@ test('boundingRadius holds each simple shape and is null where it would have to 
   assert.equal(add({ shape: 'capsule', radius: 1, halfHeight: 2 }).boundingRadius, 3);
   assert.equal(add({ shape: 'cylinder', radius: 3, halfHeight: 4 }).boundingRadius, 5);
   assert.equal(add({ shape: 'cone', radius: 3, halfHeight: 4 }).boundingRadius, 5);
+  // A sharp shape has no round radius on Rapier (undefined), which reads as 0, not NaN.
+  assert.equal(add({ shape: 'cylinder', radius: 3, halfHeight: 4 }).borderRadius(), 0);
+  assert.equal(add({ shape: 'cone', radius: 3, halfHeight: 4, borderRadius: 0.5 }).boundingRadius, 5.5);
+  assert.equal(add({ shape: 'cone', radius: 3, halfHeight: 4, borderRadius: 0.5 }).borderRadius(), 0.5);
   assert.equal(add({ shape: 'voxels', cells: cells([0, 0, 0]) }).boundingRadius, null);
   physics.dispose();
 });

@@ -14,8 +14,13 @@ export type ShapeOptions =
   | { shape: 'box'; halfExtents?: Vec3 }
   | { shape: 'sphere'; radius?: number }
   | { shape: 'capsule'; halfHeight: number; radius: number }
-  | { shape: 'cylinder'; halfHeight: number; radius: number }
-  | { shape: 'cone'; halfHeight: number; radius: number }
+  /**
+   * Along local Y, centred. `borderRadius` (default 0) rounds every edge with a border outside `radius` and `halfHeight`,
+   * Rapier's `roundCylinder`.
+   */
+  | { shape: 'cylinder'; halfHeight: number; radius: number; borderRadius?: number }
+  /** Apex at +`halfHeight` on local Y, base disk at -`halfHeight`; `borderRadius` as a cylinder's, Rapier's `roundCone`. */
+  | { shape: 'cone'; halfHeight: number; radius: number; borderRadius?: number }
   | { shape: 'convexHull'; geometry?: ColliderGeometry; points?: ArrayLike<number> }
   | {
       shape: 'trimesh';
@@ -68,8 +73,8 @@ export type CompoundPart = (
   | { shape: 'box'; halfExtents: Vec3 }
   | { shape: 'sphere'; radius: number }
   | { shape: 'capsule'; halfHeight: number; radius: number }
-  | { shape: 'cylinder'; halfHeight: number; radius: number }
-  | { shape: 'cone'; halfHeight: number; radius: number }
+  | { shape: 'cylinder'; halfHeight: number; radius: number; borderRadius?: number }
+  | { shape: 'cone'; halfHeight: number; radius: number; borderRadius?: number }
   | { shape: 'convexHull'; points: ArrayLike<number> }
 ) & {
   /** Part position in the collider's frame (default origin). */
@@ -231,17 +236,17 @@ export function createColliderDesc(
       );
       break;
     case 'cylinder':
-      desc = R.ColliderDesc.cylinder(
-        positive(options.halfHeight, 'Cylinder halfHeight'),
-        positive(options.radius, 'Cylinder radius'),
-      );
+    case 'cone': {
+      const name = options.shape === 'cone' ? 'Cone' : 'Cylinder',
+        halfHeight = positive(options.halfHeight, `${name} halfHeight`),
+        radius = positive(options.radius, `${name} radius`),
+        border = options.borderRadius ?? 0;
+      if (!(border >= 0) || !Number.isFinite(border))
+        throw new RangeError(`${name} borderRadius must be 0 or more and finite (got ${border}).`);
+      if (options.shape === 'cone') desc = border > 0 ? R.ColliderDesc.roundCone(halfHeight, radius, border) : R.ColliderDesc.cone(halfHeight, radius);
+      else desc = border > 0 ? R.ColliderDesc.roundCylinder(halfHeight, radius, border) : R.ColliderDesc.cylinder(halfHeight, radius);
       break;
-    case 'cone':
-      desc = R.ColliderDesc.cone(
-        positive(options.halfHeight, 'Cone halfHeight'),
-        positive(options.radius, 'Cone radius'),
-      );
-      break;
+    }
     case 'convexHull': {
       const points = options.points
         ? Float32Array.from(options.points)
@@ -408,6 +413,8 @@ const SHAPE_OF_TYPE: Readonly<Record<string, ShapeOptions['shape']>> = {
   Capsule: 'capsule',
   Cylinder: 'cylinder',
   Cone: 'cone',
+  RoundCylinder: 'cylinder',
+  RoundCone: 'cone',
   ConvexPolyhedron: 'convexHull',
   TriMesh: 'trimesh',
   HeightField: 'heightfield',

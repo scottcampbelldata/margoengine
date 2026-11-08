@@ -37,6 +37,8 @@ export interface Collider {
   halfExtents(): Vector | null;
   radius(): number;
   halfHeight(): number;
+  /** Undefined for a shape without round edges. */
+  roundRadius(): number | undefined;
   vertices(): Float32Array;
   indices(): Uint32Array | undefined;
   density(): number;
@@ -326,6 +328,8 @@ export interface RapierModule {
     capsule(halfHeight: number, radius: number): ColliderDesc;
     cylinder(halfHeight: number, radius: number): ColliderDesc;
     cone(halfHeight: number, radius: number): ColliderDesc;
+    roundCylinder(halfHeight: number, radius: number, borderRadius: number): ColliderDesc;
+    roundCone(halfHeight: number, radius: number, borderRadius: number): ColliderDesc;
     convexHull(points: Float32Array): ColliderDesc | null;
     trimesh(vertices: Float32Array, indices: Uint32Array, flags?: number): ColliderDesc;
     voxels?(cells: Int32Array, size: Vector): ColliderDesc;

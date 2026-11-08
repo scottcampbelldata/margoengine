@@ -49,7 +49,7 @@ export class PhysicsCollider {
         return raw.halfHeight() + raw.radius();
       case 'cylinder':
       case 'cone':
-        return Math.hypot(raw.halfHeight(), raw.radius());
+        return Math.hypot(raw.halfHeight(), raw.radius()) + (raw.roundRadius() ?? 0);
       case 'box': {
         const half = raw.halfExtents();
         return half && Math.hypot(half.x, half.y, half.z);
@@ -140,6 +140,10 @@ export class PhysicsCollider {
   /** Half the length along Y of a capsule, cylinder or cone. */
   halfHeight(): number {
     return this.check().halfHeight();
+  }
+  /** Border radius of a cylinder or cone, 0 for a sharp one (Rapier's `roundRadius`). */
+  borderRadius(): number {
+    return this.check().roundRadius() ?? 0;
   }
   /** Packed xyz positions of a trimesh or convex hull. */
   vertices(): Float32Array {

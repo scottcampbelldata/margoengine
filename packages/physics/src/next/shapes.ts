@@ -12,6 +12,8 @@ const served: Readonly<Record<string, KernelShape | 'compound'>> = {
   box: 'box',
   sphere: 'ball',
   capsule: 'capsule',
+  cylinder: 'cylinder',
+  cone: 'cone',
   convexHull: 'hull',
   trimesh: 'trimesh',
   heightfield: 'trimesh',
@@ -19,8 +21,7 @@ const served: Readonly<Record<string, KernelShape | 'compound'>> = {
   voxels: 'trimesh',
 };
 /** The convex parts a compound takes, and the parts the own solver holds so far. */
-const CONVEX_PARTS = ['box', 'sphere', 'capsule', 'cylinder', 'cone', 'convexHull'],
-  SERVED_PARTS = ['box', 'sphere', 'capsule', 'convexHull'];
+const CONVEX_PARTS = ['box', 'sphere', 'capsule', 'cylinder', 'cone', 'convexHull'];
 
 /** What the kernel needs for one collider. */
 export interface KernelCollider {
@@ -37,10 +38,51 @@ export function shapeServed(shape: ShapeOptions['shape']): boolean {
   return Object.hasOwn(served, shape);
 }
 
+/** A square root by Newton's steps from above, as `Math.sqrt` is not promised to round the same everywhere. */
+function root(squared: number): number {
+  let value = squared > 1 ? squared : 1;
+  for (let i = 0; i < 64 && value * value > squared * (1 + 1e-15); i++) value = (value + squared / value) / 2;
+  return value;
+}
+
+/** The arctangent of `x` >= 0, by halving the angle (atan x = 2 atan(x / (1 + sqrt(1 + x^2)))) and then its series. */
+function arctan(x: number): number {
+  let scale = 1;
+  while (x > 0.0625) {
+    x /= 1 + root(1 + x * x);
+    scale *= 2;
+  }
+  let sum = 0,
+    term = x;
+  for (let n = 1; n < 40; n += 2, term *= -x * x) sum += term / n;
+  return scale * sum;
+}
+
+/**
+ * A cylinder's or cone's volume with its border, by Pappus: 2 pi times the first moment about the axis of its profile, the
+ * core's rectangle or triangle with a strip along each outer side and a sector at each outer corner, as the kernel's
+ * `revolved_mass` adds them up.
+ */
+function revolvedVolume(cone: boolean, r: number, h: number, b: number): number {
+  if (!cone) return 2 * PI * (h * r * r + 2 * h * b * (r + b / 2) + r * r * b + ((PI * b * b) / 2) * (r + (4 * b) / (3 * PI)));
+  // The slanted side's length, its outward normal (nr, ny) and that normal's angle above the base.
+  const length = root(4 * h * h + r * r),
+    nr = (2 * h) / length,
+    ny = r / length,
+    side = arctan(r / (2 * h));
+  const core = (r * r * h) / 3,
+    strip = (length * b * (r + b * nr)) / 2,
+    base = (r * r * b) / 2,
+    rim = (r * b * b * (side + PI / 2)) / 2 + (b * b * b * (ny + 1)) / 3,
+    apex = (b * b * b * (1 - ny)) / 3;
+  return 2 * PI * (core + strip + base + rim + apex);
+}
+
 function volume(shape: KernelShape, size: readonly number[], hullVolume: (row: number) => number): number {
   if (shape === 'box') return 8 * size[0] * size[1] * size[2];
   if (shape === 'hull') return hullVolume(size[0]);
   if (shape === 'trimesh') return 0;
+  if (shape === 'cylinder' || shape === 'cone') return revolvedVolume(shape === 'cone', size[0], size[1], size[2]);
   const [radius, halfLength = 0] = size;
   return PI * radius * radius * ((4 / 3) * radius + 2 * halfLength);
 }
@@ -57,11 +99,6 @@ function compoundParts(parts: readonly CompoundPart[], hulls: HullRows): KernelC
       throw new TypeError(
         `Compound part shape ${String(part?.shape)} is not convex; use box, sphere, capsule, cylinder, cone or convexHull parts.`,
       );
-    if (!SERVED_PARTS.includes(part.shape))
-      throw new MargoError(
-        'unsupported',
-        `A ${part.shape} compound part is not in the own solver yet; use box, sphere, capsule or convexHull parts, or @margoengine/physics.`,
-      );
     const offset = part.offset ?? [0, 0, 0];
     checkVec(offset, 'Compound part offset');
     const placed = { position: [offset[0], offset[1], offset[2]] as [number, number, number], rotation: part.rotation };
@@ -75,10 +112,19 @@ function compoundParts(parts: readonly CompoundPart[], hulls: HullRows): KernelC
       return { shape: 'ball', size: [part.radius], ...placed };
     }
     if (part.shape === 'capsule') return { shape: 'capsule', size: [part.radius, part.halfHeight], ...placed };
+    if (part.shape === 'cylinder' || part.shape === 'cone') return { shape: part.shape, size: revolvedSize(part), ...placed };
     if (!part.points) throw new TypeError('A compound convexHull part needs points; parts are never fitted to the mesh.');
     const { vertices, faces } = buildHull(Float32Array.from(part.points));
     return { shape: 'hull', size: [hulls.addHull(vertices, faces)], ...placed };
   });
+}
+
+/** A cylinder's or cone's kernel size: radius, half height and border radius (Rapier's `roundCylinder`, `roundCone`). */
+function revolvedSize(options: { radius: number; halfHeight: number; borderRadius?: number }): number[] {
+  const { radius, halfHeight, borderRadius = 0 } = options;
+  if (!(borderRadius >= 0) || !Number.isFinite(borderRadius))
+    throw new RangeError(`A border radius is 0 or more and finite (got ${borderRadius}); it rounds the shape's edges outside its radius and half height.`);
+  return [radius, halfHeight, borderRadius];
 }
 
 /** The radius that holds every point of a mesh around the centre of its bounds. */
@@ -128,7 +174,7 @@ export function kernelCollider(
   if (!shape)
     throw new MargoError(
       'unsupported',
-      `The ${options.shape} shape is not in the own solver yet; use box, sphere, capsule, convexHull, trimesh, heightfield, compound or voxels, or @margoengine/physics.`,
+      `The ${options.shape} shape is not in the own solver yet; use box, sphere, capsule, cylinder, cone, convexHull, trimesh, heightfield, compound or voxels, or @margoengine/physics.`,
     );
   const fitted = (): Float32Array => {
       if (!fit.geometry) throw new TypeError(`A ${options.shape} collider without explicit size needs a mesh with geometry`);
@@ -155,6 +201,7 @@ export function kernelCollider(
       size = fittedSphere(points, center);
     } else size = [options.radius];
   } else if (options.shape === 'capsule') size = [options.radius, options.halfHeight];
+  else if (options.shape === 'cylinder' || options.shape === 'cone') size = revolvedSize(options);
   else if (options.shape === 'convexHull') {
     const points = options.points ?? (options.geometry ? geometryPositions(options.geometry, fit.scale) : fitted()),
       { vertices, faces } = buildHull(points);
@@ -192,7 +239,8 @@ export function kernelCollider(
       if (!(value > 0)) throw new RangeError(`Voxel size must be above zero on every axis (got ${cell.join(', ')}); pass one cell's size in metres.`);
     voxels = voxelVolume(cells, cell);
     size = [hulls.addVoxels(cells, cell)];
-  } else throw new TypeError(`Unknown shape ${options.shape}; use box, sphere, capsule, convexHull, trimesh, heightfield, compound or voxels.`);
+  } else
+    throw new TypeError(`Unknown shape ${options.shape}; use box, sphere, capsule, cylinder, cone, convexHull, trimesh, heightfield, compound or voxels.`);
   const offset = options.offset ?? [0, 0, 0];
   checkVec(offset, 'Collider offset');
   const whole = (): number =>
@@ -222,7 +270,8 @@ export function kernelCollider(
 }
 
 /**
- * A query shape for `shapeCast` and `intersectShape`: a sphere, box, capsule or convexHull with its size given.
+ * A query shape for `shapeCast` and `intersectShape`: a sphere, box, capsule, cylinder, cone or convexHull with its size
+ * given.
  * @throws MargoError `unsupported` for another shape or one sized from a mesh; RangeError for hull points that span no
  * volume.
  */
@@ -233,12 +282,13 @@ export function queryShape(options: ShapeOptions, hulls: HullRows): KernelQueryS
     return { shape: 'box', size: [...options.halfExtents] };
   }
   if (options.shape === 'capsule') return { shape: 'capsule', size: [options.radius, options.halfHeight] };
+  if (options.shape === 'cylinder' || options.shape === 'cone') return { shape: options.shape, size: revolvedSize(options) };
   if (options.shape === 'convexHull' && options.points) {
     const { vertices, faces } = buildHull(options.points);
     return { shape: 'hull', size: [hulls.addHull(vertices, faces)] };
   }
   throw new MargoError(
     'unsupported',
-    `A ${String(options?.shape)} query shape is not in the own solver yet; cast or overlap a sphere, box, capsule or convexHull with its size or points given, or use @margoengine/physics.`,
+    `A ${String(options?.shape)} query shape is not in the own solver yet; cast or overlap a sphere, box, capsule, cylinder, cone or convexHull with its size or points given, or use @margoengine/physics.`,
   );
 }

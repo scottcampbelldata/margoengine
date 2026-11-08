@@ -8,8 +8,15 @@ use crate::hull::{BoxData, Poly, box_poly};
 use crate::layout::*;
 use crate::math::*;
 use crate::sat::{Feature, Pose, closest_on_segments, sat_coherent};
+use crate::smooth::collide_solids;
 use crate::world::World;
 use core::mem::MaybeUninit;
+
+/// A cylinder or a cone, which meets everything through `smooth`.
+#[inline(always)]
+pub(crate) fn is_revolved(shape: u32) -> bool {
+    shape == SHAPE_CYLINDER || shape == SHAPE_CONE
+}
 
 /// A clipped polygon's most vertices: a largest face, plus one for each side plane of another.
 const CLIP: usize = 2 * MAX_FACE_EDGES as usize;
@@ -386,8 +393,7 @@ pub(crate) fn collide_round_poly(round: Round, poly: &Poly, pose: Pose, limit: f
     }
     let (normal, on_core, on_poly, gap);
     if !found.overlap && found.distance > COINCIDENT {
-        let between = found.on_b.sub(found.on_a);
-        normal = between.scale(1.0 / found.distance);
+        normal = found.v.scale(-1.0 / found.distance);
         on_core = found.on_a;
         on_poly = found.on_b;
         gap = found.distance;
@@ -533,6 +539,7 @@ impl World {
                 let center = self.v(MESH_BOX_X, mesh);
                 self.s(MESH_RADIUS, mesh) + sqrt(center.dot(center))
             }
+            SHAPE_CYLINDER | SHAPE_CONE => sqrt(x * x + y * y) + z,
             _ => x + y,
         };
         sqrt(offset.dot(offset)) + radius
@@ -561,6 +568,16 @@ impl World {
         let (shape_a, shape_b) = (self.uu(COLLIDER_SHAPE, a), self.uu(COLLIDER_SHAPE, b));
         let polyhedral = |shape: u32| shape == SHAPE_BOX || shape == SHAPE_HULL;
         let (mut data_a, mut data_b) = (BoxData::new(), BoxData::new());
+        if is_revolved(shape_a) || is_revolved(shape_b) {
+            let (Some(sa), Some(sb)) = (
+                self.solid(self.shape_of(a), self.collider_pose(a), &mut data_a),
+                self.solid(self.shape_of(b), self.collider_pose(b), &mut data_b),
+            ) else {
+                return;
+            };
+            collide_solids(&sa, &sb, limit, out);
+            return;
+        }
         match (polyhedral(shape_a), polyhedral(shape_b)) {
             (true, true) => {
                 let (poly_a, poly_b) = (self.poly(a, &mut data_a), self.poly(b, &mut data_b));

@@ -112,6 +112,32 @@ fn a_box_slides_across_the_seams_of_one_grid_without_catching() {
 }
 
 #[test]
+fn cylinders_and_cones_slide_across_the_seams_without_catching() {
+    // The top of the slab is at y = 1; each shape stands on it, its origin at its half height (plus a border).
+    for (shape, size, rest) in [(SHAPE_CYLINDER, [0.3, 0.3, 0.0], 1.3), (SHAPE_CYLINDER, [0.3, 0.3, 0.05], 1.35), (SHAPE_CONE, [0.4, 0.3, 0.0], 1.3)] {
+        let mut w = World::new(4, 8).unwrap();
+        let c = fixed_grid(&mut w, &slab(8), v3(0.0, 0.0, 0.0));
+        w.set_s(COLLIDER_FRICTION, c as usize, 0.0);
+        let body = w.add_body(DYNAMIC).unwrap();
+        w.set_pose(body, v3(1.0, rest, 2.5), Q::IDENTITY, false);
+        w.set_u(FLAGS, body as usize, w.flags(body as usize) & !CAN_SLEEP);
+        let own = w.add_collider(body, shape, size, [0.0; 3], ID, 1.0).unwrap();
+        w.set_s(COLLIDER_FRICTION, own as usize, 0.0);
+        w.set_v(LINEAR_X, body as usize, v3(3.0, 0.0, 0.0));
+        let (mut slowest, mut low, mut high) = (f32::INFINITY, f32::INFINITY, f32::NEG_INFINITY);
+        for _ in 0..90 {
+            w.step(DT);
+            let y = w.s(POSITION_Y, body as usize);
+            slowest = slowest.min(w.s(LINEAR_X, body as usize));
+            low = low.min(y);
+            high = high.max(y);
+        }
+        assert!(slowest > 2.99, "{shape} {size:?} caught on a seam: down to {slowest} m/s");
+        assert!(low > rest - 0.02 && high < rest + 0.01, "{shape} {size:?} height from {low} to {high}");
+    }
+}
+
+#[test]
 fn coupled_grids_have_no_seam_and_uncoupled_ones_catch_as_on_rapier() {
     for coupled in [true, false] {
         let mut w = World::new(4, 8).unwrap();

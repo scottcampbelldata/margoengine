@@ -2,6 +2,7 @@
 // add them up, and Jacobi rotations to find the principal axes, kept as a quaternion from the start.
 use crate::layout::*;
 use crate::math::*;
+use crate::revolve::{Revolved, revolved_mass};
 use crate::world::{NONE, World};
 
 const PI: f32 = core::f32::consts::PI;
@@ -247,13 +248,26 @@ impl World {
             // A surface has no volume, so no mass, as a Rapier trimesh gives a dynamic body none; `each_solid` adds a voxel
             // grid's cells.
             SHAPE_TRIMESH | SHAPE_COMPOUND => Solid { mass: 0.0, moments: v3(0.0, 0.0, 0.0) },
+            SHAPE_CYLINDER | SHAPE_CONE => {
+                let (mass, _, moments) = revolved_mass(self.revolved(c), size.z, density);
+                Solid { mass, moments }
+            }
             _ => solid_capsule(size.x, size.y, density),
         }
     }
 
-    /// A collider's centre of mass in its body's frame: only a hull's is not at the collider's origin.
+    /// A collider's core as a cylinder or cone.
+    fn revolved(&self, c: usize) -> Revolved {
+        Revolved { cone: self.uu(COLLIDER_SHAPE, c) == SHAPE_CONE, r: self.s(COLLIDER_A, c), h: self.s(COLLIDER_B, c) }
+    }
+
+    /// A collider's centre of mass in its body's frame: a hull's and a cone's are not at the collider's origin.
     fn solid_center(&self, c: usize) -> V3 {
         let place = self.v(COLLIDER_X, c);
+        if self.uu(COLLIDER_SHAPE, c) == SHAPE_CONE {
+            let (_, height, _) = revolved_mass(self.revolved(c), self.s(COLLIDER_C, c), 1.0);
+            return place.add(self.q(COLLIDER_ROTATION_X, c).rotate(v3(0.0, height, 0.0)));
+        }
         if self.uu(COLLIDER_SHAPE, c) == SHAPE_HULL {
             let center = self.v(HULL_CENTER_X, self.uu(COLLIDER_HULL, c) as usize);
             return place.add(self.q(COLLIDER_ROTATION_X, c).rotate(center));

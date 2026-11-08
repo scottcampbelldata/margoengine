@@ -438,11 +438,11 @@ impl World {
         }
     }
 
-    /// Adds a convex child (ball, box, capsule or hull, sized as `add_collider` takes them) to a compound collider, placed
+    /// Adds a convex child (ball, box, capsule, hull, cylinder or cone, sized as `add_collider` takes them) to a compound collider, placed
     /// in the compound's frame, then recomputes the body's mass. None when the rows are used up, `compound` is not a live
     /// compound, or the shape is not convex.
     pub fn add_compound_part(&mut self, compound: u32, shape: u32, size: [f32; 3], position: [f32; 3], rotation: [f32; 4]) -> Option<u32> {
-        if compound >= self.header().collider_rows || !matches!(shape, SHAPE_BALL | SHAPE_BOX | SHAPE_CAPSULE | SHAPE_HULL) {
+        if compound >= self.header().collider_rows || !matches!(shape, SHAPE_BALL | SHAPE_BOX | SHAPE_CAPSULE | SHAPE_HULL | SHAPE_CYLINDER | SHAPE_CONE) {
             return None;
         }
         let parent = compound as usize;

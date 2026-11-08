@@ -28,18 +28,21 @@ use crate::gjk::{Convex, epa, gjk, signed_volumes};
 use crate::hull::{BoxData, Poly, box_poly};
 use crate::layout::*;
 use crate::math::*;
+use crate::revolve::Revolved;
 use crate::sat::Pose;
 use crate::voxel::CELL_FILLED;
 use crate::world::{NONE, World};
 
 const ZERO: V3 = V3 { x: 0.0, y: 0.0, z: 0.0 };
 
-/// A convex shape in one frame: a segment or point grown by a radius, a polyhedron at a pose, or a triangle.
+/// A convex shape in one frame: a segment or point grown by a radius, a polyhedron at a pose, a triangle, or a cylinder or
+/// cone at a pose grown by a border radius.
 #[derive(Clone, Copy)]
 pub enum Solid {
     Round { p: V3, q: V3, r: f32 },
     Poly { poly: Poly, pose: Pose },
     Triangle([V3; 3]),
+    Revolved { shape: Revolved, border: f32, pose: Pose },
 }
 
 impl Convex for Solid {
@@ -52,6 +55,11 @@ impl Convex for Solid {
                 if l > 0.0 { core.add(d.scale(r / sqrt(l))) } else { core }
             }
             Solid::Poly { poly, pose } => pose.apply(poly.support(pose.q.unrotate(d))),
+            Solid::Revolved { shape, border, pose } => {
+                let core = pose.apply(shape.support(pose.q.unrotate(d)));
+                let l = d.dot(d);
+                if border > 0.0 && l > 0.0 { core.add(d.scale(border / sqrt(l))) } else { core }
+            }
             Solid::Triangle([a, b, c]) => {
                 let (da, db, dc) = (a.dot(d), b.dot(d), c.dot(d));
                 if da >= db && da >= dc {
@@ -146,10 +154,7 @@ pub fn cast(a: &impl Convex, b: &impl Convex, r: V3, max: f32, margin: f32) -> O
             points[i] = x.sub(ys[i]);
         }
         let closest = signed_volumes(&points, count);
-        let mut next = ZERO;
-        for i in 0..closest.count {
-            next = next.add(points[closest.places[i]].scale(closest.lambda[i]));
-        }
+        let next = closest.point;
         let kept = |s: &[V3; 4]| [s[closest.places[0]], s[closest.places[1]], s[closest.places[2]], s[closest.places[3]]];
         (ys, bs, az) = (kept(&ys), kept(&bs), kept(&az));
         count = closest.count;
@@ -180,13 +185,15 @@ fn shifted(s: &Solid, by: V3) -> Solid {
         Solid::Round { p, q, r } => Solid::Round { p: p.add(by), q: q.add(by), r },
         Solid::Poly { poly, pose } => Solid::Poly { poly, pose: Pose { p: pose.p.add(by), q: pose.q } },
         Solid::Triangle([a, b, c]) => Solid::Triangle([a.add(by), b.add(by), c.add(by)]),
+        Solid::Revolved { shape, border, pose } => Solid::Revolved { shape, border, pose: Pose { p: pose.p.add(by), q: pose.q } },
     }
 }
 
-/// A solid without its radius, and the radius: a ball's centre, a capsule's segment.
+/// A solid without its radius, and the radius: a ball's centre, a capsule's segment, a round cylinder's or cone's core.
 pub(crate) fn core(s: &Solid) -> (Solid, f32) {
     match *s {
         Solid::Round { p, q, r } => (Solid::Round { p, q, r: 0.0 }, r),
+        Solid::Revolved { shape, border, pose } => (Solid::Revolved { shape, border: 0.0, pose }, border),
         other => (other, 0.0),
     }
 }
@@ -198,7 +205,7 @@ fn touch(a: &Solid, b: &Solid) -> (V3, V3, V3) {
     let ((core_a, ra), (core_b, rb)) = (core(a), core(b));
     let d = gjk(&core_a, &core_b, ZERO, f32::INFINITY);
     if !d.overlap && d.distance > 0.0 {
-        let n = d.on_a.sub(d.on_b).scale(1.0 / d.distance);
+        let n = d.v.scale(1.0 / d.distance);
         return (n, d.on_a.sub(n.scale(ra)), d.on_b.add(n.scale(rb)));
     }
     let d = gjk(a, b, ZERO, f32::INFINITY);
@@ -216,8 +223,8 @@ fn sharpen(a: &Solid, b: &Solid, r: V3, max: f32, margin: f32, mut hit: Cast) ->
     for _ in 0..SHARPEN {
         let d = gjk(&shifted(a, r.scale(hit.t)), b, ZERO, f32::INFINITY);
         (hit.on_query, hit.on_target) = (d.on_a, d.on_b);
-        let between = d.on_a.sub(d.on_b);
-        let length = sqrt(between.dot(between));
+        let between = d.v;
+        let length = d.distance;
         if d.overlap || !(length > 0.0) {
             break;
         }
@@ -244,7 +251,7 @@ fn sharpen(a: &Solid, b: &Solid, r: V3, max: f32, margin: f32, mut hit: Cast) ->
         if ra > 0.0 || rb > 0.0 {
             let c = gjk(&core_a, &core_b, ZERO, f32::INFINITY);
             if !c.overlap && c.distance > 0.0 {
-                consider(c.on_a.sub(c.on_b).scale(1.0 / c.distance));
+                consider(c.v.scale(1.0 / c.distance));
             }
         }
         for (s, sign) in [(b, 1.0f32), (&moved, -1.0)] {
@@ -262,6 +269,11 @@ fn sharpen(a: &Solid, b: &Solid, r: V3, max: f32, margin: f32, mut hit: Cast) ->
                         consider(m);
                         consider(m.scale(-1.0));
                     }
+                }
+                Solid::Revolved { pose, .. } => {
+                    let axis = pose.q.rotate(v3(0.0, 1.0, 0.0));
+                    consider(axis.scale(sign));
+                    consider(axis.scale(-sign));
                 }
                 Solid::Round { .. } => {}
             }
@@ -286,7 +298,7 @@ fn sharpen(a: &Solid, b: &Solid, r: V3, max: f32, margin: f32, mut hit: Cast) ->
         }
     }
     // A round shape's touch is read between the cores, which stay a radius apart, so its normal is exact.
-    if matches!(a, Solid::Round { .. }) || matches!(b, Solid::Round { .. }) {
+    if core(a).1 > 0.0 || core(b).1 > 0.0 {
         (hit.normal, hit.on_query, hit.on_target) = touch(&shifted(a, r.scale(hit.t)), b);
     }
     Some(hit)
@@ -358,6 +370,13 @@ pub fn project_convex(s: &Solid, p: V3, solid: bool) -> Projection {
             Projection { point: pose.apply(poly_closest(&poly, local)), inside: false }
         }
         Solid::Triangle(t) => Projection { point: triangle_closest(t, p), inside: false },
+        Solid::Revolved { shape, border, pose } => {
+            let (point, inside) = shape.project(pose.unapply(p), border);
+            if inside && solid {
+                return Projection { point: p, inside };
+            }
+            Projection { point: pose.apply(point), inside }
+        }
     }
 }
 
@@ -486,6 +505,9 @@ impl World {
             }
             SHAPE_BOX => Solid::Poly { poly: box_poly(shape.size, data), pose },
             SHAPE_HULL if shape.hull < self.header().hull_rows[0] => Solid::Poly { poly: self.hull_poly(shape.hull as usize), pose },
+            SHAPE_CYLINDER | SHAPE_CONE => {
+                Solid::Revolved { shape: Revolved { cone: shape.kind == SHAPE_CONE, r: shape.size.x, h: shape.size.y }, border: shape.size.z, pose }
+            }
             _ => return None,
         })
     }
