@@ -165,3 +165,20 @@ test('filter: nearest or linear, anything else names its fix', () => {
   assert.doesNotThrow(() => layer({ filter: 'linear', mipmaps: false }));
   assert.doesNotThrow(() => layer({ filter: 'nearest' }));
 });
+
+test('several atlases: a list makes pages, each sprite picks one, the form stays fixed', () => {
+  const data = new Float32Array(16);
+  packSprites([new Sprite({ page: 2 })], data, camera, 16, 16, true, 16, 3);
+  assert.equal(new Uint32Array(data.buffer)[12], 2, 'the page sits after the 12 floats as a u32');
+  for (const page of [3, -1, 0.5])
+    assert.throws(() => packSprites([new Sprite({ page })], data, camera, 16, 16, true, 16, 3), {
+      message: /Invalid sprite page/,
+    });
+  const atlas = { width: 16, height: 16, data: new Uint8Array(1024) };
+  assert.throws(() => new SpriteLayer({ atlas: [] }), RangeError);
+  assert.throws(() => new SpriteLayer({ atlas: [atlas], normals: { atlas, target: {} } }), RangeError);
+  const paged = new SpriteLayer({ atlas: [atlas, atlas] });
+  assert.throws(() => paged.setAtlas(atlas), TypeError);
+  paged.setAtlas([atlas]);
+  assert.throws(() => layer().setAtlas([atlas]), TypeError);
+});

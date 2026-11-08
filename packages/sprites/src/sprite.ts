@@ -31,6 +31,7 @@ export interface SpriteOptions {
   rect?: readonly [number, number, number, number];
   visible?: boolean;
   params?: readonly [number, number, number, number];
+  page?: number;
 }
 
 /** @internal Parses `0xrrggbb`, `'#rrggbb'` or `'#rgb'` to `0xrrggbb`. Bytes are written as given, with no colour conversion. */
@@ -75,6 +76,8 @@ export class Sprite implements SpriteOptions {
   rect?: readonly [number, number, number, number];
   /** False leaves the sprite out of the draw. Default true. */
   visible = true;
+  /** Which atlas of a layer made with a list of them, from 0. Default 0. */
+  page = 0;
   /** Four numbers a layer's `shader` reads as `sprite.params`, such as an effect's amount. Default zeros. */
   params?: readonly [number, number, number, number];
   /** @internal Add order, the last sort key. */
@@ -134,7 +137,8 @@ export interface PackedSprites {
  * reports which floats changed. Per sprite: pivot in target pixels (0, 1), signed size in target pixels (2, 3), pivot
  * fractions (4, 5), rotation in radians (6), tint as RGBA8 with red in the low byte (7), atlas origin (8, 9) and signed
  * atlas size in texels (10, 11); a flip moves the origin to the far edge and negates the size. A `stride` of 16 adds the
- * sprite's `params` (12 to 15), for layers with a shader.
+ * sprite's `params` (12 to 15), for layers with a shader. With `pages` (the atlas count of a layer made with a list), the
+ * last 4 floats of the stride hold the sprite's `page` as a u32 and three zeros.
  * @throws RangeError for a non-finite value, a rectangle outside the atlas or one that is not whole texels.
  */
 export function packSprites(
@@ -145,6 +149,7 @@ export function packSprites(
   atlasHeight: number,
   snap = true,
   stride = SPRITE_FLOATS,
+  pages = 0,
 ): PackedSprites {
   const bits = new Uint32Array(data.buffer, data.byteOffset, data.length),
     { x: cameraX, y: cameraY, zoom } = camera;
@@ -212,11 +217,24 @@ export function packSprites(
     put(s.flipY ? rectY + rectH : rectY);
     put(s.flipX ? -rectW : rectW);
     put(s.flipY ? -rectH : rectH);
-    if (stride > SPRITE_FLOATS) {
+    if (stride - (pages ? 4 : 0) > SPRITE_FLOATS) {
       const p = s.params ?? none;
       if (p.length !== 4 || !Number.isFinite(p[0] + p[1] + p[2] + p[3]))
         throw rangeError('Invalid sprite params', 'sprite-options');
       for (let k = 0; k < 4; k++) put(p[k]);
+    }
+    if (pages) {
+      if (!Number.isInteger(s.page) || s.page < 0 || s.page >= pages)
+        throw rangeError('Invalid sprite page', 'sprite-options');
+      if (bits[at] !== s.page) {
+        bits[at] = s.page;
+        if (start < 0) start = at;
+        end = at + 1;
+      }
+      at++;
+      put(0);
+      put(0);
+      put(0);
     }
   }
   return { count: at / stride, start: start < 0 ? end : start, end };

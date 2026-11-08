@@ -56,8 +56,11 @@ export interface SpriteNormals {
 
 /** Settings of {@link SpriteLayer}, fixed when it is created except where a member says otherwise. */
 export interface SpriteLayerOptions {
-  /** The texels sprites cut their rectangles from, read with no filtering. Required. */
-  atlas: SpriteAtlas;
+  /**
+   * The texels sprites cut their rectangles from, read with no filtering. Required. A list of same-size atlases makes a
+   * texture array: each sprite picks one with `page`, still in one draw.
+   */
+  atlas: SpriteAtlas | readonly SpriteAtlas[];
   /** World units to pixels; see {@link SpriteLayer.camera}. Default `{x: 0, y: 0, zoom: 1}`: world units are pixels. */
   camera?: SpriteCamera;
   /** Rounds each image's corner to a whole pixel after the camera; see {@link SpriteLayer.snap}. Default true. */
@@ -93,11 +96,17 @@ export interface SpriteLayerOptions {
   name?: string;
 }
 
-const shader = (normals: boolean, smooth: boolean, effect?: string) => /* wgsl */ `
-struct Sprite{p:vec2f,s:vec2f,pivot:vec2f,turn:f32,tint:u32,rect:vec4f${effect ? ',params:vec4f' : ''}}
+const shader = (
+  normals: boolean,
+  smooth: boolean,
+  effect?: string,
+  pages = false,
+  page = pages ? 'v.page,' : '',
+) => /* wgsl */ `
+struct Sprite{p:vec2f,s:vec2f,pivot:vec2f,turn:f32,tint:u32,rect:vec4f${effect ? ',params:vec4f' : ''}${pages ? ',page:u32,pad0:u32,pad1:u32,pad2:u32' : ''}}
 @group(0) @binding(0) var<uniform> size:vec4f;
 @group(0) @binding(1) var<storage,read> sprites:array<Sprite>;
-@group(0) @binding(2) var atlas:texture_2d<f32>;
+@group(0) @binding(2) var atlas:texture_2d${pages ? '_array' : ''}<f32>;
 ${normals ? '@group(0) @binding(3) var bumps:texture_2d<f32>;' : ''}
 ${smooth ? `@group(0) @binding(4) var filtered:sampler;\n${srgb}` : ''}
 struct Varying{
@@ -108,14 +117,15 @@ struct Varying{
   @location(3) @interpolate(flat) tint:vec4f,
   @location(4) @interpolate(flat) axes:vec4f,
   ${effect ? '@location(5) @interpolate(flat) params:vec4f,' : ''}
+  ${pages ? '@location(6) @interpolate(flat) page:u32,' : ''}
 }
 ${
   effect
-    ? `struct SpriteInput{texel:vec2f,cell:vec2i,low:vec2f,high:vec2f,params:vec4f,tint:vec4f,time:f32}
+    ? `struct SpriteInput{texel:vec2f,cell:vec2i,low:vec2f,high:vec2f,params:vec4f,tint:vec4f,time:f32${pages ? ',page:u32' : ''}}
 fn spriteTexel(s:SpriteInput,o:vec2i)->vec4f{
   let p=s.cell+o;
   if(any(vec2f(p)<s.low)||any(vec2f(p)>s.high)){return vec4f(0);}
-  let c=textureLoad(atlas,p,0);
+  let c=textureLoad(atlas,p,${pages ? 's.page,' : ''}0);
   ${smooth ? 'return select(vec4f(encode(c.rgb/c.a),c.a),vec4f(0),c.a==0);' : 'return c;'}
 }
 ${effect}`
@@ -135,6 +145,7 @@ ${effect}`
   v.high=max(s.rect.xy,s.rect.xy+s.rect.zw)-1;
   v.tint=unpack4x8unorm(s.tint);
   ${effect ? 'v.params=s.params;' : ''}
+  ${pages ? 'v.page=s.page;' : ''}
   v.axes=vec4f(x*sign(s.rect.z)*sign(s.s.x),y*sign(s.rect.z)*sign(s.s.x),-y*sign(s.rect.w)*sign(s.s.y),x*sign(s.rect.w)*sign(s.s.y));
   return v;
 }
@@ -147,17 +158,17 @@ ${
   ${
     smooth
       ? `// Premultiplied linear texels, kept half a texel inside the rectangle so the next cell does not bleed in.
-  let f=textureSample(atlas,filtered,clamp(v.texel,v.low+0.5,v.high+0.5)/vec2f(textureDimensions(atlas)));
+  let f=textureSample(atlas,filtered,clamp(v.texel,v.low+0.5,v.high+0.5)/vec2f(textureDimensions(atlas))${pages ? ',v.page' : ''});
   ${
     effect
       ? `let lit=f*vec4f(decode(v.tint.rgb)*v.tint.a,v.tint.a);
-  let e=effect(select(vec4f(encode(lit.rgb/lit.a),lit.a),vec4f(0),lit.a==0),SpriteInput(v.texel,t,v.low,v.high,v.params,v.tint,size.w));
+  let e=effect(select(vec4f(encode(lit.rgb/lit.a),lit.a),vec4f(0),lit.a==0),SpriteInput(v.texel,t,v.low,v.high,v.params,v.tint,size.w${pages ? ',v.page' : ''}));
   let linear=vec4f(decode(e.rgb)*e.a,e.a);`
       : 'let linear=f*vec4f(decode(v.tint.rgb)*v.tint.a,v.tint.a);'
   }
   if(linear.a==0){discard;}
   let color=select(vec4f(encode(linear.rgb/linear.a)*linear.a,linear.a),linear,size.z>0);`
-      : `let color=${effect ? 'effect(textureLoad(atlas,t,0)*v.tint,SpriteInput(v.texel,t,v.low,v.high,v.params,v.tint,size.w))' : 'textureLoad(atlas,t,0)*v.tint'};
+      : `let color=${effect ? `effect(textureLoad(atlas,t,${page}0)*v.tint,SpriteInput(v.texel,t,v.low,v.high,v.params,v.tint,size.w${pages ? ',v.page' : ''}))` : `textureLoad(atlas,t,${page}0)*v.tint`};
   if(color.a==0){discard;}`
   }
   ${
@@ -174,6 +185,7 @@ fn encode(c:vec3f)->vec3f{return select(1.055*pow(c,vec3f(1/2.4))-0.055,c*12.92,
 // mip averages happen in linear light on premultiplied texels (T. Porter and T. Duff, Compositing Digital Images, 1984).
 const premultiply = /* wgsl */ `
 override decoded:bool=false;
+override premultiplied:bool=true;
 @group(0) @binding(0) var source:texture_2d<f32>;
 ${srgb}
 @vertex fn vertexMain(@builtin(vertex_index) i:u32)->@builtin(position) vec4f{
@@ -182,6 +194,7 @@ ${srgb}
 }
 @fragment fn fragmentMain(@builtin(position) p:vec4f)->@location(0) vec4f{
   let c=textureLoad(source,vec2i(p.xy),0);
+  if(!premultiplied){return c;}
   return vec4f(select(decode(c.rgb),c.rgb,decoded)*c.a,c.a);
 }`;
 
@@ -221,11 +234,12 @@ export class SpriteLayer implements EnginePlugin {
   private readonly smooth: boolean;
   private readonly effect?: string;
   private readonly stride: number;
+  private readonly pages: boolean;
   /** Seconds the layer has run, passed to its `shader` as `sprite.time`. Set it to restart an effect. */
   time = 0;
   private readonly mipmaps: boolean;
   private readonly mipCache = new Map<unknown, unknown>();
-  private atlas: SpriteAtlas;
+  private atlas: SpriteAtlas | readonly SpriteAtlas[];
   private engine?: Engine;
   private removePass?: () => void;
   private device?: GPUDevice;
@@ -282,7 +296,11 @@ export class SpriteLayer implements EnginePlugin {
     if (options.shader !== undefined && !/\bfn\s+effect\s*\(/.test(options.shader?.code ?? ''))
       throw typeError('Invalid sprite shader: make one with spriteShader', 'sprite-options');
     this.effect = options.shader?.code;
-    this.stride = this.effect ? SPRITE_FLOATS + 4 : SPRITE_FLOATS;
+    this.pages = Array.isArray(options.atlas);
+    if (this.pages && !(options.atlas as readonly SpriteAtlas[]).length)
+      throw rangeError('SpriteLayer needs at least one atlas', 'sprite-options');
+    if (this.pages && options.normals) throw rangeError('Sprite normals need a single atlas', 'sprite-options');
+    this.stride = SPRITE_FLOATS + (this.effect ? 4 : 0) + (this.pages ? 4 : 0);
     this.mipmaps = options.mipmaps ?? true;
     this.order = order;
     this.layerMask = checkLayers(options.layers ?? 1, 'SpriteLayer layers');
@@ -321,9 +339,16 @@ export class SpriteLayer implements EnginePlugin {
     for (const sprite of this.list) sprite.owner = undefined;
     this.list.length = 0;
   }
-  /** Replaces the colour atlas. Sprite rectangles are checked against it next frame. */
-  setAtlas(atlas: SpriteAtlas): void {
-    if (!atlas) throw typeError('SpriteLayer needs an atlas', 'sprite-options');
+  /**
+   * Replaces the colour atlas, or the list of them for a layer made with a list. Sprite rectangles and pages are
+   * checked against it next frame.
+   */
+  setAtlas(atlas: SpriteAtlas | readonly SpriteAtlas[]): void {
+    if (!atlas || Array.isArray(atlas) !== this.pages || (this.pages && !(atlas as readonly SpriteAtlas[]).length))
+      throw typeError(
+        this.pages ? 'This SpriteLayer takes a list of atlases' : 'This SpriteLayer takes one atlas',
+        'sprite-options',
+      );
     this.dropAtlas(this.colorAtlas);
     this.colorAtlas = undefined;
     this.atlas = atlas;
@@ -354,7 +379,9 @@ export class SpriteLayer implements EnginePlugin {
   }
   onDeviceRestored(): void {
     // A caller's plain GPUTexture went with the device; bytes, bitmaps and functions come back by themselves.
-    this.stale = !!this.colorAtlas && typeof this.atlas !== 'function' && 'createView' in this.atlas;
+    this.stale =
+      !!this.colorAtlas &&
+      (Array.isArray(this.atlas) ? this.atlas : [this.atlas]).some((a) => typeof a !== 'function' && 'createView' in a);
     this.release();
   }
   dispose(): void {
@@ -400,7 +427,8 @@ export class SpriteLayer implements EnginePlugin {
       this.device = device;
     }
     if (this.stale) throw fault('state', 'Sprite atlas lost with the device; call setAtlas', 'sprite-state');
-    this.colorAtlas ??= this.smooth ? this.filtered(device) : this.loadAtlas(device);
+    this.colorAtlas ??=
+      this.smooth || this.pages ? this.composed(device) : this.loadAtlas(device, this.atlas as SpriteAtlas);
     if (this.normals && !this.normalAtlas) {
       this.normalAtlas = atlasTexture(device, this.normals.atlas, () =>
         rangeError('Invalid sprite pixels', 'sprite-options'),
@@ -412,18 +440,23 @@ export class SpriteLayer implements EnginePlugin {
         throw rangeError('Sprite normal atlas differs in size', 'sprite-options');
     }
     if (!this.layout) {
-      const texture = (binding: number) => ({
-        binding,
-        visibility: GPUShaderStage.FRAGMENT,
-        texture: { sampleType: 'unfilterable-float' as const },
-      });
+      const viewDimension = this.pages ? ('2d-array' as const) : ('2d' as const),
+        texture = (binding: number) => ({
+          binding,
+          visibility: GPUShaderStage.FRAGMENT,
+          texture: { sampleType: 'unfilterable-float' as const },
+        });
       this.layout = device.createBindGroupLayout({
         entries: [
           { binding: 0, visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } },
           { binding: 1, visibility: GPUShaderStage.VERTEX, buffer: { type: 'read-only-storage' } },
           this.smooth
-            ? { binding: 2, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' as const } }
-            : texture(2),
+            ? {
+                binding: 2,
+                visibility: GPUShaderStage.FRAGMENT,
+                texture: { sampleType: 'float' as const, viewDimension },
+              }
+            : { ...texture(2), texture: { sampleType: 'unfilterable-float' as const, viewDimension } },
           ...(this.normals ? [texture(3)] : []),
           ...(this.smooth
             ? [{ binding: 4, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' as const } }]
@@ -432,57 +465,92 @@ export class SpriteLayer implements EnginePlugin {
       });
       this.module = device.createShaderModule({
         label: 'sprites',
-        code: shader(!!this.normals, this.smooth, this.effect),
+        code: shader(!!this.normals, this.smooth, this.effect, this.pages),
       });
       if (this.smooth)
         this.sampler = device.createSampler({ magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear' });
     }
   }
-  private loadAtlas(device: GPUDevice): OwnedAtlas {
-    return atlasTexture(device, this.atlas, () => rangeError('Invalid sprite pixels', 'sprite-options'));
+  private loadAtlas(device: GPUDevice, atlas: SpriteAtlas): OwnedAtlas {
+    return atlasTexture(device, atlas, () => rangeError('Invalid sprite pixels', 'sprite-options'));
   }
-  /** The premultiplied, linear-light copy of the atlas that `filter: 'linear'` samples, with its mip chain. */
-  private filtered(device: GPUDevice): OwnedAtlas {
-    const source = this.loadAtlas(device),
-      { width, height, format } = source.texture,
-      levels = this.mipmaps ? Math.floor(Math.log2(Math.max(width, height))) + 1 : 1,
+  /**
+   * The layer's own copy of its atlases: one layer of a texture array per atlas for a list, and for `filter: 'linear'`
+   * premultiplied in linear light with its mip chain. Each source is drawn in with a full-screen triangle, so any
+   * texture the caller gives works without copy usage.
+   */
+  private composed(device: GPUDevice): OwnedAtlas {
+    const sources = (this.pages ? (this.atlas as readonly SpriteAtlas[]) : [this.atlas as SpriteAtlas]).map((a) =>
+        this.loadAtlas(device, a),
+      ),
+      { width, height } = sources[0].texture,
+      smooth = this.smooth,
+      target: GPUTextureFormat = smooth ? 'rgba8unorm-srgb' : 'rgba8unorm',
+      levels = smooth && this.mipmaps ? Math.floor(Math.log2(Math.max(width, height))) + 1 : 1,
       texture = device.createTexture({
-        label: 'sprites filtered atlas',
-        size: [width, height],
-        format: 'rgba8unorm-srgb',
+        label: 'sprites atlas copy',
+        size: [width, height, sources.length],
+        format: target,
         mipLevelCount: levels,
         usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT,
       }),
-      module = device.createShaderModule({ label: 'sprites premultiply', code: premultiply }),
-      pipeline = device.createRenderPipeline({
-        label: 'sprites premultiply',
-        layout: 'auto',
-        vertex: { module, entryPoint: 'vertexMain' },
-        fragment: {
-          module,
-          entryPoint: 'fragmentMain',
-          // A float or sRGB source already reads as linear.
-          constants: { decoded: format.endsWith('-srgb') || format.includes('float') ? 1 : 0 },
-          targets: [{ format: 'rgba8unorm-srgb' }],
-        },
-      }),
-      encoder = device.createCommandEncoder(),
-      pass = encoder.beginRenderPass({
-        colorAttachments: [{ view: texture.createView({ mipLevelCount: 1 }), loadOp: 'clear', storeOp: 'store' }],
+      module = device.createShaderModule({ label: 'sprites atlas copy', code: premultiply }),
+      encoder = device.createCommandEncoder();
+    try {
+      sources.forEach((source, layer) => {
+        if (source.texture.width !== width || source.texture.height !== height)
+          throw rangeError('Sprite atlases in one layer differ in size', 'sprite-options');
+        const format = source.texture.format,
+          pipeline = device.createRenderPipeline({
+            label: 'sprites atlas copy',
+            layout: 'auto',
+            vertex: { module, entryPoint: 'vertexMain' },
+            fragment: {
+              module,
+              entryPoint: 'fragmentMain',
+              // A float or sRGB source already reads as linear.
+              constants: {
+                decoded: format.endsWith('-srgb') || format.includes('float') ? 1 : 0,
+                premultiplied: smooth ? 1 : 0,
+              },
+              targets: [{ format: target }],
+            },
+          }),
+          pass = encoder.beginRenderPass({
+            colorAttachments: [
+              {
+                view: texture.createView({
+                  dimension: '2d',
+                  baseMipLevel: 0,
+                  mipLevelCount: 1,
+                  baseArrayLayer: layer,
+                  arrayLayerCount: 1,
+                }),
+                loadOp: 'clear',
+                storeOp: 'store',
+              },
+            ],
+          });
+        pass.setPipeline(pipeline);
+        pass.setBindGroup(
+          0,
+          device.createBindGroup({
+            layout: pipeline.getBindGroupLayout(0),
+            entries: [{ binding: 0, resource: source.texture.createView() }],
+          }),
+        );
+        pass.draw(3);
+        pass.end();
       });
-    pass.setPipeline(pipeline);
-    pass.setBindGroup(
-      0,
-      device.createBindGroup({
-        layout: pipeline.getBindGroupLayout(0),
-        entries: [{ binding: 0, resource: source.texture.createView() }],
-      }),
-    );
-    pass.draw(3);
-    pass.end();
+    } catch (error) {
+      texture.destroy();
+      for (const source of sources) if (source.owned) source.texture.destroy();
+      throw error;
+    }
     device.queue.submit([encoder.finish()]);
-    generateMipmaps(device, texture, levels, this.mipCache);
-    if (source.owned) source.texture.destroy();
+    // Destroyed only once the copy is submitted: a texture destroyed before its submit fails validation.
+    for (const source of sources) if (source.owned) source.texture.destroy();
+    generateMipmaps(device, texture, levels, this.mipCache, undefined, sources.length);
     return { texture, owned: true };
   }
   private pipeline(device: GPUDevice, format: GPUTextureFormat, samples: number, normal?: GPUTextureFormat) {
@@ -539,6 +607,7 @@ export class SpriteLayer implements EnginePlugin {
         atlas.height,
         this.snap,
         this.stride,
+        this.pages ? this.colorAtlas!.texture.depthOrArrayLayers : 0,
       );
     if (this.uploadAll) device.queue.writeBuffer(this.buffer, 0, this.data, 0, count * this.stride);
     else if (end > start) device.queue.writeBuffer(this.buffer, start * 4, this.data, start, end - start);
@@ -626,7 +695,10 @@ export class SpriteLayer implements EnginePlugin {
         entries: [
           { binding: 0, resource: { buffer: state.uniform } },
           { binding: 1, resource: { buffer: this.buffer! } },
-          { binding: 2, resource: this.colorAtlas!.texture.createView() },
+          {
+            binding: 2,
+            resource: this.colorAtlas!.texture.createView({ dimension: this.pages ? '2d-array' : '2d' }),
+          },
           ...(this.normalAtlas ? [{ binding: 3, resource: this.normalAtlas.texture.createView() }] : []),
           ...(this.sampler ? [{ binding: 4, resource: this.sampler }] : []),
         ],

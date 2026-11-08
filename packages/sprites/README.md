@@ -44,12 +44,13 @@ coin.visible = false;
 | `alpha` | 1 | Opacity, 0 to 1 |
 | `rect` | whole atlas | `[x, y, width, height]` in whole atlas texels |
 | `visible` | true | False leaves it out of the draw |
+| `page` | 0 | Which atlas, on a layer made with a list of them |
 
 ## SpriteLayer
 
 | Option | Default | What it does |
 | --- | --- | --- |
-| `atlas` | required | `{width, height, data}` RGBA8 bytes, `ImageBitmap`, `GPUTexture` or `(device) => GPUTexture` |
+| `atlas` | required | `{width, height, data}` RGBA8 bytes, `ImageBitmap`, `GPUTexture` or `(device) => GPUTexture`, or a list of same-size ones |
 | `camera` | `{x: 0, y: 0, zoom: 1}` | World point at the top-left and pixels per world unit, read each frame |
 | `snap` | true | Rounds each image's corner to a whole pixel after the camera, read each frame |
 | `ySort` | false | Among equal `z`, sorts by `y`, then by add order; read each frame |
@@ -75,6 +76,28 @@ A plain `GPUTexture` belonged to the lost device: the next frame throws `MargoEr
 
 Normals write `n * 0.5 + 0.5` from a same-size normal atlas, turned and flipped with the sprite, with alpha 1 where a
 sprite covers the pixel. They need a single-sample colour target and a single-sample normal target of the same size.
+
+### Several atlases
+
+Give `atlas` a list and one layer draws from all of them in one draw, through a texture array; each sprite picks its
+atlas with `page`. Characters, props and effects can live on their own sheets without a layer each.
+
+```ts
+import { EngineKernel } from 'margoengine/core';
+import { SpriteLayer } from 'margoengine/sprites';
+
+const engine = await EngineKernel.create(document.querySelector('canvas')!, { exactSize: [64, 32] });
+const sheet = (r: number, g: number, b: number) => ({ width: 1, height: 1, data: new Uint8Array([r, g, b, 255]) });
+const layer = SpriteLayer.attach(engine, { atlas: [sheet(255, 0, 0), sheet(0, 255, 0), sheet(0, 0, 255)] });
+layer.add({ x: 4, y: 4, scaleX: 8, scaleY: 8, page: 0 });
+layer.add({ x: 16, y: 4, scaleX: 8, scaleY: 8, page: 2 });
+engine.start();
+```
+
+- The atlases must be the same size; pad smaller sheets. A page past the list throws `RangeError` on the next frame.
+- The layer copies them into its own array, so a changed `GPUTexture` atlas needs `setAtlas` with the list again;
+  `setAtlas` takes a list on a layer made with one, and one atlas otherwise.
+- `filter: 'linear'` and `shader` work with pages; `normals` need a single atlas.
 
 ### Smooth sprites
 

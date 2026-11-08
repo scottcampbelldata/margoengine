@@ -28,6 +28,7 @@ export class Sprite implements SpriteOptions {
     alpha: number;
     rect?: readonly [number, number, number, number];
     visible: boolean;
+    page: number;
     params?: readonly [number, number, number, number];
     index: number;
     owner?: object;
@@ -56,7 +57,7 @@ export class SpriteLayer implements EnginePlugin {
     add(sprite?: Sprite | SpriteOptions): Sprite;
     remove(sprite: Sprite): boolean;
     clearSprites(): void;
-    setAtlas(atlas: SpriteAtlas): void;
+    setAtlas(atlas: SpriteAtlas | readonly SpriteAtlas[]): void;
     setup(engine: Engine): void;
     onPreUpdate(delta: number): void;
     onDeviceRestored(): void;
@@ -65,7 +66,7 @@ export class SpriteLayer implements EnginePlugin {
 }
 
 export interface SpriteLayerOptions {
-    atlas: SpriteAtlas;
+    atlas: SpriteAtlas | readonly SpriteAtlas[];
     camera?: SpriteCamera;
     snap?: boolean;
     ySort?: boolean;
@@ -103,6 +104,7 @@ export interface SpriteOptions {
     rect?: readonly [number, number, number, number];
     visible?: boolean;
     params?: readonly [number, number, number, number];
+    page?: number;
 }
 
 export interface SpritePixels {
@@ -117,7 +119,7 @@ export interface SpriteShader {
 
 export type SpriteTarget = GPUTexture | (() => GPUTexture);
 
-export function packSprites(sprites: readonly Sprite[], data: Float32Array, camera: SpriteCamera, atlasWidth: number, atlasHeight: number, snap?: boolean, stride?: number): PackedSprites;
+export function packSprites(sprites: readonly Sprite[], data: Float32Array, camera: SpriteCamera, atlasWidth: number, atlasHeight: number, snap?: boolean, stride?: number, pages?: number): PackedSprites;
 
 export const snapToPixel: (pixel: number, offset: number) => number;
 

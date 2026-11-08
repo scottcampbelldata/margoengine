@@ -2600,7 +2600,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-479). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-480). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -2765,6 +2765,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Live grading (`Grade` in `@margoengine/tonemap/grade`, 2026-11-08) | By method: display-referred, on 0..1 colour after the tone curve; under an HDR `ColorOutput` what lies above white passes ungraded; curves are sampled 33 times and read linearly; the wheels are additive offsets with fixed luminance masks (no pivot or range controls); one uniform of 608 B; GPU cost not measured (LIM-477). | Grading after the curve keeps the controls in the 0..1 range artists know from grading tools. | Wheels, curves and hue against saturation move live with no LUT to bake. | Bake a LUT with `setLUT` for a look outside these controls. |
 | Sprite shaders (`SpriteLayer` `shader` with `@margoengine/sprites/shader`, 2026-11-08) | One shader per layer; four `params` per sprite; outlines reach 1 to 4 texels; palettes 1 to 16 pairs. | A layer is one pipeline and one instanced draw, so the code is per layer and the per-sprite part is data. A shaded layer packs 64 B per sprite instead of 48. | By method: effects see one texel at a time plus `spriteTexel` neighbours inside the sprite's rectangle, so an outline needs transparent texels around the art; a palette swap matches exact bytes, so it is for `filter: 'nearest'`; WGSL that does not compile shows as a validation error on the first frame, not a throw. Proved on one GPU, an RTX A6000, against values worked out in the test. Time not measured. | Several layers for several effects; your own `spriteShader` for anything else. |
 | Classic curves (`curve` `reinhard`, `cineon`, `linear` in `@margoengine/tonemap`, 2026-11-08) | By method: Reinhard is per channel (it shifts hue in saturated highlights) and never reaches white; Cineon is the filmic fit with its 2.2 gamma undone, not a film-stock model; linear clips at white; under an HDR `ColorOutput` they are scaled by the same rolloff as AgX and ACES; not compared side by side with another engine (LIM-479). | They exist to keep the look of scenes ported from engines that use them. | A ported scene keeps its contrast and highlight roll-off. | Use `neutral` or `agx` for new work. |
+| Several atlases per layer (`SpriteLayer` with a list of atlases in `@margoengine/sprites`, 2026-11-08) | Up to the device's `maxTextureArrayLayers` (at least 256) atlases, all the same size. | A texture array holds same-size layers, which is what lets one draw read them all. | By method: the layer copies the atlases into its own array (one more copy of each in GPU memory), so a changed `GPUTexture` needs `setAtlas` again; a page sprite packs 64 B (80 B with a shader); `normals` need a single atlas. Proved on one GPU, an RTX A6000, byte for byte. Time not measured. | Pad smaller sheets to one size; a separate layer for normal-mapped sprites. |
 
 
 | Limit | Starts at | Why | What you see | Escape hatch |
@@ -6617,12 +6618,13 @@ coin.visible = false;
 | `alpha` | 1 | Opacity, 0 to 1 |
 | `rect` | whole atlas | `[x, y, width, height]` in whole atlas texels |
 | `visible` | true | False leaves it out of the draw |
+| `page` | 0 | Which atlas, on a layer made with a list of them |
 
 ## SpriteLayer
 
 | Option | Default | What it does |
 | --- | --- | --- |
-| `atlas` | required | `{width, height, data}` RGBA8 bytes, `ImageBitmap`, `GPUTexture` or `(device) => GPUTexture` |
+| `atlas` | required | `{width, height, data}` RGBA8 bytes, `ImageBitmap`, `GPUTexture` or `(device) => GPUTexture`, or a list of same-size ones |
 | `camera` | `{x: 0, y: 0, zoom: 1}` | World point at the top-left and pixels per world unit, read each frame |
 | `snap` | true | Rounds each image's corner to a whole pixel after the camera, read each frame |
 | `ySort` | false | Among equal `z`, sorts by `y`, then by add order; read each frame |
@@ -6649,7 +6651,7 @@ A plain `GPUTexture` belonged to the lost device: the next frame throws `MargoEr
 Normals write `n * 0.5 + 0.5` from a same-size normal atlas, turned and flipped with the sprite, with alpha 1 where a
 sprite covers the pixel. They need a single-sample colour target and a single-sample normal target of the same size.
 
-### Smooth sprites
+### Several atlases
 
 [README continues: https://margoengine.com/llms/packages/sprites.md]
 
