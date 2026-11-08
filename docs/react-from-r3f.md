@@ -15,6 +15,7 @@ built in, more through `extend`; see "Lowercase tags and extend" in the package 
 | `<mesh>`, `<group>` | `<Mesh>`, `<Group>` | `position`, `rotation`, `scale`, `castShadow`, every pointer handler (`onClick`, `onPointerDown`, `onPointerOver`, ...), `ref`. |
 | `<boxGeometry args>` | `<BoxGeometry args>` | `Box`, `Sphere` and `Plane` bundle geometry and material for the common case. |
 | `<meshStandardMaterial map={useTexture(url)}>` on a box, sphere or plane | `<Box map={url}>`, `<Sphere map>`, `<Plane map>` | PNG or JPEG, base colour only; needs `@margoengine/gltf`. Other maps: a glTF `Model`. |
+| `<PositionalAudio url>` (drei) | `<Sound src>` inside a `<Mesh>` (`@margoengine/react/ui`) | Outside a `Mesh` it is a plain sound; `playing` plays and pauses. |
 | `<meshStandardMaterial>` | `<PbrMaterial>` | glTF metallic-roughness: `color`, `roughness`, `metalness`. |
 | `<directionalLight>` | `<Sun direction color intensity>` | `direction` points towards the light. |
 | `<ambientLight>` | `<AmbientLight color intensity>` | |

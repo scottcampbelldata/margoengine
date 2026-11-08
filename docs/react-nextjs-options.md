@@ -43,6 +43,7 @@ package, installed separately, and loaded when its component mounts.
 | `/text` | `Text` (SDF text) | `text` |
 | `/sky` | `Sky` | `sky` |
 | `/geometry` | `Box`, `Sphere`, `Plane` (with `map`: a PNG or JPEG texture), `SphereGeometry`, `PlaneGeometry` | `geometry` (+ `gltf` for `map`) |
+| `/ui` | `GameUi`, `Sound`, `SpriteLayer`, `Sprite`, `Figure`, `ScatterPlot`, `LinePlot`, `SurfacePlot` | `ui`, `audio`, `sprites`, `sciviz` (each only if used) |
 | `/materials` | `MeshTransmissionMaterial`, `BatchedMesh`, `BatchedItem` | `materials` |
 | `/post`, `/dof`, `/tonemap`, `/taa` | `EffectComposer` with `Bloom`, `SSAO`, `GTAO`, `SSR`, `SSGI`, `MotionBlur`, `LensFlare`, `SMAA`, `FXAA`, `Glitch`, `Afterimage`, `DepthTexture`, `SceneTargets`, `DepthOfField`, `Tonemap`, `TAA` | `post` (+ the effect package) |
 | `/voxel` | `Voxels`, `useBlockTextures` | `voxel` |

@@ -669,3 +669,195 @@ test('initialization errors are visible and dispose the engine', async () => {
   assert.equal(errors.length, 1);
   cleanup();
 });
+
+// @margoengine/react/ui: bindings for the UI, audio, 2D sprite and sciviz packages, with stand-ins for those packages
+// that record what the bindings call. The real packages draw on a real GPU in test:browser:tags (mode "ui").
+const bindings = [];
+mock.module('@margoengine/ui/react', {
+  namedExports: {
+    UiRoot: ({ engine, theme, children }) => {
+      bindings.push(['UiRoot', engine, theme]);
+      return React.createElement(React.Fragment, null, children);
+    },
+  },
+});
+class StandInListener {
+  static attach(engine) {
+    const listener = new this();
+    engine.use(listener);
+    return listener;
+  }
+  name = 'margoengine-audio';
+  async load(url) {
+    bindings.push(['load', url]);
+    return { url };
+  }
+}
+class StandInAudio {
+  constructor(listener, options) {
+    Object.assign(this, options);
+    this.isPlaying = false;
+    bindings.push(['sound', this.constructor.name, options.volume, options.loop]);
+  }
+  setBuffer(buffer) {
+    this.buffer = buffer;
+  }
+  play() {
+    this.isPlaying = true;
+    bindings.push(['play', this.buffer.url]);
+  }
+  pause() {
+    this.isPlaying = false;
+    bindings.push(['pause']);
+  }
+  stop() {
+    this.isPlaying = false;
+  }
+  dispose() {
+    bindings.push(['sound disposed']);
+  }
+}
+class StandInPositional extends StandInAudio {
+  refDistance = 1;
+  attach(mesh) {
+    bindings.push(['follow', mesh.id]);
+  }
+}
+mock.module('@margoengine/audio', {
+  namedExports: { AudioListener: StandInListener, Audio: StandInAudio, PositionalAudio: StandInPositional },
+});
+mock.module('@margoengine/sprites', {
+  namedExports: {
+    SpriteLayer: {
+      attach(engine, options) {
+        const layer = {
+          name: 'sprites-1',
+          sprites: [],
+          ...options,
+          add(sprite) {
+            this.sprites.push(sprite);
+            return sprite;
+          },
+          remove(sprite) {
+            this.sprites.splice(this.sprites.indexOf(sprite), 1);
+          },
+          setAtlas(atlas) {
+            this.atlas = atlas;
+          },
+          dispose() {
+            engine.removePlugin(this.name);
+          },
+        };
+        engine.use(layer);
+        bindings.push(['layer', layer]);
+        return layer;
+      },
+    },
+  },
+});
+mock.module('@margoengine/sciviz', {
+  namedExports: {
+    Figure: {
+      attach(engine, options) {
+        const figure = {
+          name: 'figure',
+          options,
+          layers: new Set(),
+          ready: async () => {},
+          async scatter(data, layerOptions) {
+            const layer = { kind: 'scatter', data, layerOptions };
+            this.layers.add(layer);
+            return layer;
+          },
+          remove(layer) {
+            this.layers.delete(layer);
+          },
+          dispose() {
+            engine.removePlugin(this.name);
+          },
+        };
+        engine.use(figure);
+        bindings.push(['figure', figure]);
+        return figure;
+      },
+    },
+  },
+});
+test('the ui entry binds the UI, audio, sprite and sciviz packages to the Canvas engine and frees them', async () => {
+  const { GameUi, Sound, SpriteLayer, Sprite, Figure, ScatterPlot } = await import('../dist/ui.js');
+  const atlas = { width: 1, height: 1, data: new Uint8Array(4) },
+    points = { x: [0, 1], y: [1, 0] };
+  let ready = 0;
+  const tree = ({ x = 1, playing = true, ySort = false } = {}) =>
+    React.createElement(
+      StrictMode,
+      null,
+      React.createElement(
+        Canvas,
+        null,
+        React.createElement(GameUi, { theme: 'dark' }, React.createElement('span', { 'data-hud': 'yes' })),
+        React.createElement(Mesh, null, React.createElement(Sound, { src: '/step.ogg', volume: 0.5, playing })),
+        React.createElement(Sound, { src: '/music.ogg', loop: true }),
+        React.createElement(
+          SpriteLayer,
+          { atlas, ySort },
+          React.createElement(Sprite, { x, y: 2, tint: '#ff0000' }),
+          React.createElement(Sprite, { x: 5 }),
+        ),
+        React.createElement(
+          Figure,
+          { mode: '2d', titles: { x: 'time', y: 'value' }, onReady: () => ready++ },
+          React.createElement(ScatterPlot, { data: points, options: { size: 3 } }),
+        ),
+      ),
+    );
+  const view = render(tree());
+  for (let i = 0; i < 4; i++) await act(async () => {});
+  const engine = instances.at(-1);
+  // UI: UiRoot gets the Canvas engine and the props, and its children render.
+  assert.ok(bindings.some(([kind, given, theme]) => kind === 'UiRoot' && given === engine && theme === 'dark'));
+  assert.equal(view.container.querySelectorAll('[data-hud]').length, 1);
+  // Audio: one listener for both sounds; the one inside a Mesh is positional and follows it.
+  assert.ok(engine.plugins.get('margoengine-audio') instanceof StandInListener);
+  const sounds = bindings.filter(([kind]) => kind === 'sound').map(([, type, volume, loop]) => [type, volume, loop]);
+  assert.deepEqual(new Set(sounds.map(String)), new Set(['StandInPositional,0.5,false', 'StandInAudio,1,true']));
+  const meshId = [...engine.meshes.values()][0].id;
+  assert.ok(bindings.some(([kind, id]) => kind === 'follow' && id === meshId));
+  const played = new Set(bindings.filter(([kind]) => kind === 'play').map(([, url]) => url));
+  assert.deepEqual(played, new Set(['/music.ogg', '/step.ogg']));
+  view.rerender(tree({ playing: false }));
+  await act(async () => {});
+  assert.deepEqual(bindings.at(-1), ['pause'], 'playing={false} pauses the sound');
+  // Sprites: the layer holds both, and props update a sprite in place.
+  const layer = bindings.findLast(([kind]) => kind === 'layer')[1];
+  assert.equal(engine.plugins.get('sprites-1'), layer);
+  assert.deepEqual(
+    layer.sprites.map((sprite) => sprite.x),
+    [1, 5],
+  );
+  const first = layer.sprites[0];
+  view.rerender(tree({ playing: false, x: 9, ySort: true }));
+  await act(async () => {});
+  assert.equal(layer.sprites[0], first, 'the same sprite, updated');
+  assert.equal(first.x, 9);
+  assert.equal(layer.ySort, true);
+  // Sciviz: the figure attaches with the options, the scatter layer joins it, and onReady fires.
+  const figure = bindings.findLast(([kind]) => kind === 'figure')[1];
+  assert.equal(engine.plugins.get('figure'), figure);
+  assert.equal(figure.options.mode, '2d');
+  assert.deepEqual(
+    [...figure.layers].map((entry) => entry.data),
+    [points],
+  );
+  assert.ok(ready >= 1);
+  assert.equal(bindings.filter(([kind]) => kind === 'figure').length >= 1, true);
+  const figures = bindings.filter(([kind]) => kind === 'figure').length;
+  view.rerender(tree({ playing: false, x: 9, ySort: true }));
+  await act(async () => {});
+  assert.equal(bindings.filter(([kind]) => kind === 'figure').length, figures, 'equal inline options keep the figure');
+  view.unmount();
+  await act(async () => {});
+  // afterEach checks that every plugin left the engine: listener, sprite layer and figure.
+  assert.equal(layer.sprites.length, 0);
+  assert.equal(figure.layers.size, 0);
+});

@@ -129,6 +129,11 @@
       "react-server": "./dist/rsc/xr.js",
       "import": "./dist/xr.js"
     },
+    "./ui": {
+      "types": "./dist/ui.d.ts",
+      "react-server": "./dist/rsc/ui.js",
+      "import": "./dist/ui.js"
+    },
     "./lines": {
       "types": "./dist/lines.d.ts",
       "react-server": "./dist/rsc/lines.js",
@@ -192,7 +197,11 @@
     "@margoengine/voxel": "^1.0.0",
     "@margoengine/lines": "^1.0.0",
     "@margoengine/inspector": "^1.0.0",
-    "@margoengine/stats": "^1.0.0"
+    "@margoengine/stats": "^1.0.0",
+    "@margoengine/ui": "^1.0.0",
+    "@margoengine/audio": "^1.0.0",
+    "@margoengine/sprites": "^1.0.0",
+    "@margoengine/sciviz": "^1.0.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/gltf": {
@@ -271,6 +280,18 @@
       "optional": true
     },
     "@margoengine/stats": {
+      "optional": true
+    },
+    "@margoengine/ui": {
+      "optional": true
+    },
+    "@margoengine/audio": {
+      "optional": true
+    },
+    "@margoengine/sprites": {
+      "optional": true
+    },
+    "@margoengine/sciviz": {
       "optional": true
     }
   }

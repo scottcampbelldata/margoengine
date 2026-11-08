@@ -98,6 +98,7 @@ const expected = {
     'usePhysics',
   ],
   './xr': ['Controller', 'XR', 'useXR'],
+  './ui': ['Figure', 'GameUi', 'LinePlot', 'ScatterPlot', 'Sound', 'Sprite', 'SpriteLayer', 'SurfacePlot'],
 };
 const optionalPeers = [
   '@margoengine/gltf-pro',
@@ -113,6 +114,10 @@ const optionalPeers = [
   '@margoengine/controls',
   '@margoengine/geometry',
   '@margoengine/gltf',
+  '@margoengine/ui',
+  '@margoengine/audio',
+  '@margoengine/sprites',
+  '@margoengine/sciviz',
   '@margoengine/post',
   '@margoengine/dof',
   '@margoengine/tonemap',

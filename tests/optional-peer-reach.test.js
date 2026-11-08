@@ -81,6 +81,7 @@ const REACT_EXTRA = {
   './dof': ['@margoengine/post'],
   './tonemap': ['@margoengine/post'],
   './taa': ['@margoengine/post'],
+  './ui': ['@margoengine/audio', '@margoengine/sprites', '@margoengine/sciviz'],
 };
 test('the React root reaches no optional package, and each subpath only the packages its name says', () => {
   const m = manifest('react'),

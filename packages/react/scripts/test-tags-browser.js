@@ -107,6 +107,44 @@ try {
   assert.deepEqual(texturedClick, ['box click child'], 'a click on the textured box reaches its onClick');
   result.checks.push({ name: 'Textured Plane and Box draw their maps', plane, boxFace, texturedClick });
 
+  // The @margoengine/react/ui bindings with the real packages. Sprites: a red and a green texel scaled to 64 px squares
+  // whose top-left corners sit at (96, 64) and (352, 64) canvas pixels (CSS 512 x 256, so world units are pixels).
+  const sprites = await shot('sprites', (i) => dominant(sample(i, 128 / 512, 96 / 256), 0));
+  const red = sample(sprites, 128 / 512, 96 / 256),
+    green = sample(sprites, 384 / 512, 96 / 256),
+    outside = sample(sprites, 256 / 512, 200 / 256);
+  assert.ok(dominant(red, 0), `<Sprite> draws the red texel, got ${red}`);
+  assert.ok(dominant(green, 1), `<Sprite> draws the green texel, got ${green}`);
+  assert.ok(Math.max(...outside) < 40, `nothing outside the sprites, got ${outside}`);
+  // Game UI: a full health bar in a panel at the top left, drawn inside the engine.
+  const coloured = (image, x0, y0, x1, y1) => {
+    let count = 0;
+    for (let y = Math.round(y0 * image.height); y < y1 * image.height; y++)
+      for (let x = Math.round(x0 * image.width); x < x1 * image.width; x++) {
+        const at = (y * image.width + x) * 4;
+        if (Math.max(image.data[at], image.data[at + 1], image.data[at + 2]) > 60) count++;
+      }
+    return count;
+  };
+  const ui = await shot('ui', (i) => coloured(i, 0, 0, 0.5, 0.4) > 500);
+  const uiPixels = coloured(ui, 0, 0, 0.5, 0.4),
+    uiElsewhere = coloured(ui, 0.6, 0.6, 1, 1);
+  assert.ok(uiPixels > 500, `<GameUi> draws the panel and health bar, ${uiPixels} lit pixels at the top left`);
+  assert.equal(uiElsewhere, 0, 'nothing drawn away from the panel');
+  // Sciviz: a 2,000-point scatter in a figure; axes and points draw, and onReady fires.
+  const figure = await shot('figure', (i) => coloured(i, 0, 0, 1, 1) > 2000);
+  const figurePixels = coloured(figure, 0, 0, 1, 1);
+  await page.waitForFunction(() => window.tags.state.ready > 0, null, { timeout: 30_000 });
+  assert.ok(figurePixels > 2000, `<Figure><ScatterPlot> draws, ${figurePixels} lit pixels`);
+  // Audio: a real WAV (CMU ARCTIC speech) decodes and plays once a click lets the page start audio.
+  await page.evaluate((mode) => window.tags.mount(mode), 'sound');
+  await page.waitForFunction(() => window.tags.state.sound, null, { timeout: 30_000 });
+  await page.mouse.click(...at(0.5));
+  await page.waitForFunction(() => window.tags.state.sound?.isPlaying, null, { timeout: 30_000 });
+  const sound = await page.evaluate(() => ({ playing: window.tags.state.sound.isPlaying }));
+  assert.equal(sound.playing, true, '<Sound> plays the decoded WAV');
+  result.checks.push({ name: 'UI, audio, sprite and sciviz bindings draw and play', red, green, uiPixels, figurePixels, sound });
+
   await page.evaluate(() => window.tags.unmount());
   assert.deepEqual(await page.evaluate(() => window.tags.state.errors), []);
   assert.deepEqual(errors, []);

@@ -2110,6 +2110,10 @@
       "types": "./dist/react/xr.d.ts",
       "import": "./dist/react/xr.js"
     },
+    "./react/ui": {
+      "types": "./dist/react/ui.d.ts",
+      "import": "./dist/react/ui.js"
+    },
     "./react/lines": {
       "types": "./dist/react/lines.d.ts",
       "import": "./dist/react/lines.js"

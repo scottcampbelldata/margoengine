@@ -465,6 +465,59 @@ function ImperativeCube() {
 }
 ```
 
+## UI, audio, 2D sprites and charts
+
+`@margoengine/react/ui` binds four packages to the Canvas engine. Each loads its package when it mounts, so install
+only the ones you use (`@margoengine/ui`, `@margoengine/audio`, `@margoengine/sprites`, `@margoengine/sciviz`).
+
+- **`GameUi`** is `UiRoot` of `@margoengine/ui/react` with the Canvas engine filled in. Nest that package's widgets
+  (`Panel`, `Label`, `Button`, `HealthBar`, `Inventory`, ...) inside; they draw on the canvas.
+- **`Sound`** plays a URL or an `AudioBuffer` through one `AudioListener` per Canvas, which follows the camera. Inside a
+  `<Mesh>` it is positional and moves with the mesh. `playing` (default true) plays and pauses; `volume`, `loop`,
+  `playbackRate`, `refDistance`, `maxDistance`, `rolloffFactor` and `distanceModel` update in place. Browsers start
+  audio after the first click or key press. The ref is the `Audio`.
+- **`SpriteLayer`** and **`Sprite`** draw 2D sprites at exact pixels: the layer takes the `@margoengine/sprites`
+  options (`atlas` swaps in place; `camera`, `snap` and `ySort` are live), each `Sprite` its fields (`x`, `y`, `rect`,
+  `tint`, `flipX`, ...), updated in place.
+- **`Figure`** with **`ScatterPlot`**, **`LinePlot`** and **`SurfacePlot`** draws a `@margoengine/sciviz` figure with
+  the Canvas camera. Options are compared by value; a new `data` (or `z`) object rebuilds its layer, so keep it in
+  `useMemo` or state. `onReady` fires once axes and labels are drawn. WebGPU only.
+
+```tsx
+import { useMemo } from 'react';
+import { BoxGeometry, Canvas, Mesh } from '@margoengine/react';
+import { Figure, GameUi, ScatterPlot, Sound, Sprite, SpriteLayer } from '@margoengine/react/ui';
+import { HealthBar, Panel } from '@margoengine/ui/react';
+
+const atlas = { width: 2, height: 1, data: new Uint8Array([255, 0, 0, 255, 0, 255, 0, 255]) };
+
+export function Everything({ hp }: { hp: number }) {
+  const points = useMemo(() => ({ x: [0, 1, 2], y: [2, 0, 1], z: [0, 1, 2] }), []);
+  return (
+    <Canvas style={{ height: 400 }}>
+      <GameUi>
+        <Panel anchor="top-left" margin={16} padding={8}>
+          <HealthBar value={hp} max={100} width={200} />
+        </Panel>
+      </GameUi>
+      <Mesh position={[2, 0, 0]}>
+        <BoxGeometry />
+        <Sound src="/sounds/engine.ogg" loop refDistance={2} />
+      </Mesh>
+      <SpriteLayer atlas={atlas}>
+        <Sprite x={16} y={16} rect={[0, 0, 1, 1]} scaleX={32} scaleY={32} />
+      </SpriteLayer>
+      <Figure titles={{ x: 'x', y: 'y', z: 'z' }}>
+        <ScatterPlot data={points} options={{ size: 4 }} />
+      </Figure>
+    </Canvas>
+  );
+}
+```
+
+A component outside its parent (`Sprite` outside `SpriteLayer`, a plot outside `Figure`, a positional `Sound` outside a
+`Mesh`) throws a `MargoError` (code `state`) that names the parent to add.
+
 ## Controls
 
 `OrbitControls`, `MapControls`, `CadControls` and `ArcballControls` bind the active camera and canvas, update from the Canvas frame loop (so `frameloop="demand"` and `invalidate()` move them too), and remove their listeners on unmount. Every public field of the controls is a prop (`enableDamping`, `dampingFactor`, `rotateSpeed`, `zoomToCursor`, `minDistance`, `maxPolarAngle`, ...); a prop removed again restores the controls' default. `target` sets the orbit point when it changes. `onChange`, `onStart` and `onEnd` receive the controls' events, and the ref is the live controls object. `CadControls` navigates like a CAD tool: `profile` is `'margo'` (default), `'solidworks'`, `'autocad'`, `'inventor'`, `'fusion'`, `'blender'`, `'maya'`, `'onshape'` or `'rhino'`, and keyboard shortcuts are on (`keyEvents={false}` turns them off). `OrbitControls` takes the same `profile` and `keyEvents` props.
