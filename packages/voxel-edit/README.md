@@ -71,6 +71,7 @@ corner coordinates.
 | `./assist` | `noiseFill` (seeded random fill), `suggestPalette` (seeded hues, linear sRGB) and `paletteUsage` (cells per index) |
 | `./library` | `fetchLibrary` / `fetchAsset` / `resolveLibraryUrl`: list and fetch `.vox` packs from a JSON index, with a body size limit and abort |
 | `./shaders` | `ShaderBrush`: your own WGSL `fn brush(p, value)` run on the GPU for every selected cell, pass after pass, to grow, erode or generate; presets `brushes.grow`, `erode`, `noise`, `smooth`; `brushSource` |
+| `./rig` | `VoxelRig`: voxel parts on a skeleton, posed by bone rotations; part matrices for drawing and `bake` to one grid; `sampleRigClip`, `rigRotation`, `slerpRotation` |
 
 Selections, picking and meshing take a dense or a sparse grid. Errors follow
 [docs/conventions.md](../../docs/conventions.md): `TypeError` and `RangeError` for arguments and budgets,
@@ -231,3 +232,52 @@ rings.dispose();
 - **Errors.** `TypeError` for a wrong device, code without `fn brush`, or a bad option; `RangeError` for a value out of
   range or a grid over the device's storage binding limit; `MargoError` `failed` for WGSL that does not compile, naming
   the line of your code, and `disposed` after `dispose()`. `label` names the GPU objects for debuggers.
+
+## Bones and posed voxel parts (`./rig`)
+
+`VoxelRig` attaches voxel parts to the bones of a skeleton, the way blocky characters are animated: each part moves
+rigidly with its bone, and a bone turns about its joint carrying its children with it. `matrices(pose)` gives every
+part a model matrix (column-major, cells to model cells) to draw its `meshGrid` mesh with; `bake(pose)` resamples the
+posed parts into one grid (each cell takes the part cell under its centre, so turned parts keep no holes), for frames,
+export or a world. Joints and offsets are in model cells, Y up.
+
+```ts
+import type { VoxelGrid } from 'margoengine/voxel-edit';
+import { meshGrid } from 'margoengine/voxel-edit/mesh';
+import { rigRotation, sampleRigClip, VoxelRig } from 'margoengine/voxel-edit/rig';
+
+const block = (sx: number, sy: number, sz: number, value: number): VoxelGrid => ({
+  size: [sx, sy, sz],
+  voxels: new Uint8Array(sx * sy * sz).fill(value),
+});
+const rig = new VoxelRig({
+  bones: [
+    { name: 'body', joint: [4, 0, 2] },
+    { name: 'arm', parent: 'body', joint: [8, 9, 2] },
+  ],
+  parts: [
+    { bone: 'body', grid: block(8, 10, 4, 1) },
+    { bone: 'arm', grid: block(2, 8, 2, 2), offset: [8, 2, 1] },
+  ],
+});
+const wave = {
+  duration: 1,
+  loop: true,
+  tracks: [{ bone: 'arm', times: [0, 0.5, 1], rotations: [rigRotation([0, 0, 1], 0), rigRotation([0, 0, 1], 90), rigRotation([0, 0, 1], 0)] }],
+};
+const pose = { rotations: sampleRigClip(wave, 0.25) };
+const [, armMatrix] = rig.matrices(pose); // draw meshGrid(part.grid) with these
+const { grid, origin } = rig.bake(pose); // the posed character as one grid; origin is its corner in model cells
+console.log(armMatrix.length, grid.size, origin, meshGrid(grid).mesh.positions.length > 0);
+```
+
+- **Poses.** `rotations` maps bone names to unit quaternions `[x, y, z, w]` (`rigRotation(axis, degrees)` builds one),
+  applied about the bone's joint after its parent's turn; a bone left out turns with its parent. `translation` moves
+  the whole model. A non-unit quaternion, an unknown bone or a parent listed after its child is refused with a fix.
+- **Clips.** `sampleRigClip(clip, time)` interpolates each track's keys by spherical interpolation (the short way
+  round), holds the first and last key, and wraps time when `loop` is true.
+- **Baking.** A quarter turn bakes exactly as `turnGrid`; other angles resample at cell centres, so a part keeps its
+  cell count only roughly. Later parts draw over earlier ones. The posed box is limited by `maxCells` (default
+  16,777,216).
+- **Rigid parts.** Each part follows one bone (rigid skinning, as blocky characters use); cells are not blended
+  between bones. For smooth skinned meshes use `@margoengine/rigging` and `@margoengine/animation`.

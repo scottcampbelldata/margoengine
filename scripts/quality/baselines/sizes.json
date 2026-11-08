@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11296810,
+  "total": 11299854,
   "history": [
     {
       "date": "2026-10-24",
@@ -4502,6 +4502,12 @@
       "commit": "44e40cbb6",
       "reason": "html fade option: grid depth shader, options and opacity step (batch 106 job 1)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "7a86183eb",
+      "reason": "new entry @margoengine/voxel-edit/rig",
+      "grew": 1
     }
   ],
   "items": {
@@ -5262,6 +5268,7 @@
     "@margoengine/voxel-edit/library": 1255,
     "@margoengine/voxel-edit/mesh": 9456,
     "@margoengine/voxel-edit/pick": 7239,
+    "@margoengine/voxel-edit/rig": 3044,
     "@margoengine/voxel-edit/shaders": 5097,
     "@margoengine/voxel-edit/smooth": 2633,
     "@margoengine/voxel-edit/sparse": 6873,

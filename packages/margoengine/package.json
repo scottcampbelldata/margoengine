@@ -3118,6 +3118,10 @@
       "types": "./dist/voxel-edit/shaders.d.ts",
       "import": "./dist/voxel-edit/shaders.js"
     },
+    "./voxel-edit/rig": {
+      "types": "./dist/voxel-edit/rig.d.ts",
+      "import": "./dist/voxel-edit/rig.js"
+    },
     "./voxel-net": {
       "types": "./dist/voxel-net.d.ts",
       "import": "./dist/voxel-net.js"
