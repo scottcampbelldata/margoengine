@@ -63,7 +63,7 @@ test('the command speaks MCP over stdio and every tool answers', { timeout: 120_
   server.send({ jsonrpc: '2.0', method: 'notifications/initialized' });
   server.send({ jsonrpc: '2.0', id: 2, method: 'tools/list' });
   const names = (await server.receive(2)).result.tools.map((tool) => tool.name);
-  assert.deepEqual(names, ['search_docs', 'list_packages', 'get_package', 'list_examples', 'check_snippet', 'port_to_margo']);
+  assert.deepEqual(names, ['search_docs', 'list_packages', 'get_package', 'list_examples', 'check_snippet', 'port_to_margo', 'explain_error']);
 
   // All five at once: requests run side by side and answers match by id.
   server.send(call(3, 'search_docs', { query: 'createStage', kind: 'api', limit: 3 }));

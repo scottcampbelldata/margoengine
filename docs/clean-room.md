@@ -341,6 +341,7 @@ The own solver's kernel (`packages/physics/kernel`, Rust, no dependencies). Noth
 | MC3 | stdio transport: one message per line, nothing but protocol messages on stdout | mcp/src/stdio.ts | MCP specification 2025-11-25, Basic, Transports, stdio |
 | MC4 | `tools/list`, `tools/call`, tool errors as results with `isError`, `structuredContent`, tool annotations | mcp/src/server.ts, mcp/src/tools.ts, mcp/src/porting.ts | MCP specification 2025-11-25, Server, Tools (read in full) |
 | MC5 | Porting guide (`port_to_margo`): rows of the parity matrix and code sections of the "Coming from" guide; word and name-part scoring | mcp/src/porting.ts | Margo's own docs ([threejs-parity.md](threejs-parity.md), [from-threejs.md](from-threejs.md)), written from the other library's public documentation; the scoring is Margo-own (whole name 3, name prefix 2, notes word 0.5, exact name +10) |
+| MC6 | Error lookup (`explain_error`): the help link, id or code, then a listed message, then shared words (shared over the larger word count, at least half of the asked words) | mcp/src/error-codes.ts | Margo's own error help page (scripts/errors/entries.js); the word match is Margo-own |
 
 ### oit
 

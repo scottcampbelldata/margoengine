@@ -23,6 +23,7 @@ the answers match your code, not the latest page on the web. The same material i
 | `list_examples` | The runnable example pages and starter projects, with what each shows. |
 | `check_snippet` | Type-checks TypeScript, TSX or JavaScript against the real package types in your project, strict, with your own `typescript`. The snippet is compiled, never run. Returns line, column, code and message for each problem. |
 | `port_to_margo` | Maps a class, function or task of another 3D library (`OrbitControls`, `InstancedMesh`, `EffectComposer`, "shadow map") to the Margo package and calls that do the same job: status (COVERED, PARTIAL, MISSING, NOT PLANNED), limits, and that library's code next to the Margo code where the porting guide has a section. From `@margoengine/mcp/porting`. |
+| `explain_error` | Explains a Margo error and its fix from the [error help page](https://margoengine.com/errors). Takes the whole message (each ends with `; see https://margoengine.com/errors#<id>`), that link, the id or the `MargoError` code. From `@margoengine/mcp/error-codes`. |
 
 Rendering a scene to a PNG is not a tool. The repository's browser harness needs Playwright, a Vite dev server and a
 real GPU behind the shared GPU lock, none of which a published package can bring along, and a scene needs a bundler
@@ -57,6 +58,33 @@ console.log(formatPorting(guide, 'OrbitControls', matches)); // the text the too
 
 Matching is by words and name parts, not meaning: ask with the other library's class name or a short task. A name
 the matrix does not list gets no row, and the answer says so and points at `search_docs`.
+
+## Error lookup
+
+Every Margo error message ends with a link to its entry on the error help page, and every entry says what causes the
+error and how to fix it. `explain_error` answers from a copy of that page made at package build, so a model can fix
+a pasted error without a browser. It finds the entry by the `errors#<id>` link, by the id or `MargoError` code
+(`disposed`, `unsupported`), by a message the page lists (with or without a `TypeError:` prefix), and failing that
+by the listed messages that share the most words with it. The lookup is also an entry of its own:
+
+```ts
+import { formatError, loadErrorEntries, lookupError } from '@margoengine/mcp/error-codes';
+
+const entries = await loadErrorEntries(); // the error help page the package ships
+const matches = lookupError(entries, 'Mesh disposed; see https://margoengine.com/errors#disposed');
+console.log(matches[0].entry.id, matches[0].by); // disposed link
+console.log(formatError('Mesh disposed', matches)); // title, link, cause and fix: the text the tool returns
+```
+
+| Function | Default | |
+| --- | --- | --- |
+| `loadErrorEntries(file?, signal?)` | the entries the package ships (`dist/error-codes.json`) | Reads the entries; a missing file is a `failed` error. |
+| `lookupError(entries, query, limit?)` | 3 entries (1 to 10) | A link, id or code gives its one entry; a listed message its entries; otherwise shared words. |
+| `createErrorTool(entries)` | | The `explain_error` tool. |
+| `createMargoServer({ errors })` | the entries the package ships | Entries the server's tool answers from. |
+
+A message with values in it (a name, a number) that the page does not list word for word is matched by its words: it
+needs at least half of its words in one listed message, so a message from outside Margo matches nothing.
 
 ## Set up
 

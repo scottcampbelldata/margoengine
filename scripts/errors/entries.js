@@ -686,6 +686,10 @@ export const entries = [
       'from must be a string',
       'limit must be an integer',
       'limit must be from 1 to 25',
+      'lookupError needs an error code, message or link',
+      'createErrorTool needs at least one entry',
+      'error is required and must be a non-empty string',
+      'limit must be from 1 to 10',
     ],
     cause:
       'A tool call got an argument it cannot use (a missing or empty string, a value outside the allowed list, a package or entry that does not exist), TypeScript is not installed in the project that check_snippet reads, the compiler did not run or ran out of time, the porting guides file (dist/porting.json) is missing from the install, or the server was disposed while a request was running. The server reports a tool failure as a result with isError set and the error code, so the model can read it and retry.',

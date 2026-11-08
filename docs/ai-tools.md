@@ -33,6 +33,7 @@ answers from the docs of the version you installed, and it type-checks code agai
 | `list_examples` | Find a runnable example before writing one. |
 | `check_snippet` | Type-check a snippet strictly against the installed packages. |
 | `port_to_margo` | Map a three.js class or task (`OrbitControls`, `InstancedMesh`, "shadow map") to the Margo package and calls, with status, limits and both libraries' code, from the [parity matrix](threejs-parity.md) and [Coming from three.js](from-threejs.md). |
+| `explain_error` | Explain a pasted Margo error (the message, its `errors#<id>` link, the id or the `MargoError` code) with its cause and fix from the [error help page](https://margoengine.com/errors). |
 
 Setup (full steps in the [package README](../packages/mcp/README.md)):
 
@@ -46,7 +47,7 @@ Claude Desktop and Cursor take the same command in a JSON config file: `command`
 
 A good loop for an assistant, and the one the server's own instructions suggest: `search_docs` or `list_packages`,
 then `get_package` for the package it will use, write the code, then `check_snippet` and fix what it reports before
-showing the answer. When the user brings three.js code, `port_to_margo` first, once per class it uses.
+showing the answer. When the user brings three.js code, `port_to_margo` first, once per class it uses; when they paste a Margo error, `explain_error`.
 
 ## 3. Give the assistant a project rule
 

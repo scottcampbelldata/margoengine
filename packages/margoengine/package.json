@@ -1642,6 +1642,10 @@
       "types": "./dist/mcp/porting.d.ts",
       "import": "./dist/mcp/porting.js"
     },
+    "./mcp/error-codes": {
+      "types": "./dist/mcp/error-codes.d.ts",
+      "import": "./dist/mcp/error-codes.js"
+    },
     "./mesh-edit": {
       "types": "./dist/mesh-edit.d.ts",
       "import": "./dist/mesh-edit.js"

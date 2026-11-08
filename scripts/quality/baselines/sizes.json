@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10861126,
+  "total": 10863259,
   "history": [
     {
       "date": "2026-10-24",
@@ -4004,6 +4004,12 @@
       "commit": "ea0583ff2",
       "reason": "post/anamorphic: new optional entry, anamorphic streaks",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "008cb6ed4",
+      "reason": "new entry @margoengine/mcp/error-codes: the explain_error error lookup tool (batch 119 job 2)",
+      "grew": 1
     }
   ],
   "items": {
@@ -4412,6 +4418,7 @@
     "@margoengine/math/vector3": 1547,
     "@margoengine/math/vector4": 919,
     "@margoengine/mcp": 8664,
+    "@margoengine/mcp/error-codes": 2133,
     "@margoengine/mcp/porting": 3531,
     "@margoengine/mesh-edit": 30203,
     "@margoengine/mesh-edit/bake": 5070,

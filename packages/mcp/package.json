@@ -33,6 +33,10 @@
     "./porting": {
       "types": "./dist/porting.d.ts",
       "import": "./dist/porting.js"
+    },
+    "./error-codes": {
+      "types": "./dist/error-codes.d.ts",
+      "import": "./dist/error-codes.js"
     }
   },
   "files": [

@@ -261,7 +261,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/scene API](https://margoengine.com/llms/api/scene.md): 3 entry points
 - [@margoengine/compute API](https://margoengine.com/llms/api/compute.md): 13 entry points
 - [@margoengine/sciviz API](https://margoengine.com/llms/api/sciviz.md): 6 entry points
-- [@margoengine/mcp API](https://margoengine.com/llms/api/mcp.md): 2 entry points
+- [@margoengine/mcp API](https://margoengine.com/llms/api/mcp.md): 3 entry points
 - [@margoengine/react API](https://margoengine.com/llms/api/react.md): 25 entry points
 
 ## Optional

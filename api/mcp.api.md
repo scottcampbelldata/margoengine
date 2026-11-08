@@ -61,7 +61,7 @@ export interface CorpusPackage {
 
 export type HitKind = 'readme' | 'api' | 'doc' | 'example';
 
-export const INSTRUCTIONS = "Margo Engine is a WebGPU 3D engine. Its core is small and frozen; every feature is a separate optional package. Before writing Margo code, call search_docs (a task or an exact name) or list_packages, then get_package for the README of the package you will use. After writing code, call check_snippet with it: it type-checks against the real package types in the project. Use list_examples to find a working example first. When the user brings code from another 3D library or names one of its APIs, call port_to_margo for the Margo package and calls that replace it.";
+export const INSTRUCTIONS = "Margo Engine is a WebGPU 3D engine. Its core is small and frozen; every feature is a separate optional package. Before writing Margo code, call search_docs (a task or an exact name) or list_packages, then get_package for the README of the package you will use. After writing code, call check_snippet with it: it type-checks against the real package types in the project. Use list_examples to find a working example first. When the user brings code from another 3D library or names one of its APIs, call port_to_margo for the Margo package and calls that replace it. When the user pastes a Margo error, call explain_error with it.";
 
 export type Json = null | boolean | number | string | Json[] | {
     [key: string]: Json;
@@ -92,6 +92,7 @@ export interface MargoServerOptions {
     corpus?: Corpus;
     projectRoot?: string;
     porting?: readonly PortingGuide[];
+    errors?: readonly ErrorEntry[];
 }
 
 export interface McpServer extends Disposable {
@@ -226,6 +227,15 @@ interface Chunk {
     title: string;
     text: string;
     length: number;
+}
+
+interface ErrorEntry {
+    id: string;
+    title: string;
+    kind: 'code' | 'family';
+    messages: string[];
+    cause: string;
+    fix: string;
 }
 
 interface PortingGuide {
