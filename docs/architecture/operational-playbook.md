@@ -538,6 +538,9 @@ The CPU tier's `new Function` applies only to this opt-in compatibility path, an
 interpreter instead of refusing it. General claims that nothing builds code at run time must stay scoped to the native
 engine. Evidence: `packages/webgl2-compat/test/interpret.test.js` compares the two paths over the corpus, and
 `compute-browser.mjs` reruns every case under a real policy; there is no quiet speed record of the interpreter yet.
+The two paths compare bytes, so a NaN must have one encoding: JavaScript lets an engine write any NaN bits, and V8
+wrote different signs on the two paths (2026-11-08). The CPU tier writes every stored, bitcast or packed NaN as
+0x7fc00000 (f16 0x7e00), which WGSL 15.7.2 allows; `test/nan-encoding.test.js` holds it on both paths.
 Recorded A6000/Edge measurements for CPU clustered binning
 over 3,456 clusters were 1.5 ms with 16 lights, 2.8 ms with 64, and 9.4 ms with 256; a 64-wide reduction with seven
 barriers reached 4.4 million invocations per second.

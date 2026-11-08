@@ -84,6 +84,8 @@ What it does:
   with MargoError code `unsupported`. On a page that allows JavaScript compiled at run time (Content-Security-Policy
   `unsafe-eval`) the CPU tier compiles each kernel with `new Function`; under a strict policy it runs the same kernel
   on an interpreter, a lazy chunk only such a page downloads, with the same results, about 13 to 41 times slower.
+  A NaN the CPU tier stores, bitcasts or packs is written as the quiet NaN 0x7fc00000 (f16 0x7e00), so the bytes are
+  the same on both paths and every browser; WGSL lets a runtime NaN be any value, so its sign and payload are not kept.
   A CPU-tier dispatch may do at most `cpuWorkBudget` invocations plus loop iterations (an `install()` option and a
   device property; default 100,000,000, about one to three seconds): past it the dispatch stops, nothing it stored
   lands, and it is reported as a `GPUInternalError` with MargoError code `failed`, so an endless loop cannot hold the

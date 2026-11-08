@@ -11,6 +11,14 @@ const fr = Math.fround;
 const f32 = new Float32Array(1),
   u32 = new Uint32Array(f32.buffer),
   i32 = new Int32Array(f32.buffer);
+/**
+ * The one f32 NaN the CPU tier writes to memory or gives as bits: the quiet NaN with sign 0 and no payload. JavaScript
+ * lets an engine write any NaN encoding (ECMA-262 25.1.3.17 NumericToRawBytes), and V8 writes different ones for the
+ * same arithmetic depending on how the value was held, so the compiled kernel and the interpreter left different bytes.
+ * WGSL lets a runtime NaN be any value of its type (WGSL 15.7.2, the finite math assumption), so one fixed encoding
+ * is a valid result, and it makes the bytes the same on every engine and both paths.
+ */
+const QNAN = 0x7fc00000;
 
 /** A storage or uniform buffer binding as the kernel sees it: its bytes (a copy of the binding's range). */
 export interface CPUBuffer {
@@ -86,7 +94,8 @@ function halfBits(x: number): number {
     sign = (b >>> 16) & 0x8000,
     e = (b >>> 23) & 0xff,
     m = b & 0x7fffff;
-  if (e === 0xff) return sign | 0x7c00 | (m ? 0x200 : 0);
+  // A NaN becomes the one f16 quiet NaN (sign 0, no payload), as an f32 NaN becomes QNAN.
+  if (e === 0xff) return m ? 0x7e00 : sign | 0x7c00;
   const he = e - 127 + 15;
   if (he >= 0x1f) return sign | 0x7c00;
   if (he <= 0) {
@@ -283,12 +292,19 @@ export const H = {
   f2i: (x: number) => (x !== x ? 0 : x <= -2147483648 ? -2147483648 : x >= 2147483520 ? 2147483520 : Math.trunc(x)),
   f2u: (x: number) => (x !== x || x <= 0 ? 0 : x >= 4294967040 ? 4294967040 : Math.trunc(x)),
   bfu(x: number): number {
+    if (x !== x) return QNAN;
     f32[0] = x;
     return u32[0];
   },
   bfi(x: number): number {
+    if (x !== x) return QNAN;
     f32[0] = x;
     return i32[0];
+  },
+  /** Stores an f32 at byte `o` of a buffer, a NaN as QNAN. */
+  stf(dv: DataView, o: number, v: number): void {
+    if (v === v) dv.setFloat32(o, v, true);
+    else dv.setUint32(o, QNAN, true);
   },
   buf(x: number): number {
     u32[0] = x;
@@ -470,7 +486,12 @@ export const H = {
     const z = t.dimension === '3d' ? p[2] : layer;
     if (p[0] < 0 || p[0] >= l.w || (p[1] ?? 0) < 0 || (p[1] ?? 0) >= l.h || z < 0 || z >= l.d) return;
     const n = (z * l.h + (p[1] ?? 0)) * l.w + p[0];
-    l.data.set(quantize(t.format, v), n * 4);
+    const q = quantize(t.format, v),
+      d = l.data;
+    d.set(q, n * 4);
+    if (d instanceof Float32Array)
+      for (let i = 0; i < 4; i++)
+        if (q[i] !== q[i]) new Uint32Array(d.buffer, d.byteOffset, d.length)[n * 4 + i] = QNAN;
     (l.written ??= new Uint8Array(l.w * l.h * l.d))[n] = 1;
   },
 };

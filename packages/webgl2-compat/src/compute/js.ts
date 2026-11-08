@@ -726,7 +726,9 @@ class JSEmitter {
         body =
           t.kind === 'scalar' && t.name === 'f16'
             ? 'b.dv.setUint16(o, halfBits(v), true);'
-            : `b.dv.${k === 'f' ? 'setFloat32' : k === 'i' ? 'setInt32' : 'setUint32'}(o, v, true);`;
+            : k === 'f'
+              ? 'stf(b.dv, o, v);'
+              : `b.dv.${k === 'i' ? 'setInt32' : 'setUint32'}(o, v, true);`;
         break;
       }
       case 'vector':
