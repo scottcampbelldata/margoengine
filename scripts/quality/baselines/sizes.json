@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11126128,
+  "total": 11131320,
   "history": [
     {
       "date": "2026-10-24",
@@ -4262,6 +4262,12 @@
       "commit": "cf5eded59",
       "reason": "lit particles: new entry @margoengine/vfx/lit, carried by the root VFX with every feature",
       "grew": 2
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "a6c27ecb9",
+      "reason": "new entry @margoengine/terrain/deform",
+      "grew": 1
     }
   ],
   "items": {
@@ -4926,6 +4932,7 @@
     "@margoengine/taa": 12187,
     "@margoengine/taa/upscale": 7093,
     "@margoengine/terrain": 12874,
+    "@margoengine/terrain/deform": 5192,
     "@margoengine/terrain/displace": 4342,
     "@margoengine/terrain/holes": 1539,
     "@margoengine/terrain/layers-pbr": 2819,

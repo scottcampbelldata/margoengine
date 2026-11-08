@@ -2678,6 +2678,10 @@
       "types": "./dist/terrain/displace.d.ts",
       "import": "./dist/terrain/displace.js"
     },
+    "./terrain/deform": {
+      "types": "./dist/terrain/deform.d.ts",
+      "import": "./dist/terrain/deform.js"
+    },
     "./text": {
       "types": "./dist/text.d.ts",
       "import": "./dist/text.js"

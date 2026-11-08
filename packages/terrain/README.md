@@ -683,6 +683,63 @@ texels finer than a pixel. Cost not timed.
 - Attach it after `TerrainMaterials`, before any effect that replaces the terrain's lit shader. `shadows` darkens the
   sun's light only, not ambient or image-based light.
 
+## Footprints, tracks and trails: `@margoengine/terrain/deform`
+
+`TerrainDeformation.attach(engine, terrain, options)` presses footprints, tyre tracks and trails into snow, mud and sand.
+Prints go into a deformation map of `size` texels a side, `texel` wide each, centred on the camera (or on what
+`follow` returns) and moved with it a texel at a time, so prints stay while they are within half its width; the
+ground pushed aside rises in a rim around each print; prints fill back in over `fade` seconds. The terrain's lit shader
+walks each near pixel's view ray down through the prints (parallax occlusion mapping) and shades the ground it meets,
+with the print's slope as its normal and darkened where it is pressed, so a footprint shows its walls and hides its far
+floor. No vertex moves: clipmap cells are far wider than a footprint.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Terrain} from 'margoengine/terrain';
+import {TerrainDeformation} from 'margoengine/terrain/deform';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const terrain = Terrain.attach(engine, {
+  size: [256, 256], origin: [-128, -128], heightScale: 10,
+  layers: [0, 1, 2, 3].map(() => ({height: [-100, 100] as [number, number], slope: [0, 1] as [number, number], scale: 0.5})),
+  textures(device) {
+    const heightmap = device.createTexture({size: [2, 2], format: 'r32float', usage: 6});
+    device.queue.writeTexture({texture: heightmap}, new Float32Array(4), {bytesPerRow: 8}, [2, 2]);
+    const layers = device.createTexture({size: [1, 1, 4], format: 'rgba8unorm-srgb', usage: 6});
+    device.queue.writeTexture({texture: layers}, new Uint8Array(16).fill(230), {bytesPerRow: 4, rowsPerImage: 1}, [1, 1, 4]);
+    return {heightmap, layers};
+  },
+});
+const snow = TerrainDeformation.attach(engine, terrain, {
+  depth: 0.15,     // deepest print, and a print's depth by default
+  fade: 120,       // seconds for a full-depth print to fill back in; 0 keeps prints
+  rim: 0.25,       // the rim's height as a share of the print's depth
+});
+for (let step = 0; step < 10; step++)                     // a walk along +X, left and right feet
+  snow.footprint(step * 0.35, step % 2 ? 0.12 : -0.12, {angle: 0, depth: 0.08});
+snow.track([-5, 2], [5, 2.5], {width: 0.22});              // a tyre
+snow.trail([[0, -3], [1, -3.5], [2, -3.2]], {width: 0.5, depth: 0.04});  // a sledge
+engine.start();
+```
+
+- A print is pressed on the GPU at the next frame: a footprint is an ellipse (`length` 0.28 and `width` 0.11 by
+  default, turned by `angle`), a track a band of `width` with round ends; the full depth reaches 55% of the way to
+  the edge and falls smoothly to 0 there, and the rim peaks at 1.2 times the half size. Each texel keeps the deepest
+  print over it. With painted `weights`, `layers` gives each layer's softness (rock 0 takes no print).
+- Defaults: `size` 1,024 texels of 2.5 cm (25.6 m), `depth` 0.15, `rim` 0.25, `fade` 120, `darken` 0.25,
+  `distance` 40 (prints shown within, fading over the last quarter), `steps` 12.
+- Memory: 16 bytes a texel (the depths and rims, and the `rgba16float` relief `texture`): 16 MiB at the defaults.
+  A frame with a print, a move or `fade` runs a compute pass over the map; a still frame with `fade: 0` runs none.
+- Prints the window leaves are gone when it comes back; device loss clears every print. The terrain's geometry,
+  shadows and SSR capture do not see prints. Attach it after the terrain's other effects.
+
+Checked on a real GPU by `test/deform.browser.mjs` (in `test:gpu`, Radeon 680M, 2026-11-08): a footprint and a track
+read back from the GPU are the profile above worked on the CPU to 0.06 mm (half-float storage) and its slopes to 0.1%;
+nothing pressed draws exactly the picture without deformation; seen from 0.6 m under a slanted sun, the deformed picture
+is 6.6 of 255 on average from the same prints built as real geometry (a terrain on a 4 mm clipmap whose heightmap is the
+read-back relief), the flat picture 33.3; a print fills back in by `depth / fade` a second of frame time (0.075, 0.050
+and 0 deep after 0.5, 1 and 2 s at 0.05 m a second); a 2 m move keeps it, a 12 m one clears it; a painted layer of
+softness 0 takes none. Cost not timed.
+
 ## Screen-space reflections
 
 `Terrain` takes SSR's capture hook (`@margoengine/post/ssr`): `ssr.add(terrain)` draws its own normal, layer colour and

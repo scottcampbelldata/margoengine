@@ -638,6 +638,15 @@ attachment, so it cannot step over a ridge; a fixed-count march did (0.08% of th
 2.76% and 30.85% at 10 and 30 cm of relief; parallax 3.07 of 255 from real geometry, flat 24.5; Radeon 680M. Missing:
 other GPUs, cost timed.
 
+Terrain deformation (`@margoengine/terrain/deform`, 2026-11-08) sits at bindings 99 and 100 and wraps the terrain's lit
+fragment (whatever effects came before): each near fragment's view ray is marched through a camera-centred relief map
+(parallax occlusion, offset limited), the hit's XZ on the undeformed tangent plane replaces the shading position (so
+shadow lookups still see the surface the shadow map holds) and the relief's slope bends the normal. The map is written
+by compute passes: an atomic maximum over float bits keeps the deepest print a texel, a fixed refill a second fades
+them, and a moving window clears the texels it exposes. Evidence: `packages/terrain/test/deform.browser.mjs`, map to
+0.06 mm of the CPU profile, picture 6.6 of 255 from real geometry (flat 33.3); Radeon 680M. Missing: other GPUs, cost
+timed.
+
 Both shadow classes take `effects`: objects that declare WGSL at bindings 40 and up (four each), give a factor that
 `shadowLit` multiplies the sun by, and update once a frame after the depth passes. With none the shader text is what it was,
 which the golden GPU proofs pin. `cloudShadows` runs the sky's cloud remap and erosion along the ray to the sun, with the
