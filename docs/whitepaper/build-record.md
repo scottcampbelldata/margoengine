@@ -2770,3 +2770,51 @@ caller's `Physics` and imports only its types.
 - **Limits and unmeasured:** row in `docs/limits.md`. Pieces are whole cubes in flat colour and never go back into the
   world; the search runs on the page thread and its speed on large edits is not measured. Nothing was run on another
   machine.
+
+## Lane H batch 80: splats
+
+Eight jobs for `@margoengine/splats` on the Beelink (lane H, work list 3): six new optional entries, two additions to
+existing entries. Core and stage are untouched. GPU work is proved on a Radeon 680M through
+`packages/splats/test/gpu/check.mjs` (in `test:gpu`), mostly on a real capture (8,385 raccoon splats from Niantic's SPZ
+sample). Nothing is timed.
+
+| # | Job | Status | Commit | Entry | Claim |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Depth with meshes | DONE | `1d913d1a2` | `/depth` (`SplatDepth`) | LIM-444 |
+| 2 | Streamed level of detail | DONE | `c14a77368` | `/lod` (`SplatLod`, `buildSplatLod`) | LIM-453 |
+| 3 | One sort for many clouds | DONE | `cdd118b27` | `/set` (`SplatSet`) | LIM-464 |
+| 4 | Shadows and relighting | DONE | `0f4f13f95` | `/lighting` (`SplatLighting`) | LIM-471 |
+| 5 | Picking and brush editing | DONE | `3792a99ce` | `/edit` (`SplatBrush`) | LIM-473 |
+| 6 | SPZ and SOG export | DONE | `c10bb05f4` | `encodeSpz`, `encodeSog` in `/data` and the root | LIM-488 |
+| 7 | Animated splats | DONE | `82779ba8c` | `/animate` (`SplatSequence`, `SplatSkin`) | LIM-490 |
+| 8 | Anti-aliased splats | DONE | `b9a501b51` | `Splats.antialias` in the root | LIM-500 |
+
+- **Built from:** alpha-tested depth and the 3 sigma quad of the colour pass (Kerbl et al. 2023); level of detail by a
+  moment-matched octree refined by projected error; one pooled cloud with one depth sort; relighting from the smallest
+  covariance eigenvector with EWA shadows; picking by atomic minimum over projected ellipses; the SPZ version 3 and SOG
+  version 2 formats; sequences by a linear mix of two frames and skins by linear blend skinning (covariance as A S A^T);
+  the Mip-Splatting 2D filter (Yu et al. 2024). Rows SP4 to SP11 in the splats part of `docs/clean-room.md`. (The
+  commit messages of jobs 6, 7 and 8 name claim numbers from before the rebase: 476, 489, 491. The docs hold the right
+  ones.)
+- **Proved:** a mesh behind a cloud is covered and one in front never hidden, exactly the splat's own pixels (job 1);
+  a fully refined hierarchy of the real capture draws what one plain cloud draws, and a 16,777,216-splat stand-in
+  streams within its budget (job 2); two overlapping captures as a set match the merged cloud exactly where two clouds
+  are off in 3,594 of 262,144 channels (job 3); relit colours match core's diffuse terms to 5.8e-8 (job 4); a 12 px
+  brush selects and erases 1,560 splats of the capture exactly (job 5); the real SPZ re-encodes with its positions and
+  opacity bytes exact, the SOG written from the real SOG file decodes within 2e-3 in position and 0.08 in SH, and the
+  lossless WebP writer round-trips through Chromium's own decoder (job 6); a sequence and a skin match the linear mix
+  and blended matrices within 1e-5 (job 7); the anti-aliased opacities fall as the screen variance implies (job 8).
+- **Sizes (gzip):** root 30,440 B; new `/depth` 1,863, `/lighting` 3,350, `/edit` 3,600; `/lod` 28,908, `/set`
+  27,719, `/animate` 19,672 and `/data` 21,490 include the shared splat code.
+- **Bugs fixed with tests:** job 6's SOG codebook merged rare values (SH error 0.34); every distinct value now gets its
+  own entry when 256 or fewer exist, and the real-SOG test holds SH under 0.08. Its test drafts used a wrong SH offset
+  and compared per-byte scales in an axis order that broke; clamped display colours are now skipped, and the duplicate
+  CRC table became `packages/shared/crc32.js` (the quality duplicates gate). Job 2 had a fix, `b6c31b09f`, after its
+  first landing.
+- **Limits:** one GPU; job 2's 16,777,216-splat cloud is a procedural stand-in; picking regions test splat centres, not
+  ellipse coverage; animation is proved on synthetic splats only (no real 4D or rigged capture); anti-aliasing is
+  proved on projected opacities, not shimmer on a moving camera. Rows in docs/whitepaper/claims.md.
+- **Slips:** job 8's landing used a lane rebase helper that took our side of `claims.md` and `clean-room.md`, which
+  overwrote main's LIM-496 and dropped its clean-room row, and a second rebase shifted our claim twice and left a gap.
+  Root tests caught both before any push. The landing script now fails before the push if any row of main in the claims,
+  limits or clean-room tables is removed or changed, or if the LIM numbers skip or repeat.
