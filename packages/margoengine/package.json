@@ -1650,6 +1650,10 @@
       "types": "./dist/mcp/render.d.ts",
       "import": "./dist/mcp/render.js"
     },
+    "./mcp/resources": {
+      "types": "./dist/mcp/resources.d.ts",
+      "import": "./dist/mcp/resources.js"
+    },
     "./mesh-edit": {
       "types": "./dist/mesh-edit.d.ts",
       "import": "./dist/mesh-edit.js"

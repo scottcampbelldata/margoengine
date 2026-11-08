@@ -9,7 +9,7 @@ import type { PortingGuide } from './porting.js';
 
 /** What the server tells the client's model about itself. */
 export const INSTRUCTIONS =
-  'Margo Engine is a WebGPU 3D engine. Its core is small and frozen; every feature is a separate optional package. Before writing Margo code, call search_docs (a task or an exact name) or list_packages, then get_package for the README of the package you will use. After writing code, call check_snippet with it: it type-checks against the real package types in the project. Use list_examples to find a working example first. When the user brings code from another 3D library or names one of its APIs, call port_to_margo for the Margo package and calls that replace it. When the user pastes a Margo error, call explain_error with it. When render_snippet is offered, render code that draws to see what it shows.';
+  'Margo Engine is a WebGPU 3D engine. Its core is small and frozen; every feature is a separate optional package. Before writing Margo code, call search_docs (a task or an exact name) or list_packages, then get_package for the README of the package you will use. After writing code, call check_snippet with it: it type-checks against the real package types in the project. Use list_examples to find a working example first. When the user brings code from another 3D library or names one of its APIs, call port_to_margo for the Margo package and calls that replace it. When the user pastes a Margo error, call explain_error with it. When render_snippet is offered, render code that draws to see what it shows. Every package README and API report and every docs page is also a resource (margo://packages/<id>/readme, margo://packages/<id>/api, margo://docs/<path>), and the prompts start_scene, port_code, fix_error and add_feature set up common requests.';
 
 /** Options of {@link createMargoServer}. */
 export interface MargoServerOptions {
@@ -28,12 +28,16 @@ export interface MargoServerOptions {
   render?: boolean | { gpuFlags?: readonly string[] };
 }
 
-/** The Margo MCP server: its tools over the shipped documentation. Pass it to {@link serveStdio}. */
+/**
+ * The Margo MCP server: its tools, the docs as resources and the starter prompts, over the shipped documentation.
+ * Pass it to {@link serveStdio}.
+ */
 export async function createMargoServer(options: MargoServerOptions = {}): Promise<McpServer> {
   const corpus = options.corpus ?? (await loadCorpus());
   // The other tools live in their own entries; loading them by the package's name keeps each one a separate module.
   const { createPortingTool, loadPortingGuides } = await import('@margoengine/mcp/porting');
   const { createErrorTool, loadErrorEntries } = await import('@margoengine/mcp/error-codes');
+  const { createDocResources, createStarterPrompts } = await import('@margoengine/mcp/resources');
   return createMcpServer({
     tools: [
       ...createTools({ corpus, projectRoot: options.projectRoot }),
@@ -48,6 +52,8 @@ export async function createMargoServer(options: MargoServerOptions = {}): Promi
           ]
         : []),
     ],
+    resources: createDocResources(corpus),
+    prompts: createStarterPrompts(),
     instructions: INSTRUCTIONS,
   });
 }
@@ -65,6 +71,8 @@ Usage: margoengine-mcp [--root <folder>] [--render]
   --help           Print this text.
 
 Tools: search_docs, list_packages, get_package, list_examples, check_snippet, port_to_margo, explain_error (and render_snippet with --render).
+Resources: margo://readme, margo://packages/<id>/readme, margo://packages/<id>/api, margo://docs/<path>.
+Prompts: start_scene, port_code, fix_error, add_feature.
 Setup for Claude Code, Claude Desktop and Cursor: https://margoengine.com/llms/docs/ai-tools.md
 `;
 

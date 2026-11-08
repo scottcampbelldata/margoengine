@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10955317,
+  "total": 10958406,
   "history": [
     {
       "date": "2026-10-24",
@@ -4076,6 +4076,12 @@
       "commit": "859084b87",
       "reason": "sciviz graph entry: new optional entry, root unchanged",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "11ff0f3fd",
+      "reason": "new entry @margoengine/mcp/resources: docs resources and starter prompts; the root entry serves the new methods (batch 119 job 4)",
+      "grew": 2
     }
   ],
   "items": {
@@ -4483,10 +4489,11 @@
     "@margoengine/math/vector2": 947,
     "@margoengine/math/vector3": 1547,
     "@margoengine/math/vector4": 919,
-    "@margoengine/mcp": 9051,
+    "@margoengine/mcp": 9827,
     "@margoengine/mcp/error-codes": 2133,
     "@margoengine/mcp/porting": 3531,
     "@margoengine/mcp/render": 3277,
+    "@margoengine/mcp/resources": 2313,
     "@margoengine/mesh-edit": 30203,
     "@margoengine/mesh-edit/bake": 5070,
     "@margoengine/mesh-edit/boolean-exact": 10620,

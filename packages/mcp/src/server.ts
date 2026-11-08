@@ -1,4 +1,4 @@
-import { fault } from '../../shared/errors.js';
+import { fault, rangeError } from '../../shared/errors.js';
 import { errorCode, helpLink } from './errors.js';
 
 /** The protocol revisions this server speaks, newest first. */
@@ -30,6 +30,8 @@ export const RPC = {
   methodNotFound: -32601,
   invalidParams: -32602,
   internal: -32603,
+  /** A resource that does not exist (MCP, resources/read). */
+  resourceNotFound: -32002,
 } as const;
 
 /** One block of a tool's answer: text, or an image as base64 with its media type. */
@@ -74,6 +76,62 @@ export interface ToolDefinition {
   run(args: Record<string, unknown>, context: ToolContext): Promise<ToolResult> | ToolResult;
 }
 
+/** A resource as resources/list describes it. */
+export interface ResourceInfo {
+  /** Its address, `margo://docs/limits`. */
+  uri: string;
+  name: string;
+  title?: string;
+  description?: string;
+  mimeType?: string;
+  /** Size of its contents in bytes, when known. */
+  size?: number;
+}
+
+/** A family of resources by a URI template (RFC 6570), as resources/templates/list describes it. */
+export interface ResourceTemplateInfo {
+  uriTemplate: string;
+  name: string;
+  title?: string;
+  description?: string;
+  mimeType?: string;
+}
+
+/** The contents of a resource: `text`, or `blob` as base64. */
+export interface ResourceContents {
+  uri: string;
+  mimeType?: string;
+  text?: string;
+  blob?: string;
+}
+
+/** What the server reads resources from. */
+export interface ResourceProvider {
+  /** Every resource, in a stable order (the server pages it). */
+  list(): readonly ResourceInfo[];
+  /** The URI templates, if any. */
+  templates?(): readonly ResourceTemplateInfo[];
+  /** The contents of `uri`, or undefined when there is no such resource. */
+  read(uri: string, context: ToolContext): Promise<ResourceContents[] | undefined> | ResourceContents[] | undefined;
+}
+
+/** One message of a prompt. */
+export interface PromptMessage {
+  role: 'user' | 'assistant';
+  content: ToolContent | { type: 'resource'; resource: ResourceContents };
+}
+
+/** A prompt the server offers. */
+export interface PromptDefinition {
+  name: string;
+  title?: string;
+  description?: string;
+  /** Its arguments; a required one must be given to prompts/get. */
+  arguments?: { name: string; description?: string; required?: boolean }[];
+  /** The messages for these arguments (all strings; the required ones are present). */
+  get(args: Record<string, string>): { description?: string; messages: PromptMessage[] };
+}
+
 /** Options of {@link createMcpServer}. */
 export interface McpServerOptions {
   /** The tools to offer. */
@@ -82,6 +140,12 @@ export interface McpServerOptions {
   instructions?: string;
   /** `serverInfo.name` (default `margoengine`). */
   name?: string;
+  /** Resources to offer; the `resources` capability is declared only when given. */
+  resources?: ResourceProvider;
+  /** Prompts to offer; the `prompts` capability is declared only when given. */
+  prompts?: readonly PromptDefinition[];
+  /** Items per page of resources/list, resources/templates/list and prompts/list (default 100). */
+  pageSize?: number;
 }
 
 /** A Model Context Protocol server, independent of the transport: feed it messages, it answers them. */
@@ -118,6 +182,22 @@ function failure(error: unknown): ToolResult {
   };
 }
 
+/** A page of `items` from an opaque cursor (the base64 of the offset), and the cursor of the next page. */
+function page<T>(items: readonly T[], cursor: unknown, size: number): { items: T[]; next?: string } | undefined {
+  let offset = 0;
+  if (cursor !== undefined) {
+    if (typeof cursor !== 'string') return undefined;
+    const text = Buffer.from(cursor, 'base64url').toString();
+    offset = Number(text);
+    if (!/^(0|[1-9]\d*)$/.test(text) || offset > items.length) return undefined;
+  }
+  const end = offset + size;
+  return {
+    items: items.slice(offset, end),
+    ...(end < items.length ? { next: Buffer.from(String(end)).toString('base64url') } : {}),
+  };
+}
+
 /**
  * Creates a server that answers `initialize`, `ping`, `tools/list` and `tools/call`, and honours
  * `notifications/cancelled`. Follows the Model Context Protocol specification (2025-11-25, and the three
@@ -125,12 +205,16 @@ function failure(error: unknown): ToolResult {
  */
 export function createMcpServer(options: McpServerOptions): McpServer {
   const tools = new Map(options.tools.map((tool) => [tool.name, tool]));
+  const prompts = new Map((options.prompts ?? []).map((prompt) => [prompt.name, prompt]));
+  const pageSize = options.pageSize ?? 100;
+  if (!Number.isInteger(pageSize) || pageSize < 1) throw rangeError('pageSize must be an integer of at least 1', 'mcp');
   const running = new Map<string | number, AbortController>();
   const lifetime = new AbortController();
   let initialized = false;
 
   async function request(message: JsonRpcRequest, id: string | number): Promise<JsonRpcResponse> {
     const params = isRecord(message.params) ? message.params : {};
+    const unknownMethod = () => rpcError(id, RPC.methodNotFound, `Method not found: ${message.method}`);
     switch (message.method) {
       case 'initialize': {
         const asked = typeof params.protocolVersion === 'string' ? params.protocolVersion : '';
@@ -140,7 +224,11 @@ export function createMcpServer(options: McpServerOptions): McpServer {
           id,
           result: {
             protocolVersion: version,
-            capabilities: { tools: { listChanged: false } },
+            capabilities: {
+              tools: { listChanged: false },
+              ...(options.resources ? { resources: { subscribe: false, listChanged: false } } : {}),
+              ...(options.prompts ? { prompts: { listChanged: false } } : {}),
+            },
             serverInfo: { name: options.name ?? 'margoengine', title: 'Margo Engine', version: VERSION },
             ...(options.instructions ? { instructions: options.instructions } : {}),
           },
@@ -182,8 +270,70 @@ export function createMcpServer(options: McpServerOptions): McpServer {
           lifetime.signal.removeEventListener('abort', abort);
         }
       }
+      case 'resources/list':
+      case 'resources/templates/list': {
+        if (!options.resources) return unknownMethod();
+        const templates = message.method === 'resources/templates/list';
+        const all = templates ? (options.resources.templates?.() ?? []) : options.resources.list();
+        const part = page<ResourceInfo | ResourceTemplateInfo>(all, params.cursor, pageSize);
+        if (!part) return rpcError(id, RPC.invalidParams, 'Invalid cursor');
+        return {
+          jsonrpc: '2.0',
+          id,
+          result: {
+            [templates ? 'resourceTemplates' : 'resources']: part.items as unknown as Json,
+            ...(part.next ? { nextCursor: part.next } : {}),
+          },
+        };
+      }
+      case 'resources/read': {
+        if (!options.resources) return unknownMethod();
+        if (typeof params.uri !== 'string' || !params.uri) return rpcError(id, RPC.invalidParams, 'uri must be a string');
+        const controller = new AbortController();
+        const abort = () => controller.abort();
+        lifetime.signal.addEventListener('abort', abort, { once: true });
+        running.set(id, controller);
+        try {
+          const contents = await options.resources.read(params.uri, { signal: controller.signal });
+          if (!contents) return rpcError(id, RPC.resourceNotFound, 'Resource not found', { uri: params.uri });
+          return { jsonrpc: '2.0', id, result: { contents: contents as unknown as Json } };
+        } finally {
+          running.delete(id);
+          lifetime.signal.removeEventListener('abort', abort);
+        }
+      }
+      case 'prompts/list': {
+        if (!options.prompts) return unknownMethod();
+        const part = page([...prompts.values()], params.cursor, pageSize);
+        if (!part) return rpcError(id, RPC.invalidParams, 'Invalid cursor');
+        return {
+          jsonrpc: '2.0',
+          id,
+          result: {
+            prompts: part.items.map((prompt) => ({
+              name: prompt.name,
+              ...(prompt.title ? { title: prompt.title } : {}),
+              ...(prompt.description ? { description: prompt.description } : {}),
+              ...(prompt.arguments ? { arguments: prompt.arguments } : {}),
+            })),
+            ...(part.next ? { nextCursor: part.next } : {}),
+          },
+        };
+      }
+      case 'prompts/get': {
+        if (!options.prompts) return unknownMethod();
+        const prompt = typeof params.name === 'string' ? prompts.get(params.name) : undefined;
+        if (!prompt) return rpcError(id, RPC.invalidParams, `Unknown prompt: ${String(params.name)}`);
+        const args = params.arguments ?? {};
+        if (!isRecord(args) || Object.values(args).some((value) => typeof value !== 'string'))
+          return rpcError(id, RPC.invalidParams, 'arguments must be an object of strings');
+        const missing = (prompt.arguments ?? []).filter((arg) => arg.required && !(args[arg.name] as string)?.trim());
+        if (missing.length)
+          return rpcError(id, RPC.invalidParams, `Missing required argument: ${missing.map((arg) => arg.name).join(', ')}`);
+        return { jsonrpc: '2.0', id, result: prompt.get(args as Record<string, string>) as unknown as Json };
+      }
       default:
-        return rpcError(id, RPC.methodNotFound, `Method not found: ${message.method}`);
+        return unknownMethod();
     }
   }
 

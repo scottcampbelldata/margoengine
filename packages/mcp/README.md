@@ -127,6 +127,68 @@ console.log(formatError('Mesh disposed', matches)); // title, link, cause and fi
 A message with values in it (a name, a number) that the page does not list word for word is matched by its words: it
 needs at least half of its words in one listed message, so a message from outside Margo matches nothing.
 
+## Resources and prompts
+
+Besides tools, the server offers the docs as MCP resources, so a client can put a page into the model's context
+without a tool call, and four starter prompts that a user picks from the client's menu (Claude Code lists them as
+slash commands, `/mcp__margoengine__start_scene` and so on). Each prompt tells the model which tools to use and in
+what order. From `@margoengine/mcp/resources`.
+
+| Resource | What it holds |
+| --- | --- |
+| `margo://readme` | The engine README. |
+| `margo://packages/<id>/readme` | A package README, by its short name (`sciviz`; `@margoengine/sciviz` works too). |
+| `margo://packages/<id>/api` | Every export of a package with its declaration, one section per entry point. |
+| `margo://docs/<path>` | A docs page by its path without `.md` (`margo://docs/limits`, `margo://docs/guides/kits`). |
+
+| Prompt | Arguments | What it asks for |
+| --- | --- | --- |
+| `start_scene` | `idea` | A first scene with the stage, started from the closest example and checked with `check_snippet`. |
+| `port_code` | `code` (required), `from` | The code converted class by class with `port_to_margo`, then checked. |
+| `fix_error` | `error` (required), `code` | The cause and fix from `explain_error`, then the fixed code. |
+| `add_feature` | `feature` (required), `code` | The optional package that provides the feature, added to the code. |
+
+Any server made with `createMcpServer` can offer them:
+
+```ts
+import { createMcpServer, loadCorpus } from '@margoengine/mcp';
+import { createDocResources, createStarterPrompts } from '@margoengine/mcp/resources';
+
+const server = createMcpServer({
+  tools: [],
+  resources: createDocResources(await loadCorpus()),
+  prompts: createStarterPrompts(),
+});
+const listed = await server.handle({ jsonrpc: '2.0', id: 1, method: 'resources/list' });
+console.log(listed); // the first 100 resources and a nextCursor for the rest
+const page = await server.handle({
+  jsonrpc: '2.0',
+  id: 2,
+  method: 'resources/read',
+  params: { uri: 'margo://packages/stage/readme' },
+});
+console.log(page); // { contents: [{ uri, mimeType: 'text/markdown', text }] }
+const prompt = await server.handle({
+  jsonrpc: '2.0',
+  id: 3,
+  method: 'prompts/get',
+  params: { name: 'fix_error', arguments: { error: 'Mesh disposed; see https://margoengine.com/errors#disposed' } },
+});
+console.log(prompt); // one user message that names explain_error and check_snippet
+server.dispose();
+```
+
+| Option | Default | |
+| --- | --- | --- |
+| `createMcpServer({ resources })` | none | A `ResourceProvider` (`list`, `templates`, `read`); the `resources` capability is declared only when given. |
+| `createMcpServer({ prompts })` | none | `PromptDefinition`s; the `prompts` capability is declared only when given. |
+| `createMcpServer({ pageSize })` | 100 | Items per page of `resources/list`, `resources/templates/list` and `prompts/list`. |
+| `createMargoServer()` | both offered | The command always offers the docs resources and the starter prompts. |
+
+Resources come only from the shipped snapshot: an address it does not list (a file path, another scheme) is `-32002`
+Resource not found. Lists are paged with an opaque `cursor`; a cursor the server did not hand out is `-32602`.
+Subscriptions and list-change notifications are not offered, since the snapshot does not change while the server runs.
+
 ## Set up
 
 Every client starts the same command. `--root` names the project whose `node_modules` has `typescript` and the
@@ -224,10 +286,11 @@ Options and defaults:
 
 A failed tool call is a normal result with `isError: true`, a `structuredContent.error` with a `code`
 (`argument`, `range`, `unsupported`, `failed`, `disposed`) and a message that ends with a link to the
-[error help](https://margoengine.com/errors#mcp). Protocol faults are JSON-RPC errors (`-32700` to `-32603`).
+[error help](https://margoengine.com/errors#mcp). Protocol faults are JSON-RPC errors (`-32700` to `-32603`, and `-32002` for an unknown resource).
 
 ## Protocol
 
 Implemented from the published specification: JSON-RPC 2.0, one message per line over stdio, `initialize` (versions
-2025-11-25, 2025-06-18, 2025-03-26 and 2024-11-05), `ping`, `tools/list`, `tools/call` and
-`notifications/cancelled`. Requests run side by side. Nothing but protocol messages goes to stdout.
+2025-11-25, 2025-06-18, 2025-03-26 and 2024-11-05), `ping`, `tools/list`, `tools/call`,
+`resources/list`, `resources/templates/list`, `resources/read`, `prompts/list`, `prompts/get` (paged with a cursor)
+and `notifications/cancelled`. Requests run side by side. Nothing but protocol messages goes to stdout.

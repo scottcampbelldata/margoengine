@@ -721,9 +721,11 @@ export const entries = [
       'language is ts or js',
       'gpuFlags is an array of strings',
       'TypeScript snippets need Node 22.13 or newer; pass language js or update Node',
+      'createDocResources needs a corpus with packages and docs',
+      'pageSize must be an integer of at least 1',
     ],
     cause:
-      'A tool call got an argument it cannot use (a missing or empty string, a value outside the allowed list, a package or entry that does not exist), TypeScript is not installed in the project that check_snippet reads, the compiler did not run or ran out of time, the porting guides file (dist/porting.json) is missing from the install, or the server was disposed while a request was running. The server reports a tool failure as a result with isError set and the error code, so the model can read it and retry.',
+      'A tool call got an argument it cannot use (a missing or empty string, a value outside the allowed list, a package or entry that does not exist), TypeScript is not installed in the project that check_snippet reads, the compiler did not run or ran out of time, the porting guides file (dist/porting.json) is missing from the install, createDocResources was given something other than a corpus, createMcpServer a pageSize below 1, or the server was disposed while a request was running. The server reports a tool failure as a result with isError set and the error code, so the model can read it and retry.',
     fix: 'Read the message: it names the fix. Pass the arguments the tool lists (call tools/list), use list_packages for package names, and start the server with --root <folder> where the folder has typescript and the @margoengine packages in node_modules (npm install typescript margoengine). Branch on error.code: argument and range are for the caller to fix, unsupported means install TypeScript, failed means retry with a shorter snippet (or reinstall @margoengine/mcp when the porting guides cannot be read). port_to_margo takes a class name or a task in name, and from only as one of the libraries its schema lists.',
   },
   {

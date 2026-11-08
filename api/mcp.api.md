@@ -61,7 +61,7 @@ export interface CorpusPackage {
 
 export type HitKind = 'readme' | 'api' | 'doc' | 'example';
 
-export const INSTRUCTIONS = "Margo Engine is a WebGPU 3D engine. Its core is small and frozen; every feature is a separate optional package. Before writing Margo code, call search_docs (a task or an exact name) or list_packages, then get_package for the README of the package you will use. After writing code, call check_snippet with it: it type-checks against the real package types in the project. Use list_examples to find a working example first. When the user brings code from another 3D library or names one of its APIs, call port_to_margo for the Margo package and calls that replace it. When the user pastes a Margo error, call explain_error with it. When render_snippet is offered, render code that draws to see what it shows.";
+export const INSTRUCTIONS = "Margo Engine is a WebGPU 3D engine. Its core is small and frozen; every feature is a separate optional package. Before writing Margo code, call search_docs (a task or an exact name) or list_packages, then get_package for the README of the package you will use. After writing code, call check_snippet with it: it type-checks against the real package types in the project. Use list_examples to find a working example first. When the user brings code from another 3D library or names one of its APIs, call port_to_margo for the Margo package and calls that replace it. When the user pastes a Margo error, call explain_error with it. When render_snippet is offered, render code that draws to see what it shows. Every package README and API report and every docs page is also a resource (margo://packages/<id>/readme, margo://packages/<id>/api, margo://docs/<path>), and the prompts start_scene, port_code, fix_error and add_feature set up common requests.";
 
 export type Json = null | boolean | number | string | Json[] | {
     [key: string]: Json;
@@ -108,9 +108,35 @@ export interface McpServerOptions {
     tools: readonly ToolDefinition[];
     instructions?: string;
     name?: string;
+    resources?: ResourceProvider;
+    prompts?: readonly PromptDefinition[];
+    pageSize?: number;
 }
 
 export const PROTOCOL_VERSIONS: readonly ['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05'];
+
+export interface PromptDefinition {
+    name: string;
+    title?: string;
+    description?: string;
+    arguments?: {
+        name: string;
+        description?: string;
+        required?: boolean;
+    }[];
+    get(args: Record<string, string>): {
+        description?: string;
+        messages: PromptMessage[];
+    };
+}
+
+export interface PromptMessage {
+    role: 'user' | 'assistant';
+    content: ToolContent | {
+        type: 'resource';
+        resource: ResourceContents;
+    };
+}
 
 export const RPC: {
     readonly parse: -32700;
@@ -118,7 +144,38 @@ export const RPC: {
     readonly methodNotFound: -32601;
     readonly invalidParams: -32602;
     readonly internal: -32603;
+    readonly resourceNotFound: -32002;
 };
+
+export interface ResourceContents {
+    uri: string;
+    mimeType?: string;
+    text?: string;
+    blob?: string;
+}
+
+export interface ResourceInfo {
+    uri: string;
+    name: string;
+    title?: string;
+    description?: string;
+    mimeType?: string;
+    size?: number;
+}
+
+export interface ResourceProvider {
+    list(): readonly ResourceInfo[];
+    templates?(): readonly ResourceTemplateInfo[];
+    read(uri: string, context: ToolContext): Promise<ResourceContents[] | undefined> | ResourceContents[] | undefined;
+}
+
+export interface ResourceTemplateInfo {
+    uriTemplate: string;
+    name: string;
+    title?: string;
+    description?: string;
+    mimeType?: string;
+}
 
 export interface SearchHit {
     kind: HitKind;

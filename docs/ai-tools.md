@@ -36,6 +36,12 @@ answers from the docs of the version you installed, and it type-checks code agai
 | `explain_error` | Explain a pasted Margo error (the message, its `errors#<id>` link, the id or the `MargoError` code) with its cause and fix from the [error help page](https://margoengine.com/errors). |
 | `render_snippet` | Only with `--render`: run a snippet on the GPU in Node and see the PNG it draws. Needs `@margoengine/headless`, `@margoengine/stage` and `webgpu` in the project; runs code with your rights. |
 
+The server also offers every package README and API report and every docs page as resources
+(`margo://packages/<id>/readme`, `margo://packages/<id>/api`, `margo://docs/<path>`, `margo://readme`), which a
+client can attach to a conversation without a tool call, and four starter prompts: `start_scene`, `port_code`,
+`fix_error` and `add_feature` (in Claude Code, `/mcp__margoengine__start_scene` and so on). Each prompt names the
+tools to use, in the order below.
+
 Setup (full steps in the [package README](../packages/mcp/README.md)):
 
 ```sh
@@ -73,6 +79,8 @@ This project uses Margo Engine (WebGPU). Docs for AI: https://margoengine.com/ll
   the server is started with `--render`.
 - **Port by meaning.** `port_to_margo` matches the words and name parts of the matrix rows. A class the matrix does not
   list gets no row; the answer says so and points at `search_docs`.
+- **Watch the docs change.** Resources come from the snapshot the package was built with, so there are no
+  subscriptions or change notifications; update `@margoengine/mcp` to get newer docs.
 - **Know a package you have not installed.** `check_snippet` resolves imports from your `node_modules`; an import of a
   package that is not installed is reported as an error, which is the right answer for an app that does not have it.
 
