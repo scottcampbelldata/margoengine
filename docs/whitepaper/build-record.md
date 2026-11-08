@@ -2534,3 +2534,41 @@ diagnostic, one machine, a loaded one.
 - **Slips:** in job 7 a wrapper timeout killed a push attempt part way, which lost the landing lock; a new check and
   push followed. Main moved several times during the pushes and each time the rebase conflicts in generated records were
   resolved by the lane's script and the records regenerated. Nothing that failed was pushed.
+
+## Lane E batch 70: post
+
+Eight jobs for `@margoengine/post` on the M6 Mac mini (Metal), each landed as one commit. Core and stage are
+untouched. New looks go in new optional entries; rough reflections and multi-bounce GI are options of the existing
+`/ssr` and `/ssgi` entries, and decal culling is part of `/decals`. Nothing is timed.
+
+| # | Job | Status | Commit | Entry | Claim |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Subsurface scattering blur | DONE | `a7d0ca037` | `/sss` | LIM-434 |
+| 2 | Normal and roughness decals | DONE | `125430edf` | `/material-decals` | LIM-441 |
+| 3 | Supersampling | SKIPPED | | already in `@margoengine/quality/ssaa` | |
+| 4 | Culled decals | DONE | `8371f7ee5` | `/decals` | LIM-442 |
+| 5 | Rough reflections | DONE | `121df4d9c` | `/ssr` (`stochastic`) | LIM-446 |
+| 6 | Multi-bounce screen GI | DONE | `3b43b9e4a` | `/ssgi` (`multiBounce`) | LIM-455 |
+| 7 | Anamorphic streaks | DONE | `b966240c0` | `/anamorphic` | LIM-459 |
+| 8 | Blur effects | DONE | this commit | `/blur` | LIM-472 |
+
+- **Built from:** rows P-36 to P-42 in `docs/clean-room.md`: papers and specifications for SSS, decal culling (Gribb
+  and Hartmann), GGX visible normals (Heitz), orthonormal bases (Duff et al.), pcg3d hashing (Jarzynski and Olano),
+  variance clipping (Salvi), the rendering equation (Kajiya) and the a trous filter chain (Holschneider et al.), each
+  written from the method as published and marked where the paper was not re-read. Blur is standard separable
+  filtering. No code from another engine was read.
+- **Proved:** each entry has a CPU test and a browser check on this Mac (Metal, Chromium) under
+  `packages/post/test/`. Anamorphic: a small white box streaks to both frame edges while rows 24 px away stay the same
+  to the bit. Blur: a box blur of radius 6 changes exactly 12 pixels per middle row at a light and dark edge, a top-half
+  region leaves the bottom half bit-equal, and radius 0 equals disabled.
+- **Sizes (gzip, B):** new entries `/sss` 6,945, `/anamorphic` 6,295, `/blur` 5,947, `/material-decals` within its
+  8,550 budget; `/decals` 5,243 with culling; `/ssr` and `/ssgi` grew within their budgets (13,257 and 13,052). Core
+  and stage unchanged.
+- **Bugs fixed:** the blur check's first draft counted changed pixels across the whole row and caught the boxes' outer
+  edges against the background as well (35 pixels for three edges, 12 each); the blur itself was right, and the check
+  now reads within 3 radius of the middle edge. The blur draft's uniform buffer was sized to its two 256 B slices
+  before it ran.
+- **Limits and unmeasured:** rows in `docs/limits.md`. GPU cost of every new pass is not measured; rough reflections
+  and multi-bounce GI need a few frames to settle and trail a moving camera; anamorphic streaks are horizontal only.
+- **Slips:** main moved during several landings; each rebase conflict in generated records was resolved by
+  regenerating them, and claim numbers were renumbered after main's. Nothing that failed was pushed.

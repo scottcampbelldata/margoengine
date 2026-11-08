@@ -677,6 +677,38 @@ streaks.options.tint = [1, 0.8, 0.6]; // warm streaks: options are read every fr
 - **Limits.** Horizontal only; one colour per streak (no rainbow split); streaks are about 4 px tall. Two quarter-size
   and one full-size `rgba16float` targets. GPU cost not measured yet. WebGPU only.
 
+## Blur: `Blur`
+
+`@margoengine/post/blur` (5,947 B min+gzip, its own entry; it carries the stack) blurs the frame, all of it or one
+rectangle: frosted glass behind a menu, a focus pull, or a step in your own chain of effects. An HDR `PostStack` effect.
+
+```ts
+import {createStage} from 'margoengine';
+import {PostStack} from 'margoengine/post/stack';
+import {Blur} from 'margoengine/post/blur';
+import {Tonemap} from 'margoengine/tonemap';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+const glass = new Blur({radius: 12, region: [0.6, 0.1, 0.95, 0.9]});
+PostStack.attach(stage.engine, [glass, new Tonemap()]);
+glass.radius = 4; // a focus pull: options are read every frame
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `kind` | `'gaussian'` | `'gaussian'` (sigma = radius / 3) or `'box'` (equal weights) |
+| `radius` | `8` | Half width of the kernel in pixels, 0 to 64; 0 passes the frame through |
+| `region` | `[0, 0, 1, 1]` | Part of the view to blur, `[x0, y0, x1, y1]` in 0..1, y down; outside it the frame passes |
+| `enabled` | `true` | False passes frames through |
+
+- **Method.** Separable: a horizontal pass of 2 radius + 1 taps into an `rgba16float` texture, then a vertical pass.
+  Gaussian weights exp(-x^2 / (2 sigma^2)) normalised over the taps, box weights all equal. Taps past the frame edge
+  read the nearest pixel.
+- **Checked on a real GPU** (`packages/post/test/blur-browser.mjs`, M6 Mac mini, Metal, Chromium): a box blur of
+  radius 6 over a light and dark edge changes exactly 12 pixels on each middle row, all within 7 px of the edge; with
+  `region` the top half, the bottom half equals the unblurred frame to the bit; radius 0 equals disabled exactly.
+- **Limits.** Cost grows with the radius (2 radius + 1 reads a pixel a pass); the region has a hard edge; a bright
+  frame border bleeds inward. One or two full-size `rgba16float` targets. GPU cost not measured yet. WebGPU only.
+
 ## Multiple render targets: `SceneTargets`
 
 `@margoengine/post/mrt` draws the scene's surfaces into several named textures in one pass. Each output is a built-in

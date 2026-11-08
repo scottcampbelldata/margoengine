@@ -28,7 +28,7 @@
   "scripts": {
     "test": "node --test test/*.test.js ../../tests/modern-scene-fade-lifecycle.test.js",
     "prepack": "npm --prefix ../.. run build:packages",
-    "test:gpu": "cd ../.. && node packages/post/test/image-browser.mjs && node packages/post/test/outline-browser.mjs && node packages/post/test/contact-shadows-browser.mjs && node packages/post/test/sss-browser.mjs && node packages/post/test/material-decals-browser.mjs && node packages/post/test/decals-cull-browser.mjs && node packages/post/test/ssr-rough-browser.mjs && node packages/post/test/ssgi-bounce-browser.mjs && node packages/post/test/anamorphic-browser.mjs",
+    "test:gpu": "cd ../.. && node packages/post/test/image-browser.mjs && node packages/post/test/outline-browser.mjs && node packages/post/test/contact-shadows-browser.mjs && node packages/post/test/sss-browser.mjs && node packages/post/test/material-decals-browser.mjs && node packages/post/test/decals-cull-browser.mjs && node packages/post/test/ssr-rough-browser.mjs && node packages/post/test/ssgi-bounce-browser.mjs && node packages/post/test/anamorphic-browser.mjs && node packages/post/test/blur-browser.mjs",
     "test:gpu:looks": "cd ../.. && node scripts/post-looks-gpu-check.js"
   },
   "sideEffects": false,
@@ -120,6 +120,10 @@
     "./anamorphic": {
       "types": "./dist/anamorphic.d.ts",
       "import": "./dist/anamorphic.js"
+    },
+    "./blur": {
+      "types": "./dist/blur.d.ts",
+      "import": "./dist/blur.js"
     },
     "./material-decals": {
       "types": "./dist/material-decals.d.ts",

@@ -1982,6 +1982,10 @@
       "types": "./dist/post/anamorphic.d.ts",
       "import": "./dist/post/anamorphic.js"
     },
+    "./post/blur": {
+      "types": "./dist/post/blur.d.ts",
+      "import": "./dist/post/blur.js"
+    },
     "./post/material-decals": {
       "types": "./dist/post/material-decals.d.ts",
       "import": "./dist/post/material-decals.js"

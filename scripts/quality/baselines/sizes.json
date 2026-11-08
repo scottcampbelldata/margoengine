@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10976176,
+  "total": 10982379,
   "history": [
     {
       "date": "2026-10-24",
@@ -4112,6 +4112,12 @@
       "commit": "8ff2b7af5",
       "reason": "environment: image decoders split into dist/loaders.js, loaded by EnvironmentLighting.load on its first URL; an app of Environment and EnvironmentLighting drops about 9.3 KB gzip, the whole root (both files) grows 477 B from the split",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "c10202e34",
+      "reason": "post/blur: new optional entry, Gaussian and box blur",
+      "grew": 1
     }
   ],
   "items": {
@@ -4590,6 +4596,7 @@
     "@margoengine/post/afterimage": 5619,
     "@margoengine/post/anamorphic": 6551,
     "@margoengine/post/bloom": 7005,
+    "@margoengine/post/blur": 6203,
     "@margoengine/post/contact-shadows": 6389,
     "@margoengine/post/decals": 5499,
     "@margoengine/post/depth": 3876,

@@ -1,5 +1,5 @@
 {
-  "commit": "8ff2b7af5",
+  "commit": "37f7209c2",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -2081,6 +2081,10 @@
         "raw": 18457,
         "gzip": 6295
       },
+      "./blur": {
+        "raw": 17070,
+        "gzip": 5947
+      },
       "./material-decals": {
         "raw": 22715,
         "gzip": 8325
@@ -2728,8 +2732,8 @@
     },
     "@margoengine/stats": {
       ".": {
-        "raw": 14029,
-        "gzip": 4825
+        "raw": 14066,
+        "gzip": 4853
       },
       "./beacon": {
         "raw": 3315,
