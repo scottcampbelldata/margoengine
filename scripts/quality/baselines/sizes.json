@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11222038,
+  "total": 11223900,
   "history": [
     {
       "date": "2026-10-24",
@@ -4346,6 +4346,12 @@
       "commit": "e396b29ea",
       "reason": "physics/next cylinder and cone, sharp and round (kernel revolve.rs and smooth.rs: closed-form support points, cap and side line manifolds, mass and inertia integrals over the rounded profile, closed-form rays and the GJK border margin; gjk.rs needle simplex numerics): kernel 137,435 to 151,744 B deflated (Lane Q commit ca91b1f8e included). Every piece is needed: Rapier has cylinder, cone, roundCylinder and roundCone, and each part has its regression test in kernel/tests/revolve.rs, gjk.rs and cast.rs.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "af8a2bc28",
+      "reason": "ui text direction and ligatures options",
+      "grew": 2
     }
   ],
   "items": {
@@ -5051,8 +5057,8 @@
     "@margoengine/tween/motion-path": 1263,
     "@margoengine/tween/scroll": 1198,
     "@margoengine/tween/stagger": 1435,
-    "@margoengine/ui": 28221,
-    "@margoengine/ui/react": 28294,
+    "@margoengine/ui": 29167,
+    "@margoengine/ui/react": 29210,
     "@margoengine/ui/world": 9277,
     "@margoengine/usdz": 12708,
     "@margoengine/usdz dist/workers/usdz.js": 116081,

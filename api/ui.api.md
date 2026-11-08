@@ -569,6 +569,11 @@ export class Ui {
     set theme(theme: Theme);
     get textScale(): number;
     set textScale(value: number);
+    get ligatures(): boolean;
+    set ligatures(value: boolean);
+    get direction(): UiDirection;
+    set direction(value: UiDirection);
+    textDirection(text: string): 'ltr' | 'rtl';
     get motion(): boolean;
     set motion(value: boolean);
     get width(): number;
@@ -656,6 +661,8 @@ export interface UiActionOptions {
 
 export type UiCommand = 'up' | 'down' | 'left' | 'right' | 'accept' | 'cancel' | 'next' | 'previous';
 
+export type UiDirection = 'auto' | 'ltr' | 'rtl';
+
 export interface UiEvent {
     type: string;
     target: Widget;
@@ -678,6 +685,8 @@ export interface UiOptions {
     textScale?: number | 'auto';
     safeArea?: SafeArea | 'auto';
     reducedMotion?: boolean;
+    ligatures?: boolean;
+    direction?: UiDirection;
 }
 
 export class UiRenderer implements EnginePlugin {

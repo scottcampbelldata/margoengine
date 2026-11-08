@@ -1,5 +1,13 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-import { Font, layoutText, type FontOptions, type TextLayout, type TextMeasurer } from '@margoengine/text';
+import {
+  Font,
+  bidiClass,
+  graphemes,
+  layoutText,
+  type FontOptions,
+  type TextLayout,
+  type TextMeasurer,
+} from '@margoengine/text';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
 import { Panel, type TextSize } from './basic.js';
 import { parseRgba, type Rgba } from './color.js';
@@ -102,11 +110,27 @@ export interface UiOptions {
   safeArea?: SafeArea | 'auto';
   /** Turn transitions off. Default the user's `prefers-reduced-motion`. */
   reducedMotion?: boolean;
+  /**
+   * Latin ligatures: each Latin word is drawn as one shaped run, so fi, fl and the font's other ligatures form. Arabic
+   * and Indic words are always drawn as shaped runs (joined letters, conjuncts, vowel signs). Default false.
+   */
+  ligatures?: boolean;
+  /**
+   * Direction of UI text. `'auto'` takes it from each text's first strong letter (Arabic and Hebrew read right to left,
+   * text with no strong letter left to right); `'ltr'` or `'rtl'` sets it for every text. A text's `'start'`
+   * alignment is its reading start: the right edge for right-to-left text. Default `'auto'`.
+   */
+  direction?: UiDirection;
 }
+
+/** Direction of UI text: from each text, or set for all. */
+export type UiDirection = 'auto' | 'ltr' | 'rtl';
+const DIRECTIONS: readonly UiDirection[] = ['auto', 'ltr', 'rtl'];
 
 const MAX_TOASTS = 5;
 const LINE_HEIGHT = 1.25;
 const ALIGN = { start: 'left', center: 'center', end: 'right' } as const;
+const ALIGN_RTL = { start: 'right', center: 'center', end: 'left' } as const;
 
 /**
  * A game user interface: a tree of widgets in layers (screen, dialogs, toasts, tooltips), a theme, resolution and text
@@ -147,6 +171,8 @@ export class Ui {
   private _pixelRatio: number;
   private _safeArea: SafeArea | 'auto';
   private _motion: boolean;
+  private _ligatures = false;
+  private _direction: UiDirection = 'auto';
   private resolved = 1;
   private layoutDirty = true;
   private drawDirty = true;
@@ -192,6 +218,7 @@ export class Ui {
     this._height = height;
     this._pixelRatio = pixelRatio;
     this.setTextScale(textScale === 'auto' ? browserTextScale() : textScale);
+    this.setShaping(options.ligatures ?? false, options.direction ?? 'auto');
     this.root = new Panel({ id: 'ui-root', direction: 'stack', radius: 0 });
     this.modalLayer = new Panel({ id: 'ui-modal', direction: 'stack', radius: 0 });
     this.toastLayer = new Panel({ id: 'ui-toasts', direction: 'stack', radius: 0 });
@@ -240,6 +267,41 @@ export class Ui {
       throw rangeError('textScale must be a number from 0.5 to 3', 'ui');
     this._textScale = value;
     this.cache.clear();
+  }
+  /** Whether Latin words draw as shaped runs with the font's ligatures. Setting it lays the text out again. */
+  get ligatures(): boolean {
+    return this._ligatures;
+  }
+  set ligatures(value: boolean) {
+    this.setShaping(value, this._direction);
+    this.invalidate(true);
+  }
+  /** Direction of UI text: `'auto'` from each text, or `'ltr'` or `'rtl'` for all. Setting it lays the text out again. */
+  get direction(): UiDirection {
+    return this._direction;
+  }
+  set direction(value: UiDirection) {
+    this.setShaping(this._ligatures, value);
+    this.invalidate(true);
+  }
+  private setShaping(ligatures: boolean, direction: UiDirection): void {
+    if (typeof ligatures !== 'boolean') throw typeError('ligatures must be true or false', 'ui');
+    if (!DIRECTIONS.includes(direction)) throw typeError("direction must be 'auto', 'ltr' or 'rtl'", 'ui');
+    this._ligatures = ligatures;
+    this._direction = direction;
+    this.cache.clear();
+  }
+  /**
+   * The direction `text` reads in: the UI's `direction` when set, otherwise that of the first strong letter (`'rtl'`
+   * for Arabic, Hebrew and their neighbours), and `'ltr'` for text without one.
+   */
+  textDirection(text: string): 'ltr' | 'rtl' {
+    if (this._direction !== 'auto') return this._direction;
+    for (const { cluster } of graphemes(text)) {
+      const kind = bidiClass(cluster);
+      if (kind !== 'N') return kind === 'R' ? 'rtl' : 'ltr';
+    }
+    return 'ltr';
   }
   /** False when transitions are off (reduced motion). */
   get motion(): boolean {
@@ -469,7 +531,9 @@ export class Ui {
   }
 
   /**
-   * Lay out text with the font: wrapped to `maxWidth` UI units, `align`ed within its widest line. Results are cached.
+   * Lay out text with the font: wrapped to `maxWidth` UI units, `align`ed within its widest line (`'start'` is the
+   * right edge of right-to-left text, see {@link Ui.textDirection}). Arabic and Indic words are shaped runs, and Latin
+   * words too with {@link UiOptions.ligatures}. Results are cached.
    * @throws TypeError or RangeError for a bad size or width.
    */
   textLayout(
@@ -494,7 +558,9 @@ export class Ui {
           fontSize,
           lineHeight,
           maxWidth: Math.max(0, maxWidth),
-          textAlign: ALIGN[align],
+          textAlign: (this.textDirection(text) === 'rtl' ? ALIGN_RTL : ALIGN)[align],
+          direction: this._direction,
+          ligatures: this._ligatures,
           whiteSpace: 'normal',
           anchorX: 'left',
           anchorY: 'top',

@@ -221,6 +221,32 @@ UI units become CSS pixels by the resolution scale and device pixels by the pixe
 units and drawn as signed distance fields at the final pixel size, so it stays sharp. `UiRenderer` calls `resize` from
 the canvas every frame. `textScale` multiplies every text size and reflows the layout.
 
+## Arabic, Indic and right-to-left text
+
+```ts
+import { Label, Panel, Ui } from '@margoengine/ui';
+
+const ui = new Ui({ ligatures: true }); // Latin words draw as shaped runs too, so fi and fl join
+ui.add(
+  new Panel({
+    anchor: 'top-left',
+    children: [
+      new Label({ text: 'مرحبا بالعالم', width: 300 }), // joined Arabic letters, at the right edge of its box
+      new Label({ text: 'नमस्ते दुनिया', width: 300 }), // Devanagari conjuncts and vowel signs
+      new Label({ text: 'office flow', width: 300 }),
+    ],
+  }),
+);
+console.log(ui.textDirection('مرحبا')); // 'rtl'
+```
+
+UI text is laid out by `@margoengine/text`, which hands each Arabic and Indic word (Devanagari, Bengali, Tamil and the
+other Indic scripts) to the browser's shaper as one run, so letters join, conjuncts form and vowel signs sit where they
+belong. `ligatures: true` does the same for Latin words. Each text reads in the direction of its first strong letter
+(`ui.textDirection(text)`), and `'start'` alignment is its reading start: the right edge for Arabic and Hebrew.
+`direction: 'rtl'` or `'ltr'` sets one direction for all UI text instead. Both can be changed later (`ui.ligatures`,
+`ui.direction`), which lays the text out again.
+
 ## Mouse, touch, keyboard and gamepad
 
 `UiRenderer.attach(engine, ui)` connects the engine's canvas for you (`{ input: false }` turns that off). Everything works
@@ -430,6 +456,8 @@ canvas. Keyboard and gamepad focus work as on the screen through the panel's own
 | `textScale` | `1` |
 | `safeArea` | `'auto'` |
 | `reducedMotion` | the user's `prefers-reduced-motion` |
+| `ligatures` | `false` (Arabic and Indic words are always shaped; `true` shapes Latin words too) |
+| `direction` | `'auto'` (each text's first strong letter); `'ltr'` or `'rtl'` for all UI text |
 | `measurer` | the font; pass your own for tests or servers |
 
 Errors follow the repository convention: bad arguments throw `TypeError` or `RangeError` whose message names the fix and
@@ -451,6 +479,8 @@ ends with a link to [margoengine.com/errors#ui](https://margoengine.com/errors#u
 
 - WebGPU only for drawing. On WebGL2 the UI still updates, but nothing shows (world panels too).
 - A world panel is a flat rectangle drawn with depth test and no depth write, so it does not hide transparent effects drawn after it; no curved panels; one texture and one pair of glyph atlases per panel.
-- Text shaping is the text package's: no Arabic or Indic shaping, no ligatures.
+- Shaping is the browser's, one word at a time: a run never crosses a space, so no join or ligature forms across
+  words. Only labels and wrapped text follow the text direction: toggles, slider values, list details and rows of
+  widgets keep left-to-right placement (no mirrored layout).
 - Layout is single-pass flexbox. A wrapping row breaks lines by its children's base sizes, so a child that would grow
   never pulls the next one up; columns do not wrap, and lines always stack down from the top (no `align-content`).

@@ -243,6 +243,51 @@ async function run() {
     await frame();
   });
 
+
+  await check('Arabic and Devanagari words draw as shaped runs and right-to-left labels start at the right edge', async () => {
+    // U+200C (zero width non-joiner) between the letters forces each one into its isolated form.
+    const word = 'مرحبا',
+      split = [...word].join('‌');
+    const joined = new Label({ text: word, size: 'large', wrap: false }),
+      apart = new Label({ text: split, size: 'large', wrap: false }),
+      boxed = new Label({ text: word, size: 'large', width: 220 }),
+      hindi = new Label({ text: 'नमस्ते', size: 'large', wrap: false });
+    const panel = new Panel({ anchor: 'bottom-left', margin: 24, gap: 8, padding: 8, align: 'start' });
+    panel.add(joined, apart, boxed, hindi);
+    ui.add(panel);
+    const f = await frame();
+    const ink = (widget) => {
+      const r = px(widget);
+      let lo = Infinity,
+        hi = -Infinity;
+      for (let x = Math.floor(r.x); x < Math.ceil(r.x + r.width); x++)
+        if (f.count({ x, y: r.y, width: 1, height: r.height }, (p) => luminance(p) > 120)) {
+          lo = Math.min(lo, x);
+          hi = Math.max(hi, x + 1);
+        }
+      return { lo, hi, width: hi - lo, box: r };
+    };
+    const a = ink(joined),
+      b = ink(apart),
+      c = ink(boxed),
+      d = ink(hindi);
+    // The browser's shaper joins the letters only when the word reaches it as one run; isolated forms are wider.
+    assert(a.width > 10 && a.width < b.width, `the joined word (${a.width} px) is narrower than its isolated letters (${b.width} px)`);
+    const letters = [...word].reduce((sum, letter) => {
+      const l = ui.textLayout(letter, 'large');
+      return sum + l.bounds.right - l.bounds.left;
+    }, 0);
+    const run = ui.textLayout(word, 'large');
+    assert(run.bounds.right - run.bounds.left < letters, 'the run is measured shaped, not letter by letter');
+    // In a 220-unit box, start is the right edge for Arabic: ink ends near the box's right and starts past its middle.
+    assert(Math.abs(c.hi - (c.box.x + c.box.width)) <= 4 * ui.scale, `right-aligned ink ends at ${c.hi}, box at ${c.box.x + c.box.width}`);
+    assert(c.lo > c.box.x + c.box.width / 2, 'the Arabic label does not start at the left edge');
+    assert(d.width > 10, `the Devanagari word draws (${d.width} px of ink)`);
+    assert(gpuErrors.length === 0, `GPU errors: ${gpuErrors}`);
+    ui.remove(panel);
+    await frame();
+  });
+
   await check('an inventory draws slots, icons and counts without GPU errors', async () => {
     const grid = new Inventory({
       columns: 4,

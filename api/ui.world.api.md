@@ -384,6 +384,11 @@ class Ui {
     set theme(theme: Theme);
     get textScale(): number;
     set textScale(value: number);
+    get ligatures(): boolean;
+    set ligatures(value: boolean);
+    get direction(): UiDirection;
+    set direction(value: UiDirection);
+    textDirection(text: string): 'ltr' | 'rtl';
     get motion(): boolean;
     set motion(value: boolean);
     get width(): number;
@@ -465,6 +470,8 @@ class Ui {
 
 type UiCommand = 'up' | 'down' | 'left' | 'right' | 'accept' | 'cancel' | 'next' | 'previous';
 
+type UiDirection = 'auto' | 'ltr' | 'rtl';
+
 interface UiEvent {
     type: string;
     target: Widget;
@@ -487,6 +494,8 @@ interface UiOptions {
     textScale?: number | 'auto';
     safeArea?: SafeArea | 'auto';
     reducedMotion?: boolean;
+    ligatures?: boolean;
+    direction?: UiDirection;
 }
 
 interface UnclipCommand {

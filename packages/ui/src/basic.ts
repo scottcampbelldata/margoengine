@@ -96,7 +96,7 @@ export interface LabelOptions extends WidgetOptions {
   size?: TextSize;
   /** A colour role such as `'textMuted'` or `'danger'`, or `#rrggbb[aa]`. Default `'text'`. */
   color?: ColorRef;
-  /** Alignment of the text inside the label's box. Default `'start'`. */
+  /** Alignment of the text inside the label's box; `'start'` is the reading start (the right edge of right-to-left text). Default `'start'`. */
   align?: 'start' | 'center' | 'end';
   /** Wrap at the box's width. Default true; false keeps one line per newline. */
   wrap?: boolean;
@@ -198,7 +198,9 @@ export class Label extends Widget {
     const r = this.rect,
       layout = ui.textLayout(this._text, this._size, this._wrap ? r.width : Infinity, this._lineHeight, this._align),
       width = layout.bounds.right - layout.bounds.left;
-    const x = this._align === 'center' ? (r.width - width) / 2 : this._align === 'end' ? r.width - width : 0;
+    // 'start' is the reading start: the right edge of right-to-left text.
+    const right = (this._align === 'end') !== (ui.textDirection(this._text) === 'rtl');
+    const x = this._align === 'center' ? (r.width - width) / 2 : right ? r.width - width : 0;
     const color: Rgba = ui.color(this._color);
     list.text(
       r.x + x - layout.bounds.left,

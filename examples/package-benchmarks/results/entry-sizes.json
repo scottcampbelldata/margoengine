@@ -1,5 +1,5 @@
 {
-  "commit": "b10af4c47",
+  "commit": "af8a2bc28",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -2402,8 +2402,8 @@
         "gzip": 977
       },
       "./scenes": {
-        "raw": 63791,
-        "gzip": 18788
+        "raw": 64087,
+        "gzip": 18909
       },
       "./stars": {
         "raw": 10128,
@@ -2928,8 +2928,8 @@
     },
     "@margoengine/tonemap": {
       ".": {
-        "raw": 35323,
-        "gzip": 12336
+        "raw": 35619,
+        "gzip": 12460
       },
       "./grade": {
         "raw": 3256,
@@ -2980,12 +2980,12 @@
     },
     "@margoengine/ui": {
       ".": {
-        "raw": 84991,
-        "gzip": 27968
+        "raw": 85918,
+        "gzip": 28317
       },
       "./react": {
-        "raw": 86925,
-        "gzip": 28062
+        "raw": 87853,
+        "gzip": 28359
       },
       "./world": {
         "raw": 25273,
@@ -3478,9 +3478,9 @@
       "brotli": 7260
     },
     "packages/tonemap/dist/index.js": {
-      "raw": 35323,
-      "gzip": 12336,
-      "brotli": 10982
+      "raw": 35619,
+      "gzip": 12460,
+      "brotli": 11098
     },
     "packages/physics/dist/index.js": {
       "raw": 59627,

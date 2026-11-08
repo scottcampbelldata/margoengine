@@ -1,5 +1,5 @@
 export { Ui, resolutionScale, readSafeArea, browserTextScale } from './ui.js';
-export type { UiOptions, ScaleOptions, SafeArea } from './ui.js';
+export type { UiOptions, ScaleOptions, SafeArea, UiDirection } from './ui.js';
 export { UiRenderer } from './renderer.js';
 export { attachInput } from './dom.js';
 export { attachMirror } from './mirror.js';
