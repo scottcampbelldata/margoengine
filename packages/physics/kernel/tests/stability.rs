@@ -163,9 +163,9 @@ fn a_stretched_joint_does_not_jump_a_body_past_a_wall() {
     assert!(x < -0.5, "reached {x}");
 }
 
-/// A random web of every kind of joint, as the replay scene makes: the fastest any body went in `steps`, and whether a value
-/// stopped being a number.
-fn web(seed: u32, steps: u32) -> f32 {
+/// A random web of every kind of joint, as the replay scene makes: the fastest any body went in `steps` and the fastest any
+/// spun, each not a number once a value stopped being one.
+fn web(seed: u32, steps: u32) -> (f32, f32) {
     let mut state = seed;
     let mut next = move || {
         state ^= state << 13;
@@ -209,7 +209,7 @@ fn web(seed: u32, steps: u32) -> f32 {
         }
     }
     w.header_mut().substeps = 1;
-    let mut top = 0.0f32;
+    let (mut top, mut spin) = (0.0f32, 0.0f32);
     for i in 0..steps {
         for &row in &rows {
             let at = row as usize;
@@ -234,9 +234,14 @@ fn web(seed: u32, steps: u32) -> f32 {
             if !(s <= top) {
                 top = s;
             }
+            let o = w.v(ANGULAR_X, row as usize);
+            let o = sqrt(o.dot(o));
+            if !(o <= spin) {
+                spin = o;
+            }
         }
     }
-    top
+    (top, spin)
 }
 
 #[test]
@@ -246,11 +251,23 @@ fn a_web_of_joints_stays_in_the_numbers() {
     // this to not a number on most seeds.
     let mut worst = 0.0f32;
     for seed in 1..=60 {
-        let top = web(seed, 2000);
+        let (top, _) = web(seed, 2000);
         assert!(top < 1e5, "seed {seed} reached {top} m/s");
         worst = worst.max(top);
     }
     println!("fastest in the webs: {worst:.0} m/s");
+}
+
+#[test]
+fn a_cut_push_still_takes_back_the_speed_along_the_locks() {
+    // Seed 45, step 1986: a hinge's limit stops a turn about an anchor 24 m off, which only the locks can carry, so it gives
+    // its body 7,500 rad/s that the path solve after it takes back. The pushing pass cut its whole path solve to nothing, that
+    // taking back included, and handed a neighbour 457,390 rad/s; contacts passed it on and a body landed 1,100 m from its
+    // joints. The scene's own motion, a kinematic turn of 77 rad/s at up to 30 m, carries an anchor at 2,300 m/s, which
+    // turns an arm of 0.125 m at no more than about 18,400 rad/s. Before the fix the web reached 162,278 rad/s.
+    let (top, spin) = web(45, 2000);
+    println!("web 45: fastest {top:.0} m/s, top spin {spin:.0} rad/s");
+    assert!(spin < 18_400.0, "a body spun at {spin} rad/s");
 }
 
 #[test]

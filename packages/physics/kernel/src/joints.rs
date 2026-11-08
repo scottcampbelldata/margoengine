@@ -38,11 +38,12 @@
 // gamma = min(1, N / M) gamma_max, N what is asked and M what the parts would each move, which M far over N shows cancelling.
 // Here N is what a path asks, M the fastest any of its bodies would go at its centre plus its arm, gamma_max is TURN, and in a
 // substep a body's turn may rise by no more than gamma, nor its centre by more than gamma of its arm, which turns a row as a
-// spin does. A rise, as a push that takes back a limit's kick slows its body and has nothing to cut. Only the pushing pass is
-// cut, so speeds stay exact, and what is cut stays in the error for the next substep. They damp each singular direction
-// apart; a path has no decomposition, so the whole push is cut, and the useful part of it waits too, which is the cost they
-// name for a plain clamp. TURN is measured: at pi / 4, the paper's value, a taut chain reaches 39 m/s, and at 0.1 it starts
-// to cut the chain of fifty. At 0.2 it cuts nothing in tests/joints.rs, a turn whose rows are out by 2 percent of their arm.
+// spin does. A rise, as a push that takes back a limit's kick slows its body and has nothing to cut. Only the pushing pass's
+// position bias is cut: the speeds along the locks are solved whole first, so speeds stay exact, and what is cut stays in
+// the error for the next substep. They damp each singular direction apart; a path has no decomposition, so the whole push
+// is cut, and the useful part of it waits too, which is the cost they name for a plain clamp. TURN is measured: at pi / 4,
+// the paper's value, a taut chain reaches 39 m/s, and at 0.1 it starts to cut the chain of fifty. At 0.2 it cuts nothing in
+// tests/joints.rs, a turn whose rows are out by 2 percent of their arm.
 //
 // A lock's position bias is capped too, at joint_max_push and what the turning carries its anchors. Pairs are found once a
 // step, over the motion the step expects, so a body a push moved further than that would land past what should stop it, as in
@@ -896,8 +897,26 @@ impl World {
         self.settle(b, &body_b);
     }
 
-    /// Solves the locks of the path from list place `first` to `last` exactly: forward, then back, then the impulses.
+    /// Solves the locks of the path from list place `first` to `last` exactly: forward, then back, then the impulses. The
+    /// pushing pass solves twice on the same factors: first the speeds along the locks, whole, then the position bias, cut by
+    /// `push_share` and capped from the speeds the locks now leave. One solve of both, cut, cut the speeds with the push, and
+    /// the limits and contacts solved since the last pass leave speed along the locks: a hinge's limit stopping a turn about
+    /// an anchor 24 m off gave its body 7,500 rad/s that only the locks take back, the next limit gave the body beyond it
+    /// 457,390 rad/s, a cut to nothing kept it, and a body landed 1,100 m from its joints
+    /// (`a_cut_push_still_takes_back_the_speed_along_the_locks`).
     fn solve_path(&mut self, first: usize, last: usize, rate: f32, most: f32, h: f32, pass: Pass) {
+        self.path_right(first, last, rate, most, false);
+        self.apply_path(first, last, 1.0, pass != Pass::Push);
+        if pass == Pass::Push {
+            let asked = self.path_right(first, last, rate, most, true);
+            let share = self.push_share(first, last, asked, h);
+            self.apply_path(first, last, share, false);
+        }
+    }
+
+    /// The path's impulses into RIGHT: what its locks' speeds ask, or with `bias` what their position bias asks, read from the
+    /// bodies' speeds as they stand. Returns the sum over its joints of the largest row asked, turning rows by their lever.
+    fn path_right(&mut self, first: usize, last: usize, rate: f32, most: f32, bias: bool) -> f32 {
         let mut asked = 0.0f32;
         for i in first..=last {
             let row = self.uu(SOLVE_JOINTS, i) as usize;
@@ -913,15 +932,18 @@ impl World {
             let mut largest = 0.0f32;
             for r in 0..m {
                 let k = axes[r];
-                let bias = if pass == Pass::Push { rate * view.at[k] } else { 0.0 };
-                let bias = if bias > most {
-                    most
-                } else if bias < -most {
-                    -most
+                let ask = if bias {
+                    let push = rate * view.at[k];
+                    if push > most {
+                        most
+                    } else if push < -most {
+                        -most
+                    } else {
+                        push
+                    }
                 } else {
-                    bias
+                    view.rows[k].speed(&body_a, &body_b)
                 };
-                let ask = view.rows[k].speed(&body_a, &body_b) + bias;
                 let size = if ask < 0.0 { -ask } else { ask };
                 let size = if k < 3 { size } else { size * lever };
                 if size > largest {
@@ -961,7 +983,11 @@ impl World {
             }
             next = x;
         }
-        let share = if pass == Pass::Push { self.push_share(first, last, asked, h) } else { 1.0 };
+        asked
+    }
+
+    /// Applies `share` of the impulses in RIGHT to the path's bodies, and with `remember` adds them to what the joints carry.
+    fn apply_path(&mut self, first: usize, last: usize, share: f32, remember: bool) {
         for i in (first..=last).rev() {
             let row = self.uu(SOLVE_JOINTS, i) as usize;
             let (m, axes) = lock_rows(self.uu(JOINT_FLAGS, row));
@@ -973,7 +999,7 @@ impl World {
                 let k = axes[r];
                 let p = unsafe { *doubles.add(RIGHT + r) } as f32 * share;
                 view.rows[k].push(&mut body_a, &mut body_b, p);
-                if pass != Pass::Push {
+                if remember {
                     self.set_s(JOINT_IMPULSE_0 + k, row, self.s(JOINT_IMPULSE_0 + k, row) + p);
                 }
             }

@@ -185,14 +185,14 @@ fn a_chain_of_fifty_holds_a_thousand_to_one_end_mass() {
     let (mass, inertia, half) = (1.0f32, 0.01f32, 0.1f32);
     let mut w = world(64);
     let top = anchor(&mut w);
-    let mut bodies = vec![];
+    let (mut bodies, mut joints) = (vec![], vec![]);
     let mut above = top;
     let mut on_above = v3(0.0, 0.0, 0.0);
     for i in 0..links {
         let last = i + 1 == links;
         let y = -((2 * i + 1) as f32) * half;
         let body = if last { point(&mut w, v3(0.0, y, 0.0), 1000.0 * mass, 1000.0 * inertia) } else { point(&mut w, v3(0.0, y, 0.0), mass, inertia) };
-        spherical(&mut w, above, body, on_above, v3(0.0, half, 0.0));
+        joints.push(spherical(&mut w, above, body, on_above, v3(0.0, half, 0.0)));
         above = body;
         on_above = v3(0.0, -half, 0.0);
         bodies.push(body);
@@ -202,27 +202,33 @@ fn a_chain_of_fifty_holds_a_thousand_to_one_end_mass() {
         let v = w.v(POSITION_X, *bodies.last().unwrap() as usize);
         (sqrt(v.dot(v)) + half - full, sqrt(w.v(LINEAR_X, *bodies.last().unwrap() as usize).dot(w.v(LINEAR_X, *bodies.last().unwrap() as usize))))
     };
-    let mut worst = 0.0f32;
+    // The end's distance is the chain's length only while the chain hangs straight: bent, it reads short and hides a joint
+    // that opens. So each joint's own gap has the same bar, hanging and swinging.
+    let (mut worst, mut opened) = (0.0f32, 0.0f32);
     for step in 0..600 {
         w.step(DT);
         let (stretch, speed) = end(&w);
         worst = worst.max(stretch);
+        opened = opened.max(worst_gap(&w, &joints));
         if step % 100 == 99 {
             println!("{:.1} s: stretch {stretch:.5} m, speed {speed:.5}", (step + 1) as f32 * DT);
         }
     }
-    println!("worst stretch {worst:.5} m of {full} m");
+    println!("worst stretch {worst:.5} m of {full} m, widest joint {opened:.2e} m");
     assert!(worst < 1e-4 * full, "stretched {worst} m");
+    assert!(opened < 1e-4 * full, "a joint opened by {opened} m");
     // Sideways kick: the swing keeps the chain's length.
     let bottom = *bodies.last().unwrap() as usize;
     w.set_v(LINEAR_X, bottom, v3(3.0, 0.0, 0.0));
-    let mut worst = 0.0f32;
+    let (mut worst, mut opened) = (0.0f32, 0.0f32);
     for _ in 0..600 {
         w.step(DT);
         worst = worst.max(end(&w).0);
+        opened = opened.max(worst_gap(&w, &joints));
     }
-    println!("swinging: worst stretch {worst:.5} m");
+    println!("swinging: worst stretch {worst:.5} m, widest joint {opened:.2e} m");
     assert!(worst < 1e-4 * full, "stretched {worst} m in the swing");
+    assert!(opened < 1e-4 * full, "a joint opened by {opened} m in the swing");
 }
 
 #[test]
