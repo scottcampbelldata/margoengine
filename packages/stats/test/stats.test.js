@@ -550,6 +550,33 @@ test('unsupported devices and overflow omit GPU timing without creating invalid 
   assert.ok(resources.every((r) => r.destroyed));
 });
 
+test('a pass that starts before the previous one ends is timed, as tile-based GPUs overlap passes', async (t) => {
+  // Recorded on the M6 Mac mini (Chrome, Metal) by the gallery's model cabinet: the second pass starts 1,416 ns before
+  // the first ends, on every frame. The profiler threw "time went backwards" and Stats logged it each sample.
+  const { device, encoder, timestamps } = gpu(t),
+    profiler = new GPUProfiler(device),
+    at = (high, low) => (BigInt(high) << 32n) + BigInt(low);
+  const sample = () => {
+    assert.equal(profiler.beginFrame(), true);
+    profiler.timestampWrites();
+    profiler.timestampWrites();
+    profiler.resolve(encoder);
+    return profiler.read();
+  };
+  try {
+    timestamps.set([at(85983, 1574298990), at(85983, 1574328738), at(85983, 1574327322), at(85983, 1574498812)]);
+    assert.equal(await sample(), (29_748 + 171_490) / 1e6);
+    assert.deepEqual([...profiler.passMilliseconds.slice(0, 2)], [29_748 / 1e6, 171_490 / 1e6]);
+    assert.equal(profiler.elapsedMilliseconds, 199_822 / 1e6);
+    // The earlier pass may also end last: the elapsed time runs to the latest end.
+    timestamps.set([1_000_000n, 9_000_000n, 2_000_000n, 7_000_000n]);
+    assert.equal(await sample(), 13);
+    assert.equal(profiler.elapsedMilliseconds, 8);
+  } finally {
+    profiler.dispose();
+  }
+});
+
 test('invalid intra-pass or cross-pass timestamps and rejected maps clear completed timings and recover', async (t) => {
   const { device, encoder, resources, timestamps } = gpu(t),
     profiler = new GPUProfiler(device),
@@ -566,7 +593,7 @@ test('invalid intra-pass or cross-pass timestamps and rejected maps clear comple
     for (const invalid of [
       [1_000_000n, 3_000_000n, 8_000_000n, 7_000_000n],
       [10_000_000n, 12_000_000n, 8_000_000n, 9_000_000n],
-      [1_000_000n, 3_000_000n, 2_000_000n, 7_000_000n],
+      [1_000_000n, 3_000_000n, 999_999n, 7_000_000n],
     ]) {
       timestamps.set(valid);
       assert.equal(await sample(), 5);

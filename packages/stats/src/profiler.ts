@@ -89,10 +89,16 @@ export class GPUProfiler {
       await buffer.mapAsync(GPUMapMode.READ, 0, this.count * 16);
       if (this.disposed) return null;
       const timestamps = new Uint32Array(buffer.getMappedRange(0, this.count * 16));
+      // A pass may start before the one recorded ahead of it has ended: a tile-based GPU runs the next pass's vertex
+      // work under the last one's fragment work (the M6 Mac mini under Chrome on Metal starts the second pass 1 to
+      // 26 us early on every frame). Only a start before the previous pass's start, or an end before its own start,
+      // is time going backwards. The elapsed time runs from the first start to the latest end.
       let totalLow = 0,
         totalHigh = 0,
         previousLow = 0,
-        previousHigh = 0;
+        previousHigh = 0,
+        lastLow = 0,
+        lastHigh = 0;
       for (let i = 0; i < timestamps.length; i += 4) {
         const startLow = timestamps[i + lowWord],
           startHigh = timestamps[i + highWord],
@@ -119,8 +125,12 @@ export class GPUProfiler {
           totalLow -= wordRange;
           totalHigh++;
         }
-        previousLow = endLow;
-        previousHigh = endHigh;
+        previousLow = startLow;
+        previousHigh = startHigh;
+        if (endHigh > lastHigh || (endHigh === lastHigh && endLow > lastLow)) {
+          lastLow = endLow;
+          lastHigh = endHigh;
+        }
       }
       // Validate the whole readback before replacing a previously completed sample.
       for (let i = 0; i < this.count; i++) {
@@ -134,8 +144,8 @@ export class GPUProfiler {
       }
       this.passMilliseconds.fill(0, this.count);
       this.passCount = this.count;
-      let elapsedLow = previousLow - timestamps[lowWord],
-        elapsedHigh = previousHigh - timestamps[highWord];
+      let elapsedLow = lastLow - timestamps[lowWord],
+        elapsedHigh = lastHigh - timestamps[highWord];
       if (elapsedLow < 0) {
         elapsedLow += wordRange;
         elapsedHigh--;
