@@ -2268,6 +2268,14 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
   yet found. They stay open in known-bugs.md.
 - **Rerun:** `node packages/navmesh/scripts/rival-bench.mjs`. Citation in clean-room.md.
 
+### 95. 100,000 entities against bitECS (diagnostic, win)
+
+- **Measurement:** one query, `position += velocity`, 100,000 entities. Setup outside the timer. Paired turns, fastest
+  of 7 rounds. bitECS 0.4.0 stays outside the repository.
+- **Result:** Margo 1.249 ms, bitECS 11.054 ms. Win. Both checksums `n = 100000`, `sum = 5000050000`. Busy machine,
+  diagnostic.
+- **Rerun:** `node packages/ecs/scripts/rival-bench.mjs`. Citation in clean-room.md.
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).

@@ -1170,6 +1170,10 @@ Written clean room from the published work below. No source of a navmesh library
 | Voxel navmesh (`navmesh/voxel`) | A Margo design: block columns stand in for the solid spans step 1 of `./build` would make, and the rest of that pipeline runs unchanged. No outside source. |
 | Flying navigation (`navmesh/volume`) | D. Brewer, "3D Flight Navigation Using Sparse Voxel Octrees", Game AI Pro 3, chapter 21, 2017 (read in full): Morton order, 4 x 4 x 4 leaves in 64 bits (here a pair of u32, so no BigInt), bottom-up build, childless nodes as free space. Margo walks the tree to find the cells across a face and does not store the chapter's neighbour links. A. Nash, S. Koenig, C. Tovey, "Lazy Theta*: Any-Angle Path Planning and Path Length Analysis in 3D", AAAI 2010 (read in full): Algorithm 3, one sight check per expanded cell, straight distance as the estimate. |
 
+## Entities and components: `@margoengine/ecs`
+
+The store is a structure of arrays, as the package README describes. The batch 167 timing drives bitECS 0.4.0 as a black box from its public introduction (https://github.com/NateTheGreatt/bitECS/blob/master/docs/Intro.md): one query, position plus velocity, 100,000 entities. The library source was not opened.
+
 ## State machines: `@margoengine/fsm`
 
 Written clean room from the published work below. No source of a statechart library or another engine was read. Sismic is run as an outside tool through its documented interface (`packages/fsm/test/outside/`); its source was not read.

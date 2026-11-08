@@ -12,6 +12,7 @@ time is the fastest round. These numbers were taken on a busy machine and are di
 | `@margoengine/navmesh` | gapped floor, one path query | 0.064 ms | recast-navigation 0.44.0, 0.082 ms | win |
 | `@margoengine/navmesh` | gapped floor, path length | 24.212 | recast-navigation 0.44.0, 23.778 | loss |
 | `@margoengine/navmesh` | open floor, path length | 22.627416997969522 | recast-navigation 0.44.0, same value, the Euclidean length | equal |
+| `@margoengine/ecs` | 100,000 entities, one `position += velocity` query | 1.249 ms | bitECS 0.4.0, 11.054 ms | win |
 
 The flock checksums after that step were 31517.19 (Margo) and 31516.70 (Yuka). Both moved from the same grid. They are
 not bit-equal: Yuka keeps a neighbourhood per vehicle and Margo uses one uniform grid. The behaviours are the ones in
@@ -25,3 +26,6 @@ separate paired runs. Margo's gapped path takes the north hall (4 points, length
 `hypot(16, 16)`. The build loss and the length loss stay open in `docs/known-bugs.md`. The open floor and the rule that
 the gapped path stays out of the hole are `packages/navmesh/test/path-length.test.js` (that test does not freeze
 Detour's length). Rerun: `node packages/navmesh/scripts/rival-bench.mjs`.
+
+The ecs row is one query over 100,000 entities, `position += velocity`, setup outside the timer. Both sides finished at
+`n = 100000` and `sum = 5000050000`. Rerun: `node packages/ecs/scripts/rival-bench.mjs`.
