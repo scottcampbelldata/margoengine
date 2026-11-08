@@ -3,7 +3,7 @@
 Import `margoengine/voxel-edit` from the `margoengine` package, or `@margoengine/voxel-edit` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Editing voxel models for voxel editors and tools: dense and sparse grids, modeling operations, brushes and
-selections, picking, export meshing, `.vox` scene editing and frame animation. CPU only, no renderer, no DOM: every
+selections, picking, export meshing, `.vox` scene editing and frame animation. CPU only (but `./shaders`, which runs on a GPUDevice), no renderer, no DOM: every
 function is pure and can run in a worker. Optional and tree-shakable; core and the stage never import it.
 
 ```ts
@@ -70,6 +70,7 @@ corner coordinates.
 | `./voxelize` | `voxelizeMesh`: a triangle mesh to a grid and palette, surface or solid, with vertex or texture colours and median cut; `AbortSignal` |
 | `./assist` | `noiseFill` (seeded random fill), `suggestPalette` (seeded hues, linear sRGB) and `paletteUsage` (cells per index) |
 | `./library` | `fetchLibrary` / `fetchAsset` / `resolveLibraryUrl`: list and fetch `.vox` packs from a JSON index, with a body size limit and abort |
+| `./shaders` | `ShaderBrush`: your own WGSL `fn brush(p, value)` run on the GPU for every selected cell, pass after pass, to grow, erode or generate; presets `brushes.grow`, `erode`, `noise`, `smooth`; `brushSource` |
 
 Selections, picking and meshing take a dense or a sparse grid. Errors follow
 [docs/conventions.md](../../docs/conventions.md): `TypeError` and `RangeError` for arguments and budgets,
@@ -184,3 +185,49 @@ check everything before decoding and copy what they keep, so the receiver may dr
 `SparseGrid.deltaSnapshot(delta)` packs only the chunks one edit touched, before and after; a worker holding the grid
 before the edit replays it with `applyDeltaSnapshot` (or undoes it with side `'before'`), which refuses with a
 `MargoError` code `state` unless the worker's grid holds exactly the chunks the delta starts from.
+
+## Shader brushes (`./shaders`)
+
+`ShaderBrush` runs a small WGSL function on the GPU (WebGPU compute) for every selected cell of a grid. The function
+gets the cell and its palette index and returns the new index; it can read any cell of the grid as it was before the
+pass, so brushes that grow, erode, smooth or generate shapes are a few lines. The grid you pass is never changed.
+
+```ts
+import { dilateGrid, type VoxelGrid } from 'margoengine/voxel-edit';
+import { brushes, ShaderBrush } from 'margoengine/voxel-edit/shaders';
+
+const adapter = await navigator.gpu.requestAdapter();
+const device = await adapter!.requestDevice();
+const model: VoxelGrid = { size: [64, 64, 64], voxels: new Uint8Array(64 ** 3) };
+model.voxels[32 + 64 * (32 + 64 * 32)] = 5; // one cell in the middle
+
+const grow = await ShaderBrush.create(device, brushes.grow);
+const { grid, changed } = await grow.run(model, { passes: 3 }); // the same cells as dilateGrid(model, {iterations: 3})
+console.log(changed, grid.voxels.every((v, i) => v === dilateGrid(model, { iterations: 3 }).grid.voxels[i]));
+
+// Your own brush: rings of colour by height inside the selection, rough edges from noise.
+const rings = await ShaderBrush.create(
+  device,
+  `fn brush(p: vec3<i32>, value: u32) -> u32 {
+  if (value == 0u || noise(vec3<f32>(p) * param(0)) < 0.3) { return value; }
+  return 1u + u32(p.y / 4) % 3u;
+}`,
+);
+const shaded = await rings.run(grid, { params: [0.2], seed: 7 });
+grow.dispose();
+rings.dispose();
+```
+
+- **What the code can call.** `cell(q)` (the index at any cell, 0 outside), `inside(q)`, `cell_index(q)`, `grid_size()`,
+  `face_offset(d)` (d 0 to 5: -x, +x, -y, +y, -z, +z), `param(i)` (the run's `params`, up to 16 numbers),
+  `pass_number()`, `tool(q)` (a second grid placed at `toolOffset`), `lookup(i)` (the run's 256-entry `table`),
+  `hash(q, salt)` (0 to 1, mixed with `seed`) and `noise(x)` (value noise 0 to 1). The result is clamped to 255.
+- **Presets.** `brushes.grow` and `brushes.erode` give exactly `dilateGrid` and `erodeGrid` with all six directions
+  (`params: [color]` colours the grown cells); `brushes.noise` fills where `noise(p * param(0)) > param(1)` with
+  `param(2)`; `brushes.smooth` keeps a cell filled when most of its 27 neighbourhood cells are.
+- **Runs.** `run(grid, {selection, passes, params, seed, tool, toolOffset, table, maxCells, signal})`: `selection` is
+  cell indexes (as `./edit` returns them; default every cell), `passes` 1 to 1,024, each reading the one before. It
+  resolves to `{grid, changed, clipped: 0}` like the CPU operations.
+- **Errors.** `TypeError` for a wrong device, code without `fn brush`, or a bad option; `RangeError` for a value out of
+  range or a grid over the device's storage binding limit; `MargoError` `failed` for WGSL that does not compile, naming
+  the line of your code, and `disposed` after `dispose()`. `label` names the GPU objects for debuggers.

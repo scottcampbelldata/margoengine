@@ -1452,3 +1452,11 @@ The following remain technical gaps, not permission to weaken a check:
     and in Node through the physics-refs harness at both settings, where every scene but the piles and the stacks' first
     steps reads bit for bit as before (the stacks' sag moves 0.003 mm). Missing: a browser run of a one-pass scene, as the
     replay keeps the default 2 passes, and a pile deeper than 30 rows, whose bottom pairs pass the 50 times bound.
+50. Voxel-edit shader brushes (`@margoengine/voxel-edit/shaders`, batch 97): user WGSL `fn brush(p, value)` compiled
+    after a fixed prelude into one compute pass per brush pass; a grid is packed four cells to a u32 word, one
+    invocation per word, ping-pong buffers, an explicit bind group layout (a brush may leave the tool, table and
+    selection bindings unused) and the shader module checked inside a validation error scope so a broken brush names
+    its line instead of raising a device error. Proved on the M6 Mac mini (Metal) by `shaders-browser-check.mjs`: the
+    grow and erode presets equal `dilateGrid` and `erodeGrid` cell for cell, over 1 and 3 passes and on a 256-cubed
+    grid (16.7 million cells), and a tool grid through a lookup table equals `combineGrids` union. Missing: any other
+    GPU; grids past one storage binding (the device limit) are refused, not split.

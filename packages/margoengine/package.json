@@ -3090,6 +3090,10 @@
       "types": "./dist/voxel-edit/voxelize.d.ts",
       "import": "./dist/voxel-edit/voxelize.js"
     },
+    "./voxel-edit/shaders": {
+      "types": "./dist/voxel-edit/shaders.d.ts",
+      "import": "./dist/voxel-edit/shaders.js"
+    },
     "./voxel-net": {
       "types": "./dist/voxel-net.d.ts",
       "import": "./dist/voxel-net.js"

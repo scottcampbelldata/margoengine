@@ -78,6 +78,10 @@
     "./voxelize": {
       "types": "./dist/voxelize.d.ts",
       "import": "./dist/voxelize.js"
+    },
+    "./shaders": {
+      "types": "./dist/shaders.d.ts",
+      "import": "./dist/shaders.js"
     }
   },
   "files": [
@@ -95,6 +99,7 @@
   "scripts": {
     "build": "node ../../scripts/build-optional.js voxel-edit",
     "test": "npm run build && node --test tests/*.test.js",
+    "test:gpu": "cd ../.. && node packages/voxel-edit/tests/shaders-browser-check.mjs",
     "prepack": "npm run build"
   }
 }

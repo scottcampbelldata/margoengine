@@ -1,0 +1,74 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Voxel-edit shader brush browser check</title></head><body>
+<script type="module">
+// Real-GPU proof of @margoengine/voxel-edit/shaders, driven by shaders-browser-check.mjs: the grow and erode presets
+// give exactly dilateGrid and erodeGrid (one and three passes, a 256-cubed grid of 16.7 million cells), a selection
+// keeps every other cell, the noise and smooth brushes generate and clean shapes, and a broken brush names its line.
+import {combineGrids,dilateGrid,erodeGrid} from '@margoengine/voxel-edit';
+import {ShaderBrush,brushes} from '@margoengine/voxel-edit/shaders';
+const errors=[];
+const adapter=await navigator.gpu.requestAdapter(),device=await adapter.requestDevice({requiredLimits:{maxStorageBufferBindingSize:adapter.limits.maxStorageBufferBindingSize,maxBufferSize:adapter.limits.maxBufferSize}});
+device.addEventListener('uncapturederror',(e)=>errors.push(e.error.message));
+let seed=11;const next=()=>((seed=(Math.imul(seed,1103515245)+12345)>>>0)/2**32);
+const randomGrid=(s,density)=>{const v=new Uint8Array(s[0]*s[1]*s[2]);for(let i=0;i<v.length;i++)if(next()<density)v[i]=1+Math.floor(next()*5);return {size:s,voxels:v};};
+const same=(a,b)=>{if(a.length!==b.length)return -1;let d=0;for(let i=0;i<a.length;i++)if(a[i]!==b[i])d++;return d;};
+window.check={
+ errors:()=>errors,
+ async run(){
+  const out={};
+  const grow=await ShaderBrush.create(device,brushes.grow),erode=await ShaderBrush.create(device,brushes.erode);
+  const small=randomGrid([37,29,41],0.08);
+  out.grow1=same((await grow.run(small)).grid.voxels,dilateGrid(small).grid.voxels);
+  out.grow3=same((await grow.run(small,{passes:3})).grid.voxels,dilateGrid(small,{iterations:3}).grid.voxels);
+  out.growColor=same((await grow.run(small,{params:[7]})).grid.voxels,dilateGrid(small,{color:7}).grid.voxels);
+  const dense=randomGrid([37,29,41],0.7);
+  out.erode1=same((await erode.run(dense)).grid.voxels,erodeGrid(dense).grid.voxels);
+  out.erode2=same((await erode.run(dense,{passes:2})).grid.voxels,erodeGrid(dense,{iterations:2}).grid.voxels);
+  // A selection: every other cell runs the brush, the rest keep their value.
+  const selection=Float64Array.from({length:Math.ceil(small.voxels.length/2)},(_,i)=>i*2);
+  const part=(await grow.run(small,{selection})).grid.voxels,full=dilateGrid(small).grid.voxels;
+  let kept=0,ran=0;for(let i=0;i<part.length;i++){if(i%2)kept+=part[i]===small.voxels[i];else ran+=part[i]===full[i];}
+  out.selection={kept,ran,half:part.length};
+  // 256 cubed: 16.7 million cells, one pass, against the CPU.
+  const big=randomGrid([256,256,256],0.02);
+  let t=performance.now();const gpuBig=await grow.run(big,{maxCells:16777216});out.bigGpuMs=performance.now()-t;
+  t=performance.now();const cpuBig=dilateGrid(big,{maxCells:16777216});out.bigCpuMs=performance.now()-t;
+  out.big=same(gpuBig.grid.voxels,cpuBig.grid.voxels);out.bigChanged=[gpuBig.changed,cpuBig.changed];
+  // Generate: noise fills about half an empty grid; the same seed repeats, another differs.
+  const noise=await ShaderBrush.create(device,brushes.noise),empty={size:[48,48,48],voxels:new Uint8Array(48**3)};
+  const n1=await noise.run(empty,{params:[0.15,0.5,3],seed:1}),n2=await noise.run(empty,{params:[0.15,0.5,3],seed:1}),n3=await noise.run(empty,{params:[0.15,0.5,3],seed:2});
+  out.noise={filled:n1.changed,repeat:same(n1.grid.voxels,n2.grid.voxels),other:same(n1.grid.voxels,n3.grid.voxels),colours:[...new Set(n1.grid.voxels)].sort()};
+  // Smooth: a cube with salt noise around it comes back the cube.
+  const cube={size:[24,24,24],voxels:new Uint8Array(24**3)};
+  for(let y=6;y<18;y++)for(let z=6;z<18;z++)for(let x=6;x<18;x++)cube.voxels[x+24*(z+24*y)]=2;
+  const salted={size:cube.size,voxels:cube.voxels.slice()};for(let k=0;k<60;k++){const i=Math.floor(next()*salted.voxels.length);const x=i%24,z=Math.floor(i/24)%24,y=Math.floor(i/576);if(x<4||x>19||y<4||y>19||z<4||z>19)salted.voxels[i]=4;}
+  const smooth=await ShaderBrush.create(device,brushes.smooth),cleaned=(await smooth.run(salted)).grid.voxels;
+  let interior=0,salt=0;for(let i=0;i<cleaned.length;i++){const x=i%24,z=Math.floor(i/24)%24,y=Math.floor(i/576);if(x>6&&x<17&&y>6&&y<17&&z>6&&z<17)interior+=cleaned[i]===2;if(salted.voxels[i]===4)salt+=cleaned[i]!==0;}
+  out.smooth={interior,salt};
+  // A user brush: a hollow shell of the grid's edge cells, coloured by height, and one that does not compile.
+  const shell=await ShaderBrush.create(device,`fn brush(p: vec3<i32>, value: u32) -> u32 {
+  let s = grid_size();
+  if (any(p == vec3<i32>(0)) || any(p == s - 1)) { return u32(1 + p.y); }
+  return 0u;
+}`);
+  const shelled=(await shell.run({size:[8,8,8],voxels:new Uint8Array(512)})).grid.voxels;
+  out.shell={filled:shelled.filter((v)=>v).length,top:shelled[0+8*(0+8*7)],bottom:shelled[3+8*(3+8*0)],middle:shelled[3+8*(3+8*3)]};
+  try{await ShaderBrush.create(device,'fn brush(p: vec3<i32>, value: u32) -> u32 {\n  return valu;\n}',{label:'expect-error:broken brush'});out.broken='compiled';}catch(e){out.broken=e.code+': '+e.message;}
+  // A tool grid stamped through a lookup table gives combineGrids' union with that palette map.
+  const stamp=await ShaderBrush.create(device,`fn brush(p: vec3<i32>, value: u32) -> u32 {
+  let t = tool(p);
+  if (t != 0u && value == 0u) { return lookup(t); }
+  return value;
+}`);
+  const toolGrid=randomGrid([9,7,11],0.5),map=new Uint8Array(256);for(let i=1;i<256;i++)map[i]=1+((i*7)%250);
+  const stamped=(await stamp.run(small,{tool:toolGrid,toolOffset:[30,-2,5],table:map})).grid.voxels;
+  out.tool=same(stamped,combineGrids(small,toolGrid,{operation:'union',offset:[30,-2,5],paletteMap:map}).grid.voxels);
+  stamp.dispose();
+  // Abort before the read-back.
+  const ac=new AbortController();ac.abort(new Error('stop'));
+  try{await grow.run(small,{signal:ac.signal});out.aborted='ran';}catch(e){out.aborted=e.message;}
+  for(const b of [grow,erode,noise,smooth,shell])b.dispose();
+  return out;
+ },
+};
+window.ready=true;
+</script></body></html>

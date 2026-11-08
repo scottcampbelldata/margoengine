@@ -335,6 +335,11 @@ test('split steps cover the whole suite: both bevel sample counts, each chain pa
     chain.map((s) => s.id),
     [1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => `voxel/test:gpu#${n}`),
   );
+  // voxel-edit's browser checks: one step each.
+  assert.deepEqual(
+    splitSteps(byId('voxel-edit/test:gpu')).map((s) => s.command),
+    ['cd ../.. && node packages/voxel-edit/tests/shaders-browser-check.mjs'],
+  );
   assert.equal(splitSteps({ label: 'x y', command: 'npm run a || node b.mjs', dir: 'x' }).length, 1);
   // Post's browser checks: one step each, so a hot machine cools between them.
   assert.deepEqual(
