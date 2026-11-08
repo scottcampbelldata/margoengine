@@ -111,7 +111,8 @@ const volumes = new FogVolumes([
   {shape: 'sphere', center: [2, 1.2, -3], radius: 1.5, density: 0.8, color: [0.6, 0.6, 0.65], edge: 0.5},  // smoke
 ]);
 const fog = VolumetricFog.attach(engine, {density: 0, volumes}); // density 0: local fog only
-volumes.volumes[1].center = [2, 1.5, -3];                     // read every frame
+const smoke = volumes.volumes[1];
+if (smoke.shape === 'sphere') smoke.center = [2, 1.5, -3];   // read every frame
 ```
 
 How it works. Each froxel adds every volume's extinction at its sample point to the fog's own and the volume's albedo times that extinction to its scattering, so overlapping volumes and the global fog mix by their extinction. A volume's density is `density` inside, rising from 0 at the boundary over `edge` metres inside it (a smoothstep of the distance to the sphere's surface or to the box's nearest face), times the fog's two-octave value noise at `noiseScale` drifting with the fog's `wind` when `noise` is above 0. The volumes are one storage buffer (64 B each, at most 256) uploaded every frame in a bind group after `lights` and `shadows`; without `volumes` VolumetricFog's shaders are byte for byte as before. `FogVolumes` owns its buffer: `dispose()` (or `using`) frees it.
