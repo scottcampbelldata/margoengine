@@ -464,6 +464,19 @@ export class KernelWorld {
     return out;
   }
   /**
+   * The first pair on a collider's list, or 0xffffffff when it has none; {@link KernelWorld.nextPair} gives the next. The
+   * walk reads only the rows of that collider's pairs, near and touching alike, so a query about one body costs its own
+   * pairs and not the world's.
+   */
+  firstPair(collider: number): number {
+    return this.columns.colliderPairs[collider];
+  }
+  /** The pair after `row` on `collider`'s list, or 0xffffffff at its end. */
+  nextPair(row: number, collider: number): number {
+    const c = this.columns;
+    return c.pairA[row] === collider ? c.pairNextA[row] : c.pairNextB[row];
+  }
+  /**
    * Every pair with contact points, after the last step. A point may lie a little apart: anything the step could reach
    * counts, so its `separation` can be above zero. A mesh pair gives one entry for each triangle it touches, each with
    * its own normal.

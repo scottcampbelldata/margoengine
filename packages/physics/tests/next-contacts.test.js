@@ -269,3 +269,68 @@ test('contactforce listeners may step and remove: each gathers into its own list
   assert.equal(calls, 2);
   physics.dispose();
 });
+
+test('touching and contactPoints walk only the asking body pairs and agree with the whole list', () => {
+  // A pile of boxes and one body of two colliders. The answers must equal those read from every manifold of the world,
+  // and come without that walk: with the world's list made to throw, both still answer.
+  const physics = new Physics(null),
+    floor = addFloor(physics),
+    bodies = [floor];
+  for (let i = 0; i < 60; i++)
+    bodies.push(
+      physics.addBody(null, {
+        position: [(i % 5) * 1.05 - 2, 0.5 + Math.floor(i / 25) * 1.05, (Math.floor(i / 5) % 5) * 1.05 - 2],
+        colliders: { shape: 'box', halfExtents: [0.5, 0.5, 0.5], density: 1 },
+      }),
+    );
+  const pair = physics.addBody(null, {
+    position: [6, 0.5, 0],
+    colliders: [
+      { shape: 'box', halfExtents: [0.5, 0.5, 0.5], density: 1 },
+      { shape: 'sphere', radius: 0.5, position: [1.2, 0, 0], density: 1 },
+    ],
+  });
+  bodies.push(pair);
+  // A mesh floor and a compound keep their points on parts of a pair, one row per triangle or part.
+  const vertices = [],
+    indices = [];
+  for (let j = 0; j <= 4; j++) for (let i = 0; i <= 4; i++) vertices.push(i - 2, 0, j - 2);
+  for (let j = 0; j < 4; j++)
+    for (let i = 0; i < 4; i++) indices.push(j * 5 + i, (j + 1) * 5 + i, j * 5 + i + 1, j * 5 + i + 1, (j + 1) * 5 + i, (j + 1) * 5 + i + 1);
+  const meshFloor = physics.addBody(null, { type: 'fixed', position: [0, 0, 12], colliders: { shape: 'trimesh', vertices, indices } }),
+    onMesh = physics.addBody(null, { position: [0.3, 0.5, 12.2], colliders: { shape: 'box', halfExtents: [0.5, 0.5, 0.5], density: 1 } }),
+    dumbbell = physics.addBody(null, {
+      position: [0, 0.5, -8],
+      colliders: {
+        shape: 'compound',
+        parts: [
+          { shape: 'sphere', radius: 0.5, offset: [-1, 0, 0] },
+          { shape: 'sphere', radius: 0.5, offset: [1, 0, 0] },
+        ],
+      },
+    });
+  bodies.push(meshFloor, onMesh, dumbbell);
+  for (let i = 0; i < 90; i++) physics.step();
+  const pressing = (point) => point.separation <= 0 || point.normalImpulse > 0,
+    of = (collider) => physics.bodyOfCollider(collider),
+    contacts = physics.kernel.contacts(),
+    touches = (a, b) =>
+      contacts.some((c) => ((of(c.colliderA) === a && of(c.colliderB) === b) || (of(c.colliderA) === b && of(c.colliderB) === a)) && c.points.some(pressing)),
+    points = (body) => contacts.flatMap((c) => (of(c.colliderA) === body || of(c.colliderB) === body ? c.points.filter(pressing).map((p) => p.position) : []));
+  const expected = bodies.map((a) => [bodies.map((b) => touches(a, b)), points(a)]);
+  assert.ok(expected.flat(2).filter((x) => x === true).length > 100, 'the pile touches');
+  assert.ok(points(pair).length >= 5, 'both colliders of one body rest on the floor: four corners and the ball');
+  assert.ok(points(onMesh).length >= 4, 'a box on a mesh is pushed through the parts of its pair');
+  assert.ok(touches(onMesh, meshFloor) && touches(dumbbell, floor), 'the mesh and the compound touch');
+  physics.kernel.contacts = () => {
+    throw new Error('walked the whole world');
+  };
+  bodies.forEach((a, i) => {
+    assert.deepEqual(
+      bodies.map((b) => physics.touching(a, b)),
+      expected[i][0],
+    );
+    assert.deepEqual(physics.contactPoints(a), expected[i][1]);
+  });
+  physics.dispose();
+});

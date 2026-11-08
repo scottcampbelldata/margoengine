@@ -171,6 +171,8 @@ export class KernelWorld {
     get colliderCapacity(): number;
     get pairCount(): number;
     pairs(): [number, number][];
+    firstPair(collider: number): number;
+    nextPair(row: number, collider: number): number;
     contacts(): KernelContact[];
     set contactFilter(filter: ((a: number, b: number) => boolean) | null);
     get eventCount(): number;

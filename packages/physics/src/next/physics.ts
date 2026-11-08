@@ -19,7 +19,6 @@ import {
   QUERY_ONLY_DYNAMIC,
   QUERY_ONLY_FIXED,
   QUERY_ONLY_KINEMATIC,
-  type KernelContactPoint,
   type KernelRayHit,
   type KernelLoadOptions,
   type KernelShape,
@@ -149,7 +148,7 @@ export interface PhysicsAttachment {
   dispose(): void;
 }
 
-/** No row: a filter word that leaves nothing out. */
+/** No row: the end of a pair list, and a filter word that leaves nothing out. */
 const NONE = 0xffffffff;
 const byDistance = (a: RaycastHit, b: RaycastHit): number => a.distance - b.distance;
 const noop = (): void => {};
@@ -160,8 +159,7 @@ function callListener(this: never, listener: (event: never) => void): void {
 const attachmentSync = (attachment: PhysicsAttachment): void => attachment.afterSync?.();
 const later = (what: string, when: string): MargoError =>
   new MargoError('unsupported', `${what} is not in the own solver yet; it comes with ${when}. Use @margoengine/physics until then.`);
-/** A point the shapes reached: overlapping, or pushed on. A speculative point ahead of a body is neither. */
-const pressing = (point: KernelContactPoint): boolean => point.separation <= 0 || point.normalImpulse > 0;
+const ascending = (x: number, y: number): number => x - y;
 const bits = (enabled: readonly [boolean, boolean, boolean]): number =>
   (enabled[0] ? 0 : 1) | (enabled[1] ? 0 : 2) | (enabled[2] ? 0 : 4);
 
@@ -186,6 +184,8 @@ export class Physics implements EnginePlugin, BodyOwner {
   private disposed = false;
   private readonly meshes: MeshSync;
   private readonly bodies = new Set<PhysicsBody>();
+  /** Pair rows of one `contactPoints` call, kept between calls. */
+  private readonly rowScratch: number[] = [];
   private readonly joints = new Set<PhysicsJoint>();
   private readonly byMesh = new Map<Mesh, PhysicsBody>();
   private readonly byRow = new Map<number, PhysicsCollider>();
@@ -722,25 +722,51 @@ export class Physics implements EnginePlugin, BodyOwner {
   intersectShape(): never {
     throw later('intersectShape', 'queries');
   }
-  /** Whether two bodies' colliders touch as of the last step. A point still ahead of a moving body does not count. */
+  /**
+   * Whether two bodies' colliders touch as of the last step. A point still ahead of a moving body does not count. It walks
+   * only the pairs of `a`'s colliders and allocates nothing.
+   */
   touching(a: PhysicsBody, b: PhysicsBody): boolean {
-    for (const contact of this.kernel.contacts()) {
-      const one = this.bodyOfCollider(contact.colliderA),
-        other = this.bodyOfCollider(contact.colliderB);
-      if (((one === a && other === b) || (one === b && other === a)) && contact.points.some(pressing)) return true;
+    const { kernel } = this,
+      c = kernel.columns,
+      { colliders } = a;
+    for (let i = 0; i < colliders.length; i++) {
+      const self = colliders[i].handle;
+      for (let row = kernel.firstPair(self); row !== NONE; row = kernel.nextPair(row, self)) {
+        if (this.bodyOfCollider(c.pairA[row] === self ? c.pairB[row] : c.pairA[row]) !== b) continue;
+        // A mesh or compound pair keeps its points on its parts, one row each down the pairChild chain.
+        for (let part = row; part !== NONE; part = c.pairChild[part])
+          for (let at = part * 4; at < part * 4 + c.pairContacts[part]; at++)
+            if (c.contactSeparation[at] <= 0 || c.contactNormalImpulse[at] > 0) return true;
+      }
     }
     return false;
   }
 
   /**
    * Where the solver pushes on this body as of the last step: one world position [x, y, z] per contact point, so a box
-   * flat on a floor has its four corners. A point two colliders share comes once for each.
+   * flat on a floor has its four corners. A point two colliders share comes once for each. It walks only the pairs of the
+   * body's colliders and their mesh parts, in the order of their rows, and allocates only what it returns.
    */
   contactPoints(body: PhysicsBody): [number, number, number][] {
-    const points: [number, number, number][] = [];
-    for (const contact of this.kernel.contacts())
-      if (this.bodyOfCollider(contact.colliderA) === body || this.bodyOfCollider(contact.colliderB) === body)
-        for (const point of contact.points) if (pressing(point)) points.push(point.position);
+    const points: [number, number, number][] = [],
+      { kernel } = this,
+      c = kernel.columns,
+      { colliders } = body,
+      rows = this.rowScratch;
+    rows.length = 0;
+    for (let i = 0; i < colliders.length; i++) {
+      const self = colliders[i].handle;
+      for (let row = kernel.firstPair(self); row !== NONE; row = kernel.nextPair(row, self))
+        for (let part = row; part !== NONE; part = c.pairChild[part]) if (c.pairContacts[part] !== 0) rows.push(part);
+    }
+    rows.sort(ascending);
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      for (let at = row * 4; at < row * 4 + c.pairContacts[row]; at++)
+        if (c.contactSeparation[at] <= 0 || c.contactNormalImpulse[at] > 0) points.push([c.contactX[at], c.contactY[at], c.contactZ[at]]);
+    }
+    rows.length = 0;
     return points;
   }
 
