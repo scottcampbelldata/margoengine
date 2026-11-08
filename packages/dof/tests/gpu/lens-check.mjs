@@ -84,6 +84,48 @@ try {
   assert.ok(Math.abs(flatTop.width - flatBottom.width) <= 2, 'no tilt: both boxes blur alike');
   assert.ok(flatTop.width > topBox.width + 5, 'no tilt: the top box is out of focus');
 
+  // Temporal DOF: the half-resolution gather against the full one. Mean absolute difference over all channels of the
+  // 512 x 512 frame; the box in focus (the middle 40 x 40) must be untouched, byte for byte.
+  const diff = (a, b, x0 = 0, y0 = 0, x1 = a.width, y1 = a.height) => {
+    let sum = 0,
+      n = 0;
+    for (let y = y0; y < y1; y++)
+      for (let x = x0; x < x1; x++)
+        for (let c = 0; c < 3; c++, n++)
+          sum += Math.abs(a.data[(y * a.width + x) * 4 + c] - b.data[(y * a.width + x) * 4 + c]);
+    return sum / n;
+  };
+  const temporal = async (on, taa, frames) => {
+    await page.evaluate(([a, b, c]) => window.check.temporal(a, b, c), [on, taa, frames]);
+    return shot();
+  };
+  const next = async () => {
+    await page.evaluate(() => window.check.more(1));
+    return shot();
+  };
+  const full = await temporal(false, false, 4),
+    fullNext = await next(),
+    halfImage = await temporal(true, false, 4),
+    halfNext = await next(),
+    fullTaa = await temporal(false, true, 40),
+    halfTaa = await temporal(true, true, 40);
+  const numbers = {
+    half: diff(halfImage, full),
+    focus: diff(halfImage, full, 236, 236, 276, 276),
+    fullSteady: diff(full, fullNext),
+    turn: diff(halfImage, halfNext),
+    taa: diff(halfTaa, fullTaa),
+    taaFocus: diff(halfTaa, fullTaa, 236, 236, 276, 276),
+  };
+  console.log('temporal', JSON.stringify(numbers));
+  // Bounds: blur at half resolution moves single edge pixels by up to a level's worth on average over the frame; in
+  // focus the join takes the full-resolution scene as it is.
+  assert.ok(numbers.half < 1 && numbers.taa < 1, 'the half gather stays within a level of the full one on average');
+  assert.equal(numbers.focus, 0, 'in focus, the temporal frame is the sharp scene');
+  assert.equal(numbers.taaFocus, 0, 'and under TAA too');
+  assert.equal(numbers.fullSteady, 0, 'the full gather repeats itself frame to frame');
+  assert.ok(numbers.turn > 0, 'the temporal taps turn from one frame to the next');
+
   assert.deepEqual(await page.evaluate(() => window.check.errors), []);
   assert.deepEqual(pageErrors, []);
   console.log('dof lens check passed');

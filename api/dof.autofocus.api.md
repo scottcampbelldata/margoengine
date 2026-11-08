@@ -88,5 +88,6 @@ interface DOFOptions {
     maxRadius?: number;
     enabled?: boolean;
     lens?: DOFLens;
+    temporal?: boolean;
 }
 ```

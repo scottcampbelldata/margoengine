@@ -34,6 +34,7 @@ export interface DOFOptions {
     maxRadius?: number;
     enabled?: boolean;
     lens?: DOFLens;
+    temporal?: boolean;
 }
 
 // Not exported from this entry, but used by the exports above:

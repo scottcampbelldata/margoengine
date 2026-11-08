@@ -11,7 +11,16 @@ import {
 import { render, group, compute } from '../../shared/gpu.js';
 import { orthographic } from '../../shared/projection.js';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
-import { cocShader, coarseShader, bokehShader, presentShader, groupMax } from './shaders.js';
+import {
+  cocShader,
+  coarseShader,
+  bokehShader,
+  presentShader,
+  groupMax,
+  halveShader,
+  joinShader,
+  halfShaders,
+} from './shaders.js';
 import { MargoError } from '@margoengine/math/errors';
 import { applyView, viewLoadOp, viewSize } from '../../shared/view-rect.js';
 import { coreShaderRequired, linearShader } from '../../shared/display.js';
@@ -50,6 +59,12 @@ export interface DOFOptions {
   enabled?: boolean;
   /** Tilt-shift and polygon bokeh, from `@margoengine/dof/lens`. Read when the effect attaches. Default: none. */
   lens?: DOFLens;
+  /**
+   * Temporal DOF: the bokeh is gathered at half resolution, a quarter of the pixels, and its taps turn by the golden
+   * angle every frame, so TAA attached after DOF averages the turns in its history into smooth bokeh. In-focus pixels
+   * stay at full resolution. WebGPU only (not on the WebGL2 layer). Read when the effect attaches. Default false.
+   */
+  temporal?: boolean;
 }
 
 /**
@@ -88,6 +103,16 @@ export class DOF implements EnginePlugin {
   private format?: GPUTextureFormat;
   private depthFormat?: GPUTextureFormat;
   private readonly values = new Float32Array(12);
+  // Temporal: the half-resolution gather's own uniform (maxRadius halved, the frame's turn) and textures.
+  private readonly halfValues = new Float32Array(12);
+  private halfUniform?: GPUBuffer;
+  private halvePipeline?: GPUComputePipeline;
+  private joinPipeline?: GPUComputePipeline;
+  private halfScene?: GPUTexture;
+  private halfCoc?: GPUTexture;
+  private halfTiles?: GPUTexture;
+  private blurred?: GPUTexture;
+  private turn = 0;
   private readonly shaders = new Map<string, string>();
   private readonly attachment: GPURenderPassColorAttachment = { view: undefined!, loadOp: 'clear', storeOp: 'store' };
   private readonly presentation: GPURenderPassDescriptor = { colorAttachments: [this.attachment] };
@@ -154,10 +179,11 @@ export class DOF implements EnginePlugin {
       !Number.isFinite(r) ||
       r < 1 ||
       r > 32 ||
-      (o.enabled !== undefined && typeof o.enabled !== 'boolean')
+      (o.enabled !== undefined && typeof o.enabled !== 'boolean') ||
+      (o.temporal !== undefined && typeof o.temporal !== 'boolean')
     )
       throw new RangeError(
-        'Invalid DOF options; use focalLength > 0, focalDistance > focalLength, aperture > 0 and maxRadius from 1 to 32',
+        'Invalid DOF options; use focalLength > 0, focalDistance > focalLength, aperture > 0, maxRadius from 1 to 32 and a boolean enabled and temporal',
       );
     if (
       (g !== undefined && !(Number.isFinite(g) && g > 0)) ||
@@ -184,7 +210,14 @@ export class DOF implements EnginePlugin {
     this.engine = engine;
     this.uniform = engine.gpu.createBuffer({ size: 48, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     const source = { cocShader, coarseShader, bokehShader, groupMax },
-      shaders = this.options.lens?.shaders(source) ?? source;
+      lensed = this.options.lens?.shaders(source) ?? source,
+      temporal = this.options.temporal === true,
+      shaders = temporal ? halfShaders(lensed) : lensed;
+    if (temporal) {
+      this.halfUniform = engine.gpu.createBuffer({ size: 48, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+      this.halvePipeline = compute(engine.gpu, halveShader);
+      this.joinPipeline = compute(engine.gpu, joinShader);
+    }
     this.cocPipeline = engine.gpu.createComputePipeline({
       layout: 'auto',
       compute: { module: engine.gpu.createShaderModule({ code: shaders.cocShader }), entryPoint: 'main' },
@@ -193,6 +226,8 @@ export class DOF implements EnginePlugin {
     this.coarsePipeline = compute(engine.gpu, shaders.coarseShader);
     const uniform = this.uniform,
       route = loadCompatRoute(engine.gpu, () => import('./compat.js'));
+    if (route && temporal)
+      throw new MargoError('unsupported', 'DOF temporal needs WebGPU; leave temporal off on the WebGL2 layer');
     // Alone, DOF skips its CoC and blur until its WebGL2 route has loaded: its WebGPU route there takes the CPU tier,
     // about a second a frame at 720p on a fast CPU and several on a laptop's (bug 58), so the first frames show the
     // captured scene sharp, and effects reading outputTexture (Tonemap's source) get that scene.
@@ -312,6 +347,13 @@ export class DOF implements EnginePlugin {
       this.captureTarget!.begin(c);
     }
     c.device.queue.writeBuffer(this.uniform!, 0, v as Float32Array<ArrayBuffer>);
+    if (this.halfUniform) {
+      const h = this.halfValues;
+      h.set(v);
+      h[3] = v[3] / 2;
+      h[11] = (this.turn++ * 2.39996323) % (2 * Math.PI);
+      c.device.queue.writeBuffer(this.halfUniform, 0, h as Float32Array<ArrayBuffer>);
+    }
   }
   private resize(c: Context): void {
     const depthFormat = c.descriptor.depthStencil!.format;
@@ -355,23 +397,40 @@ export class DOF implements EnginePlugin {
     });
     this.groups = [
       this.cocGroup(c.device, this.depth, true),
-      c.device.createBindGroup({
-        layout: this.bokehPipeline!.getBindGroupLayout(0),
-        entries: [
-          { binding: 0, resource: { buffer: this.uniform! } },
-          { binding: 1, resource: this.sceneView },
-          { binding: 2, resource: cocView },
-          { binding: 3, resource: outputView },
-          { binding: 4, resource: tileView },
-          { binding: 5, resource: coarseView },
-        ],
-      }),
+      this.halfUniform
+        ? undefined!
+        : c.device.createBindGroup({
+            layout: this.bokehPipeline!.getBindGroupLayout(0),
+            entries: [
+              { binding: 0, resource: { buffer: this.uniform! } },
+              { binding: 1, resource: this.sceneView },
+              { binding: 2, resource: cocView },
+              { binding: 3, resource: outputView },
+              { binding: 4, resource: tileView },
+              { binding: 5, resource: coarseView },
+            ],
+          }),
       c.device.createBindGroup({
         layout: this.presentPipeline.getBindGroupLayout(0),
         entries: [{ binding: 0, resource: outputView }],
       }),
-      group(c.device, this.coarsePipeline!, [{ buffer: this.uniform! }, this.sceneView, cocView, coarseView]),
+      this.halfUniform
+        ? undefined!
+        : group(c.device, this.coarsePipeline!, [{ buffer: this.uniform! }, this.sceneView, cocView, coarseView]),
     ];
+    if (this.halfUniform) this.halfGroups(c.device, this.sceneView);
+  }
+  /** Temporal: the gather's groups over the half textures (1, 3) and the halve and join groups over `input` (5, 6). */
+  private halfGroups(device: GPUDevice, input: GPUTextureView): void {
+    const u = { buffer: this.halfUniform! },
+      scene = this.halfScene!.createView(),
+      coc = this.halfCoc!.createView(),
+      tiles = this.halfTiles!.createView(),
+      blurred = this.blurred!.createView();
+    this.groups[1] = group(device, this.bokehPipeline!, [u, scene, coc, blurred, tiles, this.coarseView!]);
+    this.groups[3] = group(device, this.coarsePipeline!, [u, scene, coc, this.coarseView!]);
+    this.groups[5] = group(device, this.halvePipeline!, [input, this.cocView!, scene, coc, tiles]);
+    this.groups[6] = group(device, this.joinPipeline!, [input, this.cocView!, blurred, this.outputView!]);
   }
   /** The CoC pass's bind group; on the WebGL2 route also the tile pass's (`tilesGroup`). */
   private cocGroup(device: GPUDevice, depth: GPUTexture, direct = false): GPUBindGroup {
@@ -406,10 +465,14 @@ export class DOF implements EnginePlugin {
   private circles(c: Context): void {
     this.dispatch(c, this.cocPipeline!, this.groups[0]);
     if (this.tilesPipeline) this.dispatch(c, this.tilesPipeline, this.tilesGroup!, 64);
+    if (this.halvePipeline) this.dispatch(c, this.halvePipeline, this.groups[5], 16);
   }
   private blur(c: Context): void {
-    this.dispatch(c, this.coarsePipeline!, this.groups[3], 16);
-    this.dispatch(c, this.bokehPipeline!, this.groups[1]);
+    // Temporal: the gather covers the half image (blocks twice as wide), then the join brings it back to full size.
+    const half = this.halvePipeline ? 2 : 1;
+    this.dispatch(c, this.coarsePipeline!, this.groups[3], 16 * half);
+    this.dispatch(c, this.bokehPipeline!, this.groups[1], 8 * half);
+    if (this.joinPipeline) this.dispatch(c, this.joinPipeline, this.groups[6]);
   }
   private dispatch(c: Context, pipeline: GPUComputePipeline, group: GPUBindGroup, block = 8): void {
     if (pipeline === this.cocPipeline) this.captureTarget?.resolve(c.encoder, true);
@@ -450,7 +513,10 @@ export class DOF implements EnginePlugin {
       this.sceneDepth = depth;
       this.groups[0] = this.cocGroup(device, depth);
     }
-    if (this.input !== input) {
+    if (this.input !== input && this.halfUniform) {
+      this.input = input;
+      this.halfGroups(device, input);
+    } else if (this.input !== input) {
       this.input = input;
       this.groups[1] = group(device, this.bokehPipeline!, [
         { buffer: this.uniform! },
@@ -498,11 +564,25 @@ export class DOF implements EnginePlugin {
       format: 'r32float',
       usage: storage,
     });
+    // Temporal: the gather's own CoC, tiles and image at half size, and its 2x2 blocks over that half.
+    const half = this.halfUniform ? 2 : 1,
+      hw = Math.ceil(width / half),
+      hh = Math.ceil(height / half);
     this.coarse = device.createTexture({
-      size: [Math.ceil(width / 2), Math.ceil(height / 2)],
+      size: [Math.ceil(hw / 2), Math.ceil(hh / 2)],
       format: 'rgba16float',
       usage: storage,
     });
+    if (this.halfUniform) {
+      this.halfScene = device.createTexture({ size: [hw, hh], format: 'rgba16float', usage: storage });
+      this.halfCoc = device.createTexture({ size: [hw, hh], format: 'rg32float', usage: storage });
+      this.halfTiles = device.createTexture({
+        size: [Math.ceil(hw / 8), Math.ceil(hh / 8)],
+        format: 'r32float',
+        usage: storage,
+      });
+      this.blurred = device.createTexture({ size: [hw, hh], format: 'rgba16float', usage: storage });
+    }
     this.cocView = this.coc.createView();
     this.outputView = this.output.createView();
     this.tileView = this.tiles.createView();
@@ -517,7 +597,12 @@ export class DOF implements EnginePlugin {
     this.output?.destroy();
     this.tiles?.destroy();
     this.coarse?.destroy();
+    this.halfScene?.destroy();
+    this.halfCoc?.destroy();
+    this.halfTiles?.destroy();
+    this.blurred?.destroy();
     this.scene = this.depth = this.coc = this.output = this.tiles = this.coarse = undefined;
+    this.halfScene = this.halfCoc = this.halfTiles = this.blurred = undefined;
     this.sceneView = this.depthView = undefined;
     this.groups = [];
     this.presentPipeline = undefined;
@@ -527,7 +612,9 @@ export class DOF implements EnginePlugin {
   private release(): void {
     this.releaseTextures();
     this.uniform?.destroy();
-    this.uniform = undefined;
+    this.halfUniform?.destroy();
+    this.uniform = this.halfUniform = undefined;
+    this.halvePipeline = this.joinPipeline = undefined;
     this.cocPipeline = this.bokehPipeline = this.coarsePipeline = this.tilesPipeline = undefined;
     this.originalColor = this.originalDepth = undefined;
     this.shaders.clear();

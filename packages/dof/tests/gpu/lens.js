@@ -3,6 +3,7 @@ import { Engine, box, PbrMaterial } from '../../../core/dist/index.js';
 import { DOF } from '../../dist/index.js';
 import { DOFLens } from '../../dist/lens.js';
 import { Autofocus } from '../../dist/autofocus.js';
+import { TAA } from '../../../taa/dist/index.js';
 
 const errors = [],
   white = new PbrMaterial({ color: '#ffffff', emissive: [6, 6, 6], roughness: 1, metalness: 0 });
@@ -81,6 +82,19 @@ window.check = {
     });
     await settle(4);
   },
+  // A box in focus, one in the near field and one far behind: full or temporal (half) gather, alone or under TAA.
+  async temporal(temporal, taa, frames) {
+    await start([
+      [0, 0, 0, 1],
+      [-1.2, 0.4, 6, 0.3],
+      [1.5, -0.5, -20, 3],
+    ]);
+    const dof = DOF.attach(engine, { focalDistance: 10, focalLength: 0.1, aperture: 0.7, maxRadius: 16, temporal });
+    if (taa) TAA.attach(engine, { depth: () => dof.depthTexture });
+    await settle(frames);
+  },
+  // More frames of the current case.
+  more: (frames) => settle(frames),
   // Two boxes at one depth, above and below the middle.
   async tilt(tilt, focalDistance) {
     await start([

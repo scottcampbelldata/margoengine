@@ -1,3 +1,4 @@
+import { MargoError } from '@margoengine/math/errors';
 import { displayShader } from '../../shared/display.js';
 const params = `struct Params {lens:vec4f,frame:vec4f,ortho:vec4f}
 @group(0) @binding(0) var<uniform> p:Params;`;
@@ -126,3 +127,64 @@ ${displayShader}
 @fragment fn fragment(@builtin(position) pos:vec4f)->@location(0) vec4f {
   let c=textureLoad(scene,vec2i(pos.xy),0);return vec4f(toDisplay(c.rgb),c.a);
 }`;
+
+// Half resolution (temporal): the CoC runs at full resolution; this pass halves the scene (2x2 mean) and the CoC (the
+// nearest of the four, its radius halved) and writes the half image's 8x8 tile maxima, so the gather kernels run as
+// they are on a quarter of the pixels.
+export const halveShader = `@group(0) @binding(0) var scene:texture_2d<f32>;
+@group(0) @binding(1) var coc:texture_2d<f32>;
+@group(0) @binding(2) var halfScene:texture_storage_2d<rgba16float,write>;
+@group(0) @binding(3) var halfCoc:texture_storage_2d<rg32float,write>;
+@group(0) @binding(4) var tiles:texture_storage_2d<r32float,write>;
+${groupMax}
+@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u,@builtin(workgroup_id) tile:vec3u,@builtin(local_invocation_index) local:u32) {
+  var near=0.0;
+  if(all(id.xy<textureDimensions(halfCoc))){
+    let last=vec2i(textureDimensions(coc))-1;var color=vec4f(0);var c=vec2f(0,3.4e38);
+    for(var k=0;k<4;k++){
+      let at=min(vec2i(id.xy)*2+vec2i(k%2,k/2),last);color+=textureLoad(scene,at,0);
+      let s=textureLoad(coc,at,0).xy;if(s.y<c.y){c=s;}
+    }
+    textureStore(halfScene,vec2i(id.xy),color*0.25);textureStore(halfCoc,vec2i(id.xy),vec4f(c.x*0.5,c.y,0,0));near=-c.x*0.5;
+  }
+  let m=groupMax(near,local);
+  if(local==0u){textureStore(tiles,vec2i(tile.xy),vec4f(m,0,0,0));}
+}`;
+
+// Full resolution again: the half gather, bilinear, over the sharp scene by the pixel's own blur (in focus stays
+// sharp) or by the near-field coverage the half gather stored in alpha (foreground blur spreads over the focus).
+export const joinShader = `@group(0) @binding(0) var scene:texture_2d<f32>;
+@group(0) @binding(1) var coc:texture_2d<f32>;
+@group(0) @binding(2) var blurred:texture_2d<f32>;
+@group(0) @binding(3) var result:texture_storage_2d<rgba16float,write>;
+@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u) {
+  if(any(id.xy>=textureDimensions(result))){return;}
+  let pixel=vec2i(id.xy);let sharp=textureLoad(scene,pixel,0);
+  let g=(vec2f(pixel)+0.5)*0.5-0.5;let q=vec2i(floor(g));let f=g-floor(g);let last=vec2i(textureDimensions(blurred))-1;
+  let b=mix(mix(textureLoad(blurred,clamp(q,vec2i(0),last),0),textureLoad(blurred,clamp(q+vec2i(1,0),vec2i(0),last),0),f.x),
+    mix(textureLoad(blurred,clamp(q+vec2i(0,1),vec2i(0),last),0),textureLoad(blurred,clamp(q+vec2i(1,1),vec2i(0),last),0),f.x),f.y);
+  let w=max(smoothstep(0.5,1.5,abs(textureLoad(coc,pixel,0).x)),b.a);
+  textureStore(result,pixel,vec4f(mix(sharp.rgb,b.rgb,w),sharp.a));
+}`;
+
+/** The gather kernels for the half image: each frame turns the taps by `p.ortho.w`, and alpha holds near coverage. */
+export function halfShaders<T extends { coarseShader: string; bokehShader: string }>(source: T): T {
+  const turn = (code: string) => {
+    const parts = code.split('f32(i)*2.39996323');
+    if (parts.length < 2)
+      throw new MargoError('unsupported', 'DOF temporal needs the gather kernels of its own version');
+    return parts.join('(f32(i)*2.39996323+p.ortho.w)');
+  };
+  const store = 'textureStore(result,pixel,vec4f(color,sharp.a));';
+  const off = 'if(p.frame.w==0.0){textureStore(result,pixel,sharp);return;}';
+  if (source.bokehShader.split(store).length !== 2 || source.bokehShader.split(off).length !== 2)
+    throw new MargoError('unsupported', 'DOF temporal needs the gather kernels of its own version');
+  return {
+    ...source,
+    coarseShader: turn(source.coarseShader),
+    // Off, the half image covers nothing, so the join shows the scene.
+    bokehShader: turn(source.bokehShader)
+      .replace(store, 'textureStore(result,pixel,vec4f(color,coverage));')
+      .replace(off, 'if(p.frame.w==0.0){textureStore(result,pixel,vec4f(sharp.rgb,0));return;}'),
+  };
+}

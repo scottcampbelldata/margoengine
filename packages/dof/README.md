@@ -43,6 +43,26 @@ console.log(dof.focalLength); // the focal length in metres the last frame used
 - To drive the camera from a lens instead (focal length in, field of view out, with exposure and motion blur), use
   `PhysicalCamera` from `@margoengine/cameras/physical`.
 
+## Temporal DOF
+
+`temporal: true` gathers the bokeh at half resolution, a quarter of the pixels, and turns its taps by the golden angle
+every frame; TAA attached after DOF averages the turns in its history, so the bokeh comes out smooth for about a quarter
+of the gather's cost. Pixels in focus keep the full-resolution scene as it is.
+
+```ts
+import {createStage} from 'margoengine';
+import {DOF} from 'margoengine/dof';
+import {TAA} from 'margoengine/taa';
+const stage = await createStage('#viewport', {backend:'webgpu'});
+const dof = DOF.attach(stage.engine, {focalDistance:4, aperture:1.4, temporal:true});
+TAA.attach(stage.engine, {depth:()=>dof.depthTexture});
+```
+
+- The circle of confusion is still worked out per full-resolution pixel; each 2x2 block of the scene is averaged and
+  takes the nearest of its four depths for the half gather. Near-field blur spreads over the focus as before.
+- Read when the effect attaches. WebGPU only: on the WebGL2 layer `DOF` throws `'unsupported'` for it. Without TAA the
+  turning taps show as a faint shimmer in large far disks; an aperture image's far taps do not turn.
+
 ## Autofocus, tilt-shift and blades
 
 Each is its own entry, so a page using neither downloads neither. `DOFLens` also draws custom bokeh shapes (below).

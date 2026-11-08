@@ -235,6 +235,7 @@ test('combinations that rejected each other alone now share one capture', async 
     () => [new DOF(), new Bloom(), new PostProcessing()],
     () => [new SSAO(), new Bloom(), new PostProcessing({ atmosphere: { density: 0.02, godRays: 0.5 } }), new FXAA()],
     () => [new DOF(), new Tonemap()],
+    () => [new DOF({ temporal: true }), new Tonemap()],
   ]) {
     const h = harness(4),
       effects = make(),

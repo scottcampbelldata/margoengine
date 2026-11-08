@@ -373,3 +373,37 @@ test('filmGauge takes the focal length from the camera field of view, as a lens 
   dof.options.focalDistance = 0.1;
   assert.throws(() => h.frame(), RangeError);
 });
+
+test('temporal DOF gathers at half size with turning taps and a half maxRadius, and allocates nothing in steady frames', () => {
+  assert.throws(() => new DOF({ temporal: 'yes' }), RangeError);
+  const h = gpuHarness(),
+    dof = DOF.attach(h.engine, { focalDistance: 5, maxRadius: 16, temporal: true });
+  h.frame();
+  const codes = shaderCodes(h);
+  assert.equal(codes.length, 5, 'CoC, bokeh, coarse, halve and join kernels');
+  const find = (text) => codes.find((code) => code.includes(text)),
+    bokeh = find('nearOffset'),
+    coarse = find('coarse:texture_storage_2d'),
+    halve = find('halfScene'),
+    join = find('blurred');
+  for (const code of [bokeh, coarse]) assert.ok(code.includes('(f32(i)*2.39996323+p.ortho.w)'));
+  assert.ok(bokeh.includes('vec4f(color,coverage)') && halve.includes('halfCoc') && join.includes('smoothstep'));
+  // The half image's CoC, scene, tiles and gather output at 64 x 48 for a 128 x 96 view; its 2x2 blocks at 32 x 24.
+  const live = h.resources.filter((r) => r.width !== undefined && !r.destroyed && r.sampleCount === 1),
+    sized = (w, hh, format) => live.filter((r) => r.width === w && r.height === hh && r.format === format).length;
+  assert.equal(sized(64, 48, 'rg32float'), 1);
+  assert.equal(sized(64, 48, 'rgba16float'), 2);
+  assert.equal(sized(8, 6, 'r32float'), 1);
+  assert.equal(sized(32, 24, 'rgba16float'), 1);
+  assert.equal(sized(128, 96, 'rgba16float'), 2, 'full-size scene capture and output');
+  // The half gather's uniform (written last): maxRadius halved, the turn moving by the golden angle each frame.
+  assert.equal(h.writes[3], 8);
+  const made = ({ buffers, textures, views, groups }) => ({ buffers, textures, views, groups }),
+    first = h.writes[11],
+    counts = made(h.counts);
+  h.frame();
+  assert.ok(Math.abs(((h.writes[11] - first + 2 * Math.PI) % (2 * Math.PI)) - 2.39996323) < 1e-5);
+  assert.deepEqual(made(h.counts), counts, 'a steady frame creates nothing');
+  dof.dispose();
+  assert.ok(h.resources.filter((r) => r.width !== undefined).every((r) => r.destroyed));
+});
