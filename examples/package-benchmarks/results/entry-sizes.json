@@ -1,10 +1,10 @@
 {
-  "commit": "8113ad764",
+  "commit": "a3c5c1edd",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
     "raw": 58443,
-    "gzip": 23590,
+    "gzip": 23626,
     "limit": 25000
   },
   "packages": {
@@ -234,8 +234,8 @@
         "gzip": 4005
       },
       "./workers": {
-        "raw": 6154,
-        "gzip": 2779
+        "raw": 6482,
+        "gzip": 2856
       },
       "./gpu": {
         "raw": 62457,
@@ -257,9 +257,29 @@
         "raw": 6926,
         "gzip": 3210
       },
+      "dist/workers/biomes-erosion.js": {
+        "raw": 5127,
+        "gzip": 2578
+      },
+      "dist/workers/biomes-graph.js": {
+        "raw": 7094,
+        "gzip": 2968
+      },
+      "dist/workers/biomes-multinoise.js": {
+        "raw": 5083,
+        "gzip": 2113
+      },
+      "dist/workers/biomes-splines.js": {
+        "raw": 9669,
+        "gzip": 4261
+      },
+      "dist/workers/biomes-zones.js": {
+        "raw": 3822,
+        "gzip": 1800
+      },
       "dist/workers/biomes.js": {
-        "raw": 131232,
-        "gzip": 48618
+        "raw": 104938,
+        "gzip": 39310
       }
     },
     "@margoengine/blender": {
@@ -577,17 +597,17 @@
     "@margoengine/core": {
       ".": {
         "raw": 51214,
-        "gzip": 21258
+        "gzip": 21285
       },
       "./extension": {
-        "raw": 51313,
-        "gzip": 21323
+        "raw": 51315,
+        "gzip": 21311
       }
     },
     "@margoengine/creative": {
       ".": {
-        "raw": 61586,
-        "gzip": 19100
+        "raw": 62200,
+        "gzip": 19154
       },
       "./particles": {
         "raw": 1028,
@@ -606,16 +626,16 @@
         "gzip": 7019
       },
       "./grass": {
-        "raw": 16111,
-        "gzip": 5944
+        "raw": 16377,
+        "gzip": 5961
       },
       "./planet": {
-        "raw": 20730,
-        "gzip": 7011
+        "raw": 20958,
+        "gzip": 7027
       },
       "./stars": {
-        "raw": 6033,
-        "gzip": 2653
+        "raw": 6153,
+        "gzip": 2665
       }
     },
     "@margoengine/culling": {
@@ -2756,8 +2776,8 @@
     },
     "@margoengine/stage": {
       ".": {
-        "raw": 7314,
-        "gzip": 2966
+        "raw": 7318,
+        "gzip": 2974
       },
       "./gltf": {
         "raw": 2922,
@@ -3671,9 +3691,34 @@
       "brotli": 2690
     },
     "packages/biomes/dist/workers/biomes.js": {
-      "raw": 129928,
-      "gzip": 48474,
-      "brotli": 42638
+      "raw": 103858,
+      "gzip": 39170,
+      "brotli": 34686
+    },
+    "packages/biomes/dist/workers/biomes-splines.js": {
+      "raw": 9649,
+      "gzip": 4254,
+      "brotli": 3847
+    },
+    "packages/biomes/dist/workers/biomes-erosion.js": {
+      "raw": 5139,
+      "gzip": 2575,
+      "brotli": 2325
+    },
+    "packages/biomes/dist/workers/biomes-graph.js": {
+      "raw": 7024,
+      "gzip": 2957,
+      "brotli": 2708
+    },
+    "packages/biomes/dist/workers/biomes-zones.js": {
+      "raw": 3768,
+      "gzip": 1791,
+      "brotli": 1651
+    },
+    "packages/biomes/dist/workers/biomes-multinoise.js": {
+      "raw": 5114,
+      "gzip": 2128,
+      "brotli": 1957
     },
     "packages/voxel/dist/workers/light.js": {
       "raw": 27623,

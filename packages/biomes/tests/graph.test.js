@@ -7,7 +7,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { BiomeWorld, defineBiome } from '../dist/index.js';
 import { BiomePlacement } from '../dist/placement.js';
-import { ThreadWebWorker } from './thread-worker.js';
+import { takeLoaded, ThreadWebWorker } from './thread-worker.js';
 
 const biomes = [
   defineBiome({
@@ -192,6 +192,7 @@ test('noise thins a species where it is low; workers place the page bytes with a
     plain = BiomePlacement.attach(await BiomeWorld.create(options)),
     far = await BiomeWorld.create({ ...options, workers: 1, createWorker: () => new ThreadWebWorker() }),
     remote = BiomePlacement.attach(far, { graph });
+  takeLoaded();
   let kept = 0,
     all = 0;
   for (const [x, z] of tiles) {
@@ -206,5 +207,10 @@ test('noise thins a species where it is low; workers place the page bytes with a
   remote.update({ graph: zero });
   assert.equal(await remote.digest(1, 1), await main.digest(1, 1));
   assert.equal(keys(await main.tile(1, 1)).get('wood/fern'), undefined);
+  assert.deepEqual(
+    [...new Set(takeLoaded())],
+    ['biomes-graph.js'],
+    'the workers ran the graph part, from its own file',
+  );
   far.dispose();
 });

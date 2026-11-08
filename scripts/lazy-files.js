@@ -312,6 +312,46 @@ export const LAZY_FILES = [
     when: 'First tile, placement or view job of a `BiomeWorld` with workers (the default in browsers): up to `workers` workers, each a replica of the world, reused until `dispose()`',
   },
   {
+    package: '@margoengine/biomes',
+    file: 'packages/biomes/dist/workers/biomes-splines.js',
+    label: 'workers/biomes-splines.js',
+    kind: 'Worker part',
+    measure: 'file',
+    when: 'Each biome worker of a world with carved paths (`height: { carve }`), once, by `importScripts` (a world without it never loads the file)',
+  },
+  {
+    package: '@margoengine/biomes',
+    file: 'packages/biomes/dist/workers/biomes-erosion.js',
+    label: 'workers/biomes-erosion.js',
+    kind: 'Worker part',
+    measure: 'file',
+    when: 'Each biome worker of a relief world with `erosion`, once, by `importScripts` (a world without it never loads the file)',
+  },
+  {
+    package: '@margoengine/biomes',
+    file: 'packages/biomes/dist/workers/biomes-graph.js',
+    label: 'workers/biomes-graph.js',
+    kind: 'Worker part',
+    measure: 'file',
+    when: 'Each biome worker of a placement with a `graph`, once, by `importScripts` (a world without it never loads the file)',
+  },
+  {
+    package: '@margoengine/biomes',
+    file: 'packages/biomes/dist/workers/biomes-zones.js',
+    label: 'workers/biomes-zones.js',
+    kind: 'Worker part',
+    measure: 'file',
+    when: 'Each biome worker of a world with the Whittaker or Holdridge classifier, once, by `importScripts` (a world without it never loads the file)',
+  },
+  {
+    package: '@margoengine/biomes',
+    file: 'packages/biomes/dist/workers/biomes-multinoise.js',
+    label: 'workers/biomes-multinoise.js',
+    kind: 'Worker part',
+    measure: 'file',
+    when: 'Each biome worker of a world with a multi-noise classifier, once, by `importScripts` (a world without it never loads the file)',
+  },
+  {
     package: '@margoengine/voxel',
     file: 'packages/voxel/dist/workers/light.js',
     label: 'workers/light.js',
@@ -384,4 +424,6 @@ export const LAZY_SPLITS = [
 
 /** Built files that load on their own at runtime; each must be in LAZY_FILES. Paths relative to the repository root. */
 export const isLazyBuildFile = (path) =>
-  /^packages\/[^/]+\/dist\/(.*\.wasm|workers\/[^/]+\.js|[^/]*\.worker\.js|(draco|draco-full|draco-encoder|basis|basis-encoder|jxl)\/[^/]+\.js)$/.test(path);
+  /^packages\/[^/]+\/dist\/(.*\.wasm|workers\/[^/]+\.js|[^/]*\.worker\.js|(draco|draco-full|draco-encoder|basis|basis-encoder|jxl)\/[^/]+\.js)$/.test(
+    path,
+  );

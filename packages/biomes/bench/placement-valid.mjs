@@ -235,7 +235,8 @@ export async function coldPlacement({ create, attach, tiles, time }) {
 }
 
 /**
- * A Web Worker over a Node worker thread running the built classic worker script, as tests/thread-worker.js does, plus
+ * A Web Worker over a Node worker thread running the built classic worker script (and its part scripts, by
+ * importScripts), as tests/thread-worker.js does, plus
  * what the bench needs around the timer: `gc()` collects the worker's heap (the process runs with --expose-gc, which
  * worker threads inherit) and resolves whether it could; `terminate()` keeps the exit so the next sample starts only
  * after this one's threads are gone.
@@ -253,6 +254,10 @@ export class BenchWorker {
            parentPort.postMessage({ benchGc: typeof gc === 'function' });
          } else if (globalThis.onmessage) globalThis.onmessage({ data });
        });
+       globalThis.importScripts = (...urls) => {
+         for (const url of urls)
+           require('node:vm').runInThisContext(require('node:fs').readFileSync(require('node:url').fileURLToPath(url), 'utf8'));
+       };
        require('node:vm').runInThisContext(require('node:fs').readFileSync(${JSON.stringify(script)}, 'utf8'));`,
       { eval: true },
     );

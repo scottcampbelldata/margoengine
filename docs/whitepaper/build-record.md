@@ -3117,6 +3117,12 @@ waiting on lane J and a smaller worker file. Core and stage are untouched. Nothi
   cover tile functions out, which every view with objects needs. A classic IIFE worker cannot split with `import()`;
   part scripts loaded by `importScripts` from URLs the page sends would work without the app's bundler, but are not
   built.
+- **Job 6 finished in batch 64 (manager approved):** the optional parts are now part scripts beside the worker
+  (`dist/workers/biomes-<part>.js`), run with `importScripts` only when a world uses them, from URLs the page resolves
+  with `new URL(..., import.meta.url)` and sends with each replica's init. The worker is 39,090 B gzip (level 9) and
+  103,858 B raw; a part reads the worker's copy of every module they share, so each module has one copy. Tests: each
+  part's world gives the main thread's bytes and runs only its own file, a world without parts loads no part file, and
+  the worker's size is measured. Limits row updated with manager approval.
 - **Not updated:** the "Biome worker file" row of `docs/limits.md` still gives 43,778 B and calls digest and presets
   unused; the shared-rows guard refuses any change to an existing row, so its update waits for the manager.
 - **Limits:** rows in `docs/limits.md`; the ecosystem is CPU only, not calibrated to a real forest, time per

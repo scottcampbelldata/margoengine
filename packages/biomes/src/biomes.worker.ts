@@ -13,6 +13,32 @@ let world: BiomeWorld | undefined,
   broken: unknown;
 const placements = new Map<number, BiomePlacement>();
 
+/** Where the page's build put each optional part's script (dist/workers/biomes-<part>.js), sent with every init. */
+let partUrls: Readonly<Record<string, string>> = {};
+const parts = new Map<string, unknown>();
+type PartScope = Record<string, unknown> & {
+  importScripts(url: string): void;
+  MargoBiomesPart(name: string): Promise<unknown>;
+};
+// The optional parts (splines, erosion, graph, zones and multinoise) are classic scripts of their own: the worker build
+// (scripts/build-workers.js) turns each import() of one, in this file and in the world's own code, into a call of this
+// loader, which runs the part's script once, with importScripts, when a world first uses it. A part reads the modules
+// it shares with this file from the table the build adds here, so each module has one copy (and each hook one object).
+(self as unknown as PartScope).MargoBiomesPart = async (name) => {
+  if (!parts.has(name)) {
+    const url = partUrls[name],
+      scope = self as unknown as PartScope;
+    if (!url)
+      throw typeError(
+        'The page sent no URL for a biome worker part; load the page and the worker script from one build',
+        'biomes',
+      );
+    scope.importScripts(url);
+    parts.set(name, scope[`MargoBiomesPart_${name}`]);
+  }
+  return parts.get(name);
+};
+
 type Message = { id: number; op: string } & Record<string, unknown>;
 
 /** The classifier object for a name sent by the page ('envelopes', 'whittaker', 'holdridge' or { kind: 'multinoise', spec }). */
@@ -94,6 +120,7 @@ async function run(m: Message): Promise<unknown> {
       };
       world?.dispose();
       broken = undefined;
+      partUrls = (m.parts as Record<string, string> | undefined) ?? {};
       world = await BiomeWorld.create({
         ...state.options,
         classifier: await classifier(state.options.classifier),

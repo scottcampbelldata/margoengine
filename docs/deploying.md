@@ -61,6 +61,7 @@ Workers are separate files next to your bundle, created with the bundler-friendl
 | `decoder.worker-*.js` | `@margoengine/decoders` (Draco, KTX2) | classic, `importScripts` for the Draco and Basis wrappers |
 | `gltf-*.js` | `@margoengine/gltf-pro/worker` (`loadGLTFInWorker`, `parseGLTFInWorker`) | classic |
 | `fbx-*.js`, `usdz-*.js`, `usd-*.js` | `@margoengine/fbx`, `usdz`, `loaders` worker parsers | classic |
+| `biomes-*.js` | `@margoengine/biomes` (a `BiomeWorld` with `workers`) | classic, `importScripts` for its optional parts (`biomes-splines-*.js` and the like, same origin) |
 
 `worker-src` falls back to `script-src`, then `default-src`, so `'self'` in either is enough; listing it keeps the
 intent obvious.

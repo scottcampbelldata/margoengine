@@ -52,6 +52,19 @@ const spawn = (): Worker =>
     name: 'margoengine-biomes',
   });
 
+/**
+ * The worker's optional parts, prebuilt classic scripts beside it that bundlers copy as assets: a worker runs one with
+ * importScripts only when its world uses that part (carved paths, erosion, a placement graph, a zone or multi-noise
+ * classifier), so a world without them never downloads them.
+ */
+const partUrls = (): Record<string, string> => ({
+  splines: new URL(/* @vite-ignore */ './workers/biomes-splines.js?no-inline', import.meta.url).href,
+  erosion: new URL(/* @vite-ignore */ './workers/biomes-erosion.js?no-inline', import.meta.url).href,
+  graph: new URL(/* @vite-ignore */ './workers/biomes-graph.js?no-inline', import.meta.url).href,
+  zones: new URL(/* @vite-ignore */ './workers/biomes-zones.js?no-inline', import.meta.url).href,
+  multinoise: new URL(/* @vite-ignore */ './workers/biomes-multinoise.js?no-inline', import.meta.url).href,
+});
+
 /** A classifier as a worker gets it: its name (the worker imports the zones entry for a zone classifier), or `{ kind, spec }` for one built from a spec. */
 const classifierName = (c: unknown) =>
   c === undefined || c === 'envelopes'
@@ -105,6 +118,7 @@ export class BiomeWorkers implements Disposable {
     return {
       message: {
         op: 'init',
+        parts: partUrls(),
         state: {
           options: {
             seed: w.seed,

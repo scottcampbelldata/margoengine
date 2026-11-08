@@ -3,9 +3,11 @@
 // the same world on the main thread, after paint writes, updates and placement changes too; an aborted job leaves the
 // queue and a retry gives the same bytes; a crashed worker rejects its job with MargoError 'failed' and the next job
 // runs on a fresh replica. The worker file holds one copy of each module and leaves out the digest and presets
-// entries.
+// entries; its optional parts (splines, erosion, graph, zones, multinoise) are files of their own, loaded only by a
+// world that uses them, from the URLs the page sends.
 import test from 'node:test';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
+import { gzipSync } from 'node:zlib';
 import assert from 'node:assert/strict';
 import { BiomeWorld, defineBiome } from '../dist/index.js';
 import { BiomePlacement } from '../dist/placement.js';
@@ -13,7 +15,7 @@ import { presets } from '../dist/presets.js';
 import { groundMaterials, overviewWeights, VIEW_LAYERS, viewTile } from '../dist/view.js';
 import { BiomeWorkers, defaultWorkers } from '../dist/workers.js';
 import { whittaker } from '../dist/zones.js';
-import { ThreadWebWorker } from './thread-worker.js';
+import { takeLoaded, ThreadWebWorker } from './thread-worker.js';
 
 const options = { seed: 11, size: [1024, 1024] };
 const both = async (extra = {}) => [
@@ -41,6 +43,7 @@ test('worker options: none by default without Web Workers, validated counts, a f
 
 test('worker tiles, placements and view tiles are the main thread bytes', { timeout: 240000 }, async () => {
   const [main, remote] = await both();
+  takeLoaded();
   assert.equal(main.workers, undefined);
   assert.ok(remote.workers);
   for (const [x, z] of [
@@ -73,6 +76,8 @@ test('worker tiles, placements and view tiles are the main thread bytes', { time
   assert.deepEqual(sent.heights, local.heights);
   assert.deepEqual(sent.weights[0], local.weights[0]);
   assert.deepEqual(sent.weights[1], local.weights[1]);
+  // A world without carved paths, erosion, a placement graph or a zone classifier loads none of the part files.
+  assert.deepEqual(takeLoaded(), [], 'no part script');
   remote.dispose();
 });
 
@@ -84,8 +89,10 @@ test('paint writes, updates and placement changes reach the replicas in order', 
   for (const w of [main, remote])
     w.update({ biomes: [presets.temperate, presets.desert, presets.wetland, presets.boreal] });
   assert.equal(await remote.digest(2, 1), await main.digest(2, 1), 'after new biomes');
+  takeLoaded();
   for (const w of [main, remote]) w.update({ classifier: whittaker });
   assert.equal(await remote.digest(1, 2), await main.digest(1, 2), 'after the Whittaker classifier');
+  assert.deepEqual([...new Set(takeLoaded())], ['biomes-zones.js'], 'the zones part, from its own file');
   const p = BiomePlacement.attach(main),
     q = BiomePlacement.attach(remote),
     road = {
@@ -303,13 +310,59 @@ test('stands: worker placements are the main thread bytes', { timeout: 240000 },
   remote.dispose();
 });
 
-test('the worker file holds one copy of each module, without the digest and presets entries', () => {
+test('the worker and its part files hold one copy of each module, without the digest and presets entries', () => {
   // Regression: the package-name imports (toolkit, splines, relief, erosion) resolved to dist, which added a second
   // copy of the integer helpers (and a second object per hook); the worker never makes a digest, and the page sends its
-  // world's biomes, so the default ones are dead weight.
-  const code = readFileSync(new URL('../dist/workers/biomes.js', import.meta.url), 'utf8'),
-    count = (text) => code.split(text).length - 1;
-  assert.equal(count('isqrt needs an integer'), 1, 'one copy of fixed.ts');
-  assert.equal(count('Biome digests need Web Crypto'), 0, 'no digest entry');
-  assert.equal(count('procedural:fern'), 0, 'no presets');
+  // world's biomes, so the default ones are dead weight. The optional parts are files of their own (loaded only by a
+  // world that uses them), reading the worker's copy of every module they share with it.
+  const dir = new URL('../dist/workers/', import.meta.url),
+    files = Object.fromEntries(readdirSync(dir).map((name) => [name, readFileSync(new URL(name, dir), 'utf8')])),
+    count = (text, name) => files[name].split(text).length - 1,
+    total = (text) => Object.keys(files).reduce((n, name) => n + count(text, name), 0);
+  assert.deepEqual(Object.keys(files).sort(), [
+    'biomes-erosion.js',
+    'biomes-graph.js',
+    'biomes-multinoise.js',
+    'biomes-splines.js',
+    'biomes-zones.js',
+    'biomes.js',
+  ]);
+  assert.equal(total('isqrt needs an integer'), 1, 'one copy of fixed.ts');
+  assert.equal(count('isqrt needs an integer', 'biomes.js'), 1, 'in the worker');
+  assert.equal(total('Biome digests need Web Crypto'), 0, 'no digest entry');
+  assert.equal(total('procedural:fern'), 0, 'no presets');
+  // Each part's code is in its own file only (one message of each).
+  for (const [part, text] of [
+    ['splines', 'A path is an object such as'],
+    ['erosion', 'erode needs height as an Int32Array'],
+    ['graph', 'A placement graph has 1 to 256 nodes'],
+    ['zones', 'superarid'],
+    ['multinoise', 'multiNoise blend is a number'],
+  ]) {
+    assert.equal(total(text), 1, part);
+    assert.equal(count(text, `biomes-${part}.js`), 1, part);
+  }
+  // The worker without its parts, measured (gzip level 9): 39,090 B and 103,858 B raw on 2026-11-08, from 48,403 B and
+  // 129,928 B with every part inside (docs/limits.md, "Biome worker file").
+  const core = Buffer.from(files['biomes.js']),
+    gzip = gzipSync(core, { level: 9 }).length;
+  assert.ok(gzip <= 39_500, `worker ${gzip} B gzip`);
+  assert.ok(core.length <= 105_000, `worker ${core.length} B raw`);
+});
+
+test('a worker asked for a part whose URL the page did not send rejects the job clearly', async () => {
+  takeLoaded();
+  const w = new ThreadWebWorker(),
+    reply = await new Promise((resolve) => {
+      w.onmessage = ({ data }) => resolve(data);
+      w.postMessage({
+        id: 1,
+        op: 'init',
+        state: { options: { seed: 1, size: [512, 512], classifier: 'whittaker' }, user: [], placements: [] },
+      });
+    });
+  w.terminate();
+  assert.equal(reply.id, 1);
+  assert.match(reply.error.message, /The page sent no URL for a biome worker part/);
+  assert.deepEqual(takeLoaded(), []);
 });

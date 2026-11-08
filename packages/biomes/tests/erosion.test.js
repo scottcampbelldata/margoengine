@@ -12,7 +12,7 @@ import { erode, erodeRelief } from '../dist/erosion.js';
 import { BiomeWorld } from '../dist/index.js';
 import { priorityFlood } from '../dist/region.js';
 import { createRelief } from '../dist/relief.js';
-import { ThreadWebWorker } from './thread-worker.js';
+import { takeLoaded, ThreadWebWorker } from './thread-worker.js';
 
 const golden = JSON.parse(readFileSync(new URL('./golden/erosion.json', import.meta.url), 'utf8'));
 const DX = [1, 1, 0, -1, -1, -1, 0, 1],
@@ -209,6 +209,7 @@ test('same bytes on 1 and 4 workers as on the page', { timeout: 240000 }, async 
     page = await BiomeWorld.create({ ...options, workers: false }),
     one = await BiomeWorld.create({ ...options, workers: 1, createWorker: () => new ThreadWebWorker() }),
     four = await BiomeWorld.create({ ...options, workers: 4, createWorker: () => new ThreadWebWorker() });
+  takeLoaded();
   try {
     assert.equal(four.workers.size, 4);
     for (const [x, z] of [
@@ -221,6 +222,11 @@ test('same bytes on 1 and 4 workers as on the page', { timeout: 240000 }, async 
       assert.equal(await one.digest(x, z), want, `1 worker ${x},${z}`);
       assert.equal(await four.digest(x, z), want, `4 workers ${x},${z}`);
     }
+    assert.deepEqual(
+      [...new Set(takeLoaded())],
+      ['biomes-erosion.js'],
+      'the workers ran the erosion part, from its own file',
+    );
   } finally {
     one.dispose();
     four.dispose();

@@ -1167,6 +1167,7 @@ export const entries = [
       'Climate wind must be a non-zero [x, z] direction',
       'The biome world is disposed; create a new world',
       'Unknown biome worker job; load the page and the worker script from one build',
+      'The page sent no URL for a biome worker part; load the page and the worker script from one build',
       "Height sample unit must be 'm' or 'mm'",
       'Height samples must be an Int32Array (mm) or a Float32Array (m)',
       'Height samples need width and depth of 2 or more and width x depth values',

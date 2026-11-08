@@ -8,7 +8,7 @@ import { BiomeWorld, defineBiome } from '../dist/index.js';
 import { loadWorld, saveWorld } from '../dist/io.js';
 import { presets } from '../dist/presets.js';
 import { multiNoise, multiNoisePresets } from '../dist/multinoise.js';
-import { ThreadWebWorker } from './thread-worker.js';
+import { takeLoaded, ThreadWebWorker } from './thread-worker.js';
 import { cases, makeWorld } from './multinoise-cases.mjs';
 
 const ONE = 65536,
@@ -276,6 +276,7 @@ test('golden digests: five worlds, pinned', async () => {
 test('1 worker and 4 workers give the main thread bytes', { timeout: 240000 }, async () => {
   const c = cases['climate:1'],
     main = await makeWorld(c);
+  takeLoaded();
   for (const n of [1, 4]) {
     const remote = await makeWorld(c, { workers: n, createWorker: () => new ThreadWebWorker() });
     assert.ok(remote.workers, `${n} workers started`);
@@ -287,6 +288,11 @@ test('1 worker and 4 workers give the main thread bytes', { timeout: 240000 }, a
       assert.equal(await remote.digest(x, z), await main.digest(x, z), `${n} workers, tile ${x},${z}`);
     remote.dispose();
   }
+  assert.deepEqual(
+    [...new Set(takeLoaded())],
+    ['biomes-multinoise.js'],
+    'the workers ran the multinoise part, from its own file',
+  );
   main.dispose();
 });
 

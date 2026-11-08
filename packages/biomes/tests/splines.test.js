@@ -16,7 +16,7 @@ import { presets } from '../dist/presets.js';
 import { heightsOf } from '../dist/region.js';
 import { createRelief } from '../dist/relief.js';
 import { carvePaths, definePath, paintPaths, pathEdits, pathExclusions } from '../dist/splines.js';
-import { ThreadWebWorker } from './thread-worker.js';
+import { takeLoaded, ThreadWebWorker } from './thread-worker.js';
 import { cpuTimer } from '../../../scripts/support/cpu-budget.mjs';
 
 const golden = JSON.parse(readFileSync(new URL('./golden/splines.json', import.meta.url), 'utf8'));
@@ -517,6 +517,7 @@ test('workers: 1 and 4 worker replicas carve and paint the bytes of the page', a
     page = await BiomeWorld.create(options),
     one = await BiomeWorld.create({ ...options, workers: 1, createWorker: () => new ThreadWebWorker() }),
     four = await BiomeWorld.create({ ...options, workers: 4, createWorker: () => new ThreadWebWorker() });
+  takeLoaded();
   try {
     assert.equal(four.workers.size, 4);
     for (const w of [page, one, four]) paintPaths(BiomeEditor.attach(w), [road, track, lane]);
@@ -526,6 +527,11 @@ test('workers: 1 and 4 worker replicas carve and paint the bytes of the page', a
     // A carve sent by update reaches the replicas too.
     for (const w of [page, four]) w.update({ height: carvePaths([lane]) });
     assert.deepEqual(await digests(four), await digests(page));
+    assert.deepEqual(
+      [...new Set(takeLoaded())],
+      ['biomes-splines.js'],
+      'the workers ran the splines part, from its own file',
+    );
   } finally {
     one.dispose();
     four.dispose();

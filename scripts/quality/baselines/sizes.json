@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11323674,
+  "total": 11329087,
   "history": [
     {
       "date": "2026-10-24",
@@ -4550,6 +4550,12 @@
       "commit": "650e4d22a",
       "reason": "voxel-net entities: new entry ./entities; server onTick/sendEntities and client onEntities (batch 98 job 1)",
       "grew": 2
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "fce5a9646",
+      "reason": "biome worker optional parts split into their own files (batch 63 job 6)",
+      "grew": 5
     }
   ],
   "items": {
@@ -4586,7 +4592,12 @@
     "@margoengine/behavior/smart-objects": 2029,
     "@margoengine/behavior/steering": 3827,
     "@margoengine/biomes": 16819,
-    "@margoengine/biomes dist/workers/biomes.js": 50077,
+    "@margoengine/biomes dist/workers/biomes-erosion.js": 2834,
+    "@margoengine/biomes dist/workers/biomes-graph.js": 3224,
+    "@margoengine/biomes dist/workers/biomes-multinoise.js": 2369,
+    "@margoengine/biomes dist/workers/biomes-splines.js": 4517,
+    "@margoengine/biomes dist/workers/biomes-zones.js": 2056,
+    "@margoengine/biomes dist/workers/biomes.js": 40490,
     "@margoengine/biomes/cover": 3341,
     "@margoengine/biomes/digest": 894,
     "@margoengine/biomes/disturbance": 5771,
