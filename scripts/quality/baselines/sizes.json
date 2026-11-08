@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11290253,
+  "total": 11291891,
   "history": [
     {
       "date": "2026-10-24",
@@ -4472,6 +4472,12 @@
       "commit": "967e3a7e5",
       "reason": "biomes/ecosystem: new optional entry, growEcosystem and plantsFromTile",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "f0a0d2284",
+      "reason": "environment/fog-volumes: new entry, local fog volumes; volumetric gains the volumes option",
+      "grew": 1
     }
   ],
   "items": {
@@ -4672,6 +4678,7 @@
     "@margoengine/environment/blend": 4687,
     "@margoengine/environment/cube-camera": 5691,
     "@margoengine/environment/exr-write": 2084,
+    "@margoengine/environment/fog-volumes": 1638,
     "@margoengine/environment/gi": 18045,
     "@margoengine/environment/ground": 5433,
     "@margoengine/environment/probes": 17892,

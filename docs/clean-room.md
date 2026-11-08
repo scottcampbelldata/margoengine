@@ -197,6 +197,7 @@ carry the same citation as a one-line comment in the code.
 | E34 | ground projected background: view ray against the floor plane and a dome sphere, lookup from the photo camera above the center | environment/src/ground.ts | Margo-own: ray-plane and ray-sphere intersection (standard analytic geometry) |
 | E35 | live irradiance volume: a fixed sweep of probe captures that see the probe light of the captures before them, one bounce per sweep | environment/src/probes.ts, environment/src/gi.ts | radiosity as an iteration of gathers (Goral, Torrance, Greenberg and Battaile 1984); Margo-own sweep order |
 | E36 | probe visibility: per-probe mean and mean square distance in 24 direction bins, Chebyshev weight cubed, smooth backface term, renormalised weights | environment/src/probes.ts | variance test after Donnelly and Lauritzen 2006 (Variance Shadow Maps); per-probe visibility as in DDGI, Majercik et al. 2019 (JCGT 8(2)); Margo-own bins and biases |
+| E37 | local fog volumes: per-froxel extinction and albedo-weighted scattering summed over boxes and spheres, density smoothstep over the signed distance inside, the fog's value noise | environment/src/fog-volumes.ts, environment/src/volumetric.ts | participating media add extinction and scattering coefficients (Hillaire 2015, Physically Based and Unified Volumetric Rendering in Frostbite); signed distance of a sphere and of a box (standard analytic geometry); Margo-own edge ramp |
 
 ### exporters
 

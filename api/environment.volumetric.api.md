@@ -37,6 +37,7 @@ export interface VolumetricFogOptions {
     shadows?: VolumetricLightSource;
     lights?: VolumetricLightSource;
     depth?: () => GPUTexture | undefined;
+    volumes?: VolumetricMediumSource;
 }
 
 export interface VolumetricLightSource {
@@ -44,5 +45,10 @@ export interface VolumetricLightSource {
         readonly declarations: string;
     };
     bindings(): GPUBindGroupEntry[];
+}
+
+export interface VolumetricMediumSource {
+    medium(group: number): string;
+    bindings(device: GPUDevice): GPUBindGroupEntry[];
 }
 ```

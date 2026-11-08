@@ -846,6 +846,10 @@
       "types": "./dist/environment/gi.d.ts",
       "import": "./dist/environment/gi.js"
     },
+    "./environment/fog-volumes": {
+      "types": "./dist/environment/fog-volumes.d.ts",
+      "import": "./dist/environment/fog-volumes.js"
+    },
     "./exporters": {
       "types": "./dist/exporters.d.ts",
       "import": "./dist/exporters.js"

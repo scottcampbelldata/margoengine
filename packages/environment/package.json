@@ -36,6 +36,7 @@
     "test:ground:browser": "npm run build && node scripts/test-browser.js --page=ground",
     "test:gi:browser": "npm run build && node scripts/test-browser.js --page=gi",
     "test:visibility:browser": "npm run build && node scripts/test-browser.js --page=visibility",
+    "test:fog-volumes:browser": "npm run build && node scripts/test-browser.js --page=fog-volumes",
     "test:gpu:mirror": "cd ../.. && node scripts/env-mirror-gpu-check.js",
     "test:gpu:fog-all": "cd ../.. && node scripts/fog-all-gpu-check.js"
   },
@@ -80,6 +81,10 @@
     "./gi": {
       "types": "./dist/gi.d.ts",
       "import": "./dist/gi.js"
+    },
+    "./fog-volumes": {
+      "types": "./dist/fog-volumes.d.ts",
+      "import": "./dist/fog-volumes.js"
     }
   },
   "files": [

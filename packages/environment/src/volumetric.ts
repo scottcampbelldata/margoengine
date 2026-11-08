@@ -30,6 +30,15 @@ export interface VolumetricLightSource {
   bindings(): GPUBindGroupEntry[];
 }
 
+/**
+ * A local fog medium VolumetricFog adds to its froxel grid (`FogVolumes` from @margoengine/environment/fog-volumes):
+ * WGSL defining `fogMedium(p:vec3f)->vec4f` (scattering rgb, extinction a) and the bindings it reads.
+ */
+export interface VolumetricMediumSource {
+  medium(group: number): string;
+  bindings(device: GPUDevice): GPUBindGroupEntry[];
+}
+
 /** `VolumetricFog` settings (froxel-grid scattering with shadowed light shafts); invalid values throw RangeError. */
 export interface VolumetricFogOptions {
   /** Whether the fog draws (default true). Live: false skips its pass from the next frame and keeps its grid. */
@@ -70,6 +79,11 @@ export interface VolumetricFogOptions {
    * e.g. `() => water.depthTexture`. With a capture attached the fog reads its depth and this is not needed.
    */
   depth?: () => GPUTexture | undefined;
+  /**
+   * Local fog (`FogVolumes` from @margoengine/environment/fog-volumes): boxes and spheres with their own density,
+   * colour and noise, added to this fog and lit like it. Without it the fog's shaders are unchanged.
+   */
+  volumes?: VolumetricMediumSource;
 }
 
 const struct = /* wgsl */ `
@@ -84,10 +98,11 @@ fn sliceDepth(s:f32)->f32 {let x=s/volume.grid.z;return volume.shape.x*x*x;}
 // per-slice analytic, energy-conserving integration (S - S T) / sigma after Hillaire 2015, "Physically Based and
 // Unified Volumetric Rendering in Frostbite". Noise weights 1.3333 / 0.6667, lacunarity 2.11, the offset and the four
 // stratified shadow samples are Margo tuning.
-const compute = (lights: string | undefined, shadows: string | undefined) =>
+const compute = (lights: string | undefined, shadows: string | undefined, medium?: string) =>
   struct +
   (lights ?? '') +
   (shadows ?? '') +
+  (medium ?? '') +
   /* wgsl */ `
 @group(0) @binding(1) var history:texture_3d<f32>;
 @group(0) @binding(2) var linearSampler:sampler;
@@ -151,7 +166,7 @@ ${/* @__PURE__ */ clusterCell('p')}
     light+=volume.sunColor.rgb*phase(dot(-volume.sun.xyz,v),volume.scatter.w)*lit;
   }
   ${lights ? 'light+=localLight(uv*volume.screen.xy+volume.screen.zw,p,v,volume.scatter.w);' : ''}
-  var value=vec4f(sigma*volume.scatter.rgb*light,sigma);
+  ${medium ? 'let local=fogMedium(p);var value=vec4f((sigma*volume.scatter.rgb+local.rgb)*light,sigma+local.a);' : 'var value=vec4f(sigma*volume.scatter.rgb*light,sigma);'}
   if(volume.grid.w>0.0){
     // Reproject the froxel's centre, not the jittered sample: a still camera reads its own texel unfiltered (no drift).
     let uc=(vec2f(id.xy)+0.5)/volume.grid.xy;let nc=unproject(vec3f(uc.x*2-1,1-uc.y*2,1));let dc=unproject(vec3f(uc.x*2-1,1-uc.y*2,0.5))-nc;
@@ -233,6 +248,7 @@ export class VolumetricFog implements EnginePlugin {
   private integrateGroups: GPUBindGroup[] = [];
   private lightGroup?: { entries: GPUBindGroupEntry[]; group: GPUBindGroup };
   private shadowGroup?: { entries: GPUBindGroupEntry[]; group: GPUBindGroup };
+  private mediumGroup?: { entries: GPUBindGroupEntry[]; group: GPUBindGroup };
   private readonly composites = new Map<string, GPURenderPipeline>();
   private compositeGroup?: { pipeline: GPURenderPipeline; view: GPUTextureView; group: GPUBindGroup };
   private depthViews = new WeakMap<GPUTexture, GPUTextureView>();
@@ -308,7 +324,8 @@ export class VolumetricFog implements EnginePlugin {
       (o.depth !== undefined && typeof o.depth !== 'function') ||
       [o.shadows, o.lights].some(
         (s) => s !== undefined && (typeof s?.pbr !== 'function' || typeof s.bindings !== 'function'),
-      )
+      ) ||
+      (o.volumes !== undefined && (typeof o.volumes?.medium !== 'function' || typeof o.volumes.bindings !== 'function'))
     )
       throw new RangeError('Invalid volumetric fog options; pass finite, in-range values (see VolumetricFogOptions)');
   }
@@ -441,9 +458,10 @@ export class VolumetricFog implements EnginePlugin {
     if (grid.join() !== this.gridKey) this.allocate(device, grid);
     const lights = o.lights?.pbr(1).declarations,
       shadows = o.shadows?.pbr(lights ? 2 : 1).declarations,
-      key = (lights ?? '') + '\0' + (shadows ?? '');
+      medium = o.volumes?.medium(1 + +!!lights + +!!shadows),
+      key = (lights ?? '') + '\0' + (shadows ?? '') + (medium === undefined ? '' : '\0' + medium);
     if (key !== this.computeKey || !this.inject) {
-      const module = device.createShaderModule({ code: compute(lights, shadows) });
+      const module = device.createShaderModule({ code: compute(lights, shadows, medium) });
       this.inject = device.createComputePipeline({ layout: 'auto', compute: { module, entryPoint: 'inject' } });
       this.integrateStep = device.createComputePipeline({
         layout: 'auto',
@@ -452,7 +470,7 @@ export class VolumetricFog implements EnginePlugin {
       this.computeKey = key;
       this.injectGroups = [];
       this.integrateGroups = [];
-      this.lightGroup = this.shadowGroup = undefined;
+      this.lightGroup = this.shadowGroup = this.mediumGroup = undefined;
     }
     if (!this.injectGroups.length) {
       const views = this.textures.map((t) => t.createView()),
@@ -533,6 +551,12 @@ export class VolumetricFog implements EnginePlugin {
       if (this[slot]?.entries !== entries) this[slot] = { entries, group: this.group(this.inject, index, entries) };
       pass.setBindGroup(index++, this[slot]!.group);
     }
+    if (o.volumes) {
+      const entries = o.volumes.bindings(device);
+      if (this.mediumGroup?.entries !== entries)
+        this.mediumGroup = { entries, group: this.group(this.inject, index, entries) };
+      pass.setBindGroup(index, this.mediumGroup.group);
+    }
     pass.dispatchWorkgroups(Math.ceil(grid[0] / 4), Math.ceil(grid[1] / 4), Math.ceil(grid[2] / 4));
     pass.setPipeline(this.integrateStep!);
     pass.setBindGroup(0, this.integrateGroups[parity]);
@@ -601,7 +625,7 @@ export class VolumetricFog implements EnginePlugin {
     this.gridKey = this.computeKey = '';
     this.injectGroups = [];
     this.integrateGroups = [];
-    this.lightGroup = this.shadowGroup = this.compositeGroup = undefined;
+    this.lightGroup = this.shadowGroup = this.mediumGroup = this.compositeGroup = undefined;
     this.composites.clear();
     this.depthViews = new WeakMap();
     this.valid = false;

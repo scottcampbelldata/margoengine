@@ -23,6 +23,7 @@ for (const [entry, emptyOutDir] of [
   ['blend', false],
   ['ground', false],
   ['gi', false],
+  ['fog-volumes', false],
 ])
   await build({
     root,
