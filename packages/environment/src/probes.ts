@@ -100,13 +100,21 @@ export interface IrradianceVolume {
    */
   visibility?: boolean;
 }
-/** A local reflection probe: captured at `position`, box-projected onto `min`..`max`, which is also its influence. */
+/**
+ * A local reflection probe captured at `position`: box-projected onto `min`..`max`, which is also its influence, or with
+ * `shape: 'sphere'` sphere-projected onto the sphere of `radius` around `position` (curved rooms, outdoor areas).
+ */
 export interface ReflectionProbe {
-  /** Capture point; must lie inside the box. */
+  /** Capture point; must lie inside the box. A sphere probe's centre (moving it later keeps the sphere where it was). */
   position: Vec3;
-  min: Vec3;
-  max: Vec3;
-  /** World distance outside the box over which the probe fades out (default 10% of the box's smallest side; the box faces are inside). */
+  /** Box corners (box probes; a sphere probe takes `radius` instead and reads back its bounding box here). */
+  min?: Vec3;
+  max?: Vec3;
+  /** 'box' (default): parallax against the box. 'sphere': against the sphere of `radius`, which is also its influence. */
+  shape?: 'box' | 'sphere';
+  /** Sphere probes: the sphere's radius (world units, > 0). */
+  radius?: number;
+  /** World distance outside the box or sphere over which the probe fades out (default 10% of the box's smallest side or of the sphere's diameter; the faces are inside). */
   blend?: number;
   /** Re-captured by live capture under `priority: 'dynamic'` ({@link LiveReflectionOptions}); default false. */
   dynamic?: boolean;
@@ -147,8 +155,14 @@ export interface LightProbeOptions {
   /** Ambient light outside the probes (and the sky the captures see). Without it, receivers keep their own ambient there. */
   environment?: Environment;
   volume?: IrradianceVolume;
-  /** At most {@link MAX_REFLECTION_PROBES}; earlier probes win where boxes overlap (list nested boxes first). */
+  /** At most {@link MAX_REFLECTION_PROBES}; earlier probes win where boxes overlap (list nested boxes first), unless `reflectionBlend` is 'weighted'. */
   reflections?: readonly ReflectionProbe[];
+  /**
+   * How overlapping reflection probes combine. 'order' (default): earlier probes win, later ones fill what they leave.
+   * 'weighted': every probe counts by its fade weight and the sum is normalised where the weights pass 1, so the
+   * reflection blends smoothly across the overlap, whatever the list order.
+   */
+  reflectionBlend?: 'order' | 'weighted';
   /** Reflection probe edge: capture faces and the sharpest octahedral level (power of two, 16-256, default 128). */
   resolution?: number;
   /** Capture camera near and far planes (defaults 0.05 and 1000). */
@@ -267,7 +281,35 @@ fn depthRay(x:f32,y:f32,z:f32)->vec3f {
 // a published engine standard. The 1e-3 box-fade floor is Margo's.
 // Shading: volume irradiance (trilinear over the eight nearest probes, evaluated like environment's iblIrradiance) and
 // reflection radiance (box projection, trilinear over the prefiltered octahedral levels), mixed with the fallback by weight.
-const shadingWgsl = (group: number, environment: boolean, visibility: boolean) =>
+// Sphere probes (any in the list): a probe with min.w 1 fades by its distance past the sphere of radius max.w around the
+// box centre, and its parallax point is the far intersection of the reflected ray with that sphere. Weighted blending:
+// every probe counts by its fade, normalised where the weights sum past 1, in place of the front-to-back order.
+const reflectionWgsl = (sphere: boolean, weighted: boolean): string => {
+  const fade = weighted ? '' : '*left';
+  const project = sphere
+    ? `    var w=0.0;var hit=p;
+    if(b.min.w>0.5){
+      let o=p-(b.min.xyz+b.max.xyz)*0.5;let rr=b.max.w;w=clamp(1.0-(length(o)-rr)/max(b.position.w,1e-3),0.0,1.0)${fade};if(w<=0.0){continue;}
+      let a=max(dot(r,r),1e-12);let h=dot(o,r);hit=p+r*max((-h+sqrt(max(h*h-a*(dot(o,o)-rr*rr),0.0)))/a,0.0);
+    }else{
+      w=probeFade(p,b.min.xyz,b.max.xyz,b.position.w)${fade};if(w<=0.0){continue;}
+      let t3=(select(b.min.xyz,b.max.xyz,q>vec3f(0))-p)/q;hit=p+r*max(min(t3.x,min(t3.y,t3.z)),0.0);
+    }
+    let d=hit-b.position.xyz;
+`
+    : `    let w=probeFade(p,b.min.xyz,b.max.xyz,b.position.w)${fade};if(w<=0.0){continue;}
+    let t3=(select(b.min.xyz,b.max.xyz,q>vec3f(0))-p)/q;let d=p+r*max(min(t3.x,min(t3.y,t3.z)),0.0)-b.position.xyz;
+`;
+  return `fn probeReflection(p:vec3f,r:vec3f,rough:f32)->vec4f {
+  var sum=vec3f(0);var ${weighted ? 'total=0.0' : 'left=1.0'};let q=r+select(vec3f(0),vec3f(1e-6),abs(r)<vec3f(1e-6));
+  for(var j=0u;j<probeData.reflections.x;j++){
+    let b=probeData.boxes[j];if(b.data.w==0u){continue;}
+${project}    sum+=w*probeRadiance(b,select(r,d,dot(d,d)>1e-12),rough);${weighted ? 'total+=w;' : 'left-=w;'}
+  }
+  return ${weighted ? 'select(vec4f(sum,total),vec4f(sum/total,1.0),total>1.0)' : 'vec4f(sum,1.0-left)'};
+}`;
+};
+const shadingWgsl = (group: number, environment: boolean, visibility: boolean, sphere = false, weighted = false) =>
   dataWgsl('read', group, PROBE_BINDING) +
   (visibility ? binWgsl : '') +
   /* wgsl */ `
@@ -321,16 +363,7 @@ fn probeRadiance(b:ProbeBox,d:vec3f,rough:f32)->vec3f {
   var o0=b.data.x;for(var j=0u;j<k0;j++){let s=b.data.y>>j;o0+=s*s;}let s0=b.data.y>>k0;
   return mix(probeLevel(o0,s0,uv),probeLevel(select(o0+s0*s0,o0,k1==k0),b.data.y>>k1,uv),lod-f32(k0));
 }
-fn probeReflection(p:vec3f,r:vec3f,rough:f32)->vec4f {
-  var sum=vec3f(0);var left=1.0;let q=r+select(vec3f(0),vec3f(1e-6),abs(r)<vec3f(1e-6));
-  for(var j=0u;j<probeData.reflections.x;j++){
-    let b=probeData.boxes[j];if(b.data.w==0u){continue;}
-    let w=probeFade(p,b.min.xyz,b.max.xyz,b.position.w)*left;if(w<=0.0){continue;}
-    let t3=(select(b.min.xyz,b.max.xyz,q>vec3f(0))-p)/q;let d=p+r*max(min(t3.x,min(t3.y,t3.z)),0.0)-b.position.xyz;
-    sum+=w*probeRadiance(b,select(r,d,dot(d,d)>1e-12),rough);left-=w;
-  }
-  return vec4f(sum,1.0-left);
-}
+${reflectionWgsl(sphere, weighted)}
 ${
   environment
     ? `@group(${group}) @binding(${IBL_BINDING}) var iblSpecular:texture_cube<f32>;
@@ -536,7 +569,11 @@ const levelTexels = (size: number) => {
 export class LightProbes extends ShaderEffect {
   readonly environment?: Environment;
   readonly volume?: Readonly<IrradianceVolume>;
-  readonly reflections: readonly Readonly<ReflectionProbe>[];
+  readonly reflections: readonly Readonly<ReflectionProbe & { min: Vec3; max: Vec3; blend: number }>[];
+  /** How overlapping reflection probes combine ({@link LightProbeOptions.reflectionBlend}). */
+  readonly reflectionBlend: 'order' | 'weighted';
+  // Shading variants: sphere probes and weighted blending add WGSL only when used, so other users keep their shader text.
+  private readonly spheres: boolean;
   readonly resolution: number;
   private readonly near: number;
   private readonly far: number;
@@ -642,29 +679,64 @@ export class LightProbes extends ShaderEffect {
     }
     if (!Array.isArray(reflections as unknown) || reflections.length > MAX_REFLECTION_PROBES)
       throw new RangeError(`Expected at most ${MAX_REFLECTION_PROBES} reflection probes`);
+    const reflectionBlend = options.reflectionBlend ?? 'order';
+    if (reflectionBlend !== 'order' && reflectionBlend !== 'weighted')
+      throw new TypeError("LightProbes reflectionBlend must be 'order' or 'weighted'");
+    this.reflectionBlend = reflectionBlend;
     this.reflections = reflections.map((probe, j) => {
-      if (
-        !boxValid(probe?.min, probe?.max) ||
-        !vector(probe.position) ||
-        probe.position.some((v, i) => v < probe.min[i] || v > probe.max[i]) ||
-        (probe.blend !== undefined && (!finite(probe.blend) || probe.blend < 0))
-      )
-        throw new RangeError('Invalid reflection probe; pass min < max, position inside the box, blend >= 0');
+      const shape = probe?.shape ?? 'box';
+      if (shape !== 'box' && shape !== 'sphere')
+        throw new TypeError("Reflection probe shape must be 'box' or 'sphere'");
+      if (probe.blend !== undefined && (!finite(probe.blend) || probe.blend < 0))
+        throw new RangeError('Invalid reflection probe; pass blend >= 0');
+      let min: Vec3, max: Vec3;
+      if (shape === 'sphere') {
+        const radius = probe.radius;
+        if (
+          !vector(probe.position) ||
+          !finite(radius) ||
+          radius <= 0 ||
+          probe.min !== undefined ||
+          probe.max !== undefined
+        )
+          throw new RangeError(
+            'Invalid sphere reflection probe; pass a finite position and radius > 0, and no min or max',
+          );
+        const [x, y, z] = probe.position;
+        min = [x - radius, y - radius, z - radius];
+        max = [x + radius, y + radius, z + radius];
+      } else {
+        if (
+          !boxValid(probe.min, probe.max) ||
+          !vector(probe.position) ||
+          probe.radius !== undefined ||
+          probe.position.some((v, i) => v < probe.min![i] || v > probe.max![i])
+        )
+          throw new RangeError(
+            'Invalid reflection probe; pass min < max and position inside the box (radius is for spheres)',
+          );
+        min = [...probe.min!] as Vec3;
+        max = [...probe.max!] as Vec3;
+      }
       if (probe.dynamic !== undefined && typeof probe.dynamic !== 'boolean')
         throw new TypeError('Reflection probe dynamic must be a boolean; pass true, false or omit it');
-      const blend = probe.blend ?? 0.1 * Math.min(...probe.max.map((v, i) => v - probe.min[i])),
+      const blend = probe.blend ?? 0.1 * Math.min(...max.map((v, i) => v - min[i])),
         o = 64 + j * 64;
-      [probe.position, probe.min, probe.max].forEach((v, k) =>
-        v.forEach((x, i) => view.setFloat32(o + k * 16 + i * 4, x, true)),
-      );
+      [probe.position, min, max].forEach((v, k) => v.forEach((x, i) => view.setFloat32(o + k * 16 + i * 4, x, true)));
       view.setFloat32(o + 12, blend, true);
+      // A sphere probe: min.w 1 and max.w its radius; its centre is the box's.
+      if (shape === 'sphere') {
+        view.setFloat32(o + 28, 1, true);
+        view.setFloat32(o + 44, probe.radius!, true);
+      }
       view.setUint32(o + 48, texels, true);
       view.setUint32(o + 52, this.resolution, true);
       view.setUint32(o + 56, levelCount(this.resolution), true);
       this.offsets.push(texels);
       texels += levelTexels(this.resolution);
-      return { ...probe, position: [...probe.position], min: [...probe.min], max: [...probe.max], blend };
+      return { ...probe, position: [...probe.position], min, max, blend };
     });
+    this.spheres = this.reflections.some((probe) => probe.shape === 'sphere');
     view.setUint32(48, this.reflections.length, true);
     if (this.volume?.visibility) {
       // Visibility: 24 bins of (mean, mean square) distance as two f32 per probe, after every other texel; the header
@@ -796,8 +868,13 @@ export class LightProbes extends ShaderEffect {
     if (!Number.isInteger(index) || index < 0 || index >= this.reflections.length)
       throw new RangeError('Invalid reflection probe index; use an index below the reflection probe count');
     const probe = this.reflections[index];
-    if (!vector(position) || position.some((v, i) => v < probe.min[i] || v > probe.max[i]))
-      throw new RangeError('Reflection probe position must be finite and inside the box');
+    if (
+      !vector(position) ||
+      (probe.shape === 'sphere'
+        ? Math.hypot(...position.map((v, i) => v - (probe.min[i] + probe.max[i]) / 2)) > probe.radius!
+        : position.some((v, i) => v < probe.min[i] || v > probe.max[i]))
+    )
+      throw new RangeError('Reflection probe position must be finite and inside its box or sphere');
     (probe as ReflectionProbe).position = [...position];
     const view = this.headerView,
       offset = 64 + index * 64;
@@ -833,7 +910,9 @@ export class LightProbes extends ShaderEffect {
           : `${base}*(1.0-i.material.y)*${sky ? HEMISPHERE_TERM : `frame.radiance.w${color}`}`;
       return `let margoAmbient=probeShade(i.position,n,v,${base},i.material.y,i.material.x,${fallback},vec3f(0.04),1.0);let linear=${(sky ? terms.replace(`*${HEMISPHERE_TERM}`, '*0.0') : terms).replace('frame.radiance.w', '0.0')}+margoAmbient;`;
     });
-    return code === source ? source : shadingWgsl(group, env, this.visibilityOffset > 0) + code;
+    return code === source
+      ? source
+      : shadingWgsl(group, env, this.visibilityOffset > 0, this.spheres, this.reflectionBlend === 'weighted') + code;
   }
   protected hooks(group: number): PBRHooks {
     // Without an environment the fallback is gltf-pro's own hemisphere ambient (its `ambient(s)`, which the hook replaces).
@@ -842,7 +921,13 @@ export class LightProbes extends ShaderEffect {
       ? 'vec3f(0)'
       : '(s.base.rgb*(1.0-s.metal)+mix(s.f0,s.base.rgb,s.metal)*0.5)*mix(vec3f(0.35,0.3,0.25),vec3f(1),clamp(s.n.y*0.5+0.5,0.0,1.0))*f.radiance.w';
     return {
-      declarations: shadingWgsl(group, !!this.environment, this.visibilityOffset > 0),
+      declarations: shadingWgsl(
+        group,
+        !!this.environment,
+        this.visibilityOffset > 0,
+        this.spheres,
+        this.reflectionBlend === 'weighted',
+      ),
       ambient: `probeShade(i.position,s.n,v,s.base.rgb,s.metal,s.roughness,${ambient},s.f0,s.sw)*s.occlusion`,
     };
   }

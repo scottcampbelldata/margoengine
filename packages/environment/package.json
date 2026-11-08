@@ -39,6 +39,7 @@
     "test:fog-volumes:browser": "npm run build && node scripts/test-browser.js --page=fog-volumes",
     "test:studio:browser": "npm run build && node scripts/test-browser.js --page=studio",
     "test:fog-transparent:browser": "npm run build && node scripts/test-browser.js --page=volumetric-transparent",
+    "test:reflection-shapes:browser": "npm run build && node scripts/test-browser.js --page=reflection-shapes",
     "test:gpu:mirror": "cd ../.. && node scripts/env-mirror-gpu-check.js",
     "test:gpu:fog-all": "cd ../.. && node scripts/fog-all-gpu-check.js"
   },

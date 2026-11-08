@@ -3047,3 +3047,42 @@ Core and stage are untouched (23,626 B gzip together after the batch).
 - **Limits and unmeasured:** rows in `docs/limits.md` for each job. CSS 3D objects are not depth-tested per pixel
   against the canvas (the `occlude` hook hides whole objects); leader lines are straight and not routed around labels;
   rotations, skews and a transform on the canvas itself are not followed. Cost per frame is not measured for any job.
+
+## Lane D batch 50: environment (part 1)
+
+Eight jobs for `@margoengine/environment` on the M6 Mac mini (Metal), each landed as one commit. Core and stage are
+untouched (23,590 B gzip together after the batch).
+
+| # | Job | Status | Commit | Entry | Claim |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Blend two environments | DONE | 523fdf14e | `@margoengine/environment/blend` | LIM-493 |
+| 2 | Ground projected environment | DONE | 7abb9e0ed | `@margoengine/environment/ground` | LIM-498 |
+| 3 | Dynamic global illumination | DONE | 38bc4cae4 | `@margoengine/environment/gi` | LIM-504 |
+| 4 | Probe visibility against leaks | DONE | 2a161fdce | `volume.visibility` in `@margoengine/environment/probes` | LIM-543 |
+| 5 | Local fog volumes | DONE | 628c93efb | `@margoengine/environment/fog-volumes` | LIM-545 |
+| 6 | Procedural studio environment | DONE | 2d4f794f1 | `@margoengine/environment/studio` | LIM-547 |
+| 7 | Fogged transparents and particles | DONE | 54438d86f | `VolumetricFog.add` in `@margoengine/environment/volumetric` | LIM-548 |
+| 8 | Sphere projected and blended reflection probes | DONE | this commit | `shape: 'sphere'`, `reflectionBlend` in `@margoengine/environment/probes` | LIM-549 |
+
+- **Built from:** `docs/clean-room.md` rows E33 to E40: SH rotation and weighted cube sums, ray against a floor plane
+  and dome, DDGI-style live probe sweeps (Majercik et al. 2019), Chebyshev visibility (Donnelly and Lauritzen 2006),
+  participating media after Hillaire 2015, gnomonic softbox coverage, Beer-Lambert composition over a fogged frame,
+  and parallax-corrected local cubemaps with sphere volumes (Lagarde and Zanuttini 2012). Nothing from another engine
+  was read.
+- **Proved (real GPU, this Mac, Chromium 156 on Metal):** one browser page per job in `packages/environment/tests`
+  (`npm run test:blend:browser`, `test:ground:browser`, `test:gi:browser`, `test:visibility:browser`,
+  `test:fog-volumes:browser`, `test:studio:browser`, `test:fog-transparent:browser`,
+  `test:reflection-shapes:browser`). Jobs 7 and 8 compile the entry's own WGSL into a compute pass and compare it
+  with a CPU mirror: fogged transparents within 1.7e-7 at 192 froxel centres, sphere and weighted reflection probes
+  within 3.2e-7 at 512 random rays. Options that change shaders are hash-pinned: without them every shader keeps
+  its text (`visibility.test.js`, `fog-volumes.test.js`, `volumetric-transparent.test.js`,
+  `reflection-shapes.test.js`).
+- **Sizes (gzip budgets in the size record, B):** new entries `/blend` 4,687, `/ground` 5,433, `/gi` 18,611 (18,045
+  at job 3; it bundles the probes shading, so job 8 grew it), `/fog-volumes` 1,638, `/studio` 1,493; `/probes` 15,099
+  to 18,459, `/volumetric` 8,443 to 9,741. The `@margoengine/environment` root is unchanged at 31,320. Core and stage
+  unchanged.
+- **Bugs fixed:** none outside the batch's own code; job 6's first browser check rendered in a fixed loop, which the
+  root `check-fixed-waits` test refused, and was rewritten to one render and `onSubmittedWorkDone`.
+- **Limits and unmeasured:** rows in `docs/limits.md` for each job. Additive, multiply and transmission surfaces are
+  not fogged; sphere probes are centred where they are created; the GPU cost of every job's option is not timed;
+  nothing was run on another machine.

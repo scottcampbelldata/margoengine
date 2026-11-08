@@ -181,6 +181,33 @@ await probes.refresh(0);                                                  // re-
   where boxes overlap the earlier probe in the list wins, so list nested boxes first. `setReflectionPosition(index,
   position)` moves the capture point and its box-projection origin together, keeping the last baked radiance until the
   next `bake()`. It validates an integer probe index and a finite position inside the box; input vectors are copied.
+- **Sphere probes and weighted blending.** `{shape: 'sphere', position, radius}` sphere-projects a probe for curved
+  rooms and outdoor areas: the reflected ray is intersected with the sphere of `radius` around `position` (its far
+  hit, as seen from inside) and the sphere is the influence, fading out over `blend` (default 10% of the diameter)
+  past its surface. `reflections[i].min` and `max` read back its bounding box, and `setReflectionPosition` moves the
+  capture point inside the sphere, which stays where it was. `reflectionBlend: 'weighted'` (default `'order'`)
+  combines overlapping probes by their fade weights instead of list order, normalised where the weights sum past 1,
+  so a reflection crosses smoothly from one probe to the next. Box probes in the default order keep the shader text
+  they had; sphere probes and weighted blending add their code only when used:
+
+```ts
+import {Engine} from 'margoengine/core';
+import {LightProbes} from 'margoengine/environment/probes';
+const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
+const probes = LightProbes.attach(engine, {
+  reflections: [
+    {shape: 'sphere', position: [0, 2, 0], radius: 6},            // a round hall
+    {position: [8, 1.5, 0], min: [5, 0, -3], max: [12, 3, 3]},    // the corridor next to it
+  ],
+  reflectionBlend: 'weighted',                                     // smooth across the doorway, whatever the order
+});
+await probes.bake();
+```
+
+  Real-GPU check: `npm run test:reflection-shapes:browser` (LightProbes' own shading declarations, run in a compute
+  pass over its packed header and direction-coded texels, equal a CPU mirror of the sphere and box projections and both
+  blend modes at 512 random rays within 3.2e-7 on an Apple M6; a real engine bakes and shades sphere and box probes,
+  weighted, with no GPU error).
   For a mirror model that should receive reflections without appearing in its own capture, call
   `model.addLighting(probes)` directly instead of `probes.add(model)`.
 - **Replacing the ambient term.** Probes replace the ambient light, named `margoAmbient` like `EnvironmentLighting`, so
@@ -282,7 +309,7 @@ live probe (256 samples) and a magenta box moved into its +x view, frames render
 Limits: the irradiance volume is static: a moving object or light needs a re-bake (CPU encode plus GPU, see above);
 reflection probes can follow the scene with live capture, a few frames behind (see Live capture); no visibility per probe, so
 light leaks through walls thinner than the probe spacing (place volume boxes per room); one volume per LightProbes;
-reflection probes are box-projected only (no sphere projection); the receiver's normal map and occlusion shade the probe
+reflection probes are box- or sphere-projected (no other shapes); the receiver's normal map and occlusion shade the probe
 light (terrain takes the core-style patch like EnvironmentLighting); core meshes and models with a `draw` method
 (gltf-pro, materials) are captured, terrain, water, sky backgrounds, particles and other custom pipelines are not (the
 environment fills in where nothing was drawn); GPU-culled
@@ -692,7 +719,7 @@ Two portability measures are deliberate: the specular prefilter samples the cube
 
 `tests/probes.test.js` checks LightProbes on a mock GPU: validation and buffer layout, the ambient patch on core's shader variants (with and without an environment, terrain, clustered) and on a glTF-pro model, the bake's capture shader (rebound frame, linear output, no fog, every clustered light), its submits and dispatches, the opt-in bounded filter's bindings and atomic validation, and the CPU irradiance mirror. `npm run test:probes:browser` checks the bounded filter on a real GPU: constant HDR energy, an independent spherical integral for a directional environment including every cube seam, a rendered colored room against full-source GGX, and byte-identical sharp level 0 / volume SH. It writes `test-results/probe-samples-browser.json`. The broader real-GPU checks are `examples/package-benchmarks/probes-gpu.mjs` (README section above). `tests/probes-live.test.js` checks live capture on the mock GPU: validation, one face per frame with the prefilter on the sixth, the face budget across probes, both priorities, `refresh()` promises, a bake during live capture, pooled resources and device restoration; `examples/package-benchmarks/probes-live-gpu.mjs` measures its latency and GPU cost on a real GPU (Live capture, above).
 
-`tests/blend.test.js` checks `rotateSH` against direct evaluation at random directions and angles and the blend's argument checks; `npm run test:blend:browser` checks the blend on a real GPU (section above) and writes `test-results/blend-browser.json`. `tests/ground.test.js` checks the ground projection's settings (height and radius as a pair, center); `npm run test:ground:browser` checks it on a real GPU (section above) and writes `test-results/ground-browser.json`. `tests/gi.test.js` checks DynamicGI's defaults, options and sweep length, and `tests/probes-live.test.js` the live volume on the mock GPU (the sweep, lighting after the first sweep, sharing a frame with live reflections, a device restore, `readback`); `npm run test:gi:browser` checks it on a real GPU (section above) and writes `test-results/gi-browser.json`. `tests/fog-volumes.test.js` checks FogVolumes' validation and buffer layout, VolumetricFog's composition with it and that without it the froxel shader is byte for byte the text before the option; `npm run test:fog-volumes:browser` checks it on a real GPU (section above). `tests/volumetric-transparent.test.js` checks `fog.add` on the mock GPU: the transparent pass after the composite, depth read only, the hook declarations, a skipped frame drawing unfogged, removers and dispose, and that without `add` the fog's shaders and uniform bytes are unchanged; `npm run test:fog-transparent:browser` checks it on a real GPU (section above). `tests/studio.test.js` checks the procedural studio's validation, image layout, room gradient, each softbox's radiance and soft edge, the default lights and that the same options give the same bytes; `npm run test:studio:browser` checks it on a real GPU (section above). `tests/visibility.test.js` checks the volume `visibility` option, its buffer layout and that without it the shading WGSL is byte for byte the text before the option; `npm run test:visibility:browser` checks it on a real GPU: a thin wall between a sunlit side and a dark room, where the dark floor by the wall loses the light that leaked through (in the read-back CPU mirror and on screen), the sunlit side keeps its light, and the probe 1 m from the wall stores about 1 m toward it.
+`tests/blend.test.js` checks `rotateSH` against direct evaluation at random directions and angles and the blend's argument checks; `npm run test:blend:browser` checks the blend on a real GPU (section above) and writes `test-results/blend-browser.json`. `tests/ground.test.js` checks the ground projection's settings (height and radius as a pair, center); `npm run test:ground:browser` checks it on a real GPU (section above) and writes `test-results/ground-browser.json`. `tests/gi.test.js` checks DynamicGI's defaults, options and sweep length, and `tests/probes-live.test.js` the live volume on the mock GPU (the sweep, lighting after the first sweep, sharing a frame with live reflections, a device restore, `readback`); `npm run test:gi:browser` checks it on a real GPU (section above) and writes `test-results/gi-browser.json`. `tests/fog-volumes.test.js` checks FogVolumes' validation and buffer layout, VolumetricFog's composition with it and that without it the froxel shader is byte for byte the text before the option; `npm run test:fog-volumes:browser` checks it on a real GPU (section above). `tests/volumetric-transparent.test.js` checks `fog.add` on the mock GPU: the transparent pass after the composite, depth read only, the hook declarations, a skipped frame drawing unfogged, removers and dispose, and that without `add` the fog's shaders and uniform bytes are unchanged; `npm run test:fog-transparent:browser` checks it on a real GPU (section above). `tests/reflection-shapes.test.js` checks sphere probes' and `reflectionBlend`'s validation, the packed header (a sphere's bounding box, min.w 1, max.w its radius), moving a sphere's capture point and that box probes in order keep the shading WGSL byte for byte; `npm run test:reflection-shapes:browser` checks them on a real GPU (section above). `tests/studio.test.js` checks the procedural studio's validation, image layout, room gradient, each softbox's radiance and soft edge, the default lights and that the same options give the same bytes; `npm run test:studio:browser` checks it on a real GPU (section above). `tests/visibility.test.js` checks the volume `visibility` option, its buffer layout and that without it the shading WGSL is byte for byte the text before the option; `npm run test:visibility:browser` checks it on a real GPU: a thin wall between a sunlit side and a dark room, where the dark floor by the wall loses the light that leaked through (in the read-back CPU mirror and on screen), the sunlit side keeps its light, and the probe 1 m from the wall stores about 1 m toward it.
 
 `tests/mirror.test.js` checks Reflector, Refractor and CubeCamera on a mock GPU: captures run only the scene passes and the full frame graph comes back, the mirror camera lands mirror points x-flipped on its near plane and clips what is behind, the glass clips what is in front, excluded and off-layer meshes are hidden only during a capture, and every cube face matches the standard WebGPU addressing after its x flip, culled against its own face. The real-GPU check is `scripts/env-mirror-gpu-check.js` (above).
 

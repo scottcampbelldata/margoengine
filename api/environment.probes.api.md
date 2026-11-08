@@ -20,6 +20,7 @@ export interface LightProbeOptions {
     environment?: Environment;
     volume?: IrradianceVolume;
     reflections?: readonly ReflectionProbe[];
+    reflectionBlend?: 'order' | 'weighted';
     resolution?: number;
     near?: number;
     far?: number;
@@ -31,7 +32,12 @@ export interface LightProbeOptions {
 export class LightProbes extends ShaderEffect {
     readonly environment?: Environment;
     readonly volume?: Readonly<IrradianceVolume>;
-    readonly reflections: readonly Readonly<ReflectionProbe>[];
+    readonly reflections: readonly Readonly<ReflectionProbe & {
+        min: Vec3;
+        max: Vec3;
+        blend: number;
+    }>[];
+    readonly reflectionBlend: 'order' | 'weighted';
     readonly resolution: number;
     static attach(engine: EngineKernel, options: LightProbeOptions): LightProbes;
     constructor(options: LightProbeOptions);
@@ -82,8 +88,10 @@ export interface ProbeBakeOptions {
 
 export interface ReflectionProbe {
     position: Vec3;
-    min: Vec3;
-    max: Vec3;
+    min?: Vec3;
+    max?: Vec3;
+    shape?: 'box' | 'sphere';
+    radius?: number;
     blend?: number;
     dynamic?: boolean;
 }
