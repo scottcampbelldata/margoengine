@@ -1,5 +1,5 @@
 {
-  "commit": "e66d34c6e",
+  "commit": "7c3dc68df",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -2374,6 +2374,10 @@
       "./colormaps": {
         "raw": 10516,
         "gzip": 4171
+      },
+      "./formats": {
+        "raw": 19281,
+        "gzip": 7860
       },
       "./maths": {
         "raw": 12305,

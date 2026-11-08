@@ -335,6 +335,53 @@ a single scalar volume keeps the file's sample type, a frame of a series is a vi
 component or the magnitude is a new `Float32Array`. The colour range spans the grid's samples unless you pass `range`.
 The file's orientation (`volume.matrix`) is not applied to the box: the volume draws axis-aligned in index order.
 
+## Medical and array formats
+
+`@margoengine/sciviz/formats` reads NIfTI, DICOM and Zarr into the grid `fig.volume()` takes, with no other
+dependency (gzip and deflate use the platform's `DecompressionStream`). Every reader returns `data`, `dims`, `bounds`
+(the true proportions, from 0) and `range`, and `volumeFromGrid(fig, grid, options)` draws any of them.
+
+- **NIfTI** (`parseNIfTI(bytes)`, `loadNIfTI(url)`): NIfTI-1 and NIfTI-2, `.nii`, `.nii.gz`, and a `.hdr` with its
+  `.img` (through `resolve`), in either byte order. Scaled data (`scl_slope`, `scl_inter`) comes back as
+  `Float32Array`. `matrix` is the sform when set, else the qform (with `qfac`), else the voxel sizes; `transform`
+  says which. `all` holds every frame and component; `data` is the first.
+- **DICOM** (`parseDICOM(bytes)`, `dicomSeries(images)`, `loadDICOMSeries(urls)`): Part 10 files in implicit or
+  explicit VR little endian, explicit VR big endian and deflated explicit VR little endian, with uncompressed pixel
+  data, 8, 16 or 32 bits, one or more frames, `RescaleSlope` and `RescaleIntercept` applied. `dicomSeries` orders the
+  slices of one series by position along the slice normal (instance number when positions are missing), takes the
+  slice step from the positions and builds the voxel to patient matrix. Compressed transfer syntaxes (JPEG, JPEG-LS,
+  JPEG 2000, RLE) are refused with code `unsupported`, naming the syntax.
+- **Zarr** (`openZarr(store, path)`, `array.read({ start, stop })`, `zarrGrid(read, spacing)`): v2 (`.zarray`) and v3
+  (`zarr.json`) arrays with regular chunks, over HTTP (a base URL), an object of keys, or your own
+  `(key, signal) => bytes` function. Codecs: bytes in either order, gzip, zlib, crc32c (checked) and transpose; C and
+  F order. A missing chunk reads as the fill value; `read` fetches only the chunks the box touches, at once. blosc,
+  zstd and sharding are refused with code `unsupported`, naming the codec.
+
+```ts
+import { Figure } from '@margoengine/sciviz';
+import { loadNIfTI, parseDICOM, dicomSeries, openZarr, zarrGrid, volumeFromGrid } from '@margoengine/sciviz/formats';
+
+const fig = await Figure.create(document.querySelector('canvas')!);
+
+const brain = await loadNIfTI('/data/zstat1.nii.gz');
+console.log(brain.dims, brain.spacing, brain.transform, brain.units.space);
+volumeFromGrid(fig, brain, { colormap: 'coolwarm' });
+
+// DICOM slices of one series, in any order.
+const files = await Promise.all(['/data/CT_small.dcm'].map(async (url) => new Uint8Array(await (await fetch(url)).arrayBuffer())));
+const ct = dicomSeries(await Promise.all(files.map((bytes) => parseDICOM(bytes))));
+console.log(ct.dims, ct.range);
+
+// A Zarr array in memory (any URL of a Zarr store works the same way).
+const store = {
+  '.zarray': JSON.stringify({ zarr_format: 2, shape: [2, 2, 2], chunks: [2, 2, 2], dtype: '<f4', compressor: null, fill_value: 0, order: 'C', filters: null }),
+  '0.0.0': new Uint8Array(new Float32Array([0, 1, 2, 3, 4, 5, 6, 7]).buffer),
+};
+const array = await openZarr(store);
+const grid = zarrGrid(await array.read(), [1, 1, 2]);
+console.log(array.shape, grid.dims, grid.range);
+```
+
 ## Picking, tooltips and selection
 
 Hovering shows a tooltip for the scatter point, line vertex, surface point, bar or heatmap cell under the pointer, with its x, y, z, its

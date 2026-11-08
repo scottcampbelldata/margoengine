@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10758424,
+  "total": 10766540,
   "history": [
     {
       "date": "2026-10-24",
@@ -3890,6 +3890,12 @@
       "commit": "9ce54b640",
       "reason": "splats/depth: SplatDepth writes a cloud's depth after it draws (batch 80 job 1); splats root gains Splats.attached",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "7c3dc68df",
+      "reason": "batch 118 job 2: new entry sciviz/formats",
+      "grew": 1
     }
   ],
   "items": {
@@ -4454,6 +4460,7 @@
     "@margoengine/sciviz": 36802,
     "@margoengine/sciviz/bricks": 14265,
     "@margoengine/sciviz/colormaps": 4427,
+    "@margoengine/sciviz/formats": 8116,
     "@margoengine/sciviz/maths": 5638,
     "@margoengine/sciviz/nrrd": 1216,
     "@margoengine/selection": 21142,

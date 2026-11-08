@@ -718,6 +718,9 @@ under the standard-file exception documented above (THIRD-PARTY-NOTICES.md, `pac
 | cividis (recorded data, CC BY 4.0) | J. R. Nuñez, C. R. Anderton and R. S. Renslow, PLOS ONE 13(7): e0199239 (2018), supporting file S2 |
 | OKLab and the perceptual maps | B. Ottosson, "A perceptual color space for image processing" (2020); sRGB transfer from IEC 61966-2-1; CIELAB and D65 from CIE 15:2004 |
 | NRRD volumes in a figure (`sciviz/nrrd`) | Teem project, "Definition of NRRD File Format" (axis `kinds`, `space directions`, detached `data file`); the reading itself is `loaders/nrrd`, row LF5 |
+| NIfTI-1 and NIfTI-2 headers (`sciviz/formats`) | NIfTI Data Format Working Group, "NIfTI-1 Data Format" (the annotated header nifti1.h, field offsets, datatype codes, qform quaternion with qfac and sform rows) and the NIfTI-2 header definition (nifti2.h), https://nifti.nimh.nih.gov |
+| DICOM files and series (`sciviz/formats`) | NEMA PS3.10 (file meta information, preamble and DICM prefix), PS3.5 sections 7.1 to 7.5 (explicit and implicit VR element encoding, undefined lengths, items and delimiters) and annex A (transfer syntaxes, deflate), PS3.6 (VRs of the elements read), PS3.3 C.7.6.2 (Image Plane Module: position, orientation, pixel spacing) and C.11.1 (rescale) |
+| Zarr arrays (`sciviz/formats`) | Zarr storage specification version 2 (`.zarray`, dtype strings, chunk keys, fill values) and Zarr specification 3.0 (`zarr.json`, chunk key encodings, the bytes, gzip, crc32c and transpose codecs), https://zarr-specs.readthedocs.io; CRC-32C from J. Castagnoli, S. Brauer and M. Herrmann, IEEE Trans. Communications 41(6), 1993 |
 
 ## Data track: the Python package (`python/`)
 

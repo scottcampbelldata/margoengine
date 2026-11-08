@@ -36,6 +36,10 @@
       "types": "./dist/colormaps.d.ts",
       "import": "./dist/colormaps.js"
     },
+    "./formats": {
+      "types": "./dist/formats.d.ts",
+      "import": "./dist/formats.js"
+    },
     "./maths": {
       "types": "./dist/maths.d.ts",
       "import": "./dist/maths.js"

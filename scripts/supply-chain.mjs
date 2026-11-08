@@ -148,6 +148,10 @@ const ASSETS = [
   ],
   ['examples/assets/robot-CREDITS.md', 'RobotExpressive upstream credits (Tomás Laulhé, Don McCurdy; CC0)'],
   [
+    'packages/sciviz/tests/fixtures/NOTICE.md',
+    'test fixtures: pydicom test data CT_small and MR_small in four transfer syntaxes (MIT-licensed project; no restriction on the files stated) and the NIfTI-1 sample zstat1.nii.gz (NIMH, public domain)',
+  ],
+  [
     'packages/headless/tests/fixtures/pngsuite/NOTICE.md',
     'test fixtures: PngSuite 2017jul19 by Willem van Schaik (free to use, copy, modify and distribute)',
   ],
