@@ -25,6 +25,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./models": {
+      "types": "./dist/models.d.ts",
+      "import": "./dist/models.js"
     }
   },
   "files": [
@@ -45,6 +49,7 @@
   "scripts": {
     "build": "node ../../scripts/build-optional.js toon",
     "test": "npm run build && node --test test/*.test.js",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "test:gpu": "cd ../.. && node packages/toon/test/models-check.mjs"
   }
 }

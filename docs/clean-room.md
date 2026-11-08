@@ -675,6 +675,7 @@ The own solver's kernel (`packages/physics/kernel`, Rust, no dependencies). Noth
 | id | formula | file | source |
 | --- | --- | --- | --- |
 | P34 | Inverted-hull outline | toon/src/index.ts | Raskar & Cohen 1999 (back-face hull silhouettes) |
+| TN1 | Inverted-hull outline on deformed model vertices, normal by the cofactor matrix | toon/src/models.ts | Raskar & Cohen 1999 (back-face hull silhouettes); normals by the transpose of the inverse, as cofactors |
 | C-07 | Inverted-hull outline | toon/src/index.ts | Raskar & Cohen, "Image Precision Silhouette Edges", I3D 1999 (back faces pushed out); defaults Margo's |
 
 ### transitions

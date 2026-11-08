@@ -2846,6 +2846,10 @@
       "types": "./dist/toon.d.ts",
       "import": "./dist/toon.js"
     },
+    "./toon/models": {
+      "types": "./dist/toon/models.d.ts",
+      "import": "./dist/toon/models.js"
+    },
     "./transitions": {
       "types": "./dist/transitions.d.ts",
       "import": "./dist/transitions.js"

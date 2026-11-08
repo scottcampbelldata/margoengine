@@ -2600,7 +2600,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-562). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-563). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -2813,6 +2813,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Field of view and fog of war (`@margoengine/tilemap/fov`, 2026-11-08) | One scan of up to `max(width, height)` rows per octant per viewer on the calling thread; a mask of `width * height` bytes per call (or the `into` mask), `FogOfWar` keeps two. | Shadowcasting visits only the cells that light can still reach, so a closed room costs its own cells. | By method: sight is from the viewer's cell centre and not symmetric; orthogonal and isometric grids only (staggered and hexagonal refused); no partial light or light levels; the fog image is one pixel per cell, drawn by the caller. Time not measured. | For light levels use `@margoengine/voxel/light-rgb` or a lighting pass; for hex fog test cells with `@margoengine/tilemap/hex` lines. |
 | Pixel-art scaling (`@margoengine/pixel/scale`, 2026-11-08) | One pass a canvas view (or one into `target`), 4 texel reads a pixel for `'sharp-bilinear'` and up to 20 for `'edge'`; the picture covers whole screen pixels. | Covering each screen pixel by its share of each texel keeps art pixels flat and even at any size. | By method: two texels a side are mixed, so below 1 times the picture is not averaged over all it covers; `'edge'` below 2 times draws as `'sharp-bilinear'`; colours mix as stored (sRGB values), not in linear light; texels past the edge repeat the edge. Time not measured. | Draw the art at the size you need below 1 times. |
 | CRT look (`@margoengine/pixel/crt`, 2026-11-08) | One pass a canvas view (or one into `target`), 9 texel reads a pixel. | Working from the art's own rows keeps one scanline per art pixel at any screen size. | By method: a stylised look, not a model of a real tube (no beam spread with brightness, no persistence, no interlace, no colour bleed); one grille pattern (three columns); the art row under each pixel is taken whole, not mixed with the next; colours as stored, not in linear light. Time not measured. | For a measured tube model use a dedicated post pass. |
+| Model outlines (`@margoengine/toon/models`, 2026-11-08) | One render pass a view for every outlined primitive, one hull draw a primitive and its instances (two pipelines: plain and mirrored nodes). | The hull reuses the vertices the model already has on the GPU, deformed ones included, so it costs one more vertex pass of the outlined triangles. | By method: an inverted hull, so the line follows vertex normals: hard-edged meshes with split normals show gaps at their creases; a constant world-unit width, thinner with distance; no line on point and line primitives; GPU-culled draws still draw their hull; one width and colour for every model. Time not measured. | `@margoengine/post` `Outline` for a screen-space line of fixed pixel width. |
 
 
 | Limit | Starts at | Why | What you see | Escape hatch |
@@ -6352,7 +6353,25 @@ const engine = await Engine.create(document.querySelector('canvas')!);
 const toon = Toon.attach(engine, {bands: 4, rim: 0.15, outline: 0.025});
 ```
 
-Outline thickness is world units. color is linear RGB in 0..1. The hull replays visible core geometry with the existing reversed-Z depth buffer. Geometry should have coherent smooth normals for a continuous silhouette; hard-normal seams can separate hull corners. This is a core-mesh pipeline, not a glTF-pro/skinned-mesh shader. dispose removes both passes.
+Outline thickness is world units. color is linear RGB in 0..1. The hull replays visible core geometry with the existing reversed-Z depth buffer. Geometry should have coherent smooth normals for a continuous silhouette; hard-normal seams can separate hull corners. `Toon` is a core-mesh pipeline; outline loaded and animated models with `ModelOutlines` (below). dispose removes both passes.
+
+## Outlines on loaded and skinned models
+
+`@margoengine/toon/models` draws the same inverted hull around loaded glTF-pro models and `@margoengine/materials` meshes: skinned and morphed characters keep their outline in every pose (the hull is drawn from the vertices their deformer wrote this frame), and instanced primitives get one hull per instance.
+
+```ts
+import {ModelOutlines} from 'margoengine/toon/models';
+import {Engine} from 'margoengine/core';
+import {loadGLTF} from 'margoengine/gltf-pro';
+import {Animation} from 'margoengine/animation';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const character = await loadGLTF(engine, '/hero.glb');
+Animation.attach(character).play(0);
+const outlines = ModelOutlines.attach(engine, {outline: 0.02, color: [0.02, 0.01, 0.01]});
+outlines.outline = 0.03; // live, as is color
+```
+
+Options: `outline`, thickness in world units 0 to 10 (default 0.025, 0 hides it); `color`, linear RGB 0 to 1 (default `[0.015, 0.015, 0.015]`); `models`, the models to outline (default every model on the engine). Hidden nodes and nodes outside a view's layers get no outline; point and line primitives never do. The line follows vertex normals, so hard-edged meshes with split normals show gaps at their creases. WebGPU only; `dispose()` removes the pass. For a screen-space line of fixed pixel width, use `@margoengine/post` `Outline`.
 
 For toon shading per material, on materials meshes (plain, instanced, skinned) and loaded glTF-pro models (skinned and morphed too), use `@margoengine/materials`: `new ToonMaterial({gradientMap})` or `{steps: 3}`, and `toonModel(model)` for a loaded model or some of its primitives. Both band the sun, clustered lights and their shadows through the ramp.
 

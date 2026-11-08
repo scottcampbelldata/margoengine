@@ -379,6 +379,11 @@ test('split steps cover the whole suite: both bevel sample counts, each chain pa
     splitSteps(byId('dof/test:gpu')).map((s) => s.command.replace('cd ../.. && node packages/dof/tests/gpu/', '')),
     ['lens-check.mjs', 'compat-check.mjs'],
   );
+  // Toon's browser checks, one step each.
+  assert.deepEqual(
+    splitSteps(byId('toon/test:gpu')).map((s) => s.command.replace('cd ../.. && node packages/toon/test/', '')),
+    ['models-check.mjs'],
+  );
 });
 
 // Bug (M6 Mac mini, scripts/gpu-package-tests.mjs): with MARGO_MACHINE_PROFILE unset the Mac ran as profile
