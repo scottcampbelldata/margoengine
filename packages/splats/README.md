@@ -201,3 +201,35 @@ first.remove(); // its range is free again
   `remove()` hides them and frees the range, merged with free neighbours.
 - Every pool splat is projected and sorted each frame, free ranges too (hidden, culled before drawing), so size
   `capacity` to what you add.
+
+## Scene light and shadows (`./lighting`)
+
+`SplatLighting` relights a cloud with the engine's directional light and ambient every frame, and is a
+`@margoengine/shadows` source, so the capture casts shadows on meshes:
+
+```ts
+import {Engine, box} from 'margoengine/core';
+import {Splats} from 'margoengine/splats';
+import {parsePly} from 'margoengine/splats/data';
+import {SplatLighting} from 'margoengine/splats/lighting';
+import {Shadows} from 'margoengine/shadows';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const ground = engine.createMesh().setGeometry(box()).setScale([20, 0.1, 20]).setPosition([0, -2, 0]);
+const cloud = Splats.attach(engine, parsePly(await (await fetch('/raccoon-v2.ply')).arrayBuffer()));
+const lit = SplatLighting.attach(engine, cloud);
+const shadows = Shadows.attach(engine);
+shadows.add(ground, {static: true});
+shadows.add(lit); // the splats cast on the ground
+engine.lighting.direction.set([0.6, 1, 0.2, 3]); // toward the sun, w intensity
+engine.start();
+```
+
+- Relighting scales each splat's colour by core's diffuse terms: `nl * radiance * intensity / pi + radiance.w *
+  ambient`, with `nl` from the splat's flat axis (the axis of its smallest covariance eigenvalue, turned to the
+  camera; the view direction for a round splat). `relight: false` (live) keeps the captured colours and still casts.
+- The captured colours already hold the light they were filmed in, so a relit capture is lit twice; it reads best
+  under soft capture light. Splats do not receive shadows, and the light has no specular term.
+- Shadows: each splat draws its ellipse in the light's view (with the colour pass's 0.3 px^2 dilation in shadow-map
+  texels). By default a splat blocks each texel with the probability of its opacity there (stochastic transparency),
+  so overlapping splats shade as their combined opacity, noisy per texel and smoothed by the shadow filter;
+  `threshold` (0 to 1, live) instead blocks where one splat's opacity reaches it, without noise.

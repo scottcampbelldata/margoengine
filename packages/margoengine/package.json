@@ -2486,6 +2486,10 @@
       "types": "./dist/splats/lod.d.ts",
       "import": "./dist/splats/lod.js"
     },
+    "./splats/lighting": {
+      "types": "./dist/splats/lighting.d.ts",
+      "import": "./dist/splats/lighting.js"
+    },
     "./splats/set": {
       "types": "./dist/splats/set.d.ts",
       "import": "./dist/splats/set.js"

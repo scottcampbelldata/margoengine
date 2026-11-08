@@ -1,13 +1,15 @@
 // Browser side of check.mjs: a splat cloud (a synthetic red splat or a real capture) with meshes drawn before it (a
 // materials plane, order 1) and after it (a test pass at order 5 that depth tests like any later mesh pass).
 import { waitForPipelines } from '../../../../scripts/support/gpu-ready.js';
-import { Engine } from '../../../core/dist/index.js';
+import { Engine, box } from '../../../core/dist/index.js';
 import { Material, createMesh } from '../../../materials/dist/index.js';
 import { planeGeometry } from '../../../geometry/dist/index.js';
 import { CameraProjection } from '../../../cameras/dist/index.js';
 import { Splats } from '../../dist/index.js';
-import { parsePly, transformSplats, mergeSplats } from '../../dist/data.js';
+import { parsePly, transformSplats, mergeSplats, filterSplats } from '../../dist/data.js';
 import { SplatSet } from '../../dist/set.js';
+import { SplatLighting } from '../../dist/lighting.js';
+import { Shadows } from '../../../shadows/dist/index.js';
 import { SplatDepth } from '../../dist/depth.js';
 import { SplatLod, buildSplatLod } from '../../dist/lod.js';
 
@@ -298,5 +300,97 @@ window.check.set = async (o) => {
   }
   await waitForPipelines(draw);
   return { url: canvas.toDataURL('image/png'), ...info };
+};
+// ./lighting, relight: flat synthetic splats with known normals (and one round splat), read back after the relight
+// pass, against core's diffuse terms computed in the check.
+window.check.relight = async (o) => {
+  engine?.dispose();
+  canvas?.remove();
+  canvas = document.body.appendChild(document.createElement('canvas'));
+  canvas.style.cssText = 'width:64px;height:64px;display:block';
+  const normals = o.normals,
+    n = normals.length,
+    positions = new Float32Array(n * 3),
+    covariances = new Float32Array(n * 6),
+    colors = new Float32Array(n * 4);
+  normals.forEach((nv, i) => {
+    positions.set([(i % 4) * 0.3 - 0.45, Math.floor(i / 4) * 0.3 - 0.3, 0], i * 3);
+    // Covariance 0.01 (I - nn^T) + 1e-6 nn^T: flat across the normal; a zero normal is a round splat.
+    for (const [k, r, c] of [[0, 0, 0], [1, 0, 1], [2, 0, 2], [3, 1, 1], [4, 1, 2], [5, 2, 2]])
+      covariances[i * 6 + k] = (r === c ? 0.01 : 0) - (0.01 - 1e-6) * nv[r] * nv[c];
+    colors.set([0.2 + 0.1 * (i % 3), 0.5, 0.8 - 0.05 * i, 0.9], i * 4);
+  });
+  engine = await Engine.create(canvas, { backend: 'webgpu', camera: { position: [0, 0, 3], target: [0, 0, 0], near: 0.05, far: 100 } });
+  engine.gpu.addEventListener('uncapturederror', (e) => errors.push(e.error.message));
+  engine.lighting.direction.set(o.direction);
+  engine.lighting.radiance.set(o.radiance);
+  if (o.ambient) engine.lighting.ambient = new Float32Array(o.ambient);
+  const cloud = Splats.attach(engine, { positions, covariances, colors });
+  const lit = SplatLighting.attach(engine, cloud);
+  lit.relight = o.relight ?? true;
+  await waitForPipelines(draw);
+  const d = engine.gpu,
+    read = d.createBuffer({ size: n * 16, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST }),
+    e = d.createCommandEncoder();
+  e.copyBufferToBuffer(cloud.gpuState.colors, 0, read, 0, n * 16);
+  d.queue.submit([e.finish()]);
+  await read.mapAsync(GPUMapMode.READ);
+  const out = [...new Float32Array(read.getMappedRange())];
+  read.destroy();
+  return { colors: out, input: [...colors], positions: [...positions] };
+};
+// ./lighting, shadows: a grey ground lit by the sun and a splat cloud above it (a flat synthetic disc, or the real
+// capture), seen from straight above; the sun comes in at a slant, so the cloud's shadow lands beside the cloud.
+window.check.splatShadow = async (o) => {
+  engine?.dispose();
+  canvas?.remove();
+  canvas = document.body.appendChild(document.createElement('canvas'));
+  canvas.style.cssText = 'width:256px;height:256px;display:block';
+  let data;
+  if (o.capture) {
+    // The capture's 5 to 95 percent box on each axis (it has far floaters), cropped to that box and scaled to 1.2.
+    const full = await loadCapture(),
+      count = full.positions.length / 3,
+      lo = [],
+      hi = [];
+    for (let k = 0; k < 3; k++) {
+      const v = Array.from({ length: count }, (_, i) => full.positions[i * 3 + k]).sort((x, y) => x - y);
+      lo.push(v[Math.floor(count * 0.05)]);
+      hi.push(v[Math.floor(count * 0.95)]);
+    }
+    const a = filterSplats(full, (i) => [0, 1, 2].every((k) => full.positions[i * 3 + k] >= lo[k] && full.positions[i * 3 + k] <= hi[k]));
+    const s = 1.2 / Math.max(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]),
+      m = [s, 0, 0, 0, 0, s, 0, 0, 0, 0, s, 0, (-s * (lo[0] + hi[0])) / 2, 1 - (s * (lo[1] + hi[1])) / 2, (-s * (lo[2] + hi[2])) / 2, 1];
+    data = transformSplats(a, m);
+  } else {
+    const ring = [];
+    for (let r = 0; r <= 0.15; r += 0.03) {
+      const steps = Math.max(1, Math.round((2 * Math.PI * r) / 0.03));
+      for (let t = 0; t < steps; t++) ring.push([r * Math.cos((t * 2 * Math.PI) / steps), r * Math.sin((t * 2 * Math.PI) / steps)]);
+    }
+    const count = ring.length;
+    data = { positions: new Float32Array(count * 3), covariances: new Float32Array(count * 6), colors: new Float32Array(count * 4) };
+    ring.forEach(([x, z], i) => {
+      data.positions.set([x, 1, z], i * 3);
+      data.covariances.set([0.0004, 0, 0, 1e-6, 0, 0.0004], i * 6);
+      data.colors.set([0.9, 0.2, 0.2, 1], i * 4);
+    });
+  }
+  engine = await Engine.create(canvas, {
+    backend: 'webgpu',
+    preserveDrawingBuffer: true,
+    camera: { position: [0, 4, 0.001], target: [0, 0, 0], near: 0.05, far: 100 },
+  });
+  engine.gpu.addEventListener('uncapturederror', (e) => errors.push(e.error.message));
+  // Toward the sun: up and toward +x, so a shadow falls toward -x by 0.6 per unit of height.
+  engine.lighting.direction.set([0.6, 1, 0, 3]);
+  const ground = engine.createMesh().setGeometry(box()).setScale([4, 0.02, 4]).setPosition([0, -0.01, 0]);
+  const shadows = Shadows.attach(engine, { resolution: 2048, filter: 'hard', bounds: { min: [-2, -0.1, -2], max: [2, 1.6, 2] } });
+  shadows.add(ground, { static: true });
+  const cloud = Splats.attach(engine, data);
+  const lit = SplatLighting.attach(engine, cloud, { relight: false, threshold: o.threshold });
+  if (o.cast) shadows.add(lit);
+  await waitForPipelines(draw);
+  return { url: canvas.toDataURL('image/png') };
 };
 window.ready = true;

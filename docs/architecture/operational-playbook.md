@@ -982,6 +982,8 @@ Known rendering gaps:
 
 **One splat sort for many clouds (2026-11-08).** `@margoengine/splats/set` adds no shader: `SplatSet` writes each added cloud into a first-fit range of one pooled `Splats` (`Splats.write`, `Splats.clear`), so the one projection and stable radix sort order every member far to near, as a merged cloud would. Evidence: `packages/splats/test/gpu/check.mjs` on a Radeon 680M (two overlapping copies of a real capture match the merged cloud pixel for pixel at 1x and 4x MSAA, and differ as two clouds); missing: frame time for a large mostly free pool.
 
+**Splat lighting (2026-11-08).** `@margoengine/splats/lighting` adds two shaders: a compute pass at order -6.5 scales the projected colours by core's diffuse terms with a per-splat normal from the smallest covariance eigenvector, and a depth-only `drawShadow` for `@margoengine/shadows` that rasterises each splat's ellipse in the light's clip space (0.3 texel^2 dilation) with stochastic per-texel coverage. Evidence: `packages/splats/test/gpu/check.mjs` on a Radeon 680M (relit colours against the CPU formula; a synthetic disc and a real capture shadow a ground box); missing: splats receiving shadows, a specular term, frame time.
+
 ## 4. Quality architecture
 
 ### 4.1 Gate map

@@ -70,6 +70,8 @@ class Splats implements EnginePlugin {
         sorted: GPUBuffer;
         ellipses: GPUBuffer;
         colors: GPUBuffer;
+        positions: GPUBuffer;
+        covariances: GPUBuffer;
     };
     onDeviceRestored(engine: Engine): void;
     dispose(): void;

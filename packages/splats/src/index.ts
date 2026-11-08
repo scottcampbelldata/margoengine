@@ -473,10 +473,15 @@ export class Splats implements EnginePlugin {
   get attached(): boolean {
     return !!this.projected;
   }
-  get gpuState(): { sorted: GPUBuffer; ellipses: GPUBuffer; colors: GPUBuffer } {
+  /**
+   * The cloud's GPU buffers, for entries that draw or edit it: `sorted` keys, projected `ellipses`, evaluated `colors`
+   * (rgb, opacity) and the inputs `positions` (xyz, opacity) and `covariances` (two vec4f per splat).
+   */
+  get gpuState(): { sorted: GPUBuffer; ellipses: GPUBuffer; colors: GPUBuffer; positions: GPUBuffer; covariances: GPUBuffer } {
     if (!this.projected || !this.evaluated || !this.keys.length)
       throw new MargoError('state', 'Splats are not attached; attach them to an engine first');
-    return { sorted: this.keys[0], ellipses: this.projected, colors: this.evaluated };
+    const [positions, covariances] = this.inputs;
+    return { sorted: this.keys[0], ellipses: this.projected, colors: this.evaluated, positions, covariances };
   }
   private release(): void {
     for (const b of this.buffers) b.destroy();

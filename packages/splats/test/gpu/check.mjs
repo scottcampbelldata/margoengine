@@ -3,6 +3,7 @@
 // ./depth: meshes drawn before a cloud hide the splats behind them (the cloud's own depth test), and with SplatDepth a
 // cloud hides what later passes draw behind it, on a synthetic splat and on a real capture (raccoon, Niantic SPZ sample).
 // ./set: two overlapping copies of the capture sorted as one set draw what one merged cloud draws; as two clouds they do not.
+// ./lighting: relit colours match core's diffuse terms; a synthetic disc and the real capture shadow a ground mesh.
 // ./lod: a hierarchy of the real capture fully refined draws as the plain cloud; a 16.7 M-splat stand-in streams in a 2 M budget.
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../../scripts/browser.js';
@@ -176,6 +177,70 @@ try {
     assert.equal(together.differ, 0, `${samples}x: the set draws the merged cloud, ${together.differ} channels apart`);
     assert.equal(after.differ, 0, `${samples}x: setMatrix and a removed member leave the same picture, ${after.differ} apart`);
     assert.deepEqual(set.firsts, [0, set.used / 2], 'the freed placeholder range is reused, members in add order');
+  }
+  // ./lighting, relight: every splat's colour after the pass is its colour times core's diffuse terms, with the normal
+  // its flat axis turned to the camera; a round splat takes the view direction; relight false leaves it as it was.
+  {
+    const normals = [[0, 0, 1], [0, 0, -1], [1, 0, 0], [0, 1, 0], [0.6, 0.8, 0], [0, 0.6, -0.8], [0.48, 0.6, 0.64], [0, 0, 0]];
+    const o = { normals, direction: [0.3, 0.5, 0.8, 3], radiance: [1, 0.9, 0.8, 0.2], ambient: [0.5, 0.6, 1] };
+    const r = await page.evaluate((options) => window.check.relight(options), o);
+    const off = await page.evaluate((options) => window.check.relight(options), { ...o, relight: false });
+    const l = o.direction.slice(0, 3),
+      ll = Math.hypot(...l);
+    let worst = 0;
+    normals.forEach((nv, i) => {
+      const p = r.positions.slice(i * 3, i * 3 + 3),
+        eye = [-p[0], -p[1], 3 - p[2]],
+        el = Math.hypot(...eye);
+      let n = Math.hypot(...nv) ? nv : eye.map((v) => v / el);
+      if (n[0] * eye[0] + n[1] * eye[1] + n[2] * eye[2] < 0) n = n.map((v) => -v);
+      const nl = Math.max(0, (n[0] * l[0] + n[1] * l[1] + n[2] * l[2]) / ll);
+      for (let k = 0; k < 3; k++) {
+        const want = r.input[i * 4 + k] * ((o.radiance[k] * o.direction[3] * nl) / Math.PI + o.radiance[3] * o.ambient[k]);
+        worst = Math.max(worst, Math.abs(r.colors[i * 4 + k] - want));
+        assert.equal(off.colors[i * 4 + k], Math.fround(r.input[i * 4 + k]), 'relight false keeps the colour');
+      }
+      assert.equal(r.colors[i * 4 + 3], Math.fround(r.input[i * 4 + 3]), 'opacity is kept');
+    });
+    report['lighting relight'] = { worst };
+    // float32 maths on colours below 2: the flat axis of a 1e-6 to 0.01 covariance is good to about 1e-3 radian.
+    assert.ok(worst < 2e-3, `relit colours match core's diffuse terms, worst ${worst}`);
+  }
+  // ./lighting, shadows: with the cloud added to Shadows, the ground beside it darkens where its shadow falls; without,
+  // the ground there is as lit as everywhere else. Pixels far from the cloud and its shadow do not change.
+  for (const capture of [false, true]) {
+    const shot = async (cast) =>
+      decodePNG(Buffer.from((await page.evaluate((o) => window.check.splatShadow(o), { cast, capture })).url.split(',')[1], 'base64'));
+    const off = await shot(false),
+      on = await shot(true);
+    const changed = [];
+    let darker = 0,
+      brighter = 0,
+      cx = 0,
+      cy = 0;
+    for (let i = 0; i < off.data.length; i += 4) {
+      const d = off.data[i] + off.data[i + 1] + off.data[i + 2] - (on.data[i] + on.data[i + 1] + on.data[i + 2]),
+        x = (i / 4) % off.width,
+        y = Math.floor(i / 4 / off.width);
+      if (d) changed.push([x, y]);
+      if (d < -3) brighter++;
+      if (d > 30) {
+        darker++;
+        cx += x;
+        cy += y;
+      }
+    }
+    cx /= darker || 1;
+    cy /= darker || 1;
+    const offset = Math.hypot(cx - off.width / 2, cy - off.height / 2),
+      spread = Math.max(...changed.map(([x, y]) => Math.hypot(x - cx, y - cy)));
+    report[`lighting shadow ${capture ? 'capture' : 'disc'}`] = { darker, brighter, changed: changed.length, offset, spread };
+    // The capture (8,385 splats) is a thin figure: its shadow is a line drawing, not a filled shape.
+    assert.ok(darker > (capture ? 60 : 200), `${capture ? 'the capture' : 'the disc'} shadows the ground: ${darker} pixels darker`);
+    assert.equal(brighter, 0, 'casting never lightens a pixel');
+    // The sun is 31 degrees off vertical, so the shadow sits beside the cloud (at the centre) and nothing else changes.
+    assert.ok(offset > 10, `the shadow lands beside the cloud, ${offset} px from it`);
+    assert.ok(spread < 80, `only the shadow changes, ${spread} px across`);
   }
   const errors = await page.evaluate(() => window.check.errors);
   console.log(JSON.stringify(report));
