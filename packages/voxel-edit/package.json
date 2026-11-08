@@ -105,6 +105,7 @@
     "access": "public"
   },
   "dependencies": {
+    "@margoengine/decoders": "^1.0.0",
     "@margoengine/math": "^1.0.0",
     "@margoengine/voxel": "^1.0.0"
   },

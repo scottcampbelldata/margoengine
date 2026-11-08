@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11315479,
+  "total": 11320369,
   "history": [
     {
       "date": "2026-10-24",
@@ -4538,6 +4538,12 @@
       "commit": "5a8847d5b",
       "reason": "new entry @margoengine/html/texture: HTMLTexture, the quad pass, both rasterizers and pointer routing",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "6196fab88",
+      "reason": "voxel-edit/formats gains Goxel .gox and VoxEdit .vxm read and write (batch 97 job 4), with the decoders PNG reader",
+      "grew": 1
     }
   ],
   "items": {
@@ -5296,7 +5302,7 @@
     "@margoengine/voxel-edit/collab": 2676,
     "@margoengine/voxel-edit/edit": 10734,
     "@margoengine/voxel-edit/export": 9297,
-    "@margoengine/voxel-edit/formats": 4404,
+    "@margoengine/voxel-edit/formats": 9294,
     "@margoengine/voxel-edit/gpu": 6177,
     "@margoengine/voxel-edit/history": 1330,
     "@margoengine/voxel-edit/library": 1255,

@@ -907,7 +907,14 @@ File formats written from their public descriptions; no reader of another projec
 
 ## Voxel files: `@margoengine/voxel-edit/formats`
 
-File layouts, written from each format's public description; no reader or writer of another project was read.
+VF1 to VF6: file layouts written from each format's public description; no reader or writer of another project was read.
+
+VF7 to VF12 (`.gox` and `.vxm`, 2026-11-08) have no public specification, so they were written in a two-person clean
+room that Scott approved on 2026-11-08. A spec writer read Goxel (GPL-3.0) `src/formats/gox.c` and the files it calls at
+commit 33be5c8, vengi (MIT) `GoxFormat` and `VXMFormat` at commit 3471178, and one blog post that restates Goxel's header
+comment, decoded eight vengi test files (CC BY-SA 3.0), and wrote a prose specification with byte tables and no code.
+The implementer read only that specification: no Goxel, vengi or VoxEdit code, and no web search for code. The sample
+files were used in a local check only and are not in this repository.
 
 | id | formula | file | source |
 | --- | --- | --- | --- |
@@ -917,6 +924,12 @@ File layouts, written from each format's public description; no reader or writer
 | VF4 | KVX: header, column offsets, slab records of top, length, cull and colours; 6 bit palette in the last 768 bytes | voxel-edit/src/formats.ts | Ken Silverman, the KVX description in the SLAB6 documentation |
 | VF5 | VXL: columns of spans N, S, E, A with BGRA dwords for top and bottom colours; N of 0 ends a column | voxel-edit/src/formats.ts | Ken Silverman, the VXL format description in the Voxlap documentation |
 | VF6 | over 255 colours: drop the same low bits of each channel until 255 remain, keeping the bucket's centre | voxel-edit/src/formats.ts | Margo-own: deterministic, plain bit truncation; median cut is in the `./voxelize` entry |
+| VF7 | Goxel `.gox`: `GOX ` and version 2 (1 shifts block corners by 8), chunks of type, i32 length, data and a CRC every writer leaves 0; dictionaries of i32 key and value lengths | voxel-edit/src/gox.ts | Clean-room specification FORMATS-SPEC.md section 1 (two-person process, below) |
+| VF8 | `.gox` BL16 block: a 64 x 64 RGBA PNG, voxel (x, y, z) at byte 4(x + 16y + 256z), alpha 0 air; LAYR records (index, x, y, z, 0) place blocks at any corner, later over earlier | voxel-edit/src/gox.ts | FORMATS-SPEC.md 1.8.3 and 1.8.4; PNG from the W3C PNG specification through `@margoengine/decoders/png` and `packages/shared/png.js` |
+| VF9 | `.gox` shape layers (sphere, cube, cylinder in the unit-cube box `mat`, voxel centres inside) and clone layers (`base_id`, voxels moved by `mat`); file Z up turned to Y up as cell (x, z, -y) | voxel-edit/src/gox.ts | FORMATS-SPEC.md 1.7, 1.8.4 and 1.9; the cell mapping and edge rule are Margo-own |
+| VF10 | VoxEdit `.vxm`: `VXM` and a version character 3 to 9, A to D; the per-version field sequence (size, pivot, header surface, LOD header, mesh records, full palettes, materials, models, trailer) | voxel-edit/src/vxm.ts | FORMATS-SPEC.md 2.3 to 2.6, 2.10 and 2.11 |
+| VF11 | `.vxm` materials B, G, R, A plus an emissive byte; full palettes R, G, B, A; index 255 air; (length, index) runs filling cells Z fastest, then Y, then X, file X mirrored | voxel-edit/src/vxm.ts | FORMATS-SPEC.md 2.7 to 2.9 |
+| VF12 | `.vxm` version 12 writing: no baked mesh, one empty LOD, magenta unused palette entries, one trailer byte 0 | voxel-edit/src/vxm.ts | FORMATS-SPEC.md 2.12 |
 
 ## Smooth voxel meshes: `@margoengine/voxel-edit/smooth`
 

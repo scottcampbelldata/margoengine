@@ -10,6 +10,34 @@ export interface BinvoxFile extends VoxelFile {
     scale: number;
 }
 
+export interface GOXFile extends VoxelFile {
+    models: GOXLayer[];
+    materials: GOXMaterial[];
+    version: number;
+}
+
+export interface GOXLayer extends VoxelFileModel {
+    visible: boolean;
+    mode: number;
+    material: number;
+}
+
+export interface GOXMaterial {
+    name: string;
+    color: readonly [number, number, number, number];
+    metallic: number;
+    roughness: number;
+    emission: Vec3;
+}
+
+export interface GOXWriteModel extends VoxelFileModel {
+    visible?: boolean;
+}
+
+export interface GOXWriteOptions {
+    signal?: AbortSignal;
+}
+
 export interface KVXFile extends VoxelFile {
     pivot: Vec3;
 }
@@ -22,6 +50,26 @@ export interface QBWriteOptions {
 
 export interface VXLOptions extends GridLimits {
     size?: Vec3;
+}
+
+export interface VXMFile extends VoxelFile {
+    models: VXMModel[];
+    version: number;
+    pivot: Vec3;
+    emissive: Uint8Array;
+}
+
+export interface VXMModel extends VoxelFileModel {
+    visible: boolean;
+}
+
+export interface VXMWriteModel extends VoxelFileModel {
+    visible?: boolean;
+}
+
+export interface VXMWriteOptions {
+    pivot?: Vec3;
+    emissive?: ArrayLike<number>;
 }
 
 export interface VoxelFile {
@@ -38,6 +86,8 @@ export interface VoxelFileModel {
 
 export function parseBinvox(bytes: Uint8Array | ArrayBuffer, limits?: GridLimits): BinvoxFile;
 
+export function parseGOX(bytes: Uint8Array | ArrayBuffer, limits?: GridLimits): GOXFile;
+
 export function parseKVX(bytes: Uint8Array | ArrayBuffer, limits?: GridLimits): KVXFile;
 
 export function parseQB(bytes: Uint8Array | ArrayBuffer, limits?: GridLimits): VoxelFile;
@@ -46,9 +96,15 @@ export function parseQEF(input: string | Uint8Array | ArrayBuffer, limits?: Grid
 
 export function parseVXL(bytes: Uint8Array | ArrayBuffer, options?: VXLOptions): VoxelFile;
 
+export function parseVXM(bytes: Uint8Array | ArrayBuffer, limits?: GridLimits): VXMFile;
+
+export function writeGOX(models: GOXWriteModel | readonly GOXWriteModel[], palette: Uint8Array, options?: GOXWriteOptions): Promise<Uint8Array>;
+
 export function writeQB(models: VoxelFileModel | readonly VoxelFileModel[], palette: Uint8Array, options?: QBWriteOptions): Uint8Array;
 
 export function writeQEF(grid: VoxelGrid, palette: Uint8Array): string;
+
+export function writeVXM(models: VXMWriteModel | readonly VXMWriteModel[], palette: Uint8Array, options?: VXMWriteOptions): Uint8Array;
 
 // Not exported from this entry, but used by the exports above:
 

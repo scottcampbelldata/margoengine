@@ -65,7 +65,7 @@ corner coordinates.
 | `./animation` | `packFrames` / `unpackFrames` (each distinct model stored once) and `localFrame` (a clip's clock: offset, speed, loop or hold) |
 | `./history` | `VoxelHistory`: undo/redo of copied grids with depth, per-grid cell and total byte budgets |
 | `./export` | `gridToExportSource`: meshes a grid into one primitive per palette material (corner AO as vertex colours), the `{nodes}` scene `exportGLB`, `exportUSDZ` and `exportOBJ` take |
-| `./formats` | voxel files other tools write: `parseQB` / `writeQB` and `parseQEF` / `writeQEF` (Qubicle), `parseBinvox`, `parseKVX` and `parseVXL`; models, palette, positions, with cell budgets |
+| `./formats` | voxel files other tools write: `parseQB` / `writeQB` and `parseQEF` / `writeQEF` (Qubicle), `parseGOX` / `writeGOX` (Goxel), `parseVXM` / `writeVXM` (VoxEdit), `parseBinvox`, `parseKVX` and `parseVXL`; models, palette, positions, with cell budgets |
 | `./smooth` | `smoothGrid`: a smooth Surface Nets mesh of a grid, with relaxation, optional blur and gradient normals, for `gridToExportSource` |
 | `./voxelize` | `voxelizeMesh`: a triangle mesh to a grid and palette, surface or solid, with vertex or texture colours and median cut; `AbortSignal` |
 | `./assist` | `noiseFill` (seeded random fill), `suggestPalette` (seeded hues, linear sRGB) and `paletteUsage` (cells per index) |
@@ -111,10 +111,34 @@ const text = writeQEF(models[0].grid, palette);
 | `binvox` | `parseBinvox` | | one model of index 1, plus the header's `translate` and `scale` |
 | KVX | `parseKVX` | | the first, largest mip; colour 255 is air; file colour k is index k + 1; `pivot` in cells |
 | VXL | `parseVXL` | | Voxlap maps, with a header or bare (`size`, default 512 x 512 x 64); solid cells without a colour take the last one above them |
+| Goxel `.gox` | `parseGOX` | `writeGOX` (async) | every layer with its name, `visible`, blend `mode` and `material`; clone and shape layers built; Z up in the file, so file (x, y, z) is cell (x, z, -y); any non-zero alpha is solid |
+| VoxEdit `.vxm` | `parseVXM` | `writeVXM` | versions 3 to 13 read, 12 written; every model (one size, no positions), materials as palette indices 1 to 255, `emissive` flags and `pivot`; the file's X runs mirrored |
 
 KVX and VXL have z running down in the file, so they turn to Y up on reading: the file's y becomes z. A true-colour file
 with over 255 colours loses low bits from each channel, the same on every run, until 255 are left, and `colorsReduced`
-is true. Block-game `.schematic` and Goxel `.gox` are left out on purpose.
+is true. Block-game `.schematic` is left out on purpose.
+
+Goxel and VoxEdit files move both ways. A `.gox` keeps each layer's place, so a round trip gives back the same cells,
+positions and colours; a `.vxm` has no positions, so its models share one size and sit at the origin.
+
+```ts
+import type { VoxelGrid } from '@margoengine/voxel-edit';
+import { parseGOX, parseVXM, writeGOX, writeVXM } from '@margoengine/voxel-edit/formats';
+
+const palette = new Uint8Array(1024);
+palette.set([232, 48, 21, 255], 4); // index 1: red
+const grid: VoxelGrid = { size: [2, 1, 1], voxels: Uint8Array.of(1, 1) };
+const gox = await writeGOX({ name: 'body', position: [0, 0, 0], grid }, palette); // Uint8Array of a .gox
+const read = parseGOX(gox); // one layer `body`, cropped to its voxels; one default material
+const vxm = writeVXM(read.models, read.palette, { pivot: [0.5, 0, 0.5] }); // version 12
+const { models: back, pivot, emissive } = parseVXM(vxm);
+console.log(back[0].grid.voxels, read.materials[0].name, pivot, emissive[1]); // Uint8Array [1, 1] 'default' [0.5, 0, 0.5] 0
+```
+
+[docs/limits.md](../../docs/limits.md) ("Goxel and VoxEdit files") lists what the two readers leave out or cannot know. In
+short: `.gox` cameras, light, preview and the fork-only chunks are skipped and chunk CRCs are not checked (writers put
+0); `.vxm` baked meshes, textures and the trailer are skipped, only versions 4 and 12 were checked against real files,
+and whether VoxEdit opens a written file without a baked mesh is not known.
 
 ## Smooth meshes
 
