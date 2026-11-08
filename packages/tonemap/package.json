@@ -29,6 +29,10 @@
     "./grade": {
       "types": "./dist/grade.d.ts",
       "import": "./dist/grade.js"
+    },
+    "./custom": {
+      "types": "./dist/custom.d.ts",
+      "import": "./dist/custom.js"
     }
   },
   "files": [
@@ -54,6 +58,7 @@
     "build:demo": "vite build --config vite.config.js",
     "test:gpu:lut-sizes": "cd ../.. && node scripts/tonemap-lut-sizes-gpu-check.js",
     "test:gpu:grade": "cd ../.. && node packages/tonemap/tests/grade-browser.mjs",
-    "test:gpu:curves": "cd ../.. && node packages/tonemap/tests/curves-browser.mjs"
+    "test:gpu:curves": "cd ../.. && node packages/tonemap/tests/curves-browser.mjs",
+    "test:gpu:custom": "cd ../.. && node packages/tonemap/tests/custom-browser.mjs"
   }
 }

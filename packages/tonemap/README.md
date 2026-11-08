@@ -126,3 +126,43 @@ grade.options.hueSaturation = [1.2, 1, 0.8, 1, 1, 1]; // richer reds, quieter gr
 
 `extensions` takes any `TonemapExtension` (`key`, `patch(shader, binding)` returning the WGSL with its code in, and an
 optional `values()` for one uniform buffer at that binding); changing the list rebuilds the pipeline once.
+
+## Custom curve: `CustomCurve`
+
+`@margoengine/tonemap/custom` replaces the display curve with your own, written in WGSL or as a JavaScript function.
+Give it to Tonemap's `extensions`; contrast, `Grade`, a LUT and the sRGB encoding still run after it.
+
+```ts
+import {createStage} from 'margoengine';
+import {Tonemap} from 'margoengine/tonemap';
+import {CustomCurve} from 'margoengine/tonemap/custom';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+// WGSL: the first function is the curve; params are live as curveParams[0] to curveParams[3] (four vec4f).
+const film = new CustomCurve({
+  wgsl: 'fn film(x: vec3f) -> vec3f { let k = curveParams[0].x; return x / (x + vec3f(k)); }',
+  params: [0.6],
+});
+Tonemap.attach(stage.engine, {extensions: [film]});
+film.options.params = [0.4]; // no recompile
+// Or a JavaScript curve of one channel, sampled every frame:
+const soft = new CustomCurve({curve: (x) => 1 - Math.exp(-x)});
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `wgsl` | none | WGSL starting with `fn name(x: vec3f) -> vec3f`: exposed scene-linear RGB in, display-linear 0..1 out |
+| `curve` | none | `(x) => y`, the same for one channel, applied to R, G and B; give exactly one of `wgsl` and `curve` |
+| `params` | zeros | Up to 16 numbers for the WGSL curve, read every frame |
+
+- **Method.** The curve runs on the exposed (and white-balanced) scene-linear colour, in place of the built-in one.
+  A JavaScript curve is sampled at 128 points spaced evenly in log2 from 2^-12 to 2^8 and read with linear
+  interpolation in log2; below 2^-12 it runs linearly from its value at 0, above 2^8 it holds. A new `wgsl` string
+  compiles a new pipeline; `params` and `curve` changes do not. Under an HDR `ColorOutput` the result takes the same
+  rolloff toward the display peak as AgX and ACES.
+- **Checked on a real GPU** (`packages/tonemap/tests/custom-browser.mjs`, M6 Mac mini, Metal, Chromium): a WGSL
+  x / (x + k) with k = 1 from `params`, and a JavaScript x / (1 + x), match a CPU oracle on every pixel over 111 input
+  levels at exposures -4 to 1, within what each 8-bit input level allows; a live `params` change to k = 0.25 does too;
+  the WGSL curve compiles and draws without a GPU error under an HDR `ColorOutput`.
+- **Limits.** Shader-node graphs from `@margoengine/shader` are not taken directly (Tonemap does not depend on that
+  package): write the curve as WGSL. A JavaScript curve is per channel and sampled (128 points over 20 stops). A WGSL
+  function whose name the Tonemap shader already uses is rejected; other WGSL errors show as a GPU validation error.

@@ -2726,6 +2726,10 @@
       "types": "./dist/tonemap/grade.d.ts",
       "import": "./dist/tonemap/grade.js"
     },
+    "./tonemap/custom": {
+      "types": "./dist/tonemap/custom.d.ts",
+      "import": "./dist/tonemap/custom.js"
+    },
     "./toon": {
       "types": "./dist/toon.d.ts",
       "import": "./dist/toon.js"
