@@ -13,7 +13,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-565). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-566). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -665,3 +665,7 @@ the entry: `PbrMaterial` is core's material and pulls in no other package.
   `margoengine/gltf-pro`, not from `margoengine/game`, `/web` or `/viz`.
 - Still on the controls index: `PointerLock` (from `@margoengine/react/controls`), because `@margoengine/controls` has no
   pointer-lock entry; a page that does not use it never emits it.
+
+## External video materials (2026-11-08)
+
+`@margoengine/video/material` adds a caller-owned `HTMLVideoElement` or `VideoFrame` to a `Material.features` list. No JS-side frame upload occurs. The browser/driver may still copy or convert internally; platform zero-copy and throughput are unmeasured. A frame is imported per draw, one sampler per device; there are no mipmaps or repeat wrapping. UV0 (default) and UV1 are supported; `flipY` defaults to true, matching Texture's image orientation (first row at v=1); false puts it at v=0. Sources must be ready/open and origin-clean. WebGL2 returns `MargoError` code `unsupported` with a help link. Core's compact material has no feature slot. Custom WGSL must retain the standard surface/base-colour hook. The existing material's own maps, lighting and other features keep their own costs. External textures consume four sampled-texture slots, one implicit sampler and one uniform slot, in addition to the explicit filtering sampler; a fully mapped material can exceed a device's default limits. Alpha affects colour rendering; auxiliary caster/picking passes retain the material's existing alpha inputs. Generated colour frames and a canvas MediaStream on the RTX A6000/Edge prove imports across tasks, no material-path frame uploads and sRGB byte accuracy within 2 of 255 at 1x and 4x MSAA. Real movie files, other adapters, browser-internal copies, speed and custom shader combinations are unmeasured. Run `node scripts/gpu-lock.mjs run --owner=video-check -- node packages/video/test/material-check.mjs` after a package build.

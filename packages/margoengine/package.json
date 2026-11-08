@@ -2994,6 +2994,10 @@
       "types": "./dist/video.d.ts",
       "import": "./dist/video.js"
     },
+    "./video/material": {
+      "types": "./dist/video/material.d.ts",
+      "import": "./dist/video/material.js"
+    },
     "./viewcube": {
       "types": "./dist/viewcube.d.ts",
       "import": "./dist/viewcube.js"

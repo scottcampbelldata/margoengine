@@ -1,0 +1,148 @@
+{
+  "hardware": {
+    "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "webgpu": {
+      "vendor": "nvidia",
+      "architecture": "ampere",
+      "device": "",
+      "description": "",
+      "fallback": false
+    },
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+    "browserName": "chromium",
+    "browserVersion": "157.0.4341.42",
+    "requestedChannel": "msedge",
+    "launchArgs": [],
+    "powerPreference": "high-performance",
+    "hostPlatform": "win32",
+    "headless": true
+  },
+  "results": [
+    {
+      "samples": 1,
+      "initial": [
+        128,
+        64,
+        32,
+        255
+      ],
+      "updated": [
+        20,
+        200,
+        50,
+        255
+      ],
+      "htmlFirst": [
+        128,
+        65,
+        31,
+        255
+      ],
+      "htmlNext": [
+        20,
+        200,
+        50,
+        255
+      ],
+      "orientation": {
+        "top": [
+          255,
+          0,
+          0,
+          255
+        ],
+        "bottom": [
+          0,
+          255,
+          0,
+          255
+        ],
+        "unflippedTop": [
+          0,
+          255,
+          0,
+          255
+        ]
+      },
+      "imports": 36,
+      "frameCopies": 0,
+      "errors": [],
+      "shaders": [
+        "standard",
+        "lambert",
+        "phong",
+        "toon",
+        "normal",
+        "depth",
+        "distance",
+        "matcap",
+        "physical"
+      ]
+    },
+    {
+      "samples": 4,
+      "initial": [
+        128,
+        64,
+        32,
+        255
+      ],
+      "updated": [
+        20,
+        200,
+        50,
+        255
+      ],
+      "htmlFirst": [
+        128,
+        65,
+        31,
+        255
+      ],
+      "htmlNext": [
+        20,
+        200,
+        50,
+        255
+      ],
+      "orientation": {
+        "top": [
+          255,
+          0,
+          0,
+          255
+        ],
+        "bottom": [
+          0,
+          255,
+          0,
+          255
+        ],
+        "unflippedTop": [
+          0,
+          255,
+          0,
+          255
+        ]
+      },
+      "imports": 36,
+      "frameCopies": 0,
+      "errors": [],
+      "shaders": [
+        "standard",
+        "lambert",
+        "phong",
+        "toon",
+        "normal",
+        "depth",
+        "distance",
+        "matcap",
+        "physical"
+      ]
+    }
+  ],
+  "fallback": {
+    "code": "unsupported",
+    "message": "Video materials require WebGPU; select a WebGPU engine; see https://margoengine.com/errors#unsupported"
+  }
+}

@@ -1508,3 +1508,7 @@ is 0.795 to 0.752 ms; the uninstrumented step 2.885 to 2.852 ms (17/24 rounds). 
 result, not the 0.35 ms target. [Entry 92](../whitepaper/perf-history.md) and its committed result include the
 discarded variants, every A/B round and the browser before/after table. Missing: a quiet rerun and proof of a large
 narrow-phase gain. Solver setup and the remaining Box2D loss stay open; no physics work or tolerance was reduced.
+
+### External video material evidence (batch 112)
+
+`@margoengine/video/material` uses the existing optional MaterialFeature hooks, with no core or stage changes. Its GPU test compiles standard, physical, unlit, Lambert, Phong, toon, normal, depth, distance and matcap surfaces on the RTX A6000 at 1x and 4x MSAA; generated VideoFrames and a real HTMLVideoElement backed by a generated MediaStream return the expected sRGB colours within 2 of 255. Each draw imports an external texture, including after a media task changes the video. The test observes zero material-path frame uploads, and a real WebGL2 engine gets `unsupported` with a help link. `packages/video/test/material-check.mjs` is the package's `test:gpu`, discovered by check:gpu-packages. No movie decoder, browser-internal copy, speed, other GPU/browser or auxiliary-pass video-alpha evidence is claimed. See the video material limit in docs/limits.md.

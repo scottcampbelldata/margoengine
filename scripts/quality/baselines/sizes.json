@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11345580,
+  "total": 11346987,
   "history": [
     {
       "date": "2026-10-24",
@@ -4598,6 +4598,12 @@
       "commit": "647aba109",
       "reason": "per-material outline styles grow @margoengine/toon/models, batch 75 job 3",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "7da66b2cd",
+      "reason": "Batch 112 adds the optional video/material entry. Existing entry budgets are unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -5354,6 +5360,7 @@
     "@margoengine/vfx/texture": 1527,
     "@margoengine/vfx/wrap": 496,
     "@margoengine/video": 2199,
+    "@margoengine/video/material": 1407,
     "@margoengine/viewcube": 3608,
     "@margoengine/voxel": 6127,
     "@margoengine/voxel dist/workers/light.js": 10527,

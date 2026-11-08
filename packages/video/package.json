@@ -25,6 +25,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./material": {
+      "types": "./dist/material.d.ts",
+      "import": "./dist/material.js"
     }
   },
   "files": [
@@ -44,6 +48,7 @@
   "scripts": {
     "build": "node ../../scripts/build-optional.js video",
     "test": "npm run build && node --test test/*.test.js",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "test:gpu": "node test/material-check.mjs"
   }
 }
