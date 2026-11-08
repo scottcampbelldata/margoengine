@@ -193,7 +193,9 @@ window.runStress = async (profile, options) => {
       const before = ticks;
       await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       assert(
-        ticks === before && expected[0] === 'MargoError: WebGL context lost; create a new engine',
+        ticks === before &&
+          expected[0] ===
+            'MargoError: WebGL context lost; create a new engine, or add webglRestore from the /restore entry',
         'WebGL loss failed to stop/report once',
       );
       app.dispose();

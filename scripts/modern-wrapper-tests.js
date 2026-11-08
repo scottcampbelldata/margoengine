@@ -301,7 +301,7 @@ try {
     stopped: true,
     position: [1, 2, 3],
     detached: true,
-    errors: ['MargoError: WebGL context lost; create a new engine'],
+    errors: ['MargoError: WebGL context lost; create a new engine, or add webglRestore from the /restore entry'],
   });
   await page.waitForFunction(() => window.loss.frames >= 2);
   const recreated = await decodePNG(
