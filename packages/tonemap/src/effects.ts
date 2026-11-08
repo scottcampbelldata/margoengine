@@ -3,7 +3,8 @@ import { MargoError } from '@margoengine/math/errors';
 // White balance: Kim et al. (2002) cubic-spline fit of the Planckian locus in CIE xy, then the CIE XYZ to linear
 // Rec.709 matrix. Vignette: radial smoothstep. Grain: PCG integer hash (Jarzynski and Olano, 2020), animated per frame.
 // Chromatic aberration: radial red/blue channel offset. Auto-exposure: log-average luminance metering with
-// exponential adaptation (the usual "18% grey" key-value method).
+// exponential adaptation (the "18% grey" key value of Reinhard et al. 2002), weighted evenly, by a centre Gaussian, a
+// spot disc or a mask, optionally through a percentile-trimmed histogram of log luminance.
 
 /** Auto-exposure (eye adaptation) settings; setting `TonemapOptions.autoExposure` to an object or `true` enables it. */
 export interface AutoExposure {
@@ -15,6 +16,66 @@ export interface AutoExposure {
   speed?: number;
   /** Extra stops added to the metered exposure, e.g. 0.5 for a brighter look. Default 0. */
   compensation?: number;
+  /**
+   * How the samples become one level: `'mean'` (default) is the weighted log-average luminance; `'histogram'` sorts
+   * the weighted samples into 64 bins of log2 luminance (-12 to 12) and averages only those between `percentiles`, so
+   * a small light or a dark corner does not swing the exposure.
+   */
+  method?: 'mean' | 'histogram';
+  /** The share of the weighted samples the histogram keeps, darkest first, 0 to 1 with low below high. Default [0.1, 0.9]. */
+  percentiles?: readonly [number, number];
+  /**
+   * Where the meter looks: `'average'` (default) weighs the whole view evenly; `'center'` weighs by a Gaussian of the
+   * distance from the view centre (sigma a quarter of the view height); `'spot'` meters only the disc `spot`; `'mask'`
+   * weighs each sample by the red channel of `mask`, stretched over the view.
+   */
+  metering?: 'average' | 'center' | 'spot' | 'mask';
+  /** The spot of `'spot'` metering: centre `x`, `y` as fractions of the view (default 0.5) and `radius` as a fraction of its shorter side (default 0.05). */
+  spot?: { x?: number; y?: number; radius?: number };
+  /** Weight texture of `'mask'` metering (any size, filterable float or unorm; red channel 0 to 1). */
+  mask?: GPUTexture;
+}
+
+const METHODS = ['mean', 'histogram'],
+  METERING = ['average', 'center', 'spot', 'mask'];
+const inside = (v: number | undefined, lo: number, hi: number) =>
+  v === undefined || (Number.isFinite(v) && v >= lo && v <= hi);
+/** True when the metering options of `a` are valid (the ranges of min, max, speed and compensation are checked by Tonemap). */
+export function validMetering(a: AutoExposure): boolean {
+  const p = a.percentiles,
+    s = a.spot;
+  return (
+    (a.method === undefined || METHODS.includes(a.method)) &&
+    (a.metering === undefined || METERING.includes(a.metering)) &&
+    (p === undefined ||
+      (Array.isArray(p) && p.length === 2 && inside(p[0], 0, 1) && inside(p[1], 0, 1) && p[0] < p[1])) &&
+    (s === undefined ||
+      (typeof s === 'object' && inside(s.x, 0, 1) && inside(s.y, 0, 1) && inside(s.radius, 1e-3, 1))) &&
+    (a.metering !== 'mask' || typeof (a.mask as { createView?: unknown } | undefined)?.createView === 'function')
+  );
+}
+
+/**
+ * Writes the meter uniform (16 floats): view rect; min, max, adaptation factor, compensation; method, weighting, low
+ * and high percentile; the sampled domain in pixels (the view, or the spot's square).
+ */
+export function meterValues(out: Float32Array, rect: readonly number[], a: AutoExposure, adapt: number): Float32Array {
+  out.set(rect, 0);
+  out[4] = a.min ?? -4;
+  out[5] = a.max ?? 4;
+  out[6] = adapt;
+  out[7] = a.compensation ?? 0;
+  out[8] = +(a.method === 'histogram');
+  out[9] = METERING.indexOf(a.metering ?? 'average');
+  out[10] = a.percentiles?.[0] ?? 0.1;
+  out[11] = a.percentiles?.[1] ?? 0.9;
+  if (a.metering === 'spot') {
+    const r = (a.spot?.radius ?? 0.05) * Math.min(rect[2], rect[3]);
+    out[12] = rect[0] + (a.spot?.x ?? 0.5) * rect[2] - r;
+    out[13] = rect[1] + (a.spot?.y ?? 0.5) * rect[3] - r;
+    out[14] = out[15] = 2 * r;
+  } else out.set(rect, 12);
+  return out;
 }
 
 /** Kelvin value that leaves the image unchanged. */
@@ -160,26 +221,58 @@ export function effectsShader(code: string, auto: boolean): string {
   return out;
 }
 
-/** WGSL compute shader that meters log-average luminance over the view rectangle and adapts the stored exposure. */
+/**
+ * WGSL compute shader that meters the view into the adapted-exposure buffer: 4,096 samples on a 64 by 64 grid over the
+ * domain (the view, or the spot's square), each weighted (even, centre Gaussian, spot disc or mask), then either the
+ * weighted mean of log2 luminance or the weighted mean of the histogram bins between the two percentiles. Zero total
+ * weight (an empty mask) keeps the previous exposure.
+ */
 export const meterShader = `
-struct Meter {rect:vec4f,params:vec4f}
+struct Meter {rect:vec4f,params:vec4f,mode:vec4f,domain:vec4f}
 @group(0) @binding(0) var<uniform> m:Meter;
 @group(0) @binding(1) var scene:texture_2d<f32>;
 @group(0) @binding(2) var<storage,read_write> st:array<f32,2>;
-var<workgroup> sums:array<f32,256>;
+@group(0) @binding(3) var mask:texture_2d<f32>;
+var<workgroup> sums:array<vec2f,256>;
+var<workgroup> bins:array<atomic<u32>,64>;
 @compute @workgroup_size(256) fn main(@builtin(local_invocation_index) i:u32) {
-  let tx=i%16u;let ty=i/16u;var acc=0.0;
+  if(i<64u){atomicStore(&bins[i],0u);}
+  workgroupBarrier();
+  let tx=i%16u;let ty=i/16u;var acc=vec2f(0);
   for(var k=0u;k<16u;k++){
-    let sx=(f32(tx*4u+(k%4u))+0.5)/64.0;let sy=(f32(ty*4u+(k/4u))+0.5)/64.0;
-    let c=textureLoad(scene,vec2i(m.rect.xy+vec2f(sx,sy)*m.rect.zw),0).rgb;
+    let uv=vec2f((f32(tx*4u+(k%4u))+0.5)/64.0,(f32(ty*4u+(k/4u))+0.5)/64.0);
+    let pix=clamp(m.domain.xy+uv*m.domain.zw,m.rect.xy,m.rect.xy+m.rect.zw-1.0);
+    let c=textureLoad(scene,vec2i(pix),0).rgb;
     var l=dot(max(c,vec3f(0)),vec3f(0.2126,0.7152,0.0722));
     l=select(65000.0,l,l<65000.0);
-    acc+=clamp(log2(max(l,0.0001)),-12.0,12.0);
+    let v=clamp(log2(max(l,0.0001)),-12.0,12.0);
+    var w=1.0;
+    if(m.mode.y==1.0){let d=(pix-m.rect.xy-0.5*m.rect.zw)/m.rect.w;w=exp(-8.0*dot(d,d));}
+    else if(m.mode.y==2.0){w=select(0.0,1.0,length(uv-0.5)<=0.5);}
+    else if(m.mode.y==3.0){
+      let size=vec2f(textureDimensions(mask));
+      w=clamp(textureLoad(mask,vec2i(min((pix-m.rect.xy)/m.rect.zw*size,size-1.0)),0).r,0.0,1.0);
+    }
+    acc+=vec2f(w*v,w);
+    if(m.mode.x==1.0){atomicAdd(&bins[min(u32((v+12.0)/24.0*64.0),63u)],u32(w*256.0+0.5));}
   }
   sums[i]=acc;workgroupBarrier();
   for(var s=128u;s>0u;s>>=1u){if(i<s){sums[i]+=sums[i+s];}workgroupBarrier();}
   if(i==0u){
-    let want=clamp(log2(0.18)-sums[0]/4096.0+m.params.w,m.params.x,m.params.y);
-    if(st[1]==0.0){st[0]=want;st[1]=1.0;}else{st[0]+=(want-st[0])*m.params.z;}
+    var total=sums[0].y;var level=sums[0].x/max(total,1e-12);
+    if(m.mode.x==1.0){
+      var count=0u;for(var b=0u;b<64u;b++){count+=atomicLoad(&bins[b]);}
+      let lo=f32(count)*m.mode.z;let hi=f32(count)*m.mode.w;var below=0.0;var kept=0.0;var sum=0.0;
+      for(var b=0u;b<64u;b++){
+        let n=f32(atomicLoad(&bins[b]));let part=min(hi,below+n)-max(lo,below);
+        if(part>0.0){kept+=part;sum+=part*(-12.0+(f32(b)+0.5)*0.375);}
+        below+=n;
+      }
+      total=kept;level=sum/max(kept,1e-12);
+    }
+    if(total>0.0){
+      let want=clamp(log2(0.18)-level+m.params.w,m.params.x,m.params.y);
+      if(st[1]==0.0){st[0]=want;st[1]=1.0;}else{st[0]+=(want-st[0])*m.params.z;}
+    }
   }
 }`;

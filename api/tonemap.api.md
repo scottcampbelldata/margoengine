@@ -11,6 +11,15 @@ export interface AutoExposure {
     max?: number;
     speed?: number;
     compensation?: number;
+    method?: 'mean' | 'histogram';
+    percentiles?: readonly [number, number];
+    metering?: 'average' | 'center' | 'spot' | 'mask';
+    spot?: {
+        x?: number;
+        y?: number;
+        radius?: number;
+    };
+    mask?: GPUTexture;
 }
 
 export interface CubeLUT {

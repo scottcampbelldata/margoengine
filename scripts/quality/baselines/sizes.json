@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11005620,
+  "total": 11008105,
   "history": [
     {
       "date": "2026-10-24",
@@ -4166,6 +4166,12 @@
       "commit": "66df95e94",
       "reason": "tonemap/custom entry (CustomCurve)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "042a29435",
+      "reason": "tonemap metering modes (histogram, centre, spot, mask) in the meter shader",
+      "grew": 2
     }
   ],
   "items": {
@@ -4734,7 +4740,7 @@
     "@margoengine/scenery": 474,
     "@margoengine/scenery/aurora": 5866,
     "@margoengine/scenery/presets": 1233,
-    "@margoengine/scenery/scenes": 17810,
+    "@margoengine/scenery/scenes": 19213,
     "@margoengine/scenery/sky": 474,
     "@margoengine/scenery/stars": 4762,
     "@margoengine/sciviz": 36802,
@@ -4847,7 +4853,7 @@
     "@margoengine/tiles/s2": 3004,
     "@margoengine/tiles/splats": 1822,
     "@margoengine/tiles/terrain": 5974,
-    "@margoengine/tonemap": 11479,
+    "@margoengine/tonemap": 12561,
     "@margoengine/tonemap/custom": 1459,
     "@margoengine/tonemap/grade": 1808,
     "@margoengine/toon": 1701,

@@ -13,7 +13,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-481). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-482). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -180,6 +180,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Classic curves (`curve` `reinhard`, `cineon`, `linear` in `@margoengine/tonemap`, 2026-11-08) | By method: Reinhard is per channel (it shifts hue in saturated highlights) and never reaches white; Cineon is the filmic fit with its 2.2 gamma undone, not a film-stock model; linear clips at white; under an HDR `ColorOutput` they are scaled by the same rolloff as AgX and ACES; not compared side by side with another engine (LIM-479). | They exist to keep the look of scenes ported from engines that use them. | A ported scene keeps its contrast and highlight roll-off. | Use `neutral` or `agx` for new work. |
 | Several atlases per layer (`SpriteLayer` with a list of atlases in `@margoengine/sprites`, 2026-11-08) | Up to the device's `maxTextureArrayLayers` (at least 256) atlases, all the same size. | A texture array holds same-size layers, which is what lets one draw read them all. | By method: the layer copies the atlases into its own array (one more copy of each in GPU memory), so a changed `GPUTexture` needs `setAtlas` again; a page sprite packs 64 B (80 B with a shader); `normals` need a single atlas. Proved on one GPU, an RTX A6000, byte for byte. Time not measured. | Pad smaller sheets to one size; a separate layer for normal-mapped sprites. |
 | Custom tone curve (`CustomCurve` in `@margoengine/tonemap/custom`, 2026-11-08) | By method: a JavaScript curve is per channel, sampled at 128 points over 2^-12 to 2^8 (log2) and held above; a WGSL curve is compiled into the presentation shader, so a WGSL error shows as a GPU validation error; shader-node graphs are not taken directly; one uniform of 592 B; GPU cost not measured (LIM-481). | Tonemap does not depend on `@margoengine/shader`; sampling keeps a JavaScript curve live without a recompile. | Write a node curve as WGSL. | Use `wgsl` for exact or per-pixel curves. |
+| Metering modes (`autoExposure` `metering`, `method` in `@margoengine/tonemap`, 2026-11-08) | By method: 4,096 samples on a 64 by 64 grid (a spot narrower than a few pixels resamples the same pixels); the histogram has 64 bins over -12 to 12 stops, so its level moves in 0.375-stop bin centres weighted by the kept share; centre weighting has a fixed sigma of a quarter of the view height; the mask is read by nearest texel; GPU cost not measured (LIM-482). | One workgroup keeps metering to one dispatch with no readback. | A finer histogram or more samples would cost more threads or passes. | Use `mean` for smooth adaptation, `histogram` for scenes with small lights. |
 
 
 | Limit | Starts at | Why | What you see | Escape hatch |

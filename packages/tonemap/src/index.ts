@@ -16,6 +16,8 @@ import { applyView, viewLoadOp, viewRect } from '../../shared/view-rect.js';
 import {
   effectsShader,
   meterShader,
+  meterValues,
+  validMetering,
   usesEffects,
   whiteBalanceGain,
   NEUTRAL_TEMPERATURE,
@@ -26,7 +28,7 @@ export { parseCube };
 export { whiteBalanceGain, type AutoExposure };
 export type { CubeLUT };
 
-declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; STORAGE: number };
+declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; STORAGE: number; COPY_SRC: number };
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number; COPY_DST: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 // Set on the pass context by @margoengine/environment's ColorOutput while a P3 or HDR canvas is active.
@@ -102,7 +104,8 @@ function validAuto(a: boolean | AutoExposure | undefined): boolean {
     inRange(max, -16, 16) &&
     min <= max &&
     inRange(speed, 0.01, 100) &&
-    inRange(compensation, -8, 8)
+    inRange(compensation, -8, 8) &&
+    validMetering(a)
   );
 }
 
@@ -144,7 +147,9 @@ export class Tonemap implements EnginePlugin {
   private frameCount = 0;
   private extBuffers: (GPUBuffer | undefined)[] = [];
   private readonly fxValues = new Float32Array(16);
-  private readonly meterValues = new Float32Array(8);
+  private readonly meterValues = new Float32Array(16);
+  private meterMask?: GPUTexture;
+  private blankMask?: GPUTexture;
 
   constructor(readonly options: TonemapOptions = {}) {
     this.source = options.source;
@@ -494,7 +499,7 @@ export class Tonemap implements EnginePlugin {
   private stateBuffer(device: GPUDevice): GPUBuffer {
     return (this.aeBuffer ??= device.createBuffer({
       size: 8,
-      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
     }));
   }
   // Writes the effects uniform and, with auto-exposure, meters the source into the adapted-exposure buffer.
@@ -520,22 +525,27 @@ export class Tonemap implements EnginePlugin {
         layout: 'auto',
         compute: { module: c.device.createShaderModule({ code: meterShader }), entryPoint: 'main' },
       });
-      this.meterBuffer = c.device.createBuffer({ size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+      this.meterBuffer = c.device.createBuffer({ size: 64, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+      this.blankMask = c.device.createTexture({
+        size: [1, 1],
+        format: 'r8unorm',
+        usage: GPUTextureUsage.TEXTURE_BINDING,
+      });
     }
-    if (!this.meterGroup)
+    const mask = a.metering === 'mask' ? a.mask! : this.blankMask!;
+    if (!this.meterGroup || this.meterMask !== mask) {
+      this.meterMask = mask;
       this.meterGroup = c.device.createBindGroup({
         layout: this.meterPipeline.getBindGroupLayout(0),
         entries: [
           { binding: 0, resource: { buffer: this.meterBuffer! } },
           { binding: 1, resource: 'createView' in source ? source.createView() : source },
           { binding: 2, resource: { buffer: this.stateBuffer(c.device) } },
+          { binding: 3, resource: mask.createView() },
         ],
       });
-    m.set(rect, 0);
-    m[4] = a.min ?? -4;
-    m[5] = a.max ?? 4;
-    m[6] = 1 - Math.exp(-(a.speed ?? 1.5) * Math.max(0, Math.min(c.delta, 0.25)));
-    m[7] = a.compensation ?? 0;
+    }
+    meterValues(m, rect, a, 1 - Math.exp(-(a.speed ?? 1.5) * Math.max(0, Math.min(c.delta, 0.25))));
     c.device.queue.writeBuffer(this.meterBuffer!, 0, m as Float32Array<ArrayBuffer>);
     const pass = c.encoder.beginComputePass();
     pass.setPipeline(this.meterPipeline);
@@ -570,7 +580,8 @@ export class Tonemap implements EnginePlugin {
     this.fxBuffer?.destroy();
     this.aeBuffer?.destroy();
     this.meterBuffer?.destroy();
-    this.fxBuffer = this.aeBuffer = this.meterBuffer = undefined;
+    this.blankMask?.destroy();
+    this.fxBuffer = this.aeBuffer = this.meterBuffer = this.blankMask = this.meterMask = undefined;
     for (const b of this.extBuffers) b?.destroy();
     this.extBuffers = [];
     this.meterPipeline = this.meterGroup = undefined;

@@ -92,7 +92,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/text | `.` 35, `./rich` 8, `./msdf` 4 | 22 |  | 15,928 |
 | @margoengine/tilemap | `.` 41, `./autotile` 13, `./ldtk` 8, `./tiled` 6 | 28 |  | 7,179 |
 | @margoengine/tiles | `.` 80, `./i3dm` 3, `./metadata` 12, `./splats` 7, `./s2` 8, `./terrain` 11, `./ion` 11 | 84 |  | 15,586 |
-| @margoengine/tonemap | `.` 8, `./grade` 5, `./custom` 2 | 2 |  | 11,328 |
+| @margoengine/tonemap | `.` 8, `./grade` 5, `./custom` 2 | 2 |  | 12,195 |
 | @margoengine/toon | `.` 2 |  |  | 1,471 |
 | @margoengine/transitions | `.` 2 |  |  | 4,239 |
 | @margoengine/tween | `.` 50, `./stagger` 8, `./motion-path` 7, `./scroll` 4, `./custom-ease` 6 | 16 |  | 5,503 |

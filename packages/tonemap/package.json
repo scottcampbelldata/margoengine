@@ -59,6 +59,7 @@
     "test:gpu:lut-sizes": "cd ../.. && node scripts/tonemap-lut-sizes-gpu-check.js",
     "test:gpu:grade": "cd ../.. && node packages/tonemap/tests/grade-browser.mjs",
     "test:gpu:curves": "cd ../.. && node packages/tonemap/tests/curves-browser.mjs",
-    "test:gpu:custom": "cd ../.. && node packages/tonemap/tests/custom-browser.mjs"
+    "test:gpu:custom": "cd ../.. && node packages/tonemap/tests/custom-browser.mjs",
+    "test:gpu:metering": "cd ../.. && node packages/tonemap/tests/metering-browser.mjs"
   }
 }

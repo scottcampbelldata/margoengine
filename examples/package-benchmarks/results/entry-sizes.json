@@ -1,5 +1,5 @@
 {
-  "commit": "8130190ad",
+  "commit": "2583b050e",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -2876,8 +2876,8 @@
     },
     "@margoengine/tonemap": {
       ".": {
-        "raw": 32538,
-        "gzip": 11328
+        "raw": 34940,
+        "gzip": 12195
       },
       "./grade": {
         "raw": 3256,
@@ -3382,9 +3382,9 @@
       "brotli": 7260
     },
     "packages/tonemap/dist/index.js": {
-      "raw": 32538,
-      "gzip": 11328,
-      "brotli": 10061
+      "raw": 34940,
+      "gzip": 12195,
+      "brotli": 10872
     },
     "packages/physics/dist/index.js": {
       "raw": 59310,

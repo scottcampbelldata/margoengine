@@ -39,6 +39,24 @@ stage.dispose();
 All are off by default and compiled in only when asked for: without them the shaders, bindings and GPU calls are exactly what they were. Order: input conversion, white balance gain, exposure plus the auto-exposure stops, curve, contrast, LUT, vignette, grain, sRGB. Chromatic aberration shifts the red and blue samples radially (1 = 2% of the view at its edge) before everything else.
 
 - `autoExposure` meters the log-average luminance of the HDR source over the view with one 256-thread compute pass (4,096 samples) and moves the stored exposure toward 18% grey by `1 - exp(-speed * dt)` per frame (`min`, `max` in stops, `speed` in 1/s, `compensation` in stops; defaults -4, 4, 1.5, 0). The first frame snaps to the metered value. It adds one compute dispatch and an 8-byte storage buffer.
+- **Metering modes.** `metering` picks where the meter looks: `'average'` (default, the whole view evenly),
+  `'center'` (weighted by a Gaussian of the distance from the centre, sigma a quarter of the view height), `'spot'`
+  (only the disc `spot: {x, y, radius}`, centre as fractions of the view, defaults 0.5, 0.5, radius 0.05 of the shorter
+  side; all 4,096 samples land in it) or `'mask'` (each sample weighted by the red channel of `mask`, a texture of any
+  size stretched over the view). `method: 'histogram'` sorts the weighted samples into 64 bins of log2 luminance (-12 to
+  12) and averages only those between `percentiles` (default `[0.1, 0.9]`), so a small light or a dark corner does not
+  swing the exposure; `'mean'` (default) is the weighted log-average. A mask of zero weight keeps the last exposure.
+  Every mode shares one compute pipeline; checked on a real GPU against a CPU oracle of the meter within 0.002 stops in
+  all eight combinations (`packages/tonemap/tests/metering-browser.mjs`, M6 Mac mini, Metal).
+
+```ts
+import {createStage} from 'margoengine';
+import {Tonemap} from 'margoengine/tonemap';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+const tonemap = Tonemap.attach(stage.engine, {autoExposure: {method: 'histogram', metering: 'center'}});
+tonemap.options.autoExposure = {metering: 'spot', spot: {x: 0.5, y: 0.4, radius: 0.08}}; // meter the face
+stage.dispose();
+```
 - `temperature` is the colour temperature of the scene's light (1667-25000 K, default 6500 = no change): 3200 cools tungsten light to neutral. `tint` runs from -1 (green) to 1 (magenta). The gain keeps luminance.
 - `vignette` 0-1 with `vignetteRadius` and `vignetteSoftness` (fractions of the distance to the corner; defaults 0.5). Per view when the engine draws several.
 - `grain` 0-1 is film grain that changes every frame, strongest in the mid-tones.
