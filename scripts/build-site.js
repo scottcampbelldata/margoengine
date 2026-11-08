@@ -5,37 +5,13 @@
 // `npm run build:site` measures every package (entry-sizes.mjs) and a basic glTF scene's network log
 // (basic-scene-network.mjs, which takes the GPU lock only around its browser) first, for /sizes.html.
 import { execFileSync } from 'node:child_process';
-import { cp, rm, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
+import { cp, rm, mkdir, readdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { build } from 'vite';
 import { readSizesInputs, sizesPage } from './build-sizes.js';
 import { writeSitePages } from './build-llms.mjs';
+import { buildGallery, buildVoxel, site } from './site-gallery.mjs';
 
 const out = resolve('site/dist');
-// Ten-character hashes renamed every asset once: without site/404.html, Pages answered a request that reached a
-// deployment without the new file with index.html (200) under a year-long cache rule, and browsers kept it
-// (2026-10-15). site/404.html makes such answers 404 + no-store, and site/_headers no longer caches for a year.
-const names = {
-  entryFileNames: 'assets/[name]-[hash:10].js',
-  chunkFileNames: 'assets/[name]-[hash:10].js',
-  assetFileNames: 'assets/[name]-[hash:10][extname]',
-};
-// Demo pages import their own code only once examples/needs-webgpu.js finds WebGPU. Rollup drops a dynamically
-// imported module whose exports go unused when its package says "sideEffects": false (dof, tonemap, animator and
-// creative's earth demo left a 20-277 B main chunk), so demo sources keep their side effects.
-const demoSources = {
-  name: 'margo-site-demo-sources',
-  transform: (code, id) =>
-    id.includes('/examples/') && !id.includes('/node_modules/') ? { code, map: null, moduleSideEffects: true } : null,
-};
-const site = (config) =>
-  build({
-    ...config,
-    plugins: [...(config.plugins ?? []), demoSources],
-    logLevel: 'warn',
-    worker: { rollupOptions: { output: names } },
-    build: { ...config.build, emptyOutDir: true, rollupOptions: { ...config.build.rollupOptions, output: names } },
-  });
 await rm(out, { recursive: true, force: true });
 await mkdir(out, { recursive: true });
 for (const name of await readdir('site'))
@@ -60,7 +36,7 @@ else
 // A relative base lets the showcase run from its subfolder.
 await site({ root: 'apps/showcase-night-citadel', base: './', build: { outDir: `${out}/night-citadel` } });
 await site({ root: 'examples/gameplay-sandbox', base: './', build: { outDir: `${out}/gameplay-sandbox` } });
-await site({ root: 'examples/voxel-sandbox', base: './', build: { outDir: `${out}/voxel` } });
+await buildVoxel(out);
 const pages = [
   'character-animation',
   'robot-expressive',
@@ -94,37 +70,8 @@ await site({
     rollupOptions: { input: Object.fromEntries(pages.map((page) => [page, resolve(`examples/${page}.html`)])) },
   },
 });
-// The Harrow Head gallery (examples/gallery/DIRECTION.md): every html page there, under /gallery/. The model cabinet's
-// models are the ones its section buttons name, copied here without their reference screenshots.
-const galleryPages = (await readdir('examples/gallery')).filter((name) => name.endsWith('.html'));
-await site({
-  configFile: false,
-  root: 'examples/gallery',
-  base: './',
-  publicDir: false,
-  plugins: [demoSources],
-  build: {
-    outDir: `${out}/gallery`,
-    target: 'es2022',
-    rollupOptions: {
-      input: Object.fromEntries(galleryPages.map((page) => [page.slice(0, -5), resolve(`examples/gallery/${page}`)])),
-    },
-  },
-});
-const cabinet = await readFile('examples/gallery/khronos.html', 'utf8'),
-  published = [...cabinet.matchAll(/data-section="(\w+)"/g)].map((match) => match[1]),
-  khronos = JSON.parse(await readFile('examples/assets/khronos/manifest.json', 'utf8'));
-for (const model of published)
-  await cp(`examples/assets/khronos/${model}`, `${out}/gallery/models/${model}`, {
-    recursive: true,
-    filter: (source) => !/screenshot\.\w+$/.test(source),
-  });
-await writeFile(
-  `${out}/gallery/models/manifest.json`,
-  JSON.stringify({ models: khronos.models.filter((model) => published.includes(model.name)) }),
-);
-await cp('examples/assets/khronos/README.md', `${out}/gallery/models/README.md`);
-await cp('examples/gallery/khronos.ts', `${out}/gallery/khronos.ts`);
+// The Harrow Head gallery under /gallery/ (scripts/site-gallery.mjs; its browser check builds the same itself).
+await buildGallery(out);
 await site({
   configFile: false,
   root: 'packages/creative/examples/earth',

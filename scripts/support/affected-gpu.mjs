@@ -304,7 +304,7 @@ const READABLE = /\.(html|m?js|tsx?|css|json)$/;
 /**
  * scan() of `entries`, then the repo paths its files name in strings (a script it spawns, a page or fixture it loads by
  * path), scanned in turn until nothing new is named. `packages` and `all` are scan()'s of the entries alone; `files`
- * holds every file reached either way (files inside a workspace stay that package's). `follow(path)` limits which
+ * holds every file reached either way (files inside a workspace, or a workspace folder named whole, stay that package's). `follow(path)` limits which
  * named paths are followed.
  */
 export function closure(root, entries, workspaces, follow = () => true) {
@@ -316,7 +316,15 @@ export function closure(root, entries, workspaces, follow = () => true) {
     for (const file of frontier) {
       if (!READABLE.test(file) || !existsSync(join(root, file))) continue;
       for (const [, path] of readText(root, file).matchAll(NAMED_PATH))
-        if (!files.has(path) && follow(path) && existsSync(join(root, path)) && !workspaceOf(workspaces, path))
+        if (
+          !files.has(path) &&
+          follow(path) &&
+          existsSync(join(root, path)) &&
+          !workspaceOf(workspaces, path) &&
+          // A workspace folder named whole (`'examples/voxel-sandbox'`, a Vite root) is that package, which scan()
+          // records from the same mention; its files, and what they import from outside it, stay the package's.
+          !workspaces.some((w) => w.dir === path)
+        )
           named.add(path);
     }
     if (!named.size) break;

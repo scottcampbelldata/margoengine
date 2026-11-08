@@ -19,6 +19,7 @@ import { PARALLEL, SERIAL, TEST_CONCURRENCY, TEST_TIMEOUT_MS } from '../scripts/
 import { PREPARE, RUNNER_SMOKE, splitSteps, testId } from '../scripts/gpu-package-tests.mjs';
 import {
   analyse,
+  closure as fileClosure,
   commandEntries,
   demoSources,
   dependents,
@@ -690,6 +691,18 @@ test('stepClosure places check files in the steps that run them, and standalone 
     'x.mjs',
     'y.js',
   ]);
+});
+
+test('a workspace folder a script names whole is that package; its files and their imports stay out of the step', () => {
+  // scripts/site-gallery.mjs builds the voxel sandbox with the folder as its Vite root. Following that name took in
+  // every sandbox file and what they import from outside the package (bench.mjs and the quiet gate), so a quiet-gate
+  // change ran the gallery's GPU check.
+  const sandbox = workspaces.find((w) => w.dir === 'examples/voxel-sandbox');
+  assert.ok(sandbox, 'examples/voxel-sandbox is a workspace');
+  const reached = fileClosure(root, ['scripts/site-gallery.mjs'], workspaces);
+  assert.ok(reached.packages.has(sandbox.name));
+  assert.ok(!reached.files.has('scripts/quiet-gate.mjs'));
+  assert.ok(![...reached.files].some((f) => f.startsWith('examples/voxel-sandbox/')));
 });
 
 test('RUNNER_SMOKE holds one real test of each kind the runner treats differently', () => {

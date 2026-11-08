@@ -68,6 +68,21 @@ are still open.
 
 ## Checks
 
+### The gallery's model cabinet loads more JavaScript than its budget
+
+- **What:** `npm run test:gallery:browser` fails on main (seen 2026-11-07, M6 Mac mini, origin/main eff6d87dd):
+  `khronos.html: 125934 B gzip of JavaScript before the first frame, over 120000` (`PAGE_BUDGET` in
+  `scripts/test-gallery-browser.mjs`). 117,569 B of it is the page's main chunk (core, stage, gltf-pro, environment,
+  controls and stats, as `examples/gallery/khronos.ts` imports them). The same bytes come out of `npm run build:site`.
+- **Repro:** `npm run build:packages`, then `MARGO_GPU_SLOTS=2 node scripts/gpu-package-tests.mjs --no-build
+  --select=root/test:gallery:browser`.
+- **Cause:** the check read site/dist until 2026-11-07, which only `npm run build:site` makes, so GPU runs without it
+  stopped before the budget and none caught the growth. The page measured from source per commit: 117,230 B at
+  0c4be7e12 (2026-10-31, the gallery's last change), 120,329 B at ba3a63639 (2026-11-05, the first over), 126,206 B
+  on main. Of the +8,976 B, gltf-pro is +6,582 (PBRModel in model.ts +2,765, shader.ts +904, the new
+  vertex-inputs.ts +691), the rest shared, core, controls and environment, spread over documented feature commits.
+- **Needed to close:** bring the page back under 120,000 B without dropping features. The budget stays.
+
 ### SSAO's orthographic picture moves with the eye
 
 - **What:** `scripts/ssao-gpu-check.js` fails on main: moving an orthographic eye along its view from 6 m to 0.6 m changes the

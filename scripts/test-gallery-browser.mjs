@@ -1,5 +1,8 @@
-// `npm run test:gallery:browser`: the Harrow Head gallery as built into site/dist/gallery, in a real WebGPU browser. Runs
-// in check:gpu-packages under one GPU slot, after `npm run build:site`; its sources are examples/gallery.
+// `npm run test:gallery:browser`: the Harrow Head gallery and the voxel sandbox, built as the site builds them
+// (scripts/site-gallery.mjs) from this checkout into test-results/gallery-site, in a real WebGPU browser. Runs in
+// check:gpu-packages under one GPU slot, after `npm run build:packages`; its sources are examples/gallery. It once
+// read the site's own build folder, which only `npm run build:site` makes: the GPU runner alone failed it, and an older
+// site build passed (tests/site-gallery.test.js).
 //   every page in examples/gallery is built; title and description are unique; no long dashes; body text at least 16 px;
 //   no sideways scroll at 390 px; the text and the panel read with JavaScript off; the JavaScript a page loads before its
 //   first frame stays under the budget; every section of a scene page draws pixels with no console or GPU error; deep
@@ -9,6 +12,7 @@ import { readdir, readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { gzipSync } from 'node:zlib';
 import { preview } from 'vite';
+import { buildGallery, buildVoxel } from './site-gallery.mjs';
 import { launchBrowser } from './lib/browser.mjs';
 import { closeAll } from './support/shutdown.mjs';
 import { decodePNG } from '../tests/support/png.js';
@@ -23,7 +27,7 @@ const EGG = 'Margo engine ❤️ made for Margie';
 
 const root = resolve(import.meta.dirname, '..'),
   source = join(root, 'examples/gallery'),
-  dist = join(root, 'site/dist');
+  dist = join(root, 'test-results/gallery-site');
 
 /**
  * Gzip bytes of a built chunk plus what it imports statically and, for the page's entry, what its WebGPU gate imports;
@@ -51,12 +55,14 @@ const timer = setTimeout(() => {
 try {
   const pages = (await readdir(source)).filter((name) => name.endsWith('.html')).sort();
   assert.ok(pages.includes('index.html') && pages.includes('khronos.html'), 'the gallery pages are missing');
-  const built = (await readdir(join(dist, 'gallery')).catch(() => [])).filter((name) => name.endsWith('.html')).sort();
-  assert.deepEqual(built, pages, 'site/dist/gallery differs from examples/gallery: run npm run build:site first');
+  await buildGallery(dist);
+  await buildVoxel(dist);
+  const built = (await readdir(join(dist, 'gallery'))).filter((name) => name.endsWith('.html')).sort();
+  assert.deepEqual(built, pages, 'the gallery build differs from examples/gallery');
   site = await preview({
     configFile: false,
     root,
-    build: { outDir: 'site/dist' },
+    build: { outDir: 'test-results/gallery-site' },
     preview: { port: 0, strictPort: true },
     logLevel: 'error',
   });
