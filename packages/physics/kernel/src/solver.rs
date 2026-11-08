@@ -27,7 +27,8 @@
 // first point a heavy box on a light one walks (`a_heavy_box_stands_on_a_light_one`).
 //
 // Restitution follows Muller et al. 2020: a point struck in this substep notes its approach speed, and after relaxing is
-// solved to -e times that speed. Slower than two substeps of gravity is rest, not a bounce.
+// solved to -e times that speed. Slower than two substeps of gravity is rest, not a bounce. A point struck while its gap
+// is still open notes the speed it will meet the surface with, gravity's gain over the gap added.
 use crate::contact::tangent_of;
 use crate::integrate::apply_inverse_inertia;
 use crate::layout::*;
@@ -417,20 +418,31 @@ impl World {
         let bounce = self.s(PAIR_RESTITUTION, row);
         let count = self.uu(PAIR_CONTACTS, row) as usize;
         let zero = v3(0.0, 0.0, 0.0);
+        let (round_a, round_b) = (self.round_core(self.uu(PAIR_A, row) as usize), self.round_core(self.uu(PAIR_B, row) as usize));
         let (mut hold, mut was, mut speed, mut approach) = ([0.0f32; MANIFOLD], [0.0f32; MANIFOLD], [0.0f32; MANIFOLD], [0.0f32; MANIFOLD]);
+        let mut open = [0.0f32; MANIFOLD];
         let (mut bias, mut scale, mut leak, mut most) = ([0.0f32; MANIFOLD], [0.0f32; MANIFOLD], [0.0f32; MANIFOLD], [f32::MAX; MANIFOLD]);
         let (mut turn_a, mut turn_b, mut spin_a, mut spin_b) = ([zero; MANIFOLD], [zero; MANIFOLD], [zero; MANIFOLD], [zero; MANIFOLD]);
         for k in 0..count {
             let at = row * MANIFOLD + k;
             let (arm_a, arm_b) = (self.v(CONTACT_ARM_A_X, at), self.v(CONTACT_ARM_B_X, at));
             let pressed = self.s(CONTACT_NORMAL_IMPULSE, at);
-            // The gap from where the bodies are now.
-            let on_a = center_a.add(rotation_a.rotate(self.v(CONTACT_ANCHOR_A_X, at)));
-            let on_b = center_b.add(rotation_b.rotate(self.v(CONTACT_ANCHOR_B_X, at)));
+            // The gap from where the bodies are now. A ball or a capsule meets the other surface at its core plus its radius
+            // along the normal, wherever it has turned to; a point fixed in it would rise off the floor as it rolls.
+            let (anchor_a, anchor_b) = (self.v(CONTACT_ANCHOR_A_X, at), self.v(CONTACT_ANCHOR_B_X, at));
+            let on_a = match round_a {
+                Some(core) => center_a.add(rotation_a.rotate(core.nearest(anchor_a))).add(normal.scale(core.radius)),
+                None => center_a.add(rotation_a.rotate(anchor_a)),
+            };
+            let on_b = match round_b {
+                Some(core) => center_b.add(rotation_b.rotate(core.nearest(anchor_b))).sub(normal.scale(core.radius)),
+                None => center_b.add(rotation_b.rotate(anchor_b)),
+            };
             let gap = on_b.sub(on_a).dot(normal);
             (hold[k], was[k]) = (pressed, pressed);
             speed[k] = body_b.at(arm_b).sub(body_a.at(arm_a)).dot(normal);
             approach[k] = speed[k];
+            open[k] = gap;
             (bias[k], scale[k], leak[k]) = if gap > 0.0 {
                 (gap / h, 1.0, 0.0)
             } else if biased {
@@ -487,12 +499,45 @@ impl World {
             body_b.push(applied, arm_b);
             // A strike: the speed the point came in at, before any point of the manifold pushed.
             if biased && bounce > 0.0 && was[k] == 0.0 && hold[k] > 0.0 && approach[k] < -threshold {
-                self.set_s(CONTACT_APPROACH, at, approach[k]);
+                // A point struck across an open gap meets the surface faster than it is moving now, by what gravity adds
+                // over the gap: v^2 = v0^2 + 2 a d, constant acceleration over the distance. Taking the speed of now left the
+                // bounce short by about g h (4.5 mm of 0.25 m at 4 substeps).
+                let pull = self.gravity_pull(a, b).dot(normal);
+                let (gap, now) = (open[k], approach[k]);
+                let approach = if gap > 0.0 && pull < 0.0 { -sqrt(now * now - 2.0 * pull * gap) } else { now };
+                self.set_s(CONTACT_APPROACH, at, approach);
                 self.set_u(IMPACTS, *impacts, at as u32);
                 *impacts += 1;
             }
         }
         given
+    }
+
+    /// A ball's or a capsule's core in its body's frame, from the centre of mass: the segment from `middle - half` to
+    /// `middle + half` (a point for a ball), and the radius around it. None for any other shape.
+    fn round_core(&self, collider: usize) -> Option<RoundCore> {
+        let shape = self.uu(COLLIDER_SHAPE, collider);
+        if shape != SHAPE_BALL && shape != SHAPE_CAPSULE {
+            return None;
+        }
+        let body = self.uu(COLLIDER_BODY, collider) as usize;
+        let middle = self.v(COLLIDER_X, collider).sub(self.v(LOCAL_CENTER_X, body));
+        let half = if shape == SHAPE_CAPSULE {
+            self.q(COLLIDER_ROTATION_X, collider).rotate(v3(0.0, self.s(COLLIDER_B, collider), 0.0))
+        } else {
+            v3(0.0, 0.0, 0.0)
+        };
+        Some(RoundCore { middle, half, radius: self.s(COLLIDER_A, collider) })
+    }
+
+    /// Gravity's acceleration of b against a: none on a body the solve does not move.
+    fn gravity_pull(&self, a: usize, b: usize) -> V3 {
+        let g = self.header().gravity;
+        let g = v3(g[0], g[1], g[2]);
+        let pull = |at: usize| {
+            if self.flags(at) & (KIND | SLEEPING) == DYNAMIC && self.s(INVERSE_MASS, at) > 0.0 { g.scale(self.s(GRAVITY_SCALE, at)) } else { v3(0.0, 0.0, 0.0) }
+        };
+        pull(b).sub(pull(a))
     }
 
     /// Speed under which a contact is rest: two substeps of gravity.
@@ -524,5 +569,27 @@ impl World {
             self.settle(b, &body_b);
         }
         self.header_mut().impacts = 0;
+    }
+}
+
+/// A round shape's core: a segment in its body's frame and the radius around it.
+#[derive(Clone, Copy)]
+struct RoundCore {
+    middle: V3,
+    half: V3,
+    radius: f32,
+}
+
+impl RoundCore {
+    /// The core's point nearest a point of the body's frame.
+    #[inline(always)]
+    fn nearest(&self, point: V3) -> V3 {
+        let length = self.half.dot(self.half);
+        if length == 0.0 {
+            return self.middle;
+        }
+        let t = point.sub(self.middle).dot(self.half) / length;
+        let t = if t < -1.0 { -1.0 } else if t > 1.0 { 1.0 } else { t };
+        self.middle.add(self.half.scale(t))
     }
 }

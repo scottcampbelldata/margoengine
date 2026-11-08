@@ -339,13 +339,6 @@ does not own. Each entry says exactly what is needed to close it.
 - **Cause:** inside the 0.2 mm slop a soft normal row has no push, and its impulse scale lets a point sink at a speed that follows its load, until it is deep enough for the push to hold it. The downhill points carry three times the load of the uphill ones, reach their depth (2.23e-4 m) by 0.5 s while the uphill ones take 1 s (2.08e-4 m), so the cube tilts and then rights itself, and its centre moves with the tilt. Measured: a rigid row inside the slop (the soft row only past it) holds the cube to 1e-11 m and the flat drop and head-on tests unchanged, but the light box of the 1:1000 stack then walks 1.2 mm (bar 1 mm), so it is not landed.
 - **Needed to close:** a normal row inside the slop that does not let a point sink by its load, with the 1:1000 stack still under 1 mm, then the cube in `a_block_slides_at_its_rate_from_release`'s window below tan t = mu.
 
-### A ball rolling down a slope runs 0.3 percent fast in its first second
-
-- **What:** `@margoengine/physics/next` kernel, a ball of radius 0.5 rolling from rest with gravity turned 30 degrees: 1.0033 of 5/7 g sin t over the first second and 1.0021 over two (bar 0.2 percent). It is exact to step 10 and leaves from step 15.
-- **Repro:** a fixed floor box, a ball [0.5] at y = 0.5 with sleeping off, gravity (9.81 sin t, -9.81 cos t, 0), the speed gain over the first 60 steps against 5/7 g sin t.
-- **Cause:** a point's gap within a step is read from anchors fixed in each body, and the ball's anchor turns with the ball: after a turn of a radians it has risen r (1 - cos a) off the floor. At 1.2 m/s (step 15) that is 0.4 mm a step, past the slop, so the point reads as open, the normal row holds less in the later substeps, and the friction cone with it. At the end of each step from step 16 on the point holds no impulse at all.
-- **Needed to close:** a gap within a step that follows a round shape's surface, not a point fixed in it, then a kernel test at 30 degrees over the first second.
-
 ### A Python script test can fail to spawn on Windows, about once in thousands of runs
 
 - **What:** `packages/exporters/tests/precision-native.test.js` failed in `verify` with `spawnSync python3 EINVAL`, on

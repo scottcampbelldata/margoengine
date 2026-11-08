@@ -182,6 +182,31 @@ fn a_ball_rolls_down_a_slope_at_five_sevenths_of_g_sin_t() {
 }
 
 #[test]
+fn a_ball_rolls_from_rest_at_five_sevenths_of_g_sin_t_on_thirty_degrees() {
+    // The point of a turning ball is where the ball meets the floor, not a point fixed in the ball: fixed in the ball it rose
+    // r (1 - cos a) after a turn of a, read as an open gap from step 15, and the ball ran 1.0033 of 5/7 g sin t over its
+    // first second at 30 degrees, 1.0021 over two (the bar is 0.2 percent).
+    for (substeps, iterations) in [(8u32, 2u32), (4, 1)] {
+        for tangent in [0.3f32, 0.57735, 0.7] {
+            let mut w = world(2);
+            w.header_mut().substeps = substeps;
+            w.header_mut().iterations = iterations;
+            floor(&mut w);
+            slope(&mut w, tangent);
+            let (body, _) = ball(&mut w, v3(0.0, 0.5, 0.0), false);
+            let rolled = 5.0 / 7.0 * w.header().gravity[0];
+            for (steps, seconds) in [(60, 1.0f32), (60, 2.0)] {
+                for _ in 0..steps {
+                    w.step(DT);
+                }
+                let ratio = w.v(LINEAR_X, body as usize).x / (rolled * seconds);
+                assert!((ratio - 1.0).abs() < 0.002, "{substeps} x {iterations}, tan t {tangent}, {seconds} s: {ratio}");
+            }
+        }
+    }
+}
+
+#[test]
 fn a_block_slides_only_above_tan_t_equal_to_mu() {
     // Both surfaces take the default mu of 0.5. Below it the block must hold its place with sleeping off, not creep; above
     // it the acceleration is g cos t (tan t - mu).
@@ -284,6 +309,35 @@ fn a_ball_bounces_to_e_squared_of_its_drop() {
             let expected = 2.0 * e * e;
             assert!((top - 0.5 - expected).abs() < 0.005, "e {e}: {} against {expected}", top - 0.5);
         }
+    }
+}
+
+#[test]
+fn a_ball_bounces_to_e_squared_at_four_substeps_of_one_pass() {
+    // The cost of Rapier's and Box2D v3's defaults. A strike is seen while the gap is still open, and the speed of that moment
+    // is short of the speed at the surface by what gravity adds over the gap: from 1 m at e 0.5 the first peak was 0.2432 m.
+    for (height, e) in [(1.0f32, 0.5f32), (2.0, 0.5), (1.0, 0.75), (2.0, 0.25)] {
+        let mut w = world(2);
+        w.header_mut().substeps = 4;
+        w.header_mut().iterations = 1;
+        floor(&mut w);
+        let (body, collider) = ball(&mut w, v3(0.0, 0.5 + height, 0.0), false);
+        w.set_s(COLLIDER_RESTITUTION, collider as usize, e);
+        w.set_u(COLLIDER_COMBINE, collider as usize, COMBINE_MAX << 2);
+        let (mut top, mut rising) = (0.0f32, false);
+        for _ in 0..300 {
+            w.step(DT);
+            let (y, v) = (w.v(POSITION_X, body as usize).y, w.v(LINEAR_X, body as usize).y);
+            rising |= v > 0.0;
+            if rising {
+                top = top.max(y);
+                if v < 0.0 {
+                    break;
+                }
+            }
+        }
+        let expected = height * e * e;
+        assert!((top - 0.5 - expected).abs() < 0.005, "from {height} m at e {e}: {} against {expected}", top - 0.5);
     }
 }
 
