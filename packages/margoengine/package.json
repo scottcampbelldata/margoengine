@@ -2614,6 +2614,10 @@
       "types": "./dist/terrain/holes.d.ts",
       "import": "./dist/terrain/holes.js"
     },
+    "./terrain/rvt": {
+      "types": "./dist/terrain/rvt.d.ts",
+      "import": "./dist/terrain/rvt.js"
+    },
     "./text": {
       "types": "./dist/text.d.ts",
       "import": "./dist/text.js"

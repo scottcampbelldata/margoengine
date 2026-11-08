@@ -41,6 +41,11 @@ class Terrain implements EnginePlugin {
     get holes(): GPUTexture | undefined;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
+    colorSource(): {
+        code: string;
+        layout: GPUBindGroupLayout;
+        group: GPUBindGroup;
+    } | undefined;
     setCapture(hook: TerrainCapture): () => void;
     onDispose(callback: () => void): () => void;
     draw(c: TerrainPassContext, mode: 'capture', color?: GPUTextureView, depth?: GPUTextureView): void;

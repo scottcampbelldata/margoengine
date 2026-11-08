@@ -366,8 +366,8 @@ export class Terrain implements EnginePlugin {
     this.layout = this.device.createBindGroupLayout({
       entries: [
         { binding: 0, visibility: vertex | fragment, buffer: { type: 'uniform' } },
-        { binding: 1, visibility: vertex, texture: { sampleType: 'unfilterable-float' } },
-        { binding: 2, visibility: vertex, texture: { sampleType: 'unfilterable-float' } },
+        { binding: 1, visibility: vertex | fragment, texture: { sampleType: 'unfilterable-float' } },
+        { binding: 2, visibility: vertex | fragment, texture: { sampleType: 'unfilterable-float' } },
         { binding: 3, visibility: fragment, texture: { viewDimension: '2d-array' } },
         { binding: 4, visibility: fragment, sampler: { type: 'filtering' } },
         { binding: 5, visibility: fragment, buffer: { type: 'read-only-storage' } },
@@ -494,22 +494,33 @@ export class Terrain implements EnginePlugin {
   }
   /** The lit shader: terrain's own (with `roughness`, when given) through every lighting effect. */
   private shader(): string {
+    let code = this.base();
+    for (const effect of this.lighting) code = effect.shader(code, 1);
+    return code;
+  }
+  /**
+   * The terrain's own shader, with its edge and hole tests and no lighting effect, with the bind group layout and the
+   * finest ring's group 0 it draws with, while attached: what `@margoengine/terrain/rvt` bakes the ground colour from.
+   */
+  colorSource(): { code: string; layout: GPUBindGroupLayout; group: GPUBindGroup } | undefined {
+    if (this.disposed || !this.layout || !this.rings[0]?.group) return undefined;
+    return { code: this.base(), layout: this.layout, group: this.rings[0].group };
+  }
+  /** The terrain's own shader (with `roughness`, when given) and its edge and hole tests, before any effect. */
+  private base(): string {
     const r = this.options.roughness,
       surface = this.surface(),
       vertex =
         r === undefined
           ? terrainVertex
           : terrainVertex.replace('o.material=vec4f(0.9,0,1,1)', `o.material=vec4f(${r},0,1,1)`);
-    let code =
+    const code =
       (surface ? surfaceStruct(vertex) : vertex) +
       (this.textures?.weights
         ? weightedFragment(this.textures.weights.length, surface, !!this.textures.tint)
         : terrainFragment(surface));
-    code = this.clip(code);
-    for (const effect of this.lighting) code = effect.shader(code, 1);
-    return code;
+    return this.clip(code);
   }
-  /** Whether any layer sets `bump` or `macro`; without, the shader and rules are what they were before both. */
   /** With `TerrainTextures.holes`: declares the mask after the weights and tint and adds its test to the edge test. */
   private clip(code: string): string {
     const t = this.textures;
@@ -518,6 +529,7 @@ export class Terrain implements EnginePlugin {
     return `@group(0) @binding(${binding}) var terrainHoles:texture_2d<f32>;
 ${code.split(terrainOutside).join(terrainOutside + terrainHole)}`;
   }
+  /** Whether any layer sets `bump` or `macro`; without, the shader and rules are what they were before both. */
   private surface(): boolean {
     return this.options.layers.some((layer) => (layer.bump ?? 0) > 0 || (layer.macro ?? 0) > 0);
   }

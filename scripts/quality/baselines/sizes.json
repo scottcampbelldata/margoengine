@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10896696,
+  "total": 10902223,
   "history": [
     {
       "date": "2026-10-24",
@@ -4040,6 +4040,12 @@
       "commit": "a52beaab4",
       "reason": "voxel/gpu-mesher: new optional entry; voxel/render mesher option",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "632ebec4e",
+      "reason": "new entry @margoengine/terrain/rvt; colorSource() on the root entry",
+      "grew": 1
     }
   ],
   "items": {
@@ -4693,6 +4699,7 @@
     "@margoengine/terrain/holes": 1539,
     "@margoengine/terrain/layers-pbr": 2819,
     "@margoengine/terrain/query": 3420,
+    "@margoengine/terrain/rvt": 5527,
     "@margoengine/terrain/sculpt": 4873,
     "@margoengine/terrain/stream": 12100,
     "@margoengine/text": 16406,

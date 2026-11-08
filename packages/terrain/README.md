@@ -554,6 +554,65 @@ foot of the cone took 6.4 m of deposit on average against 0.07 m on the far plai
 bytes. It runs on the CPU (in a worker if you like); a GPU port would be a second erosion with float results that
 differ by GPU.
 
+## Runtime virtual texture: `@margoengine/terrain/rvt`
+
+`TerrainVirtualTexture.attach(engine, terrain, options)` bakes the terrain's blended ground colour, with decals and
+roads on top, into a cache around the camera: clipmap levels of `size` texels, the finest `texel` wide and each next
+twice as coarse, addressed toroidally, so a camera move bakes only the rows and columns it exposes and a still frame
+bakes nothing. The terrain's lit shader then reads its ground from the cache, one or two samples a pixel whatever the
+number of layers and decals, and draws with its own shader only where the cache does not reach or the ground is
+steeper than `steep` (the cache is baked top down). `declarations(group, binding)` and `entries(binding)` let any
+other material read the ground under it (`terrainVirtualColor(position, footprint)`), to blend a rock or a path into
+the terrain.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Terrain} from 'margoengine/terrain';
+import {TerrainVirtualTexture} from 'margoengine/terrain/rvt';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const n = 129, heights = new Float32Array(n * n).map((_, i) => 0.02 * Math.sin(i % n / 9) + 0.02 * Math.cos(i / n / 7));
+const terrain = Terrain.attach(engine, {
+  size: [512, 512], origin: [-256, -256], heightScale: 100,
+  layers: [0, 1, 2, 3].map((i) => ({height: [-100 + i, 100] as [number, number], slope: [0, 1] as [number, number], scale: 0.25})),
+  textures(device) {
+    const heightmap = device.createTexture({size: [n, n], format: 'r32float', usage: 6});
+    device.queue.writeTexture({texture: heightmap}, heights, {bytesPerRow: n * 4}, [n, n]);
+    const layers = device.createTexture({size: [1, 1, 4], format: 'rgba8unorm-srgb', usage: 6});
+    device.queue.writeTexture({texture: layers}, new Uint8Array(16).fill(140), {bytesPerRow: 4, rowsPerImage: 1}, [1, 1, 4]);
+    return {heightmap, layers};
+  },
+});
+const ground = TerrainVirtualTexture.attach(engine, terrain, {
+  texel: 0.05, size: 1024, levels: 6,
+  decals(device) {                                        // layer 0 a puddle, layer 1 a road surface
+    const pictures = device.createTexture({size: [1, 1, 2], format: 'rgba8unorm-srgb', usage: 6});
+    device.queue.writeTexture({texture: pictures}, new Uint8Array([40, 50, 60, 200, 70, 70, 70, 255]),
+      {bytesPerRow: 4, rowsPerImage: 1}, [1, 1, 2]);
+    return pictures;
+  },
+});
+ground.addDecal({center: [12, 30], size: [6, 4], angle: 0.3, layer: 0});
+ground.road([[-40, 0], [0, 20], [50, 25]], 5, {layer: 1});
+ground.invalidate(-20, -20, 20, 20);                      // after sculpting or painting there
+engine.start();
+```
+
+On a Radeon 680M, on the real Mount Rainier tile under four layers of real rock (levels of 1,024 texels, 7 levels,
+a 160 by 160 view, 2026-11-07): the cached ground drew within 0.33 of 255 of the terrain's own shader on average
+(99th percentile 2, worst 5); a camera that moved there over four frames drew exactly what a cache made there drew, a
+still frame baked nothing and a one-texel move baked one 1,024-texel strip; a 14 m decal laid later showed red on 240
+pixels with no change more than 2 pixels from it, and removing it restored the picture exactly; a compute pass reading
+through `declarations` and `entries` saw the decal's red at its centre and no coverage past the cache. Cost not timed.
+
+- Memory: `size * size * levels` texels, 4 bytes each (`rgba8unorm-srgb`) or 8 (`rgba16float`): 24 MiB at the
+  defaults. The first frame bakes every level whole; later frames bake the texels a move exposes plus invalidated
+  areas.
+- The cache holds colour only: not with `TerrainMaterials` (whose normals and roughness come from the layer loop it
+  replaces); `bump` relief shows only where the terrain's own shader draws. SSR's capture keeps the terrain's own
+  colour. Edits to heights, weights, tint or streamed tiles show after `invalidate(area)`.
+- Decals (up to 4,096) are baked in the order added, each over its rectangle; a road is a decal a segment, so sharp
+  bends leave a gap on their outer side.
+
 ## Screen-space reflections
 
 `Terrain` takes SSR's capture hook (`@margoengine/post/ssr`): `ssr.add(terrain)` draws its own normal, layer colour and
