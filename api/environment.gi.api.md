@@ -110,6 +110,7 @@ interface IrradianceVolume {
     sh?: 1 | 2;
     resolution?: number;
     blend?: number;
+    visibility?: boolean;
 }
 
 interface LightProbeOptions {

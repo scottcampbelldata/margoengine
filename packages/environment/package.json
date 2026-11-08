@@ -35,6 +35,7 @@
     "test:blend:browser": "npm run build && node scripts/test-browser.js --page=blend",
     "test:ground:browser": "npm run build && node scripts/test-browser.js --page=ground",
     "test:gi:browser": "npm run build && node scripts/test-browser.js --page=gi",
+    "test:visibility:browser": "npm run build && node scripts/test-browser.js --page=visibility",
     "test:gpu:mirror": "cd ../.. && node scripts/env-mirror-gpu-check.js",
     "test:gpu:fog-all": "cd ../.. && node scripts/fog-all-gpu-check.js"
   },

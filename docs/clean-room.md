@@ -196,6 +196,7 @@ carry the same citation as a one-line comment in the code.
 | E33 | environment blend: weighted sum of source cubes, prefiltered mips and SH per output texel; SH rotation about +Y by exact quadrature (3-point Gauss-Legendre by 8 azimuth steps) | environment/src/blend.ts | prefiltering and SH projection are linear integrals (Ramamoorthi & Hanrahan 2001); Gauss-Legendre quadrature (Abramowitz & Stegun 25.4.29) |
 | E34 | ground projected background: view ray against the floor plane and a dome sphere, lookup from the photo camera above the center | environment/src/ground.ts | Margo-own: ray-plane and ray-sphere intersection (standard analytic geometry) |
 | E35 | live irradiance volume: a fixed sweep of probe captures that see the probe light of the captures before them, one bounce per sweep | environment/src/probes.ts, environment/src/gi.ts | radiosity as an iteration of gathers (Goral, Torrance, Greenberg and Battaile 1984); Margo-own sweep order |
+| E36 | probe visibility: per-probe mean and mean square distance in 24 direction bins, Chebyshev weight cubed, smooth backface term, renormalised weights | environment/src/probes.ts | variance test after Donnelly and Lauritzen 2006 (Variance Shadow Maps); per-probe visibility as in DDGI, Majercik et al. 2019 (JCGT 8(2)); Margo-own bins and biases |
 
 ### exporters
 

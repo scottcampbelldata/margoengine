@@ -17,6 +17,21 @@ import { halfToFloat } from './half.js';
 import { common } from './shader-common.js';
 import { captureDevice } from './capture-device.js';
 import { ggxDenominator } from '../../shared/light-terms.js';
+import { invertMatrix } from '@margoengine/math/mat4';
+
+// Visibility bins per volume probe: 6 faces x 4 quadrants (probeBin), each a (mean, mean square) distance pair.
+const VISIBILITY_BINS = 24;
+// probeBin (WGSL) on the CPU: face 2 x major axis + (negative), then the signs of the two other axes.
+function visibilityBin(d: readonly number[]): number {
+  const a = d.map(Math.abs);
+  let axis = 0,
+    u = d[1],
+    v = d[2],
+    m = d[0];
+  if (a[1] > a[0] && a[1] >= a[2]) [axis, u, v, m] = [1, d[0], d[2], d[1]];
+  else if (a[2] > a[0] && a[2] > a[1]) [axis, u, v, m] = [2, d[0], d[1], d[2]];
+  return (axis * 2 + (m < 0 ? 1 : 0)) * 4 + (u >= 0 ? 1 : 0) + (v >= 0 ? 2 : 0);
+}
 
 declare const GPUBufferUsage: {
   UNIFORM: number;
@@ -44,6 +59,7 @@ type CaptureResources = {
   frame: GPUBuffer;
   params: GPUBuffer;
   read?: GPUBuffer;
+  depthUniform?: GPUBuffer;
   sampler: GPUSampler;
   targets: Map<number, CaptureTarget>;
   values: Float32Array;
@@ -78,6 +94,11 @@ export interface IrradianceVolume {
   resolution?: number;
   /** World distance outside the box over which the volume fades to the fallback (default 0: a hard edge 1 mm out; the box faces are inside). */
   blend?: number;
+  /**
+   * Store each probe's distance to the scene (mean and mean square in 24 direction bins) and weight each probe by its
+   * Chebyshev visibility of the receiver, so light does not leak through thin walls between probes. Default false.
+   */
+  visibility?: boolean;
 }
 /** A local reflection probe: captured at `position`, box-projected onto `min`..`max`, which is also its influence. */
 export interface ReflectionProbe {
@@ -198,14 +219,57 @@ fn probeOct(d:vec3f)->vec2f {
   return q*0.5+0.5;
 }
 `;
+// Only volumes with `visibility` get the visibility WGSL, so every other LightProbes shader keeps its text.
+const binWgsl = /* wgsl */ `
+// Visibility bin of a world direction: face 2 x major axis + (negative), then the signs of the two other axes.
+fn probeBin(d:vec3f)->u32 {
+  let a=abs(d);var axis=0u;var u=d.y;var v=d.z;var m=d.x;
+  if(a.y>a.x&&a.y>=a.z){axis=1u;u=d.x;v=d.z;m=d.y;}else if(a.z>a.x&&a.z>a.y){axis=2u;u=d.x;v=d.y;m=d.z;}
+  return (axis*2u+select(0u,1u,m<0.0))*4u+select(0u,1u,u>=0.0)+select(0u,2u,v>=0.0);
+}
+`;
+// Visibility: one 64-thread workgroup per quadrant of a captured face; texel distances (reversed-Z depth unprojected
+// through the face camera, sky and far capped at limits.x) summed with their squares, the means written to the bin of
+// the quadrant's centre direction. Variance shadow test after Donnelly and Lauritzen 2006; per probe, as in DDGI
+// (Majercik et al. 2019, JCGT 8(2)).
+const depthWgsl =
+  dataWgsl('read_write', 0, 0) +
+  binWgsl +
+  /* wgsl */ `
+struct Depth {inverse:mat4x4f,eye:vec4f,info:vec4u,limits:vec4f}
+@group(0) @binding(1) var<uniform> depthInfo:Depth;
+@group(0) @binding(2) var depthMap:texture_depth_2d;
+var<workgroup> sums:array<vec2f,64>;
+fn depthRay(x:f32,y:f32,z:f32)->vec3f {
+  let size=f32(depthInfo.info.z);let w=depthInfo.inverse*vec4f(x/size*2.0-1.0,1.0-y/size*2.0,z,1.0);
+  return w.xyz/w.w-depthInfo.eye.xyz;
+}
+@compute @workgroup_size(64) fn visibility(@builtin(workgroup_id) q:vec3u,@builtin(local_invocation_index) t:u32) {
+  let half=depthInfo.info.z/2u;let ox=(q.x&1u)*half;let oy=(q.x>>1u)*half;let cap=depthInfo.limits.x;
+  var s=vec2f(0);
+  for(var i=t;i<half*half;i+=64u){
+    let x=ox+i%half;let y=oy+i/half;let z=textureLoad(depthMap,vec2u(x,y),0);
+    var r=cap;if(z>0.0){r=min(length(depthRay(f32(x)+0.5,f32(y)+0.5,z)),cap);}
+    s+=vec2f(r,r*r);
+  }
+  sums[t]=s;workgroupBarrier();
+  for(var k=32u;k>0u;k>>=1u){if(t<k){sums[t]+=sums[t+k];}workgroupBarrier();}
+  if(t==0u){
+    let m=sums[0]/f32(half*half);let c=f32(half)*0.5;
+    let bin=probeBin(depthRay(f32(ox)+c,f32(oy)+c,0.5));
+    probeData.texels[depthInfo.info.y+depthInfo.info.x*${VISIBILITY_BINS}u+bin]=vec2u(bitcast<u32>(m.x),bitcast<u32>(m.y));
+  }
+}
+`;
 // Sources: octahedral maps Cigolle et al. 2014 (JCGT 3(2)); L1/L2 SH Ramamoorthi & Hanrahan 2001; box-projected
 // reflections Bjorke 2004 (GPU Gems ch. 19) and Lagarde & Zanuttini 2012; split sum Karis 2013. Without an
 // Environment the analytic environment BRDF is Karis 2014, "Physically Based Shading on Mobile" (after Lazarov 2013),
 // a published engine standard. The 1e-3 box-fade floor is Margo's.
 // Shading: volume irradiance (trilinear over the eight nearest probes, evaluated like environment's iblIrradiance) and
 // reflection radiance (box projection, trilinear over the prefiltered octahedral levels), mixed with the fallback by weight.
-const shadingWgsl = (group: number, environment: boolean) =>
+const shadingWgsl = (group: number, environment: boolean, visibility: boolean) =>
   dataWgsl('read', group, PROBE_BINDING) +
+  (visibility ? binWgsl : '') +
   /* wgsl */ `
 // 1 inside the box and on its faces (surfaces lying on a room box are lit by it), fading to 0 over blend outside it.
 fn probeFade(p:vec3f,lo:vec3f,hi:vec3f,blend:f32)->f32 {let o=max(lo-p,p-hi);return clamp(1.0-max(o.x,max(o.y,o.z))/max(blend,1e-3),0.0,1.0);}
@@ -217,15 +281,33 @@ fn probeIrradiance(p:vec3f,n:vec3f)->vec4f {
   // Each probe's coefficients are float16 rgb triples packed back to back in k vec4u (2 for L1, 4 for L2): the eight
   // corners are blended as raw halves (s0..s6 hold halves 0..27), then evaluated once.
   var s0=vec4f(0);var s1=vec4f(0);var s2=vec4f(0);var s3=vec4f(0);var s4=vec4f(0);var s5=vec4f(0);var s6=vec4f(0);
-  for(var c=0u;c<8u;c++){
+${
+  visibility
+    ? `  // Visibility (header word 13): each corner's weight times its Chebyshev visibility of the biased receiver point and a
+  // smooth backface term, then the weights renormalised.
+  let vo=probeData.reflections.y;let cell=(hi-lo)/vec3f(counts);let q=p+n*(0.25*min(cell.x,min(cell.y,cell.z)));var total=0.0;
+`
+    : ''
+}  for(var c=0u;c<8u;c++){
     let corner=min(i0+vec3u(c&1u,(c>>1u)&1u,c>>2u),counts-1u);let t=select(1.0-f,f,vec3<bool>((c&1u)!=0u,(c&2u)!=0u,(c&4u)!=0u));
-    let o=(corner.x+counts.x*(corner.y+counts.y*corner.z))*k;let wt=t.x*t.y*t.z;let a=probeData.texels[o];let b=probeData.texels[o+1u];
-    s0+=wt*vec4f(unpack2x16float(a.x),unpack2x16float(a.y));s1+=wt*vec4f(unpack2x16float(a.z),unpack2x16float(a.w));
+${
+  visibility
+    ? `    let index=corner.x+counts.x*(corner.y+counts.y*corner.z);let o=index*k;var wt=t.x*t.y*t.z;
+    let pp=lo+(vec3f(corner)+0.5)*cell;let d=q-pp;let r=length(d);
+    let i=vo+index*${VISIBILITY_BINS}u+probeBin(d/max(r,1e-6));let h=probeData.texels[i>>1u];let u=select(h.xy,h.zw,(i&1u)==1u);
+    let m=bitcast<f32>(u.x);var cheb=1.0;
+    if(r>m){let v=max(bitcast<f32>(u.y)-m*m,1e-4*dot(cell,cell));let e=r-m;cheb=v/(v+e*e);cheb=cheb*cheb*cheb;}
+    let back=(dot(-d/max(r,1e-6),n)+1.0)*0.5;wt*=max(cheb,1e-4)*(back*back+0.2);total+=wt;
+    let a=probeData.texels[o];let b=probeData.texels[o+1u];
+`
+    : `    let o=(corner.x+counts.x*(corner.y+counts.y*corner.z))*k;let wt=t.x*t.y*t.z;let a=probeData.texels[o];let b=probeData.texels[o+1u];
+`
+}    s0+=wt*vec4f(unpack2x16float(a.x),unpack2x16float(a.y));s1+=wt*vec4f(unpack2x16float(a.z),unpack2x16float(a.w));
     s2+=wt*vec4f(unpack2x16float(b.x),unpack2x16float(b.y));s3+=wt*vec4f(unpack2x16float(b.z),unpack2x16float(b.w));
     if(k>2u){let c4=probeData.texels[o+2u];let d=probeData.texels[o+3u];
       s4+=wt*vec4f(unpack2x16float(c4.x),unpack2x16float(c4.y));s5+=wt*vec4f(unpack2x16float(c4.z),unpack2x16float(c4.w));s6+=wt*vec4f(unpack2x16float(d.x),unpack2x16float(d.y));}
   }
-  let b1=0.488602512*n;
+${visibility ? '  if(total>0.0){let inv=1.0/total;s0*=inv;s1*=inv;s2*=inv;s3*=inv;s4*=inv;s5*=inv;s6*=inv;}\n' : ''}  let b1=0.488602512*n;
   var e=s0.xyz*0.282094792+vec3f(s0.w,s1.xy)*b1.y+vec3f(s1.zw,s2.x)*b1.z+s2.yzw*b1.x;
   if(k>2u){e+=s3.xyz*(1.092548431*n.x*n.y)+vec3f(s3.w,s4.xy)*(1.092548431*n.y*n.z)+vec3f(s4.zw,s5.x)*(0.315391565*(3.0*n.z*n.z-1.0))+s5.yzw*(1.092548431*n.x*n.z)+s6.xyz*(0.546274215*(n.x*n.x-n.y*n.y));}
   return vec4f(max(e,vec3f(0)),w);
@@ -495,6 +577,9 @@ export class LightProbes extends ShaderEffect {
   // Live irradiance volume: its settings, the next probe of the sweep, whether a full sweep has lit the volume since the
   // buffer was made, and the completed sweeps.
   private liveVolumeOptions: Readonly<Required<LiveVolumeOptions>> | null = null;
+  // Texel offset of the volume's visibility bins (0: no visibility) and its depth reduction pipeline per device.
+  private visibilityOffset = 0;
+  private depthPipeline?: { device: GPUDevice; pipeline: GPUComputePipeline };
   private volumeCursor = 0;
   private volumeLive = false;
   private sweepCount = 0;
@@ -537,6 +622,8 @@ export class LightProbes extends ShaderEffect {
           'Invalid irradiance volume; pass min < max, 1-64 probes per axis (4,096 in total), sh 1 or 2, blend >= 0',
         );
       powerOfTwo(volume.resolution, 16, 8, 64, 'volume resolution');
+      if (volume.visibility !== undefined && typeof volume.visibility !== 'boolean')
+        throw new TypeError('Irradiance volume visibility must be a boolean; pass true, false or omit it');
       this.volume = {
         ...volume,
         min: [...volume.min],
@@ -579,6 +666,16 @@ export class LightProbes extends ShaderEffect {
       return { ...probe, position: [...probe.position], min: [...probe.min], max: [...probe.max], blend };
     });
     view.setUint32(48, this.reflections.length, true);
+    if (this.volume?.visibility) {
+      // Visibility: 24 bins of (mean, mean square) distance as two f32 per probe, after every other texel; the header
+      // holds their offset (word 13) and the distance cap, 1.5 cell diagonals (word 7).
+      const v = this.volume,
+        cell = v.max.map((x, i) => (x - v.min[i]) / v.counts[i]);
+      view.setUint32(52, texels, true);
+      view.setFloat32(28, 1.5 * Math.hypot(...cell), true);
+      this.visibilityOffset = texels;
+      texels += v.counts[0] * v.counts[1] * v.counts[2] * VISIBILITY_BINS;
+    }
     this.environment = environment;
     this.texelCount = texels;
     this.roundDone = new Uint8Array(this.reflections.length);
@@ -736,7 +833,7 @@ export class LightProbes extends ShaderEffect {
           : `${base}*(1.0-i.material.y)*${sky ? HEMISPHERE_TERM : `frame.radiance.w${color}`}`;
       return `let margoAmbient=probeShade(i.position,n,v,${base},i.material.y,i.material.x,${fallback},vec3f(0.04),1.0);let linear=${(sky ? terms.replace(`*${HEMISPHERE_TERM}`, '*0.0') : terms).replace('frame.radiance.w', '0.0')}+margoAmbient;`;
     });
-    return code === source ? source : shadingWgsl(group, env) + code;
+    return code === source ? source : shadingWgsl(group, env, this.visibilityOffset > 0) + code;
   }
   protected hooks(group: number): PBRHooks {
     // Without an environment the fallback is gltf-pro's own hemisphere ambient (its `ambient(s)`, which the hook replaces).
@@ -745,7 +842,7 @@ export class LightProbes extends ShaderEffect {
       ? 'vec3f(0)'
       : '(s.base.rgb*(1.0-s.metal)+mix(s.f0,s.base.rgb,s.metal)*0.5)*mix(vec3f(0.35,0.3,0.25),vec3f(1),clamp(s.n.y*0.5+0.5,0.0,1.0))*f.radiance.w';
     return {
-      declarations: shadingWgsl(group, !!this.environment),
+      declarations: shadingWgsl(group, !!this.environment, this.visibilityOffset > 0),
       ambient: `probeShade(i.position,s.n,v,s.base.rgb,s.metal,s.roughness,${ambient},s.f0,s.sw)*s.occlusion`,
     };
   }
@@ -927,9 +1024,31 @@ export class LightProbes extends ShaderEffect {
         Math.min(n[i] - 1, Math.max(0, ((p - v.min[i]) / (v.max[i] - v.min[i])) * n[i] - 0.5)),
       ),
       i0 = g.map(Math.floor);
+    // Visibility as the shader weighs it: Chebyshev on the biased point, smooth backface, renormalised.
+    const vo = this.visibilityOffset,
+      cell = v.max.map((x, i) => (x - v.min[i]) / n[i]),
+      q = position.map((x, i) => x + normal[i] * 0.25 * Math.min(...cell)),
+      floats = new Float32Array(data.buffer, data.byteOffset, data.length);
+    let total = 0;
     for (let c = 0; c < 8; c++) {
-      const corner = [0, 1, 2].map((a) => Math.min(i0[a] + ((c >> a) & 1), n[a] - 1)),
-        w = [0, 1, 2].reduce((t, a) => t * ((c >> a) & 1 ? g[a] - i0[a] : 1 - g[a] + i0[a]), 1);
+      const corner = [0, 1, 2].map((a) => Math.min(i0[a] + ((c >> a) & 1), n[a] - 1));
+      let w = [0, 1, 2].reduce((t, a) => t * ((c >> a) & 1 ? g[a] - i0[a] : 1 - g[a] + i0[a]), 1);
+      if (vo) {
+        const d = corner.map((x, i) => q[i] - (v.min[i] + (x + 0.5) * cell[i])),
+          r = Math.hypot(...d),
+          unit = d.map((x) => x / Math.max(r, 1e-6)),
+          index = corner[0] + n[0] * (corner[1] + n[1] * corner[2]),
+          at = (vo + index * VISIBILITY_BINS + visibilityBin(unit)) * 2,
+          m = floats[at];
+        let cheb = 1;
+        if (r > m) {
+          const variance = Math.max(floats[at + 1] - m * m, 1e-4 * cell.reduce((t, x) => t + x * x, 0));
+          cheb = (variance / (variance + (r - m) ** 2)) ** 3;
+        }
+        const back = (1 - (unit[0] * normal[0] + unit[1] * normal[1] + unit[2] * normal[2])) * 0.5;
+        w *= Math.max(cheb, 1e-4) * (back * back + 0.2);
+        total += w;
+      }
       // The probe's halves start at word (index * vec4u per probe * 4); coefficient j, channel ch is half 3j + ch.
       const o = (corner[0] + n[0] * (corner[1] + n[1] * corner[2])) * (k === 9 ? 16 : 8);
       coefficients.fill(0);
@@ -938,6 +1057,7 @@ export class LightProbes extends ShaderEffect {
         out[ch] += x * w;
       });
     }
+    if (vo && total > 0) for (let ch = 0; ch < 3; ch++) out[ch] /= total;
     return out.map((x) => Math.max(0, x)) as [number, number, number];
   }
   /** @internal The last bake's 32-bit words: volume probes first (each its SH as float16 rgb triples in 16 words for L2, 8 for
@@ -976,7 +1096,8 @@ export class LightProbes extends ShaderEffect {
             device.createTexture({
               size: [size, size],
               format: 'depth24plus',
-              usage: GPUTextureUsage.RENDER_ATTACHMENT,
+              // Visibility reads each face's depth back in a compute pass.
+              usage: GPUTextureUsage.RENDER_ATTACHMENT | (this.visibilityOffset ? GPUTextureUsage.TEXTURE_BINDING : 0),
             }),
           ),
           depthView = depth.createView(),
@@ -1415,6 +1536,8 @@ export class LightProbes extends ShaderEffect {
         model.draw(view, 'beauty', color, depth);
         if (this.disposed || this.gpu !== device) throw interrupted(this.disposed);
       }
+      if (this.visibilityOffset && reflectionIndex === -1 && volumeIndex >= 0)
+        this.measureDepth(resources, target, encoder, camera, position, volumeIndex, face, size);
       if (face === 5) this.filterProbe(resources, target, bake, encoder, volumeIndex, reflectionIndex, samples);
       resources.commands[0] = encoder.finish();
       device.queue.submit(resources.commands);
@@ -1454,6 +1577,61 @@ export class LightProbes extends ShaderEffect {
     }
     return group;
   }
+  // Visibility: the mean and mean square distance of each quadrant of this face's depth, into the probe's bin for the
+  // quadrant's world direction (every texel of a 90 degree face quadrant has the same major axis and minor signs).
+  private measureDepth(
+    resources: CaptureResources,
+    target: CaptureTarget,
+    encoder: GPUCommandEncoder,
+    camera: Camera,
+    position: Vec3,
+    volumeIndex: number,
+    face: number,
+    size: number,
+  ): void {
+    const device = resources.device;
+    if (this.depthPipeline?.device !== device)
+      this.depthPipeline = {
+        device,
+        pipeline: device.createComputePipeline({
+          layout: 'auto',
+          compute: { module: device.createShaderModule({ code: depthWgsl }), entryPoint: 'visibility' },
+        }),
+      };
+    const pipeline = this.depthPipeline.pipeline;
+    let uniform = resources.depthUniform;
+    if (!uniform) {
+      uniform = device.createBuffer({ size: 6 * 256, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+      resources.owned.push(uniform);
+      resources.depthUniform = uniform;
+    }
+    const values = new Float32Array(28),
+      words = new Uint32Array(values.buffer);
+    if (!invertMatrix(camera.matrix, this.depthInverse)) return;
+    values.set(this.depthInverse);
+    values.set(position, 16);
+    words[20] = volumeIndex;
+    words[21] = this.visibilityOffset;
+    words[22] = size;
+    values[24] = this.headerView.getFloat32(28, true);
+    device.queue.writeBuffer(uniform, face * 256, values);
+    let groups = target.groups.get(pipeline);
+    if (!groups) target.groups.set(pipeline, (groups = []));
+    const group = (groups[face] ??= device.createBindGroup({
+      layout: pipeline.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: { buffer: this.buffer! } },
+        { binding: 1, resource: { buffer: uniform, offset: face * 256, size: 112 } },
+        { binding: 2, resource: target.depthView },
+      ],
+    }));
+    const pass = encoder.beginComputePass();
+    pass.setPipeline(pipeline);
+    pass.setBindGroup(0, group);
+    pass.dispatchWorkgroups(4);
+    pass.end();
+  }
+  private readonly depthInverse = new Float64Array(16);
   private filterProbe(
     resources: CaptureResources,
     target: CaptureTarget,
