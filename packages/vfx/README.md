@@ -557,7 +557,8 @@ engine.start();
 ```
 
 On WebGPU the mix is in the billboard fragment shader. On the WebGL2 route the same shader translates to GLSL ES 3.00
-(`mix` of the two cell samples) and the route's draw wrapper still drops instances past the frame's count; a pixel
-comparison on that layer was not run. `node packages/vfx/test/features-check.mjs` (real GPU) holds two particles
-halfway between frames of a 2 x 2 solid atlas, one of them wrapping onto the next row, and checks each centre pixel
-against the same mix computed on the CPU.
+(`mix` of the two cell samples) and the route's draw wrapper still drops instances past the frame's count.
+`node packages/vfx/test/flipbook-webgl2.mjs` runs that page on the compatibility layer: on an RTX A6000 the same two
+centre pixels read 111,111,0 and 0,79,79, within 1 of the CPU mix 112,112,0 and 0,80,80.
+`node packages/vfx/test/features-check.mjs` (real GPU) holds two particles halfway between frames of a 2 x 2 solid
+atlas, one of them wrapping onto the next row, and checks each centre pixel against the same mix computed on the CPU.
