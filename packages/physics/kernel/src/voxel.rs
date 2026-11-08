@@ -16,7 +16,7 @@ use crate::hull::{BoxData, Poly, box_poly};
 use crate::layout::*;
 use crate::math::*;
 use crate::mesh::LEAN;
-use crate::narrow::{Manifold, collide_polys, collide_round_poly, face_contact};
+use crate::narrow::{Manifold, Round, collide_polys, collide_round_poly, face_contact};
 use crate::sat::Pose;
 use crate::world::World;
 
@@ -244,6 +244,7 @@ impl World {
     }
 
     /// Grows a grid to hold the cell at `at`: new words, the old cells copied, links across the old border made again.
+    #[inline(never)]
     fn grow_grid(&mut self, mesh: usize, at: [i32; 3]) -> bool {
         let (min, dims) = (self.voxel_min(mesh), self.voxel_dims(mesh));
         let mut low = min;
@@ -362,9 +363,10 @@ impl World {
     }
 
     /// Calls `visit` with each filled cell of grid `mesh` that has an exposed face and lies under the box from `low` to
-    /// `high` in its frame, until it returns false. False when a visit did.
+    /// `high` in its frame, until it returns false. False when a visit did. The visit is a dynamic call, so the walk is one
+    /// copy for its five callers instead of one each.
     #[inline(never)]
-    fn exposed_cells(&self, mesh: usize, low: V3, high: V3, mut visit: impl FnMut(&Self, u32) -> bool) -> bool {
+    fn exposed_cells(&self, mesh: usize, low: V3, high: V3, visit: &mut dyn FnMut(&Self, u32) -> bool) -> bool {
         let Some((first, last)) = self.cell_range(mesh, low, high) else { return true };
         let dims = self.voxel_dims(mesh);
         for k in first[2]..=last[2] {
@@ -392,27 +394,26 @@ impl World {
         let poly = box_poly(half, &mut data);
         let shape = self.uu(COLLIDER_SHAPE, other);
         let round = shape == SHAPE_BALL || shape == SHAPE_CAPSULE;
+        // The other shape is read once: its pose, round form and polyhedron serve the test and the snap.
         let mut other_data = BoxData::new();
+        let (other_round, other_poly, other_pose) = if round {
+            (self.round_of(other), poly, cell)
+        } else {
+            (Round { p: cell.p, q: cell.p, radius: 0.0 }, self.poly_of(other, &mut other_data), self.collider_pose(other))
+        };
         // Every routine below gives the normal from the cell to the other shape, `on_a` on the cell.
         if round {
-            collide_round_poly(self.round_of(other), &poly, cell, limit, out);
+            collide_round_poly(other_round, &poly, cell, limit, out);
             crate::mesh::flip(out);
         } else {
-            let other_poly = self.poly_of(other, &mut other_data);
-            collide_polys(&poly, cell, &other_poly, self.collider_pose(other), limit, out);
+            collide_polys(&poly, cell, &other_poly, other_pose, limit, out);
         }
         if out.count > 0 {
             match voxel_verdict(pose.q.unrotate(out.normal), self.cell_byte(mesh, index)) {
                 None => out.count = 0,
                 Some((false, _)) => {}
-                Some((true, face)) => {
-                    if round {
-                        crate::mesh::snap_round(self.round_of(other), &poly, face, cell, limit, out);
-                    } else {
-                        let other_poly = self.poly_of(other, &mut other_data);
-                        snap_poly(&poly, cell, &other_poly, self.collider_pose(other), face, limit, out);
-                    }
-                }
+                Some((true, face)) if round => crate::mesh::snap_round(other_round, &poly, face, cell, limit, out),
+                Some((true, face)) => snap_poly(&poly, cell, &other_poly, other_pose, face, limit, out),
             }
         }
         if other_is_a {
@@ -458,6 +459,7 @@ impl World {
     /// Every exposed cell of grid collider `grid` near convex row `other` into the parts of pair `row`, keyed by cell.
     /// `sides` holds the row, whether its side is the pair's A, and the compound child it is (NONE for a collider of its
     /// own). False when memory cannot hold a new part.
+    #[inline(never)]
     pub(crate) fn voxel_walk(&mut self, row: usize, grid: usize, sides: (usize, bool, u32), limit: f32, ratio: f32, bodies: (usize, usize)) -> bool {
         let (other, other_is_a, sub) = sides;
         let mesh = self.uu(COLLIDER_HULL, grid) as usize;
@@ -469,7 +471,7 @@ impl World {
         let mut start = 0u32;
         loop {
             let (mut count, mut seen) = (0usize, 0u32);
-            let full = !self.exposed_cells(mesh, low, high, |_, index| {
+            let full = !self.exposed_cells(mesh, low, high, &mut |_, index| {
                 if seen >= start {
                     if count == cells.len() {
                         return false;
@@ -493,6 +495,7 @@ impl World {
     }
 
     /// The narrow phase of two grids: a part for each pair of exposed cells that touch, keyed by both cells.
+    #[inline(never)]
     pub(crate) fn voxels_pair(&mut self, row: usize, a: usize, b: usize, limit: f32, ratio: f32, bodies: (usize, usize)) -> bool {
         let (ma, mb) = (self.uu(COLLIDER_HULL, a) as usize, self.uu(COLLIDER_HULL, b) as usize);
         let (pa, pb) = (self.collider_pose(a), self.collider_pose(b));
@@ -502,10 +505,10 @@ impl World {
         let mut start = 0u32;
         loop {
             let (mut count, mut seen) = (0usize, 0u32);
-            let full = !self.exposed_cells(mb, low, high, |w, ib| {
+            let full = !self.exposed_cells(mb, low, high, &mut |w, ib| {
                 let (cell, half) = w.cell_pose(mb, ib, pb);
                 let (lo, hi) = box_in(cell, half, pa);
-                w.exposed_cells(ma, lo, hi, |_, ia| {
+                w.exposed_cells(ma, lo, hi, &mut |_, ia| {
                     if seen >= start {
                         if count == found.len() {
                             return false;
@@ -530,27 +533,29 @@ impl World {
     }
 
     /// True when convex row `other` overlaps an exposed cell of grid collider `grid`.
+    #[inline(never)]
     pub(crate) fn voxel_overlaps(&self, grid: usize, other: usize, other_is_a: bool) -> bool {
         let mesh = self.uu(COLLIDER_HULL, grid) as usize;
         let pose = self.collider_pose(grid);
         let (low, high) = self.local_box(other, pose);
         let mut manifold = Manifold::new();
-        !self.exposed_cells(mesh, low, high, |w, index| {
+        !self.exposed_cells(mesh, low, high, &mut |w, index| {
             w.collide_cell(other, other_is_a, mesh, index, pose, 0.0, &mut manifold);
             !manifold.points[..manifold.count].iter().any(|point| point.separation <= 0.0)
         })
     }
 
     /// True when two grids' exposed cells overlap.
+    #[inline(never)]
     pub(crate) fn voxels_overlap(&self, a: usize, b: usize) -> bool {
         let (ma, mb) = (self.uu(COLLIDER_HULL, a) as usize, self.uu(COLLIDER_HULL, b) as usize);
         let (pa, pb) = (self.collider_pose(a), self.collider_pose(b));
         let (low, high) = self.local_box(a, pb);
         let mut manifold = Manifold::new();
-        !self.exposed_cells(mb, low, high, |w, ib| {
+        !self.exposed_cells(mb, low, high, &mut |w, ib| {
             let (cell, half) = w.cell_pose(mb, ib, pb);
             let (lo, hi) = box_in(cell, half, pa);
-            w.exposed_cells(ma, lo, hi, |w, ia| {
+            w.exposed_cells(ma, lo, hi, &mut |w, ia| {
                 w.collide_cells((ma, ia, pa), (mb, ib, pb), 0.0, &mut manifold);
                 !manifold.points[..manifold.count].iter().any(|point| point.separation <= 0.0)
             })

@@ -666,6 +666,15 @@ impl World {
     pub(crate) fn touch_part(
         &mut self, row: usize, key: (u32, u32), ratio: f32, bodies: (usize, usize), manifold: &mut Manifold, collide: impl FnOnce(&Self, &mut Manifold),
     ) -> bool {
+        // Only the call to `collide` is generic; the bookkeeping either side is one copy for every caller.
+        let part = self.open_part(row, key, manifold);
+        collide(self, manifold);
+        self.close_part(row, key, part, ratio, bodies, manifold)
+    }
+
+    /// The part of pair `row` named by `key`, or NONE, with the points it held loaded into `manifold`.
+    #[inline(never)]
+    fn open_part(&self, row: usize, key: (u32, u32), manifold: &mut Manifold) -> u32 {
         let part = self.find_part(row, key);
         manifold.held_count = 0;
         manifold.feature = 0;
@@ -676,7 +685,12 @@ impl World {
             }
             manifold.feature = self.uu(PAIR_FEATURE, part as usize);
         }
-        collide(self, manifold);
+        part
+    }
+
+    /// Stores a manifold with points in `part` (made now when NONE). False when memory cannot hold a new part.
+    #[inline(never)]
+    fn close_part(&mut self, row: usize, key: (u32, u32), part: u32, ratio: f32, bodies: (usize, usize), manifold: &Manifold) -> bool {
         if manifold.count == 0 {
             return true;
         }
