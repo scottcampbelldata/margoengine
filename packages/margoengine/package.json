@@ -274,6 +274,10 @@
       "types": "./dist/biomes/graph.d.ts",
       "import": "./dist/biomes/graph.js"
     },
+    "./biomes/ecosystem": {
+      "types": "./dist/biomes/ecosystem.d.ts",
+      "import": "./dist/biomes/ecosystem.js"
+    },
     "./blender": {
       "types": "./dist/blender.d.ts",
       "import": "./dist/blender.js"

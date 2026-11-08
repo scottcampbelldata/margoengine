@@ -1,6 +1,6 @@
-# @margoengine/biomes: Disturbance
+# @margoengine/biomes: Disturbance and ecosystem growth
 
-Fire history, flood return periods and succession stages over the region grid (`/disturbance`). One of the package guides; the [README](../README.md) has the quickstart and the list of guides.
+Fire history, flood return periods and succession stages over the region grid (`/disturbance`), and forest growth over years (`/ecosystem`). One of the package guides; the [README](../README.md) has the quickstart and the list of guides.
 
 ## Disturbance
 
@@ -76,3 +76,81 @@ fuel divided by 255 times moisture damping. Never burned means the oldest age, i
 Flood follows each D8 path to the first channel or outlet, with memoised drainage. Catchment area is flow times
 step squared; fixed-point logarithms avoid overflowing that product. These synthetic layers support authored worlds,
 not forecasts of actual fires or flood risk. No performance or package-size target was measured for this entry.
+
+## Ecosystem growth
+
+`/ecosystem` grows a forest year by year from a few founders, or from a placed tile's plants. Every year each living
+plant is shaded by the taller crowns it overlaps, grows by the light left to it, may die, and once mature scatters
+seedlings, so a stand fills in, closes its canopy and thins itself, and shade-tolerant species take the understorey.
+
+```js
+import { growEcosystem } from '@margoengine/biomes/ecosystem';
+
+const forest = growEcosystem({
+  bounds: [0, 0, 100, 100], // metres; seedlings establish only inside
+  species: [
+    { id: 'birch', radius: 3, growth: 0.3, age: 80, shade: 0.1, seeds: 6, dispersal: 8 },
+    { id: 'beech', radius: 5, growth: 0.12, age: 250, shade: 0.9, seeds: 3, dispersal: 6 },
+  ],
+  plants: [
+    { species: 'birch', x: 30, z: 30, radius: 2 },
+    { species: 'beech', x: 70, z: 60, radius: 3 },
+  ],
+  years: 60,
+  seed: 1,
+});
+console.log(forest.counts, forest.history.at(-1)); // living plants per species; the last year's alive, born and died
+```
+
+A species sets its largest crown `radius` (metres), its logistic `growth` rate a year in full light, its lifespan
+`age` (past it a quarter die each year), its `shade` tolerance 0..1, its `seeds` a year at full crown (0..64, scaled by
+crown area), its `dispersal` scale (half the seedlings land closer than it) and the share of the largest crown at which
+it starts to seed (`maturity`, default 0.4). `where(x, z, species)` gives a seedling's chance to establish at a place,
+0..1, for example from a world's moisture or a clearing. `forest.plants` lists the living plants, then the standing
+dead (`died` is their year), which fall after `snags` years (default 10). `plantsFromTile(placement, tile)` gives a
+placed tile's living plants as founders, keyed `'<biome>/<species>'` with their crowns, so a run can start from what
+`BiomePlacement` placed:
+
+```js
+import { BiomeWorld, defineBiome } from '@margoengine/biomes';
+import { BiomePlacement } from '@margoengine/biomes/placement';
+import { growEcosystem, plantsFromTile } from '@margoengine/biomes/ecosystem';
+
+const world = await BiomeWorld.create({
+    seed: 3,
+    size: [512, 512],
+    biomes: [
+      defineBiome({
+        id: 'wood',
+        climate: {},
+        ground: [{ material: 'grass' }],
+        plants: [{ id: 'oak', mesh: 'procedural:broadleaf', density: 80, radius: 4 }],
+      }),
+    ],
+  }),
+  placement = BiomePlacement.attach(world),
+  tile = await placement.tile(0, 0);
+const grown = growEcosystem({
+  bounds: [tile.origin[0], tile.origin[1], tile.origin[0] + tile.size, tile.origin[1] + tile.size],
+  species: [{ id: 'wood/oak', radius: 8, age: 300, shade: 0.6 }],
+  plants: plantsFromTile(placement, tile),
+  years: 10,
+});
+console.log(grown.counts['wood/oak']);
+```
+
+Everything is integers (centimetres, millimetres and Q16.16 shares) decided by hashes of the seed, the plant's birth
+number and the year, so the same start gives the same forest on every machine. Light is a crown-overlap share, not a
+ray-cast canopy; there is no soil, water or seed bank, and plants do not move. A run is CPU only and its cost grows with
+plants times neighbours times years; `limit` caps the plants held (default 200,000) and `crowded` counts the seedlings
+left out.
+
+### Sources and limits
+
+| Source | URL or DOI | Exact claim used | Assumptions and limits |
+| --- | --- | --- | --- |
+| Botkin, Janak and Wallis 1972 | [10.2307/2258570](https://doi.org/10.2307/2258570) | Individual trees in a plot grow, shade one another by height and die by a base and a growth-dependent rate, year by year. | Not re-verified in this run. Crown radius stands in for diameter and height; no climate or soil response. |
+| Pacala et al. 1996 | [10.2307/2963479](https://doi.org/10.2307/2963479) | Growth falls with the light a tree receives as the species allows, and the chance of death rises as growth falls. | Not re-verified in this run. The light share and the rates are assumptions, not the paper's fitted functions. |
+| Clark et al. 1999 | [10.1890/0012-9658(1999)080[1475:SDNAFP]2.0.CO;2](https://doi.org/10.1890/0012-9658(1999)080[1475:SDNAFP]2.0.CO;2) | The 2Dt kernel fits seed dispersal with a fat tail; with shape 1 its distance CDF is r² / (u + r²). | Not re-verified in this run. Shape fixed at 1, scale per species, capped at 30 scales; seedlings by crown area. |
+| Weiner 1990 | [10.1016/0169-5347(90)90095-U](https://doi.org/10.1016/0169-5347(90)90095-U) | Competition for light is size-asymmetric: larger plants take a share out of proportion to their size. | Not re-verified in this run. Only taller crowns shade a crown (ties to the older); the shaded share is overlap depth over the crown's diameter. |
+| Bella 1971 | [10.1093/forestscience/17.3.364](https://doi.org/10.1093/forestscience/17.3.364) | A tree's competition is the overlap of its zone of influence with its neighbours'. | Not re-verified in this run. Crowns are the zones; no weighting by size ratio. |

@@ -133,6 +133,10 @@
     "./graph": {
       "types": "./dist/graph.d.ts",
       "import": "./dist/graph.js"
+    },
+    "./ecosystem": {
+      "types": "./dist/ecosystem.d.ts",
+      "import": "./dist/ecosystem.js"
     }
   },
   "files": [

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11286787,
+  "total": 11290253,
   "history": [
     {
       "date": "2026-10-24",
@@ -4466,6 +4466,12 @@
       "commit": "58e94464e",
       "reason": "environment/probes: volume visibility against leaks (per-probe depth moments)",
       "grew": 2
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "967e3a7e5",
+      "reason": "biomes/ecosystem: new optional entry, growEcosystem and plantsFromTile",
+      "grew": 1
     }
   ],
   "items": {
@@ -4506,6 +4512,7 @@
     "@margoengine/biomes/cover": 3341,
     "@margoengine/biomes/digest": 894,
     "@margoengine/biomes/disturbance": 5771,
+    "@margoengine/biomes/ecosystem": 3466,
     "@margoengine/biomes/editor": 4010,
     "@margoengine/biomes/erosion": 3202,
     "@margoengine/biomes/far": 3745,
