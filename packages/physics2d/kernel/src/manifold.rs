@@ -52,14 +52,14 @@ fn closest_on_segment(p: V2, a: V2, b: V2) -> (V2, f32) {
 }
 
 /// A core's vertices and normals in another frame.
-struct Placed {
-    count: usize,
-    edges: usize,
-    vertices: [V2; MAX_VERTICES],
-    normals: [V2; MAX_VERTICES],
+pub(crate) struct Placed {
+    pub(crate) count: usize,
+    pub(crate) edges: usize,
+    pub(crate) vertices: [V2; MAX_VERTICES],
+    pub(crate) normals: [V2; MAX_VERTICES],
 }
 
-fn place(core: &Core, xf: Xf) -> Placed {
+pub(crate) fn place(core: &Core, xf: Xf) -> Placed {
     let mut placed = Placed { count: core.count, edges: core.edges(), vertices: [V2::ZERO; MAX_VERTICES], normals: [V2::ZERO; MAX_VERTICES] };
     for i in 0..core.count {
         placed.vertices[i] = xf.apply(core.vertices[i]);
@@ -196,7 +196,7 @@ pub fn collide(a: &Core, xa: Xf, b: &Core, xb: Xf, speculative: f32) -> Manifold
 
 /// Clips the incident feature of `other` to the side planes of `owner`'s edge `edge`, in A's frame.
 #[allow(clippy::too_many_arguments)]
-fn clip(m: &mut Manifold, owner: &Placed, other: &Placed, edge: usize, flip: bool, owner_radius: f32, other_radius: f32, speculative: f32) {
+pub(crate) fn clip(m: &mut Manifold, owner: &Placed, other: &Placed, edge: usize, flip: bool, owner_radius: f32, other_radius: f32, speculative: f32) {
     let n = owner.normals[edge];
     let (r1, r2) = owner.edge(edge);
     // The incident edge: the face of `other` most against the reference normal; a circle's one point.

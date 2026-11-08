@@ -12,7 +12,8 @@ use margoengine_physics_kernel_common::island::{UnionFind, sleep_tick};
 use crate::manifold::{Manifold, collide};
 use crate::mass::mass_of;
 use crate::math::{Rot, V2, Xf, sqrt, v2};
-use crate::shape::{Core, LINEAR_SLOP};
+use crate::shape::{Core, LINEAR_SLOP, ShapeError};
+use crate::smooth::{CHAIN_WELD, collide_smooth};
 use crate::solver;
 
 /// How far apart two shapes may be and still get contact points: a gap the solver closes within a substep.
@@ -150,6 +151,10 @@ pub struct Shape {
     pub density: f32,
     pub friction: f32,
     pub restitution: f32,
+    /// For a segment of a chain: the far vertices of the segments before and after it, in the body's frame (smooth.rs);
+    /// `None` at a chain's open end, and for every other shape.
+    pub ghosts: [Option<V2>; 2],
+    pub chain: bool,
 }
 
 /// What two shapes keep between steps: the manifold and each point's impulses, matched by point id.
@@ -310,12 +315,47 @@ impl World {
     /// Adds `core`, given in the body's frame, to `body`, and works out the body's mass again.
     pub fn create_shape(&mut self, body: u32, core: Core, def: &ShapeDef) -> u32 {
         let id = self.shapes.len() as u32;
-        self.shapes.push(Shape { body, core, density: def.density, friction: def.friction, restitution: def.restitution });
+        self.shapes.push(Shape { body, core, density: def.density, friction: def.friction, restitution: def.restitution, ghosts: [None; 2], chain: false });
         self.bodies[body as usize].shapes.push(id);
         self.update_mass(body);
         let xf = self.bodies[body as usize].xf;
         self.broad.place(id, &bounds_of(&core, xf), BOX_MARGIN);
         id
+    }
+
+    /// A polyline through `points` (the body's frame) as one segment shape a pair of points, each knowing its neighbours'
+    /// far vertices so shapes slide across the joins (smooth.rs). `closed` joins the last point to the first. Points
+    /// closer than `CHAIN_WELD` to the one before are dropped. Returns the segment shapes in order.
+    pub fn create_chain(&mut self, body: u32, points: &[V2], closed: bool, def: &ShapeDef) -> Result<Vec<u32>, ShapeError> {
+        if points.iter().any(|p| !(p.x.is_finite() && p.y.is_finite())) {
+            return Err(ShapeError::NotFinite);
+        }
+        let mut kept: Vec<V2> = Vec::with_capacity(points.len());
+        for &p in points {
+            if kept.last().is_none_or(|q| p.sub(*q).length() > CHAIN_WELD) {
+                kept.push(p);
+            }
+        }
+        if closed && kept.len() > 1 && kept[0].sub(kept[kept.len() - 1]).length() <= CHAIN_WELD {
+            kept.pop();
+        }
+        let n = kept.len();
+        if n < 2 || (closed && n < 3) {
+            return Err(ShapeError::Degenerate);
+        }
+        let segments = if closed { n } else { n - 1 };
+        let mut ids = Vec::with_capacity(segments);
+        for i in 0..segments {
+            let (a, b) = (kept[i], kept[(i + 1) % n]);
+            let before = if i > 0 { Some(kept[i - 1]) } else if closed { Some(kept[n - 1]) } else { None };
+            let after = if i + 2 < n || closed { Some(kept[(i + 2) % n]) } else { None };
+            let id = self.create_shape(body, Core::segment(a, b)?, def);
+            let shape = &mut self.shapes[id as usize];
+            shape.ghosts = [before, after];
+            shape.chain = true;
+            ids.push(id);
+        }
+        Ok(ids)
     }
 
     /// Mass, centre and inertia from the shapes. A dynamic body with no area gets a mass of 1 kg and does not turn.
@@ -441,7 +481,17 @@ impl World {
             let (oa, ob) = (ba.exact_origin(), bb.exact_origin());
             let xa = Xf { p: v2((oa[0] - from[0]) as f32, (oa[1] - from[1]) as f32), q: ba.xf.q };
             let xb = Xf { p: v2((ob[0] - from[0]) as f32, (ob[1] - from[1]) as f32), q: bb.xf.q };
-            let manifold = collide(&sa.core, xa, &sb.core, xb, SPECULATIVE);
+            // A chain segment takes its ghosts (smooth.rs); with the chain second, the pair is solved the other way round
+            // and the normal turned back, so it still runs from `a` to `b`.
+            let manifold = if sa.chain {
+                collide_smooth(&sa.core, sa.ghosts, xa, &sb.core, xb, SPECULATIVE)
+            } else if sb.chain {
+                let mut m = collide_smooth(&sb.core, sb.ghosts, xb, &sa.core, xa, SPECULATIVE);
+                m.normal = m.normal.neg();
+                m
+            } else {
+                collide(&sa.core, xa, &sb.core, xb, SPECULATIVE)
+            };
             let (mut normal, mut tangent) = ([0.0f32; 2], [0.0f32; 2]);
             for (k, point) in manifold.points[..manifold.count].iter().enumerate() {
                 for j in 0..contact.manifold.count {

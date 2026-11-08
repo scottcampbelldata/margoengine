@@ -332,7 +332,7 @@ The root entry never exposed these, so no Margo user loses them at the switch; t
 | Row | Rapier | Root today (`physics2d`) | Own solver | Status | WebGPU | WebGL2 |
 | --- | --- | --- | --- | --- | --- | --- |
 | T-01 | 2D bodies, types, forces, damping, sleep, locks | yes | the kernel's world, native only (`physics2d/kernel/tests/world.rs`): static, kinematic and dynamic bodies, gravity scale, damping, islands that sleep and wake as one; forces and locks not yet | BUILDING 127 | Wasm | Wasm |
-| T-02 | `ball`, `cuboid`, `capsule`, `segment`, `convex_polygon`, `polyline` | `circle`, `box`, `capsule`, `segment`, `polygon`, `polyline` | the kernel's shapes, mass and contacts, native only (`physics2d/kernel/tests/shapes.rs`, `manifold.rs`); no world yet | BUILDING 127 | Wasm | Wasm |
+| T-02 | `ball`, `cuboid`, `capsule`, `segment`, `convex_polygon`, `polyline` | `circle`, `box`, `capsule`, `segment`, `polygon`, `polyline` | the kernel's shapes, mass and contacts and polylines with ghost vertices, native only (`physics2d/kernel/tests/shapes.rs`, `manifold.rs`, `chain.rs`: a box slides across 50 joins without catching where Rapier's polyline catches, LIM-528) | BUILDING 127 | Wasm | Wasm |
 | T-03 | `triangle`, `round_triangle`, `round_cuboid`, `round_convex_polygon` | no | every kernel polygon takes a radius, with exact mass (`physics2d/kernel/tests/shapes.rs`); no world yet | BUILDING 127 (was 143.1) | Wasm | Wasm |
 | T-04 | 2D `heightfield`, `halfspace`, `compound`, `voxels`, `convex_decomposition` | no | none | MISSING, 143.2 | Wasm | Wasm |
 | T-05 | `oriented_polyline` (one-sided) | no | none | MISSING, 143.1 | Wasm | Wasm |

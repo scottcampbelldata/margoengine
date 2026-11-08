@@ -9,6 +9,7 @@ pub mod manifold;
 pub mod mass;
 pub mod math;
 pub mod shape;
+pub mod smooth;
 pub mod solver;
 pub mod world;
 
