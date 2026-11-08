@@ -79,8 +79,11 @@ Any other collider setting (`friction`, `restitution`, `sensor`, `density` and t
 ## Kernel development
 
 The in-repository Rust kernel under `kernel/` is separate from this package's Rapier facade. Its world batches four
-awake quad contacts through exact SIMD SAT and clipping; separated cores keep the original closest-distance path,
-and other shapes, chains and short tails retain their collision paths. `manifold::collide_four` has a runnable Rust
+awake quad contacts through exact SIMD SAT and clipping. A rectangle certified from its current vertices and normals
+uses support corners for SAT; separated cores can certify the original preferred clipped face from conservative
+distance bounds. Uncertified cases use the complete closest-distance path. The
+[floating-point proof](../../docs/architecture/physics2d-manifold-proof.md) describes the guards and fallback.
+Other shapes, chains and short tails retain their collision paths. `manifold::collide_four` has a runnable Rust
 example in [its API documentation](kernel/src/manifold/four.rs); every lane's manifold is bit-identical to the
 scalar call, including signed zeros and unused point slots. Run the native and shipped Wasm checks from the root:
 

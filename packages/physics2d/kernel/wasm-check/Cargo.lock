@@ -17,5 +17,6 @@ dependencies = [
 name = "margoengine-physics2d-wasm-check"
 version = "0.1.0"
 dependencies = [
+ "margoengine-physics-kernel-common",
  "margoengine-physics2d-kernel",
 ]

@@ -683,3 +683,19 @@ the entry: `PbrMaterial` is core's material and pulls in no other package.
 ## 360 and stereo video (2026-11-08)
 
 `@margoengine/video/360` uses UV0 of `sphereGeometry`, an unlit back-sided material and a camera at its centre. Image centre -Z, right +X, top +Y. Mono (default) spans the whole source; stereo-left-right holds one complete panorama per half, selected explicitly for a screen material (eye left by default). Stereo sources need at least two pixels across, enforced before binding. Sampling clamps half a texel inside each eye; no mips or repeat wrapping. WebGL2 receives coded unsupported with a help link. One video feature per material; playback and source lifetime remain caller-owned. XR reuses native `XRLayers.video` with an equirectangular sphere, automatic compositor eye choice and radius 0 at infinity; it requires the draft WebXR Layers API and XRMediaBinding. Missing XR support propagates the existing XR error. Generated colour panoramas prove six screen directions and both eyes on RTX A6000/Edge; an integrated stand-in session/binding proves XR delegation and layer lifecycle. No headset, real movie, other browser/GPU or speed evidence. Entry 1,694 B gzip, budget 1,881 B. LIM-573.
+
+## Own 2D certified geometry and solver evidence (2026-11-08)
+
+The optional Rust kernel's exact rectangle SAT path requires a current canonical axis rectangle in pair-local
+coordinates, finite vertex squared norms at most 2^120 and B-normal squared norms at most 4. The preferred-face
+distance certificate additionally requires a coordinate-magnitude bound M in [1,2^20], positive finite A-face
+separation and its finite radius/speculation/result checks. These restrict eligibility for an optimization;
+all other inputs retain the full prior collision path. [Proof](architecture/physics2d-manifold-proof.md) and
+[entry 101](whitepaper/perf-history.md) record the precise guards and unchanged native/Wasm hashes.
+
+The two-point block solver remains production behavior. New per-point alternatives did not meet all contracts
+and establish a browser gain, so none was re-pinned. All original accuracy bars remain unchanged. The new 1:1000
+contact-stack extension fails even the original block solver, and owned-2D CCD is absent; these differ from the
+existing 1000:1 joint-chain and 3D CCD coverage. See [known-bugs](known-bugs.md#own-2d-physics-acceptance-gaps).
+After browser diagnostics: Edge 3.66/1.69/14.52 ms and Firefox 3.50/1.52/11.20 ms for Margo/Box2D/Rapier; separate
+loaded sessions cannot prove before/after speed. The Box2D goal remains open and quiet reruns are required.

@@ -349,6 +349,27 @@ fn four_pair_identity_and_signed_zero_manifolds_keep_their_bits() {
 }
 
 #[test]
+fn restricted_rectangle_sat_matches_reference_for_axis_local_and_mixed_random_pairs() {
+    let mut random = Rng(0x71a5_4c39);
+    let mut inputs = Vec::new();
+    for i in 0..20_000 {
+        let a = Core::rect(random.range(0.01, 10.0), random.range(0.01, 10.0), v2(random.range(-0.2, 0.2), random.range(-0.2, 0.2)), 1.0, 0.0, random.range(0.0, 0.2)).unwrap();
+        let b = if i % 4 == 0 { shape(&mut random) } else {
+            let angle = random.range(-3.2, 3.2);
+            Core::rect(random.range(0.01, 10.0), random.range(0.01, 10.0), v2(random.range(-0.2, 0.2), random.range(-0.2, 0.2)), angle.cos(), angle.sin(), random.range(0.0, 0.2)).unwrap()
+        };
+        let qa = random.range(-3.2, 3.2);
+        let qb = random.range(-3.2, 3.2);
+        let xa = Xf { p: v2(random.range(-10_000.0, 10_000.0), random.range(-10_000.0, 10_000.0)), q: Rot::from_pair(qa.cos(), qa.sin()) };
+        let xb = Xf { p: xa.p.add(v2(random.range(-20.0, 20.0), random.range(-20.0, 20.0))), q: Rot::from_pair(qb.cos(), qb.sin()) };
+        inputs.push((a, xa, b, xb, LAST_FACES[i % LAST_FACES.len()]));
+    }
+    let (n, differ) = compare(&inputs);
+    assert_eq!(n, 120_000);
+    assert_eq!(differ, 0);
+}
+
+#[test]
 fn four_pair_large_local_and_world_coordinates_keep_their_bits() {
     let mut inputs = Vec::new();
     for local in [0.0, 1_000.0, 100_000.0, 1_000_000.0] {
@@ -490,4 +511,63 @@ fn transpose_moves_rows_to_columns_and_keeps_every_bit() {
             assert_eq!(columns[j][i].to_bits(), rows[i][j].to_bits(), "row {i} lane {j}");
         }
     }
+}
+
+// Extra exactness coverage. Every comparison uses the untouched retained reference.
+#[test]
+fn face_distance_adjacent_float_boundaries_and_mutated_public_cores_are_exact() {
+    fn adjacent(x: f32) -> [f32; 5] {
+        let up = |v: f32| if v == 0.0 { f32::from_bits(1) } else if v > 0.0 { f32::from_bits(v.to_bits() + 1) } else { f32::from_bits(v.to_bits() - 1) };
+        let down = |v: f32| if v == 0.0 { -f32::from_bits(1) } else if v > 0.0 { f32::from_bits(v.to_bits() - 1) } else { f32::from_bits(v.to_bits() + 1) };
+        [down(down(x)), down(x), x, up(x), up(up(x))]
+    }
+    let tolerance = 0.1 * margoengine_physics2d_kernel::shape::LINEAR_SLOP;
+    let corner_offset = ((2.0 * 0.02f64 * tolerance as f64) + (tolerance as f64).powi(2)).sqrt() as f32;
+    let mut comparisons = 0;
+    let mut differences = 0;
+    for speculative in [0.0, tolerance, 0.02, 0.5] {
+        let mut inputs = Vec::new();
+        for radius in [0.0, f32::from_bits(1), 0.01, 0.1] {
+            let a = Core::rect(0.5, 0.5, V2::ZERO, 1.0, 0.0, radius).unwrap();
+            for y in adjacent(1.0 + radius + radius + speculative) {
+                for x_boundary in [0.0, 0.5, 1.0, -1.0, 1.0 + corner_offset, -1.0 - corner_offset] {
+                    for x in adjacent(x_boundary) {
+                        for angle in [0.0f64, 1.0e-7, tolerance as f64, 0.005] {
+                            let b = Core::rect(0.5, 0.5, V2::ZERO, 1.0, 0.0, radius).unwrap();
+                            let rotation = Rot { c: angle.cos() as f32, s: angle.sin() as f32 };
+                            for last in [None, Some(false), Some(true)] {
+                                inputs.push((a, Xf::IDENTITY, b, Xf { p: v2(x, y), q: rotation }, last));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        let a = Core::rect(0.5, 0.5, V2::ZERO, 1.0, 0.0, 0.0).unwrap();
+        for mutation in 0..8 {
+            let (mut altered_a, mut b) = (a, a);
+            match mutation {
+                0 => altered_a.normals[0].y = -0.75,
+                1 => altered_a.vertices[1].y += 0.001,
+                2 => altered_a.vertices[1] = altered_a.vertices[0],
+                3 => b.normals[1].x = 3.0,
+                4 => b.normals[0].y = -0.75,
+                5 => b.vertices[1] = b.vertices[0],
+                6 => for point in &mut b.vertices[..4] { point.x *= 1.0e-23; point.y *= 1.0e-23; },
+                _ => for point in &mut altered_a.vertices[..4] { point.x *= f32::MIN_POSITIVE; point.y *= f32::MIN_POSITIVE; },
+            }
+            for y in adjacent(1.0 + speculative) {
+                for last in [None, Some(false), Some(true)] {
+                    inputs.push((altered_a, Xf::IDENTITY, b, Xf { p: v2(0.0, y), ..Xf::IDENTITY }, last));
+                }
+            }
+        }
+        for chunk in inputs.chunks(4) {
+            let batch = core::array::from_fn(|lane| &chunk[lane % chunk.len()]);
+            compare_lanes(batch, speculative, &mut comparisons, &mut differences);
+        }
+    }
+    println!("face interval boundaries: compared {comparisons} scalar/batch/reference manifolds, {differences} differ; nextafter around spec/clip/tolerance, all preferred faces, tiny spans/public mutations");
+    assert!(comparisons > 50_000);
+    assert_eq!(differences, 0);
 }

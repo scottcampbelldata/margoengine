@@ -4,6 +4,36 @@ What is known to be wrong or not yet proven, and what it would take to close eac
 boundary is a decision, with its escape hatch) live in [limits.md](limits.md); this page lists defects and checks that
 are still open.
 
+## Own 2D physics acceptance gaps
+
+### The contact recovery-speed clamp also caps sustained spring load
+
+- **Repro:** the existing `kernel/tests/world.rs` 1:100 heavy-on-three-light stack, extended to a 1000 kg top box,
+  otherwise unchanged defaults. Lane P's diagnostic preserves the same 3% closed-form sag, 0.1 mm x drift,
+  10 mm post-one-second creep and sleep predicates. On the unchanged `7fd5a9547` block control, sag is 1.186208 m
+  against the unclamped spring prediction 0.518551 m; creep is 0.092105 m. All 28 legacy accuracy cases pass.
+- **Cause:** `solver.rs::row` caps negative soft bias at `contact_max_push=3`. With four substeps, 60 Hz and damping
+  10, a middle contact needs 3.021895 m/s of bias to support its 1002 kg load, exceeding that cap. Its maximum
+  supported load is about 994.74 kg even at exact convergence. The linear closed form assumes no active clamp.
+  Raising the cap to 3.1 diagnoses the ceiling but is not a fix: sag approaches the closed form, while post-one-second
+  creep is 0.555621 m. Waking that settled control and continuing without sleep approaches the predicted sag.
+- **Needed:** separate sustained soft-constraint support from penetration recovery-speed limiting, or a supported
+  alternative formulation, then preserve every existing bar and explicitly establish the missing 1:1000 contact bar.
+  Do not raise an accuracy tolerance, re-pin a failing candidate or present this diagnostic as an existing passed bar.
+  The owned 2D kernel also has no CCD implementation/acceptance fixture; speculative contacts do not establish CCD.
+
+### Raw 2D shape density can create a nonfinite body centre
+
+- **Repro:** on `7fd5a9547`, create a default dynamic body and a unit-box shape with `ShapeDef::density` set to
+  `f32::INFINITY`, or to `f32::from_bits(1)`. Both calls return a shape id without an error or panic and immediately
+  publish NaNs in `local_center` and `exact_center`. A normal density of 1 stays finite and contacts the floor.
+- **Cause:** `world.rs::create_shape` and `update_mass` do not bound material inputs or check mass, first moments
+  and reciprocal results. Infinite density produces infinite mass and nonfinite moments; the smallest positive
+  density produces an infinite inverse mass. A finite-positive input check alone would miss the latter case.
+- **Needed:** define the raw Rust material-input error contract and validate derived mass properties before
+  publishing the shape/body state, with regression tests for both inputs. Lane P's isolated reproduction and
+  source audit are in `.lane/p/material-audit/`; no solver candidate fixes this upstream defect.
+
 ## Rendering
 
 ### Two identical runs of GlassVaseFlowers can differ on a few pixels

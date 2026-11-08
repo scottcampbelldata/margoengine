@@ -12,6 +12,7 @@ use margoengine_physics_kernel_common::lanes::F4;
 use crate::shape::{Core, LINEAR_SLOP, MAX_VERTICES};
 
 mod four;
+mod face_distance;
 pub use four::collide_four;
 
 /// How far a face's separation may sit under the true distance and still count as the closest feature.
@@ -344,7 +345,7 @@ pub fn collide_coherent(a: &Core, xa: Xf, b: &Core, xb: Xf, speculative: f32, la
     if a.count == 4 && b.count == 4 {
         let (pa, pb) = (place_quad(a, Xf::IDENTITY), place_quad(b, xa.inverse_mul(xb)));
         let faces = (best_face_quads(&pa, &pb), best_face_quads(&pb, &pa));
-        return decide(&pa, &pb, faces, a.radius, b.radius, xa, speculative, last, closest_quads);
+        return face_distance::decide_quads(&pa, &pb, faces, a.radius, b.radius, xa, speculative, last);
     }
     let (pa, pb) = (place(a, Xf::IDENTITY), place(b, xa.inverse_mul(xb)));
     let faces = (best_face(&pa, &pb), best_face(&pb, &pa));

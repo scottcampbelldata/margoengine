@@ -230,3 +230,39 @@ For the browser comparison set `BOX2D_WASM` to the existing external `box2d3-pyr
 the JSON report from each run. Edge WebGPU/WebGL2 and Firefox WebGL2 passed the pinned bits here; Firefox WebGPU
 has no adapter and remains unrun. All timings are diagnostic on the loaded SCOTT-DEV machine; a quiet rerun is
 required for release numbers. The target 0.35 ms narrow phase and the Box2D speed gap remain open.
+
+## Own 2D certified faces and solver study (perf history entry 101)
+
+The existing kernel doctest and package examples remain runnable. From the root, with cargo on PATH:
+
+~~~sh
+npm test --workspace @margoengine/physics2d
+npm run test:physics2d-kernel
+npm run check:rust-kernels
+npm run check:readme-run -- --packages=physics,physics2d
+cargo test --locked --manifest-path packages/physics2d/kernel/Cargo.toml --lib -- --nocapture
+~~~
+
+The last command prints `FACE_INTERVAL_TOTAL` for frames 60–99; the ordinary parallel unit test asserts positive
+whole-window work reduction. Interpret the bound as `32*hits - 2*attempts` squared-distance candidates, not saved
+sqrt calls. `tests/manifold_exact.rs` compares all fields against the unchanged kept reference, including the
+new nextafter thresholds and public mutations. `tests/common.rs` checks IEEE lane equality, including NaN and zeros.
+
+Build `kernel/wasm-check/Cargo.toml` at baseline `7fd5a9547` and current using `--locked --release --target
+wasm32-unknown-unknown` with `RUSTFLAGS=-C target-feature=+simd128`; retain each module in your own worktree.
+Use the same one-process 24-round A/B procedure described for entry 92, require the original three hashes and
+5,050 awake bodies, settle 60 and take the minimum of 40 steps in every round, alternating old/new first.
+For three variants rotate all six permutations equally. Lane P's retained driver is `.lane/p/metadata-ab.mjs`.
+
+For browsers set `BOX2D_WASM` to the existing external black box and `REPLAY_FIREFOX` if needed, then:
+
+~~~sh
+node scripts/physics2d-kernel-browsers.mjs --browsers=default,firefox --rounds=12
+~~~
+
+Set `MARGO_GPU_EXCLUSIVE=1` for that timing run. Preserve `test-results/physics2d-kernel-browsers.json` before and
+after. Firefox WebGPU without an adapter remains unrun. All raw rounds and acceptance outcomes are in
+[the record](results/physics2d-certified-faces-20261108.json); failed solver sources remain isolated in Lane P,
+with paths and formulas in the [study](../architecture/physics2d-solver-study.md). They are not production options.
+The 1:1000 contact extension is a new failing baseline diagnostic, not a passed bar. Existing 1:1000 joints and
+3D CCD run in the full Rust gate. Loaded timings are diagnostic; no Box2D parity or release speed is claimed.

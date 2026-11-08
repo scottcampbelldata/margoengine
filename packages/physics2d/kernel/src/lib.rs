@@ -5,6 +5,10 @@
 #![cfg_attr(target_arch = "wasm32", no_std)]
 extern crate alloc;
 
+// Shared integration fixtures also compile inside native unit tests.
+#[cfg(test)]
+extern crate self as margoengine_physics2d_kernel;
+
 pub mod joint;
 pub mod manifold;
 pub mod mass;

@@ -1,6 +1,6 @@
 // Four independent polygon pairs in SIMD lanes. SAT and face clipping use the same ordered operations as the
-// scalar Quad path in the parent module (Ericson 2005; Catto 2006, cited there). Apart pairs keep its exact distance
-// path. No horizontal reductions: a lane's face choices, clipping and output never depend on another pair.
+// scalar Quad path in the parent module (Ericson 2005; Catto 2006, cited there). Apart pairs keep its exact decision:
+// a proven preferred-face certificate or the complete distance path. No lane's output depends on another pair.
 use super::*;
 use margoengine_physics_kernel_common::lanes::M4;
 
@@ -89,6 +89,105 @@ fn best(a: &Quads, b: &Quads) -> (F4, F4) {
     (most, edge)
 }
 
+// Restricted support-point SAT. This is a certificate over current placed values, not constructor metadata:
+// Core's arrays are public and may have changed. All eight axes remain; uncertified lanes keep the old scans.
+#[inline(always)]
+fn grid(a: &Quads) -> M4 {
+    let mut valid = a.v[0].x.eq(a.v[3].x).and(a.v[1].x.eq(a.v[2].x))
+        .and(a.v[0].y.eq(a.v[1].y)).and(a.v[2].y.eq(a.v[3].y))
+        .and(a.v[0].x.lt(a.v[1].x)).and(a.v[0].y.lt(a.v[3].y));
+    // Canonical outward normals are certified from the current public arrays, including their magnitudes.
+    for (i, [x, y]) in [[0.0, -1.0], [1.0, 0.0], [0.0, 1.0], [-1.0, 0.0]].into_iter().enumerate() {
+        valid = valid.and(a.n[i].x.eq(F4::splat(x))).and(a.n[i].y.eq(F4::splat(y)));
+    }
+    valid
+}
+
+
+/// Created only by this module from the current grid+safe SAT certificate.
+/// Fields are private: public Core data cannot forge a scan bypass.
+#[derive(Clone, Copy)]
+pub(super) struct DistanceMetadata {
+    magnitude: f32,
+}
+impl DistanceMetadata {
+    pub(super) fn magnitude(self) -> f32 { self.magnitude }
+}
+
+struct SatCertificate {
+    valid: M4,
+    magnitude: F4,
+}
+impl SatCertificate {
+    fn metadata<const L: usize>(&self) -> Option<DistanceMetadata> {
+        let magnitude = self.magnitude.get()[L];
+        if self.valid.bits() >> L & 1 != 0 && magnitude >= 1.0 && magnitude <= 1_048_576.0 {
+            Some(DistanceMetadata { magnitude })
+        } else { None }
+    }
+}
+
+#[inline(always)]
+fn safe(a: &Quads, b: &Quads) -> (M4, F4) {
+    // A successful squared-length comparison rejects NaN/infinity/overflow as well as overly large finite data.
+    // |coordinate| <= 2^60 and |normal component| <= 2 imply |difference| <= 2^61, |product| <= 2^62,
+    // |sum| <= 2^63. Every original projection operation is therefore finite. Larger data retain the old path.
+    let coordinate_squared = F4::splat(f32::from_bits(0x7b80_0000)); // 2^120
+    let normal_squared = F4::splat(4.0);
+    let mut valid = M4::from_bits(15);
+    let mut magnitude = F4::splat(1.0);
+    for vertex in [a.v[0], a.v[2], b.v[0], b.v[1], b.v[2], b.v[3]] {
+        let squared = vertex.dot(vertex);
+        valid = valid.and(squared.le(coordinate_squared));
+        // For representable |x|>=1, RN(x*x)>=|x| by monotonicity;
+        // RN(nonnegative square sum) cannot be lower. Below1, the floor1 wins.
+        magnitude = magnitude.pmax(squared);
+    }
+    // A normals are exact unit axes by grid(); only B needs the range guard.
+    for normal in b.n {
+        valid = valid.and(normal.dot(normal).le(normal_squared));
+    }
+    (valid, magnitude)
+}
+
+#[inline(always)]
+fn restricted(a: &Quads, b: &Quads) -> ((F4, F4), (F4, F4), SatCertificate) {
+    let mut certified = grid(a);
+    if certified.bits() == 0 { return (best(a, b), best(b, a), SatCertificate { valid: certified, magnitude: F4::splat(1.0) }); }
+    let (safe_mask, magnitude) = safe(a, b);
+    certified = certified.and(safe_mask);
+    if certified.bits() == 0 { return (best(a, b), best(b, a), SatCertificate { valid: certified, magnitude }); }
+    let zero = F4::splat(0.0);
+    let (mut lo, mut hi) = (b.v[0], b.v[0]);
+    for vertex in &b.v[1..] {
+        lo = V { x: lo.x.pmin(vertex.x), y: lo.y.pmin(vertex.y) };
+        hi = V { x: hi.x.pmax(vertex.x), y: hi.y.pmax(vertex.y) };
+    }
+    let (mut da, mut ea, mut db, mut eb) = (F4::splat(f32::NEG_INFINITY), F4::splat(-1.0), F4::splat(f32::NEG_INFINITY), F4::splat(-1.0));
+    let support_b = [V { x: lo.x, y: hi.y }, lo, lo, V { x: hi.x, y: lo.y }];
+    for i in 0..4 {
+        // A's canonical normals fix the B coordinate extreme without per-face sign selections. The matching B coordinate extreme is the same numeric minimum;
+        // the unused coordinate multiplies zero. Both coordinate differences are finite by the certificate.
+        let vertex_b = support_b[i];
+        let minimum_a = a.n[i].dot(vertex_b.sub(a.v[i]));
+        let greater_a = minimum_a.gt(da);
+        da = F4::select(greater_a, minimum_a, da);
+        ea = F4::select(greater_a, F4::splat(i as f32), ea);
+
+        // Every combination of the grid's coordinate extremes is an actual corner. Fixed-sign multiplication and
+        // correctly rounded subtraction/addition are monotone, so evaluating this original dot gives the old minimum.
+        // Coordinate equality may differ only in +/-0 bits between equal grid corners; SAT values are only compared.
+        let vertex_a = V { x: F4::select(b.n[i].x.ge(zero), a.v[0].x, a.v[1].x), y: F4::select(b.n[i].y.ge(zero), a.v[0].y, a.v[3].y) };
+        let minimum_b = b.n[i].dot(vertex_a.sub(b.v[i]));
+        let greater_b = minimum_b.gt(db);
+        db = F4::select(greater_b, minimum_b, db);
+        eb = F4::select(greater_b, F4::splat(i as f32), eb);
+    }
+    if certified.bits() == 15 { return ((da, ea), (db, eb), SatCertificate { valid: certified, magnitude }); }
+    let ((old_da, old_ea), (old_db, old_eb)) = (best(a, b), best(b, a));
+    ((F4::select(certified, da, old_da), F4::select(certified, ea, old_ea)), (F4::select(certified, db, old_db), F4::select(certified, eb, old_eb)), SatCertificate { valid: certified, magnitude })
+}
+
 #[inline(always)]
 fn pick(values: &[V; 4], index: F4) -> V {
     let mut value = values[0];
@@ -162,8 +261,9 @@ fn separated(
     faces: ((f32, usize), (f32, usize)),
     pair: (&Core, Xf, &Core, Xf, Option<bool>),
     speculative: f32,
+    metadata: Option<DistanceMetadata>,
 ) -> Manifold {
-    decide(
+    face_distance::decide_quads_with_metadata(
         a,
         b,
         faces,
@@ -172,7 +272,7 @@ fn separated(
         pair.1,
         speculative,
         pair.4,
-        closest_quads,
+        metadata,
     )
 }
 
@@ -214,7 +314,7 @@ pub fn collide_four(pairs: [(&Core, Xf, &Core, Xf, Option<bool>); 4], speculativ
     };
     let a = place_four(pairs.map(|p| p.0), one, zero, V { x: zero, y: zero });
     let b = place_four(pairs.map(|p| p.2), c * bc + s * bs, c * bs - s * bc, relative_origin);
-    let ((da, ea), (db, eb)) = (best(&a, &b), best(&b, &a));
+    let ((da, ea), (db, eb), certificate) = restricted(&a, &b);
     let (ra, rb) = (F4::new(pairs.map(|p| p.0.radius)), F4::new(pairs.map(|p| p.2.radius)));
     let face = da.pmax(db);
     let valid = M4::from_bits(quad_bits).and(ea.ge(zero)).and(eb.ge(zero));
@@ -324,6 +424,7 @@ pub fn collide_four(pairs: [(&Core, Xf, &Core, Xf, Option<bool>); 4], speculativ
                         ((das[$lane], eas[$lane] as usize), (dbs[$lane], ebs[$lane] as usize)),
                         pairs[$lane],
                         speculative,
+                        certificate.metadata::<$lane>(),
                     )
                 } else {
                     collide_coherent(ac, xa, bc, xb, speculative, last)
@@ -336,4 +437,70 @@ pub fn collide_four(pairs: [(&Core, Xf, &Core, Xf, Option<bool>); 4], speculativ
     fallback!(2);
     fallback!(3);
     out
+}
+
+#[cfg(test)]
+mod axis_tests {
+    use super::*;
+
+    #[test]
+    fn rectangle_certificate_uses_current_data_and_guards_oversized_or_nonfinite_inputs() {
+        let core = Core::rect(0.5, 0.75, V2::ZERO, 1.0, 0.0, 0.0).unwrap();
+        let zero = F4::splat(0.0);
+        let one = F4::splat(1.0);
+        let mut a = place_four([&core; 4], one, zero, V { x: zero, y: zero });
+        let mut b = place_four([&core; 4], F4::new([1.0, 0.6, -1.0, 0.8]), F4::new([0.0, 0.8, -0.0, -0.6]), V { x: F4::new([0.0, 0.03, 2.0, -0.05]), y: F4::new([1.5, 0.9, -0.0, 0.5]) });
+        assert_eq!(grid(&a).and(safe(&a, &b).0).bits(), 15);
+        let verify = |a: &Quads, b: &Quads| {
+            let ((da, ea), (db, eb), _) = restricted(a, b);
+            let ((old_da, old_ea), (old_db, old_eb)) = (best(a, b), best(b, a));
+            // SAT callers compare face values; +/-0 are equal there. Every face index must be identical.
+            assert_eq!(da.get(), old_da.get()); assert_eq!(db.get(), old_db.get());
+            assert_eq!(ea.get().map(f32::to_bits), old_ea.get().map(f32::to_bits));
+            assert_eq!(eb.get().map(f32::to_bits), old_eb.get().map(f32::to_bits));
+        };
+        verify(&a, &b);
+        let mut magnitude = a.n[0].y.get(); magnitude[0] = -0.75; a.n[0].y = F4::new(magnitude);
+        assert_eq!(grid(&a).and(safe(&a, &b).0).bits(), 14, "axis-normal magnitude mutation must invalidate the certificate");
+        verify(&a, &b);
+        magnitude[0] = -1.0; a.n[0].y = F4::new(magnitude);
+        let mut changed = a.v[1].y.get(); changed[2] += 0.0001; a.v[1].y = F4::new(changed);
+        let mut huge = b.v[0].x.get(); huge[3] = 1e30; b.v[0].x = F4::new(huge);
+        assert_eq!(grid(&a).and(safe(&a, &b).0).bits(), 3);
+        verify(&a, &b);
+        let mut changed = a.n[0].x.get(); changed[0] = 0.001; a.n[0].x = F4::new(changed);
+        let mut nan = b.n[1].x.get(); nan[1] = f32::NAN; b.n[1].x = F4::new(nan);
+        assert_eq!(grid(&a).and(safe(&a, &b).0).bits(), 0);
+        verify(&a, &b);
+    }
+}
+
+
+#[cfg(test)]
+mod metadata_tests {
+    use super::*;
+    #[test]
+    fn current_sat_metadata_bounds_coordinates_and_preserves_the_old_sat_range() {
+        let core = Core::rect(0.5, 0.75, V2::ZERO, 1.0, 0.0, 0.0).unwrap();
+        let zero = F4::splat(0.0);
+        let one = F4::splat(1.0);
+        let a = place_four([&core; 4], one, zero, V { x: zero, y: zero });
+        let b = place_four([&core; 4], one, zero, V { x: F4::new([0.0, 2.0, 2_000.0, 1.0e12]), y: F4::new([1.52, 0.0, 0.0, 0.0]) });
+        let (_, _, certificate) = restricted(&a, &b);
+        assert_eq!(certificate.valid.bits(), 15, "distance metadata must not shrink the original2^120 SAT range");
+        for lane in 0..4 {
+            let magnitude = certificate.magnitude.get()[lane];
+            for vertex in [a.v[0], a.v[1], a.v[2], a.v[3], b.v[0], b.v[1], b.v[2], b.v[3]] {
+                assert!(vertex.x.get()[lane].abs() <= magnitude && vertex.y.get()[lane].abs() <= magnitude);
+            }
+        }
+        assert!(certificate.metadata::<0>().is_some());
+        assert!(certificate.metadata::<1>().is_some());
+        assert!(certificate.metadata::<2>().is_none());
+        assert!(certificate.metadata::<3>().is_none());
+        let mut mutated = a;
+        let mut normal = mutated.n[0].y.get(); normal[0] = -0.75; mutated.n[0].y = F4::new(normal);
+        let (_, _, changed) = restricted(&mutated, &b);
+        assert!(changed.metadata::<0>().is_none(), "current public normal mutation invalidates private metadata");
+    }
 }

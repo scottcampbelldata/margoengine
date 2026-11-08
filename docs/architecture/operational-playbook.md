@@ -1520,3 +1520,23 @@ narrow-phase gain. Solver setup and the remaining Box2D loss stay open; no physi
 ### 360 video evidence (batch 112, section 5 addendum)
 
 `@margoengine/video/360` adds a sphere UV remap over the existing external material feature and delegates XR spheres to XRLayers, without core/stage changes. `packages/video/test/panorama-check.mjs`, included in video's GPU suite, compiles mono and both stereo-eye shader variants on RTX A6000/Edge and checks six directions within 2 of 255; WebGL2 refuses binding with code/help link. `panorama.test.js` integrates the XR adapter with real XRLayers and a stand-in XRMediaBinding/session, verifying equirect creation, source packing, radius and disposal. No headset or real movie was run; projection on a headset, other GPUs/browsers and speed remain unmeasured. See LIM-573 and the committed panorama result.
+
+### Exact 2D rectangle and preferred-face certificates (2026-11-08, section 5 addendum)
+
+The current-data rectangle certificate replaces four-vertex scans on each of the same eight SAT axes with exact
+support projections. The distance certificate proves the old first preferred face succeeds for every original
+rounded distance in a conservative interval. It never substitutes an estimated distance into output or fallback.
+The private current SAT metadata omits repeated range scans; uncertified lanes and scalar calls keep complete
+guards. [Proof](physics2d-manifold-proof.md) includes the 14uM coordinate /22uM norm bounds, absolute subnormal
+error, public-array mutation, signed-zero comparisons and the three monotone acceptance checks.
+
+Evidence: 20,384,784 scene, 2,400,000 randomized and 58,560 added boundary/mutation comparisons, zero differences;
+unchanged scalar/SIMD/native/Wasm pins; Edge WebGPU/WebGL2 and Firefox WebGL2 bits. In 40 timed-window frames,
+102,862 certificates avoid at least 3,030,990 squared-distance candidates after accounting for all attempted
+upper bounds. A/B minima 3.0449→2.9581 ms, 11/24 wins, do not establish a stable speed gain. Firefox WebGPU and
+quiet-machine timing remain missing. [Entry 101](../whitepaper/perf-history.md) includes browser losses and raw data.
+
+The block solver remains unchanged. [Solver study](physics2d-solver-study.md) records failed setup and per-point
+alternatives with all old bars retained and zero accepted hash re-pins. A new 1:1000 contact diagnostic exposes
+the old recovery-bias support ceiling; it is distinct from the passing 1000:1 joint chain. Owned-2D CCD is missing,
+not proved by speculation. Both acceptance gaps and the separate raw-density defect are tracked in known-bugs.

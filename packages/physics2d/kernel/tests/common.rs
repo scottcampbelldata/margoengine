@@ -280,3 +280,13 @@ fn four_lanes_give_each_lane_the_scalar_bits() {
         }
     }
 }
+
+#[test]
+fn lane_equality_matches_ieee_f32_for_signed_zero_nan_and_infinity() {
+    let values = [0.0, -0.0, 1.0, -1.0, f32::INFINITY, f32::NEG_INFINITY, f32::from_bits(0x7fc0_1234), f32::from_bits(0x7fa0_5678), f32::from_bits(1), f32::MAX];
+    for a in values { for b in values {
+        let x = [a, b, a, b]; let y = [b, a, a, b];
+        let expected = (0..4).fold(0, |bits, lane| bits | ((x[lane] == y[lane]) as u32) << lane);
+        assert_eq!(F4::new(x).eq(F4::new(y)).bits(), expected);
+    } }
+}

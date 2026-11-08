@@ -2324,6 +2324,63 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
 - **Rerun:** `node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node packages/compute/scripts/rival-bench.mjs`.
   The oracle is `packages/compute/tests/numpy-oracle.test.js`. Citation in clean-room.md.
 
+### 101. Exact rectangle SAT and a certified preferred face; solver alternatives rejected
+
+For fully certified four-lane batches, the current-data certificate in `physics2d/kernel/src/manifold/four.rs`
+replaces 32 vertex projections per pair with eight on the same eight SAT axes. Mixed batches also evaluate the
+original scans for fallback. A separate interval certificate proves that the original first preferred clipped face
+must succeed before omitting the complete closest-point search. It reuses the current SAT range certificate;
+scalar calls and uncertified lanes retain their complete guards and fallback. The
+[floating-point proof](../architecture/physics2d-manifold-proof.md) covers signed zeros, mutable public arrays,
+underflow, the conservative 22uM distance loss and all three ordered acceptance comparisons. No contact, point,
+substep, solver pass, friction, restitution or sleep work was removed. The block solver and all three native/Wasm
+pins remain unchanged; **no result-changing hash was re-pinned**.
+
+The retained-reference suite compared 20,384,784 scene manifolds, 2,400,000 randomized manifolds and 58,560 added
+boundary/mutation manifolds with zero differences, plus the separate axis/mixed/permutation coverage. Native
+scalar/SIMD and Node Wasm hashes pass; Edge WebGPU/WebGL2 and Firefox WebGL2 reproduce them. Firefox WebGPU has
+no adapter and is unrun. Over steps 60–99 of the unchanged 100-row scene, 102,862 of 130,297 attempts certify a
+face. Counting two candidates even for every failed attempt gives a whole-window lower bound of
+`32*102862 - 2*130297 = 3,030,990` removed point-to-edge projection/squared-distance candidates. Certificate
+overhead remains. This is a deterministic geometry-work count, not a sqrt count or a measured speed percentage.
+
+One-process, balanced three-way Wasm A/B, 24 rounds, each minimum of 40 steps after 60 settling steps, all 5,050
+bodies awake: control **3.0449 ms**, repeated-guard face certificate **3.0161 ms** (14/24 wins against control),
+SAT-metadata face certificate **2.9581 ms** (11/24 against control, 12/24 against the repeated-guard version).
+The selected variant's paired median delta is +0.13145 ms, with quartiles -0.1724 and +0.3674 ms; it does not
+establish a speed gain or a slowdown beyond the spread. The earlier session was 2.9465 / 2.9328 / 2.9681 ms for
+control / axis-only / repeated-guard face certificate. Acceptance rests on exact output and less geometry work.
+
+Browser before/after, best of 12 rounds per engine, one page with the engines taking turns:
+
+| Browser | Before Margo / Box2D / Rapier | After Margo / Box2D / Rapier |
+| --- | --- | --- |
+| edge 157 webgpu | 2.90 / 1.47 / 8.11 ms | 3.66 / 1.69 / 14.52 ms |
+| firefox 157 webgl2 | 3.32 / 1.46 / 9.86 ms | 3.50 / 1.52 / 11.20 ms |
+
+These are separate sessions on loaded SCOTT-DEV, not a controlled before/after gain or regression. Box2D is its
+external v3.2.0 Wasm black box, Rapier 2D is 0.21.0. Margo beats Box2D in 0/12 after rounds in both browsers.
+**The Box2D goal remains unmet.** A quiet rerun is required before any release speed number.
+
+The requested exact setup phase came first. Cached four-state determinants retaining the original division and
+direct rows into blocks preserve pins but regress paired timing: 2.8759 ms control, rows 2.9254, matrix 2.9538,
+combined 3.0046. They were rejected. Multiplying by a cached reciprocal is not bit-identical in IEEE f32
+(9/10 versus 9*rounded(1/10)); its later guarded result-changing trial also showed no gain.
+
+The [sourced solver study](../architecture/physics2d-solver-study.md) records the subsequent alternatives and every
+rejection. Plain per-point constraints fail existing 1:100 creep (35.597 mm against 10) and chain-seam vertical
+speed (about 8.52e-5 against 7.44e-5 m/s). Reversing order still fails. The island-conditioned hybrid preserves
+the 27 physical fixtures but changes the explicit force-block count contract, and has no reliable browser gain.
+Its matched profile saves only about 37 microseconds across biased/relax wide calls; setup policy consumes much
+of that. Jacobian reassociation, reciprocal caching, outlining and persistent colouring were not accepted.
+The new 1:1000 contact extension already fails on the unchanged block control; the recovery clamp's spring-load
+ceiling and missing owned-2D CCD contract are recorded in [known-bugs](../known-bugs.md#own-2d-physics-acceptance-gaps).
+The passing original 1000:1 joint-chain bar and separate 3D/CCD tests are distinct evidence.
+
+Raw rounds, explicit diagnostic hashes, block/point accuracy outcomes and both browser reports are in the
+[committed record](results/physics2d-certified-faces-20261108.json). [Reproduce](reproduce.md#own-2d-certified-faces-and-solver-study-perf-history-entry-101)
+gives commands. No accuracy assertion or timing budget was weakened.
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).
@@ -2400,3 +2457,5 @@ These entries lack a recorded number, a named machine or a quiet run:
 [reproduce.md](reproduce.md) has the commands for the rest of the measured claims.
 
 23. Four-pair 2D narrow phase (entry 92): a quiet run of the paired Wasm/native and browser rows.
+
+24. Certified 2D faces and solver study (entry 101): quiet paired Wasm and browser reruns; the Box2D loss remains open.

@@ -45,6 +45,8 @@ mod imp {
         f32x4_neg(a)
     }
     #[inline(always)]
+    pub fn eq(a: F, b: F) -> M { f32x4_eq(a, b) }
+    #[inline(always)]
     pub fn lt(a: F, b: F) -> M {
         f32x4_lt(a, b)
     }
@@ -139,6 +141,8 @@ mod imp {
         unsafe { _mm_xor_ps(a, _mm_set1_ps(-0.0)) }
     }
     #[inline(always)]
+    pub fn eq(a: F, b: F) -> M { unsafe { _mm_cmpeq_ps(a, b) } }
+    #[inline(always)]
     pub fn lt(a: F, b: F) -> M {
         unsafe { _mm_cmplt_ps(a, b) }
     }
@@ -230,6 +234,8 @@ mod imp {
     pub fn neg(a: F) -> F {
         a.map(|x| -x)
     }
+    pub fn eq(a: F, b: F) -> M { test(a, b, |x, y| x == y) }
+    #[inline(always)]
     pub fn lt(a: F, b: F) -> M {
         test(a, b, |x, y| x < y)
     }
@@ -286,6 +292,9 @@ impl F4 {
     pub fn get(self) -> [f32; 4] {
         imp::to_array(self.0)
     }
+    /// Lanes where self == o (signed zeros equal, either NaN unequal).
+    #[inline(always)]
+    pub fn eq(self, o: F4) -> M4 { M4(imp::eq(self.0, o.0)) }
     /// Lanes where self < o.
     #[inline(always)]
     pub fn lt(self, o: F4) -> M4 {

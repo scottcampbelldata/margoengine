@@ -53,3 +53,9 @@ pub extern "C" fn bench_step() -> u32 {
         None => 0,
     }
 }
+
+#[unsafe(no_mangle)]
+pub extern "C" fn diagnostic_eq(a: u32, b: u32) -> u32 {
+    use margoengine_physics_kernel_common::lanes::F4;
+    F4::new([f32::from_bits(a), f32::from_bits(b), f32::from_bits(a), f32::from_bits(b)]).eq(F4::new([f32::from_bits(b), f32::from_bits(a), f32::from_bits(a), f32::from_bits(b)])).bits()
+}

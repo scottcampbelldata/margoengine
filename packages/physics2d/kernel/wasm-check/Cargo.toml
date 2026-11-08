@@ -10,6 +10,7 @@ publish = false
 # (scripts/rust-kernel-tests.mjs), which loads the module in Node and calls `checks` and `check`.
 [dependencies]
 margoengine-physics2d-kernel = { path = ".." }
+margoengine-physics-kernel-common = { path = "../../../physics/kernel-common" }
 
 [lib]
 crate-type = ["cdylib"]
