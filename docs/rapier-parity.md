@@ -21,7 +21,7 @@ Scott's order, 2026-11-07: Margo's own physics must have every feature and every
 | MISSING, N.j | Not built and not owned before this file; job j of batch N now owns it. `127.x` and `128.x` are extra jobs added to those batches. |
 | N/A | Not a feature a JavaScript engine can have; the row says why and what stands in for it. |
 
-Batch order, parity first (reasons in [Order](#order)): 126, 127, 128, 138, 139, 140, 141, 142, 143, 129, 130, 131, 144, 145, 146, then the beyond batches 147 to 158.
+Batch order, parity first (reasons in [Order](#order)): 126, 127, 128, 138, 139, 140, 141, 142, 143, 129, 130, 131, 144, 145, 146, then the beyond batches 147 to 155, 157 and 158.
 
 # Part 1: Rapier parity
 
@@ -42,11 +42,11 @@ Batch order, parity first (reasons in [Order](#order)): 126, 127, 128, 138, 139,
 | B-11 | `profiler` (per-stage counters and timers) | not wrapped | none | MISSING, 138.6 | Wasm | Wasm |
 | B-12 | `unsync-callbacks` | n/a | hooks run on the calling thread | N/A: JavaScript callbacks have no `Sync` bound; threads (B-05) never call user code off the main thread | none | none |
 | B-13 | debug features (`solver-bounds-checks` and the like) | n/a | NaN and range checks refuse bad input by name | N/A: developer build flags; the coded refusals stand in (`kernel-step.test.js` "settings read back, and values that would put a NaN in the state are refused") | Wasm | Wasm |
-| B-14 | `rapier3d-urdf` (URDF robots onto bodies, impulse or multibody joints) | no | none | MISSING, 141.6 (Scott decides first: robotics stays private by his 2026-11-06 line) | Wasm | Wasm |
-| B-15 | `rapier3d-mjcf` (MuJoCo XML) | no | none | MISSING, 141.6 (Scott decides first, as B-14) | Wasm | Wasm |
 | B-16 | `rapier3d-meshloader` (stl, collada, obj into colliders, `MeshConverter`) | `addModel` on loaded glTF and FBX | `addModel` throws until trimesh | PARTIAL: BUILDING 126 (trimesh, `addModel`); converter options MISSING, 139.4 | Wasm | Wasm |
 | B-17 | `reserveMemory`, `version` | no | `KernelWorld(capacity)`, `reserve(n)`; no build id | PARTIAL: reserve DONE: `kernel-step.test.js` "addBody grows the world by itself and rows stay where they were"; build id MISSING, 138.6 | Wasm | Wasm |
 | B-18 | C, Python and Bevy bindings | n/a | `@margoengine/react/physics` is the framework binding | N/A: other languages; Margo is a TypeScript engine | none | none |
+
+Rapier's robot model import crates have no rows: robot model import is not part of this engine. Row ids never change once given, so a few numbers in this file are unused.
 
 ## World, pipelines and integration parameters
 
@@ -385,7 +385,7 @@ The root entry never exposed these, so no Margo user loses them at the switch; t
 
 # Part 2: Beyond Rapier
 
-Every feature here is an optional, tree-shakable entry or package, never core and never a cost for an app that does not import it. Size and speed claims are measured. Engines named: Jolt, PhysX 5, Bullet (with pybullet), MuJoCo, Havok, Box2D v3 and Unreal Chaos, from their public docs and feature lists only; a name marked (u) was not confirmed from a fetched page and must be checked before any public claim. Papers are to be fetched and read in full by the job that builds the row; a DOI marked (u) must be checked first. "Batch" is the beyond batch that owns the row (147 to 158). The fit columns say how each backend runs it; "GPU" rows run in WebGPU compute and, on WebGL2, in the Wasm kernel or a render-to-texture pass, with the same results within the same tolerances.
+Every feature here is an optional, tree-shakable entry or package, never core and never a cost for an app that does not import it. Size and speed claims are measured. Engines named: Jolt, PhysX 5, Bullet, MuJoCo, Havok, Box2D v3 and Unreal Chaos, from their public docs and feature lists only; a name marked (u) was not confirmed from a fetched page and must be checked before any public claim. Papers are to be fetched and read in full by the job that builds the row; a DOI marked (u) must be checked first. "Batch" is the beyond batch that owns the row (147 to 155, 157 and 158). The fit columns say how each backend runs it; "GPU" rows run in WebGPU compute and, on WebGL2, in the Wasm kernel or a render-to-texture pass, with the same results within the same tolerances.
 
 ## Rigid-body and collision extras
 
@@ -499,20 +499,6 @@ Parity soft bodies (144 to 146) run on the Wasm kernel. These rows add GPU paths
 | X-64 | Powered ragdoll driven to an animation pose | Jolt, Chaos physical animation | Tan, Liu, Turk 2011; Peng et al., "DeepMimic", ACM TOG 37(4) 2018 (as the pose-tracking reference) | Wasm | Wasm | 154.3 (with `@margoengine/ragdoll`) |
 | X-65 | Character mass ratios and pushing rules | Jolt | none needed | Wasm | Wasm | 154.1 |
 
-## Articulations and robotics
-
-Scott decides first whether these rows are built in this repository: robotics stays private by his 2026-11-06 line (open source except robotics and CAD). Batch 156 waits for his word.
-
-| Row | Feature | Who has it | Paper | WebGPU | WebGL2 | Batch |
-| --- | --- | --- | --- | --- | --- | --- |
-| X-66 | Inverse dynamics (recursive Newton-Euler) | Bullet, MuJoCo | Walker and Orin, "Efficient Dynamic Computer Simulation of Robotic Mechanisms", J. Dyn. Sys. Meas. Control 104(3) 1982 | Wasm | Wasm | 156.1 |
-| X-67 | Mass matrix and Jacobian queries | Bullet, MuJoCo | Featherstone, "Rigid Body Dynamics Algorithms", Springer 2008 | Wasm | Wasm | 156.1 |
-| X-68 | Fixed and spatial tendons with pulleys | MuJoCo | Todorov, Erez, Tassa, "MuJoCo: A Physics Engine for Model-Based Control", IROS 2012; Sueda et al. 2008 | Wasm | Wasm | 156.2 |
-| X-69 | Muscle actuators with activation dynamics | MuJoCo | Millard et al., "Flexing Computational Muscle", J. Biomech. Eng. 135(2) 2013 | Wasm | Wasm | 156.3 |
-| X-70 | Soft contacts with an analytic inverse | MuJoCo | Todorov, "Convex and Analytically-Invertible Dynamics with Contacts and Constraints", ICRA 2014 | Wasm | Wasm | 156.4 |
-| X-71 | Sensors: touch, IMU, force-torque, rangefinder | MuJoCo | none needed; reads of solver state | Wasm | Wasm | 156.5 |
-| X-72 | Many independent worlds stepped at once (learning and testing) | MuJoCo MJX, PhysX GPU | Makoviychuk et al., "Isaac Gym", NeurIPS 2021, arXiv 2108.10470 | GPU compute (one world a workgroup) | Wasm worker per world (accepted difference: fewer worlds) | 156.6 |
-
 ## Solvers, scale and stepping
 
 | Row | Feature | Who has it | Paper | WebGPU | WebGL2 | Batch |
@@ -536,7 +522,6 @@ Scott decides first whether these rows are built in this repository: robotics st
 | X-84 | Record and replay debugger (step through a recorded run) | Chaos visual debugger, Jolt recorder | none needed | inspector panel | inspector panel | 158.5 |
 | X-85 | Profiler with per-stage, per-island timings in `@margoengine/inspector` | Jolt, Box2D v3 | none needed | Wasm | Wasm | 158.5 |
 | X-86 | Binary save of shapes (hulls, BVHs, decompositions) to skip rebuilds | Jolt, Bullet, PhysX | none needed | Wasm | Wasm | 158.6 |
-| X-87 | Model formats: URDF and MJCF (parity 141.6), SDF format | Bullet, MuJoCo | SDFormat specification, sdformat.org | Wasm | Wasm | 158.6 |
 
 ## Summary
 
@@ -544,10 +529,10 @@ Counted from the rows on 2026-11-07, one count a row by the first word of its St
 
 | Part | Rows | DONE | PARTIAL | BUILDING 126 | PLANNED 127 to 131 | MISSING, now owned | N/A |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1, Rapier parity | 251 | 57 | 19 | 25 | 14 | 132 | 4 |
-| 2, beyond Rapier | 87 | 0 | 0 | 0 | 4 (extended later) | 83 | 0 |
+| 1, Rapier parity | 249 | 57 | 19 | 25 | 14 | 130 | 4 |
+| 2, beyond Rapier | 79 | 0 | 0 | 0 | 4 (extended later) | 75 | 0 |
 
-Margo already does more than Rapier in 15 rows (M-01 to M-15). The missing parity rows are owned by four extra jobs added to batches 127 and 128 (3D debug drawing, 2D events and filters, the multibody API, multibody inverse kinematics) and by batches 138 to 146. Part 2 is owned by batches 147 to 158 (64 jobs; the parity batches 138 to 146 hold 51 jobs, plus the four extra jobs in 127 and 128); 4 of its rows extend what batch 131 already plans and 1 (X-79) extends parity job 142.2.
+Margo already does more than Rapier in 15 rows (M-01 to M-15). The missing parity rows are owned by four extra jobs added to batches 127 and 128 (3D debug drawing, 2D events and filters, the multibody API, multibody inverse kinematics) and by batches 138 to 146. Part 2 is owned by batches 147 to 155, 157 and 158 (58 jobs; the parity batches 138 to 146 hold 50 jobs, plus the four extra jobs in 127 and 128); 4 of its rows extend what batch 131 already plans and 1 (X-79) extends parity job 142.2.
 
 ## Order
 
@@ -556,4 +541,4 @@ Margo already does more than Rapier in 15 rows (M-01 to M-15). The missing parit
 3. **138 to 143, the kernel parity batches, before 129.** Batch 129 is the parity gate and the benchmark matrix, so it must run on the full feature set; benchmarking first would measure a kernel that later grows. 138 world and solver options, 139 shapes, 140 materials, filters, hooks and queries, 141 joints and controllers, 142 SIMD, f64, BVH strategies, block solver and the WebGL2 tests, 143 the 2D rows.
 4. **129, 130, 131** as planned: gate, switch, after.
 5. **144 to 146, soft bodies, after the switch.** The root entry never exposed Rapier's soft bodies, so no user loses them at the switch, and the solver they need is a separate entry (`/soft`). They are still parity and come before any beyond batch.
-6. **Beyond, 147 to 158, by what three.js users want most.** three.js has no physics, so its users bring cannon-es, Rapier or @react-three/rapier, and what they build is games, product scenes and showpieces. In that order of demand: interaction and joints (147: drag joint, breakable and mechanical joints, every one a three.js user asks for in the first week); cloth and soft bodies at scale (148: flags, capes and squishy things are the most shown physics demos); buoyancy and water (149: Margo already has water, and floating is the first thing people try on it); destruction (150); vehicles with real tyres (151); ropes and rods (152); fluids (153: loved, but heavy and GPU first); characters and powered ragdolls (154); large scenes on the GPU (155: thousands of bodies, an instancing showcase); robotics (156: MuJoCo style, a smaller three.js audience, and only on Scott's word); collision extras (157); scale, netcode and tooling (158). 131's fracture, buoyancy, 2D ropes and threads stay where they are; 149, 150, 152 and 158 extend them.
+6. **Beyond, 147 to 155, 157 and 158, by what three.js users want most.** three.js has no physics, so its users bring cannon-es, Rapier or @react-three/rapier, and what they build is games, product scenes and showpieces. In that order of demand: interaction and joints (147: drag joint, breakable and mechanical joints, every one a three.js user asks for in the first week); cloth and soft bodies at scale (148: flags, capes and squishy things are the most shown physics demos); buoyancy and water (149: Margo already has water, and floating is the first thing people try on it); destruction (150); vehicles with real tyres (151); ropes and rods (152); fluids (153: loved, but heavy and GPU first); characters and powered ragdolls (154); large scenes on the GPU (155: thousands of bodies, an instancing showcase); collision extras (157); scale, netcode and tooling (158). 131's fracture, buoyancy, 2D ropes and threads stay where they are; 149, 150, 152 and 158 extend them.

@@ -1218,7 +1218,7 @@ An audit of the finished batches against their job text listed 70 gaps for the H
 | B18 | Shadow resolution, cascades and fog on or off scale by measured cost | DONE | `75a9990ef` | - |
 | B19 | Long-tail formats: 3DS cameras, lights, keyframes; every LWO map, image map and bone; placed KMZ; loadTextures; parsePCX | DONE | `8dd321423` | LIM-195 |
 | IFC | IFC package taken out of this repository, it stays private; 99 public packages | DONE | `866c124de` | - |
-| ROBOT | Robot planning taken out of this repository, it stays private; /swept and /sdf kept | DONE | `d7ec4be35` | - |
+| ROBOT | Robot planning taken out of this repository; /swept and /sdf kept | DONE | `d7ec4be35` | - |
 | HULL | GJK reads a flat parallelogram of the Minkowski difference as a gap, not a false contact | DONE | `943fe4751` | LIM-251 |
 | A2, C2 | README examples and the stage run in Node on the webgpu binding (dev dependency), same picture as the page | DONE | `2597a9a94` | LIM-091 |
 | B3 surfaces | parse3DM draws surfaces with no render mesh through the one NURBS evaluator; opt-in rhino3dm fetch tool | DONE | `bd070ceb0` | LIM-208 |
