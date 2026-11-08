@@ -331,10 +331,10 @@ test('MomentOIT: BLEND primitives draw twice, into the moments and then shaded b
     .map((t) => [t.format, t.sampleCount]);
   assert.deepEqual(formats, [
     ['rgba16float', 1],
-    ['r16float', 1],
+    ['rgba16float', 1],
     ['rgba16float', 1],
     ['rgba16float', 4],
-    ['r16float', 4],
+    ['rgba16float', 4],
     ['rgba16float', 4],
   ]);
   const before = frame(1);

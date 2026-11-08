@@ -71,7 +71,28 @@ try {
     report['blocked' + samples] = { got: centre(blocked), wanted: white.map(Math.round) };
     assert.ok(biggest(centre(blocked), white) <= 20, `${samples}x: layers behind an opaque plane stay out`);
   }
-  // A range around the planes is at least as good as the default around the camera target.
+  // Sums one half-float step off (another add order, another GPU's log) must not move what a layer sees in front of it.
+  // Four power moments of two layers make a singular Hankel matrix: there one step moved the red plane's transmittance
+  // anywhere from 0.51 to 0.93 (Apple M6, 2026-11-07), and one layer's from 0.50 to 1. Trigonometric moments keep it
+  // well posed: under 0.001.
+  {
+    await build({ samples: 1, mode: 'moment' });
+    const planes = [
+        [0.5, 3.4],
+        [0.4, 3.7],
+        [0.6, 4],
+        [0.5, 4.3],
+      ],
+      range = [3.332, 4.386];
+    report.steps = [];
+    for (const count of [1, 2, 3, 4]) {
+      const spans = await page.evaluate(([l, r]) => window.check.recover(l, r), [planes.slice(0, count), range]),
+        worst = Math.max(...spans.map(([least, most]) => most - least));
+      report.steps.push(+worst.toFixed(4));
+      assert.ok(worst <= 0.01, `${count} layers: one half-float step moves a transmittance by ${worst}`);
+    }
+  }
+  // A range around the planes is at least as good as the default box round them.
   {
     const tight = await build({ samples: 1, mode: 'moment', depthRange: [3, 6] }),
       wanted = over(at(tight, 4, 4), four);

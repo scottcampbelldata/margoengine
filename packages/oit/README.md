@@ -158,27 +158,30 @@ oit.fit();                                                 // after moving model
 ```
 
 How it works (Muenstermann, Krumpen, Klein and Peters, I3D 2018): the first draw of each model adds up, per pixel, the
-optical depth `-ln(1 - alpha)` of its layers and four power moments of their log-warped depth. The second draw shades
-each fragment and scales it by the transmittance in front of it, recovered from the moments by the Hamburger bound
-(Peters and Klein 2015). A composite then normalises the sum and lays it over the scene at the coverage
-`1 - exp(-optical depth)`. Every target is `rgba16float` or `r16float`, which blend on every WebGPU device, so no feature
-is needed; the bias is 5e-5 and a CPU model of random layers puts half sums within 0.5 of 255 of float sums at that bias.
+optical depth `-ln(1 - alpha)` of its layers and three trigonometric moments of their log-warped depth (the paper's
+Section 5). The second draw shades each fragment and scales it by the transmittance in front of it, recovered from the
+moments by the paper's Algorithm 2. A composite then normalises the sum and lays it over the scene at the coverage
+`1 - exp(-optical depth)`. Every target is `rgba16float`, which blends on every WebGPU device, so no feature is needed.
+Trigonometric moments, not power moments, because half-float sums leave power moments ill-posed where a pixel has two
+or three layers: there one half-float step in the sums moved a layer's transmittance from 0.51 to 0.93 on an Apple M6,
+and the order models were added in moved pixels by 4. With trigonometric moments and a bias of 3e-3, one step moves it
+by under 0.001.
 
 | Option | Default | Meaning |
 | --- | --- | --- |
 | `depthRange` | the box round the added models | `[near, far]` view depth the moments resolve, 0 < near < far. Layers outside blend as if at the end they passed. |
 | `order` | 8 | Frame graph order, as for `OIT`. |
 
-Measured on an RTX A6000 (`npm run test:gpu --workspace packages/oit`), worst channel, 0-255, against sorted blending
-worked out by hand, at 1x and 4x MSAA:
+Measured on an Apple M6 (Chrome, `npm run test:gpu --workspace packages/oit`), worst channel, 0-255, against sorted
+blending worked out by hand, at 1x and 4x MSAA:
 
 | Scene | Moments | Weighted |
 | --- | --- | --- |
-| Four layers at alphas 0.5, 0.4, 0.6, 0.5 | 6.24 | 13.26 |
-| Two dense layers at alpha 0.9 | 2.81 | 71.81 |
+| Four layers at alphas 0.5, 0.4, 0.6, 0.5 | 2.34 | 13.26 |
+| Two dense layers at alpha 0.9 | 0.26 | 71.81 |
 | One layer | under 1.5 | under 1.5 |
 
-Adding models in another order moved no pixel in these runs. Time is not measured yet.
+Adding models in another order moved a pixel by at most 1 in these runs. Time is not measured yet.
 
 Limits:
 
@@ -186,10 +189,13 @@ Limits:
   and close layers blur together, so results sit between `OIT` and `ExactOIT`. Total coverage is exact.
 - Precision follows the range. The default box is measured once, reading every vertex, on the first frame after `add` or
   `fit`: a model moved far from there falls outside and loses depth order until `fit()` runs (in the check, the error
-  more than doubles). Wide boxes with close layers cost accuracy too: on the CPU model a range 7 times the layers' depth
-  gave 16 where a close one gave 6.5 with a bias of 5e-4. `depthRange` sets it by hand.
+  more than doubles). Wide ranges with close layers cost accuracy too: in the check, a hand range of 3 to 6 round planes
+  from 3.4 to 4.3 gave 3.26 where the box gave 2.34. `depthRange` sets it by hand.
+- Half-float sums round as they add. The bias of 3e-3 holds a one-step change in every stored channel to under 0.001 of
+  transmittance for one to four layers; many more layers in one pixel round more, and the paper raises the bias for
+  large overdraw. That case is not measured yet.
 - Every model draws twice, and the second draw reads two more textures, which lowers the 16-texture budget of a material
-  to 14. Memory: 18 bytes per pixel, plus 72 under 4x MSAA.
+  to 14. Memory: 24 bytes per pixel, plus 96 under 4x MSAA.
 - Transmission, custom blending and depth overrides keep the sorted path: `blending` is an `OIT` option only.
 
 ## Depth and motion for glass (`TransparentDepth`)
@@ -310,6 +316,9 @@ A6000:
 | LightsPunctualLamp | 1 BLEND | 0, nothing overlaps | 0.17%, worst 64 | 0 | 0 |
 | TransmissionTest | none | 0, nothing taken | 0.99%, worst 247 | 0 | 0 |
 | CommercialRefrigerator | none | 0, nothing taken | 0.02%, worst 27 | 0 | 0 |
+
+The Moments column predates trigonometric moments (2026-11-07). Since then, on an Apple M6 (Chrome), GlassVaseFlowers
+reads 0.68%, worst 42, against exact.
 
 What that shows:
 

@@ -31,7 +31,7 @@ export interface ExactOITOptions {
 }
 /** What the last read-back frame stored, from `ExactOIT.stats`; it trails the picture by a few frames. */
 export interface ExactOITStats {
-  /** Transparent fragments of that frame, those behind opaque surfaces included. */
+  /** Transparent fragments of that frame, those behind opaque surfaces included; multisampled, a GPU that runs the list shader once per sample (Apple) counts each sample. */
   fragments: number;
   /** Fragments the list holds now. */
   capacity: number;
@@ -67,7 +67,14 @@ fn margoTransparentAt(color:vec4f,clip:vec4f,depth:f32)->MargoTransparent {
 `;
 // Reversed depth: larger is nearer. Equal depths fall back to the colour bits, so coplanar layers keep one order
 // however the list happened to fill.
-const sort = (layers: number) => /* wgsl */ `
+//
+// Multisampled, a GPU may run the list shader more than once for one fragment: WGSL fixes how often only for
+// sample-frequency shaders (sample_index or sample interpolation). Apple GPUs under Metal run it up to once per sample,
+// every copy at the pixel centre with a coverage mask that may be the whole fragment's or part of it, so one layer
+// lands in the list several times. The copies agree in depth, colour and alpha, so a multisampled sort merges nodes
+// equal in those into one whose coverage is the union. The parts of one surface that meet in a pixel merge the same
+// way, which is right; two coplanar layers of one colour and alpha become one layer there.
+const sort = (layers: number, unique: boolean) => /* wgsl */ `
 @group(0) @binding(0) var<uniform> u:vec4u;
 @group(0) @binding(1) var<storage,read> heads:array<u32>;
 @group(0) @binding(2) var<storage,read_write> nodes:array<vec4u>;
@@ -76,7 +83,7 @@ fn nearer(a:vec4u,b:vec4u)->bool {
   if(x!=y){return x>y;}
   if(a.x!=b.x){return a.x>b.x;}
   if(a.y!=b.y){return a.y>b.y;}
-  return (a.w>>28u)>(b.w>>28u);
+  return ${unique ? 'false' : '(a.w>>28u)>(b.w>>28u)'};
 }
 @compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) g:vec3u) {
   if(g.x>=u.x||g.y>=u.w){return;}
@@ -85,9 +92,12 @@ fn nearer(a:vec4u,b:vec4u)->bool {
   var kept:array<vec4u,${layers}>; var count=0u; var slot=first;
   while(slot!=0u){
     let node=nodes[slot]; slot=node.w&${LINK}u;
-    if(count==${layers}u&&!nearer(node,kept[count-1u])){continue;}
-    var at=min(count,${layers - 1}u);
-    while(at>0u&&nearer(node,kept[at-1u])){kept[at]=kept[at-1u]; at-=1u;}
+    if(count==${layers}u&&${unique ? 'nearer(kept[count-1u],node)' : '!nearer(node,kept[count-1u])'}){continue;}
+    var at=count;
+    while(at>0u&&nearer(node,kept[at-1u])){at-=1u;}
+    ${unique ? `if(at>0u&&all(node.xyz==kept[at-1u].xyz)){kept[at-1u].w|=node.w&~${LINK}u; continue;}\n    if(at==${layers}u){continue;}` : ''}
+    var to=min(count,${layers - 1}u);
+    while(to>at){kept[to]=kept[to-1u]; to-=1u;}
     kept[at]=node; count=min(count+1u,${layers}u);
   }
   // The nearest layers go back on the front of the same chain, which ends after them.
@@ -149,7 +159,7 @@ export class ExactOIT extends TransparentPass {
   private capacity = 0;
   private wanted = 0;
   private readonly pipelines = new Map<string, GPURenderPipeline>();
-  private sorter?: GPUComputePipeline;
+  private readonly sorters = new Map<boolean, GPUComputePipeline>();
   private readback?: GPUBuffer;
   /** The fragment count was copied for the frame now being finished and waits to be mapped. */
   private copied = false;
@@ -283,23 +293,29 @@ export class ExactOIT extends TransparentPass {
       c.encoder.copyBufferToBuffer(this.heads!, bytes - 4, this.readback!, 0, 4);
       this.copied = true;
     }
-    this.sorter ??= device.createComputePipeline({
-      label: 'oit:sort',
-      layout: 'auto',
-      compute: { module: device.createShaderModule({ code: sort(this.layers) }), entryPoint: 'main' },
-    });
+    const samples = c.descriptor.multisample?.count ?? 1,
+      unique = samples > 1;
+    let sorter = this.sorters.get(unique);
+    if (!sorter)
+      this.sorters.set(
+        unique,
+        (sorter = device.createComputePipeline({
+          label: 'oit:sort',
+          layout: 'auto',
+          compute: { module: device.createShaderModule({ code: sort(this.layers, unique) }), entryPoint: 'main' },
+        })),
+      );
     const entries = [
       { binding: 0, resource: uniform },
       { binding: 1, resource: { buffer: this.heads! } },
       { binding: 2, resource: { buffer: this.nodes! } },
     ];
     const compute = c.encoder.beginComputePass({ label: 'oit:sort' });
-    compute.setPipeline(this.sorter);
-    compute.setBindGroup(0, device.createBindGroup({ layout: this.sorter.getBindGroupLayout(0), entries }));
+    compute.setPipeline(sorter);
+    compute.setBindGroup(0, device.createBindGroup({ layout: sorter.getBindGroupLayout(0), entries }));
     compute.dispatchWorkgroups(Math.ceil(c.width / 8), Math.ceil(c.height / 8));
     compute.end();
-    const samples = c.descriptor.multisample?.count ?? 1,
-      format = c.descriptor.depthStencil!.format,
+    const format = c.descriptor.depthStencil!.format,
       key = c.format + samples + format;
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
@@ -336,7 +352,7 @@ export class ExactOIT extends TransparentPass {
   protected freeDevice(): void {
     this.release();
     this.pipelines.clear();
-    this.sorter = undefined;
+    this.sorters.clear();
     retire(this.device!, this.uniform);
     retire(this.device!, this.readback);
     this.uniform = this.readback = undefined;

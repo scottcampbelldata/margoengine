@@ -1,9 +1,16 @@
 // Moment-based order-independent transparency (Muenstermann, Krumpen, Klein and Peters 2018, I3D). A first pass sums the
-// optical depth of each pixel's layers and four power moments of their depth; a second shades every fragment and scales
-// it by the transmittance in front of it, read back from the moments by the Hamburger bound of Peters and Klein 2015.
+// optical depth of each pixel's layers and three trigonometric moments of their depth (the paper's Section 5); a second
+// shades every fragment and scales it by the transmittance in front of it, read back from the moments by the paper's
+// Algorithm 2.
 //
-// Every target is rgba16float or r16float, which blend on every WebGPU device. Half precision costs bias, not layers: on
-// a CPU model of 2, 4 and 8 random layers, bias 5e-5 on halves stays within 0.5 of 255 of float sums at bias 5e-7.
+// Every target is rgba16float, which blends on every WebGPU device. Trigonometric moments, not power moments: four power
+// moments of two layers make a singular Hankel matrix, so one half-float step in the sums (or another GPU's rounding of
+// log) moved a layer's transmittance a long way (moments-check.mjs, "one half-float step"; Apple M6, 2026-11-07). The
+// paper stores trigonometric moments in 16 bits each with no transform (Section 5.3; supplementary Table 1, bias 6.5e-4
+// for three in 112 bits of fixed point). Half floats are coarser near 1, a step up to 2^-10 of the value, so the moments
+// of one layer can leave the unit disc after rounding: the bias here is 3e-3, which the check's half-step case needs.
+// Two trigonometric moments (the five channels the power moments used) could not hold both that bias and the check's
+// hand-set depthRange case; three can, at the paper's wrapping zone.
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type Engine, type PassContext } from '@margoengine/core/extension';
 import type { PBRModel, PBRTransparency } from '@margoengine/gltf-pro';
@@ -37,47 +44,119 @@ const add: GPUBlendState = {
   color: { srcFactor: 'one', dstFactor: 'one' },
   alpha: { srcFactor: 'one', dstFactor: 'one' },
 };
+/** The paper's psi of the point at `angle` on the unit circle: monotonic in the angle, -1 at 0 up to 7 near 2pi. */
+const psi = (angle: number): number => {
+  const x = Math.cos(angle),
+    y = Math.sin(angle);
+  if (y >= 0) return x >= 0 ? y - x : 2 - x - y;
+  return x >= 0 ? 6 + x + y : 4 + x - y;
+};
+// Depth is warped to -1..1 by its logarithm (x, y of the uniform), then to an angle on the unit circle (the paper's
+// Equation 5). The wrapping zone THETA, the paper's pi/10, holds no depth: the far end wraps round to the near one
+// continuously through it.
+const THETA = Math.PI / 10;
 const warp = /* wgsl */ `
 fn margoWarp(depth:f32)->f32 {
   return clamp(log(max(depth,1e-6))*margoOIT.x+margoOIT.y,-1.0,1.0);
 }
+fn margoAngle(z:f32)->f32 {return ${(2 * Math.PI - THETA).toFixed(9)}*(z+1.0)*0.5;}
+fn margoHalf(v:vec4f)->vec4f {
+  let b=bitcast<vec4u>(v); let near=bitcast<vec4f>((b+vec4u(0xfffu)+((b>>vec4u(13u))&vec4u(1u)))&vec4u(0xffffe000u));
+  return select(near,round(v*16777216.0)/16777216.0,abs(v)<vec4f(6.103515625e-5));
+}
 `;
-// Depth is warped to -1..1 by its logarithm (x, y of the uniform). Optical depth, not alpha, is what adds up.
+// Optical depth, not alpha, is what adds up: tau times the angle's point on the circle and its square in one target, the
+// optical depth and the cube in the other. Every output of both passes is rounded to a half float first (margoHalf): the
+// Apple M6 adds the float output to the stored half and rounds once, so two layers summed in either order came out a
+// step apart (vfx-check.mjs, splats added in either order, 1 of 255). Two halves sum the same either way. The rounding
+// is done on the bits, to nearest even: under Chrome on that Mac, quantizeToF16 and a pack2x16float round trip left the
+// value as it was.
 const sums = (group: number) => /* wgsl */ `
 struct MargoTransparent {@location(0) moments:vec4f, @location(1) optical:vec4f}
 @group(${group}) @binding(${BINDING}) var<uniform> margoOIT:vec4f;
 ${warp}
 fn margoTransparentAt(color:vec4f,clip:vec4f,depth:f32)->MargoTransparent {
-  let tau=-log(1.0-clamp(color.a,0.0,0.999)); let z=margoWarp(depth); let z2=z*z; var o:MargoTransparent;
-  o.moments=tau*vec4f(z,z2,z2*z,z2*z2); o.optical=vec4f(tau); return o;
+  let tau=-log(1.0-clamp(color.a,0.0,0.999)); let a=margoAngle(margoWarp(depth)); var o:MargoTransparent;
+  o.moments=margoHalf(tau*vec4f(cos(a),sin(a),cos(2.0*a),sin(2.0*a)));
+  o.optical=margoHalf(tau*vec4f(1.0,cos(3.0*a),sin(3.0*a),0.0)); return o;
 }
 `;
-// Hamburger bound with 4 moments: the Cholesky factors of the Hankel matrix give the kernel polynomial through z; its
-// roots and z carry the three-point distribution that matches the moments, and the share below z is what lies in front.
-// At z itself a quarter counts (the paper's overestimation), so a layer dims itself a little instead of half.
-// The bias pulls the moments towards those of a fixed distribution, which keeps the matrix invertible on half sums.
+// Algorithm 2 with m = 3, in complex numbers held as vec2f. The moments b1..b3 (b0 = 1 after dividing by the optical
+// depth) are biased towards (1, 0, 0, 0) by 3e-3. The Toeplitz system G q = (1, conj x0, conj x0^2, conj x0^3), with
+// G[j][k] = b[k-j] and b[-k] = conj b[k], is solved by its LDL^H factors. The kernel polynomial q0 + q1 x + q2 x^2 + q3 x^3
+// has its roots on the unit circle; they come from Cardano's formula, taking the larger of the two cube candidates to
+// avoid cancellation, then one Newton step each and a projection back onto the circle. Those roots and x0 carry the
+// four-point distribution with these moments; its weights come from the Vandermonde system as Lagrange sums. Points
+// nearer than x0 count whole, x0 itself a quarter (the paper's overestimation), points in the wrapping zone in
+// proportion (Equation 6, with its piecewise-linear psi).
 const shade = (group: number) => /* wgsl */ `
 struct MargoTransparent {@location(0) color:vec4f}
 @group(${group}) @binding(${BINDING}) var<uniform> margoOIT:vec4f;
 @group(${group}) @binding(${BINDING + 1}) var margoMoments:texture_2d<f32>;
 @group(${group}) @binding(${BINDING + 2}) var margoOptical:texture_2d<f32>;
 ${warp}
-fn margoInFront(b:vec4f,z:f32)->f32 {
-  let m=mix(b,vec4f(0.0,0.375,0.0,0.375),5e-5);
-  let d22=max(m.y-m.x*m.x,1e-7); let l32=(m.z-m.x*m.y)/d22; let d33=max(m.w-m.y*m.y-l32*l32*d22,1e-7);
-  let y2=z-m.x; let y3=z*z-m.y-l32*y2;
-  let c2=y3/d33; let c1=y2/d22-l32*c2; let c0=1.0-m.x*c1-m.y*c2;
-  if(abs(c2)<1e-9){return 0.0;}
-  let root=sqrt(max(c1*c1-4.0*c2*c0,0.0)); let r=vec2f(-c1-root,-c1+root)/(2.0*c2);
-  let lo=min(r.x,r.y); let hi=max(r.x,r.y);
-  let share=vec3f((m.y-(lo+hi)*m.x+lo*hi)/((z-lo)*(z-hi)),(m.y-(z+hi)*m.x+z*hi)/((lo-z)*(lo-hi)),(m.y-(z+lo)*m.x+z*lo)/((hi-z)*(hi-lo)));
-  return clamp(select(0.0,share.y,lo<z)+select(0.0,share.z,hi<z)+0.25*share.x,0.0,1.0);
+fn margoMul(a:vec2f,b:vec2f)->vec2f {return vec2f(a.x*b.x-a.y*b.y,a.x*b.y+a.y*b.x);}
+fn margoConj(a:vec2f)->vec2f {return vec2f(a.x,-a.y);}
+fn margoDiv(a:vec2f,b:vec2f)->vec2f {return margoMul(a,margoConj(b))/max(dot(b,b),1e-30);}
+fn margoSqrt(a:vec2f)->vec2f {
+  let r=length(a); return vec2f(sqrt(max(0.5*(r+a.x),0.0)),select(1.0,-1.0,a.y<0.0)*sqrt(max(0.5*(r-a.x),0.0)));
+}
+fn margoCbrt(a:vec2f)->vec2f {let r=pow(max(length(a),1e-30),1.0/3.0); let t=atan2(a.y,a.x)/3.0; return r*vec2f(cos(t),sin(t));}
+fn margoPsi(x:vec2f)->f32 {
+  if(x.y>=0.0){return select(2.0-x.x-x.y,x.y-x.x,x.x>=0.0);}
+  return select(4.0+x.x-x.y,6.0+x.x+x.y,x.x>=0.0);
+}
+// The weight of point l of four, the others a, b, c: the Lagrange polynomial of l applied to the moments.
+fn margoWeight(l:vec2f,a:vec2f,b:vec2f,c:vec2f,m1:vec2f,m2:vec2f,m3:vec2f)->f32 {
+  let ab=margoMul(a,b);
+  let n=m3-margoMul(a+b+c,m2)+margoMul(ab+margoMul(a+b,c),m1)-margoMul(ab,c);
+  return margoDiv(n,margoMul(margoMul(l-a,l-b),l-c)).x;
+}
+fn margoRoot(x:vec2f,q:array<vec2f,4>)->vec2f {
+  let f=q[0]+margoMul(x,q[1]+margoMul(x,q[2]+margoMul(x,q[3])));
+  let d=q[1]+margoMul(x,2.0*q[2]+3.0*margoMul(x,q[3]));
+  let y=x-margoDiv(f,d); return y/max(length(y),1e-30);
+}
+fn margoInFront(m:vec4f,o:vec4f,z:f32)->f32 {
+  var b:array<vec2f,4>; b[0]=vec2f(1.0,0.0); b[1]=0.997*m.xy/o.x; b[2]=0.997*m.zw/o.x; b[3]=0.997*o.yz/o.x;
+  let a=margoAngle(z); let x0=vec2f(cos(a),sin(a));
+  var l:array<array<vec2f,4>,4>; var d:array<f32,4>; var y:array<vec2f,4>; var q:array<vec2f,4>;
+  var r=vec2f(1.0,0.0);
+  for(var j=0;j<4;j++){
+    for(var i=0;i<j;i++){
+      var s=margoConj(b[j-i]);
+      for(var k=0;k<i;k++){s-=margoMul(l[j][k],margoConj(l[i][k]))*d[k];}
+      l[j][i]=s/d[i];
+    }
+    var e=1.0; for(var k=0;k<j;k++){e-=dot(l[j][k],l[j][k])*d[k];}
+    d[j]=max(e,1e-7);
+    var t=r; for(var k=0;k<j;k++){t-=margoMul(l[j][k],y[k]);}
+    y[j]=t; r=margoMul(r,margoConj(x0));
+  }
+  for(var j=3;j>=0;j--){
+    var t=y[j]/d[j]; for(var k=j+1;k<4;k++){t-=margoMul(margoConj(l[k][j]),q[k]);}
+    q[j]=t;
+  }
+  // Monic x^3 + c2 x^2 + c1 x + c0, depressed by x = u - c2/3 to u^3 + p u + h.
+  let c2=margoDiv(q[2],q[3]); let c1=margoDiv(q[1],q[3]); let c0=margoDiv(q[0],q[3]);
+  let s=c2/3.0; let p=c1-margoMul(c2,s); let h=c0-margoMul(c1,s)+2.0*margoMul(s,margoMul(s,s));
+  let w=margoSqrt(margoMul(h,h)/4.0+margoMul(p,margoMul(p,p))/27.0);
+  let k=select(-h/2.0+w,-h/2.0-w,dot(-h/2.0-w,-h/2.0-w)>dot(-h/2.0+w,-h/2.0+w));
+  let u=margoCbrt(k); let turn=vec2f(-0.5,0.866025404);
+  let u1=margoMul(u,turn); let u2=margoMul(u1,turn);
+  let x1=margoRoot(u-margoDiv(p,3.0*u)-s,q); let x2=margoRoot(u1-margoDiv(p,3.0*u1)-s,q); let x3=margoRoot(u2-margoDiv(p,3.0*u2)-s,q);
+  let w0=margoWeight(x0,x1,x2,x3,b[1],b[2],b[3]); let w1=margoWeight(x1,x0,x2,x3,b[1],b[2],b[3]);
+  let w2=margoWeight(x2,x0,x1,x3,b[1],b[2],b[3]); let w3=margoWeight(x3,x0,x1,x2,b[1],b[2],b[3]);
+  let p0=margoPsi(x0); let edge=${psi(2 * Math.PI - THETA).toFixed(9)};
+  let ps=vec3f(margoPsi(x1),margoPsi(x2),margoPsi(x3));
+  let v=select(select(vec3f(0.0),(ps-edge)/(7.0-edge),ps>vec3f(edge)),vec3f(1.0),ps<vec3f(p0));
+  return o.x*clamp(0.25*w0+dot(v,vec3f(w1,w2,w3)),0.0,1.0);
 }
 fn margoTransparentAt(color:vec4f,clip:vec4f,depth:f32)->MargoTransparent {
-  let q=vec2i(clip.xy); let total=textureLoad(margoOptical,q,0).r; var o:MargoTransparent;
+  let q=vec2i(clip.xy); let o=textureLoad(margoOptical,q,0); var out:MargoTransparent;
   var t=1.0;
-  if(total>1e-5){t=exp(-total*margoInFront(textureLoad(margoMoments,q,0)/total,margoWarp(depth)));}
-  let w=clamp(color.a,0.0,1.0)*t; o.color=vec4f(color.rgb*w,w); return o;
+  if(o.x>1e-5){t=exp(-margoInFront(textureLoad(margoMoments,q,0),o,margoWarp(depth)));}
+  let w=clamp(color.a,0.0,1.0)*t; out.color=margoHalf(vec4f(color.rgb*w,w)); return out;
 }
 `;
 // As weighted OIT's composite: the weighted average colour at the coverage the optical depth gives.
@@ -91,7 +170,7 @@ const composite = /* wgsl */ `
 `;
 
 /** The formats of the three targets, in the order `targets` makes them. */
-const formats: readonly GPUTextureFormat[] = ['rgba16float', 'r16float', 'rgba16float'];
+const formats: readonly GPUTextureFormat[] = ['rgba16float', 'rgba16float', 'rgba16float'];
 
 /**
  * Moment-based order-independent transparency: `oit.add(model)` draws the model's BLEND primitives (gltf-pro) or a
@@ -106,7 +185,7 @@ const formats: readonly GPUTextureFormat[] = ['rgba16float', 'r16float', 'rgba16
 export class MomentOIT extends TransparentPass {
   readonly targets: readonly GPUColorTargetState[] = [
     { format: 'rgba16float', blend: add },
-    { format: 'r16float', blend: add },
+    { format: 'rgba16float', blend: add },
   ];
   private readonly range?: readonly [number, number];
   /** World box of the added models: min x, y, z, max x, y, z. */

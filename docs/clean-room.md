@@ -336,6 +336,7 @@ The own solver's kernel (`packages/physics/kernel`, Rust, no dependencies). Noth
 | --- | --- | --- | --- |
 | O-01 | Weighted blended OIT weight | oit/src/index.ts | McGuire & Bavoil, "Weighted Blended Order-Independent Transparency", JCGT 2(2), 2013, eqs. 7-9 form (cited). Power, scale and the 1000 cap are Margo's, with the reason given in a comment |
 | O-02 | Composite accum/revealage | oit/src/index.ts | McGuire & Bavoil 2013 |
+| O-03 | MomentOIT: three trigonometric moments of the log-warped depth, mapped to the circle by exp((2 pi - theta) i (z + 1) / 2) with wrapping zone theta = pi/10; transmittance by Algorithm 2 (Toeplitz system by LDL^H, roots of the kernel polynomial, weights from the Vandermonde system), overestimation 0.25, continuous weights in the wrapping zone with the piecewise-linear psi (Equation 6), bias towards (1, 0, 0, 0) | oit/src/moments.ts | **Read:** Muenstermann, Krumpen, Klein and Peters, "Moment-Based Order-Independent Transparency", PACMCGIT 1(1), 2018 (I3D), Sections 3 to 5 and Algorithm 2, and its supplementary document, Section 1 and Table 1. The HLSL code the paper links was not opened. The cubic is solved by Cardano's formula with the larger cube candidate, one Newton step and a projection onto the circle (our own, after the paper's remark on avoiding cancellation); the bias 3e-3 for half floats is ours, measured, where the paper gives 6.5e-4 for 16-bit fixed point |
 
 ### points
 

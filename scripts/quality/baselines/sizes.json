@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10822810,
+  "total": 10824408,
   "history": [
     {
       "date": "2026-10-24",
@@ -3956,6 +3956,12 @@
       "commit": "add564c95",
       "reason": "post/ssgi: multi-bounce over frames (batch 70 job 6)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "3b43b9e4a",
+      "reason": "oit: ExactOIT merges equal nodes at 4x MSAA; MomentOIT moves to three trigonometric moments with half rounding (three targets, wrapping zone, margoHalf)",
+      "grew": 2
     }
   ],
   "items": {
@@ -4404,9 +4410,9 @@
     "@margoengine/netcode/webtransport": 1819,
     "@margoengine/oit": 3808,
     "@margoengine/oit/depth": 2004,
-    "@margoengine/oit/exact": 4537,
+    "@margoengine/oit/exact": 4820,
     "@margoengine/oit/meshes": 747,
-    "@margoengine/oit/moments": 4197,
+    "@margoengine/oit/moments": 5512,
     "@margoengine/oit/vfx": 486,
     "@margoengine/physics": 19679,
     "@margoengine/physics/next": 91997,
