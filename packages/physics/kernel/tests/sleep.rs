@@ -549,3 +549,46 @@ fn a_body_whose_support_goes_falls_though_its_time_to_sleep_ran_out_long_ago() {
         assert!(y < 1.0, "way {way}: it hangs at {y}");
     }
 }
+
+#[test]
+fn a_kinematic_position_body_at_its_target_is_still_whatever_its_rotation() {
+    // A turned body: the product of its rotation and the conjugate is no exact identity in f32, and that residue counted as
+    // turning, so what rested on a parked kinematicPosition body never slept.
+    let rotation = Q { x: 0.3, y: 0.5, z: 0.1, w: 0.8 }.normalized();
+    let residue = rotation.mul(rotation.conjugate()).to_rotation_vector();
+    assert!(residue.dot(residue) > 0.0, "the rotation must show the rounding this test is about");
+    let mut w = free_world(2);
+    let dynamic = ball(&mut w, DYNAMIC, 0.0);
+    let parked = ball(&mut w, KINEMATIC_POSITION, 1.0);
+    w.set_q(ROTATION_X, parked as usize, rotation);
+    w.set_q(TARGET_ROTATION_X, parked as usize, rotation);
+    w.set_v(TARGET_X, parked as usize, v3(1.0, 0.0, 0.0));
+    for _ in 0..60 {
+        w.step(DT);
+    }
+    assert_eq!(w.v(ANGULAR_X, parked as usize), v3(0.0, 0.0, 0.0));
+    assert!(asleep(&w, dynamic), "a parked kinematic body lets what touches it sleep");
+    assert!(w.flags(parked as usize) & RESTING != 0, "and rests itself, as Rapier's does");
+    check(&w);
+}
+
+#[test]
+fn a_sleeper_changed_without_a_wake_stays_in_its_ring_until_one_comes() {
+    for kind in [FIXED, KINEMATIC_POSITION, KINEMATIC_VELOCITY] {
+        let mut w = free_world(3);
+        let (a, b) = (ball(&mut w, DYNAMIC, 0.0), ball(&mut w, DYNAMIC, 1.0));
+        for _ in 0..40 {
+            w.step(DT);
+        }
+        assert!(asleep(&w, a) && asleep(&w, b));
+        w.set_body_kind(a, kind, false);
+        assert!(asleep(&w, a) && asleep(&w, b), "kind {kind}: no wake was asked");
+        check(&w);
+        w.wake_touching(a);
+        assert!(!asleep(&w, a) && !asleep(&w, b), "kind {kind}: the wake reaches the ring");
+        assert_eq!(w.is_awake(a as usize), kind != FIXED, "kind {kind}: a fixed body goes on no list");
+        check(&w);
+        w.step(DT);
+        check(&w);
+    }
+}

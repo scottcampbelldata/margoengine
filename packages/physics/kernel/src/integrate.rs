@@ -111,11 +111,13 @@ impl World {
         self.mark_moved(body);
     }
 
-    /// The pose a kinematicPosition body reaches at the end of the next step.
+    /// The pose a kinematicPosition body reaches at the end of the next step; the body wakes.
     pub fn set_target(&mut self, body: u32, position: V3, rotation: Q) {
         if self.body_alive(body) {
             self.set_v(TARGET_X, body as usize, position);
             self.set_q(TARGET_ROTATION_X, body as usize, rotation.normalized());
+            // A target wakes the body, as on Rapier.
+            self.wake(body);
         }
     }
 
@@ -150,9 +152,10 @@ impl World {
             if passes < 2 {
                 self.solve_joints(h, stiffness, Pass::Settle, 0, 2 - passes);
             }
-            let all = passes + most;
+            // Any u32 is a valid count, as on Rapier: the sum saturates instead of wrapping to a few passes.
+            let all = passes.saturating_add(most);
             for pass in 1..=all {
-                let least = (most + 1).saturating_sub(pass);
+                let least = most.saturating_add(1).saturating_sub(pass);
                 self.solve_joints(h, stiffness, if pass == all { Pass::Push } else { Pass::Settle }, least, u32::MAX);
                 self.solve_contacts(h, stiffness, true, substep as usize, least);
             }
@@ -203,8 +206,12 @@ impl World {
             } else if kind == KINEMATIC_POSITION {
                 let inverse = 1.0 / dt;
                 self.set_v(LINEAR_X, at, self.v(TARGET_X, at).sub(position).scale(inverse));
-                let turn = self.q(TARGET_ROTATION_X, at).mul(rotation.conjugate());
-                self.set_v(ANGULAR_X, at, turn.to_rotation_vector().scale(inverse));
+                // A target equal to the pose is no turn. The product with the conjugate leaves rounding of about 1e-15 there,
+                // and a body that turns that little would count as moving and keep what rests on it awake for ever.
+                let target = self.q(TARGET_ROTATION_X, at);
+                let still = target.x == rotation.x && target.y == rotation.y && target.z == rotation.z && target.w == rotation.w;
+                let turn = if still { v3(0.0, 0.0, 0.0) } else { target.mul(rotation.conjugate()).to_rotation_vector() };
+                self.set_v(ANGULAR_X, at, turn.scale(inverse));
             }
         }
     }

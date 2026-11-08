@@ -40,6 +40,7 @@ interface KernelExports extends WebAssembly.Exports {
   world_sleep_energy(): number;
   world_sleep_time(): number;
   body_wake(body: number): void;
+  body_wake_touching(body: number): void;
   body_sleep(body: number): void;
   world_ensure(bytes: number): number;
   body_set_pose(
@@ -57,7 +58,7 @@ interface KernelExports extends WebAssembly.Exports {
   body_add(kind: number): number;
   body_remove(body: number): number;
   body_update_mass(body: number): void;
-  body_set_kind(body: number, kind: number): void;
+  body_set_kind(body: number, kind: number, wake: number): void;
   body_set_own(
     body: number,
     mass: number,
@@ -199,7 +200,8 @@ export interface KernelColliderOptions {
 /** Bits of the `flags` column (kernel/src/layout.rs). */
 const ALIVE = 1,
   SLEEPING = 1 << 9,
-  CAN_SLEEP = 1 << 10;
+  CAN_SLEEP = 1 << 10,
+  RESTING = 1 << 12;
 
 /** The kind bits of the `flags` column (kernel/src/layout.rs). */
 const bodyKinds: Readonly<Record<KernelBodyKind, number>> = {
@@ -247,6 +249,8 @@ export class KernelWorld {
   private stepping = false;
   private filter: ((a: number, b: number) => boolean) | null = null;
   private hullRows = 0;
+  /** Sleepers whose kind changed: they wake before the next step, as Rapier's do. */
+  private wakeAtStep: number[] = [];
 
   /**
    * @param bodies Body rows to start with (default 1024); `reserve` adds more.
@@ -391,10 +395,10 @@ export class KernelWorld {
     this.api.world_set_sleep(energy, time);
     return this;
   }
-  /** True when the row holds a sleeping body. */
+  /** True when the row holds a sleeping body, or a kinematic one still for the sleep window (it reads asleep, as on Rapier). */
   isSleeping(body: number): boolean {
     const flags = this.columns.flags[body] ?? 0;
-    return (flags & ALIVE) !== 0 && (flags & SLEEPING) !== 0;
+    return (flags & ALIVE) !== 0 && (flags & (SLEEPING | RESTING)) !== 0;
   }
   /**
    * Wakes a body and every body it sleeps with. Writing a sleeper's velocity or force columns does not wake it, so call
@@ -477,7 +481,10 @@ export class KernelWorld {
    * @returns false when the row holds no body.
    */
   removeBody(body: number): boolean {
-    return Number.isInteger(body) && body >= 0 && this.api.body_remove(body) === 1;
+    if (!(Number.isInteger(body) && body >= 0 && this.api.body_remove(body) === 1)) return false;
+    // The row may hold a new body before the step: the wake was for the old one.
+    if (this.wakeAtStep.length) this.wakeAtStep = this.wakeAtStep.filter((row) => row !== body);
+    return true;
   }
   /**
    * Adds a collider to a body and works out the body's mass, centre and inertia again. Grows the world when the rows run
@@ -633,16 +640,21 @@ export class KernelWorld {
     return this;
   }
   /**
-   * Changes how a body moves, keeping its pose, colliders and joints. It wakes, with what it touches. A body made fixed
-   * stops and drops its pairs with other fixed bodies, so what they touched ends; one made `kinematicPosition` holds its
-   * pose until given a target.
+   * Changes how a body moves, keeping its pose, colliders and joints. A body made fixed stops and drops its pairs with
+   * other fixed bodies, so what they touched ends; one made `kinematicPosition` holds its pose until given a target. With
+   * `wakeUp` (default true) a body made dynamic or kinematic wakes now, with what it touches. A sleeper otherwise, or made
+   * fixed, reads asleep until the next step, which wakes it and what it touches whatever `wakeUp` said: Rapier does both
+   * (measured on the root entry).
    * @throws RangeError for an unknown kind.
    */
-  setKind(body: number, kind: KernelBodyKind): this {
+  setKind(body: number, kind: KernelBodyKind, wakeUp = true): this {
     const bits = Object.hasOwn(bodyKinds, kind) ? bodyKinds[kind] : undefined;
     if (bits === undefined)
       throw new RangeError(`Unknown body kind ${String(kind)}; use one of ${Object.keys(bodyKinds).join(', ')}.`);
-    this.api.body_set_kind(body, bits);
+    const flags = this.columns.flags[body] ?? 0,
+      changes = (flags & ALIVE) !== 0 && (flags & (3 << 1)) !== bits;
+    this.api.body_set_kind(body, bits, wakeUp ? 1 : 0);
+    if (changes && ((this.columns.flags[body] ?? 0) & (SLEEPING | RESTING)) !== 0) this.wakeAtStep.push(body);
     return this;
   }
   /**
@@ -698,6 +710,8 @@ export class KernelWorld {
     if (!(dt > 0) || !Number.isFinite(dt))
       throw new RangeError(`A step must be finite and above zero; a usual step is 1 / 60 (got ${dt}).`);
     if (this.stepping) throw new MargoError('state', 'A contact filter ran a step; a filter may only read the world.');
+    for (const row of this.wakeAtStep) this.api.body_wake_touching(row);
+    this.wakeAtStep.length = 0;
     this.stepping = true;
     let failed: number;
     try {

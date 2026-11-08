@@ -177,6 +177,13 @@ pub extern "C" fn body_wake(body: u32) {
         world().wake(body);
     }
 }
+/// Wakes a body and what its colliders touch: what a change of kind does at the step after it.
+#[unsafe(no_mangle)]
+pub extern "C" fn body_wake_touching(body: u32) {
+    if world().body_alive(body) {
+        world().wake_touching(body);
+    }
+}
 #[unsafe(no_mangle)]
 pub extern "C" fn body_sleep(body: u32) {
     if world().body_alive(body) {
@@ -204,8 +211,8 @@ pub extern "C" fn body_update_mass(body: u32) {
 }
 /// Changes how a body moves: one of the FIXED, DYNAMIC, KINEMATIC_ bits.
 #[unsafe(no_mangle)]
-pub extern "C" fn body_set_kind(body: u32, kind: u32) {
-    world().set_body_kind(body, kind);
+pub extern "C" fn body_set_kind(body: u32, kind: u32, wake: u32) {
+    world().set_body_kind(body, kind, wake != 0);
 }
 /// Sets a body's own solid: mass at a point of its frame, principal moments along a frame of its own, then its mass again.
 #[unsafe(no_mangle)]

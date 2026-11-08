@@ -309,8 +309,9 @@ export class PhysicsBody {
     return this.check().additionalSolverIterations();
   }
   set additionalSolverIterations(passes: number) {
-    if (!Number.isInteger(passes) || passes < 0)
-      throw new RangeError('Additional solver iterations must be a whole number of at least 0; pass extra passes.');
+    // Rapier keeps the count in 32 bits: a larger one would wrap to a few passes without a word.
+    if (!Number.isInteger(passes) || passes < 0 || passes > 0xffffffff)
+      throw new RangeError('Additional solver iterations must be a whole number from 0 to 4294967295; pass extra passes.');
     this.check().setAdditionalSolverIterations(passes);
   }
   get gravityScale(): number {

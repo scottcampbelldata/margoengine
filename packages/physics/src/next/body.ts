@@ -75,16 +75,15 @@ export class PhysicsBody {
    * Switches how the body moves, keeping its pose, colliders and joints: a ragdoll going limp (`'dynamic'`) or back under
    * animation (`'kinematicPosition'`), a door that unlocks. A dynamic or kinematic body keeps its velocity; one made fixed
    * stops, and what it touched among fixed bodies ends. A body made `'kinematicPosition'` holds its pose until given a
-   * target. The body wakes whatever `wakeUp` says, with what it touches: the own solver lists a body again when its kind
-   * changes.
+   * target. With `wakeUp` (default true) a body made dynamic or kinematic wakes now. A sleeper otherwise, or made fixed,
+   * reads asleep until the next step, which wakes it and what it touches whatever `wakeUp` said, as on the root entry.
    */
   setType(type: BodyType, wakeUp = true): this {
     const kernel = this.world();
     if (typeof type !== 'string' || !['dynamic', 'fixed', 'kinematicPosition', 'kinematicVelocity'].includes(type))
       throw new TypeError(`Unknown body type ${String(type)}; use dynamic, fixed, kinematicPosition or kinematicVelocity.`);
-    void wakeUp;
     if (type === this.kind) return this;
-    kernel.setKind(this.row, type);
+    kernel.setKind(this.row, type, wakeUp !== false);
     this.kind = type;
     this.dirty = true;
     this.restWritten = false;
@@ -333,8 +332,8 @@ export class PhysicsBody {
     return this.columns.extraPasses[this.row];
   }
   set additionalSolverIterations(passes: number) {
-    if (!Number.isInteger(passes) || passes < 0 || passes > 1000)
-      throw new RangeError('Additional solver iterations must be a whole number from 0 to 1000; pass extra passes.');
+    if (!Number.isInteger(passes) || passes < 0 || passes > 0xffffffff)
+      throw new RangeError('Additional solver iterations must be a whole number from 0 to 4294967295; pass extra passes.');
     this.columns.extraPasses[this.row] = passes;
   }
   /** Not served yet: reads false, and true throws. */

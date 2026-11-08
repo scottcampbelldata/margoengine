@@ -2,9 +2,10 @@
 // packages/physics/README.md says the root entry does.
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { Physics as Root } from '../dist/index.js';
 import { Physics } from '../dist/next.js';
 
-await Physics.load();
+await Promise.all([Physics.load(), Root.load()]);
 
 const near = (got, want, within, what) => assert.ok(Math.abs(got - want) <= within, `${what}: ${got} against ${want}`);
 const cube = (half = 0.5, extra = {}) => ({ shape: 'box', halfExtents: [half, half, half], ...extra });
@@ -171,7 +172,11 @@ test('extra passes give an island what a world of that many passes would, and le
   assert.equal(body.additionalSolverIterations, 0);
   body.additionalSolverIterations = 4;
   assert.equal(body.additionalSolverIterations, 4);
-  assert.throws(() => (body.additionalSolverIterations = -1), /whole number from 0 to 1000/);
+  assert.throws(() => (body.additionalSolverIterations = -1), /whole number from 0 to 4294967295/);
+  // Rapier's 32 bits, not a cap of our own: the largest count is kept, and one past it throws on both entries.
+  body.additionalSolverIterations = 0xffffffff;
+  assert.equal(body.additionalSolverIterations, 0xffffffff);
+  body.additionalSolverIterations = 0;
   assert.throws(() => (body.additionalSolverIterations = 1.5), RangeError);
   physics.dispose();
 });
@@ -233,4 +238,91 @@ test('a generic joint holds its limits and drives its motors: the README door, a
   near(car.position[1], 4.5, 0.01, 'the car hangs at the end of its travel');
   near(car.position[0], 10, 1e-4, 'and stays on the rail');
   physics.dispose();
+});
+
+/** Sleep reads through a kind change, the same calls on either entry: before, after setType, after one step, much later. */
+function switchReads(Engine, from, to, wakeUp) {
+  const physics = new Engine(null);
+  physics.addBody(null, { type: 'fixed', position: [0, -0.5, 0], colliders: { shape: 'box', halfExtents: [50, 0.5, 50] } });
+  const body = physics.addBody(null, { type: from, position: [0, 0.5, 0], colliders: cube() }),
+    top = physics.addBody(null, { position: [0, 1.5, 0], colliders: cube() }),
+    reads = () => [body.sleeping, top.sleeping];
+  for (let i = 0; i < 300; i++) physics.step();
+  const out = [reads()];
+  body.setType(to, wakeUp);
+  out.push(reads());
+  physics.step();
+  out.push(reads());
+  for (let i = 0; i < 300; i++) physics.step();
+  out.push(reads());
+  physics.dispose();
+  return out;
+}
+
+test('setType honours wakeUp as the root entry does: asleep until the step, which wakes it and what it touches', () => {
+  // Measured on the root entry (Rapier): wakeUp only decides the read before the next step, and a body made fixed is not woken.
+  // The own solver wakes a whole sleeping island at once, so after setType(type, true) the body on top reads awake a step
+  // early there; docs/limits.md has it.
+  for (const to of ['fixed', 'kinematicPosition', 'dynamic'])
+    for (const from of ['dynamic', 'kinematicPosition'])
+      for (const wakeUp of [false, true]) {
+        if (from === to) continue;
+        const root = switchReads(Root, from, to, wakeUp),
+          own = switchReads(Physics, from, to, wakeUp),
+          what = `${from} to ${to}, wakeUp ${wakeUp}`;
+        assert.deepEqual(own[0], root[0], `${what}: before`);
+        assert.equal(own[1][0], root[1][0], `${what}: the body right after setType`);
+        if (!wakeUp || to === 'fixed') assert.equal(own[1][1], root[1][1], `${what}: the body on top right after setType`);
+        assert.deepEqual(own[2], root[2], `${what}: after one step`);
+        assert.deepEqual(own[3], root[3], `${what}: much later`);
+      }
+});
+
+test('a still kinematic body reads asleep as on the root entry, sleep() stops it, and a target wakes it', () => {
+  for (const Engine of [Root, Physics]) {
+    const physics = new Engine(null),
+      name = Engine === Root ? 'root' : 'own';
+    for (const type of ['kinematicPosition', 'kinematicVelocity']) {
+      const body = physics.addBody(null, { type, colliders: cube() });
+      const reads = [];
+      for (let i = 0; i < 40; i++) {
+        physics.step();
+        reads.push(body.sleeping);
+      }
+      assert.equal(reads.at(-1), true, `${name} ${type} rests`);
+      if (type === 'kinematicPosition') {
+        body.setNextPosition([1, 0, 0]);
+        assert.equal(body.sleeping, false, `${name}: a target wakes it`);
+        physics.step();
+        near(body.position[0], 1, 1e-6, `${name}: it reaches the target`);
+      } else {
+        body.setLinearVelocity([1, 0, 0]);
+        physics.step();
+        assert.equal(body.sleeping, false, `${name}: speed ends the rest`);
+        body.sleep();
+        assert.equal(body.sleeping, true, `${name}: sleep() reads asleep at once`);
+        const x = body.position[0];
+        physics.step();
+        physics.step();
+        assert.equal(body.position[0], x, `${name}: a kinematic body put to sleep stops`);
+        assert.deepEqual(body.linearVelocity, [0, 0, 0]);
+      }
+    }
+    physics.dispose();
+  }
+});
+
+test('the step a still kinematic body starts to read asleep is the same on both entries', () => {
+  const first = (Engine) => {
+    const physics = new Engine(null),
+      body = physics.addBody(null, { type: 'kinematicVelocity', colliders: cube() });
+    let step = 0;
+    while (!body.sleeping && step < 200) {
+      physics.step();
+      step++;
+    }
+    physics.dispose();
+    return step;
+  };
+  assert.equal(first(Physics), first(Root));
 });

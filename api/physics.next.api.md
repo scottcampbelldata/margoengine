@@ -194,7 +194,7 @@ export class KernelWorld {
     setJointAxis(joint: number, axis: readonly [number, number, number]): void;
     setJointFrames(joint: number, a: Quat, b: Quat): void;
     updateMass(body: number): this;
-    setKind(body: number, kind: KernelBodyKind): this;
+    setKind(body: number, kind: KernelBodyKind, wakeUp?: boolean): this;
     setOwnSolid(body: number, mass: number, center: Vec3, inertia: Vec3, frame?: Quat): this;
     setPose(body: number, position: Vec3, rotation: Quat, wake?: boolean): this;
     setTarget(body: number, position: Vec3, rotation: Quat): this;

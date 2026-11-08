@@ -503,6 +503,9 @@ pub const SLEEPING: u32 = 1 << 9;
 pub const CAN_SLEEP: u32 = 1 << 10;
 /// Out of the world: on no list, touching nothing, its joints at rest.
 pub const DISABLED: u32 = 1 << 11;
+/// A kinematic body still for the sleep window: it reads asleep, as Rapier's does, though it stays on the awake list, since a
+/// script may give it speed at any time. It moves and wakes nothing while still, so this changes no result.
+pub const RESTING: u32 = 1 << 12;
 
 // Bits of the COLLIDER_FLAGS column.
 /// Sees overlaps and pushes nothing.

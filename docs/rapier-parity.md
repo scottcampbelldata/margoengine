@@ -89,7 +89,7 @@ Batch order, parity first (reasons in [Order](#order)): 126, 127, 128, 138, 139,
 | Row | Rapier | Root today | Own solver | Status | WebGPU | WebGL2 |
 | --- | --- | --- | --- | --- | --- | --- |
 | RB-01 | types `Dynamic`, `Fixed`, `KinematicPositionBased`, `KinematicVelocityBased` | four types | four types | DONE: `kernel/tests/integrate.rs` `a_kinematic_velocity_body_ignores_forces_and_a_fixed_one_never_moves` | Wasm | Wasm |
-| RB-02 | `set_body_type` | `setType` | throws | BUILDING 126 (extra job) | Wasm | Wasm |
+| RB-02 | `set_body_type` | `setType` | yes | DONE: `next-bodies.test.js` "setType honours wakeUp as the root entry does: asleep until the step, which wakes it and what it touches" | Wasm | Wasm |
 | RB-03 | translation, rotation, pose, teleport | yes | yes | DONE: `kernel/tests/pose.rs` `a_pose_is_normalised_and_holds_every_column_that_starts_a_step` | Wasm | Wasm |
 | RB-04 | `linvel`, `angvel` | yes | yes | DONE: `kernel/tests/integrate.rs` `the_reported_velocity_is_the_one_that_moved_the_body` | Wasm | Wasm |
 | RB-05 | `gravity_scale` | yes | column | DONE without a named test; test added in 138.3 | Wasm | Wasm |
@@ -99,10 +99,10 @@ Batch order, parity first (reasons in [Order](#order)): 126, 127, 128, 138, 139,
 | RB-09 | `ccd_enabled` | `ccd` | throws | BUILDING 126 | Wasm | Wasm |
 | RB-10 | `soft_ccd_prediction` | no | none | BUILDING 126 (speculative margin); option MISSING if left out, 140.5 | Wasm | Wasm |
 | RB-11 | `additional_mass` | `additionalMass` | yes | DONE: `kernel-collider.test.js` "additional mass scales the inertia" | Wasm | Wasm |
-| RB-12 | `additional_mass_properties` (mass, centre, principal inertia, frame) | `setMassProperties` | throws | BUILDING 126 (extra job) | Wasm | Wasm |
+| RB-12 | `additional_mass_properties` (mass, centre, principal inertia, frame) | `setMassProperties` | yes | DONE: `next-bodies.test.js` "setMassProperties: mass alone scales the inertia, every figure given is the body exactly" | Wasm | Wasm |
 | RB-13 | `lock_translations`, `lock_rotations`, `enabled_translations`, `enabled_rotations`, `LockedAxes` | yes | yes | DONE: `kernel/tests/integrate.rs` `locks_hold_a_body_on_its_world_axes` | Wasm | Wasm |
 | RB-14 | `dominance_group` (-127 to 127) | `dominance` | yes | DONE: `next-events.test.js` "a higher dominance is a wall to a lower one, and nothing to a floor" | Wasm | Wasm |
-| RB-15 | `additional_solver_iterations` | yes | throws | BUILDING 126 (extra job) | Wasm | Wasm |
+| RB-15 | `additional_solver_iterations` | yes | yes | DONE: `next-bodies.test.js` "extra passes give an island what a world of that many passes would, and leave the others alone" | Wasm | Wasm |
 | RB-16 | `additional_pgs_iterations` | no | none | MISSING, 138.3 | Wasm | Wasm |
 | RB-17 | `allow_fast_rotation` | no | none | MISSING, 138.3 | Wasm | Wasm |
 | RB-18 | `gyroscopic_forces_enabled` | no | gyroscopic term always on | PARTIAL: term DONE: `kernel/tests/integrate.rs` `a_free_symmetric_top_precesses_at_the_closed_form_rate`; switch MISSING, 138.3 | Wasm | Wasm |
@@ -215,7 +215,7 @@ Batch order, parity first (reasons in [Order](#order)): 126, 127, 128, 138, 139,
 | J-08 | `SpringJoint` rest length, stiffness, damping | `spring` | yes | DONE: `kernel/tests/joints.rs` `a_spring_settles_at_its_rest_length_plus_the_static_stretch` | Wasm | Wasm |
 | J-09 | `spring_model` (`ForceBased` default, `AccelerationBased`) | no | force model | MISSING, 141.1 | Wasm | Wasm |
 | J-10 | `PinSlotJoint` | no | none | MISSING, 141.1 | Wasm | Wasm |
-| J-11 | `GenericJoint`: locked axes, limit axes, motor axes, `JointAxesMask`, `JointAxis` | `generic` | throws | BUILDING 126 (extra job) | Wasm | Wasm |
+| J-11 | `GenericJoint`: locked axes, limit axes, motor axes, `JointAxesMask`, `JointAxis` | `generic` | yes | DONE: `next-bodies.test.js` "a generic joint is the joint its locks make: all six a fixed joint, the linear three a ball joint" | Wasm | Wasm |
 | J-12 | generic `coupled_axes` | no | none | MISSING, 141.1 | Wasm | Wasm |
 | J-13 | local anchors and local frames | `anchorA/B`, `frameA/B` | yes | DONE: `next-joints.test.js` "frames in place of an axis: the rest pose reads 0, whatever the frames" | Wasm | Wasm |
 | J-14 | `setAnchor1/2`, `setLocalFrame1/2`, `setFrameX1/2` after creation, `flip` | no | none | MISSING, 141.2 | Wasm | Wasm |
@@ -540,7 +540,7 @@ Counted from the rows on 2026-11-07, one count a row by the first word of its St
 
 | Part | Rows | DONE | PARTIAL | BUILDING 126 | PLANNED 127 to 131 | MISSING, now owned | N/A |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1, Rapier parity | 251 | 57 | 19 | 25 | 14 | 132 | 4 |
+| 1, Rapier parity | 251 | 61 | 19 | 21 | 14 | 132 | 4 |
 | 2, beyond Rapier | 83 | 0 | 0 | 0 | 4 (extended later) | 79 | 0 |
 
 Margo already does more than Rapier in 15 rows (M-01 to M-15). The missing parity rows are owned by four extra jobs added to batches 127 and 128 (3D debug drawing, 2D events and filters, the multibody API, multibody inverse kinematics) and by batches 138 to 146. Part 2 is owned by batches 147 to 158 (60 jobs; the parity batches 138 to 146 hold 52 jobs, plus the four extra jobs in 127 and 128); 4 of its rows extend what batch 131 already plans 1 (X-79) extends parity job 142.2, and 1 (X-88) is parity job 141.7.

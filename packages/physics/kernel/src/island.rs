@@ -104,7 +104,12 @@ impl World {
 
     /// Wakes a sleeping body and the whole ring it sleeps in; does nothing to one that is awake.
     pub fn wake(&mut self, body: u32) {
-        if self.flags(body as usize) & SLEEPING == 0 {
+        let flags = self.flags(body as usize);
+        if flags & RESTING != 0 {
+            self.set_u(FLAGS, body as usize, flags & !RESTING);
+            self.set_s(SLEEP_TIME, body as usize, 0.0);
+        }
+        if flags & SLEEPING == 0 {
             return;
         }
         let first = self.header().awake;
@@ -116,7 +121,10 @@ impl World {
             self.set_u(FLAGS, row, self.flags(row) & !SLEEPING);
             self.set_s(SLEEP_TIME, row, 0.0);
             self.set_s(SLEEP_ENERGY, row, 0.0);
-            self.list_awake(at);
+            // A sleeper made fixed waits in its ring for the wake that follows; a fixed body goes on no list.
+            if self.flags(row) & KIND != FIXED {
+                self.list_awake(at);
+            }
             at = next;
             if at == body {
                 break;
@@ -135,15 +143,29 @@ impl World {
         }
     }
 
-    /// Asks a body to sleep: it counts as ready at once, so it sleeps with its island at the next step where all are ready.
+    /// Wakes a body, and every body its colliders touch.
+    pub fn wake_touching(&mut self, body: u32) {
+        self.wake(body);
+        let mut collider = self.uu(FIRST_COLLIDER, body as usize);
+        while collider != NONE {
+            self.touch_collider(collider);
+            collider = self.uu(COLLIDER_NEXT, collider as usize);
+        }
+    }
+
+    /// Asks a body to sleep: it counts as ready at once, so it sleeps with its island at the next step where all are ready. A
+    /// kinematic body is in no island: it stops and reads asleep at once.
     pub fn request_sleep(&mut self, body: u32) {
         let at = body as usize;
         let flags = self.flags(at);
-        if flags & SLEEPING == 0 && flags & KIND == DYNAMIC {
+        if flags & SLEEPING == 0 && flags & KIND != FIXED {
             self.set_v(LINEAR_X, at, v3(0.0, 0.0, 0.0));
             self.set_v(ANGULAR_X, at, v3(0.0, 0.0, 0.0));
             self.set_s(SLEEP_TIME, at, self.header().sleep_time);
             self.set_s(SLEEP_ENERGY, at, 0.0);
+            if flags & KIND != DYNAMIC {
+                self.set_u(FLAGS, at, flags | RESTING);
+            }
         }
     }
 
@@ -320,6 +342,15 @@ impl World {
         }
         self.header_mut().islands = kept as u32;
         self.header_mut().extra_passes = most;
+        // A kinematic body joins no island: it rests alone once still for the window, and any speed ends the rest.
+        for i in 0..self.header().awake as usize {
+            let body = self.uu(AWAKE, i) as usize;
+            let flags = self.flags(body);
+            if flags & KIND != DYNAMIC {
+                let rests = self.tick(body, dt);
+                self.set_u(FLAGS, body, if rests { flags | RESTING } else { flags & !RESTING });
+            }
+        }
     }
 
     /// Extra passes the island of a body asks for: 0 for a body in no island of this step.
@@ -337,25 +368,27 @@ impl World {
     /// Changes how a body moves, keeping its pose, colliders and joints. Two fixed bodies have no pair, so a body that stops
     /// being fixed finds the fixed colliders its boxes overlap now, and the broad phase finds the rest as its boxes move; a
     /// body that becomes fixed drops its pairs with fixed bodies, and what they touched ends. A fixed body is still, so it
-    /// loses its speed; a kinematicPosition body's target starts at its pose, so it stays put until given one. It wakes,
-    /// and so does what it touches.
-    pub fn set_body_kind(&mut self, body: u32, kind: u32) {
+    /// loses its speed; a kinematicPosition body's target starts at its pose, so it stays put until given one. With `wake` a
+    /// body made dynamic or kinematic wakes, and so does what it touches; otherwise, and always when made fixed, a sleeper
+    /// stays in its ring until a wake comes. Rapier keeps it asleep until its next step, and wakes it then whatever was asked
+    /// (measured on the root entry), so the caller wakes it before that step.
+    pub fn set_body_kind(&mut self, body: u32, kind: u32, wake: bool) {
         let at = body as usize;
         let kind = kind & KIND;
         if !self.body_alive(body) || self.flags(at) & KIND == kind {
             return;
         }
         let was_fixed = self.flags(at) & KIND == FIXED;
-        self.wake(body);
-        let mut collider = self.uu(FIRST_COLLIDER, at);
-        while collider != NONE {
-            self.touch_collider(collider);
-            collider = self.uu(COLLIDER_NEXT, collider as usize);
+        let now = wake && kind != FIXED;
+        if now {
+            self.wake_touching(body);
         }
+        // A kinematic body's rest ends with the wake; until then it reads asleep, whatever its kind.
         self.set_u(FLAGS, at, self.flags(at) & !KIND | kind);
         let out = self.flags(at) & DISABLED != 0;
         if was_fixed {
-            if !out {
+            // A sleeper made fixed and back again is still in its ring.
+            if !out && self.flags(at) & SLEEPING == 0 {
                 self.set_s(SLEEP_TIME, at, 0.0);
                 self.list_awake(body);
             }
