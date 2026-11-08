@@ -17,16 +17,25 @@ export class HTML extends LabelRenderer {
     add(element: HTMLElement, options?: LabelOptions): Label;
     remove(item: Label | CSS3DObject): void;
     setup(instance: EngineKernel): void;
+    onPreUpdate(delta: number): void;
+    update(): void;
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(): void;
     dispose(): void;
     [Symbol.dispose]: () => void;
 }
 
+export interface HTMLFadeOptions {
+    radius?: number;
+    samples?: number;
+    duration?: number;
+}
+
 export interface HTMLOptions extends LabelRendererOptions {
     depth?: false | (() => GPUTexture | undefined);
     capacity?: number;
     depthBias?: number;
+    fade?: boolean | HTMLFadeOptions;
 }
 
 export { Label } from "@margoengine/labels";

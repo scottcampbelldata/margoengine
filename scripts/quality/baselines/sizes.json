@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11295815,
+  "total": 11296810,
   "history": [
     {
       "date": "2026-10-24",
@@ -4496,6 +4496,12 @@
       "commit": "1cd9f8e9b",
       "reason": "environment/probes grows by sphere reflection probes and weighted blending",
       "grew": 2
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "44e40cbb6",
+      "reason": "html fade option: grid depth shader, options and opacity step (batch 106 job 1)",
+      "grew": 1
     }
   ],
   "items": {
@@ -4805,7 +4811,7 @@
     "@margoengine/headless/formats": 5809,
     "@margoengine/headless/stage": 3306,
     "@margoengine/headless/video": 7287,
-    "@margoengine/html": 5013,
+    "@margoengine/html": 6008,
     "@margoengine/input": 5414,
     "@margoengine/input/interactions": 1614,
     "@margoengine/input/motion": 1806,

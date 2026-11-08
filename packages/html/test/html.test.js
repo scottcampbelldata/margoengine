@@ -161,3 +161,96 @@ test('HTML clears stale occlusion while an anchor moves before depth readback', 
     dom.window.close();
   }
 });
+
+test('HTML fade follows the covered share of the depth grid, steps by duration and hides at 0', async () => {
+  const h = optionalGPU(),
+    dom = new JSDOM('<body><canvas width="128" height="96"></canvas></body>');
+  h.engine.canvas = dom.window.document.querySelector('canvas');
+  for (const fade of [{ samples: 1 }, { samples: 9 }, { samples: 2.5 }, { radius: -1 }, { duration: 11 }, 'x', null])
+    assert.throws(() => new HTML({ fade }), /fade options/, JSON.stringify(fade));
+  const overlay = new HTML({ capacity: 2, fade: { samples: 4, radius: 8, duration: 0.2 } });
+  h.engine.use(overlay);
+  const label = overlay.add(dom.window.document.createElement('span'), { position: [0, 0, 0.5] });
+  const frame = async () => {
+    h.frame();
+    await new Promise((resolve) => setImmediate(resolve));
+  };
+  try {
+    const code = h.pipelines.at(-1).compute.module.code;
+    assert.match(code, /j<4u/, 'The fade shader takes a 4 x 4 grid');
+    const radius = h.resources.find((r) => r.size === 16 && r.usage & GPUBufferUsage.UNIFORM);
+    const covered = new Uint32Array(overlay.output.data);
+    covered[0] = 8;
+    await frame();
+    assert.deepEqual([...new Float32Array(radius.data)], [8, 8, 0, 0], 'Radius in drawing-buffer pixels');
+    assert.equal(label.element.style.opacity, '', 'Opacity 1 before any result');
+    await frame();
+    assert.equal(label.element.style.opacity, '0.5', 'Half the grid covered: one 0.1 s frame of a 0.2 s fade');
+    covered[0] = 16;
+    await frame();
+    assert.equal(label.element.style.opacity, '0.5', 'Results arrive a frame late');
+    await frame();
+    assert.equal(label.onScreen, false, 'Fully covered: hidden once the opacity reaches 0');
+    assert.equal(label.element.style.display, 'none');
+    covered[0] = 4;
+    await frame();
+    assert.equal(label.onScreen, false, 'Still hidden while the clearer result is read');
+    await frame();
+    assert.equal(label.onScreen, true);
+    assert.equal(label.element.style.opacity, '0.5', 'Rising toward 0.75 by 0.5 a frame');
+    await frame();
+    assert.equal(label.element.style.opacity, '0.75');
+    covered[0] = 0;
+    await frame();
+    await frame();
+    assert.equal(label.element.style.opacity, '', 'Fully clear writes opacity back to the stylesheet');
+  } finally {
+    overlay.dispose();
+    dom.window.close();
+  }
+  await null;
+  assert.ok(
+    h.resources.every((r) => r.destroyed),
+    'Fade radius buffer destroyed with the rest',
+  );
+});
+
+test('HTML fade with duration 0 follows each result and a stale result shows the anchor', async () => {
+  const h = optionalGPU(),
+    dom = new JSDOM('<body><canvas width="128" height="96"></canvas></body>');
+  h.engine.canvas = dom.window.document.querySelector('canvas');
+  const overlay = new HTML({ capacity: 1, fade: { samples: 2, radius: 4, duration: 0 } });
+  h.engine.use(overlay);
+  const label = overlay.add(dom.window.document.createElement('span'), { position: [0, 0, 0.5] });
+  const frame = async () => {
+    h.frame();
+    await new Promise((resolve) => setImmediate(resolve));
+  };
+  try {
+    new Uint32Array(overlay.output.data)[0] = 3;
+    await frame();
+    await frame();
+    assert.equal(label.element.style.opacity, '0.25');
+    let finish;
+    overlay.read.mapAsync = () =>
+      new Promise((resolve) => {
+        finish = () => {
+          overlay.read.mapState = 'mapped';
+          resolve();
+        };
+      });
+    h.frame();
+    await Promise.resolve();
+    label.position[0] = 0.5;
+    h.frame();
+    finish();
+    await new Promise((resolve) => setImmediate(resolve));
+    h.frame();
+    assert.equal(label.element.style.opacity, '', 'A result taken before the anchor moved away is not applied');
+    finish();
+    await new Promise((resolve) => setImmediate(resolve));
+  } finally {
+    overlay.dispose();
+    dom.window.close();
+  }
+});

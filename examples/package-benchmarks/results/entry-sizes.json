@@ -1,10 +1,10 @@
 {
-  "commit": "c8a436a56",
+  "commit": "d11858f0c",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
     "raw": 58443,
-    "gzip": 23590,
+    "gzip": 23626,
     "limit": 25000
   },
   "packages": {
@@ -577,17 +577,17 @@
     "@margoengine/core": {
       ".": {
         "raw": 51214,
-        "gzip": 21258
+        "gzip": 21285
       },
       "./extension": {
-        "raw": 51313,
-        "gzip": 21323
+        "raw": 51315,
+        "gzip": 21311
       }
     },
     "@margoengine/creative": {
       ".": {
-        "raw": 61586,
-        "gzip": 19100
+        "raw": 62200,
+        "gzip": 19154
       },
       "./particles": {
         "raw": 1028,
@@ -606,16 +606,16 @@
         "gzip": 7019
       },
       "./grass": {
-        "raw": 16111,
-        "gzip": 5944
+        "raw": 16377,
+        "gzip": 5961
       },
       "./planet": {
-        "raw": 20730,
-        "gzip": 7011
+        "raw": 20958,
+        "gzip": 7027
       },
       "./stars": {
-        "raw": 6033,
-        "gzip": 2653
+        "raw": 6153,
+        "gzip": 2665
       }
     },
     "@margoengine/culling": {
@@ -826,12 +826,12 @@
         "gzip": 30496
       },
       "./probes": {
-        "raw": 48023,
-        "gzip": 17370
+        "raw": 49678,
+        "gzip": 17921
       },
       "./volumetric": {
-        "raw": 21892,
-        "gzip": 8330
+        "raw": 25947,
+        "gzip": 9457
       },
       "./reflector": {
         "raw": 29646,
@@ -858,8 +858,8 @@
         "gzip": 5177
       },
       "./gi": {
-        "raw": 48504,
-        "gzip": 17519
+        "raw": 50159,
+        "gzip": 18068
       },
       "./fog-volumes": {
         "raw": 2704,
@@ -1290,8 +1290,8 @@
     },
     "@margoengine/html": {
       ".": {
-        "raw": 14418,
-        "gzip": 4989
+        "raw": 16789,
+        "gzip": 5752
       }
     },
     "@margoengine/input": {
@@ -2748,8 +2748,8 @@
     },
     "@margoengine/stage": {
       ".": {
-        "raw": 7314,
-        "gzip": 2966
+        "raw": 7318,
+        "gzip": 2974
       },
       "./gltf": {
         "raw": 2922,

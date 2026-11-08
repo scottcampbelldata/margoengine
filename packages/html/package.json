@@ -44,6 +44,7 @@
   "scripts": {
     "build": "node ../../scripts/build-optional.js html",
     "test": "npm run build && node --test test/*.test.js",
+    "test:browser": "npm run build && node scripts/test-browser.js",
     "prepack": "npm run build"
   }
 }
