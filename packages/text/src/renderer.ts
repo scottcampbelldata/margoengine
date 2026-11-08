@@ -11,8 +11,15 @@ import { Text } from './text.js';
 import { applyView } from '../../shared/view-rect.js';
 import { overlayPass } from '../../shared/pass.js';
 
-declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number };
-declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };
+declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number } | undefined;
+declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number } | undefined;
+
+const STAGE_VERTEX = typeof GPUShaderStage !== 'undefined' ? GPUShaderStage.VERTEX : 1;
+const STAGE_FRAGMENT = typeof GPUShaderStage !== 'undefined' ? GPUShaderStage.FRAGMENT : 2;
+const BUFFER_USAGE_UNIFORM_COPY_DST =
+  typeof GPUBufferUsage !== 'undefined' ? GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST : 0x0040 | 0x0008;
+const BUFFER_USAGE_STORAGE_COPY_DST =
+  typeof GPUBufferUsage !== 'undefined' ? GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST : 0x0080 | 0x0008;
 
 type GpuContext = Extract<PassContext, { backend: 'webgpu' }>;
 const GLYPH_FLOATS = 12,
@@ -77,8 +84,8 @@ export class TextRenderer implements EnginePlugin {
   private frameBuffer?: GPUBuffer;
   private frameGroup?: GPUBindGroup;
   private frameGroupKey = '';
-  private sdfAtlas?: GlyphAtlas;
-  private colorAtlas?: GlyphAtlas;
+  private _sdfAtlas?: GlyphAtlas;
+  private _colorAtlas?: GlyphAtlas;
   private readonly frameData = new Float32Array(28);
   private readonly view = new Float32Array(16);
   private readonly depthTexts: Array<[Text, Resources]> = [];
@@ -116,13 +123,23 @@ export class TextRenderer implements EnginePlugin {
     return this.members;
   }
 
+  /** The SDF glyph atlas, available after setup. */
+  get sdfAtlas(): GlyphAtlas | undefined {
+    return this._sdfAtlas;
+  }
+
+  /** The color (emoji) glyph atlas, available after setup. */
+  get colorAtlas(): GlyphAtlas | undefined {
+    return this._colorAtlas;
+  }
+
   /** Atlas usage: pages and glyphs of the SDF and color atlases. */
   get atlas(): { sdfPages: number; colorPages: number; glyphs: number; colorGlyphs: number; pageSize: number } {
     return {
-      sdfPages: this.sdfAtlas?.pages ?? 0,
-      colorPages: this.colorAtlas?.pages ?? 0,
-      glyphs: this.sdfAtlas?.slots.size ?? 0,
-      colorGlyphs: this.colorAtlas?.slots.size ?? 0,
+      sdfPages: this._sdfAtlas?.pages ?? 0,
+      colorPages: this._colorAtlas?.pages ?? 0,
+      glyphs: this._sdfAtlas?.slots.size ?? 0,
+      colorGlyphs: this._colorAtlas?.slots.size ?? 0,
       pageSize: this.options.atlasSize,
     };
   }
@@ -144,6 +161,39 @@ export class TextRenderer implements EnginePlugin {
     for (const text of [...this.members]) this.remove(text);
   }
 
+  /** Decides whether an atlas page is in use by any active, visible Text. */
+  readonly canEvictPage = (page: number, atlas: GlyphAtlas): boolean => {
+    for (const text of this.members) {
+      if (!text.visible) continue;
+      const font = text.font;
+      for (const g of text.layout.glyphs) {
+        if (g.whitespace) continue;
+        const bitmap = font.glyph(g.cluster);
+        if (!bitmap) continue;
+        const slot = atlas.slots.get(bitmap);
+        if (slot && slot.page === page) return false;
+      }
+    }
+    return true;
+  };
+
+  /**
+   * Evicts all atlas pages that are no longer used by any active, visible text block.
+   * Returns the number of pages freed.
+   */
+  evictUnused(): number {
+    let freed = 0;
+    for (const atlas of [this._sdfAtlas, this._colorAtlas]) {
+      if (!atlas) continue;
+      for (let p = 0; p < atlas.pages; p++) {
+        if (this.canEvictPage(p, atlas)) {
+          if (atlas.evictPage(p)) freed++;
+        }
+      }
+    }
+    return freed;
+  }
+
   setup(engine: Engine): void {
     this.engine = engine;
     if (engine.backend !== 'webgpu' || !engine.gpu) {
@@ -154,19 +204,19 @@ export class TextRenderer implements EnginePlugin {
       return;
     }
     const device = (this.device = engine.gpu),
-      both = GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT;
+      both = STAGE_VERTEX | STAGE_FRAGMENT;
     const frame = device.createBindGroupLayout({
       entries: [
         { binding: 0, visibility: both, buffer: { type: 'uniform', minBindingSize: 112 } },
-        { binding: 1, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' } },
+        { binding: 1, visibility: STAGE_FRAGMENT, sampler: { type: 'filtering' } },
         {
           binding: 2,
-          visibility: GPUShaderStage.FRAGMENT,
+          visibility: STAGE_FRAGMENT,
           texture: { sampleType: 'float', viewDimension: '2d-array' },
         },
         {
           binding: 3,
-          visibility: GPUShaderStage.FRAGMENT,
+          visibility: STAGE_FRAGMENT,
           texture: { sampleType: 'float', viewDimension: '2d-array' },
         },
       ],
@@ -176,7 +226,7 @@ export class TextRenderer implements EnginePlugin {
         { binding: 0, visibility: both, buffer: { type: 'uniform', minBindingSize: BLOCK_BYTES } },
         {
           binding: 1,
-          visibility: GPUShaderStage.VERTEX,
+          visibility: STAGE_VERTEX,
           buffer: { type: 'read-only-storage', minBindingSize: GLYPH_FLOATS * 4 },
         },
       ],
@@ -189,15 +239,23 @@ export class TextRenderer implements EnginePlugin {
       addressModeU: 'clamp-to-edge',
       addressModeV: 'clamp-to-edge',
     });
-    this.frameBuffer = device.createBuffer({ size: 112, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.frameBuffer = device.createBuffer({ size: 112, usage: BUFFER_USAGE_UNIFORM_COPY_DST });
     const maxPages = Math.min(this.options.maxPages, device.limits.maxTextureArrayLayers, 2048),
       atlases = glyphAtlases(
         device,
         { ...this.options, maxPages },
-        this.sdfAtlas && this.colorAtlas ? { sdf: this.sdfAtlas, color: this.colorAtlas } : undefined,
+        this._sdfAtlas && this._colorAtlas ? { sdf: this._sdfAtlas, color: this._colorAtlas } : undefined,
       );
-    this.sdfAtlas = atlases.sdf;
-    this.colorAtlas = atlases.color;
+    this._sdfAtlas = atlases.sdf;
+    this._colorAtlas = atlases.color;
+    this._sdfAtlas.canEvict = this.canEvictPage;
+    this._colorAtlas.canEvict = this.canEvictPage;
+    this._sdfAtlas.onEvict = () => {
+      this.atlasEpoch++;
+    };
+    this._colorAtlas.onEvict = () => {
+      this.atlasEpoch++;
+    };
     this.frameGroup = undefined;
     this.frameGroupKey = '';
   }
@@ -246,8 +304,8 @@ export class TextRenderer implements EnginePlugin {
         created.push(buffer);
         return buffer;
       };
-      const uniform = r?.uniform ?? make(BLOCK_BYTES, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
-      const glyphs = make(capacity * GLYPH_FLOATS * 4, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST);
+      const uniform = r?.uniform ?? make(BLOCK_BYTES, BUFFER_USAGE_UNIFORM_COPY_DST);
+      const glyphs = make(capacity * GLYPH_FLOATS * 4, BUFFER_USAGE_STORAGE_COPY_DST);
       const group = device.createBindGroup({
         layout: this.layouts!.block,
         entries: [
@@ -302,7 +360,7 @@ export class TextRenderer implements EnginePlugin {
       if (g.whitespace) continue;
       const bitmap = font.glyph(g.cluster);
       if (!bitmap) continue;
-      const atlas = bitmap.color ? this.colorAtlas! : this.sdfAtlas!,
+      const atlas = bitmap.color ? this._colorAtlas! : this._sdfAtlas!,
         slot = atlas.place(bitmap),
         size = atlas.size,
         o = count * GLYPH_FLOATS;
@@ -428,18 +486,18 @@ export class TextRenderer implements EnginePlugin {
     }
     if (!this.depthTexts.length && !this.topTexts.length) return;
     this.writeFrame(context, linearTarget);
-    const key = `${this.sdfAtlas!.generation}|${this.colorAtlas!.generation}`;
+    const key = `${this._sdfAtlas!.generation}|${this._colorAtlas!.generation}`;
     if (!this.frameGroup || key !== this.frameGroupKey) {
       this.frameGroup = device.createBindGroup({
         layout: this.layouts!.frame,
         entries: [
           { binding: 0, resource: { buffer: this.frameBuffer! } },
           { binding: 1, resource: this.sampler! },
-          { binding: 2, resource: this.sdfAtlas!.view },
-          { binding: 3, resource: this.colorAtlas!.view },
+          { binding: 2, resource: this._sdfAtlas!.view },
+          { binding: 3, resource: this._colorAtlas!.view },
         ],
       });
-      this.frameGroupKey = `${this.sdfAtlas!.generation}|${this.colorAtlas!.generation}`;
+      this.frameGroupKey = `${this._sdfAtlas!.generation}|${this._colorAtlas!.generation}`;
     }
     this.colorAttachment.view = context.color;
     this.depthAttachment.view = context.depth;
@@ -492,9 +550,9 @@ export class TextRenderer implements EnginePlugin {
     for (const text of [...this.resources.keys()]) this.release(text);
     this.frameBuffer?.destroy();
     if (atlases) {
-      this.sdfAtlas?.dispose();
-      this.colorAtlas?.dispose();
-      this.sdfAtlas = this.colorAtlas = undefined;
+      this._sdfAtlas?.dispose();
+      this._colorAtlas?.dispose();
+      this._sdfAtlas = this._colorAtlas = undefined;
       this.atlasEpoch++;
     }
     this.frameBuffer = this.frameGroup = this.module = this.layouts = this.sampler = this.device = undefined;

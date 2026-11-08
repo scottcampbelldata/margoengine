@@ -2600,7 +2600,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-571). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-572). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -2817,6 +2817,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Model outlines (`@margoengine/toon/models`, 2026-11-08) | One render pass a view for every outlined primitive, one hull draw a primitive and its instances (two pipelines: plain and mirrored nodes). | The hull reuses the vertices the model already has on the GPU, deformed ones included, so it costs one more vertex pass of the outlined triangles. | By method: an inverted hull, so the line follows vertex normals: hard-edged meshes with split normals show gaps at their creases; a constant world-unit width, thinner with distance; no line on point and line primitives; GPU-culled draws still draw their hull; one width and colour for every model. Time not measured. | `@margoengine/post` `Outline` for a screen-space line of fixed pixel width. |
 | Palette cycling and ramps (`@margoengine/pixel/palette`, 2026-11-08) | `cyclePalette` and `mixPalettes` run on the CPU per call; `setSwap` writes one 256 x 1 row at most each frame. | Rotating the drawn colours animates water and fire without repainting a pixel, and the matching stays. | By method: cycles rotate the colours drawn, not the matching (a pixel keeps its index); one rate per run, no ping-pong or easing; mixing is linear in Oklab between two palettes. Time not measured. | For more than two palettes over a day, mix the neighbouring pair. |
 | Hatching and halftone (`@margoengine/toon/hatch`, 2026-11-08) | Core meshes only, one shader patch: up to 4 stroke layers or one dot a pixel, in the mesh's own fragment pass. | A screen-space pattern needs no textures or UVs and keeps the same stroke width at any distance. | By method: the pattern is fixed to the screen, so it slides over a moving surface (no texture-space strokes); tone is Lambert n.l of the sun only (clustered lights and shadows are not inked); hatching steps by whole layers; the paper takes the full lit colour without the 1/pi of Lambert, as `ToonShading` does. Time not measured. | `@margoengine/shader` `halftone` for a screen effect over everything; a `NodeMaterial` lighting function for glTF-pro and materials meshes. |
+| Text atlas eviction (`@margoengine/text`, 2026-11-08) | `TextRenderer.evictUnused()` and `GlyphAtlas.evict()` free texture array pages whose glyphs are no longer in any active visible `Text` block (LIM-572). When `maxPages` is full, `place()` evicts an unused page before failing. | For chat and user-generated text: keeps memory capped without leaking full atlas pages when old messages are removed or modified. | By method: only pages without active visible glyphs are evicted; if all pages contain active visible glyphs, `place()` throws `RangeError`. Time not measured. | Call `evictUnused()` after disposing old messages, or raise `maxPages` / `atlasSize`. |
 
 
 | Limit | Starts at | Why | What you see | Escape hatch |
@@ -6891,18 +6892,20 @@ const index = title.hitTest(0.3, -0.1);
 const caret = title.caretRect(index); // {x, top, bottom, line}
 title.layout.bounds;                  // {left, right, top, bottom}
 
+// Free atlas pages when old text blocks are removed or replaced.
+text.evictUnused();
+
 // On teardown: engine.removePlugin('text') or engine.dispose().
 ```
 
 ## How it works
 
 - **Glyphs on demand.** Text is split into grapheme clusters (`Intl.Segmenter`), so combining marks, flags and emoji sequences stay whole. Each new cluster is drawn once at 48 px on an OffscreenCanvas (or a canvas element), and its alpha is turned into an 8-bit signed distance field with an exact Euclidean distance transform (Felzenszwalb and Huttenlocher's lower envelope of parabolas), with sub-pixel edge positions taken from antialiased coverage. Glyphs with colored pixels, such as emoji, are kept as premultiplied RGBA bitmaps instead. Nothing touches the DOM until the first measurement, so construction is SSR-safe.
-- **Growable atlases.** Glyphs are shelf-packed into a single-channel texture array (1024 px pages, 1 MB each) and emoji into an RGBA array (512 px pages), uploaded one at a time with `writeTexture`. When a page fills, the array grows by doubling its layers on the GPU, so existing glyphs never move. CPU bitmaps stay with the `Font`, so a restored device re-uploads them.
+- **Growable atlases and eviction.** Glyphs are shelf-packed into a single-channel texture array (1024 px pages, 1 MB each) and emoji into an RGBA array (512 px pages), uploaded one at a time with `writeTexture`. When a page fills, the array grows by doubling its layers on the GPU, so existing glyphs never move. CPU bitmaps stay with the `Font`, so a restored device re-uploads them. When `maxPages` is reached, atlas eviction automatically frees pages no longer referenced by any active visible text block, or call `textRenderer.evictUnused()`.
 - **Layout.** Font size and line height are in world units; ascent and descent come from the font bounding box with half-leading. Lines break at spaces, between ideographs and, for words wider than `maxWidth`, inside the word. Trailing spaces hang outside the line. Kerning is measured per pair with the canvas (`measureText(ab) - a - b`) and cached. Alignment is relative to the widest line; justify spreads the gap over the spaces of every line except the last of a paragraph. Right-to-left runs are reordered with a simplified Unicode bidi algorithm (strong R and L classes, neutrals, numbers kept left to right, bracket pairs, mirrored brackets). `text.layout` exposes every cluster's advance box, the line boxes and the total bounds.
 - **One draw call per block.** Glyph quads live in a storage buffer and are expanded in the vertex shader. Shadow, outline and fill are layers of the same instanced draw (instance `i` draws glyph `i % n` in layer `i / n`), so every fill is drawn over every neighbour's outline. Antialiasing uses screen-space derivatives of the atlas coordinates, so edges stay one pixel wide at any scale or angle.
 - **Blending and depth.** Premultiplied alpha blending, reversed-Z depth test (`greater-equal`) without depth writes, so overlapping glyph quads never z-fight. Blocks are sorted back to front; `onTop` blocks draw last with the depth test off.
-- **Placement.** World-oriented text uses its local matrix, times the attached mesh's world matrix from `engineRuntime(engine).store.matrices`. Billboard text keeps the model's origin and scale and spans the camera's right and up vectors. Text attached to a hidden or disposed mesh is skipped.
-- **Lifecycle.** `onDeviceRestored` rebuilds pipelines, buffers and atlases; `dispose` (via `removePlugin`) releases them. Texts stay registered.
+- **Placement.** World-oriented text uses its local matrix, times the attached mesh's world matrix from `engineRuntime(engine).store.matrices`. Billboard text keeps the model's origin and sc
 
 [README continues: https://margoengine.com/llms/packages/text.md]
 

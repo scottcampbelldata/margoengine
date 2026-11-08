@@ -535,6 +535,14 @@ window.runTextTests = async () => {
     `Atlas grows to ${growth.sdfPages} pages for ${growth.characters} distinct ${hasCjk ? 'CJK' : 'Latin, Greek and Cyrillic'} glyphs; existing glyphs render identically afterwards`,
   );
   many.dispose();
+  const pagesFreed = renderer.evictUnused();
+  assert(pagesFreed > 0, `Expected evictUnused to free unused pages, freed ${pagesFreed}`);
+  const postEvict = await frame();
+  let evictDiffering = 0;
+  for (let i = 0; i < before.bytes.length; i += 4)
+    if (Math.abs(before.bytes[i] - postEvict.bytes[i]) > 2) evictDiffering++;
+  assert(evictDiffering === 0, `Glyphs changed after atlas eviction: ${evictDiffering} pixels differ`);
+  report.checks.push('Atlas eviction frees unused glyph pages and preserves visible text');
 
   // 9. Device restoration rebuilds the atlas and buffers.
   image = await frame();

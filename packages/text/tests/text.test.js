@@ -11,6 +11,7 @@ import {
   sdfDistance,
   SDF_DEFAULTS,
   ShelfPacker,
+  GlyphAtlas,
   Font,
   Text,
   TextRenderer,
@@ -398,6 +399,147 @@ test('shelf packer: no overlaps, padding, new pages when full, null past the lim
   assert.equal(packer.pack(64, 64), null, 'rectangles larger than a page minus padding never fit');
   assert.ok(packer.occupancy > 0.5, `occupancy ${packer.occupancy}`);
   assert.throws(() => packer.pack(0, 3), RangeError);
+});
+
+test('shelf packer page clearing: clearPage frees page for new slots, validates page index', () => {
+  const packer = new ShelfPacker(32, 2, 1);
+  for (let i = 0; i < 8; i++) {
+    const slot = packer.pack(15, 15);
+    assert.ok(slot, `slot ${i} packed`);
+  }
+  assert.equal(packer.pack(15, 15), null);
+  assert.equal(packer.pageCount, 2);
+
+  assert.throws(() => packer.clearPage(-1), RangeError);
+  assert.throws(() => packer.clearPage(2), RangeError);
+
+  packer.clearPage(0);
+  assert.equal(packer.isPageEmpty(0), true);
+  assert.equal(packer.isPageEmpty(1), false);
+
+  const slot = packer.pack(15, 15);
+  assert.ok(slot);
+  assert.equal(slot.page, 0);
+  assert.equal(slot.x, 0);
+  assert.equal(slot.y, 0);
+});
+
+test('glyph atlas eviction: frees unused pages on demand or LRU when full, reuses freed pages', () => {
+  const fakeTexture = { createView: () => ({}), destroy() {} };
+  const mockDevice = {
+    createTexture: () => fakeTexture,
+    createCommandEncoder: () => ({ copyTextureToTexture() {}, finish: () => ({}) }),
+    queue: { writeTexture() {}, submit() {} },
+    limits: { maxTextureDimension2D: 8192 },
+  };
+
+  const atlas = new GlyphAtlas(mockDevice, 'r8unorm', 32, 2);
+  const glyphs = [];
+  for (let i = 0; i < 8; i++) {
+    glyphs.push({
+      cluster: `g${i}`,
+      width: 15,
+      height: 15,
+      left: 0,
+      top: 0,
+      color: false,
+      data: new Uint8Array(225),
+    });
+  }
+
+  for (let i = 0; i < 8; i++) {
+    const slot = atlas.place(glyphs[i]);
+    assert.equal(slot.page, Math.floor(i / 4));
+  }
+  assert.equal(atlas.pages, 2);
+  assert.equal(atlas.slots.size, 8);
+
+  const extraGlyph = {
+    cluster: 'extra',
+    width: 15,
+    height: 15,
+    left: 0,
+    top: 0,
+    color: false,
+    data: new Uint8Array(225),
+  };
+
+  atlas.canEvict = () => false;
+  assert.throws(() => atlas.place(extraGlyph), RangeError);
+
+  atlas.canEvict = (p) => p === 0;
+  const initialGen = atlas.generation;
+  const slot = atlas.place(extraGlyph);
+  assert.ok(slot);
+  assert.equal(slot.page, 0);
+  assert.ok(atlas.generation > initialGen);
+  for (let i = 0; i < 4; i++) {
+    assert.equal(atlas.slots.has(glyphs[i]), false);
+  }
+  for (let i = 4; i < 8; i++) {
+    assert.equal(atlas.slots.has(glyphs[i]), true);
+  }
+
+  assert.equal(atlas.evictPage(1), true);
+  assert.equal(atlas.evictPage(5), false);
+  for (let i = 4; i < 8; i++) {
+    assert.equal(atlas.slots.has(glyphs[i]), false);
+  }
+});
+
+test('TextRenderer evictUnused and canEvictPage: identifies unused pages and frees them', () => {
+  const fakeTexture = { createView: () => ({}), destroy() {} };
+  const mockDevice = {
+    createTexture: () => fakeTexture,
+    createCommandEncoder: () => ({ copyTextureToTexture() {}, finish: () => ({}) }),
+    queue: { writeTexture() {}, submit() {}, writeBuffer() {} },
+    limits: { maxTextureDimension2D: 8192, maxTextureArrayLayers: 256 },
+    createBindGroupLayout: () => ({}),
+    createPipelineLayout: () => ({}),
+    createShaderModule: () => ({}),
+    createSampler: () => ({}),
+    createBuffer: () => ({ destroy() {} }),
+  };
+  const mockEngine = {
+    backend: 'webgpu',
+    gpu: mockDevice,
+    store: { matrices: new Float32Array(100) },
+  };
+
+  const renderer = new TextRenderer({ atlasSize: 64, maxPages: 4 });
+  renderer.setup(mockEngine);
+
+  const glyphA = { cluster: 'A', width: 10, height: 10, left: 0, top: 0, color: false, data: new Uint8Array(100) };
+  const glyphB = { cluster: 'B', width: 10, height: 10, left: 0, top: 0, color: false, data: new Uint8Array(100) };
+  const font = Object.assign(Object.create(Font.prototype), {
+    revision: 0,
+    size: 48,
+    radius: 8,
+    cutoff: 0.25,
+    advance: (c) => mock.advance(c),
+    kerning: mock.kerning,
+    metrics: mock.metrics,
+    glyph: (c) => (c === 'A' ? glyphA : c === 'B' ? glyphB : null),
+  });
+  const text1 = new Text({ text: 'A', font });
+  const text2 = new Text({ text: 'B', font });
+  renderer.add(text1);
+  renderer.add(text2);
+
+  const atlas = renderer.sdfAtlas;
+  assert.equal(renderer.canEvictPage(0, atlas), true);
+
+  atlas.place(glyphA);
+  atlas.place(glyphB);
+  assert.equal(renderer.canEvictPage(0, atlas), false);
+
+  renderer.remove(text1);
+  renderer.remove(text2);
+  assert.equal(renderer.canEvictPage(0, atlas), true);
+
+  const freed = renderer.evictUnused();
+  assert.equal(freed, 1);
+  assert.equal(atlas.slots.size, 0);
 });
 
 // --- SSR safety and object validation ------------------------------------------------------------

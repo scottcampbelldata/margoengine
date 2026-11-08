@@ -56,11 +56,16 @@ export class GlyphAtlas {
     readonly packer: ShelfPacker;
     readonly slots: Map<GlyphBitmap, AtlasSlot>;
     generation: number;
+    canEvict?: (page: number, atlas: GlyphAtlas) => boolean;
+    onEvict?: (page: number, atlas: GlyphAtlas) => void;
     constructor(device: GPUDevice, format: 'r8unorm' | 'rgba8unorm', size: number, maxPages: number);
     get size(): number;
     get pages(): number;
     private get bytesPerTexel();
     get view(): GPUTextureView;
+    touch(page: number): void;
+    evictPage(page: number): boolean;
+    evict(page?: number): boolean;
     place(glyph: GlyphBitmap): AtlasSlot;
     restore(device: GPUDevice): void;
     dispose(): void;
@@ -145,6 +150,8 @@ export class ShelfPacker {
     get pageCount(): number;
     get occupancy(): number;
     pack(width: number, height: number): AtlasSlot | null;
+    clearPage(page: number): void;
+    isPageEmpty(page: number): boolean;
     clear(): void;
 }
 
@@ -251,6 +258,8 @@ export class TextRenderer implements EnginePlugin {
     static attach(engine: EngineKernel, options?: TextRendererOptions): TextRenderer;
     constructor(options?: TextRendererOptions);
     get texts(): ReadonlySet<Text>;
+    get sdfAtlas(): GlyphAtlas | undefined;
+    get colorAtlas(): GlyphAtlas | undefined;
     get atlas(): {
         sdfPages: number;
         colorPages: number;
@@ -261,6 +270,8 @@ export class TextRenderer implements EnginePlugin {
     add<T extends Text>(text: T): T;
     remove(text: Text): void;
     clear(): void;
+    readonly canEvictPage: (page: number, atlas: GlyphAtlas) => boolean;
+    evictUnused(): number;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(engine: Engine): void;

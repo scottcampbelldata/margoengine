@@ -102,6 +102,21 @@ export class ShelfPacker {
     return { page: this.pages.length - 1, x: 0, y: 0, width, height };
   }
 
+  /** Clears a single page so its texels can be reused by future pack calls. */
+  clearPage(page: number): void {
+    if (!Number.isInteger(page) || page < 0 || page >= this.pages.length)
+      throw new RangeError(
+        `Invalid atlas page index ${page}; use an integer from 0 to ${Math.max(0, this.pages.length - 1)}.`,
+      );
+    this.pages[page] = [];
+    this.used[page] = 0;
+  }
+
+  /** Whether a page has no shelves placed on it. */
+  isPageEmpty(page: number): boolean {
+    return !this.pages[page] || this.pages[page].length === 0;
+  }
+
   /** Forgets every slot. */
   clear(): void {
     this.pages.length = 0;

@@ -2,7 +2,12 @@
 import type { GlyphBitmap } from './font.js';
 import { ShelfPacker, type AtlasSlot } from './packer.js';
 
-declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number; COPY_SRC: number };
+declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number; COPY_SRC: number } | undefined;
+
+const ATLAS_TEXTURE_USAGE =
+  typeof GPUTextureUsage !== 'undefined'
+    ? GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.COPY_SRC
+    : 0x04 | 0x02 | 0x01;
 
 /** Sizes for {@link glyphAtlases}. */
 export interface GlyphAtlasSizes {
@@ -48,6 +53,14 @@ export class GlyphAtlas {
   private texture?: GPUTexture;
   private textureView?: GPUTextureView;
   private layers = 0;
+  private readonly pageLastUsed: number[] = [];
+  private clock = 0;
+
+  /** Optional predicate deciding whether `page` may be evicted. Return true to permit eviction. */
+  canEvict?: (page: number, atlas: GlyphAtlas) => boolean;
+
+  /** Optional callback invoked when `page` is evicted. */
+  onEvict?: (page: number, atlas: GlyphAtlas) => void;
 
   constructor(
     private device: GPUDevice,
@@ -81,7 +94,7 @@ export class GlyphAtlas {
       size: [size, size, count],
       format: this.format,
       dimension: '2d',
-      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.COPY_SRC,
+      usage: ATLAS_TEXTURE_USAGE,
     });
     const previous = this.texture,
       previousLayers = this.layers;
@@ -101,16 +114,67 @@ export class GlyphAtlas {
     this.generation++;
   }
 
+  /** Touches a page so LRU eviction knows when it was last accessed. */
+  touch(page: number): void {
+    this.pageLastUsed[page] = ++this.clock;
+  }
+
+  /**
+   * Frees a page and removes all its glyph slots so new glyphs can be packed into it.
+   * Returns true if the page was evicted, false if the page index was invalid.
+   */
+  evictPage(page: number): boolean {
+    if (!Number.isInteger(page) || page < 0 || page >= this.packer.pageCount) return false;
+    for (const [glyph, slot] of this.slots) {
+      if (slot.page === page) {
+        this.slots.delete(glyph);
+      }
+    }
+    this.packer.clearPage(page);
+    this.pageLastUsed[page] = 0;
+    this.onEvict?.(page, this);
+    this.generation++;
+    return true;
+  }
+
+  /**
+   * Frees a page and removes all glyph slots on it.
+   * If `page` is omitted, evicts the least recently used evictable page.
+   * Returns true if a page was evicted, false if no page could be evicted.
+   */
+  evict(page?: number): boolean {
+    if (page !== undefined) return this.evictPage(page);
+    let candidate = -1;
+    let oldest = Infinity;
+    for (let p = 0; p < this.packer.pageCount; p++) {
+      if (this.canEvict && !this.canEvict(p, this)) continue;
+      const last = this.pageLastUsed[p] ?? 0;
+      if (last < oldest) {
+        oldest = last;
+        candidate = p;
+      }
+    }
+    if (candidate >= 0) return this.evictPage(candidate);
+    return false;
+  }
+
   /** Returns the glyph's slot, packing and uploading it first if needed. Throws when the atlas is full. */
   place(glyph: GlyphBitmap): AtlasSlot {
     let slot = this.slots.get(glyph);
-    if (slot) return slot;
-    const packed = this.packer.pack(glyph.width, glyph.height);
+    if (slot) {
+      this.touch(slot.page);
+      return slot;
+    }
+    let packed = this.packer.pack(glyph.width, glyph.height);
+    if (!packed && this.evict()) {
+      packed = this.packer.pack(glyph.width, glyph.height);
+    }
     if (!packed)
       throw new RangeError(
         `Glyph atlas is full (${this.packer.maxPages} pages of ${this.size}px); raise maxPages or atlasSize, or use fewer glyphs and sizes.`,
       );
     slot = packed;
+    this.touch(slot.page);
     if (slot.page >= this.layers)
       this.allocate(Math.min(this.packer.maxPages, Math.max(slot.page + 1, this.layers * 2)));
     this.upload(glyph, slot);
@@ -143,6 +207,8 @@ export class GlyphAtlas {
     this.layers = 0;
     this.slots.clear();
     this.packer.clear();
+    this.pageLastUsed.length = 0;
+    this.clock = 0;
     this.generation++;
   }
   declare [Symbol.dispose]: () => void;
