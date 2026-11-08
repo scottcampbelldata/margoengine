@@ -62,7 +62,7 @@ test('no Python: the reason names what was tried and the one-command fix, withou
   const { exec, calls } = fake(() => ({ status: null, error: new Error('spawn python ENOENT') }));
   const result = ensureVenv({ venv, env: {}, exec, log: quiet });
   assert.equal(result.ok, false);
-  assert.match(result.reason, /no supported Python found .*install Python 3.12 or 3.13.*MARGO_PYTHON/);
+  assert.match(result.reason, /no supported Python found .*install Python 3.12, 3.13 or 3.14.*MARGO_PYTHON/);
   assert.ok(result.reason.includes(SETUP), result.reason);
   assert.deepEqual(
     calls.map((c) => [c.command, ...c.args.slice(0, -2)].join(' ')),
@@ -193,7 +193,7 @@ const probe = (versions) => (command, args) => {
   return key in versions ? { status: 0, stdout: `${versions[key]}\n` } : { status: 1 };
 };
 
-test('picks 3.13 or 3.12, never a newer Python the pinned PyYAML has no wheel for (bug 24b)', () => {
+test('picks 3.13, 3.12 or 3.14, never a newer Python the pinned PyYAML has no wheel for (bug 24b)', () => {
   // Python 3.15 is first on PATH, as on the Beelink; the py launcher also has 3.12.
   const { exec } = fake(probe({ python: '3.15.0', python3: '3.15.0', 'py -3.12': '3.12.7' }));
   assert.deepEqual(findPython({ env: {}, exec, platform: 'win32' }), { command: ['py', '-3.12'], version: '3.12.7' });
@@ -214,7 +214,7 @@ test('only Python 3.15 on PATH: stops with one line naming the fix, no venv, no 
   const { exec, calls } = fake(probe({ python: '3.15.0', python3: '3.15.0', 'py -3.13': '3.15.0' }));
   const result = ensureVenv({ venv, env: {}, exec, log: quiet });
   assert.equal(result.ok, false);
-  assert.match(result.reason, /install Python 3.12 or 3.13.*set MARGO_PYTHON/);
+  assert.match(result.reason, /install Python 3.12, 3.13 or 3.14.*set MARGO_PYTHON/);
   assert.doesNotMatch(result.reason, /Visual C\+\+/);
   assert.ok(
     calls.every((c) => c.args.includes('-c')),
@@ -450,4 +450,38 @@ test('a freshly made venv whose interpreter is not its own is removed with the r
   } finally {
     rmSync(resolve(venv, '..'), { recursive: true, force: true });
   }
+});
+
+// Mac bug (2026-11-07): the Jupyter check never ran on the M6 Mac mini. Its only Python is python.org's 3.14 (python3),
+// which the check refused, and pip could not have installed the pins there anyway: pywinpty, a Windows-only dependency
+// of terminado taken from a Windows freeze, was pinned with no marker and has no macOS or Linux build.
+test('takes Python 3.14 (every pin has a 3.14 wheel), still after 3.13 and 3.12', () => {
+  const mac = fake(probe({ python3: '3.14.10' }));
+  assert.deepEqual(findPython({ env: {}, exec: mac.exec, platform: 'darwin' }), {
+    command: ['python3'],
+    version: '3.14.10',
+  });
+  const both = fake(probe({ python3: '3.14.10', 'python3.12': '3.12.4' }));
+  assert.deepEqual(findPython({ env: {}, exec: both.exec, platform: 'darwin' }), {
+    command: ['python3.12'],
+    version: '3.12.4',
+  });
+});
+
+test('pywinpty is pinned for Windows only, and the pins of each platform are the ones pip installs there', () => {
+  const text = readFileSync(join(root, 'python/requirements-notebook.txt'), 'utf8');
+  assert.equal(parsePins(text, 'win32').get('pywinpty'), '3.1.0');
+  for (const platform of ['darwin', 'linux']) {
+    const pins = parsePins(text, platform);
+    assert.ok(!pins.has('pywinpty'), `pywinpty is pinned on ${platform}, where it has no build`);
+    assert.ok(pins.has('pyyaml') && pins.has('notebook'), platform);
+  }
+  assert.deepEqual(
+    [...parsePins('a==1; sys_platform != "win32"\nb==2 ; sys_platform == \'linux\'', 'linux')],
+    [
+      ['a', '1'],
+      ['b', '2'],
+    ],
+  );
+  assert.deepEqual([...parsePins('a==1; python_version > "3"', 'darwin')], [['a', '1']]);
 });

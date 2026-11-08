@@ -417,6 +417,31 @@ class PngExport(unittest.TestCase):
         self.assertEqual(pong[:2], b"\x8a\x82")
         self.assertEqual(bytes(b ^ pong[2 + i % 4] for i, b in enumerate(pong[6:])), b"hi")
 
+    def test_a_browser_name_finds_that_browser_where_its_installer_put_it(self):
+        # Mac bug (2026-11-07): browser="msedge" (the Jupyter check's) matched only a file named msedge, so on macOS,
+        # where Edge is "Microsoft Edge.app", to_png said the installed Edge was not found.
+        from margoengine import _png
+
+        mac = [
+            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+            "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+        ]
+        linux = ["/usr/bin/google-chrome-stable", "/usr/bin/microsoft-edge"]
+        windows = [r"C:\Program Files\Microsoft\Edge\Application\msedge.exe"]
+        original = (_png._installed, _png.shutil.which)
+        _png.shutil.which = lambda name: None
+        try:
+            for installed, edge, chrome in ((mac, mac[1], mac[0]), (linux, linux[1], linux[0]), (windows, windows[0], None)):
+                _png._installed = lambda: installed
+                for name in ("msedge", "edge", "microsoft-edge"):
+                    self.assertEqual(_png.find_browser(name), edge)
+                if chrome:
+                    self.assertEqual(_png.find_browser("chrome"), chrome)
+                with self.assertRaises(FileNotFoundError):
+                    _png.find_browser("chromium")
+        finally:
+            _png._installed, _png.shutil.which = original
+
     def test_to_png_checks_its_options_and_names_a_missing_browser(self):
         fig = margo.scatter(x=[0, 1], y=[0, 1], comm_factory=FakeComm)
         with self.assertRaises(ValueError):

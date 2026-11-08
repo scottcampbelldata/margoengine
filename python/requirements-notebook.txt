@@ -1,5 +1,6 @@
 # Everything to run examples/notebooks/margo-data.ipynb in JupyterLab (Python 3.15), as installed and checked on 2026-10-25.
 # Install: python -m pip install -r python/requirements-notebook.txt (the notebook check's venv: npm run setup:python-test)
+# pywinpty (a Windows-only dependency of terminado) carries its platform marker: it has no build for macOS or Linux.
 anyio==4.15.1
 argon2-cffi==25.1.0
 argon2-cffi-bindings==26.1.0
@@ -75,7 +76,7 @@ Pygments==2.21.0
 pytest==9.1.1
 python-dateutil==3.0.0
 python-json-logger==4.2.0
-pywinpty==3.1.0
+pywinpty==3.1.0; sys_platform == "win32"
 PyYAML==6.0.3
 pyzmq==27.2.0
 referencing==0.37.0

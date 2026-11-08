@@ -4,7 +4,7 @@
 // instead of a hang: every step has a hard time limit.
 //   npm run setup:python-test               make it (or report it ready)
 //   MARGO_JUPYTER_VENV=<dir>                use another folder (default: test-results/.venv-data in the main checkout)
-//   MARGO_PYTHON=<python>                   make it with this Python (default: Python 3.12 or 3.13 found by py -3.13 / py -3.12 / python3.13 / python3.12 / python3 / python)
+//   MARGO_PYTHON=<python>                   make it with this Python (default: Python 3.12 to 3.14 found by py -3.13 / py -3.12 / py -3.14 / python3.13 / python3.12 / python3.14 / python3 / python)
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -85,11 +85,15 @@ const run = (command, args, ms) =>
   spawnSync(command, args, { encoding: 'utf8', timeout: ms, killSignal: 'SIGKILL', windowsHide: true });
 const tail = (text, lines = 12) => (text ?? '').trim().split('\n').slice(-lines).join('\n');
 
-/** The Python minor versions the pinned python/requirements-notebook.txt has wheels for (PyYAML has none for newer ones). */
-export const SUPPORTED_PYTHON = ['3.13', '3.12'];
-export const PYTHON_FIX = 'install Python 3.12 or 3.13 from https://www.python.org/downloads/, or set MARGO_PYTHON to one';
+/**
+ * The Python minor versions the pinned python/requirements-notebook.txt has wheels for on Windows, macOS and Linux, best
+ * first (PyYAML has none for 3.15). 3.14 checked with pip download --only-binary on win_amd64, macosx_11_0_arm64 and
+ * manylinux x86_64 (2026-11-07): it is the Python python.org installs on the M6 Mac mini.
+ */
+export const SUPPORTED_PYTHON = ['3.13', '3.12', '3.14'];
+export const PYTHON_FIX = 'install Python 3.12, 3.13 or 3.14 from https://www.python.org/downloads/, or set MARGO_PYTHON to one';
 
-/** Where to look for a supported Python, best first: the py launcher on Windows, python3.13 and python3.12 elsewhere, then plain names. */
+/** Where to look for a supported Python, best first: the py launcher on Windows, python3.13, 3.12 and 3.14 elsewhere, then plain names. */
 export const pythonCandidates = (platform = process.platform) => [
   ...SUPPORTED_PYTHON.map((v) => (platform === 'win32' ? ['py', `-${v}`] : [`python${v}`])),
   ['python3'],
@@ -97,7 +101,7 @@ export const pythonCandidates = (platform = process.platform) => [
 ];
 
 /**
- * The first working supported Python (3.12 or 3.13) as `[command, ...args]` with its version, or undefined.
+ * The first working supported Python (3.12 to 3.14) as `[command, ...args]` with its version, or undefined.
  * MARGO_PYTHON (one command) wins and is used as given. Newer Pythons are skipped: the pinned PyYAML has no wheel for
  * them and the install would die needing a C compiler. (Windows' python.exe store alias only prints a hint and fails,
  * so it is skipped too.)
@@ -161,7 +165,7 @@ export function ensureVenv({ venv = venvDir(), env = process.env, exec = run, lo
   if (!python)
     return {
       ok: false,
-      reason: `no supported Python found (${env.MARGO_PYTHON ? `MARGO_PYTHON=${env.MARGO_PYTHON}` : 'Python 3.12 or 3.13 via py -3.13, py -3.12, python3.13, python3.12, python3 or python on PATH'}): ${PYTHON_FIX}, then ${fix}`,
+      reason: `no supported Python found (${env.MARGO_PYTHON ? `MARGO_PYTHON=${env.MARGO_PYTHON}` : 'Python 3.12 to 3.14 via py -3.13, py -3.12, py -3.14, python3.13, python3.12, python3.14, python3 or python on PATH'}): ${PYTHON_FIX}, then ${fix}`,
     };
   const [command, ...args] = python.command;
   log(`python venv: making ${venv} with ${python.command.join(' ')} (Python ${python.version}), pinned ${requirements}`);
@@ -192,12 +196,20 @@ export function ensureVenv({ venv = venvDir(), env = process.env, exec = run, lo
 /** PEP 503 name normalisation: runs of `-`, `_` and `.` become one `-`, lower case. */
 export const normaliseName = (name) => name.replace(/[-_.]+/g, '-').toLowerCase();
 
-/** The `name==version` pins in a requirements text as a Map of normalised name to version (comments and blank lines skipped). */
-export function parsePins(text) {
+/**
+ * The `name==version` pins in a requirements text as a Map of normalised name to version (comments and blank lines
+ * skipped), for one platform: a pin with a `sys_platform == "..."` (or `!=`) marker counts only where pip installs it;
+ * any other marker keeps its pin.
+ * Node's process.platform names win32, darwin and linux as Python's sys.platform does.
+ */
+export function parsePins(text, platform = process.platform) {
   const pins = new Map();
   for (const line of text.split(/\r?\n/)) {
-    const match = /^\s*([A-Za-z0-9][A-Za-z0-9._-]*)\s*==\s*([^\s;#]+)/.exec(line);
-    if (match) pins.set(normaliseName(match[1]), match[2]);
+    const match = /^\s*([A-Za-z0-9][A-Za-z0-9._-]*)\s*==\s*([^\s;#]+)\s*(?:;([^#]*))?/.exec(line);
+    if (!match) continue;
+    const marker = match[3] && /^\s*sys_platform\s*(==|!=)\s*["']([^"']+)["']\s*$/.exec(match[3]);
+    if (marker && (marker[1] === '==') !== (marker[2] === platform)) continue;
+    pins.set(normaliseName(match[1]), match[2]);
   }
   return pins;
 }

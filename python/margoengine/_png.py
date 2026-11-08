@@ -48,7 +48,7 @@ def find_browser(browser: Optional[str] = None) -> str:
     if chosen:
         # A path, a command on PATH, or the name of an installed browser ("msedge", "chrome") from the usual places.
         found = shutil.which(chosen) or (chosen if Path(chosen).is_file() else None)
-        found = found or next((c for c in _installed() if Path(c).stem.lower() == Path(chosen).stem.lower()), None)
+        found = found or next((c for c in _installed() if _kind(c) == _kind(chosen)), None)
         if not found:
             raise FileNotFoundError(f"browser {chosen!r} not found; give the path to Chrome, Edge or Chromium ({HELP})")
         return found
@@ -58,6 +58,30 @@ def find_browser(browser: Optional[str] = None) -> str:
         "to_png needs Chrome, Edge or Chromium (it draws the figure with WebGPU in a headless browser); install one or "
         f"set MARGO_BROWSER to its path ({HELP})"
     )
+
+
+# The names one browser goes by: its Windows file, its Linux commands and its macOS app all name the same browser, so
+# browser="msedge" finds "Microsoft Edge.app" on macOS and microsoft-edge on Linux.
+_KINDS = {
+    "msedge": "edge",
+    "edge": "edge",
+    "microsoft edge": "edge",
+    "microsoft-edge": "edge",
+    "microsoft-edge-stable": "edge",
+    "chrome": "chrome",
+    "google chrome": "chrome",
+    "google-chrome": "chrome",
+    "google-chrome-stable": "chrome",
+    "chromium": "chromium",
+    "chromium-browser": "chromium",
+}
+
+
+def _kind(name: str) -> str:
+    # Either separator, so a Windows path reads the same on every system.
+    stem = name.replace("\\", "/").rsplit("/", 1)[-1].lower()
+    stem = stem[:-4] if stem.endswith(".exe") else stem
+    return _KINDS.get(stem, stem)
 
 
 def _installed() -> List[str]:
