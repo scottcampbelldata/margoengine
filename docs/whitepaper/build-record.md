@@ -2448,3 +2448,49 @@ are untouched. Every GPU proof runs on an RTX A6000 in Edge 157 (`npm run test:b
   after it. Rebases renumbered the claims from LIM-427 to 431 to LIM-448 to 452.
 - **Gate:** on the newest main with every job: lint, hygiene, `npm run verify`, `npm run modern:test:react`,
   `check:readme-run`, the React GPU suites (scene, after-scene, extras, tags) and `modern:test:browser`.
+## Lane C batch 118: sciviz
+
+Five jobs for `@margoengine/sciviz`, on this PC (RTX A6000, Chromium), each a new optional entry; core and stage are
+untouched (core + stage 23,626 B gzip after the batch). The batch's aim is the data a scientist brings: volume and
+medical files, finite-element meshes, networks and maps, all drawn under the figure's own axes and colour maps.
+Nothing is timed; the million-edge graph step prints its time as a diagnostic only.
+
+| # | Job | Status | Commit | Entry | Gzip | Claim |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | NRRD volumes | DONE | `44470a37c` | `/nrrd` | 1,216 B | LIM-443 |
+| 2 | Medical and array formats (NIfTI, DICOM, Zarr) | DONE | `621c97103`, spec repair `f3e34e158` | `/formats` | 13,712 B | LIM-445 |
+| 3 | Unstructured grids | DONE | `13f8381af` | `/grids` | 10,885 B | LIM-460 |
+| 4 | Graph layouts | DONE | `1b593e17e` | `/graph` | 9,722 B | LIM-466 |
+| 5 | Geographic layers | DONE | `804bea2e9` | `/geo` | 4,305 B | LIM-469 |
+
+- **Spec repair:** after job 2 the NRRD, NIfTI-1 and 2, DICOM (PS3.3, 3.5, 3.6, 3.10), Zarr v2 and 3.1 texts were read
+  in full and the readers checked against them; every deviation found has a regression test
+  (`packages/sciviz/tests/formats-spec.test.js`, `packages/loaders/tests/nrrd.test.js`), listed in `f3e34e158`.
+- **Bugs fixed:** in job 4, each with a test in `packages/sciviz/tests/graph.test.js`: a 2D layout given positions with
+  z kept that z in the distances but never moved it (now z = 0); a cell holding the node was taken as one body at
+  large theta; coincident nodes; the simmer floor. And the opening test: the plain Barnes and Hut test d > s / theta
+  took a cell whose mass sat on its far side as one far body for a node beside its near side, so at the default theta
+  0.9 one 24-node ring seed in ten kept two edges crossed for ever (13 % uneven, exact forces untangle it). The tree
+  now uses Barnes's 1994 test d > s / theta + delta (Dubinski 1996, eq. 2); the ring test runs at the shipped default,
+  ten seeds, all 2.5 % to 5.7 %. Cost, counted: 10 % more cells opened on a 20,000-node graph's first step in 2D (19 %
+  in 3D) and 21 % (41 %) over the next 100 steps. Outside sciviz: `tests/parallel-check.test.js` failed under load
+  with EPERM removing a timed-out job's temp folder. On Windows libuv's `kill(pid, 0)` answers "gone" once the exit
+  code is set, before the process has closed its handles; `endTree` now waits on each killed process object
+  (`956c3d051`, `fix(check)`, two tests in `tests/gpu-test-limit.test.js` seen failing without it). In job 5 the GPU
+  runner refused the browser's 404 line for the tile the case asks for on purpose; a case now names such paths and the
+  runner checks that each 404 happened. Drafts: a geo layer disposed while a tile decoded kept the texture.
+- **Proved:** each entry's Node tests, and `packages/sciviz/tests/entries-browser.mjs` on the GPU natively and on the
+  WebGL2 layer with matching pixels (grids, graph 2D and 3D, the Mercator map and the globe); the maps' lit bars are
+  their projected area on screen (lit 22,496 of 22,041 and 14,618 of 14,540 pixels), not a number seen.
+- **Sources:** rows in `docs/clean-room.md`: the NRRD, NIfTI, DICOM and Zarr texts; VTK file formats; Fruchterman and
+  Reingold 1991 in full; Barnes and Hut 1989 appendix A (the 1986 Nature paper is paywalled, recorded so); Dubinski
+  1996 section 2.2; Snyder 1987 chapters 7 and 12, table 7, eq. 4-20; WGS 84 from NIMA TR8350.2.
+- **Limits:** rows in `docs/limits.md`: graph layouts on the main thread, one zoom of raster tiles per geo layer, no
+  vector tiles or datum shifts, and the rest per entry.
+- **Slips:** a rebase settle in the lane's own script matched claim rows by number, so job 4's new LIM-461 replaced
+  another lane's LIM-461 (Error lookup) in the working tree; it was caught by comparing rows against main before the
+  push and restored, and the script now matches claims by name and fails on any claim main has that the settle lost.
+  Nothing that failed was pushed.
+- **Gate:** lint, hygiene, verify, `check:readmes`, `check:readme-run --packages=sciviz`, the claims test, the sciviz
+  tests, the root tests and both sciviz GPU tests per job; after a move of main the ship reran the records, the api and
+  quality gates, the claims, llms and lock tests, the sciviz tests and the GPU tests.
