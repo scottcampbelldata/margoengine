@@ -31,6 +31,7 @@ export class TerrainMaterials implements EnginePlugin, TerrainLighting {
     private constructor();
     static attach(engine: EngineKernel, terrain: Terrain, options: TerrainMaterialOptions): TerrainMaterials;
     setup(engine: Engine): void;
+    get surface(): GPUTexture | undefined;
     bindings(): GPUBindGroupEntry[];
     shader(source: string, group: number): string;
     onDeviceRestored(engine: Engine): void;

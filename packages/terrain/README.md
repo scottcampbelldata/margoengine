@@ -613,6 +613,76 @@ through `declarations` and `entries` saw the decal's red at its centre and no co
 - Decals (up to 4,096) are baked in the order added, each over its rectangle; a road is a decal a segment, so sharp
   bends leave a gap on their outer side.
 
+## Near displacement and parallax: `@margoengine/terrain/displace`
+
+`TerrainDisplacement.attach(engine, terrain, materials, options)` gives ground near the camera the depth of its layer
+height maps (the `surface` maps' alpha that `TerrainMaterials` binds): each pixel within `distance` walks its view ray
+down through the relief (parallax occlusion mapping), and the terrain shades the point the ray hits, so pebbles hide
+the ground behind them and cracks look deep. With `shadows` (the default) the relief also shadows itself from the sun:
+a ray from the hit toward the sun runs through a maximum mipmap of the height maps, passing over every square of the
+map whose highest point stays under it, so no thin ridge is stepped over. No geometry moves: the ground's outline
+against the sky stays the clipmap's.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Terrain} from 'margoengine/terrain';
+import {TerrainMaterials} from 'margoengine/terrain/layers-pbr';
+import {TerrainDisplacement} from 'margoengine/terrain/displace';
+const engine = await Engine.create(document.querySelector('canvas')!);
+// Four 2 x 2 layers here; use your layers' full-size maps (square, a power of two in size for shadows).
+function array(device: GPUDevice, rgba: (i: number) => number[]) {
+  const texture = device.createTexture({size: [2, 2, 4], format: 'rgba8unorm', usage: 6});
+  const data = new Uint8Array(Array.from({length: 16}, (_, i) => rgba(i % 4)).flat());
+  device.queue.writeTexture({texture}, data, {bytesPerRow: 8, rowsPerImage: 2}, [2, 2, 4]);
+  return texture;
+}
+const terrain = Terrain.attach(engine, {
+  size: [128, 128], origin: [-64, -64], heightScale: 20,
+  layers: [0, 1, 2, 3].map(() => ({height: [-100, 100] as [number, number], slope: [0, 1] as [number, number], scale: 0.5})),
+  textures(device) {
+    const heightmap = device.createTexture({size: [2, 2], format: 'r32float', usage: 6});
+    device.queue.writeTexture({texture: heightmap}, new Float32Array(4), {bytesPerRow: 8}, [2, 2]);
+    const layers = device.createTexture({size: [1, 1, 4], format: 'rgba8unorm-srgb', usage: 6});
+    device.queue.writeTexture({texture: layers}, new Uint8Array(16).fill(150), {bytesPerRow: 4, rowsPerImage: 1}, [1, 1, 4]);
+    return {heightmap, layers};
+  },
+});
+const materials = TerrainMaterials.attach(engine, terrain, {
+  textures: (device) => ({
+    normals: array(device, () => [128, 128, 255, 255]),
+    surface: array(device, (texel) => [255, 230, 0, texel === 0 ? 255 : 40]), // one raised stone in four
+  }),
+});
+TerrainDisplacement.attach(engine, terrain, materials, {
+  depth: 0.05,          // world depth from height 1 to 0 (per layer: layers: [{depth}])
+  distance: 30,         // shown within 30 m, fading over the last quarter
+  steps: 24,            // most view-ray steps a pixel takes
+  shadows: true,
+});
+engine.start();
+```
+
+Checked on a real GPU by `test/displace.browser.mjs` (in `test:gpu`), on Poly Haven's CC0 Aerial Rocks 02 maps (one
+4 m repeat of 1,024 texels, Radeon 680M, 2026-11-08): seen from 0.35 m at a slant with 10 cm of relief, the parallax
+picture was 3.07 of 255 from the same rock built as real geometry (a terrain whose heightmap is the displacement map,
+on a 4 mm clipmap), the flat one 24.5; depth 0 and a reach short of the view drew the flat picture exactly; painted
+weights drew the same rock. Seen from straight above under a 14 degree sun, with white, flat materials and no ambient
+light, the share of the ground in shadow was 2.71% against 2.76% from a CPU trace of the same relief at 10 cm deep, and
+30.7% against 30.85% at 30 cm; the shadowed pixels overlapped the CPU's by 0.57 and 0.56 (union), the rest being
+texels finer than a pixel. Cost not timed.
+
+- Relief: the layers' heights blended by the terrain's weights with the materials' `heightBlend`, from the top
+  projection only, on ground no steeper than about 57 degrees (fading out from about 32); cliffs stay flat. The view
+  ray reads the height maps' mipmaps at the pixel's footprint; the shadow ray reads the full-size map.
+- Shadows: soft over about 1.1 degrees either side of the relief's horizon; a ray takes at most 160 steps through the
+  mipmap (squares passed over, descended into or tested) and counts what it has not reached as lit. Where layers of
+  different `scale` overlap, the mipmap of the finest decides the squares and the coarser ones are bounded by up to
+  four of their own texels. They need square surface maps a power of two in size (`'unsupported'` otherwise; pass
+  `shadows: false`) and add an `r32float` maximum mipmap: 4 bytes a texel a layer plus a third, about 21 MiB for four
+  1,024-texel layers.
+- Attach it after `TerrainMaterials`, before any effect that replaces the terrain's lit shader. `shadows` darkens the
+  sun's light only, not ambient or image-based light.
+
 ## Screen-space reflections
 
 `Terrain` takes SSR's capture hook (`@margoengine/post/ssr`): `ssr.add(terrain)` draws its own normal, layer colour and

@@ -629,6 +629,15 @@ Evidence: `packages/terrain/test/layers-pbr.browser.mjs`, flat maps 0 of 255 fro
 painted weights and bump; tilts lit from the right side on both axes; real CC0 rock maps 1.6 times the luminance spread of
 colour alone; Radeon 680M. Missing: other GPUs, cost timed.
 
+Terrain near displacement (`@margoengine/terrain/displace`, 2026-11-08) sits after the layer materials at bindings 97 and
+98: it wraps the materials' fragment so the view ray's hit (parallax occlusion) replaces the shading position, keeps the
+surface's own derivatives for every texture read, and multiplies the sun's direct term by the relief's self-shadow. The
+shadow ray walks a maximum mipmap (Tevs, Ihrke and Seidel 2008) built from the surface maps' alpha by a compute pass at
+attachment, so it cannot step over a ridge; a fixed-count march did (0.08% of the rock shadowed where a CPU trace gives
+2.85%). Evidence: `packages/terrain/test/displace.browser.mjs`, shadowed share 2.71% and 30.7% against a CPU trace's
+2.76% and 30.85% at 10 and 30 cm of relief; parallax 3.07 of 255 from real geometry, flat 24.5; Radeon 680M. Missing:
+other GPUs, cost timed.
+
 Both shadow classes take `effects`: objects that declare WGSL at bindings 40 and up (four each), give a factor that
 `shadowLit` multiplies the sun by, and update once a frame after the depth passes. With none the shader text is what it was,
 which the golden GPU proofs pin. `cloudShadows` runs the sky's cloud remap and erosion along the ray to the sun, with the

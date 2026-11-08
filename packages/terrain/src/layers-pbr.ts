@@ -147,6 +147,15 @@ export class TerrainMaterials implements EnginePlugin, TerrainLighting {
     this.remove ??= this.terrain.addLighting(this);
   }
 
+  /**
+   * The surface maps texture the `textures` factory returned, while attached (undefined before and after disposal; a
+   * new one after device restoration). The materials own it. `TerrainDisplacement` (`@margoengine/terrain/displace`)
+   * reads its height channel.
+   */
+  get surface(): GPUTexture | undefined {
+    return this.textures?.surface;
+  }
+
   /** The group-1 entries the patched shader reads. */
   bindings(): GPUBindGroupEntry[] {
     return this.entries;

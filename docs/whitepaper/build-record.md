@@ -2596,3 +2596,43 @@ the new effect's README points to it. Nothing is timed.
   invalid command buffer and the name changed. The check's first background bound (luma under 60) was below this
   scene's background (65) and counted nothing; it now separates background (under 100) from the bars (over 600).
 - **Limits and unmeasured:** row in `docs/limits.md`. One radial term; GPU cost not measured.
+
+## Lane I batch 61: terrain
+
+Eight jobs for `@margoengine/terrain` on the Beelink (lane I, work list 3): six new optional entries, one job already
+built (documented), and job 8 below. Core and stage are untouched. GPU work is proved on a Radeon 680M through each
+entry's `packages/terrain/test/*.browser.mjs` (in `test:gpu`). Nothing is timed.
+
+| # | Job | Status | Commit | Entry | Claim |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Height and ray queries | DONE | `9bbe0d44` | `/query` (`TerrainQuery`) | LIM-426 |
+| 2 | Full PBR layer materials | DONE | `8700e8e0` | `/layers-pbr` (`TerrainMaterials`) | LIM-430 |
+| 3 | Height streaming | DONE | `4bca3271` | `/stream` (`TerrainStream`) | LIM-435 |
+| 4 | Sculpt and paint brushes | DONE | `b607f64b` | `/sculpt` (`TerrainSculpt`) | LIM-437 |
+| 5 | Holes and cutouts | DONE | `78dac761` | `/holes` (`TerrainHoles`, `TerrainTextures.holes`) | LIM-456 |
+| 6 | GPU erosion | SKIPPED | `c7e6406f` | exists as `erode` in `@margoengine/biomes/erosion`; the terrain README now shows it | |
+| 7 | Runtime virtual texture | DONE | `e7a7994e` | `/rvt` (`TerrainVirtualTexture`) | LIM-463 |
+| 8 | Near displacement and parallax | DONE | this commit | `/displace` (`TerrainDisplacement`) | LIM-483 |
+
+- **Built from:** ray queries and the displacement's self-shadow through maximum mipmaps (Tevs, Ihrke and Seidel 2008);
+  layer normals as surface gradients (Mikkelsen 2020) with height blending after Mishkinis 2013; streaming and the
+  virtual texture after clipmaps (Tanner, Migdal and Jones 1998; Losasso and Hoppe 2004) and procedural virtual
+  textures (Widmark 2012, van Waveren 2009); brushes with a binomial smooth (Burt and Adelson 1983) and Wendland C2
+  falloff; parallax occlusion after Tatarchuk 2006, Policarpo, Oliveira and Comba 2005 and Welsh 2004. Rows S59 to S65
+  in `docs/clean-room.md`.
+- **Proved:** queries matched the terrain's own WGSL height on the GPU to 2.6 mm on real Mount Rainier elevation;
+  layer materials with flat maps drew the terrain's own pixels exactly; streaming, brushes (exact undo and redo) and
+  holes on real Terrarium tiles; the virtual texture within 0.33 of 255 of the terrain's own shader; displacement 3.07
+  of 255 from the same rock as real geometry (flat 24.5), its shadowed share 2.71% and 30.7% against a CPU trace's
+  2.76% and 30.85% at 10 and 30 cm of relief.
+- **Sizes:** new `/query` 3,347 B gzip, `/layers-pbr` 2,563 (2,571 after job 8's `surface` getter), `/stream` 11,977,
+  `/sculpt` 4,617, `/holes` 1,283, `/rvt` 5,271, `/displace` 4,086.
+- **Bugs fixed with tests:** job 7's drafts picked the bake module as the lit shader in its unit test, aliased the eye
+  array into the mock camera, read back through a buffer made MAP_READ instead of COPY_SRC and placed the test decal
+  below the view. Job 8's first self-shadow, a fixed march of 8 samples with a soft depth threshold, stepped over thin
+  ridges and shadowed 0.08% of the rock where a CPU trace gives 2.85% (1.7% where it gives 33.3% at 30 cm); the march
+  now walks a maximum mipmap and the GPU check holds the shadowed share to the CPU trace at both depths.
+- **Limits:** one GPU; displacement is parallax only (no silhouette) and its shadows need square power-of-two maps; the
+  virtual texture holds colour only. Rows in docs/limits.md.
+- **Slips:** job 5 lost 10 push races before landing (main moved every 4 to 5 minutes, a landing attempt took about
+  6.5); the manager added the short lost-race rule. Job 8 was first handed off BLOCKED on the self-shadow above.

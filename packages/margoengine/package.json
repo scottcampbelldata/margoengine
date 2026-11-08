@@ -2662,6 +2662,10 @@
       "types": "./dist/terrain/rvt.d.ts",
       "import": "./dist/terrain/rvt.js"
     },
+    "./terrain/displace": {
+      "types": "./dist/terrain/displace.d.ts",
+      "import": "./dist/terrain/displace.js"
+    },
     "./text": {
       "types": "./dist/text.d.ts",
       "import": "./dist/text.js"

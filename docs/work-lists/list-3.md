@@ -20,7 +20,7 @@ For the third account. Starts when Scott is home and opens it.
 | I | sky and land | 58 | sky | 2 | done |
 | I | sky and land | 59 | weather | 7 | done |
 | I | sky and land | 60 | scenery | 5 | done |
-| I | sky and land | 61 | terrain | 8 | todo |
+| I | sky and land | 61 | terrain | 8 | done |
 | I | sky and land | 62 | terrain | 4 | todo |
 | I | sky and land | 63 | biomes | 6 | todo |
 | I | sky and land | 64 | scatter | 6 | todo |
