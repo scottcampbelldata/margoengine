@@ -294,3 +294,54 @@ test('Autofocus on a world point uses its distance along the view with no read',
   assert.ok(Math.abs(dof.options.focalDistance - 8) < 1e-6);
   assert.equal(copies, 0);
 });
+
+// A disk image of `size` pixels whose open part is where `open(x, y)` holds, x and y from -1 to 1 (y down).
+const apertureImage = (size, open) => {
+  const data = new Uint8ClampedArray(size * size * 4);
+  for (let y = 0; y < size; y++)
+    for (let x = 0; x < size; x++)
+      if (open(((x + 0.5) / size) * 2 - 1, ((y + 0.5) / size) * 2 - 1))
+        data.fill(255, (y * size + x) * 4, (y * size + x) * 4 + 4);
+  return { width: size, height: size, data };
+};
+const tables = (code) =>
+  Object.fromEntries(
+    [...code.matchAll(/var<private> taps(\d+):array<vec3f,\d+>=array<vec3f,\d+>\((.*?)\);/g)].map(([, n, body]) => [
+      n,
+      [...body.matchAll(/vec3f\(([^)]*)\)/g)].map(([, v]) => v.split(',').map(Number)),
+    ]),
+  );
+
+test('DOFLens aperture image: taps spread over the mirrored shape, the near gather weighs by the mask', () => {
+  for (const bad of [
+    { width: 0, height: 1, data: [] },
+    { width: 2, height: 2, data: new Uint8Array(15) },
+    apertureImage(8, () => false),
+  ])
+    assert.throws(() => new DOFLens({ aperture: bad }), RangeError);
+  assert.throws(() => new DOFLens({ blades: 5, aperture: apertureImage(8, () => true) }), RangeError);
+  // Left half open: a far tap at s takes a neighbour whose bokeh covers this pixel only when -s is open, so x >= 0,
+  // give or take the mask's softening: a cell of 1/16 the diameter straddling the edge, then bilinear to the next.
+  const lens = new DOFLens({ aperture: apertureImage(64, (x) => x < 0) });
+  const h = gpuHarness();
+  DOF.attach(h.engine, { focalDistance: 5, lens });
+  const [, bokeh, coarse] = shaderCodes(h);
+  for (const code of [bokeh, coarse]) assert.ok(code.includes('fn aperture(v:vec2f)->f32'));
+  const taps = tables(bokeh);
+  assert.deepEqual(Object.keys(taps).sort(), ['16', '32', '64']);
+  for (const [n, list] of Object.entries(taps)) {
+    assert.equal(list.length, +n);
+    for (const [x, y, w] of list) {
+      assert.ok(Math.hypot(x, y) <= 1 && x > -3 / 32, `tap ${x},${y} lies on the mirrored half`);
+      assert.ok(w > 0 && w <= 1);
+    }
+    // Spread over the half disk, not bunched: the mean lies near the half disk's centroid 4 / (3 pi).
+    const mx = list.reduce((s, [x]) => s + x, 0) / list.length;
+    assert.ok(Math.abs(mx - 4 / (3 * Math.PI)) < 0.12, `taps ${n} centroid ${mx}`);
+  }
+  // The mean transmission over the disk, about 0.5 for a half: the rim cells lose a little to the mask's softening.
+  const mean = +/\*aperture\(-vec2f\(nearOffset\)\/radius\)\/([0-9.]+);/.exec(bokeh)[1];
+  assert.ok(mean > 0.45 && mean < 0.55, `near weight over a half disk divides by about 0.5, got ${mean}`);
+  assert.ok(bokeh.includes('farWeight+=farTap.z;'));
+  assert.ok(!bokeh.includes('round(spiral(i,16.0)*center.x)'));
+});

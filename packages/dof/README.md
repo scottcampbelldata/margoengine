@@ -21,7 +21,7 @@ Standalone output uses Margo's display curve (Khronos PBR Neutral, then sRGB), a
 
 ## Autofocus, tilt-shift and blades
 
-Each is its own entry, so a page using neither downloads neither.
+Each is its own entry, so a page using neither downloads neither. `DOFLens` also draws custom bokeh shapes (below).
 
 ```ts
 import {Engine} from 'margoengine/core';
@@ -43,6 +43,36 @@ engine.start();
 
 - `Autofocus` sets `dof.options.focalDistance`. It reads one depth texel into a buffer and maps it later without waiting, so the focus follows a frame or two behind and a frame never stalls. The sky leaves the focus where it was. Attach it after the `DOF`, alone or in a `PostStack`.
 - `DOFLens` is read when the effect attaches; only `tilt` and `tiltDirection` change afterwards. A perspective plane stays a plane: `1/focus` is linear across the screen, and past the horizon of the plane everything counts as in front of it. It is checked on WebGPU; autofocus and the lens are not checked on the WebGL2 layer.
+
+## Custom bokeh shapes
+
+`DOFLens` also takes an aperture image (hearts, stars, dirty glass): any RGBA pixels, such as a canvas's `ImageData`.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {DOF} from 'margoengine/dof';
+import {DOFLens} from 'margoengine/dof/lens';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+// Draw a white heart on a transparent 64 x 64 canvas: light passes where the image is bright.
+const art = document.createElement('canvas');
+art.width = art.height = 64;
+const pen = art.getContext('2d')!;
+pen.fillStyle = '#fff';
+pen.font = '60px sans-serif';
+pen.textAlign = 'center';
+pen.textBaseline = 'middle';
+pen.fillText('\u2665', 32, 36);
+const lens = new DOFLens({aperture: pen.getImageData(0, 0, 64, 64)});
+DOF.attach(engine, {focalDistance: 8, focalLength: 0.05, aperture: 1.4, lens});
+engine.start();
+```
+
+- Light passes as the image's luminance times its alpha, so grey parts pass part of it (smudged glass). The image's
+  inscribed circle covers the blur disk, its top towards the top of the screen; outside that circle nothing passes.
+- The image is baked into the kernels when the effect attaches: a 32 x 32 mask, and far-field taps spread over the open
+  part, so detail finer than about 1/16 of the bokeh's diameter is lost. Near and far bokeh show the image the same way
+  up (a real lens flips one of them). `blades` and `aperture` do not combine.
 
 ## Cost
 

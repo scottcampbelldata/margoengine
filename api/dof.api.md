@@ -35,10 +35,16 @@ export interface DOFOptions {
 
 // Not exported from this entry, but used by the exports above:
 
+interface DOFApertureImage {
+    readonly width: number;
+    readonly height: number;
+    readonly data: ArrayLike<number>;
+}
+
 class DOFLens {
     tilt: number;
     tiltDirection: readonly [number, number];
-    constructor({ blades, bladeRotation, tilt, tiltDirection }?: DOFLensOptions);
+    constructor({ blades, bladeRotation, tilt, tiltDirection, aperture }?: DOFLensOptions);
     shaders(source: DOFLensShaders): DOFLensShaders;
     write(values: Float32Array, camera: {
         fov: number;
@@ -52,6 +58,7 @@ interface DOFLensOptions {
     bladeRotation?: number;
     tilt?: number;
     tiltDirection?: readonly [number, number];
+    aperture?: DOFApertureImage;
 }
 
 interface DOFLensShaders {

@@ -65,6 +65,22 @@ window.check = {
     });
     await settle(4);
   },
+  // The near box through an aperture image, all open or only its left half: the half's bokeh spreads left only.
+  async aperture(half) {
+    await start([[0, 0, 7, 0.1]]);
+    const size = 64,
+      data = new Uint8ClampedArray(size * size * 4);
+    for (let y = 0; y < size; y++)
+      for (let x = 0; x < (half ? size / 2 : size); x++) data.fill(255, (y * size + x) * 4, (y * size + x) * 4 + 4);
+    DOF.attach(engine, {
+      focalDistance: 20,
+      focalLength: 0.1,
+      aperture: 0.5,
+      maxRadius: 16,
+      lens: new DOFLens({ aperture: { width: size, height: size, data } }),
+    });
+    await settle(4);
+  },
   // Two boxes at one depth, above and below the middle.
   async tilt(tilt, focalDistance) {
     await start([

@@ -152,6 +152,7 @@ carry the same citation as a one-line comment in the code.
 | D-03 | Defaults: focus 5, focal length 0.05, f/2.8, max radius 16 | dof/src/index.ts | Margo-own: Public-API defaults |
 | D-04 | Golden-angle spiral taps | dof/src/shaders.ts | Vogel 1979 |
 | D-05 | Gather tiers, depth tests, near weighting | dof/src/shaders.ts | Margo-own: Margo design (explained in comments) |
+| D-06 | Aperture image bokeh: transmission mask, taps spread over the mirrored shape by farthest-point sampling, near weight over the mean transmission | dof/src/lens.ts | Margo-own: Margo design (explained in comments); farthest-point sampling as in Eldar et al., "The farthest point strategy for progressive image sampling", IEEE TIP 1997 |
 
 ### environment
 

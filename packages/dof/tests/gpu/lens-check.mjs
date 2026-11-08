@@ -53,6 +53,17 @@ try {
   assert.ok(lopsided(triangle) >= 6, `three blades are lopsided, got ${lopsided(triangle)}`);
   assert.ok(triangle.count < round.count, 'the polygon lies inside the disk');
 
+  // An aperture image: all open, it matches the round disk; its left half alone spreads the near bokeh to the left.
+  await page.evaluate(() => window.check.aperture(false));
+  const open = bright(await shot());
+  await page.evaluate(() => window.check.aperture(true));
+  const half = bright(await shot());
+  const sideways = (s) => middle - s.left - (s.right - middle);
+  console.log('aperture open', JSON.stringify(open), 'half', JSON.stringify(half));
+  assert.ok(Math.abs(open.width - round.width) <= 2 && Math.abs(sideways(open)) <= 3, 'an open aperture is the disk');
+  assert.ok(sideways(half) >= 8, `a left-half aperture spreads left, got ${sideways(half)}`);
+  assert.ok(Math.abs(half.height - open.height) <= 2, 'and keeps the full height');
+
   // Clip y of the boxes: 2.8 / (10 tan 25 degrees). The plane runs through the top box and recedes downwards, so the
   // bottom box lies in the near field, where blur spreads over the background.
   const clip = 2.8 / (10 * Math.tan((25 * Math.PI) / 180)),

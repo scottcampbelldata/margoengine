@@ -2600,7 +2600,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-534). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-535). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -2690,6 +2690,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | TAA reactive mask (`reactive` in `@margoengine/taa`, 2026-11-08) | By method: the caller draws the mask; particles, splats and blended glTF do not write it themselves. A reactive pixel shows that frame's own jittered sample, so it aliases until history builds again; the mask is read by nearest texel; history alpha holds the mask, so `taa.velocity.resolved` alpha is the mask, not 1; GPU cost not measured (LIM-515). | The effect packages each draw differently, and a mask is the one contract all of them can meet. | Edges of reactive effects shimmer a little more than opaque ones. | Keep mask values below 1 (0.5 to 0.8) where a soft trail is acceptable and less aliasing is wanted. |
 | TAA history rejection (`rejection: 'variance'`, `locks` in `@margoengine/taa`, 2026-11-08) | By method: variance clipping uses the same nine samples as the min/max box and only narrows it, so a neighbourhood split evenly between two colours keeps as wide a box (and as much ghost) as the clamp; a lock trusts history fully for eight frames, so a transparent effect without a reactive mask that crosses a locked thin feature ghosts there, and a thin feature that really disappears lingers up to eight frames at 0.9 decay; thin detection looks only along x and y, so a diagonal one-pixel line is not locked; GPU cost not measured (LIM-523). | The resolve keeps one pass and four extra loads; locks need one r32float pair. | Fewer ghosts next to bright specks; thin lines that stay visible. | Draw transparent effects into `reactive`, which drops locks. |
 | TAA sharpen (`Sharpen` in `@margoengine/taa/sharpen`, 2026-11-08) | By method: an unsharp mask on the four neighbours whose weight is at most -0.2 at `amount` 1 and falls with the pixel's headroom to black and white, clamped to the 5-tap range, so it never adds a halo or clips but cannot raise a feature above its brightest neighbour; it sharpens only the frame shown, never the history; GPU cost not measured (LIM-525). | The history must stay unsharpened, or each frame would sharpen the last one's sharpening. | Mild by design: at full strength the spread of soft 8 px stripes grows about 1%; dark and bright regions are left almost alone. | `TAAUpscale` keeps its own `sharpen` option, the same function. |
+| Custom bokeh shapes (`aperture` of `DOFLens` in `@margoengine/dof/lens`, 2026-11-08) | By method: the image is baked into the kernels when the effect attaches, as a 32 x 32 transmission mask over its inscribed circle (luminance times alpha, softened by about one cell at its edges) and 16, 32 and 64 far-gather taps spread over the shape; finer detail than a cell, about 1/16 of the bokeh's diameter, is lost; near and far bokeh show the image the same way up, where a real lens flips one of them; not with `blades`; GPU cost not measured (LIM-535). | The gather reads a fixed number of taps per pixel, so the shape is as fine as its taps and mask. | A heart or star bokeh from any image; a large disk shows the tap pattern a little more than the round one, as the taps cover only the open part. | Draw the shape larger (a lower f-number) for more detail per tap. |
 | TAA in stereo and XR (`@margoengine/taa` with `@margoengine/xr`, 2026-11-08) | By method: each eye is an engine view with its own TAA history, jitter cycle and captures at the eye's size; no multiview (one pass into a texture array), as the engine has none; the proof uses stereo views drawn as `EyeViews` draws them, not a headset; GPU cost not measured (LIM-531). | The engine draws XR eyes as separate views, and history must not cross eyes. | Each eye pays a full TAA resolve and holds its own history (two rgba16float and two r32float textures per eye). | None: per-eye cost is the price of per-eye history. |
 | TAA velocity of shapes a shader moves (NodeMaterial `positionNode`, raw `velocityEntry`, 2026-11-08) | By method: a `positionNode` move that reads the graph's uniform block runs again on last frame's block (kept per TAA view and draw) at last frame's model matrix; a move read from a storage buffer or texture that changes (skinning bones, morph weights, a height map), or from a `Fn` whose body reads a uniform, gets no motion of its own; a raw mesh moves only by the `velocityEntry` it writes, and keeps last frame's value of its own uniforms itself (`margoBefore` holds time, world matrix and view-projection); a raw mesh without the entry, or a transparent one, still gets camera motion only; GPU cost not measured (LIM-533). | A graph's storage and textures have no kept copy, and a raw shader is opaque code: only its author knows where a vertex was. | One more uniform block and a second run of the move per moved vertex in TAA's velocity pass; for raw, one more draw per opted-in mesh. | Register custom deformation as velocity primitives (`taa.add`) when it is in a storage buffer. |
 | Raw mesh shared buffers (`@margoengine/shader/raw`) | Enforced by method: meshes share a buffer only when every packed byte is equal, compared on upload. | Comparing needs the bytes, so each shared buffer keeps a CPU copy of them until its meshes have left it. | One more CPU copy per distinct stream, and a first write to a shared buffer makes that mesh a new GPU buffer. | Build meshes from different data, or write to them, and they hold their own buffers. |
@@ -7436,7 +7437,7 @@ Standalone output uses Margo's display curve (Khronos PBR Neutral, then sRGB), a
 
 ## Autofocus, tilt-shift and blades
 
-Each is its own entry, so a page using neither downloads neither.
+Each is its own entry, so a page using neither downloads neither. `DOFLens` also draws custom bokeh shapes (below).
 
 ```ts
 import {Engine} from 'margoengine/core';
@@ -7459,9 +7460,15 @@ engine.start();
 - `Autofocus` sets `dof.options.focalDistance`. It reads one depth texel into a buffer and maps it later without waiting, so the focus follows a frame or two behind and a frame never stalls. The sky leaves the focus where it was. Attach it after the `DOF`, alone or in a `PostStack`.
 - `DOFLens` is read when the effect attaches; only `tilt` and `tiltDirection` change afterwards. A perspective plane stays a plane: `1/focus` is linear across the screen, and past the horizon of the plane everything counts as in front of it. It is checked on WebGPU; autofocus and the lens are not checked on the WebGL2 layer.
 
-## Cost
+## Custom bokeh shapes
 
-GPU time of the DOF passes (CoC, wide-disk 2x2-block gather, bokeh), Intel Arc 140V laptop iGPU, Edge 155, DamagedHelmet scene (the earlier test model) with environment light in a `PostStack` [DOF, Tonemap], median of 6 alternating old/new rounds x 90 frames (`examples/package-benchmarks/gates/dof.mjs`, `results/gates-dof.json`). "Before" is the 64-tap full-resolution gather of `5b9dbbd`.
+`DOFLens` also takes an aperture image (hearts, stars, dirty glass): any RGBA pixels, such as a canvas's `ImageData`.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {DOF} from 'margoengine/dof';
+import {DOFLens} from 'margoengine/dof/lens';
+```
 
 [README continues: https://margoengine.com/llms/packages/dof.md]
 
