@@ -153,12 +153,10 @@ pub struct Scratch {
     ids: Vec<u32>,
     slot: Vec<u32>,
     start: Vec<Rot>,
-    /// The colouring of the contacts, the bodies each writes, their keys, and the lists the contacts are put in colour order in.
+    /// The colouring of the contacts (its `order` the visiting order), the bodies each writes, and their keys.
     colouring: Colouring,
     writes: Vec<[u32; 2]>,
     keys: Vec<u32>,
-    sorted: Vec<Constraint>,
-    sorted_bounces: Vec<Bounce>,
     /// The colours' contacts in blocks of four for the four-lane solve.
     blocks: wide::Blocks,
     pub(crate) paths: joint::Paths,
@@ -355,15 +353,12 @@ pub fn solve(world: &mut World, dt: f32) {
     scratch.writes.extend(constraints.iter().map(writes));
     scratch.colouring.build(bodies.len(), &scratch.writes, &keys);
     scratch.keys = keys;
-    scratch.sorted.clear();
-    scratch.sorted.extend(scratch.colouring.order.iter().map(|&i| constraints[i as usize]));
-    scratch.sorted_bounces.clear();
-    scratch.sorted_bounces.extend(scratch.colouring.order.iter().map(|&i| bounces[i as usize]));
-    core::mem::swap(&mut constraints, &mut scratch.sorted);
-    core::mem::swap(&mut bounces, &mut scratch.sorted_bounces);
-    world.counts.colours = scratch.colouring.used() as u64;
-    world.counts.overflow = scratch.colouring.overflow() as u64;
-    let starts = scratch.colouring.starts;
+    // The constraints stay where they were made; `order` lists them in visiting order.
+    let colouring = core::mem::take(&mut scratch.colouring);
+    let order = &colouring.order[..];
+    world.counts.colours = colouring.used() as u64;
+    world.counts.overflow = colouring.overflow() as u64;
+    let starts = colouring.starts;
     // The colours go to the four-lane solve, the overflow one at a time after them, in the same order as one at a time.
     let lanes = settings.contact_lanes || cfg!(target_arch = "wasm32");
     let single = if lanes { starts[COLOURS] as usize } else { 0 };
@@ -372,7 +367,7 @@ pub fn solve(world: &mut World, dt: f32) {
     blocks.ends.clear();
     if lanes {
         for k in 0..COLOURS {
-            blocks.push(&constraints[starts[k] as usize..starts[k + 1] as usize]);
+            blocks.push(&constraints, &order[starts[k] as usize..starts[k + 1] as usize]);
         }
     }
     let wide_springs = wide::Springs { quarter, eighth };
@@ -386,6 +381,8 @@ pub fn solve(world: &mut World, dt: f32) {
     let joint_pass = Pass { h, inv_h, biased: false, spring: joint::joint_spring(settings.joint_hertz, settings.joint_damping, h), max_push: settings.joint_max_push };
     let springs = [quarter, eighth];
     let max_push = settings.contact_max_push;
+    // Whether the bodies have moved since the four-lane solve last worked out its gaps (see wide::solve).
+    let mut fresh = true;
     for _ in 0..substeps {
         for (body, &id) in bodies[..moving].iter_mut().zip(&ids) {
             let source = &world.bodies[id as usize];
@@ -397,8 +394,8 @@ pub fn solve(world: &mut World, dt: f32) {
             body.w *= 1.0 / (1.0 + h * source.angular_damping);
         }
         wide::warm_start(&mut bodies, &blocks.blocks);
-        for c in &constraints[single..] {
-            warm_start(&mut bodies, c);
+        for &i in &order[single..] {
+            warm_start(&mut bodies, &constraints[i as usize]);
         }
         if joints {
             write_velocities(world, &bodies, &ids);
@@ -411,11 +408,12 @@ pub fn solve(world: &mut World, dt: f32) {
                 joint::solve(world, &mut paths, &Pass { biased: true, ..joint_pass });
                 read_velocities(world, &mut bodies, &ids);
             }
-            let (b, s) = wide::solve(&mut bodies, &mut blocks, true, inv_h, max_push, &wide_springs);
+            let (b, s) = wide::solve(&mut bodies, &mut blocks, true, fresh, inv_h, max_push, &wide_springs);
+            fresh = false;
             block += b;
             sequential += s;
-            for c in constraints[single..].iter_mut() {
-                let (b, s) = solve_contact(&mut bodies, c, true, inv_h, max_push, &springs);
+            for &i in &order[single..] {
+                let (b, s) = solve_contact(&mut bodies, &mut constraints[i as usize], true, inv_h, max_push, &springs);
                 block += b;
                 sequential += s;
             }
@@ -428,17 +426,19 @@ pub fn solve(world: &mut World, dt: f32) {
             target.xf.q = target.xf.q.integrate(h * body.w);
             body.turn = target.xf.q.mul(inverse(*start));
         }
+        fresh = true;
         for _ in 0..passes {
             if joints {
                 write_velocities(world, &bodies, &ids);
                 joint::solve(world, &mut paths, &joint_pass);
                 read_velocities(world, &mut bodies, &ids);
             }
-            let (b, s) = wide::solve(&mut bodies, &mut blocks, false, inv_h, max_push, &wide_springs);
+            let (b, s) = wide::solve(&mut bodies, &mut blocks, false, fresh, inv_h, max_push, &wide_springs);
+            fresh = false;
             block += b;
             sequential += s;
-            for c in constraints[single..].iter_mut() {
-                let (b, s) = solve_contact(&mut bodies, c, false, inv_h, max_push, &springs);
+            for &i in &order[single..] {
+                let (b, s) = solve_contact(&mut bodies, &mut constraints[i as usize], false, inv_h, max_push, &springs);
                 block += b;
                 sequential += s;
             }
@@ -449,12 +449,13 @@ pub fn solve(world: &mut World, dt: f32) {
     if lanes {
         let mut first = 0;
         for k in 0..COLOURS {
-            first += blocks.write_back(first, &mut constraints[starts[k] as usize..starts[k + 1] as usize]);
+            first += blocks.write_back(first, &mut constraints, &order[starts[k] as usize..starts[k + 1] as usize]);
         }
     }
 
     let threshold = settings.restitution_threshold;
-    for (c, bounce) in constraints.iter_mut().zip(&bounces) {
+    for &i in order {
+        let (c, bounce) = (&mut constraints[i as usize], &bounces[i as usize]);
         if bounce.restitution == 0.0 {
             continue;
         }
@@ -492,6 +493,7 @@ pub fn solve(world: &mut World, dt: f32) {
     world.scratch.start = start;
     world.scratch.paths = paths;
     world.scratch.blocks = blocks;
+    world.scratch.colouring = colouring;
 }
 
 /// sqrt(a b): the friction of two materials.

@@ -2163,14 +2163,57 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
   `RUSTFLAGS=-C target-feature=+simd128` in `packages/physics2d/kernel/wasm-check`) and time them in turns in one
   process, or run the browser comparison (reproduce.md).
 
+### 91. Own 2D physics: less work in the four-lane solve at the same bits (paired Wasm, 3.06 to 2.87 ms); Box2D v3 natively at four lanes as well as eight
+
+- **Change (`solver/wide.rs`, `solver.rs`):** a lane that holds no contact is never written back (`scatter` and
+  `write_back` skip it), so a step that covers every live lane (point 0; point 1 when every contact of the block has
+  two points; the block solve when it answers every lane) writes its results without the selects that kept the other
+  lanes (`Block::all_two`, `all_block`); each point's gap is worked out once after the poses move and kept in the
+  block for the passes until they move again (a gap depends only on how far the bodies moved and turned); a block's
+  counts are worked out once when it is made; the contacts are no longer copied into colour order, the blocks, the
+  overflow, restitution and the write-back read them through the colouring's `order`.
+- **Same output:** the pinned hashes of `tests/bits.rs` hold natively (lanes on and off) and in the Wasm build
+  (`check:rust-kernels`), and on the WebGPU and WebGL2 pages in Edge 157 and Firefox 157.
+- **Paired (two Wasm builds in one Node process in turns, a fresh 100-row pyramid per round, fastest of 40 steps after
+  60, 12 rounds, both passing the pinned hashes; busy machine):** the selects 3.036 to 2.921 ms (12 of 12 rounds); the
+  kept gaps 3.055 to 3.050 (8 of 12: off the dependency chain, kept because it does less work for the same bits); no
+  sorted copy 2.911 to 2.899 (10 of 12); the counts and impulse stores 2.899 to 2.870 (10 of 12); all of it against
+  entry 90's build 3.095 to 2.913 ms (12 of 12).
+- **Tried and dropped (paired, same bits):** the two blocks' normal solves interleaved step by step (2.907 to 2.931, 1
+  of 12: more registers live); one block a visit (2.879 to 3.025, 0 of 8); blocks filled lane by lane straight from
+  the contacts (2.961 to 2.970, 2 of 12); the body record's hot fields first in a `repr(C)` layout (no gain).
+- **Where the Wasm step goes now (instrumented copy, Node, fastest of 200 steps, busy machine):** 2.95 ms = broad 0.14,
+  narrow 0.80, islands 0.07, solve 1.90 (setup 0.58: rows 0.27, colouring 0.11, blocks 0.10; warm start 0.11, biased
+  passes 0.51, relaxing passes 0.55, end 0.06). The narrow phase: 14,950 box pairs a step, 3,994 of them apart (they
+  take `closest`'s 32 distances, about 0.1 ms in all).
+- **Browser (one page, the engines taking turns, 12 rounds, best step; busy machine, diagnostic):** 
+
+  | Browser | Margo before (`067fbe545`) | Margo after | Box2D v3 Wasm | Rapier 2D 0.21.0 Wasm |
+  | --- | --- | --- | --- | --- |
+  | Edge 157 (WebGPU page) | 3.07 ms | 2.93 ms | 1.44 to 1.45 ms | 7.63 to 7.64 ms |
+  | Firefox 157 (WebGL2 page) | 3.40 ms | 3.24 ms | 1.40 ms | 8.14 to 8.18 ms |
+
+  The before and after runs went one after the other in one session (`scripts/physics2d-kernel-browsers.mjs
+  --rounds=12`, `BOX2D_WASM` set); the pinned bits held on every page. The loss stays open: Box2D's Wasm is 2.0 to 2.3
+  times faster.
+- **Box2D v3 natively, like for like (physics-refs `native/box2d3/profile.cpp`, its own per-phase profile, the same
+  pyramid, 60 steps then the fastest of 40, the builds in turns, three runs each):** Box2D's default build (its contact
+  file at `/arch:AVX2`, eight lanes) 0.97 to 1.00 ms a step, contact solve 0.61; the four-lane build (`-DREFS_BOX2D_SSE2`,
+  the harness answering 4 to Box2D's SIMD width query, reported on stderr) 1.24 ms, contact solve 0.87 (warm start
+  0.13, solve 0.22, relax 0.34). Margo natively (SSE2, four lanes): 2.87 ms. The four-lane row is the like for like
+  with Margo's Wasm, which is 128 bits wide.
+- **Rerun:** the paired Wasm A/B as entry 90; the native rows as reproduce.md ("Own 2D physics against Box2D v3
+  natively"); the browser run with `BOX2D_WASM` (reproduce.md).
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).
 
-- **Own 2D physics, the 100-row pyramid: 3.6 to 3.7 ms a step in Wasm against Box2D v3's Wasm 1.5 to 1.6 ms (entries
-  83, 85 to 90; entry 90 took about 6 percent more off, paired).** One page, the engines taking turns, busy machine, diagnostic (entry 89). Natively the step is now the
-  solver 2.1 ms (Box2D's own profile: 0.8 to 1.0, eight lanes), the narrow phase 0.77 (0.13 to 0.18), the broad phase
-  0.23 (0.10 to 0.20). Rapier 2D's Wasm takes 8.2 to 8.6 ms in the same page. Rerun: entry 89.
+- **Own 2D physics, the 100-row pyramid: 2.9 to 3.2 ms a step in Wasm against Box2D v3's Wasm 1.4 ms (entries
+  83, 85 to 91; entry 91 took about 6 percent more off, paired).** One page, the engines taking turns, busy machine,
+  diagnostic. Like for like natively (entry 91): Box2D at four lanes (SSE2) 1.24 ms, at its default eight (AVX2) 0.98;
+  Margo at four 2.87. The Wasm step by phase: setup 0.58 ms, passes 1.17, narrow phase 0.80, broad 0.14. Rapier 2D's
+  Wasm takes 7.6 to 8.2 ms in the same page. Rerun: entry 91.
 
 - **Own convex decomposition against Rapier's V-HACD (entry 81).** 1.1 to 17.3 s where Rapier takes 0.1 to 0.3 s on five
   meshes of 72 to 2,304 triangles, with fewer or as many parts. Cause: 500 tree-search iterations per cut with a hull per

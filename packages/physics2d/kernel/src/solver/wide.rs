@@ -6,6 +6,11 @@
 // and turned into lanes by a transpose, and written back the same way, only for the lanes that hold a contact and write
 // that body. Two blocks of one colour are visited together, step by step, so their chains overlap (they write different
 // bodies, so the order between them changes nothing).
+//
+// Less work for the same bits: a lane that holds no contact is never written back, so a step that covers every live
+// lane (point 0, point 1 of a block whose contacts all have two points, the block solve answering every lane) writes
+// its results without the selects that keep the other lanes; each point's gap is worked out once after the poses move
+// and kept for the passes until they move again; a block's counts are worked out once when it is made.
 use alloc::vec::Vec;
 
 use margoengine_physics_kernel_common::lanes::{F4, M4};
@@ -38,6 +43,14 @@ pub(super) struct Block {
     eighth: M4,
     write_a: u32,
     write_b: u32,
+    /// Whether every contact of the block has two points; whether every one takes the block solve. A step that touches
+    /// every live lane needs no select to leave the others as they were: the lanes without a contact are never written
+    /// back (`scatter` and `write_back` skip them), so what they hold does not matter.
+    all_two: bool,
+    all_block: bool,
+    /// Contacts in the block; two-point contacts not on the block solve (each counts as sequential every visit).
+    lanes: u8,
+    singles: u8,
     inv_mass_a: F4,
     inv_i_a: F4,
     inv_mass_b: F4,
@@ -51,6 +64,9 @@ pub(super) struct Block {
     points: [PointLanes; 2],
     /// Lanes whose point k has pushed in some substep.
     pushed: [M4; 2],
+    /// Each point's gap as the last pass that worked it out found it: the bodies have not moved since when the pass is
+    /// not `fresh` (see `solve`).
+    gap: [F4; 2],
 }
 
 /// Velocities of four bodies.
@@ -70,14 +86,15 @@ pub(super) struct Blocks {
 }
 
 impl Blocks {
-    /// Puts `constraints` (one colour's, in visiting order) into blocks of four.
-    pub(super) fn push(&mut self, constraints: &[Constraint]) {
-        for group in constraints.chunks(4) {
+    /// Puts `constraints[order[i]]` (one colour's, in visiting order) into blocks of four.
+    pub(super) fn push(&mut self, constraints: &[Constraint], order: &[u32]) {
+        for group in order.chunks(4) {
             // Field by field across the lanes; empty lanes keep zeros and the last contact's bodies.
             let mut f = [[0.0f32; 4]; 12 + 18];
-            let (mut a, mut b) = ([group[group.len() - 1].a; 4], [group[group.len() - 1].b; 4]);
+            let last = &constraints[group[group.len() - 1] as usize];
+            let (mut a, mut b) = ([last.a; 4], [last.b; 4]);
             let (mut two, mut block, mut eighth, mut write_a, mut write_b, mut pushed0, mut pushed1) = (0, 0, 0, 0, 0, 0, 0);
-            for (k, c) in group.iter().enumerate() {
+            for (k, c) in group.iter().map(|&i| &constraints[i as usize]).enumerate() {
                 a[k] = c.a;
                 b[k] = c.b;
                 two |= ((c.count == 2) as u32) << k;
@@ -122,6 +139,10 @@ impl Blocks {
                 eighth: M4::from_bits(eighth),
                 write_a,
                 write_b,
+                all_two: two == (1 << group.len()) - 1,
+                all_block: block == (1 << group.len()) - 1,
+                lanes: group.len() as u8,
+                singles: (two & !block).count_ones() as u8,
                 inv_mass_a: v(0),
                 inv_i_a: v(1),
                 inv_mass_b: v(2),
@@ -134,26 +155,27 @@ impl Blocks {
                 k22: v(9),
                 points: [point(0), point(1)],
                 pushed: [M4::from_bits(pushed0), M4::from_bits(pushed1)],
+                gap: [F4::splat(0.0); 2],
             });
         }
         self.ends.push(self.blocks.len());
     }
 
-    /// Writes the impulses and pushed bits of the blocks from `first` on back to `constraints`, the contacts `push` put
-    /// in them, in the same order; returns the number of blocks read.
-    pub(super) fn write_back(&self, first: usize, constraints: &mut [Constraint]) -> usize {
-        let count = constraints.len().div_ceil(4);
-        for (block, group) in self.blocks[first..first + count].iter().zip(constraints.chunks_mut(4)) {
-            for (i, p) in block.points.iter().enumerate() {
-                let (n, t) = (p.normal_impulse.get(), p.tangent_impulse.get());
-                for (k, c) in group.iter_mut().enumerate() {
-                    c.points[i].normal_impulse = n[k];
-                    c.points[i].tangent_impulse = t[k];
-                }
-            }
-            let (p0, p1) = (block.pushed[0].bits(), block.pushed[1].bits());
-            for (k, c) in group.iter_mut().enumerate() {
-                c.pushed = (p0 >> k & 1) as u8 | ((p1 >> k & 1) as u8) << 1;
+    /// Writes the impulses and pushed bits of the blocks from `first` on back to `constraints[order[i]]`, the contacts
+    /// `push` put in them, in the same order; returns the number of blocks read.
+    pub(super) fn write_back(&self, first: usize, constraints: &mut [Constraint], order: &[u32]) -> usize {
+        let count = order.len().div_ceil(4);
+        for (block, group) in self.blocks[first..first + count].iter().zip(order.chunks(4)) {
+            let [p0, p1] = &block.points;
+            let (n0, t0, n1, t1) = (p0.normal_impulse.get(), p0.tangent_impulse.get(), p1.normal_impulse.get(), p1.tangent_impulse.get());
+            let (pushed0, pushed1) = (block.pushed[0].bits(), block.pushed[1].bits());
+            for (k, &i) in group.iter().enumerate() {
+                let c = &mut constraints[i as usize];
+                c.points[0].normal_impulse = n0[k];
+                c.points[0].tangent_impulse = t0[k];
+                c.points[1].normal_impulse = n1[k];
+                c.points[1].tangent_impulse = t1[k];
+                c.pushed = (pushed0 >> k & 1) as u8 | ((pushed1 >> k & 1) as u8) << 1;
             }
         }
         count
@@ -198,13 +220,20 @@ fn speed_at(m: &Motion4, rx: F4, ry: F4) -> (F4, F4) {
     (m.vx + -ry * m.w, m.vy + rx * m.w)
 }
 
-/// `apply`: impulse (jx, jy) from A to B at point `p`, in the lanes of `m` only.
+/// `apply`: impulse (jx, jy) from A to B at point `p`, in the lanes of `m` only; `full`: `m` holds every live lane, so
+/// the other lanes need not be kept.
+#[allow(clippy::too_many_arguments)]
 #[inline(always)]
-fn apply(c: &Block, ma: &mut Motion4, mb: &mut Motion4, p: &PointLanes, jx: F4, jy: F4, m: M4) {
+fn apply(c: &Block, ma: &mut Motion4, mb: &mut Motion4, p: &PointLanes, jx: F4, jy: F4, m: M4, full: bool) {
     let na = Motion4 { vx: ma.vx - jx * c.inv_mass_a, vy: ma.vy - jy * c.inv_mass_a, w: ma.w - c.inv_i_a * (p.rax * jy - p.ray * jx) };
     let nb = Motion4 { vx: mb.vx + jx * c.inv_mass_b, vy: mb.vy + jy * c.inv_mass_b, w: mb.w + c.inv_i_b * (p.rbx * jy - p.rby * jx) };
-    *ma = keep(m, na, *ma);
-    *mb = keep(m, nb, *mb);
+    if full {
+        *ma = na;
+        *mb = nb;
+    } else {
+        *ma = keep(m, na, *ma);
+        *mb = keep(m, nb, *mb);
+    }
 }
 
 /// The normal speed of point `p`: n . (speed at B - speed at A).
@@ -224,7 +253,7 @@ pub(super) fn warm_start(bodies: &mut [SolverBody], blocks: &[Block]) {
             let m = if i == 0 { c.live } else { c.live.and(c.two) };
             let jx = c.nx * p.normal_impulse + tx * p.tangent_impulse;
             let jy = c.ny * p.normal_impulse + ty * p.tangent_impulse;
-            apply(c, &mut ma, &mut mb, p, jx, jy, m);
+            apply(c, &mut ma, &mut mb, p, jx, jy, m, i == 0 || c.all_two);
         }
         scatter(bodies, &c.a, ma, c.write_a);
         scatter(bodies, &c.b, mb, c.write_b);
@@ -256,8 +285,11 @@ fn row(spring: (F4, F4, F4), s: F4, biased: bool, inv_h: F4, max_push: F4) -> (F
 
 /// One pass over the blocks: friction and normal, in the pass's order. Returns (block solves, sequential fallbacks).
 /// Inside a colour two blocks are visited together, step by step, so their independent chains overlap; they write
-/// different bodies, so this gives what one after the other gives.
-pub(super) fn solve(bodies: &mut [SolverBody], blocks: &mut Blocks, biased: bool, inv_h: f32, max_push: f32, springs: &Springs) -> (u64, u64) {
+/// different bodies, so this gives what one after the other gives. `fresh`: the bodies have moved since the last pass,
+/// so each point's gap is worked out again and kept; otherwise the kept gap is the same number and is read instead (a
+/// gap depends only on how far the bodies have moved and turned, which changes only when the poses integrate).
+#[allow(clippy::too_many_arguments)]
+pub(super) fn solve(bodies: &mut [SolverBody], blocks: &mut Blocks, biased: bool, fresh: bool, inv_h: f32, max_push: f32, springs: &Springs) -> (u64, u64) {
     let (inv_h, max_push) = (F4::splat(inv_h), F4::splat(max_push));
     // Each spring's impulse scale over its mass scale, the block solve's diagonal term, once a pass: the same division
     // the scalar solve makes on every visit, so the same bits.
@@ -269,13 +301,13 @@ pub(super) fn solve(bodies: &mut [SolverBody], blocks: &mut Blocks, biased: bool
         let mut i = begin;
         while i + 1 < end {
             let (x, y) = blocks.blocks.split_at_mut(i + 1);
-            let (b, s) = visit(bodies, [&mut x[i], &mut y[0]], biased, inv_h, max_push, q, e);
+            let (b, s) = visit(bodies, [&mut x[i], &mut y[0]], biased, fresh, inv_h, max_push, q, e);
             block_count += b;
             sequential_count += s;
             i += 2;
         }
         if i < end {
-            let (b, s) = visit(bodies, [&mut blocks.blocks[i]], biased, inv_h, max_push, q, e);
+            let (b, s) = visit(bodies, [&mut blocks.blocks[i]], biased, fresh, inv_h, max_push, q, e);
             block_count += b;
             sequential_count += s;
         }
@@ -288,10 +320,15 @@ type Lanes4 = (F4, F4, F4, F4);
 
 #[allow(clippy::too_many_arguments)]
 #[inline(always)]
-fn visit<const N: usize>(bodies: &mut [SolverBody], mut cs: [&mut Block; N], biased: bool, inv_h: F4, max_push: F4, q: Lanes4, e: Lanes4) -> (u64, u64) {
+fn visit<const N: usize>(bodies: &mut [SolverBody], mut cs: [&mut Block; N], biased: bool, fresh: bool, inv_h: F4, max_push: F4, q: Lanes4, e: Lanes4) -> (u64, u64) {
     let mut ma: [Motion4; N] = core::array::from_fn(|j| gather(bodies, &cs[j].a));
     let mut mb: [Motion4; N] = core::array::from_fn(|j| gather(bodies, &cs[j].b));
-    let g: [[F4; 2]; N] = core::array::from_fn(|j| gaps(bodies, cs[j]));
+    let g: [[F4; 2]; N] = core::array::from_fn(|j| {
+        if fresh {
+            cs[j].gap = gaps(bodies, cs[j]);
+        }
+        cs[j].gap
+    });
     if biased {
         friction_n(&mut cs, &mut ma, &mut mb);
     }
@@ -353,8 +390,9 @@ fn friction_point(c: &mut Block, ma: &mut Motion4, mb: &mut Motion4, i: usize) {
     let x = F4::select(x.lt(low), low, x);
     let total = F4::select(x.gt(limit), limit, x);
     let applied = total - p.tangent_impulse;
-    c.points[i].tangent_impulse = F4::select(m, total, p.tangent_impulse);
-    apply(c, ma, mb, &p, tx * applied, ty * applied, m);
+    let full = i == 0 || c.all_two;
+    c.points[i].tangent_impulse = if full { total } else { F4::select(m, total, p.tangent_impulse) };
+    apply(c, ma, mb, &p, tx * applied, ty * applied, m, full);
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -390,7 +428,7 @@ fn normal(c: &mut Block, ma: &mut Motion4, mb: &mut Motion4, gaps: [F4; 2], bias
     let both = c.live.and(c.block);
     let mut done = M4::from_bits(0);
     let (start_a, start_b) = (*ma, *mb);
-    if both.bits() != 0 {
+    if c.all_block || both.bits() != 0 {
         let (b1, _, _) = row(spring, gaps[0], biased, inv_h, max_push);
         let (b2, _, _) = row(spring, gaps[1], biased, inv_h, max_push);
         let (k11, k12, k22) = (c.k11, c.k12, c.k22);
@@ -408,9 +446,20 @@ fn normal(c: &mut Block, ma: &mut Motion4, mb: &mut Motion4, gaps: [F4; 2], bias
         let x1 = (m22 * r1 - k12 * r2) / det;
         let x2 = (m11 * r2 - k12 * r1) / det;
         let case1 = det.gt(zero).and(x1.ge(zero)).and(x2.ge(zero));
-        let (found, n1, n2) = if both.and_not(case1).bits() == 0 {
+        if c.all_block && both.and_not(case1).bits() == 0 {
+            // Every contact of the block on the block solve and answered by both points pushing (the usual case at
+            // rest): no select needed, the lanes without a contact are never read back.
+            c.points[0].normal_impulse = x1;
+            c.points[1].normal_impulse = x2;
+            c.pushed[0] = c.pushed[0].or(x1.gt(zero));
+            c.pushed[1] = c.pushed[1].or(x2.gt(zero));
+            apply(c, ma, mb, &p, c.nx * (x1 - l1), c.ny * (x1 - l1), both, true);
+            apply(c, ma, mb, &q, c.nx * (x2 - l2), c.ny * (x2 - l2), both, true);
+            return (c.lanes as u64, 0);
+        }
+        let (found, n1, n2, full) = if both.and_not(case1).bits() == 0 {
             // Every lane is answered by both points pushing (the usual case at rest): the other cases are not needed.
-            (both, x1, x2)
+            (both, x1, x2, c.all_block)
         } else {
             let y1 = r1 / m11;
             let case2 = y1.ge(zero).and((k12 * y1 - r2).ge(zero)).and_not(case1);
@@ -418,22 +467,22 @@ fn normal(c: &mut Block, ma: &mut Motion4, mb: &mut Motion4, gaps: [F4; 2], bias
             let case3 = y2.ge(zero).and((k12 * y2 - r1).ge(zero)).and_not(case1.or(case2));
             let case4 = r1.le(zero).and(r2.le(zero)).and_not(case1.or(case2).or(case3));
             let found = case1.or(case2).or(case3).or(case4).and(both);
-            (found, F4::select(case1, x1, F4::select(case2, y1, zero)), F4::select(case1, x2, F4::select(case3, y2, zero)))
+            (found, F4::select(case1, x1, F4::select(case2, y1, zero)), F4::select(case1, x2, F4::select(case3, y2, zero)), false)
         };
         let (d1, d2) = (n1 - l1, n2 - l2);
         c.points[0].normal_impulse = F4::select(found, n1, l1);
         c.points[1].normal_impulse = F4::select(found, n2, l2);
         c.pushed[0] = c.pushed[0].or(n1.gt(zero).and(found));
         c.pushed[1] = c.pushed[1].or(n2.gt(zero).and(found));
-        apply(c, ma, mb, &p, c.nx * d1, c.ny * d1, found);
-        apply(c, ma, mb, &q, c.nx * d2, c.ny * d2, found);
+        apply(c, ma, mb, &p, c.nx * d1, c.ny * d1, found, full);
+        apply(c, ma, mb, &q, c.nx * d2, c.ny * d2, found, full);
         done = found;
     }
     // Lanes the block solve did not answer: the rows one at a time, from the velocities the visit started with.
     let rest = c.live.and_not(done);
     let blocks = done.bits().count_ones() as u64;
     let fallbacks = both.and_not(done).bits().count_ones() as u64;
-    let singles = c.live.and(c.two).and_not(c.block).bits().count_ones() as u64;
+    let singles = c.singles as u64;
     if rest.bits() != 0 {
         let (mut sa, mut sb) = (start_a, start_b);
         for i in 0..2 {
@@ -447,7 +496,7 @@ fn normal(c: &mut Block, ma: &mut Motion4, mb: &mut Motion4, gaps: [F4; 2], bias
             let applied = total - p.normal_impulse;
             c.points[i].normal_impulse = F4::select(m, total, p.normal_impulse);
             c.pushed[i] = c.pushed[i].or(total.gt(zero).and(m));
-            apply(c, &mut sa, &mut sb, &p, c.nx * applied, c.ny * applied, m);
+            apply(c, &mut sa, &mut sb, &p, c.nx * applied, c.ny * applied, m, false);
         }
         *ma = keep(rest, sa, *ma);
         *mb = keep(rest, sb, *mb);
