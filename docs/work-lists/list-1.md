@@ -2,7 +2,7 @@
 
 Stays with the first account, the manager session. Listed so the other accounts know what not to touch.
 
-**Stream P, own physics:** batches 122 to 131, then the physics parity batches 138 to 146 and the physics beyond batches 147 to 155, 157 and 158 (Scott, 2026-11-07; tracking file `docs/rapier-parity.md`). Order: 126, 127, 128, 138 to 143, 129, 130, 131, 144 to 146, 147 to 158. Owns `packages/physics`, `packages/physics2d` and their kernels.
+**Stream P, own physics:** batches 122 to 131, then the physics parity batches 138 to 146 and the physics beyond batches 147 to 158 (Scott, 2026-11-07; tracking file `docs/rapier-parity.md`). Order: 126, 127, 128, 138 to 143, 129, 130, 131, 144 to 146, 147 to 158. Owns `packages/physics`, `packages/physics2d` and their kernels.
 
 **Stream G, gaps:** the open gap list and the ragdoll items. Owns `packages/ragdoll` until they finish.
 
