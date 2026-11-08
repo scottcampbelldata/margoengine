@@ -171,7 +171,7 @@ impl World {
     }
 
     /// Notes the first awake body past RANGE, or not a number at all.
-    fn check_range(&mut self) {
+    pub fn check_range(&mut self) {
         for slot in 0..self.header().awake as usize {
             let at = self.uu(AWAKE, slot) as usize;
             for v in [self.v(POSITION_X, at), self.v(LINEAR_X, at), self.v(ANGULAR_X, at)] {
@@ -186,7 +186,7 @@ impl World {
     }
 
     /// Keeps the pose the step starts from, finds each centre of mass, lands impulses, works out kinematic velocities.
-    fn begin_step(&mut self, dt: f32) {
+    pub fn begin_step(&mut self, dt: f32) {
         for slot in 0..self.header().awake as usize {
             let at = self.uu(AWAKE, slot) as usize;
             let kind = self.flags(at) & KIND;
@@ -217,7 +217,7 @@ impl World {
     }
 
     /// Semi-implicit Euler's velocity half: gravity and forces, the gyroscopic term, then damping and locks.
-    fn integrate_velocities(&mut self, h: f32) {
+    pub fn integrate_velocities(&mut self, h: f32) {
         let gravity = self.header().gravity;
         let gravity = v3(gravity[0], gravity[1], gravity[2]);
         for slot in 0..self.header().awake as usize {
@@ -257,7 +257,7 @@ impl World {
 
     /// Semi-implicit Euler's position half, with the velocities just updated, so the velocity a body reports is the one
     /// that moved it. A kinematicPosition body lands exactly on its target on the last substep.
-    fn integrate_poses(&mut self, h: f32, last: bool) {
+    pub fn integrate_poses(&mut self, h: f32, last: bool) {
         for slot in 0..self.header().awake as usize {
             let at = self.uu(AWAKE, slot) as usize;
             let kind = self.flags(at) & KIND;
