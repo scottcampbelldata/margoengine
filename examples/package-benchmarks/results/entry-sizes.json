@@ -1,5 +1,5 @@
 {
-  "commit": "9df6e6312",
+  "commit": "859084b87",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -1712,8 +1712,8 @@
     },
     "@margoengine/mcp": {
       ".": {
-        "raw": 22299,
-        "gzip": 8591
+        "raw": 22887,
+        "gzip": 8787
       },
       "./porting": {
         "raw": 7108,
@@ -1722,6 +1722,10 @@
       "./error-codes": {
         "raw": 3863,
         "gzip": 1877
+      },
+      "./render": {
+        "raw": 6711,
+        "gzip": 3021
       }
     },
     "@margoengine/mesh-edit": {
@@ -1918,8 +1922,8 @@
         "gzip": 19195
       },
       "./next": {
-        "raw": 212616,
-        "gzip": 127029
+        "raw": 210144,
+        "gzip": 124889
       }
     },
     "@margoengine/physics2d": {
@@ -2402,6 +2406,10 @@
       "./formats": {
         "raw": 35694,
         "gzip": 13312
+      },
+      "./graph": {
+        "raw": 24668,
+        "gzip": 9438
       },
       "./grids": {
         "raw": 26618,

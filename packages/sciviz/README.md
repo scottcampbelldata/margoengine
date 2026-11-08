@@ -398,6 +398,52 @@ const grid = zarrGrid(await array.read(), [1, 1, 2]);
 console.log(array.shape, grid.dims, grid.range);
 ```
 
+## Graph layouts
+
+`@margoengine/sciviz/graph` lays out networks with forces and draws them on the GPU. `ForceLayout` follows Fruchterman
+and Reingold (1991): every edge pulls its ends together with d² / k, every pair of nodes pushes apart with k² / d, and
+each node moves at most a temperature that cools quickly and then simmers at a low constant. The all-pairs push runs
+through a Barnes and Hut tree (quadtree in 2D, octree in 3D), so one iteration costs about E + N log N: a cell acts as
+one body at its centre of mass when the node is farther from that centre than the cell's side over `theta` plus the
+centre's offset from the cell's middle, and is not inside the cell. That is Barnes's 1994 form of the test: the plain
+side-over-distance test of 1986 takes a cell whose mass sits on its far side as one far body for a node right beside
+its near side, and at `theta` 0.9 that kept a ring's crossed edges crossed. `theta: 0` gives the exact all-pairs push. A weak pull toward the origin (`gravity`) keeps parts that are not
+connected in view.
+
+- `new ForceLayout(graph, options)`: `graph` is `{ nodes, edges, weights? }` with two node indices per edge. Options:
+  `dimensions` (2 or 3, default 2), `theta` (default 0.9), `length` (the ideal edge length k, default 1),
+  `temperature` (first step limit, default a tenth of the start square's side, at least k), `cooling` (default 0.97),
+  `simmer` (lowest step limit in units of k, default 0.05), `gravity` (default 0.01), `seed` or `positions` (xyz per
+  node; a 2D layout sets z to 0).
+- `layout.step()` runs one iteration; `for await (const step of layout.run({ iterations, tolerance, signal }))` runs
+  them and yields to the page between iterations, stopping at the limit (default 300), once no node moves more than
+  `tolerance` times k, or when the signal aborts.
+- `graphLayer(fig, graph, positions, options)` draws edges as lines and nodes as discs `nodeSize` CSS pixels across,
+  coloured by `values` (default each node's degree) through a colour map; `layer.setPositions(layout.positions)` after
+  a step moves it. The figure frames `bounds` (default the positions' box when the layer is made).
+
+```ts
+import { Figure } from '@margoengine/sciviz';
+import { ForceLayout, graphLayer } from '@margoengine/sciviz/graph';
+
+const fig = await Figure.create(document.querySelector('canvas')!);
+
+// A ring of 200 nodes with a few chords.
+const nodes = 200;
+const edges: number[] = [];
+for (let i = 0; i < nodes; i++) edges.push(i, (i + 1) % nodes);
+for (let i = 0; i < nodes; i += 25) edges.push(i, (i + 100) % nodes);
+const graph = { nodes, edges };
+
+const layout = new ForceLayout(graph, { seed: 1 });
+for await (const step of layout.run({ iterations: 200 })) console.log(step.iteration, step.moved);
+const layer = graphLayer(fig, graph, layout.positions, { nodeSize: 5, colormap: 'magma' });
+
+// Later steps move the drawing; the figure keeps the frame it was given at creation (`bounds`).
+layout.step();
+layer.setPositions(layout.positions);
+```
+
 ## Unstructured grids
 
 `@margoengine/sciviz/grids` draws finite-element style meshes: tetrahedra, hexahedra, wedges and pyramids with a value

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10945595,
+  "total": 10955317,
   "history": [
     {
       "date": "2026-10-24",
@@ -4070,6 +4070,12 @@
       "commit": "6568f968b",
       "reason": "new entry @margoengine/mcp/render: the render_snippet tool (batch 119 job 3)",
       "grew": 2
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "859084b87",
+      "reason": "sciviz graph entry: new optional entry, root unchanged",
+      "grew": 1
     }
   ],
   "items": {
@@ -4642,6 +4648,7 @@
     "@margoengine/sciviz/bricks": 14265,
     "@margoengine/sciviz/colormaps": 4427,
     "@margoengine/sciviz/formats": 13712,
+    "@margoengine/sciviz/graph": 9722,
     "@margoengine/sciviz/grids": 10885,
     "@margoengine/sciviz/maths": 5638,
     "@margoengine/sciviz/nrrd": 1216,
