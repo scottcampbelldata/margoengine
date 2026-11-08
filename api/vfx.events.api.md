@@ -24,6 +24,12 @@ interface ParticleAtlas {
     frames: 'random' | 'lifetime';
 }
 
+interface VFXAttractor {
+    position: Vec3;
+    strength: number;
+    radius?: number;
+}
+
 interface VFXCurves {
     size?: readonly number[];
     alpha?: readonly number[];
@@ -73,6 +79,11 @@ interface VFXExtension<T> {
     simulation?(code: string, value: T): string;
     billboard?(code: string, value: T): string;
     create?(state: VFXState, value: T, owned: OwnedResources): VFXRuntime;
+}
+
+interface VFXFields {
+    attractors?: readonly VFXAttractor[];
+    field?: VFXVectorField;
 }
 
 interface VFXLightSource {
@@ -141,6 +152,7 @@ interface VFXOptions {
     lit?: VFXLit;
     depthCollide?: VFXDepthCollide;
     stretch?: VFXStretch;
+    fields?: VFXFields;
 }
 
 interface VFXRibbons {
@@ -189,5 +201,13 @@ interface VFXTexture {
     height: number;
     data: Uint8Array | Uint8ClampedArray;
     atlas?: ParticleAtlas;
+}
+
+interface VFXVectorField {
+    size: Vec3;
+    data: Float32Array;
+    center?: Vec3;
+    halfSize: Vec3;
+    strength?: number;
 }
 ```

@@ -215,7 +215,7 @@ from 0.010 to 0.031 ms at 100,000; the draw is unchanged.
 `VFX` from `@margoengine/vfx` (about 14.1 kB min+gzip) carries every feature. An effect that uses none of them can
 import the same class from `@margoengine/vfx/base` (about 8.3 kB); add features as a second argument from their own
 entries: `/obstacles` (1.1 kB alone), `/wrap` (0.2 kB), `/sort` (1.1 kB), `/texture` (1.5 kB; it exports
-`textureFeature`, passed as `{texture: textureFeature}`), `/curves` (1.6 kB), `/emitter` (2.4 kB), `/soft` (1.3 kB), `/ribbons` (2.6 kB, the quality gate's figure), `/mesh` (3.2 kB, the same), `/events` (2.3 kB, the same), `/lit` (1.7 kB, the same), `/depth-collide` (2.0 kB, the same) and `/stretch` (0.8 kB, the same). Sizes are vite library builds with bare imports external,
+`textureFeature`, passed as `{texture: textureFeature}`), `/curves` (1.6 kB), `/emitter` (2.4 kB), `/soft` (1.3 kB), `/ribbons` (2.6 kB, the quality gate's figure), `/mesh` (3.2 kB, the same), `/events` (2.3 kB, the same), `/lit` (1.7 kB, the same), `/depth-collide` (2.0 kB, the same), `/stretch` (0.8 kB, the same) and `/fields` (1.8 kB, the same). Sizes are vite library builds with bare imports external,
 each entry compressed on its own ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)), so a
 bundle that combines them adds less: the whole root is 14.1 kB. `node examples/package-benchmarks/vfx-size.mjs` measures base-plus-feature bundles
 (`results/vfx-size.json`, at an earlier commit, `76af7a0`).
@@ -455,3 +455,39 @@ billboard, drawn longer, so it works with `texture`, `soft`, `curves` and `lit` 
 keep their own shapes. `node packages/vfx/test/features-check.mjs` (real GPU) compares every pixel along and across a
 fast particle's streak, flying across and up the screen, at 1x and 4x MSAA, and with factor 0, against the stretched
 disc computed on the CPU.
+
+### Force fields
+
+`fields` adds point attractors and a 3D vector field to each particle's acceleration, alongside gravity and
+turbulence: for portals, vortices, wind volumes and magic that gathers to a point. An attractor pulls with `strength
+x d / (|d|^2 + radius^2)^1.5` (an inverse square, softened by `radius`, default 0.5, so it stays finite at its centre);
+a negative strength pushes. The vector field holds one acceleration per cell over a box, trilinear between the cell
+centres, the edge cells' value out to the box's faces and nothing outside it, times `strength`. Up to 16 attractors;
+up to 2,097,152 cells (128^3).
+
+```ts
+import {EngineKernel} from 'margoengine/core';
+import {VFX} from 'margoengine/vfx/base';
+import {fields} from 'margoengine/vfx/fields';
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
+// A swirl: each cell of an 8^3 field pushes around the y axis.
+const n = 8, data = new Float32Array(n * n * n * 3);
+for (let z = 0; z < n; z++) for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+  const i = (x + n * (y + n * z)) * 3;
+  data[i] = -(z - n / 2 + 0.5); data[i + 2] = x - n / 2 + 0.5;
+}
+const effect = VFX.attach(engine, {
+  capacity: 8192, rate: 800, position: [0, 0, 0], spread: 1, gravity: [0, 0, 0], size: 0.03, lifetime: [2, 4],
+  color: [0.4, 0.8, 1, 1], intensity: 2,
+  fields: {attractors: [{position: [0, 1, 0], strength: 2}], field: {size: [n, n, n], data, halfSize: [2, 2, 2]}},
+}, {fields});
+engine.start();
+// Attractors, the box and strengths are read every frame.
+effect.options.fields!.attractors![0]!.strength = -2;
+```
+
+The field's cells are copied at attach, and whether an effect has a field is fixed then; attractors, the box's centre
+and size and both strengths can change every frame. With `obstacles` the flow bends around them with the field forces
+in it, as it does with gravity. `node packages/vfx/test/features-check.mjs` (real GPU) reads back particles under an
+attractor and a repeller, and in a linear field inside the cell centres, in the band at the box's edge and outside it,
+against the same frames stepped on the CPU.

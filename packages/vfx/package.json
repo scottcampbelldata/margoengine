@@ -93,6 +93,10 @@
     "./stretch": {
       "types": "./dist/stretch.d.ts",
       "import": "./dist/stretch.js"
+    },
+    "./fields": {
+      "types": "./dist/fields.d.ts",
+      "import": "./dist/fields.js"
     }
   },
   "files": [

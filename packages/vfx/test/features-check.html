@@ -257,5 +257,54 @@ window.checkStretch=async({samples=1,speed=2,factor=0.25,vertical=false}={})=>{
  }
  return {error,errors:errors.splice(0),checked,largest,mismatches:mismatches.slice(0,8),along};
 };
+/**
+ * Force fields, read back from the particle buffer. Particles start at rest (no gravity, no turbulence) and take four
+ * steps of 0.05 s; the CPU steps the same frames in double precision: velocity += force x dt, then position +=
+ * velocity x dt. 'attract': an attractor of strength 3 (radius 0.5) and a repeller of strength -2 (radius 0.25) pull
+ * with strength x d / (|d|^2 + r^2)^1.5. 'field': a 4 x 3 x 5 field over a box (centre [1, 0, -1], half size [2, 1.5,
+ * 2.5]) holds v = A x + b at its cell centres, times strength 0.5: trilinear between centres is exact for a linear
+ * field, so a particle inside the centres feels A x + b; one between the outer centres and the box edge feels the edge
+ * cells (the clamped point); one outside the box feels nothing. 'off': the same particles without the feature stay at
+ * rest.
+ */
+window.checkFields=async({kind='attract'}={})=>{
+ const dt=0.05,frames=3,steps=frames+1,mismatches=[];
+ const A=[[0.3,-0.2,0.1],[0.05,0.4,-0.3],[-0.1,0.2,0.25]],b=[0.5,-0.25,1];
+ const field={size:[4,3,5],center:[1,0,-1],halfSize:[2,1.5,2.5],strength:0.5};
+ const cell=field.halfSize.map((h,i)=>2*h/field.size[i]);
+ const centre=(i,a)=>field.center[a]-field.halfSize[a]+(i+0.5)*cell[a];
+ const data=new Float32Array(4*3*5*3);
+ for(let z=0;z<5;z++)for(let y=0;y<3;y++)for(let x=0;x<4;x++){
+  const c=[centre(x,0),centre(y,1),centre(z,2)],k=(x+4*(y+3*z))*3;
+  for(let r=0;r<3;r++)data[k+r]=A[r][0]*c[0]+A[r][1]*c[1]+A[r][2]*c[2]+b[r];
+ }
+ const attractors=[{position:[0.5,0.2,0],strength:3,radius:0.5},{position:[-0.6,-0.3,0.4],strength:-2,radius:0.25}];
+ const starts=kind==='field'||kind==='off'?[[1.2,0.1,-0.8],[2.0,0.5,-2.0],[2.9,0.2,-1],[3.5,0,-1]]:[[-1,0,0],[1,1,0.5],[0,-0.5,0.3],[2,0,-1]];
+ const options=kind==='attract'?{fields:{attractors}}:kind==='field'?{fields:{field:{...field,data}}}:{};
+ const effect=new VFX({...still,capacity:starts.length,velocity:[0,0,0],...options});
+ const {buffers:[p],error}=await run(effect,{frames,dt,setup:()=>device.queue.writeBuffer(effect.gpuState.particles,0,records(starts.map(at=>({at,size:0.01,color:[1,1,1]})),starts.length)),read:()=>[effect.gpuState.particles]});
+ effect.dispose();
+ const fieldAt=(x)=>{
+  const local=x.map((v,a)=>(v-field.center[a])/field.halfSize[a]);
+  if(local.some(l=>Math.abs(l)>1))return [0,0,0];
+  // Inside the box: the point clamped to the outer cell centres, where the linear field is exact.
+  const q=x.map((v,a)=>Math.min(Math.max(v,centre(0,a)),centre(field.size[a]-1,a)));
+  return A.map((row,r)=>(row[0]*q[0]+row[1]*q[1]+row[2]*q[2]+b[r])*field.strength);
+ };
+ const pull=(x)=>attractors.reduce((s,a)=>{const d=a.position.map((v,i)=>v-x[i]),q=d[0]**2+d[1]**2+d[2]**2+a.radius**2;return s.map((v,i)=>v+d[i]*a.strength/q**1.5);},[0,0,0]);
+ const got=[],want=[];
+ starts.forEach((start,k)=>{
+  let at=[...start],v=[0,0,0];
+  for(let s=0;s<steps;s++){
+   const force=kind==='attract'?pull(at):kind==='field'?fieldAt(at):[0,0,0];
+   v=v.map((x,i)=>x+force[i]*dt);at=at.map((x,i)=>x+v[i]*dt);
+  }
+  const g={at:[...p.subarray(k*8,k*8+3)],v:[...p.subarray(k*8+4,k*8+7)]};got.push(g);want.push({at,v});
+  const near=(a,c)=>a.every((x,i)=>Math.abs(x-c[i])<=1e-4+1e-4*Math.abs(c[i]));
+  if(!near(g.at,at))mismatches.push({k,what:'position',got:g.at,want:at});
+  if(!near(g.v,v))mismatches.push({k,what:'velocity',got:g.v,want:v});
+ });
+ return {error,errors:errors.splice(0),mismatches,got,want};
+};
 window.ready=true;
 </script></body></html>

@@ -17,6 +17,8 @@
 // (past the thickness) or without the feature.
 // Stretch: a fast particle's disc is stretched along its motion on screen to size + factor x speed and keeps its size
 // across, horizontally and vertically, at 1x and 4x MSAA; factor 0 is the round disc.
+// Fields: particles under two attractors, or in a linear vector field (inside, in the edge band, outside the box),
+// move as the CPU steps them; without the feature they stay at rest.
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
@@ -124,6 +126,14 @@ try {
     console.log(
       `ok ${name}: ${r.checked} pixels, largest difference ${r.largest.toFixed(2)}/255, half length ${r.along}`,
     );
+  }
+  for (const kind of ['attract', 'field', 'off']) {
+    const name = `fields ${kind}`,
+      r = await page.evaluate((o) => window.checkFields(o), { kind });
+    report.results[name] = r;
+    clean(r, name);
+    assert.deepEqual(r.mismatches, [], name);
+    console.log(`ok ${name}: first velocity ${r.got[0].v.map((v) => v.toFixed(4))}`);
   }
   assert.deepEqual(pageErrors, []);
   await mkdir('test-results', { recursive: true });

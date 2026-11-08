@@ -28,6 +28,12 @@ export class VFX extends VFXBase {
     static attach(instance: EngineKernel, options?: VFXOptions): VFX;
 }
 
+export interface VFXAttractor {
+    position: Vec3;
+    strength: number;
+    radius?: number;
+}
+
 export interface VFXCurves {
     size?: readonly number[];
     alpha?: readonly number[];
@@ -120,6 +126,12 @@ export interface VFXFeatures {
     lit?: VFXExtension<VFXLit>;
     depthCollide?: VFXExtension<VFXDepthCollide>;
     stretch?: VFXExtension<VFXStretch>;
+    fields?: VFXExtension<VFXFields>;
+}
+
+export interface VFXFields {
+    attractors?: readonly VFXAttractor[];
+    field?: VFXVectorField;
 }
 
 export interface VFXLightSource {
@@ -188,6 +200,7 @@ export interface VFXOptions {
     lit?: VFXLit;
     depthCollide?: VFXDepthCollide;
     stretch?: VFXStretch;
+    fields?: VFXFields;
 }
 
 export interface VFXRibbons {
@@ -206,6 +219,14 @@ export interface VFXTexture {
     height: number;
     data: Uint8Array | Uint8ClampedArray;
     atlas?: ParticleAtlas;
+}
+
+export interface VFXVectorField {
+    size: Vec3;
+    data: Float32Array;
+    center?: Vec3;
+    halfSize: Vec3;
+    strength?: number;
 }
 
 // Not exported from this entry, but used by the exports above:

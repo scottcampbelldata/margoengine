@@ -108,6 +108,39 @@ export interface VFXOptions {
   depthCollide?: VFXDepthCollide;
   /** Billboards stretched along their motion on screen, for sparks, rain and tracers. Needs `stretch` from `@margoengine/vfx/stretch`. */
   stretch?: VFXStretch;
+  /** Point attractors and a 3D vector field added to each particle's acceleration. Needs `fields` from `@margoengine/vfx/fields`. */
+  fields?: VFXFields;
+}
+/** A point that pulls particles towards it (or pushes them away with a negative strength). */
+export interface VFXAttractor {
+  position: Vec3;
+  /** Pull in world units^3 per second^2: the acceleration is strength x d / (|d|^2 + radius^2)^1.5; negative pushes. */
+  strength: number;
+  /** Softening radius in world units, > 0, so the pull stays finite at the centre. Default 0.5. */
+  radius?: number;
+}
+/** A 3D vector field over a box: one acceleration vector per cell, at the cell centres, trilinear between them. */
+export interface VFXVectorField {
+  /** Cells along x, y and z, whole numbers >= 1, at most 2,097,152 in all. */
+  size: Vec3;
+  /** Vectors x, y, z per cell, x fastest then y then z. Copied at attach. */
+  data: Float32Array;
+  /** The box centre in world units. Default [0, 0, 0]. */
+  center?: Vec3;
+  /** Half the box size on each axis, > 0. */
+  halfSize: Vec3;
+  /** Scale on the field's vectors. Default 1. */
+  strength?: number;
+}
+/**
+ * Force fields: up to 16 attractors and one vector field (zero outside its box, the edge cells' value between the outer
+ * cell centres and the box edge) added to each particle's acceleration, with gravity and turbulence. Attractors, the
+ * box and the strengths are read every frame; whether there is a field, and its cells, are fixed at attach. Needs the
+ * `fields` feature.
+ */
+export interface VFXFields {
+  attractors?: readonly VFXAttractor[];
+  field?: VFXVectorField;
 }
 /**
  * Velocity-stretched billboards: each billboard's long axis follows the particle's velocity across the screen and it
@@ -344,7 +377,7 @@ export interface VFXExtension<T> {
   create?(state: VFXState, value: T, owned: OwnedResources): VFXRuntime;
 }
 /** Added features, in the order their patches apply. */
-const extensions = ['ribbons', 'mesh', 'events', 'lit', 'depthCollide', 'stretch'] as const;
+const extensions = ['ribbons', 'mesh', 'events', 'lit', 'depthCollide', 'stretch', 'fields'] as const;
 /** One compute dispatch of the slot-order passes. */
 type Step = [GPUComputePipeline, GPUBindGroup];
 /**
@@ -407,6 +440,7 @@ export interface VFXFeatures {
   lit?: VFXExtension<VFXLit>;
   depthCollide?: VFXExtension<VFXDepthCollide>;
   stretch?: VFXExtension<VFXStretch>;
+  fields?: VFXExtension<VFXFields>;
 }
 let nextId = 0;
 /**

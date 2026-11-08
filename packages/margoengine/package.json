@@ -2914,6 +2914,10 @@
       "types": "./dist/vfx/stretch.d.ts",
       "import": "./dist/vfx/stretch.js"
     },
+    "./vfx/fields": {
+      "types": "./dist/vfx/fields.d.ts",
+      "import": "./dist/vfx/fields.js"
+    },
     "./video": {
       "types": "./dist/video.d.ts",
       "import": "./dist/video.js"
