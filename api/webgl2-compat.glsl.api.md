@@ -138,6 +138,7 @@ export interface GLSLStorage {
     readonly info: string;
     readonly minSize: number;
     readonly access: 'read' | 'read_write';
+    readonly uniform?: boolean;
 }
 
 export interface GLSLTexture {
@@ -527,6 +528,7 @@ export interface TranslateOptions {
     readonly clipControl?: boolean;
     readonly points?: boolean;
     readonly sharedStorage?: (group: number, binding: number) => boolean;
+    readonly uniformBlockSize?: number;
 }
 
 export interface TranslateStage {

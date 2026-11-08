@@ -641,6 +641,7 @@ interface GLSLStorage {
     readonly info: string;
     readonly minSize: number;
     readonly access: 'read' | 'read_write';
+    readonly uniform?: boolean;
 }
 
 interface GLSLTexture {

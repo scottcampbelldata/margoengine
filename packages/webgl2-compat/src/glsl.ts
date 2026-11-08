@@ -49,6 +49,11 @@ export interface TranslateOptions {
    * device uses it for every storage binding without a dynamic offset). Default: none, one texture per buffer.
    */
   readonly sharedStorage?: (group: number, binding: number) => boolean;
+  /**
+   * Bytes a GLSL uniform block holds (the context's MAX_UNIFORM_BLOCK_SIZE). A larger uniform buffer, up to WebGPU's
+   * 64 KiB, is read through a data texture as a storage buffer is. Default 65,536.
+   */
+  readonly uniformBlockSize?: number;
 }
 
 /** A translated pipeline: GLSL ES 3.00 sources and what each stage binds. */
@@ -128,6 +133,7 @@ export function translateWGSL(options: TranslateOptions): GLSLProgram {
     clipControl: options.clipControl ?? true,
     points: options.points ?? false,
     sharedStorage: options.sharedStorage,
+    uniformBlockSize: options.uniformBlockSize,
   };
   let fragment = EMPTY_FRAGMENT;
   if (options.fragment) {

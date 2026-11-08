@@ -233,6 +233,36 @@ ${V}
   assert.match(g.source, /return k < n \? k : p - 1 - k;/, 'mirror-repeat');
 });
 
+test('a uniform buffer larger than a uniform block of the context reads from its own data texture', () => {
+  // ANGLE's Metal back end holds 16 KiB per block; WebGPU promises 64 KiB (voxel-pathtracer's 32 KiB material table).
+  const source = `@group(0) @binding(1) var<uniform> big: array<vec4f, 2048>;
+@group(0) @binding(2) var<uniform> small: vec4f;
+${V}
+@fragment fn f(@builtin(position) p: vec4f) -> @location(0) vec4f { return big[u32(p.x)] + small; }`;
+  const fits = translateWGSL({ vertex: { source }, fragment: { source } }).fragment;
+  assert.deepEqual(
+    fits.uniforms.map((u) => u.binding),
+    [1, 2],
+  );
+  assert.equal(fits.storage.length, 0);
+  const g = translateWGSL({
+    vertex: { source },
+    fragment: { source },
+    uniformBlockSize: 16384,
+    sharedStorage: () => true,
+  }).fragment;
+  assert.deepEqual(
+    g.uniforms.map((u) => u.binding),
+    [2],
+  );
+  assert.deepEqual(
+    g.storage.map(({ group, binding, minSize, uniform, shared }) => ({ group, binding, minSize, uniform, shared })),
+    [{ group: 0, binding: 1, minSize: 32768, uniform: true, shared: false }],
+  );
+  assert.doesNotMatch(g.source, /uniform _Bf0_1/);
+  assert.match(g.source, /uniform highp usampler2D _df0_1;/);
+});
+
 test('storage buffers are read through a data texture: rows clamped into the binding, arrayLength from its size', () => {
   const source = `struct P { a: vec4f, b: vec2f, n: u32 }
 struct S { count: u32, items: array<P> }

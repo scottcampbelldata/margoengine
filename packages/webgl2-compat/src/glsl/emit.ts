@@ -82,6 +82,11 @@ export interface GLSLStorage {
   readonly minSize: number;
   /** WGSL access mode; only reads are translated (a write is refused, milestone M5). */
   readonly access: 'read' | 'read_write';
+  /**
+   * A uniform buffer larger than the context's uniform blocks (MAX_UNIFORM_BLOCK_SIZE, 16 KiB on ANGLE's Metal back
+   * end), read through its own data texture instead; WebGPU promises 64 KiB uniform bindings.
+   */
+  readonly uniform?: boolean;
 }
 /** A combined sampler: one texture with one sampler (or none, for loads and queries). */
 export interface GLSLTexture {
@@ -160,6 +165,8 @@ interface EmitOptions {
   readonly prefix?: string;
   /** True for storage buffers read from their bind group's shared data texture (see GLSLStorage.shared). */
   readonly sharedStorage?: (group: number, binding: number) => boolean;
+  /** Bytes a uniform block may hold (MAX_UNIFORM_BLOCK_SIZE); a larger uniform buffer reads from a data texture. */
+  readonly uniformBlockSize?: number;
 }
 
 /** @internal A memory reference: a GLSL lvalue, or a place in a uniform or storage buffer. */
@@ -647,6 +654,7 @@ export class StageEmitter {
     const minSize = sizeOf(v.type),
       words = Math.max(1, Math.ceil(minSize / 16));
     if (words > 4096) throw unsupported(`uniform buffer '${v.name}' of ${minSize} bytes (WebGL2 blocks hold 65,536)`);
+    if (words * 16 > (this.options.uniformBlockSize ?? 65536)) return this.storageBuffer(v);
     const tag = `${this.prefix}${v.group}_${v.binding}`;
     u = {
       group: v.group as number,
@@ -668,8 +676,10 @@ export class StageEmitter {
   private storageBuffer(v: IRGlobalVar): GLSLStorage & { array: string } {
     let b = this.storages.get(v);
     if (b) return b;
-    const tag = `${this.prefix}${v.group}_${v.binding}`;
-    const shared = this.options.sharedStorage?.(v.group as number, v.binding as number) ?? false,
+    const tag = `${this.prefix}${v.group}_${v.binding}`,
+      uniform = v.space === 'uniform';
+    // A uniform binding never joins the bind group's shared data texture, which holds storage bindings only.
+    const shared = !uniform && (this.options.sharedStorage?.(v.group as number, v.binding as number) ?? false),
       texture = shared ? `_dg${this.prefix}${v.group}` : `_d${tag}`;
     b = {
       group: v.group as number,
@@ -679,6 +689,7 @@ export class StageEmitter {
       info: `_i${tag}`,
       minSize: sizeOf(v.type),
       access: v.access === 'read_write' ? 'read_write' : 'read',
+      ...(uniform && { uniform: true }),
       array: `_r${tag}`,
     };
     this.storages.set(v, b);

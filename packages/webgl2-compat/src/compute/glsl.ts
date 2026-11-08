@@ -44,6 +44,8 @@ interface ComputeEmitOptions {
   /** The target this program draws into (its stores are kept; every other store is evaluated and dropped). */
   readonly target: ComputeTarget;
   readonly sharedStorage?: (group: number, binding: number) => boolean;
+  /** Bytes a GLSL uniform block holds; a larger uniform buffer reads from a data texture. */
+  readonly uniformBlockSize?: number;
 }
 
 const SWIZZLE = 'xyzw';
@@ -110,7 +112,12 @@ class ComputeEmitter extends StageEmitter {
     super(
       module,
       entry,
-      { constants: options.constants, prefix: 'c', sharedStorage: options.sharedStorage },
+      {
+        constants: options.constants,
+        prefix: 'c',
+        sharedStorage: options.sharedStorage,
+        uniformBlockSize: options.uniformBlockSize,
+      },
       tier === 'fragment' ? 'fragment' : 'vertex',
     );
     this.tier = tier;

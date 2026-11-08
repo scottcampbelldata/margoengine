@@ -241,6 +241,7 @@ export class CompatRenderPipeline {
           // Storage bindings without a dynamic offset share their bind group's data texture: one unit per group.
           sharedStorage: (group, binding) =>
             !explicit?.bindGroupLayouts[group]?.entries.find((e) => e.binding === binding)?.buffer?.hasDynamicOffset,
+          uniformBlockSize: device.adapter.capabilities.limits.MAX_UNIFORM_BLOCK_SIZE,
         });
     } catch (error) {
       if ((error as { code?: string }).code === 'unsupported') throw error;
@@ -439,7 +440,7 @@ function autoLayouts(glsl: GLSLProgram): CompatBindGroupLayout[] {
           binding: b.binding,
           visibility: bit,
           buffer: {
-            type: b.access === 'read' ? 'read-only-storage' : 'storage',
+            type: b.uniform ? 'uniform' : b.access === 'read' ? 'read-only-storage' : 'storage',
             hasDynamicOffset: false,
             minBindingSize: b.minSize,
           },
