@@ -8,6 +8,10 @@ publish = false
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+[features]
+# Work counts for examples/profile.rs, native only; never in the Wasm build.
+counts = []
+
 [profile.release]
 opt-level = 3
 lto = "fat"

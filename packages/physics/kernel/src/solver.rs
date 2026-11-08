@@ -42,6 +42,11 @@ const TAU: f32 = 6.283_185_5;
 /// last part to settle moves no body: the points' shares of one load among themselves.
 const SWEEPS: u32 = 16;
 
+/// Work counts for `examples/profile.rs`, native only (feature `counts`): one-point normal updates in biased passes [0]
+/// and relaxing passes [1], every sweep counted. The Wasm build has no such feature, so its code is untouched.
+#[cfg(feature = "counts")]
+pub static NORMAL_UPDATES: [core::sync::atomic::AtomicU64; 2] = [core::sync::atomic::AtomicU64::new(0), core::sync::atomic::AtomicU64::new(0)];
+
 /// Scales of one soft constraint at one substep length.
 #[derive(Clone, Copy)]
 pub struct Soft {
@@ -483,6 +488,8 @@ impl World {
                 largest = if total > largest { total } else { largest };
             }
             sweeps += 1;
+            #[cfg(feature = "counts")]
+            NORMAL_UPDATES[if biased { 0 } else { 1 }].fetch_add(count as u64, core::sync::atomic::Ordering::Relaxed);
             // A lone point is exact in one sweep.
             if count == 1 || moved <= f32::EPSILON * largest || sweeps == SWEEPS {
                 break;

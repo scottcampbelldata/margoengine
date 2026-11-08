@@ -1,6 +1,7 @@
 // Where a step's time goes, natively: the harness scenes of physics-refs, each phase of `World::step` timed apart.
 // `cargo run --release --example profile -- [scene] [default|equal]`. Scenes: pyramid, cubes1000, cubes5000,
-// cubes1000-awake, cubes5000-awake, chain, grid, all (the default).
+// cubes1000-awake, cubes5000-awake, chain, grid, all (the default). With `--features counts` it also prints the normal row
+// updates a step makes, every sweep of every pass counted, against one update a point a pass.
 //
 // The loop below is `World::step` written out with a clock between the phases. After each scene a twin world takes the
 // same steps through `World::step` itself and the two world hashes must agree, so a change to the
@@ -236,6 +237,10 @@ fn run(scene: &str, equal: bool) {
     let mut clock = Clock { total: [0.0; PHASES.len()], last: Instant::now() };
     let mut times = Vec::with_capacity(steps);
     let (mut pairs, mut solving, mut points, mut awake) = (0u64, 0u64, 0u64, 0u64);
+    #[cfg(feature = "counts")]
+    for c in &margoengine_physics_kernel::solver::NORMAL_UPDATES {
+        c.store(0, std::sync::atomic::Ordering::Relaxed);
+    }
     for _ in 0..steps {
         let start = Instant::now();
         step(&mut w, DT, &mut clock);
@@ -248,6 +253,8 @@ fn run(scene: &str, equal: bool) {
             points += w.uu(PAIR_CONTACTS, w.uu(SOLVE_PAIRS, i) as usize) as u64;
         }
     }
+    #[cfg(feature = "counts")]
+    let updates = margoengine_physics_kernel::solver::NORMAL_UPDATES.each_ref().map(|c| c.load(std::sync::atomic::Ordering::Relaxed));
     // The twin, through World::step itself.
     let (mut twin, _) = build(scene, equal);
     for _ in 0..steps {
@@ -271,6 +278,18 @@ fn run(scene: &str, equal: bool) {
         points as f64 / n,
         w.header().joint_solving,
     );
+    #[cfg(feature = "counts")]
+    {
+        // One update a point a pass is what a single sweep and one relaxing pass gave before 2026-11-07.
+        let (h, passes) = (w.header().substeps as f64, w.header().iterations as f64);
+        println!(
+            "  normal updates per step: biased {:.0}, relaxing {:.0}; one a point a pass would be {:.0} biased, {:.0} for one relaxing pass",
+            updates[0] as f64 / n,
+            updates[1] as f64 / n,
+            points as f64 / n * h * passes,
+            points as f64 / n * h,
+        );
+    }
     for (k, name) in PHASES.iter().enumerate() {
         let ms = clock.total[k] * 1e3;
         if ms > 0.0005 * total {

@@ -1841,6 +1841,40 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
 - **RTX A6000, Chromium, seven rounds, ms at 256, 16,777,216 elements:** reduce 2.69, scan 0.59, sort 12.06. No size beat 256 beyond one timestamp step. 1024 threads cost 56 to 72 percent more on all three, so the size does matter, and the default is good on this card.
 - **How:** the `tuneCompute` check of `packages/compute/tests/compute-autotune-browser.js` prints every timing. Diagnostic: lanes shared the A6000, the M6 ran alone but timestamps are rounded.
 
+### 78. Own physics contacts: two relaxing passes and swept manifolds (accepted difference in work)
+
+- **Before (to `4dbfd6b24`):** each substep ran its biased passes and one relaxing pass, and each pass updated a manifold's
+  normal rows once, one point after another: one normal update a point a pass.
+- **Change (`d9fa86e5b`, bug hunt of 2026-11-07):** as many relaxing passes as biased ones, the normal before friction in the
+  relaxing pass, and a manifold's normal rows swept until no impulse moves by more than rounding, at most 16 sweeps a pass.
+  One relaxing pass left the friction anchors' push in a 14-row pile as speed, and it rocked for good; one sweep let a cube's
+  first point take a whole strike, so a cube dropped flat spun and slid (`docs/known-bugs.md` history, `tests/solver.rs`).
+- **Work, counted (deterministic, `--features counts` of `kernel/examples/profile.rs`, per step):** pyramid of 20 rows at the
+  defaults (8 substeps, 2 passes) 54,988 biased and 27,202 relaxing normal updates against 4,007 and 2,003 at one a point a
+  pass, 13.7 and 13.6 times; 5,000 cubes all awake at the defaults 4,779,395 and 1,510,454 against 313,941 and 156,971, 15.2
+  and 9.6 times; at 4 substeps of one pass, the pyramid 119,228 and 82,785 against 9,440 and 9,440, 5,000 cubes 1,197,540 and
+  424,655 against 79,476 and 79,476. A soft pass nearly always runs all 16 sweeps: the points' shares of one load among
+  themselves settle last and move no body. Friction keeps one sweep a pass, so its work is twice the old at the defaults
+  (2 relaxing passes for 1) and the same at one pass.
+- **Trade-off:** the bars this bought (a block on a slope holds and slides at its rate, a cube dropped flat lands flat, the
+  14-row pile stops) against about 14 times the normal-row work. Rapier 0.21 and Box2D v3 solve a manifold's points one pass
+  each, as Margo did before. A stop on the soft passes that keeps every bar is the open tuning item
+  of the physics lane; time hints only until the quiet rerun (`docs/work-lists/busy-retests.md`).
+- **Rerun:** `cargo run --locked --release --features counts --manifest-path packages/physics/kernel/Cargo.toml --example
+  profile -- pyramid default` (and `cubes5000-awake`, `equal`).
+
+### 79. Own physics `touching` and `contactPoints`: the asking body's pairs, not the world's
+
+- **Before:** both read `kernel.contacts()`, which walks every pair row of the world and builds an object for each manifold,
+  its normal, its point list and each point: at 5,000 cubes resting, 6,701 rows read and 55,001 objects built per call.
+- **Change:** both walk the pair lists of the asking body's colliders (`KernelWorld.firstPair` and `nextPair`) and the parts
+  of a mesh or compound pair; `touching` builds nothing and `contactPoints` only the points it returns, in the old order.
+- **Work, counted (deterministic):** at 5,000 cubes after 1 s and 10 s, 2.62 rows read per body on
+  average, 26 at most, against 6,701.
+- **Rerun:** `npm run build --workspace @margoengine/physics`, then `node packages/physics/scripts/contact-query-counts.mjs`.
+- **Guard:** `touching and contactPoints walk only the asking body pairs` in `packages/physics/tests/next-contacts.test.js`
+  makes `kernel.contacts` throw and compares every answer with the whole list's, mesh and compound pairs included.
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).
