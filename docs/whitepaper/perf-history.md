@@ -2276,6 +2276,13 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
   diagnostic.
 - **Rerun:** `node packages/ecs/scripts/rival-bench.mjs`. Citation in clean-room.md.
 
+### 96. 10,000 transitions against XState (diagnostic, win)
+
+- **Measurement:** 10,000 `NEXT` events on a two-state toggle. The machine is built outside the timer. Paired turns,
+  fastest of 7 rounds. XState 5.33.4 stays outside the repository.
+- **Result:** Margo 1.443 ms, XState 27.935 ms. Win. Both end in state `a`. Busy machine, diagnostic.
+- **Rerun:** `node packages/fsm/scripts/rival-bench.mjs`. Citation in clean-room.md.
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).

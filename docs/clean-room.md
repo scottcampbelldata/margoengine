@@ -1176,7 +1176,7 @@ The store is a structure of arrays, as the package README describes. The batch 1
 
 ## State machines: `@margoengine/fsm`
 
-Written clean room from the published work below. No source of a statechart library or another engine was read. Sismic is run as an outside tool through its documented interface (`packages/fsm/test/outside/`); its source was not read.
+Written clean room from the published work below. No source of a statechart library or another engine was read. Sismic is run as an outside tool through its documented interface (`packages/fsm/test/outside/`); its source was not read. The batch 167 timing drives XState 5.33.4 as a black box from its package README (https://github.com/statelyai/xstate/tree/main/packages/core#readme): 10,000 transitions of a two-state toggle. The library source was not opened.
 
 | Part | Source |
 | --- | --- |
