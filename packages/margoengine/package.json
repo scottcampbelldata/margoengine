@@ -2694,6 +2694,10 @@
       "types": "./dist/terrain/blend.d.ts",
       "import": "./dist/terrain/blend.js"
     },
+    "./terrain/planet": {
+      "types": "./dist/terrain/planet.d.ts",
+      "import": "./dist/terrain/planet.js"
+    },
     "./text": {
       "types": "./dist/text.d.ts",
       "import": "./dist/text.js"

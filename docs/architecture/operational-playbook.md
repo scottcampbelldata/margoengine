@@ -663,6 +663,14 @@ heightmap's over `height`, so core's lighting shades the mesh's foot as the grou
 `packages/terrain/test/blend.browser.mjs`, seam 126.6 to 6.8 of 255, nothing off the foot changes; Radeon 680M.
 Missing: other GPUs, cost timed, sloped ground in a picture check.
 
+Planet terrain (`@margoengine/terrain/planet`, 2026-11-08) draws a cube sphere quadtree with its own pass and shader.
+Precision: each patch stores float32 vertices relative to its float64 centre; each frame the CPU subtracts the camera
+position from each drawn centre in float64 (one instance attribute a patch) and builds a view-projection with no
+translation from the camera's position, target, up and projection, so no float32 value holds a world coordinate; depth is
+core's reversed z. Evidence: `packages/terrain/test/planet.browser.mjs`, the disc from orbit within 0.2% of a sphere's
+projection, the horizon dip within a pixel, no sky through the ground and the same picture with a `FloatingOrigin` at
+6,371 km from the world origin; Radeon 680M. Missing: frame cost, other GPUs, shadows and lighting effects on it.
+
 Both shadow classes take `effects`: objects that declare WGSL at bindings 40 and up (four each), give a factor that
 `shadowLit` multiplies the sun by, and update once a frame after the depth passes. With none the shader text is what it was,
 which the golden GPU proofs pin. `cloudShadows` runs the sky's cloud remap and erosion along the ray to the sun, with the

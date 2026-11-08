@@ -798,6 +798,63 @@ without). Every pixel that changes lies on the box's foot (within the fade's rea
 same bytes. With noise 0 the fade's top is the same row across the face (spread 1), with noise 1 it wanders over 10
 rows. Cost not timed.
 
+## Planet terrain: `@margoengine/terrain/planet`
+
+`PlanetTerrain.attach(engine, options)` draws a whole planet that can be flown around from orbit down to a metre above
+the ground. The six faces of a cube are each a quadtree of height patches mapped onto the sphere, so the ground curves
+and the horizon dips as on a real world. A patch splits into four while its vertices would be more than `screenError`
+pixels apart on screen (the ground nearest the camera first); patches behind the horizon or outside the view are not
+drawn, and skirts hung from patch edges close the seams between levels. Each patch keeps its centre in float64 and is
+drawn relative to the camera, so an Earth-sized planet holds still at any distance with no setting. With a
+`FloatingOrigin` (`@margoengine/cameras/origin`) the planet's centre follows each rebase, so meshes placed near the
+camera stay precise too.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {FloatingOrigin} from 'margoengine/cameras/origin';
+import {PlanetTerrain} from 'margoengine/terrain/planet';
+const engine = await Engine.create(document.querySelector('canvas')!, {
+  camera: {position: [0, 0, 2e7], target: [0, 0, 0], near: 1, far: 1e9},
+});
+const origin = FloatingOrigin.attach(engine);
+const planet = PlanetTerrain.attach(engine, {
+  radius: 6371000,  // metres at height 0 (the Earth's mean radius)
+  relief: 8000,     // the default ground spans about -8 km to 8 km
+  seaLevel: 0,      // lower ground draws as flat sea; false for none
+  screenError: 4,   // pixels between vertices before a patch splits
+  origin,           // the planet's centre follows the origin's rebases
+});
+engine.start();
+console.log(planet.altitude(engine.camera.position)); // metres above the ground under the camera
+```
+
+- Options and defaults: `radius` 6,371,000 m; `center` [0, 0, 0] (a float64 world position); `height` (default
+  `planetNoise({radius, relief, seed})`, fractal value noise); `relief` 8,000 m; `seed` 1; `seaLevel` 0 (or `false`);
+  `resolution` 32 quads a patch side (even, 4 to 64); `maxLevel` 20 (vertices 0.3 m apart on the Earth); `screenError`
+  4 px; `budget` 4 ms of patch building a frame (at least one patch; `Infinity` builds everything a view needs in one
+  frame); `maxPatches` 2,048 on the GPU at once (about 24 KB each at resolution 32, so 50 MB); `origin` a
+  `FloatingOrigin` to follow. Invalid values throw `RangeError` or `TypeError`.
+- Your own ground: `height(x, y, z, detail)` gets a unit direction from the centre (float64) and returns metres above
+  `radius`; `detail` is the spacing of the vertices being built there, so a procedural height can skip finer detail.
+  `cubeSphere(face, s, t)` maps a cube face point to its direction.
+- `heightAt(direction)` and `altitude(position)` read the ground on the CPU (the drawn surface is that ground sampled at
+  the patch's vertices). `update(camera, [width, height])` plans and builds the patches for a view ahead of time (the
+  frame calls it); `stats` says what the last frame drew and built, `patches` lists the drawn patches.
+- Shading: the sun (`engine.lighting`) and ambient light over colours by height and slope (sea, sand, grass, dry
+  ground, rock, snow). No shadows, SSR, lighting effects or layer textures yet; one view per frame.
+
+Checked on a real GPU by `test/planet.browser.mjs` (in `test:gpu`, Radeon 680M, Edge 157, 2026-11-08), an Earth-sized
+planet at 320 x 240: from 3 radii out the planet is a disc of 16,939 px against the 16,965 px of a sphere's projection;
+on a smooth planet 100 km up, looking level, the horizon dips to the row `acos(R / (R + h))` predicts (157 against
+156.97 in the middle), within a pixel in every column; 300 m above the default ground, 6,371 km from the world origin,
+no sky shows through the ground, and the same view with a `FloatingOrigin` (which rebases the camera to near zero) is
+the same picture, pixel for pixel; a 41-frame flight from two radii up to 2.8 m above the ground draws ground in every
+frame, reaches level 20 and rebases once, with no validation error. `test/planet.test.js` checks the cube sphere's
+seams and cell areas, the horizon culling, the screen error, that refining with no budget never leaves a hole, the
+patch limit, sea level and following an origin. Building a patch costs about 1.3 ms of main-thread time at
+resolution 32 with the default ground (Node, Beelink, busy machine: diagnostic); the 1,682 patches a view 100 m above
+the ground at 1280 x 720 needs took 2.2 s, which the `budget` spreads over frames. Frame cost not timed.
+
 ## On the WebGL2 compatibility layer
 
 Where the browser has no WebGPU, install the layer (`margoengine/webgl2-compat`) before `Engine.create` and the

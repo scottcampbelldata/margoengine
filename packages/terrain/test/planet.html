@@ -1,0 +1,113 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Planet terrain</title>
+</head>
+<body style="margin:0">
+<script type="module">
+// Pictures of a PlanetTerrain for test/planet.browser.mjs. `window.planet.shot(options)` makes an engine (320 x 240,
+// exact pixels, magenta background so any gap in the ground shows), renders until every pipeline is in place and every
+// patch the view needs is built, reads the canvas in the task that rendered it, and returns the pixels' summary.
+// `window.planet.flight()` flies one engine from orbit to the ground.
+import { Engine } from '/packages/core/dist/index.js';
+import { PlanetTerrain } from '/packages/terrain/dist/planet.js';
+import { FloatingOrigin } from '/packages/cameras/dist/origin.js';
+import { waitForPipelines } from '/scripts/support/gpu-ready.js';
+
+const W = 320,
+  H = 240,
+  R = 6371000;
+const flat = () => 0;
+const norm = (a) => {
+  const l = Math.hypot(...a);
+  return a.map((v) => v / l);
+};
+function read(canvas) {
+  const c = new OffscreenCanvas(W, H).getContext('2d');
+  c.drawImage(canvas, 0, 0);
+  return c.getImageData(0, 0, W, H).data;
+}
+// Ground pixels are anything but the magenta background.
+const isSky = (d, o) => d[o] > 200 && d[o + 1] < 60 && d[o + 2] > 200;
+async function make({ eye, target, fov = 60, near = 1, origin = false, ...options }) {
+  const canvas = document.createElement('canvas');
+  document.body.append(canvas);
+  const engine = await Engine.create(canvas, {
+    backend: 'webgpu',
+    exactSize: [W, H],
+    camera: { position: eye, target, fov, near, far: 1e9 },
+  });
+  engine.scene.background = '#ff00ff';
+  // The sun behind the camera, so the side seen is lit.
+  engine.lighting.direction.set([...norm(eye), 3]);
+  engine.gpu.pushErrorScope('validation');
+  const floating = origin ? FloatingOrigin.attach(engine) : undefined;
+  const planet = PlanetTerrain.attach(engine, { budget: Infinity, ...options, ...(floating ? { origin: floating } : {}) });
+  return { canvas, engine, planet, floating };
+}
+async function frame(s) {
+  s.engine.render({ delta: 0 });
+  s.pixels = read(s.canvas);
+  await s.engine.gpu.queue.onSubmittedWorkDone();
+}
+function summary(d) {
+  let ground = 0,
+    gaps = 0,
+    sum = 0;
+  const horizon = [];
+  for (let x = 0; x < W; x++) {
+    let first = -1;
+    for (let y = 0; y < H; y++) {
+      const o = (y * W + x) * 4;
+      if (isSky(d, o)) {
+        if (first >= 0) gaps++;
+      } else {
+        if (first < 0) first = y;
+        ground++;
+        sum += d[o] + d[o + 1] + d[o + 2];
+      }
+    }
+    horizon.push(first);
+  }
+  return { ground, gaps, horizon, brightness: ground ? sum / ground / 3 : 0 };
+}
+window.planet = {
+  async shot(options) {
+    const s = await make({ ...options, height: options.flat ? flat : undefined, seaLevel: options.flat ? false : options.seaLevel });
+    // Ready when a frame built no patch: every patch the view asks for is on the GPU.
+    await waitForPipelines(() => frame(s), { ready: () => s.planet.stats.built === 0 });
+    const error = await s.engine.gpu.popErrorScope(),
+      out = { ...summary(s.pixels), stats: { ...s.planet.stats }, error: error?.message ?? null, pixels: Array.from(s.pixels) };
+    if (s.floating) out.rebases = s.floating.rebases;
+    s.planet.dispose();
+    s.engine.dispose();
+    s.canvas.remove();
+    return out;
+  },
+  async flight() {
+    const up = norm([0.3, 0.5, 0.8]),
+      s = await make({ eye: up.map((v) => v * 3 * R), target: [0, 0, 0], origin: true }),
+      frames = [];
+    for (let i = 0; i <= 40; i++) {
+      // From two radii above the ground to 2 m, looking ahead and down; the floating origin rebases on the way.
+      const altitude = 2 * R * 0.66 ** i + 2,
+        world = up.map((v) => v * (R + altitude + s.planet.heightAt(up))),
+        ahead = norm([up[1], -up[0], 0]);
+      s.floating.lookAt(world, world.map((v, k) => v + ahead[k] * 1000 - up[k] * 1000 * Math.max(1, altitude / 1e5)));
+      await frame(s);
+      const { ground } = summary(s.pixels);
+      frames.push({ altitude, ground, ...s.planet.stats, under: s.planet.altitude(s.engine.camera.position) });
+    }
+    const error = await s.engine.gpu.popErrorScope();
+    const rebases = s.floating.rebases;
+    s.planet.dispose();
+    s.engine.dispose();
+    s.canvas.remove();
+    return { frames, rebases, error: error?.message ?? null };
+  },
+};
+window.ready = true;
+</script>
+</body>
+</html>
