@@ -21,6 +21,11 @@ async function oracle(store) {
 }
 const bits = (array) =>
   Array.from(new Uint32Array(array.buffer.slice(array.byteOffset, array.byteOffset + array.byteLength)));
+/** Instance rows (24 floats each) as bit patterns, ordered by mesh id (float 23): a culling flip moves rows. */
+const rowsById = (array) =>
+  Array.from({ length: array.length / 24 }, (_, row) => array.subarray(row * 24, row * 24 + 24))
+    .sort((a, b) => a[23] - b[23])
+    .map(bits);
 
 test('dirty transform propagation matches a full recompute', async () => {
   const frames = [],
@@ -55,7 +60,7 @@ test('dirty transform propagation matches a full recompute', async () => {
       );
       assert.equal(store.visible[mesh.id], expected.visible[mesh.id], `${label}: visibility of ${mesh.name}`);
     }
-    // Instances drawn this frame equal a from-scratch collection in mesh order.
+    // Instances drawn this frame equal a from-scratch collection, row for row (in any order).
     const want = new Map();
     for (const mesh of engine.meshes.values())
       if (mesh.geometry && store.visible[mesh.id]) {
@@ -65,8 +70,8 @@ test('dirty transform propagation matches a full recompute', async () => {
       }
     for (const batch of frames.at(-1))
       assert.deepEqual(
-        bits(batch.instances),
-        bits(new Float32Array(want.get(batch.geometry) ?? [])),
+        rowsById(batch.instances),
+        rowsById(new Float32Array(want.get(batch.geometry) ?? [])),
         `${label}: instances`,
       );
   };

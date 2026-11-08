@@ -9,7 +9,7 @@ const reviewed = {
   EulerView: 'mesh write lane',
   Mesh: 'current receives',
   Engine:
-    'batches checkedMaterials materialFrame free next revision materials seen slots callbacks raf last running rendering primaryCulling recovery frameOptions disposing watchDevice collect frame update collectedScene collectedLayers active layers drawn claims enter checkScene renderViews viewPixels cameraLayers resize collectInstances picking pickNow',
+    'batches checkedMaterials materialFrame free next revision materials seen slots callbacks raf last running rendering primaryCulling recovery frameOptions disposing watchDevice collect place frame update collectedScene collectedLayers active layers drawn claims enter checkScene renderViews viewPixels cameraLayers resize collectInstances picking pickNow',
   TransformStore: 'handle api bind',
   FrameGraph: 'passes owner executing',
   GPURenderer:

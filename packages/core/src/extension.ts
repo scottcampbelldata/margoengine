@@ -8,6 +8,7 @@ export { Geometry, PbrMaterial, box } from './geometry.js';
 export { Camera } from './camera.js';
 export type { Vec3, CameraOptions } from './camera.js';
 export type { GeometryBuffers, Renderer, Batch, Lighting, RenderView, ViewDraw } from './renderer.js';
+export { uploadRows } from './renderer.js';
 import type { EngineKernel, Mesh as MeshHandle } from './api.js';
 import type { Engine, Mesh } from './engine.js';
 /** Type-only view of a public engine as its runtime `Engine` (no check or copy; same object). */

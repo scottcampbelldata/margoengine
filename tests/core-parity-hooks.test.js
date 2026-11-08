@@ -4,6 +4,15 @@ import { Engine } from '../packages/core/dist/engine.js';
 import { Camera } from '../packages/core/dist/camera.js';
 import { TransformStore } from '../packages/core/dist/kernel.js';
 import { box } from '../packages/core/dist/geometry.js';
+import { uploadRows } from '../packages/core/dist/extension.js';
+
+/** The float ranges `uploadRows` would write for a batch now; with `consume`, it also marks the batch uploaded. */
+function uploads(batch, consume) {
+  const ranges = [],
+    queue = { writeBuffer: (_buffer, _offset, _data, start, size) => ranges.push([start, start + size]) };
+  uploadRows(queue, {}, consume ? batch : { ...batch, rows: batch.rows?.slice() });
+  return ranges;
+}
 
 // Keep the real engine, camera, graph and Wasm culling; replace only GPU submission.
 async function scene(backend = 'webgpu') {
@@ -34,11 +43,9 @@ async function scene(backend = 'webgpu') {
         height: 64,
         draw() {
           for (const batch of liveBatches) {
-            frame.ranges.push([batch.start, batch.end]);
             for (let i = 0; i < batch.count; i++) frame.ids.push(batch.instances[i * 24 + 23]);
             // The production renderer consumes each pending instance upload here.
-            batch.start = Infinity;
-            batch.end = 0;
+            frame.ranges.push(...uploads(batch, true));
           }
         },
       });
@@ -68,8 +75,9 @@ function primaryView(h, ids) {
   );
   assert.deepEqual(engine.stats, h.frames.at(-1).stats, 'the counts stay those of the frame last drawn');
   const batches = h.batches();
+  // In id order: a culling flip moves rows inside a batch.
   assert.deepEqual(
-    batches.flatMap((b) => Array.from({ length: b.count }, (_, i) => b.instances[i * 24 + 23])),
+    batches.flatMap((b) => Array.from({ length: b.count }, (_, i) => b.instances[i * 24 + 23])).sort((a, b) => a - b),
     ids,
     'primary batches restored before returning',
   );
@@ -94,8 +102,9 @@ test('alternate camera culls shared geometry and restores primary batches with p
     assert.deepEqual(engine.store.planes, planes);
     primaryView(h, [front.id]);
     assert.deepEqual(
-      h.batches().map((b) => [b.start, b.end]),
-      [[0, 24]],
+      h.batches().map((b) => uploads(b)),
+      [[[0, 24]]],
+      'the restored primary row is pending',
     );
     engine.render();
     assert.deepEqual(frames.at(-1).ids, [front.id]);

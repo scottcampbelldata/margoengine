@@ -40,9 +40,13 @@ export function rectangleClear(
   return 'draw';
 }
 
-/** `start`/`end`: float range of `instances` changed since the WebGPU renderer last uploaded it (absent: upload all).
+/** `rows`/`dirty`: bit r of `rows` is set when row r of `instances` changed since the last upload, and `dirty` counts
+ * those rows (-1 or absent: every row changed). A row is 24 floats: matrix, material, then the mesh id at float 23. Rows
+ * 0..count are drawn; a mesh that is shown takes row `count`, one that is hidden gives its row to the last. `uploadRows`
+ * writes them.
  * `mask`: nonzero when a drawn instance needs back faces (double-sided material or mirrored transform); 0 lets core's
- * own pass draw the batch with its back-culled pipeline (absent counts as 0).
+ * own pass draw the batch with its back-culled pipeline (absent counts as 0). Core sets it to the number of its drawn
+ * rows that need them, kept as rows are shown, hidden and moved.
  * `redirect`: set by a GPU-culling package for the frame (core never sets it): every core draw of the batch reads instances
  * from `instances` and its drawIndexedIndirect arguments from `args` (offset 0) instead of core's instance buffer and
  * `count`; core still uploads the batch into its own buffer, which stays the source the package reads. A batch with a
@@ -55,11 +59,51 @@ export interface Batch {
   geometry: Geometry;
   instances: Float32Array;
   count: number;
-  start?: number;
-  end?: number;
+  rows?: Uint32Array;
+  dirty?: number;
   mask?: number;
   redirect?: { instances: GPUBuffer; args: GPUBuffer };
   claimed?: boolean;
+}
+/** Writes rows [start, stop) of `instances` (clamped to `end` floats), when any are left. */
+const send = (queue: GPUQueue, buffer: GPUBuffer, instances: Float32Array, start: number, stop: number, end: number) => {
+  start *= 24;
+  stop = stop * 24 > end ? end : stop * 24;
+  if (stop > start) queue.writeBuffer(buffer, start * 4, instances as Float32Array<ArrayBuffer>, start, stop - start);
+};
+/**
+ * Writes a batch's changed rows (`rows`/`dirty`; every row with `all`) from `instances` into its GPU `buffer`, one
+ * `writeBuffer` for each run of neighbouring rows, up to `count` rows, and marks the batch uploaded. For a package that
+ * draws a batch itself (it set `claimed`): core then does not upload it.
+ */
+export function uploadRows(queue: GPUQueue, buffer: GPUBuffer, batch: Batch, all?: boolean): void {
+  const { rows, instances } = batch,
+    end = batch.count * 24;
+  if (all || !rows || !(batch.dirty! >= 0)) {
+    send(queue, buffer, instances, 0, end, end);
+    rows?.fill(0);
+  } else if (batch.dirty)
+    // Runs of set bits, merged across words, in row order: no sort and nothing allocated.
+    for (let word = 0, start = 0, stop = 0; word <= rows.length; word++) {
+      let bits = rows[word];
+      if (word === rows.length) send(queue, buffer, instances, start, stop, end);
+      else if (bits) {
+        rows[word] = 0;
+        while (bits) {
+          const low = 31 - Math.clz32(bits & -bits),
+            gap = ~(bits >>> low),
+            top = low + (gap ? 31 - Math.clz32(gap & -gap) : 32),
+            row = word * 32 + low;
+          if (row !== stop) {
+            send(queue, buffer, instances, start, stop, end);
+            start = row;
+          }
+          stop = word * 32 + top;
+          bits = top > 31 ? 0 : (bits >>> top) << top;
+        }
+      }
+    }
+  batch.dirty = 0;
 }
 /**
  * The single directional light. `direction`: xyz toward the light (non-zero), w intensity (>= 0); default [3, 5, 4, 3].
@@ -755,20 +799,9 @@ export class GPURenderer implements Renderer {
     }
     return set.views;
   }
-  /** Uploads the batch's changed instance range (all of it into a buffer not yet written), marked as `frame`'s. */
+  /** Uploads the batch's changed rows (all of them into a buffer not yet written), marked as `frame`'s. */
   private upload(batch: Batch, resource: { instance: GPUBuffer; frame: number }, frame: number): void {
-    const start = resource.frame < 0 ? 0 : (batch.start ?? 0),
-      end = Math.min(resource.frame < 0 ? 1 / 0 : (batch.end ?? 1 / 0), batch.count * 24);
-    if (end > start)
-      this.device.queue.writeBuffer(
-        resource.instance,
-        start * 4,
-        batch.instances as Float32Array<ArrayBuffer>,
-        start,
-        end - start,
-      );
-    batch.start = 1 / 0;
-    batch.end = 0;
+    uploadRows(this.device.queue, resource.instance, batch, resource.frame < 0);
     resource.frame = frame;
   }
   /**
@@ -881,7 +914,7 @@ export class GPURenderer implements Renderer {
       for (const batch of batches)
         if (batch.count) {
           const r = this.resources.get(batch.geometry)!;
-          // Only the changed range, as a frame does (rewriting every instance cost each pick 960 KB for 10k meshes); the
+          // Only the changed rows, as a frame does (rewriting every instance cost each pick 960 KB for 10k meshes); the
           // next frame then has nothing left to upload. Before the first frame, frameId - 1 is -1: upload all again.
           this.upload(batch, r, this.frameId - 1);
           pass.setVertexBuffer(0, r.vertex);

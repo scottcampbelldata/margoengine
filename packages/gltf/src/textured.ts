@@ -1,7 +1,7 @@
 // Base colour maps and MASK cut-outs for the light loader. Core's meshes have one constant colour, so this entry keeps
 // the mesh in core (bounds, picking, instances) and claims its batch: its own pass draws those instances with core's
 // shader plus a UV input and a texture read, so a package that patches core's shader applies here too.
-import type { Engine, EnginePlugin, FrameGraph, Geometry, PassContext } from '@margoengine/core/extension';
+import { uploadRows, type Engine, type EnginePlugin, type FrameGraph, type Geometry, type PassContext } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
 import { setGeometrySurface } from '../../shared/mesh-source.js';
 import { generateMipmaps } from '../../shared/mipmaps.js';
@@ -259,19 +259,8 @@ class TexturedDraw implements EnginePlugin {
       // Core counted this frame's draws before this first claim, and `draw` counts this batch.
       if (!batch.claimed && (batch.count || batch.redirect)) this.engine.stats.drawCalls--;
       batch.claimed = true;
-      // Core uploads only what it draws, so its window of changed instances is this pass's to send and reset.
-      const start = part.sent ? (batch.start ?? 0) : 0,
-        end = Math.min(part.sent ? (batch.end ?? Infinity) : Infinity, batch.count * 24);
-      if (end > start)
-        c.device.queue.writeBuffer(
-          this.engine.geometryBuffers(batch.geometry)!.instance,
-          start * 4,
-          batch.instances as Float32Array<ArrayBuffer>,
-          start,
-          end - start,
-        );
-      batch.start = Infinity;
-      batch.end = 0;
+      // Core uploads only what it draws, so its changed rows are this pass's to send and reset.
+      uploadRows(c.device.queue, this.engine.geometryBuffers(batch.geometry)!.instance, batch, !part.sent);
       part.sent = true;
     }
   }

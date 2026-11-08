@@ -7,8 +7,8 @@ export interface Batch {
     geometry: Geometry;
     instances: Float32Array;
     count: number;
-    start?: number;
-    end?: number;
+    rows?: Uint32Array;
+    dirty?: number;
     mask?: number;
     redirect?: {
         instances: GPUBuffer;
@@ -370,6 +370,8 @@ export function box(width?: number, height?: number, depth?: number): Geometry;
 export const engineRuntime: (engine: EngineKernel) => Engine;
 
 export const meshRuntime: (mesh: MeshHandle) => Mesh;
+
+export function uploadRows(queue: GPUQueue, buffer: GPUBuffer, batch: Batch, all?: boolean): void;
 
 // Not exported from this entry, but used by the exports above:
 

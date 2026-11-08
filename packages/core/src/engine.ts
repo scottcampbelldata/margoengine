@@ -147,12 +147,28 @@ export class VectorRef {
   }
 }
 
-/** 1 when a mesh needs back faces drawn (double-sided or mirrored); batches without one draw with cullMode back. */
-const keep = ({ matrix: m, material }: Mesh) =>
+/**
+ * 1 when the instance row at float `o` needs back faces drawn: double-sided (float 22 is 1 or 1.25, single-sided 0 or
+ * 0.25) or a mirrored matrix. A batch's `mask` counts its drawn rows that do, so a hidden or unmirrored row leaves it.
+ */
+const keep = (r: Float32Array, o: number) =>
   +(
-    material.data[6] > 0 ||
-    m[0] * (m[5] * m[10] - m[6] * m[9]) - m[4] * (m[1] * m[10] - m[2] * m[9]) + m[8] * (m[1] * m[6] - m[2] * m[5]) < 0
+    r[o + 22] > 0.5 ||
+    r[o] * (r[o + 5] * r[o + 10] - r[o + 6] * r[o + 9]) -
+      r[o + 4] * (r[o + 1] * r[o + 10] - r[o + 2] * r[o + 9]) +
+      r[o + 8] * (r[o + 1] * r[o + 6] - r[o + 2] * r[o + 5]) <
+      0
   );
+/** Marks the row at float `offset` of a batch changed for `uploadRows` (nothing to mark once every row is). */
+const mark = (batch: Batch, offset: number) => {
+  const row = offset / 24,
+    bit = 1 << (row & 31),
+    rows = batch.rows!;
+  if (batch.dirty! >= 0 && !(rows[row >> 5] & bit)) {
+    rows[row >> 5] |= bit;
+    batch.dirty!++;
+  }
+};
 const views = (mesh: Mesh) =>
   Object.assign(mesh, {
     matrix: mesh.engine.store.matrices.subarray(mesh.id * 16, mesh.id * 16 + 16),
@@ -689,14 +705,22 @@ export class Engine {
    * throw leaves the engine, the batch and its GPU buffers as they were; a later call can retry.
    */
   retain(geometry: Geometry): void {
-    const batch = this.batches.get(geometry) ?? { geometry, instances: new Float32Array(), count: 0, references: 0 };
+    const batch = this.batches.get(geometry) ?? {
+      geometry,
+      instances: new Float32Array(),
+      rows: new Uint32Array(),
+      count: 0,
+      references: 0,
+    };
     // Size instance storage to the meshes using this geometry, doubling as it grows, not to the engine capacity.
     if (batch.references >= batch.instances.length / 24) {
       const size = (batch.references + 1) * 2,
-        instances = new Float32Array(size * 24);
+        instances = new Float32Array(size * 24),
+        rows = new Uint32Array((size + 31) >> 5);
       // On the renderer in use even during a restore: that one may fail and stay, and hooks run on the restored one.
       this.renderer.add(geometry, size);
       batch.instances = instances;
+      batch.rows = rows;
       this.collected = -1;
     }
     if (!batch.references++) {
@@ -714,31 +738,33 @@ export class Engine {
   }
   private readonly collect = (mesh: Mesh): void => {
     if (this.layers !== -1 && !(meshLayers(mesh) & this.layers)) return;
-    const unshadowed = !mesh.receiveShadow;
-    this.unshadowed += +unshadowed;
-    if (mesh.geometry && this.store.visible[mesh.id]) {
-      if (this.checkedMaterials.get(mesh.material) !== this.materialFrame) {
-        const material = mesh.material.data;
-        finite(material, 8, 'Material');
-        for (let i = 0; i < 8; i++)
-          if (material[i] < 0 || material[i] > 1) throw rangeError('Invalid material', 'material');
-        // 0.045: minimum perceptual roughness, Filament design document (published engine standard).
-        if (material[3] !== 1 || material[4] < Math.fround(0.045) || (material[6] !== 0 && material[6] !== 1))
-          throw rangeError('Invalid material', 'material');
-        this.checkedMaterials.set(mesh.material, this.materialFrame);
-        this.materials.push([mesh.material, ...material]);
-      }
-      const batch = this.batches.get(mesh.geometry)!,
-        offset = batch.count++ * 24;
-      batch.mask! |= keep(mesh);
-      this.slots[mesh.id] = offset;
-      batch.instances.set(mesh.matrix, offset);
-      batch.instances.set(mesh.material.data, offset + 16);
-      // doubleSided (0 or 1) + 0.25: every `< 0.5` single-sided test keeps its meaning.
-      if (unshadowed) batch.instances[offset + 22] += 0.25;
-      batch.instances[offset + 23] = mesh.id;
-    }
+    this.unshadowed += +!mesh.receiveShadow;
+    if (mesh.geometry && this.store.visible[mesh.id]) this.place(mesh);
   };
+  /** Appends a drawn mesh's row to its batch (validating a material first seen since the last full collection). */
+  private place(mesh: Mesh): void {
+    if (this.checkedMaterials.get(mesh.material) !== this.materialFrame) {
+      const material = mesh.material.data;
+      finite(material, 8, 'Material');
+      for (let i = 0; i < 8; i++)
+        if (material[i] < 0 || material[i] > 1) throw rangeError('Invalid material', 'material');
+      // 0.045: minimum perceptual roughness, Filament design document (published engine standard).
+      if (material[3] !== 1 || material[4] < Math.fround(0.045) || (material[6] !== 0 && material[6] !== 1))
+        throw rangeError('Invalid material', 'material');
+      this.checkedMaterials.set(mesh.material, this.materialFrame);
+      this.materials.push([mesh.material, ...material]);
+    }
+    const batch = this.batches.get(mesh.geometry!)!,
+      offset = batch.count++ * 24;
+    this.slots[mesh.id] = offset;
+    batch.instances.set(mesh.matrix, offset);
+    batch.instances.set(mesh.material.data, offset + 16);
+    // doubleSided (0 or 1) + 0.25: every `< 0.5` single-sided test keeps its meaning.
+    if (!mesh.receiveShadow) batch.instances[offset + 22] += 0.25;
+    batch.instances[offset + 23] = mesh.id;
+    batch.mask! += keep(batch.instances, offset);
+    mark(batch, offset);
+  }
   /**
    * Draws one frame. Without `views`: the full canvas through `camera` (default the engine camera), restoring the
    * primary view before returning. With `views`: each view in order (see {@link RenderView}); plugins update once
@@ -943,8 +969,8 @@ export class Engine {
     if (this.canvas.height !== height) this.canvas.height = height;
   }
   private collectInstances(): void {
-    // Reuse the last collection unless the mesh set, scene, layers, visibility or a material changed (or masks come
-    // from a source that can change at any time); then patch moved matrices only.
+    // Reuse the last collection unless the mesh set, scene, layers or a material changed (or masks come from a source
+    // that can change at any time); then move only the rows of meshes shown or hidden, and patch moved matrices.
     const { visible, changed } = this.store,
       seen = this.seen,
       scene = this.active,
@@ -954,13 +980,16 @@ export class Engine {
       this.collectedScene !== scene ||
       this.collectedLayers !== layers ||
       (layers !== -1 && !!layerRegistry()?.source);
-    for (let id = 0; !full && id < this.next; id++) full = visible[id] !== seen[id];
     for (let m = 0; !full && m < this.materials.length; m++)
       for (let i = 0, values = this.materials[m]; !full && i < 8; i++) full = values[0].data[i] !== values[i + 1];
     if (full) {
       // Until it finishes: a material that throws below leaves counts part-way and `materials`, which found it, empty.
       this.collected = -1;
-      for (const batch of this.batchList) batch.count = batch.mask = 0;
+      // dirty -1 first: every row is new, so `place` marks none.
+      for (const batch of this.batchList) {
+        batch.count = batch.mask = 0;
+        batch.dirty = -1;
+      }
       this.unshadowed = 0;
       this.materialFrame++;
       this.materials.length = 0;
@@ -971,24 +1000,51 @@ export class Engine {
       this.collectedLayers = layers;
       seen.set(visible);
       changed.fill(0);
-      for (const batch of this.batchList) {
-        batch.start = 0;
-        batch.end = batch.count * 24;
-      }
-    } else
+    } else {
+      // A culling flip moves one row: a mesh shown takes the next row, one hidden gives its row to the batch's last.
+      // Flips come before moves, so a row placed here is current. Meshes of another scene or layer, or without
+      // geometry, are not drawn either way.
+      for (let id = 0; id < this.next; id++)
+        if (visible[id] !== seen[id]) {
+          const mesh = this.meshes.get(id),
+            offset = this.slots[id];
+          if (
+            mesh?.geometry &&
+            mesh.scene === scene &&
+            (layers === -1 || meshLayers(mesh) & layers) &&
+            +(offset >= 0) !== visible[id]
+          )
+            if (offset < 0) {
+              this.place(mesh);
+              // Its row is current: the move loop below has nothing to copy.
+              changed[id] = 0;
+            } else {
+              const batch = this.batches.get(mesh.geometry)!,
+                last = --batch.count * 24,
+                rows = batch.instances;
+              batch.mask! -= keep(rows, offset);
+              if (offset !== last) {
+                rows.copyWithin(offset, last, last + 24);
+                this.slots[rows[offset + 23]] = offset;
+                mark(batch, offset);
+              }
+              this.slots[id] = -1;
+            }
+          seen[id] = visible[id];
+        }
       for (let id = changed.indexOf(1); id >= 0; id = changed.indexOf(1, id + 1)) {
         changed[id] = 0;
         const offset = this.slots[id];
         if (offset >= 0) {
           const mesh = this.meshes.get(id)!,
             batch = this.batches.get(mesh.geometry!)!;
+          batch.mask! -= keep(batch.instances, offset);
           batch.instances.set(mesh.matrix, offset);
-          batch.mask! |= keep(mesh);
-          // Whole numbers, so compares match Math.min and Math.max (V8 13 Maglev boxes their numbers per moved mesh).
-          if (offset < batch.start!) batch.start = offset;
-          if (offset + 16 > batch.end!) batch.end = offset + 16;
+          batch.mask! += keep(batch.instances, offset);
+          mark(batch, offset);
         }
       }
+    }
   }
   /**
    * The mesh under CSS pixel (x, y), or null. With `view`, picks through that view (null outside its rectangle);

@@ -177,6 +177,42 @@ test('a geometry batch draws back-culled (no discard) only while every drawn ins
   }
 });
 
+test('the cull mode follows mirrored rows exactly through moves, hides and shows without a full collection', async (t) => {
+  const { canvas, log } = fakeGPU(t);
+  const engine = await EngineKernel.create(canvas, {
+    capacity: 8,
+    backend: 'webgpu',
+    camera: { position: [0, 0, 6], target: [0, 0, 0] },
+  });
+  try {
+    const single = new PbrMaterial({ doubleSided: false }),
+      cube = box();
+    const meshes = [0, 1, 2].map((i) => engine.createMesh().setGeometry(cube).setMaterial(single).setPosition([i, 0, 0]));
+    const frame = () => {
+      log.culls.length = 0;
+      engine.render();
+      return log.culls.slice();
+    };
+    assert.deepEqual(frame(), ['back']);
+    meshes[0].scale.set(-1, 1, 1);
+    meshes[2].scale.set(1, -1, 1);
+    assert.deepEqual(frame(), ['none'], 'two mirrored rows');
+    meshes[0].scale.set(1, 1, 1);
+    assert.deepEqual(frame(), ['none'], 'one mirrored row is left');
+    meshes[2].scale.set(1, 1, 1);
+    assert.deepEqual(frame(), ['back'], 'unmirrored by a move: the batch culls again');
+    meshes[1].scale.set(-1, 1, 1);
+    meshes[0].visible = false;
+    assert.deepEqual(frame(), ['none'], 'the hidden row gave its slot to a mirrored one, which still counts');
+    meshes[1].visible = false;
+    assert.deepEqual(frame(), ['back']);
+    meshes[1].visible = true;
+    assert.deepEqual(frame(), ['none'], 'shown again, mirrored');
+  } finally {
+    engine.dispose();
+  }
+});
+
 test('PbrMaterial.set validates before writing and keeps constructor defaults', () => {
   const material = new PbrMaterial({ color: undefined, roughness: undefined }),
     before = material.data.slice();

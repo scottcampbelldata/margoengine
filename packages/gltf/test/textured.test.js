@@ -352,3 +352,40 @@ test('the plugin stays while a model holds it and leaves nothing on the device',
     engine.dispose();
   }
 });
+
+test('a claimed batch uploads every row first, then only the rows core marked changed', async (t) => {
+  withBitmaps(t);
+  const { engine } = await gpuEngine(t),
+    instance = {},
+    writes = [],
+    queue = { writeBuffer: (buffer, byteOffset, _data, start, size) => writes.push([buffer, byteOffset / 4, start, size]) };
+  // The stand-in renderer has no GPU buffers; the claim writes core's instance buffer of the geometry.
+  engine.renderer.geometryBuffers = () => ({ instance });
+  try {
+    const model = await load(engine, file()),
+      [mesh] = model.meshes,
+      second = engine.createMesh().setGeometry(mesh.geometry).setPosition([4, 0, 0]),
+      plugin = engine.plugins.get('gltf-textured'),
+      claim = (batches) => plugin.claim({ batches, device: { queue } });
+    engine.render({ culling: false });
+    const batch = [...plugin.parts.keys()].map((geometry) =>
+      Object.values(engine)
+        .find((value) => value instanceof Map && value.has(geometry))
+        .get(geometry),
+    )[0];
+    assert.equal(batch.count, 2);
+    claim([batch]);
+    assert.deepEqual(writes, [[instance, 0, 0, 48]], 'first claim: every row');
+    writes.length = 0;
+    claim([batch]);
+    assert.deepEqual(writes, [], 'nothing changed');
+    const row = batch.instances[23] === second.id ? 0 : 1;
+    second.setPosition([5, 0, 0]);
+    engine.render({ culling: false });
+    claim([batch]);
+    assert.deepEqual(writes, [[instance, row * 24, row * 24, 24]], 'the moved row only');
+    model.dispose();
+  } finally {
+    engine.dispose();
+  }
+});
