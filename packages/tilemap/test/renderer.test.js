@@ -111,6 +111,7 @@ test('bad options throw errors that link their fix', () => {
   assert.throws(() => new TileMap({}), TypeError);
   assert.throws(() => new TileMap({ map }), /TileMap needs atlases/);
   assert.throws(() => new TileMap({ map, atlases: {}, order: Number.NaN }), RangeError);
+  assert.throws(() => new TileMap({ map: { ...map, orientation: 'isometric' }, atlases: {} }), /GridTileMap/);
   assert.throws(() => new TileMap({ map, atlases: {}, mapLayers: ['b'] }), /Unknown tile layer/);
   const tiles = new TileMap({ map, atlases: {} });
   assert.throws(() => tiles.setTile('a', 2, 0, 1), /Tile outside the layer/);

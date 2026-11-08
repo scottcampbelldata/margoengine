@@ -2651,7 +2651,7 @@ is timed.
 | 3 | Per-sprite shaders | DONE | `dbd89c3b9` | `/shader` (+ root `shader`) | 966 B | LIM-478 |
 | 4 | Several atlases per layer | DONE | `66df95e94` | root, `atlas` list | see job 2 | LIM-480 |
 | 5 | 2D skeletal animation | DONE | `a8e7201bd` | `/skeletal` | 5,270 B | LIM-484 |
-| 6 | Sprite masks | DONE | this commit | root, `mask` | see job 2 | LIM-485 |
+| 6 | Sprite masks | DONE | `b1a212ab9` | root, `mask` | see job 2 | LIM-487 |
 
 - **Built from:** rows T-14 to T-18 in `docs/clean-room.md`: Fritsch and Carlson (1980) monotone curves, Reinhard et
   al. (2002) and the Hejl and Burgess-Dawson filmic fit, the 18% key value for metering, Durand and Dorsey (2002) with

@@ -5,6 +5,7 @@
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type Engine, type EnginePlugin, type PassContext } from '@margoengine/core/extension';
 import { atlasTexture } from '../../shared/atlas-texture.js';
+import { texelVarying } from '../../shared/texel-varying.js';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
 import { overlayDepthPass, overlayPass } from '../../shared/pass.js';
 import { viewMatrix } from '../../shared/view.js';
@@ -206,13 +207,7 @@ struct Board{p:vec3f,turn:f32,s:vec2f,pivot:vec2f,rect:vec4f,tint:u32,a:u32,b:u3
 @group(0) @binding(0) var<uniform> frame:Frame;
 @group(0) @binding(1) var<storage,read> boards:array<Board>;
 @group(0) @binding(2) var atlas:texture_2d<f32>;
-struct Varying{
-  @builtin(position) position:vec4f,
-  @location(0) texel:vec2f,
-  @location(1) @interpolate(flat) low:vec2f,
-  @location(2) @interpolate(flat) high:vec2f,
-  @location(3) @interpolate(flat) tint:vec4f,
-}
+${texelVarying}
 fn linear(c:vec3f)->vec3f{return select(pow((c+0.055)/1.055,vec3f(2.4)),c/12.92,c<=vec3f(0.04045));}
 @vertex fn vertexMain(@builtin(vertex_index) corner:u32,@builtin(instance_index) index:u32)->Varying{
   let b=boards[index];

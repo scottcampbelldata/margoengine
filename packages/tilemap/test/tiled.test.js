@@ -154,7 +154,7 @@ test('input that is not a Tiled map is refused', async () => {
   await rejects(parseTiled(42), 'syntax');
   await rejects(parseTiled({ width: 1 }), 'syntax');
   await rejects(parseTiled(baseMap({ tilewidth: 0 })), 'syntax');
-  await rejects(parseTiled(baseMap({ orientation: 'isometric' })), 'unsupported');
+  await rejects(parseTiled(baseMap({ orientation: 'oblique' })), 'unsupported');
   await rejects(parseTiled(baseMap({ width: 5000, height: 5000 })), 'limit');
   await rejects(
     parseTiled(baseMap({ layers: [{ type: 'tilelayer', name: 'big', width: 5000, height: 5000, data: [] }] })),
@@ -541,4 +541,31 @@ test('fromTMX turns the loaders TMX result into the same TileMapData', () => {
   assert.deepEqual({ ...objects.objects[0].shape }, { kind: 'rect', x: 0, y: 0, width: 4, height: 5 });
   assert.equal(objects.objects[1].shape.kind, 'point');
   assert.equal(objects.objects[2].gid, (3 | FLIP_H) >>> 0);
+});
+
+test('isometric, staggered and hexagonal maps keep their layout; hex turns keep bit 28, others drop it', async () => {
+  const iso = await parseTiled(baseMap({ orientation: 'isometric', staggeraxis: 'x' }));
+  assert.equal(iso.orientation, 'isometric');
+  assert.equal(iso.staggerAxis, undefined);
+  validateTileMap(iso);
+  const stag = await parseTiled(baseMap({ orientation: 'staggered', staggeraxis: 'x', staggerindex: 'even' }));
+  assert.deepEqual(
+    [stag.orientation, stag.staggerAxis, stag.staggerIndex, stag.hexSideLength],
+    ['staggered', 'x', 'even', undefined],
+  );
+  const turned = (0x10000000 | 2) >>> 0;
+  const layers = [{ type: 'tilelayer', name: 'ground', width: 2, height: 2, data: [1, turned, 0, 4] }];
+  const hex = await parseTiled(baseMap({ orientation: 'hexagonal', hexsidelength: 8, layers }));
+  assert.deepEqual(
+    [hex.orientation, hex.staggerAxis, hex.staggerIndex, hex.hexSideLength],
+    ['hexagonal', 'y', 'odd', 8],
+  );
+  assert.equal(hex.layers[0].data[1], turned);
+  assert.equal((await parseTiled(baseMap({ layers }))).layers[0].data[1], 2, 'an orthogonal map clears bit 28');
+  const plain = await parseTiled(baseMap());
+  assert.equal('orientation' in plain, false, 'orthogonal maps stay as they were');
+  await rejects(parseTiled(baseMap({ orientation: 'isometric', infinite: true })), 'unsupported');
+  await rejects(parseTiled(baseMap({ orientation: 'staggered', staggeraxis: 'z' })), 'syntax');
+  await rejects(parseTiled(baseMap({ orientation: 'hexagonal', staggerindex: 'third' })), 'syntax');
+  assert.throws(() => validateTileMap({ ...plain, orientation: 'oblique' }), /orientation/);
 });

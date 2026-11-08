@@ -37,6 +37,14 @@
     "./tiled": {
       "types": "./dist/tiled.d.ts",
       "import": "./dist/tiled.js"
+    },
+    "./iso": {
+      "types": "./dist/iso.d.ts",
+      "import": "./dist/iso.js"
+    },
+    "./hex": {
+      "types": "./dist/hex.d.ts",
+      "import": "./dist/hex.js"
     }
   },
   "files": [
@@ -57,6 +65,7 @@
     "build": "node ../../scripts/build-optional.js tilemap",
     "test": "npm run build && node --test test/*.test.js",
     "test:gpu": "cd ../.. && node packages/tilemap/test/browser-check.mjs",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "test:gpu:iso": "cd ../.. && node packages/tilemap/test/iso-check.mjs"
   }
 }

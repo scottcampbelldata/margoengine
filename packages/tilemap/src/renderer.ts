@@ -261,6 +261,8 @@ export class TileMap implements EnginePlugin {
   setMap(map: TileMapData): void {
     if (this.disposed) throw fault('disposed', 'TileMap disposed', 'disposed');
     if (!map) throw typeError('TileMap needs a map', 'tilemap-options');
+    if ((map.orientation ?? 'orthogonal') !== 'orthogonal')
+      throw rangeError('TileMap draws orthogonal maps; draw this one with GridTileMap', 'tilemap-options');
     const tiles = map.layers.filter((layer): layer is TileLayer => layer.type === 'tile');
     for (const name of this.names ?? [])
       if (!tiles.some((layer) => layer.name === name)) throw rangeError('Unknown tile layer', 'tilemap-options');

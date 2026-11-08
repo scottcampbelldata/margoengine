@@ -90,6 +90,8 @@ interface MapObject {
     readonly properties?: Properties;
 }
 
+type MapOrientation = 'orthogonal' | 'isometric' | 'staggered' | 'hexagonal';
+
 type MapShape = {
     readonly kind: 'rect';
     readonly x: number;
@@ -182,6 +184,10 @@ interface TileLayer extends LayerBase {
 interface TileMapData {
     readonly width: number;
     readonly height: number;
+    readonly orientation?: MapOrientation;
+    readonly staggerAxis?: 'x' | 'y';
+    readonly staggerIndex?: 'odd' | 'even';
+    readonly hexSideLength?: number;
     readonly tileWidth: number;
     readonly tileHeight: number;
     readonly tilesets: readonly MapTileset[];

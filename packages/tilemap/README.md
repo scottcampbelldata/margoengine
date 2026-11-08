@@ -2,7 +2,7 @@
 
 Import `margoengine/tilemap` from the `margoengine` package, or `@margoengine/tilemap` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
-The 2D tile map format every other piece builds on: `TileMapData` holds the tile size, tilesets with per-tile properties, animation and collision shapes, tile layers as `Uint32Array` with Tiled's flip bits, object layers, parallax, offset, opacity and custom properties. The root entry has the types, small helpers and the `TileMap` renderer; auto-tiling and the Tiled importer are their own entries. Orthogonal maps only. (`@margoengine/tiles` is OGC 3D Tiles; this package is unrelated.)
+The 2D tile map format every other piece builds on: `TileMapData` holds the tile size, tilesets with per-tile properties, animation and collision shapes, tile layers as `Uint32Array` with Tiled's flip bits, object layers, parallax, offset, opacity and custom properties. The root entry has the types, small helpers and the `TileMap` renderer; auto-tiling and the Tiled importer are their own entries. `TileMap` draws orthogonal maps; `GridTileMap` of the `iso` entry draws isometric, staggered and hexagonal ones. (`@margoengine/tiles` is OGC 3D Tiles; this package is unrelated.)
 
 ```ts
 import {createTileLayer, encodeTile, FLIP_H, tileAt, validateTileMap, type TileMapData} from 'margoengine/tilemap';
@@ -57,6 +57,59 @@ To draw into a compositor layer of `margoengine/pixel`, pass `target: layer.targ
 
 Tiles animate by their `animation` steps on the `time` clock (milliseconds; each frame adds its delta), which changes a small lookup and no cells. A tile larger than the cell sits on the cell's bottom left, as in Tiled. Layer `offset`, `opacity`, `tint`, `visible` and `parallax` and tileset `margin`, `spacing` and `tileOffset` are honoured. Overlapping oversize tiles of different tilesets draw tileset by tileset. Object layers are data only: draw tile objects with `margoengine/sprites`. Image collection tilesets (`columns: 0`) must be packed into one atlas first. After writing into `layer.data` yourself, call `invalidate(layer)`.
 
+## Isometric, staggered and hexagonal maps
+
+`margoengine/tilemap/iso` places cells the way Tiled does for every `orientation`: isometric diamonds, staggered
+diamonds whose rows (or columns) are pushed half a cell, and hexagons with flat sides of `hexSideLength`. `GridTileMap`
+draws them with exact texels, the cells in view back to front so tiles taller than their cell (walls, trees) cover the
+cells behind them. `margoengine/tilemap/hex` adds cube coordinates for distances, rings and lines.
+
+```ts
+import { EngineKernel } from 'margoengine/core';
+import { createTileLayer, type TileMapData } from 'margoengine/tilemap';
+import { cellCenter, GridTileMap, pixelToCell } from 'margoengine/tilemap/iso';
+import { hexDistance, hexRing } from 'margoengine/tilemap/hex';
+
+const engine = await EngineKernel.create(document.querySelector('canvas')!, { exactSize: [160, 90] });
+// Two 16 x 8 diamond tiles: grass and stone.
+const data = new Uint8Array(32 * 8 * 4);
+for (let y = 0; y < 8; y++)
+  for (let x = 0; x < 32; x++)
+    if (Math.abs((x % 16) + 0.5 - 8) / 8 + Math.abs(y + 0.5 - 4) / 4 <= 1)
+      data.set(x < 16 ? [70, 160, 60, 255] : [150, 150, 160, 255], (y * 32 + x) * 4);
+const map: TileMapData = {
+  orientation: 'isometric', width: 8, height: 8, tileWidth: 16, tileHeight: 8,
+  layers: [createTileLayer('ground', 8, 8, new Uint32Array(64).map((_, i) => 1 + ((i >> 3) % 2)))],
+  tilesets: [{ name: 'floor', firstGid: 1, tileWidth: 16, tileHeight: 8, tileCount: 2, columns: 2 }],
+};
+GridTileMap.attach(engine, { map, atlases: { floor: { width: 32, height: 8, data } }, camera: { x: -16, y: -10, zoom: 1 } });
+engine.start();
+
+console.log(pixelToCell(map, ...cellCenter(map, 3, 5))); // [3, 5]
+const hexes: TileMapData = { ...map, orientation: 'hexagonal', hexSideLength: 4, staggerAxis: 'y', staggerIndex: 'odd' };
+console.log(hexDistance(hexes, [0, 0], [3, 2]), hexRing(hexes, 4, 4, 1).length); // 4 6
+```
+
+| Function | What it gives |
+| --- | --- |
+| `cellBox(map, x, y)` | The cell's bounding box `{x, y, width, height}` in map pixels |
+| `cellCenter`, `cellPolygon` | The cell's centre; its outline, 4 corners (6 for hexagons), clockwise from the top |
+| `pixelToCell(map, px, py)` | The cell under a map pixel, for picking; cells outside the map are returned too |
+| `cellNeighbors(map, x, y)` | The cells that share an edge: 4, or 6 on hexagonal maps |
+| `mapPixelSize(map)`, `paintOrder(map)` | The box around all cells; every cell index back to front |
+| `visibleCells(map, layer, [left, top, right, bottom])` | The cells whose boxes reach a view, in paint order |
+| `cellToCube`, `cubeToCell`, `hexDistance`, `hexLine`, `hexRing`, `roundCube` (`/hex`) | Cube coordinates `q + r + s = 0` of hexagonal and staggered maps |
+
+`GridTileMap` takes the options of `TileMap` (`map`, `atlases`, `camera`, `snap`, `mapLayers`, `parallax`, `target`,
+`clear`, `order`, `layers`, `name`) and draws any orientation, `TileMap` included; `setMap`, `setAtlas`, `time`,
+`stats` and `dispose` (or `using`) work the same. `TileMap` itself refuses a map that is not orthogonal.
+
+- Tiles larger than the cell sit on the cell box's bottom left, as Tiled's format describes; flips work as on
+  orthogonal maps, and on hexagonal maps `FLIP_D` turns a tile 60 degrees clockwise and `HEX_ROTATE_120` 120.
+- It writes the cells in view each frame (12 words each), so its cost follows the view, not the map; one draw per run
+  of tiles from one tileset in paint order. Cells are read every frame: writes into `layer.data` show on the next one.
+- WebGPU only, exact texels on a single-sample target, like `TileMap`.
+
 ## Auto-tiling
 
 `margoengine/tilemap/autotile` picks the tile for each cell from its neighbours with rule sets written as data: 16 tiles for the four edge neighbours (`cardinal`), or 47 for all eight (`blob`; corners count only when both edges beside them are filled). Terrain sets match the terrain at a tile's four corners instead. Both are deterministic.
@@ -73,7 +126,7 @@ console.log(cells.length); // 9 global tile values, 0 where nothing is drawn
 
 ## Tiled import
 
-`margoengine/tilemap/tiled` reads a Tiled map saved as JSON (`.tmj`, or `.json`) into `TileMapData`. It takes the text, UTF-8 bytes or the parsed object. Tile layers may be CSV (an array), base64, or base64 with zlib or gzip compression; infinite maps are joined into one layer per Tiled layer; group layers pass their offset, opacity, visibility and parallax to their children. An external tileset (`.tsj`) is loaded through `options.resolve`, which receives the path written in the map. Image layers, text and object templates are skipped with a call to `onWarning`, and hexagonal and isometric maps are refused.
+`margoengine/tilemap/tiled` reads a Tiled map saved as JSON (`.tmj`, or `.json`) into `TileMapData`. It takes the text, UTF-8 bytes or the parsed object. Tile layers may be CSV (an array), base64, or base64 with zlib or gzip compression; infinite maps are joined into one layer per Tiled layer; group layers pass their offset, opacity, visibility and parallax to their children. An external tileset (`.tsj`) is loaded through `options.resolve`, which receives the path written in the map. Image layers, text and object templates are skipped with a call to `onWarning`. Isometric, staggered and hexagonal maps keep their `orientation`, `staggerAxis`, `staggerIndex` and `hexSideLength`, and hexagonal ones keep Tiled's 120 degree turn bit (`HEX_ROTATE_120`); oblique maps and infinite maps that are not orthogonal are refused.
 
 ```ts
 import { parseTiled } from 'margoengine/tilemap/tiled';

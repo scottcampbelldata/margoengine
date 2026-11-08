@@ -177,7 +177,13 @@ async function inflate(bytes: Uint8Array, format: 'deflate' | 'gzip', cap: numbe
   return out;
 }
 
-async function decodeCells(layer: Obj, data: unknown, count: number, signal?: AbortSignal): Promise<Uint32Array> {
+async function decodeCells(
+  layer: Obj,
+  data: unknown,
+  count: number,
+  signal?: AbortSignal,
+  hex = false,
+): Promise<Uint32Array> {
   const name = str(layer, 'name') ?? '';
   const out = new Uint32Array(count);
   if (Array.isArray(data)) {
@@ -187,7 +193,7 @@ async function decodeCells(layer: Obj, data: unknown, count: number, signal?: Ab
       const v = data[i];
       if (typeof v !== 'number' || !Number.isInteger(v) || v < 0 || v > 0xffffffff)
         return fail('syntax', `layer "${name}" tile ${i} is ${String(v)}, not an unsigned 32 bit integer.`);
-      out[i] = cleanGid(v);
+      out[i] = cleanGid(v, hex);
     }
     return out;
   }
@@ -216,7 +222,7 @@ async function decodeCells(layer: Obj, data: unknown, count: number, signal?: Ab
       `layer "${name}" decodes to ${bytes.length} bytes, expected ${count * 4}; re-save the map.`,
     );
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  for (let i = 0; i < count; i++) out[i] = cleanGid(view.getUint32(i * 4, true));
+  for (let i = 0; i < count; i++) out[i] = cleanGid(view.getUint32(i * 4, true), hex);
   return out;
 }
 
@@ -246,11 +252,37 @@ export async function parseTiled(
       'this is not a Tiled map: "layers" and "tilesets" are missing; pass the .tmj / .json file contents.',
     );
   const orientation = str(root, 'orientation') ?? 'orthogonal';
-  if (orientation !== 'orthogonal')
+  if (
+    orientation !== 'orthogonal' &&
+    orientation !== 'isometric' &&
+    orientation !== 'staggered' &&
+    orientation !== 'hexagonal'
+  )
     return fail(
       'unsupported',
-      `the map is ${orientation}; only orthogonal maps are read, change the orientation in Tiled.`,
+      `the map is ${orientation}; orthogonal, isometric, staggered and hexagonal maps are read, change the orientation in Tiled.`,
     );
+  const hex = orientation === 'hexagonal';
+  if (orientation !== 'orthogonal' && root.infinite === true)
+    return fail('unsupported', `the map is an infinite ${orientation} map; untick Infinite in Tiled's map properties.`);
+  const staggerAxis = str(root, 'staggeraxis'),
+    staggerIndex = str(root, 'staggerindex'),
+    hexSideLength = num(root, 'hexsidelength');
+  if ((staggerAxis ?? 'y') !== 'x' && (staggerAxis ?? 'y') !== 'y')
+    return fail('syntax', `staggeraxis is "${staggerAxis}"; Tiled writes x or y.`);
+  if ((staggerIndex ?? 'odd') !== 'odd' && (staggerIndex ?? 'odd') !== 'even')
+    return fail('syntax', `staggerindex is "${staggerIndex}"; Tiled writes odd or even.`);
+  const layout: Pick<TileMapData, 'orientation' | 'staggerAxis' | 'staggerIndex' | 'hexSideLength'> =
+    orientation === 'orthogonal'
+      ? {}
+      : orientation === 'isometric'
+        ? { orientation }
+        : {
+            orientation,
+            staggerAxis: (staggerAxis ?? 'y') as 'x' | 'y',
+            staggerIndex: (staggerIndex ?? 'odd') as 'odd' | 'even',
+            ...(hex ? { hexSideLength: Math.max(0, hexSideLength) } : {}),
+          };
   const tileWidth = num(root, 'tilewidth');
   const tileHeight = num(root, 'tileheight');
   if (!(tileWidth > 0 && tileHeight > 0)) return fail('syntax', 'tilewidth and tileheight must be positive numbers.');
@@ -359,7 +391,7 @@ export async function parseTiled(
         ...offset(0, 0),
         width: w,
         height: h,
-        data: await decodeCells(l, l.data, w * h, options.signal),
+        data: await decodeCells(l, l.data, w * h, options.signal, hex),
       });
     }
   };
@@ -372,6 +404,7 @@ export async function parseTiled(
     height,
     tileWidth,
     tileHeight,
+    ...layout,
     tilesets,
     layers,
     ...(background ? { backgroundColor: background } : {}),

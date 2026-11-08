@@ -30,8 +30,9 @@ export const str = (o: Obj, key: string): string | undefined =>
   typeof o[key] === 'string' ? (o[key] as string) : undefined;
 export const list = (o: Obj, key: string): readonly unknown[] => (Array.isArray(o[key]) ? (o[key] as unknown[]) : []);
 
-/** Keep the id bits and the three flip bits; drop Tiled's hex rotation bit. */
-export const cleanGid = (value: number): number => (value & (GID_MASK | FLIP_MASK)) >>> 0;
+/** Keep the id bits and the three flip bits; drop Tiled's hex rotation bit unless `hex` (a hexagonal map). */
+export const cleanGid = (value: number, hex = false): number =>
+  (value & (GID_MASK | FLIP_MASK | (hex ? 0x10000000 : 0))) >>> 0;
 
 /** Set an own property by name even when the name is `__proto__`. */
 export function setOwn<T>(target: { [key: string]: T }, key: string, value: T): void {

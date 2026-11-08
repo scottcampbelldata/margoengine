@@ -173,11 +173,22 @@ export interface ObjectLayer extends LayerBase {
 /** A tile layer or an object layer. */
 export type MapLayer = TileLayer | ObjectLayer;
 
-/** A whole map. Orthogonal only. */
+/** How cells sit on screen, as Tiled names it. */
+export type MapOrientation = 'orthogonal' | 'isometric' | 'staggered' | 'hexagonal';
+
+/** A whole map. `TileMap` draws orthogonal ones; `GridTileMap` of `margoengine/tilemap/iso` draws any orientation. */
 export interface TileMapData {
   /** Size in tiles. */
   readonly width: number;
   readonly height: number;
+  /** Default `'orthogonal'`. */
+  readonly orientation?: MapOrientation;
+  /** Staggered and hexagonal maps: rows (`'y'`, default) or columns (`'x'`) are pushed half a cell. */
+  readonly staggerAxis?: 'x' | 'y';
+  /** Staggered and hexagonal maps: which rows or columns are pushed. Default `'odd'`. */
+  readonly staggerIndex?: 'odd' | 'even';
+  /** Hexagonal maps: pixel length of the flat sides along the stagger axis. Default 0. */
+  readonly hexSideLength?: number;
   /** Tile size in pixels. */
   readonly tileWidth: number;
   readonly tileHeight: number;
@@ -259,6 +270,8 @@ export function validateTileMap(map: TileMapData): void {
   size(map.height, 'map.height', 0);
   size(map.tileWidth, 'map.tileWidth');
   size(map.tileHeight, 'map.tileHeight');
+  if (map.orientation !== undefined && !['orthogonal', 'isometric', 'staggered', 'hexagonal'].includes(map.orientation))
+    throw new RangeError(`map.orientation is "${map.orientation}"; use orthogonal, isometric, staggered or hexagonal.`);
   if (!Array.isArray(map.tilesets) || !Array.isArray(map.layers))
     throw new TypeError('map.tilesets and map.layers must be arrays; pass [] for none.');
   let end = 1;

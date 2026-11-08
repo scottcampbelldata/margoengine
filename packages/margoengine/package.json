@@ -2702,6 +2702,14 @@
       "types": "./dist/tilemap/tiled.d.ts",
       "import": "./dist/tilemap/tiled.js"
     },
+    "./tilemap/iso": {
+      "types": "./dist/tilemap/iso.d.ts",
+      "import": "./dist/tilemap/iso.js"
+    },
+    "./tilemap/hex": {
+      "types": "./dist/tilemap/hex.d.ts",
+      "import": "./dist/tilemap/hex.js"
+    },
     "./tiles": {
       "types": "./dist/tiles.d.ts",
       "import": "./dist/tiles.js"

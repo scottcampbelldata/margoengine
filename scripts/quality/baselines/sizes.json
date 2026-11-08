@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11078725,
+  "total": 11087923,
   "history": [
     {
       "date": "2026-10-24",
@@ -4226,6 +4226,12 @@
       "commit": "c10bb05f4",
       "reason": "new entry @margoengine/splats/animate (SplatSequence, SplatSkin)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "ed60352d1",
+      "reason": "new entries @margoengine/tilemap/iso and /hex (isometric, staggered and hexagonal maps)",
+      "grew": 3
     }
   ],
   "items": {
@@ -4901,8 +4907,10 @@
     "@margoengine/text/rich": 11403,
     "@margoengine/tilemap": 7435,
     "@margoengine/tilemap/autotile": 1605,
+    "@margoengine/tilemap/hex": 2287,
+    "@margoengine/tilemap/iso": 6635,
     "@margoengine/tilemap/ldtk": 3070,
-    "@margoengine/tilemap/tiled": 4264,
+    "@margoengine/tilemap/tiled": 4540,
     "@margoengine/tiles": 15927,
     "@margoengine/tiles/i3dm": 1629,
     "@margoengine/tiles/ion": 2785,

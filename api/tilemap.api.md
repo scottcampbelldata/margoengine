@@ -57,6 +57,8 @@ export interface MapObject {
     readonly properties?: Properties;
 }
 
+export type MapOrientation = 'orthogonal' | 'isometric' | 'staggered' | 'hexagonal';
+
 export type MapShape = {
     readonly kind: 'rect';
     readonly x: number;
@@ -180,6 +182,10 @@ export class TileMap implements EnginePlugin {
 export interface TileMapData {
     readonly width: number;
     readonly height: number;
+    readonly orientation?: MapOrientation;
+    readonly staggerAxis?: 'x' | 'y';
+    readonly staggerIndex?: 'odd' | 'even';
+    readonly hexSideLength?: number;
     readonly tileWidth: number;
     readonly tileHeight: number;
     readonly tilesets: readonly MapTileset[];

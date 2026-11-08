@@ -2600,7 +2600,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-490). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-491). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -2773,6 +2773,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | 2D skeletal animation (`@margoengine/sprites/skeletal`, 2026-11-08) | Four bones per vertex; skinning on the CPU every frame for every visible mesh, about 20 B per vertex uploaded each frame. | Linear blend skinning is a weighted sum per vertex, cheap enough on the CPU for character meshes, and it keeps skinning testable in Node. | By method: linear blend skinning collapses a joint bent far (each vertex lies between its bones' rigid copies, so a sharp bend loses area), so give bends a shared, half-weighted vertex row; texels read exactly with no filtering, single-sample target; clips are linear keys only (no curves, events or blending between clips). Proved on one GPU, an RTX A6000, byte for byte. Time not measured. | More grid rows at joints; your own pose code that sets `Bone` fields before `skeleton.update()`. |
 | Local exposure (`LocalExposure` in `@margoengine/tonemap/local`, 2026-11-08) | By method: the bilateral blur is separable (horizontal then vertical), an approximation of the 2D filter that can leave a faint halo along thin bright lines; quarter-resolution base (4 by 4 blocks); the whole source is filtered, not one view rect; three r32float textures (about 1.5 MB at 1920 by 1080); GPU time not measured (LIM-486). | Separable passes keep the cost linear in the radius. | Very fine structures are not separated into their own regions. | Lower `edges` for sharper region borders. |
 | Sprite masks (`SpriteLayer` `mask` in `@margoengine/sprites`, 2026-11-08) | One rect or circle per layer, hard edged. | The test runs per pixel in the layer's fragment shader against one uniform, so a mask costs no extra pass or texture. | By method: a pixel is in or out by its centre, so edges step by whole pixels and do not antialias; a turned or scaled shape needs a rect or circle (no polygons or image masks). Every layer's uniform grew from 16 to 48 B for it. Proved on one GPU, an RTX A6000, pixel for pixel. Time not measured. | Draw into a `target` and composite it with your own mask pass for soft or image masks. |
+| Isometric, staggered and hexagonal maps (`@margoengine/tilemap/iso`, `/hex`, 2026-11-08) | The cells in view are written each frame, 48 B each; one draw per run of one tileset in paint order. Oblique maps, and infinite maps that are not orthogonal, are refused by the Tiled importer; `fromTMX` (TMX through `@margoengine/loaders`) reads orthogonal maps only, as the loader does not carry the orientation. | Drawing in paint order across the whole view is what lets tall tiles cover the cells behind them; a cached 64 x 64 chunk per draw, as `TileMap` uses, would draw a tall tile on a chunk's edge under its neighbour's cells. | By method: the CPU cost grows with the cells in view (not measured); a turned hexagonal tile's edge pixels fall where rounding puts them; a tile wider than its cell may overlap a cell drawn later in the same row. Proved on one GPU, an RTX A6000, pixel for pixel against images painted from the layout rules. Time not measured. | Orthogonal maps draw with `TileMap` and its chunk cache; split a huge view into several targets. |
 
 
 | Limit | Starts at | Why | What you see | Escape hatch |
@@ -8038,7 +8039,7 @@ Build and unit tests: npm test --workspace @margoengine/road
 
 Import `margoengine/tilemap` from the `margoengine` package, or `@margoengine/tilemap` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
-The 2D tile map format every other piece builds on: `TileMapData` holds the tile size, tilesets with per-tile properties, animation and collision shapes, tile layers as `Uint32Array` with Tiled's flip bits, object layers, parallax, offset, opacity and custom properties. The root entry has the types, small helpers and the `TileMap` renderer; auto-tiling and the Tiled importer are their own entries. Orthogonal maps only. (`@margoengine/tiles` is OGC 3D Tiles; this package is unrelated.)
+The 2D tile map format every other piece builds on: `TileMapData` holds the tile size, tilesets with per-tile properties, animation and collision shapes, tile layers as `Uint32Array` with Tiled's flip bits, object layers, parallax, offset, opacity and custom properties. The root entry has the types, small helpers and the `TileMap` renderer; auto-tiling and the Tiled importer are their own entries. `TileMap` draws orthogonal maps; `GridTileMap` of the `iso` entry draws isometric, staggered and hexagonal ones. (`@margoengine/tiles` is OGC 3D Tiles; this package is unrelated.)
 
 ```ts
 import {createTileLayer, encodeTile, FLIP_H, tileAt, validateTileMap, type TileMapData} from 'margoengine/tilemap';
@@ -8093,7 +8094,7 @@ To draw into a compositor layer of `margoengine/pixel`, pass `target: layer.targ
 
 Tiles animate by their `animation` steps on the `time` clock (milliseconds; each frame adds its delta), which changes a small lookup and no cells. A tile larger than the cell sits on the cell's bottom left, as in Tiled. Layer `offset`, `opacity`, `tint`, `visible` and `parallax` and tileset `margin`, `spacing` and `tileOffset` are honoured. Overlapping oversize tiles of different tilesets draw tileset by tileset. Object layers are data only: draw tile objects with `margoengine/sprites`. Image collection tilesets (`columns: 0`) must be packed into one atlas first. After writing into `layer.data` yourself, call `invalidate(layer)`.
 
-## Auto-tiling
+## Isometric, staggered and hexagonal maps
 
 [README continues: https://margoengine.com/llms/packages/tilemap.md]
 

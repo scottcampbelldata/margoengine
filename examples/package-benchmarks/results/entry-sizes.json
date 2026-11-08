@@ -1,5 +1,5 @@
 {
-  "commit": "90fa78d72",
+  "commit": "ed60352d1",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -2690,8 +2690,8 @@
         "gzip": 393
       },
       "./billboard": {
-        "raw": 12630,
-        "gzip": 5140
+        "raw": 12639,
+        "gzip": 5149
       },
       "./shader": {
         "raw": 2130,
@@ -2840,8 +2840,8 @@
     },
     "@margoengine/tilemap": {
       ".": {
-        "raw": 19229,
-        "gzip": 7179
+        "raw": 19581,
+        "gzip": 7303
       },
       "./autotile": {
         "raw": 2789,
@@ -2852,8 +2852,16 @@
         "gzip": 2853
       },
       "./tiled": {
-        "raw": 10019,
-        "gzip": 4033
+        "raw": 10733,
+        "gzip": 4284
+      },
+      "./iso": {
+        "raw": 15484,
+        "gzip": 6379
+      },
+      "./hex": {
+        "raw": 4803,
+        "gzip": 2031
       }
     },
     "@margoengine/tiles": {
