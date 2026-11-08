@@ -5,6 +5,9 @@ import { DOFLens } from '../../dist/lens.js';
 import { Autofocus } from '../../dist/autofocus.js';
 import { TAA } from '../../../taa/dist/index.js';
 
+// ?mode=compat draws on the WebGL2 compatibility layer (compat-check.mjs).
+if (new URLSearchParams(location.search).get('mode') === 'compat')
+  await (await import('../../../webgl2-compat/dist/index.js')).install({ force: true });
 const errors = [],
   white = new PbrMaterial({ color: '#ffffff', emissive: [6, 6, 6], roughness: 1, metalness: 0 });
 addEventListener('error', (e) => errors.push(e.message));
@@ -19,9 +22,10 @@ const settle = async (n = 12) => {
     await new Promise((resolve) => setTimeout(resolve, 5));
   }
 };
-const start = async (boxes) => {
+// exact: one sample (exactSize), so the depth DOF reads is not a multisample resolve.
+const start = async (boxes, exact = false) => {
   engine?.dispose?.();
-  engine = await Engine.create(canvas, { backend: 'webgpu' });
+  engine = await Engine.create(canvas, { backend: 'webgpu', ...(exact && { exactSize: true }) });
   engine.camera.fov = 50;
   engine.camera.near = 0.1;
   engine.camera.far = 100;
@@ -36,6 +40,7 @@ const start = async (boxes) => {
 };
 window.check = {
   errors,
+  vendor: () => engine?.gpu?.adapterInfo?.vendor ?? null,
   // A near box in the middle and a far one to the side: the focus follows the pixel, then a world point.
   async autofocus() {
     await start([
@@ -105,20 +110,29 @@ window.check = {
     });
     await settle(4);
   },
+  // The near box with DOF off: the scene the gathers start from.
+  async sharp() {
+    await start([[0, 0, 7, 0.1]]);
+    DOF.attach(engine, { focalDistance: 20, focalLength: 0.1, aperture: 0.5, maxRadius: 16, enabled: false });
+    await settle(4);
+  },
   // More frames of the current case.
   more: (frames) => settle(frames),
-  // Two boxes at one depth, above and below the middle.
-  async tilt(tilt, focalDistance) {
-    await start([
-      [0, 2.8, 0, 0.3],
-      [0, -2.8, 0, 0.3],
-    ]);
+  // Two boxes at one depth, above and below the middle; tilt null: no lens.
+  async tilt(tilt, focalDistance, maxRadius = 32, exact = false) {
+    await start(
+      [
+        [0, 2.8, 0, 0.3],
+        [0, -2.8, 0, 0.3],
+      ],
+      exact,
+    );
     DOF.attach(engine, {
       focalDistance,
       focalLength: 0.1,
       aperture: 0.05,
-      maxRadius: 32,
-      lens: new DOFLens({ tilt, tiltDirection: [0, -1] }),
+      maxRadius,
+      lens: tilt === null ? undefined : new DOFLens({ tilt, tiltDirection: [0, -1] }),
     });
     await settle(4);
   },

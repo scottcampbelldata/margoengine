@@ -310,6 +310,10 @@ export class DOF implements EnginePlugin {
     v[6] = (v[1] * viewHeight) / (4 * v[2] * (v[0] - v[1]) * Math.tan((c.camera.fov * Math.PI) / 360));
     v[7] = +this.enabled;
     v[8] = 0;
+    // The WebGL2 route's CoC takes the nearest depth of each pixel's neighbours when the capture is multisampled, as
+    // the layer resolves multisampled depth to one sample (./compat.ts). It stays 0 on WebGPU, where the temporal
+    // gathers turn their taps by this slot of their own uniform.
+    v[11] = +(!!this.tilesPipeline && (c.descriptor.multisample?.count ?? 4) > 1);
     // Orthographic clip matrix (e.g. @margoengine/cameras): linear depth and a blur linear in defocus, scaled like a
     // perspective lens whose pixel size at the focal distance matches the orthographic zoom.
     const ortho = orthographic(c.camera.matrix, c.camera.position);

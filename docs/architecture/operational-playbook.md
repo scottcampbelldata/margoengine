@@ -534,6 +534,11 @@ culling and shadows. A CPU-tier kernel that reads a GPU-written resource waits f
 kernel can cost a whole frame: the sky projection cost 57 ms that way. Evidence: `routes.test.js` and the frame budget of
 `visual:compat:budget`; the integrated-GPU budget run is still missing.
 
+A route that reads a resolved multisampled depth must allow for the layer reading it as one sample (WebGL2 cannot
+read one sample of a multisampled texture). DOF's route takes the nearest depth of each pixel and its four neighbours
+when the capture is multisampled; without it silhouette pixels kept the background's depth under the object's colour
+and every far gather drew a faint ring (2026-11-08). Evidence: `packages/dof/tests/gpu/compat-check.mjs`.
+
 Texture read-back left the layer's base on 2026-11-06 (`device/readback.ts`, 70,274 B base): the queue holds a submit
 with a `copyTextureToBuffer` until the chunk has loaded, as it does for compute, and the sizes gate measures the chunk in
 the split's lazy number. Evidence: `tests/lazy-boundary.test.js` and `readbackOrder` in `compute-browser.mjs`.

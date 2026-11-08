@@ -27,6 +27,16 @@ export const cocPixelShader = ({ cocShader, groupMax }: DOFShaders): string =>
     [groupMax, ''],
     [shared, ''],
     ['\n  let m=groupMax(near,local);\n  if(local==0u){textureStore(tiles,vec2i(tile.xy),vec4f(m,0,0,0));}', ''],
+    // The layer reads a multisampled depth texture as its resolved texel, one sample, where the WebGPU route's resolve
+    // keeps the nearest of the four: a silhouette pixel the object only partly covers then holds the background's
+    // depth with the object's colour blended in, and every far gather around it picks that colour up, a faint ring
+    // as wide as maxRadius around each bright object. The nearest depth of the pixel and its four neighbours puts
+    // those pixels back on the object (measured on the M6 Mac mini, Metal: the closest of the 3x3, plus, and one-
+    // sided neighbourhoods to the WebGPU route's pixels). p.ortho.w is 1 when the capture is multisampled.
+    [
+      'let d=textureLoad(depth,vec2i(id.xy),0);',
+      'let at=vec2i(id.xy);var d=textureLoad(depth,at,0);\n    if(p.ortho.w>0.5){let last=vec2i(textureDimensions(depth))-1;for(var k=0;k<4;k++){let o=select(vec2i(0,k*2-1),vec2i(k*2-5,0),k>1);d=max(d,textureLoad(depth,clamp(at+o,vec2i(0),last),0));}}',
+    ],
   ]);
 
 /**

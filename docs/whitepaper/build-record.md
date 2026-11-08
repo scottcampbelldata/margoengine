@@ -2981,3 +2981,37 @@ raw WGSL meshes get an opt-in), and the last of the five to land is job 2.
 - **Limits and unmeasured:** rows in `docs/limits.md` for each job. No multiview path (the engine has none); a move read
   from a storage buffer or texture gets no motion of its own; GPU cost of every option is not measured; nothing was run
   on another machine or in a headset.
+
+## Lane E batch 74: dof
+
+Five jobs for `@margoengine/dof` on the M6 Mac mini (Metal), each landed as one commit. Core and stage are untouched.
+
+| # | Job | Status | Commit | Entry | Claim |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Custom bokeh shapes | DONE | 111db1c7b | `aperture` of `DOFLens` in `@margoengine/dof/lens` | LIM-535 |
+| 2 | Physical camera link | DONE | ee86b87e2 | `filmGauge`, `sensorFit`, `dof.focalLength` in `@margoengine/dof` | LIM-536 |
+| 3 | Temporal DOF | DONE | 252d7d387 | `temporal` in `@margoengine/dof` | LIM-537 |
+| 4 | Optical vignetting and anamorphic bokeh | DONE | ef4403df0 | `catEye`, `anamorphic` of `DOFLens` | LIM-538 |
+| 5 | Lens and autofocus on the WebGL2 layer | DONE (no new entry) | this commit | DOF's lazy WebGL2 route (`src/compat.ts`); proof and docs | LIM-541 |
+
+- **Built from:** `docs/clean-room.md` rows D-06 to D-09: pinhole projection geometry, the thin-lens model already in
+  the package, two-circle mechanical vignetting, and Margo's own design for the aperture mask, its tap spread, the
+  half-resolution gather and the turning taps. Job 5 needed no outside source. Nothing from another engine was read.
+- **Proved (real GPU, this Mac):** `lens-check.mjs` (a half aperture image spreads a near box's bokeh to one side only;
+  the focal length follows the field of view; the half-resolution gather stays within 0.27 sRGB levels of the full one
+  with in-focus pixels byte for byte; cat's eye and anamorphic shapes against the two-circle geometry) and
+  `compat-check.mjs` (eight lens cases drawn natively and on the WebGL2 layer: 0.02% to 0.09% of pixels more than 2
+  levels apart, under the layer's 0.1% rule, the same bokeh extent within 1 px; the scene before the blur and a
+  one-sample capture byte for byte; autofocus 5.5, 14.5 and 3 on both; temporal refused on the layer, coded). Unit
+  tests in `packages/dof/tests/dof.test.js`.
+- **Sizes (gzip budgets, B):** `@margoengine/dof` 7,880 to 9,297, `@margoengine/dof/lens` 1,506 to 3,529,
+  `@margoengine/dof/autofocus` unchanged at 2,154. Core and stage unchanged.
+- **Bugs fixed:** job 5 found that on the WebGL2 layer DOF drew a faint ring as wide as `maxRadius` around every bright
+  object (72 px where WebGPU draws 31). The first guess, a CoC stuck at `-maxRadius`, was wrong: the CoC, the tile
+  maxima and the depth read match WebGPU exactly. The layer reads a multisampled depth as one sample, so silhouette
+  pixels held the background's depth under the object's blended colour, and far gathers took it. DOF's WebGL2 CoC now
+  takes the nearest depth of each pixel and its four neighbours when the capture is multisampled. Regression test:
+  `compat-check.mjs` (`focus` and `focus 1x`); it fails without the fix (0.3% to 1.0% of pixels apart).
+- **Limits and unmeasured:** rows in `docs/limits.md` for each job. On the layer, silhouette pixels of a blur still
+  differ (the four depth samples cannot be rebuilt); temporal DOF is WebGPU only; GPU cost of every option is not
+  measured; nothing was run on another machine.
