@@ -95,9 +95,6 @@ pub struct Body {
     pub awake: bool,
     pub sleep_time: f32,
     pub shapes: Vec<u32>,
-    /// How far the centre of mass has moved this step, and the rotation at the step's start (the solver's).
-    pub(crate) moved: V2,
-    pub(crate) start_rotation: Rot,
 }
 
 impl Body {
@@ -365,8 +362,6 @@ impl World {
             awake: moving,
             sleep_time: 0.0,
             shapes: Vec::new(),
-            moved: V2::ZERO,
-            start_rotation: rotation,
         });
         let id = self.bodies.len() as u32 - 1;
         self.update_mass(id);

@@ -32,6 +32,12 @@
 // loaded ones keep a quarter. This is the 3D kernel's rule for deep piles (eb1947a05, Catto 2024's advice that the soft
 // step's stiffness sit well below the substep rate); the proof is the same: the 20-row pyramid sleeps at one pass, and the
 // 1:100 stack keeps the quarter's small sag (tests/world.rs).
+//
+// The solver works on its own compact copy of the bodies (Catto, "Solver2D", 2024, and "SIMD Matters", 2024, as
+// descriptions of the layout): 28 bytes each, the velocity, the turn, the offset moved this step and the rotation turned
+// this step, the last worked out once a body integrates instead of twice on every visit. A contact's visit reads two of
+// those and its own 128-byte record; the world's large body records are read and written once a substep, and around the
+// joint passes. The same operations in the same order: every bit as before (tests/bits.rs).
 use alloc::vec::Vec;
 
 use crate::joint::{self, Pass};
@@ -76,17 +82,15 @@ struct Point {
     base: f32,
     normal_impulse: f32,
     tangent_impulse: f32,
-    /// The largest normal impulse any substep gave: restitution needs the point to have pushed.
-    max_normal_impulse: f32,
     normal_mass: f32,
     tangent_mass: f32,
-    /// The normal speed at the step's start, before anything was solved: what restitution reverses.
-    approach: f32,
 }
 
+/// One contact as the solver visits it: 128 bytes.
 #[derive(Clone, Copy, Debug)]
 struct Constraint {
     contact: u32,
+    /// The two bodies' places in the solver's list.
     a: u32,
     b: u32,
     inv_mass_a: f32,
@@ -95,28 +99,90 @@ struct Constraint {
     inv_i_b: f32,
     normal: V2,
     friction: f32,
-    restitution: f32,
-    count: usize,
-    points: [Point; 2],
-    /// K for the block solve: k11, k12, k22; `block` when it is well conditioned.
+    /// K for the block solve: k11, k12, k22.
     k: [f32; 3],
+    points: [Point; 2],
+    count: u8,
+    /// Whether K is well conditioned for the block solve.
     block: bool,
-    /// The spring of this pair for the biased passes.
-    spring: Soft,
+    /// Whether the pair takes the eighth-rate spring in the biased passes (else the quarter).
+    eighth: bool,
+    /// Bit k: whether point k has pushed in any substep (restitution needs it).
+    pushed: u8,
+}
+
+/// What restitution needs of a constraint, kept beside it: the pair's restitution and each point's normal speed at the
+/// step's start, before anything was solved (what restitution reverses).
+#[derive(Clone, Copy, Debug)]
+struct Bounce {
+    restitution: f32,
+    approach: [f32; 2],
+}
+
+/// A body as the solver sees it. `moved` is how far its centre of mass has moved this step and `turn` the rotation it
+/// has turned, its rotation now times the inverse of the one at the step's start.
+#[derive(Clone, Copy, Debug)]
+struct SolverBody {
+    v: V2,
+    w: f32,
+    moved: V2,
+    turn: Rot,
 }
 
 /// Lists the solver keeps between steps so a step allocates nothing once the world has settled in size.
 #[derive(Default)]
 pub struct Scratch {
     constraints: Vec<Constraint>,
+    bounces: Vec<Bounce>,
+    /// The solver's bodies; `ids[i]` is the world body of `bodies[i]`, `slot[id]` the place of world body `id` plus 1
+    /// (0: none yet), `start[i]` the rotation at the step's start of the first `moving` bodies, the awake ones that are
+    /// not static. After them come the static and sleeping bodies a contact touches, which never move.
+    bodies: Vec<SolverBody>,
+    ids: Vec<u32>,
+    slot: Vec<u32>,
+    start: Vec<Rot>,
     pub(crate) paths: joint::Paths,
 }
 
-/// Velocity and turn of a body while the solver works, read from and written back to the world.
+/// Velocity and turn of a body while the solver works, read from and written back to the solver's bodies.
 #[derive(Clone, Copy)]
 struct Motion {
     v: V2,
     w: f32,
+}
+
+/// The place of world body `id` in the solver's list, adding it (it does not move this step) when it has none yet.
+fn place(world: &World, bodies: &mut Vec<SolverBody>, ids: &mut Vec<u32>, slot: &mut [u32], id: u32) -> u32 {
+    if slot[id as usize] == 0 {
+        let body = &world.bodies[id as usize];
+        bodies.push(SolverBody {
+            v: body.linear_velocity,
+            w: body.angular_velocity,
+            moved: V2::ZERO,
+            turn: body.xf.q.mul(inverse(body.xf.q)),
+        });
+        ids.push(id);
+        slot[id as usize] = bodies.len() as u32;
+    }
+    slot[id as usize] - 1
+}
+
+/// Writes the solver's velocities to the world's bodies (before a joint pass, and at the end of the step).
+fn write_velocities(world: &mut World, bodies: &[SolverBody], ids: &[u32]) {
+    for (body, &id) in bodies.iter().zip(ids) {
+        let target = &mut world.bodies[id as usize];
+        target.linear_velocity = body.v;
+        target.angular_velocity = body.w;
+    }
+}
+
+/// Reads the world's velocities back into the solver's bodies (after a joint pass).
+fn read_velocities(world: &World, bodies: &mut [SolverBody], ids: &[u32]) {
+    for (body, &id) in bodies.iter_mut().zip(ids) {
+        let source = &world.bodies[id as usize];
+        body.v = source.linear_velocity;
+        body.w = source.angular_velocity;
+    }
 }
 
 #[inline(always)]
@@ -127,12 +193,10 @@ fn speed_at(m: Motion, r: V2) -> V2 {
 
 /// The separation of point `p` of constraint `c` now, from how far each body moved and turned this step.
 #[inline]
-fn gap(world: &World, c: &Constraint, p: &Point) -> f32 {
-    let (ba, bb) = (&world.bodies[c.a as usize], &world.bodies[c.b as usize]);
-    let turn_a = ba.xf.q.mul(inverse(ba.start_rotation));
-    let turn_b = bb.xf.q.mul(inverse(bb.start_rotation));
-    let ra = turn_a.apply(p.anchor_a);
-    let rb = turn_b.apply(p.anchor_b);
+fn gap(bodies: &[SolverBody], c: &Constraint, p: &Point) -> f32 {
+    let (ba, bb) = (&bodies[c.a as usize], &bodies[c.b as usize]);
+    let ra = ba.turn.apply(p.anchor_a);
+    let rb = bb.turn.apply(p.anchor_b);
     let d = bb.moved.add(rb).sub(ba.moved.add(ra));
     c.normal.dot(d) + p.base
 }
@@ -158,7 +222,26 @@ pub fn solve(world: &mut World, dt: f32) {
     let chain_limit = CHAIN_LOAD * h * gravity_length(&settings);
 
     let mut constraints = core::mem::take(&mut world.scratch.constraints);
+    let mut bounces = core::mem::take(&mut world.scratch.bounces);
+    let mut bodies = core::mem::take(&mut world.scratch.bodies);
+    let mut ids = core::mem::take(&mut world.scratch.ids);
+    let mut slot = core::mem::take(&mut world.scratch.slot);
+    let mut start = core::mem::take(&mut world.scratch.start);
     constraints.clear();
+    bounces.clear();
+    bodies.clear();
+    ids.clear();
+    start.clear();
+    slot.clear();
+    slot.resize(world.bodies.len(), 0);
+    // Start of step: every moving body's place, offset and rotation; the bodies after them join as contacts reach them.
+    for (id, body) in world.bodies.iter().enumerate() {
+        if body.kind != Kind::Static && body.awake {
+            place(world, &mut bodies, &mut ids, &mut slot, id as u32);
+            start.push(body.xf.q);
+        }
+    }
+    let moving = bodies.len();
     for (index, contact) in world.contacts.iter().enumerate() {
         if !contact.touching() {
             continue;
@@ -178,21 +261,22 @@ pub fn solve(world: &mut World, dt: f32) {
         let (imb, iib) = if bb.is_dynamic() { (bb.inv_mass, bb.inv_inertia) } else { (0.0, 0.0) };
         let mut c = Constraint {
             contact: index as u32,
-            a,
-            b,
+            a: place(world, &mut bodies, &mut ids, &mut slot, a),
+            b: place(world, &mut bodies, &mut ids, &mut slot, b),
             inv_mass_a: ima,
             inv_i_a: iia,
             inv_mass_b: imb,
             inv_i_b: iib,
             normal: n,
             friction: sqrt_product(sa.friction, sb.friction),
-            restitution: sa.restitution.max(sb.restitution),
-            count: m.count,
-            points: [Point::default(); 2],
             k: [0.0; 3],
+            points: [Point::default(); 2],
+            count: m.count as u8,
             block: false,
-            spring: quarter,
+            eighth: false,
+            pushed: 0,
         };
+        let mut bounce = Bounce { restitution: sa.restitution.max(sb.restitution), approach: [0.0; 2] };
         let (ma, mb) = (Motion { v: ba.linear_velocity, w: ba.angular_velocity }, Motion { v: bb.linear_velocity, w: bb.angular_velocity });
         let mut load = 0.0f32;
         // The manifold's points are relative to A's centre already.
@@ -212,11 +296,10 @@ pub fn solve(world: &mut World, dt: f32) {
                 base: mp.separation - n.dot(rb.sub(ra)),
                 normal_impulse: contact.normal_impulse[k],
                 tangent_impulse: contact.tangent_impulse[k],
-                max_normal_impulse: 0.0,
                 normal_mass: if kn > 0.0 { 1.0 / kn } else { 0.0 },
                 tangent_mass: if kt > 0.0 { 1.0 / kt } else { 0.0 },
-                approach: n.dot(dv),
             };
+            bounce.approach[k] = n.dot(dv);
             load += contact.normal_impulse[k];
         }
         if m.count == 2 {
@@ -229,17 +312,13 @@ pub fn solve(world: &mut World, dt: f32) {
             c.block = settings.block_solver && k11 * k11 < MAX_CONDITION * (k11 * k22 - k12 * k12);
         }
         if passes < 2 && ba.kind == Kind::Dynamic && bb.kind == Kind::Dynamic && load * ima.max(imb) < chain_limit {
-            c.spring = eighth;
+            c.eighth = true;
         }
         constraints.push(c);
+        bounces.push(bounce);
     }
     world.counts.constraints = constraints.len() as u64;
-
-    // Start of step: every moving body's offset and rotation.
-    for body in world.bodies.iter_mut() {
-        body.moved = V2::ZERO;
-        body.start_rotation = body.xf.q;
-    }
+    let joints = !world.joints.is_empty();
 
     let g = settings.gravity;
     let (mut block, mut sequential) = (0u64, 0u64);
@@ -247,40 +326,54 @@ pub fn solve(world: &mut World, dt: f32) {
     let mut paths = core::mem::take(&mut world.scratch.paths);
     joint::build_paths(world, &mut paths);
     let joint_pass = Pass { h, inv_h, biased: false, spring: joint::joint_spring(settings.joint_hertz, settings.joint_damping, h), max_push: settings.joint_max_push };
+    let springs = [quarter, eighth];
+    let max_push = settings.contact_max_push;
     for _ in 0..substeps {
-        for body in world.bodies.iter_mut() {
-            if body.kind != Kind::Dynamic || !body.awake {
+        for (body, &id) in bodies[..moving].iter_mut().zip(&ids) {
+            let source = &world.bodies[id as usize];
+            if source.kind != Kind::Dynamic {
                 continue;
             }
-            let v = body.linear_velocity.add(g.scale(h * body.gravity_scale));
-            body.linear_velocity = v.scale(1.0 / (1.0 + h * body.linear_damping));
-            body.angular_velocity *= 1.0 / (1.0 + h * body.angular_damping);
+            let v = body.v.add(g.scale(h * source.gravity_scale));
+            body.v = v.scale(1.0 / (1.0 + h * source.linear_damping));
+            body.w *= 1.0 / (1.0 + h * source.angular_damping);
         }
         for c in &constraints {
-            warm_start(world, c);
+            warm_start(&mut bodies, c);
         }
-        joint::warm_start(world, &mut paths, h, settings.joint_geometric_stiffness);
+        if joints {
+            write_velocities(world, &bodies, &ids);
+            joint::warm_start(world, &mut paths, h, settings.joint_geometric_stiffness);
+            read_velocities(world, &mut bodies, &ids);
+        }
         for _ in 0..passes {
-            joint::solve(world, &mut paths, &Pass { biased: true, ..joint_pass });
+            if joints {
+                write_velocities(world, &bodies, &ids);
+                joint::solve(world, &mut paths, &Pass { biased: true, ..joint_pass });
+                read_velocities(world, &mut bodies, &ids);
+            }
             for c in constraints.iter_mut() {
-                let (b, s) = solve_contact(world, c, true, inv_h, settings.contact_max_push);
+                let (b, s) = solve_contact(&mut bodies, c, true, inv_h, max_push, &springs);
                 block += b;
                 sequential += s;
             }
         }
-        for body in world.bodies.iter_mut() {
-            if body.kind == Kind::Static || !body.awake {
-                continue;
-            }
-            let step = body.linear_velocity.scale(h);
-            body.exact_center = [body.exact_center[0] + step.x as f64, body.exact_center[1] + step.y as f64];
+        for ((body, &id), start) in bodies[..moving].iter_mut().zip(&ids).zip(&start) {
+            let target = &mut world.bodies[id as usize];
+            let step = body.v.scale(h);
+            target.exact_center = [target.exact_center[0] + step.x as f64, target.exact_center[1] + step.y as f64];
             body.moved = body.moved.add(step);
-            body.xf.q = body.xf.q.integrate(h * body.angular_velocity);
+            target.xf.q = target.xf.q.integrate(h * body.w);
+            body.turn = target.xf.q.mul(inverse(*start));
         }
         for _ in 0..passes {
-            joint::solve(world, &mut paths, &joint_pass);
+            if joints {
+                write_velocities(world, &bodies, &ids);
+                joint::solve(world, &mut paths, &joint_pass);
+                read_velocities(world, &mut bodies, &ids);
+            }
             for c in constraints.iter_mut() {
-                let (b, s) = solve_contact(world, c, false, inv_h, settings.contact_max_push);
+                let (b, s) = solve_contact(&mut bodies, c, false, inv_h, max_push, &springs);
                 block += b;
                 sequential += s;
             }
@@ -290,38 +383,42 @@ pub fn solve(world: &mut World, dt: f32) {
     world.counts.sequential = sequential;
 
     let threshold = settings.restitution_threshold;
-    for c in constraints.iter_mut() {
-        if c.restitution == 0.0 {
+    for (c, bounce) in constraints.iter_mut().zip(&bounces) {
+        if bounce.restitution == 0.0 {
             continue;
         }
-        let (mut ma, mut mb) = motions(world, c);
-        for k in 0..c.count {
+        let (mut ma, mut mb) = motions(&bodies, c);
+        for k in 0..c.count as usize {
             let p = c.points[k];
-            if p.approach > -threshold || p.max_normal_impulse == 0.0 {
+            if bounce.approach[k] > -threshold || c.pushed & (1 << k) == 0 {
                 continue;
             }
             let vn = c.normal.dot(speed_at(mb, p.anchor_b).sub(speed_at(ma, p.anchor_a)));
-            let impulse = -p.normal_mass * (vn + c.restitution * p.approach);
+            let impulse = -p.normal_mass * (vn + bounce.restitution * bounce.approach[k]);
             let total = (p.normal_impulse + impulse).max(0.0);
             c.points[k].normal_impulse = total;
             apply(c, &mut ma, &mut mb, &p, c.normal.scale(total - p.normal_impulse));
         }
-        store(world, c, ma, mb);
+        store(&mut bodies, c, ma, mb);
     }
+    write_velocities(world, &bodies, &ids);
 
     for c in &constraints {
         let contact = &mut world.contacts[c.contact as usize];
-        for k in 0..c.count {
+        for k in 0..c.count as usize {
             contact.normal_impulse[k] = c.points[k].normal_impulse;
             contact.tangent_impulse[k] = c.points[k].tangent_impulse;
         }
     }
-    for body in world.bodies.iter_mut() {
-        if body.kind != Kind::Static && body.awake {
-            body.round_pose();
-        }
+    for &id in &ids[..moving] {
+        world.bodies[id as usize].round_pose();
     }
     world.scratch.constraints = constraints;
+    world.scratch.bounces = bounces;
+    world.scratch.bodies = bodies;
+    world.scratch.ids = ids;
+    world.scratch.slot = slot;
+    world.scratch.start = start;
     world.scratch.paths = paths;
 }
 
@@ -332,22 +429,22 @@ fn sqrt_product(a: f32, b: f32) -> f32 {
 }
 
 #[inline(always)]
-fn motions(world: &World, c: &Constraint) -> (Motion, Motion) {
-    let (ba, bb) = (&world.bodies[c.a as usize], &world.bodies[c.b as usize]);
-    (Motion { v: ba.linear_velocity, w: ba.angular_velocity }, Motion { v: bb.linear_velocity, w: bb.angular_velocity })
+fn motions(bodies: &[SolverBody], c: &Constraint) -> (Motion, Motion) {
+    let (ba, bb) = (&bodies[c.a as usize], &bodies[c.b as usize]);
+    (Motion { v: ba.v, w: ba.w }, Motion { v: bb.v, w: bb.w })
 }
 
 #[inline(always)]
-fn store(world: &mut World, c: &Constraint, ma: Motion, mb: Motion) {
+fn store(bodies: &mut [SolverBody], c: &Constraint, ma: Motion, mb: Motion) {
     if c.inv_mass_a > 0.0 || c.inv_i_a > 0.0 {
-        let body = &mut world.bodies[c.a as usize];
-        body.linear_velocity = ma.v;
-        body.angular_velocity = ma.w;
+        let body = &mut bodies[c.a as usize];
+        body.v = ma.v;
+        body.w = ma.w;
     }
     if c.inv_mass_b > 0.0 || c.inv_i_b > 0.0 {
-        let body = &mut world.bodies[c.b as usize];
-        body.linear_velocity = mb.v;
-        body.angular_velocity = mb.w;
+        let body = &mut bodies[c.b as usize];
+        body.v = mb.v;
+        body.w = mb.w;
     }
 }
 
@@ -360,50 +457,51 @@ fn apply(c: &Constraint, ma: &mut Motion, mb: &mut Motion, p: &Point, j: V2) {
     mb.w += c.inv_i_b * p.anchor_b.cross(j);
 }
 
-fn warm_start(world: &mut World, c: &Constraint) {
-    let (mut ma, mut mb) = motions(world, c);
+fn warm_start(bodies: &mut [SolverBody], c: &Constraint) {
+    let (mut ma, mut mb) = motions(bodies, c);
     let t = c.normal.right();
-    for p in &c.points[..c.count] {
+    for p in &c.points[..c.count as usize] {
         let j = c.normal.scale(p.normal_impulse).add(t.scale(p.tangent_impulse));
         apply(c, &mut ma, &mut mb, p, j);
     }
-    store(world, c, ma, mb);
+    store(bodies, c, ma, mb);
 }
 
 /// One row's terms: the bias, and the soft scales (1 and 0 for a rigid row).
 #[inline(always)]
-fn row(c: &Constraint, s: f32, biased: bool, inv_h: f32, max_push: f32) -> (f32, f32, f32) {
+fn row(spring: &Soft, s: f32, biased: bool, inv_h: f32, max_push: f32) -> (f32, f32, f32) {
     if s > 0.0 {
         (s * inv_h, 1.0, 0.0)
     } else if biased {
-        ((c.spring.bias_rate * s).max(-max_push), c.spring.mass_scale, c.spring.impulse_scale)
+        ((spring.bias_rate * s).max(-max_push), spring.mass_scale, spring.impulse_scale)
     } else {
         (0.0, 1.0, 0.0)
     }
 }
 
 /// One pass over one contact: friction and normal, in the pass's order. Returns (block solves, sequential fallbacks).
-fn solve_contact(world: &mut World, c: &mut Constraint, biased: bool, inv_h: f32, max_push: f32) -> (u64, u64) {
-    let (mut ma, mut mb) = motions(world, c);
+fn solve_contact(bodies: &mut [SolverBody], c: &mut Constraint, biased: bool, inv_h: f32, max_push: f32, springs: &[Soft; 2]) -> (u64, u64) {
+    let (mut ma, mut mb) = motions(bodies, c);
     let mut gaps = [0.0f32; 2];
-    for k in 0..c.count {
-        gaps[k] = gap(world, c, &c.points[k]);
+    for k in 0..c.count as usize {
+        gaps[k] = gap(bodies, c, &c.points[k]);
     }
     if biased {
         friction(c, &mut ma, &mut mb);
     }
-    let counts = normal(c, &mut ma, &mut mb, gaps, biased, inv_h, max_push);
+    let spring = &springs[c.eighth as usize];
+    let counts = normal(c, &mut ma, &mut mb, gaps, biased, inv_h, max_push, spring);
     if !biased {
         friction(c, &mut ma, &mut mb);
     }
-    store(world, c, ma, mb);
+    store(bodies, c, ma, mb);
     counts
 }
 
 fn friction(c: &mut Constraint, ma: &mut Motion, mb: &mut Motion) {
     let t = c.normal.right();
     let mu = c.friction;
-    for k in 0..c.count {
+    for k in 0..c.count as usize {
         let p = c.points[k];
         let vt = t.dot(speed_at(*mb, p.anchor_b).sub(speed_at(*ma, p.anchor_a)));
         let limit = mu * p.normal_impulse;
@@ -415,12 +513,12 @@ fn friction(c: &mut Constraint, ma: &mut Motion, mb: &mut Motion) {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn normal(c: &mut Constraint, ma: &mut Motion, mb: &mut Motion, gaps: [f32; 2], biased: bool, inv_h: f32, max_push: f32) -> (u64, u64) {
+fn normal(c: &mut Constraint, ma: &mut Motion, mb: &mut Motion, gaps: [f32; 2], biased: bool, inv_h: f32, max_push: f32, spring: &Soft) -> (u64, u64) {
     let n = c.normal;
     if c.count == 2 && c.block {
         let (p, q) = (c.points[0], c.points[1]);
-        let (b1, ms1, is1) = row(c, gaps[0], biased, inv_h, max_push);
-        let (b2, ms2, is2) = row(c, gaps[1], biased, inv_h, max_push);
+        let (b1, ms1, is1) = row(spring, gaps[0], biased, inv_h, max_push);
+        let (b2, ms2, is2) = row(spring, gaps[1], biased, inv_h, max_push);
         let [k11, k12, k22] = c.k;
         // The soft rows' diagonal terms k_ii / a2 = k_ii (impulse scale / mass scale).
         let m11 = k11 + k11 * (is1 / ms1);
@@ -458,32 +556,42 @@ fn normal(c: &mut Constraint, ma: &mut Motion, mb: &mut Motion, gaps: [f32; 2], 
             let (d1, d2) = (x1 - l1, x2 - l2);
             c.points[0].normal_impulse = x1;
             c.points[1].normal_impulse = x2;
-            c.points[0].max_normal_impulse = c.points[0].max_normal_impulse.max(x1);
-            c.points[1].max_normal_impulse = c.points[1].max_normal_impulse.max(x2);
+            c.pushed |= (x1 > 0.0) as u8 | ((x2 > 0.0) as u8) << 1;
             apply(c, ma, mb, &p, n.scale(d1));
             apply(c, ma, mb, &q, n.scale(d2));
             return (1, 0);
         }
         // Rounding left no case standing: the rows one at a time.
-        sequential_normal(c, ma, mb, gaps, biased, inv_h, max_push);
+        sequential_normal(c, ma, mb, gaps, biased, inv_h, max_push, spring);
         return (0, 1);
     }
-    sequential_normal(c, ma, mb, gaps, biased, inv_h, max_push);
+    sequential_normal(c, ma, mb, gaps, biased, inv_h, max_push, spring);
     (0, (c.count == 2) as u64)
 }
 
 #[allow(clippy::too_many_arguments)]
-fn sequential_normal(c: &mut Constraint, ma: &mut Motion, mb: &mut Motion, gaps: [f32; 2], biased: bool, inv_h: f32, max_push: f32) {
+fn sequential_normal(c: &mut Constraint, ma: &mut Motion, mb: &mut Motion, gaps: [f32; 2], biased: bool, inv_h: f32, max_push: f32, spring: &Soft) {
     let n = c.normal;
-    for k in 0..c.count {
+    for k in 0..c.count as usize {
         let p = c.points[k];
-        let (bias, mass_scale, impulse_scale) = row(c, gaps[k], biased, inv_h, max_push);
+        let (bias, mass_scale, impulse_scale) = row(spring, gaps[k], biased, inv_h, max_push);
         let vn = n.dot(speed_at(*mb, p.anchor_b).sub(speed_at(*ma, p.anchor_a)));
         let impulse = -p.normal_mass * mass_scale * (vn + bias) - impulse_scale * p.normal_impulse;
         let total = (p.normal_impulse + impulse).max(0.0);
         let applied = total - p.normal_impulse;
         c.points[k].normal_impulse = total;
-        c.points[k].max_normal_impulse = c.points[k].max_normal_impulse.max(total);
+        c.pushed |= ((total > 0.0) as u8) << k;
         apply(c, ma, mb, &p, n.scale(applied));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_visit_reads_two_28_byte_bodies_and_a_128_byte_contact() {
+        assert_eq!(core::mem::size_of::<SolverBody>(), 28);
+        assert_eq!(core::mem::size_of::<Constraint>(), 128);
     }
 }

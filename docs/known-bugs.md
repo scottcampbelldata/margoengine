@@ -799,8 +799,10 @@ Measured but not fixed. Their history, sources and rerun commands are in
   perf history entry 83): repro `cargo test --release --manifest-path packages/physics2d/kernel/Cargo.toml --test broad
   -- --include-ignored --nocapture`. Cause, measured: the broad phase was 1.03 ms of 7.2 and now takes 0.29 (the box
   tree); the solver takes 5.1 ms, 14,000 contacts over 4 substeps, each reading and writing the world's large body
-  records. Fix planned with the 2D Wasm layout (batch 127, part 6): compact solver bodies, then the contacts in
-  colour groups solved several at a time with SIMD.
+  records. Compact solver bodies (perf history entry 85) took the body records off the contact visit with every bit
+  the same, and the step barely moved (7.07 against 7.14 ms, paired): each visit waits on the one before it, which
+  wrote the same bodies, so the visits run one after another whatever their size. Fix planned: the contacts in
+  colour groups, no two in a group sharing a moving body, solved four at a time with SIMD (batch 127, part 6).
 
 - **Own convex decomposition builds 5 to 120 times slower than Rapier's V-HACD** (`@margoengine/physics/decomposition`,
   perf history entry 81): repro `node packages/physics/scripts/decomposition-vs-rapier.mjs` after the physics build;

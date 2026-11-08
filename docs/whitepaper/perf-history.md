@@ -2004,12 +2004,35 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
   against 1,441. The 20-row pyramid: top 28.41 mm (28.37 before), asleep at 0.75 s, unchanged.
 - **Rerun:** `cargo test --release --manifest-path packages/physics2d/kernel/Cargo.toml --test world -- --nocapture`.
 
+### 85. Own 2D physics solver: compact solver bodies (work count, the same bits; the 100-row pyramid's loss stays open)
+
+- **Before (`f4635b802`):** every contact visit read and wrote the world's 144-byte body records and turned both
+  anchors by a rotation worked out again on each visit (the rotation now times the inverse of the step's start, two
+  products a point a pass); a contact record was 168 bytes.
+- **Change:** `packages/physics2d/kernel/src/solver.rs` keeps its own list of 28-byte bodies (velocity, turn rate,
+  offset moved this step, rotation turned this step), the moving ones first, then the static and sleeping bodies a
+  contact touches; the turned rotation is worked out once a body integrates. A contact record is 128 bytes (restitution's
+  terms sit beside it; the largest impulse became a pushed bit). The world's records are read and written once a
+  substep, and around the joint passes. The same operations in the same order.
+- **Work, counted:** a visit reads two 28-byte bodies and a 128-byte record, where it read two 144-byte records and a
+  168-byte one (`solver.rs`'s size test); rotations worked out on the 100-row pyramid's 14,946 contacts, mostly two
+  points, at 4 substeps of two solving passes: up to 478,000 a step down to 20,200 (5,050 bodies, 4 substeps). Bits
+  pinned before the change and unchanged after it on the 100-row pyramid, the joint grid and a mixed scene (chain floor,
+  kinematic paddle, restitution, a jointed chain hitting the floor), counts included (`tests/bits.rs`).
+- **Time (paired, native, the parent's and this commit's test binaries in turns, 15 rounds, per-round minimums of 40
+  steps, busy machine, diagnostic):** step 7.07 ms median against 7.14 (best 6.84 against 6.99), inside the
+  round-to-round spread. The visits are a chain: each reads the bodies the one before it wrote, so they run one after
+  another whatever their size. Graph colouring and four lanes are next (known-bugs).
+- **Rerun:** `cargo test --release --manifest-path packages/physics2d/kernel/Cargo.toml --test bits -- --include-ignored
+  --nocapture` at both commits, in turns.
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).
 
 - **Own 2D physics, the 100-row pyramid: 6.7 ms a step against Box2D v3's 1.02 ms (entry 83).** Native, busy machine,
-  diagnostic. The broad phase is fixed; the solver takes 5.1 ms of the step. Rerun: as entry 83.
+  diagnostic. The broad phase is fixed; the solver takes 5.1 ms of the step; compact solver bodies (entry 85) left it
+  near 7 ms. Rerun: as entries 83 and 85.
 
 - **Own convex decomposition against Rapier's V-HACD (entry 81).** 1.1 to 17.3 s where Rapier takes 0.1 to 0.3 s on five
   meshes of 72 to 2,304 triangles, with fewer or as many parts. Cause: 500 tree-search iterations per cut with a hull per
