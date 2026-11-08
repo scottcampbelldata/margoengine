@@ -2662,6 +2662,10 @@
       "types": "./dist/taa/upscale.d.ts",
       "import": "./dist/taa/upscale.js"
     },
+    "./taa/sharpen": {
+      "types": "./dist/taa/sharpen.d.ts",
+      "import": "./dist/taa/sharpen.js"
+    },
     "./terrain": {
       "types": "./dist/terrain.d.ts",
       "import": "./dist/terrain.js"

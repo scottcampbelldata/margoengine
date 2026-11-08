@@ -356,7 +356,13 @@ test('split steps cover the whole suite: both bevel sample counts, each chain pa
   // TAA's browser checks, one step each.
   assert.deepEqual(
     splitSteps(byId('taa/test:gpu')).map((s) => s.command.replace('cd ../.. && node packages/taa/test/', '')),
-    ['upscale-browser.mjs', 'velocity-only-browser.mjs', 'reactive-browser.mjs', 'rejection-browser.mjs'],
+    [
+      'upscale-browser.mjs',
+      'velocity-only-browser.mjs',
+      'reactive-browser.mjs',
+      'rejection-browser.mjs',
+      'sharpen-browser.mjs',
+    ],
   );
 });
 

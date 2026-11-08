@@ -81,6 +81,21 @@ export interface TAAOptions {
    * Default false.
    */
   locks?: boolean;
+  /**
+   * A step in TAA's present pass, such as `new Sharpen()` from `@margoengine/taa/sharpen`: it changes only the frame
+   * shown, never the history. Fixed at construction. Default none.
+   */
+  present?: TAAPresent;
+}
+/**
+ * A step run in TAA's present pass ({@link TAAOptions.present}): `code` rewrites the present shader once per pipeline,
+ * and `values` gives a 16-byte uniform, bound at group 0 binding 1, written every frame. `Sharpen` is one.
+ */
+export interface TAAPresent {
+  /** The present shader with the step in it; binding 0 of `present` is TAA's resolved linear frame. */
+  code(present: string): string;
+  /** This frame's uniform, 4 floats; may throw RangeError for an invalid setting before any GPU command. */
+  values(): Float32Array;
 }
 /** A drawable whose per-vertex motion TAA tracks: the `shadowPrimitives` contract of core and gltf-pro meshes. */
 export interface VelocityPrimitive extends CasterCutout {
@@ -212,6 +227,8 @@ export class TAA implements EnginePlugin {
   private cameraGroup?: GPUBindGroup;
   private resolveGroups: GPUBindGroup[] = [];
   private presentGroups: GPUBindGroup[] = [];
+  /** The `present` step's uniform; made only when the option is set. */
+  private presentUniform?: GPUBuffer;
   private depthSource?: GPUTexture;
   private motionViews: GPUTextureView[] = [];
   private motionResolve?: GPURenderPipeline;
@@ -287,6 +304,12 @@ export class TAA implements EnginePlugin {
       throw new RangeError('Invalid TAA clipGamma; pass a number from 0.5 to 4.');
     if (o.locks !== undefined && typeof o.locks !== 'boolean')
       throw new TypeError('Invalid TAA locks; pass true or false.');
+    if (o.present !== undefined && (typeof o.present?.code !== 'function' || typeof o.present.values !== 'function'))
+      throw new TypeError('Invalid TAA present; pass a present step such as new Sharpen() from @margoengine/taa/sharpen.');
+    if (o.present && o.velocityOnly)
+      throw new TypeError('TAA velocityOnly presents nothing, so a present step has no effect; drop present or velocityOnly.');
+    // Checked here too, so a bad setting throws before this frame's first GPU command.
+    o.present?.values();
     if (o.reactive && o.velocityOnly)
       throw new TypeError('TAA velocityOnly resolves nothing, so a reactive mask has no effect; drop reactive or velocityOnly.');
     if (o.stochastic !== undefined && typeof o.stochastic !== 'boolean')
@@ -539,7 +562,10 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
       });
     }
     if (!only) {
-      const module = c.device.createShaderModule({ code: present });
+      const step = this.options.present;
+      const module = c.device.createShaderModule({ code: step ? step.code(present) : present });
+      if (step && !this.presentUniform)
+        this.presentUniform = c.device.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
       this.presentPipeline = c.device.createRenderPipeline({
         layout: 'auto',
         vertex: { module, entryPoint: 'vertex' },
@@ -549,7 +575,10 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
       this.presentGroups = this.histories.map((t) =>
         c.device.createBindGroup({
           layout: this.presentPipeline!.getBindGroupLayout(0),
-          entries: [{ binding: 0, resource: t.createView() }],
+          entries: [
+            { binding: 0, resource: t.createView() },
+            ...(this.presentUniform ? [{ binding: 1, resource: { buffer: this.presentUniform } }] : []),
+          ],
         }),
       );
     }
@@ -989,6 +1018,7 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
         compute.dispatchWorkgroups(Math.ceil(c.width / 8), Math.ceil(c.height / 8));
         compute.end();
         const next = 1 - this.front;
+        if (this.presentUniform) c.device.queue.writeBuffer(this.presentUniform, 0, this.options.present!.values());
         const pass = c.encoder.beginRenderPass({
           colorAttachments: [{ view: this.original!, loadOp: viewLoadOp(c, 'clear'), storeOp: 'store' }],
         });
@@ -1055,6 +1085,8 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
         r.source?.destroy();
       }
     this.uniform?.destroy();
+    this.presentUniform?.destroy();
+    this.presentUniform = undefined;
     this.objectCamera?.destroy();
     this.objectCamera = undefined;
     this.textures = [];

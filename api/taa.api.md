@@ -38,6 +38,12 @@ export interface TAAOptions {
     rejection?: 'clamp' | 'variance';
     clipGamma?: number;
     locks?: boolean;
+    present?: TAAPresent;
+}
+
+export interface TAAPresent {
+    code(present: string): string;
+    values(): Float32Array;
 }
 
 export interface TAAVelocity {

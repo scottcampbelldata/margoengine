@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11246588,
+  "total": 11247611,
   "history": [
     {
       "date": "2026-10-24",
@@ -4382,6 +4382,12 @@
       "commit": "f56f11c09",
       "reason": "biomes/settlements new entry (batch 63 job 3): village sites, terrain-following road network, lanes and house lots",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "4d7267a81",
+      "reason": "new entry @margoengine/taa/sharpen (Sharpen, batch 73 job 4)",
+      "grew": 1
     }
   ],
   "items": {
@@ -5048,6 +5054,7 @@
     "@margoengine/stats/phases": 1714,
     "@margoengine/stats/report": 1378,
     "@margoengine/taa": 13858,
+    "@margoengine/taa/sharpen": 1023,
     "@margoengine/taa/upscale": 7093,
     "@margoengine/terrain": 12874,
     "@margoengine/terrain/blend": 3676,

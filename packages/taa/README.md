@@ -95,6 +95,23 @@ const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElemen
 TAA.attach(engine, {rejection: 'variance', clipGamma: 1.25, locks: true});
 ```
 
+`@margoengine/taa/sharpen` adds a contrast-adaptive sharpen after TAA at native resolution, for the softness history
+blending leaves. `present: new Sharpen({amount})` (0 off to 1, default 0.3, read every frame from `sharpen.amount`) runs
+an unsharp mask on the four neighbours in TAA's present pass. Its strength falls as a pixel's neighbourhood nears black
+or white, and the result is clamped to that neighbourhood's range, so it adds no halo and never clips. Only the frame
+shown is sharpened, never the history, so it does not build up from frame to frame. `TAAUpscale` uses the same function
+for its `sharpen` option. `present` is fixed at construction; without it TAA's GPU work is unchanged.
+
+```ts
+import {EngineKernel} from 'margoengine/core';
+import {TAA} from 'margoengine/taa';
+import {Sharpen} from 'margoengine/taa/sharpen';
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
+const sharpen = new Sharpen({amount: 0.4});
+TAA.attach(engine, {present: sharpen});
+sharpen.amount = 0.6; // takes effect next frame
+```
+
 `gpuState` exposes velocity, current history color and history depth textures after rendering. `dispose()`/`destroy()` releases owned buffers, textures and source records. Device restoration recreates everything and discards stale history. The package is independent of PBR, animation, shadows, clustered lighting, particles and stage; helper-only imports discard the renderer. It follows the workspace's `@margoengine/*` naming convention.
 
 ## Upscaling: `TAAUpscale`

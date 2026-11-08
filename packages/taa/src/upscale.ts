@@ -2,8 +2,9 @@
 // Temporal upscaling: the scene renders jittered at a lower size and accumulates at output size. Sample weights and
 // the jitter idea after B. Karis, "High Quality Temporal Supersampling" (SIGGRAPH 2014); the neighbourhood range after
 // M. Salvi, "An Excursion in Temporal Supersampling" (GDC 2016, variance clipping); history reads with a Catmull-Rom
-// spline (Catmull & Rom 1974). A sample counts by its distance in output pixels, so jittered samples land as detail. The sharpen is an unsharp mask whose strength falls as a pixel's neighbours near the
-// ends of the display range. The spatial path is Lanczos-2 (Duchon 1979).
+// spline (Catmull & Rom 1974). A sample counts by its distance in output pixels, so jittered samples land as detail. The sharpen
+// (./cas.ts, shared with `Sharpen`) is an unsharp mask whose strength falls as a pixel's neighbours near the ends of the
+// display range. The spatial path is Lanczos-2 (Duchon 1979).
 import type { EngineKernel } from '@margoengine/core';
 import {
   engineRuntime,
@@ -17,6 +18,7 @@ import { MargoError } from '@margoengine/math/errors';
 import { SceneTarget } from '../../shared/msaa.js';
 import { halton } from './jitter.js';
 import { color, fullscreen } from './shader.js';
+import { sharpenCode } from './cas.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number; STORAGE_BINDING: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
@@ -101,17 +103,9 @@ const present = `${fullscreen}
 override manualSRGB:bool=true;
 @group(0) @binding(0) var<uniform> sharpen:vec4f;
 @group(0) @binding(1) var image:texture_2d<f32>;
+${sharpenCode}
 @fragment fn fragment(i:Fullscreen)->@location(0) vec4f {
- let p=vec2i(i.clip.xy);let top=vec2i(textureDimensions(image))-1;
- let c=textureLoad(image,p,0).rgb;var out=c;
- if(sharpen.x>0){
-  let n=textureLoad(image,clamp(p-vec2i(0,1),vec2i(0),top),0).rgb;let s=textureLoad(image,clamp(p+vec2i(0,1),vec2i(0),top),0).rgb;
-  let w=textureLoad(image,clamp(p-vec2i(1,0),vec2i(0),top),0).rgb;let e=textureLoad(image,clamp(p+vec2i(1,0),vec2i(0),top),0).rgb;
-  let lo=min(c,min(min(n,s),min(w,e)));let hi=max(c,max(max(n,s),max(w,e)));
-  let room=saturate(min(lo,1-hi)/max(hi,vec3f(0.0001)));let k=-0.2*sharpen.x*room;
-  out=clamp((c+k*(n+s+w+e))/(1+4*k),lo,hi);
- }
- out=max(out,vec3f(0));
+ let out=max(margoSharpen(image,vec2i(i.clip.xy),sharpen.x),vec3f(0));
  return vec4f(select(out,select(out*12.92,1.055*pow(out,vec3f(1.0/2.4))-0.055,out>=vec3f(0.0031308)),manualSRGB),1);
 }`;
 
