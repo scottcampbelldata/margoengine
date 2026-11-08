@@ -1250,6 +1250,10 @@
       "types": "./dist/html.d.ts",
       "import": "./dist/html.js"
     },
+    "./html/texture": {
+      "types": "./dist/html/texture.d.ts",
+      "import": "./dist/html/texture.js"
+    },
     "./input": {
       "types": "./dist/input.d.ts",
       "import": "./dist/input.js"
