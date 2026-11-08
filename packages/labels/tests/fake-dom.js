@@ -56,12 +56,21 @@ export class FakeElement {
       this.parentElement = null;
     }
   }
+  // Rects follow CSS scales with transform-origin 0 0: `cssScale` (a test's own scale transform) and a `scale(k)`
+  // in the style transform scale the element and its children; the position comes from the parent's scale.
   getBoundingClientRect() {
     if (this.fixedRect) return { ...this.fixedRect };
-    const parent = this.parentElement?.getBoundingClientRect() ?? { left: 0, top: 0 };
+    const parent = this.parentElement?.getBoundingClientRect() ?? { left: 0, top: 0, scale: 1 };
+    const outer = parent.scale ?? 1,
+      transform = /^scale\(([-\d.e+]+)\)$/.exec(this.style.transform ?? ''),
+      scale = outer * (this.cssScale ?? 1) * (transform ? Number(transform[1]) : 1),
+      width = parseFloat(this.style.width),
+      height = parseFloat(this.style.height);
     return {
-      left: parent.left + (parseFloat(this.style.left) || 0),
-      top: parent.top + (parseFloat(this.style.top) || 0),
+      left: parent.left + (parseFloat(this.style.left) || 0) * outer,
+      top: parent.top + (parseFloat(this.style.top) || 0) * outer,
+      ...(Number.isFinite(width) ? { width: width * scale, height: height * scale } : {}),
+      scale,
     };
   }
   setAttribute(name, value) {

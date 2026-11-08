@@ -39,7 +39,7 @@ engine.removePlugin(labels.name); // or engine.dispose(): removes every element 
 
 ## How it works
 
-- **Overlay.** `setup` inserts one `div` right after the canvas (or into `parent`), absolutely positioned over the canvas content box with `pointer-events: none` and `overflow: hidden`. Each frame it measures the canvas and corrects the overlay offset, so it stays aligned inside any containing block, border or padding.
+- **Overlay.** `setup` inserts one `div` right after the canvas (or into `parent`), absolutely positioned over the canvas content box with `pointer-events: none` and `overflow: hidden`. Each frame it measures the canvas and corrects the overlay offset, so it stays aligned inside any containing block, border or padding, and under a CSS `scale()` on the canvas's ancestors (see [Scaled pages](#scaled-pages)).
 - **Projection.** A frame pass (order 1000, after the scene) projects every label with `camera.matrix`: reversed-Z WebGPU clip space (z from 0 to w) or WebGL2 clip space (z from -w to w), chosen from `engine.backend`. Labels behind the camera are always hidden; labels outside the frustum are hidden unless `frustumCulling: false`. Mesh labels read `engineRuntime(engine).store.matrices`, so they follow parents, rotation and scale, and hide while the mesh or an ancestor is hidden (`followVisibility`) or once the mesh is disposed.
 - **Placement.** `transform: translate(x, y) [scale(s)] translate(-anchorX%, -anchorY%)` with `transform-origin: 0 0`, so the anchor point of the element sits exactly on the projected point, with or without distance scaling.
 - **Depth order.** Visible labels are sorted by distance to the camera every frame and get `z-index` 1..n, nearest on top. `sort: false` leaves a label's z-index alone.
@@ -48,6 +48,29 @@ engine.removePlugin(labels.name); // or engine.dispose(): removes every element 
 - **Minimal DOM writes.** Every style property is cached per element and written only when its string changes; `renderer.writes` reports how many writes the last update made (0 on a static frame).
 - **Engine views.** `new LabelRenderer({view})` (or `labels.view = {camera, viewport, pixels?}`) places labels through that view's camera inside its rectangle, clipped to it; hook coordinates are then relative to the view's corner. One renderer per view.
 - **Occlusion hook.** Depth-buffer occlusion is not built in. `occlude(label, {x, y, depth, distance, world})` on the renderer or a label returns true to hide that label this frame; the per-label hook overrides the renderer one.
+
+## Scaled pages
+
+A CSS scale on an element around the canvas (a zoomed preview, a slide, a fitted dashboard tile) scales what the browser draws but not the `left` and `top` the overlay is placed with. Each update the renderer reads the overlay's drawn width against the width it gave it, converts its correction by that scale, and lands on the canvas content box in the same update at any scale. An overlay in another `parent`, outside the scaled element, is scaled itself (`transform: scale(k)`, origin at its corner) so a CSS pixel of the labels is a CSS pixel of the canvas.
+
+```ts
+import {LabelRenderer} from 'margoengine/labels';
+import {Engine} from 'margoengine/core';
+const canvas = document.querySelector('canvas')!;
+const engine = await Engine.create(canvas);
+
+canvas.parentElement!.style.transformOrigin = '0 0';
+canvas.parentElement!.style.transform = 'scale(0.75)'; // a zoomed-out preview
+const tag = (text: string) => Object.assign(document.createElement('div'), {textContent: text});
+const beside = LabelRenderer.attach(engine); // beside the canvas: shares its scale
+beside.add(tag('Pump 3'), {position: [0, 1, 0]});
+const outside = LabelRenderer.attach(engine, {parent: document.body, name: 'labels-outside'}); // scaled to match
+outside.add(tag('Valve'), {position: [1, 0, 0]});
+```
+
+- **Beside the canvas** (the default) the overlay shares the canvas's ancestors and needs no scale of its own; no `transform` is written on it.
+- **Another parent.** The canvas's scale is its drawn width over `offsetWidth`, which the browser rounds to whole pixels, so a canvas of fractional CSS width is matched to about half a pixel over its width.
+- **Not followed.** Rotations and skews on the ancestors, and a transform on the canvas element itself.
 
 ## Decluttering
 
@@ -187,13 +210,13 @@ panel.remeasure(); // its size changed: measure it again at the next update
 ## Limits
 
 - CSS 3D objects are not depth-tested per pixel against WebGL/WebGPU geometry and sit above the canvas; the `occlude` hook hides a whole object. They are cut at the near plane by their rectangle, so content painted outside the element box (shadows, overflow) is cut with it.
-- Overlay alignment assumes no CSS scale transform on the canvas's ancestors.
+- Overlay alignment follows CSS scales on the canvas's ancestors, not rotations, skews or a transform on the canvas itself.
 - Occlusion against scene geometry is left to the `occlude` hook.
 - Leader lines are straight and drawn under every label; nothing keeps them from crossing labels or each other.
 - Decluttering tests the element's box, not its painted shape, and measures it once; a box that changes size needs `remeasure()`.
 
 ## Tests
 
-`npm test` in `packages/labels` runs Node checks: `projectPoint` against hand-computed values on both clip spaces (near, far, behind, outside), `lookAtView` against the core camera matrix, a CSS transform-chain evaluator showing CSS 3D element corners land on the projected world corners, and the renderer on a fake DOM (overlay placement, mesh following, local and world offsets, anchors, frustum and visibility hiding, z-order, zero writes on a static frame, distance scaling, occlusion hooks, WebGL2, CSS 3D transforms, dispose), decluttering (priority wins, positions tried in order, padding, `inside`, sticky ties, distance-scaled boxes, sizes measured once, still frames write nothing, and 400 random labels placed exactly as a test of every pair places them), CSS 3D depth (panels through the near plane with the origin on either side shown and cut, every polygon point on or in front of the plane, 60 random poses checked on a 21 x 21 grid of element points against the plane, an orthographic cut at depth 0, `clip-path` written only while cut, the CSS 3D `occlude` hook), callouts (a line from the point to the nearest corner or edge of the moved box with a dot, none for labels on their point and those not measured, lines that follow, hide with their labels, hide when no label is shown and are deleted with removed ones, a still frame writing nothing, a wrapped `Declutter` whose hidden labels get no line and whose boxes use the offset, anchors placed by a wrapped layout, checked options), plus orthographic cameras from `@margoengine/cameras` (projection on both clip spaces, CSS 3D corners and depth order, `perspective: none`, near-plane hiding, zoom-based `distanceScale`). `npm run test:browser` (a real-GPU script, not in CI) runs a real engine in Chromium on WebGPU and then WebGL2: a label sits over its mesh's projected center within 1 px (with the mesh color read back under it), follows a moving mesh, hides behind the camera, passes pointer events through, z-orders by depth under hit testing and re-sorts when the camera moves, CSS 3D corner markers land within 2 px of the projected world corners, a tilted CSS 3D panel whose origin is behind the near plane is hit in its far half and not in its near half, a callout's line starts within 1 px of the projected point and ends within 1 px of the nearest point of the label's laid-out box, there are zero WebGPU validation errors, and removing the plugin leaves no overlay elements.
+`npm test` in `packages/labels` runs Node checks: `projectPoint` against hand-computed values on both clip spaces (near, far, behind, outside), `lookAtView` against the core camera matrix, a CSS transform-chain evaluator showing CSS 3D element corners land on the projected world corners, and the renderer on a fake DOM (overlay placement, mesh following, local and world offsets, anchors, frustum and visibility hiding, z-order, zero writes on a static frame, distance scaling, occlusion hooks, WebGL2, CSS 3D transforms, dispose), decluttering (priority wins, positions tried in order, padding, `inside`, sticky ties, distance-scaled boxes, sizes measured once, still frames write nothing, and 400 random labels placed exactly as a test of every pair places them), CSS 3D depth (panels through the near plane with the origin on either side shown and cut, every polygon point on or in front of the plane, 60 random poses checked on a 21 x 21 grid of element points against the plane, an orthographic cut at depth 0, `clip-path` written only while cut, the CSS 3D `occlude` hook), scaled ancestors (the overlay on the content box in one update at scales 0.5 to 4 beside the canvas with no scale of its own, an overlay in another parent scaled to the canvas, the scale cleared again, still frames writing nothing), callouts (a line from the point to the nearest corner or edge of the moved box with a dot, none for labels on their point and those not measured, lines that follow, hide with their labels, hide when no label is shown and are deleted with removed ones, a still frame writing nothing, a wrapped `Declutter` whose hidden labels get no line and whose boxes use the offset, anchors placed by a wrapped layout, checked options), plus orthographic cameras from `@margoengine/cameras` (projection on both clip spaces, CSS 3D corners and depth order, `perspective: none`, near-plane hiding, zoom-based `distanceScale`). `npm run test:browser` (a real-GPU script, not in CI) runs a real engine in Chromium on WebGPU and then WebGL2: a label sits over its mesh's projected center within 1 px (with the mesh color read back under it), follows a moving mesh, hides behind the camera, stays within 1 px of its point in one update with the canvas's frame scaled by 0.75 and 2 (and a second overlay in `document.body` too, drawn at the frame's scale), passes pointer events through, z-orders by depth under hit testing and re-sorts when the camera moves, CSS 3D corner markers land within 2 px of the projected world corners, a tilted CSS 3D panel whose origin is behind the near plane is hit in its far half and not in its near half, a callout's line starts within 1 px of the projected point and ends within 1 px of the nearest point of the label's laid-out box, there are zero WebGPU validation errors, and removing the plugin leaves no overlay elements.
 
 Apache-2.0 licensed.

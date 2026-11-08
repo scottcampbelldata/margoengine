@@ -359,6 +359,8 @@ export class LabelRenderer implements EnginePlugin {
   private readonly world: [number, number, number] = [0, 0, 0];
   private left = 0;
   private top = 0;
+  /** CSS scale written on the root, from the canvas's ancestor scale over the root's; 1 when they agree. */
+  private rootScale = 1;
   /** Number of style properties written during the last update (diagnostics and tests). */
   writes = 0;
 
@@ -397,6 +399,7 @@ export class LabelRenderer implements EnginePlugin {
     style.top = '0px';
     style.margin = '0';
     style.padding = '0';
+    style.transformOrigin = '0 0';
     root.dataset.margoengineLabels = '';
     const parent = this.options.parent ?? canvas.parentElement ?? document.body;
     if (parent === canvas.parentElement) parent.insertBefore(root, canvas.nextSibling);
@@ -404,6 +407,7 @@ export class LabelRenderer implements EnginePlugin {
     this.root = root;
     this.left = 0;
     this.top = 0;
+    this.rootScale = 1;
     for (const label of this.labels) this.mount(label);
     for (const object of this.objects) this.mount(object);
   }
@@ -739,18 +743,30 @@ export class LabelRenderer implements EnginePlugin {
   }
   private syncRoot(canvas: HTMLCanvasElement, x: number, y: number, width: number, height: number): void {
     const root = this.root!;
+    this.set(root, this.rootCache, 'width', px(width));
+    this.set(root, this.rootCache, 'height', px(height));
     // Correct the root by the measured offset to the view's corner in the canvas content box, so any containing
-    // block works.
+    // block works. A CSS scale on an ancestor scales what getBoundingClientRect reports, not `left` and `top`, so the
+    // offset is converted with the scale of the root's ancestors: its drawn width over the width it was given.
     const target = canvas.getBoundingClientRect(),
-      current = root.getBoundingClientRect();
-    const dx = target.left + canvas.clientLeft + x - current.left,
-      dy = target.top + canvas.clientTop + y - current.top;
+      current = root.getBoundingClientRect(),
+      written = Number.parseFloat(this.rootCache.width);
+    const outer = current.width > 0 && written > 0 ? current.width / (written * this.rootScale) : 1;
+    // Beside the canvas the root shares its ancestors, so their scale is the canvas's. Elsewhere (a `parent` outside a
+    // scaled element) the canvas's own is measured and the root is scaled by the difference, so a CSS pixel of the
+    // labels is a CSS pixel of the canvas.
+    const sibling = root.parentElement === canvas.parentElement,
+      inner = !sibling && target.width > 0 && canvas.offsetWidth > 0 ? target.width / canvas.offsetWidth : outer,
+      scale = sibling ? 1 : Math.round((inner / outer) * 1e6) / 1e6;
+    const dx = (target.left + (canvas.clientLeft + x) * inner - current.left) / outer,
+      dy = (target.top + (canvas.clientTop + y) * inner - current.top) / outer;
     if (Math.abs(dx) > 0.01) this.left += dx;
     if (Math.abs(dy) > 0.01) this.top += dy;
     this.set(root, this.rootCache, 'left', px(this.left));
     this.set(root, this.rootCache, 'top', px(this.top));
-    this.set(root, this.rootCache, 'width', px(width));
-    this.set(root, this.rootCache, 'height', px(height));
+    this.rootScale = scale;
+    if (scale !== 1 || this.rootCache.transform)
+      this.set(root, this.rootCache, 'transform', scale === 1 ? '' : `scale(${scale})`);
   }
   private mount(item: Label | CSS3DObject): void {
     const root = this.root;

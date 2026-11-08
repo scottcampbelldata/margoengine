@@ -161,7 +161,10 @@ test('overlay root sits after the canvas, covers it and passes pointer events th
   assert.equal(engine.passes[0].name, 'margoengine-labels');
   assert.ok(engine.passes[0].order > 0);
   engine.frame();
-  assert.deepEqual(root.getBoundingClientRect(), engine.canvas.getBoundingClientRect());
+  // The fake DOM's rects also carry the drawn width and scale; the canvas's fixed rect has only its corner.
+  const rect = root.getBoundingClientRect(),
+    corner = engine.canvas.getBoundingClientRect();
+  assert.deepEqual([rect.left, rect.top, rect.width, rect.scale], [corner.left, corner.top, 800, 1]);
   assert.equal(root.style.width, '800px');
   assert.equal(root.style.height, '400px');
 });
@@ -174,7 +177,8 @@ test('a view places the overlay in its rectangle and projects labels through its
   engine.frame();
   const root = renderer.root,
     canvas = engine.canvas.getBoundingClientRect();
-  assert.deepEqual(root.getBoundingClientRect(), { left: canvas.left + 400, top: canvas.top });
+  const rect = root.getBoundingClientRect();
+  assert.deepEqual([rect.left, rect.top, rect.width], [canvas.left + 400, canvas.top, 400]);
   assert.deepEqual([root.style.width, root.style.height], ['400px', '400px']);
   const expected = projectPoint(camera.matrix, 1, 0.5, 0, 400, 400),
     [x, y] = translate(label.element);

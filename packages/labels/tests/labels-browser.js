@@ -19,10 +19,11 @@ const tag = (text) => {
   return element;
 };
 
-/** Projected world point in page coordinates (canvas content box origin + CSS pixels). */
+/** Projected world point in page coordinates (canvas content box origin + CSS pixels, times any CSS scale above). */
 function pagePoint(engine, point) {
   const canvas = engine.canvas,
-    rect = canvas.getBoundingClientRect();
+    rect = canvas.getBoundingClientRect(),
+    scale = rect.width / canvas.offsetWidth;
   const p = projectPoint(
     engine.camera.matrix,
     point[0],
@@ -32,7 +33,7 @@ function pagePoint(engine, point) {
     canvas.clientHeight,
     engine.backend,
   );
-  return [rect.left + canvas.clientLeft + p.x, rect.top + canvas.clientTop + p.y];
+  return [rect.left + (canvas.clientLeft + p.x) * scale, rect.top + (canvas.clientTop + p.y) * scale];
 }
 function readPixel(canvas, x, y) {
   const copy = document.createElement('canvas');
@@ -101,6 +102,36 @@ async function scenario(backend) {
   measurements.followError = Math.hypot(actual[0] - expected[0], actual[1] - expected[1]);
   assert(measurements.followError <= 1, `${backend}: label did not follow the mesh ${actual} vs ${expected}`);
   checks.push(`${backend}: the label follows a moving mesh`);
+
+  // Scaled ancestors: the canvas's frame scaled by CSS. Labels beside the canvas, and in a second overlay placed in
+  // document.body (outside the scaled frame, so it is scaled itself), stay on their points.
+  const frame = canvas.parentElement;
+  const outside = new LabelRenderer({ parent: document.body, name: 'margoengine-labels-outside' });
+  engine.use(outside);
+  const free = outside.add(tag('B'), { position: [0.6, 0.7, 0] });
+  frame.style.transformOrigin = '0 0';
+  for (const scale of [0.75, 2]) {
+    frame.style.transform = `scale(${scale})`;
+    engine.render();
+    expected = pagePoint(engine, [-1.2, -0.4, 0.5]);
+    actual = center(label.element);
+    const inside = Math.hypot(actual[0] - expected[0], actual[1] - expected[1]);
+    const away = pagePoint(engine, [0.6, 0.7, 0]),
+      there = center(free.element),
+      outsideError = Math.hypot(there[0] - away[0], there[1] - away[1]),
+      size = free.element.getBoundingClientRect().width / free.element.offsetWidth;
+    measurements[`scaled${scale}`] = { inside, outside: outsideError, size };
+    assert(inside <= 1, `${backend}: at scale ${scale} the label is ${inside} px off its point`);
+    assert(outsideError <= 1, `${backend}: at scale ${scale} the outside label is ${outsideError} px off its point`);
+    assert(Math.abs(size - scale) < 1e-3, `${backend}: at scale ${scale} the outside label is drawn at ${size}`);
+  }
+  frame.style.transform = '';
+  engine.removePlugin(outside.name);
+  engine.render();
+  assert(!free.element.isConnected, 'the outside overlay was not removed');
+  checks.push(
+    `${backend}: with the canvas's frame scaled by 0.75 and 2, labels beside the canvas and in an overlay outside the frame stay within 1 px of their points in one update`,
+  );
 
   // Pointer events pass through to the canvas by default.
   assert(document.elementFromPoint(...center(label.element)) === canvas, 'Default label blocked pointer events');

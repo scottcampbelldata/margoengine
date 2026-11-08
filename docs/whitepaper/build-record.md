@@ -3015,3 +3015,35 @@ Five jobs for `@margoengine/dof` on the M6 Mac mini (Metal), each landed as one 
 - **Limits and unmeasured:** rows in `docs/limits.md` for each job. On the layer, silhouette pixels of a blur still
   differ (the four depth samples cannot be rebuilt); temporal DOF is WebGPU only; GPU cost of every option is not
   measured; nothing was run on another machine.
+
+## Lane H batch 105: labels
+
+Five jobs for `@margoengine/labels` on the Beelink (Radeon 680M), four landed as one commit each and one skipped.
+Core and stage are untouched (23,626 B gzip together after the batch).
+
+| # | Job | Status | Commit | Entry | Claim |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Label decluttering | DONE | 8fa990070 | `@margoengine/labels/declutter` | LIM-532 |
+| 2 | One CSS3DObject | SKIPPED: `@margoengine/html` already re-exports the labels type (`export type { Label, CSS3DObject } from '@margoengine/labels'`, since 9b98d25e2); the one implementation is in `packages/labels/src/renderer.ts` and `api/html.api.md` shows the re-export | none | none | none |
+| 3 | Depth with CSS 3D objects | DONE | 1d347b065 | `CSS3DObject` in `@margoengine/labels` | LIM-540 |
+| 4 | Leader lines and callouts | DONE | b040eb4d9 | `@margoengine/labels/callouts` | LIM-542 |
+| 5 | Scaled ancestors | DONE | this commit | `LabelRenderer` in `@margoengine/labels` | LIM-546 |
+
+- **Built from:** `docs/clean-room.md` rows S76 (Christensen, Marks and Shieber 1995; Imhof 1975), S78 (Sutherland and
+  Hodgman 1974; CSS Masking 1, CSS Transforms 2), S79 (SVG 2) and S80 (CSSOM View, CSS Transforms 1). Nothing from
+  another engine was read.
+- **Proved (real GPU, this Beelink, Chromium on WebGPU and WebGL2):** `node packages/labels/scripts/test-browser.js`:
+  a tilted CSS 3D panel whose origin is behind the near plane is hit in its far half and not its near half; a callout
+  line starts 0.0007 px from the projected point and ends 0.00001 px from the nearest point of the laid-out box; with
+  the canvas's frame at `scale(0.75)` and `scale(2)` labels beside the canvas and in an overlay in `document.body`
+  stay within 1 px of their points in one update. Node tests: `declutter`, `depth3d` (60 random poses against a 21 x 21
+  grid), `callouts` and `scaled` in `packages/labels/tests`.
+- **Sizes (gzip, B):** `@margoengine/labels` 4,502 to 5,346 over the batch, new `/declutter` 1,269 and `/callouts`
+  1,347. The `margoengine/web` kit, which holds labels, is stated at 91,456 B in `docs/guides/kits.md` (job 3: labels
+  grew 370 B; the kit had grown 2.7 percent on main before it).
+- **Bugs fixed:** the overlay correction under a CSS scale on the canvas's ancestors was made in drawn pixels and
+  overshot by the scale, so it was off for a frame at any scale and never settled from scale 2 up (job 5, regression
+  test `packages/labels/tests/scaled.test.js`).
+- **Limits and unmeasured:** rows in `docs/limits.md` for each job. CSS 3D objects are not depth-tested per pixel
+  against the canvas (the `occlude` hook hides whole objects); leader lines are straight and not routed around labels;
+  rotations, skews and a transform on the canvas itself are not followed. Cost per frame is not measured for any job.
