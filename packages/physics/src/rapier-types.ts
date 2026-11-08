@@ -316,6 +316,7 @@ export interface RapierModule {
   ImpulseJoint?: { prototype: Partial<ImpulseJoint> };
   ShapeType: Record<string, number | string>;
   TriMeshFlags?: { FIX_INTERNAL_EDGES?: number };
+  HeightFieldFlags?: { FIX_INTERNAL_EDGES?: number };
   Collider?: { prototype: Partial<Collider> };
   ColliderDesc: {
     // Takes Rapier's own Shape class, wider than Shape here: `never` keeps the real module assignable to this type.
@@ -328,7 +329,7 @@ export interface RapierModule {
     convexHull(points: Float32Array): ColliderDesc | null;
     trimesh(vertices: Float32Array, indices: Uint32Array, flags?: number): ColliderDesc;
     voxels?(cells: Int32Array, size: Vector): ColliderDesc;
-    heightfield(rows: number, columns: number, heights: Float32Array, scale: Vector): ColliderDesc;
+    heightfield(rows: number, columns: number, heights: Float32Array, scale: Vector, flags?: number): ColliderDesc;
     /** Rapier 0.19 and later. */
     compound?(shapes: Shape[], positions: Vector[], rotations: Rotation[]): ColliderDesc;
     /** Rapier 0.19 and later (V-HACD). */

@@ -108,6 +108,7 @@ interface KernelExports extends WebAssembly.Exports {
   hull_next(rows: number): number;
   mesh_begin(vertices: number, triangles: number): number;
   mesh_end(vertices: number, triangles: number, flags: number): number;
+  mesh_end_grid(rows: number, columns: number, flags: number): number;
   mesh_next(rows: number): number;
   hull_count(): number;
   mesh_count(): number;
@@ -138,7 +139,8 @@ export type KernelBodyKind = 'fixed' | 'dynamic' | 'kinematicPosition' | 'kinema
 
 /**
  * Shapes the kernel holds today. Sizes: a ball's radius; a box's half extents; a capsule's radius and half core length; a
- * hull's row from {@link KernelWorld.addHull}; a mesh's row from {@link KernelWorld.addTrimesh}.
+ * hull's row from {@link KernelWorld.addHull}; a mesh's row from {@link KernelWorld.addTrimesh} or
+ * {@link KernelWorld.addHeightfield}.
  */
 export type KernelShape = 'ball' | 'box' | 'capsule' | 'hull' | 'trimesh';
 
@@ -157,6 +159,7 @@ const meshErrors: Readonly<Record<number, string>> = {
   [-2]: 'A triangle names a vertex that does not exist; check the indices',
   [-3]: 'A vertex is not finite; check what fed it',
   [-4]: 'The triangle found across an edge does not exist',
+  [-5]: 'The heights do not make a grid the kernel can hold; pass a scale whose cells are wider than rounding, and fewer cells',
 };
 
 /** Options of {@link KernelWorld.addTrimesh}. */
@@ -164,6 +167,15 @@ export interface KernelTrimeshOptions {
   /**
    * Keeps contacts on a triangle's inner edges to the normals the surface allows, so shapes slide over the seams between
    * triangles without catching (Rapier's `TriMeshFlags.FIX_INTERNAL_EDGES`). Default false, as in Rapier.
+   */
+  fixInternalEdges?: boolean;
+}
+
+/** Options of {@link KernelWorld.addHeightfield}. */
+export interface KernelHeightfieldOptions {
+  /**
+   * Keeps contacts on the grid's inner edges to the normals the surface allows, as for a trimesh (Rapier's
+   * `HeightFieldFlags.FIX_INTERNAL_EDGES`). Default false, as in Rapier.
    */
   fixInternalEdges?: boolean;
 }
@@ -732,6 +744,53 @@ export class KernelWorld {
     }
     const row = api.mesh_end(count, triangles, fixInternalEdges ? 1 : 0);
     if (row < 0) throw new RangeError(`This trimesh was refused; fix what this says: ${meshErrors[row]}.`);
+    this.meshRows = row + 1;
+    return row;
+  }
+  /**
+   * Adds a height field that colliders can share, for {@link KernelWorld.addCollider} with shape `trimesh`, laid out as
+   * Rapier's `heightfield`: `rows` cells along z and `columns` along x, `(rows + 1) * (columns + 1)` heights column major
+   * (row r, column c is `heights[r + (rows + 1) * c]`), times `scale`, the whole field's size, centred on the collider.
+   * Each cell is two triangles split along the diagonal from row r + 1, column c to row r, column c + 1. The kernel keeps
+   * the grid's vertices only, 12 bytes each, and finds the cells under a shape by halving, so it builds no tree.
+   * @returns The mesh's row.
+   * @throws RangeError for a size, height or scale the kernel cannot use, naming what is wrong.
+   */
+  addHeightfield(
+    rows: number,
+    columns: number,
+    heights: ArrayLike<number>,
+    scale: readonly [number, number, number],
+    options: KernelHeightfieldOptions = {},
+  ): number {
+    const { api } = this,
+      { fixInternalEdges = false } = options;
+    if (!Number.isInteger(rows) || !Number.isInteger(columns) || rows < 1 || columns < 1 || 2 * rows * columns >= 0xffffffff)
+      throw new RangeError(`A heightfield takes whole rows and columns of cells from 1 up, under 2^31 cells (got ${rows} and ${columns}); pass the cells along z and along x.`);
+    const count = (rows + 1) * (columns + 1);
+    if (heights.length !== count)
+      throw new RangeError(`A heightfield of ${rows} by ${columns} cells takes (rows + 1) * (columns + 1) = ${count} heights (got ${heights.length}); pass one a grid point, column major.`);
+    if (scale.length !== 3 || !scale.every((value) => value > 0 && Number.isFinite(value)))
+      throw new RangeError(`A heightfield scale is three finite sizes above zero (got ${scale.join(', ')}); pass the field's width, height factor and depth.`);
+    for (let i = 0; i < count; i++)
+      if (!Number.isFinite(heights[i])) throw new RangeError(`Heightfield height ${i} is ${heights[i]}; pass finite heights.`);
+    if (!api.mesh_begin(count, 0))
+      throw new RangeError(`Memory cannot hold a heightfield of ${count} points; free another world, or use fewer cells.`);
+    if (api.world_layout() !== this.layout) this.bind();
+    const c = this.columns,
+      v0 = api.mesh_next(0),
+      [width, lift, depth] = scale;
+    for (let column = 0; column <= columns; column++) {
+      const x = -width / 2 + (width * column) / columns;
+      for (let row = 0; row <= rows; row++) {
+        const i = row + (rows + 1) * column;
+        c.meshVertexX[v0 + i] = x;
+        c.meshVertexY[v0 + i] = heights[i] * lift;
+        c.meshVertexZ[v0 + i] = -depth / 2 + (depth * row) / rows;
+      }
+    }
+    const row = api.mesh_end_grid(rows, columns, fixInternalEdges ? 1 : 0);
+    if (row < 0) throw new RangeError(`This heightfield was refused; fix what this says: ${meshErrors[row]}.`);
     this.meshRows = row + 1;
     return row;
   }

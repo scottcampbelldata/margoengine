@@ -1263,3 +1263,11 @@ The following remain technical gaps, not permission to weaken a check:
     in Node (flat slides, 1,000 boxes on St Helens, 11 broken meshes). Missing: rays and shape casts against a mesh (job
     6), a mesh against a mesh, any browser run of a mesh scene beyond the replay's hash, and speed parity: the build is
     65 ms against Rapier's 43 ms and a step of the box pile 1.52 ms median against 1.14 (`docs/limits.md`), for batch 129.
+
+36. The own physics kernel's height fields (batch 126 job 3, `kernel/src/mesh.rs` `end_grid`): a field's triangles and
+    neighbours are checked against the same cells held as triangle rows and joined by corner position, and its contacts
+    against them bit for bit on 48 drops of boxes, balls and capsules with the edge rule on and off
+    (`kernel/tests/mesh.rs`); its layout against Rapier 0.21 by 300 rays through the root entry
+    (`tests/next-heightfield.test.js`); the physics-refs heightfield scenes pass in Node (flat slides, 1,000 balls on St
+    Helens). Missing: rays and shape casts against a field (job 6), a field against a mesh, Rapier's per-cell status, any
+    browser run beyond the replay's hash, and speed parity on the 499,849-cell build (16.3 ms against 8.6), batch 129.

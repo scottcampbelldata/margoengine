@@ -14,6 +14,7 @@ const served: Readonly<Record<string, KernelShape>> = {
   capsule: 'capsule',
   convexHull: 'hull',
   trimesh: 'trimesh',
+  heightfield: 'trimesh',
 };
 
 /** What the kernel needs for one collider. */
@@ -52,11 +53,12 @@ function fittedSphere(points: Float32Array, center: number[]): number[] {
   return [radius];
 }
 
-/** What building a collider needs from its world: a hull's row for its faces, a hull row's volume, a mesh's row. */
+/** What building a collider needs from its world: a hull's row for its faces, a hull row's volume, a mesh's or a height field's row. */
 export interface HullRows {
   addHull(vertices: readonly (readonly [number, number, number])[], faces: readonly (readonly number[])[]): number;
   hullVolume(row: number): number;
   addTrimesh(vertices: Float32Array, indices: Uint32Array, fixInternalEdges: boolean): number;
+  addHeightfield(rows: number, columns: number, heights: ArrayLike<number>, scale: Vec3, fixInternalEdges: boolean): number;
 }
 
 /**
@@ -75,7 +77,7 @@ export function kernelCollider(
   if (!shape)
     throw new MargoError(
       'unsupported',
-      `The ${options.shape} shape is not in the own solver yet; use box, sphere, capsule, convexHull or trimesh, or @margoengine/physics.`,
+      `The ${options.shape} shape is not in the own solver yet; use box, sphere, capsule, convexHull, trimesh or heightfield, or @margoengine/physics.`,
     );
   const fitted = (): Float32Array => {
       if (!fit.geometry) throw new TypeError(`A ${options.shape} collider without explicit size needs a mesh with geometry`);
@@ -118,7 +120,14 @@ export function kernelCollider(
         'A trimesh has no volume, so no mass or density; give the body its mass with setMassProperties, or use convexHull or convexDecomposition.',
       );
     size = [hulls.addTrimesh(vertices, Uint32Array.from(indexSource), options.fixInternalEdges ?? false)];
-  } else throw new TypeError(`Unknown shape ${options.shape}; use box, sphere, capsule, convexHull or trimesh.`);
+  } else if (options.shape === 'heightfield') {
+    if (options.mass !== undefined || options.density !== undefined)
+      throw new RangeError(
+        'A heightfield has no volume, so no mass or density; make its body fixed, or give the body its mass with setMassProperties.',
+      );
+    checkVec(options.scale, 'Heightfield scale');
+    size = [hulls.addHeightfield(options.rows, options.columns, options.heights, options.scale, options.fixInternalEdges ?? false)];
+  } else throw new TypeError(`Unknown shape ${options.shape}; use box, sphere, capsule, convexHull, trimesh or heightfield.`);
   const offset = options.offset ?? [0, 0, 0];
   checkVec(offset, 'Collider offset');
   const density = options.massless || shape === 'trimesh'

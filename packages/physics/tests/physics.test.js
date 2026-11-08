@@ -580,6 +580,7 @@ rtest('trimesh, convex hull and heightfield colliders support resting bodies', (
   );
   const heights = new Float32Array(5 * 5).fill(0.5);
   near(rest({ shape: 'heightfield', rows: 4, columns: 4, heights, scale: [20, 1, 20] }), 0.5, 0.02, 'heightfield');
+  near(rest({ shape: 'heightfield', rows: 4, columns: 4, heights, scale: [20, 1, 20], fixInternalEdges: true }), 0.5, 0.02, 'heightfield, internal edges fixed');
   // Geometry-derived colliders take the mesh scale.
   const physics = create();
   const body = physics.addBody(

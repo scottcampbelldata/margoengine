@@ -481,6 +481,9 @@ export interface RapierModule {
     TriMeshFlags?: {
         FIX_INTERNAL_EDGES?: number;
     };
+    HeightFieldFlags?: {
+        FIX_INTERNAL_EDGES?: number;
+    };
     Collider?: {
         prototype: Partial<Collider>;
     };
@@ -494,7 +497,7 @@ export interface RapierModule {
         convexHull(points: Float32Array): ColliderDesc | null;
         trimesh(vertices: Float32Array, indices: Uint32Array, flags?: number): ColliderDesc;
         voxels?(cells: Int32Array, size: Vector): ColliderDesc;
-        heightfield(rows: number, columns: number, heights: Float32Array, scale: Vector): ColliderDesc;
+        heightfield(rows: number, columns: number, heights: Float32Array, scale: Vector, flags?: number): ColliderDesc;
         compound?(shapes: Shape[], positions: Vector[], rotations: Rotation[]): ColliderDesc;
         convexDecomposition?(vertices: Float32Array, indices: Uint32Array): ColliderDesc | null;
     };
@@ -606,6 +609,7 @@ export type ShapeOptions = {
     columns: number;
     heights: ArrayLike<number>;
     scale: Vec3;
+    fixInternalEdges?: boolean;
 }
  | {
     shape: 'compound';

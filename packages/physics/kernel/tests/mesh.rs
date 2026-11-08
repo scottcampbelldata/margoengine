@@ -1,5 +1,6 @@
 // Triangle meshes: the tree finds what brute force finds, edges sort into the right classes, the ghost rule keeps shapes
-// sliding over inner edges, and a mesh pair's parts come and go with the triangles a shape touches.
+// sliding over inner edges, and a mesh pair's parts come and go with the triangles a shape touches. A height field meets
+// shapes as the same triangles held as rows do.
 use margoengine_physics_kernel::layout::*;
 use margoengine_physics_kernel::math::*;
 use margoengine_physics_kernel::mesh::*;
@@ -155,9 +156,14 @@ fn the_ghost_rule_stands_snaps_and_skips_as_the_edges_say() {
 /// Slides a body across the grid at `speed` along x with no friction, and returns the variance of its x speed and the
 /// largest of its y speed and spin over the run, after it has settled.
 fn slide(shape: u32, size: [f32; 3], rest: f32, rotation: [f32; 4], flags: u32) -> (f32, f32, f32) {
-    let mut w = World::new(4, 4).unwrap();
     let (vertices, triangles) = grid(20, 1.0, |_, _| 0.0);
-    let mesh = add_mesh(&mut w, &vertices, &triangles, flags);
+    slide_with(shape, size, rest, rotation, |w| add_mesh(w, &vertices, &triangles, flags))
+}
+
+/// `slide` on the ground `make` adds.
+fn slide_with(shape: u32, size: [f32; 3], rest: f32, rotation: [f32; 4], make: impl Fn(&mut World) -> i32) -> (f32, f32, f32) {
+    let mut w = World::new(4, 4).unwrap();
+    let mesh = make(&mut w);
     let floor = ground(&mut w, mesh);
     w.set_s(COLLIDER_FRICTION, floor as usize, 0.0);
     let (body, collider) = turned(&mut w, shape, size, v3(-7.0, rest, 0.3), rotation);
@@ -296,4 +302,177 @@ fn a_box_rests_on_a_bumpy_mesh_as_on_brute_force() {
         assert_eq!(found.len(), all.len(), "parts at {at:?}");
         assert_eq!(total(&found), total(&all), "points at {at:?}");
     }
+}
+
+/// A height field of `rows` by `columns` cells of `size` metres centred on the origin, heights from `height(row,
+/// column)`, written as `end_grid` reads it: vertex r + (rows + 1) c at row r (along z) and column c (along x).
+fn height_points(rows: u32, columns: u32, size: f32, height: &impl Fn(u32, u32) -> f32) -> Vec<V3> {
+    let mut vertices = vec![v3(0.0, 0.0, 0.0); ((rows + 1) * (columns + 1)) as usize];
+    for c in 0..=columns {
+        for r in 0..=rows {
+            let (x, z) = (c as f32 * size - columns as f32 * size / 2.0, r as f32 * size - rows as f32 * size / 2.0);
+            vertices[(r + (rows + 1) * c) as usize] = v3(x, height(r, c), z);
+        }
+    }
+    vertices
+}
+
+fn add_grid(w: &mut World, rows: u32, columns: u32, vertices: &[V3], flags: u32) -> i32 {
+    assert!(w.begin_mesh(vertices.len() as u32, 0));
+    let v0 = w.header().mesh_rows[1] as usize;
+    for (i, &p) in vertices.iter().enumerate() {
+        w.set_v(MESH_VERTEX_X, v0 + i, p);
+    }
+    w.end_grid(rows, columns, flags)
+}
+
+/// The same cells as triangle rows, in the height field's order: cell r + rows c is triangles 2 (r + rows c) and the
+/// next, split from (r + 1, c) to (r, c + 1).
+fn height_triangles(rows: u32, columns: u32) -> Vec<[u32; 3]> {
+    let at = |r: u32, c: u32| r + (rows + 1) * c;
+    let mut triangles = Vec::new();
+    for c in 0..columns {
+        for r in 0..rows {
+            triangles.push([at(r, c), at(r + 1, c), at(r, c + 1)]);
+            triangles.push([at(r + 1, c), at(r + 1, c + 1), at(r, c + 1)]);
+        }
+    }
+    triangles
+}
+
+/// Finds pairs and points without moving anything.
+fn detect(w: &mut World) {
+    w.broad_update(DT);
+    w.narrow_phase(DT);
+}
+
+fn bumpy(r: u32, c: u32) -> f32 {
+    0.11 * ((r * 7 + c * 3) % 5) as f32 - 0.07 * ((r * c) % 3) as f32
+}
+
+#[test]
+fn a_height_field_has_the_triangles_and_neighbours_of_its_cells() {
+    let (rows, columns) = (5, 7);
+    let vertices = height_points(rows, columns, 0.5, &bumpy);
+    let triangles = height_triangles(rows, columns);
+    let links = across(&vertices, &triangles);
+    let mut w = World::new(4, 4).unwrap();
+    let mesh = add_grid(&mut w, rows, columns, &vertices, MESH_FIX_EDGES) as usize;
+    assert_eq!(w.uu(MESH_COLUMNS, mesh), columns);
+    for (t, tri) in triangles.iter().enumerate() {
+        let corners = w.mesh_triangle(mesh, t as u32);
+        assert_eq!(corners, [vertices[tri[0] as usize], vertices[tri[1] as usize], vertices[tri[2] as usize]], "triangle {t}");
+        let n = corners[1].sub(corners[0]).cross(corners[2].sub(corners[0]));
+        assert!(n.y > 0.0, "triangle {t} faces up");
+        for k in 0..3 {
+            assert_eq!(w.mesh_across(mesh, t as u32, k), links[t][k], "triangle {t} edge {k}: the one across by corner positions");
+        }
+    }
+}
+
+#[test]
+fn a_height_field_meets_shapes_as_the_same_triangles_do() {
+    // The grid's cells against the same triangles as rows with a tree: the same parts with the same points, bit for bit.
+    let (rows, columns) = (8, 10);
+    let vertices = height_points(rows, columns, 0.5, &bumpy);
+    let triangles = height_triangles(rows, columns);
+    let mut seed = 7u32;
+    let mut next = || {
+        seed ^= seed << 13;
+        seed ^= seed >> 17;
+        seed ^= seed << 5;
+        (seed % 10_000) as f32 / 10_000.0
+    };
+    let shapes = [(SHAPE_BOX, [0.4, 0.3, 0.35]), (SHAPE_BALL, [0.3, 0.0, 0.0]), (SHAPE_CAPSULE, [0.2, 0.3, 0.0])];
+    let mut touched = 0;
+    for flags in [0, MESH_FIX_EDGES] {
+        for n in 0..24 {
+            let (shape, size) = shapes[n % 3];
+            // Some over the edge of the grid, where cells run out.
+            let at = v3(next() * 6.0 - 3.0, 0.2 + next() * 0.3, next() * 5.0 - 2.5);
+            let turn = Q::from_rotation_vector(v3(0.6, 0.0, 0.8).scale(next() * 3.0));
+            let contacts = |w: &World| {
+                let mut out: Vec<(u32, u32, Vec<u32>)> = (0..w.header().pair_rows as usize)
+                    .filter(|&r| w.uu(PAIR_A, r) != NONE && w.uu(PAIR_FLAGS, r) & PAIR_IS_PART != 0)
+                    .map(|r| {
+                        let count = w.uu(PAIR_CONTACTS, r);
+                        let depths = (0..count as usize).map(|k| w.s(CONTACT_SEPARATION, r * MANIFOLD + k).to_bits()).collect();
+                        (w.uu(PAIR_PART, r), count, depths)
+                    })
+                    .collect();
+                out.sort();
+                out
+            };
+            let mut grid = World::new(4, 4).unwrap();
+            let field = add_grid(&mut grid, rows, columns, &vertices, flags);
+            assert!(field >= 0);
+            ground(&mut grid, field);
+            let (body, _) = dynamic(&mut grid, shape, size, at);
+            grid.set_pose(body, at, turn, false);
+            detect(&mut grid);
+            let mut tree = World::new(4, 4).unwrap();
+            let mesh = add_mesh(&mut tree, &vertices, &triangles, flags);
+            ground(&mut tree, mesh);
+            let (body, _) = dynamic(&mut tree, shape, size, at);
+            tree.set_pose(body, at, turn, false);
+            detect(&mut tree);
+            let found = contacts(&grid);
+            touched += found.len();
+            assert_eq!(found, contacts(&tree), "shape {shape} at {at:?}, flags {flags}");
+        }
+    }
+    assert!(touched > 40, "most drops touch some triangles ({touched} parts)");
+}
+
+#[test]
+fn a_height_field_that_is_not_a_grid_is_refused() {
+    let mut w = World::new(4, 4).unwrap();
+    let good = height_points(2, 3, 1.0, &|_, _| 0.0);
+    assert_eq!(add_grid(&mut w, 0, 3, &good[..4], 0), MESH_EMPTY);
+    let mut bad = good.clone();
+    bad[(1 + 3) as usize].x += 0.25;
+    assert_eq!(add_grid(&mut w, 2, 3, &bad, 0), MESH_BAD_GRID, "a column at two x");
+    let mut bad = good.clone();
+    for r in 0..3 {
+        bad[(r + 3 * 2) as usize].x = bad[(r + 3) as usize].x;
+    }
+    assert_eq!(add_grid(&mut w, 2, 3, &bad, 0), MESH_BAD_GRID, "two columns at one x");
+    let mut bad = good.clone();
+    bad[5].y = f32::NAN;
+    assert_eq!(add_grid(&mut w, 2, 3, &bad, 0), MESH_NOT_FINITE);
+    assert!(add_grid(&mut w, 2, 3, &good, 0) >= 0, "and the good one is taken after the refusals");
+}
+
+/// Slides a body over a flat height field of 20 by 20 cells of a metre, as `slide` does on a mesh.
+fn slide_on_field(shape: u32, size: [f32; 3], rest: f32, rotation: [f32; 4], flags: u32) -> (f32, f32, f32) {
+    slide_with(shape, size, rest, rotation, |w| add_grid(w, 20, 20, &height_points(20, 20, 1.0, &|_, _| 0.0), flags))
+}
+
+#[test]
+fn a_ball_and_a_box_cross_a_flat_height_field_with_their_speed_steady() {
+    let (variance, lift, _) = slide_on_field(SHAPE_BALL, [0.5, 0.0, 0.0], 0.5, [0.0, 0.0, 0.0, 1.0], MESH_FIX_EDGES);
+    println!("ball on a field: variance {variance:e}, lift {lift:e}");
+    assert!(variance < 1e-4, "speed variance {variance}");
+    assert!(lift < 1e-2, "lift {lift}");
+    let (variance, lift, spin) = slide_on_field(SHAPE_BOX, [0.4, 0.25, 0.3], 0.25, [0.0, 0.0, 0.0, 1.0], MESH_FIX_EDGES);
+    let (loose, _, _) = slide_on_field(SHAPE_BOX, [0.4, 0.25, 0.3], 0.25, [0.0, 0.0, 0.0, 1.0], 0);
+    println!("box on a field: variance {variance:e}, lift {lift:e}, spin {spin:e}; without the rule {loose:e}");
+    assert!(loose > 1e-2, "without the rule the box catches on the inner edges, which is what this test watches for");
+    assert!(variance < 1e-4 && lift < 1e-2 && spin < 1e-2, "variance {variance}, lift {lift}, spin {spin}");
+}
+
+#[test]
+fn a_shape_beside_a_height_field_touches_no_cell() {
+    let mut w = World::new(4, 4).unwrap();
+    let field = add_grid(&mut w, 4, 4, &height_points(4, 4, 1.0, &|_, _| 0.0), 0);
+    ground(&mut w, field);
+    // Within the field's fat box (2 m round, 0.04 m margin) but past its last column: no cell, no part.
+    let (body, _) = dynamic(&mut w, SHAPE_BALL, [0.2, 0.0, 0.0], v3(2.23, 0.1, 0.0));
+    w.header_mut().gravity = [0.0, 0.0, 0.0];
+    w.step(DT);
+    assert_eq!(parts(&w), 0);
+    // Over the last cell: it touches.
+    w.set_pose(body, v3(1.9, 0.15, 0.0), Q::IDENTITY, false);
+    w.step(DT);
+    assert!(parts(&w) >= 1);
 }

@@ -279,6 +279,12 @@ pub extern "C" fn mesh_begin(vertices: u32, triangles: u32) -> u32 {
 pub extern "C" fn mesh_end(vertices: u32, triangles: u32, flags: u32) -> i32 {
     world().end_mesh(vertices, triangles, flags)
 }
+/// Finishes a height field written after `mesh_begin(vertices, 0)` as `(rows + 1) (columns + 1)` vertices, column
+/// major: its row, or a negative MESH_ code. `flags` holds MESH_ bits.
+#[unsafe(no_mangle)]
+pub extern "C" fn mesh_end_grid(rows: u32, columns: u32, flags: u32) -> i32 {
+    world().end_grid(rows, columns, flags)
+}
 /// Where the next mesh's rows start: 0 vertices, 1 triangles, 2 tree nodes.
 #[unsafe(no_mangle)]
 pub extern "C" fn mesh_next(class: u32) -> u32 {

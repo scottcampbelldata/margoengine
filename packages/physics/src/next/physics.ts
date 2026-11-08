@@ -151,6 +151,8 @@ export class Physics implements EnginePlugin, BodyOwner {
     },
     hullVolume: (row) => this.kernel.columns.hullVolume[row],
     addTrimesh: (vertices, indices, fixInternalEdges) => this.kernel.addTrimesh(vertices, indices, { fixInternalEdges }),
+    addHeightfield: (rows, columns, heights, scale, fixInternalEdges) =>
+      this.kernel.addHeightfield(rows, columns, heights, [scale[0], scale[1], scale[2]], { fixInternalEdges }),
   };
   private readonly attachments = new Set<PhysicsAttachment>();
   private readonly listeners = new Map<keyof PhysicsEventMap, Set<(event: never) => void>>();

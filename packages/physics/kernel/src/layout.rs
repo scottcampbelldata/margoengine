@@ -434,7 +434,8 @@ columns! {
     PAIR_PART u32 Pair,
     PAIR_CHILD u32 Pair,
     // A triangle mesh: where its rows start and how many it has, MESH_ bits, the box around it and the radius about the
-    // box's centre that holds it.
+    // box's centre that holds it. MESH_COLUMNS is 0 for a mesh of triangle rows and a height field's columns of cells
+    // otherwise: a height field has vertex rows only, and its triangles follow from its cells (mesh.rs, `end_grid`).
     MESH_FIRST_VERTEX u32 Mesh,
     MESH_VERTICES u32 Mesh,
     MESH_FIRST_TRIANGLE u32 Mesh,
@@ -442,6 +443,7 @@ columns! {
     MESH_FIRST_NODE u32 Mesh,
     MESH_NODES u32 Mesh,
     MESH_FLAGS u32 Mesh,
+    MESH_COLUMNS u32 Mesh,
     MESH_BOX_X f32 Mesh,
     MESH_BOX_Y f32 Mesh,
     MESH_BOX_Z f32 Mesh,
@@ -558,7 +560,8 @@ pub const SHAPE_BALL: u32 = 0;
 pub const SHAPE_BOX: u32 = 1;
 pub const SHAPE_CAPSULE: u32 = 2;
 pub const SHAPE_HULL: u32 = 3;
-/// A triangle mesh: its row in COLLIDER_HULL, no size, no volume. It touches every other shape but a mesh.
+/// A triangle mesh or a height field: its row in COLLIDER_HULL, no size, no volume. It touches every other shape but a
+/// mesh.
 pub const SHAPE_TRIMESH: u32 = 4;
 
 /// MESH_FLAGS: contacts on a triangle's inner edges keep to the normals the surface allows (fixInternalEdges).

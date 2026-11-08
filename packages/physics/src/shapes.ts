@@ -25,7 +25,15 @@ export type ShapeOptions =
       /** Smooth the normals at shared edges so bodies slide and roll over the seams without catching (default false). */
       fixInternalEdges?: boolean;
     }
-  | { shape: 'heightfield'; rows: number; columns: number; heights: ArrayLike<number>; scale: Vec3 }
+  | {
+      shape: 'heightfield';
+      rows: number;
+      columns: number;
+      heights: ArrayLike<number>;
+      scale: Vec3;
+      /** Smooth the normals at the grid's inner edges so bodies slide and roll over them without catching (default false). */
+      fixInternalEdges?: boolean;
+    }
   /**
    * Several convex parts welded into one collider (one handle, one set of events), each with its own offset and
    * rotation in the collider's frame: a chair from boxes, a dumbbell from two spheres and a cylinder.
@@ -277,7 +285,13 @@ export function createColliderDesc(
       checkVec(scale, 'Heightfield scale');
       const values = Float32Array.from(heights);
       finite(values, 'Heightfield heights');
-      desc = R.ColliderDesc.heightfield(rows, columns, values, vec(scale));
+      const flags = options.fixInternalEdges ? R.HeightFieldFlags?.FIX_INTERNAL_EDGES : undefined;
+      if (options.fixInternalEdges && flags === undefined)
+        throw new MargoError(
+          'unsupported',
+          'fixInternalEdges on a heightfield needs a Rapier with HeightFieldFlags; upgrade @dimforge/rapier3d-compat or leave it out.',
+        );
+      desc = R.ColliderDesc.heightfield(rows, columns, values, vec(scale), flags);
       break;
     }
     case 'compound': {

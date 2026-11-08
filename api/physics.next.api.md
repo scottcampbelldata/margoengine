@@ -193,6 +193,7 @@ export class KernelWorld {
     addCollider(body: number, shape: KernelShape, size: readonly number[], options?: KernelColliderOptions): number;
     addHull(vertices: readonly (readonly [number, number, number])[], faces: readonly (readonly number[])[]): number;
     addTrimesh(vertices: ArrayLike<number>, indices: ArrayLike<number>, options?: KernelTrimeshOptions): number;
+    addHeightfield(rows: number, columns: number, heights: ArrayLike<number>, scale: readonly [number, number, number], options?: KernelHeightfieldOptions): number;
     removeCollider(collider: number): boolean;
     addJoint(a: number, b: number, flags: number): number;
     removeJoint(joint: number): boolean;
@@ -485,6 +486,7 @@ export type ShapeOptions = {
     columns: number;
     heights: ArrayLike<number>;
     scale: Vec3;
+    fixInternalEdges?: boolean;
 }
  | {
     shape: 'compound';
@@ -610,6 +612,10 @@ interface JointBase {
 interface JointOwner {
     readonly kernel: KernelWorld;
     removeJoint(joint: PhysicsJoint): void;
+}
+
+interface KernelHeightfieldOptions {
+    fixInternalEdges?: boolean;
 }
 
 interface PhysicsAttachment {
