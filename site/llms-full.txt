@@ -2600,7 +2600,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-572). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-573). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -3265,6 +3265,10 @@ the entry: `PbrMaterial` is core's material and pulls in no other package.
 ## Page canvas recording (2026-11-08)
 
 `@margoengine/video/record` records origin-clean page canvases with MediaRecorder, on WebGPU, WebGL2 or 2D. Container support and codecs are the browser's choice: default WebM, optional MP4, otherwise coded unsupported with a help link. The caller supplies optional live audio tracks, cloned so originals remain owned by the caller. No audio mixing is performed. All compressed chunks stay in memory until stop. Real-time capture can drop frames or shorten media on a busy/background page; no exact duration/frame count or A/V synchronization bound is claimed. Stop waits for the final chunk; abort, disposal and errors release owned tracks and discard the result. No Node/OffscreenCanvas API or alternate codec fallback is included. The real RTX A6000/Edge check decodes WebM (VP8/Opus) and MP4 (H.264/Opus) from both backends: generated colour and a tone are stand-ins. Other browsers, players, codecs, microphone permission paths and long recordings are unmeasured. Entry 1,140 B gzip; budget 1,396 B. No speed claim. See LIM-571.
+
+## 360 and stereo video (2026-11-08)
+
+`@margoengine/video/360` uses UV0 of `sphereGeometry`, an unlit back-sided material and a camera at its centre. Image centre -Z, right +X, top +Y. Mono (default) spans the whole source; stereo-left-right holds one complete panorama per half, selected explicitly for a screen material (eye left by default). Stereo sources need at least two pixels across, enforced before binding. Sampling clamps half a texel inside each eye; no mips or repeat wrapping. WebGL2 receives coded unsupported with a help link. One video feature per material; playback and source lifetime remain caller-owned. XR reuses native `XRLayers.video` with an equirectangular sphere, automatic compositor eye choice and radius 0 at infinity; it requires the draft WebXR Layers API and XRMediaBinding. Missing XR support propagates the existing XR error. Generated colour panoramas prove six screen directions and both eyes on RTX A6000/Edge; an integrated stand-in session/binding proves XR delegation and layer lifecycle. No headset, real movie, other browser/GPU or speed evidence. Entry 1,694 B gzip, budget 1,881 B. LIM-573.
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
 

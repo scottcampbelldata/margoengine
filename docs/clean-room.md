@@ -1388,3 +1388,7 @@ Unity VFX Graph and Shuriken, Godot particles, three.js and Babylon particle sys
 ## Page canvas recording (batch 112)
 
 Written from the W3C [MediaStream Recording working draft](https://www.w3.org/TR/mediastream-recording/) (MediaRecorder construction, type support, final dataavailable before stop and errors) and [Media Capture from DOM Elements working draft](https://www.w3.org/TR/mediacapture-fromelement/) (canvas captureStream, origin cleanliness and frame production). Both are drafts. Track clone/stop ownership follows [Media Capture and Streams](https://www.w3.org/TR/mediacapture-streams/). No other library source was read or reused. Existing exporters/capture and headless/video encode supplied frame sequences; neither provides real-time page canvas recording with audio, so this optional entry owns that path.
+
+## 360 and stereo video (batch 112)
+
+Written from the W3C [WebXR Layers working draft](https://www.w3.org/TR/webxrlayers-1/) (mono/stereo-left-right packing, XREquirectLayer and XRMediaBinding) and [WebGPU external textures](https://www.w3.org/TR/webgpu/#external-texture) (dimensions and clamped external sampling). The sphere UV mapping is derived from Margo's own sphereGeometry coordinates; half-texel bounds follow texel centres. Existing XRLayers already owns XR media equirect spheres, and is reused rather than rebuilt. No other renderer/library source was read or reused. Generated panoramas and a stand-in XR binding are explicitly labelled in the evidence.

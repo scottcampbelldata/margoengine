@@ -131,3 +131,59 @@ OffscreenCanvas has this page capture API. The GPU check records generated colou
 tone stand-ins, decodes both WebM and MP4 through Edge on WebGPU and WebGL2, checks picture
 and sound, and confirms cancellation. Other players and browsers are unmeasured.
 
+## 360 and stereo video
+
+`video360Material` from `margoengine/video/360` maps equirectangular video onto the inside
+of `sphereGeometry`. The image centre faces -Z, its right quarter +X, and its top +Y.
+Use a camera inside the sphere and an unlit material with `side: 'back'`:
+
+```ts
+import {Engine} from 'margoengine/core';
+import {sphereGeometry} from 'margoengine/geometry';
+import {UnlitMaterial, createMesh} from 'margoengine/materials';
+import {video360Material} from 'margoengine/video/360';
+
+const art = new OffscreenCanvas(128, 64);
+const paint = art.getContext('2d')!;
+paint.fillStyle = '#336699';
+paint.fillRect(0, 0, 128, 64);
+const frame = new VideoFrame(art, {timestamp: 0});
+const engine = await Engine.create(document.querySelector('canvas')!, {
+  backend: 'webgpu', camera: {position: [0,0,0], target: [0,0,-1]},
+});
+const material = new UnlitMaterial({side: 'back', features: [video360Material(frame)]});
+const sphere = createMesh(engine, sphereGeometry(10, 64, 32), material);
+engine.stop();
+engine.render({delta: 0});
+await engine.gpu!.queue.onSubmittedWorkDone();
+sphere.dispose();
+material.dispose();
+engine.dispose();
+frame.close();
+```
+
+Pass a ready, playing HTMLVideoElement for a movie. `layout` defaults to `'mono'`,
+usually a 2:1 image. `'stereo-left-right'` holds two complete panoramas side by side,
+usually 4:1 overall. `eye` selects `'left'` (default) or `'right'` on screen; make a
+material for each eye for separate screen views. A stereo source must be at least
+two pixels wide. Each eye clamps half a texel inside
+its rectangle, preventing filtering from the adjacent eye. There are no mipmaps or
+repeat wrapping. Camera position should match the sphere centre. The feature occupies
+the same video slot as `videoMaterial`; choose one per material. It uses UV0 and the
+UV convention of `sphereGeometry`, not an arbitrary sphere's authored UVs. WebGL2
+binding throws coded `unsupported` with a help link. Source ownership and colour
+conversion follow `videoMaterial`.
+
+In XR, `video360Layer(layers, video, {layout: 'stereo-left-right', radius: 0})` reuses
+an existing `XRLayers` instance from `margoengine/xr/layers`. Attach it after requesting
+an XR session with `optionalFeatures: ['layers']`. This calls the existing native
+XRMediaBinding equirectangular layer path; the compositor selects each eye, without
+an extra mesh or frame upload. `layout` defaults to `'mono'` and `radius` to 0 (infinity);
+a finite positive radius is in metres. Dispose the returned XRPanel to remove it.
+The caller owns playback, origin permission and the session. Missing native layers
+support propagates the existing XR `unsupported` error. This XR route is not a WebGL2
+mesh fallback. The WebXR Layers API is a draft. A stand-in session/binding proves
+delegation, packing and disposal; no headset has been run. Generated panorama colours
+prove the screen sphere axes and both eyes on RTX A6000/Edge; real movie files, headset
+projection, other browsers/GPUs and speed remain unmeasured.
+

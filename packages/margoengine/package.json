@@ -3010,6 +3010,10 @@
       "types": "./dist/video/record.d.ts",
       "import": "./dist/video/record.js"
     },
+    "./video/360": {
+      "types": "./dist/video/360.d.ts",
+      "import": "./dist/video/360.js"
+    },
     "./viewcube": {
       "types": "./dist/viewcube.d.ts",
       "import": "./dist/viewcube.js"
