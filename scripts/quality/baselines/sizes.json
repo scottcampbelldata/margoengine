@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10986235,
+  "total": 10993122,
   "history": [
     {
       "date": "2026-10-24",
@@ -4124,6 +4124,12 @@
       "commit": "0f4f13f95",
       "reason": "splats/edit: GPU picking and brush editing entry; root gains Splats.read",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "3792a99ce",
+      "reason": "post/lens: new optional entry, lens dirt and barrel distortion",
+      "grew": 1
     }
   ],
   "items": {
@@ -4610,6 +4616,7 @@
     "@margoengine/post/glitch": 6211,
     "@margoengine/post/gtao": 11961,
     "@margoengine/post/image": 11882,
+    "@margoengine/post/lens": 6887,
     "@margoengine/post/lens-flare": 6549,
     "@margoengine/post/material-decals": 8550,
     "@margoengine/post/motion-blur": 7762,

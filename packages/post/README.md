@@ -709,6 +709,44 @@ glass.radius = 4; // a focus pull: options are read every frame
 - **Limits.** Cost grows with the radius (2 radius + 1 reads a pixel a pass); the region has a hard edge; a bright
   frame border bleeds inward. One or two full-size `rgba16float` targets. GPU cost not measured yet. WebGPU only.
 
+## Lens model: `Lens`
+
+`@margoengine/post/lens` (6,631 B min+gzip, its own entry; it carries the stack) adds what a real lens does to the
+picture: barrel or pincushion distortion, and dirt on the front glass that lights up around bright lights. An HDR
+`PostStack` effect: put it after the effects that draw light (`Bloom`, `LensFlare`) so they are distorted too. For the
+Panini projection of a wide field of view use the `WideAngle` camera in `@margoengine/cameras/panini`.
+
+```ts
+import {createStage} from 'margoengine';
+import {PostStack} from 'margoengine/post/stack';
+import {Lens} from 'margoengine/post/lens';
+import {Tonemap} from 'margoengine/tonemap';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+const lens = new Lens({distortion: 0.15, dirtIntensity: 1.5});
+PostStack.attach(stage.engine, [lens, new Tonemap()]);
+lens.options.distortion = -0.1; // pincushion: options are read every frame
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `distortion` | `0` | Radial distortion k, -1 to 1: above 0 barrel (corners stay put), below 0 pincushion |
+| `dirtIntensity` | `1` | Strength of the lit dirt, 0 to 10; 0 skips the glow passes |
+| `threshold` | `1` | Linear brightness (largest channel) above which light lights the dirt |
+| `dirt` | built-in smudges | A `GPUTexture` of the engine's device, linear RGB, stretched over the view |
+| `enabled` | `true` | False passes frames through |
+
+- **Method.** Each pixel reads the frame at c + (p - c) (1 + k r^2) s, with r measured in view heights from the
+  centre c; for barrel s scales the corners back onto the corners. The dirt glow is the light above `threshold`
+  averaged over 8 by 8 pixel blocks, blurred by a 25-tap Gaussian across and down at an eighth of the size, and added
+  times the dirt at the undistorted point (the dirt sits on the glass).
+- **Checked on a real GPU** (`packages/post/test/lens-browser.mjs`, M6 Mac mini, Metal, Chromium): with k 0.3 a bar
+  moves to within 0.13 px of where the mapping predicts; with dirt white on the left half and black on the right, the
+  dark background around the left bar brightens and the right half equals the frame without the effect to the bit; a
+  threshold above everything, and no distortion with no dirt, equal disabled exactly.
+- **Limits.** One radial term (no tangential or colour split); distortion resamples bilinearly, softening slightly; the
+  glow reaches about 50 px. Two eighth-size and one full-size `rgba16float` targets. GPU cost not measured yet. WebGPU
+  only.
+
 ## Multiple render targets: `SceneTargets`
 
 `@margoengine/post/mrt` draws the scene's surfaces into several named textures in one pass. Each output is a built-in

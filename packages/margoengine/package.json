@@ -1986,6 +1986,10 @@
       "types": "./dist/post/blur.d.ts",
       "import": "./dist/post/blur.js"
     },
+    "./post/lens": {
+      "types": "./dist/post/lens.d.ts",
+      "import": "./dist/post/lens.js"
+    },
     "./post/material-decals": {
       "types": "./dist/post/material-decals.d.ts",
       "import": "./dist/post/material-decals.js"

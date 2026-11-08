@@ -2572,3 +2572,27 @@ untouched. New looks go in new optional entries; rough reflections and multi-bou
   and multi-bounce GI need a few frames to settle and trail a moving camera; anamorphic streaks are horizontal only.
 - **Slips:** main moved during several landings; each rebase conflict in generated records was resolved by
   regenerating them, and claim numbers were renumbered after main's. Nothing that failed was pushed.
+
+## Lane E batch 71: post (part 2)
+
+One job for `@margoengine/post` on the M6 Mac mini (Metal), landed as one commit. Core and stage are untouched. The
+Panini part of the job already exists as the `WideAngle` camera in `@margoengine/cameras/panini`, so it is SKIPPED and
+the new effect's README points to it. Nothing is timed.
+
+| # | Job | Status | Commit | Entry | Claim |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Lens model effects: lens dirt, barrel distortion | DONE | this commit | `/lens` | LIM-474 |
+| 1 | Lens model effects: Panini projection | SKIPPED | | already `WideAngle` in `@margoengine/cameras/panini` | |
+
+- **Built from:** row P-43 in `docs/clean-room.md`: Brown's radial distortion model (1966) and the pcg2d hash of
+  Jarzynski and Olano (2020), from the method as published; the corner fit, glow and smudge pattern are Margo-own. No
+  code from another engine was read.
+- **Proved:** `packages/post/test/lens-browser.mjs` on this Mac: with k 0.3 a bar moves to within 0.13 px of the
+  predicted place; dirt white on the left half lights 15,786 background pixels there while the black right half stays
+  the same to the bit; a threshold above everything, and no distortion with no dirt, equal disabled exactly.
+  `lens.test.js`: pass count, axes, corner fit, option checks, disposal.
+- **Sizes (gzip, B):** new entry `/lens` 6,631. Core and stage unchanged.
+- **Bugs fixed:** the draft named a shader variable `from`, a WGSL reserved word; the browser check caught it as an
+  invalid command buffer and the name changed. The check's first background bound (luma under 60) was below this
+  scene's background (65) and counted nothing; it now separates background (under 100) from the bars (over 600).
+- **Limits and unmeasured:** row in `docs/limits.md`. One radial term; GPU cost not measured.

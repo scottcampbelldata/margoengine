@@ -349,6 +349,7 @@ test('split steps cover the whole suite: both bevel sample counts, each chain pa
       'ssgi-bounce-browser.mjs',
       'anamorphic-browser.mjs',
       'blur-browser.mjs',
+      'lens-browser.mjs',
     ],
   );
 });
