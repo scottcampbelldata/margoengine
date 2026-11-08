@@ -40,6 +40,10 @@
       "types": "./dist/formats.d.ts",
       "import": "./dist/formats.js"
     },
+    "./grids": {
+      "types": "./dist/grids.d.ts",
+      "import": "./dist/grids.js"
+    },
     "./maths": {
       "types": "./dist/maths.d.ts",
       "import": "./dist/maths.js"
@@ -73,7 +77,7 @@
   "scripts": {
     "build": "node ../../scripts/build-optional.js sciviz",
     "test": "npm run build && node --test tests/*.test.js",
-    "test:browser": "npm run build && node tests/sciviz-browser.mjs && node tests/bricks-browser.mjs",
+    "test:browser": "npm run build && node tests/sciviz-browser.mjs && node tests/bricks-browser.mjs && node tests/entries-browser.mjs",
     "prepack": "npm run build"
   }
 }

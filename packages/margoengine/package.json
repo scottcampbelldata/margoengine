@@ -2282,6 +2282,10 @@
       "types": "./dist/sciviz/formats.d.ts",
       "import": "./dist/sciviz/formats.js"
     },
+    "./sciviz/grids": {
+      "types": "./dist/sciviz/grids.d.ts",
+      "import": "./dist/sciviz/grids.js"
+    },
     "./sciviz/maths": {
       "types": "./dist/sciviz/maths.d.ts",
       "import": "./dist/sciviz/maths.js"

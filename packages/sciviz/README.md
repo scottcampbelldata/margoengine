@@ -398,6 +398,51 @@ const grid = zarrGrid(await array.read(), [1, 1, 2]);
 console.log(array.shape, grid.dims, grid.range);
 ```
 
+## Unstructured grids
+
+`@margoengine/sciviz/grids` draws finite-element style meshes: tetrahedra, hexahedra, wedges and pyramids with a value
+per point or per cell, in VTK's UnstructuredGrid layout (`points`, `connectivity`, `offsets` as the end of each cell,
+`types` as VTK cell type numbers) and VTK's point order for each cell.
+
+- `gridSurface(grid, { values })` is the outer surface: every face exactly one cell owns, facing out, as triangles.
+- `sliceGrid(grid, { normal, offset }, { values })` cuts the grid by the plane `dot(normal, p) = offset`: one convex
+  polygon per cell the plane crosses, with point values interpolated along the cut edges, so neighbouring cells meet
+  without cracks. Cell values stay constant per cell.
+- `gridLayer(fig, grid, { slice, values, colormap, range, opacity, missing })` draws either one, coloured through a
+  colour map; `layer.update(sliceGrid(grid, plane))` moves the slice. `meshLayer(fig, set)` draws any triangle set.
+- `parseVtk(text or bytes)` reads a legacy `.vtk` file (versions up to 4.2, ASCII or BINARY) holding an
+  UNSTRUCTURED_GRID. Voxels become hexahedra; vertices, lines, surface and quadratic cells are skipped and counted in
+  `skipped`. Every SCALARS array is kept by name (`pointArrays`, `cellArrays`); the first of each kind is `pointData` and
+  `cellData`. Version 5.1 files and XML `.vtu` are refused with a `RangeError` naming the version.
+
+Wedges follow VTK's corrected order: points 0, 1, 2 run counter-clockwise seen from 3, 4, 5, as in a hexahedron.
+
+```ts
+import { Figure } from '@margoengine/sciviz';
+import { gridLayer, sliceGrid, parseVtk, CELL_TYPES } from '@margoengine/sciviz/grids';
+
+const fig = await Figure.create(document.querySelector('canvas')!);
+
+// One hexahedron and one wedge on its +x side, with a value per point.
+const grid = {
+  points: [0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 2, 0, 0, 2, 0, 1],
+  connectivity: [0, 1, 2, 3, 4, 5, 6, 7, 1, 8, 2, 5, 9, 6],
+  offsets: [8, 14],
+  types: [CELL_TYPES.hexahedron, CELL_TYPES.wedge],
+  pointData: [0, 1, 2, 1, 1, 2, 3, 2, 2, 3],
+};
+const layer = gridLayer(fig, grid, { colormap: 'viridis' });
+
+// Show a slice instead of the surface.
+layer.update(sliceGrid(grid, { normal: [1, 0, 0], offset: 0.5 }));
+
+// A legacy VTK file from a solver.
+const text = '# vtk DataFile Version 3.0\none tetrahedron\nASCII\nDATASET UNSTRUCTURED_GRID\nPOINTS 4 float\n0 0 0 1 0 0 0 1 0 0 0 1\nCELLS 1 5\n4 0 1 2 3\nCELL_TYPES 1\n10\nCELL_DATA 1\nSCALARS stress float\nLOOKUP_TABLE default\n7.5\n';
+const mesh = parseVtk(text);
+console.log(mesh.title, mesh.cellArrays.stress, mesh.skipped);
+gridLayer(fig, mesh, { values: 'cell' });
+```
+
 ## Picking, tooltips and selection
 
 Hovering shows a tooltip for the scatter point, line vertex, surface point, bar or heatmap cell under the pointer, with its x, y, z, its

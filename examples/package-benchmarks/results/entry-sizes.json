@@ -1,6 +1,6 @@
 {
-  "commit": "9993a5f32",
-  "dirty": true,
+  "commit": "a3d0e8dc4",
+  "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
     "raw": 57071,
@@ -2402,6 +2402,10 @@
       "./formats": {
         "raw": 35694,
         "gzip": 13312
+      },
+      "./grids": {
+        "raw": 26618,
+        "gzip": 10567
       },
       "./maths": {
         "raw": 12305,
