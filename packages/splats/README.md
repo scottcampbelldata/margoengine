@@ -172,3 +172,32 @@ console.log(lod.selected.length, lod.drawn);
   leaf splats and draws exactly what one plain cloud of the pool's splats draws; against the capture in its own order
   188 of 262,144 channels differ (exact depth ties blend in another order); 400 units away the root alone. A procedural stand-in of 16,777,216 splats (256 leaves of 65,536) streams within a
   2,097,152 budget (1,110,016 drawn, 16 leaves near the camera).
+
+## One sort for many clouds (`./set`)
+
+Separate `Splats` clouds sort and draw one after the other, so where two captures overlap the one drawn last covers the
+other whole. A `SplatSet` puts every cloud added to it into ranges of one pooled `Splats`, so all their splats sort and
+blend far to near together, as one merged cloud would, while each stays movable and removable on its own:
+
+```ts
+import {Engine} from 'margoengine/core';
+import {parsePly} from 'margoengine/splats/data';
+import {SplatSet} from 'margoengine/splats/set';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const capture = parsePly(await (await fetch('/raccoon-v2.ply')).arrayBuffer());
+// Every member has the set's SH count: this capture's coefficients per channel (0 when it has none).
+const coefficients = (capture.sphericalHarmonics?.length ?? 0) / capture.positions.length;
+const set = SplatSet.attach(engine, {capacity: 500_000, coefficients});
+const first = set.add(capture);
+const second = set.add(capture, {matrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 2, 0, 0, 1]});
+engine.start();
+second.setMatrix([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 3, 0, 0, 1]); // move it
+first.remove(); // its range is free again
+```
+
+- `capacity` (1 to 3,000,000, default 1,000,000) is the pool; `coefficients` (0, 4, 9 or 16) the SH count every
+  member must have. `add` takes the first free range that holds the cloud and throws a RangeError when none does.
+- A member's `setMatrix(matrix)` rewrites its splats from its own data moved by the matrix (`transformSplats`);
+  `remove()` hides them and frees the range, merged with free neighbours.
+- Every pool splat is projected and sorted each frame, free ranges too (hidden, culled before drawing), so size
+  `capacity` to what you add.

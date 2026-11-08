@@ -42,6 +42,10 @@
       "types": "./dist/lod.d.ts",
       "import": "./dist/lod.js"
     },
+    "./set": {
+      "types": "./dist/set.d.ts",
+      "import": "./dist/set.js"
+    },
     "./data": {
       "types": "./dist/data.d.ts",
       "import": "./dist/data.js"

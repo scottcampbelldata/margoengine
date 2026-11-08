@@ -980,6 +980,8 @@ Known rendering gaps:
 
 **Splat level of detail (2026-11-07).** `@margoengine/splats/lod` adds no shader: a pass at order -8 picks the cut on the CPU and writes changed nodes into a fixed pool of one `Splats` with `queue.writeBuffer` (`Splats.write`, `Splats.clear`), before the cloud projects at -7. Hidden pool splats (opacity 0) are culled by the projection and sort to the end. Evidence: `packages/splats/test/gpu/check.mjs` on a Radeon 680M (real capture, full cut against a plain cloud of the pool; 16.7 M-splat procedural stand-in); missing: a real capture past 3,000,000 splats, trained hierarchy levels, frame time.
 
+**One splat sort for many clouds (2026-11-08).** `@margoengine/splats/set` adds no shader: `SplatSet` writes each added cloud into a first-fit range of one pooled `Splats` (`Splats.write`, `Splats.clear`), so the one projection and stable radix sort order every member far to near, as a merged cloud would. Evidence: `packages/splats/test/gpu/check.mjs` on a Radeon 680M (two overlapping copies of a real capture match the merged cloud pixel for pixel at 1x and 4x MSAA, and differ as two clouds); missing: frame time for a large mostly free pool.
+
 ## 4. Quality architecture
 
 ### 4.1 Gate map

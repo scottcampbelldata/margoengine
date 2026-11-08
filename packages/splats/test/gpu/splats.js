@@ -6,7 +6,8 @@ import { Material, createMesh } from '../../../materials/dist/index.js';
 import { planeGeometry } from '../../../geometry/dist/index.js';
 import { CameraProjection } from '../../../cameras/dist/index.js';
 import { Splats } from '../../dist/index.js';
-import { parsePly } from '../../dist/data.js';
+import { parsePly, transformSplats, mergeSplats } from '../../dist/data.js';
+import { SplatSet } from '../../dist/set.js';
 import { SplatDepth } from '../../dist/depth.js';
 import { SplatLod, buildSplatLod } from '../../dist/lod.js';
 
@@ -253,5 +254,49 @@ window.check.lod = async (o) => {
     result.moved = { selected: [...lod.selected], drawn: lod.drawn, url: canvas.toDataURL('image/png') };
   }
   return result;
+};
+// ./set: two overlapping copies of the real capture (the second tinted green and moved 1 cm along the view) as two
+// clouds, as one merged cloud, or as two members of one SplatSet.
+window.check.set = async (o) => {
+  engine?.dispose();
+  canvas?.remove();
+  extras = [];
+  globalThis.margoLow = o.samples === 1 ? 1 : undefined;
+  canvas = document.body.appendChild(document.createElement('canvas'));
+  canvas.style.cssText = 'width:256px;height:256px;display:block';
+  const a = await loadCapture(),
+    n = a.positions.length / 3,
+    sum = [0, 0, 0];
+  for (let i = 0; i < n; i++) for (let k = 0; k < 3; k++) sum[k] += a.positions[i * 3 + k];
+  const at = sum.map((s) => s / n),
+    move = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0.01, 0.02, 0, 1],
+    tint = { ...a, colors: a.colors.map((v, i) => (i % 4 === 3 ? v : i % 4 === 1 ? Math.min(1, v * 1.5 + 0.2) : v * 0.3)) },
+    b = transformSplats(tint, move);
+  engine = await Engine.create(canvas, {
+    backend: 'webgpu',
+    preserveDrawingBuffer: true,
+    camera: { position: [at[0] - 2.5, at[1], at[2]], target: at, near: 0.05, far: 100 },
+  });
+  engine.gpu.addEventListener('uncapturederror', (e) => errors.push(e.error.message));
+  let info = {};
+  if (o.mode === 'separate') {
+    Splats.attach(engine, a);
+    Splats.attach(engine, b);
+  } else if (o.mode === 'merged') Splats.attach(engine, mergeSplats(a, b));
+  else {
+    const set = SplatSet.attach(engine, { capacity: 3 * n, coefficients: a.sphericalHarmonics ? a.sphericalHarmonics.length / n / 3 : 0 });
+    // A placeholder first, removed again, so the first member goes into a freed range.
+    set.add(a).remove();
+    const first = set.add(a),
+      second = o.moved ? set.add(tint) : set.add(b);
+    if (o.moved) second.setMatrix(move);
+    if (o.removed) {
+      const third = set.add(b);
+      third.remove();
+    }
+    info = { firsts: [first.first, second.first], used: set.used };
+  }
+  await waitForPipelines(draw);
+  return { url: canvas.toDataURL('image/png'), ...info };
 };
 window.ready = true;

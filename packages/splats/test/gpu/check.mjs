@@ -2,6 +2,7 @@
 // slot itself): node packages/splats/test/gpu/check.mjs
 // ./depth: meshes drawn before a cloud hide the splats behind them (the cloud's own depth test), and with SplatDepth a
 // cloud hides what later passes draw behind it, on a synthetic splat and on a real capture (raccoon, Niantic SPZ sample).
+// ./set: two overlapping copies of the capture sorted as one set draw what one merged cloud draws; as two clouds they do not.
 // ./lod: a hierarchy of the real capture fully refined draws as the plain cloud; a 16.7 M-splat stand-in streams in a 2 M budget.
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../../scripts/browser.js';
@@ -145,6 +146,36 @@ try {
     assert.ok(big.drawn <= 2097152 && big.moved.drawn <= 2097152, `within the budget: ${big.drawn}, ${big.moved.drawn}`);
     assert.ok(big.leaves > 0, 'leaves near the camera are drawn');
     assert.notDeepEqual(big.selected, big.moved.selected, 'a moved camera streams another cut');
+  }
+  // ./set: two clouds sort apart, so the one drawn last covers the other where they overlap; a SplatSet sorts them as
+  // one, so it draws what the merged cloud (the same splats in the same order) draws, pixel for pixel.
+  for (const samples of [1, 4]) {
+    const run = async (o) => {
+      const r = await page.evaluate((options) => window.check.set(options), { samples, ...o });
+      return { ...r, image: await decodePNG(Buffer.from(r.url.split(',')[1], 'base64')) };
+    };
+    const compare = (x, y) => {
+      let differ = 0,
+        far = 0;
+      for (let i = 0; i < x.data.length; i++) {
+        const d = Math.abs(x.data[i] - y.data[i]);
+        if (d) differ++;
+        if (d > 8) far++;
+      }
+      return { differ, far };
+    };
+    const merged = await run({ mode: 'merged' }),
+      separate = await run({ mode: 'separate' }),
+      set = await run({ mode: 'set' }),
+      moved = await run({ mode: 'set', moved: true, removed: true });
+    const apart = compare(separate.image, merged.image),
+      together = compare(set.image, merged.image),
+      after = compare(moved.image, merged.image);
+    report[`set ${samples}x`] = { apart, together, after, firsts: set.firsts, used: set.used, channels: merged.image.data.length };
+    assert.ok(apart.far > 100, `${samples}x: separate clouds blend in the wrong order, ${apart.far} channels off by more than 8`);
+    assert.equal(together.differ, 0, `${samples}x: the set draws the merged cloud, ${together.differ} channels apart`);
+    assert.equal(after.differ, 0, `${samples}x: setMatrix and a removed member leave the same picture, ${after.differ} apart`);
+    assert.deepEqual(set.firsts, [0, set.used / 2], 'the freed placeholder range is reused, members in add order');
   }
   const errors = await page.evaluate(() => window.check.errors);
   console.log(JSON.stringify(report));

@@ -2470,6 +2470,10 @@
       "types": "./dist/splats/lod.d.ts",
       "import": "./dist/splats/lod.js"
     },
+    "./splats/set": {
+      "types": "./dist/splats/set.d.ts",
+      "import": "./dist/splats/set.js"
+    },
     "./splats/data": {
       "types": "./dist/splats/data.d.ts",
       "import": "./dist/splats/data.js"
