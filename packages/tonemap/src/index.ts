@@ -41,6 +41,9 @@ type Output = { peak: number; p3: boolean; excess?: (width: number, height: numb
  */
 export type TonemapCurve = 'agx' | 'acescg' | 'neutral' | 'reinhard' | 'cineon' | 'linear';
 const curves: readonly TonemapCurve[] = ['agx', 'acescg', 'neutral', 'reinhard', 'cineon', 'linear'];
+/** The extensions and extra bindings of a Tonemap without extensions: shared, so such a frame allocates none. */
+const NO_EXTENSIONS: readonly TonemapExtension[] = [],
+  NO_BINDINGS: readonly { binding: number; resource: GPUBindingResource }[] = [];
 /** What {@link TonemapExtension.encode} gets: the frame's encoder and HDR source, before the presentation pass. */
 export interface TonemapPassContext {
   readonly device: GPUDevice;
@@ -408,17 +411,31 @@ export class Tonemap implements EnginePlugin {
       o = this.options,
       auto = !!o.autoExposure,
       fxOn = usesEffects(o),
-      exts = o.extensions ?? [],
+      exts = o.extensions ?? NO_EXTENSIONS,
       classic = curves.indexOf(o.curve!) > 2,
+      flags = exts.length
+        ? -1
+        : (excess ? 1 : 0) | (variableLUT ? 2 : 0) | (fxOn ? (auto ? 12 : 4) : 0) | (classic ? 16 : 0),
+      // The key string is built only when what it names may have changed (a frame with extensions always builds it):
+      // a steady frame builds no string.
       key =
-        format +
-        ':' +
-        multisample?.count +
-        (excess ? ':output' : '') +
-        (variableLUT ? ':lut-size' : '') +
-        (fxOn ? (auto ? ':fx-auto' : ':fx') : '') +
-        (classic ? ':classic' : '') +
-        (exts.length ? ':' + exts.map((e) => e.key).join(',') : '');
+        this.pipeline &&
+        flags >= 0 &&
+        flags === this.keyFlags &&
+        format === this.keyFormat &&
+        multisample?.count === this.keySamples
+          ? this.pipelineFormat!
+          : format +
+            ':' +
+            multisample?.count +
+            (excess ? ':output' : '') +
+            (variableLUT ? ':lut-size' : '') +
+            (fxOn ? (auto ? ':fx-auto' : ':fx') : '') +
+            (classic ? ':classic' : '') +
+            (exts.length ? ':' + exts.map((e) => e.key).join(',') : '');
+    this.keyFlags = flags;
+    this.keyFormat = format;
+    this.keySamples = multisample?.count;
     if (!this.pipeline || this.pipelineFormat !== key) {
       let code = excess ? outputShader : tonemapShader;
       if (variableLUT) code = sizedLUTShader(code);
@@ -451,15 +468,19 @@ export class Tonemap implements EnginePlugin {
       this.pipelineFormat = key;
       this.group = undefined;
     }
-    for (const e of exts) e.encode?.({ device: c.device, encoder: c.encoder, source, width: c.width, height: c.height });
-    const extra = exts.flatMap((e, i) =>
-      (e.resources?.() ?? []).slice(0, 4).map((resource, k) => ({ binding: 16 + 4 * i + k, resource })),
-    );
+    // A frame without extensions makes no array, closure or iterator here (the frame-allocation floors).
+    for (let i = 0; i < exts.length; i++)
+      exts[i].encode?.({ device: c.device, encoder: c.encoder, source, width: c.width, height: c.height });
+    const extra = exts.length
+      ? exts.flatMap((e, i) =>
+          (e.resources?.() ?? []).slice(0, 4).map((resource, k) => ({ binding: 16 + 4 * i + k, resource })),
+        )
+      : NO_BINDINGS;
     if (
       !this.group ||
       this.sourceTexture !== source ||
       extra.length !== this.extResources.length ||
-      extra.some((r, i) => r.resource !== this.extResources[i])
+      (extra.length > 0 && extra.some((r, i) => r.resource !== this.extResources[i]))
     ) {
       this.extResources = extra.map((r) => r.resource);
       const group = {
@@ -494,10 +515,11 @@ export class Tonemap implements EnginePlugin {
     v[13] = excess ? out!.peak : 0;
     v[14] = +!!(excess && out!.p3);
     c.device.queue.writeBuffer(this.uniform!, 0, v as Float32Array<ArrayBuffer>);
-    exts.forEach((e, i) => {
-      const buffer = this.extBuffers[i];
+    for (let i = 0; i < exts.length; i++) {
+      const buffer = this.extBuffers[i],
+        e = exts[i];
       if (buffer && e.values) c.device.queue.writeBuffer(buffer, 0, e.values() as Float32Array<ArrayBuffer>);
-    });
+    }
     if (fxOn) this.applyEffects(c, source, auto);
     this.attachment.view = view;
     this.attachment.loadOp = viewLoadOp(c, 'clear');
@@ -589,6 +611,10 @@ export class Tonemap implements EnginePlugin {
   private captureTarget?: SceneTarget;
   private depth?: GPUTexture;
   private pipelineFormat?: string;
+  /** What {@link pipelineFormat} was built from, so a steady frame can reuse it without building its string. */
+  private keyFlags = -1;
+  private keyFormat?: GPUTextureFormat;
+  private keySamples?: number;
   private release(): void {
     this.captureTarget?.dispose();
     this.captureTarget = undefined;
