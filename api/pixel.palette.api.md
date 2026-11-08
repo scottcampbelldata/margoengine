@@ -8,6 +8,13 @@ import { Engine, EnginePlugin } from "@margoengine/core/extension";
 
 export type PaletteColor = string | readonly [number, number, number];
 
+export interface PaletteCycle {
+    from: number;
+    to: number;
+    rate: number;
+    blend?: boolean;
+}
+
 export type PaletteDistance = 'oklab' | 'srgb';
 
 export type PaletteDither = 'none' | 'bayer2' | 'bayer4' | 'bayer8' | 'blue-noise';
@@ -19,6 +26,7 @@ export class PaletteQuantize implements EnginePlugin {
     constructor(options: PaletteQuantizeOptions);
     static attach(instance: EngineKernel, options: PaletteQuantizeOptions): PaletteQuantize;
     setPalette(palette: readonly PaletteColor[], swap?: readonly PaletteColor[]): void;
+    setSwap(swap: readonly PaletteColor[]): void;
     setup(engine: Engine): void;
     onDeviceRestored(): void;
     dispose(): void;
@@ -44,10 +52,14 @@ export function bayerMatrix(size: 2 | 4 | 8): Float32Array;
 
 export function blueNoise(size?: number, seed?: number): Float32Array;
 
+export function cyclePalette(colors: readonly PaletteColor[], cycles: readonly PaletteCycle[], seconds: number): string[];
+
 export function ditherMatrix(mode: PaletteDither): {
     size: number;
     values: Float32Array;
 } | undefined;
+
+export function mixPalettes(a: readonly PaletteColor[], b: readonly PaletteColor[], t: number): string[];
 
 export function nearestPaletteIndex(r: number, g: number, b: number, palette: PaletteRGB, distance?: PaletteDistance, threshold?: number, spread?: number): number;
 

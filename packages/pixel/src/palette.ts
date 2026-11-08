@@ -97,6 +97,82 @@ export function paletteRamp(from: PaletteColor, to: PaletteColor, steps: number)
   });
 }
 
+/** A run of palette entries that cycles: {@link cyclePalette}. */
+export interface PaletteCycle {
+  /** First index of the run. */
+  from: number;
+  /** Last index of the run, included; above `from`. */
+  to: number;
+  /** Entries a second the colours move toward `to`; below 0 toward `from`. */
+  rate: number;
+  /** Mixes each step in Oklab instead of jumping a whole entry at a time. Default false. */
+  blend?: boolean;
+}
+
+/**
+ * The palette at time `seconds` with each run's colours rotated along it, for water, fire and conveyor belts drawn in
+ * a few palette entries: entry `from + i` shows the colour that started at `from + (i - rate * seconds)`, wrapping
+ * inside the run. Entries outside every run stay. Feed it to {@link PaletteQuantize.setSwap} each frame. Returns
+ * `#rrggbb`.
+ */
+export function cyclePalette(
+  colors: readonly PaletteColor[],
+  cycles: readonly PaletteCycle[],
+  seconds: number,
+): string[] {
+  const rgb = readPalette(colors),
+    out = rgb.map((c) => hex(c));
+  if (!Number.isFinite(seconds)) throw rangeError('cyclePalette seconds must be a finite number', 'pixel-palette');
+  const owner = new Int32Array(rgb.length).fill(-1);
+  cycles.forEach((cycle, k) => {
+    const { from, to, rate } = cycle;
+    if (!Number.isInteger(from) || !Number.isInteger(to) || from < 0 || to >= rgb.length || to <= from)
+      throw rangeError(
+        `A palette cycle needs whole from < to inside the palette, got ${from} to ${to}`,
+        'pixel-palette',
+      );
+    if (!Number.isFinite(rate)) throw rangeError('A palette cycle rate must be a finite number', 'pixel-palette');
+    for (let i = from; i <= to; i++) {
+      if (owner[i] >= 0)
+        throw rangeError(`Palette cycles ${owner[i]} and ${k} must not share entry ${i}`, 'pixel-palette');
+      owner[i] = k;
+    }
+    const length = to - from + 1,
+      shift = rate * seconds,
+      whole = Math.floor(shift),
+      part = cycle.blend ? shift - whole : 0,
+      wrap = (i: number) => from + (((i % length) + length) % length);
+    for (let i = 0; i < length; i++) {
+      const a = rgb[wrap(i - whole)];
+      if (!part) {
+        out[from + i] = hex(a);
+        continue;
+      }
+      const b = rgb[wrap(i - whole - 1)],
+        la = oklabFromSRGB(...a),
+        lb = oklabFromSRGB(...b);
+      out[from + i] = hex(sRGBFromOklab(...(la.map((v, c) => v + (lb[c] - v) * part) as [number, number, number])));
+    }
+  });
+  return out;
+}
+
+/**
+ * Each entry mixed from `a` toward `b` by `t` (0 gives `a`, 1 gives `b`) in Oklab, for day and night or seasons: two
+ * palettes of the same length, one index meaning the same thing in both. Returns `#rrggbb`.
+ */
+export function mixPalettes(a: readonly PaletteColor[], b: readonly PaletteColor[], t: number): string[] {
+  const from = readPalette(a),
+    to = readPalette(b);
+  if (from.length !== to.length) throw rangeError('mixPalettes needs two palettes of the same length', 'pixel-palette');
+  if (!(t >= 0 && t <= 1)) throw rangeError(`mixPalettes t must be between 0 and 1, got ${t}`, 'pixel-palette');
+  return from.map((c, i) => {
+    const p = oklabFromSRGB(...c),
+      q = oklabFromSRGB(...to[i]);
+    return hex(sRGBFromOklab(...(p.map((v, k) => v + (q[k] - v) * t) as [number, number, number])));
+  });
+}
+
 /**
  * The ordered dither matrix of side `size` (2, 4 or 8), row by row: each value `(rank + 0.5) / size^2`, so every value is
  * above 0 and below 1. @throws RangeError for another size.
@@ -364,6 +440,24 @@ export class PaletteQuantize implements EnginePlugin {
     this.#colors = colors;
     this.#shown = shown;
     this.#dropPalette();
+  }
+  /**
+   * Replaces only the colours drawn for each match, from the next frame, writing them into the texture already made:
+   * the matching stays, so it is cheap enough for every frame (palette cycling, day and night).
+   */
+  setSwap(swap: readonly PaletteColor[]): void {
+    const shown = readPalette(swap);
+    if (shown.length !== this.#colors.length)
+      throw rangeError('A palette swap has as many colours as its palette', 'pixel-palette');
+    this.#shown = shown;
+    if (this.#shownTexture && this.#device) {
+      const bytes = new Uint8Array(shown.length * 4);
+      shown.forEach((c, i) => bytes.set([...c.map((v) => Math.round(v * 255)), 255], i * 4));
+      this.#device.queue.writeTexture({ texture: this.#shownTexture }, bytes, { bytesPerRow: bytes.byteLength }, [
+        shown.length,
+        1,
+      ]);
+    }
   }
   setup(engine: Engine): void {
     if (this.#disposed) throw fault('disposed', 'PaletteQuantize disposed; create a new one');

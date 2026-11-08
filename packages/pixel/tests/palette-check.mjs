@@ -1,7 +1,7 @@
 // Real-GPU proof (from the repository root after building packages; check:gpu-packages takes the GPU lock around it):
 //   node scripts/gpu-lock.mjs run --owner=<you> -- node packages/pixel/tests/palette-check.mjs
 // A 16 x 4 gradient quantized to a 4-colour palette matches the CPU matcher byte for byte for each dither mode and both
-// distances; palette swap, alpha, a device loss. Results: test-results/palette-browser.json.
+// distances; palette swap, a swap set live with no new texture, alpha, a device loss. Results: test-results/palette-browser.json.
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
@@ -22,6 +22,7 @@ try {
   assert.deepEqual(failed, [], 'every pixel matches the CPU reference');
   assert.ok(result.distinct > 1, 'the dithered gradient shows more than one colour in a row');
   assert.equal(result.sameTexture, 'state', 'the same source and target name their fix');
+  assert.equal(result.swapTextures, 0, 'setSwap makes no texture');
   assert.equal(result.validation, null, 'no validation errors');
   assert.deepEqual(result.errors, []);
   assert.deepEqual(pageErrors, []);

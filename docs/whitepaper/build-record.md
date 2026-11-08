@@ -3224,3 +3224,31 @@ the batch).
 - **Limits and unmeasured:** rows in `docs/limits.md` for each job. HTML drawn into the scene is WebGPU only, and scene
   geometry in front of a quad does not stop the pointer reaching the element; `foreignObject` loads nothing from
   inside the image. Slots never shrink. Cost per frame is not measured for any job.
+
+## Lane C batch 102: pixel
+
+Four jobs for `@margoengine/pixel`, on this PC (RTX A6000, Edge), as new optional entries or additions to the palette
+entry; core and stage are untouched. The aim is pixel art on any screen: sizes that are not whole multiples, a tube
+look and animated palettes. Nothing is timed.
+
+| # | Job | Status | Commit | Entry | Gzip | Claim |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Sub-pixel smooth camera | SKIPPED | | already `PixelCamera` `smooth`, which carries the scroll below a low-res pixel into the composite in whole output pixels | | |
+| 2 | Pixel-art scaling filters | DONE | `7665fdb6f` | `/scale` | 3111 B | LIM-561 |
+| 3 | Retro display effects | DONE | `8fc674631` | `/crt` | 2816 B | LIM-562 |
+| 4 | Palette cycling and ramps | DONE | this commit | `/palette` (`cyclePalette`, `mixPalettes`, `setSwap`) | 4604 B | LIM-567 |
+
+- **Bugs fixed:** none outside the batch was found. Caught before landing: the CRT check first timed out because the
+  new entry was not yet in the package's exports, so its file was never built.
+- **Proved:** each job's Node tests and its GPU check on the RTX A6000 (`scale-check.mjs`, `crt-check.mjs`,
+  `palette-check.mjs`), against the maths worked out on the CPU in float64 in the check, never copied from a run; each
+  check was also run once with a deliberate fault in the built shader (the wrong texel pair, the wrong blur weight)
+  and failed on it.
+- **Sources:** rows PX1 to PX3 in `docs/clean-room.md`: the box-filter coverage derived from its definition; the EPX
+  and Scale2x corner rule from the Wikipedia article on pixel-art scaling, read as prose with its pseudocode skipped;
+  the CRT look and colour cycling as Margo designs; Oklab as already cited.
+- **Limits:** rows in `docs/limits.md`: two texels a side below 1 times, `'edge'` from 2 times, colours mixed as
+  stored; a stylised tube; cycles rotate the drawn colours, not the matching.
+- **Gate:** lint, hygiene, verify, `check:readmes`, `check:readme-run --packages=pixel`, the claims test, the pixel,
+  lighting2d and margoengine tests, the root tests and every pixel GPU check per job; after a move of main the ship
+  reran the records, the api and quality gates, the claims, llms and lock tests, the package tests and the GPU checks.

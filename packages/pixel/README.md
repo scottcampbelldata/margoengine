@@ -213,6 +213,41 @@ engine.render({delta: 1 / 60});
 
 The pattern is fixed to the target's pixels. `shiftPaletteHue(colors, degrees)` and `paletteRamp(from, to, steps)` make palettes in Oklab; `bayerMatrix`, `blueNoise` and `nearestPaletteIndex` are the CPU forms the pass uses.
 
+### Palette cycling and ramps
+
+`cyclePalette(colors, cycles, seconds)` rotates runs of palette entries over time, the old way to animate water, fire
+and lights by repainting no pixel; `mixPalettes(a, b, t)` mixes two palettes entry by entry in Oklab, for day and
+night. Hand the result to `setSwap` each frame: it rewrites the drawn colours in place and keeps the matching.
+
+```ts
+import {EngineKernel} from 'margoengine/core';
+import {LayerCompositor} from 'margoengine/pixel';
+import {cyclePalette, mixPalettes, PaletteQuantize} from 'margoengine/pixel/palette';
+const canvas = document.querySelector('canvas')!;
+const engine = await EngineKernel.create(canvas, {backend: 'webgpu', exactSize: [320, 180]});
+const compositor = LayerCompositor.attach(engine, {camera: {width: 320, height: 180}});
+const drawn = compositor.addLayer({visible: false});
+const shown = compositor.addLayer();
+// Entries 1 to 3 are water; dusk is the same palette in the evening.
+const day = ['#101820', '#1d4e89', '#3a7fc1', '#7fb8e6', '#f4e9d8'];
+const dusk = ['#100818', '#2a2a6a', '#4a4a9a', '#8a78b8', '#e8b890'];
+const pass = PaletteQuantize.attach(engine, {palette: day, source: drawn.target, target: shown.target});
+const water = {from: 1, to: 3, rate: 4, blend: true}; // 4 entries a second, mixed between steps
+// Three frames a quarter of a second apart; a game does this in its frame loop.
+for (const seconds of [0, 0.25, 0.5]) {
+  pass.setSwap(cyclePalette(mixPalettes(day, dusk, seconds), [water], seconds));
+  engine.render({delta: 0.25});
+}
+console.log(cyclePalette(['#000000', '#ff0000', '#00ff00', '#0000ff'], [{from: 1, to: 3, rate: 1}], 1)); // ['#000000', '#0000ff', '#ff0000', '#00ff00']
+```
+
+| Field of a cycle | What it does |
+| --- | --- |
+| `from`, `to` | The run, both ends included, `from < to`; runs must not share entries |
+| `rate` | Entries a second the colours move toward `to`; below 0 toward `from` |
+| `blend` | Mixes in Oklab between steps instead of jumping a whole entry. Default false |
+
+
 ## 3D to pixels
 
 `margoengine/pixel/render3d` draws the 3D scene small. `Render3D` holds a low-res view with depth, and outlines what it shows from depth and surface direction. Pass its `view` to `render` with your canvas view.

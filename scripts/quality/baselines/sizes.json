@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11346987,
+  "total": 11347506,
   "history": [
     {
       "date": "2026-10-24",
@@ -4604,6 +4604,12 @@
       "commit": "7da66b2cd",
       "reason": "Batch 112 adds the optional video/material entry. Existing entry budgets are unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "efd98d33f",
+      "reason": "palette cycling and ramps in @margoengine/pixel/palette",
+      "grew": 1
     }
   ],
   "items": {
@@ -5084,7 +5090,7 @@
     "@margoengine/physics2d/outline": 2524,
     "@margoengine/pixel": 4664,
     "@margoengine/pixel/crt": 3072,
-    "@margoengine/pixel/palette": 4341,
+    "@margoengine/pixel/palette": 4860,
     "@margoengine/pixel/render3d": 3866,
     "@margoengine/pixel/scale": 3367,
     "@margoengine/points": 23954,

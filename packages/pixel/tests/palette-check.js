@@ -172,6 +172,28 @@ window.check = {
       source.destroy();
       target.destroy();
     }
+    // setSwap writes the drawn colours into the texture it has: the next frame shows them and no texture is made.
+    {
+      const data = gradient(),
+        { source, target } = textures(data),
+        pass = PaletteQuantize.attach(instance, { palette: PALETTE, source, target, dither: 'bayer2' });
+      instance.render({ delta: 1 / 60 });
+      const device = engine.gpu,
+        create = device.createTexture;
+      let made = 0;
+      device.createTexture = (descriptor) => {
+        made++;
+        return create.call(device, descriptor);
+      };
+      pass.setSwap(SWAP);
+      instance.render({ delta: 1 / 60 });
+      device.createTexture = create;
+      out.checks['swap set live'] = wrong(await read(target), reference(data, PALETTE, SWAP, { dither: 'bayer2' }));
+      out.swapTextures = made;
+      pass.dispose();
+      source.destroy();
+      target.destroy();
+    }
     out.validation = (await engine.gpu.popErrorScope())?.message ?? null;
 
     // A lost device: the pass makes its textures again.
