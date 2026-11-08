@@ -795,6 +795,16 @@ Sweep record: every package's tests and browser or GPU tests on the Mac mini (M6
 Measured but not fixed. Their history, sources and rerun commands are in
 [whitepaper/perf-history.md](whitepaper/perf-history.md#open-losses).
 
+- **Navmesh build of one gapped floor is slower than recast-navigation 0.44.0** (`@margoengine/navmesh`, perf history
+  entry 94): 3.190 ms against 1.130 ms, paired turns, per-round minimum, busy machine, diagnostic. Repro:
+  `node packages/navmesh/scripts/rival-bench.mjs` after the navmesh build. The rival is installed outside the
+  repository. Cause not yet found. Publishing the number does not close it.
+- **Navmesh path on that floor is longer than Detour's** (`@margoengine/navmesh`, perf history entry 94): Margo 24.212
+  (north hall, 4 points) against recast-navigation 0.44.0 at 23.778 (south hall, 5 points). The corner route through
+  either hall is about 23.26. The open floor is equal (both 22.627416997969522, the Euclidean length). Cause not yet
+  found. `packages/navmesh/test/path-length.test.js` checks the open floor and that the gapped path stays out of the
+  hole. It does not freeze Detour's length. Publishing the number does not close it.
+
 - **Own 2D physics steps the 100-row pyramid in 2.9 ms in Wasm where Box2D v3's Wasm takes 1.4 ms**
   (`packages/physics2d/kernel`, perf history entries 83 to 91): repro `BOX2D_WASM=<box2d3-pyramid.mjs> node
   scripts/physics2d-kernel-browsers.mjs` (the Box2D build is in reproduce.md). Cause, measured: the broad phase was

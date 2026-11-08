@@ -8,9 +8,20 @@ time is the fastest round. These numbers were taken on a busy machine and are di
 | Package | Work | Margo | Rival | Result |
 | --- | --- | --- | --- | --- |
 | `@margoengine/behavior` | 1,000 agents, one flock step (separation, alignment, cohesion, radius 2) | 3.098 ms | Yuka 0.7.8, 9.472 ms | win |
+| `@margoengine/navmesh` | gapped floor, build | 3.190 ms | recast-navigation 0.44.0, 1.130 ms | loss |
+| `@margoengine/navmesh` | gapped floor, one path query | 0.064 ms | recast-navigation 0.44.0, 0.082 ms | win |
+| `@margoengine/navmesh` | gapped floor, path length | 24.212 | recast-navigation 0.44.0, 23.778 | loss |
+| `@margoengine/navmesh` | open floor, path length | 22.627416997969522 | recast-navigation 0.44.0, same value, the Euclidean length | equal |
 
 The flock checksums after that step were 31517.19 (Margo) and 31516.70 (Yuka). Both moved from the same grid. They are
 not bit-equal: Yuka keeps a neighbourhood per vehicle and Margo uses one uniform grid. The behaviours are the ones in
 Reynolds 1987, weights 1.5, 1 and 1, max speed 3, max force 6. Rerun: `node packages/behavior/scripts/rival-bench.mjs`
 after `npm run build --workspace @margoengine/behavior`. The Yuka install is `batch-167` under engine-bench
 (`MARGO_ENGINE_BENCH` overrides the folder).
+
+The navmesh rows use one gapped floor (four quads, cell size 0.25) and one open floor. Build time and the path query are
+separate paired runs. Margo's gapped path takes the north hall (4 points, length 24.212). Detour takes the south hall
+(5 points, length 23.778). The straight line through the gap corners is about 23.26. Both open-floor paths equal
+`hypot(16, 16)`. The build loss and the length loss stay open in `docs/known-bugs.md`. The open floor and the rule that
+the gapped path stays out of the hole are `packages/navmesh/test/path-length.test.js` (that test does not freeze
+Detour's length). Rerun: `node packages/navmesh/scripts/rival-bench.mjs`.

@@ -2257,6 +2257,17 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
 - **Rerun:** `node packages/behavior/scripts/rival-bench.mjs`. Yuka stays outside the repository. Citation in
   clean-room.md.
 
+### 94. Navmesh build and path length against recast-navigation (diagnostic)
+
+- **Measurement:** one gapped floor (four quads, cell size 0.25, the config in the bench) and one open floor. Build
+  time and one path query, paired turns, fastest of 7 rounds. Path length on both meshes. The rival is
+  recast-navigation 0.44.0, outside the repository.
+- **Result:** build loss, Margo 3.190 ms, recast 1.130 ms. Query win, 0.064 ms against 0.082 ms. Gapped length loss,
+  24.212 (north hall, 4 points) against 23.778 (south hall, 5 points). The corner route is about 23.26. Open floor
+  equal, both 22.627416997969522, which is `hypot(16, 16)`. Busy machine, diagnostic. Cause of the two losses is not
+  yet found. They stay open in known-bugs.md.
+- **Rerun:** `node packages/navmesh/scripts/rival-bench.mjs`. Citation in clean-room.md.
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).

@@ -1156,7 +1156,7 @@ Written clean room from the published work below. No source of a camera system i
 
 ## Navigation: `@margoengine/navmesh`
 
-Written clean room from the published work below. No source of a navmesh library or another engine was read; Recast and Detour were not opened. The earlier parts of this package (ORCA, the funnel, the voxel pipeline) cite their sources in `packages/navmesh/src/`.
+Written clean room from the published work below. No source of a navmesh library or another engine was read; Recast and Detour were not opened. The batch 167 timing drives recast-navigation 0.44.0 as a black box. The config field names are the ones in its README and generators API (https://github.com/isaac-mason/recast-navigation-js). The library source was not opened. The earlier parts of this package (ORCA, the funnel, the voxel pipeline) cite their sources in `packages/navmesh/src/`.
 
 | Area | Source |
 | --- | --- |
