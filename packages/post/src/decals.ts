@@ -47,6 +47,9 @@ export interface Decal {
 export interface DecalOptions {
   /** RGBA atlas the decals' `rect`s address (2D, sampled; mipmaps used when present). Default a 1x1 white texel. */
   atlas?: GPUTexture;
+  /** Screen-size cull: a decal whose bounding sphere spans fewer than this many pixels on screen is not drawn (finite,
+   * >= 0, default 1; 0 draws every decal in view). The span is a conservative bound, so a culled decal covers less. */
+  minPixels?: number;
 }
 /** Decals per {@link Decals.setDecals} call. */
 export const MAX_DECALS = 4096;
@@ -110,6 +113,8 @@ const over: GPUBlendState = {
 export class Decals implements EnginePlugin {
   readonly name = 'post:decals';
   readonly atlas?: GPUTexture;
+  /** Screen-size cull threshold in pixels ({@link DecalOptions.minPixels}). */
+  readonly minPixels: number;
   private engine?: Engine;
   private device?: GPUDevice;
   private uniform?: GPUBuffer;
@@ -122,6 +127,15 @@ export class Decals implements EnginePlugin {
   private depthViews = new WeakMap<GPUTexture, GPUTextureView>();
   private data = new Float32Array(0);
   private counts: [number, number] = [0, 0];
+  // Per decal, in `data` order: bounding sphere centre and radius (half the box diagonal).
+  private spheres = new Float64Array(0);
+  // The visible decals compacted for upload, their indices, the indices last uploaded, and the drawn count per mode.
+  private visible = new Float32Array(0);
+  private shown = new Int32Array(0);
+  private uploaded = new Int32Array(0);
+  private uploadedCount = -1;
+  private drawCounts: [number, number] = [0, 0];
+  private readonly planes = new Float64Array(24);
   private dirty = false;
   private disposed = false;
   private readonly values = new Float32Array(40);
@@ -138,7 +152,11 @@ export class Decals implements EnginePlugin {
         !(atlas.usage & GPUTextureUsage.TEXTURE_BINDING))
     )
       throw new TypeError('Decal atlas must be a sampled 2D GPUTexture');
+    const minPixels = options.minPixels ?? 1;
+    if (!(Number.isFinite(minPixels) && minPixels >= 0))
+      throw new RangeError('Decal minPixels must be a finite number >= 0');
     this.atlas = atlas;
+    this.minPixels = minPixels;
   }
   get owner(): Engine | undefined {
     return this.engine;
@@ -214,7 +232,17 @@ export class Decals implements EnginePlugin {
     });
     const order = [...packed.filter((p) => p.mode === 'multiply'), ...packed.filter((p) => p.mode === 'over')];
     this.data = new Float32Array(order.length * FLOATS);
-    order.forEach((p, i) => this.data.set(p.values, i * FLOATS));
+    this.spheres = new Float64Array(order.length * 4);
+    order.forEach((p, i) => {
+      const v = p.values;
+      this.data.set(v, i * FLOATS);
+      this.spheres.set([v[0], v[1], v[2], Math.hypot(v[4], v[5], v[6], v[8], v[9], v[10], v[12], v[13], v[14])], i * 4);
+    });
+    this.visible = new Float32Array(this.data.length);
+    this.shown = new Int32Array(order.length);
+    this.uploaded = new Int32Array(order.length);
+    this.uploadedCount = -1;
+    this.drawCounts = [0, 0];
     this.counts = [
       order.length - packed.filter((p) => p.mode === 'over').length,
       packed.filter((p) => p.mode === 'over').length,
@@ -225,6 +253,11 @@ export class Decals implements EnginePlugin {
   /** Number of decals set. */
   get count(): number {
     return this.counts[0] + this.counts[1];
+  }
+  /** Number of decals drawn in the last frame: those whose bounding sphere is in the view frustum and spans at least
+   * {@link minPixels} pixels. */
+  get drawn(): number {
+    return this.drawCounts[0] + this.drawCounts[1];
   }
   setup(engine: Engine): void {
     if (this.disposed || !engine.gpu)
@@ -275,21 +308,34 @@ export class Decals implements EnginePlugin {
       );
     const multisampled = target.samples > 1,
       depth = multisampled ? target.depthSource : this.depthView(target.resolvedDepth);
-    if (this.dirty || !this.storage) {
-      if (!this.storage || this.storage.size < this.data.byteLength) {
-        this.storage?.destroy();
-        this.storage = device.createBuffer({
-          size: Math.max(FLOATS * 4, this.data.byteLength),
-          usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-        });
-        this.group = undefined;
-      }
-      device.queue.writeBuffer(this.storage, 0, this.data as Float32Array<ArrayBuffer>);
-      this.dirty = false;
-    }
     const v = this.values;
+    this.drawCounts = [0, 0];
     v.set(c.camera.matrix);
     if (!invertMatrixStable(c.camera.matrix, v.subarray(16, 32), this.workspace)) return;
+    const shown = this.cull(c.camera.matrix, c.width, c.height);
+    if (!shown) return;
+    if (!this.storage || this.storage.size < this.data.byteLength) {
+      this.storage?.destroy();
+      this.storage = device.createBuffer({
+        size: Math.max(FLOATS * 4, this.data.byteLength),
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+      });
+      this.group = undefined;
+      this.dirty = true;
+    }
+    // Upload only when the visible set changed: a still camera costs no decal upload.
+    let same = !this.dirty && shown === this.uploadedCount;
+    for (let i = 0; same && i < shown; i++) same = this.shown[i] === this.uploaded[i];
+    if (!same) {
+      for (let i = 0; i < shown; i++) {
+        const k = this.shown[i] * FLOATS;
+        this.visible.set(this.data.subarray(k, k + FLOATS), i * FLOATS);
+      }
+      device.queue.writeBuffer(this.storage, 0, this.visible as Float32Array<ArrayBuffer>, 0, shown * FLOATS);
+      this.uploaded.set(this.shown.subarray(0, shown));
+      this.uploadedCount = shown;
+      this.dirty = false;
+    }
     v.set(c.camera.position, 32);
     v[36] = c.width;
     v[37] = c.height;
@@ -351,17 +397,71 @@ export class Decals implements EnginePlugin {
     (this.pass.colorAttachments as GPURenderPassColorAttachment[])[0].view = c.color;
     const pass = c.encoder.beginRenderPass(this.pass);
     applyView(pass, c);
-    if (this.counts[0]) {
+    const [multiplied, overed] = this.drawCounts;
+    if (multiplied) {
       pass.setPipeline(pipeline('multiply'));
       pass.setBindGroup(0, this.group.group);
-      pass.draw(36, this.counts[0]);
+      pass.draw(36, multiplied);
     }
-    if (this.counts[1]) {
+    if (overed) {
       pass.setPipeline(pipeline('over'));
       pass.setBindGroup(0, this.group.group);
-      pass.draw(36, this.counts[1], 0, this.counts[0]);
+      pass.draw(36, overed, 0, multiplied);
     }
     pass.end();
+  }
+  /**
+   * Fills `shown` with the indices of the decals to draw, in `data` order, sets the drawn count per mode and returns the
+   * total. A decal is drawn when its bounding sphere is inside all six clip planes of `matrix` (column-major view-
+   * projection, clip depth 0..w) and its screen span is at least `minPixels`. The span bound: for any point within
+   * radius r of a centre with clip w and NDC x, |dx_ndc| <= r (|row0.xyz| + |x| |row3.xyz|) / (w - r |row3.xyz|), likewise y.
+   */
+  private cull(m: ArrayLike<number>, width: number, height: number): number {
+    const planes = this.planes;
+    // Rows i of the matrix are m[i], m[4 + i], m[8 + i], m[12 + i]. Planes: w + x, w - x, w + y, w - y, w - z, z.
+    for (let k = 0; k < 6; k++) {
+      const row = k >> 1,
+        sign = k === 1 || k === 3 || k === 4 ? -1 : 1,
+        lead = k === 5 ? 0 : 1;
+      let length = 0;
+      for (let j = 0; j < 4; j++) {
+        const value = lead * m[4 * j + 3] + sign * m[4 * j + row];
+        planes[k * 4 + j] = value;
+        if (j < 3) length += value * value;
+      }
+      length = Math.sqrt(length);
+      // A plane with no direction (a degenerate projection row) culls nothing.
+      for (let j = 0; j < 4; j++) planes[k * 4 + j] = length > 1e-12 ? planes[k * 4 + j] / length : j === 3 ? 1 : 0;
+    }
+    const s = this.spheres,
+      row0 = Math.hypot(m[0], m[4], m[8]),
+      row1 = Math.hypot(m[1], m[5], m[9]),
+      row3 = Math.hypot(m[3], m[7], m[11]),
+      split = this.counts[0];
+    let n = 0;
+    for (let i = 0; i < this.count; i++) {
+      const x = s[i * 4],
+        y = s[i * 4 + 1],
+        z = s[i * 4 + 2],
+        r = s[i * 4 + 3];
+      let inside = true;
+      for (let k = 0; inside && k < 6; k++)
+        inside = planes[k * 4] * x + planes[k * 4 + 1] * y + planes[k * 4 + 2] * z + planes[k * 4 + 3] >= -r;
+      if (!inside) continue;
+      if (this.minPixels > 0) {
+        const w = m[3] * x + m[7] * y + m[11] * z + m[15],
+          below = w - r * row3;
+        if (below > 0) {
+          const nx = Math.abs((m[0] * x + m[4] * y + m[8] * z + m[12]) / w),
+            ny = Math.abs((m[1] * x + m[5] * y + m[9] * z + m[13]) / w),
+            span = Math.max(((row0 + nx * row3) * width) / below, ((row1 + ny * row3) * height) / below) * r;
+          if (span < this.minPixels) continue;
+        }
+      }
+      this.shown[n++] = i;
+      this.drawCounts[i < split ? 0 : 1]++;
+    }
+    return n;
   }
   private depthView(texture: GPUTexture): GPUTextureView {
     let view = this.depthViews.get(texture);

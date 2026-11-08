@@ -22,16 +22,19 @@ export interface Decal {
 
 export interface DecalOptions {
     atlas?: GPUTexture;
+    minPixels?: number;
 }
 
 export class Decals implements EnginePlugin {
     readonly name = "post:decals";
     readonly atlas?: GPUTexture;
+    readonly minPixels: number;
     constructor(options?: DecalOptions);
     get owner(): Engine | undefined;
     static attach(instance: EngineKernel, options?: DecalOptions): Decals;
     setDecals(list: readonly Decal[]): this;
     get count(): number;
+    get drawn(): number;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(engine: Engine): void;

@@ -674,7 +674,7 @@ the same results at 1x and 4x MSAA):
 
 ## Projected decals: `Decals`
 
-`@margoengine/post/decals` (4,118 B min+gzip, its own entry) projects textured boxes onto whatever is already drawn,
+`@margoengine/post/decals` (5,243 B min+gzip, its own entry) projects textured boxes onto whatever is already drawn,
 the screen-space way: each decal is a box projector; its pass reconstructs every covered pixel's world position from
 scene depth, keeps the pixels inside the box, fades by the angle between the surface and the projection and samples one
 texture atlas.
@@ -706,6 +706,27 @@ decals.setDecals([
   the effects after it draw over them. Back faces of the boxes only, no depth test: each covered pixel runs once, also
   with the camera inside a box. One render pass, one instanced draw per mode (36 vertices per decal), one storage buffer
   of 96 B per decal; it adds nothing to any mesh shader. With no decals the pass records nothing.
+- **Culling.** Each frame, on the CPU, a decal is drawn only when its bounding sphere (centre `position`, radius half
+  the box diagonal) is inside the six clip planes of the camera's view-projection and spans at least `minPixels`
+  (default 1) on screen. The span is a conservative bound, so a culled decal covers less than that. The visible decals
+  are packed together and uploaded only when the visible set changes, so thousands cost what is in view: draw counts,
+  per-pixel work and the upload follow the visible ones. `decals.drawn` reads how many the last frame drew;
+  `minPixels: 0` turns the size cull off (the view cull never changes the picture).
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Tonemap} from 'margoengine/tonemap';
+import {Decals} from 'margoengine/post/decals';
+const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
+Tonemap.attach(engine);
+const decals = Decals.attach(engine, {minPixels: 2});  // skip decals under 2 px across
+decals.setDecals(Array.from({length: 4096}, (_, i) => ({
+  position: [(i % 64) * 2 - 64, 0, Math.floor(i / 64) * 2 - 64], direction: [0, -1, 0], width: 1, height: 1,
+})));
+engine.render();
+console.log(`${decals.drawn} of ${decals.count} decals drawn`);
+```
+
 - **Validation.** `setDecals` checks the whole list (no holes, every field valid, values finite as Float32) before
   replacing anything, so a bad list throws and leaves the current decals drawing. `setDecals([])` clears them.
 - **Checks** (Intel Arc 140V, Edge 155, AC, GPU lock; `node examples/package-benchmarks/decals-gpu.mjs`,
@@ -715,6 +736,10 @@ decals.setDecals([
   'neutral'); over a cube's top edge the top face is marked and the 90-degree side faces are untouched (0/255), and the
   floor below the box's depth range stays untouched; an `over` decal on the atlas's red quadrant shows exactly
   tonemap(0.6, 0, 0); a box containing the camera still draws; an empty Decals equals none.
+- **Culling check** (M6 Mac mini, Metal, Chromium; `node packages/post/test/decals-cull-browser.mjs`): 4,096 decals
+  with one on screen (2,000 beside the view, 2,045 behind the camera, 50 under a tenth of a pixel across) equal the frame
+  with that decal alone exactly, and `drawn` is 1. On the CPU, 200 random spheres anywhere in view, from 0.5 to 60 m:
+  none whose real projected span (4,000 surface points) reaches `minPixels` is culled.
 - **Cost** (diagnostic: the quiet gate passed at 6% CPU, but other jobs were running): GPU time of the whole frame, 4x MSAA, 1 m
   decals on the floor in front of the camera: 1280 x 720 1.64 ms without, 1.64 / 1.97 / 6.36 ms with 1 / 16 / 256
   decals (256 overlap about four deep); 1920 x 1080 3.67 ms -> 3.93 / 4.33 / 14.03 ms. The first decal's cost is mostly
@@ -724,7 +749,8 @@ decals.setDecals([
 Limits: needs a post capture's scene depth (throws `Decals need scene depth: attach a post capture (Tonemap, Bloom,
 PostStack, SSAO, TAA) first`); at 4x MSAA it reads depth sample 0 and writes every covered sample, so decal edges along
 geometry silhouettes are per pixel, not per sample; gltf-pro BLEND primitives (drawn before it, without depth) get no
-decal of their own and are tinted with the decal of the surface behind them; it changes colour only (`MaterialDecals` below changes normal, roughness and metalness); `multiply` cannot lighten; up to 4,096 decals per `setDecals`, every one drawn every frame (no culling). WebGPU only.
+decal of their own and are tinted with the decal of the surface behind them; it changes colour only (`MaterialDecals` below changes normal, roughness and metalness); `multiply` cannot lighten; up to 4,096 decals per `setDecals`; the cull costs one sphere test per decal per frame on the CPU and the size cull drops
+decals under `minPixels` across (default 1 px). WebGPU only.
 
 ## Material decals: `MaterialDecals`
 
