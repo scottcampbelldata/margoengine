@@ -26,7 +26,8 @@
 // check:readme-run, on the GPU, runs the same packages' examples as the tarball test, every example when
 // a file it runs changed, and every example in the full run, the check after a push. It is in no gate before the push.
 // check:rust-kernels (scripts/rust-kernel-tests.mjs, CPU only) runs `cargo test` of each package with a Rust kernel whose
-// own files changed (its kernel folder included), every kernel when its script changed, and every kernel in the full run.
+// own files changed (its kernel folder included) or whose crate reaches a changed package by a path dependency, every
+// kernel when its script changed, and every kernel in the full run.
 // The mode and the reason are printed first and written to test-results/check-merge.json. A step that fails while the
 // Windows event log shows a GPU driver reset (scripts/support/driver-resets.mjs, bug 25) runs once more; the reset is
 // printed and recorded with the step, and a second failure fails the run. A run that passed only that way says so: a
@@ -160,8 +161,9 @@ export function planSteps({ steps, decision, tests, workspaces, testId, scope, k
         const dirs = wgslPackages(workspaces, decision.affected);
         return dirs.length ? [{ command: `${command} -- --packages=${dirs.join(',')}` }] : skip(none);
       }
-      // The Rust kernel tests of the packages whose own files changed (a kernel folder is its package's); all of them
-      // when the step's own script changed. A dependency's change cannot reach a kernel: the crates import no package.
+      // The Rust kernel tests of the packages whose own files changed (a kernel folder is its package's), and of the
+      // kernels whose crates reach a changed package by a Cargo path dependency (kernel-common); all of them when the
+      // step's own script changed. No npm dependency reaches a crate: the crates import no package.
       case 'check:rust-kernels': {
         if (hit.has('rust-kernels')) return [{ command }];
         const dirs = changedKernelDirs(kernels, decision.changed ?? []);

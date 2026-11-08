@@ -1,0 +1,11 @@
+[package]
+name = "margoengine-physics-kernel-common"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+
+# Parts the 2D and 3D physics kernels share, generic over the dimension: sweep and prune, islands, sleep timers.
+# A library only: its tests run in the kernels that use it (packages/physics2d/kernel/tests/common.rs).
+[lib]
+crate-type = ["rlib"]

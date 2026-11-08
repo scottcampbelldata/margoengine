@@ -1,7 +1,9 @@
 // Rust kernel tests of the workspace packages (`npm run check:rust-kernels`, part of check:merge; CPU only, no GPU
 // lock): `cargo test --locked` for every workspace package that holds a Rust kernel, `<dir>/kernel/Cargo.toml` or
 // `<dir>/Cargo.toml` (today packages/physics and packages/physics2d, the suites behind `test:physics-kernel` and
-// `test:physics2d-kernel`). The core kernel (packages/kernel, not a workspace) is `npm run test:kernel`.
+// `test:physics2d-kernel`). The core kernel (packages/kernel, not a workspace) is `npm run test:kernel`. A crate that
+// reaches another package's folder by a `path =` dependency (the 2D kernel uses packages/physics/kernel-common) runs
+// when that package changes too, so a change to shared kernel code reaches every kernel built on it.
 //   node scripts/rust-kernel-tests.mjs                      every package kernel
 //   node scripts/rust-kernel-tests.mjs --packages=physics   only those package directories (check:merge passes the
 //                                                           changed ones; a kernel folder counts as its package)
@@ -9,8 +11,8 @@
 //                                                           tree is ended and the run fails
 // cargo is started directly, not through a shell, so the command search is the operating system's and not cmd.exe's.
 import { spawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
+import { join, posix, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { margoError } from '../packages/shared/errors.js';
 import { loadWorkspaces } from './support/affected-gpu.mjs';
@@ -21,18 +23,31 @@ const root = resolve(import.meta.dirname, '..');
 /** Default hard limit for one crate's tests, in minutes. */
 export const DEFAULT_KERNEL_MINUTES = 20;
 
-/** [{ name, dir, manifest }] for every workspace package with a Rust kernel; `manifest` is repo-relative. */
-export function rustKernels(workspaces, dir = root, exists = existsSync) {
+/** Workspace names, other than `own`, whose folders hold a crate that `text` (a Cargo.toml at repo path `manifest`)
+ * names by a `path = "..."` dependency. */
+export function pathDependencies(text, manifest, workspaces, own) {
+  const base = posix.dirname(manifest);
+  const paths = [...text.matchAll(/\bpath\s*=\s*"([^"]+)"/g)].map((m) => posix.normalize(posix.join(base, m[1])));
+  return workspaces
+    .filter((w) => w.name !== own && paths.some((p) => p === w.dir || p.startsWith(`${w.dir}/`)))
+    .map((w) => w.name);
+}
+
+/** [{ name, dir, manifest, uses }] for every workspace package with a Rust kernel; `manifest` is repo-relative and
+ * `uses` names the packages its path dependencies live in. */
+export function rustKernels(workspaces, dir = root, exists = existsSync, read = (p) => readFileSync(p, 'utf8')) {
   return workspaces.flatMap((w) => {
     const manifest = [`${w.dir}/kernel/Cargo.toml`, `${w.dir}/Cargo.toml`].find((m) => exists(join(dir, m)));
-    return manifest ? [{ name: w.name, dir: w.dir, manifest }] : [];
+    if (!manifest) return [];
+    return [{ name: w.name, dir: w.dir, manifest, uses: pathDependencies(read(join(dir, manifest)), manifest, workspaces, w.name) }];
   });
 }
 
-/** Package directories (after `packages/`) of the kernels whose package is in `changed` (workspace names). */
+/** Package directories (after `packages/`) of the kernels whose package, or a package one of their path dependencies
+ * lives in, is in `changed` (workspace names). */
 export function changedKernelDirs(kernels, changed) {
   return kernels
-    .filter((k) => changed.includes(k.name) && k.dir.startsWith('packages/'))
+    .filter((k) => (changed.includes(k.name) || (k.uses ?? []).some((u) => changed.includes(u))) && k.dir.startsWith('packages/'))
     .map((k) => k.dir.slice('packages/'.length));
 }
 

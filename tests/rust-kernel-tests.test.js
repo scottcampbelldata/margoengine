@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import test from 'node:test';
 import { planContext, planFiles } from '../scripts/check-merge.mjs';
-import { cargoArgs, changedKernelDirs, rustKernels, selectKernels } from '../scripts/rust-kernel-tests.mjs';
+import { cargoArgs, changedKernelDirs, pathDependencies, rustKernels, selectKernels } from '../scripts/rust-kernel-tests.mjs';
 import { loadWorkspaces } from '../scripts/support/affected-gpu.mjs';
 
 const root = resolve(import.meta.dirname, '..');
@@ -40,6 +40,25 @@ test('check:merge runs the kernel tests of a changed package, its kernel folder 
   assert.deepEqual(step(['packages/physics/kernel/src/lib.rs']), { command: 'npm run check:rust-kernels' });
   assert.ok(step(['docs/known-bugs.md']).skip, 'documents only');
   assert.ok(step(['packages/dof/src/index.ts']).skip, 'a package without a kernel');
+});
+
+test('a kernel built on another package\'s crate runs when that package changes (the 2D kernel on kernel-common)', () => {
+  const twoD = kernels.find((k) => k.dir === 'packages/physics2d');
+  assert.deepEqual(twoD.uses, ['@margoengine/physics'], 'packages/physics2d/kernel/Cargo.toml uses ../../physics/kernel-common');
+  assert.deepEqual(kernels.find((k) => k.dir === 'packages/physics').uses, []);
+  const workspaces = [
+    { name: '@x/a', dir: 'packages/a' },
+    { name: '@x/b', dir: 'packages/b' },
+    { name: '@x/ab', dir: 'packages/ab' },
+  ];
+  const text = '[dependencies]\nshared = { path = "../../a/kernel-common" }\nself = { path = "../own" }\n';
+  assert.deepEqual(pathDependencies(text, 'packages/b/kernel/Cargo.toml', workspaces, '@x/b'), ['@x/a'], 'a prefix of another folder name is not a match');
+  const some = [
+    { name: '@x/a', dir: 'packages/a', manifest: 'packages/a/kernel/Cargo.toml', uses: [] },
+    { name: '@x/b', dir: 'packages/b', manifest: 'packages/b/kernel/Cargo.toml', uses: ['@x/a'] },
+  ];
+  assert.deepEqual(changedKernelDirs(some, ['@x/a']), ['a', 'b']);
+  assert.deepEqual(changedKernelDirs(some, ['@x/b']), ['b']);
 });
 
 test('check:merge runs every kernel when its script changed and in the full run', () => {
