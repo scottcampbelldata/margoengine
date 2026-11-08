@@ -70,6 +70,8 @@ export class Splats implements EnginePlugin {
     write(first: number, data: SplatData): this;
     clear(first: number, count: number): this;
     read(): Promise<SplatData>;
+    get antialias(): boolean;
+    set antialias(on: boolean);
     get fog(): FogLike | null;
     setFog(fog: FogLike | null): this;
     static attach(instance: EngineKernel, data: SplatData): Splats;

@@ -86,6 +86,7 @@ export class Splats implements EnginePlugin {
   private compatSort?: { pipeline: GPUComputePipeline; group: GPUBindGroup };
   private renders = new Map<string, { pipeline: GPURenderPipeline; group: GPUBindGroup }>();
   private disposed = false;
+  private mip = false;
   private writes = 0;
   private readonly transparency = transparencySlot();
   // Reused each frame: the draw pass descriptor and the pipeline record for the current target formats.
@@ -233,6 +234,18 @@ export class Splats implements EnginePlugin {
     }
     if (this.coefficients) data.sphericalHarmonics = this.sh.slice();
     return data;
+  }
+  /**
+   * Anti-aliasing (Mip-Splatting's 2D filter): when true, each splat's opacity is scaled by
+   * sqrt(det(S) / det(S + 0.3 I)) of its screen covariance S, so a splat smaller than a pixel fades with its true
+   * coverage instead of drawing as a 0.3 px^2 blob at full opacity, and distant or small captures stop shimmering.
+   * Default false (the look trained 3DGS files were made with). Live: read each frame, no recompile.
+   */
+  get antialias(): boolean {
+    return this.mip;
+  }
+  set antialias(on: boolean) {
+    this.mip = !!on;
   }
   /** The fog the splats are drawn in (see `setFog`), or null. */
   get fog(): FogLike | null {
@@ -392,7 +405,8 @@ export class Splats implements EnginePlugin {
     }
     n[44] = this.count;
     n[45] = this.sh.length === 4 ? 0 : this.sh.length / this.count / 3;
-    n[46] = n[47] = 0;
+    n[46] = +this.mip;
+    n[47] = 0;
     c.device.queue.writeBuffer(this.uniform!, 0, this.values as Float32Array<ArrayBuffer>);
     const fog = this.fogSource && this.fogResources(c.device);
     if (fog) {

@@ -1009,6 +1009,8 @@ Known rendering gaps:
 
 **Animated splats (2026-11-08).** `@margoengine/splats/animate` adds two compute passes at order -7.5, before a cloud's projection at -7: a sequence mixes two packed frames into the cloud's positions, covariances and colours; a skin copies the rest pose once (copyBufferToBuffer, so the root's covariance buffer now has COPY_SRC) and writes the blended joint transform of each centre and A S A^T of each covariance. `Splats.read` now reads covariances back too, so a posed cloud exports as posed. Evidence: `packages/splats/test/gpu/check.mjs` on a Radeon 680M; missing: pass cost on a 3,000,000-splat cloud.
 
+**Anti-aliased splats (2026-11-08).** `Splats.antialias` sets `counts.z` of the projection uniform; the projection pass then scales the ellipse opacity (ellipse centre w, which the render, depth, lighting and brush passes read) by sqrt(det(S) / det(S + 0.3 I)) of the dilated screen covariance. No recompile and no extra pass. Evidence: `packages/splats/test/gpu/check.mjs` on a Radeon 680M; missing: a real capture trained with the filter.
+
 ## 4. Quality architecture
 
 ### 4.1 Gate map

@@ -502,4 +502,36 @@ window.check.animate = async (o) => {
   const d = await cloud.read();
   return { positions: [...d.positions], covariances: [...d.covariances], colors: [...d.colors] };
 };
+// Anti-aliasing: three splats on the view axis (two of variance 1e-4 at distances 3 and 23, one of 1e-2 at 3), drawn
+// with `antialias` off and on; returns each splat's projected opacity (ellipse centre w) both ways.
+window.check.antialias = async () => {
+  engine?.dispose();
+  canvas?.remove();
+  canvas = document.body.appendChild(document.createElement('canvas'));
+  canvas.style.cssText = 'width:128px;height:128px;display:block';
+  engine = await Engine.create(canvas, { backend: 'webgpu', camera: { position: [0, 0, 3], target: [0, 0, 0], far: 100 } });
+  engine.gpu.addEventListener('uncapturederror', (e) => errors.push(e.error.message));
+  const cloud = Splats.attach(engine, {
+      positions: new Float32Array([0, 0, 0, 0, 0, -20, 0, 0, 0]),
+      covariances: new Float32Array([1e-4, 0, 0, 1e-4, 0, 1e-4, 1e-4, 0, 0, 1e-4, 0, 1e-4, 1e-2, 0, 0, 1e-2, 0, 1e-2]),
+      colors: new Float32Array([1, 1, 1, 0.9, 1, 1, 1, 0.9, 1, 1, 1, 0.9]),
+    }),
+    opacities = async () => {
+      await draw();
+      const d = engine.gpu,
+        staging = d.createBuffer({ size: 3 * 32, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST }),
+        e = d.createCommandEncoder();
+      e.copyBufferToBuffer(cloud.gpuState.ellipses, 0, staging, 0, 3 * 32);
+      d.queue.submit([e.finish()]);
+      await staging.mapAsync(GPUMapMode.READ);
+      const f = new Float32Array(staging.getMappedRange().slice(0));
+      staging.destroy();
+      return [f[3], f[11], f[19]];
+    };
+  await waitForPipelines(draw);
+  const off = await opacities();
+  cloud.antialias = true;
+  const on = await opacities();
+  return { off, on, flag: cloud.antialias };
+};
 window.ready = true;

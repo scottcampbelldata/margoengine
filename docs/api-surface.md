@@ -81,7 +81,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/shader | `.` 189, `./noise` 14, `./graph` 17, `./readback` 4, `./raw` 21, `./effects` 19, `./editor` 24, `./compute-texture` 9, `./lighting` 11, `./deform` 11, `./pass` 7, `./utils` 37, `./subgroups` 12 | 347 | 1 | 18,452 |
 | @margoengine/shadows | `.` 14, `./virtual` 3, `./light-function` 6, `./vsm` 3, `./transmission` 3, `./distance` 3, `./style` 3, `./rt` 5 | 45 |  | 18,456 |
 | @margoengine/sky | `.` 12, `./base` 13, `./preetham` 1, `./bruneton` 1, `./clouds` 1, `./night` 1, `./fog` 1, `./reflection` 1, `./lighting` 1, `./weather` 9, `./sun` 19, `./volumetric-clouds` 7, `./cloud-shadows` 5, `./aerial` 6, `./hillaire` 5, `./shafts` 4, `./astro` 25, `./weather-fx` 5, `./presets` 4 | 105 |  | 17,694 |
-| @margoengine/splats | `.` 25, `./depth` 2, `./lod` 8, `./lighting` 5, `./set` 3, `./edit` 5, `./animate` 6, `./data` 23 | 34 | 1 | 30,362 |
+| @margoengine/splats | `.` 25, `./depth` 2, `./lod` 8, `./lighting` 5, `./set` 3, `./edit` 5, `./animate` 6, `./data` 23 | 34 | 1 | 30,440 |
 | @margoengine/splines | `.` 3, `./closest` 4, `./frames` 8, `./knots` 5, `./mesh` 9, `./fit` 3 | 20 |  | 1,597 |
 | @margoengine/sprites | `.` 17, `./animation` 6, `./aseprite` 13, `./atlas` 3, `./billboard` 8, `./shader` 8, `./skeletal` 11 | 11 |  | 7,404 |
 | @margoengine/stage | `.` 23, `./gltf` 3, `./sky` 1, `./particles` 1, `./effects` 1, `./environment` 2, `./shadows` 1, `./xr` 3, `./viewer` 4, `./physics` 4, `./scene` 4 | 23 |  | 2,974 |

@@ -5,6 +5,7 @@
 // ./set: two overlapping copies of the capture sorted as one set draw what one merged cloud draws; as two clouds they do not.
 // ./lighting: relit colours match core's diffuse terms; a synthetic disc and the real capture shadow a ground mesh.
 // ./edit: GPU picks take the nearest splat; select, erase and paint change exactly the region's splats, read back.
+// Root antialias: projected opacities scale by s / (s + 0.3) for an isotropic splat of screen variance s.
 // ./animate: a sequence held between two frames draws their mix; a skin moves and turns splats and their covariances.
 // ./data: the browser's own WebP decoder reads the SOG writer's lossless WebP images back exactly.
 // ./lod: a hierarchy of the real capture fully refined draws as the plain cloud; a 16.7 M-splat stand-in streams in a 2 M budget.
@@ -322,6 +323,22 @@ try {
     assert.ok(index >= 0, 'a splat at the centre of the capture');
     assert.ok(selected.length > 20 && selected.length < r.input.length / 8, `the brush selects a patch: ${selected.length}`);
     assert.equal(wrong, 0, 'exactly the selected splats are erased');
+  }
+  // Root `antialias` (Mip-Splatting's 2D filter): off, every splat keeps opacity 0.9; on, an isotropic splat of screen
+  // variance s keeps 0.9 s / (s + 0.3). From the two ratios of the same splat at distances 3 and 23, s falls with the
+  // square of the distance (23/3)^2, so the filter follows the projected size; a splat about 4 px across (s near 14)
+  // keeps 0.95 of its opacity or more.
+  {
+    const r = await page.evaluate(() => window.check.antialias()),
+      ratio = r.on.map((v, i) => v / r.off[i]),
+      s = ratio.map((t) => (0.3 * t) / (1 - t));
+    report.antialias = { off: r.off, on: r.on, variances: s };
+    for (const v of r.off) assert.ok(Math.abs(v - 0.9) < 1e-6, `off keeps opacity: ${v}`);
+    assert.ok(r.flag === true);
+    assert.ok(ratio[1] < ratio[0] && ratio[1] < 0.5, `the far splat fades: ${ratio}`);
+    assert.ok(Math.abs(s[0] / s[1] / (23 / 3) ** 2 - 1) < 1e-3, `screen variance falls with distance squared: ${s}`);
+    assert.ok(Math.abs(s[2] / s[0] - 100) < 0.1, `and grows with the world variance: ${s}`);
+    assert.ok(ratio[2] > 0.95, `a large splat keeps its opacity: ${ratio[2]}`);
   }
   // ./animate: a two-frame sequence at 30% of the way mixes centres, covariances and colours; a skin with joint 0
   // moving 1 along x and joint 1 turning 90 degrees about z poses each splat by its blended matrix, A S A^T.

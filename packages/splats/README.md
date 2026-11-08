@@ -40,6 +40,22 @@ const cloud = Splats.attach(engine, parseSplat(await (await fetch('/capture.spla
 cloud.setFog(Fog.attach(engine, {color: '#8090a0', density: 0.02}));
 ```
 
+`cloud.antialias = true` turns on Mip-Splatting's 2D filter (Yu et al. 2024): each splat's opacity is scaled by
+sqrt(det(S) / det(S + 0.3 I)) of its screen covariance S, so a splat smaller than a pixel fades with its coverage
+instead of drawing as a 0.3 px^2 blob at full opacity, and far or small captures stop shimmering and thickening.
+Splats several pixels wide keep nearly all their opacity. It is live (no recompile) and off by default, the look
+trained 3DGS files expect; a capture trained with the filter (SPZ's antialiased flag) should turn it on.
+
+```ts
+import {Splats} from 'margoengine/splats';
+import {parsePly} from 'margoengine/splats/data';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const cloud = Splats.attach(engine, parsePly(await (await fetch('/raccoon-v2.ply')).arrayBuffer()));
+cloud.antialias = true;
+engine.start();
+```
+
 ## With glass
 
 The cloud sorts against itself and blends over the scene, so glass in front of it comes out wrong. `addEffect` from
