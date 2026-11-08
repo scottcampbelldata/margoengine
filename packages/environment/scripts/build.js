@@ -21,6 +21,7 @@ for (const [entry, emptyOutDir] of [
   ['main', false],
   ['loaders', false],
   ['blend', false],
+  ['ground', false],
 ])
   await build({
     root,

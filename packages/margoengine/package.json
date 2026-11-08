@@ -826,6 +826,10 @@
       "types": "./dist/environment/blend.d.ts",
       "import": "./dist/environment/blend.js"
     },
+    "./environment/ground": {
+      "types": "./dist/environment/ground.d.ts",
+      "import": "./dist/environment/ground.js"
+    },
     "./exporters": {
       "types": "./dist/exporters.d.ts",
       "import": "./dist/exporters.js"

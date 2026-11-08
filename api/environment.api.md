@@ -157,6 +157,8 @@ export class EnvironmentBackground {
     dispose(): void;
     [Symbol.dispose]: () => void;
     record(context: GPUContext): void;
+    protected shaderCode(): string;
+    protected writeExtra(_floats: Float32Array): void;
 }
 
 export interface EnvironmentBackgroundOptions {
@@ -403,6 +405,8 @@ class EnvironmentBackground {
     dispose(): void;
     [Symbol.dispose]: () => void;
     record(context: GPUContext): void;
+    protected shaderCode(): string;
+    protected writeExtra(_floats: Float32Array): void;
 }
 
 export class TransparentCanvas extends ColorBackground {

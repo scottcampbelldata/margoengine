@@ -206,19 +206,21 @@ struct Varyings { @builtin(position) position: vec4f, @location(0) ndc: vec2f }
 // buffer still holds its cleared value. Output matches core: Khronos PBR Neutral then sRGB encode
 // (shared/display.js) into the canvas
 // format, or linear radiance when the destination is an HDR rgba16float buffer (outputHdr).
-export const background =
+// `project` (WGSL) may declare `fn project(ray: vec3f) -> vec3f`, turning the view ray into the lookup direction
+// (ground projection, the /ground entry); `ground` and `dome` are its parameters.
+export const backgroundShader = (project = ''): string =>
   common +
   /* wgsl */ `
-struct Uniforms { inverseViewProjection: mat4x4f, eye: vec4f, params: vec4f, mode: vec4u }
+struct Uniforms { inverseViewProjection: mat4x4f, eye: vec4f, params: vec4f, mode: vec4u, ground: vec4f, dome: vec4f }
 @group(0) @binding(0) var<uniform> u: Uniforms;
 @group(0) @binding(1) var linearSampler: sampler;
 @group(0) @binding(2) var equirect: texture_2d<f32>;
 @group(0) @binding(3) var cube: texture_cube<f32>;
 @group(0) @binding(4) var specular: texture_cube<f32>;
-${screen}${displayShader}
+${screen}${displayShader}${project}
 @fragment fn fragmentMain(v: Varyings) -> @location(0) vec4f {
   let world = u.inverseViewProjection * vec4f(v.ndc, 0.5, 1.0);
-  let ray = normalize(world.xyz / world.w - u.eye.xyz);
+  let ray = ${project ? 'project(' : '('}normalize(world.xyz / world.w - u.eye.xyz));
   let c = u.params.y;
   let s = u.params.z;
   let d = vec3f(c * ray.x - s * ray.z, ray.y, s * ray.x + c * ray.z);

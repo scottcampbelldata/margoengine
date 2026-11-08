@@ -264,6 +264,26 @@ How it works. Prefiltering and SH projection are linear in the radiance, so blen
 
 Limits: a linear crossfade of radiance, not a time-of-day model (use `@margoengine/sky` for a sun that moves); the output keeps a full source cube and prefiltered cube of its own (the memory of a third environment); the background shows the blended cube, not either source's equirect; the output's BRDF LUT uses `brdfSize` and `brdfSamples` (Environment defaults unless set). Real-GPU check: `npm run test:blend:browser` (every cube and specular mip and the SH equal the weighted sources within rgba16float rounding at t 0, 0.25 and 1; a source turned a quarter turn with intensity 2 lands texel for texel; mixed sizes; a device restore blends again).
 
+## Ground projected environment
+
+`@margoengine/environment/ground` projects the environment onto a floor disc and a dome around the point it was photographed above, so a product or car stands on the photographed floor instead of floating inside an infinitely distant sphere. `GroundProjectedBackground` is an `EnvironmentBackground` (same pass, order, exposure, rotation, blur, depth test and outputs) with three more settings: `height`, the photo camera's height above the floor in metres (the tripod's, default 1.6); `radius`, the radius of the floor disc and of the dome it ends in (default 50); and `center`, the world floor point under the photo's camera (default `[0, 0, 0]`):
+
+```ts
+import {Engine, PbrMaterial, box} from 'margoengine/core';
+import {Environment, EnvironmentLighting, loadEnvironmentImage} from 'margoengine/environment';
+import {GroundProjectedBackground} from 'margoengine/environment/ground';
+const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu', camera: {position: [0, 1.5, 4], target: [0, 0.5, 0]}});
+const environment = await Environment.attach(engine, await loadEnvironmentImage('/garage.hdr'));
+EnvironmentLighting.attach(engine, environment);
+GroundProjectedBackground.attach(engine, environment, {height: 1.6, radius: 20});
+engine.createMesh().setGeometry(box(1, 1, 1)).setMaterial(new PbrMaterial({color: '#c08040'})).setPosition([0, 0.5, 0]);
+engine.start();
+```
+
+How it works. Per pixel the view ray from the eye meets the floor plane at the center's height (when it points down and the eye is above the floor) or the dome, a sphere of `radius` around `center`, whichever is nearer; the lookup direction then runs from the photo's camera, `height` above `center`, to that point, so the floor of the image stays in place in the world as the camera moves. Exact ray-plane and ray-sphere geometry in the background's fragment shader; outside the dome the plain view ray is used. `height`, `radius` and `center` are live (a uniform write); `height` must stay below `radius` (each setter checks the pair and a refused value changes nothing).
+
+Limits: the floor is flat at the center's height and the dome is a sphere, so anything in the photo that is not on the floor (walls, cars, trees) is projected onto the dome and bends as the camera moves; keep the camera inside the dome and above the floor; the projection only moves the background, models get no contact shadow from it (add `@margoengine/shadows` or a shadow catcher). Real-GPU check: `npm run test:ground:browser` (every pixel equals the environment along the CPU-mirrored projected direction from two cameras, a floor point keeps its colour from both cameras while a plain background does not, geometry is never covered, blur draws, and a real engine draws a box on the projected floor with no validation error).
+
 ## Mirrors, glass and cube cameras
 
 Optional entries that render the scene a second time through another camera, into their own HDR target, before the
@@ -578,7 +598,7 @@ Two portability measures are deliberate: the specular prefilter samples the cube
 
 `tests/probes.test.js` checks LightProbes on a mock GPU: validation and buffer layout, the ambient patch on core's shader variants (with and without an environment, terrain, clustered) and on a glTF-pro model, the bake's capture shader (rebound frame, linear output, no fog, every clustered light), its submits and dispatches, the opt-in bounded filter's bindings and atomic validation, and the CPU irradiance mirror. `npm run test:probes:browser` checks the bounded filter on a real GPU: constant HDR energy, an independent spherical integral for a directional environment including every cube seam, a rendered colored room against full-source GGX, and byte-identical sharp level 0 / volume SH. It writes `test-results/probe-samples-browser.json`. The broader real-GPU checks are `examples/package-benchmarks/probes-gpu.mjs` (README section above). `tests/probes-live.test.js` checks live capture on the mock GPU: validation, one face per frame with the prefilter on the sixth, the face budget across probes, both priorities, `refresh()` promises, a bake during live capture, pooled resources and device restoration; `examples/package-benchmarks/probes-live-gpu.mjs` measures its latency and GPU cost on a real GPU (Live capture, above).
 
-`tests/blend.test.js` checks `rotateSH` against direct evaluation at random directions and angles and the blend's argument checks; `npm run test:blend:browser` checks the blend on a real GPU (section above) and writes `test-results/blend-browser.json`.
+`tests/blend.test.js` checks `rotateSH` against direct evaluation at random directions and angles and the blend's argument checks; `npm run test:blend:browser` checks the blend on a real GPU (section above) and writes `test-results/blend-browser.json`. `tests/ground.test.js` checks the ground projection's settings (height and radius as a pair, center); `npm run test:ground:browser` checks it on a real GPU (section above) and writes `test-results/ground-browser.json`.
 
 `tests/mirror.test.js` checks Reflector, Refractor and CubeCamera on a mock GPU: captures run only the scene passes and the full frame graph comes back, the mirror camera lands mirror points x-flipped on its near plane and clips what is behind, the glass clips what is in front, excluded and off-layer meshes are hidden only during a capture, and every cube face matches the standard WebGPU addressing after its x flip, culled against its own face. The real-GPU check is `scripts/env-mirror-gpu-check.js` (above).
 

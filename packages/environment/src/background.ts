@@ -5,7 +5,7 @@ import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type FrameGraph, type PassContext } from '@margoengine/core/extension';
 import type { Environment } from './environment.js';
 import type { RGBA8Image } from './ultrahdr.js';
-import { background as backgroundShader, imageBackground as imageBackgroundShader } from './shaders.js';
+import { backgroundShader, imageBackground as imageBackgroundShader } from './shaders.js';
 import { invertMatrix } from '@margoengine/math/mat4';
 import { MargoError } from '@margoengine/math/errors';
 import { applyView } from '../../shared/view-rect.js';
@@ -73,7 +73,7 @@ export class EnvironmentBackground {
   private state?: DeviceState;
   private disposed = false;
   private engine?: EngineKernel;
-  private readonly uniformData = new ArrayBuffer(112);
+  private readonly uniformData = new ArrayBuffer(144);
   private readonly floats = new Float32Array(this.uniformData);
   private readonly uints = new Uint32Array(this.uniformData);
   private readonly inverse = new Float64Array(16);
@@ -231,8 +231,16 @@ export class EnvironmentBackground {
     f[22] = Math.sin(angle);
     f[23] = environment.roughnessToLod(this.blurValue);
     this.uints[24] = this.blurValue > 0 ? 2 : this.source === 'cube' || !environment.equirectView ? 1 : 0;
+    this.writeExtra(f);
     context.device.queue.writeBuffer(state.uniform, 0, this.uniformData);
   }
+
+  /** WGSL of the pass; the ground projection (/ground) adds its `project` function. */
+  protected shaderCode(): string {
+    return backgroundShader();
+  }
+  /** Writes subclass uniforms after the base ones (floats 28 to 35: `ground` and `dome`). */
+  protected writeExtra(_floats: Float32Array): void {}
 
   private stateFor(device: GPUDevice): DeviceState {
     if (this.state?.device === device) return this.state;
@@ -244,7 +252,7 @@ export class EnvironmentBackground {
     const layout = device.createBindGroupLayout({
       label: 'environment background',
       entries: [
-        { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform', minBindingSize: 112 } },
+        { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform', minBindingSize: 144 } },
         { binding: 1, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' } },
         { binding: 2, visibility: GPUShaderStage.FRAGMENT, texture: texture('2d') },
         { binding: 3, visibility: GPUShaderStage.FRAGMENT, texture: texture('cube') },
@@ -253,7 +261,7 @@ export class EnvironmentBackground {
     });
     const uniform = device.createBuffer({
       label: 'environment background',
-      size: 112,
+      size: 144,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
     try {
@@ -261,7 +269,7 @@ export class EnvironmentBackground {
         device,
         layout,
         pipelineLayout: device.createPipelineLayout({ bindGroupLayouts: [layout] }),
-        module: device.createShaderModule({ code: backgroundShader }),
+        module: device.createShaderModule({ code: this.shaderCode() }),
         uniform,
         pipelines: new Map(),
         groupVersion: -1,

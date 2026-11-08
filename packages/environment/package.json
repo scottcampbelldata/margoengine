@@ -33,6 +33,7 @@
     "prepack": "npm run build",
     "test:probes:browser": "npm run build && node scripts/test-browser.js --probe-samples",
     "test:blend:browser": "npm run build && node scripts/test-browser.js --page=blend",
+    "test:ground:browser": "npm run build && node scripts/test-browser.js --page=ground",
     "test:gpu:mirror": "cd ../.. && node scripts/env-mirror-gpu-check.js",
     "test:gpu:fog-all": "cd ../.. && node scripts/fog-all-gpu-check.js"
   },
@@ -69,6 +70,10 @@
     "./blend": {
       "types": "./dist/blend.d.ts",
       "import": "./dist/blend.js"
+    },
+    "./ground": {
+      "types": "./dist/ground.d.ts",
+      "import": "./dist/ground.js"
     }
   },
   "files": [
