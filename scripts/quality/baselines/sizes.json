@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10999817,
+  "total": 11002045,
   "history": [
     {
       "date": "2026-10-24",
@@ -4142,6 +4142,12 @@
       "commit": "03f409bd5",
       "reason": "sprites root gains filter: 'linear' with mipmaps",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "2236c9a5a",
+      "reason": "tonemap/grade: new optional entry, live grading; Tonemap gains the extensions hook",
+      "grew": 2
     }
   ],
   "items": {
@@ -4822,7 +4828,8 @@
     "@margoengine/tiles/s2": 3004,
     "@margoengine/tiles/splats": 1822,
     "@margoengine/tiles/terrain": 5974,
-    "@margoengine/tonemap": 11059,
+    "@margoengine/tonemap": 11479,
+    "@margoengine/tonemap/grade": 1808,
     "@margoengine/toon": 1701,
     "@margoengine/transitions": 4303,
     "@margoengine/tween": 5759,

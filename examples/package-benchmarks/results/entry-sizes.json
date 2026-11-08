@@ -1,10 +1,10 @@
 {
-  "commit": "8f5761806",
+  "commit": "3a2e1d094",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
     "raw": 58443,
-    "gzip": 23626,
+    "gzip": 23590,
     "limit": 25000
   },
   "packages": {
@@ -565,17 +565,17 @@
     "@margoengine/core": {
       ".": {
         "raw": 51214,
-        "gzip": 21285
+        "gzip": 21258
       },
       "./extension": {
-        "raw": 51315,
-        "gzip": 21311
+        "raw": 51313,
+        "gzip": 21323
       }
     },
     "@margoengine/creative": {
       ".": {
-        "raw": 62200,
-        "gzip": 19154
+        "raw": 61586,
+        "gzip": 19100
       },
       "./particles": {
         "raw": 1028,
@@ -594,16 +594,16 @@
         "gzip": 7019
       },
       "./grass": {
-        "raw": 16377,
-        "gzip": 5961
+        "raw": 16111,
+        "gzip": 5944
       },
       "./planet": {
-        "raw": 20958,
-        "gzip": 7027
+        "raw": 20730,
+        "gzip": 7011
       },
       "./stars": {
-        "raw": 6153,
-        "gzip": 2665
+        "raw": 6033,
+        "gzip": 2653
       }
     },
     "@margoengine/culling": {
@@ -2390,8 +2390,8 @@
         "gzip": 977
       },
       "./scenes": {
-        "raw": 59817,
-        "gzip": 17327
+        "raw": 60496,
+        "gzip": 17545
       },
       "./stars": {
         "raw": 10128,
@@ -2692,8 +2692,8 @@
     },
     "@margoengine/stage": {
       ".": {
-        "raw": 7318,
-        "gzip": 2974
+        "raw": 7314,
+        "gzip": 2966
       },
       "./gltf": {
         "raw": 2922,
@@ -2872,8 +2872,12 @@
     },
     "@margoengine/tonemap": {
       ".": {
-        "raw": 31355,
-        "gzip": 10926
+        "raw": 32033,
+        "gzip": 11144
+      },
+      "./grade": {
+        "raw": 3256,
+        "gzip": 1552
       }
     },
     "@margoengine/toon": {
@@ -3370,9 +3374,9 @@
       "brotli": 7260
     },
     "packages/tonemap/dist/index.js": {
-      "raw": 31355,
-      "gzip": 10926,
-      "brotli": 9703
+      "raw": 32033,
+      "gzip": 11144,
+      "brotli": 9879
     },
     "packages/physics/dist/index.js": {
       "raw": 59310,

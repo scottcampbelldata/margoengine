@@ -11,7 +11,7 @@ export function gpuHarness() {
   const resources = [],
     pipelines = [],
     groups = [],
-    writes = new Float32Array(64),
+    writes = new Float32Array(256),
     counts = { buffers: 0, textures: 0, views: 0, groups: 0, compute: 0, render: 0, uploads: 0 };
   const pass = { setPipeline() {}, setBindGroup() {}, dispatchWorkgroups() {}, draw() {}, end() {} };
   const device = {

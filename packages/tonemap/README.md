@@ -79,3 +79,43 @@ demo at `/demos/tonemap/`; the package catalog links to that built route. The de
 uses the package's built `dist` entry, preserves local LUT loading/controls, and marks
 the complete scene's correlated GPU readiness. npm publication is separate:
 use the workspace or packed local archives until the package is published.
+
+## Live grading: `Grade`
+
+`@margoengine/tonemap/grade` (1,552 B min+gzip, its own entry) grades the picture live, without a LUT: shadows,
+midtones and highlights wheels, tone curves, and saturation against hue. Give it to Tonemap's `extensions`; its
+options are read every frame, so sliders can drive them.
+
+```ts
+import {createStage} from 'margoengine';
+import {Tonemap} from 'margoengine/tonemap';
+import {Grade} from 'margoengine/tonemap/grade';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+const grade = new Grade({shadows: [0, 0.01, 0.04], highlights: [0.04, 0.02, 0]}); // teal shadows, warm highlights
+Tonemap.attach(stage.engine, {curve: 'agx', extensions: [grade]});
+grade.options.curves = {master: [[0, 0.02], [0.25, 0.2], [0.75, 0.82], [1, 1]]}; // a gentle S curve
+grade.options.hueSaturation = [1.2, 1, 0.8, 1, 1, 1]; // richer reds, quieter greens
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `shadows` | `[0, 0, 0]` | RGB offset for the dark tones, each -1 to 1 |
+| `midtones` | `[0, 0, 0]` | RGB offset for the middle tones, each -1 to 1 |
+| `highlights` | `[0, 0, 0]` | RGB offset for the bright tones, each -1 to 1 |
+| `curves` | straight | `{master, red, green, blue}`, each two or more `[x, y]` points in 0..1 with x increasing |
+| `hueSaturation` | `[1, 1, 1, 1, 1, 1]` | Saturation multipliers, 0 to 4, at red, yellow, green, cyan, blue, magenta |
+
+- **Method.** On display-linear colour after the curve and contrast, before a LUT. The wheels add their offsets
+  weighted by luminance masks that sum to 1: shadows 1 - smoothstep(0, 0.5, l), highlights smoothstep(0.5, 1, l),
+  midtones the rest. Curves are monotone cubics through the points (no overshoot), sampled 33 times a frame and read
+  with linear interpolation; the master curve runs first, then each channel's. Hue against saturation interpolates the
+  six multipliers around the HSV hue circle and scales each colour's distance from its luma.
+- **Checked on a real GPU** (`packages/tonemap/tests/grade-browser.mjs`, M6 Mac mini, Metal, Chromium): default
+  options change no pixel; a blue shadows offset lifts the blue of the dark pixels by 59 levels and leaves the bright
+  ones; a red highlights cut lands within half a level of a CPU oracle of the wheel math; saturation 0 turns every
+  pixel grey and a flat curve at 0.5 gives sRGB 188 everywhere.
+- **Limits.** Display-referred grading in 0..1 (what lies above white under an HDR `ColorOutput` passes ungraded); 33
+  curve samples; one Grade per Tonemap.
+
+`extensions` takes any `TonemapExtension` (`key`, `patch(shader, binding)` returning the WGSL with its code in, and an
+optional `values()` for one uniform buffer at that binding); changing the list rebuilds the pipeline once.

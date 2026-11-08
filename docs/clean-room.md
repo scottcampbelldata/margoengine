@@ -599,6 +599,7 @@ The own solver's kernel (`packages/physics/kernel`, Rust, no dependencies). Noth
 | T-11 | sRGB to P3 and back, gamut clip in P3 | tonemap/src/shaders.ts | Derived from the Display P3 (SMPTE EG 432-1 primaries, D65) and BT.709 primaries; checked to 6 dp |
 | T-12 | Neutral in the HDR output path | tonemap/src/shaders.ts | Khronos PBR Neutral + T-10 |
 | T-13 | AgX/ACES scaled by the same rolloff ratio; LUT on the SDR part; out-of-gamut negative carry | tonemap/src/shaders.ts | Margo-own: Margo design, described in the TSDoc above `outputShader` |
+| T-14 | Live grading: luminance-masked lift offsets for shadows, midtones and highlights; monotone cubic tone curves; saturation against HSV hue | tonemap/src/grade.ts | Monotone curves after F. N. Fritsch and R. E. Carlson, "Monotone Piecewise Cubic Interpolation", SIAM J. Numer. Anal. 17(2), 1980 (the slope limit, from memory of the method; the paper was not re-read); HSV hue after A. R. Smith, "Color Gamut Transform Pairs", SIGGRAPH 1978; the masks and the hue interpolation are Margo-own |
 
 ### toon
 

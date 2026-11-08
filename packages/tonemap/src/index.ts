@@ -37,6 +37,18 @@ type Output = { peak: number; p3: boolean; excess?: (width: number, height: numb
  * `'acescg'` (ACES fitted RRT/ODT with AP1 handling).
  */
 export type TonemapCurve = 'agx' | 'acescg' | 'neutral';
+/**
+ * A shader extension of Tonemap, such as `Grade` from `@margoengine/tonemap/grade`: it patches the WGSL of the
+ * presentation pass and may bind one uniform buffer of its own.
+ */
+export interface TonemapExtension {
+  /** Names the extension in the pipeline cache key. */
+  readonly key: string;
+  /** Returns `shader` with the extension's code in it; its uniform, if any, is `@group(0) @binding(binding)`. */
+  patch(shader: string, binding: number): string;
+  /** The extension uniform's contents, written every frame (a fixed multiple of 16 bytes). Omit for none. */
+  values?(): Float32Array;
+}
 /** Tonemap settings. Every field except `source` is read each frame, so change them on `tonemap.options`. */
 export interface TonemapOptions {
   /**
@@ -72,6 +84,8 @@ export interface TonemapOptions {
    * `exposure`. `true` uses the defaults of {@link AutoExposure}. Default off.
    */
   autoExposure?: boolean | AutoExposure;
+  /** Shader extensions such as `Grade` (`@margoengine/tonemap/grade`), applied in order. Default none. */
+  extensions?: readonly TonemapExtension[];
   /** Optional HDR source, e.g. () => dof.outputTexture. Fixed at attachment. */
   source?: () => GPUTexture | undefined;
 }
@@ -126,6 +140,7 @@ export class Tonemap implements EnginePlugin {
   private meterGroup?: GPUBindGroup;
   private meterBuffer?: GPUBuffer;
   private frameCount = 0;
+  private extBuffers: (GPUBuffer | undefined)[] = [];
   private readonly fxValues = new Float32Array(16);
   private readonly meterValues = new Float32Array(8);
 
@@ -167,6 +182,11 @@ export class Tonemap implements EnginePlugin {
       !inRange(o.tint, -1, 1) ||
       !inRange(o.temperature, 1667, 25000) ||
       !validAuto(o.autoExposure) ||
+      (o.extensions !== undefined &&
+        !(
+          Array.isArray(o.extensions) &&
+          o.extensions.every((x) => typeof x?.patch === 'function' && typeof x.key === 'string')
+        )) ||
       (o.curve !== undefined && o.curve !== 'agx' && o.curve !== 'acescg' && o.curve !== 'neutral') ||
       (o.inputColorSpace !== undefined && o.inputColorSpace !== 'linear-srgb' && o.inputColorSpace !== 'acescg') ||
       !Number.isFinite(e) ||
@@ -363,17 +383,29 @@ export class Tonemap implements EnginePlugin {
       o = this.options,
       auto = !!o.autoExposure,
       fxOn = usesEffects(o),
+      exts = o.extensions ?? [],
       key =
         format +
         ':' +
         multisample?.count +
         (excess ? ':output' : '') +
         (variableLUT ? ':lut-size' : '') +
-        (fxOn ? (auto ? ':fx-auto' : ':fx') : '');
+        (fxOn ? (auto ? ':fx-auto' : ':fx') : '') +
+        (exts.length ? ':' + exts.map((e) => e.key).join(',') : '');
     if (!this.pipeline || this.pipelineFormat !== key) {
       let code = excess ? outputShader : tonemapShader;
       if (variableLUT) code = sizedLUTShader(code);
       if (fxOn) code = effectsShader(code, auto);
+      for (const [i, e] of exts.entries()) code = e.patch(code, 5 + i);
+      for (const b of this.extBuffers) b?.destroy();
+      this.extBuffers = exts.map(
+        (e) =>
+          e.values &&
+          c.device.createBuffer({
+            size: e.values().byteLength,
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+          }),
+      );
       const module = c.device.createShaderModule({ code });
       this.pipeline = c.device.createRenderPipeline({
         layout: 'auto',
@@ -400,6 +432,7 @@ export class Tonemap implements EnginePlugin {
           { binding: 2, resource: this.lutTexture!.createView() },
           ...(fxOn ? [{ binding: 3, resource: { buffer: this.effectsBuffer(c.device) } }] : []),
           ...(auto ? [{ binding: 4, resource: { buffer: this.stateBuffer(c.device) } }] : []),
+          ...this.extBuffers.flatMap((buffer, i) => (buffer ? [{ binding: 5 + i, resource: { buffer } }] : [])),
         ],
       };
       this.meterGroup = undefined;
@@ -422,6 +455,10 @@ export class Tonemap implements EnginePlugin {
     v[13] = excess ? out!.peak : 0;
     v[14] = +!!(excess && out!.p3);
     c.device.queue.writeBuffer(this.uniform!, 0, v as Float32Array<ArrayBuffer>);
+    exts.forEach((e, i) => {
+      const buffer = this.extBuffers[i];
+      if (buffer && e.values) c.device.queue.writeBuffer(buffer, 0, e.values() as Float32Array<ArrayBuffer>);
+    });
     if (fxOn) this.applyEffects(c, source, auto);
     this.attachment.view = view;
     this.attachment.loadOp = viewLoadOp(c, 'clear');
@@ -529,6 +566,8 @@ export class Tonemap implements EnginePlugin {
     this.aeBuffer?.destroy();
     this.meterBuffer?.destroy();
     this.fxBuffer = this.aeBuffer = this.meterBuffer = undefined;
+    for (const b of this.extBuffers) b?.destroy();
+    this.extBuffers = [];
     this.meterPipeline = this.meterGroup = undefined;
     this.original = undefined;
     this.shaders.clear();

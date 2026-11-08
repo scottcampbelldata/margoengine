@@ -36,6 +36,12 @@ export class Tonemap implements EnginePlugin {
 
 export type TonemapCurve = 'agx' | 'acescg' | 'neutral';
 
+export interface TonemapExtension {
+    readonly key: string;
+    patch(shader: string, binding: number): string;
+    values?(): Float32Array;
+}
+
 export interface TonemapOptions {
     curve?: TonemapCurve;
     exposure?: number;
@@ -49,6 +55,7 @@ export interface TonemapOptions {
     grain?: number;
     chromaticAberration?: number;
     autoExposure?: boolean | AutoExposure;
+    extensions?: readonly TonemapExtension[];
     source?: () => GPUTexture | undefined;
 }
 

@@ -2718,6 +2718,10 @@
       "types": "./dist/tonemap.d.ts",
       "import": "./dist/tonemap.js"
     },
+    "./tonemap/grade": {
+      "types": "./dist/tonemap/grade.d.ts",
+      "import": "./dist/tonemap/grade.js"
+    },
     "./toon": {
       "types": "./dist/toon.d.ts",
       "import": "./dist/toon.js"
