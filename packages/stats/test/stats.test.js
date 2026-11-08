@@ -572,6 +572,15 @@ test('a pass that starts before the previous one ends is timed, as tile-based GP
     timestamps.set([1_000_000n, 9_000_000n, 2_000_000n, 7_000_000n]);
     assert.equal(await sample(), 13);
     assert.equal(profiler.elapsedMilliseconds, 8);
+    // The M6's later readings: the second pass starts about 9.5 us before the first starts, and ends after it.
+    // WebGPU section 20.4 leaves timestamp values to the implementation; Metal samples without waiting for earlier
+    // passes. The starts are the M6's (high word 86877); the ends are illustrative.
+    timestamps.set([at(86877, 1187469213), at(86877, 1187509213), at(86877, 1187459671), at(86877, 1187529671)]);
+    assert.equal(await sample(), (40_000 + 70_000) / 1e6);
+    assert.equal(profiler.elapsedMilliseconds, 70_000 / 1e6, 'from the earliest start to the latest end');
+    timestamps.set([1_000_000n, 3_000_000n, 999_999n, 7_000_000n]);
+    assert.equal(await sample(), (2_000_000 + 6_000_001) / 1e6);
+    assert.equal(profiler.elapsedMilliseconds, 6.000001);
   } finally {
     profiler.dispose();
   }
@@ -593,7 +602,7 @@ test('invalid intra-pass or cross-pass timestamps and rejected maps clear comple
     for (const invalid of [
       [1_000_000n, 3_000_000n, 8_000_000n, 7_000_000n],
       [10_000_000n, 12_000_000n, 8_000_000n, 9_000_000n],
-      [1_000_000n, 3_000_000n, 999_999n, 7_000_000n],
+      [1_000_000n, 3_000_000n, 200_000n, 999_999n],
     ]) {
       timestamps.set(valid);
       assert.equal(await sample(), 5);

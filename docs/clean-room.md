@@ -700,6 +700,15 @@ The own solver's kernel (`packages/physics/kernel`, Rust, no dependencies). Noth
 | W12 | spray seeding and ballistics | water/src/spray.ts | Teschner et al. 2003 (spatial-hash primes), uncited |
 | W13 | fog tail on water (Neutral + fog mix + sRGB) | water/src/index.ts | Khronos PBR Neutral; IEC 61966-2-1 |
 
+## GPU pass timing: `@margoengine/stats` (`GPUProfiler`)
+
+Written from the specification and API documentation below; no other profiler's code was read.
+
+| Area | Source |
+| --- | --- |
+| Which pass timestamps are time going backwards | W3C WebGPU, section 20.4 "Timestamp Query" (Candidate Recommendation Draft, read 2026-11-08): "Timestamp values are implementation-defined. Applications must handle arbitrary timestamp results, and should not be written in such a way that unexpected timestamps cause an application failure." Its note: the device "may reset the timestamp counter occasionally", giving "negative deltas", and "these data points can safely be discarded". Nothing in the section orders one pass's timestamps against another's, so a pass that starts before the pass recorded ahead of it is accepted when the two overlap; an end before its own start, or a pass that ends before the previous pass starts, is discarded as a reset |
+| Why passes overlap on Apple GPUs | Apple Metal documentation, "Sampling GPU data into counter sample buffers" (read 2026-11-08): Apple silicon samples "at the stage boundary"; the counters are sampled "when the GPU starts or finishes a stage", and only a sample with a barrier "waits for the GPU to complete all the previous commands in the buffer before sampling". How Chrome maps WebGPU timestamps onto these samples was not read (no browser source) |
+
 ## Data track: `@margoengine/compute`
 
 Written clean room in October 2026 from the specifications, papers and API documentation below. No source code of

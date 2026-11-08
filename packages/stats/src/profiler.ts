@@ -89,16 +89,20 @@ export class GPUProfiler {
       await buffer.mapAsync(GPUMapMode.READ, 0, this.count * 16);
       if (this.disposed) return null;
       const timestamps = new Uint32Array(buffer.getMappedRange(0, this.count * 16));
-      // A pass may start before the one recorded ahead of it has ended: a tile-based GPU runs the next pass's vertex
-      // work under the last one's fragment work (the M6 Mac mini under Chrome on Metal starts the second pass 1 to
-      // 26 us early on every frame). Only a start before the previous pass's start, or an end before its own start,
-      // is time going backwards. The elapsed time runs from the first start to the latest end.
+      // Passes need not start in the order they were recorded: WebGPU section 20.4 makes timestamp values
+      // implementation-defined, and Metal on Apple GPUs samples a pass's start at its first stage boundary without
+      // waiting for earlier commands, so the GPU overlaps passes (the M6 Mac mini under Chrome starts the second pass
+      // up to 26 us before the first ends, or about 9.5 us before the first starts). Time going backwards, as after
+      // the counter reset that section names, is an end before its own start or a pass that ends before the
+      // previous pass starts (no overlap at all). The elapsed time runs from the earliest start to the latest end.
       let totalLow = 0,
         totalHigh = 0,
         previousLow = 0,
         previousHigh = 0,
         lastLow = 0,
-        lastHigh = 0;
+        lastHigh = 0,
+        firstLow = timestamps[lowWord],
+        firstHigh = timestamps[highWord];
       for (let i = 0; i < timestamps.length; i += 4) {
         const startLow = timestamps[i + lowWord],
           startHigh = timestamps[i + highWord],
@@ -107,7 +111,7 @@ export class GPUProfiler {
         if (
           endHigh < startHigh ||
           (endHigh === startHigh && endLow < startLow) ||
-          (i > 0 && (startHigh < previousHigh || (startHigh === previousHigh && startLow < previousLow)))
+          (i > 0 && (endHigh < previousHigh || (endHigh === previousHigh && endLow < previousLow)))
         )
           throw new MargoError(
             'failed',
@@ -127,6 +131,10 @@ export class GPUProfiler {
         }
         previousLow = startLow;
         previousHigh = startHigh;
+        if (startHigh < firstHigh || (startHigh === firstHigh && startLow < firstLow)) {
+          firstLow = startLow;
+          firstHigh = startHigh;
+        }
         if (endHigh > lastHigh || (endHigh === lastHigh && endLow > lastLow)) {
           lastLow = endLow;
           lastHigh = endHigh;
@@ -144,8 +152,8 @@ export class GPUProfiler {
       }
       this.passMilliseconds.fill(0, this.count);
       this.passCount = this.count;
-      let elapsedLow = lastLow - timestamps[lowWord],
-        elapsedHigh = lastHigh - timestamps[highWord];
+      let elapsedLow = lastLow - firstLow,
+        elapsedHigh = lastHigh - firstHigh;
       if (elapsedLow < 0) {
         elapsedLow += wordRange;
         elapsedHigh--;
