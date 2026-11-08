@@ -38,7 +38,7 @@ pub const MESH_BAD_GRID: i32 = -5;
 /// An edge folds less than this, as the sine of the fold, and it is flat: about 0.06 degrees.
 const FOLD: f32 = 1e-3;
 /// A normal leans over an edge when its share along the edge's outward perpendicular passes this.
-const LEAN: f32 = 1e-4;
+pub(crate) const LEAN: f32 = 1e-4;
 /// A triangle whose doubled area squared is this small a share of its longest edge's fourth power has no normal.
 const SLIVER: f32 = 1e-12;
 /// A part this pair saw in this narrow phase.
@@ -260,10 +260,10 @@ impl World {
     }
 
     /// Grows the mesh classes to at least these rows; false when memory cannot.
-    pub fn reserve_mesh(&mut self, meshes: u32, vertices: u32, triangles: u32, nodes: u32) -> bool {
+    pub fn reserve_mesh(&mut self, rows: [u32; 5]) -> bool {
         let old = self.header().capacity;
         let have = mesh_capacity(&old);
-        let need = [meshes.max(have[0]), vertices.max(have[1]), triangles.max(have[2]), nodes.max(have[3])];
+        let need = core::array::from_fn(|k| rows[k].max(have[k]));
         if need == have {
             return true;
         }
@@ -280,13 +280,13 @@ impl World {
         };
         let have = mesh_capacity(&self.header().capacity);
         let room = |need: u32, have: u32| if need > have { need.max(have.saturating_mul(2)) } else { have };
-        self.reserve_mesh(room(used[0] + 1, have[0]), room(v, have[1]), room(t, have[2]), room(n, have[3]))
+        self.reserve_mesh([room(used[0] + 1, have[0]), room(v, have[1]), room(t, have[2]), room(n, have[3]), have[4]])
     }
 
     /// Checks the mesh written after `begin_mesh`, sorts its edges into classes and builds its tree. Its row, or a MESH_
     /// code, and then the rows it used are written over by the next. Rows stay for the world's life.
     pub fn end_mesh(&mut self, vertices: u32, triangles: u32, flags: u32) -> i32 {
-        let [row, first_vertex, first_triangle, first_node] = self.header().mesh_rows;
+        let [row, first_vertex, first_triangle, first_node, _] = self.header().mesh_rows;
         if vertices < 3 || triangles < 1 {
             return MESH_EMPTY;
         }
@@ -378,7 +378,8 @@ impl World {
         self.set_v(MESH_BOX_X, at, center);
         self.set_v(MESH_HALF_X, at, high.sub(low).scale(0.5));
         self.set_s(MESH_RADIUS, at, sqrt(radius));
-        self.header_mut().mesh_rows = [row + 1, first_vertex + vertices, first_triangle + triangles, first_node + nodes];
+        let words = self.header().mesh_rows[4];
+        self.header_mut().mesh_rows = [row + 1, first_vertex + vertices, first_triangle + triangles, first_node + nodes, words];
         row as i32
     }
 
@@ -386,7 +387,7 @@ impl World {
     /// row r and column c at `r + (rows + 1) c`, every column at one x growing with c and every row at one z growing
     /// with r. Its row, or a MESH_ code. Rows stay for the world's life.
     pub fn end_grid(&mut self, rows: u32, columns: u32, flags: u32) -> i32 {
-        let [row, first_vertex, first_triangle, first_node] = self.header().mesh_rows;
+        let [row, first_vertex, first_triangle, first_node, _] = self.header().mesh_rows;
         if rows == 0 || columns == 0 {
             return MESH_EMPTY;
         }
@@ -529,7 +530,7 @@ impl World {
                 Verdict::Snap => {
                     let face = if n.dot(front) < 0.0 { 1 } else { 0 };
                     if round {
-                        snap_round(self.round_of(other), &data, face, pose, limit, out);
+                        snap_round(self.round_of(other), &tri, face, pose, limit, out);
                     } else {
                         let mut box_data = crate::hull::BoxData::new();
                         let poly = self.poly_of(other, &mut box_data);
@@ -556,7 +557,15 @@ impl World {
         let (mesh_collider, other, other_is_a) = self.mesh_sides(a, b);
         let bodies = (self.uu(COLLIDER_BODY, a) as usize, self.uu(COLLIDER_BODY, b) as usize);
         if self.uu(COLLIDER_SHAPE, other) == SHAPE_TRIMESH {
-            self.drop_contacts(row, bodies.0, bodies.1);
+            // Two voxel grids meet cell by cell; a grid and a mesh, or two meshes, do not meet, as on Rapier.
+            let voxels = |c: usize| self.is_voxels(self.uu(COLLIDER_HULL, c) as usize);
+            if voxels(a) && voxels(b) {
+                if self.voxels_pair(row, a, b, limit, ratio, bodies) {
+                    self.drop_unseen(row, bodies);
+                }
+            } else {
+                self.drop_contacts(row, bodies.0, bodies.1);
+            }
             return;
         }
         if self.mesh_walk(row, mesh_collider, (other, other_is_a, NONE), limit, ratio, bodies) {
@@ -576,6 +585,9 @@ impl World {
     pub(crate) fn mesh_walk(&mut self, row: usize, mesh_collider: usize, sides: (usize, bool, u32), limit: f32, ratio: f32, bodies: (usize, usize)) -> bool {
         let (other, other_is_a, sub) = sides;
         let mesh = self.uu(COLLIDER_HULL, mesh_collider) as usize;
+        if self.is_voxels(mesh) {
+            return self.voxel_walk(row, mesh_collider, sides, limit, ratio, bodies);
+        }
         let pose = self.collider_pose(mesh_collider);
         let (low, high) = self.local_box(other, pose);
         let mut manifold = Manifold::new();
@@ -683,7 +695,8 @@ impl World {
     pub fn mesh_overlaps(&self, a: usize, b: usize) -> bool {
         let (mesh_collider, other, other_is_a) = self.mesh_sides(a, b);
         if self.uu(COLLIDER_SHAPE, other) == SHAPE_TRIMESH {
-            return false;
+            let voxels = |c: usize| self.is_voxels(self.uu(COLLIDER_HULL, c) as usize);
+            return voxels(a) && voxels(b) && self.voxels_overlap(a, b);
         }
         self.mesh_overlaps_with(mesh_collider, other, other_is_a)
     }
@@ -691,6 +704,9 @@ impl World {
     /// True when convex row `other` overlaps a triangle of `mesh_collider`.
     pub(crate) fn mesh_overlaps_with(&self, mesh_collider: usize, other: usize, other_is_a: bool) -> bool {
         let mesh = self.uu(COLLIDER_HULL, mesh_collider) as usize;
+        if self.is_voxels(mesh) {
+            return self.voxel_overlaps(mesh_collider, other, other_is_a);
+        }
         let pose = self.collider_pose(mesh_collider);
         let (low, high) = self.local_box(other, pose);
         let mut manifold = Manifold::new();
@@ -737,7 +753,7 @@ impl World {
     }
 
     /// The other collider's fat box in the mesh's frame.
-    fn local_box(&self, other: usize, pose: Pose) -> (V3, V3) {
+    pub(crate) fn local_box(&self, other: usize, pose: Pose) -> (V3, V3) {
         let (low, high) = (self.v(FAT_MIN_X, other), self.v(FAT_MAX_X, other));
         let (center, half) = (low.add(high).scale(0.5), high.sub(low).scale(0.5));
         let c = pose.unapply(center);
@@ -838,17 +854,16 @@ impl World {
 
 /// Turns a manifold round: the normal and the two surfaces.
 #[inline(always)]
-fn flip(out: &mut Manifold) {
+pub(crate) fn flip(out: &mut Manifold) {
     out.normal = out.normal.scale(-1.0);
     for point in out.points.iter_mut().take(out.count) {
         core::mem::swap(&mut point.on_a, &mut point.on_b);
     }
 }
 
-/// A ball's or capsule's points against the plane of a triangle's face, the normal from the triangle to it, `on_a` on the
-/// triangle: the snapped normal of the ghost rule, where only the face can push.
-fn snap_round(round: Round, data: &TriData, face: usize, pose: Pose, limit: f32, out: &mut Manifold) {
-    let tri = data.poly();
+/// A ball's or capsule's points against the plane of a face of a triangle or a voxel cell, the normal from it to the
+/// round shape, `on_a` on the face: the snapped normal of the ghost rule, where only the face can push.
+pub(crate) fn snap_round(round: Round, tri: &Poly, face: usize, pose: Pose, limit: f32, out: &mut Manifold) {
     let n = tri.normal(face);
     let offset = tri.plane(face);
     let ends = if round.p.x == round.q.x && round.p.y == round.q.y && round.p.z == round.q.z { 1 } else { 2 };

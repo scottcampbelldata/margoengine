@@ -23,6 +23,7 @@ pub mod mesh;
 pub mod narrow;
 pub mod sat;
 pub mod solver;
+pub mod voxel;
 pub mod world;
 
 #[cfg(target_arch = "wasm32")]

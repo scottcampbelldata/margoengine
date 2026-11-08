@@ -145,15 +145,10 @@ impl World {
         let mut collider = unsafe { *self.u(FIRST_COLLIDER).add(at) };
         while collider != NONE {
             let c = collider as usize;
-            let density = self.s(COLLIDER_DENSITY, c);
-            let mut piece = self.first_piece(c);
-            while piece != NONE {
-                let p = piece as usize;
-                let solid = self.collider_solid(p, density);
+            self.each_solid(c, |solid, center, _| {
                 mass += solid.mass;
-                moment_sum = moment_sum.add(self.solid_center(p).scale(solid.mass));
-                piece = self.next_piece(c, p);
-            }
+                moment_sum = moment_sum.add(center.scale(solid.mass));
+            });
             collider = unsafe { *self.u(COLLIDER_NEXT).add(c) };
         }
         let base = mass + own_mass;
@@ -172,15 +167,10 @@ impl World {
             let mut collider = unsafe { *self.u(FIRST_COLLIDER).add(at) };
             while collider != NONE {
                 let c = collider as usize;
-                let density = self.s(COLLIDER_DENSITY, c);
-                let mut piece = self.first_piece(c);
-                while piece != NONE {
-                    let p = piece as usize;
-                    let solid = self.collider_solid(p, density);
-                    add_rotated(&mut inertia, self.solid_frame(p), solid.moments);
-                    add_offset(&mut inertia, solid.mass, self.solid_center(p).sub(center));
-                    piece = self.next_piece(c, p);
-                }
+                self.each_solid(c, |solid, at, frame| {
+                    add_rotated(&mut inertia, frame, solid.moments);
+                    add_offset(&mut inertia, solid.mass, at.sub(center));
+                });
                 collider = unsafe { *self.u(COLLIDER_NEXT).add(c) };
             }
             if own {
@@ -213,6 +203,25 @@ impl World {
         self.update_mass(body);
     }
 
+    /// Calls `add` with each solid collider `c` adds, its centre and the frame of its moments in the body's frame: one for
+    /// a convex collider, one a child for a compound, one a filled cell for a voxel grid, none for a mesh.
+    fn each_solid(&self, c: usize, mut add: impl FnMut(Solid, V3, Q)) {
+        let density = self.s(COLLIDER_DENSITY, c);
+        if self.uu(COLLIDER_SHAPE, c) == SHAPE_TRIMESH {
+            if density > 0.0 && self.is_voxels(self.uu(COLLIDER_HULL, c) as usize) {
+                let (place, turn) = (self.v(COLLIDER_X, c), self.q(COLLIDER_ROTATION_X, c));
+                self.voxel_solids(c, |center, half| add(solid_box(half, density), place.add(turn.rotate(center)), turn));
+            }
+            return;
+        }
+        let mut piece = self.first_piece(c);
+        while piece != NONE {
+            let p = piece as usize;
+            add(self.collider_solid(p, density), self.solid_center(p), self.solid_frame(p));
+            piece = self.next_piece(c, p);
+        }
+    }
+
     /// The first row whose solid a collider adds: its own, or a compound's first child (NONE when it has none).
     #[inline(always)]
     fn first_piece(&self, c: usize) -> u32 {
@@ -235,7 +244,8 @@ impl World {
                 let hull = self.uu(COLLIDER_HULL, c) as usize;
                 Solid { mass: self.s(HULL_VOLUME, hull) * density, moments: self.v(HULL_MOMENT_X, hull).scale(density) }
             }
-            // A surface has no volume, so no mass, as a Rapier trimesh gives a dynamic body none.
+            // A surface has no volume, so no mass, as a Rapier trimesh gives a dynamic body none; `each_solid` adds a voxel
+            // grid's cells.
             SHAPE_TRIMESH | SHAPE_COMPOUND => Solid { mass: 0.0, moments: v3(0.0, 0.0, 0.0) },
             _ => solid_capsule(size.x, size.y, density),
         }

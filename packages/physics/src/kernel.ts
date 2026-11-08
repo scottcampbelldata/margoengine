@@ -124,6 +124,11 @@ interface KernelExports extends WebAssembly.Exports {
   mesh_end(vertices: number, triangles: number, flags: number): number;
   mesh_end_grid(rows: number, columns: number, flags: number): number;
   mesh_next(rows: number): number;
+  voxels_begin(cells: number): number;
+  voxels_end(x: number, y: number, z: number, dx: number, dy: number, dz: number, sx: number, sy: number, sz: number): number;
+  voxels_set(collider: number, x: number, y: number, z: number, filled: number): number;
+  voxels_combine(a: number, b: number, sx: number, sy: number, sz: number): number;
+  voxels_propagate(a: number, b: number, x: number, y: number, z: number, sx: number, sy: number, sz: number): number;
   hull_count(): number;
   mesh_count(): number;
 }
@@ -883,6 +888,67 @@ export class KernelWorld {
     if (row < 0) throw new RangeError(`This heightfield was refused; fix what this says: ${meshErrors[row]}.`);
     this.meshRows = row + 1;
     return row;
+  }
+  /**
+   * Adds a voxel grid, for {@link KernelWorld.addCollider} with shape `trimesh`: the filled cells, three whole numbers
+   * each, cell (i, j, k) spanning `[i, i + 1] * size[0]` along x and so on in the collider's frame, as Rapier's `voxels`
+   * takes them. A cell named twice is one cell; no cells is an empty grid. The kernel keeps a byte a cell over the box of
+   * the cells, so a sparse grid costs its box.
+   * @returns The grid's mesh row. A grid is not shared: its edits change every collider that names it.
+   * @throws RangeError for a cell or size the kernel cannot use, naming what is wrong.
+   */
+  addVoxels(cells: Int32Array, size: readonly [number, number, number]): number {
+    const { api } = this;
+    if (!(cells instanceof Int32Array) || cells.length % 3)
+      throw new RangeError(`Voxel cells are an Int32Array of x, y, z cell coordinates, three per cell (got ${cells?.length} numbers); pass whole cells.`);
+    if (size.length !== 3 || !size.every((value) => value > 0 && Number.isFinite(value)))
+      throw new RangeError(`A voxel size is three finite sizes above zero (got ${size.join(', ')}); pass one cell's width, height and depth.`);
+    const low = [0, 0, 0],
+      high = [0, 0, 0];
+    for (let i = 0; i < cells.length; i++) {
+      const k = i % 3,
+        value = cells[i];
+      if (i < 3 || value < low[k]) low[k] = value;
+      if (i < 3 || value > high[k]) high[k] = value;
+    }
+    const dims = [high[0] - low[0] + 1, high[1] - low[1] + 1, high[2] - low[2] + 1],
+      count = dims[0] * dims[1] * dims[2];
+    if (count > 0x40000000)
+      throw new RangeError(`A voxel grid spans at most 2^30 cells of its box (these span ${count}); split the world into chunks, one grid each.`);
+    if (!api.voxels_begin(count))
+      throw new RangeError(`Memory cannot hold a voxel grid of ${count} cells; free another world, or split the grid into chunks.`);
+    if (api.world_layout() !== this.layout) this.bind();
+    const words = this.columns.voxelWord,
+      first = api.mesh_next(3);
+    for (let i = 0; i < cells.length; i += 3) {
+      const index = cells[i] - low[0] + dims[0] * (cells[i + 1] - low[1] + dims[1] * (cells[i + 2] - low[2]));
+      words[first + (index >>> 2)] |= 1 << (8 * (index & 3));
+    }
+    const row = api.voxels_end(low[0], low[1], low[2], dims[0], dims[1], dims[2], size[0], size[1], size[2]);
+    if (row < 0) throw new RangeError('This voxel grid was refused; pass cells whose box fits 32-bit cell numbers, and a positive size.');
+    this.meshRows = row + 1;
+    return row;
+  }
+  /**
+   * Fills or empties cell (x, y, z) of a voxel collider in place, growing the grid for a cell outside it. The body's mass
+   * is worked out again and what touches the collider wakes.
+   * @throws RangeError for a collider that is not a voxel grid, or when memory cannot grow the grid.
+   */
+  setVoxel(collider: number, x: number, y: number, z: number, filled: boolean): void {
+    this.voxelDone(this.api.voxels_set(collider, x, y, z, filled ? 1 : 0), 'setVoxel');
+  }
+  /** Makes two voxel colliders see each other's border cells, `b`'s cell (0, 0, 0) at `a`'s `shift`. */
+  combineVoxels(a: number, b: number, shift: readonly [number, number, number]): void {
+    this.voxelDone(this.api.voxels_combine(a, b, shift[0], shift[1], shift[2]), 'combineVoxelStates');
+  }
+  /** Tells voxel collider `b`, coupled at `shift`, that cell `at` of `a` changed. */
+  propagateVoxel(a: number, b: number, at: readonly [number, number, number], shift: readonly [number, number, number]): void {
+    this.voxelDone(this.api.voxels_propagate(a, b, at[0], at[1], at[2], shift[0], shift[1], shift[2]), 'propagateVoxelChange');
+  }
+  private voxelDone(code: number, what: string): void {
+    if (this.api.world_layout() !== this.layout) this.bind();
+    if (code === -2) throw new RangeError(`${what} works on voxels colliders only; call it on a collider made with shape 'voxels'.`);
+    if (code < 0) throw new RangeError(`Memory cannot grow this voxel grid for ${what}; free another world, or keep edits inside the grid.`);
   }
   /**
    * Removes a collider and works out its body's mass again. Its row comes back after the next step.

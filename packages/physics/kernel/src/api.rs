@@ -291,7 +291,7 @@ pub extern "C" fn mesh_end(vertices: u32, triangles: u32, flags: u32) -> i32 {
 pub extern "C" fn mesh_end_grid(rows: u32, columns: u32, flags: u32) -> i32 {
     world().end_grid(rows, columns, flags)
 }
-/// Where the next mesh's rows start: 0 vertices, 1 triangles, 2 tree nodes.
+/// Where the next mesh's rows start: 0 vertices, 1 triangles, 2 tree nodes, 3 voxel words.
 #[unsafe(no_mangle)]
 pub extern "C" fn mesh_next(class: u32) -> u32 {
     world().header().mesh_rows[class as usize + 1]
@@ -304,4 +304,27 @@ pub extern "C" fn hull_count() -> u32 {
 #[unsafe(no_mangle)]
 pub extern "C" fn mesh_count() -> u32 {
     world().header().mesh_rows[0]
+}
+/// Makes room for a voxel grid of `cells` cells; its words start at `mesh_next(3)`.
+#[unsafe(no_mangle)]
+pub extern "C" fn voxels_begin(cells: u32) -> u32 {
+    world().begin_voxels(cells) as u32
+}
+#[unsafe(no_mangle)]
+#[allow(clippy::too_many_arguments)]
+pub extern "C" fn voxels_end(x: i32, y: i32, z: i32, dx: u32, dy: u32, dz: u32, sx: f32, sy: f32, sz: f32) -> i32 {
+    world().end_voxels([x, y, z], [dx, dy, dz], crate::math::v3(sx, sy, sz))
+}
+#[unsafe(no_mangle)]
+pub extern "C" fn voxels_set(collider: u32, x: i32, y: i32, z: i32, filled: u32) -> i32 {
+    world().set_voxel(collider, [x, y, z], filled != 0)
+}
+#[unsafe(no_mangle)]
+pub extern "C" fn voxels_combine(a: u32, b: u32, sx: i32, sy: i32, sz: i32) -> i32 {
+    world().combine_voxels(a, b, [sx, sy, sz])
+}
+#[unsafe(no_mangle)]
+#[allow(clippy::too_many_arguments)]
+pub extern "C" fn voxels_propagate(a: u32, b: u32, x: i32, y: i32, z: i32, sx: i32, sy: i32, sz: i32) -> i32 {
+    world().propagate_voxel(a, b, [x, y, z], [sx, sy, sz])
 }

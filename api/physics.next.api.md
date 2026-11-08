@@ -195,6 +195,10 @@ export class KernelWorld {
     addHull(vertices: readonly (readonly [number, number, number])[], faces: readonly (readonly number[])[]): number;
     addTrimesh(vertices: ArrayLike<number>, indices: ArrayLike<number>, options?: KernelTrimeshOptions): number;
     addHeightfield(rows: number, columns: number, heights: ArrayLike<number>, scale: readonly [number, number, number], options?: KernelHeightfieldOptions): number;
+    addVoxels(cells: Int32Array, size: readonly [number, number, number]): number;
+    setVoxel(collider: number, x: number, y: number, z: number, filled: boolean): void;
+    combineVoxels(a: number, b: number, shift: readonly [number, number, number]): void;
+    propagateVoxel(a: number, b: number, at: readonly [number, number, number], shift: readonly [number, number, number]): void;
     removeCollider(collider: number): boolean;
     addJoint(a: number, b: number, flags: number): number;
     removeJoint(joint: number): boolean;
@@ -396,6 +400,9 @@ export class PhysicsCollider {
     setCollisionGroups(groups: number): this;
     solverGroups(): number;
     setSolverGroups(groups: number): this;
+    setVoxel(x: number, y: number, z: number, filled: boolean): this;
+    combineVoxelStates(other: PhysicsCollider, sx?: number, sy?: number, sz?: number): this;
+    propagateVoxelChange(other: PhysicsCollider, x: number, y: number, z: number, sx?: number, sy?: number, sz?: number): this;
 }
 
 export interface PhysicsEventMap {

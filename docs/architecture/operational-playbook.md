@@ -1307,3 +1307,9 @@ The following remain technical gaps, not permission to weaken a check:
     and after a large edit, and a `VoxelRenderer` with it draws the worker mesher's picture pixel for pixel. The faces
     kernel finishes each slice's greedy merge in one invocation per workgroup (192 per chunk), so a dispatch is bounded by
     that serial scan; slabs and stairs stay on the CPU path. Timings in the check are diagnostic, one machine.
+40. The own physics kernel's voxel grids (batch 126 job 5, `kernel/src/voxel.rs`): a mesh row flagged MESH_VOXELS, a new
+    row class of VOXEL_WORD (four cells a word, a byte each: filled and six neighbour bits) and VOXEL_ columns on the mesh
+    row, so ROW_CLASSES is 19 and the world's bytes, not its poses, changed. Contacts are cell boxes through the convex
+    routines, a part per cell, with Catto's ghost rule on exposed faces. Proved: `kernel/tests/voxel.rs` (five tests
+    fail with the rule switched off) and `tests/next-voxels.test.js` against Rapier 0.21. Missing: rays and casts, a tree
+    or run-length walk for very large grids, and any browser run beyond the replay's hash.

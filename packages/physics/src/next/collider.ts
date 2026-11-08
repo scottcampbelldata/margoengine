@@ -4,6 +4,13 @@ import { COLLIDER_OFF, COLLIDER_SENSOR, type KernelWorld } from '../kernel.js';
 import type { ColliderShape } from '../collider.js';
 import type { PhysicsBody } from './body.js';
 
+/** A cell coordinate, checked: a whole number in 32 bits. */
+function cell(value: number): number {
+  if (!Number.isInteger(value) || value < -(2 ** 31) || value >= 2 ** 31)
+    throw new RangeError(`A voxel cell coordinate is a whole number in 32 bits (got ${value}); pass cell numbers, not metres.`);
+  return value;
+}
+
 /** A collider on a {@link PhysicsBody}: what `body.colliders` hands you. */
 export class PhysicsCollider {
   private removed = false;
@@ -147,6 +154,33 @@ export class PhysicsCollider {
   setSolverGroups(groups: number): this {
     this.columns().colliderSolverGroups[this.handle] = groups;
     this.reach();
+    return this;
+  }
+  /**
+   * `voxels` shape: fills or empties cell (x, y, z) in place, growing the grid for a cell outside it, and keeps the
+   * contacts of every other cell. A dynamic body's mass follows at once (Rapier's follows at the next step).
+   * @throws RangeError for a cell that is not three whole numbers, or on another shape.
+   */
+  setVoxel(x: number, y: number, z: number, filled: boolean): this {
+    this.columns();
+    this.kernel.setVoxel(this.handle, cell(x), cell(y), cell(z), filled);
+    return this;
+  }
+  /**
+   * `voxels` shape: makes this grid and `other` aware of each other's cells along their shared border, so a body crosses
+   * it without catching on the seam. `sx`, `sy` and `sz` are the cells `other` is shifted by.
+   */
+  combineVoxelStates(other: PhysicsCollider, sx = 0, sy = 0, sz = 0): this {
+    this.columns();
+    other.columns();
+    this.kernel.combineVoxels(this.handle, other.handle, [cell(sx), cell(sy), cell(sz)]);
+    return this;
+  }
+  /** `voxels` shape: tells a coupled neighbour that cell (x, y, z) of this grid changed. */
+  propagateVoxelChange(other: PhysicsCollider, x: number, y: number, z: number, sx = 0, sy = 0, sz = 0): this {
+    this.columns();
+    other.columns();
+    this.kernel.propagateVoxel(this.handle, other.handle, [cell(x), cell(y), cell(z)], [cell(sx), cell(sy), cell(sz)]);
     return this;
   }
   private reach(): void {

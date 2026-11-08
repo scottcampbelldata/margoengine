@@ -31,8 +31,10 @@ pub enum Rows {
     MeshVertex,
     MeshTriangle,
     MeshNode,
+    /// Cells of voxel grids, four a word, held for the world's life.
+    Voxel,
 }
-pub const ROW_CLASSES: usize = 18;
+pub const ROW_CLASSES: usize = 19;
 
 macro_rules! columns {
     ($($name:ident $kind:ident $rows:ident,)*) => {
@@ -455,6 +457,18 @@ columns! {
     MESH_HALF_Y f32 Mesh,
     MESH_HALF_Z f32 Mesh,
     MESH_RADIUS f32 Mesh,
+    // A voxel grid (MESH_VOXELS): its first word, its cells along x, y and z, the cell at its corner (i32 bits) and one
+    // cell's size. Cell (i, j, k) spans [i, i + 1] times the size along x, and so on, in the collider's frame.
+    VOXEL_FIRST u32 Mesh,
+    VOXEL_DIM_X u32 Mesh,
+    VOXEL_DIM_Y u32 Mesh,
+    VOXEL_DIM_Z u32 Mesh,
+    VOXEL_MIN_X u32 Mesh,
+    VOXEL_MIN_Y u32 Mesh,
+    VOXEL_MIN_Z u32 Mesh,
+    VOXEL_SIZE_X f32 Mesh,
+    VOXEL_SIZE_Y f32 Mesh,
+    VOXEL_SIZE_Z f32 Mesh,
     MESH_VERTEX_X f32 MeshVertex,
     MESH_VERTEX_Y f32 MeshVertex,
     MESH_VERTEX_Z f32 MeshVertex,
@@ -478,6 +492,9 @@ columns! {
     NODE_MAX_Z f32 MeshNode,
     NODE_FIRST u32 MeshNode,
     NODE_COUNT u32 MeshNode,
+    // Four cells a word, a byte each from the low end: bit 0 filled, bits 1 to 6 whether the cell across each face is
+    // filled, faces in a box's order (+x, -x, +y, -y, +z, -z), across a coupled grid's border too (voxel.rs).
+    VOXEL_WORD u32 Voxel,
 }
 
 /// Rows every column of a class is padded to, so each column stays on a 16-byte boundary.
@@ -507,9 +524,9 @@ pub const MANIFOLD: usize = 4;
 
 /// The rows of every class for `bodies`, `colliders` and `pairs`, keeping the hull and mesh rows a world already has room
 /// for.
-pub fn capacities(bodies: u32, colliders: u32, pairs: u32, hulls: [u32; 4], joints: u32, meshes: [u32; 4]) -> [u32; ROW_CLASSES] {
+pub fn capacities(bodies: u32, colliders: u32, pairs: u32, hulls: [u32; 4], joints: u32, meshes: [u32; 5]) -> [u32; ROW_CLASSES] {
     let [hull, vertices, edges, faces] = hulls;
-    let [mesh, mesh_vertices, triangles, nodes] = meshes;
+    let [mesh, mesh_vertices, triangles, nodes, words] = meshes;
     [
         bodies,
         colliders,
@@ -529,6 +546,7 @@ pub fn capacities(bodies: u32, colliders: u32, pairs: u32, hulls: [u32; 4], join
         mesh_vertices,
         triangles,
         nodes,
+        words,
     ]
 }
 
@@ -538,10 +556,10 @@ pub fn hull_capacity(c: &[u32; ROW_CLASSES]) -> [u32; 4] {
     [c[7], c[8], c[9], c[10]]
 }
 
-/// The mesh rows of a capacity.
+/// The mesh rows of a capacity: meshes, vertices, triangles, tree nodes and voxel words.
 #[inline]
-pub fn mesh_capacity(c: &[u32; ROW_CLASSES]) -> [u32; 4] {
-    [c[14], c[15], c[16], c[17]]
+pub fn mesh_capacity(c: &[u32; ROW_CLASSES]) -> [u32; 5] {
+    [c[14], c[15], c[16], c[17], c[18]]
 }
 
 /// Most bodies and colliders one world holds.
@@ -574,6 +592,9 @@ pub const SHAPE_COMPOUND: u32 = 5;
 
 /// MESH_FLAGS: contacts on a triangle's inner edges keep to the normals the surface allows (fixInternalEdges).
 pub const MESH_FIX_EDGES: u32 = 1;
+/// MESH_FLAGS: a voxel grid, no vertices or triangles: its cells are in VOXEL_WORD rows from VOXEL_FIRST. It meets what a
+/// mesh meets, and other grids too.
+pub const MESH_VOXELS: u32 = 2;
 /// TRIANGLE_EDGES, two bits an edge: open (no triangle across), convex, concave, or flat.
 pub const EDGE_OPEN: u32 = 0;
 pub const EDGE_CONVEX: u32 = 1;

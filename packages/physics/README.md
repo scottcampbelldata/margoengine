@@ -306,7 +306,7 @@ console.log(body.position[1]);         // fallen about 4.9 m in the second
 physics.dispose();
 ```
 
-It holds `box`, `sphere`, `capsule`, `convexHull`, `trimesh`, `heightfield` and `compound` colliders, bodies of every kind, forces, impulses, velocities, damping, locks, kinematic targets, gravity, sleeping and the `beforestep` and `afterstep` events. Bodies collide, with friction, restitution and the four combine rules, and `physics.touching(a, b)` and `physics.contactPoints(body)` read the contacts of the last step. Contact and intersection events, sensors, `collisionGroups`, `solverGroups`, `contactFilter`, `dominance` and `enabled` on bodies and colliders work as on the root entry, with the same names. `body.setType`, `setAdditionalMass` (with inertia of its own), `setMassProperties`, `collider.setDensity` and `additionalSolverIterations` work as on the root entry, with the same names and errors. A call that needs what is still to come throws a `MargoError` with code `unsupported` naming what it waits for: the other shapes and `addModel` with the shapes and queries batch, `ccd` with continuous collision, queries, `follow` and character controllers, and `debugRender`. `body.sleep()` and impulses take effect at the next step.
+It holds `box`, `sphere`, `capsule`, `convexHull`, `trimesh`, `heightfield`, `compound` and `voxels` colliders, bodies of every kind, forces, impulses, velocities, damping, locks, kinematic targets, gravity, sleeping and the `beforestep` and `afterstep` events. Bodies collide, with friction, restitution and the four combine rules, and `physics.touching(a, b)` and `physics.contactPoints(body)` read the contacts of the last step. Contact and intersection events, sensors, `collisionGroups`, `solverGroups`, `contactFilter`, `dominance` and `enabled` on bodies and colliders work as on the root entry, with the same names. `body.setType`, `setAdditionalMass` (with inertia of its own), `setMassProperties`, `collider.setDensity` and `additionalSolverIterations` work as on the root entry, with the same names and errors. A call that needs what is still to come throws a `MargoError` with code `unsupported` naming what it waits for: the other shapes and `addModel` with the shapes and queries batch, `ccd` with continuous collision, queries, `follow` and character controllers, and `debugRender`. `body.sleep()` and impulses take effect at the next step.
 
 Mesh writes on the own solver follow the kernel's awake list, so a sleeping or fixed body costs `sync()` nothing. A body
 is written while it is awake and moves, once more when it comes to rest (its exact pose at rest), once after you place it
@@ -392,6 +392,28 @@ const dumbbell = physics.addBody(null, {
 });
 for (let i = 0; i < 240; i++) physics.step();
 console.log(dumbbell.colliders.length, dumbbell.position[1].toFixed(2)); // 1 0.50: one collider, resting on its balls
+```
+
+A `voxels` collider takes the root entry's `cells` (an `Int32Array` of x, y, z cell numbers, three per cell) and `size` (one cell, default `[1, 1, 1]`); cell (i, j, k) spans `[i, i + 1]` times the size along x, and so on. `setVoxel(x, y, z, filled)` edits it in place, keeping the contacts of every other cell, and a cell outside the grid grows it. Two grids that meet call `a.combineVoxelStates(b, sx, sy, sz)` once, `sx`, `sy`, `sz` the cells `b` is shifted by, and `a.propagateVoxelChange(b, x, y, z, sx, sy, sz)` after an edit on their border, so a body crosses the seam without catching; left uncoupled, the border is the side of a step and a sliding box catches on it, as on Rapier. A grid has the mass of its cells, so it can be a dynamic body; it meets every shape but triangle meshes and heightfields, which it falls through, as Rapier's does. Inside one grid a body slides across the cells without catching on the faces between them: a contact normal may lean only toward exposed faces. Its mass follows an edit at once (Rapier's at the next step). The kernel keeps one byte a cell over the box of the cells, so a sparse grid costs its box: split a large world into chunks. `KernelWorld.addVoxels(cells, size)` is the kernel's view of it.
+
+```js
+import {Physics} from 'margoengine/physics/next';
+
+await Physics.load();
+const physics = new Physics(null);
+// A 4 by 4 slab of cells at y = 0, twice, side by side.
+const slab = Int32Array.from(Array.from({length: 16}, (_, i) => [i >> 2, 0, i & 3]).flat());
+const [a, b] = [0, 4].map(
+  (x) => physics.addBody(null, {type: 'fixed', position: [x, 0, 0], colliders: {shape: 'voxels', cells: slab, friction: 0}}).colliders[0],
+);
+a.combineVoxelStates(b, 4, 0, 0); // b's cell (0, 0, 0) is a's (4, 0, 0)
+a.setVoxel(3, 0, 0, false).propagateVoxelChange(b, 3, 0, 0, 4, 0, 0); // dig on the border, tell b
+const crate = physics.addBody(null, {
+  position: [2, 1.3, 2], linearVelocity: [3, 0, 0], canSleep: false,
+  colliders: {shape: 'box', halfExtents: [0.3, 0.3, 0.3], friction: 0},
+});
+for (let i = 0; i < 60; i++) physics.step();
+console.log(crate.position[0].toFixed(1), crate.position[1].toFixed(2)); // 5.0 1.30: across the seam at its height
 ```
 
 A `convexHull` takes `points` (flat x, y, z numbers), or `geometry`, or the body's mesh when it has neither, scaled with the mesh, as on the root entry. The solver builds it by Quickhull: points inside, repeats and points within 2.5e-5 of the hull's size of a face are dropped, triangles in one plane become one face of up to 256 corners, and colliders built from the same points share one hull. `convexHull(points)` returns the `vertices` and `faces` it builds, for drawing or checking; it throws a `RangeError` naming the fix for fewer than four points or points that span no volume.

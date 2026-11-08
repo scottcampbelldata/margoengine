@@ -116,7 +116,7 @@ fn a_dumbbell_rests_on_a_triangle_mesh() {
     let mut w = World::new(4, 8).unwrap();
     let vertices = [v3(-5.0, 0.0, -5.0), v3(-5.0, 0.0, 5.0), v3(5.0, 0.0, -5.0), v3(5.0, 0.0, 5.0)];
     assert!(w.begin_mesh(4, 2));
-    let [_, v0, t0, _] = w.header().mesh_rows;
+    let [_, v0, t0, _, _] = w.header().mesh_rows;
     for (i, &p) in vertices.iter().enumerate() {
         w.set_v(MESH_VERTEX_X, v0 as usize + i, p);
     }

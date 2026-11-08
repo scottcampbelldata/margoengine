@@ -16,6 +16,7 @@ const served: Readonly<Record<string, KernelShape | 'compound'>> = {
   trimesh: 'trimesh',
   heightfield: 'trimesh',
   compound: 'compound',
+  voxels: 'trimesh',
 };
 /** The convex parts a compound takes, and the parts the own solver holds so far. */
 const CONVEX_PARTS = ['box', 'sphere', 'capsule', 'cylinder', 'cone', 'convexHull'],
@@ -101,6 +102,14 @@ export interface HullRows {
   hullVolume(row: number): number;
   addTrimesh(vertices: Float32Array, indices: Uint32Array, fixInternalEdges: boolean): number;
   addHeightfield(rows: number, columns: number, heights: ArrayLike<number>, scale: Vec3, fixInternalEdges: boolean): number;
+  addVoxels(cells: Int32Array, size: Vec3): number;
+}
+
+/** The volume of a voxels collider's distinct cells. */
+function voxelVolume(cells: Int32Array, size: Vec3): number {
+  const seen = new Set<string>();
+  for (let i = 0; i < cells.length; i += 3) seen.add(`${cells[i]},${cells[i + 1]},${cells[i + 2]}`);
+  return seen.size * size[0] * size[1] * size[2];
 }
 
 /**
@@ -119,7 +128,7 @@ export function kernelCollider(
   if (!shape)
     throw new MargoError(
       'unsupported',
-      `The ${options.shape} shape is not in the own solver yet; use box, sphere, capsule, convexHull, trimesh, heightfield or compound, or @margoengine/physics.`,
+      `The ${options.shape} shape is not in the own solver yet; use box, sphere, capsule, convexHull, trimesh, heightfield, compound or voxels, or @margoengine/physics.`,
     );
   const fitted = (): Float32Array => {
       if (!fit.geometry) throw new TypeError(`A ${options.shape} collider without explicit size needs a mesh with geometry`);
@@ -127,7 +136,8 @@ export function kernelCollider(
     },
     center = [0, 0, 0];
   let size: number[],
-    parts: KernelCompoundPart[] | undefined;
+    parts: KernelCompoundPart[] | undefined,
+    voxels: number | undefined;
   if (options.shape === 'box') {
     let half = options.halfExtents;
     if (!half) {
@@ -173,14 +183,23 @@ export function kernelCollider(
   } else if (options.shape === 'compound') {
     parts = compoundParts(options.parts, hulls);
     size = [];
-  } else throw new TypeError(`Unknown shape ${options.shape}; use box, sphere, capsule, convexHull, trimesh, heightfield or compound.`);
+  } else if (options.shape === 'voxels') {
+    const { cells, size: cell = [1, 1, 1] } = options;
+    if (!(cells instanceof Int32Array) || cells.length % 3)
+      throw new TypeError('A voxels collider needs cells as an Int32Array of x, y, z cell coordinates, three per cell.');
+    checkVec(cell, 'Voxel size');
+    for (const value of cell)
+      if (!(value > 0)) throw new RangeError(`Voxel size must be above zero on every axis (got ${cell.join(', ')}); pass one cell's size in metres.`);
+    voxels = voxelVolume(cells, cell);
+    size = [hulls.addVoxels(cells, cell)];
+  } else throw new TypeError(`Unknown shape ${options.shape}; use box, sphere, capsule, convexHull, trimesh, heightfield, compound or voxels.`);
   const offset = options.offset ?? [0, 0, 0];
   checkVec(offset, 'Collider offset');
   const whole = (): number =>
       parts
         ? parts.reduce((sum, part) => sum + volume(part.shape, part.size, hulls.hullVolume), 0)
-        : volume(shape as KernelShape, size, hulls.hullVolume),
-    density = options.massless || shape === 'trimesh'
+        : (voxels ?? volume(shape as KernelShape, size, hulls.hullVolume)),
+    density = options.massless || (shape === 'trimesh' && voxels === undefined)
       ? 0
       : options.mass !== undefined
         ? options.mass / whole()

@@ -34,7 +34,7 @@ fn across(vertices: &[V3], triangles: &[[u32; 3]]) -> Vec<[u32; 3]> {
 
 fn add_mesh(w: &mut World, vertices: &[V3], triangles: &[[u32; 3]], flags: u32) -> i32 {
     assert!(w.begin_mesh(vertices.len() as u32, triangles.len() as u32));
-    let [_, v0, t0, _] = w.header().mesh_rows;
+    let [_, v0, t0, _, _] = w.header().mesh_rows;
     for (i, &p) in vertices.iter().enumerate() {
         w.set_v(MESH_VERTEX_X, v0 as usize + i, p);
     }
@@ -118,7 +118,7 @@ fn a_mesh_with_bad_rows_is_refused() {
     let mut w = World::new(4, 4).unwrap();
     let vertices = [v3(0.0, 0.0, 0.0), v3(1.0, 0.0, 0.0), v3(0.0, 0.0, 1.0)];
     assert!(w.begin_mesh(3, 1));
-    let [_, v0, t0, _] = w.header().mesh_rows;
+    let [_, v0, t0, _, _] = w.header().mesh_rows;
     for (i, &p) in vertices.iter().enumerate() {
         w.set_v(MESH_VERTEX_X, v0 as usize + i, p);
     }
