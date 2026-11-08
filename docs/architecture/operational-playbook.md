@@ -1207,8 +1207,6 @@ The following remain technical gaps, not permission to weaken a check:
 21. Every timing since 2026-11-05 is diagnostic. The parity ledger's last run is 2026-10-27: after numbers sit in the row's cause text,
     and `p-morph-compiled`, `p-motion-blur-velocity` and `p-pmrem-refresh` have no ledger row yet.
 22. The WebGL2 CPU tier's interpreter and the path tracer on the layer have no committed timing script.
-23. The own physics solver's body kinds, own mass and extra passes (LIM-433) are proved in Node and by the replay in Chromium and
-    Firefox; nothing of it is timed against Rapier yet (batch 129).
 23. `@margoengine/shader` compute passes have no check on the WebGL2 layer, and `@margoengine/compute/nn` and `/graph` no speed measurement.
 24. The headless stage runs in Node on Windows only (Dawn on D3D12 and WARP), and a textured glTF does not load there.
 25. Draw counts in LIM rows are printed by GPU checks and asserted only as bounds, and no result file holds them.
@@ -1219,3 +1217,8 @@ The following remain technical gaps, not permission to weaken a check:
 30. The own physics kernel is proved bit-equal on one Windows x86-64 PC only: no run in Safari, on ARM or on a second machine, and it has no timing against Rapier yet. The range check runs once a step, so a run away of more than 23 orders of magnitude inside one step would reach a NaN: none seen in 200 random webs of 10,000 steps.
     its load time against a cold Wasm transcoder is not measured.
 31. Voxel far levels (`@margoengine/voxel/lod`, a scaled `VoxelRenderer`) are proved on the M6 Mac mini (Metal) only: scale 2 against scale 1 drew the same image; frame cost at kilometre view distances is not measured on any GPU.
+32. The own physics solver's body kinds, own mass and extra passes (LIM-438) are proved in Node and by the replay in Chromium and
+    Firefox; nothing of it is timed against Rapier yet (batch 129). Sleep reads through `setType` and of still kinematic bodies
+    (a RESTING flag: they stay on the awake list) are held to the root entry's measured reads in `next-bodies.test.js`; an island
+    still wakes at the call rather than at the step, an accepted difference in `docs/limits.md`. A kinematicPosition body at its
+    target is exactly still (`kernel/tests/sleep.rs`), so what rests on it sleeps.
