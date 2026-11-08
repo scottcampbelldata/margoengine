@@ -1114,7 +1114,7 @@
     "package": "@margoengine/sprites",
     "version": "1.0.0",
     "published": false,
-    "description": "2D sprites at exact pixels: one instanced draw per layer, atlas rectangles, pivot, flip, rotation, tint, z and y sorting, integer pixel snapping and an optional normal map target.",
+    "description": "2D sprites at exact pixels: one instanced draw per layer, atlas rectangles, pivot, flip, rotation, tint, z and y sorting, integer pixel snapping and an optional normal map target, and camera-facing billboards in 3D.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "sprites",
     "install": "npm install @margoengine/core@1.0.0 @margoengine/sprites@1.0.0",

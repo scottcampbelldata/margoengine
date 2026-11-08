@@ -2550,6 +2550,10 @@
       "types": "./dist/sprites/atlas.d.ts",
       "import": "./dist/sprites/atlas.js"
     },
+    "./sprites/billboard": {
+      "types": "./dist/sprites/billboard.d.ts",
+      "import": "./dist/sprites/billboard.js"
+    },
     "./stage/gltf": {
       "types": "./dist/stage/gltf.d.ts",
       "import": "./dist/stage/gltf.js"

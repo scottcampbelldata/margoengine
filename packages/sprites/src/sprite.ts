@@ -32,8 +32,8 @@ export interface SpriteOptions {
   visible?: boolean;
 }
 
-/** Parses `0xrrggbb`, `'#rrggbb'` or `'#rgb'` to `0xrrggbb`. Bytes are written as given, with no colour conversion. */
-function parseTint(tint: number | string): number {
+/** @internal Parses `0xrrggbb`, `'#rrggbb'` or `'#rgb'` to `0xrrggbb`. Bytes are written as given, with no colour conversion. */
+export function parseTint(tint: number | string): number {
   if (typeof tint === 'string') {
     const short = /^#[\da-f]{3}$/i.test(tint);
     if (!short && !/^#[\da-f]{6}$/i.test(tint)) throw typeError('Invalid sprite tint', 'sprite-options');

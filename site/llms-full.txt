@@ -359,7 +359,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 | [`@margoengine/lod`](packages/lod/README.md) | Level of detail with hysteresis and screen-size switching for thousands of instances, plus GPU-baked octahedral imposters drawn in one instanced call per atlas. |
 | [`@margoengine/culling`](packages/culling/README.md) | GPU-driven static instances: frustum and Hi-Z occlusion culling in compute, order-preserving compaction and indirect draws, no per-part CPU work per frame. |
 | [`@margoengine/points`](packages/points/README.md) | Large point clouds (PointCloud, PointsMaterial) and instanced sprites (SpriteBatch, SpriteMaterial) for Margo Engine, WebGPU. |
-| [`@margoengine/sprites`](packages/sprites/README.md) | 2D sprites at exact pixels: one instanced draw per layer, atlas rectangles, pivot, flip, rotation, tint, z and y sorting, integer pixel snapping and an optional normal map target. |
+| [`@margoengine/sprites`](packages/sprites/README.md) | 2D sprites at exact pixels: one instanced draw per layer, atlas rectangles, pivot, flip, rotation, tint, z and y sorting, integer pixel snapping and an optional normal map target, and camera-facing billboards in 3D. |
 | [`@margoengine/lines`](packages/lines/README.md) | Fat lines (Line, LineMaterial) and debug helpers for Margo Engine, WebGPU. |
 | [`@margoengine/text`](packages/text/README.md) | GPU signed distance field text for Margo Engine: runtime glyph atlases from any browser font, wrapping, alignment, outlines and shadows, WebGPU. |
 | [`@margoengine/pixel`](packages/pixel/README.md) | Pixel art rendering: a pixel camera with integer zoom and parallax, and a layer compositor that scales low-res layers by whole numbers and turns them with every output pixel one source pixel. |
@@ -2600,7 +2600,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-474). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-475). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -2760,6 +2760,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Anamorphic streaks (`Anamorphic` in `@margoengine/post/anamorphic`, 2026-11-07) | By method: streaks are horizontal only (no rotation); they are built at half width and a quarter of the height, so a streak is about 4 px tall and a light smaller than a pixel still draws one; each streak is the light's own colour times `tint`, with no spectral split; reach is 2 (3^passes - 1) half-width texels each side; two quarter-size and one full-size `rgba16float` targets; GPU cost not measured (LIM-459). | A chain of sparse 9-tap passes reaches far for a few reads per pixel, where one wide kernel would read hundreds. | Bright points and highlights draw thin tinted lines across the frame. | Lower `passes` for short streaks, raise `threshold` so only lights streak. |
 | Blur (`Blur` in `@margoengine/post/blur`, 2026-11-08) | By method: 2 radius + 1 texture reads per pixel per pass, so cost grows with the radius (64 at most, 129 reads a pass); the kernel is cut at 3 sigma for the Gaussian; edges clamp to the nearest pixel, so a bright border bleeds inward; `region` is a rectangle with a hard edge; one or two full-size `rgba16float` targets; GPU cost not measured (LIM-472). | A plain separable loop is exact for every radius and needs no mip chain. | Menus behind glass, focus pulls and custom chains blur by any whole-pixel radius. | Keep the radius small on weak GPUs, or chain two Blurs of half the radius for a wider, cheaper look. |
 | Lens model (`Lens` in `@margoengine/post/lens`, 2026-11-08) | By method: one radial distortion term (k r^2), no tangential or chromatic part; distortion resamples the frame bilinearly, so it softens it slightly; the dirt is lit by its own glow at an eighth of the frame size (reach about 50 px), not by the glow of `Bloom`; the built-in dirt is a fixed pattern; two eighth-size and one full-size `rgba16float` targets; GPU cost not measured (LIM-474). The Panini projection is a camera (`WideAngle` in `@margoengine/cameras/panini`), not part of this effect. | One term covers the usual barrel and pincushion look; a small glow keeps the dirt cheap. | Wide lenses bulge, and smudges on the glass light up around bright lights. | Pass your own `dirt` texture; set `dirtIntensity` 0 for distortion alone. |
+| Billboards (`BillboardLayer` in `@margoengine/sprites/billboard`, 2026-11-08) | `capacity` 256 billboards before a buffer grows; at most the device's `maxStorageBufferBindingSize` / 64 per view. | One instanced draw per view, each view with its own sorted buffer, so its memory is 64 B per billboard per view. | By method: blended billboards sort by the pivot's distance, so two that cross draw one over the other whole; pixel-sized ones take their depth from the pivot; `lockY` applies to world sizes only; texels are read with no filtering. Proved on one GPU, an RTX A6000, by measured pixel extents. Time not measured. | `transparent: false` (cut-out with depth writes) needs no sort; split crossing quads into two billboards. |
 
 
 | Limit | Starts at | Why | What you see | Escape hatch |
@@ -6640,15 +6641,15 @@ A plain `GPUTexture` belonged to the lost device: the next frame throws `MargoEr
 Normals write `n * 0.5 + 0.5` from a same-size normal atlas, turned and flipped with the sprite, with alpha 1 where a
 sprite covers the pixel. They need a single-sample colour target and a single-sample normal target of the same size.
 
-## Animation
+## Billboards
 
-`@margoengine/sprites/animation` (`margoengine/sprites/animation`) plays sprite-sheet clips. It is plain CPU code, so it
-runs in Node and an app that only draws still frames does not ship it.
+`margoengine/sprites/billboard` draws camera-facing sprites in a 3D scene: markers, foliage, effects. One instanced draw
+per view after the scene, depth tested against it. Sizes are world units that shrink with distance, or pixels with
+`sizeAttenuation: false`, so a marker keeps its size at any range.
 
 ```ts
 import { EngineKernel } from 'margoengine/core';
-import { SpriteLayer } from 'margoengine/sprites';
-import { frameGrid, SpriteAnimation } from 'margoengine/sprites/animation';
+import { BillboardLayer } from 'margoengine/sprites/billboard';
 ```
 
 [README continues: https://margoengine.com/llms/packages/sprites.md]

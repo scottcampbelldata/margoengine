@@ -73,6 +73,53 @@ A plain `GPUTexture` belonged to the lost device: the next frame throws `MargoEr
 Normals write `n * 0.5 + 0.5` from a same-size normal atlas, turned and flipped with the sprite, with alpha 1 where a
 sprite covers the pixel. They need a single-sample colour target and a single-sample normal target of the same size.
 
+## Billboards
+
+`margoengine/sprites/billboard` draws camera-facing sprites in a 3D scene: markers, foliage, effects. One instanced draw
+per view after the scene, depth tested against it. Sizes are world units that shrink with distance, or pixels with
+`sizeAttenuation: false`, so a marker keeps its size at any range.
+
+```ts
+import { EngineKernel } from 'margoengine/core';
+import { BillboardLayer } from 'margoengine/sprites/billboard';
+
+const engine = await EngineKernel.create(document.querySelector('canvas')!);
+engine.camera.position = [0, 1.5, 6];
+// A 2 x 1 atlas: a green leaf and an orange marker.
+const data = new Uint8Array([40, 160, 60, 255, 255, 140, 0, 255]);
+const trees = BillboardLayer.attach(engine, { atlas: { width: 2, height: 1, data }, lockY: true });
+for (let i = 0; i < 5; i++) trees.add({ x: i * 2 - 4, width: 1, height: 2, pivotY: 1, rect: [0, 0, 1, 1] });
+const markers = BillboardLayer.attach(engine, { atlas: { width: 2, height: 1, data }, sizeAttenuation: false });
+const pin = markers.add({ y: 3, width: 12, height: 12, rect: [1, 0, 1, 1] });
+engine.start();
+
+// Change any field whenever you like.
+pin.x = 1;
+pin.rotation = Math.PI / 4;
+```
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| `atlas` | required | Same as a `SpriteLayer` atlas; texels read with no filtering |
+| `sizeAttenuation` | true | World-unit sizes (true) or pixel sizes (false), read each frame |
+| `lockY` | false | Turn about world +Y only, so trees and grass stay upright; read each frame |
+| `transparent` | false | False: cut-out, depth written, any order. True: straight-alpha blend, sorted back to front, depth tested only |
+| `alphaTest` | 0.5 | Cut-out: texels with alpha under this are dropped; read each frame |
+| `order` | 15 | Frame-graph order: after the scene, before text (22) and post-processing (30) |
+| `layers` | 1 | Render-layer bits; a view with `layers` that shares none skips this layer |
+| `capacity` | 256 | Billboards before the buffers grow |
+| `name` | `billboards-1`, ... | Plugin name, unique per scene |
+
+A `Billboard` has `x`, `y`, `z` (world, y up), `width` and `height` (default 1), `pivotX` and `pivotY` (default 0.5;
+`pivotY: 1` stands the image on its point), `rotation` (clockwise on screen, radians), `flipX`, `flipY`, `tint`,
+`alpha`, `rect` and `visible`, as on a `Sprite`. Methods: `add`, `remove`, `clearBillboards`, `setAtlas`, `dispose` (or
+`using`). Each view gets its own sorted buffer, so split screens sort for their own camera. On an sRGB or float target
+texels are decoded from sRGB like any colour texture; on an 8-bit target they go through as they are.
+
+- Pixel-sized billboards take their depth from the pivot, and `lockY` applies to world sizes only.
+- Sorting is by the pivot's distance: two blended billboards that cross each other draw one over the other whole.
+- WebGPU only.
+
 ## Animation
 
 `@margoengine/sprites/animation` (`margoengine/sprites/animation`) plays sprite-sheet clips. It is plain CPU code, so it

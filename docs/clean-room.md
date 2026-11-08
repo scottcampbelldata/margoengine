@@ -250,6 +250,7 @@ The own solver's kernel (`packages/physics/kernel`, Rust, no dependencies). Noth
 | id | formula | file | source |
 | --- | --- | --- | --- |
 | SP1 | Aseprite file layout: header, frames, layer, cel, tag, palette, user data and slice chunks | sprites/src/aseprite.ts | Aseprite's public file format specification document (docs/ase-file-specs.md), read alone; its source was not read |
+| SP2 | Billboards: a quad spanned by the camera's right and up axes (world sizes) or offset in clip space by size / viewport * w (pixel sizes); an upright variant spans the horizontal right axis and world +Y; blended ones sorted back to front | sprites/src/billboard.ts | T. Akenine-Moller, E. Haines, N. Hoffman et al., *Real-Time Rendering*, 4th ed., 2018, section 13.6 (Billboarding: screen-aligned, world-oriented and axial billboards); the WebGPU and WGSL specifications for instancing, depth compare and blending. No other engine's billboard code was read |
 
 | EX3 | Animated PNG chunks (acTL, fcTL, fdAT, sequence numbers, delays, dispose and blend ops) | exporters/src/apng.ts | W3C PNG specification, third edition |
 | EX4 | Lossless WebP encoding (VP8L header, colour indexing, subtract green, predictor modes, LZ77 prefix coding, code-length codes) and the animated container (VP8X, ANIM, ANMF) | exporters/src/webp.ts | RFC 9649 WebP Lossless Bitstream Specification; WebP Container Specification |

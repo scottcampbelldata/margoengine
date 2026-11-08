@@ -1,10 +1,10 @@
 {
-  "commit": "ad40cb8a6",
+  "commit": "9cb13c06d",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
     "raw": 58443,
-    "gzip": 23590,
+    "gzip": 23626,
     "limit": 25000
   },
   "packages": {
@@ -565,17 +565,17 @@
     "@margoengine/core": {
       ".": {
         "raw": 51214,
-        "gzip": 21258
+        "gzip": 21285
       },
       "./extension": {
-        "raw": 51313,
-        "gzip": 21323
+        "raw": 51315,
+        "gzip": 21311
       }
     },
     "@margoengine/creative": {
       ".": {
-        "raw": 61586,
-        "gzip": 19100
+        "raw": 62200,
+        "gzip": 19154
       },
       "./particles": {
         "raw": 1028,
@@ -594,16 +594,16 @@
         "gzip": 7019
       },
       "./grass": {
-        "raw": 16111,
-        "gzip": 5944
+        "raw": 16377,
+        "gzip": 5961
       },
       "./planet": {
-        "raw": 20730,
-        "gzip": 7011
+        "raw": 20958,
+        "gzip": 7027
       },
       "./stars": {
-        "raw": 6033,
-        "gzip": 2653
+        "raw": 6153,
+        "gzip": 2665
       }
     },
     "@margoengine/culling": {
@@ -2684,12 +2684,16 @@
       "./atlas": {
         "raw": 650,
         "gzip": 393
+      },
+      "./billboard": {
+        "raw": 12634,
+        "gzip": 5133
       }
     },
     "@margoengine/stage": {
       ".": {
-        "raw": 7314,
-        "gzip": 2966
+        "raw": 7318,
+        "gzip": 2974
       },
       "./gltf": {
         "raw": 2922,
@@ -3244,20 +3248,20 @@
     },
     "@margoengine/webgl2-compat": {
       ".": {
-        "raw": 336173,
-        "gzip": 101909
+        "raw": 336400,
+        "gzip": 102019
       },
       "./adapter": {
         "raw": 1861,
         "gzip": 958
       },
       "./compute": {
-        "raw": 165456,
-        "gzip": 48236
+        "raw": 165686,
+        "gzip": 48351
       },
       "./device": {
-        "raw": 335296,
-        "gzip": 102009
+        "raw": 335523,
+        "gzip": 102122
       },
       "./glsl": {
         "raw": 145851,
@@ -3268,8 +3272,8 @@
         "gzip": 26476
       },
       "./xr": {
-        "raw": 335336,
-        "gzip": 101903
+        "raw": 335563,
+        "gzip": 101952
       }
     },
     "@margoengine/wfc": {
@@ -3526,8 +3530,8 @@
       },
       "lazy": {
         "name": "compute runtime and read-back",
-        "raw": 96739,
-        "gzip": 30877,
+        "raw": 96966,
+        "gzip": 30985,
         "loadedBy": "the first compute pipeline or texture read-back on the layer (import() in device/device.ts)"
       }
     },

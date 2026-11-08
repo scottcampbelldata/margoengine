@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10993122,
+  "total": 10998511,
   "history": [
     {
       "date": "2026-10-24",
@@ -4130,6 +4130,12 @@
       "commit": "3792a99ce",
       "reason": "post/lens: new optional entry, lens dirt and barrel distortion",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "9cb13c06d",
+      "reason": "billboard entry is new; sprites root unchanged",
+      "grew": 1
     }
   ],
   "items": {
@@ -4768,6 +4774,7 @@
     "@margoengine/sprites/animation": 1387,
     "@margoengine/sprites/aseprite": 4595,
     "@margoengine/sprites/atlas": 649,
+    "@margoengine/sprites/billboard": 5389,
     "@margoengine/stage": 3222,
     "@margoengine/stage/effects": 727,
     "@margoengine/stage/environment": 747,

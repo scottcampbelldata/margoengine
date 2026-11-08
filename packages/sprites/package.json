@@ -1,7 +1,7 @@
 {
   "name": "@margoengine/sprites",
   "version": "1.0.0",
-  "description": "2D sprites at exact pixels: one instanced draw per layer, atlas rectangles, pivot, flip, rotation, tint, z and y sorting, integer pixel snapping and an optional normal map target.",
+  "description": "2D sprites at exact pixels: one instanced draw per layer, atlas rectangles, pivot, flip, rotation, tint, z and y sorting, integer pixel snapping and an optional normal map target, and camera-facing billboards in 3D.",
   "keywords": [
     "margoengine",
     "webgpu",
@@ -38,6 +38,10 @@
     "./atlas": {
       "types": "./dist/atlas.d.ts",
       "import": "./dist/atlas.js"
+    },
+    "./billboard": {
+      "types": "./dist/billboard.d.ts",
+      "import": "./dist/billboard.js"
     }
   },
   "files": [
@@ -55,6 +59,7 @@
     "build": "node ../../scripts/build-optional.js sprites",
     "test": "npm run build && node --test tests/*.test.js",
     "test:gpu": "cd ../.. && node packages/sprites/tests/browser-check.mjs",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "test:gpu:billboard": "cd ../.. && node packages/sprites/tests/billboard-check.mjs"
   }
 }
