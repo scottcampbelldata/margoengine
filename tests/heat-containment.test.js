@@ -382,7 +382,7 @@ test('split steps cover the whole suite: both bevel sample counts, each chain pa
   // Toon's browser checks, one step each.
   assert.deepEqual(
     splitSteps(byId('toon/test:gpu')).map((s) => s.command.replace('cd ../.. && node packages/toon/test/', '')),
-    ['models-check.mjs'],
+    ['models-check.mjs', 'hatch-check.mjs'],
   );
 });
 

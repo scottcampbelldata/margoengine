@@ -33,6 +33,20 @@ outlines.vertexColors = true; // painted COLOR_0 tints the line and its alpha sc
 
 Options: `outline`, thickness in world units 0 to 10 (default 0.025, 0 hides it); `color`, linear RGB 0 to 1 (default `[0.015, 0.015, 0.015]`); `smooth`, seam-free outlines (default true, live); `materials`, width and colour by glTF material name over those two (default none, live); `vertexColors`, the line's colour times the vertex colour (COLOR_0) RGB and its width times its alpha (default false, live); `models`, the models to outline (default every model on the engine). Hidden nodes and nodes outside a view's layers get no outline; point and line primitives never do. With `smooth`, every copy of a vertex at one position (split by a hard edge or a UV seam) pushes out along the average of their normals, read each frame from the vertices drawn, so hard-edged meshes get an unbroken outline, posed ones too; it is thinner at sharp corners (a cube's corner moves the width over the square root of 3 each way). `positionRings(vertices)` returns the links it bakes, each vertex's next copy at the same position. Positions must match bit for bit; at most 64 copies a position are averaged; a vertex buffer without STORAGE usage draws as `smooth: false`. With `smooth: false` the line follows each vertex's own normal and parts at creases. WebGPU only; `dispose()` removes the pass. For a screen-space line of fixed pixel width, use `@margoengine/post` `Outline`.
 
+## Hatching and halftone
+
+`@margoengine/toon/hatch` draws pen hatching or print dots in place of flat bands on core meshes: the surface takes its full lit colour (the paper) and the diffuse light level decides how much of each pixel is ink, in a pattern fixed to the screen.
+
+```ts
+import {Hatching} from 'margoengine/toon/hatch';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const hatching = Hatching.attach(engine, {style: 'hatch', spacing: 8, layers: 3});
+hatching.style = 'halftone'; // live, as are the other options; hatching.set({...}) changes several at once
+```
+
+Options (each live): `style`, `'hatch'` (default) or `'halftone'`; `spacing`, line or dot spacing in screen pixels, 2 to 64 (default 8); `width`, stroke width in pixels for `'hatch'`, 0.5 up to `spacing` (default 1.5); `layers`, stroke layers for `'hatch'`, 1 to 4 (default 3), layer k drawn where the light is below (layers - k) / (layers + 1), each turned 180 / layers degrees from the last; `angle`, the first strokes' or the dot grid's angle in degrees (default 45); `ink`, linear RGB 0 to 1 drawn unlit (default black). Halftone dots cover 1 - light of each cell. With `Toon` attached too, hatching replaces its bands and keeps its rim and outlines. Core meshes only; it uses group 0 binding 146. WebGPU only.
+
 For toon shading per material, on materials meshes (plain, instanced, skinned) and loaded glTF-pro models (skinned and morphed too), use `@margoengine/materials`: `new ToonMaterial({gradientMap})` or `{steps: 3}`, and `toonModel(model)` for a loaded model or some of its primitives. Both band the sun, clustered lights and their shadows through the ramp.
 
 ```ts

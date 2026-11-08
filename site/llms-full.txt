@@ -2600,7 +2600,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-567). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-568). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -2815,6 +2815,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | CRT look (`@margoengine/pixel/crt`, 2026-11-08) | One pass a canvas view (or one into `target`), 9 texel reads a pixel. | Working from the art's own rows keeps one scanline per art pixel at any screen size. | By method: a stylised look, not a model of a real tube (no beam spread with brightness, no persistence, no interlace, no colour bleed); one grille pattern (three columns); the art row under each pixel is taken whole, not mixed with the next; colours as stored, not in linear light. Time not measured. | For a measured tube model use a dedicated post pass. |
 | Model outlines (`@margoengine/toon/models`, 2026-11-08) | One render pass a view for every outlined primitive, one hull draw a primitive and its instances (two pipelines: plain and mirrored nodes). | The hull reuses the vertices the model already has on the GPU, deformed ones included, so it costs one more vertex pass of the outlined triangles. | By method: an inverted hull, so the line follows vertex normals: hard-edged meshes with split normals show gaps at their creases; a constant world-unit width, thinner with distance; no line on point and line primitives; GPU-culled draws still draw their hull; one width and colour for every model. Time not measured. | `@margoengine/post` `Outline` for a screen-space line of fixed pixel width. |
 | Palette cycling and ramps (`@margoengine/pixel/palette`, 2026-11-08) | `cyclePalette` and `mixPalettes` run on the CPU per call; `setSwap` writes one 256 x 1 row at most each frame. | Rotating the drawn colours animates water and fire without repainting a pixel, and the matching stays. | By method: cycles rotate the colours drawn, not the matching (a pixel keeps its index); one rate per run, no ping-pong or easing; mixing is linear in Oklab between two palettes. Time not measured. | For more than two palettes over a day, mix the neighbouring pair. |
+| Hatching and halftone (`@margoengine/toon/hatch`, 2026-11-08) | Core meshes only, one shader patch: up to 4 stroke layers or one dot a pixel, in the mesh's own fragment pass. | A screen-space pattern needs no textures or UVs and keeps the same stroke width at any distance. | By method: the pattern is fixed to the screen, so it slides over a moving surface (no texture-space strokes); tone is Lambert n.l of the sun only (clustered lights and shadows are not inked); hatching steps by whole layers; the paper takes the full lit colour without the 1/pi of Lambert, as `ToonShading` does. Time not measured. | `@margoengine/shader` `halftone` for a screen effect over everything; a `NodeMaterial` lighting function for glTF-pro and materials meshes. |
 
 
 | Limit | Starts at | Why | What you see | Escape hatch |
@@ -4056,6 +4057,16 @@ Sweep record: every package's tests and browser or GPU tests on the Mac mini (M6
 
 Measured but not fixed. Their history, sources and rerun commands are in
 [whitepaper/perf-history.md](whitepaper/perf-history.md#open-losses).
+
+- **Navmesh build of one gapped floor is slower than recast-navigation 0.44.0** (`@margoengine/navmesh`, perf history
+  entry 94): 3.190 ms against 1.130 ms, paired turns, per-round minimum, busy machine, diagnostic. Repro:
+  `node packages/navmesh/scripts/rival-bench.mjs` after the navmesh build. The rival is installed outside the
+  repository. Cause not yet found. Publishing the number does not close it.
+- **Navmesh path on that floor is longer than Detour's** (`@margoengine/navmesh`, perf history entry 94): Margo 24.212
+  (north hall, 4 points) against recast-navigation 0.44.0 at 23.778 (south hall, 5 points). The corner route through
+  either hall is about 23.26. The open floor is equal (both 22.627416997969522, the Euclidean length). Cause not yet
+  found. `packages/navmesh/test/path-length.test.js` checks the open floor and that the gapped path stays out of the
+  hole. It does not freeze Detour's length. Publishing the number does not close it.
 
 - **Own 2D physics steps the 100-row pyramid in 2.9 ms in Wasm where Box2D v3's Wasm takes 1.4 ms**
   (`packages/physics2d/kernel`, perf history entries 83 to 91): repro `BOX2D_WASM=<box2d3-pyramid.mjs> node
@@ -6380,22 +6391,21 @@ outlines.vertexColors = true; // painted COLOR_0 tints the line and its alpha sc
 
 Options: `outline`, thickness in world units 0 to 10 (default 0.025, 0 hides it); `color`, linear RGB 0 to 1 (default `[0.015, 0.015, 0.015]`); `smooth`, seam-free outlines (default true, live); `materials`, width and colour by glTF material name over those two (default none, live); `vertexColors`, the line's colour times the vertex colour (COLOR_0) RGB and its width times its alpha (default false, live); `models`, the models to outline (default every model on the engine). Hidden nodes and nodes outside a view's layers get no outline; point and line primitives never do. With `smooth`, every copy of a vertex at one position (split by a hard edge or a UV seam) pushes out along the average of their normals, read each frame from the vertices drawn, so hard-edged meshes get an unbroken outline, posed ones too; it is thinner at sharp corners (a cube's corner moves the width over the square root of 3 each way). `positionRings(vertices)` returns the links it bakes, each vertex's next copy at the same position. Positions must match bit for bit; at most 64 copies a position are averaged; a vertex buffer without STORAGE usage draws as `smooth: false`. With `smooth: false` the line follows each vertex's own normal and parts at creases. WebGPU only; `dispose()` removes the pass. For a screen-space line of fixed pixel width, use `@margoengine/post` `Outline`.
 
-For toon shading per material, on materials meshes (plain, instanced, skinned) and loaded glTF-pro models (skinned and morphed too), use `@margoengine/materials`: `new ToonMaterial({gradientMap})` or `{steps: 3}`, and `toonModel(model)` for a loaded model or some of its primitives. Both band the sun, clustered lights and their shadows through the ramp.
+## Hatching and halftone
+
+`@margoengine/toon/hatch` draws pen hatching or print dots in place of flat bands on core meshes: the surface takes its full lit colour (the paper) and the diffuse light level decides how much of each pixel is ink, in a pattern fixed to the screen.
 
 ```ts
-import {ToonMaterial, createMesh, toonModel} from 'margoengine/materials';
+import {Hatching} from 'margoengine/toon/hatch';
 import {Engine} from 'margoengine/core';
-import {sphereGeometry} from 'margoengine/geometry';
-import {loadGLTF} from 'margoengine/gltf-pro';
 const engine = await Engine.create(document.querySelector('canvas')!);
-const geometry = sphereGeometry(1, 32, 16), character = await loadGLTF(engine, '/hero.glb');
-createMesh(engine, geometry, new ToonMaterial({color: '#e07040', steps: 3}));
-toonModel(character, {steps: 4});
+const hatching = Hatching.attach(engine, {style: 'hatch', spacing: 8, layers: 3});
+hatching.style = 'halftone'; // live, as are the other options; hatching.set({...}) changes several at once
 ```
 
-Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
+Options (each live): `style`, `'hatch'` (default) or `'halftone'`; `spacing`, line or dot spacing in screen pixels, 2 to 64 (default 8); `width`, stroke width in pixels for `'hatch'`, 0.5 up to `spacing` (default 1.5); `layers`, stroke layers for `'hatch'`, 1 to 4 (default 3), layer k drawn where the light is below (layers - k) / (layers + 1), each turned 180 / layers degrees from the last; `angle`, the first strokes' or the dot grid's angle in degrees (default 45); `ink`, linear RGB 0 to 1 drawn unlit (default black). Halftone dots cover 1 - light of each cell. With `Toon` attached too, hatching replaces its bands and keeps its rim and outlines. Core meshes only; it uses group 0 binding 146. WebGPU only.
 
-Build and unit tests: npm test --workspace @margoengine/toon
+[README continues: https://margoengine.com/llms/packages/toon.md]
 
 === @margoengine/oit (packages/oit/README.md) ===
 

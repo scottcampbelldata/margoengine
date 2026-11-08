@@ -53,6 +53,7 @@ shaders. The extended guard includes `margoFaceTest`; the compact guard does not
 extended and physical shaders, with node overrides applied before either face or alpha rejection.
 
 Core-mesh effects reserve group 0 binding 18 for TAA's jittered camera and 19 for toon parameters; sky ambient uses 8.
+`Hatching` (`@margoengine/toon/hatch`) takes group 0 binding 146 on core meshes and patches after `ToonShading`.
 `LODFade` (`@margoengine/lod/fade`) takes group 0 binding 95 and inter-stage location 14 on core meshes, and binding 97
 in the lit shader's group on models.
 In the lit shader's group (0 for core meshes, 2 for gltf-pro), clustered's directional lights use 141, IES profiles 142

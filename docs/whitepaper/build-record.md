@@ -3252,3 +3252,35 @@ look and animated palettes. Nothing is timed.
 - **Gate:** lint, hygiene, verify, `check:readmes`, `check:readme-run --packages=pixel`, the claims test, the pixel,
   lighting2d and margoengine tests, the root tests and every pixel GPU check per job; after a move of main the ship
   reran the records, the api and quality gates, the claims, llms and lock tests, the package tests and the GPU checks.
+
+## Lane E batch 75: toon
+
+Four jobs for `@margoengine/toon` on the M6 Mac mini (Metal), each landed as one commit. Core and stage are untouched.
+
+| # | Job | Status | Commit | Entry | Claim |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Outlines on glTF and skinned meshes | DONE | 38a8f40e5 | `ModelOutlines` in `@margoengine/toon/models` (new entry) | LIM-563 |
+| 2 | Seam-free outlines | DONE | ae61d3732 | `smooth` and `positionRings` in `@margoengine/toon/models` | LIM-564 |
+| 3 | Per-material outline width and colour | DONE | 66b32ca51 | `materials`, `vertexColors` in `@margoengine/toon/models` | LIM-565 |
+| 4 | Hatching and halftone shading | DONE | this commit | `Hatching` in `@margoengine/toon/hatch` (new entry) | LIM-568 |
+
+- **Built from:** `docs/clean-room.md` rows TN1 to TN4: the inverted hull of Raskar and Cohen (I3D 1999) and normals
+  by cofactors; welding by position and averaging normals (Margo's own); Praun, Hoppe, Webb and Finkelstein's tonal
+  art maps (SIGGRAPH 2001) drawn procedurally, and Ulichney's clustered-dot amplitude-modulated screens (1987). Jobs 2
+  and 3 went into `@margoengine/toon/models`, not the root entry: they need the model vertex buffers that only that
+  entry draws. Nothing from another engine was read.
+- **Proved (real GPU, this Mac):** `models-check.mjs`: Fox.glb (Khronos sample) posed by `@margoengine/animation` at two
+  frames gets a ring hugging its silhouette in both poses, and a hull from the bind-pose vertices fails the check
+  (2,482 pixels off); a hard-edged box leaves 217 uncovered pixels in the ring's band without `smooth` and none with
+  it; a material styled by name draws its own colour and width (0: none); vertex alpha 0 removes the line, red paint
+  tints a white one. `hatch-check.mjs`: a board lit at known n.l inks the share of a window that the dot and stripe
+  geometry give through core's display curve, within 0.003 (halftone) and 0.011 (hatching). Unit tests in
+  `packages/toon/test/models.test.js` and `hatch.test.js`.
+- **Sizes (gzip budgets, B):** `@margoengine/toon/models` new, 3,792 to 4,843 over jobs 1 to 3; `@margoengine/toon/hatch`
+  new; `@margoengine/toon` unchanged. Core and stage unchanged.
+- **Bugs fixed:** none in shipped code. Slips caught by the gates before landing: job 1's attachment set-up copied
+  `gltf`'s (moved into `packages/shared/scene-pass.js`), and its first browser page rendered a fixed number of frames
+  (now `waitForPipelines`).
+- **Limits and unmeasured:** rows in `docs/limits.md`: the hull follows normals at a constant world width; smoothing
+  matches positions bit for bit and caps at 64 copies; hatching is screen space, sun only, core meshes only. GPU cost
+  is not measured; nothing was run on another machine.

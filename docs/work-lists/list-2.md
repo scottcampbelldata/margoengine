@@ -18,7 +18,7 @@ For the second account. Start now.
 | E | post and effects | 72 | tonemap | 6 | done |
 | E | post and effects | 73 | taa | 5 | done |
 | E | post and effects | 74 | dof | 5 | done |
-| E | post and effects | 75 | toon | 4 | todo |
+| E | post and effects | 75 | toon | 4 | done |
 | E | post and effects | 76 | transitions | 4 | todo |
 | E | post and effects | 77 | creative | 5 | todo |
 | E | post and effects | 78 | vfx | 8 | done |

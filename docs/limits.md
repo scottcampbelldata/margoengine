@@ -13,7 +13,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-567). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-568). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -228,6 +228,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | CRT look (`@margoengine/pixel/crt`, 2026-11-08) | One pass a canvas view (or one into `target`), 9 texel reads a pixel. | Working from the art's own rows keeps one scanline per art pixel at any screen size. | By method: a stylised look, not a model of a real tube (no beam spread with brightness, no persistence, no interlace, no colour bleed); one grille pattern (three columns); the art row under each pixel is taken whole, not mixed with the next; colours as stored, not in linear light. Time not measured. | For a measured tube model use a dedicated post pass. |
 | Model outlines (`@margoengine/toon/models`, 2026-11-08) | One render pass a view for every outlined primitive, one hull draw a primitive and its instances (two pipelines: plain and mirrored nodes). | The hull reuses the vertices the model already has on the GPU, deformed ones included, so it costs one more vertex pass of the outlined triangles. | By method: an inverted hull, so the line follows vertex normals: hard-edged meshes with split normals show gaps at their creases; a constant world-unit width, thinner with distance; no line on point and line primitives; GPU-culled draws still draw their hull; one width and colour for every model. Time not measured. | `@margoengine/post` `Outline` for a screen-space line of fixed pixel width. |
 | Palette cycling and ramps (`@margoengine/pixel/palette`, 2026-11-08) | `cyclePalette` and `mixPalettes` run on the CPU per call; `setSwap` writes one 256 x 1 row at most each frame. | Rotating the drawn colours animates water and fire without repainting a pixel, and the matching stays. | By method: cycles rotate the colours drawn, not the matching (a pixel keeps its index); one rate per run, no ping-pong or easing; mixing is linear in Oklab between two palettes. Time not measured. | For more than two palettes over a day, mix the neighbouring pair. |
+| Hatching and halftone (`@margoengine/toon/hatch`, 2026-11-08) | Core meshes only, one shader patch: up to 4 stroke layers or one dot a pixel, in the mesh's own fragment pass. | A screen-space pattern needs no textures or UVs and keeps the same stroke width at any distance. | By method: the pattern is fixed to the screen, so it slides over a moving surface (no texture-space strokes); tone is Lambert n.l of the sun only (clustered lights and shadows are not inked); hatching steps by whole layers; the paper takes the full lit colour without the 1/pi of Lambert, as `ToonShading` does. Time not measured. | `@margoengine/shader` `halftone` for a screen effect over everything; a `NodeMaterial` lighting function for glTF-pro and materials meshes. |
 
 
 | Limit | Starts at | Why | What you see | Escape hatch |
