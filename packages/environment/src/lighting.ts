@@ -6,7 +6,6 @@
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type FrameGraph } from '@margoengine/core/extension';
 import { Environment, type EnvironmentOptions, type EnvironmentSource } from './environment.js';
-import { loadEnvironmentImage } from './load.js';
 import type { UltraHDROptions } from './ultrahdr.js';
 import { IBL_WGSL, iblBindGroupEntries } from './ibl.js';
 import { linearColor, type ColorInput } from './color.js';
@@ -192,9 +191,10 @@ export class EnvironmentLighting extends ShaderEffect {
       if (engine.disposed) throw new DOMException('Engine disposed', 'AbortError');
     };
     check();
+    // The decoders load with the first URL (loaders.ts): a page that lights from pixels never fetches them.
     const image =
       typeof source === 'string' || source instanceof URL
-        ? await loadEnvironmentImage(source, { signal, decode, weight })
+        ? await (await import('./loaders.js')).loadEnvironmentImage(source, { signal, decode, weight })
         : source;
     check();
     const environment = await Environment.create(engine, image, options);

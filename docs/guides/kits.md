@@ -12,7 +12,7 @@ extra install), and it costs nothing you do not use: a bundler keeps only the na
 | --- | --- | --- |
 | `margoengine/game` | Games: models, animation, light and shadow, sky, physics, audio, input, effects | 341,740 B |
 | `margoengine/viz` | Data and scientific visualization: figures and GPU compute, points, lines, splats, terrain, labels and text | 228,204 B |
-| `margoengine/web` | Product viewers and 3D on web pages: a glTF model, studio light, orbit, HTML on top | 97,175 B |
+| `margoengine/web` | Product viewers and 3D on web pages: a glTF model, studio light, orbit, HTML on top | 88,695 B |
 
 The last column is min+gzip JavaScript with every name in the kit used, core and stage included (an app that uses
 part of a kit pays for that part; core + stage alone is 23,626 B). Wasm decoders, workers and lazily loaded parts

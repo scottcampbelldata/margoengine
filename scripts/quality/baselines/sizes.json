@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10974786,
+  "total": 10976176,
   "history": [
     {
       "date": "2026-10-24",
@@ -4106,6 +4106,12 @@
       "commit": "cdd118b27",
       "reason": "splats/lighting: splat relighting and shadows (batch 80 job 4); splats root gpuState gains its input buffers",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "8ff2b7af5",
+      "reason": "environment: image decoders split into dist/loaders.js, loaded by EnvironmentLighting.load on its first URL; an app of Environment and EnvironmentLighting drops about 9.3 KB gzip, the whole root (both files) grows 477 B from the split",
+      "grew": 1
     }
   ],
   "items": {
@@ -4299,7 +4305,7 @@
     "@margoengine/ecs/query": 1021,
     "@margoengine/ecs/relations": 1209,
     "@margoengine/ecs/schedule": 1743,
-    "@margoengine/environment": 29930,
+    "@margoengine/environment": 31320,
     "@margoengine/environment/cube-camera": 5691,
     "@margoengine/environment/exr-write": 2084,
     "@margoengine/environment/probes": 15099,

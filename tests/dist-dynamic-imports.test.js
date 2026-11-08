@@ -1,7 +1,10 @@
 // No package ships an ineffective dynamic import: a dist module that one file loads with import() while another file
 // of the same package imports it statically. The static import already pulls it into the importer's chunk, so the
 // import() splits nothing, and Vite prints "dynamic import will not move module into another chunk" for every app that
-// links the package from a folder (gltf-pro's Draco module did, 2026-10-26). Run after `npm run build:packages`.
+// links the package from a folder (gltf-pro's Draco module did, 2026-10-26). A module made only of re-exports
+// (`export ... from`) is not such an importer: a bundler resolves a name through it and does not take in what the app
+// leaves unnamed, so @margoengine/environment's index.js re-exports dist/loaders.js while main.js imports it on demand
+// (packages/environment/tests/lazy-loaders.test.js bundles that split). Run after `npm run build:packages`.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
@@ -33,6 +36,12 @@ export function relativeImports(filename, code) {
       if (key !== 'comments' && child && typeof child === 'object') walk(child);
   };
   walk(parsed.program);
+  // Only re-exports: every top-level statement re-exports from another module.
+  found.reexportsOnly =
+    parsed.program.body.length > 0 &&
+    parsed.program.body.every(
+      (node) => (node.type === 'ExportNamedDeclaration' || node.type === 'ExportAllDeclaration') && node.source,
+    );
   return found;
 }
 
@@ -46,8 +55,8 @@ export async function ineffectiveDynamicImports(dist) {
       const file = join(directory, entry.name);
       if (entry.isDirectory()) await visit(file);
       else if (/\.m?js$/.test(entry.name)) {
-        const { static: s, dynamic: d } = relativeImports(file, await readFile(file, 'utf8'));
-        for (const specifier of s) add(statics, resolve(dirname(file), specifier), file);
+        const { static: s, dynamic: d, reexportsOnly } = relativeImports(file, await readFile(file, 'utf8'));
+        if (!reexportsOnly) for (const specifier of s) add(statics, resolve(dirname(file), specifier), file);
         for (const specifier of d) add(dynamics, resolve(dirname(file), specifier), file);
       }
     }
@@ -71,6 +80,10 @@ test('the check finds a module that is both dynamically and statically imported'
   );
   assert.deepEqual([...found.static].sort(), ['./a.js', './b.js']);
   assert.deepEqual([...found.dynamic], ['./c.js']);
+  assert.equal(found.reexportsOnly, false);
+  assert.equal(relativeImports('index.js', "export*from'./main.js';export{a}from'./b.js';").reexportsOnly, true);
+  // A re-export beside code is still a static import of what it names.
+  assert.equal(relativeImports('index.js', "export*from'./b.js';export const c=1;").reexportsOnly, false);
 });
 
 test('no package dist module is both dynamically and statically imported', async () => {

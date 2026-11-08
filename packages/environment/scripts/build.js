@@ -8,7 +8,8 @@ import { copyLegal } from '../../../scripts/package-legal.js';
 const root = fileURLToPath(new URL('..', import.meta.url));
 const repository = resolve(root, '../..');
 await copyLegal(root);
-// One self-contained build per entry, so the optional entries share no chunk with (and never change) the root.
+// One self-contained build per entry, so the optional entries share no chunk with (and never change) the root; the
+// image decoders alone are one file every entry imports (dist/loaders.js).
 for (const [entry, emptyOutDir] of [
   ['index', true],
   ['volumetric', false],
@@ -17,6 +18,8 @@ for (const [entry, emptyOutDir] of [
   ['refractor', false],
   ['cube-camera', false],
   ['exr-write', false],
+  ['main', false],
+  ['loaders', false],
 ])
   await build({
     root,
@@ -28,7 +31,15 @@ for (const [entry, emptyOutDir] of [
       emptyOutDir,
       target: 'es2022',
       lib: { entry: resolve(root, `src/${entry}.ts`), formats: ['es'], fileName: entry },
-      rollupOptions: { external: ['@margoengine/core', '@margoengine/core/extension'] },
+      // index.js only re-exports dist/main.js and dist/loaders.js (src/main.ts), and every entry reaches the image
+      // decoders through dist/loaders.js, which EnvironmentLighting.load imports on its first URL.
+      rollupOptions: {
+        external: (id) =>
+          id === '@margoengine/core' ||
+          id === '@margoengine/core/extension' ||
+          (id === './loaders.js' && entry !== 'loaders') ||
+          (id === './main.js' && entry === 'index'),
+      },
     },
   });
 execFileSync(

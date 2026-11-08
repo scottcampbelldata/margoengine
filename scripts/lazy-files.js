@@ -240,6 +240,17 @@ export const LAZY_FILES = [
     measure: 'file',
     when: 'With the Basis encoder glue above',
   },
+  // The environment's image decoders (EXR, Radiance HDR, UltraHDR): the root re-exports them, and an app that names
+  // none of them gets them as a chunk on its first URL load.
+  {
+    package: '@margoengine/environment',
+    file: 'packages/environment/dist/loaders.js',
+    label: 'loaders.js',
+    kind: 'Chunk',
+    measure: 'bundle',
+    external: core,
+    when: '`EnvironmentLighting.load(engine, url)` with a URL, first call (an app that imports no decoder itself)',
+  },
   // Parser workers: one per call, from each package's `/worker` entry (or progressive loading).
   // Draco and KTX2 are not inside these scripts. A compressed file is handed back to the owning thread,
   // which uses @margoengine/decoders' own worker and Wasm.
