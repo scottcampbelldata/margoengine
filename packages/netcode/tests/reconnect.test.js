@@ -60,8 +60,16 @@ function world(Class = Table) {
   const lose = () => connections.at(-1).close(1006, 'link lost');
   return { client, connections, errors, lose, network, rooms, stop: () => (clearInterval(pump), rooms.close()) };
 }
+// The room's reconnectWindow timer is a mocked setTimeout, so a held seat runs out only when a test calls
+// t.mock.timers.tick. With a real 60 ms window a loaded machine (verify runs eight files at once) let seats run out
+// between two steps of a test that needed them held. The loopback pump and these waits use setInterval, which stays real.
+test.beforeEach((t) => t.mock.timers.enable({ apis: ['setTimeout'] }));
+const pause = (ms) =>
+  new Promise((r) => {
+    const h = setInterval(() => (clearInterval(h), r()), ms);
+  });
 const until = async (check) => {
-  for (let i = 0; i < 400 && !check(); i++) await new Promise((r) => setTimeout(r, 2));
+  for (let i = 0; i < 400 && !check(); i++) await pause(2);
   assert.ok(check(), 'it happened in time');
 };
 
@@ -94,8 +102,8 @@ test('reconnect: a dropped player comes back to the same seat, with the whole st
   assert.equal(room.dropped.length, 0);
   back.send('move', 9);
   await until(() => room.state.players.get(id).x === 9);
-  // fixed-wait: longer than the window, to show the old timer was cancelled
-  await new Promise((r) => setTimeout(r, 90));
+  t.mock.timers.tick(90); // longer than the window, to show the old timer was cancelled
+  await pause(10);
   assert.deepEqual(room.events, ['join', 'drop', 'back'], 'the timer of the old drop was cancelled');
 });
 
@@ -112,6 +120,8 @@ test('reconnect: when the time runs out the seat goes, onLeave runs and the toke
   await until(() => room.dropped.length === 1);
   const third = await w.client.joinOrCreate('table', {}, join);
   assert.equal(room.clients.length, 1);
+  assert.equal(room.dropped.length, 1, 'the seat is still held before the window ends');
+  t.mock.timers.tick(60);
   await until(() => room.events.includes('gone'));
   assert.equal(room.dropped.length, 0);
   await assert.rejects(w.client.reconnect(first.reconnectionToken, join), /seat is gone/);
@@ -161,6 +171,8 @@ test('reconnect: the empty room is disposed when the last held seat runs out', a
   await w.client.joinOrCreate('table', {}, join);
   const room = w.rooms.rooms[0];
   w.lose();
+  await until(() => room.dropped.length === 1);
+  t.mock.timers.tick(60);
   await until(() => room.events.includes('dispose'));
   assert.deepEqual(room.events, ['join', 'drop', 'gone', 'dispose']);
 });
@@ -264,4 +276,20 @@ test('reconnect: a seat held when the room closes gets its onLeave; hooks that t
   held.disconnect();
   await until(() => held.events.includes('gone'));
   assert.deepEqual(held.events, ['join', 'drop', 'gone', 'dispose']);
+});
+
+test('reconnect: a held seat outlasts a slow step of the test, as on a loaded machine', async (t) => {
+  // Regression: verify on a busy Windows machine took longer than the 60 ms window between two steps, the seat ran
+  // out and "a held seat counts as taken" failed. A 100 ms stall stands in for that load.
+  const w = world();
+  t.after(w.stop);
+  const first = await w.client.joinOrCreate('table', {}, join),
+    room = w.rooms.rooms[0];
+  w.lose();
+  await until(() => room.dropped.length === 1);
+  for (const end = performance.now() + 100; performance.now() < end; );
+  await pause(10);
+  assert.equal(room.dropped.length, 1, 'the seat is still held');
+  const back = await w.client.reconnect(first.reconnectionToken, join);
+  assert.equal(back.sessionId, first.sessionId);
 });

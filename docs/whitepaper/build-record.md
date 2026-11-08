@@ -2433,6 +2433,11 @@ are untouched. Every GPU proof runs on an RTX A6000 in Edge 157 (`npm run test:b
   `tests/react-bundle.test.js` checks every plain entry of every package for a directive (`d782b8cf`). In job 2's
   draft, a pointer released before a captured move's pick finished lost the capture early; the unit test caught it
   before any commit.
+- **Bug found on the way, fixed with a test:** the landing's `npm run verify` failed `packages/netcode/tests/
+  reconnect.test.js` "a held seat counts as taken": the suite held seats for a real 60 ms `reconnectWindow`, and with
+  eight test files at once more than 60 ms passed between two steps, so the seat ran out. The suite now mocks
+  `setTimeout`, a seat runs out only on `t.mock.timers.tick`, and a new test stalls the event loop 100 ms while a seat
+  is held (it fails with the real timer). The room code was right.
 - **Blocked, job 6:** a React Native target needs a native WebGPU surface (a Dawn or wgpu binding inside the app),
   which Margo does not ship and cannot write clean room in this batch, and no React Native device or toolchain is set
   up to prove it. Nothing was built; a stand-in would prove nothing about a phone.
