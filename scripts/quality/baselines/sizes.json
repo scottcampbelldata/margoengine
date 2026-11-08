@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10851044,
+  "total": 10854575,
   "history": [
     {
       "date": "2026-10-24",
@@ -3992,6 +3992,12 @@
       "commit": "6cc76e6df",
       "reason": "animation: eight-influence shaders run the four-influence blend verbatim where the extra weights are zero (Metal 1 ulp fix)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "4f748988e",
+      "reason": "new entry @margoengine/mcp/porting: the port_to_margo porting guide tool (batch 119 job 1)",
+      "grew": 1
     }
   ],
   "items": {
@@ -4400,6 +4406,7 @@
     "@margoengine/math/vector3": 1547,
     "@margoengine/math/vector4": 919,
     "@margoengine/mcp": 8664,
+    "@margoengine/mcp/porting": 3531,
     "@margoengine/mesh-edit": 30203,
     "@margoengine/mesh-edit/bake": 5070,
     "@margoengine/mesh-edit/boolean-exact": 10620,

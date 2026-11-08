@@ -332,6 +332,16 @@ The own solver's kernel (`packages/physics/kernel`, Rust, no dependencies). Noth
 | P38 | Luminance | materials/src/catcher.ts, shader/src/effects.ts | ITU-R BT.709-6 |
 | P43 | Lambertian light-map response | materials/src/built-material.ts | Lambert |
 
+### mcp
+
+| id | formula | file | source |
+| --- | --- | --- | --- |
+| MC1 | JSON-RPC 2.0 messages, request ids, batches and the standard error codes -32700 to -32603 | mcp/src/server.ts | JSON-RPC 2.0 Specification (jsonrpc.org, 2013-01-04) |
+| MC2 | Lifecycle: `initialize` first, the server answers the asked protocol version when it supports it and its latest one otherwise, `notifications/initialized`, `ping`, capabilities only for what is served, shutdown when stdin closes | mcp/src/server.ts, mcp/src/stdio.ts | Model Context Protocol specification 2025-11-25, Basic, Lifecycle (read in full), with Utilities, Ping and Cancellation |
+| MC3 | stdio transport: one message per line, nothing but protocol messages on stdout | mcp/src/stdio.ts | MCP specification 2025-11-25, Basic, Transports, stdio |
+| MC4 | `tools/list`, `tools/call`, tool errors as results with `isError`, `structuredContent`, tool annotations | mcp/src/server.ts, mcp/src/tools.ts, mcp/src/porting.ts | MCP specification 2025-11-25, Server, Tools (read in full) |
+| MC5 | Porting guide (`port_to_margo`): rows of the parity matrix and code sections of the "Coming from" guide; word and name-part scoring | mcp/src/porting.ts | Margo's own docs ([threejs-parity.md](threejs-parity.md), [from-threejs.md](from-threejs.md)), written from the other library's public documentation; the scoring is Margo-own (whole name 3, name prefix 2, notes word 0.5, exact name +10) |
+
 ### oit
 
 | id | formula | file | source |

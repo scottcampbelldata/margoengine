@@ -1638,6 +1638,10 @@
       "types": "./dist/mcp.d.ts",
       "import": "./dist/mcp.js"
     },
+    "./mcp/porting": {
+      "types": "./dist/mcp/porting.d.ts",
+      "import": "./dist/mcp/porting.js"
+    },
     "./mesh-edit": {
       "types": "./dist/mesh-edit.d.ts",
       "import": "./dist/mesh-edit.js"

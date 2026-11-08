@@ -22,10 +22,41 @@ the answers match your code, not the latest page on the web. The same material i
 | `get_package` | One package's README, its API report (every export with its declaration, per entry point) or both. Accepts `sciviz`, `@margoengine/sciviz` or `margoengine/sciviz`. |
 | `list_examples` | The runnable example pages and starter projects, with what each shows. |
 | `check_snippet` | Type-checks TypeScript, TSX or JavaScript against the real package types in your project, strict, with your own `typescript`. The snippet is compiled, never run. Returns line, column, code and message for each problem. |
+| `port_to_margo` | Maps a class, function or task of another 3D library (`OrbitControls`, `InstancedMesh`, `EffectComposer`, "shadow map") to the Margo package and calls that do the same job: status (COVERED, PARTIAL, MISSING, NOT PLANNED), limits, and that library's code next to the Margo code where the porting guide has a section. From `@margoengine/mcp/porting`. |
 
 Rendering a scene to a PNG is not a tool. The repository's browser harness needs Playwright, a Vite dev server and a
 real GPU behind the shared GPU lock, none of which a published package can bring along, and a scene needs a bundler
 step before any browser can load it. Use the visual checks in the repository (`npm run visual:check`) for pictures.
+
+## Porting guide
+
+`port_to_margo` reads the parity matrix and the "Coming from" guide in the repository's `docs/` (one row per
+feature of the other library, 195 rows today), copied into the package at build time, so a model converting code
+gets the Margo package, the calls, the status and the worked code in one answer. The library the guide compares
+comes from the docs: a docs page with a `## Matrix` table whose columns are `<library> | Status | Margo | Shows it |
+Notes` is a guide, and the page titled `Coming from <library>` gives its code sections. The lookup is also an entry
+of its own, `@margoengine/mcp/porting`:
+
+```ts
+import { formatPorting, loadPortingGuides, lookupPorting } from '@margoengine/mcp/porting';
+
+const [guide] = await loadPortingGuides(); // the guides the package ships
+const matches = lookupPorting(guide, 'OrbitControls', 2); // a class name, NS.ClassName or a task such as "shadow map"
+for (const { row, section } of matches) console.log(row.status, row.from, '->', row.margo, section?.title ?? '');
+console.log(formatPorting(guide, 'OrbitControls', matches)); // the text the tool returns
+```
+
+| Function | Default | |
+| --- | --- | --- |
+| `loadPortingGuides(file?, signal?)` | the guides the package ships (`dist/porting.json`) | Reads the guides; a missing file is a `failed` error. |
+| `lookupPorting(guide, query, limit?)` | 5 rows (1 to 25) | Best rows first; a name in the row counts more than a word in its notes, the exact name most. |
+| `parsePortingGuide(matrix, guide?, sources?)` | no guide sections, no paths | Parses one matrix page and its guide page. |
+| `portingGuidesFromCorpus(corpus)` | | Every guide in a docs corpus. |
+| `createPortingTool(guides)` | | The `port_to_margo` tool; the first guide is the default `from`. |
+| `createMargoServer({ porting })` | the guides the package ships | Guides the server's tool answers from. |
+
+Matching is by words and name parts, not meaning: ask with the other library's class name or a short task. A name
+the matrix does not list gets no row, and the answer says so and points at `search_docs`.
 
 ## Set up
 

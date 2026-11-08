@@ -29,6 +29,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./porting": {
+      "types": "./dist/porting.d.ts",
+      "import": "./dist/porting.js"
     }
   },
   "files": [

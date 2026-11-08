@@ -2600,7 +2600,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-457). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-458). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -2959,6 +2959,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 | Limit | Starts at | Why | What you see | Escape hatch |
 | --- | --- | --- | --- | --- |
+| Porting guide (`port_to_margo` in `@margoengine/mcp/porting`, 2026-11-08) | Enforced: `limit` from 1 to 25 rows (default 3 in the tool, 5 in `lookupPorting`); `from` only one of the libraries the docs hold a matrix for (today one, three.js r186: 195 rows in 19 areas, 27 guide sections). By method: rows match by words and the parts of camelCase names, with plural and verb endings dropped, not by meaning; a name the matrix does not list gets no row; a guide section is attached only when it shares a title word or four text words with the row. The guides are copied from `docs/` at package build, so an installed package answers for its own version. | The matrix and guide are the source of truth, and a docs page is easier to keep current than a mapping in code. | A row with its status, Margo calls, notes and, where the guide has a section, both libraries' code; otherwise "No ... row matches" and a pointer to `search_docs`. | `search_docs` for anything the matrix does not name; `parsePortingGuide` and `createMargoServer({ porting })` for your own matrix. |
 | Boxes and capsules in the rewind (`@margoengine/netcode/hitboxes`, 2026-11-07) | Enforced: `history` from 2 to 4,096 ticks; sizes of 0 or more; a rotation of non-zero length. By method: 3D only, so a 2D game passes z as 0; every shape is tested in turn, with no broad phase, so the cost grows with the number of shapes; a shape moves in a straight line between ticks, as in `LagCompensation`; one id is one shape, so a body of several parts uses several ids. Rays only: no sweep of a moving shot or an area | A shot at a turning box or capsule counts where the shooter saw it | `LagCompensation` for circles and spheres, in the root entry |
 | Engine scene binding (`@margoengine/save/engine`, 2026-11-07) | Enforced: a save is checked whole before anything changes; a plugin in the save and not in the scene needs a `type`; the binding's component names are refused for yours. By method: geometry is written into the save as base64, about 32 bytes a vertex and 5.3 an index before gzip, with no table of named geometry, so a big mesh belongs in a model. A model comes back from its URL, which must still serve the same file: node indices are matched, not names. A node within two float32 steps of its file pose counts as not moved; a node given by a `matrix` in its file is always saved. Rotations go through `setQuaternion`, which normalises again, so a value can move by two float32 steps per level of the tree. A model not loaded from a URL needs `modelURL`. A restore holds the old and new models at once until the swap. Plugins: the default reads only `saveState`, JSON `options` and getter and setter pairs, because public fields cannot be told from private ones at run time, so a field such as `Animation.time` needs `properties`; a plugin with nothing readable is reported to `onSkip` and left out; nothing in the plugin set has `saveState` yet; a plugin is matched by `name`, so one whose name has a running number needs the same name on load or its own loading; `options` apply only when a `type` attaches the plugin. A `type` attaches to the engine's current scene. A mesh a plugin owns, other than a model's, is saved like any mesh unless `filter` leaves it out. Textures and custom shaders of a `@margoengine/materials` mesh are not saved. A captured file's geometry and flags mean nothing to `addScene`, which reads its models and transforms. Stand-in: hierarchies, plugins and failures run on a real engine with a stand-in renderer and stand-in models. Not measured: no timed number. | LIM-411 |
 | Save slots (`@margoengine/save/slots`, 2026-11-07) | Enforced: `auto-` ids belong to the ring; a `namespace` holds no `:`. By method: a slot is one save file, an optional thumbnail file and a record, so a save with a thumbnail is three writes, and the old slot stands until the third. That holds where one write of the storage is atomic (`@margoengine/save/slots` adds no checksum, so a torn record shows as `damaged`, and a torn save fails on load). Two tabs or processes on one storage are not coordinated: the write order holds inside one `SaveSlots`. A `savedAt` comes from the clock, and the ring takes the oldest by it, so a clock set back can pick a newer autosave. `captureThumbnail` needs `OffscreenCanvas`, and a WebGPU canvas must be taken in the task of its frame. Stand-in: failed writes are a stand-in storage. Not measured: no timed number; one GPU, one browser. | LIM-413 |
@@ -4326,6 +4327,7 @@ answers from the docs of the version you installed, and it type-checks code agai
 | `get_package` | Read one package's README or API report. |
 | `list_examples` | Find a runnable example before writing one. |
 | `check_snippet` | Type-check a snippet strictly against the installed packages. |
+| `port_to_margo` | Map a three.js class or task (`OrbitControls`, `InstancedMesh`, "shadow map") to the Margo package and calls, with status, limits and both libraries' code, from the [parity matrix](threejs-parity.md) and [Coming from three.js](from-threejs.md). |
 
 Setup (full steps in the [package README](../packages/mcp/README.md)):
 
@@ -4339,7 +4341,7 @@ Claude Desktop and Cursor take the same command in a JSON config file: `command`
 
 A good loop for an assistant, and the one the server's own instructions suggest: `search_docs` or `list_packages`,
 then `get_package` for the package it will use, write the code, then `check_snippet` and fix what it reports before
-showing the answer.
+showing the answer. When the user brings three.js code, `port_to_margo` first, once per class it uses.
 
 ## 3. Give the assistant a project rule
 
@@ -4362,6 +4364,8 @@ This project uses Margo Engine (WebGPU). Docs for AI: https://margoengine.com/ll
   `npm run visual:check` in a checkout.
 - **Run your code.** `check_snippet` only compiles. It catches wrong names, arguments and missing awaits, not wrong
   pictures.
+- **Port by meaning.** `port_to_margo` matches the words and name parts of the matrix rows. A class the matrix does not
+  list gets no row; the answer says so and points at `search_docs`.
 - **Know a package you have not installed.** `check_snippet` resolves imports from your `node_modules`; an import of a
   package that is not installed is reported as an error, which is the right answer for an app that does not have it.
 
@@ -10766,10 +10770,41 @@ the answers match your code, not the latest page on the web. The same material i
 | `get_package` | One package's README, its API report (every export with its declaration, per entry point) or both. Accepts `sciviz`, `@margoengine/sciviz` or `margoengine/sciviz`. |
 | `list_examples` | The runnable example pages and starter projects, with what each shows. |
 | `check_snippet` | Type-checks TypeScript, TSX or JavaScript against the real package types in your project, strict, with your own `typescript`. The snippet is compiled, never run. Returns line, column, code and message for each problem. |
+| `port_to_margo` | Maps a class, function or task of another 3D library (`OrbitControls`, `InstancedMesh`, `EffectComposer`, "shadow map") to the Margo package and calls that do the same job: status (COVERED, PARTIAL, MISSING, NOT PLANNED), limits, and that library's code next to the Margo code where the porting guide has a section. From `@margoengine/mcp/porting`. |
 
 Rendering a scene to a PNG is not a tool. The repository's browser harness needs Playwright, a Vite dev server and a
 real GPU behind the shared GPU lock, none of which a published package can bring along, and a scene needs a bundler
 step before any browser can load it. Use the visual checks in the repository (`npm run visual:check`) for pictures.
+
+## Porting guide
+
+`port_to_margo` reads the parity matrix and the "Coming from" guide in the repository's `docs/` (one row per
+feature of the other library, 195 rows today), copied into the package at build time, so a model converting code
+gets the Margo package, the calls, the status and the worked code in one answer. The library the guide compares
+comes from the docs: a docs page with a `## Matrix` table whose columns are `<library> | Status | Margo | Shows it |
+Notes` is a guide, and the page titled `Coming from <library>` gives its code sections. The lookup is also an entry
+of its own, `@margoengine/mcp/porting`:
+
+```ts
+import { formatPorting, loadPortingGuides, lookupPorting } from '@margoengine/mcp/porting';
+
+const [guide] = await loadPortingGuides(); // the guides the package ships
+const matches = lookupPorting(guide, 'OrbitControls', 2); // a class name, NS.ClassName or a task such as "shadow map"
+for (const { row, section } of matches) console.log(row.status, row.from, '->', row.margo, section?.title ?? '');
+console.log(formatPorting(guide, 'OrbitControls', matches)); // the text the tool returns
+```
+
+| Function | Default | |
+| --- | --- | --- |
+| `loadPortingGuides(file?, signal?)` | the guides the package ships (`dist/porting.json`) | Reads the guides; a missing file is a `failed` error. |
+| `lookupPorting(guide, query, limit?)` | 5 rows (1 to 25) | Best rows first; a name in the row counts more than a word in its notes, the exact name most. |
+| `parsePortingGuide(matrix, guide?, sources?)` | no guide sections, no paths | Parses one matrix page and its guide page. |
+| `portingGuidesFromCorpus(corpus)` | | Every guide in a docs corpus. |
+| `createPortingTool(guides)` | | The `port_to_margo` tool; the first guide is the default `from`. |
+| `createMargoServer({ porting })` | the guides the package ships | Guides the server's tool answers from. |
+
+Matching is by words and name parts, not meaning: ask with the other library's class name or a short task. A name
+the matrix does not list gets no row, and the answer says so and points at `search_docs`.
 
 ## Set up
 
@@ -10784,86 +10819,6 @@ claude mcp add margoengine -- npx -y @margoengine/mcp
 ```
 
 Or share it with the team in `.mcp.json` at the project root:
-
-```json
-{
-  "mcpServers": {
-    "margoengine": { "command": "npx", "args": ["-y", "@margoengine/mcp"] }
-  }
-}
-```
-
-### Claude Desktop
-
-Open Settings, Developer, Edit Config, and add the server to `claude_desktop_config.json`. Claude Desktop does not
-start servers in your project, so name it with `--root`:
-
-```json
-{
-  "mcpServers": {
-    "margoengine": {
-      "command": "npx",
-      "args": ["-y", "@margoengine/mcp", "--root", "/path/to/your/project"]
-    }
-  }
-}
-```
-
-On Windows, write the path with forward slashes or doubled backslashes. Restart Claude Desktop.
-
-### Cursor
-
-Add the same block to `.cursor/mcp.json` in the project (or `~/.cursor/mcp.json` for every project), then enable
-`margoengine` under Settings, MCP:
-
-```json
-{
-  "mcpServers": {
-    "margoengine": { "command": "npx", "args": ["-y", "@margoengine/mcp"] }
-  }
-}
-```
-
-### Copilot and other clients
-
-Any client that starts a stdio server works: command `npx`, arguments `-y @margoengine/mcp`. In VS Code, put the
-block in `.vscode/mcp.json` under the key `servers` instead of `mcpServers`.
-
-## Use it from code
-
-The server is a plain function from messages to responses, so you can embed it or test against it.
-
-```ts
-import { createMargoServer, serveStdio } from '@margoengine/mcp';
-
-const server = await createMargoServer({ projectRoot: '.' });
-await serveStdio(server); // reads JSON-RPC lines from stdin, writes responses to stdout
-```
-
-```ts
-import { createMcpServer, createTools, loadCorpus } from '@margoengine/mcp';
-
-const server = createMcpServer({ tools: createTools({ corpus: await loadCorpus() }) });
-const answer = await server.handle({
-  jsonrpc: '2.0',
-  id: 1,
-  method: 'tools/call',
-  params: { name: 'search_docs', arguments: { query: 'orbit camera', limit: 3 } },
-});
-console.log(answer);
-server.dispose();
-```
-
-Options and defaults:
-
-| Option | Default | |
-| --- | --- | --- |
-| `createMargoServer({ corpus })` | the corpus the package ships | Documentation to serve. |
-| `createMargoServer({ projectRoot })` | the current directory | Where `check_snippet` finds `typescript` and the Margo packages. |
-| `serveStdio(server, { input, output, signal })` | `process.stdin`, `process.stdout`, none | Streams to use; abort the signal to stop. |
-| `checkSnippet(code, { language, strict, timeoutMs, signal })` | `ts`, `true`, 60000, none | The type check on its own. |
-
-## Errors
 
 [README continues: https://margoengine.com/llms/packages/mcp.md]
 
