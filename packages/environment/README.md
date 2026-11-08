@@ -180,7 +180,7 @@ await probes.refresh(0);                                                  // re-
   captured live lights receivers from its first refresh, baked or not. Live radiance stays on the GPU: `texels`,
   `irradianceAt` and device-loss restore keep the last `bake()`, and after a device loss live probes are dark until
   recaptured (a requested refresh restarts). A `bake()` during live capture restarts the probe in progress. The
-  irradiance volume is bake-only. Captures draw what the frame draws: core meshes the frame culls for the main camera
+  irradiance volume has its own live mode, `setLiveVolume({probesPerFrame})` (the `/gi` entry, below). Captures draw what the frame draws: core meshes the frame culls for the main camera
   are missing from them, so render with `culling: false` when probes must see what the camera does not.
 - **Bindings.** One storage buffer (header, then float16 RGB texels: 72 B per L2 probe, 21,840 texels per 128 px
   reflection probe) and no sampled texture; with an environment the same five IBL bindings EnvironmentLighting uses. So
@@ -283,6 +283,28 @@ engine.start();
 How it works. Per pixel the view ray from the eye meets the floor plane at the center's height (when it points down and the eye is above the floor) or the dome, a sphere of `radius` around `center`, whichever is nearer; the lookup direction then runs from the photo's camera, `height` above `center`, to that point, so the floor of the image stays in place in the world as the camera moves. Exact ray-plane and ray-sphere geometry in the background's fragment shader; outside the dome the plain view ray is used. `height`, `radius` and `center` are live (a uniform write); `height` must stay below `radius` (each setter checks the pair and a refused value changes nothing).
 
 Limits: the floor is flat at the center's height and the dome is a sphere, so anything in the photo that is not on the floor (walls, cars, trees) is projected onto the dome and bends as the camera moves; keep the camera inside the dome and above the floor; the projection only moves the background, models get no contact shadow from it (add `@margoengine/shadows` or a shadow catcher). Real-GPU check: `npm run test:ground:browser` (every pixel equals the environment along the CPU-mirrored projected direction from two cameras, a floor point keeps its colour from both cameras while a plain background does not, geometry is never covered, blur draws, and a real engine draws a box on the projected floor with no validation error).
+
+## Dynamic global illumination
+
+`@margoengine/environment/gi` gives bounce light that follows moving lights and objects each frame, so opening a door or moving the sun lights the room, with no bake. `DynamicGI` is `LightProbes` with an irradiance volume over a box in live mode: every frame it captures `probesPerFrame` volume probes (six cube faces at `resolution` each, then their SH) in a fixed sweep, so the whole volume is captured again every `sweepFrames` frames:
+
+```ts
+import {Engine, PbrMaterial, box} from 'margoengine/core';
+import {DynamicGI} from 'margoengine/environment/gi';
+const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu', camera: {position: [0, 1.5, 4], target: [0, 1, 0]}});
+engine.createMesh().setGeometry(box(6, 0.1, 6)).setMaterial(new PbrMaterial({color: '#cccccc'}));
+engine.createMesh().setGeometry(box(0.2, 3, 6)).setPosition([-2, 1.5, 0]).setMaterial(new PbrMaterial({color: '#cc1010'}));
+const gi = DynamicGI.attach(engine, {min: [-1.8, 0, -2], max: [2, 2.5, 2], counts: [4, 3, 4], probesPerFrame: 4});
+const frame = () => {
+  engine.render({culling: false}); // the probes see the whole room, not only what the camera sees
+  requestAnimationFrame(frame);
+};
+requestAnimationFrame(frame);
+```
+
+How it works. Each capture renders the scene as the frame lights it, probe light included, so every sweep adds one more bounce: the volume converges to the multi-bounce light as a radiosity iteration does (Goral et al. 1984), changes in the scene reach the light within one sweep and further bounces settle over the following sweeps. Receivers read the volume as they read a baked one (trilinear between probe centres, L1 or L2 SH, `blend` metres of fade to the fallback outside the box); the volume lights them from the end of the first sweep, and after a device restore from the end of the first sweep on the new device. `gi.sweeps` counts finished sweeps; `setLiveVolume(null)` stops capturing (the last light stays) and `setLiveVolume({probesPerFrame})` starts it again; `await gi.readback()` copies the GPU light to the CPU copy that `irradianceAt` reads. `LightProbes` itself takes the same `liveVolume` option. Each entry is self-contained, so `DynamicGI` extends its own copy of `LightProbes` (`instanceof` against the class of `/probes` is false).
+
+Limits: the cost is `6 x probesPerFrame` scene renders of `resolution` squared pixels a frame (not timed); a change takes up to one sweep to show and each further bounce one more sweep; light between probe centres is interpolated, so a small volume grid leaks light through thin walls; captures draw what the frame draws, so render with `culling: false`; no specular bounce (reflections stay as they are). Real-GPU check: `npm run test:gi:browser` (a sunlit red wall bounces red light into the room after one sweep; with the sun behind the wall, or the wall moved away, the red bounce falls within one sweep; with live capture off the light holds still; after a device restore it comes back).
 
 ## Mirrors, glass and cube cameras
 
@@ -598,7 +620,7 @@ Two portability measures are deliberate: the specular prefilter samples the cube
 
 `tests/probes.test.js` checks LightProbes on a mock GPU: validation and buffer layout, the ambient patch on core's shader variants (with and without an environment, terrain, clustered) and on a glTF-pro model, the bake's capture shader (rebound frame, linear output, no fog, every clustered light), its submits and dispatches, the opt-in bounded filter's bindings and atomic validation, and the CPU irradiance mirror. `npm run test:probes:browser` checks the bounded filter on a real GPU: constant HDR energy, an independent spherical integral for a directional environment including every cube seam, a rendered colored room against full-source GGX, and byte-identical sharp level 0 / volume SH. It writes `test-results/probe-samples-browser.json`. The broader real-GPU checks are `examples/package-benchmarks/probes-gpu.mjs` (README section above). `tests/probes-live.test.js` checks live capture on the mock GPU: validation, one face per frame with the prefilter on the sixth, the face budget across probes, both priorities, `refresh()` promises, a bake during live capture, pooled resources and device restoration; `examples/package-benchmarks/probes-live-gpu.mjs` measures its latency and GPU cost on a real GPU (Live capture, above).
 
-`tests/blend.test.js` checks `rotateSH` against direct evaluation at random directions and angles and the blend's argument checks; `npm run test:blend:browser` checks the blend on a real GPU (section above) and writes `test-results/blend-browser.json`. `tests/ground.test.js` checks the ground projection's settings (height and radius as a pair, center); `npm run test:ground:browser` checks it on a real GPU (section above) and writes `test-results/ground-browser.json`.
+`tests/blend.test.js` checks `rotateSH` against direct evaluation at random directions and angles and the blend's argument checks; `npm run test:blend:browser` checks the blend on a real GPU (section above) and writes `test-results/blend-browser.json`. `tests/ground.test.js` checks the ground projection's settings (height and radius as a pair, center); `npm run test:ground:browser` checks it on a real GPU (section above) and writes `test-results/ground-browser.json`. `tests/gi.test.js` checks DynamicGI's defaults, options and sweep length, and `tests/probes-live.test.js` the live volume on the mock GPU (the sweep, lighting after the first sweep, sharing a frame with live reflections, a device restore, `readback`); `npm run test:gi:browser` checks it on a real GPU (section above) and writes `test-results/gi-browser.json`.
 
 `tests/mirror.test.js` checks Reflector, Refractor and CubeCamera on a mock GPU: captures run only the scene passes and the full frame graph comes back, the mirror camera lands mirror points x-flipped on its near plane and clips what is behind, the glass clips what is in front, excluded and off-layer meshes are hidden only during a capture, and every cube face matches the standard WebGPU addressing after its x flip, culled against its own face. The real-GPU check is `scripts/env-mirror-gpu-check.js` (above).
 

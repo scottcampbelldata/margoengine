@@ -334,3 +334,111 @@ test('a live capture that throws turns live capture off and rejects waiting refr
   assert.equal(captures(h.render()).length, 6);
   h.probes.dispose();
 });
+
+// Live irradiance volume (dynamic GI): the header word that turns the volume on (4: vec4u per L2 probe).
+const volumeOn = (log) => log.find((e) => e[0] === 'writeBuffer' && e[2] === 44 && e[3] === '04000000');
+const sweepRoom = { ...room, counts: [3, 1, 1], resolution: 8 };
+
+test('the live volume validates, needs a volume, starts from the constructor and stops with null', () => {
+  assert.throws(
+    () => new LightProbes({ reflections: [{ position: [0, 1, 0], ...room }], liveVolume: {} }),
+    /needs an irradiance volume/,
+  );
+  const probes = new LightProbes({ volume: { ...room, counts: [2, 2, 2] }, liveVolume: { probesPerFrame: 3 } });
+  assert.deepEqual(probes.liveVolume, { probesPerFrame: 3 });
+  assert.ok(Object.isFrozen(probes.liveVolume));
+  for (const probesPerFrame of [0, 2.5, 4097, NaN])
+    assert.throws(() => probes.setLiveVolume({ probesPerFrame }), RangeError, String(probesPerFrame));
+  assert.throws(() => probes.setLiveVolume('on'), TypeError);
+  assert.deepEqual(probes.liveVolume, { probesPerFrame: 3 }, 'failed calls change nothing');
+  probes.setLiveVolume(null);
+  assert.equal(probes.liveVolume, null);
+  assert.deepEqual(new LightProbes({ volume: { ...room, counts: [1, 1, 1] }, liveVolume: {} }).liveVolume, {
+    probesPerFrame: 4,
+  });
+});
+
+test('the live volume captures probesPerFrame probes a frame in a sweep, and lights the volume after the first', () => {
+  const h = harness({ reflections: [], volume: sweepRoom, liveVolume: { probesPerFrame: 2 } });
+  const logs = Array.from({ length: 4 }, () => h.render());
+  // Two probes a frame: six faces and one SH pass each, the sweep running on across its end (3 probes: 0 1 | 2 0 | ...).
+  assert.deepEqual(
+    logs.map((log) => captures(log).length),
+    [12, 12, 12, 12],
+  );
+  assert.deepEqual(logs.map(computePasses), [2, 2, 2, 2]);
+  const xs = logs.flatMap((log) =>
+    captures(log)
+      .filter((_, i) => i % 6 === 0)
+      .map((p) => p[0]),
+  );
+  assert.deepEqual(xs, [-1.3333, 0, 1.3333, -1.3333, 0, 1.3333, -1.3333, 0]);
+  assert.ok(
+    logs[0].filter((e) => e[0] === 'pass.dispatchWorkgroups').every((e) => e[1] === 1 && e[2] === 1),
+    'SH only: no reflection resample or prefilter',
+  );
+  // The volume lights receivers from the end of the first sweep (frame 2), once.
+  assert.deepEqual(
+    logs.map((log) => !!volumeOn(log)),
+    [false, true, false, false],
+  );
+  assert.equal(h.probes.sweeps, 2, 'eight captures of three probes: two full sweeps');
+  assert.equal(h.probes.baked, false, 'live capture is not a bake: no CPU snapshot');
+  h.probes.setLiveVolume(null);
+  assert.equal(captures(h.render()).length, 0, 'stopping the live volume stops capturing');
+  h.probes.dispose();
+});
+
+test('live reflections and the live volume share a frame: the reflection faces first, then the volume probes', () => {
+  const h = harness({ volume: sweepRoom, live: { facesPerFrame: 2 }, liveVolume: { probesPerFrame: 1 } });
+  const log = h.render(),
+    eyes = captures(log).map((p) => p[0]);
+  assert.deepEqual(eyes, [0, 0, -1.3333, -1.3333, -1.3333, -1.3333, -1.3333, -1.3333]);
+  h.probes.dispose();
+});
+
+test('a device restore darkens the live volume until a full sweep on the new device', () => {
+  const h = harness({ reflections: [], volume: sweepRoom, liveVolume: { probesPerFrame: 3 } });
+  assert.ok(volumeOn(h.render()), 'lit after one sweep');
+  h.render(); // a sweep in progress on the old device
+  const fresh = mockGPU();
+  fresh.encoder.finish = () => ({});
+  Object.assign(fresh.device, {
+    createCommandEncoder: () => fresh.encoder,
+    queue: Object.assign(fresh.device.queue, { onSubmittedWorkDone: async () => undefined }),
+  });
+  h.engine.gpu = fresh.device;
+  const restore = fresh.record(() => h.probes.onDeviceRestored(h.engine));
+  const header = Buffer.from(restore.find((e) => e[0] === 'writeBuffer' && e[2] === 0)[3], 'hex');
+  assert.equal(header.readUInt32LE(44), 0, 'the volume light was lost with the device');
+  const frame = context(fresh, { shader: coreShader }),
+    run = passes(h.probes),
+    log = fresh.record(() => {
+      frame.begin(0);
+      run(frame.c);
+    });
+  // The sweep starts again at probe 0 and lights the volume when it ends.
+  assert.deepEqual(
+    captures(log)
+      .filter((_, i) => i % 6 === 0)
+      .map((p) => p[0]),
+    [-1.3333, 0, 1.3333],
+  );
+  assert.ok(volumeOn(log));
+  h.probes.dispose();
+});
+
+test('readback copies the GPU probe data to the CPU, one copy at a time, and needs an attached engine', async () => {
+  await assert.rejects(new LightProbes({ volume: sweepRoom }).readback(), /not attached/);
+  const h = harness({ reflections: [], volume: sweepRoom, liveVolume: { probesPerFrame: 3 } });
+  h.render();
+  assert.equal(h.probes.baked, false);
+  const log = await h.gpu.record(async () => {
+    await Promise.all([h.probes.readback(), h.probes.readback()]);
+  });
+  assert.equal(log.filter((e) => e[0] === 'copyBufferToBuffer').length, 1, 'concurrent calls share one copy');
+  assert.equal(h.probes.texels.length, (h.probes.byteLength - 1088) / 4);
+  assert.ok(h.probes.irradianceAt([0, 1, 0], [0, 1, 0]), 'irradianceAt reads the copy');
+  h.probes.dispose();
+  await assert.rejects(h.probes.readback(), /disposed/);
+});

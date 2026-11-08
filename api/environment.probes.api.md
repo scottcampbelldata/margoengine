@@ -24,6 +24,7 @@ export interface LightProbeOptions {
     far?: number;
     name?: string;
     live?: LiveReflectionOptions;
+    liveVolume?: LiveVolumeOptions;
 }
 
 export class LightProbes extends ShaderEffect {
@@ -38,6 +39,10 @@ export class LightProbes extends ShaderEffect {
     get live(): Readonly<Required<LiveReflectionOptions>> | null;
     get refreshes(): number;
     setLive(options: LiveReflectionOptions | null): void;
+    get liveVolume(): Readonly<Required<LiveVolumeOptions>> | null;
+    get sweeps(): number;
+    setLiveVolume(options: LiveVolumeOptions | null): void;
+    readback(): Promise<void>;
     refresh(index?: number): Promise<void>;
     setReflectionPosition(index: number, position: Vec3): void;
     protected get device(): GPUDevice | null | undefined;
@@ -59,6 +64,10 @@ export interface LiveReflectionOptions {
     facesPerFrame?: number;
     priority?: 'nearest' | 'dynamic';
     samples?: number;
+}
+
+export interface LiveVolumeOptions {
+    probesPerFrame?: number;
 }
 
 export const MAX_REFLECTION_PROBES = 16;

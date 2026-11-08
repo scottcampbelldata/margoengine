@@ -34,6 +34,7 @@
     "test:probes:browser": "npm run build && node scripts/test-browser.js --probe-samples",
     "test:blend:browser": "npm run build && node scripts/test-browser.js --page=blend",
     "test:ground:browser": "npm run build && node scripts/test-browser.js --page=ground",
+    "test:gi:browser": "npm run build && node scripts/test-browser.js --page=gi",
     "test:gpu:mirror": "cd ../.. && node scripts/env-mirror-gpu-check.js",
     "test:gpu:fog-all": "cd ../.. && node scripts/fog-all-gpu-check.js"
   },
@@ -74,6 +75,10 @@
     "./ground": {
       "types": "./dist/ground.d.ts",
       "import": "./dist/ground.js"
+    },
+    "./gi": {
+      "types": "./dist/gi.d.ts",
+      "import": "./dist/gi.js"
     }
   },
   "files": [

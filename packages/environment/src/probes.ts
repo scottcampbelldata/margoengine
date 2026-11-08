@@ -110,6 +110,17 @@ export interface LiveReflectionOptions {
    */
   samples?: number;
 }
+/**
+ * Live irradiance volume ({@link LightProbes.setLiveVolume}): dynamic global illumination. Every frame re-captures
+ * `probesPerFrame` volume probes (six cube faces at the volume resolution each, then their SH) in a fixed sweep, so the
+ * whole volume is captured again every `ceil(probes / probesPerFrame)` frames. Each capture sees the probe light of the
+ * captures before it, so every sweep adds one more bounce: moving lights and objects change the bounce light within
+ * one sweep, and further bounces settle over the following sweeps.
+ */
+export interface LiveVolumeOptions {
+  /** Volume probes captured per frame (1-4,096, default 4). */
+  probesPerFrame?: number;
+}
 /** Options of {@link LightProbes}. */
 export interface LightProbeOptions {
   /** Ambient light outside the probes (and the sky the captures see). Without it, receivers keep their own ambient there. */
@@ -126,6 +137,8 @@ export interface LightProbeOptions {
   name?: string;
   /** Starts live reflection capture ({@link LightProbes.setLive}); default off. */
   live?: LiveReflectionOptions;
+  /** Starts the live irradiance volume ({@link LightProbes.setLiveVolume}); default off (bake only). */
+  liveVolume?: LiveVolumeOptions;
 }
 /** Options of {@link LightProbes.bake}. */
 export interface ProbeBakeOptions {
@@ -479,6 +492,13 @@ export class LightProbes extends ShaderEffect {
   private readonly roundDone: Uint8Array;
   private readonly active: Uint8Array;
   private refreshCount = 0;
+  // Live irradiance volume: its settings, the next probe of the sweep, whether a full sweep has lit the volume since the
+  // buffer was made, and the completed sweeps.
+  private liveVolumeOptions: Readonly<Required<LiveVolumeOptions>> | null = null;
+  private volumeCursor = 0;
+  private volumeLive = false;
+  private sweepCount = 0;
+  private copying?: Promise<void>;
 
   /** Same as `engine.use(new LightProbes(options))`; returns the LightProbes. */
   static attach(engine: EngineKernel, options: LightProbeOptions): LightProbes {
@@ -565,6 +585,7 @@ export class LightProbes extends ShaderEffect {
     this.active = new Uint8Array(this.reflections.length);
     this.refreshWaiters = this.reflections.map(() => []);
     if (options.live !== undefined) this.setLive(options.live);
+    if (options.liveVolume !== undefined) this.setLiveVolume(options.liveVolume);
   }
 
   /** GPU bytes of the probe buffer: a 1,088-byte header, 64 B per L2 volume probe (32 B per L1), 8 B per reflection texel. */
@@ -589,7 +610,8 @@ export class LightProbes extends ShaderEffect {
    * `priority`) and prefilters a probe with its sixth face, so shading switches to complete new radiance at once.
    * Captures draw what the frame draws: core meshes the frame culls (outside the main camera) are missing from them, so
    * render with `culling: false` (`engine.start({culling: false})`) when probes must see the whole scene. The irradiance
-   * volume is bake-only. A probe captured live lights receivers from its first refresh, baked or not.
+   * volume has its own live mode ({@link setLiveVolume}). A probe captured live lights receivers from its first refresh,
+   * baked or not.
    */
   setLive(options: LiveReflectionOptions | null): void {
     if (options === null) {
@@ -610,6 +632,44 @@ export class LightProbes extends ShaderEffect {
       throw new TypeError("LightProbes live priority must be 'nearest' or 'dynamic'");
     this.liveOptions = Object.freeze({ facesPerFrame, priority, samples });
     this.roundDone.fill(0);
+  }
+  /** The live irradiance volume settings ({@link setLiveVolume}), or null while it is off. */
+  get liveVolume(): Readonly<Required<LiveVolumeOptions>> | null {
+    return this.liveVolumeOptions;
+  }
+  /** Full sweeps of the live irradiance volume completed (every volume probe captured once per sweep). */
+  get sweeps(): number {
+    return this.sweepCount;
+  }
+  /**
+   * Starts the live irradiance volume with these settings, or stops it with null (the last captured light stays). While
+   * it runs, every frame captures `probesPerFrame` volume probes in a fixed sweep (x fastest, then y, then z) and
+   * projects each to SH at once; once the first full sweep has finished, the volume lights receivers even without a
+   * bake. Captures draw what the frame draws, as live reflections do: render with `culling: false` when the probes
+   * must see the whole scene. `irradianceAt` reads the CPU copy, which `readback()` brings up to date.
+   */
+  setLiveVolume(options: LiveVolumeOptions | null): void {
+    if (options === null) {
+      this.liveVolumeOptions = null;
+      return;
+    }
+    if (typeof options !== 'object') throw new TypeError('LightProbes liveVolume options must be an object or null');
+    if (!this.volume) throw new TypeError('LightProbes liveVolume needs an irradiance volume; pass `volume`');
+    const probesPerFrame = options.probesPerFrame ?? 4;
+    if (!Number.isInteger(probesPerFrame) || probesPerFrame < 1 || probesPerFrame > MAX_VOLUME_PROBES)
+      throw new RangeError('LightProbes liveVolume probesPerFrame must be an integer from 1 to 4,096');
+    this.liveVolumeOptions = Object.freeze({ probesPerFrame });
+  }
+  /**
+   * Copies the probe data from the GPU into the CPU copy that `irradianceAt` and `texels` read and that a device
+   * restore uploads again: after live capture, they then hold the current light. Resolves when the copy is done.
+   */
+  async readback(): Promise<void> {
+    if (this.disposed || !this.gpu || !this.buffer)
+      throw this.disposed
+        ? new MargoError('disposed', `${this.name} is disposed; create new LightProbes`)
+        : new MargoError('state', `${this.name} is not attached: engine.use(probes) first`);
+    await this.copyBack(this.gpu);
   }
   /**
    * Re-captures reflection probe `index` (every reflection probe when omitted) over the next frames, ahead of the live
@@ -738,7 +798,8 @@ export class LightProbes extends ShaderEffect {
   private writeHeader(baked: boolean): void {
     this.headerBaked = baked;
     const view = this.headerView;
-    if (this.volume) view.setUint32(44, baked ? (this.volume.sh === 2 ? 4 : 2) : 0, true); // vec4u per probe; 0 = unbaked
+    // vec4u per probe; 0 = unlit (neither baked nor swept live)
+    if (this.volume) view.setUint32(44, baked || this.volumeLive ? (this.volume.sh === 2 ? 4 : 2) : 0, true);
     for (let j = 0; j < this.reflections.length; j++)
       view.setUint32(64 + j * 64 + 60, +(baked || !!this.active[j]), true);
     this.gpu!.queue.writeBuffer(this.buffer!, 0, view.buffer);
@@ -752,6 +813,9 @@ export class LightProbes extends ShaderEffect {
     }
     this.jobWaiters = [];
     this.job = -1;
+    // The live volume's GPU light is gone too: it lights again after a full sweep on the new buffer.
+    this.volumeLive = false;
+    this.volumeCursor = 0;
     const resources = this.captureResources;
     this.captureResources = undefined;
     if (resources) for (const resource of resources.owned) resource.destroy();
@@ -779,7 +843,8 @@ export class LightProbes extends ShaderEffect {
           // The bake re-captures every face into the shared targets: a live refresh in progress starts over.
           this.jobFace = 0;
           this.captureAll(c);
-        } else if (this.job !== -1 || this.refreshQueue.length || this.liveOptions) this.captureSlice(c);
+        } else if (this.job !== -1 || this.refreshQueue.length || this.liveOptions || this.liveVolumeOptions)
+          this.captureSlice(c);
       },
     });
   }
@@ -837,34 +902,7 @@ export class LightProbes extends ShaderEffect {
         if (this.disposed || this.gpu !== device) throw interrupted(this.disposed);
         this.writeHeader(true);
       }
-      const resources = this.captureResources!;
-      let read = resources.read;
-      if (!read) {
-        read = device.createBuffer({
-          size: this.texelCount * 8,
-          usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
-        });
-        resources.owned.push(read);
-        resources.read = read;
-      }
-      let mapped = false;
-      try {
-        const encoder = device.createCommandEncoder();
-        encoder.copyBufferToBuffer(this.buffer!, HEADER_BYTES, read, 0, this.texelCount * 8);
-        resources.commands[0] = encoder.finish();
-        device.queue.submit(resources.commands);
-        await read.mapAsync(GPUMapMode.READ);
-        mapped = true;
-        if (this.disposed || this.gpu !== device) throw interrupted(this.disposed);
-        const words = new Uint32Array(read.getMappedRange());
-        // Public texels have snapshot lifetime. An unobserved private result can
-        // reuse its large backing store until the getter actually publishes it.
-        if (this.snapshot && !this.snapshotExposed && this.snapshot.length === words.length) this.snapshot.set(words);
-        else this.snapshot = words.slice();
-        this.snapshotExposed = false;
-      } finally {
-        if (mapped) read.unmap();
-      }
+      await this.copyBack(device);
     } finally {
       this.pending = false;
       this.baking = false;
@@ -1058,6 +1096,47 @@ export class LightProbes extends ShaderEffect {
     if (!resources.view) resources.view = { ...c };
     return bake;
   }
+  // Copies the probe data (after the header) from the GPU into the CPU snapshot. One copy at a time: a call while one
+  // runs waits for that one, since both would map the same buffer.
+  private copyBack(device: GPUDevice): Promise<void> {
+    this.copying ??= this.copyOnce(device).finally(() => {
+      this.copying = undefined;
+    });
+    return this.copying;
+  }
+  private async copyOnce(device: GPUDevice): Promise<void> {
+    // Pooled with the capture resources; before any capture, a buffer of its own for this copy.
+    const resources = this.captureResources;
+    let read = resources?.read;
+    if (!read) {
+      read = device.createBuffer({
+        size: this.texelCount * 8,
+        usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+      });
+      if (resources) {
+        resources.owned.push(read);
+        resources.read = read;
+      }
+    }
+    let mapped = false;
+    try {
+      const encoder = device.createCommandEncoder();
+      encoder.copyBufferToBuffer(this.buffer!, HEADER_BYTES, read, 0, this.texelCount * 8);
+      device.queue.submit([encoder.finish()]);
+      await read.mapAsync(GPUMapMode.READ);
+      mapped = true;
+      if (this.disposed || this.gpu !== device) throw interrupted(this.disposed);
+      const words = new Uint32Array(read.getMappedRange());
+      // Public texels have snapshot lifetime. An unobserved private result can
+      // reuse its large backing store until the getter actually publishes it.
+      if (this.snapshot && !this.snapshotExposed && this.snapshot.length === words.length) this.snapshot.set(words);
+      else this.snapshot = words.slice();
+      this.snapshotExposed = false;
+    } finally {
+      if (mapped) read.unmap();
+      if (!resources) read.destroy();
+    }
+  }
   private captureAll(c: Context): void {
     const samples = this.bakeSamples,
       bake = this.prepare(c, samples),
@@ -1101,7 +1180,8 @@ export class LightProbes extends ShaderEffect {
         );
   }
   // Live and on-demand capture for this frame: up to facesPerFrame cube faces of one reflection probe at a time (they
-  // share the capture target), the probe's prefilter with its sixth face. A capture that throws (an unrecognised
+  // share the capture target), the probe's prefilter with its sixth face; then the live volume's probes of this frame.
+  // A capture that throws (an unrecognised
   // shader, say) turns live capture off and rejects the waiting refreshes before the error stops the engine, so a
   // restarted engine does not hit it again.
   private captureSlice(c: Context): void {
@@ -1110,7 +1190,7 @@ export class LightProbes extends ShaderEffect {
     let bake: BakePipelines | undefined;
     try {
       for (let budget = live ? live.facesPerFrame : 1; budget > 0; budget--) {
-        if (this.job === -1 && !this.nextJob(c.camera)) return;
+        if (this.job === -1 && !this.nextJob(c.camera)) break;
         bake ??= this.prepare(c, samples);
         const face = this.jobFace++;
         this.captureFace(
@@ -1126,8 +1206,38 @@ export class LightProbes extends ShaderEffect {
         );
         if (face === 5) this.finishJob();
       }
+      const sweep = this.liveVolumeOptions,
+        volume = this.volume;
+      if (sweep && volume) {
+        bake ??= this.prepare(c, samples);
+        const [nx, ny, nz] = volume.counts,
+          total = nx * ny * nz,
+          size = volume.resolution ?? 16,
+          position = this.volumePosition;
+        for (let budget = Math.min(sweep.probesPerFrame, total); budget > 0; budget--) {
+          const index = this.volumeCursor,
+            x = index % nx,
+            y = Math.floor(index / nx) % ny,
+            z = Math.floor(index / (nx * ny));
+          position[0] = volume.min[0] + ((x + 0.5) * (volume.max[0] - volume.min[0])) / nx;
+          position[1] = volume.min[1] + ((y + 0.5) * (volume.max[1] - volume.min[1])) / ny;
+          position[2] = volume.min[2] + ((z + 0.5) * (volume.max[2] - volume.min[2])) / nz;
+          for (let face = 0; face < 6; face++)
+            this.captureFace(c, this.captureResources!, bake, position, size, face, index, -1, samples);
+          if (++this.volumeCursor < total) continue;
+          this.volumeCursor = 0;
+          this.sweepCount++;
+          if (!this.volumeLive) {
+            // Lit from now on: the flag lands after this sweep's last SH, before this frame's shading.
+            this.volumeLive = true;
+            this.headerView.setUint32(44, volume.sh === 2 ? 4 : 2, true);
+            this.gpu!.queue.writeBuffer(this.buffer!, 44, this.header, 44, 4);
+          }
+        }
+      }
     } catch (error) {
       this.liveOptions = null;
+      this.liveVolumeOptions = null;
       this.job = -1;
       this.rejectRefreshes(error);
       throw error;
@@ -1404,6 +1514,7 @@ export class LightProbes extends ShaderEffect {
     this.release();
     this.captured.clear();
     this.liveOptions = null;
+    this.liveVolumeOptions = null;
     this.rejectRefreshes(new MargoError('disposed', `${this.name} was disposed before the refresh finished`));
   }
 }

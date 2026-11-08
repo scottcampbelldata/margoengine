@@ -1,45 +1,45 @@
 {
-  "commit": "13778c365",
+  "commit": "a0086838c",
   "dirty": false,
-  "browser": "msedge 157.0.4341.42 headless",
-  "adapter": "amd rdna-2",
+  "browser": "chromium 156.0.8078.4 headless",
+  "adapter": "apple metal-3",
   "method": "Vite production build of tests/fixtures/basic-scene (base ./, es2022), served by vite preview (its own on-the-fly gzip); transferred = Playwright requestfinished sizes (encoded body + response headers); raw, gzip and brotli of the same built files at zlib defaults",
   "files": [
     {
       "path": "index.html",
       "role": "Page",
       "encoding": "identity",
-      "transferred": 808,
-      "raw": 558,
-      "gzip": 371,
-      "brotli": 228
+      "transferred": 794,
+      "raw": 544,
+      "gzip": 363,
+      "brotli": 222
     },
     {
-      "path": "assets/index-CVKVWMjq.js",
-      "role": "Entry: core + stage + app",
-      "encoding": "gzip",
-      "transferred": 24239,
-      "raw": 58005,
-      "gzip": 23857,
-      "brotli": 21007
-    },
-    {
-      "path": "assets/geometry-UWhAkNGX.js",
+      "path": "assets/geometry-Dfp_B16v.js",
       "role": "Shared chunk",
       "encoding": "gzip",
-      "transferred": 2393,
-      "raw": 3988,
-      "gzip": 2023,
-      "brotli": 1814
+      "transferred": 2382,
+      "raw": 3949,
+      "gzip": 2012,
+      "brotli": 1806
     },
     {
-      "path": "assets/dist-U6jPaYLN.js",
+      "path": "assets/index-q1NbvXRp.js",
+      "role": "Entry: core + stage + app",
+      "encoding": "gzip",
+      "transferred": 24212,
+      "raw": 58006,
+      "gzip": 23830,
+      "brotli": 20977
+    },
+    {
+      "path": "assets/dist-CNNpnxvj.js",
       "role": "@margoengine/gltf (addGLTF)",
       "encoding": "gzip",
-      "transferred": 7036,
+      "transferred": 7034,
       "raw": 17341,
-      "gzip": 6664,
-      "brotli": 5980
+      "gzip": 6662,
+      "brotli": 5978
     },
     {
       "path": "model.glb",
@@ -53,10 +53,10 @@
   ],
   "total": {
     "requests": 5,
-    "transferred": 36081,
-    "raw": 81224,
-    "gzip": 33369,
-    "brotli": 29388
+    "transferred": 36027,
+    "raw": 81172,
+    "gzip": 33321,
+    "brotli": 29342
   },
   "notFetched": []
 }
