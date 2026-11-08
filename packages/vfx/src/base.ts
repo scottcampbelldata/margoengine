@@ -100,6 +100,33 @@ export interface VFXOptions {
   ribbons?: VFXRibbons;
   /** Draw each particle as a small lit triangle mesh instead of a billboard. Needs `mesh` from `@margoengine/vfx/mesh`. */
   mesh?: VFXMeshParticles;
+  /** Sub-emitters: particles born on the GPU where a particle dies or hits the ground. Needs `events` from `@margoengine/vfx/events`. */
+  events?: VFXEvents;
+}
+/**
+ * Sub-emitters: a particle that dies (`on: 'death'`), or meets the ground faster than `speed` (`on: 'collision'`),
+ * raises an event on the GPU, and in the next frame `count` particles are born where it was into free slots of the same
+ * effect, with their own life, size, velocity and colour. Children never raise events. `on` is read at attach, the rest
+ * every frame. Needs the `events` feature.
+ */
+export interface VFXEvents {
+  on: 'death' | 'collision';
+  /** Particles born per event, an integer 1..64. Default 8. */
+  count?: number;
+  /** Random life [min, max] of the children in seconds, 0 < min <= max. Default [0.5, 1]. */
+  lifetime?: readonly [number, number];
+  /** The children's billboard diameter in world units, > 0. Default 0.05. */
+  size?: number;
+  /** The children's velocity in world units per second, added to `inherit` times the parent's. Default [0, 0, 0]. */
+  velocity?: Vec3;
+  /** Random velocity added to each child, world units per second, >= 0. Default 1. */
+  spread?: number;
+  /** Fraction of the parent's velocity (at its death or impact) the children start with, -10..10. Default 0. */
+  inherit?: number;
+  /** With `on: 'collision'`, the slowest impact (world units per second towards the ground) that raises an event, >= 0. Default 0.5. */
+  speed?: number;
+  /** The children's linear RGBA at birth, each 0..1, times `intensity`; alpha fades over their life. Default [1, 1, 1, 1]. */
+  color?: readonly [number, number, number, number];
 }
 /**
  * A mesh drawn for every particle in place of its billboard, opaque and depth written, scaled so its farthest vertex from
@@ -246,6 +273,10 @@ export interface VFXRuntime {
   draw?(c: Context): void;
   /** True while the billboards are not drawn: the feature draws the particles itself. */
   hides?(): boolean;
+  /** Births can come from the feature's own list, so the deaths and births scan run in frames without emitter births. */
+  births?: boolean;
+  /** Called by `VFX.reset()` after the particle buffers are cleared. */
+  reset?(): void;
 }
 /** A feature beyond the first seven (ribbons and later). The shape is internal: pass the entry's export. */
 export interface VFXExtension<T> {
@@ -256,7 +287,7 @@ export interface VFXExtension<T> {
   create?(state: VFXState, value: T, owned: OwnedResources): VFXRuntime;
 }
 /** Added features, in the order their patches apply. */
-const extensions = ['ribbons', 'mesh'] as const;
+const extensions = ['ribbons', 'mesh', 'events'] as const;
 /** One compute dispatch of the slot-order passes. */
 type Step = [GPUComputePipeline, GPUBindGroup];
 /**
@@ -315,6 +346,7 @@ export interface VFXFeatures {
   };
   ribbons?: VFXExtension<VFXRibbons>;
   mesh?: VFXExtension<VFXMeshParticles>;
+  events?: VFXExtension<VFXEvents>;
 }
 let nextId = 0;
 /**
@@ -523,6 +555,7 @@ export class VFX implements EnginePlugin {
       this.device.queue.writeBuffer(buffer, 0, new Uint8Array(buffer.size));
     for (const buffer of [this.indirect!, this.visible!])
       this.device.queue.writeBuffer(buffer, 0, new Uint32Array([3, 0, 0, 0, 0]));
+    for (const r of this.runtimes) r.reset?.();
     return this;
   }
   setup(engine: Engine): void {
@@ -764,9 +797,11 @@ export class VFX implements EnginePlugin {
       },
       [deaths, births] = this.births!,
       [scan, compact] = this.listing!;
-    if (this.route) this.route.kernels.encode(pass, budget > 0);
+    // A feature that gives births of its own needs the free slots counted in every frame.
+    const counted = budget > 0 || this.runtimes.some((r) => r.births);
+    if (this.route) this.route.kernels.encode(pass, counted);
     else {
-      if (budget) {
+      if (counted) {
         step(deaths, groups);
         step(births, 1);
       }

@@ -35,7 +35,7 @@ async function run(effect,{frames,dt=0.1,samples=1,before=()=>{},setup=()=>{},re
  const c=context(encoder);effect.simulate(c);effect.draw(c);
  if(samples>1)encoder.beginRenderPass({colorAttachments:[{view:color.createView(),resolveTarget:resolved.createView(),loadOp:'load',storeOp:'store'}]}).end();
  encoder.copyTextureToBuffer({texture:resolved},{buffer:pixels,bytesPerRow:size*4},[size,size]);
- const copies=read.map(b=>{const copy=device.createBuffer({size:b.size,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});encoder.copyBufferToBuffer(b,0,copy,0,b.size);return copy;});
+ const copies=(typeof read==='function'?read():read).map(b=>{const copy=device.createBuffer({size:b.size,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});encoder.copyBufferToBuffer(b,0,copy,0,b.size);return copy;});
  device.queue.submit([encoder.finish()]);
  await Promise.all([pixels.mapAsync(GPUMapMode.READ),...copies.map(b=>b.mapAsync(GPUMapMode.READ))]);
  const image=new Uint8Array(pixels.getMappedRange().slice(0)),buffers=copies.map(b=>new Float32Array(b.getMappedRange().slice(0)));
@@ -121,6 +121,44 @@ window.checkMesh=async({samples=1,kind='front'}={})=>{
   expect(Math.floor(c+half+3),c,[0,0,0],'ends at its length');
  }
  return {error,errors:errors.splice(0),mismatches};
+};
+/**
+ * Sub-emitters, read back from the particle buffer after the frames (steps of 0.1 s, no gravity or noise). 'death': one
+ * particle born at the origin flies +x at 1 unit/s for 0.35 s; it dies in step 4 where it was (x = 0.3), and step 5
+ * gives `count` children into the lowest free slots at that point plus their velocity times the step, with the event's
+ * life, size, colour and generation 1. `capacity` below the children wanted gives as many as there are slots. `short`:
+ * children live 0.25 s and die in step 7 without children of their own, so every slot is empty after step 8 (where grandchildren would be born). 'collision': a
+ * particle falls onto the ground at 5 units/s; where it touches, `count` children start the next step with `inherit` of
+ * its velocity plus their own; with `speed` above the impact speed nothing is born.
+ */
+window.checkEvents=async({on='death',capacity=16,short=false,speed=0.5}={})=>{
+ const count=4,dt=0.1,size=0.1,color=[0.5,0.25,1,1],life=short?0.25:5,mismatches=[];
+ const events={on,count,lifetime:[life,life],size,spread:0,color,speed,...(on==='death'?{velocity:[0,2,0]}:{velocity:[1,0,0],inherit:-0.5})};
+ const effect=on==='death'
+  ?new VFX({...still,capacity,position:[0,0,0],velocity:[1,0,0],lifetime:[0.35,0.35],intensity:2,events})
+  :new VFX({...still,capacity,position:[0,1,0],velocity:[0,-5,0],ground:0,bounce:0.5,size:0.1,lifetime:[100,100],intensity:2,events});
+ effect.burst(1);
+ const frames=on==='death'?(short?7:4):2;
+ const {buffers:[p],error}=await run(effect,{frames,dt,read:()=>[effect.gpuState.particles]});
+ effect.dispose();
+ const near=(a,b)=>Math.abs(a-b)<=1e-5*Math.max(1,Math.abs(b)),slot=(i)=>({at:[...p.subarray(i*8,i*8+4)],vs:[...p.subarray(i*8+4,i*8+8)],color:[...p.subarray(capacity*8+i*8,capacity*8+i*8+4)],rotation:[...p.subarray(capacity*8+i*8+4,capacity*8+i*8+8)]});
+ const want=(i,what,got,expected)=>{if(got.length!==expected.length||!got.every((g,k)=>expected[k]===null||near(g,expected[k])))mismatches.push({slot:i,what,got,expected});};
+ let children=0;
+ if(on==='death'&&short){for(let i=0;i<capacity;i++)if(p[i*8+3]>0)mismatches.push({slot:i,what:'empty at the end',life:p[i*8+3]});}
+ else{
+  const first=on==='death'?0:1,born=Math.min(count,capacity-first),start=on==='death'?[0.3,0,0]:[0,0.05,0],v=on==='death'?[0,2,0]:[1,2.5,0];
+  if(on==='collision'){const s=slot(0);want(0,'parent after its bounce',s.at,[0,0.3,0,100-3*dt]);}
+  for(let i=first;i<capacity;i++){
+   const s=slot(i),child=i<first+born&&speed<5;
+   if(!child){if(s.at[3]>0)mismatches.push({slot:i,what:'no child here',life:s.at[3]});continue;}
+   children++;
+   want(i,'position and life',s.at,[start[0]+v[0]*dt,start[1]+v[1]*dt,start[2]+v[2]*dt,life-dt]);
+   want(i,'velocity and size',s.vs,[...v,size]);
+   want(i,'colour times intensity',s.color,[color[0]*2,color[1]*2,color[2]*2,color[3]]);
+   want(i,'life and generation',s.rotation.slice(2),[life,1]);
+  }
+ }
+ return {error,errors:errors.splice(0),children,mismatches:mismatches.slice(0,8),bytes:Array.from(new Uint32Array(p.buffer))};
 };
 window.ready=true;
 </script></body></html>

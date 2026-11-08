@@ -7,6 +7,9 @@
 // Mesh particles: a cube lit head-on shows its front face in the lit particle colour, exactly as wide as the face's
 // projection, and hides a cube behind it (depth written), at 1x and 4x MSAA; a cube turned by its birth angle about its
 // hashed axis shows the shade of the face the test finds turned to the camera; a long box follows its velocity.
+// Events: a particle that dies, or hits the ground faster than `speed`, gives `count` children in the next frame at
+// its death or impact point, with the event's life, size, colour and generation, read back from the particle buffer;
+// fewer free slots give fewer children; children never give children; the same frames give the same bytes.
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
@@ -58,6 +61,28 @@ try {
     clean(r, name);
     assert.deepEqual(r.mismatches, [], name);
     console.log(`ok ${name}`);
+  }
+  for (const options of [
+    { on: 'death' },
+    { on: 'death', capacity: 3 },
+    { on: 'death', short: true },
+    { on: 'collision' },
+    { on: 'collision', speed: 6 },
+  ]) {
+    const name = `events ${JSON.stringify(options)}`,
+      r = await page.evaluate((o) => window.checkEvents(o), options);
+    const { bytes, ...kept } = r;
+    report.results[name] = kept;
+    clean(r, name);
+    assert.deepEqual(r.mismatches, [], name);
+    if (options.on === 'death' && !options.short) {
+      assert.equal(r.children, Math.min(4, options.capacity ?? 16), `${name}: children born`);
+      // The same frames again give the same particle buffer, byte for byte (slot order, no atomics).
+      const again = await page.evaluate((o) => window.checkEvents(o), options);
+      assert.deepEqual(again.bytes, bytes, `${name}: same frames, same particles`);
+    }
+    if (options.on === 'collision') assert.equal(r.children, options.speed ? 0 : 4, `${name}: children born`);
+    console.log(`ok ${name}: ${r.children} children`);
   }
   assert.deepEqual(pageErrors, []);
   await mkdir('test-results', { recursive: true });

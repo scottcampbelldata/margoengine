@@ -56,6 +56,18 @@ type VFXEmitter = {
     speed?: number;
 };
 
+interface VFXEvents {
+    on: 'death' | 'collision';
+    count?: number;
+    lifetime?: readonly [number, number];
+    size?: number;
+    velocity?: Vec3;
+    spread?: number;
+    inherit?: number;
+    speed?: number;
+    color?: readonly [number, number, number, number];
+}
+
 interface VFXExtension<T> {
     validate(value: T, options: VFXOptions): void;
     simulation?(code: string, value: T): string;
@@ -107,6 +119,7 @@ interface VFXFeatures {
     };
     ribbons?: VFXExtension<VFXRibbons>;
     mesh?: VFXExtension<VFXMeshParticles>;
+    events?: VFXExtension<VFXEvents>;
 }
 
 interface VFXMeshParticles {
@@ -157,6 +170,7 @@ interface VFXOptions {
     emitter?: VFXEmitter;
     ribbons?: VFXRibbons;
     mesh?: VFXMeshParticles;
+    events?: VFXEvents;
 }
 
 interface VFXRibbons {
@@ -173,6 +187,8 @@ interface VFXRuntime {
     run?(pass: GPUComputePassEncoder): void;
     draw?(c: Context): void;
     hides?(): boolean;
+    births?: boolean;
+    reset?(): void;
 }
 
 interface VFXState {

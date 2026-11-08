@@ -215,7 +215,7 @@ from 0.010 to 0.031 ms at 100,000; the draw is unchanged.
 `VFX` from `@margoengine/vfx` (about 14.1 kB min+gzip) carries every feature. An effect that uses none of them can
 import the same class from `@margoengine/vfx/base` (about 8.3 kB); add features as a second argument from their own
 entries: `/obstacles` (1.1 kB alone), `/wrap` (0.2 kB), `/sort` (1.1 kB), `/texture` (1.5 kB; it exports
-`textureFeature`, passed as `{texture: textureFeature}`), `/curves` (1.6 kB), `/emitter` (2.4 kB), `/soft` (1.3 kB), `/ribbons` (2.6 kB, the quality gate's figure) and `/mesh` (3.2 kB, the quality gate's figure). Sizes are vite library builds with bare imports external,
+`textureFeature`, passed as `{texture: textureFeature}`), `/curves` (1.6 kB), `/emitter` (2.4 kB), `/soft` (1.3 kB), `/ribbons` (2.6 kB, the quality gate's figure), `/mesh` (3.2 kB, the same) and `/events` (2.3 kB, the same). Sizes are vite library builds with bare imports external,
 each entry compressed on its own ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)), so a
 bundle that combines them adds less: the whole root is 14.1 kB. `node examples/package-benchmarks/vfx-size.mjs` measures base-plus-feature bundles
 (`results/vfx-size.json`, at an earlier commit, `76af7a0`).
@@ -324,3 +324,36 @@ order-independent pass. Up to 65,536 triangles a mesh; every corner runs for eve
 (real GPU) checks a cube lit head-on for its exact lit colour and width and that it hides a cube behind it, at 1x and
 4x MSAA, a cube turned by its random axis for the shade of the face turned to the camera, and a long box following its
 velocity.
+
+### Sub-emitters and GPU events
+
+`events` gives particles children: when a particle dies (`on: 'death'`), or meets the ground faster than `speed` world
+units a second (`on: 'collision'`, default 0.5), it raises an event on the GPU, and in the next frame `count` particles
+(1 to 64, default 8) are born where it was into free slots of the same effect. They start with `inherit` (default 0) of
+the parent's velocity at that moment plus `velocity` and a random `spread`, and take their own `lifetime`, `size` and
+`color` (times `intensity`). Fireworks that burst where the rocket burns out, sparks where debris strikes the floor,
+splashes where rain lands. Children never raise events of their own, so one event gives one generation.
+
+```ts
+import {EngineKernel} from 'margoengine/core';
+import {VFX} from 'margoengine/vfx/base';
+import {events} from 'margoengine/vfx/events';
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
+// Fireworks: rockets climb for about a second and burst into 48 sparks where they burn out.
+const fireworks = VFX.attach(engine, {
+  capacity: 20_000, rate: 3, position: [0, 0, 0], velocity: [0, 12, 0], spread: 2, size: 0.15,
+  lifetime: [0.9, 1.2], gravity: [0, -4, 0], turbulence: 0, color: [1, 0.8, 0.5, 1], intensity: 4,
+  events: {on: 'death', count: 48, lifetime: [1, 1.6], size: 0.08, spread: 6, inherit: 0.3, color: [1, 0.4, 0.8, 1]},
+}, {events});
+engine.start();
+```
+
+Events are found, listed and turned into births entirely on the GPU in slot order (no atomics, no read-back), so the
+same frames give the same particles byte for byte. Children take only free slots: when there are fewer free slots
+than children wanted, the lowest events in slot order get theirs first and the rest are dropped; the emitter's own
+births (`rate`, `burst`) come first. Collision events come from the ground plane only, not from `obstacles`. With
+events on, the effect counts its free slots every frame, two small dispatches it skips without them, and adds two
+storage buffers to the simulation (eight is the device minimum: events with a mesh `emitter` use all eight). `on` is
+read at attach; the other settings every frame. `node packages/vfx/test/features-check.mjs` (real GPU) reads back the
+children of a death and of an impact (position, velocity, life, size, colour, generation), fewer children when slots
+run out, none from a slow impact or from a child, and the same bytes from the same frames.
