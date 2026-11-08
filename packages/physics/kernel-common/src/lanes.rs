@@ -3,7 +3,8 @@
 // SSE2 (part of every x86_64 CPU), anything else plain arrays. Only add, sub, mul, div, negation, compares and
 // bitwise selects: each lane is the IEEE result the scalar operation gives, so a four-lane solve and the same solve one
 // constraint at a time agree bit for bit. Min and max are left out on purpose: the instructions' rules for zeros and NaN
-// differ between targets and from Rust's `f32::max`; a solver writes them as a compare and a select.
+// differ between targets and from Rust's `f32::max`; a solver writes them as a compare and a select, or as `pmin` and
+// `pmax`, which are defined as exactly that compare and select on both targets.
 use core::ops::{Add, Div, Mul, Neg, Sub};
 
 #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
@@ -54,6 +55,16 @@ mod imp {
     #[inline(always)]
     pub fn select(m: M, a: F, b: F) -> F {
         v128_bitselect(a, b, m)
+    }
+    /// b < a ? b : a, lane by lane (f32x4.pmin is defined as exactly this).
+    #[inline(always)]
+    pub fn pmin(a: F, b: F) -> F {
+        f32x4_pmin(a, b)
+    }
+    /// a < b ? b : a, lane by lane (f32x4.pmax).
+    #[inline(always)]
+    pub fn pmax(a: F, b: F) -> F {
+        f32x4_pmax(a, b)
     }
     #[inline(always)]
     pub fn and(a: M, b: M) -> M {
@@ -131,6 +142,16 @@ mod imp {
     pub fn select(m: M, a: F, b: F) -> F {
         unsafe { _mm_or_ps(_mm_and_ps(m, a), _mm_andnot_ps(m, b)) }
     }
+    /// b < a ? b : a: minps(x, y) is x < y ? x : y, so the operands go in swapped.
+    #[inline(always)]
+    pub fn pmin(a: F, b: F) -> F {
+        unsafe { _mm_min_ps(b, a) }
+    }
+    /// a < b ? b : a: maxps(x, y) is x > y ? x : y.
+    #[inline(always)]
+    pub fn pmax(a: F, b: F) -> F {
+        unsafe { _mm_max_ps(b, a) }
+    }
     #[inline(always)]
     pub fn and(a: M, b: M) -> M {
         unsafe { _mm_and_ps(a, b) }
@@ -200,6 +221,12 @@ mod imp {
     pub fn select(m: M, a: F, b: F) -> F {
         [0, 1, 2, 3].map(|k| if m[k] { a[k] } else { b[k] })
     }
+    pub fn pmin(a: F, b: F) -> F {
+        map(a, b, |x, y| if y < x { y } else { x })
+    }
+    pub fn pmax(a: F, b: F) -> F {
+        map(a, b, |x, y| if x < y { y } else { x })
+    }
     pub fn and(a: M, b: M) -> M {
         [0, 1, 2, 3].map(|k| a[k] && b[k])
     }
@@ -259,6 +286,18 @@ impl F4 {
     #[inline(always)]
     pub fn select(m: M4, a: F4, b: F4) -> F4 {
         F4(imp::select(m.0, a.0, b.0))
+    }
+    /// `o < self ? o : self` lane by lane: `select(o.lt(self), o, self)` in one instruction on both SIMD targets
+    /// (SSE2 `minps`, Wasm `f32x4.pmin`), so the same bits as the compare and select, zeros and NaN included. It is
+    /// not `f32::min`.
+    #[inline(always)]
+    pub fn pmin(self, o: F4) -> F4 {
+        F4(imp::pmin(self.0, o.0))
+    }
+    /// `self < o ? o : self` lane by lane: `select(self.lt(o), o, self)` in one instruction (`maxps`, `f32x4.pmax`).
+    #[inline(always)]
+    pub fn pmax(self, o: F4) -> F4 {
+        F4(imp::pmax(self.0, o.0))
     }
 }
 

@@ -795,21 +795,16 @@ Sweep record: every package's tests and browser or GPU tests on the Mac mini (M6
 Measured but not fixed. Their history, sources and rerun commands are in
 [whitepaper/perf-history.md](whitepaper/perf-history.md#open-losses).
 
-- **Own 2D physics steps the 100-row pyramid in 3.6 ms where Box2D v3 takes 1.02 ms** (`packages/physics2d/kernel`,
-  perf history entry 83): repro `cargo test --release --manifest-path packages/physics2d/kernel/Cargo.toml --test broad
-  -- --include-ignored --nocapture`. Cause, measured: the broad phase was 1.03 ms of 7.2 and now takes 0.29 (the box
-  tree); the solver takes 5.1 ms, 14,000 contacts over 4 substeps, each reading and writing the world's large body
-  records. Compact solver bodies (perf history entry 85) took the body records off the contact visit with every bit
-  the same, and the step barely moved (7.07 against 7.14 ms, paired): each visit waits on the one before it, which
-  wrote the same bodies. Colour order (perf history entry 86) removed that wait, no two contacts of a colour sharing a
-  moving body, and the scalar solve still took 5.0 ms (paired, against 5.0): a visit is bound by its own arithmetic.
-  Four contacts at a time in SIMD lanes (perf history entry 87) took the passes from 4.6 to 1.5 ms and the step to
-  3.6 ms, every bit the same. Left, measured by phase: the narrow phase 1.1 ms (next, batch 127 part 6, B4), the passes
-  1.5, contact rows and colouring 0.5, the broad phase 0.2; what remains after the narrow phase is planned from a new
-  per-phase measurement and the papers. The comparison that counts is the shipped Wasm in the browser (perf history
-  entry 88): there Margo steps it in 4.0 to 4.3 ms against Rapier 2D's Wasm 7.8 to 7.9 (Edge 157, Firefox 157), and
-  Box2D v3 has no Wasm build here yet (needs Emscripten); its native 1.02 ms is an AVX2 build, eight lanes to Margo's
-  four.
+- **Own 2D physics steps the 100-row pyramid in 3.6 ms in Wasm where Box2D v3's Wasm takes 1.5 ms**
+  (`packages/physics2d/kernel`, perf history entries 83 to 89): repro `BOX2D_WASM=<box2d3-pyramid.mjs> node
+  scripts/physics2d-kernel-browsers.mjs` (the Box2D build is in reproduce.md). Cause, measured: the broad phase was
+  1.03 ms of 7.2 and now takes 0.23 (the box tree); compact solver bodies (entry 85), colour order (86) and four
+  contacts at a time in SIMD lanes (87) took the passes from 4.6 to 1.5 ms, every bit the same; box pairs colliding in
+  lanes (89) took the narrow phase from 1.1 to 0.77 ms in the step (collide alone 1.10 to 0.57, paired), every bit the
+  same. Left, native, by phase: the solver 2.1 ms (Box2D's own profile 0.8 to 1.0 with eight AVX2 lanes), the narrow
+  phase 0.77 (0.13 to 0.18), the broad phase 0.23 (0.10 to 0.20). In one page (entry 89) Margo's Wasm steps it in 3.58
+  to 3.74 ms, Box2D v3's Wasm in 1.53 to 1.62 and Rapier 2D's Wasm in 8.18 to 8.56 (Edge 157, Firefox 157). Next: the
+  solver's contact rows and passes, then the narrow phase's clip and the loop around it.
 
 - **Own convex decomposition builds 5 to 120 times slower than Rapier's V-HACD** (`@margoengine/physics/decomposition`,
   perf history entry 81): repro `node packages/physics/scripts/decomposition-vs-rapier.mjs` after the physics build;

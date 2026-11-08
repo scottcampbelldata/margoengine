@@ -2102,15 +2102,55 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
 - **Rerun:** `node scripts/physics2d-kernel-browsers.mjs` (reproduce.md); check:merge runs the bits part in the default
   browser (`npm run test:physics2d-kernel-browsers`).
 
+### 89. Own 2D physics: box pairs collide in SIMD lanes, every bit the same (paired, 1.10 to 0.57 ms); Box2D v3's Wasm build joins the browser comparison (the loss stays open)
+
+- **Change:** `collide_coherent` (`packages/physics2d/kernel/src/manifold.rs`) takes two four-cornered polygons (every
+  box) down a lane path: both cores placed four corners at a time, each best face's four separations in one lane block
+  (the least by `pmin`), `closest`'s 32 vertex to edge distances in eight lane blocks and the first least found by
+  masks, the incident face by lanes; the winner's points are worked out again by the scalar code. Other shapes walk
+  edges by a compare instead of a remainder. `kernel-common/src/lanes.rs` gains `pmin` and `pmax`, one instruction
+  each (SSE2 `minps`/`maxps` with the operands swapped, Wasm `f32x4.pmin`/`pmax`), defined as exactly the compare and
+  select they replace, zeros and NaN included (`tests/manifold_exact.rs` checks them against the scalar rule).
+- **Same output:** the old code is kept verbatim in `tests/support/manifold_ref.rs`; `tests/manifold_exact.rs`
+  compares every manifold field with `to_bits`: 10,188,921 manifolds of the suite scenes (the 100-row pyramid, the
+  joint grid, the mixed scene, the 20-row pyramid, 240 steps each, at three speculative distances) and 1,200,000
+  random pairs of boxes, quads, triangles, hexagons, capsules and circles, rounded and not: none differ. The pinned
+  hashes of `tests/bits.rs` hold natively and in the Wasm build (wasm-check, and Edge 157 on WebGPU and WebGL2 and
+  Firefox 157 on WebGL2 in the browser run).
+- **Paired (one process, old and new in turns, the 14,950 pairs of the 100-row pyramid after 60 steps, 30 rounds,
+  per-round minimums; busy machine):** 1.102 ms (73.7 ns a pair) before, 0.565 ms (37.8 ns) after; the new code was
+  faster in all 30 rounds. In the step (native, fastest of 40 after 60) the narrow phase is now 0.77 ms (1.1 before),
+  the solver 2.12, the broad phase 0.23, islands 0.05.
+- **Box2D v3 in Wasm, black box:** built with the official emsdk (Emscripten 7.0.0) from its own CMake project with its
+  Emscripten defaults (`-O3 -pthread -msimd128 -msse2 -ffp-contract=off`, one worker, no task system), and a harness of
+  ours on its public API (physics-refs `wasm/box2d3/pyramid.c`, `build.sh`), outside this repository.
+  `BOX2D_WASM=<path> node scripts/physics2d-kernel-browsers.mjs` serves it read-only and adds it to the page's turns.
+  The three engines in one page, 12 rounds, fastest of 40 steps after 60 (median of rounds), busy machine, diagnostic:
+
+  | Browser | Margo Wasm | Box2D v3 Wasm | Rapier 2D 0.21 Wasm |
+  | --- | --- | --- | --- |
+  | Edge 157, before this entry | 3.88 ms | 1.44 ms | 7.75 ms |
+  | Edge 157, after | 3.58 (3.82) | 1.53 (1.65) | 8.56 (8.78) |
+  | Firefox 157, before | 4.32 | 1.44 | 7.82 |
+  | Firefox 157, after | 3.74 (3.80) | 1.62 (1.68) | 8.18 (8.36) |
+
+  Per page, Margo against Box2D went from 2.7 and 3.0 times to 2.3 and 2.3 times. Box2D's top box ends at 98.777 m
+  in every round, as its native build's 726 mm drop says it should.
+- **Like for like:** Box2D's native 1.02 ms (entries 83 to 87) is its AVX2 build, the contact solve eight contacts a
+  lane block; its Wasm build is four lanes (simd128 through its SSE2 path), as Margo's is. The Wasm row is the one that
+  counts: it is what ships.
+- **Left:** the solver, 2.1 ms natively against Box2D's 0.8 to 1.0 (its own profile), is now two thirds of the step.
+- **Rerun:** `cargo test --release --manifest-path packages/physics2d/kernel/Cargo.toml --test manifold_exact --
+  --include-ignored --nocapture` (exactness and the paired A/B), then the browser run with `BOX2D_WASM` (reproduce.md).
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).
 
-- **Own 2D physics, the 100-row pyramid: 3.6 ms a step against Box2D v3's 1.02 ms (entries 83, 85 to 87).** Native,
-  busy machine, diagnostic. Four lanes (entry 87) took the step from 6.8 ms; it is now the solver 2.0 ms (passes 1.5,
-  contact rows and colouring 0.5), the narrow phase 1.1, the broad phase 0.2. Rerun: as entries 83 and 87. In the browser
-  (entry 88) Margo's Wasm steps it in 4.0 to 4.3 ms against Rapier 2D's Wasm 7.8 to 7.9; Box2D v3's Wasm build, the
-  comparison that counts, is not made yet, and its native 1.02 ms is an eight-lane AVX2 build.
+- **Own 2D physics, the 100-row pyramid: 3.6 to 3.7 ms a step in Wasm against Box2D v3's Wasm 1.5 to 1.6 ms (entries
+  83, 85 to 89).** One page, the engines taking turns, busy machine, diagnostic (entry 89). Natively the step is now the
+  solver 2.1 ms (Box2D's own profile: 0.8 to 1.0, eight lanes), the narrow phase 0.77 (0.13 to 0.18), the broad phase
+  0.23 (0.10 to 0.20). Rapier 2D's Wasm takes 8.2 to 8.6 ms in the same page. Rerun: entry 89.
 
 - **Own convex decomposition against Rapier's V-HACD (entry 81).** 1.1 to 17.3 s where Rapier takes 0.1 to 0.3 s on five
   meshes of 72 to 2,304 triangles, with fewer or as many parts. Cause: 500 tree-search iterations per cut with a hull per

@@ -7,15 +7,17 @@
 //   2. on the WebGPU page of each browser (WebGL2 in a browser without it), the 100-row pyramid is timed in this kernel
 //      and in Rapier 2D's Wasm build (@dimforge/rapier2d-compat), taking turns in one page (--rounds=, default 8): the
 //      fastest of 40 steps after 60, per round, compared by per-round minimums (AGENTS.md). The page is cross-origin
-//      isolated so the browsers' timers resolve microseconds. Box2D v3 has no Wasm build here yet (docs/known-bugs.md).
+//      isolated so the browsers' timers resolve microseconds. BOX2D_WASM=<path to box2d3-pyramid.mjs> adds Box2D v3's
+//      Wasm build to the turns: a black box built outside the repository with the official emsdk (its own CMake
+//      project; the harness and build script are in physics-refs, docs/whitepaper/reproduce.md), served read-only.
 // The pages are WebGPU users, so the run takes the GPU lock. Writes test-results/physics2d-kernel-browsers.json.
 // `npm run test:physics2d-kernel-browsers` (a ROOT suite of scripts/gpu-package-tests.mjs, so check:merge runs it) is
 // part 1 in the default browser, with no timing; the full run, Firefox and the timing too, is the script itself:
-//   node scripts/physics2d-kernel-browsers.mjs [--browsers=default,firefox] [--rounds=8]
+//   [BOX2D_WASM=...] node scripts/physics2d-kernel-browsers.mjs [--browsers=default,firefox] [--rounds=8]
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { createServer } from 'vite';
 import { acquire } from './gpu-lock.mjs';
 import { launchBrowser, resolveBrowser } from './lib/browser.mjs';
@@ -33,6 +35,8 @@ execFileSync('cargo', wasmBuildArgs(check), { cwd: root, stdio: 'inherit', timeo
 const module = `/${wasmModule(check, await readFile(join(root, check), 'utf8'))}`;
 const rapier = '/node_modules/@dimforge/rapier2d-compat/dist/rapier.mjs';
 const rapierVersion = JSON.parse(await readFile(join(root, 'node_modules/@dimforge/rapier2d-compat/package.json'), 'utf8')).version;
+const box2dPath = process.env.BOX2D_WASM ? resolve(process.env.BOX2D_WASM) : undefined;
+const box2d = box2dPath ? `/@fs/${box2dPath.replaceAll('\\', '/')}` : undefined;
 
 const release = await acquire({ owner: 'physics2d-kernel-browsers' });
 const server = await createServer({
@@ -44,10 +48,11 @@ const server = await createServer({
     port: 0,
     hmr: false,
     watch: null,
+    fs: { allow: [root, ...(box2dPath ? [dirname(box2dPath)] : [])] },
     headers: { 'Cross-Origin-Opener-Policy': 'same-origin', 'Cross-Origin-Embedder-Policy': 'require-corp' },
   },
 });
-const report = { module: module.slice(1), rustflags: WASM_RUSTFLAGS, rapier2d: rapierVersion, runs: [] };
+const report = { module: module.slice(1), rustflags: WASM_RUSTFLAGS, rapier2d: rapierVersion, box2d: box2dPath ? 'v3.2.0 Wasm (BOX2D_WASM)' : 'not run', runs: [] };
 let failed = 0;
 try {
   await server.listen();
@@ -74,7 +79,7 @@ try {
         await tab.goto(page);
         await tab.waitForFunction(() => typeof window.runKernel === 'function', null, { timeout: 60_000 });
         const timed = backend === (hasWebGPU ? 'webgpu' : 'webgl2') ? rounds : 0;
-        const result = await tab.evaluate((o) => window.runKernel(o), { backend, module, rapier, rounds: timed });
+        const result = await tab.evaluate((o) => window.runKernel(o), { backend, module, rapier, box2d, rounds: timed });
         await tab.close();
         try {
           assert.deepEqual(errors, []);
@@ -92,6 +97,13 @@ try {
           console.log(
             `${label}: 100-row pyramid step, best of ${result.times.length} rounds: Margo ${margo.toFixed(2)} ms, Rapier 2D ${rapierVersion} ${rapier2d.toFixed(2)} ms (Margo faster in ${faster} rounds)`,
           );
+          if (box2d) {
+            const box2d3 = Math.min(...result.times.map((t) => t.box2d)),
+              ahead = result.times.filter((t) => t.margo < t.box2d).length,
+              tops = result.times.map((t) => t.box2dTop);
+            assert.ok(tops.every((y) => y > 98 && y < 100), `${label}: Box2D's top box ended at ${tops}, not near 99.5 m`);
+            console.log(`${label}: Box2D v3 Wasm ${box2d3.toFixed(2)} ms (Margo faster in ${ahead} rounds)`);
+          }
         }
         report.runs.push({ browser: shown, version: browser.version(), backend, run: true, ...result });
       }

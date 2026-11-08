@@ -1,7 +1,8 @@
 // The own 2D kernel's shipped Wasm build (simd128) in a page that renders: the pinned-bits scenes of
 // kernel/tests/bits.rs are stepped between frames of an engine on WebGPU or on the WebGL2 fallback, so the physics is
 // shown to give the same bits whichever renderer the page draws with; then the 100-row pyramid is timed in this
-// kernel and in Rapier 2D's Wasm build, side by side in one page. Run by scripts/physics2d-kernel-browsers.mjs.
+// kernel, in Rapier 2D's Wasm build and, when the run names one, in a Box2D v3 Wasm build (a black box built outside
+// the repository, docs/whitepaper/reproduce.md), side by side in one page. Run by scripts/physics2d-kernel-browsers.mjs.
 import { Engine, PbrMaterial, box } from '/packages/core/dist/index.js';
 import { webglRenderer } from '/packages/webgl/dist/index.js';
 
@@ -33,7 +34,7 @@ function rapierPyramid(R, rows) {
   return w;
 }
 
-window.runKernel = async ({ backend, module, rapier, rounds }) => {
+window.runKernel = async ({ backend, module, rapier, box2d, rounds }) => {
   const canvas = document.querySelector('canvas');
   const engine = await Engine.create(canvas, { backend, fallback: webglRenderer });
   engine.createMesh().setGeometry(box()).setMaterial(new PbrMaterial({ color: [1, 0.5, 0] }));
@@ -52,6 +53,8 @@ window.runKernel = async ({ backend, module, rapier, rounds }) => {
   if (rounds > 0) {
     const R = (await import(rapier)).default;
     await R.init();
+    // Box2D's harness (physics-refs wasm/box2d3/pyramid.c): bench_pyramid(rows), bench_step(), bench_top_y().
+    const B = box2d ? await (await import(box2d)).default() : null;
     // Taking turns, a fresh world each round: 60 steps to settle, then the fastest of the next 40 (as tests/bits.rs).
     for (let r = 0; r < rounds; r++) {
       k.bench_pyramid(100);
@@ -59,7 +62,14 @@ window.runKernel = async ({ backend, module, rapier, rounds }) => {
       const w = rapierPyramid(R, 100);
       const rapier2d = bestStep(() => w.step(), 60, 40);
       w.free();
-      times.push({ margo, rapier2d });
+      const round = { margo, rapier2d };
+      if (B) {
+        B._bench_pyramid(100);
+        round.box2d = bestStep(() => B._bench_step(), 60, 40);
+        // The top box of a pyramid that ran stands near its start, 99.5 m up (it sinks under a metre).
+        round.box2dTop = B._bench_top_y();
+      }
+      times.push(round);
     }
   }
   return { backend: used, checks, times };
