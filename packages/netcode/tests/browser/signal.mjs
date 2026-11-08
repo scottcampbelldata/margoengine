@@ -14,6 +14,10 @@ import { listenWebSocket } from '../../dist/node.js';
 import { SignalServer } from '../../dist/signal.js';
 
 const PAGES = 3;
+// Chromium hides each host candidate behind a random `.local` name that the other page must resolve by multicast DNS.
+// On macOS that lookup never answers for a test Chromium without the Local Network permission, so ICE gets no pair
+// and every page waits forever. The pages share one machine, so plain host addresses prove the same thing.
+const ARGS = ['--disable-features=WebRtcHideLocalIpsWithMdns'];
 const limit = setTimeout(() => {
   console.error('signal proof timed out');
   process.exit(1);
@@ -40,7 +44,7 @@ const signals = new SignalServer(),
   listener = await listenWebSocket({ port: 0, host: '127.0.0.1', origins: '*' });
 listener.onconnection = (connection) => signals.accept(connection);
 
-const browser = await launchBrowser({ headless: true, needs: 'dom' });
+const browser = await launchBrowser({ headless: true, needs: 'dom', args: ARGS });
 try {
   const pages = [];
   for (let i = 0; i < PAGES; i++) {
@@ -48,6 +52,39 @@ try {
     await page.goto(`http://127.0.0.1:${web.address().port}/`);
     pages.push(page);
   }
+  // Two peer connections in one page must open a data channel first; if they cannot, the mesh below would only hang,
+  // so say why here: the candidates this browser offers and the ICE state they reached.
+  const loopback = await pages[0].evaluate(async () => {
+    const a = new RTCPeerConnection(),
+      b = new RTCPeerConnection(),
+      candidates = [];
+    a.onicecandidate = ({ candidate }) => {
+      if (!candidate) return;
+      candidates.push(candidate.address);
+      b.addIceCandidate(candidate);
+    };
+    b.onicecandidate = ({ candidate }) => candidate && a.addIceCandidate(candidate);
+    const channel = a.createDataChannel('probe');
+    const opened = new Promise((resolve) => {
+      channel.onopen = () => resolve(true);
+      // fixed-wait: an upper bound on the open; it resolves as soon as the channel opens
+      setTimeout(() => resolve(false), 10_000);
+    });
+    await a.setLocalDescription();
+    await b.setRemoteDescription(a.localDescription);
+    await b.setLocalDescription();
+    await a.setRemoteDescription(b.localDescription);
+    const open = await opened,
+      state = a.iceConnectionState;
+    a.close();
+    b.close();
+    return { open, state, candidates };
+  });
+  assert.ok(
+    loopback.open,
+    `WebRTC cannot connect two peers in one page (ICE ${loopback.state}, host candidates ${loopback.candidates.join(', ') || 'none'}); ` +
+      'a .local candidate means mDNS hiding is on and unresolved',
+  );
   // All at once: the server's order decides who offers to whom.
   const meshes = [];
   for (const page of pages)
