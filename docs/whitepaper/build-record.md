@@ -1691,6 +1691,32 @@ Joints for Margo's own solver, from papers: fixed, spherical, revolute and prism
 - **Papers:** read in full: Wang 2015, Baraff 1996, Montanari 2017, Muller 2020, Catto 2011, 2013 and 2014, Dobrowolski 2015, Tan, Liu and Turk 2011, Higham 1990 and 2009, Buss 2009, Buss and Kim 2005. In part: Hairer, section V.5. Not read: Lacoursiere; Tomcin 2014 and Cline and Pai 2003 could not be obtained. `docs/clean-room.md` PK24 and PK25.
 - **Open:** a loop has no closure solve; the range check runs once a step; a sensor reads the pose a step starts from, so it reports up to a step late; generic joints, setType, setMassProperties, inertia of its own and additionalSolverIterations refuse, naming the shapes and queries batch (126).
 
+## Batch 126: physics P4, shapes, queries, ccd
+
+Shapes, queries and continuous collision for Margo's own solver, from papers: Quickhull, triangle meshes with a tree and ghost-collision handling, height fields, compounds, voxel grids, rays, shape casts, point projections and overlaps on every shape, continuous collision, cylinders and cones, and convex decomposition in its own entry; with the extra job the manager added (setType, a body's own mass, extra solver passes and the generic joint), so the switch in batch 130 loses nothing.
+
+| # | Job | Status | Commit | Entry | Claim |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Quickhull convex hulls | DONE | `c1b6acabd` | `physics/next` | LIM-432 |
+| extra | setType, own mass, extra passes, generic joint | DONE | `5c2eec616` | `physics/next` | LIM-438 |
+| 2 | Triangle meshes, tree and internal edges | DONE | `484755a39` | `physics/next` | LIM-518 |
+| 3 | Height fields | DONE | `3fc31d62a` | `physics/next` | LIM-519 |
+| 4 | Compound colliders | DONE | `61800b11f` | `physics/next` | LIM-520 |
+| 5 | Voxel colliders | DONE | `1a905f8a0` | `physics/next` | LIM-521 |
+| queries 1 | Rays on every shape, the query filter | DONE | `128882a54` | `physics/next` | LIM-522 |
+| queries 2 | Shape casts, point projections, overlaps | DONE | `f2375f529` | `physics/next` | LIM-494 |
+| ccd | Continuous collision | DONE | `93a1044c3` | `physics/next` | LIM-506 |
+| extra 2 | Cylinders and cones, sharp and round | DONE | `eb18ed49b` | `physics/next` | LIM-512 |
+| 6 | Convex decomposition (CoACD) | DONE | `8fdfecded` | `physics/decomposition` | LIM-517 |
+
+- **Proof asked for:** 1,000 bullets at 300 m/s never tunnel (LIM-506: no bullet's centre with `ccd` reaches a 2 cm wall's middle plane, where Rapier 0.21 with CCD on lets 974 balls, 189 boxes and 2 capsules end past its far face); a ball crosses a flat triangle grid with speed variance 3.9e-11 against the bar of 1e-4, and a box with 0 (without `fixInternalEdges` the box 0.91, `kernel/tests/mesh.rs`); queries against brute force on random scenes (`kernel/tests/query.rs`, `tests/next-queries.test.js`, `tests/next-shape-queries.test.js`); a marble inside a decomposed cup (`tests/next-decomposition.test.js`, on the own solver).
+- **Against Rapier 0.21 as a black box:** hull, compound, voxel and cylinder masses within 1e-5; rests within 0.01 m; 1,200 rays within 1e-4 m; casts within 1e-5 m of the exact touch where Rapier's are up to 9.4e-4 m off; the paper's tube decomposed in 4 parts where Rapier makes 7.
+- **Losses, said plainly:** a 130,050-triangle mesh builds in 65 ms (105 ms with the edge rule) where Rapier takes 43, and 1,000 boxes on it step in 1.52 ms median where Rapier takes 1.14 (loaded machine; batch 129); the decomposition builds 5 to 120 times slower than V-HACD (perf history entry 81). Rapier faults seen: CCD lets bullets through, round shapes weigh their core only, casts on round cylinders and cones are off by up to 9.4e-4 m.
+- **Docs fixes in this record's push:** the parity file's summary was typed by hand and had drifted (61 DONE where the rows held 85); the two rows still marked BUILDING 126 were set to what landed (J-03 PARTIAL, CC-03 MISSING, 140.5); it is now recounted by `scripts/check-rapier-parity.mjs` and `tests/rapier-parity-summary.test.js` fails when they disagree. Jobs 2 to 5 and the rays had limits rows but no claim; claims LIM-518, LIM-519, LIM-520, LIM-521 and LIM-522 now name their proofs.
+- **Sizes:** kernel deflated 85,869 B at the start of the batch, then 98,790, 96,934, 103,200, 125,310, 133,068, 137,435 and 151,744 B (cylinders and cones); `physics/decomposition` 11,130 B gzip, its own entry, loaded only by a game that imports it.
+- **Papers:** Barber, Dobkin and Huhdanpaa 1996 and Gregorius 2014 (Quickhull); Wald 2007 (binned SAH); Catto 2020 (ghost collisions); Ericson 2005; van den Bergen 2004, Montanari et al. 2017 (GJK); Mirtich 1996 and Catto 2013 (CCD); Haines et al. 2019 (rays); Wei, Liu, Ling and Su 2022 (CoACD), read in full. Each with what was read in `docs/clean-room.md` (PK rows of this batch).
+- **Open:** convex mesh without a hull step, round box, triangle and hull, polyline and tetrahedron shapes (batch 139); the V-HACD voxel options and round decomposition (139.6); merging over part of a shared cut face; the decomposition and mesh build speed (batch 129).
+
 ## Batch 49: shadows
 
 Eight jobs for `@margoengine/shadows`, each proved on real glTF models or real elevation against Blender Cycles, a path tracer that shares no code with Margo.

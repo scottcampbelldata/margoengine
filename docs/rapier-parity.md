@@ -4,7 +4,7 @@ Scott's order, 2026-11-07: Margo's own physics must have every feature and every
 
 **Reference.** Rapier 0.36.1 (the `rapier3d` and `rapier2d` crates on docs.rs, Rust user guide 0.36) and `@dimforge/rapier3d` / `@dimforge/rapier2d` 0.21.0 (JS user guide 0.21), inventoried on 2026-11-07. Rapier is Apache-2.0 and is the reference only by name. The inventory was taken clean room: from the public user guide at rapier.rs/docs (Rust and JS, 2D and 3D), the JS API reference pages and the docs.rs type and method pages. No source repository file, no source view page and no example or benchmark code was opened, and nothing beyond names was copied. Part 2 was taken the same way, from public documentation and feature lists only. Rapier's names appear here so a row can be checked against its docs; Margo keeps its own names (the root entry's, in `packages/physics/README.md`) and the row says which one maps to which.
 
-**Where Margo stands.** The root entry `@margoengine/physics` (and `@margoengine/physics2d`) wraps Rapier today. The own solver is a Rust kernel compiled to WebAssembly behind `@margoengine/physics/next`, landed through batch 125 and batch 126 job 1 (commit c1b6acabd, Quickhull). Batch 126 jobs 2 to 5 (shape queries, continuous collision, cylinder and cone) have landed; job 6 (convex decomposition) is being built now on Lane P. Batches 127 to 131 are planned in Scott's batch prompts, which are kept outside the repository; batch 130 is the switch that makes the own solver the root and takes Rapier out. Parity is judged on the own solver: a row is done when the own solver has it with a test, because the wrapper leaves at the switch.
+**Where Margo stands.** The root entry `@margoengine/physics` (and `@margoengine/physics2d`) wraps Rapier today. The own solver is a Rust kernel compiled to WebAssembly behind `@margoengine/physics/next`, landed through batch 126 (Quickhull c1b6acabd to convex decomposition 8fdfecded; the jobs and commits are in the build record, Batch 126). Batches 127 to 131 are planned in Scott's batch prompts, which are kept outside the repository; batch 130 is the switch that makes the own solver the root and takes Rapier out. Parity is judged on the own solver: a row is done when the own solver has it with a test, because the wrapper leaves at the switch.
 
 **Backends.** The engine renders on WebGPU and falls back to WebGL2 (`@margoengine/webgl2-compat`, a WebGPU-shaped device on WebGL2, and the smaller `@margoengine/webgl` preview). Every physics feature must work on both. The kernel is CPU WebAssembly, so it runs the same bits whichever backend draws the frame: a row marked `Wasm` in both columns needs no GPU at all. A feature with a GPU path also needs a WebGL2 path (the Wasm kernel, or WebGL2 render-to-texture or transform feedback) that gives the same results within the same tolerances, and its tests run on both. Where WebGL2 cannot reach the same speed, the row says so as an accepted difference with its cause.
 
@@ -16,7 +16,7 @@ Scott's order, 2026-11-07: Margo's own physics must have every feature and every
 | --- | --- |
 | DONE | The own solver has it, and the named test proves it. |
 | PARTIAL | Part is DONE with the named test; the rest is owned by the batch and job named. |
-| BUILDING 126 | Lane P is building it now in batch 126. |
+| BUILDING N | A lane is building it now in batch N. |
 | PLANNED N | A planned batch (127 to 131) owns it. |
 | MISSING, N.j | Not built and not owned before this file; job j of batch N now owns it. `127.x` and `128.x` are extra jobs added to those batches. |
 | N/A | Not a feature a JavaScript engine can have; the row says why and what stands in for it. |
@@ -208,7 +208,7 @@ Batch order, parity first (reasons in [Order](#order)): 126, 127, 128, 138, 139,
 | --- | --- | --- | --- | --- | --- | --- |
 | J-01 | `FixedJoint` with local frames | `fixed` | yes | DONE: `kernel/tests/joints.rs` `a_fixed_joint_holds_a_heavy_body_rigid` | Wasm | Wasm |
 | J-02 | `SphericalJoint` | `spherical` | yes | DONE: `next-joints.test.js` "fixed and spherical joints hold their anchors" | Wasm | Wasm |
-| J-03 | spherical joint `limits(axis, [min, max])` per angular axis | no | cone joint (swing ellipse and twist) | BUILDING 126 (per-axis limits come with the generic joint) | Wasm | Wasm |
+| J-03 | spherical joint `limits(axis, [min, max])` per angular axis | no | cone joint (swing ellipse and twist) | PARTIAL: a `generic` joint with its linear axes locked limits a turning axis (`next-bodies.test.js` "a generic joint holds its limits and drives its motors"), shown with one free turning axis; limits on two or three free turning axes at once, with a test, 141.1 | Wasm | Wasm |
 | J-04 | `RevoluteJoint` with limits and motor | yes | yes | DONE: `next-joints.test.js` "revolute joints respect limits and motors drive them" | Wasm | Wasm |
 | J-05 | `PrismaticJoint` with limits and motor | yes | yes | DONE: `next-joints.test.js` "prismatic joints respect limits and position motors" | Wasm | Wasm |
 | J-06 | `RopeJoint` `max_distance` | `rope` | yes | DONE: `kernel/tests/joints.rs` `a_rope_is_slack_inside_its_length_and_holds_at_it` | Wasm | Wasm |
@@ -241,7 +241,7 @@ Batch order, parity first (reasons in [Order](#order)): 126, 127, 128, 138, 139,
 | --- | --- | --- | --- | --- | --- | --- |
 | CC-01 | bullet CCD against every body kind | `ccd` | conservative advancement after each step against every collider whose fat box meets the path: fixed, kinematic, dynamic and sleeping bodies, every shape, compounds piece by piece; a body stopped on a kinematic body, or a dynamic one without `ccd`, rides with it for the rest of the step | DONE (126.8): `kernel/tests/ccd.rs` (1,000 turning bullets at a box wall, a mesh and a height field; a ball sliding fast on a floor the same bits as without `ccd`; a stopped bullet carried by a kinematic wall; 200 spinning bullets at a wall coming at them), `tests/next-ccd.test.js` (1,000 balls, boxes and capsules at 300 m/s: none reaches the middle plane of a 2 cm wall, a mesh or a height field; 200 spinning bullets at a kinematic wall coming at 20 m/s and at a free dynamic plate: none ends a step past its middle);Rapier's result for 129: Rapier 0.21 with `ccd` on, as a black box through the root entry, on the same 1,000 shots: 974 balls, 189 boxes and 2 capsules end a step with their centre past the far face of the 2 cm box wall (they stop at the touch, then the next step carries them into the wall and its contacts push them out on the far side); 4 boxes pass the two-triangle mesh; none pass the height field; loss for 129: the sweep tests every collider's fat box, with no tree | Wasm | Wasm |
 | CC-02 | fast non-bullet bodies swept against fixed colliders by default | Rapier's | speculative contacts as far ahead as each body can move in a step, the sweep only with `ccd`, as in Rapier | DONE (126.8): `kernel/tests/solver.rs` `a_fast_ball_stops_on_the_floor_without_passing_through`; `tests/next-ccd.test.js` shows that without `ccd` fast turning boxes can pass a thin wall | Wasm | Wasm |
-| CC-03 | soft CCD (predictive contacts ahead) | no | none | BUILDING 126 | Wasm | Wasm |
+| CC-03 | soft CCD (predictive contacts ahead) | no | none: speculative contacts reach as far as the body moves in a step, with no per-body distance (RB-10) | MISSING, 140.5 | Wasm | Wasm |
 | CC-04 | `is_ccd_active` | no | `body.ccdActive` | DONE (126.8): `tests/next-ccd.test.js` (true on a step the sweep checked a fast body, false once it is slow, never on a slow body) | Wasm | Wasm |
 
 ## Scene queries
@@ -537,18 +537,18 @@ The standard floor every physics engine with multibodies ships, built here on th
 
 ## Summary
 
-Counted from the rows on 2026-11-07, one count a row by the first word of its Status cell. Update the counts in the same push as any row.
+Counted from the rows on 2026-11-08 by `node scripts/check-rapier-parity.mjs`, one count a row by the first word of its Status cell (Part 2 by its Batch cell). `tests/rapier-parity-summary.test.js` fails when this table and the rows disagree, so update both in the same push.
 
-| Part | Rows | DONE | PARTIAL | BUILDING 126 | PLANNED 127 to 131 | MISSING, now owned | N/A |
+| Part | Rows | DONE | PARTIAL | BUILDING | PLANNED 127 to 131 | MISSING, now owned | N/A |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1, Rapier parity | 251 | 61 | 19 | 21 | 14 | 132 | 4 |
+| 1, Rapier parity | 252 | 85 | 19 | 0 | 14 | 130 | 4 |
 | 2, beyond Rapier | 83 | 0 | 0 | 0 | 4 (extended later) | 79 | 0 |
 
-Margo already does more than Rapier in 15 rows (M-01 to M-15). The missing parity rows are owned by four extra jobs added to batches 127 and 128 (3D debug drawing, 2D events and filters, the multibody API, multibody inverse kinematics) and by batches 138 to 146. Part 2 is owned by batches 147 to 158 (60 jobs; the parity batches 138 to 146 hold 52 jobs, plus the four extra jobs in 127 and 128); 4 of its rows extend what batch 131 already plans 1 (X-79) extends parity job 142.2, and 1 (X-88) is parity job 141.7.
+Margo already does more than Rapier in 15 rows (M-01 to M-15). The missing parity rows are owned by four extra jobs added to batches 127 and 128 (3D debug drawing, 2D events and filters, the multibody API, multibody inverse kinematics) and by batches 138 to 146. Part 2 is owned by batches 147 to 158 (60 jobs; the parity batches 138 to 146 hold 52 jobs, plus the four extra jobs in 127 and 128); 4 of its rows extend what batch 131 already plans; 1 (X-79) extends parity job 142.2, and 1 (X-88) is parity job 141.7.
 
 ## Order
 
-1. **126 first** (being built): shapes, queries and CCD close the most rows at once.
+1. **126 first** (done): shapes, queries and CCD close the most rows at once.
 2. **127 and 128 next**, as planned, with four extra jobs added: 127.x 3D `debugRender` with every mode (the root has it, so the switch needs it), 127.y 2D events and filters (the 2D root has them); 128.x the articulation API and 128.y multibody inverse kinematics (Rapier's multibody surface, which belongs with `/articulation`).
 3. **138 to 143, the kernel parity batches, before 129.** Batch 129 is the parity gate and the benchmark matrix, so it must run on the full feature set; benchmarking first would measure a kernel that later grows. 138 world and solver options, 139 shapes, 140 materials, filters, hooks and queries, 141 joints and controllers, 142 SIMD, f64, BVH strategies, block solver and the WebGL2 tests, 143 the 2D rows.
 4. **129, 130, 131** as planned: gate, switch, after.
