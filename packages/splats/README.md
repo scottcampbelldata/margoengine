@@ -262,6 +262,44 @@ engine.start();
   so overlapping splats shade as their combined opacity, noisy per texel and smoothed by the shadow filter;
   `threshold` (0 to 1, live) instead blocks where one splat's opacity reaches it, without noise.
 
+## Animated splats (`./animate`)
+
+`SplatSequence` plays a 4D capture (a list of frames of the same splats); `SplatSkin` poses a cloud with a skeleton
+by linear blend skinning, for captured performances:
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Splats} from 'margoengine/splats';
+import {parsePly, transformSplats} from 'margoengine/splats/data';
+import {SplatSequence, SplatSkin} from 'margoengine/splats/animate';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const first = parsePly(await (await fetch('/raccoon-v2.ply')).arrayBuffer());
+const frames = [0, 1, 2, 3].map((k) => transformSplats(first, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, k * 0.1, 0, 1]));
+const performer = Splats.attach(engine, first);
+const sequence = SplatSequence.attach(engine, performer, frames, {fps: 12});
+sequence.speed = 0.5; // live: time, speed, playing, loop
+const n = first.positions.length / 3;
+const second = Splats.attach(engine, first);
+const skin = SplatSkin.attach(engine, second, {
+  joints: 2,
+  indices: Array.from({length: n * 4}, (_, i) => (i % 4 === 0 ? (first.positions[(i / 4) * 3 + 1] > 0 ? 1 : 0) : 0)),
+  weights: Array.from({length: n * 4}, (_, i) => (i % 4 === 0 ? 1 : 0)),
+});
+skin.matrices.set([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0.5, 0, 0, 1], 16); // joint 1: move the top half 0.5 along x
+engine.start();
+console.log(sequence.duration, (await second.read()).positions.length);
+```
+
+- Both run one compute pass before the cloud projects and write its GPU inputs, so sorting, `./depth`,
+  `./lighting` and `./edit` see the pose; `cloud.read()` returns the posed cloud.
+- A sequence mixes centres, covariances, colours and opacity of the two frames around `time` linearly (a mix of
+  positive-definite covariances stays positive definite); SH stays the cloud's. Every frame lives on the GPU, 64 bytes
+  per splat, so a long capture at 3,000,000 splats does not fit: stream frames into a few sequences instead.
+- A skin moves each centre by the weighted sum of up to four joint matrices and each covariance by the blend's linear
+  part, A S A^T; weights are normalised, all zero keeps a splat at rest. The rest pose is the cloud as it is when first
+  posed, or after `rebind()` (call it after `Splats.write`). Like any linear blend skin, a blend of two far-turned
+  joints shrinks the splats between them. Colours and SH are not turned with the joints.
+
 ## Picking and brush editing (`./edit`)
 
 `SplatBrush` picks, selects, erases and paints splats on the GPU, for clean-up tools. Regions are in pixels of the

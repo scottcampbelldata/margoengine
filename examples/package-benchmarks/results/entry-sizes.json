@@ -1,5 +1,5 @@
 {
-  "commit": "623cab99c",
+  "commit": "90fa78d72",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -1926,8 +1926,8 @@
         "gzip": 19195
       },
       "./next": {
-        "raw": 221728,
-        "gzip": 133092
+        "raw": 223391,
+        "gzip": 133973
       }
     },
     "@margoengine/physics2d": {
@@ -2614,28 +2614,32 @@
     },
     "@margoengine/splats": {
       ".": {
-        "raw": 85971,
-        "gzip": 30367
+        "raw": 85972,
+        "gzip": 30362
       },
       "./depth": {
         "raw": 3954,
         "gzip": 1863
       },
       "./lod": {
-        "raw": 81685,
-        "gzip": 28835
+        "raw": 81686,
+        "gzip": 28830
       },
       "./lighting": {
         "raw": 7793,
         "gzip": 3350
       },
       "./set": {
-        "raw": 77555,
-        "gzip": 27649
+        "raw": 77556,
+        "gzip": 27646
       },
       "./edit": {
         "raw": 8369,
         "gzip": 3600
+      },
+      "./animate": {
+        "raw": 53957,
+        "gzip": 19672
       },
       "./data": {
         "raw": 59084,
@@ -2984,12 +2988,12 @@
     },
     "@margoengine/vfx": {
       ".": {
-        "raw": 56701,
-        "gzip": 18466
+        "raw": 63355,
+        "gzip": 20237
       },
       "./base": {
-        "raw": 33522,
-        "gzip": 11005
+        "raw": 33562,
+        "gzip": 11014
       },
       "./obstacles": {
         "raw": 2388,
@@ -3022,6 +3026,10 @@
       "./ribbons": {
         "raw": 5640,
         "gzip": 2598
+      },
+      "./mesh": {
+        "raw": 7151,
+        "gzip": 3193
       }
     },
     "@margoengine/video": {
@@ -3363,9 +3371,9 @@
       "brotli": 8574
     },
     "packages/creative/dist/particles.js": {
-      "raw": 44072,
-      "gzip": 14936,
-      "brotli": 13319
+      "raw": 44112,
+      "gzip": 14947,
+      "brotli": 13340
     },
     "packages/creative/dist/post.js": {
       "raw": 19250,
@@ -3388,9 +3396,9 @@
       "brotli": 7854
     },
     "packages/gltf-pro/dist/index.js": {
-      "raw": 1425484,
-      "gzip": 575348,
-      "brotli": 469630
+      "raw": 1425485,
+      "gzip": 575698,
+      "brotli": 469963
     },
     "packages/staging/dist/index.js": {
       "raw": 22060,

@@ -998,6 +998,8 @@ Known rendering gaps:
 
 **Splat brush (2026-11-08).** `@margoengine/splats/edit` adds one compute shader with every operation behind a uniform switch: select, erase and paint test each splat's projected centre against a pixel region, and a pick runs two submissions (atomic min of an order-preserving view-depth key, then of the indices at that key; one submission would see only the second pass's uniform, as queue writes land before the command buffer runs). `Splats.read` copies positions, colours and SH back for export and restoration, reading again when a `write` lands during the read. Evidence: `packages/splats/test/gpu/check.mjs` on a Radeon 680M; missing: stroke cost on a 3,000,000-splat cloud.
 
+**Animated splats (2026-11-08).** `@margoengine/splats/animate` adds two compute passes at order -7.5, before a cloud's projection at -7: a sequence mixes two packed frames into the cloud's positions, covariances and colours; a skin copies the rest pose once (copyBufferToBuffer, so the root's covariance buffer now has COPY_SRC) and writes the blended joint transform of each centre and A S A^T of each covariance. `Splats.read` now reads covariances back too, so a posed cloud exports as posed. Evidence: `packages/splats/test/gpu/check.mjs` on a Radeon 680M; missing: pass cost on a 3,000,000-splat cloud.
+
 ## 4. Quality architecture
 
 ### 4.1 Gate map

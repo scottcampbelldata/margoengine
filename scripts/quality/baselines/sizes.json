@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11058477,
+  "total": 11078725,
   "history": [
     {
       "date": "2026-10-24",
@@ -4220,6 +4220,12 @@
       "commit": "82a670e50",
       "reason": "vfx mesh: new optional mesh entry (instanced lit triangle mesh per particle, one indirect draw over the billboards' list); root VFX carries it with the other features; base gains the mesh option type and keeps added-feature draws outside OIT; effects without mesh record the same GPU work (trace fixtures)",
       "grew": 2
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "c10bb05f4",
+      "reason": "new entry @margoengine/splats/animate (SplatSequence, SplatSkin)",
+      "grew": 1
     }
   ],
   "items": {
@@ -4841,13 +4847,14 @@
     "@margoengine/sky/volumetric-clouds": 7571,
     "@margoengine/sky/weather": 6189,
     "@margoengine/sky/weather-fx": 5533,
-    "@margoengine/splats": 31279,
+    "@margoengine/splats": 31273,
+    "@margoengine/splats/animate": 20263,
     "@margoengine/splats/data": 22135,
     "@margoengine/splats/depth": 2119,
     "@margoengine/splats/edit": 3856,
     "@margoengine/splats/lighting": 3606,
-    "@margoengine/splats/lod": 29701,
-    "@margoengine/splats/set": 28479,
+    "@margoengine/splats/lod": 29695,
+    "@margoengine/splats/set": 28476,
     "@margoengine/splines": 1853,
     "@margoengine/splines/closest": 983,
     "@margoengine/splines/fit": 3250,

@@ -13,6 +13,7 @@ import { Shadows } from '../../../shadows/dist/index.js';
 import { SplatDepth } from '../../dist/depth.js';
 import { SplatLod, buildSplatLod } from '../../dist/lod.js';
 import { SplatBrush } from '../../dist/brush.js';
+import { SplatSequence, SplatSkin } from '../../dist/animate.js';
 
 const errors = [];
 addEventListener('error', (e) => errors.push(e.message));
@@ -466,5 +467,39 @@ window.check.brush = async (o) => {
   }
   await draw();
   return { out, frame: [w, h], points: (o.points ?? []).map(pixel), input: [...data.colors], url: canvas.toDataURL('image/png'), count: cloud.count };
+};
+// ./animate: three splats played as a two-frame sequence held at a time between the frames, or posed by a two-joint
+// skin; returns the cloud read back after one drawn frame.
+window.check.animate = async (o) => {
+  engine?.dispose();
+  canvas?.remove();
+  canvas = document.body.appendChild(document.createElement('canvas'));
+  canvas.style.cssText = 'width:128px;height:128px;display:block';
+  const frame = (dx, s, c) => ({
+      positions: new Float32Array([-0.5 + dx, 0, 0, 0 + dx, 0.2, 0, 0.5 + dx, 0, 0]),
+      covariances: new Float32Array([s, 0, 0, 0.001, 0, 0.001, s, 0, 0, 0.001, 0, 0.001, s, 0, 0, 0.001, 0, 0.001]),
+      colors: new Float32Array([c, 0, 0, 0.9, c, 0, 0, 0.9, c, 0, 0, 0.5]),
+    }),
+    rest = frame(0, 0.004, 1);
+  engine = await Engine.create(canvas, { backend: 'webgpu', camera: { position: [0, 0, 3], target: [0, 0, 0] } });
+  engine.gpu.addEventListener('uncapturederror', (e) => errors.push(e.error.message));
+  const cloud = Splats.attach(engine, rest);
+  if (o.sequence) {
+    const sequence = SplatSequence.attach(engine, cloud, [rest, frame(0.4, 0.001, 0.2)], { fps: 10 });
+    sequence.playing = false;
+    sequence.time = o.sequence / 10;
+  } else {
+    const skin = SplatSkin.attach(engine, cloud, {
+      joints: 2,
+      indices: [0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0],
+      weights: [1, 0, 0, 0, 1, 0, 0, 0, 0.5, 0.5, 0, 0],
+    });
+    skin.matrices.set([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1], 0); // joint 0: move 1 along x
+    skin.matrices.set([0, 1, 0, 0, -1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1], 16); // joint 1: 90 degrees about z
+  }
+  await waitForPipelines(draw);
+  await draw();
+  const d = await cloud.read();
+  return { positions: [...d.positions], covariances: [...d.covariances], colors: [...d.colors] };
 };
 window.ready = true;

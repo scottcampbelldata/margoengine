@@ -189,20 +189,21 @@ export class Splats implements EnginePlugin {
     return this;
   }
   /**
-   * The cloud as data, after any edits made on the GPU (`@margoengine/splats/edit`): when attached, opacities, colours
-   * and SH are read back from the GPU into the copy kept for device restoration first. For export (`encodeSplat`,
-   * `encodeSpz`, `encodeSog`) and to keep GPU edits through a device loss.
+   * The cloud as data, after any edits or poses made on the GPU (`./edit`, `./animate`): when attached, centres,
+   * covariances, opacities, colours and SH are read back into the copy kept for device restoration first. For export
+   * (`encodeSplat`, `encodeSpz`, `encodeSog`) and to keep GPU edits through a device loss.
    * @throws MargoError `'disposed'` after `dispose()`; the GPU's error when the device is lost during the read.
    */
   async read(): Promise<SplatData> {
     this.range(0, 0);
     const d = this.device,
-      [positions, , colors, sh] = this.inputs;
+      [positions, covariances, colors, sh] = this.inputs;
     // A write or clear during the read reaches both copies after the GPU copy was taken: read again.
     for (let writes = -1; d && positions && writes !== this.writes; ) {
       writes = this.writes;
       const parts: Array<[GPUBuffer, Float32Array]> = [
           [positions, this.positions],
+          [covariances, this.covariances],
           [colors, this.colors],
           [sh, this.sh],
         ],
@@ -298,7 +299,7 @@ export class Splats implements EnginePlugin {
     // Positions, colours and SH can be read back (`read`) after GPU edits such as ./edit's brush.
     const editable = GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
       positions = buffer(this.positions.byteLength, editable, this.positions),
-      covariances = buffer(this.covariances.byteLength, GPUBufferUsage.STORAGE, this.covariances),
+      covariances = buffer(this.covariances.byteLength, editable, this.covariances),
       colors = buffer(this.colors.byteLength, editable, this.colors),
       sh = buffer(this.sh.byteLength, editable, this.sh);
     this.inputs = [positions, covariances, colors, sh];

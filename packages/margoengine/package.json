@@ -2506,6 +2506,10 @@
       "types": "./dist/splats/edit.d.ts",
       "import": "./dist/splats/edit.js"
     },
+    "./splats/animate": {
+      "types": "./dist/splats/animate.d.ts",
+      "import": "./dist/splats/animate.js"
+    },
     "./splats/data": {
       "types": "./dist/splats/data.d.ts",
       "import": "./dist/splats/data.js"

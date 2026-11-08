@@ -5,6 +5,7 @@
 // ./set: two overlapping copies of the capture sorted as one set draw what one merged cloud draws; as two clouds they do not.
 // ./lighting: relit colours match core's diffuse terms; a synthetic disc and the real capture shadow a ground mesh.
 // ./edit: GPU picks take the nearest splat; select, erase and paint change exactly the region's splats, read back.
+// ./animate: a sequence held between two frames draws their mix; a skin moves and turns splats and their covariances.
 // ./data: the browser's own WebP decoder reads the SOG writer's lossless WebP images back exactly.
 // ./lod: a hierarchy of the real capture fully refined draws as the plain cloud; a 16.7 M-splat stand-in streams in a 2 M budget.
 import assert from 'node:assert/strict';
@@ -321,6 +322,24 @@ try {
     assert.ok(index >= 0, 'a splat at the centre of the capture');
     assert.ok(selected.length > 20 && selected.length < r.input.length / 8, `the brush selects a patch: ${selected.length}`);
     assert.equal(wrong, 0, 'exactly the selected splats are erased');
+  }
+  // ./animate: a two-frame sequence at 30% of the way mixes centres, covariances and colours; a skin with joint 0
+  // moving 1 along x and joint 1 turning 90 degrees about z poses each splat by its blended matrix, A S A^T.
+  {
+    const r = await page.evaluate((o) => window.check.animate(o), { sequence: 0.3 }),
+      close = (a, b, what) => a.forEach((v, i) => assert.ok(Math.abs(v - b[i]) < 1e-5, `${what} ${i}: ${v} against ${b[i]}`));
+    close(r.positions, [-0.38, 0, 0, 0.12, 0.2, 0, 0.62, 0, 0], 'sequence centre');
+    close(r.covariances.slice(0, 6), [0.0031, 0, 0, 0.001, 0, 0.001], 'sequence covariance');
+    close(r.colors.slice(0, 4), [0.76, 0, 0, 0.9], 'sequence colour');
+    const s = await page.evaluate((o) => window.check.animate(o), {});
+    // Splat 1 at (0, 0.2) turns to (-0.2, 0); its long x axis (0.004) becomes y. Splat 2 takes the half-half blend:
+    // centre (0.5, 0) to (0.75, 0.25), linear part [[0.5, -0.5], [0.5, 0.5]].
+    close(s.positions, [0.5, 0, 0, -0.2, 0, 0, 0.75, 0.25, 0], 'skin centre');
+    close(s.covariances.slice(0, 6), [0.004, 0, 0, 0.001, 0, 0.001], 'skin translate keeps the covariance');
+    close(s.covariances.slice(6, 12), [0.001, 0, 0, 0.004, 0, 0.001], 'skin rotation turns the covariance');
+    close(s.covariances.slice(12, 18), [0.00125, 0.00075, 0, 0.00125, 0, 0.001], 'skin blend');
+    close(s.colors, [1, 0, 0, 0.9, 1, 0, 0, 0.9, 1, 0, 0, 0.5], 'skin keeps colours');
+    report.animate = { sequence: r.positions.slice(0, 3), skin: s.positions };
   }
   // ./data: the SOG writer's WebP images decode in the browser (createImageBitmap, then a WebGPU texture without
   // premultiplication or colour conversion) to the exact pixels written, alpha included.
