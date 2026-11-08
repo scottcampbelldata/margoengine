@@ -23,7 +23,7 @@ Sources: `packages/react/README.md`, `packages/react/SCENE.md`, `packages/react/
 | `npm i margoengine react react-dom` | After 1.0.0 is published. |
 | Local tarballs (`npm run pack:packages`, then install `test-results/*.tgz` into your app) | Works today. |
 | `examples/react-viewer` (`npm run dev --workspace @margoengine/react-viewer`) | Works today, Vite. |
-| `examples/next` | Works today, Next.js 16.4.3 with React 19.3.0, built with webpack. |
+| `examples/next` | Works today, Next.js 16.4.3 with React 19.3.0: `npm run build` builds it with Turbopack (Next 16's default), `npm run build:webpack` with webpack, and `npm run modern:test:browser` checks the Turbopack build in a browser on a real GPU. |
 
 ## 3. Entries (pay only for what you import)
 
@@ -169,7 +169,6 @@ type-checked from packed tarballs), `modern:test:bundlers`. Guides: `docs/react-
 
 - Not on npm yet (tarballs only).
 - WebGPU only for React click events, PBR, IBL, shadows, post; WebGL2 is a basic preview (`engine.pick` needs its `/pick` entry there).
-- `Box`, `Sphere`, `Plane` take colour only (no textures); use a glTF `Model`.
-- Lowercase JSX tags and `extend()` need `jsxImportSource: '@margoengine/react'` (2026-11-07); `extend` takes React components, not engine classes. No event bubbling.
-- Next.js example builds with `--webpack`; Turbopack is covered by the bundler matrix, not the example script.
+- `Box`, `Sphere`, `Plane` take a colour or one base colour `map` (PNG or JPEG, WebGPU only, needs `@margoengine/gltf`); other maps need a glTF `Model`.
+- Lowercase JSX tags and `extend()` need `jsxImportSource: '@margoengine/react'` (2026-11-07); `extend` takes React components, not engine classes. Events bubble from the hit mesh through its parents.
 - `Model`, `Fbx`, `Animation` and the `materials` components have their own entries (`margoengine/react/gltf-pro` and so on), so a page without them builds with no Basis or Draco `.wasm`.

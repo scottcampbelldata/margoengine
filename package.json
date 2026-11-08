@@ -213,7 +213,7 @@
     "modern:dev:extensions": "npm run build:packages && vite --host 127.0.0.1",
     "modern:dev:showcase": "npm run dev --workspace @margoengine/showcase-night-citadel",
     "modern:build:showcase": "npm run build --workspace @margoengine/showcase-night-citadel",
-    "modern:build:starters": "npm run build --workspace @margoengine/starter-vite && npm run build --workspace @margoengine/starter-next",
+    "modern:build:starters": "npm run build --workspace @margoengine/starter-vite && npm run build:webpack --workspace @margoengine/starter-next && npm run build --workspace @margoengine/starter-next",
     "predev": "npm run build:packages",
     "dev": "npm run modern:dev:showcase",
     "build": "npm run build:packages && npm run modern:build:starters && npm run modern:build:showcase",
