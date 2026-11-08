@@ -12,7 +12,16 @@ import {
 import { invertMatrixStable } from '@margoengine/math/mat4';
 import { meshTriangles } from '../../shared/mesh-source.js';
 import { halton, jitterProjection } from './jitter.js';
-import { fullscreen, cameraVelocity, objectVelocity, snapshot, resolve, stochasticResolve, present } from './shader.js';
+import {
+  fullscreen,
+  cameraVelocity,
+  objectVelocity,
+  snapshot,
+  resolve,
+  stochasticResolve,
+  reactiveResolve,
+  present,
+} from './shader.js';
 import { displacementGroup, opacityEntries, type CasterCutout } from '../../shared/caster.js';
 import { MargoError } from '@margoengine/math/errors';
 import { applyView, fromTarget, toTarget, viewLoadOp, viewRect, viewSize, ViewStates } from '../../shared/view-rect.js';
@@ -48,6 +57,13 @@ export interface TAAOptions {
    * pixel's motion, at the price of a pixel of ghosting along moving edges. Default false.
    */
   stochastic?: boolean;
+  /**
+   * Reactive mask: a texture whose red channel, 0 to 1, tells TAA how far to distrust history at each pixel (1 keeps
+   * none), so particles, blended glTF surfaces and splats that move without motion vectors leave no ghost trail. Draw
+   * their coverage into it each frame; any size (read scaled to the view), filterable float or unorm. Return undefined
+   * for a frame with nothing reactive. Fixed at construction whether a mask is used; the texture may change per frame.
+   */
+  reactive?: () => GPUTexture | undefined;
 }
 /** A drawable whose per-vertex motion TAA tracks: the `shadowPrimitives` contract of core and gltf-pro meshes. */
 export interface VelocityPrimitive extends CasterCutout {
@@ -213,8 +229,11 @@ export class TAA implements EnginePlugin {
   private projection = '';
   private format?: GPUTextureFormat;
   private samples = 0;
+  /** Whether the resolve reads a reactive mask: fixed at construction, as the shader is compiled for it. */
+  private readonly masked: boolean;
   constructor(readonly options: TAAOptions = {}) {
     this.validate();
+    this.masked = !!options.reactive;
   }
   static attach(instance: EngineKernel, options: TAAOptions = {}): TAA {
     const effect = new TAA(options);
@@ -235,6 +254,10 @@ export class TAA implements EnginePlugin {
       throw new RangeError(
         'Invalid TAA options; historyWeight must be in [0, 1), depthThreshold in [0, 1] and depth a function.',
       );
+    if (o.reactive !== undefined && typeof o.reactive !== 'function')
+      throw new TypeError('Invalid TAA reactive; pass a function that returns the mask texture.');
+    if (o.reactive && o.velocityOnly)
+      throw new TypeError('TAA velocityOnly resolves nothing, so a reactive mask has no effect; drop reactive or velocityOnly.');
     if (o.stochastic !== undefined && typeof o.stochastic !== 'boolean')
       throw new TypeError('Invalid TAA stochastic; pass true or false.');
     if (o.velocityOnly !== undefined && typeof o.velocityOnly !== 'boolean')
@@ -398,7 +421,7 @@ export class TAA implements EnginePlugin {
       this.resolvePipeline = c.device.createComputePipeline({
         layout: 'auto',
         compute: {
-          module: c.device.createShaderModule({ code: this.options.stochastic ? stochasticResolve() : resolve }),
+          module: c.device.createShaderModule({ code: this.resolveCode() }),
           entryPoint: 'main',
           constants: { manualSRGB },
         },
@@ -506,6 +529,23 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
         'state',
         'TAA needs the current sampleable scene depth; provide options.depth for an HDR/SSAO capture',
       );
+    if (this.masked) {
+      const mask = this.options.reactive?.();
+      if (
+        mask &&
+        (!(mask.usage & GPUTextureUsage.TEXTURE_BINDING) ||
+          mask.dimension !== '2d' ||
+          /depth|stencil|int/.test(mask.format))
+      )
+        throw new MargoError(
+          'state',
+          'Invalid TAA reactive mask; return a 2D float or unorm texture with TEXTURE_BINDING usage, e.g. r8unorm',
+        );
+      if (mask !== this.reactiveSource) {
+        this.reactiveSource = mask;
+        this.depthSource = undefined;
+      }
+    }
     if (depth !== this.depthSource) {
       this.sampledDepth = depth.createView({ aspect: 'depth-only' });
       const group = (p: GPUComputePipeline | GPURenderPipeline, resources: (GPUTextureView | GPUBufferBinding)[]) =>
@@ -526,6 +566,7 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
             this.historyDepths[i].createView(),
             this.histories[1 - i].createView(),
             this.historyDepths[1 - i].createView(),
+            ...(this.masked ? [this.reactiveView(c.device)] : []),
           ]),
         );
       this.depthSource = depth;
@@ -613,6 +654,23 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
           if (!records.size) this.draws.delete(mesh);
         }
   }
+  /** The resolve shader for these options: stochastic rejection and the reactive mask are compiled in only when asked for. */
+  private resolveCode(): string {
+    const code = this.options.stochastic ? stochasticResolve() : resolve;
+    return this.masked ? reactiveResolve(code) : code;
+  }
+  /** This frame's reactive mask, or a 1 by 1 black one (nothing reactive). */
+  private reactiveView(device: GPUDevice): GPUTextureView {
+    if (this.reactiveSource) return this.reactiveSource.createView();
+    if (!this.blackView) {
+      this.blackTexture = device.createTexture({ size: [1, 1], format: 'r8unorm', usage: GPUTextureUsage.TEXTURE_BINDING });
+      this.blackView = this.blackTexture.createView();
+    }
+    return this.blackView;
+  }
+  private reactiveSource?: GPUTexture;
+  private blackTexture?: GPUTexture;
+  private blackView?: GPUTextureView;
   /** The mask of a primitive without one (a materials mesh with no map): opaque, as the shadow passes read it. */
   private white(device: GPUDevice): GPUTextureView {
     if (!this.whiteView) {
@@ -938,6 +996,8 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
     this.captureTarget = undefined;
     this.whiteTexture?.destroy();
     this.whiteTexture = this.whiteView = this.whiteSampler = undefined;
+    this.blackTexture?.destroy();
+    this.blackTexture = this.blackView = this.reactiveSource = undefined;
     for (const t of this.textures) t.destroy();
     for (const records of this.draws.values())
       for (const r of records.values()) {

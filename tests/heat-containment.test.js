@@ -353,6 +353,11 @@ test('split steps cover the whole suite: both bevel sample counts, each chain pa
       'lens-browser.mjs',
     ],
   );
+  // TAA's browser checks, one step each.
+  assert.deepEqual(
+    splitSteps(byId('taa/test:gpu')).map((s) => s.command.replace('cd ../.. && node packages/taa/test/', '')),
+    ['upscale-browser.mjs', 'velocity-only-browser.mjs', 'reactive-browser.mjs'],
+  );
 });
 
 // Bug (M6 Mac mini, scripts/gpu-package-tests.mjs): with MARGO_MACHINE_PROFILE unset the Mac ran as profile

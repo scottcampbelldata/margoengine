@@ -1,3 +1,4 @@
+import { MargoError } from '@margoengine/math/errors';
 import { opacityCode, solidVertexDepth } from '../../shared/caster.js';
 import { displacementCode } from '../../shared/displacement.js';
 import { sectionShader } from '../../shared/section.js';
@@ -133,3 +134,38 @@ override manualSRGB:bool=true;
 @group(0) @binding(0) var image:texture_2d<f32>;
 @fragment fn fragment(i:Fullscreen)->@location(0) vec4f {let c=max(textureLoad(image,vec2i(i.clip.xy),0).rgb,vec3f(0));
   return vec4f(select(c,select(c*12.92,1.055*pow(c,vec3f(1.0/2.4))-0.055,c>=vec3f(0.0031308)),manualSRGB),1);}`;
+
+/**
+ * `reactive` (TAAOptions): binding 9 is a mask whose red channel, 0 to 1, takes that share of the history weight away
+ * (1 keeps none), for pixels that change in ways motion vectors cannot describe: particles, blended surfaces, splats.
+ * The mask is read at the pixel's place scaled to its own size, so a lower-resolution mask works. History alpha carries
+ * each frame's mask to the next, so the pixels an effect left (its trail) distrust history too: max(now, before).
+ */
+export function reactiveResolve(code: string): string {
+  const targets = [
+    '@group(0) @binding(8) var outputDepth:texture_storage_2d<r32float,write>;',
+    'let current=linear(textureLoad(scene,p,0).rgb);',
+    'var old=vec3f(0);var total=0.0;',
+    'old+=textureLoad(history,pixel,0).rgb*weight;',
+    'result=mix(current,rgb(clamp(ycocg(old/total),lo,hi)),temporal.settings.x);',
+    'textureStore(output,p,vec4f(max(result,vec3f(0)),1));',
+  ];
+  if (targets.some((t) => code.split(t).length !== 2))
+    throw new MargoError('state', 'TAA reactive patch target missing; update reactiveResolve to the resolve shader');
+  const [binding, scene, taps, tap, blend, store] = targets;
+  return code
+    .replace(binding, binding + '\n@group(0) @binding(9) var reactiveMask:texture_2d<f32>;')
+    .replace(
+      scene,
+      scene +
+        'let maskSize=vec2f(textureDimensions(reactiveMask));' +
+        'let react=clamp(textureLoad(reactiveMask,vec2i(min((vec2f(id.xy)+0.5)/vec2f(size)*maskSize,maskSize-1.0)),0).r,0.0,1.0);',
+    )
+    .replace(taps, taps + 'var oldReact=0.0;')
+    .replace(tap, 'let h=textureLoad(history,pixel,0);old+=h.rgb*weight;oldReact+=h.a*weight;')
+    .replace(
+      blend,
+      'result=mix(current,rgb(clamp(ycocg(old/total),lo,hi)),temporal.settings.x*(1.0-max(react,oldReact/total)));',
+    )
+    .replace(store, 'textureStore(output,p,vec4f(max(result,vec3f(0)),react));');
+}

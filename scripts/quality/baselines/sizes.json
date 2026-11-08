@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11223900,
+  "total": 11224712,
   "history": [
     {
       "date": "2026-10-24",
@@ -4352,6 +4352,12 @@
       "commit": "af8a2bc28",
       "reason": "ui text direction and ligatures options",
       "grew": 2
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "ca41009b8",
+      "reason": "taa reactive mask: option, mask validation and the resolve patch (batch 73 job 1)",
+      "grew": 1
     }
   ],
   "items": {
@@ -5015,7 +5021,7 @@
     "@margoengine/stats/leaks": 1921,
     "@margoengine/stats/phases": 1714,
     "@margoengine/stats/report": 1378,
-    "@margoengine/taa": 12187,
+    "@margoengine/taa": 12999,
     "@margoengine/taa/upscale": 7093,
     "@margoengine/terrain": 12874,
     "@margoengine/terrain/blend": 3676,

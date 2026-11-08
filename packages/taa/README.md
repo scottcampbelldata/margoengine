@@ -18,7 +18,7 @@ A materials mesh writes velocity where its surface is: `displacement` moves it a
 
 Core mesh motion and loaded glTF/FBX node motion are automatic, including parent transforms and reused entity IDs. `taa.add(pbrModel)` remains available for explicit velocity sources and safely overlaps automatic discovery. TAA reads the current animated stride-80 vertex buffer after skinning/morph computation and snapshots it on the GPU for the next frame. Static PBR vertices receive a lazily allocated TAA-owned storage copy from retained CPU data; ordinary PBR buffer usage is unchanged. There is no animation pass or palette duplication. Alpha-masked primitives retain UV0/UV1 selection, affine texture transforms, opacity maps (materials `alphaMap`), vertex alpha (left out with `vertexAlpha: false`) and cutoff, so a hole writes no velocity. The returned function unregisters the explicit source. Custom sources use the `shadowPrimitives` contract (24-byte core or 80-byte PBR vertices); PBR buffers need storage usage or retained `primitive.vertices`; a primitive with no alpha texture reads as opaque. Disposed models are removed during rendering.
 
-Other opaque renderers get camera-motion reprojection from scene depth. Custom deformation needs registered velocity primitives. Transparent particles, blended glTF and splats use the underlying opaque depth and neighborhood clamping; they do not supply their own velocity or occlusion history. Fast transparent effects can still ghost. Call `reset()` when a scene change cannot be described by motion.
+Other opaque renderers get camera-motion reprojection from scene depth. Custom deformation needs registered velocity primitives. Transparent particles, blended glTF and splats use the underlying opaque depth and neighborhood clamping; they do not supply their own velocity or occlusion history. Fast transparent effects can still ghost unless they are drawn into the `reactive` mask (below). Call `reset()` when a scene change cannot be described by motion.
 
 `historyWeight` is in [0,1), default 0.9; zero disables history blending. `depthThreshold` is the relative reversed-depth rejection tolerance in [0,1], default 0.01. Parameters are validated before commands. History resets on resize, projection changes and device restoration; first-frame/newly visible primitives reject history. Rendering receives a retained camera view with the jittered matrix and the public camera's current properties. The public camera matrix stays unchanged, including when another pass throws; presentation restores the original context camera reference. Culling uses the normal camera frustum. With engine views, each view (by `RenderView.id`) keeps its own history, jitter and captures at canvas size; a view not drawn for a frame releases them.
 
@@ -54,6 +54,29 @@ import {EngineKernel} from 'margoengine/core';
 import {TAA} from 'margoengine/taa';
 const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
 TAA.attach(engine, {stochastic: true});
+```
+
+`reactive` lets particles, blended glTF surfaces and splats mark the pixels where history cannot be trusted: they move
+without motion vectors, so TAA would reproject what was behind them and leave a ghost trail. Return a texture whose red
+channel, 0 to 1, takes that share of the history weight away (1 keeps none); draw their coverage into it each frame
+before TAA resolves at frame-graph order 40 (particles draw at 6, splats at 3). Any 2D float or unorm format and any size
+works (it is read scaled to the view); return undefined for a frame with nothing reactive. TAA keeps each frame's mask in
+the alpha of its history, so the pixels an effect has just left drop their history too and the trail goes, not only the
+smear on the effect itself. Fixed at construction whether a mask is used (default none, which compiles the same resolve
+as before); the texture may change from frame to frame. A reactive pixel shows that frame's own jittered sample, so its
+edges alias until history builds again.
+
+```ts
+import {EngineKernel} from 'margoengine/core';
+import {TAA} from 'margoengine/taa';
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
+const mask = engine.gpu!.createTexture({
+  size: [640, 360],
+  format: 'r8unorm',
+  usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+});
+// Each frame, clear `mask` and draw the coverage of your particles or splats into it (a render pass at order 6 to 39).
+TAA.attach(engine, {reactive: () => mask});
 ```
 
 `gpuState` exposes velocity, current history color and history depth textures after rendering. `dispose()`/`destroy()` releases owned buffers, textures and source records. Device restoration recreates everything and discards stale history. The package is independent of PBR, animation, shadows, clustered lighting, particles and stage; helper-only imports discard the renderer. It follows the workspace's `@margoengine/*` naming convention.

@@ -595,6 +595,7 @@ The own solver's kernel (`packages/physics/kernel`, Rust, no dependencies). Noth
 | A-02 | Reprojection, 3x3 YCoCg min/max clamp, history blend | taa/src/shader.ts | Karis, "High Quality Temporal Supersampling", SIGGRAPH 2014. Not cited in code |
 | A-03 | Depth rejection of history | taa/src/shader.ts | Margo-own: Margo design |
 | A-04 | Halton (2, 3) jitter, 8-frame cycle | taa/src/shader.ts, taa/src/index.ts | Halton 1964; 8-sample Halton(2,3) in Karis 2014 |
+| A-05 | Reactive mask: history weight scaled by 1 - max(mask now, mask carried in history alpha) | taa/src/shader.ts, taa/src/index.ts | The idea of a per-pixel reactivity input that lowers history trust for transparent effects is described in AMD's public FidelityFX Super Resolution 2 documentation (read as documentation, not code); carrying the mask through history alpha so trails clear is Margo-own; no engine source was read |
 
 ### terrain
 
