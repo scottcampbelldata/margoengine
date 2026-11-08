@@ -6,5 +6,6 @@ extern crate alloc;
 
 pub mod broad;
 pub mod colour;
+pub mod lanes;
 pub mod island;
 pub mod tree;

@@ -16,14 +16,16 @@ use alloc::vec::Vec;
 
 /// Colours before the overflow.
 pub const COLOURS: usize = 16;
+// A body's colours are the bits of a u16.
+const _: () = assert!(COLOURS == u16::BITS as usize);
 /// The body index that stands for "writes no body".
 pub const NONE: u32 = u32::MAX;
 
 /// A colouring kept between steps so building one allocates nothing once the world has settled in size.
 #[derive(Default)]
 pub struct Colouring {
-    /// Per colour, one bit per body: whether a constraint of the colour writes it.
-    bits: Vec<u64>,
+    /// Per body, one bit per colour: whether a constraint of the colour writes it.
+    taken: Vec<u16>,
     /// Key and constraint index pairs, `key << 32 | index`, and the radix sort's second buffer.
     sorted: Vec<u64>,
     spare: Vec<u64>,
@@ -51,27 +53,23 @@ impl Colouring {
         self.sorted.extend(keys.iter().enumerate().map(|(i, &k)| (k as u64) << 32 | i as u64));
         radix_sort(&mut self.sorted, &mut self.spare);
 
-        let words = bodies.div_ceil(64);
-        self.bits.clear();
-        self.bits.resize(words * COLOURS, 0);
+        self.taken.clear();
+        self.taken.resize(bodies, 0);
         self.colour.clear();
         self.colour.resize(writes.len(), 0);
         let mut sizes = [0u32; COLOURS + 1];
         for &entry in &self.sorted {
             let i = entry as u32 as usize;
             let [a, b] = writes[i];
-            let mut chosen = COLOURS;
-            for c in 0..COLOURS {
-                let set = &mut self.bits[c * words..(c + 1) * words];
-                let free = |x: u32, set: &[u64]| x == NONE || set[(x / 64) as usize] & (1 << (x % 64)) == 0;
-                if free(a, set) && free(b, set) {
-                    for x in [a, b] {
-                        if x != NONE {
-                            set[(x / 64) as usize] |= 1 << (x % 64);
-                        }
+            // The first colour neither body is in: the lowest clear bit of the two bodies' colours.
+            let of = |x: u32, taken: &[u16]| if x == NONE { 0 } else { taken[x as usize] };
+            let used = of(a, &self.taken) | of(b, &self.taken);
+            let chosen = (!used).trailing_zeros() as usize;
+            if chosen < COLOURS {
+                for x in [a, b] {
+                    if x != NONE {
+                        self.taken[x as usize] |= 1 << chosen;
                     }
-                    chosen = c;
-                    break;
                 }
             }
             self.colour[i] = chosen as u8;

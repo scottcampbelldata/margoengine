@@ -2058,13 +2058,35 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
 - **Rerun:** `cargo test --release --manifest-path packages/physics2d/kernel/Cargo.toml --test world -- --nocapture`;
   the time as entry 85.
 
+### 87. Own 2D physics solver: four contacts at a time in SIMD lanes (paired, the same bits; the loss stays open)
+
+- **Before (`7d92afa2c`):** colour order (entry 86), one contact a visit.
+- **Change:** `packages/physics/kernel-common/src/lanes.rs`, four f32 lanes (`core::arch::wasm32` simd128 on Wasm,
+  SSE2 on x86_64, arrays elsewhere) with only add, sub, mul, div, negation, compares and selects, so each lane is the
+  scalar operation's IEEE result. `packages/physics2d/kernel/src/solver/wide.rs` (Catto, "SIMD Matters", 2024, as a
+  description): a colour's contacts in blocks of four, field by field; bodies gathered by scalar loads and written back
+  only for the lanes that write them; the block solve's four cases as lane masks, the later cases worked out only when a
+  lane needs them; the springs' impulse to mass ratio once a pass instead of on every visit (the same division). The
+  overflow and restitution stay one at a time. Max is a compare and a select in both solves. Colouring takes a body's
+  colours as the bits of a u16, the first free colour its lowest clear bit (the same first fit), and the keys are made
+  as the contacts are built. `Settings::contact_lanes` (default on; off solves one contact at a time, native only).
+- **Bits:** `tests/bits.rs` runs the three pinned scenes both ways: the same hashes as entry 86, counts included.
+  `tests/common.rs` checks every lane operation against the scalar one on random and special values.
+- **Time (paired, native, parent and this commit's test binaries in turns, 12 rounds, per-round minimums of 40 steps
+  after 60, busy machine, diagnostic):** step 3.64 ms median against 6.77; solve 2.12 against 5.22, of which the substep
+  passes 1.53 against 4.60 (3.0 times), contact rows and colouring 0.50 against 0.54, restitution and write back 0.07
+  against 0.04. The new step by phase (best of 40): broad 0.23, narrow 1.12, islands 0.05, solve 2.04, sleep 0.02 ms.
+- **Tried, no gain, dropped:** bodies padded to 32 bytes and loaded as two rows through a 4 by 4 transpose: the passes
+  took 1.51 ms against 1.50, inside the spread, so the bodies stay 28 bytes and are gathered field by field.
+- **Rerun:** as entry 85, with the probe's step split by phase.
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).
 
-- **Own 2D physics, the 100-row pyramid: 6.7 ms a step against Box2D v3's 1.02 ms (entry 83).** Native, busy machine,
-  diagnostic. The broad phase is fixed; the solver takes 5.0 ms of the step; compact solver bodies (entry 85) and colour
-  order (entry 86) left it near 6.5 ms. Rerun: as entries 83 and 85.
+- **Own 2D physics, the 100-row pyramid: 3.6 ms a step against Box2D v3's 1.02 ms (entries 83, 85 to 87).** Native,
+  busy machine, diagnostic. Four lanes (entry 87) took the step from 6.8 ms; it is now the solver 2.0 ms (passes 1.5,
+  contact rows and colouring 0.5), the narrow phase 1.1, the broad phase 0.2. Rerun: as entries 83 and 87.
 
 - **Own convex decomposition against Rapier's V-HACD (entry 81).** 1.1 to 17.3 s where Rapier takes 0.1 to 0.3 s on five
   meshes of 72 to 2,304 triangles, with fewer or as many parts. Cause: 500 tree-search iterations per cut with a hull per

@@ -1,7 +1,8 @@
 // Pinned bits: suite scenes stepped 120 times, every body's exact centre, rotation and velocities and every step's work
 // counts folded into one FNV-1a hash. A change that must not move a bit (a new memory layout, a faster loop) keeps these
 // hashes; a change that moves results re-pins them in its own commit and re-measures every bar. Re-pinned 2026-11-08 when
-// the contacts went to colour order (perf history entry 86); the compact solver bodies before it kept every bit (85).
+// the contacts went to colour order (perf history entry 86); the compact solver bodies before it kept every bit (85), and
+// the four-lane solve after it keeps them, run both ways (87).
 use margoengine_physics2d_kernel::joint::{JointDef, JointKind};
 use margoengine_physics2d_kernel::math::{Rot, V2, v2};
 use margoengine_physics2d_kernel::shape::Core;
@@ -120,9 +121,15 @@ fn mixed() -> World {
 
 #[test]
 fn suite_scenes_step_to_their_pinned_bits() {
-    let got = [run(pyramid(100)), run(joint_grid()), run(mixed())];
-    println!("pinned bits: {:#018x} {:#018x} {:#018x}", got[0], got[1], got[2]);
-    assert_eq!(got, [0x9ffe_fc83_c3a9_9be4, 0x95a4_7530_df18_0011, 0x9acb_6847_1fbe_6ba0], "the 100-row pyramid, the joint grid, the mixed scene");
+    // The four-lane solve and the same solve one contact at a time give the same bits.
+    for lanes in [true, false] {
+        let got = [pyramid(100), joint_grid(), mixed()].map(|mut world| {
+            world.settings.contact_lanes = lanes;
+            run(world)
+        });
+        println!("pinned bits, lanes {lanes}: {:#018x} {:#018x} {:#018x}", got[0], got[1], got[2]);
+        assert_eq!(got, [0x9ffe_fc83_c3a9_9be4, 0x95a4_7530_df18_0011, 0x9acb_6847_1fbe_6ba0], "the 100-row pyramid, the joint grid, the mixed scene, lanes {lanes}");
+    }
 }
 
 #[test]

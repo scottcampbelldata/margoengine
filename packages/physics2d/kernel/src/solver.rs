@@ -42,13 +42,16 @@
 // The passes visit the contacts colour by colour (kernel-common colour.rs): no two contacts of a colour write the same
 // body, so the visits inside a colour do not wait on each other, and the contacts are coloured from the top of the scene
 // down along gravity, so the order of a sweep follows the pile, not the order its bodies were made in. Joints go first,
-// one at a time, as before.
+// one at a time, as before. Each colour is solved four contacts at a time in SIMD lanes (solver/wide.rs), every bit as
+// one at a time; the overflow and restitution go one at a time.
 use alloc::vec::Vec;
-use margoengine_physics_kernel_common::colour::{Colouring, NONE, float_key};
+use margoengine_physics_kernel_common::colour::{COLOURS, Colouring, NONE, float_key};
 
 use crate::joint::{self, Pass};
 use crate::math::{Rot, V2};
 use crate::world::{Kind, World, gravity_length};
+
+mod wide;
 
 /// 2 pi as the nearest f32.
 const TAU: f32 = 6.283_185_5;
@@ -153,6 +156,8 @@ pub struct Scratch {
     keys: Vec<u32>,
     sorted: Vec<Constraint>,
     sorted_bounces: Vec<Bounce>,
+    /// The colours' contacts in blocks of four for the four-lane solve.
+    blocks: wide::Blocks,
     pub(crate) paths: joint::Paths,
 }
 
@@ -254,6 +259,12 @@ pub fn solve(world: &mut World, dt: f32) {
         }
     }
     let moving = bodies.len();
+    // Each contact's colouring key: g . p of its first point, p taken from the first moving body's centre so a scene far
+    // from the origin keys as one at it (see the colour order below).
+    let (gx, gy) = (settings.gravity.x as f64, settings.gravity.y as f64);
+    let origin = ids.first().map_or([0.0; 2], |&id| world.bodies[id as usize].exact_center);
+    let mut keys = core::mem::take(&mut world.scratch.keys);
+    keys.clear();
     for (index, contact) in world.contacts.iter().enumerate() {
         if !contact.touching() {
             continue;
@@ -326,26 +337,20 @@ pub fn solve(world: &mut World, dt: f32) {
         if passes < 2 && ba.kind == Kind::Dynamic && bb.kind == Kind::Dynamic && load * ima.max(imb) < chain_limit {
             c.eighth = true;
         }
+        let (centre, p) = (ba.exact_center, c.points[0].anchor_a);
+        keys.push(float_key((gx * (centre[0] - origin[0] + p.x as f64) + gy * (centre[1] - origin[1] + p.y as f64)) as f32));
         constraints.push(c);
         bounces.push(bounce);
     }
     world.counts.constraints = constraints.len() as u64;
     // Colour order: the passes below visit the contacts colour by colour, the overflow last. Inside a colour no two
     // contacts write the same body, so the visits are independent of each other. The contacts are coloured from the top
-    // of the scene down along gravity (the key: g . p of the first point, lowest first; see colour.rs), p taken from the
-    // first moving body's centre so a scene far from the origin keys as one at it.
-    let (gx, gy) = (settings.gravity.x as f64, settings.gravity.y as f64);
-    let origin = ids.first().map_or([0.0; 2], |&id| world.bodies[id as usize].exact_center);
+    // of the scene down along gravity (the key: g . p of the first point, lowest first; see colour.rs).
     let scratch = &mut world.scratch;
     scratch.writes.clear();
     scratch.writes.extend(constraints.iter().map(writes));
-    scratch.keys.clear();
-    scratch.keys.extend(constraints.iter().map(|c| {
-        let centre = world.bodies[ids[c.a as usize] as usize].exact_center;
-        let p = c.points[0].anchor_a;
-        float_key((gx * (centre[0] - origin[0] + p.x as f64) + gy * (centre[1] - origin[1] + p.y as f64)) as f32)
-    }));
-    scratch.colouring.build(bodies.len(), &scratch.writes, &scratch.keys);
+    scratch.colouring.build(bodies.len(), &scratch.writes, &keys);
+    scratch.keys = keys;
     scratch.sorted.clear();
     scratch.sorted.extend(scratch.colouring.order.iter().map(|&i| constraints[i as usize]));
     scratch.sorted_bounces.clear();
@@ -354,6 +359,18 @@ pub fn solve(world: &mut World, dt: f32) {
     core::mem::swap(&mut bounces, &mut scratch.sorted_bounces);
     world.counts.colours = scratch.colouring.used() as u64;
     world.counts.overflow = scratch.colouring.overflow() as u64;
+    let starts = scratch.colouring.starts;
+    // The colours go to the four-lane solve, the overflow one at a time after them, in the same order as one at a time.
+    let lanes = settings.contact_lanes || cfg!(target_arch = "wasm32");
+    let single = if lanes { starts[COLOURS] as usize } else { 0 };
+    let mut blocks = core::mem::take(&mut scratch.blocks);
+    blocks.blocks.clear();
+    if lanes {
+        for k in 0..COLOURS {
+            blocks.push(&constraints[starts[k] as usize..starts[k + 1] as usize]);
+        }
+    }
+    let wide_springs = wide::Springs { quarter, eighth };
     let joints = !world.joints.is_empty();
 
     let g = settings.gravity;
@@ -374,7 +391,8 @@ pub fn solve(world: &mut World, dt: f32) {
             body.v = v.scale(1.0 / (1.0 + h * source.linear_damping));
             body.w *= 1.0 / (1.0 + h * source.angular_damping);
         }
-        for c in &constraints {
+        wide::warm_start(&mut bodies, &blocks.blocks);
+        for c in &constraints[single..] {
             warm_start(&mut bodies, c);
         }
         if joints {
@@ -388,7 +406,10 @@ pub fn solve(world: &mut World, dt: f32) {
                 joint::solve(world, &mut paths, &Pass { biased: true, ..joint_pass });
                 read_velocities(world, &mut bodies, &ids);
             }
-            for c in constraints.iter_mut() {
+            let (b, s) = wide::solve(&mut bodies, &mut blocks.blocks, true, inv_h, max_push, &wide_springs);
+            block += b;
+            sequential += s;
+            for c in constraints[single..].iter_mut() {
                 let (b, s) = solve_contact(&mut bodies, c, true, inv_h, max_push, &springs);
                 block += b;
                 sequential += s;
@@ -408,7 +429,10 @@ pub fn solve(world: &mut World, dt: f32) {
                 joint::solve(world, &mut paths, &joint_pass);
                 read_velocities(world, &mut bodies, &ids);
             }
-            for c in constraints.iter_mut() {
+            let (b, s) = wide::solve(&mut bodies, &mut blocks.blocks, false, inv_h, max_push, &wide_springs);
+            block += b;
+            sequential += s;
+            for c in constraints[single..].iter_mut() {
                 let (b, s) = solve_contact(&mut bodies, c, false, inv_h, max_push, &springs);
                 block += b;
                 sequential += s;
@@ -417,6 +441,12 @@ pub fn solve(world: &mut World, dt: f32) {
     }
     world.counts.block = block;
     world.counts.sequential = sequential;
+    if lanes {
+        let mut first = 0;
+        for k in 0..COLOURS {
+            first += blocks.write_back(first, &mut constraints[starts[k] as usize..starts[k + 1] as usize]);
+        }
+    }
 
     let threshold = settings.restitution_threshold;
     for (c, bounce) in constraints.iter_mut().zip(&bounces) {
@@ -456,6 +486,7 @@ pub fn solve(world: &mut World, dt: f32) {
     world.scratch.slot = slot;
     world.scratch.start = start;
     world.scratch.paths = paths;
+    world.scratch.blocks = blocks;
 }
 
 /// sqrt(a b): the friction of two materials.
@@ -510,13 +541,20 @@ fn warm_start(bodies: &mut [SolverBody], c: &Constraint) {
     store(bodies, c, ma, mb);
 }
 
+/// `a` if it is above `b`, else `b`: a compare and a select, as the four-lane solve does it (f32::max's rules for zeros
+/// and NaN differ between targets).
+#[inline(always)]
+fn larger(a: f32, b: f32) -> f32 {
+    if a > b { a } else { b }
+}
+
 /// One row's terms: the bias, and the soft scales (1 and 0 for a rigid row).
 #[inline(always)]
 fn row(spring: &Soft, s: f32, biased: bool, inv_h: f32, max_push: f32) -> (f32, f32, f32) {
     if s > 0.0 {
         (s * inv_h, 1.0, 0.0)
     } else if biased {
-        ((spring.bias_rate * s).max(-max_push), spring.mass_scale, spring.impulse_scale)
+        (larger(spring.bias_rate * s, -max_push), spring.mass_scale, spring.impulse_scale)
     } else {
         (0.0, 1.0, 0.0)
     }
@@ -620,7 +658,7 @@ fn sequential_normal(c: &mut Constraint, ma: &mut Motion, mb: &mut Motion, gaps:
         let (bias, mass_scale, impulse_scale) = row(spring, gaps[k], biased, inv_h, max_push);
         let vn = n.dot(speed_at(*mb, p.anchor_b).sub(speed_at(*ma, p.anchor_a)));
         let impulse = -p.normal_mass * mass_scale * (vn + bias) - impulse_scale * p.normal_impulse;
-        let total = (p.normal_impulse + impulse).max(0.0);
+        let total = larger(p.normal_impulse + impulse, 0.0);
         let applied = total - p.normal_impulse;
         c.points[k].normal_impulse = total;
         c.pushed |= ((total > 0.0) as u8) << k;

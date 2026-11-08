@@ -1,9 +1,10 @@
 // The shared kernel parts (packages/physics/kernel-common) against brute force: sweep and prune finds exactly the
 // overlapping pairs of random boxes in 2 and 3 dimensions as they move, are added and removed; the union-find islands
 // are the connected components a graph search finds; the colouring never puts two constraints that write one body in one
-// colour and visits in the order it promises.
+// colour and visits in the order it promises; four lanes give each lane the scalar operation's bits.
 use margoengine_physics_kernel_common::broad::{Bounds, SweepPrune};
 use margoengine_physics_kernel_common::colour::{COLOURS, Colouring, NONE, float_key};
+use margoengine_physics_kernel_common::lanes::{F4, M4};
 use margoengine_physics_kernel_common::island::{UnionFind, sleep_tick};
 
 struct Random(u64);
@@ -242,4 +243,40 @@ fn constraints_on_one_body_fill_the_colours_then_the_overflow_and_the_last_colou
     assert_eq!(colouring.used(), 2);
     assert_eq!(colouring.order, [2, 0, 1]);
     assert!(float_key(-1.0) < float_key(-0.5) && float_key(-0.5) < float_key(0.0) && float_key(0.0) < float_key(2.0));
+}
+
+#[test]
+fn four_lanes_give_each_lane_the_scalar_bits() {
+    let mut random = Random(11);
+    let pick = |random: &mut Random| {
+        let specials = [0.0, -0.0, 1.0, -1.0, f32::MIN_POSITIVE, 1e-30, 3.0e38, f32::INFINITY, f32::NAN];
+        if random.next() < 0.3 { specials[(random.next() * specials.len() as f32) as usize % specials.len()] } else { random.range(-1e3, 1e3) }
+    };
+    let same = |a: [f32; 4], b: [f32; 4]| a.iter().zip(&b).all(|(x, y)| x.to_bits() == y.to_bits() || (x.is_nan() && y.is_nan()));
+    for _ in 0..2000 {
+        let x = [0; 4].map(|_| pick(&mut random));
+        let y = [0; 4].map(|_| pick(&mut random));
+        let (a, b) = (F4::new(x), F4::new(y));
+        let each = |f: fn(f32, f32) -> f32| [0, 1, 2, 3].map(|k| f(x[k], y[k]));
+        assert!(same((a + b).get(), each(|p, q| p + q)));
+        assert!(same((a - b).get(), each(|p, q| p - q)));
+        assert!(same((a * b).get(), each(|p, q| p * q)));
+        assert!(same((a / b).get(), each(|p, q| p / q)));
+        assert!(same((-a).get(), [0, 1, 2, 3].map(|k| -x[k])));
+        let bits = |f: fn(f32, f32) -> bool| (0..4).map(|k| (f(x[k], y[k]) as u32) << k).sum::<u32>();
+        assert_eq!(a.lt(b).bits(), bits(|p, q| p < q));
+        assert_eq!(a.le(b).bits(), bits(|p, q| p <= q));
+        assert_eq!(a.gt(b).bits(), bits(|p, q| p > q));
+        assert_eq!(a.ge(b).bits(), bits(|p, q| p >= q));
+        // A compare and a select: the larger as `if p > q { p } else { q }` gives it, zeros and NaN included.
+        assert!(same(F4::select(a.gt(b), a, b).get(), each(|p, q| if p > q { p } else { q })));
+    }
+    for m in 0..16 {
+        assert_eq!(M4::from_bits(m).bits(), m);
+        for n in 0..16 {
+            assert_eq!(M4::from_bits(m).and(M4::from_bits(n)).bits(), m & n);
+            assert_eq!(M4::from_bits(m).or(M4::from_bits(n)).bits(), m | n);
+            assert_eq!(M4::from_bits(m).and_not(M4::from_bits(n)).bits(), m & !n);
+        }
+    }
 }

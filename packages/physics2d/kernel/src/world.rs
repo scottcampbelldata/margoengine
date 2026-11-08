@@ -204,6 +204,9 @@ pub struct Settings {
     pub joint_geometric_stiffness: bool,
     /// How the broad phase finds pairs; read when the world is made.
     pub broad_phase: BroadPhase,
+    /// Contacts solved four at a time in SIMD lanes (the default); off, one at a time, every bit the same. Native builds
+    /// only: the Wasm build always solves in lanes.
+    pub contact_lanes: bool,
 }
 
 /// The broad phase. Both give the same pairs in the same order, so the same step to the bit; they differ in work.
@@ -260,6 +263,7 @@ impl Default for Settings {
             joint_max_push: 3.0,
             joint_geometric_stiffness: true,
             broad_phase: BroadPhase::Tree,
+            contact_lanes: true,
         }
     }
 }
