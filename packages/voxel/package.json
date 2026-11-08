@@ -73,6 +73,10 @@
     "./lod": {
       "types": "./dist/lod.d.ts",
       "import": "./dist/lod.js"
+    },
+    "./light-worker": {
+      "types": "./dist/light-worker.d.ts",
+      "import": "./dist/light-worker.js"
     }
   },
   "files": [

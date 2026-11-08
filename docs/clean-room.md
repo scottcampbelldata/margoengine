@@ -596,6 +596,7 @@ The own solver's kernel (`packages/physics/kernel`, Rust, no dependencies). Noth
 | VX13 | baked light x diffuse replaces sun + ambient on charted fragments | voxel/src/lightmap.ts | Margo-own: Margo design choice |
 | VX14 | MATL keys to block options, direct mapping | voxel/src/vox.ts | MagicaVoxel .vox MATL chunk description (ephtracy/voxel-model format notes): file-format semantics |
 | VX15 | far levels: octree of coarse chunks split when the eye is nearer than `radius` child sizes (Chebyshev), level cells 2^L blocks, coarse column height rounded to the nearest cell; scaled renderer: camera times scale(s), inverse rows over s, frustum planes (n, d / s) | voxel/src/lod.ts, voxel/src/render.ts | Margo-own: distance-based quadtree/octree level of detail is textbook (Luebke et al. 2003, "Level of Detail for 3D Graphics"); the matrix and plane scaling is linear algebra |
+| VX16 | light in a worker: the page's chunk loads, unloads and edits replayed in order on a copy, lit by the same flood fill, light written back by load generation | voxel/src/light-worker.ts, voxel/src/light.worker.ts | Margo-own: message-passing copy of VX12 |
 
 ### voxel-pathtracer
 

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10726088,
+  "total": 10742956,
   "history": [
     {
       "date": "2026-10-24",
@@ -3854,6 +3854,12 @@
       "commit": "5c2eec616",
       "reason": "voxel/render: scale option for far levels of detail (camera, inverse, eye and planes in cell units; refuses effects, shadows and capture when scaled); voxel/lod: new far chunk levels entry",
       "grew": 2
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "ae827c37e",
+      "reason": "voxel/light-worker: new entry, VoxelLighting in a Web Worker, and its worker script",
+      "grew": 2
     }
   ],
   "items": {
@@ -4541,6 +4547,7 @@
     "@margoengine/video": 2199,
     "@margoengine/viewcube": 3608,
     "@margoengine/voxel": 6127,
+    "@margoengine/voxel dist/workers/light.js": 10527,
     "@margoengine/voxel dist/workers/mesher.js": 6162,
     "@margoengine/voxel dist/workers/terrain.js": 5948,
     "@margoengine/voxel-edit": 7789,
@@ -4567,6 +4574,7 @@
     "@margoengine/voxel/codec": 9368,
     "@margoengine/voxel/generate": 4426,
     "@margoengine/voxel/light": 8638,
+    "@margoengine/voxel/light-worker": 6341,
     "@margoengine/voxel/lightmap": 2762,
     "@margoengine/voxel/lod": 7228,
     "@margoengine/voxel/mesher": 8312,

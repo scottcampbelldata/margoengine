@@ -2786,6 +2786,10 @@
       "types": "./dist/voxel/lod.d.ts",
       "import": "./dist/voxel/lod.js"
     },
+    "./voxel/light-worker": {
+      "types": "./dist/voxel/light-worker.d.ts",
+      "import": "./dist/voxel/light-worker.js"
+    },
     "./voxel-edit": {
       "types": "./dist/voxel-edit.d.ts",
       "import": "./dist/voxel-edit.js"

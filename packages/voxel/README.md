@@ -933,3 +933,45 @@ GPU check (`node packages/voxel/tests/lod-browser-check.mjs`, in `test:gpu`): a 
 eye, near and far gives the same image as at scale 1 (0 of 29,823 drawn pixels differ on the M6 Mac mini, Metal), and four
 levels of `noiseTerrainLod` draw terrain to the horizon from 90 blocks up with no validation error. Node generation runs
 on the main thread (about a millisecond a node; `budget` caps it per frame); frame cost at kilometre views is unmeasured.
+
+## Light in a worker (`@margoengine/voxel/light-worker`)
+
+`VoxelLightWorker` computes the same sky and block light as `VoxelLighting`, in a Web Worker: the page posts chunk
+loads, unloads and edits to it and writes back the light bytes it answers with, so removing a roof or loading a chunk
+costs the page the copies, not the flood fill.
+
+```ts
+import { BlockTypes, VoxelWorld } from 'margoengine/voxel';
+import { VoxelLightWorker } from 'margoengine/voxel/light-worker';
+import { BlockTextures, VoxelRenderer } from 'margoengine/voxel/render';
+import { Engine } from 'margoengine/core';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const blocks = new BlockTypes();
+const stone = blocks.define('stone');
+const world = new VoxelWorld({ blocks });
+const textures = await BlockTextures.load(['stone.png']);
+const lighting = VoxelLightWorker.attach(world); // instead of VoxelLighting.attach(world)
+VoxelRenderer.attach(engine, { world, textures });
+engine.onFrame(() => lighting.update()); // posts this frame's changes, writes the light that came back
+world.setBlock(0, 64, 0, stone);
+await lighting.settled(); // the worker has answered everything so far (a loading screen)
+lighting.update();
+lighting.dispose();
+```
+
+- **Same light.** The worker keeps a copy of the world's blocks (chunk loads, unloads, edits and block types defined
+  later go to it in page order) and runs `VoxelLighting` on it with no budget; the tests check every light byte against
+  `VoxelLighting` on the page after loads, torches, a roof removed and put back, slabs, unloads and reloads.
+- **Writing back.** `update()` writes the light of each chunk the worker changed (its byte, or its 32 KiB) and the
+  heightmaps of their columns, and adds those chunks to `world.dirty`. Light computed for a chunk that has been unloaded
+  or loaded again since is dropped; the newer load's light follows. Light arrives a frame or more after the change.
+- **Memory.** The worker holds a second copy of every loaded chunk's blocks and light.
+- **Errors.** `TypeError` for a wrong world or `worker` option, `MargoError` `'unsupported'` without Web Workers,
+  `'attached'` for a second one on a world, `'disposed'` after `dispose()`; a worker failure is thrown by the next
+  `update()` or `settled()`. Do not attach `VoxelLighting` to the same world.
+
+Measured with Node on the M6 Mac mini while other lanes ran (diagnostic; `node --test
+packages/voxel/tests/light-worker-benchmark.test.js` prints yours): removing a 32 x 32 stone roof over a 39-deep room (89,088 cells) took 4.5-8.4 ms
+of `VoxelLighting.update()` on the page; with `VoxelLightWorker` the page spent 0.12-0.37 ms posting the edits and
+0.01-0.03 ms writing the 18 chunks back.

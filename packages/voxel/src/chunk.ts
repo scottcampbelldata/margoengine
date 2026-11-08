@@ -60,6 +60,10 @@ export let settleCells: (chunk: VoxelChunk) => void;
 export let uniformState: (chunk: VoxelChunk) => number | undefined;
 /** The states `chunk`'s cells use, possibly with unused ones (as `pack` gives them), as a view: no copy. */
 export let paletteOf: (chunk: VoxelChunk) => Uint32Array;
+/** The chunk's light: its one byte while every cell has it, else a copy of the 32,768 bytes. */
+export let lightOf: (chunk: VoxelChunk) => number | Uint8Array;
+/** Replaces the chunk's light with one byte for every cell or 32,768 bytes (taken, not copied). */
+export let writeLight: (chunk: VoxelChunk, light: number | Uint8Array) => void;
 
 /**
  * The 32,768 block states and light bytes of one chunk. States are stored as indices into a palette of the distinct
@@ -91,6 +95,13 @@ export class VoxelChunk {
     };
     uniformState = (chunk) => (chunk.bits ? undefined : chunk.palette[0]);
     paletteOf = (chunk) => chunk.palette.subarray(0, chunk.size);
+    lightOf = (chunk) => (chunk.lightCells ? chunk.lightCells.slice() : chunk.lightByte);
+    writeLight = (chunk, light) => {
+      if (typeof light === 'number') {
+        chunk.lightByte = light;
+        chunk.lightCells = null;
+      } else chunk.lightCells = light;
+    };
   }
   /**
    * A uniform chunk: every cell is `state` (default 0, air) and every light byte 0.
