@@ -112,6 +112,7 @@ const optionalPeers = [
   '@margoengine/shadows',
   '@margoengine/controls',
   '@margoengine/geometry',
+  '@margoengine/gltf',
   '@margoengine/post',
   '@margoengine/dof',
   '@margoengine/tonemap',

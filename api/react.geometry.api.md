@@ -33,6 +33,8 @@ export interface SphereProps extends ShapeProps {
     args?: Parameters<GeometryApi['sphereGeometry']>;
 }
 
+export type TextureSource = string | URL | Blob | ArrayBuffer | ArrayBufferView;
+
 // Not exported from this entry, but used by the exports above:
 
 interface ErrorProps {
@@ -96,5 +98,6 @@ type ShapeKind = 'boxGeometry' | 'sphereGeometry' | 'planeGeometry';
 
 interface ShapeProps extends MeshProps, ErrorProps, PbrMaterialProps {
     castShadow?: boolean;
+    map?: TextureSource;
 }
 ```

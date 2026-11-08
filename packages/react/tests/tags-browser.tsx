@@ -4,7 +4,7 @@
 import { StrictMode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { Canvas, extend, useFrame } from '@margoengine/react';
-import { SphereGeometry } from '@margoengine/react/geometry';
+import { Box, Plane, SphereGeometry } from '@margoengine/react/geometry';
 
 extend({ SphereGeometry });
 declare module '@margoengine/react' {
@@ -12,7 +12,10 @@ declare module '@margoengine/react' {
     sphereGeometry: import('react').ComponentProps<typeof SphereGeometry>;
   }
 }
-type Mode = 'tags' | 'bubbling';
+type Mode = 'tags' | 'bubbling' | 'textured';
+// Real files: a Khronos sample JPEG and a KayKit PNG (THIRD-PARTY-NOTICES.md), served by the test's Vite server.
+const jpeg = '/examples/assets/khronos-samples/CesiumMan.jpg',
+  png = '/examples/assets/kaykit/dungeon/pieces/dungeon_texture.png';
 const state = { frames: 0, errors: [] as string[], events: [] as string[] };
 const log = (entry: string) => state.events.push(entry);
 function Count() {
@@ -44,6 +47,18 @@ function App({ mode }: { mode: Mode }) {
                 <meshStandardMaterial color="#2040ff" roughness={0.6} />
               </mesh>
             </group>
+          </>
+        )}
+        {mode === 'textured' && (
+          <>
+            <directionalLight position={[0, 0, 5]} intensity={3} />
+            <Plane position={[-2, 0, 0]} args={[3.6, 3.6]} map={jpeg} />
+            <Box
+              position={[2.2, 0, 0]}
+              args={[1.8, 1.8, 1.8]}
+              map={png}
+              onClick={(event) => log(`box click ${event.target === event.currentTarget ? 'self' : 'child'}`)}
+            />
           </>
         )}
         {mode === 'bubbling' && (

@@ -42,7 +42,7 @@ package, installed separately, and loaded when its component mounts.
 | `/html` | `Html` DOM labels projected into the scene | `html` |
 | `/text` | `Text` (SDF text) | `text` |
 | `/sky` | `Sky` | `sky` |
-| `/geometry` | `Box`, `Sphere`, `Plane` | `geometry` |
+| `/geometry` | `Box`, `Sphere`, `Plane` (with `map`: a PNG or JPEG texture), `SphereGeometry`, `PlaneGeometry` | `geometry` (+ `gltf` for `map`) |
 | `/materials` | `MeshTransmissionMaterial`, `BatchedMesh`, `BatchedItem` | `materials` |
 | `/post`, `/dof`, `/tonemap`, `/taa` | `EffectComposer` with `Bloom`, `SSAO`, `GTAO`, `SSR`, `SSGI`, `MotionBlur`, `LensFlare`, `SMAA`, `FXAA`, `Glitch`, `Afterimage`, `DepthTexture`, `SceneTargets`, `DepthOfField`, `Tonemap`, `TAA` | `post` (+ the effect package) |
 | `/voxel` | `Voxels`, `useBlockTextures` | `voxel` |

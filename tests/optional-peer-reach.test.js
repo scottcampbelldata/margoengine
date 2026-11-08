@@ -75,6 +75,7 @@ test('the stage root reaches no optional package', () => {
 const REACT_EXTRA = {
   './devtools': ['@margoengine/inspector', '@margoengine/stats'],
   './fbx': ['@margoengine/gltf-pro'],
+  './geometry': ['@margoengine/gltf'],
   './animation': ['@margoengine/animator'],
   './materials': ['@margoengine/gltf-pro'],
   './dof': ['@margoengine/post'],

@@ -199,8 +199,40 @@ export function Both() {
 }
 ```
 
-Use `Box`, `Sphere` and `Plane` for floors, blocks and prototypes with a plain colour. Use `Mesh` with children when you
-need a material component other than the standard one (as above) or a geometry other than a box, sphere or plane.
+Use `Box`, `Sphere` and `Plane` for floors, blocks and prototypes with a plain colour or one texture. Use `Mesh` with
+children when you need a material component other than the standard one (as above) or a geometry other than a box,
+sphere or plane.
+
+### Textured Box, Sphere and Plane
+
+`map` gives `Box`, `Sphere` and `Plane` a base colour texture on the shape's own UVs: a URL, fetched through the Canvas
+asset cache so `useProgress` counts it, or the PNG or JPEG bytes (`ArrayBuffer`, a typed array or a `Blob`). The map is
+multiplied by `color`, which is white when a map is set. Install the optional peer `@margoengine/gltf` (npm i
+@margoengine/gltf): the shape is built as a one-primitive glTF in memory and drawn by its `textured` entry, so it stays a
+core mesh that moves, picks and casts shadows with the component.
+
+```tsx
+import { Canvas } from '@margoengine/react';
+import { Box, Plane } from '@margoengine/react/geometry';
+
+export function Crates() {
+  return (
+    <Canvas style={{ height: 400 }}>
+      <Plane args={[10, 10]} rotation={[-Math.PI / 2, 0, 0]} map="/textures/floor.jpg" />
+      <Box position={[0, 0.5, 0]} map="/textures/crate.png" roughness={0.8} onClick={() => console.log('crate')} />
+    </Canvas>
+  );
+}
+```
+
+| Prop | Default | Effect |
+| --- | --- | --- |
+| `map` | none | PNG or JPEG: a URL or the bytes. A new value rebuilds the shape. |
+| `color` | `'#ffffff'` with a map | Multiplies the map. |
+
+A textured shape needs WebGPU and draws in the Canvas default scene: inside `<Scene name>` it sends a `MargoError` (code
+`unsupported`) to `onError`. Other formats (KTX2, WebP) and other maps (normal, roughness) belong in a glTF `Model`.
+Pointer events on it have the drawn child mesh as `target` and the component's mesh as `currentTarget`.
 
 ### Pointer events and picking
 
@@ -704,8 +736,8 @@ The measured breakdown of a React build, package by package, is in [docs/limits.
   namespace form `<Margo.mesh>`. In development the Canvas prints a warning that names the component to use.
 - **A hook throws a `state` error.** `useMargo`, `usePhysics` and `useXR` work only inside their provider (`<Canvas>`, `<Physics>`, `<XR>`).
 - **The scene re-renders constantly.** Per-frame values belong in refs: see [State vs the frame loop](#state-vs-the-frame-loop).
-- **A click handler never runs, or a test sees the old state.** Picking is asynchronous and does not bubble: see [Pointer events and picking](#pointer-events-and-picking). The WebGL2 fallback needs `webglPicking`.
-- **Textures on `Box` or `Sphere`.** They take a colour only. Use a glTF `Model`, or `createMesh` from `margoengine/materials` in an effect.
+- **A click handler never runs, or a test sees the old state.** Picking is asynchronous: see [Pointer events and picking](#pointer-events-and-picking). The WebGL2 fallback needs `webglPicking`.
+- **Textures on `Box`, `Sphere` or `Plane`.** Pass `map` and install `@margoengine/gltf`: see [Textured Box, Sphere and Plane](#textured-box-sphere-and-plane). For more maps than base colour, use a glTF `Model`.
 - **Next.js error about hooks in a server component.** Put the `Canvas` in a file that starts with `'use client'`.
 
 Apache-2.0 licensed.

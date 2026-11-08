@@ -14,6 +14,7 @@ built in, more through `extend`; see "Lowercase tags and extend" in the package 
 | `<Canvas>` | `<Canvas>` | `frameloop="always" \| "demand"`, `shadows`, `camera`, `onCreated`, `onError`. |
 | `<mesh>`, `<group>` | `<Mesh>`, `<Group>` | `position`, `rotation`, `scale`, `castShadow`, every pointer handler (`onClick`, `onPointerDown`, `onPointerOver`, ...), `ref`. |
 | `<boxGeometry args>` | `<BoxGeometry args>` | `Box`, `Sphere` and `Plane` bundle geometry and material for the common case. |
+| `<meshStandardMaterial map={useTexture(url)}>` on a box, sphere or plane | `<Box map={url}>`, `<Sphere map>`, `<Plane map>` | PNG or JPEG, base colour only; needs `@margoengine/gltf`. Other maps: a glTF `Model`. |
 | `<meshStandardMaterial>` | `<PbrMaterial>` | glTF metallic-roughness: `color`, `roughness`, `metalness`. |
 | `<directionalLight>` | `<Sun direction color intensity>` | `direction` points towards the light. |
 | `<ambientLight>` | `<AmbientLight color intensity>` | |

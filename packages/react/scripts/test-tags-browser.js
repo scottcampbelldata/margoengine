@@ -92,6 +92,21 @@ try {
   assert.deepEqual(empty, ['group missed pointerup', 'canvas missed pointerup'], 'a click on nothing is missed');
   result.checks.push({ name: 'Pointer events bubble on a real engine', hover, boxClick, sphereClick, empty });
 
+  // Textured shapes: a Plane with a real JPEG and a Box with a real PNG. A texture shows as colours that vary across
+  // the face (samples inside each face only), where an untextured face is one colour lit evenly; the box click comes
+  // from its drawn child.
+  const across = (image, from, to) => Array.from({ length: 7 }, (_, i) => sample(image, from + ((to - from) * i) / 6, 0.5, 2));
+  const spread = (samples) => Math.max(...[0, 1, 2].map((c) => Math.max(...samples.map((s) => s[c])) - Math.min(...samples.map((s) => s[c]))));
+  const textured = await shot('textured', (i) => spread(across(i, 0.29, 0.47)) > 40 && spread(across(i, 0.61, 0.71)) > 20);
+  const plane = across(textured, 0.29, 0.47),
+    boxFace = across(textured, 0.61, 0.71);
+  assert.ok(spread(plane) > 40, `the JPEG shows on the plane, samples ${JSON.stringify(plane)}`);
+  assert.ok(spread(boxFace) > 20, `the PNG shows on the box, samples ${JSON.stringify(boxFace)}`);
+  await page.mouse.click(...at(0.65));
+  const texturedClick = await events(1);
+  assert.deepEqual(texturedClick, ['box click child'], 'a click on the textured box reaches its onClick');
+  result.checks.push({ name: 'Textured Plane and Box draw their maps', plane, boxFace, texturedClick });
+
   await page.evaluate(() => window.tags.unmount());
   assert.deepEqual(await page.evaluate(() => window.tags.state.errors), []);
   assert.deepEqual(errors, []);
