@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11120193,
+  "total": 11123035,
   "history": [
     {
       "date": "2026-10-24",
@@ -4250,6 +4250,12 @@
       "commit": "73a162862",
       "reason": "physics/next shape casts, point projections and overlaps on every shape (kernel cast.rs, van den Bergen 2004 GJK ray casting with closest-point steps, projections by region, GJK overlaps; meshes, height fields and voxel grids share one walk with them): kernel 104,802 to 125,310 B deflated. Waste checked with a named build: the three tree walks and two grid scans were merged into one, 1.6 KB off; the rest is the new query code, each function needed by a served option.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "5c9b9e8e7",
+      "reason": "new entry @margoengine/tilemap/path (grid pathfinding)",
+      "grew": 1
     }
   ],
   "items": {
@@ -4929,6 +4935,7 @@
     "@margoengine/tilemap/hex": 2287,
     "@margoengine/tilemap/iso": 6635,
     "@margoengine/tilemap/ldtk": 3070,
+    "@margoengine/tilemap/path": 2842,
     "@margoengine/tilemap/tiled": 4540,
     "@margoengine/tiles": 15927,
     "@margoengine/tiles/i3dm": 1629,

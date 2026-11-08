@@ -110,6 +110,48 @@ console.log(hexDistance(hexes, [0, 0], [3, 2]), hexRing(hexes, 4, 4, 1).length);
   of tiles from one tileset in paint order. Cells are read every frame: writes into `layer.data` show on the next one.
 - WebGPU only, exact texels on a single-sample target, like `TileMap`.
 
+## Pathfinding
+
+`margoengine/tilemap/path` finds ways across a map: `findPath` gives a cheapest path from one cell to another by A*,
+and `flowField` gives every cell its cost to the nearest goal and the next cell toward it, for many units heading to
+the same places. Costs come from the map's tile properties with `tileCosts`, or from any array.
+
+```ts
+import { createTileLayer, type TileMapData } from 'margoengine/tilemap';
+import { findPath, flowField, followFlow, tileCosts } from 'margoengine/tilemap/path';
+
+const map: TileMapData = {
+  width: 5, height: 3, tileWidth: 16, tileHeight: 16,
+  tilesets: [{ name: 'ground', firstGid: 1, tileWidth: 16, tileHeight: 16, tileCount: 3, columns: 3,
+    tiles: [{ id: 1, properties: { cost: 5 } }, { id: 2, properties: { solid: true } }] }],
+  // Grass (1), a swamp column (2) and one wall (3).
+  layers: [createTileLayer('ground', 5, 3, Uint32Array.of(1, 1, 2, 1, 1, 1, 3, 2, 1, 1, 1, 1, 1, 1, 1))],
+};
+const grid = tileCosts(map);
+const path = findPath(grid, [0, 0], [4, 0]);
+// Round the wall and down past the swamp: (0,0) (0,1) (0,2) (1,2) (2,2), then two corner steps up to (4,0).
+console.log(path?.cells.length, path?.cost.toFixed(2)); // 7 6.83
+const field = flowField(grid, [[4, 0]], { diagonal: 'never' });
+console.log(followFlow(field, 0, 2).length); // 7
+```
+
+| Piece | What it does |
+| --- | --- |
+| `findPath(grid, start, goal, options)` | `{cells, cost}` from start to goal, both cells included, or null when there is no way |
+| `flowField(grid, goals, options)` | `{width, height, distance, next}`: each cell's cost to the nearest goal and its next cell (`y * width + x`, -1 at goals and where none is reached) |
+| `followFlow(field, x, y)` | The cells from (`x`, `y`) along a field to its goal |
+| `tileCosts(map, {layers, property, solid, fallback, empty})` | A cost grid from tile properties: `solid: true` blocks (default property names `'solid'` and `'cost'`), a numeric `cost` sets the price, other tiles cost `fallback` (1), cells with no tile `empty` (`fallback`). A cell takes its highest layer cost |
+
+A grid is `{width, height, cost, layout?}`; a step costs the cell it enters times its length, and a cost of 0, below 0
+or Infinity blocks the cell. Options: `diagonal` (`'no-corners'` default: corner steps only when both cells beside them
+are open; `'always'`; `'never'`) and `maxCells` (1,000,000).
+
+- On staggered and hexagonal maps (`layout` set, as `tileCosts` does) steps go to the cells that share an edge and
+  `diagonal` does not apply; orthogonal and isometric maps step along rows and columns.
+- A* estimates with the octile (or hex) distance times the lowest cost on the grid, so paths are cheapest ones; equal
+  ones are broken by the order cells were found, the same every run.
+- Both run on the calling thread and allocate a few arrays of the grid's size per call.
+
 ## Auto-tiling
 
 `margoengine/tilemap/autotile` picks the tile for each cell from its neighbours with rule sets written as data: 16 tiles for the four edge neighbours (`cardinal`), or 47 for all eight (`blob`; corners count only when both edges beside them are filled). Terrain sets match the terrain at a tile's four corners instead. Both are deterministic.

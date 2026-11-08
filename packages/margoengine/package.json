@@ -2714,6 +2714,10 @@
       "types": "./dist/tilemap/hex.d.ts",
       "import": "./dist/tilemap/hex.js"
     },
+    "./tilemap/path": {
+      "types": "./dist/tilemap/path.d.ts",
+      "import": "./dist/tilemap/path.js"
+    },
     "./tiles": {
       "types": "./dist/tiles.d.ts",
       "import": "./dist/tiles.js"

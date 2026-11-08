@@ -45,6 +45,10 @@
     "./hex": {
       "types": "./dist/hex.d.ts",
       "import": "./dist/hex.js"
+    },
+    "./path": {
+      "types": "./dist/path.d.ts",
+      "import": "./dist/path.js"
     }
   },
   "files": [
