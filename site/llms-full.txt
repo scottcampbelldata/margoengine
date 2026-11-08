@@ -3608,6 +3608,10 @@ Sweep record: every package's tests and browser or GPU tests on the Mac mini (M6
   (shoreline foam cap: `night-citadel`, `gameplay-sandbox`), 6f0836ee3 (the tint draw reads the surface: `flight-helmet`, `FlightHelmet`, `ABeautifulGame`, `IridescenceLamp`, `LightsPunctualLamp`) and
   43b39e9df (specular weight: `AnisotropyBarnLamp`, `DiffuseTransmissionTeacup`, `ToyCar`). The 2026-11-05 lighting2d and scatter fixes changed none of them, and all 20 proofs pass. To close: look at
   the 16 views and re-record them: Scott's call.
+  Edge 157 (2026-11-08) moved none of them: in Edge 157, abadfb455 still draws the Edge 156 pictures and its child 6f0836ee3 the Edge 157
+  profile's (`flight-helmet` lens mean 72.8 against 11.5 of 255, `LightsPunctualLamp` up to 79 levels, the same commit's), and `gameplay-sandbox`
+  at abadfb455 on Edge 156 is bit-identical to the Edge 157 profile. The near-black `flight-helmet` lenses were an asset defect that
+  6f0836ee3 exposed, fixed since: the demo GLBs' lens base colour had been composited over black when written as JPEG.
 - **Playwright WebKit sometimes drops to 20 or 30 FPS after navigating in the same tab.** `examples/voxel-sandbox`, `quality=high`, 1920 x 1000, 60 Hz display:
   in chains of five same-tab loads, 7 of 30 loads ran at 30 FPS, then the rate came back by itself on a later load. Never on the first load of a browser (0 of 11 chains),
   and not at 1280 x 720 (0 of 11 loads). First seen as 20 (light then high) and 30 (high then high), with the rate of the page's own `requestAnimationFrame` the same, frame CPU

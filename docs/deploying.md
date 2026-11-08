@@ -165,7 +165,7 @@ to 25% and 39% with brotli). For `.glb` it depends on what is inside, measured o
 | --- | --- | --- |
 | `robot-expressive.glb` (464 KB) | raw geometry and animation, no textures | 22% of raw |
 | `flight-helmet-mobile.glb` (1.3 MB) | JPEG textures, quantized geometry | 85% |
-| `flight-helmet.glb` (5.6 MB) | JPEG textures, quantized geometry | 85% |
+| `flight-helmet.glb` (5.5 MB) | JPEG textures, quantized geometry | 85% |
 
 JPEG, PNG, WebP and KTX2 images are already compressed, and so is Draco geometry. Meshopt
 (`EXT_meshopt_compression`) is the exception: its output is designed to be compressed again with gzip or brotli, so

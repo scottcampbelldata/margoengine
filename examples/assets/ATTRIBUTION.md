@@ -11,7 +11,11 @@ GitHub's asset server. The original GLBs retain their geometry, materials and an
   require it. Derived from `khronos/FlightHelmet/` (glTF + PNG, see `khronos/README.md` in the repository): all
   94,722 triangles, 1024-pixel JPEG maps, quantized normals/tangents/UVs (`KHR_mesh_quantization`).
 - `flight-helmet-mobile.glb`: the same helmet with 512-pixel JPEG maps and 20,734 triangles, simplified earlier with
-  meshoptimizer (normal/UV-aware, error bound 0.005) and kept as committed. Also CC0.
+  meshoptimizer (normal/UV-aware, error bound 0.005) and kept as committed, except the lens base colour, encoded again
+  from the source PNG in 2026-11 (`scripts/optimize-demo-assets.js`). Also CC0.
+- Both helmets keep each map's colour as authored and drop its alpha, which glTF ignores in OPAQUE mode. An earlier
+  encode composited the lens base colour over black, about 30 times too dark in linear light, and the lenses drew
+  near black (`tests/demo-helmet-textures.test.js`).
 
 - `tokyo-diorama.glb`: original work for Margo Engine (Apache-2.0), built by `npm run build:tokyo`. Its baked textures use
   Poly Haven CC0 textures and its lettering uses Noto Sans CJK (SIL OFL 1.1). See [its credits](tokyo-diorama-CREDITS.md).

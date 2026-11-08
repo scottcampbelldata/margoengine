@@ -107,7 +107,9 @@ Pass selected production paths to benchmark just those demos; that writes
 `test-results/demo-subject-report.json` and captures complete-scene images.
 `node scripts/optimize-demo-assets.js` regenerates the checked-in Earth phone assets and
 the desktop helmet using the workspace's installed sharp and gltf-validator tools; the
-phone helmet was simplified earlier and is kept as committed.
+phone helmet was simplified earlier and its mesh is kept as committed, while its textures whose source has
+alpha are encoded again from the source. JPEG holds no alpha, so each map keeps its colour as authored
+(glTF ignores a base colour's alpha in OPAQUE mode); `tests/demo-helmet-textures.test.js` checks both helmets.
 
 The Planet unit tests cover concurrent requests, sibling failure, late decode
 cleanup, caller cancellation, GPU validation failures and device restoration.

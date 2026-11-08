@@ -1,11 +1,13 @@
 // Regenerate the checked-in desktop Earth and phone assets and the desktop demo helmet GLB with installed sharp.
-// The phone helmet (examples/assets/flight-helmet-mobile.glb) was simplified earlier with another tool and is kept as
-// committed: there is no mesh simplifier here to rebuild it.
+// The phone helmet (examples/assets/flight-helmet-mobile.glb) was simplified earlier with another tool and its mesh is
+// kept as committed: there is no mesh simplifier here to rebuild it. Its textures whose source has an alpha channel in
+// use are encoded again from the source (reencodeAlphaImages). tests/demo-helmet-textures.test.js checks both helmets.
 import assert from 'node:assert/strict';
 import { readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import sharp from 'sharp';
 import validator from 'gltf-validator';
+import { alphaImages, jpegTexture } from './support/gltf-jpeg.mjs';
 
 const earth = 'packages/creative/examples/earth/assets/';
 for (const [source, target, lossless, desktopTarget] of [
@@ -207,17 +209,25 @@ async function packGLTF(source, target, { maxSize, quality = [85, 90] }) {
       .filter(Boolean)
       .map((t) => doc.textures[t.index].source),
   );
+  // JPEG holds no alpha: a BLEND or MASK base colour would lose its coverage.
+  assert.equal(alphaImages(doc).size, 0, 'a BLEND or MASK material needs an image format with alpha');
   for (const [i, image] of doc.images.entries()) {
-    const bytes = await sharp(await readFile(join(dir, decodeURIComponent(image.uri))))
-      .resize(maxSize, maxSize, { fit: 'inside', withoutEnlargement: true })
-      .jpeg({ quality: quality[color.has(i) ? 0 : 1], chromaSubsampling: '4:4:4' })
-      .toBuffer();
+    const bytes = await jpegTexture(await readFile(join(dir, decodeURIComponent(image.uri))), {
+      maxSize,
+      quality: quality[color.has(i) ? 0 : 1],
+    });
     doc.images[i] = { bufferView: push(bytes), mimeType: 'image/jpeg', ...(image.name && { name: image.name }) };
   }
   Object.assign(doc, { accessors, bufferViews: views, buffers: [{ byteLength: offset }] });
   if (quantized)
     for (const key of ['extensionsUsed', 'extensionsRequired'])
       doc[key] = [...new Set([...(doc[key] ?? []), 'KHR_mesh_quantization'])];
+  return { ...(await saveGLB(doc, chunks, offset, target)), triangles };
+}
+
+// Writes `doc` and its binary chunk (`offset` bytes in `chunks`) as a GLB at `target` once the Khronos validator finds
+// no error in it.
+async function saveGLB(doc, chunks, offset, target) {
   const json = Buffer.from(JSON.stringify(doc)),
     padding = Buffer.alloc((4 - (json.length % 4)) % 4, 0x20),
     header = Buffer.alloc(20),
@@ -235,20 +245,56 @@ async function packGLTF(source, target, { maxSize, quality = [85, 90] }) {
   await writeFile(target, glb);
   return {
     bytes: glb.length,
-    triangles,
     validationErrors: report.issues.numErrors,
     warnings: report.issues.numWarnings,
   };
+}
+
+// Encodes again, from `source`'s files, the images of the GLB at `target` whose source has an alpha channel in use, at
+// the size they have in the GLB; every other byte is kept. A texture is matched to its source file by its name, which
+// holds that file's name. An earlier encode of the phone helmet composited its lens colour over black.
+async function reencodeAlphaImages(target, source, { quality = 85 } = {}) {
+  const glb = await readFile(target),
+    jsonLength = glb.readUInt32LE(12),
+    doc = JSON.parse(glb.subarray(20, 20 + jsonLength).toString('utf8')),
+    bin = 20 + jsonLength + 8,
+    dir = dirname(source),
+    bytesOf = (view) => glb.subarray(bin + (view.byteOffset ?? 0), bin + (view.byteOffset ?? 0) + view.byteLength),
+    replaced = new Map();
+  assert.equal(alphaImages(doc).size, 0, 'a BLEND or MASK material needs an image format with alpha');
+  for (const [i, image] of doc.images.entries()) {
+    const file = join(dir, doc.textures.find((t) => t.source === i).name),
+      original = await readFile(file);
+    if ((await sharp(original).stats()).isOpaque) continue;
+    const { width, height } = await sharp(bytesOf(doc.bufferViews[image.bufferView])).metadata();
+    replaced.set(image.bufferView, await jpegTexture(original, { size: { width, height }, quality }));
+  }
+  const chunks = [];
+  let offset = 0;
+  for (const [i, view] of doc.bufferViews.entries()) {
+    const bytes = replaced.get(i) ?? bytesOf(view);
+    Object.assign(view, { byteOffset: offset, byteLength: bytes.length });
+    chunks.push(bytes, Buffer.alloc((4 - (bytes.length % 4)) % 4));
+    offset += Math.ceil(bytes.length / 4) * 4;
+  }
+  doc.buffers = [{ byteLength: offset }];
+  return { ...(await saveGLB(doc, chunks, offset, target)), images: replaced.size };
 }
 
 // Demo helmet: Khronos FlightHelmet (CC0). Desktop: full mesh, 1024-pixel maps.
 const helmet = 'examples/assets/khronos/FlightHelmet/FlightHelmet.gltf';
 const desktop = await packGLTF(helmet, 'examples/assets/flight-helmet.glb', { maxSize: 1024 });
 assert.equal(desktop.warnings, 0);
+// Phone: the committed simplified mesh (20,734 triangles), 512-pixel maps.
+const phone = await reencodeAlphaImages('examples/assets/flight-helmet-mobile.glb', helmet);
+assert.equal(phone.warnings, 0);
 console.log(
   JSON.stringify({
     helmetDesktop: desktop.bytes,
     triangles: desktop.triangles,
     validationErrors: desktop.validationErrors,
+    helmetPhone: phone.bytes,
+    phoneImagesEncoded: phone.images,
+    phoneValidationErrors: phone.validationErrors,
   }),
 );
