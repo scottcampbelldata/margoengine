@@ -403,6 +403,7 @@ Every feature here is an optional, tree-shakable entry or package, never core an
 | X-10 | Body move events and joint force threshold events | Box2D v3, MuJoCo sensors | none needed | Wasm | Wasm | 157.4 |
 | X-11 | Batched ray queries for thousands of rays (sensors, audio, AI) | Bullet, PhysX | Wald et al., "Embree", ACM TOG 33(4) 2014 for packet traversal | GPU compute over the BVH | Wasm (accepted difference: slower above 100k rays) | 157.5 |
 | X-12 | Closest points between two shapes as a public query | Bullet, Jolt | Montanari, Petrinic, Barbieri, "Improving the GJK Algorithm", ACM TOG 36(3) 2017 | Wasm | Wasm | 157.5 |
+| X-88 | Ray distance sensor: a few rays cast from a body each step, range and hit returned, no noise model | Bullet (batched rays), MuJoCo (rangefinder) | none needed | Wasm | Wasm | parity 141.7 |
 
 ## Joints, constraints and interaction
 
@@ -540,9 +541,9 @@ Counted from the rows on 2026-11-07, one count a row by the first word of its St
 | Part | Rows | DONE | PARTIAL | BUILDING 126 | PLANNED 127 to 131 | MISSING, now owned | N/A |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1, Rapier parity | 251 | 57 | 19 | 25 | 14 | 132 | 4 |
-| 2, beyond Rapier | 82 | 0 | 0 | 0 | 4 (extended later) | 78 | 0 |
+| 2, beyond Rapier | 83 | 0 | 0 | 0 | 4 (extended later) | 79 | 0 |
 
-Margo already does more than Rapier in 15 rows (M-01 to M-15). The missing parity rows are owned by four extra jobs added to batches 127 and 128 (3D debug drawing, 2D events and filters, the multibody API, multibody inverse kinematics) and by batches 138 to 146. Part 2 is owned by batches 147 to 158 (60 jobs; the parity batches 138 to 146 hold 51 jobs, plus the four extra jobs in 127 and 128); 4 of its rows extend what batch 131 already plans and 1 (X-79) extends parity job 142.2.
+Margo already does more than Rapier in 15 rows (M-01 to M-15). The missing parity rows are owned by four extra jobs added to batches 127 and 128 (3D debug drawing, 2D events and filters, the multibody API, multibody inverse kinematics) and by batches 138 to 146. Part 2 is owned by batches 147 to 158 (60 jobs; the parity batches 138 to 146 hold 52 jobs, plus the four extra jobs in 127 and 128); 4 of its rows extend what batch 131 already plans 1 (X-79) extends parity job 142.2, and 1 (X-88) is parity job 141.7.
 
 ## Order
 
