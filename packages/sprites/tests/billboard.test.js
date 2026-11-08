@@ -12,7 +12,18 @@ const pack = (boards, data = new Float32Array(boards.length * BILLBOARD_FLOATS))
 test('the buffer layout: 16 floats of position, turn, size, pivot, signed rectangle and tint bytes', () => {
   assert.equal(BILLBOARD_FLOATS, 16);
   const { data, count } = pack([
-    new Billboard({ x: 1, y: 2, z: 3, rotation: 0.5, width: 4, height: 2, pivotY: 1, rect: [4, 8, 2, 3], tint: 0x102030, alpha: 1 }),
+    new Billboard({
+      x: 1,
+      y: 2,
+      z: 3,
+      rotation: 0.5,
+      width: 4,
+      height: 2,
+      pivotY: 1,
+      rect: [4, 8, 2, 3],
+      tint: 0x102030,
+      alpha: 1,
+    }),
   ]);
   assert.equal(count, 1);
   assert.deepEqual([...data.subarray(0, 12)], [1, 2, 3, 0.5, 4, 2, 0.5, 1, 4, 8, 2, 3]);
@@ -42,7 +53,12 @@ test('hidden billboards are skipped and only changed floats are reported', () =>
 test('invalid billboards throw RangeError naming the field group', () => {
   for (const bad of [{ x: NaN }, { width: 0 }, { height: -1 }, { alpha: 2 }, { rotation: Infinity }])
     assert.throws(() => pack([new Billboard(bad)]), { name: 'RangeError', message: /Invalid billboard/ });
-  for (const rect of [[0, 0, 17, 1], [0.5, 0, 1, 1], [0, 0, 0, 1], [-1, 0, 1, 1]])
+  for (const rect of [
+    [0, 0, 17, 1],
+    [0.5, 0, 1, 1],
+    [0, 0, 0, 1],
+    [-1, 0, 1, 1],
+  ])
     assert.throws(() => pack([new Billboard({ rect })]), { message: /Invalid billboard rect/ });
   assert.throws(() => new Billboard({ tint: '#12' }), TypeError);
 });

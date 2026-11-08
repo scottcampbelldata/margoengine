@@ -2554,6 +2554,10 @@
       "types": "./dist/sprites/billboard.d.ts",
       "import": "./dist/sprites/billboard.js"
     },
+    "./sprites/shader": {
+      "types": "./dist/sprites/shader.d.ts",
+      "import": "./dist/sprites/shader.js"
+    },
     "./stage/gltf": {
       "types": "./dist/stage/gltf.d.ts",
       "import": "./dist/stage/gltf.js"

@@ -470,7 +470,8 @@ export class BillboardLayer implements EnginePlugin {
   private draw(c: BillboardPassContext): void {
     const view = c.view;
     if (view?.layers !== undefined && !(view.layers & this.layerMask)) return;
-    if (!(this.alphaTest >= 0 && this.alphaTest <= 1)) throw rangeError('Invalid billboard alphaTest', 'sprite-options');
+    if (!(this.alphaTest >= 0 && this.alphaTest <= 1))
+      throw rangeError('Invalid billboard alphaTest', 'sprite-options');
     const device = c.device,
       camera = c.camera;
     this.prepare(device);

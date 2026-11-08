@@ -33,7 +33,10 @@ try {
     r.edge[source].forEach(([red, green, blue], i) => {
       const expected = 255 * (1 - weight(i));
       assert.ok(Math.abs(red - expected) <= 2, `${source} pixel ${i}: ${red}, expected ${expected}`);
-      assert.ok(Math.abs(red - green) <= 1 && Math.abs(red - blue) <= 1, `${source} pixel ${i}: red fringe ${[red, green, blue]}`);
+      assert.ok(
+        Math.abs(red - green) <= 1 && Math.abs(red - blue) <= 1,
+        `${source} pixel ${i}: red fringe ${[red, green, blue]}`,
+      );
     });
   assert.ok(new Set(r.edge.linear.map((p) => p[0])).size > 8, 'linear filtering makes a ramp');
   // An sRGB target stores linear light: decoded, the bytes give 1 - w to one storage step (at most 1/255 / 0.44 at 1)
@@ -46,14 +49,19 @@ try {
   });
   // Mipmaps average in linear light: 0.5, encoded 187.5 on the 8-bit canvas. Without them each centre reads black.
   for (const [red, green, blue] of r.stripes.mipmaps)
-    assert.ok([red, green, blue].every((v) => Math.abs(v - 255 * encode(0.5)) <= 2), `mipmapped stripes ${[red, green, blue]}`);
+    assert.ok(
+      [red, green, blue].every((v) => Math.abs(v - 255 * encode(0.5)) <= 2),
+      `mipmapped stripes ${[red, green, blue]}`,
+    );
   for (const pixel of r.stripes.none) assert.deepEqual(pixel.slice(0, 3), [0, 0, 0], 'level 0 alone aliases');
   // White at alpha 0.5 under a red tint: (0.5, 0, 0) premultiplied, 127.5 on the canvas.
   assert.ok(Math.abs(r.tinted[0] - 127.5) <= 1 && r.tinted[1] === 0 && r.tinted[2] === 0, `tinted ${r.tinted}`);
   assert.equal(r.validation, null, 'no validation errors');
   assert.deepEqual(r.errors, []);
   assert.deepEqual(pageErrors, []);
-  console.log('ok smooth sprites: bilinear ramp with no fringe, caller texture, sRGB target, linear-light mipmaps, tint; 0 validation errors');
+  console.log(
+    'ok smooth sprites: bilinear ramp with no fringe, caller texture, sRGB target, linear-light mipmaps, tint; 0 validation errors',
+  );
 } finally {
   await context.close();
 }

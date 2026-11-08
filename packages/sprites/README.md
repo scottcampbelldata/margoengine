@@ -57,6 +57,7 @@ coin.visible = false;
 | `clear` | `[0, 0, 0, 0]` | With `target`: the clear colour, or false to draw over it |
 | `filter` | `'nearest'` | `'linear'` filters smoothly for HD art: premultiplied, in linear light, with mipmaps |
 | `mipmaps` | true | With `filter: 'linear'`: a full mip chain, so sprites drawn small do not shimmer |
+| `shader` | none | Custom fragment code from `margoengine/sprites/shader`; sprites then carry `params` |
 | `normals` | none | `{atlas, target, clear}`: a second colour target for 2D lighting |
 | `order` | 10 | Frame-graph order, after the scene at 0 |
 | `layers` | 1 | Render-layer bits; a view with `layers` that shares none skips this layer |
@@ -98,6 +99,48 @@ ball.x += 0.1; // moves by a tenth of a pixel
   average across cells: leave a gutter of a few texels around cells drawn very small, or set `mipmaps: false`.
 - The copy is made once. After changing a `GPUTexture` atlas's contents, call `setAtlas` with it again.
 - Normals stay exact-pixel.
+
+### Sprite shaders
+
+`margoengine/sprites/shader` gives a layer its own fragment code: hit flashes, outlines, dissolves, palette swaps or your
+own WGSL. Each sprite carries four `params` the code reads, so one layer flashes one sprite and leaves the rest alone.
+
+```ts
+import { EngineKernel } from 'margoengine/core';
+import { SpriteLayer } from 'margoengine/sprites';
+import { flashShader, outlineShader, spriteShader } from 'margoengine/sprites/shader';
+
+const engine = await EngineKernel.create(document.querySelector('canvas')!, { exactSize: [64, 32] });
+// A 3 x 3 atlas: one red texel in the middle of a transparent border.
+const data = new Uint8Array(36);
+data.set([255, 0, 0, 255], 16);
+const atlas = { width: 3, height: 3, data };
+const enemies = SpriteLayer.attach(engine, { atlas, shader: flashShader() });
+const hit = enemies.add({ x: 4, y: 4, scaleX: 4, scaleY: 4 });
+hit.params = [1, 0, 0, 0]; // fully white this frame
+const picked = SpriteLayer.attach(engine, { atlas, shader: outlineShader({ color: '#ffff00' }) });
+picked.add({ x: 24, y: 4, scaleX: 4, scaleY: 4, params: [1, 0, 0, 0] });
+// Your own effect: pulse with the layer's time.
+const pulse = spriteShader(`fn effect(c: vec4f, s: SpriteInput) -> vec4f {
+  return vec4f(c.rgb * (0.75 + 0.25 * sin(s.time * 6.0)), c.a);
+}`);
+SpriteLayer.attach(engine, { atlas, shader: pulse }).add({ x: 44, y: 4, scaleX: 4, scaleY: 4 });
+engine.start();
+```
+
+| Effect | `params[0]` | Options |
+| --- | --- | --- |
+| `flashShader(color)` | amount, 0 to 1 | colour, default white |
+| `outlineShader({color, width})` | opacity, 0 to 1 | colour (black), reach 1 to 4 texels with diagonals (1) |
+| `dissolveShader({edge, band})` | progress, 0 whole to 1 gone | edge colour (`#ff8020`), band width (0.08) |
+| `paletteShader(from, to)` | none | 1 to 16 exact colour pairs, for `filter: 'nearest'` |
+
+`spriteShader(code)` takes WGSL defining `fn effect(color: vec4f, sprite: SpriteInput) -> vec4f`. `color` is the tinted
+texel as atlas bytes over 255, straight alpha; return alpha 0 to drop the texel. `SpriteInput` holds `texel`, `cell`
+(the texel read), `low` and `high` (the rectangle's first and last texel), `params`, `tint` and `time` (the layer's
+`time`, seconds it has run; set it to restart). `spriteTexel(sprite, offset)` reads an untinted neighbour, transparent
+outside the rectangle, so outlines need transparent texels around the art. A shader that does not compile shows as a
+WebGPU validation error on the first frame.
 
 ## Billboards
 

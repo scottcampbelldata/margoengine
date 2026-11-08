@@ -30,6 +30,7 @@ export interface SpriteOptions {
   alpha?: number;
   rect?: readonly [number, number, number, number];
   visible?: boolean;
+  params?: readonly [number, number, number, number];
 }
 
 /** @internal Parses `0xrrggbb`, `'#rrggbb'` or `'#rgb'` to `0xrrggbb`. Bytes are written as given, with no colour conversion. */
@@ -74,6 +75,8 @@ export class Sprite implements SpriteOptions {
   rect?: readonly [number, number, number, number];
   /** False leaves the sprite out of the draw. Default true. */
   visible = true;
+  /** Four numbers a layer's `shader` reads as `sprite.params`, such as an effect's amount. Default zeros. */
+  params?: readonly [number, number, number, number];
   /** @internal Add order, the last sort key. */
   index = 0;
   /** @internal The layer that holds this sprite. */
@@ -114,6 +117,8 @@ const byZY = (a: Sprite, b: Sprite) => a.z - b.z || a.y - b.y || a.index - b.ind
  */
 export const snapToPixel = (pixel: number, offset: number): number => Math.round(pixel - offset) + offset;
 
+const none = [0, 0, 0, 0] as const;
+
 /** The range of floats a {@link packSprites} call changed, and how many sprites it wrote. */
 export interface PackedSprites {
   /** Visible sprites written. */
@@ -128,7 +133,8 @@ export interface PackedSprites {
  * Writes the visible `sprites`, in their current order, into `data` (at least `sprites.length * SPRITE_FLOATS` long) and
  * reports which floats changed. Per sprite: pivot in target pixels (0, 1), signed size in target pixels (2, 3), pivot
  * fractions (4, 5), rotation in radians (6), tint as RGBA8 with red in the low byte (7), atlas origin (8, 9) and signed
- * atlas size in texels (10, 11); a flip moves the origin to the far edge and negates the size.
+ * atlas size in texels (10, 11); a flip moves the origin to the far edge and negates the size. A `stride` of 16 adds the
+ * sprite's `params` (12 to 15), for layers with a shader.
  * @throws RangeError for a non-finite value, a rectangle outside the atlas or one that is not whole texels.
  */
 export function packSprites(
@@ -138,6 +144,7 @@ export function packSprites(
   atlasWidth: number,
   atlasHeight: number,
   snap = true,
+  stride = SPRITE_FLOATS,
 ): PackedSprites {
   const bits = new Uint32Array(data.buffer, data.byteOffset, data.length),
     { x: cameraX, y: cameraY, zoom } = camera;
@@ -205,6 +212,12 @@ export function packSprites(
     put(s.flipY ? rectY + rectH : rectY);
     put(s.flipX ? -rectW : rectW);
     put(s.flipY ? -rectH : rectH);
+    if (stride > SPRITE_FLOATS) {
+      const p = s.params ?? none;
+      if (p.length !== 4 || !Number.isFinite(p[0] + p[1] + p[2] + p[3]))
+        throw rangeError('Invalid sprite params', 'sprite-options');
+      for (let k = 0; k < 4; k++) put(p[k]);
+    }
   }
-  return { count: at / SPRITE_FLOATS, start: start < 0 ? end : start, end };
+  return { count: at / stride, start: start < 0 ? end : start, end };
 }

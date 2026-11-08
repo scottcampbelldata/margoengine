@@ -42,6 +42,10 @@
     "./billboard": {
       "types": "./dist/billboard.d.ts",
       "import": "./dist/billboard.js"
+    },
+    "./shader": {
+      "types": "./dist/shader.d.ts",
+      "import": "./dist/shader.js"
     }
   },
   "files": [
@@ -61,6 +65,7 @@
     "test:gpu": "cd ../.. && node packages/sprites/tests/browser-check.mjs",
     "prepack": "npm run build",
     "test:gpu:billboard": "cd ../.. && node packages/sprites/tests/billboard-check.mjs",
-    "test:gpu:smooth": "cd ../.. && node packages/sprites/tests/smooth-check.mjs"
+    "test:gpu:smooth": "cd ../.. && node packages/sprites/tests/smooth-check.mjs",
+    "test:gpu:shader": "cd ../.. && node packages/sprites/tests/shader-check.mjs"
   }
 }

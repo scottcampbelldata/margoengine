@@ -27,14 +27,18 @@ const frame = () => {
 const readTexture = async (texture) => {
   const row = Math.ceil((texture.width * 4) / 256) * 256,
     device = engine.gpu,
-    buffer = device.createBuffer({ size: row * texture.height, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ }),
+    buffer = device.createBuffer({
+      size: row * texture.height,
+      usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+    }),
     encoder = device.createCommandEncoder();
   encoder.copyTextureToBuffer({ texture }, { buffer, bytesPerRow: row }, [texture.width, texture.height]);
   device.queue.submit([encoder.finish()]);
   await buffer.mapAsync(GPUMapMode.READ);
   const raw = new Uint8Array(buffer.getMappedRange()),
     out = new Uint8Array(texture.width * texture.height * 4);
-  for (let y = 0; y < texture.height; y++) out.set(raw.subarray(y * row, y * row + texture.width * 4), y * texture.width * 4);
+  for (let y = 0; y < texture.height; y++)
+    out.set(raw.subarray(y * row, y * row + texture.width * 4), y * texture.width * 4);
   buffer.destroy();
   return out;
 };

@@ -34,6 +34,13 @@ export interface SpritePixels {
  * `GPUTexture` stays the caller's and needs {@link SpriteLayer.setAtlas} after a device loss.
  */
 export type SpriteAtlas = SpritePixels | ImageBitmap | GPUTexture | ((device: GPUDevice) => GPUTexture);
+/**
+ * Custom fragment code for a layer, made by `spriteShader` and the effects in `@margoengine/sprites/shader`: WGSL that
+ * defines `fn effect(color: vec4f, sprite: SpriteInput) -> vec4f`.
+ */
+export interface SpriteShader {
+  readonly code: string;
+}
 /** A render target, or a function read each frame for one that changes. */
 export type SpriteTarget = GPUTexture | (() => GPUTexture);
 
@@ -69,6 +76,11 @@ export interface SpriteLayerOptions {
   filter?: 'nearest' | 'linear';
   /** With `filter: 'linear'`, builds a full mip chain for the atlas. Default true. */
   mipmaps?: boolean;
+  /**
+   * Custom fragment code from `@margoengine/sprites/shader`, run on every texel; sprites then carry four `params` it
+   * reads, and the layer's `time`. Fixed. Default none.
+   */
+  shader?: SpriteShader;
   /** Writes normals to a second colour target. Needs a single-sample colour target. Default none. */
   normals?: SpriteNormals;
   /** Frame-graph order. Runs after the scene (0); 40 draws after a Tonemap. Default 10. */
@@ -81,8 +93,8 @@ export interface SpriteLayerOptions {
   name?: string;
 }
 
-const shader = (normals: boolean, smooth: boolean) => /* wgsl */ `
-struct Sprite{p:vec2f,s:vec2f,pivot:vec2f,turn:f32,tint:u32,rect:vec4f}
+const shader = (normals: boolean, smooth: boolean, effect?: string) => /* wgsl */ `
+struct Sprite{p:vec2f,s:vec2f,pivot:vec2f,turn:f32,tint:u32,rect:vec4f${effect ? ',params:vec4f' : ''}}
 @group(0) @binding(0) var<uniform> size:vec4f;
 @group(0) @binding(1) var<storage,read> sprites:array<Sprite>;
 @group(0) @binding(2) var atlas:texture_2d<f32>;
@@ -95,6 +107,19 @@ struct Varying{
   @location(2) @interpolate(flat) high:vec2f,
   @location(3) @interpolate(flat) tint:vec4f,
   @location(4) @interpolate(flat) axes:vec4f,
+  ${effect ? '@location(5) @interpolate(flat) params:vec4f,' : ''}
+}
+${
+  effect
+    ? `struct SpriteInput{texel:vec2f,cell:vec2i,low:vec2f,high:vec2f,params:vec4f,tint:vec4f,time:f32}
+fn spriteTexel(s:SpriteInput,o:vec2i)->vec4f{
+  let p=s.cell+o;
+  if(any(vec2f(p)<s.low)||any(vec2f(p)>s.high)){return vec4f(0);}
+  let c=textureLoad(atlas,p,0);
+  ${smooth ? 'return select(vec4f(encode(c.rgb/c.a),c.a),vec4f(0),c.a==0);' : 'return c;'}
+}
+${effect}`
+    : ''
 }
 @vertex fn vertexMain(@builtin(vertex_index) corner:u32,@builtin(instance_index) index:u32)->Varying{
   let s=sprites[index];
@@ -109,6 +134,7 @@ struct Varying{
   v.low=min(s.rect.xy,s.rect.xy+s.rect.zw);
   v.high=max(s.rect.xy,s.rect.xy+s.rect.zw)-1;
   v.tint=unpack4x8unorm(s.tint);
+  ${effect ? 'v.params=s.params;' : ''}
   v.axes=vec4f(x*sign(s.rect.z)*sign(s.s.x),y*sign(s.rect.z)*sign(s.s.x),-y*sign(s.rect.w)*sign(s.s.y),x*sign(s.rect.w)*sign(s.s.y));
   return v;
 }
@@ -122,10 +148,16 @@ ${
     smooth
       ? `// Premultiplied linear texels, kept half a texel inside the rectangle so the next cell does not bleed in.
   let f=textureSample(atlas,filtered,clamp(v.texel,v.low+0.5,v.high+0.5)/vec2f(textureDimensions(atlas)));
-  let linear=f*vec4f(decode(v.tint.rgb)*v.tint.a,v.tint.a);
+  ${
+    effect
+      ? `let lit=f*vec4f(decode(v.tint.rgb)*v.tint.a,v.tint.a);
+  let e=effect(select(vec4f(encode(lit.rgb/lit.a),lit.a),vec4f(0),lit.a==0),SpriteInput(v.texel,t,v.low,v.high,v.params,v.tint,size.w));
+  let linear=vec4f(decode(e.rgb)*e.a,e.a);`
+      : 'let linear=f*vec4f(decode(v.tint.rgb)*v.tint.a,v.tint.a);'
+  }
   if(linear.a==0){discard;}
   let color=select(vec4f(encode(linear.rgb/linear.a)*linear.a,linear.a),linear,size.z>0);`
-      : `let color=textureLoad(atlas,t,0)*v.tint;
+      : `let color=${effect ? 'effect(textureLoad(atlas,t,0)*v.tint,SpriteInput(v.texel,t,v.low,v.high,v.params,v.tint,size.w))' : 'textureLoad(atlas,t,0)*v.tint'};
   if(color.a==0){discard;}`
   }
   ${
@@ -187,6 +219,10 @@ export class SpriteLayer implements EnginePlugin {
   private readonly clear: number[] | false;
   private readonly normals?: SpriteNormals;
   private readonly smooth: boolean;
+  private readonly effect?: string;
+  private readonly stride: number;
+  /** Seconds the layer has run, passed to its `shader` as `sprite.time`. Set it to restart an effect. */
+  time = 0;
   private readonly mipmaps: boolean;
   private readonly mipCache = new Map<unknown, unknown>();
   private atlas: SpriteAtlas;
@@ -243,11 +279,15 @@ export class SpriteLayer implements EnginePlugin {
     this.clear = options.clear === false ? false : [...(options.clear ?? [0, 0, 0, 0])];
     this.normals = options.normals;
     this.smooth = options.filter === 'linear';
+    if (options.shader !== undefined && !/\bfn\s+effect\s*\(/.test(options.shader?.code ?? ''))
+      throw typeError('Invalid sprite shader: make one with spriteShader', 'sprite-options');
+    this.effect = options.shader?.code;
+    this.stride = this.effect ? SPRITE_FLOATS + 4 : SPRITE_FLOATS;
     this.mipmaps = options.mipmaps ?? true;
     this.order = order;
     this.layerMask = checkLayers(options.layers ?? 1, 'SpriteLayer layers');
     this.name = options.name ?? `sprites-${++layerCount}`;
-    this.data = new Float32Array(capacity * SPRITE_FLOATS);
+    this.data = new Float32Array(capacity * this.stride);
   }
   /** Creates a layer and attaches it to `instance`. */
   static attach(instance: EngineKernel, options: SpriteLayerOptions): SpriteLayer {
@@ -307,7 +347,10 @@ export class SpriteLayer implements EnginePlugin {
     });
   }
   onPreUpdate(delta: number): void {
-    if (delta > 0) this.states.prune();
+    if (delta > 0) {
+      this.states.prune();
+      this.time += delta;
+    }
   }
   onDeviceRestored(): void {
     // A caller's plain GPUTexture went with the device; bytes, bitmaps and functions come back by themselves.
@@ -336,7 +379,14 @@ export class SpriteLayer implements EnginePlugin {
     this.dropAtlas(this.colorAtlas);
     this.dropAtlas(this.normalAtlas);
     this.buffer?.destroy();
-    this.colorAtlas = this.normalAtlas = this.buffer = this.layout = this.module = this.device = this.sampler = undefined;
+    this.colorAtlas =
+      this.normalAtlas =
+      this.buffer =
+      this.layout =
+      this.module =
+      this.device =
+      this.sampler =
+        undefined;
     this.mipCache.clear();
     this.targetTexture = this.normalTexture = undefined;
     this.targetView = this.normalView = undefined;
@@ -380,7 +430,10 @@ export class SpriteLayer implements EnginePlugin {
             : []),
         ],
       });
-      this.module = device.createShaderModule({ label: 'sprites', code: shader(!!this.normals, this.smooth) });
+      this.module = device.createShaderModule({
+        label: 'sprites',
+        code: shader(!!this.normals, this.smooth, this.effect),
+      });
       if (this.smooth)
         this.sampler = device.createSampler({ magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear' });
     }
@@ -460,7 +513,7 @@ export class SpriteLayer implements EnginePlugin {
   /** Sorts, packs and uploads; returns how many sprites to draw. Several views in a frame upload once. */
   private upload(device: GPUDevice): number {
     sortSprites(this.list, this.ySort);
-    const need = this.list.length * SPRITE_FLOATS;
+    const need = this.list.length * this.stride;
     if (need > this.data.length) {
       this.data = new Float32Array(Math.max(need, this.data.length * 2));
       this.buffer?.destroy();
@@ -478,8 +531,16 @@ export class SpriteLayer implements EnginePlugin {
       this.uploadAll = true;
     }
     const atlas = this.colorAtlas!.texture,
-      { count, start, end } = packSprites(this.list, this.data, this.camera, atlas.width, atlas.height, this.snap);
-    if (this.uploadAll) device.queue.writeBuffer(this.buffer, 0, this.data, 0, count * SPRITE_FLOATS);
+      { count, start, end } = packSprites(
+        this.list,
+        this.data,
+        this.camera,
+        atlas.width,
+        atlas.height,
+        this.snap,
+        this.stride,
+      );
+    if (this.uploadAll) device.queue.writeBuffer(this.buffer, 0, this.data, 0, count * this.stride);
     else if (end > start) device.queue.writeBuffer(this.buffer, start * 4, this.data, start, end - start);
     this.uploadAll = false;
     return count;
@@ -545,10 +606,17 @@ export class SpriteLayer implements EnginePlugin {
       state = this.states.get(c);
     // Targets that store linear light (sRGB and float formats) take the filtered colour as it is; 8-bit ones encoded.
     const linear = format.endsWith('-srgb') || format.includes('float') ? 1 : 0;
-    if (state.values[0] !== width || state.values[1] !== height || state.values[2] !== linear) {
+    const time = this.effect ? this.time : 0;
+    if (
+      state.values[0] !== width ||
+      state.values[1] !== height ||
+      state.values[2] !== linear ||
+      state.values[3] !== time
+    ) {
       state.values[0] = width;
       state.values[1] = height;
       state.values[2] = linear;
+      state.values[3] = time;
       device.queue.writeBuffer(state.uniform, 0, state.values);
     }
     if (state.generation !== this.generation) {

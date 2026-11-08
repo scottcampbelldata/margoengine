@@ -28,6 +28,7 @@ export class Sprite implements SpriteOptions {
     alpha: number;
     rect?: readonly [number, number, number, number];
     visible: boolean;
+    params?: readonly [number, number, number, number];
     index: number;
     owner?: object;
     constructor(options?: SpriteOptions);
@@ -48,6 +49,7 @@ export class SpriteLayer implements EnginePlugin {
     camera: SpriteCamera;
     snap: boolean;
     ySort: boolean;
+    time: number;
     constructor(options: SpriteLayerOptions);
     static attach(instance: EngineKernel, options: SpriteLayerOptions): SpriteLayer;
     get sprites(): readonly Sprite[];
@@ -71,6 +73,7 @@ export interface SpriteLayerOptions {
     clear?: readonly [number, number, number, number] | false;
     filter?: 'nearest' | 'linear';
     mipmaps?: boolean;
+    shader?: SpriteShader;
     normals?: SpriteNormals;
     order?: number;
     layers?: number;
@@ -99,6 +102,7 @@ export interface SpriteOptions {
     alpha?: number;
     rect?: readonly [number, number, number, number];
     visible?: boolean;
+    params?: readonly [number, number, number, number];
 }
 
 export interface SpritePixels {
@@ -107,9 +111,13 @@ export interface SpritePixels {
     data: Uint8Array | Uint8ClampedArray;
 }
 
+export interface SpriteShader {
+    readonly code: string;
+}
+
 export type SpriteTarget = GPUTexture | (() => GPUTexture);
 
-export function packSprites(sprites: readonly Sprite[], data: Float32Array, camera: SpriteCamera, atlasWidth: number, atlasHeight: number, snap?: boolean): PackedSprites;
+export function packSprites(sprites: readonly Sprite[], data: Float32Array, camera: SpriteCamera, atlasWidth: number, atlasHeight: number, snap?: boolean, stride?: number): PackedSprites;
 
 export const snapToPixel: (pixel: number, offset: number) => number;
 
