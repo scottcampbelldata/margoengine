@@ -70,6 +70,8 @@ export const ROOT = {
   'modern:test:finalization': 'picking races, depth precision at 500 m, 10,000-part hierarchy and device reboot',
   'test:gallery:browser':
     'the Harrow Head gallery: every page and section draws, no errors, phone layout, JavaScript off, budget, dedication',
+  'test:physics2d-kernel-browsers':
+    'the own 2D physics kernel in Wasm (simd128) gives the native pinned bits on a WebGPU page and a WebGL2 page',
   'test:tokyo':
     'the Tokyo diorama example: production build, tram animation, reduced motion, phone layout, missing asset',
 };

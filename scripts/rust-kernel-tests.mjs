@@ -22,6 +22,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join, posix, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { margoError } from '../packages/shared/errors.js';
+import { WASM_RUSTFLAGS, WASM_TARGET, crateFile, wasmBuildArgs, wasmModule } from './support/wasm-kernel.mjs';
 import { loadWorkspaces } from './support/affected-gpu.mjs';
 import { endTree } from './support/shutdown.mjs';
 
@@ -42,9 +43,6 @@ export function pathDependencies(text, manifest, workspaces, own) {
 
 /** True when a Cargo.toml's text lists a `cdylib` crate type: the crate ships as a Wasm module. */
 export const shipsWasm = (text) => /^\s*crate-type\s*=\s*\[[^\]]*"cdylib"/m.test(text);
-
-/** The file name cargo gives a crate's library: the package name its Cargo.toml declares, dashes to underscores. */
-export const crateFile = (text) => /^\s*name\s*=\s*"([^"]+)"/m.exec(text)[1].replaceAll('-', '_');
 
 /** [{ name, dir, manifest, uses, wasm, wasmCheck }] for every workspace package with a Rust kernel; `manifest` is
  * repo-relative, `uses` names the packages its path dependencies live in, `wasm` is true when it ships as Wasm and
@@ -72,17 +70,6 @@ export function changedKernelDirs(kernels, changed) {
 /** The cargo arguments for one kernel. */
 export const cargoArgs = (manifest) => ['test', '--locked', '--manifest-path', manifest];
 
-/** The Wasm target and flags the kernels ship with (packages/physics/scripts/build-kernel.mjs builds the 3D one so). */
-export const WASM_TARGET = 'wasm32-unknown-unknown';
-export const WASM_RUSTFLAGS = '-C target-feature=+simd128';
-
-/** The cargo arguments of a crate's Wasm build as shipped: release, the Wasm target, the lock file as committed. */
-export const wasmBuildArgs = (manifest) => ['build', '--locked', '--release', '--target', WASM_TARGET, '--manifest-path', manifest];
-
-/** Where `wasmBuildArgs` puts a crate's module (the crate's own target folder); `text` is its Cargo.toml. */
-export const wasmModule = (manifest, text) =>
-  posix.join(posix.dirname(manifest), 'target', WASM_TARGET, 'release', `${crateFile(text)}.wasm`);
-
 /** Runs a Wasm check module's `check(i)` for every i below `checks()`, printing each; returns the failed indices. */
 export async function runWasmChecks(bytes) {
   const { instance } = await WebAssembly.instantiate(bytes);
@@ -97,6 +84,8 @@ export async function runWasmChecks(bytes) {
   }
   return failed;
 }
+
+export { WASM_RUSTFLAGS, WASM_TARGET, crateFile, wasmBuildArgs, wasmModule };
 
 /** Kernels picked by `--packages=a,b`; a name with no kernel throws so a typo cannot pass as a green run. */
 export function selectKernels(kernels, packages) {

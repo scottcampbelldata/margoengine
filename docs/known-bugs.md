@@ -806,7 +806,10 @@ Measured but not fixed. Their history, sources and rerun commands are in
   Four contacts at a time in SIMD lanes (perf history entry 87) took the passes from 4.6 to 1.5 ms and the step to
   3.6 ms, every bit the same. Left, measured by phase: the narrow phase 1.1 ms (next, batch 127 part 6, B4), the passes
   1.5, contact rows and colouring 0.5, the broad phase 0.2; what remains after the narrow phase is planned from a new
-  per-phase measurement and the papers.
+  per-phase measurement and the papers. The comparison that counts is the shipped Wasm in the browser (perf history
+  entry 88): there Margo steps it in 4.0 to 4.3 ms against Rapier 2D's Wasm 7.8 to 7.9 (Edge 157, Firefox 157), and
+  Box2D v3 has no Wasm build here yet (needs Emscripten); its native 1.02 ms is an AVX2 build, eight lanes to Margo's
+  four.
 
 - **Own convex decomposition builds 5 to 120 times slower than Rapier's V-HACD** (`@margoengine/physics/decomposition`,
   perf history entry 81): repro `node packages/physics/scripts/decomposition-vs-rapier.mjs` after the physics build;
