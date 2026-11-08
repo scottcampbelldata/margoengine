@@ -78,3 +78,56 @@ GPU checks: `node scripts/gpu-lock.mjs run --owner=video-check -- node packages/
 The check uses generated colour frames and a generated canvas video stream on a real GPU;
 these stand in for decoded movie files. Codec files and other GPUs are not covered by this entry's check.
 
+## Canvas recording with audio
+
+`recordCanvas` from `margoengine/video/record` (or `@margoengine/video/record`) records a
+page canvas in real time using MediaRecorder. WebGPU, WebGL2 and 2D canvases use the same
+capture API. This example records one second of a generated canvas and tone:
+
+```ts
+import {recordCanvas} from 'margoengine/video/record';
+
+const canvas = document.createElement('canvas');
+canvas.width = canvas.height = 64;
+document.body.append(canvas);
+const drawing = canvas.getContext('2d')!;
+drawing.fillStyle = '#336699';
+drawing.fillRect(0, 0, 64, 64);
+const audio = new AudioContext();
+const destination = audio.createMediaStreamDestination();
+const tone = audio.createOscillator();
+tone.connect(destination);
+tone.start();
+await audio.resume(); // Run from a user gesture on pages that restrict audio playback.
+const recording = recordCanvas(canvas, {audio: destination.stream, format: 'webm'});
+// Media time: let one second of picture and sound reach the recorder.
+await new Promise<void>(resolve => setTimeout(resolve, 1000));
+const file = await recording.stop(); // Blob, ready for URL.createObjectURL(file) or saving.
+console.log(file.type, file.size);
+tone.stop();
+destination.stream.getTracks().forEach(track => track.stop());
+await audio.close();
+canvas.remove();
+```
+
+`format` defaults to `'webm'`; `'mp4'` requests MP4. Codecs depend on the browser;
+an unavailable container throws `MargoError` code `unsupported` with a help link before
+capture starts. `fps` defaults to 30 and must be finite and positive. Optional
+`videoBitsPerSecond` and `audioBitsPerSecond` are positive integer bitrate hints;
+unset leaves the browser's defaults. `audio` defaults to none and takes a MediaStream
+of live audio tracks, for example a microphone stream or Web Audio destination.
+Each audio track is cloned and only the clones and captured video tracks are stopped.
+Mix several sounds into one Web Audio destination for reliable single-track output.
+
+The canvas must be origin-clean. Keep rendering normally during capture. `stop()` and
+`result` share one `Promise<Blob>`, resolved after the final chunk; repeated stops are
+safe. The optional `signal` aborts and discards the file; `dispose()` and `Symbol.dispose`
+discard an unfinished recording. The complete compressed recording stays in memory.
+There is no duration, frame-count, codec, audio-mixing or cross-player compatibility
+guarantee: this is real-time capture, so overloaded or background pages can drop frames.
+Use exporters/capture or headless/video for deterministic offline frame sequences.
+Audio permission and user gestures remain the page's responsibility. Neither Node nor
+OffscreenCanvas has this page capture API. The GPU check records generated colour and
+tone stand-ins, decodes both WebM and MP4 through Edge on WebGPU and WebGL2, checks picture
+and sound, and confirms cancellation. Other players and browsers are unmeasured.
+

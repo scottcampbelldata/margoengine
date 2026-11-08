@@ -3006,6 +3006,10 @@
       "types": "./dist/video/material.d.ts",
       "import": "./dist/video/material.js"
     },
+    "./video/record": {
+      "types": "./dist/video/record.d.ts",
+      "import": "./dist/video/record.js"
+    },
     "./viewcube": {
       "types": "./dist/viewcube.d.ts",
       "import": "./dist/viewcube.js"

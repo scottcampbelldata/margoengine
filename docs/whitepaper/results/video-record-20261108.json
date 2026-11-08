@@ -1,0 +1,94 @@
+{
+  "hardware": {
+    "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "webgpu": {
+      "vendor": "nvidia",
+      "architecture": "ampere",
+      "device": "",
+      "description": "",
+      "fallback": false
+    },
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+    "browserName": "chromium",
+    "browserVersion": "157.0.4341.42",
+    "requestedChannel": "msedge",
+    "launchArgs": [],
+    "powerPreference": "high-performance",
+    "hostPlatform": "win32",
+    "headless": true
+  },
+  "results": [
+    {
+      "backend": "webgpu",
+      "format": "webm",
+      "bytes": 18607,
+      "type": "video/webm;codecs=vp8,opus",
+      "width": 64,
+      "height": 64,
+      "pixel": [
+        51,
+        101,
+        153,
+        255
+      ],
+      "audioSeconds": 1.08,
+      "rms": 0.7066633895393173,
+      "hz": 440.74074074074076,
+      "callerAudio": "live"
+    },
+    {
+      "backend": "webgpu",
+      "format": "mp4",
+      "bytes": 21555,
+      "type": "video/mp4;codecs=avc1,opus",
+      "width": 64,
+      "height": 64,
+      "pixel": [
+        51,
+        101,
+        153,
+        255
+      ],
+      "audioSeconds": 1.12,
+      "rms": 0.7071257665060364,
+      "hz": 439.2857142857143,
+      "callerAudio": "live"
+    },
+    {
+      "backend": "webgl2",
+      "format": "webm",
+      "bytes": 20587,
+      "type": "video/webm;codecs=vp8,opus",
+      "width": 64,
+      "height": 64,
+      "pixel": [
+        51,
+        101,
+        153,
+        255
+      ],
+      "audioSeconds": 1.2,
+      "rms": 0.7066543459827643,
+      "hz": 440,
+      "callerAudio": "live"
+    },
+    {
+      "backend": "webgl2",
+      "format": "mp4",
+      "bytes": 21555,
+      "type": "video/mp4;codecs=avc1,opus",
+      "width": 64,
+      "height": 64,
+      "pixel": [
+        51,
+        101,
+        153,
+        255
+      ],
+      "audioSeconds": 1.12,
+      "rms": 0.7071257665060364,
+      "hz": 439.2857142857143,
+      "callerAudio": "live"
+    }
+  ]
+}

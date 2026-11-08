@@ -1,0 +1,47 @@
+<!doctype html><meta charset="utf-8"><title>Canvas recording check</title>
+<script type="module">
+import {Engine} from '/packages/core/dist/index.js';
+import {webglRenderer} from '/packages/webgl/dist/index.js';
+import {recordCanvas} from '/packages/video/dist/record.js';
+window.check=async()=>{
+  const results=[];
+  for(const backend of ['webgpu','webgl2']) for(const format of ['webm','mp4']) {
+    const canvas=document.createElement('canvas');canvas.width=canvas.height=64;document.body.append(canvas);
+    const engine=await Engine.create(canvas,{backend,...(backend==='webgl2'?{fallback:webglRenderer}:{})});
+    engine.scene.background='#336699';
+    const audio=new AudioContext(),tone=audio.createOscillator(),dest=audio.createMediaStreamDestination();
+    tone.frequency.value=440;tone.connect(dest);tone.start();await audio.resume();
+    let frame;
+    const draw=()=>{engine.render({delta:0});frame=requestAnimationFrame(draw);};
+    engine.stop();draw();
+    try {
+      if(!MediaRecorder.isTypeSupported('video/'+format)) {
+        try {recordCanvas(canvas,{format});throw Error('unsupported container was accepted');}
+        catch(e){if(e.code!=='unsupported'||!e.message.includes('https:'))throw e;results.push({backend,format,unsupported:e.code});}
+        continue;
+      }
+      const recording=recordCanvas(canvas,{format,audio:dest.stream});
+      // fixed-wait: real-time recording needs 1.2 seconds of media time to produce picture and sound, independent of GPU readiness.
+      await new Promise(resolve=>setTimeout(resolve,1200));
+      const blob=await recording.stop(),buffer=await blob.arrayBuffer();
+      const video=document.createElement('video'),url=URL.createObjectURL(blob);video.muted=true;video.src=url;
+      try{
+        await new Promise((resolve,reject)=>{video.onloadeddata=resolve;video.onerror=()=>reject(Error('recorded file did not decode'));video.load();});
+        await new Promise((resolve,reject)=>{video.onseeked=resolve;video.onerror=()=>reject(Error('recorded file did not seek'));video.currentTime=0.5;});
+        const decoded=new OffscreenCanvas(64,64),ctx=decoded.getContext('2d');ctx.drawImage(video,0,0);
+        const pixel=[...ctx.getImageData(32,32,1,1).data];
+        // Independent browser demuxer/audio decoder proves the recorded file contains audible sound.
+        const sound=await audio.decodeAudioData(buffer.slice(0)),samples=sound.getChannelData(0);
+        let energy=0,crossings=0;
+        const start=Math.floor(samples.length/4),end=Math.floor(samples.length*3/4);
+        for(let i=start;i<end;i++){energy+=samples[i]**2;if(i>start&&samples[i-1]<=0&&samples[i]>0)crossings++;}
+        const rms=Math.sqrt(energy/(end-start)),hz=crossings*sound.sampleRate/(end-start);
+        results.push({backend,format,bytes:blob.size,type:blob.type,width:video.videoWidth,height:video.videoHeight,pixel,audioSeconds:sound.duration,rms,hz,callerAudio:dest.stream.getAudioTracks()[0].readyState});
+      }finally{video.removeAttribute('src');video.load();URL.revokeObjectURL(url);}
+      const abort=new AbortController(),cancelled=recordCanvas(canvas,{signal:abort.signal});abort.abort();
+      try{await cancelled.result;throw Error('abort resolved');}catch(e){if(e.name!=='AbortError')throw e;}
+    }finally{cancelAnimationFrame(frame);engine.dispose();tone.stop();dest.stream.getTracks().forEach(t=>t.stop());await audio.close();canvas.remove();}
+  }
+  return results;
+};
+</script>
