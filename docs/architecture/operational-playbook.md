@@ -1072,6 +1072,9 @@ The audited CI matrix included:
 GPU proof, visual, and full local hardware checks are not assumed to run on a hosted CI GPU. Whether a remote workflow
 actually ran is field evidence, not inferred from the YAML.
 
+Since 2026-11-07 GitHub Actions is off while the repository is private (Scott: not paid for); local CI on the dev PC (Windows
+11, RTX A6000) runs the same ground instead, see section 5, gap 34.
+
 ### 4.5 Golden-output proofs
 
 A proof scripts a package story against a recording stand-in GPU and compares every call, descriptor, and buffer byte.
@@ -1229,3 +1232,27 @@ The following remain technical gaps, not permission to weaken a check:
     still wakes at the call rather than at the step, an accepted difference in `docs/limits.md`. A kinematicPosition body at its
     target is exactly still (`kernel/tests/sleep.rs`), so what rests on it sleeps.
 33. Coloured voxel block light (`@margoengine/voxel/light-rgb`, a `VoxelRenderer` lighting effect sampling a wrapping 3D texture) is proved on the M6 Mac mini (Metal) only: a dark room is red by a red torch and blue by a blue lamp with it, black without; its frame cost and the upload cost when the camera crosses chunks are not measured.
+34. Local CI replaces GitHub Actions while the repository is private (2026-11-07; the CI, Browser checks and Biomes
+    digests workflows are disabled on GitHub). It runs in its own worktree, `C:\Development\Projects\margoengine-ci`, from
+    a script in its git-excluded `.ci/` folder (`ci.mjs`, `quiet.mjs`, `register-tasks.ps1`), as Scott's user, not elevated,
+    through Windows Task Scheduler (folder `\Margo\`):
+    - CPU set at 08:00, 12:00, 14:00, 16:00, 18:00, 20:00 and 22:00 on the newest `origin/main` (skipped when that commit
+      was already checked): `build:packages`, `lint`, `typecheck`, `hygiene`, `check-engines --run=repo`, every chain of
+      `verify`'s stage 2 (API reports, quality, parity table, sandboxes, root unit tests, docs links, README checks, size,
+      proofs) and `test:kernel`.
+    - Full set at 10:00: the CPU set (reused from an earlier run on the same commit), then every `check:merge:steps` step
+      after `verify`, one at a time, each through the GPU lock as one shared slot (exclusive for its timing tests). No GPU
+      step starts from 12:00 to 20:00 (benchmarks); one that would is recorded as deferred.
+    - Weekly quiet hour, Sunday 06:00 to 07:00: waits up to 20 minutes for the whole machine under 10 percent CPU, else
+      records "not quiet"; then, holding the GPU alone, Margo's two columns of the physics comparison harness (defaults
+      and equal cost) and the three.js parity matrix (`bench/cli.mjs parity`, without the report that rewrites docs).
+    Every step has a hard limit and a hang kills its process tree; nothing is retried, pushed or edited in tracked files.
+    One run at a time (a lock with a heartbeat, reclaimed when dead). Results stay on the dev PC, in the main checkout's git-excluded
+    folder for private notes. Status: `ci-status.json` (commit, times, each step's result, duration and CPU load, the failing tests by name, log paths; a time or
+    speed failure under a mean load of 70 percent or more is listed apart as "time-only under load", unless it is more
+    than 2x its budget). Timing trend: `ci-timings.jsonl`, each timed test and step per main commit with its load;
+    a jump of 1.5x or more against the previous main commit at a load within 15 points is flagged in the status file.
+    Quiet-hour results: `quiet-bench/<date>.json` with a diff against the last quiet run. Logs: the last 10 runs
+    in `.ci/logs/`. Not covered locally: the Node 22.12, 22.x and Node 24.18 runs of `node-compat` and `node22-tests` (one
+    Node, 26.12, is installed), the Linux and macOS biomes digests, and the on-demand Browser checks workflow's
+    SwiftShader runs.
