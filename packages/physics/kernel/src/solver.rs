@@ -48,6 +48,18 @@ const SWEEPS: u32 = 16;
 #[cfg(feature = "counts")]
 pub static NORMAL_UPDATES: [core::sync::atomic::AtomicU64; 2] = [core::sync::atomic::AtomicU64::new(0), core::sync::atomic::AtomicU64::new(0)];
 
+/// At one pass a substep, a contact between two movable bodies takes the soft constraint at an eighth of the substep rate
+/// (30 Hz at 4 substeps of a 60 Hz step), unless it carries this many times the lighter body's weight. One Gauss-Seidel pass
+/// does not settle a pile at a quarter of the rate: the 20-row pyramid of the harness rocked for good, its fastest box at
+/// 0.28 m/s after 30 s, at damping ratios from 1 to 40, and its rows' rocking fed what the pass left back in as speed. An eighth
+/// keeps the stiffness well below the substep rate, as Catto's Solver2D post (2024) asks of the soft step, where a quarter does
+/// not at one pass; the pile then sleeps in 2.3 s. The ground, kinematic and dominant bodies keep the quarter, as one pass
+/// solves such a pair against an immovable body within its own manifold, and so does a heavy body on a light one, whose sag is
+/// its load over the spring: at an eighth the 1:100 and 1:1000 stacks of `examples/bars.rs` would sag 35 and 345 mm in place of
+/// 14 and 137. The 20 and 30 row piles load their bottom pairs about 26 and 40 times a cube's weight, the stacks 100 and 1000,
+/// so 50 lies between them with room on both sides. Two passes or more settle a quarter, and every pair keeps it there.
+const CHAIN_LOAD: f32 = 50.0;
+
 /// Scales of one soft constraint at one substep length.
 #[derive(Clone, Copy)]
 pub struct Soft {
@@ -333,6 +345,16 @@ impl World {
     #[allow(clippy::too_many_arguments)]
     pub fn solve_contacts(&mut self, h: f32, step: Soft, biased: bool, turn: usize, least: u32, last: bool) {
         let mut impacts = self.header().impacts as usize;
+        // The chain spring of `CHAIN_LOAD`, and the load (impulse times the lighter body's inverse mass) a chain pair stays under.
+        let passes = self.header().iterations;
+        let chain = if biased && passes < 2 {
+            let (hertz, damping) = (self.header().contact_hertz, self.header().contact_damping);
+            let hertz = if hertz * h > 0.125 { 0.125 / h } else { hertz };
+            let g = v3(self.header().gravity[0], self.header().gravity[1], self.header().gravity[2]);
+            Some((soft(hertz, damping, h), CHAIN_LOAD * h * sqrt(g.dot(g))))
+        } else {
+            None
+        };
         for i in 0..self.header().solving as usize {
             let row = self.uu(SOLVE_PAIRS, i) as usize;
             let (a, b) = self.pair_bodies(row as u32);
@@ -340,6 +362,10 @@ impl World {
                 continue;
             }
             let (mut body_a, mut body_b) = self.pair_moving(row, a, b);
+            let step = match chain {
+                Some((eighth, limit)) if self.is_chain(row, a, b, passes, limit) => eighth,
+                _ => step,
+            };
             let given = if biased {
                 self.friction_rows(row, step, true, turn, &mut body_a, &mut body_b);
                 self.normal_rows(row, a, b, h, step, true, turn, &mut impacts, &mut body_a, &mut body_b)
@@ -356,6 +382,23 @@ impl World {
             self.settle(b, &body_b);
         }
         self.header_mut().impacts = impacts as u32;
+    }
+
+    /// Whether a pair takes the chain spring of `CHAIN_LOAD`: two dynamic bodies, neither dominating, with one pass between
+    /// them, carrying less than `limit` (its impulse so far times the lighter body's inverse mass).
+    #[inline(always)]
+    fn is_chain(&self, row: usize, a: usize, b: usize, passes: u32, limit: f32) -> bool {
+        if self.flags(a) & KIND != DYNAMIC || self.flags(b) & KIND != DYNAMIC || self.uu(PAIR_FLAGS, row) & (PAIR_A_RULES | PAIR_B_RULES) != 0 {
+            return false;
+        }
+        if passes.saturating_add(self.extra_of(a).max(self.extra_of(b))) >= 2 {
+            return false;
+        }
+        let mut load = 0.0f32;
+        for k in 0..self.uu(PAIR_CONTACTS, row) as usize {
+            load += self.s(CONTACT_NORMAL_IMPULSE, row * MANIFOLD + k);
+        }
+        load * self.s(INVERSE_MASS, a).max(self.s(INVERSE_MASS, b)) < limit
     }
 
     /// A pair's friction, one sweep over the points, each in a circular cone of mu times its normal impulse so far.

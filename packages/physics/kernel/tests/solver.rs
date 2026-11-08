@@ -131,6 +131,59 @@ fn a_pyramid_of_twenty_rows_stands_for_thirty_seconds_under_a_millimetre() {
     }
 }
 
+/// The harness pyramid at 4 substeps of one pass, `rows` rows of metre cubes touching side by side, 30 s: the fastest box at
+/// the end, the farthest any box moved, and the step the world fell asleep at.
+fn one_pass_pile(rows: usize, sleep: bool) -> (f32, f32, Option<usize>) {
+    let mut w = world((rows * (rows + 1) / 2 + 1) as u32);
+    w.header_mut().substeps = 4;
+    w.header_mut().iterations = 1;
+    floor(&mut w);
+    let mut bodies = vec![];
+    for row in 0..rows {
+        for i in 0..rows - row {
+            let at = v3(i as f32 - (rows - row - 1) as f32 * 0.5, 0.5 + row as f32, 0.0);
+            bodies.push((block(&mut w, [0.5, 0.5, 0.5], at, 1.0, sleep), at));
+        }
+    }
+    let mut asleep = None;
+    for step in 0..1800 {
+        w.step(DT);
+        if asleep.is_none() && w.header().awake == 0 {
+            asleep = Some(step);
+        }
+    }
+    let fastest = bodies.iter().fold(0.0f32, |m, &(b, _)| m.max(size(w.v(LINEAR_X, b as usize))));
+    let moved = bodies.iter().fold(0.0f32, |m, &(b, at)| m.max(size(w.v(POSITION_X, b as usize).sub(at))));
+    (fastest, moved, asleep)
+}
+
+#[test]
+fn a_pyramid_settles_at_one_pass_a_substep() {
+    // 210 cubes. With every contact at a quarter of the substep rate one pass a substep left this pile rocking for good: its
+    // fastest box at 0.278 m/s after 30 s with sleeping off, its top walked 0.27 m, and it never slept. A contact between two
+    // movable bodies now takes the eighth of the rate unless a heavy one rests on a light one (`CHAIN_LOAD`).
+    for sleep in [true, false] {
+        let (fastest, moved, asleep) = one_pass_pile(20, sleep);
+        assert!(fastest < 1e-3 && moved < 0.04, "sleep {sleep}: fastest {fastest} m/s at 30 s, moved {moved} m");
+        if sleep {
+            assert!(asleep.is_some_and(|s| s < 300), "asleep at step {asleep:?}");
+        }
+    }
+}
+
+#[test]
+fn a_pyramid_of_thirty_rows_settles_at_one_pass_a_substep() {
+    // 465 cubes, whose bottom pairs carry about 40 times a cube's weight: still under `CHAIN_LOAD`, so the whole pile takes the
+    // eighth-rate spring and settles.
+    for sleep in [true, false] {
+        let (fastest, moved, asleep) = one_pass_pile(30, sleep);
+        assert!(fastest < 1e-3 && moved < 0.1, "sleep {sleep}: fastest {fastest} m/s at 30 s, moved {moved} m");
+        if sleep {
+            assert!(asleep.is_some_and(|s| s < 300), "asleep at step {asleep:?}");
+        }
+    }
+}
+
 #[test]
 fn a_heavy_box_stands_on_a_light_one() {
     // The light box is a metre cube of density 1 on the floor; the sag is the load over the contact's stiffness, which

@@ -1938,6 +1938,35 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
   row. Until then decompose at build time and store the parts.
 - **Guard:** `packages/physics/tests/next-decomposition.test.js` (parts and scores, not time).
 
+### 82. Own physics contacts: a deep pile sleeps at one pass a substep (fix, equal cost)
+
+- **Before (`5f728ef68`):** at 4 substeps of one pass, the harness's equal cost, every contact sat at a quarter of the
+  substep rate (60 Hz) and one Gauss-Seidel pass could not settle the 20-row pyramid of 210 metre cubes: never asleep, its
+  fastest box at 0.278 m/s after 30 s with sleeping off, its top walked 0.270 m; 30 rows 0.60 m/s and 0.18 m.
+- **Change:** at one pass a substep a contact between two dynamic bodies that neither dominates takes an eighth of the
+  substep rate (30 Hz) while it carries under 50 times the lighter body's weight (`CHAIN_LOAD`, `kernel/src/solver.rs`);
+  the ground, kinematic and dominant bodies and heavier loads keep the quarter. At two passes or more the code path is the
+  old one, so the defaults read bit for bit as before. Same passes, same rows, no new columns.
+- **Bars (native `examples/bars.rs` and the physics-refs harness in Node, `5f728ef68` against this change, same session):**
+  4 substeps of one pass: the pyramid sleeps at 2.28 s (never), top moved 32.3 mm (269.6), bottom row 1.192 mm into the
+  floor (1.189); with sleeping off it rests at 9.9e-5 m/s at 30 s, and 30 rows sleep at 2.03 s and rest at 5.9e-4 m/s, top
+  69 mm. 1,000 and 5,000 cubes sleep at 1.32 and 1.82 s (1.55 and 2.13), none below the floor. The 1:100 and 1:1000
+  stacks sag 14.39 and 137.43 mm in `bars` (unchanged) and move 0.003 mm in the harness, whose stacks start at no load;
+  bounce, rolling ball, slopes, pendulum, chain, joint grid, bullets and meshes read bit for bit the same. Defaults: every
+  harness number bit for bit the same, and the replay's 200 hashes unchanged (only the kernel source hash is new).
+- **Against the references (black boxes, outputs only):** Rapier 0.21 (3D harness, its defaults, 8 passes a step) rests
+  the pile at 0.90 s, top 27.5 mm, sink 0.92 mm, and Box2D v3 (2D harness) at 1.02 s, top 29.1 mm: both rest it sooner and
+  stiffer at the top. Neither holds the 1:1000 stack: Rapier's heavy box falls through the light one to the floor, and Box2D's
+  falls through it at its defaults (planner's probe), and Rapier sags 34.2 mm at 1:100 where Margo sags 14.4. An accepted
+  difference: Margo's pile is softer by 5 mm at the top for a stack both references lose.
+- **Work, counted (`--features counts`, normal updates per step, biased and relaxing):** 4 substeps of one pass, pyramid
+  9,440 and 9,440 to 4,422 and 4,903 (it sleeps), 1,000 cubes 10,182 and 10,583 to 8,333 and 8,664; defaults identical
+  (pyramid 9,729 and 12,432, 1,000 cubes 24,387 and 24,792).
+- **Size:** `@margoengine/physics/next` 424 B more raw and 217 B more gzip (one test a pair, one more soft constraint a
+  pass, an island lookup); not in the core and stage gate.
+- **Rerun:** `cargo run --locked --release --manifest-path packages/physics/kernel/Cargo.toml --example bars`; `node
+  js/margo-next/margo3d.mjs <out.json> equal <worktree>/packages/physics/dist/next.js` in physics-refs; counts as in entry 80.
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).
