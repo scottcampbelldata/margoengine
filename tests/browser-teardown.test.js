@@ -9,7 +9,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { createServer, request } from 'node:http';
 import { launchBrowser, withBoundedClose } from '../scripts/lib/browser.mjs';
-import { closeAll, endTree, taskkillPids } from '../scripts/support/shutdown.mjs';
+import { closeAll, endTree, runSuite, taskkillPids, waitSignaled } from '../scripts/support/shutdown.mjs';
 
 const root = new URL('..', import.meta.url);
 
@@ -161,21 +161,75 @@ test('Firefox and a browser already gone close the ordinary way', async () => {
   }
 });
 
-test('a real browser: close ends its main process and everything under it', { timeout: 5 * 60_000 }, async () => {
-  const browser = await launchBrowser({ headless: true, needs: 'none' });
-  const session = await browser.newBrowserCDPSession();
-  const pids = (await session.send('SystemInfo.getProcessInfo')).processInfo.map((process) => process.id);
-  assert.ok(pids.length > 1);
-  await browser.close();
-  const alive = pids.filter((pid) => {
-    try {
-      process.kill(pid, 0);
-      return true;
-    } catch {
-      return false;
-    }
+test('a Chromium browser whose processes cannot be ended still closes the ordinary way, then the close fails', async () => {
+  let closed = false;
+  const fake = {
+    browserType: () => ({ name: () => 'chromium' }),
+    isConnected: () => true,
+    newBrowserCDPSession: async () => {
+      throw new Error('CDP session refused');
+    },
+    close: async () => (closed = true),
+  };
+  await assert.rejects(withBoundedClose(fake, { end: () => assert.fail('no pid to end') }).close(), {
+    message: 'CDP session refused',
   });
-  assert.deepEqual(alive, []);
+  assert.equal(closed, true, 'a browser left running holds the suite open after its last check');
+});
+
+/**
+ * The processes of `browser` with a page open, so a renderer runs under the browser process (right after the launch a
+ * busy machine often lists the browser process alone). Closes the browser on every path: a failed check that left it
+ * running held this file's process open after its last test, and the root run waited on it with no limit (2026-11-08).
+ * @returns {Promise<{ id: number, type: string }[] & { listedAt: number }>} `listedAt`: when the list was read (epoch ms)
+ */
+export async function processTree(browser) {
+  let tree;
+  await runSuite(
+    async () => {
+      await browser.newPage();
+      const session = await browser.newBrowserCDPSession();
+      tree = (await session.send('SystemInfo.getProcessInfo')).processInfo;
+      tree.listedAt = Date.now();
+      const types = tree.map((process) => process.type);
+      assert.ok(types.includes('browser') && types.includes('renderer'), `a browser and a renderer: ${types}`);
+    },
+    () => browser.close(),
+  );
+  return tree;
+}
+
+test('a failed check on a real browser still closes it, so the file can exit', async () => {
+  for (const fail of ['list', 'page']) {
+    let closes = 0;
+    const fake = {
+      newPage: async () => {
+        if (fail === 'page') throw new Error('no page');
+      },
+      newBrowserCDPSession: async () => ({ send: async () => ({ processInfo: [{ id: 1, type: 'browser' }] }) }),
+      close: async () => closes++,
+    };
+    await assert.rejects(processTree(fake), fail === 'page' ? { message: 'no page' } : { code: 'ERR_ASSERTION' });
+    assert.equal(closes, 1, `${fail}: the browser is closed once`);
+  }
+});
+
+test('a real browser: close ends its main process and everything under it', { timeout: 5 * 60_000 }, async () => {
+  const tree = await processTree(await launchBrowser({ headless: true, needs: 'none' }));
+  let alive = tree
+    .filter(({ id }) => {
+      try {
+        process.kill(id, 0);
+        return true;
+      } catch {
+        return false;
+      }
+    })
+    .map(({ id }) => id);
+  // Windows hands a freed pid to the next new process at once, and suites side by side start many: a pid that answers
+  // here counts only if its process started before the list was read (waitSignaled skips a newer one).
+  if (alive.length && process.platform === 'win32') alive = await waitSignaled(alive, 10_000, tree.listedAt);
+  assert.deepEqual(alive, [], `still running after the close, of ${tree.map(({ id, type }) => `${type} ${id}`)}`);
 });
 
 test('endTree waits for every process taskkill named, and returns the ones past the limit', async () => {

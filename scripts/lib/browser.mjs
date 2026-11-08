@@ -181,8 +181,16 @@ export function withBoundedClose(browser, { end = endTree } = {}) {
     closeAll({
       browser: {
         close: async () => {
-          await endChromium(browser, end);
-          return close(...args);
+          // An end that fails (its CDP session refused, say) still closes the ordinary way, then throws: a browser left
+          // running holds its suite's process open after the last check, and the run around it never ends.
+          let failed;
+          try {
+            await endChromium(browser, end);
+          } catch (error) {
+            failed = { error };
+          }
+          await close(...args);
+          if (failed) throw failed.error;
         },
       },
     });
