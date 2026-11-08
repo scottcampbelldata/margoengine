@@ -508,11 +508,11 @@ shadows.add(mesh);
 | Colour, SSAO's G-buffer and ambient passes | yes | yes | yes |
 | `Shadows`, `VirtualShadows`, `LocalShadows`, `Clustered` integrated shadows | yes | not read | yes |
 | Picking primitives and contact shadows | yes | not read | yes |
-| TAA velocity | yes: the surface moves as the mesh and camera do | not read | yes |
+| TAA velocity | yes: the surface moves as the mesh and camera do, and as the graph's uniforms changed since last frame | not read | yes |
 
 **Normals.** After a `positionNode`, normals follow the new shape. `positionNormals: 'neighbours'` evaluates the graph again 0.001 mesh units to two sides of each vertex: smooth, for shapes worked out from `positionLocal`, at three evaluations of the graph per vertex. `'faces'` takes each triangle's normal in the fragment, for graphs that read `uv()`, whose neighbours a vertex cannot know: it shows facets on a coarse mesh and keeps a normal map's detail on top. `'keep'` leaves the mesh's normals. The default is `'faces'` when the graph reads `uv()`, else `'neighbours'`; a `normalNode` wins over `'faces'`.
 
-**What a depth pass reads.** `cameraPosition`, `viewDirection`, `viewMatrix`, `projectionMatrix`, `positionView`, `normalView`, `linearDepth`, `cameraNear` and `cameraFar` are the main camera's in every depth pass, not the light's, so a mesh that faces the camera casts the shape the camera sees; in a multi-view frame that is `engine.camera`. A shadow has no surface, so fragment nodes that read `materialColor`, `materialNormal`, `materialRoughness`, `materialMetalness` or `materialEmissive` cast without their `discard()`, and a `positionNode` reading `tangentLocal`, `tangentWorld` or `bitangentWorld` casts the mesh unmoved; the colour pass is not affected. A `positionNode` also replaces a `displacementMap` in depth passes. Such a caster counts as moving, so shadow caches redraw it each frame. In TAA velocity a graph that changes between frames adds no velocity of its own, as a displacement map does not: the surface moves as the mesh and the camera do.
+**What a depth pass reads.** `cameraPosition`, `viewDirection`, `viewMatrix`, `projectionMatrix`, `positionView`, `normalView`, `linearDepth`, `cameraNear` and `cameraFar` are the main camera's in every depth pass, not the light's, so a mesh that faces the camera casts the shape the camera sees; in a multi-view frame that is `engine.camera`. A shadow has no surface, so fragment nodes that read `materialColor`, `materialNormal`, `materialRoughness`, `materialMetalness` or `materialEmissive` cast without their `discard()`, and a `positionNode` reading `tangentLocal`, `tangentWorld` or `bitangentWorld` casts the mesh unmoved; the colour pass is not affected. A `positionNode` also replaces a `displacementMap` in depth passes. Such a caster counts as moving, so shadow caches redraw it each frame. In TAA velocity a `positionNode` that reads the graph's uniforms (a `uniform()` you change, `time`, the camera) runs a second time on last frame's values, which TAA keeps per view, so a shape that moves over time leaves no ghost trail; nothing to register. A move driven by a storage buffer or a texture that changes (skinning bones, morph weights, a height map) is not tracked that way: its surface moves as the mesh and camera do.
 
 `node packages/shader/test/passes-check.mjs` (real GPU, under the GPU lock) checks these on pixels: a caster moved by a graph against a plain mesh placed there in all four shadow passes, a cut caster against a half-sized one, both normal modes against the analytic normal of a wave, and SSAO's G-buffer pass drawing such a surface.
 
@@ -817,6 +817,40 @@ console.log(picking.rawOf(hit) === mesh);
   too when its code holds `discard`, so a cut-out shape casts a cut-out shadow. Transparent materials cast none. For
   `{static: true}`, call `mesh.invalidateShadow()` after moving the mesh; attribute changes and a newly compiled pipeline
   redraw the map by themselves. A raw shader receives no shadow unless it samples one itself.
+- **TAA.** A raw shader's motion is its own code, so TAA sees only a raw mesh's depth and the camera's motion, and a
+  shape the shader moves ghosts. Give the material `velocityEntry`: a `@vertex fn` beside your vertex entry, with the same
+  inputs, that returns `margoVelocity(position, positionBefore)`, where the vertex is now and where it was last frame, both
+  before `mesh.world`. It may read `margoBefore.time` (last frame's `camera.time`) and `margoBefore.world`; keep last
+  frame's value of any uniform your move reads beside it. Then `taa.add(raw)`: opaque meshes with the entry draw their
+  motion into TAA's velocity pass, with last frame kept per TAA view. Without the entry nothing changes.
+
+```ts
+import {EngineKernel} from 'margoengine/core';
+import {TAA} from 'margoengine/taa';
+import {RawMesh, RawShaderMaterial, RawShaders} from 'margoengine/shader/raw';
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend: 'webgpu'});
+const raw = RawShaders.attach(engine), taa = TAA.attach(engine);
+const material = new RawShaderMaterial({
+  vertexShader: `
+    fn wave(p:vec3f, t:f32)->vec3f {return p + vec3f(0, sin(p.x * 3 + t) * 0.2, 0);}
+    @vertex fn vertex(a:Attributes)->@builtin(position) vec4f {
+      return camera.viewProjection * mesh.world * vec4f(wave(a.position, camera.time), 1);
+    }
+    @vertex fn velocity(a:Attributes)->MargoVelocity {
+      return margoVelocity(wave(a.position, camera.time), wave(a.position, margoBefore.time));
+    }
+    @fragment fn fragment()->@location(0) vec4f {return margoDisplay(vec4f(0.2, 0.5, 0.9, 1));}`,
+  velocityEntry: 'velocity',
+  cull: 'none',
+});
+raw.add(new RawMesh({
+  material,
+  attributes: {position: {data: [-1, -1, 0, 1, -1, 0, 1, 1, 0, -1, 1, 0], type: 'vec3f'}},
+  index: [0, 1, 2, 0, 2, 3],
+}));
+taa.add(raw); // the waving quad writes its own motion
+```
+
 - **SSAO.** Opaque raw meshes occlude from their depth with nothing to set, like every mesh, and their pixels are not
   darkened. `ssao.add(raw)` with `gbufferEntry` on a material goes further: that `@fragment fn` returns
   `margoGBuffer(worldNormal, worldPosition, ambient)`, SSAO uses your normals, and `ambient` is the light it may take away.
@@ -872,7 +906,7 @@ match their formulas within 0.6 of 255; halftone and dot screen compile and draw
 - Nodes are fixed when a NodeMaterial, NodePass or ComputePass is constructed; build a new one to change the graph. Only uniform values, textures' pixels and storage contents change live.
 - NodeMaterial patches gltf-pro's shader (standard and KHR physical variants); [Node output in every pass](#node-output-in-every-pass) lists what the other passes see. At most 8 varyings. Its bindings start at group 2, binding 48, and node textures count against WebGPU's 16 sampled textures per stage: a `NodeMaterial` on a materials mesh fits 6 texture nodes alone, 5 with directional shadows and 3 with shadows, IBL and LocalShadows; past that, gltf-pro throws a `RangeError` naming the combination.
 - `uv()` is the raw first UV set (no texture transform). `select` evaluates both branches; `If` runs one. A NodePass's discarded pixels stay the cleared transparent black. Fn bodies cannot read stage inputs such as `uv()`; pass them as arguments. No automatic derivative-safe sampling: `texture(map, uv)`, `dpdx`, `dpdy` and `fwidth` inside an `If`, `Switch` or `While` on a per-pixel value, or a loop with a non-uniform bound or a `Break` on one, are a WGSL uniformity error, reported when the pipeline compiles; pass `texture` an explicit level there or sample before the branch.
-- Raw meshes cast into `Shadows` only: `VirtualShadows` and `LocalShadows` take no custom caster. SSR, GTAO, SSGI, TAA velocity and scene passes do not see them, beyond the depth they write. A raw pick names the mesh, not the instance, and ignores `discard`. Uniform arrays hold 16-byte elements, struct fields are not arrays or structs, and a material has one colour target, 32-bit attribute formats only and at most two extra bind groups.
+- Raw meshes cast into `Shadows` only: `VirtualShadows` and `LocalShadows` take no custom caster. SSR, GTAO, SSGI and scene passes do not see them, beyond the depth they write; TAA velocity sees a mesh's own motion only through `velocityEntry`. A raw pick names the mesh, not the instance, and ignores `discard`. Uniform arrays hold 16-byte elements, struct fields are not arrays or structs, and a material has one colour target, 32-bit attribute formats only and at most two extra bind groups.
 - NodePass runs only inside a PostStack (a stack of one is fine). An `hdr` pass that ends the chain tonemaps with ACES.
 - Subgroup operations and half floats run in ComputePass nodes only: `enable` has to open a module, and a material's shader is assembled from others. There are no `quad*` operations, and no f16 uniforms, storage or textures.
 - Storage textures are 2D, one mip level, one sample; `@margoengine/shader/compute-texture` has no 3D or array form.

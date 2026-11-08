@@ -121,6 +121,14 @@ export interface RawShaderMaterialOptions {
    * depth still occludes and its pixels are not darkened.
    */
   gbufferEntry?: string;
+  /**
+   * A `@vertex fn` of the vertex code that returns `margoVelocity(position, positionBefore)`: where the vertex is now and
+   * where it was last frame, both before `mesh.world`. Drawn when the RawShaders is added to TAA (`taa.add(raw)`), it gives
+   * TAA the motion of a shape the shader moves, so the shape leaves no ghost trail. It reads `margoBefore.time` (last
+   * frame's `camera.time`) and `margoBefore.world`; keep last frame's value of any uniform the move reads beside it. A
+   * mesh without it gets TAA's camera motion only, from its depth. Default none.
+   */
+  velocityEntry?: string;
   /** Draw after the opaque scene, sorted back to front, with blending. Default false. */
   transparent?: boolean;
   /** Default `'normal'`, which blends only when `transparent`. */
@@ -177,6 +185,18 @@ struct MargoMesh { world:mat4x4f, normal:mat3x3f, pickId:u32 }
 @group(0) @binding(1) var<uniform> mesh:MargoMesh;
 struct MargoGBuffer { @location(0) normal:vec4f, @location(1) ambient:vec4f }
 fn margoGBuffer(normal:vec3f,position:vec3f,ambient:vec3f)->MargoGBuffer {return MargoGBuffer(vec4f(normalize((camera.view*vec4f(normal,0)).xyz),-(camera.view*vec4f(position,1)).z),vec4f(ambient,1));}`;
+// A velocity module's additions: last frame's view-projection, world matrix and time, the vertex helper, and the fragment
+// that writes TAA's motion (current minus previous position in uv, and the previous depth) as its own pass does.
+const velocityPrelude = `struct MargoBefore { viewProjection:mat4x4f, world:mat4x4f, time:f32, valid:f32 }
+@group(0) @binding(2) var<uniform> margoBefore:MargoBefore;
+struct MargoVelocity { @builtin(position) clip:vec4f, @location(0) previous:vec4f }
+fn margoVelocity(position:vec3f,before:vec3f)->MargoVelocity {return MargoVelocity(camera.viewProjection*mesh.world*vec4f(position,1),margoBefore.viewProjection*margoBefore.world*vec4f(before,1));}
+`;
+const velocityFragment = `
+struct MargoMotion { @location(0) velocity:vec2f, @location(1) depth:f32 }
+@fragment fn margoVelocityFragment(i:MargoVelocity)->MargoMotion {var o:MargoMotion;o.velocity=vec2f(0);o.depth=-1;
+  if(i.previous.w>0&&margoBefore.valid>0){o.velocity=i.clip.xy/camera.resolution-(i.previous.xy/i.previous.w*vec2f(0.5,-0.5)+0.5);o.depth=i.previous.z/i.previous.w;}return o;}
+`;
 // The pick pass reads no part of the caller's fragment stage: a mesh's ID covers its whole shape.
 const pickFragment = '@fragment fn margoPick()->@location(0) u32 {return mesh.pickId;}\n';
 /** Byte offset of `pickId` in the object block, and the block's size. */
@@ -199,7 +219,7 @@ interface Member {
   fields?: Field[];
 }
 /** Which pipeline of a material: the colour pass, a shadow cascade, SSAO's G-buffer or a pick. */
-type RawPass = 'color' | 'shadow' | 'gbuffer' | 'pick';
+type RawPass = 'color' | 'shadow' | 'gbuffer' | 'pick' | 'velocity';
 interface PipelineEntry {
   state: 'pending' | 'ready' | 'failed';
   pipeline?: GPURenderPipeline;
@@ -207,6 +227,10 @@ interface PipelineEntry {
 interface MaterialGpu {
   layout?: GPUBindGroupLayout;
   pipelineLayout: GPUPipelineLayout;
+  /** The velocity pass's: group 0 also holds last frame's block. Made on first use. */
+  velocityLayout?: GPUPipelineLayout;
+  /** Groups 1 and up of `pipelineLayout`. */
+  groupLayouts: GPUBindGroupLayout[];
   buffer?: GPUBuffer;
   written?: Uint8Array;
   group?: GPUBindGroup;
@@ -218,19 +242,25 @@ interface MaterialGpu {
   pipelines: Map<string, PipelineEntry>;
 }
 const frameLayouts = new WeakMap<GPUDevice, GPUBindGroupLayout>(),
+  velocityLayouts = new WeakMap<GPUDevice, GPUBindGroupLayout>(),
   samplers = new WeakMap<GPUDevice, Map<string, GPUSampler>>(),
   views = new WeakMap<GPUTexture, Map<string, GPUTextureView>>(),
   owners = new WeakMap<object, GPUDevice>(),
   fallbacks = new WeakMap<GPUDevice, Map<string, GPUTextureView>>();
 const visibility = () => GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT;
-function frameLayout(device: GPUDevice): GPUBindGroupLayout {
-  let layout = frameLayouts.get(device);
+function frameLayout(device: GPUDevice, velocity = false): GPUBindGroupLayout {
+  const cache = velocity ? velocityLayouts : frameLayouts;
+  let layout = cache.get(device);
   if (!layout) {
     layout = device.createBindGroupLayout({
-      label: 'shader:raw:frame',
-      entries: [0, 1].map((binding) => ({ binding, visibility: visibility(), buffer: { type: 'uniform' as const } })),
+      label: velocity ? 'shader:raw:velocity' : 'shader:raw:frame',
+      entries: (velocity ? [0, 1, 2] : [0, 1]).map((binding) => ({
+        binding,
+        visibility: visibility(),
+        buffer: { type: 'uniform' as const },
+      })),
     });
-    frameLayouts.set(device, layout);
+    cache.set(device, layout);
   }
   return layout;
 }
@@ -361,6 +391,7 @@ export class RawShaderMaterial {
   /** @internal Pipelines finished so far: a static shadow map redraws when a caster's pipeline arrives. */ compiled = 0;
   private readonly groups: readonly RawBindGroup[];
   private readonly gbufferName?: string;
+  /** @internal The `velocityEntry`, when the material draws its own motion for TAA. */ readonly velocityName?: string;
   private vertexCode = '';
   private fragmentCode?: string;
   private vertexName = '';
@@ -379,6 +410,7 @@ export class RawShaderMaterial {
     this.cull = options.cull ?? 'back';
     this.colorWrite = options.colorWrite ?? true;
     this.gbufferName = options.gbufferEntry;
+    this.velocityName = options.velocityEntry;
     this.groups = options.groups ?? [];
     if (this.groups.length > 2 || this.groups.some((g) => typeof g !== 'function'))
       throw new TypeError(
@@ -514,6 +546,10 @@ export class RawShaderMaterial {
       throw new TypeError(
         `RawShaderMaterial ${this.name} has no @fragment fn ${this.gbufferName}; add it beside the colour fragment or drop gbufferEntry`,
       );
+    if (this.velocityName && !new RegExp(`@vertex\\s+fn\\s+${this.velocityName}\\b`).test(vertex))
+      throw new TypeError(
+        `RawShaderMaterial ${this.name} has no @vertex fn ${this.velocityName}; add it to vertexShader or drop velocityEntry`,
+      );
     this.vertexCode = vertex;
     this.fragmentCode = fragment;
     this.vertexName = v;
@@ -538,6 +574,8 @@ export class RawShaderMaterial {
         out.push(
           `struct ${m.type} {\n${m.fields.map((f, i) => `  ${i ? '' : '@align(16) '}${f.name}:${f.type},`).join('\n')}\n}`,
         );
+    // Every stage of a material with a velocity entry declares what that entry reads; unused, it binds nothing.
+    if (this.velocityName) out.push(velocityPrelude);
     if (this.members.length)
       out.push(
         `struct Uniforms {\n${this.members.map((m) => `  ${m.name}:${m.count === undefined ? m.type : `array<${m.type},${m.count}>`},`).join('\n')}\n}\n@group(1) @binding(0) var<uniform> uniforms:Uniforms;`,
@@ -618,13 +656,11 @@ export class RawShaderMaterial {
           entries.length || extras.length
             ? device.createBindGroupLayout({ label: 'shader:raw:' + this.name, entries })
             : undefined;
+      const groupLayouts = layout ? [layout, ...extras.map((e) => e.layout)] : [];
       gpu = {
         layout,
-        pipelineLayout: device.createPipelineLayout({
-          bindGroupLayouts: layout
-            ? [frameLayout(device), layout, ...extras.map((e) => e.layout)]
-            : [frameLayout(device)],
-        }),
+        groupLayouts,
+        pipelineLayout: device.createPipelineLayout({ bindGroupLayouts: [frameLayout(device), ...groupLayouts] }),
         bound: [],
         extras: extras.map((e) => e.group),
         modules: new Map(),
@@ -746,6 +782,12 @@ export class RawShaderMaterial {
           depthCompare: this.depthTest ? 'greater-equal' : 'always',
         },
       };
+    if (kind === 'velocity')
+      return {
+        entry: 'margoVelocityFragment',
+        targets: [{ format: 'rg16float' }, { format: 'r32float' }],
+        depthStencil: { format, depthWriteEnabled: false, depthCompare: 'equal' },
+      };
     if (kind === 'gbuffer')
       return {
         entry: this.gbufferName,
@@ -781,11 +823,16 @@ export class RawShaderMaterial {
     if (e) return e.pipeline;
     e = { state: 'pending' };
     gpu.pipelines.set(key, e);
-    const module = (stage: 'vertex' | 'fragment' | 'pick') => {
+    const module = (stage: 'vertex' | 'fragment' | 'pick' | 'velocity') => {
       const k = stage + '|' + mesh.layoutKey;
       let m = gpu.modules.get(k);
       if (!m) {
-        const code = stage === 'pick' ? this.prelude(mesh) + pickFragment : this.code(stage, mesh);
+        const code =
+          stage === 'pick'
+            ? this.prelude(mesh) + pickFragment
+            : stage === 'velocity'
+              ? this.code('vertex', mesh) + velocityFragment
+              : this.code(stage, mesh);
         m = device.createShaderModule({ label: `shader:raw:${this.name}:${stage}`, code });
         gpu.modules.set(k, m);
         // Asked now, for the error report: a request made later, on an idle device, can stay pending (Chromium).
@@ -795,18 +842,28 @@ export class RawShaderMaterial {
     };
     device.pushErrorScope?.('validation');
     const { entry: fragmentEntry, targets, depthStencil } = this.target(kind, c, compare),
-      vertex = module('vertex'),
-      fragment = kind === 'pick' ? module('pick') : this.fragmentCode === undefined ? vertex : module('fragment'),
+      velocity = kind === 'velocity',
+      vertex = module(velocity ? 'velocity' : 'vertex'),
+      fragment =
+        kind === 'pick'
+          ? module('pick')
+          : velocity || this.fragmentCode === undefined
+            ? vertex
+            : module('fragment'),
       scope = device.popErrorScope?.(),
       descriptor: GPURenderPipelineDescriptor = {
         label: 'shader:raw:' + this.name,
-        layout: gpu.pipelineLayout,
-        vertex: { module: vertex, entryPoint: this.vertexName, buffers: mesh.buffers() },
+        layout: velocity
+          ? (gpu.velocityLayout ??= device.createPipelineLayout({
+              bindGroupLayouts: [frameLayout(device, true), ...gpu.groupLayouts],
+            }))
+          : gpu.pipelineLayout,
+        vertex: { module: vertex, entryPoint: velocity ? this.velocityName! : this.vertexName, buffers: mesh.buffers() },
         ...(fragmentEntry ? { fragment: { module: fragment, entryPoint: fragmentEntry, targets } } : {}),
         primitive: {
           topology: mesh.topology,
-          // A light sees either side, as in the depth pipeline of `Shadows`.
-          cullMode: kind === 'shadow' ? 'none' : this.cull,
+          // A light sees either side, as in the depth pipeline of `Shadows`; TAA's velocity draws both, as its own do.
+          cullMode: kind === 'shadow' || velocity ? 'none' : this.cull,
           ...(strip ? { stripIndexFormat: strip } : {}),
         },
         depthStencil,
@@ -1486,6 +1543,13 @@ function typed(data: ArrayLike<number>, type: RawAttributeType, name: string): F
 }
 
 /** One mesh's draw in a pass. */
+/** One TAA view's velocity state: last frame's time, and per mesh its block of last frame's values. */
+interface VelocityState {
+  camera: GPUBuffer;
+  frame: number;
+  time?: number;
+  meshes: Map<RawMesh, { before: GPUBuffer; group: GPUBindGroup; object: GPUBuffer; world: Float32Array; frame: number }>;
+}
 interface Draw {
   mesh: RawMesh;
   pipeline: GPURenderPipeline;
@@ -1545,6 +1609,9 @@ export class RawShaders implements EnginePlugin {
   private readonly cameraData = new Float32Array(56);
   private readonly view = new Float64Array(16);
   private readonly inverse = new Float64Array(16);
+  /** TAA velocity state per TAA view: its camera block, last frame's time and each mesh's last world matrix. */
+  private readonly velocityStates = new Map<object, VelocityState>();
+  private readonly beforeData = new Float32Array(36);
   /** Same as `engine.use(new RawShaders(...))`; returns the plugin. */
   static attach(engine: EngineKernel, options?: RawShadersOptions): RawShaders {
     const value = new RawShaders(options);
@@ -1576,6 +1643,10 @@ export class RawShaders implements EnginePlugin {
   /** Stops drawing `mesh` and releases its GPU buffers; true when it was here. */
   remove(mesh: RawMesh): boolean {
     if (!this.meshes.delete(mesh)) return false;
+    for (const state of this.velocityStates.values()) {
+      state.meshes.get(mesh)?.before.destroy();
+      state.meshes.delete(mesh);
+    }
     mesh.release();
     mesh.owner = undefined;
     for (const watcher of this.watchers) watcher.removed(mesh);
@@ -1632,6 +1703,7 @@ export class RawShaders implements EnginePlugin {
     }
     this.camera?.destroy();
     this.camera = undefined;
+    for (const key of [...this.velocityStates.keys()]) this.releaseVelocity(key);
     for (const buffer of this.shadowCameras) buffer.destroy();
     this.shadowCameras.length = this.shadowWritten.length = 0;
     this.shadowEncoder = undefined;
@@ -1750,6 +1822,95 @@ export class RawShaders implements EnginePlugin {
       if (pipeline) draws.push({ mesh, pipeline, gpu, call, distance: 0 });
     }
     drawList(external.pass, draws);
+  }
+  /**
+   * The `TAAVelocityPass` contract of `@margoengine/taa` (`taa.add(raw)`): opaque meshes whose material has
+   * `velocityEntry` draw their own motion into TAA's object velocity pass, with last frame's view-projection, world
+   * matrix and time in `margoBefore`, kept per TAA view.
+   */
+  drawVelocity(
+    pass: GPURenderPassEncoder,
+    frame: { context: PassContext; camera: Float32Array; key: object },
+  ): void {
+    const c = frame.context,
+      device = this.device,
+      engine = this.engine as unknown as EngineKernel;
+    // The colour pass drew first (frame-graph order 0.5 before TAA's 9) and made the camera block meshes bind there.
+    if (c.backend !== 'webgpu' || !device || !engine || c.device !== device || !this.camera) return;
+    let state = this.velocityStates.get(frame.key);
+    if (!state) this.velocityStates.set(frame.key, (state = { camera: this.cameraBuffer(device), frame: 0, meshes: new Map() }));
+    state.frame++;
+    const rows = frame.camera,
+      now = rows.subarray(0, 16),
+      token = this.nextPass(),
+      draws: { mesh: RawMesh; pipeline: GPURenderPipeline; gpu: MaterialGpu; call: number[]; group: GPUBindGroup }[] = [];
+    let time: number | undefined;
+    for (const mesh of this.meshes) {
+      const material = mesh.material;
+      if (!mesh.visible || material.transparent || !material.velocityName) continue;
+      const world = mesh.worldMatrix(engine);
+      if (!world || mesh.culled(world, now)) continue;
+      if (time === undefined) {
+        const block = this.cameraBlock(c.camera, now, c.width, c.height, c.delta, 0);
+        time = block[51];
+        device.queue.writeBuffer(state.camera, 0, block);
+      }
+      const call = mesh.upload(device, this.camera, world);
+      const object = mesh.gpu?.object;
+      if (!call || !object) continue;
+      let m = state.meshes.get(mesh);
+      if (!m || m.object !== object) {
+        m?.before.destroy();
+        const before = device.createBuffer({
+          label: 'shader:raw:before',
+          size: 144,
+          usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        });
+        m = {
+          before,
+          object,
+          world: new Float32Array(16),
+          frame: -1,
+          group: device.createBindGroup({
+            layout: frameLayout(device, true),
+            entries: [state.camera, object, before].map((buffer, binding) => ({ binding, resource: { buffer } })),
+          }),
+        };
+        state.meshes.set(mesh, m);
+      }
+      // Last frame's values when this mesh was drawn then and TAA has history; else this frame's, and no motion.
+      const valid = m.frame === state.frame - 1 && rows[34] > 0 && state.time !== undefined,
+        d = this.beforeData;
+      d.set(rows.subarray(16, 32), 0);
+      d.set(valid ? m.world : world, 16);
+      d[32] = valid ? state.time! : time!;
+      d[33] = +valid;
+      device.queue.writeBuffer(m.before, 0, d);
+      m.world.set(world);
+      m.frame = state.frame;
+      const gpu = material.prepare(device, token),
+        pipeline = material.pipeline(this, gpu, device, mesh, 'velocity', c);
+      if (pipeline) draws.push({ mesh, pipeline, gpu, call, group: m.group });
+    }
+    if (time !== undefined) state.time = time;
+    const bound: BoundBuffers = { slots: [] };
+    for (const d of draws) {
+      pass.setPipeline(d.pipeline);
+      pass.setBindGroup(0, d.group);
+      if (d.gpu.group) {
+        pass.setBindGroup(1, d.gpu.group);
+        d.gpu.extras.forEach((extra, i) => pass.setBindGroup(2 + i, extra));
+      }
+      d.mesh.draw(pass, d.call[0], d.call[1], d.call[2], bound);
+    }
+  }
+  /** Forgets a TAA view's velocity state (`TAAVelocityPass`): TAA calls it when the view's history goes. */
+  releaseVelocity(key: object): void {
+    const state = this.velocityStates.get(key);
+    if (!state) return;
+    state.camera.destroy();
+    for (const m of state.meshes.values()) m.before.destroy();
+    this.velocityStates.delete(key);
   }
   private execute(c: PassContext, transparent: boolean): void {
     if (!transparent) this.stats.meshes = this.stats.drawCalls = this.stats.culled = 0;

@@ -142,6 +142,29 @@ export interface TAAVelocity {
    * with `velocityOnly`, which resolves nothing. */
   readonly resolved?: GPUTexture;
 }
+/**
+ * TAA's object velocity pass as handed to a {@link TAAVelocityPass}: draw with `targets`, `depthStencil` and `samples`,
+ * reading `camera` (this frame's jittered view-projection, last frame's in the target, then the target's size and 1 when
+ * there is history). One pass per view, each with its own `key`.
+ */
+export interface TAAVelocityFrame {
+  readonly context: Extract<PassContext, { backend: 'webgpu' }>;
+  /** 36 floats: current view-projection, previous view-projection, width, height, history (1 or 0), 0. */
+  readonly camera: Float32Array;
+  /** The view's TAA: state kept for last frame (previous matrices, times) is kept per key. */
+  readonly key: object;
+  readonly targets: readonly GPUColorTargetState[];
+  readonly depthStencil: GPUDepthStencilState;
+  readonly samples: number;
+}
+/**
+ * A drawer of its own motion, such as `RawShaders` from `@margoengine/shader/raw` for raw meshes that opt in: TAA calls
+ * `drawVelocity` inside its object velocity pass every frame and `releaseVelocity` when a view's state goes.
+ */
+export interface TAAVelocityPass {
+  drawVelocity(pass: GPURenderPassEncoder, frame: TAAVelocityFrame): void;
+  releaseVelocity?(key: object): void;
+}
 /** What `taa.add` takes: a model exposing its primitives (a gltf-pro `PBRModel`); dropped once `disposed` is true. */
 export interface VelocitySource {
   /** Primitives read every frame (after skinning and morphing). */
@@ -169,6 +192,11 @@ interface Draw {
   opacity?: VelocityPrimitive['opacity'];
   displacement?: VelocityPrimitive['displacement'];
   displaced?: GPUBindGroup;
+  /**
+   * Last frame's uniform block of a graph whose move reads it (a NodeMaterial positionNode changing over time), bound
+   * beside the graph's own, and the bytes it holds next.
+   */
+  before?: { buffer: GPUBuffer; bytes: () => Uint8Array | undefined; last?: Uint8Array<ArrayBuffer> };
   clip?: GPUBuffer;
   frame: number;
 }
@@ -239,7 +267,7 @@ export class TAA implements EnginePlugin {
   /** The object velocity draws' shared camera block, and its rows. */
   private objectCamera?: GPUBuffer;
   private readonly cameraRows = new Float32Array(36);
-  private sources = new Set<VelocitySource>();
+  private sources = new Set<VelocitySource | TAAVelocityPass>();
   private whiteTexture?: GPUTexture;
   private whiteView?: GPUTextureView;
   private whiteSampler?: GPUSampler;
@@ -321,12 +349,26 @@ export class TAA implements EnginePlugin {
         'TAA velocityOnly captures no scene depth; pass depth, e.g. () => stack.depthTexture from a PostStack.',
       );
   }
-  add(source: VelocitySource): () => void {
-    if (this.disposed || !source || source.disposed || !Array.isArray(source.shadowPrimitives))
+  /**
+   * Draws `source`'s motion every frame: a model's primitives (a gltf-pro `PBRModel`), or a {@link TAAVelocityPass} that
+   * draws its own (`RawShaders`, for raw meshes with a `velocityEntry`). Returns a function that removes it.
+   */
+  add(source: VelocitySource | TAAVelocityPass): () => void {
+    if (!this.disposed && typeof (source as TAAVelocityPass)?.drawVelocity === 'function') {
+      const drawer = source as TAAVelocityPass;
+      if (this.sources.has(drawer)) throw new MargoError('attached', 'Duplicate TAA source; add each source once');
+      this.sources.add(drawer);
+      this.reset();
+      return () => {
+        if (this.sources.delete(drawer)) for (const view of [this, ...this.views.values()]) drawer.releaseVelocity?.(view);
+        this.reset();
+      };
+    }
+    if (this.disposed || !source || (source as VelocitySource).disposed || !Array.isArray((source as VelocitySource).shadowPrimitives))
       throw new TypeError(
         'Invalid TAA velocity source; pass a live object with a shadowPrimitives array to a TAA that is not disposed.',
       );
-    if (source.shadowPrimitives.some((p) => p.node.engine !== this.engine))
+    if ((source as VelocitySource).shadowPrimitives.some((p) => p.node.engine !== this.engine))
       throw new MargoError('attached', 'TAA source belongs to another engine; use objects created by the same engine');
     if (this.sources.has(source)) throw new MargoError('attached', 'Duplicate TAA source; add each source once');
     this.sources.add(source);
@@ -686,14 +728,19 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
         draw({ node: mesh, ...buffers, count: triangles.geometry.indices.length, stride: 24 });
       } else if (triangles?.kind === 'pbr') for (const primitive of triangles.source.shadowPrimitives) draw(primitive);
     }
+    const drawers: TAAVelocityPass[] = [];
     for (const source of this.sources) {
+      if ('drawVelocity' in source) {
+        drawers.push(source);
+        continue;
+      }
       if (source.disposed) {
         this.sources.delete(source);
         continue;
       }
       for (const primitive of source.shadowPrimitives) draw(primitive);
     }
-    this.flushMotion(c, pending);
+    this.flushMotion(c, pending, drawers);
     if (this.motionViews.length) {
       const depth = sceneTarget(c)?.depthSource;
       if (!depth)
@@ -726,6 +773,7 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
           r.uniform.destroy();
           r.vertices?.destroy();
           r.source?.destroy();
+          r.before?.buffer.destroy();
           records.delete(index);
           if (!records.size) this.draws.delete(mesh);
         }
@@ -788,7 +836,9 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
       );
     const { opacity, surfaceClip: clip } = p,
       displacement = p.displacement,
-      graph = displacement?.velocity;
+      graph = displacement?.velocity,
+      // A move that reads the graph's uniforms runs again on last frame's.
+      before = displacement?.move?.some((line) => line.includes('ndu.')) && displacement.program ? displacement : undefined;
     if ((opacity || displacement || clip) && p.stride !== 80)
       throw new TypeError('Invalid TAA opacity map, displacement or clip; use it on a primitive with stride 80.');
     const pbr = p.stride === 80,
@@ -812,7 +862,16 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
     let pipeline = this.objectPipelines.get(key);
     if (!pipeline) {
       const module = c.device.createShaderModule({
-        code: objectVelocity(pbr, !!transform, !!opacity, solid, !!displacement, !!clip, graph),
+        code: objectVelocity(
+          pbr,
+          !!transform,
+          !!opacity,
+          solid,
+          !!displacement,
+          !!clip,
+          graph,
+          before && { move: before.move!, binding: before.program!.next },
+        ),
       });
       pipeline = c.device.createRenderPipeline({
         layout: 'auto',
@@ -866,6 +925,7 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
       r?.uniform.destroy();
       r?.vertices?.destroy();
       r?.source?.destroy();
+      r?.before?.buffer.destroy();
       // A block's const: a closure over the function's variable would cost a context on every draw (see shadows).
       const made = pipeline;
       const uniform = c.device.createBuffer({
@@ -886,11 +946,26 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
         sampler: p.alphaSampler,
         opacity,
         displacement,
-        displaced: displacementGroup(c.device, () => made.getBindGroupLayout(1), displacement),
+        displaced: undefined,
         clip: clip?.buffer,
         frame: -2,
       };
       records.set(identity, r);
+      // A graph whose move reads its uniforms binds last frame's beside them.
+      if (before) {
+        // The graph's entries upload its block first, so its bytes give the size.
+        const entries = before.entries(),
+          bytes = () => before.program!.buffers.get(c.device)?.bytes,
+          buffer = c.device.createBuffer({
+            size: bytes()?.length ?? 16,
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+          });
+        r.before = { buffer, bytes };
+        r.displaced = c.device.createBindGroup({
+          layout: made.getBindGroupLayout(1),
+          entries: [...entries, { binding: before.program!.next, resource: { buffer } }],
+        });
+      } else r.displaced = displacementGroup(c.device, () => made.getBindGroupLayout(1), displacement);
       if (pbr) {
         if (size > c.device.limits.maxStorageBufferBindingSize)
           throw new TypeError('TAA PBR source needs a storage-sized vertex buffer');
@@ -966,6 +1041,12 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
     if (changed) c.device.queue.writeBuffer(r.uniform, 0, v as Float32Array<ArrayBuffer>);
     if (r.source && p.vertex.usage & GPUBufferUsage.COPY_SRC)
       c.encoder.copyBufferToBuffer(p.vertex, offset, r.source, 0, size);
+    // Last frame's block goes up before the draw; this frame's (the colour pass uploaded it) is kept for the next.
+    const now = r.before?.bytes();
+    if (now) {
+      c.device.queue.writeBuffer(r.before!.buffer, 0, r.before!.last ?? (now as Uint8Array<ArrayBuffer>));
+      (r.before!.last ??= new Uint8Array(now.length)).set(now);
+    }
     r.previous.set(p.node.matrix);
     r.frame = this.frame;
     out.push({ r, p });
@@ -975,8 +1056,8 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
    * as the previous ones next frame) in one compute pass: each draw reads its own snapshot buffer, so taking them all
    * after all draws is the same as after each.
    */
-  private flushMotion(c: Context, draws: { r: Draw; p: VelocityPrimitive }[]): void {
-    if (!draws.length) return;
+  private flushMotion(c: Context, draws: { r: Draw; p: VelocityPrimitive }[], drawers: TAAVelocityPass[]): void {
+    if (!draws.length && !drawers.length) return;
     const pass = c.encoder.beginRenderPass({
       colorAttachments: (this.motionViews.length ? this.motionViews : [this.velocityView!, this.expectedView!]).map(
         (view) => ({ view, loadOp: 'load', storeOp: 'store' }),
@@ -995,6 +1076,17 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
       pass.setVertexBuffer(0, p.vertex, r.vertexOffset || undefined);
       pass.setIndexBuffer(p.index, 'uint32');
       pass.drawIndexed(p.count);
+    }
+    if (drawers.length) {
+      const frame: TAAVelocityFrame = {
+        context: c,
+        camera: this.cameraRows,
+        key: this,
+        targets: [{ format: 'rg16float' }, { format: 'r32float' }],
+        depthStencil: { format: c.descriptor.depthStencil!.format, depthWriteEnabled: false, depthCompare: 'equal' },
+        samples: c.descriptor.multisample?.count ?? 1,
+      };
+      for (const drawer of drawers) drawer.drawVelocity(pass, frame);
     }
     pass.end();
     if (!draws.some(({ r }) => r.snapshot)) return;
@@ -1083,7 +1175,9 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
         r.uniform.destroy();
         r.vertices?.destroy();
         r.source?.destroy();
+        r.before?.buffer.destroy();
       }
+    for (const source of this.sources) if ('drawVelocity' in source) source.releaseVelocity?.(this);
     this.uniform?.destroy();
     this.presentUniform?.destroy();
     this.presentUniform = undefined;

@@ -27,6 +27,7 @@ export function objectVelocity(
   displaced = false,
   clipped = false,
   graph?: (code: string, group: number) => string,
+  before?: { move: readonly string[]; binding: number },
 ): string {
   let code = `${opacity ? opacityCode(0, 5) : ''}
 struct ObjectCamera {current:mat4x4f,previous:mat4x4f,settings:vec4f}
@@ -63,6 +64,7 @@ ${motion}
           'let shift=i.normal.xyz*margoDisplacement(i.uv);let p=vec4f(i.position.xyz+shift,1);',
         )
         .replace('vec4f(previousVertices[index*5].xyz,1)', 'vec4f(previousVertices[index*5].xyz+shift,1)');
+  if (graph && before) code = beforeMove(code, before.move, before.binding);
   if (clipped)
     code = sectionShader(
       code
@@ -135,6 +137,30 @@ override manualSRGB:bool=true;
 @fragment fn fragment(i:Fullscreen)->@location(0) vec4f {let c=max(textureLoad(image,vec2i(i.clip.xy),0).rgb,vec3f(0));
   return vec4f(select(c,select(c*12.92,1.055*pow(c,vec3f(1.0/2.4))-0.055,c>=vec3f(0.0031308)),manualSRGB),1);}`;
 
+/**
+ * A graph's move that reads its uniform block (`ndu`, a NodeMaterial positionNode changing over time) runs a second
+ * time on last frame's block, `nduBefore` at `binding` of group 1, at last frame's model matrix, and the previous vertex
+ * moves by that: the graph writes its own motion. Placed first, so the current move's varyings win.
+ */
+export function beforeMove(code: string, move: readonly string[], binding: number): string {
+  const start = '{var o:Out;',
+    shift = 'previousVertices[index*5].xyz+shift';
+  if (code.split(start).length !== 2 || code.split(shift).length !== 2)
+    throw new MargoError('state', 'TAA graph velocity patch target missing; use matching @margoengine/shader and taa');
+  return (
+    code
+      .replace(
+        start,
+        start +
+          'var margoBefore=i.position.xyz;{let margoWorld=(f.previousModel*vec4f(i.position.xyz,1)).xyz;' +
+          'let margoWorldNormal=normalize((f.previousModel*vec4f(i.normal.xyz,0)).xyz);var margoPosition=i.position.xyz;\n' +
+          move.join('\n').replaceAll('ndu.', 'nduBefore.').replaceAll('i.ndVertex', 'index') +
+          '\nmargoBefore=margoPosition;}',
+      )
+      .replace(shift, 'previousVertices[index*5].xyz+margoBefore-i.position.xyz') +
+    `\n@group(1) @binding(${binding}) var<uniform> nduBefore:NdUniforms;`
+  );
+}
 /**
  * `reactive` (TAAOptions): binding 9 is a mask whose red channel, 0 to 1, takes that share of the history weight away
  * (1 keeps none), for pixels that change in ways motion vectors cannot describe: particles, blended surfaces, splats.

@@ -356,6 +356,8 @@ export class NodeMaterial extends Material {
   private readonly patched = new Map<string, string>();
   private readonly rederived: boolean;
   private readonly depthVertex: string;
+  /** The depth vertex's move of `margoPosition` alone; TAA runs it again on last frame's uniforms. */
+  private readonly depthMove: string[];
   private depthFragment: string;
   private depthFields: string;
   private depthRecord?: { device: GPUDevice; record: CasterDisplacement };
@@ -458,6 +460,7 @@ export class NodeMaterial extends Material {
       list.length = 0;
     }
     this.depthFields = varyingCode(list);
+    this.depthMove = moved;
     this.depthVertex =
       moved.length || list.length
         ? `{\n${moved.join('\n')}\n}\n{\n${[...(list.length ? passed.lines : []), ...(list.length ? passed.values.map((x, i) => `o.ndv${i}=${x};`) : [])].join('\n')}\n}`
@@ -578,6 +581,8 @@ export class NodeMaterial extends Material {
       cuts: !!this.depthFragment,
       depth: (code, group) => this.depthShader(code, group),
       velocity: (code, group) => this.velocityShader(code, group),
+      move: this.depthMove,
+      program: this.program,
       layout: () => (layout ??= device.createBindGroupLayout({ entries: [...reached.values()] })),
       entries: () =>
         this.program

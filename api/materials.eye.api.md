@@ -41,6 +41,8 @@ type CasterDisplacement =
       readonly entries?: undefined;
       readonly layout?: undefined;
       readonly cuts?: undefined;
+      readonly move?: undefined;
+      readonly program?: undefined;
     }
   | {
       readonly key: string;
@@ -49,6 +51,8 @@ type CasterDisplacement =
       entries(): GPUBindGroupEntry[];
       layout(): GPUBindGroupLayout;
       readonly cuts: boolean;
+      readonly move?: readonly string[];
+      readonly program?: { readonly next: number; readonly buffers: WeakMap<GPUDevice, { bytes: Uint8Array }> };
     };
 
 type CubeSource = {

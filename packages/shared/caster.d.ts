@@ -30,6 +30,8 @@ export type CasterDisplacement =
       readonly entries?: undefined;
       readonly layout?: undefined;
       readonly cuts?: undefined;
+      readonly move?: undefined;
+      readonly program?: undefined;
     }
   | {
       readonly key: string;
@@ -41,6 +43,12 @@ export type CasterDisplacement =
       layout(): GPUBindGroupLayout;
       /** The patch discards fragments, so a pass that skips the fragment stage of opaque casters needs it here. */
       readonly cuts: boolean;
+      /**
+       * The WGSL lines of the patch's move of `margoPosition` alone (empty: no move), and its program: TAA runs a move
+       * that reads the uniform block `ndu` again on last frame's bytes of it, bound at `program.next`.
+       */
+      readonly move?: readonly string[];
+      readonly program?: { readonly next: number; readonly buffers: WeakMap<GPUDevice, { bytes: Uint8Array }> };
     };
 /** A depth-only caster pipeline (less-equal depth into depth32float, line lists for `lines`). */
 export function casterPipeline(

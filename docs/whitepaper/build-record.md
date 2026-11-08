@@ -2672,14 +2672,12 @@ is timed.
 
 | # | Job | Status | Commit | Entry | Claim |
 | --- | --- | --- | --- | --- | --- |
-| 1 | KHR_gaussian_splatting | DONE | 18e04b891 | `/splats` | LIM-256 |
-| 2 | EXT_materials_bump | DONE | d75aa0ea9 | root | LIM-259 |
-| 3 | TEXCOORD_2 and 3 | DONE | 6a169101f | root | LIM-261 |
-| 4 | KHR_materials_volume_scatter | DONE | e0c78f9c7 | root | LIM-264 |
-| 5 | EXT_lights_ies, EXT_lights_image_based | DONE | 9a4655720 | `/lights` | LIM-266 |
-| 6 | Texture mip streaming | DONE | 58b4138a4 | `textures` of `/progressive` | LIM-271 |
-| 7 | KHR_physics_rigid_bodies, KHR_implicit_shapes | DONE | 0e2dd31f7 | `/physics` | LIM-275 |
-| 8 | KHR_interactivity | DONE | 869810a55 | `/interactivity`, `@margoengine/animation/interactivity` | LIM-276 |
+| 1 | Grading controls (wheels, curves, hue against saturation) | DONE | f716e0612 | `/grade` | LIM-477 |
+| 2 | Reinhard, Cineon and linear curves | DONE | 8e8fb4ef4 | main (`curve`) | LIM-479 |
+| 3 | Custom curve hook (WGSL or JavaScript) | DONE | 92687acd5 | `/custom` | LIM-481 |
+| 4 | Metering modes (histogram, centre, spot, mask) | DONE | 2d9bce624 | main (`autoExposure`) | LIM-482 |
+| 5 | Local exposure | DONE | 42b347700 | `/local` | LIM-486 |
+| 6 | Physical camera exposure (EV100, shared with DOF) | SKIPPED | | already `PhysicalCamera` in `@margoengine/cameras/physical` (EV100 from aperture, shutter and ISO; `apply` drives Tonemap exposure and DOF) | |
 
 - **Built from:** rows T-14 to T-18 in `docs/clean-room.md`: Fritsch and Carlson (1980) monotone curves, Reinhard et
   al. (2002) and the Hejl and Burgess-Dawson filmic fit, the 18% key value for metering, Durand and Dorsey (2002) with
@@ -2946,3 +2944,40 @@ root entry. Core and stage are untouched. GPU work is proved on a Radeon 680M in
   they come in visual order. Job 6's draft labelled style sheet errors as markup errors and accepted a leading `>`;
   both fixed before landing. The shared-rows guard now compares against the sha the rebase went onto, not the live
   `origin/main`.
+
+## Lane E batch 73: taa
+
+Five jobs for `@margoengine/taa` on the M6 Mac mini (Metal), each landed as one commit. Core and stage are untouched.
+Job 2 also changes `@margoengine/shader` (the manager's decision: NodeMaterial hands TAA its move and uniform block, and
+raw WGSL meshes get an opt-in), and the last of the five to land is job 2.
+
+| # | Job | Status | Commit | Entry | Claim |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Reactive mask | DONE | f7fedeff8 | `reactive` in `@margoengine/taa` | LIM-515 |
+| 2 | Automatic custom-deformation velocity | DONE | this commit | `@margoengine/taa`; `velocityEntry` in `@margoengine/shader/raw` | LIM-533 |
+| 3 | Better history rejection | DONE | f3faee7d9 | `rejection`, `clipGamma`, `locks` in `@margoengine/taa` | LIM-523 |
+| 4 | Sharpen for plain TAA | DONE | f173555f7 | `@margoengine/taa/sharpen` | LIM-525 |
+| 5 | TAA in XR and multiview | DONE (no new entry) | e615275a0 | per-eye history already in `@margoengine/taa`; proof and docs | LIM-531 |
+
+- **Built from:** `docs/clean-room.md` rows A-05 to A-09: AMD's public FidelityFX documentation for the ideas of a
+  reactive mask, thin-feature locks and contrast-adaptive sharpening (read as documentation, no source), Salvi 2016 for
+  variance clipping, and Margo's own design for carrying the mask in history alpha, the lock lifetime, the sharpen's
+  weight and clamp, and the velocity of shapes a shader moves. Nothing from another engine was read.
+- **Proved (real GPU, this Mac):** `reactive-browser.mjs` (a square with no velocity leaves no trail where masked),
+  `rejection-browser.mjs` (trail 53.0 to 35.1 sRGB levels under variance clipping; a 0.4 px line stays at 54 with locks),
+  `sharpen-browser.mjs` (every sharpened pixel inside its 4-neighbour range, GPU within 0.90 levels of a CPU run of the
+  formula), `xr-browser.mjs` (each of two `xr-0`/`xr-1` eyes equals itself drawn alone, byte for byte, after 24 frames),
+  `deform-browser.mjs` (a plane slid by its vertex shader alone matches the matrix-moved plane within 0.0001 levels on
+  average with a `positionNode` and 0.0007 with a raw `velocityEntry`; the raw shader without it trails 24.7 levels, as
+  the graph did before job 2). Unit tests beside each: reactive, rejection, sharpen and deform-velocity in
+  `packages/taa/test`, passes and raw in `packages/shader/test`.
+- **Sizes (gzip, B):** `@margoengine/taa` 13,858 to 14,202 over the batch's later jobs, new `/sharpen` 1,023,
+  `@margoengine/shader` 18,452 to 18,473 (under its 18,500 budget: TAA holds the second run of the move, the shader only
+  hands over its move and uniform block), `@margoengine/shader/raw` 13,652 to 14,234. Core and stage unchanged.
+- **Bugs fixed:** none outside the new work. Found on `main` during job 5 and not in this batch's packages:
+  `tests/support-async-calls.test.js` fails on `scripts/rust-kernel-tests.mjs:63` (`endTree` not awaited) from
+  357872866; reported to the manager and fixed on `main` before job 5 landed. Batch 72's job table above had been
+  overwritten by another batch's rows in a later landing; its own rows are back.
+- **Limits and unmeasured:** rows in `docs/limits.md` for each job. No multiview path (the engine has none); a move read
+  from a storage buffer or texture gets no motion of its own; GPU cost of every option is not measured; nothing was run
+  on another machine or in a headset.

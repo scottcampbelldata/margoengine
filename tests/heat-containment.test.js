@@ -368,6 +368,7 @@ test('split steps cover the whole suite: both bevel sample counts, each chain pa
       'rejection-browser.mjs',
       'sharpen-browser.mjs',
       'xr-browser.mjs',
+      'deform-browser.mjs',
     ],
   );
 });

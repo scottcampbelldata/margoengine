@@ -4,14 +4,14 @@
 
 ```ts
 import { EngineKernel } from "@margoengine/core";
-import { Engine, EnginePlugin, FrameGraph, Mesh } from "@margoengine/core/extension";
+import { Engine, EnginePlugin, FrameGraph, Mesh, PassContext } from "@margoengine/core/extension";
 
 export class TAA implements EnginePlugin {
     readonly options: TAAOptions;
     readonly name = "taa";
     constructor(options?: TAAOptions);
     static attach(instance: EngineKernel, options?: TAAOptions): TAA;
-    add(source: VelocitySource): () => void;
+    add(source: VelocitySource | TAAVelocityPass): () => void;
     reset(): void;
     onPreUpdate(delta: number): void;
     setup(engine: Engine): void;
@@ -50,6 +50,22 @@ export interface TAAVelocity {
     readonly texture: GPUTexture;
     readonly jitter: Float32Array;
     readonly resolved?: GPUTexture;
+}
+
+export interface TAAVelocityFrame {
+    readonly context: Extract<PassContext, {
+        backend: 'webgpu';
+    }>;
+    readonly camera: Float32Array;
+    readonly key: object;
+    readonly targets: readonly GPUColorTargetState[];
+    readonly depthStencil: GPUDepthStencilState;
+    readonly samples: number;
+}
+
+export interface TAAVelocityPass {
+    drawVelocity(pass: GPURenderPassEncoder, frame: TAAVelocityFrame): void;
+    releaseVelocity?(key: object): void;
 }
 
 export interface VelocityPrimitive extends CasterCutout {
@@ -100,6 +116,8 @@ type CasterDisplacement =
       readonly entries?: undefined;
       readonly layout?: undefined;
       readonly cuts?: undefined;
+      readonly move?: undefined;
+      readonly program?: undefined;
     }
   | {
       readonly key: string;
@@ -108,5 +126,7 @@ type CasterDisplacement =
       entries(): GPUBindGroupEntry[];
       layout(): GPUBindGroupLayout;
       readonly cuts: boolean;
+      readonly move?: readonly string[];
+      readonly program?: { readonly next: number; readonly buffers: WeakMap<GPUDevice, { bytes: Uint8Array }> };
     };
 ```

@@ -18,7 +18,7 @@ A materials mesh writes velocity where its surface is: `displacement` moves it a
 
 Core mesh motion and loaded glTF/FBX node motion are automatic, including parent transforms and reused entity IDs. `taa.add(pbrModel)` remains available for explicit velocity sources and safely overlaps automatic discovery. TAA reads the current animated stride-80 vertex buffer after skinning/morph computation and snapshots it on the GPU for the next frame. Static PBR vertices receive a lazily allocated TAA-owned storage copy from retained CPU data; ordinary PBR buffer usage is unchanged. There is no animation pass or palette duplication. Alpha-masked primitives retain UV0/UV1 selection, affine texture transforms, opacity maps (materials `alphaMap`), vertex alpha (left out with `vertexAlpha: false`) and cutoff, so a hole writes no velocity. The returned function unregisters the explicit source. Custom sources use the `shadowPrimitives` contract (24-byte core or 80-byte PBR vertices); PBR buffers need storage usage or retained `primitive.vertices`; a primitive with no alpha texture reads as opaque. Disposed models are removed during rendering.
 
-Other opaque renderers get camera-motion reprojection from scene depth. Custom deformation needs registered velocity primitives. Transparent particles, blended glTF and splats use the underlying opaque depth and neighborhood clamping; they do not supply their own velocity or occlusion history. Fast transparent effects can still ghost unless they are drawn into the `reactive` mask (below). Call `reset()` when a scene change cannot be described by motion.
+Other opaque renderers get camera-motion reprojection from scene depth. Shapes a shader moves write their own motion: a NodeMaterial `positionNode` that reads its uniforms needs nothing (last frame's uniforms are kept per view), and a raw WGSL mesh does with `velocityEntry` and `taa.add(raw)` (`@margoengine/shader/raw`); other custom deformation needs registered velocity primitives. Transparent particles, blended glTF and splats use the underlying opaque depth and neighborhood clamping; they do not supply their own velocity or occlusion history. Fast transparent effects can still ghost unless they are drawn into the `reactive` mask (below). Call `reset()` when a scene change cannot be described by motion.
 
 `historyWeight` is in [0,1), default 0.9; zero disables history blending. `depthThreshold` is the relative reversed-depth rejection tolerance in [0,1], default 0.01. Parameters are validated before commands. History resets on resize, projection changes and device restoration; first-frame/newly visible primitives reject history. Rendering receives a retained camera view with the jittered matrix and the public camera's current properties. The public camera matrix stays unchanged, including when another pass throws; presentation restores the original context camera reference. Culling uses the normal camera frustum. With engine views, each view (by `RenderView.id`) keeps its own history, jitter and captures at canvas size; a view not drawn for a frame releases them.
 
@@ -113,6 +113,28 @@ sharpen.amount = 0.6; // takes effect next frame
 ```
 
 `gpuState` exposes velocity, current history color and history depth textures after rendering. `dispose()`/`destroy()` releases owned buffers, textures and source records. Device restoration recreates everything and discards stale history. The package is independent of PBR, animation, shadows, clustered lighting, particles and stage; helper-only imports discard the renderer. It follows the workspace's `@margoengine/*` naming convention.
+
+## Shapes a shader moves
+
+TAA reprojects each pixel by its velocity, and a mesh whose matrix never changes writes none, so a shape its vertex
+shader moves (a wave, a sliding pattern, a flag) used to read its own stale history and trail. Two kinds now write their
+own motion. A NodeMaterial `positionNode` that reads the graph's uniforms (a `uniform()` you change, `time`, the camera)
+runs a second time in TAA's velocity pass on last frame's values, kept per view and draw, at last frame's model matrix.
+A raw WGSL mesh opts in with `velocityEntry` and `taa.add(raw)` (see `@margoengine/shader/raw`); a raw mesh without it
+keeps camera motion from its depth only. A move read from a storage buffer or texture that changes is not tracked.
+
+```ts
+import {EngineKernel} from 'margoengine/core';
+import {planeGeometry} from 'margoengine/geometry';
+import {createMesh} from 'margoengine/materials';
+import {NodeMaterial, positionLocal, uniform, vec3, sin} from 'margoengine/shader';
+import {TAA} from 'margoengine/taa';
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
+TAA.attach(engine);
+const phase = uniform(0);
+createMesh(engine, planeGeometry(2, 2), new NodeMaterial({positionNode: positionLocal.add(vec3(sin(phase), 0, 0))}));
+engine.onFrame((_, delta) => { phase.value += delta * 4; }); // its motion reaches TAA by itself
+```
 
 ## Stereo and XR
 

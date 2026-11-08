@@ -221,6 +221,12 @@ class Program {
     readonly varyings: Node[];
     readonly functions: Map<string, string>;
     next: number;
+    readonly buffers: WeakMap<GPUDevice, {
+        buffer: GPUBuffer;
+        view: DataView;
+        bytes: Uint8Array;
+        last: number;
+    }>;
     constructor(base?: number, compute?: boolean);
     stage(stage: ShaderStage, outputs: readonly Node[]): {
         lines: string[];

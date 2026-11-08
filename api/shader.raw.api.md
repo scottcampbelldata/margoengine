@@ -137,6 +137,7 @@ export class RawShaderMaterial {
     readonly gpu: Map<GPUDevice, MaterialGpu>;
     revision: number;
     compiled: number;
+    readonly velocityName?: string;
     constructor(options: RawShaderMaterialOptions);
     get vertexShader(): string;
     set vertexShader(code: string);
@@ -163,6 +164,7 @@ export interface RawShaderMaterialOptions {
     storage?: Record<string, RawStorage>;
     groups?: readonly RawBindGroup[];
     gbufferEntry?: string;
+    velocityEntry?: string;
     transparent?: boolean;
     blending?: RawBlending;
     depthTest?: boolean;
@@ -202,6 +204,12 @@ export class RawShaders implements EnginePlugin {
         view: ArrayLike<number>;
         depthCompare: GPUCompareFunction;
     }): void;
+    drawVelocity(pass: GPURenderPassEncoder, frame: {
+        context: PassContext;
+        camera: Float32Array;
+        key: object;
+    }): void;
+    releaseVelocity(key: object): void;
 }
 
 export interface RawShadersOptions {
@@ -274,6 +282,8 @@ interface HeldBuffer {
 interface MaterialGpu {
     layout?: GPUBindGroupLayout;
     pipelineLayout: GPUPipelineLayout;
+    velocityLayout?: GPUPipelineLayout;
+    groupLayouts: GPUBindGroupLayout[];
     buffer?: GPUBuffer;
     written?: Uint8Array;
     group?: GPUBindGroup;
@@ -309,7 +319,7 @@ interface PipelineEntry {
     pipeline?: GPURenderPipeline;
 }
 
-type RawPass = 'color' | 'shadow' | 'gbuffer' | 'pick';
+type RawPass = 'color' | 'shadow' | 'gbuffer' | 'pick' | 'velocity';
 
 type RawPassContext = Extract<PassContext, {
     backend: 'webgpu';

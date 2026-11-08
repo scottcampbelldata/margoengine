@@ -877,7 +877,7 @@ export class Program {
   private counter = 0;
   /** @internal The binding the next new resource takes: every binding below it is held. */ next: number;
   private block?: { resource: Resource; name: string; binding: number };
-  private readonly buffers = new WeakMap<
+  /** @internal The uniform block per device; TAA reads last frame's `bytes`. */ readonly buffers = new WeakMap<
     GPUDevice,
     { buffer: GPUBuffer; view: DataView; bytes: Uint8Array; last: number }
   >();

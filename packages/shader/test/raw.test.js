@@ -1080,3 +1080,53 @@ test('a pick after a device swap makes a new camera block, and a broken material
   assert.equal(host.overlay.pickHit(0), null);
   assert.ok(mesh);
 });
+
+test('TAA velocity draws only opaque meshes with velocityEntry, with last frame kept per TAA view', () => {
+  const code = `${shader}
+@vertex fn moved(a:Attributes)->MargoVelocity {return margoVelocity(a.position+vec3f(uniforms.gain,0,0),a.position);}`,
+    h = harness(),
+    raw = RawShaders.attach(h.engine),
+    own = material({ vertexShader: code, velocityEntry: 'moved' });
+  const mesh = raw.add(new RawMesh({ material: own, attributes: quad() }));
+  raw.add(new RawMesh({ material: material(), attributes: quad() }));
+  raw.add(new RawMesh({ material: material({ vertexShader: code, velocityEntry: 'moved', transparent: true }), attributes: quad() }));
+  assert.match(own.code('vertex'), /var<uniform> margoBefore:MargoBefore;/, 'every stage declares what the entry reads');
+  assert.doesNotMatch(material().code('vertex'), /margoBefore/, 'a material without it is unchanged');
+  const key = {},
+    rows = new Float32Array(36);
+  rows.set([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1], 0);
+  rows.set([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0.5, 0, 0, 1], 16);
+  rows.set([64, 64, 1, 0], 32);
+  const velocity = () =>
+    h.gpu.record(() => {
+      h.frame();
+      const pass = h.gpu.encoder.beginRenderPass({ colorAttachments: [] });
+      raw.drawVelocity(pass, { context: h.view.c, camera: rows, key });
+      pass.end();
+    });
+  const first = velocity(),
+    pipeline = named(first, 'renderPipeline').find((p) => p[2].fragment?.entryPoint === 'margoVelocityFragment')[2];
+  assert.equal(pipeline.vertex.entryPoint, 'moved');
+  assert.deepEqual(pipeline.fragment.targets, [{ format: 'rg16float' }, { format: 'r32float' }]);
+  assert.equal(pipeline.depthStencil.depthCompare, 'equal');
+  assert.equal(pipeline.depthStencil.depthWriteEnabled, false);
+  assert.equal(pipeline.primitive.cullMode, 'none');
+  const module = named(first, 'module').find((m) => /margoVelocityFragment/.test(m[2].code));
+  assert.match(module[2].code, /@vertex fn moved/);
+  const befores = (log) => named(log, 'writeBuffer').filter((c) => c[3].length === 144 * 2).map((c) => floats(c[3]));
+  assert.equal(befores(first).length, 1, 'one opted-in opaque mesh');
+  assert.equal(befores(first)[0][33], 0, 'no last frame yet: no motion');
+  assert.deepEqual(befores(first)[0].slice(0, 16), [...rows.slice(16, 32)], "TAA's previous view-projection");
+  mesh.matrix = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 2, 0, 0, 1];
+  const second = befores(velocity())[0];
+  assert.equal(second[33], 1, 'drawn last frame and TAA has history');
+  assert.equal(second[28], 0, "last frame's world, not this frame's");
+  assert.ok(second[32] > 0, "last frame's time");
+  const third = velocity();
+  assert.equal(befores(third)[0][28], 2, 'then the moved one');
+  assert.equal(named(third, 'pass.draw').length + named(third, 'pass.drawIndexed').length, 3 + 1, 'the scene passes draw three, TAA one');
+  // Releasing the view's state frees its buffers; idle without an open TAA pass.
+  const freed = h.gpu.record(() => raw.releaseVelocity(key));
+  assert.equal(named(freed, 'destroy').length, 2, 'the camera block and the one mesh block');
+  assert.throws(() => material({ velocityEntry: 'missing' }), /has no @vertex fn missing/);
+});

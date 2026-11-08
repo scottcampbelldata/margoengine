@@ -170,3 +170,29 @@ test('the colour group holds what any stage of the colour pass reads, and not a 
   assert.equal(held(new NodeMaterial({ colorNode: vec3(value) })), 1, 'a uniform the colour reads');
   assert.equal(held(new NodeMaterial({ positionNode: positionLocal.add(cameraPosition.mul(0.1)) })), 0, 'the depth camera');
 });
+
+test("a move that reads the graph's uniforms runs again on last frame's in TAA's velocity", () => {
+  globalThis.GPUTextureUsage ??= { TEXTURE_BINDING: 4, COPY_DST: 2 };
+  globalThis.GPUBufferUsage ??= { UNIFORM: 64, COPY_DST: 8 };
+  const gpu = mockGPU(),
+    shift = uniform(0),
+    graph = new NodeMaterial({ positionNode: positionLocal.add(vec3(shift, 0, 0)) }),
+    record = graph.caster(gpu.device);
+  assert.ok(record.move.some((line) => line.includes('ndu.')), 'the move alone, reading the block');
+  assert.ok(record.entries().every((e) => e.binding < record.program.next), 'last frame binds after the graph');
+  graph.bindings(gpu.device);
+  assert.equal(record.program.buffers.get(gpu.device).bytes.length % 16, 0, 'the block TAA copies');
+  const code = objectVelocity(true, false, false, false, true, false, record.velocity, {
+    move: record.move,
+    binding: record.program.next,
+  });
+  assert.match(code, new RegExp(`@group\\(1\\) @binding\\(${record.program.next}\\) var<uniform> nduBefore:NdUniforms;`));
+  assert.match(code, /\{var o:Out;var margoBefore=i\.position\.xyz;\{let margoWorld=\(f\.previousModel\*/);
+  assert.match(code, /nduBefore\./);
+  assert.match(code, /margoBefore=margoPosition;\}let margoWorld=\(f\.model\*/, 'last frame first, then this frame');
+  assert.match(code, /previousVertices\[index\*5\]\.xyz\+margoBefore-i\.position\.xyz/);
+  assert.doesNotMatch(code, /\+shift,1\)/);
+  // A move that reads no uniform moves the same on both frames.
+  const still = new NodeMaterial({ positionNode: positionLocal.add(vec3(0, 1, 0)) }).caster(gpu.device);
+  assert.ok(!still.move.some((line) => line.includes('ndu.')));
+});
