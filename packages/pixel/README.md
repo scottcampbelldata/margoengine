@@ -108,6 +108,41 @@ Exact bytes need one sample per pixel, which `exactSize` gives; an engine with M
 back by themselves after a device loss, with the last `write` in them, so read `layer.texture` each frame rather than
 keeping it.
 
+## Scaling to any screen
+
+`margoengine/pixel/scale` draws a low-res picture as large as the canvas allows when the canvas is not a whole multiple
+of it, such as 320 x 180 art on a 1366 x 768 laptop (4.27 times). Nearest sampling there makes some art pixels one
+screen pixel wider than others; `'sharp-bilinear'` keeps every art pixel flat and mixes only the one screen pixel that
+straddles two of them, by how much of it each covers. `'edge'` first doubles the art by the Scale2x rule, which rounds
+diagonal steps, then scales the same way.
+
+```ts
+import {EngineKernel} from 'margoengine/core';
+import {LayerCompositor} from 'margoengine/pixel';
+import {PixelScale} from 'margoengine/pixel/scale';
+const canvas = document.querySelector('canvas')!;
+const engine = await EngineKernel.create(canvas, {backend: 'webgpu', exactSize: [1366, 768]});
+const compositor = LayerCompositor.attach(engine, {camera: {width: 320, height: 180}});
+const art = compositor.addLayer({visible: false}); // sprites and maps draw here
+const scale = PixelScale.attach(engine, {source: art.target, filter: 'sharp-bilinear'});
+engine.render({delta: 1 / 60});
+scale.filter = 'edge'; // read each frame
+```
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| `source` | required | The low-res picture, premultiplied as in a pixel layer: a texture or a function returning one |
+| `target` | each canvas view | A texture to draw into instead, cleared first; on the canvas the picture goes over what is there |
+| `filter` | `'sharp-bilinear'` | `'nearest'`, `'sharp-bilinear'` or `'edge'`, read each frame |
+| `fit` | `'contain'` | `'contain'`: as large as fits keeping its shape, in the middle; `'stretch'`: the whole view. Read each frame |
+| `layers` | 1 | Render-layer bits; a canvas view whose `layers` shares none is left alone |
+| `order` | `35` | Frame-graph order, after a compositor (30) |
+| `name` | `pixel-scale-1`, ... | Plugin name, unique per scene |
+
+The picture covers whole screen pixels: `fitRect(width, height, viewWidth, viewHeight, fit)` gives that rectangle.
+`'edge'` needs room for the doubled picture: below 2 times it draws as `'sharp-bilinear'`. Colours mix as stored, not
+in linear light. `scale2x(image)` is the CPU form of the doubling, to export sprites at twice the size.
+
 ## Palettes and dithering
 
 `margoengine/pixel/palette` reduces a low-res picture to a palette: one pass from a layer into another, with each pixel becoming exactly one palette colour. Matching is in Oklab or plain sRGB. Ordered Bayer 2, 4 and 8 and a 64 x 64 blue-noise tile dither before matching. `swap` draws other colours for the same matches.

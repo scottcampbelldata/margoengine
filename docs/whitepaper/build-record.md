@@ -2746,7 +2746,7 @@ side can see. Nothing is timed.
 | 1 | Isometric, staggered and hexagonal maps | DONE | `2284acdaa` | `/iso`, `/hex` | 6,379 B, 2,031 B | LIM-491 |
 | 2 | Colliders from tiles | SKIPPED | | already `addTileMap` and `tileMapColliders` in `@margoengine/physics2d`, which merge whole-cell solid tiles into outline loops | | |
 | 3 | Grid pathfinding | DONE | `c76992f3d` | `/path` | 2,586 B | LIM-495 |
-| 4 | Fog of war and tile visibility | DONE | this commit | `/fov` | 1,587 B | LIM-498 |
+| 4 | Fog of war and tile visibility | DONE | this commit | `/fov` | 1,587 B | LIM-499 |
 
 - **Bugs fixed:** batch 100's build record (b1a212ab9) had written its six job rows over the table of the tonemap batch
   above it and left its own heading with a bare separator; both tables are back, and `tests/markdown-tables.test.js`

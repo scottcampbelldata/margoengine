@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11334334,
+  "total": 11337701,
   "history": [
     {
       "date": "2026-10-24",
@@ -4568,6 +4568,12 @@
       "commit": "373ebde76",
       "reason": "new entry @margoengine/inspector/packages (batch 107 job 1)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "5c391047a",
+      "reason": "new entry @margoengine/pixel/scale (pixel-art scaling)",
+      "grew": 1
     }
   ],
   "items": {
@@ -5049,6 +5055,7 @@
     "@margoengine/pixel": 4664,
     "@margoengine/pixel/palette": 4341,
     "@margoengine/pixel/render3d": 3866,
+    "@margoengine/pixel/scale": 3367,
     "@margoengine/points": 23954,
     "@margoengine/points/copc": 15633,
     "@margoengine/points/e57": 6537,

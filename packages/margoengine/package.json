@@ -1910,6 +1910,10 @@
       "types": "./dist/pixel/render3d.d.ts",
       "import": "./dist/pixel/render3d.js"
     },
+    "./pixel/scale": {
+      "types": "./dist/pixel/scale.d.ts",
+      "import": "./dist/pixel/scale.js"
+    },
     "./points": {
       "types": "./dist/points.d.ts",
       "import": "./dist/points.js"
