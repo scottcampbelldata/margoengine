@@ -3133,25 +3133,25 @@ waiting on lane J and a smaller worker file. Core and stage are untouched. Nothi
 
 ## Lane F batch 97: voxel-edit
 
-Five jobs for `@margoengine/voxel-edit` on the M6 Mac mini (Metal); four landed as one commit each, one is blocked.
-Core and stage are untouched. Row 97 of `docs/work-lists/list-2.md` stays open until job 4 is decided.
+Five jobs for `@margoengine/voxel-edit` on the M6 Mac mini (Metal), each landed as one commit. Core and stage are
+untouched. Job 4 was first blocked for the clean room and landed after Scott's decision; this follow-up commit records it
+and sets row 97 of `docs/work-lists/list-2.md` to done.
 
 | # | Job | Status | Commit | Entry | Claim |
 | --- | --- | --- | --- | --- | --- |
 | 1 | Procedural shader brushes | DONE | 220cb61ae | `ShaderBrush` in `@margoengine/voxel-edit/shaders` | LIM-530 |
 | 2 | Bones and skinned voxel animation | DONE | cbf7566fa | `VoxelRig` in `@margoengine/voxel-edit/rig` | LIM-551 |
 | 3 | GPU bulk edits | DONE | a5e315535 | `GpuGrid` in `@margoengine/voxel-edit/gpu` | LIM-553 |
-| 4 | Goxel and VoxEdit formats | BLOCKED (awaiting Scott) | none | none | none |
-| 5 | Shared editing | DONE | this commit | `VoxelReplica` in `@margoengine/voxel-edit/collab` | LIM-555 |
+| 4 | Goxel and VoxEdit formats | DONE | 6fc3c7606 | `parseGOX`/`writeGOX`, `parseVXM`/`writeVXM` in `@margoengine/voxel-edit/formats` | LIM-557 |
+| 5 | Shared editing | DONE | ac9bcfd7f | `VoxelReplica` in `@margoengine/voxel-edit/collab` | LIM-555 |
 
 - **Built from:** `docs/clean-room.md` rows VX24 to VX27: a fixed WGSL prelude for user brushes over a packed grid,
   rigid bones composed down a hierarchy with slerp keys (Shoemake 1985), a resident ping-pong grid with fixed brushes
   for fills, booleans and filters, and a last-writer-wins register per cell stamped by a Lamport clock (Lamport 1978,
   Shapiro et al. 2011). Nothing from another engine was read.
-- **Job 4 blocked (clean room):** no public prose specification of VoxEdit `.vxm` was found at all, and for `.gox` only
-  a page reproducing the comment block of Goxel's source (chunk layout, `BL16` blocks as 64 x 64 PNG, `LAYR`
-  records); byte order, the CRC range and the `BL16` pixel mapping exist only in source, which the clean-room rule
-  forbids reading. It needs Scott: real sample files with an approved licence, or an approved spec.
+- **Job 4 (formats):** this lane found no public prose specification of VoxEdit `.vxm` and none of `.gox` beyond a
+  copy of Goxel's source comment, so it stopped for Scott's decision; the job then landed as 6fc3c7606, whose own
+  commit and `docs/clean-room.md` rows VF7 to VF12 record how its specification was obtained.
 - **Proved:** jobs 1 and 3 on the real GPU of this Mac (`shaders-browser-check.mjs`, `gpu-browser-check.mjs`): grow and
   erode equal `dilateGrid` and `erodeGrid` cell for cell, and a chain of fills, booleans and filters equals the same
   CPU chain on 37 x 29 x 41 and on 16.7 million cells. Job 2 by unit tests (`rig.test.js`: a quarter turn bakes
