@@ -132,7 +132,7 @@ const label = new Text({text: 'Hello', font});
 ## Limits
 
 - WebGPU only. On the WebGL2 backend the plugin warns once and draws nothing.
-- Shaping needs the browser's text stack: a worker without the font draws isolated fallback forms. A shaped run is at most 16 em across, and wider runs clip. Letter spacing applies between runs, not inside them.
+- Shaping needs the browser's text stack: a worker without the font draws isolated fallback forms. Shaped runs size dynamically without clipping, and letter spacing applies between clusters within shaped runs.
 - Outlines plus shadow blur are limited by the field range to about 0.14 em together. Very small text (under about 6 px) loses thin strokes, as with any SDF text.
 - Emoji are bitmaps scaled from 48 px, so they soften when magnified far beyond that.
 - No extruded 3D glyph geometry; that needs vector outlines a browser canvas does not expose.

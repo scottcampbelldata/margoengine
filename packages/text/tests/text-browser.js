@@ -431,6 +431,22 @@ window.runTextTests = async () => {
   if (isolated > joined * 1.02) {
     if (!bitmap || bitmap.width < 48) throw new Error('A shaped Arabic run rasterizes as one bitmap');
     report.checks.push('Arabic runs are measured and rasterized joined, narrower than their isolated letters');
+    // Long run check: a 60-character Arabic sentence rasterizes without the 16 em clamp
+    const longSentence = '\u0633\u0644\u0627\u0645'.repeat(15),
+      longBitmap = shaper.glyph(longSentence);
+    if (longBitmap) {
+      if (longBitmap.width <= 16 * shaper.size)
+        throw new Error(`Long Arabic run was clamped: width ${longBitmap.width} <= ${16 * shaper.size}`);
+      const longText = new Text({ text: longSentence, font: shaper, fontSize: 1, letterSpacing: 2 });
+      const layout = longText.layout;
+      assert(layout.glyphs.length === 1, 'Long Arabic sentence lays out as one run');
+      const expectedAdvance = shaper.advance(longSentence) + 59 * 2;
+      assert(
+        Math.abs(layout.glyphs[0].advance - expectedAdvance) < 1e-4,
+        'Expected cluster advances with letterSpacing: 2',
+      );
+      report.checks.push('Long Arabic runs rasterize without truncation and apply letter spacing to advances');
+    }
   }
   await settle(runtime.gpu);
 

@@ -281,9 +281,10 @@ export function layoutText(text: string, options: LayoutOptions, measurer: TextM
     if (next && next === kind && run) {
       const offset = run.cluster.length,
         joined = run.cluster + cluster;
-      (run.carets ??= []).push([offset, measurer.advance(run.cluster) * fs]);
+      const count = (run.carets?.length ?? 0) + 1;
+      (run.carets ??= []).push([offset, measurer.advance(run.cluster) * fs + count * spacing]);
       run.cluster = joined;
-      run.advance = measurer.advance(joined) * fs;
+      run.advance = measurer.advance(joined) * fs + count * spacing;
       continue;
     }
     kind = next;

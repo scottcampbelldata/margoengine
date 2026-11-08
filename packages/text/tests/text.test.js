@@ -772,6 +772,34 @@ test('Arabic and Indic words lay out as one shaped run with carets by grapheme',
   assert.equal(layout(arabic + '\u0928').glyphs.length, 2, 'scripts do not join');
 });
 
+test('shaped runs apply letterSpacing between clusters', () => {
+  const arabic = '\u0633\u0644\u0627\u0645',
+    byLength = { ...mock, advance: (cluster) => 0.5 * cluster.length },
+    l = layoutText(arabic, { letterSpacing: 2 }, byLength);
+  assert.equal(l.glyphs.length, 1);
+  const g = l.glyphs[0];
+  // 4 clusters * 0.5 em + 3 internal letter gaps * 2 = 2.0 + 6 = 8.0
+  close(g.advance, 8.0, 'advance with letterSpacing: 2');
+  assert.equal(g.carets.length, 3);
+  close(g.carets[0][1], 0.5 * 1 + 1 * 2, 'caret 1');
+  close(g.carets[1][1], 0.5 * 2 + 2 * 2, 'caret 2');
+  close(g.carets[2][1], 0.5 * 3 + 3 * 2, 'caret 3');
+  close(caretRect(l, 1).x, g.x + g.advance - g.carets[0][1], 'rtl caret 1');
+  close(caretRect(l, 2).x, g.x + g.advance - g.carets[1][1], 'rtl caret 2');
+  close(caretRect(l, 3).x, g.x + g.advance - g.carets[2][1], 'rtl caret 3');
+  assert.equal(hitTest(l, g.x + g.advance - g.carets[1][1], -0.5), 2);
+});
+
+test('long shaped run lays out without advance truncation', () => {
+  const longArabic = '\u0633'.repeat(60),
+    byLength = { ...mock, advance: (cluster) => 0.5 * cluster.length },
+    l = layoutText(longArabic, {}, byLength);
+  assert.equal(l.glyphs.length, 1);
+  const g = l.glyphs[0];
+  close(g.advance, 30.0, '60-character run advance');
+  assert.equal(g.carets.length, 59);
+});
+
 test('a shaped run stays whole across a line break', () => {
   const l = layout('\u0633\u0644\u0627\u0645\u0633\u0644\u0627\u0645', { maxWidth: 1 });
   assert.equal(l.lines.length, 1);
