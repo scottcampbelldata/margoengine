@@ -384,6 +384,7 @@ The own solver's kernel (`packages/physics/kernel`, Rust, no dependencies). Noth
 | P-34 | ImagePost curves and display gamma | post/src/image.ts | as cited |
 | P-35 | Projected decal fade | post/src/decals.ts | Margo-own: Margo design |
 | P-36 | Separable screen-space subsurface blur, per-channel Gaussian profile in world units | post/src/sss.ts | Jimenez, Zsolnai, Jarabo, Freude, Auzinger, Wu, von der Pahlen, Wimmer, Gutierrez, "Separable Subsurface Scattering", Computer Graphics Forum 34(6), 2015 (method, from the paper's description); d'Eon and Luebke, "Advanced Techniques for Realistic Real-Time Skin Rendering", GPU Gems 3 ch. 14, 2007 (profiles as sums of Gaussians, red widest). Both read from memory of the publications, not re-read for this change; the single Gaussian per channel and the default shares are Margo-own |
+| P-37 | Material decals: tangent-space normal, roughness and metalness under box projectors, relit as the change in core's sun and ambient light with the sun's share read back from the lit image | post/src/material-decals.ts | Shading: core's own lit model (Lambert plus GGX after Walter, Marschner, Li and Torrance, "Microfacet Models for Refraction through Rough Surfaces", EGSR 2007; Smith-GGX visibility; Schlick Fresnel, 1994), replayed from core's shader; tangent frame by Gram-Schmidt from the decal's axes. The relight by difference and the read-back shadow share are Margo-own |
 
 ### scatter
 

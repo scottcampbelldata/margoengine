@@ -724,8 +724,60 @@ decals.setDecals([
 Limits: needs a post capture's scene depth (throws `Decals need scene depth: attach a post capture (Tonemap, Bloom,
 PostStack, SSAO, TAA) first`); at 4x MSAA it reads depth sample 0 and writes every covered sample, so decal edges along
 geometry silhouettes are per pixel, not per sample; gltf-pro BLEND primitives (drawn before it, without depth) get no
-decal of their own and are tinted with the decal of the surface behind them; no normal or roughness decals (it changes colour
-only); `multiply` cannot lighten; up to 4,096 decals per `setDecals`, every one drawn every frame (no culling). WebGPU only.
+decal of their own and are tinted with the decal of the surface behind them; it changes colour only (`MaterialDecals` below changes normal, roughness and metalness); `multiply` cannot lighten; up to 4,096 decals per `setDecals`, every one drawn every frame (no culling). WebGPU only.
+
+## Material decals: `MaterialDecals`
+
+`@margoengine/post/material-decals` (its own entry) projects boxes that change the surface itself: its normal, from a
+tangent-space normal atlas, its roughness, metalness and base colour, for bullet holes, dents, wet patches and grime
+with depth. It is an HDR PostStack effect: the surface under each pixel comes from a `SceneTargets` capture (built-in
+`albedo`, `normal` and `material`), the light is the scene's sun and ambient (`engine.lighting`), and the pixel's direct
+and ambient light are worked out with core's lit shading model for the surface before and after the decals; the
+difference is added to the lit image. How much sun reached the pixel is read back from the lit image, so a decal in
+shadow stays in shadow.
+
+```ts
+import {Engine, box, PbrMaterial} from 'margoengine/core';
+import {SceneTargets} from 'margoengine/post/mrt';
+import {PostStack} from 'margoengine/post/stack';
+import {Tonemap} from 'margoengine/tonemap';
+import {MaterialDecals} from 'margoengine/post/material-decals';
+const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
+engine.createMesh().setGeometry(box(8, 0.2, 8)).setMaterial(new PbrMaterial({color: '#808080', roughness: 1}));
+const targets = SceneTargets.attach(engine, {outputs: {albedo: 'albedo', normal: 'normal', material: 'material'}});
+const decals = new MaterialDecals({
+  targets: () => ({albedo: targets.texture('albedo')!, normal: targets.texture('normal')!, material: targets.texture('material')!}),
+});
+PostStack.attach(engine, [decals, new Tonemap()]);
+decals.setDecals([
+  {position: [0, 0.1, 0], direction: [0, -1, 0], width: 1.5, height: 1, roughness: 0.08, color: [0.6, 0.6, 0.65]}, // a wet patch
+  {position: [2, 0.1, 1], direction: [0, -1, 0], width: 0.3, height: 0.3, metalness: 1, bump: 2},              // scraped metal
+]);
+```
+
+- **Decals.** Each is a box projector placed as a `Decal` of `@margoengine/post/decals` (`position`, `direction`,
+  `width`, `height`, `depth`, `up`, `rect`, `opacity`, `angle`, same defaults). `bump` (0 to 4, default 1) scales the
+  atlas normal; `roughness` and `metalness` (0 to 1) replace the surface's, unset keeps them; `color` (default
+  `[1, 1, 1]`) multiplies the base colour. Coverage is the atlas alpha times `opacity` and the angle and depth fades;
+  later decals apply over earlier ones. At most 64 per `setDecals`; every pixel tests each one.
+- **Atlas.** `atlas` is a sampled 2D texture: RGB a tangent-space normal map (green up, as glTF and OpenGL), alpha the
+  coverage, read at mip level 0. The map's x follows the decal's right axis (`up` x `direction`) and its y the decal's up
+  axis, laid onto the surface. Default a flat normal with full coverage, so a decal without an atlas changes only
+  roughness, metalness and colour.
+- **Light.** The relight uses core's lit model (Lambert plus GGX, the sun and the ambient of `engine.lighting`). Core
+  meshes match it; gltf-pro and materials models, which add image-based light and more lights, get the sun and ambient
+  part of the change only.
+- **Checks** (M6 Mac mini, Metal, Chromium; `node packages/post/test/material-decals-browser.mjs`): on a rough grey
+  floor seen along the sun's mirror direction, a 1 m decal with a normal tilted 45 degrees toward the sun brightens
+  3,949 pixels and darkens none, tilted away darkens 3,949 and brightens none, roughness 0.05 shows the highlight,
+  metalness 1 darkens all it covers; a decal that changes nothing, no capture and `enabled: false` each equal the frame
+  without decals exactly.
+
+Limits: needs a `SceneTargets` capture (one more scene pass) and runs in a PostStack, so it also relights what
+transparent effects drew over the decal's surface; the shadow share is read per pixel from the lit image, so where the
+unshadowed sun gives the old surface nothing (facing away from the sun) a new normal that faces it is treated as lit;
+the atlas has no mipmaps in use (level 0), so a far, dense normal map can shimmer; up to 64 decals, no culling. WebGPU
+only.
 
 ## FXAA
 

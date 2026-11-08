@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10742956,
+  "total": 10751506,
   "history": [
     {
       "date": "2026-10-24",
@@ -3860,6 +3860,12 @@
       "commit": "ae827c37e",
       "reason": "voxel/light-worker: new entry, VoxelLighting in a Web Worker, and its worker script",
       "grew": 2
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "ca08382d3",
+      "reason": "post/material-decals: normal, roughness and metalness decals (new entry)",
+      "grew": 1
     }
   ],
   "items": {
@@ -4341,6 +4347,7 @@
     "@margoengine/post/gtao": 11961,
     "@margoengine/post/image": 11882,
     "@margoengine/post/lens-flare": 6549,
+    "@margoengine/post/material-decals": 8550,
     "@margoengine/post/motion-blur": 7762,
     "@margoengine/post/mrt": 3753,
     "@margoengine/post/outline": 6054,

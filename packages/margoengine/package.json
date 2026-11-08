@@ -1962,6 +1962,10 @@
       "types": "./dist/post/sss.d.ts",
       "import": "./dist/post/sss.js"
     },
+    "./post/material-decals": {
+      "types": "./dist/post/material-decals.d.ts",
+      "import": "./dist/post/material-decals.js"
+    },
     "./procedural": {
       "types": "./dist/procedural.d.ts",
       "import": "./dist/procedural.js"
