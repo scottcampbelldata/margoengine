@@ -33,6 +33,10 @@
     "./custom": {
       "types": "./dist/custom.d.ts",
       "import": "./dist/custom.js"
+    },
+    "./local": {
+      "types": "./dist/local.d.ts",
+      "import": "./dist/local.js"
     }
   },
   "files": [
@@ -60,6 +64,7 @@
     "test:gpu:grade": "cd ../.. && node packages/tonemap/tests/grade-browser.mjs",
     "test:gpu:curves": "cd ../.. && node packages/tonemap/tests/curves-browser.mjs",
     "test:gpu:custom": "cd ../.. && node packages/tonemap/tests/custom-browser.mjs",
-    "test:gpu:metering": "cd ../.. && node packages/tonemap/tests/metering-browser.mjs"
+    "test:gpu:metering": "cd ../.. && node packages/tonemap/tests/metering-browser.mjs",
+    "test:gpu:local": "cd ../.. && node packages/tonemap/tests/local-browser.mjs"
   }
 }

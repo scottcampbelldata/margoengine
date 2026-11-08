@@ -142,8 +142,8 @@ grade.options.hueSaturation = [1.2, 1, 0.8, 1, 1, 1]; // richer reds, quieter gr
 - **Limits.** Display-referred grading in 0..1 (what lies above white under an HDR `ColorOutput` passes ungraded); 33
   curve samples; one Grade per Tonemap.
 
-`extensions` takes any `TonemapExtension` (`key`, `patch(shader, binding)` returning the WGSL with its code in, and an
-optional `values()` for one uniform buffer at that binding); changing the list rebuilds the pipeline once.
+`extensions` takes any `TonemapExtension` (`key`, `patch(shader, binding, extra)` returning the WGSL with its code in,
+an optional `values()` for one uniform buffer at that binding); changing the list rebuilds the pipeline once.
 
 ## Custom curve: `CustomCurve`
 
@@ -184,3 +184,44 @@ const soft = new CustomCurve({curve: (x) => 1 - Math.exp(-x)});
 - **Limits.** Shader-node graphs from `@margoengine/shader` are not taken directly (Tonemap does not depend on that
   package): write the curve as WGSL. A JavaScript curve is per channel and sampled (128 points over 20 stops). A WGSL
   function whose name the Tonemap shader already uses is rejected; other WGSL errors show as a GPU validation error.
+
+## Local exposure: `LocalExposure`
+
+`@margoengine/tonemap/local` keeps detail in bright windows and dark interiors in one frame: dark regions come up and
+bright ones come down toward middle grey, while the detail inside each region keeps its contrast. Give it to Tonemap's
+`extensions`; its options are read every frame.
+
+```ts
+import {createStage} from 'margoengine';
+import {Tonemap} from 'margoengine/tonemap';
+import {LocalExposure} from 'margoengine/tonemap/local';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+using local = new LocalExposure({strength: 0.5, maxStops: 3});
+Tonemap.attach(stage.engine, {curve: 'agx', autoExposure: true, extensions: [local]});
+local.options.strength = 0.7; // a flatter, more "HDR photo" look
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `strength` | `0.5` | How far each region's level moves toward middle grey, 0 (off) to 1 (flat) |
+| `maxStops` | `3` | Largest local change, 0 to 8 stops |
+| `radius` | `0.02` | Region size: the blur's spatial sigma as a fraction of the view height, 0.002 to 0.1 |
+| `edges` | `1.3` | Edge stop of the bilateral blur in stops of luminance, 0.1 to 8: lower keeps edges sharper |
+
+- **Method.** The base and detail split of Durand and Dorsey (2002): log2 luminance is averaged over 4 by 4 blocks, then
+  blurred by a bilateral filter run as two separable passes (horizontal, vertical; an approximation of the 2D filter),
+  all in `r32float`. Each pixel's exposure then moves by `-strength * (base + exposure - log2(0.18))` stops, clamped to
+  `maxStops`, with the base read bilinearly; only the smooth base is compressed. It follows `exposure` and
+  `autoExposure`, and runs before the curve, so every curve, `Grade` and a LUT apply after it.
+- **Cost.** Three render passes at quarter resolution before the presentation pass and three `r32float` textures (a
+  1920 by 1080 view: 480 by 270, about 1.5 MB). Dispose it (or `using`) to free them. GPU time not measured.
+- **Checked on a real GPU** (`packages/tonemap/tests/local-browser.mjs`, M6 Mac mini, Metal, Chromium): on a synthetic
+  source with a bright window and a dark interior, both with a checker of detail, every pixel lands within one 8-bit
+  level of a CPU oracle of the whole chain; strength 0 changes no pixel; the interior comes up 3 stops (the clamp), the
+  window goes down 0.75, and neighbouring checker cells differ in local stops by under 0.02.
+- **Limits.** The separable bilateral blur is an approximation: a thin bright line across a dark region can leave a
+  faint halo along it; one view rect at a time (the whole source is filtered); 4 by 4 blocks set the finest region.
+
+`extensions` takes any `TonemapExtension`: `patch(shader, binding, extra)`, an optional `values()` for one uniform at
+`binding`, `resources()` for up to four more resources at `extra` on, and `encode(context)` for passes of its own before
+the presentation pass.

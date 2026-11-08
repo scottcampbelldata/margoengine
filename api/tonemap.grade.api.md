@@ -34,7 +34,17 @@ export function sampleCurve(points: GradeCurve | undefined, out?: Float32Array<A
 
 interface TonemapExtension {
     readonly key: string;
-    patch(shader: string, binding: number): string;
+    patch(shader: string, binding: number, extra: number): string;
     values?(): Float32Array;
+    resources?(): readonly GPUBindingResource[];
+    encode?(context: TonemapPassContext): void;
+}
+
+interface TonemapPassContext {
+    readonly device: GPUDevice;
+    readonly encoder: GPUCommandEncoder;
+    readonly source: GPUTexture | GPUTextureView;
+    readonly width: number;
+    readonly height: number;
 }
 ```

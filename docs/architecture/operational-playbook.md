@@ -1354,3 +1354,6 @@ The following remain technical gaps, not permission to weaken a check:
     (closed forms, each walk against brute force, f64 references for far and grazing rays; mutations of the walks fail
     it) and `tests/next-queries.test.js` against Rapier 0.21. Missing: a tree over colliders for the world ray (each
     collider is tested), shape casts, point queries, and any browser run.
+45. Tonemap's grading, custom curves, metering modes and local exposure (`@margoengine/tonemap`, `/grade`, `/custom`,
+    `/local`) are proved against CPU oracles of their maths on the M6 Mac mini (Metal) only, on synthetic sources and
+    simple lit scenes; GPU time of the new passes, other GPUs and photographed HDR scenes are not measured.

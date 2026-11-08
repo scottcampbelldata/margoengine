@@ -2636,3 +2636,39 @@ entry's `packages/terrain/test/*.browser.mjs` (in `test:gpu`). Nothing is timed.
   virtual texture holds colour only. Rows in docs/limits.md.
 - **Slips:** job 5 lost 10 push races before landing (main moved every 4 to 5 minutes, a landing attempt took about
   6.5); the manager added the short lost-race rule. Job 8 was first handed off BLOCKED on the self-shadow above.
+## Lane E batch 72: tonemap
+
+Six jobs for `@margoengine/tonemap` on the M6 Mac mini (Metal), each landed as one commit. Core and stage are
+untouched. Tonemap gained `extensions`, a hook that lets an entry patch its presentation shader, bind a uniform and up
+to four resources, and encode passes of its own; without extensions the shaders and bindings are unchanged. The
+physical camera job already exists as `PhysicalCamera` in `@margoengine/cameras/physical`, so it is SKIPPED. Nothing
+is timed.
+
+| # | Job | Status | Commit | Entry | Claim |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Grading controls (wheels, curves, hue against saturation) | DONE | f716e0612 | `/grade` | LIM-477 |
+| 2 | Reinhard, Cineon and linear curves | DONE | 8e8fb4ef4 | main (`curve`) | LIM-479 |
+| 3 | Custom curve hook (WGSL or JavaScript) | DONE | 92687acd5 | `/custom` | LIM-481 |
+| 4 | Metering modes (histogram, centre, spot, mask) | DONE | 2d9bce624 | main (`autoExposure`) | LIM-482 |
+| 5 | Local exposure | DONE | this commit | `/local` | LIM-486 |
+| 6 | Physical camera exposure (EV100, shared with DOF) | SKIPPED | | already `PhysicalCamera` in `@margoengine/cameras/physical` (EV100 from aperture, shutter and ISO; `apply` drives Tonemap exposure and DOF) | |
+
+- **Built from:** rows T-14 to T-18 in `docs/clean-room.md`: Fritsch and Carlson (1980) monotone curves, Reinhard et
+  al. (2002) and the Hejl and Burgess-Dawson filmic fit, the 18% key value for metering, Durand and Dorsey (2002) with
+  Tomasi and Manduchi (1998) for local exposure; the rest is Margo-own. No code from another engine was read.
+- **Proved:** one browser check per job on this Mac (`grade-browser.mjs`, `curves-browser.mjs`, `custom-browser.mjs`,
+  `metering-browser.mjs`, `local-browser.mjs` in `packages/tonemap/tests/`), each against a CPU oracle of its maths:
+  grading within half a level, classic curves within 1.1 levels over 144 input levels, custom curves on every pixel
+  within what each 8-bit input allows, metering within 0.002 stops in all eight mode and method combinations, local
+  exposure every pixel within one level of the whole chain. Unit tests cover patch places, bindings, uniform layouts,
+  recompiles and option checks.
+- **Bugs fixed:** none in shipped code. The first custom-curve check bounded the error by a fixed 2 levels, which a steep
+  curve exceeds from 8-bit input rounding alone; it now bounds each pixel by what the curve gives over the input's
+  half-level interval. Job 4's first landing stopped at the size gate (the main entry grew); the growth is recorded
+  with its reason.
+- **Sizes:** `/custom` 1,203 B gzip; `/grade`, `/local` and the main entry in `entry-sizes.json`. Core and stage
+  unchanged.
+- **Limits and unmeasured:** rows in `docs/limits.md` (LIM-477, LIM-479, LIM-481, LIM-482 and LIM-486 for this batch). GPU time of every new pass
+  is not measured; shader-node graphs are not taken by the custom curve; the separable bilateral blur can leave faint
+  halos along thin bright lines.
+

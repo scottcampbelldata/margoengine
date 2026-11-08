@@ -41,17 +41,34 @@ type Output = { peak: number; p3: boolean; excess?: (width: number, height: numb
  */
 export type TonemapCurve = 'agx' | 'acescg' | 'neutral' | 'reinhard' | 'cineon' | 'linear';
 const curves: readonly TonemapCurve[] = ['agx', 'acescg', 'neutral', 'reinhard', 'cineon', 'linear'];
+/** What {@link TonemapExtension.encode} gets: the frame's encoder and HDR source, before the presentation pass. */
+export interface TonemapPassContext {
+  readonly device: GPUDevice;
+  readonly encoder: GPUCommandEncoder;
+  /** The linear HDR texture Tonemap presents this frame. */
+  readonly source: GPUTexture | GPUTextureView;
+  readonly width: number;
+  readonly height: number;
+}
 /**
  * A shader extension of Tonemap, such as `Grade` from `@margoengine/tonemap/grade`: it patches the WGSL of the
- * presentation pass and may bind one uniform buffer of its own.
+ * presentation pass, may bind one uniform buffer and up to four more resources of its own, and may encode passes of
+ * its own before the presentation pass.
  */
 export interface TonemapExtension {
   /** Names the extension in the pipeline cache key. */
   readonly key: string;
-  /** Returns `shader` with the extension's code in it; its uniform, if any, is `@group(0) @binding(binding)`. */
-  patch(shader: string, binding: number): string;
+  /**
+   * Returns `shader` with the extension's code in it; its uniform, if any, is `@group(0) @binding(binding)` and its
+   * {@link resources} are at `extra` to `extra + 3`.
+   */
+  patch(shader: string, binding: number, extra: number): string;
   /** The extension uniform's contents, written every frame (a fixed multiple of 16 bytes). Omit for none. */
   values?(): Float32Array;
+  /** Up to four more resources (textures, samplers), bound at `extra` on; a new object rebinds. Omit for none. */
+  resources?(): readonly GPUBindingResource[];
+  /** Encodes the extension's own passes each frame, before the presentation pass reads its resources. */
+  encode?(context: TonemapPassContext): void;
 }
 /** Tonemap settings. Every field except `source` is read each frame, so change them on `tonemap.options`. */
 export interface TonemapOptions {
@@ -146,6 +163,7 @@ export class Tonemap implements EnginePlugin {
   private meterBuffer?: GPUBuffer;
   private frameCount = 0;
   private extBuffers: (GPUBuffer | undefined)[] = [];
+  private extResources: GPUBindingResource[] = [];
   private readonly fxValues = new Float32Array(16);
   private readonly meterValues = new Float32Array(16);
   private meterMask?: GPUTexture;
@@ -406,7 +424,7 @@ export class Tonemap implements EnginePlugin {
       if (variableLUT) code = sizedLUTShader(code);
       if (fxOn) code = effectsShader(code, auto);
       if (classic) code = classicShader(code);
-      for (const [i, e] of exts.entries()) code = e.patch(code, 5 + i);
+      for (const [i, e] of exts.entries()) code = e.patch(code, 5 + i, 16 + 4 * i);
       for (const b of this.extBuffers) b?.destroy();
       this.extBuffers = exts.map(
         (e) =>
@@ -433,7 +451,17 @@ export class Tonemap implements EnginePlugin {
       this.pipelineFormat = key;
       this.group = undefined;
     }
-    if (!this.group || this.sourceTexture !== source) {
+    for (const e of exts) e.encode?.({ device: c.device, encoder: c.encoder, source, width: c.width, height: c.height });
+    const extra = exts.flatMap((e, i) =>
+      (e.resources?.() ?? []).slice(0, 4).map((resource, k) => ({ binding: 16 + 4 * i + k, resource })),
+    );
+    if (
+      !this.group ||
+      this.sourceTexture !== source ||
+      extra.length !== this.extResources.length ||
+      extra.some((r, i) => r.resource !== this.extResources[i])
+    ) {
+      this.extResources = extra.map((r) => r.resource);
       const group = {
         layout: this.pipeline.getBindGroupLayout(0),
         entries: [
@@ -443,6 +471,7 @@ export class Tonemap implements EnginePlugin {
           ...(fxOn ? [{ binding: 3, resource: { buffer: this.effectsBuffer(c.device) } }] : []),
           ...(auto ? [{ binding: 4, resource: { buffer: this.stateBuffer(c.device) } }] : []),
           ...this.extBuffers.flatMap((buffer, i) => (buffer ? [{ binding: 5 + i, resource: { buffer } }] : [])),
+          ...extra,
         ],
       };
       this.meterGroup = undefined;
@@ -584,6 +613,7 @@ export class Tonemap implements EnginePlugin {
     this.fxBuffer = this.aeBuffer = this.meterBuffer = this.blankMask = this.meterMask = undefined;
     for (const b of this.extBuffers) b?.destroy();
     this.extBuffers = [];
+    this.extResources = [];
     this.meterPipeline = this.meterGroup = undefined;
     this.original = undefined;
     this.shaders.clear();

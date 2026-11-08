@@ -2600,7 +2600,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-485). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-486). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -2770,6 +2770,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Custom tone curve (`CustomCurve` in `@margoengine/tonemap/custom`, 2026-11-08) | By method: a JavaScript curve is per channel, sampled at 128 points over 2^-12 to 2^8 (log2) and held above; a WGSL curve is compiled into the presentation shader, so a WGSL error shows as a GPU validation error; shader-node graphs are not taken directly; one uniform of 592 B; GPU cost not measured (LIM-481). | Tonemap does not depend on `@margoengine/shader`; sampling keeps a JavaScript curve live without a recompile. | Write a node curve as WGSL. | Use `wgsl` for exact or per-pixel curves. |
 | Metering modes (`autoExposure` `metering`, `method` in `@margoengine/tonemap`, 2026-11-08) | By method: 4,096 samples on a 64 by 64 grid (a spot narrower than a few pixels resamples the same pixels); the histogram has 64 bins over -12 to 12 stops, so its level moves in 0.375-stop bin centres weighted by the kept share; centre weighting has a fixed sigma of a quarter of the view height; the mask is read by nearest texel; GPU cost not measured (LIM-482). | One workgroup keeps metering to one dispatch with no readback. | A finer histogram or more samples would cost more threads or passes. | Use `mean` for smooth adaptation, `histogram` for scenes with small lights. |
 | 2D skeletal animation (`@margoengine/sprites/skeletal`, 2026-11-08) | Four bones per vertex; skinning on the CPU every frame for every visible mesh, about 20 B per vertex uploaded each frame. | Linear blend skinning is a weighted sum per vertex, cheap enough on the CPU for character meshes, and it keeps skinning testable in Node. | By method: linear blend skinning collapses a joint bent far (each vertex lies between its bones' rigid copies, so a sharp bend loses area), so give bends a shared, half-weighted vertex row; texels read exactly with no filtering, single-sample target; clips are linear keys only (no curves, events or blending between clips). Proved on one GPU, an RTX A6000, byte for byte. Time not measured. | More grid rows at joints; your own pose code that sets `Bone` fields before `skeleton.update()`. |
+| Local exposure (`LocalExposure` in `@margoengine/tonemap/local`, 2026-11-08) | By method: the bilateral blur is separable (horizontal then vertical), an approximation of the 2D filter that can leave a faint halo along thin bright lines; quarter-resolution base (4 by 4 blocks); the whole source is filtered, not one view rect; three r32float textures (about 1.5 MB at 1920 by 1080); GPU time not measured (LIM-486). | Separable passes keep the cost linear in the radius. | Very fine structures are not separated into their own regions. | Lower `edges` for sharper region borders. |
 
 
 | Limit | Starts at | Why | What you see | Escape hatch |

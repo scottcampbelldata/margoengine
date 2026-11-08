@@ -15,7 +15,7 @@ For the second account. Start now.
 | D | lighting | 56 | staging | 7 | todo |
 | E | post and effects | 70 | post | 8 | done |
 | E | post and effects | 71 | post | 1 | done |
-| E | post and effects | 72 | tonemap | 6 | todo |
+| E | post and effects | 72 | tonemap | 6 | done |
 | E | post and effects | 73 | taa | 5 | todo |
 | E | post and effects | 74 | dof | 5 | todo |
 | E | post and effects | 75 | toon | 4 | todo |

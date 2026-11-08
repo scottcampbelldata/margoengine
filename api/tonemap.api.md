@@ -47,8 +47,10 @@ export type TonemapCurve = 'agx' | 'acescg' | 'neutral' | 'reinhard' | 'cineon' 
 
 export interface TonemapExtension {
     readonly key: string;
-    patch(shader: string, binding: number): string;
+    patch(shader: string, binding: number, extra: number): string;
     values?(): Float32Array;
+    resources?(): readonly GPUBindingResource[];
+    encode?(context: TonemapPassContext): void;
 }
 
 export interface TonemapOptions {
@@ -66,6 +68,14 @@ export interface TonemapOptions {
     autoExposure?: boolean | AutoExposure;
     extensions?: readonly TonemapExtension[];
     source?: () => GPUTexture | undefined;
+}
+
+export interface TonemapPassContext {
+    readonly device: GPUDevice;
+    readonly encoder: GPUCommandEncoder;
+    readonly source: GPUTexture | GPUTextureView;
+    readonly width: number;
+    readonly height: number;
 }
 
 export function parseCube(text: string): CubeLUT;
