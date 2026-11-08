@@ -4,17 +4,35 @@
 
 ```ts
 import { EngineKernel, Vec3 } from "@margoengine/core";
-import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
+import { Engine, EnginePlugin, FrameGraph, PassContext } from "@margoengine/core/extension";
 
-export class VolumetricFog implements EnginePlugin {
+export interface FoggedEffect {
+    setTransparency(hook: SurfaceTransparency, released?: () => void): () => void;
+    drawTransparent(c: Context, hook: SurfaceTransparency): void;
+}
+
+export interface FoggedModel {
+    setTransparency(hook: VolumetricFog): () => void;
+    onDispose(listener: () => void): () => void;
+    draw(c: Context, mode: 'transparent', color: GPUTextureView, depth: GPUTextureView): void;
+}
+
+export class VolumetricFog implements EnginePlugin, SurfaceTransparency {
     readonly options: VolumetricFogOptions;
     readonly name = "volumetric-fog";
+    readonly layout: readonly GPUBindGroupLayoutEntry[];
     constructor(options?: VolumetricFogOptions);
     static attach(engine: EngineKernel, options?: VolumetricFogOptions): VolumetricFog;
     get texture(): GPUTexture | undefined;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
     onPreUpdate(delta: number): void;
+    add(target: FoggedModel | FoggedEffect): () => void;
+    declarations(group: number): string;
+    surface(group: number): string;
+    bindings(): GPUBindGroupEntry[];
+    get targets(): readonly GPUColorTargetState[];
+    begin(): GPURenderPassEncoder;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
     [Symbol.dispose]: () => void;
@@ -50,5 +68,20 @@ export interface VolumetricLightSource {
 export interface VolumetricMediumSource {
     medium(group: number): string;
     bindings(device: GPUDevice): GPUBindGroupEntry[];
+}
+
+// Not exported from this entry, but used by the exports above:
+
+type Context = Extract<PassContext, {
+    backend: 'webgpu';
+}>;
+
+interface SurfaceTransparency {
+  surface(group: number): string;
+  readonly layout: readonly GPUBindGroupLayoutEntry[];
+  bindings(): GPUBindGroupEntry[];
+  readonly blends?: boolean;
+  readonly targets: readonly GPUColorTargetState[];
+  begin(): GPURenderPassEncoder;
 }
 ```

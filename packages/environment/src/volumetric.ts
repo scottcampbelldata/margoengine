@@ -19,6 +19,7 @@ import { preset } from '../../shared/preset.js';
 import { displayShader } from '../../shared/display.js';
 import { clusterCell, decayTerms, legacyTerms } from '../../shared/light-terms.js';
 import { applyView, viewRect, ViewStates } from '../../shared/view-rect.js';
+import { alphaBlend, groupCode, overlayPass, type SurfaceTransparency } from '../../shared/pass.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; STORAGE_BINDING: number; COPY_SRC: number };
@@ -213,6 +214,47 @@ ${displayShader}
   return vec4f(light,opacity);
 }`;
 
+// Fogged transparents (`fog.add`): the fog between the camera and a transparent fragment, read from the integrated
+// volume where the composite reads it at the scene depth. Drawn with straight alpha over the fogged frame, whose pixel
+// already holds L (light scattered in front of the fragment) plus T (transmittance to it) times what is behind, so
+// a (c T + L) + (1 - a) dst equals fogging the blended result exactly. jitter.w is 1 while the fog applies, 0 when it
+// skipped the frame (disabled, no depth): then colours pass through.
+const transparentSurface = (group: number) => /* wgsl */ `
+struct MargoTransparent {@location(0) color:vec4f}
+${struct.slice(0, struct.indexOf('@group')).replace('Volume', 'MargoFog')}
+@group(${group}) @binding(120) var<uniform> margoFog:MargoFog;
+@group(${group}) @binding(121) var margoFogVolume:texture_3d<f32>;
+@group(${group}) @binding(122) var margoFogSampler:sampler;
+${displayShader.replaceAll('pbrNeutral', 'margoFogNeutral').replace('toDisplay', 'margoFogDisplay')}
+fn margoTransparentAt(color:vec4f,clip:vec4f,depth:f32)->MargoTransparent {
+  var o:MargoTransparent;o.color=color;
+  let uv=(clip.xy-margoFog.screen.zw)/margoFog.screen.xy;let p=margoFog.inverse*vec4f(uv.x*2-1,1-uv.y*2,clip.z,1);
+  let t=clamp(dot(margoFog.plane,vec4f(p.xyz/p.w,1)),0.0,margoFog.shape.x);
+  let s=textureSampleLevel(margoFogVolume,margoFogSampler,vec3f(uv,(sqrt(t/margoFog.shape.x)*margoFog.grid.z-0.5)/margoFog.grid.z),0);
+  let opacity=1.0-exp(-s.a);var light=s.rgb;
+  if(margoFog.wind.w<0.5&&opacity>0.0){light=margoFogDisplay(s.rgb/opacity)*opacity;}
+  if(margoFog.jitter.w>0.5){o.color=vec4f(color.rgb*(1.0-opacity)+light,color.a);}
+  return o;
+}
+`;
+// What a gltf-pro surface passes on to margoTransparentAt (as @margoengine/oit's surfaces do).
+const pbrLayer = `fn margoTransparent(color:vec4f,i:Out)->MargoTransparent {
+  return margoTransparentAt(color,i.clip,-(f.view*vec4f(i.position,1)).z);
+}
+`;
+
+/** A gltf-pro `PBRModel` or a transparent `@margoengine/materials` mesh: what `VolumetricFog.add` takes over. */
+export interface FoggedModel {
+  setTransparency(hook: VolumetricFog): () => void;
+  onDispose(listener: () => void): () => void;
+  draw(c: Context, mode: 'transparent', color: GPUTextureView, depth: GPUTextureView): void;
+}
+/** A `VFX`, `Splats` or `PointsPlugin`: an effect that can leave its transparent draw to a pass. */
+export interface FoggedEffect {
+  setTransparency(hook: SurfaceTransparency, released?: () => void): () => void;
+  drawTransparent(c: Context, hook: SurfaceTransparency): void;
+}
+
 const finite = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(Math.fround(value));
 const vector = (value: Vec3 | undefined, min: number, max = Infinity): boolean =>
   value === undefined ||
@@ -233,7 +275,7 @@ const halton = (index: number, base: number): number => {
  * SSAO, TAA), or pass `depth`; it replaces environment `Fog` and sky's `fog` option (it throws while either is on, so the
  * scene is never fogged twice). `options` are read every frame.
  */
-export class VolumetricFog implements EnginePlugin {
+export class VolumetricFog implements EnginePlugin, SurfaceTransparency {
   readonly name = 'volumetric-fog';
   private engine?: Engine;
   private device?: GPUDevice;
@@ -280,6 +322,26 @@ export class VolumetricFog implements EnginePlugin {
   private offset = [0, 0, 0];
   private readonly attachment: GPURenderPassColorAttachment = { view: undefined!, loadOp: 'load', storeOp: 'store' };
   private readonly pass: GPURenderPassDescriptor = { colorAttachments: [this.attachment] };
+  private readonly models = new Map<FoggedModel, () => void>();
+  private readonly effects = new Map<FoggedEffect, () => void>();
+  private readonly overlay = overlayPass() as GPURenderPassDescriptor & {
+    colorAttachments: [GPURenderPassColorAttachment];
+    depthStencilAttachment: GPURenderPassDepthStencilAttachment;
+  };
+  private readonly code = new Map<number, string>();
+  private readonly surfaceCode = new Map<number, string>();
+  private readonly formats = new Map<string, GPUColorTargetState[]>();
+  private format: GPUTextureFormat = 'rgba16float';
+  private transparentPass?: GPURenderPassEncoder;
+  private context?: Context;
+  private entries?: GPUBindGroupEntry[];
+  private readonly off = new Float32Array(1);
+  /** @internal Effect hook: the bindings `surface` declares. */
+  readonly layout: readonly GPUBindGroupLayoutEntry[] = [
+    { binding: 120, visibility: 2, buffer: {} },
+    { binding: 121, visibility: 2, texture: { viewDimension: '3d' } },
+    { binding: 122, visibility: 2, sampler: {} },
+  ];
 
   constructor(readonly options: VolumetricFogOptions = {}) {
     this.options = preset('volumetric', options);
@@ -350,10 +412,12 @@ export class VolumetricFog implements EnginePlugin {
       order: 5,
       execute: (c) => {
         if (c.backend !== 'webgpu') return;
-        const view = this.forView(c);
+        const view = this.forView(c),
+          transparents = this.models.size + this.effects.size > 0;
         // A frame without fog breaks the history, so the next one starts from itself.
         if (this.options.enabled === false) view.valid = false;
-        else view.render(c);
+        const fogged = this.options.enabled !== false && view.render(c, transparents);
+        if (transparents) this.drawTransparents(c, view, fogged);
       },
     });
   }
@@ -405,7 +469,7 @@ export class VolumetricFog implements EnginePlugin {
     this.gridKey = grid.join();
     this.injectGroups = [];
     this.integrateGroups = [];
-    this.compositeGroup = undefined;
+    this.compositeGroup = this.entries = undefined;
     this.valid = false;
   }
   private group(
@@ -415,8 +479,8 @@ export class VolumetricFog implements EnginePlugin {
   ): GPUBindGroup {
     return this.device!.createBindGroup({ layout: pipeline.getBindGroupLayout(index), entries });
   }
-  private render(c: Context): void {
-    if (this.disposed || c.device !== this.device) return;
+  private render(c: Context, transparents = false): boolean {
+    if (this.disposed || c.device !== this.device) return false;
     this.validate();
     this.conflicts();
     const rect = viewRect(c),
@@ -432,7 +496,7 @@ export class VolumetricFog implements EnginePlugin {
       multisampled = false;
     if (o.depth) {
       const texture = o.depth();
-      if (!texture) return;
+      if (!texture) return false;
       if (
         !texture.format.startsWith('depth') ||
         texture.dimension !== '2d' ||
@@ -453,7 +517,7 @@ export class VolumetricFog implements EnginePlugin {
         'state',
         'VolumetricFog needs scene depth: attach a post capture (Tonemap, Bloom, PostStack, SSAO, TAA) first or pass options.depth',
       );
-    if (!invertMatrix(c.camera.matrix, this.inverse)) return;
+    if (!invertMatrix(c.camera.matrix, this.inverse)) return false;
     const grid = o.grid ?? [160, 90, 64];
     if (grid.join() !== this.gridKey) this.allocate(device, grid);
     const lights = o.lights?.pbr(1).declarations,
@@ -531,6 +595,7 @@ export class VolumetricFog implements EnginePlugin {
     v[67] = +(c.format === 'rgba16float' || c.format === 'rgba32float');
     const frame = (this.frameIndex % 16) + 1;
     for (let i = 0; i < 3; i++) v[68 + i] = temporal > 0 ? halton(frame, [2, 3, 5][i]) - 0.5 : 0;
+    v[71] = +transparents;
     v[72] = rect?.[2] ?? c.width;
     v[73] = rect?.[3] ?? c.height;
     v[74] = rect?.[0] ?? 0;
@@ -609,6 +674,101 @@ export class VolumetricFog implements EnginePlugin {
     v.copyWithin(36, 32, 36);
     this.valid = true;
     this.frameIndex++;
+    return true;
+  }
+  /**
+   * Fogs a transparent drawable: a gltf-pro model's BLEND primitives (or a transparent `@margoengine/materials` mesh),
+   * or a `VFX`, `Splats` or `PointsPlugin`'s normally blended particles, splats and sprites. The fog takes over its
+   * transparent draw and runs it right after the fog's composite, depth tested against the scene and not written, each
+   * fragment fogged by the volume between the camera and it. Additive and multiply surfaces, native transmission and
+   * additive point sprites keep their own draw. Returns a remover; disposing either side removes it too.
+   * @throws TypeError for anything else; MargoError `'disposed'` after `dispose()`, `'state'` before `attach`.
+   */
+  add(target: FoggedModel | FoggedEffect): () => void {
+    if (this.disposed || !this.engine)
+      throw new MargoError(
+        this.disposed ? 'disposed' : 'state',
+        this.disposed ? 'VolumetricFog is disposed; create a new one' : 'VolumetricFog.add needs attach(engine) first',
+      );
+    const effect = typeof (target as FoggedEffect)?.drawTransparent === 'function';
+    if (
+      typeof target?.setTransparency !== 'function' ||
+      (!effect &&
+        (typeof (target as FoggedModel).draw !== 'function' || typeof (target as FoggedModel).onDispose !== 'function'))
+    )
+      throw new TypeError('VolumetricFog.add needs a gltf-pro model, a materials mesh, VFX, Splats or a PointsPlugin');
+    const map = (effect ? this.effects : this.models) as Map<object, () => void>;
+    let release = map.get(target);
+    if (!release) {
+      const drop = () => {
+        if (map.get(target) === release) map.delete(target);
+      };
+      let forget = () => {},
+        restore: () => void;
+      if (effect) restore = (target as FoggedEffect).setTransparency(this, drop);
+      else {
+        restore = (target as FoggedModel).setTransparency(this);
+        forget = (target as FoggedModel).onDispose(drop);
+      }
+      const remove = () => {
+        if (map.get(target) !== remove) return;
+        map.delete(target);
+        forget();
+        restore();
+      };
+      map.set(target, (release = remove));
+    }
+    return release;
+  }
+  /** @internal gltf-pro transparency hook. */
+  declarations(group: number): string {
+    return groupCode(this.code, group, (g) => transparentSurface(g) + pbrLayer);
+  }
+  /** @internal Effect hook. */
+  surface(group: number): string {
+    return groupCode(this.surfaceCode, group, transparentSurface);
+  }
+  /** @internal Both hooks: this view's uniform, integrated volume and sampler. */
+  bindings(): GPUBindGroupEntry[] {
+    const view = this.activeView ?? this;
+    return (view.entries ??= [
+      { binding: 120, resource: { buffer: view.uniform! } },
+      { binding: 121, resource: view.textures[2].createView() },
+      { binding: 122, resource: view.sampler! },
+    ]);
+  }
+  /** @internal Both hooks: straight alpha into the frame's colour target. */
+  get targets(): readonly GPUColorTargetState[] {
+    let targets = this.formats.get(this.format);
+    if (!targets) this.formats.set(this.format, (targets = [{ format: this.format, blend: alphaBlend }]));
+    return targets;
+  }
+  /** @internal Both hooks: this frame's transparent pass over the fogged frame, depth read only. */
+  begin(): GPURenderPassEncoder {
+    if (this.transparentPass) return this.transparentPass;
+    const c = this.context!;
+    this.overlay.colorAttachments[0].view = c.color;
+    this.overlay.depthStencilAttachment.view = c.depth;
+    const pass = (this.transparentPass = c.encoder.beginRenderPass(this.overlay));
+    applyView(pass, c);
+    return pass;
+  }
+  private drawTransparents(c: Context, view: VolumetricFog, fogged: boolean): void {
+    if (this.disposed || c.device !== this.device) return;
+    if (!fogged) {
+      // Not fogged this frame: the colours pass through (jitter.w 0), read from a volume that must exist to bind.
+      if (!view.textures.length) view.allocate(c.device, this.options.grid ?? [160, 90, 64]);
+      c.device.queue.writeBuffer(view.uniform!, 284, this.off);
+    }
+    this.format = c.format as GPUTextureFormat;
+    this.context = c;
+    try {
+      for (const model of this.models.keys()) model.draw(c, 'transparent', c.color, c.depth);
+      for (const effect of this.effects.keys()) effect.drawTransparent(c, this);
+    } finally {
+      this.transparentPass?.end();
+      this.transparentPass = this.context = undefined;
+    }
   }
   private depthView(texture: GPUTexture): GPUTextureView {
     let view = this.depthViews.get(texture);
@@ -625,7 +785,7 @@ export class VolumetricFog implements EnginePlugin {
     this.gridKey = this.computeKey = '';
     this.injectGroups = [];
     this.integrateGroups = [];
-    this.lightGroup = this.shadowGroup = this.mediumGroup = this.compositeGroup = undefined;
+    this.lightGroup = this.shadowGroup = this.mediumGroup = this.compositeGroup = this.entries = undefined;
     this.composites.clear();
     this.depthViews = new WeakMap();
     this.valid = false;
@@ -639,6 +799,7 @@ export class VolumetricFog implements EnginePlugin {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    for (const release of [...this.models.values(), ...this.effects.values()]) release();
     this.engine?.removePlugin(this.name);
     this.release();
     this.engine = this.device = undefined;
