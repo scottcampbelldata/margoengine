@@ -80,6 +80,13 @@ export interface LayoutStyle {
   cellHeight?: number;
   /** `'scroll'` lets the children exceed the box along the main axis and scroll; `'hidden'` clips. Default `'visible'`. */
   overflow?: 'visible' | 'hidden' | 'scroll';
+  /**
+   * In a `'row'`, children that do not fit move onto new lines below, as tag lists and toolbars reflow. Each line shares
+   * its own free space (`grow`, `shrink`, `justify`) and is as tall as its tallest child, which `align` places
+   * children within; the row gap of `gap` separates the lines, and `overflow: 'scroll'` scrolls them vertically.
+   * Columns ignore it. Default false.
+   */
+  wrap?: boolean;
 }
 
 /** What {@link arrange} needs from a box. {@link Widget} implements it; tests can use plain objects. */
@@ -149,6 +156,7 @@ export function validateStyle(style: LayoutStyle): LayoutStyle {
     if (!Array.isArray(parts) || parts.length > 2 || parts.some((n) => !Number.isFinite(n) || n < 0))
       throw rangeError('gap is a number of at least 0 or [column gap, row gap]', 'ui');
   }
+  if (style.wrap !== undefined && typeof style.wrap !== 'boolean') throw typeError('wrap is true or false', 'ui');
   if (style.offset !== undefined && (style.offset.length !== 2 || style.offset.some((n) => !Number.isFinite(n))))
     throw rangeError('offset is [x, y] in finite UI units', 'ui');
   edges(style.padding);
@@ -219,6 +227,16 @@ function contentOf(node: LayoutNode, innerWidth: number): Size2 {
     return { width: cols * cellW + (cols - 1) * gx, height: rows * cellH + Math.max(0, rows - 1) * gy };
   }
   const row = isRow(node);
+  if (row && style.wrap && Number.isFinite(innerWidth)) {
+    const lines = wrapLines(flexItems(node, flow, innerWidth, Infinity), innerWidth, gx);
+    let width = 0,
+      height = 0;
+    for (const line of lines) {
+      width = Math.max(width, distribute(line, innerWidth, gx, true, false));
+      height += lineHeight(line, Infinity);
+    }
+    return { width, height: height + gy * (lines.length - 1) };
+  }
   let main = 0,
     cross = 0;
   for (const child of flow) {
@@ -335,15 +353,13 @@ interface Item {
   size: number;
 }
 
-function placeFlex(node: LayoutNode, flow: LayoutNode[], inner: Rect): void {
-  const s = node.style,
-    row = isRow(node),
-    [gx, gy] = gaps(s),
-    gap = row ? gx : gy,
-    innerMain = row ? inner.width : inner.height,
-    innerCross = row ? inner.height : inner.width,
-    parentAlign: Align = s.align ?? (row ? 'center' : 'stretch');
-  const items: Item[] = flow.map((child) => {
+const alignOf = (node: LayoutNode): Align => node.style.align ?? (isRow(node) ? 'center' : 'stretch');
+
+/** Flex items of `flow` with their base sizes along `node`'s main axis. */
+function flexItems(node: LayoutNode, flow: LayoutNode[], innerMain: number, innerCross: number): Item[] {
+  const row = isRow(node),
+    parentAlign = alignOf(node);
+  return flow.map((child) => {
     const cs = child.style,
       m = edges(cs.margin),
       mainStyle = row ? cs.width : cs.height,
@@ -375,11 +391,44 @@ function placeFlex(node: LayoutNode, flow: LayoutNode[], inner: Rect): void {
       size: 0,
     };
   });
+}
+
+/** Break a wrapping row's items into lines no wider than `innerMain`; an item wider than that has a line to itself. */
+function wrapLines(items: Item[], innerMain: number, gap: number): Item[][] {
+  const lines: Item[][] = [];
+  let line: Item[] = [],
+    width = 0;
+  for (const it of items) {
+    const w = it.base + horizontal(it.m);
+    if (line.length && width + gap + w > innerMain + 1e-9) {
+      lines.push(line);
+      line = [];
+      width = 0;
+    }
+    width += (line.length ? gap : 0) + w;
+    line.push(it);
+  }
+  if (line.length) lines.push(line);
+  return lines;
+}
+
+/** Height of a wrapped line: its tallest child at the width it was given, margins included. */
+function lineHeight(line: Item[], innerHeight: number): number {
+  let height = 0;
+  for (const it of line) {
+    const cs = it.child.style,
+      own = explicit(cs.height, innerHeight) ?? heightAt(it.child, it.size);
+    height = Math.max(height, clamp(own, cs.minHeight, cs.maxHeight) + vertical(it.m));
+  }
+  return height;
+}
+
+/** Share the free main-axis space (`grow`) or the shortage (`shrink`) among `items`; returns the space they use. */
+function distribute(items: Item[], innerMain: number, gap: number, row: boolean, scrolling: boolean): number {
   const margins = (it: Item) => (row ? horizontal(it.m) : vertical(it.m));
   const gapTotal = gap * (items.length - 1);
   const natural = items.reduce((sum, it) => sum + it.base + margins(it), 0) + gapTotal;
-  const scrolling = s.overflow === 'scroll';
-  let free = scrolling ? Math.max(0, innerMain - natural) : innerMain - natural;
+  const free = scrolling ? Math.max(0, innerMain - natural) : innerMain - natural;
   for (const it of items) it.size = it.base;
   if (free > 0) {
     const grow = items.reduce((sum, it) => sum + it.grow, 0);
@@ -388,8 +437,49 @@ function placeFlex(node: LayoutNode, flow: LayoutNode[], inner: Rect): void {
     const weight = items.reduce((sum, it) => sum + it.shrink * it.base, 0);
     if (weight > 0) for (const it of items) it.size = Math.max(it.min, it.base + (free * it.shrink * it.base) / weight);
   }
-  const used = items.reduce((sum, it) => sum + it.size + margins(it), 0) + gapTotal;
-  free = Math.max(0, innerMain - used);
+  return items.reduce((sum, it) => sum + it.size + margins(it), 0) + gapTotal;
+}
+
+function placeFlex(node: LayoutNode, flow: LayoutNode[], inner: Rect): void {
+  const s = node.style,
+    row = isRow(node),
+    [gx, gy] = gaps(s),
+    gap = row ? gx : gy,
+    innerMain = row ? inner.width : inner.height,
+    items = flexItems(node, flow, innerMain, row ? inner.height : inner.width);
+  if (row && s.wrap) {
+    // Each line is a row of its own; the lines stack down by the row gap and scroll vertically.
+    const lines = wrapLines(items, innerMain, gx),
+      used = lines.map((line) => distribute(line, innerMain, gx, true, false)),
+      heights = lines.map((line) => lineHeight(line, inner.height)),
+      total = heights.reduce((sum, h) => sum + h, 0) + gy * (lines.length - 1),
+      scroll = scrollOf(node, total, inner.height, 'y');
+    node.contentHeight = total;
+    let y = inner.y - scroll;
+    lines.forEach((line, i) => {
+      placeLine(node, line, { x: inner.x, y, width: inner.width, height: heights[i] }, used[i], 0);
+      y += heights[i] + gy;
+    });
+    return;
+  }
+  const used = distribute(items, innerMain, gap, row, s.overflow === 'scroll');
+  const scroll = scrollOf(node, used, innerMain, row ? 'x' : 'y');
+  if (row) node.contentWidth = used;
+  else node.contentHeight = used;
+  placeLine(node, items, inner, used, scroll);
+}
+
+/** Place one line of sized items along `node`'s main axis inside `inner`, by `justify` and `align`. */
+function placeLine(node: LayoutNode, items: Item[], inner: Rect, used: number, scroll: number): void {
+  const s = node.style,
+    row = isRow(node),
+    [gx, gy] = gaps(s),
+    gap = row ? gx : gy,
+    innerMain = row ? inner.width : inner.height,
+    innerCross = row ? inner.height : inner.width,
+    parentAlign = alignOf(node),
+    margins = (it: Item) => (row ? horizontal(it.m) : vertical(it.m)),
+    free = Math.max(0, innerMain - used);
   let start = 0,
     between = gap;
   const n = items.length;
@@ -412,9 +502,6 @@ function placeFlex(node: LayoutNode, flow: LayoutNode[], inner: Rect): void {
       between = gap + free / (n + 1);
       break;
   }
-  const scroll = scrollOf(node, used, innerMain, row ? 'x' : 'y');
-  if (row) node.contentWidth = used;
-  else node.contentHeight = used;
   let cursor = start - scroll;
   for (const it of items) {
     const cs = it.child.style,

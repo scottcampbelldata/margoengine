@@ -213,6 +213,7 @@ interface LayoutStyle {
     cellWidth?: number;
     cellHeight?: number;
     overflow?: 'visible' | 'hidden' | 'scroll';
+    wrap?: boolean;
 }
 
 class Panel extends Widget {

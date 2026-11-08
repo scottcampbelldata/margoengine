@@ -242,6 +242,7 @@ interface LayoutStyle {
     cellWidth?: number;
     cellHeight?: number;
     overflow?: 'visible' | 'hidden' | 'scroll';
+    wrap?: boolean;
 }
 
 interface ListEntry {

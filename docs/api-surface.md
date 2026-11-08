@@ -61,7 +61,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/net | `.` 3, `./delay` 2, `./fields` 5, `./timeline` 5 |  |  | 1,729 |
 | @margoengine/netcode | `.` 48, `./rollback` 4, `./websocket` 2, `./webrtc` 3, `./node` 6, `./rooms` 11, `./smoothing` 2, `./webtransport` 7, `./signal` 6, `./extrapolate` 2, `./relay` 7, `./hitboxes` 5, `./interest` 4, `./generate` 2 | 105 | 1 | 12,534 |
 | @margoengine/oit | `.` 2, `./meshes` 2, `./exact` 4, `./moments` 3, `./depth` 3, `./vfx` 3 | 19 |  | 3,690 |
-| @margoengine/physics | `.` 48, `./next` 39 | 47 |  | 19,195 |
+| @margoengine/physics | `.` 48, `./next` 39 | 47 |  | 19,296 |
 | @margoengine/physics2d | `.` 30, `./outline` 6 | 21 |  | 7,943 |
 | @margoengine/pixel | `.` 13, `./palette` 15, `./render3d` 8 |  |  | 4,408 |
 | @margoengine/points | `.` 55, `./las` 21, `./laz` 7, `./e57` 13, `./copc` 4, `./octree` 11, `./surfels` 4, `./potree` 5, `./pick` 5 | 78 |  | 23,939 |
@@ -73,7 +73,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/rigging | `.` 21, `./ik` 12, `./retarget` 10, `./hulls` 4, `./springs` 13, `./vrm` 26, `./autorig` 3, `./voxel-weights` 3, `./correctives` 9, `./transfer` 4, `./face` 10 | 47 |  | 7,631 |
 | @margoengine/road | `.` 3 |  |  | 1,027 |
 | @margoengine/save | `.` 42, `./node` 1, `./engine` 9, `./slots` 9, `./remote` 6, `./safe` 5 | 29 |  | 6,728 |
-| @margoengine/scatter | `.` 20, `./tiles` 3, `./paint` 3 | 12 |  | 18,766 |
+| @margoengine/scatter | `.` 20, `./tiles` 3, `./paint` 3 | 12 |  | 18,820 |
 | @margoengine/scene | `.` 13, `./bulk` 3, `./mesh` 2 | 5 |  | 1,713 |
 | @margoengine/scenery | `.` 2, `./sky` 2, `./presets` 10, `./scenes` 6, `./stars` 4, `./aurora` 6 | 6 |  | 219 |
 | @margoengine/sciviz | `.` 71, `./bricks` 21, `./colormaps` 11, `./formats` 18, `./geo` 12, `./graph` 8, `./grids` 15, `./maths` 37, `./nrrd` 10 | 353 |  | 35,812 |
@@ -96,7 +96,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/toon | `.` 2 |  |  | 1,471 |
 | @margoengine/transitions | `.` 2 |  |  | 4,239 |
 | @margoengine/tween | `.` 50, `./stagger` 8, `./motion-path` 7, `./scroll` 4, `./custom-ease` 6 | 16 |  | 5,503 |
-| @margoengine/ui | `.` 97, `./react` 23, `./world` 10 | 108 |  | 27,546 |
+| @margoengine/ui | `.` 97, `./react` 23, `./world` 10 | 108 |  | 27,968 |
 | @margoengine/usdz | `.` 12, `./worker` 2, `./compose` 7, `./skel` 1, `./anim` 1, `./subdiv` 2, `./lux` 4, `./materialx` 3 | 95 |  | 12,337 |
 | @margoengine/vfx | `.` 21, `./base` 25, `./obstacles` 1, `./wrap` 1, `./sort` 1, `./texture` 1, `./soft` 1, `./curves` 3, `./emitter` 2, `./ribbons` 3, `./mesh` 3, `./events` 1, `./lit` 1, `./depth-collide` 1, `./stretch` 1, `./fields` 3, `./skinned` 3 | 361 |  | 26,715 |
 | @margoengine/video | `.` 2 |  |  | 2,094 |

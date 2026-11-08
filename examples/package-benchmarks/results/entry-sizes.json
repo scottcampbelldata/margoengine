@@ -1,5 +1,5 @@
 {
-  "commit": "f01a14d3e",
+  "commit": "b10af4c47",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -1934,12 +1934,12 @@
     },
     "@margoengine/physics": {
       ".": {
-        "raw": 59310,
-        "gzip": 19195
+        "raw": 59627,
+        "gzip": 19296
       },
       "./next": {
-        "raw": 272417,
-        "gzip": 168870
+        "raw": 291844,
+        "gzip": 182955
       }
     },
     "@margoengine/physics2d": {
@@ -2362,8 +2362,8 @@
     },
     "@margoengine/scatter": {
       ".": {
-        "raw": 62549,
-        "gzip": 18766
+        "raw": 62649,
+        "gzip": 18820
       },
       "./tiles": {
         "raw": 7525,
@@ -2980,12 +2980,12 @@
     },
     "@margoengine/ui": {
       ".": {
-        "raw": 83874,
-        "gzip": 27546
+        "raw": 84991,
+        "gzip": 27968
       },
       "./react": {
-        "raw": 85800,
-        "gzip": 27612
+        "raw": 86925,
+        "gzip": 28062
       },
       "./world": {
         "raw": 25273,
@@ -3483,9 +3483,9 @@
       "brotli": 10982
     },
     "packages/physics/dist/index.js": {
-      "raw": 59310,
-      "gzip": 19195,
-      "brotli": 16949
+      "raw": 59627,
+      "gzip": 19296,
+      "brotli": 17041
     },
     "packages/save/dist/index.js": {
       "raw": 19901,

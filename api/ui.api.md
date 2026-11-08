@@ -241,6 +241,7 @@ export interface LayoutStyle {
     cellWidth?: number;
     cellHeight?: number;
     overflow?: 'visible' | 'hidden' | 'scroll';
+    wrap?: boolean;
 }
 
 export class List extends Panel {

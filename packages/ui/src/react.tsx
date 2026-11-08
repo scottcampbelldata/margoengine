@@ -143,6 +143,7 @@ const STYLE_KEYS = [
   'cellWidth',
   'cellHeight',
   'overflow',
+  'wrap',
 ] as const;
 const COMMON_KEYS = ['id', 'visible', 'enabled', 'label', 'description', 'tooltip', 'pointerEvents'] as const;
 

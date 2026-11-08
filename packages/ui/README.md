@@ -87,7 +87,8 @@ Sizes are UI units. By default one unit is one CSS pixel; see Scaling.
 | `offset` | `[0, 0]` | shift after layout, for animation |
 | `bleed` | `false` | in a stack, ignore the parent's padding and the safe area |
 | `columns`, `cellWidth`, `cellHeight` | `1`, widest, tallest | for `direction: 'grid'` |
-| `overflow` | `'visible'` | `'hidden'` clips; `'scroll'` clips and scrolls on the main axis |
+| `overflow` | `'visible'` | `'hidden'` clips; `'scroll'` clips and scrolls on the main axis (a wrapping row scrolls its lines vertically) |
+| `wrap` | `false` | in a `'row'`, children that do not fit move onto new lines below |
 
 The screen layer is a stack, so a widget with an `anchor` sits at that corner or edge of the screen, inside the safe area:
 
@@ -108,6 +109,26 @@ console.log(hud.rect); // { x, y, width, height } in UI units
 Safe areas keep the HUD out of notches, rounded corners and the TV overscan. `new Ui({ safeArea: 'auto' })` (the default)
 reads the device's `env(safe-area-inset-*)`; `ui.setSafeArea([top, right, bottom, left])` sets it in CSS pixels. A widget
 with `bleed: true` (a full-screen backdrop, say) ignores it.
+
+### Wrapping rows
+
+A row with `wrap: true` moves the children that do not fit onto new lines, so tag lists and toolbars reflow when the
+panel narrows or the text grows. Each line shares its own free space (`grow`, `shrink`, `justify`) and is as tall as
+its tallest child, which `align` places children within; the second number of `gap` separates the lines. A child
+wider than the row gets a line to itself and shrinks to fit.
+
+```ts
+import { Ui, Panel, Label } from '@margoengine/ui';
+
+const ui = new Ui();
+const tags = ['fire', 'ice', 'poison', 'holy', 'shadow', 'storm'].map((text) => new Label({ text }));
+const bar = new Panel({ direction: 'row', wrap: true, gap: [8, 4], width: 200, anchor: 'top-left', children: tags });
+ui.add(bar);
+ui.update(1 / 60);
+console.log(new Set(tags.map((tag) => tag.rect.y)).size); // the number of lines
+bar.setStyle({ width: 600 });
+ui.update(1 / 60); // wide enough now: one line
+```
 
 ## Widgets
 
@@ -423,7 +444,7 @@ ends with a link to [margoengine.com/errors#ui](https://margoengine.com/errors#u
   quads sampling the text package's atlases. Both read storage buffers by instance index, in the engine's own render pass
   after post-processing, with premultiplied alpha blending and one scissor per clip region.
 - **Layout.** A small flexbox: base sizes, then free space by `grow` and a shortage by `shrink`, then `justify` and
-  `align`. Stacks anchor their children; grids fill cells row by row.
+  `align`. A wrapping row first breaks its children into lines by their base sizes, then does the same per line. Stacks anchor their children; grids fill cells row by row.
 - **No globals.** Nothing runs on import; the only DOM access is reading the safe area, and only when you ask for it.
 
 ## Limits
@@ -431,4 +452,5 @@ ends with a link to [margoengine.com/errors#ui](https://margoengine.com/errors#u
 - WebGPU only for drawing. On WebGL2 the UI still updates, but nothing shows (world panels too).
 - A world panel is a flat rectangle drawn with depth test and no depth write, so it does not hide transparent effects drawn after it; no curved panels; one texture and one pair of glyph atlases per panel.
 - Text shaping is the text package's: no Arabic or Indic shaping, no ligatures.
-- Layout is single-pass flexbox without wrapping rows; use a grid for wrapped content.
+- Layout is single-pass flexbox. A wrapping row breaks lines by its children's base sizes, so a child that would grow
+  never pulls the next one up; columns do not wrap, and lines always stack down from the top (no `align-content`).
