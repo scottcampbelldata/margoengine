@@ -203,6 +203,48 @@ for (const file of ['docs/whitepaper/claims.md', 'docs/limits.md', 'docs/clean-r
     );
   });
 
+// A rebase helper once re-added a clean-room row beside main's row of the same id (two S70 rows in the sky table), and
+// every check passed: the cell and stray-row checks see a well-formed row, and claims.md only numbers LIM ids. An id is
+// the first cell of a body row (S70, SP3, EX12). Separate tables may reuse a prefix (the sprites and exporters tables
+// each have their own SP and EX series), so an id must be unique within its table.
+function repeatedIds(text) {
+  const out = [];
+  let fence = false,
+    seen = null;
+  text
+    .replace(/\r\n/g, '\n')
+    .split('\n')
+    .forEach((line, i) => {
+      if (/^\s*(```|~~~)/.test(line)) fence = !fence;
+      if (fence || !line.startsWith('|')) {
+        seen = null;
+        return;
+      }
+      seen ??= new Map();
+      const id = /^\|\s*([A-Z]+\d+[a-z]?)\s*\|/.exec(line)?.[1];
+      if (!id) return;
+      if (seen.has(id)) out.push(`line ${i + 1}: ${id} again (first on line ${seen.get(id)})`);
+      else seen.set(id, i + 1);
+    });
+  return out;
+}
+
+test('the repeated-id finder sees two rows with one id in a table, and allows one id in two tables', () => {
+  const table = (...rows) => `| id | formula |\n| --- | --- |\n${rows.map((r) => `| ${r} | x |`).join('\n')}\n`;
+  assert.deepEqual(repeatedIds(table('S69', 'S70', 'S71')), []);
+  assert.deepEqual(repeatedIds(table('S69', 'S70', 'S70')), ['line 5: S70 again (first on line 4)']);
+  assert.deepEqual(repeatedIds(`${table('SP1')}\n### other\n\n${table('SP1')}`), []);
+  assert.deepEqual(repeatedIds('```\n| S1 | a |\n| S1 | b |\n```\n'), []);
+});
+
+test('no table in docs/clean-room.md holds two rows with one id', () => {
+  assert.deepEqual(
+    repeatedIds(readFileSync('docs/clean-room.md', 'utf8')),
+    [],
+    "two clean-room rows share an id: keep main's row and give the added row the next free id in its table",
+  );
+});
+
 test('every limit claim row sits in the design envelope table of claims.md', () => {
   const section = claims.split(/^## /m).find((s) => s.startsWith('Design envelope'));
   assert.equal((section.match(/^\| LIM-\d+ \|/gm) ?? []).length, ids.length, 'a LIM row sits outside its section');
