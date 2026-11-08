@@ -911,6 +911,8 @@ export class CompatBindGroup {
   label: string;
   readonly layout: CompatBindGroupLayout;
   readonly entries = new Map<number, Bound>();
+  /** Why the group is invalid (reported when it was created), else null; a pass treats an invalid group as unset. */
+  readonly invalid: string | null = null;
   /** The shared data texture of the group's storage bindings without a dynamic offset (see storageTexture()). */
   private shared: {
     texture: WebGLTexture;
@@ -947,6 +949,19 @@ export class CompatBindGroup {
           `Bind group entry ${e.binding} is not a resource of this device; pass a buffer binding, sampler, texture view or external texture made by it`,
         );
     }
+    // WebGPU's createBindGroup rules for buffers: the range lies inside the buffer and covers the layout's minimum
+    // binding size. Without them a too-small buffer reached the CPU tier, which read past its end (a RangeError).
+    for (const l of this.layout.entries) {
+      const bound = this.entries.get(l.binding);
+      if (!l.buffer || bound?.kind !== 'buffer') continue;
+      const where = `createBindGroup${this.label ? ` '${this.label}'` : ''} @binding(${l.binding})`;
+      if (bound.offset < 0 || bound.offset + bound.size > bound.buffer.size)
+        this.invalid = `${where}: bytes ${bound.offset} to ${bound.offset + bound.size} are outside the ${bound.buffer.size}-byte buffer`;
+      else if (bound.size < l.buffer.minBindingSize)
+        this.invalid = `${where}: the binding is ${bound.size} bytes, below the layout's minimum binding size of ${l.buffer.minBindingSize}`;
+      if (this.invalid) break;
+    }
+    if (this.invalid) device.validationError(this.invalid);
   }
 
   /**

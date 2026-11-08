@@ -1244,7 +1244,8 @@ export class Replayer {
     if (this.pass) this.pass.pipeline = p;
   }
   setBindGroup(index: number, group: CompatBindGroup | null, offsets: number[]): void {
-    if (this.pass) this.pass.groups[index] = group ? { group, offsets } : null;
+    // An invalid group (its error was reported at createBindGroup) binds nothing, so its draws are skipped.
+    if (this.pass) this.pass.groups[index] = group && !group.invalid ? { group, offsets } : null;
   }
   setVertexBuffer(slot: number, buffer: CompatBuffer | null, offset: number, _size?: number): void {
     if (this.pass) this.pass.vertex[slot] = buffer ? { buffer, offset } : null;

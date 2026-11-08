@@ -186,7 +186,8 @@ export class CompatComputePassEncoder {
   ): void {
     const list = offsets ? [...(offsets as Iterable<number>)] : [];
     const dynamic = offsets instanceof Uint32Array ? list.slice(start, start + (length ?? list.length - start)) : list;
-    this.groups[index] = group ? { group, offsets: dynamic } : null;
+    // An invalid group (its error was reported at createBindGroup) binds nothing, so the dispatch is skipped.
+    this.groups[index] = group && !group.invalid ? { group, offsets: dynamic } : null;
   }
   dispatchWorkgroups(x: number, y = 1, z = 1): void {
     this.record(() => [x, y, z]);

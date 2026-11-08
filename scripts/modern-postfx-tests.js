@@ -323,7 +323,7 @@ try {
     );
     // Tonemap extras (white balance, vignette, grain, chromatic aberration, auto-exposure) on the real GPU.
     {
-      const { effectsShader, meterShader } = await import('/packages/tonemap/src/effects.ts');
+      const { effectsShader, meterShader, meterValues } = await import('/packages/tonemap/src/effects.ts');
       grade[12] = 0;
       grade[2] = 2;
       grade[0] = 0;
@@ -406,11 +406,18 @@ try {
       setFx([1, 1, 1, 0, 0.5, 0.5, 0, 0.02, -0.5, -0.5, 1, 1, 0, 0, 0, 0]);
       near(await toneWith(fxPipe, fxGroup, rgb), base, 0.00002, 'Aberration clamps at the texture edge');
       {
-        // Metering: log-average luminance of a flat field drives the adapted stops toward 18% grey.
+        // Metering: log-average luminance of a flat field drives the adapted stops toward 18% grey. The uniform and
+        // the mask binding follow the shader (meterValues writes its 16 floats; the mask is blank, as in Tonemap).
         const field = texture(64, 64, 'rgba32float', T.TEXTURE_BINDING | T.COPY_DST),
-          meter = buffer(32),
+          blankMask = texture(1, 1, 'r8unorm', T.TEXTURE_BINDING),
+          meter = buffer(64),
           meterPipeline = await compute(meterShader),
-          meterGroup = group(meterPipeline, [{ buffer: meter }, field.createView(), { buffer: ae }]);
+          meterGroup = group(meterPipeline, [
+            { buffer: meter },
+            field.createView(),
+            { buffer: ae },
+            blankMask.createView(),
+          ]);
         const fill = (v) =>
           device.queue.writeTexture(
             { texture: field },
@@ -429,7 +436,7 @@ try {
           return v;
         };
         const run = (k, comp = 0) => {
-          device.queue.writeBuffer(meter, 0, new Float32Array([0, 0, 64, 64, -4, 4, k, comp]));
+          device.queue.writeBuffer(meter, 0, meterValues(new Float32Array(16), [0, 0, 64, 64], { compensation: comp }, k));
           const e = device.createCommandEncoder(),
             p = e.beginComputePass();
           p.setPipeline(meterPipeline);

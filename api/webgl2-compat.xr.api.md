@@ -131,6 +131,7 @@ class CompatBindGroup {
     label: string;
     readonly layout: CompatBindGroupLayout;
     readonly entries: Map<number, Bound>;
+    readonly invalid: string | null;
     constructor(device: CompatDevice, descriptor: GPUBindGroupDescriptor);
     storageTexture(): {
         texture: WebGLTexture;

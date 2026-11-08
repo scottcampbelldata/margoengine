@@ -243,3 +243,31 @@ test('keepFrame() replaces the shown image with a copy made outside the WebGL2 c
     else delete globalThis.OffscreenCanvas;
   }
 });
+
+// Bug (scripts/modern-postfx-tests.js --compat, the auto-exposure meter): a 32-byte buffer bound where the shader's
+// uniform is 64 bytes reached the CPU tier, which read past the buffer's end (`RangeError: Offset is outside the bounds
+// of the DataView`). As in WebGPU, createBindGroup now reports a validation error and a pass binds nothing for the group.
+test('createBindGroup refuses a buffer range below the minimum binding size or past the buffer end', async () => {
+  const gl = new Proxy(fakeContext(), { get: (context, key) => (key in context ? context[key] : () => ({})) });
+  const adapter = await createCompatGPU({ createContext: () => gl }).requestAdapter();
+  const device = await adapter.requestDevice();
+  const layout = device.createBindGroupLayout({
+    entries: [{ binding: 0, visibility: 4, buffer: { type: 'uniform', minBindingSize: 64 } }],
+  });
+  const small = device.createBuffer({ size: 32, usage: 0x40 | 0x8 }),
+    big = device.createBuffer({ size: 128, usage: 0x40 | 0x8 });
+  const errorOf = (resource) => {
+    device.pushErrorScope('validation');
+    const group = device.createBindGroup({ layout, entries: [{ binding: 0, resource }] });
+    return device.popErrorScope().then((error) => ({ error, group }));
+  };
+  const tooSmall = await errorOf({ buffer: small });
+  assert.match(tooSmall.error?.message ?? '', /32 bytes, below the layout's minimum binding size of 64/);
+  assert.ok(tooSmall.group.invalid);
+  const pastEnd = await errorOf({ buffer: big, offset: 96, size: 64 });
+  assert.match(pastEnd.error?.message ?? '', /bytes 96 to 160 are outside the 128-byte buffer/);
+  const fine = await errorOf({ buffer: big, offset: 64 });
+  assert.equal(fine.error, null);
+  assert.equal(fine.group.invalid, null);
+  device.destroy();
+});
