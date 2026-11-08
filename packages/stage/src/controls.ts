@@ -1,4 +1,4 @@
-import type { Camera, Vec3 } from './camera.js';
+import type { Camera, Vec3 } from '@margoengine/core';
 import { rangeError } from '../../shared/errors.js';
 /**
  * Pointer orbit/pan/zoom for a {@link Camera} on a canvas: left drag orbits, middle/right or Shift+left drag pans, the

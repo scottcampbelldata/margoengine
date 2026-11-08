@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { EngineKernel, PbrMaterial, box, CADCameraControls } from '../../core/dist/index.js';
+import { EngineKernel, PbrMaterial, box } from '../../core/dist/index.js';
+import { CADCameraControls } from '../../stage/dist/controls.js';
 import { OrbitControls } from '../../controls/dist/index.js';
 import { Raycaster } from '../../bvh/dist/index.js';
 import { FloatingOrigin } from '../dist/origin.js';

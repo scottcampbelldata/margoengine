@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
-import { Camera, CADCameraControls } from '../../core/dist/index.js';
+import { Camera } from '../../core/dist/index.js';
+import { CADCameraControls } from '../../stage/dist/controls.js';
 import { OrbitControls, AUTOCAD, BLENDER, SOLIDWORKS } from '../../controls/dist/index.js';
 import { CameraProjection } from '../../cameras/dist/index.js';
 import { compactOutput } from '../../../scripts/measure-size.js';
@@ -240,7 +241,7 @@ test('a click animates around the target, keeps the distance, and top/bottom kee
   assert.throws(() => cube.view('side'), /Invalid view/);
 });
 
-test('works with core CADCameraControls and OrbitControls: their input cancels an animation, idle controls do not', () => {
+test('works with the stage CADCameraControls and OrbitControls: their input cancels an animation, idle controls do not', () => {
   const { engine, canvas } = setup(),
     orbit = new OrbitControls(engine),
     cube = new ViewCube(engine, { duration: 0.4 });

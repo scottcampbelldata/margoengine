@@ -16,7 +16,7 @@ const canvas = document.querySelector('canvas')!;
 
 const engine = await Engine.create(canvas);           // the canvas needs a parent element; the cube is placed in it
 const projection = CameraProjection.attach(engine, {mode: 'perspective'});
-OrbitControls.attach(engine);                             // or core's CADCameraControls
+OrbitControls.attach(engine);                             // or the stage's CADCameraControls
 const cube = ViewCube.attach(engine, {projection});       // omit projection to hide the toggle
 
 cube.view('top');                                      // 'top' | 'bottom' | 'front' | 'back' | 'left' | 'right' | 'iso'
@@ -43,7 +43,7 @@ also follows projection changes made elsewhere (Blender's numpad 5 through a pro
   a CameraProjection's vertical `up`. OrbitControls and CADCameraControls leave an exact pole at azimuth 0, so after a
   top view reached from the side they start from the front.
 - **Engine views.** `ViewCube.attach(engine, {view: {camera, viewport}})` turns that view's camera and sits in the chosen corner of its rectangle (the cube's container must cover the canvas). One cube per view.
-- **Controls.** The cube writes `camera.position` (and `camera.up` on the poles); OrbitControls, MapControls and core's CADCameraControls read
+- **Controls.** The cube writes `camera.position` (and `camera.up` on the poles); OrbitControls, MapControls and the stage's CADCameraControls read
   the camera each frame, so they keep working. Any other camera change during an animation (a drag, a wheel) cancels it.
   A running `fitToBoundingBox` animation is cancelled when a view starts.
 - **Accessibility.** The root is a labelled group. The six faces are buttons named "Front view", "Top view", ...; only
@@ -55,7 +55,7 @@ also follows projection changes made elsewhere (Blender's numpad 5 through a pro
   and touches the DOM only when the orientation changed.
 
 Why a separate package and not `@margoengine/controls`: the cube is a DOM widget that drives any camera controller
-(including core's CADCameraControls, which does not use controls) and optionally `@margoengine/cameras`; keeping it
+(including the stage's CADCameraControls, which does not use controls) and optionally `@margoengine/cameras`; keeping it
 out leaves controls' bundle and dependencies unchanged.
 
 Limits: no drag-to-orbit on the cube itself, no roll (the cube sets `camera.up` only on the poles), no "home" view of your own (use

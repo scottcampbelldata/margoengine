@@ -849,13 +849,13 @@ export interface CADControlsOptions {
 }
 
 /**
- * Familiar CAD navigation in one call: replaces the stage's built-in core `CADCameraControls` (attached by
+ * Familiar CAD navigation in one call: replaces the stage's built-in `CADCameraControls` (attached by
  * `createStage` unless `controls: false`) with `OrbitControls` under `profile`, or attaches them to a bare engine.
  * Core's controls take no profile; these give the same orbit, pan and zoom with a CAD tool's mouse buttons. Listen
  * for `fit` on the result to frame your model when the profile's fit gesture is used.
  */
 export function cadControls(engine: EngineKernel, { profile, keys }: CADControlsOptions = {}): OrbitControls {
-  // The stage facade's plugin that drives core CADCameraControls (packages/margoengine/src/index.ts); a no-op without it.
+  // The stage facade's plugin that drives CADCameraControls (packages/stage/src/index.ts); a no-op without it.
   engine.removePlugin('margoengine-controls');
   const orbit = OrbitControls.attach(engine);
   if (profile) orbit.setProfile(profile);

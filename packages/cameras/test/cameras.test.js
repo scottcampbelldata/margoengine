@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Camera, CADCameraControls } from '../../core/dist/index.js';
+import { Camera } from '../../core/dist/index.js';
+import { CADCameraControls } from '../../stage/dist/controls.js';
 import { Engine, TransformStore, box } from '../../core/dist/extension.js';
 import { viewMatrix } from '../../shared/view.js';
 import { jitterProjection } from '../../taa/dist/index.js';

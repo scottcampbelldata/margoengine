@@ -1,6 +1,5 @@
 import {
   Engine,
-  CADCameraControls,
   Geometry,
   PbrMaterial,
   box,
@@ -11,10 +10,12 @@ import {
   type Scene,
   type Vec3,
 } from '@margoengine/core';
+import { CADCameraControls } from './controls.js';
 import { worldBounds } from './model.js';
 import { rangeError, typeError } from '../../shared/errors.js';
 
 export * from '@margoengine/core';
+export { CADCameraControls } from './controls.js';
 export type { LoadedModel } from './model.js';
 /** Options for `createStage`: engine options plus the stage's own. */
 export interface StageOptions extends EngineOptions {

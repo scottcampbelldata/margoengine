@@ -5,5 +5,4 @@ export { Geometry, PbrMaterial, box } from './geometry.js';
 export type { PbrMaterialOptions } from './geometry.js';
 export { Camera } from './camera.js';
 export type { RenderView } from './renderer.js';
-export { CADCameraControls } from './controls.js';
 export type { Vec3, CameraOptions } from './camera.js';

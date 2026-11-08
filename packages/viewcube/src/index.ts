@@ -99,7 +99,7 @@ let count = 0;
 /**
  * A CAD orientation cube in a corner of the view (Autodesk-style ViewCube). It turns with the camera; a click on a face,
  * edge or corner animates the camera around its target to that view, keeping the distance. Keyboard: the six faces are
- * buttons; arrow keys step the view 45°, Home goes to the isometric view. Works with core's CADCameraControls and
+ * buttons; arrow keys step the view 45°, Home goes to the isometric view. Works with the stage's CADCameraControls and
  * `@margoengine/controls` OrbitControls (they read the camera each frame), and toggles a `@margoengine/cameras` projection.
  */
 export class ViewCube {

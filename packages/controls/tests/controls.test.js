@@ -435,7 +435,7 @@ test('map controls: left drag pans along the ground plane', () => {
 test("cadControls replaces the stage's CAD controls with OrbitControls under a CAD tool's profile", async () => {
   const { engine, canvas } = await engineWith();
   let disposed = 0;
-  // What createStage attaches by default: the plugin that drives core CADCameraControls.
+  // What createStage attaches by default: the plugin that drives the stage's CADCameraControls.
   engine.use({ name: 'margoengine-controls', setup() {}, dispose: () => disposed++ });
   const keys = new FakeTarget(),
     orbit = cadControls(engine, { profile: SOLIDWORKS, keys });

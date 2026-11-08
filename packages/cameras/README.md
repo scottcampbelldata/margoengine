@@ -33,7 +33,7 @@ projection.fit(model.bounds);                // frame a box: [minX, minY, minZ, 
 - **Parameters**: `left`, `right`, `top`, `bottom` (all four replace `height` and
   the canvas aspect, so update them on resize), `zoom` (divides the frustum about its centre), `near`, `far` (eye-space, may be negative).
   Without `height` or bounds the visible height is `2 · distance · tan(fov / 2)`: the perspective framing at the target,
-  so `fitToBoundingBox`, core's `CADCameraControls` and `@margoengine/controls` dolly become ortho zoom and pan tracks
+  so `fitToBoundingBox`, the stage's `CADCameraControls` and `@margoengine/controls` dolly become ortho zoom and pan tracks
   the cursor exactly. Without `near`/`far` the depth range is `camera.far` deep and centred on the target (Blender's
   convention), so zooming in never clips a model at the eye.
 - **Fixed size.** With an explicit `height` or all four bounds, `projection.fixedOrthographic` (also readable on the

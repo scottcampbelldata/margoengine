@@ -1,15 +1,20 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { execFile } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { Camera } from '../packages/core/dist/camera.js';
+// In @margoengine/stage since 2026-11-07 (core before); a baseline checkout from before then keeps it in core.
 const sourceFile = process.env.DEEP_INGESTION_BASELINE
-  ? resolve(process.env.DEEP_INGESTION_BASELINE, 'packages/core/src/controls.ts')
-  : fileURLToPath(new URL('../packages/core/src/controls.ts', import.meta.url));
+  ? [
+      resolve(process.env.DEEP_INGESTION_BASELINE, 'packages/stage/src/controls.ts'),
+      resolve(process.env.DEEP_INGESTION_BASELINE, 'packages/core/src/controls.ts'),
+    ].find((file) => existsSync(file))
+  : fileURLToPath(new URL('../packages/stage/src/controls.ts', import.meta.url));
 // Parameter properties need compilation; Node 26 only supports type stripping.
 const directory = await fs.mkdtemp(join(tmpdir(), 'margo-camera-controls-'));
 let source;

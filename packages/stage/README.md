@@ -35,6 +35,28 @@ Use a selector, an HTMLElement container or an existing canvas. The wrapper appe
 | `app.signal` | An `AbortSignal` that aborts when the stage is disposed; the feature entries combine it with yours |
 | `app.engine` | Existing core API: camera, picking, plugins, manual render, start/stop and recovery |
 
+## CAD camera controls
+
+`createStage` attaches `CADCameraControls` unless `controls: false`: left drag orbits the pivot, middle, right or
+Shift + left drag pans, and the wheel zooms smoothly between 2x `camera.near` and 0.8x `camera.far`. On an engine of
+your own, attach them yourself and call `update(delta)` each frame. `setPivot(point)` moves the pivot and keeps the
+eye; `orbit(azimuth, elevation)` and `pan(x, y)` move the camera from code. `dispose()` removes the listeners and puts
+the canvas's `touch-action` back. It moved here from `@margoengine/core` on 2026-11-07, so import it from this package
+(or `margoengine`). For CAD-tool button mappings use `cadControls` of `@margoengine/controls`.
+
+```ts
+import { Engine, box } from '@margoengine/core';
+import { CADCameraControls } from '@margoengine/stage';
+
+const canvas = document.querySelector('canvas')!;
+const engine = await Engine.create(canvas);
+engine.createMesh().setGeometry(box());
+const controls = new CADCameraControls(engine.camera, canvas);
+const off = engine.onFrame((_, delta) => controls.update(delta));
+engine.start();
+window.addEventListener('pagehide', () => { off(); controls.dispose(); engine.dispose(); }, { once: true });
+```
+
 ## Feature entries
 
 Each optional feature is a function in its own entry that takes the stage, so an app bundles (and must install) only

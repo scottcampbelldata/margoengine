@@ -478,7 +478,7 @@ Not modelled: roll (SolidWorks Alt + middle, two-finger twist), SolidWorks rotat
 Ctrl + Shift + middle free orbit, Blender Ctrl/Shift + wheel pan and numpad 2/4/6/8 steps, Maya Alt + Ctrl box zoom,
 Inventor F2-F6 (F6 focuses the browser's address bar), 3Dconnexion space mice (WebHID, not trivial), gamepads (use
 `@margoengine/input`, which polls actions per tick; these profiles are event chords on the canvas). Profiles drive
-`OrbitControls` and `MapControls`. Core's `CADCameraControls` (attached by the stage facade) hard-codes left orbit,
+`OrbitControls` and `MapControls`. The stage's `CADCameraControls` (attached by `createStage`) hard-codes left orbit,
 other buttons or Shift pan, and wheel zoom; for a CAD tool's mapping, `cadControls(stage.engine, {profile: SOLIDWORKS,
 keys: window})` replaces them with `OrbitControls` under that profile in one call (on a bare engine it just attaches
 them), and returns the controls so you can listen for `fit`.

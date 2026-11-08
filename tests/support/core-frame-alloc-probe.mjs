@@ -5,7 +5,7 @@
 // through the position, Euler and quaternion setters. `--shadows` adds @margoengine/shadows with eight moving
 // casters. Prints JSON { bytes: [JavaScript heap bytes per frame, one per window of 1,000 frames] }.
 // `--allocate` makes every frame allocate on purpose, to prove the probe notices.
-import { CADCameraControls } from '../../packages/core/dist/controls.js';
+import { CADCameraControls } from '../../packages/stage/dist/controls.js';
 import { Engine, TransformStore, box } from '../../packages/core/dist/extension.js';
 import { bytesPerFrame, frameDriver, stillRenderer } from './still-gpu.mjs';
 

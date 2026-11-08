@@ -13,7 +13,7 @@ import { GPUParticles, PostProcessing, ToonShading, HDRRenderTarget } from '../p
 import { parseGLTF } from '../packages/gltf/dist/index.js';
 import { compose } from './support/matrices.js';
 import { GPURenderer } from '../packages/core/dist/renderer.js';
-import { CADCameraControls } from '../packages/core/dist/controls.js';
+import { CADCameraControls } from '../packages/stage/dist/controls.js';
 
 function activate(store, id) {
   store.active[id] = 1;
@@ -809,7 +809,7 @@ test('Frozen core entry stays portable and the one-install React entry exposes i
     react = await import('margoengine/react');
   assert.deepEqual(
     Object.keys(api).sort(),
-    ['CADCameraControls', 'Camera', 'Engine', 'EngineKernel', 'Geometry', 'PbrMaterial', 'box'].sort(),
+    ['Camera', 'Engine', 'EngineKernel', 'Geometry', 'PbrMaterial', 'box'].sort(),
   );
   assert.equal(api.EngineKernel, api.Engine);
   assert.deepEqual(

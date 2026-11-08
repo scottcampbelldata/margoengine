@@ -90,7 +90,8 @@ Shared `Geometry` identity produces one instanced draw even when material parame
 `EngineKernel` and `Engine` are aliases of the same asynchronous factory. The portable TypeScript surface exposes mesh handles, camera, frame lifecycle, plugin attachment, statistics, rendering, picking and reboot. `useMargoStage`, `useFrame` and React `MeshRef` share that surface. `Canvas.onCreated` receives a `Stage` facade with the portable engine at `stage.engine`. Wasm slot IDs, matrix views, storage and raw GPU state are omitted. Runtime export snapshots and packed strict consumer checks guard the contract, including expected type errors for accessing hidden internals. Advanced plugin authors explicitly import `@margoengine/core/extension` for `EnginePlugin`, `FrameGraph`, `PassContext`, `TransformStore`, and `engineRuntime`/`meshRuntime`. This is an API boundary, not a JavaScript security membrane. Prior direct storage/device imports must migrate to that entry.
 
 ```ts
-import { EngineKernel, CADCameraControls } from '@margoengine/core';
+import { EngineKernel } from '@margoengine/core';
+import { CADCameraControls } from '@margoengine/stage';
 const engine = await EngineKernel.create(canvas, { backend: 'webgpu' });
 const controls = new CADCameraControls(engine.camera, canvas);
 const unsubscribe = engine.onFrame((_, delta) => controls.update(delta));
@@ -107,7 +108,7 @@ Picking is WebGPU-only, asynchronous and interaction-driven: it rasterizes retai
 
 WebGPU uses reversed Z: near=1, far=0, clear=0 and `greater-equal` with `depth32float`. When the adapter exposes the optional `depth32float-stencil8` feature, it is requested and the same float depth precision is combined with stencil; without it, float depth, picking and shader-only sections still work. HDR, cap, particle and sky passes use the same convention. WebGL2 retains its conventional -1..1 projection/depth path. Finite positive near/far planes still apply; float depth does not make Float32 world transforms infinitely precise. A real GPU check resolves surfaces 0.1 mm apart at 500 m with near=1 mm and far=10 km, even when the farther red surface is drawn last.
 
-`CADCameraControls` owns pointer/wheel listeners: left drag orbits the current pivot, Shift/middle/right drag pans in screen space, and wheel zoom decays smoothly through `update(delta)`. `setPivot(point)` keeps the eye position; `Camera.fitToBoundingBox(min,max,{aspect,duration,padding})` fits a bounding sphere and smoothly advances during engine frames, including recovery. Pointer navigation cancels the fit. Dispose controls and unsubscribe the update callback when detached.
+`CADCameraControls` (from `@margoengine/stage`, also exported by `margoengine`; core until 2026-11-07) owns pointer/wheel listeners: left drag orbits the current pivot, Shift/middle/right drag pans in screen space, and wheel zoom decays smoothly through `update(delta)`. `setPivot(point)` keeps the eye position; `Camera.fitToBoundingBox(min,max,{aspect,duration,padding})` fits a bounding sphere and smoothly advances during engine frames, including recovery. Pointer navigation cancels the fit. Dispose controls and unsubscribe the update callback when detached.
 
 ## React
 

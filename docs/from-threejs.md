@@ -739,7 +739,7 @@ ViewCube.attach(engine, {...BLENDER.viewCube});               // clicking the cu
 ```
 
 - Also `MapControls`, `TrackballControls`, `FlyControls`, `FirstPersonControls` and `PointerLockControls`, with three.js
-  option names. Core has `CADCameraControls` (orbit about a pivot, pan, smooth zoom), which the stage facade uses.
+  option names. The stage has `CADCameraControls` (orbit about a pivot, pan, smooth zoom), which `createStage` attaches.
 - Without an engine, pass a camera and an element and call `update(delta)` yourself:
   `new FlyControls(engine.camera, canvas)`.
 - `ViewCube.attach(engine)` from `@margoengine/viewcube` replaces `ViewHelper` (click a face to turn the view).

@@ -5,7 +5,16 @@
 ```ts
 import { GeometryBuffers } from "@margoengine/core/extension";
 
-export { CADCameraControls } from "@margoengine/core";
+export class CADCameraControls {
+    readonly camera: Camera;
+    readonly element: HTMLCanvasElement;
+    constructor(camera: Camera, element: HTMLCanvasElement);
+    setPivot(point: Vec3): void;
+    orbit(azimuth: number, elevation: number): void;
+    pan(x: number, y: number): void;
+    update(delta: number): void;
+    dispose(): void;
+}
 
 export { Camera } from "@margoengine/core";
 
