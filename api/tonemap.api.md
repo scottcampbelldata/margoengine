@@ -34,7 +34,7 @@ export class Tonemap implements EnginePlugin {
     destroy(): void;
 }
 
-export type TonemapCurve = 'agx' | 'acescg' | 'neutral';
+export type TonemapCurve = 'agx' | 'acescg' | 'neutral' | 'reinhard' | 'cineon' | 'linear';
 
 export interface TonemapExtension {
     readonly key: string;

@@ -53,6 +53,7 @@
     "dev": "vite --config vite.config.js --open /examples/index.html",
     "build:demo": "vite build --config vite.config.js",
     "test:gpu:lut-sizes": "cd ../.. && node scripts/tonemap-lut-sizes-gpu-check.js",
-    "test:gpu:grade": "cd ../.. && node packages/tonemap/tests/grade-browser.mjs"
+    "test:gpu:grade": "cd ../.. && node packages/tonemap/tests/grade-browser.mjs",
+    "test:gpu:curves": "cd ../.. && node packages/tonemap/tests/curves-browser.mjs"
   }
 }

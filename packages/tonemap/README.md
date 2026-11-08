@@ -62,6 +62,13 @@ Standalone capture at order −50 replaces the standard core shader's display ma
 
 Display P3 and HDR canvases: with `ColorOutput` from `@margoengine/environment` active (alone or in a PostStack), Tonemap compiles an output variant of its shader. Below the 0.76 knee the curves are the SDR ones; on an HDR canvas Khronos PBR Neutral's highlight rolloff aims at ColorOutput's `peak` instead of 1 (AgX and ACES are scaled by the same rolloff ratio of the brightest channel), and on a P3 canvas the input is clipped to the P3 gamut instead of sRGB. It writes the 0..1 part to its target as before and the rest (above white; negative components for colours outside sRGB) to ColorOutput's excess texture in a second full-screen pass. Without ColorOutput nothing changes: `examples/package-benchmarks/proofs/color-output.proof.js` records the same GPU calls as before. Details and limits: environment README, "Display P3 and HDR output".
 
+Classic curves: `curve: 'reinhard'` (x / (1 + x) per channel), `'cineon'` (the filmic fit of Hejl and Burgess-Dawson,
+taken back to linear with a 2.2 power before the sRGB encoding) and `'linear'` (a clamp to 0..1 after exposure) match
+the curves of the same names in other engines, so a scene ported with its tone mapping keeps its look. They compile a
+separate shader variant only when selected, and switching among them compiles nothing. Checked on a real GPU
+(`packages/tonemap/tests/curves-browser.mjs`, M6 Mac mini, Metal): over 144 input levels at exposures -4 to 1, each
+pixel lands within 1.1 levels of a CPU oracle of its formula.
+
 GPU resources and JS descriptors are reused in steady state. Resize, LUT updates and device restoration rebuild the necessary resources; removal frees them. Opaque and transparent scene color are graded together.
 
 ```sh

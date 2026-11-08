@@ -9,7 +9,7 @@ import {
   type PassContext,
 } from '@margoengine/core/extension';
 import { parseCube, validateLUT, type CubeLUT } from './cube.js';
-import { outputShader, tonemapShader, sizedLUTShader } from './shaders.js';
+import { outputShader, tonemapShader, sizedLUTShader, classicShader } from './shaders.js';
 import type { StackHost, StackStage } from '../../shared/stack.js';
 import { MargoError } from '@margoengine/math/errors';
 import { applyView, viewLoadOp, viewRect } from '../../shared/view-rect.js';
@@ -34,9 +34,11 @@ const OUTPUT = Symbol.for('margoengine.color-output');
 type Output = { peak: number; p3: boolean; excess?: (width: number, height: number) => GPUTextureView };
 /**
  * Display transform: `'neutral'` (Khronos PBR Neutral, core's own curve), `'agx'` (AgX, computed in the shader) or
- * `'acescg'` (ACES fitted RRT/ODT with AP1 handling).
+ * `'acescg'` (ACES fitted RRT/ODT with AP1 handling); the classic `'reinhard'` (x / (1 + x)), `'cineon'` (the
+ * Hejl and Burgess-Dawson filmic fit) and `'linear'` (clamp) curves, for scenes ported from engines that use them.
  */
-export type TonemapCurve = 'agx' | 'acescg' | 'neutral';
+export type TonemapCurve = 'agx' | 'acescg' | 'neutral' | 'reinhard' | 'cineon' | 'linear';
+const curves: readonly TonemapCurve[] = ['agx', 'acescg', 'neutral', 'reinhard', 'cineon', 'linear'];
 /**
  * A shader extension of Tonemap, such as `Grade` from `@margoengine/tonemap/grade`: it patches the WGSL of the
  * presentation pass and may bind one uniform buffer of its own.
@@ -187,7 +189,7 @@ export class Tonemap implements EnginePlugin {
           Array.isArray(o.extensions) &&
           o.extensions.every((x) => typeof x?.patch === 'function' && typeof x.key === 'string')
         )) ||
-      (o.curve !== undefined && o.curve !== 'agx' && o.curve !== 'acescg' && o.curve !== 'neutral') ||
+      (o.curve !== undefined && !curves.includes(o.curve)) ||
       (o.inputColorSpace !== undefined && o.inputColorSpace !== 'linear-srgb' && o.inputColorSpace !== 'acescg') ||
       !Number.isFinite(e) ||
       e < -16 ||
@@ -199,7 +201,7 @@ export class Tonemap implements EnginePlugin {
       (o.source !== undefined && typeof o.source !== 'function')
     )
       throw new RangeError(
-        'Invalid Tonemap options; use curve agx, acescg or neutral, exposure within -16..16, contrast within 0..4, and keep source unchanged after attach.',
+        'Invalid Tonemap options; use curve agx, acescg, neutral, reinhard, cineon or linear, exposure within -16..16, contrast within 0..4, and keep source unchanged after attach.',
       );
     if (!this.source && o.inputColorSpace === 'acescg')
       throw new MargoError('state', 'ACEScg input requires an external ACEScg source; pass options.source');
@@ -384,6 +386,7 @@ export class Tonemap implements EnginePlugin {
       auto = !!o.autoExposure,
       fxOn = usesEffects(o),
       exts = o.extensions ?? [],
+      classic = curves.indexOf(o.curve!) > 2,
       key =
         format +
         ':' +
@@ -391,11 +394,13 @@ export class Tonemap implements EnginePlugin {
         (excess ? ':output' : '') +
         (variableLUT ? ':lut-size' : '') +
         (fxOn ? (auto ? ':fx-auto' : ':fx') : '') +
+        (classic ? ':classic' : '') +
         (exts.length ? ':' + exts.map((e) => e.key).join(',') : '');
     if (!this.pipeline || this.pipelineFormat !== key) {
       let code = excess ? outputShader : tonemapShader;
       if (variableLUT) code = sizedLUTShader(code);
       if (fxOn) code = effectsShader(code, auto);
+      if (classic) code = classicShader(code);
       for (const [i, e] of exts.entries()) code = e.patch(code, 5 + i);
       for (const b of this.extBuffers) b?.destroy();
       this.extBuffers = exts.map(
@@ -445,7 +450,7 @@ export class Tonemap implements EnginePlugin {
     const v = this.values;
     v[0] = o.exposure ?? 0;
     v[1] = o.contrast ?? 1;
-    v[2] = o.curve === 'acescg' ? 1 : o.curve === 'agx' ? 0 : 2;
+    v[2] = o.curve === 'acescg' ? 1 : o.curve === 'agx' ? 0 : o.curve === undefined ? 2 : curves.indexOf(o.curve);
     v[3] = +!!this.lut;
     for (let i = 0; i < 3; i++) {
       v[4 + i] = this.lut?.domainMin[i] ?? 0;

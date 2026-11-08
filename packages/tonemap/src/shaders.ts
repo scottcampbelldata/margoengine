@@ -93,3 +93,18 @@ export function sizedLUTShader(code: string): string {
     .replace('vec3f(1))*32.0;', 'vec3f(1))*f32(edge);')
     .replace('min(lo+1,vec3i(32))', 'min(lo+1,vec3i(edge))');
 }
+
+/**
+ * The classic curves, compiled in only when one is selected so the other shaders stay byte-identical: Reinhard
+ * x / (1 + x) (Reinhard et al., "Photographic Tone Reproduction for Digital Images", 2002, the global operator per
+ * channel); Cineon, the filmic fit of J. Hejl and R. Burgess-Dawson (GDC 2010), whose output includes a 2.2 display
+ * gamma, so it is raised to 2.2 back to linear; linear, a clamp to 0..1. Codes 3, 4 and 5 of `p.grade.z`.
+ */
+export function classicShader(code: string): string {
+  const classic = (x: string) =>
+    `}else if(p.grade.z==3.0){color=${x}/(1.0+${x});}else if(p.grade.z==4.0){let f=max(${x}-0.004,vec3f(0));` +
+    `color=pow(f*(6.2*f+0.5)/(f*(6.2*f+1.7)+0.06),vec3f(2.2));}else if(p.grade.z==5.0){color=min(${x},vec3f(1));}else{color=agx(${x});}`;
+  return code
+    .replace('}else{color=agx(hdr);}', classic('hdr'))
+    .replace('}else{color=agx(positive);}', classic('positive'));
+}
