@@ -9,6 +9,8 @@ import { attachMirror, type MirrorOptions } from './mirror.js';
 import type { Ui } from './ui.js';
 
 type GpuContext = Extract<PassContext, { backend: 'webgpu' }>;
+type GlContext = Extract<PassContext, { backend: 'webgl2' }>;
+type GlModule = typeof import('./gl.js');
 
 /** Options for {@link UiRenderer}. */
 export interface UiRendererOptions {
@@ -34,13 +36,12 @@ export interface UiRendererOptions {
   mirror?: boolean | MirrorOptions;
 }
 
-let warned = false;
-
 /**
  * Engine plugin that draws a {@link Ui} over the finished frame, in the engine's own render pass: rounded rectangles
  * and signed distance field text from the text package, in device pixels, so it works in fullscreen and in exported
  * games with no DOM involved. It also steps the UI each frame (`ui.update`) and keeps its size in step with the canvas.
- * WebGPU only; on the WebGL2 backend it warns once, draws nothing, and the UI still updates and mirrors to the DOM.
+ * On core's WebGL2 preview backend it draws the same rectangles and text with WebGL2 (its code loads on first use, so
+ * the UI shows from the first frame after that load).
  *
  * @example
  * const ui = new Ui();
@@ -58,6 +59,8 @@ export class UiRenderer implements EnginePlugin {
   private readonly options: Required<Omit<UiRendererOptions, 'name' | 'order' | 'input' | 'mirror'>>;
   private readonly inputOptions: AttachOptions | false;
   private readonly mirrorOptions: MirrorOptions | false;
+  private gl?: GlModule;
+  private glPainter?: InstanceType<GlModule['GlUiPainter']>;
   private detach?: Detach;
   private detachMirror?: Detach;
   private disposed = false;
@@ -105,12 +108,10 @@ export class UiRenderer implements EnginePlugin {
     if (this.mirrorOptions && canvas && !this.detachMirror)
       this.detachMirror = attachMirror(this.ui, canvas, this.mirrorOptions);
     if (engine.backend !== 'webgpu' || !engine.gpu) {
-      if (!warned) {
-        warned = true;
-        console.warn(
-          '@margoengine/ui: the WebGL2 backend is not supported, the UI will not be drawn (the accessibility mirror still works).',
-        );
-      }
+      if (!this.gl)
+        void import('./gl.js').then((module) => {
+          if (!this.disposed) this.gl = module;
+        });
       return;
     }
     this.painter.setup((this.device = engine.gpu));
@@ -126,17 +127,16 @@ export class UiRenderer implements EnginePlugin {
 
   private readonly execute = (context: PassContext): void => {
     this.stats.rects = this.stats.glyphs = this.stats.drawCalls = this.stats.uploads = 0;
-    if (context.backend !== 'webgpu' || !this.device || !this.engine || context.device !== this.device) return;
     const view = context.view;
     if (view && view.index !== view.count - 1) return;
+    if (context.backend === 'webgl2') return this.drawGl(context);
+    if (!this.device || !this.engine || context.device !== this.device) return;
     this.draw(context);
   };
 
   private draw(context: GpuContext): void {
     const ui = this.ui,
-      canvas = (this.engine as unknown as { canvas?: HTMLCanvasElement }).canvas,
-      cssWidth = canvas?.clientWidth || 0,
-      ratio = cssWidth > 0 ? context.width / cssWidth : (globalThis.devicePixelRatio ?? 1);
+      ratio = this.pixelRatio(context.width);
     // The drawing buffer is the canvas in device pixels; the UI works in CSS pixels times the pixel ratio.
     ui.resize(context.width / ratio, context.height / ratio, ratio);
     if (!this.painter.prepare(ui.draw())) return;
@@ -153,7 +153,28 @@ export class UiRenderer implements EnginePlugin {
     pass.end();
   }
 
+  /** The WebGL2 path: the same draw list over the finished frame in the default framebuffer. */
+  private drawGl(context: GlContext): void {
+    if (!this.gl || !this.engine || context.gl.isContextLost()) return;
+    if (this.glPainter?.gl !== context.gl) {
+      this.glPainter?.dispose();
+      this.glPainter = new this.gl.GlUiPainter(context.gl, this.options, this.stats);
+    }
+    const ratio = this.pixelRatio(context.width);
+    this.ui.resize(context.width / ratio, context.height / ratio, ratio);
+    this.glPainter.draw(this.ui.draw(), context.width, context.height);
+  }
+
+  /** Device pixels per CSS pixel: the drawing buffer's width over the canvas's CSS width. */
+  private pixelRatio(width: number): number {
+    const canvas = (this.engine as unknown as { canvas?: HTMLCanvasElement }).canvas,
+      cssWidth = canvas?.clientWidth || 0;
+    return cssWidth > 0 ? width / cssWidth : (globalThis.devicePixelRatio ?? 1);
+  }
+
   onDeviceRestored(engine: Engine): void {
+    // A restored WebGL2 context is a new set of objects: the painter is made again on the next frame.
+    this.glPainter = undefined;
     this.painter.release(false);
     this.device = undefined;
     this.setup(engine);
@@ -167,6 +188,8 @@ export class UiRenderer implements EnginePlugin {
     this.detachMirror?.();
     this.detachMirror = undefined;
     this.painter.release(true);
+    if (this.glPainter && !this.glPainter.gl.isContextLost()) this.glPainter.dispose();
+    this.glPainter = this.gl = undefined;
     this.device = undefined;
     this.engine = undefined;
   }

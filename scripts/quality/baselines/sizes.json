@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11224712,
+  "total": 11230051,
   "history": [
     {
       "date": "2026-10-24",
@@ -4358,6 +4358,12 @@
       "commit": "ca41009b8",
       "reason": "taa reactive mask: option, mask validation and the resolve patch (batch 73 job 1)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "b661c0ec5",
+      "reason": "ui draws on the WebGL2 preview backend (gl chunk loaded on first use)",
+      "grew": 2
     }
   ],
   "items": {
@@ -5063,8 +5069,8 @@
     "@margoengine/tween/motion-path": 1263,
     "@margoengine/tween/scroll": 1198,
     "@margoengine/tween/stagger": 1435,
-    "@margoengine/ui": 29167,
-    "@margoengine/ui/react": 29210,
+    "@margoengine/ui": 31836,
+    "@margoengine/ui/react": 31880,
     "@margoengine/ui/world": 9277,
     "@margoengine/usdz": 12708,
     "@margoengine/usdz dist/workers/usdz.js": 116081,

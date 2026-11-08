@@ -3,6 +3,7 @@
 // themes, resolution scaling, dialog scrims and the pixel ratio.
 import { Engine } from '@margoengine/core';
 import { Button, HealthBar, Inventory, Label, List, Panel, Ui, UiRenderer, themes, parseRgba } from '@margoengine/ui';
+import { webglRenderer } from '@margoengine/webgl';
 
 const checks = [];
 const assert = (condition, message) => {
@@ -307,6 +308,74 @@ async function run() {
     assert(f.count(g, (p) => luminance(p) > 170) > 8, 'icon draws in the slot');
     ui.remove(grid);
     await frame();
+  });
+
+  await check("on core's WebGL2 preview backend the UI draws its rectangles, outlines and text, and clips a list", async () => {
+    const glCanvas = document.createElement('canvas');
+    glCanvas.width = 320;
+    glCanvas.height = 240;
+    glCanvas.style.cssText = 'width:320px;height:240px';
+    document.body.append(glCanvas);
+    const glEngine = await Engine.create(glCanvas, { backend: 'webgl2', fallback: webglRenderer });
+    glEngine.scene.background = '#202830';
+    const glUi = new Ui({ theme: themes.dark, reducedMotion: true, safeArea: [0, 0, 0, 0] }),
+      glRenderer = UiRenderer.attach(glEngine, glUi, { input: false, mirror: false });
+    await glUi.ready;
+    const card = new Panel({ anchor: 'top-left', margin: 16, width: 200, padding: 12, gap: 8, background: 'surface', radius: 12 }),
+      title = new Label({ text: 'WebGL2 menu', size: 'large' }),
+      bar = new HealthBar({ value: 50, max: 100, width: 160 }),
+      list = new List({ items: Array.from({ length: 30 }, (_, i) => `Row ${i}`), height: 60, width: 160 });
+    card.add(title, bar, list);
+    glUi.add(card);
+    const gl = glCanvas.getContext('webgl2');
+    // The drawing code loads on first use: render until it has drawn, waiting a task between frames.
+    const read = () => {
+      glEngine.render(0.016);
+      const pixels = new Uint8Array(glCanvas.width * glCanvas.height * 4);
+      gl.readPixels(0, 0, glCanvas.width, glCanvas.height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+      // Rows come bottom up from readPixels; at(x, y) takes top-down device pixels like the WebGPU frame().
+      const at = (x, y) => {
+          const i = ((glCanvas.height - 1 - Math.round(y)) * glCanvas.width + Math.round(x)) * 4;
+          return [pixels[i], pixels[i + 1], pixels[i + 2]];
+        },
+        count = (r, predicate) => {
+          let n = 0;
+          for (let y = Math.ceil(r.y); y < Math.floor(r.y + r.height); y++)
+            for (let x = Math.ceil(r.x); x < Math.floor(r.x + r.width); x++) if (predicate(at(x, y))) n++;
+          return n;
+        };
+      return { at, count };
+    };
+    let f = read();
+    for (let i = 0; i < 200 && glRenderer.stats.drawCalls === 0; i++) {
+      await new Promise((resolve) => setTimeout(resolve));
+      f = read();
+    }
+    assert(glRenderer.stats.drawCalls >= 2, `WebGL2 draw calls ${glRenderer.stats.drawCalls}`);
+    assert(glRenderer.stats.rects > 3 && glRenderer.stats.glyphs > 10, `instances ${JSON.stringify(glRenderer.stats)}`);
+    const s = glUi.scale,
+      box = (w) => ({ x: w.rect.x * s, y: w.rect.y * s, width: w.rect.width * s, height: w.rect.height * s });
+    const c = box(card),
+      surface = to255(themes.dark.colors.surface);
+    near(f.at(c.x + c.width - 6, c.y + c.height / 2), surface, 6, 'the card fills with the surface colour');
+    near(f.at(c.x + 1, c.y + 1), to255('#202830'), 6, 'the rounded corner shows the background');
+    near(f.at(c.x + c.width + 20, c.y + 4), to255('#202830'), 6, 'outside the card is the background');
+    const t = box(title);
+    assert(f.count(t, (p) => luminance(p) > 170) > 30, 'the title draws light text');
+    assert(f.count(box(bar), (p) => Math.max(...p) - Math.min(...p) > 60) > 50, 'the health bar draws its colour');
+    const l = box(list);
+    assert(f.count(l, (p) => luminance(p) > 170) > 20, 'rows draw inside the list');
+    const below = { x: l.x, y: l.y + l.height + 1, width: l.width, height: 24 * s };
+    assert(f.count(below, (p) => luminance(p) > 170) === 0, 'rows past the list are clipped');
+    assert(gl.getError() === gl.NO_ERROR, 'no WebGL error');
+    // An unchanged frame draws again (the default framebuffer is cleared every frame) but uploads nothing.
+    f = read();
+    assert(glRenderer.stats.uploads === 0 && glRenderer.stats.drawCalls >= 2, `unchanged frame ${JSON.stringify(glRenderer.stats)}`);
+    near(f.at(c.x + c.width - 6, c.y + c.height / 2), surface, 6, 'the unchanged frame still shows the card');
+    glRenderer.dispose();
+    glUi.dispose();
+    glEngine.dispose();
+    glCanvas.remove();
   });
 
   assert(gpuErrors.length === 0, `GPU validation errors: ${gpuErrors.join('; ')}`);

@@ -1,4 +1,4 @@
-import { type GlyphAtlas, SDF_DEFAULTS, glyphAtlases } from '@margoengine/text';
+import { type AtlasSlot, type GlyphAtlas, type GlyphBitmap, SDF_DEFAULTS, glyphAtlases } from '@margoengine/text';
 import type { DrawList, TextCommand } from './draw.js';
 import { uiShader } from './shader.js';
 
@@ -13,8 +13,10 @@ export const PREMULTIPLIED: GPUBlendState = {
 const ATLAS: GPUTextureBindingLayout = { sampleType: 'float', viewDimension: '2d-array' };
 /** Two triangles per instance, both faces drawn. */
 const OVERLAY = { primitive: { topology: 'triangle-list', cullMode: 'none' } } as const;
-const RECT_FLOATS = 16,
-  GLYPH_FLOATS = 16;
+/** Floats per rectangle instance: box, fill, border, then radius, border width and blur. */
+export const RECT_FLOATS = 16;
+/** Floats per glyph instance: box, atlas rectangle, colour, then page, colour flag and outline width. */
+export const GLYPH_FLOATS = 16;
 
 /** Atlas options of a painter. */
 export interface PainterOptions {
@@ -40,7 +42,15 @@ export interface PaintStats {
   uploads: number;
 }
 
-interface Run {
+/** Glyph atlas pages a batch places glyphs on: the text package's WebGPU atlas, or the WebGL2 painter's. */
+export interface GlyphPages {
+  readonly size: number;
+  readonly generation: number;
+  place(glyph: GlyphBitmap): AtlasSlot;
+}
+
+/** Consecutive instances of one kind under one clip region, drawn with one call. */
+export interface Run {
   glyphs: boolean;
   first: number;
   count: number;
@@ -70,11 +80,7 @@ export class UiPainter {
   private colorAtlas?: GlyphAtlas;
   private readonly pipelines = new Map<string, GPURenderPipeline>();
   private readonly frameData = new Float32Array(8);
-  private rects: Float32Array<ArrayBuffer> = new Float32Array(RECT_FLOATS * 256);
-  private glyphs: Float32Array<ArrayBuffer> = new Float32Array(GLYPH_FLOATS * 1024);
-  private runs: Run[] = [];
-  private rectCount = 0;
-  private glyphCount = 0;
+  private readonly batch = new UiBatch();
   private uploaded = -1;
   private uploadedAtlas = '';
   private fresh = false;
@@ -146,19 +152,21 @@ export class UiPainter {
     if (!this.device) return false;
     const device = this.device;
     if (this.uploaded !== list.version || this.uploadedAtlas !== this.atlasKey) {
-      this.build(list);
-      this.fresh = this.ensureBuffers(this.rectCount, this.glyphCount) || this.fresh;
-      if (this.rectCount) device.queue.writeBuffer(this.rectBuffer!, 0, this.rects, 0, this.rectCount * RECT_FLOATS);
-      if (this.glyphCount)
-        device.queue.writeBuffer(this.glyphBuffer!, 0, this.glyphs, 0, this.glyphCount * GLYPH_FLOATS);
+      const batch = this.batch;
+      batch.build(list, this.sdfAtlas!, this.colorAtlas!);
+      this.fresh = this.ensureBuffers(batch.rectCount, batch.glyphCount) || this.fresh;
+      if (batch.rectCount)
+        device.queue.writeBuffer(this.rectBuffer!, 0, batch.rects, 0, batch.rectCount * RECT_FLOATS);
+      if (batch.glyphCount)
+        device.queue.writeBuffer(this.glyphBuffer!, 0, batch.glyphs, 0, batch.glyphCount * GLYPH_FLOATS);
       stats.uploads++;
       // Building may have grown the atlases; the key then changes and the glyph pages are re-read.
       this.uploaded = list.version;
       this.uploadedAtlas = this.atlasKey;
     }
-    stats.rects = this.rectCount;
-    stats.glyphs = this.glyphCount;
-    return this.runs.length > 0;
+    stats.rects = this.batch.rectCount;
+    stats.glyphs = this.batch.glyphCount;
+    return this.batch.runs.length > 0;
   }
 
   /** Encode the prepared draws into `pass`, an open render pass on `target`. */
@@ -191,7 +199,7 @@ export class UiPainter {
     device.queue.writeBuffer(this.frameBuffer!, 0, f);
     pass.setBindGroup(0, this.group);
     let current: boolean | undefined;
-    for (const run of this.runs) {
+    for (const run of this.batch.runs) {
       if (run.glyphs !== current) {
         pass.setPipeline(this.pipeline(target, run.glyphs));
         current = run.glyphs;
@@ -230,8 +238,74 @@ export class UiPainter {
     return pipeline;
   }
 
+  private ensureBuffers(rects: number, glyphs: number): boolean {
+    const device = this.device!;
+    let changed = false;
+    if (!this.rectBuffer || rects > this.rectCapacity) {
+      this.rectBuffer?.destroy();
+      this.rectCapacity = Math.max(64, 2 ** Math.ceil(Math.log2(Math.max(1, rects))));
+      this.rectBuffer = device.createBuffer({
+        size: this.rectCapacity * RECT_FLOATS * 4,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+      });
+      changed = true;
+    }
+    if (!this.glyphBuffer || glyphs > this.glyphCapacity) {
+      this.glyphBuffer?.destroy();
+      this.glyphCapacity = Math.max(256, 2 ** Math.ceil(Math.log2(Math.max(1, glyphs))));
+      this.glyphBuffer = device.createBuffer({
+        size: this.glyphCapacity * GLYPH_FLOATS * 4,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+      });
+      changed = true;
+    }
+    return changed;
+  }
+
+  /** Release the GPU resources; with `atlases`, the glyph atlases too. */
+  release(atlases: boolean): void {
+    this.frameBuffer?.destroy();
+    this.rectBuffer?.destroy();
+    this.glyphBuffer?.destroy();
+    if (atlases) {
+      this.sdfAtlas?.dispose();
+      this.colorAtlas?.dispose();
+      this.sdfAtlas = this.colorAtlas = undefined;
+    }
+    this.frameBuffer =
+      this.rectBuffer =
+      this.glyphBuffer =
+      this.group =
+      this.module =
+      this.layout =
+      this.pipelineLayout =
+      this.sampler =
+      this.device =
+        undefined;
+    this.rectCapacity = this.glyphCapacity = 0;
+    this.pipelines.clear();
+    this.uploaded = -1;
+  }
+}
+
+/**
+ * The instances of one draw list, shared by the WebGPU and WebGL2 painters: rounded rectangles and glyphs in device
+ * pixels, and the runs (one kind, one clip region) that draw them back to front.
+ * @internal
+ */
+export class UiBatch {
+  rects: Float32Array<ArrayBuffer> = new Float32Array(RECT_FLOATS * 256);
+  glyphs: Float32Array<ArrayBuffer> = new Float32Array(GLYPH_FLOATS * 1024);
+  readonly runs: Run[] = [];
+  rectCount = 0;
+  glyphCount = 0;
+  private sdf?: GlyphPages;
+  private color?: GlyphPages;
+
   /** Turn the draw list into rect and glyph instances and the runs that draw them. */
-  private build(list: DrawList): void {
+  build(list: DrawList, sdf: GlyphPages, color: GlyphPages): void {
+    this.sdf = sdf;
+    this.color = color;
     this.runs.length = 0;
     let rectCount = 0,
       glyphCount = 0;
@@ -293,7 +367,7 @@ export class UiPainter {
         if (g.whitespace) continue;
         const bitmap = font.glyph(g.cluster);
         if (!bitmap || (outline && bitmap.color)) continue;
-        const atlas = bitmap.color ? this.colorAtlas! : this.sdfAtlas!,
+        const atlas = bitmap.color ? this.color! : this.sdf!,
           slot = atlas.place(bitmap),
           size = atlas.size;
         if ((at + 1) * GLYPH_FLOATS > this.glyphs.length) this.glyphs = grow(this.glyphs, (at + 1) * GLYPH_FLOATS);
@@ -318,55 +392,6 @@ export class UiPainter {
       }
     }
     return at;
-  }
-
-  private ensureBuffers(rects: number, glyphs: number): boolean {
-    const device = this.device!;
-    let changed = false;
-    if (!this.rectBuffer || rects > this.rectCapacity) {
-      this.rectBuffer?.destroy();
-      this.rectCapacity = Math.max(64, 2 ** Math.ceil(Math.log2(Math.max(1, rects))));
-      this.rectBuffer = device.createBuffer({
-        size: this.rectCapacity * RECT_FLOATS * 4,
-        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-      });
-      changed = true;
-    }
-    if (!this.glyphBuffer || glyphs > this.glyphCapacity) {
-      this.glyphBuffer?.destroy();
-      this.glyphCapacity = Math.max(256, 2 ** Math.ceil(Math.log2(Math.max(1, glyphs))));
-      this.glyphBuffer = device.createBuffer({
-        size: this.glyphCapacity * GLYPH_FLOATS * 4,
-        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-      });
-      changed = true;
-    }
-    return changed;
-  }
-
-  /** Release the GPU resources; with `atlases`, the glyph atlases too. */
-  release(atlases: boolean): void {
-    this.frameBuffer?.destroy();
-    this.rectBuffer?.destroy();
-    this.glyphBuffer?.destroy();
-    if (atlases) {
-      this.sdfAtlas?.dispose();
-      this.colorAtlas?.dispose();
-      this.sdfAtlas = this.colorAtlas = undefined;
-    }
-    this.frameBuffer =
-      this.rectBuffer =
-      this.glyphBuffer =
-      this.group =
-      this.module =
-      this.layout =
-      this.pipelineLayout =
-      this.sampler =
-      this.device =
-        undefined;
-    this.rectCapacity = this.glyphCapacity = 0;
-    this.pipelines.clear();
-    this.uploaded = -1;
   }
 }
 

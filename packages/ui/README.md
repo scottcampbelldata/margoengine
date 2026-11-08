@@ -15,7 +15,7 @@ canvas:
 
 The package is optional and tree-shakable and adds nothing to core. `Ui` holds the widgets and produces a list of
 rectangles and text in pixels; it touches neither the GPU nor the DOM, so it runs in Node and in tests.
-`UiRenderer` is the engine plugin that draws that list on WebGPU. On the WebGL2 backend it warns once and draws nothing.
+`UiRenderer` is the engine plugin that draws that list, on WebGPU and on core's WebGL2 preview backend alike.
 
 ```ts
 import { Engine } from '@margoengine/core';
@@ -475,9 +475,28 @@ ends with a link to [margoengine.com/errors#ui](https://margoengine.com/errors#u
   `align`. A wrapping row first breaks its children into lines by their base sizes, then does the same per line. Stacks anchor their children; grids fill cells row by row.
 - **No globals.** Nothing runs on import; the only DOM access is reading the safe area, and only when you ask for it.
 
+## WebGL2 preview backend
+
+```ts
+import { Engine } from '@margoengine/core';
+import { webglRenderer } from '@margoengine/webgl';
+import { Button, Ui, UiRenderer } from '@margoengine/ui';
+
+const canvas = document.querySelector('canvas')!;
+const engine = await Engine.create(canvas, { backend: 'webgl2', fallback: webglRenderer });
+const ui = new Ui();
+ui.add(new Button({ text: 'Play', anchor: 'center' }));
+UiRenderer.attach(engine, ui); // the same rectangles and text as on WebGPU
+engine.start();
+```
+
+On WebGL2 the renderer draws the same instances with two small GLSL ES 3.00 programs into the default framebuffer, over
+the finished frame. Its code loads on first use, so WebGPU pages never fetch it and the UI shows from the first frame
+after that load. An unchanged UI uploads nothing; it is drawn again each frame because WebGL2 clears its canvas.
+
 ## Limits
 
-- WebGPU only for drawing. On WebGL2 the UI still updates, but nothing shows (world panels too).
+- World panels draw on WebGPU only: on WebGL2 they update and take rays, but nothing shows. The screen UI draws on both.
 - A world panel is a flat rectangle drawn with depth test and no depth write, so it does not hide transparent effects drawn after it; no curved panels; one texture and one pair of glyph atlases per panel.
 - Shaping is the browser's, one word at a time: a run never crosses a space, so no join or ligature forms across
   words. Only labels and wrapped text follow the text direction: toggles, slider values, list details and rows of

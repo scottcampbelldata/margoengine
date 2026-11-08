@@ -671,6 +671,16 @@ scene, one camera uniform per view index so XR eyes never share a buffer written
 `packages/ui/tests/world-browser.mjs` on a Radeon 680M (colours, occlusion, back face, repaint counts, a real click by
 camera ray). Missing: other GPUs, an XR headset, cost timed.
 
+Screen UI on the WebGL2 preview backend (`@margoengine/ui`, 2026-11-08): `ui/src/painter.ts` builds one `UiBatch` of
+rectangle and glyph instances (16 floats each) for either backend; `ui/src/gl.ts` draws it with instanced attributes and
+two GLSL ES 3.00 programs that compute the same rounded box distance and SDF coverage as `ui/src/shader.ts`. WebGL2 has
+no base instance, so each run moves its attribute offsets to its first instance; clip regions are scissors in GL's
+bottom-up rows; the atlases are `TEXTURE_2D_ARRAY` (R8 for SDF, RGBA8 for colour glyphs) grown by reallocation and
+re-upload. The code is a separate chunk loaded on the first WebGL2 frame. Evidence: `packages/ui/tests/webgl2.test.js`
+(a recording WebGL2 context: draws, offsets, scissors, texture units, lost and restored contexts) and the WebGL2 check
+in `packages/ui/tests/ui-browser.js` on a Radeon 680M (colours, rounded corner, text ink, clipped list, unchanged
+frame). Missing: other GPUs, WebKit and Firefox, world panels on WebGL2.
+
 Planet terrain (`@margoengine/terrain/planet`, 2026-11-08) draws a cube sphere quadtree with its own pass and shader.
 Precision: each patch stores float32 vertices relative to its float64 centre; each frame the CPU subtracts the camera
 position from each drawn centre in float64 (one instance attribute a patch) and builds a view-projection with no
