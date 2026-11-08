@@ -90,6 +90,10 @@
     "./gpu": {
       "types": "./dist/gpu.d.ts",
       "import": "./dist/gpu.js"
+    },
+    "./collab": {
+      "types": "./dist/collab.d.ts",
+      "import": "./dist/collab.js"
     }
   },
   "files": [

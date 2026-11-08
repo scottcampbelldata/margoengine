@@ -720,6 +720,7 @@ The own solver's kernel (`packages/physics/kernel`, Rust, no dependencies). Noth
 | VX24 | shader brushes: user WGSL after a fixed prelude (cell, tool, lookup, PCG-style hash, trilinear value noise), one invocation per packed word of four cells, ping-pong passes; grow and erode presets as gathers of dilateGrid and erodeGrid | voxel-edit/src/shaders.ts, voxel-edit/src/brush-gpu.ts | Margo-own; hash after O'Neill 2014 (PCG) |
 | VX25 | voxel rigs: bones as rigid transforms turned about their joints and composed down the hierarchy, quaternion keys interpolated by slerp, bake by inverse-mapping cell centres into each part | voxel-edit/src/rig.ts | Margo-own; slerp after K. Shoemake, "Animating rotation with quaternion curves", SIGGRAPH 1985 |
 | VX26 | GPU bulk edits: a resident packed grid in ping-pong storage buffers; box and sphere fills, tool booleans through a lookup table, palette remaps and morphology as fixed brushes on the shader-brush prelude | voxel-edit/src/gpu.ts | Margo-own |
+| VX27 | shared editing: a last-writer-wins register per cell stamped by a Lamport clock with the site name as tie-break (a state-based CRDT applied as operations), plus a per-site sequence for catch-up | voxel-edit/src/collab.ts | Margo-own; after L. Lamport, "Time, clocks, and the ordering of events in a distributed system", CACM 1978, and M. Shapiro et al., "Conflict-free replicated data types", SSS 2011 |
 
 ### voxel-pathtracer
 

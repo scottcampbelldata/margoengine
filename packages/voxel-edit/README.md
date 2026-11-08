@@ -73,6 +73,7 @@ corner coordinates.
 | `./shaders` | `ShaderBrush`: your own WGSL `fn brush(p, value)` run on the GPU for every selected cell, pass after pass, to grow, erode or generate; presets `brushes.grow`, `erode`, `noise`, `smooth`; `brushSource` |
 | `./rig` | `VoxelRig`: voxel parts on a skeleton, posed by bone rotations; part matrices for drawing and `bake` to one grid; `sampleRigClip`, `rigRotation`, `slerpRotation` |
 | `./gpu` | `GpuGrid`: a grid kept on the GPU for bulk edits on multi-million-cell models: `fill` (box, sphere), `combine` (union, intersect, subtract), `dilate`, `erode`, `smooth`, `remap`, `brush` (any `ShaderBrush`), then `read` once |
+| `./collab` | `VoxelReplica`: shared editing, where edits from several users merge to the same cells in any order with no server; `encodeVoxelOp` / `decodeVoxelOp` for the network |
 
 Selections, picking and meshing take a dense or a sparse grid. Errors follow
 [docs/conventions.md](../../docs/conventions.md): `TypeError` and `RangeError` for arguments and budgets,
@@ -320,3 +321,39 @@ grid.dispose();
   `remap(table)` replaces each index `i` by `table[i]`.
 - **Lifetime.** `dispose()` (or `using`) frees the GPU buffers; any call after it throws a `MargoError` with code
   `disposed`.
+
+## Shared editing (`./collab`)
+
+`VoxelReplica` lets several people edit one model at once. Each user holds a replica of the grid; `edit` makes an
+operation to send to the others and `apply` takes anyone's operation, in any order and any number of times. Every
+operation carries a Lamport clock, and each cell keeps the write with the highest clock (the higher site name breaks a
+tie), so replicas that have applied the same operations hold the same cells: there is no conflict to resolve and no
+server to order the edits. Send operations over any channel (WebSocket, WebRTC, a `BroadcastChannel`) as bytes.
+
+```ts
+import { decodeVoxelOp, encodeVoxelOp, VoxelReplica } from 'margoengine/voxel-edit/collab';
+
+const start = { size: [32, 16, 32] as [number, number, number], voxels: new Uint8Array(32 * 16 * 32) };
+const ann = new VoxelReplica(start, { site: 'ann' });
+const bo = new VoxelReplica(start, { site: 'bo' });
+
+// Both paint cell 40 at the same moment, neither having seen the other's edit.
+const fromAnn = encodeVoxelOp(ann.edit([40, 41], 3));
+const fromBo = encodeVoxelOp(bo.edit([40], 7));
+bo.apply(decodeVoxelOp(fromAnn));
+ann.apply(decodeVoxelOp(fromBo));
+console.log(ann.get(40), bo.get(40), ann.get(41)); // 7 7 3: the same cells on both
+
+// A peer that was away catches up with only what it lacks; a newcomer starts from a snapshot.
+for (const op of ann.since(bo.version)) bo.apply(op);
+const cy = VoxelReplica.fromSnapshot(ann.snapshot(), { site: 'cy' });
+cy.onChange((op, changed) => console.log(`${op.site} changed ${changed} cells`));
+cy.apply(ann.edit([42], 1)); // ann changed 1 cells
+```
+
+- **Order.** Apply operations as they arrive; a repeat does nothing. `version` counts, per site, the operations held
+  with none missing before them, so `since(version)` also resends anything that arrived out of order.
+- **Memory.** A replica keeps 7 bytes a cell (the cell, its last write's clock and site) and every operation it has
+  seen, so a long session grows by 5 bytes per edited cell. `maxCells` defaults to 16,777,216; 65,535 sites at most.
+- **Scope.** Each cell takes the latest value written to it; edits are not combined (two users drawing over each other
+  leave the later stroke). Operations name cells by index, so every replica must start from a grid of the same size.

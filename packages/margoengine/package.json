@@ -3130,6 +3130,10 @@
       "types": "./dist/voxel-edit/gpu.d.ts",
       "import": "./dist/voxel-edit/gpu.js"
     },
+    "./voxel-edit/collab": {
+      "types": "./dist/voxel-edit/collab.d.ts",
+      "import": "./dist/voxel-edit/collab.js"
+    },
     "./voxel-net": {
       "types": "./dist/voxel-net.d.ts",
       "import": "./dist/voxel-net.js"

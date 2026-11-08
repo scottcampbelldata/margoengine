@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11308024,
+  "total": 11310700,
   "history": [
     {
       "date": "2026-10-24",
@@ -4526,6 +4526,12 @@
       "commit": "c00948de7",
       "reason": "rebased onto main",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "a98108da5",
+      "reason": "new entry @margoengine/voxel-edit/collab (batch 97 job 5)",
+      "grew": 1
     }
   ],
   "items": {
@@ -5280,6 +5286,7 @@
     "@margoengine/voxel-edit": 7789,
     "@margoengine/voxel-edit/animation": 1895,
     "@margoengine/voxel-edit/assist": 1255,
+    "@margoengine/voxel-edit/collab": 2676,
     "@margoengine/voxel-edit/edit": 10734,
     "@margoengine/voxel-edit/export": 9297,
     "@margoengine/voxel-edit/formats": 4404,
