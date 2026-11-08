@@ -1258,3 +1258,56 @@ engine.start();
 - **Errors.** `TypeError` for a wrong engine or world, `RangeError` for options out of range or an albedo that is not
   [r, g, b] in 0..1, `MargoError` `'unsupported'` without WebGPU, `'disposed'` after `dispose()` (also
   `[Symbol.dispose]`).
+
+## Destruction: loose pieces break off (`@margoengine/voxel/debris`)
+
+`VoxelDebris` watches a world's edits. When a removal cuts a group of solid blocks off from everything that holds it,
+`update()` takes the group out of the world in one `setBlocks` and turns it into a piece: a dynamic body in your
+`Physics` (with `VoxelPhysics` on the same world it lands on the blocks) and, given an `engine`, core meshes of its
+open faces that follow the body.
+
+```ts
+import { Physics } from 'margoengine/physics';
+import { BlockTypes, VoxelWorld } from 'margoengine/voxel';
+import { VoxelDebris } from 'margoengine/voxel/debris';
+import { VoxelPhysics } from 'margoengine/voxel/physics';
+
+await Physics.load();
+const physics = new Physics(null, { gravity: [0, -9.81, 0] }); // Physics.attach(engine) in an app
+const blocks = new BlockTypes();
+const stone = blocks.define('stone');
+const world = new VoxelWorld({ blocks });
+world.addChunk(0, 0, 0);
+const edits: number[] = [];
+for (let x = 0; x < 32; x++) for (let z = 0; z < 32; z++) edits.push(x, 0, z, stone);
+for (let y = 1; y < 5; y++) edits.push(10, y, 10, stone); // a pillar
+for (let x = 10; x < 16; x++) edits.push(x, 5, 10, stone); // a beam on it
+world.setBlocks(edits);
+new VoxelPhysics(physics, world, { budget: Infinity });
+const debris = new VoxelDebris(world, { physics }); // add `engine` to draw the pieces
+debris.onBreak((piece) => console.log(`${piece.cells.length / 3} blocks broke off`)); // 8 blocks broke off
+world.setBlock(10, 2, 10, 0); // cut the pillar
+for (let i = 0; i < 120; i++) {
+  debris.update(1 / 60); // after edits, before the step
+  physics.step();
+}
+console.log(debris.pieces[0].body!.position[1] < 5); // true: the beam fell onto the floor
+```
+
+- **What holds a group.** Blocks join through their faces when their type is `solid` and not a liquid (flowers, water
+  and air neither join nor hold). A group is held when it reaches a cell at `floor` or below (default `-Infinity`), an
+  `anchors` block type (ids or names, such as bedrock), a chunk that is not loaded, or `maxCells` cells (default
+  4,096, up to 65,536), which bounds the search. Anything else breaks off. Only removals of solid blocks start a search,
+  from the six cells beside each, depth first and downward first.
+- **The piece.** `cells` and `states` are the blocks it held, `center` the mean of their centres (the body's start and
+  the mesh origin), `boxes` the merged boxes of its compound collider (runs along x, merged along z, then y), `body` a
+  dynamic body of `density` kg per cell (default 1) and `friction` 0.6 whose `userData` is the piece, and `meshes` one
+  core mesh per block type (`material(type)`, default a `PbrMaterial` of the type's colour), the first driven by the
+  body and the others its children.
+- **Lifetime.** `update(delta)` ages the pieces; one past `lifetime` seconds (default `Infinity`) is removed, as is the
+  oldest when more than `maxPieces` (default 64) are alive. `remove(piece)` removes one now; `dispose()` (also `using`)
+  removes all and stops watching. Pieces never go back into the world.
+- **Errors.** `TypeError` for a wrong world, physics, engine or option type, `RangeError` for an option out of range or
+  an anchor that is not a defined block type, `MargoError` `disposed` from `update` after `dispose()`.
+- **Limits.** Pieces are whole cubes for both the collider and the picture (slabs and stairs too), drawn in flat
+  colour without the world's textures or light; the search runs on this thread; see `docs/limits.md`.

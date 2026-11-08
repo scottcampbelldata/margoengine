@@ -101,6 +101,10 @@
     "./gi": {
       "types": "./dist/gi.d.ts",
       "import": "./dist/gi.js"
+    },
+    "./debris": {
+      "types": "./dist/debris.d.ts",
+      "import": "./dist/debris.js"
     }
   },
   "files": [
@@ -128,7 +132,7 @@
     "build": "node ../../scripts/build-optional.js voxel",
     "test": "npm run build && node --test tests/*.test.js",
     "prepack": "npm run build",
-    "test:gpu": "cd ../.. && node packages/voxel/tests/render-browser-check.mjs && node packages/voxel/tests/bevel-browser-check.mjs && node packages/voxel/tests/render-lighting-browser-check.mjs && node packages/voxel/tests/lod-browser-check.mjs && node packages/voxel/tests/light-rgb-browser-check.mjs && node packages/voxel/tests/gpu-mesher-browser-check.mjs && node packages/voxel/tests/smooth-browser-check.mjs && node packages/voxel/tests/gi-browser-check.mjs",
+    "test:gpu": "cd ../.. && node packages/voxel/tests/render-browser-check.mjs && node packages/voxel/tests/bevel-browser-check.mjs && node packages/voxel/tests/render-lighting-browser-check.mjs && node packages/voxel/tests/lod-browser-check.mjs && node packages/voxel/tests/light-rgb-browser-check.mjs && node packages/voxel/tests/gpu-mesher-browser-check.mjs && node packages/voxel/tests/smooth-browser-check.mjs && node packages/voxel/tests/gi-browser-check.mjs && node packages/voxel/tests/debris-browser-check.mjs",
     "test:gpu:slow-compile": "cd ../.. && node packages/voxel/tests/bevel-browser-check.mjs --pipeline-delay=500",
     "test:gpu:slow-mesh": "cd ../.. && node packages/voxel/tests/bevel-browser-check.mjs --worker-delay=150"
   },

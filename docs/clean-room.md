@@ -665,6 +665,7 @@ The own solver's kernel (`packages/physics/kernel`, Rust, no dependencies). Noth
 | VX20 | GPU meshing: meshChunk's faces, VX2 AO, smooth light and greedy merge in scan order as WGSL compute, one workgroup per chunk slice, quads placed in `meshChunk`'s order by prefix sums | voxel/src/gpu-mesher.ts | Margo-own: port of voxel/src/mesher.ts |
 | VX21 | smooth terrain: Surface Nets over signed densities (one point per crossed net cell at the mean of its edge crossings, a quad per sign-changing sample edge, gradient normals), neighbour samples across chunk borders | voxel/src/smooth.ts | Gibson 1998, Constrained elastic surface nets (MERL TR99-24); the method of voxel-edit/src/smooth.ts |
 | VX22 | voxel GI: cell-stepping rays through an opaque-cube grid, one sunlit bounce per hit face with its own shadow ray, L1 SH per cell (projection with uniform sphere sampling, irradiance with the cosine lobe), sun visibility from cone-jittered rays, exponential blend over sweeps | voxel/src/gi.ts | Amanatides and Woo 1987 (fast voxel traversal); Ramamoorthi and Hanrahan 2001 (irradiance environment maps); PCG-style integer hash (O'Neill 2014) |
+| VX23 | destruction: depth-first flood fill over solid face neighbours from the cells beside a removed block, stopping at a holding cell; loose cells merged into boxes (x runs, then z, then y) for a compound body; open faces meshed per block type | voxel/src/debris.ts | Margo-own |
 
 ### voxel-pathtracer
 

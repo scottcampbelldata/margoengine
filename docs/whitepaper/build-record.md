@@ -2744,3 +2744,29 @@ side can see. Nothing is timed.
   tilemap, exporters and physics2d tests, the root tests and the tilemap GPU checks per job; after a move of main the
   ship reran the records, the api and quality gates, the claims, llms and lock tests, the package tests and the GPU
   checks.
+
+## Lane F batch 96: voxel (part 2)
+
+One job for `@margoengine/voxel` on the M6 Mac mini (Metal): voxel destruction as a new optional entry, landed as one
+commit. Core, stage, `@margoengine/physics` and `packages/voxel/src/physics.ts` are untouched; the entry takes the
+caller's `Physics` and imports only its types.
+
+| # | Job | Status | Commit | Entry | Claim |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Voxel destruction | DONE | this commit | `/debris` | LIM-501 |
+
+- **Built from:** row VX23 in `docs/clean-room.md`: a depth-first flood fill over face-joined solid blocks from the
+  cells beside each removed block, stopping at the first holding cell, and a box merge (x runs, then z, then y) for the
+  compound collider. Margo's own method; nothing from another engine was read.
+- **Proved:** `debris.test.js`: a cut pillar frees its top and beam as one piece of exactly its 8 cells, cleared from the
+  world, with the stump and floor kept; a second pillar, an anchor block, a beam into an unloaded chunk and a `floor`
+  hold; one cut frees four arms; `maxCells` holds a big group; the merged boxes cover each cell once (20 random sets);
+  with `Physics` and `VoxelPhysics` the piece is a 16 kg body (8 cells of 2 kg) that falls onto the floor and stops.
+  `debris-browser-check.mjs` on this Mac: the red beam is gone from where it was (141 grey) and its core mesh, moved
+  by the body, is drawn red where it came to rest (82 red against 4 green).
+- **Sizes (gzip, B):** new entry `/debris` 7,496 (it carries `VoxelWorld` for its type check and core's `Geometry` and
+  `PbrMaterial`). Existing entries unchanged; core and stage unchanged.
+- **Bugs fixed:** none found outside the new entry.
+- **Limits and unmeasured:** row in `docs/limits.md`. Pieces are whole cubes in flat colour and never go back into the
+  world; the search runs on the page thread and its speed on large edits is not measured. Nothing was run on another
+  machine.

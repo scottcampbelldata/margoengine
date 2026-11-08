@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11138596,
+  "total": 11146348,
   "history": [
     {
       "date": "2026-10-24",
@@ -4280,6 +4280,12 @@
       "commit": "13886361d",
       "reason": "new entry @margoengine/tilemap/fov (field of view and fog of war)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "39335ea58",
+      "reason": "voxel/debris: new entry for voxel destruction (batch 96)",
+      "grew": 1
     }
   ],
   "items": {
@@ -5034,6 +5040,7 @@
     "@margoengine/voxel-pathtracer/studio": 1303,
     "@margoengine/voxel/bevel": 2457,
     "@margoengine/voxel/codec": 9368,
+    "@margoengine/voxel/debris": 7752,
     "@margoengine/voxel/fluids": 2668,
     "@margoengine/voxel/generate": 4426,
     "@margoengine/voxel/gi": 5130,

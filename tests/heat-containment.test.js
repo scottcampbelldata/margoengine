@@ -328,11 +328,12 @@ test('split steps cover the whole suite: both bevel sample counts, each chain pa
       'cd ../.. && node packages/voxel/tests/gpu-mesher-browser-check.mjs',
       'cd ../.. && node packages/voxel/tests/smooth-browser-check.mjs',
       'cd ../.. && node packages/voxel/tests/gi-browser-check.mjs',
+      'cd ../.. && node packages/voxel/tests/debris-browser-check.mjs',
     ],
   );
   assert.deepEqual(
     chain.map((s) => s.id),
-    [1, 2, 3, 4, 5, 6, 7, 8].map((n) => `voxel/test:gpu#${n}`),
+    [1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => `voxel/test:gpu#${n}`),
   );
   assert.equal(splitSteps({ label: 'x y', command: 'npm run a || node b.mjs', dir: 'x' }).length, 1);
   // Post's browser checks: one step each, so a hot machine cools between them.

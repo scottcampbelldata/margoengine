@@ -2982,6 +2982,10 @@
       "types": "./dist/voxel/gi.d.ts",
       "import": "./dist/voxel/gi.js"
     },
+    "./voxel/debris": {
+      "types": "./dist/voxel/debris.d.ts",
+      "import": "./dist/voxel/debris.js"
+    },
     "./voxel-edit": {
       "types": "./dist/voxel-edit.d.ts",
       "import": "./dist/voxel-edit.js"

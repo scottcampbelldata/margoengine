@@ -24,7 +24,7 @@ For the second account. Start now.
 | E | post and effects | 78 | vfx | 8 | list 1 (dev PC) |
 | E | post and effects | 79 | vfx | 3 | list 1 (dev PC) |
 | F | voxels, then 2D | 95 | voxel | 8 | done |
-| F | voxels, then 2D | 96 | voxel | 1 | todo |
+| F | voxels, then 2D | 96 | voxel | 1 | done |
 | F | voxels, then 2D | 97 | voxel-edit | 5 | todo |
 | F | voxels, then 2D | 98 | voxel-net | 7 | todo |
 | F | voxels, then 2D | 99 | voxel-pathtracer | 8 | todo |
