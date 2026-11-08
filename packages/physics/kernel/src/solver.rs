@@ -450,6 +450,11 @@ impl World {
             open[k] = gap;
             (bias[k], scale[k], leak[k]) = if gap > 0.0 {
                 (gap / h, 1.0, 0.0)
+            } else if biased && gap + slop > 0.0 {
+                // Inside the slop the point closes to the slop's depth as a speculative row, rigidly (Catto's Solver2D
+                // soft step). A soft row here, with nothing to push, let a point sink at a speed that followed its load,
+                // so a cube on a slope tilted downhill for its first second.
+                ((gap + slop) / h, 1.0, 0.0)
             } else if biased {
                 let depth = gap + slop;
                 let depth = if depth < 0.0 { depth } else { 0.0 };

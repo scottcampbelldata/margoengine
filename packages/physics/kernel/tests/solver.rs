@@ -236,6 +236,31 @@ fn a_block_slides_only_above_tan_t_equal_to_mu() {
 }
 
 #[test]
+fn a_cube_released_on_a_slope_below_tan_t_equal_to_mu_holds_from_its_first_second() {
+    // Inside the slop a point sank at a speed that followed its load, the downhill points three times the uphill ones, so the
+    // cube tilted and its centre moved 2e-5 to 3.8e-5 m between 0.5 s and 2.5 s (the harness bar is 1e-6).
+    for (substeps, iterations) in [(8u32, 2u32), (4, 1)] {
+        for tangent in [0.36f32, 0.42, 0.47, 0.49] {
+            let mut w = world(2);
+            w.header_mut().substeps = substeps;
+            w.header_mut().iterations = iterations;
+            floor(&mut w);
+            slope(&mut w, tangent);
+            let body = block(&mut w, [0.5, 0.5, 0.5], v3(0.0, 0.5, 0.0), 1.0, false);
+            for _ in 0..30 {
+                w.step(DT);
+            }
+            let x = w.v(POSITION_X, body as usize).x;
+            for _ in 0..120 {
+                w.step(DT);
+            }
+            let moved = w.v(POSITION_X, body as usize).x - x;
+            assert!(moved.abs() < 1e-6, "{substeps} x {iterations}, tan {tangent}: moved {moved}");
+        }
+    }
+}
+
+#[test]
 fn a_block_slides_at_its_rate_from_release() {
     // Measured from 0.5 s to 2.5 s after release, as the harness does, for a cube and a flat block: a = g cos t (tan t - mu).
     // The relaxing pass once took friction's cone from the normal the soft pass left, short of the load by its impulse scale,
