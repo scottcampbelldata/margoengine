@@ -1075,3 +1075,52 @@ world.setBlock(0, 64, 0, water); // a source: it flows
   light, meshes and change events follow.
 - **Errors.** `TypeError` for a wrong world or option type, `RangeError` for options out of range, an undefined block
   or a fluid that is not a `'liquid'` shape; `MargoError` `'disposed'` after `dispose()`.
+
+
+## Block ticks and cellular rules (`@margoengine/voxel/ticks`)
+
+`VoxelTicks` runs block rules on a fixed tick: random ticks for growth and spread, scheduled ticks for timers, and
+`placed` and `neighbor` hooks when a cell or the cell beside it changes. Built-in rules cover falling sand, spreading
+grass, growing crops and fire.
+
+```ts
+import { BlockTypes, VoxelWorld } from 'margoengine/voxel';
+import { fallingRule, fireRule, growRule, spreadRule, VoxelTicks } from 'margoengine/voxel/ticks';
+import { Engine } from 'margoengine/core';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const blocks = new BlockTypes();
+const dirt = blocks.define('dirt');
+blocks.define('grass');
+blocks.define('sand');
+blocks.define('wheat', { shape: 'cross', solid: false, layer: 'cutout' });
+const planks = blocks.define('planks');
+blocks.define('fire', { shape: 'cross', solid: false, layer: 'cutout', light: 15 });
+const world = new VoxelWorld({ blocks });
+const ticks = VoxelTicks.attach(world, {
+  rules: {
+    sand: fallingRule(),
+    grass: spreadRule({ onto: dirt, light: 9, smothered: dirt }),
+    wheat: growRule(8, 0.3),
+    fire: fireRule({ burns: { [planks]: 0.3 } }),
+  },
+});
+ticks.rule('dirt', { random: (c) => c.random() < 0.001 && c.world.setBlock(c.x, c.y + 1, c.z, 0) }); // your own
+engine.onFrame((_, delta) => ticks.update(delta)); // 20 ticks a second
+```
+
+- **A tick** runs, in order: the scheduled updates due (in the order they were scheduled), the random ticks
+  (`randomTicks` cells per loaded chunk, default 24, picked by a seeded generator, chunks in load order), then the
+  `placed` hook of every cell changed since the last tick and the `neighbor` hooks of its six neighbours. Changes the
+  hooks make run next tick, so a chain never recurses. At most `maxUpdates` scheduled and neighbour updates a tick.
+  The same seed, world and edits give the same result.
+- **Hooks** get `{world, x, y, z, state, tick, random(), schedule(delay)}`; `schedule` runs the cell's `scheduled`
+  hook later (for whatever block is there then).
+- **Built-in rules.** `fallingRule(delay)`: falls a cell every `delay` ticks while the cell below is open (air or not
+  solid, loaded, in range). `spreadRule({onto, chance, light, smothered})`: on a random tick, onto an `onto` block in
+  the 3 x 3 x 3 around it whose cell above is not solid and has at least `light` sky light; a solid block on top turns
+  it into `smothered`. `growRule(stages, chance, grown)`: state data counts the stages, then `grown`.
+  `fireRule({burns, delay, life})`: each step sets each burnable neighbour on fire with its chance, ages, and goes out
+  after `life` steps or with nothing left to burn.
+- **Errors.** `TypeError` for a wrong world, option or rule type, `RangeError` for options out of range or a rule for an
+  undefined block; `MargoError` `'disposed'` after `dispose()`.

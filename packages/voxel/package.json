@@ -85,6 +85,10 @@
     "./fluids": {
       "types": "./dist/fluids.d.ts",
       "import": "./dist/fluids.js"
+    },
+    "./ticks": {
+      "types": "./dist/ticks.d.ts",
+      "import": "./dist/ticks.js"
     }
   },
   "files": [
