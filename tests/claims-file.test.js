@@ -67,3 +67,68 @@ test('no table in docs/limits.md holds two rows for one limit', () => {
     seen.set(key, true);
   }
 });
+
+// Rebases that settle a clash in these tables have dropped cells from the end of rows and swallowed a separator into
+// a formula, and nothing noticed: a row with the wrong number of cells shows its columns shifted or empty. A separator is
+// a pipe that is not escaped (\|) and not inside a code span.
+function splitCells(line) {
+  const out = [];
+  let cell = '',
+    code = false;
+  const s = line.trim();
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (c === '\\' && s[i + 1] === '|') {
+      cell += '\\|';
+      i++;
+    } else if (c === '|' && !code) {
+      out.push(cell);
+      cell = '';
+    } else {
+      if (c === '`') code = !code;
+      cell += c;
+    }
+  }
+  out.push(cell);
+  return out.slice(1, -1);
+}
+
+function badRows(text) {
+  const bad = [];
+  let header = 0,
+    inTable = false,
+    fence = false;
+  text
+    .replace(/\r\n/g, '\n')
+    .split('\n')
+    .forEach((line, i) => {
+      if (/^\s*(```|~~~)/.test(line)) fence = !fence;
+      if (fence || !line.startsWith('|')) {
+        inTable = false;
+        return;
+      }
+      const n = splitCells(line).length;
+      if (!inTable) {
+        inTable = true;
+        header = n;
+      } else if (n !== header) bad.push(`line ${i + 1}: ${n} cells, header has ${header}: ${line.slice(0, 60)}`);
+    });
+  return bad;
+}
+
+test('the cell counter reads escaped pipes and code spans', () => {
+  assert.deepEqual(splitCells('| a | `b | c` | d \\| e |'), [' a ', ' `b | c` ', ' d \\| e ']);
+  assert.deepEqual(badRows('| A | B |\n| - | - |\n| 1 | 2 |\n| 3 |\n\n| X |\n| 1 | 2 |\n'), [
+    'line 4: 1 cells, header has 2: | 3 |',
+    'line 7: 2 cells, header has 1: | 1 | 2 |',
+  ]);
+});
+
+for (const file of ['docs/whitepaper/claims.md', 'docs/limits.md', 'docs/clean-room.md'])
+  test(`every table row in ${file} has as many cells as its header`, () => {
+    assert.deepEqual(
+      badRows(readFileSync(file, 'utf8')),
+      [],
+      'a cell was dropped or a pipe in a formula was left bare: restore the cells, never pad',
+    );
+  });
