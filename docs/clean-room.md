@@ -406,6 +406,7 @@ The own solver's kernel (`packages/physics/kernel`, Rust, no dependencies). Noth
 | P39 | Vignette | shader/src/effects.ts | Margo-own: Margo's own parameterisation; defaults do not match any engine I know |
 | P40 | RGB shift default amount | shader/src/effects.ts | Margo-own: 0.002, about 4 px of fringe at 1920 wide; rewritten 2026-10-24 |
 | P41 | Sobel; sepia | shader/src/effects.ts | Sobel; W3C Filter Effects L1 sepia() |
+| P45 | Subgroup check: zeros compare by value | shader/test/subgroups-check.mjs | W3C WGSL 15.7 (an implementation may ignore the sign of a zero) and 17.12.1.1 (the lowest active lane's exclusive add is T(0)); Metal returns -0 there |
 
 ### shadows
 

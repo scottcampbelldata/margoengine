@@ -56,8 +56,10 @@ function verify(r, { whole, small, bits, real }) {
       if (list.length <= 32) expected.ballot = big.reduce((m, x, j) => (x ? (m | (1 << j)) >>> 0 : m), 0);
       if (k > 0) expected.shuffleUp = w[k - 1];
       if (k < list.length - 1) expected.shuffleDown = w[k + 1];
+      // Every result is read back as f32. WGSL 15.7 lets an implementation ignore the sign of a zero, and the lowest
+      // lane's exclusive scan is T(0) (17.12.1.1): Metal gives -0 there. Zeros compare by value; all else exactly.
       for (const [name, value] of Object.entries(expected))
-        assert.equal(r[name][i], value, `${name}, lane ${k} of ${list.length}`);
+        assert.equal(r[name][i] === 0 ? 0 : r[name][i], value, `${name}, lane ${k} of ${list.length}`);
     });
     assert.equal(list.filter((i) => r.elect[i]).length, 1, 'one lane is elected');
   }
