@@ -1,7 +1,8 @@
 // The Wasm exports: one world per instance, plain numbers across the boundary, columns read through JS views.
 #![cfg(target_arch = "wasm32")]
 use crate::layout::*;
-use crate::math::{Q, v3};
+use crate::math::{Q, V3, sqrt, v3};
+use crate::query::{Filter, RayHit};
 use crate::world::World;
 
 static mut WORLD: Option<World> = None;
@@ -327,4 +328,68 @@ pub extern "C" fn voxels_combine(a: u32, b: u32, sx: i32, sy: i32, sz: i32) -> i
 #[allow(clippy::too_many_arguments)]
 pub extern "C" fn voxels_propagate(a: u32, b: u32, x: i32, y: i32, z: i32, sx: i32, sy: i32, sz: i32) -> i32 {
     world().propagate_voxel(a, b, [x, y, z], [sx, sy, sz])
+}
+
+/// Hits of the last ray query, eight words each: collider, distance, normal x y z, point x y z (floats as bits).
+const QUERY_HITS: usize = 256;
+static mut QUERY: [u32; 8 * QUERY_HITS] = [0; 8 * QUERY_HITS];
+
+/// Where the last query's hits are, for JS to read.
+#[unsafe(no_mangle)]
+pub extern "C" fn query_buffer() -> u32 {
+    core::ptr::addr_of!(QUERY) as u32
+}
+
+#[allow(clippy::too_many_arguments)]
+fn ray_args(ox: f32, oy: f32, oz: f32, dx: f32, dy: f32, dz: f32, flags: u32, groups: u32, collider: u32, body: u32) -> Option<(V3, V3, Filter)> {
+    let length = sqrt(dx * dx + dy * dy + dz * dz);
+    if !(length > 0.0 && length < f32::INFINITY) || !(ox.is_finite() && oy.is_finite() && oz.is_finite()) {
+        return None;
+    }
+    Some((v3(ox, oy, oz), v3(dx / length, dy / length, dz / length), Filter { flags, groups, collider, body }))
+}
+
+fn write_hit(k: usize, collider: u32, hit: RayHit, origin: V3, dir: V3) {
+    let p = origin.add(dir.scale(hit.t));
+    let words = [collider, hit.t.to_bits(), hit.normal.x.to_bits(), hit.normal.y.to_bits(), hit.normal.z.to_bits(), p.x.to_bits(), p.y.to_bits(), p.z.to_bits()];
+    let at = core::ptr::addr_of_mut!(QUERY) as *mut u32;
+    for (i, &word) in words.iter().enumerate() {
+        // SAFETY: one thread, and k < QUERY_HITS keeps 8 k + i inside the buffer.
+        unsafe { *at.add(8 * k + i) = word };
+    }
+}
+
+/// The nearest ray hit into the query buffer: 1, 0 for none, -1 for a zero or not finite ray. The direction need not be
+/// unit length; distances are along its unit.
+#[allow(clippy::too_many_arguments)]
+#[unsafe(no_mangle)]
+pub extern "C" fn query_ray(ox: f32, oy: f32, oz: f32, dx: f32, dy: f32, dz: f32, max: f32, solid: u32, flags: u32, groups: u32, collider: u32, body: u32) -> i32 {
+    let Some((origin, dir, filter)) = ray_args(ox, oy, oz, dx, dy, dz, flags, groups, collider, body) else { return -1 };
+    match world().cast_ray(origin, dir, max, solid != 0, &filter) {
+        Some((c, hit)) => {
+            write_hit(0, c, hit, origin, dir);
+            1
+        }
+        None => 0,
+    }
+}
+
+/// Every collider's hit along a ray, in row order: hits `skip` onwards go into the buffer (up to its 256), and the
+/// count of all hits comes back, or -1 for a zero or not finite ray.
+#[allow(clippy::too_many_arguments)]
+#[unsafe(no_mangle)]
+pub extern "C" fn query_ray_all(ox: f32, oy: f32, oz: f32, dx: f32, dy: f32, dz: f32, max: f32, solid: u32, flags: u32, groups: u32, collider: u32, body: u32, skip: u32) -> i32 {
+    let Some((origin, dir, filter)) = ray_args(ox, oy, oz, dx, dy, dz, flags, groups, collider, body) else { return -1 };
+    let w = world();
+    let mut count = 0usize;
+    w.each_queried(&filter, &mut |c| {
+        if let Some(hit) = w.ray_collider(c, origin, dir, max, solid != 0) {
+            if count >= skip as usize && count - (skip as usize) < QUERY_HITS {
+                write_hit(count - skip as usize, c as u32, hit, origin, dir);
+            }
+            count += 1;
+        }
+        true
+    });
+    count as i32
 }

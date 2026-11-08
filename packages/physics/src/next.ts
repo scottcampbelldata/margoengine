@@ -8,7 +8,16 @@ export { collisionGroups } from './shapes.js';
 export { buildHull as convexHull } from './next/hull.js';
 export type { HullFaces } from './next/hull.js';
 export type { ConeJointOptions, NextJointOptions } from './next/joint.js';
-export type { CollisionEvent, CollisionEventType, ContactForceEvent, PhysicsEventMap, PhysicsOptions } from './next/physics.js';
+export type {
+  CollisionEvent,
+  CollisionEventType,
+  ContactForceEvent,
+  PhysicsEventMap,
+  PhysicsOptions,
+  PhysicsRaycastOptions,
+  QueryFilter,
+  RaycastHit,
+} from './next/physics.js';
 export type { BodyOptions, BodyType } from './body.js';
 export type { JointDof, JointOptions, JointType, MotorOptions, RotationMotorOptions } from './joints.js';
 export type { ColliderOptions, ShapeOptions } from './shapes.js';
@@ -20,6 +29,7 @@ export type {
   KernelContact,
   KernelContactPoint,
   KernelLoadOptions,
+  KernelRayHit,
   KernelShape,
   KernelTrimeshOptions,
 } from './kernel.js';

@@ -151,6 +151,13 @@ export interface KernelLoadOptions {
     signal?: AbortSignal;
 }
 
+export interface KernelRayHit {
+    collider: number;
+    distance: number;
+    normal: [number, number, number];
+    point: [number, number, number];
+}
+
 export type KernelShape = 'ball' | 'box' | 'capsule' | 'hull' | 'trimesh';
 
 export interface KernelTrimeshOptions {
@@ -199,6 +206,8 @@ export class KernelWorld {
     setVoxel(collider: number, x: number, y: number, z: number, filled: boolean): void;
     combineVoxels(a: number, b: number, shift: readonly [number, number, number]): void;
     propagateVoxel(a: number, b: number, at: readonly [number, number, number], shift: readonly [number, number, number]): void;
+    raycast(origin: readonly number[], direction: readonly number[], max: number, solid: boolean, flags: number, groups: number, collider: number, body: number): KernelRayHit | null;
+    raycastAll(origin: readonly number[], direction: readonly number[], max: number, solid: boolean, flags: number, groups: number, collider: number, body: number): KernelRayHit[];
     removeCollider(collider: number): boolean;
     addJoint(a: number, b: number, flags: number): number;
     removeJoint(joint: number): boolean;
@@ -281,8 +290,10 @@ export class Physics implements EnginePlugin, BodyOwner {
     removeJoint(joint: PhysicsJoint): void;
     createCharacterController(): never;
     removeController(): never;
-    raycast(): never;
-    raycastAll(): never;
+    raycast(origin: Vec3, direction: Vec3, options?: PhysicsRaycastOptions): RaycastHit | null;
+    raycastAll(origin: Vec3, direction: Vec3, options?: PhysicsRaycastOptions & {
+        stop?: (hit: RaycastHit) => boolean;
+    }): RaycastHit[];
     shapeCast(): never;
     projectPoint(): never;
     intersectPoint(): never;
@@ -455,6 +466,35 @@ export interface PhysicsOptions {
     solverIterations?: number;
     name?: string;
     contactFilter?: (a: PhysicsBody, b: PhysicsBody) => boolean;
+}
+
+export interface PhysicsRaycastOptions extends QueryFilter {
+    maxDistance?: number;
+    solid?: boolean;
+}
+
+export interface QueryFilter {
+    groups?: number;
+    exclude?: PhysicsBody;
+    excludeCollider?: PhysicsCollider;
+    excludeSensors?: boolean;
+    excludeSolids?: boolean;
+    excludeFixed?: boolean;
+    excludeKinematic?: boolean;
+    excludeDynamic?: boolean;
+    onlyDynamic?: boolean;
+    onlyKinematic?: boolean;
+    onlyFixed?: boolean;
+    predicate?: (body: PhysicsBody, collider: PhysicsCollider) => boolean;
+}
+
+export interface RaycastHit {
+    body: PhysicsBody;
+    mesh: Mesh | null;
+    collider: PhysicsCollider;
+    distance: number;
+    point: [number, number, number];
+    normal: [number, number, number];
 }
 
 export type RotationMotorOptions = Pick<MotorOptions, 'stiffness' | 'damping' | 'model' | 'maxForce'> & {

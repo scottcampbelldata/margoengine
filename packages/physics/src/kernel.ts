@@ -129,6 +129,9 @@ interface KernelExports extends WebAssembly.Exports {
   voxels_set(collider: number, x: number, y: number, z: number, filled: number): number;
   voxels_combine(a: number, b: number, sx: number, sy: number, sz: number): number;
   voxels_propagate(a: number, b: number, x: number, y: number, z: number, sx: number, sy: number, sz: number): number;
+  query_buffer(): number;
+  query_ray(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, max: number, solid: number, flags: number, groups: number, collider: number, body: number): number;
+  query_ray_all(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, max: number, solid: number, flags: number, groups: number, collider: number, body: number, skip: number): number;
   hull_count(): number;
   mesh_count(): number;
 }
@@ -301,6 +304,26 @@ export interface KernelContact {
   normal: [number, number, number];
   points: KernelContactPoint[];
 }
+
+/** A ray's hit: the collider row, the distance along the ray's unit direction, the surface normal (zero for a start
+ * inside a solid shape) and the point, all world space. */
+export interface KernelRayHit {
+  collider: number;
+  distance: number;
+  normal: [number, number, number];
+  point: [number, number, number];
+}
+/** Filter bits of the kernel's queries (`KernelWorld.raycast`), as Rapier's `QueryFilterFlags`. */
+export const QUERY_EXCLUDE_FIXED = 1,
+  QUERY_EXCLUDE_KINEMATIC = 2,
+  QUERY_EXCLUDE_DYNAMIC = 4,
+  QUERY_EXCLUDE_SENSORS = 8,
+  QUERY_EXCLUDE_SOLIDS = 16,
+  QUERY_ONLY_DYNAMIC = 32,
+  QUERY_ONLY_KINEMATIC = 64,
+  QUERY_ONLY_FIXED = 128;
+/** Hits the kernel's query buffer holds at once; `raycastAll` pages through more. */
+const QUERY_HITS = 256;
 
 /** How two colliders mix a value. When their rules differ the pair takes the higher: max, multiply, min, average. */
 export type KernelCombine = 'average' | 'min' | 'multiply' | 'max';
@@ -944,6 +967,37 @@ export class KernelWorld {
   /** Tells voxel collider `b`, coupled at `shift`, that cell `at` of `a` changed. */
   propagateVoxel(a: number, b: number, at: readonly [number, number, number], shift: readonly [number, number, number]): void {
     this.voxelDone(this.api.voxels_propagate(a, b, at[0], at[1], at[2], shift[0], shift[1], shift[2]), 'propagateVoxelChange');
+  }
+  /**
+   * The nearest ray hit among the colliders the filter words let through, or null. The direction need not be unit
+   * length; `distance` is along its unit. Words: `flags` (QUERY_ bits), `groups` (packed, as `collisionGroups`), and a
+   * collider row and a body row to leave out (0xffffffff for none).
+   * @throws RangeError for an origin or direction that is not finite, or a zero direction.
+   */
+  raycast(origin: readonly number[], direction: readonly number[], max: number, solid: boolean, flags: number, groups: number, collider: number, body: number): KernelRayHit | null {
+    const found = this.api.query_ray(origin[0]!, origin[1]!, origin[2]!, direction[0]!, direction[1]!, direction[2]!, max, solid ? 1 : 0, flags, groups, collider, body);
+    if (found < 0) throw new RangeError('A ray needs a finite origin and a finite, nonzero direction; pass three numbers for each.');
+    return found ? this.readHit(0) : null;
+  }
+  /**
+   * Each collider's ray hit, in row order (not sorted), with the same words as {@link KernelWorld.raycast}.
+   * @throws RangeError for an origin or direction that is not finite, or a zero direction.
+   */
+  raycastAll(origin: readonly number[], direction: readonly number[], max: number, solid: boolean, flags: number, groups: number, collider: number, body: number): KernelRayHit[] {
+    const hits: KernelRayHit[] = [];
+    for (let skip = 0, total = 1; skip < total; ) {
+      total = this.api.query_ray_all(origin[0]!, origin[1]!, origin[2]!, direction[0]!, direction[1]!, direction[2]!, max, solid ? 1 : 0, flags, groups, collider, body, skip);
+      if (total < 0) throw new RangeError('A ray needs a finite origin and a finite, nonzero direction; pass three numbers for each.');
+      const page = total - skip < QUERY_HITS ? total - skip : QUERY_HITS;
+      for (let i = 0; i < page; i++) hits.push(this.readHit(i));
+      skip += page;
+    }
+    return hits;
+  }
+  private readHit(i: number): KernelRayHit {
+    const words = new Uint32Array(this.api.memory.buffer, this.api.query_buffer() + 32 * i, 8),
+      floats = new Float32Array(words.buffer, words.byteOffset, 8);
+    return { collider: words[0]!, distance: floats[1]!, normal: [floats[2]!, floats[3]!, floats[4]!], point: [floats[5]!, floats[6]!, floats[7]!] };
   }
   private voxelDone(code: number, what: string): void {
     if (this.api.world_layout() !== this.layout) this.bind();

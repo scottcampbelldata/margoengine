@@ -1335,7 +1335,7 @@ The following remain technical gaps, not permission to weaken a check:
     row class of VOXEL_WORD (four cells a word, a byte each: filled and six neighbour bits) and VOXEL_ columns on the mesh
     row, so ROW_CLASSES is 19 and the world's bytes, not its poses, changed. Contacts are cell boxes through the convex
     routines, a part per cell, with Catto's ghost rule on exposed faces. Proved: `kernel/tests/voxel.rs` (five tests
-    fail with the rule switched off) and `tests/next-voxels.test.js` against Rapier 0.21. Missing: rays and casts, a tree
+    fail with the rule switched off) and `tests/next-voxels.test.js` against Rapier 0.21. Missing: shape casts, a tree
     or run-length walk for very large grids, and any browser run beyond the replay's hash.
 41. `render_snippet` (`@margoengine/mcp/render`, `packages/mcp/tests/render-gpu-check.mjs`, in `test:gpu`) is proved on the
     RTX A6000 (Windows, D3D12 through `webgpu` 0.6.2) only: a box drawn and fitted shows green in the centre and an
@@ -1347,3 +1347,10 @@ The following remain technical gaps, not permission to weaken a check:
 43. Voxel bounce light and soft sun shadows (`@margoengine/voxel/gi`, rays traced in WebGPU compute through the world's opaque blocks) are proved on
     the M6 Mac mini (Metal) only, in one scene: a white floor beside a sunlit red wall turns red and a one-block pole casts
     a soft shadow the renderer alone does not draw. Frame cost, other scenes, multi-bounce and sky light are not measured or built.
+44. The own physics kernel's rays (batch 126, queries job, `kernel/src/query.rs`, exports `query_ray`, `query_ray_all`
+    and `query_buffer`): no new columns, so the world's bytes and poses are as before; hits go through a static buffer
+    of 256, paged by `raycastAll`. Convex shapes by intervals (ball and capsule side in the precise forms of Ray Tracing
+    Gems ch. 7), meshes by their tree, height fields and voxel grids by cell walks. Proved: `kernel/tests/query.rs`
+    (closed forms, each walk against brute force, f64 references for far and grazing rays; mutations of the walks fail
+    it) and `tests/next-queries.test.js` against Rapier 0.21. Missing: a tree over colliders for the world ray (each
+    collider is tested), shape casts, point queries, and any browser run.

@@ -247,9 +247,9 @@ Batch order, parity first (reasons in [Order](#order)): 126, 127, 128, 138, 139,
 
 | Row | Rapier | Root today | Own solver | Status | WebGPU | WebGL2 |
 | --- | --- | --- | --- | --- | --- | --- |
-| Q-01 | `cast_ray` with `solid` | `raycast` | throws | BUILDING 126 | Wasm | Wasm |
-| Q-02 | `cast_ray_and_get_normal` | `raycast` (normal) | throws | BUILDING 126 | Wasm | Wasm |
-| Q-03 | `intersect_ray` (all hits, callback may stop) | `raycastAll` | throws | PARTIAL: BUILDING 126; early stop MISSING, 140.6 | Wasm | Wasm |
+| Q-01 | `cast_ray` with `solid` | `raycast` | `raycast` with `solid` and `maxDistance` on every shape (ball, box, capsule, hull, trimesh, heightfield, voxels, compound) | DONE (126.6): `kernel/tests/query.rs` (closed forms, hull as box, mesh tree, height field and voxel walks and compound against brute force), `tests/next-queries.test.js` (600 random rays on a scene of every shape, solid and hollow, against Rapier 0.21); differences: a solid start inside a ball gives no normal where Rapier gives the ray reversed, and Rapier 0.21 misses a few rays across a height field's cells (2 of 1,200 in the test) where its own ray from the surface confirms the point the own solver finds; loss for 129: the world ray tests every collider in turn (no tree over colliders) | Wasm | Wasm |
+| Q-02 | `cast_ray_and_get_normal` | `raycast` (normal) | the hit's `normal` and `point` | DONE (126.6): `kernel/tests/query.rs`, `tests/next-queries.test.js` (normals and points against Rapier 0.21) | Wasm | Wasm |
+| Q-03 | `intersect_ray` (all hits, callback may stop) | `raycastAll` | `raycastAll`, nearest first, with `stop` to end the list | DONE (126.6): `tests/next-queries.test.js` (the same colliders in the same order as Rapier 0.21; `stop`) | Wasm | Wasm |
 | Q-04 | `project_point` with `is_inside` | `projectPoint` | throws | BUILDING 126 | Wasm | Wasm |
 | Q-05 | `project_point_and_get_feature`, ray `FeatureId` | no | none | MISSING, 140.6 | Wasm | Wasm |
 | Q-06 | `intersect_point` | `intersectPoint` | throws | BUILDING 126 | Wasm | Wasm |
@@ -258,8 +258,8 @@ Batch order, parity first (reasons in [Order](#order)): 126, 127, 128, 138, 139,
 | Q-09 | `cast_shape` | `shapeCast` | throws | BUILDING 126 | Wasm | Wasm |
 | Q-10 | `ShapeCastOptions` `target_distance`, `stop_at_penetration`, `compute_impact_geometry_on_penetration`; witnesses and both normals in the hit | `maxDistance` only | none | MISSING, 140.6 | Wasm | Wasm |
 | Q-11 | `cast_shape_nonlinear` (a turning cast) | no | none | MISSING, 140.6 | Wasm | Wasm |
-| Q-12 | `QueryFilter` groups, exclude collider, exclude body, predicate; flags `EXCLUDE_FIXED`, `EXCLUDE_KINEMATIC`, `EXCLUDE_DYNAMIC`, `EXCLUDE_SENSORS` | yes | none | BUILDING 126 | Wasm | Wasm |
-| Q-13 | flags `EXCLUDE_SOLIDS`, `ONLY_DYNAMIC`, `ONLY_KINEMATIC`, `ONLY_FIXED` | no | none | MISSING, 140.6 | Wasm | Wasm |
+| Q-12 | `QueryFilter` groups, exclude collider, exclude body, predicate; flags `EXCLUDE_FIXED`, `EXCLUDE_KINEMATIC`, `EXCLUDE_DYNAMIC`, `EXCLUDE_SENSORS` | yes | the same, as `groups`, `excludeCollider`, `exclude`, `predicate`, `excludeFixed`, `excludeKinematic`, `excludeDynamic`, `excludeSensors` on every query served | DONE (126.6) for rays: `kernel/tests/query.rs`, `tests/next-queries.test.js` (each option against Rapier 0.21) | Wasm | Wasm |
+| Q-13 | flags `EXCLUDE_SOLIDS`, `ONLY_DYNAMIC`, `ONLY_KINEMATIC`, `ONLY_FIXED` | no | `excludeSolids`, `onlyDynamic`, `onlyKinematic`, `onlyFixed` | DONE (126.6) for rays on `/next`: `kernel/tests/query.rs`, `tests/next-queries.test.js`; the root entry still lacks them (140.6) | Wasm | Wasm |
 | Q-14 | `propagateModifiedBodyPositionsToColliders` (queries see a moved body before the step) | queries see the last step (2D refreshes) | none | MISSING, 140.6 | Wasm | Wasm |
 
 ## Character controller

@@ -11,7 +11,16 @@ import {
   KernelWorld,
   loadKernel,
   PAIR_IS_PART,
+  QUERY_EXCLUDE_DYNAMIC,
+  QUERY_EXCLUDE_FIXED,
+  QUERY_EXCLUDE_KINEMATIC,
+  QUERY_EXCLUDE_SENSORS,
+  QUERY_EXCLUDE_SOLIDS,
+  QUERY_ONLY_DYNAMIC,
+  QUERY_ONLY_FIXED,
+  QUERY_ONLY_KINEMATIC,
   type KernelContactPoint,
+  type KernelRayHit,
   type KernelLoadOptions,
   type KernelShape,
 } from '../kernel.js';
@@ -93,6 +102,45 @@ export interface PhysicsEventMap {
   afterstep: number;
 }
 
+/** Which colliders a scene query sees: the root entry's names, plus Rapier's flags the root does not name. */
+export interface QueryFilter {
+  /** Packed interaction groups of the query, see `collisionGroups`; a collider is seen when the groups meet both ways. */
+  groups?: number;
+  /** Leave out every collider of this body. */
+  exclude?: PhysicsBody;
+  /** Leave out this one collider. */
+  excludeCollider?: PhysicsCollider;
+  excludeSensors?: boolean;
+  /** Leave out colliders that are not sensors. */
+  excludeSolids?: boolean;
+  excludeFixed?: boolean;
+  excludeKinematic?: boolean;
+  excludeDynamic?: boolean;
+  /** See only colliders of dynamic bodies; with other `only` flags, any of the kinds named. */
+  onlyDynamic?: boolean;
+  onlyKinematic?: boolean;
+  onlyFixed?: boolean;
+  /** Return false to skip a collider. */
+  predicate?: (body: PhysicsBody, collider: PhysicsCollider) => boolean;
+}
+/** Options of `Physics.raycast` and `raycastAll`: the query filter plus a distance limit and solid starts. */
+export interface PhysicsRaycastOptions extends QueryFilter {
+  /** Default unbounded. */
+  maxDistance?: number;
+  /** A ray that starts inside a shape hits it at distance 0 (default true); false: where it leaves, the normal facing the ray. */
+  solid?: boolean;
+}
+/** A ray hit: the body, its mesh and the collider, how far along the ray, the point and the surface normal. */
+export interface RaycastHit {
+  body: PhysicsBody;
+  mesh: Mesh | null;
+  collider: PhysicsCollider;
+  distance: number;
+  point: [number, number, number];
+  /** Outward surface normal, world space; zero for a hit at distance 0 inside a solid shape. */
+  normal: [number, number, number];
+}
+
 /** @internal A helper that steps, syncs and is disposed with a world. */
 export interface PhysicsAttachment {
   beforeStep?(dt: number): void;
@@ -101,6 +149,9 @@ export interface PhysicsAttachment {
   dispose(): void;
 }
 
+/** No row: a filter word that leaves nothing out. */
+const NONE = 0xffffffff;
+const byDistance = (a: RaycastHit, b: RaycastHit): number => a.distance - b.distance;
 const noop = (): void => {};
 // Set.forEach with the event as thisArg calls listeners without allocating a closure or a snapshot array.
 function callListener(this: never, listener: (event: never) => void): void {
@@ -592,13 +643,68 @@ export class Physics implements EnginePlugin, BodyOwner {
   removeController(): never {
     throw later('removeController', 'the character and vehicle batch');
   }
-  /** Not served yet: throws. */
-  raycast(): never {
-    throw later('raycast', 'queries');
+  /** The kernel's filter words for a query filter: flags, groups, collider row and body row to leave out. */
+  private filterWords(filter: QueryFilter): [number, number, number, number] {
+    let flags = 0;
+    if (filter.excludeFixed) flags |= QUERY_EXCLUDE_FIXED;
+    if (filter.excludeKinematic) flags |= QUERY_EXCLUDE_KINEMATIC;
+    if (filter.excludeDynamic) flags |= QUERY_EXCLUDE_DYNAMIC;
+    if (filter.excludeSensors) flags |= QUERY_EXCLUDE_SENSORS;
+    if (filter.excludeSolids) flags |= QUERY_EXCLUDE_SOLIDS;
+    if (filter.onlyDynamic) flags |= QUERY_ONLY_DYNAMIC;
+    if (filter.onlyKinematic) flags |= QUERY_ONLY_KINEMATIC;
+    if (filter.onlyFixed) flags |= QUERY_ONLY_FIXED;
+    const groups = filter.groups === undefined ? 0xffffffff : filter.groups >>> 0;
+    const collider = filter.excludeCollider ? filter.excludeCollider.handle : NONE;
+    const body = filter.exclude ? filter.exclude.row : NONE;
+    return [flags, groups, collider, body];
   }
-  /** Not served yet: throws. */
-  raycastAll(): never {
-    throw later('raycastAll', 'queries');
+  private rayHit(hit: KernelRayHit): RaycastHit | null {
+    const collider = this.byRow.get(hit.collider);
+    return collider ? { body: collider.body, mesh: collider.body.mesh, collider, distance: hit.distance, point: hit.point, normal: hit.normal } : null;
+  }
+  private passes(hit: RaycastHit, predicate: QueryFilter['predicate']): boolean {
+    return !predicate || predicate(hit.body, hit.collider);
+  }
+  /**
+   * The first hit along a ray, or null. Queries see the poses of the last step, as Rapier's do.
+   * @throws RangeError for an origin or direction that is not three finite numbers, or a zero direction.
+   */
+  raycast(origin: Vec3, direction: Vec3, options: PhysicsRaycastOptions = {}): RaycastHit | null {
+    checkVec(origin, 'Ray origin');
+    checkVec(direction, 'Ray direction');
+    if (this.disposed) throw new MargoError('disposed', 'Physics is disposed; create a new Physics.');
+    const max = options.maxDistance ?? Infinity,
+      solid = options.solid ?? true,
+      words = this.filterWords(options);
+    if (options.predicate) {
+      let best: RaycastHit | null = null;
+      for (const raw of this.kernel.raycastAll(origin, direction, max, solid, ...words)) {
+        const hit = this.rayHit(raw);
+        if (hit && this.passes(hit, options.predicate) && (!best || hit.distance < best.distance)) best = hit;
+      }
+      return best;
+    }
+    const raw = this.kernel.raycast(origin, direction, max, solid, ...words);
+    return raw ? this.rayHit(raw) : null;
+  }
+  /**
+   * Every hit along a ray, nearest first: one a collider. Return false from `options.stop` to end the list there.
+   * @throws RangeError for an origin or direction that is not three finite numbers, or a zero direction.
+   */
+  raycastAll(origin: Vec3, direction: Vec3, options: PhysicsRaycastOptions & { stop?: (hit: RaycastHit) => boolean } = {}): RaycastHit[] {
+    checkVec(origin, 'Ray origin');
+    checkVec(direction, 'Ray direction');
+    if (this.disposed) throw new MargoError('disposed', 'Physics is disposed; create a new Physics.');
+    const hits: RaycastHit[] = [];
+    for (const raw of this.kernel.raycastAll(origin, direction, options.maxDistance ?? Infinity, options.solid ?? true, ...this.filterWords(options))) {
+      const hit = this.rayHit(raw);
+      if (hit && this.passes(hit, options.predicate)) hits.push(hit);
+    }
+    hits.sort(byDistance);
+    if (options.stop)
+      for (let i = 0; i < hits.length; i++) if (!options.stop(hits[i]!)) return hits.slice(0, i + 1);
+    return hits;
   }
   /** Not served yet: throws. */
   shapeCast(): never {

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11012447,
+  "total": 11020896,
   "history": [
     {
       "date": "2026-10-24",
@@ -4178,6 +4178,12 @@
       "commit": "2d9bce624",
       "reason": "new entry @margoengine/terrain/displace",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "2e837ba1a",
+      "reason": "physics /next grows: own-solver rays on every shape with the Rapier query filter (batch 126 queries part 1)",
+      "grew": 1
     }
   ],
   "items": {
@@ -4635,7 +4641,7 @@
     "@margoengine/oit/moments": 5512,
     "@margoengine/oit/vfx": 486,
     "@margoengine/physics": 19679,
-    "@margoengine/physics/next": 128636,
+    "@margoengine/physics/next": 137085,
     "@margoengine/physics2d": 8199,
     "@margoengine/physics2d/outline": 2524,
     "@margoengine/pixel": 4664,

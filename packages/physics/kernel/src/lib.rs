@@ -21,6 +21,7 @@ pub mod math;
 pub mod memory;
 pub mod mesh;
 pub mod narrow;
+pub mod query;
 pub mod sat;
 pub mod solver;
 pub mod voxel;
