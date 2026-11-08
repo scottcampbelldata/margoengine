@@ -3027,10 +3027,10 @@ Core and stage are untouched (23,626 B gzip together after the batch).
 | 2 | One CSS3DObject | SKIPPED: `@margoengine/html` already re-exports the labels type (`export type { Label, CSS3DObject } from '@margoengine/labels'`, since 9b98d25e2); the one implementation is in `packages/labels/src/renderer.ts` and `api/html.api.md` shows the re-export | none | none | none |
 | 3 | Depth with CSS 3D objects | DONE | 1d347b065 | `CSS3DObject` in `@margoengine/labels` | LIM-540 |
 | 4 | Leader lines and callouts | DONE | b040eb4d9 | `@margoengine/labels/callouts` | LIM-542 |
-| 5 | Scaled ancestors | DONE | this commit | `LabelRenderer` in `@margoengine/labels` | LIM-546 |
+| 5 | Scaled ancestors | DONE | 5bfd530af | `LabelRenderer` in `@margoengine/labels` | LIM-546 |
 
 - **Built from:** `docs/clean-room.md` rows S76 (Christensen, Marks and Shieber 1995; Imhof 1975), S78 (Sutherland and
-  Hodgman 1974; CSS Masking 1, CSS Transforms 2), S79 (SVG 2) and S80 (CSSOM View, CSS Transforms 1). Nothing from
+  Hodgman 1974; CSS Masking 1, CSS Transforms 2), S79 (SVG 2) and S81 (CSSOM View, CSS Transforms 1). Nothing from
   another engine was read.
 - **Proved (real GPU, this Beelink, Chromium on WebGPU and WebGL2):** `node packages/labels/scripts/test-browser.js`:
   a tilted CSS 3D panel whose origin is behind the near plane is hit in its far half and not its near half; a callout
