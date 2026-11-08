@@ -86,6 +86,10 @@
     "./rig": {
       "types": "./dist/rig.d.ts",
       "import": "./dist/rig.js"
+    },
+    "./gpu": {
+      "types": "./dist/gpu.d.ts",
+      "import": "./dist/gpu.js"
     }
   },
   "files": [
@@ -103,7 +107,7 @@
   "scripts": {
     "build": "node ../../scripts/build-optional.js voxel-edit",
     "test": "npm run build && node --test tests/*.test.js",
-    "test:gpu": "cd ../.. && node packages/voxel-edit/tests/shaders-browser-check.mjs",
+    "test:gpu": "cd ../.. && node packages/voxel-edit/tests/shaders-browser-check.mjs && node packages/voxel-edit/tests/gpu-browser-check.mjs",
     "prepack": "npm run build"
   }
 }

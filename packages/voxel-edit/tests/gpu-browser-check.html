@@ -1,0 +1,59 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Voxel-edit GPU bulk edits browser check</title></head><body>
+<script type="module">
+// Real-GPU proof of @margoengine/voxel-edit/gpu, driven by gpu-browser-check.mjs: a chain of fills, booleans and
+// filters on a GpuGrid gives exactly the cells of the same chain of CPU operations, on 37 x 29 x 41 and on 256 x 256 x
+// 256 (16.7 million cells); a ShaderBrush runs on the resident grid; write and read round-trip.
+import {boxCells,sphereCells} from '@margoengine/voxel-edit/edit';
+import {combineGrids,dilateGrid,erodeGrid} from '@margoengine/voxel-edit';
+import {GpuGrid} from '@margoengine/voxel-edit/gpu';
+import {ShaderBrush,brushes} from '@margoengine/voxel-edit/shaders';
+const errors=[];
+const adapter=await navigator.gpu.requestAdapter(),device=await adapter.requestDevice({requiredLimits:{maxStorageBufferBindingSize:adapter.limits.maxStorageBufferBindingSize,maxBufferSize:adapter.limits.maxBufferSize}});
+device.addEventListener('uncapturederror',(e)=>errors.push(e.error.message));
+let seed=5;const next=()=>((seed=(Math.imul(seed,1103515245)+12345)>>>0)/2**32);
+const randomGrid=(s,density)=>{const v=new Uint8Array(s[0]*s[1]*s[2]);for(let i=0;i<v.length;i++)if(next()<density)v[i]=1+Math.floor(next()*5);return {size:s,voxels:v};};
+const same=(a,b)=>{if(a.length!==b.length)return -1;let d=0;for(let i=0;i<a.length;i++)if(a[i]!==b[i])d++;return d;};
+// CPU reference of the chain: stamp cells, then the grid operations.
+const stamp=(grid,cells,value)=>{const v=grid.voxels.slice(),[sx,sy,sz]=grid.size;for(const [x,y,z] of cells)if(x>=0&&y>=0&&z>=0&&x<sx&&y<sy&&z<sz)v[x+sx*(z+sz*y)]=value;return {size:grid.size,voxels:v};};
+async function chain(size,density,limits){
+ const base=randomGrid(size,density),tool=randomGrid([Math.ceil(size[0]/3),Math.ceil(size[1]/2),Math.ceil(size[2]/3)],0.6),map=new Uint8Array(256);
+ for(let i=1;i<256;i++)map[i]=1+((i*3)%200);
+ const r=Math.min(...size)/4,c=[size[0]/2,size[1]/2,size[2]/2],off=[Math.floor(size[0]/2),-3,Math.floor(size[2]/4)];
+ let t=performance.now();
+ const gpu=await GpuGrid.create(device,base,limits);
+ gpu.fill({shape:'box',min:[2,1,3],max:[size[0]-5,Math.floor(size[1]/3),size[2]-2]},4).fill({shape:'sphere',center:c,radius:r},0);
+ const clipped=gpu.combine(tool,{operation:'union',offset:off,paletteMap:map,overlap:'tool'});
+ gpu.combine(tool,{operation:'subtract',offset:[1,size[1]-4,1]});gpu.dilate({iterations:2}).erode().smooth();
+ const out=await gpu.read();const gpuMs=performance.now()-t;
+ t=performance.now();
+ let cpu=stamp(base,boxCells([2,1,3],[size[0]-6,Math.floor(size[1]/3)-1,size[2]-3]),4);
+ cpu=stamp(cpu,sphereCells(c,r),0);
+ const u=combineGrids(cpu,tool,{operation:'union',offset:off,paletteMap:map,overlap:'tool',...limits});cpu=u.grid;
+ cpu=combineGrids(cpu,tool,{operation:'subtract',offset:[1,size[1]-4,1],...limits}).grid;
+ cpu=dilateGrid(dilateGrid(cpu,limits).grid,limits).grid;cpu=erodeGrid(cpu,limits).grid;
+ const cpuMs=performance.now()-t;
+ // The smooth step has no CPU operation: its brush on the CPU result, compared by running the brush alone.
+ const brush=await ShaderBrush.create(device,brushes.smooth),smoothed=(await brush.run(cpu,limits)).grid;brush.dispose();
+ gpu.dispose();
+ return {differ:same(out.voxels,smoothed.voxels),clipped:[clipped,u.clipped],filled:out.voxels.filter((v)=>v).length,gpuMs,cpuMs};
+}
+window.check={
+ errors:()=>errors,
+ async run(){
+  const out={};
+  out.small=await chain([37,29,41],0.3,{});
+  out.big=await chain([256,256,256],0.05,{});
+  // A user brush on the resident grid, write and read.
+  const g=await GpuGrid.create(device,{size:[8,8,8],voxels:new Uint8Array(512)});
+  const shell=await ShaderBrush.create(device,'fn brush(p: vec3<i32>, value: u32) -> u32 {\n  if (any(p == vec3<i32>(0))) { return 6u; }\n  return value;\n}');
+  out.brush=(await g.brush(shell).read()).voxels.filter((v)=>v===6).length;
+  const back=randomGrid([8,8,8],0.5);out.roundTrip=same((await g.write(back).read()).voxels,back.voxels);
+  const remap=new Uint8Array(256);remap[3]=9;out.remap=(await g.remap(remap).read()).voxels.filter((v)=>v===9).length;out.threes=back.voxels.filter((v)=>v===3).length;
+  out.otherDevice='same';const d2=await (await navigator.gpu.requestAdapter()).requestDevice();try{(await GpuGrid.create(d2,{size:[2,2,2],voxels:new Uint8Array(8)})).brush(shell);}catch(e){out.otherDevice=e.message;}d2.destroy();
+  g.dispose();shell.dispose();
+  try{g.dilate();out.disposed='ran';}catch(e){out.disposed=e.code;}
+  return out;
+ },
+};
+window.ready=true;
+</script></body></html>

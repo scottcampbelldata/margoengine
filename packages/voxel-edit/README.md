@@ -3,7 +3,7 @@
 Import `margoengine/voxel-edit` from the `margoengine` package, or `@margoengine/voxel-edit` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Editing voxel models for voxel editors and tools: dense and sparse grids, modeling operations, brushes and
-selections, picking, export meshing, `.vox` scene editing and frame animation. CPU only (but `./shaders`, which runs on a GPUDevice), no renderer, no DOM: every
+selections, picking, export meshing, `.vox` scene editing and frame animation. CPU only (but `./shaders` and `./gpu`, which run on a GPUDevice), no renderer, no DOM: every
 function is pure and can run in a worker. Optional and tree-shakable; core and the stage never import it.
 
 ```ts
@@ -72,6 +72,7 @@ corner coordinates.
 | `./library` | `fetchLibrary` / `fetchAsset` / `resolveLibraryUrl`: list and fetch `.vox` packs from a JSON index, with a body size limit and abort |
 | `./shaders` | `ShaderBrush`: your own WGSL `fn brush(p, value)` run on the GPU for every selected cell, pass after pass, to grow, erode or generate; presets `brushes.grow`, `erode`, `noise`, `smooth`; `brushSource` |
 | `./rig` | `VoxelRig`: voxel parts on a skeleton, posed by bone rotations; part matrices for drawing and `bake` to one grid; `sampleRigClip`, `rigRotation`, `slerpRotation` |
+| `./gpu` | `GpuGrid`: a grid kept on the GPU for bulk edits on multi-million-cell models: `fill` (box, sphere), `combine` (union, intersect, subtract), `dilate`, `erode`, `smooth`, `remap`, `brush` (any `ShaderBrush`), then `read` once |
 
 Selections, picking and meshing take a dense or a sparse grid. Errors follow
 [docs/conventions.md](../../docs/conventions.md): `TypeError` and `RangeError` for arguments and budgets,
@@ -281,3 +282,41 @@ console.log(armMatrix.length, grid.size, origin, meshGrid(grid).mesh.positions.l
   16,777,216).
 - **Rigid parts.** Each part follows one bone (rigid skinning, as blocky characters use); cells are not blended
   between bones. For smooth skinned meshes use `@margoengine/rigging` and `@margoengine/animation`.
+
+## GPU bulk edits (`./gpu`)
+
+`GpuGrid` keeps a grid on the GPU (WebGPU compute) so large fills, booleans and filters run as compute passes, one
+after another with no read-back in between; `read()` brings the cells back once at the end. Every operation gives
+exactly the cells of its CPU counterpart: `fill` the cells of `boxCells` (with `max` exclusive) or `sphereCells`,
+`combine` those of `combineGrids`, `dilate` and `erode` those of `dilateGrid` and `erodeGrid` (all six directions),
+`smooth` the `smooth` shader brush, and `brush` any `ShaderBrush` made on the same device.
+
+```ts
+import type { VoxelGrid } from 'margoengine/voxel-edit';
+import { GpuGrid } from 'margoengine/voxel-edit/gpu';
+
+const adapter = await navigator.gpu.requestAdapter();
+const device = await adapter!.requestDevice();
+const n = 256; // 16.7 million cells
+const model: VoxelGrid = { size: [n, n, n], voxels: new Uint8Array(n ** 3) };
+const tool: VoxelGrid = { size: [32, 32, 32], voxels: new Uint8Array(32 ** 3).fill(2) };
+const map = Uint8Array.from({ length: 256 }, (_, i) => i); // tool indexes kept as they are
+
+const grid = await GpuGrid.create(device, model);
+grid
+  .fill({ shape: 'box', min: [0, 0, 0], max: [n, 64, n] }, 1) // a floor 64 cells deep
+  .fill({ shape: 'sphere', center: [128, 64, 128], radius: 40 }, 0); // a crater in it
+const clipped = grid.combine(tool, { operation: 'union', offset: [240, 64, 240], paletteMap: map });
+grid.dilate({ iterations: 2 }).erode().smooth();
+const edited = await grid.read();
+console.log(clipped, edited.voxels.filter((v) => v !== 0).length);
+grid.dispose();
+```
+
+- **Order.** Edits queue at once and run in order on the GPU; each reads the grid the edit before left. `combine`
+  returns the tool cells that fall outside the grid, counted on the CPU.
+- **Limits.** A grid must fit one storage binding (128 MiB by default: raise `maxStorageBufferBindingSize` when
+  requesting the device) and `maxCells` (default 16,777,216, at most 67,108,864). `write(grid)` replaces every cell;
+  `remap(table)` replaces each index `i` by `table[i]`.
+- **Lifetime.** `dispose()` (or `using`) frees the GPU buffers; any call after it throws a `MargoError` with code
+  `disposed`.

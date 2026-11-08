@@ -338,7 +338,10 @@ test('split steps cover the whole suite: both bevel sample counts, each chain pa
   // voxel-edit's browser checks: one step each.
   assert.deepEqual(
     splitSteps(byId('voxel-edit/test:gpu')).map((s) => s.command),
-    ['cd ../.. && node packages/voxel-edit/tests/shaders-browser-check.mjs'],
+    [
+      'cd ../.. && node packages/voxel-edit/tests/shaders-browser-check.mjs',
+      'cd ../.. && node packages/voxel-edit/tests/gpu-browser-check.mjs',
+    ],
   );
   assert.equal(splitSteps({ label: 'x y', command: 'npm run a || node b.mjs', dir: 'x' }).length, 1);
   // Post's browser checks: one step each, so a hot machine cools between them.
@@ -387,7 +390,10 @@ test('an Apple silicon Mac gets its own profile, not the workstation; a name sti
   assert.match(mac.description, /Mac/);
   assert.equal(mac.heat, null);
   assert.deepEqual(mac.exclude, {});
-  const named = machineProfile({ MARGO_MACHINE_PROFILE: 'laptop' }, PROFILES_FILE, { platform: 'darwin', arch: 'arm64' });
+  const named = machineProfile({ MARGO_MACHINE_PROFILE: 'laptop' }, PROFILES_FILE, {
+    platform: 'darwin',
+    arch: 'arm64',
+  });
   assert.equal(named.name, 'laptop');
   for (const host of [
     { platform: 'win32', arch: 'x64' },

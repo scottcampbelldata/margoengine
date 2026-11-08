@@ -718,6 +718,7 @@ The own solver's kernel (`packages/physics/kernel`, Rust, no dependencies). Noth
 | VX23 | destruction: depth-first flood fill over solid face neighbours from the cells beside a removed block, stopping at a holding cell; loose cells merged into boxes (x runs, then z, then y) for a compound body; open faces meshed per block type | voxel/src/debris.ts | Margo-own |
 | VX24 | shader brushes: user WGSL after a fixed prelude (cell, tool, lookup, PCG-style hash, trilinear value noise), one invocation per packed word of four cells, ping-pong passes; grow and erode presets as gathers of dilateGrid and erodeGrid | voxel-edit/src/shaders.ts, voxel-edit/src/brush-gpu.ts | Margo-own; hash after O'Neill 2014 (PCG) |
 | VX25 | voxel rigs: bones as rigid transforms turned about their joints and composed down the hierarchy, quaternion keys interpolated by slerp, bake by inverse-mapping cell centres into each part | voxel-edit/src/rig.ts | Margo-own; slerp after K. Shoemake, "Animating rotation with quaternion curves", SIGGRAPH 1985 |
+| VX26 | GPU bulk edits: a resident packed grid in ping-pong storage buffers; box and sphere fills, tool booleans through a lookup table, palette remaps and morphology as fixed brushes on the shader-brush prelude | voxel-edit/src/gpu.ts | Margo-own |
 
 ### voxel-pathtracer
 

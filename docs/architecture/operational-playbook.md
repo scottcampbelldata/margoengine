@@ -1483,3 +1483,11 @@ The following remain technical gaps, not permission to weaken a check:
     scenes and their counts (`kernel/tests/bits.rs`), and lane by lane against scalar operations
     (`kernel/tests/common.rs`); paired time in perf history entry 87. The Wasm simd128 path type-checks but has not
     run: the 2D kernel has no Wasm build yet (no allocator). Missing: a Wasm run and a browser timing.
+55. Voxel-edit GPU bulk edits (`@margoengine/voxel-edit/gpu`, batch 97): `GpuGrid` keeps a grid resident in the shader
+    brushes' packed ping-pong buffers, so fills, booleans, morphology, smoothing, palette remaps and user brushes queue
+    compute passes back to back and the grid is read back once. Fill, combine and remap are fixed brushes on the same
+    prelude (box, sphere by whole-cell squared distance, tool lookup), so every operation is exact integer work.
+    Proved on the M6 Mac mini (Metal) by `gpu-browser-check.mjs`: a chain of a box fill, a sphere erase, a union with
+    a palette map, a subtract, two dilations, an erosion and a smoothing pass equals the same CPU chain cell for cell
+    on 37 x 29 x 41 and on a 256-cubed grid (16.7 million cells), clipped counts included. Missing: any other GPU;
+    grids past one storage binding are refused, not split; the tool grid is uploaded per combine.

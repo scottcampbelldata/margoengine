@@ -3122,6 +3122,10 @@
       "types": "./dist/voxel-edit/rig.d.ts",
       "import": "./dist/voxel-edit/rig.js"
     },
+    "./voxel-edit/gpu": {
+      "types": "./dist/voxel-edit/gpu.d.ts",
+      "import": "./dist/voxel-edit/gpu.js"
+    },
     "./voxel-net": {
       "types": "./dist/voxel-net.d.ts",
       "import": "./dist/voxel-net.js"
