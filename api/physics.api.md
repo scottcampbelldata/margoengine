@@ -626,6 +626,7 @@ export type ShapeOptions = {
 }
  | {
     shape: 'convexDecomposition';
+    parts?: readonly CompoundPart[];
     geometry?: ColliderGeometry;
     vertices?: ArrayLike<number>;
     indices?: ArrayLike<number>;

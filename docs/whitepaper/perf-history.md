@@ -1907,9 +1907,44 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
   profile -- cubes1000-awake default` (and `equal`, `pyramid`, `cubes5000-awake`); the before figures from the same command on
   `93a1044c3`.
 
+### 81. Own convex decomposition against Rapier's V-HACD: slower to build, fewer or as many parts (open loss)
+
+- **Measured (batch 126 job 6, one run each on a busy PC, defaults on both sides):** `node packages/physics/scripts/decomposition-vs-rapier.mjs`
+  after the build. Parts, build time, the paper's score (Wei et al. 2022, Eq. 10, by `decompositionConcavity` for both)
+  and the hulls' volume over the mesh's:
+
+  | Mesh | Rapier parts | Own parts | Rapier ms | Own ms | Rapier Eq. 10 | Own Eq. 10 | Rapier hulls / mesh | Own hulls / mesh |
+  | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+  | tube (paper Fig. 9) | 7 | 4 | 222 | 1060 | 0.1381 | 0.0495 | 1.030 | 1.032 |
+  | cup, five slabs | 12 | 12 | 128 | 3577 | 0.0354 | 0.0320 | 0.993 | 0.966 |
+  | cup, one closed surface | 12 | 12 | 256 | 9182 | 0.0518 | 0.0248 | 1.058 | 1.016 |
+  | torus | 11 | 6 | 173 | 17281 | 0.0296 | 0.0359 | 1.037 | 1.088 |
+  | libigl knight | 19 | 15 | 116 | 14407 | 0.0520 | 0.0435 | 1.275 | 1.319 |
+
+  The five slabs overlap, so their summed volume is over the solid's and its share reads under 1.
+- **Why it is slower, measured:** the method does more work. Each cut runs 500 tree-search iterations, each cutting the
+  mesh up to four times in three directions and building a hull for every piece, where V-HACD makes one greedy pass over
+  a voxel grid. A CPU profile of the torus at 100 iterations puts 60 percent of the time in Quickhull (`src/next/hull.ts`).
+  The code is TypeScript, not the kernel's Rust.
+- **Like for like:** `--greedy` runs the paper's one-step greedy baseline (Table 2: depth 1, one iteration per candidate,
+  every plane tried once), the search V-HACD makes. It is no faster: on the tube it cuts to the cap of 64 parts in
+  23.9 s with a part still at 0.244, as every first cut scores the same and the paper's Fig. 9 says; on the five meshes
+  together it passed a 10 minute limit. V-HACD's balance and symmetry terms are what keep its greedy pass short; the
+  tree search replaces them, at the cost of the iterations.
+- **What is better:** the tube, which the paper uses to show what a tree search finds, comes out in its 4 walls where
+  V-HACD makes 7 with a score three times the threshold; fewer or as many parts on every mesh, and a lower score on all
+  but the torus, where 6 parts sit looser than Rapier's 11.
+- **Plan:** the hull of a cut piece for its volume alone, and the search in the kernel's Rust, batch 129's decomposition
+  row. Until then decompose at build time and store the parts.
+- **Guard:** `packages/physics/tests/next-decomposition.test.js` (parts and scores, not time).
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).
+
+- **Own convex decomposition against Rapier's V-HACD (entry 81).** 1.1 to 17.3 s where Rapier takes 0.1 to 0.3 s on five
+  meshes of 72 to 2,304 triangles, with fewer or as many parts. Cause: 500 tree-search iterations per cut with a hull per
+  trial piece, in TypeScript. Rerun: `node packages/physics/scripts/decomposition-vs-rapier.mjs`.
 
 - **three.js `InstancedMesh` against Margo's instanced paths: partly closed.**
   - Before: [boxes-vs-threejs.md](boxes-vs-threejs.md), "Instanced <-> instanced";

@@ -45,11 +45,14 @@ export type ShapeOptions =
    */
   | { shape: 'compound'; parts: readonly CompoundPart[] }
   /**
-   * A concave mesh split into convex pieces (V-HACD), so dynamic bodies get a hollow cup or a torus right. Takes
-   * `geometry` or `vertices` and `indices`, like a trimesh; without them it uses the mesh geometry.
+   * A concave mesh split into convex pieces, so dynamic bodies get a hollow cup or a torus right. Takes `parts`, the
+   * result of `convexDecomposition` from `@margoengine/physics/decomposition` (the own decomposition, which
+   * `@margoengine/physics/next` needs), or on this entry `geometry` or `vertices` and `indices` like a trimesh, which
+   * Rapier splits with V-HACD; without any of them it uses the mesh geometry.
    */
   | {
       shape: 'convexDecomposition';
+      parts?: readonly CompoundPart[];
       geometry?: ColliderGeometry;
       vertices?: ArrayLike<number>;
       indices?: ArrayLike<number>;
@@ -334,6 +337,8 @@ export function createColliderDesc(
       break;
     }
     case 'convexDecomposition': {
+      // Parts decomposed already (@margoengine/physics/decomposition) are a compound of their hulls.
+      if (options.parts) return createColliderDesc(R, { shape: 'compound', parts: options.parts });
       if (!R.ColliderDesc.convexDecomposition)
         throw new MargoError(
           'unsupported',

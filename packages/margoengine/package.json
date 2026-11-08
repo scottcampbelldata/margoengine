@@ -1850,6 +1850,10 @@
       "types": "./dist/physics/next.d.ts",
       "import": "./dist/physics/next.js"
     },
+    "./physics/decomposition": {
+      "types": "./dist/physics/decomposition.d.ts",
+      "import": "./dist/physics/decomposition.js"
+    },
     "./physics2d": {
       "types": "./dist/physics2d.d.ts",
       "import": "./dist/physics2d.js"

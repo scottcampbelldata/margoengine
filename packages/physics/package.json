@@ -40,6 +40,10 @@
     "./next": {
       "types": "./dist/next.d.ts",
       "import": "./dist/next.js"
+    },
+    "./decomposition": {
+      "types": "./dist/decomposition.d.ts",
+      "import": "./dist/decomposition.js"
     }
   },
   "files": [

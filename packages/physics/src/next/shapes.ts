@@ -18,6 +18,7 @@ const served: Readonly<Record<string, KernelShape | 'compound'>> = {
   trimesh: 'trimesh',
   heightfield: 'trimesh',
   compound: 'compound',
+  convexDecomposition: 'compound',
   voxels: 'trimesh',
 };
 /** The convex parts a compound takes, and the parts the own solver holds so far. */
@@ -174,7 +175,7 @@ export function kernelCollider(
   if (!shape)
     throw new MargoError(
       'unsupported',
-      `The ${options.shape} shape is not in the own solver yet; use box, sphere, capsule, cylinder, cone, convexHull, trimesh, heightfield, compound or voxels, or @margoengine/physics.`,
+      `The ${options.shape} shape is not in the own solver yet; use box, sphere, capsule, cylinder, cone, convexHull, trimesh, heightfield, compound, convexDecomposition or voxels, or @margoengine/physics.`,
     );
   const fitted = (): Float32Array => {
       if (!fit.geometry) throw new TypeError(`A ${options.shape} collider without explicit size needs a mesh with geometry`);
@@ -230,6 +231,15 @@ export function kernelCollider(
   } else if (options.shape === 'compound') {
     parts = compoundParts(options.parts, hulls);
     size = [];
+  } else if (options.shape === 'convexDecomposition') {
+    // The search is build-time work in its own entry, so a game that never decomposes never loads it.
+    if (!options.parts)
+      throw new MargoError(
+        'unsupported',
+        "The own solver takes a decomposed mesh, not the mesh: import { convexDecomposition } from '@margoengine/physics/decomposition' and pass its result, body.addCollider(convexDecomposition({ vertices, indices })).",
+      );
+    parts = compoundParts(options.parts, hulls);
+    size = [];
   } else if (options.shape === 'voxels') {
     const { cells, size: cell = [1, 1, 1] } = options;
     if (!(cells instanceof Int32Array) || cells.length % 3)
@@ -240,7 +250,7 @@ export function kernelCollider(
     voxels = voxelVolume(cells, cell);
     size = [hulls.addVoxels(cells, cell)];
   } else
-    throw new TypeError(`Unknown shape ${options.shape}; use box, sphere, capsule, cylinder, cone, convexHull, trimesh, heightfield, compound or voxels.`);
+    throw new TypeError(`Unknown shape ${options.shape}; use box, sphere, capsule, cylinder, cone, convexHull, trimesh, heightfield, compound, convexDecomposition or voxels.`);
   const offset = options.offset ?? [0, 0, 0];
   checkVec(offset, 'Collider offset');
   const whole = (): number =>

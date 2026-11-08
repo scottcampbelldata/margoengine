@@ -113,7 +113,7 @@ console.log(car.speed, car.wheel(0).inContact, polyline.length);
   ```
 
 - **Compound colliders.** `{shape: 'compound', parts}` welds boxes, spheres, capsules, cylinders, cones and convex hulls, each with its own `offset` and `rotation`, into one collider: one handle, one contact pair per touching body, one set of material and filter settings. Parts are never fitted to the mesh, so each gives its size. For separate colliders with their own events, pass an array to `colliders` instead.
-- **Convex decomposition.** `{shape: 'convexDecomposition'}` splits a concave triangle mesh (`geometry`, or `vertices` and `indices`, or the body's mesh) into convex pieces with Rapier's V-HACD, so a dynamic cup stays hollow where a `convexHull` fills it in. `addModel(model, {shape: 'convexDecomposition'})` does it per primitive. It costs more to build than a hull; build it once and reuse the body.
+- **Convex decomposition.** `{shape: 'convexDecomposition'}` splits a concave triangle mesh (`geometry`, or `vertices` and `indices`, or the body's mesh) into convex pieces with Rapier's V-HACD, or takes the `parts` of the own `convexDecomposition` (see the own solver preview), so a dynamic cup stays hollow where a `convexHull` fills it in. `addModel(model, {shape: 'convexDecomposition'})` does it per primitive. It costs more to build than a hull; build it once and reuse the body.
 - **Vehicles.** `new Vehicle(physics, chassis, {wheels})` wraps Rapier's ray-cast vehicle controller around a dynamic chassis. Each wheel casts its suspension along `direction` (default down) from its `position` every fixed step. `engineForce` (driven wheels), `steering` (radians around the chassis up axis, positive turns a +Z-facing car toward +X) and `brake` act on the wheels marked `drive` (default true), `steer` (default false) and `brake` (default true); `setInput({throttle, steer, brake})` maps normalized input onto `maxEngineForce` (default the chassis mass in newtons per driven wheel, so four driven wheels accelerate at 0.4 g), `maxSteeringAngle` (0.5 rad) and `maxBrakeForce` (0.05 x the mass). Throttle wakes a sleeping chassis. `speed` is the forward speed in m/s, `wheel(i)` the contact, suspension and spin state, and `wheelLocalPose(i)` the hub pose that wheel `mesh`es (children of the chassis mesh) receive after every sync. Suspension and tyre settings default to Rapier's values. `vehicle.dispose()` (or removing the chassis) removes the controller. Ropes and vehicles step and dispose with their world, and the `Physics` class never imports them, so a bundle that does not use them leaves them out.
 
 ## How it works
@@ -680,6 +680,39 @@ console.log(world.hash === before);    // true: stepping again gives the same ru
 ```
 
 Same calls in the same order with the same kernel build give bit-equal worlds. `world.hash` is a fingerprint of every byte of a world, and the replay test holds it equal over 10,000 steps in Node, native code, Chromium and Firefox. `world.setPose`, `world.setTarget` and `world.setLocks` are the checked ways to write a pose, a kinematic target and locked axes.
+
+A concave mesh for a dynamic body goes through `convexDecomposition` from `margoengine/physics/decomposition`, its own entry, so a game that never decomposes never loads it. It takes a closed mesh (`vertices` and `indices`, or a geometry; equal positions are welded when the mesh is only closed after that, and one wound inside out is turned) and returns `{shape: 'convexDecomposition', parts, concavity}`, which is a collider on this entry and on the root one. It is the method of Wei, Liu, Ling and Su (ACM TOG 2022, CoACD): a part is cut by the axis plane a tree search over the next four cuts likes best, until each part's concavity, the larger of the widest gap between the part's surface and its hull's and 0.3 times the radius of a ball with the volume the hull adds, is under `concavity`, a share of the mesh's largest side (default 0.05); then neighbours that share a whole cut face merge while they stay under it. `maxConvexHulls` (default 64) caps the parts, cutting the least convex first; `planes` (20 per axis), `iterations` (500), `depth` (4) and `merge` (true) are the paper's settings; `seed` (0) makes a result repeat bit for bit; `timeLimit` (60,000 ms) stops it with a `timeout` `MargoError`, never a half-done answer. It is build-time work, seconds for a thousand triangles, so decompose once and keep the parts. `decompositionConcavity(mesh, parts)` scores any set of convex parts by the paper's measure, Rapier's included.
+
+```ts
+import {Physics} from 'margoengine/physics/next';
+import {convexDecomposition} from 'margoengine/physics/decomposition';
+
+// An open box, 2 m wide and 1 m tall with 0.1 m walls, as five slabs: the floor and four walls.
+const vertices = [],
+  indices = [];
+for (const [x0, y0, z0, x1, y1, z1] of [
+  [-1, 0, -1, 1, 0.1, 1],
+  [-1, 0, -1, -0.9, 1, 1],
+  [0.9, 0, -1, 1, 1, 1],
+  [-1, 0, -1, 1, 1, -0.9],
+  [-1, 0, 0.9, 1, 1, 1],
+]) {
+  const base = vertices.length / 3;
+  for (let i = 0; i < 8; i++) vertices.push(i & 4 ? x1 : x0, i & 2 ? y1 : y0, i & 1 ? z1 : z0);
+  for (const [a, b, c, d] of [[0, 1, 3, 2], [4, 6, 7, 5], [0, 4, 5, 1], [2, 3, 7, 6], [0, 2, 6, 4], [1, 5, 7, 3]])
+    indices.push(base + a, base + b, base + c, base + a, base + c, base + d);
+}
+const box = convexDecomposition({vertices, indices});
+
+await Physics.load();
+const physics = new Physics(null);
+physics.addBody(null, {type: 'fixed', position: [0, -0.5, 0], colliders: {shape: 'box', halfExtents: [20, 0.5, 20]}});
+physics.addBody(null, {colliders: box});
+const marble = physics.addBody(null, {position: [0, 2, 0], colliders: {shape: 'sphere', radius: 0.2}});
+for (let i = 0; i < 300; i++) physics.step();
+console.log(box.parts.length, marble.position[1].toFixed(2)); // 8 0.33: inside the box, not on a lid
+physics.dispose();
+```
 
 ## Limits
 

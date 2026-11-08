@@ -822,6 +822,11 @@ Sweep record: every package's tests and browser or GPU tests on the Mac mini (M6
 Measured but not fixed. Their history, sources and rerun commands are in
 [whitepaper/perf-history.md](whitepaper/perf-history.md#open-losses).
 
+- **Own convex decomposition builds 5 to 120 times slower than Rapier's V-HACD** (`@margoengine/physics/decomposition`,
+  perf history entry 81): repro `node packages/physics/scripts/decomposition-vs-rapier.mjs` after the physics build;
+  cause, measured: the paper's tree search cuts and hulls every trial piece (60 percent of the time in Quickhull), in
+  TypeScript. Fix planned with batch 129's decomposition row.
+
 - **three.js `InstancedMesh` against Margo's instanced paths:** partly closed on 2026-10-25 (culled pipeline, one
   upload per frame, GPU spheres, untextured materials); `CulledInstances` now leads on static boxes at 10k and 50k.
   The three gaps still open are the entries below.
