@@ -71,6 +71,64 @@ const placement = BiomePlacement.attach(world, { exclusions: pathExclusions(path
   carved ground, and `saveWorld` writes the paths into the saved heights (still format version 1; a saved world without
   paths loads as before).
 
+## Villages and the roads between them
+
+`layoutSettlements(world, options)` (entry `@margoengine/biomes/settlements`) lays out the paths for you: villages on
+good sites, roads between them that follow the terrain, lanes inside each village and the houses along them. The result
+is plain data: `paths` (roads, then lanes) go to `carvePaths` and `paintPaths` above, `exclusions` (the paths with
+their edges as verges, and each house with its yard) clear the trees and shrubs off them, and `villages` hold each
+house's corners and floor height for your own building meshes.
+
+```ts
+import { BiomeWorld } from '@margoengine/biomes';
+import { BiomePlacement } from '@margoengine/biomes/placement';
+import { layoutSettlements } from '@margoengine/biomes/settlements';
+import { carvePaths } from '@margoengine/biomes/splines';
+
+const probe = await BiomeWorld.create(); // the land the layout reads
+const town = layoutSettlements(probe, { villages: 3, houses: 16 });
+const world = await BiomeWorld.create({ height: carvePaths(town.paths) }); // the same land, roads flattened in
+const placement = BiomePlacement.attach(world, { exclusions: town.exclusions }); // no tree on a road or a house
+console.log(town.villages.length, town.roads.length, town.villages[0]?.houses.length); // 3 2 8 on the default world
+```
+
+| Setting | Default | What it does |
+| --- | --- | --- |
+| `villages` | 3 | most villages, 0 to 64; fewer when the land has no more sites |
+| `sites` | none | your own village centres `[x, z]` in metres (up to 64), used instead of the site search |
+| `spacing` | 800 | least distance between village centres in metres, 50 to 100,000 |
+| `houses` | 16 | most houses a village, 0 to 256 |
+| `cell` | 16 | side of the grid the sites and roads are found on, metres, 2 to 256 (at most 4,194,304 cells) |
+| `maxGrade` | 0.12 | steepest road grade, rise over run, before a step costs 20 times more (a switchback) |
+| `siteGrade` | 0.08 | steepest ground under a village site or a house lot |
+| `bridge` | 8 | cost of a road cell over a river, a multiple of a dry one |
+| `detour` | 1.6 | a link beyond the spanning tree joins two villages whose tree way is longer than this times the direct one |
+| `road`, `lane` | width 5, edge 3, Catmull-Rom; width 3, edge 1.5, polyline | path settings (`biome`, `mask`, `carve` and the rest), mask `'roads'` |
+| `yard` | 4 | metres kept clear around each house |
+| `seed` | 1 | the jitter of the site scores and the house sizes |
+
+- **Sites.** Grid points on dry land, above sea level and off the rivers, whose ground and eight neighbours stay under
+  `siteGrade`. They score by flatness, by nearness to water (best 30 to 400 m from a river or the coast; closer floods)
+  and by lowness, plus a small seeded jitter, and the best ones at least `spacing` apart become villages.
+- **Roads.** A minimum spanning tree over the villages (Prim), plus the shortest links whose way through the tree is
+  longer than `detour` times the direct one. Each link is an A* least-cost path over the grid: a step costs its length
+  times 1 + (grade / `maxGrade`)^2, 20 times that past `maxGrade`, `bridge` times over a river and half on a road
+  already built, so later roads join earlier ones; the sea is never crossed, so two islands get no road. The cells are
+  thinned by Douglas-Peucker to within 0.75 of a cell and drawn as a Catmull-Rom curve. A road goes round a ridge
+  through its pass and crosses a river once, on a short bridge.
+- **Houses.** Lanes leave each village along its roads and, up to six, between them; houses take lots on both sides
+  every 13 m out to 14 + 7 sqrt(`houses`) metres, 7 to 10 m wide and 6 to 9 m deep, facing the lane. A lot is kept when
+  its corners stand on dry land, its ground varies by less than `siteGrade` over its size, and it keeps clear of the
+  roads and their edges, of the other lanes and of every other house. A lane along a road is the road itself.
+- **Same layout everywhere.** The decisions use only + - * / and square roots, which IEEE 754 rounds the same way on
+  every engine, integer hashes for the jitter, integer CORDIC for the lane angles and a heap that breaks ties by cell, so
+  the same world and options give the same JSON on every machine.
+- **Cost.** About 1.4 s on the busy Beelink for the default 4 km world at the 16 m cell (66,049 height reads, three
+  villages; diagnostic, not a timed result). The work grows with the cells and with the links: each link is one search.
+
+`tests/settlements.test.js` checks the site choice, the pass, the bridge, the sea, the network, the lots, the placement
+exclusions on a real world and the same bytes.
+
 ## Same bytes everywhere
 
 Every value is integer millimetres or Q16 with floors: quantised points, the integer curve bases, distances from a

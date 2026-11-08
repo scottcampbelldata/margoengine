@@ -125,6 +125,10 @@
     "./splines": {
       "types": "./dist/splines.d.ts",
       "import": "./dist/splines.js"
+    },
+    "./settlements": {
+      "types": "./dist/settlements.d.ts",
+      "import": "./dist/settlements.js"
     }
   },
   "files": [

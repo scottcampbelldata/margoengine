@@ -266,6 +266,10 @@
       "types": "./dist/biomes/splines.d.ts",
       "import": "./dist/biomes/splines.js"
     },
+    "./biomes/settlements": {
+      "types": "./dist/biomes/settlements.d.ts",
+      "import": "./dist/biomes/settlements.js"
+    },
     "./blender": {
       "types": "./dist/blender.d.ts",
       "import": "./dist/blender.js"
