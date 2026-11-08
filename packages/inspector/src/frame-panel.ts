@@ -76,6 +76,20 @@ export class FramePanel {
       for (const pass of entry.passes) node.append(this.pass(pass, report.pipelines));
       body.append(node);
     }
+    const plugins = this.details(`Plugins (${report.plugins.length})`);
+    plugins.append(
+      this.table(
+        ['Plugin', 'Scene', 'Order', 'Passes', 'onPreUpdate'],
+        report.plugins.map((p) => [
+          p.name,
+          p.scene,
+          String(p.order),
+          String(p.passes),
+          p.preUpdateMilliseconds === null ? 'none' : ms(p.preUpdateMilliseconds),
+        ]),
+      ),
+    );
+    body.append(plugins);
     const pipelines = this.details(`Pipelines (${report.pipelines.length})`);
     pipelines.append(
       this.table(

@@ -121,3 +121,26 @@ editor still work there. Neither core nor the stage facade is modified.
 With engine views, the debug helpers show in each view for the meshes that view draws (its culling and layers), the tree lists the meshes of the inspector's scene (`scene.use(inspector)` for another scene), and a frame capture lists every pass once per view with `view` (id, rectangle, scene); scenes created after a capture starts appear from the next capture. `select(mesh)` selects an entity. `setDebug('wireframe' | 'normals' | 'bounds' | 'lights', true)`
 toggles a scene overlay. `dispose()` releases the DOM, timer, GPU resources and
 registered passes; engine disposal also performs this cleanup.
+
+## Plugin and pass view
+
+`margoengine/inspector/frame` records one frame. Its report lists every attached plugin in attach order with the
+frame graph passes it registered and the time its `onPreUpdate` took in that frame, and every frame graph pass with
+its owner, order and CPU and GPU cost. The panel shows both.
+
+```ts
+import {FrameDebugger} from 'margoengine/inspector/frame';
+import type {EngineKernel} from 'margoengine/core';
+async function pluginCosts(engine: EngineKernel) {
+  const debug = FrameDebugger.attach(engine, {parent: null});   // null: no panel
+  const report = await debug.capture({render: true});
+  for (const p of report.plugins) console.log(p.scene, p.order, p.name, p.passes, p.preUpdateMilliseconds);
+  for (const pass of report.graph) console.log(pass.owner, pass.order, pass.name, pass.cpuMilliseconds, pass.gpuMilliseconds);
+  debug.dispose();
+  return report.plugins;
+}
+```
+
+`preUpdateMilliseconds` is null for a plugin with no `onPreUpdate` and for a frozen one (its hook cannot be wrapped);
+a plugin of a scene the frame did not draw shows 0. The hooks are wrapped only for the captured frame. Plugins and
+scenes added during the frame show from the next capture. Frame capture needs WebGPU.

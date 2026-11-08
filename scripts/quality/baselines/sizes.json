@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11350671,
+  "total": 11351005,
   "history": [
     {
       "date": "2026-10-24",
@@ -4622,6 +4622,12 @@
       "commit": "1d6d8a762",
       "reason": "flipbook frame blending: new entry @margoengine/vfx/flipbook, carried by the root VFX with every feature",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "4cd232bda",
+      "reason": "inspector frame report lists plugins",
+      "grew": 1
     }
   ],
   "items": {
@@ -4945,7 +4951,7 @@
     "@margoengine/input/players": 5248,
     "@margoengine/input/replay": 1713,
     "@margoengine/inspector": 9302,
-    "@margoengine/inspector/frame": 8897,
+    "@margoengine/inspector/frame": 9231,
     "@margoengine/inspector/history": 1101,
     "@margoengine/inspector/packages": 4990,
     "@margoengine/inspector/resources": 902,

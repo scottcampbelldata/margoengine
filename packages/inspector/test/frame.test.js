@@ -728,3 +728,70 @@ test('texture size estimate covers mips, layers, samples and block formats', () 
     (128 * 128) / 4,
   );
 });
+
+test('capture lists every plugin in attach order with its pass count and onPreUpdate time, and restores the hooks', async (t) => {
+  const gpu = fakeGPU(t),
+    dom = new JSDOM('<body></body>');
+  t.after(() => dom.window.close());
+  const engine = await EngineKernel.create(gpu.canvas, { capacity: 4, backend: 'webgpu' });
+  t.after(() => engine.dispose());
+  const debug = FrameDebugger.attach(engine, { parent: dom.window.document.body });
+  t.after(() => debug.dispose());
+  engine.createMesh().setGeometry(box());
+  engine.use(effect());
+  const deltas = [],
+    slowHook = function (delta) {
+      deltas.push(delta);
+      const start = performance.now();
+      while (performance.now() - start < 2);
+    },
+    slow = {
+      name: 'slow',
+      setup() {},
+      onPreUpdate: slowHook,
+      registerPasses(graph) {
+        graph.add({ name: 'slow:a', order: 20, execute() {} });
+        graph.add({ name: 'slow:b', order: 30, execute() {} });
+      },
+    },
+    frozenCalls = [],
+    frozen = Object.freeze({ name: 'frozen', setup() {}, onPreUpdate: (delta) => frozenCalls.push(delta) });
+  engine.use(slow);
+  engine.use(frozen);
+  const other = engine.createScene('side');
+  engine.use({ name: 'idle', setup() {}, onPreUpdate() {} }, other);
+  const report = await debug.capture({ render: true });
+  const rows = report.plugins.map(({ preUpdateMilliseconds, ...row }) => ({
+    ...row,
+    timed: preUpdateMilliseconds !== null,
+  }));
+  assert.deepEqual(rows, [
+    { name: 'frame-debugger', scene: 'default', order: 0, passes: 0, timed: false },
+    { name: 'fx', scene: 'default', order: 1, passes: 1, timed: false },
+    { name: 'slow', scene: 'default', order: 2, passes: 2, timed: true },
+    { name: 'frozen', scene: 'default', order: 3, passes: 0, timed: false },
+    { name: 'idle', scene: 'side', order: 0, passes: 0, timed: true },
+  ]);
+  const byName = Object.fromEntries(report.plugins.map((p) => [p.name, p]));
+  assert.equal(deltas.length, 1, 'core ran the slow hook once in the captured frame');
+  assert.ok(
+    byName.slow.preUpdateMilliseconds >= 2,
+    `slow onPreUpdate measured ${byName.slow.preUpdateMilliseconds} ms`,
+  );
+  assert.equal(byName.idle.preUpdateMilliseconds, 0, 'a scene not drawn this frame ran no hook');
+  assert.equal(frozenCalls.length, 1, 'a frozen plugin still runs, untimed');
+  assert.equal(
+    report.graph.filter((entry) => entry.owner === 'slow').length,
+    byName.slow.passes,
+    'the pass count matches the graph entries it owns',
+  );
+  assert.equal(slow.onPreUpdate, slowHook, 'the hook is restored after the capture');
+  assert.equal(JSON.parse(JSON.stringify(report.plugins)).length, 5, 'plain JSON');
+  const measured = byName.slow.preUpdateMilliseconds;
+  engine.render();
+  assert.equal(deltas.length, 2);
+  assert.equal(byName.slow.preUpdateMilliseconds, measured, 'a frame after the capture adds nothing to its report');
+  const panel = dom.window.document.querySelector('[data-margo-frame-debugger]').shadowRoot;
+  assert.match(panel.textContent, /Plugins \(5\)/);
+  assert.match(panel.textContent, /slow.*default.*2.*2/);
+});

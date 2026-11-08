@@ -90,6 +90,7 @@ export interface FrameReport {
     cpuMilliseconds: number;
     gpuMilliseconds: number | null;
     graph: FramePassReport[];
+    plugins: PluginReport[];
     pipelines: PipelineReport[];
     bindGroups: BindGroupReport[];
     totals: {
@@ -163,6 +164,14 @@ export interface PipelineReport {
     samples?: number;
     textures: number;
     samplers: number;
+}
+
+export interface PluginReport {
+    name: string;
+    scene: string;
+    order: number;
+    passes: number;
+    preUpdateMilliseconds: number | null;
 }
 
 export interface TextureReport {

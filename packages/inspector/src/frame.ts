@@ -141,6 +141,22 @@ export interface MemoryReport {
   largest: Array<{ kind: 'buffer' | 'texture'; label: string; bytes: number }>;
 }
 
+/** One plugin attached when the capture started, in attach order per scene. */
+export interface PluginReport {
+  name: string;
+  /** Name of the scene it is attached to. */
+  scene: string;
+  /** Attach order within its scene, from 0. */
+  order: number;
+  /** Frame graph passes it registered (listed in `graph` with it as `owner`). */
+  passes: number;
+  /**
+   * Time spent in its `onPreUpdate` during the captured frame, summed over every call; null when it has none or the
+   * hook cannot be wrapped (a frozen plugin).
+   */
+  preUpdateMilliseconds: number | null;
+}
+
 /** Everything `FrameDebugger.capture()` recorded for one frame; plain JSON. */
 export interface FrameReport {
   /** `gpu` when pass times come from timestamp queries, else `cpu` (encode time). */
@@ -149,6 +165,8 @@ export interface FrameReport {
   cpuMilliseconds: number;
   gpuMilliseconds: number | null;
   graph: FramePassReport[];
+  /** Plugins of every scene at the start of the capture (one attached during the frame is not listed). */
+  plugins: PluginReport[];
   pipelines: PipelineReport[];
   bindGroups: BindGroupReport[];
   totals: {
@@ -344,6 +362,7 @@ class Session {
   readonly before: RawGraphPass = { name: '(before frame graph)', owner: 'engine', order: null, cpu: 0, passes: [] };
   readonly after: RawGraphPass = { name: '(after frame graph)', owner: 'engine', order: null, cpu: 0, passes: [] };
   readonly graph: RawGraphPass[] = [];
+  readonly plugins: PluginReport[] = [];
   current = this.before;
   main?: GPUCommandEncoder;
   encoders = 0;
@@ -761,6 +780,48 @@ export class FrameDebugger implements EnginePlugin {
     }, reject);
   }
 
+  // Each plugin's onPreUpdate is wrapped for the captured frame: core calls it inside render, before the frame graph.
+  private instrumentPlugins(
+    session: Session,
+    scene: string,
+    plugins: ReadonlyMap<string, EnginePlugin>,
+    records: readonly GraphRecord[],
+  ): void {
+    let order = 0;
+    for (const [name, plugin] of plugins) {
+      const report: PluginReport = {
+        name,
+        scene,
+        order: order++,
+        passes: records.filter((record) => record.owner === name).length,
+        preUpdateMilliseconds: null,
+      };
+      session.plugins.push(report);
+      if (typeof plugin.onPreUpdate !== 'function') continue;
+      let unpatch: Unpatch<EnginePlugin>;
+      try {
+        unpatch = patch(
+          plugin,
+          'onPreUpdate',
+          (original) =>
+            function (this: EnginePlugin, delta: number): void {
+              if (!session.live) return original!.call(this, delta);
+              const start = performance.now();
+              try {
+                original!.call(this, delta);
+              } finally {
+                report.preUpdateMilliseconds = (report.preUpdateMilliseconds ?? 0) + performance.now() - start;
+              }
+            },
+        );
+      } catch {
+        continue; // A frozen plugin: listed, not timed.
+      }
+      report.preUpdateMilliseconds = 0;
+      hold(session.unpatch, plugin, unpatch);
+    }
+  }
+
   private instrument(session: Session, engine: Engine, device: GPUDevice): void {
     const self = this,
       keep = <T>(target: T, unpatch: Unpatch<T>): void => hold(session.unpatch, target, unpatch);
@@ -768,6 +829,7 @@ export class FrameDebugger implements EnginePlugin {
     // runs each view's scene graph once per view.
     for (const scene of engine.scenes) {
       const graph = scene.frameGraph;
+      this.instrumentPlugins(session, scene.name, scene.plugins, graphPasses(graph));
       keep(
         graph,
         patch(
@@ -1439,6 +1501,7 @@ export class FrameDebugger implements EnginePlugin {
       cpuMilliseconds: session.cpu,
       gpuMilliseconds: gpu ? graph.reduce((sum, entry) => sum + (entry.gpuMilliseconds ?? 0), 0) : null,
       graph,
+      plugins: session.plugins,
       pipelines,
       bindGroups: [...groupIds.values()],
       totals,

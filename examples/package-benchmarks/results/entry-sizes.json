@@ -1,10 +1,10 @@
 {
-  "commit": "58e0787d7",
+  "commit": "4cd232bda",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
     "raw": 58443,
-    "gzip": 23590,
+    "gzip": 23626,
     "limit": 25000
   },
   "packages": {
@@ -597,17 +597,17 @@
     "@margoengine/core": {
       ".": {
         "raw": 51214,
-        "gzip": 21258
+        "gzip": 21285
       },
       "./extension": {
-        "raw": 51313,
-        "gzip": 21323
+        "raw": 51315,
+        "gzip": 21311
       }
     },
     "@margoengine/creative": {
       ".": {
-        "raw": 61586,
-        "gzip": 19100
+        "raw": 62200,
+        "gzip": 19154
       },
       "./particles": {
         "raw": 1028,
@@ -626,16 +626,16 @@
         "gzip": 7019
       },
       "./grass": {
-        "raw": 16111,
-        "gzip": 5944
+        "raw": 16377,
+        "gzip": 5961
       },
       "./planet": {
-        "raw": 20730,
-        "gzip": 7011
+        "raw": 20958,
+        "gzip": 7027
       },
       "./stars": {
-        "raw": 6033,
-        "gzip": 2653
+        "raw": 6153,
+        "gzip": 2665
       }
     },
     "@margoengine/culling": {
@@ -1350,8 +1350,8 @@
         "gzip": 9045
       },
       "./frame": {
-        "raw": 23776,
-        "gzip": 8738
+        "raw": 24606,
+        "gzip": 8962
       },
       "./history": {
         "raw": 1962,
@@ -2788,8 +2788,8 @@
     },
     "@margoengine/stage": {
       ".": {
-        "raw": 7314,
-        "gzip": 2966
+        "raw": 7318,
+        "gzip": 2974
       },
       "./gltf": {
         "raw": 2922,
@@ -3120,12 +3120,12 @@
     },
     "@margoengine/vfx": {
       ".": {
-        "raw": 86315,
-        "gzip": 26715
+        "raw": 88334,
+        "gzip": 27335
       },
       "./base": {
-        "raw": 33964,
-        "gzip": 11163
+        "raw": 33975,
+        "gzip": 11170
       },
       "./obstacles": {
         "raw": 2388,
@@ -3186,6 +3186,10 @@
       "./skinned": {
         "raw": 4296,
         "gzip": 2058
+      },
+      "./flipbook": {
+        "raw": 2064,
+        "gzip": 911
       }
     },
     "@margoengine/video": {
@@ -3555,9 +3559,9 @@
       "brotli": 8574
     },
     "packages/creative/dist/particles.js": {
-      "raw": 44514,
-      "gzip": 15084,
-      "brotli": 13487
+      "raw": 44525,
+      "gzip": 15091,
+      "brotli": 13514
     },
     "packages/creative/dist/post.js": {
       "raw": 19250,
