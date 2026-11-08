@@ -333,6 +333,7 @@ test('point and shape overlaps find the same bodies as Rapier', () => {
     next = random(13),
     indices = (list, bodies) => list.map((body) => bodies.indexOf(body)).sort((a, b) => a - b);
   let found = 0,
+    fields = 0,
     missed = 0;
   // A point or a small shape dropped at random meets one of the 32 bodies about one time in twelve, so 1,200 drops.
   for (let i = 0; i < 1200; i++) {
@@ -352,6 +353,7 @@ test('point and shape overlaps find the same bodies as Rapier', () => {
       if (Math.hypot(...sub(point, rapierBodies[index].position)) > 3.5) continue;
       const exact = reference(rapierBodies[index], index, shape, point, rotation, [0, 1, 0], { maxDistance: 0 }) === 0;
       assert.equal(shapes.includes(index), exact, `shape ${i} at ${point}: the own overlap with height field ${index}`);
+      if (exact) fields++;
     }
     for (const index of extra) {
       assert.ok(index % sceneShapes.length === 5 && shape.shape !== 'sphere', `shape ${i} at ${point}: an own overlap with body ${index} that Rapier does not find`);
@@ -361,7 +363,9 @@ test('point and shape overlaps find the same bodies as Rapier', () => {
     found += mine.length + shapes.length;
   }
   assert.ok(found > 60, `too few overlaps to mean anything: ${found}`);
-  assert.ok(missed > 0, 'Rapier now finds every height-field overlap; drop the allowance for it and update the parity rows');
+  // Rapier's count for this seed, pinned so the record stays exact: it misses every one of the height-field overlaps
+  // with a box, capsule or hull. A change means Rapier changed; update the parity rows and this count with it.
+  assert.deepEqual({ fields, missed }, { fields: 30, missed: 17 }, 'height-field overlaps found by the exact reference, and missed by Rapier');
 });
 
 test('stopAtPenetration and the filter act as Rapier documents them', () => {
