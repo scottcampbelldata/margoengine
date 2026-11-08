@@ -2600,7 +2600,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-464). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-465). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -4375,6 +4375,7 @@ answers from the docs of the version you installed, and it type-checks code agai
 | `check_snippet` | Type-check a snippet strictly against the installed packages. |
 | `port_to_margo` | Map a three.js class or task (`OrbitControls`, `InstancedMesh`, "shadow map") to the Margo package and calls, with status, limits and both libraries' code, from the [parity matrix](threejs-parity.md) and [Coming from three.js](from-threejs.md). |
 | `explain_error` | Explain a pasted Margo error (the message, its `errors#<id>` link, the id or the `MargoError` code) with its cause and fix from the [error help page](https://margoengine.com/errors). |
+| `render_snippet` | Only with `--render`: run a snippet on the GPU in Node and see the PNG it draws. Needs `@margoengine/headless`, `@margoengine/stage` and `webgpu` in the project; runs code with your rights. |
 
 Setup (full steps in the [package README](../packages/mcp/README.md)):
 
@@ -4406,11 +4407,11 @@ This project uses Margo Engine (WebGPU). Docs for AI: https://margoengine.com/ll
 
 ## What the tools cannot do
 
-- **Render a scene to an image.** The MCP server has no screenshot tool: the repository's browser harness depends on
-  Playwright, a Vite dev server and a real GPU under the shared GPU lock, which a published package cannot ship. Use
-  `npm run visual:check` in a checkout.
-- **Run your code.** `check_snippet` only compiles. It catches wrong names, arguments and missing awaits, not wrong
-  pictures.
+- **Render without a GPU binding or a browser page.** `render_snippet` draws in Node through the `webgpu` binding,
+  so it needs that package and a GPU (or a software adapter through `gpuFlags`). Code that needs a page (DOM input,
+  `createStage('#canvas')`, a frame loop) does not run there: write the snippet against the stage it is given.
+- **Run your code by default.** `check_snippet` only compiles; `render_snippet`, which runs code, is offered only when
+  the server is started with `--render`.
 - **Port by meaning.** `port_to_margo` matches the words and name parts of the matrix rows. A class the matrix does not
   list gets no row; the answer says so and points at `search_docs`.
 - **Know a package you have not installed.** `check_snippet` resolves imports from your `node_modules`; an import of a
@@ -10798,42 +10799,46 @@ the answers match your code, not the latest page on the web. The same material i
 | `check_snippet` | Type-checks TypeScript, TSX or JavaScript against the real package types in your project, strict, with your own `typescript`. The snippet is compiled, never run. Returns line, column, code and message for each problem. |
 | `port_to_margo` | Maps a class, function or task of another 3D library (`OrbitControls`, `InstancedMesh`, `EffectComposer`, "shadow map") to the Margo package and calls that do the same job: status (COVERED, PARTIAL, MISSING, NOT PLANNED), limits, and that library's code next to the Margo code where the porting guide has a section. From `@margoengine/mcp/porting`. |
 | `explain_error` | Explains a Margo error and its fix from the [error help page](https://margoengine.com/errors). Takes the whole message (each ends with `; see https://margoengine.com/errors#<id>`), that link, the id or the `MargoError` code. From `@margoengine/mcp/error-codes`. |
+| `render_snippet` | Only with `--render`. Runs a snippet in Node on your GPU (through `@margoengine/headless` and the `webgpu` binding) and returns the picture as PNG image content. From `@margoengine/mcp/render`. |
 
-Rendering a scene to a PNG is not a tool. The repository's browser harness needs Playwright, a Vite dev server and a
-real GPU behind the shared GPU lock, none of which a published package can bring along, and a scene needs a bundler
-step before any browser can load it. Use the visual checks in the repository (`npm run visual:check`) for pictures.
+## Render a snippet
 
-## Porting guide
+`render_snippet` lets a model see what its code draws. It runs the snippet in a child Node process on the machine's
+GPU, with no page: a headless stage from `@margoengine/headless/stage` on the project's own `webgpu` binding. The
+snippet is a module whose default export takes that stage; the tool answers with the PNG as image content and the
+snippet's console output.
 
-`port_to_margo` reads the parity matrix and the "Coming from" guide in the repository's `docs/` (one row per
-feature of the other library, 195 rows today), copied into the package at build time, so a model converting code
-gets the Margo package, the calls, the status and the worked code in one answer. The library the guide compares
-comes from the docs: a docs page with a `## Matrix` table whose columns are `<library> | Status | Margo | Shows it |
-Notes` is a guide, and the page titled `Coming from <library>` gives its code sections. The lookup is also an entry
-of its own, `@margoengine/mcp/porting`:
-
-```ts
-import { formatPorting, loadPortingGuides, lookupPorting } from '@margoengine/mcp/porting';
-
-const [guide] = await loadPortingGuides(); // the guides the package ships
-const matches = lookupPorting(guide, 'OrbitControls', 2); // a class name, NS.ClassName or a task such as "shadow map"
-for (const { row, section } of matches) console.log(row.status, row.from, '->', row.margo, section?.title ?? '');
-console.log(formatPorting(guide, 'OrbitControls', matches)); // the text the tool returns
+```sh
+npm i -D @margoengine/headless @margoengine/stage webgpu
+claude mcp add margoengine -- npx -y @margoengine/mcp --render
 ```
 
-| Function | Default | |
+The tool runs code with your rights, like `node` would, so the server offers it only when started with `--render`.
+The snippet's imports resolve from the project (`--root`, or the folder the client starts the server in, or the
+nearest folder above it with those packages), so stage feature entries such as `@margoengine/stage/sky` work. The run
+folder lives in `node_modules/.cache/margoengine-mcp` and is removed after each run. The same call from code:
+
+```ts
+import { writeFile } from 'node:fs/promises';
+import { renderSnippet } from '@margoengine/mcp/render';
+
+const snippet = `export default (stage) => {
+  stage.box({ color: '#84d6bd' });
+  stage.fit(); // nothing is in view until the camera is placed
+};`;
+const result = await renderSnippet(snippet, { width: 320, height: 200, language: 'js' });
+await writeFile('snippet.png', result.png);
+console.log(result.drawnPixels, 'pixels drawn in', result.ms, 'ms');
+```
+
+| Option | Default | |
 | --- | --- | --- |
-| `loadPortingGuides(file?, signal?)` | the guides the package ships (`dist/porting.json`) | Reads the guides; a missing file is a `failed` error. |
-| `lookupPorting(guide, query, limit?)` | 5 rows (1 to 25) | Best rows first; a name in the row counts more than a word in its notes, the exact name most. |
-| `parsePortingGuide(matrix, guide?, sources?)` | no guide sections, no paths | Parses one matrix page and its guide page. |
-| `portingGuidesFromCorpus(corpus)` | | Every guide in a docs corpus. |
-| `createPortingTool(guides)` | | The `port_to_margo` tool; the first guide is the default `from`. |
-| `createMargoServer({ porting })` | the guides the package ships | Guides the server's tool answers from. |
-
-Matching is by words and name parts, not meaning: ask with the other library's class name or a short task. A name
-the matrix does not list gets no row, and the answer says so and points at `search_docs`.
-
-## Error lookup
+| `projectRoot` | the current directory | Where the snippet's imports resolve: this folder or the nearest one above it whose `node_modules` has `@margoengine/headless`, `@margoengine/stage` and `webgpu`. |
+| `width`, `height` | 512, 512 | Image size, 16 to 2048. |
+| `language` | `ts` | `ts` has its types stripped (Node 22.13 or newer), not checked: run `check_snippet` first. `js` runs as written. |
+| `timeoutMs` | 60000 | 1000 to 300000; the process is killed after it. |
+| `gpuFlags` | none | Flags for the binding's `create`, for example `['adapter=Microsoft Basic Render Driver']`; `createMargoServer({ render: { gpuFlags } })` for the tool. |
+| `signal` | none | Abort to kill the run. |
 
 [README continues: https://margoengine.com/llms/packages/mcp.md]
 

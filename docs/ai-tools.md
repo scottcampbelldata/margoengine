@@ -34,6 +34,7 @@ answers from the docs of the version you installed, and it type-checks code agai
 | `check_snippet` | Type-check a snippet strictly against the installed packages. |
 | `port_to_margo` | Map a three.js class or task (`OrbitControls`, `InstancedMesh`, "shadow map") to the Margo package and calls, with status, limits and both libraries' code, from the [parity matrix](threejs-parity.md) and [Coming from three.js](from-threejs.md). |
 | `explain_error` | Explain a pasted Margo error (the message, its `errors#<id>` link, the id or the `MargoError` code) with its cause and fix from the [error help page](https://margoengine.com/errors). |
+| `render_snippet` | Only with `--render`: run a snippet on the GPU in Node and see the PNG it draws. Needs `@margoengine/headless`, `@margoengine/stage` and `webgpu` in the project; runs code with your rights. |
 
 Setup (full steps in the [package README](../packages/mcp/README.md)):
 
@@ -65,11 +66,11 @@ This project uses Margo Engine (WebGPU). Docs for AI: https://margoengine.com/ll
 
 ## What the tools cannot do
 
-- **Render a scene to an image.** The MCP server has no screenshot tool: the repository's browser harness depends on
-  Playwright, a Vite dev server and a real GPU under the shared GPU lock, which a published package cannot ship. Use
-  `npm run visual:check` in a checkout.
-- **Run your code.** `check_snippet` only compiles. It catches wrong names, arguments and missing awaits, not wrong
-  pictures.
+- **Render without a GPU binding or a browser page.** `render_snippet` draws in Node through the `webgpu` binding,
+  so it needs that package and a GPU (or a software adapter through `gpuFlags`). Code that needs a page (DOM input,
+  `createStage('#canvas')`, a frame loop) does not run there: write the snippet against the stage it is given.
+- **Run your code by default.** `check_snippet` only compiles; `render_snippet`, which runs code, is offered only when
+  the server is started with `--render`.
 - **Port by meaning.** `port_to_margo` matches the words and name parts of the matrix rows. A class the matrix does not
   list gets no row; the answer says so and points at `search_docs`.
 - **Know a package you have not installed.** `check_snippet` resolves imports from your `node_modules`; an import of a

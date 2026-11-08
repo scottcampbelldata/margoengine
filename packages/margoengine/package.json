@@ -1646,6 +1646,10 @@
       "types": "./dist/mcp/error-codes.d.ts",
       "import": "./dist/mcp/error-codes.js"
     },
+    "./mcp/render": {
+      "types": "./dist/mcp/render.d.ts",
+      "import": "./dist/mcp/render.js"
+    },
     "./mesh-edit": {
       "types": "./dist/mesh-edit.d.ts",
       "import": "./dist/mesh-edit.js"

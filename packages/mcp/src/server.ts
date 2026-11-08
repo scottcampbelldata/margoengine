@@ -32,9 +32,12 @@ export const RPC = {
   internal: -32603,
 } as const;
 
-/** What a tool returns: text for the model, and the same data as JSON for programs. */
+/** One block of a tool's answer: text, or an image as base64 with its media type. */
+export type ToolContent = { type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string };
+
+/** What a tool returns: text (or pictures) for the model, and the same data as JSON for programs. */
 export interface ToolResult {
-  content: { type: 'text'; text: string }[];
+  content: ToolContent[];
   structuredContent?: { [key: string]: Json };
   isError?: boolean;
 }

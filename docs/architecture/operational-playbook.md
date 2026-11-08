@@ -1315,3 +1315,6 @@ The following remain technical gaps, not permission to weaken a check:
     routines, a part per cell, with Catto's ghost rule on exposed faces. Proved: `kernel/tests/voxel.rs` (five tests
     fail with the rule switched off) and `tests/next-voxels.test.js` against Rapier 0.21. Missing: rays and casts, a tree
     or run-length walk for very large grids, and any browser run beyond the replay's hash.
+41. `render_snippet` (`@margoengine/mcp/render`, `packages/mcp/tests/render-gpu-check.mjs`, in `test:gpu`) is proved on the
+    RTX A6000 (Windows, D3D12 through `webgpu` 0.6.2) only: a box drawn and fitted shows green in the centre and an
+    empty snippet one colour. Missing: Metal and Vulkan runs, a software adapter, and the cost of a render per call.

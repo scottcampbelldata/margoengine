@@ -12,6 +12,7 @@ export type {
   McpServer,
   McpServerOptions,
   ToolContext,
+  ToolContent,
   ToolDefinition,
   ToolResult,
 } from './server.js';

@@ -708,6 +708,12 @@ export const entries = [
       'createErrorTool needs at least one entry',
       'error is required and must be a non-empty string',
       'limit must be from 1 to 10',
+      'render_snippet needs a non-empty code string',
+      'width and height are integers from 16 to 2048',
+      'timeoutMs is from 1000 to 300000',
+      'language is ts or js',
+      'gpuFlags is an array of strings',
+      'TypeScript snippets need Node 22.13 or newer; pass language js or update Node',
     ],
     cause:
       'A tool call got an argument it cannot use (a missing or empty string, a value outside the allowed list, a package or entry that does not exist), TypeScript is not installed in the project that check_snippet reads, the compiler did not run or ran out of time, the porting guides file (dist/porting.json) is missing from the install, or the server was disposed while a request was running. The server reports a tool failure as a result with isError set and the error code, so the model can read it and retry.',

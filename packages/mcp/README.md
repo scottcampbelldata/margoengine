@@ -24,10 +24,51 @@ the answers match your code, not the latest page on the web. The same material i
 | `check_snippet` | Type-checks TypeScript, TSX or JavaScript against the real package types in your project, strict, with your own `typescript`. The snippet is compiled, never run. Returns line, column, code and message for each problem. |
 | `port_to_margo` | Maps a class, function or task of another 3D library (`OrbitControls`, `InstancedMesh`, `EffectComposer`, "shadow map") to the Margo package and calls that do the same job: status (COVERED, PARTIAL, MISSING, NOT PLANNED), limits, and that library's code next to the Margo code where the porting guide has a section. From `@margoengine/mcp/porting`. |
 | `explain_error` | Explains a Margo error and its fix from the [error help page](https://margoengine.com/errors). Takes the whole message (each ends with `; see https://margoengine.com/errors#<id>`), that link, the id or the `MargoError` code. From `@margoengine/mcp/error-codes`. |
+| `render_snippet` | Only with `--render`. Runs a snippet in Node on your GPU (through `@margoengine/headless` and the `webgpu` binding) and returns the picture as PNG image content. From `@margoengine/mcp/render`. |
 
-Rendering a scene to a PNG is not a tool. The repository's browser harness needs Playwright, a Vite dev server and a
-real GPU behind the shared GPU lock, none of which a published package can bring along, and a scene needs a bundler
-step before any browser can load it. Use the visual checks in the repository (`npm run visual:check`) for pictures.
+## Render a snippet
+
+`render_snippet` lets a model see what its code draws. It runs the snippet in a child Node process on the machine's
+GPU, with no page: a headless stage from `@margoengine/headless/stage` on the project's own `webgpu` binding. The
+snippet is a module whose default export takes that stage; the tool answers with the PNG as image content and the
+snippet's console output.
+
+```sh
+npm i -D @margoengine/headless @margoengine/stage webgpu
+claude mcp add margoengine -- npx -y @margoengine/mcp --render
+```
+
+The tool runs code with your rights, like `node` would, so the server offers it only when started with `--render`.
+The snippet's imports resolve from the project (`--root`, or the folder the client starts the server in, or the
+nearest folder above it with those packages), so stage feature entries such as `@margoengine/stage/sky` work. The run
+folder lives in `node_modules/.cache/margoengine-mcp` and is removed after each run. The same call from code:
+
+```ts
+import { writeFile } from 'node:fs/promises';
+import { renderSnippet } from '@margoengine/mcp/render';
+
+const snippet = `export default (stage) => {
+  stage.box({ color: '#84d6bd' });
+  stage.fit(); // nothing is in view until the camera is placed
+};`;
+const result = await renderSnippet(snippet, { width: 320, height: 200, language: 'js' });
+await writeFile('snippet.png', result.png);
+console.log(result.drawnPixels, 'pixels drawn in', result.ms, 'ms');
+```
+
+| Option | Default | |
+| --- | --- | --- |
+| `projectRoot` | the current directory | Where the snippet's imports resolve: this folder or the nearest one above it whose `node_modules` has `@margoengine/headless`, `@margoengine/stage` and `webgpu`. |
+| `width`, `height` | 512, 512 | Image size, 16 to 2048. |
+| `language` | `ts` | `ts` has its types stripped (Node 22.13 or newer), not checked: run `check_snippet` first. `js` runs as written. |
+| `timeoutMs` | 60000 | 1000 to 300000; the process is killed after it. |
+| `gpuFlags` | none | Flags for the binding's `create`, for example `['adapter=Microsoft Basic Render Driver']`; `createMargoServer({ render: { gpuFlags } })` for the tool. |
+| `signal` | none | Abort to kill the run. |
+
+`result` holds `png`, `width`, `height`, `drawnPixels` (pixels whose colour differs from the top-left one; 0
+means nothing in view, and the tool says so), `output` (the console, last 4,000 characters) and `ms`. A snippet that
+throws, has no default export function or causes a WebGPU validation error fails with `failed` and the error text; a
+project without the packages fails with `unsupported`.
 
 ## Porting guide
 
@@ -174,7 +215,8 @@ Options and defaults:
 | Option | Default | |
 | --- | --- | --- |
 | `createMargoServer({ corpus })` | the corpus the package ships | Documentation to serve. |
-| `createMargoServer({ projectRoot })` | the current directory | Where `check_snippet` finds `typescript` and the Margo packages. |
+| `createMargoServer({ projectRoot })` | the current directory | Where `check_snippet` finds `typescript` and the Margo packages, and where `render_snippet` resolves imports. |
+| `createMargoServer({ render })` | `false` | `true` (or `{ gpuFlags }`) offers `render_snippet`; the command's `--render`. |
 | `serveStdio(server, { input, output, signal })` | `process.stdin`, `process.stdout`, none | Streams to use; abort the signal to stop. |
 | `checkSnippet(code, { language, strict, timeoutMs, signal })` | `ts`, `true`, 60000, none | The type check on its own. |
 

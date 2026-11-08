@@ -94,6 +94,15 @@ type Json = null | boolean | number | string | Json[] | {
     [key: string]: Json;
 };
 
+type ToolContent = {
+    type: 'text';
+    text: string;
+} | {
+    type: 'image';
+    data: string;
+    mimeType: string;
+};
+
 interface ToolContext {
     signal: AbortSignal;
 }
@@ -118,10 +127,7 @@ interface ToolDefinition {
 }
 
 interface ToolResult {
-    content: {
-        type: 'text';
-        text: string;
-    }[];
+    content: ToolContent[];
     structuredContent?: {
         [key: string]: Json;
     };

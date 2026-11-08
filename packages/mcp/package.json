@@ -37,6 +37,10 @@
     "./error-codes": {
       "types": "./dist/error-codes.d.ts",
       "import": "./dist/error-codes.js"
+    },
+    "./render": {
+      "types": "./dist/render.d.ts",
+      "import": "./dist/render.js"
     }
   },
   "files": [
@@ -54,6 +58,7 @@
   "scripts": {
     "build": "node ../../scripts/build-optional.js mcp && node scripts/build-corpus.mjs",
     "test": "npm run build && node --test tests/*.test.js",
+    "test:gpu": "cd ../.. && node packages/mcp/tests/render-gpu-check.mjs",
     "prepack": "npm run build"
   }
 }

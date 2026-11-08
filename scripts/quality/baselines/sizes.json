@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10944135,
+  "total": 10947799,
   "history": [
     {
       "date": "2026-10-24",
@@ -4064,6 +4064,12 @@
       "commit": "b6c31b09f",
       "reason": "splats/set: one sort for many splat clouds (batch 80 job 3)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "6568f968b",
+      "reason": "new entry @margoengine/mcp/render: the render_snippet tool (batch 119 job 3)",
+      "grew": 2
     }
   ],
   "items": {
@@ -4471,9 +4477,10 @@
     "@margoengine/math/vector2": 947,
     "@margoengine/math/vector3": 1547,
     "@margoengine/math/vector4": 919,
-    "@margoengine/mcp": 8664,
+    "@margoengine/mcp": 9051,
     "@margoengine/mcp/error-codes": 2133,
     "@margoengine/mcp/porting": 3531,
+    "@margoengine/mcp/render": 3277,
     "@margoengine/mesh-edit": 30203,
     "@margoengine/mesh-edit/bake": 5070,
     "@margoengine/mesh-edit/boolean-exact": 10620,
