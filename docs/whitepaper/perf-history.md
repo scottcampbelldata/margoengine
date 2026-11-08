@@ -1875,6 +1875,38 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
 - **Guard:** `touching and contactPoints walk only the asking body pairs` in `packages/physics/tests/next-contacts.test.js`
   makes `kernel.contacts` throw and compares every answer with the whole list's, mesh and compound pairs included.
 
+### 80. Own physics contacts: the four points' shares solved exactly each sweep
+
+- **Before (`a6a767220`):** a soft pass swept a manifold's normal rows until no impulse moved by more than rounding, at most
+  16 sweeps, and nearly always ran all 16 (entry 78). Four points of one plane push the bodies through three numbers, so one
+  pattern of their impulses (their shares of one load) moves no body; on a soft row only the leak sees it, and Gauss-Seidel
+  settled it by about the leak a sweep, 3 percent at the defaults, feeding the speeds back as it went.
+- **Change:** a four-point manifold ends each sweep with the exact minimum of the rows' quadratic along that pattern (the
+  four-dimensional cross product of the rows of ones and of the points' turn arms along two tangents), cut to the bounds. The
+  stop test is unchanged. Results change (closer to the soft rows' fixed point), so every bar was rerun natively: all kernel
+  tests pass; bounce peaks unchanged; the 20-row pyramid at the defaults sleeps at 1.50 s (1.78); the 1:100 and 1:1000 stacks'
+  drift reads 0.000 mm (0.126 and 0.021 mm at the defaults); at 4 substeps of one pass the pyramid's top moves 0.270 m and its
+  fastest box runs 0.28 m/s at 30 s (0.291 m, 0.51 m/s), still awake (`docs/known-bugs.md`).
+- **Work, counted (deterministic, `--features counts` of `kernel/examples/profile.rs`, biased normal updates per step):**
+  1,000 cubes all awake at the defaults 968,419 to 286,613 (3.4 times fewer), at 4 substeps of one pass 241,518 to 58,295
+  (4.1 times); 5,000 cubes all awake at the defaults 4,778,496 to 1,397,505 (3.4 times), at 4 substeps of one pass 1,198,348
+  to 300,157 (4.0 times); the 20-row pyramid at 4 substeps of one pass 113,483 to 81,456, at the defaults 24,521 to 9,729 (it
+  sleeps sooner). Relaxing updates per step: 1,000 cubes 311,185 to 290,945 and 84,335 to 58,396, 5,000 cubes 1,517,091 to
+  1,396,081 and 428,338 to 302,866. Rerun on `93a1044c3` (the joints and continuous collision changes since `a6a767220` leave
+  these scenes' counts identical), 2026-11-08 after 12:00 UTC.
+- **Harness bars (physics-refs `js/margo-next/margo3d.mjs`, `93a1044c3` against this change, same machine, same session):**
+  every bar keeps its pass or fail. Bounce, rolling ball, pendulum, chain of 50, joint grid, bullets (continuous and discrete) and broken meshes are
+  bit for bit the same. Better: the 1:100 and 1:1000 stacks' drift falls from up to 1.0e-4 m to under 1.5e-7 m on both
+  settings; the defaults' 1,000 and 5,000 cubes sleep at 1.15 and 1.28 s (1.68 and 4.8 s); at 4 substeps of one pass all
+  1,000 and all 5,000 cubes sleep by 10 s (680 and 4,189) and the pyramid's top moves 0.270 m (0.291) at 0.28 m/s (0.51).
+  Slightly worse and recorded: the defaults' pyramid sinks 0.457 mm (0.453, its bar is 1 mm); the slope block's slide at 4
+  substeps of one pass reads 0.2782, 0.8475 and 4.8488 m at 27, 28 and 35 degrees (0.2779, 0.8473, 4.8487; closed form
+  0.2498, 0.8240, 4.8265, a bar both fail), and at the defaults 4.830657 m at 35 degrees (4.830653). Chromium and Firefox
+  replay 10,000 steps with 200 hashes equal to native.
+- **Rerun:** `cargo run --locked --release --features counts --manifest-path packages/physics/kernel/Cargo.toml --example
+  profile -- cubes1000-awake default` (and `equal`, `pyramid`, `cubes5000-awake`); the before figures from the same command on
+  `93a1044c3`.
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).

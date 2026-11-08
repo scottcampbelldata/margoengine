@@ -38,8 +38,9 @@ use crate::world::World;
 /// 2 pi as the nearest f32.
 const TAU: f32 = 6.283_185_5;
 
-/// The most sweeps a pair's normal rows take in one pass. A manifold not settled by then is left as it stands; the soft rows'
-/// last part to settle moves no body: the points' shares of one load among themselves.
+/// The most sweeps a pair's normal rows take in one pass. A manifold not settled by then is left as it stands. The part that
+/// settled last, the shares four points take of one load among themselves, moves no body and is now solved exactly each sweep
+/// (`normal_rows`), so a pass settles in 3 to 4 sweeps on average where it ran out at 16.
 const SWEEPS: u32 = 16;
 
 /// Work counts for `examples/profile.rs`, native only (feature `counts`): one-point normal updates in biased passes [0]
@@ -472,6 +473,27 @@ impl World {
             (spin_a[k], spin_b[k]) = (body_a.inertia.mul(turn_a[k]), body_b.inertia.mul(turn_b[k]));
         }
         let along = normal.mul(normal).dot(body_a.mass.add(body_b.mass));
+        // Four points of one plane push the bodies through three numbers, a force and two turns, so one pattern of their
+        // impulses moves no body: `null`, with sum zero and no turn about either body. On a soft row only the leak sees it,
+        // and Gauss-Seidel settles it by about the leak a sweep (3 percent at the defaults), so the sweeps used to run out
+        // first. Each sweep ends with the exact step along it, the minimum of the rows' quadratic on that line, cut to the bounds.
+        let (mut null, mut cfm) = ([0.0f32; MANIFOLD], [0.0f32; MANIFOLD]);
+        let mut along_null = false;
+        if count == 4 {
+            let tangent = self.v(PAIR_TANGENT_X, row);
+            let other = normal.cross(tangent);
+            let (u, w): ([f32; 4], [f32; 4]) = (core::array::from_fn(|i| turn_a[i].dot(tangent)), core::array::from_fn(|i| turn_a[i].dot(other)));
+            // The cross product of the rows (1, 1, 1, 1), u and w in four dimensions: each entry a signed 3 x 3 minor.
+            let minor = |a: usize, b: usize, c: usize| (u[b] * w[c] - u[c] * w[b]) - (u[a] * w[c] - u[c] * w[a]) + (u[a] * w[b] - u[b] * w[a]);
+            null = [minor(1, 2, 3), -minor(0, 2, 3), minor(0, 1, 3), -minor(0, 1, 2)];
+            let mut curve = 0.0f32;
+            for k in 0..4 {
+                let mass = self.s(CONTACT_NORMAL_MASS, row * MANIFOLD + k);
+                cfm[k] = if mass > 0.0 { leak[k] / (mass * scale[k]) } else { 0.0 };
+                curve += cfm[k] * null[k] * null[k];
+            }
+            along_null = curve > 0.0;
+        }
         let mut sweeps = 0;
         loop {
             let (mut moved, mut largest) = (0.0f32, 0.0f32);
@@ -491,6 +513,29 @@ impl World {
                 let size = if applied < 0.0 { -applied } else { applied };
                 moved = if size > moved { size } else { moved };
                 largest = if total > largest { total } else { largest };
+            }
+            if along_null {
+                let (mut slope, mut curve) = (0.0f32, 0.0f32);
+                let (mut low, mut high) = (f32::MIN, f32::MAX);
+                for k in 0..4 {
+                    slope += null[k] * (speed[k] + bias[k] + cfm[k] * hold[k]);
+                    curve += cfm[k] * null[k] * null[k];
+                    if null[k] > 0.0 {
+                        low = low.max(-hold[k] / null[k]);
+                        high = high.min((most[k] - hold[k]) / null[k]);
+                    } else if null[k] < 0.0 {
+                        low = low.max((most[k] - hold[k]) / null[k]);
+                        high = high.min(-hold[k] / null[k]);
+                    }
+                }
+                let t = -slope / curve;
+                let t = if t < low { low } else if t > high { high } else { t };
+                if low <= high && t != 0.0 {
+                    for k in 0..4 {
+                        let total = hold[k] + t * null[k];
+                        hold[k] = if total > 0.0 { if total > most[k] { most[k] } else { total } } else { 0.0 };
+                    }
+                }
             }
             sweeps += 1;
             #[cfg(feature = "counts")]

@@ -318,6 +318,28 @@ does not own. Each entry says exactly what is needed to close it.
 
 ## Open defects
 
+### A deep pile rocks for good at 4 substeps of one pass
+
+- **What:** `@margoengine/physics/next` kernel at 4 substeps of one pass (the harness's equal cost), contacts at their cap of a
+  quarter of the substep rate (60 Hz). The 20-row pyramid of 210 touching metre cubes never sleeps: its top moves 0.270 m in 30 s
+  and its fastest box still runs 0.28 m/s (before `d9fa86e5b` 0.061 m and 0.275 m/s, also awake). Held to a plane the same pile
+  walks 2 m. At 30 rows it rocks before `d9fa86e5b` too (0.83 m held to a plane), so the bug predates it and `d9fa86e5b` and
+  `a6a767220` only thinned the margin.
+- **Repro:** `cargo run --locked --release --manifest-path packages/physics/kernel/Cargo.toml --example bars`, the `equal 4x1
+  pyramid` line.
+- **Cause, measured (2026-11-08):** one Gauss-Seidel pass a substep does not take back what the soft pass pushes into the pile's
+  rocking: with every rotation locked the pile stands, and at 4 substeps of 2 passes, or 1 biased pass and 2 relaxing ones, the
+  20-row pile sleeps in 1.2 s. Ruled out, each alone at a quarter of the rate: damping ratios 1 to 40, pairs ordered by stack
+  level bottom up or top down, the pair order reversed each substep, each manifold's normal rows swept 400 times, under-relaxed
+  normal updates, a settling pass before the push, and a relaxing pass that keeps the slop's speculative bias. What does settle
+  20 and 30 rows: stiffness at a sixth of the substep rate (40 Hz) at one pass, but then a cube on a slope at tan 0.47 settles
+  1.009e-6 m between 0.5 and 2.5 s against its 1e-6 bar, and the 1:100 and 1:1000 stacks sag 31.6 and 311 mm (14.4 and 137);
+  a fifth (48 Hz) keeps the slope but leaves the pile at 0.37 m/s with sleeping off. A second relaxing pass costs a third more
+  passes at equal cost and still rocks at 30 rows. The sixth is one line: the cap in `World::step` (`integrate.rs`) taken as 1/6 under 2 passes.
+- **Needed to close:** a solve that settles a deep pile in one pass a substep at a quarter of the rate without a softer contact,
+  for example a position pass whose push never reaches the velocities (split impulses), measured against every bar; or a
+  decision by Scott to trade the equal-cost sag for the settled pile.
+
 ### A chain laid out level under a 1000:1 end mass stretches once it is taut
 
 - **What:** `@margoengine/physics/next`, 50 spherical joints of 0.1 m between 1 kg balls of radius 0.05 (a sphere's inertia, 0.001 kg m2), a 1000 kg ball at the end, all laid out level and let fall at the defaults (8 substeps, 2 passes, 60 Hz). The polyline through the link centres passes 1e-4 of its length at step 32 and reaches 2.1 times its length by step 60 (native kernel; 0.107 in the Wasm build). Hung straight down, the same chain holds (the kernel test `a_chain_of_fifty_holds_a_thousand_to_one_end_mass`). End ratio 100:1 passes 1e-4 at step 207 and 10:1 at step 318; 1:1 holds. 16 substeps hold it to step 66, 32 to step 229. Ten times the links' inertia holds it to step 219. The joints open even where the stretch holds, as a bent chain's centre line reads short (measured 2026-11-08, 600 steps, a 3 m/s kick, 600 more): each joint's widest gap is 7.0 mm at 1:1, 9.7 mm at 10:1, 23 mm at 100:1 and 0.38 to 0.45 m at 1000:1, against 1.9e-5 m on the chain hung straight, whose test now bars each joint at 1e-4 of the length. The level 1:1 gap is the turn within a substep, r (h w)^2 / 2 at a whip end of 264 rad/s.
