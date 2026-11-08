@@ -990,7 +990,9 @@ Maya, Pinocchio, libigl, three.js, Babylon, Godot, Unity, Unreal and the like) w
 
 Written clean room from the papers, talks and textbook descriptions below. No source code of behaviour-tree, utility-AI
 or steering libraries or engines (Unreal, Unity, Godot, BehaviorTree.CPP, OpenSteer, three.js, Babylon, Yuka and the
-like) was read.
+like) was read. The batch 167 timing drives Yuka 0.7.8 as a black box from its documented flocking example
+(https://github.com/Mugen87/yuka/blob/master/examples/steering/flocking/index.html): one shared alignment, cohesion and
+separation behaviour, and no wander. The library source was not opened.
 
 | Area | Source |
 | --- | --- |

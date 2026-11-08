@@ -2247,6 +2247,16 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
   Solver setup (rows then colour then blocks) and distance-path work remain open in known-bugs.md. A quiet-machine
   rerun is required before publishing speed numbers. Rerun commands and the paired native benchmark are in reproduce.md.
 
+### 93. Flock of 1,000 against Yuka (diagnostic, win)
+
+- **Measurement:** one step of 1,000 boids, separation, alignment and cohesion, radius 2, weights 1.5, 1 and 1, max
+  speed 3, max force 6, delta 1/60. Fresh positions each round, outside the timer. Paired turns in one process, fastest
+  of 7 rounds.
+- **Result:** Margo 3.098 ms, Yuka 0.7.8 9.472 ms. Win. Checksums 31517.19 and 31516.70, both moved, not bit-equal
+  (a per-vehicle neighbourhood against one grid). Busy machine, diagnostic.
+- **Rerun:** `node packages/behavior/scripts/rival-bench.mjs`. Yuka stays outside the repository. Citation in
+  clean-room.md.
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).
