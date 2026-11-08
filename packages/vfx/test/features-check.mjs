@@ -10,6 +10,8 @@
 // Events: a particle that dies, or hits the ground faster than `speed`, gives `count` children in the next frame at
 // its death or impact point, with the event's life, size, colour and generation, read back from the particle buffer;
 // fewer free slots give fewer children; children never give children; the same frames give the same bytes.
+// Lit: a particle lit by the sun shows, at every pixel of its disc, the wrap-lit ball shading computed here, at any
+// birth angle and at 1x and 4x MSAA.
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
@@ -83,6 +85,21 @@ try {
     }
     if (options.on === 'collision') assert.equal(r.children, options.speed ? 0 : 4, `${name}: children born`);
     console.log(`ok ${name}: ${r.children} children`);
+  }
+  for (const options of [
+    { samples: 1 },
+    { samples: 4 },
+    { samples: 1, wrap: 0, angle: 1.1 },
+    { samples: 1, wrap: 1, sun: [0, -1, 0.2] },
+  ]) {
+    const name = `lit ${JSON.stringify(options)}`,
+      r = await page.evaluate((o) => window.checkLit(o), options);
+    report.results[name] = r;
+    clean(r, name);
+    // A ball 4 world units across at about 0.028 units a pixel, every third pixel inside 0.95 of its radius.
+    assert.ok(r.checked >= 1200, `${name}: ${r.checked} pixels compared`);
+    assert.deepEqual(r.mismatches, [], name);
+    console.log(`ok ${name}: ${r.checked} pixels, largest difference ${r.largest.toFixed(2)}/255`);
   }
   assert.deepEqual(pageErrors, []);
   await mkdir('test-results', { recursive: true });

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11123035,
+  "total": 11126128,
   "history": [
     {
       "date": "2026-10-24",
@@ -4256,6 +4256,12 @@
       "commit": "5c9b9e8e7",
       "reason": "new entry @margoengine/tilemap/path (grid pathfinding)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "cf5eded59",
+      "reason": "lit particles: new entry @margoengine/vfx/lit, carried by the root VFX with every feature",
+      "grew": 2
     }
   ],
   "items": {
@@ -4966,11 +4972,12 @@
     "@margoengine/usdz/skel": 7987,
     "@margoengine/usdz/subdiv": 4929,
     "@margoengine/usdz/worker": 13771,
-    "@margoengine/vfx": 22327,
+    "@margoengine/vfx": 23460,
     "@margoengine/vfx/base": 11336,
     "@margoengine/vfx/curves": 1816,
     "@margoengine/vfx/emitter": 2656,
     "@margoengine/vfx/events": 2601,
+    "@margoengine/vfx/lit": 1960,
     "@margoengine/vfx/mesh": 3449,
     "@margoengine/vfx/obstacles": 1364,
     "@margoengine/vfx/ribbons": 2854,

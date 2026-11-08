@@ -18,9 +18,9 @@ window.unit=unit;
  * `samples` x MSAA, over a cleared black target and a depth cleared to 0 (reversed Z: nothing drawn). Returns the RGBA8
  * picture and any validation error.
  */
-async function run(effect,{frames,dt=0.1,samples=1,before=()=>{},setup=()=>{},read=[]}){
+async function run(effect,{frames,dt=0.1,samples=1,before=()=>{},setup=()=>{},read=[],lighting}){
  device.pushErrorScope('validation');
- effect.setup({gpu:device,stats:{drawCalls:0},removePlugin(){}});
+ effect.setup({gpu:device,stats:{drawCalls:0},removePlugin(){},lighting});
  setup();
  const target=(format,count,usage)=>device.createTexture({size:[size,size],format,sampleCount:count,usage});
  const color=target('rgba8unorm',samples,GPUTextureUsage.RENDER_ATTACHMENT|(samples===1?GPUTextureUsage.COPY_SRC:0)),
@@ -159,6 +159,31 @@ window.checkEvents=async({on='death',capacity=16,short=false,speed=0.5}={})=>{
   }
  }
  return {error,errors:errors.splice(0),children,mismatches:mismatches.slice(0,8),bytes:Array.from(new Uint32Array(p.buffer))};
+};
+/**
+ * Lit particles, with one record written straight into the buffer (life full, so opacity (1 - r)^2 on the disc) and a
+ * step of 0 s. The sun comes from `sun` at intensity pi (so the Lambert 1/pi cancels), ambient 0.25 (radiance.w 0.25
+ * times ambient 1). At each pixel of the disc, uv = (x, y) / half size on the z = 0 plane, the ball's normal is
+ * (u, v, sqrt(1 - r)) and the colour over black is base x (0.25 + max(0, (n.l + wrap) / (1 + wrap))) x (1 - r)^2. The
+ * particle's birth angle turns the disc, never the light: the ball looks the same at any angle.
+ */
+window.checkLit=async({samples=1,wrap=0.5,angle=0,sun=[1,0,1]}={})=>{
+ const n=4,half=2,base=[0.6,0.5,0.4],l=Math.hypot(...sun),dir=sun.map(v=>v/l);
+ const lighting={direction:new Float32Array([...sun,Math.PI]),radiance:new Float32Array([1,1,1,0.25]),ambient:new Float32Array([1,1,1])};
+ const effect=new VFX({...still,capacity:n,velocity:[0,0,0],lit:{wrap}});
+ const {image,error}=await run(effect,{frames:0,dt:0,samples,lighting,setup:()=>device.queue.writeBuffer(effect.gpuState.particles,0,records([{at:[0,0,0],size:2*half,color:base,angle}],n))});
+ effect.dispose();
+ const mismatches=[];let checked=0,largest=0;
+ for(let py=0;py<size;py+=3)for(let px=0;px<size;px+=3){
+  const [x,y]=world(px,py),u=x/half,v=y/half,r=u*u+v*v;
+  // Skip the rim, where a pixel is partly covered.
+  if(r>0.9)continue;
+  const z=Math.sqrt(1-r),nl=u*dir[0]+v*dir[1]+z*dir[2],k=0.25+Math.max(0,(nl+wrap)/(1+wrap)),a=(1-r)*(1-r);
+  const want=base.map(b=>255*Math.min(1,b*k)*a),got=[...image.subarray((py*size+px)*4,(py*size+px)*4+3)];
+  const d=Math.max(...got.map((g,i)=>Math.abs(g-want[i])));largest=Math.max(largest,d);checked++;
+  if(d>2)mismatches.push({px,py,want,got});
+ }
+ return {error,errors:errors.splice(0),checked,largest,mismatches:mismatches.slice(0,8)};
 };
 window.ready=true;
 </script></body></html>

@@ -1,0 +1,52 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>VFX lit check</title></head><body>
+<script type="module">
+// Lit particles in a real engine, run by lit-check.mjs: one big particle at the origin, seen from z = 10, lit by a
+// Clustered point light, by the sun through Shadows with a caster beside it, and both again in an ExactOIT pass.
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
+import {Engine} from '/packages/core/dist/index.js';
+import {Material,createMesh} from '/packages/materials/dist/index.js';
+import {boxGeometry} from '/packages/geometry/dist/index.js';
+import {Clustered} from '/packages/clustered/dist/index.js';
+import {Shadows} from '/packages/shadows/dist/index.js';
+import {ExactOIT} from '/packages/oit/dist/exact.js';
+import {addEffect} from '/packages/oit/dist/vfx.js';
+import {VFX} from '/packages/vfx/dist/index.js';
+const errors=[];
+addEventListener('error',e=>errors.push(e.message));
+addEventListener('unhandledrejection',e=>errors.push(String(e.reason)));
+let engine,canvas;
+const draw=async()=>{engine.render({delta:1/60});await engine.gpu.queue.onSubmittedWorkDone();};
+/**
+ * {lights, shadows, caster, oit}: `lights` a white point light of intensity 2 at (0, 0, 2); `shadows` the sun from +x
+ * at intensity pi through Shadows (hard filter), with `caster` a slab at x = 3 between the sun and the particle (or
+ * 'away', far above it); `oit` the particle in an ExactOIT pass; `ambient` the lit ambient. The particle is grey 0.5,
+ * 2 units across, with no ambient unless given.
+ * Returns the RGB of the pixels at the centre and a quarter and a half of the radius to its right.
+ */
+window.check=async({lights=false,shadows=false,caster,oit=false,ambient}={})=>{
+ engine?.dispose();canvas?.remove();
+ canvas=document.body.appendChild(document.createElement('canvas'));canvas.width=canvas.height=256;canvas.style.cssText='width:256px;height:256px;display:block';
+ engine=await Engine.create(canvas,{backend:'webgpu',preserveDrawingBuffer:true,camera:{position:[0,0,10],target:[0,0,0],fov:40,near:0.1,far:100}});
+ engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+ engine.scene.background='#000000';
+ engine.lighting.direction.set([1,0,0,shadows?Math.PI:0]);engine.lighting.radiance.set([1,1,1,0]);
+ const lit=ambient?{ambient:[ambient,ambient,ambient]}:{};
+ if(lights){lit.lights=Clustered.attach(engine);lit.lights.setLights([{position:[0,0,2],range:20,color:[1,1,1],intensity:2}]);}
+ if(shadows){
+  lit.shadows=Shadows.attach(engine,{filter:'hard',resolution:1024});
+  if(caster){const slab=createMesh(engine,boxGeometry(0.2,4,4),new Material({color:[1,1,1]}));slab.root.setPosition(caster==='away'?[3,30,0]:[3,0,0]);lit.shadows.add(slab);}
+ }
+ const effect=VFX.attach(engine,{capacity:4,initialCount:1,rate:0,position:[0,0,0],velocity:[0,0,0],spread:0,gravity:[0,0,0],turbulence:0,ground:-100,color:[0.5,0.5,0.5,1],size:2,lifetime:[1e6,1e6],lit});
+ if(oit)addEffect(ExactOIT.attach(engine),effect);
+ engine.gpu.pushErrorScope('validation');
+ await waitForPipelines(draw);
+ const error=await engine.gpu.popErrorScope();
+ // Read in the same task as the frame's submit: the canvas cannot be presented, resized or cleared in between.
+ const read=document.createElement('canvas');read.width=canvas.width;read.height=canvas.height;
+ const g=read.getContext('2d',{willReadFrequently:true});engine.render({delta:1/60});g.drawImage(canvas,0,0);
+ // The particle's radius in pixels: 1 unit at distance 10 with a 40 degree field of view.
+ const c=canvas.width/2,radius=1/(10*Math.tan(20*Math.PI/180))*c,at=dx=>[...g.getImageData(Math.floor(c+dx),Math.floor(c),1,1).data.subarray(0,3)];
+ return {error:error?.message??null,errors:errors.splice(0),pixels:[at(0),at(radius/4),at(radius/2)],radius,c};
+};
+window.ready=true;
+</script></body></html>

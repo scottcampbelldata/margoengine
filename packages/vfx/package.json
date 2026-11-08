@@ -30,7 +30,7 @@
     "build": "node ../../scripts/build-optional.js vfx",
     "test": "npm run build && node --test test/*.test.js",
     "prepack": "npm --prefix ../.. run build:packages",
-    "test:gpu": "cd ../.. && node packages/vfx/test/browser-check.mjs && node packages/vfx/test/features-check.mjs"
+    "test:gpu": "cd ../.. && node packages/vfx/test/browser-check.mjs && node packages/vfx/test/features-check.mjs && node packages/vfx/test/lit-check.mjs"
   },
   "sideEffects": false,
   "exports": {
@@ -81,6 +81,10 @@
     "./events": {
       "types": "./dist/events.d.ts",
       "import": "./dist/events.js"
+    },
+    "./lit": {
+      "types": "./dist/lit.d.ts",
+      "import": "./dist/lit.js"
     }
   },
   "files": [

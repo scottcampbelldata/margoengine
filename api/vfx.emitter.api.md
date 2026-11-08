@@ -4,7 +4,7 @@
 
 ```ts
 import { Vec3 } from "@margoengine/core";
-import { PassContext } from "@margoengine/core/extension";
+import { Engine, PassContext } from "@margoengine/core/extension";
 
 export const MAX_EMITTER_TRIANGLES = 262144;
 
@@ -118,6 +118,21 @@ interface VFXFeatures {
     ribbons?: VFXExtension<VFXRibbons>;
     mesh?: VFXExtension<VFXMeshParticles>;
     events?: VFXExtension<VFXEvents>;
+    lit?: VFXExtension<VFXLit>;
+}
+
+interface VFXLightSource {
+    pbr(group: number): {
+        readonly declarations: string;
+    };
+    bindings(): GPUBindGroupEntry[];
+}
+
+interface VFXLit {
+    lights?: VFXLightSource;
+    shadows?: VFXLightSource;
+    wrap?: number;
+    ambient?: readonly [number, number, number];
 }
 
 interface VFXMeshParticles {
@@ -169,6 +184,7 @@ interface VFXOptions {
     ribbons?: VFXRibbons;
     mesh?: VFXMeshParticles;
     events?: VFXEvents;
+    lit?: VFXLit;
 }
 
 interface VFXRibbons {
@@ -187,6 +203,9 @@ interface VFXRuntime {
     hides?(): boolean;
     births?: boolean;
     reset?(): void;
+    key?(group: number): string;
+    shade?(code: string, group: number): string;
+    bind?(pass: GPURenderPassEncoder, pipeline: GPURenderPipeline, group: number): void;
 }
 
 interface VFXState {
@@ -202,6 +221,7 @@ interface VFXState {
     stats: {
         drawCalls: number;
     };
+    engine: Engine;
 }
 
 interface VFXTexture {

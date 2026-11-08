@@ -215,7 +215,7 @@ from 0.010 to 0.031 ms at 100,000; the draw is unchanged.
 `VFX` from `@margoengine/vfx` (about 14.1 kB min+gzip) carries every feature. An effect that uses none of them can
 import the same class from `@margoengine/vfx/base` (about 8.3 kB); add features as a second argument from their own
 entries: `/obstacles` (1.1 kB alone), `/wrap` (0.2 kB), `/sort` (1.1 kB), `/texture` (1.5 kB; it exports
-`textureFeature`, passed as `{texture: textureFeature}`), `/curves` (1.6 kB), `/emitter` (2.4 kB), `/soft` (1.3 kB), `/ribbons` (2.6 kB, the quality gate's figure), `/mesh` (3.2 kB, the same) and `/events` (2.3 kB, the same). Sizes are vite library builds with bare imports external,
+`textureFeature`, passed as `{texture: textureFeature}`), `/curves` (1.6 kB), `/emitter` (2.4 kB), `/soft` (1.3 kB), `/ribbons` (2.6 kB, the quality gate's figure), `/mesh` (3.2 kB, the same), `/events` (2.3 kB, the same) and `/lit` (1.7 kB, the same). Sizes are vite library builds with bare imports external,
 each entry compressed on its own ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)), so a
 bundle that combines them adds less: the whole root is 14.1 kB. `node examples/package-benchmarks/vfx-size.mjs` measures base-plus-feature bundles
 (`results/vfx-size.json`, at an earlier commit, `76af7a0`).
@@ -357,3 +357,40 @@ storage buffers to the simulation (eight is the device minimum: events with a me
 read at attach; the other settings every frame. `node packages/vfx/test/features-check.mjs` (real GPU) reads back the
 children of a death and of an impact (position, velocity, life, size, colour, generation), fewer children when slots
 run out, none from a slow impact or from a child, and the same bytes from the same frames.
+
+### Lit particles
+
+`lit` shades each billboard as a ball of its own size, so smoke, dust and steam take light from the side it comes
+from: the pixel's normal comes from where it lies on the disc (turning with the particle's spin), and its colour is
+the particle colour (texture and curves included) lit by the engine's sun (`engine.lighting`), the ambient light, and
+optionally `Clustered` point and spot lights and `Shadows` sun shadows. The sun uses wrap lighting: `wrap` (0 to 1,
+default 0.5) lets light reach round the dark side, as it does through thin smoke. Clustered lights use the clustered
+shader's own light loop (falloff, cones, IES and local shadows) at roughness 1 and no metal; sun shadows are looked up
+at the ball's surface point.
+
+```ts
+import {EngineKernel} from 'margoengine/core';
+import {VFX} from 'margoengine/vfx/base';
+import {lit} from 'margoengine/vfx/lit';
+import {Clustered} from 'margoengine/clustered';
+import {Shadows} from 'margoengine/shadows';
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
+const lights = Clustered.attach(engine);
+lights.setLights([{position: [1, 1.5, 0], range: 8, color: [1, 0.6, 0.3], intensity: 6}]);
+const shadows = Shadows.attach(engine);
+// Grey smoke rising past an orange lamp, shadowed where the sun is blocked.
+const smoke = VFX.attach(engine, {
+  capacity: 4096, rate: 400, velocity: [0, 0.8, 0], spread: 0.3, gravity: [0, 0.2, 0], size: 0.6,
+  lifetime: [2, 4], color: [0.6, 0.6, 0.6, 0.35], lit: {lights, shadows, wrap: 0.6},
+}, {lit});
+engine.start();
+```
+
+Under an order-independent pass (`addEffect` from `@margoengine/oit/vfx`) lit particles are lit the same way: the
+pass's declarations take bind group 1 and the lights and shadows move to group 2, within the four groups every
+device offers. `lights` and `shadows` are read at attach; `wrap` and `ambient` (linear RGB, default the engine's
+`radiance[3]` times `ambient`) every frame, on the same object. Lighting is per pixel on the billboards only: ribbons
+keep their own fade, and mesh particles their own light. `node packages/vfx/test/features-check.mjs` (real GPU)
+compares every third pixel of a sun-lit particle with the wrap-lit ball shading at any spin and at 1x and 4x MSAA;
+`node packages/vfx/test/lit-check.mjs` checks a real engine's clustered point light, a shadow caster and both again
+in an `ExactOIT` pass against the same light computed on the CPU.

@@ -102,6 +102,32 @@ export interface VFXOptions {
   mesh?: VFXMeshParticles;
   /** Sub-emitters: particles born on the GPU where a particle dies or hits the ground. Needs `events` from `@margoengine/vfx/events`. */
   events?: VFXEvents;
+  /** Billboards lit by the sun, clustered point and spot lights and sun shadows, as round particles. Needs `lit` from `@margoengine/vfx/lit`. */
+  lit?: VFXLit;
+}
+/**
+ * Where lit particles get their light from: `Clustered` from `@margoengine/clustered` or `Shadows` from
+ * `@margoengine/shadows` (or anything with their `pbr` and `bindings`), attached to the same engine.
+ */
+export interface VFXLightSource {
+  pbr(group: number): { readonly declarations: string };
+  bindings(): GPUBindGroupEntry[];
+}
+/**
+ * Lighting for the billboards: each one is shaded as a ball (its normal from where the pixel lies on the disc) in its
+ * own colour, by the engine's sun with wrap lighting, the ambient light, and optionally clustered lights and sun
+ * shadows. `lights` and `shadows` are read at attach; `wrap` and `ambient` every frame (change them on the same
+ * object). Needs the `lit` feature.
+ */
+export interface VFXLit {
+  /** Point and spot lights: `Clustered` from `@margoengine/clustered`. Fixed at attach. */
+  lights?: VFXLightSource;
+  /** Sun shadows on the particles: `Shadows` from `@margoengine/shadows`. Fixed at attach. */
+  shadows?: VFXLightSource;
+  /** How far the sun wraps round the dark side, 0 (a hard ball) to 1 (dark only at the far pole). Default 0.5. */
+  wrap?: number;
+  /** Ambient light, linear RGB, each 0..16. Default the engine's: `lighting.radiance[3]` times `lighting.ambient`. */
+  ambient?: readonly [number, number, number];
 }
 /**
  * Sub-emitters: a particle that dies (`on: 'death'`), or meets the ground faster than `speed` (`on: 'collision'`),
@@ -257,6 +283,8 @@ export interface VFXState {
   options: VFXOptions;
   /** The engine's frame statistics: a feature's own draw adds to `drawCalls`. */
   stats: { drawCalls: number };
+  /** The engine the effect is attached to (its `lighting` is read every frame by `lit`). */
+  engine: Engine;
 }
 
 /** The GPU side of an added feature, made at attach and again after device restoration. */
@@ -277,6 +305,12 @@ export interface VFXRuntime {
   births?: boolean;
   /** Called by `VFX.reset()` after the particle buffers are cleared. */
   reset?(): void;
+  /** Part of the billboard pipeline's cache key when its bind group `group` (1, or 2 under a transparency hook) is the feature's. */
+  key?(group: number): string;
+  /** The finished billboard shader with the feature's declarations for bind group `group` added. */
+  shade?(code: string, group: number): string;
+  /** Sets the feature's bind group `group` on a billboard draw with `pipeline`. */
+  bind?(pass: GPURenderPassEncoder, pipeline: GPURenderPipeline, group: number): void;
 }
 /** A feature beyond the first seven (ribbons and later). The shape is internal: pass the entry's export. */
 export interface VFXExtension<T> {
@@ -287,7 +321,7 @@ export interface VFXExtension<T> {
   create?(state: VFXState, value: T, owned: OwnedResources): VFXRuntime;
 }
 /** Added features, in the order their patches apply. */
-const extensions = ['ribbons', 'mesh', 'events'] as const;
+const extensions = ['ribbons', 'mesh', 'events', 'lit'] as const;
 /** One compute dispatch of the slot-order passes. */
 type Step = [GPUComputePipeline, GPUBindGroup];
 /**
@@ -347,6 +381,7 @@ export interface VFXFeatures {
   ribbons?: VFXExtension<VFXRibbons>;
   mesh?: VFXExtension<VFXMeshParticles>;
   events?: VFXExtension<VFXEvents>;
+  lit?: VFXExtension<VFXLit>;
 }
 let nextId = 0;
 /**
@@ -652,6 +687,7 @@ export class VFX implements EnginePlugin {
                 module,
                 options: o,
                 stats: this.engine!.stats,
+                engine: this.engine!,
               },
               value,
               this.owned,
@@ -838,26 +874,29 @@ export class VFX implements EnginePlugin {
       samples = this.softRuntime.write(c, this.options.depth!(), this.view, softness);
       if (this.softRuntime.changed) this.renderGroups.clear();
     }
+    // A feature's own bind group comes after group 0, and after the hook's group 1.
     const declarations = hook?.surface(1),
-      key =
-        this.renderKey +
-        ':' +
-        c.descriptor.multisample?.count +
-        (fog ? ':fog' : '') +
-        (samples ? ':soft' + samples : '') +
-        (declarations ?? '');
+      slot = hook ? 2 : 1;
+    let key =
+      this.renderKey +
+      ':' +
+      c.descriptor.multisample?.count +
+      (fog ? ':fog' : '') +
+      (samples ? ':soft' + samples : '') +
+      (declarations ?? '');
+    for (const r of this.runtimes) if (r.key) key += r.key(slot);
     let pipeline = this.renders.get(key);
     if (!pipeline) {
       const lit = samples ? this.features.soft!.patch(this.billboard, samples) : this.billboard,
         fogged = fog ? foggedBillboard(lit) : lit,
         billboard = this.route ? this.route.billboard(fogged) : fogged;
-      const module = c.device.createShaderModule({
-        code: declarations
-          ? transparentBillboard(billboard, declarations)
-          : (c.descriptor.multisample?.count ?? 1) > 1
-            ? multisampled(billboard)
-            : billboard,
-      });
+      let code = declarations
+        ? transparentBillboard(billboard, declarations)
+        : (c.descriptor.multisample?.count ?? 1) > 1
+          ? multisampled(billboard)
+          : billboard;
+      for (const r of this.runtimes) if (r.shade) code = r.shade(code, slot);
+      const module = c.device.createShaderModule({ code });
       pipeline = c.device.createRenderPipeline({
         layout: 'auto',
         vertex: { module, entryPoint: 'vertex' },
@@ -921,6 +960,7 @@ export class VFX implements EnginePlugin {
     const pass = c.encoder.beginRenderPass(this.presentation);
     pass.setPipeline(pipeline);
     pass.setBindGroup(0, group);
+    for (const r of this.runtimes) r.bind?.(pass, pipeline, 1);
     applyView(pass, c);
     if (this.route) pass.draw(3, this.capacity);
     else pass.drawIndirect(this.visible!, 0);
@@ -939,6 +979,7 @@ export class VFX implements EnginePlugin {
     if (!this.visible || this.runtimes.some((r) => r.hides?.())) return;
     const [pipeline, group] = this.prepare(c, hook),
       pass = surfacePass(c.device, hook, pipeline, group);
+    for (const r of this.runtimes) r.bind?.(pass, pipeline, 2);
     if (this.route) pass.draw(3, this.capacity);
     else pass.drawIndirect(this.visible, 0);
     this.engine!.stats.drawCalls++;

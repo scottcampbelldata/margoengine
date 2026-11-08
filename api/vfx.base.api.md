@@ -145,6 +145,21 @@ export interface VFXFeatures {
     ribbons?: VFXExtension<VFXRibbons>;
     mesh?: VFXExtension<VFXMeshParticles>;
     events?: VFXExtension<VFXEvents>;
+    lit?: VFXExtension<VFXLit>;
+}
+
+export interface VFXLightSource {
+    pbr(group: number): {
+        readonly declarations: string;
+    };
+    bindings(): GPUBindGroupEntry[];
+}
+
+export interface VFXLit {
+    lights?: VFXLightSource;
+    shadows?: VFXLightSource;
+    wrap?: number;
+    ambient?: readonly [number, number, number];
 }
 
 export interface VFXMeshParticles {
@@ -196,6 +211,7 @@ export interface VFXOptions {
     ribbons?: VFXRibbons;
     mesh?: VFXMeshParticles;
     events?: VFXEvents;
+    lit?: VFXLit;
 }
 
 export interface VFXRibbons {
@@ -214,6 +230,9 @@ export interface VFXRuntime {
     hides?(): boolean;
     births?: boolean;
     reset?(): void;
+    key?(group: number): string;
+    shade?(code: string, group: number): string;
+    bind?(pass: GPURenderPassEncoder, pipeline: GPURenderPipeline, group: number): void;
 }
 
 export interface VFXState {
@@ -229,6 +248,7 @@ export interface VFXState {
     stats: {
         drawCalls: number;
     };
+    engine: Engine;
 }
 
 export interface VFXTexture {

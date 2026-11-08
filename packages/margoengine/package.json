@@ -2878,6 +2878,10 @@
       "types": "./dist/vfx/events.d.ts",
       "import": "./dist/vfx/events.js"
     },
+    "./vfx/lit": {
+      "types": "./dist/vfx/lit.d.ts",
+      "import": "./dist/vfx/lit.js"
+    },
     "./video": {
       "types": "./dist/video.d.ts",
       "import": "./dist/video.js"
