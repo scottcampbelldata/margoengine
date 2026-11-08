@@ -650,7 +650,7 @@ fn invert(k: &M3, n: usize) -> M3 {
             dropped[c] = true;
             continue;
         }
-        let root = d.sqrt();
+        let root = crate::math::sqrt64(d);
         l[c][c] = root;
         for r in c + 1..n {
             let mut s = k[r][c];

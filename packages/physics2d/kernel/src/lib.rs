@@ -14,6 +14,11 @@ pub mod smooth;
 pub mod solver;
 pub mod world;
 
+/// The Wasm build's memory allocator (kernel-common's size-class heap over linear memory); native builds use the system's.
+#[cfg(target_arch = "wasm32")]
+#[global_allocator]
+static HEAP: margoengine_physics_kernel_common::heap::WasmHeap = margoengine_physics_kernel_common::heap::WasmHeap::new();
+
 #[cfg(target_arch = "wasm32")]
 #[panic_handler]
 fn panic(_: &core::panic::PanicInfo) -> ! {

@@ -16,6 +16,21 @@ pub fn sqrt(value: f32) -> f32 {
     }
 }
 
+/// Correctly rounded square root of a double (the joint solver's Cholesky factor). Wasm: `f64.sqrt` through the SIMD
+/// form, as core has no float maths and a no_std Wasm build has no `f64::sqrt`.
+#[inline(always)]
+pub fn sqrt64(value: f64) -> f64 {
+    #[cfg(target_arch = "wasm32")]
+    {
+        use core::arch::wasm32::*;
+        f64x2_extract_lane::<0>(f64x2_sqrt(f64x2_splat(value)))
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        value.sqrt()
+    }
+}
+
 /// pi and half of it as the nearest f32.
 pub const PI: f32 = 3.141_592_7;
 pub const HALF_PI: f32 = 1.570_796_4;

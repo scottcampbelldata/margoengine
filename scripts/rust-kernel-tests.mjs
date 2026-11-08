@@ -9,6 +9,13 @@
 //                                                           changed ones; a kernel folder counts as its package)
 //   --minutes=<n>                                           hard limit per crate (default 20); past it the process
 //                                                           tree is ended and the run fails
+//   --run-wasm=<module.wasm>                                runs one Wasm check module's checks (the child step)
+// A kernel that ships as Wasm (its Cargo.toml lists a `cdylib` crate type) is also built for wasm32-unknown-unknown
+// with the shipped flags (`WASM_RUSTFLAGS`), so a kernel that builds natively but not for Wasm fails here: the 2D kernel
+// once called `f64::sqrt`, which a no_std Wasm build lacks, and had no memory allocator, and no check saw it. A kernel
+// with a `wasm-check/` crate beside its Cargo.toml then builds that crate the same way and runs it in Node: it exports
+// `checks()` and `check(i)` (0 = pass); the 2D kernel's steps the pinned-bits scenes of tests/bits.rs in Wasm against
+// the native hashes. The Wasm run is a child process under the same hard limit.
 // cargo is started directly, not through a shell, so the command search is the operating system's and not cmd.exe's.
 import { spawn } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
@@ -33,13 +40,24 @@ export function pathDependencies(text, manifest, workspaces, own) {
     .map((w) => w.name);
 }
 
-/** [{ name, dir, manifest, uses }] for every workspace package with a Rust kernel; `manifest` is repo-relative and
- * `uses` names the packages its path dependencies live in. */
+/** True when a Cargo.toml's text lists a `cdylib` crate type: the crate ships as a Wasm module. */
+export const shipsWasm = (text) => /^\s*crate-type\s*=\s*\[[^\]]*"cdylib"/m.test(text);
+
+/** The file name cargo gives a crate's library: the package name its Cargo.toml declares, dashes to underscores. */
+export const crateFile = (text) => /^\s*name\s*=\s*"([^"]+)"/m.exec(text)[1].replaceAll('-', '_');
+
+/** [{ name, dir, manifest, uses, wasm, wasmCheck }] for every workspace package with a Rust kernel; `manifest` is
+ * repo-relative, `uses` names the packages its path dependencies live in, `wasm` is true when it ships as Wasm and
+ * `wasmCheck` is the repo path of its `wasm-check/Cargo.toml`, or null. */
 export function rustKernels(workspaces, dir = root, exists = existsSync, read = (p) => readFileSync(p, 'utf8')) {
   return workspaces.flatMap((w) => {
     const manifest = [`${w.dir}/kernel/Cargo.toml`, `${w.dir}/Cargo.toml`].find((m) => exists(join(dir, m)));
     if (!manifest) return [];
-    return [{ name: w.name, dir: w.dir, manifest, uses: pathDependencies(read(join(dir, manifest)), manifest, workspaces, w.name) }];
+    const text = read(join(dir, manifest)),
+      check = posix.join(posix.dirname(manifest), 'wasm-check/Cargo.toml'),
+      wasm = shipsWasm(text);
+    const uses = pathDependencies(text, manifest, workspaces, w.name);
+    return [{ name: w.name, dir: w.dir, manifest, uses, wasm, wasmCheck: wasm && exists(join(dir, check)) ? check : null }];
   });
 }
 
@@ -54,6 +72,32 @@ export function changedKernelDirs(kernels, changed) {
 /** The cargo arguments for one kernel. */
 export const cargoArgs = (manifest) => ['test', '--locked', '--manifest-path', manifest];
 
+/** The Wasm target and flags the kernels ship with (packages/physics/scripts/build-kernel.mjs builds the 3D one so). */
+export const WASM_TARGET = 'wasm32-unknown-unknown';
+export const WASM_RUSTFLAGS = '-C target-feature=+simd128';
+
+/** The cargo arguments of a crate's Wasm build as shipped: release, the Wasm target, the lock file as committed. */
+export const wasmBuildArgs = (manifest) => ['build', '--locked', '--release', '--target', WASM_TARGET, '--manifest-path', manifest];
+
+/** Where `wasmBuildArgs` puts a crate's module (the crate's own target folder); `text` is its Cargo.toml. */
+export const wasmModule = (manifest, text) =>
+  posix.join(posix.dirname(manifest), 'target', WASM_TARGET, 'release', `${crateFile(text)}.wasm`);
+
+/** Runs a Wasm check module's `check(i)` for every i below `checks()`, printing each; returns the failed indices. */
+export async function runWasmChecks(bytes) {
+  const { instance } = await WebAssembly.instantiate(bytes);
+  const { checks, check, bits } = instance.exports,
+    failed = [];
+  for (let i = 0; i < checks(); i++) {
+    const t0 = performance.now(),
+      code = check(i);
+    const got = code !== 0 && bits ? ` (bits ${BigInt.asUintN(64, bits(i)).toString(16)})` : '';
+    console.log(`  wasm check ${i}: ${code === 0 ? 'pass' : `FAIL code ${code}${got}`} in ${((performance.now() - t0) / 1000).toFixed(1)} s`);
+    if (code !== 0) failed.push(i);
+  }
+  return failed;
+}
+
 /** Kernels picked by `--packages=a,b`; a name with no kernel throws so a typo cannot pass as a green run. */
 export function selectKernels(kernels, packages) {
   if (packages === undefined) return kernels;
@@ -67,10 +111,10 @@ export function selectKernels(kernels, packages) {
   return kernels.filter((k) => names.includes(k.dir.slice(9)));
 }
 
-function runCargo(manifest, limitMs) {
+function runTimed(command, args, limitMs, env = process.env) {
   return new Promise((done) => {
     const t0 = performance.now();
-    const child = spawn('cargo', cargoArgs(manifest), { cwd: root, stdio: 'inherit', shell: false });
+    const child = spawn(command, args, { cwd: root, stdio: 'inherit', shell: false, env });
     let timedOut = false,
       ended = Promise.resolve([]);
     const timer = setTimeout(() => {
@@ -89,15 +133,29 @@ function runCargo(manifest, limitMs) {
 
 async function main(args) {
   const arg = (name) => args.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3);
+  if (arg('run-wasm')) return (await runWasmChecks(readFileSync(arg('run-wasm')))).length ? 1 : 0;
   const minutes = Number(arg('minutes') ?? DEFAULT_KERNEL_MINUTES);
   if (!(minutes > 0)) throw new RangeError(`--minutes must be a positive number, got ${arg('minutes')}`);
   const kernels = selectKernels(rustKernels(loadWorkspaces(root)), arg('packages'));
   let failed = 0;
-  for (const { manifest } of kernels) {
-    console.log(`\n# cargo ${cargoArgs(manifest).join(' ')} (limit ${minutes} min)`);
-    const { ok, timedOut, error, seconds } = await runCargo(manifest, minutes * 60_000);
+  const wasmEnv = { ...process.env, RUSTFLAGS: WASM_RUSTFLAGS };
+  const step = async (label, command, args, env) => {
+    console.log(`\n# ${label} (limit ${minutes} min)`);
+    const { ok, timedOut, error, seconds } = await runTimed(command, args, minutes * 60_000, env);
     const why = timedOut ? `TIMEOUT after ${minutes} min, process tree ended` : error ? error.message : '';
-    console.log(`# ${manifest}: ${ok ? 'pass' : `FAIL ${why}`} in ${seconds.toFixed(1)} s`);
+    console.log(`# ${ok ? 'pass' : `FAIL ${why}`} in ${seconds.toFixed(1)} s`);
+    return ok;
+  };
+  const wasmBuild = (manifest) =>
+    step(`RUSTFLAGS="${WASM_RUSTFLAGS}" cargo ${wasmBuildArgs(manifest).join(' ')}`, 'cargo', wasmBuildArgs(manifest), wasmEnv);
+  for (const { manifest, wasm, wasmCheck } of kernels) {
+    let ok = await step(`cargo ${cargoArgs(manifest).join(' ')}`, 'cargo', cargoArgs(manifest));
+    if (ok && wasm) ok = await wasmBuild(manifest);
+    if (ok && wasmCheck) {
+      const module = join(root, wasmModule(wasmCheck, readFileSync(join(root, wasmCheck), 'utf8')));
+      ok = (await wasmBuild(wasmCheck)) && (await step(`wasm checks of ${wasmCheck}`, process.execPath, [import.meta.filename, `--run-wasm=${module}`]));
+    }
+    console.log(`# ${manifest}: ${ok ? 'pass' : 'FAIL'}`);
     if (!ok) failed++;
   }
   console.log(`\nrust kernels: ${kernels.length - failed} of ${kernels.length} passed`);

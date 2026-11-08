@@ -1,0 +1,24 @@
+[package]
+name = "margoengine-physics2d-wasm-check"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+
+# The 2D kernel's checks inside its shipped Wasm build (wasm32, simd128, no_std, its own heap): the pinned-bits scenes of
+# tests/bits.rs stepped in Wasm must give the native hashes. Built and run by `npm run check:rust-kernels`
+# (scripts/rust-kernel-tests.mjs), which loads the module in Node and calls `checks` and `check`.
+[dependencies]
+margoengine-physics2d-kernel = { path = ".." }
+
+[lib]
+crate-type = ["cdylib"]
+path = "src/lib.rs"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+overflow-checks = false
+strip = "symbols"

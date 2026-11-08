@@ -1,12 +1,26 @@
 // The physics kernels' Rust tests (`test:physics-kernel`, `test:physics2d-kernel`) ran in no check: not verify, not
 // check:merge, not local CI, while claims cite them. check:merge now runs `check:rust-kernels`
-// (scripts/rust-kernel-tests.mjs) for each package with a Rust kernel whose own files changed.
+// (scripts/rust-kernel-tests.mjs) for each package with a Rust kernel whose own files changed. The 2D kernel then did not
+// build for Wasm, its shipped target (an f64 square root no_std lacks, no memory allocator), and no check built it: a
+// kernel that ships as Wasm is now built for wasm32 with the shipped flags, and its wasm-check crate run in Node.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import test from 'node:test';
 import { planContext, planFiles } from '../scripts/check-merge.mjs';
-import { cargoArgs, changedKernelDirs, pathDependencies, rustKernels, selectKernels } from '../scripts/rust-kernel-tests.mjs';
+import {
+  WASM_RUSTFLAGS,
+  cargoArgs,
+  changedKernelDirs,
+  pathDependencies,
+  runWasmChecks,
+  rustKernels,
+  selectKernels,
+  shipsWasm,
+  wasmBuildArgs,
+  wasmModule,
+} from '../scripts/rust-kernel-tests.mjs';
+import { RUSTFLAGS as PHYSICS_RUSTFLAGS } from '../packages/physics/scripts/build-kernel.mjs';
 import { loadWorkspaces } from '../scripts/support/affected-gpu.mjs';
 
 const root = resolve(import.meta.dirname, '..');
@@ -79,4 +93,34 @@ test('changedKernelDirs and selectKernels: changed names map to directories; an 
   assert.equal(selectKernels(some, undefined), some);
   assert.throws(() => selectKernels(some, 'a,zz'), /zz, which hold no Rust kernel/);
   assert.throws(() => selectKernels(some, ''), /names nothing/);
+});
+
+test('every kernel that ships as Wasm is built for wasm32 with the shipped flags, the 2D one checked in Wasm too', () => {
+  for (const dir of ['packages/physics', 'packages/physics2d']) assert.ok(kernels.find((k) => k.dir === dir).wasm, `${dir} ships as Wasm`);
+  assert.equal(WASM_RUSTFLAGS, PHYSICS_RUSTFLAGS, 'the flags of the 3D kernel blueprint');
+  assert.deepEqual(wasmBuildArgs('k/Cargo.toml'), ['build', '--locked', '--release', '--target', 'wasm32-unknown-unknown', '--manifest-path', 'k/Cargo.toml']);
+  assert.ok(shipsWasm('[lib]\ncrate-type = ["cdylib", "rlib"]\n'));
+  assert.ok(!shipsWasm('[lib]\ncrate-type = ["rlib"]\n'));
+  const twoD = kernels.find((k) => k.dir === 'packages/physics2d');
+  assert.equal(twoD.wasmCheck, 'packages/physics2d/kernel/wasm-check/Cargo.toml');
+  assert.equal(kernels.find((k) => k.dir === 'packages/physics').wasmCheck, null);
+  const check = readFileSync(resolve(root, twoD.wasmCheck), 'utf8');
+  assert.equal(
+    wasmModule(twoD.wasmCheck, check),
+    'packages/physics2d/kernel/wasm-check/target/wasm32-unknown-unknown/release/margoengine_physics2d_wasm_check.wasm',
+  );
+  // The Wasm check and the native pinned-bits test step one scene file against one set of hashes.
+  const scenes = '#[path = "support/bits_scenes.rs"]';
+  assert.ok(readFileSync(resolve(root, 'packages/physics2d/kernel/tests/bits.rs'), 'utf8').includes(scenes));
+  assert.ok(readFileSync(resolve(root, 'packages/physics2d/kernel/wasm-check/src/lib.rs'), 'utf8').includes('#[path = "../../tests/support/bits_scenes.rs"]'));
+});
+
+test('a Wasm check module fails on the checks that return nonzero', async () => {
+  // (func checks (result i32) 2) (func check (param i32) (result i32) local.get 0): check 0 passes, check 1 fails.
+  const module = Uint8Array.from([
+    0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00, 0x01, 0x0a, 0x02, 0x60, 0x00, 0x01, 0x7f, 0x60, 0x01, 0x7f, 0x01, 0x7f,
+    0x03, 0x03, 0x02, 0x00, 0x01, 0x07, 0x12, 0x02, 0x06, 0x63, 0x68, 0x65, 0x63, 0x6b, 0x73, 0x00, 0x00, 0x05, 0x63, 0x68,
+    0x65, 0x63, 0x6b, 0x00, 0x01, 0x0a, 0x0b, 0x02, 0x04, 0x00, 0x41, 0x02, 0x0b, 0x04, 0x00, 0x20, 0x00, 0x0b,
+  ]);
+  assert.deepEqual(await runWasmChecks(module), [1]);
 });
