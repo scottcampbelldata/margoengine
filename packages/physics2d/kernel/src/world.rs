@@ -9,6 +9,7 @@ use alloc::vec::Vec;
 use margoengine_physics_kernel_common::broad::{Bounds, SweepPrune};
 use margoengine_physics_kernel_common::island::{UnionFind, sleep_tick};
 
+use crate::joint::{Joint, JointDef};
 use crate::manifold::{Manifold, collide};
 use crate::mass::mass_of;
 use crate::math::{Rot, V2, Xf, sqrt, v2};
@@ -195,6 +196,14 @@ pub struct Settings {
     pub sleep: bool,
     /// Two-point manifolds solved as one 2 by 2 problem (solver.rs); off, point by point.
     pub block_solver: bool,
+    /// The joint spring of the biased pass (joint.rs), held to a quarter of the substep rate, its damping ratio, and how
+    /// fast a joint's error is pulled out at most.
+    pub joint_hertz: f32,
+    pub joint_damping: f32,
+    pub joint_max_push: f32,
+    /// Joints solve with each body's turning stiffened by the pull of its taut point joints (joint.rs, `stiffen`), which
+    /// keeps a heavily loaded chain from flying apart at a few substeps; off, the plain inertia.
+    pub joint_geometric_stiffness: bool,
 }
 
 impl Default for Settings {
@@ -211,6 +220,10 @@ impl Default for Settings {
             sleep_time: 0.5,
             sleep: true,
             block_solver: true,
+            joint_hertz: 60.0,
+            joint_damping: 2.0,
+            joint_max_push: 3.0,
+            joint_geometric_stiffness: true,
         }
     }
 }
@@ -235,6 +248,7 @@ pub struct World {
     pub bodies: Vec<Body>,
     pub shapes: Vec<Shape>,
     pub contacts: Vec<Contact>,
+    pub joints: Vec<Joint>,
     pub counts: Counts,
     pub steps: u64,
     broad: SweepPrune<2>,
@@ -270,6 +284,7 @@ impl World {
             bodies: Vec::new(),
             shapes: Vec::new(),
             contacts: Vec::new(),
+            joints: Vec::new(),
             counts: Counts::default(),
             steps: 0,
             broad: SweepPrune::new(),
@@ -399,6 +414,19 @@ impl World {
         body.inv_inertia = if inertia > 0.0 && !body.fixed_rotation { 1.0 / inertia } else { 0.0 };
     }
 
+    /// Joins two bodies (joint.rs) and wakes both.
+    pub fn create_joint(&mut self, def: &JointDef) -> u32 {
+        self.joints.push(Joint::new(*def));
+        self.wake(def.a);
+        self.wake(def.b);
+        self.joints.len() as u32 - 1
+    }
+
+    /// Whether a joint between bodies `a` and `b` keeps their shapes from colliding.
+    fn jointed_apart(joints: &[Joint], a: u32, b: u32) -> bool {
+        joints.iter().any(|j| !j.def.collide && ((j.def.a == a && j.def.b == b) || (j.def.a == b && j.def.b == a)))
+    }
+
     /// Wakes `body` and resets its sleep timer.
     pub fn wake(&mut self, body: u32) {
         let b = &mut self.bodies[body as usize];
@@ -441,9 +469,10 @@ impl World {
         let mut pairs = core::mem::take(&mut self.pairs);
         let shapes = &self.shapes;
         let bodies = &self.bodies;
+        let joints = &self.joints;
         self.broad.pairs(&mut pairs, |a, b| {
             let (ba, bb) = (shapes[a as usize].body, shapes[b as usize].body);
-            ba != bb && (bodies[ba as usize].is_dynamic() || bodies[bb as usize].is_dynamic())
+            ba != bb && (bodies[ba as usize].is_dynamic() || bodies[bb as usize].is_dynamic()) && (joints.is_empty() || !Self::jointed_apart(joints, ba, bb))
         });
         debug_assert!(pairs.iter().all(|&(a, b)| self.may_touch(a, b)));
         self.counts.compared = self.broad.compared;
@@ -524,6 +553,19 @@ impl World {
                 self.union.union(a, b);
             } else {
                 // A kinematic or static body joins no island; an awake kinematic one wakes the dynamic body it touches.
+                let (other, dynamic) = if ba.is_dynamic() { (bb, b) } else { (ba, a) };
+                if other.kind == Kind::Kinematic && other.awake {
+                    woken.push(dynamic);
+                }
+            }
+        }
+        // A joint between two dynamic bodies joins them; one to a kinematic body wakes the dynamic one while it moves.
+        for joint in &self.joints {
+            let (a, b) = (joint.def.a, joint.def.b);
+            let (ba, bb) = (&self.bodies[a as usize], &self.bodies[b as usize]);
+            if ba.is_dynamic() && bb.is_dynamic() {
+                self.union.union(a, b);
+            } else {
                 let (other, dynamic) = if ba.is_dynamic() { (bb, b) } else { (ba, a) };
                 if other.kind == Kind::Kinematic && other.awake {
                     woken.push(dynamic);

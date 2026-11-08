@@ -34,6 +34,7 @@
 // 1:100 stack keeps the quarter's small sag (tests/world.rs).
 use alloc::vec::Vec;
 
+use crate::joint::{self, Pass};
 use crate::math::{Rot, V2};
 use crate::world::{Kind, World, gravity_length};
 
@@ -108,6 +109,7 @@ struct Constraint {
 #[derive(Default)]
 pub struct Scratch {
     constraints: Vec<Constraint>,
+    pub(crate) paths: joint::Paths,
 }
 
 /// Velocity and turn of a body while the solver works, read from and written back to the world.
@@ -241,6 +243,10 @@ pub fn solve(world: &mut World, dt: f32) {
 
     let g = settings.gravity;
     let (mut block, mut sequential) = (0u64, 0u64);
+    // Joint passes: relaxing unless marked biased.
+    let mut paths = core::mem::take(&mut world.scratch.paths);
+    joint::build_paths(world, &mut paths);
+    let joint_pass = Pass { h, inv_h, biased: false, spring: joint::joint_spring(settings.joint_hertz, settings.joint_damping, h), max_push: settings.joint_max_push };
     for _ in 0..substeps {
         for body in world.bodies.iter_mut() {
             if body.kind != Kind::Dynamic || !body.awake {
@@ -253,7 +259,9 @@ pub fn solve(world: &mut World, dt: f32) {
         for c in &constraints {
             warm_start(world, c);
         }
+        joint::warm_start(world, &mut paths, h, settings.joint_geometric_stiffness);
         for _ in 0..passes {
+            joint::solve(world, &mut paths, &Pass { biased: true, ..joint_pass });
             for c in constraints.iter_mut() {
                 let (b, s) = solve_contact(world, c, true, inv_h, settings.contact_max_push);
                 block += b;
@@ -270,6 +278,7 @@ pub fn solve(world: &mut World, dt: f32) {
             body.xf.q = body.xf.q.integrate(h * body.angular_velocity);
         }
         for _ in 0..passes {
+            joint::solve(world, &mut paths, &joint_pass);
             for c in constraints.iter_mut() {
                 let (b, s) = solve_contact(world, c, false, inv_h, settings.contact_max_push);
                 block += b;
@@ -313,6 +322,7 @@ pub fn solve(world: &mut World, dt: f32) {
         }
     }
     world.scratch.constraints = constraints;
+    world.scratch.paths = paths;
 }
 
 /// sqrt(a b): the friction of two materials.
