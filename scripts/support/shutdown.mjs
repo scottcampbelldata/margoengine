@@ -27,7 +27,11 @@ export async function killTree(child) {
     await new Promise((resolve) => child.once('exit', resolve));
 }
 
-/** Whether `pid` is still running. On Windows this reads the exit code, which is set before the process's handles close. */
+/**
+ * Whether `pid` is still running. On Windows this reads the exit code (libuv's `kill(pid, 0)` answers "gone" once the
+ * exit code is set), and the exit code is set before the process has closed its handles: a folder it sat in or a file
+ * it wrote can still be held then. `waitSignaled` waits for the handles.
+ */
 function isAlive(pid) {
   try {
     process.kill(pid, 0);
@@ -42,6 +46,42 @@ export function taskkillPids(output) {
   return [...output.matchAll(/^\S.*?PID (\d+)/gm)].map((match) => Number(match[1]));
 }
 
+/**
+ * Windows: waits until each of `pids` has finished exiting, its handles closed (its process object signalled), and
+ * resolves to the ones still running when `waitMs` ran out. A pid that is gone, or that a newer process took after
+ * `sinceMs` (epoch ms), is not waited for. Node has no call that waits on a process it did not start, so .NET's
+ * `Process.WaitForExit` does, from one Windows PowerShell for all the pids.
+ * @param {number[]} pids
+ * @param {number} waitMs
+ * @param {number} sinceMs
+ * @returns {Promise<number[]>}
+ */
+export function waitSignaled(pids, waitMs, sinceMs) {
+  const ids = pids.filter((pid) => Number.isInteger(pid) && pid > 0);
+  if (!ids.length) return Promise.resolve([]);
+  if (!(waitMs > 0)) return Promise.resolve(ids);
+  const script = [
+    `$end = [DateTime]::UtcNow.AddMilliseconds(${Math.round(waitMs)})`,
+    `$since = [DateTimeOffset]::FromUnixTimeMilliseconds(${Math.round(sinceMs)}).UtcDateTime`,
+    `foreach ($id in @(${ids.join(',')})) {`,
+    '  try { $p = [Diagnostics.Process]::GetProcessById($id) } catch { continue }',
+    '  try { if ($p.StartTime.ToUniversalTime() -gt $since) { continue } } catch {}',
+    '  $left = [int][Math]::Max(0, ($end - [DateTime]::UtcNow).TotalMilliseconds)',
+    '  if (-not $p.WaitForExit($left)) { $id }',
+    '}',
+  ].join('\n');
+  return new Promise((resolve) => {
+    // A PowerShell that did not answer in time says nothing about the pids, so all of them count as still running.
+    execFile(
+      'powershell.exe',
+      ['-NoProfile', '-NonInteractive', '-Command', script],
+      { timeout: waitMs + 10_000, windowsHide: true },
+      (error, stdout) =>
+        resolve(error?.killed ? ids : [...String(stdout).matchAll(/\d+/g)].map((match) => Number(match[0]))),
+    );
+  });
+}
+
 function taskkillTree(pid, timeout) {
   return new Promise((resolve) => {
     // Exit code 128 only says one process had already ended, so the lines say what happened, not the code.
@@ -52,13 +92,22 @@ function taskkillTree(pid, timeout) {
 }
 
 /**
- * Ends `pid` and everything it started, and resolves when none of them runs any more. Never waits past `waitMs`: it
- * resolves to the pids still running then, normally none.
+ * Ends `pid` and everything it started, and resolves when none of them runs any more and, on Windows, each has closed
+ * its handles (`settle`, default `waitSignaled`), so the folders and files they held can be removed. Never waits past
+ * `waitMs` (plus PowerShell's start on Windows): it resolves to the pids still running then, normally none.
  * @param {number} pid
- * @param {{ waitMs?: number, kill?: (pid: number, timeout: number) => Promise<number[]>, alive?: (pid: number) => boolean }} [options]
+ * @param {{ waitMs?: number, kill?: (pid: number, timeout: number) => Promise<number[]>, alive?: (pid: number) => boolean, settle?: (pids: number[], waitMs: number, sinceMs: number) => Promise<number[]> }} [options]
  * @returns {Promise<number[]>}
  */
-export async function endTree(pid, { waitMs = SHUTDOWN_BUDGET_MS, kill, alive = isAlive } = {}) {
+export async function endTree(
+  pid,
+  {
+    waitMs = SHUTDOWN_BUDGET_MS,
+    kill,
+    alive = isAlive,
+    settle = process.platform === 'win32' ? waitSignaled : null,
+  } = {},
+) {
   if (!pid) return [];
   const begun = Date.now();
   let pids;
@@ -74,10 +123,12 @@ export async function endTree(pid, { waitMs = SHUTDOWN_BUDGET_MS, kill, alive = 
       } catch {}
     }
   }
+  const killed = pids;
   for (;;) {
     pids = pids.filter(alive);
     // wall-clock: a bound on the wait for processes already killed, far from normal.
-    if (!pids.length || Date.now() - begun > waitMs) return pids;
+    if (pids.length && Date.now() - begun > waitMs) return pids;
+    if (!pids.length) return settle ? settle(killed, begun + waitMs - Date.now(), begun) : [];
     // fixed-wait: polling the process table, which has no event to wait on.
     await new Promise((resolve) => setTimeout(resolve, 10));
   }

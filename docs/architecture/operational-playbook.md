@@ -1047,6 +1047,10 @@ are the enforceable non-regression layer for the overlapping categories.
 `scripts/verify.mjs` runs fast hygiene and one package build in order, then independent chains in parallel: API,
 quality, parity, sandbox build/tests, unit tests at bounded concurrency, documentation links, size measurement, and
 current proofs. A chain failure terminates the other process trees. Serial mode remains available for diagnosis.
+A killed tree counts as ended only when its processes have closed their handles (`endTree` in
+`scripts/support/shutdown.mjs`): on Windows a process's exit code is set before its handles close, so the end waits on
+each process object, and the folder, log and ports of a timed-out step are free when `runLimited` returns (fixed
+2026-11-08 after an EPERM on a timed-out job's temp folder).
 Three of those chains start a TypeScript checker (tsgo) at about the same time: API reports, quality (through hygiene
 gate 6) and the API report tests in the unit step. Each starts it through the async API, whose start has no fixed time
 limit, so a slow start under load waits instead of failing; the step's own timeout still bounds a hang. Evidence: a

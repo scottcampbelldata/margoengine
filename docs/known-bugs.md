@@ -988,6 +988,12 @@ diagnostic). Their causes and the fixes that landed are in `bench/parity-causes.
   on these numbers is not remeasured yet. If a quiet rerun does not close the gap, record what is left as an accepted
   difference.
 
+## Fixed 2026-11-08
+
+| Bug | Cause | Fix | Regression test |
+| --- | --- | --- | --- |
+| `tests/parallel-check.test.js` "runLimited keeps a suite log, and a timed-out job has its tree killed" failed under load with `EPERM` removing its temp folder (root tests, lane C, 2026-11-07); the folder could be removed a moment later | `endTree` (scripts/support/shutdown.mjs) took a killed process as gone once `kill(pid, 0)` said so, and on Windows libuv answers that from the exit code, which is set before the process has closed its handles: the hung node still held the folder it ran in and the log it wrote to. `runLimited` and every bounded browser close resolve through `endTree` | On Windows `endTree` then waits for each killed process to finish exiting (its process object signalled, after its handles close) with `waitSignaled`, one PowerShell `Process.WaitForExit` for all the pids, within the same budget; a pid a newer process took is not waited for | `tests/gpu-test-limit.test.js`, "endTree resolves only once the killed processes have closed their handles" and "waitSignaled waits for a running process to finish" |
+
 ## Fixed 2026-11-07
 
 | Bug | Cause | Fix | Regression test |

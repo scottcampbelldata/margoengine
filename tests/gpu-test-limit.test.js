@@ -6,7 +6,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import { DEFAULT_TEST_MINUTES, runLimited, testLimitMs } from '../scripts/support/run-limited.mjs';
-import { endTree, taskkillPids } from '../scripts/support/shutdown.mjs';
+import { spawn } from 'node:child_process';
+import { endTree, taskkillPids, waitSignaled } from '../scripts/support/shutdown.mjs';
 
 const node = JSON.stringify(process.execPath);
 const alive = (pid) => {
@@ -112,6 +113,7 @@ test('endTree waits for every process taskkill named, and returns the ones past 
   let polls = 0;
   const gone = await endTree(1, {
     kill: async () => [11, 12],
+    settle: async () => [],
     alive: (pid) => {
       seen.push(pid);
       return pid === 12 && ++polls < 3;
@@ -121,6 +123,50 @@ test('endTree waits for every process taskkill named, and returns the ones past 
   assert.equal(polls, 3, 'it kept asking until the last process was gone');
   const left = await endTree(1, { kill: async () => [13], alive: () => true, waitMs: 20 });
   assert.deepEqual(left, [13]);
+});
+
+test('endTree resolves only once the killed processes have closed their handles, not when their exit code is set', async () => {
+  // parallel-check.test.js failed with EPERM removing the folder a killed process sat in: on Windows the exit code
+  // (all that kill(pid, 0) reads) is set before the process closes its handles, so "gone" came too early.
+  const asked = [];
+  let finishSettle;
+  let resolved = false;
+  const since = Date.now();
+  const ending = endTree(1, {
+    kill: async () => [21, 22],
+    alive: () => false,
+    settle: (pids, waitMs, sinceMs) => {
+      asked.push({ pids, waitMs, sinceMs });
+      return new Promise((resolve) => (finishSettle = resolve));
+    },
+  }).then((left) => {
+    resolved = true;
+    return left;
+  });
+  // fixed-wait: a few turns of the loop; the assertion can only pass wrongly, never fail wrongly.
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  assert.equal(resolved, false, 'resolved before the handles were closed');
+  assert.deepEqual(asked[0].pids, [21, 22], 'every process taskkill named is waited for');
+  assert.ok(asked[0].sinceMs >= since && asked[0].waitMs > 0 && asked[0].waitMs <= 30_000);
+  finishSettle([22]);
+  assert.deepEqual(await ending, [22], 'a process that never closed is reported');
+});
+
+test('waitSignaled waits for a running process to finish, and skips a pid that is gone or newer', LIMIT, async (t) => {
+  if (process.platform !== 'win32') return t.skip('Windows only: elsewhere the exit and the handles go together');
+  const child = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 700)'], { stdio: 'ignore' });
+  let exited = false;
+  child.once('exit', () => (exited = true));
+  assert.deepEqual(await waitSignaled([child.pid], 60_000, Date.now()), []);
+  assert.equal(exited || child.exitCode !== null, true, 'resolved before the process had exited');
+  assert.deepEqual(await waitSignaled([child.pid], 60_000, Date.now()), [], 'a gone pid is not waited for');
+  const hung = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });
+  try {
+    assert.deepEqual(await waitSignaled([hung.pid], 60_000, Date.now() - 600_000), [], 'a newer process is not ours');
+    assert.deepEqual(await waitSignaled([hung.pid], 300, Date.now() + 1000), [hung.pid], 'still running at the limit');
+  } finally {
+    hung.kill();
+  }
 });
 
 test('the pids come from taskkill lines, never the parent it names', () => {

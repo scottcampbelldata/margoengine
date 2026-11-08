@@ -182,6 +182,7 @@ test('endTree waits for every process taskkill named, and returns the ones past 
   let polls = 0;
   const gone = await endTree(1, {
     kill: async () => [11, 12],
+    settle: async () => [],
     alive: (pid) => pid === 12 && ++polls < 3,
   });
   assert.deepEqual(gone, []);
