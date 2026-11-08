@@ -15,6 +15,7 @@ import { margoError } from '../../shared/errors.js';
 import { meshTriangles } from '../../shared/mesh-source.js';
 import { inView } from '../../shared/view-rect.js';
 import { EditHistory } from './history.js';
+import { hexOf } from './color.js';
 import { restoreSnapshot, snapshotMeshes, type RestoreResult, type SceneSnapshot } from './snapshot.js';
 import { describeEngine, type EngineResources } from './resources.js';
 export { EditHistory, type Edit } from './history.js';
@@ -115,19 +116,6 @@ function wireframe(mesh: Mesh): Line {
     wirePositions.set(source.identity, positions);
   }
   return new Line({ mesh, positions, mode: 'segments', color: '#72e8cc', onTop: true, cap: 'butt', join: 'miter' });
-}
-
-/** `#rrggbb` (sRGB) of a core material's linear colour, for a colour input. */
-function hexOf(data: Float32Array): string {
-  let out = '#';
-  for (let i = 0; i < 3; i++) {
-    const v = Math.max(0, Math.min(1, data[i])),
-      s = v <= 0.0031308 ? v * 12.92 : 1.055 * v ** (1 / 2.4) - 0.055;
-    out += Math.round(s * 255)
-      .toString(16)
-      .padStart(2, '0');
-  }
-  return out;
 }
 
 const css = `

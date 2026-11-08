@@ -1,5 +1,5 @@
 {
-  "commit": "e111dde8a",
+  "commit": "373ebde76",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -1346,8 +1346,8 @@
     },
     "@margoengine/inspector": {
       ".": {
-        "raw": 26191,
-        "gzip": 9058
+        "raw": 26200,
+        "gzip": 9045
       },
       "./frame": {
         "raw": 23776,
@@ -1364,6 +1364,10 @@
       "./resources": {
         "raw": 1375,
         "gzip": 676
+      },
+      "./packages": {
+        "raw": 11773,
+        "gzip": 4734
       }
     },
     "@margoengine/kinematics-constraints": {

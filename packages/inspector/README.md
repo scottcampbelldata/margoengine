@@ -72,8 +72,40 @@ shader shows the WGSL of the latest WebGPU frame; both build their text only whi
 `EditHistory` from `margoengine/inspector/history`, `snapshotMeshes`/`restoreSnapshot`/`parseSnapshot` from
 `margoengine/inspector/snapshot` and `describeEngine` from `margoengine/inspector/resources`.
 
-Not included: creating or deleting entities, reparenting, shader editing, a GPU memory view (WebGPU does not report
-resource sizes) and editing materials other than core's PBR values.
+Not included: creating or deleting entities, reparenting, shader editing and a GPU memory view (WebGPU does not report
+resource sizes). Other packages' lights, materials, shadows and effects are edited in the package panel below.
+
+## Edit other packages' objects
+
+`margoengine/inspector/packages` edits what other packages attach, found by shape without importing them: core's sun and
+ambient, every light in a `clustered*` plugin's `list` (point, spot, directional, area), the glTF PBR materials of the
+scene's gltf-pro and FBX nodes (base colour, opacity, roughness, metallic, normal scale, occlusion, emissive, alpha
+cutoff, double sided, wireframe), the `shadows` options (distance, cascade blend, light size, bias, normal bias, caster
+margin) and every other plugin's `options` numbers and switches (Bloom's strength, threshold, exposure and radius, say).
+An option the app never set shows its documented default; an undo back past the first edit unsets it again.
+
+```ts
+import {Inspector} from 'margoengine/inspector';
+import {PackageEditor, findPackageObjects, editProperty} from 'margoengine/inspector/packages';
+import type {EngineKernel} from 'margoengine/core';
+function editPackages(engine: EngineKernel, settings: {speed: number}) {
+  const inspector = Inspector.attach(engine);
+  // One undo history for both panels; `objects` adds your own (a materials Material, app settings).
+  const editor = PackageEditor.attach(engine, {history: inspector.history, objects: {Settings: settings}});
+  const sun = findPackageObjects(engine).find((o) => o.id === 'light:sun')!;
+  editProperty(sun, 'intensity', 4, inspector.history);   // checked: a negative intensity throws RangeError
+  editor.set('light:sun', 'color', [1, 0.9, 0.8]);
+  return editor;
+}
+```
+
+Each object has an `id` (`light:clustered:0`, `material:0`, `shadows:shadows`, `effect:bloom`), a `group` and its
+`properties` (`key`, `kind` number, boolean, color or vector, `min`, `max`, live `get` and `set`). Colours are linear
+RGB (the panel's colour inputs are sRGB). The panel lists objects again every 500 ms when plugins, lights or meshes come
+and go. A glTF material whose `@margoengine/materials` shading reports a version is shown read only (that shading
+caches its values by version): pass its `Material` in `objects`, whose setters `describeObject` finds. A package reads
+most of these values every frame; an option it reads only when it attaches keeps its old value until it is attached
+again.
 
 WebGPU wireframe edges, world-space vertex normals and AABB boxes use the existing
 `@margoengine/lines` helpers. These overlays apply to core meshes and loaded glTF/FBX

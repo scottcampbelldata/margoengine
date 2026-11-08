@@ -41,6 +41,10 @@
     "./resources": {
       "types": "./dist/resources.d.ts",
       "import": "./dist/resources.js"
+    },
+    "./packages": {
+      "types": "./dist/packages.d.ts",
+      "import": "./dist/packages.js"
     }
   },
   "files": [

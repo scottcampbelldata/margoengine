@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11329344,
+  "total": 11334334,
   "history": [
     {
       "date": "2026-10-24",
@@ -4562,6 +4562,12 @@
       "commit": "e111dde8a",
       "reason": "growable anchor slots: capacity up to 1,048,576, storage doubles from 64 slots, work to the used slots",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "373ebde76",
+      "reason": "new entry @margoengine/inspector/packages (batch 107 job 1)",
+      "grew": 1
     }
   ],
   "items": {
@@ -4887,6 +4893,7 @@
     "@margoengine/inspector": 9302,
     "@margoengine/inspector/frame": 8897,
     "@margoengine/inspector/history": 1101,
+    "@margoengine/inspector/packages": 4990,
     "@margoengine/inspector/resources": 902,
     "@margoengine/inspector/snapshot": 1320,
     "@margoengine/kinematics-constraints": 11751,
