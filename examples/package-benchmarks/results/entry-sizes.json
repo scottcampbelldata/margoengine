@@ -1,6 +1,6 @@
 {
-  "commit": "2d9bce624",
-  "dirty": true,
+  "commit": "21bec500b",
+  "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
     "raw": 58443,
@@ -1926,8 +1926,8 @@
         "gzip": 19195
       },
       "./next": {
-        "raw": 211212,
-        "gzip": 125866
+        "raw": 221728,
+        "gzip": 133092
       }
     },
     "@margoengine/physics2d": {
@@ -2692,6 +2692,10 @@
       "./shader": {
         "raw": 2130,
         "gzip": 966
+      },
+      "./skeletal": {
+        "raw": 13774,
+        "gzip": 5270
       }
     },
     "@margoengine/stage": {

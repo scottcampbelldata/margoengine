@@ -1,7 +1,7 @@
 {
   "name": "@margoengine/sprites",
   "version": "1.0.0",
-  "description": "2D sprites at exact pixels: one instanced draw per layer, atlas rectangles, pivot, flip, rotation, tint, z and y sorting, integer pixel snapping and an optional normal map target, and camera-facing billboards in 3D.",
+  "description": "2D sprites at exact pixels: one instanced draw per layer, atlas rectangles, pivot, flip, rotation, tint, z and y sorting, integer pixel snapping and an optional normal map target, camera-facing billboards in 3D and bone-driven 2D skeletal meshes.",
   "keywords": [
     "margoengine",
     "webgpu",
@@ -46,6 +46,10 @@
     "./shader": {
       "types": "./dist/shader.d.ts",
       "import": "./dist/shader.js"
+    },
+    "./skeletal": {
+      "types": "./dist/skeletal.d.ts",
+      "import": "./dist/skeletal.js"
     }
   },
   "files": [
@@ -67,6 +71,7 @@
     "test:gpu:billboard": "cd ../.. && node packages/sprites/tests/billboard-check.mjs",
     "test:gpu:smooth": "cd ../.. && node packages/sprites/tests/smooth-check.mjs",
     "test:gpu:shader": "cd ../.. && node packages/sprites/tests/shader-check.mjs",
-    "test:gpu:pages": "cd ../.. && node packages/sprites/tests/pages-check.mjs"
+    "test:gpu:pages": "cd ../.. && node packages/sprites/tests/pages-check.mjs",
+    "test:gpu:skeletal": "cd ../.. && node packages/sprites/tests/skeletal-check.mjs"
   }
 }

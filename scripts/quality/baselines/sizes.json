@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11020896,
+  "total": 11026422,
   "history": [
     {
       "date": "2026-10-24",
@@ -4184,6 +4184,12 @@
       "commit": "2e837ba1a",
       "reason": "physics /next grows: own-solver rays on every shape with the Rapier query filter (batch 126 queries part 1)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "21bec500b",
+      "reason": "new entry @margoengine/sprites/skeletal (2D skeletal animation)",
+      "grew": 1
     }
   ],
   "items": {
@@ -4824,6 +4830,7 @@
     "@margoengine/sprites/atlas": 649,
     "@margoengine/sprites/billboard": 5389,
     "@margoengine/sprites/shader": 1222,
+    "@margoengine/sprites/skeletal": 5526,
     "@margoengine/stage": 3222,
     "@margoengine/stage/effects": 727,
     "@margoengine/stage/environment": 747,

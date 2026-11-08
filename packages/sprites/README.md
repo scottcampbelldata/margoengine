@@ -212,6 +212,59 @@ texels are decoded from sRGB like any colour texture; on an 8-bit target they go
 - Sorting is by the pivot's distance: two blended billboards that cross each other draw one over the other whole.
 - WebGPU only.
 
+## 2D skeletal animation
+
+`margoengine/sprites/skeletal` bends sprite art with bones, for characters that move smoothly instead of swapping
+frames. A `Skeleton2D` holds the bones, a `SkinnedMesh` ties each vertex to up to four bones with weights (linear
+blend skinning, done on the CPU each frame), and a `SkeletalLayer` draws all its meshes in one indexed draw with exact
+texels, like a `SpriteLayer`.
+
+```ts
+import { EngineKernel } from 'margoengine/core';
+import { gridMesh, poseSkeleton, SkeletalLayer, Skeleton2D, SkinnedMesh } from 'margoengine/sprites/skeletal';
+
+const engine = await EngineKernel.create(document.querySelector('canvas')!, { exactSize: [64, 32] });
+// A 4 x 8 atlas: an orange arm.
+const data = new Uint8Array(4 * 8 * 4).map((_, i) => [230, 120, 40, 255][i % 4]);
+const layer = SkeletalLayer.attach(engine, { atlas: { width: 4, height: 8, data } });
+// Two bones: the upper arm at the shoulder, the forearm 4 units down it.
+const skeleton = new Skeleton2D([{ name: 'upper' }, { name: 'fore', parent: 'upper', y: 4 }]);
+// A 1 x 4 grid over the atlas: vertex rows at y 0 and 2 follow the upper arm, y 6 and 8 the forearm.
+const grid = gridMesh([0, 0, 4, 8], 1, 4);
+const joints = new Array(40).fill(0);
+const weights = new Array(40).fill(0);
+for (let v = 0; v < 10; v++) {
+  joints[v * 4] = v < 6 ? 0 : 1; // vertices 0 to 5 are the rows at y 0, 2 and 4
+  weights[v * 4] = 1;
+}
+// The elbow row at y 4 is shared half and half, so the bend is smooth.
+joints[4 * 4 + 1] = joints[5 * 4 + 1] = 1;
+weights[4 * 4 + 1] = weights[5 * 4 + 1] = 1;
+const arm = layer.add(new SkinnedMesh({ skeleton, ...grid, joints, weights }));
+arm.x = 30;
+arm.y = 4;
+const wave = { duration: 1, bones: { fore: { rotation: [[0, 0], [0.5, 1.2], [1, 0]] } } };
+let time = 0;
+engine.onFrame((_, delta) => {
+  time += delta;
+  poseSkeleton(skeleton, wave, time);
+});
+engine.start();
+```
+
+| Piece | What it does |
+| --- | --- |
+| `Skeleton2D(bones)` | Bones `{name, parent?, x, y, rotation, scaleX, scaleY}` relative to the parent, y down, rotation clockwise in radians (as on a sprite); any order, parents are found by name. `update()` computes each bone's `world` `[a, b, c, d, tx, ty]`; `resetPose()` puts the bones back; `bone(name)` finds one |
+| `SkinnedMesh(options)` | `skeleton`, bind-pose `positions` (x, y per vertex), atlas texel `uvs`, triangle `indices`, four `joints` (bone indices) and four `weights` per vertex. The skeleton's pose when the mesh is made is the bind pose. Place it with `x`, `y`, `z`; `tint`, `alpha` and `visible` as on a `Sprite`; `deform()` returns the skinned positions |
+| `gridMesh(rect, columns, rows, {x, y, scale})` | Positions, uvs and indices of a grid over an atlas rectangle, `scale` units per texel (default 1) |
+| `poseSkeleton(skeleton, clip, time, loop = true)` | Sets the bones from a clip `{duration, bones: {name: {x?, y?, rotation?, scaleX?, scaleY?: [[time, value], ...]}}}`, keys linear, rotations the short way round, and updates the skeleton |
+| `SkeletalLayer` | Options `atlas` (required, as a `SpriteLayer`'s), `camera` (`{x: 0, y: 0, zoom: 1}`), `order` (10), `layers` (1), `name` (`skeletal-1`, ...). Methods `add`, `remove`, `setAtlas`, `dispose` (or `using`) |
+
+- Call `skeleton.update()` after changing bones by hand; `poseSkeleton` does it for you.
+- Weights are scaled to sum to 1 per vertex; more than four bones per vertex is not supported.
+- Skinning runs on the CPU: about a thousand vertices a frame is light, tens of thousands is not (time not measured).
+- Texels are read at exact positions with no filtering, and the layer needs a single-sample target. WebGPU only.
+
 ## Animation
 
 `@margoengine/sprites/animation` (`margoengine/sprites/animation`) plays sprite-sheet clips. It is plain CPU code, so it

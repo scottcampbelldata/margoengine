@@ -2558,6 +2558,10 @@
       "types": "./dist/sprites/shader.d.ts",
       "import": "./dist/sprites/shader.js"
     },
+    "./sprites/skeletal": {
+      "types": "./dist/sprites/skeletal.d.ts",
+      "import": "./dist/sprites/skeletal.js"
+    },
     "./stage/gltf": {
       "types": "./dist/stage/gltf.d.ts",
       "import": "./dist/stage/gltf.js"
