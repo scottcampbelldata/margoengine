@@ -7,6 +7,7 @@
 // and the same instances the atomic cull gives when its threads run in index order. With the atomic cull the reverse
 // run fills every ring backwards.
 import test from 'node:test';
+import { readdirSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { box } from '@margoengine/core';
 import { Scatter, scatterCullShader } from '../dist/index.js';
@@ -157,4 +158,22 @@ test('ScatterTiles: a ring at its capacity keeps the first instances in record o
     xs,
     xs.map((_, k) => Math.fround(-128 + ((30000 + k * 64) * 256) / 65536)),
   );
+});
+
+// Bug (npm run check:wgsl on Metal): compactShader took any number as its ring, and its WGSL indexes the lanes vector
+// (vec4u: candidates, then the three rings' capacities) at ring + 1, so compactShader(4) built a shader that reads
+// n[5u] and fails to compile ("index 5 out of bounds [0..3]"). A ring is 0, 1 or 2; anything else throws, and each
+// ring's kernel indexes the lanes vector within its four lanes.
+test('the ring compaction is built for the three LOD rings only, each within its lanes vector', async () => {
+  const dist = new URL('../dist/', import.meta.url),
+    chunk = readdirSync(dist).find((f) => /^compat-[\w-]+\.js$/.test(f)),
+    { compactShader } = await import(new URL(chunk, dist).href);
+  for (const ring of [0, 1, 2]) {
+    const code = compactShader(ring),
+      lanes = [...code.matchAll(/\bn\[(\d+)u\]/g)].map((m) => Number(m[1]));
+    assert.deepEqual(lanes, [ring + 1], `ring ${ring} reads its own capacity`);
+    assert.ok(lanes.every((k) => k < 4));
+  }
+  for (const ring of [3, 4, -1, 1.5, Number.NaN])
+    assert.throws(() => compactShader(ring), RangeError, `ring ${ring} is refused`);
 });

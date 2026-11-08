@@ -71,12 +71,19 @@ ${cullEntry}
  let n=frame.ids.x;marks[id.x]=mask&1u;marks[n+id.x]=(mask>>1u)&1u;marks[2u*n+id.x]=mask>>2u;
 }`;
 }
+/** A LOD ring: near, middle or far. */
+export type Ring = 0 | 1 | 2;
+/** The three LOD rings, in order. */
+export const RINGS: readonly Ring[] = [0, 1, 2];
 /**
- * One LOD ring's compaction, up to the ring's capacity (`n[ring + 1]`); a fade band's copy takes the rotation.w of
- * that ring's half of the band (1 or 2).
+ * One LOD ring's compaction, up to the ring's capacity (`n[ring + 1]`, the lanes vector holds the candidates and then
+ * three capacities); a fade band's copy takes the rotation.w of that ring's half of the band (1 or 2).
+ * @throws RangeError when `ring` is not 0, 1 or 2 (any other ring would index past the lanes vector). The literal
+ * union is written out (not {@link Ring}) so check:wgsl compiles each ring's variant.
  */
-export const compactShader = (ring: number): string =>
-  `struct Instance {position:vec4f,rotation:vec4f}
+export const compactShader = (ring: 0 | 1 | 2): string => {
+  if (!RINGS.includes(ring)) throw new RangeError('Invalid scatter LOD ring; pass 0, 1 or 2.');
+  return `struct Instance {position:vec4f,rotation:vec4f}
 ${lanes}@group(0) @binding(1) var<storage,read> candidates:array<Instance>;
 @group(0) @binding(2) var<storage,read> marks:array<u32>;
 @group(0) @binding(3) var<storage,read> slots:array<u32>;
@@ -89,6 +96,7 @@ ${lanes}@group(0) @binding(1) var<storage,read> candidates:array<Instance>;
  if(c.rotation.w>0.0){c.rotation.w=select(2.0,1.0,u32(c.rotation.w)==${ring + 1}u);}
  rings[slot]=c;
 }`;
+};
 /** One invocation: each ring's instance count, up to its capacity, into its indirect draw. */
 const ringTotalsShader = `${lanes}@group(0) @binding(1) var<storage,read> slots:array<u32>;
 @group(0) @binding(2) var<storage,read_write> commands:array<u32>;
@@ -148,8 +156,8 @@ export class OrderedCull {
       fresh = [...rings, commands];
     if (fresh.some((b, k) => b !== this.bound[k])) {
       const groups = Math.ceil(this.n / 64);
-      this.steps = rings.map((ring, r) =>
-        kernel(d, compactShader(r), [this.lanes, this.candidates, this.flags, this.prefix.prefix, ring], groups),
+      this.steps = RINGS.map((r) =>
+        kernel(d, compactShader(r), [this.lanes, this.candidates, this.flags, this.prefix.prefix, rings[r]], groups),
       );
       this.steps.push(kernel(d, ringTotalsShader, [this.lanes, this.prefix.prefix, commands], 1));
       this.bound = fresh;

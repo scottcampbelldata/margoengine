@@ -11,7 +11,7 @@
 // slot of its ring or list and its vertex shader drops those at or past the count, read from a small buffer of counts.
 import { MargoError } from '@margoengine/math/errors';
 import { PrefixCount } from '../../shared/prefix.js';
-import { candidateShader, compactShader } from './order.js';
+import { RINGS as RING_IDS, candidateShader, compactShader } from './order.js';
 export { candidateShader, compactShader };
 
 declare const GPUBufferUsage: { STORAGE: number; UNIFORM: number; COPY_DST: number };
@@ -161,8 +161,12 @@ export class ScatterRoute {
     d.queue.writeBuffer(this.lanes, 0, new Uint32Array([n, host.capacity, host.capacity, host.capacity]));
     this.placing = pipeline(d, candidateShader(host.cull));
     const groups = Math.ceil(n / 64);
-    this.finish = host.rings.map((ring, r) =>
-      this.kernel(compactShader(r), [this.lanes, this.candidates, this.slots.flags, this.slots.prefix, ring], groups),
+    this.finish = RING_IDS.map((r) =>
+      this.kernel(
+        compactShader(r),
+        [this.lanes, this.candidates, this.slots.flags, this.slots.prefix, host.rings[r]],
+        groups,
+      ),
     );
     this.finish.push(
       this.kernel(totalsShader(0, RINGS), [this.lanes, this.slots.prefix, host.commands, this.counts], 1),
