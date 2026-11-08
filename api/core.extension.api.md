@@ -96,6 +96,7 @@ export class Engine {
     sceneOf(plugin: EnginePlugin): Scene | undefined;
     createMesh(parent?: Mesh | null, scene?: Scene): Mesh;
     remove(mesh: Mesh): void;
+    writePoses(ids: ArrayLike<number>, poses: ArrayLike<number>, count?: number): void;
     retain(geometry: Geometry): void;
     release(geometry: Geometry): void;
     render({ camera, culling, delta, views }?: {

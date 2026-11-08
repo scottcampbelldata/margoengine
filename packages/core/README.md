@@ -8,7 +8,7 @@ Desktop scenes use 4× MSAA with a canvas DPR cap of 1; phones use single-sample
 
 `engine.pick(x, y)` updates scene state without forcing a color frame. One readback runs at a time and overlapping calls wait their turn, so a loop of picks costs one readback a point; `pickMany` of `@margoengine/selection` answers many points from one. For cached forward-pass IDs, instance culling in a 3×3 micro frustum and neighbor resolution, attach the optional `Picking` plugin from `@margoengine/selection`. On a canvas without client size (an `OffscreenCanvas` in a worker) pick coordinates are canvas pixels.
 
-Static scenes cost little per frame: the kernel recomputes only entities whose position, rotation, scale, parent, bounds or visibility changed (and their descendants); the engine reuses last frame's instance list unless the mesh set, a geometry or material assignment, a material's values, visibility or the culling result changed, and otherwise patches only the moved matrices; the WebGPU renderer uploads only the changed instance range. On an Intel Arc 140V laptop this made the kernel 2.6-4x cheaper and lets 50,000 CAD parts orbit at 92 FPS instead of 49; an orbiting camera still re-collects every frame, so 90,000 parts stay GPU-bound at 33 FPS (CAD measurements). Contract for `@margoengine/core/extension` users: the per-geometry instance buffers (`engine.geometryBuffers(geometry).instance`) belong to core and are read-only for packages (bind them, never write them; use your own buffer, as `@margoengine/selection`'s micro pick pass does), and `store.matrices` is kernel output (change transforms through the mesh, never by writing world matrices). GPU culling of core meshes (`@margoengine/culling`'s `CulledMeshes`) uses one hook: passes see the frame's batches as `context.batches`, and a package may set `batch.redirect = {instances, args}` for the frame; every core draw of that batch (main pass and replays) then reads the package's compacted instance records and `drawIndexedIndirect` arguments instead of core's buffer and count. Core still uploads into its own instance buffer, which stays the read-only source the package culls from. `engine.start({culling: false})` skips core's CPU frustum test in the built-in loop (as `render({culling: false})` does for one frame) when a package culls on the GPU.
+Static scenes cost little per frame: the kernel recomputes only entities whose position, rotation, scale, parent, bounds or visibility changed (and their descendants); the engine reuses last frame's instance list unless the mesh set, a geometry or material assignment, a material's values or the layers changed; a mesh that culling or `visible` shows or hides moves one row of its batch (shown: the batch's next row; hidden: the batch's last row takes its place), a moved mesh rewrites its own row, and the WebGPU renderer uploads only the changed rows, one `writeBuffer` for each run of neighbouring rows. On an Intel Arc 140V laptop the kernel part made the kernel 2.6-4x cheaper and let 50,000 CAD parts orbit at 92 FPS instead of 49 (CAD measurements, before the row change). An orbiting camera no longer re-collects every frame: with 50,000 boxes and 500 culling flips a frame, the frame does 50,000 byte compares, 1,000 map lookups, 12,000 float copies and uploads 48 KB in at most 500 writes, where it did 100,000 lookups, 1.2 million float copies and a 4.8 MB upload (counted in `tests/core-instance-cache.test.js`; not timed yet). Several cameras on one scene flip most rows, and then cost what a full collection costs. Draw order among the instances of one geometry follows these row moves, so it changes after a flip; opaque pixels are the same except for two core meshes at exactly the same depth. Contract for `@margoengine/core/extension` users: the per-geometry instance buffers (`engine.geometryBuffers(geometry).instance`) belong to core and are read-only for packages (bind them, never write them; use your own buffer, as `@margoengine/selection`'s micro pick pass does), and `store.matrices` is kernel output (change transforms through the mesh, never by writing world matrices). GPU culling of core meshes (`@margoengine/culling`'s `CulledMeshes`) uses one hook: passes see the frame's batches as `context.batches`, and a package may set `batch.redirect = {instances, args}` for the frame; every core draw of that batch (main pass and replays) then reads the package's compacted instance records and `drawIndexedIndirect` arguments instead of core's buffer and count. Core still uploads into its own instance buffer, which stays the read-only source the package culls from. `engine.start({culling: false})` skips core's CPU frustum test in the built-in loop (as `render({culling: false})` does for one frame) when a package culls on the GPU.
 
 Entity capacity grows on demand: `Engine.create(canvas, {capacity})` sets the initial number of slots (default 1,024) and `createMesh` doubles the transform store when it is full, up to 8,388,608 (2^23). Growing re-creates the kernel at the same Wasm address, re-binds every `store` view and `mesh.matrix`, and recomputes every entity once on the next tick; a growth that cannot allocate throws and leaves the store unchanged. Store views and `mesh.matrix` taken before a `createMesh` may be stale afterwards (detached, or aliasing the new layout): re-read them, never keep them. Memory per slot: 344 B of kernel columns plus 7 B of flags (351 B; 352 MB of Wasm memory at 1,048,576 slots) and 5 B in the engine; each drawn instance adds 96 B on the CPU and 96 B on the GPU.
 
@@ -48,6 +48,79 @@ Back faces of single-sided materials (`doubleSided: false`) are culled by the GP
 `mesh.receiveShadow = false` (default true) keeps a mesh's direct light unshadowed by `@margoengine/shadows` and clustered local shadows while it still casts; the next frame re-collects instances. Core marks it by adding 0.25 to the instance's doubleSided factor (float 22), so every `< 0.5` single-sided test reads it unchanged; the shadow packages patch core's shader for it only while some mesh opts out.
 
 The canvas is opaque. For a transparent canvas over HTML and CSS, attach `TransparentCanvas` from `@margoengine/environment`; core needs no option.
+
+## Bulk poses and instance rows (extension)
+
+`engine.writePoses(ids, poses, count?)` sets the position and rotation of many meshes in one call: row k of `poses`
+holds `x y z qx qy qz qw` for mesh `ids[k]`, relative to its parent as `setPosition` is, and every value lands with the
+bits `setPosition` and `setQuaternion` would give it, Euler angles included (the quaternion is normalised). It checks
+every row before it writes any: `Error: Mesh disposed` for an id with no live mesh, `RangeError: Invalid transform: k`
+for a value that is not finite as float32 and `RangeError: Quaternion nonzero: k` for four zeros. It looks no mesh up,
+so drop the ids of meshes you dispose (a freed id goes to the next new mesh). `count` defaults to `ids.length`. A
+`Float64Array` keeps the bits of numbers you computed in doubles; `@margoengine/physics` writes its awake bodies this way.
+
+```ts
+import { Engine, box } from '@margoengine/core/extension';
+
+const canvas = document.querySelector('canvas')!;
+const engine = await Engine.create(canvas);
+const meshes = Array.from({ length: 100 }, () => engine.createMesh().setGeometry(box(0.2)));
+const ids = Int32Array.from(meshes, (mesh) => mesh.id);
+const poses = new Float64Array(meshes.length * 7);
+const clock = new Float64Array(1);
+engine.onFrame((_, delta) => {
+  clock[0] += delta;
+  for (let k = 0; k < meshes.length; k++) {
+    const angle = clock[0] + k * 0.1;
+    poses[k * 7] = Math.cos(angle) * 3; // x y z
+    poses[k * 7 + 1] = (k - 50) * 0.05;
+    poses[k * 7 + 2] = Math.sin(angle) * 3;
+    poses[k * 7 + 4] = Math.sin(angle / 2); // qx qy qz qw: a turn about y
+    poses[k * 7 + 6] = Math.cos(angle / 2);
+  }
+  engine.writePoses(ids, poses);
+});
+engine.start();
+```
+
+Each batch keeps the rows it changed since its last upload: bit r of `batch.rows` is set for row r, and `batch.dirty`
+counts them (-1: every row). `uploadRows(queue, buffer, batch, all?)` writes those rows into a GPU buffer, one
+`writeBuffer` for each run of neighbouring rows up to `batch.count`, and clears them. Core calls it for the batches it
+draws; a package that sets `batch.claimed` and draws a batch itself calls it into core's instance buffer, with `all`
+the first time and after a device restore:
+
+```ts
+import { Engine, box, uploadRows } from '@margoengine/core/extension';
+
+const canvas = document.querySelector('canvas')!;
+const engine = await Engine.create(canvas);
+const geometry = box();
+engine.createMesh().setGeometry(geometry);
+let sent = false;
+engine.use({
+  name: 'own-draw',
+  setup() {},
+  onDeviceRestored() {
+    sent = false;
+  },
+  registerPasses(graph) {
+    graph.add({
+      name: 'own-draw:claim',
+      order: -1,
+      execute(context) {
+        if (context.backend !== 'webgpu') return;
+        const batch = context.batches?.find((b) => b.geometry === geometry);
+        if (!batch) return;
+        batch.claimed = true; // core no longer draws it, or uploads it
+        uploadRows(context.device.queue, engine.geometryBuffers(geometry)!.instance, batch, !sent);
+        sent = true;
+        // Draw batch.count instances from that buffer in a pass of your own here.
+      },
+    });
+  },
+});
+engine.start();
+```
 
 ## When an allocation fails
 

@@ -97,9 +97,9 @@
     </section>
     <section id="transform">
       <h2><a href="#transform">Transform values</a></h2>
-      <p class="messages"><code>Invalid transform</code> <code>Scale nonzero</code> <code>Quaternion nonzero</code> <code>&lt;name&gt;: &lt;n&gt; values</code> <code>&lt;name&gt;: finite values</code> <code>Invalid transform/bounds: &lt;id&gt;</code></p>
-      <p><strong>Cause.</strong> A position, rotation, scale, quaternion or other vector had the wrong length, a value that is not a finite float32, a zero scale, or an all-zero quaternion. The kernel names the entity whose transform or bounds went non-finite.</p>
-      <p><strong>Fix.</strong> Pass arrays of the stated length with finite numbers; use nonzero scale factors and a nonzero quaternion. Look for divisions by zero or NaN upstream of the entity id the kernel reports.</p>
+      <p class="messages"><code>Invalid transform</code> <code>Scale nonzero</code> <code>Quaternion nonzero</code> <code>Invalid poses</code> <code>Invalid transform: &lt;k&gt;</code> <code>Quaternion nonzero: &lt;k&gt;</code> <code>&lt;name&gt;: &lt;n&gt; values</code> <code>&lt;name&gt;: finite values</code> <code>Invalid transform/bounds: &lt;id&gt;</code></p>
+      <p><strong>Cause.</strong> A position, rotation, scale, quaternion or other vector had the wrong length, a value that is not a finite float32, a zero scale, or an all-zero quaternion. <code>engine.writePoses</code> names the failing row k, refuses a <code>count</code> above <code>ids.length</code> or <code>poses</code> shorter than <code>count * 7</code>, and writes nothing when any row fails. The kernel names the entity whose transform or bounds went non-finite.</p>
+      <p><strong>Fix.</strong> Pass arrays of the stated length with finite numbers; use nonzero scale factors and a nonzero quaternion. Give <code>writePoses</code> 7 numbers a mesh. Look for divisions by zero or NaN upstream of the entity id the kernel reports.</p>
     </section>
     <section id="hierarchy">
       <h2><a href="#hierarchy">Parents and meshes from another engine or scene</a></h2>

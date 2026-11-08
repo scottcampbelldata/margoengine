@@ -199,7 +199,7 @@ export class Physics implements EnginePlugin, BodyOwner {
     const substeps = options.substeps ?? options.solverIterations;
     if (substeps !== undefined) this.world.substeps = substeps;
     if (options.iterations !== undefined) this.world.iterations = options.iterations;
-    this.meshes = new MeshSync(this.world.columns, (body) => this.removeBody(body));
+    this.meshes = new MeshSync(this.world, (body) => this.removeBody(body));
     if (engine)
       try {
         engine.use(this);
@@ -397,7 +397,7 @@ export class Physics implements EnginePlugin, BodyOwner {
   sync(alpha = this.lastAlpha): void {
     if (this.disposed) return;
     if (!Number.isFinite(alpha)) throw new RangeError('Interpolation alpha must be a finite number; pass a value from 0 to 1.');
-    this.meshes.write(this.bodies, !this.interpolate || alpha > 1 ? 1 : alpha < 0 ? 0 : alpha);
+    this.meshes.write(!this.interpolate || alpha > 1 ? 1 : alpha < 0 ? 0 : alpha);
     this.attachments.forEach(attachmentSync);
   }
 
@@ -444,6 +444,7 @@ export class Physics implements EnginePlugin, BodyOwner {
     // A pose taken from the mesh is already on the mesh; writing it back would only round a child's transform.
     if (mesh && !options.position && !options.rotation) body.dirty = false;
     this.bodies.add(body);
+    this.meshes.add(body);
     if (mesh) this.byMesh.set(mesh, body);
     const colliders =
       options.colliders === undefined
@@ -521,9 +522,14 @@ export class Physics implements EnginePlugin, BodyOwner {
     for (const joint of this.joints) if (joint.bodyA === body || joint.bodyB === body) this.removeJoint(joint);
     for (const collider of body.colliders) this.byRow.delete(collider.handle);
     this.bodies.delete(body);
+    this.meshes.remove(body);
     if (body.mesh) this.byMesh.delete(body.mesh);
     this.kernel.removeBody(body.row);
     body.markRemoved();
+  }
+  /** @internal use `body.setTranslation` and the like: the mesh follows at the next sync. */
+  moved(body: PhysicsBody): void {
+    this.meshes.mark(body);
   }
   owns(body: PhysicsBody): boolean {
     return this.bodies.has(body);

@@ -148,6 +148,32 @@ export class VectorRef {
 }
 
 /**
+ * Stores `q[at..at + 4]` normalised as entity `id`'s quaternion, with the Euler lanes it gives: setQuaternion and
+ * writePoses, so both write the same bits. RangeError when all four are 0. No spread or map: physics and animation
+ * call it for every moving body each frame. Whole numbers cross the call, so V8 boxes no number here.
+ */
+const storeQuaternion = (store: TransformStore, id: number, q: ArrayLike<number>, at: number) => {
+  const length = hypot(4, q[at], q[at + 1], q[at + 2], q[at + 3]);
+  if (!length) throw rangeError('Quaternion nonzero', 'transform');
+  const x = q[at] / length,
+    y = q[at + 1] / length,
+    z = q[at + 2] / length,
+    w = q[at + 3] / length,
+    t = store.transforms,
+    lanes = store.rotations,
+    lane = id * 3;
+  t.qx[id] = x;
+  t.qy[id] = y;
+  t.qz[id] = z;
+  t.qw[id] = w;
+  // A clamp by compares, not Math.max and Math.min: V8 13 (Node 24) Maglev calls them, boxing their numbers. The
+  // value is finite (a unit quaternion), so the compares give the same number, -0 included.
+  const sinPitch = 2 * (x * z + w * y);
+  lanes[lane + 1] = Math.asin(sinPitch > 1 ? 1 : sinPitch < -1 ? -1 : sinPitch);
+  lanes[lane] = Math.atan2(2 * (w * x - y * z), 1 - 2 * (x * x + y * y));
+  lanes[lane + 2] = Math.atan2(2 * (w * z - x * y), 1 - 2 * (y * y + z * z));
+};
+/**
  * 1 when the instance row at float `o` needs back faces drawn: double-sided (float 22 is 1 or 1.25, single-sided 0 or
  * 0.25) or a mirrored matrix. A batch's `mask` counts its drawn rows that do, so a hidden or unmirrored row leaves it.
  */
@@ -254,27 +280,7 @@ export class Mesh {
   setQuaternion(value: readonly number[]): this {
     this.check();
     finite(value, 4, 'Quaternion');
-    // No spread or map: physics and animation call this for every moving body each frame.
-    const length = hypot(4, value[0], value[1], value[2], value[3]);
-    if (!length) throw rangeError('Quaternion nonzero', 'transform');
-    const x = value[0] / length,
-      y = value[1] / length,
-      z = value[2] / length,
-      w = value[3] / length,
-      t = this.engine.store.transforms,
-      id = this.id;
-    t.qx[id] = x;
-    t.qy[id] = y;
-    t.qz[id] = z;
-    t.qw[id] = w;
-    const lanes = this.engine.store.rotations,
-      at = id * 3;
-    // A clamp by compares, not Math.max and Math.min: V8 13 (Node 24) Maglev calls them, boxing their numbers. The
-    // value is finite (a unit quaternion), so the compares give the same number, -0 included.
-    const sinPitch = 2 * (x * z + w * y);
-    lanes[at + 1] = Math.asin(sinPitch > 1 ? 1 : sinPitch < -1 ? -1 : sinPitch);
-    lanes[at] = Math.atan2(2 * (w * x - y * z), 1 - 2 * (x * x + y * y));
-    lanes[at + 2] = Math.atan2(2 * (w * z - x * y), 1 - 2 * (y * y + z * z));
+    storeQuaternion(this.engine.store, this.id, value, 0);
     return this;
   }
   setParent(parent: Mesh | null): this {
@@ -699,6 +705,37 @@ export class Engine {
     this.store.active[mesh.id] = 0;
     this.store.visible[mesh.id] = 0;
     this.free.push(mesh.id);
+  }
+  /**
+   * Sets the position and rotation of many meshes in one call, with the same float32 bits (Euler angles included) as
+   * `setPosition` and `setQuaternion` on each: row k of `poses` holds x y z qx qy qz qw (7 numbers, relative to the
+   * parent, the quaternion normalised here) for mesh `ids[k]`, for k below `count`. Every row is checked before any is
+   * written: Error 'Mesh disposed' for an id that is no live mesh slot (an id freed and taken by a new mesh is that new
+   * mesh, so drop ids of disposed meshes), RangeError 'Invalid transform: k' for a value not finite as float32 and
+   * 'Quaternion nonzero: k' for four zeros. For physics, animation and other writers of many meshes a frame.
+   */
+  writePoses(ids: ArrayLike<number>, poses: ArrayLike<number>, count = ids.length): void {
+    this.live();
+    const { transforms: t, active } = this.store;
+    if (!(count >= 0 && count <= ids.length && poses.length >= count * 7)) throw rangeError('Invalid poses', 'transform');
+    for (let k = 0, at = 0; k < count; k++, at += 7) {
+      if (active[ids[k]] !== 1) throw fault('disposed', 'Mesh disposed');
+      for (let i = at; i < at + 7; i++) {
+        const value = poses[i];
+        // As VectorRef.validate: compares, no Math.fround or Math.abs.
+        if (typeof value !== 'number' || !(value < F32_OVERFLOW && value > -F32_OVERFLOW))
+          throw rangeError(`Invalid transform: ${k}`, 'transform');
+      }
+      if (!(poses[at + 3] || poses[at + 4] || poses[at + 5] || poses[at + 6]))
+        throw rangeError(`Quaternion nonzero: ${k}`, 'transform');
+    }
+    for (let k = 0, at = 0; k < count; k++, at += 7) {
+      const id = ids[k];
+      t.x[id] = poses[at];
+      t.y[id] = poses[at + 1];
+      t.z[id] = poses[at + 2];
+      storeQuaternion(this.store, id, poses, at + 3);
+    }
   }
   /**
    * Takes one reference to `geometry`, allocating or growing its storage. Everything that can fail comes first, so a

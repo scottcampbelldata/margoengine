@@ -169,13 +169,16 @@ export const entries = [
       'Invalid transform',
       'Scale nonzero',
       'Quaternion nonzero',
+      'Invalid poses',
+      'Invalid transform: <k>',
+      'Quaternion nonzero: <k>',
       '<name>: <n> values',
       '<name>: finite values',
       'Invalid transform/bounds: <id>',
     ],
     cause:
-      'A position, rotation, scale, quaternion or other vector had the wrong length, a value that is not a finite float32, a zero scale, or an all-zero quaternion. The kernel names the entity whose transform or bounds went non-finite.',
-    fix: 'Pass arrays of the stated length with finite numbers; use nonzero scale factors and a nonzero quaternion. Look for divisions by zero or NaN upstream of the entity id the kernel reports.',
+      'A position, rotation, scale, quaternion or other vector had the wrong length, a value that is not a finite float32, a zero scale, or an all-zero quaternion. `engine.writePoses` names the failing row k, refuses a `count` above `ids.length` or `poses` shorter than `count * 7`, and writes nothing when any row fails. The kernel names the entity whose transform or bounds went non-finite.',
+    fix: 'Pass arrays of the stated length with finite numbers; use nonzero scale factors and a nonzero quaternion. Give `writePoses` 7 numbers a mesh. Look for divisions by zero or NaN upstream of the entity id the kernel reports.',
   },
   {
     id: 'hierarchy',

@@ -267,6 +267,7 @@ export class Physics implements EnginePlugin, BodyOwner {
     addCollider(body: PhysicsBody, options: ColliderOptions): PhysicsCollider;
     removeCollider(body: PhysicsBody, collider: PhysicsCollider): void;
     removeBody(body: PhysicsBody): void;
+    moved(body: PhysicsBody): void;
     owns(body: PhysicsBody): boolean;
     attach(attachment: PhysicsAttachment): void;
     detach(attachment: PhysicsAttachment): boolean;
@@ -529,6 +530,7 @@ interface BodyOwner {
     addCollider(body: PhysicsBody, options: ColliderOptions): PhysicsCollider;
     removeCollider(body: PhysicsBody, collider: PhysicsCollider): void;
     removeBody(body: PhysicsBody): void;
+    moved(body: PhysicsBody): void;
 }
 
 interface ColliderDesc {

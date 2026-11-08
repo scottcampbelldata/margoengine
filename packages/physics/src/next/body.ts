@@ -14,6 +14,8 @@ export interface BodyOwner {
   addCollider(body: PhysicsBody, options: ColliderOptions): PhysicsCollider;
   removeCollider(body: PhysicsBody, collider: PhysicsCollider): void;
   removeBody(body: PhysicsBody): void;
+  /** The body was placed by hand or changed type: its mesh is written at the next sync, awake or not. */
+  moved(body: PhysicsBody): void;
 }
 
 const later = (what: string, when: string): MargoError =>
@@ -87,6 +89,7 @@ export class PhysicsBody {
     this.kind = type;
     this.dirty = true;
     this.restWritten = false;
+    this.owner.moved(this);
     return this;
   }
 
@@ -106,6 +109,7 @@ export class PhysicsBody {
     this.world().setPose(this.row, position, rotation, wakeUp);
     this.dirty = true;
     this.restWritten = false;
+    this.owner.moved(this);
     return this;
   }
   /** Teleports the body. Interpolation restarts from the new pose so it does not streak. */
