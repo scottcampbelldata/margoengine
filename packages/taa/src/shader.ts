@@ -169,3 +169,77 @@ export function reactiveResolve(code: string): string {
     )
     .replace(store, 'textureStore(output,p,vec4f(max(result,vec3f(0)),react));');
 }
+
+/**
+ * `rejection: 'variance'` (TAAOptions): history is clipped toward the centre of the box mean +- gamma * sigma of the 3x3
+ * neighbourhood in YCoCg (gamma in `temporal.settings.w`), cut to the min/max box, instead of clamped per axis to the
+ * min/max box: one outlier pixel no longer opens the box for a ghost. After M. Salvi, "An Excursion in Temporal
+ * Supersampling" (GDC 2016, variance clipping) and Karis 2014 (clipping toward the centre, not clamping).
+ */
+export function varianceResolve(code: string): string {
+  const targets = [
+    '@compute @workgroup_size(8,8)',
+    'var lo=vec3f(1e30);var hi=vec3f(-1e30);',
+    'lo=min(lo,sample);hi=max(hi,sample);',
+    'clamp(ycocg(old/total),lo,hi)',
+  ];
+  if (targets.some((t) => code.split(t).length !== 2))
+    throw new MargoError('state', 'TAA variance patch target missing; update varianceResolve to the resolve shader');
+  const [entry, box, sample, clamp] = targets;
+  return code
+    .replace(
+      entry,
+      'fn clipHistory(h:vec3f,lo:vec3f,hi:vec3f,m1:vec3f,m2:vec3f)->vec3f {let mean=m1/9.0;' +
+        'let sigma=sqrt(max(m2/9.0-mean*mean,vec3f(0)))*temporal.settings.w;let a=max(lo,mean-sigma);let b=min(hi,mean+sigma);' +
+        'let centre=(a+b)*0.5;let extent=max((b-a)*0.5,vec3f(1e-6));let d=h-centre;' +
+        'let t=max(abs(d.x)/extent.x,max(abs(d.y)/extent.y,abs(d.z)/extent.z));return select(h,centre+d/t,t>1.0);}\n' +
+        entry,
+    )
+    .replace(box, box + 'var m1=vec3f(0);var m2=vec3f(0);')
+    .replace(sample, sample + 'm1+=sample;m2+=sample*sample;')
+    .replace(clamp, 'clipHistory(ycocg(old/total),lo,hi,m1,m2)');
+}
+/**
+ * `locks` (TAAOptions): a pixel one pixel wide against its neighbours across x or y (a wire, a fence, a far edge: its
+ * luminance differs from both by more than a quarter of its own) takes a lock that lasts eight frames, the Halton
+ * cycle, renewed while the feature is seen and carried from the nearest accepted history tap. A locked pixel keeps its
+ * history unclipped, so a feature the jitter misses on some frames does not flash. Bindings 10 and 11 read and write
+ * the lock (r32float); rejected history, a disocclusion or a reactive pixel drops it. Margo-own design.
+ */
+export function lockResolve(code: string): string {
+  const targets = [
+    '@group(0) @binding(8) var outputDepth:texture_storage_2d<r32float,write>;',
+    'var old=vec3f(0);var total=0.0;',
+    'let current=linear(textureLoad(scene,p,0).rgb);',
+    'if(total>0.001){',
+    'textureStore(outputDepth,p,',
+    'total+=weight;}',
+  ];
+  const kept = /(?:clamp|clipHistory)\(ycocg\(old\/total\),lo,hi(?:,m1,m2)?\)/;
+  if (targets.some((t) => code.split(t).length !== 2) || code.split(kept).length !== 2)
+    throw new MargoError('state', 'TAA lock patch target missing; update lockResolve to the resolve shader');
+  const [binding, taps, scene, accepted, store, tap] = targets;
+  const react = code.includes('reactiveMask') ? '*(1.0-max(react,oldReact/total))' : '';
+  return code
+    .replace(
+      binding,
+      binding +
+        '\n@group(0) @binding(10) var lockHistory:texture_2d<f32>;\n@group(0) @binding(11) var lockOutput:texture_storage_2d<r32float,write>;',
+    )
+    .replace(
+      scene,
+      scene +
+        'let lum=array<f32,4>(ycocg(linear(textureLoad(scene,clamp(p+vec2i(-1,0),vec2i(0),vec2i(size)-1),0).rgb)).x,' +
+        'ycocg(linear(textureLoad(scene,clamp(p+vec2i(1,0),vec2i(0),vec2i(size)-1),0).rgb)).x,' +
+        'ycocg(linear(textureLoad(scene,clamp(p+vec2i(0,-1),vec2i(0),vec2i(size)-1),0).rgb)).x,' +
+        'ycocg(linear(textureLoad(scene,clamp(p+vec2i(0,1),vec2i(0),vec2i(size)-1),0).rgb)).x);' +
+        'let centre=ycocg(current).x;let edge=0.25*max(centre,0.05);' +
+        'let thin=centre-max(lum[0],lum[1])>edge||centre-max(lum[2],lum[3])>edge||min(lum[0],lum[1])-centre>edge||min(lum[2],lum[3])-centre>edge;' +
+        'var lock=select(0.0,1.0,thin);',
+    )
+    .replace(taps, taps + 'var lockOld=0.0;var nearest=0.0;')
+    .replace(tap, 'if(weight>nearest){nearest=weight;lockOld=textureLoad(lockHistory,pixel,0).r;}' + tap)
+    .replace(accepted, accepted + 'lock=max(lock,lockOld-0.125)' + react + ';')
+    .replace(kept, (m) => `select(${m},ycocg(old/total),lock>0.0)`)
+    .replace(store, 'textureStore(lockOutput,p,vec4f(lock));' + store);
+}

@@ -1,10 +1,10 @@
 {
-  "commit": "b661c0ec5",
+  "commit": "1cc3b8bf0",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
     "raw": 58443,
-    "gzip": 23626,
+    "gzip": 23590,
     "limit": 25000
   },
   "packages": {
@@ -565,17 +565,17 @@
     "@margoengine/core": {
       ".": {
         "raw": 51214,
-        "gzip": 21285
+        "gzip": 21258
       },
       "./extension": {
-        "raw": 51315,
-        "gzip": 21311
+        "raw": 51313,
+        "gzip": 21323
       }
     },
     "@margoengine/creative": {
       ".": {
-        "raw": 62200,
-        "gzip": 19154
+        "raw": 61586,
+        "gzip": 19100
       },
       "./particles": {
         "raw": 1028,
@@ -594,16 +594,16 @@
         "gzip": 7019
       },
       "./grass": {
-        "raw": 16377,
-        "gzip": 5961
+        "raw": 16111,
+        "gzip": 5944
       },
       "./planet": {
-        "raw": 20958,
-        "gzip": 7027
+        "raw": 20730,
+        "gzip": 7011
       },
       "./stars": {
-        "raw": 6153,
-        "gzip": 2665
+        "raw": 6033,
+        "gzip": 2653
       }
     },
     "@margoengine/culling": {
@@ -1934,12 +1934,16 @@
     },
     "@margoengine/physics": {
       ".": {
-        "raw": 59627,
-        "gzip": 19296
+        "raw": 59683,
+        "gzip": 19311
       },
       "./next": {
-        "raw": 291844,
-        "gzip": 182955
+        "raw": 292212,
+        "gzip": 182976
+      },
+      "./decomposition": {
+        "raw": 26425,
+        "gzip": 10805
       }
     },
     "@margoengine/physics2d": {
@@ -2716,8 +2720,8 @@
     },
     "@margoengine/stage": {
       ".": {
-        "raw": 7318,
-        "gzip": 2974
+        "raw": 7314,
+        "gzip": 2966
       },
       "./gltf": {
         "raw": 2922,
@@ -2794,8 +2798,8 @@
     },
     "@margoengine/taa": {
       ".": {
-        "raw": 42061,
-        "gzip": 12620
+        "raw": 45304,
+        "gzip": 13459
       },
       "./upscale": {
         "raw": 20429,
@@ -3483,9 +3487,9 @@
       "brotli": 11098
     },
     "packages/physics/dist/index.js": {
-      "raw": 59627,
-      "gzip": 19296,
-      "brotli": 17041
+      "raw": 59683,
+      "gzip": 19311,
+      "brotli": 17098
     },
     "packages/save/dist/index.js": {
       "raw": 19901,

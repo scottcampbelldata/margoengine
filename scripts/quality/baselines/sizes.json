@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11241181,
+  "total": 11242040,
   "history": [
     {
       "date": "2026-10-24",
@@ -4370,6 +4370,12 @@
       "commit": "69265afc9",
       "reason": "new entry @margoengine/physics/decomposition: convex decomposition after Wei, Liu, Ling and Su 2022 (CoACD): mesh cut and capping, concavity sampling, Monte Carlo tree search, merging; /next and the root entry take its parts as a convexDecomposition collider (a few hundred bytes each). Only a game that imports the entry pays for it; Rapier has convexDecomposition, and each piece has its test in tests/next-decomposition.test.js.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "8fdfecded",
+      "reason": "taa variance clipping and thin-feature locks: options and resolve patches (batch 73 job 3)",
+      "grew": 1
     }
   ],
   "items": {
@@ -5034,7 +5040,7 @@
     "@margoengine/stats/leaks": 1921,
     "@margoengine/stats/phases": 1714,
     "@margoengine/stats/report": 1378,
-    "@margoengine/taa": 12999,
+    "@margoengine/taa": 13858,
     "@margoengine/taa/upscale": 7093,
     "@margoengine/terrain": 12874,
     "@margoengine/terrain/blend": 3676,

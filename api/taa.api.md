@@ -35,6 +35,9 @@ export interface TAAOptions {
     velocityOnly?: boolean;
     stochastic?: boolean;
     reactive?: () => GPUTexture | undefined;
+    rejection?: 'clamp' | 'variance';
+    clipGamma?: number;
+    locks?: boolean;
 }
 
 export interface TAAVelocity {

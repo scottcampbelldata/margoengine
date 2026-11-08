@@ -20,6 +20,8 @@ import {
   resolve,
   stochasticResolve,
   reactiveResolve,
+  varianceResolve,
+  lockResolve,
   present,
 } from './shader.js';
 import { displacementGroup, opacityEntries, type CasterCutout } from '../../shared/caster.js';
@@ -64,6 +66,21 @@ export interface TAAOptions {
    * for a frame with nothing reactive. Fixed at construction whether a mask is used; the texture may change per frame.
    */
   reactive?: () => GPUTexture | undefined;
+  /**
+   * How history is kept inside this frame's 3x3 neighbourhood: `'clamp'`, per axis to its min/max box in YCoCg, or
+   * `'variance'`, clipped toward the centre of mean +- `clipGamma` standard deviations cut to that box, so one outlier
+   * pixel no longer opens the box for a ghost. Fixed at construction. Default `'clamp'`.
+   */
+  rejection?: 'clamp' | 'variance';
+  /** Standard deviations of the neighbourhood that `'variance'` keeps, 0.5 to 4, read every frame. Default 1.25. */
+  clipGamma?: number;
+  /**
+   * Thin-feature locks: a pixel one pixel wide against its neighbours across x or y (a wire, a fence, a far edge) keeps
+   * its history unclipped for the eight frames of the jitter cycle after it was last seen, so a feature the jitter
+   * misses on some frames does not flash. Rejected history and reactive pixels drop the lock. Fixed at construction.
+   * Default false.
+   */
+  locks?: boolean;
 }
 /** A drawable whose per-vertex motion TAA tracks: the `shadowPrimitives` contract of core and gltf-pro meshes. */
 export interface VelocityPrimitive extends CasterCutout {
@@ -231,9 +248,16 @@ export class TAA implements EnginePlugin {
   private samples = 0;
   /** Whether the resolve reads a reactive mask: fixed at construction, as the shader is compiled for it. */
   private readonly masked: boolean;
+  /** Variance clipping and thin-feature locks, fixed at construction like the mask. */
+  private readonly variance: boolean;
+  private readonly locked: boolean;
+  /** Thin-feature lock textures (r32float), read and written in turn like the histories. */
+  private lockTextures: GPUTexture[] = [];
   constructor(readonly options: TAAOptions = {}) {
     this.validate();
     this.masked = !!options.reactive;
+    this.variance = options.rejection === 'variance';
+    this.locked = !!options.locks;
   }
   static attach(instance: EngineKernel, options: TAAOptions = {}): TAA {
     const effect = new TAA(options);
@@ -256,6 +280,13 @@ export class TAA implements EnginePlugin {
       );
     if (o.reactive !== undefined && typeof o.reactive !== 'function')
       throw new TypeError('Invalid TAA reactive; pass a function that returns the mask texture.');
+    if (o.rejection !== undefined && o.rejection !== 'clamp' && o.rejection !== 'variance')
+      throw new TypeError("Invalid TAA rejection; pass 'clamp' or 'variance'.");
+    const gamma = o.clipGamma ?? 1.25;
+    if (!Number.isFinite(gamma) || gamma < 0.5 || gamma > 4)
+      throw new RangeError('Invalid TAA clipGamma; pass a number from 0.5 to 4.');
+    if (o.locks !== undefined && typeof o.locks !== 'boolean')
+      throw new TypeError('Invalid TAA locks; pass true or false.');
     if (o.reactive && o.velocityOnly)
       throw new TypeError('TAA velocityOnly resolves nothing, so a reactive mask has no effect; drop reactive or velocityOnly.');
     if (o.stochastic !== undefined && typeof o.stochastic !== 'boolean')
@@ -375,7 +406,16 @@ export class TAA implements EnginePlugin {
         throw new MargoError('state', 'Invalid TAA camera; give the camera a finite, invertible projection');
       toTarget(c, this.values, 16);
       fromTarget(c, this.values, 32);
-      this.values.set([this.options.historyWeight ?? 0.9, this.options.depthThreshold ?? 0.01, +this.valid, 0], 48);
+      this.values.set(
+        [
+          this.options.historyWeight ?? 0.9,
+          this.options.depthThreshold ?? 0.01,
+          +this.valid,
+          // Only variance clipping reads it; the clamp keeps the uniform it always wrote.
+          this.variance ? (this.options.clipGamma ?? 1.25) : 0,
+        ],
+        48,
+      );
       const jitter = this.vectors.jitter;
       jitter[0] = this.valid ? this.offset[0] - this.lastOffset[0] : 0;
       jitter[1] = this.valid ? this.offset[1] - this.lastOffset[1] : 0;
@@ -413,6 +453,7 @@ export class TAA implements EnginePlugin {
     this.textures = [];
     this.histories = [];
     this.historyDepths = [];
+    this.lockTextures = [];
     this.format = c.format;
     this.samples = samples;
     // Unorm canvas shaders write sRGB themselves; sRGB attachments and floating-point HDR targets supply linear samples.
@@ -445,6 +486,7 @@ export class TAA implements EnginePlugin {
       for (let i = 0; i < 2; i++) {
         this.histories.push(texture('rgba16float', GPUTextureUsage.STORAGE_BINDING));
         this.historyDepths.push(texture('r32float', GPUTextureUsage.STORAGE_BINDING));
+        if (this.locked) this.lockTextures.push(texture('r32float', GPUTextureUsage.STORAGE_BINDING));
       }
       this.captureTarget = new SceneTarget(c.device, this.scene!, this.depth!, samples);
       this.colorView = this.scene!.createView();
@@ -548,10 +590,14 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
     }
     if (depth !== this.depthSource) {
       this.sampledDepth = depth.createView({ aspect: 'depth-only' });
-      const group = (p: GPUComputePipeline | GPURenderPipeline, resources: (GPUTextureView | GPUBufferBinding)[]) =>
+      // Each resource at the binding of its place; an undefined place (no reactive mask) is left out.
+      const group = (
+        p: GPUComputePipeline | GPURenderPipeline,
+        resources: (GPUTextureView | GPUBufferBinding | undefined)[],
+      ) =>
         c.device.createBindGroup({
           layout: p.getBindGroupLayout(0),
-          entries: resources.map((resource, binding) => ({ binding, resource })),
+          entries: resources.flatMap((resource, binding) => (resource ? [{ binding, resource }] : [])),
         });
       this.cameraGroup = group(this.cameraPipeline!, [{ buffer: this.uniform! }, this.sampledDepth]);
       if (!this.options.velocityOnly)
@@ -566,7 +612,8 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
             this.historyDepths[i].createView(),
             this.histories[1 - i].createView(),
             this.historyDepths[1 - i].createView(),
-            ...(this.masked ? [this.reactiveView(c.device)] : []),
+            this.masked ? this.reactiveView(c.device) : undefined,
+            ...(this.locked ? [this.lockTextures[i].createView(), this.lockTextures[1 - i].createView()] : []),
           ]),
         );
       this.depthSource = depth;
@@ -657,7 +704,9 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
   /** The resolve shader for these options: stochastic rejection and the reactive mask are compiled in only when asked for. */
   private resolveCode(): string {
     const code = this.options.stochastic ? stochasticResolve() : resolve;
-    return this.masked ? reactiveResolve(code) : code;
+    const masked = this.masked ? reactiveResolve(code) : code,
+      clipped = this.variance ? varianceResolve(masked) : masked;
+    return this.locked ? lockResolve(clipped) : clipped;
   }
   /** This frame's reactive mask, or a 1 by 1 black one (nothing reactive). */
   private reactiveView(device: GPUDevice): GPUTextureView {

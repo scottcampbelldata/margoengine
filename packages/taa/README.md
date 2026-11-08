@@ -79,6 +79,22 @@ const mask = engine.gpu!.createTexture({
 TAA.attach(engine, {reactive: () => mask});
 ```
 
+`rejection` and `locks` change how history is kept. With the default `rejection: 'clamp'` reprojected history is clamped,
+per axis, to the min/max box of this frame's 3x3 neighbourhood in YCoCg; one bright pixel in the neighbourhood opens
+that box wide, and a ghost survives inside it. `'variance'` clips history toward the centre of the box mean +-
+`clipGamma` standard deviations (default 1.25, 0.5 to 4, read every frame), cut to the min/max box, which one outlier
+moves much less. `locks: true` marks a pixel one pixel wide against its neighbours across x or y (a wire, a fence rail, a
+far edge) and keeps its history unclipped for the eight frames of the jitter cycle after it was last seen, so a thin
+feature the jitter misses on some frames stays on screen instead of flashing; rejected history and reactive pixels drop
+the lock. Both are fixed at construction; depth rejection of disoccluded history applies in every mode.
+
+```ts
+import {EngineKernel} from 'margoengine/core';
+import {TAA} from 'margoengine/taa';
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
+TAA.attach(engine, {rejection: 'variance', clipGamma: 1.25, locks: true});
+```
+
 `gpuState` exposes velocity, current history color and history depth textures after rendering. `dispose()`/`destroy()` releases owned buffers, textures and source records. Device restoration recreates everything and discards stale history. The package is independent of PBR, animation, shadows, clustered lighting, particles and stage; helper-only imports discard the renderer. It follows the workspace's `@margoengine/*` naming convention.
 
 ## Upscaling: `TAAUpscale`

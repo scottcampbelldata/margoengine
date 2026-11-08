@@ -598,6 +598,8 @@ The own solver's kernel (`packages/physics/kernel`, Rust, no dependencies). Noth
 | A-03 | Depth rejection of history | taa/src/shader.ts | Margo-own: Margo design |
 | A-04 | Halton (2, 3) jitter, 8-frame cycle | taa/src/shader.ts, taa/src/index.ts | Halton 1964; 8-sample Halton(2,3) in Karis 2014 |
 | A-05 | Reactive mask: history weight scaled by 1 - max(mask now, mask carried in history alpha) | taa/src/shader.ts, taa/src/index.ts | The idea of a per-pixel reactivity input that lowers history trust for transparent effects is described in AMD's public FidelityFX Super Resolution 2 documentation (read as documentation, not code); carrying the mask through history alpha so trails clear is Margo-own; no engine source was read |
+| A-06 | Variance clipping: history clipped toward the centre of mean +- gamma sigma of the 3x3 YCoCg neighbourhood, cut to its min/max box | taa/src/shader.ts | M. Salvi, "An Excursion in Temporal Supersampling", GDC 2016 (variance box, from memory of the talk; not re-read); clipping toward the centre after Karis 2014; no engine source was read |
+| A-07 | Thin-feature locks: a pixel whose luminance differs from both neighbours across x or y by over a quarter of its own keeps unclipped history for eight frames, carried from the nearest accepted history tap | taa/src/shader.ts, taa/src/index.ts | The idea of locking thin features against history rejection is described in AMD's public FidelityFX Super Resolution 2 documentation (read as documentation, not code); the detection, lifetime and carry are Margo-own; no engine source was read |
 
 ### terrain
 
