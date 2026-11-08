@@ -206,7 +206,7 @@ test('check:gpu-packages is not watched twice; its exit 75 is an unresumed heat 
 });
 
 test('the workstation profile (heat null) runs every step as before: no watch, no reading, no heat lines', async () => {
-  const workstation = machineProfile({});
+  const workstation = machineProfile({ MARGO_MACHINE_PROFILE: 'workstation' });
   assert.equal(workstation.name, 'workstation');
   assert.equal(workstation.heat, null);
   const record = [];

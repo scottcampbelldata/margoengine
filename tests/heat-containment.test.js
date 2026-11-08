@@ -290,7 +290,7 @@ test('the laptop profile loads, has a heat watch and excludes nothing', () => {
 });
 
 test('the default profile runs every planned test as one step, exactly as before', () => {
-  const profile = machineProfile({}),
+  const profile = machineProfile({}, PROFILES_FILE, { platform: 'win32', arch: 'x64' }),
     tests = plan(),
     steps = planSteps(tests, profile);
   assert.equal(profile.name, 'workstation');
@@ -353,6 +353,36 @@ test('split steps cover the whole suite: both bevel sample counts, each chain pa
       'lens-browser.mjs',
     ],
   );
+});
+
+// Bug (M6 Mac mini, scripts/gpu-package-tests.mjs): with MARGO_MACHINE_PROFILE unset the Mac ran as profile
+// "workstation", described as the maintainer's RTX A6000 PC. An unnamed run now takes the profile matching its platform.
+test('an Apple silicon Mac gets its own profile, not the workstation; a name still wins, other hosts keep the default', () => {
+  const mac = machineProfile({}, PROFILES_FILE, { platform: 'darwin', arch: 'arm64' });
+  assert.equal(mac.name, 'apple-silicon');
+  assert.doesNotMatch(mac.description, /A6000/);
+  assert.match(mac.description, /Mac/);
+  assert.equal(mac.heat, null);
+  assert.deepEqual(mac.exclude, {});
+  const named = machineProfile({ MARGO_MACHINE_PROFILE: 'laptop' }, PROFILES_FILE, { platform: 'darwin', arch: 'arm64' });
+  assert.equal(named.name, 'laptop');
+  for (const host of [
+    { platform: 'win32', arch: 'x64' },
+    { platform: 'linux', arch: 'x64' },
+    { platform: 'darwin', arch: 'x64' },
+  ])
+    assert.equal(machineProfile({}, PROFILES_FILE, host).name, 'workstation', `${host.platform} ${host.arch}`);
+  const dir = mkdtempSync(join(tmpdir(), 'profiles-')),
+    file = join(dir, 'p.json');
+  try {
+    writeFileSync(file, JSON.stringify({ default: 'a', profiles: { a: { match: { platform: 'darwin' } } } }));
+    assert.throws(
+      () => readProfiles(file),
+      (error) => error.code === 'MACHINE_PROFILES_INVALID' && /match\.arch/.test(error.message),
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test('profiles are chosen by name, are checked, and hold no machine names or home paths', () => {

@@ -1,9 +1,16 @@
 {
-  "$comment": "Which GPU tests a machine can run and how it guards its temperature. Choose one with MARGO_MACHINE_PROFILE=<name>; unset means `default`. Read by scripts/support/machine-profile.mjs for scripts/gpu-package-tests.mjs and scripts/check-merge.mjs. `heat` null means no heat watch. `split` runs heavy suites as short steps. `exclude` records packages this hardware must not run and why.",
+  "$comment": "Which GPU tests a machine can run and how it guards its temperature. Choose one with MARGO_MACHINE_PROFILE=<name>; unset means the first profile whose `match` names this platform and CPU architecture (Node process.platform and process.arch), else `default`. Read by scripts/support/machine-profile.mjs for scripts/gpu-package-tests.mjs and scripts/check-merge.mjs. `heat` null means no heat watch. `split` runs heavy suites as short steps. `exclude` records packages this hardware must not run and why.",
   "default": "workstation",
   "profiles": {
     "workstation": {
       "description": "a desktop with a discrete GPU and active cooling, the maintainer's RTX A6000 PC; every test runs as one step",
+      "heat": null,
+      "split": false,
+      "exclude": {}
+    },
+    "apple-silicon": {
+      "description": "an Apple silicon Mac (the maintainer's M6 Mac mini, 24 GB unified memory) with WebGPU on Metal; chosen on macOS arm64 when no profile is named; no heat watch, every test runs as one step",
+      "match": { "platform": "darwin", "arch": "arm64" },
       "heat": null,
       "split": false,
       "exclude": {}

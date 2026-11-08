@@ -1,6 +1,8 @@
 // Machine profiles (scripts/support/machine-profiles.json, item 57.1a): which GPU tests a machine may run, whether its
 // temperature is watched, and whether heavy suites run as short steps. The profile is chosen by name
-// with MARGO_MACHINE_PROFILE, never by hostname, so no machine names or paths live in public files.
+// with MARGO_MACHINE_PROFILE, never by hostname, so no machine names or paths live in public files. Unset, the first
+// profile whose `match` names this platform and CPU architecture is chosen (an Apple silicon Mac is not the Windows
+// workstation), else the file's default.
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { margoError } from '../../packages/shared/errors.js';
@@ -32,6 +34,10 @@ function checkProfile(name, profile, file) {
       throw bad(`heat.resumeC (${heat.resumeC}) must be below heat.stopC (${heat.stopC})`);
     if (!(heat.maxWaitMin > 0)) throw bad('heat.maxWaitMin must be above 0, so a cooldown always ends');
   }
+  if (profile.match !== undefined)
+    for (const key of ['platform', 'arch'])
+      if (typeof profile.match?.[key] !== 'string' || !profile.match[key])
+        throw bad(`match.${key} must name a Node process.${key} value, got ${JSON.stringify(profile.match?.[key])}`);
   for (const [key, reason] of Object.entries(profile.exclude ?? {}))
     if (typeof reason !== 'string' || !reason.trim())
       throw bad(`exclude.${key} must state the reason the package does not run there`);
@@ -39,11 +45,19 @@ function checkProfile(name, profile, file) {
 
 /**
  * The profile for this run: `{ name, description, heat, split, exclude }`. MARGO_MACHINE_PROFILE picks it by
- * name (unset: the file's default). An unknown name throws MACHINE_PROFILE_UNKNOWN listing the known ones.
+ * name; unset, the first profile whose `match` is `host`'s platform and architecture, else the file's default. An
+ * unknown name throws MACHINE_PROFILE_UNKNOWN listing the known ones.
  */
-export function machineProfile(env = process.env, file = PROFILES_FILE) {
+export function machineProfile(
+  env = process.env,
+  file = PROFILES_FILE,
+  host = { platform: process.platform, arch: process.arch },
+) {
   const data = readProfiles(file),
-    name = env.MARGO_MACHINE_PROFILE || data.default,
+    matched = Object.entries(data.profiles).find(
+      ([, p]) => p.match && p.match.platform === host.platform && p.match.arch === host.arch,
+    )?.[0],
+    name = env.MARGO_MACHINE_PROFILE || matched || data.default,
     profile = data.profiles[name];
   if (!profile)
     throw margoError(
