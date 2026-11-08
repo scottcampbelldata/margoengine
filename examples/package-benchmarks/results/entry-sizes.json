@@ -1,5 +1,5 @@
 {
-  "commit": "5202e2c53",
+  "commit": "2e5db318f",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -2992,16 +2992,20 @@
     },
     "@margoengine/ui": {
       ".": {
-        "raw": 99053,
-        "gzip": 32005
+        "raw": 99058,
+        "gzip": 31885
       },
       "./react": {
-        "raw": 100974,
-        "gzip": 32047
+        "raw": 100979,
+        "gzip": 32058
       },
       "./world": {
         "raw": 25406,
         "gzip": 9033
+      },
+      "./markup": {
+        "raw": 31336,
+        "gzip": 10504
       }
     },
     "@margoengine/usdz": {

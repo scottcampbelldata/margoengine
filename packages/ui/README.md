@@ -474,6 +474,46 @@ panel under a ray, `screenRay(camera, x, y, width, height)` the ray under a canv
 pointing ray. Give a panel's `Ui` to `WorldPanels` only, never also to `UiRenderer`: the renderer would resize it to the
 canvas. Keyboard and gamepad focus work as on the screen through the panel's own `ui` (`ui.bindInput`, `ui.navigate`).
 
+## Markup and style sheets
+
+```ts
+import { Ui } from '@margoengine/ui';
+import { buildScreen } from '@margoengine/ui/markup';
+
+const markup = `
+<panel id="pause" class="menu">
+  <label class="title">Paused</label>
+  <row class="buttons">
+    <button variant="primary" on-click="resume">Resume</button>
+    <button on-click="quit">Quit</button>
+  </row>
+  <toggle id="music" checked="true">Music</toggle>
+  <list id="saves" height="120"><item detail="2 h">Slot 1</item><item>Slot 2</item></list>
+</panel>`;
+const styles = `
+.menu { anchor: center; width: 320; padding: 16; gap: 12 }
+.menu .title { size: large }
+.buttons > button { grow: 1 }`;
+
+const ui = new Ui();
+const screen = buildScreen(markup, {
+  styles,
+  actions: { resume: () => console.log('resume'), quit: () => console.log('quit') },
+});
+ui.add(...screen.widgets);
+console.log(screen.get('music')); // the Toggle with id="music"
+```
+
+`@margoengine/ui/markup` builds a screen from a markup file and style sheets that a designer can edit without code.
+Elements are the widgets in lower case: `panel`, `row` and `column` hold other elements; `label`, `button`,
+`toggle`, `slider`, `progress` and `health` take their text from their content; `list` and `menu` take `<item>`
+children. Attributes and style declarations are the widgets' options in kebab-case (`min-width`, `show-value`), with
+spaces between numbers (`padding: 8 16`). Rules select by type, `#id` and `.class`, joined by a space (any
+descendant) or `>` (a child); the more specific rule wins, then the later one, and an element's own attributes win over
+every sheet. `on-click`, `on-change` and `on-select` name a function in `actions`. Every error names its line and
+column. `loadScreen(url, { styles: [cssUrl], actions, signal })` fetches the files first, with an `AbortSignal`;
+`parseMarkup` and `parseStyleSheet` return the parsed trees for tools.
+
 ## Options
 
 | `new Ui({...})` option | Default |
@@ -531,6 +571,9 @@ after that load. An unchanged UI uploads nothing; it is drawn again each frame b
 - Shaping is the browser's, one word at a time: a run never crosses a space, so no join or ligature forms across
   words. Only labels and wrapped text follow the text direction: toggles, slider values, list details and rows of
   widgets keep left-to-right placement (no mirrored layout).
+- Markup is a subset of XML: no DOCTYPE, CDATA or namespaces, and only the five named character references. Style
+  sheets have no pseudo-classes, attribute selectors, `+` or `~`, `@` rules or `!important`, and do not restyle a
+  screen after it is built.
 - A `VirtualList` has one row height; rows of different heights need a `List`.
 - Layout is single-pass flexbox. A wrapping row breaks lines by its children's base sizes, so a child that would grow
   never pulls the next one up; columns do not wrap, and lines always stack down from the top (no `align-content`).

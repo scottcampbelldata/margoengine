@@ -37,6 +37,10 @@
     "./world": {
       "types": "./dist/world.d.ts",
       "import": "./dist/world.js"
+    },
+    "./markup": {
+      "types": "./dist/markup.d.ts",
+      "import": "./dist/markup.js"
     }
   },
   "files": [

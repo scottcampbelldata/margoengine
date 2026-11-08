@@ -793,6 +793,9 @@ export const entries = [
       'overscan must be a whole number, 0 or more',
       'count must be a whole number, 0 or more',
       'row(index) returns a string or a { label } entry',
+      'parseMarkup takes the markup text',
+      'parseStyleSheet takes the style sheet text',
+      'styles is style sheet text or an array of them',
     ],
     cause:
       'A widget, layout style, theme, colour or Ui option got a value it cannot use: a size that is not a number, auto, fill or a percentage; spacing that is not one, two or four numbers; a colour that is not #rrggbb or #rrggbbaa; a theme field or colour role that does not exist; a slider or progress bar with a range that is empty or not finite; a list entry without a label; an index outside the widgets there are; a text scale outside 0.5 to 3; or a Ui used after it was disposed.',

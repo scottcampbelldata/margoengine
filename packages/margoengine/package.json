@@ -2838,6 +2838,10 @@
       "types": "./dist/ui/world.d.ts",
       "import": "./dist/ui/world.js"
     },
+    "./ui/markup": {
+      "types": "./dist/ui/markup.d.ts",
+      "import": "./dist/ui/markup.js"
+    },
     "./usdz": {
       "types": "./dist/usdz.d.ts",
       "import": "./dist/usdz.js"

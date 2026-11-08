@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11249870,
+  "total": 11260566,
   "history": [
     {
       "date": "2026-10-24",
@@ -4394,6 +4394,12 @@
       "commit": "17f5d4afa",
       "reason": "ui VirtualList",
       "grew": 2
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "eb1af37c2",
+      "reason": "ui markup entry",
+      "grew": 1
     }
   ],
   "items": {
@@ -5102,7 +5108,8 @@
     "@margoengine/tween/motion-path": 1263,
     "@margoengine/tween/scroll": 1198,
     "@margoengine/tween/stagger": 1435,
-    "@margoengine/ui": 32966,
+    "@margoengine/ui": 32842,
+    "@margoengine/ui/markup": 10820,
     "@margoengine/ui/react": 33009,
     "@margoengine/ui/world": 9277,
     "@margoengine/usdz": 12708,

@@ -2907,3 +2907,42 @@ job's `packages/terrain/test/*.browser.mjs` (in `test:gpu`). Nothing is timed.
   LIM-505 and replaced main's vfx depth-collide rows in claims, limits and clean-room. Never pushed; fixed by hand
   (our rows dropped, rebased on main's files, re-added as LIM-507). `resolve.mjs` is unsafe for shared tables and is no
   longer used for them.
+
+## Lane H batch 104: ui
+
+Six jobs for `@margoengine/ui` on the Beelink (lane H, work list 3): two new optional entries and four features in the
+root entry. Core and stage are untouched. GPU work is proved on a Radeon 680M in headless Chromium through
+`packages/ui/tests/ui-browser.mjs` and `world-browser.mjs`. Nothing is timed.
+
+| # | Job | Status | Commit | Entry | Claim |
+| --- | --- | --- | --- | --- | --- |
+| 1 | World-space and XR panels | DONE | `c75fce9bd` | `/world` (`WorldPanel`, `WorldPanels`) | LIM-510 |
+| 2 | Wrapping flex rows | DONE | `238da2506` | root (`wrap` style) | LIM-513 |
+| 3 | Arabic and Indic shaping and ligatures | DONE | `ca41009b8` | root (`ligatures`, `direction`, `textDirection`) | LIM-514 |
+| 4 | Drawing on the WebGL2 preview | DONE | `0cfd3e9f0` | root (`UiRenderer`, GL chunk loaded on first use) | LIM-516 |
+| 5 | Virtualised lists | DONE | `c25aace5d` | root (`VirtualList`) | LIM-526 |
+| 6 | Markup and style sheets | DONE | this commit | `/markup` (`buildScreen`, `loadScreen`, `parseMarkup`, `parseStyleSheet`) | LIM-528 |
+
+- **Built from:** world panels painted into a texture and hit by rays (S69); flexbox line collection and per-line
+  sizing (S70, CSS Flexible Box Layout section 9.3 and 9.4); paragraph direction from the first strong character
+  (S71, UAX 9 P2 and P3); instanced WebGL2 drawing with array texture atlases (S72, OpenGL ES 3.0 and WebGL 2.0); rows of
+  one height built by arithmetic, with `aria-setsize` and `aria-posinset` (S74, WAI-ARIA 1.2); an XML subset and
+  Selectors Level 3 specificity (S75). Shaping itself is the text package's runs handed to the browser's shaper.
+- **Proved:** job 3 on the GPU: a joined Arabic word draws narrower than the same letters split by zero width
+  non-joiners, a right-to-left label's ink ends at its box's right edge, Devanagari draws. Job 4 on the GPU through
+  core's WebGL2 backend: surface colour, rounded corner, text ink, a clipped list, `NO_ERROR`, and an unchanged frame
+  that draws but uploads nothing; in Node on a recording context, draws, offsets, scissors and texture units. Jobs 2, 5
+  and 6 in Node (layout, virtual range and focus, the mirror, parsing and the cascade).
+- **Bugs fixed with a regression test:** job 4, the colour atlas's placeholder texture bound itself to the SDF atlas's
+  unit, so WebGL2 glyphs drew no ink (`packages/ui/tests/webgl2.test.js`, texture units test); job 4, the WebGL2
+  placeholder bumped the atlas generation and forced a second upload (same file, unchanged frame test); job 5,
+  `Widget.wheel` clamped the scroll by the whole box, not the box less its padding, so a padded `List` never showed
+  its last row whole (`packages/ui/tests/widgets.test.js`).
+- **Limits:** one GPU and one browser. World panels draw on WebGPU only. Other widgets keep left-to-right placement in
+  right-to-left text. A virtual list has one row height. Markup and sheets are subsets (no pseudo-classes, `+`, `~`,
+  `@` rules). Build, shaping and draw costs are unmeasured. Rows in docs/limits.md.
+- **Slips:** job 2's first landing failed `tests/errors-page.test.js` (a new message missing from
+  `scripts/errors/entries.js`); fixed in the same commit. Job 3's draft test expected Arabic glyphs in logical order;
+  they come in visual order. Job 6's draft labelled style sheet errors as markup errors and accepted a leading `>`;
+  both fixed before landing. The shared-rows guard now compares against the sha the rebase went onto, not the live
+  `origin/main`.

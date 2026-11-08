@@ -10,7 +10,7 @@ For the third account. Starts when Scott is home and opens it.
 | H | loading and interface | 47 | tiles | 8 | done |
 | H | loading and interface | 48 | blender | 8 | done |
 | H | loading and interface | 80 | splats | 8 | done |
-| H | loading and interface | 104 | ui | 6 | todo |
+| H | loading and interface | 104 | ui | 6 | done |
 | H | loading and interface | 105 | labels | 5 | todo |
 | H | loading and interface | 106 | html | 4 | todo |
 | H | loading and interface | 107 | inspector | 4 | todo |
