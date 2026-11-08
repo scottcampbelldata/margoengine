@@ -299,3 +299,16 @@ test('single-clip eight-influence playback creates no typed arrays, quaternion c
   for (const key of ['buffers', 'textures', 'views', 'groups']) assert.equal(h.counts[key], counts[key]);
   assert.equal(h.counts.compute, 121);
 });
+
+test('eight influences run the four-influence blend verbatim where the extra weights are zero', () => {
+  // WGSL lets a compiler reassociate and fuse (15.7.5): four zero-weighted terms moved a skinned position 1 ulp on
+  // Metal (scripts/animation-influences-browser-tests.js). Only the same text gives the same bits.
+  const four = (code) => code.slice(code.indexOf('let skin='), code.indexOf('v.tangent=vec4f((skin*'));
+  const perPrimitive = four(deformationShader),
+    batched = four(batchedDeformationShader(false));
+  assert.ok(perPrimitive.length > 100 && batched.length > 100);
+  assert.ok(deformationShader8.includes('if(all(inf.weightsExtra==vec4f(0))){\n    ' + perPrimitive));
+  assert.ok(batchedDeformationShader(true).includes('if(all(weightsExtra==vec4f(0))){\n' + batched));
+  assert.match(deformationShader8, /\}else\{[\s\S]*inf\.weightsExtra\.w;/);
+  assert.match(batchedDeformationShader(true), /\}else\{[\s\S]*weightsExtra\.w;/);
+});

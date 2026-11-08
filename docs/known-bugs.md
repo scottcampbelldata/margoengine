@@ -83,21 +83,6 @@ are still open.
   vertex-inputs.ts +691), the rest shared, core, controls and environment, spread over documented feature commits.
 - **Needed to close:** bring the page back under 120,000 B without dropping features. The budget stays.
 
-### Zero extra skin influences change one coordinate by 1 ulp on Metal
-
-- **What:** `modern:test:extensions` stops in `scripts/animation-influences-browser-tests.js` on the M6 Mac mini (Metal,
-  2026-11-07): `Zero extra influences changed four-bone output`. The tentacle rig skinned with JOINTS_1 and WEIGHTS_1
-  all zero differs from the same rig without them in 1 of 60 output floats, by 1 ulp (vertex 0 position x,
-  -0.5798871517181396 against -0.5798870921134949). The check wants the same bits (`Object.is`).
-- **Repro:** `npm run build:packages`, then `MARGO_GPU_SLOTS=2 node scripts/gpu-lock.mjs run --owner=<you> -- node
-  scripts/animation-influences-browser-tests.js`.
-- **Ruled out:** the CPU packing (`packages/animation/src/index.ts` divides each weight by the same sum on both paths);
-  the term order of the blend. Summing the extra four apart, and skipping them with a branch when their weights are all
-  zero, in both `deformationShader8` and the batched `linearBlend`, left the same value, so the 1 ulp comes from
-  somewhere else in the eight-influence path (its morph step, its pipeline or the Metal compiler's fused multiply-adds).
-- **Needed to close:** read back the four- and eight-influence pipelines' intermediate values for vertex 0 on Metal,
-  find the first that differs and make that step the same arithmetic; the check stays bit for bit.
-
 ### SSAO's orthographic picture moves with the eye
 
 - **What:** `scripts/ssao-gpu-check.js` fails on main: moving an orthographic eye along its view from 6 m to 0.6 m changes the
@@ -972,6 +957,7 @@ diagnostic). Their causes and the fixes that landed are in `bench/parity-causes.
 
 | Bug | Cause | Fix | Regression test |
 | --- | --- | --- | --- |
+| `animation`: zero extra skin influences (JOINTS_1 and WEIGHTS_1 all zero) moved one skinned position by 1 ulp on the M6 Mac mini (Metal), so `scripts/animation-influences-browser-tests.js` failed its bit-for-bit check | WGSL lets a compiler reassociate and fuse floating-point operations (15.7.5): the eight-influence blend adds four zero-weighted bone terms, and Metal folds `skin*vec4f(p,1)` into it, so the position differs by 1 ulp; the skin matrix itself is the same (normals and tangents bit for bit) | Both eight-influence shaders (`deformationShader8` and the batched `linearBlend(true)` in `packages/animation/src/shader.ts`) run the four-influence blend text verbatim where a vertex's extra weights are all zero, and the eight-term blend otherwise; the four-influence shaders are unchanged | `packages/animation/tests/influences.test.js`, "eight influences run the four-influence blend verbatim" (fails without the fix); `scripts/animation-influences-browser-tests.js` passes on Metal |
 | `oit` `ExactOIT` at 4x MSAA on an Apple M6 (Chrome, Metal): each layer counted up to four times, so `exact-check.mjs` failed at 4x | A fragment shader that is not sample-frequency may still run more than once per pixel (WebGPU 23.2.10); Apple GPUs run the list shader up to once per sample, at the pixel centre with a whole or partial coverage mask, so one layer entered the list several times | A multisampled sort merges nodes equal in depth, colour and alpha into one whose coverage is the union (`packages/oit/src/exact.ts`); the test page draws at 4x until the list has grown, as Apple fills the starting pool on the first frames | `packages/oit/test/gpu/exact-check.mjs` 4x cases (fail on the M6 without the merge) |
 | `oit` `MomentOIT`: two splats added in either order differed by 1 of 255 on an Apple M6 (Chrome), so `vfx-check.mjs` failed "the order of the data changes nothing" (hidden until now behind `moments-check.mjs`) | The M6 adds a fragment's float output to the stored half and rounds once, so round(round(a) + b) and round(round(b) + a) differ by a step. Rounding the outputs with `quantizeToF16` or a `pack2x16float` round trip changed nothing under Chrome on Metal: the stored sums were bit for bit the same | Both passes round every output to a half float on its bits, to nearest even (`margoHalf` in `packages/oit/src/moments.ts`); two halves then sum the same in either order | `packages/oit/test/gpu/vfx-check.mjs`, splat order (fails on the M6 without the rounding, and with `quantizeToF16` in its place) |
 | `oit` `MomentOIT`: where a pixel had two or three layers, the order models were added in moved it by 4 of 255 on an Apple M6 (`moments-check.mjs`, bound 3) | Precision, not Metal: four power moments of two layers make a singular Hankel matrix, and the half-float sums sat one rounding step either side of it (`d33` -6e-4 before the bias), so one step moved a layer's transmittance from 0.51 to 0.93. The RTX A6000's rounding happened to stay on the valid side | Three trigonometric moments (Muenstermann et al. 2018, Section 5 and Algorithm 2) in three `rgba16float` targets, wrapping zone pi/10, bias 3e-3 for half floats; no device feature. One step now moves a transmittance by under 0.001, and the check's four layers land at 2.34 of 255 where power moments gave 6.24 on the RTX A6000 | `packages/oit/test/gpu/moments-check.mjs`, "one half-float step" (runs the pass's own WGSL on sums moved by one step in every channel; fails with power moments on any GPU: 0.42 for two layers) |

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10850725,
+  "total": 10851044,
   "history": [
     {
       "date": "2026-10-24",
@@ -3986,12 +3986,18 @@
       "commit": "df2b33dfd",
       "reason": "voxel/ticks: new optional entry",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "6cc76e6df",
+      "reason": "animation: eight-influence shaders run the four-influence blend verbatim where the extra weights are zero (Metal 1 ulp fix)",
+      "grew": 1
     }
   ],
   "items": {
     "@margoengine/animation": 22595,
     "@margoengine/animation/clip-utils": 5160,
-    "@margoengine/animation/dqs": 3473,
+    "@margoengine/animation/dqs": 3792,
     "@margoengine/animation/geometry-cache": 4645,
     "@margoengine/animation/instanced-skin": 9634,
     "@margoengine/animation/interactivity": 24902,

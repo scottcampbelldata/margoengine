@@ -29,6 +29,20 @@ struct Influence {joints:vec4u,weights:vec4f}
 }
 `;
 
+/** The per-primitive shader's four-influence blend, from `let skin=` to the tangent. */
+const perPrimitiveBlend = deformationShader.slice(
+  deformationShader.indexOf('    let skin='),
+  deformationShader.indexOf('\n  }\n  v.normal=vec4f(normalize'),
+);
+/**
+ * Eight influences, or the four-influence blend verbatim where a vertex's extra four weights are all zero. WGSL lets a
+ * compiler reassociate and fuse floating-point operations (15.7.5 Reassociation and Fusion), so four zero-weighted
+ * terms are not a no-op in practice: Metal folds `skin*vec4f(p,1)` into the blend and its position comes out 1 ulp
+ * off the four-influence result. Only the same arithmetic gives the same bits.
+ */
+const zeroExtraIsFour = (extra: string, four: string, eight: string) =>
+  `if(all(${extra}==vec4f(0))){\n${four}\n    }else{\n${eight}\n    }`;
+
 /** The four-influence shader and its 32-byte storage stride remain unchanged. */
 export const deformationShader8 = deformationShader
   .replace(
@@ -36,8 +50,15 @@ export const deformationShader8 = deformationShader
     'struct Influence {joints:vec4u,weights:vec4f,jointsExtra:vec4u,weightsExtra:vec4f}',
   )
   .replace(
-    'boneMatrices[inf.joints.w]*inf.weights.w;',
-    'boneMatrices[inf.joints.w]*inf.weights.w+boneMatrices[inf.jointsExtra.x]*inf.weightsExtra.x+boneMatrices[inf.jointsExtra.y]*inf.weightsExtra.y+boneMatrices[inf.jointsExtra.z]*inf.weightsExtra.z+boneMatrices[inf.jointsExtra.w]*inf.weightsExtra.w;',
+    perPrimitiveBlend,
+    zeroExtraIsFour(
+      'inf.weightsExtra',
+      perPrimitiveBlend,
+      perPrimitiveBlend.replace(
+        'boneMatrices[inf.joints.w]*inf.weights.w;',
+        'boneMatrices[inf.joints.w]*inf.weights.w+boneMatrices[inf.jointsExtra.x]*inf.weightsExtra.x+boneMatrices[inf.jointsExtra.y]*inf.weightsExtra.y+boneMatrices[inf.jointsExtra.z]*inf.weightsExtra.z+boneMatrices[inf.jointsExtra.w]*inf.weightsExtra.w;',
+      ),
+    ),
   );
 
 /** Another way to blend bones: `Animation`'s `skinning` option. `@margoengine/animation/dqs` holds the one Margo ships. */
@@ -56,7 +77,7 @@ export interface SkinningShader {
   blend: string;
 }
 
-const linearBlend = (extra: boolean) => /* wgsl */ `let skin=boneMatrices[s.bones+joints.x]*jointWeights.x+boneMatrices[s.bones+joints.y]*jointWeights.y+boneMatrices[s.bones+joints.z]*jointWeights.z+boneMatrices[s.bones+joints.w]*jointWeights.w${
+const blendTerms = (extra: boolean) => /* wgsl */ `let skin=boneMatrices[s.bones+joints.x]*jointWeights.x+boneMatrices[s.bones+joints.y]*jointWeights.y+boneMatrices[s.bones+joints.z]*jointWeights.z+boneMatrices[s.bones+joints.w]*jointWeights.w${
   extra
     ? '+boneMatrices[s.bones+jointsExtra.x]*weightsExtra.x+boneMatrices[s.bones+jointsExtra.y]*weightsExtra.y+boneMatrices[s.bones+jointsExtra.z]*weightsExtra.z+boneMatrices[s.bones+jointsExtra.w]*weightsExtra.w'
     : ''
@@ -66,6 +87,10 @@ const linearBlend = (extra: boolean) => /* wgsl */ `let skin=boneMatrices[s.bone
     let handedness=sign(dot(skin[0].xyz,cross(skin[1].xyz,skin[2].xyz)));
     v.normal=vec4f(normalMatrix*v.normal.xyz*handedness,0);
     v.tangent=vec4f((skin*vec4f(v.tangent.xyz,0)).xyz,v.tangent.w*handedness);`;
+
+/** Linear blending; eight influences fall back to the four-influence text where the extra weights are zero. */
+const linearBlend = (extra: boolean) =>
+  extra ? zeroExtraIsFour('weightsExtra', blendTerms(false), blendTerms(true)) : blendTerms(false);
 
 /**
  * Batched deformation (batch.ts): many primitives in one dispatch. Each workgroup deforms 64 vertices of one slot,
