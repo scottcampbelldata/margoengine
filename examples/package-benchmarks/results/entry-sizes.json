@@ -1,5 +1,5 @@
 {
-  "commit": "65693183b",
+  "commit": "3fc958a48",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -2980,12 +2980,16 @@
     },
     "@margoengine/ui": {
       ".": {
-        "raw": 83274,
-        "gzip": 27399
+        "raw": 83874,
+        "gzip": 27546
       },
       "./react": {
-        "raw": 85204,
-        "gzip": 27469
+        "raw": 85800,
+        "gzip": 27612
+      },
+      "./world": {
+        "raw": 25273,
+        "gzip": 9006
       }
     },
     "@margoengine/usdz": {
@@ -3028,12 +3032,12 @@
     },
     "@margoengine/vfx": {
       ".": {
-        "raw": 76551,
-        "gzip": 23889
+        "raw": 82101,
+        "gzip": 25404
       },
       "./base": {
-        "raw": 33935,
-        "gzip": 11148
+        "raw": 33954,
+        "gzip": 11157
       },
       "./obstacles": {
         "raw": 2388,
@@ -3082,6 +3086,14 @@
       "./depth-collide": {
         "raw": 4191,
         "gzip": 2006
+      },
+      "./stretch": {
+        "raw": 1578,
+        "gzip": 843
+      },
+      "./fields": {
+        "raw": 4117,
+        "gzip": 1823
       }
     },
     "@margoengine/video": {
@@ -3427,9 +3439,9 @@
       "brotli": 8574
     },
     "packages/creative/dist/particles.js": {
-      "raw": 44485,
-      "gzip": 15070,
-      "brotli": 13501
+      "raw": 44504,
+      "gzip": 15077,
+      "brotli": 13470
     },
     "packages/creative/dist/post.js": {
       "raw": 19250,

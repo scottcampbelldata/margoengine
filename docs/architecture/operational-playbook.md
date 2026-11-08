@@ -663,6 +663,14 @@ heightmap's over `height`, so core's lighting shades the mesh's foot as the grou
 `packages/terrain/test/blend.browser.mjs`, seam 126.6 to 6.8 of 255, nothing off the foot changes; Radeon 680M.
 Missing: other GPUs, cost timed, sloped ground in a picture check.
 
+World-space UI panels (`@margoengine/ui/world`, 2026-11-08) share the screen UI's drawing core (`ui/src/painter.ts`,
+used by `UiRenderer` too, so one copy of the instanced rectangle and SDF glyph pipeline): each panel's draw list is
+painted into an `rgba8unorm-srgb` texture in its own submission only when the list or the glyph atlases changed, then
+mipmapped, and a quad pass at order 25 (inside the scene, before post-processing) samples it with depth test against the
+scene, one camera uniform per view index so XR eyes never share a buffer written in the same frame. Evidence:
+`packages/ui/tests/world-browser.mjs` on a Radeon 680M (colours, occlusion, back face, repaint counts, a real click by
+camera ray). Missing: other GPUs, an XR headset, cost timed.
+
 Planet terrain (`@margoengine/terrain/planet`, 2026-11-08) draws a cube sphere quadtree with its own pass and shader.
 Precision: each patch stores float32 vertices relative to its float64 centre; each frame the CPU subtracts the camera
 position from each drawn centre in float64 (one instance attribute a patch) and builds a view-projection with no

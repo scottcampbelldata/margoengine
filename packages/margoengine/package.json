@@ -2822,6 +2822,10 @@
       "types": "./dist/ui/react.d.ts",
       "import": "./dist/ui/react.js"
     },
+    "./ui/world": {
+      "types": "./dist/ui/world.d.ts",
+      "import": "./dist/ui/world.js"
+    },
     "./usdz": {
       "types": "./dist/usdz.d.ts",
       "import": "./dist/usdz.js"

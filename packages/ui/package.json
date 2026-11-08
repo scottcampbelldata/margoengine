@@ -33,6 +33,10 @@
       "types": "./dist/react.d.ts",
       "react-server": "./dist/rsc/react.js",
       "import": "./dist/react.js"
+    },
+    "./world": {
+      "types": "./dist/world.d.ts",
+      "import": "./dist/world.js"
     }
   },
   "files": [
@@ -61,6 +65,7 @@
     "build": "node ../../scripts/build-optional.js ui",
     "test": "npm run build && node --test tests/*.test.js",
     "test:browser": "npm run build && node tests/ui-browser.mjs",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "test:browser:world": "npm run build && node tests/world-browser.mjs"
   }
 }

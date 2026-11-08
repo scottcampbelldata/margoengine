@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11193734,
+  "total": 11203012,
   "history": [
     {
       "date": "2026-10-24",
@@ -4328,6 +4328,12 @@
       "commit": "48c61055f",
       "reason": "force fields: new entry @margoengine/vfx/fields, carried by the root VFX with every feature",
       "grew": 2
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "2170888f6",
+      "reason": "new entry @margoengine/ui/world (world-space and XR panels)",
+      "grew": 2
     }
   ],
   "items": {
@@ -5035,6 +5041,7 @@
     "@margoengine/tween/stagger": 1435,
     "@margoengine/ui": 28221,
     "@margoengine/ui/react": 28294,
+    "@margoengine/ui/world": 9277,
     "@margoengine/usdz": 12708,
     "@margoengine/usdz dist/workers/usdz.js": 116081,
     "@margoengine/usdz/anim": 6436,
@@ -5196,6 +5203,7 @@
     "leak @margoengine/shader/pass -> @margoengine/materials": 1,
     "leak @margoengine/ui -> @margoengine/text": 1,
     "leak @margoengine/ui/react -> @margoengine/text": 1,
+    "leak @margoengine/ui/world -> @margoengine/text": 1,
     "leak @margoengine/usdz -> @margoengine/gltf-pro/model": 1,
     "leak @margoengine/usdz/compose -> @margoengine/gltf-pro/model": 1,
     "leak @margoengine/usdz/worker -> @margoengine/gltf-pro/worker": 1,

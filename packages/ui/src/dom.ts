@@ -1,4 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
+import type { PointerInfo } from './interaction.js';
 import type { Ui } from './ui.js';
 
 /** Options for {@link attachInput}. */
@@ -41,6 +42,10 @@ export function handleKeyDown(ui: Ui, e: KeyboardEvent, skip: ReadonlySet<string
   return !!command && ui.wantsKeys() && ui.execute(command, 'keyboard');
 }
 const NONE: ReadonlySet<string> = new Set();
+const consume = (event: Event) => {
+  event.preventDefault();
+  event.stopImmediatePropagation();
+};
 
 /**
  * Connect an element (normally the engine's canvas) to a {@link Ui}: pointer, touch and wheel go to the widgets under
@@ -59,52 +64,8 @@ const NONE: ReadonlySet<string> = new Set();
 export function attachInput(ui: Ui, target: HTMLElement, options: AttachOptions = {}): Detach {
   const { signal, keyboard = true, pointer = true, wheel = true } = options;
   const cleanups: (() => void)[] = [];
-  const on = <K extends keyof HTMLElementEventMap>(type: K, handler: (event: HTMLElementEventMap[K]) => void) => {
-    target.addEventListener(type, handler as EventListener, { capture: true, passive: false });
-    cleanups.push(() => target.removeEventListener(type, handler as EventListener, { capture: true }));
-  };
-  const local = (event: MouseEvent): [number, number] => {
-    const r = target.getBoundingClientRect();
-    return [event.clientX - r.left, event.clientY - r.top];
-  };
-  const info = (e: PointerEvent) => ({
-    id: e.pointerId,
-    button: e.button,
-    type: (e.pointerType || 'mouse') as 'mouse' | 'touch' | 'pen',
-  });
-  const consume = (event: Event) => {
-    event.preventDefault();
-    event.stopImmediatePropagation();
-  };
-  if (pointer) {
-    on('pointermove', (e) => {
-      const [x, y] = local(e);
-      if (ui.pointerMove(x, y, info(e)) && e.buttons) e.stopImmediatePropagation();
-    });
-    on('pointerdown', (e) => {
-      const [x, y] = local(e);
-      if (ui.pointerDown(x, y, info(e))) {
-        consume(e);
-        target.setPointerCapture?.(e.pointerId);
-        target.focus?.({ preventScroll: true });
-      }
-    });
-    const up = (e: PointerEvent) => {
-      const [x, y] = local(e);
-      if (ui.pointerUp(x, y, info(e))) {
-        e.stopImmediatePropagation();
-        target.releasePointerCapture?.(e.pointerId);
-      }
-    };
-    on('pointerup', up);
-    on('pointercancel', () => ui.pointerCancel());
-    on('pointerleave', () => ui.pointerLeave());
-  }
-  if (wheel)
-    on('wheel', (e) => {
-      const [x, y] = local(e);
-      if (ui.wheel(x, y, e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY)) consume(e);
-    });
+  const on = listener(target, cleanups);
+  attachPointer(ui, target, on, { pointer, wheel });
   if (keyboard) {
     if (!target.hasAttribute('tabindex')) {
       target.setAttribute('tabindex', '0');
@@ -115,6 +76,81 @@ export function attachInput(ui: Ui, target: HTMLElement, options: AttachOptions 
     });
     on('blur', () => ui.pointerCancel());
   }
+  return detacher(cleanups, signal);
+}
+
+/** What {@link attachPointer} sends pointer events to: a {@link Ui}, or world panels picked by a ray. @internal */
+export interface PointerSink {
+  pointerMove(x: number, y: number, info: PointerInfo): boolean;
+  pointerDown(x: number, y: number, info: PointerInfo): boolean;
+  pointerUp(x: number, y: number, info: PointerInfo): boolean;
+  pointerCancel(): void;
+  pointerLeave(): void;
+  wheel(x: number, y: number, dy: number): boolean;
+}
+type Listen = <K extends keyof HTMLElementEventMap>(type: K, handler: (event: HTMLElementEventMap[K]) => void) => void;
+
+/**
+ * The pointer and wheel listeners of {@link attachInput}, in CSS pixels from the element's top left: an event the sink
+ * used is stopped, so it does not also reach the game.
+ * @internal
+ */
+export function attachPointer(
+  sink: PointerSink,
+  target: HTMLElement,
+  on: Listen,
+  { pointer = true, wheel = true }: { pointer?: boolean; wheel?: boolean } = {},
+): void {
+  const local = (event: MouseEvent): [number, number] => {
+    const r = target.getBoundingClientRect();
+    return [event.clientX - r.left, event.clientY - r.top];
+  };
+  const info = (e: PointerEvent) => ({
+    id: e.pointerId,
+    button: e.button,
+    type: (e.pointerType || 'mouse') as 'mouse' | 'touch' | 'pen',
+  });
+  if (pointer) {
+    on('pointermove', (e) => {
+      const [x, y] = local(e);
+      if (sink.pointerMove(x, y, info(e)) && e.buttons) e.stopImmediatePropagation();
+    });
+    on('pointerdown', (e) => {
+      const [x, y] = local(e);
+      if (sink.pointerDown(x, y, info(e))) {
+        consume(e);
+        target.setPointerCapture?.(e.pointerId);
+        target.focus?.({ preventScroll: true });
+      }
+    });
+    const up = (e: PointerEvent) => {
+      const [x, y] = local(e);
+      if (sink.pointerUp(x, y, info(e))) {
+        e.stopImmediatePropagation();
+        target.releasePointerCapture?.(e.pointerId);
+      }
+    };
+    on('pointerup', up);
+    on('pointercancel', () => sink.pointerCancel());
+    on('pointerleave', () => sink.pointerLeave());
+  }
+  if (wheel)
+    on('wheel', (e) => {
+      const [x, y] = local(e);
+      if (sink.wheel(x, y, e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY)) consume(e);
+    });
+}
+
+/** Adds capture-phase listeners to `target`, each removed by a function pushed onto `cleanups`. @internal */
+export function listener(target: HTMLElement, cleanups: (() => void)[]): Listen {
+  return (type, handler) => {
+    target.addEventListener(type, handler as EventListener, { capture: true, passive: false });
+    cleanups.push(() => target.removeEventListener(type, handler as EventListener, { capture: true }));
+  };
+}
+
+/** A function that runs `cleanups` in reverse once, also disposable, and runs when `signal` aborts. @internal */
+export function detacher(cleanups: (() => void)[], signal?: AbortSignal): Detach {
   const detach = (() => {
     for (const cleanup of cleanups.splice(0).reverse()) cleanup();
   }) as Detach;

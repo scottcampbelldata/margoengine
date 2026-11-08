@@ -335,6 +335,68 @@ widget with `visible` rather than by mounting it conditionally if its place in t
 Vite and Rollup print no warning for it). Props only a constructor
 reads (a slider's `min` and `max`, an inventory's `columns` and `slots`) recreate the widget when they change.
 
+## World-space and XR panels
+
+`@margoengine/ui/world` puts a `Ui` on a flat panel in the 3D scene: a diegetic screen on a terminal, a VR menu, a wrist
+panel. The panel's `Ui` keeps its own size in CSS pixels; `WorldPanels` draws it into a texture (redrawn only when the UI
+changes, with mipmaps so a distant panel does not shimmer) and puts that texture on a quad in the scene, depth-tested
+against it, in every view and XR eye. A mouse, pen or touch on the canvas reaches the nearest panel under it by a ray from
+the camera, and a press a panel used never reaches the game.
+
+```ts
+import { Engine } from '@margoengine/core';
+import { Ui, Panel, Label, Button } from '@margoengine/ui';
+import { WorldPanel, WorldPanels } from '@margoengine/ui/world';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const menu = new Ui({ width: 480, height: 300 }); // its own Ui, in CSS pixels of the panel
+menu.add(
+  new Panel({
+    background: 'surface',
+    anchor: 'stretch',
+    padding: 24,
+    gap: 12,
+    children: [
+      new Label({ text: 'Workshop', size: 'title' }),
+      new Button({ text: 'Craft', variant: 'primary', onClick: () => menu.toast('Crafted') }),
+    ],
+  }),
+);
+const panels = WorldPanels.attach(engine); // draws every panel in the scene and routes canvas pointers to them
+panels.add(new WorldPanel(menu, { width: 1.2, position: [0, 1.4, -1.5], pixelRatio: 2 }));
+```
+
+| `new WorldPanel(ui, {...})` option | Default |
+| --- | --- |
+| `width` | `1` world unit (metres in glTF scenes) |
+| `height` | the width times the UI's height over its width, so the UI keeps its shape |
+| `position`, `rotation` | `[0, 0, 0]` and the quaternion `[0, 0, 0, 1]`: the UI faces +Z with +Y up |
+| `pixelRatio` | `1` texture pixel per CSS pixel; 2 reads sharper up close in VR |
+| `doubleSided` | `false`: the back is invisible and takes no input; `true` shows the UI from behind too, mirrored so it reads |
+
+`panel.matrix` is the pose (column-major, rotation and translation only): copy a controller's grip pose into it for a wrist
+menu, or call `panel.setPose(position, rotation)`. `WorldPanels.attach(engine, { order, input })` takes the frame graph order
+(default 25: in the scene, before post-processing) and `input: false` to leave the canvas alone.
+
+Rays from anything else go through `panels.pointer(ray, pressed, { id })`: the ray hovers the nearest visible panel, a change
+of `pressed` presses or releases, and a pressed pointer keeps its panel until it is released (a slider dragged off the
+edge). For XR, hand each controller to `panels.controller(controller, id)` every frame: `@margoengine/xr`'s `XRController`
+has the shape it reads (`targetRayMatrix` and `buttons`), its ray hovers and button 0, the trigger, presses.
+
+```ts
+import type { RayController, WorldPanels } from '@margoengine/ui/world';
+
+// Call once a frame during an XR session; ids keep the two hands apart.
+export function pointAtPanels(panels: WorldPanels, controllers: readonly RayController[]): void {
+  controllers.forEach((controller, hand) => panels.controller(controller, hand + 1));
+}
+```
+
+`panel.intersect(ray)` returns the hit (distance, world point, UI pixel, inside or not), `pickPanel(panels, ray)` the nearest
+panel under a ray, `screenRay(camera, x, y, width, height)` the ray under a canvas point and `rayFromMatrix(pose)` an XR
+pointing ray. Give a panel's `Ui` to `WorldPanels` only, never also to `UiRenderer`: the renderer would resize it to the
+canvas. Keyboard and gamepad focus work as on the screen through the panel's own `ui` (`ui.bindInput`, `ui.navigate`).
+
 ## Options
 
 | `new Ui({...})` option | Default |
@@ -366,6 +428,7 @@ ends with a link to [margoengine.com/errors#ui](https://margoengine.com/errors#u
 
 ## Limits
 
-- WebGPU only for drawing. On WebGL2 the UI still updates, but nothing shows.
+- WebGPU only for drawing. On WebGL2 the UI still updates, but nothing shows (world panels too).
+- A world panel is a flat rectangle drawn with depth test and no depth write, so it does not hide transparent effects drawn after it; no curved panels; one texture and one pair of glyph atlases per panel.
 - Text shaping is the text package's: no Arabic or Indic shaping, no ligatures.
 - Layout is single-pass flexbox without wrapping rows; use a grid for wrapped content.

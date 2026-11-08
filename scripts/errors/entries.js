@@ -780,6 +780,11 @@ export const entries = [
       'A widget must be inside <UiRoot>; wrap the interface in <UiRoot engine={engine}>',
       'announce(message) takes a non-empty string',
       'bindInput takes an Input from @margoengine/input made with uiActions()',
+      'WorldPanel needs a Ui: new WorldPanel(new Ui())',
+      'WorldPanel width, height and pixelRatio must be finite and above 0; pass numbers such as { width: 1.2, pixelRatio: 2 }',
+      'WorldPanel position must be finite and rotation a unit quaternion [x, y, z, w]; normalize the rotation',
+      'WorldPanels needs a non-empty name and a finite order; pass a name string and an order number',
+      'WorldPanels.add takes WorldPanel objects; wrap the Ui first: new WorldPanel(ui)',
     ],
     cause:
       'A widget, layout style, theme, colour or Ui option got a value it cannot use: a size that is not a number, auto, fill or a percentage; spacing that is not one, two or four numbers; a colour that is not #rrggbb or #rrggbbaa; a theme field or colour role that does not exist; a slider or progress bar with a range that is empty or not finite; a list entry without a label; an index outside the widgets there are; a text scale outside 0.5 to 3; or a Ui used after it was disposed.',
