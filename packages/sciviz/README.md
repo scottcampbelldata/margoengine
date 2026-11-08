@@ -398,6 +398,46 @@ const grid = zarrGrid(await array.read(), [1, 1, 2]);
 console.log(array.shape, grid.dims, grid.range);
 ```
 
+## Geographic layers
+
+`@margoengine/sciviz/geo` puts raster map tiles under a figure's data layers, flat or on a globe, and maps longitude,
+latitude and height into the same data units so scatter, line and other layers sit on the map.
+
+- Projections: `'mercator'` (Web Mercator on the sphere, the world in [-1, 1] by [-1, 1], ending at
+  `MERCATOR_MAX_LAT`, about 85.05 degrees), `'plate'` (plate carrée, x = lon / 180, y = lat / 180) and `'globe'` (the
+  WGS 84 ellipsoid, Earth-centred, equatorial radius 1, z toward the north pole, heights along the ellipsoid normal).
+  Formulas from Snyder's "Map Projections: A Working Manual" (USGS, 1987), chapters 7 and 12.
+- `project(lon, lat, height, projection)` and `unproject(x, y, projection)` convert points; longitudes outside
+  ±180 degrees wrap by 360. `tileAt`, `tileBounds` and `tilesIn` work in the slippy-map scheme (z/x/y, y from the
+  north); a box whose west edge lies east of its east edge crosses the 180th meridian.
+- `tileLayer(fig, { tiles, projection, zoom, area, maxTiles, attribution, init, signal })` loads every tile of `area`
+  at `zoom` (default 2) from a URL template with `{z}`, `{x}` and `{y}` or from your own function, then draws them.
+  Each tile is a 16 by 16 grid whose vertices the shader projects, so the globe is round and seams close. A 404 counts
+  in `layer.missing`; other HTTP errors reject. Credit the tile provider with `attribution`; it shows in the figure's
+  corner.
+
+```ts
+import { Figure } from '@margoengine/sciviz';
+import { tileLayer, project } from '@margoengine/sciviz/geo';
+
+const fig = await Figure.create(document.querySelector('canvas')!);
+
+// Your own tile server, or a provider whose terms allow it (with its credit line).
+const map = await tileLayer(fig, {
+  tiles: '/tiles/{z}/{x}/{y}.png',
+  zoom: 2,
+  attribution: 'Map tiles: your provider',
+});
+
+// Three cities as points on the map, in the map's data units.
+const cities = [
+  [-0.13, 51.51],
+  [139.69, 35.69],
+  [-74.01, 40.71],
+].map(([lon, lat]) => project(lon, lat, 0, map.projection));
+await fig.scatter({ x: cities.map((p) => p[0]), y: cities.map((p) => p[1]), z: cities.map((p) => p[2]) });
+```
+
 ## Graph layouts
 
 `@margoengine/sciviz/graph` lays out networks with forces and draws them on the GPU. `ForceLayout` follows Fruchterman

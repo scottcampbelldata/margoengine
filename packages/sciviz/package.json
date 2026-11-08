@@ -40,6 +40,10 @@
       "types": "./dist/formats.d.ts",
       "import": "./dist/formats.js"
     },
+    "./geo": {
+      "types": "./dist/geo.d.ts",
+      "import": "./dist/geo.js"
+    },
     "./graph": {
       "types": "./dist/graph.d.ts",
       "import": "./dist/graph.js"

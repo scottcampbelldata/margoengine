@@ -16,16 +16,24 @@ const MAX_SHARE = 0.001,
 async function run(compat) {
   const context = await openBrowser({ startPath: `/packages/sciviz/tests/entries.html${compat ? '?compat=1' : ''}`, port: compat ? 5246 : 5245 });
   const { page, hardware } = context;
-  const errors = [];
+  const errors = [],
+    missed = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  page.on('console', (m) => {
-    if (m.type() === 'error') errors.push(m.text());
+  // A case may ask for a file it knows is not there (a map tile, to count it as missing): it names the path in
+  // window.expectedMissing, and the browser's 404 line for exactly that path is the one console error allowed.
+  page.on('console', async (m) => {
+    if (m.type() !== 'error') return;
+    const path = new URL(m.location().url || 'about:blank').pathname,
+      expected = / 404 /.test(m.text()) && (await page.evaluate(() => window.expectedMissing ?? []).catch(() => []));
+    if (expected && expected.includes(path)) missed.push(path);
+    else errors.push(m.text());
   });
   page.setDefaultTimeout(300_000);
   try {
     await page.waitForFunction(() => window.entriesReady === true);
     const report = await page.evaluate(() => window.runEntryChecks());
     assert.deepEqual(errors, []);
+    assert.deepEqual(missed.sort(), (await page.evaluate(() => window.expectedMissing ?? [])).sort(), 'every expected 404 happened');
     return { hardware, report };
   } finally {
     await context.close();

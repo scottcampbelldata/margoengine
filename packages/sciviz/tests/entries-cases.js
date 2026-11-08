@@ -2,6 +2,7 @@
 // the facts it checked.
 import { gridLayer, CELL_TYPES } from '@margoengine/sciviz/grids';
 import { ForceLayout, graphLayer } from '@margoengine/sciviz/graph';
+import { tileLayer } from '@margoengine/sciviz/geo';
 
 /** The cases entries-browser.js runs, in order. */
 export const cases = [];
@@ -9,7 +10,10 @@ const addCase = (name, run) => cases.push({ name, run });
 
 // The figure puts data x along scene x, data y along scene -z and data z up, so a flat (z = 0) layer is seen from
 // above: TOP looks down with data y up the screen.
-const TOP = [[0, 2.8, 0], [0, 0, -1]];
+const TOP = [
+  [0, 2.8, 0],
+  [0, 0, -1],
+];
 function look(figure, position = [1.9, 1.3, 2.1], up = [0, 1, 0]) {
   figure.engine.stop?.();
   figure.engine.camera.position = position;
@@ -78,7 +82,12 @@ for (const dimensions of [2, 3])
     assert(layout.positions.every(Number.isFinite), 'the layout gave a position that is not finite');
     // Colour by index so no node takes a colour map end that could match the background.
     const values = Array.from({ length: graph.nodes }, (_, i) => i),
-      layer = graphLayer(figure, graph, layout.positions, { nodeSize: 6, values, range: [-20, 140], colormap: 'aurora' });
+      layer = graphLayer(figure, graph, layout.positions, {
+        nodeSize: 6,
+        values,
+        range: [-20, 140],
+        colormap: 'aurora',
+      });
     await figure.ready();
     const image = await pixels(),
       count = lit(image);
@@ -86,4 +95,81 @@ for (const dimensions of [2, 3])
     // 120 discs of 6 pixels across cover about 120 x 28 = 3,400 pixels; at least half must show past overlaps.
     assert(count > 1700, `the graph lit ${count} pixels`);
     return { edges: layer.edges, lit: count };
+  });
+
+// The nine Terrarium PNG tiles of the terrain fixtures, reused as the 16 tiles of zoom 2, so the whole map lights.
+const FIXTURES = '/packages/terrain/test/fixtures/terrarium-10/';
+const fixtureTile = async (z, x, y, signal) => {
+  const response = await fetch(`${FIXTURES}${164 + (x % 3)}-${359 + (y % 3)}.png`, { signal });
+  return response.blob();
+};
+
+// The map's area on screen in pixels: the convex hull of its outline (the plane) or of points all over it (the
+// globe, whose silhouette is convex) projected by the figure's data-to-clip transform.
+function mapArea(figure, map, image) {
+  const m = figure.engine.camera.matrix,
+    d = figure.model,
+    at = (p) => {
+      const s = [0, 1, 2].map((r) => d[r] * p[0] + d[4 + r] * p[1] + d[8 + r] * p[2] + d[12 + r]);
+      const c = [0, 1, 2, 3].map((r) => m[r] * s[0] + m[4 + r] * s[1] + m[8 + r] * s[2] + m[12 + r]);
+      return [((c[0] / c[3] + 1) / 2) * image.width, ((1 - c[1] / c[3]) / 2) * image.height];
+    };
+  const points = [];
+  if (map.projection === 'globe')
+    for (let lat = -90; lat <= 90; lat += 3)
+      for (let lon = -180; lon < 180; lon += 3) points.push(at(map.project(lon, lat)));
+  else
+    for (const [lon, lat] of [
+      [-180, -85.0511],
+      [180, -85.0511],
+      [180, 85.0511],
+      [-180, 85.0511],
+    ])
+      points.push(at(map.project(lon, lat)));
+  points.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]),
+    hull = [];
+  for (const pass of [points, [...points].reverse()]) {
+    const start = hull.length;
+    for (const p of pass) {
+      while (hull.length >= start + 2 && cross(hull[hull.length - 2], hull[hull.length - 1], p) <= 0) hull.pop();
+      hull.push(p);
+    }
+    hull.pop();
+  }
+  const width = image.width,
+    height = image.height;
+  if (!hull.every(([x, y]) => x >= 0 && x <= width && y >= 0 && y <= height))
+    throw new Error(`the ${map.projection} map runs off the ${width} x ${height} canvas`);
+  let area = 0;
+  for (let i = 0; i < hull.length; i++) {
+    const [x0, y0] = hull[i],
+      [x1, y1] = hull[(i + 1) % hull.length];
+    area += x0 * y1 - x1 * y0;
+  }
+  return Math.abs(area) / 2;
+}
+
+for (const projection of ['mercator', 'globe'])
+  addCase(`geo-${projection}`, async (figure, { pixels, lit, assert }) => {
+    if (projection === 'globe') look(figure, [1.6, 0.9, 2.2]);
+    else look(figure, ...TOP);
+    const map = await tileLayer(figure, { tiles: fixtureTile, projection, zoom: 2, attribution: 'Test tiles' });
+    assert(map.loaded === 16 && map.missing === 0, `loaded ${map.loaded}, missing ${map.missing}`);
+    // A URL template whose tile does not exist counts it as missing rather than failing.
+    if (projection === 'mercator') {
+      (window.expectedMissing ??= []).push(`${FIXTURES}0-0.png`);
+      const none = await tileLayer(figure, { tiles: `${FIXTURES}{x}-{y}.png`, zoom: 0 });
+      assert(none.loaded === 0 && none.missing === 1, `404 tile: loaded ${none.loaded}, missing ${none.missing}`);
+      figure.remove(none);
+    }
+    await figure.ready();
+    const image = await pixels(),
+      count = lit(image),
+      area = mapArea(figure, map, image);
+    // Every pixel the map covers differs from the background (Terrarium tiles are mid red and green); its edge
+    // pixels are partly covered, so at least 90 % of the projected area, and nothing outside it plus its rim.
+    assert(area > 5000, `the ${projection} map covers only ${area} pixels on screen`);
+    assert(count >= 0.9 * area && count <= area * 1.05 + 400, `the ${projection} map lit ${count} pixels of ${area}`);
+    return { tiles: map.loaded, lit: count, area: Math.round(area) };
   });

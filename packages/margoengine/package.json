@@ -2290,6 +2290,10 @@
       "types": "./dist/sciviz/formats.d.ts",
       "import": "./dist/sciviz/formats.js"
     },
+    "./sciviz/geo": {
+      "types": "./dist/sciviz/geo.d.ts",
+      "import": "./dist/sciviz/geo.js"
+    },
     "./sciviz/graph": {
       "types": "./dist/sciviz/graph.d.ts",
       "import": "./dist/sciviz/graph.js"

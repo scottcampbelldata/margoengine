@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10961745,
+  "total": 10966050,
   "history": [
     {
       "date": "2026-10-24",
@@ -4088,6 +4088,12 @@
       "commit": "83d230f60",
       "reason": "voxel smooth terrain entry (job 7)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "0bcdc4fc1",
+      "reason": "sciviz geo entry: new optional entry, root unchanged",
+      "grew": 1
     }
   ],
   "items": {
@@ -4661,6 +4667,7 @@
     "@margoengine/sciviz/bricks": 14265,
     "@margoengine/sciviz/colormaps": 4427,
     "@margoengine/sciviz/formats": 13712,
+    "@margoengine/sciviz/geo": 4305,
     "@margoengine/sciviz/graph": 9722,
     "@margoengine/sciviz/grids": 10885,
     "@margoengine/sciviz/maths": 5638,
