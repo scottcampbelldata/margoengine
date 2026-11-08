@@ -117,6 +117,16 @@ fn bvhEnter(node: u32, r: BVHRay, far: f32) -> f32 {
   let leave = min(min(far3.x, far3.y), far3.z) * 1.0000004;
   return select(BVH_NEVER, enter, enter <= leave && enter <= far);
 }
+// Edge function p x q of two sheared vertices. A shared edge must give two triangles exactly opposite values, or a ray
+// through it can miss both. WGSL lets a compile fuse and reassociate (15.7.5), and Metal fuses p.x*q.y - p.y*q.x into one
+// fma, which is not antisymmetric; so both sides evaluate the edge with its ends in one fixed order and negate.
+fn bvhEdge(p: vec2f, q: vec2f) -> f32 {
+  let swap = q.x < p.x || (q.x == p.x && q.y < p.y);
+  let s = select(p, q, swap);
+  let e = select(q, p, swap);
+  let value = s.x * e.y - s.y * e.x;
+  return select(value, -value, swap);
+}
 // Weights and distance in xyzw, w < 0 for a miss.
 fn bvhTriangle(r: BVHRay, a3: vec3f, b3: vec3f, c3: vec3f, side: u32, far: f32) -> vec4f {
   let a = a3 - r.origin;
@@ -131,9 +141,9 @@ fn bvhTriangle(r: BVHRay, a3: vec3f, b3: vec3f, c3: vec3f, side: u32, far: f32) 
   let by = b[r.axes.y] - r.shear.y * bz;
   let cx = c[r.axes.x] - r.shear.x * cz;
   let cy = c[r.axes.y] - r.shear.y * cz;
-  let u = cx * by - cy * bx;
-  let v = ax * cy - ay * cx;
-  let w = bx * ay - by * ax;
+  let u = bvhEdge(vec2f(cx, cy), vec2f(bx, by));
+  let v = bvhEdge(vec2f(ax, ay), vec2f(cx, cy));
+  let w = bvhEdge(vec2f(bx, by), vec2f(ax, ay));
   let det = u + v + w;
   let positive = u >= 0.0 && v >= 0.0 && w >= 0.0;
   let negative = u <= 0.0 && v <= 0.0 && w <= 0.0;

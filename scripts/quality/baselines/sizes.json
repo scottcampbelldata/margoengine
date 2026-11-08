@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10880284,
+  "total": 10881803,
   "history": [
     {
       "date": "2026-10-24",
@@ -4022,6 +4022,12 @@
       "commit": "c0895e40e",
       "reason": "physics: compound colliders on the own solver (batch 126 job 4)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "61800b11f",
+      "reason": "bvh: watertight edge function (bvhEdge) in the ray-triangle WGSL, shared by gpu, gpu-build and shadows/rt",
+      "grew": 3
     }
   ],
   "items": {
@@ -4093,8 +4099,8 @@
     "@margoengine/bvh": 23398,
     "@margoengine/bvh/alpha": 16873,
     "@margoengine/bvh/bake": 2583,
-    "@margoengine/bvh/gpu": 5208,
-    "@margoengine/bvh/gpu-build": 18897,
+    "@margoengine/bvh/gpu": 5738,
+    "@margoengine/bvh/gpu-build": 19594,
     "@margoengine/bvh/inside": 12903,
     "@margoengine/bvh/lines": 6113,
     "@margoengine/bvh/points": 17799,
@@ -4613,7 +4619,7 @@
     "@margoengine/shadows": 18738,
     "@margoengine/shadows/distance": 2421,
     "@margoengine/shadows/light-function": 1921,
-    "@margoengine/shadows/rt": 6194,
+    "@margoengine/shadows/rt": 6486,
     "@margoengine/shadows/style": 799,
     "@margoengine/shadows/transmission": 1027,
     "@margoengine/shadows/virtual": 15956,

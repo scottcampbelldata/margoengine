@@ -86,6 +86,7 @@ carry the same citation as a one-line comment in the code.
 | id | formula | file | source |
 | --- | --- | --- | --- |
 | BK1 | vertex-colour bake: Lambert, Karis 2013 window, spot smoothstep, cosine AO | bvh/src/bake.ts | Karis 2013 windowed inverse-square falloff; Lambert; spot smoothstep and cosine AO are textbook forms |
+| BK2 | GPU ray against triangle: each edge function p x q evaluated with its two ends in one fixed order and negated for the other, so triangles sharing an edge get exactly opposite values even where the compile fuses the multiply-add | bvh/src/gpu.ts | Woop, Benthin and Wald 2013, "Watertight Ray/Triangle Intersection", JCGT 2(1), Section 3 (a shared edge must give exactly opposite edge values); W3C WGSL 15.7.5 (an implementation may fuse and reassociate). The fixed order is ours |
 
 ### cache
 
