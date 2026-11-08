@@ -126,6 +126,7 @@ interface VFXFeatures {
     events?: VFXExtension<VFXEvents>;
     lit?: VFXExtension<VFXLit>;
     depthCollide?: VFXExtension<VFXDepthCollide>;
+    stretch?: VFXExtension<VFXStretch>;
 }
 
 interface VFXLightSource {
@@ -193,6 +194,7 @@ interface VFXOptions {
     events?: VFXEvents;
     lit?: VFXLit;
     depthCollide?: VFXDepthCollide;
+    stretch?: VFXStretch;
 }
 
 interface VFXRibbons {
@@ -230,6 +232,10 @@ interface VFXState {
         drawCalls: number;
     };
     engine: Engine;
+}
+
+interface VFXStretch {
+    factor?: number;
 }
 
 interface VFXTexture {

@@ -233,5 +233,29 @@ window.checkDepthCollide=async({kind='wall'}={})=>{
  if(!near(got.v,v))mismatches.push({what:'velocity',got:got.v,want:v});
  return {error,errors:errors.splice(0),mismatches,got,want:{at,v}};
 };
+/**
+ * Stretched billboards: one white particle flying +x at `speed` (one step of 0.1 s brings it to the origin). With
+ * `factor` k its disc is stretched along the motion to half length size/2 x (1 + k x speed / size) and keeps half width
+ * size/2 across, so along the row and the column through it the red channel must be 255 x fade x (1 - u^2)^2, u the
+ * distance over that half extent. `vertical`: it flies +y instead, so the long axis turns with the motion.
+ */
+window.checkStretch=async({samples=1,speed=2,factor=0.25,vertical=false}={})=>{
+ const diameter=0.5,dt=0.1,life=100,direction=vertical?[0,1,0]:[1,0,0];
+ const effect=new VFX({...still,capacity:4,position:direction.map(d=>-d*speed*dt),velocity:direction.map(d=>d*speed),size:diameter,lifetime:[life,life],stretch:{factor}});
+ effect.burst(1);
+ const {image,error}=await run(effect,{frames:0,dt,samples});
+ effect.dispose();
+ const fade=(life-dt)/life,along=diameter/2*(1+factor*speed/diameter),across=diameter/2,mismatches=[];let checked=0,largest=0;
+ const [cx,cy]=pixel(0,0);
+ for(let k=-60;k<=60;k++)for(const axis of [0,1]){
+  const px=axis===0?cx+k:cx,py=axis===0?cy:cy+k,[x,y]=world(px,py);
+  const [a,b]=vertical?[y,x]:[x,y],u2=(a/along)**2+(b/across)**2,want=u2>=1?0:255*fade*(1-u2)**2;
+  // Pixels within a pixel of the rim are partly covered under MSAA; compare the rest.
+  if(Math.abs(Math.sqrt(u2)-1)*Math.min(along,across)<1.5*unit)continue;
+  const got=image[(py*size+px)*4],d=Math.abs(got-want);checked++;largest=Math.max(largest,d);
+  if(d>2)mismatches.push({px,py,want,got});
+ }
+ return {error,errors:errors.splice(0),checked,largest,mismatches:mismatches.slice(0,8),along};
+};
 window.ready=true;
 </script></body></html>

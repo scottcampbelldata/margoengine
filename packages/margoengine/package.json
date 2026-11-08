@@ -2910,6 +2910,10 @@
       "types": "./dist/vfx/depth-collide.d.ts",
       "import": "./dist/vfx/depth-collide.js"
     },
+    "./vfx/stretch": {
+      "types": "./dist/vfx/stretch.d.ts",
+      "import": "./dist/vfx/stretch.js"
+    },
     "./video": {
       "types": "./dist/video.d.ts",
       "import": "./dist/video.js"

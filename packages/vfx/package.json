@@ -89,6 +89,10 @@
     "./depth-collide": {
       "types": "./dist/depth-collide.d.ts",
       "import": "./dist/depth-collide.js"
+    },
+    "./stretch": {
+      "types": "./dist/stretch.d.ts",
+      "import": "./dist/stretch.js"
     }
   },
   "files": [

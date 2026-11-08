@@ -13,6 +13,7 @@ import { mesh } from './mesh.js';
 import { events } from './events.js';
 import { lit } from './lit.js';
 import { depthCollide } from './depth-collide.js';
+import { stretch } from './stretch.js';
 export type {
   VFXOptions,
   VFXObstacle,
@@ -28,6 +29,7 @@ export type {
   VFXLit,
   VFXLightSource,
   VFXDepthCollide,
+  VFXStretch,
 } from './base.js';
 const features = {
   obstacles,
@@ -42,9 +44,10 @@ const features = {
   events,
   lit,
   depthCollide,
+  stretch,
 };
 /**
- * GPU particles with every optional feature (obstacles, wrap, sort, texture, curves, emitter, soft, ribbons, mesh, events, lit, depthCollide). Effects that use none of them load
+ * GPU particles with every optional feature (obstacles, wrap, sort, texture, curves, emitter, soft, ribbons, mesh, events, lit, depthCollide, stretch). Effects that use none of them load
  * less with `VFX` from `@margoengine/vfx/base`, adding only the feature entries they use.
  */
 export class VFX extends VFXBase {

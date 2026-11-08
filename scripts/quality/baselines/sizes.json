@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11188995,
+  "total": 11190094,
   "history": [
     {
       "date": "2026-10-24",
@@ -4316,6 +4316,12 @@
       "commit": "65693183b",
       "reason": "new entry @margoengine/terrain/planet",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "27c341e16",
+      "reason": "velocity stretch: new entry @margoengine/vfx/stretch, carried by the root VFX with every feature",
+      "grew": 1
     }
   ],
   "items": {
@@ -5044,6 +5050,7 @@
     "@margoengine/vfx/ribbons": 2854,
     "@margoengine/vfx/soft": 1551,
     "@margoengine/vfx/sort": 1356,
+    "@margoengine/vfx/stretch": 1099,
     "@margoengine/vfx/texture": 1527,
     "@margoengine/vfx/wrap": 496,
     "@margoengine/video": 2199,

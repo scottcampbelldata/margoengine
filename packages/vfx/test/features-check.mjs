@@ -15,6 +15,8 @@
 // Depth collide: a particle flying into a depth texture drawn from quads bounces off a wall and a slope with the
 // velocity and position the CPU steps, takes its normal from its own surface at an edge, and flies on behind a wall
 // (past the thickness) or without the feature.
+// Stretch: a fast particle's disc is stretched along its motion on screen to size + factor x speed and keeps its size
+// across, horizontally and vertically, at 1x and 4x MSAA; factor 0 is the round disc.
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
@@ -111,6 +113,17 @@ try {
     clean(r, name);
     assert.deepEqual(r.mismatches, [], name);
     console.log(`ok ${name}: velocity ${r.got.v.map((v) => v.toFixed(3))}`);
+  }
+  for (const options of [{ samples: 1 }, { samples: 4 }, { samples: 1, vertical: true }, { samples: 1, factor: 0 }]) {
+    const name = `stretch ${JSON.stringify(options)}`,
+      r = await page.evaluate((o) => window.checkStretch(o), options);
+    report.results[name] = r;
+    clean(r, name);
+    assert.ok(r.checked >= 20, `${name}: ${r.checked} pixels compared`);
+    assert.deepEqual(r.mismatches, [], name);
+    console.log(
+      `ok ${name}: ${r.checked} pixels, largest difference ${r.largest.toFixed(2)}/255, half length ${r.along}`,
+    );
   }
   assert.deepEqual(pageErrors, []);
   await mkdir('test-results', { recursive: true });

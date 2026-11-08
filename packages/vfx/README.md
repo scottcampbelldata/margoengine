@@ -215,7 +215,7 @@ from 0.010 to 0.031 ms at 100,000; the draw is unchanged.
 `VFX` from `@margoengine/vfx` (about 14.1 kB min+gzip) carries every feature. An effect that uses none of them can
 import the same class from `@margoengine/vfx/base` (about 8.3 kB); add features as a second argument from their own
 entries: `/obstacles` (1.1 kB alone), `/wrap` (0.2 kB), `/sort` (1.1 kB), `/texture` (1.5 kB; it exports
-`textureFeature`, passed as `{texture: textureFeature}`), `/curves` (1.6 kB), `/emitter` (2.4 kB), `/soft` (1.3 kB), `/ribbons` (2.6 kB, the quality gate's figure), `/mesh` (3.2 kB, the same), `/events` (2.3 kB, the same), `/lit` (1.7 kB, the same) and `/depth-collide` (2.0 kB, the same). Sizes are vite library builds with bare imports external,
+`textureFeature`, passed as `{texture: textureFeature}`), `/curves` (1.6 kB), `/emitter` (2.4 kB), `/soft` (1.3 kB), `/ribbons` (2.6 kB, the quality gate's figure), `/mesh` (3.2 kB, the same), `/events` (2.3 kB, the same), `/lit` (1.7 kB, the same), `/depth-collide` (2.0 kB, the same) and `/stretch` (0.8 kB, the same). Sizes are vite library builds with bare imports external,
 each entry compressed on its own ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)), so a
 bundle that combines them adds less: the whole root is 14.1 kB. `node examples/package-benchmarks/vfx-size.mjs` measures base-plus-feature bundles
 (`results/vfx-size.json`, at an earlier commit, `76af7a0`).
@@ -428,3 +428,30 @@ attach `DepthTexture` at its default order (-5, after the particles simulate). O
 listed particles; with `thickness` and `bounce` read every frame. `node packages/vfx/test/features-check.mjs` (real
 GPU) reads back a particle bouncing off a wall and a 45 degree slope, at an object's edge in front of a far wall,
 behind a wall, and without the feature, against the same frames stepped on the CPU.
+
+### Velocity-stretched billboards
+
+`stretch` turns each billboard into a streak along its motion, for sparks, rain and tracers: the long axis follows the
+particle's velocity across the screen and the billboard is `size + factor x speed` long, `factor` seconds of travel
+(default 0.05), and keeps `size` across. A particle with no motion across the screen (flying straight at the camera)
+stays round, and spin is ignored, since a streak points where it flies. The draw list's cull sphere grows to the
+streak's length, so a streak reaching into view is never dropped.
+
+```ts
+import {EngineKernel} from 'margoengine/core';
+import {VFX} from 'margoengine/vfx/base';
+import {stretch} from 'margoengine/vfx/stretch';
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
+// Sparks that streak as they fly and shorten as they slow down.
+VFX.attach(engine, {
+  capacity: 4096, rate: 400, position: [0, 1, 0], velocity: [0, 4, 0], spread: 6, size: 0.03, lifetime: [0.5, 1],
+  color: [1, 0.6, 0.2, 1], intensity: 4, stretch: {factor: 0.04},
+}, {stretch});
+engine.start();
+```
+
+`factor` is read every frame (0 draws round billboards again). The streak is the same soft disc as a round
+billboard, drawn longer, so it works with `texture`, `soft`, `curves` and `lit` unchanged; mesh particles and ribbons
+keep their own shapes. `node packages/vfx/test/features-check.mjs` (real GPU) compares every pixel along and across a
+fast particle's streak, flying across and up the screen, at 1x and 4x MSAA, and with factor 0, against the stretched
+disc computed on the CPU.

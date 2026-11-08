@@ -119,6 +119,7 @@ export interface VFXFeatures {
     events?: VFXExtension<VFXEvents>;
     lit?: VFXExtension<VFXLit>;
     depthCollide?: VFXExtension<VFXDepthCollide>;
+    stretch?: VFXExtension<VFXStretch>;
 }
 
 export interface VFXLightSource {
@@ -186,6 +187,7 @@ export interface VFXOptions {
     events?: VFXEvents;
     lit?: VFXLit;
     depthCollide?: VFXDepthCollide;
+    stretch?: VFXStretch;
 }
 
 export interface VFXRibbons {
@@ -193,6 +195,10 @@ export interface VFXRibbons {
     interval?: number;
     width?: number;
     heads?: boolean;
+}
+
+export interface VFXStretch {
+    factor?: number;
 }
 
 export interface VFXTexture {

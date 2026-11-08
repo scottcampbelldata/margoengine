@@ -106,6 +106,17 @@ export interface VFXOptions {
   lit?: VFXLit;
   /** Particles bounce off whatever was drawn last frame, from the scene `depth`. Needs `depthCollide` from `@margoengine/vfx/depth-collide`. */
   depthCollide?: VFXDepthCollide;
+  /** Billboards stretched along their motion on screen, for sparks, rain and tracers. Needs `stretch` from `@margoengine/vfx/stretch`. */
+  stretch?: VFXStretch;
+}
+/**
+ * Velocity-stretched billboards: each billboard's long axis follows the particle's velocity across the screen and it
+ * is `size + factor x speed` long (never shorter than `size`), `size` across. A particle with no motion across the
+ * screen stays round; spin is ignored. Read every frame. Needs the `stretch` feature.
+ */
+export interface VFXStretch {
+  /** Seconds of travel the streak is long, 0..10. Default 0.05. */
+  factor?: number;
 }
 /**
  * Collisions with the scene depth: each frame, before the simulation, a particle on last frame's draw list that meets
@@ -333,7 +344,7 @@ export interface VFXExtension<T> {
   create?(state: VFXState, value: T, owned: OwnedResources): VFXRuntime;
 }
 /** Added features, in the order their patches apply. */
-const extensions = ['ribbons', 'mesh', 'events', 'lit', 'depthCollide'] as const;
+const extensions = ['ribbons', 'mesh', 'events', 'lit', 'depthCollide', 'stretch'] as const;
 /** One compute dispatch of the slot-order passes. */
 type Step = [GPUComputePipeline, GPUBindGroup];
 /**
@@ -395,6 +406,7 @@ export interface VFXFeatures {
   events?: VFXExtension<VFXEvents>;
   lit?: VFXExtension<VFXLit>;
   depthCollide?: VFXExtension<VFXDepthCollide>;
+  stretch?: VFXExtension<VFXStretch>;
 }
 let nextId = 0;
 /**
