@@ -28,6 +28,11 @@ export interface LabelInfo {
 }
 /** Return true to hide the label this frame (custom occlusion, for example a raycast against the scene). */
 export type OccludeHook = (label: Label, info: LabelInfo) => boolean;
+/**
+ * Return true to hide the CSS 3D object this frame, for example when scene geometry is in front of it. `info`
+ * describes the object's origin; its `x` and `y` are NaN when the origin is behind the camera.
+ */
+export type CSS3DOccludeHook = (object: CSS3DObject, info: LabelInfo) => boolean;
 /** Scales a label by distance: a reference distance, optionally clamped between min and max scale. */
 export type DistanceScale = number | { reference: number; min?: number; max?: number };
 
@@ -96,6 +101,8 @@ export interface CSS3DOptions {
   pixelScale?: number;
   pointerEvents?: 'none' | 'auto';
   followVisibility?: boolean;
+  /** Hides the object while it returns true; CSS 3D objects are not depth-tested against the canvas. */
+  occlude?: CSS3DOccludeHook;
   visible?: boolean;
 }
 
@@ -166,8 +173,15 @@ abstract class Item {
     this.followVisibility = followVisibility ?? true;
     this.visible = visible ?? true;
   }
+  /** @internal Element size in CSS pixels, measured once (`offsetWidth`, `offsetHeight`); null until measured. */
+  measured: [number, number] | null = null;
   get mesh(): Mesh | null {
     return this.meshValue;
+  }
+  /** Measures the element again at the next update, after its content or style changed its size. */
+  remeasure(): this {
+    this.measured = null;
+    return this;
   }
   /** Removes the element from the overlay and stops tracking it. */
   remove(): void {
@@ -187,8 +201,6 @@ export class Label extends Item {
   scale = 1;
   /** Anchor used at the last update: `anchor`, or the one a layout placed the label with. */
   readonly placedAnchor: [number, number] = [0.5, 0.5];
-  /** @internal Size measured for layouts, CSS pixels before scaling; null until measured. */
-  measured: [number, number] | null = null;
   /** @internal Layout decision of the current update: hidden, or placed with another anchor. */
   layoutHidden = false;
   /** @internal */ layoutAnchor: [number, number] | null = null;
@@ -221,11 +233,6 @@ export class Label extends Item {
   set priority(value: number) {
     this.priorityValue = checkPriority(value);
   }
-  /** Measures the element again at the next update, after its content or style changed its size. */
-  remeasure(): this {
-    this.measured = null;
-    return this;
-  }
   get position(): Vec3 {
     return this.positionValue;
   }
@@ -251,6 +258,9 @@ export class Label extends Item {
 /** An HTML element placed in world space with a CSS matrix3d transform. */
 export class CSS3DObject extends Item {
   pixelScale: number;
+  occlude: CSS3DOccludeHook | null;
+  /** True when part of the element was behind the near plane at the last update and was cut off (`clip-path`). */
+  clipped = false;
   /** World matrix used at the last update (column-major). */
   readonly matrix = new Float64Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
   private readonly own = new Float64Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
@@ -258,6 +268,7 @@ export class CSS3DObject extends Item {
     super(owner, element, options.mesh, options.followVisibility, options.visible);
     this.pixelScale = options.pixelScale ?? 0.01;
     if (!Number.isFinite(this.pixelScale) || this.pixelScale <= 0) throw new RangeError('pixelScale must be > 0');
+    this.occlude = options.occlude ?? null;
     if (options.matrix) this.setMatrix(options.matrix);
     else
       composeMatrix(
@@ -313,6 +324,8 @@ export class LabelRenderer implements EnginePlugin {
   private readonly cameraCache: StyleCache = {};
   private readonly cssView = new Float64Array(16);
   private readonly point = createScreenPoint();
+  /** Signed distances in front of the near plane at a CSS 3D element's corners, reused every update. */
+  private readonly depths = new Float64Array(4);
   private readonly visibleLabels: Label[] = [];
   private readonly shownLabels: Label[] = [];
   private readonly layoutContext = {
@@ -591,27 +604,64 @@ export class LabelRenderer implements EnginePlugin {
         if (runtime.meshes.get(id) !== mesh || (object.followVisibility && hiddenInTree(store, id))) show = false;
         else for (let i = 0; i < 16; i++) matrix[i] = matrices[id * 16 + i];
       } else if (show) matrix.set(object.ownMatrix);
+      let clip = '';
       if (show) {
-        // Hide objects whose origin is at or behind the near plane; CSS perspective cannot clip them.
-        const viewZ = view[2] * matrix[12] + view[6] * matrix[13] + view[10] * matrix[14] + view[14];
-        if (
-          orthographic
-            ? projectPoint(camera.matrix, matrix[12], matrix[13], matrix[14], width, height, backend, this.point)
-                .depth < 0
-            : -viewZ <= camera.near
-        )
-          show = false;
+        // CSS perspective cannot clip at the near plane, so the renderer does: the signed distance in front of the
+        // plane at the element's four corners (affine over the element) says whether it is whole, cut or gone.
+        const [w, h] = this.measure(object),
+          scale = object.pixelScale,
+          depths = this.depths;
+        let low = Infinity,
+          high = -Infinity;
+        for (let i = 0; i < 4; i++) {
+          // Corners (0, 0), (w, 0), (w, h), (0, h) in element pixels, from the centre, CSS y down to world y up.
+          const u = (i === 1 || i === 2 ? 0.5 : -0.5) * w * scale,
+            v = (i >= 2 ? -0.5 : 0.5) * h * scale,
+            px = matrix[0] * u + matrix[4] * v + matrix[12],
+            py = matrix[1] * u + matrix[5] * v + matrix[13],
+            pz = matrix[2] * u + matrix[6] * v + matrix[14];
+          const depth = orthographic
+            ? projectPoint(camera.matrix, px, py, pz, width, height, backend, this.point).depth
+            : -(view[2] * px + view[6] * py + view[10] * pz + view[14]) - camera.near;
+          depths[i] = depth;
+          low = Math.min(low, depth);
+          high = Math.max(high, depth);
+        }
+        if (!(high > 0)) show = false;
+        else if (low < 0) clip = this.nearClip(w, h);
         object.distance = Math.hypot(
           matrix[12] - camera.position[0],
           matrix[13] - camera.position[1],
           matrix[14] - camera.position[2],
         );
       }
+      if (show && object.occlude) {
+        const point = projectPoint(
+          camera.matrix,
+          matrix[12],
+          matrix[13],
+          matrix[14],
+          width,
+          height,
+          backend,
+          this.point,
+        );
+        show = !object.occlude(object, {
+          x: point.x,
+          y: point.y,
+          depth: point.depth,
+          distance: object.distance,
+          world: [matrix[12], matrix[13], matrix[14]],
+        });
+      }
       object.onScreen = show;
+      object.clipped = show && clip !== '';
       if (!show) {
         this.set(object.element, object.cache, 'display', 'none');
         continue;
       }
+      // Written only while cut, and once more to clear it.
+      if (clip || object.cache.clipPath) this.set(object.element, object.cache, 'clipPath', clip);
       this.set(object.element, object.cache, 'transform', objectCSSTransform(matrix, object.pixelScale));
       this.set(object.element, object.cache, 'display', '');
     }
@@ -636,11 +686,35 @@ export class LabelRenderer implements EnginePlugin {
     this.dispose();
   }
 
-  private measure(label: Label): readonly [number, number] {
-    if (label.measured) return label.measured;
+  private measure(item: Label | CSS3DObject): readonly [number, number] {
+    if (item.measured) return item.measured;
     // A hidden element measures 0: show it for the reading. The update then writes its final display.
-    this.set(label.element, label.cache, 'display', '');
-    return (label.measured = [label.element.offsetWidth || 0, label.element.offsetHeight || 0]);
+    this.set(item.element, item.cache, 'display', '');
+    return (item.measured = [item.element.offsetWidth || 0, item.element.offsetHeight || 0]);
+  }
+  /**
+   * The part of a `w` x `h` element in front of the near plane, as a CSS `polygon()` in element pixels: one-plane
+   * Sutherland-Hodgman clipping of its corners by the signed distances in `depths` (corner order (0, 0), (w, 0),
+   * (w, h), (0, h)).
+   */
+  private nearClip(w: number, h: number): string {
+    const depths = this.depths;
+    let text = '';
+    for (let i = 0; i < 4; i++) {
+      const j = (i + 1) & 3,
+        a = depths[i],
+        b = depths[j],
+        ax = i === 1 || i === 2 ? w : 0,
+        ay = i >= 2 ? h : 0,
+        bx = j === 1 || j === 2 ? w : 0,
+        by = j >= 2 ? h : 0;
+      if (a >= 0) text += `${text ? ',' : ''}${px(ax)} ${px(ay)}`;
+      if (a >= 0 !== b >= 0) {
+        const t = a / (a - b);
+        text += `${text ? ',' : ''}${px(ax + (bx - ax) * t)} ${px(ay + (by - ay) * t)}`;
+      }
+    }
+    return `polygon(${text})`;
   }
   private set(element: HTMLElement, cache: StyleCache, property: string, value: string): void {
     if (cache[property] === value) return;

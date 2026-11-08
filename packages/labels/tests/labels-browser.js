@@ -173,8 +173,42 @@ async function scenario(backend) {
   assert(worst <= 2, `${backend}: CSS3D corners off by ${worst}px`);
   checks.push(`${backend}: CSS3D element corners land on the projected world corners within 2 px`);
 
+  // CSS3D near plane: a tilted panel whose origin is behind the near plane is cut there, not hidden whole. A point of
+  // its far half hits it; a point of its near half, in front of the camera but before the near plane, does not.
+  farLabel.visible = false;
+  nearLabel.visible = false;
+  engine.camera.position = [0, 0, 6];
+  engine.camera.target = [0, 0, 0];
+  engine.camera.near = 2;
+  const tilted = document.createElement('div');
+  tilted.className = 'panel';
+  const angle = Math.PI / 6; // half of 60 degrees about x: the element's top leans toward the camera
+  const cut = labels.add3D(tilted, {
+    position: [0, 0, 4.1],
+    quaternion: [Math.sin(angle), 0, 0, Math.cos(angle)],
+    pixelScale: 0.02,
+    pointerEvents: 'auto',
+  });
+  engine.render();
+  const at = (x, y) => pagePoint(engine, cssPointToWorld(cut.matrix, cut.pixelScale, x - 50, y - 30));
+  const viewDepth = (x, y) => 6 - cssPointToWorld(cut.matrix, cut.pixelScale, x - 50, y - 30)[2];
+  assert(viewDepth(50, 30) < 2, `${backend}: the panel origin should be behind the near plane`);
+  assert(cut.onScreen && cut.clipped && getComputedStyle(tilted).display !== 'none', `${backend}: cut panel hidden`);
+  assert(
+    viewDepth(50, 55) > 2.1 && document.elementFromPoint(...at(50, 55)) === tilted,
+    `${backend}: far half missing`,
+  );
+  const nearHalf = at(50, 4);
+  assert(viewDepth(50, 4) > 0.5 && viewDepth(50, 4) < 1.9, `${backend}: probe not between camera and near plane`);
+  assert(document.elementFromPoint(...nearHalf) !== tilted, `${backend}: the part before the near plane is drawn`);
+  measurements.css3dCut = getComputedStyle(tilted).clipPath;
+  engine.camera.near = 0.1;
+  checks.push(
+    `${backend}: a CSS3D panel through the near plane is cut there (hit inside its far half, not its near half)`,
+  );
+
   // Dispose cleans the DOM.
-  const elements = [label.element, farLabel.element, nearLabel.element, panel];
+  const elements = [label.element, farLabel.element, nearLabel.element, panel, tilted];
   if (device) {
     const error = await device.popErrorScope();
     if (error) gpuErrors.push(error.message);

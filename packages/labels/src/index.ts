@@ -6,6 +6,7 @@ export type {
   LabelView,
   LabelInfo,
   OccludeHook,
+  CSS3DOccludeHook,
   DistanceScale,
   LabelLayout,
   LayoutContext,

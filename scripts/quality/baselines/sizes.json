@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11280418,
+  "total": 11280788,
   "history": [
     {
       "date": "2026-10-24",
@@ -4448,6 +4448,12 @@
       "commit": "6560302db",
       "reason": "biomes graph: placement rule graphs (new entry /graph); the placement entry and worker gain the graph hook and the worker the graph code",
       "grew": 3
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "f11ccb8e0",
+      "reason": "labels CSS 3D near-plane cut",
+      "grew": 1
     }
   ],
   "items": {
@@ -4769,7 +4775,7 @@
     "@margoengine/kinematics-constraints": 11751,
     "@margoengine/kinematics-constraints/sdf": 7229,
     "@margoengine/kinematics-constraints/swept": 9491,
-    "@margoengine/labels": 5176,
+    "@margoengine/labels": 5546,
     "@margoengine/labels/declutter": 1512,
     "@margoengine/lighting2d": 4389,
     "@margoengine/lightmap": 4053,

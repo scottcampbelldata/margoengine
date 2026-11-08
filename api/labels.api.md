@@ -11,6 +11,8 @@ export { Backend } from "@margoengine/math";
 
 export class CSS3DObject extends Item {
     pixelScale: number;
+    occlude: CSS3DOccludeHook | null;
+    clipped: boolean;
     readonly matrix: Float64Array<ArrayBuffer>;
     constructor(owner: LabelRenderer, element: HTMLElement, options: CSS3DOptions);
     setMesh(mesh: Mesh | null): this;
@@ -18,6 +20,8 @@ export class CSS3DObject extends Item {
     setPose(position: Vec3, quaternion?: readonly number[]): this;
     get ownMatrix(): Float64Array;
 }
+
+export type CSS3DOccludeHook = (object: CSS3DObject, info: LabelInfo) => boolean;
 
 export interface CSS3DOptions {
     mesh?: Mesh | null;
@@ -27,6 +31,7 @@ export interface CSS3DOptions {
     pixelScale?: number;
     pointerEvents?: 'none' | 'auto';
     followVisibility?: boolean;
+    occlude?: CSS3DOccludeHook;
     visible?: boolean;
 }
 
@@ -44,7 +49,6 @@ export class Label extends Item {
     occlude: OccludeHook | null;
     scale: number;
     readonly placedAnchor: [number, number];
-    measured: [number, number] | null;
     layoutHidden: boolean;
     layoutAnchor: [number, number] | null;
     readonly screen: ScreenPoint;
@@ -54,7 +58,6 @@ export class Label extends Item {
     constructor(owner: LabelRenderer, element: HTMLElement, options: LabelOptions);
     get priority(): number;
     set priority(value: number);
-    remeasure(): this;
     get position(): Vec3;
     get offset(): Vec3;
     setMesh(mesh: Mesh | null): this;
@@ -161,7 +164,9 @@ abstract class Item {
     readonly cache: StyleCache;
     owner: LabelRenderer | null;
     constructor(owner: LabelRenderer, element: HTMLElement, mesh: Mesh | null | undefined, followVisibility: boolean | undefined, visible: boolean | undefined);
+    measured: [number, number] | null;
     get mesh(): Mesh | null;
+    remeasure(): this;
     remove(): void;
 }
 
