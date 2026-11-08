@@ -48,7 +48,7 @@ const closeOf = (conn) => new Promise((done) => (conn.onclose = (code, reason) =
 const listed = (server, n) => () => server.players.length === n;
 
 test('an app message round-trips through the codec, at every size up to the limit', () => {
-  assert.equal(PROTOCOL_VERSION, 4);
+  assert.equal(PROTOCOL_VERSION, 5);
   assert.equal(MAX_APP_BYTES, 16384);
   for (const data of [
     new Uint8Array(0),
@@ -190,7 +190,7 @@ test('a client on protocol 2 is refused with a reason naming both versions', asy
   old.send(encodeClientMessage({ type: 'hello', version: 2, view: 2, name: 'old page' }));
   const { code, reason } = await closed;
   assert.equal(code, 1008);
-  assert.equal(reason, 'protocol 2, server speaks 4');
+  assert.equal(reason, 'protocol 2, server speaks 5');
   assert.equal(server.players.length, 0);
 });
 

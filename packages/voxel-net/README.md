@@ -63,6 +63,8 @@ client.edit(x, y, z, 0); // shown at once; the server confirms it or sends the c
   and players carry the `@margoengine/voxel/codec` bytes. Chunks go out without light (clients light them).
 - **Bots** (`./bot`): `VoxelBot.connect({url, blocks})` joins with the same client, walks, jumps, swims and edits;
   it decodes only the chunks within one chunk of itself.
+- **Entities** (`./entities`): mobs, items and other non-player things the server runs, sent to each player only
+  when near; see [Entities and mobs](#entities-and-mobs-entities).
 - **File store** (`./file-store`, Node): `new FileChunkStore(dir)` is a `ChunkStore` with one deflated file per chunk; pass
   it as the server's `store` and edits survive a restart.
 
@@ -144,7 +146,8 @@ await server.importEdits(deserialize(await readFile('world.snapshot')));
 await server.close();
 ```
 
-Breaking change (2026-10-31): `PROTOCOL_VERSION` is 3 (2 added names, 3 adds app messages). Server and clients must be
+Breaking change (2026-11-08): `PROTOCOL_VERSION` is 5 (2 added names, 3 app messages, 4 resuming a dropped
+connection, 5 entities messages). Server and clients must be
 built from the same version; a client on another one is closed with 1008 and a reason naming both, which
 `connectVoxelNet` passes to `onError`.
 
@@ -265,9 +268,58 @@ client.onClose = ({ code, resumeFailed }) => {
   `replaced`, `chunksResent` and `fullResends`; `client.stats` counts `drops`, `resumes`, `resumeAttempts` and
   `resumeFailed`.
 
+## Entities and mobs (`./entities`)
+
+`VoxelEntities` runs creatures, dropped items and anything else that is not a player on the server. Each tick it runs
+every entity's brain (a function that returns where to walk, or nothing to stand), moves its body (a `VoxelCharacter`:
+it falls, collides and steps up ledges in the server's world), then sends each player only the entities near it.
+An entity enters a player's set within `radius` (default 64 blocks) and leaves past `leaveRadius` (default 10% more),
+so one on the edge does not flicker; past `maxPerPlayer` (default 256) the nearest go. States go as `EntityCodec`
+deltas: only what changed. On the client, `VoxelEntityView` decodes them and interpolates each entity 100 ms behind,
+as the client does other players. Entities over chunks the server has not loaded (no player near) wait where they are.
+
+```ts
+import { BlockTypes, VoxelWorld } from 'margoengine/voxel';
+import { connectVoxelNet } from 'margoengine/voxel-net';
+import { VoxelEntities, VoxelEntityView, wander } from 'margoengine/voxel-net/entities';
+import { VoxelServer } from 'margoengine/voxel-net/server';
+
+const blocks = new BlockTypes();
+for (const name of ['stone', 'dirt', 'grass', 'sand', 'water', 'log', 'leaves']) blocks.define(name);
+const PIG = 1,
+  STONE_ITEM = 2;
+
+// Server: a wandering pig and a dropped stone that falls to the ground. Kinds and the state byte are yours.
+const server = new VoxelServer({ blocks });
+await server.listen(8787, '0.0.0.0');
+const entities = new VoxelEntities(server, { radius: 48 });
+const pig = entities.spawn({ kind: PIG, position: [16, 40, 16], brain: wander() });
+entities.spawn({ kind: STONE_ITEM, position: [18, 40, 16], body: { size: [0.25, 0.25, 0.25] } });
+pig.state = 1; // say, "hurt": clients get it with the next tick
+
+// Client: draw each entity where the view puts it.
+const client = connectVoxelNet('ws://127.0.0.1:8787', new VoxelWorld({ blocks }));
+const view = new VoxelEntityView(client);
+view.onEnter = (e) => console.log(`entity ${e.id} of kind ${e.kind} came into view`);
+setInterval(() => {
+  for (const e of view.sample().values()) console.log(e.kind, e.snapshot.position);
+}, 1000);
+```
+
+- **Server.** `spawn({kind, position, yaw?, state?, body?, brain?})` returns the entity; write its `position`, `yaw`
+  and `state` at any time. `body: false` gives an entity you move yourself. `remove(entity)`, `get(id)`,
+  `near(position, radius)` (nearest first), `size` and iteration. `wander({seed, every, rest})` walks about and jumps
+  when a wall stops it. `maxEntities` (default 4,096) caps the world. `dispose()` (or `using`) stops the entities and
+  tells every client to drop them.
+- **Client.** `view.entities` by id (`kind`, `state`, `snapshot` filled by `sample(now)`), `onEnter` and `onLeave`.
+  The view takes the client's `onEntities` handler; a parked player that comes back gets every entity again in full.
+- **Wire.** An `entities` message (type 26, protocol 5): the server tick, a full flag and `EntityCodec` bytes of
+  `ENTITY_SCHEMA` (position, a yaw rotation, kind u16, state u8). `server.metrics.bytesOut.entities` and
+  `client.stats.received.entities` count the bytes.
+
 ## Limits of the prototype
 
-No mobs, chat or inventories, no TLS (put `wss://` behind a reverse proxy), one process per world. The server trusts
+No chat or inventories, no TLS (put `wss://` behind a reverse proxy), one process per world. The server trusts
 nothing from clients and rate-limits edits and inputs; connections that have not joined are capped as above, but a
 flood at the network level needs a proxy or firewall in front.
 

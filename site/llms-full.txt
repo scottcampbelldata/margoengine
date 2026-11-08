@@ -2600,7 +2600,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-557). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-558). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -2641,6 +2641,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Voxel-edit GPU bulk edits (`@margoengine/voxel-edit/gpu`, 2026-11-08) | Enforced: a grid within the device's storage binding limit (128 MiB by default) and `maxCells` (default 16,777,216, at most 67,108,864); fill radius 0 to 128; 0 to 1,024 iterations per filter; a 256-entry remap table of 0 to 255; a brush made on the grid's own device. By method: every edit reads the grid as the edit before left it; one submit per pass; a combine uploads its tool grid each time and counts clipped cells on the CPU. | Exact integer cell work keeps every result equal to the CPU operation. | A grid larger than one storage binding is refused, not split. | Split a large model with `voxTiles` (`./vox`) and edit each tile. |
 | Voxel-edit shared editing (`@margoengine/voxel-edit/collab`, 2026-11-08) | Enforced: a site name of 1 to 256 characters, 65,535 sites per replica, clock and seq 1 to 4,294,967,295, cells inside the grid, values 0 to 255, `maxCells` (default 16,777,216). By method: each cell keeps the write with the highest Lamport clock, the higher site name breaking a tie; an operation already applied is ignored. | Last writer wins per cell needs no server and no conflict step, and merges in any order. | Each cell keeps one value, so two users drawing over the same cells keep only the later stroke; a replica keeps 7 bytes a cell plus every operation seen (5 bytes per edited cell), with no compaction. | Start a new shared grid from a snapshot when the log grows too large; give each user a stable site name. |
 | Goxel and VoxEdit files (`@margoengine/voxel-edit/formats`, 2026-11-08) | Enforced: `.gox` versions 1 and 2 read, 2 written; BL16 blocks of exactly 64 x 64 pixels; at most 4,096 layers; `maxCells` (default 16,777,216) counts each layer's block bounds before cropping; names and dictionary values written up to 255 bytes. `.vxm` versions 3 to 13 read, 12 written; at most 255 materials (palette indices 1 to 255) and 255 models, all of one size; textures up to 2,048 and face lists up to 262,144 quads are skipped, larger ones refused. By method: from a clean-room specification, not from either program. | Neither format has a public specification; the one Margo reads was written from two programs' behaviour and eight sample files, and lists what it could not determine. | Skipped and lost on a round trip: `.gox` cameras, light, preview, material lists beyond one default on writing, layer matrices of plain layers (written as identity), and the fork-only PLAC, CLRH and CUST chunks; `.vxm` baked meshes, textures, surface data, palette chunks and the trailer. Unknown and so not checked: the `.gox` chunk CRC (no writer computes one; written as 0), the colour space of block colours, the meaning of alpha 1 to 254 (read as solid), clone layers under a rotating `mat` (each voxel centre goes to the cell it lands in), and the inside test at a shape's exact edge (centres on the edge count as inside); `.vxm` versions other than 4 and 12 (no sample files; version 13 in particular rests on one program's reader), the v6 to v10 texture compression, the pivot X convention of v10 and older (returned as stored), and whether VoxEdit opens a file with no baked mesh, as `writeVXM` writes. | Open a written `.vxm` in VoxEdit before relying on it; keep `.vox` (`./vox`) as the exchange file when a model must keep cameras, materials or meshes. |
+| Voxel-net entities (`@margoengine/voxel-net/entities`, 2026-11-08) | Enforced: `maxEntities` (default 4,096, at most 1,048,576), `maxPerPlayer` (default 256, nearest first), kind 0 to 65,535, state 0 to 255, `leaveRadius` at least `radius` (default 64 and 10% more). By method: entities over a chunk the server has not loaded do not move; each entity is quantized once per tick and sent as a delta against the player's last message; a player away (parked) gets every entity again in full. | Sending only what is near and changed keeps a crowded world within the 20 Hz tick and each link. | A world of many entities steps every one each tick on the server's thread, with no sleeping of far ones beyond unloaded chunks; brains run on the main thread; no pathfinding (only `wander`). | Keep entities near players; write your own brain for chase or flee; raise `maxPerPlayer` with care for the link. |
 
 ## Rendering
 
@@ -10452,10 +10453,9 @@ client.edit(x, y, z, 0); // shown at once; the server confirms it or sends the c
   and players carry the `@margoengine/voxel/codec` bytes. Chunks go out without light (clients light them).
 - **Bots** (`./bot`): `VoxelBot.connect({url, blocks})` joins with the same client, walks, jumps, swims and edits;
   it decodes only the chunks within one chunk of itself.
-- **File store** (`./file-store`, Node): `new FileChunkStore(dir)` is a `ChunkStore` with one deflated file per chunk; pass
-  it as the server's `store` and edits survive a restart.
-
-## Connections, login and saved edits
+- **Entities** (`./entities`): mobs, items and other non-player things the server runs, sent to each player only
+  when near; see [Entities and mobs](#entities-and-mobs-entities).
+- **File store** (`./file-store`, Node): `new FileChunkStore(dir)` is
 
 [README continues: https://margoengine.com/llms/packages/voxel-net.md]
 

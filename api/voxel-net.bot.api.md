@@ -134,6 +134,12 @@ type ServerMessage =
  | {
     type: 'app';
     data: Uint8Array;
+}
+ | {
+    type: 'entities';
+    tick: number;
+    full: boolean;
+    data: Uint8Array;
 };
 
 class VoxelNetClient {
@@ -150,6 +156,7 @@ class VoxelNetClient {
     onSpawn: () => void;
     onLoaded: () => void;
     onApp: (data: Uint8Array) => void;
+    onEntities: (tick: number, full: boolean, data: Uint8Array) => void;
     onBlocks: (changes: Int32Array) => void;
     onClose: (event: VoxelNetClose) => void;
     onResume: (event: VoxelNetResume) => void;

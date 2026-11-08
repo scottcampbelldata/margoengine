@@ -37,6 +37,8 @@ export class VoxelServer {
     get players(): VoxelServerPlayer[];
     send(player: VoxelServerPlayer, data: Uint8Array): boolean;
     broadcast(data: Uint8Array): number;
+    onTick(listener: (tick: number, dt: number) => void): () => void;
+    sendEntities(player: VoxelServerPlayer, tick: number, full: boolean, data: Uint8Array): boolean;
     get counts(): {
         players: number;
         parked: number;
@@ -218,6 +220,12 @@ type ServerMessage =
 }
  | {
     type: 'app';
+    data: Uint8Array;
+}
+ | {
+    type: 'entities';
+    tick: number;
+    full: boolean;
     data: Uint8Array;
 };
 ```

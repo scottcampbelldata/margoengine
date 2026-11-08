@@ -207,6 +207,7 @@ export class VoxelNetClient {
       names: 0,
       heartbeat: 0,
       app: 0,
+      entities: 0,
     },
     sent: 0,
     corrections: 0,
@@ -232,6 +233,11 @@ export class VoxelNetClient {
    * closes the connection, as for any handler. Default does nothing.
    */
   onApp: (data: Uint8Array) => void = () => {};
+  /**
+   * Called with each `entities` message: server tick, whether it is in full (against no baseline), and `EntityCodec`
+   * bytes. `VoxelEntityView` of `@margoengine/voxel-net/entities` takes it over. Default does nothing.
+   */
+  onEntities: (tick: number, full: boolean, data: Uint8Array) => void = () => {};
   /** Called with each block change list the server sends, flat `[x, y, z, state, ...]`, before it is applied. */
   onBlocks: (changes: Int32Array) => void = () => {};
   /**
@@ -502,6 +508,9 @@ export class VoxelNetClient {
         break;
       case 'app':
         this.onApp(m.data);
+        break;
+      case 'entities':
+        this.onEntities(m.tick, m.full, m.data);
         break;
     }
   }

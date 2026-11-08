@@ -240,7 +240,8 @@ Bots: four bots for two seconds with no errors.
 
 ## Not in the prototype
 
-Accounts and login, saving to disk, mobs, chat, inventories, TLS, several server processes for one world.
+Chat, inventories, TLS, several server processes for one world. (Login, saving to disk and, since 2026-11-08, mobs
+and items through `./entities` have since been added; see the README.)
 
 ## Open questions (all answered yes)
 

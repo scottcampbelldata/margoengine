@@ -341,6 +341,7 @@ const NAMES: Record<number, ServerMessage['type']> = {
     23: 'names',
     24: 'heartbeat',
     25: 'app',
+    26: 'entities',
   },
   RING = 512, // chunk messages remembered per client
   BANK = 60, // movement steps a client may save up: 0.5 s
@@ -585,6 +586,7 @@ export class VoxelServer {
   metrics: VoxelServerMetrics = VoxelServer.#emptyMetrics();
   /** Receives errors that do not belong to one call: a failed generation, a broken client. Default console.error. */
   onError: (error: unknown) => void = (error) => console.error(error);
+  readonly #tickListeners = new Set<(tick: number, dt: number) => void>();
   readonly #tickRate: number;
   readonly #view: number;
   readonly #maxView: number;
@@ -783,6 +785,30 @@ export class VoxelServer {
     let n = 0;
     for (const c of this.#clients) if (this.#queueApp(c, message)) n++;
     return n;
+  }
+  /**
+   * Calls `listener(tick, dt)` once per tick, after the players moved and before the tick's messages go out, so what it
+   * sends goes with them. `dt` is the tick length in seconds. A throw goes to {@link VoxelServer.onError}. Returns an
+   * unsubscribe. `@margoengine/voxel-net/entities` runs on it.
+   */
+  onTick(listener: (tick: number, dt: number) => void): () => void {
+    if (typeof listener !== 'function')
+      throw new TypeError('VoxelServer.onTick needs a function; pass (tick, dt) => {}');
+    this.#tickListeners.add(listener);
+    return () => this.#tickListeners.delete(listener);
+  }
+  /**
+   * Queues an `entities` message (`EntityCodec` bytes of `ENTITY_SCHEMA`) for a playing, connected player, sent with the
+   * tick's other messages. `@margoengine/voxel-net/entities` calls it; `full` says the bytes are against no baseline.
+   * @returns false when the player is not playing or not connected (it gets everything in full when it is back).
+   */
+  sendEntities(player: VoxelServerPlayer, tick: number, full: boolean, data: Uint8Array): boolean {
+    if (!player || typeof player !== 'object' || typeof (player as { id?: unknown }).id !== 'number')
+      throw new TypeError('VoxelServer.sendEntities needs a player from server.players; pass one');
+    const c = player as unknown as Client;
+    if (!this.#clients.has(c) || c.phase !== 'playing' || !c.connected) return false;
+    c.out.push(encodeServerMessage({ type: 'entities', tick, full, data }));
+    return true;
   }
   #queueApp(c: Client, message: Uint8Array): boolean {
     // Only a client the server holds, past its hello: before the welcome there is nothing to deliver to.
@@ -989,6 +1015,7 @@ export class VoxelServer {
         names: 0,
         heartbeat: 0,
         app: 0,
+        entities: 0,
       },
       bytesIn: 0,
       corrections: 0,
@@ -1685,6 +1712,12 @@ export class VoxelServer {
     for (const c of clients) if (c.phase === 'playing') this.#process(c, now);
     for (const c of clients) if (c.phase === 'playing' || c.phase === 'spawning') this.#recenter(c);
     for (const c of clients) if (c.phase === 'spawning') this.#trySpawn(c, now);
+    for (const listener of [...this.#tickListeners])
+      try {
+        listener(this.#tick, 1 / this.#tickRate);
+      } catch (error) {
+        this.onError(error);
+      }
     // One prepared (quantized) state per player per tick, shared by every client's players message; the grid finds
     // players near a column.
     const states = new Map<number, PreparedEntity>(),

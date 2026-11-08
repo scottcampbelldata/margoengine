@@ -3154,6 +3154,10 @@
       "types": "./dist/voxel-net/file-store.d.ts",
       "import": "./dist/voxel-net/file-store.js"
     },
+    "./voxel-net/entities": {
+      "types": "./dist/voxel-net/entities.d.ts",
+      "import": "./dist/voxel-net/entities.js"
+    },
     "./voxel-pathtracer": {
       "types": "./dist/voxel-pathtracer.d.ts",
       "import": "./dist/voxel-pathtracer.js"

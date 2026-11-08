@@ -8,7 +8,7 @@ import type { VoxelMoveIntent } from '@margoengine/voxel/query';
 import { ByteReader, ByteWriter, unzigzag, zigzag } from '../../shared/bytes.js';
 
 /** Version of this wire format; a server closes connections that say another. */
-export const PROTOCOL_VERSION = 4;
+export const PROTOCOL_VERSION = 5;
 
 /** Bytes of the token that resumes a dropped connection. */
 export const RESUME_TOKEN_BYTES = 16;
@@ -136,7 +136,12 @@ export type ServerMessage =
    * Bytes the game running on the server sent with `VoxelServer.send` or `broadcast`, at most {@link MAX_APP_BYTES}; the
    * package never looks inside them. Delivered in order with the other messages, to `VoxelNetClient.onApp`.
    */
-  | { type: 'app'; data: Uint8Array };
+  | { type: 'app'; data: Uint8Array }
+  /**
+   * Entities near this client (`@margoengine/voxel-net/entities`): `EntityCodec` bytes of `ENTITY_SCHEMA` at server tick
+   * `tick`, a delta against the last entities message, or against nothing when `full` is set.
+   */
+  | { type: 'entities'; tick: number; full: boolean; data: Uint8Array };
 
 const HELLO = 1,
   INPUT = 2,
@@ -151,6 +156,7 @@ const HELLO = 1,
   NAMES = 23,
   HEARTBEAT = 24,
   APP = 25,
+  ENTITIES = 26,
   MAX_RUNS = 1024,
   MAX_NAMES = 65535, // VoxelServer's largest maxPlayers
   encoder = new TextEncoder(),
@@ -441,6 +447,12 @@ export function encodeServerMessage(message: ServerMessage): Uint8Array {
     case 'heartbeat':
       w.u8(HEARTBEAT);
       break;
+    case 'entities':
+      w.u8(ENTITIES);
+      w.varint(integer('entities tick', message.tick, 0, 2 ** 32 - 1));
+      w.u8(message.full ? 1 : 0);
+      w.raw(bytesOf('entities data', message.data));
+      break;
     case 'app': {
       const data = bytesOf('app data', message.data);
       if (data.length > MAX_APP_BYTES)
@@ -524,7 +536,12 @@ export function decodeServerMessage(bytes: Uint8Array): ServerMessage {
   else if (type === PLAYERS) message = { type: 'players', tick: r.varint(), data: r.rest() };
   else if (type === LOADED) message = { type: 'loaded' };
   else if (type === HEARTBEAT) message = { type: 'heartbeat' };
-  else if (type === APP) {
+  else if (type === ENTITIES) {
+    const tick = r.varint(),
+      full = r.u8();
+    if (full > 1) throw r.fail(`has entities flag ${full}, not 0 or 1`);
+    message = { type: 'entities', tick, full: full === 1, data: new Uint8Array(r.rest()) };
+  } else if (type === APP) {
     const data = new Uint8Array(r.rest()); // a plain copy: a Node Buffer's slice would share the socket's memory
     if (data.length > MAX_APP_BYTES) throw r.fail(`has ${data.length} bytes of app data, over ${MAX_APP_BYTES}`);
     message = { type: 'app', data };

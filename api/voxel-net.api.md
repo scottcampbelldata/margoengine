@@ -62,7 +62,7 @@ export const PLAYER_SCHEMA: {
     readonly rotation: 'rotation';
 };
 
-export const PROTOCOL_VERSION = 4;
+export const PROTOCOL_VERSION = 5;
 
 export interface PlayerName {
     id: number;
@@ -153,6 +153,12 @@ export type ServerMessage =
  | {
     type: 'app';
     data: Uint8Array;
+}
+ | {
+    type: 'entities';
+    tick: number;
+    full: boolean;
+    data: Uint8Array;
 };
 
 export class VoxelNetClient {
@@ -169,6 +175,7 @@ export class VoxelNetClient {
     onSpawn: () => void;
     onLoaded: () => void;
     onApp: (data: Uint8Array) => void;
+    onEntities: (tick: number, full: boolean, data: Uint8Array) => void;
     onBlocks: (changes: Int32Array) => void;
     onClose: (event: VoxelNetClose) => void;
     onResume: (event: VoxelNetResume) => void;

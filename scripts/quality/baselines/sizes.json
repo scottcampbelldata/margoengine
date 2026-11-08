@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11320369,
+  "total": 11323674,
   "history": [
     {
       "date": "2026-10-24",
@@ -4544,6 +4544,12 @@
       "commit": "6196fab88",
       "reason": "voxel-edit/formats gains Goxel .gox and VoxEdit .vxm read and write (batch 97 job 4), with the decoders PNG reader",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "650e4d22a",
+      "reason": "voxel-net entities: new entry ./entities; server onTick/sendEntities and client onEntities (batch 98 job 1)",
+      "grew": 2
     }
   ],
   "items": {
@@ -5316,8 +5322,9 @@
     "@margoengine/voxel-edit/voxelize": 3724,
     "@margoengine/voxel-net": 8267,
     "@margoengine/voxel-net/bot": 9726,
+    "@margoengine/voxel-net/entities": 2791,
     "@margoengine/voxel-net/file-store": 1045,
-    "@margoengine/voxel-net/server": 16799,
+    "@margoengine/voxel-net/server": 17313,
     "@margoengine/voxel-pathtracer": 80311,
     "@margoengine/voxel-pathtracer/studio": 1303,
     "@margoengine/voxel/bevel": 2457,
