@@ -1124,3 +1124,43 @@ engine.onFrame((_, delta) => ticks.update(delta)); // 20 ticks a second
   after `life` steps or with nothing left to burn.
 - **Errors.** `TypeError` for a wrong world, option or rule type, `RangeError` for options out of range or a rule for an
   undefined block; `MargoError` `'disposed'` after `dispose()`.
+
+## Meshing on the GPU (`@margoengine/voxel/gpu-mesher`)
+
+`GpuVoxelMesher` meshes chunks in WebGPU compute shaders and gives back the same quads, in the same order, as
+`meshChunk`. Give it to the renderer in place of its worker pool, so a large edit remeshes in a few GPU passes.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { BlockTypes, VoxelWorld } from 'margoengine/voxel';
+import { GpuVoxelMesher } from 'margoengine/voxel/gpu-mesher';
+import { BlockTextures, VoxelRenderer } from 'margoengine/voxel/render';
+
+const engine = await Engine.create(document.querySelector('canvas')!, { backend: 'webgpu' });
+const grey = { width: 16, height: 16, data: new Uint8Array(1024).fill(180) };
+const textures = new BlockTextures({ images: [grey] });
+const blocks = new BlockTypes();
+const stone = blocks.define('stone', { textures: 0 });
+const world = new VoxelWorld({ blocks });
+world.addChunk(0, 0, 0);
+for (let x = 0; x < 32; x++) for (let z = 0; z < 32; z++) world.setBlock(x, (x * z) % 7, z, stone);
+const mesher = new GpuVoxelMesher(engine.gpu!, { batch: 8 });
+VoxelRenderer.attach(engine, { world, textures, mesher });
+// Or mesh chunks yourself: calls made together go out in one batch.
+const mesh = await mesher.mesh(world, '0,0,0');
+console.log(mesh?.opaque.length, mesher.stats); // 3 words per quad; { gpu, cpu, empty, batches }
+```
+
+- **Same output.** Faces, ambient occlusion, smooth light, greedy merges, cross blocks, liquid levels and visibility
+  match `meshChunk` word for word (checked on every chunk of a lit test terrain on the M6 Mac mini's Metal GPU).
+- **Batches.** `mesh(world, key, priority, eye)` works like `VoxelMesher.mesh`: calls made in the same task go out
+  together, up to `batch` chunks per dispatch (default 8, 1 to 32), lowest priority first; a newer call for a key
+  supersedes the older one (null), `cancel(key)` drops one. Each batch slot takes about 3.5 MB of GPU memory.
+- **On this thread.** A chunk with a slab or stair within a cell of it is meshed by `meshChunk` on the page
+  (`stats.cpu`); an all-air chunk needs no GPU (`stats.empty`). The page still packs each chunk and its shell and
+  finds which chunk faces see each other, then waits for two GPU round trips per batch.
+- **Renderer.** `VoxelRendererOptions.mesher` takes this mesher (or any object with `mesh`, `cancel` and `dispose`);
+  the renderer does not dispose a mesher it was given.
+- **Errors.** `TypeError` without a `GPUDevice`, `RangeError` for a `batch` out of range or over the device's binding
+  limit and for wrong keys, priorities or eyes; a mesh rejects with `MargoError` `'failed'` when the GPU reports a
+  validation error; `MargoError` `'disposed'` after `dispose()` (also `[Symbol.dispose]`).

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10883936,
+  "total": 10896696,
   "history": [
     {
       "date": "2026-10-24",
@@ -4034,6 +4034,12 @@
       "commit": "548b32d7e",
       "reason": "core speed (2026-11-07): CADCameraControls moved from core into the stage; stable instance rows with uploadRows and Engine.writePoses in core/extension under the unchanged core cap; physics/next writes awake bodies through writePoses",
       "grew": 2
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "a52beaab4",
+      "reason": "voxel/gpu-mesher: new optional entry; voxel/render mesher option",
+      "grew": 1
     }
   ],
   "items": {
@@ -4663,7 +4669,7 @@
     "@margoengine/sprites/animation": 1387,
     "@margoengine/sprites/aseprite": 4595,
     "@margoengine/sprites/atlas": 649,
-    "@margoengine/stage": 3230,
+    "@margoengine/stage": 3222,
     "@margoengine/stage/effects": 727,
     "@margoengine/stage/environment": 747,
     "@margoengine/stage/gltf": 1621,
@@ -4761,6 +4767,7 @@
     "@margoengine/voxel/codec": 9368,
     "@margoengine/voxel/fluids": 2668,
     "@margoengine/voxel/generate": 4426,
+    "@margoengine/voxel/gpu-mesher": 12768,
     "@margoengine/voxel/light": 8638,
     "@margoengine/voxel/light-rgb": 10978,
     "@margoengine/voxel/light-worker": 6341,

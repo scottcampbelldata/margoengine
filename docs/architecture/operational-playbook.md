@@ -1302,3 +1302,8 @@ The following remain technical gaps, not permission to weaken a check:
     `boulder` and `khronos-LightsPunctualLamp`, with the same numbers before them (`docs/known-bugs.md`). Missing: a timed run (the machines were busy; the
     plan is `bench parity boxes-10000` with culling on, and an orbit of 50,000 CAD parts), and the cost of a frame where
     several cameras view one scene.
+39. Voxel GPU meshing (`@margoengine/voxel/gpu-mesher`, compute shaders writing `meshChunk`'s quad format) is proved on the M6 Mac
+    mini (Metal) only: every chunk of a lit test terrain and five special chunks gives `meshChunk`'s words exactly, before
+    and after a large edit, and a `VoxelRenderer` with it draws the worker mesher's picture pixel for pixel. The faces
+    kernel finishes each slice's greedy merge in one invocation per workgroup (192 per chunk), so a dispatch is bounded by
+    that serial scan; slabs and stairs stay on the CPU path. Timings in the check are diagnostic, one machine.

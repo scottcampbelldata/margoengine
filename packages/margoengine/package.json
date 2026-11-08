@@ -2854,6 +2854,10 @@
       "types": "./dist/voxel/ticks.d.ts",
       "import": "./dist/voxel/ticks.js"
     },
+    "./voxel/gpu-mesher": {
+      "types": "./dist/voxel/gpu-mesher.d.ts",
+      "import": "./dist/voxel/gpu-mesher.js"
+    },
     "./voxel-edit": {
       "types": "./dist/voxel-edit.d.ts",
       "import": "./dist/voxel-edit.js"

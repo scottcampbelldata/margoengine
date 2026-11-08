@@ -268,6 +268,14 @@ struct ShadowOut {@builtin(position) clip:vec4f,@location(0) @interpolate(flat) 
 }
 `;
 
+/** What {@link VoxelRendererOptions.mesher} needs: `VoxelMesher`'s methods. */
+export interface VoxelChunkMesher {
+  mesh(world: VoxelWorld, key: string, priority?: number, eye?: Vec3): Promise<ChunkMesh | null>;
+  cancel(key: string): void;
+  warm?(): void;
+  dispose(): void;
+}
+
 /** Options of {@link VoxelRenderer.attach}. */
 export interface VoxelRendererOptions {
   /** The world to draw. The renderer meshes the chunks in `world.dirty` (nearest first) and removes their keys. */
@@ -276,6 +284,11 @@ export interface VoxelRendererOptions {
   textures: BlockTextures;
   /** Mesher workers, as `VoxelMesherOptions.workers`. Default: half the logical cores minus one, 1 to 4. */
   workers?: number;
+  /**
+   * The chunk mesher to use instead of a pool of `workers`, such as `GpuVoxelMesher` of `@margoengine/voxel/gpu-mesher`:
+   * any object with `VoxelMesher`'s `mesh`, `cancel` and `dispose`. The renderer never disposes a mesher it was given.
+   */
+  mesher?: VoxelChunkMesher;
   /**
    * Most GPU bytes for quads (12 each, in pages of 64): the buffer starts at 4 MiB and doubles up to this. A mesh that
    * does not fit waits until other chunks free pages. Default 96 MiB; at most the device's maxStorageBufferBindingSize.
@@ -589,7 +602,8 @@ export class VoxelRenderer implements EnginePlugin {
   /** The textures drawn with. */
   readonly textures: BlockTextures;
   #engine?: Engine;
-  #mesher: VoxelMesher;
+  #mesher: VoxelChunkMesher;
+  #ownMesher: boolean;
   #maxPages: number;
   #fancyLeaves: boolean;
   #bevel?: VoxelBevel;
@@ -661,6 +675,7 @@ export class VoxelRenderer implements EnginePlugin {
       world,
       textures,
       workers,
+      mesher,
       maxQuadBytes = 96 << 20,
       daylight = 1,
       fancyLeaves = true,
@@ -693,7 +708,15 @@ export class VoxelRenderer implements EnginePlugin {
     this.#bevel = bevel;
     this.lightmap = lightmap;
     this.daylight = daylight;
-    this.#mesher = new VoxelMesher(workers === undefined ? {} : { workers });
+    if (
+      mesher !== undefined &&
+      (typeof mesher?.mesh !== 'function' ||
+        typeof mesher.cancel !== 'function' ||
+        typeof mesher.dispose !== 'function')
+    )
+      throw new TypeError('VoxelRenderer mesher needs mesh, cancel and dispose; pass a GpuVoxelMesher or VoxelMesher');
+    this.#ownMesher = !mesher;
+    this.#mesher = mesher ?? new VoxelMesher(workers === undefined ? {} : { workers });
   }
 
   /**
@@ -1026,7 +1049,7 @@ export class VoxelRenderer implements EnginePlugin {
   /** @internal Engine plugin hook. */
   setup(engine: Engine): void {
     if (this.#disposed) throw new MargoError('disposed', 'VoxelRenderer is disposed; attach a new one');
-    this.#mesher.warm();
+    this.#mesher.warm?.();
     const device = engine.gpu;
     if (!device)
       throw new MargoError('unsupported', 'VoxelRenderer needs the WebGPU backend; create the engine with WebGPU');
@@ -1061,7 +1084,8 @@ export class VoxelRenderer implements EnginePlugin {
     this.#disposeListeners.clear();
     this.#capture = undefined;
     this.#engine?.removePlugin(this.name);
-    this.#mesher.dispose();
+    if (this.#ownMesher) this.#mesher.dispose();
+    else for (const key of this.#meshing.keys()) this.#mesher.cancel(key);
     this.#release();
     this.#chunks.clear();
     this.#ordered = undefined;

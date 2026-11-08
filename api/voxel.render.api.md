@@ -37,6 +37,13 @@ export interface VoxelCapture {
     begin(): GPURenderPassEncoder;
 }
 
+export interface VoxelChunkMesher {
+    mesh(world: VoxelWorld, key: string, priority?: number, eye?: Vec3): Promise<ChunkMesh | null>;
+    cancel(key: string): void;
+    warm?(): void;
+    dispose(): void;
+}
+
 export interface VoxelLightmap {
     readonly texture: GPUTexture;
     readonly charts: Float32Array;
@@ -93,6 +100,7 @@ export interface VoxelRendererOptions {
     world: VoxelWorld;
     textures: BlockTextures;
     workers?: number;
+    mesher?: VoxelChunkMesher;
     maxQuadBytes?: number;
     daylight?: number;
     fancyLeaves?: boolean;
@@ -187,6 +195,13 @@ class BlockTypes {
     define(name: string, options?: BlockTypeOptions): number;
     id(name: string): number;
     get(id: number): BlockType;
+}
+
+interface ChunkMesh {
+    opaque: Uint32Array;
+    cutout: Uint32Array;
+    translucent: Uint32Array;
+    visibility: number;
 }
 
 interface CubeFace {

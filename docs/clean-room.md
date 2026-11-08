@@ -625,6 +625,7 @@ The own solver's kernel (`packages/physics/kernel`, Rust, no dependencies). Noth
 | VX17 | coloured block light: emitter level x colour per channel, each channel flooded as VX12; trilinear fetch of level x open over open cells half a cell in front of the face; level to brightness by VX1 | voxel/src/light-rgb.ts | Margo-own: per-channel use of VX12 and VX1 |
 | VX18 | flowing liquids: levels 0-7 in state data, falling flag, settle from the lowest neighbour plus a step, flow down first, sideways toward the nearest drop within 4, two-source renewal, liquid meeting rules | voxel/src/fluids.ts | Margo-own: cellular automaton after published descriptions of block-game liquid behaviour (no code read) |
 | VX19 | block ticks: fixed-rate tick, scheduled queue by tick, random cells per chunk from Mulberry32, placed and neighbour hooks queued to the next tick; falling, spreading, growing and fire rules | voxel/src/ticks.ts | Margo-own: Mulberry32 (Tommy Ettinger, public domain); rules after published block-game descriptions |
+| VX20 | GPU meshing: meshChunk's faces, VX2 AO, smooth light and greedy merge in scan order as WGSL compute, one workgroup per chunk slice, quads placed in `meshChunk`'s order by prefix sums | voxel/src/gpu-mesher.ts | Margo-own: port of voxel/src/mesher.ts |
 
 ### voxel-pathtracer
 

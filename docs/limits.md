@@ -13,7 +13,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-460). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-462). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -42,6 +42,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Coloured block light (`@margoengine/voxel/light-rgb`, 2026-11-07) | Enforced: colours 0..1, `extent` multiples of 32 up to 1,024. By method: three copies of every loaded chunk (blocks and light) and three floods per change; coloured light only inside the box around the camera (default 128 x 64 x 128 blocks); the renderer's own block light should be switched off (`blockLightColor` [0, 0, 0]) or it adds on top; a level is rounded per channel, so dim colours lose hue; not on scaled renderers. |
 | Flowing liquids (`@margoengine/voxel/fluids`, 2026-11-07) | Enforced: `reach` 1 to 7, `delay` 1 or more, at most `maxUpdates` cells a tick and 10 ticks an update. By method: levels in eighths (state data), so a liquid runs at most 7 cells from a source; flow toward drops looks 4 cells ahead; no currents pushing bodies, no pressure (a liquid never rises); unloaded chunks stop it like rock; speed on large pools unmeasured. |
 | Block ticks (`@margoengine/voxel/ticks`, 2026-11-07) | Enforced: `randomTicks` 0 to 4,096 a chunk, at most `maxUpdates` scheduled and neighbour updates a tick, 10 ticks an update. By method: changes made by hooks run next tick (no recursion), so a chain of falling blocks moves one cell per tick plus its delay; random ticks cost every loaded chunk every tick; falling blocks are cells, not bodies. |
+| Voxel GPU meshing (`@margoengine/voxel/gpu-mesher`, 2026-11-08) | Enforced: `batch` 1 to 32 chunks and within the device's storage binding limit (about 3.2 MB of scratch per chunk). By method: chunks with a slab or stair within a cell are meshed on the page; the page still packs each chunk and its shell and flood-fills visibility; two GPU round trips per batch; each slice's greedy merge runs in one invocation, so the GPU path is not faster than `meshChunk` on the M6 Mac mini; one block table per batch. |
 
 ## Rendering
 
