@@ -2836,7 +2836,7 @@ timed.
 | 5 | Depth buffer collision | DONE | `b368bc1bd` | `/depth-collide` | LIM-505 |
 | 6 | Velocity-stretched billboards | DONE | `2543ac436` | `/stretch` | LIM-508 |
 | 7 | Vector fields and attractors | DONE | `2e9d64d10` | `/fields` | LIM-509 |
-| 8 | Skinned mesh emitters | DONE | the commit that adds this section | `/skinned` | LIM-510 |
+| 8 | Skinned mesh emitters | DONE | `d20d93e06` | `/skinned` | LIM-511 |
 
 - **Built from:** Reeves 1983 throughout; prefix-sum compaction for GPU events (Blelloch 1990); wrap lighting (Green
   2004) on the clustered BRDF; screen-space depth tests with a thickness (McGuire and Mara 2014); Plummer-softened
