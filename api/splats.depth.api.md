@@ -54,6 +54,10 @@ class Splats implements EnginePlugin {
     readonly name: string;
     readonly count: number;
     constructor(data: SplatData);
+    static reserve(count: number, coefficients?: number): Splats;
+    get coefficients(): number;
+    write(first: number, data: SplatData): this;
+    clear(first: number, count: number): this;
     get fog(): FogLike | null;
     setFog(fog: FogLike | null): this;
     static attach(instance: EngineKernel, data: SplatData): Splats;

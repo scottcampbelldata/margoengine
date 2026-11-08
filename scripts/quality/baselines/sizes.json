@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10792861,
+  "total": 10818670,
   "history": [
     {
       "date": "2026-10-24",
@@ -3932,6 +3932,12 @@
       "commit": "fbb8d0cbc",
       "reason": "react: UI, audio, sprite and sciviz bindings, new entry @margoengine/react/ui (batch 117 job 4)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "1d913d1a2",
+      "reason": "splats/lod: streamed splat level of detail (batch 80 job 2); splats root gains Splats.reserve, write, clear and coefficients",
+      "grew": 2
     }
   ],
   "items": {
@@ -4543,9 +4549,10 @@
     "@margoengine/sky/volumetric-clouds": 7571,
     "@margoengine/sky/weather": 6189,
     "@margoengine/sky/weather-fx": 5533,
-    "@margoengine/splats": 25646,
+    "@margoengine/splats": 26702,
     "@margoengine/splats/data": 17665,
     "@margoengine/splats/depth": 2119,
+    "@margoengine/splats/lod": 24753,
     "@margoengine/splines": 1853,
     "@margoengine/splines/closest": 983,
     "@margoengine/splines/fit": 3250,

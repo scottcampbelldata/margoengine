@@ -2,6 +2,7 @@
 // slot itself): node packages/splats/test/gpu/check.mjs
 // ./depth: meshes drawn before a cloud hide the splats behind them (the cloud's own depth test), and with SplatDepth a
 // cloud hides what later passes draw behind it, on a synthetic splat and on a real capture (raccoon, Niantic SPZ sample).
+// ./lod: a hierarchy of the real capture fully refined draws as the plain cloud; a 16.7 M-splat stand-in streams in a 2 M budget.
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../../scripts/browser.js';
 import { acquire } from '../../../../scripts/gpu-lock.mjs';
@@ -100,6 +101,50 @@ try {
     // MSAA can resolve an edge sample of the plane into a capture pixel; at 1x every pixel is one or the other.
     if (samples === 1) assert.equal(mixed, 0, '1x: each pixel is the plane or the capture alone');
     assert.ok(hidden > covered * 0.25, `${samples}x: the capture hides the plane where solid, ${hidden} of ${covered}`);
+  }
+  // ./lod, real capture: a hierarchy of 1,024-splat nodes. Fully refined (maxError 0) it draws every leaf, the whole
+  // capture, as the plain cloud does; far away it draws the root alone.
+  {
+    const lod = (o) => page.evaluate((options) => window.check.lod(options), o),
+      decode = async (url) => decodePNG(Buffer.from(url.split(',')[1], 'base64'));
+    const plain = await decode((await lod({ plain: true })).url),
+      full = await lod({ maxError: 0, reference: true }),
+      reference = await decode(full.reference),
+      fullImage = await decode(full.url),
+      far = await lod({ distance: 400 });
+    let differ = 0,
+      most = 0;
+    for (let i = 0; i < plain.data.length; i++) {
+      const d = Math.abs(plain.data[i] - fullImage.data[i]);
+      if (d) differ++;
+      most = Math.max(most, d);
+    }
+    report['lod capture'] = { full: { ...full, url: undefined, reference: undefined }, far: { ...far, url: undefined }, differ, most };
+    assert.deepEqual(full.errors, [], 'no load failed');
+    assert.equal(full.drawn, full.total, 'maxError 0 draws every leaf splat');
+    assert.equal(full.leaves, full.selected.length, 'maxError 0 draws leaves only');
+    // After streaming swapped nodes in and out of the slots, the pool draws exactly what one plain cloud of the same
+    // splats in the same order draws: no splat of a coarser node is left behind and none is missing.
+    let apart = 0;
+    for (let i = 0; i < reference.data.length; i++) if (reference.data[i] !== fullImage.data[i]) apart++;
+    report['lod capture'].apart = apart;
+    assert.equal(apart, 0, `the streamed pool draws as a plain cloud of its splats, ${apart} channels apart`);
+    // Against the capture in its own order the splats are the same, but equal sort keys (exact float depth ties, many
+    // in a thin slab seen edge on) blend in another order where they overlap: reported, and under 1% of channels.
+    assert.ok(differ < plain.data.length / 100, `under 1% of channels differ from the capture's own order, ${differ}`);
+    assert.deepEqual(far.selected, [0], 'far away the root alone is drawn');
+    assert.ok(far.drawn <= 1024, `the root holds at most a node of splats, ${far.drawn}`);
+  }
+  // ./lod, stand-in hierarchy of 16,777,216 leaf splats (5.6 times the 3,000,000 cap of one cloud): a 2,097,152 budget
+  // streams a cut that never exceeds it, refines near the camera and swaps as the camera moves.
+  {
+    const big = await page.evaluate(() => window.check.lod({ virtual: true, budget: 2097152, move: [56, 3, 56] }));
+    report['lod stand-in'] = { ...big, url: undefined, moved: { ...big.moved, url: undefined } };
+    assert.equal(big.total, 16777216);
+    assert.deepEqual(big.errors, []);
+    assert.ok(big.drawn <= 2097152 && big.moved.drawn <= 2097152, `within the budget: ${big.drawn}, ${big.moved.drawn}`);
+    assert.ok(big.leaves > 0, 'leaves near the camera are drawn');
+    assert.notDeepEqual(big.selected, big.moved.selected, 'a moved camera streams another cut');
   }
   const errors = await page.evaluate(() => window.check.errors);
   console.log(JSON.stringify(report));

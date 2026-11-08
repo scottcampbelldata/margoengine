@@ -134,3 +134,41 @@ depth.threshold = 0.3; // live: lower writes more of a thin capture
   pixels the capture covers; lower it for thin captures.
 - Depth is the splat's centre depth over its whole ellipse, as the colour pass places it.
 - `dispose()` stops the writes; a cloud that is not attached, or is disposed, writes nothing.
+
+## Streamed level of detail (`./lod`)
+
+For captures larger than one cloud takes (3,000,000 splats) or than a GPU should draw at once, `./lod` draws a cut of a
+splat hierarchy chosen by the view, loading only the nodes the cut needs:
+
+```ts
+import {Engine} from 'margoengine/core';
+import {parsePly} from 'margoengine/splats/data';
+import {SplatLod, buildSplatLod} from 'margoengine/splats/lod';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const capture = parsePly(await (await fetch('/capture.ply')).arrayBuffer());
+const lod = SplatLod.attach(engine, buildSplatLod(capture, {leafSize: 65536}), {budget: 1_000_000, maxError: 2});
+engine.start();
+await lod.settled(); // the current view is fully streamed in
+console.log(lod.selected.length, lod.drawn);
+```
+
+- `buildSplatLod(data, {leafSize})` splits the capture into an octree until a cell holds at most `leafSize` splats
+  (default 65,536); leaves keep the trained splats untouched, and each inner cell gets a moment-matched merge of its
+  splats (`decimateSplats`) on the coarsest grid that still fits `leafSize`, with that grid cell as its `error`.
+- A streamed capture is any `SplatLodSource`: `{nodes, coefficients, load(index, signal)}`, each node a bounding sphere,
+  an `error` in world units (0 for a leaf), its `count` and `children`. `load` may fetch the node (for instance a
+  `.splat` from `encodeSplat`, one file per node) and must return `count` splats with `coefficients` SH.
+- Each frame, before the splats project, `chooseSplatNodes` replaces the node of largest projected error
+  (`error x focal / distance`, pixels) by its children while that error exceeds `maxError` (default 2), all its children
+  are loaded and the cut fits `budget` (default 1,000,000). Children it lacks are loaded, at most `concurrency` (4) at
+  a time; until they arrive the parent stays, so streaming never leaves a hole.
+- Drawn nodes live in fixed slots of one `Splats` (`lod.cloud`, `budget` rounded down to whole slots of the largest
+  node), written with `Splats.write` and hidden with `Splats.clear`, so every drawn node sorts together. Loaded nodes
+  stay on the CPU up to `cache` splats (twice the budget), oldest dropped first.
+- `Splats.reserve(count, coefficients)` makes such a pool of hidden splats; `write(first, data)` and
+  `clear(first, count)` work on any cloud.
+- `lod.placement` maps each drawn node to the pool index of its first splat, for picking or editing.
+- On the real raccoon fixture (41 nodes of at most 1,024 splats) `maxError: 0` streams in all 8,385
+  leaf splats and draws exactly what one plain cloud of the pool's splats draws; against the capture in its own order
+  188 of 262,144 channels differ (exact depth ties blend in another order); 400 units away the root alone. A procedural stand-in of 16,777,216 splats (256 leaves of 65,536) streams within a
+  2,097,152 budget (1,110,016 drawn, 16 leaves near the camera).

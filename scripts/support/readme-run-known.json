@@ -90,6 +90,7 @@
   "splats/readme-margoengine-splats-f08e38": "sample: Error: Failed to load splats: 404",
   "splats/readme-ply-captures-editing-and-level-o-0d1416": "sample: Error: Failed to load splats: 404",
   "splats/readme-ply-captures-editing-and-level-o-73481e": "sample: RangeError: Not an SPZ file: it starts with neither gzip (versions 2-3) nor NGSP (version 4); check that the file is a complete .spz.",
+  "splats/readme-streamed-level-of-detail-lod-712c08": "sample: RangeError: Not a PLY file: it must start with \"ply\" and have an end_header line.",
   "stage/readme-feature-entries-a6844a": "example: MargoError: Minimal glTF supports static uncompressed models; required extensions, skins and animations are unsupported; load it with @margoengine/gltf-pro",
   "text/readme-prebuilt-atlases-bitmapfont-5ec840": "sample: TypeError: BitmapFont could not fetch http://127.0.0.1:50822/fonts/inter.json: 404; check the URL",
   "tonemap/readme-margoengine-tonemap-5802b3": "sample: TypeError: .cube sample row is invalid; supply exactly size³ RGB rows after the size header",

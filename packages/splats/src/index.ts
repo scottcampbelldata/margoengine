@@ -49,6 +49,8 @@ export class Splats implements EnginePlugin {
   private engine?: Engine;
   private device?: GPUDevice;
   private buffers: GPUBuffer[] = [];
+  // positions, covariances, colors and SH on the GPU, for `write` and `clear`.
+  private inputs: GPUBuffer[] = [];
   private uniform?: GPUBuffer;
   private index?: GPUBuffer;
   private projected?: GPUBuffer;
@@ -97,6 +99,74 @@ export class Splats implements EnginePlugin {
       this.positions[i * 4 + 3] = data.colors[i * 4 + 3];
       this.covariances.set(data.covariances.subarray(i * 6, i * 6 + 6), i * 8);
     }
+  }
+  /**
+   * A cloud of `count` hidden splats (opacity 0) with `coefficients` SH coefficients per channel (0, 4, 9 or 16), to
+   * fill later with `write`: a pool for streamed or edited splats. Hidden splats are culled before the sort.
+   * @throws RangeError for a count outside 1 to 3,000,000 or another coefficient count.
+   */
+  static reserve(count: number, coefficients = 0): Splats {
+    if (![0, 4, 9, 16].includes(coefficients)) throw new RangeError('Splat SH coefficients must be 0, 4, 9 or 16');
+    if (!Number.isInteger(count) || count < 1 || count > 3_000_000)
+      throw new RangeError('Splats.reserve needs 1 to 3,000,000 splats');
+    const covariances = new Float32Array(count * 6);
+    for (let i = 0; i < count; i++) covariances[i * 6] = covariances[i * 6 + 3] = covariances[i * 6 + 5] = 1;
+    return new Splats({
+      positions: new Float32Array(count * 3),
+      covariances,
+      colors: new Float32Array(count * 4),
+      ...(coefficients ? { sphericalHarmonics: new Float32Array(count * coefficients * 3) } : {}),
+    });
+  }
+  /** SH coefficients per channel: 0, 4, 9 or 16. */
+  get coefficients(): number {
+    return this.sh.length === 4 ? 0 : this.sh.length / this.count / 3;
+  }
+  /**
+   * Replaces splats `first` to `first + n - 1` with the `n` splats of `data` (same SH coefficient count as the cloud),
+   * in the copy kept for device restoration and, when attached, on the GPU before the next frame.
+   * @throws RangeError when `data` is invalid, has another SH coefficient count or does not fit; MargoError
+   * `'disposed'` after `dispose()`.
+   */
+  write(first: number, data: SplatData): this {
+    const n = validateSplats(data),
+      k = this.coefficients;
+    if ((data.sphericalHarmonics ? data.sphericalHarmonics.length / n / 3 : 0) !== k)
+      throw new RangeError(`Splats.write needs ${k} SH coefficients per channel, as the cloud has`);
+    this.range(first, n);
+    for (let i = 0; i < n; i++) {
+      this.positions.set(data.positions.subarray(i * 3, i * 3 + 3), (first + i) * 4);
+      this.positions[(first + i) * 4 + 3] = data.colors[i * 4 + 3];
+      this.covariances.set(data.covariances.subarray(i * 6, i * 6 + 6), (first + i) * 8);
+    }
+    this.colors.set(data.colors, first * 4);
+    if (k) this.sh.set(data.sphericalHarmonics!, first * k * 3);
+    return this.upload(first, n, true);
+  }
+  /**
+   * Hides splats `first` to `first + count - 1` (opacity 0), as `write` would.
+   * @throws RangeError when the range does not fit; MargoError `'disposed'` after `dispose()`.
+   */
+  clear(first: number, count: number): this {
+    this.range(first, count);
+    for (let i = first; i < first + count; i++) this.positions[i * 4 + 3] = this.colors[i * 4 + 3] = 0;
+    return this.upload(first, count, false);
+  }
+  private range(first: number, n: number): void {
+    if (this.disposed) throw new MargoError('disposed', 'The splats were disposed; write to a live cloud');
+    if (!Number.isInteger(first) || !Number.isInteger(n) || first < 0 || n < 0 || first + n > this.count)
+      throw new RangeError(`Splats ${first} to ${first + n - 1} are outside this cloud of ${this.count}; keep first + count within the cloud`);
+  }
+  private upload(first: number, n: number, all: boolean): this {
+    const [positions, covariances, colors, sh] = this.inputs,
+      q = this.device?.queue,
+      k = this.coefficients;
+    if (!q || !positions || !n) return this;
+    q.writeBuffer(positions, first * 16, this.positions as Float32Array<ArrayBuffer>, first * 4, n * 4);
+    q.writeBuffer(colors, first * 16, this.colors as Float32Array<ArrayBuffer>, first * 4, n * 4);
+    if (all) q.writeBuffer(covariances, first * 32, this.covariances as Float32Array<ArrayBuffer>, first * 8, n * 8);
+    if (all && k) q.writeBuffer(sh, first * k * 12, this.sh as Float32Array<ArrayBuffer>, first * k * 3, n * k * 3);
+    return this;
   }
   /** The fog the splats are drawn in (see `setFog`), or null. */
   get fog(): FogLike | null {
@@ -164,6 +234,7 @@ export class Splats implements EnginePlugin {
       covariances = buffer(this.covariances.byteLength, GPUBufferUsage.STORAGE, this.covariances),
       colors = buffer(this.colors.byteLength, GPUBufferUsage.STORAGE, this.colors),
       sh = buffer(this.sh.byteLength, GPUBufferUsage.STORAGE, this.sh);
+    this.inputs = [positions, covariances, colors, sh];
     this.projected = buffer(this.count * 32, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC);
     this.evaluated = buffer(this.count * 16, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC);
     this.keys = [0, 1].map(() => buffer(this.count * 8, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC));
@@ -410,6 +481,7 @@ export class Splats implements EnginePlugin {
   private release(): void {
     for (const b of this.buffers) b.destroy();
     this.buffers = [];
+    this.inputs = [];
     this.keys = [];
     this.sortGroups = [];
     this.sortPipelines = [];

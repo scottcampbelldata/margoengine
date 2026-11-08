@@ -38,6 +38,10 @@
       "types": "./dist/depth.d.ts",
       "import": "./dist/depth.js"
     },
+    "./lod": {
+      "types": "./dist/lod.d.ts",
+      "import": "./dist/lod.js"
+    },
     "./data": {
       "types": "./dist/data.d.ts",
       "import": "./dist/data.js"

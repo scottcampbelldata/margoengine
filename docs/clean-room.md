@@ -534,6 +534,7 @@ The own solver's kernel (`packages/physics/kernel`, Rust, no dependencies). Noth
 | SP2 | EWA projection (view rotation, perspective Jacobian), 2D low-pass dilation, eigen axes, 3 sigma extent | splats/src/shader.ts | Zwicker et al. 2001, EWA Splatting eq. 29-31; 0.3 px^2 dilation is the 3D Gaussian Splatting asset convention (Kerbl et al. 2023) |
 | SP3 | Gaussian falloff, alpha cap, low-alpha discard | splats/src/shader.ts | Kerbl et al. 2023, "3D Gaussian Splatting", App. C (clamp to 0.99, skip below 1/255) |
 | SP4 | alpha-tested splat depth: the colour pass's 3 sigma quad and Gaussian falloff, depth written where opacity reaches a threshold, nearest wins (reversed Z) | splats/src/depth.ts | Kerbl et al. 2023, "3D Gaussian Splatting for Real-Time Radiance Field Rendering", ACM TOG 42(4), App. C (falloff, 0.99 cap); Zwicker et al. 2001, "EWA Splatting" (ellipses); W3C WebGPU specification (depth-only render pass, depthCompare) |
+| SP5 | splat level of detail: octree of splat centres, inner nodes moment-matched on a grid, cut refined by projected geometric error largest first within a budget, parent kept until all children load | splats/src/lod.ts | Luebke et al. 2003, "Level of Detail for 3D Graphics", ch. 4 (screen-space error); OGC 3D Tiles 1.1 (geometricError, REPLACE refinement); Kerbl et al. 2024, "A Hierarchical 3D Gaussian Representation for Real-Time Rendering of Very Large Datasets", ACM TOG 43(4) |
 
 ### taa
 

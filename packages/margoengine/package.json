@@ -2450,6 +2450,10 @@
       "types": "./dist/splats/depth.d.ts",
       "import": "./dist/splats/depth.js"
     },
+    "./splats/lod": {
+      "types": "./dist/splats/lod.d.ts",
+      "import": "./dist/splats/lod.js"
+    },
     "./splats/data": {
       "types": "./dist/splats/data.d.ts",
       "import": "./dist/splats/data.js"
