@@ -124,6 +124,12 @@ test('SplatLod checks its source and options; Splats.reserve, write and clear ch
   assert.equal(lod.cloud.count, Math.floor(1000 / slot) * slot, 'whole slots of the largest node');
   assert.deepEqual(lod.selected, []);
   lod.dispose();
+  // Regression: the pool was the whole budget even for a small source, so a 1,000,000 budget of degree-3 SH for the
+  // 8,385-splat raccoon went past a Radeon 680M's storage limit. A cut holds at most one node per leaf.
+  const big = new SplatLod(source, { budget: 1_000_000 }),
+    leaves = source.nodes.filter((n) => !n.children.length).length;
+  assert.equal(big.cloud.count, leaves * slot, 'no more slots than leaves');
+  big.dispose();
   const pool = Splats.reserve(10, 4);
   assert.equal(pool.count, 10);
   assert.equal(pool.coefficients, 4);

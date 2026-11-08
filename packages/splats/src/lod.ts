@@ -220,7 +220,10 @@ export function chooseSplatNodes(
 
 /** Options of {@link SplatLod}. */
 export interface SplatLodOptions {
-  /** Most splats drawn at once (the GPU pool, rounded up to whole node slots). Default 1,000,000. */
+  /**
+   * Most splats drawn at once (the GPU pool, rounded down to whole node slots and to no more slots than the source has
+   * leaves, the most nodes a cut can hold). Default 1,000,000.
+   */
   budget?: number;
   /** Largest projected error left unrefined, in pixels. Default 2. */
   maxError?: number;
@@ -286,7 +289,10 @@ export class SplatLod implements EnginePlugin {
     if (largest > budget) throw new RangeError(`SplatLod budget ${budget} is under the largest node, ${largest} splats; raise the budget or split the node`);
     this.source = source;
     this.slot = largest;
-    this.slots = new Array(Math.floor(budget / largest)).fill(undefined);
+    // A cut never holds more nodes than the tree has leaves, so a pool past that only wastes GPU memory (a 1,000,000
+    // splat pool of degree-3 SH for an 8,385-splat capture went past a Radeon 680M's storage limit).
+    const leaves = nodes.filter((n: SplatLodNode) => !n.children.length).length;
+    this.slots = new Array(Math.min(Math.floor(budget / largest), leaves)).fill(undefined);
     this.cacheSize = options.cache ?? this.slots.length * largest * 2;
     this.cloud = Splats.reserve(this.slots.length * largest, source.coefficients);
     options.signal?.addEventListener('abort', () => this.abort.abort(options.signal!.reason), { once: true });

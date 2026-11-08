@@ -1,6 +1,6 @@
 {
-  "commit": "632ebec4e",
-  "dirty": true,
+  "commit": "217c023f1",
+  "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
     "raw": 58443,
@@ -1426,8 +1426,8 @@
         "gzip": 446
       },
       "./nrrd": {
-        "raw": 15509,
-        "gzip": 6106
+        "raw": 16849,
+        "gzip": 6750
       },
       "./ldraw": {
         "raw": 9826,
@@ -2598,8 +2598,8 @@
         "gzip": 1863
       },
       "./lod": {
-        "raw": 67888,
-        "gzip": 24099
+        "raw": 67945,
+        "gzip": 24115
       },
       "./data": {
         "raw": 47693,

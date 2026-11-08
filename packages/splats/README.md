@@ -145,8 +145,8 @@ import {Engine} from 'margoengine/core';
 import {parsePly} from 'margoengine/splats/data';
 import {SplatLod, buildSplatLod} from 'margoengine/splats/lod';
 const engine = await Engine.create(document.querySelector('canvas')!);
-const capture = parsePly(await (await fetch('/capture.ply')).arrayBuffer());
-const lod = SplatLod.attach(engine, buildSplatLod(capture, {leafSize: 65536}), {budget: 1_000_000, maxError: 2});
+const capture = parsePly(await (await fetch('/raccoon-v2.ply')).arrayBuffer());
+const lod = SplatLod.attach(engine, buildSplatLod(capture, {leafSize: 1024}), {budget: 1_000_000, maxError: 2});
 engine.start();
 await lod.settled(); // the current view is fully streamed in
 console.log(lod.selected.length, lod.drawn);
@@ -163,7 +163,7 @@ console.log(lod.selected.length, lod.drawn);
   are loaded and the cut fits `budget` (default 1,000,000). Children it lacks are loaded, at most `concurrency` (4) at
   a time; until they arrive the parent stays, so streaming never leaves a hole.
 - Drawn nodes live in fixed slots of one `Splats` (`lod.cloud`, `budget` rounded down to whole slots of the largest
-  node), written with `Splats.write` and hidden with `Splats.clear`, so every drawn node sorts together. Loaded nodes
+  node, and to no more slots than the source has leaves), written with `Splats.write` and hidden with `Splats.clear`, so every drawn node sorts together. Loaded nodes
   stay on the CPU up to `cache` splats (twice the budget), oldest dropped first.
 - `Splats.reserve(count, coefficients)` makes such a pool of hidden splats; `write(first, data)` and
   `clear(first, count)` work on any cloud.
