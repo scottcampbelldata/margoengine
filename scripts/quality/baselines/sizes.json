@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11146348,
+  "total": 11150024,
   "history": [
     {
       "date": "2026-10-24",
@@ -4286,6 +4286,12 @@
       "commit": "39335ea58",
       "reason": "voxel/debris: new entry for voxel destruction (batch 96)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "132e6b20b",
+      "reason": "new entry @margoengine/terrain/blend",
+      "grew": 1
     }
   ],
   "items": {
@@ -4951,6 +4957,7 @@
     "@margoengine/taa": 12187,
     "@margoengine/taa/upscale": 7093,
     "@margoengine/terrain": 12874,
+    "@margoengine/terrain/blend": 3676,
     "@margoengine/terrain/deform": 5192,
     "@margoengine/terrain/displace": 4342,
     "@margoengine/terrain/holes": 1539,

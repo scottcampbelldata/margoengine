@@ -740,6 +740,64 @@ read-back relief), the flat picture 33.3; a print fills back in by `depth / fade
 and 0 deep after 0.5, 1 and 2 s at 0.05 m a second); a 2 m move keeps it, a 12 m one clears it; a painted layer of
 softness 0 takes none. Cost not timed.
 
+## Mesh to terrain blending: `@margoengine/terrain/blend`
+
+`TerrainBlend.attach(engine, terrain, virtualTexture, options)` blends rocks, cliffs and buildings into the ground they
+stand on, so a placed asset shows no hard seam line where its surface meets the terrain's. `add(mesh, options)` picks
+the meshes. On each pixel of an added mesh the ground height under it is read from the heightmap (as the terrain's
+vertex shader reads it); over the lowest `height` above that ground the mesh fades into the ground: its colour to the
+terrain's colour there, read from the runtime virtual texture (`@margoengine/terrain/rvt`), its roughness to the
+terrain's and its shading normal to the ground's, so core's lighting then shades the foot of the mesh as it shades the
+ground. Value noise moves the fade up and down so it never reads as a ruled line.
+
+```ts
+import {Engine, PbrMaterial, box} from 'margoengine/core';
+import {Terrain} from 'margoengine/terrain';
+import {TerrainVirtualTexture} from 'margoengine/terrain/rvt';
+import {TerrainBlend} from 'margoengine/terrain/blend';
+const engine = await Engine.create(document.querySelector('canvas')!, {camera: {position: [0, 1, -6], target: [0, 0.5, 0]}});
+const terrain = Terrain.attach(engine, {
+  size: [64, 64], origin: [-32, -32], heightScale: 1,
+  layers: [0, 1, 2, 3].map(() => ({height: [-100, 100] as [number, number], slope: [0, 1] as [number, number], scale: 1})),
+  textures(device) {
+    const heightmap = device.createTexture({size: [2, 2], format: 'r32float', usage: 6});
+    device.queue.writeTexture({texture: heightmap}, new Float32Array(4), {bytesPerRow: 8}, [2, 2]);
+    const layers = device.createTexture({size: [1, 1, 4], format: 'rgba8unorm-srgb', usage: 6});
+    device.queue.writeTexture({texture: layers}, new Uint8Array(16).fill(160), {bytesPerRow: 4, rowsPerImage: 1}, [1, 1, 4]);
+    return {heightmap, layers};
+  },
+});
+const ground = TerrainVirtualTexture.attach(engine, terrain);
+const rock = engine.createMesh().setGeometry(box(2, 2, 2)).setPosition([0, 0.5, 0])
+  .setMaterial(new PbrMaterial({color: '#4f6f9f', roughness: 0.5}));
+const blend = TerrainBlend.attach(engine, terrain, ground, {
+  height: 0.5,  // world units above the ground over which a mesh fades into it
+  noise: 0.5,   // how far noise moves the fade, as a share of height
+  normal: 1,    // how far the shading normal turns to the ground's
+});
+blend.add(rock);                       // or blend.add(rock, {height: 1}) for this mesh alone
+engine.start();
+```
+
+- Defaults: `height` 0.5, `noise` 0.5 (the fade's top and bottom move by up to a quarter of `height` either way),
+  `normal` 1. Each mesh can override them; adding a mesh again changes its settings, `remove(mesh)` stops it, and
+  neither recompiles the shader after the first mesh (the settings are a storage buffer row per mesh id).
+- It works on meshes drawn with core's standard material, next to `TerrainColors` (they share one varying and one
+  per-pixel block). Meshes on other shaders (glTF PBR, custom materials) draw as they were.
+- The ground colour is the virtual texture's, so the terrain must use one (`TerrainVirtualTexture` refuses layer
+  materials); past the cache's reach the mesh does not fade. The normal is the heightmap's (a terrain `normalmap` is
+  not read). The fade is in the mesh's colour, roughness and normal only: its shape and shadow stay as they are, and a
+  mesh floating higher than `height` above the ground is not touched.
+- Cost: five group-0 bindings (from 40, past any taken) and, on an added mesh's pixels, five height reads, one noise
+  and one or two cache samples; other meshes pay one storage read. WebGPU only.
+
+Checked on a real GPU by `test/blend.browser.mjs` (in `test:gpu`, Radeon 680M, 2026-11-08): a 2 m box half a metre into
+flat sandy ground, seen square from 6 m. Without the blend the colour jumps by 126.6 of 255 across the contact line;
+with it 6.8 (noise 0.5) and 8.0 (noise 0), and the box's lowest row is 3.5 of 255 from the ground below it (126.7
+without). Every pixel that changes lies on the box's foot (within the fade's reach): the rest of the picture is the
+same bytes. With noise 0 the fade's top is the same row across the face (spread 1), with noise 1 it wanders over 10
+rows. Cost not timed.
+
 ## Screen-space reflections
 
 `Terrain` takes SSR's capture hook (`@margoengine/post/ssr`): `ssr.add(terrain)` draws its own normal, layer colour and

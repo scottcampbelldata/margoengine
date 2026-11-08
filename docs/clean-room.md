@@ -1,4 +1,5 @@
 # Clean room
+| S67 | mesh to terrain blending: per pixel of a mesh, its height above the heightmap's bilinear ground (as the terrain's vertex shader reads it) moved by lattice value noise; a smoothstep fade over `height` mixes the mesh's colour toward the terrain's runtime virtual texture at the ground point under the pixel (read at the pixel's footprint), its roughness to the terrain's and its normal toward the heightmap's central-difference normal; per-mesh settings in a storage buffer indexed by mesh id | terrain/src/blend.ts, terrain/src/mesh-patch.ts | van Waveren 2009, "id Tech 5 Challenges: From Texture Virtualization to Massive Parallelization" (SIGGRAPH course); Chen 2015, "Adaptive Virtual Texture Rendering in Far Cry 4" (GDC talk); Wellons 2018, "Prospecting for Hash Functions"; the fade itself by method |
 
 Margo is written clean room. This page says what that means, how the 2026-10-24 rewrites were done, and where every
 lighting and post-processing formula in the engine comes from.

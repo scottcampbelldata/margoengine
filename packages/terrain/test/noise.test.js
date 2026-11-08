@@ -2,7 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-const code = readFileSync(new URL('../src/colors.ts', import.meta.url), 'utf8');
+// The noise lives in the shared mesh patch module; terrain colors turn its fine octave.
+const code = ['../src/mesh-patch.ts', '../src/colors.ts']
+  .map((path) => readFileSync(new URL(path, import.meta.url), 'utf8'))
+  .join('\n');
 // JS twin of terrainNoise: lowbias32 (C. Wellons, "Prospecting for Hash Functions", 2018) nested over the cell, cubic
 // fade, bilinear blend, analytic gradient.
 const lowbias32 = (v) => {

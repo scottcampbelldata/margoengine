@@ -23,7 +23,7 @@ Text anchors in core's shader (the full list, with the package file using each, 
 | Anchor | Used by |
 | --- | --- |
 | `let linear=direct*`, `let linear=…;` | shadows, clustered, environment IBL, scatter (also mirrored in terrain's own shader) |
-| `let n=normalize(i.normal)*select(-1.0,1.0,facing);` | terrain colors: a block opened after it and closed with the fragment shadows `i` and `n` with the terrain's per-pixel albedo, roughness and normal, so later patches keep their text |
+| `let n=normalize(i.normal)*select(-1.0,1.0,facing);` | terrain colors and terrain blend (`terrain/src/mesh-patch.ts`): a block opened after it and closed with the fragment shadows `i` and `n` with the terrain's per-pixel albedo, roughness and normal, so later patches keep their text |
 | `frame.radiance.w` | sky lighting (sky ambient), environment IBL (zeroes the constant ambient) |
 | `*frame.radiance.w*frame.ambient.rgb` (terrain: `*frame.radiance.w`), or the same zeroed by IBL | environment HemisphereLight (writes `*margoSkyLight(n)` in its place; LightProbes and post SSAO recognise that term) |
 | `let mapped=linear/…return vec4f(…);` | `packages/shared/display.js` `linearShader`, used by tonemap, post stack/bloom/SSAO capture, creative post, dof and environment captures: the HDR capture returns `vec4f(linear,1)` |
@@ -33,7 +33,7 @@ Text anchors in core's shader (the full list, with the package file using each, 
 | `let direct=…return vec4f(…);`, fragment signature `->@location(0) vec4f`, `n`/`v`/`i.color`/`i.material` | post SSR material replay (three targets: IBL specular + roughness, split-sum weight, normal); with `margoAmbient` it also calls environment's `iblBrdfTerms`/`iblPrefiltered` (`packages/environment/src/ibl.ts`) |
 | `o.clip=frame.camera*p` | taa (jittered camera) |
 | `let direct=…;`, `let linear=…;` | creative ToonShading replaces the directional BRDF and adds rim light while preserving the lighting hooks |
-| `@location(3) material:vec4f`, `o.color=i.color.rgb`, fragment signature | selection picking (id MRT), scatter, terrain colors |
+| `@location(3) material:vec4f`, `o.color=i.color.rgb`, fragment signature | selection picking (id MRT), scatter, terrain colors and terrain blend |
 | `struct Frame/Input/Output {…}`, `let p=model*vec4f(i.position,1);`, `@vertex fn vertex(…)`, `@fragment fn fragment(…){` | scatter (wind, LOD fade) |
 
 `packages/shared/gpu.js` `meshVertex` is a copy of core's vertex inputs for packages that draw core meshes with their own

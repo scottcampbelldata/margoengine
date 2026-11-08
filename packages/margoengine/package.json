@@ -2686,6 +2686,10 @@
       "types": "./dist/terrain/deform.d.ts",
       "import": "./dist/terrain/deform.js"
     },
+    "./terrain/blend": {
+      "types": "./dist/terrain/blend.d.ts",
+      "import": "./dist/terrain/blend.js"
+    },
     "./text": {
       "types": "./dist/text.d.ts",
       "import": "./dist/text.js"

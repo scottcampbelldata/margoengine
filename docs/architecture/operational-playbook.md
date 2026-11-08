@@ -647,6 +647,15 @@ them, and a moving window clears the texels it exposes. Evidence: `packages/terr
 0.06 mm of the CPU profile, picture 6.6 of 255 from real geometry (flat 33.3); Radeon 680M. Missing: other GPUs, cost
 timed.
 
+Mesh to terrain blending (`@margoengine/terrain/blend`, 2026-11-08) patches core's standard fragment through the same
+mesh-ID varying and per-pixel block as `TerrainColors` (shared in `terrain/src/mesh-patch.ts`, so either runs first
+and the shader holds one copy). At the top of the block, where control flow is uniform, it takes the pixel's footprint
+from the position's screen derivatives; per blended mesh (a storage row by mesh id) it reads the ground height from the
+heightmap, fades the colour toward the virtual texture's, roughness toward the terrain's and the normal toward the
+heightmap's over `height`, so core's lighting shades the mesh's foot as the ground. Evidence:
+`packages/terrain/test/blend.browser.mjs`, seam 126.6 to 6.8 of 255, nothing off the foot changes; Radeon 680M.
+Missing: other GPUs, cost timed, sloped ground in a picture check.
+
 Both shadow classes take `effects`: objects that declare WGSL at bindings 40 and up (four each), give a factor that
 `shadowLit` multiplies the sun by, and update once a frame after the depth passes. With none the shader text is what it was,
 which the golden GPU proofs pin. `cloudShadows` runs the sky's cloud remap and erosion along the ray to the sun, with the

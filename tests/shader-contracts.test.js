@@ -66,9 +66,9 @@ const contracts = [
   ['scatter/src/index.ts', 'core', '@location(3) material:vec4f'],
   ['scatter/src/index.ts', 'core', /@vertex fn vertex\([\s\S]*?(?=@fragment)/],
   ['scatter/src/index.ts', 'core', /(@fragment fn fragment[^{]+\{)/],
-  ['terrain/src/colors.ts', 'core', 'o.color=i.color.rgb;'],
-  ['terrain/src/colors.ts', 'core', /struct Output \{[^}]+\}/],
-  ['terrain/src/colors.ts', 'core', 'let n=normalize(i.normal)*select(-1.0,1.0,facing);'],
+  ['terrain/src/mesh-patch.ts', 'core', 'o.color=i.color.rgb;'],
+  ['terrain/src/mesh-patch.ts', 'core', /struct Output \{[^}]+\}/],
+  ['terrain/src/mesh-patch.ts', 'core', 'let n=normalize(i.normal)*select(-1.0,1.0,facing);'],
   // Text patches of gltf-pro's shader that stay (they rewrite sampling and the vertex stage, not lighting).
   [
     'materials/src/built-material.ts',
