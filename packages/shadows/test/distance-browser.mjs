@@ -79,6 +79,19 @@ try {
     assert.ok(Math.abs(got - want) < 0.03, `${d} from the wall the sun shows ${got} of its disc, not ${want}`);
   }
 
+  // A rise of 0.8 one unit before the ground read stands 0.2 below the sun's ray there, above the wall's top at 0.5 below it
+  // 7 units off; seen from the ground the wall is the higher horizon (6.5 / 7 against 0.8 / 1), so the wall makes the
+  // penumbra. Ranking by the height over the ray took the rise and its one unit, a full sun.
+  const rise = [];
+  for (let row = 0; row < 65; row++) rise.push([40, row, 6.5], [34, row, 0.8]);
+  await start({ field: { ...field, walls: rise }, toLight: [1, 1, 0], options: { sunSize: 0.4 } });
+  {
+    const got = share((await read(1, 0)).shaded),
+      want = disc((2 * 0.5) / (7 * 0.4));
+    console.log(JSON.stringify({ rise: got, want }));
+    assert.ok(Math.abs(got - want) < 0.03, `behind a low rise the far wall's horizon gives ${want} of the disc, not ${got}`);
+  }
+
   // An edited field holds until invalidate(): the shadow stands for the heights last marched.
   await start({ field, toLight: [1, 1, 0], options: { sunSize: 0 } });
   await page.evaluate(() => window.check.flatten(false));

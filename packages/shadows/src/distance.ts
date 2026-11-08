@@ -38,7 +38,12 @@ export interface DistanceShadows<Context = unknown> extends ShadowEffect<Context
   invalidate(): void;
 }
 // One thread per cell. plane(d) is the ridge's height less the sun's climb over distance d: a point of height y here is in
-// shadow when some ridge's plane stands above y. The march stops once even the field's top could not stand above the best.
+// shadow when some ridge's plane stands above y. The cell keeps the sample of the highest elevation seen from its own ground
+// (Max's horizon, Stewart 1996), its plane and its distance: the penumbra is the disc's share above that horizon, so the
+// ridge nearest the sun in angle decides it, not the one highest above the sun's ray. A near rise and a far wall can stand
+// equally above the ray while the wall stands far nearer the sun. The march stops once even the field's top, seen from the
+// cell's ground, could not rise above the best elevation. A receiver standing above the ground reads the horizon its
+// ground sees, as a horizon map holds one horizon per point.
 const march = /* wgsl */ `struct March {sun:vec4f,cell:vec4f,size:vec4u,top:vec4f}
 @group(0) @binding(0) var<uniform> m:March;
 @group(0) @binding(1) var<storage,read> heights:array<f32>;
@@ -54,16 +59,16 @@ fn heightAt(p:vec2f)->f32 {
   let flat=length(m.sun.xz);let tangent=m.sun.y/max(flat,0.000001);
   let step=m.sun.xz/max(flat,0.000001);let stepCells=step/max(abs(step.x),abs(step.y))/m.cell.xy*min(m.cell.x,m.cell.y);
   let worldStep=length(stepCells*m.cell.xy);
-  var best=-1e30;var far=0.0;var p=vec2f(id.xy);
-  let bound=vec2f(m.size.xy)-1.0;
+  var best=-1e30;var far=0.0;var p=vec2f(id.xy);var rise=-1e30;
+  let bound=vec2f(m.size.xy)-1.0;let ground=heightAt(p);
   if(flat>0.000001){
     for(var i=1u;i<m.size.z;i++){
       p+=stepCells;
       if(any(p<vec2f(0))||any(p>bound)){break;}
       let d=f32(i)*worldStep;
-      if(m.top.x-d*tangent<best){break;}
-      let plane=heightAt(p)-d*tangent;
-      if(plane>best){best=plane;far=d;}
+      if((m.top.x-ground)/d<rise){break;}
+      let h=heightAt(p);let slope=(h-ground)/d;
+      if(slope>rise){rise=slope;best=h-d*tangent;far=d;}
     }
   }
   shade[id.y*m.size.x+id.x]=vec2f(best,far);
