@@ -38,3 +38,17 @@ export function referenceMaker(code, file = 'reference.png') {
     throw new Error('the comparing example no longer starts its comparison with `const result = await compareImages(`');
   return `${code.slice(0, cut)}await writeFile('${file}', await encodePNG(await readPixels(engine)));\n`;
 }
+
+/**
+ * Why `examples` cannot all run on this machine, or undefined when they can: an example that pipes to ffmpeg needs it
+ * on the path. Said in the repository's words for a check that did not run, which is never a pass (AGENTS.md: no
+ * skipped tests), so node-check.mjs fails with it instead of skipping the example.
+ */
+export function cannotRun(examples, { ffmpeg }) {
+  const missing = examples.flatMap((code, index) => (needs(code).ffmpeg && !ffmpeg ? [index] : []));
+  if (!missing.length) return undefined;
+  return (
+    `README example ${missing.join(', ')} did not run (this is not a pass): it pipes frames to ffmpeg, which is not ` +
+    "on this machine's path. Install ffmpeg (https://ffmpeg.org/download.html) and run the check again."
+  );
+}

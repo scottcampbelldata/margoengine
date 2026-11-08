@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { needs, nodeExamples, referenceMaker } from './readme-examples.mjs';
+import { cannotRun, needs, nodeExamples, referenceMaker } from './readme-examples.mjs';
 
 const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8'),
   example = (body) => `\`\`\`ts\nimport { create } from 'webgpu';\n${body}\n\`\`\`\n`;
@@ -42,4 +42,18 @@ test('the ffmpeg and comparing examples say what they need, and the reference is
   );
   assert.doesNotMatch(maker, /compareImages\(await/);
   assert.throws(() => referenceMaker('const same = compareImages(a, b);'), /no longer starts its comparison/);
+});
+
+test('an example the machine cannot run fails the check as not run, never a skip', () => {
+  // node-check.mjs once printed "skip README example ..." and passed where ffmpeg was missing (AGENTS.md: no skips).
+  const examples = nodeExamples(readme),
+    index = examples.findIndex((code) => needs(code).ffmpeg);
+  assert.equal(cannotRun(examples, { ffmpeg: true }), undefined);
+  assert.match(
+    cannotRun(examples, { ffmpeg: false }),
+    new RegExp(`^README example ${index} did not run \\(this is not a pass\\): it pipes frames to ffmpeg`),
+  );
+  const check = readFileSync(new URL('./node-check.mjs', import.meta.url), 'utf8');
+  assert.doesNotMatch(check, /\bskip\b/i, 'node-check.mjs skips nothing');
+  assert.match(check, /cannotRun\(examples, \{ ffmpeg: hasFFmpeg \}\)/);
 });

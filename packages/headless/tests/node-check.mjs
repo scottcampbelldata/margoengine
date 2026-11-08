@@ -2,8 +2,8 @@
 //   node scripts/gpu-lock.mjs run --owner=<you> -- node packages/headless/tests/node-check.mjs
 // Runs every README example that names the `webgpu` binding, as written, each in its own Node process, and reads back
 // the files it wrote: every one holds bytes, and a PNG or EXR shows the scene. A comparing example gets its reference
-// from its own scene, made first in another process. The ffmpeg example runs where ffmpeg is on the path and says so
-// where it is not. MARGO_NODE_GPU=<adapter name> picks an adapter, for example 'Microsoft Basic Render Driver' (WARP,
+// from its own scene, made first in another process. The ffmpeg example needs ffmpeg on the path: without it the check
+// fails before running anything, saying the example did not run (this is not a pass). MARGO_NODE_GPU=<adapter name> picks an adapter, for example 'Microsoft Basic Render Driver' (WARP,
 // software) on a Windows runner with no GPU.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
@@ -11,12 +11,18 @@ import { mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url';
 import { parseEXR } from '@margoengine/environment';
 import { decodePNG } from '../../../tests/support/png.js';
-import { needs, nodeExamples, referenceMaker } from './readme-examples.mjs';
+import { cannotRun, needs, nodeExamples, referenceMaker } from './readme-examples.mjs';
 
 const here = fileURLToPath(new URL('.', import.meta.url)),
   scratch = `${here}.node-check-${process.pid}/`,
   examples = nodeExamples(await readFile(`${here}../README.md`, 'utf8')),
   hasFFmpeg = spawnSync('ffmpeg', ['-version'], { stdio: 'ignore' }).status === 0;
+
+const missing = cannotRun(examples, { ffmpeg: hasFFmpeg });
+if (missing) {
+  console.error(`==== FAIL: ${missing} ====`);
+  process.exit(1);
+}
 
 const flags = process.env.MARGO_NODE_GPU ? `[${JSON.stringify(`adapter=${process.env.MARGO_NODE_GPU}`)}]` : '[]';
 
@@ -47,12 +53,6 @@ await mkdir(scratch);
 try {
   for (const [index, code] of examples.entries()) {
     const need = needs(code);
-    if (need.ffmpeg && !hasFFmpeg) {
-      console.log(
-        `skip README example ${index} in Node: it pipes frames to ffmpeg, which is not on this machine's path`,
-      );
-      continue;
-    }
     const folder = `${scratch}${index}/`,
       source = code.replace('create([])', `create(${flags})`);
     await mkdir(folder);
