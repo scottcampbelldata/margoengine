@@ -19,6 +19,30 @@ Passes capture linear HDR and sampleable reversed-Z depth before drawing, calcul
 
 Standalone output uses Margo's display curve (Khronos PBR Neutral, then sRGB), as core does. For color grading, attach DOF first, then `Tonemap.attach(stage.engine, {source:()=>dof.outputTexture})`. The current HDR `outputTexture` and `depthTexture` are undefined before the first frame and change on resize/restoration. With TAA, supply `depth:()=>dof.depthTexture` to TAA. Destroy dependent effects before DOF. Alone, SSAO and Creative PostProcessing own conflicting scene captures and are rejected. To combine DOF with SSAO, Bloom, Tonemap, Creative PostProcessing or FXAA, add it to a `PostStack` from `@margoengine/post/stack`, e.g. `PostStack.attach(stage.engine, [new SSAO(), new DOF(), new Bloom(), new Tonemap()])`; there it reads the stack's shared HDR capture and depth, and its `depthTexture` is the stack's.
 
+## Focal length from the camera
+
+Give `filmGauge` (the sensor size in millimetres) and the focal length follows the camera's field of view every frame,
+as a real lens on that sensor would have it: zooming in (a narrower `camera.fov`) lengthens the lens and deepens the blur,
+with no second number to keep in step.
+
+```ts
+import {createStage} from 'margoengine';
+import {DOF} from 'margoengine/dof';
+const stage = await createStage('#viewport', {backend:'webgpu'});
+// A full-frame sensor, 36 mm across the longer side of the view; focalLength is not used.
+const dof = DOF.attach(stage.engine, {focalDistance:4, aperture:1.8, filmGauge:36});
+stage.engine.camera.fov = 20; // a longer lens: about 57 mm in a 16:9 view
+console.log(dof.focalLength); // the focal length in metres the last frame used
+```
+
+- `sensorFit` names the side the gauge spans: `'auto'` (the longer side, the default), `'horizontal'` or `'vertical'`, as
+  in `lensToFov` and `fovToLens` of `@margoengine/cameras`. Common gauges: 36 full frame, 23.6 APS-C, 17.3 Micro Four
+  Thirds, 24.89 Super 35.
+- The focal length comes out in metres, so `focalDistance` is in metres too (glTF's unit). With an orthographic camera
+  it still comes from `camera.fov`.
+- To drive the camera from a lens instead (focal length in, field of view out, with exposure and motion blur), use
+  `PhysicalCamera` from `@margoengine/cameras/physical`.
+
 ## Autofocus, tilt-shift and blades
 
 Each is its own entry, so a page using neither downloads neither. `DOFLens` also draws custom bokeh shapes (below).

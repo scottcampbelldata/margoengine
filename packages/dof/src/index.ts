@@ -31,8 +31,17 @@ type Context = Extract<PassContext, { backend: 'webgpu' }>;
 export interface DOFOptions {
   /** Scene units, measured along the camera's viewing axis. Default 5. */
   focalDistance?: number;
-  /** Same units as focalDistance; default 0.05 for a metre-based scene. */
+  /** Same units as focalDistance; default 0.05 for a metre-based scene. Not used while `filmGauge` is set. */
   focalLength?: number;
+  /**
+   * Film or sensor size in millimetres along the side `sensorFit` names: 36 for full frame, 23.6 for APS-C, 17.3 for
+   * Micro Four Thirds. When set, the focal length follows the camera's field of view every frame, as a real lens on
+   * that sensor would have it, in metres; a zoom (a narrower `camera.fov`) lengthens it and deepens the blur. Default:
+   * unset, `focalLength` is used.
+   */
+  filmGauge?: number;
+  /** The side `filmGauge` spans: `'auto'` the longer side of the view, `'horizontal'` or `'vertical'`. Default `'auto'`. */
+  sensorFit?: 'auto' | 'horizontal' | 'vertical';
   /** Lens f-number, default 2.8. */
   aperture?: number;
   /** Maximum disk radius in pixels, 1-32. Default 16. */
@@ -108,6 +117,13 @@ export class DOF implements EnginePlugin {
   get outputTexture(): GPUTexture | undefined {
     return this.paused ? this.scene : this.output;
   }
+  /**
+   * The focal length of the last frame, in the units of `focalDistance`: `focalLength`, or with `filmGauge` the one
+   * the camera's field of view gives on that sensor. Before the first frame, `focalLength` (default 0.05).
+   */
+  get focalLength(): number {
+    return this.values[1] || (this.options.focalLength ?? 0.05);
+  }
   get enabled(): boolean {
     return this.options.enabled ?? true;
   }
@@ -123,13 +139,14 @@ export class DOF implements EnginePlugin {
   }
   private validate(): void {
     const o = this.options,
-      f = o.focalLength ?? 0.05,
+      g = o.filmGauge,
+      f = g === undefined ? (o.focalLength ?? 0.05) : 0,
       d = o.focalDistance ?? 5,
       a = o.aperture ?? 2.8,
       r = o.maxRadius ?? 16;
     if (
       !Number.isFinite(Math.fround(f)) ||
-      Math.fround(f) <= 0 ||
+      (g === undefined && Math.fround(f) <= 0) ||
       !Number.isFinite(Math.fround(d)) ||
       Math.fround(d) <= Math.fround(f) ||
       !Number.isFinite(Math.fround(a)) ||
@@ -141,6 +158,13 @@ export class DOF implements EnginePlugin {
     )
       throw new RangeError(
         'Invalid DOF options; use focalLength > 0, focalDistance > focalLength, aperture > 0 and maxRadius from 1 to 32',
+      );
+    if (
+      (g !== undefined && !(Number.isFinite(g) && g > 0)) ||
+      (o.sensorFit !== undefined && !['auto', 'horizontal', 'vertical'].includes(o.sensorFit))
+    )
+      throw new RangeError(
+        "Invalid DOF filmGauge or sensorFit; use millimetres > 0 and 'auto', 'horizontal' or 'vertical'",
       );
   }
   setup(engine: Engine): void {
@@ -226,13 +250,24 @@ export class DOF implements EnginePlugin {
       },
     });
   }
+  // Inverse of a lens's field of view on its film: tan(fov / 2) = gauge / (2 f), over the side the gauge spans.
+  private lens(gauge: number, fov: number, aspect: number): number {
+    const fit = this.options.sensorFit ?? 'auto',
+      half = Math.tan((fov * Math.PI) / 360);
+    return gauge / (2000 * half * (fit === 'horizontal' || (fit === 'auto' && aspect >= 1) ? aspect : 1));
+  }
   private capture(c: Context): void {
     this.validate();
     const o = this.options,
       v = this.values;
     const [viewWidth, viewHeight] = viewSize(c);
     v[0] = o.focalDistance ?? 5;
-    v[1] = o.focalLength ?? 0.05;
+    v[1] =
+      o.filmGauge === undefined
+        ? (o.focalLength ?? 0.05)
+        : this.lens(o.filmGauge, c.camera.fov, viewWidth / viewHeight);
+    if (!(Math.fround(v[0]) > Math.fround(v[1])))
+      throw new RangeError(`DOF focalDistance must lie beyond the focal length the camera gives, ${v[1]}`);
     v[2] = o.aperture ?? 2.8;
     v[3] = o.maxRadius ?? 16;
     v[4] = c.camera.near;

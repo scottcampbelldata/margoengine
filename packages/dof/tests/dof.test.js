@@ -5,7 +5,7 @@ import { DOFLens } from '../dist/lens.js';
 import { Autofocus } from '../dist/autofocus.js';
 import { gpuHarness } from '../../../tests/support/postfx-gpu.js';
 import { Camera } from '../../core/dist/index.js';
-import { CameraProjection } from '../../cameras/dist/index.js';
+import { CameraProjection, fovToLens } from '../../cameras/dist/index.js';
 
 test('DOF validates the thin lens at float32 precision and rejects WebGL', () => {
   for (const options of [
@@ -344,4 +344,32 @@ test('DOFLens aperture image: taps spread over the mirrored shape, the near gath
   assert.ok(mean > 0.45 && mean < 0.55, `near weight over a half disk divides by about 0.5, got ${mean}`);
   assert.ok(bokeh.includes('farWeight+=farTap.z;'));
   assert.ok(!bokeh.includes('round(spiral(i,16.0)*center.x)'));
+});
+
+test('filmGauge takes the focal length from the camera field of view, as a lens on that sensor gives it', () => {
+  for (const options of [{ filmGauge: 0 }, { filmGauge: NaN }, { filmGauge: 36, sensorFit: 'diagonal' }])
+    assert.throws(() => new DOF(options), RangeError);
+  const h = gpuHarness(),
+    dof = DOF.attach(h.engine, { focalDistance: 5, aperture: 2, filmGauge: 36 });
+  assert.equal(dof.focalLength, 0.05, 'before a frame: the default focal length');
+  h.context.camera.fov = 40;
+  h.frame();
+  // A 128 x 96 view spans the 36 mm gauge horizontally: f = 36 mm / (2 tan(20 degrees) * 4 / 3).
+  const tan = Math.tan((20 * Math.PI) / 180),
+    f = 0.036 / (2 * tan * (128 / 96));
+  assert.ok(Math.abs(h.writes[1] - f) < 1e-7 && Math.abs(dof.focalLength - h.writes[1]) < 1e-9);
+  // The CoC scale is the thin lens's with that focal length: f * height / (4 N (d - f) tan(fov / 2)).
+  assert.ok(Math.abs(h.writes[6] - (f * 96) / (4 * 2 * (5 - f) * tan)) < 1e-4 * h.writes[6]);
+  // Zooming in (half the field of view) lengthens the lens; a vertical fit spans the 96 px side instead.
+  h.context.camera.fov = 20;
+  h.frame();
+  assert.ok(Math.abs(h.writes[1] - 0.036 / (2 * Math.tan((10 * Math.PI) / 180) * (128 / 96))) < 1e-7);
+  dof.options.sensorFit = 'vertical';
+  h.frame();
+  assert.ok(Math.abs(h.writes[1] - 0.036 / (2 * Math.tan((10 * Math.PI) / 180))) < 1e-7);
+  // Matches @margoengine/cameras: fovToLens gives the same millimetres.
+  assert.ok(Math.abs(fovToLens(20, 128 / 96, { filmGauge: 36, sensorFit: 'vertical' }) / 1000 - h.writes[1]) < 1e-7);
+  // A focus inside the focal length the camera gives is refused at the frame.
+  dof.options.focalDistance = 0.1;
+  assert.throws(() => h.frame(), RangeError);
 });

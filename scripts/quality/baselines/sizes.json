@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11271464,
+  "total": 11271943,
   "history": [
     {
       "date": "2026-10-24",
@@ -4424,6 +4424,12 @@
       "commit": "e15ec404d",
       "reason": "dof/lens: custom bokeh shapes from an aperture image (batch 74 job 1)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "111db1c7b",
+      "reason": "dof: focal length from the camera field of view and film gauge (batch 74 job 2)",
+      "grew": 1
     }
   ],
   "items": {
@@ -4608,7 +4614,7 @@
     "@margoengine/decoders/webp": 11720,
     "@margoengine/decoders/webp-lossless": 3366,
     "@margoengine/decoders/xz": 4182,
-    "@margoengine/dof": 7880,
+    "@margoengine/dof": 8359,
     "@margoengine/dof/autofocus": 2154,
     "@margoengine/dof/lens": 3025,
     "@margoengine/ecs": 4554,

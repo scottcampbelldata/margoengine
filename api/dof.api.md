@@ -13,6 +13,7 @@ export class DOF implements EnginePlugin {
     static attach(instance: EngineKernel, options?: DOFOptions): DOF;
     get depthTexture(): GPUTexture | undefined;
     get outputTexture(): GPUTexture | undefined;
+    get focalLength(): number;
     get enabled(): boolean;
     set enabled(value: boolean);
     setup(engine: Engine): void;
@@ -27,6 +28,8 @@ export class DOF implements EnginePlugin {
 export interface DOFOptions {
     focalDistance?: number;
     focalLength?: number;
+    filmGauge?: number;
+    sensorFit?: 'auto' | 'horizontal' | 'vertical';
     aperture?: number;
     maxRadius?: number;
     enabled?: boolean;

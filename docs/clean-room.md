@@ -153,6 +153,7 @@ carry the same citation as a one-line comment in the code.
 | D-04 | Golden-angle spiral taps | dof/src/shaders.ts | Vogel 1979 |
 | D-05 | Gather tiers, depth tests, near weighting | dof/src/shaders.ts | Margo-own: Margo design (explained in comments) |
 | D-06 | Aperture image bokeh: transmission mask, taps spread over the mirrored shape by farthest-point sampling, near weight over the mean transmission | dof/src/lens.ts | Margo-own: Margo design (explained in comments); farthest-point sampling as in Eldar et al., "The farthest point strategy for progressive image sampling", IEEE TIP 1997 |
+| D-07 | Focal length from field of view and film gauge | dof/src/index.ts | Pinhole projection geometry: tan(fov / 2) = gauge / (2 f); the same relation as `fovToLens` in cameras |
 
 ### environment
 

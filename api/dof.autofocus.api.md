@@ -34,6 +34,7 @@ class DOF implements EnginePlugin {
     static attach(instance: EngineKernel, options?: DOFOptions): DOF;
     get depthTexture(): GPUTexture | undefined;
     get outputTexture(): GPUTexture | undefined;
+    get focalLength(): number;
     get enabled(): boolean;
     set enabled(value: boolean);
     setup(engine: Engine): void;
@@ -81,6 +82,8 @@ interface DOFLensShaders {
 interface DOFOptions {
     focalDistance?: number;
     focalLength?: number;
+    filmGauge?: number;
+    sensorFit?: 'auto' | 'horizontal' | 'vertical';
     aperture?: number;
     maxRadius?: number;
     enabled?: boolean;
