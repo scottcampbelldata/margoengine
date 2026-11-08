@@ -152,6 +152,10 @@ const ASSETS = [
     'test fixtures: pydicom test data CT_small and MR_small in four transfer syntaxes (MIT-licensed project; no restriction on the files stated) and the NIfTI-1 sample zstat1.nii.gz (NIMH, public domain)',
   ],
   [
+    'packages/physics/tests/fixtures/thingi10k/NOTICE.md',
+    'test points for @margoengine/physics convex hulls: the distinct vertices of Thingi10K meshes 40261 and 41940 (Zhou and Jacobson 2016; Public Domain on Thingiverse; never shipped)',
+  ],
+  [
     'packages/headless/tests/fixtures/pngsuite/NOTICE.md',
     'test fixtures: PngSuite 2017jul19 by Willem van Schaik (free to use, copy, modify and distribute)',
   ],

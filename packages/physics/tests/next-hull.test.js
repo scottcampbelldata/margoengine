@@ -1,6 +1,7 @@
 // Convex hulls from points on the own solver. The oracle is brute force: every point lies inside every face, every
 // direction finds the same farthest point in the hull as in the points, and the kernel takes the faces it is given.
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { KernelWorld, Physics, convexHull, loadKernel } from '../dist/next.js';
 
@@ -133,6 +134,44 @@ test('every hull holds its points, reaches its farthest ones, and the kernel tak
     assert.ok(kernel.addHull(hull.vertices, hull.faces) >= 0, `${name}: the kernel refused it`);
   }
   console.log(`hulls: worst point outside ${worstOutside.toExponential(2)}, worst support gap ${worstGap.toExponential(2)} of the size`);
+});
+
+/** The points of `given` in an order drawn from `r`. */
+function shuffled(given, count, r) {
+  const order = Array.from({ length: count }, (_, i) => i);
+  for (let i = count - 1; i > 0; i--) {
+    const j = Math.floor(r() * (i + 1));
+    [order[i], order[j]] = [order[j], order[i]];
+  }
+  return order.flatMap((i) => [given[i * 3], given[i * 3 + 1], given[i * 3 + 2]]);
+}
+
+// Regression (2026-11-07): on these two Thingi10K meshes (tests/fixtures/thingi10k/NOTICE.md) convexHull gave a hull that
+// was not convex, a corner 5.5 m above a face, which the kernel then refused as "not convex". A face the eye was a hair
+// below counted as seen by its rounded plane, and the cone folded over its neighbour; points in one plane met by rounding
+// noise did the same in shuffled orders. Seen-ness now comes from the sign of the volume a point spans with the face's
+// corners, beyond its error bound.
+test('the hulls of two scanned meshes with large flat faces are convex, hold their points, and the kernel takes them', async () => {
+  const kernel = new KernelWorld(await loadKernel());
+  for (const id of ['40261', '41940']) {
+    const bytes = readFileSync(new URL(`fixtures/thingi10k/${id}-points.bin`, import.meta.url)),
+      given = Array.from(new Float32Array(bytes.buffer, bytes.byteOffset, bytes.length / 4)),
+      count = given.length / 3,
+      r = random(Number(id));
+    // The file's order, then shuffled ones: which point comes first changes every step of the build.
+    for (let order = 0; order < 8; order++) {
+      const points = order ? shuffled(given, count, r) : given,
+        hull = convexHull(points),
+        { outside, gap } = check(points, hull);
+      assert.ok(outside <= 3e-5, `${id} order ${order}: a point lies ${outside} of the size outside a face`);
+      assert.ok(gap <= 3e-5, `${id} order ${order}: the hull falls ${gap} of the size short of its points`);
+      assert.ok(kernel.addHull(hull.vertices, hull.faces) >= 0, `${id} order ${order}: the kernel refused it`);
+    }
+    const points = given;
+    const physics = new Physics(null);
+    physics.addBody(null, { type: 'fixed', colliders: { shape: 'convexHull', points } });
+    physics.dispose();
+  }
 });
 
 test('a box from its corners, repeats and middle has six faces of four', () => {

@@ -3,15 +3,16 @@
 //
 // Each unprocessed point waits in the outside set of one face it lies above, and a face's farthest point is added next:
 // the faces it can see go, and a fan from it to their horizon takes their place (the paper's Theorem 2.1). Planes are fat
-// (Gregorius): a point counts as above a face only past `fat`, so points within rounding of the hull never make slivers,
-// and a face counts as seen unless the eye is clearly below it, so a new face meets its horizon neighbour at a clearly
-// convex edge. The result is a hull of triangles. Triangles then merge into the polygons the kernel asks for (Gregorius
+// (Gregorius): a point waits above a face only past `fat`, so points within rounding of the hull never make slivers. Which
+// faces the eye sees is the sign of the volume it spans with each face's corners, past that volume's rounding bound,
+// so neighbouring faces always agree on it and the fan cannot fold over a face it keeps; an eye on the
+// line of a horizon edge takes the face beyond it too. The result is a hull of triangles. Triangles then merge into the polygons the kernel asks for (Gregorius
 // 2015: large faces, no neighbours in one plane): the paper's merging of coplanar facets, done here by growing each face
 // from the largest triangle left, whose plane supports every point, over the triangles that lie within `thin` of it. A
 // convex surface under a supporting plane bounds a region within such a slab from below by its edge, so a region grown
 // this way has no holes; a triangle that would touch the region only at a corner waits until it shares a second edge.
 //
-// On the add path, as a game can add colliders in its step: no `Math` but `abs`, so the hull is the same in every browser.
+// On the add path, as a game can add colliders in its step: no `Math` at all, so the hull is the same in every browser.
 
 /** A hull as the kernel takes it: vertices, and faces of vertex indices counter-clockwise seen from outside. */
 export interface HullFaces {
@@ -54,6 +55,9 @@ export function root(value: number): number {
   }
   return estimate;
 }
+
+/** The absolute value, exact in every engine, as the step path takes nothing from `Math`. */
+const abs = (x: number): number => (x < 0 ? -x : x);
 
 const degenerate = (): RangeError =>
   new RangeError(
@@ -137,6 +141,34 @@ export function buildHull(input: ArrayLike<number>): HullFaces {
   const link = (f: number, k: number, g: number, l: number): void => {
     across[f * 3 + k] = g;
     across[g * 3 + l] = f;
+  };
+  /**
+   * Whether point `i` lies above face `f`, by the sign of the volume it spans with the face's corners. The sign comes from
+   * the corners themselves, not the stored plane, so every face sees a point the same way its neighbours do: a face the
+   * eye is a hair below that counted as seen, by a plane rounded from a thin triangle, folded the cone over its neighbour
+   * and left a hull that was not convex (Thingi10K meshes 40261 and 41940).
+   */
+  const above = (f: number, i: number): boolean => {
+    const a = corner[f * 3] * 3,
+      b = corner[f * 3 + 1] * 3,
+      c = corner[f * 3 + 2] * 3,
+      j = i * 3,
+      ux = p[b] - p[a],
+      uy = p[b + 1] - p[a + 1],
+      uz = p[b + 2] - p[a + 2],
+      vx = p[c] - p[a],
+      vy = p[c + 1] - p[a + 1],
+      vz = p[c + 2] - p[a + 2],
+      wx = p[j] - p[a],
+      wy = p[j + 1] - p[a + 1],
+      wz = p[j + 2] - p[a + 2];
+    // Rounding can give points in one plane, common in mesh data, a volume of either sign; a volume within rounding of
+    // its products counts as none. Each product rounds by a few ulp of its size and their sizes sum to at most the product
+    // of the three L1 lengths, so 45 ulp of that is a wide bound (own derivation; filtering a sign by its error bound is
+    // Shewchuk 1997).
+    const volume = (uy * vz - uz * vy) * wx + (uz * vx - ux * vz) * wy + (ux * vy - uy * vx) * wz,
+      bound = (abs(ux) + abs(uy) + abs(uz)) * (abs(vx) + abs(vy) + abs(vz)) * (abs(wx) + abs(wy) + abs(wz)) * 5e-15;
+    return volume > bound;
   };
   const assign = (faces: readonly number[], i: number): void => {
     let owner = -1,
@@ -222,7 +254,22 @@ export function buildHull(input: ArrayLike<number>): HullFaces {
   // Faces gain points only when made, so one pass over the growing list reaches every face that has any.
   const horizon: number[] = [],
     visible: number[] = [],
-    stack: number[] = [];
+    stack: number[] = [],
+    absorbed: number[] = [];
+  /** Whether `e` lies on the line through `a` and `b`, so the three make no face. */
+  const collinear = (a: number, b: number, e: number): boolean => {
+    const ux = p[b * 3] - p[a * 3],
+      uy = p[b * 3 + 1] - p[a * 3 + 1],
+      uz = p[b * 3 + 2] - p[a * 3 + 2],
+      vx = p[e * 3] - p[a * 3],
+      vy = p[e * 3 + 1] - p[a * 3 + 1],
+      vz = p[e * 3 + 2] - p[a * 3 + 2],
+      nx = uy * vz - uz * vy,
+      ny = uz * vx - ux * vz,
+      nz = ux * vy - uy * vx,
+      bound = (abs(ux) + abs(uy) + abs(uz)) * (abs(vx) + abs(vy) + abs(vz)) * 5e-15;
+    return !(nx * nx + ny * ny + nz * nz > bound * bound);
+  };
   for (let current = 0; current < alive.length; current++) {
     if (!alive[current] || !outside[current].length) continue;
     let eye = -1,
@@ -232,29 +279,45 @@ export function buildHull(input: ArrayLike<number>): HullFaces {
       if (d > far) [far, eye] = [d, i];
     }
     // Depth first over the faces the eye sees; each frame is a face, the edge it was entered by, and how many of its
-    // edges are done, so the horizon comes out as one counter-clockwise loop (Gregorius 2014).
-    horizon.length = visible.length = stack.length = 0;
-    seen[current] = eye;
-    visible.push(current);
-    stack.push(current, 0, 0);
-    while (stack.length) {
-      const top = stack.length - 3,
-        f = stack[top],
-        entry = stack[top + 1],
-        done = stack[top + 2];
-      if (done === (f === current ? 3 : 2)) {
-        stack.length = top;
-        continue;
+    // edges are done, so the horizon comes out as one counter-clockwise loop (Gregorius 2014). An eye on the line of a
+    // horizon edge would make a face of no area: it lies in the plane of the face beyond that edge too, so that face
+    // goes with the ones the eye replaces, which moves no surface, and the walk runs again.
+    absorbed.length = 0;
+    for (;;) {
+      horizon.length = visible.length = stack.length = 0;
+      seen[current] = eye;
+      visible.push(current);
+      stack.push(current, 0, 0);
+      while (stack.length) {
+        const top = stack.length - 3,
+          f = stack[top],
+          entry = stack[top + 1],
+          done = stack[top + 2];
+        if (done === (f === current ? 3 : 2)) {
+          stack.length = top;
+          continue;
+        }
+        stack[top + 2] = done + 1;
+        const k = (entry + done + (f === current ? 0 : 1)) % 3,
+          g = across[f * 3 + k];
+        if (seen[g] === eye) continue;
+        if (above(g, eye) || absorbed.includes(g)) {
+          seen[g] = eye;
+          visible.push(g);
+          stack.push(g, edgeOf(g, corner[f * 3 + k], corner[f * 3 + ((k + 1) % 3)]), 0);
+        } else horizon.push(f, k);
       }
-      stack[top + 2] = done + 1;
-      const k = (entry + done + (f === current ? 0 : 1)) % 3,
-        g = across[f * 3 + k];
-      if (seen[g] === eye) continue;
-      if (height(g, eye) > -fat) {
-        seen[g] = eye;
-        visible.push(g);
-        stack.push(g, edgeOf(g, corner[f * 3 + k], corner[f * 3 + ((k + 1) % 3)]), 0);
-      } else horizon.push(f, k);
+      let flat = false;
+      for (let h = 0; h < horizon.length; h += 2) {
+        const f = horizon[h],
+          k = horizon[h + 1];
+        if (collinear(corner[f * 3 + k], corner[f * 3 + ((k + 1) % 3)], eye)) {
+          absorbed.push(across[f * 3 + k]);
+          flat = true;
+        }
+      }
+      if (!flat) break;
+      for (const f of visible) seen[f] = -1;
     }
     const loop = horizon.length / 2;
     for (let h = 0; h < loop; h++) {
@@ -387,6 +450,21 @@ export function buildHull(input: ArrayLike<number>): HullFaces {
       return d <= wide && -d <= wide;
     });
 
+  // Two faces join into one only where their outlines meet along one run of edges: a run of k edges has k + 1 corners.
+  // Faces that also meet at a corner away from that run, or along two runs, would join into a face pinched at a corner
+  // or with a hole, which has no outline.
+  const joinsAsDisk = (f: readonly number[], g: readonly number[]): boolean => {
+    const corners = new Set(f);
+    let common = 0,
+      shared = 0;
+    for (const v of g) if (corners.has(v)) common++;
+    for (let i = 0; i < f.length; i++) {
+      const a = f[i],
+        b = f[(i + 1) % f.length];
+      for (let j = 0; j < g.length; j++) if (g[j] === b && g[(j + 1) % g.length] === a) shared++;
+    }
+    return shared > 0 && common === shared + 1;
+  };
   // Neighbours the kernel would call one plane split in two (COPLANAR in kernel/src/hull.rs) merge, wider than its band so
   // rounding to f32 cannot leave one behind; what merges stays within the kernel's FLAT.
   const wide = size * FLAT * MERGE;
@@ -422,7 +500,7 @@ export function buildHull(input: ArrayLike<number>): HullFaces {
     const used = new Set<number>();
     let merged = false;
     for (const [, f, g] of pairs) {
-      if (used.has(f) || used.has(g)) continue;
+      if (used.has(f) || used.has(g) || !joinsAsDisk(polygons[f], polygons[g])) continue;
       used.add(f).add(g);
       for (const t of groups[ids[g]]) region[t] = ids[f];
       groups[ids[f]].push(...groups[ids[g]]);
