@@ -49,6 +49,10 @@
     "./path": {
       "types": "./dist/path.d.ts",
       "import": "./dist/path.js"
+    },
+    "./fov": {
+      "types": "./dist/fov.d.ts",
+      "import": "./dist/fov.js"
     }
   },
   "files": [

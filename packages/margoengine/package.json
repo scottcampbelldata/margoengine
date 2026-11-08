@@ -2726,6 +2726,10 @@
       "types": "./dist/tilemap/path.d.ts",
       "import": "./dist/tilemap/path.js"
     },
+    "./tilemap/fov": {
+      "types": "./dist/tilemap/fov.d.ts",
+      "import": "./dist/tilemap/fov.js"
+    },
     "./tiles": {
       "types": "./dist/tiles.d.ts",
       "import": "./dist/tiles.js"

@@ -2644,14 +2644,16 @@ to four resources, and encode passes of its own; without extensions the shaders 
 physical camera job already exists as `PhysicalCamera` in `@margoengine/cameras/physical`, so it is SKIPPED. Nothing
 is timed.
 
-| # | Job | Status | Commit | Entry | Gzip | Claim |
+| # | Job | Status | Commit | Entry | Claim |
 | --- | --- | --- | --- | --- | --- |
-| 1 | World-space billboards | DONE | `5923095b8` | `/billboard` | 5,140 B | LIM-475 |
-| 2 | Smooth filtered mode | DONE | `2236c9a5a` | root, `filter: 'linear'` | root 5,059 to 7,404 B over jobs 2 to 6 | LIM-476 |
-| 3 | Per-sprite shaders | DONE | `dbd89c3b9` | `/shader` (+ root `shader`) | 966 B | LIM-478 |
-| 4 | Several atlases per layer | DONE | `66df95e94` | root, `atlas` list | see job 2 | LIM-480 |
-| 5 | 2D skeletal animation | DONE | `a8e7201bd` | `/skeletal` | 5,270 B | LIM-484 |
-| 6 | Sprite masks | DONE | `b1a212ab9` | root, `mask` | see job 2 | LIM-487 |
+| 1 | KHR_gaussian_splatting | DONE | 18e04b891 | `/splats` | LIM-256 |
+| 2 | EXT_materials_bump | DONE | d75aa0ea9 | root | LIM-259 |
+| 3 | TEXCOORD_2 and 3 | DONE | 6a169101f | root | LIM-261 |
+| 4 | KHR_materials_volume_scatter | DONE | e0c78f9c7 | root | LIM-264 |
+| 5 | EXT_lights_ies, EXT_lights_image_based | DONE | 9a4655720 | `/lights` | LIM-266 |
+| 6 | Texture mip streaming | DONE | 58b4138a4 | `textures` of `/progressive` | LIM-271 |
+| 7 | KHR_physics_rigid_bodies, KHR_implicit_shapes | DONE | 0e2dd31f7 | `/physics` | LIM-275 |
+| 8 | KHR_interactivity | DONE | 869810a55 | `/interactivity`, `@margoengine/animation/interactivity` | LIM-276 |
 
 - **Built from:** rows T-14 to T-18 in `docs/clean-room.md`: Fritsch and Carlson (1980) monotone curves, Reinhard et
   al. (2002) and the Hejl and Burgess-Dawson filmic fit, the 18% key value for metering, Durand and Dorsey (2002) with
@@ -2680,7 +2682,14 @@ entry; core and stage are untouched (core + stage 23,626 B gzip after the batch)
 markers in 3D, HD art beside exact pixels, effects per sprite, several sheets per draw, bones and masks. Nothing is
 timed.
 
+| # | Job | Status | Commit | Entry | Gzip | Claim |
 | --- | --- | --- | --- | --- | --- | --- |
+| 1 | World-space billboards | DONE | `5923095b8` | `/billboard` | 5,140 B | LIM-475 |
+| 2 | Smooth filtered mode | DONE | `2236c9a5a` | root, `filter: 'linear'` | root 5,059 to 7,404 B over jobs 2 to 6 | LIM-476 |
+| 3 | Per-sprite shaders | DONE | `dbd89c3b9` | `/shader` (+ root `shader`) | 966 B | LIM-478 |
+| 4 | Several atlases per layer | DONE | `66df95e94` | root, `atlas` list | see job 2 | LIM-480 |
+| 5 | 2D skeletal animation | DONE | `a8e7201bd` | `/skeletal` | 5,270 B | LIM-484 |
+| 6 | Sprite masks | DONE | `b1a212ab9` | root, `mask` | see job 2 | LIM-487 |
 
 - **Bugs fixed:** none outside the batch was found. Two of the batch's own were caught before they shipped: in job 4
   atlas copies were destroyed before their submit (seen by the smooth check); in job 5 a clip written as plain
@@ -2701,3 +2710,37 @@ timed.
 - **Gate:** lint, hygiene, verify, `check:readmes`, `check:readme-run --packages=sprites`, the claims test, the sprites,
   lighting2d and react tests, the root tests and all seven sprites GPU checks per job; after a move of main the ship
   reran the records, the api and quality gates, the claims, llms and lock tests, the package tests and the GPU checks.
+
+## Lane C batch 101: tilemap
+
+Four jobs for `@margoengine/tilemap`, on this PC (RTX A6000, Edge), as new optional entries; core and stage are
+untouched. The aim is maps for strategy and role-playing games: every Tiled layout, ways across the map and what each
+side can see. Nothing is timed.
+
+| # | Job | Status | Commit | Entry | Gzip | Claim |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Isometric, staggered and hexagonal maps | DONE | `2284acdaa` | `/iso`, `/hex` | 6,379 B, 2,031 B | LIM-491 |
+| 2 | Colliders from tiles | SKIPPED | | already `addTileMap` and `tileMapColliders` in `@margoengine/physics2d`, which merge whole-cell solid tiles into outline loops | | |
+| 3 | Grid pathfinding | DONE | `c76992f3d` | `/path` | 2,586 B | LIM-495 |
+| 4 | Fog of war and tile visibility | DONE | this commit | `/fov` | 1,587 B | LIM-498 |
+
+- **Bugs fixed:** batch 100's build record (b1a212ab9) had written its six job rows over the table of the tonemap batch
+  above it and left its own heading with a bare separator; both tables are back, and `tests/markdown-tables.test.js`
+  now fails on any table in `docs/` or `README.md` whose separator has no header row of the same width. Caught before
+  landing: two error messages in `/path` that named no fix (the hygiene gate), and the iso check's test oracle that did
+  not scale drawn sizes by zoom (the GPU check).
+- **Proved:** each job's Node tests, and for job 1 its GPU check (`node packages/tilemap/test/iso-check.mjs`, pixel for
+  pixel). Expected values are worked out by hand or by an independent oracle, never copied from a run: path costs
+  against a plain Bellman-Ford relaxation on random grids, field of view against an exact ray oracle that casts one
+  sight line inside every gap between cell-corner angles and knows nothing of octants.
+- **Sources:** rows TM1 to TM3 in `docs/clean-room.md`: the Tiled TMX format reference and its Global Tile IDs page;
+  A. Patel's Red Blob Games pages on hexagonal grids and A*, with Hart, Nilsson and Raphael 1968; B. Bergstrom's
+  recursive shadowcasting description, read as prose only. Field of view was written by a helper that never saw
+  reference code for it; an earlier draft by a helper who had seen the CC0 code on A. Ford's "Symmetric Shadowcasting"
+  page was deleted unread.
+- **Limits:** rows in `docs/limits.md`: no oblique maps; one search per call with no incremental or hierarchical
+  search; field of view on orthogonal and isometric grids only, from cell centres and not symmetric.
+- **Gate:** lint, hygiene, verify, `check:readmes`, `check:readme-run --packages=tilemap`, the claims test, the
+  tilemap, exporters and physics2d tests, the root tests and the tilemap GPU checks per job; after a move of main the
+  ship reran the records, the api and quality gates, the claims, llms and lock tests, the package tests and the GPU
+  checks.

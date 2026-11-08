@@ -152,6 +152,50 @@ are open; `'always'`; `'never'`) and `maxCells` (1,000,000).
   ones are broken by the order cells were found, the same every run.
 - Both run on the calling thread and allocate a few arrays of the grid's size per call.
 
+## Field of view and fog of war
+
+`margoengine/tilemap/fov` works out which cells a viewer sees by shadowcasting, and `FogOfWar` keeps what is seen now
+apart from what was seen before, for strategy maps and dungeon crawlers. Which tiles block sight comes from their
+`opaque: true` property with `tileOpacity`, or from any array.
+
+```ts
+import { createTileLayer, type TileMapData } from 'margoengine/tilemap';
+import { FOG_EXPLORED, FogOfWar, fieldOfView, tileOpacity } from 'margoengine/tilemap/fov';
+
+const map: TileMapData = {
+  width: 7, height: 5, tileWidth: 16, tileHeight: 16,
+  tilesets: [{ name: 'dungeon', firstGid: 1, tileWidth: 16, tileHeight: 16, tileCount: 2, columns: 2,
+    tiles: [{ id: 1, properties: { opaque: true } }] }],
+  // Floor (1) with one pillar (2) at (2, 2).
+  layers: [createTileLayer('ground', 7, 5, new Uint32Array(35).map((_, i) => (i === 16 ? 2 : 1)))],
+};
+const sight = tileOpacity(map);
+const seen = fieldOfView(sight, 0, 2);
+// The pillar's shadow widens behind it: (3, 2) to (6, 2), and (5, 1), (6, 1), (5, 3), (6, 3) at its edges.
+console.log(seen.reduce((n, v) => n + v, 0)); // 27
+const fog = new FogOfWar(sight);
+fog.update([{ x: 0, y: 2, radius: 3 }]).update([{ x: 6, y: 2, radius: 3 }]);
+console.log(fog.state(0, 2) === FOG_EXPLORED); // true
+const { width, height, data } = fog.image(); // one RGBA pixel per cell, to stretch over the map as a fog texture
+```
+
+| Piece | What it does |
+| --- | --- |
+| `fieldOfView(grid, x, y, {radius, into})` | A `width * height` mask, 1 where the viewer at (`x`, `y`) sees the cell; `into` adds the cells to a mask you pass, to join viewers |
+| `FogOfWar(grid, explored?)` | `update(viewers)` refreshes `visible` from `{x, y, radius?}` viewers and adds it to `explored`; `state(x, y)` is `FOG_VISIBLE`, `FOG_EXPLORED` or `FOG_UNSEEN`; `image(colors)` gives RGBA per cell (default unseen black, explored black at alpha 128, visible clear) |
+| `tileOpacity(map, {layers, property})` | A sight grid from tile properties: a cell blocks when any of its tiles has `opaque: true` (`property`, default `'opaque'`) |
+
+A grid is `{width, height, opaque, orientation?}`. Sight lines leave the centre of the viewer's cell and walls are whole
+squares: a cell is seen when a fan of sight lines wider than a point reaches it, blocking cells that are reached are
+seen too, and two walls that touch at a corner close the gap between them. `radius` (default Infinity) keeps the cells
+whose centre is within it.
+
+- Orthogonal and isometric maps only; staggered and hexagonal grids are refused.
+- Sight is not symmetric: a cell seen from here may not see back, because sight starts at a centre and ends anywhere in
+  a cell.
+- `FogOfWar` reads `grid.opaque` on every `update`, so changing it (an opened door) counts on the next one. Save
+  `explored` and pass it back to the constructor to restore a game.
+
 ## Auto-tiling
 
 `margoengine/tilemap/autotile` picks the tile for each cell from its neighbours with rule sets written as data: 16 tiles for the four edge neighbours (`cardinal`), or 47 for all eight (`blob`; corners count only when both edges beside them are filled). Terrain sets match the terrain at a tile's four corners instead. Both are deterministic.
