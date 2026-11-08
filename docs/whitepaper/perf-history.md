@@ -2283,6 +2283,14 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
 - **Result:** Margo 1.443 ms, XState 27.935 ms. Win. Both end in state `a`. Busy machine, diagnostic.
 - **Rerun:** `node packages/fsm/scripts/rival-bench.mjs`. Citation in clean-room.md.
 
+### 97. 10,000 tweens against tween.js (diagnostic, win)
+
+- **Measurement:** 10,000 linear tweens from 0 to 100 over 1 second, one step of 16 ms. Fresh tweens each round,
+  outside the timer. Paired turns, fastest of 7 rounds. tween.js 25.0.0 stays outside the repository.
+- **Result:** Margo 0.371 ms, tween.js 1.018 ms. Win. Both checksums 16000.000000002541. Busy machine, diagnostic.
+- **Rerun:** `node packages/tween/scripts/rival-bench.mjs`. The linear halfway rule is
+  `packages/tween/test/linear-oracle.test.js`. Citation in clean-room.md.
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).

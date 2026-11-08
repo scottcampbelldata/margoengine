@@ -1331,6 +1331,7 @@ ragdoll reaches it only through the public `@margoengine/physics` API.
 | Kinematics concave obstacles (`kinematics-constraints/sdf`) | Lipschitz pruning from J. C. Hart, The Visual Computer 12(10), 1996; distances from the repository's own `bvh` and GJK. No other engine's source was read |
 | Custom ease curves (`tween/custom-ease`) | Monotone cubic from F. N. Fritsch and R. E. Carlson, SIAM J. Numer. Anal. 17(2), 1980; stroke thinning from U. Ramer, 1972, and D. Douglas and T. Peucker, 1973; the JSON shape is Margo's own. |
 | Springs by duration and bounce (`tween` `springOptions`) | The damped oscillator from any mechanics text; `duration` and `bounce` as Apple's public SwiftUI documentation describes them. |
+| Linear tween timing (batch 167) | tween.js 25.0.0 is driven as a black box from its user guide (https://github.com/tweenjs/tween.js/blob/main/docs/user_guide.md): 10,000 linear tweens, one 16 ms step. The library source was not opened. Default easing is linear, locked by `packages/tween/test/linear-oracle.test.js`. |
 
 ## 2D sprites: `@margoengine/sprites`
 

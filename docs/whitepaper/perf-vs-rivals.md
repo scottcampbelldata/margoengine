@@ -14,6 +14,7 @@ time is the fastest round. These numbers were taken on a busy machine and are di
 | `@margoengine/navmesh` | open floor, path length | 22.627416997969522 | recast-navigation 0.44.0, same value, the Euclidean length | equal |
 | `@margoengine/ecs` | 100,000 entities, one `position += velocity` query | 1.249 ms | bitECS 0.4.0, 11.054 ms | win |
 | `@margoengine/fsm` | 10,000 transitions of a two-state toggle | 1.443 ms | XState 5.33.4, 27.935 ms | win |
+| `@margoengine/tween` | 10,000 linear tweens, one 16 ms step | 0.371 ms | tween.js 25.0.0, 1.018 ms | win |
 
 The flock checksums after that step were 31517.19 (Margo) and 31516.70 (Yuka). Both moved from the same grid. They are
 not bit-equal: Yuka keeps a neighbourhood per vehicle and Margo uses one uniform grid. The behaviours are the ones in
@@ -33,3 +34,7 @@ The ecs row is one query over 100,000 entities, `position += velocity`, setup ou
 
 The fsm row is 10,000 `NEXT` events on a two-state toggle. Construction is outside the timer. Both machines end in
 state `a`. Rerun: `node packages/fsm/scripts/rival-bench.mjs`.
+
+The tween row is 10,000 linear tweens from 0 to 100 over 1 second, one step of 16 ms. Both checksums are
+16000.000000002541, which is 10,000 times 1.6. Halfway through a linear tween is halfway to the target
+(`packages/tween/test/linear-oracle.test.js`). Rerun: `node packages/tween/scripts/rival-bench.mjs`.
