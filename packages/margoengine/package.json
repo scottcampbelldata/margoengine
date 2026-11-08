@@ -2886,6 +2886,10 @@
       "types": "./dist/voxel/smooth.d.ts",
       "import": "./dist/voxel/smooth.js"
     },
+    "./voxel/gi": {
+      "types": "./dist/voxel/gi.d.ts",
+      "import": "./dist/voxel/gi.js"
+    },
     "./voxel-edit": {
       "types": "./dist/voxel-edit.d.ts",
       "import": "./dist/voxel-edit.js"

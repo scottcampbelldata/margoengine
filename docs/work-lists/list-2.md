@@ -23,7 +23,7 @@ For the second account. Start now.
 | E | post and effects | 77 | creative | 5 | todo |
 | E | post and effects | 78 | vfx | 8 | todo |
 | E | post and effects | 79 | vfx | 3 | todo |
-| F | voxels, then 2D | 95 | voxel | 8 | todo |
+| F | voxels, then 2D | 95 | voxel | 8 | done |
 | F | voxels, then 2D | 96 | voxel | 1 | todo |
 | F | voxels, then 2D | 97 | voxel-edit | 5 | todo |
 | F | voxels, then 2D | 98 | voxel-net | 7 | todo |

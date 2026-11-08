@@ -1206,3 +1206,55 @@ engine.start();
   outside the y range (`minChunkY` -4, `maxChunkY` 7 by default), a NaN density, a material outside 0 to 255, or sculpt
   arguments out of range; `MargoError` `'disposed'` after `view.dispose()` (also `[Symbol.dispose]`), which removes its
   meshes.
+
+## Ray-traced bounce light (`@margoengine/voxel/gi`)
+
+`VoxelGI` traces rays through the world's own blocks on the GPU for bounce light (sunlit blocks colour what faces them)
+and soft sun shadows, and adds both to a `VoxelRenderer` as a lighting effect. It follows the engine's directional
+light. For path-traced pictures of voxel models, see `@margoengine/voxel-pathtracer`; this one is a real-time term for
+block worlds.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { BlockTypes, VoxelWorld } from 'margoengine/voxel';
+import { VoxelGI } from 'margoengine/voxel/gi';
+import { VoxelLighting } from 'margoengine/voxel/light';
+import { BlockTextures, VoxelRenderer } from 'margoengine/voxel/render';
+
+const engine = await Engine.create(document.querySelector('canvas')!, { backend: 'webgpu' });
+const pixels = (r: number, g: number, b: number) => ({
+  width: 16,
+  height: 16,
+  data: Uint8Array.from({ length: 1024 }, (_, i) => [r, g, b, 255][i & 3]),
+});
+const textures = new BlockTextures({ images: [pixels(230, 230, 230), pixels(220, 40, 30)] });
+const blocks = new BlockTypes();
+const white = blocks.define('white', { textures: 0 });
+const red = blocks.define('red', { textures: 1 });
+const world = new VoxelWorld({ blocks });
+world.addChunk(0, 0, 0);
+for (let x = 0; x < 32; x++) for (let z = 0; z < 32; z++) world.setBlock(x, 0, z, white);
+for (let x = 8; x < 20; x++) for (let y = 1; y < 10; y++) world.setBlock(x, y, 20, red);
+VoxelLighting.attach(world).update();
+const voxels = VoxelRenderer.attach(engine, { world, textures });
+const gi = VoxelGI.attach(engine, { world, albedo: { red: [0.8, 0.05, 0.03] }, softness: 0.05 });
+gi.add(voxels);
+engine.onFrame(() => gi.update()); // traces the next 32,768 open cells of the window
+engine.start();
+```
+
+- **What it traces.** The blocks of a 64 x 64 x 64 window around the camera (moved in steps of 32 cells) go to the GPU
+  as a grid; only opaque cubes stop rays. Each `update()` traces the next `cells` open cells of the window (default
+  32,768, so the whole window refreshes every 8 updates): `rays` directions over the sphere (default 4, up to `range`
+  cells, default 32), each hit block face sending back its albedo times the sunlight on it (its own shadow ray to the
+  sun), stored as L1 spherical harmonics per cell, plus one ray toward a random point of the sun's disc (`softness`, its
+  half-angle in radians) for the cell's sun visibility. A new window starts from its first sweep; later sweeps blend in
+  an eighth each, so moving light settles over a few dozen updates.
+- **Shading.** The renderer adds `albedo x irradiance / pi` in the face's normal, read from the open cells around the
+  point half a cell in front of the face (`strength` scales it, live), and multiplies the sun term by the visibility
+  there. Outside the window there is no bounce light and the sun is unshadowed.
+- **Cost.** About 26 MB of GPU memory (the 1 MB grid, 16 MB of sums and four 2 MB volumes); the trace cost grows with
+  `cells x rays`. Changing blocks or the block table re-uploads the window's blocks (on this thread, 262,144 cells).
+- **Errors.** `TypeError` for a wrong engine or world, `RangeError` for options out of range or an albedo that is not
+  [r, g, b] in 0..1, `MargoError` `'unsupported'` without WebGPU, `'disposed'` after `dispose()` (also
+  `[Symbol.dispose]`).

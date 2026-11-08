@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10966050,
+  "total": 10971180,
   "history": [
     {
       "date": "2026-10-24",
@@ -4094,6 +4094,12 @@
       "commit": "0bcdc4fc1",
       "reason": "sciviz geo entry: new optional entry, root unchanged",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "84f3e44d3",
+      "reason": "voxel GI entry (job 8)",
+      "grew": 1
     }
   ],
   "items": {
@@ -4827,6 +4833,7 @@
     "@margoengine/voxel/codec": 9368,
     "@margoengine/voxel/fluids": 2668,
     "@margoengine/voxel/generate": 4426,
+    "@margoengine/voxel/gi": 5130,
     "@margoengine/voxel/gpu-mesher": 12768,
     "@margoengine/voxel/light": 8638,
     "@margoengine/voxel/light-rgb": 10978,

@@ -2494,3 +2494,43 @@ Nothing is timed; the million-edge graph step prints its time as a diagnostic on
 - **Gate:** lint, hygiene, verify, `check:readmes`, `check:readme-run --packages=sciviz`, the claims test, the sciviz
   tests, the root tests and both sciviz GPU tests per job; after a move of main the ship reran the records, the api and
   quality gates, the claims, llms and lock tests, the sciviz tests and the GPU tests.
+
+## Lane F batch 95: voxel
+
+Eight jobs for `@margoengine/voxel` on the M6 Mac mini (Metal), each a new optional entry with its own check, landed one
+commit at a time. Core, stage and `packages/voxel/src/physics.ts` are untouched. The batch's aim is a block world that
+lights, flows, ticks, meshes on the GPU and draws smooth terrain, each piece paid for only when imported. Timings are
+diagnostic, one machine, a loaded one.
+
+| # | Job | Status | Commit | Entry | Claim |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Far chunk levels of detail | DONE | `ae827c37e` | `/lod` | LIM-439 |
+| 2 | Light in a worker | DONE | `a23580439` | `/light-worker` | LIM-440 |
+| 3 | Coloured block light | DONE | `c15bed75d` | `/light-rgb` | LIM-447 |
+| 4 | Flowing liquids | DONE | `4bc66f142` | `/fluids` | LIM-454 |
+| 5 | Block ticks and cellular rules | DONE | `6cc76e6df` | `/ticks` | LIM-457 |
+| 6 | GPU meshing | DONE | `d5d29dd86` | `/gpu-mesher` | LIM-462 |
+| 7 | Smooth terrain | DONE | `2c3f7c7da` | `/smooth` | LIM-468 |
+| 8 | Voxel GI | DONE | this commit | `/gi` | LIM-470 |
+
+- **Built from:** rows VX in `docs/clean-room.md`. The smooth entry reimplements Surface Nets inside voxel, since
+  voxel-edit depends on voxel and cannot be imported; the README and the row name it as the method of voxel-edit's
+  smooth grid (Gibson 1998). GI uses Amanatides and Woo 1987, Ramamoorthi and Hanrahan 2001 and a PCG-style hash. Fluid
+  and tick rules follow published descriptions of block-game behaviour; no code from another engine was read.
+- **Proved:** the tests of each entry, and a browser check on this Mac for jobs 3, 6, 7 and 8. Smooth: a ball of radius
+  9.3 meshes closed and wound outward, split over eight chunks it gives the same triangles with no seam, and a carved
+  ball re-meshes only the four chunks it touches. GI: the floor beside a sunlit red wall goes from 189 to 205 red with
+  green and blue unchanged, and a one-block pole's shadow dips the floor to 104 against 183 outside. GPU meshing gives
+  `meshChunk`'s words exactly over 23 chunks.
+- **Sizes (gzip, B):** new entries `/lod` 7,228, `/light-worker` 6,341, `/light-rgb` 10,978, `/fluids` 2,668, `/ticks`
+  2,801, `/gpu-mesher` 12,768, `/smooth` 3,339, `/gi` 5,130. Existing entries unchanged; core and stage unchanged.
+- **Bugs fixed:** the root checks went red after jobs 1 and 2 and `68958e0d1` fixed them (`VoxelLod` got
+  `Symbol.dispose`, a fixed wait left a check, the light worker joined `scripts/lazy-files.js`). In job 7 the draft's
+  `dispose` called `remove` on the engine type that has none; `tsc` caught it where the browser check, served from the
+  `.ts`, did not, and it now disposes each mesh.
+- **Limits and unmeasured:** rows in `docs/limits.md`. The GPU mesher is not faster than `meshChunk` on this Mac and no
+  speed claim is made. Smooth terrain meshes on the page thread, has no LOD, textures or collision. GI is one bounce of
+  sunlight in a 64-cubed window; frame cost is not measured. Nothing was run on another machine.
+- **Slips:** in job 7 a wrapper timeout killed a push attempt part way, which lost the landing lock; a new check and
+  push followed. Main moved several times during the pushes and each time the rebase conflicts in generated records were
+  resolved by the lane's script and the records regenerated. Nothing that failed was pushed.

@@ -1,0 +1,56 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Voxel GI browser check</title><style>body{margin:0}canvas{display:block;width:320px;height:240px}</style></head><body><canvas></canvas>
+<script type="module">
+// Real-GPU proof of @margoengine/voxel/gi, driven by gi-browser-check.mjs. A white floor, a red wall standing in full
+// sun and a thin white pole. With VoxelGI: the floor next to the sunlit red
+// wall turns red (bounce light) and the pole casts a sun shadow on the floor, which the renderer alone does not draw
+// (it has no shadow map here). Without it neither.
+import {Engine} from '/packages/core/dist/index.js';
+import {BlockTypes,VoxelWorld} from '/packages/voxel/dist/index.js';
+import {VoxelLighting} from '/packages/voxel/dist/light.js';
+import {VoxelGI} from '/packages/voxel/dist/gi.js';
+import {BlockTextures,VoxelRenderer} from '/packages/voxel/dist/render.js';
+const canvas=document.querySelector('canvas'),errors=[];
+const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[30,22,6],target:[30,1,30],near:0.1,far:200}});
+engine.gpu.addEventListener('uncapturederror',(e)=>errors.push(e.error.message));
+// The sun: from high in the +x, -z quarter, white.
+const l=[0.45,0.8,-0.4],n=Math.hypot(...l);engine.lighting.direction.set(l.map((v)=>v/n));engine.lighting.radiance.set([1.2,1.2,1.2]);
+const tex=(r,g,b)=>({width:16,height:16,data:Uint8Array.from({length:1024},(_,i)=>[r,g,b,255][i&3])});
+const textures=new BlockTextures({images:[tex(190,190,190),tex(230,30,20)]});
+const blocks=new BlockTypes();const WHITE=blocks.define('white',{textures:0});const RED=blocks.define('red',{textures:1});
+const world=new VoxelWorld({blocks}),e=[];
+for(let cz=0;cz<2;cz++)for(let cx=0;cx<2;cx++)world.addChunk(cx,0,cz);
+for(let z=0;z<64;z++)for(let x=0;x<64;x++)e.push(x,0,z,WHITE);
+for(let y=1;y<12;y++)for(let x=14;x<26;x++)e.push(x,y,30,RED); // red wall, its sunlit -z face over the floor at z < 30
+for(let y=1;y<14;y++)e.push(40,y,24,WHITE); // a pole casting a shadow
+world.setBlocks(e);
+const lighting=VoxelLighting.attach(world,{budget:Infinity});lighting.update();
+const voxels=VoxelRenderer.attach(engine,{world,textures,workers:2});
+const gi=VoxelGI.attach(engine,{world,albedo:{red:[0.8,0.05,0.03],white:[0.8,0.8,0.8]},softness:0.08,cells:262144,rays:8,strength:4});
+const readCanvas=()=>{const c=new OffscreenCanvas(canvas.width,canvas.height).getContext('2d');c.drawImage(canvas,0,0);return c.getImageData(0,0,canvas.width,canvas.height).data;};
+const project=(p)=>{const m=engine.camera.matrix,v=[0,1,2,3].map((r)=>m[r]*p[0]+m[4+r]*p[1]+m[8+r]*p[2]+m[12+r]);return [(v[0]/v[3]*0.5+0.5)*canvas.width,(0.5-v[1]/v[3]*0.5)*canvas.height];};
+const at=(image,p,r=1)=>{const [px,py]=project(p).map(Math.round),s=[0,0,0];let k=0;
+ for(let y=py-r;y<=py+r;y++)for(let x=px-r;x<=px+r;x++){const o=(y*canvas.width+x)*4;for(let c=0;c<3;c++)s[c]+=image[o+c];k++;}return s.map((v)=>v/k);};
+async function frames(count,withGi){let stable=0;
+ for(let i=0;i<4000&&(stable<4||count>0);i++){if(withGi)gi.update();engine.render({delta:0});await engine.gpu.queue.onSubmittedWorkDone();await new Promise((r)=>setTimeout(r,1));count--;
+  stable=!world.dirty.size&&!voxels.stats.pending&&!voxels.stats.compiling&&voxels.stats.draws?stable+1:0;}
+ if(stable<4)throw new Error('renderer did not settle');
+ // Read in the task that drew: once presented, a WebGPU canvas's texture may read back blank.
+ if(withGi)gi.update();engine.render({delta:0});return readCanvas();}
+// Floor points: in front of the red wall, far from it; along a line across the pole's shadow edge.
+const nearWall=[20,1,28.5],open=[50,1,14];
+window.check={
+ errors:()=>errors,
+ async run(){
+  const off=await frames(0,false);
+  const remove=gi.add(voxels);const on=await frames(48,true);
+  // The pole's shadow on the floor runs from its foot away from the sun (-x, +z).
+  const d=[-l[0]/l[1],0,-l[2]/l[1]],foot=[40.5,1,24.5],tip=[foot[0]+d[0]*10,1,foot[2]+d[2]*10];
+  const side=[d[2],0,-d[0]],len=Math.hypot(...side),across=[];
+  for(let k=-12;k<=12;k++){const s=k/8/len;across.push(at(on,[tip[0]+side[0]*s,1,tip[2]+side[2]*s])[1]);}
+  const acrossOff=[];for(let k=-12;k<=12;k++){const s=k/8/len;acrossOff.push(at(off,[tip[0]+side[0]*s,1,tip[2]+side[2]*s])[1]);}
+  remove();
+  return {off:{nearWall:at(off,nearWall),open:at(off,open)},on:{nearWall:at(on,nearWall),open:at(on,open)},across,acrossOff,origin:gi.origin};
+ },
+};
+window.ready=true;
+</script></body></html>

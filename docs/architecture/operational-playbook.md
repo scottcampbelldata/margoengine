@@ -1328,3 +1328,6 @@ The following remain technical gaps, not permission to weaken a check:
     mini (Metal) only: a ball meshes closed and wound outward, split over eight chunks it gives the same triangles with no
     seam, and sculpting re-meshes only the chunks that read the changed cells. Meshing runs on the page thread; speed and
     memory at large view distances, LOD, textures and collision with `@margoengine/voxel/physics` are not built or measured.
+43. Voxel bounce light and soft sun shadows (`@margoengine/voxel/gi`, rays traced in WebGPU compute through the world's opaque blocks) are proved on
+    the M6 Mac mini (Metal) only, in one scene: a white floor beside a sunlit red wall turns red and a one-block pole casts
+    a soft shadow the renderer alone does not draw. Frame cost, other scenes, multi-bounce and sky light are not measured or built.

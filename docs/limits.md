@@ -13,7 +13,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-469). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-470). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -44,6 +44,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Block ticks (`@margoengine/voxel/ticks`, 2026-11-07) | Enforced: `randomTicks` 0 to 4,096 a chunk, at most `maxUpdates` scheduled and neighbour updates a tick, 10 ticks an update. By method: changes made by hooks run next tick (no recursion), so a chain of falling blocks moves one cell per tick plus its delay; random ticks cost every loaded chunk every tick; falling blocks are cells, not bodies. |
 | Voxel GPU meshing (`@margoengine/voxel/gpu-mesher`, 2026-11-08) | Enforced: `batch` 1 to 32 chunks and within the device's storage binding limit (about 3.2 MB of scratch per chunk). By method: chunks with a slab or stair within a cell are meshed on the page; the page still packs each chunk and its shell and flood-fills visibility; two GPU round trips per batch; each slice's greedy merge runs in one invocation, so the GPU path is not faster than `meshChunk` on the M6 Mac mini; one block table per batch. |
 | Smooth voxel terrain (`@margoengine/voxel/smooth`, 2026-11-08) | Enforced: densities clamped to -1..1 in 1/127ths, materials 0 to 255, sculpt radius up to 64 and strength -2 to 2, chunk y within `minChunkY` to `maxChunkY`. By method: meshing runs on the page thread (`budget` chunks a frame); no relaxation pass, so the surface keeps a slight cell pattern; one core mesh per chunk and material, plain colour materials (no textures or triplanar mapping); no far levels; past an unloaded neighbour the surface is left open; smooth terrain has no collision with `@margoengine/voxel/physics`. |
+| Voxel bounce light (`@margoengine/voxel/gi`, 2026-11-08) | Enforced: `strength` 0 to 8, `softness` 0 to 0.5 rad, `cells` 4,096 to 262,144, `rays` 1 to 16, `range` 4 to 64. By method: a 64 x 64 x 64 cell window around the camera; one bounce of sunlight (no sky, block light or multi-bounce); only opaque cubes stop rays and bounce (slabs, stairs, leaves, glass and liquids pass light); light per cell, L1 spherical harmonics, so detail finer than a cell and sharp shadow edges are lost; light settles over several updates after a change; noisy with few `rays`; not on scaled renderers. |
 
 ## Rendering
 
