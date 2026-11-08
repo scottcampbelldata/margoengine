@@ -5,11 +5,13 @@
 // ./set: two overlapping copies of the capture sorted as one set draw what one merged cloud draws; as two clouds they do not.
 // ./lighting: relit colours match core's diffuse terms; a synthetic disc and the real capture shadow a ground mesh.
 // ./edit: GPU picks take the nearest splat; select, erase and paint change exactly the region's splats, read back.
+// ./data: the browser's own WebP decoder reads the SOG writer's lossless WebP images back exactly.
 // ./lod: a hierarchy of the real capture fully refined draws as the plain cloud; a 16.7 M-splat stand-in streams in a 2 M budget.
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../../scripts/browser.js';
 import { acquire } from '../../../../scripts/gpu-lock.mjs';
 import { decodePNG } from '../../../../tests/support/png.js';
+import { encodeWebpLossless } from '../../src/webp.ts';
 
 const release = await acquire({ owner: 'splats-gpu' });
 const context = await openBrowser({ startPath: '/packages/splats/test/gpu/splats.html', port: 'free' }),
@@ -319,6 +321,50 @@ try {
     assert.ok(index >= 0, 'a splat at the centre of the capture');
     assert.ok(selected.length > 20 && selected.length < r.input.length / 8, `the brush selects a patch: ${selected.length}`);
     assert.equal(wrong, 0, 'exactly the selected splats are erased');
+  }
+  // ./data: the SOG writer's WebP images decode in the browser (createImageBitmap, then a WebGPU texture without
+  // premultiplication or colour conversion) to the exact pixels written, alpha included.
+  {
+    let seed = 11;
+    const random = () => ((seed = (seed * 1103515245 + 12345) >>> 0) >>> 8) / 2 ** 24,
+      images = [
+        [61, 23, () => random() * 256],
+        [64, 64, (i) => (i % 4 === 3 ? 255 : -Math.log(random() + 1e-9) * 6)],
+        [7, 5, (i) => (i % 4 === 3 ? 252 + (i % 3) : 128)],
+      ].map(([width, height, fill]) => {
+        const pixels = Uint8Array.from({ length: width * height * 4 }, (_, i) => Math.min(255, Math.floor(fill(i))));
+        return { width, height, pixels: [...pixels], file: [...encodeWebpLossless(pixels, width, height)] };
+      });
+    const wrong = await page.evaluate(async (list) => {
+      const device = await (await navigator.gpu.requestAdapter()).requestDevice(),
+        out = [];
+      for (const { width, height, pixels, file } of list) {
+        const bitmap = await createImageBitmap(new Blob([new Uint8Array(file)], { type: 'image/webp' }), {
+            premultiplyAlpha: 'none',
+            colorSpaceConversion: 'none',
+          }),
+          texture = device.createTexture({
+            size: [width, height],
+            format: 'rgba8unorm',
+            usage: GPUTextureUsage.COPY_DST | GPUTextureUsage.COPY_SRC | GPUTextureUsage.RENDER_ATTACHMENT,
+          }),
+          row = Math.ceil((width * 4) / 256) * 256,
+          buffer = device.createBuffer({ size: row * height, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+        device.queue.copyExternalImageToTexture({ source: bitmap }, { texture, premultipliedAlpha: false }, [width, height]);
+        const encoder = device.createCommandEncoder();
+        encoder.copyTextureToBuffer({ texture }, { buffer, bytesPerRow: row }, [width, height]);
+        device.queue.submit([encoder.finish()]);
+        await buffer.mapAsync(GPUMapMode.READ);
+        const got = new Uint8Array(buffer.getMappedRange());
+        let bad = 0;
+        for (let y = 0; y < height; y++)
+          for (let x = 0; x < width * 4; x++) if (got[y * row + x] !== pixels[y * width * 4 + x]) bad++;
+        out.push([bitmap.width, bitmap.height, bad]);
+      }
+      return out;
+    }, images);
+    report['data webp'] = wrong;
+    images.forEach(({ width, height }, i) => assert.deepEqual(wrong[i], [width, height, 0], `WebP ${width} x ${height}`));
   }
   const errors = await page.evaluate(() => window.check.errors);
   console.log(JSON.stringify(report));

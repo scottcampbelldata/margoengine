@@ -1,5 +1,5 @@
 {
-  "commit": "e1d929538",
+  "commit": "623cab99c",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -2614,32 +2614,32 @@
     },
     "@margoengine/splats": {
       ".": {
-        "raw": 74536,
-        "gzip": 26319
+        "raw": 85971,
+        "gzip": 30367
       },
       "./depth": {
         "raw": 3954,
         "gzip": 1863
       },
       "./lod": {
-        "raw": 68926,
-        "gzip": 24488
+        "raw": 81685,
+        "gzip": 28835
       },
       "./lighting": {
         "raw": 7793,
         "gzip": 3350
       },
       "./set": {
-        "raw": 64791,
-        "gzip": 23261
+        "raw": 77555,
+        "gzip": 27649
       },
       "./edit": {
-        "raw": 8365,
+        "raw": 8369,
         "gzip": 3600
       },
       "./data": {
-        "raw": 47693,
-        "gzip": 17523
+        "raw": 59084,
+        "gzip": 21490
       }
     },
     "@margoengine/splines": {
@@ -3388,9 +3388,9 @@
       "brotli": 7854
     },
     "packages/gltf-pro/dist/index.js": {
-      "raw": 1414141,
-      "gzip": 571458,
-      "brotli": 466517
+      "raw": 1425484,
+      "gzip": 575348,
+      "brotli": 469630
     },
     "packages/staging/dist/index.js": {
       "raw": 22060,

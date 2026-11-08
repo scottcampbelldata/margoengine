@@ -104,6 +104,34 @@ const sog = await parseSog(await (await fetch('/capture.sog')).arrayBuffer());
 console.log(spz.positions.length / 3, sog.positions.length / 3);
 ```
 
+## Compressed export (`./data`)
+
+`encodeSpz` and `encodeSog` write a cloud as SPZ (version 3) or a bundled SOG (version 2), so an edited capture ships
+small; `encodeSplat` writes the 32-byte `.splat` layout:
+
+```ts
+import {encodeSog, encodeSpz, parsePly, parseSpz} from 'margoengine/splats/data';
+
+const cloud = parsePly(await (await fetch('/raccoon-v2.ply')).arrayBuffer());
+const spz = await encodeSpz(cloud); // gzip, about a tenth of the PLY
+const sog = await encodeSog(cloud); // ZIP of meta.json and lossless WebP textures
+const back = await parseSpz(spz); // the cloud up to SPZ's quantisation
+console.log(spz.length, sog.length, back.positions.length / 3);
+```
+
+- Both start from the stored attributes: axis scales and rotation from each covariance (eigen-decomposition), display
+  (sRGB) colour from linear, exactly for the base band and to first order for the view-dependent terms.
+- SPZ: positions are 24-bit fixed point with the most fractional bits that fit the largest coordinate (up to 16;
+  `fractionalBits` to choose), opacity, colour and log scale one byte each, rotations the smallest-three 10-bit
+  packing, spherical harmonics one byte per coefficient. Version 3 is written (gzip), which version 3 and 4 readers
+  read.
+- SOG: positions are 16-bit after a log transform within the cloud's bounds, log scales and base colours 256-entry
+  codebooks (1D k-means), rotations three bytes, opacity a byte. Spherical-harmonic bands use a palette of up to
+  65,536 entries: each splat's own when the cloud has at most 65,536 splats, else the means of equal groups along the
+  bands' principal axis, which blurs view-dependent colour on large clouds. The WebP textures are lossless, written by
+  a built-in encoder whose images Margo's decoder and the browser's (`createImageBitmap`) read back exactly.
+- From a `Splats` cloud edited on the GPU, export `await cloud.read()` (or `await brush.commit()`).
+
 `gpuState` exposes sorted key/index pairs, projected ellipses and evaluated colors (fogged while a fog is set) for diagnostics. Ellipse records are eight floats: normalized center xyz and opacity, then two normalized-screen ellipse axes. `dispose()`/`destroy()` releases all owned GPU resources. Device restoration reuploads the copied input and recreates sorting/rendering passes. The package stays outside core/stage and has no dependencies on other optional renderers; parser-only imports discard GPU code. It follows the workspace's `@margoengine/*` naming convention.
 
 ## Depth with meshes (`./depth`)

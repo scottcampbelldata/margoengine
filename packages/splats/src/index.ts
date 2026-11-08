@@ -24,9 +24,19 @@ export {
   encodeSplat,
   decomposeCovariance,
   splatsFromAttributes,
+  attributesFromSplats,
   type GaussianAttributes,
 } from './ply.js';
-export { parseSpz, parseSog, type ParseSpzOptions, type ParseSogOptions, type SogFiles } from './compressed.js';
+export {
+  parseSpz,
+  parseSog,
+  encodeSpz,
+  encodeSog,
+  type ParseSpzOptions,
+  type ParseSogOptions,
+  type SogFiles,
+  type EncodeSpzOptions,
+} from './compressed.js';
 export { cropSplats, filterSplats, transformSplats, mergeSplats, decimateSplats, type SplatRegion } from './edit.js';
 declare const GPUBufferUsage: {
   UNIFORM: number;

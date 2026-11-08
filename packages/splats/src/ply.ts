@@ -396,3 +396,40 @@ export function encodeSplat(data: SplatData): Uint8Array<ArrayBuffer> {
   }
   return bytes;
 }
+
+/**
+ * The stored Gaussian attributes of a cloud, the inverse of `splatsFromAttributes`: axis scales and rotation from
+ * the covariance (`decomposeCovariance`), display colour from linear (exactly for the base band, to first order for
+ * the view-dependent terms), for the SPZ and SOG writers.
+ * @throws RangeError when `data` fails `validateSplats`.
+ */
+export function attributesFromSplats(data: SplatData): GaussianAttributes {
+  const count = validateSplats(data),
+    sh = data.sphericalHarmonics,
+    perChannel = sh ? sh.length / count / 3 : 1,
+    raw: GaussianAttributes = {
+      count,
+      positions: data.positions.slice(),
+      logScales: new Float32Array(count * 3),
+      rotations: new Float32Array(count * 4),
+      dc: new Float32Array(count * 3),
+      alphas: new Float32Array(count),
+      ...(sh ? { rest: new Float32Array(count * (perChannel - 1) * 3) } : {}),
+    };
+  for (let i = 0; i < count; i++) {
+    const { scale, rotation } = decomposeCovariance(data.covariances, i * 6),
+      [x, y, z, w] = rotation;
+    for (let a = 0; a < 3; a++) raw.logScales[i * 3 + a] = Math.log(Math.max(scale[a], 1e-30));
+    raw.rotations.set([w, x, y, z], i * 4);
+    raw.alphas[i] = data.colors[i * 4 + 3];
+    for (let c = 0; c < 3; c++) {
+      const base = sh ? 0.5 + C0 * sh[i * perChannel * 3 + c] : data.colors[i * 4 + c],
+        display = toSRGB(base),
+        k = slope(display);
+      raw.dc[i * 3 + c] = (display - 0.5) / C0;
+      for (let j = 1; j < perChannel; j++)
+        raw.rest![(i * (perChannel - 1) + j - 1) * 3 + c] = sh![(i * perChannel + j) * 3 + c] / k;
+    }
+  }
+  return raw;
+}

@@ -516,10 +516,13 @@
     "imports": "import { Splats } from '@margoengine/splats';",
     "exports": [
       "Splats",
+      "attributesFromSplats",
       "cropSplats",
       "decimateSplats",
       "decomposeCovariance",
+      "encodeSog",
       "encodeSplat",
+      "encodeSpz",
       "filterSplats",
       "mergeSplats",
       "parsePly",

@@ -7,6 +7,11 @@ import { EngineKernel } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph, PassContext } from "@margoengine/core/extension";
 import { ColorInput } from "@margoengine/math";
 
+export interface EncodeSpzOptions {
+    fractionalBits?: number;
+    antialiased?: boolean;
+}
+
 export interface FogLike {
   readonly color?: ColorInput;
   readonly near?: number;
@@ -88,6 +93,8 @@ export class Splats implements EnginePlugin {
     destroy(): void;
 }
 
+export function attributesFromSplats(data: SplatData): GaussianAttributes;
+
 export function cropSplats(data: SplatData, region: SplatRegion, options?: {
     invert?: boolean;
 }): SplatData;
@@ -101,7 +108,11 @@ export function decomposeCovariance(c: ArrayLike<number>, at?: number): {
     rotation: number[];
 };
 
+export function encodeSog(data: SplatData): Promise<Uint8Array<ArrayBuffer>>;
+
 export function encodeSplat(data: SplatData): Uint8Array<ArrayBuffer>;
+
+export function encodeSpz(data: SplatData, options?: EncodeSpzOptions): Promise<Uint8Array<ArrayBuffer>>;
 
 export function filterSplats(data: SplatData, keep: (index: number, data: SplatData) => boolean): SplatData;
 

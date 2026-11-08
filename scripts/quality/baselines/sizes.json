@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11034292,
+  "total": 11053203,
   "history": [
     {
       "date": "2026-10-24",
@@ -4208,6 +4208,12 @@
       "commit": "e1d929538",
       "reason": "sprites root gains layer masks",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "e5dea170e",
+      "reason": "splats SPZ and SOG writers (encodeSpz, encodeSog), loaded by import() on first call; the size records count lazy chunks in the entry",
+      "grew": 4
     }
   ],
   "items": {
@@ -4829,13 +4835,13 @@
     "@margoengine/sky/volumetric-clouds": 7571,
     "@margoengine/sky/weather": 6189,
     "@margoengine/sky/weather-fx": 5533,
-    "@margoengine/splats": 26702,
-    "@margoengine/splats/data": 17665,
+    "@margoengine/splats": 31279,
+    "@margoengine/splats/data": 22135,
     "@margoengine/splats/depth": 2119,
     "@margoengine/splats/edit": 3856,
     "@margoengine/splats/lighting": 3606,
-    "@margoengine/splats/lod": 24753,
-    "@margoengine/splats/set": 23563,
+    "@margoengine/splats/lod": 29701,
+    "@margoengine/splats/set": 28479,
     "@margoengine/splines": 1853,
     "@margoengine/splines/closest": 983,
     "@margoengine/splines/fit": 3250,
