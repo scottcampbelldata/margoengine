@@ -114,6 +114,28 @@ sharpen.amount = 0.6; // takes effect next frame
 
 `gpuState` exposes velocity, current history color and history depth textures after rendering. `dispose()`/`destroy()` releases owned buffers, textures and source records. Device restoration recreates everything and discards stale history. The package is independent of PBR, animation, shadows, clustered lighting, particles and stage; helper-only imports discard the renderer. It follows the workspace's `@margoengine/*` naming convention.
 
+## Stereo and XR
+
+TAA runs per eye with no extra entry. `@margoengine/xr` with an engine from `createXREngine` draws each eye as a view of
+`engine.render({views})` with its own id (`xr-0`, `xr-1`), and TAA keeps a history, jitter cycle and captures per view
+id, so neither eye reprojects the other's frame. An eye's frustum may be off-axis, as WebXR gives it: the jitter is
+added to the eye's own projection. Each eye then costs a full TAA pass and history at the eye's size. Multiview (both
+eyes in one pass into a texture array) is not offered by the engine, so TAA has no multiview path.
+
+```ts
+import {box} from 'margoengine/core';
+import {TAA} from 'margoengine/taa';
+import {XR,createXREngine} from 'margoengine/xr';
+const canvas=document.createElement('canvas');document.body.append(canvas);
+const engine=await createXREngine(canvas);
+engine.createMesh().setGeometry(box()).setPosition([0,1.5,-2]);
+TAA.attach(engine); // one history per eye
+const xr=await XR.create(engine);
+const enter=document.createElement('button');enter.textContent='Enter VR';document.body.append(enter);
+enter.onclick=()=>void xr.requestSession('immersive-vr').catch(engine.onError);
+engine.start();
+```
+
 ## Upscaling: `TAAUpscale`
 
 `@margoengine/taa/upscale` renders the scene below output size and rebuilds the full frame, from jittered frames or, with
