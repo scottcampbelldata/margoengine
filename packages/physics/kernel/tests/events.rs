@@ -331,8 +331,7 @@ fn a_filter_refuses_a_sensor_its_events_too() {
 #[test]
 fn a_dominant_body_takes_no_push_from_a_lower_one() {
     // Two blocks of equal mass meet head on in empty space. Equal, they stop. With one dominant it keeps its speed, and the
-    // other leaves as from a wall: at the speed the wall moves, as no bounce is asked for. What is left is the speed the soft
-    // push leaves in a contact, 0.014 m/s here, as a block on a real wall.
+    // other leaves as from a wall: at the speed the wall moves, as no bounce is asked for.
     for (rank, kept) in [(0.0f32, 0.0f64), (1.0, 2.0)] {
         let mut w = world(4);
         w.header_mut().gravity = [0.0; 3];
@@ -347,6 +346,13 @@ fn a_dominant_body_takes_no_push_from_a_lower_one() {
         println!("dominance {rank}: speeds {a:.4} and {b:.4}");
         assert!((a - kept).abs() < 0.02, "{a}");
         assert!((b - kept).abs() < 0.02, "{b}");
+        // Face to face, they leave straight and not turning. From one sweep over the manifold's points the first took the
+        // whole strike: 0.15 and 0.28 m/s sideways and 5 rad/s of spin.
+        for body in [left, right] {
+            let (v, o) = (w.v(LINEAR_X, body as usize), w.v(ANGULAR_X, body as usize));
+            assert!(v.y.abs() < 1e-3 && v.z.abs() < 1e-3, "dominance {rank}: sideways {v:?}");
+            assert!(o.dot(o) < 1e-6, "dominance {rank}: turning {o:?}");
+        }
     }
 }
 

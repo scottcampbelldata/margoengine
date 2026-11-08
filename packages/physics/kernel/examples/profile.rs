@@ -88,17 +88,23 @@ fn step(w: &mut World, dt: f32, clock: &mut Clock) {
             let least = most.saturating_add(1).saturating_sub(pass);
             w.solve_joints(h, stiffness, if pass == all { Pass::Push } else { Pass::Settle }, least, u32::MAX);
             clock.lap(9);
-            w.solve_contacts(h, stiffness, true, substep as usize, least);
+            w.solve_contacts(h, stiffness, true, substep as usize, least, false);
             clock.lap(10);
         }
         w.integrate_poses(h, substep + 1 == substeps);
+        w.tally_drift(h);
         clock.lap(11);
         w.refresh_joints();
         clock.lap(7);
-        w.solve_joints(h, stiffness, Pass::Relax, 0, u32::MAX);
-        clock.lap(9);
-        w.solve_contacts(h, stiffness, false, substep as usize, 0);
-        clock.lap(12);
+        let relaxes = all.max(1);
+        for pass in 1..=relaxes {
+            let need = relaxes - (pass - 1);
+            let least = if need <= 1 { 0 } else { need.saturating_sub(passes) };
+            w.solve_joints(h, stiffness, Pass::Relax, least, u32::MAX);
+            clock.lap(9);
+            w.solve_contacts(h, stiffness, false, substep as usize, least, pass == relaxes);
+            clock.lap(12);
+        }
         w.solve_impacts();
         clock.lap(13);
     }

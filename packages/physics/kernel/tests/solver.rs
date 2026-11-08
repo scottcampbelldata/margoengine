@@ -211,6 +211,56 @@ fn a_block_slides_only_above_tan_t_equal_to_mu() {
 }
 
 #[test]
+fn a_block_slides_at_its_rate_from_release() {
+    // Measured from 0.5 s to 2.5 s after release, as the harness does, for a cube and a flat block: a = g cos t (tan t - mu).
+    // The relaxing pass once took friction's cone from the normal the soft pass left, short of the load by its impulse scale,
+    // and the cube ran up to 0.008 m/s2 fast.
+    for half_y in [0.5f32, 0.25] {
+        for tangent in [0.51f32, 0.55, 0.6, 0.7, 0.85, 1.0] {
+            let mut w = world(2);
+            floor(&mut w);
+            slope(&mut w, tangent);
+            let body = block(&mut w, [0.5, half_y, 0.5], v3(0.0, half_y, 0.0), 1.0, false);
+            for _ in 0..30 {
+                w.step(DT);
+            }
+            let v = w.v(LINEAR_X, body as usize).x;
+            for _ in 0..120 {
+                w.step(DT);
+            }
+            let c = 1.0 / (1.0 + tangent * tangent).sqrt();
+            let expected = 9.81 * c * (tangent - 0.5);
+            let got = (w.v(LINEAR_X, body as usize).x - v) / 2.0;
+            assert!((got - expected).abs() < 0.002, "half height {half_y}, tan {tangent}: {got} against {expected}");
+        }
+    }
+}
+
+#[test]
+fn a_cube_dropped_flat_lands_flat() {
+    // A unit cube falls flat onto the floor with no bounce: it must land and stay as it fell, not turned and not moved
+    // sideways. From one sweep over its four points the first took the whole strike: from 8 m it spun at 0.64 rad/s, slid
+    // at 0.34 m/s and came to rest 2.6 cm off, turned 1.7 degrees.
+    for height in [0.5f32, 2.0, 8.0] {
+        let mut w = world(2);
+        floor(&mut w);
+        let body = block(&mut w, [0.5, 0.5, 0.5], v3(0.0, 0.5 + height, 0.0), 1.0, false);
+        let (mut spin, mut side, mut up) = (0.0f32, 0.0f32, 0.0f32);
+        for _ in 0..240 {
+            w.step(DT);
+            let (v, o) = (w.v(LINEAR_X, body as usize), w.v(ANGULAR_X, body as usize));
+            spin = spin.max(size(o));
+            side = side.max((v.x * v.x + v.z * v.z).sqrt());
+            up = up.max(v.y);
+        }
+        let (p, q) = (w.v(POSITION_X, body as usize), w.q(ROTATION_X, body as usize));
+        assert!(spin < 1e-3 && side < 1e-3 && up < 1e-3, "from {height} m: spin {spin}, sideways {side}, up {up}");
+        assert!(p.x.abs() < 1e-5 && p.z.abs() < 1e-5, "from {height} m: rests at {p:?}");
+        assert!(q.x.abs() < 1e-5 && q.y.abs() < 1e-5 && q.z.abs() < 1e-5, "from {height} m: turned {q:?}");
+    }
+}
+
+#[test]
 fn a_ball_bounces_to_e_squared_of_its_drop() {
     for sleep in [true, false] {
         for e in [0.25f32, 0.5, 0.75, 1.0] {

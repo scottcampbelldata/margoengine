@@ -2,7 +2,8 @@
 // soft constraints from Catto 2011, substeps from Macklin et al. 2019). Contacts are found once a step; everything below
 // runs each substep over those same points, with the gap worked out again from the bodies' new poses.
 //
-//   integrate velocities; warm start; solve with bias; integrate poses; relax; restitution.
+//   integrate velocities; warm start; solve with bias; integrate poses; tally the drift; relax, as many times as the
+//   biased solve ran; restitution.
 //
 // The biased solve pushes shapes apart through a soft constraint, a spring and damper in implicit form with this frequency
 // and damping ratio: omega = 2 pi hertz, a1 = 2 zeta + omega h, a2 = h omega a1, a3 = 1 / (1 + a2), and then
@@ -12,13 +13,15 @@
 // Relaxing solves again with no bias and does not move the poses, so the speed the push added leaves the velocities and
 // stacks do not hop. A gap still open is a speculative point: it lets the bodies close it within this substep and no more.
 //
-// Friction comes first, from the normal impulse so far, in a circular cone: the tangent impulse is one vector, cut back to
+// In the biased solve friction comes first, from the normal impulse so far, and in the relaxing one the normal does, so
+// the cone is what the relaxed normal holds. The cone is circular: the tangent impulse is one vector, cut back to
 // mu times the normal impulse. It is anchored: `drift` holds how far the two surfaces have slid since the point last
 // stuck, and the biased solve pulls that back, so a block on a slope holds its place instead of creeping (the sticky
-// anchors of Solver2D's TGS_Sticky). Muller et al. 2020 hold static friction by position too, but cancel one substep's slip
-// and let go when the multiplier passes the cone; here the slip adds up and is pulled back by a soft constraint of the same
-// form as the normal. A cone that saturates keeps the anchor at its edge: the drift scales by the same cut, so a sliding
-// block pulls it along and one that stops holds from there.
+// anchors of Solver2D's TGS_Sticky). The drift is tallied from the speeds the poses moved with. Muller et al. 2020 hold
+// static friction by position too, but cancel one substep's slip and let go when the multiplier passes the cone; here the
+// slip adds up and is pulled back by a soft constraint of the same form as the normal. A cone that saturates keeps the
+// anchor at its edge: the drift scales by the same cut, so a sliding block pulls it along and one that stops holds from
+// there.
 //
 // The first point of a manifold turns each substep, as within a substep the first point sees the whole load: from a fixed
 // first point a heavy box on a light one walks (`a_heavy_box_stands_on_a_light_one`).
@@ -33,6 +36,10 @@ use crate::world::World;
 
 /// 2 pi as the nearest f32.
 const TAU: f32 = 6.283_185_5;
+
+/// The most sweeps a pair's normal rows take in one pass. A manifold not settled by then is left as it stands; the soft rows'
+/// last part to settle moves no body: the points' shares of one load among themselves.
+const SWEEPS: u32 = 16;
 
 /// Scales of one soft constraint at one substep length.
 #[derive(Clone, Copy)]
@@ -285,13 +292,39 @@ impl World {
         }
     }
 
+    /// Each substep, once the poses have moved: adds to each point's drift how far its two surfaces slid, from the speeds
+    /// the poses moved with. Tallied in the relaxing pass instead, each point would see the speeds as the points before it
+    /// in that pass left them, a slide no pose made, and a resting block would keep a twist in its anchors that eats its
+    /// friction (`a_block_slides_only_above_tan_t_equal_to_mu`).
+    pub fn tally_drift(&mut self, h: f32) {
+        for i in 0..self.header().solving as usize {
+            let row = self.uu(SOLVE_PAIRS, i) as usize;
+            let (a, b) = self.pair_bodies(row as u32);
+            let (linear_a, angular_a) = (self.v(LINEAR_X, a), self.v(ANGULAR_X, a));
+            let (linear_b, angular_b) = (self.v(LINEAR_X, b), self.v(ANGULAR_X, b));
+            let normal = self.v(PAIR_NORMAL_X, row);
+            for k in 0..self.uu(PAIR_CONTACTS, row) as usize {
+                let at = row * MANIFOLD + k;
+                let (arm_a, arm_b) = (self.v(CONTACT_ARM_A_X, at), self.v(CONTACT_ARM_B_X, at));
+                let relative = linear_b.add(angular_b.cross(arm_b)).sub(linear_a.add(angular_a.cross(arm_a)));
+                let slide = relative.sub(normal.scale(relative.dot(normal)));
+                self.set_v(CONTACT_DRIFT_X, at, self.v(CONTACT_DRIFT_X, at).add(slide.scale(h)));
+            }
+        }
+    }
+
     /// One pass over the points. `biased`: the soft pass, which pushes; otherwise the relaxing one, which takes the push's
-    /// speed back out and tallies the drift.
-    /// `least`: a pair joins only when its island asks for at least this many extra passes (see `step`).
-    pub fn solve_contacts(&mut self, h: f32, step: Soft, biased: bool, turn: usize, least: u32) {
-        let max_push = self.header().contact_max_push;
-        let slop = self.header().contact_slop;
-        let threshold = self.bounce_speed(h);
+    /// speed back out. `least`: a pair joins only when its island asks for at least this many extra passes (see `step`).
+    /// `last`: the last relaxing pass, after which what the points hold is what they gave in this substep.
+    ///
+    /// Gauss-Seidel over the pairs. Within a pair, friction takes one sweep over the points, the first point turning each
+    /// substep; the normal rows sweep until no impulse moves by more than rounding. From one sweep the first point held a
+    /// whole strike: a cube dropped flat on its face spun and slid off sideways, and two meeting head on left turning
+    /// (`a_cube_dropped_flat_lands_flat`). The soft pass solves friction first, from the normal so far; the relaxing pass
+    /// solves the normal first, so friction's cone is what the normal holds once the push is out. From the soft pass's
+    /// normal, short of the load by its impulse scale, a block slid that should hold (`a_block_slides_only_above_tan_t_equal_to_mu`).
+    #[allow(clippy::too_many_arguments)]
+    pub fn solve_contacts(&mut self, h: f32, step: Soft, biased: bool, turn: usize, least: u32, last: bool) {
         let mut impacts = self.header().impacts as usize;
         for i in 0..self.header().solving as usize {
             let row = self.uu(SOLVE_PAIRS, i) as usize;
@@ -300,96 +333,166 @@ impl World {
                 continue;
             }
             let (mut body_a, mut body_b) = self.pair_moving(row, a, b);
-            let (center_a, center_b) = (self.v(CENTER_X, a), self.v(CENTER_X, b));
-            let (rotation_a, rotation_b) = (self.q(ROTATION_X, a), self.q(ROTATION_X, b));
-            let normal = self.v(PAIR_NORMAL_X, row);
-            let tangent = self.v(PAIR_TANGENT_X, row);
-            let other = normal.cross(tangent);
-            let friction = self.s(PAIR_FRICTION, row);
-            let bounce = self.s(PAIR_RESTITUTION, row);
-            let count = self.uu(PAIR_CONTACTS, row) as usize;
-            for k in 0..count {
-                let at = row * MANIFOLD + (k + turn) % count;
-                let (arm_a, arm_b) = (self.v(CONTACT_ARM_A_X, at), self.v(CONTACT_ARM_B_X, at));
-
-                // Friction, from the normal impulse so far.
-                let pressed = self.s(CONTACT_NORMAL_IMPULSE, at);
-                let mut held = self.v(CONTACT_TANGENT_X, at);
-                let mut drift = self.v(CONTACT_DRIFT_X, at);
-                let relative = body_b.at(arm_b).sub(body_a.at(arm_a));
-                let slide = relative.sub(normal.scale(relative.dot(normal)));
-                let (mass_scale, impulse_scale, target) = if biased {
-                    (step.mass_scale, step.impulse_scale, slide.add(drift.scale(step.bias_rate)))
-                } else {
-                    drift = drift.add(slide.scale(h));
-                    (1.0, 0.0, slide)
-                };
-                let along = -self.s(CONTACT_TANGENT_MASS, at) * mass_scale * target.dot(tangent) - impulse_scale * held.dot(tangent);
-                let across = -self.s(CONTACT_OTHER_MASS, at) * mass_scale * target.dot(other) - impulse_scale * held.dot(other);
-                let mut next = held.add(tangent.scale(along)).add(other.scale(across));
-                let most = friction * pressed;
-                let squared = next.dot(next);
-                if squared > most * most {
-                    let cut = most / sqrt(squared);
-                    next = next.scale(cut);
-                    // Only the last word counts: within a substep the first point of a manifold sees the whole load. The
-                    // anchor comes along, to where the cone holds it.
-                    if !biased {
-                        drift = drift.scale(cut);
-                    }
-                }
-                let applied = next.sub(held);
-                held = next;
-                body_a.push(applied.scale(-1.0), arm_a);
-                body_b.push(applied, arm_b);
-                self.set_v(CONTACT_TANGENT_X, at, held);
-                self.set_v(CONTACT_DRIFT_X, at, drift);
-            }
-            let mut given = 0.0;
-            for k in 0..count {
-                let at = row * MANIFOLD + (k + turn) % count;
-                let (arm_a, arm_b) = (self.v(CONTACT_ARM_A_X, at), self.v(CONTACT_ARM_B_X, at));
-                let pressed = self.s(CONTACT_NORMAL_IMPULSE, at);
-                // The normal: the gap from where the bodies are now.
-                let on_a = center_a.add(rotation_a.rotate(self.v(CONTACT_ANCHOR_A_X, at)));
-                let on_b = center_b.add(rotation_b.rotate(self.v(CONTACT_ANCHOR_B_X, at)));
-                let gap = on_b.sub(on_a).dot(normal);
-                let speed = body_b.at(arm_b).sub(body_a.at(arm_a)).dot(normal);
-                let (bias, mass_scale, impulse_scale) = if gap > 0.0 {
-                    (gap / h, 1.0, 0.0)
-                } else if biased {
-                    let depth = gap + slop;
-                    let depth = if depth < 0.0 { depth } else { 0.0 };
-                    let push = step.bias_rate * depth;
-                    (if push > -max_push { push } else { -max_push }, step.mass_scale, step.impulse_scale)
-                } else {
-                    (0.0, 1.0, 0.0)
-                };
-                let change = -self.s(CONTACT_NORMAL_MASS, at) * mass_scale * (speed + bias) - impulse_scale * pressed;
-                let total = pressed + change;
-                let total = if total > 0.0 { total } else { 0.0 };
-                // A relaxing pass only takes back. A gap still open is met by the next biased pass, which is where a strike
-                // is noticed; acting here would slow the body first and hide it.
-                let total = if !biased && gap > 0.0 && total > pressed { pressed } else { total };
-                let applied = normal.scale(total - pressed);
-                self.set_s(CONTACT_NORMAL_IMPULSE, at, total);
-                given += total;
-                body_a.push(applied.scale(-1.0), arm_a);
-                body_b.push(applied, arm_b);
-                if biased && bounce > 0.0 && pressed == 0.0 && total > 0.0 && speed < -threshold {
-                    self.set_s(CONTACT_APPROACH, at, speed);
-                    self.set_u(IMPACTS, impacts, at as u32);
-                    impacts += 1;
-                }
-            }
-            // What a point holds after the relaxing pass is all it gave in this substep, its warm start included.
-            if !biased {
+            let given = if biased {
+                self.friction_rows(row, step, true, turn, &mut body_a, &mut body_b);
+                self.normal_rows(row, a, b, h, step, true, turn, &mut impacts, &mut body_a, &mut body_b)
+            } else {
+                let given = self.normal_rows(row, a, b, h, step, false, turn, &mut impacts, &mut body_a, &mut body_b);
+                self.friction_rows(row, step, false, turn, &mut body_a, &mut body_b);
+                given
+            };
+            // What a point holds after the last relaxing pass is all it gave in this substep, its warm start included.
+            if last {
                 self.set_s(PAIR_FORCE, row, self.s(PAIR_FORCE, row) + given);
             }
             self.settle(a, &body_a);
             self.settle(b, &body_b);
         }
         self.header_mut().impacts = impacts as u32;
+    }
+
+    /// A pair's friction, one sweep over the points, each in a circular cone of mu times its normal impulse so far.
+    fn friction_rows(&mut self, row: usize, step: Soft, biased: bool, turn: usize, body_a: &mut Moving, body_b: &mut Moving) {
+        let normal = self.v(PAIR_NORMAL_X, row);
+        let tangent = self.v(PAIR_TANGENT_X, row);
+        let other = normal.cross(tangent);
+        let friction = self.s(PAIR_FRICTION, row);
+        let count = self.uu(PAIR_CONTACTS, row) as usize;
+        for k in 0..count {
+            let at = row * MANIFOLD + (k + turn) % count;
+            let (arm_a, arm_b) = (self.v(CONTACT_ARM_A_X, at), self.v(CONTACT_ARM_B_X, at));
+            let pressed = self.s(CONTACT_NORMAL_IMPULSE, at);
+            let held = self.v(CONTACT_TANGENT_X, at);
+            let drift = self.v(CONTACT_DRIFT_X, at);
+            let relative = body_b.at(arm_b).sub(body_a.at(arm_a));
+            let slide = relative.sub(normal.scale(relative.dot(normal)));
+            let (mass_scale, impulse_scale, target) = if biased {
+                (step.mass_scale, step.impulse_scale, slide.add(drift.scale(step.bias_rate)))
+            } else {
+                (1.0, 0.0, slide)
+            };
+            let along = -self.s(CONTACT_TANGENT_MASS, at) * mass_scale * target.dot(tangent) - impulse_scale * held.dot(tangent);
+            let across = -self.s(CONTACT_OTHER_MASS, at) * mass_scale * target.dot(other) - impulse_scale * held.dot(other);
+            let mut next = held.add(tangent.scale(along)).add(other.scale(across));
+            let most = friction * pressed;
+            let squared = next.dot(next);
+            if squared > most * most {
+                let cut = most / sqrt(squared);
+                next = next.scale(cut);
+                // Only the last word counts: within a substep the first point of a manifold sees the whole load. The anchor
+                // comes along, to where the cone holds it: a sliding block pulls it along, and one that stops holds from there.
+                if !biased {
+                    self.set_v(CONTACT_DRIFT_X, at, drift.scale(cut));
+                }
+            }
+            let applied = next.sub(held);
+            body_a.push(applied.scale(-1.0), arm_a);
+            body_b.push(applied, arm_b);
+            self.set_v(CONTACT_TANGENT_X, at, next);
+        }
+    }
+
+    /// A pair's normal rows; returns what its points hold. Each row's update is the one a single point always had; the sweeps
+    /// run on the points' speeds alone, through the manifold's own J M^-1 J^T, and the impulses land on the bodies at the end.
+    #[allow(clippy::too_many_arguments)]
+    fn normal_rows(
+        &mut self,
+        row: usize,
+        a: usize,
+        b: usize,
+        h: f32,
+        step: Soft,
+        biased: bool,
+        turn: usize,
+        impacts: &mut usize,
+        body_a: &mut Moving,
+        body_b: &mut Moving,
+    ) -> f32 {
+        let max_push = self.header().contact_max_push;
+        let slop = self.header().contact_slop;
+        let threshold = self.bounce_speed(h);
+        let (center_a, center_b) = (self.v(CENTER_X, a), self.v(CENTER_X, b));
+        let (rotation_a, rotation_b) = (self.q(ROTATION_X, a), self.q(ROTATION_X, b));
+        let normal = self.v(PAIR_NORMAL_X, row);
+        let bounce = self.s(PAIR_RESTITUTION, row);
+        let count = self.uu(PAIR_CONTACTS, row) as usize;
+        let zero = v3(0.0, 0.0, 0.0);
+        let (mut hold, mut was, mut speed, mut approach) = ([0.0f32; MANIFOLD], [0.0f32; MANIFOLD], [0.0f32; MANIFOLD], [0.0f32; MANIFOLD]);
+        let (mut bias, mut scale, mut leak, mut most) = ([0.0f32; MANIFOLD], [0.0f32; MANIFOLD], [0.0f32; MANIFOLD], [f32::MAX; MANIFOLD]);
+        let (mut turn_a, mut turn_b, mut spin_a, mut spin_b) = ([zero; MANIFOLD], [zero; MANIFOLD], [zero; MANIFOLD], [zero; MANIFOLD]);
+        for k in 0..count {
+            let at = row * MANIFOLD + k;
+            let (arm_a, arm_b) = (self.v(CONTACT_ARM_A_X, at), self.v(CONTACT_ARM_B_X, at));
+            let pressed = self.s(CONTACT_NORMAL_IMPULSE, at);
+            // The gap from where the bodies are now.
+            let on_a = center_a.add(rotation_a.rotate(self.v(CONTACT_ANCHOR_A_X, at)));
+            let on_b = center_b.add(rotation_b.rotate(self.v(CONTACT_ANCHOR_B_X, at)));
+            let gap = on_b.sub(on_a).dot(normal);
+            (hold[k], was[k]) = (pressed, pressed);
+            speed[k] = body_b.at(arm_b).sub(body_a.at(arm_a)).dot(normal);
+            approach[k] = speed[k];
+            (bias[k], scale[k], leak[k]) = if gap > 0.0 {
+                (gap / h, 1.0, 0.0)
+            } else if biased {
+                let depth = gap + slop;
+                let depth = if depth < 0.0 { depth } else { 0.0 };
+                let push = step.bias_rate * depth;
+                (if push > -max_push { push } else { -max_push }, step.mass_scale, step.impulse_scale)
+            } else {
+                (0.0, 1.0, 0.0)
+            };
+            // A relaxing pass only takes back. A gap still open is met by the next biased pass, which is where a strike is
+            // noticed; acting here would slow the body first and hide it.
+            if !biased && gap > 0.0 {
+                most[k] = pressed;
+            }
+            (turn_a[k], turn_b[k]) = (arm_a.cross(normal), arm_b.cross(normal));
+            (spin_a[k], spin_b[k]) = (body_a.inertia.mul(turn_a[k]), body_b.inertia.mul(turn_b[k]));
+        }
+        let along = normal.mul(normal).dot(body_a.mass.add(body_b.mass));
+        let mut sweeps = 0;
+        loop {
+            let (mut moved, mut largest) = (0.0f32, 0.0f32);
+            for k in 0..count {
+                let i = (k + turn) % count;
+                let change = -self.s(CONTACT_NORMAL_MASS, row * MANIFOLD + i) * scale[i] * (speed[i] + bias[i]) - leak[i] * hold[i];
+                let total = hold[i] + change;
+                let total = if total > 0.0 { total } else { 0.0 };
+                let total = if total > most[i] { most[i] } else { total };
+                let applied = total - hold[i];
+                if applied != 0.0 {
+                    for j in 0..count {
+                        speed[j] += (along + turn_a[j].dot(spin_a[i]) + turn_b[j].dot(spin_b[i])) * applied;
+                    }
+                    hold[i] = total;
+                }
+                let size = if applied < 0.0 { -applied } else { applied };
+                moved = if size > moved { size } else { moved };
+                largest = if total > largest { total } else { largest };
+            }
+            sweeps += 1;
+            // A lone point is exact in one sweep.
+            if count == 1 || moved <= f32::EPSILON * largest || sweeps == SWEEPS {
+                break;
+            }
+        }
+        let mut given = 0.0;
+        for k in 0..count {
+            let at = row * MANIFOLD + k;
+            let (arm_a, arm_b) = (self.v(CONTACT_ARM_A_X, at), self.v(CONTACT_ARM_B_X, at));
+            let applied = normal.scale(hold[k] - was[k]);
+            self.set_s(CONTACT_NORMAL_IMPULSE, at, hold[k]);
+            given += hold[k];
+            body_a.push(applied.scale(-1.0), arm_a);
+            body_b.push(applied, arm_b);
+            // A strike: the speed the point came in at, before any point of the manifold pushed.
+            if biased && bounce > 0.0 && was[k] == 0.0 && hold[k] > 0.0 && approach[k] < -threshold {
+                self.set_s(CONTACT_APPROACH, at, approach[k]);
+                self.set_u(IMPACTS, *impacts, at as u32);
+                *impacts += 1;
+            }
+        }
+        given
     }
 
     /// Speed under which a contact is rest: two substeps of gravity.
