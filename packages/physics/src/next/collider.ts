@@ -31,12 +31,17 @@ export class PhysicsCollider {
     if (this.removed) throw new MargoError('state', 'Collider was removed; add a new one with body.addCollider.');
     return this.kernel.columns;
   }
-  /** Radius of a sphere around {@link PhysicsCollider.translationWrtParent} that holds the shape. */
-  get boundingRadius(): number {
+  /**
+   * Radius of a sphere around {@link PhysicsCollider.translationWrtParent} that holds the shape: the radius of a sphere, the
+   * reach of a capsule, the corner distance of a box. Null for the other shapes, which would have to walk their geometry,
+   * as on the Rapier entry.
+   */
+  get boundingRadius(): number | null {
     const { colliderA, colliderB, colliderC } = this.columns(),
       a = this.handle;
     if (this.shape === 'box') return Math.hypot(colliderA[a], colliderB[a], colliderC[a]);
-    return this.shape === 'capsule' ? colliderA[a] + colliderB[a] : colliderA[a];
+    if (this.shape === 'capsule') return colliderA[a] + colliderB[a];
+    return this.shape === 'sphere' ? colliderA[a] : null;
   }
   isSensor(): boolean {
     return (this.columns().colliderFlags[this.handle] & COLLIDER_SENSOR) !== 0;

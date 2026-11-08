@@ -492,6 +492,11 @@ impl World {
     /// How far apart two colliders may be and still touch before the step ends: the margin, what each can move in the
     /// step, and gravity's pull. Anything closer gets contact points now, so detection once a step serves every substep
     /// (Macklin et al. 2019).
+    #[inline(always)]
+    pub(crate) fn contact_limit_of(&self, a: usize, b: usize, dt: f32) -> f32 {
+        self.contact_limit(a, b, dt)
+    }
+
     fn contact_limit(&self, a: usize, b: usize, dt: f32) -> f32 {
         let g = self.header().gravity;
         let pull = sqrt(g[0] * g[0] + g[1] * g[1] + g[2] * g[2]) * dt * dt;
@@ -591,6 +596,7 @@ impl World {
             let (a, b) = (self.uu(PAIR_A, row) as usize, self.uu(PAIR_B, row) as usize);
             let (body_a, body_b) = (self.uu(COLLIDER_BODY, a) as usize, self.uu(COLLIDER_BODY, b) as usize);
             let meshed = self.uu(COLLIDER_SHAPE, a) == SHAPE_TRIMESH || self.uu(COLLIDER_SHAPE, b) == SHAPE_TRIMESH;
+            let compound = self.has_compound(a, b);
             let sensor = (self.uu(COLLIDER_FLAGS, a) | self.uu(COLLIDER_FLAGS, b)) & COLLIDER_SENSOR != 0;
             // Scripted bodies pass through each other: nothing can push them. A sensor still sees them.
             let scripted = self.flags(body_a) & KIND != DYNAMIC && self.flags(body_b) & KIND != DYNAMIC;
@@ -603,7 +609,9 @@ impl World {
             if sensor || !groups_meet(self.uu(COLLIDER_SOLVER_GROUPS, a), self.uu(COLLIDER_SOLVER_GROUPS, b)) {
                 manifold.held_count = 0;
                 manifold.feature = 0;
-                let overlaps = if meshed {
+                let overlaps = if compound {
+                    self.compound_overlaps(a, b)
+                } else if meshed {
                     self.mesh_overlaps(a, b)
                 } else {
                     self.collide(a, b, 0.0, &mut manifold);
@@ -614,6 +622,10 @@ impl World {
                 continue;
             }
             self.set_u(PAIR_FLAGS, row, flags);
+            if compound {
+                self.compound_pair(row, a, b, dt, ratio);
+                continue;
+            }
             let limit = self.contact_limit(a, b, dt);
             if meshed {
                 self.mesh_pair(row, a, b, limit, ratio);

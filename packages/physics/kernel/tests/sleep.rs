@@ -592,3 +592,32 @@ fn a_sleeper_changed_without_a_wake_stays_in_its_ring_until_one_comes() {
         check(&w);
     }
 }
+
+#[test]
+fn a_sleeper_wakes_and_falls_when_the_collider_under_it_goes() {
+    // A ball asleep on a fixed shelf over a floor: removing the shelf's collider, or the shelf, drops it to the floor.
+    for remove_body in [false, true] {
+        let mut w = World::new(4, 4).unwrap();
+        let floor = w.add_body(FIXED).unwrap();
+        w.add_collider(floor, SHAPE_BOX, [10.0, 0.5, 10.0], [0.0, -0.5, 0.0], IDENTITY, 0.0).unwrap();
+        let shelf = w.add_body(FIXED).unwrap();
+        let board = w.add_collider(shelf, SHAPE_BOX, [1.0, 0.1, 1.0], [0.0, 2.0, 0.0], IDENTITY, 0.0).unwrap();
+        let ball = w.add_body(DYNAMIC).unwrap();
+        w.add_collider(ball, SHAPE_BALL, [0.2, 0.0, 0.0], [0.0; 3], IDENTITY, 1.0).unwrap();
+        w.set_v(POSITION_X, ball as usize, v3(0.5, 2.4, 0.5));
+        for _ in 0..300 {
+            w.step(DT);
+        }
+        assert!(asleep(&w, ball), "the ball sleeps on the shelf");
+        if remove_body {
+            assert!(w.remove_body(shelf));
+        } else {
+            assert!(w.remove_collider(board));
+        }
+        for _ in 0..120 {
+            w.step(DT);
+        }
+        let y = w.v(POSITION_X, ball as usize).y;
+        assert!((y - 0.2).abs() < 0.01, "falls to the floor (remove_body {remove_body}), at {y}");
+    }
+}

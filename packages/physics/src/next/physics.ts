@@ -13,6 +13,7 @@ import {
   PAIR_IS_PART,
   type KernelContactPoint,
   type KernelLoadOptions,
+  type KernelShape,
 } from '../kernel.js';
 import { checkVec, type Quat, type Vec3 } from '../math.js';
 import { colliderGeometry } from '../mesh-fit.js';
@@ -491,8 +492,8 @@ export class Physics implements EnginePlugin, BodyOwner {
           ? colliderGeometry(mesh, body.fitScale)
           : { geometry: null, scale: mesh ? ([mesh.scale.x, mesh.scale.y, mesh.scale.z] as const) : ([1, 1, 1] as const) };
     if (body.fitScale && mesh?.geometry) fit.scale = body.fitScale;
-    const { name, shape, size, options: placed } = kernelCollider(options, fit, this.hulls),
-      row = this.kernel.addCollider(body.row, shape, size, placed),
+    const { name, shape, size, parts, options: placed } = kernelCollider(options, fit, this.hulls),
+      row = parts ? this.kernel.addCompound(body.row, parts, placed) : this.kernel.addCollider(body.row, shape as KernelShape, size, placed),
       collider = new PhysicsCollider(this.kernel, row, body, name);
     if (options.collisionGroups !== undefined) this.kernel.columns.colliderGroups[row] = options.collisionGroups;
     if (options.solverGroups !== undefined) this.kernel.columns.colliderSolverGroups[row] = options.solverGroups;

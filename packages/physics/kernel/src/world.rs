@@ -312,6 +312,23 @@ impl World {
     /// costs one pass over the lists.
     fn retire_collider(&mut self, collider: u32) {
         let at = collider as usize;
+        // What it held up or pushed wakes now, while its pairs still name its body.
+        self.wake_touching_pairs(collider);
+        // A compound's children go with it: rows off the broad phase, so the next step only frees them.
+        if unsafe { *self.u(COLLIDER_SHAPE).add(at) } == SHAPE_COMPOUND {
+            let mut child = unsafe { *self.u(COLLIDER_HULL).add(at) };
+            unsafe { *self.u(COLLIDER_HULL).add(at) = NONE };
+            while child != NONE {
+                let next = unsafe { *self.u(COLLIDER_NEXT).add(child as usize) };
+                unsafe {
+                    *self.u(COLLIDER_BODY).add(child as usize) = NONE;
+                    *self.u(COLLIDER_GENERATION).add(child as usize) += 1;
+                    *self.u(COLLIDER_STATE).add(child as usize) |= REMOVED;
+                }
+                self.mark_pending(child);
+                child = next;
+            }
+        }
         unsafe {
             *self.u(COLLIDER_BODY).add(at) = NONE;
             *self.u(COLLIDER_GENERATION).add(at) += 1;
@@ -358,17 +375,7 @@ impl World {
             return None;
         }
         self.wake(body);
-        let header = self.header();
-        let (free, rows, capacity) = (header.free_collider, header.collider_rows, header.capacity[1]);
-        let row = if free != NONE {
-            self.header_mut().free_collider = unsafe { *self.u(COLLIDER_NEXT).add(free as usize) };
-            free
-        } else if rows < capacity {
-            self.header_mut().collider_rows = rows + 1;
-            rows
-        } else {
-            return None;
-        };
+        let row = self.take_collider_row()?;
         let at = row as usize;
         self.clear_row(Rows::Collider, at, COLLIDER_GENERATION);
         unsafe {
@@ -381,6 +388,12 @@ impl World {
             if shape == SHAPE_HULL || shape == SHAPE_TRIMESH {
                 *self.u(COLLIDER_HULL).add(at) = size[0] as u32;
                 *self.f(COLLIDER_A).add(at) = 0.0;
+            } else if shape == SHAPE_COMPOUND {
+                // Empty until add_compound_part gives it children.
+                *self.u(COLLIDER_HULL).add(at) = NONE;
+                for k in 0..3 {
+                    *self.f(COLLIDER_A + k).add(at) = 0.0;
+                }
             }
             for k in 0..4 {
                 *self.f(COLLIDER_ROTATION_X + k).add(at) = rotation[k];
@@ -406,6 +419,75 @@ impl World {
             }
         }
         self.mark_pending(row);
+        self.update_mass(body);
+        Some(row)
+    }
+
+    /// A free collider row, or None when the rows are used up.
+    fn take_collider_row(&mut self) -> Option<u32> {
+        let header = self.header();
+        let (free, rows, capacity) = (header.free_collider, header.collider_rows, header.capacity[1]);
+        if free != NONE {
+            self.header_mut().free_collider = unsafe { *self.u(COLLIDER_NEXT).add(free as usize) };
+            Some(free)
+        } else if rows < capacity {
+            self.header_mut().collider_rows = rows + 1;
+            Some(rows)
+        } else {
+            None
+        }
+    }
+
+    /// Adds a convex child (ball, box, capsule or hull, sized as `add_collider` takes them) to a compound collider, placed
+    /// in the compound's frame, then recomputes the body's mass. None when the rows are used up, `compound` is not a live
+    /// compound, or the shape is not convex.
+    pub fn add_compound_part(&mut self, compound: u32, shape: u32, size: [f32; 3], position: [f32; 3], rotation: [f32; 4]) -> Option<u32> {
+        if compound >= self.header().collider_rows || !matches!(shape, SHAPE_BALL | SHAPE_BOX | SHAPE_CAPSULE | SHAPE_HULL) {
+            return None;
+        }
+        let parent = compound as usize;
+        let body = unsafe { *self.u(COLLIDER_BODY).add(parent) };
+        if body == NONE || !self.body_alive(body) || unsafe { *self.u(COLLIDER_SHAPE).add(parent) } != SHAPE_COMPOUND {
+            return None;
+        }
+        let row = self.take_collider_row()?;
+        let at = row as usize;
+        self.clear_row(Rows::Collider, at, COLLIDER_GENERATION);
+        // The child's pose in the body's frame: the compound's pose, then the part's within it.
+        let (place, turn) = (self.v(COLLIDER_X, parent), self.q(COLLIDER_ROTATION_X, parent));
+        let local = crate::math::Q { x: rotation[0], y: rotation[1], z: rotation[2], w: rotation[3] };
+        let p = place.add(turn.rotate(crate::math::v3(position[0], position[1], position[2])));
+        let q = turn.mul(local);
+        unsafe {
+            *self.u(COLLIDER_BODY).add(at) = body;
+            *self.u(COLLIDER_SHAPE).add(at) = shape;
+            for k in 0..3 {
+                *self.f(COLLIDER_A + k).add(at) = size[k];
+            }
+            if shape == SHAPE_HULL {
+                *self.u(COLLIDER_HULL).add(at) = size[0] as u32;
+                *self.f(COLLIDER_A).add(at) = 0.0;
+            }
+            *self.f(COLLIDER_DENSITY).add(at) = *self.f(COLLIDER_DENSITY).add(parent);
+            *self.u(COLLIDER_PAIRS).add(at) = NONE;
+            *self.u(COLLIDER_NEXT).add(at) = NONE;
+            // At the end of the compound's chain, so children keep the order they were given.
+            let first = self.u(COLLIDER_HULL).add(parent);
+            if *first == NONE {
+                *first = row;
+            } else {
+                let mut last = *first;
+                while *self.u(COLLIDER_NEXT).add(last as usize) != NONE {
+                    last = *self.u(COLLIDER_NEXT).add(last as usize);
+                }
+                *self.u(COLLIDER_NEXT).add(last as usize) = row;
+            }
+        }
+        self.set_v(COLLIDER_X, at, p);
+        self.set_q(COLLIDER_ROTATION_X, at, q);
+        self.wake(body);
+        // The compound's box grows to hold the child at the next step.
+        self.mark_pending(compound);
         self.update_mass(body);
         Some(row)
     }

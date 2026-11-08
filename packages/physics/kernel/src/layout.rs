@@ -429,10 +429,14 @@ columns! {
     SOLVE_SHARE f32 JointList,
     // Rows, measures and factors of the solving joints.
     JOINT_SCRATCH f32 JointScratch,
-    // A pair of a triangle mesh holds no points itself: each triangle that touches has a part, a pair row of its own off
-    // the broad phase's lists, chained from the pair. A part names its triangle; the chain ends in NONE.
+    // A pair of a triangle mesh or a compound holds no points itself: each triangle or compound child that touches has a
+    // part, a pair row of its own off the broad phase's lists, chained from the pair; the chain ends in NONE. A part names
+    // its triangle, or the child row of the pair's other side for a compound against a convex shape or against the B
+    // compound; PAIR_SUB names the compound child on the other side (A's child of two compounds, the child against a
+    // mesh), NONE when there is none.
     PAIR_PART u32 Pair,
     PAIR_CHILD u32 Pair,
+    PAIR_SUB u32 Pair,
     // A triangle mesh: where its rows start and how many it has, MESH_ bits, the box around it and the radius about the
     // box's centre that holds it. MESH_COLUMNS is 0 for a mesh of triangle rows and a height field's columns of cells
     // otherwise: a height field has vertex rows only, and its triangles follow from its cells (mesh.rs, `end_grid`).
@@ -563,6 +567,10 @@ pub const SHAPE_HULL: u32 = 3;
 /// A triangle mesh or a height field: its row in COLLIDER_HULL, no size, no volume. It touches every other shape but a
 /// mesh.
 pub const SHAPE_TRIMESH: u32 = 4;
+/// Convex children welded into one collider: COLLIDER_HULL holds the first child, a collider row off the broad phase and
+/// off its body's chain, and each child's COLLIDER_NEXT the next (NONE ends it). A child keeps its pose in the body's
+/// frame and its own fat box; the compound's box holds them all. No size of its own.
+pub const SHAPE_COMPOUND: u32 = 5;
 
 /// MESH_FLAGS: contacts on a triangle's inner edges keep to the normals the surface allows (fixInternalEdges).
 pub const MESH_FIX_EDGES: u32 = 1;

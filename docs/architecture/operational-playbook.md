@@ -1271,3 +1271,11 @@ The following remain technical gaps, not permission to weaken a check:
     (`tests/next-heightfield.test.js`); the physics-refs heightfield scenes pass in Node (flat slides, 1,000 balls on St
     Helens). Missing: rays and shape casts against a field (job 6), a field against a mesh, Rapier's per-cell status, any
     browser run beyond the replay's hash, and speed parity on the 499,849-cell build (16.3 ms against 8.6), batch 129.
+
+37. The own physics kernel's compound colliders (batch 126 job 4, `kernel/src/compound.rs`): children are collider rows
+    off the broad phase with fat boxes the broad phase writes, and a compound pair holds a part per touching child, child
+    pair or child and triangle (PAIR_PART and the new PAIR_SUB column). Proved: mass the same bits as the parts as
+    colliders, rest, one pair, mesh contact, stacking, empty gaps, sensors and row reuse (`kernel/tests/compound.rs`);
+    mass, centre, inertia and rest against Rapier 0.21 (`tests/next-compound.test.js`). Fixed with it: removing a
+    collider now wakes what touched it (`kernel/tests/sleep.rs`), as Rapier does. Missing: cylinder and cone parts, rays
+    and casts, a tree over many children, and any browser run beyond the replay's hash.

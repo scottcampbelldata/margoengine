@@ -120,7 +120,7 @@ impl World {
 
     /// Writes a collider's fat box when what the step can reach has left it, or it has grown far too big. True when it did.
     fn refresh(&mut self, c: usize, dt: f32) -> bool {
-        let (low, high) = self.reach(c, dt);
+        let (low, high) = self.reach_fitting(c, dt);
         let (fat_low, fat_high) = (self.v(FAT_MIN_X, c), self.v(FAT_MAX_X, c));
         let inside = low.x >= fat_low.x
             && low.y >= fat_low.y
@@ -137,6 +137,30 @@ impl World {
         }
         self.fit(c, low, high);
         true
+    }
+
+    /// What a collider can reach in the step. A compound's children get their fat boxes here, each step its body moves, as
+    /// its pairs cull children by them; the compound reaches what they reach together.
+    #[inline(always)]
+    fn reach_fitting(&mut self, c: usize, dt: f32) -> (V3, V3) {
+        if self.uu(COLLIDER_SHAPE, c) != SHAPE_COMPOUND {
+            return self.reach(c, dt);
+        }
+        let mut child = self.uu(COLLIDER_HULL, c);
+        if child == NONE {
+            let p = self.collider_pose(c).p;
+            return (p, p);
+        }
+        let (mut low, mut high) = self.reach(child as usize, dt);
+        while child != NONE {
+            let at = child as usize;
+            let (lo, hi) = self.reach(at, dt);
+            self.fit(at, lo, hi);
+            low = low.min(lo);
+            high = high.max(hi);
+            child = self.uu(COLLIDER_NEXT, at);
+        }
+        (low, high)
     }
 
     #[inline(always)]
@@ -299,7 +323,7 @@ impl World {
     fn join(&mut self, fresh: usize, dt: f32) {
         for i in 0..fresh {
             let c = self.uu(LIST_NEW, i) as usize;
-            let (low, high) = self.reach(c, dt);
+            let (low, high) = self.reach_fitting(c, dt);
             self.fit(c, low, high);
             let state = self.uu(COLLIDER_STATE, c);
             self.set_u(COLLIDER_STATE, c, state | IN_BROAD | JOINING);
@@ -486,6 +510,7 @@ impl World {
         let at = row as usize;
         self.set_u(PAIR_PART, at, NONE);
         self.set_u(PAIR_CHILD, at, NONE);
+        self.set_u(PAIR_SUB, at, NONE);
         let (first_a, first_b) = (self.uu(COLLIDER_PAIRS, a as usize), self.uu(COLLIDER_PAIRS, b as usize));
         self.set_u(PAIR_A, at, a);
         self.set_u(PAIR_B, at, b);

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10874144,
+  "total": 10880284,
   "history": [
     {
       "date": "2026-10-24",
@@ -4016,6 +4016,12 @@
       "commit": "16401d28c",
       "reason": "sciviz grids entry: new optional entry, root unchanged",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "c0895e40e",
+      "reason": "physics: compound colliders on the own solver (batch 126 job 4)",
+      "grew": 1
     }
   ],
   "items": {
@@ -4471,7 +4477,7 @@
     "@margoengine/oit/moments": 5512,
     "@margoengine/oit/vfx": 486,
     "@margoengine/physics": 19679,
-    "@margoengine/physics/next": 106995,
+    "@margoengine/physics/next": 113135,
     "@margoengine/physics2d": 8199,
     "@margoengine/physics2d/outline": 2524,
     "@margoengine/pixel": 4664,

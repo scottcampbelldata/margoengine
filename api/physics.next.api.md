@@ -191,6 +191,7 @@ export class KernelWorld {
     addBody(kind: KernelBodyKind): number;
     removeBody(body: number): boolean;
     addCollider(body: number, shape: KernelShape, size: readonly number[], options?: KernelColliderOptions): number;
+    addCompound(body: number, parts: readonly KernelCompoundPart[], options?: KernelColliderOptions): number;
     addHull(vertices: readonly (readonly [number, number, number])[], faces: readonly (readonly number[])[]): number;
     addTrimesh(vertices: ArrayLike<number>, indices: ArrayLike<number>, options?: KernelTrimeshOptions): number;
     addHeightfield(rows: number, columns: number, heights: ArrayLike<number>, scale: readonly [number, number, number], options?: KernelHeightfieldOptions): number;
@@ -361,7 +362,7 @@ export class PhysicsCollider {
     shape: ColliderShape);
     get valid(): boolean;
     markRemoved(): void;
-    get boundingRadius(): number;
+    get boundingRadius(): number | null;
     isSensor(): boolean;
     setSensor(sensor: boolean): this;
     isEnabled(): boolean;
@@ -612,6 +613,13 @@ interface JointBase {
 interface JointOwner {
     readonly kernel: KernelWorld;
     removeJoint(joint: PhysicsJoint): void;
+}
+
+interface KernelCompoundPart {
+    shape: 'ball' | 'box' | 'capsule' | 'hull';
+    size: readonly number[];
+    position?: readonly [number, number, number];
+    rotation?: readonly [number, number, number, number];
 }
 
 interface KernelHeightfieldOptions {

@@ -1,27 +1,33 @@
 // What a collider's options mean to the kernel. On the step path, as a game can add colliders in its step: no `Math`.
 import { MargoError } from '@margoengine/math/errors';
-import type { KernelColliderOptions, KernelShape } from '../kernel.js';
+import type { KernelColliderOptions, KernelCompoundPart, KernelShape } from '../kernel.js';
 import { checkVec, type Vec3 } from '../math.js';
-import { bounds, geometryPositions, type ColliderGeometry, type ColliderOptions, type ShapeOptions } from '../shapes.js';
+import { bounds, geometryPositions, type ColliderGeometry, type ColliderOptions, type CompoundPart, type ShapeOptions } from '../shapes.js';
 import { buildHull } from './hull.js';
 
 const PI = 3.141592653589793;
 
 /** The shapes the own solver holds so far, by the name their options use. */
-const served: Readonly<Record<string, KernelShape>> = {
+const served: Readonly<Record<string, KernelShape | 'compound'>> = {
   box: 'box',
   sphere: 'ball',
   capsule: 'capsule',
   convexHull: 'hull',
   trimesh: 'trimesh',
   heightfield: 'trimesh',
+  compound: 'compound',
 };
+/** The convex parts a compound takes, and the parts the own solver holds so far. */
+const CONVEX_PARTS = ['box', 'sphere', 'capsule', 'cylinder', 'cone', 'convexHull'],
+  SERVED_PARTS = ['box', 'sphere', 'capsule', 'convexHull'];
 
 /** What the kernel needs for one collider. */
 export interface KernelCollider {
   name: ShapeOptions['shape'];
-  shape: KernelShape;
+  shape: KernelShape | 'compound';
   size: number[];
+  /** A compound's children, for KernelWorld.addCompound. */
+  parts?: KernelCompoundPart[];
   options: KernelColliderOptions;
 }
 
@@ -36,6 +42,42 @@ function volume(shape: KernelShape, size: readonly number[], hullVolume: (row: n
   if (shape === 'trimesh') return 0;
   const [radius, halfLength = 0] = size;
   return PI * radius * radius * ((4 / 3) * radius + 2 * halfLength);
+}
+
+/**
+ * A compound's parts as kernel children, each sized from its own options: parts are never fitted to the mesh.
+ * @throws RangeError for no parts; TypeError for a part that is not convex or leaves out its size.
+ */
+function compoundParts(parts: readonly CompoundPart[], hulls: HullRows): KernelCompoundPart[] {
+  if (!Array.isArray(parts) || !parts.length)
+    throw new RangeError("A compound collider needs at least one part: {shape: 'compound', parts: [{shape: 'box', halfExtents: [1, 1, 1]}]}");
+  return parts.map((part) => {
+    if (!CONVEX_PARTS.includes(part?.shape))
+      throw new TypeError(
+        `Compound part shape ${String(part?.shape)} is not convex; use box, sphere, capsule, cylinder, cone or convexHull parts.`,
+      );
+    if (!SERVED_PARTS.includes(part.shape))
+      throw new MargoError(
+        'unsupported',
+        `A ${part.shape} compound part is not in the own solver yet; use box, sphere, capsule or convexHull parts, or @margoengine/physics.`,
+      );
+    const offset = part.offset ?? [0, 0, 0];
+    checkVec(offset, 'Compound part offset');
+    const placed = { position: [offset[0], offset[1], offset[2]] as [number, number, number], rotation: part.rotation };
+    if (part.shape === 'box') {
+      if (!part.halfExtents) throw new TypeError('A compound box part needs halfExtents; parts are never fitted to the mesh.');
+      checkVec(part.halfExtents, 'Compound box halfExtents');
+      return { shape: 'box', size: [...part.halfExtents], ...placed };
+    }
+    if (part.shape === 'sphere') {
+      if (part.radius === undefined) throw new TypeError('A compound sphere part needs a radius; parts are never fitted to the mesh.');
+      return { shape: 'ball', size: [part.radius], ...placed };
+    }
+    if (part.shape === 'capsule') return { shape: 'capsule', size: [part.radius, part.halfHeight], ...placed };
+    if (!part.points) throw new TypeError('A compound convexHull part needs points; parts are never fitted to the mesh.');
+    const { vertices, faces } = buildHull(Float32Array.from(part.points));
+    return { shape: 'hull', size: [hulls.addHull(vertices, faces)], ...placed };
+  });
 }
 
 /** The radius that holds every point of a mesh around the centre of its bounds. */
@@ -77,14 +119,15 @@ export function kernelCollider(
   if (!shape)
     throw new MargoError(
       'unsupported',
-      `The ${options.shape} shape is not in the own solver yet; use box, sphere, capsule, convexHull, trimesh or heightfield, or @margoengine/physics.`,
+      `The ${options.shape} shape is not in the own solver yet; use box, sphere, capsule, convexHull, trimesh, heightfield or compound, or @margoengine/physics.`,
     );
   const fitted = (): Float32Array => {
       if (!fit.geometry) throw new TypeError(`A ${options.shape} collider without explicit size needs a mesh with geometry`);
       return geometryPositions(fit.geometry, fit.scale);
     },
     center = [0, 0, 0];
-  let size: number[];
+  let size: number[],
+    parts: KernelCompoundPart[] | undefined;
   if (options.shape === 'box') {
     let half = options.halfExtents;
     if (!half) {
@@ -127,18 +170,26 @@ export function kernelCollider(
       );
     checkVec(options.scale, 'Heightfield scale');
     size = [hulls.addHeightfield(options.rows, options.columns, options.heights, options.scale, options.fixInternalEdges ?? false)];
-  } else throw new TypeError(`Unknown shape ${options.shape}; use box, sphere, capsule, convexHull, trimesh or heightfield.`);
+  } else if (options.shape === 'compound') {
+    parts = compoundParts(options.parts, hulls);
+    size = [];
+  } else throw new TypeError(`Unknown shape ${options.shape}; use box, sphere, capsule, convexHull, trimesh, heightfield or compound.`);
   const offset = options.offset ?? [0, 0, 0];
   checkVec(offset, 'Collider offset');
-  const density = options.massless || shape === 'trimesh'
-    ? 0
-    : options.mass !== undefined
-      ? options.mass / volume(shape, size, hulls.hullVolume)
-      : (options.density ?? 1);
+  const whole = (): number =>
+      parts
+        ? parts.reduce((sum, part) => sum + volume(part.shape, part.size, hulls.hullVolume), 0)
+        : volume(shape as KernelShape, size, hulls.hullVolume),
+    density = options.massless || shape === 'trimesh'
+      ? 0
+      : options.mass !== undefined
+        ? options.mass / whole()
+        : (options.density ?? 1);
   return {
     name: options.shape,
     shape,
     size,
+    parts,
     options: {
       position: [offset[0] + center[0], offset[1] + center[1], offset[2] + center[2]],
       rotation: options.rotation,

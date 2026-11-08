@@ -145,9 +145,15 @@ impl World {
         let mut collider = unsafe { *self.u(FIRST_COLLIDER).add(at) };
         while collider != NONE {
             let c = collider as usize;
-            let solid = self.collider_solid(c);
-            mass += solid.mass;
-            moment_sum = moment_sum.add(self.solid_center(c).scale(solid.mass));
+            let density = self.s(COLLIDER_DENSITY, c);
+            let mut piece = self.first_piece(c);
+            while piece != NONE {
+                let p = piece as usize;
+                let solid = self.collider_solid(p, density);
+                mass += solid.mass;
+                moment_sum = moment_sum.add(self.solid_center(p).scale(solid.mass));
+                piece = self.next_piece(c, p);
+            }
             collider = unsafe { *self.u(COLLIDER_NEXT).add(c) };
         }
         let base = mass + own_mass;
@@ -166,9 +172,15 @@ impl World {
             let mut collider = unsafe { *self.u(FIRST_COLLIDER).add(at) };
             while collider != NONE {
                 let c = collider as usize;
-                let solid = self.collider_solid(c);
-                add_rotated(&mut inertia, self.solid_frame(c), solid.moments);
-                add_offset(&mut inertia, solid.mass, self.solid_center(c).sub(center));
+                let density = self.s(COLLIDER_DENSITY, c);
+                let mut piece = self.first_piece(c);
+                while piece != NONE {
+                    let p = piece as usize;
+                    let solid = self.collider_solid(p, density);
+                    add_rotated(&mut inertia, self.solid_frame(p), solid.moments);
+                    add_offset(&mut inertia, solid.mass, self.solid_center(p).sub(center));
+                    piece = self.next_piece(c, p);
+                }
                 collider = unsafe { *self.u(COLLIDER_NEXT).add(c) };
             }
             if own {
@@ -201,8 +213,20 @@ impl World {
         self.update_mass(body);
     }
 
-    fn collider_solid(&self, c: usize) -> Solid {
-        let density = self.s(COLLIDER_DENSITY, c);
+    /// The first row whose solid a collider adds: its own, or a compound's first child (NONE when it has none).
+    #[inline(always)]
+    fn first_piece(&self, c: usize) -> u32 {
+        if self.uu(COLLIDER_SHAPE, c) == SHAPE_COMPOUND { self.uu(COLLIDER_HULL, c) } else { c as u32 }
+    }
+
+    /// The row after `p` among collider `c`'s pieces, or NONE.
+    #[inline(always)]
+    fn next_piece(&self, c: usize, p: usize) -> u32 {
+        if p == c { NONE } else { self.uu(COLLIDER_NEXT, p) }
+    }
+
+    /// The solid of one convex row at `density`: a compound's children take the compound's, as one collider has one.
+    fn collider_solid(&self, c: usize, density: f32) -> Solid {
         let size = self.v(COLLIDER_A, c);
         match unsafe { *self.u(COLLIDER_SHAPE).add(c) } {
             SHAPE_BALL => solid_ball(size.x, density),
@@ -212,7 +236,7 @@ impl World {
                 Solid { mass: self.s(HULL_VOLUME, hull) * density, moments: self.v(HULL_MOMENT_X, hull).scale(density) }
             }
             // A surface has no volume, so no mass, as a Rapier trimesh gives a dynamic body none.
-            SHAPE_TRIMESH => Solid { mass: 0.0, moments: v3(0.0, 0.0, 0.0) },
+            SHAPE_TRIMESH | SHAPE_COMPOUND => Solid { mass: 0.0, moments: v3(0.0, 0.0, 0.0) },
             _ => solid_capsule(size.x, size.y, density),
         }
     }

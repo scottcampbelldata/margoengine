@@ -88,6 +88,20 @@ interface KernelExports extends WebAssembly.Exports {
     qw: number,
     density: number,
   ): number;
+  collider_add_part(
+    compound: number,
+    shape: number,
+    a: number,
+    b: number,
+    c: number,
+    x: number,
+    y: number,
+    z: number,
+    qx: number,
+    qy: number,
+    qz: number,
+    qw: number,
+  ): number;
   collider_remove(collider: number): number;
   joint_add(a: number, b: number, flags: number): number;
   joint_remove(joint: number): number;
@@ -144,6 +158,16 @@ export type KernelBodyKind = 'fixed' | 'dynamic' | 'kinematicPosition' | 'kinema
  */
 export type KernelShape = 'ball' | 'box' | 'capsule' | 'hull' | 'trimesh';
 
+/** One convex child of {@link KernelWorld.addCompound}: a shape and size as {@link KernelWorld.addCollider} takes them. */
+export interface KernelCompoundPart {
+  shape: 'ball' | 'box' | 'capsule' | 'hull';
+  size: readonly number[];
+  /** Place in the compound's frame (default its origin). */
+  position?: readonly [number, number, number];
+  /** Unit quaternion, x, y, z, w, in the compound's frame (default none). */
+  rotation?: readonly [number, number, number, number];
+}
+
 /** How many numbers each shape's size takes, and its value in the `colliderShape` column. */
 const shapes: Readonly<Record<KernelShape, readonly [number, number]>> = {
   ball: [0, 1],
@@ -152,6 +176,8 @@ const shapes: Readonly<Record<KernelShape, readonly [number, number]>> = {
   hull: [3, 1],
   trimesh: [4, 1],
 };
+/** The `colliderShape` value of a compound (layout.rs SHAPE_COMPOUND). */
+export const SHAPE_COMPOUND = 5;
 
 /** What each refusal of `mesh_end` means, with the fix. */
 const meshErrors: Readonly<Record<number, string>> = {
@@ -595,29 +621,99 @@ export class KernelWorld {
    * @throws RangeError for a dead body, an unknown shape, or a size, pose or density the kernel cannot use.
    */
   addCollider(body: number, shape: KernelShape, size: readonly number[], options: KernelColliderOptions = {}): number {
-    const {
-        position = [0, 0, 0],
-        rotation = [0, 0, 0, 1],
-        density = 1000,
-        friction = 0.5,
-        restitution = 0,
-        frictionCombine = 'average',
-        restitutionCombine = 'average',
-      } = options,
+    const { position = [0, 0, 0], rotation = [0, 0, 0, 1] } = options,
       spec = Object.hasOwn(shapes, shape) ? shapes[shape] : undefined,
       { flags } = this.columns;
     if (!spec) throw new RangeError(`Unknown shape ${String(shape)}; use one of ${Object.keys(shapes).join(', ')}.`);
     if (!Number.isInteger(body) || body < 0 || body >= flags.length || !(flags[body] & 1))
       throw new RangeError(`Row ${body} holds no body; use a row addBody returned.`);
-    const [code, numbers] = spec;
+    this.checkSize(shape, size);
+    this.checkPose(position, rotation);
+    return this.place(body, spec[0], size, options);
+  }
+
+  /**
+   * Adds a compound collider: convex children welded into one collider, with one row, one pair against each other
+   * collider and one set of events, as Rapier's compound shape is. Its density is every child's. The body's mass, centre and
+   * inertia are worked out again, so read views from `columns` after this call.
+   * @param parts At least one ball, box, capsule or hull, each placed in the compound's frame.
+   * @returns The compound's row. Its children have rows of their own, off the broad phase, that nothing else names.
+   * @throws RangeError for a dead body, no parts, a part the kernel cannot use, or a size, pose or density it cannot use.
+   */
+  addCompound(body: number, parts: readonly KernelCompoundPart[], options: KernelColliderOptions = {}): number {
+    const { flags } = this.columns;
+    if (!Number.isInteger(body) || body < 0 || body >= flags.length || !(flags[body] & 1))
+      throw new RangeError(`Row ${body} holds no body; use a row addBody returned.`);
+    if (!Array.isArray(parts) || parts.length === 0)
+      throw new RangeError('A compound needs at least one part; pass [{shape: "box", size: [1, 1, 1]}].');
+    const codes: number[] = [];
+    for (const part of parts) {
+      const shape: string = part?.shape,
+        spec = shape !== 'trimesh' && Object.hasOwn(shapes, shape) ? shapes[shape as KernelShape] : undefined;
+      if (!spec) throw new RangeError(`A compound part is a ball, box, capsule or hull (got ${String(part?.shape)}); pass one of those.`);
+      this.checkSize(part.shape, part.size);
+      this.checkPose(part.position ?? [0, 0, 0], part.rotation ?? [0, 0, 0, 1]);
+      codes.push(spec[0]);
+    }
+    this.checkPose(options.position ?? [0, 0, 0], options.rotation ?? [0, 0, 0, 1]);
+    const row = this.place(body, SHAPE_COMPOUND, [], options);
+    parts.forEach((part, k) => {
+      const { size, position = [0, 0, 0], rotation = [0, 0, 0, 1] } = part,
+        add = (): number =>
+          this.api.collider_add_part(
+            row,
+            codes[k],
+            size[0],
+            size[1] ?? 0,
+            size[2] ?? 0,
+            position[0],
+            position[1],
+            position[2],
+            rotation[0],
+            rotation[1],
+            rotation[2],
+            rotation[3],
+          );
+      if (add() < 0) {
+        this.reserve(this.capacity, this.colliderCapacity * 2);
+        add();
+      }
+    });
+    return row;
+  }
+
+  private checkSize(shape: KernelShape, size: readonly number[]): void {
+    const numbers = shapes[shape][1];
     if (shape === 'hull') {
       if (size.length !== 1 || !Number.isInteger(size[0]) || size[0] < 0 || size[0] >= this.hullRows)
         throw new RangeError(`A hull collider needs [row], a row addHull returned (got ${size.join(', ')}).`);
     } else if (shape === 'trimesh') {
       if (size.length !== 1 || !Number.isInteger(size[0]) || size[0] < 0 || size[0] >= this.meshRows)
         throw new RangeError(`A trimesh collider needs [row], a row addTrimesh returned (got ${size.join(', ')}).`);
-    } else if (size.length !== numbers || !size.every((value) => value > 0 && Number.isFinite(value)))
-      throw new RangeError(`A ${shape} needs ${numbers} finite sizes above zero (got ${size.join(', ')}).`);
+    } else if (!Array.isArray(size) || size.length !== numbers || !size.every((value) => value > 0 && Number.isFinite(value)))
+      throw new RangeError(`A ${shape} needs ${numbers} finite sizes above zero (got ${String(size)}).`);
+  }
+
+  private checkPose(position: readonly number[], rotation: readonly number[]): void {
+    if (![...position, ...rotation].every(Number.isFinite))
+      throw new RangeError('A collider pose must be finite; check what fed it.');
+    const [qx, qy, qz, qw] = rotation,
+      squared = qx * qx + qy * qy + qz * qz + qw * qw;
+    if (!(squared >= 0.998001 && squared <= 1.002001))
+      throw new RangeError(`A collider rotation must be a unit quaternion; normalize it (its length squared is ${squared}).`);
+  }
+
+  /** Adds a collider of shape `code` once its size and pose are checked. */
+  private place(body: number, code: number, size: readonly number[], options: KernelColliderOptions): number {
+    const {
+      position = [0, 0, 0],
+      rotation = [0, 0, 0, 1],
+      density = 1000,
+      friction = 0.5,
+      restitution = 0,
+      frictionCombine = 'average',
+      restitutionCombine = 'average',
+    } = options;
     if (!(density >= 0) || !Number.isFinite(density))
       throw new RangeError(`Density must be finite and not negative; 1000 is water (got ${density}).`);
     if (!(friction >= 0) || !Number.isFinite(friction))
@@ -628,17 +724,11 @@ export class KernelWorld {
       restitutionRule = combines.indexOf(restitutionCombine);
     if (frictionRule < 0 || restitutionRule < 0)
       throw new RangeError(`Unknown combine rule; use one of ${combines.join(', ')}.`);
-    if (![...position, ...rotation].every(Number.isFinite))
-      throw new RangeError('A collider pose must be finite; check what fed it.');
-    const [qx, qy, qz, qw] = rotation,
-      squared = qx * qx + qy * qy + qz * qz + qw * qw;
-    if (!(squared >= 0.998001 && squared <= 1.002001))
-      throw new RangeError(`A collider rotation must be a unit quaternion; normalize it (its length squared is ${squared}).`);
     const add = (): number =>
       this.api.collider_add(
         body,
         code,
-        size[0],
+        size[0] ?? 0,
         size[1] ?? 0,
         size[2] ?? 0,
         position[0],

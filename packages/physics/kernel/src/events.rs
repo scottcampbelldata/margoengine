@@ -115,6 +115,18 @@ impl World {
         self.wake(b as u32);
     }
 
+    /// Wakes the bodies of every pair a collider touches in: what rests on a collider that goes falls, as Rapier wakes
+    /// the bodies of a contact pair it removes.
+    pub fn wake_touching_pairs(&mut self, collider: u32) {
+        let mut pair = self.uu(COLLIDER_PAIRS, collider as usize);
+        while pair != NONE {
+            if self.uu(PAIR_FLAGS, pair as usize) & PAIR_TOUCHING != 0 {
+                self.wake_pair(pair);
+            }
+            pair = self.next_pair(pair, collider);
+        }
+    }
+
     /// Wakes what a collider's box reaches, after its groups changed: the next step sees them with the new groups.
     pub fn touch_collider(&mut self, collider: u32) {
         let mut pair = self.uu(COLLIDER_PAIRS, collider as usize);

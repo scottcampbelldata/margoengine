@@ -306,7 +306,7 @@ console.log(body.position[1]);         // fallen about 4.9 m in the second
 physics.dispose();
 ```
 
-It holds `box`, `sphere`, `capsule`, `convexHull`, `trimesh` and `heightfield` colliders, bodies of every kind, forces, impulses, velocities, damping, locks, kinematic targets, gravity, sleeping and the `beforestep` and `afterstep` events. Bodies collide, with friction, restitution and the four combine rules, and `physics.touching(a, b)` and `physics.contactPoints(body)` read the contacts of the last step. Contact and intersection events, sensors, `collisionGroups`, `solverGroups`, `contactFilter`, `dominance` and `enabled` on bodies and colliders work as on the root entry, with the same names. `body.setType`, `setAdditionalMass` (with inertia of its own), `setMassProperties`, `collider.setDensity` and `additionalSolverIterations` work as on the root entry, with the same names and errors. A call that needs what is still to come throws a `MargoError` with code `unsupported` naming what it waits for: the other shapes and `addModel` with the shapes and queries batch, `ccd` with continuous collision, queries, `follow` and character controllers, and `debugRender`. `body.sleep()` and impulses take effect at the next step.
+It holds `box`, `sphere`, `capsule`, `convexHull`, `trimesh`, `heightfield` and `compound` colliders, bodies of every kind, forces, impulses, velocities, damping, locks, kinematic targets, gravity, sleeping and the `beforestep` and `afterstep` events. Bodies collide, with friction, restitution and the four combine rules, and `physics.touching(a, b)` and `physics.contactPoints(body)` read the contacts of the last step. Contact and intersection events, sensors, `collisionGroups`, `solverGroups`, `contactFilter`, `dominance` and `enabled` on bodies and colliders work as on the root entry, with the same names. `body.setType`, `setAdditionalMass` (with inertia of its own), `setMassProperties`, `collider.setDensity` and `additionalSolverIterations` work as on the root entry, with the same names and errors. A call that needs what is still to come throws a `MargoError` with code `unsupported` naming what it waits for: the other shapes and `addModel` with the shapes and queries batch, `ccd` with continuous collision, queries, `follow` and character controllers, and `debugRender`. `body.sleep()` and impulses take effect at the next step.
 
 `setType` keeps the pose, colliders and joints: a body made fixed stops, and its touches with other fixed bodies end; one made `kinematicPosition` holds its pose until given a target; a dynamic or kinematic body keeps its velocity. With `wakeUp` (default true) a body made dynamic or kinematic wakes now; a sleeper otherwise, or one made fixed, reads asleep until the next step, which wakes it and what it touches whatever `wakeUp` said, as on the root entry (measured). A kinematic body still for the sleep window reads asleep, as on Rapier, and a target wakes it. `setAdditionalMass(mass, inertia)` puts the mass at the centre of mass the body has now, so alone it leaves the inertia as it is, and replaces an earlier call, `setMassProperties` and the `additionalMass` option, which spreads its mass as the colliders are. `setMassProperties` sets the colliders' density to 0, and colliders added later add their own mass. `additionalSolverIterations` (any whole number from 0 to 4294967295, Rapier's 32 bits, on both entries) gives the body's island that many passes more: it runs as a world of that many passes would, bit for bit, and the other islands are left alone.
 
@@ -358,6 +358,30 @@ physics.addBody(null, {
 const ball = physics.addBody(null, {position: [-2.5, 2, -2.5], colliders: {shape: 'sphere', radius: 0.5}});
 for (let i = 0; i < 120; i++) physics.step();
 console.log(ball.position[1].toFixed(2)); // 0.50: resting on the field
+```
+
+A `compound` takes the root entry's `parts`: boxes, spheres, capsules and convex hulls, each with its own `offset` and `rotation` in the collider's frame, never fitted to the mesh. It is one collider, as in Rapier: one handle, one pair and one set of events against each other collider, and one `density` (or `mass`, spread by volume) for every part. Each part that touches keeps its own contact points and warm start, and parts are culled by their own boxes, so the gaps between them are empty. Its mass, centre and inertia match Rapier's for the same parts (a test holds them to 1e-5) and are the same bits as the parts added as colliders of their own. `cylinder` and `cone` parts throw `unsupported` until the own solver has those shapes; `boundingRadius` is null, as on the root entry. `KernelWorld.addCompound(body, parts, options)` is the kernel's view of it.
+
+```js
+import {Physics} from 'margoengine/physics/next';
+
+await Physics.load();
+const physics = new Physics(null);
+physics.addBody(null, {type: 'fixed', position: [0, -0.5, 0], colliders: {shape: 'box', halfExtents: [10, 0.5, 10]}});
+// A dumbbell: two balls on a bar, welded into one collider.
+const dumbbell = physics.addBody(null, {
+  position: [0, 3, 0],
+  colliders: {
+    shape: 'compound',
+    parts: [
+      {shape: 'sphere', radius: 0.5, offset: [-1, 0, 0]},
+      {shape: 'sphere', radius: 0.5, offset: [1, 0, 0]},
+      {shape: 'capsule', halfHeight: 0.5, radius: 0.1, rotation: [0, 0, Math.SQRT1_2, Math.SQRT1_2]},
+    ],
+  },
+});
+for (let i = 0; i < 240; i++) physics.step();
+console.log(dumbbell.colliders.length, dumbbell.position[1].toFixed(2)); // 1 0.50: one collider, resting on its balls
 ```
 
 A `convexHull` takes `points` (flat x, y, z numbers), or `geometry`, or the body's mesh when it has neither, scaled with the mesh, as on the root entry. The solver builds it by Quickhull: points inside, repeats and points within 2.5e-5 of the hull's size of a face are dropped, triangles in one plane become one face of up to 256 corners, and colliders built from the same points share one hull. `convexHull(points)` returns the `vertices` and `faces` it builds, for drawing or checking; it throws a `RangeError` naming the fix for fewer than four points or points that span no volume.

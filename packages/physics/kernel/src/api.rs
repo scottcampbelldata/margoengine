@@ -250,6 +250,12 @@ pub extern "C" fn collider_add(
 ) -> i32 {
     world().add_collider(body, shape, [a, b, c], [x, y, z], [qx, qy, qz, qw], density).map_or(-1, |row| row as i32)
 }
+/// Adds a convex child to a compound collider, placed in the compound's frame: its row, or -1 when the rows are used up,
+/// the compound is gone or the shape is not a ball, box, capsule or hull.
+#[unsafe(no_mangle)]
+pub extern "C" fn collider_add_part(compound: u32, shape: u32, a: f32, b: f32, c: f32, x: f32, y: f32, z: f32, qx: f32, qy: f32, qz: f32, qw: f32) -> i32 {
+    world().add_compound_part(compound, shape, [a, b, c], [x, y, z], [qx, qy, qz, qw]).map_or(-1, |row| row as i32)
+}
 /// Makes room for a hull of this size, whose rows JS then writes through its views; 0 when memory cannot.
 #[unsafe(no_mangle)]
 pub extern "C" fn hull_begin(vertices: u32, faces: u32, edges: u32) -> u32 {

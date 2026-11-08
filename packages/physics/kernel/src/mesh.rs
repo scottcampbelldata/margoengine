@@ -554,11 +554,27 @@ impl World {
     /// narrow phase. `ratio` is the new substep over the old.
     pub fn mesh_pair(&mut self, row: usize, a: usize, b: usize, limit: f32, ratio: f32) {
         let (mesh_collider, other, other_is_a) = self.mesh_sides(a, b);
-        let (body_a, body_b) = (self.uu(COLLIDER_BODY, a) as usize, self.uu(COLLIDER_BODY, b) as usize);
+        let bodies = (self.uu(COLLIDER_BODY, a) as usize, self.uu(COLLIDER_BODY, b) as usize);
         if self.uu(COLLIDER_SHAPE, other) == SHAPE_TRIMESH {
-            self.drop_contacts(row, body_a, body_b);
+            self.drop_contacts(row, bodies.0, bodies.1);
             return;
         }
+        if self.mesh_walk(row, mesh_collider, (other, other_is_a, NONE), limit, ratio, bodies) {
+            self.drop_unseen(row, bodies);
+        }
+    }
+
+    /// The mesh and the other collider of a mesh pair, and whether the other is the pair's A.
+    #[inline(always)]
+    pub(crate) fn mesh_of(&self, a: usize, b: usize) -> (usize, usize, bool) {
+        self.mesh_sides(a, b)
+    }
+
+    /// Every triangle of `mesh_collider` near convex row `other` into the parts of pair `row`. `sides` holds the row,
+    /// whether its side is the pair's A, and the compound child it is (NONE for a collider of its own). False when memory
+    /// cannot hold a new part.
+    pub(crate) fn mesh_walk(&mut self, row: usize, mesh_collider: usize, sides: (usize, bool, u32), limit: f32, ratio: f32, bodies: (usize, usize)) -> bool {
+        let (other, other_is_a, sub) = sides;
         let mesh = self.uu(COLLIDER_HULL, mesh_collider) as usize;
         let pose = self.collider_pose(mesh_collider);
         let (low, high) = self.local_box(other, pose);
@@ -572,46 +588,50 @@ impl World {
                         }
                         let cell = 2 * (r + rows * c);
                         for triangle in [cell, cell + 1] {
-                            if !self.touch_triangle(row, (other, other_is_a, mesh), triangle, pose, limit, ratio, (body_a, body_b), &mut manifold) {
-                                return;
+                            if !self.touch_triangle(row, (other, other_is_a, mesh, sub), triangle, pose, limit, ratio, bodies, &mut manifold) {
+                                return false;
                             }
                         }
                     }
                 }
             }
-        } else {
-            let (t0, n0) = (self.uu(MESH_FIRST_TRIANGLE, mesh) as usize, self.uu(MESH_FIRST_NODE, mesh) as usize);
-            let mut stack = [0u32; crate::bvh::STACK + 1];
-            let mut top = 1;
-            while top > 0 {
-                top -= 1;
-                let node = n0 + stack[top] as usize;
-                let (lo, hi) = (self.v(NODE_MIN_X, node), self.v(NODE_MAX_X, node));
-                if lo.x > high.x || lo.y > high.y || lo.z > high.z || hi.x < low.x || hi.y < low.y || hi.z < low.z {
-                    continue;
-                }
-                let (first, count) = (self.uu(NODE_FIRST, node), self.uu(NODE_COUNT, node));
-                if count == 0 {
-                    stack[top] = first + 1;
-                    stack[top + 1] = first;
-                    top += 2;
-                    continue;
-                }
-                for place in first..first + count {
-                    let triangle = self.uu(TRIANGLE_ORDER, t0 + place as usize);
-                    if !self.touch_triangle(row, (other, other_is_a, mesh), triangle, pose, limit, ratio, (body_a, body_b), &mut manifold) {
-                        return;
-                    }
+            return true;
+        }
+        let (t0, n0) = (self.uu(MESH_FIRST_TRIANGLE, mesh) as usize, self.uu(MESH_FIRST_NODE, mesh) as usize);
+        let mut stack = [0u32; crate::bvh::STACK + 1];
+        let mut top = 1;
+        while top > 0 {
+            top -= 1;
+            let node = n0 + stack[top] as usize;
+            let (lo, hi) = (self.v(NODE_MIN_X, node), self.v(NODE_MAX_X, node));
+            if lo.x > high.x || lo.y > high.y || lo.z > high.z || hi.x < low.x || hi.y < low.y || hi.z < low.z {
+                continue;
+            }
+            let (first, count) = (self.uu(NODE_FIRST, node), self.uu(NODE_COUNT, node));
+            if count == 0 {
+                stack[top] = first + 1;
+                stack[top + 1] = first;
+                top += 2;
+                continue;
+            }
+            for place in first..first + count {
+                let triangle = self.uu(TRIANGLE_ORDER, t0 + place as usize);
+                if !self.touch_triangle(row, (other, other_is_a, mesh, sub), triangle, pose, limit, ratio, bodies, &mut manifold) {
+                    return false;
                 }
             }
         }
-        // Parts no triangle touched this time lose their points.
+        true
+    }
+
+    /// After a pair's parts are walked: parts nothing touched this time lose their points.
+    pub(crate) fn drop_unseen(&mut self, row: usize, bodies: (usize, usize)) {
         let mut part = self.uu(PAIR_CHILD, row);
         while part != NONE {
             let at = part as usize;
             let flags = self.uu(PAIR_FLAGS, at);
             if flags & PART_SEEN == 0 {
-                self.drop_contacts(at, body_a, body_b);
+                self.drop_contacts(at, bodies.0, bodies.1);
                 self.header_mut().stale_parts += 1;
             }
             self.set_u(PAIR_FLAGS, at, flags & !PART_SEEN);
@@ -620,12 +640,21 @@ impl World {
     }
 
     /// One triangle of mesh pair `row`: its manifold against the other collider (`sides` holds the other, whether it is
-    /// the pair's A, and the mesh row), stored in the triangle's part, made when it first touches. False when memory
-    /// cannot hold a new part.
+    /// the pair's A, the mesh row and the compound child or NONE), stored in the triangle's part, made when it first
+    /// touches. False when memory cannot hold a new part.
     #[allow(clippy::too_many_arguments)]
-    fn touch_triangle(&mut self, row: usize, sides: (usize, bool, usize), triangle: u32, pose: Pose, limit: f32, ratio: f32, bodies: (usize, usize), manifold: &mut Manifold) -> bool {
-        let (other, other_is_a, mesh) = sides;
-        let part = self.find_part(row, triangle);
+    fn touch_triangle(&mut self, row: usize, sides: (usize, bool, usize, u32), triangle: u32, pose: Pose, limit: f32, ratio: f32, bodies: (usize, usize), manifold: &mut Manifold) -> bool {
+        let (other, other_is_a, mesh, sub) = sides;
+        self.touch_part(row, (triangle, sub), ratio, bodies, manifold, |w, m| w.collide_triangle(other, other_is_a, mesh, triangle, pose, limit, m))
+    }
+
+    /// One part of pair `row`, named by `key` (its PAIR_PART and PAIR_SUB): `collide` fills the manifold, which starts
+    /// with the points the part held, and a manifold with points is stored in the part, made when it first touches.
+    /// False when memory cannot hold a new part.
+    pub(crate) fn touch_part(
+        &mut self, row: usize, key: (u32, u32), ratio: f32, bodies: (usize, usize), manifold: &mut Manifold, collide: impl FnOnce(&Self, &mut Manifold),
+    ) -> bool {
+        let part = self.find_part(row, key);
         manifold.held_count = 0;
         manifold.feature = 0;
         if part != NONE {
@@ -635,11 +664,11 @@ impl World {
             }
             manifold.feature = self.uu(PAIR_FEATURE, part as usize);
         }
-        self.collide_triangle(other, other_is_a, mesh, triangle, pose, limit, manifold);
+        collide(self, manifold);
         if manifold.count == 0 {
             return true;
         }
-        let part = if part != NONE { part } else { self.add_part(row, triangle) };
+        let part = if part != NONE { part } else { self.add_part(row, key) };
         if part == NONE {
             return false;
         }
@@ -656,6 +685,11 @@ impl World {
         if self.uu(COLLIDER_SHAPE, other) == SHAPE_TRIMESH {
             return false;
         }
+        self.mesh_overlaps_with(mesh_collider, other, other_is_a)
+    }
+
+    /// True when convex row `other` overlaps a triangle of `mesh_collider`.
+    pub(crate) fn mesh_overlaps_with(&self, mesh_collider: usize, other: usize, other_is_a: bool) -> bool {
         let mesh = self.uu(COLLIDER_HULL, mesh_collider) as usize;
         let pose = self.collider_pose(mesh_collider);
         let (low, high) = self.local_box(other, pose);
@@ -712,17 +746,17 @@ impl World {
         (c.sub(e), c.add(e))
     }
 
-    /// The part of `row` for `triangle`, or NONE.
-    fn find_part(&self, row: usize, triangle: u32) -> u32 {
+    /// The part of `row` named `key` (PAIR_PART, PAIR_SUB), or NONE.
+    fn find_part(&self, row: usize, key: (u32, u32)) -> u32 {
         let mut part = self.uu(PAIR_CHILD, row);
-        while part != NONE && self.uu(PAIR_PART, part as usize) != triangle {
+        while part != NONE && (self.uu(PAIR_PART, part as usize) != key.0 || self.uu(PAIR_SUB, part as usize) != key.1) {
             part = self.uu(PAIR_CHILD, part as usize);
         }
         part
     }
 
-    /// A new part of `row` for `triangle`, on the active list when its pair is; NONE when memory cannot.
-    fn add_part(&mut self, row: usize, triangle: u32) -> u32 {
+    /// A new part of `row` named `key`, on the active list when its pair is; NONE when memory cannot.
+    fn add_part(&mut self, row: usize, key: (u32, u32)) -> u32 {
         let Some(part) = self.take_pair_row() else { return NONE };
         let at = part as usize;
         self.set_u(PAIR_A, at, self.uu(PAIR_A, row));
@@ -734,7 +768,8 @@ impl World {
         for column in [PAIR_NEXT_A, PAIR_PREVIOUS_A, PAIR_NEXT_B, PAIR_PREVIOUS_B, PAIR_SLOT] {
             self.set_u(column, at, NONE);
         }
-        self.set_u(PAIR_PART, at, triangle);
+        self.set_u(PAIR_PART, at, key.0);
+        self.set_u(PAIR_SUB, at, key.1);
         self.set_u(PAIR_CHILD, at, self.uu(PAIR_CHILD, row));
         self.set_u(PAIR_CHILD, row, part);
         if self.uu(PAIR_SLOT, row) != NONE {
