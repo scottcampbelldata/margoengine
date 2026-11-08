@@ -336,7 +336,7 @@ The root entry never exposed these, so no Margo user loses them at the switch; t
 | T-03 | `triangle`, `round_triangle`, `round_cuboid`, `round_convex_polygon` | no | every kernel polygon takes a radius, with exact mass (`physics2d/kernel/tests/shapes.rs`); no world yet | BUILDING 127 (was 143.1) | Wasm | Wasm |
 | T-04 | 2D `heightfield`, `halfspace`, `compound`, `voxels`, `convex_decomposition` | no | none | MISSING, 143.2 | Wasm | Wasm |
 | T-05 | `oriented_polyline` (one-sided) | no | none | MISSING, 143.1 | Wasm | Wasm |
-| T-06 | 2D fixed, revolute, prismatic, rope and spring joints with limits and motors | yes | the kernel's joints, native only (`physics2d/kernel/tests/joints.rs`: a 50-link chain under a 1000:1 end mass stretches 0.55 percent where Rapier 2D's stretches to 22 times its length; the 30 by 30 joint grid within 3.96 mm, Rapier 2D 9.88; LIM-531) | BUILDING 127 | Wasm | Wasm |
+| T-06 | 2D fixed, revolute, prismatic, rope and spring joints with limits and motors | yes | the kernel's joints, native only (`physics2d/kernel/tests/joints.rs`: a 50-link chain under a 1000:1 end mass stretches 0.55 percent where Rapier 2D's stretches to 22 times its length; the 30 by 30 joint grid within 3.96 mm, Rapier 2D 9.88; LIM-534) | BUILDING 127 | Wasm | Wasm |
 | T-07 | 2D pin-slot and generic joints | no | none | MISSING, 143.3 | Wasm | Wasm |
 | T-08 | 2D multibody joints | no | none | MISSING, 143.3 | Wasm | Wasm |
 | T-09 | 2D block solver | Rapier's | the kernel's two-point block solve with a fall-back row by row, native only (`physics2d/kernel/tests/world.rs`: the 20-row pyramid drops less and sleeps sooner than Box2D v3's and Rapier 2D's, LIM-527) | BUILDING 127 | Wasm | Wasm |

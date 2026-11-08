@@ -7,6 +7,7 @@
 // their shape ids, so two worlds built the same way step the same, bit for bit.
 use alloc::vec::Vec;
 use margoengine_physics_kernel_common::broad::{Bounds, SweepPrune};
+use margoengine_physics_kernel_common::tree::Tree;
 use margoengine_physics_kernel_common::island::{UnionFind, sleep_tick};
 
 use crate::joint::{Joint, JointDef};
@@ -204,6 +205,43 @@ pub struct Settings {
     /// Joints solve with each body's turning stiffened by the pull of its taut point joints (joint.rs, `stiffen`), which
     /// keeps a heavily loaded chain from flying apart at a few substeps; off, the plain inertia.
     pub joint_geometric_stiffness: bool,
+    /// How the broad phase finds pairs; read when the world is made.
+    pub broad_phase: BroadPhase,
+}
+
+/// The broad phase. Both give the same pairs in the same order, so the same step to the bit; they differ in work.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BroadPhase {
+    /// A dynamic box tree with the pairs kept from step to step: work follows the boxes that moved (the default).
+    Tree,
+    /// Sweep and prune along one axis, every box each step: kept for the paired comparison.
+    Sweep,
+}
+
+enum Broad {
+    Tree(Tree<2>),
+    Sweep(SweepPrune<2>),
+}
+
+impl Broad {
+    fn place(&mut self, key: u32, tight: &Bounds<2>, margin: f32) -> bool {
+        match self {
+            Broad::Tree(t) => t.place(key, tight, margin),
+            Broad::Sweep(s) => s.place(key, tight, margin),
+        }
+    }
+    fn pairs(&mut self, out: &mut Vec<(u32, u32)>, keep: impl FnMut(u32, u32) -> bool) {
+        match self {
+            Broad::Tree(t) => t.pairs(out, keep),
+            Broad::Sweep(s) => s.pairs(out, keep),
+        }
+    }
+    fn compared(&self) -> u64 {
+        match self {
+            Broad::Tree(t) => t.compared,
+            Broad::Sweep(s) => s.compared,
+        }
+    }
 }
 
 impl Default for Settings {
@@ -224,6 +262,7 @@ impl Default for Settings {
             joint_damping: 2.0,
             joint_max_push: 3.0,
             joint_geometric_stiffness: true,
+            broad_phase: BroadPhase::Tree,
         }
     }
 }
@@ -231,7 +270,8 @@ impl Default for Settings {
 /// Work counts, reset each step: they prove speed changes by work done, not by wall clock (AGENTS.md).
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Counts {
-    /// Fat box pairs compared in the sweep, pairs it kept, manifolds built.
+    /// Fat boxes tested by the broad phase (tree nodes its queries opened, or box pairs the sweep compared), pairs it
+    /// kept, manifolds built.
     pub compared: u64,
     pub pairs: u64,
     pub manifolds: u64,
@@ -251,8 +291,10 @@ pub struct World {
     pub joints: Vec<Joint>,
     pub counts: Counts,
     pub steps: u64,
-    broad: SweepPrune<2>,
+    broad: Broad,
     pairs: Vec<(u32, u32)>,
+    /// Body pairs a joint keeps from colliding, sorted, rebuilt each step.
+    apart: Vec<(u32, u32)>,
     union: UnionFind,
     island_of: Vec<u32>,
     pub(crate) scratch: solver::Scratch,
@@ -287,7 +329,8 @@ impl World {
             joints: Vec::new(),
             counts: Counts::default(),
             steps: 0,
-            broad: SweepPrune::new(),
+            broad: if settings.broad_phase == BroadPhase::Sweep { Broad::Sweep(SweepPrune::new()) } else { Broad::Tree(Tree::new()) },
+            apart: Vec::new(),
             pairs: Vec::new(),
             union: UnionFind::new(),
             island_of: Vec::new(),
@@ -422,10 +465,6 @@ impl World {
         self.joints.len() as u32 - 1
     }
 
-    /// Whether a joint between bodies `a` and `b` keeps their shapes from colliding.
-    fn jointed_apart(joints: &[Joint], a: u32, b: u32) -> bool {
-        joints.iter().any(|j| !j.def.collide && ((j.def.a == a && j.def.b == b) || (j.def.a == b && j.def.b == a)))
-    }
 
     /// Wakes `body` and resets its sleep timer.
     pub fn wake(&mut self, body: u32) {
@@ -466,16 +505,22 @@ impl World {
                 self.broad.place(s as u32, &tight, BOX_MARGIN);
             }
         }
+        // The body pairs joints keep apart, sorted once, so each pair's filter is a binary search, not a scan of every
+        // joint (the 30 by 30 joint grid has 1,711).
+        self.apart.clear();
+        self.apart.extend(self.joints.iter().filter(|j| !j.def.collide).map(|j| (j.def.a.min(j.def.b), j.def.a.max(j.def.b))));
+        self.apart.sort_unstable();
+        self.apart.dedup();
         let mut pairs = core::mem::take(&mut self.pairs);
         let shapes = &self.shapes;
         let bodies = &self.bodies;
-        let joints = &self.joints;
+        let apart = &self.apart;
         self.broad.pairs(&mut pairs, |a, b| {
             let (ba, bb) = (shapes[a as usize].body, shapes[b as usize].body);
-            ba != bb && (bodies[ba as usize].is_dynamic() || bodies[bb as usize].is_dynamic()) && (joints.is_empty() || !Self::jointed_apart(joints, ba, bb))
+            ba != bb && (bodies[ba as usize].is_dynamic() || bodies[bb as usize].is_dynamic()) && (apart.is_empty() || apart.binary_search(&(ba.min(bb), ba.max(bb))).is_err())
         });
         debug_assert!(pairs.iter().all(|&(a, b)| self.may_touch(a, b)));
-        self.counts.compared = self.broad.compared;
+        self.counts.compared = self.broad.compared();
         self.counts.pairs = pairs.len() as u64;
         // Both lists are sorted by (a, b): one merge keeps the contacts whose pair remains.
         let old = core::mem::take(&mut self.contacts);

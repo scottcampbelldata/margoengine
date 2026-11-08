@@ -1967,9 +1967,32 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
 - **Rerun:** `cargo run --locked --release --manifest-path packages/physics/kernel/Cargo.toml --example bars`; `node
   js/margo-next/margo3d.mjs <out.json> equal <worktree>/packages/physics/dist/next.js` in physics-refs; counts as in entry 80.
 
+### 83. Own 2D physics broad phase: a box tree with kept pairs (work count; the 100-row pyramid's loss stays open)
+
+- **Before (`d2d8eefa0`):** the 2D kernel found pairs by sweep and prune along one axis every step. On the 100-row
+  pyramid (5,050 unit boxes, Box2D v3's and Rapier 2D's scene) a 1D sweep meets each column of the pile as one run: 497,402
+  box tests a step to find 14,950 pairs.
+- **Change:** `packages/physics/kernel-common/src/tree.rs`, a dynamic box tree (van den Bergen 1997; Goldsmith and Salmon's
+  insertion cost, 1987; Kopta et al.'s rotations, I3D 2012) that keeps the set of overlapping fat boxes from step to step
+  and queries only the boxes refitted since the last step. The same pairs in the same order, so the same step to the bit;
+  the sweep stays as `BroadPhase::Sweep` for the paired check. Without the rotations a pile put in row by row grew a tree
+  as deep as a row, 1,175 nodes a query; with them 65.
+- **Work, counted (`tests/broad.rs`, first 120 steps):** 15,133 box tests a step against 497,402 (the first step, every
+  box put in, 329,171); bodies bit for bit the same every step.
+- **Time (paired, native, one process taking turns, per-round minimums of 20 steps, busy machine, diagnostic):** step
+  6.66 ms against 7.21 ms; of the step, broad phase 0.29 ms against 1.03, narrow phase 1.13, the solver 5.08.
+- **What is left of the loss:** Box2D v3 steps the same pile in 1.02 ms natively. The broad phase was 1 ms of it; the
+  solver is 5.1 ms, 14,000 contacts at 4 substeps over bodies kept in the world's large records. Open below and in
+  known-bugs.
+- **Rerun:** `cargo test --release --manifest-path packages/physics2d/kernel/Cargo.toml --test broad -- --include-ignored
+  --nocapture`.
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).
+
+- **Own 2D physics, the 100-row pyramid: 6.7 ms a step against Box2D v3's 1.02 ms (entry 83).** Native, busy machine,
+  diagnostic. The broad phase is fixed; the solver takes 5.1 ms of the step. Rerun: as entry 83.
 
 - **Own convex decomposition against Rapier's V-HACD (entry 81).** 1.1 to 17.3 s where Rapier takes 0.1 to 0.3 s on five
   meshes of 72 to 2,304 triangles, with fewer or as many parts. Cause: 500 tree-search iterations per cut with a hull per
