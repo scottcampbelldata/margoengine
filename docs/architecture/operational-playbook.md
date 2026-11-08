@@ -1134,7 +1134,9 @@ failure with an instruction to select the intended GPU or deliberately capture a
 needs it. It is not Safari, which needs safaridriver, and it is not a visual profile of its own.
 
 At the audit snapshot, profiles existed for Intel Arc 140V/Edge 155 and RTX A6000/Edge 155 and 156. Intel on newer
-Edge, Intel UHD, AMD, and Linux coverage remained absent.
+Edge, Intel UHD, AMD, and Linux coverage remained absent. RTX A6000/Edge 157 was added on 2026-11-08 (4 runs per
+view, 81 views, captured from `d9fa86e5b`) after Edge updated itself; against the 156 profile 16 of 81 views differ,
+the largest per-pixel difference being 221 (FlightHelmet).
 
 ### 4.7 Public truth and benchmarking
 
