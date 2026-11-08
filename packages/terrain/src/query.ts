@@ -24,6 +24,17 @@ export interface TerrainQueryOptions {
   readonly heightScale?: number;
   /** World Y added to every height. Default 0. */
   readonly heightOffset?: number;
+  /**
+   * Hole cells to skip, as the terrain drops them (`TerrainTextures.holes`): a `TerrainHoles` from
+   * `@margoengine/terrain/holes` fits. Read live, so later cuts apply without a refresh. Default none.
+   */
+  readonly holes?: TerrainHoleMask;
+}
+/** A hole mask over the heightmap's bounds: `columns * rows` bytes, row by row along +Z, 0 for a hole. */
+export interface TerrainHoleMask {
+  readonly mask: Uint8Array;
+  readonly columns: number;
+  readonly rows: number;
 }
 /** A ray's first hit on the terrain. Its shape is `@margoengine/animator`'s `GroundHit`, so it plants feet as it is. */
 export interface TerrainHit {
@@ -69,6 +80,7 @@ export class TerrainQuery {
   private readonly dz: number;
   private readonly scale: number;
   private readonly offset: number;
+  private readonly holes?: TerrainHoleMask;
   /** Min-max levels from 1 up; level l's node (i, j) covers cells [i << l, (i + 1) << l) each way, [min, max] pairs. */
   private readonly levels: Float32Array[] = [];
   private readonly widths: number[] = [];
@@ -100,6 +112,18 @@ export class TerrainQuery {
       throw new RangeError(
         'Invalid terrain query options; give a size above 0 each way and a finite origin, heightScale and heightOffset.',
       );
+    const holes = options?.holes;
+    if (
+      holes !== undefined &&
+      (!(holes?.mask instanceof Uint8Array) ||
+        !Number.isInteger(holes.columns) ||
+        !Number.isInteger(holes.rows) ||
+        holes.columns < 1 ||
+        holes.rows < 1 ||
+        holes.mask.length !== holes.columns * holes.rows)
+    )
+      throw new RangeError('Invalid terrain query holes; pass a mask of columns * rows bytes (a TerrainHoles fits).');
+    this.holes = holes;
     this.heights = heights;
     this.columns = columns;
     this.rows = rows;
@@ -244,7 +268,8 @@ export class TerrainQuery {
 
   /** World height at world (x, z), or undefined outside the heightmap's rectangle (where the terrain draws nothing). */
   height(x: number, z: number): number | undefined {
-    if (!(x >= this.ox && x <= this.ox + this.sx && z >= this.oz && z <= this.oz + this.sz)) return undefined;
+    if (!(x >= this.ox && x <= this.ox + this.sx && z >= this.oz && z <= this.oz + this.sz) || this.hole(x, z))
+      return undefined;
     return this.sample(x, z);
   }
 
@@ -253,7 +278,8 @@ export class TerrainQuery {
    * of the height one texel either way (heights clamped at the edges). Undefined outside the heightmap's rectangle.
    */
   normal(x: number, z: number, out: MutableVec3 = [0, 0, 0]): MutableVec3 | undefined {
-    if (!(x >= this.ox && x <= this.ox + this.sx && z >= this.oz && z <= this.oz + this.sz)) return undefined;
+    if (!(x >= this.ox && x <= this.ox + this.sx && z >= this.oz && z <= this.oz + this.sz) || this.hole(x, z))
+      return undefined;
     const nx = (this.sample(x - this.dx, z) - this.sample(x + this.dx, z)) / (2 * this.dx),
       nz = (this.sample(x, z - this.dz) - this.sample(x, z + this.dz)) / (2 * this.dz),
       length = Math.hypot(nx, 1, nz);
@@ -349,9 +375,11 @@ export class TerrainQuery {
         // patch, whose height along the ray is quadratic in t.
         const t = this.patch(cx0, cz0, ox, oy, oz, vx, vy, vz, t0, t1);
         if (t === undefined) continue;
-        const hit = out ?? { distance: 0, position: [0, 0, 0], normal: [0, 0, 0] },
-          px = ox + vx * t,
+        const px = ox + vx * t,
           pz = oz + vz * t;
+        // A hit in a hole cell passes through, as the drawn terrain has no ground there.
+        if (this.hole(px, pz)) continue;
+        const hit = out ?? { distance: 0, position: [0, 0, 0], normal: [0, 0, 0] };
         hit.distance = t;
         hit.position[0] = px;
         hit.position[1] = oy + vy * t;
@@ -449,6 +477,15 @@ export class TerrainQuery {
   }
 
   /** Bilinear world height at (x, z), clamped to the heightmap like the shader's `height`. */
+  /** Whether world (x, z) is in a hole cell of `holes` (the cell the terrain's fragment test reads there). */
+  private hole(x: number, z: number): boolean {
+    const h = this.holes;
+    if (!h) return false;
+    const u = Math.min(Math.max(Math.floor(((x - this.ox) / this.sx) * h.columns), 0), h.columns - 1),
+      v = Math.min(Math.max(Math.floor(((z - this.oz) / this.sz) * h.rows), 0), h.rows - 1);
+    return h.mask[v * h.columns + u] < 128;
+  }
+
   private sample(x: number, z: number): number {
     const c = this.columns,
       px = Math.min(Math.max((x - this.ox) / this.sx, 0), 1) * (c - 1),

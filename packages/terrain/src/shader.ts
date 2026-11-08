@@ -31,6 +31,11 @@ struct Output {@builtin(position) clip:vec4f,@location(0) position:vec3f,@locati
  * only the clamped edge texels (a flat shelf with stretched walls). Fragments there are dropped, so the sky shows past
  * the terrain's edge (main drew that shelf to the horizon).
  */
+/**
+ * `TerrainTextures.holes`, added after `terrainOutside` in every pass with a mask: the fragment's cell of the mask
+ * (its texels split the bounds evenly), dropped where R is below 0.5.
+ */
+export const terrainHole = /* wgsl */ `{let hd=vec2i(textureDimensions(terrainHoles));if(textureLoad(terrainHoles,clamp(vec2i(floor((i.position.xz-frame.map.xy)/frame.map.zw*vec2f(hd))),vec2i(0),hd-vec2i(1)),0).r<0.5){discard;}}`;
 export const terrainOutside = /* wgsl */ `if(any(i.position.xz<frame.map.xy)||any(i.position.xz>frame.map.xy+frame.map.zw)){discard;}`;
 /**
  * `TerrainLayer.bump` and `macro`, compiled in only when some layer sets one (otherwise every shader is the text it was).

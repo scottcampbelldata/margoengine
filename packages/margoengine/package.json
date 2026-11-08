@@ -2594,6 +2594,10 @@
       "types": "./dist/terrain/sculpt.d.ts",
       "import": "./dist/terrain/sculpt.js"
     },
+    "./terrain/holes": {
+      "types": "./dist/terrain/holes.d.ts",
+      "import": "./dist/terrain/holes.js"
+    },
     "./text": {
       "types": "./dist/text.d.ts",
       "import": "./dist/text.js"

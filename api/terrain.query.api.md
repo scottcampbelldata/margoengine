@@ -17,6 +17,12 @@ export interface TerrainHit {
     normal: MutableVec3;
 }
 
+export interface TerrainHoleMask {
+    readonly mask: Uint8Array;
+    readonly columns: number;
+    readonly rows: number;
+}
+
 export class TerrainQuery {
     readonly heights: Float32Array;
     readonly columns: number;
@@ -34,6 +40,7 @@ export interface TerrainQueryOptions {
     readonly size: readonly [number, number];
     readonly heightScale?: number;
     readonly heightOffset?: number;
+    readonly holes?: TerrainHoleMask;
 }
 
 export interface TerrainReadOptions {

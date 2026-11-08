@@ -76,6 +76,7 @@ class Terrain implements EnginePlugin {
     invalidate(): void;
     get heightmap(): GPUTexture | undefined;
     get weights(): readonly GPUTexture[] | undefined;
+    get holes(): GPUTexture | undefined;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
     setCapture(hook: TerrainCapture): () => void;
@@ -141,5 +142,6 @@ interface TerrainTextures {
     layers: GPUTexture;
     weights?: readonly GPUTexture[];
     tint?: GPUTexture;
+    holes?: GPUTexture;
 }
 ```

@@ -456,6 +456,58 @@ step of the formula; after every stroke the CPU copy equals the GPU read back an
 weights and picture exactly, and redoing them the edited ones; a heightmap without storage usage is refused. Cost not
 timed.
 
+## Holes and cutouts: `@margoengine/terrain/holes`
+
+`TerrainTextures.holes` takes a mask over the heightmap's bounds (`r8unorm` or `rgba8unorm`, a texel per cell); where
+its R is below 0.5 the terrain draws nothing, in its colour, SSR capture, shadow and occluder passes alike, so caves,
+tunnels, basements and mine entrances pass through the ground and light falls through them. `TerrainHoles` makes and
+edits that mask on the CPU, by cell centre: `circle`, `rect` and `polygon` (even-odd rule) cut, or fill with
+`hole: false`; `texture(device)` makes the texture for the factory and `upload(terrain)` sends later cuts.
+`TerrainQuery` takes the same mask as its `holes` option: no height or normal there, and rays pass through.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Terrain} from 'margoengine/terrain';
+import {TerrainHoles} from 'margoengine/terrain/holes';
+import {TerrainQuery} from 'margoengine/terrain/query';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const n = 129, heights = new Float32Array(n * n).fill(0.05);
+const options = {size: [128, 128] as [number, number], origin: [-64, -64] as [number, number], heightScale: 20};
+const holes = new TerrainHoles(options, n - 1);          // one mask cell per heightmap cell
+holes.circle(10, -5, 6).polygon([[-30, 20], [-20, 20], [-25, 30]]);
+const terrain = Terrain.attach(engine, {
+  ...options,
+  layers: [0, 1, 2, 3].map(() => ({height: [-100, 100] as [number, number], slope: [0, 1] as [number, number], scale: 0.25})),
+  textures(device) {
+    const heightmap = device.createTexture({size: [n, n], format: 'r32float', usage: 6});
+    device.queue.writeTexture({texture: heightmap}, heights, {bytesPerRow: n * 4}, [n, n]);
+    const layers = device.createTexture({size: [1, 1, 4], format: 'rgba8unorm-srgb', usage: 6});
+    device.queue.writeTexture({texture: layers}, new Uint8Array(16).fill(140), {bytesPerRow: 4, rowsPerImage: 1}, [1, 1, 4]);
+    return {heightmap, layers, holes: holes.texture(device)};
+  },
+});
+const ground = new TerrainQuery(heights, n, n, {...options, holes});
+console.log(ground.height(10, -5));                       // undefined: a hole
+holes.rect(30, 30, 40, 36);                               // a basement, cut later
+holes.upload(terrain);
+engine.start();
+```
+
+- A mask cell covers the bounds split evenly into the mask's width by height, so one per heightmap cell
+  (`columns - 1` by `rows - 1`) cuts the ground cell by cell; any size works. Hole edges follow the cells, not the
+  triangles, so a hole's rim is exact on the drawn surface.
+- `TerrainQuery` reads the mask live (no refresh after a cut). A ray that meets a hole cell passes on to the next
+  ground it meets; with a mask finer than the heightmap's cells, a cell hit inside a hole is skipped whole.
+- Without `holes` every shader and binding is as it was. With it, one texel load and a compare a fragment in each
+  pass; the mask binds after the weights and tint.
+
+Checked on a real GPU by `test/holes.browser.mjs` (in `test:gpu`) on the Mount Rainier tile (Radeon 680M): a mask
+with no hole draws exactly the terrain without one and a mask of all holes exactly no terrain, alone and with SSR on;
+a 3 km crater shows the empty scene's pixels through it; a flat roof 50 m over flat ground, sun overhead, lets the
+ground under its hole be lit exactly as with no roof, while a slanted sun shades the hole's far edge; an all-hole
+occluder writes no depth; a cut sent with `upload` draws as one made before attaching. The node tests check the
+bindings and that the colour, shadow and occluder shaders each declare and test the mask, and that queries skip holes.
+
 ## Screen-space reflections
 
 `Terrain` takes SSR's capture hook (`@margoengine/post/ssr`): `ssr.add(terrain)` draws its own normal, layer colour and

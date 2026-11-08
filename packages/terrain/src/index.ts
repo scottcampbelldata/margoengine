@@ -17,6 +17,7 @@ import {
   terrainVertex,
   terrainFragment,
   terrainOutside,
+  terrainHole,
   terrainShading,
   weightedFragment,
 } from './shader.js';
@@ -52,6 +53,13 @@ export interface TerrainTextures {
    * unchanged. Default: none.
    */
   tint?: GPUTexture;
+  /**
+   * Optional holes over the heightmap's bounds: one `r8unorm` or `rgba8unorm` 2D texture of any size, a texel per
+   * cell (texel (u, v) covers cell (u, v) of the bounds split into its width by height); where its R is below 0.5 the
+   * terrain draws nothing, in its colour, SSR capture, shadow and occluder passes alike. `TerrainHoles`
+   * (`@margoengine/terrain/holes`) makes and edits one. Without it the shaders and bindings are unchanged. Default: none.
+   */
+  holes?: GPUTexture;
 }
 /** A splat rule: where layer i's texture shows. Rules blend smoothly around their bounds; layer 0 is the fallback. */
 export interface TerrainLayer {
@@ -254,6 +262,10 @@ export class Terrain implements EnginePlugin {
   get weights(): readonly GPUTexture[] | undefined {
     return this.textures?.weights;
   }
+  /** The holes texture the factory returned, while attached; else undefined. `TerrainHoles.upload` writes into it. */
+  get holes(): GPUTexture | undefined {
+    return this.textures?.holes;
+  }
   setup(engine: Engine): void {
     if (this.disposed || !engine.gpu)
       throw new MargoError(
@@ -265,7 +277,8 @@ export class Terrain implements EnginePlugin {
     this.textures = this.options.textures(this.device);
     const t = this.textures;
     const weights = t.weights,
-      tint = t.tint;
+      tint = t.tint,
+      holes = t.holes;
     if (
       tint !== undefined &&
       (!weights || !['rgba8unorm', 'rgba8unorm-srgb'].includes(tint?.format) || tint.depthOrArrayLayers !== 1)
@@ -287,6 +300,7 @@ export class Terrain implements EnginePlugin {
       ...(t.normalmap ? [t.normalmap] : []),
       ...(weights ?? []),
       ...(tint ? [tint] : []),
+      ...(holes ? [holes] : []),
     ])
       if (texture.dimension !== '2d' || !(texture.usage & GPUTextureUsage.TEXTURE_BINDING) || texture.sampleCount !== 1)
         throw new TypeError('Terrain textures must be sampled 2D textures');
@@ -297,7 +311,8 @@ export class Terrain implements EnginePlugin {
       !['rgba8unorm', 'rgba8unorm-srgb', 'rgba16float'].includes(t.layers.format) ||
       !['r32float', 'rgba16float', 'rgba8unorm'].includes(t.heightmap.format) ||
       (t.normalmap && !['rgba8unorm', 'rgba16float'].includes(t.normalmap.format)) ||
-      (weights && weights.some((w) => w.format !== 'rgba8unorm' || w.depthOrArrayLayers !== 1))
+      (weights && weights.some((w) => w.format !== 'rgba8unorm' || w.depthOrArrayLayers !== 1)) ||
+      (holes && (!['r8unorm', 'rgba8unorm'].includes(holes.format) || holes.depthOrArrayLayers !== 1))
     )
       throw new TypeError(
         'Invalid terrain texture format or layer count; use a layers array texture with one layer per terrain layer and a supported heightmap format.',
@@ -356,7 +371,7 @@ export class Terrain implements EnginePlugin {
         { binding: 3, visibility: fragment, texture: { viewDimension: '2d-array' } },
         { binding: 4, visibility: fragment, sampler: { type: 'filtering' } },
         { binding: 5, visibility: fragment, buffer: { type: 'read-only-storage' } },
-        ...[...(weights ?? []), ...(tint ? [tint] : [])].map((_, i) => ({
+        ...[...(weights ?? []), ...(tint ? [tint] : []), ...(t.holes ? [t.holes] : [])].map((_, i) => ({
           binding: 6 + i,
           visibility: fragment,
           texture: {},
@@ -371,6 +386,7 @@ export class Terrain implements EnginePlugin {
       { buffer: this.rules },
       ...(weights ? weights.map((w) => w.createView()) : []),
       ...(tint ? [tint.createView()] : []),
+      ...(t.holes ? [t.holes.createView()] : []),
     ];
     const group = (buffer: GPUBuffer) =>
       this.device!.createBindGroup({
@@ -401,7 +417,7 @@ export class Terrain implements EnginePlugin {
     }
     // The shadow pass drops what lies outside the heightmap too: the outer rings' clamped shelf cast shadows inward.
     const module = this.device.createShaderModule({
-      code: terrainVertex + `@fragment fn outside(i:Output){${terrainOutside}}`,
+      code: this.clip(terrainVertex + `@fragment fn outside(i:Output){${terrainOutside}}`),
     });
     this.shadowPipeline = this.device.createRenderPipeline({
       layout: this.device.createPipelineLayout({ bindGroupLayouts: [this.layout] }),
@@ -489,10 +505,19 @@ export class Terrain implements EnginePlugin {
       (this.textures?.weights
         ? weightedFragment(this.textures.weights.length, surface, !!this.textures.tint)
         : terrainFragment(surface));
+    code = this.clip(code);
     for (const effect of this.lighting) code = effect.shader(code, 1);
     return code;
   }
   /** Whether any layer sets `bump` or `macro`; without, the shader and rules are what they were before both. */
+  /** With `TerrainTextures.holes`: declares the mask after the weights and tint and adds its test to the edge test. */
+  private clip(code: string): string {
+    const t = this.textures;
+    if (!t?.holes) return code;
+    const binding = 6 + (t.weights?.length ?? 0) + (t.tint ? 1 : 0);
+    return `@group(0) @binding(${binding}) var terrainHoles:texture_2d<f32>;
+${code.split(terrainOutside).join(terrainOutside + terrainHole)}`;
+  }
   private surface(): boolean {
     return this.options.layers.some((layer) => (layer.bump ?? 0) > 0 || (layer.macro ?? 0) > 0);
   }
@@ -597,7 +622,7 @@ export class Terrain implements EnginePlugin {
       code =
         declarations +
         lit.replace(head, 'fn margoShade(i:Output)->vec4f {') +
-        `\n@fragment fn capture(i:Output)->MargoSSR {${terrainOutside}${terrainShading(this.surface())}let v=normalize(frame.eye.xyz-i.position);${declarations.includes('var<private> margoPosition:') ? 'margoPosition=i.position;' : ''}return margoSSR(n,v,base,i.material.y,i.material.x);}\n`;
+        `\n@fragment fn capture(i:Output)->MargoSSR {${terrainOutside}${this.textures?.holes ? terrainHole : ''}${terrainShading(this.surface())}let v=normalize(frame.eye.xyz-i.position);${declarations.includes('var<private> margoPosition:') ? 'margoPosition=i.position;' : ''}return margoSSR(n,v,base,i.material.y,i.material.x);}\n`;
       if (this.captureCode.size >= 16) this.captureCode.clear();
       this.captureCode.set(lit, code);
     }
@@ -686,7 +711,7 @@ export class Terrain implements EnginePlugin {
     if (this.disposed || !this.device) return;
     if (this.occluder?.samples !== samples) {
       const module = this.device.createShaderModule({
-        code: terrainVertex + `@fragment fn outside(i:Output){${terrainOutside}}`,
+        code: this.clip(terrainVertex + `@fragment fn outside(i:Output){${terrainOutside}}`),
       });
       this.occluder = {
         samples,
@@ -744,6 +769,7 @@ export class Terrain implements EnginePlugin {
             this.textures.layers,
             ...(this.textures.weights ?? []),
             this.textures.tint,
+            this.textures.holes,
           ]
         : [],
     ))

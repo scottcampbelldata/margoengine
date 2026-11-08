@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10839406,
+  "total": 10840945,
   "history": [
     {
       "date": "2026-10-24",
@@ -3968,6 +3968,12 @@
       "commit": "2b83cb41f",
       "reason": "batch 126 job 2: triangle meshes in the own physics kernel (BVH, mesh parts, internal edge rule)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "964ddc1b5",
+      "reason": "new entry @margoengine/terrain/holes; holes texture option and getter on the root entry",
+      "grew": 1
     }
   ],
   "items": {
@@ -4614,6 +4620,7 @@
     "@margoengine/taa": 12187,
     "@margoengine/taa/upscale": 7093,
     "@margoengine/terrain": 12874,
+    "@margoengine/terrain/holes": 1539,
     "@margoengine/terrain/layers-pbr": 2819,
     "@margoengine/terrain/query": 3420,
     "@margoengine/terrain/sculpt": 4873,
