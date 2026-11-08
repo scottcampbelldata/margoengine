@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10821331,
+  "total": 10821997,
   "history": [
     {
       "date": "2026-10-24",
@@ -3944,6 +3944,12 @@
       "commit": "97d32db8c",
       "reason": "new entry @margoengine/voxel/fluids: flowing liquids (VoxelFluids)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "4bc66f142",
+      "reason": "SceneTarget depth copy setup in its own function so copyDepth allocates nothing per call (post/bloom, post/ssgi about 20 to 33 B gzip)",
+      "grew": 2
     }
   ],
   "items": {
@@ -4416,7 +4422,7 @@
     "@margoengine/points/surfels": 14851,
     "@margoengine/post": 42058,
     "@margoengine/post/afterimage": 5619,
-    "@margoengine/post/bloom": 6716,
+    "@margoengine/post/bloom": 7005,
     "@margoengine/post/contact-shadows": 6389,
     "@margoengine/post/decals": 5499,
     "@margoengine/post/depth": 3876,
@@ -4432,7 +4438,7 @@
     "@margoengine/post/scene-fade": 3074,
     "@margoengine/post/smaa": 6244,
     "@margoengine/post/ssao": 9601,
-    "@margoengine/post/ssgi": 11862,
+    "@margoengine/post/ssgi": 12239,
     "@margoengine/post/ssr": 13257,
     "@margoengine/post/sss": 7201,
     "@margoengine/post/stack": 4001,

@@ -2,7 +2,8 @@
 // once per frame sits in for its first thousands of frames in a browser (scripts/frame-alloc-browser.mjs measures it
 // there). Maglev boxes every fractional number it passes to a call it does not inline (Number.isFinite included) and
 // allocates a function's closure context on each call. Prints JSON { bytes: [heap bytes per call, five windows] }.
-// Cases: invert (invertMatrixStable of a camera-like matrix), cascades (cascadeSplits + fitCascades of four cascades).
+// Cases: invert (invertMatrixStable of a camera-like matrix), cascades (cascadeSplits + fitCascades of four cascades),
+// copyDepth (the three depth copies a post-processed 4x frame makes through SceneTarget, on a stand-in device).
 // MARGO_PROBE_ROOT points it at another checkout (to measure a commit before a fix).
 import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
@@ -36,6 +37,30 @@ if (name === 'invert') {
   call = () => {
     cascadeSplits(near, far, 0.5, splits, 4);
     fitCascades(camera, 4 / 3, direction, 1024, splits, matrices, ranges, 100, result, 4);
+  };
+} else if (name === 'copyDepth') {
+  const { SceneTarget } = await load('packages/shared/msaa.js');
+  globalThis.GPUTextureUsage ??= { RENDER_ATTACHMENT: 16, TEXTURE_BINDING: 4 };
+  // The stand-in returns one object per kind, so every byte left is SceneTarget's own (a browser adds a 16 B wrapper
+  // per pass, as for every pass).
+  const view = {},
+    texture = (format) => ({ width: 8, height: 8, format, createView: () => view }),
+    pipeline = { getBindGroupLayout: () => ({}) },
+    device = {
+      features: new Set(['core-features-and-limits']),
+      createTexture: ({ format }) => texture(format),
+      createShaderModule: () => ({}),
+      createRenderPipeline: () => pipeline,
+      createBindGroup: () => ({}),
+    },
+    pass = { setPipeline() {}, setBindGroup() {}, draw() {}, end() {} },
+    encoder = { beginRenderPass: () => pass },
+    target = new SceneTarget(device, texture('rgba16float'), texture('depth24plus'), 4),
+    original = {};
+  call = () => {
+    target.copyDepth(encoder, view, 1);
+    target.copyDepth(encoder, view, 1);
+    target.copyDepth(encoder, original, 4, 'depth24plus');
   };
 } else throw new TypeError(`Unknown case ${name}`);
 

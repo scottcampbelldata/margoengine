@@ -15,6 +15,42 @@ const depthShader =
  return max(max(textureLoad(source,q,0),textureLoad(source,q,1)),max(textureLoad(source,q,2),textureLoad(source,q,3)));
 }`;
 
+/** The draws and pass descriptor that copy `count`-sample depth into a `format` attachment, made once per pair. */
+function depthCopy(device, source, view, count, format) {
+  // Preserve each reversed-Z coverage sample when returning to an outer scene.
+  const load = (sample) => depthShader.replace(/return max[^;]+;/, `return textureLoad(source,q,${sample});`),
+    draw = (code, multisample) => {
+      const module = device.createShaderModule({ code }),
+        pipeline = device.createRenderPipeline({
+          layout: 'auto',
+          vertex: { module, entryPoint: 'vertex' },
+          fragment: { module, entryPoint: 'fragment', targets: [] },
+          depthStencil: { format, depthWriteEnabled: true, depthCompare: 'always' },
+          multisample,
+        });
+      return { pipeline, group: group(device, pipeline, source) };
+    };
+  return {
+    // The compatibility level has no sample_index: one draw per sample, the pipeline's mask writing that sample alone.
+    draws:
+      count !== 4
+        ? [draw(depthShader, { count })]
+        : compatibilityLevel(device)
+          ? [0, 1, 2, 3].map((sample) => draw(load(sample), { count, mask: 1 << sample }))
+          : [draw(load('i32(sample)').replace('p:vec4f)', 'p:vec4f,@builtin(sample_index) sample:u32)'), { count })],
+    descriptor: {
+      colorAttachments: [],
+      depthStencilAttachment: {
+        view,
+        depthLoadOp: 'clear',
+        depthClearValue: 0,
+        depthStoreOp: 'store',
+        stencilReadOnly: true,
+      },
+    },
+  };
+}
+
 /** Optional scene capture: 4x raster attachments, with sampleable 1x outputs. */
 export class SceneTarget {
   constructor(device, color, depth, samples = 4) {
@@ -90,48 +126,18 @@ export class SceneTarget {
     let formats = this.pipelines.get(count);
     if (!formats) this.pipelines.set(count, (formats = new Map()));
     let cached = formats.get(format);
-    if (!cached) {
-      // Preserve each reversed-Z coverage sample when returning to an outer scene.
-      const load = (sample) => depthShader.replace(/return max[^;]+;/, `return textureLoad(source,q,${sample});`),
-        draw = (code, multisample) => {
-          const module = this.device.createShaderModule({ code }),
-            pipeline = this.device.createRenderPipeline({
-              layout: 'auto',
-              vertex: { module, entryPoint: 'vertex' },
-              fragment: { module, entryPoint: 'fragment', targets: [] },
-              depthStencil: { format, depthWriteEnabled: true, depthCompare: 'always' },
-              multisample,
-            });
-          return { pipeline, group: group(this.device, pipeline, this.depthSource) };
-        };
-      cached = {
-        // The compatibility level has no sample_index: one draw per sample, the pipeline's mask writing that sample alone.
-        draws:
-          count !== 4
-            ? [draw(depthShader, { count })]
-            : compatibilityLevel(this.device)
-              ? [0, 1, 2, 3].map((sample) => draw(load(sample), { count, mask: 1 << sample }))
-              : [draw(load('i32(sample)').replace('p:vec4f)', 'p:vec4f,@builtin(sample_index) sample:u32)'), { count })],
-        descriptor: {
-          colorAttachments: [],
-          depthStencilAttachment: {
-            view,
-            depthLoadOp: 'clear',
-            depthClearValue: 0,
-            depthStoreOp: 'store',
-            stencilReadOnly: true,
-          },
-        },
-      };
-      formats.set(format, cached);
-    }
+    if (!cached) formats.set(format, (cached = depthCopy(this.device, this.depthSource, view, count, format)));
     cached.descriptor.depthStencilAttachment.view = view;
     cached.descriptor.depthStencilAttachment.depthLoadOp = this.viewContext?.view ? 'load' : 'clear';
     const pass = encoder.beginRenderPass(cached.descriptor);
     if (this.viewContext) applyView(pass, this.viewContext);
-    for (const { pipeline, group } of cached.draws) {
-      pass.setPipeline(pipeline);
-      pass.setBindGroup(0, group);
+    // An indexed loop, and the pipeline setup outside this method: it runs up to three times a frame, and a for-of
+    // iterator or a context for the setup's closures cost 92 B a call wherever V8 does not optimize them away
+    // (Chrome 156 on macOS arm64; tests/frame-alloc.test.js).
+    const draws = cached.draws;
+    for (let i = 0; i < draws.length; i++) {
+      pass.setPipeline(draws[i].pipeline);
+      pass.setBindGroup(0, draws[i].group);
       pass.draw(3);
     }
     pass.end();
