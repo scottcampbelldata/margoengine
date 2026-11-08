@@ -610,6 +610,7 @@ export const entries = [
       'Isosurface disposed; create a new one',
       'sciviz needs the WebGPU backend; the engine runs WebGL2',
       'sciviz renderer is not attached; create a Figure on an engine',
+      'loadNRRD takes a URL, an ArrayBuffer or a typed array',
       'A GpuArray surface needs range: [min, max] (read it with z.min().item())',
       'This surface reads a GpuArray; write to the GpuArray instead',
       'A GpuArray volume needs range: [min, max] (read it with data.min().item())',

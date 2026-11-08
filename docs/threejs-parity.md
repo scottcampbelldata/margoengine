@@ -8,9 +8,9 @@ What Margo Engine covers compared with three.js r186 and its common add-ons (`th
 
 | Status | Count | Meaning |
 | --- | --- | --- |
-| COVERED | 168 | A Margo package implements the feature in a form a three.js user would accept as equivalent (limits noted). |
+| COVERED | 169 | A Margo package implements the feature in a form a three.js user would accept as equivalent (limits noted). |
 | PARTIAL | 5 | Some of it exists, but a common use case is missing. The notes say what. |
-| MISSING | 11 | Worth having and not written yet. Listed below with what to do. |
+| MISSING | 10 | Worth having and not written yet. Listed below with what to do. |
 | NOT PLANNED | 11 | Out of scope by decision. The note says why and what to use instead. |
 
 The earlier version of this table had 161 rows and hid several gaps inside one coarse row or inside a COVERED row's notes. Those gaps now have rows of their own, which is why the MISSING count went up while no feature was lost.
@@ -193,7 +193,7 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 | Texture loaders (UltraHDR, TGA, DDS, KTX v1, TIFF, IES, LUT3dl, LUTImage) | COVERED | decoders `parseTGA`, `parseDDS`, `parseKTX`, `parseTIFF`, `uploadTexture` (`@margoengine/decoders/tga`, `/dds`, `/ktx`, `/tiff`); environment `decodeUltraHDR`; clustered `parseIES` (`@margoengine/clustered/ies`); tonemap `setLUT` (`.cube`) | [page](https://margoengine.com/demos/texture-formats.html) | TGA (colour-mapped, true-colour and grey, RLE, every origin), DDS (BC1-BC7 passed through on devices with `texture-compression-bc`, legacy masks converted, DX10, mips, cubes and arrays), KTX 1 (uncompressed, S3TC/RGTC/BPTC, ETC1/ETC2/EAC, ASTC, mips, cubes, arrays) and baseline TIFF (strips and tiles; none, LZW with predictor, PackBits, Deflate; grey, RGB, palette, 16-bit and float). 8-bit TGA/TIFF go straight into a materials `Texture`; compressed or cube DDS/KTX upload with `uploadTexture`. Drawn from one file per format in `demos/texture-formats.html`. No `.3dl` or LUT-image loader (`.cube` LUTs only); 16-bit TIFF samples are reduced to 8 bits; KTX orientation is not applied. |
 | LUTCubeLoader | COVERED † | tonemap `parseCube`, `Tonemap.setLUT` (`packages/tonemap/src/cube.ts`, `index.ts`) | | 3D RGB cubes with integer axis sizes 2-65, including common 16³/17³/32³/33³/64³/65³ files, domains and red-fastest order. Text cap: 32 Mi JavaScript characters. Legacy objects without `size` mean 33³. No 1D/shaper LUTs. Verification. |
 | LoadingManager, Cache, progress events | COVERED | cache `LoadingManager` (`@margoengine/cache/manager`, `packages/cache/src/manager.ts`); `AssetCache` (`packages/cache/src/index.ts`); per-loader `AbortSignal` and byte caps (`packages/shared/loading.js`) | | One manager for every loader through their `fetch` option (`fetch: manager.fetch`): item and byte progress (`onStart`, `onProgress`, `onLoad`, `onError`), a URL modifier applied to sibling files too (glTF buffers and images, OBJ/MTL textures), `abort()`, and `itemStart`/`itemEnd` for custom work; composes with `AssetCache` in either order (persistent IndexedDB with revalidation, offline fallback, range requests and LRU eviction, beyond three's in-memory `THREE.Cache`). `loadGLTFProgressive` uses the manager only on its main-thread path; worker decoders fetch nothing. |
-| NRRD volumes | MISSING | sciviz, loaders | | Volume rendering takes data arrays; this file format is not read. |
+| NRRD volumes (NRRDLoader) | COVERED | loaders `parseNRRD` (`@margoengine/loaders/nrrd`, `packages/loaders/src/nrrd.ts`); sciviz `loadNRRD`, `nrrdGrid`, `volumeFromNRRD` (`@margoengine/sciviz/nrrd`, `packages/sciviz/src/nrrd.ts`) | | Raw, ascii, hex, gzip and bzip2 data, detached `.nhdr`, time series and multi-component voxels; the `block` type is refused. The volume draws axis-aligned in index order. |
 | JPEG XL | COVERED | decoders `JXLDecoder`, `readJXLHeader` (`@margoengine/decoders/jxl`, `packages/decoders/src/jxl.ts`) | | RGBA8, first frame; three.js has no JPEG XL loader. |
 | PVRLoader (PVRTC) | COVERED | decoders `parsePVR`, `decodePVRTC` (`@margoengine/decoders/pvr`, `packages/decoders/src/pvr.ts`) | | WebGPU has no PVRTC format, so levels decode to RGBA8 on the CPU. |
 | VDB volumes, Lottie, MaterialX | NOT PLANNED | loaders, decoders | | Niche formats with runtimes of their own. |
@@ -313,7 +313,7 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 
 ## What is missing or partial, and what to do
 
-Recounted from the rows (2026-11-07): 5 PARTIAL, 11 MISSING. Each fix goes in the optional package named; core stays frozen for features.
+Recounted from the rows (2026-11-07): 5 PARTIAL, 10 MISSING. Each fix goes in the optional package named; core stays frozen for features.
 
 | Row | What is missing | What to do |
 | --- | --- | --- |
@@ -322,7 +322,7 @@ Recounted from the rows (2026-11-07): 5 PARTIAL, 11 MISSING. Each fix goes in th
 | WebXR VR, WebXR AR | PARTIAL. Never run on a headset or AR device. | Test on a device first (`examples/xr-device-check`). |
 | WebGL2 fallback | PARTIAL. M8 is done; the voxel path tracer runs on it, slowly compiled on ANGLE Direct3D, XR runs on it through `/xr`, and the integrated-GPU frame-budget run is still to be recorded. | See [the roadmap](webgl2-compat-roadmap.md). |
 | Shadows from alpha cut-outs, soft particles | MISSING. | Planned before v1.0.0, one landing per package. |
-| Rendering in a worker, render into layers, compute writing textures, environment blend and ground projection, KTX2 arrays and cubes, NRRD, subsurface blur | MISSING. | After v1.0.0, in the owning package. |
+| Rendering in a worker, render into layers, compute writing textures, environment blend and ground projection, KTX2 arrays and cubes, subsurface blur | MISSING. | After v1.0.0, in the owning package. |
 
 ## Leave as the documented limit
 

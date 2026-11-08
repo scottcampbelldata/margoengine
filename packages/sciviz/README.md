@@ -301,6 +301,40 @@ const timeline = fig.timeline([0, 1], (index) => volume.setFrame(index));
 await timeline.seek(1);
 ```
 
+## NRRD volumes
+
+`volumeFromNRRD(fig, source, options)` from `@margoengine/sciviz/nrrd` reads a NRRD file, the format CT, MRI and
+microscopy tools such as 3D Slicer write, and draws it with `fig.volume()` in the file's true proportions. `source` is
+a URL to fetch or the file's bytes; a detached `.nhdr` header fetches its data file next to it. The reading is
+`parseNRRD` of [`@margoengine/loaders/nrrd`](../loaders/README.md#nrrd-volumes), so every encoding it reads works here
+(raw, ascii, hex, gzip, and bzip2 with `@margoengine/decoders`). It takes every `fig.volume()` option plus:
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `frame` | `0` | volume of a time series (axes after the spatial ones) |
+| `component` | `0` | sample of a multi-component voxel (an RGB or vector axis), or `'magnitude'` |
+| `resolve` | fetch next to the URL | reads a detached data file by the path the header writes; needed for `.nhdr` bytes |
+| `maxSamples` | `536_870_912` | stops a huge declared size before anything is allocated |
+| `init` | none | request options for every fetch, such as headers |
+| `signal` | none | abandons the fetches and the read |
+
+```ts
+import { Figure } from '@margoengine/sciviz';
+import { volumeFromNRRD, nrrdGrid } from '@margoengine/sciviz/nrrd';
+
+const fig = await Figure.create(document.querySelector('canvas')!);
+const { volume, grid } = await volumeFromNRRD(fig, '/scans/volume-raw.nrrd', { colormap: 'magma' });
+console.log(volume.dims, volume.spacing, grid.range);
+// The same grid also feeds an isosurface or a slice.
+await fig.isosurface(grid.data, (grid.range[0] + grid.range[1]) / 2, { dims: grid.dims, bounds: grid.bounds });
+console.log(nrrdGrid(volume, { frame: 0 }).dims);
+```
+
+`loadNRRD(source, options)` reads without drawing, and `nrrdGrid(volume, { frame, component })` picks one scalar grid:
+a single scalar volume keeps the file's sample type, a frame of a series is a view of the file's array, and a chosen
+component or the magnitude is a new `Float32Array`. The colour range spans the grid's samples unless you pass `range`.
+The file's orientation (`volume.matrix`) is not applied to the box: the volume draws axis-aligned in index order.
+
 ## Picking, tooltips and selection
 
 Hovering shows a tooltip for the scatter point, line vertex, surface point, bar or heatmap cell under the pointer, with its x, y, z, its

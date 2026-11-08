@@ -2258,6 +2258,10 @@
       "types": "./dist/sciviz/maths.d.ts",
       "import": "./dist/sciviz/maths.js"
     },
+    "./sciviz/nrrd": {
+      "types": "./dist/sciviz/nrrd.d.ts",
+      "import": "./dist/sciviz/nrrd.js"
+    },
     "./selection": {
       "types": "./dist/selection.d.ts",
       "import": "./dist/selection.js"

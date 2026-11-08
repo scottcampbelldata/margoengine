@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10752245,
+  "total": 10753461,
   "history": [
     {
       "date": "2026-10-24",
@@ -3872,6 +3872,12 @@
       "commit": "125430edf",
       "reason": "post/decals: per-frame view and screen-size culling with compacted upload (batch 70 job 4)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "29ec06018",
+      "reason": "batch 118 job 1: new entry sciviz/nrrd",
+      "grew": 1
     }
   ],
   "items": {
@@ -4437,6 +4443,7 @@
     "@margoengine/sciviz/bricks": 14265,
     "@margoengine/sciviz/colormaps": 4427,
     "@margoengine/sciviz/maths": 5638,
+    "@margoengine/sciviz/nrrd": 1216,
     "@margoengine/selection": 21142,
     "@margoengine/shader": 18459,
     "@margoengine/shader/compute-texture": 4761,

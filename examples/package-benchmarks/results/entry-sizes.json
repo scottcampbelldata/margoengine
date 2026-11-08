@@ -1,10 +1,10 @@
 {
-  "commit": "2050ed45f",
+  "commit": "1c68e2ced",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
-    "raw": 57075,
-    "gzip": 22998,
+    "raw": 57071,
+    "gzip": 23013,
     "limit": 25000
   },
   "packages": {
@@ -565,17 +565,17 @@
     "@margoengine/core": {
       ".": {
         "raw": 53083,
-        "gzip": 21568
+        "gzip": 21586
       },
       "./extension": {
-        "raw": 49928,
-        "gzip": 20720
+        "raw": 49930,
+        "gzip": 20678
       }
     },
     "@margoengine/creative": {
       ".": {
-        "raw": 61551,
-        "gzip": 19070
+        "raw": 62165,
+        "gzip": 19126
       },
       "./particles": {
         "raw": 1028,
@@ -594,16 +594,16 @@
         "gzip": 6999
       },
       "./grass": {
-        "raw": 16111,
-        "gzip": 5944
+        "raw": 16377,
+        "gzip": 5961
       },
       "./planet": {
-        "raw": 20730,
-        "gzip": 7011
+        "raw": 20958,
+        "gzip": 7027
       },
       "./stars": {
-        "raw": 6033,
-        "gzip": 2653
+        "raw": 6153,
+        "gzip": 2665
       }
     },
     "@margoengine/culling": {
@@ -2002,8 +2002,8 @@
         "gzip": 4593
       },
       "./decals": {
-        "raw": 10845,
-        "gzip": 4561
+        "raw": 12738,
+        "gzip": 5243
       },
       "./ssr": {
         "raw": 33142,
@@ -2378,6 +2378,10 @@
       "./maths": {
         "raw": 12305,
         "gzip": 5382
+      },
+      "./nrrd": {
+        "raw": 1824,
+        "gzip": 960
       }
     },
     "@margoengine/selection": {
@@ -2462,8 +2466,8 @@
         "gzip": 771
       },
       "./distance": {
-        "raw": 4919,
-        "gzip": 2165
+        "raw": 4984,
+        "gzip": 2193
       },
       "./style": {
         "raw": 834,
@@ -2608,48 +2612,48 @@
     },
     "@margoengine/stage": {
       ".": {
-        "raw": 4105,
-        "gzip": 2017
+        "raw": 4101,
+        "gzip": 2016
       },
       "./gltf": {
-        "raw": 2926,
-        "gzip": 1392
+        "raw": 2922,
+        "gzip": 1393
       },
       "./sky": {
-        "raw": 1027,
-        "gzip": 587
+        "raw": 714,
+        "gzip": 463
       },
       "./particles": {
-        "raw": 1046,
-        "gzip": 593
+        "raw": 733,
+        "gzip": 468
       },
       "./effects": {
-        "raw": 1041,
-        "gzip": 595
+        "raw": 728,
+        "gzip": 471
       },
       "./environment": {
-        "raw": 1107,
-        "gzip": 612
+        "raw": 794,
+        "gzip": 491
       },
       "./shadows": {
-        "raw": 1100,
-        "gzip": 616
+        "raw": 787,
+        "gzip": 494
       },
       "./xr": {
-        "raw": 3918,
-        "gzip": 1972
+        "raw": 3605,
+        "gzip": 1882
       },
       "./viewer": {
-        "raw": 5253,
-        "gzip": 2458
+        "raw": 4940,
+        "gzip": 2371
       },
       "./physics": {
-        "raw": 2420,
-        "gzip": 1240
+        "raw": 2107,
+        "gzip": 1148
       },
       "./scene": {
-        "raw": 7763,
-        "gzip": 3264
+        "raw": 7450,
+        "gzip": 3185
       }
     },
     "@margoengine/staging": {
@@ -3132,8 +3136,8 @@
     },
     "@margoengine/webgl2-compat": {
       ".": {
-        "raw": 335866,
-        "gzip": 101771
+        "raw": 336173,
+        "gzip": 101909
       },
       "./adapter": {
         "raw": 1861,
@@ -3144,20 +3148,20 @@
         "gzip": 48236
       },
       "./device": {
-        "raw": 334989,
-        "gzip": 101866
+        "raw": 335296,
+        "gzip": 102009
       },
       "./glsl": {
-        "raw": 145692,
-        "gzip": 42314
+        "raw": 145851,
+        "gzip": 42377
       },
       "./wgsl": {
         "raw": 92868,
         "gzip": 26476
       },
       "./xr": {
-        "raw": 335029,
-        "gzip": 101695
+        "raw": 335336,
+        "gzip": 101903
       }
     },
     "@margoengine/wfc": {
@@ -3403,14 +3407,14 @@
     "@margoengine/webgl2-compat": {
       "entry": ".",
       "base": {
-        "raw": 239242,
-        "gzip": 71372,
+        "raw": 239433,
+        "gzip": 71457,
         "target": 73000
       },
       "lazy": {
         "name": "compute runtime and read-back",
-        "raw": 96623,
-        "gzip": 30816,
+        "raw": 96739,
+        "gzip": 30877,
         "loadedBy": "the first compute pipeline or texture read-back on the layer (import() in device/device.ts)"
       }
     },

@@ -39,6 +39,10 @@
     "./maths": {
       "types": "./dist/maths.d.ts",
       "import": "./dist/maths.js"
+    },
+    "./nrrd": {
+      "types": "./dist/nrrd.d.ts",
+      "import": "./dist/nrrd.js"
     }
   },
   "files": [
@@ -58,6 +62,7 @@
     "@margoengine/controls": "^1.0.0",
     "@margoengine/labels": "^1.0.0",
     "@margoengine/lines": "^1.0.0",
+    "@margoengine/loaders": "^1.0.0",
     "@margoengine/math": "^1.0.0",
     "@margoengine/points": "^1.0.0"
   },

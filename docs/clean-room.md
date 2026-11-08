@@ -716,6 +716,7 @@ under the standard-file exception documented above (THIRD-PARTY-NOTICES.md, `pac
 | viridis, magma, inferno, plasma (recorded data, CC0) | N. Smith and S. van der Walt, mpl-colormaps, https://github.com/BIDS/colormap (the authors' table file `colormaps.py`; data only) |
 | cividis (recorded data, CC BY 4.0) | J. R. Nuñez, C. R. Anderton and R. S. Renslow, PLOS ONE 13(7): e0199239 (2018), supporting file S2 |
 | OKLab and the perceptual maps | B. Ottosson, "A perceptual color space for image processing" (2020); sRGB transfer from IEC 61966-2-1; CIELAB and D65 from CIE 15:2004 |
+| NRRD volumes in a figure (`sciviz/nrrd`) | Teem project, "Definition of NRRD File Format" (axis `kinds`, `space directions`, detached `data file`); the reading itself is `loaders/nrrd`, row LF5 |
 
 ## Data track: the Python package (`python/`)
 
