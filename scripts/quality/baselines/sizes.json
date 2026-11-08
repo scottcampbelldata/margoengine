@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10818670,
+  "total": 10821331,
   "history": [
     {
       "date": "2026-10-24",
@@ -3938,6 +3938,12 @@
       "commit": "1d913d1a2",
       "reason": "splats/lod: streamed splat level of detail (batch 80 job 2); splats root gains Splats.reserve, write, clear and coefficients",
       "grew": 2
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "97d32db8c",
+      "reason": "new entry @margoengine/voxel/fluids: flowing liquids (VoxelFluids)",
+      "grew": 1
     }
   ],
   "items": {
@@ -4611,7 +4617,7 @@
     "@margoengine/tween/scroll": 1198,
     "@margoengine/tween/stagger": 1435,
     "@margoengine/ui": 28221,
-    "@margoengine/ui/react": 28301,
+    "@margoengine/ui/react": 28294,
     "@margoengine/usdz": 12708,
     "@margoengine/usdz dist/workers/usdz.js": 116081,
     "@margoengine/usdz/anim": 6436,
@@ -4658,6 +4664,7 @@
     "@margoengine/voxel-pathtracer/studio": 1303,
     "@margoengine/voxel/bevel": 2457,
     "@margoengine/voxel/codec": 9368,
+    "@margoengine/voxel/fluids": 2668,
     "@margoengine/voxel/generate": 4426,
     "@margoengine/voxel/light": 8638,
     "@margoengine/voxel/light-rgb": 10978,

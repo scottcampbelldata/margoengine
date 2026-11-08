@@ -1032,3 +1032,46 @@ colored.setColor('lamp', [0.2, 1, 0.3]); // live
 GPU check (`node packages/voxel/tests/light-rgb-browser-check.mjs`, in `test:gpu`): a closed room with a red torch and
 a blue lamp, the renderer's block light off, is black without the effect and red by the torch, blue by the lamp with it
 (M6 Mac mini, Metal).
+
+
+## Flowing liquids (`@margoengine/voxel/fluids`)
+
+`VoxelFluids` makes liquid blocks flow: a source spreads sideways and falls, flowing cells dry up when nothing feeds
+them, and two liquids that meet turn into blocks.
+
+```ts
+import { BlockTypes, VoxelWorld } from 'margoengine/voxel';
+import { VoxelFluids } from 'margoengine/voxel/fluids';
+import { Engine } from 'margoengine/core';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const blocks = new BlockTypes();
+blocks.define('stone');
+const water = blocks.define('water', { shape: 'liquid', liquid: true, solid: false, layer: 'translucent' });
+blocks.define('lava', { shape: 'liquid', liquid: true, solid: false, light: 15 });
+blocks.define('obsidian');
+blocks.define('cobblestone');
+const world = new VoxelWorld({ blocks });
+const fluids = VoxelFluids.attach(world, {
+  fluids: [{ block: 'water', infinite: true }, { block: 'lava', reach: 3, delay: 30 }],
+  mixes: [{ fluid: 'lava', touches: 'water', source: 'obsidian', flowing: 'cobblestone' }],
+});
+engine.onFrame((_, delta) => fluids.update(delta)); // 20 ticks a second
+world.setBlock(0, 64, 0, water); // a source: it flows
+```
+
+- **Levels.** A liquid cell's state data is its level: 0 a source (full), 1 to 7 flowing (the mesher lowers its top
+  by that many eighths), `FLUID_FALLING` (8) falling, full, fed from above. A liquid with `reach` r steps
+  `floor(7 / r)` levels a cell (water 1, lava 2).
+- **Steps.** Any change schedules the cell and its six neighbours `delay` ticks later. A due flowing cell first
+  settles: with the same liquid above it falls, else its level is the lowest beside it plus the step, and past 7 it
+  dries up; with `infinite`, two sources beside it on solid ground or a source make it one. Then it flows: down into
+  an open cell (air, or neither solid nor liquid, so plants wash away) as a falling cell; else, from solid ground or a
+  source below, sideways to the next level, only toward the nearest drop within 4 cells when there is one (counted
+  through cells it already flows in). Mixes: a cell beside or under the liquid it `touches` becomes `source` or
+  `flowing`. Unloaded chunks and the world's y range stop it like rock.
+- **Ticks.** `update(seconds)` runs whole ticks at `ticksPerSecond` (at most 10 a call), `tick()` one, `settle()`
+  until nothing is pending; at most `maxUpdates` cells a tick, the rest wait a tick. Edits go through the world, so
+  light, meshes and change events follow.
+- **Errors.** `TypeError` for a wrong world or option type, `RangeError` for options out of range, an undefined block
+  or a fluid that is not a `'liquid'` shape; `MargoError` `'disposed'` after `dispose()`.

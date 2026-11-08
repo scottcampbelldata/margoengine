@@ -2826,6 +2826,10 @@
       "types": "./dist/voxel/light-rgb.d.ts",
       "import": "./dist/voxel/light-rgb.js"
     },
+    "./voxel/fluids": {
+      "types": "./dist/voxel/fluids.d.ts",
+      "import": "./dist/voxel/fluids.js"
+    },
     "./voxel-edit": {
       "types": "./dist/voxel-edit.d.ts",
       "import": "./dist/voxel-edit.js"

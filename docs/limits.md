@@ -13,7 +13,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-453). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-454). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -39,6 +39,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Far voxel levels (`@margoengine/voxel/lod`, 2026-11-07) | Enforced: 1 to 12 levels, `radius` 2 to 32 nodes, `scale` a power of two to 4,096. By method: a level-L cell is 2^L blocks, so detail under a cell is gone (a tree, a one-block wall) and a coarse surface is within half a cell of the real one; `noiseTerrainLod` leaves out caves and trees; edits to the real world show in far levels only where its chunks are loaded; nodes generate on the main thread, `budget` a frame; the streamed chunks must stay inside level 1 (`2 * radius` above the streamer's `distance` + 1) or the two overlap; while a level changes, old and new nodes may both show for a few frames; a scaled renderer takes no lighting effects, shadows or capture. Frame cost at kilometre views is unmeasured. |
 | Voxel light in a worker (`@margoengine/voxel/light-worker`, 2026-11-07) | By method: the worker holds a second copy of every loaded chunk's blocks and light; light arrives a frame or more after a change; the page still packs each loaded chunk once and copies the light of changed chunks back (32 KiB each); one worker per world, not with `VoxelLighting` on the same world. |
 | Coloured block light (`@margoengine/voxel/light-rgb`, 2026-11-07) | Enforced: colours 0..1, `extent` multiples of 32 up to 1,024. By method: three copies of every loaded chunk (blocks and light) and three floods per change; coloured light only inside the box around the camera (default 128 x 64 x 128 blocks); the renderer's own block light should be switched off (`blockLightColor` [0, 0, 0]) or it adds on top; a level is rounded per channel, so dim colours lose hue; not on scaled renderers. |
+| Flowing liquids (`@margoengine/voxel/fluids`, 2026-11-07) | Enforced: `reach` 1 to 7, `delay` 1 or more, at most `maxUpdates` cells a tick and 10 ticks an update. By method: levels in eighths (state data), so a liquid runs at most 7 cells from a source; flow toward drops looks 4 cells ahead; no currents pushing bodies, no pressure (a liquid never rises); unloaded chunks stop it like rock; speed on large pools unmeasured. |
 
 ## Rendering
 

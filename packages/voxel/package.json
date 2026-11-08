@@ -81,6 +81,10 @@
     "./light-rgb": {
       "types": "./dist/light-rgb.d.ts",
       "import": "./dist/light-rgb.js"
+    },
+    "./fluids": {
+      "types": "./dist/fluids.d.ts",
+      "import": "./dist/fluids.js"
     }
   },
   "files": [
