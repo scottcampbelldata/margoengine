@@ -1,0 +1,714 @@
+{
+  "date": "2026-11-08",
+  "machine": "SCOTT-DEV, AMD Ryzen 9 9950X, Windows",
+  "diagnostic": true,
+  "baseline": "6fc3c7606c5541fdf2d74ab562af54d712583b39",
+  "afterSourceSha256": {
+    "src/manifold.rs": "eafb49d73b13fc833b0f197fc59f5c4f7959be3858a3add6bfbec69d57461e96",
+    "src/manifold/four.rs": "87c41df69681e712a5efbd14ef2cf52f58466a8503f3c1521547ce58ac58a1ad",
+    "src/world.rs": "878043d04ee55d6c5f3d898ddd01185313fa819aec443a6a2dda4e3fca47cdec",
+    "tests/manifold_exact.rs": "2a3e9b651be0d438940afca08ef254ca368c4010b27388c44e8592ef138ae8e5"
+  },
+  "method": "100-row pyramid, fresh world per round, 60 settling steps then minimum of 40 steps; old/new alternate first position each round, one Node process; both pinned Wasm hashes checked before timing",
+  "caveat": "Loaded machine. A phase probe overlapped part of the 24-round A/B. Browser before/after are sequential sessions with different load; use paired A/B and deterministic work reduction, not their absolute difference, as evidence. Quiet rerun remains required.",
+  "wasm": {
+    "rows": [
+      [
+        2.932399999999916,
+        2.88149999999996
+      ],
+      [
+        2.8854999999998654,
+        2.858400000000074
+      ],
+      [
+        2.897599999999784,
+        2.9111000000002605
+      ],
+      [
+        2.915399999999863,
+        2.8874000000000706
+      ],
+      [
+        2.9104000000006636,
+        2.8773999999993976
+      ],
+      [
+        2.9517000000005282,
+        2.902900000000045
+      ],
+      [
+        2.906600000000253,
+        2.917199999999866
+      ],
+      [
+        2.891200000000026,
+        2.874699999999393
+      ],
+      [
+        2.940400000000409,
+        2.890900000000329
+      ],
+      [
+        2.9451000000008207,
+        2.980800000000272
+      ],
+      [
+        2.898800000000847,
+        2.861300000000483
+      ],
+      [
+        2.9438000000009197,
+        3.072599999999511
+      ],
+      [
+        2.9407999999984895,
+        2.936600000000908
+      ],
+      [
+        2.8856999999989057,
+        2.8893000000007305
+      ],
+      [
+        3.0241000000005442,
+        2.989799999999377
+      ],
+      [
+        2.888999999999214,
+        2.875500000000102
+      ],
+      [
+        2.8966999999993277,
+        2.851700000001074
+      ],
+      [
+        2.9017000000003463,
+        2.90440000000126
+      ],
+      [
+        2.939700000000812,
+        2.8937000000005355
+      ],
+      [
+        3.0917000000008557,
+        2.8725999999987835
+      ],
+      [
+        2.91150000000016,
+        2.8958000000002357
+      ],
+      [
+        3.916900000000169,
+        2.9156000000002678
+      ],
+      [
+        4.36109999999826,
+        4.447499999998399
+      ],
+      [
+        4.460699999999633,
+        4.32209999999759
+      ]
+    ],
+    "ratios": [
+      0.9826422043377584,
+      0.990608213481271,
+      1.0046590281614016,
+      0.9903958290458277,
+      0.9886613523909914,
+      0.9834671545209627,
+      1.00364687263456,
+      0.9942930271165492,
+      0.9831655557066817,
+      1.0121218294792846,
+      0.9870636125292007,
+      1.0437529723481729,
+      0.9985718171934224,
+      1.0012475309290039,
+      0.9886577824803542,
+      0.9953271028040444,
+      0.9844650809547885,
+      1.0009304890239905,
+      0.9843521447765882,
+      0.9291328395374675,
+      0.9946075905890698,
+      0.7443641655391106,
+      1.0198115154433913,
+      0.9689286434859877
+    ]
+  },
+  "phases": {
+    "names": [
+      "total",
+      "broad",
+      "narrow",
+      "islands",
+      "solve",
+      "sleep"
+    ],
+    "rows": [
+      [
+        [
+          2.9364000000000487,
+          0.141599,
+          0.8008989999999999,
+          0.0718,
+          1.8622999999999998,
+          0.017299
+        ],
+        [
+          2.882000000000062,
+          0.140599,
+          0.763999,
+          0.069799,
+          1.864499,
+          0.0177
+        ]
+      ],
+      [
+        [
+          2.9456999999997606,
+          0.1457,
+          0.8109999999999999,
+          0.07049899999999999,
+          1.8785999999999998,
+          0.0177
+        ],
+        [
+          2.8734999999996944,
+          0.140699,
+          0.757099,
+          0.075499,
+          1.8616,
+          0.016999
+        ]
+      ],
+      [
+        [
+          3.8167999999996027,
+          0.24439999999999998,
+          0.8271999999999999,
+          0.078599,
+          2.1021,
+          0.0183
+        ],
+        [
+          4.610500000000229,
+          0.24939999999999998,
+          1.1709,
+          0.116799,
+          2.8584989999999997,
+          0.029099
+        ]
+      ],
+      [
+        [
+          4.626900000000205,
+          0.247699,
+          1.1403999999999999,
+          0.115799,
+          2.864,
+          0.027899999999999998
+        ],
+        [
+          4.653999999999542,
+          0.2496,
+          0.969599,
+          0.0799,
+          2.949899,
+          0.029599
+        ]
+      ],
+      [
+        [
+          4.518100000000231,
+          0.243,
+          1.082199,
+          0.1158,
+          2.844299,
+          0.029099999999999997
+        ],
+        [
+          2.863499999999476,
+          0.140199,
+          0.754699,
+          0.0751,
+          1.859999,
+          0.017199
+        ]
+      ],
+      [
+        [
+          2.8731000000007043,
+          0.13999999999999999,
+          0.8099,
+          0.072199,
+          1.8311,
+          0.017699
+        ],
+        [
+          2.862699999999677,
+          0.1414,
+          0.7552989999999999,
+          0.07529899999999999,
+          1.8431989999999998,
+          0.0172
+        ]
+      ],
+      [
+        [
+          2.878600000000006,
+          0.13999999999999999,
+          0.804399,
+          0.07329999999999999,
+          1.8289,
+          0.017398999999999998
+        ],
+        [
+          2.8432000000002517,
+          0.140199,
+          0.755699,
+          0.07429999999999999,
+          1.833499,
+          0.017499
+        ]
+      ],
+      [
+        [
+          2.977400000000671,
+          0.140699,
+          0.7955,
+          0.0749,
+          1.8440999999999999,
+          0.017699
+        ],
+        [
+          2.8914000000004307,
+          0.13899999999999998,
+          0.7523989999999999,
+          0.072,
+          1.863,
+          0.016599
+        ]
+      ],
+      [
+        [
+          2.8788000000004104,
+          0.138399,
+          0.8033,
+          0.072299,
+          1.828099,
+          0.017398999999999998
+        ],
+        [
+          2.862199999999575,
+          0.14049899999999999,
+          0.760999,
+          0.073499,
+          1.8392,
+          0.017299
+        ]
+      ],
+      [
+        [
+          3.032500000001164,
+          0.14729899999999999,
+          0.8135,
+          0.0776,
+          1.9153989999999999,
+          0.018199
+        ],
+        [
+          2.836300000000847,
+          0.13999899999999998,
+          0.767899,
+          0.07429999999999999,
+          1.8330989999999998,
+          0.017299
+        ]
+      ],
+      [
+        [
+          2.944099999998798,
+          0.145599,
+          0.8137989999999999,
+          0.07719899999999999,
+          1.8826999999999998,
+          0.0177
+        ],
+        [
+          2.9296999999987747,
+          0.1424,
+          0.7697999999999999,
+          0.0774,
+          1.8871989999999998,
+          0.018
+        ]
+      ],
+      [
+        [
+          3.3245000000006257,
+          0.1576,
+          0.841,
+          0.0784,
+          2.0091989999999997,
+          0.017099
+        ],
+        [
+          2.9316000000017084,
+          0.1422,
+          0.763799,
+          0.075499,
+          1.8672989999999998,
+          0.0167
+        ]
+      ]
+    ]
+  },
+  "native": [
+    "AB round 01: scalar 0.586900 ms, four 0.574100 ms, ratio 0.978190",
+    "AB round 02: scalar 0.587700 ms, four 0.575300 ms, ratio 0.978901",
+    "AB round 03: scalar 0.600500 ms, four 0.585000 ms, ratio 0.974188",
+    "AB round 04: scalar 0.602100 ms, four 0.589300 ms, ratio 0.978741",
+    "AB round 05: scalar 0.610900 ms, four 0.601300 ms, ratio 0.984285",
+    "AB round 06: scalar 0.612700 ms, four 0.598800 ms, ratio 0.977314",
+    "AB round 07: scalar 0.612100 ms, four 0.597500 ms, ratio 0.976148",
+    "AB round 08: scalar 0.605000 ms, four 0.593900 ms, ratio 0.981653",
+    "AB round 09: scalar 0.609900 ms, four 0.670900 ms, ratio 1.100016",
+    "AB round 10: scalar 0.624600 ms, four 0.618600 ms, ratio 0.990394",
+    "AB round 11: scalar 0.615700 ms, four 0.597300 ms, ratio 0.970115",
+    "AB round 12: scalar 0.601900 ms, four 0.583900 ms, ratio 0.970095",
+    "AB round 13: scalar 0.598000 ms, four 0.587400 ms, ratio 0.982274",
+    "AB round 14: scalar 0.613500 ms, four 0.605200 ms, ratio 0.986471",
+    "AB round 15: scalar 0.609400 ms, four 0.596800 ms, ratio 0.979324",
+    "AB round 16: scalar 0.607100 ms, four 0.592600 ms, ratio 0.976116",
+    "AB round 17: scalar 0.612800 ms, four 0.611200 ms, ratio 0.997389",
+    "AB round 18: scalar 0.597300 ms, four 0.580400 ms, ratio 0.971706",
+    "AB round 19: scalar 0.586200 ms, four 0.572400 ms, ratio 0.976459",
+    "AB round 20: scalar 0.610200 ms, four 0.605900 ms, ratio 0.992953",
+    "AB round 21: scalar 0.603400 ms, four 0.575400 ms, ratio 0.953596",
+    "AB round 22: scalar 0.615400 ms, four 0.633000 ms, ratio 1.028599",
+    "AB round 23: scalar 0.620400 ms, four 0.591600 ms, ratio 0.953578",
+    "AB round 24: scalar 0.619400 ms, four 0.612000 ms, ratio 0.988053",
+    "AB round 25: scalar 0.609700 ms, four 0.594800 ms, ratio 0.975562",
+    "AB round 26: scalar 0.606800 ms, four 0.593000 ms, ratio 0.977258",
+    "AB round 27: scalar 0.600900 ms, four 0.579200 ms, ratio 0.963888",
+    "AB round 28: scalar 0.589200 ms, four 0.575200 ms, ratio 0.976239",
+    "AB round 29: scalar 0.588900 ms, four 0.579500 ms, ratio 0.984038",
+    "AB round 30: scalar 0.600700 ms, four 0.581900 ms, ratio 0.968703",
+    "AB 14950 pairs, 30 rounds, 5 visits: scalar 0.586200 ms (39.211 ns a pair), four 0.572400 ms (38.288 ns), ratio 0.976459, four faster in 28 rounds"
+  ],
+  "browserBeforeSummary": [
+    "edge 157.0.4341.42 webgpu: 3 pinned-bits scenes equal to native",
+    "edge 157.0.4341.42 webgpu: 100-row pyramid step, best of 12 rounds: Margo 3.50 ms, Rapier 2D 0.21.0 9.63 ms (Margo faster in 12 rounds)",
+    "edge 157.0.4341.42 webgpu: Box2D v3 Wasm 2.19 ms (Margo faster in 0 rounds)",
+    "edge 157.0.4341.42 webgl2: 3 pinned-bits scenes equal to native",
+    "firefox 157.0 webgpu: NOT RUN, this browser has no WebGPU adapter",
+    "firefox 157.0 webgl2: 3 pinned-bits scenes equal to native",
+    "firefox 157.0 webgl2: 100-row pyramid step, best of 12 rounds: Margo 3.50 ms, Rapier 2D 0.21.0 8.42 ms (Margo faster in 12 rounds)",
+    "firefox 157.0 webgl2: Box2D v3 Wasm 1.40 ms (Margo faster in 0 rounds)"
+  ],
+  "browserAfter": {
+    "module": "packages/physics2d/kernel/wasm-check/target/wasm32-unknown-unknown/release/margoengine_physics2d_wasm_check.wasm",
+    "rustflags": "-C target-feature=+simd128",
+    "rapier2d": "0.21.0",
+    "box2d": "v3.2.0 Wasm (BOX2D_WASM)",
+    "runs": [
+      {
+        "browser": "edge",
+        "version": "157.0.4341.42",
+        "backend": "webgpu",
+        "run": true,
+        "checks": [
+          {
+            "check": 0,
+            "pass": true
+          },
+          {
+            "check": 1,
+            "pass": true
+          },
+          {
+            "check": 2,
+            "pass": true
+          }
+        ],
+        "times": [
+          {
+            "margo": 3.0049999952316284,
+            "rapier2d": 8.224999964237213,
+            "box2d": 1.4749999642372131,
+            "box2dTop": 98.77718353271484
+          },
+          {
+            "margo": 2.990000009536743,
+            "rapier2d": 8.395000040531158,
+            "box2d": 1.5100000500679016,
+            "box2dTop": 98.77718353271484
+          },
+          {
+            "margo": 3.1100000143051147,
+            "rapier2d": 8.25,
+            "box2d": 2.0850000381469727,
+            "box2dTop": 98.77718353271484
+          },
+          {
+            "margo": 3.009999990463257,
+            "rapier2d": 8.905000030994415,
+            "box2d": 1.4900000095367432,
+            "box2dTop": 98.77718353271484
+          },
+          {
+            "margo": 3.0300000309944153,
+            "rapier2d": 8.715000033378601,
+            "box2d": 1.449999988079071,
+            "box2dTop": 98.77718353271484
+          },
+          {
+            "margo": 2.865000009536743,
+            "rapier2d": 8.115000009536743,
+            "box2d": 1.409999966621399,
+            "box2dTop": 98.77718353271484
+          },
+          {
+            "margo": 2.8550000190734863,
+            "rapier2d": 8.530000030994415,
+            "box2d": 1.5,
+            "box2dTop": 98.77718353271484
+          },
+          {
+            "margo": 2.8899999856948853,
+            "rapier2d": 8.280000030994415,
+            "box2d": 1.4200000166893005,
+            "box2dTop": 98.77718353271484
+          },
+          {
+            "margo": 2.899999976158142,
+            "rapier2d": 8.620000004768372,
+            "box2d": 1.8399999737739563,
+            "box2dTop": 98.77718353271484
+          },
+          {
+            "margo": 3.949999988079071,
+            "rapier2d": 8.740000009536743,
+            "box2d": 1.9850000143051147,
+            "box2dTop": 98.77718353271484
+          },
+          {
+            "margo": 2.8649999499320984,
+            "rapier2d": 10.814999997615814,
+            "box2d": 1.4100000262260437,
+            "box2dTop": 98.77718353271484
+          },
+          {
+            "margo": 2.884999990463257,
+            "rapier2d": 8.930000007152557,
+            "box2d": 1.5499999523162842,
+            "box2dTop": 98.77718353271484
+          }
+        ]
+      },
+      {
+        "browser": "edge",
+        "version": "157.0.4341.42",
+        "backend": "webgl2",
+        "run": true,
+        "checks": [
+          {
+            "check": 0,
+            "pass": true
+          },
+          {
+            "check": 1,
+            "pass": true
+          },
+          {
+            "check": 2,
+            "pass": true
+          }
+        ],
+        "times": []
+      },
+      {
+        "browser": "firefox",
+        "version": "157.0",
+        "backend": "webgpu",
+        "run": false
+      },
+      {
+        "browser": "firefox",
+        "version": "157.0",
+        "backend": "webgl2",
+        "run": true,
+        "checks": [
+          {
+            "check": 0,
+            "pass": true
+          },
+          {
+            "check": 1,
+            "pass": true
+          },
+          {
+            "check": 2,
+            "pass": true
+          }
+        ],
+        "times": [
+          {
+            "margo": 3.199999999999818,
+            "rapier2d": 9.579999999999927,
+            "box2d": 1.5399999999999636,
+            "box2dTop": 98.77718353271484
+          },
+          {
+            "margo": 3.1599999999998545,
+            "rapier2d": 8.719999999999345,
+            "box2d": 1.5,
+            "box2dTop": 98.77718353271484
+          },
+          {
+            "margo": 3.199999999999818,
+            "rapier2d": 8.5,
+            "box2d": 1.5399999999999636,
+            "box2dTop": 98.77718353271484
+          },
+          {
+            "margo": 3.1799999999993815,
+            "rapier2d": 9.5,
+            "box2d": 1.5799999999999272,
+            "box2dTop": 98.77718353271484
+          },
+          {
+            "margo": 3.2600000000002183,
+            "rapier2d": 8.920000000000073,
+            "box2d": 1.5399999999990541,
+            "box2dTop": 98.77718353271484
+          },
+          {
+            "margo": 3.179999999998472,
+            "rapier2d": 8.859999999998763,
+            "box2d": 1.5200000000004366,
+            "box2dTop": 98.77718353271484
+          },
+          {
+            "margo": 3.180000000000291,
+            "rapier2d": 8.680000000000291,
+            "box2d": 1.5200000000004366,
+            "box2dTop": 98.77718353271484
+          },
+          {
+            "margo": 3.1599999999998545,
+            "rapier2d": 8.399999999999636,
+            "box2d": 1.5199999999986176,
+            "box2dTop": 98.77718353271484
+          },
+          {
+            "margo": 3.2399999999997817,
+            "rapier2d": 8.360000000000582,
+            "box2d": 1.5400000000008731,
+            "box2dTop": 98.77718353271484
+          },
+          {
+            "margo": 3.1599999999998545,
+            "rapier2d": 8.340000000000146,
+            "box2d": 1.5200000000004366,
+            "box2dTop": 98.77718353271484
+          },
+          {
+            "margo": 3.1599999999998545,
+            "rapier2d": 8.400000000001455,
+            "box2d": 1.5400000000008731,
+            "box2dTop": 98.77718353271484
+          },
+          {
+            "margo": 3.180000000000291,
+            "rapier2d": 8.760000000002037,
+            "box2d": 1.5400000000008731,
+            "box2dTop": 98.77718353271484
+          }
+        ]
+      }
+    ]
+  },
+  "discarded": [
+    {
+      "variant": "initial dynamic extraction, scalar relative poses",
+      "old": 2.876,
+      "new": 2.918,
+      "faster": 1,
+      "rounds": 12
+    },
+    {
+      "variant": "all four Quad values transposed for fallback, owner preselect, vector poses",
+      "old": 3.791,
+      "new": 3.961,
+      "faster": 3,
+      "rounds": 12
+    },
+    {
+      "variant": "fixed fallback lanes with inlined distance branches and conditional cuts",
+      "old": 3.267,
+      "new": 3.728,
+      "faster": 1,
+      "rounds": 12
+    }
+  ],
+  "exactness": "Native pinned hashes and whole-manifold comparison to untouched reference passed. Wasm pinned hashes pass. Edge WebGPU/WebGL2 and Firefox WebGL2 pinned hashes pass; Firefox WebGPU has no adapter and is NOT RUN.",
+  "nativeVariant": "Final out-of-line scalar fallback, measured after the final source changes; discardedNativeV3 retains the earlier inlined-fallback experiment.",
+  "discardedNativeV3": [
+    "AB round 01: scalar 0.559300 ms, four 0.557200 ms, ratio 0.996245",
+    "AB round 02: scalar 0.559300 ms, four 0.548500 ms, ratio 0.980690",
+    "AB round 03: scalar 0.559800 ms, four 0.553400 ms, ratio 0.988567",
+    "AB round 04: scalar 0.559800 ms, four 0.550600 ms, ratio 0.983566",
+    "AB round 05: scalar 0.561500 ms, four 0.551700 ms, ratio 0.982547",
+    "AB round 06: scalar 0.560600 ms, four 0.552500 ms, ratio 0.985551",
+    "AB round 07: scalar 0.559600 ms, four 0.551000 ms, ratio 0.984632",
+    "AB round 08: scalar 0.562700 ms, four 0.554300 ms, ratio 0.985072",
+    "AB round 09: scalar 0.558300 ms, four 0.550400 ms, ratio 0.985850",
+    "AB round 10: scalar 0.557400 ms, four 0.549300 ms, ratio 0.985468",
+    "AB round 11: scalar 0.560100 ms, four 0.552900 ms, ratio 0.987145",
+    "AB round 12: scalar 0.562900 ms, four 0.548000 ms, ratio 0.973530",
+    "AB round 13: scalar 0.559200 ms, four 0.551000 ms, ratio 0.985336",
+    "AB round 14: scalar 0.559900 ms, four 0.540700 ms, ratio 0.965708",
+    "AB round 15: scalar 0.560900 ms, four 0.543700 ms, ratio 0.969335",
+    "AB round 16: scalar 0.557500 ms, four 0.540000 ms, ratio 0.968610",
+    "AB round 17: scalar 0.562100 ms, four 0.542100 ms, ratio 0.964419",
+    "AB round 18: scalar 0.561900 ms, four 0.541600 ms, ratio 0.963873",
+    "AB round 19: scalar 0.560400 ms, four 0.537900 ms, ratio 0.959850",
+    "AB round 20: scalar 0.562000 ms, four 0.539300 ms, ratio 0.959609",
+    "AB round 21: scalar 0.562300 ms, four 0.542600 ms, ratio 0.964965",
+    "AB round 22: scalar 0.565000 ms, four 0.542700 ms, ratio 0.960531",
+    "AB round 23: scalar 0.562800 ms, four 0.544900 ms, ratio 0.968195",
+    "AB round 24: scalar 0.563000 ms, four 0.540800 ms, ratio 0.960568",
+    "AB round 25: scalar 0.560200 ms, four 0.539700 ms, ratio 0.963406",
+    "AB round 26: scalar 0.561600 ms, four 0.538200 ms, ratio 0.958333",
+    "AB round 27: scalar 0.560500 ms, four 0.541300 ms, ratio 0.965745",
+    "AB round 28: scalar 0.562400 ms, four 0.539100 ms, ratio 0.958570",
+    "AB round 29: scalar 0.560800 ms, four 0.543800 ms, ratio 0.969686",
+    "AB round 30: scalar 0.562300 ms, four 0.540400 ms, ratio 0.961053",
+    "AB 14950 pairs, 30 rounds, 5 visits: scalar 0.557400 ms (37.284 ns a pair), four 0.537900 ms (35.980 ns), ratio 0.965016, four faster in 30 rounds"
+  ],
+  "sourceHashNormalization": "UTF-8 with CRLF normalized to LF before SHA-256, so Git newline conversion does not change the source identity.",
+  "validation": {
+    "passed": [
+      "npm run lint",
+      "npm run hygiene",
+      "npm run verify",
+      "npm --prefix packages/physics2d test",
+      "npm run test:physics2d-kernel",
+      "npm run check:rust-kernels",
+      "npm run check:readme-run -- --packages=physics2d",
+      "npm run test:physics2d-kernel-browsers"
+    ],
+    "verifyRuns": 1,
+    "verifySeconds": 507.7,
+    "readmeExamples": {
+      "node": 1,
+      "browser": 1,
+      "failed": 0
+    },
+    "prerequisiteFailure": "First hygiene run lacked packages/html/dist/texture.d.ts after rebase. npm run build:packages generated it, then hygiene passed. No test or tolerance changed.",
+    "timeout": false
+  }
+}

@@ -1491,3 +1491,20 @@ The following remain technical gaps, not permission to weaken a check:
     a palette map, a subtract, two dilations, an erosion and a smoothing pass equals the same CPU chain cell for cell
     on 37 x 29 x 41 and on a 256-cubed grid (16.7 million cells), clipped counts included. Missing: any other GPU;
     grids past one storage binding are refused, not split; the tool grid is uploaded per combine.
+
+### Four-pair 2D narrow phase evidence (2026-11-08, section 5 addendum)
+
+`physics2d/kernel/src/manifold/four.rs` groups four independent quad pairs per SIMD evaluation, including relative
+transforms, ordered SAT, history-aware reference and incident selection, clipping and world-space placement. It
+retains the exact scalar Quad distance path for apart cores, reusing placed vertices and SAT results. Fixed lane
+extraction and an out-of-line scalar branch avoid duplicating distance code inside the Wasm batch function.
+`world.rs` queues only awake non-chain quad contacts; other shapes, chains and short tails keep their existing
+paths. Refresh uses original IDs and impulse mapping. No core/stage or shared kernel-common changes are involved.
+
+Evidence now present: pinned native and Wasm hashes; whole-field reference comparisons for scene/random pairs,
+permutations, histories, signed zero and large coordinates; mixed world queues and every tail; Edge WebGPU/WebGL2
+and Firefox WebGL2 browser hashes. Firefox WebGPU has no adapter and is not claimed. The paired Wasm narrow probe
+is 0.795 to 0.752 ms; the uninstrumented step 2.885 to 2.852 ms (17/24 rounds). This is a modest loaded-machine
+result, not the 0.35 ms target. [Entry 92](../whitepaper/perf-history.md) and its committed result include the
+discarded variants, every A/B round and the browser before/after table. Missing: a quiet rerun and proof of a large
+narrow-phase gain. Solver setup and the remaining Box2D loss stay open; no physics work or tolerance was reduced.

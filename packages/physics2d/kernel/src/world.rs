@@ -11,7 +11,7 @@ use margoengine_physics_kernel_common::tree::Tree;
 use margoengine_physics_kernel_common::island::{UnionFind, sleep_tick};
 
 use crate::joint::{Joint, JointDef};
-use crate::manifold::{Manifold, collide_coherent, reference_flip};
+use crate::manifold::{Manifold, collide_coherent, collide_four, reference_flip};
 use crate::mass::mass_of;
 use crate::math::{Rot, V2, Xf, sqrt, v2};
 use crate::shape::{Core, LINEAR_SLOP, ShapeError};
@@ -172,6 +172,31 @@ impl Contact {
     #[inline]
     pub fn touching(&self) -> bool {
         self.manifold.count > 0
+    }
+
+    /// Carries matching point ids' impulses into a new manifold; counts unmatched points when the old one pushed.
+    #[inline]
+    fn refresh(&mut self, manifold: Manifold) -> u64 {
+        let (mut normal, mut tangent) = ([0.0f32; 2], [0.0f32; 2]);
+        let pushed = self.normal_impulse[..self.manifold.count].iter().any(|&i| i != 0.0);
+        let mut cold = 0;
+        for (k, point) in manifold.points[..manifold.count].iter().enumerate() {
+            let mut found = false;
+            for j in 0..self.manifold.count {
+                if self.manifold.points[j].id == point.id {
+                    normal[k] = self.normal_impulse[j];
+                    tangent[k] = self.tangent_impulse[j];
+                    found = true;
+                }
+            }
+            if !found && pushed {
+                cold += 1;
+            }
+        }
+        self.manifold = manifold;
+        self.normal_impulse = normal;
+        self.tangent_impulse = tangent;
+        cold
     }
 }
 
@@ -548,6 +573,9 @@ impl World {
     /// New manifolds for the contacts with an awake body; each new point takes the impulses of the old point with its id.
     fn narrow_phase(&mut self) {
         let (mut built, mut cold) = (0u64, 0u64);
+        let mut inputs = [None; 4];
+        let mut pending: [Option<&mut Contact>; 4] = [None, None, None, None];
+        let mut queued = 0;
         for contact in self.contacts.iter_mut() {
             let (sa, sb) = (&self.shapes[contact.a as usize], &self.shapes[contact.b as usize]);
             let (ba, bb) = (&self.bodies[sa.body as usize], &self.bodies[sb.body as usize]);
@@ -560,6 +588,19 @@ impl World {
             let (oa, ob) = (ba.exact_origin(), bb.exact_origin());
             let xa = Xf { p: v2((oa[0] - from[0]) as f32, (oa[1] - from[1]) as f32), q: ba.xf.q };
             let xb = Xf { p: v2((ob[0] - from[0]) as f32, (ob[1] - from[1]) as f32), q: bb.xf.q };
+            if !sa.chain && !sb.chain && sa.core.count == 4 && sb.core.count == 4 {
+                inputs[queued] = Some((&sa.core, xa, &sb.core, xb, reference_flip(&contact.manifold)));
+                pending[queued] = Some(contact);
+                queued += 1;
+                if queued == 4 {
+                    let manifolds = collide_four(inputs.map(Option::unwrap), SPECULATIVE);
+                    for (slot, manifold) in pending.iter_mut().zip(manifolds) {
+                        cold += slot.take().unwrap().refresh(manifold);
+                    }
+                    queued = 0;
+                }
+                continue;
+            }
             // A chain segment takes its ghosts (smooth.rs); with the chain second, the pair is solved the other way round
             // and the normal turned back, so it still runs from `a` to `b`.
             let manifold = if sa.chain {
@@ -572,24 +613,12 @@ impl World {
                 // Last step's reference face is kept within the hysteresis, so resting points keep their ids.
                 collide_coherent(&sa.core, xa, &sb.core, xb, SPECULATIVE, reference_flip(&contact.manifold))
             };
-            let (mut normal, mut tangent) = ([0.0f32; 2], [0.0f32; 2]);
-            let pushed = contact.normal_impulse[..contact.manifold.count].iter().any(|&i| i != 0.0);
-            for (k, point) in manifold.points[..manifold.count].iter().enumerate() {
-                let mut found = false;
-                for j in 0..contact.manifold.count {
-                    if contact.manifold.points[j].id == point.id {
-                        normal[k] = contact.normal_impulse[j];
-                        tangent[k] = contact.tangent_impulse[j];
-                        found = true;
-                    }
-                }
-                if !found && pushed {
-                    cold += 1;
-                }
-            }
-            contact.manifold = manifold;
-            contact.normal_impulse = normal;
-            contact.tangent_impulse = tangent;
+            cold += contact.refresh(manifold);
+        }
+        // Fewer than four remaining quads keep the scalar path, with the same per-contact frame and last face.
+        for (slot, input) in pending.into_iter().zip(inputs).take(queued) {
+            let (a, xa, b, xb, last) = input.unwrap();
+            cold += slot.unwrap().refresh(collide_coherent(a, xa, b, xb, SPECULATIVE, last));
         }
         self.counts.manifolds = built;
         self.counts.cold_points = cold;

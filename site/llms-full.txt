@@ -4059,8 +4059,13 @@ Measured but not fixed. Their history, sources and rerun commands are in
   1.40 to 1.45 and Rapier 2D's Wasm in 7.63 to 8.14 (Edge 157, Firefox 157). Like for like natively at four lanes:
   Box2D 1.24 ms, Margo 2.87. Left, Wasm, by phase: the narrow phase 0.80 ms (14,950 box pairs, about 54 ns each), the
   solver's setup 0.58 (contact rows 0.27, colouring 0.11, blocks 0.10) and the passes 1.17 (now about as bound by
-  operation count as by the dependency chain). Next: four box pairs at a time in lanes in the narrow phase, the contact
-  rows built straight into the blocks after the colouring, then `closest` skipped where the face is provably closest.
+  operation count as by the dependency chain). The remaining candidates are contact rows built straight into the
+  blocks after the colouring, then `closest` skipped where the face is provably closest.
+  Entry 92 implements four-pair SAT/clipping with every manifold bit retained, but only takes the paired narrow
+  phase from 0.795 to 0.752 ms (11/12 rounds) and the uninstrumented step from 2.885 to 2.852 (17/24);
+  the 0.35 ms narrow target is still open. After: Edge 2.86 ms against Box2D 1.41, Firefox 3.16 against 1.50
+  (diagnostic, changing load). Next: setup rows straight into coloured blocks; profile lane gathers, masked
+  endpoint selection and scalar distance fallback before doing more narrow-phase work.
 
 - **Own convex decomposition builds 5 to 120 times slower than Rapier's V-HACD** (`@margoengine/physics/decomposition`,
   perf history entry 81): repro `node packages/physics/scripts/decomposition-vs-rapier.mjs` after the physics build;

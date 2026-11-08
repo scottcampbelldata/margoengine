@@ -194,3 +194,31 @@ On a discrete-GPU desktop or a Mac: the setup above, then `npm run bench` and `n
 keep the `benchmarks/runs/` folder. On Linux or macOS the AC check returns `null` (recorded, not enforced). Set
 `MARGO_BROWSER=chrome` where Edge is not installed. On macOS, `MARGO_BROWSER=webkit` runs the browser suites in Playwright's
 WebKit build, which has WebGPU there (`npx playwright install webkit`). That is not Safari. Phones are not scripted yet.
+
+## Own 2D four-pair narrow phase (perf history entry 92)
+
+The Rust kernel's batch API has a runnable doctest in `kernel/src/manifold/four.rs`; the package's JavaScript
+Rapier facade is unchanged. From the repository root, with cargo on PATH:
+
+```sh
+npm run test:physics2d-kernel
+npm run check:rust-kernels -- --packages=physics2d
+cargo test --locked --release --manifest-path packages/physics2d/kernel/Cargo.toml --test manifold_exact -- --ignored --nocapture narrow_ab
+```
+
+The ignored benchmark compares current scalar collision and four-pair collision on the identical 14,950-pair
+pyramid snapshot, checks every output bit first, alternates first position per visit, and prints the minimum of
+five visits per round for 30 rounds. The normal exactness tests still compare both paths with the untouched kept
+reference. For a whole-step Wasm A/B, build the baseline and new `kernel/wasm-check/Cargo.toml` with `--locked
+--release --target wasm32-unknown-unknown` and `RUSTFLAGS=-C target-feature=+simd128`, keeping the two modules.
+Instantiate both in one Node process, require every `check(i)` to return zero, then in each of 24 rounds create a
+100-row pyramid, settle 60 steps and take the minimum of the next 40; alternate which module goes first each round.
+Lane P's local driver is `.lane/p/ab-wasm.mjs old.wasm new.wasm 24`. The committed
+[record](results/physics2d-four-pairs-20261108.json) contains every round and the separate phase-probe rows.
+
+For the browser comparison set `BOX2D_WASM` to the existing external `box2d3-pyramid.mjs` black box,
+`REPLAY_FIREFOX` if needed, and `MARGO_GPU_EXCLUSIVE=1`; run
+`node scripts/physics2d-kernel-browsers.mjs --browsers=default,firefox --rounds=12` before and after, preserving
+the JSON report from each run. Edge WebGPU/WebGL2 and Firefox WebGL2 passed the pinned bits here; Firefox WebGPU
+has no adapter and remains unrun. All timings are diagnostic on the loaded SCOTT-DEV machine; a quiet rerun is
+required for release numbers. The target 0.35 ms narrow phase and the Box2D speed gap remain open.

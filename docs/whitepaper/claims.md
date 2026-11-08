@@ -1083,3 +1083,10 @@ that NVIDIA reference with the new controls disabled. `npm run check:merge` repr
 splats, water and quality-presets stories used to note the thrown message, so rewording an error message (messages now
 name their fix) changed the recorded calls. The stories note only that a throw happened (`gpu.note('throw')`), for
 reference and candidate alike; GPU calls, bindings and uploads are unchanged.
+
+## Own 2D four-pair collision (2026-11-08)
+
+| Claim | Evidence | Command | Status |
+| --- | --- | --- | --- |
+| Four-pair and scalar collision keep every manifold field bit, including empty normals and unused points, against the kept reference on suite/random inputs, permutations, face histories, mixed shapes, tails, signed zero and large coordinates; world queuing preserves scalar/chain/sleep contact results | `packages/physics2d/kernel/tests/manifold_exact.rs`, unchanged `tests/support/manifold_ref.rs`, native/Node/browser pinned hashes | `npm run test:physics2d-kernel`; `npm run check:rust-kernels -- --packages=physics2d`; browser command in reproduce.md | PROVEN on native, Wasm Node, Edge WebGPU/WebGL2 and Firefox WebGL2; Firefox WebGPU unrun |
+| Four-pair collision closes the 0.80 to 0.35 ms narrow-phase target or the Box2D speed gap | [Entry 92](perf-history.md), [diagnostic record](results/physics2d-four-pairs-20261108.json): narrow 0.795 to 0.752 ms; whole step 2.885 to 2.852 ms (17/24); changing-load browser sessions | [Reproduce](reproduce.md#own-2d-four-pair-narrow-phase-perf-history-entry-92) | UNPROVEN; target unmet, gap open, quiet rerun required |

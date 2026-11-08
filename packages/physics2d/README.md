@@ -75,3 +75,20 @@ Pass `sprite` and the colliders land on the sprite's pivot and scale, and its `r
 | `edges` | false | False gives filled convex `polygon` colliders; true gives one closed `polyline` per outline and hole, for fixed terrain |
 
 Any other collider setting (`friction`, `restitution`, `sensor`, `density` and the rest) goes on every collider. Limits are in [docs/limits.md](../../docs/limits.md).
+
+## Kernel development
+
+The in-repository Rust kernel under `kernel/` is separate from this package's Rapier facade. Its world batches four
+awake quad contacts through exact SIMD SAT and clipping; separated cores keep the original closest-distance path,
+and other shapes, chains and short tails retain their collision paths. `manifold::collide_four` has a runnable Rust
+example in [its API documentation](kernel/src/manifold/four.rs); every lane's manifold is bit-identical to the
+scalar call, including signed zeros and unused point slots. Run the native and shipped Wasm checks from the root:
+
+```sh
+npm run test:physics2d-kernel
+npm run check:rust-kernels -- --packages=physics2d
+```
+
+[Performance history](../../docs/whitepaper/perf-history.md) records the modest paired gain and the remaining Box2D
+loss; the 0.35 ms narrow-phase target has not been met. Browser evidence covers Edge WebGPU/WebGL2 and Firefox
+WebGL2; Firefox WebGPU has no adapter on the test installation.

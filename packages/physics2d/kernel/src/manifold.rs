@@ -11,6 +11,9 @@ use crate::math::{V2, Xf, v2};
 use margoengine_physics_kernel_common::lanes::F4;
 use crate::shape::{Core, LINEAR_SLOP, MAX_VERTICES};
 
+mod four;
+pub use four::collide_four;
+
 /// How far a face's separation may sit under the true distance and still count as the closest feature.
 const FACE_TOLERANCE: f32 = 0.1 * LINEAR_SLOP;
 /// How close the two faces' separations must be for a pair to keep last step's reference face. Boxes resting on boxes tilt

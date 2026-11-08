@@ -2205,6 +2205,48 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
 - **Rerun:** the paired Wasm A/B as entry 90; the native rows as reproduce.md ("Own 2D physics against Box2D v3
   natively"); the browser run with `BOX2D_WASM` (reproduce.md).
 
+### 92. Own 2D physics: four quad pairs in the narrow phase, every bit unchanged (less work; modest paired Wasm gain)
+
+- **Loss:** the narrow phase still took 0.80 ms of the roughly 2.9 ms Wasm step after entry 91. SIMD lanes held
+  corners of one quad; reference choice and clipping still ran separately for every pair.
+- **Change:** `manifold/four.rs` puts four pairs in lanes through ordered SAT, reference/incident selection and
+  clipping. Relative transforms use the scalar's exact operation order in lanes. Owner vertices are selected once
+  before endpoint picks; a side with no live outside endpoint does no intersection arithmetic. Apart cores reuse
+  the placed Quad values and SAT results in the original exact-distance path; only those lanes are extracted.
+  Keeping that scalar path out of line avoids four copies in the Wasm batch function. World queues four awake
+  quad contacts without allocations; chains, other cores and the final one to three pairs retain their paths.
+- **Evidence:** [record](results/physics2d-four-pairs-20261108.json), SCOTT-DEV, Ryzen 9 9950X, Windows, 2026-11-08.
+  Busy-machine diagnostics, not release speed claims. Two Wasm builds in one Node process, old/new alternating first,
+  fresh 100-row pyramid each round, fastest of 40 steps after 60: **2.885 to 2.852 ms**, faster in **17 of 24** rounds.
+  The paired phase probe: narrow **0.795 to 0.752 ms**, faster in **11 of 12**; total 2.873 to 2.836 ms. The phase
+  probe overlapped part of the uninstrumented run. The discarded inlined variant improved the native narrow-only
+  A/B from **0.5574 to 0.5379 ms** (30/30, five visits per round), while losing in Wasm; that is experiment evidence,
+  not a final native speed claim. The final out-of-line variant also passes the native A/B: **0.5862 to 0.5724 ms**,
+  faster in **28 of 30** rounds. The work reduction is also explicit: four relative transforms, and on a fully
+  overlapping batch four tangent normalizations, become one lane-wise evaluation each, and repeated
+  owner/incident endpoint selection is shared. No contacts, rows, iterations or outputs are removed.
+- **Discarded:** the first batch implementation (2.876 to 2.918 ms, 1/12); transposing all fallback pairs
+  (3.791 to 3.961, 3/12); fixed extractions with four inlined scalar distance branches (3.267 to 3.728, 1/12).
+  Every build retained the pinned hashes. Native and Wasm timing differ; native timing alone did not select a build.
+- **Browser:** sequential before/after sessions, 12 rounds per engine taking turns on one page. Load changed
+  between sessions, so the difference below is not an isolated estimate of this change's gain.
+
+  | Browser/page | Margo before / after | Box2D v3 Wasm before / after | Rapier 2D 0.21.0 Wasm before / after |
+  | --- | --- | --- | --- |
+  | Edge 157 WebGPU | 3.50 / 2.86 ms | 2.19 / 1.41 ms | 9.63 / 8.12 ms |
+  | Firefox 157 WebGL2 | 3.50 / 3.16 ms | 1.40 / 1.50 ms | 8.42 / 8.34 ms |
+
+  Edge WebGPU and WebGL2 and Firefox WebGL2 each passed all three native pinned hashes before and after.
+  Firefox WebGPU had no adapter and is **not run**, not counted as passed. Box2D was a Wasm black box built outside
+  this repository; no reference-engine source was read or copied.
+- **Guard:** `tests/bits.rs`, the Node/browser Wasm checks, and `tests/manifold_exact.rs` against the untouched
+  `support/manifold_ref.rs`: all manifold fields including unused slots, suite scenes over 240 steps, 400,000 random
+  pairs at three speculative distances, mixed lanes, all 24 permutations and 81 face histories, signed zero,
+  large coordinates, and actual world queues across scalar/chain/sleep gaps with every tail size.
+- **Left:** the 0.35 ms narrow target was not reached. Box2D remains about twice as fast in these browser rows.
+  Solver setup (rows then colour then blocks) and distance-path work remain open in known-bugs.md. A quiet-machine
+  rerun is required before publishing speed numbers. Rerun commands and the paired native benchmark are in reproduce.md.
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).
@@ -2279,3 +2321,5 @@ These entries lack a recorded number, a named machine or a quiet run:
 22. `tuneCompute` (entry 77): a quiet run on the A6000 and the M6, and an AMD and an Intel GPU.
 
 [reproduce.md](reproduce.md) has the commands for the rest of the measured claims.
+
+23. Four-pair 2D narrow phase (entry 92): a quiet run of the paired Wasm/native and browser rows.

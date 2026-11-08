@@ -1,6 +1,7 @@
 // The narrow phase's fast paths (src/manifold.rs: four-cornered polygons in lanes, the remainder-free edge walk) give
-// the bits of the code they replaced, kept verbatim in support/manifold_ref.rs: every manifold of the suite scenes over
-// 240 steps and of a million random pairs is compared field by field with `to_bits`. The ignored test is the paired
+// the bits of the code they replaced, kept verbatim in support/manifold_ref.rs: every scalar and four-pair manifold of
+// the suite scenes over 240 steps and of 400,000 random pairs at three speculative distances is compared field by field with `to_bits`. The ignored
+// test is the paired
 // A/B of the two (AGENTS.md: old and new in turns in one process, per-round minimums).
 extern crate alloc;
 
@@ -10,18 +11,20 @@ mod scenes;
 mod reference;
 
 use margoengine_physics_kernel_common::lanes::F4;
-use margoengine_physics2d_kernel::manifold::{Manifold, collide_coherent, reference_flip};
+use margoengine_physics2d_kernel::manifold::{Manifold, collide_coherent, collide_four, reference_flip};
 use margoengine_physics2d_kernel::math::{Rot, V2, Xf, v2};
 use margoengine_physics2d_kernel::shape::Core;
-use margoengine_physics2d_kernel::world::{SPECULATIVE, World};
+use margoengine_physics2d_kernel::smooth::collide_smooth;
+use margoengine_physics2d_kernel::world::{BodyDef, Kind, SPECULATIVE, Settings, ShapeDef, World};
 
 type Input = (Core, Xf, Core, Xf, Option<bool>);
 
-/// Every manifold field as bits: count, normal, then each point's position, separation and id.
-fn key(m: &Manifold) -> Vec<u32> {
-    let mut k = vec![m.count as u32, m.normal.x.to_bits(), m.normal.y.to_bits()];
-    for p in &m.points[..m.count] {
-        k.extend([p.point.x.to_bits(), p.point.y.to_bits(), p.separation.to_bits(), p.id]);
+/// Every manifold field as bits, including the unused point slots and an empty manifold's normal.
+fn key(m: &Manifold) -> [u32; 11] {
+    let mut k = [0; 11];
+    k[..3].copy_from_slice(&[m.count as u32, m.normal.x.to_bits(), m.normal.y.to_bits()]);
+    for (i, p) in m.points.iter().enumerate() {
+        k[3 + 4 * i..7 + 4 * i].copy_from_slice(&[p.point.x.to_bits(), p.point.y.to_bits(), p.separation.to_bits(), p.id]);
     }
     k
 }
@@ -44,19 +47,33 @@ fn narrow_inputs(world: &World) -> Vec<Input> {
     out
 }
 
-/// Compares the two on `inputs` at several speculative distances; returns (compared, differing).
-fn compare(inputs: &[Input]) -> (u64, u64) {
-    let (mut n, mut differ) = (0u64, 0u64);
-    for (a, xa, b, xb, last) in inputs {
-        for speculative in [SPECULATIVE, 0.5, 0.0] {
-            let (new, old) = (collide_coherent(a, *xa, b, *xb, speculative, *last), reference::collide_coherent(a, *xa, b, *xb, speculative, *last));
-            n += 1;
+/// Both entry points against the kept reference, lane by lane; no lane can borrow another lane's result or face choice.
+fn compare_lanes(inputs: [&Input; 4], speculative: f32, n: &mut u64, differ: &mut u64) {
+    let batch = inputs.map(|(a, xa, b, xb, last)| (a, *xa, b, *xb, *last));
+    let batched = collide_four(batch, speculative);
+    for (lane, (a, xa, b, xb, last)) in inputs.into_iter().enumerate() {
+        let old = reference::collide_coherent(a, *xa, b, *xb, speculative, *last);
+        let scalar = collide_coherent(a, *xa, b, *xb, speculative, *last);
+        for (path, new) in [("scalar", scalar), ("four", batched[lane])] {
+            *n += 1;
             if key(&new) != key(&old) {
-                differ += 1;
-                if differ <= 3 {
-                    println!("differs: {a:?} {xa:?} {b:?} {xb:?} {last:?} at {speculative}\n new {new:?}\n old {old:?}");
+                *differ += 1;
+                if *differ <= 3 {
+                    println!("{path} lane {lane} differs: {a:?} {xa:?} {b:?} {xb:?} {last:?} at {speculative}\n new {new:?}\n old {old:?}");
                 }
             }
+        }
+    }
+}
+
+/// Compares both entry points at several speculative distances; pads a final 1/2/3-pair batch with live inputs and
+/// checks those lanes too, so the same input is exact whether it stands alone or shares a full batch.
+fn compare(inputs: &[Input]) -> (u64, u64) {
+    let (mut n, mut differ) = (0u64, 0u64);
+    for chunk in inputs.chunks(4) {
+        let batch = core::array::from_fn(|lane| &chunk[lane % chunk.len()]);
+        for speculative in [SPECULATIVE, 0.5, 0.0] {
+            compare_lanes(batch, speculative, &mut n, &mut differ);
         }
     }
     (n, differ)
@@ -147,35 +164,299 @@ fn random_pair_manifolds_keep_their_bits() {
     assert_eq!(differ, 0);
 }
 
+const LAST_FACES: [Option<bool>; 3] = [None, Some(false), Some(true)];
+const PERMUTATIONS: [[usize; 4]; 24] = [
+    [0, 1, 2, 3], [0, 1, 3, 2], [0, 2, 1, 3], [0, 2, 3, 1], [0, 3, 1, 2], [0, 3, 2, 1],
+    [1, 0, 2, 3], [1, 0, 3, 2], [1, 2, 0, 3], [1, 2, 3, 0], [1, 3, 0, 2], [1, 3, 2, 0],
+    [2, 0, 1, 3], [2, 0, 3, 1], [2, 1, 0, 3], [2, 1, 3, 0], [2, 3, 0, 1], [2, 3, 1, 0],
+    [3, 0, 1, 2], [3, 0, 2, 1], [3, 1, 0, 2], [3, 1, 2, 0], [3, 2, 0, 1], [3, 2, 1, 0],
+];
+
+/// Mixed batches deliberately put overlap clipping, apart-distance fallback, rejection and non-quad fallback together.
+fn batch_cases() -> [Input; 12] {
+    let square = Core::rect(0.5, 0.5, V2::ZERO, 1.0, 0.0, 0.0).unwrap();
+    let rounded = Core::rect(0.5, 0.5, V2::ZERO, 1.0, 0.0, 0.1).unwrap();
+    let quad = Core::polygon(&[v2(-0.7, -0.4), v2(0.5, -0.6), v2(0.8, 0.4), v2(-0.4, 0.7)], 0.03).unwrap();
+    let triangle = Core::polygon(&[v2(-0.6, -0.5), v2(0.6, -0.5), v2(0.0, 0.7)], 0.02).unwrap();
+    let capsule = Core::capsule(v2(-0.4, 0.0), v2(0.4, 0.1), 0.2).unwrap();
+    let circle = Core::circle(v2(0.1, -0.1), 0.3).unwrap();
+    let at = |x, y| Xf { p: v2(x, y), q: Rot { c: 1.0, s: 0.0 } };
+    let turned = |x, y| Xf { p: v2(x, y), q: Rot { c: 0.8, s: 0.6 } };
+    [
+        (square, Xf::IDENTITY, square, at(0.0, 0.9), None),
+        (rounded, Xf::IDENTITY, rounded, at(1.08, 1.08), None),
+        (square, Xf::IDENTITY, square, at(4.0, 3.0), None),
+        (circle, Xf::IDENTITY, circle, at(0.4, 0.0), None),
+        (square, Xf::IDENTITY, square, at(0.1, 1.015), None),
+        (square, at(-0.2, 0.4), square, turned(0.35, 0.9), None),
+        (quad, Xf::IDENTITY, triangle, turned(0.4, 0.5), None),
+        (capsule, turned(0.0, 0.0), circle, at(0.3, 0.15), None),
+        (quad, turned(-0.4, 0.1), rounded, at(0.3, 0.4), None),
+        (square, Xf::IDENTITY, square, at(0.0, 1.0), None),
+        (square, Xf::IDENTITY, square, turned(0.9, 0.6), None),
+        (square, turned(0.0, 0.0), quad, turned(1.0, 0.3), None),
+    ]
+}
+
+#[test]
+fn four_pair_lane_permutations_and_all_face_choices_keep_their_bits() {
+    let cases = batch_cases();
+    let (mut n, mut differ) = (0, 0);
+    for group in cases.chunks_exact(4) {
+        for permutation in PERMUTATIONS {
+            // All 3^4 histories, independently in each lane. A batch-wide last-face flag would fail this test.
+            for histories in 0..81 {
+                let mut remaining = histories;
+                let batch: [Input; 4] = permutation.map(|index| {
+                    let mut input = group[index];
+                    input.4 = LAST_FACES[remaining % 3];
+                    remaining /= 3;
+                    input
+                });
+                for speculative in [SPECULATIVE, 0.5, 0.0] {
+                    compare_lanes(batch.each_ref(), speculative, &mut n, &mut differ);
+                    assert_eq!(differ, 0, "permutation {permutation:?}, face histories {histories}, speculative {speculative}");
+                }
+            }
+        }
+    }
+    assert_eq!(n, 3 * 24 * 81 * 3 * 8);
+}
+
+#[test]
+fn four_pair_empty_and_short_tails_keep_their_bits() {
+    let cases = batch_cases();
+    // Every tail length, both with and without a preceding full batch. Rotate the cases so each path can be the tail.
+    for offset in 0..cases.len() {
+        let rotated: Vec<Input> = (0..cases.len()).map(|i| cases[(i + offset) % cases.len()]).collect();
+        for len in 0..=cases.len() {
+            let (n, differ) = compare(&rotated[..len]);
+            assert_eq!(n, len.div_ceil(4) as u64 * 24, "offset {offset}, tail length {len}");
+            assert_eq!(differ, 0, "offset {offset}, tail length {len}");
+        }
+    }
+}
+
+#[test]
+fn world_quad_queue_crosses_scalar_chain_and_sleep_gaps_and_keeps_tail_bits() {
+    let square = Core::rect(0.5, 0.5, V2::ZERO, 1.0, 0.0, 0.0).unwrap();
+    let circle = Core::circle(V2::ZERO, 0.5).unwrap();
+    for quads in 0..=12usize {
+        let mut world = World::new(Settings { gravity: V2::ZERO, ..Default::default() });
+        let groups = quads.max(1);
+        for group in 0..groups {
+            for kind in 0..4 {
+                if kind == 0 && group >= quads {
+                    continue;
+                }
+                let x = (group * 4 + kind) as f32 * 10.0;
+                let base = world.create_body(&BodyDef { kind: Kind::Static, position: v2(x, 0.0), ..Default::default() });
+                let height = if kind == 2 { 0.51 } else { 1.01 };
+                let top = world.create_body(&BodyDef { position: v2(x, height), ..Default::default() });
+                match kind {
+                    0 | 3 => {
+                        world.create_shape(base, square, &ShapeDef::default());
+                        world.create_shape(top, square, &ShapeDef::default());
+                    }
+                    1 => {
+                        world.create_shape(base, circle, &ShapeDef::default());
+                        world.create_shape(top, circle, &ShapeDef::default());
+                    }
+                    _ => {
+                        // Alternate which shape id owns the chain, exercising both smooth-dispatch directions.
+                        if group % 2 == 0 {
+                            world.create_shape(top, circle, &ShapeDef::default());
+                        }
+                        world.create_chain(base, &[v2(-0.5, 0.0), v2(0.5, 0.0)], false, &ShapeDef::default()).unwrap();
+                        if group % 2 != 0 {
+                            world.create_shape(top, circle, &ShapeDef::default());
+                        }
+                    }
+                }
+                if kind == 3 {
+                    world.bodies[top as usize].awake = false;
+                }
+            }
+        }
+        for step in 0..3 {
+            let before = world.bodies.clone();
+            let old_contacts = world.contacts.clone();
+            world.step(scenes::DT);
+            let (mut eligible, mut built, mut cold) = (0, 0, 0);
+            for contact in &world.contacts {
+                let (sa, sb) = (&world.shapes[contact.a as usize], &world.shapes[contact.b as usize]);
+                let (ba, bb) = (&before[sa.body as usize], &before[sb.body as usize]);
+                let old = old_contacts.iter().find(|c| (c.a, c.b) == (contact.a, contact.b));
+                let previous = old.map_or(Manifold::default(), |c| c.manifold);
+                let expected = if !ba.awake && !bb.awake {
+                    previous
+                } else {
+                    built += 1;
+                    eligible += usize::from(!sa.chain && !sb.chain && sa.core.count == 4 && sb.core.count == 4);
+                    let from = ba.exact_center;
+                    let (oa, ob) = (ba.exact_origin(), bb.exact_origin());
+                    let xa = Xf { p: v2((oa[0] - from[0]) as f32, (oa[1] - from[1]) as f32), q: ba.xf.q };
+                    let xb = Xf { p: v2((ob[0] - from[0]) as f32, (ob[1] - from[1]) as f32), q: bb.xf.q };
+                    let manifold = if sa.chain {
+                        collide_smooth(&sa.core, sa.ghosts, xa, &sb.core, xb, SPECULATIVE)
+                    } else if sb.chain {
+                        let mut m = collide_smooth(&sb.core, sb.ghosts, xb, &sa.core, xa, SPECULATIVE);
+                        m.normal = m.normal.neg();
+                        m
+                    } else {
+                        reference::collide_coherent(&sa.core, xa, &sb.core, xb, SPECULATIVE, reference_flip(&previous))
+                    };
+                    if old.is_some_and(|c| c.normal_impulse[..c.manifold.count].iter().any(|&impulse| impulse != 0.0)) {
+                        cold += manifold.points[..manifold.count].iter().filter(|point| {
+                            !previous.points[..previous.count].iter().any(|old_point| old_point.id == point.id)
+                        }).count() as u64;
+                    }
+                    manifold
+                };
+                assert_eq!(key(&contact.manifold), key(&expected), "{quads} queued quads, step {step}, pair ({}, {})", contact.a, contact.b);
+            }
+            assert_eq!(eligible, quads, "eligible queue length, step {step}");
+            assert_eq!(built, quads + 2 * groups, "awake quad/scalar/chain contacts, step {step}");
+            assert_eq!(world.contacts.len(), quads + 3 * groups, "including sleeping gaps, step {step}");
+            assert_eq!(world.counts.manifolds, built as u64);
+            assert_eq!(world.counts.cold_points, cold);
+        }
+    }
+}
+
+#[test]
+fn four_pair_identity_and_signed_zero_manifolds_keep_their_bits() {
+    let mut inputs = Vec::new();
+    for zero in [0.0f32, -0.0] {
+        for other_zero in [0.0f32, -0.0] {
+            let a = Core::rect(0.5, 0.5, v2(zero, other_zero), 1.0, zero, other_zero).unwrap();
+            let b = Core::rect(0.6, 0.2, v2(other_zero, zero), 0.0, 1.0, zero).unwrap();
+            let rotations = [Rot { c: 1.0, s: zero }, Rot { c: -1.0, s: other_zero }, Rot { c: zero, s: 1.0 }];
+            for qa in rotations {
+                for qb in rotations {
+                    for p in [v2(zero, other_zero), v2(zero, 0.69), v2(1.1001, other_zero), v2(2.0, 2.0)] {
+                        for last in LAST_FACES {
+                            inputs.push((a, Xf { p: v2(zero, other_zero), q: qa }, b, Xf { p, q: qb }, last));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    let (n, differ) = compare(&inputs);
+    assert_eq!(n, inputs.len() as u64 * 6);
+    assert_eq!(differ, 0);
+}
+
+#[test]
+fn four_pair_large_local_and_world_coordinates_keep_their_bits() {
+    let mut inputs = Vec::new();
+    for local in [0.0, 1_000.0, 100_000.0, 1_000_000.0] {
+        let a = Core::rect(0.5, 0.75, v2(local, -local), 1.0, 0.0, 0.03).unwrap();
+        let b = Core::rect(0.7, 0.3, v2(local, -local), 0.8, 0.6, 0.07).unwrap();
+        for world in [0.0, -1_000.0, 1_000_000.0, -16_777_216.0, 1e15] {
+            for q in [Rot { c: 1.0, s: 0.0 }, Rot { c: 0.8, s: 0.6 }] {
+                let xa = Xf { p: v2(world, -world), q };
+                for offset in [v2(0.0, 0.0), v2(0.7, 0.2), v2(1.4, 0.0), v2(3.0, -2.0)] {
+                    let xb = Xf { p: xa.p.add(offset), q };
+                    for last in LAST_FACES {
+                        inputs.push((a, xa, b, xb, last));
+                    }
+                }
+            }
+        }
+    }
+    let (n, differ) = compare(&inputs);
+    assert_eq!(n, inputs.len() as u64 * 6);
+    assert_eq!(differ, 0);
+}
+
 #[test]
 #[ignore]
 fn narrow_ab_of_the_100_row_pyramid() {
-    // Paired A/B: the reference and the fast paths on the same pyramid inputs in turns, 30 rounds, per-round minimums.
+    // Current scalar versus four-pair entry on identical inputs: alternate order on every visit and take
+    // each round's fastest of five visits, so a busy machine's scheduling does not decide the comparison.
+    const ROUNDS: usize = 30;
+    const VISITS: usize = 5;
     let mut world = scenes::pyramid(100);
     for _ in 0..60 {
         world.step(scenes::DT);
     }
     let inputs = narrow_inputs(&world);
-    let (mut old, mut new, mut sink) = (Vec::new(), Vec::new(), 0.0f32);
-    for _ in 0..30 {
-        let t = std::time::Instant::now();
-        for (a, xa, b, xb, last) in &inputs {
-            sink += reference::collide_coherent(a, *xa, b, *xb, SPECULATIVE, *last).normal.x;
+    assert!(!inputs.is_empty());
+    for chunk in inputs.chunks_exact(4) {
+        let batch = core::array::from_fn(|lane| {
+            let (a, xa, b, xb, last) = &chunk[lane];
+            (a, *xa, b, *xb, *last)
+        });
+        for ((a, xa, b, xb, last), four) in chunk.iter().zip(collide_four(batch, SPECULATIVE)) {
+            assert_eq!(key(&collide_coherent(a, *xa, b, *xb, SPECULATIVE, *last)), key(&four));
         }
-        old.push(t.elapsed().as_secs_f64() * 1e3);
-        let t = std::time::Instant::now();
-        for (a, xa, b, xb, last) in &inputs {
-            sink += collide_coherent(a, *xa, b, *xb, SPECULATIVE, *last).normal.x;
-        }
-        new.push(t.elapsed().as_secs_f64() * 1e3);
     }
-    let (o, w) = (old.iter().cloned().fold(f64::INFINITY, f64::min), new.iter().cloned().fold(f64::INFINITY, f64::min));
-    let faster = old.iter().zip(&new).filter(|(o, n)| n < o).count();
+    let scalar = || {
+        let mut sink = 0.0f32;
+        for (a, xa, b, xb, last) in std::hint::black_box(inputs.as_slice()) {
+            let manifold = std::hint::black_box(collide_coherent(a, *xa, b, *xb, SPECULATIVE, *last));
+            sink += manifold.normal.x;
+        }
+        std::hint::black_box(sink)
+    };
+    let four = || {
+        let mut sink = 0.0f32;
+        let mut chunks = std::hint::black_box(inputs.as_slice()).chunks_exact(4);
+        for chunk in &mut chunks {
+            let batch = core::array::from_fn(|lane| {
+                let (a, xa, b, xb, last) = &chunk[lane];
+                (a, *xa, b, *xb, *last)
+            });
+            for manifold in collide_four(batch, SPECULATIVE) {
+                let manifold = std::hint::black_box(manifold);
+                sink += manifold.normal.x;
+            }
+        }
+        // The same final one, two or three pairs are still solved, without padding or extra work.
+        for (a, xa, b, xb, last) in chunks.remainder() {
+            let manifold = std::hint::black_box(collide_coherent(a, *xa, b, *xb, SPECULATIVE, *last));
+            sink += manifold.normal.x;
+        }
+        std::hint::black_box(sink)
+    };
+    assert_eq!(scalar().to_bits(), four().to_bits());
+    let time = |run: &dyn Fn() -> f32| {
+        let t = std::time::Instant::now();
+        std::hint::black_box(run());
+        t.elapsed().as_secs_f64() * 1e3
+    };
+    let (mut scalar_rounds, mut four_rounds) = (Vec::new(), Vec::new());
+    for round in 0..ROUNDS {
+        let (mut scalar_min, mut four_min) = (f64::INFINITY, f64::INFINITY);
+        for visit in 0..VISITS {
+            let (s, f) = if (round + visit) % 2 == 0 {
+                (time(&scalar), time(&four))
+            } else {
+                let f = time(&four);
+                (time(&scalar), f)
+            };
+            scalar_min = scalar_min.min(s);
+            four_min = four_min.min(f);
+        }
+        scalar_rounds.push(scalar_min);
+        four_rounds.push(four_min);
+        println!(
+            "AB round {:02}: scalar {scalar_min:.6} ms, four {four_min:.6} ms, ratio {:.6}",
+            round + 1,
+            four_min / scalar_min
+        );
+    }
+    let scalar_min = scalar_rounds.iter().copied().fold(f64::INFINITY, f64::min);
+    let four_min = four_rounds.iter().copied().fold(f64::INFINITY, f64::min);
+    let faster = scalar_rounds.iter().zip(&four_rounds).filter(|(s, f)| f < s).count();
     println!(
-        "AB {} pairs: old {o:.3} ms ({:.1} ns a pair), new {w:.3} ms ({:.1} ns), new faster in {faster} of 30 rounds {sink}",
+        "AB {} pairs, {ROUNDS} rounds, {VISITS} visits: scalar {scalar_min:.6} ms ({:.3} ns a pair), four {four_min:.6} ms ({:.3} ns), ratio {:.6}, four faster in {faster} rounds",
         inputs.len(),
-        o * 1e6 / inputs.len() as f64,
-        w * 1e6 / inputs.len() as f64
+        scalar_min * 1e6 / inputs.len() as f64,
+        four_min * 1e6 / inputs.len() as f64,
+        four_min / scalar_min
     );
 }
 
