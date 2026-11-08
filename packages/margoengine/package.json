@@ -2290,6 +2290,10 @@
       "types": "./dist/scatter/paint.d.ts",
       "import": "./dist/scatter/paint.js"
     },
+    "./scatter/pick": {
+      "types": "./dist/scatter/pick.d.ts",
+      "import": "./dist/scatter/pick.js"
+    },
     "./scene": {
       "types": "./dist/scene.d.ts",
       "import": "./dist/scene.js"

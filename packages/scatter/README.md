@@ -422,6 +422,55 @@ and slots); `tiles.gpuBytes` reports it from the first frame (0 for a mesh that 
 capacity keeps the first instances in record order. The GPU's `maxStorageBufferBindingSize` holds 32 bytes per record
 slot: 4,194,304 slots at the WebGPU default of 128 MiB.
 
+## Picking instances: `@margoengine/scatter/pick`
+
+`InstancePicker` hit tests single scattered instances for selection and harvesting. It works on the transforms you
+already hold (`instanceTransforms`, `groundTransforms`, a `ScatterBatch`'s `transforms`), on the CPU, so it needs no
+GPU and no readback. A ray finds the nearest instance; a sphere finds every instance it reaches; `remove` takes an
+instance out of later picks, and `kept()` gives the transforms left to draw again.
+
+```ts
+import { InstancePicker, boundsOf } from 'margoengine/scatter/pick';
+import { instanceTransforms } from 'margoengine/scatter';
+
+// 400 bushes on a 20 x 20 grid, each a box 1 m wide and 1.5 m tall around its root.
+const places: [number, number, number, number, number][] = [];
+for (let z = 0; z < 20; z++) for (let x = 0; x < 20; x++) places.push([x * 3, 0, z * 3, 1, (x + z) * 0.7]);
+const transforms = instanceTransforms(places);
+const picker = new InstancePicker(transforms, { bounds: { min: [-0.5, 0, -0.5], max: [0.5, 1.5, 0.5] } });
+
+// A ray from the camera (for example `Raycaster.setFromEngine` in margoengine/bvh gives origin and direction).
+const hit = picker.pick([-5, 4, -5], [1, -0.4, 1]);
+if (hit) {
+  console.log(hit.index, hit.distance.toFixed(2), hit.point);
+  picker.remove(hit.index); // harvested: later picks go through to the bush behind
+}
+console.log(picker.near([30, 0, 30], 4)); // every bush within 4 m of the player, nearest first
+const { transforms: left, indices } = picker.kept(); // draw `left` again; indices[k] is its old number
+console.log(left.length / 16, indices.length, boundsOf(new Float32Array([0, 0, 0, 1, 2, 3])));
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `bounds` | the box of `mesh` | the drawn mesh's local box, `{min, max}` |
+| `mesh` | none | `{positions, stride?, indices}`: also test the triangles, so a ray through the gaps of a tree misses it; `stride` 20 reads a `ScatterBatch`'s `vertices` |
+| `cell` | from the spread and size | side of a grid cell in world units |
+
+- `pick(origin, direction, maxDistance?)` returns `{index, distance, point}` or `null`; `pickAll` lists every hit,
+  nearest first. Both faces of a triangle count, as for a blade or a leaf card.
+- `near(center, radius)` returns the instance numbers whose world box comes within `radius`, nearest box first.
+- `remove(index)`, `restore(index)`, `removed(index)` and `active` track harvesting; `setTransform(index, matrix)`
+  moves one instance. The grid is rebuilt on the next pick after any of these, in time linear in the instance count,
+  so many changes in a frame cost one rebuild.
+- How it works: the instances' world boxes go into a uniform XZ grid, which a ray walks front to back cell by cell
+  (Amanatides and Woo 1987), stopping once the nearest hit lies inside the cells walked. Each instance is tested in its
+  own local space: the ray against the box by slabs (Kay and Kajiya 1986), then against the triangles (Moller and
+  Trumbore 1997) when a mesh is given. A test checks 3,000 rays against testing every instance one by one.
+- Limits: CPU only, on transforms you pass. The GPU `Scatter` and `ScatterTiles` make their instances on the GPU from
+  the seed and tiles, so they are not picked here; pick the records you stored for tiles by passing their
+  transforms. An instance scaled to 0 is never hit. The picker keeps a copy of the transforms (64 bytes an instance)
+  plus 125 bytes of world box, inverse and flags an instance, and 4 bytes a grid entry.
+
 Real WebGPU LOD, diffuse/PBR fade-mask and device-restoration checks:
 `npm run test:browser --workspace @margoengine/scatter` (build geometry/core first).
 

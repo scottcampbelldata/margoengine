@@ -1239,4 +1239,26 @@ export const entries = [
       'A client and server of different protocol versions met, or the server refused the page or stopped, or nothing arrived for `serverTimeout` on a dead network; a `filterName` hook returned something other than a string; or `importEdits` got something other than the output of `exportEdits` for this game.',
     fix: "Build server and client from the same voxel-net version (`PROTOCOL_VERSION`), and read the close reason in the message. After a silent server, join again; keep `serverTimeout` well above the server's `heartbeatInterval`, and `clientTimeout` above `heartbeatInterval`. Return a string from `filterName`. Pass `importEdits` the `Map` that `exportEdits` returned, on a server with the same block types, and give a `VoxelEditStore` a `delete(key)` when chunks must go back to the generator.",
   },
+  {
+    id: 'scatter',
+    title: '@margoengine/scatter: picking and other optional entries',
+    kind: 'family',
+    messages: [
+      'boundsOf takes a Float32Array of positions and a stride of 3 or more',
+      'InstancePicker takes transforms: a Float32Array of 16 floats per instance',
+      'A pick mesh is { positions, stride?, indices } with indices into positions',
+      'InstancePicker needs bounds { min, max } or a mesh { positions, indices }',
+      'A pick box is { min: [x, y, z], max: [x, y, z] } with min at most max',
+      'A pick cell is a number of world units above 0',
+      'A pick instance index is an integer 0..count - 1',
+      'A pick ray needs a finite origin and a direction other than 0',
+      'A pick maxDistance is above 0 (default Infinity)',
+      'A pick centre is a finite [x, y, z]',
+      'A pick radius is a number above 0',
+      'setTransform takes 16 floats of a column-major matrix',
+    ],
+    cause:
+      'An option or argument of a scatter entry is out of its range or of the wrong type: for `InstancePicker`, transforms that are not 16 floats an instance, a box with its min above its max, a mesh index past its positions, a ray with no direction, or an instance number past `count`.',
+    fix: 'Pass the transforms `instanceTransforms` or `groundTransforms` return, the drawn mesh\'s local box (or its `mesh`, and `boundsOf` makes the box), a ray with a direction other than 0, and instance numbers below `picker.count`. The package README lists every option with its range.',
+  },
 ];

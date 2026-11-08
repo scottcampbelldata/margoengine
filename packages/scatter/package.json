@@ -33,6 +33,10 @@
     "./paint": {
       "types": "./dist/paint.d.ts",
       "import": "./dist/paint.js"
+    },
+    "./pick": {
+      "types": "./dist/pick.d.ts",
+      "import": "./dist/pick.js"
     }
   },
   "files": [
