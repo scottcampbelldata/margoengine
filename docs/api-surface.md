@@ -98,7 +98,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/tween | `.` 50, `./stagger` 8, `./motion-path` 7, `./scroll` 4, `./custom-ease` 6 | 16 |  | 5,503 |
 | @margoengine/ui | `.` 97, `./react` 23, `./world` 10 | 108 |  | 27,546 |
 | @margoengine/usdz | `.` 12, `./worker` 2, `./compose` 7, `./skel` 1, `./anim` 1, `./subdiv` 2, `./lux` 4, `./materialx` 3 | 95 |  | 12,337 |
-| @margoengine/vfx | `.` 21, `./base` 25, `./obstacles` 1, `./wrap` 1, `./sort` 1, `./texture` 1, `./soft` 1, `./curves` 3, `./emitter` 2, `./ribbons` 3, `./mesh` 3, `./events` 1, `./lit` 1, `./depth-collide` 1, `./stretch` 1, `./fields` 3, `./skinned` 3 | 361 |  | 25,404 |
+| @margoengine/vfx | `.` 21, `./base` 25, `./obstacles` 1, `./wrap` 1, `./sort` 1, `./texture` 1, `./soft` 1, `./curves` 3, `./emitter` 2, `./ribbons` 3, `./mesh` 3, `./events` 1, `./lit` 1, `./depth-collide` 1, `./stretch` 1, `./fields` 3, `./skinned` 3 | 361 |  | 26,715 |
 | @margoengine/video | `.` 2 |  |  | 2,094 |
 | @margoengine/viewcube | `.` 5 |  |  | 3,394 |
 | @margoengine/voxel | `.` 22, `./query` 7, `./codec` 9, `./stream` 5, `./generate` 5, `./bevel` 5, `./mesher` 12, `./light` 3, `./vox` 14, `./physics` 2, `./render` 11, `./lightmap` 3, `./lod` 6, `./light-worker` 4, `./light-rgb` 2, `./fluids` 5, `./ticks` 10, `./gpu-mesher` 3, `./smooth` 8, `./gi` 2, `./debris` 4 | 157 |  | 5,871 |

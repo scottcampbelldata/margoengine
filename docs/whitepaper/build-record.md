@@ -2849,3 +2849,35 @@ timed.
 - **Bugs found:** a test-only canvas read race in `lit-check.html` (fixed); the `fields` edit had to target the force
   sum so it works with `obstacles` (caught before landing); a skinned birth would have added the emitter's default
   `position` on top of the mesh `transform` (caught by the GPU check, regression in `skinned.test.js`).
+## Lane I batch 62: terrain
+
+Four jobs for `@margoengine/terrain` on the Beelink (lane I, work list 3): three new optional entries and one
+compatibility check with no new entry. Core and stage are untouched. GPU work is proved on a Radeon 680M through each
+job's `packages/terrain/test/*.browser.mjs` (in `test:gpu`). Nothing is timed.
+
+| # | Job | Status | Commit | Entry | Claim |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Deformable ground | DONE | `132e6b20b` | `/deform` (`TerrainDeformation`) | LIM-497 |
+| 2 | Mesh to terrain blending | DONE | `1ad863a90` | `/blend` (`TerrainBlend`) | LIM-502 |
+| 3 | WebGL2 fallback | DONE | `4242e43ba` | root (compat route, no entry) | LIM-503 |
+| 4 | Planet terrain | DONE | `d9cbfbf82` | `/planet` (`PlanetTerrain`, `cubeSphere`, `planetNoise`) | LIM-507 |
+
+- **Built from:** a camera-centred deformation map addressed toroidally (S66); a mesh pixel's height above the
+  heightmap's bilinear ground (S67); the equal-angle cube sphere warp with a quadtree split by screen error, skirts,
+  and patch centres in float64 drawn relative to the eye (S68). Rows S66 to S68 in `docs/clean-room.md`.
+- **Proved:** the compatibility check draws the rules, painted weights with a hole, and the runtime virtual texture
+  natively and through `install({ force: true })` in exact pixels, at most 1 of 255 apart in every case; the virtual
+  texture bakes 1,310,720 texels on both; the cost is counted in the page: 6 engine draws, 6 GL draws, 48 GL calls a
+  frame (50 with the virtual texture). The planet's disc is 16,939 px against 16,965 expected, its horizon dip is
+  within 1 px in every column, no sky shows through the ground at 6,371 km from the origin, a FloatingOrigin gives an
+  identical picture, and a flight from 2 radii to 2.8 m reaches level 20. A patch builds in about 1.3 ms of CPU
+  (diagnostic).
+- **Limits:** one GPU. The fallback was not run for layers-pbr, stream, sculpt, deform, displace or blend. Rows in
+  docs/limits.md.
+- **Slips:** job 3's first landing failed a root test: `tests/check-fixed-waits.test.js` flagged a 4-frame warm-up loop
+  in `compat.html`; it now waits for the pipelines, ready when the virtual texture's last frame baked nothing. Job 4's
+  first landing failed the quality api gate (3 error messages without a fix hint). Its second failed the root tests
+  (claims-file: two rows for one limit): the lane rebase helper `resolve.mjs` mapped our renumbered claim onto main's
+  LIM-505 and replaced main's vfx depth-collide rows in claims, limits and clean-room. Never pushed; fixed by hand
+  (our rows dropped, rebased on main's files, re-added as LIM-507). `resolve.mjs` is unsafe for shared tables and is no
+  longer used for them.
