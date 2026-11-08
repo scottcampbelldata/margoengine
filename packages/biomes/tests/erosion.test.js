@@ -240,14 +240,14 @@ test('erosion entry is loaded only for a relief that asks for it; without it the
     script = `
       const { createRelief } = await import(${JSON.stringify(relief)});
       try { createRelief({ erosion: {} }); console.log('no error'); }
-      catch (e) { console.log(e.name, e.code, e.message.includes('@margoengine/biomes/erosion')); }
+      catch (e) { console.log(e.name + ' ' + e.code + ' ' + e.message.includes('@margoengine/biomes/erosion')); }
       const { BiomeWorld } = await import(${JSON.stringify(index)});
       const w = await BiomeWorld.create({ size: [256, 256] });
       try { w.update({ height: { relief: { erosion: {} } } }); console.log('no error'); }
-      catch (e) { console.log('update', e.code); }
+      catch (e) { console.log('update ' + e.code); }
       const v = await BiomeWorld.create({ size: [256, 256], height: { relief: { erosion: { iterations: 2 } } } });
       w.update({ height: { relief: { erosion: { iterations: 2 } } } });
-      console.log('after load', (await w.digest(0, 0)) === (await v.digest(0, 0)));`;
+      console.log('after load ' + ((await w.digest(0, 0)) === (await v.digest(0, 0))));`;
   const out = execFileSync(process.execPath, ['--input-type=module', '-e', script], {
     encoding: 'utf8',
     timeout: 60_000,

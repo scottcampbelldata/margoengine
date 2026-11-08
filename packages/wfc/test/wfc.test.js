@@ -56,7 +56,7 @@ test('thirty-two tile types solve instead of propagating forever', async () => {
   const { spawnSync } = await import('node:child_process');
   const code = `import {WFC} from ${JSON.stringify(new URL('../dist/index.js', import.meta.url).href)};
     const all = Array.from({length: 32}, (_, i) => i), wfc = new WFC([4, 2, 2], all.map(() => ({neighbors: Array.from({length: 6}, () => all)})));
-    const result = wfc.solve(7, [{position: [0, 0, 0], tile: 31}]); console.log(result.length, result[0], Math.max(...result) < 32);`;
+    const result = wfc.solve(7, [{position: [0, 0, 0], tile: 31}]); console.log(result.length + ' ' + result[0] + ' ' + (Math.max(...result) < 32));`;
   const run = spawnSync(process.execPath, ['--input-type=module', '-e', code], { encoding: 'utf8', timeout: 20000 });
   assert.equal(run.error, undefined, 'solve did not return');
   assert.equal(run.stdout.trim(), '16 31 true', run.stderr);

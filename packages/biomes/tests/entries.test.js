@@ -97,10 +97,10 @@ test('relief entry is loaded only by worlds that use it; update to a relief heig
       const { BiomeWorld } = await import(${JSON.stringify(index)});
       const w = await BiomeWorld.create({ size: [256, 256], height: { field: () => 10 } });
       try { w.update({ height: { relief: {} } }); console.log('no error'); }
-      catch (e) { console.log(e.name, e.code, e.message.includes('@margoengine/biomes/relief')); }
+      catch (e) { console.log(e.name + ' ' + e.code + ' ' + e.message.includes('@margoengine/biomes/relief')); }
       await BiomeWorld.create({ size: [256, 256] });
       w.update({ height: { relief: {} } });
-      console.log('after load', (await w.tile(0, 0)).layers.length);`;
+      console.log('after load ' + (await w.tile(0, 0)).layers.length);`;
   const out = execFileSync(process.execPath, ['--input-type=module', '-e', script], {
     encoding: 'utf8',
     timeout: 60_000,

@@ -54,7 +54,7 @@ test('MARGO_CPU_BUDGET_SLOWDOWN burns and reports that many times the work, so e
       const read = () => { const { user, system } = process.threadCpuUsage(); return (user + system) / 1000; };
       const cpu = cpuTimer();
       for (const end = read() + 100; read() < end; );
-      console.log(cpu());`,
+      console.log(String(cpu()));`,
     run = spawnSync(process.execPath, ['--input-type=module', '-e', script], {
       encoding: 'utf8',
       timeout: 60_000,

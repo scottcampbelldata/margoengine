@@ -58,6 +58,14 @@ export const PARALLEL = [
   ['npm run proofs -- --current'],
 ];
 
+/**
+ * Environment for one verify step. `FORCE_COLOR` is forced off: Node colors `console.log` of a number or a
+ * boolean when it is set, and tests read that text. An agent shell sets it, so a step must not inherit it.
+ */
+export function commandEnv(base = process.env) {
+  return { ...base, NO_COLOR: '1', FORCE_COLOR: '0' };
+}
+
 /** What a command is to the result cache: the steps with their own keys. The hygiene gate is seconds and stays out. */
 export function cacheKind(command) {
   if (command === 'npm run build:packages') return 'builds';
@@ -106,7 +114,7 @@ async function main() {
           cwd: root,
           shell: true,
           stdio: ['ignore', 'pipe', 'pipe'],
-          ...(recorded ? { env: recorded.env } : {}),
+          env: commandEnv(recorded ? recorded.env : process.env),
         });
       const finish = (code) => {
         const output = Buffer.concat(chunks).toString();

@@ -13,7 +13,7 @@ function rejectsQuickly(body) {
     [
       '--input-type=module',
       '--eval',
-      `import assert from 'node:assert/strict';import {triangulate} from ${JSON.stringify(module)};const start=process.cpuUsage();${body}const used=process.cpuUsage(start);console.log((used.user+used.system)/1000);`,
+      `import assert from 'node:assert/strict';import {triangulate} from ${JSON.stringify(module)};const start=process.cpuUsage();${body}const used=process.cpuUsage(start);console.log(String((used.user+used.system)/1000));`,
     ],
     { timeout: 120_000, encoding: 'utf8', maxBuffer: 64 * 1024 },
   );

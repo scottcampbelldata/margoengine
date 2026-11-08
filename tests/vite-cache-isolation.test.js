@@ -143,7 +143,7 @@ test('a checkout reached through a Windows short path serves its pages', () => {
       const dev = await startDevServer({ startPath: '/LICENSE', port: 0 });
       const port = dev.server.httpServer.address().port;
       const response = await fetch('http://127.0.0.1:' + port + '/${dir}/page.js');
-      console.log(response.status);
+      console.log(String(response.status));
       await dev.close();`;
   try {
     const run = spawnSync(process.execPath, ['--input-type=module', '-e', script], { cwd, encoding: 'utf8' });

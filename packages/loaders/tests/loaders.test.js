@@ -282,7 +282,8 @@ test('PLY: float colors, u/v and texture_u/texture_v names, CRLF header, ArrayBu
 });
 
 test('regression: a PLY header line with no keyword, as Blender 2.4x wrote, is kept as a comment', () => {
-  const file = 'ply\nformat ascii 1.0\nCreated by Blender3D 247 - www.blender.org\nelement vertex 1\nproperty float x\nproperty float y\nproperty float z\nend_header\n1 2 3\n';
+  const file =
+    'ply\nformat ascii 1.0\nCreated by Blender3D 247 - www.blender.org\nelement vertex 1\nproperty float x\nproperty float y\nproperty float z\nend_header\n1 2 3\n';
   assert.deepEqual([...parsePLY(text(file)).positions], [1, 2, 3]);
   assert.deepEqual(parsePLYHeader(text(file)).comments, ['Created by Blender3D 247 - www.blender.org']);
 });
@@ -525,7 +526,10 @@ test('OFF: errors and real libigl files', (t) => {
 });
 
 test('regression: an XYZ column name line, as swisstopo writes, is not a point', () => {
-  assert.deepEqual([...parseXYZ(text('X Y Z\n2600001 1199999 553.67\n')).positions].map(Math.round), [2600001, 1199999, 554]);
+  assert.deepEqual(
+    [...parseXYZ(text('X Y Z\n2600001 1199999 553.67\n')).positions].map(Math.round),
+    [2600001, 1199999, 554],
+  );
   rejects(() => parseXYZ(text('X Y Z\n')), 'syntax');
   rejects(() => parseXYZ(text('1 2 3\nX Y Z\n')), 'syntax');
 });
@@ -1717,7 +1721,7 @@ test('SSR safety: importing and parsing never touches window, document, navigato
     const loaders = await import(${JSON.stringify(new URL('../dist/index.js', import.meta.url).href)});
     const result = loaders.parseOFF(new TextEncoder().encode('OFF\\n3 1 0\\n0 0 0\\n1 0 0\\n0 1 0\\n3 0 1 2\\n'));
     loaders.toGeometry(result);
-    console.log('ok', Object.keys(loaders).length);`;
+    console.log('ok ' + Object.keys(loaders).length);`;
   const output = execFileSync(process.execPath, ['--input-type=module', '-e', script], { encoding: 'utf8' });
   assert.match(output, /^ok \d+/);
 });

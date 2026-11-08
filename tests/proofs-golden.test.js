@@ -259,7 +259,7 @@ test('a ref is resolved once: a run keeps reading the commit it started with, wi
   const run = history(`
     const id = revision('HEAD');
     process.env.PATH = '';
-    console.log(revision('HEAD') === id, revision(id) === id);
+    console.log(String(revision('HEAD') === id) + ' ' + String(revision(id) === id));
   `);
   assert.equal(run.status, 0, run.out);
   assert.match(run.out, /^true true$/m);
