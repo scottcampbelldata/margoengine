@@ -21,16 +21,18 @@ For the second account. Start now.
 | E | post and effects | 75 | toon | 4 | todo |
 | E | post and effects | 76 | transitions | 4 | todo |
 | E | post and effects | 77 | creative | 5 | todo |
-| E | post and effects | 78 | vfx | 8 | todo |
-| E | post and effects | 79 | vfx | 3 | todo |
+| E | post and effects | 78 | vfx | 8 | list 1 (dev PC) |
+| E | post and effects | 79 | vfx | 3 | list 1 (dev PC) |
 | F | voxels, then 2D | 95 | voxel | 8 | done |
 | F | voxels, then 2D | 96 | voxel | 1 | todo |
 | F | voxels, then 2D | 97 | voxel-edit | 5 | todo |
 | F | voxels, then 2D | 98 | voxel-net | 7 | todo |
 | F | voxels, then 2D | 99 | voxel-pathtracer | 8 | todo |
-| F | voxels, then 2D | 100 | sprites | 6 | todo |
-| F | voxels, then 2D | 101 | tilemap | 4 | todo |
-| F | voxels, then 2D | 102 | pixel | 4 | todo |
-| F | voxels, then 2D | 103 | text | 5 | todo |
+| F | voxels, then 2D | 100 | sprites | 6 | list 1 (dev PC) |
+| F | voxels, then 2D | 101 | tilemap | 4 | list 1 (dev PC) |
+| F | voxels, then 2D | 102 | pixel | 4 | list 1 (dev PC) |
+| F | voxels, then 2D | 103 | text | 5 | list 1 (dev PC) |
+
+Split, Scott 2026-11-08: batches 78, 79 (vfx) and 100 to 103 (sprites, tilemap, pixel, text) move to list 1 on the dev PC, which marks them `done` here when they land. The Mac skips them; stream E ends at 77 and stream F at 99.
 
 When a batch is finished and pushed, change its status to `done` in the same push as its last job. Only the account running this list edits this file.
