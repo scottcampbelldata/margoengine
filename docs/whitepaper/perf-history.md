@@ -2310,6 +2310,20 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
   `packages/save/tests/migration-fuzz.test.js` locks seed 167 and 40 further documents.
 - **Rerun:** `node packages/save/scripts/fuzz-roundtrip.mjs`.
 
+### 100. matmul, FFT and a sum against TensorFlow.js WebGPU (diagnostic, win)
+
+- **Measurement:** matmul-256, fft-65536 and a sum of 1,048,576 f32 values. The clock includes reading the result
+  back. Inputs are uploaded first. Two warmup calls, then 7 paired rounds in one headless page, fastest round.
+  Node 26.12 has no WebGPU global and no WebGPU flag, so the page is the runtime that can run both. TensorFlow.js
+  4.22.0 with tfjs-backend-webgpu 4.22.0 stays outside the repository. RTX A6000, WebGPU adapter nvidia ampere.
+- **Result:** matmul win, Margo 0.900 ms, TensorFlow.js 3.100 ms. FFT win, 2.400 ms against 22.700 ms. Sum win,
+  0.900 ms against 3.000 ms. Both matmuls match NumPy float32 (sum 519, sum of squares 8591379379). Both sums are
+  393216. Margo's FFT stays within 0.01 of the NumPy float64 bins that the test locks; the CPU comparison of every
+  bin was at most 0.00845 off. TensorFlow.js is the same transform with a wider error (energy 0.028% high, peak
+  magnitude 0.06% low). Busy machine, diagnostic. Not a loss.
+- **Rerun:** `node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node packages/compute/scripts/rival-bench.mjs`.
+  The oracle is `packages/compute/tests/numpy-oracle.test.js`. Citation in clean-room.md.
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).

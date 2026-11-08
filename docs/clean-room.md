@@ -812,7 +812,11 @@ Written from the specification and API documentation below; no other profiler's 
 Written clean room in October 2026 from the specifications, papers and API documentation below. No source code of
 another GPU, array or data library (NumPy, CuPy, TensorFlow.js, GPU.js, taichi.js, Random123, cuFFT/VkFFT and the like)
 was read. API names and semantics follow the libraries' public documentation so data scientists find what they
-expect; the documentation describes behaviour, not code.
+expect; the documentation describes behaviour, not code. The batch 167 timing drives TensorFlow.js 4.22.0 and
+tfjs-backend-webgpu 4.22.0 as a black box from the WebGPU backend README
+(https://github.com/tensorflow/tfjs/blob/master/tfjs-backend-webgpu/README.md) and the API pages for `matMul`,
+`spectral.fft`, `sum`, `complex`, `real` and `imag` (https://js.tensorflow.org/api/latest/). The library source was
+not opened. NumPy 2.5.4, outside the repository, is the correctness oracle for those three sizes.
 
 | Area | Source |
 | --- | --- |

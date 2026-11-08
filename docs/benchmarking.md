@@ -413,7 +413,8 @@ The `viz` suite on the same run (`@margoengine/sciviz` figures with axes, camera
 | volume-128 | 525 | 0.105 | 0.776 | 1,119 |
 
 Other compute libraries join through engine-bench as other engines do ([Comparing engines](#comparing-engines)).
-None is set up yet, so these numbers have no comparison yet.
+TensorFlow.js WebGPU is compared on matmul-256, fft-65536 and a sum of 1,048,576 values (perf history entry 100).
+That clock includes reading the result back, so it is not a row of the table above.
 
 ## The three.js parity matrix
 

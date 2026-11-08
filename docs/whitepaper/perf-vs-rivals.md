@@ -17,6 +17,9 @@ time is the fastest round. These numbers were taken on a busy machine and are di
 | `@margoengine/tween` | 10,000 linear tweens, one 16 ms step | 0.371 ms | tween.js 25.0.0, 1.018 ms | win |
 | `@margoengine/netcode` | 180 frames, two peers, rollback against a forward-only run | 0.0176 ms/frame (rollback), 0.0086 ms/frame (forward) | no JavaScript rollback rival | published |
 | `@margoengine/save` | 200 seeded migration round trips | 0.086 ms each, 87,234 bytes, 0 failures | no rival package | published |
+| `@margoengine/compute` | matmul 256 x 256, f32, then read the product | 0.900 ms | TensorFlow.js 4.22.0 WebGPU, 3.100 ms | win |
+| `@margoengine/compute` | FFT of 65,536 real points, then read both halves | 2.400 ms | TensorFlow.js 4.22.0 WebGPU, 22.700 ms | win |
+| `@margoengine/compute` | sum of 1,048,576 values, then read the scalar | 0.900 ms | TensorFlow.js 4.22.0 WebGPU, 3.000 ms | win |
 
 The flock checksums after that step were 31517.19 (Margo) and 31516.70 (Yuka). Both moved from the same grid. They are
 not bit-equal: Yuka keeps a neighbourhood per vehicle and Margo uses one uniform grid. The behaviours are the ones in
@@ -52,3 +55,16 @@ The save row has no rival package. Two hundred documents from seed 167 (version 
 `$ref`) are migrated to version 2, validated, encoded, decoded, parsed and migrated again. The two results match and
 validation is empty. One run on a busy machine: 87,234 bytes, 0.086 ms each. The same generator is locked by
 `packages/save/tests/migration-fuzz.test.js`. Rerun: `node packages/save/scripts/fuzz-roundtrip.mjs`.
+
+The compute rows are the published cases matmul-256, fft-65536 and reduce-1048576. The clock is the operation plus the
+read of its result. Inputs are uploaded first. Two warmup calls each, then 7 paired rounds, and the time is the
+fastest round. Node 26.12 has no WebGPU, so both libraries share one headless page on an RTX A6000 (WebGPU adapter:
+nvidia, ampere). Matmul matches on both sides: sum 519, sum of squares 8591379379, first element -511, last 509.
+The sum is 393216 on both sides. Margo's FFT checksums are sum of real parts -131071.9960873127, imag sum 0, energy
+8590063186.016674, against NumPy's -131072, 0 and 8590065664. Every CPU bin was within 0.00845 of NumPy, and the GPU
+run met the same 0.01 window. TensorFlow.js keeps the same transform: DC bin exact, energy 0.028% high, peak bin off
+by 16.7 and 153 (magnitude 0.06% low). The FFT rounds do not overlap (Margo 2.4 to 7.0 ms, TensorFlow.js 22.7 to
+27.1). On matmul and the sum, one slow Margo round sits inside the TensorFlow.js spread; the minima still favour
+Margo. Busy machine, diagnostic. Rerun:
+`node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node packages/compute/scripts/rival-bench.mjs`.
+The oracle is `packages/compute/tests/numpy-oracle.test.js`.
