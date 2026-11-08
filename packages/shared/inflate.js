@@ -1,7 +1,8 @@
 // zlib (RFC 1950) and DEFLATE (RFC 1951) decoder, written from the two RFCs: EXR ZIP and ZIPS chunks
 // (@margoengine/environment) and PNG image data (@margoengine/decoders/png), whose decompressed size is known up front
 // and fills one buffer of exactly that size. With a `{ limit }` option the size need not be stored: the buffer grows
-// up to that limit. Every input read, output write and back reference is bounds checked, and damaged data throws
+// up to that limit. inflateRaw serves containers that must know where a raw stream ends (gzip members and deflated
+// DICOM data sets in @margoengine/sciviz/formats). Every input read, output write and back reference is bounds checked, and damaged data throws
 // MargoError 'failed'.
 import { margoError } from './errors.js';
 
@@ -82,14 +83,16 @@ class Inflater {
   #input;
   #limit;
   #output;
-  #position = 2;
+  #position;
   #held = 0;
   #count = 0;
   #written = 0;
-  constructor(input, size) {
+  constructor(input, size, start = 2) {
     this.#input = input;
+    this.#position = start;
     this.#limit = size.limit;
-    this.#output = new Uint8Array(this.#limit === undefined ? size : 1024);
+    // A growable buffer starts no larger than its limit, so a limit under 1 KiB holds as well as a larger one.
+    this.#output = new Uint8Array(this.#limit === undefined ? size : Math.min(1024, this.#limit));
   }
   // The stream is read least significant bit first, holding up to 32 bits ahead.
   #refill() {
@@ -191,15 +194,20 @@ class Inflater {
     if (!lengths[END_OF_BLOCK]) throw damaged(BAD);
     this.#block(huffmanTable(lengths.subarray(0, literalCount)), huffmanTable(lengths.subarray(literalCount)));
   }
-  /** Decodes every block and checks the trailer; see {@link inflateZlib}. */
-  run(size, checkAdler) {
+  /**
+   * Decodes every block and checks the trailer; see {@link inflateZlib}. A `raw` stream (no zlib header or trailer)
+   * returns its bytes and the position after its final block instead; see {@link inflateRaw}.
+   */
+  run(size, checkAdler, raw) {
     const input = this.#input;
-    if (input.length < 2) throw damaged(EARLY);
-    const method = input[0],
-      flags = input[1];
-    // RFC 1950: compression method 8 (deflate), window of at most 32 KiB, header check, no preset dictionary.
-    if ((method & 15) !== 8 || method >> 4 > 7 || ((method << 8) | flags) % 31 !== 0 || flags & 0x20)
-      throw damaged(BAD);
+    if (!raw) {
+      if (input.length < 2) throw damaged(EARLY);
+      const method = input[0],
+        flags = input[1];
+      // RFC 1950: compression method 8 (deflate), window of at most 32 KiB, header check, no preset dictionary.
+      if ((method & 15) !== 8 || method >> 4 > 7 || ((method << 8) | flags) % 31 !== 0 || flags & 0x20)
+        throw damaged(BAD);
+    }
     let final = 0;
     do {
       final = this.#bits(1);
@@ -227,8 +235,9 @@ class Inflater {
     } while (!final);
     if (this.#limit === undefined && this.#written !== size) throw damaged(SIZE);
     const output = this.#output.subarray(0, this.#written);
-    // RFC 1950 trailer: the Adler-32 of the decompressed bytes, big-endian, after the last block's final byte.
     const at = this.#align();
+    if (raw) return { output, end: at };
+    // RFC 1950 trailer: the Adler-32 of the decompressed bytes, big-endian, after the last block's final byte.
     if (input.length - at < 4) throw damaged(EARLY);
     const stored = ((input[at] << 24) | (input[at + 1] << 16) | (input[at + 2] << 8) | input[at + 3]) >>> 0;
     if (checkAdler && adler32(output) !== stored) throw damaged('fails its Adler-32 checksum');
@@ -238,6 +247,9 @@ class Inflater {
 
 /** Inflates zlib `input`; see inflate.d.ts. */
 export const inflateZlib = (input, size, checkAdler = true) => new Inflater(input, size).run(size, checkAdler);
+
+/** Inflates the raw DEFLATE stream at `start` of `input`; see inflate.d.ts. */
+export const inflateRaw = (input, start, size) => new Inflater(input, size, start).run(size, false, true);
 
 /**
  * Adler-32 (RFC 1950 section 8.2): two sums modulo 65521. 5552 bytes is the longest run after which the second sum

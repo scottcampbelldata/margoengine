@@ -194,13 +194,211 @@ test('bad files are named errors', async () => {
   await refuses(parseNRRD(text(`${head([...ok.slice(0, 3), 'encoding: ascii'])}1`)), 'truncated');
 });
 
-test('a huge declared size stops before any allocation, and gzip cannot grow past the header', async () => {
+test('a huge declared size stops before any allocation', async () => {
   const big = ['type: double', 'dimension: 3', 'sizes: 100000 100000 100000', 'encoding: raw', 'endian: little'];
   await refuses(parseNRRD(text(head(big))), 'limit');
   await refuses(parseNRRD(text(head(['type: uchar', 'dimension: 1', 'sizes: 9', 'encoding: raw'])), { maxSamples: 8 }), 'limit');
   await refuses(parseNRRD(new Uint8Array(0), { maxSamples: 1.5 }), 'range');
-  const bomb = join(head(['type: uchar', 'dimension: 1', 'sizes: 2', 'encoding: gz']), gzipSync(Buffer.alloc(1 << 20)));
-  await refuses(parseNRRD(bomb), 'zip');
+});
+
+// Counts the bytes every DecompressionStream made gives out while `run` goes.
+async function countInflated(run) {
+  const Original = globalThis.DecompressionStream;
+  let produced = 0;
+  globalThis.DecompressionStream = class {
+    constructor(format) {
+      const inner = new Original(format);
+      this.writable = inner.writable;
+      this.readable = inner.readable.pipeThrough(
+        new TransformStream({
+          transform(chunk, controller) {
+            produced += chunk.length;
+            controller.enqueue(chunk);
+          },
+        }),
+      );
+    }
+  };
+  try {
+    return { result: await run(), produced: () => produced };
+  } finally {
+    globalThis.DecompressionStream = Original;
+  }
+}
+
+// Format section 5: "Data file contents remaining after all data has been read should be ignored." A gzip stream longer
+// than the header needs is read, not refused, and decoding stops once the samples are out (the zip-bomb bound).
+test('gzip data past what the header needs is ignored, and decoding stops at the needed length', async () => {
+  const bomb = join(head(['type: uchar', 'dimension: 1', 'sizes: 2', 'encoding: gz']), gzipSync(Buffer.alloc(64 << 20, 5)));
+  const { result, produced } = await countInflated(() => parseNRRD(bomb));
+  assert.deepEqual([...result.data], [5, 5]);
+  assert.ok(produced() < 1 << 20, `inflated ${produced()} bytes of a 64 MiB stream for 2 samples`);
+  const skipped = join(head(['type: uchar', 'dimension: 1', 'sizes: 2', 'encoding: gzip', 'byte skip: 1']), gzipSync(Buffer.from([0, 7, 8, 9, 9])));
+  assert.deepEqual([...(await parseNRRD(skipped)).data], [7, 8]);
+  const junk = join(head(['type: uchar', 'dimension: 1', 'sizes: 2', 'encoding: gzip']), gzipSync(Buffer.from([7, 8])), 'not gzip');
+  assert.deepEqual([...(await parseNRRD(junk)).data], [7, 8]);
+  await refuses(parseNRRD(join(head(['type: uchar', 'dimension: 1', 'sizes: 3', 'encoding: gzip']), gzipSync(Buffer.from([7, 8])))), 'truncated');
+});
+
+test('raw, hex and ascii data past what the header needs is ignored', async () => {
+  const fields = ['type: uchar', 'dimension: 1', 'sizes: 2'];
+  const raw = await parseNRRD(join(head([...fields, 'encoding: raw']), Buffer.from([7, 8, 9, 10])));
+  const hex = await parseNRRD(text(`${head([...fields, 'encoding: hex'])}0708 ff zz trailing`));
+  const ascii = await parseNRRD(text(`${head([...fields, 'encoding: ascii'])}7 8 9 junk`));
+  for (const { data } of [raw, hex, ascii]) assert.deepEqual([...data], [7, 8]);
+});
+
+test('kinds, space and none compare case-insensitively', async () => {
+  const volume = await parseNRRD(
+    join(
+      head(['type: uchar', 'dimension: 4', 'sizes: 3 2 2 2', 'kinds: RGB-COLOR Domain SPACE domain', 'encoding: raw']),
+      Buffer.alloc(24),
+    ),
+  );
+  assert.equal(volume.components, 3);
+  assert.deepEqual(volume.dims, [2, 2, 2]);
+  const directed = await parseNRRD(
+    join(
+      head(['type: uchar', 'dimension: 3', 'sizes: 3 2 2', 'encoding: raw', 'space: Left-Posterior-Superior', 'space directions: NONE (1,0,0) (0,1,0)']),
+      Buffer.alloc(12),
+    ),
+  );
+  assert.equal(directed.components, 3);
+  assert.equal(directed.space, 'left-posterior-superior');
+});
+
+test('ascii floats follow section 2: nan anywhere, then -inf, then inf', async () => {
+  const words = 'nan(0x1) -NaN 1e5nan INF -inf +Infinity -INFINITY xinfx 2.5';
+  const { data } = await parseNRRD(text(`${head(['type: double', 'dimension: 1', 'sizes: 9', 'encoding: ascii'])}${words}`));
+  assert.ok([...data.subarray(0, 3)].every(Number.isNaN));
+  assert.deepEqual([...data.subarray(3)], [Infinity, -Infinity, Infinity, -Infinity, Infinity, 2.5]);
+});
+
+test('subdim sets how much data each file holds, and the file count must match it', async () => {
+  const fields = ['type: uchar', 'dimension: 3', 'sizes: 2 2 2', 'encoding: raw'];
+  const resolve = (each) => async (path) => new Uint8Array(Array.from({ length: each }, (_, k) => Number(path[1]) * each + k));
+  const read = (data, each) => parseNRRD(text(head([...fields, `data file: ${data}`])), { resolve: resolve(each) });
+  assert.deepEqual([...(await read('f%d.raw 0 1 1', 4)).data], [0, 1, 2, 3, 4, 5, 6, 7]);
+  assert.deepEqual([...(await read('f%d.raw 0 3 1 1', 2)).data], [0, 1, 2, 3, 4, 5, 6, 7]);
+  assert.deepEqual([...(await read('f%d.raw 0 1 1 3', 4)).data], [0, 1, 2, 3, 4, 5, 6, 7]);
+  const list = (lines) => text(`NRRD0005\n${fields.join('\n')}\n${lines}\n`);
+  assert.deepEqual([...(await parseNRRD(list('data file: LIST 3\nf0.raw\nf1.raw'), { resolve: resolve(4) })).data], [0, 1, 2, 3, 4, 5, 6, 7]);
+  assert.deepEqual([...(await parseNRRD(list('data file: LIST 1\nf0.raw\nf1.raw\nf2.raw\nf3.raw'), { resolve: resolve(2) })).data], [0, 1, 2, 3, 4, 5, 6, 7]);
+  // The default is one slice along the slowest axis per file: four files of a 2 x 2 x 2 array do not fit it.
+  await refuses(read('f%d.raw 0 3 1', 2), 'range');
+  await refuses(parseNRRD(list('data file: LIST\nf0.raw\nf1.raw\nf2.raw\nf3.raw'), { resolve: resolve(2) }), 'range');
+  await refuses(read('f%d.raw 0 2 1 3', 2), 'range');
+  await refuses(read('f%d.raw 0 1 1 0', 4), 'range');
+  await refuses(read('f%d.raw 0 1 1 4', 4), 'range');
+  await refuses(parseNRRD(list('data file: LIST 4\nf0.raw\nf1.raw'), { resolve: resolve(4) }), 'range');
+});
+
+test('a data file pattern is formatted as sprintf would', async () => {
+  const names = async (pattern, count) => {
+    const asked = [];
+    await parseNRRD(text(head(['type: uchar', 'dimension: 1', `sizes: ${count}`, 'encoding: raw', `data file: ${pattern}`])), {
+      resolve: async (path) => (asked.push(path), new Uint8Array(1)),
+    });
+    return asked;
+  };
+  assert.deepEqual(await names('I.%03d -2 0 1', 3), ['I.-02', 'I.-01', 'I.000']);
+  assert.deepEqual(await names('a%-3d| 1 1 1', 1), ['a1  |']);
+  assert.deepEqual(await names('a%+d 1 1 1', 1), ['a+1']);
+  assert.deepEqual(await names('a%5.3d 7 7 1', 1), ['a  007']);
+  assert.deepEqual(await names('a%x.%%.raw 10 10 1', 1), ['aa.%.raw']);
+  assert.deepEqual(await names('a%#06X 255 255 1', 1), ['a0X00FF']);
+  assert.deepEqual(await names('a%o 8 8 1', 1), ['a10']);
+  assert.deepEqual(await names('a%i 3 1 -2', 2), ['a3', 'a1']);
+  await refuses(names('a%d%d 1 1 1', 1), 'syntax');
+  await refuses(names('a%s 1 1 1', 1), 'syntax');
+  await refuses(names('a%ld 1 1 1', 1), 'syntax');
+});
+
+test('byte skip -1 makes line skip moot', async () => {
+  const fields = ['type: uchar', 'dimension: 1', 'sizes: 2', 'encoding: raw', 'line skip: 5', 'byte skip: -1'];
+  assert.deepEqual([...(await parseNRRD(join(head(fields), 'no lines', Buffer.from([7, 8])))).data], [7, 8]);
+});
+
+test('only the magics NRRD0001 to NRRD0005 open, alone on their line', async () => {
+  const body = 'type: uchar\ndimension: 1\nsizes: 1\nencoding: ascii\n\n1';
+  for (const magic of ['NRRD0001', 'NRRD0005', 'NRRD00.01', 'NRRD0004\r'])
+    assert.deepEqual([...(await parseNRRD(text(`${magic}\n${body}`))).data], [1]);
+  for (const magic of ['NRRD0006', 'NRRD0000', 'NRRD0004 extra', 'NRRD00041', 'NRRDabcd'])
+    await refuses(parseNRRD(text(`${magic}\n${body}`)), 'header');
+});
+
+test('a field or key/value pair newer than the magic is refused', async () => {
+  const at = (version, extra, data = '1') =>
+    parseNRRD(text(`NRRD000${version}\ntype: uchar\ndimension: 1\nsizes: 1\nencoding: ascii\n${extra}\n\n${data}`));
+  await refuses(at(1, 'k:=v'), 'header');
+  assert.equal((await at(2, 'k:=v')).meta.k, 'v');
+  await refuses(at(2, 'kinds: domain'), 'header');
+  assert.deepEqual([...(await at(3, 'kinds: domain')).data], [1]);
+  await refuses(at(3, 'space: RAS'), 'header');
+  await refuses(at(3, 'space dimension: 3'), 'header');
+  await refuses(at(3, 'thicknesses: 1'), 'header');
+  await refuses(at(3, 'sample units: mm'), 'header');
+  await refuses(at(3, 'data file: s%d.raw 1 1 1'), 'header');
+  await refuses(at(4, 'space: RAS\nmeasurement frame: (1,0,0) (0,1,0) (0,0,1)'), 'header');
+  assert.equal((await at(4, 'space: RAS\nspace origin: (1,2,3)')).matrix[12], 1);
+});
+
+test('key/value escapes are only \\n and \\\\, in the key and the value', async () => {
+  const { meta } = await parseNRRD(text(`${head(['type: uchar', 'dimension: 1', 'sizes: 1', 'encoding: ascii', 'a\\tb\\n:=x\\qy\\\\\\n'])}1`));
+  assert.deepEqual(Object.entries(meta), [['a\\tb\n', 'x\\qy\\\n']]);
+});
+
+test('every space of section 4 is known, and an unknown one is refused', async () => {
+  const at = (space, directions) =>
+    parseNRRD(join(head(['type: uchar', 'dimension: 1', 'sizes: 1', 'encoding: raw', `space: ${space}`, `space directions: ${directions}`]), Buffer.alloc(1)));
+  assert.equal((await at('scanner-xyz', '(1,0,0)')).space, 'scanner-xyz');
+  assert.equal((await at('3d-right-handed', '(1,0,0)')).space, '3D-right-handed');
+  assert.equal((await at('3D-LEFT-HANDED-TIME', '(1,0,0,0)')).space, '3D-left-handed-time');
+  assert.equal((await at('LPST', '(1,0,0,0)')).space, 'left-posterior-superior-time');
+  await refuses(at('mars', '(1,0,0)'), 'header');
+  await refuses(at('3D-right-handed', '(1,0,0,0)'), 'syntax');
+});
+
+test('vectors refuse anything between or inside them', async () => {
+  const at = (directions, origin = '(0,0,0)') =>
+    parseNRRD(
+      join(
+        head(['type: uchar', 'dimension: 3', 'sizes: 1 1 1', 'encoding: raw', 'space: RAS', `space directions: ${directions}`, `space origin: ${origin}`]),
+        Buffer.alloc(1),
+      ),
+    );
+  assert.deepEqual((await at('(1,0,0)\t(0,1,0)  (0,0,1)')).spacing, [1, 1, 1]);
+  await refuses(at('(1,0,0) junk (0,1,0) (0,0,1)'), 'syntax');
+  await refuses(at('nonexistent (0,1,0) (0,0,1)'), 'syntax');
+  await refuses(at('(1,0,0)(0,1,0) (0,0,1)'), 'syntax');
+  await refuses(at('(1,0,0) (0,1,0) (0,0,1) none'), 'syntax');
+  await refuses(at('(1,0,0) (0,1,0) (0,0,1)', '(0,0,0) (1,1,1)'), 'syntax');
+  await refuses(at('(1,0,0) (0,1,0) (0,0,1)', 'none'), 'syntax');
+  await refuses(at('(1,,0) (0,1,0) (0,0,1)'), 'syntax');
+});
+
+test('kinds, spacings and field order follow the per-axis rules', async () => {
+  const at = (...extra) => parseNRRD(join(head(['type: uchar', 'dimension: 2', 'sizes: 4 2', 'encoding: raw', ...extra]), Buffer.alloc(8)));
+  await refuses(at('kinds: RGB-color domain'), 'range');
+  await refuses(at('kinds: 3D-matrix domain'), 'range');
+  await refuses(at('kinds: colour domain'), 'syntax');
+  assert.equal((await at('kinds: RGBA-color domain')).components, 4);
+  assert.equal((await at('kinds: quaternion space')).components, 4);
+  // A space direction and a known spacing, axis min or axis max exclude each other on the same axis.
+  const directed = ['space dimension: 2', 'space directions: none (0,1)'];
+  assert.deepEqual((await at(...directed, 'spacings: 2 nan')).spacing, [1, 1, 1]);
+  await refuses(at(...directed, 'spacings: nan 2'), 'syntax');
+  await refuses(at(...directed, 'axis mins: nan 0'), 'syntax');
+  await refuses(at(...directed, 'axis maxs: NaN 1'), 'syntax');
+  await refuses(at('spacings: 0 1'), 'range');
+  await refuses(at('spacings: inf 1'), 'range');
+  await refuses(at('spacings: 1 abc'), 'syntax');
+  // Duplicate fields under their two spellings, and fields before what they depend on.
+  await refuses(at('line skip: 0', 'lineskip: 0'), 'syntax');
+  await refuses(at('byteskip: 0', 'byte skip: 0'), 'syntax');
+  await refuses(at('centers: cell cell', 'centerings: cell cell'), 'syntax');
+  await refuses(at('space origin: (0,0)', 'space dimension: 2'), 'syntax');
+  await refuses(parseNRRD(join(head(['type: uchar', 'sizes: 2', 'dimension: 1', 'encoding: raw']), Buffer.alloc(2))), 'syntax');
 });
 
 test('a header past the limit stops, and an abort stops the read', async () => {
@@ -219,9 +417,13 @@ test('a real bzip2 volume from pynrrd reads the same samples as its raw twin', a
   assert.deepEqual(packed.sizes, plain.sizes);
 });
 
-test('bzip2 data cannot grow past what the header declares', async () => {
+test('bzip2 data past what the header needs is ignored, and decoding stops at the needed length', async () => {
+  // Section 2: data remaining after all data has been read is ignored. Reading 8 of the 3072 floats returns the first 8
+  // samples; maxBytes in the decoder equals what the header needs, so nothing past them is ever inflated.
   const body = readFileSync(new URL('./fixtures/volume-bzip2.nrrd', import.meta.url)),
     at = body.indexOf('\n\n') + 2,
-    short = head(['type: float', 'dimension: 1', 'sizes: 8', 'encoding: bzip2', 'endian: little']);
-  await refuses(parseNRRD(join(short, body.subarray(at))), 'zip');
+    short = head(['type: float', 'dimension: 1', 'sizes: 8', 'encoding: bzip2', 'endian: little']),
+    plain = await parseNRRD(readFileSync(new URL('./fixtures/volume-raw.nrrd', import.meta.url)));
+  const volume = await parseNRRD(join(short, body.subarray(at)));
+  assert.deepEqual([...volume.data], [...plain.data.subarray(0, 8)]);
 });

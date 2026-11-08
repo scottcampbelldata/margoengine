@@ -173,6 +173,7 @@ const bytes = decodeBrotli(new Uint8Array(await (await fetch('/node.br')).arrayB
 | Option | Default | What it does |
 | --- | --- | --- |
 | `maxBytes` | 2^30 (1 GiB) | Largest output; a stream that would pass it throws, so a small file cannot fill memory. |
+| `stopAt` | none (decode to the end) | Return exactly the first `stopAt` bytes and decode nothing past them. |
 
 A stream that breaks the format, ends early or passes `maxBytes` throws a `MargoError` with code `failed`. The RFC's 122,784-byte
 dictionary ships in this entry (about 60 KB compressed in the bundle) and unpacks the first time a stream refers to it. The
@@ -199,7 +200,9 @@ console.log(fromBzip2.length, fromXz.length);
 | --- | --- | --- |
 | `maxBytes` | 2^30 (1 GiB) | Largest output; a stream that would pass it throws, so a small file cannot fill memory. |
 
-Concatenated streams read as one. Every bzip2 block and stream CRC is checked. In `.xz`, the CRC32s of the headers, index and
+Concatenated streams read as one. Every bzip2 block and stream CRC is checked. `decodeBzip2(bytes, { stopAt })` returns
+exactly the first `stopAt` bytes and decodes nothing past them, for containers such as NRRD whose header gives the size and
+whose data may run on; the CRC of the block holding the last of those bytes is then not checked. In `.xz`, the CRC32s of the headers, index and
 footer are checked, and each block's own CRC32, CRC64 or SHA-256. `.lzma` has no
 check, so damage shows only as a broken stream. Only the LZMA2 filter is read: BCJ and delta filters throw `unsupported`, and so
 do bzip2's randomised blocks, which nothing has written since 1999. A stream that breaks the format, ends early or passes

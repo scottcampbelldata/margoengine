@@ -1,12 +1,13 @@
 // NRRD volumes (NRRD0001 to NRRD0005): the header, the raw, ascii, hex and gzip encodings, and detached data files.
 import { LoaderError, type AssetResolver } from './types.js';
 import { findLineEnd, latin1, resolvePath, throwIfAborted, toBytes, type BinaryInput } from './util.js';
-import { inflate } from './zip.js';
 
 const F = 'NRRD';
 const MAX_HEADER = 1 << 20;
 const MAX_DIMENSION = 16;
 const LITTLE = new Uint8Array(new Uint16Array([1]).buffer)[0] === 1;
+/** Compressed bytes handed to the gzip decoder per step, so decoding can stop once the samples are out. */
+const FEED = 1 << 16;
 
 /** A sample type of a NRRD file, with the C spellings folded to one name. */
 export type NRRDType =
@@ -95,25 +96,116 @@ const ENCODINGS: Record<string, 'raw' | 'ascii' | 'hex' | 'gzip' | 'bzip2'> = Ob
   bzip2: 'bzip2',
 });
 
-/** bzip2 data, which `@margoengine/decoders` undoes, loaded only for a file that needs it. */
+/**
+ * bzip2 data, which `@margoengine/decoders` undoes, loaded only for a file that needs it. Decoding stops once `size`
+ * bytes are out: section 2 says data past what the header needs is ignored, and nothing more is ever inflated.
+ */
 async function bunzip(body: Uint8Array, size: number): Promise<Uint8Array> {
   const { decodeBzip2 } = await import('@margoengine/decoders/bzip2');
   try {
-    return decodeBzip2(body, { maxBytes: size });
+    return decodeBzip2(body, { maxBytes: size, stopAt: size });
   } catch (error) {
     throw new LoaderError(F, 'zip', (error as Error).message);
   }
 }
 
-const SPACES: Record<string, string> = Object.assign(Object.create(null), {
-  ras: 'right-anterior-superior',
-  las: 'left-anterior-superior',
-  lps: 'left-posterior-superior',
-  rast: 'right-anterior-superior-time',
-  last: 'left-anterior-superior-time',
-  lpst: 'left-posterior-superior-time',
+/** The spaces the format names (section 4), by lower-case spelling, with their dimension. */
+const SPACES: Record<string, [name: string, dimension: number]> = Object.create(null);
+for (const [name, short] of [
+  ['right-anterior-superior', 'ras'],
+  ['left-anterior-superior', 'las'],
+  ['left-posterior-superior', 'lps'],
+  ['scanner-xyz', ''],
+  ['3D-right-handed', ''],
+  ['3D-left-handed', ''],
+] as const)
+  for (const time of [false, true]) {
+    const full = time ? `${name}-time` : name;
+    SPACES[full.toLowerCase()] = [full, time ? 4 : 3];
+    if (short) SPACES[time ? `${short}t` : short] = [full, time ? 4 : 3];
+  }
+
+/** Kinds of the format (section 6) with the axis size each requires, 0 for none. */
+const KINDS: Record<string, number> = Object.assign(Object.create(null), {
+  domain: 0,
+  space: 0,
+  time: 0,
+  list: 0,
+  point: 0,
+  vector: 0,
+  'covariant-vector': 0,
+  normal: 0,
+  stub: 1,
+  scalar: 1,
+  complex: 2,
+  '2-vector': 2,
+  '3-color': 3,
+  'rgb-color': 3,
+  'hsv-color': 3,
+  'xyz-color': 3,
+  '4-color': 4,
+  'rgba-color': 4,
+  '3-vector': 3,
+  '3-gradient': 3,
+  '3-normal': 3,
+  '4-vector': 4,
+  quaternion: 4,
+  '2d-symmetric-matrix': 3,
+  '2d-masked-symmetric-matrix': 4,
+  '2d-matrix': 4,
+  // The spec's table gives 4 here but lists five components (a mask and four), so no size is required of it.
+  '2d-masked-matrix': 0,
+  '3d-symmetric-matrix': 6,
+  '3d-masked-symmetric-matrix': 7,
+  '3d-matrix': 9,
+  '3d-masked-matrix': 10,
+  '???': 0,
+  none: 0,
 });
-const spaceSize = (name: string): number => (name.endsWith('time') ? 4 : 3);
+
+/** Second spellings of field identifiers, mapped to the first. */
+const ALIASES: Record<string, string> = Object.assign(Object.create(null), {
+  blocksize: 'block size',
+  oldmin: 'old min',
+  oldmax: 'old max',
+  datafile: 'data file',
+  lineskip: 'line skip',
+  byteskip: 'byte skip',
+  sampleunits: 'sample units',
+  axismins: 'axis mins',
+  axismaxs: 'axis maxs',
+  centerings: 'centers',
+});
+
+/** The first magic version each field exists in (section 1.1). */
+const SINCE: Record<string, number> = Object.assign(Object.create(null), {
+  kinds: 3,
+  thicknesses: 4,
+  'sample units': 4,
+  space: 4,
+  'space dimension': 4,
+  'space units': 4,
+  'space origin': 4,
+  'space directions': 4,
+  'measurement frame': 5,
+});
+
+/** Per-axis fields, which only come after `dimension` (section 1.3). */
+const PER_AXIS = new Set([
+  'sizes',
+  'spacings',
+  'thicknesses',
+  'axis mins',
+  'axis maxs',
+  'centers',
+  'labels',
+  'units',
+  'kinds',
+  'space directions',
+]);
+
+/** Orientation fields, which only come after `space` or `space dimension` (section 4). */
+const ORIENTATION = new Set(['space units', 'space origin', 'space directions', 'measurement frame']);
 
 const SIZE: Record<NRRDType, number> = {
   int8: 1,
@@ -162,24 +254,58 @@ function integer(value: string | undefined, name: string, fallback: number): num
   return number;
 }
 
-/** Reads `(a,b,c)` vectors and `none` words; `none` comes back as null. */
+/**
+ * Reads `(a,b,c)` vectors and `none` words, separated by spaces or tabs; `none` comes back as null. Anything else in
+ * the descriptor, between or inside the words, is a syntax error.
+ */
 function vectors(value: string, name: string, size: number): (number[] | null)[] {
-  const found: (number[] | null)[] = [];
-  for (const [word, body] of value.matchAll(/\(([^)]*)\)|none/g)) {
-    if (body === undefined) {
+  const found: (number[] | null)[] = [],
+    word = /[ \t]*(?:\(([^()]*)\)|(none))(?=[ \t]|$)/iy;
+  let at = 0;
+  for (let match = word.exec(value); match; match = word.exec(value)) {
+    at = word.lastIndex;
+    if (match[1] === undefined) {
       found.push(null);
       continue;
     }
-    const vector = body.split(',').map(Number);
+    const vector = match[1].split(',').map((part) => (part.trim() === '' ? NaN : Number(part)));
     if (vector.length !== size || !vector.every(Number.isFinite))
-      throw new LoaderError(F, 'syntax', `invalid vector "${word.slice(0, 64)}" in ${name}`);
+      throw new LoaderError(F, 'syntax', `invalid vector "(${match[1].slice(0, 64)})" in ${name}`);
     found.push(vector);
   }
+  const rest = value.slice(at).trim();
+  if (rest) throw new LoaderError(F, 'syntax', `unexpected "${rest.slice(0, 32)}" in ${name}`);
   return found;
 }
 
+/** A floating point value by the rules of section 2: "nan" anywhere is NaN, then "-inf", then "inf". */
+function float(word: string): number {
+  if (/nan/i.test(word)) return NaN;
+  if (/-inf/i.test(word)) return -Infinity;
+  if (/inf/i.test(word)) return Infinity;
+  const value = Number(word);
+  if (word.trim() === '' || Number.isNaN(value))
+    throw new LoaderError(F, 'syntax', `invalid number "${word.slice(0, 32)}"`);
+  return value;
+}
+
+/** A per-axis list of doubles; infinite entries are refused (spacings, axis mins and axis maxs never hold one). */
+function doubles(value: string, name: string, dimension: number): number[] {
+  const parts = value.trim().split(/[ \t]+/).map(float);
+  if (parts.length !== dimension)
+    throw new LoaderError(F, 'syntax', `${name} has ${parts.length} entries for ${dimension} axes`);
+  if (parts.some((part) => part === Infinity || part === -Infinity))
+    throw new LoaderError(F, 'range', `${name} holds an infinite value`);
+  return parts;
+}
+
 interface Header {
+  /** The magic's version, 1 to 5. */
+  version: number;
+  /** Fields by lower-case identifier, as written. */
   fields: Record<string, string>;
+  /** The same fields by their first spelling (`line skip` for `lineskip`). */
+  known: Record<string, string>;
   meta: Record<string, string>;
   /** Offset of the first byte after the header's blank line. */
   end: number;
@@ -187,15 +313,25 @@ interface Header {
   list: string[];
 }
 
+/** `\n` and `\\` are the only escapes of a key or value (section 1.2); any other backslash stays as written. */
+const unescape = (text: string): string => text.replace(/\\([n\\])/g, (_, c: string) => (c === 'n' ? '\n' : '\\'));
+
 function readHeader(bytes: Uint8Array): Header {
-  if (bytes.length < 8 || latin1(bytes, 0, 4) !== 'NRRD' || !/^\d{4}$/.test(latin1(bytes, 4, 8)))
+  if (bytes.length < 4 || latin1(bytes, 0, 4) !== 'NRRD')
     throw new LoaderError(F, 'header', 'missing the NRRD000x magic line');
-  const fields: Record<string, string> = Object.create(null),
+  const magicEnd = findLineEnd(bytes, 0, MAX_HEADER);
+  if (magicEnd < 0) throw new LoaderError(F, 'truncated', 'the file ends after the magic line');
+  const magic = latin1(bytes, 0, magicEnd).replace(/\r$/, ''),
+    numbered = /^NRRD000([1-5])$/.exec(magic);
+  if (!numbered && magic !== 'NRRD00.01')
+    throw new LoaderError(F, 'header', `the magic line "${magic.slice(0, 32)}" is not NRRD0001 to NRRD0005`);
+  const version = numbered ? Number(numbered[1]) : 1,
+    fields: Record<string, string> = Object.create(null),
+    known: Record<string, string> = Object.create(null),
     meta: Record<string, string> = Object.create(null),
     list: string[] = [];
-  let pos = findLineEnd(bytes, 0, MAX_HEADER) + 1,
+  let pos = magicEnd + 1,
     listing = false;
-  if (pos === 0) throw new LoaderError(F, 'truncated', 'the file ends after the magic line');
   while (pos < bytes.length) {
     const lineEnd = findLineEnd(bytes, pos, MAX_HEADER + 1),
       end = lineEnd < 0 ? bytes.length : lineEnd;
@@ -211,40 +347,105 @@ function readHeader(bytes: Uint8Array): Header {
     const pair = line.indexOf(':='),
       colon = line.indexOf(': ');
     if (pair > 0 && (colon < 0 || pair < colon)) {
-      meta[line.slice(0, pair)] = line.slice(pair + 2).replace(/\\(.)/g, (_, c: string) => (c === 'n' ? '\n' : c));
+      if (version < 2) throw new LoaderError(F, 'header', 'key/value pairs need NRRD0002 or later');
+      meta[unescape(line.slice(0, pair))] = unescape(line.slice(pair + 2));
       continue;
     }
     if (colon <= 0) throw new LoaderError(F, 'syntax', `bad header line "${line.slice(0, 64)}"`);
     const name = line.slice(0, colon).toLowerCase(),
+      first = ALIASES[name] ?? name,
       value = line.slice(colon + 2).trim();
-    if (name in fields) throw new LoaderError(F, 'syntax', `the field "${name.slice(0, 32)}" appears twice`);
+    if (first in known) throw new LoaderError(F, 'syntax', `the field "${first.slice(0, 32)}" appears twice`);
+    if ((SINCE[first] ?? 1) > version)
+      throw new LoaderError(F, 'header', `the field "${first}" needs NRRD000${SINCE[first]} or later`);
+    if (PER_AXIS.has(first) && !('dimension' in known))
+      throw new LoaderError(F, 'syntax', `the field "${first}" comes before dimension`);
+    if (ORIENTATION.has(first) && !('space' in known) && !('space dimension' in known))
+      throw new LoaderError(F, 'syntax', `the field "${first}" comes before space or space dimension`);
     fields[name] = value;
-    listing = (name === 'data file' || name === 'datafile') && /^LIST\b/.test(value);
+    known[first] = value;
+    listing = first === 'data file' && value.split(/\s+/)[0] === 'LIST';
   }
-  return { fields, meta, end: Math.min(pos, bytes.length), list };
+  return { version, fields, known, meta, end: Math.min(pos, bytes.length), list };
 }
 
-/** The data files of a detached header, or an empty list for attached data. */
-function dataFiles(header: Header): string[] {
-  const value = header.fields['data file'] ?? header.fields.datafile;
-  if (value === undefined) return [];
-  if (/^LIST\b/.test(value)) {
-    if (!header.list.length) throw new LoaderError(F, 'syntax', 'data file: LIST names no files');
-    return header.list;
+/** One printf conversion of an int (C99 7.19.6.1): flags `-+ 0#`, a width, a precision, and `d i o u x X`. */
+function printf(spec: RegExpExecArray, value: number): string {
+  const [, flags, widthText, precisionText, conversion] = spec,
+    width = Number(widthText || 0),
+    precision = precisionText === undefined ? undefined : Number(precisionText || 0),
+    signed = conversion === 'd' || conversion === 'i',
+    magnitude = signed ? Math.abs(value) : value >>> 0,
+    hex = conversion === 'x' || conversion === 'X';
+  let digits = magnitude.toString(conversion === 'o' ? 8 : hex ? 16 : 10);
+  if (conversion === 'X') digits = digits.toUpperCase();
+  if (precision !== undefined) digits = precision === 0 && value === 0 ? '' : digits.padStart(precision, '0');
+  if (flags.includes('#') && conversion === 'o' && !digits.startsWith('0')) digits = `0${digits}`;
+  const sign = !signed ? '' : value < 0 ? '-' : flags.includes('+') ? '+' : flags.includes(' ') ? ' ' : '',
+    prefix = hex && flags.includes('#') && magnitude !== 0 ? `0${conversion}` : '',
+    body = sign + prefix + digits;
+  if (body.length >= width) return body;
+  if (flags.includes('-')) return body.padEnd(width);
+  if (flags.includes('0') && precision === undefined)
+    return sign + prefix + digits.padStart(width - sign.length - prefix.length, '0');
+  return body.padStart(width);
+}
+
+/** Splits a `data file` pattern at its one integer conversion; `%%` is a literal percent sign. */
+function pattern(format: string, value: string): { before: string; spec: RegExpExecArray; after: string } {
+  const bad = () => new LoaderError(F, 'syntax', `bad data file pattern "${value.slice(0, 64)}"`),
+    conversion = /%([-+ 0#]*)(\d{0,3})(?:\.(\d{0,3}))?([diouxX])/y;
+  let before = '',
+    after = '',
+    spec: RegExpExecArray | null = null;
+  for (let i = 0; i < format.length; i++) {
+    if (format[i] === '%') {
+      if (format[i + 1] === '%') i++;
+      else {
+        conversion.lastIndex = i;
+        const found = conversion.exec(format);
+        if (!found || spec) throw bad();
+        spec = found;
+        i = conversion.lastIndex - 1;
+        continue;
+      }
+    }
+    if (spec) after += format[i];
+    else before += format[i];
   }
+  if (!spec) throw bad();
+  return { before, spec, after };
+}
+
+/** The data files of a detached header, empty for attached data, and the dimension of the data in each file. */
+function dataFiles(header: Header, dimension: number): { files: string[]; subdim: number } {
+  const value = header.known['data file'],
+    int32 = (n: number) => Number.isInteger(n) && n >= -(2 ** 31) && n < 2 ** 31;
+  if (value === undefined) return { files: [], subdim: dimension };
   const parts = value.split(/\s+/);
-  if (parts.length === 1) return parts;
+  if (parts.length === 1 && parts[0] !== 'LIST') return { files: parts, subdim: dimension };
+  if (header.version < 4) throw new LoaderError(F, 'header', 'several data files need NRRD0004 or later');
+  const listed = parts[0] === 'LIST';
+  if (listed ? parts.length > 2 : parts.length !== 4 && parts.length !== 5)
+    throw new LoaderError(F, 'syntax', `bad data file pattern "${value.slice(0, 64)}"`);
+  const last = listed ? parts[1] : parts[4],
+    subdim = last === undefined ? dimension - 1 : Number(last);
+  if (last !== undefined && !(Number.isInteger(subdim) && subdim >= 1 && subdim <= dimension))
+    throw new LoaderError(F, 'range', `data file subdim ${last.slice(0, 16)} is outside 1..${dimension}`);
+  if (listed) {
+    if (!header.list.length) throw new LoaderError(F, 'syntax', 'data file: LIST names no files');
+    return { files: header.list, subdim };
+  }
   const [format, ...numbers] = parts,
     [min, max, step] = numbers.map(Number),
-    pattern = /%(0?)(\d*)d/.exec(format);
-  if (!pattern || !Number.isSafeInteger(min) || !Number.isSafeInteger(max) || !Number.isSafeInteger(step) || !step)
+    { before, spec, after } = pattern(format, value);
+  if (!int32(min) || !int32(max) || !int32(step) || !step)
     throw new LoaderError(F, 'syntax', `bad data file pattern "${value.slice(0, 64)}"`);
   if ((max - min) / step < 0 || (max - min) / step > 1_000_000)
     throw new LoaderError(F, 'range', `data file pattern "${value.slice(0, 64)}" names no files or too many`);
   const files: string[] = [];
-  for (let i = min; step > 0 ? i <= max : i >= max; i += step)
-    files.push(format.replace(pattern[0], String(i).padStart(Number(pattern[2]), pattern[1] ? '0' : ' ')));
-  return files;
+  for (let i = min; step > 0 ? i <= max : i >= max; i += step) files.push(before + printf(spec, i) + after);
+  return { files, subdim };
 }
 
 function skipLines(bytes: Uint8Array, lines: number): number {
@@ -278,20 +479,18 @@ function store(out: NRRDData, offset: number, bytes: Uint8Array<ArrayBuffer>, ty
   out.set(new View(bytes.buffer, 0, count) as never, offset);
 }
 
-function sample(word: string, float: boolean): number {
+function sample(word: string, floating: boolean): number {
+  if (floating) return float(word);
   const value = Number(word);
-  if (float) {
-    if (!Number.isNaN(value) || /^[+-]?nan$/i.test(word)) return value;
-    if (/^[+-]?inf(inity)?$/i.test(word)) return word[0] === '-' ? -Infinity : Infinity;
-  } else if (Number.isSafeInteger(value)) return value;
+  if (Number.isSafeInteger(value)) return value;
   throw new LoaderError(F, 'syntax', `invalid sample "${word.slice(0, 32)}"`);
 }
 
-function readText(text: string, out: NRRDData, offset: number, count: number, float: boolean): void {
+function readText(text: string, out: NRRDData, offset: number, count: number, floating: boolean): void {
   const token = /[^\s,]+/g;
   let i = 0;
   for (let match = token.exec(text); match && i < count; match = token.exec(text), i++)
-    out[offset + i] = sample(match[0], float);
+    out[offset + i] = sample(match[0], floating);
   if (i < count) throw new LoaderError(F, 'truncated', `found ${i} samples, expected ${count}`);
 }
 
@@ -315,6 +514,47 @@ function readHex(text: string, length: number): Uint8Array<ArrayBuffer> {
   return out;
 }
 
+/**
+ * The first `size` bytes of gzip data. The compressed bytes go in a step at a time and decoding stops once `size`
+ * bytes are out: the rest of the stream, and anything after it, is ignored (section 5, "Data file contents remaining
+ * after all data has been read should be ignored"), and a small file cannot inflate to more than it needs.
+ */
+async function gunzip(body: Uint8Array, size: number, signal?: AbortSignal): Promise<Uint8Array> {
+  if (typeof DecompressionStream !== 'function')
+    throw new LoaderError(F, 'unsupported', 'DecompressionStream is not available in this runtime');
+  let fed = 0;
+  const input = new ReadableStream<Uint8Array>(
+    {
+      pull(controller) {
+        if (fed >= body.length) controller.close();
+        else controller.enqueue(body.subarray(fed, (fed += FEED)));
+      },
+    },
+    { highWaterMark: 0 },
+  );
+  const reader = input
+      .pipeThrough(new DecompressionStream('gzip') as unknown as ReadableWritablePair<Uint8Array, Uint8Array>)
+      .getReader(),
+    out = new Uint8Array(size);
+  let length = 0;
+  try {
+    while (length < size) {
+      throwIfAborted(signal, F);
+      const { done, value } = await reader.read();
+      if (done) break;
+      const take = Math.min(value.length, size - length);
+      out.set(value.subarray(0, take), length);
+      length += take;
+    }
+  } catch (error) {
+    if (error instanceof LoaderError) throw error;
+    throw new LoaderError(F, 'zip', `the data has corrupt gzip data (${(error as Error)?.message ?? error})`);
+  } finally {
+    void reader.cancel().catch(() => {});
+  }
+  return out.subarray(0, length);
+}
+
 interface Encoded {
   type: NRRDType;
   encoding: 'raw' | 'ascii' | 'hex' | 'gzip' | 'bzip2';
@@ -328,7 +568,8 @@ async function decode(file: Uint8Array, out: NRRDData, offset: number, count: nu
   const { type, encoding, byteSkip } = how,
     size = SIZE[type],
     length = count * size;
-  let body = file.subarray(skipLines(file, how.lineSkip));
+  // With byte skip -1 the data is found from the end of the file, so line skip is moot (section 5).
+  let body = file.subarray(byteSkip === -1 ? 0 : skipLines(file, how.lineSkip));
   if (encoding === 'ascii') {
     readText(latin1(body, byteSkip), out, offset, count, type === 'float32' || type === 'float64');
     return;
@@ -336,7 +577,7 @@ async function decode(file: Uint8Array, out: NRRDData, offset: number, count: nu
   let raw: Uint8Array<ArrayBuffer>;
   if (encoding === 'hex') raw = readHex(latin1(body, byteSkip), length);
   else {
-    if (encoding === 'gzip') body = await inflate(body, length + byteSkip, 'the data', how.signal, 'gzip', F);
+    if (encoding === 'gzip') body = await gunzip(body, length + byteSkip, how.signal);
     else if (encoding === 'bzip2') body = await bunzip(body, length + Math.max(byteSkip, 0));
     const start = byteSkip < 0 ? body.length - length : byteSkip;
     if (start < 0 || start + length > body.length)
@@ -354,11 +595,13 @@ function layout(
   sizes: number[],
 ): Pick<NRRDVolume, 'dims' | 'components' | 'frames' | 'spacing' | 'bounds' | 'matrix' | 'space'> {
   const dimension = sizes.length,
-    named = fields.space?.toLowerCase(),
-    space = named === undefined ? undefined : (SPACES[named] ?? named);
+    named = fields.space === undefined ? undefined : SPACES[fields.space.toLowerCase()];
+  if (fields.space !== undefined && !named)
+    throw new LoaderError(F, 'header', `unknown space "${fields.space.slice(0, 32)}"`);
+  const space = named?.[0];
   if (space && fields['space dimension'] !== undefined)
     throw new LoaderError(F, 'syntax', 'a file gives space or space dimension, never both');
-  const spaceDimension = integer(fields['space dimension'], 'space dimension', space ? spaceSize(space) : 0);
+  const spaceDimension = integer(fields['space dimension'], 'space dimension', named ? named[1] : 0);
   if (spaceDimension < 0 || spaceDimension > MAX_DIMENSION)
     throw new LoaderError(F, 'range', `space dimension ${spaceDimension} is out of range`);
   let directions: (number[] | null)[] | undefined;
@@ -368,9 +611,24 @@ function layout(
     if (directions.length !== dimension)
       throw new LoaderError(F, 'syntax', `space directions has ${directions.length} entries for ${dimension} axes`);
   }
-  const kinds = fields.kinds?.trim().split(/\s+/);
+  const kinds = fields.kinds?.trim().toLowerCase().split(/[ \t]+/);
   if (kinds && kinds.length !== dimension)
     throw new LoaderError(F, 'syntax', `kinds has ${kinds.length} entries for ${dimension} axes`);
+  kinds?.forEach((kind, axis) => {
+    const size = KINDS[kind];
+    if (size === undefined) throw new LoaderError(F, 'syntax', `unknown kind "${kind.slice(0, 32)}"`);
+    if (size && sizes[axis] !== size)
+      throw new LoaderError(F, 'range', `axis ${axis} of kind ${kind} has size ${sizes[axis]}, not ${size}`);
+  });
+  // A space direction and a known spacing, axis min or axis max on the same axis exclude each other (section 4).
+  const spacings = fields.spacings === undefined ? undefined : doubles(fields.spacings, 'spacings', dimension);
+  if (spacings?.includes(0)) throw new LoaderError(F, 'range', 'spacings holds a zero');
+  for (const name of ['spacings', 'axis mins', 'axis maxs']) {
+    const values =
+      name === 'spacings' ? spacings : fields[name] === undefined ? undefined : doubles(fields[name], name, dimension);
+    const axis = values?.findIndex((value, i) => !Number.isNaN(value) && directions?.[i]) ?? -1;
+    if (axis >= 0) throw new LoaderError(F, 'syntax', `axis ${axis} has both a space direction and ${name}`);
+  }
   const spatial = (axis: number): boolean => {
     const kind = kinds?.[axis];
     if (directions) return directions[axis] !== null && kind !== 'time';
@@ -384,11 +642,12 @@ function layout(
   let frames = 1;
   for (let axis = first + axes.length; axis < dimension; axis++) frames *= sizes[axis];
 
-  const spacings = fields.spacings?.trim().split(/\s+/).map(Number);
-  if (spacings && spacings.length !== dimension)
-    throw new LoaderError(F, 'syntax', `spacings has ${spacings.length} entries for ${dimension} axes`);
-  const origin =
-    fields['space origin'] === undefined ? null : vectors(fields['space origin'], 'space origin', spaceDimension)[0];
+  let origin: number[] | null = null;
+  if (fields['space origin'] !== undefined) {
+    const found = vectors(fields['space origin'], 'space origin', spaceDimension);
+    if (found.length !== 1 || !found[0]) throw new LoaderError(F, 'syntax', 'space origin must be one vector');
+    origin = found[0];
+  }
   const dims: [number, number, number] = [1, 1, 1],
     spacing: [number, number, number] = [1, 1, 1],
     matrix = new Float64Array(16);
@@ -405,7 +664,7 @@ function layout(
       continue;
     }
     const step = axis === undefined ? undefined : spacings?.[axis],
-      usable = step !== undefined && step !== 0 && Number.isFinite(step);
+      usable = step !== undefined && !Number.isNaN(step);
     if (usable) spacing[k] = Math.abs(step);
     matrix[k * 5] = usable ? step : 1;
   }
@@ -424,8 +683,9 @@ function layout(
 
 /**
  * Reads a NRRD volume from a `.nrrd` file, or a `.nhdr` header with its detached data through `resolve`. Encodings are
- * raw, ascii, hex and gzip, with either byte order, `line skip` and `byte skip` (-1 for the end of a raw file) and one
- * or many data files. `space directions`, `space origin`, `spacings` and `kinds` set `dims`, `spacing`, `bounds` and
+ * raw, ascii, hex, gzip and bzip2, with either byte order, `line skip` and `byte skip` (-1 for the end of a raw file)
+ * and one or many data files (a printf pattern or a `LIST`, with `subdim`). Data past what the header needs is
+ * ignored, and gzip decoding stops there. `space directions`, `space origin`, `spacings` and `kinds` set `dims`, `spacing`, `bounds` and
  * `matrix`; a leading non-spatial axis is `components` and trailing ones are `frames`.
  *
  * @param input The file's bytes.
@@ -451,8 +711,8 @@ export async function parseNRRD(input: BinaryInput, options: NRRDOptions = {}): 
   if (!Number.isSafeInteger(maxSamples) || maxSamples < 0)
     throw new LoaderError(F, 'range', 'maxSamples must be a non-negative integer');
   const header = readHeader(bytes),
-    { fields, meta } = header;
-  const missing = ['type', 'dimension', 'sizes', 'encoding'].find((name) => !(name in fields));
+    { fields, known, meta } = header;
+  const missing = ['type', 'dimension', 'sizes', 'encoding'].find((name) => !(name in known));
   if (missing) throw new LoaderError(F, 'header', `the required field "${missing}" is missing`);
   if (fields.type.toLowerCase() === 'block') throw new LoaderError(F, 'unsupported', 'the block type has no array form');
   const type = TYPES[fields.type.toLowerCase()];
@@ -477,12 +737,12 @@ export async function parseNRRD(input: BinaryInput, options: NRRDOptions = {}): 
     throw new LoaderError(F, 'header', `unknown endian "${endian.slice(0, 32)}"`);
   if (endian === undefined && SIZE[type] > 1 && encoding !== 'ascii')
     throw new LoaderError(F, 'header', 'the required field "endian" is missing');
-  const lineSkip = integer(fields['line skip'] ?? fields.lineskip, 'line skip', 0),
-    byteSkip = integer(fields['byte skip'] ?? fields.byteskip, 'byte skip', 0);
+  const lineSkip = integer(known['line skip'], 'line skip', 0),
+    byteSkip = integer(known['byte skip'], 'byte skip', 0);
   if (lineSkip < 0) throw new LoaderError(F, 'range', `line skip ${lineSkip} is negative`);
   if (byteSkip < -1 || (byteSkip === -1 && encoding !== 'raw'))
     throw new LoaderError(F, 'range', `byte skip ${byteSkip} is not allowed with ${encoding} data`);
-  const placed = layout(fields, sizes);
+  const placed = layout(known, sizes);
 
   const data = allocate(type, total),
     how: Encoded = {
@@ -493,13 +753,22 @@ export async function parseNRRD(input: BinaryInput, options: NRRDOptions = {}): 
       byteSkip,
       signal,
     },
-    files = dataFiles(header);
+    { files, subdim } = dataFiles(header, dimension);
   if (!files.length) await decode(bytes.subarray(header.end), data, 0, total, how);
   else {
     if (!resolve)
       throw new LoaderError(F, 'unsupported', `the data is in "${files[0].slice(0, 64)}"; pass a resolve option`);
-    if (total % files.length)
-      throw new LoaderError(F, 'range', `${total} samples do not divide over ${files.length} data files`);
+    // Each file holds the first `subdim` axes and the axes after them count the files; with subdim equal to the
+    // dimension the files are equal slabs cut along the slowest axis (section 3).
+    let expected = 1;
+    for (let axis = subdim; axis < dimension; axis++) expected *= sizes[axis];
+    const fits = subdim === dimension ? sizes[dimension - 1] % files.length === 0 : files.length === expected;
+    if (!fits)
+      throw new LoaderError(
+        F,
+        'range',
+        `${files.length} data files do not fit sizes ${sizes.join(' ')} with subdim ${subdim}`,
+      );
     const each = total / files.length;
     for (let i = 0; i < files.length; i++) {
       throwIfAborted(signal, F);

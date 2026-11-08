@@ -98,3 +98,9 @@ test('volumeFromNRRD hands the grid, true bounds and range to fig.volume', async
   assert.equal(calls[0].options.colormap, 'magma');
   assert.equal(calls[0].data.length, 8);
 });
+
+test('nrrdGrid range is the smallest and largest finite sample', async () => {
+  const header = 'NRRD0004\ntype: float\ndimension: 1\nsizes: 5\nencoding: ascii\n\n';
+  assert.deepEqual(nrrdGrid(await loadNRRD(text(`${header}1 inf 3 -inf nan\n`))).range, [1, 3]);
+  assert.deepEqual(nrrdGrid(await loadNRRD(text(`${header}inf -inf nan inf nan\n`))).range, [0, 0]);
+});

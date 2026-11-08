@@ -5,6 +5,7 @@
 ```ts
 export interface Bzip2Options {
     maxBytes?: number;
+    stopAt?: number;
 }
 
 export function decodeBzip2(input: Uint8Array, options?: Bzip2Options): Uint8Array;

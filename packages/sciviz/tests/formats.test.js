@@ -20,13 +20,27 @@ test('a real big-endian NIfTI-1 statistics map (FSL zstat1, gzip) reads its grid
   const raw = gunzipSync(fixture('zstat1.nii.gz')),
     view = new DataView(raw.buffer, raw.byteOffset),
     offset = view.getFloat32(108, false);
-  for (const i of [0, 1000, 40000, 64 * 64 * 21 - 1]) assert.equal(image.data[i], view.getFloat32(offset + i * 4, false));
+  for (const i of [0, 1000, 40000, 64 * 64 * 21 - 1])
+    assert.equal(image.data[i], view.getFloat32(offset + i * 4, false));
   assert.deepEqual(image.spacing, [4, 4, 6]);
   assert.ok(image.range[0] < 0 && image.range[1] > 0, `range ${image.range}`);
 });
 
 // A NIfTI-1 or -2 header written field by field from the format's definition (a stand-in, not a tool's file).
-function nifti({ version = 1, little = true, dims = [2, 2, 2], datatype = 4, bitpix = 16, slope = 0, inter = 0, qform, sform, pixdim = [1, 1, 1, 1], magic, data }) {
+function nifti({
+  version = 1,
+  little = true,
+  dims = [2, 2, 2],
+  datatype = 4,
+  bitpix = 16,
+  slope = 0,
+  inter = 0,
+  qform,
+  sform,
+  pixdim = [1, 1, 1, 1],
+  magic,
+  data,
+}) {
   const size = version === 1 ? 348 : 540,
     offset = version === 1 ? 352 : 544,
     bytes = new Uint8Array(offset + data.byteLength),
@@ -55,6 +69,8 @@ function nifti({ version = 1, little = true, dims = [2, 2, 2], datatype = 4, bit
     put(344, magic ?? 'n+1');
   } else {
     put(4, magic ?? 'n+2');
+    // The NIfTI-2 signature after the magic's NUL: 0D 0A 1A 0A.
+    bytes.set([0x0d, 0x0a, 0x1a, 0x0a], 8);
     v.setInt16(12, datatype, little);
     v.setInt16(14, bitpix, little);
     v.setBigInt64(16, BigInt(dims.length), little);
@@ -74,7 +90,9 @@ function nifti({ version = 1, little = true, dims = [2, 2, 2], datatype = 4, bit
 }
 
 test('NIfTI-2, scaling, qform rotation with qfac and the sform win as the definition orders', async () => {
-  const two = await parseNIfTI(nifti({ version: 2, dims: [2, 1, 1], datatype: 16, bitpix: 32, data: new Float32Array([1.5, -2]) }));
+  const two = await parseNIfTI(
+    nifti({ version: 2, dims: [2, 1, 1], datatype: 16, bitpix: 32, data: new Float32Array([1.5, -2]) }),
+  );
   assert.equal(two.version, 2);
   assert.deepEqual([...two.data], [1.5, -2]);
   assert.deepEqual(two.units, { space: 'mm', time: 's' });
@@ -89,11 +107,21 @@ test('NIfTI-2, scaling, qform rotation with qfac and the sform win as the defini
   const m = [...q.matrix].map((x) => Math.round(x * 1e5) / 1e5 + 0);
   assert.deepEqual(m, [0, 2, 0, 0, -3, 0, 0, 0, 0, 0, -4, 0, 10, 20, 30, 1]);
   const both = await parseNIfTI(
-    nifti({ qform: { quat: [0, 0, s], offset: [0, 0, 0] }, sform: [[1, 0, 0, 5], [0, 2, 0, 6], [0, 0, 3, 7]], data: new Int16Array(8) }),
+    nifti({
+      qform: { quat: [0, 0, s], offset: [0, 0, 0] },
+      sform: [
+        [1, 0, 0, 5],
+        [0, 2, 0, 6],
+        [0, 0, 3, 7],
+      ],
+      data: new Int16Array(8),
+    }),
   );
   assert.equal(both.transform, 'sform');
   assert.deepEqual([...both.matrix], [1, 0, 0, 0, 0, 2, 0, 0, 0, 0, 3, 0, 5, 6, 7, 1]);
-  const big = await parseNIfTI(gzipSync(nifti({ little: false, dims: [2, 1, 1, 3], datatype: 512, data: be16([1, 2, 3, 4, 5, 6]) })));
+  const big = await parseNIfTI(
+    gzipSync(nifti({ little: false, dims: [2, 1, 1, 3], datatype: 512, data: be16([1, 2, 3, 4, 5, 6]) })),
+  );
   assert.equal(big.frames, 3);
   assert.deepEqual([...big.data], [1, 2]);
   assert.deepEqual([...big.all], [1, 2, 3, 4, 5, 6]);
@@ -120,7 +148,10 @@ test('a .hdr and .img pair reads the image through resolve; bad files are coded 
   assert.deepEqual([...pair.data], [1, 2, 3, 4, 5, 6, 7, 8]);
   await assert.rejects(parseNIfTI(header), TypeError);
   await assert.rejects(parseNIfTI(new Uint8Array(100)), RangeError);
-  await assert.rejects(parseNIfTI(nifti({ datatype: 32, bitpix: 64, data: new Float32Array(16) })), code('unsupported'));
+  await assert.rejects(
+    parseNIfTI(nifti({ datatype: 32, bitpix: 64, data: new Float32Array(16) })),
+    code('unsupported'),
+  );
   await assert.rejects(parseNIfTI(nifti({ dims: [1000, 1000, 1000], data: new Int16Array(1) })), RangeError);
   await assert.rejects(parseNIfTI(nifti({ data: new Int16Array(3) })), RangeError);
 });
@@ -158,14 +189,31 @@ test('one MR image in explicit little, implicit little and explicit big endian r
 });
 
 test('compressed pixel data is refused naming its transfer syntax', async () => {
-  await assert.rejects(parseDICOM(fixture('MR_small_RLE.dcm')), (error) => error.code === 'unsupported' && /1\.2\.840\.10008\.1\.2\.5/.test(error.message));
+  await assert.rejects(
+    parseDICOM(fixture('MR_small_RLE.dcm')),
+    (error) => error.code === 'unsupported' && /1\.2\.840\.10008\.1\.2\.5/.test(error.message),
+  );
 });
 
 // A DICOM file written element by element (a stand-in): explicit VR little endian meta, then the data set.
-function dicom({ syntax = '1.2.840.10008.1.2.1', rows = 2, columns = 2, position, orientation = [1, 0, 0, 0, 1, 0], instance, series = '1.2.3', pixels, deflate = false, frames, sequence = false }) {
-  const parts = [];
+function dicom({
+  syntax = '1.2.840.10008.1.2.1',
+  rows = 2,
+  columns = 2,
+  position,
+  orientation = [1, 0, 0, 0, 1, 0],
+  instance,
+  series = '1.2.3',
+  pixels,
+  deflate = false,
+  frames,
+  sequence = false,
+}) {
   const el = (g, e, vr, value, little = true) => {
-    const body = typeof value === 'string' ? Buffer.from(value.length % 2 ? `${value}${vr === 'UI' ? '\0' : ' '}` : value, 'latin1') : Buffer.from(value);
+    const body =
+      typeof value === 'string'
+        ? Buffer.from(value.length % 2 ? `${value}${vr === 'UI' ? '\0' : ' '}` : value, 'latin1')
+        : Buffer.from(value);
     const long = ['OB', 'OW', 'SQ', 'UN', 'UT'].includes(vr);
     const head = Buffer.alloc(long ? 12 : 8);
     head.writeUInt16LE(g, 0);
@@ -230,10 +278,10 @@ test('dicomSeries orders slices by position along the normal, spaces them and bu
   assert.deepEqual([...volume.matrix], [0.25, 0, 0, 0, 0, 0.5, 0, 0, 0, 0, 2, 0, -5, 7, 0, 1]);
   const other = await parseDICOM(dicom({ position: [0, 0, 6], series: '9.9', pixels: [0, 0, 0, 0] }));
   assert.throws(() => dicomSeries([...slices, other]), RangeError);
-  // A multi-frame image stacks its frames.
+  // A multi-frame image without a Frame Increment Pointer does not say its frames lie in space, so it is not stacked.
   const multi = await parseDICOM(dicom({ frames: 2, pixels: [1, 2, 3, 4, 5, 6, 7, 8] }));
   assert.equal(multi.frames, 2);
-  assert.deepEqual(dicomSeries([multi]).dims, [2, 2, 2]);
+  assert.throws(() => dicomSeries([multi]), code('unsupported'));
 });
 
 // ------------------------------------------------------------------------------------------------------------- Zarr
@@ -247,14 +295,25 @@ test('a chunked Zarr v2 array with zlib reads whole, as a box, and with a missin
   const full = Array.from({ length: 12 }, (_, i) => i);
   const chunk = (r, c) => {
     const out = new Float32Array(6).fill(0);
-    for (let i = 0; i < 2; i++) for (let j = 0; j < 3; j++) {
-      const y = r * 2 + i, x = c * 3 + j;
-      out[i * 3 + j] = y < 3 && x < 4 ? full[y * 4 + x] : 0;
-    }
+    for (let i = 0; i < 2; i++)
+      for (let j = 0; j < 3; j++) {
+        const y = r * 2 + i,
+          x = c * 3 + j;
+        out[i * 3 + j] = y < 3 && x < 4 ? full[y * 4 + x] : 0;
+      }
     return deflateSync(new Uint8Array(out.buffer));
   };
   const store = {
-    'a/.zarray': json({ zarr_format: 2, shape: [3, 4], chunks: [2, 3], dtype: '<f4', compressor: { id: 'zlib', level: 1 }, fill_value: -1, order: 'C', filters: null }),
+    'a/.zarray': json({
+      zarr_format: 2,
+      shape: [3, 4],
+      chunks: [2, 3],
+      dtype: '<f4',
+      compressor: { id: 'zlib', level: 1 },
+      fill_value: -1,
+      order: 'C',
+      filters: null,
+    }),
     'a/.zattrs': json({ units: 'K' }),
     'a/0.0': chunk(0, 0),
     'a/0.1': chunk(0, 1),
@@ -296,7 +355,11 @@ test('a Zarr v3 array with gzip, crc32c and big-endian bytes reads; a damaged ch
     chunk_grid: { name: 'regular', configuration: { chunk_shape: [2, 2] } },
     chunk_key_encoding: { name: 'default', configuration: { separator: '/' } },
     fill_value: 0,
-    codecs: [{ name: 'bytes', configuration: { endian: 'big' } }, { name: 'gzip', configuration: { level: 1 } }, { name: 'crc32c' }],
+    codecs: [
+      { name: 'bytes', configuration: { endian: 'big' } },
+      { name: 'gzip', configuration: { level: 1 } },
+      { name: 'crc32c' },
+    ],
     dimension_names: ['y', 'x'],
   });
   const array = await openZarr({ 'zarr.json': meta, 'c/0/0': chunk });
@@ -309,7 +372,14 @@ test('a Zarr v3 array with gzip, crc32c and big-endian bytes reads; a damaged ch
   await assert.rejects(damaged.read(), (error) => error.code === 'failed');
   // A transposed chunk (stored x-major) comes back in C order.
   const transposed = await openZarr({
-    'zarr.json': json({ ...JSON.parse(meta), data_type: 'float32', codecs: [{ name: 'transpose', configuration: { order: [1, 0] } }, { name: 'bytes', configuration: { endian: 'little' } }] }),
+    'zarr.json': json({
+      ...JSON.parse(meta),
+      data_type: 'float32',
+      codecs: [
+        { name: 'transpose', configuration: { order: [1, 0] } },
+        { name: 'bytes', configuration: { endian: 'little' } },
+      ],
+    }),
     'c/0/0': f32([1, 3, 2, 4]),
   });
   assert.deepEqual([...(await transposed.read()).data], [1, 2, 3, 4]);
@@ -321,7 +391,16 @@ test('a Zarr v3 array with gzip, crc32c and big-endian bytes reads; a damaged ch
 
 test('zarrGrid makes a volume of the last three dimensions and volumeFromGrid hands it to fig.volume', async () => {
   const store = {
-    '.zarray': json({ zarr_format: 2, shape: [1, 2, 2, 3], chunks: [1, 2, 2, 3], dtype: '<f4', compressor: null, fill_value: 0, order: 'C', filters: null }),
+    '.zarray': json({
+      zarr_format: 2,
+      shape: [1, 2, 2, 3],
+      chunks: [1, 2, 2, 3],
+      dtype: '<f4',
+      compressor: null,
+      fill_value: 0,
+      order: 'C',
+      filters: null,
+    }),
     '0.0.0.0': f32(Array.from({ length: 12 }, (_, i) => i)),
   };
   const array = await openZarr(store);

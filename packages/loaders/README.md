@@ -443,7 +443,7 @@ console.log(first.positions.length, filament, min, max);
 
 ## NRRD volumes
 
-`parseNRRD` from `@margoengine/loaders/nrrd` reads the NRRD files CT and MRI tools write, `.nrrd` and detached `.nhdr`, into the arrays `fig.volume()` of `@margoengine/sciviz` takes. It reads raw, ascii, hex and gzip data in either byte order, `line skip`, `byte skip` (with -1 for the end of a raw file), and one data file, a `%03d` pattern or a `LIST`. Samples stay in the file's own type; 64-bit integers become `Float64Array`, exact up to 2^53.
+`parseNRRD` from `@margoengine/loaders/nrrd` reads the NRRD files CT and MRI tools write, `.nrrd` and detached `.nhdr`, into the arrays `fig.volume()` of `@margoengine/sciviz` takes. It reads raw, ascii, hex and gzip data in either byte order, `line skip`, `byte skip` (with -1 for the end of a raw file), and one data file, a printf pattern such as `slice%03d.raw` or a `LIST`, each with its optional `subdim` (by default one slice along the slowest axis per file, and the file count must match). Samples stay in the file's own type; 64-bit integers become `Float64Array`, exact up to 2^53.
 
 ```ts
 import { parseNRRD } from '@margoengine/loaders/nrrd';
@@ -465,7 +465,8 @@ console.log(data);
 - `dims` holds the spatial axes, the first fastest. A leading non-spatial axis (an RGB `kinds` entry, or `none` in `space directions`) is `components`; axes after the spatial ones, such as time, are `frames`. A sample sits at `(((t * nz + z) * ny + y) * nx + x) * components + c`.
 - `bounds` is the box in true proportions from 0. `matrix` takes a voxel index to the file's `space`, with its origin, rotation and flips: use it to line a scan up with other data.
 - `resolve` gets the path as the header writes it, tidied of `.` and `..`. It is your code: keep it inside the folder you trust.
-- `maxSamples` (default 536,870,912) stops a huge declared size before anything is allocated, and gzip data cannot inflate past what the header declares. `bzip2` data needs `@margoengine/decoders` and stops at the same size. The `block` type has no array form and is an `unsupported` error.
+- The header is checked against the format: the magic is `NRRD0001` to `NRRD0005` alone on its line, a field newer than the magic (key/value pairs before 0002, `kinds` before 0003, `space` fields and several data files before 0004) is a `header` error, as is an unknown `space` or a kind on an axis of the wrong size (`RGB-color` needs 3). ASCII floats follow the format's rule: any word with `nan` is NaN, then `-inf` and `inf`.
+- `maxSamples` (default 536,870,912) stops a huge declared size before anything is allocated. Data past what the header needs is ignored, as the format says: gzip and bzip2 decoding stop once the samples are out, so a small file never inflates to more than it needs. `bzip2` data needs `@margoengine/decoders`. The `block` type has no array form and is an `unsupported` error.
 
 ## LDraw
 

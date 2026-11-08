@@ -1,6 +1,6 @@
 {
-  "commit": "964ddc1b5",
-  "dirty": true,
+  "commit": "ba90ebe1b",
+  "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
     "raw": 57071,
@@ -680,24 +680,24 @@
         "gzip": 658
       },
       "./png": {
-        "raw": 8285,
-        "gzip": 3770
+        "raw": 8352,
+        "gzip": 3798
       },
       "./brotli": {
-        "raw": 93816,
-        "gzip": 66924
+        "raw": 93883,
+        "gzip": 66947
       },
       "./bzip2": {
-        "raw": 4094,
-        "gzip": 1912
+        "raw": 4244,
+        "gzip": 1963
       },
       "./xz": {
         "raw": 10491,
         "gzip": 3926
       },
       "./image": {
-        "raw": 1661462,
-        "gzip": 763949
+        "raw": 1661529,
+        "gzip": 763964
       },
       "./bc": {
         "raw": 9349,
@@ -728,24 +728,24 @@
         "gzip": 2603
       },
       "./tiff": {
-        "raw": 8413,
-        "gzip": 3873
+        "raw": 8480,
+        "gzip": 3894
       },
       "./ktx2-layers": {
-        "raw": 809402,
-        "gzip": 374592
+        "raw": 809469,
+        "gzip": 374614
       },
       "./ktx2-hdr": {
         "raw": 790761,
         "gzip": 367257
       },
       "./ktx2-gpu": {
-        "raw": 35624,
-        "gzip": 13897
+        "raw": 35691,
+        "gzip": 13917
       },
       "./ktx2-stream": {
-        "raw": 819914,
-        "gzip": 378589
+        "raw": 819981,
+        "gzip": 378612
       },
       "./meshopt-simd": {
         "raw": 42312,
@@ -753,7 +753,7 @@
       },
       "./jxl": {
         "raw": 2274888,
-        "gzip": 875878
+        "gzip": 875877
       },
       "./pvr": {
         "raw": 6490,
@@ -810,8 +810,8 @@
     },
     "@margoengine/environment": {
       ".": {
-        "raw": 90507,
-        "gzip": 29642
+        "raw": 90574,
+        "gzip": 29670
       },
       "./probes": {
         "raw": 40397,
@@ -1042,8 +1042,8 @@
         "gzip": 3587
       },
       "dist/workers/fbx.js": {
-        "raw": 249383,
-        "gzip": 81969
+        "raw": 249450,
+        "gzip": 82005
       }
     },
     "@margoengine/fsm": {
@@ -1426,8 +1426,8 @@
         "gzip": 446
       },
       "./nrrd": {
-        "raw": 11903,
-        "gzip": 4783
+        "raw": 15509,
+        "gzip": 6106
       },
       "./ldraw": {
         "raw": 9826,
@@ -2388,16 +2388,16 @@
         "gzip": 4171
       },
       "./formats": {
-        "raw": 19281,
-        "gzip": 7860
+        "raw": 35694,
+        "gzip": 13312
       },
       "./maths": {
         "raw": 12305,
         "gzip": 5382
       },
       "./nrrd": {
-        "raw": 1824,
-        "gzip": 960
+        "raw": 1846,
+        "gzip": 972
       }
     },
     "@margoengine/selection": {
@@ -3269,9 +3269,9 @@
       "brotli": 6346
     },
     "packages/environment/dist/index.js": {
-      "raw": 90507,
-      "gzip": 29642,
-      "brotli": 26250
+      "raw": 90574,
+      "gzip": 29670,
+      "brotli": 26329
     },
     "packages/shadows/dist/index.js": {
       "raw": 55970,
@@ -3359,9 +3359,9 @@
       "brotli": 427795
     },
     "packages/exporters/dist/encoder.worker.js": {
-      "raw": 20853,
-      "gzip": 8856,
-      "brotli": 7920
+      "raw": 20920,
+      "gzip": 8883,
+      "brotli": 7970
     },
     "packages/exporters/dist/draco-encoder/draco_encoder_wrapper.js": {
       "raw": 49007,
@@ -3394,9 +3394,9 @@
       "brotli": 14147
     },
     "packages/fbx/dist/workers/fbx.js": {
-      "raw": 247226,
-      "gzip": 81813,
-      "brotli": 70810
+      "raw": 247293,
+      "gzip": 81846,
+      "brotli": 70795
     },
     "packages/usdz/dist/workers/usdz.js": {
       "raw": 331954,

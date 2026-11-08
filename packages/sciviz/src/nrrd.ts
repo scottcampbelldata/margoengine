@@ -101,6 +101,8 @@ export function nrrdGrid(volume: NRRDVolume, options: NRRDGridOptions = {}): NRR
     max = -Infinity;
   for (let i = 0; i < data.length; i++) {
     const value = data[i];
+    // Infinite samples (ascii "inf" is one) and NaN stay out of the range, which is the finite extent.
+    if (!Number.isFinite(value)) continue;
     if (value < min) min = value;
     if (value > max) max = value;
   }

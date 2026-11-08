@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10840945,
+  "total": 10847924,
   "history": [
     {
       "date": "2026-10-24",
@@ -3974,6 +3974,12 @@
       "commit": "964ddc1b5",
       "reason": "new entry @margoengine/terrain/holes; holes texture option and getter on the root entry",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "ba90ebe1b",
+      "reason": "NRRD and formats readers follow their specs; shared inflater",
+      "grew": 2
     }
   ],
   "items": {
@@ -4140,7 +4146,7 @@
     "@margoengine/decoders/dds": 3029,
     "@margoengine/decoders/draco-points": 154011,
     "@margoengine/decoders/image": 786471,
-    "@margoengine/decoders/jxl": 902155,
+    "@margoengine/decoders/jxl": 902154,
     "@margoengine/decoders/ktx": 2851,
     "@margoengine/decoders/ktx2-gpu": 14314,
     "@margoengine/decoders/ktx2-hdr": 378245,
@@ -4318,7 +4324,7 @@
     "@margoengine/loaders/md2": 2265,
     "@margoengine/loaders/mocap": 2146,
     "@margoengine/loaders/mtl": 8186,
-    "@margoengine/loaders/nrrd": 4978,
+    "@margoengine/loaders/nrrd": 6362,
     "@margoengine/loaders/nurbs": 2763,
     "@margoengine/loaders/pdb": 2464,
     "@margoengine/loaders/render": 3148,
@@ -4541,7 +4547,7 @@
     "@margoengine/sciviz": 36802,
     "@margoengine/sciviz/bricks": 14265,
     "@margoengine/sciviz/colormaps": 4427,
-    "@margoengine/sciviz/formats": 8116,
+    "@margoengine/sciviz/formats": 13712,
     "@margoengine/sciviz/maths": 5638,
     "@margoengine/sciviz/nrrd": 1216,
     "@margoengine/selection": 21142,

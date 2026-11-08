@@ -149,7 +149,7 @@ const ASSETS = [
   ['examples/assets/robot-CREDITS.md', 'RobotExpressive upstream credits (Tomás Laulhé, Don McCurdy; CC0)'],
   [
     'packages/sciviz/tests/fixtures/NOTICE.md',
-    'test fixtures: pydicom test data CT_small and MR_small in four transfer syntaxes (MIT-licensed project; no restriction on the files stated) and the NIfTI-1 sample zstat1.nii.gz (NIMH, public domain)',
+    'test fixtures: pydicom test data CT_small and MR_small in four transfer syntaxes (MIT-licensed project; no restriction on the files stated) and the NIfTI-1 sample zstat1.nii.gz (NIMH, public domain); real Zarr stores: the zarr_implementations v2 astronaut (MIT, Copyright 2021 Zarr Developers; image NASA, public domain), zarrs array_gzip.zarr (MIT OR Apache-2.0) and two GDAL autotest v3 arrays (GDAL MIT-style licence); commits and sha256 there',
   ],
   [
     'packages/physics/tests/fixtures/thingi10k/NOTICE.md',

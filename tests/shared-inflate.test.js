@@ -2,8 +2,8 @@
 // node:zlib across levels, strategies and window sizes, and the RFC 1950 Adler-32 trailer enforced.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { constants, deflateSync } from 'node:zlib';
-import { inflateZlib } from '../packages/shared/inflate.js';
+import { constants, deflateRawSync, deflateSync } from 'node:zlib';
+import { inflateRaw, inflateZlib } from '../packages/shared/inflate.js';
 
 let seed = 3;
 const random = () => (seed = (seed * 1103515245 + 12345) >>> 0) >>> 8;
@@ -54,4 +54,29 @@ test('checkAdler false skips only the checksum, still requiring the trailer', ()
   assert.deepEqual(inflateZlib(flipped, data.length, false), data);
   assert.throws(() => inflateZlib(flipped, data.length), failed);
   assert.throws(() => inflateZlib(zlib.subarray(0, zlib.length - 1), data.length, false), failed);
+});
+
+test('a limit under 1 KiB holds: output one byte past it is refused', () => {
+  // Regression: the growable buffer started at 1024 bytes whatever the limit, so up to 1024 bytes passed any limit.
+  const data = new Uint8Array(100).fill(7),
+    zlib = new Uint8Array(deflateSync(data));
+  assert.deepEqual(inflateZlib(zlib, { limit: 100 }), data);
+  assert.throws(() => inflateZlib(zlib, { limit: 99 }), failed);
+  assert.throws(() => inflateRaw(new Uint8Array(deflateRawSync(data)), 0, { limit: 10 }), failed);
+});
+
+test('inflateRaw reads a raw stream at any start and reports the byte after its final block', () => {
+  for (const [i, size] of [0, 1, 300, 70000].entries()) {
+    const data = new Uint8Array(size);
+    for (let k = 0; k < size; k++) data[k] = i % 2 ? random() & 255 : (k >> 4) & 255;
+    const raw = new Uint8Array(deflateRawSync(data, { level: i * 3 })),
+      framed = new Uint8Array(5 + raw.length + 3);
+    framed.set(raw, 5);
+    framed.set([0xaa, 0xbb, 0xcc], 5 + raw.length);
+    const { output, end } = inflateRaw(framed, 5, { limit: size });
+    assert.deepEqual(output, data, `stream ${i}`);
+    assert.equal(end, 5 + raw.length, `stream ${i} ends after its final block`);
+    assert.deepEqual(inflateRaw(framed, 5, size).output, data);
+    assert.throws(() => inflateRaw(framed.subarray(0, 5 + raw.length - 1), 5, { limit: size }), failed);
+  }
 });

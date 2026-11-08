@@ -7,6 +7,12 @@ import { decodeFailed, deviceUnsupported } from './errors.js';
 export interface Bzip2Options {
   /** Largest output accepted, in bytes, so a small stream cannot fill memory. Default 2^30 (1 GiB). */
   maxBytes?: number;
+  /**
+   * Stop as soon as this many bytes are out and return exactly them, for containers whose header gives the size and
+   * whose data may run on (NRRD). Nothing past them is decoded, so the CRC of the block holding the last of them and
+   * of the stream are not checked. Default: decode every stream to its end.
+   */
+  stopAt?: number;
 }
 
 const corrupt = (why: string) => decodeFailed(`bzip2 stream is corrupt: ${why}`);
@@ -197,7 +203,9 @@ function readBlock(bits: Bits, tt: Uint32Array, size: number): { count: number; 
  * @throws MargoError `'failed'` for a corrupt or short stream or one past `maxBytes`, `'unsupported'` for a randomised block.
  */
 export function decodeBzip2(input: Uint8Array, options: Bzip2Options = {}): Uint8Array {
-  const maxBytes = options.maxBytes ?? 2 ** 30;
+  const maxBytes = options.maxBytes ?? 2 ** 30,
+    stop = options.stopAt ?? Number.POSITIVE_INFINITY;
+  if (stop <= 0) return new Uint8Array(0);
   let out = new Uint8Array(Math.min(maxBytes, Math.max(1024, input.length * 4))),
     length = 0,
     start = 0;
@@ -233,10 +241,12 @@ export function decodeBzip2(input: Uint8Array, options: Bzip2Options = {}): Uint
           byte = entry & 0xff;
         at = entry >>> 8;
         if (same === 4) {
-          room(byte);
-          out.fill(previous, length, length + byte);
-          for (let k = 0; k < byte; k++) crc = (crc << 8) ^ crcTable[(crc >>> 24) ^ previous];
-          length += byte;
+          const run = Math.min(byte, stop - length);
+          room(run);
+          out.fill(previous, length, length + run);
+          for (let k = 0; k < run; k++) crc = (crc << 8) ^ crcTable[(crc >>> 24) ^ previous];
+          length += run;
+          if (length >= stop) return out.subarray(0, length);
           same = 0;
           previous = -1;
           continue;
@@ -245,6 +255,7 @@ export function decodeBzip2(input: Uint8Array, options: Bzip2Options = {}): Uint
         previous = byte;
         room(1);
         out[length++] = byte;
+        if (length >= stop) return out.subarray(0, length);
         crc = (crc << 8) ^ crcTable[(crc >>> 24) ^ byte];
       }
       crc = ~crc >>> 0;

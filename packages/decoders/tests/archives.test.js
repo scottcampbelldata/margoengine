@@ -89,6 +89,19 @@ test('output stops at maxBytes, and a file that fits exactly passes', () => {
   }
 });
 
+test('stopAt returns exactly the first bytes of a stream and decodes no further', () => {
+  for (const name of Object.keys(expected).filter((n) => n.endsWith('.bz2'))) {
+    const file = read(name),
+      whole = decodeBzip2(file);
+    for (const stop of [0, 1, 5, whole.length >> 1, whole.length, whole.length + 10]) {
+      // maxBytes as small as the bytes wanted proves nothing past them was written, even inside a run.
+      const want = Math.min(stop, whole.length),
+        out = decodeBzip2(file, { stopAt: stop, maxBytes: Math.max(want, 1) });
+      assert.deepEqual(out, whole.subarray(0, want), `${name} stopAt ${stop}`);
+    }
+  }
+});
+
 test('a wrong header is named, and an xz filter that is not LZMA2 is unsupported', () => {
   assert.throws(() => decodeBzip2(new TextEncoder().encode('not bzip2 data')), /no BZh header/);
   assert.throws(() => decodeXz(new TextEncoder().encode('not an xz file, at all')), /no xz header/);

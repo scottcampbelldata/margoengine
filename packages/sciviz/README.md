@@ -338,24 +338,40 @@ The file's orientation (`volume.matrix`) is not applied to the box: the volume d
 ## Medical and array formats
 
 `@margoengine/sciviz/formats` reads NIfTI, DICOM and Zarr into the grid `fig.volume()` takes, with no other
-dependency (gzip and deflate use the platform's `DecompressionStream`). Every reader returns `data`, `dims`, `bounds`
-(the true proportions, from 0) and `range`, and `volumeFromGrid(fig, grid, options)` draws any of them.
+dependency: gzip (every member of the file), zlib and deflate are inflated in the package, so a reader knows where each
+stream ends. Every reader returns `data`, `dims`, `bounds` (the true proportions, from 0) and `range` (the smallest and
+largest finite sample), and `volumeFromGrid(fig, grid, options)` draws any of them.
 
 - **NIfTI** (`parseNIfTI(bytes)`, `loadNIfTI(url)`): NIfTI-1 and NIfTI-2, `.nii`, `.nii.gz`, and a `.hdr` with its
   `.img` (through `resolve`), in either byte order. Scaled data (`scl_slope`, `scl_inter`) comes back as
-  `Float32Array`. `matrix` is the sform when set, else the qform (with `qfac`), else the voxel sizes; `transform`
-  says which. `all` holds every frame and component; `data` is the first.
-- **DICOM** (`parseDICOM(bytes)`, `dicomSeries(images)`, `loadDICOMSeries(urls)`): Part 10 files in implicit or
-  explicit VR little endian, explicit VR big endian and deflated explicit VR little endian, with uncompressed pixel
-  data, 8, 16 or 32 bits, one or more frames, `RescaleSlope` and `RescaleIntercept` applied. `dicomSeries` orders the
-  slices of one series by position along the slice normal (instance number when positions are missing), takes the
-  slice step from the positions and builds the voxel to patient matrix. Compressed transfer syntaxes (JPEG, JPEG-LS,
-  JPEG 2000, RLE) are refused with code `unsupported`, naming the syntax.
+  `Float32Array`; RGB24 and RGBA32 are never scaled. `matrix` is the sform when set, else the qform (with `qfac`), else
+  the voxel sizes; `transform` says which. `all` holds every frame and component; `data` is the first. A `vox_offset`
+  below 352 (544 for NIfTI-2) in a `.nii` means 352 (544). A magic that does not match the header size or lacks its
+  NUL, a NIfTI-2 file without the `0D 0A 1A 0A` signature, a `bitpix` that does not match the datatype and a
+  non-finite `vox_offset` are refused with a `RangeError`.
+- **DICOM** (`parseDICOM(bytes)`, `dicomSeries(images)`, `loadDICOMSeries(urls)`): Part 10 files (with the preamble,
+  with `DICM` only, or starting at the file meta group) in implicit or explicit VR little endian, explicit VR big
+  endian and deflated explicit VR little endian, with uncompressed pixel data: 8, 16 or 32 bit integers masked to Bits
+  Stored and sign-extended from High Bit, Float and Double Float Pixel Data, and YBR_FULL_422 expanded to three samples
+  a pixel. The Modality LUT Sequence or `RescaleSlope` and `RescaleIntercept` is applied. Elements sent as UN read with
+  their dictionary VR. `dicomSeries` orders the slices of one series by position along the slice normal (instance
+  number when positions are missing), takes the slice step from the positions (else `SpacingBetweenSlices`, else
+  `SliceThickness`) and builds the voxel to patient matrix. A multi-frame image whose Frame Increment Pointer names
+  Frame Time or Frame Time Vector gives the volume's time steps (`frames`); any other multi-frame image is refused with
+  code `unsupported`, since its frames are not known to lie in space. Compressed transfer syntaxes (JPEG, JPEG-LS,
+  JPEG 2000, RLE), 32-bit OW pixel data in big endian files and YBR_PARTIAL_422 or 420 are refused with code
+  `unsupported`, naming what. A bare data set (no preamble, no `DICM`, no meta group) has no transfer syntax and is
+  read as explicit VR little endian when a VR follows its first tag, else as implicit VR little endian.
 - **Zarr** (`openZarr(store, path)`, `array.read({ start, stop })`, `zarrGrid(read, spacing)`): v2 (`.zarray`) and v3
-  (`zarr.json`) arrays with regular chunks, over HTTP (a base URL), an object of keys, or your own
-  `(key, signal) => bytes` function. Codecs: bytes in either order, gzip, zlib, crc32c (checked) and transpose; C and
-  F order. A missing chunk reads as the fill value; `read` fetches only the chunks the box touches, at once. blosc,
-  zstd and sharding are refused with code `unsupported`, naming the codec.
+  (`zarr.json`, with the v3.1 short-hand names) arrays with regular chunks, over HTTP (a base URL), an object of keys,
+  or your own `(key, signal) => bytes` function. Codecs: bytes in either order, gzip, zlib, crc32c (checked) and
+  transpose (chained ones compose); C and F order. Only an absent key (HTTP 404) is a missing chunk, read as the fill
+  value; any other HTTP error fails with code `failed`. `read` fetches only the chunks the box touches, at once. blosc,
+  zstd, sharding, storage transformers, other chunk key encodings and metadata fields this reader does not know (unless
+  marked `must_understand: false`) are refused with code `unsupported`, naming them. Metadata the specification does
+  not allow (a codec chain without one bytes codec, a fill value outside its data type, a `.` or `..` path segment,
+  `dimension_names` of the wrong length) and a chunk that decodes to more or fewer bytes than its shape needs are
+  refused with a `RangeError`.
 
 ```ts
 import { Figure } from '@margoengine/sciviz';

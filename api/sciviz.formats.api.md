@@ -20,11 +20,13 @@ export interface DICOMImage {
     readonly position: [number, number, number] | undefined;
     readonly orientation: [number, number, number, number, number, number] | undefined;
     readonly sliceThickness: number | undefined;
+    readonly spacingBetweenSlices: number | undefined;
     readonly instanceNumber: number | undefined;
     readonly seriesUID: string | undefined;
     readonly modality: string | undefined;
     readonly photometric: string;
     readonly transferSyntax: string;
+    readonly frameIncrementPointer: readonly string[];
     readonly elements: Readonly<Record<string, string | number[]>>;
 }
 
