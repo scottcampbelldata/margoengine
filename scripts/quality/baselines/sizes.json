@@ -4452,6 +4452,8 @@
     "@margoengine/react/gltf-pro": 3809,
     "@margoengine/react/helpers": 3799,
     "@margoengine/react/html": 1529,
+    "@margoengine/react/jsx-dev-runtime": 2522,
+    "@margoengine/react/jsx-runtime": 2522,
     "@margoengine/react/lines": 999,
     "@margoengine/react/materials": 4316,
     "@margoengine/react/physics": 6167,
@@ -4461,6 +4463,7 @@
     "@margoengine/react/taa": 1153,
     "@margoengine/react/text": 1665,
     "@margoengine/react/tonemap": 1156,
+    "@margoengine/react/ui": 2992,
     "@margoengine/react/voxel": 2200,
     "@margoengine/react/xr": 3818,
     "@margoengine/rigging": 7870,
@@ -4756,9 +4759,6 @@
     "margoengine": 308,
     "margoengine/game": 996,
     "margoengine/viz": 800,
-    "margoengine/web": 577,
-    "@margoengine/react/jsx-dev-runtime": 2522,
-    "@margoengine/react/jsx-runtime": 2522,
-    "@margoengine/react/ui": 2992
+    "margoengine/web": 577
   }
 }

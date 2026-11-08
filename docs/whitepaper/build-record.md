@@ -2394,3 +2394,52 @@ runtime is attached to this PC, so every check runs on a stand-in session. Nothi
 - **Gate:** lint, hygiene, verify, `check:readmes`, `check:readme-run --packages=xr`, the claims test, the xr tests and
   the xr GPU test per job (and the layer's XR GPU test for job 6). After a move of main the ship reran the records, the
   api and quality gates, the claims, llms and lock tests, the xr tests and the GPU test.
+## Lane N batch 117: react
+Six jobs for `@margoengine/react`, written so react-three-fiber code and habits move over: lowercase tags, bubbling
+events, textured shapes, bindings for four more packages and a Turbopack build of the Next.js example. Core and stage
+are untouched. Every GPU proof runs on an RTX A6000 in Edge 157 (`npm run test:browser:tags --workspace
+@margoengine/react`, and `npm run modern:test:browser` for job 5). Nothing is timed.
+| 1 | JSX tags and extend | DONE | `8b6b2681` | `/jsx-runtime`, `/jsx-dev-runtime`; `extend` in the root | LIM-448 |
+| 2 | Event bubbling | DONE | `3ef357a8` | root: every pointer handler, `stopPropagation`, capture, Canvas `onPointerMissed` | LIM-449 |
+| 3 | Textured primitives | DONE | `899354d1` | `/geometry`: `map` on `Box`, `Sphere`, `Plane` | LIM-450 |
+| 4 | Bindings for 2D, UI, audio and sciviz | DONE | `5b1319f9` | `/ui` (`GameUi`, `Sound`, `SpriteLayer`, `Sprite`, `Figure`, `ScatterPlot`, `LinePlot`, `SurfacePlot`) | LIM-451 |
+| 5 | Turbopack example | DONE | `7917b5c4` | `examples/next`: `build` is Turbopack, `build:webpack` stays | LIM-452 |
+| 6 | React Native | BLOCKED | | none | |
+- **Built from:** React's public documentation of the automatic JSX runtime and `jsxImportSource` (job 1: React's own
+  runtime, a known lowercase tag swapped for its component when the element is made, so no custom reconciler); the
+  W3C UI Events and Pointer Events specifications for event order, bubbling, `pointerover` before `pointerenter`,
+  enter and leave not bubbling, and pointer capture (job 2); the glTF 2.0 specification, sections 3.6 to 3.9, for the
+  in-memory document of a textured shape, and the PNG and JPEG signatures for its image type (job 3). No paper was
+  needed: the jobs are API bindings over packages that cite their own. No source of react-three-fiber, drei or any
+  other library was read.
+- **Proved:** job 1: a page compiled with the runtime draws a red `<mesh>` box and a blue `extend()` sphere and no tag
+  reaches the DOM. Job 2: real mouse moves and clicks give over, then enter outside in, a box click that bubbles to its
+  group, a sphere click its `stopPropagation()` keeps, and `onPointerMissed` on the group and the Canvas for a click on
+  nothing; JSDOM with real DOM events and a stand-in pick covers every handler, capture, double click, context menu and
+  wheel. Job 3: a `Plane` with a Khronos sample JPEG and a `Box` with a KayKit PNG show colours varying across each
+  face, and a click on the textured box reaches its handler; the glTF it builds keeps every byte, 4-byte alignment and
+  POSITION bounds. Job 4: with the real packages, two sprites draw their red and green texels, `GameUi` draws a health
+  bar panel, a 2,000-point scatter draws and fires `onReady`, and a `Sound` plays a CMU ARCTIC WAV after a click; JSDOM
+  with stand-in packages covers engine hand-over, one shared listener, in-place updates and cleanup. Job 5: both
+  builds pass and the Turbopack build hydrates and draws its cube (11,470 lit pixels in the first frame).
+- **Stand-ins:** the JSDOM tests of jobs 2 and 4 use a stand-in pick and stand-in packages; each job also has the real
+  GPU run above, so no claim rests on a stand-in.
+- **Sizes (gzip budgets):** root 8,317 to 9,852 B (job 1 to 8,811, job 2 to 9,852); `/geometry` 2,403 to 4,374 B (the
+  textured path; its glTF builder loads with the shape); new `/jsx-runtime` and `/jsx-dev-runtime` 2,522 B each, `/ui`
+  2,992 B. Core and stage unchanged. New optional peers: `@margoengine/gltf`, `ui`, `audio`, `sprites`, `sciviz`.
+- **Bugs fixed with tests:** `@margoengine/ui/react` began with `'use client'`, so every Vite or Rollup build that
+  bundled it printed MODULE_LEVEL_DIRECTIVE; job 4's umbrella build showed it (`packages/react/tests/subpaths.test.js`).
+  The entry now has a `react-server` client boundary written by `scripts/react-server-entries.js`, and
+  `tests/react-bundle.test.js` checks every plain entry of every package for a directive (`d782b8cf`). In job 2's
+  draft, a pointer released before a captured move's pick finished lost the capture early; the unit test caught it
+  before any commit.
+- **Blocked, job 6:** a React Native target needs a native WebGPU surface (a Dawn or wgpu binding inside the app),
+  which Margo does not ship and cannot write clean room in this batch, and no React Native device or toolchain is set
+  up to prove it. Nothing was built; a stand-in would prove nothing about a phone.
+- **Limits:** picking returns the nearest mesh only (no `intersections` list); a textured shape is WebGPU only, base
+  colour only, PNG or JPEG, default scene only; `Figure` keeps the Canvas camera. Rows in docs/limits.md.
+- **Slips:** job 1 waited a day on `check:readme-run` failures in other packages on main (ragdoll, animator, usdz,
+  scenery, decoders, animation), fixed there by another helper; jobs 2 to 5 were built meanwhile and landed together
+  after it. Rebases renumbered the claims from LIM-427 to 431 to LIM-448 to 452.
+- **Gate:** on the newest main with every job: lint, hygiene, `npm run verify`, `npm run modern:test:react`,
+  `check:readme-run`, the React GPU suites (scene, after-scene, extras, tags) and `modern:test:browser`.
