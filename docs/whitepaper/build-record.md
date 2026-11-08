@@ -3284,3 +3284,31 @@ Four jobs for `@margoengine/toon` on the M6 Mac mini (Metal), each landed as one
 - **Limits and unmeasured:** rows in `docs/limits.md`: the hull follows normals at a constant world width; smoothing
   matches positions bit for bit and caps at 64 copies; hatching is screen space, sun only, core meshes only. GPU cost
   is not measured; nothing was run on another machine.
+
+## Lane H batch 108: selection
+
+Three jobs for `@margoengine/selection` on the Beelink (Radeon 680M). Two were already built and are
+skipped; the third landed as one commit. The splat overlay lives in `@margoengine/splats`, beside the line and point
+overlays in their own packages, so selection imports no drawing package. Core and stage are untouched (23,626 B gzip
+together after the batch).
+
+| # | Job | Status | Commit | Entry | Claim |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Picking fat lines and splats | DONE (splats; lines already done) | this commit | `@margoengine/splats/pick` (`SplatPicking`) | LIM-574 |
+| 2 | Batched picks | SKIPPED: `picking.pickMany` answers many points from one readback | none | `Picking.pickMany` | none |
+| 3 | GPU picking of points | SKIPPED: `PointPicking` in `@margoengine/points/pick` | none | `@margoengine/points/pick` | none |
+
+- **Built from:** `docs/clean-room.md` row SP12 (Kerbl et al. 2023 App. C falloff and cap, Zwicker et al. 2001 EWA
+  ellipses, the WebGPU specification). Nothing from another engine was read.
+- **Proved (real GPU, this Beelink):** `node packages/splats/test/gpu/check.mjs`: a 66-splat grid with a plane mesh
+  between its layers, under a perspective and an orthographic camera. `picking.pick` takes the splat in front of the
+  plane (index 64, over the lower-index splat 36 behind it), the plane in front of a grid splat, a lone splat and
+  nothing on a gap; `pickMany` answers the same; `engine.pick` answers the stand-in mesh; a 0.99 threshold lets the
+  plane through; a splat the brush erased on the GPU is not picked; after `dispose` only meshes answer. Every other
+  check of the splats GPU suite passes with the projection moved into the shared `projectSplat` function. Node test:
+  `packages/splats/test/pick.test.js`.
+- **Sizes (gzip, B):** new `@margoengine/splats/pick` 3,317. Selection gains two optional `PickHit` fields (types only).
+- **Slips:** the first GPU run read `engine.pick`'s answer as a hit, but it answers a mesh; the check now names
+  `picking.pick` for hits and `engine.pick` for the stand-in mesh. Found before any commit.
+- **Limits and unmeasured:** row in `docs/limits.md`. Every pick projects every splat of the cloud again, so its cost
+  grows with the cloud; that cost is not measured.

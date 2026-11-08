@@ -1,7 +1,7 @@
 import { MargoError } from '@margoengine/math/errors';
 import { fogWgsl } from '../../shared/fog.js';
 import { surfaceEntry } from '../../shared/pass.js';
-const frame = `struct Frame {camera:mat4x4f,view:mat4x4f,eye:vec4f,viewport:vec4f,settings:vec4f,counts:vec4u}
+export const frame = `struct Frame {camera:mat4x4f,view:mat4x4f,eye:vec4f,viewport:vec4f,settings:vec4f,counts:vec4u}
 @group(0) @binding(0) var<uniform> f:Frame;
 struct Ellipse {center:vec4f,axes:vec4f}`;
 // Orthographic cameras (settings.w): the projection is affine, so the Jacobian is the constant pixel scale, sort keys
@@ -12,11 +12,39 @@ struct Ellipse {center:vec4f,axes:vec4f}`;
 // (counts.z = 1) scales opacity by sqrt(det(S) / det(S + 0.3 I)), so the dilated Gaussian keeps the energy of the
 // undilated one and a sub-pixel splat fades instead of growing: the 2D Mip filter of Yu et al. 2024, "Mip-Splatting:
 // Alias-free 3D Gaussian Splatting" (CVPR), eq. 9, with the 0.3 px^2 low-pass the files were trained with.
+/** The two inputs the projection reads (bindings 1 and 2), read only, so a vertex shader can project as well. */
+export const projectInputs = `
+@group(0) @binding(1) var<storage,read> positions:array<vec4f>;
+@group(0) @binding(2) var<storage,read> covariances:array<vec4f>;`;
+/**
+ * One splat's screen ellipse (centre in NDC with its opacity in w, the two 3 sigma half axes in NDC) and sort key, or
+ * a culled one (opacity 0, off screen) with key 0xffffffff. Reads only `f`, `positions` and `covariances`.
+ */
+export const projectSplat = `
+struct Projected {ellipse:Ellipse,key:u32}
+fn projectSplat(index:u32)->Projected {
+  let world=positions[index];let p=f.view*vec4f(world.xyz,1);let depth=-p.z;
+  var ellipse:Ellipse;ellipse.center=vec4f(2,2,0,0);ellipse.axes=vec4f(0);var key=0xffffffffu;
+  if(depth>=f.settings.x&&depth<=f.settings.y&&world.w>0){
+    let a=covariances[index*2];let b=covariances[index*2+1];let covariance=mat3x3f(vec3f(a.x,a.y,a.z),vec3f(a.y,a.w,b.x),vec3f(a.z,b.x,b.y));
+    let rotation=mat3x3f(f.view[0].xyz,f.view[1].xyz,f.view[2].xyz);let c=rotation*covariance*transpose(rotation);
+    var jx=vec3f(f.viewport.z/depth,0,f.viewport.z*p.x/(depth*depth));var jy=vec3f(0,f.viewport.w/depth,f.viewport.w*p.y/(depth*depth));
+    if(f.settings.w>0.5){jx=vec3f(f.viewport.z,0,0);jy=vec3f(0,f.viewport.w,0);}
+    let xx=dot(jx,c*jx)+0.3;let xy=dot(jx,c*jy);let yy=dot(jy,c*jy)+0.3;var opacity=world.w;
+    if(f.counts.z==1u){opacity*=sqrt(max((xx-0.3)*(yy-0.3)-xy*xy,0.0)/max(xx*yy-xy*xy,1e-12));}
+    let mid=(xx+yy)*0.5;let radius=sqrt(max(0.0,(xx-yy)*(xx-yy)*0.25+xy*xy));
+    let major=max(mid+radius,0.3);let minor=max(mid-radius,0.3);var axis=vec2f(1,0);
+    if(abs(xy)>0.000001){axis=normalize(vec2f(xy,major-xx));}else if(yy>xx){axis=vec2f(0,1);}
+    let scale=vec2f(2)/f.viewport.xy;let first=axis*(3*sqrt(major))*scale;let second=vec2f(-axis.y,axis.x)*(3*sqrt(minor))*scale;
+    let clip=f.camera*vec4f(world.xyz,1);let ndc=clip.xyz/clip.w;let extent=abs(first)+abs(second);
+    if(all(abs(ndc.xy)<=vec2f(1)+extent)) {ellipse.center=vec4f(ndc,opacity);ellipse.axes=vec4f(first,second);key=~bitcast<u32>(select(depth,depth-f.settings.x,f.settings.w>0.5));}
+  }return Projected(ellipse,key);
+}`;
 export const project =
   frame +
+  projectInputs +
+  projectSplat +
   `
-@group(0) @binding(1) var<storage,read> positions:array<vec4f>;
-@group(0) @binding(2) var<storage,read> covariances:array<vec4f>;
 @group(0) @binding(3) var<storage,read> colors:array<vec4f>;
 @group(0) @binding(4) var<storage,read> sh:array<f32>;
 @group(0) @binding(5) var<storage,read_write> ellipses:array<Ellipse>;
@@ -32,22 +60,8 @@ fn color(index:u32)->vec3f {
   var c=vec3f(0.5);for(var i=0u;i<f.counts.y;i++){let at=(index*f.counts.y+i)*3;c+=basis[i]*vec3f(sh[at],sh[at+1],sh[at+2]);}return max(c,vec3f(0));
 }
 @compute @workgroup_size(256) fn main(@builtin(global_invocation_id) id:vec3u) {
-  let index=id.x;if(index>=f.counts.x){return;}let world=positions[index];let p=f.view*vec4f(world.xyz,1);let depth=-p.z;
-  var ellipse:Ellipse;ellipse.center=vec4f(2,2,0,0);ellipse.axes=vec4f(0);keys[index]=vec2u(0xffffffffu,index);
-  if(depth>=f.settings.x&&depth<=f.settings.y&&world.w>0){
-    let a=covariances[index*2];let b=covariances[index*2+1];let covariance=mat3x3f(vec3f(a.x,a.y,a.z),vec3f(a.y,a.w,b.x),vec3f(a.z,b.x,b.y));
-    let rotation=mat3x3f(f.view[0].xyz,f.view[1].xyz,f.view[2].xyz);let c=rotation*covariance*transpose(rotation);
-    var jx=vec3f(f.viewport.z/depth,0,f.viewport.z*p.x/(depth*depth));var jy=vec3f(0,f.viewport.w/depth,f.viewport.w*p.y/(depth*depth));
-    if(f.settings.w>0.5){jx=vec3f(f.viewport.z,0,0);jy=vec3f(0,f.viewport.w,0);}
-    let xx=dot(jx,c*jx)+0.3;let xy=dot(jx,c*jy);let yy=dot(jy,c*jy)+0.3;var opacity=world.w;
-    if(f.counts.z==1u){opacity*=sqrt(max((xx-0.3)*(yy-0.3)-xy*xy,0.0)/max(xx*yy-xy*xy,1e-12));}
-    let mid=(xx+yy)*0.5;let radius=sqrt(max(0.0,(xx-yy)*(xx-yy)*0.25+xy*xy));
-    let major=max(mid+radius,0.3);let minor=max(mid-radius,0.3);var axis=vec2f(1,0);
-    if(abs(xy)>0.000001){axis=normalize(vec2f(xy,major-xx));}else if(yy>xx){axis=vec2f(0,1);}
-    let scale=vec2f(2)/f.viewport.xy;let first=axis*(3*sqrt(major))*scale;let second=vec2f(-axis.y,axis.x)*(3*sqrt(minor))*scale;
-    let clip=f.camera*vec4f(world.xyz,1);let ndc=clip.xyz/clip.w;let extent=abs(first)+abs(second);
-    if(all(abs(ndc.xy)<=vec2f(1)+extent)) {ellipse.center=vec4f(ndc,opacity);ellipse.axes=vec4f(first,second);keys[index]=vec2u(~bitcast<u32>(select(depth,depth-f.settings.x,f.settings.w>0.5)),index);}
-  }ellipses[index]=ellipse;evaluated[index]=vec4f(color(index),world.w);
+  let index=id.x;if(index>=f.counts.x){return;}let world=positions[index];let projected=projectSplat(index);
+  ellipses[index]=projected.ellipse;keys[index]=vec2u(projected.key,index);evaluated[index]=vec4f(color(index),world.w);
 }`;
 /**
  * The projection pass with scene fog (`setFog`, uniform at binding 8): each splat's evaluated colour fades toward the

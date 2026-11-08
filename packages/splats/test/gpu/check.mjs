@@ -5,6 +5,7 @@
 // ./set: two overlapping copies of the capture sorted as one set draw what one merged cloud draws; as two clouds they do not.
 // ./lighting: relit colours match core's diffuse terms; a synthetic disc and the real capture shadow a ground mesh.
 // ./edit: GPU picks take the nearest splat; select, erase and paint change exactly the region's splats, read back.
+// ./pick: Picking answers the nearest of splats and meshes in one depth test, with engine.pick and pickMany.
 // Root antialias: projected opacities scale by s / (s + 0.3) for an isotropic splat of screen variance s.
 // ./animate: a sequence held between two frames draws their mix; a skin moves and turns splats and their covariances.
 // ./data: the browser's own WebP decoder reads the SOG writer's lossless WebP images back exactly.
@@ -401,6 +402,31 @@ try {
     }, images);
     report['data webp'] = wrong;
     images.forEach(({ width, height }, i) => assert.deepEqual(wrong[i], [width, height, 0], `WebP ${width} x ${height}`));
+  }
+  // ./pick: one depth test with meshes. The front splat beats the plane behind it, the plane beats the grid splat
+  // behind it, a gap and the background miss; pickMany answers what engine.pick answers; a threshold over the splats'
+  // opacity lets the plane through; a splat erased on the GPU is gone; after dispose only meshes answer. Perspective
+  // and orthographic.
+  {
+    const points = [
+      [0.1, 0.1, 0.5],
+      [0.3, 0.3, 0],
+      [-0.7, -0.7, 0],
+      [-0.6, -0.6, 0],
+    ];
+    for (const orthographic of [false, true]) {
+      const tag = orthographic ? 'orthographic' : 'perspective',
+        r = await page.evaluate((o) => window.check.splatPick(o), { points, orthographic }),
+        strict = await page.evaluate((o) => window.check.splatPick(o), { points, orthographic, threshold: 0.99 }),
+        erased = await page.evaluate((o) => window.check.splatPick(o), { points, orthographic, erase: true });
+      report[`pick ${tag}`] = { ...r, strict: strict.one, erased: erased.one };
+      assert.deepEqual(r.one, [64, 'mesh', 0, -1], `${tag}: picking.pick takes the nearest of splats and meshes`);
+      assert.deepEqual(r.meshes, ['cloud', 'mesh', 'cloud', -1], `${tag}: engine.pick answers the stand-in mesh for a splat`);
+      assert.deepEqual(r.many, r.one, `${tag}: pickMany answers as picking.pick`);
+      assert.deepEqual(r.after, ['mesh', 'mesh', -1, -1], `${tag}: after dispose the splats are not picked`);
+      assert.deepEqual(strict.one, ['mesh', 'mesh', -1, -1], `${tag}: no splat reaches opacity 0.99, so the plane is hit`);
+      assert.deepEqual(erased.one, ['mesh', 'mesh', 0, -1], `${tag}: a splat the brush erased on the GPU is not picked`);
+    }
   }
   const errors = await page.evaluate(() => window.check.errors);
   console.log(JSON.stringify(report));

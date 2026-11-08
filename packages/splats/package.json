@@ -54,6 +54,10 @@
       "types": "./dist/brush.d.ts",
       "import": "./dist/brush.js"
     },
+    "./pick": {
+      "types": "./dist/pick.d.ts",
+      "import": "./dist/pick.js"
+    },
     "./animate": {
       "types": "./dist/animate.d.ts",
       "import": "./dist/animate.js"

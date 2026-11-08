@@ -351,3 +351,39 @@ engine.start();
   to the blended colour and fades the higher bands by the same strength.
 - The selection lives on the GPU (4 bytes per splat); `selection()` reads it back as indices. A restored device
   starts with an empty selection.
+
+## Picking with meshes (`./pick`)
+
+`SplatBrush.pick` sees splats only. `SplatPicking` adds a cloud to `Picking` from `margoengine/selection`, so one
+`engine.pick`, `picking.pick` or `picking.pickMany` answers whichever of splats and meshes is nearest at the pixel. A mesh
+in front of a splat blocks it, and a splat in front of a mesh wins:
+
+```ts
+import {Engine, box} from 'margoengine/core';
+import {Splats} from 'margoengine/splats';
+import {parsePly} from 'margoengine/splats/data';
+import {SplatPicking} from 'margoengine/splats/pick';
+import {Picking} from 'margoengine/selection';
+const engine = await Engine.create(document.querySelector('canvas')!);
+engine.createMesh().setGeometry(box());
+const cloud = Splats.attach(engine, parsePly(await (await fetch('/raccoon-v2.ply')).arrayBuffer()));
+const picking = Picking.attach(engine);
+const splatPicking = SplatPicking.attach(picking, cloud); // {threshold: 0.1} by default
+const hit = await engine.pick(128, 96); // canvas CSS pixels
+if (hit && splatPicking.splatsOf(hit.mesh)) console.log('splat', hit.splat, 'of', hit.splats);
+else if (hit) console.log('mesh', hit.mesh);
+const hits = await picking.pickMany([[10, 20], [64, 64]]); // one readback for both
+console.log(hits.map((h) => h?.splat ?? null));
+engine.start();
+```
+
+- A pick projects every splat of the cloud again for its 3 x 3 tile, with the colour pass's own projection (the same
+  WGSL function), in a vertex shader: it needs no drawn frame and follows the current camera, perspective or
+  orthographic, the antialias flag, brush erasing (`./edit`) and poses (`./animate`), which write the same GPU inputs.
+- A splat hits where its Gaussian times its opacity at the pixel, capped at 0.99 as drawn, reaches `threshold`
+  (default 0.1, as `SplatBrush.pick`; settable). Among those the nearest splat centre wins, and it then competes with
+  the meshes at that depth.
+- `hit.mesh` is an empty stand-in mesh, as `engine.pick` answers meshes; `splatsOf(mesh)` maps it back to the cloud.
+  `hit.splat` is the splat's index in the cloud (a pool index under `SplatSet` and `SplatLod`). `dispose()` leaves
+  Picking and frees the stand-in; the cloud stays.
+- A pick's cost grows with the cloud: four vertices of projection per splat, every pick. Picking takes up to 8 overlays.

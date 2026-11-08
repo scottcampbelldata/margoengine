@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11354282,
+  "total": 11357841,
   "history": [
     {
       "date": "2026-10-24",
@@ -4640,6 +4640,12 @@
       "commit": "4b83eee8a",
       "reason": "Batch 112 adds optional video/360, sharing external material sampling and the existing XR layer route. Existing entry budgets unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "be357b382",
+      "reason": "new entry @margoengine/splats/pick (SplatPicking, 3317 B gzip)",
+      "grew": 1
     }
   ],
   "items": {
@@ -5289,6 +5295,7 @@
     "@margoengine/splats/edit": 3856,
     "@margoengine/splats/lighting": 3606,
     "@margoengine/splats/lod": 29695,
+    "@margoengine/splats/pick": 3573,
     "@margoengine/splats/set": 28476,
     "@margoengine/splines": 1853,
     "@margoengine/splines/closest": 983,
@@ -5336,7 +5343,7 @@
     "@margoengine/terrain/sculpt": 4873,
     "@margoengine/terrain/stream": 12100,
     "@margoengine/text": 16406,
-    "@margoengine/text/msdf": 4516,
+    "@margoengine/text/msdf": 4502,
     "@margoengine/text/rich": 11403,
     "@margoengine/tilemap": 7435,
     "@margoengine/tilemap/autotile": 1605,

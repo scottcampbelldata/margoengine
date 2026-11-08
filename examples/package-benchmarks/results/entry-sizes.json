@@ -1,5 +1,5 @@
 {
-  "commit": "4cd232bda",
+  "commit": "3ef73763c",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -2698,36 +2698,40 @@
     },
     "@margoengine/splats": {
       ".": {
-        "raw": 86177,
-        "gzip": 30440
+        "raw": 86370,
+        "gzip": 30423
       },
       "./depth": {
         "raw": 3954,
         "gzip": 1863
       },
       "./lod": {
-        "raw": 81891,
-        "gzip": 28908
+        "raw": 82084,
+        "gzip": 28972
       },
       "./lighting": {
         "raw": 7793,
         "gzip": 3350
       },
       "./set": {
-        "raw": 77761,
-        "gzip": 27719
+        "raw": 77954,
+        "gzip": 27765
       },
       "./edit": {
         "raw": 8369,
         "gzip": 3600
       },
+      "./pick": {
+        "raw": 7246,
+        "gzip": 3317
+      },
       "./animate": {
         "raw": 53957,
-        "gzip": 19672
+        "gzip": 19673
       },
       "./data": {
-        "raw": 59084,
-        "gzip": 21490
+        "raw": 59089,
+        "gzip": 21491
       }
     },
     "@margoengine/splines": {
@@ -2926,16 +2930,16 @@
     },
     "@margoengine/text": {
       ".": {
-        "raw": 40805,
-        "gzip": 15928
+        "raw": 42462,
+        "gzip": 16396
       },
       "./rich": {
-        "raw": 27202,
-        "gzip": 11070
+        "raw": 27191,
+        "gzip": 11071
       },
       "./msdf": {
-        "raw": 9834,
-        "gzip": 4260
+        "raw": 9789,
+        "gzip": 4246
       }
     },
     "@margoengine/tilemap": {
@@ -3200,6 +3204,14 @@
       "./material": {
         "raw": 2221,
         "gzip": 1151
+      },
+      "./record": {
+        "raw": 2368,
+        "gzip": 1140
+      },
+      "./360": {
+        "raw": 3597,
+        "gzip": 1694
       }
     },
     "@margoengine/viewcube": {
@@ -3584,9 +3596,9 @@
       "brotli": 7854
     },
     "packages/gltf-pro/dist/index.js": {
-      "raw": 1425690,
-      "gzip": 575431,
-      "brotli": 469872
+      "raw": 1425878,
+      "gzip": 575841,
+      "brotli": 470035
     },
     "packages/staging/dist/index.js": {
       "raw": 22060,

@@ -121,7 +121,7 @@ export interface PickingOverlayContext {
   /** The ID of the overlay's item 0; it owns the next 2^28. */
   firstId: number;
 }
-/** Something other than triangles (fat lines) that picks in the same depth test as meshes; register it with `addOverlay`. */
+/** Something other than triangles (fat lines, points, splats) that picks in the same depth test as meshes; register it with `addOverlay`. */
 export interface PickingOverlay {
   /** Draws item `n` as ID `firstId + n`, after every mesh. */
   drawPick(context: PickingOverlayContext): void;
@@ -133,6 +133,8 @@ export interface PickingOverlay {
     cloud?: object;
     point?: number;
     position?: readonly number[];
+    splats?: object;
+    splat?: number;
   } | null;
 }
 /** A pick result: the core mesh, or for gltf-pro models the glTF node with its model and primitive. `approximate`: a pick proxy (imposter level) hit through its bounding sphere; `mesh` is the LOD anchor. */
@@ -154,6 +156,10 @@ export interface PickHit {
   line?: object;
   /** The line's segment index. */
   segment?: number;
+  /** A hit on `@margoengine/splats/pick`'s overlay: the cloud. `mesh` is then its stand-in. */
+  splats?: object;
+  /** The splat's index in the cloud. */
+  splat?: number;
 }
 
 /** UV sphere scaled so its faces enclose the unit sphere (proxy picks cover at least the bounding sphere the bvh Raycaster tests), as 20-float gltf-pro vertices. */

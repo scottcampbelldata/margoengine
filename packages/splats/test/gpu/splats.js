@@ -13,6 +13,8 @@ import { Shadows } from '../../../shadows/dist/index.js';
 import { SplatDepth } from '../../dist/depth.js';
 import { SplatLod, buildSplatLod } from '../../dist/lod.js';
 import { SplatBrush } from '../../dist/brush.js';
+import { SplatPicking } from '../../dist/pick.js';
+import { Picking } from '../../../selection/dist/index.js';
 import { SplatSequence, SplatSkin } from '../../dist/animate.js';
 
 const errors = [];
@@ -467,6 +469,77 @@ window.check.brush = async (o) => {
   }
   await draw();
   return { out, frame: [w, h], points: (o.points ?? []).map(pixel), input: [...data.colors], url: canvas.toDataURL('image/png'), count: cloud.count };
+};
+// ./pick: the brush's grid (64 red splats at z 0, a blue one in front of the grid splat at (0.1, 0.1), index 64, one
+// behind it, 65) with a plane mesh at z 0.25 over x and y from -0.05 to 0.45, picked through Picking. Each world point
+// of `o.points` is picked with picking.pick and all of them with pickMany (a splat index, 'mesh', or -1 for nothing),
+// and with engine.pick, which answers meshes ('cloud' for the stand-in). `o.erase`: the brush first erases the splat
+// under the first point on the GPU.
+window.check.splatPick = async (o) => {
+  engine?.dispose();
+  canvas?.remove();
+  canvas = document.body.appendChild(document.createElement('canvas'));
+  canvas.style.cssText = 'width:256px;height:256px;display:block';
+  const n = 66,
+    data = { positions: new Float32Array(n * 3), covariances: new Float32Array(n * 6), colors: new Float32Array(n * 4) };
+  for (let i = 0; i < n; i++) {
+    const grid = i < 64;
+    data.positions.set(grid ? [-0.7 + (i % 8) * 0.2, -0.7 + Math.floor(i / 8) * 0.2, 0] : [0.1, 0.1, i === 64 ? 0.5 : -0.5], i * 3);
+    data.covariances.set([0.0009, 0, 0, 0.0009, 0, 0.0009], i * 6);
+    data.colors.set(i === 64 ? [0, 0, 1, 0.95] : [1, 0, 0, 0.95], i * 4);
+  }
+  engine = await Engine.create(canvas, {
+    backend: 'webgpu',
+    preserveDrawingBuffer: true,
+    camera: { position: [0, 0, 4], target: [0, 0, 0], near: 0.05, far: 100 },
+  });
+  engine.gpu.addEventListener('uncapturederror', (e) => errors.push(e.error.message));
+  if (o.orthographic) CameraProjection.attach(engine).mode = 'orthographic';
+  const plane = createMesh(engine, planeGeometry(0.5, 0.5), new Material({ shading: 'basic', color: [0.4, 0.4, 0.4] }));
+  plane.root.setPosition([0.2, 0.2, 0.25]);
+  const picking = Picking.attach(engine),
+    cloud = Splats.attach(engine, data),
+    overlay = SplatPicking.attach(picking, cloud, o.threshold === undefined ? {} : { threshold: o.threshold });
+  let matrix;
+  engine.use({
+    name: 'matrix',
+    setup() {},
+    registerPasses(graph) {
+      graph.add({ name: 'matrix', order: 0, execute: (c) => (matrix = c.camera.matrix.slice()) });
+    },
+  });
+  await waitForPipelines(draw);
+  const css = (p) => {
+      const c = [0, 1, 3].map((r) => matrix[r] * p[0] + matrix[4 + r] * p[1] + matrix[8 + r] * p[2] + matrix[12 + r]);
+      return [((c[0] / c[2] + 1) / 2) * canvas.clientWidth, ((1 - c[1] / c[2]) / 2) * canvas.clientHeight];
+    },
+    name = (hit) => {
+      if (!hit) return -1;
+      const splats = overlay.splatsOf(hit.mesh);
+      if (!splats) return hit.splat === undefined ? 'mesh' : 'stray splat';
+      return splats === cloud && hit.splats === cloud ? hit.splat : 'wrong cloud';
+    },
+    pixels = o.points.map(css),
+    one = [];
+  if (o.erase) {
+    const brush = SplatBrush.attach(engine, cloud);
+    await draw();
+    const [w, h] = brush.frame;
+    brush.select({ x: (pixels[0][0] * w) / canvas.clientWidth, y: (pixels[0][1] * h) / canvas.clientHeight, radius: 1 });
+    brush.erase('selection');
+    await draw();
+  }
+  for (const [x, y] of pixels) one.push(name(await picking.pick(x, y)));
+  const meshes = [];
+  for (const [x, y] of pixels) {
+    const mesh = await engine.pick(x, y);
+    meshes.push(!mesh ? -1 : overlay.splatsOf(mesh) === cloud ? 'cloud' : 'mesh');
+  }
+  const many = (await picking.pickMany(pixels)).map(name);
+  overlay.dispose();
+  const after = [];
+  for (const [x, y] of pixels) after.push(name(await picking.pick(x, y)));
+  return { one, many, meshes, after };
 };
 // ./animate: three splats played as a two-frame sequence held at a time between the frames, or posed by a two-joint
 // skin; returns the cloud read back after one drawn frame.

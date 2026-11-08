@@ -73,6 +73,8 @@ export interface PickHit {
     position?: readonly number[];
     line?: object;
     segment?: number;
+    splats?: object;
+    splat?: number;
 }
 
 export interface PickProxy {
@@ -269,6 +271,8 @@ interface PickingOverlay {
         cloud?: object;
         point?: number;
         position?: readonly number[];
+        splats?: object;
+        splat?: number;
     } | null;
 }
 

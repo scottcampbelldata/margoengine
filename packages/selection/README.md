@@ -56,7 +56,7 @@ const meshes = hits.map((hit) => hit?.mesh ?? null);
 
 ## Lines in picks
 
-`LinePicking.attach(picking, lines)` from `margoengine/lines/pick` makes fat lines answer `engine.pick`, `picking.pick` and `pickMany`, in one depth test with the meshes, with `hit.line` and `hit.segment` set. See the [lines README](../lines/README.md#gpu-picking).
+`LinePicking.attach(picking, lines)` from `margoengine/lines/pick` makes fat lines answer `engine.pick`, `picking.pick` and `pickMany`, in one depth test with the meshes, with `hit.line` and `hit.segment` set. See the [lines README](../lines/README.md#gpu-picking). `PointPicking` from `margoengine/points/pick` does the same for point clouds (`hit.cloud`, `hit.point`), and `SplatPicking` from `margoengine/splats/pick` for Gaussian splats (`hit.splats`, `hit.splat`); see the [splats README](../splats/README.md#picking-with-meshes-pick).
 
 `picking.addOverlay(overlay)` is the hook it uses: an overlay draws into the 3 x 3 pick tile after every mesh, with IDs from `firstId`, and `pickHit(index)` turns an ID back into a hit. Up to 8 overlays; each owns 2^28 IDs. While one is registered, picks use the 3 x 3 pass rather than the cached ID texture.
 

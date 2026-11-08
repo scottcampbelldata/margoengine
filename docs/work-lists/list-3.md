@@ -14,7 +14,7 @@ For the third account. Starts when Scott is home and opens it.
 | H | loading and interface | 105 | labels | 5 | done |
 | H | loading and interface | 106 | html | 4 | done |
 | H | loading and interface | 107 | inspector | 4 | todo |
-| H | loading and interface | 108 | selection | 3 | todo |
+| H | loading and interface | 108 | selection | 3 | done |
 | H | loading and interface | 109 | viewcube | 5 | todo |
 | I | sky and land | 57 | sky | 8 | done |
 | I | sky and land | 58 | sky | 2 | done |
