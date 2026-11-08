@@ -2644,14 +2644,14 @@ to four resources, and encode passes of its own; without extensions the shaders 
 physical camera job already exists as `PhysicalCamera` in `@margoengine/cameras/physical`, so it is SKIPPED. Nothing
 is timed.
 
-| # | Job | Status | Commit | Entry | Claim |
+| # | Job | Status | Commit | Entry | Gzip | Claim |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Grading controls (wheels, curves, hue against saturation) | DONE | f716e0612 | `/grade` | LIM-477 |
-| 2 | Reinhard, Cineon and linear curves | DONE | 8e8fb4ef4 | main (`curve`) | LIM-479 |
-| 3 | Custom curve hook (WGSL or JavaScript) | DONE | 92687acd5 | `/custom` | LIM-481 |
-| 4 | Metering modes (histogram, centre, spot, mask) | DONE | 2d9bce624 | main (`autoExposure`) | LIM-482 |
-| 5 | Local exposure | DONE | this commit | `/local` | LIM-486 |
-| 6 | Physical camera exposure (EV100, shared with DOF) | SKIPPED | | already `PhysicalCamera` in `@margoengine/cameras/physical` (EV100 from aperture, shutter and ISO; `apply` drives Tonemap exposure and DOF) | |
+| 1 | World-space billboards | DONE | `5923095b8` | `/billboard` | 5,140 B | LIM-475 |
+| 2 | Smooth filtered mode | DONE | `2236c9a5a` | root, `filter: 'linear'` | root 5,059 to 7,404 B over jobs 2 to 6 | LIM-476 |
+| 3 | Per-sprite shaders | DONE | `dbd89c3b9` | `/shader` (+ root `shader`) | 966 B | LIM-478 |
+| 4 | Several atlases per layer | DONE | `66df95e94` | root, `atlas` list | see job 2 | LIM-480 |
+| 5 | 2D skeletal animation | DONE | `a8e7201bd` | `/skeletal` | 5,270 B | LIM-484 |
+| 6 | Sprite masks | DONE | this commit | root, `mask` | see job 2 | LIM-485 |
 
 - **Built from:** rows T-14 to T-18 in `docs/clean-room.md`: Fritsch and Carlson (1980) monotone curves, Reinhard et
   al. (2002) and the Hejl and Burgess-Dawson filmic fit, the 18% key value for metering, Durand and Dorsey (2002) with
@@ -2672,3 +2672,32 @@ is timed.
   is not measured; shader-node graphs are not taken by the custom curve; the separable bilateral blur can leave faint
   halos along thin bright lines.
 
+
+## Lane C batch 100: sprites
+
+Six jobs for `@margoengine/sprites`, on this PC (RTX A6000, Edge), as new optional entries or options of the root
+entry; core and stage are untouched (core + stage 23,626 B gzip after the batch). The aim is 2D art at every scale:
+markers in 3D, HD art beside exact pixels, effects per sprite, several sheets per draw, bones and masks. Nothing is
+timed.
+
+| --- | --- | --- | --- | --- | --- | --- |
+
+- **Bugs fixed:** none outside the batch was found. Two of the batch's own were caught before they shipped: in job 4
+  atlas copies were destroyed before their submit (seen by the smooth check); in job 5 a clip written as plain
+  `number[][]` literals did not type-check against the tuple key type (seen by `check:readmes`), so keys are now any
+  pair of numbers, checked at run time with a test for a key of the wrong length.
+- **Proved:** each job's Node tests and its GPU check (`npm run test:gpu:<billboard|smooth|shader|pages|skeletal|masks>
+  --workspace packages/sprites`), against images and values worked out from the maths in the test, never copied from a
+  run: the skeletal check's swung texel (2, 7) at pixel (47, 7) comes from the bent triangle's uv at that pixel centre,
+  and the mask checks compare every pixel with the pixel-centre rule.
+- **Sources:** rows SP2 to SP7 in `docs/clean-room.md`: Real-Time Rendering 4th ed. section 13.6; Porter and Duff 1984;
+  IEC 61966-2-1 as in CSS Color 4; Marsaglia 2003; Lewis, Cordner and Fong 2000 section 2.3.2, read in full, for the
+  skinning sum and its collapsing joints; the WebGPU and WGSL specifications.
+- **Limits:** rows in `docs/limits.md`: one shader per layer, same-size atlases, four bones per vertex skinned on the
+  CPU, one hard-edged mask shape per layer.
+- **Slips:** the lane's ship compared claim rows with `origin/main` after its own rebase; another worktree's fetch moved
+  that ref mid-run and the check reported a row lost that was only newer than the rebase. The check now reads the
+  commit the rebase went onto. Nothing that failed was pushed.
+- **Gate:** lint, hygiene, verify, `check:readmes`, `check:readme-run --packages=sprites`, the claims test, the sprites,
+  lighting2d and react tests, the root tests and all seven sprites GPU checks per job; after a move of main the ship
+  reran the records, the api and quality gates, the claims, llms and lock tests, the package tests and the GPU checks.

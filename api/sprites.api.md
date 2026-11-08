@@ -50,6 +50,7 @@ export class SpriteLayer implements EnginePlugin {
     camera: SpriteCamera;
     snap: boolean;
     ySort: boolean;
+    mask: SpriteMask | undefined;
     time: number;
     constructor(options: SpriteLayerOptions);
     static attach(instance: EngineKernel, options: SpriteLayerOptions): SpriteLayer;
@@ -76,11 +77,20 @@ export interface SpriteLayerOptions {
     mipmaps?: boolean;
     shader?: SpriteShader;
     normals?: SpriteNormals;
+    mask?: SpriteMask;
     order?: number;
     layers?: number;
     capacity?: number;
     name?: string;
 }
+
+export type SpriteMask = {
+    rect: readonly [number, number, number, number];
+    outside?: boolean;
+} | {
+    circle: readonly [number, number, number];
+    outside?: boolean;
+};
 
 export interface SpriteNormals {
     atlas: SpriteAtlas;
@@ -118,6 +128,8 @@ export interface SpriteShader {
 }
 
 export type SpriteTarget = GPUTexture | (() => GPUTexture);
+
+export function maskPixels(mask: SpriteMask | undefined, camera: SpriteCamera): number[];
 
 export function packSprites(sprites: readonly Sprite[], data: Float32Array, camera: SpriteCamera, atlasWidth: number, atlasHeight: number, snap?: boolean, stride?: number, pages?: number): PackedSprites;
 

@@ -59,6 +59,7 @@ coin.visible = false;
 | `filter` | `'nearest'` | `'linear'` filters smoothly for HD art: premultiplied, in linear light, with mipmaps |
 | `mipmaps` | true | With `filter: 'linear'`: a full mip chain, so sprites drawn small do not shimmer |
 | `shader` | none | Custom fragment code from `margoengine/sprites/shader`; sprites then carry `params` |
+| `mask` | none | Draw only inside, or outside, a rect or circle in world units; read each frame |
 | `normals` | none | `{atlas, target, clear}`: a second colour target for 2D lighting |
 | `order` | 10 | Frame-graph order, after the scene at 0 |
 | `layers` | 1 | Render-layer bits; a view with `layers` that shares none skips this layer |
@@ -98,6 +99,33 @@ engine.start();
 - The layer copies them into its own array, so a changed `GPUTexture` atlas needs `setAtlas` with the list again;
   `setAtlas` takes a list on a layer made with one, and one atlas otherwise.
 - `filter: 'linear'` and `shader` work with pages; `normals` need a single atlas.
+
+### Sprite masks
+
+`mask` limits where a layer draws: inside a rectangle or circle, or outside it with `outside: true`. The shape is in
+world units, like sprite positions, and goes through the layer's camera. It is read each frame, so it can follow a
+character for a spotlight or a keyhole, or close in for a scene wipe.
+
+```ts
+import { EngineKernel } from 'margoengine/core';
+import { SpriteLayer } from 'margoengine/sprites';
+
+const engine = await EngineKernel.create(document.querySelector('canvas')!, { exactSize: [64, 32] });
+const sky = { width: 1, height: 1, data: new Uint8Array([90, 150, 230, 255]) };
+const layer = SpriteLayer.attach(engine, { atlas: sky, mask: { circle: [32, 16, 12] } });
+layer.add({ scaleX: 64, scaleY: 32 });
+let radius = 12;
+engine.onFrame((_, delta) => {
+  radius = Math.max(0, radius - delta * 4);
+  layer.mask = { circle: [32, 16, radius] };
+});
+engine.start();
+```
+
+- `rect` is `[x, y, width, height]` and `circle` is `[x, y, radius]`. A pixel draws when its centre is inside (edges of a
+  rect: left and top in, right and bottom out; a circle's edge in), so masks cut along whole pixels with no soft edge.
+- One shape per layer. For several holes or a soft edge, draw the layer into a `target` and mask that.
+- Works with `filter`, `shader`, pages and `normals` (a masked pixel writes neither colour nor normal).
 
 ### Smooth sprites
 

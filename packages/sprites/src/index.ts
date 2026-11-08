@@ -41,6 +41,13 @@ export type SpriteAtlas = SpritePixels | ImageBitmap | GPUTexture | ((device: GP
 export interface SpriteShader {
   readonly code: string;
 }
+/**
+ * A shape that limits where a layer draws, in world units like sprite positions: `rect` `[x, y, width, height]` or
+ * `circle` `[x, y, radius]`. A pixel draws when its centre is inside, or outside with `outside: true`.
+ */
+export type SpriteMask =
+  | { rect: readonly [number, number, number, number]; outside?: boolean }
+  | { circle: readonly [number, number, number]; outside?: boolean };
 /** A render target, or a function read each frame for one that changes. */
 export type SpriteTarget = GPUTexture | (() => GPUTexture);
 
@@ -86,6 +93,8 @@ export interface SpriteLayerOptions {
   shader?: SpriteShader;
   /** Writes normals to a second colour target. Needs a single-sample colour target. Default none. */
   normals?: SpriteNormals;
+  /** Draws only inside (or outside) a shape; see {@link SpriteLayer.mask}. Default none. */
+  mask?: SpriteMask;
   /** Frame-graph order. Runs after the scene (0); 40 draws after a Tonemap. Default 10. */
   order?: number;
   /** Render-layer bits; a view whose `layers` shares none leaves this layer out. Default 1. */
@@ -104,7 +113,8 @@ const shader = (
   page = pages ? 'v.page,' : '',
 ) => /* wgsl */ `
 struct Sprite{p:vec2f,s:vec2f,pivot:vec2f,turn:f32,tint:u32,rect:vec4f${effect ? ',params:vec4f' : ''}${pages ? ',page:u32,pad0:u32,pad1:u32,pad2:u32' : ''}}
-@group(0) @binding(0) var<uniform> size:vec4f;
+struct Frame{size:vec4f,shape:vec4f,mask:vec4f}
+@group(0) @binding(0) var<uniform> frame:Frame;
 @group(0) @binding(1) var<storage,read> sprites:array<Sprite>;
 @group(0) @binding(2) var atlas:texture_2d${pages ? '_array' : ''}<f32>;
 ${normals ? '@group(0) @binding(3) var bumps:texture_2d<f32>;' : ''}
@@ -116,6 +126,7 @@ struct Varying{
   @location(2) @interpolate(flat) high:vec2f,
   @location(3) @interpolate(flat) tint:vec4f,
   @location(4) @interpolate(flat) axes:vec4f,
+  @location(7) pixel:vec2f,
   ${effect ? '@location(5) @interpolate(flat) params:vec4f,' : ''}
   ${pages ? '@location(6) @interpolate(flat) page:u32,' : ''}
 }
@@ -139,7 +150,8 @@ ${effect}`
   let y=sin(s.turn);
   let p=s.p+vec2f(q.x*x-q.y*y,q.x*y+q.y*x);
   var v:Varying;
-  v.position=vec4f(p/size.xy*vec2f(2,-2)+vec2f(-1,1),0,1);
+  v.position=vec4f(p/frame.size.xy*vec2f(2,-2)+vec2f(-1,1),0,1);
+  v.pixel=p;
   v.texel=s.rect.xy+s.rect.zw*c;
   v.low=min(s.rect.xy,s.rect.xy+s.rect.zw);
   v.high=max(s.rect.xy,s.rect.xy+s.rect.zw)-1;
@@ -154,6 +166,14 @@ ${
     ? 'struct Output{@location(0) color:vec4f,@location(1) normal:vec4f}\n@fragment fn fragmentMain(v:Varying)->Output'
     : '@fragment fn fragmentMain(v:Varying)->@location(0) vec4f'
 }{
+  // The mask tests the pixel centre in layer pixels: inside a rect is low <= p < high, inside a circle |p - c| <= r.
+  let m=frame.mask;
+  let k=frame.shape.x;
+  if(k>0){
+    let d=v.pixel-m.xy;
+    let inside=select(dot(d,d)<=m.z*m.z,all(v.pixel>=m.xy)&&all(v.pixel<m.zw),k==1);
+    if(inside==(frame.shape.y>0)){discard;}
+  }
   let t=vec2i(clamp(floor(v.texel),v.low,v.high));
   ${
     smooth
@@ -162,13 +182,13 @@ ${
   ${
     effect
       ? `let lit=f*vec4f(decode(v.tint.rgb)*v.tint.a,v.tint.a);
-  let e=effect(select(vec4f(encode(lit.rgb/lit.a),lit.a),vec4f(0),lit.a==0),SpriteInput(v.texel,t,v.low,v.high,v.params,v.tint,size.w${pages ? ',v.page' : ''}));
+  let e=effect(select(vec4f(encode(lit.rgb/lit.a),lit.a),vec4f(0),lit.a==0),SpriteInput(v.texel,t,v.low,v.high,v.params,v.tint,frame.size.w${pages ? ',v.page' : ''}));
   let linear=vec4f(decode(e.rgb)*e.a,e.a);`
       : 'let linear=f*vec4f(decode(v.tint.rgb)*v.tint.a,v.tint.a);'
   }
   if(linear.a==0){discard;}
-  let color=select(vec4f(encode(linear.rgb/linear.a)*linear.a,linear.a),linear,size.z>0);`
-      : `let color=${effect ? `effect(textureLoad(atlas,t,${page}0)*v.tint,SpriteInput(v.texel,t,v.low,v.high,v.params,v.tint,size.w${pages ? ',v.page' : ''}))` : `textureLoad(atlas,t,${page}0)*v.tint`};
+  let color=select(vec4f(encode(linear.rgb/linear.a)*linear.a,linear.a),linear,frame.size.z>0);`
+      : `let color=${effect ? `effect(textureLoad(atlas,t,${page}0)*v.tint,SpriteInput(v.texel,t,v.low,v.high,v.params,v.tint,frame.size.w${pages ? ',v.page' : ''}))` : `textureLoad(atlas,t,${page}0)*v.tint`};
   if(color.a==0){discard;}`
   }
   ${
@@ -197,6 +217,32 @@ ${srgb}
   if(!premultiplied){return c;}
   return vec4f(select(decode(c.rgb),c.rgb,decoded)*c.a,c.a);
 }`;
+
+/**
+ * A mask in layer pixels for the shader: `[kind, outside, 0, 0, a, b, c, d]`, kind 0 none, 1 a rect from (a, b) to
+ * (c, d), 2 a circle at (a, b) of radius c. World units go through the camera as sprite positions do.
+ * @throws RangeError for a mask that is neither shape or has a non-finite or negative size.
+ */
+export function maskPixels(mask: SpriteMask | undefined, camera: SpriteCamera): number[] {
+  if (!mask) return [0, 0, 0, 0, 0, 0, 0, 0];
+  const { x, y, zoom } = camera,
+    outside = mask.outside ? 1 : 0;
+  if (
+    'rect' in mask &&
+    mask.rect?.length === 4 &&
+    mask.rect.every(Number.isFinite) &&
+    mask.rect[2] >= 0 &&
+    mask.rect[3] >= 0
+  ) {
+    const [rx, ry, w, h] = mask.rect;
+    return [1, outside, 0, 0, (rx - x) * zoom, (ry - y) * zoom, (rx + w - x) * zoom, (ry + h - y) * zoom];
+  }
+  if ('circle' in mask && mask.circle?.length === 3 && mask.circle.every(Number.isFinite) && mask.circle[2] >= 0) {
+    const [cx, cy, r] = mask.circle;
+    return [2, outside, 0, 0, (cx - x) * zoom, (cy - y) * zoom, r * zoom, 0];
+  }
+  throw rangeError('Invalid sprite mask: give rect [x, y, width, height] or circle [x, y, radius]', 'sprite-options');
+}
 
 interface ViewState {
   uniform: GPUBuffer;
@@ -235,6 +281,11 @@ export class SpriteLayer implements EnginePlugin {
   private readonly effect?: string;
   private readonly stride: number;
   private readonly pages: boolean;
+  /**
+   * Draws only inside a shape, or outside it with `outside: true`, in world units through the layer's camera; none
+   * draws everywhere. Read each frame, so a mask can follow a character or a spotlight.
+   */
+  mask: SpriteMask | undefined;
   /** Seconds the layer has run, passed to its `shader` as `sprite.time`. Set it to restart an effect. */
   time = 0;
   private readonly mipmaps: boolean;
@@ -260,10 +311,10 @@ export class SpriteLayer implements EnginePlugin {
   private readonly states = new ViewStates<ViewState>(
     () => {
       const uniform = this.device!.createBuffer({
-        size: 16,
+        size: 48,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
       });
-      return { uniform, values: new Float32Array(4), generation: -1 };
+      return { uniform, values: new Float32Array(12), generation: -1 };
     },
     (state) => state.uniform.destroy(),
   );
@@ -292,6 +343,7 @@ export class SpriteLayer implements EnginePlugin {
     this.target = options.target;
     this.clear = options.clear === false ? false : [...(options.clear ?? [0, 0, 0, 0])];
     this.normals = options.normals;
+    this.mask = options.mask;
     this.smooth = options.filter === 'linear';
     if (options.shader !== undefined && !/\bfn\s+effect\s*\(/.test(options.shader?.code ?? ''))
       throw typeError('Invalid sprite shader: make one with spriteShader', 'sprite-options');
@@ -675,17 +727,10 @@ export class SpriteLayer implements EnginePlugin {
       state = this.states.get(c);
     // Targets that store linear light (sRGB and float formats) take the filtered colour as it is; 8-bit ones encoded.
     const linear = format.endsWith('-srgb') || format.includes('float') ? 1 : 0;
-    const time = this.effect ? this.time : 0;
-    if (
-      state.values[0] !== width ||
-      state.values[1] !== height ||
-      state.values[2] !== linear ||
-      state.values[3] !== time
-    ) {
-      state.values[0] = width;
-      state.values[1] = height;
-      state.values[2] = linear;
-      state.values[3] = time;
+    const time = this.effect ? this.time : 0,
+      next = [width, height, linear, time, ...maskPixels(this.mask, this.camera)];
+    if (next.some((value, i) => state.values[i] !== value)) {
+      state.values.set(next);
       device.queue.writeBuffer(state.uniform, 0, state.values);
     }
     if (state.generation !== this.generation) {

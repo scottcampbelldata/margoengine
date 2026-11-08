@@ -1123,6 +1123,7 @@
       "SPRITE_FLOATS",
       "Sprite",
       "SpriteLayer",
+      "maskPixels",
       "packSprites",
       "snapToPixel",
       "sortSprites"
