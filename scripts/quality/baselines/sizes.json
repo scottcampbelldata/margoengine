@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10821997,
+  "total": 10822810,
   "history": [
     {
       "date": "2026-10-24",
@@ -3950,6 +3950,12 @@
       "commit": "4bc66f142",
       "reason": "SceneTarget depth copy setup in its own function so copyDepth allocates nothing per call (post/bloom, post/ssgi about 20 to 33 B gzip)",
       "grew": 2
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "add564c95",
+      "reason": "post/ssgi: multi-bounce over frames (batch 70 job 6)",
+      "grew": 1
     }
   ],
   "items": {
@@ -4438,7 +4444,7 @@
     "@margoengine/post/scene-fade": 3074,
     "@margoengine/post/smaa": 6244,
     "@margoengine/post/ssao": 9601,
-    "@margoengine/post/ssgi": 12239,
+    "@margoengine/post/ssgi": 13052,
     "@margoengine/post/ssr": 13257,
     "@margoengine/post/sss": 7201,
     "@margoengine/post/stack": 4001,

@@ -235,7 +235,7 @@ gtao.options.slices = 1;        // options and `enabled` are read every frame
 
 ## Screen-space global illumination: `SSGI`
 
-`@margoengine/post/ssgi` (9,801 B min+gzip, its own entry; it carries the stack) adds one bounce of diffuse light: light
+`@margoengine/post/ssgi` (12,638 B min+gzip, its own entry; it carries the stack) adds one bounce of diffuse light: light
 that lit surfaces on screen throw onto their neighbours (a red wall tints the floor in front of it). It is an HDR
 `PostStack` effect; `SSGI.attach(engine, options)` runs it alone in its own one-effect stack.
 
@@ -279,9 +279,30 @@ ssgi.add(model); ssr.add(model);  // gltf-pro model or materials mesh: both may 
   against 0.111 at 2 m) and red stays 1.000; the same at 1x MSAA, for a gltf-pro floor added to SSGI and SSR (red
   0.990: gltf-pro's ambient also holds a specular term, removed and not re-added), and with an orthographic camera
   (within 0.021). With GTAO, SSR and TAA in the same frame and alone: no errors, no NaN.
+- **More bounces (`multiBounce: true`).** Rays then read the light they hit from the previous frame's result,
+  reprojected through the previous frame's camera, which already holds the bounces before it: each frame adds one
+  more bounce, so a room open to the sun fills with light and a still view settles to all of them. A hit the previous
+  frame did not see on screen (and the first frame) takes the current input, so the first frame is exactly one bounce.
+  The results ping-pong between two `rgba16float` targets; SSGI then hands the newer one to the next HDR effect, or
+  draws it with the display transform when it ends the stack. Checked on a real GPU (M6 Mac mini, Metal, Chromium;
+  `node packages/post/test/ssgi-bounce-browser.mjs`): a white room open toward the camera, its ceiling over the back
+  half: the first multi-bounce frame equals one bounce within 1/255 (the `rgba16float` step), after 42 frames the
+  mean luma is 10.4/255 higher with 57,229 of 76,800 pixels brighter by more than 2/255, the next frame changes
+  nothing, and switching it off gives the one-bounce frame back exactly.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {SSGI} from 'margoengine/post/ssgi';
+const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
+const gi = SSGI.attach(engine, {rays: 4, multiBounce: true}); // indoor scenes: bounces build up over frames
+gi.options.multiBounce = false;                                // back to one bounce, nothing kept between frames
+```
+
 - **Limits.** Only what is on screen bounces: light from off-screen or hidden surfaces is missing, and rays that leave
-  the screen keep the ambient light. One diffuse bounce (no specular, no second bounce); the bounce light is the
-  scene as lit before SSGI (emission included), so it does not see its own result. Water, terrain and other custom
+  the screen keep the ambient light. Diffuse only; one bounce by default, the bounce light being the scene as lit
+  before SSGI (emission included). With `multiBounce` the extra bounces trail a moving camera or light by a few
+  frames, a hit hidden in the previous frame takes the light of whatever covered it there for a frame, and one history
+  serves every view of a frame (split screen). Water, terrain and other custom
   shaders bounce light but take none (no albedo in the replay). Options: `rays` 1-16, `steps` 1-256, `maxDistance` and
   `thickness` > 0, `intensity` 0-4 (`RangeError` otherwise); stack only (`MargoError` code `state` alone with
   `engine.use`). Memory: three material targets, two `rgba16float` GI targets, a half-resolution Hi-Z and blur chain,

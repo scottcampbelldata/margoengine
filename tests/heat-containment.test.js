@@ -343,6 +343,7 @@ test('split steps cover the whole suite: both bevel sample counts, each chain pa
       'material-decals-browser.mjs',
       'decals-cull-browser.mjs',
       'ssr-rough-browser.mjs',
+      'ssgi-bounce-browser.mjs',
     ],
   );
 });

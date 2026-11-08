@@ -33,6 +33,10 @@ export interface SSGIOptions {
   intensity?: number;
   /** False skips the effect (the scene passes through). Default true; also `ssgi.enabled`. */
   enabled?: boolean;
+  /** More than one bounce, accumulated over frames: rays read the light they hit from the previous frame's result
+   * (reprojected through last frame's camera), which already holds the bounces before it, so each frame adds one more
+   * bounce and a still view converges to all of them. Default false (one bounce, nothing kept between frames). */
+  multiBounce?: boolean;
 }
 
 // Material replay outputs: the ambient light the scene added (rgb, as SSAO replays it: `margoAmbient` when a plugin names
@@ -156,6 +160,36 @@ return vec4f(toDisplay(c),s.a);
 const linearComposite = compositeShader.replace('return vec4f(toDisplay(c),s.a);', 'return vec4f(c,s.a);');
 if (linearComposite.includes('vec4f(toDisplay(c)'))
   throw margoError('failed', 'SSGI: the HDR composite still encodes for display; update its linear-output patch');
+// Multi-bounce trace: binding 9 holds last frame's camera (and whether there is a last frame), binding 10 last frame's
+// linear result; the blurred chain is built from that result too. A hit that last frame saw on screen takes its light
+// from there (all bounces so far); one it did not see takes the current input (direct light and ambient only).
+const feedbackTrace = traceShader
+  .replace(
+    '@group(0) @binding(8) var<storage,read> rays:array<vec4f>;',
+    `@group(0) @binding(8) var<storage,read> rays:array<vec4f>;
+struct P {previous:mat4x4f,c:vec4f}
+@group(0) @binding(9) var<uniform> last:P;
+@group(0) @binding(10) var lit:texture_2d<f32>;`,
+  )
+  .replace(
+    'let lod=log2(max(h.w*u.g.w,1.0));var light=textureLoad(input,hq,0).rgb;\nif(lod>1.0){light=textureSampleLevel(blurred,bilinear,h.xy/u.a.xy,min(lod-1.0,f32(textureNumLevels(blurred)-1))).rgb;}',
+    `let lod=log2(max(h.w*u.g.w,1.0));var light=textureLoad(input,hq,0).rgb;
+let pc=last.previous*vec4f(hp,1.0);let puv=vec2f(pc.x/pc.w*0.5+0.5,0.5-pc.y/pc.w*0.5);
+if(last.c.x>0.5&&pc.w>0.0&&all(puv>=vec2f(0))&&all(puv<vec2f(1))){
+light=textureLoad(lit,vec2i(puv*u.a.xy),0).rgb;
+if(lod>1.0){light=textureSampleLevel(blurred,bilinear,puv+(h.xy-vec2f(hq)-0.5)/u.a.xy,min(lod-1.0,f32(textureNumLevels(blurred)-1))).rgb;}}`,
+  );
+if (!feedbackTrace.includes('var lit:') || !feedbackTrace.includes('last.previous*vec4f(hp,1.0)'))
+  throw margoError(
+    'failed',
+    'SSGI: the multi-bounce trace patch no longer matches the trace shader; update the feedbackTrace patch to it',
+  );
+const presentShader =
+  vertex +
+  `
+@group(0) @binding(0) var lit:texture_2d<f32>;
+${displayShader}
+@fragment fn fragment(@builtin(position) frag:vec4f)->@location(0) vec4f {let s=textureLoad(lit,vec2i(frag.xy),0);return vec4f(toDisplay(s.rgb),s.a);}`;
 const formats: GPUTextureFormat[] = ['rgba16float', 'rgba8unorm', 'rgb10a2unorm'],
   targets = formats.map((format) => ({ format })),
   blurLevels = 5;
@@ -260,6 +294,23 @@ export class SSGI implements EnginePlugin {
     },
   };
   private readonly values = new Float32Array(44);
+  // Multi-bounce: last frame's linear results (ping-pong), the feedback trace and present pipelines, their uniform
+  // (last frame's camera, history valid), and which result is the newest.
+  private multi = false;
+  private lit: GPUTextureView[] = [];
+  private litPasses: GPURenderPassDescriptor[] = [];
+  private litComposite?: GPURenderPipeline;
+  private feedback?: GPURenderPipeline;
+  private present?: GPURenderPipeline;
+  private presentKey = '';
+  private feedbackUniform?: GPUBuffer;
+  private feedbackGroups: { get(copy?: GPUBufferBinding): GPUBindGroup[] }[] = [];
+  private presentGroups: GPUBindGroup[] = [];
+  private chainFirst: GPUBindGroup[] = [];
+  private newest = 0;
+  private frames = 0;
+  private readonly previous = new Float32Array(16);
+  private readonly feedbackValues = new Float32Array(20);
   private readonly workspace = new Float64Array(52);
   private readonly inverse = this.values.subarray(0, 16);
   constructor(readonly options: SSGIOptions = {}) {
@@ -308,10 +359,11 @@ export class SSGI implements EnginePlugin {
       s < 1 ||
       s > 256 ||
       !(i >= 0 && i <= 4) ||
-      (o.enabled !== undefined && typeof o.enabled !== 'boolean')
+      (o.enabled !== undefined && typeof o.enabled !== 'boolean') ||
+      (o.multiBounce !== undefined && typeof o.multiBounce !== 'boolean')
     )
       throw new RangeError(
-        'Invalid SSGI options; rays must be an integer 1-16, maxDistance > 0, thickness > 0, steps an integer 1-256, intensity 0-4.',
+        'Invalid SSGI options; rays must be an integer 1-16, maxDistance > 0, thickness > 0, steps an integer 1-256, intensity 0-4, multiBounce a boolean.',
       );
   }
   setup(engine: Engine): void {
@@ -458,7 +510,8 @@ export class SSGI implements EnginePlugin {
     pass.draw(3);
     pass.end();
   }
-  private stage(c: Context, input: GPUTextureView, output: StageOutput): void {
+  private stage(c: Context, input: GPUTextureView, output: StageOutput): GPUTextureView | void {
+    if (this.multi) return this.stageMulti(c, input, output);
     const key = output.format + output.multisample.count + output.hdr;
     if (this.key !== key) {
       this.key = key;
@@ -499,10 +552,82 @@ export class SSGI implements EnginePlugin {
     this.compositeAttachment.loadOp = viewLoadOp(c, 'clear');
     this.fullscreen(c, this.compositePass, this.composite!, composite);
   }
+  /** Multi-bounce frame: blur chain from last frame's result, the feedback trace, the same bilateral blur, a linear
+   * composite into the newer result, then the display pass when SSGI ends the stack. */
+  private stageMulti(c: Context, input: GPUTextureView, output: StageOutput): GPUTextureView | void {
+    const device = c.device,
+      last = this.newest,
+      next = last ^ 1;
+    this.litComposite ??= render(device, linearComposite, 'rgba16float');
+    this.feedback ??= render(device, feedbackTrace, 'rgba16float');
+    if (this.input !== input) {
+      this.input = input;
+      // Sources 0 and 1: last frame's results; 2: this frame's input, for a frame without history.
+      const sources = [...this.lit, input];
+      this.feedbackGroups = sources.map((source) =>
+        uniformGroups(this.uniform!, (uniform) => [
+          bind(device, this.feedback!, [
+            uniform,
+            input,
+            this.chain!,
+            this.sampler!,
+            this.depthView!,
+            this.hiz!,
+            this.material[2],
+            this.material[1],
+            { buffer: this.rays! },
+            { buffer: this.feedbackUniform! },
+            source,
+          ]),
+          bind(device, this.litComposite!, [uniform, input, this.gi[0], this.material[0], this.material[1]]),
+        ]),
+      );
+      this.chainFirst = sources.map((view) => bind(device, this.downsample!, [view, this.sampler!]));
+      this.presentGroups = [];
+    }
+    // Without history the rays read this frame's input through an unmoved camera: exactly one bounce.
+    const source = this.frames ? last : 2,
+      [trace, composite] = this.feedbackGroups[source].get(this.slice);
+    const f = this.feedbackValues;
+    f.set(this.frames ? this.previous : this.values.subarray(16, 32));
+    f[16] = 1;
+    device.queue.writeBuffer(this.feedbackUniform!, 0, f as Float32Array<ArrayBuffer>);
+    this.previous.set(this.values.subarray(16, 32));
+    this.frames = this.enabled ? this.frames + 1 : 0;
+    if (this.enabled) {
+      // The chain's first level reads last frame's result: rebind it when that is the other texture.
+      this.chainGroups[0] = this.chainFirst[source];
+      for (let i = 0; i < blurLevels; i++)
+        this.fullscreen(c, this.chainPasses[i], this.downsample!, this.chainGroups[i], false);
+      const blur = this.blurViewGroups!.get(this.slice);
+      this.fullscreen(c, this.giPasses[0], this.feedback!, trace);
+      this.fullscreen(c, this.giPasses[1], this.blur!, blur[0]);
+      this.fullscreen(c, this.giPasses[0], this.blur!, blur[1]);
+    }
+    this.fullscreen(c, this.litPasses[next], this.litComposite!, composite, false);
+    this.newest = next;
+    if (output.hdr) return this.lit[next];
+    const key = output.format + output.multisample.count;
+    if (this.presentKey !== key) {
+      this.presentKey = key;
+      this.present = render(device, presentShader, output.format, { multisample: output.multisample });
+      this.presentGroups = [];
+    }
+    const present = (this.presentGroups[next] ??= bind(device, this.present!, [this.lit[next]]));
+    this.compositeAttachment.view = output.view;
+    this.compositeAttachment.loadOp = viewLoadOp(c, 'clear');
+    this.fullscreen(c, this.compositePass, this.present!, present);
+  }
   private resize(c: Context): void {
     // This view draws in the frame: what it releases waits while another view's commands still need it.
     currentFrame(c.device, c.view ?? c);
-    const target = this.host!.target!;
+    const target = this.host!.target!,
+      multi = this.options.multiBounce ?? false;
+    if (multi !== this.multi) {
+      // Switched: new targets and an empty history.
+      this.multi = multi;
+      this.width = 0;
+    }
     if (this.width === c.width && this.height === c.height && this.target === target) return;
     this.release();
     this.width = c.width;
@@ -550,6 +675,15 @@ export class SSGI implements EnginePlugin {
     }
     this.gi = [0, 1].map(() => texture([c.width, c.height], 'rgba16float', attachment).createView());
     this.giPasses = this.gi.map((view) => ({ colorAttachments: [{ view, loadOp: 'clear', storeOp: 'store' }] }));
+    if (this.multi) {
+      this.feedbackUniform ??= device.createBuffer({
+        size: 80,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      });
+      this.lit = [0, 1].map(() => texture([c.width, c.height], 'rgba16float', attachment).createView());
+      this.litPasses = this.lit.map((view) => ({ colorAttachments: [{ view, loadOp: 'clear', storeOp: 'store' }] }));
+      this.frames = 0;
+    }
     const normals = this.material[2];
     this.blurViewGroups = uniformGroups(this.uniform!, (uniform) =>
       [0, 1].map((i) =>
@@ -570,6 +704,11 @@ export class SSGI implements EnginePlugin {
     this.chainPasses = [];
     this.gi = [];
     this.giPasses = [];
+    this.lit = [];
+    this.litPasses = [];
+    this.feedbackGroups = [];
+    this.presentGroups = [];
+    this.frames = 0;
     this.blurViewGroups = undefined;
     this.extra = [];
     this.depthView = this.ownDepth = this.hiz = this.chain = undefined;
@@ -581,8 +720,12 @@ export class SSGI implements EnginePlugin {
   private releaseBuffers(): void {
     retire(this.device!, this.uniform);
     retire(this.device!, this.rays);
+    retire(this.device!, this.feedbackUniform);
     for (const b of this.axes) retire(this.device!, b);
-    this.uniform = this.rays = undefined;
+    this.uniform = this.rays = this.feedbackUniform = undefined;
+    this.litComposite = this.feedback = this.present = undefined;
+    this.presentKey = '';
+    this.multi = false;
     this.axes = [];
     this.replay = this.composite = undefined;
     this.replayKey = this.base = undefined;

@@ -28,6 +28,7 @@ export interface SSGIOptions {
     steps?: number;
     intensity?: number;
     enabled?: boolean;
+    multiBounce?: boolean;
 }
 
 // Not exported from this entry, but used by the exports above:

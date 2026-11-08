@@ -292,6 +292,7 @@ export interface SSGIOptions {
     steps?: number;
     intensity?: number;
     enabled?: boolean;
+    multiBounce?: boolean;
 }
 
 export class SSR implements EnginePlugin {

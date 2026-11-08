@@ -138,7 +138,52 @@ test('SSGI runs only in a PostStack and validates its options', async () => {
     { thickness: -1 },
     { steps: 0 },
     { intensity: 5 },
+    { multiBounce: 1 },
   ])
     assert.throws(() => new SSGI(options), RangeError);
   assert.throws(() => ssgi.add({}), { name: 'MargoError', code: 'disposed' });
+});
+
+test("multiBounce: rays read the light they hit from last frame's result, reprojected; results ping-pong", async () => {
+  const h = harness({ samples: 1 }),
+    ssgi = new SSGI({ multiBounce: true });
+  h.engine.use(new PostStack([ssgi]));
+  const log = h.gpu.record(() => h.frame()),
+    codes = modules(log),
+    trace = codes.find((code) => code.includes('var lit:texture_2d<f32>'));
+  assert.ok(trace, 'the feedback trace');
+  assert.match(trace, /let pc=last\.previous\*vec4f\(hp,1\.0\);/);
+  assert.match(trace, /light=textureLoad\(lit,vec2i\(puv\*u\.a\.xy\),0\)\.rgb;/);
+  // A linear composite into the newer result, then the display pass (SSGI ends the stack).
+  assert.ok(codes.some((code) => code.includes('var gi:texture_2d<f32>') && code.includes('return vec4f(c,s.a);')));
+  assert.ok(
+    codes.some((code) => code.includes('let s=textureLoad(lit,vec2i(frag.xy),0);return vec4f(toDisplay(s.rgb),s.a);')),
+  );
+  // First frame: this frame's camera as last frame's and the input as the source: one bounce.
+  const first = written(log, 80),
+    camera = written(log, 176).subarray(16, 32);
+  assert.deepEqual([...first.subarray(0, 16)], [...camera]);
+  assert.equal(first[16], 1);
+  const groups = (l) => l.filter((e) => e[0] === 'group').length;
+  await null;
+  const second = h.gpu.record(() => h.frame());
+  await null;
+  const third = h.gpu.record(() => h.frame());
+  assert.equal(groups(third), 0, 'steady frames create no bind groups');
+  assert.equal(
+    third.filter((e) => /^(texture|buffer|module|renderPipeline|view|sampler)$/.test(e[0])).length,
+    0,
+    'steady frames create no GPU objects',
+  );
+  assert.equal(passes(second), passes(log), 'mips, trace, two blurs, composite, display');
+  // Off again: the one-bounce composite straight into the output.
+  ssgi.options.multiBounce = false;
+  await null;
+  const off = h.gpu.record(() => h.frame());
+  assert.ok(!modules(off).some((code) => code.includes('var lit:')));
+  assert.equal(passes(off), passes(log) - 1, 'no separate display pass');
+  ssgi.dispose();
+  h.engine.removePlugin('post:stack');
+  await null;
+  assert.deepEqual(h.live(), []);
 });
