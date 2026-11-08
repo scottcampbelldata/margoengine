@@ -1324,3 +1324,7 @@ The following remain technical gaps, not permission to weaken a check:
 41. `render_snippet` (`@margoengine/mcp/render`, `packages/mcp/tests/render-gpu-check.mjs`, in `test:gpu`) is proved on the
     RTX A6000 (Windows, D3D12 through `webgpu` 0.6.2) only: a box drawn and fitted shows green in the centre and an
     empty snippet one colour. Missing: Metal and Vulkan runs, a software adapter, and the cost of a render per call.
+42. Smooth voxel terrain (`@margoengine/voxel/smooth`, Surface Nets over signed densities, drawn as core meshes) is proved on the M6 Mac
+    mini (Metal) only: a ball meshes closed and wound outward, split over eight chunks it gives the same triangles with no
+    seam, and sculpting re-meshes only the chunks that read the changed cells. Meshing runs on the page thread; speed and
+    memory at large view distances, LOD, textures and collision with `@margoengine/voxel/physics` are not built or measured.

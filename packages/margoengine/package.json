@@ -2878,6 +2878,10 @@
       "types": "./dist/voxel/gpu-mesher.d.ts",
       "import": "./dist/voxel/gpu-mesher.js"
     },
+    "./voxel/smooth": {
+      "types": "./dist/voxel/smooth.d.ts",
+      "import": "./dist/voxel/smooth.js"
+    },
     "./voxel-edit": {
       "types": "./dist/voxel-edit.d.ts",
       "import": "./dist/voxel-edit.js"

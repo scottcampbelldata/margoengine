@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10958406,
+  "total": 10961745,
   "history": [
     {
       "date": "2026-10-24",
@@ -4082,6 +4082,12 @@
       "commit": "11ff0f3fd",
       "reason": "new entry @margoengine/mcp/resources: docs resources and starter prompts; the root entry serves the new methods (batch 119 job 4)",
       "grew": 2
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "83d230f60",
+      "reason": "voxel smooth terrain entry (job 7)",
+      "grew": 1
     }
   ],
   "items": {
@@ -4824,6 +4830,7 @@
     "@margoengine/voxel/physics": 10072,
     "@margoengine/voxel/query": 3821,
     "@margoengine/voxel/render": 25048,
+    "@margoengine/voxel/smooth": 3339,
     "@margoengine/voxel/stream": 13408,
     "@margoengine/voxel/ticks": 2801,
     "@margoengine/voxel/vox": 12969,

@@ -1164,3 +1164,45 @@ console.log(mesh?.opaque.length, mesher.stats); // 3 words per quad; { gpu, cpu,
 - **Errors.** `TypeError` without a `GPUDevice`, `RangeError` for a `batch` out of range or over the device's binding
   limit and for wrong keys, priorities or eyes; a mesh rejects with `MargoError` `'failed'` when the GPU reports a
   validation error; `MargoError` `'disposed'` after `dispose()` (also `[Symbol.dispose]`).
+
+## Smooth terrain (`@margoengine/voxel/smooth`)
+
+`SmoothTerrain` holds smooth voxel terrain in 32-cubed chunks: a signed density per cell (solid above 0) and a material.
+`meshSmoothChunk` meshes a chunk with Surface Nets, and `SmoothTerrainView` draws the chunks as core meshes, so a block
+world's `VoxelRenderer` draws beside it in the same scene.
+
+```ts
+import { Engine, PbrMaterial } from 'margoengine/core';
+import { SmoothTerrain, SmoothTerrainView } from 'margoengine/voxel/smooth';
+
+const engine = await Engine.create(document.querySelector('canvas')!, { backend: 'webgpu' });
+const terrain = new SmoothTerrain();
+const height = (x: number, z: number) => 12 + 5 * Math.sin(x / 11) + 4 * Math.cos(z / 9);
+for (let cx = 0; cx < 3; cx++)
+  for (let cz = 0; cz < 3; cz++)
+    terrain.addChunk(cx, 0, cz, (x, y, z) => height(x, z) - y, (x, y, z) => (y > height(x, z) - 2 ? 0 : 1));
+const view = SmoothTerrainView.attach(engine, {
+  terrain,
+  materials: [new PbrMaterial({ color: '#3fae3a' }), new PbrMaterial({ color: '#8a6f5a' })],
+});
+terrain.sculpt([30, 10, 30], 6, -1); // carve a smooth hollow; 1 builds up instead
+engine.onFrame(() => view.update()); // meshes up to 4 dirty chunks a frame, nearest first
+engine.start();
+```
+
+- **Density.** `addChunk(cx, cy, cz, density, material)` samples `density(x, y, z)` at each cell (positive inside, about
+  the signed distance in blocks near the surface, stored clamped to -1..1 in 1/127ths) and `material` (0 to 255). Chunks
+  load and unload in any order; `removeChunk` unloads one. `sculpt(center, radius, strength, material)` moves every cell
+  within `radius` toward solid (`strength` > 0) or air by `strength` times its closeness to the centre.
+- **Meshing.** One surface point per net cell the surface crosses, at the mean of its edge crossings, one quad per pair
+  of neighbouring samples across the surface, normals from the density gradient (the method of
+  `@margoengine/voxel-edit/smooth`, over densities instead of filled cells). Samples past the chunk come from its loaded
+  neighbours, so chunks join without seams; past an unloaded neighbour the border repeats (the surface stays open there,
+  no wall). Each quad takes its solid sample's material; `meshSmoothChunk` returns one part per material.
+- **Dirty chunks.** Every change puts the chunks that read the changed cells in `terrain.dirty` (a chunk and the
+  neighbours sharing its border cells); `view.update()` meshes up to `budget` of them (default 4) on this thread, nearest
+  the camera first, and swaps their core meshes (one per chunk and material, placed at the chunk's corner).
+- **Errors.** `TypeError` for a wrong engine, terrain, field or materials list; `RangeError` for chunk coordinates
+  outside the y range (`minChunkY` -4, `maxChunkY` 7 by default), a NaN density, a material outside 0 to 255, or sculpt
+  arguments out of range; `MargoError` `'disposed'` after `view.dispose()` (also `[Symbol.dispose]`), which removes its
+  meshes.

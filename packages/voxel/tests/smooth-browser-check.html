@@ -1,0 +1,48 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Voxel smooth terrain browser check</title><style>body{margin:0}canvas{display:block;width:320px;height:240px}</style></head><body><canvas></canvas>
+<script type="module">
+// Real-GPU proof of @margoengine/voxel/smooth, driven by smooth-browser-check.mjs: a rolling smooth terrain of grass
+// over red rock in 3 x 3 chunks, drawn by SmoothTerrainView as core meshes beside a block world's stone tower drawn by
+// VoxelRenderer; a ball carved out of the hill changes the picture there and only re-meshes the chunks it touches.
+import {Engine,PbrMaterial} from '/packages/core/dist/index.js';
+import {BlockTypes,VoxelWorld} from '/packages/voxel/dist/index.js';
+import {VoxelLighting} from '/packages/voxel/dist/light.js';
+import {BlockTextures,VoxelRenderer} from '/packages/voxel/dist/render.js';
+import {SmoothTerrain,SmoothTerrainView} from '/packages/voxel/dist/smooth.js';
+const canvas=document.querySelector('canvas'),errors=[];
+const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[48,60,-40],target:[62,12,48],near:0.1,far:400}});
+engine.gpu.addEventListener('uncapturederror',(e)=>errors.push(e.error.message));
+const terrain=new SmoothTerrain();
+const height=(x,z)=>12+5*Math.sin(x/11)+4*Math.cos(z/9);
+for(let cz=0;cz<3;cz++)for(let cx=0;cx<3;cx++)terrain.addChunk(cx,0,cz,(x,y,z)=>height(x,z)-y,(x,y,z)=>y>height(x,z)-2?0:1);
+const view=SmoothTerrainView.attach(engine,{terrain,materials:[new PbrMaterial({color:'#3fae3a',roughness:0.9}),new PbrMaterial({color:'#b03a2e',roughness:0.9})],budget:4});
+// A block world beside it: a stone tower at x 100.
+const grey={width:16,height:16,data:new Uint8Array(1024).fill(200)};
+const blocks=new BlockTypes();const STONE=blocks.define('stone',{textures:0});
+const world=new VoxelWorld({blocks});world.addChunk(3,0,1);
+const e=[];for(let y=0;y<30;y++)for(let z=44;z<52;z++)for(let x=100;x<108;x++)e.push(x,y,z,STONE);world.setBlocks(e);VoxelLighting.attach(world,{budget:Infinity}).update();
+const voxels=VoxelRenderer.attach(engine,{world,textures:new BlockTextures({images:[grey]}),workers:1});
+const readCanvas=()=>{const c=new OffscreenCanvas(canvas.width,canvas.height).getContext('2d');c.drawImage(canvas,0,0);return c.getImageData(0,0,canvas.width,canvas.height).data;};
+const project=(p)=>{const m=engine.camera.matrix,v=[0,1,2,3].map((r)=>m[r]*p[0]+m[4+r]*p[1]+m[8+r]*p[2]+m[12+r]);return [(v[0]/v[3]*0.5+0.5)*canvas.width,(0.5-v[1]/v[3]*0.5)*canvas.height];};
+const mean=(image,p,r=3)=>{const [cx,cy]=project(p),s=[0,0,0];let n=0;
+ for(let y=Math.round(cy-r);y<=cy+r;y++)for(let x=Math.round(cx-r);x<=cx+r;x++){const o=(y*canvas.width+x)*4;for(let c=0;c<3;c++)s[c]+=image[o+c];n++;}return s.map((v)=>v/n);};
+async function settle(){let stable=0,meshed=0;
+ for(let i=0;i<2000&&stable<4;i++){meshed+=view.update();engine.render({delta:0});await engine.gpu.queue.onSubmittedWorkDone();await new Promise((r)=>setTimeout(r,1));
+  stable=!view.stats.pending&&!world.dirty.size&&!voxels.stats.pending&&!voxels.stats.compiling&&voxels.stats.draws?stable+1:0;}
+ if(stable<4)throw new Error('did not settle');
+ // Read in the task that drew: once presented, a WebGPU canvas's texture may read back blank.
+ engine.render({delta:0});return {image:readCanvas(),meshed};}
+window.check={
+ errors:()=>errors,
+ async run(){
+  const before=await settle(),stats={...view.stats};
+  const grass=[48,height(48,40),40],tower=[104,20,44];
+  const hill=[30,height(30,30),30];
+  const carved=terrain.sculpt([30,height(30,30),30],7,-2),dirty=terrain.dirty.size;
+  const after=await settle();
+  const out={stats,meshed:[before.meshed,after.meshed],dirty,carved,
+   grass:mean(before.image,grass),tower:mean(before.image,tower),hill:[mean(before.image,hill),mean(after.image,hill)]};
+  view.dispose();voxels.dispose();return out;
+ },
+};
+window.ready=true;
+</script></body></html>
