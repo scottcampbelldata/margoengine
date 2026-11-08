@@ -141,6 +141,26 @@ test('autosaves take turns over the oldest and leave slots alone', async () => {
   await assert.rejects(slots.save('auto-1', save('x')), /belong to autosave/);
 });
 
+test('saves within one millisecond keep their order, and the ring still overwrites the oldest', async () => {
+  // A fast machine autosaves twice in one Date.now() millisecond: the list must not fall back to id order, and the
+  // ring must not take a newer autosave for the oldest.
+  const slots = new SaveSlots(memoryStorage(), { autosaves: 3, now: () => 1000 });
+  for (const title of ['a1', 'a2', 'a3', 'a4', 'a5']) await slots.autosave(save(title));
+  await slots.save('slot-2', save('mine 2'));
+  await slots.save('slot-1', save('mine 1'));
+  await slots.copy('slot-2', 'slot-0');
+  assert.deepEqual((await slots.list()).map((s) => [s.id, s.title]), [
+    ['slot-0', 'mine 2'],
+    ['slot-1', 'mine 1'],
+    ['slot-2', 'mine 2'],
+    ['auto-1', 'a5'],
+    ['auto-0', 'a4'],
+    ['auto-2', 'a3'],
+  ]);
+  assert.equal((await slots.latest()).id, 'slot-0');
+  assert.equal('sequence' in (await slots.info('auto-1')), false, 'the order of saves stays out of SlotInfo');
+});
+
 test('a failed autosave leaves the ring whole', async () => {
   const inner = memoryStorage(),
     slots = new SaveSlots(inner, { autosaves: 2, now: clock() });

@@ -76,8 +76,24 @@ class DamagedRecord extends TypeError {}
 const AUTO = 'auto-';
 const RECORD = 'margo-slot';
 
-/** The stored record: the info and the generation of the files it switches to. */
-type SlotRecord = Omit<SlotInfo, 'id' | 'damaged'> & { format: typeof RECORD; generation: number };
+/**
+ * The stored record: the info, the generation of the files it switches to, and its place in the order of saves
+ * (one more than every record's before it), which orders two saves of the same millisecond. Older records have none.
+ */
+type SlotRecord = Omit<SlotInfo, 'id' | 'damaged'> & { format: typeof RECORD; generation: number; sequence?: number };
+
+/** A listed slot and its place in the order of saves. */
+interface Listed {
+  slot: SlotInfo;
+  sequence: number;
+}
+
+/** Newest first: later time, then later save, then id. */
+const newest = (a: Listed, b: Listed): number =>
+  b.slot.savedAt - a.slot.savedAt || b.sequence - a.sequence || (a.slot.id < b.slot.id ? -1 : 1);
+
+/** The place after every listed save. */
+const after = (listed: readonly Listed[]): number => listed.reduce((top, { sequence }) => Math.max(top, sequence), 0) + 1;
 
 const sniff = (bytes: Uint8Array): string => {
   const head = (at: number, text: string): boolean => [...text].every((c, i) => bytes[at + i] === c.charCodeAt(0));
@@ -165,7 +181,7 @@ export class SaveSlots {
       if (key.startsWith(start) && !keep.includes(key)) await this.#storage.delete(key, options);
   }
 
-  async #write(id: string, document: SaveDocument, options: SlotSaveOptions, autosave: boolean): Promise<SlotInfo> {
+  async #write(id: string, document: SaveDocument, options: SlotSaveOptions, autosave: boolean, sequence: number): Promise<SlotInfo> {
     const { title, playTime, meta = {}, thumbnail, signal } = options,
       call = { signal },
       generation = await this.#next(id, call),
@@ -177,6 +193,7 @@ export class SaveSlots {
     const record: SlotRecord = {
       format: RECORD,
       generation,
+      sequence,
       savedAt: this.#now(),
       autosave,
       version: document.version,
@@ -205,25 +222,31 @@ export class SaveSlots {
   async save(id: string, document: SaveDocument, options: SlotSaveOptions = {}): Promise<SlotInfo> {
     checkId(id);
     if (id.startsWith(AUTO)) throw new TypeError(`Slot id '${id}': 'auto-' names belong to autosave(); use another id`);
-    return this.#turn(() => this.#write(id, document, options, false));
+    return this.#turn(async () => this.#write(id, document, options, false, after(await this.#scan(options))));
   }
 
   /** Saves over the oldest autosave, or an unused one, so the last few are always there. Other slots are not touched. */
   autosave(document: SaveDocument, options: SlotSaveOptions = {}): Promise<SlotInfo> {
     return this.#turn(async () => {
-      const taken = new Map<string, number>();
-      for (const slot of await this.#read(options)) if (slot.autosave) taken.set(slot.id, slot.savedAt);
+      const listed = await this.#scan(options),
+        taken = new Map<string, Listed>();
+      for (const entry of listed) if (entry.slot.autosave) taken.set(entry.slot.id, entry);
+      // The oldest by time and then by order of saves, so a ring saved within one millisecond still takes turns.
       let id = '',
-        oldest = Infinity;
+        oldest: Listed | undefined;
       for (let i = 0; i < this.#autosaves; i++) {
         const name = `${AUTO}${i}`,
-          at = taken.get(name) ?? -Infinity;
-        if (at < oldest) {
+          at = taken.get(name);
+        if (!at) {
+          id = name;
+          break;
+        }
+        if (!oldest || newest(oldest, at) < 0) {
           id = name;
           oldest = at;
         }
       }
-      return this.#write(id, document, options, true);
+      return this.#write(id, document, options, true, after(listed));
     });
   }
 
@@ -261,22 +284,26 @@ export class SaveSlots {
     return { stop, [Symbol.dispose]: stop };
   }
 
-  async #read(options?: StorageCallOptions): Promise<SlotInfo[]> {
+  async #scan(options?: StorageCallOptions): Promise<Listed[]> {
     const start = `${this.#namespace}:`,
-      out: SlotInfo[] = [];
+      out: Listed[] = [];
     for (const key of await this.#storage.keys(options)) {
       if (!key.startsWith(start) || !key.endsWith('.info')) continue;
       const id = slotId(key.slice(start.length, -'.info'.length));
       if (id === null) continue;
       try {
         const record = await this.#record(id, options);
-        if (record) out.push(toInfo(id, record));
+        if (record) out.push({ slot: toInfo(id, record), sequence: record.sequence ?? 0 });
       } catch (error) {
         if (!(error instanceof DamagedRecord)) throw error;
-        out.push({ id, savedAt: 0, autosave: id.startsWith(AUTO), version: 0, bytes: 0, meta: {}, damaged: true });
+        out.push({ slot: { id, savedAt: 0, autosave: id.startsWith(AUTO), version: 0, bytes: 0, meta: {}, damaged: true }, sequence: 0 });
       }
     }
-    return out.sort((a, b) => b.savedAt - a.savedAt || (a.id < b.id ? -1 : 1));
+    return out.sort(newest);
+  }
+
+  async #read(options?: StorageCallOptions): Promise<SlotInfo[]> {
+    return (await this.#scan(options)).map(({ slot }) => slot);
   }
 
   /** Every slot, newest first, read from the records alone. A slot whose record is damaged is listed with `damaged`. */
@@ -344,7 +371,7 @@ export class SaveSlots {
           await this.#storage.write(keep[1], image, options);
         }
       }
-      const copied: SlotRecord = { ...record, generation, autosave: false };
+      const copied: SlotRecord = { ...record, generation, sequence: after(await this.#scan(options)), autosave: false };
       await this.#storage.write(this.#info(to), new TextEncoder().encode(JSON.stringify(copied)), options);
       await this.#clear(to, keep, options);
       return toInfo(to, copied);
@@ -376,7 +403,7 @@ function checkId(id: string): void {
 }
 
 function toInfo(id: string, record: SlotRecord): SlotInfo {
-  const { format: _format, generation: _generation, ...info } = record;
+  const { format: _format, generation: _generation, sequence: _sequence, ...info } = record;
   return { id, ...info };
 }
 
