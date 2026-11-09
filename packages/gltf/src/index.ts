@@ -112,11 +112,11 @@ function transform(mesh: Mesh, node: GLTFNode): void {
     const m = node.matrix;
     if (m[3] !== 0 || m[7] !== 0 || m[11] !== 0 || m[15] !== 1) throw new TypeError('glTF matrix must be affine');
     const trs = splitTRS(m);
-    if (typeof trs === 'string')
-      throw trs === 'singular'
+    if (!trs.ok)
+      throw trs.reason === 'singular'
         ? new RangeError('Singular glTF matrix')
         : new Error('Sheared glTF matrices are unsupported');
-    mesh.setPosition(trs[0]).setScale(trs[2]).setQuaternion(trs[1]);
+    mesh.setPosition(trs.position).setScale(trs.scale).setQuaternion(trs.rotation);
   } else {
     mesh
       .setPosition((node.translation ?? [0, 0, 0]) as [number, number, number])

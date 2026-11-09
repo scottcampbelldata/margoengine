@@ -306,7 +306,7 @@ export interface DAESkinBindingOptions {
 
 function trs(m: Matrix): Pick<DAEBone, 'translation' | 'rotation' | 'scale'> {
   const split = splitTRS(m, Infinity);
-  if (typeof split !== 'string') return { translation: split[0], rotation: split[1], scale: split[2] };
+  if (split.ok) return { translation: split.position, rotation: split.rotation, scale: split.scale };
   return { translation: [m[12], m[13], m[14]], rotation: [0, 0, 0, 1], scale: [0, 0, 0] };
 }
 

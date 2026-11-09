@@ -126,6 +126,24 @@ test('the parallel build starts a package only after its dependencies, never exc
   }
 });
 
+test('a narrowed build retains dependency paths through unselected packages', async () => {
+  const dependencies = new Map([
+    ['consumer', new Set(['bridge'])],
+    ['bridge', new Set(['provider'])],
+    ['provider', new Set()],
+    ['independent', new Set(['prebuilt'])],
+  ]);
+  for (const jobs of [1, 3]) {
+    const finished = new Set();
+    await buildInDependencyOrder(['consumer', 'provider', 'independent'], dependencies, jobs, async (name) => {
+      if (name === 'consumer') assert.ok(finished.has('provider'), 'provider declarations must exist first');
+      await Promise.resolve();
+      finished.add(name);
+    });
+    assert.deepEqual([...finished].sort(), ['consumer', 'independent', 'provider']);
+  }
+});
+
 test('a failed package build rejects and starts nothing new', async () => {
   const dependencies = new Map([
       ['a', new Set()],

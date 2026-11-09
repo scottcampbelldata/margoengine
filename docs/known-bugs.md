@@ -3125,3 +3125,21 @@ Final main rebase inherits unrelated diagnostics and documentation; erosion
 source/Wasm and proof inputs stay unchanged. Packages are rebuilt, with genuine
 paired entry/network records from 604f09866, dirty=false, then generated API.
 Logs: test-results/skip-gaps/item1-*.log; no benchmark or timing-only run.
+
+### Fixed 2026-11-10: splitTRS named results and non-finite failures
+
+The optional math/quat API had been made positional to save bytes. It now returns
+an ok-discriminated object with named position/rotation/scale or reason; all six
+callers are migrated. The singular contract also missed infinite column lengths
+and infinite determinant overflow, returning success with NaN rotation values.
+Explicit finite checks fix that cause before normalization. Regressions and
+sources: [size restoration](size-restore.md#named-matrix-decomposition-audit-finding-6).
+
+### Fixed 2026-11-10: narrowed package builds lost transitive ordering
+
+Repro: select math, gltf-pro and rigging in build-modern --only while leaving the
+intervening animator/animation packages prebuilt. Direct-edge-only scheduling
+could compile rigging while gltf-pro replaced declarations, causing unknown/any
+model-node errors. package-order now retains paths through unselected packages.
+The regression lists the consumer before the provider at one and three jobs:
+tests/package-order.test.js. No retries or declaration/type relaxations.

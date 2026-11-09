@@ -1947,9 +1947,9 @@ function transform(node: Mesh, def: GLTFNode): void {
         'Invalid glTF affine matrix; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
       );
     const trs = splitTRS(m);
-    if (typeof trs === 'string')
-      throw trs === 'singular' ? new RangeError('Singular glTF matrix') : new Error('Sheared matrices are unsupported');
-    node.setPosition(trs[0]).setScale(trs[2]).setQuaternion(trs[1]);
+    if (!trs.ok)
+      throw trs.reason === 'singular' ? new RangeError('Singular glTF matrix') : new Error('Sheared matrices are unsupported');
+    node.setPosition(trs.position).setScale(trs.scale).setQuaternion(trs.rotation);
   } else
     node
       .setPosition((def.translation ?? [0, 0, 0]) as [number, number, number])

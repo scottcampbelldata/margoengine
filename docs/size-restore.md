@@ -209,3 +209,106 @@ Current-main fetch then included 8ca1632cb's independent deferred spectral fix.
 Preserved it and its documentation; rebuilt the changed spectral package and
 remeasured the combined entries/network pair from 8ca1632cb with package changes,
 then regenerated the API. Pixel source and its passing proof inputs stay unchanged.
+
+## Named matrix decomposition (audit finding 6)
+
+Verified on 2f31a061e: math/quat still returned a tuple or a bare reason string.
+Restore TRSSplit as a discriminated union with ok and named position, rotation,
+scale or reason. Migrate every caller in exporters, gltf, gltf-pro, loaders,
+rigging and scene, including scene's world rotation/scale readers. This is a
+pre-release API correction with no deprecation adapter; the math README gives a
+runnable migration example and api:update records the signature.
+
+Research compared three primary sources:
+
+- Khronos 3D Formats Working Group, *glTF 2.0 Specification*, 2017 (2.0.1,
+  2021), [Transformations](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#transformations):
+  column-major affine TRS and XYZW quaternion layout; shear is outside glTF TRS.
+- Ken Shoemake and Tom Duff, *Matrix Animation and Polar Decomposition*, 1992,
+  [Graphics Interface](https://graphicsinterface.org/proceedings/gi1992/gi1992-30/):
+  distinguishes a general affine decomposition, including stretch, from simple
+  translation/rotation/scale. This restoration retains the existing TRS check;
+  it does not introduce polar decomposition or change accepted finite arithmetic.
+- Microsoft TypeScript team, *TypeScript Handbook: Narrowing*, living handbook,
+  accessed 2026-11-09, [Discriminated unions](https://www.typescriptlang.org/docs/handbook/2/narrowing.html#discriminated-unions):
+  a common literal field narrows named result members. Use ok rather than
+  overloading a tuple/string distinction. This API choice is a design inference.
+
+No companion code or foreign engine source was read or copied. Finite successful
+inputs retain exactly the existing expressions, negative-x reflection convention
+and shear tolerances (1e-5 default; callers retain 1e-6, 1e-3 or Infinity).
+The documented singular result previously missed infinite column lengths and
+infinite determinants, allowing NaN rotations. The owning helper now checks
+these explicitly before normalization. Its regression covers non-finite inputs
+and finite determinant overflow, even with Infinity shear tolerance.
+
+Regression: packages/math/test/split-trs.test.js requires named success/failure
+fields, recomposition for rotated and reflected matrices, unmodified input,
+singular/dependent columns, shear thresholds and the non-finite failure above.
+Existing consumer tests exercise their unchanged matrix handling.
+Synchronous named results belong in math/quat; splitting them into a lazy entry
+would change the helper contract and complicate all six consumers. Byte changes
+and raised optional ceilings are recorded in limits.md. No speed claim.
+
+The first partial build also exposed a scheduler defect: when rigging and
+math/gltf-pro are selected but the intervening animator/animation packages are
+prebuilt, only direct selected edges were honored. Rigging could read gltf-pro
+while its declarations were being replaced and infer unknown/any model nodes.
+The scheduler now respects transitive paths through unselected packages without
+rebuilding those intermediates. Regression: tests/package-order.test.js, narrowed
+build case, at one and three jobs, with a consumer listed before its provider.
+This is a build-tool fix; runtime bytes are unchanged. The initial passing math
+and scene builds were retained; only failed rigging and not-yet-started gltf,
+gltf-pro, exporters and loaders were built afterward.
+
+Research: Arthur B. Kahn, *Topological sorting of large networks*, 1962,
+[Communications of the ACM](https://doi.org/10.1145/368996.369025), requires ordering
+by dependency paths; Microsoft TypeScript team, *Project References*, living
+handbook, accessed 2026-11-09,
+[Build mode](https://www.typescriptlang.org/docs/handbook/project-references#build-mode-for-typescript),
+explains why declarations must be built in dependency order. Retain that ordering
+when filtering the build graph. No foreign implementation was read or copied.
+
+A deterministic comparison against Margo's pre-restoration helper checks 4000
+finite rotated/reflected/sheared cases across all four caller tolerances with
+exactly equal parts/reasons after adapting the old result shape. The prior
+helper demonstrably succeeds with a NaN quaternion for an infinite first column
+under Infinity tolerance; the new helper returns singular. The prior narrowed
+scheduler fails the new ordering condition. Local evidence: math-parity.json
+and math-parity-corrected.log in test-results/size-restore. No timing measurement.
+
+Validation: lint and hygiene pass; the changed scheduler and regression files
+also pass targeted lint. Full verify passes 13763 unit tests and every other
+step, with one stale generated llms-full.txt failure after the math README
+migration. Regenerate it and rerun only that failed case, retaining all passed
+results. The three new math regressions and seven build-order cases pass; the
+full unit run includes every changed consumer package. No tolerance or test is
+relaxed. Paired entry/network records measure 2f31a061e with dirty packages;
+the basic scene makes five requests, with zero unused built files. api:update
+records the named TRSSplit union and the changed size summary.
+
+All consumer GPU suites pass: gltf, gltf-pro extensions, exporters, rigging,
+loaders and loaders/render. The first gltf-pro run passed six cases before
+Windows logged nvlddmkm event 153 at 16:02:42 and requestDevice failed with
+D3D12 E_OUTOFMEMORY. Retain those six passes; only the failed lights group and
+remaining scatter/uv/bump/splats groups run afterward, all passing. No source
+or bar changed for that confirmed system reset. Each real GPU leaf holds one
+shared slot, wait-max 60; no build/unit/verify command holds a GPU lock. The
+premature README request was stopped while still waiting, before any example
+ran, so the consumer sequence and subsequent README run never overlap.
+
+README execution: 112 of 121 pass, nine already listed known failures, no new
+exemptions. The new named-result math example passes. Existing known failures
+are retained rather than reported as passing examples. The standalone full
+verify is not rerun; only failed steps and new merge-record checks are needed.
+
+The sole failed llms currentness case passes after regeneration, completing the
+13764-test result without repeating successful unit tests. Rebase onto 68a03f32c
+preserves sciviz moving-flow and the new BVH/shadow alpha entries, their docs,
+ceilings and histories. The math implementation, six callers, scheduler and
+regressions are byte-identical to the tested 5bf38b4a9 source. Rebuild inherited
+bvh/shadows/sciviz/umbrella packages, then genuinely remeasure paired entry/network
+records from 559e2dba1 (dirty=false), followed by api:update. Core plus stage
+remains 23924 B and math/quat 1346 B. The merged size gate, nine paired-record/API
+tests, llms currentness case and documentation links pass. No successful
+consumer GPU/README suite or full verify is rerun, and no metadata is relabeled.

@@ -23,6 +23,23 @@ Array helpers: the other Margo packages work on plain arrays (`number[]`, `Float
 
 Checked contracts for saved data (each reproduces Margo Voxel Studio's saved arithmetic bit for bit, `test/checked.test.js`; nothing else changes): `@margoengine/math/quat` `interpolateQuaternions(a, b, t, linearAbove)` interpolates along the shorter arc, linearly above dot `linearAbove` (0.9995 is Studio's saved curve) and spherically below, always normalized; `Quaternion.slerp` keeps its own switch. `@margoengine/math/mat4` `transformPointChecked(m, p, minW = 1e-12)` divides by w like `Vector3.applyMatrix4` but returns `{ok: false, reason, w}` for a non-finite w, |w| below `minW` or a non-finite point instead of a NaN or huge point. `@margoengine/math/affine` `decomposeAffine(matrix, tolerance = 1e-5)` returns `Matrix4.decompose`'s translation, rotation (normalized) and scale with what that reading drops: Gram-Schmidt `shear` factors, `handedness` (`'right'`, `'left'` for a reflection, `'degenerate'`), `projective`, and the recomposition `error` with `lossless` (error <= tolerance). `Matrix4.decompose` always returns parts, even for a sheared matrix; check `lossless` before treating them as the whole transform. `@margoengine/math/color` also has `parseColor(value, out?, offset?)` for the packages' `ColorInput` (`'#rrggbb'`, `'#rgb'`, `0xrrggbb` decoded from sRGB, CSS `color(display-p3 r g b)` and the `srgb`, `srgb-linear` and `display-p3-linear` spaces, or linear `[r, g, b]`). Display P3 input: `ColorSpace` has `'display-p3'` and `'display-p3-linear'` (`Color.setRGB/setHex/setHSL/setStyle/getRGB/getHex/getHSL` take them), `P3_TO_SRGB`/`SRGB_TO_P3` are the linear matrices derived from the two sets of primaries (D65), `linearP3ToLinearSRGB` and `linearSRGBToLinearP3` apply them, and colours outside sRGB keep their negative linear sRGB channels for the shaders that carry them to a wide-gamut canvas (tonemap's excess output with environment's `ColorOutput`). `clipToSRGB(rgb)` desaturates such a colour toward its luminance until no channel is negative, for inputs that take sRGB only, such as core's sun. `@margoengine/math/vec3`: `add`, `sub`, `scale`, `dot`, `cross`, `length`, `normalize` on `[x, y, z]` (new arrays). `@margoengine/math/validate`: `finiteVector(v, size, name)` throws unless `v` is `size` Float32-finite numbers. These are kept bit-for-bit identical to the package copies they replaced (`examples/package-benchmarks/proofs/math-consolidation.proof.js`), so their operand order is fixed. Bit for bit means on the same JavaScript engine: the sRGB curves use `**`, and `length`, `normalize` and `eulerToQuaternion` use `Math.hypot`, `Math.sin` and `Math.cos`, which each engine may round in its own way, so their last bit can differ between engines and versions (Node 26 on Windows computes `**` with the C library's pow, Node 22 with V8's own). Everything built only from `+ - * /` and `Math.sqrt`, such as the matrix products and inverses, gives the same bits everywhere.
 
+`splitTRS(matrix, tolerance = 1e-5)` from `@margoengine/math/quat` splits a column-major affine matrix into
+`{ok: true, position, rotation, scale}` or `{ok: false, reason: 'singular' | 'shear'}`. Check `ok` before reading the
+named parts. Rotation is `[x, y, z, w]`; a reflection goes into negative x scale. Zero or non-finite column lengths
+or determinant return `singular`; non-perpendicular unit columns beyond the tolerance return `shear`. The caller
+must supply an affine matrix. `Infinity` tolerance explicitly permits shear for approximate rotation queries.
+This pre-release API replaces the positional tuple and bare failure strings; migrate `parts[0..2]` to the named
+fields and `typeof parts === 'string'` to `!parts.ok` with `parts.reason`.
+
+```ts
+import {composeMatrix} from '@margoengine/math/mat4';
+import {splitTRS} from '@margoengine/math/quat';
+const matrix = composeMatrix([4, 2, 0], [0, 0, 0, 1], [-2, 3, 4], new Float64Array(16));
+const parts = splitTRS(matrix);
+if (parts.ok) console.log(parts.position, parts.rotation, parts.scale);
+else console.log(parts.reason); // 'singular' or 'shear'
+```
+
 Oriented boxes (`OBB`, also `@margoengine/math/obb`): `center`, `halfSize` and a pure-rotation `rotation` (Matrix3).
 `fromBox3(box)` starts from an axis-aligned box and `applyMatrix4(world)` moves it (rotation, translation, mirroring,
 and scale along the box's own axes, folded into `halfSize`). Queries: `containsPoint`, `clampPoint`, `distanceToPoint`,

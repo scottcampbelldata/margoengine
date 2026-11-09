@@ -151,7 +151,7 @@ const write = <T extends VectorTarget | undefined>(out: T, x: number, y: number,
 const split = (mesh: Mesh) => {
   // Infinity: a world matrix under a rotated, unevenly scaled parent has shear, and this reports the nearest rotation.
   const parts = splitTRS(worldMatrix(mesh), Number.POSITIVE_INFINITY);
-  if (typeof parts === 'string') throw fault('state', `World matrix of a mesh is ${parts}`, 'transform');
+  if (!parts.ok) throw fault('state', `World matrix of a mesh is ${parts.reason}`, 'transform');
   return parts;
 };
 
@@ -165,7 +165,7 @@ export function getWorldPosition(mesh: Mesh, out?: VectorTarget): VectorTarget {
 
 /** The mesh's rotation in world space as `[x, y, z, w]`, in `out` or a new array. With a mirror, the scale's x holds it. */
 export function getWorldQuaternion(mesh: Mesh, out: WorldQuaternion = [0, 0, 0, 1]): WorldQuaternion {
-  const rotation = split(mesh)[1],
+  const rotation = split(mesh).rotation,
     length = Math.hypot(...rotation);
   for (let i = 0; i < 4; i++) out[i] = rotation[i] / length;
   return out;
@@ -175,7 +175,7 @@ export function getWorldQuaternion(mesh: Mesh, out: WorldQuaternion = [0, 0, 0, 
 export function getWorldScale(mesh: Mesh): MutableVec3;
 export function getWorldScale<T extends VectorTarget>(mesh: Mesh, out: T): T;
 export function getWorldScale(mesh: Mesh, out?: VectorTarget): VectorTarget {
-  const [x, y, z] = split(mesh)[2];
+  const [x, y, z] = split(mesh).scale;
   return write(out, x, y, z) as VectorTarget;
 }
 

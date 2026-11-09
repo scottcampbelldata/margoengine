@@ -2116,3 +2116,14 @@ examples pass. One ordinary-RT README requestDevice failure coincided with a
 [logged NVIDIA driver reset](results/rt-alpha-readme-reset-20261109.json); only
 that failed example reran, once, and passed. The result is explicitly a pass
 after a driver reset, with the fourteen first-run shadow README passes retained.
+
+
+## Named TRS decomposition restoration
+
+math/quat splitTRS returns an ok-discriminated result with named position,
+rotation and scale, or a singular/shear reason. All six consumers use the named
+fields. packages/math/test/split-trs.test.js proves the shape, rotation/reflection
+recomposition, caller tolerance behavior and rejection of non-finite column
+lengths/determinants. This restores usability and the documented failure contract;
+it makes no speed or general affine/polar-decomposition claim. Sources and
+limits are in docs/size-restore.md and docs/limits.md.

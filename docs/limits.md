@@ -2487,3 +2487,39 @@ Measured gzip entries: bvh root 23,362 / 23,398 B ceiling, bvh/gpu
 5,582 / 5,738 B, bvh/alpha 16,513 / 16,873 B, shadows/rt 6,409 / 6,486 B.
 New alpha-triangles is 1,125 B (1,381 B ceiling); rt-alpha is 8,739 B
 (8,816 B ceiling). No existing ceiling rises. Core plus stage remains 23,924 B.
+
+### Named TRS restoration (audit finding 6, 2026-11-10)
+
+Before: 2f31a061e built entries; after: the same source plus the named-result
+restoration. Min+gzip, default gzip, bare package imports external. Every grown
+optional entry raises its ceiling in this change; none is squeezed to fit.
+
+| Entry | Gzip bytes before -> after | Ceiling before -> after |
+| --- | ---: | ---: |
+| @margoengine/exporters | 36211 -> 36213 | 37298 -> 37300 |
+| @margoengine/exporters/usdz | 17257 -> 17260 | 17775 -> 17778 |
+| @margoengine/exporters/usdz-anim | 20356 -> 20358 | 20967 -> 20969 |
+| @margoengine/exporters/threemf | 16113 -> 16116 | 16597 -> 16600 |
+| @margoengine/exporters/model | 9403 -> 9405 | 9536 -> 9688 |
+| @margoengine/exporters/collect | 10542 -> 10545 | 10836 -> 10862 |
+| @margoengine/exporters/dae | 12396 -> 12399 | 12699 -> 12771 |
+| @margoengine/exporters/gltf | 17102 -> 17106 | 17616 -> 17620 |
+| @margoengine/exporters/roblox | 19963 -> 19968 | 20044 -> 20568 |
+| @margoengine/gltf | 6913 -> 6954 | 7169 -> 7210 |
+| @margoengine/gltf/auto | 14288 -> 14320 | 14717 -> 14750 |
+| @margoengine/gltf-pro | 67364 -> 67403 | 69385 -> 69426 |
+| @margoengine/gltf-pro/model | 55884 -> 55928 | 57561 -> 57606 |
+| @margoengine/gltf-pro/progressive | 76178 -> 76222 | 78464 -> 78509 |
+| @margoengine/gltf-pro/worker | 67805 -> 67844 | 69840 -> 69880 |
+| @margoengine/loaders | 52082 -> 52087 | 52602 -> 53650 |
+| @margoengine/math/quat | 1292 -> 1346 | 1317 -> 1602 |
+| @margoengine/scene | 1713 -> 1718 | 1969 -> 1974 |
+| @margoengine/scene/mesh | 1863 -> 1867 | 2119 -> 2123 |
+
+Rigging/vrm shrinks 10427 -> 10426 B; its ceiling is unchanged. Core plus stage
+remains 23924 B. A synchronous named result and finite checks remain in math/quat;
+a lazy module or tuple compatibility adapter would complicate all six callers.
+No finite-input calculations or caller shear tolerances are changed. The caller
+still supplies an affine matrix; Infinity tolerance permits approximate rotation
+on sheared matrices, not an exact affine decomposition. No timing claim.
+Research, migration and regression evidence: [size restoration](size-restore.md).

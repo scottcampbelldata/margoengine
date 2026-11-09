@@ -657,8 +657,8 @@ const conjugate = (q: ArrayLike<number>): number[] => [-q[0], -q[1], -q[2], q[3]
 
 function rotationOfMatrix(m: ArrayLike<number>): number[] {
   const split = splitTRS(m, 1e-3);
-  if (typeof split === 'string') throw new MargoError('state', 'A VRM head matrix has no rotation; fix its scale');
-  return split[1];
+  if (!split.ok) throw new MargoError('state', 'A VRM head matrix has no rotation; fix its scale');
+  return split.rotation;
 }
 
 /** Rest rotation of every node in model space. */

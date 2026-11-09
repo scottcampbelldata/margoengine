@@ -4187,3 +4187,27 @@ Inherited packages were rebuilt, then genuine paired entry/network records
 measure 0986b11d2, dirty=false, followed by API generation. Core plus stage stays
 23,924 B; alpha-triangles is 1,125 B and rt-alpha 8,739 B, without raising any
 existing ceiling. Logs: test-results/skip-gaps/item2-*.log.
+
+### Section 5 evidence: named TRS results
+
+Size-restoration finding 6 restores the math/quat ok-discriminated named result
+and migrates exporters, gltf, gltf-pro, loaders, rigging and scene together.
+The finite TRS calculations and caller shear tolerances are unchanged. Infinite
+column lengths/determinants now produce the documented singular result before
+normalization. Named-shape, rotated/reflected recomposition, shear, singularity
+and non-finite regressions are in packages/math/test/split-trs.test.js. This is
+CPU matrix evidence; no core, rendering algorithm or speed change is claimed.
+
+The narrowed-build scheduler also retains transitive dependency paths through
+prebuilt unselected packages; it cannot start a selected consumer while a
+selected provider replaces declarations. tests/package-order.test.js covers this
+at one and three jobs without time assertions. Research and the real partial
+build reproduction are in size-restore.md. Runtime package bytes are unaffected.
+
+Finding 6 validation retains all 13764 unit results (the sole stale generated
+llms artifact was regenerated and only its failed case rerun), all consumer GPU
+suites, and 112 of 121 README examples with nine prior known failures. The
+confirmed driver-reset interruption and failed/remaining-only GPU completion
+are recorded in size-restore.md. Fresh combined entry/network records preserve
+current-main sciviz/BVH/shadow work; merged size, API/record and documentation
+checks pass. Core plus stage remains 23924 B, with no timing claim.

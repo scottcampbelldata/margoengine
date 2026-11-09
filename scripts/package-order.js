@@ -51,17 +51,19 @@ export function packageClosure(dir, dependencies) {
 
 /**
  * Runs build(name) for every name, each one only after the names it depends on (dependencies: name -> Set of names;
- * a dependency that is not in `names` is ignored) have finished, with at most `jobs` running at once. A failed build
+ * unselected intermediates are not rebuilt, but paths through them still order selected dependencies) have finished,
+ * with at most `jobs` running at once. A failed build
  * rejects once the builds already running have settled.
  */
 export async function buildInDependencyOrder(names, dependencies, jobs, build) {
   const waiting = new Set(names),
-    running = new Map();
+    running = new Map(),
+    required = new Map([...waiting].map((name) => [name, packageClosure(name, dependencies)]));
   let failure;
   while (waiting.size || running.size) {
     if (!failure)
       for (const name of waiting)
-        if (running.size < jobs && [...dependencies.get(name)].every((dep) => !waiting.has(dep) && !running.has(dep))) {
+        if (running.size < jobs && required.get(name).every((dep) => !waiting.has(dep) && !running.has(dep))) {
           waiting.delete(name);
           running.set(
             name,
