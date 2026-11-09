@@ -280,6 +280,19 @@ five known failures; 18 of 23 examples succeed. Full verify passed 13,616 tests
 with zero failures/skips before the final main rebase; all 80 scoped rebase
 regressions pass. The memory-admission fix landed first as 0d318eb86, followed
 by the separate browser repair. No timing proof or completed Basis job follows.
+### Batch 56 review repair audit
+
+Reported causes: TAA's transient matrix entered the still controller/history key;
+planar, image and colour draws omitted per-view state; scene capture and explicit
+surface/cube disposal selected the active default scene; ground contact projection
+had no HDR direction input; studio normalization overflowed for finite directions.
+The repair adds focused regressions and the missing optional directional receiver.
+Sibling audit includes cube capture/disposal, backgrounds, output, lighting,
+volumetric disposal and external probe baking. No core or stage feature is added.
+Validation must finish before these repairs are described as landed; browser and
+full-gate results accompany the repair commit.
+
+
 
 ### Closed 2026-11-09: ray-shadow cutouts (batch 49 job 1)
 

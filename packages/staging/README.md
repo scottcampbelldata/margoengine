@@ -142,15 +142,16 @@ loss. [Scene, metrics and scope](../../docs/whitepaper/perf-vs-rivals.md).
 
 ## A product on the HDR floor
 
-Ground projection already lives in `@margoengine/environment/ground`. Combine it with this package's
-shadow catcher. Draw the background at order `0.25`, before the contact plane at `0.5`, so the background
-does not paint over the shadow:
+Ground projection lives in `@margoengine/environment/ground`. The optional
+`@margoengine/staging/ground` receiver infers a dominant light from the HDR's luminance-weighted
+first radiance SH band, projects the product's shadow opposite that direction, and follows live
+`environment.rotation`. Draw the backdrop at order `0.25`, before the receiver at `0.5`:
 
 ```ts
 import {Engine, PbrMaterial, box} from 'margoengine/core';
 import {EnvironmentLighting} from 'margoengine/environment';
 import {GroundProjectedBackground} from 'margoengine/environment/ground';
-import {ContactShadows} from 'margoengine/staging';
+import {GroundShadows} from 'margoengine/staging/ground';
 const engine = await Engine.create(document.querySelector('canvas')!, {
   backend: 'webgpu', camera: {position: [0, 2, 4], target: [0, 0.5, 0]},
 });
@@ -158,19 +159,28 @@ const light = await EnvironmentLighting.load(engine, '/garage.hdr', {signal: Abo
 GroundProjectedBackground.attach(engine, light.environment, {height: 1.6, radius: 20, order: 0.25});
 const product = engine.createMesh().setGeometry(box(1, 1, 1))
   .setMaterial(new PbrMaterial({color: '#8090a0'})).setPosition([0, 0.5, 0]);
-const shadow = ContactShadows.attach(engine, {size: 4, height: 2, blur: 0.12});
+const shadow = GroundShadows.attach(engine, {environment: light.environment, size: 8, height: 2, blur: 0.12});
 shadow.add(product);
 engine.start();
 // Later: engine.dispose() releases the lighting, backdrop and shadow.
 ```
 
-Keep the catcher position at the background's `center` (both default to the origin). This is a contact
-cue over the photographed floor; it does not infer light directions or reproduce the HDR's physical
-shadows. The HDR backdrop remains Y-up; the receiver's `up` option does not rotate it. `test/ground-browser.mjs` compares
-on/off pixels using the licensed OpenEXR BrightRings image, checks the model remains visible, removes
-the caster and replaces a real device. Run it with `--compat` for the WebGL2 compatibility layer;
-that path passes the same assertions. The native WebGL2 engine remains unsupported. The box is a
-generated stand-in, not a photographed product.
+Keep the receiver position at the background's `center` (both default to the origin). All contact
+receiver options keep their defaults; `environment` defaults to the `environment` plugin in the
+receiver's owning scene. Use `scene.use(new GroundShadows({environment, ...options}))` for a secondary
+scene. Rotation and SH edits invalidate even a `static: true` receiver; intensity zero removes the
+shadow. The HDR backdrop remains Y-up; the receiver accepts any `up`.
+
+This is a single dominant directional-light approximation with the receiver's spatial blur, not the
+full environment visibility integral or recovered photograph geometry. It cannot reproduce multiple
+lights, full radiometry, HDR light size or shadows on the product itself. An isotropic field
+(moment length <= 1e-6 of luminance L0) or a light at/below the receiver horizon (normal dot direction
+<= 1e-6) draws no directional shadow. Choose `size` large enough for low-elevation light's long shadows.
+`test/hdr-shadow-browser.mjs` proves PI rotation and HDR direction alignment in shadow pixels, actual
+floor darkening, deterministic rotation reset and caster removal with a raised box and the licensed
+FlightHelmet model under Poly Haven's photographed Small Empty Room 1 HDR. It runs on WebGPU and
+WebGL2 compatibility. Native WebGL2 preview remains unsupported. `test/ground-browser.mjs` retains
+the separate contact-only composition/device-restore proof.
 
 ## Accumulated soft shadows
 
@@ -347,3 +357,7 @@ disposal, identical repeated stills and actual device replacement. The layer's W
 ANGLE Vulkan. ANGLE Direct3D cannot finish compiling the inherited integrator and keeps raster;
 see its documented backend limit. Plain WebGL2 gives linked `unsupported`. No speed or general
 photographic-quality claim.
+
+The idle still controller compares the unjittered camera and gives that projection to its integrator.
+TAA subpixel jitter does not restart the idle delay or sample history, including `idleDelay: 0`.
+Raster jitter is restored before TAA resolves.

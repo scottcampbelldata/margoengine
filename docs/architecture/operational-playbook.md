@@ -2065,6 +2065,21 @@ resumes retained chunks. The normal voxel package tests and full verify run them
 affected-package verification. This is loaded-data admission evidence; total process memory and subsequent
 edits are outside that budget, and no rendering or speed claim follows from these tests.
 
+Batch 56 review repairs add a constant-size SH radiance-moment directional receiver
+in optional staging/ground; ray-plane projection retains caster-height clipping.
+No core or stage change. Scene-target draws must call applyView; full local targets
+must declare why their viewport is local. The verify unit suite's
+`tests/environment-staging-view-state.test.js` checks every render-pass start in
+environment/staging and tests the detector with missing-view and false-local inputs.
+Temporary TAA/TAAUpscale wrappers retain their unjittered source across optional
+bundle boundaries. The still controller supplies it at orders 19..21 and restores
+raster jitter before TAA's order-40 resolve. Capture and disposal use sceneOf;
+probe baking is audited for the same external-default-scene problem. Remaining
+limits are single-moment lighting, spatial blur, native preview refusal and no
+claim of authored photographic transport fidelity. Regression evidence is in
+package review56/ground/pathtrace tests and the browser suites; final run results
+are recorded with the repair commit's validation evidence.
+
 ### Sciviz asynchronous updates and trace replacement (2026-11-10)
 
 Restore audit: every sciviz `Drawable` must implement `restore`; package type checks and the layer protocol

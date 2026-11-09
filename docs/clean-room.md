@@ -2939,3 +2939,34 @@ through engine.use and checks sceneOf before and after disposal. This is our
 test-design inference from those descriptions. No external implementation was
 read or copied. All 512 rays per blend mode, f32/f16 comparisons, tolerances,
 blend-difference checks and the real room bake remain unchanged.
+
+### Batch 56 review repairs: HDR direction, view state and temporal cameras
+
+The optional staging/ground entry uses the real first-band basis published by
+[Peter-Pike Sloan, Stupid Spherical Harmonics Tricks (GDC 2008)](https://www.ppsloan.org/publications/StupidSH36.pdf),
+with Margo's established coefficient order Y, Z, X. Sloan's own
+[2012 explanation of dominant direction from RGB SH](https://sourceforge.net/p/gdalgorithms/mailman/message/28778859/)
+confirms luminance weighting followed by extraction of the linear coefficient vector;
+our positive real basis determines its signs and component order. Taking RGB luminance of that
+band gives a vector proportional to the radiance first moment. Its normalized
+vector is our dominant-light approximation; this is not a claim that a moment
+recovers every light or the brightest texel. The inverse of the environment's
+lookup rotation rotates that vector into world space. No image processing loop
+is added: only three RGB dot products and constant-size matrix arithmetic.
+
+Directional ray/plane projection is derived from
+[Jim Blinn, Me and My (Fake) Shadow (IEEE CG&A, January 1988)](https://www.jimblinn.com/publications/):
+for receiver point C, unit normal N, light direction L and caster P,
+Q = P - L * dot(N, P-C) / dot(N,L). Dot Q-C with the receiver tangents and
+scale to clip coordinates. Retaining caster height as depth clips geometry to
+the configured slab. Existing Margo caster/blur/receiver code is reused. The
+SH rule and the projection were written from the mathematical descriptions;
+no other renderer's implementation was inspected or copied.
+
+W3C WebGPU viewport/scissor rules govern each scene-target pass. Local caster,
+blur, history, cube-face and LUT passes explicitly declare their local view
+state; the verify unit suite audits every environment/staging render-pass start.
+TAA's temporary camera wrapper carries its source under a shared symbol so
+separately bundled optional entries agree on identity. Staging supplies the
+unjittered projection only during its own integrator interval, then restores
+raster jitter before temporal resolve. These changes do not modify core.

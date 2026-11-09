@@ -2842,6 +2842,10 @@
       "types": "./dist/staging/pathtrace.d.ts",
       "import": "./dist/staging/pathtrace.js"
     },
+    "./staging/ground": {
+      "types": "./dist/staging/ground.d.ts",
+      "import": "./dist/staging/ground.js"
+    },
     "./stats": {
       "types": "./dist/stats.d.ts",
       "import": "./dist/stats.js"

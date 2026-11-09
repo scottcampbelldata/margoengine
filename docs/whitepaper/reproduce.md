@@ -1747,3 +1747,26 @@ It changes no compat, post, shared, core or stage source. Those consumers are
 rebuilt and API/llms regenerated. The paired entry/network records retain their
 actual pre-TRS measured revision 4e441cc88 and clean package state; they are
 historical measurements, not relabeled as the final integration revision.
+
+### Batch 56 review regressions
+
+From this checkout after `npm run build:packages`, run the package unit suites
+(environment, staging and TAA), then these bounded real-GPU cases:
+
+```sh
+node scripts/gpu-lock.mjs run --owner=codex-56fix --max=10 -- node packages/staging/test/pathtrace-browser.mjs
+node scripts/gpu-lock.mjs run --owner=codex-56fix --max=10 -- node packages/environment/tests/review56-browser.mjs
+node scripts/gpu-lock.mjs run --owner=codex-56fix --max=10 -- node packages/environment/tests/review56-browser.mjs --compat
+node scripts/gpu-lock.mjs run --owner=codex-56fix --max=10 -- node packages/staging/test/hdr-shadow-browser.mjs
+node scripts/gpu-lock.mjs run --owner=codex-56fix --max=10 -- node packages/staging/test/hdr-shadow-browser.mjs --compat
+```
+
+Pathtrace includes both backends and sixteen stationary TAA frames for each
+idleDelay 0.25 and 0 (four-sample cap). View isolation compares every RGB component
+outside the half-canvas viewport or independent scissor. HDR rotation compares
+shadow-pixel centroids at 0 and PI with the actual radiance first moment, returns
+to exactly the original mask statistics, and checks the photographed floor darkens.
+Inputs are the pinned CC0 Poly Haven Small Empty Room 1 HDR and the existing
+licensed FlightHelmet model, plus a raised-box geometry control. No foreign
+implementation is required. Full package GPU suites and README runtime examples
+remain required, along with lint, hygiene, verify and the unchanged size ceilings.

@@ -2150,8 +2150,22 @@ accepted scoped rows are identical. Original failures and failed-scene-only
 repairs are retained separately. This is not an all-package parity claim.
 
 ### Batch 56 review: finite studio directions
+### Batch 56 review repair claims
 
-Studio normalizes finite directions after scaling by their largest absolute component.
-The exact review input [MAX_VALUE, MAX_VALUE, 0] and the subnormal equivalent
-produce every texel of [1, 1, 0]. Proof: environment/tests/studio.test.js.
+- Optional staging/ground follows an HDR radiance first moment and live rotation,
+  rather than a centred contact-only projection. Proof: staging ground unit ray
+  oracle and hdr-shadow-browser pixel tests with a raised box and real FlightHelmet
+  under the photographed Small Empty Room 1 HDR, both backends. This is one distant
+  light plus spatial blur, not full HDR shadow transport or inferred floor geometry.
+- TAA jitter is excluded from still idle detection and integrator history; raster
+  jitter is restored for temporal resolve. Proof: pathtrace unit test and the
+  sixteen-frame WebGPU/compatibility cases at idleDelay 0.25 and 0, maxSamples 4.
+- Reflective surfaces and image/colour backgrounds respect half-canvas views and
+  independent scissors. Proof: review56-browser exact outside-region pixels;
+  class guard is in verify, hence check:merge.
+- Reflector, Refractor and CubeCamera capture their owning scene and detach from it,
+  preserving same-name plugins in other scenes. Proof: environment review56 tests.
+- Studio's extreme finite direction preserves its radiance. Proof: exact review
+  input [MAX_VALUE, MAX_VALUE, 0] compared with [1,1,0] in review56 tests.
 
+No new speed comparison or claim of full photographic equivalence is made.

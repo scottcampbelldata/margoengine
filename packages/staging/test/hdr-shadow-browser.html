@@ -1,0 +1,34 @@
+<!doctype html><html><meta charset="utf-8"><title>HDR ground shadow regression</title><style>body{margin:0}canvas{width:256px;height:256px}</style><canvas></canvas><script type="module">
+import {Engine,PbrMaterial,box} from '/packages/core/dist/index.js';
+import {EnvironmentLighting} from '/packages/environment/dist/index.js';
+import {GroundProjectedBackground} from '/packages/environment/dist/ground.js';
+import {GroundShadows} from '/packages/staging/dist/ground.js';
+import {loadGLTF} from '/packages/gltf-pro/dist/index.js';
+import {worldTriangles} from '/packages/bvh/dist/index.js';
+const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,30,0],target:[0,0,0],up:[0,0,-1]}});
+const errors=[];engine.onError=e=>errors.push(e.message);engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const create=engine.gpu.createTexture.bind(engine.gpu);engine.gpu.createTexture=o=>create(o.format==='r16float'?{...o,usage:o.usage|GPUTextureUsage.COPY_SRC}:o);
+const lighting=await EnvironmentLighting.load(engine,'/packages/staging/test/fixtures/small_empty_room_1_1k.hdr',{size:64,samples:32,signal:AbortSignal.timeout(30000)});
+GroundProjectedBackground.attach(engine,lighting.environment,{height:1.6,radius:60,order:0.25});
+const product=await loadGLTF(engine,'/examples/assets/flight-helmet-mobile.glb',{signal:AbortSignal.timeout(30000)});
+product.root.setPosition([0,.25,0]);lighting.add(product);
+const triangles=worldTriangles(engine,[product]);
+const raised=engine.createMesh().setGeometry(box(.5,.2,.5)).setMaterial(new PbrMaterial()).setPosition([0,.3,0]);raised.visible=false;
+const shadow=GroundShadows.attach(engine,{size:48,height:2,resolution:512,blur:0,opacity:.8,static:true});
+let remove=shadow.add(product);
+const pixels=async()=>{
+ const texture=shadow.targets.textures[0],size=512,stride=size*2;
+ const buffer=engine.gpu.createBuffer({size:stride*size,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+ const encoder=engine.gpu.createCommandEncoder();encoder.copyTextureToBuffer({texture},{buffer,bytesPerRow:stride},[size,size]);engine.gpu.queue.submit([encoder.finish()]);
+ await buffer.mapAsync(GPUMapMode.READ);const words=new Uint16Array(buffer.getMappedRange());let count=0,xsum=0,zsum=0;
+ for(let y=0;y<size;y++)for(let x=0;x<size;x++)if(words[y*size+x]){count++;xsum+=(x+.5)/size*48-24;zsum+=24-(y+.5)/size*48;}
+ buffer.destroy();return {count,x:count?xsum/count:0,z:count?zsum/count:0};
+};
+window.check={
+ async render(rotation,opacity=.8){lighting.environment.rotation=rotation;shadow.options.opacity=opacity;engine.render({delta:0});await engine.gpu.queue.onSubmittedWorkDone();return pixels();},
+ box(){remove();product.root.visible=false;raised.visible=true;remove=shadow.add(raised);},
+ async remove(){remove();engine.render();await engine.gpu.queue.onSubmittedWorkDone();return pixels();},
+ info(){return {triangles:triangles.indices.length/3,sh:Array.from(lighting.environment.sh.radiance),errors};},
+ dispose(){shadow.dispose();engine.dispose();return errors;}
+};window.ready=true;
+</script></html>

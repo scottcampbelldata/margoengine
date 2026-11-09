@@ -2585,8 +2585,21 @@ Untested features of the scoped core, shadows, materials and culling packages
 also remain in T273-COVERAGE; a passing scene does not certify a whole package.
 
 ### Batch 56 review: finite studio directions
+### Batch 56 review fixes: dominant HDR ground shadow
 
-Studio softbox directions are scaled before normalization. Extreme finite and
-subnormal directions retain the same image as their normalized direction.
-No core, stage, size ceiling or speed claim changes.
+The optional staging/ground receiver approximates one distant light from the
+luminance-weighted first radiance SH moment. It follows environment rotation;
+multiple-light visibility, physical HDR light size, full radiometry, product
+self-shadow and photographic floor reconstruction are outside this approximation.
+It retains contact receiver dimensions, texture limits and spatial Gaussian blur.
+At moment length <= 1e-6 * abs(luminance L0), intensity zero, or receiver-normal
+cosine <= 1e-6, it draws no directional shadow. Very low lights need a wide
+receiver; the configured rectangle clips long shadows. No CPU geometry loop,
+new Wasm, core feature or speed claim is added. Native WebGL2 preview refuses;
+WebGPU and the compatibility backend execute the same pass path.
 
+Scene captures and explicit disposal use the owning scene. Viewport/scissor
+are applied to the planar surface, image background and colour background;
+local target passes keep local coordinates. Staging still idle/history keys
+exclude temporal raster jitter, including zero idle delay. Studio softboxes
+preserve finite extreme and subnormal directions by scaling before normalization.

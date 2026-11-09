@@ -369,6 +369,10 @@ const ASSETS = [
     'test fixtures: Khronos CarConcept textures Dot_C.ktx2 and Rib_N.ktx2 (CC BY 4.0, Darmstadt Graphics Group, Eric Chadwick)',
   ],
   [
+    'packages/staging/test/fixtures/NOTICE.md',
+    'Small Empty Room 1 photographic HDR by Sergej Majboroda, Poly Haven, CC0-1.0; unmodified 1K Radiance test image, source and SHA-256 in the notice',
+  ],
+  [
     'packages/decoders/tests/fixtures/basis134/NOTICE.md',
     'test-only licensed replacements for AGI HQ atlas, alpha3, Kodak03 and the Memorial HDR cube after their original image-use grants could not be proved. Three .basis fixtures derive from the pinned FlightHelmet GlassPlasticMat BaseColor PNG (CC0-1.0, copyright 2018 Public, conversion Gary Hsu); the six-face HDR cube and its source arrays are Margo analytic data dedicated CC0-1.0. Same dimensions, mip counts and input/alpha/cube features; hashes, source arrays, generator and 45-pair/250-image old-prebuilt quality baseline in the fixture folder. Encoder executed opaquely outside the repository; no implementation source read or copied',
   ],
