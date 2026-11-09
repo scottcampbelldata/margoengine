@@ -1609,6 +1609,21 @@ command stopped after its 30 passing base assertions on browser teardown, and th
 exceeded its completion limit. The causes and remaining current screenshots are pending; see known-bugs.md and
 the private handoff. Earlier targeted restoration, cancellation and label checks do not replace the final gate.
 
+Half-float conversion allocation evidence (2026-11-10): the bricked README investigation isolated two temporary
+typed-array views per voxel in the shared scalar encoder. One reusable four-byte bit-cast buffer removes those
+allocations without changing the voxel loop or GPU work. `tests/f16-allocation.test.js` fails on the parent with
+574,992 allocations for one default brick and checks every half word and signed ties. The README still has its
+unchanged 20-second page limit; all 18 rebuilt examples pass it, while the browser teardown still fails as recorded below.
+
+Final sciviz validation remains incomplete (2026-11-10): after rebasing onto `67f9dab93`, lint, 132 sciviz unit
+checks and full verify (13,541 passing tests, zero failures/skips) pass. Shadow-cache bookkeeping was off; every
+normal gate and test ran. The base suite passes 30 assertions but still fails its unchanged browser close deadline,
+despite main's `6ebbd1aa4` repair. All 18 rebuilt README examples pass their page budgets, then browser shutdown
+fails. The exact two-frame brick fixture performs the same 62 reads and 15,796,312 source samples as the parent.
+A non-rendering phase trace found native termination taking most of the close; earlier pipe release did not help
+and is not shipped. A queued GPU trace must isolate the failing phase. Final colour-bar screenshots, remaining
+GPU suites and successful teardown are still required; no busy exemption or complete final gate is claimed.
+
 GPU coordination on Windows (2026-11-10): a real delete-pending directory handle reproduces `EPERM` on the
 shared lock's parent or mutex name. `makeLockDirectory` handles this as bounded acquisition contention (10 seconds
 per name), including older clients' in-place deletion; live ownership is never changed. Native Windows and

@@ -1,10 +1,12 @@
 // IEEE 754 binary16 encoding with round-to-nearest-even (overflow to infinity, subnormals kept), for f16 uniforms
 // (@margoengine/compute) and half-float volume textures (@margoengine/sciviz).
 
+// Encoding is synchronous. Reuse the bit-cast storage instead of allocating two views per voxel.
+const f = new Float32Array(1),
+  u = new Uint32Array(f.buffer);
+
 /** The binary16 bit pattern of `value`. */
 export function f16Bits(value) {
-  const f = new Float32Array(1),
-    u = new Uint32Array(f.buffer);
   f[0] = value;
   const x = u[0],
     sign = (x >>> 16) & 0x8000,

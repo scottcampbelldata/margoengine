@@ -349,6 +349,8 @@ read failed (coarser bricks keep drawing, an `error` event also fires, and calli
 `await layer.setFrame(index, { signal })` moves to a time step: the old step stays on screen until the new one's bricks
 for the view are in, so a timeline's playback waits for it. `layer.stats` reports the bricks and bytes in use. Bricks
 are chosen and started as frames draw, so the engine's loop must be running (it is, unless you stopped it).
+Voxel encoding reuses its bit-cast storage, keeping temporary memory constant instead of allocating typed arrays
+for every voxel. The atlas budget, selected bricks, border samples and encoded values are unchanged.
 
 ```ts
 import { Figure } from '@margoengine/sciviz';

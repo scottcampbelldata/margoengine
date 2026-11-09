@@ -64,18 +64,25 @@ measure 5,450 B gzip, below the unchanged 5,546 B entry budget.
 
 ### Open validation blockers: sciviz final GPU and README run (2026-11-10)
 
-The final package GPU run passed all 30 base browser assertions, then failed its unchanged 30-second browser
-shutdown limit before the subsequent package suites ran. Reproduce with the owner-wrapped sciviz `test:browser`.
-A separately instrumented run passed: Windows owned-process termination took 15.9 seconds, client disconnect
-2 ms and server cleanup 0.38 seconds. The original failed subphase was not traced, so its deeper cause remains
-unconfirmed. No engine repair or timing waiver is claimed. Evidence stays in
-`test-results/sciviz-fixes/gpu.log` and `trace.log`; the native process tree was subject to forced termination.
+### Open validation blocker: sciviz browser shutdown after the main repair (2026-11-10)
 
-The final `check:readme-run -- --packages=sciviz` also hit its unchanged 20-second module-completion limit in
-`readme-bricked-volumes-739d75`. Its completion cause is not yet isolated. A parent/current comparison using the
-actual 320 x 200 canvas fixture is queued in `bricks-paired-small.mjs`; an earlier 800 x 600 diagnostic is not valid
-for that budget. Neither failure has been classified as a busy-machine exception. Final GPU suites, updated
-colour-bar spacing screenshots and the README gate must finish before landing; these are not release waivers.
+After rebasing onto `67f9dab93`, including `6ebbd1aa4`, the exact base suite again passed all 30 assertions and
+failed the unchanged 30-second browser close deadline. The rebuilt README run also failed browser shutdown,
+after all 18 examples passed their individual budgets, including `readme-bricked-volumes-739d75`.
+Evidence: `test-results/sciviz-fixes/teardown-main.log`, `readme-final.log` and `readme-final-examples.json`.
+Neither failed close has phase tracing, so the remaining cause is unconfirmed. A native, non-rendering probe
+records owned-process termination taking 25.7 s, 15.2 s and 2.3 s; client disconnect and driver cleanup are prompt.
+Moving pipe destruction earlier did not improve a paired diagnostic and is not shipped. This is not a timing waiver.
+A phase-traced GPU run is queued; final GPU suites and colour-bar spacing screenshots remain required before push.
+
+### Fixed 2026-11-10: per-voxel half-float allocation churn
+
+The bricked README investigation found real conversion work, rather than a non-settling read: the exact
+320 x 200 parent/current fixture completes with the same 62 reads and 15,796,312 source samples over two frames.
+The scalar half encoder allocated two typed-array views per voxel, including border copies. Its reusable four-byte
+bit-cast buffer now removes 574,992 temporary views per default brick without changing the loops or output bits.
+`tests/f16-allocation.test.js` fails on the parent allocation count and verifies every half word and rounding ties.
+All 18 rebuilt README examples now pass their page budgets; the overall gate remains blocked by the close above.
 
 ### Fixed 2026-11-10: GPU lock directory deletion contention on Windows
 

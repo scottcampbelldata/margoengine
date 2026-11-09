@@ -45,6 +45,10 @@ An independent one-second refresh preserves the old reader/writer client's
 ten-second freshness convention during synchronous work. Holder/waiter formats
 remain compatible. This is CPU-only scheduling evidence, not a GPU speed claim.
 
+Half-float voxel encoding uses one reusable four-byte bit-cast buffer, with no typed-array allocations per voxel.
+It retains IEEE binary16 rounding, subnormals and special values. This changes neither brick selection nor the
+atlas budget; `tests/f16-allocation.test.js` checks all 65,536 half words, rounding ties and allocation counts.
+
 Biome prefetch shares raw work with streaming and retains at most 1,024 terrain/object results,
 with capacity checked on completion. The original 144-tile flight still generates every tile;
 all 292 unique default-world worker outputs match the parent exactly. The view entry is

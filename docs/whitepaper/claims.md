@@ -7,6 +7,12 @@ snapshot/restore and ref identity through store growth. Core + stage: 23,837 to
 23,924 B gzip (+87 B); core alone 21,553 B, below its unchanged 21,587 B cap.
 No throughput or cross-hardware claim.
 
+Half-float allocation correction (2026-11-10): scalar encoding now reuses two views over one four-byte buffer.
+`tests/f16-allocation.test.js` proves zero per-value view allocations, against 574,992 for a default 66-cubed brick
+on the parent, and checks every binary16 word plus signed rounding ties. Selected bricks, samples and output bits
+are preserved. This is an allocation-count claim, without a wall-clock speed claim. Reproduce with
+`node --test tests/f16-allocation.test.js`.
+
 The [active licensed corpus](results/batch-134-active-corpus.json)
 replaces the AGI atlas, alpha3, Kodak03 and Memorial cube with CC0 assets of the
 same dimensions, input formats, alpha/cube features and mip counts. All 699
