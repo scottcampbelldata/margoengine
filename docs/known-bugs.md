@@ -1256,3 +1256,9 @@ other-browser and latency acceptance remain unmeasured design/coverage limits in
 
 Snapshots have no known open defect in tested layouts. Unsupported topology/state coverage and
 unmeasured browser/recording paths are documented in the snapshots limits section.
+
+Exact dynamics have no known open defect for finite PCM in the tested reconstruction model.
+Conservative attenuation and unmeasured converter/listening/browser coverage are documented limits.
+The browser fixture lifetime issue is fixed by awaiting rendering inside the using scope.
+The cached-registration cancellation race is fixed in both factories: each checks the signal
+immediately before allocating nodes. Regression: sidechain.test.js and worklet.test.js final tests.

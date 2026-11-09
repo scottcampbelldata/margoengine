@@ -1606,3 +1606,15 @@ Snapshots reuse existing bus ramps and native effect AudioParams, entirely in th
 Generated audio checks underwater filtering, fades and restoration beside both rendering backends;
 Node tests check JSON silence, endpoint blending, matching layouts and atomic refusal of malformed
 states, unsafe feedback and changed chains. No core/stage or GPU maths change. LIM-586.
+
+### Mixer exact dynamics (batch 111): section 5 evidence
+
+The optional entry owns compression and 11-sample lookahead, using a mathematical absolute-FIR
+bound so changing gains cannot create an inter-sample overshoot in the specified ITU model.
+[Proof](mixer-true-peak.md) states the conservative attenuation trade-off. Real Edge AudioWorklet
+renders pass beside WebGPU/WebGL2; Node tests check independent convolution, static curves,
+attack recurrence, linked channels, tails and adversarial ceilings across render quantum sizes.
+The browser fixture now awaits rendering before leaving its using scope. No core/stage/GPU maths
+change. Real recordings, other browsers, perceptual quality and timing remain unmeasured. LIM-589.
+Both worklet factories also check cancellation at the post-registration allocation boundary.
+Microtask-order regressions fail before the fix and confirm no node allocation after an abort.

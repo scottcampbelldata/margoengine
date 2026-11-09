@@ -1750,6 +1750,10 @@
       "types": "./dist/mixer/snapshots.d.ts",
       "import": "./dist/mixer/snapshots.js"
     },
+    "./mixer/worklet": {
+      "types": "./dist/mixer/worklet.d.ts",
+      "import": "./dist/mixer/worklet.js"
+    },
     "./navmesh": {
       "types": "./dist/navmesh.d.ts",
       "import": "./dist/navmesh.js"

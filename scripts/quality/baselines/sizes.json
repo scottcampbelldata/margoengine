@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11408584,
+  "total": 11411409,
   "history": [
     {
       "date": "2026-10-24",
@@ -4724,6 +4724,12 @@
       "commit": "f2a093294",
       "reason": "viewcube axis triad: new entry viewcube/axes 1127 B gzip over the root; root 5065 to 5130 B measured",
       "grew": 1
+    },
+    {
+      "date": "2026-11-08",
+      "commit": "batch-111",
+      "reason": "New optional @margoengine/mixer/worklet, isolated from mixer root, core and stage",
+      "grew": 1
     }
   ],
   "items": {
@@ -5165,6 +5171,7 @@
     "@margoengine/mixer": 6926,
     "@margoengine/mixer/sidechain": 1815,
     "@margoengine/mixer/snapshots": 1956,
+    "@margoengine/mixer/worklet": 2825,
     "@margoengine/navmesh": 7694,
     "@margoengine/navmesh/agents": 15964,
     "@margoengine/navmesh/build": 12727,

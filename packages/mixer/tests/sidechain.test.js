@@ -94,3 +94,15 @@ test('registration is shared; unsupported, invalid options and aborted loading a
   await assert.rejects(pending, /during load/);
   finish();
 });
+
+test('abort between cached registration and factory continuation creates no sidechain nodes', async (t) => {
+  const h = harness(t);
+  using warm = await createSidechain(h.context);
+  const count = h.nodes.length;
+  const controller = new AbortController();
+  const pending = createSidechain(h.context, { signal: controller.signal });
+  await Promise.resolve(); await Promise.resolve();
+  controller.abort(new Error('late stop'));
+  await assert.rejects(pending, /late stop/);
+  assert.equal(h.nodes.length, count);
+});

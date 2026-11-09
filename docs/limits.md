@@ -13,7 +13,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-588). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-589). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -789,7 +789,7 @@ module registration is shared per context and can still complete. Real OfflineAu
 renders with generated signals pass beside WebGPU and WebGL2 on RTX A6000/Edge. Unit stand-ins
 check envelopes, hold across quanta, key isolation, disposal, validation and cancellation.
 Other browsers, real dialogue and speed/latency unmeasured. LIM-583.
-Sidechain entry: 1,559 B gzip, budget 1,815 B; core plus stage remains 23,626 B.
+Sidechain entry: 1,565 B gzip, budget 1,815 B; core plus stage remains 23,626 B.
 
 ## Mixer snapshots (batch 111)
 
@@ -803,3 +803,18 @@ filter types, delay times, impulses, external worklets or active duck envelopes 
 Generated OfflineAudioContext and Node graph stand-ins prove the paths; real WebGPU/WebGL2 contexts
 in Edge coexist with the audio. Other browsers, real recordings and timing remain unmeasured. LIM-586.
 Snapshots entry: 1,700 B gzip, budget 1,983 B.
+
+## Mixer exact dynamics (batch 111)
+
+Optional mixer/worklet supplies a fixed soft-knee compressor and linked gain safety limiter.
+The guaranteed ceiling covers original samples and the ITU four-phase 12-tap FIR estimate, not
+all converters/codecs. The absolute-sum bound can over-attenuate; no sample clipping, listening
+quality or minimum-attenuation claim. Algorithmic delay is 11 samples. Defaults and bounds are
+in the package README; options are fixed, finite PCM is required, secure AudioWorklet/blob CSP
+is required and signal cancels waiting. Zero attack/release jumps; otherwise times are one-pole
+constants. The meter uses the published 48 kHz/4x model at all rates; no all-rate certification.
+Node stand-ins prove curves, envelope, quantum independence and adversarial ceilings; real Edge
+AudioWorklet renders pass beside WebGPU and WebGL2. Other browsers, real recordings, playback
+latency, perceptual comparisons and speed are unmeasured. See the finite-FIR proof. LIM-589.
+Worklet entry: 2,574 B gzip, budget 2,825 B.
+Both worklet factories recheck AbortSignal after cached registration, before allocating nodes; microtask-order regressions cover this boundary.

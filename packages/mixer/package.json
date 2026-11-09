@@ -38,6 +38,10 @@
     "./snapshots": {
       "types": "./dist/snapshots.d.ts",
       "import": "./dist/snapshots.js"
+    },
+    "./worklet": {
+      "types": "./dist/worklet.d.ts",
+      "import": "./dist/worklet.js"
     }
   },
   "files": [

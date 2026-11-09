@@ -75,7 +75,7 @@ The reverb room is synthetic by default: seeded noise that falls 60 dB over `dec
 
 ## Limits
 
-- Compressor and limiter use the browser's DynamicsCompressorNode. The Web Audio specification leaves its curve to the browser and adds an automatic make-up gain, so results differ between browsers; the limiter lowers peaks hard but is not a sample-accurate brick wall. `compressorCurve` is a design aid, not a model of the node.
+- Compressor and limiter use the browser's DynamicsCompressorNode. The Web Audio specification leaves its curve to the browser and adds an automatic make-up gain, so results differ between browsers; the root limiter lowers peaks hard but is not a sample-accurate brick wall; use the optional worklet entry below for its fixed curve and true-peak bound. `compressorCurve` is a design aid, not a model of the node.
 - Web Audio cannot be interrupted mid-render: an aborted `renderOffline` rejects when the render ends and drops the result.
 - Web Audio cannot loop faster than 128 samples (2.7 ms at 48 kHz), so that is the shortest delay `time`, and it is fixed when the effect is created; build a new effect to change it.
 - The root entry has manual ducking; automatic detection is in the optional `mixer/sidechain` entry.
@@ -163,3 +163,44 @@ creation/removal, active manual ducks and external worklets are not captured or 
 Native effect parameters keep their existing valid ranges, including the delay's 0.95 feedback cap.
 WebGPU and WebGL2 use the same Web Audio path, tested beside both in Edge. Other browsers and real
 recordings unmeasured. No timer, async wait or engine attachment is involved.
+
+## Exact worklet dynamics
+
+`createDynamics(context, options)` from `margoengine/mixer/worklet` (or
+`@margoengine/mixer/worklet`) provides a package-owned AudioWorklet compressor/limiter.
+The curve is defined by this package in every browser, with no native compressor or automatic
+make-up gain. Channels share peak detection and gain. Compressor mode uses the published
+soft-knee dB curve; a true-peak safety stage follows both modes.
+
+```ts
+import { createDynamics, measureTruePeak } from 'margoengine/mixer/worklet';
+const context = new OfflineAudioContext(2, 48128, 48000);
+using dynamics = await createDynamics(context, { mode: 'compressor', threshold: -24, ratio: 4, ceiling: -1 });
+const source = new ConstantSourceNode(context, { offset: 0.5 });
+source.connect(dynamics.input);
+dynamics.output.connect(context.destination);
+source.start(0); source.stop(1);
+const result = await context.startRendering();
+console.log(measureTruePeak([result.getChannelData(0), result.getChannelData(1)]));
+```
+
+Defaults: `mode: 'limiter'`; `ceiling: -1` dBTP (-96..0); `threshold: -24` dBFS (-96..0),
+`knee: 6` dB (0..40), `ratio: 4` (1..100), `attack: 0.003` s (0..10), `release: 0.05` s
+(0..10), `makeup: 0` dB (-24..24), `channels: 2` (integer 1..32), `signal` unset.
+Threshold, knee, ratio and attack affect compressor mode. Release also smooths limiter recovery;
+limiter attenuation is immediate when needed. Times are one-pole gain time constants; zero jumps.
+Options are fixed. Input PCM must be finite. Disposal disconnects and stops owned processing.
+Signal cancels module waiting, as for sidechain. AudioWorklet/CSP failures have a code and help link.
+
+The ceiling is guaranteed for the ITU-R BS.1770-5 Annex 2 four-phase, 12-tap-per-phase FIR
+reconstruction estimate and original samples, with an 11-sample lookahead. `latencyFrames` is 11;
+`latency` is 11 / context.sampleRate seconds, excluding device/graph buffering. The absolute-sum
+bound is conservative: it may reduce a signal already below its measured ceiling. No sample
+clipping is used. The [proof and accepted difference](../../docs/architecture/mixer-true-peak.md)
+explain why gain changes cannot escape that bound. This is not a promise about every DAC or codec.
+`measureTruePeak(channels)` returns a linear peak, includes zero-padded boundaries, accepts 1..32
+equal-length finite Float32Array channels, and is usable in Node without Web Audio. The FIR is the
+published 48 kHz/4x design; other rates use the same relative reconstruction model, not separate
+meter-certification profiles. Quiet input below the bound is an exact copy delayed by 11 samples.
+WebGPU and WebGL2 use the same audio path, tested beside both in Edge. Generated signals prove
+curve/envelope/ceiling; other browsers, real recordings, perceptual quality and speed are unmeasured.

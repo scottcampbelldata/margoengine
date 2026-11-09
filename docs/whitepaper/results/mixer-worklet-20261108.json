@@ -1,0 +1,45 @@
+{
+  "runs": [
+    {
+      "checks": [
+        "equaliser bands match the biquad formulas (gain at 1 kHz, +6 dB bell)",
+        "filters match the formulas across the spectrum (lowpass, highpass, shelf, notch)",
+        "an impulse through a lowpass matches the reference biquad sample by sample",
+        "delay echoes land on the exact samples with the feedback decay",
+        "reverb of an impulse is the impulse response, and renders are bit-identical",
+        "fader, mute and solo set the level",
+        "a send adds the aux path at the set gain",
+        "ducking follows the scheduled exponential attack and release on the audio clock",
+        "limiter and compressor reduce a loud sine; the limiter reduces more",
+        "an emitter pans toward its side and falls off with distance",
+        "an aborted render rejects with the signal reason",
+        "mixer works on a live AudioContext too (nodes build, ducks and gates schedule)",
+        "automatic sidechain ducks only while the dialogue key is active, then recovers",
+        "snapshots fade music and underwater filter on the audio clock and restore them",
+        "exact worklet compressor uses its fixed curve, and limiter contains inter-sample peaks"
+      ],
+      "backend": "webgpu"
+    },
+    {
+      "checks": [
+        "equaliser bands match the biquad formulas (gain at 1 kHz, +6 dB bell)",
+        "filters match the formulas across the spectrum (lowpass, highpass, shelf, notch)",
+        "an impulse through a lowpass matches the reference biquad sample by sample",
+        "delay echoes land on the exact samples with the feedback decay",
+        "reverb of an impulse is the impulse response, and renders are bit-identical",
+        "fader, mute and solo set the level",
+        "a send adds the aux path at the set gain",
+        "ducking follows the scheduled exponential attack and release on the audio clock",
+        "limiter and compressor reduce a loud sine; the limiter reduces more",
+        "an emitter pans toward its side and falls off with distance",
+        "an aborted render rejects with the signal reason",
+        "mixer works on a live AudioContext too (nodes build, ducks and gates schedule)",
+        "automatic sidechain ducks only while the dialogue key is active, then recovers",
+        "snapshots fade music and underwater filter on the audio clock and restore them",
+        "exact worklet compressor uses its fixed curve, and limiter contains inter-sample peaks"
+      ],
+      "backend": "webgl2"
+    }
+  ],
+  "browser": "157.0.4341.42"
+}

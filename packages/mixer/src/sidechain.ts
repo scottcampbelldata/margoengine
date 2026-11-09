@@ -77,6 +77,7 @@ export async function createSidechain(context: BaseAudioContext, options: Sidech
   const channels = bounded(options.channels ?? 2, 1, 32, 'Sidechain channels');
   if (!Number.isInteger(channels)) throw new RangeError('Sidechain channels needs an integer; pass 1 through 32');
   await loadProcessor(context, 'margo-sidechain-v1', processor, options.signal);
+  options.signal?.throwIfAborted();
   const output = new AudioWorkletNode(context, 'margo-sidechain-v1', {
     numberOfInputs: 2, numberOfOutputs: 1, outputChannelCount: [channels],
     channelCount: channels, channelCountMode: 'explicit', processorOptions: settings,

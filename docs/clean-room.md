@@ -1447,3 +1447,12 @@ No other engine/library source was read or copied. All test signals are generate
 
 Written from the W3C [Web Audio Recommendation, AudioParam automation](https://www.w3.org/TR/2021/REC-webaudio-20210617/#AudioParam).
 Snapshots compose Margo's existing bus/effect API; interpolation and schema are written here. No external source or assets.
+
+## Mixer exact dynamics (batch 111)
+
+Written from [ITU-R BS.1770-5 Annex 2](https://www.itu.int/dms_pubrec/itu-r/rec/bs/R-REC-BS.1770-5-202311-I!!PDF-E.pdf),
+using only its published numeric interpolation data, and [Giannoulis, Massberg and Reiss, JAES 2012](https://eecs.qmul.ac.uk/~josh/documents/2012/GiannoulisMassbergReiss-dynamicrangecompression-JAES2012.pdf)
+for the soft-knee curve and one-pole gain smoothing. The lookahead absolute-sum ceiling is derived
+here by the triangle inequality, documented in architecture/mixer-true-peak.md. Web Audio processor
+registration/channel rules follow the W3C Recommendation cited above. No library/engine source or
+paper-linked code was read or reused. No external assets; generated signals are stand-ins.

@@ -13,6 +13,7 @@ import {
 } from '@margoengine/mixer';
 import { createSidechain } from '@margoengine/mixer/sidechain';
 import { captureSnapshot, recallSnapshot } from '@margoengine/mixer/snapshots';
+import { createDynamics, measureTruePeak } from '@margoengine/mixer/worklet';
 
 const rate = 48000;
 const assert = (condition, message) => {
@@ -302,6 +303,26 @@ export async function runChecks() {
     near(rms(0.9, 1), rms(0.05, 0.15), 1e-4, 'clear snapshot restores sound');
     const mid = rms(0.21, 0.22);
     assert(mid > rms(0.4, 0.6) && mid < rms(0.05, 0.15), 'intermediate mix is a fade');
+  });
+  await check('exact worklet compressor uses its fixed curve, and limiter contains inter-sample peaks', async () => {
+    const render = async (data, settings) => {
+      const context = new OfflineAudioContext(2, data.length + 128, rate);
+      using stage = await createDynamics(context, settings);
+      play(context, data).connect(stage.input);
+      stage.output.connect(context.destination);
+      // Await before leaving the using scope so the stage survives the render.
+      return await context.startRendering();
+    };
+    const compressed = await render(constant(0.1, 0.25), { mode: 'compressor', threshold: -24, knee: 0, ratio: 4, attack: 0, release: 0, ceiling: 0 });
+    const expected = dbToGain(-24 + (20 * Math.log10(0.25) + 24) / 4);
+    near(compressed.getChannelData(0)[1000], expected, 3e-8, 'fixed compressor curve, no native make-up');
+    const loud = Float32Array.from({ length: 12000 }, (_, i) => 3 * Math.sin(Math.PI * i / 2 + Math.PI / 4));
+    assert(measureTruePeak([loud]) > measure(loud).peak * 1.38, 'fixture has inter-sample overs');
+    const limited = await render(loud, { ceiling: -6, release: 0.02 });
+    const peak = measureTruePeak([limited.getChannelData(0), limited.getChannelData(1)]);
+    assert(peak <= dbToGain(-6), `true peak ${peak} exceeds ceiling`);
+    assert(peak > 0.05, 'limiter is audible');
+    assert(limited.getChannelData(0).slice(0, 11).every((v) => v === 0), '11-sample lookahead');
   });
   device?.destroy();
   return { checks, backend };
