@@ -2465,3 +2465,11 @@ triangles, highest folded hit and coastal dry mask define the result.
 agreement, independent coastal-flux evidence and GPU displacement derivatives
 on native WebGPU and the full compatibility backend. No boat dynamics,
 shading-micro-ripple geometry, universal hardware or speed claim is made.
+
+### Shared point projection (2026-11-10)
+
+Points CPU projection uses math/mat4 projectPoint and matches its x/y and
+perspective w or orthographic depth exactly. Non-finite normalized depth rejects
+without publishing output. Evidence: packages/points/tests/points.test.js;
+reproduce with the points unit suite. Sources: [size restoration](../size-restore.md).
+No performance or cross-runtime floating-point claim is added.

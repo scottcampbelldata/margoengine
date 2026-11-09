@@ -1,5 +1,5 @@
 import test from 'node:test';
-import { multiplyMatrices } from '@margoengine/math/mat4';
+import { multiplyMatrices, projectPoint } from '@margoengine/math/mat4';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { Camera } from '@margoengine/core';
@@ -293,6 +293,44 @@ test('projection and nearest-point picking match a brute-force search', () => {
   assert.ok(Math.abs(p[0] - (128 + 128 / Math.tan(Math.PI / 6) / 10)) < 1e-3);
   const rect = boxScreenRect([0, 0, 0, 1, 1, 0], camera().matrix, 256, 256);
   assert.ok(rect[0] < 128 && rect[2] > 128 && rect[1] < 128 && rect[3] > 128);
+});
+
+test('projectToPixels shares mat4 projection, depth rejection and unchanged failure output', () => {
+  const identity = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+  const perspective = camera().matrix;
+  const matrices = [identity, perspective, multiplyMatrices(perspective, translate(1, -2, 3))];
+  const coords = [-100, -1, -0, 0, Number.MIN_VALUE, 0.1, 0.5, 1, 10, 100];
+  let accepted = 0,
+    rejected = 0,
+    outside = 0;
+  for (const matrix of matrices)
+    for (const x of coords)
+      for (const y of coords)
+        for (const z of coords) {
+          const expected = projectPoint(matrix, x, y, z, 513, 257);
+          const visible = expected.inFront && expected.depth >= 0 && expected.depth <= 1;
+          for (const out of [[17, 19, 23], new Float64Array([17, 19, 23])]) {
+            assert.equal(projectToPixels(matrix, x, y, z, 513, 257, out), visible);
+            assert.deepEqual(
+              Array.from(out),
+              visible
+                ? [expected.x, expected.y, matrix[3] || matrix[7] || matrix[11] ? expected.w : expected.depth]
+                : [17, 19, 23],
+            );
+          }
+          if (visible) {
+            accepted++;
+            if (!expected.inFrustum) outside++;
+          } else rejected++;
+        }
+  assert.ok(accepted && rejected && outside, 'offscreen x/y remain available to picking');
+  for (const depth of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
+    const matrix = [...identity];
+    matrix[14] = depth;
+    const out = [17, 19, 23];
+    assert.equal(projectToPixels(matrix, 0, 0, 0, 513, 257, out), false);
+    assert.deepEqual(out, [17, 19, 23], 'invalid depth must not publish a screen point');
+  }
 });
 
 test('orthographic cameras: screen area ignores distance, picking prefers the nearer point', () => {

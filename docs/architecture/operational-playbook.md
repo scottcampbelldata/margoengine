@@ -4723,3 +4723,12 @@ and skips; API, quality, sizes, parity, XR records, preview contracts, both
 sandboxes, README type checks, documentation links and all historical proofs pass.
 Lint passes with 120 existing warnings; hygiene passes. The [Save receipt](../whitepaper/results/batch-56-save-owner-20261109.json)
 retains the full acceptance scope.
+
+### Section 5 evidence: shared points projection
+
+Size restoration finding 9 routes CPU point projection and picking through
+math/mat4 projectPoint. The owning regression compares exact x/y/depth outputs
+for perspective, transformed and orthographic matrices, retains offscreen x/y,
+and rejects NaN depth without overwriting caller output. The NaN case fails the
+old implementation. No core, GPU math or reversed-Z convention changes.
+Research and size evidence: [size restoration](../size-restore.md).

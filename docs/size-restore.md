@@ -470,3 +470,40 @@ paired measurements now name d28f0200b with dirty=false, followed by a scoped
 sciviz API refresh and llms generation. All 17 record/llms cases and docs links
 pass again for those changed artifacts. No metadata is relabeled and no
 successful source correctness or GPU suite is replayed.
+
+## Finding 9: one projection implementation
+
+Restore points projectToPixels as a wrapper over math/mat4 projectPoint,
+reusing one ScreenPoint for synchronous calls. The wrapper keeps device-pixel
+units, offscreen x/y coordinates, perspective clip w and orthographic normalized
+depth; rejected points leave the caller's output unchanged. The duplicate
+accepted NaN clip depth because both ordered comparisons were false. The shared
+positive range check rejects it. No math or core API change is needed.
+
+Research compared Kai Ninomiya, Brandon Jones and Jim Blandy (editors),
+[WebGPU, coordinate systems](https://www.w3.org/TR/webgpu/#coordinate-systems)
+(2026), the Khronos 3D Formats Working Group,
+[glTF 2.0.1, cameras](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#cameras)
+(2021), and Paul Heckbert,
+[What Are the Coordinates of a Pixel?](https://publications.ri.cmu.edu/what-are-the-coordinates-of-a-pixel)
+(1990). WebGPU defines the clip divide and top-left framebuffer origin;
+glTF distinguishes perspective and orthographic projection; Heckbert explains
+pixel coordinate conventions. Use Margo's existing shared projection and its
+reversed-Z convention, preserving the wrapper's physical-pixel inputs. No
+foreign implementation source was read or copied.
+
+Regression: packages/points/tests/points.test.js compares exact shared results
+for 3000 perspective, transformed and orthographic points, both output types,
+near/far rejection, offscreen coordinates and unchanged rejected outputs.
+Its NaN depth case fails on the prior built implementation.
+
+Measured optional entry changes: @margoengine/points: 23947->24138 B gzip; ceiling 23954->24863; @margoengine/points/las: 13735->13737 B gzip; ceiling 14148->14150; @margoengine/points/potree: 17178->17179 B gzip; ceiling 17694->17695; @margoengine/points/las base (without LAZ decoder): 5761->5764 B gzip; ceiling 6017->6020; @margoengine/points/las lazy LAZ decoder: 8523->8525 B gzip; ceiling 8779->8781.
+Secondary LAS/Potree gzip changes follow changed shared chunk names.
+Keep standard optional-entry headroom; no artificial module split. Core plus
+stage remains 23924 B. All 155 points units and both real-GPU sample suites
+pass (1x: 21 checks; 4x: 22 checks), as do all 19 README examples (18 original page examples plus the new Node example). The paired
+network record makes five requests and leaves no unused built files.
+
+Finding 9 acceptance: lint, hygiene and full verify pass, including all repository
+unit cases, API currentness, quality gates, sandbox checks and README type checks.
+Successful points GPU/unit/README steps are retained without replay.

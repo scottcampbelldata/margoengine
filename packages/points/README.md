@@ -565,3 +565,21 @@ Apache-2.0 licensed.
 The small `@margoengine/webgl2-compat/preview` renderer reports `backend: 'webgl2'` and has no GPU device. GPU-only attachments throw a linked `MargoError` with code `unsupported` before allocating resources. Native WebGPU and the full WebGL2 compatibility layer both report `backend: 'webgpu'`. Use [`autoEngine` with `loadCompat`](../webgl2-compat/README.md#automatic-escalation) during scene setup to select a complete tier automatically.
 
 The renderer now refuses the preview during setup, allowing automatic escalation instead of accepting an attachment that cannot draw.
+
+### Shared CPU projection
+
+`projectToPixels` delegates to `@margoengine/math/mat4` `projectPoint` with
+WebGPU reversed-Z depth. Width and height are device pixels. It returns false
+for a point behind the camera or outside normalized depth 0..1 (including NaN)
+and leaves `out` unchanged. Offscreen x/y still project for radius picking.
+The third output is clip w in perspective and normalized near-to-far depth for
+orthographic matrices. The call is synchronous and reuses internal scratch.
+
+```js
+import { projectToPixels } from '@margoengine/points';
+const matrix = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+const screen = new Float64Array(3);
+if (projectToPixels(matrix, 0, 0, 0.5, 640, 480, screen)) {
+  console.log(screen); // Float64Array [320, 240, 0.5]
+}
+```

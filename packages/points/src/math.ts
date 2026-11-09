@@ -2,7 +2,10 @@
  * CPU side of the point renderer: spatial chunking into blocks, frustum culling, point budget allocation,
  * color packing and nearest-point picking. Everything here is pure and runs in Node.
  */
+import { createScreenPoint, projectPoint } from '@margoengine/math/mat4';
 import { createRandom } from '@margoengine/math/mathutils';
+
+const projection = createScreenPoint();
 
 /** Marks a point that belongs to no block (non-finite position at build time). */
 export const NO_BLOCK = 0xffffffff;
@@ -366,7 +369,8 @@ export function allocateBudget(
 
 /**
  * Projects a local point through a column-major model-view-projection matrix to device pixels (origin top left,
- * y down). Writes x, y and clip w to `out`; returns false when the point is behind the camera or outside the
+ * y down), using math/mat4 projectPoint. Writes x, y and perspective clip w (orthographic normalized depth)
+ * to `out`; returns false without changing `out` when the point is behind the camera or outside the
  * near/far range (reversed-Z clip z in 0..w).
  */
 export function projectToPixels(
@@ -378,16 +382,12 @@ export function projectToPixels(
   height: number,
   out: Float64Array | number[],
 ): boolean {
-  const w = mvp[3] * x + mvp[7] * y + mvp[11] * z + mvp[15];
-  if (!(w > 0)) return false;
-  const cz = mvp[2] * x + mvp[6] * y + mvp[10] * z + mvp[14];
-  if (cz < 0 || cz > w) return false;
-  const cx = mvp[0] * x + mvp[4] * y + mvp[8] * z + mvp[12],
-    cy = mvp[1] * x + mvp[5] * y + mvp[9] * z + mvp[13];
-  // Orthographic (w is 1 everywhere): depth is the reversed-Z distance from the near plane in NDC units.
-  out[0] = ((cx / w) * 0.5 + 0.5) * width;
-  out[1] = (0.5 - (cy / w) * 0.5) * height;
-  out[2] = mvp[3] || mvp[7] || mvp[11] ? w : 1 - cz;
+  const point = projectPoint(mvp, x, y, z, width, height, 'webgpu', projection);
+  if (!point.inFront || !(point.depth >= 0 && point.depth <= 1)) return false;
+  out[0] = point.x;
+  out[1] = point.y;
+  // Orthographic (w is 1 everywhere): depth is the normalized distance from the near plane.
+  out[2] = mvp[3] || mvp[7] || mvp[11] ? point.w : point.depth;
   return true;
 }
 

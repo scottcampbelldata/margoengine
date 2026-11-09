@@ -5506,6 +5506,12 @@ Bare-peer min+gzip: `/query` 4,463 B (new ceiling 4,719 B), water root
 The small root changes expose an internal resource bridge, with all capture
 and query implementation in the optional entry. Core + stage stays 23,924 B.
 
+Size restoration finding 9: points CPU projection shares math/mat4 projectPoint.
+The wrapper keeps offscreen x/y and perspective w or orthographic normalized
+depth; failed depth/front checks leave output unchanged. Exact shared parity
+and NaN depth rejection are covered by points.test.js. Entry min+gzip changes:
+@margoengine/points: 23947->24138 B gzip; ceiling 23954->24863; @margoengine/points/las: 13735->13737 B gzip; ceiling 14148->14150; @margoengine/points/potree: 17178->17179 B gzip; ceiling 17694->17695; @margoengine/points/las base (without LAZ decoder): 5761->5764 B gzip; ceiling 6017->6020; @margoengine/points/las lazy LAZ decoder: 8523->8525 B gzip; ceiling 8779->8781. Core plus stage remains 23924 B. No performance claim.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
