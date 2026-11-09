@@ -2538,6 +2538,10 @@
       "types": "./dist/sciviz/lic.d.ts",
       "import": "./dist/sciviz/lic.js"
     },
+    "./sciviz/tubes": {
+      "types": "./dist/sciviz/tubes.d.ts",
+      "import": "./dist/sciviz/tubes.js"
+    },
     "./selection": {
       "types": "./dist/selection.d.ts",
       "import": "./dist/selection.js"

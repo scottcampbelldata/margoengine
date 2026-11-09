@@ -75,6 +75,10 @@
     "./lic": {
       "types": "./dist/lic.d.ts",
       "import": "./dist/lic.js"
+    },
+    "./tubes": {
+      "types": "./dist/tubes.d.ts",
+      "import": "./dist/tubes.js"
     }
   },
   "files": [
@@ -96,7 +100,8 @@
     "@margoengine/lines": "^1.0.0",
     "@margoengine/loaders": "^1.0.0",
     "@margoengine/math": "^1.0.0",
-    "@margoengine/points": "^1.0.0"
+    "@margoengine/points": "^1.0.0",
+    "@margoengine/geometry": "^1.0.0"
   },
   "scripts": {
     "build": "node ../../scripts/build-optional.js sciviz && node scripts/copy-fallback.mjs",

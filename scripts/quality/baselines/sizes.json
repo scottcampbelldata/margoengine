@@ -6226,6 +6226,7 @@
     "@margoengine/voxel-pathtracer/compose": 1589,
     "@margoengine/water/fft": 7590,
     "@margoengine/sciviz/lic": 24165,
-    "@margoengine/water/query": 4719
+    "@margoengine/water/query": 4719,
+    "@margoengine/sciviz/tubes": 2789
   }
 }

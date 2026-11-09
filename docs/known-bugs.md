@@ -1,5 +1,13 @@
 # Known bugs and unverified features
 
+### Fixed: scientific mesh failed construction/publication leaked resources
+
+MeshLayer allocated its uniform/colour texture before later creation or triangle validation could throw;
+meshLayer registered a drawable before a 2D/disposed/nonlinear figure could reject publication. Both error
+paths now release every acquired buffer/texture and renderer registration, preserving the original exception.
+Native fallback refuses with linked unsupported before allocation. mesh-ownership.test.js fails on all four
+old paths and passes the corrected build. This CPU checkpoint does not claim full job 3 GPU acceptance.
+
 ### Open: batch 134 private adapter duplicates decoded Zstd levels
 
 All 173 scalar memory pairs pass Wasm high water, but 25 fail fresh-process

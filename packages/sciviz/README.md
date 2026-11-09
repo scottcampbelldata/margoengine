@@ -984,3 +984,41 @@ console.log(ticks(0, 97).labels); // ['0', '20', '40', '60', '80']
 LIC is a separate optional entry: 23,461 B minified gzip in the integrated build (24,165 B ceiling).
 This includes the same full-precision published colormap data as the other colour-bearing entries; the
 normalized pre-restoration measurement was 10,429 B. Core + stage remains 23,924 B combined gzip.
+
+## Stream tubes and ribbons
+
+The optional `@margoengine/sciviz/tubes` entry turns packed xyz polylines into owned CPU mesh arrays.
+`streamTubeGeometry(path, options)` takes `radius` (default 1, or absolute scalar radius per input point),
+`sides` (12), `caps` (true), `steps` (max(64, point count - 1)) and `closed` (false).
+`streamRibbonGeometry` takes full `width` (1 or values per point), initial `angle` (0 radians), and optional
+`streamwiseVorticity` plus positive physical `speeds`: angle changes by the integral of half streamwise curl
+per speed over distance. Rates interpolate linearly with an exact partial-interval integral. Spin is not
+geometric torsion or a material surface with strain. The ordinary 2D horizontal wind has zero streamwise curl.
+
+The existing geometry sweep supplies transported frames, smooth taper normals, seam joining, cap normals
+and UVs. Output rows sample the input polyline at equal arc length. Set `steps` high enough to resolve bends
+and radius/scalar features; self-intersections are retained. Consecutive duplicate points and reversing cusps
+reject with linked errors. Closed input repeats its first point, scalar and size; a closed physical ribbon
+needs a whole number of full turns. Positions/scalars are finite within +/-1e15; steps 1..16384, sides 3..128,
+input 2..16385 points, wall vertices at most one million. Float32 output has normal coordinate precision limits.
+
+`path.scalar` (default zero) gives colour values per input point; `streamMeshTriangles(mesh)` preserves
+smooth normals and values for the existing `meshLayer`. Output triangle arrays are capped at 128 MiB and
+owned independently. Pure builders retain no resources, load nothing and need no disposal. An optional
+`signal` checks cancellation before synchronous work. The rendered layer supports `dispose()`/`using`
+and existing device recovery. Rendering requires WebGPU or real WebGL2 compatibility.
+
+```ts
+import { Figure } from '@margoengine/sciviz';
+import { streamTubeGeometry, streamRibbonGeometry, streamMeshTriangles } from '@margoengine/sciviz/tubes';
+import { meshLayer } from '@margoengine/sciviz/grids';
+
+const figure = await Figure.create(document.querySelector('canvas')!);
+const path = { positions: [0, 0, 0, 1, 0.5, 0, 2, 1, 0.5], scalar: [2, 4, 8] };
+const tube = streamTubeGeometry(path, { radius: [0.05, 0.12, 0.08], sides: 16, steps: 96 });
+const layer = meshLayer(figure, streamMeshTriangles(tube), { range: [2, 8] });
+const ribbon = streamRibbonGeometry(path, {
+  width: 0.15, streamwiseVorticity: [0, 0.5, 1], speeds: [1, 1, 1], steps: 96,
+});
+console.log(tube.positions.length / 3, ribbon.indices.length / 3, layer.triangles);
+```

@@ -39,6 +39,12 @@ The [published evidence](results/batch-134-scalar-payload-bar.json) pins this
 combined Wasm and its sources. EAC denominator is 2047 squared, not a rounded
 byte decode. No GPU lock or timing A/B is involved in these commands.
 
+Batch 171 job 3 CPU checkpoint: build the geometry and sciviz packages, then run
+node --test --test-timeout=120000 packages/sciviz/tests/tubes.test.js packages/sciviz/tests/mesh-ownership.test.js.
+The ignored own-worktree receipts under test-results/sciviz-fixes/lic-tubes-* retain the four failing old
+ownership cases and the passing corrected build. This is not GPU/demo/full-verify acceptance.
+
+
 The [remaining-target draft](results/batch-134-remaining-targets.json) uses
 author-retained measurement scripts `remaining-quality-report21.mjs`
 (UASTC EAC) and `remaining-quality-report21-etc2.mjs` (ETC1S ETC2).

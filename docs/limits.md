@@ -49,6 +49,19 @@ Public integration, remaining targets, all-current-Wasm fuzz/corpus,
 candidate GPU uploads, peak memory and final entry acceptance remain open.
 All timing proof stays deferred. Earlier reports below are historical.
 
+Batch 171 tubes/ribbons CPU checkpoint: a new optional /tubes adapter reuses Margo geometry's sweep,
+parallel transport, joined seam normals and flat caps. Polyline input is resampled at equal arc length:
+2..16385 points, 1..16384 output steps, tube sides 3..128, at most one million wall vertices. Increase steps
+for bends/radius/scalar features between output rows; polygonal self-intersection is not removed. Finite
+input magnitudes are at most 1e15. Rendering positions/normals/scalars are float32. Width and radius may
+reach zero but must have at least one positive input; duplicate samples and reversing cusps reject. Closed
+input repeats its first point/scalar/size exactly. Physical ribbon spin integrates half streamwise curl over
+travel time, with positive speeds; accumulated angle is at most 1e12 radians. Closed physical spin must be
+whole full turns. Pure geometry needs no disposal; streamMeshTriangles returns an independent triangle set
+for the existing mesh renderer, with output typed arrays limited to 128 MiB. No new renderer or Wasm kernel.
+CPU checkpoint only: entry size, real NOAA demo, both GPU backends and final acceptance remain pending.
+
+
 Batch 134 remaining-target draft: UASTC EAC R11 source quality passes 26/26
 pairs; EAC RG11 fails 26/26; ETC1S ETC2 RGBA passes 22/23. All 993 original
 payload/source controls and zero-tolerance per-file bars remain unchanged.

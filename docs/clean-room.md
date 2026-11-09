@@ -60,6 +60,64 @@ ETC2/EAC code remains. Rejected latent source code/tests stay archived in
 private experiment backups. Existing byte/header/vector tests are retained.
 Earlier notes below retain the bars and observations at their checkpoint.
 
+## Batch 171 job 3: scientific tube and ribbon adapters (CPU checkpoint)
+
+Before implementation, audited sciviz README/source/manifest exports: no scientific radius/twist adapter.
+Margo geometry already owns sweepGeometry, transported frames, angle-weighted surface normals and periodic
+seam joining. Reuse those implementations through their public entries; add no second mesher or renderer.
+Inspected Scott's private CAD kernel local package README and API snapshot first (no top-level AGENTS.md or
+README.md exists there). Its supported solid/format tessellation APIs do not supply this scientific polyline
+adapter. No proprietary kernel files, names or code are incorporated into this engine.
+
+Research compared before implementation:
+
+- Andrew J. Hanson and Hui Ma, *Parallel Transport Approach to Curve Framing*, 1995, Indiana TR425,
+  https://scholarworks.iu.edu/dspace/items/39fbe931-c2c8-43a1-9c9d-a207b92d551e and
+  https://scholarworks.iu.edu/dspace/bitstreams/23d6fd59-b151-4064-88a7-f7e058b2cc69/download.
+  Read the framing discussion: Frenet curvature singularities motivate the existing transported frame method;
+  periodic closure requires a distributed holonomy correction. Reuse Margo's current implementation.
+- Wenping Wang, Bert Juttler, Dayue Zheng and Yang Liu, *Computation of Rotation Minimizing Frames*, 2008,
+  https://doi.org/10.1145/1330511.1330513 and https://hub.hku.hk/handle/10722/152386.
+  The authors' repository abstract compares double reflection with rotation/projection and RK4. Full-paper
+  fetches failed, so no new double-reflection implementation, error-order or speed claim is made here.
+- G. K. Karch, F. Sadlo, D. Weiskopf and T. Ertl, *Streamline-Based Concepts for Space-Time Analysis of
+  2D Time-Dependent Flow*, 2014, sections 3.1/3.2,
+  https://vcg.iwr.uni-heidelberg.de/static/publications/karch2014spaceTimeStreamlines.pdf.
+  Differentiates ordinary 3D streamribbon spin from space-time ribbons. This entry is an ordinary geometric
+  polyline adapter and does not claim a time-dependent material surface or strain-following separation.
+- MIT Unified Engineering teaching staff, *F11: Vorticity and Strain Rate; Circulation*, 2005-2006,
+  https://ocw.mit.edu/courses/16-01-unified-engineering-i-ii-iii-iv-fall-2005-spring-2006/c1453542b4d710e22b7e30c9e6b7c755_f11.pdf.
+  The antisymmetric velocity gradient gives half-curl angular velocity. Project curl onto the ordered tangent;
+  integrate d(angle)/ds = streamwiseVorticity/(2 speed). Nodal angular rates are linearly interpolated;
+  trapezoids integrate complete intervals and the exact quadratic integrates partial intervals.
+- Nelson Max, *Weights for Computing Vertex Normals from Facet Normals*, 1999 (repository edition 2000),
+  https://escholarship.org/uc/item/7657d8h3. The abstract compares weighted facet normal estimates. Retain
+  the existing mesher's angle weighting; do not claim Max's alternative estimator or analytic normals for
+  every polygonal path. Analytical conical-taper tests independently check the normals we actually return.
+
+Public rival documentation compared capabilities only: Babylon ribbon path-array/update and closure docs
+(https://doc.babylonjs.com/features/featuresDeepDive/mesh/creation/param/ribbon), VTK TubeFilter scalar-radius
+API and RibbonFilter normal API. No rival source page or companion implementation was opened or used.
+Search-result snippets are not implementation inputs. The adapter maps scalar radii/widths and physical
+spin into existing Margo sweep options; sampled geometry, UVs and scalar colour are independent CPU arrays.
+Exact reversing cusps have no unique frame and reject; users split the path. Closed physical ribbon twist
+must be integral full turns, rather than silently erasing physical spin to close a seam.
+
+The existing TypeScript sweep is reused, not rebuilt. New CPU work is bounded input/scalar adaptation and
+an optional indexed-to-triangle conversion, not a replacement geometry kernel. No measured Wasm or speed
+gain is claimed. No benchmark, timing assertion or GPU lease is used for this CPU checkpoint.
+
+Mesh ownership audit before adding the renderer adapter found that MeshLayer constructor allocation/update
+failures and meshLayer figure-publication failures leaked resources/renderer registration. Regression tests
+fail on the unchanged build in all four cases, including native-backend error translation. Research before
+repair: David Abrahams, *Exception-Safety in Generic Components*, 2000 (Dagstuhl 1998), author paper
+https://www.boost.org/doc/libs/1_31_0/more/generic_exception_safety.html; Bjarne Stroustrup, *Exception
+Safety: Concepts and Techniques*, 2000, https://doi.org/10.1007/3-540-39953-4_3. The basic resource guarantee
+and transactional publication motivate immediate cleanup followed by exact-error rethrow, never suppression.
+The owner now disposes partial construction and rolls back failed publication; native unsupported is refused
+before allocation. Four permanent regressions pass after the fix. GPU/demo/full acceptance remains pending.
+
+
 ## Batch 134 ETC1S ETC2 and UASTC EAC draft (2026-11-09)
 
 Research preceded implementation. Compared Andrew Garrard / Khronos Group,

@@ -53,6 +53,14 @@ historical reports below keep their original bars and results. Their statements
 about waiting for Scott or a then-current bar do not describe this new ruling.
 No public decoder replacement or completed batch job is claimed.
 
+Batch 171 job 3 CPU checkpoint only: tubes.test.js independently checks tapered straight-tube normals,
+scalar radius/colour, unequal input intervals, signed half-vorticity twist including partial quadratic
+integration, straight/inflection frames and exact closed seams. mesh-ownership.test.js reproduces four
+allocation/publication/native-refusal failures before repair and passes afterward. The adapter reuses Margo's
+existing geometry implementation. Real-data demonstration, rendering evidence and full acceptance remain
+pending; no speed, arbitrary physical streamsurface or complete job 3 claim is made.
+
+
 The [remaining-target draft](results/batch-134-remaining-targets.json) passes
 all 26 UASTC EAC R11 original-source pairs (345 images). EAC RG11 fails all
 26 pairs and ETC1S ETC2 RGBA fails one of 23, so neither is accepted.

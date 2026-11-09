@@ -47,6 +47,16 @@ proof does not close remaining-target/API/fuzz/GPU/memory/entry acceptance.
 No timing A/B, benchmark or timing assertion; speed-phase debt stays open.
 Earlier experiment descriptions retain their historical scope.
 
+### Section 5 evidence: scientific tube/ribbon CPU foundation
+
+The /tubes adapter uses existing optional geometry sweeps and transported frames; core/stage and shaders
+are untouched. Analytical cone normals/scalar radius, exact nodal and partial vorticity integrals, unequal
+arc intervals, cap scalar ownership, inflection continuity, periodic seam normals and failure/cancellation
+checks pass in Node. Existing meshLayer constructor/publication ownership failures are independently
+reproduced before repair and pass afterward. No GPU, real-data demo or complete job 3 acceptance is claimed
+at this checkpoint. Sources and integration choice: clean-room.md, batch 171 job 3.
+
+
 ### Section 5 evidence: batch 134 rejected rational-source hypothesis
 
 The private scalar experiment completely optimizes rational source estimates

@@ -10,7 +10,7 @@ import { invertMatrix } from '@margoengine/math/mat4';
 import { hexColor, SRGBToLinear } from '@margoengine/math/color';
 import { rangeError, typeError } from '../../shared/errors.js';
 import { colormapTexture, resolveColormap, type Bounds, type ColormapSource } from './layer.js';
-import { frameWGSL, type Drawable, type GpuContext, type SciRenderer } from './render.js';
+import { frameWGSL, requireGPU, type Drawable, type GpuContext, type SciRenderer } from './render.js';
 import type { Colormap } from './colormaps.js';
 import type { Figure } from './figure.js';
 
@@ -674,8 +674,13 @@ export class MeshLayer implements Drawable {
       throw rangeError('Mesh range must be [min, max] with min < max', 'sciviz');
     this.#bounds = set.bounds;
     this.#set = set;
-    this.#build();
-    this.update(set);
+    try {
+      this.#build();
+      this.update(set);
+    } catch (error) {
+      this.dispose();
+      throw error;
+    }
   }
 
   #build(): void {
@@ -862,9 +867,15 @@ export class MeshLayer implements Drawable {
 
 /** Draws any triangle set in a figure (3D mode). */
 export function meshLayer(figure: Figure, set: TriangleSet, options: MeshLayerOptions = {}): MeshLayer {
+  requireGPU(figure.renderer);
   const layer = new MeshLayer(figure.renderer, set, options);
-  figure.renderer.add(layer);
-  return figure.addLayer(layer);
+  try {
+    figure.renderer.add(layer);
+    return figure.addLayer(layer);
+  } catch (error) {
+    layer.dispose();
+    throw error;
+  }
 }
 
 /** Options of {@link gridLayer}. */
