@@ -29,10 +29,11 @@ bridge. Readback temporarily adds one image-sized buffer and a luminance array. 
 LIC, volume LIC or physical unsteady advection claim. Native sciviz/webgl2 is unsupported; the intended
 backends are WebGPU and compatibility-backed WebGL2. Independent analytical box error: 1.4725853414443435e-7;
 exact circular-arc error: 1.1380660922433172e-5. Both have zero backend pixel differences and exact restoration.
-The NOAA demo passes both layouts/backends. New entry: 10,210 B gzip, ceiling 10,517 B; root 36,915 B,
-flow 8,673 B, native driver 4,476 B (shared bundling changes root -1 B and flow +8 B, source unchanged).
+The NOAA demo passes both layouts/backends. New entry: 10,210 B gzip, ceiling 10,517 B; the final full build
+records root 36,916 B, flow 8,665 B and native driver 4,476 B, all unchanged from the prior full build.
 Core/stage source is unchanged at 23,924 B combined gzip, with the strict 25,000 B ceiling intact.
-Full landing gates are pending at this checkpoint; no speed claim.
+The one full verify ran 13,769 tests: 13,765 passed; four metadata/test-fixture failures were corrected and the
+affected checks pass. Package CPU/GPU, README, lint, hygiene and quality checks pass; no speed claim.
 
 Batch 134 rational scalar-source experiment: 184,335 B raw /
 69,278 B gzip9, versus the byte-objective draft's 169,084 / 61,994 B.

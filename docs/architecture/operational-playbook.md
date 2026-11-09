@@ -1941,14 +1941,16 @@ All 12 existing water GPU runs and the full verify gate pass. The scope is
 the FFT row's spectral behaviour, not a general hydrodynamics claim. No timing
 proof is run in build phase.
 
-Batch 171 LIC checkpoint: the optional entry retains GPU image texels, generating on creation, phase change
+Batch 171 LIC: the optional entry retains GPU image texels, generating on creation, phase change
 or device replacement. Trilinear field sampling uses normalized coordinates; the inverse Gram basis projects
 3D velocity onto affine slices; midpoint tracing uses image-texel arc length. Static box and Hann-windowed
 periodic filters normalize accepted support. CPU validation/lifecycle tests pass. Independent analytical
 convolution (maximum luminance error 1.4725853414443435e-7), exact circular arcs (1.1380660922433172e-5), NaN/domain
 masks, oblique slices, phase loops/reversal and exact restored pixels pass on WebGPU and compatibility-backed
 WebGL2, with zero backend pixel differences. Frozen `batch-171-lic*.json` evidence is in the whitepaper results.
-NOAA demo controls/export pass on desktop/mobile on both backends; full landing gates remain pending.
+NOAA demo controls/export and late updates after loader-deadline expiry pass on desktop/mobile on both backends.
+One full verify ran 13,769 tests (13,765 passed); its four metadata/test-fixture failures were corrected and their
+affected checks pass. All sciviz GPU suites, 24 README examples, lint, hygiene and all five quality gates pass.
 Native WebGL2 LIC rejects before GPU allocation. New optional entry 10,210 B gzip; core + stage stays 23,924 B.
 No arbitrary curved-surface/unsteady-advection proof or timing claim.
 

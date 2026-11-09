@@ -23,7 +23,7 @@ No scalar bar changed, no accepted scalar improvement, no fourth scalar round.
 Reproduction: `node scripts/measure/scalar-ideal-bound.mjs <evidence-directory>` with the retained
 private corpus, control payloads and specification-derived quality readers.
 
-Batch 171 LIC implementation checkpoint: `packages/sciviz/tests/lic.test.js` passes validation, immutable
+Batch 171 LIC evidence: `packages/sciviz/tests/lic.test.js` passes validation, immutable
 inputs, tiny velocity normalization, cancellation, resource budgets, partial-allocation cleanup and device
 reconstruction. `entries-cases.js` independently checks horizontal/vertical analytical box convolution with
 absolute luminance bound 2e-6, static sign reversal, anisotropic axes, oblique slices, boundaries, masks,
@@ -33,7 +33,12 @@ parity. [Box/slice/animation evidence](results/batch-171-lic.json) has maximum a
 [Exact circular-arc evidence](results/batch-171-lic-curvature.json) has maximum error 1.1380660922433172e-5,
 22,492 lit pixels, exact restoration, and zero backend differences. Reversing phase and velocity preserves
 animation luminance within 2e-6. [NOAA demo evidence](results/batch-171-lic-demo.json) covers both desktop/mobile
-layouts on both backends, day/colour/animation changes and PNG export. Full landing gates remain pending.
+layouts on both backends, day/colour/animation changes after the initial load deadline expires, and PNG export.
+The one full verify ran 13,769 tests (13,765 passed); its four metadata/test-fixture failures were corrected and
+the affected checks passed. [Closure evidence](results/batch-171-lic-validation.json) records those checks and
+the coherent clean-source entry/network pair. All package GPU suites, 24 sciviz and three umbrella README examples pass.
+Rebased main's fixed-wait scanner also passes after documenting the compute-owner test's existing exact
+four-step invariant, with its original GPU value/count assertions unchanged and passing on both backends.
 New entry is 10,210 B gzip (10,517 B ceiling), core + stage 23,924 B. No speed result;
 [method sources](../clean-room.md#batch-171-job-2-line-integral-convolution).
 

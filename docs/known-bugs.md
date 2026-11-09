@@ -32,11 +32,12 @@ It therefore ran in development but its HTML did not ship. The builder now uses 
 list, including Moving wind and LIC. `tests/sciviz-site-pages.test.js` checks all README scientific links and
 their scientific navigation destinations against production targets, and fails against the old builder.
 
-### LIC validation checkpoint
+### Verified: LIC validation and remaining native-driver limit
 
 The new optional LIC entry's input/lifecycle tests and real-GPU analytical, animation, mask, slice, exact
 restoration and strict backend pixel checks pass. NOAA demo checks pass in all four layout/backend cases.
-Full landing gates remain pending at this checkpoint. Native sciviz/webgl2 has no LIC implementation and
+The one full verify's four metadata/test-fixture failures are corrected and their affected checks pass;
+package CPU/GPU, README and quality gates pass. Native sciviz/webgl2 has no LIC implementation and
 rejects it explicitly; compatibility-backed WebGL2 is the supported fallback.
 There is no claim of physical unsteady advection, volume LIC or arbitrary triangle-surface support.
 

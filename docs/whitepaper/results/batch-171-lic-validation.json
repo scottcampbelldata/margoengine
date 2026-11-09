@@ -1,0 +1,146 @@
+{
+  "source": {
+    "commit": "a58dda187",
+    "packagesDirty": false,
+    "records": [
+      "entry-sizes.json",
+      "basic-scene-network.json"
+    ]
+  },
+  "fullVerify": {
+    "ranOnce": true,
+    "tests": 13769,
+    "passed": 13765,
+    "failed": 4,
+    "affectedFiles": [
+      "tests/check-fixed-waits.test.js",
+      "tests/errors-page.test.js",
+      "tests/umbrella.test.js"
+    ],
+    "allFailuresClosed": true
+  },
+  "gates": {
+    "lint": {
+      "passed": true
+    },
+    "hygiene": {
+      "passed": true
+    },
+    "quality-rebased": {
+      "passed": true
+    },
+    "hygiene-rebased": {
+      "passed": true
+    },
+    "units-failed-files": {
+      "passed": true
+    },
+    "umbrella-final": {
+      "passed": true
+    },
+    "readme-umbrella": {
+      "passed": true
+    },
+    "close-targeted": {
+      "passed": true
+    },
+    "waits-rebased-fixed": {
+      "passed": true
+    },
+    "compute-owner-annotated": {
+      "passed": true
+    },
+    "close-lint": {
+      "passed": true
+    },
+    "close-docs-links": {
+      "passed": true
+    },
+    "gpu-curve": {
+      "passed": true
+    },
+    "gpu-flow-motion": {
+      "passed": true
+    },
+    "gpu-flow-pathline": {
+      "passed": true
+    },
+    "gpu-replace-scatter": {
+      "passed": true
+    },
+    "gpu-replace-quiver": {
+      "passed": true
+    },
+    "gpu-replace-streamlines": {
+      "passed": true
+    },
+    "gpu-replace-histogram": {
+      "passed": true
+    },
+    "gpu-grid-surface": {
+      "passed": true
+    },
+    "gpu-grid-slice": {
+      "passed": true
+    },
+    "gpu-graph-2d": {
+      "passed": true
+    },
+    "gpu-graph-3d": {
+      "passed": true
+    },
+    "gpu-geo-mercator": {
+      "passed": true
+    },
+    "gpu-geo-globe": {
+      "passed": true
+    },
+    "gpu-base": {
+      "passed": true
+    },
+    "gpu-bricks": {
+      "passed": true
+    },
+    "gpu-restore": {
+      "passed": true
+    },
+    "gpu-demos-other": {
+      "passed": true
+    },
+    "gpu-webgl": {
+      "passed": true
+    },
+    "gpu-readme": {
+      "passed": true
+    }
+  },
+  "rebasedGpu": [
+    {
+      "name": "lic",
+      "passed": true
+    },
+    {
+      "name": "curve",
+      "passed": true
+    },
+    {
+      "name": "demo",
+      "passed": true
+    }
+  ],
+  "sizes": {
+    "lic": 10210,
+    "licCeiling": 10517,
+    "root": 36916,
+    "flow": 8665,
+    "nativeDriver": 4476,
+    "coreStage": 23924,
+    "coreStageLimit": 25000
+  },
+  "notes": [
+    "No benchmark, timing-only assertion or exclusive GPU lease ran.",
+    "Each real GPU command used one shared lane slot and wait-max 60.",
+    "The compute-owner loop annotation preserves its original four-step work and every exact assertion.",
+    "The initial raw build omitted the separate Wasm-copy step; restored package assets closed the affected CPU/GPU failures."
+  ]
+}

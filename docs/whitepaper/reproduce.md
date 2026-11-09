@@ -17,6 +17,8 @@ interrupted for an exact work reduction before its cap; its partial results
 are preserved. No timing A/B or completed replacement claim follows.
 
 Batch 171 LIC checkpoint (analytical and demo GPU checks pass; full gates pending):
+
+Batch 171 LIC (analytical, demo and package GPU checks pass; full verify's four affected failures corrected):
 `npm run build --workspace @margoengine/sciviz`, then
 `node --test --test-timeout=120000 packages/sciviz/tests/lic.test.js`. Analytical convolution, masks, slices,
 animation and restored/backend pixels: `node scripts/gpu-lock.mjs run --owner=codex-batch171 --wait-max=60

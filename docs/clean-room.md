@@ -86,7 +86,12 @@ axes, oblique slice projection, masks, stagnation, phase loops and reversed velo
 WebGPU and compatibility-backed WebGL2, with exact restored pixels and zero backend pixel differences.
 The real NOAA demo passes all four desktop/mobile/backend cases. Frozen evidence:
 `docs/whitepaper/results/batch-171-lic.json`, `batch-171-lic-curvature.json`, `batch-171-lic-demo.json`.
-Full landing gates remain pending at this implementation checkpoint. New optional entry: 10,210 B gzip,
+Landing closure: the one full verify ran 13,769 tests, with 13,765 passed and four metadata/test-fixture failures
+corrected by generating the umbrella alias, adding error help and fixing the async playback-wait predicate.
+The affected checks pass. All sciviz GPU suites and 24 sciviz plus three umbrella README examples pass.
+After rebase, the LIC analytical/curved/demo cases also pass against the updated backend. The final full-build
+entry/network records both name their actual clean source `a58dda187`; no record is relabelled to a later commit.
+New optional entry: 10,210 B gzip,
 10,517 B ceiling; core + stage remains 23,924 B. No quality or functionality was removed for optional size.
 
 Site-target audit found that the already documented Moving wind page was absent from the production build's
@@ -108,6 +113,13 @@ Sebastian Nanz and Bertrand Meyer, *How to Cancel a Task*, 2013,
 Task-scoped cooperative cancellation informs the ownership boundary, with the DOM standard defining exact
 signal semantics. The real-browser regression deterministically expires the initial loader deadline,
 then changes day/colour/animation; the first draft fails without waiting two wall-clock minutes.
+
+Rebased main added `compute/tests/scene-owner-browser.mjs`: its four frames execute four deterministic
+increments, and the test asserts all 1,024 values and the step count equal four. The fixed-wait scanner
+misclassified that counted workload. Its supported explanatory annotation now records the existing invariant;
+no loop, assertion, timing bound or budget changed. This follows the separation of tasks/results from
+scheduling in the build-system papers above and the batch's deterministic-work rule. The scanner regression
+and the real compute-owner test still run, with the exact original array/count assertions.
 
 ## Batch 134 rational scalar-source experiment (2026-11-09)
 
