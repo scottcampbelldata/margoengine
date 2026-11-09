@@ -1510,3 +1510,7 @@ The existing mixer finite-FIR meter supplies true peak and a documented float32 
 ## Emissive sprites and bloom hookup (batch 55)
 
 `@margoengine/lighting2d/emissive` is written from standard first principles: radial and box distance metrics for sprite boundaries, polynomial distance attenuation for emitted light falloff, luminance thresholding, and bloom HDR intensity scaling. The WGSL shader routines and CPU reference functions are Margo-own clean room implementations derived from first principles; no other engine source or library code was read.
+
+## Audio occlusion (batch 110)
+
+Written from the [W3C Web Audio Recommendation](https://www.w3.org/TR/2021/REC-webaudio-20210617/) sections BiquadFilterNode, GainNode and AudioParam automation. The sampled segment geometry and interpolation are Margo-own first-principles design choices. The qualitative attenuation plus low-pass approximation follows the published sound occlusion descriptions in [Funkhouser et al., Survey of Methods for Modeling Sound Propagation in Interactive Virtual Environment Systems, SIGGRAPH 2002 course notes](https://www.cs.princeton.edu/~funk/course02.pdf). No engine or library source was read. Reuses Margo's BVH raycaster. No downloaded assets; generated tones and boxes are stand-ins.

@@ -1,0 +1,36 @@
+{
+  "browser": "157.0.4341.42",
+  "fixture": "Generated sine waves and engine box geometry, stand-ins",
+  "reports": [
+    {
+      "backend": "webgpu",
+      "clearHigh": 0.24999980761522,
+      "blockedHigh": 0.009782004719073088,
+      "clearLow": 0.2499999997926861,
+      "blockedLow": 0.06249240602455906,
+      "highRatio": 0.039128048986856734,
+      "lowRatio": 0.24996962430552494,
+      "gpuErrors": []
+    },
+    {
+      "backend": "webgl2",
+      "clearHigh": 0.24999980761522,
+      "blockedHigh": 0.009782004719073088,
+      "clearLow": 0.2499999997926861,
+      "blockedLow": 0.06249240602455906,
+      "highRatio": 0.039128048986856734,
+      "lowRatio": 0.24996962430552494,
+      "gpuErrors": []
+    },
+    {
+      "backend": "webgl2-compat",
+      "clearHigh": 0.24999980761522,
+      "blockedHigh": 0.009782004719073088,
+      "clearLow": 0.2499999997926861,
+      "blockedLow": 0.06249240602455906,
+      "highRatio": 0.039128048986856734,
+      "lowRatio": 0.24996962430552494,
+      "gpuErrors": []
+    }
+  ]
+}

@@ -13,7 +13,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-601). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-602). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -928,3 +928,11 @@ Optional `@margoengine/lighting2d/height` casts perspective and directional heig
 ## Emissive sprites and bloom hookup (batch 55)
 
 Optional `@margoengine/lighting2d/emissive` adds glowing emissive sprites with distance falloff and bloom threshold extraction. Emissive sprites emit light directly into the 2D lighting target and isolate HDR light above a luminance threshold for external bloom passes (`connectBloom`) or integrated 2D bloom glow. WebGPU only; WebGL2 rejects with coded error and help link. Real RTX A6000 check passes with 0 wrong pixels against the CPU reference form. LIM-601.
+
+## Audio occlusion and obstruction (batch 110)
+
+Optional audio/occlusion uses five CPU rays (one with radius 0) and interpolated gain/low-pass filtering. Radius 0..100 m, default 0.25; blocked gain 0..1, default 0.25; cutoff 10..min(20000, Nyquist) Hz, default 800; smoothing 0..60 s, default listener.smoothing. Source and followed-listener meshes are excluded; each segment excludes 1 mm at both ends. Sampled aperture, not diffraction, physical transmission, material/thickness modelling, reflections or reverb-send control. Visible CPU triangles only; alpha masks and arbitrary shader deformation are absent, active skin/morph needs a static proxy. World matrices and sound/listener poses must be current before explicit update. Keep the sound filter chain in place while active.
+
+Real Edge 157 audio renders beside native WebGPU, WebGL2 and WebGL2 compatibility engines show 2 kHz blocked/clear RMS 0.039128 and 100 Hz 0.249970 with zero GPU validation errors. Node tests use renderer/audio stand-ins with real engine transforms and BVH. Generated tones/boxes are stand-ins; real recordings, listening quality, other browsers and performance are unmeasured. LIM-602.
+
+Occlusion entry: 1,516 B gzip, budget 1,772 B, with package dependencies external; audio root: 7,508 B gzip. BVH is a separate optional dependency loaded only on create, never through the audio root. Core plus stage remains 23,626 B gzip.

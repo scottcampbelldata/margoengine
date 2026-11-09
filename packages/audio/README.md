@@ -120,3 +120,57 @@ Errors carry a stable `code` (`error.code`): `disposed` for a sound used after `
 `npm test` in `packages/audio` runs Node checks against a small fake Web Audio implementation: no context at import, lazy creation, camera following, mesh following with a local forward axis, first-write-immediate then smoothed automation, auto-resume, graph wiring with filters and panner, playhead math for pause, playback rate, offset, duration and loop regions, `seek` while playing (exactly one new source at the new offset), paused or stopped, `sync` (silent before `timelineStart`, no re-seek under the drift tolerance, one re-seek over it, silent scrubbing, loop wrapping without re-seeking at the seam, reverse is silent, sources released after many seeks), `onEnded` only on a natural end, fade ramps, mesh following and hidden-mesh muting, media, stream and node sources, analyser math, the distance and cone formulas, loader caching, abort and failure handling, dispose, and voice pools (overlapping plays on separate voices sharing the buffer, positions and per-play volume and rate applied at once, the oldest voice stolen, an ended voice reused first, `stopAll`, release on dispose). `npm run test:browser` (a browser script, not in CI) renders with `OfflineAudioContext` in Chromium: a source on the right is louder in the right channel (HRTF and equal-power), linear, inverse and exponential attenuation match the formulas within 2%, the cone drops to `coneOuterGain` behind the source, the analyser finds a 1 kHz tone, loop points, offset and duration pick the right samples, a seek while playing reads on from the new position on one source (and past the end ends it), fadeIn ramps linearly, and a voice pool plays two overlapping sounds at their own positions and volumes, steals its only voice for a second play and halves the length at playbackRate 2. A live WebGPU engine check confirms the listener follows the camera, the panner follows its mesh, hidden meshes go silent, a decoded WAV is cached, a media element reports `onEnded`, there are no WebGPU validation errors, and a real click resumes a suspended context. The script adds `--autoplay-policy=no-user-gesture-required`.
 
 Apache-2.0 licensed.
+
+## Occlusion and obstruction
+
+`@margoengine/audio/occlusion` traces scene geometry with the existing BVH raycaster.
+Full cover muffles and lowers a positional sound; partial cover gives intermediate filtering.
+The listener updates the controller after its sound poses, on WebGPU and both WebGL2 routes.
+BVH loads only when `create` is called. Install the optional `@margoengine/bvh` peer when
+using this entry alone; the audio root imports neither occlusion nor BVH.
+
+```ts
+import {Engine, box} from 'margoengine/core';
+import {AudioListener, PositionalAudio} from 'margoengine/audio';
+import {AudioOcclusion} from 'margoengine/audio/occlusion';
+
+const canvas = document.createElement('canvas');
+document.body.append(canvas);
+const engine = await Engine.create(canvas, {camera: {position: [0, 0, 4], target: [0, 0, 0]}});
+const context = new OfflineAudioContext(2, 4800, 48000);
+const listener = AudioListener.attach(engine, {context});
+engine.createMesh().setGeometry(box()).setScale([4, 4, 0.1]).setPosition([0, 0, 2]);
+using sound = new PositionalAudio(listener).setPosition(0, 0, 0);
+const buffer = listener.context.createBuffer(1, 4800, 48000);
+buffer.getChannelData(0).forEach((_, i, data) => { data[i] = 0.2 * Math.sin(2 * Math.PI * 1000 * i / 48000); });
+sound.setBuffer(buffer);
+using occlusion = await AudioOcclusion.create(sound, {signal: AbortSignal.timeout(10000)});
+engine.render(); // updates listener and sound poses, then traces the wall
+sound.play();
+console.log(occlusion.blocked); // 1: all five rays hit the wall
+const rendered = await context.startRendering(); // real muffled PCM without an autoplay gesture
+console.log(rendered.length); // 4800 stereo frames
+// In a live app, use the listener's default context and retain the objects until teardown.
+engine.dispose();
+```
+
+Options: `radius=0.25` m (0..100) samples the centre and four perpendicular source offsets;
+0 traces one ray. `blockedGain=0.25` (0..1), `blockedFrequency=800` Hz
+(10..min(20000, Nyquist)), `smoothing=listener.smoothing` seconds (0..60),
+`filter` includes all visible geometry by default, and `signal` defaults to none.
+The source mesh and listener's followed mesh are excluded. Gain interpolates linearly with
+blocked-ray fraction; cutoff interpolates geometrically from min(20000, Nyquist).
+The 1 mm segment-end exclusion avoids endpoint self-intersections. Coincident positions are clear.
+Owned `lowpass` and `attenuation` nodes append to the existing filter chain; ordinary volume,
+fades and hidden muting stay independent. Keep that chain in place while active.
+`dispose()` or `using` removes only these nodes; listener teardown also disposes controllers.
+`update(engine)` runs explicitly after world matrices and sound/listener poses are current.
+Missing engines and disposed controllers raise coded errors with help links.
+
+This is a sampled geometric approximation without diffraction, thickness/material transmission,
+reflections or reverb-send control. BVH's visible CPU geometry coverage applies: fragment alpha
+and arbitrary shader deformation are not evaluated; active skin/morph geometry needs a static
+blocker/proxy. Radius is a sampled source aperture, not a physical acoustic simulation.
+Node tests use stand-in rendering and audio graphs. The browser test measures generated tones
+in real OfflineAudioContext renders beside real WebGPU, WebGL2 and compatibility engines.
+Real recordings, listening quality, other browsers and speed are unmeasured.

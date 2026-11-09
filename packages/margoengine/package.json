@@ -130,6 +130,10 @@
       "types": "./dist/audio.d.ts",
       "import": "./dist/audio.js"
     },
+    "./audio/occlusion": {
+      "types": "./dist/audio/occlusion.d.ts",
+      "import": "./dist/audio/occlusion.js"
+    },
     "./behavior": {
       "types": "./dist/behavior.d.ts",
       "import": "./dist/behavior.js"

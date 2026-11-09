@@ -1289,3 +1289,7 @@ invalid values could also cancel prior automation. The owning scheduler now vali
 setGain commits metadata only after scheduling succeeds, and duck release validates before removal.
 The undefined-release/gate default inconsistency is fixed too. mixer.test.js adds regressions that
 fail on the prior implementation; no known open scheduling defect remains in these tested paths.
+
+### Audio occlusion (batch 110)
+
+No known open defect in tested static geometry/partial-cover paths. Generated browser tests cover native WebGPU and both WebGL2 routes. Sampling, deformation and acoustic-model limits are documented in limits.md. The first browser fixture incorrectly treated the compatibility engine's WebGPU-shaped API label as its underlying backend; the fixture now asserts isCompatDevice and also exercises the native WebGL2 renderer.

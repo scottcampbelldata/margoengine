@@ -24,7 +24,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "node scripts/build.js",
+    "build": "node ../../scripts/build-optional.js audio",
     "test": "npm run build && node --test tests/*.test.js",
     "test:browser": "npm run build && node scripts/test-browser.js",
     "prepack": "npm run build"
@@ -34,6 +34,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./occlusion": {
+      "types": "./dist/occlusion.d.ts",
+      "import": "./dist/occlusion.js"
     }
   },
   "files": [
@@ -41,6 +45,12 @@
     "NOTICE"
   ],
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0"
+    "@margoengine/core": "^1.0.0",
+    "@margoengine/bvh": "^1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@margoengine/bvh": {
+      "optional": true
+    }
   }
 }

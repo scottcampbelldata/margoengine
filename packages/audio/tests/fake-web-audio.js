@@ -122,6 +122,7 @@ export class FakeAudioContext {
   createBiquadFilter() {
     const node = new FakeNode(this, 'biquad');
     node.frequency = new FakeParam(350);
+    node.Q = new FakeParam(1);
     return node;
   }
   createPanner() {

@@ -1724,3 +1724,7 @@ Shipped Wasm emits 14 fewer each of abs, comparison and mask-AND operations in t
 with unchanged solver add/subtract/multiply/divide counts. These are static branch-inclusive inventories.
 Decoded source-path/panic-data relocations explain distinct artifact hashes; timing independence from layout
 is not claimed. Entry 107 records paired/browser diagnostics without a demonstrated gain or Box2D parity.
+
+### Audio occlusion evidence (batch 110, section 5)
+
+The optional audio/occlusion entry reuses BVH CPU segment queries and owns gain/low-pass stages in the sound's existing filter chain. It registers after the sound with AudioListener, so normal frame updates supply world positions before tracing. Dynamic BVH import keeps the audio root unchanged. Real Edge OfflineAudioContext renders of generated tones beside WebGPU, native WebGL2 and the WebGL2 compatibility device prove spectral attenuation (2 kHz ratio 0.039128; 100 Hz 0.249970) and zero GPU validation errors. occlusion.test.js covers real engine transforms with stand-in renderer/audio, partial cover, visibility, endpoint/source exclusions, vertical rays, smoothing, cancellation and teardown. Stand-in content only; diffraction, deforming geometry, listening quality, other browsers and speed remain unmeasured. See LIM-602 and results/audio-occlusion-20261108.json in the whitepaper.

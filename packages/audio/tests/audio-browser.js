@@ -1,4 +1,5 @@
 import { Engine, PbrMaterial, box } from '@margoengine/core';
+import { runOcclusionTests } from './occlusion-browser.js';
 import {
   AudioListener,
   Audio,
@@ -433,3 +434,4 @@ window.checkGesture = async () => {
   gestureEngine.dispose();
   return state;
 };
+window.runOcclusionTests = runOcclusionTests;

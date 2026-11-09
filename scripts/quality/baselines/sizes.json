@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11465636,
+  "total": 11467408,
   "history": [
     {
       "date": "2026-10-24",
@@ -4790,6 +4790,12 @@
       "commit": "3b9fb5df3",
       "reason": "lighting2d/emissive emissive sprites and bloom hookup (LIM-601)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-09",
+      "commit": "5ec353be7",
+      "reason": "Batch-110-adds-optional-audio-occlusion-with-unchanged-audio-root-and-core",
+      "grew": 1
     }
   ],
   "items": {
@@ -4816,6 +4822,7 @@
     "@margoengine/animator/sync": 2070,
     "@margoengine/animator/warping": 4883,
     "@margoengine/audio": 7716,
+    "@margoengine/audio/occlusion": 1772,
     "@margoengine/behavior": 8897,
     "@margoengine/behavior/context": 1658,
     "@margoengine/behavior/eqs": 2221,
