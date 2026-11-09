@@ -101,7 +101,7 @@ least two per axis; the input length must match; the level must be finite in flo
 non-cubic row tails, chunk boundaries and the real MRI are checked in `packages/sciviz/tests/fallback.test.js`.
 Root Figure attachment still rejects the engine's WebGL2 preview backend; the optional `sciviz/webgl2`
 adapter adds surface and rectangle drawing below. CPU extraction is not integrated into that adapter yet.
-Drawing parity remains unverified until its queued correctness run finishes.
+Strict surface/rectangle drawing parity passes on Chromium/RTX A6000; the other native layer paths remain pending.
 
 Sciviz native drawing piece (batch 181, 2026-11-10): `await attachWebGL2(engine, { axes: false, ... })`
 returns a Figure on a real `backend: 'webgl2'` engine. CPU-backed surfaces, bars, histograms and heatmaps only;
@@ -114,10 +114,14 @@ restoring GL state after drawing and uploads. Restoration uses retained data, in
 Axes, points/lines, volumes/slices, integrated CPU isosurfaces and the real-data demos are still pending;
 unsupported Figure calls reject with coded help before publishing. The browser test's preselected all-pixel
 bound is share(d > 2/255) <= 0.001 and mean(max RGB channel difference) <= 0.25/255, at 320 x 240,
-single-sampled on the test machine. Execution evidence is pending; no cross-hardware or speed claim.
-The drawing entry is 4,288 B min+gzip with bare imports external (new ceiling 4,442 B), plus the shared
-Figure root at 36,802 B under its unchanged 36,802 B ceiling. All existing ceilings are unchanged.
-Core plus stage remains 23,837 B gzip, below 25,000. The CPU extractor remains 2,002 B plus its lazy Wasm.
+single-sampled on Chromium/RTX A6000. All eight images pass, including real context restoration; no
+cross-hardware or speed claim. The drawing entry is 4,476 B min+gzip with bare imports external (previously
+4,288 B; ceiling 4,442 to 4,476 B), plus the shared Figure root at 36,916 B (previously 36,802 B; ceiling
+36,802 to 36,916 B). Scott's optional-package ruling permits these 34 B and 114 B ceiling increases for matching
+missing-triangle/boundary-normal correctness and generation-safe GL disposal. Another split would introduce
+an artificial shader loader and divide one generation's resource ownership. Readable shaders, full errors and
+the existing optional boundary are retained. Core plus stage remains 23,924 B gzip, below the unchanged 25,000 B.
+The CPU extractor remains 2,002 B plus its lazy Wasm.
 
 Sciviz restoration (2026-11-10): CPU-backed layers rebuild on a replacement device; `Figure.ready()` waits for
 isosurface reconstruction. Pending old-device extractions reject with code `state`. Caller-owned GPU arrays
@@ -2052,3 +2056,7 @@ pipeline compiles; it does not promise a bound on driver compilation. The existi
 20-second module-completion gate remains unchanged. Off-screen rendering still
 uses renderImage and its documented capture lifecycle. Transport and entry exports
 are unchanged, and no runtime speed claim is made.
+
+Native sciviz corrections: root 36,916 B gzip and /webgl2 4,476 B meet the explicitly revised optional ceilings
+above. Missing triangles are completely rejected, with finite one-sided boundary normals. Core + stage remains
+23,924 B under 25,000 B. The strict all-pixel bound and all timeouts are unchanged.

@@ -1,5 +1,22 @@
 # Clean room
 
+## Native GL loss-event gate ordering (2026-11-10)
+
+The Khronos WebGL Working Group's *WEBGL_lose_context* specification, revision
+15 (2020), https://registry.khronos.org/webgl/extensions/WEBGL_lose_context/,
+explicitly forbids restoreContext before the lost-event dispatch completes.
+WHATWG contributors' *HTML Standard* (2026),
+https://html.spec.whatwg.org/multipage/webappapis.html#perform-a-microtask-checkpoint,
+explains checkpoints during callback cleanup. Compared with the resource-ownership
+papers cited below, these standards determine the gate's event ordering.
+Awaiting a promise resolved by the loss listener resumed inside dispatch and
+produced INVALID_OPERATION, then a bounded gate timeout. The regression now posts
+one MessageChannel task before requesting restoration, closes both ports and
+awaits both the restored event and the engine's bounded recovery. It retains
+actual context destruction, exact pixels and all GL-error assertions. No sleep,
+retry, timeout increase or production workaround is introduced. No foreign code
+was read or copied.
+
 ## Sciviz size-record repair (2026-11-10)
 
 The review revalidation also checked the retained implementation against these
@@ -2321,3 +2338,16 @@ shader, sample budget, readiness promise or deadline changes. A controlled-promi
 regression checks initialization, preview dispatch, eventual guided tracing and
 disposal without a wall-clock speed assertion. The real cache-disabled module
 completion probe retains the README gate's 20-second limit; no speed claim.
+
+### Missing-sample boundary review (native sciviz checkpoint)
+
+The follow-up numerical review compared Bengt Fornberg, *Generation of Finite Difference Formulas on
+Arbitrarily Spaced Grids* (1988), https://www.colorado.edu/amath/sites/default/files/attached-files/mathcomp_88_fd_formulas.pdf,
+with Alan Baker, Mehmet Oguz Derin and David Neto (editors), W3C *WebGPU Shading Language* (2026),
+https://www.w3.org/TR/2026/CRD-WGSL-20261106/#floating-point-evaluation, and the GLSL ES 3.00 rules cited
+above. The simple regular-grid special case uses centred differences where both neighbours exist and
+one-sided differences where only one exists. It does not implement Fornberg's general recurrence.
+Missing triangles are rejected as whole primitives; no NaN reaches a surviving primitive's normal arithmetic.
+The generation validity check follows WebGL object invalidation on restored contexts; no invalid object is
+deleted or rebound. The preview's first-frame clear follows Margo's existing WebGPU attachment initialization
+and Khronos scissor/clear rules. Exact images and GL errors are checked; no foreign implementation was read.

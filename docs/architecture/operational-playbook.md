@@ -57,7 +57,7 @@ kept a flagged binding alive until a plugin switched programs, at which point it
 Preview restore and disposal now unbind their own current program before deletion, preserving foreign programs.
 `packages/webgl2-compat/test/preview-webgl.test.js` fails before the repair and checks both paths and foreign
 state preservation. `packages/sciviz/tests/webgl2-browser.js` checks NO_ERROR immediately after every reboot,
-upload and draw; that real-context gate is deferred until the browser shutdown repair lands on origin/main.
+upload and draw. The real-context gate now passes after main's teardown repair; entry byte ceilings still block landing.
 The CPU test models the specification's marked-object rebinding error and checks owned, foreign and null
 bindings after both operations. No core or stage implementation changes are needed.
 
@@ -1710,17 +1710,18 @@ vertex fetches and instanced integer-colour attributes retain all cells with no 
 owns its programs/VAOs/buffers/textures, scopes caller GL state around uploads/draws, shares the engine depth
 buffer and applies top-left view rectangles to GL's bottom-left viewport/scissor. Layer restore replaces those
 resources from retained CPU data, including updated heights; use the existing optional webglRestore plugin.
-Unit protocol/limit/ownership checks exist. Native WebGPU versus real native WebGL2 all-pixel parity, live
-restoration and hostile-state checks are queued in `packages/sciviz/tests/webgl2-browser.mjs`, not yet proved.
-The first run passed all eight WebGPU cases, then native WebGL2 bar failed its final no-GL-error assertion
-after image/restore/state comparisons. Per-phase strict checks are queued to identify the invalid operation;
-no successful native GL surface run or parity result is claimed. CPU tests pass 149/149 from a serialized build.
-Axes, points/lines, volume/slice and CPU-isosurface integration, plus the real-data demos, remain open. Their
-Figure APIs reject with coded help before publication. The original 28-case demos now pass every assertion,
-including label/colour-bar clearance, but their browser teardown still fails; lane-A owns that repair.
-All eight current head/star screenshots were visually reviewed at 390 x 844 and 1440 x 900 on both existing
-backends: titles, ticks and colour bars remain separate and visible. Hashes and the precise backend distinction
-are recorded in `test-results/sciviz-fixes/label-review.json`. This closes the visual-review gap, not teardown.
+All 346 scoped CPU tests and strict eight-image native parity now pass on Chromium/RTX A6000,
+including real context restoration and resource disposal with NO_ERROR. The initial-frame clear must also cover
+pixels outside the first view scissor; the preview now does this after rectangle validation and preserves later
+views. NaN holes reject whole triangles, with finite one-sided normals at missing-data boundaries. The protocol
+waits until the context-lost event has fully dispatched before requesting restoration, using one posted task.
+Scott's optional-size ruling keeps the existing driver boundary and raises root/driver ceilings from
+36,802/4,442 B to their measured 36,916/4,476 B. The root previously measured 36,802 B; driver 4,288 B.
+The extra bytes preserve missing-data parity and generation-safe disposal. Splitting the shared shader adds
+an artificial async loader/restore contract; splitting cleanup divides ownership of one resource generation.
+Only the repeated GL receiver alias survives the stopped size work; byte-only shader/message changes and the
+pipeline helper are dropped. Core + stage stays 23,924 B under 25,000. Full package GPU/README gates follow.
+Axes, points/lines, volumes/slices, integrated CPU isosurfaces and real native demos remain pending.
 No exclusive lock, benchmark, paired wall-clock measurement or timing assertion is part of this piece.
 
 

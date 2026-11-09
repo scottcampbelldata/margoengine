@@ -288,12 +288,24 @@ window.runWebGLChecks = async () => {
       const restored = new Promise((resolve) =>
         canvas.addEventListener('webglcontextrestored', resolve, { once: true }),
       );
+      // A promise listener resumes at a microtask checkpoint inside dispatch.
+      // WEBGL_lose_context permits restoration only after that dispatch completes.
+      await new Promise((resolve) => {
+        const channel = new MessageChannel();
+        channel.port1.onmessage = () => {
+          channel.port1.close();
+          channel.port2.close();
+          resolve();
+        };
+        channel.port2.postMessage(null);
+      });
       extension.restoreContext();
-      await restored;
-      await recovery;
+      await Promise.all([restored, recovery]);
       await lostFigure.ready();
+      checkGL('actual context restoration');
       equal(encode(await pixels(lostFigure)), image, 'actual context loss reconstructs every surface pixel');
       lostFigure.dispose();
+      checkGL('restored layer disposal');
       checks.push('actual WEBGL_lose_context event and restoration preserve pixels');
       const figure = await make();
       await figure.ready();

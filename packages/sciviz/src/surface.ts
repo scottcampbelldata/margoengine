@@ -63,28 +63,36 @@ fn height(i: i32, j: i32) -> f32 {
   return heights[u32(clamp(j, 0, ny - 1) * nx + clamp(i, 0, nx - 1))];
 }
 fn isNan(v: f32) -> bool { return (bitcast<u32>(v) & 0x7fffffffu) > 0x7f800000u; }
+fn difference(a: f32, b: f32, h: f32, span: f32) -> f32 {
+  let x = isNan(a); let y = isNan(b);
+  return (select(b, h, y) - select(a, h, x)) / max(span - f32(u32(x) + u32(y)), 1.0);
+}
 @vertex fn vertex(@builtin(vertex_index) index: u32) -> Out {
   let cells = surface.size.x - 1u;
   let cell = index / 6u;
   let corner = index % 6u;
   let di = select(0u, 1u, corner == 1u || corner == 2u || corner == 4u);
   let dj = select(0u, 1u, corner == 2u || corner == 4u || corner == 5u);
-  let i = i32(cell % cells + di);
-  let j = i32(cell / cells + dj);
+  let x = i32(cell % cells); let y = i32(cell / cells);
+  let i = x + i32(di);
+  let j = y + i32(dj);
+  let p = vec2i(i, j);
   let h = height(i, j);
-  let dx = surface.grid.y;
-  let dy = surface.grid.w;
-  let gx = (height(i + 1, j) - height(i - 1, j)) / (dx * f32(min(i + 1, i32(surface.size.x) - 1) - max(i - 1, 0)));
-  let gy = (height(i, j + 1) - height(i, j - 1)) / (dy * f32(min(j + 1, i32(surface.size.y) - 1) - max(j - 1, 0)));
-  let data = vec3f(surface.grid.x + f32(i) * dx, surface.grid.z + f32(j) * dy, h);
+  let span = vec2f(min(p + vec2i(1), vec2i(surface.size.xy) - 1) - max(p - vec2i(1), vec2i(0)));
+  let gradient = vec2f(difference(height(i - 1, j), height(i + 1, j), h, span.x),
+                       difference(height(i, j - 1), height(i, j + 1), h, span.y)) / surface.grid.yw;
+  let data = vec3f(surface.grid.xz + vec2f(p) * surface.grid.yw, h);
   var out: Out;
   let world = surface.model * vec4f(data, 1.0);
   out.world = world.xyz;
   out.clip = frame.clip * world;
-  out.normal = normalize((surface.normalModel * vec4f(-gx, -gy, 1.0, 0.0)).xyz);
+  out.normal = normalize((surface.normalModel * vec4f(-gradient, 1.0, 0.0)).xyz);
   out.value = h;
-  out.cell = vec2f(f32(i), f32(j));
-  if (isNan(h)) { out.clip = vec4f(0.0, 0.0, 2.0, 1.0); }
+  out.cell = vec2f(p);
+  if (isNan(height(x, y)) || isNan(height(x + 1, y + 1)) ||
+      isNan(height(x + select(0, 1, corner < 3u), y + select(1, 0, corner < 3u)))) {
+    out.clip = vec4f(0.0, 0.0, 2.0, 1.0);
+  }
   return out;
 }
 @fragment fn fragment(in: Out) -> @location(0) vec4f {

@@ -79,33 +79,38 @@ commit/dirty metadata. All eight unchanged sizes-page tests pass. The prior full
 verify's sole failure was this record gate; only that failed step was rerun as
 requested. Core + stage remains 23,924 B gzip under the unchanged 25,000 B cap.
 
-Continuation: all 28 demo cases passed their assertions, including the existing 8 CSS-pixel axis/colour-bar
-clearance checks. All eight current head/star screenshots were visually reviewed at the two viewport sizes;
-`test-results/sciviz-fixes/label-review.json` pins the captures. Browser shutdown still fails, so the suite as a
-whole remains failed. No screenshot or timing assertion was loosened.
+### Corrected: native sciviz missing-data parity and resource lifetime
 
-### Sciviz WebGL2 implementation in progress (batch 181 job 1, 2026-11-10)
+The review fixes are on main through 7289abf3b. Teardown is fixed on main and
+the CPU-only hold is over. This local native drawing piece now passes the strict
+eight-image WebGPU/native-WebGL2 parity gate, including actual context loss,
+live reboots, hostile GL state and disposal with NO_ERROR. The root measures
+36,916 B gzip (previously 36,802 B) and /webgl2 4,476 B (previously 4,288 B).
+Scott's optional-size ruling raises their ceilings from 36,802/4,442 B to those
+measured sizes. Another split would add an artificial shader loader and divide
+GL-generation ownership. Readable shaders and full errors are retained; only a
+local GL receiver alias survives the stopped size work. Pixel bounds and timeouts
+are unchanged. Native drawing remains an incomplete feature: axes,
+points/lines, volumes/slices, integrated CPU isosurfaces and real demos are pending.
 
-The existing Figure rejects engines with backend `webgl2` in `SciRenderer.setup`; its layers own WebGPU buffers
-and pipelines. The points and lines plugins also leave that preview backend undrawn, so removing the guard alone
-would silently lose the catalogue and wind data. The optional `/fallback` entry now provides the CPU marching-cubes
-foundation using the GPU's derived table, with independent scalar and real-MRI tests. A separate optional
-`/webgl2` drawing piece now connects Figure surfaces and rectangles to native GL, with retained-data restoration
-and explicit state ownership. Its correctness run is queued; execution/parity is not yet claimed. Axes, points/lines,
-volumes/slices, integrated CPU isosurfaces and the three demos remain to be implemented. The adapter requires
-axes:false and unsupported Figure calls reject before publishing, so it cannot silently lose star or wind data.
+The gate first stalled because its promise resumed inside webglcontextlost
+dispatch; restoration is forbidden until dispatch completes. A MessageChannel
+task fixes the test protocol without a sleep, retry or increased timeout. Then
+the unchanged pixel gate exposed an initial-frame clear missing outside the
+native first-view scissor (35,148 black pixels), plus undefined NaN arithmetic
+and partially clipped missing-sample triangles. The preview now initialises the
+whole first frame after validating draw rectangles. Both surface shaders reject
+complete missing triangles and use finite one-sided differences beside a missing
+sample. Native resource disposal ignores an entire already-invalid context
+generation, using its linked program as validity witness; current owned programs
+are unbound before deletion. Errors-page coverage also exposed missing sciviz
+literal help messages, now registered against the existing regression.
 
-First native drawing run: all eight WebGPU cases passed; the native WebGL2 bar produced/restored the same
-pixels and passed hostile-state image/identity comparisons, but its final `gl.getError() === NO_ERROR` assertion
-failed. Reproduce with the shared lock around `node packages/sciviz/tests/webgl2-browser.mjs` after building.
-The strict diagnostic isolated `useProgram` at bar reboot: the preview renderer deleted its still-current
-program during live restore. Deletion leaves it bound; a later plugin's state scope saves the flagged object,
-switches programs and cannot rebind the now-deleted object. The owning preview renderer now releases only its
-own current binding before deletion, on restore and disposal. The unit regression fails before the repair and
-passes afterwards; the unchanged native GL browser checkpoints are deferred under the coordinator's CPU-only
-instruction until the remaining browser teardown repair lands on origin/main. No GPU lock is requested. Evidence:
-`test-results/sciviz-fixes/webgl-gl-diagnostic.*`, `program-lifetime-before.log`, `program-lifetime-after.log`.
-No native surface parity or full-job completion is claimed until the browser gate passes. This piece stays local.
+Evidence: resume-webgl-native*.log, resume-webgl-parity-fixed.log (NaN failure),
+resume-webgl-checkpoint-native.log (pass), webgl2-pixels.json and webgl-sizes.json
+under test-results/sciviz-fixes. All 346 scoped CPU tests pass. Full package GPU,
+README and size-record gates must run on the final eligible tree before push.
+The old frozen records remain intact until a final coherent pair is regenerated.
 
 ### Fixed 2026-11-10: per-voxel half-float allocation churn
 

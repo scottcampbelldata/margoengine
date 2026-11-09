@@ -88,17 +88,21 @@ fetches, retaining every grid cell, central-difference normals, contours, grid s
 the caller's GL state, uses the engine view's viewport/scissor and shares its depth buffer with core meshes.
 `webglRestore()` rebuilds layer resources from retained data, including the latest height update.
 The preview renderer releases its own current program before live rebuild/disposal, allowing a layer's
-GL state scope to restore a valid binding. CPU regression tests cover this; native reboot validation is pending.
+GL state scope to restore a valid binding. CPU and real-context regressions cover this. Missing samples reject their whole triangles; normals beside them use available one-sided differences.
 Root `Figure.create` continues to select WebGPU. Importing the root or CPU extractor never loads this driver.
 
 `npm run test:webgl2 --workspace @margoengine/sciviz` checks the two real engine backends, restoration,
 updates, NaN holes and caller GL state. Its fixed parity bound counts every pixel: at most 0.1% with any
 RGB channel difference above 2/255, mean per-pixel maximum-channel difference at most 0.25/255.
-Run it under the shared GPU lock. The first run passed all eight WebGPU cases, then native WebGL2's bar case
-failed its no-GL-error assertion. Phase checks are queued to isolate the invalid call; parity is not yet proved.
+Run it under the shared GPU lock. The strict eight-image gate now passes on both backends, including actual
+context loss and restoration. The first-view canvas clear includes pixels outside its scissor.
 No speed or other-browser/hardware claim is made.
-The driver entry measures 4,288 B min+gzip, plus the separately shared Figure root. The CPU extraction entry
-does not load it. Existing size ceilings are unchanged.
+The corrected driver measures 4,476 B min+gzip (previously 4,288 B; ceiling 4,442 to 4,476 B); the shared root
+measures 36,916 B (previously 36,802 B; ceiling 36,802 to 36,916 B). These optional ceilings follow Scott's
+2026-11-10 ruling. The bytes retain complete missing-triangle rejection, finite boundary normals and safe GL
+resource disposal. Another split would add an artificial shader loader and divide resource ownership. The
+existing optional driver boundary stays intact; the CPU extractor does not load it. Core + stage is 23,924 B
+under its unchanged 25,000 B limit. Pixel bounds and timeouts are unchanged.
 
 ## A first WebGPU figure
 

@@ -224,6 +224,7 @@ export class GLRenderer implements Renderer {
         'WebGL2 cannot draw a view into a texture; use the WebGPU backend for target views',
       );
     if (this.intercept) return this.intercept(camera, batches, view);
+    let started = false;
     const context: PassContext = {
       backend: 'webgl2',
       gl,
@@ -253,6 +254,14 @@ export class GLRenderer implements Renderer {
               : options.scissor;
         validateRectangle(viewport, width, height);
         validateRectangle(scissor, width, height);
+        // As on WebGPU, initialise outside the first view's scissor too.
+        if (!started && !view?.index) {
+          gl.disable(gl.SCISSOR_TEST);
+          gl.colorMask(true, true, true, true);
+          gl.clearColor(...(this.clear as [number, number, number, number]));
+          gl.clear(gl.COLOR_BUFFER_BIT);
+        }
+        started = true;
         const named = context.view?.clear?.color,
           clearColor = options.clear ?? (named === false ? false : typeof named === 'string' || !context.view?.index),
           clearDepth = options.clearDepth ?? context.view?.clear?.depth ?? options.clear ?? true;

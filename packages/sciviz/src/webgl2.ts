@@ -45,21 +45,28 @@ out vec3 normal;
 out float value;
 out vec2 cell;
 float heightAt(int i, int j) { return texelFetch(heights, clamp(ivec2(i, j), ivec2(0), size - 1), 0).r; }
+bool missing(float v) { return (floatBitsToUint(v) & 0x7fffffffu) > 0x7f800000u; }
+float difference(float a, float b, float h, float span) {
+  bool x = missing(a), y = missing(b);
+  return ((y ? h : b) - (x ? h : a)) / max(span - float(int(x) + int(y)), 1.0);
+}
 void main() {
   int c = gl_VertexID / 6;
   int corner = gl_VertexID % 6;
   int i = c % (size.x - 1) + int(corner == 1 || corner == 2 || corner == 4);
   int j = c / (size.x - 1) + int(corner == 2 || corner == 4 || corner == 5);
   float h = heightAt(i, j);
-  float gx = (heightAt(i + 1, j) - heightAt(i - 1, j)) / (grid.y * float(min(i + 1, size.x - 1) - max(i - 1, 0)));
-  float gy = (heightAt(i, j + 1) - heightAt(i, j - 1)) / (grid.w * float(min(j + 1, size.y - 1) - max(j - 1, 0)));
+  float gx = difference(heightAt(i - 1, j), heightAt(i + 1, j), h, float(min(i + 1, size.x - 1) - max(i - 1, 0))) / grid.y;
+  float gy = difference(heightAt(i, j - 1), heightAt(i, j + 1), h, float(min(j + 1, size.y - 1) - max(j - 1, 0))) / grid.w;
   vec4 w = model * vec4(grid.x + float(i) * grid.y, grid.z + float(j) * grid.w, h, 1.0);
   world = w.xyz;
   normal = normalize((normalModel * vec4(-gx, -gy, 1.0, 0.0)).xyz);
   value = h;
   cell = vec2(i, j);
   gl_Position = clip * w;
-  if (isnan(h)) gl_Position = vec4(0.0, 0.0, 2.0, 1.0);
+  int x = c % (size.x - 1), y = c / (size.x - 1);
+  if (missing(heightAt(x, y)) || missing(heightAt(x + 1, y + 1)) ||
+      missing(heightAt(x + int(corner < 3), y + int(corner >= 3)))) gl_Position = vec4(0.0, 0.0, 2.0, 1.0);
 }`;
 const surfaceFragment = `${header}${lighting}
 uniform sampler2D colours;
@@ -260,10 +267,14 @@ class Resources implements FallbackDraw {
   dispose(): void {
     if (this.#disposed) return;
     this.#disposed = true;
-    this.gl.deleteProgram(this.program);
-    this.gl.deleteVertexArray(this.vao);
-    for (const b of this.buffers) this.gl.deleteBuffer(b);
-    for (const t of this.textures) this.gl.deleteTexture(t);
+    const gl = this.gl;
+    // After a real loss every object in this linked-program resource group is invalid.
+    if (!gl.isProgram(this.program)) return;
+    if (gl.getParameter(gl.CURRENT_PROGRAM) === this.program) gl.useProgram(null);
+    gl.deleteProgram(this.program);
+    gl.deleteVertexArray(this.vao);
+    for (const b of this.buffers) gl.deleteBuffer(b);
+    for (const t of this.textures) gl.deleteTexture(t);
   }
 }
 

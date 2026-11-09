@@ -198,6 +198,7 @@ test('WebGL clears the full attachment with scissor disabled and honors clear:fa
     draw({ scissor: [1, 2, 3, 4] });
   });
   assert.deepEqual(h.clears, [
+    { mask: 16384, scissorEnabled: false },
     { mask: 16640, scissorEnabled: true },
     { mask: 16640, scissorEnabled: true },
   ]);
@@ -214,6 +215,19 @@ test('WebGL clears the full attachment with scissor disabled and honors clear:fa
     h.draws.every((draw) => draw.scissorEnabled),
     'scissor is re-enabled for the actual indexed draws',
   );
+});
+
+test('WebGL initialises outside the first view scissor and preserves it for later views', (t) => {
+  const h = glDrawHarness(t),
+    view = { index: 0, count: 2, rect: [0, 0, 160, 120], scissor: [9, 13, 25, 17] };
+  h.frame(undefined, view);
+  assert.deepEqual(h.clears, [
+    { mask: 16384, scissorEnabled: false },
+    { mask: 16640, scissorEnabled: true },
+  ]);
+  h.clears.length = 0;
+  h.frame(undefined, { ...view, index: 1 });
+  assert.deepEqual(h.clears, [{ mask: 256, scissorEnabled: true }]);
 });
 
 for (const option of ['viewport', 'scissor'])

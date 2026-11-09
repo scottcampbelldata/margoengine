@@ -193,6 +193,7 @@ export function glDrawHarness(t) {
         trace.push(['disable', capability]);
       },
       clearColor() {},
+      colorMask() {},
       clear(mask) {
         clears.push({ mask, scissorEnabled: enabled.has(gl.SCISSOR_TEST) });
         trace.push(['clear', mask]);

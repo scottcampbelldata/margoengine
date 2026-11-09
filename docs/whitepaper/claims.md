@@ -10,8 +10,8 @@ No throughput or cross-hardware claim.
 Native GL reboot ownership repair (batch 181): the preview renderer releases its current program before
 deletion on live restoration and disposal, so another plugin does not retain a binding that becomes invalid
 when switched away. Foreign current programs are preserved. `preview-webgl.test.js` is the failing-before,
-passing-after CPU regression for owned, foreign and null bindings; sciviz's existing strict real-context reboot
-checkpoints are deferred pending the browser teardown repair on origin/main. This is a
+passing-after CPU regression for owned, foreign and null bindings; sciviz's strict real-context reboot
+checkpoints now pass after main's teardown repair. This is a
 resource-lifetime claim only; no new hardware, pixel-equivalence or speed claim follows.
 
 Batch 181 native drawing piece (2026-11-10): `sciviz/webgl2` implements CPU-backed height surfaces and
@@ -19,9 +19,11 @@ instanced rectangles on an engine whose actual backend is WebGL2, without a WebG
 extractor do not load that optional implementation. `packages/sciviz/tests/webgl2.test.js` checks delegation,
 latest-height restore, ownership, resource limits and explicit unsupported paths. The browser test checks
 both real engine backends, all-pixel parity, update/NaN/opacity/contour cases, live reconstruction and GL state.
-Its GPU run is queued; no observed parity, full-job completion, speed or other-hardware claim is made yet.
-The first attempt passed all eight WebGPU cases and failed native WebGL2 bar's no-error check; strict phase
-diagnostics are queued. This is an open failure, not accepted pixel or performance variance.
+All eight image pairs pass the unchanged all-pixel bounds on Chromium/RTX A6000, including real
+WEBGL_lose_context restoration, hostile GL state, live reboots and disposal with NO_ERROR. Complete
+missing-triangle rejection and finite one-sided normals preserve parity at NaN holes. The first-view frame
+clear also covers pixels outside its scissor. Evidence: resume-webgl-checkpoint-native.log and webgl2-pixels.json
+in test-results/sciviz-fixes. No full-job completion, speed or other-hardware claim is made.
 Axes, points/lines, volume/slice and CPU-isosurface integration and all three real-data demos are still owed.
 
 CPU isosurface foundation (2026-11-10): `@margoengine/sciviz/fallback` extracts without a GPU using the existing

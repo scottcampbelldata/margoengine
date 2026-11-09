@@ -484,3 +484,5 @@ below what the layer needs rejects with the layer's `unsupported` error, which n
 Apache-2.0. Optional, tree-shakable package; core peer: ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/webgl2-compat
+
+The native preview initialises the whole first frame before applying a view scissor, matching the WebGPU canvas background outside plot margins. Later views retain that frame. Invalid draw rectangles reject before any clear. Live resource rebuilds unbind only the preview's own current program before deletion.
