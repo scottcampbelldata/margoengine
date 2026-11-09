@@ -4501,6 +4501,18 @@ process creation time before waiting, so recycled PIDs cannot spend the shutdown
 budget on an unrelated replacement. Both cases have regression coverage in
 `tests/browser-teardown.test.js`; no timeout or assertion was relaxed.
 
+### Unverified: test-page 45 compatibility path-tracer disposal hang
+
+The live test-page log reports a Chromium/Edge ANGLE Direct3D11 hang after
+installCompat({force:true}), Engine.create(canvas), VoxelPathTracer.attach(engine,
+{scene}), tracer.dispose(), engine.dispose(). The reported stopping point is
+CompatDevice.destroy's WEBGL_lose_context.loseContext call; the claimed cause is
+unreleased float-target/compute state from the path tracer compatibility route.
+That attribution still needs independent reproduction and root-cause proof.
+The coordinator requires the existing local test-page follow-ups to land first;
+entry 45 is retained for subsequent owning-package triage, alongside 42-44 in
+testpage-bugs.md. No core change is implied by this report.
+
 ### Open: test-page 36 writable mesh transform references; 32 assignment consistency
 
 On main 6ebbd1aa4, create a mesh, assign `mesh.position = [0, -2.5, 0]`

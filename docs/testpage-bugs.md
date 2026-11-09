@@ -281,3 +281,20 @@ test was loosened. The failed verify stopped its remaining unit/API chains, so a
 complete verify is still required. The next run uses the original landing's
 MARGO_RESULT_CACHE=off environment: optional shadow recording is disabled, and
 every actual check still runs.
+
+The repaired follow-up gates pass: lint 6 s, hygiene 43.2 s, full verify
+593.6 s (590.5 s reported internally), including 13,517 unit tests with zero
+failures/skips, all 20 proof scenarios, 887 API entries/8,638 exports, and all
+970 quality size entries against unchanged budgets. Logs and result JSON use
+test-results/testpage-followup-repaired-*. The labels package unit suite and
+scoped API regeneration also pass. Only the queued labels/netcode/tiles browser
+and six-package executable README runs remain before the required first push.
+An earlier GPU wait expired without starting a test; the replacement has an
+explicit 59-minute wait and 20-minute hold limit, owned by codex-testpage.
+
+The 11:25 EST live BUGS.md reread adds entry 45: with forced WebGL2 compatibility,
+attach VoxelPathTracer, dispose the tracer, then dispose its engine. The report
+attributes an ANGLE/Direct3D11 loseContext hang to float targets/compute state.
+That cause is not yet independently confirmed. Preserve this new entry for
+reproduction and owning-package triage after the coordinator's required local
+landing; do not count it as fixed or silently omit it.
