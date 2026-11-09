@@ -2498,3 +2498,11 @@ The variant cache has at most 256 masks, with a constant eight-slot construction
 geometry or image loop is introduced. CPU renderer regressions check bindings and all eight
 authored slots independently. The full actual-device viewer assertions now pass on compatibility.
 Core, stage root and physics are untouched. No measured speed or whole-material-conformance claim.
+
+### Direct glTF GPU input evidence: section 5 (batch 56 audit)
+
+The extension harness now requires its four external sample families through verify's hash-checked
+resolver. An unset environment override no longer bypasses those cases. The root contract test
+checks helmet, IBL, skull and tower validation and bans optional-presence branches in this harness.
+The existing resolver tests exercise missing, partial, changed and LFS-only content. Real GPU
+assertions use the existing outside files; no new reference image or tolerance is substituted.

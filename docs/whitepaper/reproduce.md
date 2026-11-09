@@ -993,3 +993,11 @@ transmission-factor lens, uses IBL plus a floor shadow. Before the repair ANGLE 
 texture image units exceeding MAX_TEXTURE_IMAGE_UNITS(16), the frame loop stopped and the
 turntable assertion failed. The same unchanged assertions pass after unused physical maps are
 replaced by exact fallback constants and omitted from the bind group.
+
+### Batch 56 audit: mandatory direct glTF GPU inputs
+
+Run node scripts/support/external-test-assets.mjs, then run the gltf-pro test:extensions:browser
+script through the GPU lock. No environment override is required for the normal shared cache.
+For a missing or changed input, use the named fetch-skip-assets recovery command. The four cases
+now actually consume their validated files. Run tests/external-test-assets.test.js for the cache
+failure regressions and the direct-harness contract checked by verify/check:merge.

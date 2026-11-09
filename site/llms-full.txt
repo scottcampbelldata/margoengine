@@ -4135,6 +4135,13 @@ fully textured combinations can still exceed device texture limits. This repairs
 transmission lens with image lighting and shadowing on a 16-unit WebGL2 compatibility device.
 Native WebGL2 still refuses glTF PBR. No speed claim or core/stage-root size change.
 
+### Required direct extension GPU inputs (batch 56 audit)
+
+The direct gltf-pro extension GPU check requires the same external cache as verify, or the explicit
+MARGO_SPLAT_SAMPLES override. Its helmet, IBL, skull and tower cases fail for absent or changed
+inputs rather than reporting success without running their assertions. This is a validation repair,
+with no package runtime bytes, rendering feature or performance result.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -6050,6 +6057,15 @@ refused the program on its 16-unit device, and the viewer frame loop stopped. Na
 shaders and group 1 now omit absent extension slots, substituting their exact fallback constants.
 Authored maps and custom hook resource contracts remain intact. Regression:
 gltf-pro/tests/physical-map-renderer.test.js and the real stage-viewer-gpu-check.js --compat.
+
+### Batch 56 direct GPU input validation (resolved)
+
+The gltf-pro extension GPU harness looked only at MARGO_SPLAT_SAMPLES and returned successfully
+when four sample families were absent, even when verify had validated the normal shared cache.
+Each case now uses externalAssetRoot and requireExternalAssets. The root external-test-assets
+regression, included in verify/check:merge, prevents optional-presence branches from returning.
+Missing, partial, changed and LFS-only caches retain the helper's tested hard failures and recovery
+command. No renderer change or new third-party input.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 

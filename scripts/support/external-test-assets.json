@@ -2123,5 +2123,173 @@
     "sha256": "b63a1ec0d388b5ffe22fc65812ad0e91a28eefb5c4d552fe86417685d356a6ab",
     "licence": "CC-BY-4.0 with trademark limitations (Cesium 2017 BoxTextured), hosted Blender 5.1 USDZ conversion by Needle; no engine code",
     "licenceUrl": "https://asset-explorer.needle.tools/BoxTextured"
+  },
+  {
+    "file": "helmet/FlightHelmet.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390/Models/FlightHelmet/glTF-KTX-BasisU/FlightHelmet.gltf",
+    "sha256": "7b9fba86f509582754421ecd3cc991540b86fbd11537099af0085e8e7fd2f2be",
+    "size": 15843,
+    "licence": "CC0-1.0 (Gary Hsu and Microsoft)"
+  },
+  {
+    "file": "helmet/FlightHelmet.bin",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390/Models/FlightHelmet/glTF-KTX-BasisU/FlightHelmet.bin",
+    "sha256": "3d93548c0fee7d3695015e86171edaffe8cbb6d090459c54370d7acc6dc7999a",
+    "size": 3227148,
+    "licence": "CC0-1.0 (Gary Hsu and Microsoft)"
+  },
+  {
+    "file": "helmet/FlightHelmet_Materials_RubberWoodMat_Normal.ktx2",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390/Models/FlightHelmet/glTF-KTX-BasisU/FlightHelmet_Materials_RubberWoodMat_Normal.ktx2",
+    "sha256": "a8ddc6f2ef0df6f01fd4d29ae52b3d9f371bb4115437a3238c76558ca6b02465",
+    "size": 3469735,
+    "licence": "CC0-1.0 (Gary Hsu and Microsoft)"
+  },
+  {
+    "file": "helmet/FlightHelmet_Materials_RubberWoodMat_OcclusionRoughMetal.ktx2",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390/Models/FlightHelmet/glTF-KTX-BasisU/FlightHelmet_Materials_RubberWoodMat_OcclusionRoughMetal.ktx2",
+    "sha256": "8d64c98f1caf8c9e2c09a63e0a87fe73373590ce4a2ca2898081d73477d2d063",
+    "size": 3507563,
+    "licence": "CC0-1.0 (Gary Hsu and Microsoft)"
+  },
+  {
+    "file": "helmet/FlightHelmet_Materials_RubberWoodMat_BaseColor.ktx2",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390/Models/FlightHelmet/glTF-KTX-BasisU/FlightHelmet_Materials_RubberWoodMat_BaseColor.ktx2",
+    "sha256": "78ec356c80127ae0e0c4d2d518835ee87aacc4433a33916e494ed218333af98b",
+    "size": 441540,
+    "licence": "CC0-1.0 (Gary Hsu and Microsoft)"
+  },
+  {
+    "file": "helmet/FlightHelmet_Materials_GlassPlasticMat_Normal.ktx2",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390/Models/FlightHelmet/glTF-KTX-BasisU/FlightHelmet_Materials_GlassPlasticMat_Normal.ktx2",
+    "sha256": "0bde000da96cd191c9ac33398898994bb169d2b036e39f29dd1f610d1dd87b7c",
+    "size": 2758459,
+    "licence": "CC0-1.0 (Gary Hsu and Microsoft)"
+  },
+  {
+    "file": "helmet/FlightHelmet_Materials_GlassPlasticMat_OcclusionRoughMetal.ktx2",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390/Models/FlightHelmet/glTF-KTX-BasisU/FlightHelmet_Materials_GlassPlasticMat_OcclusionRoughMetal.ktx2",
+    "sha256": "78bc3c654262ae22975274a8d8a6758112ef1e4a1c3ebd6675e18948e9967e4f",
+    "size": 3822463,
+    "licence": "CC0-1.0 (Gary Hsu and Microsoft)"
+  },
+  {
+    "file": "helmet/FlightHelmet_Materials_GlassPlasticMat_BaseColor.ktx2",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390/Models/FlightHelmet/glTF-KTX-BasisU/FlightHelmet_Materials_GlassPlasticMat_BaseColor.ktx2",
+    "sha256": "6ed2e12a1f2674bfd0b744feb3581b7527eb711c9e6a03ce6b0ef58431a9668a",
+    "size": 311727,
+    "licence": "CC0-1.0 (Gary Hsu and Microsoft)"
+  },
+  {
+    "file": "helmet/FlightHelmet_Materials_MetalPartsMat_Normal.ktx2",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390/Models/FlightHelmet/glTF-KTX-BasisU/FlightHelmet_Materials_MetalPartsMat_Normal.ktx2",
+    "sha256": "0bcbb79128829cc24918f0a490bdbb04bddc1b5e377461ae4116c4b1af23cdc0",
+    "size": 3555793,
+    "licence": "CC0-1.0 (Gary Hsu and Microsoft)"
+  },
+  {
+    "file": "helmet/FlightHelmet_Materials_MetalPartsMat_OcclusionRoughMetal.ktx2",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390/Models/FlightHelmet/glTF-KTX-BasisU/FlightHelmet_Materials_MetalPartsMat_OcclusionRoughMetal.ktx2",
+    "sha256": "929107fa88ec2d5dda4cca2fda795b8aca782a6c4b19754671748423b466c617",
+    "size": 3110408,
+    "licence": "CC0-1.0 (Gary Hsu and Microsoft)"
+  },
+  {
+    "file": "helmet/FlightHelmet_Materials_MetalPartsMat_BaseColor.ktx2",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390/Models/FlightHelmet/glTF-KTX-BasisU/FlightHelmet_Materials_MetalPartsMat_BaseColor.ktx2",
+    "sha256": "a449314ab2bb48dee6beb7ab0fff70821b0f60f0c6d7713e94928c84b799c429",
+    "size": 474341,
+    "licence": "CC0-1.0 (Gary Hsu and Microsoft)"
+  },
+  {
+    "file": "helmet/FlightHelmet_Materials_LeatherPartsMat_Normal.ktx2",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390/Models/FlightHelmet/glTF-KTX-BasisU/FlightHelmet_Materials_LeatherPartsMat_Normal.ktx2",
+    "sha256": "b8001bbc10520089675aa621cef422b37dce95f3bb905e8514ad8f5141b70c47",
+    "size": 3814941,
+    "licence": "CC0-1.0 (Gary Hsu and Microsoft)"
+  },
+  {
+    "file": "helmet/FlightHelmet_Materials_LeatherPartsMat_OcclusionRoughMetal.ktx2",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390/Models/FlightHelmet/glTF-KTX-BasisU/FlightHelmet_Materials_LeatherPartsMat_OcclusionRoughMetal.ktx2",
+    "sha256": "afc8dde5b4fc044035b3ea263cae731d54cc53b4af229f790434edfab3d7b043",
+    "size": 4157862,
+    "licence": "CC0-1.0 (Gary Hsu and Microsoft)"
+  },
+  {
+    "file": "helmet/FlightHelmet_Materials_LeatherPartsMat_BaseColor.ktx2",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390/Models/FlightHelmet/glTF-KTX-BasisU/FlightHelmet_Materials_LeatherPartsMat_BaseColor.ktx2",
+    "sha256": "a2e9a07e50a86550421cb69efdbae096a0530a491a18d072da96bf14e43991e8",
+    "size": 493130,
+    "licence": "CC0-1.0 (Gary Hsu and Microsoft)"
+  },
+  {
+    "file": "helmet/FlightHelmet_Materials_LensesMat_Normal.ktx2",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390/Models/FlightHelmet/glTF-KTX-BasisU/FlightHelmet_Materials_LensesMat_Normal.ktx2",
+    "sha256": "b240ec01ac1507a1310d765a277055d731ba9cd432cc905715cfba026f6e7fb8",
+    "size": 1685,
+    "licence": "CC0-1.0 (Gary Hsu and Microsoft)"
+  },
+  {
+    "file": "helmet/FlightHelmet_Materials_LensesMat_OcclusionRoughMetal.ktx2",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390/Models/FlightHelmet/glTF-KTX-BasisU/FlightHelmet_Materials_LensesMat_OcclusionRoughMetal.ktx2",
+    "sha256": "7ddf10e67bdf7283fa9cd9bc48871566073d680d4c931742a0805c6735c204c6",
+    "size": 703897,
+    "licence": "CC0-1.0 (Gary Hsu and Microsoft)"
+  },
+  {
+    "file": "helmet/FlightHelmet_Materials_LensesMat_BaseColor.ktx2",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390/Models/FlightHelmet/glTF-KTX-BasisU/FlightHelmet_Materials_LensesMat_BaseColor.ktx2",
+    "sha256": "f9f709a21f50974ec7fb3f3098f0968954822e1cde0d35a375bc23acbcd8e5f7",
+    "size": 93420,
+    "licence": "CC0-1.0 (Gary Hsu and Microsoft)"
+  },
+  {
+    "file": "ibl/EnvironmentTest.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390/Models/EnvironmentTest/glTF-IBL/EnvironmentTest.gltf",
+    "sha256": "43bb563c795f299fd14a2c0f3127f921768a7be1510f41310a6b046fde723679",
+    "size": 19371,
+    "licence": "Adobe Stock License (Adobe Dimension sample; external test only)"
+  },
+  {
+    "file": "ibl/EnvironmentTest_binary.bin",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390/Models/EnvironmentTest/glTF-IBL/EnvironmentTest_binary.bin",
+    "sha256": "7c7a285d3ebd57900023cd56182a07da7ea52acf2b22b1a6320f747290fdf56e",
+    "size": 1414042,
+    "licence": "Adobe Stock License (Adobe Dimension sample; external test only)"
+  },
+  {
+    "file": "ibl/EnvironmentTest_images/roughness_metallic_0.png",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390/Models/EnvironmentTest/glTF-IBL/EnvironmentTest_images/roughness_metallic_0.png",
+    "sha256": "0e07400f4b9a0cb0cd625a65018fac96516a1e98be4a6c85fe618076a0c620df",
+    "size": 624,
+    "licence": "Adobe Stock License (Adobe Dimension sample; external test only)"
+  },
+  {
+    "file": "ibl/EnvironmentTest_images/roughness_metallic_1.png",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390/Models/EnvironmentTest/glTF-IBL/EnvironmentTest_images/roughness_metallic_1.png",
+    "sha256": "2709360619580ae8aace9fc7afb94a80ba6b987297948829f4093026e80426d3",
+    "size": 624,
+    "licence": "Adobe Stock License (Adobe Dimension sample; external test only)"
+  },
+  {
+    "file": "skull/ScatteringSkull.gltf",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390/Models/ScatteringSkull/glTF/ScatteringSkull.gltf",
+    "sha256": "5c8dad085a0957359311ee4a0b946e3d8af048fbe8891a574c5969895e64ca5b",
+    "size": 5697,
+    "licence": "CC0-1.0 (Vladimir Petkovic and Adobe Inc.)"
+  },
+  {
+    "file": "skull/ScatteringSkull_binary.bin",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390/Models/ScatteringSkull/glTF/ScatteringSkull_binary.bin",
+    "sha256": "3c929421b610ee902618078fb65376bbfdb1801cb1095ba9a5174e587b0adab5",
+    "size": 6964692,
+    "licence": "CC0-1.0 (Vladimir Petkovic and Adobe Inc.)"
+  },
+  {
+    "file": "skull/ScatteringSkull_images/aoThickness.png",
+    "url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/8f492390/Models/ScatteringSkull/glTF/ScatteringSkull_images/aoThickness.png",
+    "sha256": "e3ecec5022ab19cdeedcc9a5708baacf31ea2edc8e37690adfb07ff44fd6f6a8",
+    "size": 1991579,
+    "licence": "CC0-1.0 (Vladimir Petkovic and Adobe Inc.)"
   }
 ]

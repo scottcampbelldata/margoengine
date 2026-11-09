@@ -15,7 +15,7 @@ test('all worktrees and direct tests resolve the same external assets without an
   );
   assert.equal(externalAssetRoot({ MARGO_SPLAT_SAMPLES: 'test-results/override' }), resolve('test-results/override'));
   assert.ok(SERIAL.includes('node scripts/support/external-test-assets.mjs'));
-  assert.equal(externalAssets.length, 353);
+  assert.equal(externalAssets.length, 377);
   for (const file of [
     'video/flower.mp4',
     'usdz-static/BoxTextured.blender.usdz',
@@ -90,4 +90,12 @@ test('physics sample provenance preserves the exact pinned commit in notices and
       file + ' must name ' + commit,
     );
   }
+});
+
+test('direct glTF extension GPU cases require every external family instead of silently passing absent files', () => {
+  const source = readFileSync('packages/gltf-pro/scripts/test-extensions-browser.js', 'utf8');
+  for (const family of ['helmet/', 'ibl/', 'skull/', 'tower.glb'])
+    assert.ok(source.includes(`requireExternalAssets('${family}')`), `GPU case must validate ${family}`);
+  assert.doesNotMatch(source, /process\.env\.MARGO_SPLAT_SAMPLES|\bexistsSync\s*\(/,
+    'Use the shared resolver and mandatory content validation, with no optional file-presence branch');
 });

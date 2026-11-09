@@ -1547,3 +1547,10 @@ the coat normal). The five core slots stay stable. Material hooks retain their o
 fully textured combinations can still exceed device texture limits. This repairs the FlightHelmet
 transmission lens with image lighting and shadowing on a 16-unit WebGL2 compatibility device.
 Native WebGL2 still refuses glTF PBR. No speed claim or core/stage-root size change.
+
+### Required direct extension GPU inputs (batch 56 audit)
+
+The direct gltf-pro extension GPU check requires the same external cache as verify, or the explicit
+MARGO_SPLAT_SAMPLES override. Its helmet, IBL, skull and tower cases fail for absent or changed
+inputs rather than reporting success without running their assertions. This is a validation repair,
+with no package runtime bytes, rendering feature or performance result.

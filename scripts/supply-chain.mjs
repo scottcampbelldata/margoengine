@@ -281,11 +281,11 @@ const ASSETS = [
   ],
   [
     'packages/gltf-pro/tests/fixtures/scatter/NOTICE.md',
-    'test fixture: ScatteringSkull.gltf, the material of the Khronos glTF-Sample-Assets sample (CC0-1.0, Vladimir Petkovic and Adobe Inc.)',
+    'test fixture: ScatteringSkull.gltf and its external geometry and thickness map, Khronos glTF-Sample-Assets commit 8f492390 (CC0-1.0, Vladimir Petkovic and Adobe Inc.); required hashes in scripts/support/external-test-assets.json',
   ],
   [
     'packages/gltf-pro/tests/fixtures/streaming/NOTICE.md',
-    'test fixture: a texture of the Khronos glTF-Sample-Assets FlightHelmet, glTF-KTX-BasisU (CC0-1.0, Gary Hsu and Microsoft)',
+    'test fixture: the FlightHelmet glTF-KTX-BasisU texture and all 17 external model inputs, Khronos glTF-Sample-Assets commit 8f492390 (CC0-1.0, Gary Hsu and Microsoft); required hashes in scripts/support/external-test-assets.json',
   ],
   [
     'packages/clustered/test/fixtures/NOTICE.md',
@@ -305,7 +305,7 @@ const ASSETS = [
   ],
   [
     'packages/gltf-pro/tests/fixtures/lights/NOTICE.md',
-    'test fixtures: the EXT_lights_ies Example files and LightProfile.ies from https://github.com/BabylonJS/Assets/tree/master/meshes/EXT_lights_ies (CC-BY-4.0, The Babylon.js contributors)',
+    'test fixtures: the EXT_lights_ies Example files and LightProfile.ies from https://github.com/BabylonJS/Assets/tree/master/meshes/EXT_lights_ies (CC-BY-4.0, The Babylon.js contributors); external EnvironmentTest glTF-IBL and its three companions, Khronos glTF-Sample-Assets commit 8f492390 (Adobe Stock License, Adobe Dimension sample; external test only), required hashes in scripts/support/external-test-assets.json',
   ],
   [
     'packages/gltf-pro/tests/fixtures/splats/NOTICE.md',

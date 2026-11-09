@@ -756,3 +756,10 @@ are retained; a material that really exceeds hardware limits still has that limi
 The existing loadGLTF examples apply unchanged. Run scripts/stage-viewer-gpu-check.js with --compat
 through the GPU lock for the licensed FlightHelmet integration regression, including cascaded
 shadows, IBL, visible product, turntable radius, failed-load rollback and disposal. No speed claim.
+
+### Required outside GPU samples
+
+The extension GPU harness resolves FlightHelmet, EnvironmentTest, ScatteringSkull and the large
+tower capture through the same external cache as verify. Every case validates its files and
+companions by hash. Missing files fail with the existing fetch-skip-assets recovery command; an
+unset MARGO_SPLAT_SAMPLES uses the normal shared cache. No case reports success without its input.

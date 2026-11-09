@@ -1494,3 +1494,10 @@ physical extension-map bindings and substitute their exact existing constant tex
 tests check five retained core slots, absent extension bindings and each authored physical map.
 The actual-device stage viewer harness retains every pixel, orbit-radius, rollback and disposal
 assertion on both backends. This proves that integration, not all fully textured combinations or speed.
+
+## Batch 56 audit: mandatory direct glTF GPU inputs
+
+The extension GPU harness validates its FlightHelmet, EnvironmentTest, ScatteringSkull and tower
+input families by hash with the shared external-asset resolver. The root regression prevents the
+old silent-return branches. Existing helper tests prove missing/partial/changed/LFS-only failures.
+This closes an input-validation gap; it does not add a rendering accuracy or speed claim.

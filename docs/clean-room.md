@@ -1903,3 +1903,8 @@ The [KHR_materials_transmission specification](https://github.com/KhronosGroup/g
 defines the authored factor and optional map. Only specifications and existing Margo implementation
 were inspected. The exact normal fallback retains Margo's existing UNORM texel. No third-party
 implementation source was read or added. FlightHelmet is an already recorded licensed fixture.
+
+### Batch 56 direct GPU input validation
+
+Reuses Margo's existing external-asset resolver, pinned hash manifest and supply-chain notices.
+No downloaded implementation, asset substitution, shader or rendering algorithm is introduced.

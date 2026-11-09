@@ -1911,3 +1911,12 @@ refused the program on its 16-unit device, and the viewer frame loop stopped. Na
 shaders and group 1 now omit absent extension slots, substituting their exact fallback constants.
 Authored maps and custom hook resource contracts remain intact. Regression:
 gltf-pro/tests/physical-map-renderer.test.js and the real stage-viewer-gpu-check.js --compat.
+
+### Batch 56 direct GPU input validation (resolved)
+
+The gltf-pro extension GPU harness looked only at MARGO_SPLAT_SAMPLES and returned successfully
+when four sample families were absent, even when verify had validated the normal shared cache.
+Each case now uses externalAssetRoot and requireExternalAssets. The root external-test-assets
+regression, included in verify/check:merge, prevents optional-presence branches from returning.
+Missing, partial, changed and LFS-only caches retain the helper's tested hard failures and recovery
+command. No renderer change or new third-party input.

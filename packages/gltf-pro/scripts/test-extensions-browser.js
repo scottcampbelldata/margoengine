@@ -1,14 +1,15 @@
 // Real-GPU checks of gltf-pro's file extensions, each through the real loaders on a physical adapter. Run from the
 // repository root after `npm run build:packages`: `npm run test:extensions:browser --workspace packages/gltf-pro`.
-// MARGO_SPLAT_SAMPLES names a folder holding the large tower.glb capture (tests/fixtures/splats/NOTICE.md).
+// External samples use the same required, hash-checked cache as verify, with MARGO_SPLAT_SAMPLES as an override.
 import assert from 'node:assert/strict';
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { openBrowser } from '../../../scripts/browser.js';
 import { decodePNG } from '../../../tests/support/png.js';
 import { cubeDocument } from '../tests/support/cube-png.js';
+import { externalAssetRoot, requireExternalAssets } from '../../../scripts/support/external-test-assets.mjs';
 
 process.chdir(fileURLToPath(new URL('../../..', import.meta.url)));
 const browser = await openBrowser({ startPath: '/tests/modern-extension.html', port: 'free' }),
@@ -679,11 +680,8 @@ const checks = {
   },
   // MARGO_SPLAT_SAMPLES/helmet holds the Khronos FlightHelmet glTF-KTX-BasisU files (CC0, 33 MB, so not in the repository).
   async 'streaming: the real FlightHelmet starts from a small part of its files'() {
-    const folder = process.env.MARGO_SPLAT_SAMPLES;
-    if (!folder || !existsSync(join(folder, 'helmet/FlightHelmet.gltf'))) {
-      console.log('FlightHelmet absent: set MARGO_SPLAT_SAMPLES (packages/gltf-pro/README.md)');
-      return;
-    }
+    const folder = externalAssetRoot();
+    requireExternalAssets('helmet/');
     const names = readdirSync(join(folder, 'helmet')),
       files = Object.fromEntries(names.map((name) => [name, new Uint8Array(readFileSync(join(folder, 'helmet', name)))])),
       total = Object.values(files).reduce((sum, bytes) => sum + bytes.length, 0),
@@ -767,11 +765,8 @@ const checks = {
   },
   // Adobe Stock licence: stays out of the repository, read from MARGO_SPLAT_SAMPLES/ibl when it is there.
   async 'lights: the real EnvironmentTest (Adobe Dimension) lights its spheres'() {
-    const folder = process.env.MARGO_SPLAT_SAMPLES;
-    if (!folder || !existsSync(join(folder, 'ibl/EnvironmentTest.gltf'))) {
-      console.log('EnvironmentTest absent: set MARGO_SPLAT_SAMPLES (tests/fixtures/lights/NOTICE.md)');
-      return;
-    }
+    const folder = externalAssetRoot();
+    requireExternalAssets('ibl/');
     await page.route('**/ibl-sample/**', (route) =>
       route.fulfill({ body: readFileSync(join(folder, 'ibl', new URL(route.request().url()).pathname.split('/ibl-sample/')[1])) }),
     );
@@ -856,11 +851,8 @@ const checks = {
   // Its material as the file states it, and with the extension taken out: the skull's lit pixels leave the colour of the
   // diffuse transmission's back lobe for the file's multi-scatter colour, which has more blue than red.
   async 'scatter: the real Khronos ScatteringSkull draws'() {
-    const folder = process.env.MARGO_SPLAT_SAMPLES;
-    if (!folder || !existsSync(join(folder, 'skull/ScatteringSkull.gltf'))) {
-      console.log('ScatteringSkull absent: set MARGO_SPLAT_SAMPLES (tests/fixtures/scatter/NOTICE.md)');
-      return;
-    }
+    const folder = externalAssetRoot();
+    requireExternalAssets('skull/');
     const read = (name) => readFileSync(join(folder, 'skull', name)).toString('base64'),
       png = read('ScatteringSkull_images/aoThickness.png'),
       bin = read('ScatteringSkull_binary.bin'),
@@ -1079,11 +1071,8 @@ const checks = {
     await close();
   },
   async 'splats: the real tower capture draws'() {
-    const folder = process.env.MARGO_SPLAT_SAMPLES;
-    if (!folder || !existsSync(join(folder, 'tower.glb'))) {
-      console.log('tower.glb absent: set MARGO_SPLAT_SAMPLES (tests/fixtures/splats/NOTICE.md)');
-      return;
-    }
+    const folder = externalAssetRoot();
+    requireExternalAssets('tower.glb');
     await open();
     const bytes = readFileSync(join(folder, 'tower.glb')).toString('base64'),
       count = await page.evaluate(async (base64) => {

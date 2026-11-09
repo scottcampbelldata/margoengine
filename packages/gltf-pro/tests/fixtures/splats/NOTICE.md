@@ -8,5 +8,6 @@ Used only by the tests; not part of the published package (`files` is `dist`).
 | `minimal_point.gltf`, `minimal_point.bin` | luma.gl, `examples/showcase/gaussian-splats/fixtures/godot-minimal/` (https://github.com/visgl/luma.gl), one uncompressed splat written by the godot-gsplat sample | MIT, Copyright (c) 2026 KOGA Mitsuhiro |
 
 The real capture `tower/0/0.glb` from the same CesiumJS folder (286,868 splats, 7,499,156 bytes, sha256
-`9ef9d8d0756d1f423cd6aa8bd99f7dd26957f96df03dcbcec6e37103e39350b4`) is too large to commit. The tests that read it say
-so and pass over it when it is absent: set `MARGO_SPLAT_SAMPLES` to a folder holding it as `tower.glb`.
+`9ef9d8d0756d1f423cd6aa8bd99f7dd26957f96df03dcbcec6e37103e39350b4`) is too large to commit. The direct extension GPU check
+requires it from the shared hash-checked cache. `MARGO_SPLAT_SAMPLES` can override that cache with a folder holding it
+as `tower.glb`. Missing or changed inputs fail with `node scripts/reference-rendering/fetch-skip-assets.mjs` as recovery.
