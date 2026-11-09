@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11434568,
+  "total": 11439313,
   "history": [
     {
       "date": "2026-10-24",
@@ -4754,6 +4754,12 @@
       "commit": "batch-111",
       "reason": "New optional @margoengine/mixer/loudness, isolated from mixer root, core and stage",
       "grew": 1
+    },
+    {
+      "date": "2026-11-09",
+      "commit": "c9397eb2f",
+      "reason": "Correctness repair of all 14 extruded text review findings. Bounded font decoding and Type 2 semantics, nonzero contour union, complete visible hole triangulation, outward closed bevel meshes, and allocation limits require 10834 gzip bytes instead of 6214. Tests and core-stage size limit are unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -5459,7 +5465,7 @@
     "@margoengine/terrain/stream": 12100,
     "@margoengine/text": 16406,
     "@margoengine/text/animate": 11783,
-    "@margoengine/text/extrude": 6415,
+    "@margoengine/text/extrude": 11160,
     "@margoengine/text/msdf": 4502,
     "@margoengine/text/rich": 11403,
     "@margoengine/tilemap": 7435,

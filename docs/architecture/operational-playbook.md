@@ -1279,9 +1279,32 @@ slower baseline is invalid; compare the run's baseline against the recorded base
 | Clipping planes must cut the same in the rasterizer as by discard | `packages/materials/test/features-browser.mjs` job `clip` draws one scene on a device with the feature and on one without, reads the compiled shaders, classifies every pixel against the plane and compares the two pictures and shadows. Only an RTX A6000 has run it. |
 | Graph-side normal, parallax and colour helpers could flip a handedness or drift from the maths they name | `packages/shader/test/utils-check.mjs` reads each `@margoengine/shader/utils` node back on a real GPU: the UV origin of a `Texture` against each normal map direction, a known slope through the Mikkelsen bump, the line of sight under a flat and a sloped height field, `matcapUV` against `MatcapMaterial`, and the maths and blend nodes against JavaScript formulas |
 
+### Extruded text correctness gate (2026-11-08)
+
+`@margoengine/text/extrude` remains an optional CPU font/mesh entry; core and stage are unchanged. All binary reads
+are confined to their file/table/glyph/program span. Composite and Type 2 execution have bounded depth and work;
+subdivision options reject nonfinite/fractional/excessive values with a coded error. Contours are filled by nonzero
+winding before visible hole bridging and complete ear clipping; failed triangulations never return partial caps.
+Both outward caps and the bevel walls share terminal ring coordinates. Invalid offset geometry is rejected.
+
+`npm run check:text-extrude` is part of `check:merge:steps`, covering all extrusion tests, hostile font bytes,
+curve/transform semantics, cap area, directed edge incidence, signed volume and unit normals. The package test
+also discovers all extrusion test files. Independent reference and complete real-font runs cover Source Sans 3
+Regular 3.052 in TTF and CFF1 (2,478 glyphs each; 2,469 nonempty solids per font); ten glyphs per font are compared
+against frozen native unhinted cubic controls with a separate de Casteljau evaluator. The browser suite asserts
+WebGPU orange pixels and native WebGL2 orange pixels, then zero orange pixels with the mesh hidden. The README
+procedural font uses em coordinates and is executed as a regression case and by the README runtime gate.
+
+Evidence limits: one family, two formats, one Windows GPU/browser, no speed claim or universal font guarantee.
+CID CFF/CFF2, variations and shaping remain outside this entry; severe bevels throw instead of intersecting.
+The all-glyph test covers unbeveled solids; synthetic cases cover rounded/chamfered bevels, holes and invalid offsets.
+
 ## 5. Current evidence gaps
 
 The following remain technical gaps, not permission to weaken a check:
+
+Extruded text has the scoped evidence above, not cross-font-family or multi-device certification; font hinting,
+shaping and arbitrary bevel topology changes are not proved by those checks.
 
 1. No gate directly proves that embedded Wasm matches current Rust source.
 2. Native and Wasm turn reduction differ at an exact half-way case that lacks a regression test.

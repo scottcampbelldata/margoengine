@@ -162,8 +162,8 @@ import { extrudeText } from 'margoengine/text/extrude';
 const font = {
   unitsPerEm: 1000,
   glyphIndex: () => 1,
-  glyphAdvance: () => 600,
-  getGlyphContours: () => [[[50, 0], [300, 750], [550, 0], [450, 0], [300, 500], [150, 0]]],
+  glyphAdvance: () => 0.6,
+  getGlyphContours: () => [[[0.05, 0], [0.3, 0.75], [0.55, 0], [0.45, 0], [0.3, 0.5], [0.15, 0]]],
 };
 
 const geometry = extrudeText('A', {
@@ -177,6 +177,27 @@ const geometry = extrudeText('A', {
 
 console.log(geometry.positions.length, geometry.indices.length);
 ```
+
+`FontLike` returns contours and advances in em coordinates, including for procedural fonts; `unitsPerEm` describes
+the source font and does not rescale those values. `size` defaults to 1. `depth` defaults to 0.2 world units.
+`curveSegments` is an integer in 1..256 (default 12); `steps` is an integer in 1..256 (default 1).
+`bevelEnabled` defaults to false. When enabled, `bevelSize` is the outward expansion of the body (default 0.02),
+`bevelThickness` is the depth at each end (default 0.02, at most half of `depth`), and `bevelOffset` moves the cap
+outline outward (default 0). These three lengths are world units, independent of `size`. `bevelSegments` is an
+integer in 0..64 (default 3); 0 and 1 produce a flat chamfer. Collapsing or intersecting bevels throw a coded
+`MargoError` (`code: 'failed'`); reduce the bevel to fit the glyph. Normals are unit surface normals, with outward caps.
+`letterSpacing` defaults to 0 em, `lineHeight` to 1.2, and `align` to `'left'` (`'center'` and `'right'` are also supported).
+
+Contours use nonzero winding: overlapping and nested contours with the same winding stay filled. Zero-area paths
+are discarded without an absolute world-size cutoff. Fonts use Unicode cmap format 4 or 12, unhinted TrueType
+outlines or name-keyed CFF1 Type 2 outlines. CID-keyed CFF, CFF2, variations and shaping are outside this entry.
+TrueType composite depth is at most 32, with 4,096 components and 200,000 source points per glyph. Type 2 uses
+the specification's 48 operands, 96 stems and 10 nested subroutine calls, plus a 100,000-token execution budget.
+Outline decoding and contour filling accept at most 16,384 flattened vertices per glyph; mesh allocation has a
+conservative 1,000,000-vertex budget per text block. Boundary vertices weld at 1e-12 of the glyph
+extent. Malformed font ranges and subdivision limits throw `MargoError` with `code: 'failed'` and a help link.
+Depth 0 produces two planar caps; positive depth produces a solid. `toGeometry(Geometry)` takes the core constructor
+explicitly; with no constructor it returns the attribute data.
 
 ## Limits
 

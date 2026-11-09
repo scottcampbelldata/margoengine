@@ -804,13 +804,18 @@ The batch 168 timing drives `@mkkellogg/gaussian-splats-3d` 0.4.7 as a black box
 
 ## Extruded 3D text: `@margoengine/text/extrude`
 
-Written clean room in November 2026 from the specifications and papers below; no source code of other engines or font libraries (opentype.js, three.js TextGeometry, Troika, FreeType, HarfBuzz) was read.
+Written and repaired clean room from the specifications and papers below. No other engine or font-library source
+was read, adapted or copied. Only the two standard font assets and their licence were downloaded (see
+[third-party notices](../THIRD-PARTY-NOTICES.md)). The private CAD repository's package/API boundaries were inspected;
+its CAD APIs do not own this optional font decoder or text mesher, and no kernel code/dependency is added here.
 
-| Area | Source |
+| Area | Source and implementation |
 | --- | --- |
-| OpenType SFNT, TrueType `glyf`/`loca`, and PostScript `CFF ` | ISO/IEC 14496-22 (OpenType specification) / Microsoft OpenType specification: table directory, `head`, `maxp`, `hhea`, `hmtx`, `cmap` (formats 4 and 12), `loca`, `glyf` simple and composite glyph outlines with flags and delta coordinates; Adobe Technical Note #5176 "The Compact Font Format Specification" and Adobe Technical Note #5177 "The Type 2 Charstring Format" (`CFF ` table, charstrings). |
-| 2D Polygon Triangulation with Holes | Held, M. (2001), "FIST: Fast Industrial-Strength Triangulation of Polygons", Algorithmica, 30(4), 563-596; Eberly, D. (2002), "Triangulation by Ear Clipping", Geometric Tools (hole-bridging by mutual visibility ray cast and ear clipping). |
-| Bevel and Wall Extrusion | Linear sweep along normal profile with rounded/flat corner interpolation and planar/perimeter UV generation. |
+| Bounded SFNT, cmap, TrueType outlines and composite transforms | [Microsoft OpenType](https://learn.microsoft.com/en-us/typography/opentype/spec/), especially [cmap](https://learn.microsoft.com/en-us/typography/opentype/spec/cmap) and [glyf](https://learn.microsoft.com/en-us/typography/opentype/spec/glyf). Component attachment uses raw point indices before implied points and curve flattening. Scaled/unscaled offsets follow the component flags; the default unscaled offset matches the Microsoft/Apple recommended default. |
+| CFF INDEX/DICT/charset and Type 2 | Adobe [Technical Note 5176](https://adobe-type-tools.github.io/font-tech-notes/pdfs/5176.CFF.pdf) and [Technical Note 5177](https://adobe-type-tools.github.io/font-tech-notes/pdfs/5177.Type2.pdf). The interpreter shares its stack, width state, hints and transient storage across calls; masks consume bytes, all curve/flex families are explicit, and recursion/operand bounds are enforced. Appendix B/C numerical StandardEncoding/charset data comes from 5176. Deprecated endchar composites resolve by SID; nested composites are forbidden by 5177 Appendix C. FontMatrix is applied once after decoding raw coordinates. |
+| Polygon filling and triangulation | Nonzero winding is computed on split contour edges; only edges separating zero/nonzero faces survive, oriented with fill on the left. Our arrangement splitting, relative coordinate welding and stitching are derived here from line intersection and winding-number definitions. [Eberly, Triangulation by Ear Clipping](https://www.geometrictools.com/Documentation/TriangulationByEarClipping.pdf), sections 2-5: duplicate bridge endpoints, mutually visible hole connections and ear removal. Visibility here is tested against every edge and the local interior cone, rather than a nearest-vertex guess. Incomplete clipping throws, and cap area is verified. |
+| Bevel extrusion | Parallel-edge offset intersections give miter displacements; sine/cosine profiles give rounded rims, one segment a chamfer. Caps consume the exact terminal wall rings; wall normals come from their cross products and are normalized. Offset-ring crossings, reversed edges and collapses are rejected. |
+| Independent outline evidence | Our `generate-outline-reference.py` uses the public Windows [GetGlyphOutlineW](https://learn.microsoft.com/en-us/windows/win32/api/wingdi/nf-wingdi-getglyphoutlinew), [TTPOLYGONHEADER](https://learn.microsoft.com/en-us/windows/win32/api/wingdi/ns-wingdi-ttpolygonheader) and [TTPOLYCURVE](https://learn.microsoft.com/en-us/windows/win32/api/wingdi/ns-wingdi-ttpolycurve) contracts, checks the selected face's head bytes, and freezes unhinted absolute cubic controls. Our separate de Casteljau traversal compares both directions with the analytic chord-error bound max second derivative / (8 n squared), plus 16.16 control quantization. No decoder logic is shared with production. |
 
 ## GPU pass timing: `@margoengine/stats` (`GPUProfiler`)
 

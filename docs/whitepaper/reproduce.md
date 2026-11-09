@@ -401,3 +401,26 @@ For the separate constitutive bending analysis, run `kernel/examples/support_ben
 [documented 180-second process-tree wrapper](../architecture/physics2d-support-bending.md). It never steps the
 solver. Exit 0 confirms its contact/force domain and prints the directional derivative, not a passing solver
 instability condition. The proof states the nonlinear/f32/discrete-trajectory limits. CCD remains T-11 / 127.y.
+
+## Extruded text repair, LIM-587 (2026-11-08)
+
+Run `npm test --workspace @margoengine/text`, then `npm run check:text-extrude`. These cover hostile/malformed
+font inputs, every Type 2 curve family and shared subroutine state, quadratic midpoints, raw-point/scaled-offset
+composites, nonzero overlaps, complete hole caps, outward volume, closed bevels, small text and the README example.
+The Source Sans 3 assets and licence live in `packages/text/tests/fixtures/fonts/`. The all-glyph test checks all
+2,478 glyph indices in each TTF/OTF, including nine empty glyphs. To regenerate the independent frozen cubic
+controls on Windows, run `python packages/text/tests/generate-outline-reference.py`; its head-table assertion
+rejects a substituted system face. Portable Node tests compare ten glyphs per format with independent de Casteljau
+sampling and an analytic chord-error bound. No speed comparison is claimed.
+
+For both WebGPU and the native WebGL2 mesh output assertion:
+
+~~~sh
+node scripts/gpu-lock.mjs run --owner=codex-extrude --max=10 --wait-max=5 -- node packages/text/scripts/test-browser.js
+node scripts/gpu-lock.mjs run --owner=codex-extrude --max=10 --wait-max=5 -- npm run check:readme-run -- --packages=text
+~~~
+
+The browser report includes orange pixel count and hidden orange pixel count for WebGL2; calling render alone is
+not a pass. CPU work has no benchmark here. Entry-size comparisons bundle the entry in isolation with Vite,
+ES2022 minification and `compactOutput` from `scripts/measure-size.js`, then zlib default gzip. Include the shared
+error helper on both sides; do not compare a standalone bundle to a split dist file.

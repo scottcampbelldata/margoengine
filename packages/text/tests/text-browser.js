@@ -666,7 +666,11 @@ window.runTextTests = async () => {
     warn = console.warn;
   console.warn = (...args) => warnings.push(String(args[0]));
   try {
-    const gl = await Engine.create(glCanvas, { backend: 'webgl2', fallback: webglRenderer }),
+    const gl = await Engine.create(glCanvas, {
+        backend: 'webgl2',
+        fallback: webglRenderer,
+        camera: { position: [0, 0, 6], target: [0, 0, 0], fov: 60, near: 0.1, far: 100 },
+      }),
       glText = new TextRenderer({ name: 'gl-text' });
     gl.use(glText);
     glText.add(new Text({ text: 'noop', font }));
@@ -677,8 +681,26 @@ window.runTextTests = async () => {
     assert(gl.backend === 'webgl2' && glText.stats.drawCalls === 0, 'WebGL2 text should not draw');
     const glMesh = gl
       .createMesh()
-      .setGeometry(new Geometry(geomData.positions, geomData.normals, geomData.indices));
+      .setGeometry(new Geometry(geomData.positions, geomData.normals, geomData.indices))
+      .setMaterial(new PbrMaterial({ color: '#ff8800', roughness: 0.4 }));
+    glMesh.setPosition([-1.2, -1.2, 0]);
     gl.render();
+    const context = glCanvas.getContext('webgl2'),
+      pixels = new Uint8Array(64 * 64 * 4);
+    context.readPixels(0, 0, 64, 64, context.RGBA, context.UNSIGNED_BYTE, pixels);
+    let orange = 0;
+    for (let i = 0; i < pixels.length; i += 4)
+      if (pixels[i] > 180 && pixels[i + 1] > 80 && pixels[i + 2] < 50) orange++;
+    assert(orange > 50, `Extruded text WebGL2 mesh did not draw orange pixels: ${orange}`);
+    glMesh.visible = false;
+    gl.render();
+    context.readPixels(0, 0, 64, 64, context.RGBA, context.UNSIGNED_BYTE, pixels);
+    let hiddenOrange = 0;
+    for (let i = 0; i < pixels.length; i += 4)
+      if (pixels[i] > 180 && pixels[i + 1] > 80 && pixels[i + 2] < 50) hiddenOrange++;
+    assert(hiddenOrange === 0, `Hidden WebGL2 extrusion still drew: ${hiddenOrange}`);
+    report.extrudedWebGL2 = { orange, hiddenOrange };
+    report.checks.push('Extruded text WebGL2 mesh draws orange pixels and disappears when hidden');
     gl.dispose();
   } finally {
     console.warn = warn;

@@ -9,13 +9,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import {
-  heatWatched,
-  NO_GPU_STEPS,
-  runSteps,
-  SELF_WATCHED_STEPS,
-  summary,
-} from '../scripts/check-merge.mjs';
+import { heatWatched, NO_GPU_STEPS, runSteps, SELF_WATCHED_STEPS, summary } from '../scripts/check-merge.mjs';
 import { HEAT_EXIT } from '../scripts/gpu-package-tests.mjs';
 import { thermalSource } from '../scripts/support/heat.mjs';
 import { machineProfile } from '../scripts/support/machine-profile.mjs';
@@ -248,4 +242,13 @@ test('every check:merge step that drives the GPU is heat-watched by check:merge 
   ])
     assert.ok(heatWatched(name), `${name} drives the GPU and must be heat-watched`);
   assert.equal(heatWatched('check:gpu-packages'), false);
+});
+
+test('check:merge always runs the complete CPU font and mesh regression suite', () => {
+  const manifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
+  const pkg = JSON.parse(readFileSync(join(root, 'packages/text/package.json'), 'utf8'));
+  assert.ok(manifest.scripts['check:merge:steps'].split(' && ').includes('npm run check:text-extrude'));
+  assert.ok(manifest.scripts['check:text-extrude'].includes('packages/text/tests/extrude*.test.js'));
+  assert.ok(pkg.scripts.test.includes('tests/extrude*.test.js'));
+  assert.equal(heatWatched('check:text-extrude'), false);
 });

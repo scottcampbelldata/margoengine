@@ -127,6 +127,10 @@ export const BUNDLED = [
 /** Credits for the assets the site, demos and examples use. None of these files is in an npm tarball. */
 const ASSETS = [
   [
+    'packages/text/tests/fixtures/fonts/NOTICE.md',
+    'test fonts: Source Sans 3 Regular 3.052R TTF and name-keyed CFF1 OTF, unmodified binary assets from https://github.com/adobe-fonts/source-sans/tree/3.052R (TTF/SourceSans3-Regular.ttf and OTF/SourceSans3-Regular.otf), downloaded 2026-11-08; Copyright 2010-2022 Adobe, Reserved Font Name Source, SIL Open Font License 1.1 (full text in packages/text/tests/fixtures/fonts/OFL.txt, from that release LICENSE.md). The linked notice and outline-reference.json record provenance and SHA-256. Our independent native-outline reference data and its generator are test-only, never shipped',
+  ],
+  [
     'site/fonts/OFL.txt',
     'site text typeface: Source Sans 3 (Copyright 2010-2024 Adobe, with Reserved Font Name "Source"; SIL Open Font License 1.1, full text in the linked file), self-hosted as site/fonts/SourceSans3-latin.woff2, the Latin subset of the variable font exactly as served by Google Fonts (https://fonts.gstatic.com/s/sourcesans3/v20/nwpStKy2OAdR1K-IwhWudF-R3w8aZQ.woff2, 28,872 bytes, SHA-256 19143dca075972bc84e3fd9eab7416dd40cc565dccb2435a044bdfabe060c7d5, fetched 2026-10-28, not modified); licence text from https://github.com/adobe-fonts/source-sans (LICENSE.md, SHA-256 56af9b9c6715597e458284a474dc118a50a4150e9d547c70f7b4a33c3e6a9328)',
   ],
