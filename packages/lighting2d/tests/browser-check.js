@@ -6,6 +6,7 @@ import { SpriteLayer } from '/packages/sprites/dist/index.js';
 import { inShadow, lightAt, Lighting2D, occluderEdges } from '/packages/lighting2d/dist/index.js';
 import { SoftLighting2D, softLightAt } from '/packages/lighting2d/dist/soft.js';
 import { CookieLighting2D, cookieLightAt, createSpotCookie } from '/packages/lighting2d/dist/cookie.js';
+import { GILighting2D, RadianceCascade2D } from '/packages/lighting2d/dist/gi.js';
 
 const WIDTH = 32,
   HEIGHT = 16,
@@ -455,6 +456,38 @@ window.check = {
       out.checks['light mask and layer filtering'] = compare(bytes, wantMask);
       maskPass.dispose();
       maskTarget.destroy();
+    }
+
+    // 2D global illumination: radiance cascades bounce light and emissive sprites.
+    {
+      const giTarget = texture(),
+        emitters = [{ x: 24, y: 8, radius: 4, color: [1, 0.6, 0.2], intensity: 2.0 }],
+        occluders = [{ shape: 'segment', from: [16, -10], to: [16, 30] }],
+        cascades = { cascades: 2, baseRays: 4, baseDistance: 16, bounces: 1, albedo: 0.8 },
+        camera = { x: 16, y: 8, zoom: 1 },
+        giPass = GILighting2D.attach(instance, {
+          target: () => giTarget,
+          camera,
+          emitters,
+          occluders,
+          cascades,
+          ambient: '#000000',
+        });
+      frame();
+      const bytes = await read(giTarget);
+      const wantGI = new Float64Array(WIDTH * HEIGHT * 3);
+      const rc = new RadianceCascade2D(cascades);
+      for (let y = 0; y < HEIGHT; y++) {
+        for (let x = 0; x < WIDTH; x++) {
+          const wx = camera.x + (x + 0.5 - WIDTH * 0.5) / camera.zoom;
+          const wy = camera.y + (y + 0.5 - HEIGHT * 0.5) / camera.zoom;
+          const irr = rc.evaluateAt([wx, wy], undefined, { emitters, occluders });
+          for (let c = 0; c < 3; c++) wantGI[(y * WIDTH + x) * 3 + c] = Math.min(1, irr[c]) * 255;
+        }
+      }
+      out.checks['2d global illumination radiance cascades'] = compare(bytes, wantGI);
+      giPass.dispose();
+      giTarget.destroy();
     }
     out.validation = (await engine.gpu.popErrorScope())?.message ?? null;
     target.destroy();

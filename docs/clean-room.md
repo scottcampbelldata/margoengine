@@ -1498,3 +1498,7 @@ The existing mixer finite-FIR meter supplies true peak and a documented float32 
 ## 2D light masks and layers (batch 55)
 
 `@margoengine/lighting2d` light masking and layer filtering are written from standard first principles: point-in-polygon ray-crossing test derived from W. Randolph Franklin, "PNPOLY - Point Inclusion in Polygon Test", 1970 (Jordan curve theorem), and bitwise layer masking. The WGSL shader bounds tests and CPU reference functions are Margo-own clean room implementations; no other engine source or library code was read.
+
+## 2D global illumination (batch 55)
+
+`@margoengine/lighting2d/gi` is written from published descriptions of radiance cascades for 2D global illumination: Alexander Sannikov, "Radiance Cascades: A Novel Approach to Calculating Global Illumination", 2023. Ray interval partitioning across cascade levels, angular ray distribution, ray-segment and ray-circle intersections, and irradiance integration are Margo-own clean room implementations derived from first principles; no other engine source or library code was read.

@@ -13,7 +13,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-598). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-599). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -908,3 +908,7 @@ Mixer gain/mute/solo/duck scheduling now validates finite nonnegative audio time
 ## 2D light masks and layers (batch 55)
 
 `@margoengine/lighting2d` supports geometric light masks (`rect`, `circle`, `polygon`) and bitmask layer filtering (`layers` on `Light2DOptions` and `layer` on `Lighting2DOptions`). Lights masked or on mismatched layers are clipped in the shader or culled before draw submission. WebGPU only; WebGL2 rejects with coded error and help link. Real RTX A6000 check passes with 0 wrong pixels against the CPU reference form. LIM-597.
+
+## 2D global illumination (batch 55)
+
+Optional `@margoengine/lighting2d/gi` adds 2D global illumination with radiance cascades for multi-bounce bounce lighting and emissive sprites. Angular directions and ray intervals partition ray marching across cascades; emissive sprites and occluder edges cast light and block rays. WebGPU only; WebGL2 rejects with coded error and help link. Real RTX A6000 check passes with 0 wrong pixels against the CPU reference form. LIM-599.

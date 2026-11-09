@@ -44,6 +44,10 @@
     "./cookie": {
       "types": "./dist/cookie.d.ts",
       "import": "./dist/cookie.js"
+    },
+    "./gi": {
+      "types": "./dist/gi.d.ts",
+      "import": "./dist/gi.js"
     }
   },
   "files": [
