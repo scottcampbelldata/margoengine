@@ -28,6 +28,8 @@ test('batch 79 records shadow and node evidence on both backends', () => {
   assert.match(backends, /@margoengine\/vfx\/shadows/);
   assert.match(backends, /@margoengine\/vfx\/nodes/);
   assert.match(backends, /settles the cancelled map/);
+  assert.match(backends, /GPU point-draw route/);
+  assert.equal(backends.includes('existing CPU route'), false);
   const evidence = playbook.slice(playbook.indexOf('## 5. Current evidence gaps'));
   assert.match(evidence, /checkShadowFar/);
   assert.match(evidence, /checkNodeNorm/);
@@ -35,4 +37,12 @@ test('batch 79 records shadow and node evidence on both backends', () => {
   assert.match(evidence, /checkNodeF32/);
   assert.match(evidence, /RTX A6000/);
   assert.match(evidence, /any GPU other than the RTX A6000/);
+  for (const file of ['../../../docs/limits.md', '../../../docs/whitepaper/claims.md']) {
+    const rows = read(file).split('\n').filter((line) => /LIM-581|LIM-590|LIM-594|LIM-595/.test(line));
+    assert.equal(rows.length, 4, file);
+    assert.ok(rows.every((row) => !row.includes('WebGL2 route was not run')), file);
+    assert.match(rows.join('\n'), /0.97004885/);
+    assert.match(rows.join('\n'), /restoration during readback/);
+    assert.match(rows.join('\n'), /f32 overflow/);
+  }
 });

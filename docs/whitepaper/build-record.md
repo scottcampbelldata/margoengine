@@ -3490,3 +3490,11 @@ where appropriate. No job was skipped. The claim landed first as dc727f60a.
   Undefined release/gate defaults are consistent. New mixer.test.js regressions fail before the fix
   and pass after; valid fade constants remain unchanged. Root/snapshots growth stays within existing
   budgets, checked by docs.test.js. No core/stage changes and no raised size/time/accuracy bar.
+
+## Batch 79 review completion (2026-11-08)
+
+Reviewed all six Grok fixes against the original findings. With each fix removed locally, the regression failed: sphere front depth at centre 1.02; disposal readback AbortError; published lights left after disposal; tiny-vector normalization (native zero, WebGL2 0.1); f32 literal overflow; and unreconciled evidence documentation. Runtime regressions were reproduced on both backends, then the source was restored. The readback mutation retained the later disposal fix's lifetime flag so the test exercised cancellation rather than a missing-name build failure.
+
+The finish adds real-GPU restoration cancellation, far-plane boundary and wholly clipped cases, mixed-component and zero normalization, and retained compatibility result details. It corrects the playbook's CPU-route description and reconciles claims/limits with WebGL2 evidence. The full compatibility suite exposed a visibility-kernel declaration/binding loss for stretch and an ExactOIT guard that relied only on an optional limit; both have regression tests proved red with their source fixes removed. ExactOIT remains WebGPU-only: compatibility checks its documented rejection and renders the lit-particle comparison through weighted OIT. No accuracy bar, time bar or size budget changes.
+
+Finish sizes (min+gzip B): VFX root 31,434 (budget 32,070), base 11,191 (11,336), shadows 3,056 (3,061), nodes 3,238 (3,349); ExactOIT 4,663. Core + stage stays 23,626 B, below 25,000. Reproduce with the package tests, `test:gpu` for VFX both normally and with `MARGO_COMPAT=1`, `test:gpu` for OIT, and the runnable README checks for both packages, all GPU work under `node scripts/gpu-lock.mjs run --owner=codex-79 -- ...`. Tests use the RTX A6000 only; timings and other GPUs remain unproved.

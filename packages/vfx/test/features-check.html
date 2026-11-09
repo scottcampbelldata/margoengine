@@ -499,7 +499,7 @@ window.checkShadowFar=async()=>{
  const sphere=new VFX({...still,capacity:1,velocity:[0,0,0],size:2,shadows:{count:0,cast}});
  const depthRun=await run(sphere,{frames:0,dt:0,samples:1,setup:()=>device.queue.writeBuffer(sphere.gpuState.particles,0,records([{at:[0,0,0],life:4,size:2,color:[1,1,1]}],1))});
  const depthN=64,samples=[];
- for(const center of [0.98,1.02]){
+ for(const center of [0.98,1,1.02,1.08]){
   device.pushErrorScope('validation');
   const texture=device.createTexture({size:[depthN,depthN],format:'depth32float',usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.COPY_SRC});
   const encoder=device.createCommandEncoder();
@@ -530,12 +530,20 @@ window.checkShadowRelease=async()=>{
  };
  window.addEventListener('unhandledrejection', onReject);
  try{
-  const effect=new VFX({...still,capacity:1,shadows:{into:{setLights(){}}}});
-  const started=await run(effect,{frames:0,dt:0,setup:()=>device.queue.writeBuffer(effect.gpuState.particles,0,records([{at:[1,2,3],life:4,size:2,color:[1,0,0]}],1))});
-  effect.simulate({backend:'webgpu',device,delta:0,camera,width:size,height:size,encoder:device.createCommandEncoder()});
-  effect.dispose();
-  await new Promise((resolve)=>setTimeout(resolve,100));
-  return {error:started.error,errors:errors.splice(0),rejected};
+  const modes=[];
+  let error=null;
+  for(const mode of ['dispose','restore']){
+   const effect=new VFX({...still,capacity:1,shadows:{into:{setLights(){}}}});
+   const started=await run(effect,{frames:0,dt:0,setup:()=>device.queue.writeBuffer(effect.gpuState.particles,0,records([{at:[1,2,3],life:4,size:2,color:[1,0,0]}],1))});
+   error??=started.error;
+   effect.simulate({backend:'webgpu',device,delta:0,camera,width:size,height:size,encoder:device.createCommandEncoder()});
+   if(mode==='restore')effect.onDeviceRestored({gpu:device,stats:{drawCalls:0},removePlugin(){}});
+   else effect.dispose();
+   await new Promise((resolve)=>setTimeout(resolve,100));
+   effect.dispose();
+   modes.push(mode);
+  }
+  return {error,errors:errors.splice(0),rejected,modes};
  }finally{
   window.removeEventListener('unhandledrejection', onReject);
  }
@@ -555,7 +563,13 @@ window.checkNodeNorm=async()=>{
  };
  const tiny=await step([1e-21,0,0]);
  const huge=await step([1e20,0,0]);
- return {error:tiny.error??huge.error,errors:errors.splice(0),tiny:tiny.accel,huge:huge.accel};
+ const vectors=[];
+ for(const value of [[3e-21,-4e-21,0],[-3e20,0,4e20],[0,0,0]]){
+  const result=await step(value);
+  const length=Math.hypot(...value);
+  vectors.push({value,got:result.accel,want:value.map(v=>length===0?0:v/length),error:result.error});
+ }
+ return {error:tiny.error??huge.error,errors:errors.splice(0),tiny:tiny.accel,huge:huge.accel,vectors};
 };
 // A finite double that is not a finite f32 is rejected before a uniform is packed.
 window.checkNodeF32=()=>{

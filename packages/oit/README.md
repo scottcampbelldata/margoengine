@@ -135,7 +135,7 @@ Limits:
   bytes per pixel.
 - Colour is held in half floats: at most 65,504, 11 bits of precision.
 - It needs storage buffers in fragment shaders, so WebGPU only, and not compatibility mode: `setup` throws
-  `'unsupported'` there; use `OIT`.
+  `'unsupported'` there; use `OIT`. The guard checks the WebGL2 device tier and native compatibility feature level as well as explicit fragment-storage limits, before allocating list buffers. `test/oit.test.js` covers all three refusal paths; VFX's `test/lit-check.mjs` checks the real WebGL2 rejection and the same lit-particle pixels through weighted `OIT`.
 - Transmission, custom blending and depth overrides keep the sorted path: `blending` is an `OIT` option only.
 
 ## Moments (`MomentOIT`)

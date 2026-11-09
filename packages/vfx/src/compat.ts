@@ -60,7 +60,9 @@ export function routeShaders(simulation: string): { flags: string; update: strin
     flags: `${frame}${particlesRead}@group(0) @binding(2) var<storage,read_write> flags:array<u32>;
 ${dies}${entry}){if(id.x<f.control.x){flags[id.x]=dies(id.x);}}`,
     update: `${update}${entry}){if(id.x<f.control.x){let drawn=update(id.x,tickets[id.x]);}}`,
-    marks: `${frame}${particlesRead}@group(0) @binding(2) var<storage,read_write> living:array<u32>;
+    // Keep the patched simulation declarations with its cull expression: optional features can read their own
+    // uniforms or helpers there. The entry only calls onScreen; update and its other helpers stay unreachable.
+    marks: `${update}@group(0) @binding(2) var<storage,read_write> living:array<u32>;
 @group(0) @binding(3) var<storage,read_write> shown:array<u32>;
 fn onScreen(p:Particle)->u32 {${test}  return 1u;
 }
@@ -138,7 +140,14 @@ export class SimulationRoute {
     );
     this.marking = kernel(
       code.marks,
-      [bind(0, b.uniform), bind(1, b.particles), bind(2, this.living.flags), bind(3, this.shown.flags)],
+      [
+        bind(0, b.uniform),
+        bind(1, b.particles),
+        bind(2, this.living.flags),
+        bind(3, this.shown.flags),
+        bind(5, this.deaths.prefix),
+        ...more,
+      ],
       groups,
     );
     const size = device.createBuffer({ size: 16, usage: 0x48 }); // UNIFORM | COPY_DST

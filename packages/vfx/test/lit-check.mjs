@@ -9,6 +9,7 @@
 // - both together in an ExactOIT pass, the same as without it (the pass's group 1, the lights' group 2).
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../scripts/browser.js';
+import { compatRun } from '../../../scripts/support/compat-shim.js';
 
 const context = await openBrowser({ startPath: '/packages/vfx/test/lit-check.html', port: 5291 }),
   { page } = context,
@@ -53,13 +54,25 @@ try {
     .catch((error) => {
       throw new Error(`the page did not start: ${pageErrors.join('; ') || error.message}`);
     });
+  if (compatRun()) {
+    const refused = await page.evaluate(async () => {
+      try {
+        await window.check({ lights: true, shadows: true, caster: 'slab', oit: true });
+        return null;
+      } catch (error) {
+        return { code: error.code, message: error.message };
+      }
+    });
+    assert.equal(refused?.code, 'unsupported', 'ExactOIT refuses the compatibility device before shader creation');
+    assert.match(refused.message, /ExactOIT needs storage buffers in fragment shaders; use OIT/);
+  }
   for (const [options, want] of [
     [{ ambient: 1 }, ({ alpha }) => 255 * base * alpha],
     [{ lights: true }, pointLight],
     [{ shadows: true, caster: 'away' }, sun],
     [{ shadows: true, caster: 'slab' }, () => 0],
     [{ lights: true, shadows: true, caster: 'slab' }, pointLight],
-    [{ lights: true, shadows: true, caster: 'slab', oit: true }, pointLight],
+    [{ lights: true, shadows: true, caster: 'slab', oit: compatRun() ? 'weighted' : true }, pointLight],
   ]) {
     const name = `lit ${JSON.stringify(options)}`,
       r = await page.evaluate((o) => window.check(o), options);

@@ -13,6 +13,7 @@ import { applyView } from '../../shared/view-rect.js';
 import { currentFrame, retire, writeUniform } from '../../shared/frame-resources.js';
 import { alphaBlend, groupCode } from '../../shared/pass.js';
 import { TransparentPass, pbrLayer } from './pass.js';
+import { compatTier, compatibilityLevel } from '../../shared/compat.js';
 
 export type { TransparentPass };
 
@@ -192,7 +193,7 @@ export class ExactOIT extends TransparentPass {
     const device = engine.gpu!,
       // A limit of compatibility devices; a core device has none and allows the normal count.
       storage = (device.limits as { maxStorageBuffersInFragmentStage?: number }).maxStorageBuffersInFragmentStage;
-    if (storage !== undefined && storage < 2)
+    if (compatTier(device) === 'webgl2' || compatibilityLevel(device) || (storage !== undefined && storage < 2))
       throw new MargoError('unsupported', 'ExactOIT needs storage buffers in fragment shaders; use OIT on this device');
     this.uniform = device.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.readback = device.createBuffer({ size: 4, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST });

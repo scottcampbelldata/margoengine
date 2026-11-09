@@ -355,7 +355,7 @@ than children wanted, the lowest events in slot order get theirs first and the r
 births (`rate`, `burst`) come first. Collision events come from the ground plane only, not from `obstacles`. With
 events on, the effect counts its free slots every frame, two small dispatches it skips without them, and adds two
 storage buffers to the simulation (eight is the device minimum: events with a mesh `emitter` use all eight). `on` is
-read at attach; the other settings every frame. `node packages/vfx/test/features-check.mjs` (real GPU) reads back the
+read at attach; the other settings every frame. Both GPU runners also check disposal and device restoration during read-back, and centres at clip depths 0.98, 1, 1.02 and 1.08. `node packages/vfx/test/features-check.mjs` (real GPU) reads back the
 children of a death and of an impact (position, velocity, life, size, colour, generation), fewer children when slots
 run out, none from a slow impact or from a child, and the same bytes from the same frames.
 
@@ -563,6 +563,8 @@ centre pixels read 111,111,0 and 0,79,79, within 1 of the CPU mix 112,112,0 and 
 `node packages/vfx/test/features-check.mjs` (real GPU) holds two particles halfway between frames of a 2 x 2 solid
 atlas, one of them wrapping onto the next row, and checks each centre pixel against the same mix computed on the CPU.
 
+The WebGL2 visibility kernel retains the simulation declarations and feature bindings used by its cull expression. The full GPU suite checks velocity stretch on that route as well as native WebGPU. Lit particles use weighted `OIT` on WebGL2; the suite also requires the documented `ExactOIT` rejection there, while native WebGPU keeps its exact-pass pixel checks.
+
 ### Particle shadows and lights
 
 `shadows` makes particles cast sun shadows and emit point lights. Each live particle is a sphere impostor in the directional shadow map: under the cascade's orthographic matrix the front of the sphere is `centerZ - sqrt(r^2 - x^2 - y^2)`. The map's own receiver bias stays in the shadow pass. The first `count` live slots, in slot order, become point lights (default 8, at most 64). `range` is a distance in world units (default 4), not scaled by the particle's size. `intensity` (default 1) is the light's intensity. `decay` is always 2, so a clustered list uses its windowed inverse-square falloff. `cast` is a `Shadows` and `into` is a `Clustered`; either may be left out. `count`, `range` and `intensity` are read every frame. `range` and `intensity` must be finite f32 values. A finite double that overflows f32 is a RangeError (https://margoengine.com/errors#vfx-f32). `cast` and `into` are fixed at attach. The feature sets `buffer` on the options object to the light list (a header, then up to 64 lights). `into` sees that list about two frames later, because the read-back waits for the frame to finish.
@@ -588,7 +590,7 @@ The light list is packed with a workgroup prefix sum, so the same slots give the
 
 ### Particle update nodes
 
-`nodes` compiles a graph into the simulation. Each operator is `const`, `attribute` (`position`, `velocity`, `size`, `color`, `life`, `age`), `add`, `mul`, `sub`, `mix`, `min`, `max`, `scale`, `normalize`, `length`, `force` or `drag`. `force` adds a vector to the acceleration. `drag` subtracts a number times the velocity. `normalize` divides by the largest absolute component and then by that vector's length, on the CPU and in the shader, so a tiny or huge finite vector matches on WebGPU and WebGL2. An operator runs after the ones it reads. A cycle, a self input, an unknown operator or a bad width is a `TypeError`. At most 32 operators, and at most 16 numeric literals. Const and scale numbers are read every frame, and each one must be a finite f32. A finite double that overflows f32 is a RangeError (https://margoengine.com/errors#vfx-f32). The operators and the wires are fixed at attach. The acceleration is added after gravity, curl and fields. Velocity moves by that acceleration times the step, then position moves by the new velocity times the step.
+`nodes` compiles a graph into the simulation. Each operator is `const`, `attribute` (`position`, `velocity`, `size`, `color`, `life`, `age`), `add`, `mul`, `sub`, `mix`, `min`, `max`, `scale`, `normalize`, `length`, `force` or `drag`. `force` adds a vector to the acceleration. `drag` subtracts a number times the velocity. `normalize` divides by the largest absolute component and then by that vector's length, on the CPU and in the shader. The GPU checks cover (1e-21, 0, 0), (1e20, 0, 0), mixed-component vectors and zero on WebGPU and WebGL2. An operator runs after the ones it reads. A cycle, a self input, an unknown operator or a bad width is a `TypeError`. At most 32 operators, and at most 16 numeric literals. Const and scale numbers are read every frame, and each one must be a finite f32. A finite double that overflows f32 is a RangeError (https://margoengine.com/errors#vfx-f32). The operators and the wires are fixed at attach. The acceleration is added after gravity, curl and fields. Velocity moves by that acceleration times the step, then position moves by the new velocity times the step.
 
 ```ts
 import {EngineKernel} from 'margoengine/core';

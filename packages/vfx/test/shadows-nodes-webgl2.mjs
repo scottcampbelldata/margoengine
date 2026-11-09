@@ -85,6 +85,7 @@ try {
   const release = await page.evaluate(() => window.checkShadowRelease());
   clean(release, 'shadow release');
   assert.deepEqual(release.rejected, [], 'shadow release');
+  assert.deepEqual(release.modes, ['dispose', 'restore'], 'shadow release');
   console.log('ok shadow release webgl2');
 
   const nodes = await page.evaluate(() => window.checkNodes());
@@ -103,6 +104,11 @@ try {
   };
   unit(norm.tiny, '1e-21');
   unit(norm.huge, '1e20');
+  for (const vector of norm.vectors) {
+    assert.equal(vector.error, null, 'node norm');
+    for (let axis = 0; axis < 3; axis++)
+      assert.ok(Math.abs(vector.got[axis] - vector.want[axis]) <= 1e-4, JSON.stringify(vector));
+  }
   console.log(
     `ok node norm webgl2: ${norm.tiny.map((v) => v.toFixed(5)).join(',')} and ${norm.huge.map((v) => v.toFixed(5)).join(',')}`,
   );
@@ -120,6 +126,10 @@ try {
     plain: plain.got,
     shadows: { header: shadows.header, depthGot: shadows.depthGot, depthWant: shadows.depthWant },
     nodes: nodes.got,
+    far,
+    release,
+    norm,
+    f32,
   };
   await mkdir('test-results', { recursive: true });
   await writeFile('test-results/vfx-shadows-nodes-webgl2.json', JSON.stringify(report, null, 1));

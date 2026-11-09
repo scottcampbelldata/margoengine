@@ -215,6 +215,7 @@ try {
     report.results[name] = r;
     clean(r, name);
     assert.deepEqual(r.rejected, [], name);
+    assert.deepEqual(r.modes, ['dispose', 'restore'], name);
     console.log(`ok ${name}`);
   }
   {
@@ -239,6 +240,11 @@ try {
     };
     unit(r.tiny, '1e-21');
     unit(r.huge, '1e20');
+    for (const vector of r.vectors) {
+      assert.equal(vector.error, null, name);
+      for (let axis = 0; axis < 3; axis++)
+        assert.ok(Math.abs(vector.got[axis] - vector.want[axis]) <= 1e-4, JSON.stringify(vector));
+    }
     console.log(
       `ok ${name}: ${r.tiny.map((v) => v.toFixed(5)).join(',')} and ${r.huge.map((v) => v.toFixed(5)).join(',')}`,
     );

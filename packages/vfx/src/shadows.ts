@@ -128,12 +128,12 @@ export const shadows: VFXExtension<VFXShadows> = {
     if (!Number.isInteger(count) || count < 0 || count > MAX_PARTICLE_LIGHTS)
       throw new RangeError('VFX shadows count must be a whole number from 0 to 64; pass e.g. 8');
     const range = value.range ?? 4;
-    if (typeof range === 'number' && Number.isFinite(range) && !Number.isFinite(Math.fround(range)))
+    if (finite(range) && !Number.isFinite(Math.fround(range)))
       throw new RangeError('VFX shadows range is not a finite f32; see https://margoengine.com/errors#vfx-f32');
     if (!finite(range) || range <= 0)
       throw new RangeError('VFX shadows range must be a finite distance above 0; pass e.g. 4');
     const intensity = value.intensity ?? 1;
-    if (typeof intensity === 'number' && Number.isFinite(intensity) && !Number.isFinite(Math.fround(intensity)))
+    if (finite(intensity) && !Number.isFinite(Math.fround(intensity)))
       throw new RangeError('VFX shadows intensity is not a finite f32; see https://margoengine.com/errors#vfx-f32');
     if (!finite(intensity) || intensity < 0)
       throw new RangeError('VFX shadows intensity must be a finite number of 0 or more; pass e.g. 1');
@@ -187,7 +187,6 @@ export const shadows: VFXExtension<VFXShadows> = {
     let copied = false;
     let mapping = false;
     let pending: Float32Array | null = null;
-    let released = false;
     let removed = false;
     let published = false;
     let unbind: (() => void) | undefined;
@@ -238,14 +237,13 @@ export const shadows: VFXExtension<VFXShadows> = {
     const drop = () => {
       if (removed) return;
       removed = true;
-      released = true;
       source.disposed = true;
       unbind?.();
       // This effect owns the list it last handed to `into`. Disposal and plugin removal both come through here.
       if (published) into!.setLights([]);
     };
     const publish = (data: Float32Array) => {
-      if (released) return;
+      if (removed) return;
       const n = Math.min(MAX_PARTICLE_LIGHTS, Math.max(0, Math.round(data[0] ?? 0)));
       const list: VFXParticleLight[] = [];
       for (let i = 0; i < n; i++) {
@@ -286,7 +284,7 @@ export const shadows: VFXExtension<VFXShadows> = {
             () => {
               mapping = false;
               copied = false;
-              if (released) return;
+              if (removed) return;
               const copy = new Float32Array(buffer.getMappedRange().slice(0));
               buffer.unmap();
               pending = copy;
@@ -294,12 +292,12 @@ export const shadows: VFXExtension<VFXShadows> = {
             (error: unknown) => {
               mapping = false;
               copied = false;
-              if (released && error instanceof Error && error.name === 'AbortError') return;
+              if (removed && error instanceof Error && error.name === 'AbortError') return;
               throw error;
             },
           );
         }
-        if (pending && into && !released) {
+        if (pending && into && !removed) {
           const data = pending;
           pending = null;
           publish(data);

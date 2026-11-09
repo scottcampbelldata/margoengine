@@ -1,9 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readdirSync } from 'node:fs';
 import { VFX } from '../dist/index.js';
 import { VFX as Base } from '../dist/base.js';
 import { stretch } from '../dist/stretch.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
+
+const compatChunk = readdirSync(new URL('../dist/', import.meta.url)).find((name) => /^compat-.*\.js$/.test(name));
+assert.ok(compatChunk, 'the private compatibility route chunk');
+const { routeShaders, SimulationRoute } = await import(`../dist/${compatChunk}`);
 
 const attach = (options, features) => {
   const h = optionalGPU();
@@ -12,6 +17,23 @@ const attach = (options, features) => {
   h.engine.use(effect);
   return { h, effect };
 };
+
+test('the compatibility visibility kernel retains feature declarations and bindings', () => {
+  const { h, effect } = attach({ capacity: 8, stretch: { factor: 0.2 } }, { stretch });
+  const simulation = h.pipelines.find((p) => p.compute?.module.code.includes('fn update(')).compute.module.code;
+  const { marks } = routeShaders(simulation);
+  assert.match(marks, /var<uniform> stretch:Stretch/);
+  assert.match(marks, /let r=\(p.velocitySize.w\+stretch.shape.x\*length/);
+  const uniform = h.resources.find((r) => r.size === 16);
+  const particles = effect.gpuState.particles;
+  const feature = { binding: 18, resource: { buffer: uniform } };
+  const owned = [];
+  new SimulationRoute(h.engine.gpu, simulation, 8, { uniform, particles, ...effect.gpuState }, [feature], owned);
+  const marking = h.groups.at(-3);
+  assert.ok(marking.entries.includes(feature), 'feature resources are bound to the visibility kernel');
+  owned.forEach((resource) => resource.destroy());
+  effect.dispose();
+});
 
 test('stretch writes its factor every frame, 0 once removed, and patches the billboard and the cull sphere', () => {
   const { h, effect } = attach({ capacity: 8, initialCount: 8, stretch: { factor: 0.2 } }, { stretch });

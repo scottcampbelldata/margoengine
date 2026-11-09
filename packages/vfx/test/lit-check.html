@@ -9,6 +9,7 @@ import {boxGeometry} from '/packages/geometry/dist/index.js';
 import {Clustered} from '/packages/clustered/dist/index.js';
 import {Shadows} from '/packages/shadows/dist/index.js';
 import {ExactOIT} from '/packages/oit/dist/exact.js';
+import {OIT} from '/packages/oit/dist/index.js';
 import {addEffect} from '/packages/oit/dist/vfx.js';
 import {VFX} from '/packages/vfx/dist/index.js';
 const errors=[];
@@ -37,7 +38,7 @@ window.check=async({lights=false,shadows=false,caster,oit=false,ambient}={})=>{
   if(caster){const slab=createMesh(engine,boxGeometry(0.2,4,4),new Material({color:[1,1,1]}));slab.root.setPosition(caster==='away'?[3,30,0]:[3,0,0]);lit.shadows.add(slab);}
  }
  const effect=VFX.attach(engine,{capacity:4,initialCount:1,rate:0,position:[0,0,0],velocity:[0,0,0],spread:0,gravity:[0,0,0],turbulence:0,ground:-100,color:[0.5,0.5,0.5,1],size:2,lifetime:[1e6,1e6],lit});
- if(oit)addEffect(ExactOIT.attach(engine),effect);
+ if(oit)addEffect((oit==='weighted'?OIT:ExactOIT).attach(engine),effect);
  engine.gpu.pushErrorScope('validation');
  await waitForPipelines(draw);
  const error=await engine.gpu.popErrorScope();

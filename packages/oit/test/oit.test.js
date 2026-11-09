@@ -302,6 +302,22 @@ test('ExactOIT: BLEND primitives go to the list pass with no colour targets, the
   );
 });
 
+test('ExactOIT refuses compatibility devices before creating GPU resources', async () => {
+  for (const capability of ['webgl2', 'compatibility', 'fragment-limit']) {
+    const { engine, gpu } = await scene();
+    if (capability === 'webgl2') gpu.device.adapterInfo = { vendor: 'margo-webgl2' };
+    if (capability === 'compatibility') gpu.device.features = new Set();
+    if (capability === 'fragment-limit') gpu.device.limits.maxStorageBuffersInFragmentStage = 0;
+    const calls = gpu.record(() => {
+      assert.throws(() => ExactOIT.attach(engine), (error) =>
+        error.code === 'unsupported' && /use OIT on this device/.test(error.message),
+      );
+    });
+    assert.equal(of(calls, 'createBuffer').length, 0, capability);
+    engine.dispose();
+  }
+});
+
 test('ExactOIT refuses settings it cannot keep', () => {
   for (const layers of [0, 33, 1.5, Number.NaN]) assert.throws(() => new ExactOIT({ layers }), RangeError);
   for (const pool of [0, -1, Number.POSITIVE_INFINITY]) assert.throws(() => new ExactOIT({ pool }), RangeError);
