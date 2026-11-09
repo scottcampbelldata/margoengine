@@ -212,6 +212,36 @@ sun.angle += 0.01;
 CPU helper functions `inHeightShadow(light, occluders, x, y, receiverElevation)`, `heightShadowFactor(light, occluders, x, y, receiverElevation)`
 and `heightLightAt(light, occluders, x, y, receiverElevation, normal)` evaluate height-based shading and self-shadowing in Node.
 
+## Emissive sprites and bloom hookup
+
+`@margoengine/lighting2d/emissive` adds glowing emissive sprites that emit light into the scene with falloff, and isolates
+HDR light above a bloom threshold for connection to bloom passes (such as `@margoengine/post/bloom`) or integrated 2D bloom glow.
+
+```ts
+import {EngineKernel} from 'margoengine/core';
+import {LayerCompositor} from 'margoengine/pixel';
+import {EmissiveLighting2D} from 'margoengine/lighting2d/emissive';
+const canvas = document.querySelector('canvas')!;
+const engine = await EngineKernel.create(canvas, {backend: 'webgpu', exactSize: [640, 360]});
+const compositor = LayerCompositor.attach(engine, {camera: {width: 160, height: 90, zoom: 4}});
+const picture = compositor.addLayer();
+const shade = compositor.addLayer({blend: 'multiply', z: 1});
+const emissive = EmissiveLighting2D.attach(engine, {
+  target: shade.target,
+  camera: shade.camera,
+  bloom: true,
+  bloomThreshold: 0.8,
+  bloomIntensity: 1.0,
+});
+const orb = emissive.addSprite({x: 80, y: 45, radius: 8, glowRadius: 24, color: '#ffcc44', intensity: 2.0});
+picture.write({width: 160, height: 90, data: new Uint8Array(160 * 90 * 4).fill(200)});
+engine.render({delta: 1 / 60});
+orb.x += 1;
+```
+
+`connectBloom(bloomPass)` wires `emissive.emissiveTexture` into an external bloom pass. `emissiveLightAt(sprite, x, y)`
+evaluates emitted light and bloom glow in Node.
+
 ## CPU forms
 
 `lightAt(light, x, y, normal)` is what a light adds at a world point, `occluderEdges(list)` the edges of a list, and

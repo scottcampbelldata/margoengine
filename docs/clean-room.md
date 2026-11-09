@@ -1506,3 +1506,7 @@ The existing mixer finite-FIR meter supplies true peak and a documented float32 
 ## 2.5D height shadows and self-shadowing (batch 55)
 
 `@margoengine/lighting2d/height` is written from standard 3D perspective and directional shadow projection geometry (similar triangles and ray-slab / ray-cylinder intersections along height intervals) applied to 2D top-down and isometric game projections. Height-interval testing, ground shadow projection, and surface self-shadowing are Margo-own clean room implementations derived from first principles; no other engine source or library code was read.
+
+## Emissive sprites and bloom hookup (batch 55)
+
+`@margoengine/lighting2d/emissive` is written from standard first principles: radial and box distance metrics for sprite boundaries, polynomial distance attenuation for emitted light falloff, luminance thresholding, and bloom HDR intensity scaling. The WGSL shader routines and CPU reference functions are Margo-own clean room implementations derived from first principles; no other engine source or library code was read.

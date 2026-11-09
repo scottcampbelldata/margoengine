@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11461856,
+  "total": 11465636,
   "history": [
     {
       "date": "2026-10-24",
@@ -4784,6 +4784,12 @@
       "commit": "c54726b11",
       "reason": "lighting2d/height 2.5D height and self-shadowing (LIM-600)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-09",
+      "commit": "3b9fb5df3",
+      "reason": "lighting2d/emissive emissive sprites and bloom hookup (LIM-601)",
+      "grew": 1
     }
   ],
   "items": {
@@ -5120,6 +5126,7 @@
     "@margoengine/labels/declutter": 1512,
     "@margoengine/lighting2d": 5152,
     "@margoengine/lighting2d/cookie": 7079,
+    "@margoengine/lighting2d/emissive": 3780,
     "@margoengine/lighting2d/gi": 6941,
     "@margoengine/lighting2d/height": 6323,
     "@margoengine/lighting2d/soft": 5605,

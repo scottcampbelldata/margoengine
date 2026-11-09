@@ -8,6 +8,7 @@ import { SoftLighting2D, softLightAt } from '/packages/lighting2d/dist/soft.js';
 import { CookieLighting2D, cookieLightAt, createSpotCookie } from '/packages/lighting2d/dist/cookie.js';
 import { GILighting2D, RadianceCascade2D } from '/packages/lighting2d/dist/gi.js';
 import { HeightLighting2D, createHeightOccluder, heightLightAt } from '/packages/lighting2d/dist/height.js';
+import { EmissiveLighting2D, EmissiveSprite2D, emissiveLightAt } from '/packages/lighting2d/dist/emissive.js';
 
 const WIDTH = 32,
   HEIGHT = 16,
@@ -536,6 +537,48 @@ window.check = {
       out.checks['2.5d height and self shadowing'] = compare(bytes, wantHeight);
       heightPass.dispose();
       heightTarget.destroy();
+    }
+
+    // Emissive sprites and bloom glow
+    {
+      const emissiveTarget = texture(),
+        camera = { x: 0, y: 0, zoom: 1 },
+        sprites = [
+          new EmissiveSprite2D({
+            x: 16,
+            y: 8,
+            shape: 'circle',
+            radius: 4,
+            glowRadius: 12,
+            color: '#ffcc44',
+            intensity: 1.5,
+            bloomThreshold: 0.8,
+            bloomStrength: 1.0,
+          }),
+        ],
+        emissivePass = EmissiveLighting2D.attach(instance, {
+          target: emissiveTarget,
+          camera,
+          sprites,
+          bloom: true,
+          bloomThreshold: 0.8,
+          bloomIntensity: 1.0,
+        });
+
+      frame();
+      const bytes = await read(emissiveTarget);
+      const wantEmissive = new Float64Array(WIDTH * HEIGHT * 3);
+      for (let y = 0; y < HEIGHT; y++) {
+        for (let x = 0; x < WIDTH; x++) {
+          const wx = camera.x + (x + 0.5) / camera.zoom;
+          const wy = camera.y + (y + 0.5) / camera.zoom;
+          const rgb = emissiveLightAt(sprites[0], wx, wy);
+          for (let c = 0; c < 3; c++) wantEmissive[(y * WIDTH + x) * 3 + c] = Math.min(1, rgb[c]) * 255;
+        }
+      }
+      out.checks['emissive sprites and bloom glow'] = compare(bytes, wantEmissive);
+      emissivePass.dispose();
+      emissiveTarget.destroy();
     }
     out.validation = (await engine.gpu.popErrorScope())?.message ?? null;
     target.destroy();

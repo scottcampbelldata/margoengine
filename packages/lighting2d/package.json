@@ -52,6 +52,10 @@
     "./height": {
       "types": "./dist/height.d.ts",
       "import": "./dist/height.js"
+    },
+    "./emissive": {
+      "types": "./dist/emissive.d.ts",
+      "import": "./dist/emissive.js"
     }
   },
   "files": [

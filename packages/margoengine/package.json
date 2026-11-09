@@ -1346,6 +1346,10 @@
       "types": "./dist/lighting2d/height.d.ts",
       "import": "./dist/lighting2d/height.js"
     },
+    "./lighting2d/emissive": {
+      "types": "./dist/lighting2d/emissive.d.ts",
+      "import": "./dist/lighting2d/emissive.js"
+    },
     "./lightmap": {
       "types": "./dist/lightmap.d.ts",
       "import": "./dist/lightmap.js"
