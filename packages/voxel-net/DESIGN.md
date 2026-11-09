@@ -201,6 +201,15 @@ the shooter drew, `(now - clock offset - interpolationDelay) * tickRate`. Shots 
 server in order with the shooter's inputs, and the shooter's own eye is where the server has it. Blocks are not
 rewound: a block placed since the view tick stops the shot.
 
+## Database store (`./sql-store`, 2026-11-09)
+
+`SqlChunkStore` is the `ChunkStore` contract of `FileChunkStore` (per-chunk queue, `get` after every earlier put and
+delete, failures to the call and the next `flush`) over one table, `(cx, cy, cz)` primary key and the `encodeChunk`
+bytes, so a world of millions of edited chunks is one file (SQLite) or one server (Postgres) instead of a folder of
+millions of files. No driver dependency: it takes the `prepare` of a SQLite database or the `query` of a `pg` client,
+and writes `?` placeholders that become `$n` for Postgres. Saves are `INSERT ... ON CONFLICT DO UPDATE`, atomic per
+chunk in both. The table name is the one thing written into SQL, so it is checked against a plain identifier.
+
 ## Interest management (defaults)
 
 | Distance | Default | Meaning |
@@ -257,7 +266,7 @@ Bots: four bots for two seconds with no errors.
 
 ## Not in the prototype
 
-TLS. (Chat and inventories through `./chat`, lag compensation through `./rewind`, login, saving to disk and, since 2026-11-08, mobs and items through `./entities` and
+TLS. (Chat and inventories through `./chat`, lag compensation through `./rewind`, a database store through `./sql-store`, login, saving to disk and, since 2026-11-08, mobs and items through `./entities` and
 several server processes for one world through `./shards` and WebTransport datagrams through `./webtransport` have
 since been added; see the README.)
 

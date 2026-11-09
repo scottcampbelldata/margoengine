@@ -3314,6 +3314,10 @@
       "types": "./dist/voxel-net/rewind.d.ts",
       "import": "./dist/voxel-net/rewind.js"
     },
+    "./voxel-net/sql-store": {
+      "types": "./dist/voxel-net/sql-store.d.ts",
+      "import": "./dist/voxel-net/sql-store.js"
+    },
     "./voxel-pathtracer": {
       "types": "./dist/voxel-pathtracer.d.ts",
       "import": "./dist/voxel-pathtracer.js"

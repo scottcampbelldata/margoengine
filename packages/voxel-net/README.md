@@ -67,6 +67,8 @@ client.edit(x, y, z, 0); // shown at once; the server confirms it or sends the c
   when near; see [Entities and mobs](#entities-and-mobs-entities).
 - **File store** (`./file-store`, Node): `new FileChunkStore(dir)` is a `ChunkStore` with one deflated file per chunk; pass
   it as the server's `store` and edits survive a restart.
+- **Database store** (`./sql-store`, Node): `new SqlChunkStore(db)` is a `ChunkStore` in one SQLite or Postgres table, a
+  row per chunk, for worlds too large for a file per chunk; see [Database store](#database-store-sql-store).
 
 ## Connections, login and saved edits
 
@@ -83,7 +85,7 @@ Every limit has a safe default; set them on `new VoxelServer({...})`.
 | `authenticate` | none | `(req, hello) => boolean \| string \| Promise<...>`, called on the upgrade request (`hello` undefined: read a cookie or token header) and again on the hello (`{ name }`). `true` lets the client on, a non-empty string too and becomes `player.identity`, anything else closes it with 1008 `'not authorized'`. A throw, or a call longer than `authTimeout`, closes it with 1011 (reason `auth-failed...` or `auth-timeout...`) and goes to `onError`. |
 | `authTimeout` | 5,000 ms | Time each `authenticate` call may take. |
 | `maxEditedChunks` | 65,536 | Edited chunks held in memory. Past it the least recently edited one is saved to `store` and dropped, and read back when needed. Without a store, a player edit to one more chunk is refused and `onError` gets a MargoError `'failed'` naming the option. |
-| `store` | none | Where edited chunks are kept: a `FileChunkStore` (a folder, one file per chunk; `margoengine/voxel-net/file-store`), any `ChunkStore` of `@margoengine/voxel/stream`, or your own `VoxelEditStore` (`save(key, chunk)`, `load(key)`, either may be async) for a database. It is also read when a chunk loads, and `server.close()` saves every edited chunk still in memory to it, so a world persists across restarts. |
+| `store` | none | Where edited chunks are kept: a `FileChunkStore` (a folder, one file per chunk; `margoengine/voxel-net/file-store`), a `SqlChunkStore` (a SQLite or Postgres table; `margoengine/voxel-net/sql-store`), any `ChunkStore` of `@margoengine/voxel/stream`, or your own `VoxelEditStore` (`save(key, chunk)`, `load(key)`, either may be async) for a database. It is also read when a chunk loads, and `server.close()` saves every edited chunk still in memory to it, so a world persists across restarts. |
 
 Breaking change (2026-10-28): `origins` used to default to any page. A browser client served from another origin (a
 dev server on another port, say) now gets 403; pass that origin, for example `origins: ['http://127.0.0.1:5173']`.
@@ -525,6 +527,46 @@ globalThis.addEventListener?.('pointerdown', () => sendShot(client, [0, 0, -1]))
 - **Wire.** A shot is an app message starting with `SHOT_PREFIX` (`MRW` and 1), then the view tick and the direction
   as four little-endian f64; `encodeShot` and `decodeShot` are exported. A client that sends unreadable shot bytes is
   closed with 4003 `'unreadable-shot'`. A client can claim any view tick, so `maxRewind` is the most a cheat gains.
+
+## Database store (`./sql-store`)
+
+`SqlChunkStore` keeps edited chunks in one table of a database you open: a row per chunk keyed by its chunk
+coordinates (`cx`, `cy`, `cz` integers, the primary key) with the deflated `encodeChunk` bytes in `data` (BLOB in
+SQLite, BYTEA in Postgres). It is a `ChunkStore`, so a `VoxelServer` and a `VoxelStreamer` both take it. It needs no
+dependency: hand it a SQLite database with `prepare` (`node:sqlite` `DatabaseSync`, built into Node, or
+`better-sqlite3`) or a Postgres `Client` or `Pool` of the `pg` package (anything with `query(sql, params)`). The table
+(default `margo_chunks`, set `table`) is made on first use when missing. Each save is one upsert, so a crash leaves the
+old chunk or the new one; calls on one chunk run in order and a load sees every save before it.
+
+```ts
+import { DatabaseSync } from 'node:sqlite';
+import { BlockTypes } from 'margoengine/voxel';
+import { VoxelServer } from 'margoengine/voxel-net/server';
+import { SqlChunkStore } from 'margoengine/voxel-net/sql-store';
+
+const blocks = new BlockTypes();
+for (const name of ['stone', 'dirt', 'grass', 'sand', 'water', 'log', 'leaves']) blocks.define(name);
+// Edited chunks in world.db, one row each: they survive a restart.
+const db = new DatabaseSync('world.db');
+db.exec('PRAGMA journal_mode = WAL'); // readers do not wait on the writer
+const server = new VoxelServer({ blocks, store: new SqlChunkStore(db) });
+await server.listen(8787, '0.0.0.0');
+// Later: await server.close() saves every edited chunk still in memory, then close the database.
+```
+
+On Postgres (`npm install pg`), pass a pool shared with the rest of your game:
+`new SqlChunkStore(new pg.Pool({ connectionString: process.env.DATABASE_URL }), { table: 'world_chunks' })`.
+
+- **SQLite blocks the thread.** `DatabaseSync` runs each query on the server's thread; a save of one chunk is one
+  upsert of its deflated bytes, but a slow disk stalls ticks. Postgres
+  queries run off the thread.
+- **Several worlds in one database**: one `table` each. The name is checked (letters, digits, `_`, at most 63
+  characters, optionally `schema.`) because it is written into the SQL; coordinates and bytes are always parameters.
+- **Errors** go where the `ChunkStore` contract puts them: a failed save rejects that call and the next `flush()`
+  (the server sends both to `onError`), a damaged row rejects the load with a RangeError, and a table that cannot be
+  made (the database still starting) is tried again on the next call.
+- Tested on `node:sqlite` and, for the Postgres SQL (`$n` placeholders, BYTEA, `ON CONFLICT` upsert, needs Postgres
+  9.5 or later), through a `pg`-shaped client over `node:sqlite`; not yet against a running Postgres server.
 
 ## Limits of the prototype
 

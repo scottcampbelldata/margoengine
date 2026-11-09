@@ -58,6 +58,10 @@
     "./rewind": {
       "types": "./dist/rewind.d.ts",
       "import": "./dist/rewind.js"
+    },
+    "./sql-store": {
+      "types": "./dist/sql-store.d.ts",
+      "import": "./dist/sql-store.js"
     }
   },
   "files": [
