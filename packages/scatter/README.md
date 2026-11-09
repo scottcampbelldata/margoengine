@@ -505,6 +505,10 @@ engine.start();
 - An interactor is `{ position, radius, strength? }`: within `radius` of `position` (x and z; the field is flat) the
   push points away from it with amount `strength * (1 - (d / radius)^2)`, and a cell keeps the stronger of its own
   push and the new one, so grass under a standing player stays down. Up to 4,096 interactors a frame.
+- Positions must have all three finite GPU float components. Radius, bend, size and cells per unit must fit positive
+  normal GPU floats (at least 2^-126); strength is a number from 0 to 1. A rejected list preserves the last successful
+  list. A camera teleport with no field overlap clears the old pushes, including shifts beyond signed 32-bit cells.
+- Distance uses a scaled norm, so finite large offsets and radii do not lose their push through squared-length overflow.
 - How it works: one compute pass a frame, before the distribute pass, moves the field with the camera in whole cells,
   scales every cell by `exp(-3 dt / recover)` and stamps the interactors; a cell below 0.001 is upright again, so a
   recovered meadow draws exactly as a plain `Scatter`. The vertex stages read the push at each root (bilinear between

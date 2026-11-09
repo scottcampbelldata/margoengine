@@ -1599,3 +1599,12 @@ Written from Nachbar, Zotter, Deleflie and Sontacchi, [AmbiX - A Suggested Ambis
 ## WFC overlapping pins and ground (batch 69, job 1)
 
 Written from Karth and Smith, [WaveFunctionCollapse is Constraint Solving in the Wild (2017)](https://adamsmith.as/papers/wfc_is_constraint_solving_in_the_wild.pdf), sections 4 and 5. Pattern-domain unary restrictions are derived directly: for each fixed output pixel, remove every covering pattern whose corresponding pixel differs. Chronological undo starts after these restrictions. No external engine/library code read, copied or adapted; tests use generated binary and maze stand-ins.
+
+### Batch 77 scatter interaction audit
+
+GPU input validation follows the [WGSL floating-point evaluation specification](https://www.w3.org/TR/WGSL/#floating-point-evaluation)
+(W3C Candidate Recommendation Draft, 6 November 2026):
+f32 inputs must remain finite, and positive divisors must survive permitted subnormal flushing. The nonoverlapping
+field-shift clamp, atomic interactor validation and maximum-component scaling of a vector norm are Margo's own
+numerical logic. Scaling bounds the squared components by 1; component subtraction that would exceed f32 is outside
+every supported finite radius. No external implementation was read.

@@ -51,6 +51,19 @@ await runSuite(
   async () => {
     console.log('adapter', JSON.stringify(hardware.webgpu));
     await page.waitForFunction(() => window.ready, null, { timeout: 60000 });
+    await page.evaluate(async () => {
+      const { Engine, box } = await import('/packages/core/dist/index.js');
+      const { webglRenderer } = await import('/packages/webgl/dist/index.js');
+      const { TrampledScatter } = await import('/packages/scatter/dist/interact.js');
+      const fallback = await Engine.create(document.createElement('canvas'), { backend: 'webgl2', fallback: webglRenderer });
+      let refused = false;
+      try {
+        if (fallback.backend !== 'webgl2') throw new Error('Native WebGL2 was not selected');
+        try { TrampledScatter.attach(fallback, box()); }
+        catch (error) { refused = error.code === 'unsupported' && error.message.includes('https://margoengine.com/errors#scatter'); }
+      } finally { fallback.dispose(); }
+      if (!refused) throw new Error('Native WebGL2 must refuse interaction with a coded error and help link');
+    });
     await call('make', 'plain');
     const plain = await frame();
     const empty = await call('make', 'trampled');
@@ -114,6 +127,26 @@ await runSuite(
     for (let k = 0; k < 12; k++) done = await call('step', 0.5, []);
     assert.ok(done.slice(6).every((v) => v === 0), 'every cell upright again');
     assert.equal(differing(await frame(), plain), 0, 'recovered grass draws as plain grass');
+    await call('step', 0, movers);
+    const teleported = await call('step', 0, [], [
+      [2 ** 31, 9, 9],
+      [2 ** 31, 0, 0],
+    ]);
+    assert.ok(teleported.slice(6).every((v) => v === 0), 'a nonoverlapping teleport clears every old push without Int32 wrap');
+    // Finite GPU floats can still overflow length's squares; a huge radius must also retain direction nearby.
+    for (const mover of [
+      { position: [1e30, 0, 0], radius: 2e30 },
+      { position: [3, 0, 0], radius: 2e38 },
+    ]) {
+      const extreme = await call('step', 0, [mover], [[0, 9, 9], [0, 0, 0]]);
+      const e = header(extreme);
+      for (let j = 0; j < e.n; j++) for (let i = 0; i < e.n; i++) {
+        const want = push(e.origin[0] + (i + 0.5) / e.cells, e.origin[1] + (j + 0.5) / e.cells, [mover]);
+        const at = 6 + (j * e.n + i) * 2;
+        assert.ok(Math.abs(extreme[at] - want[0]) < 1e-5 && Math.abs(extreme[at + 1] - want[1]) < 1e-5,
+          `finite extreme push at ${i},${j}: ${extreme[at]},${extreme[at + 1]} != ${want}`);
+      }
+    }
     assert.deepEqual(pageErrors, []);
     console.log('ok scatter trample', JSON.stringify({ touched, worst, bentPixels: differing(bent, plain) }));
   },

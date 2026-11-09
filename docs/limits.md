@@ -1047,3 +1047,15 @@ LIM-610: Node full yaw/elevation/roll basis and lifecycle checks, and real brows
 ## WFC overlapping pins and ground (batch 69)
 
 Optional wfc/overlapping: 2,451 B min+gzip, peers external. Existing N 2..5, 4096-pattern and cells times patterns <= 4,194,304 limits remain. Pins are exact finite sample values at output pixels; ground fixes 1..height bottom rows (default 1), and may appear elsewhere. Periodic wrapping includes all covering pattern offsets even when output dimensions are smaller than N. Conflicts are unsatisfiable, with bounded failure rather than altered pixels. No connected-layout guarantee. CPU only on both WebGPU and WebGL2; browser checks create real contexts, solve and test coded contradictions. LIM-613: synthetic binary/maze samples, no authored level or hardware performance claim. Abort checkpoints are synchronous; use a worker for in-flight event cancellation.
+
+### Scatter interaction numeric limits (batch 77 audit)
+
+LIM-604 retains its field-size, resolution and 4,096-interactor limits. Every position has three finite f32
+components; radius, bend, size and resolution/size must fit positive normal f32 (at least 2^-126), so permitted
+subnormal flushing cannot zero a divisor. Strength is a number in [0,1]. A rejected update keeps the last successful
+interactors. Shifts beyond the field's side discard its old pushes without signed 32-bit wrapping. Floating-point
+world precision still applies; the field reads XZ and does not simulate a physical explosion. The optional interact
+entry measures 7,463 minified bytes / 3,318 B gzip with bare peers external. The budget rises from 3,206 to 3,574 B
+(the measured entry plus the established 256 B headroom) for input validation, atomic updates, a bounded shift and
+overflow-safe distance maths. Those extra checks and ALU preserve finite extreme inputs; no speed is measured.
+Core plus stage remains 23,626 B gzip.

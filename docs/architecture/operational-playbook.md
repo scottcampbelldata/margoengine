@@ -1890,3 +1890,16 @@ Audio/ambisonics keeps four components discrete through a splitter and eight gai
 ### WFC unary output constraints (batch 69)
 
 Overlapping pins/ground remove incompatible pattern domains at every covering origin before search. Initial bans are below all decision trail marks; retries rebuild them. Section 5 evidence: generated binary/maze Node tests and the wfc browser check on real WebGPU and WebGL2 contexts. No GPU maths, shaders or device capability requirement; no authored-level, cross-vendor or timing evidence yet.
+
+### Scatter interaction input proof (batch 77 audit, section 5)
+
+Interaction uploads now reject nonrepresentable GPU floats and sparse positions before modifying retained state.
+Cell displacement is clamped at the field side before Int32 conversion: larger moves have no overlap and must clear
+old pushes. All three interact-inputs.test.js regressions fail on the parent and pass with the fix. The existing
+real-GPU interaction suite additionally asserts every field cell is zero after a 2^32-cell teleport. Its existing
+stamp/recovery/pixel checks remain unchanged. The test is already part of the scatter GPU plan; the new unit file is
+picked up by verify and check:merge. A scaled norm fixes squared-length overflow; two finite extreme GPU cases
+(offset 1e30/radius 2e30 and nearby offset/radius 2e38) match the CPU reference for every cell within the existing 1e-5
+bound. The usual 143 pressed cells match within 1.63e-7 on RTX A6000. Native WebGL2 is exercised and refused with a
+coded unsupported error and help link. A CPU resource stand-in checks restoration and terminal disposal. Core/stage
+are unchanged; no speed claim.

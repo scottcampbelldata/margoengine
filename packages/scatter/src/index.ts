@@ -650,7 +650,8 @@ export class Scatter implements EnginePlugin {
     if (this.disposed || !engine.gpu)
       throw new MargoError(
         this.disposed ? 'disposed' : 'unsupported',
-        'Scatter requires WebGPU; attach a new Scatter to a WebGPU engine',
+        (this.disposed ? 'Scatter is disposed; create a new Scatter' : 'Scatter requires WebGPU; attach a new Scatter to a WebGPU engine') +
+          '; see https://margoengine.com/errors#scatter',
       );
     const d = engine.gpu;
     this.engine = engine;

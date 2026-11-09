@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11494864,
+  "total": 11495232,
   "history": [
     {
       "date": "2026-10-24",
@@ -4862,6 +4862,12 @@
       "commit": "7bc32a1cb",
       "reason": "WFC-pixel-pins-and-ground-restrict-all-covering-patterns",
       "grew": 1
+    },
+    {
+      "date": "2026-11-09",
+      "commit": "af1249532",
+      "reason": "Batch 77 scatter interaction audit: finite GPU float and sparse input validation, atomic list updates, nonoverlapping camera shift clamp and scaled distance norm. Optional scatter/interact measures 3318 B gzip; existing 256 B headroom gives 3574 B. Only this entry grows; core plus stage remains 23626 B.",
+      "grew": 1
     }
   ],
   "items": {
@@ -5459,7 +5465,7 @@
     "@margoengine/save/slots": 5741,
     "@margoengine/scatter": 19252,
     "@margoengine/scatter/imposter": 2968,
-    "@margoengine/scatter/interact": 3206,
+    "@margoengine/scatter/interact": 3574,
     "@margoengine/scatter/paint": 1507,
     "@margoengine/scatter/pick": 3793,
     "@margoengine/scatter/tiles": 3415,

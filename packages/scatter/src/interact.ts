@@ -41,6 +41,9 @@ export interface Interactor {
 const MOST = 4096;
 /** Words of the field before its cells: origin xz, cells per unit and resolution, bend. */
 const HEAD = 3;
+// GPU inputs must be finite after conversion; positive divisors must survive WGSL's permitted subnormal flushing.
+const gpuFloat = (v: number) => Number.isFinite(v) && Number.isFinite(Math.fround(v));
+const gpuPositive = (v: number) => gpuFloat(v) && Math.fround(v) >= 2 ** -126;
 
 /** WGSL of the field read and the turn, for a posing vertex stage: `trample` at `binding` of `group`. */
 export function trampleCode(group: number, binding: number): string {
@@ -97,8 +100,16 @@ struct Update {origin:vec2f,shift:vec2i,cells:f32,n:u32,keep:f32,count:u32,bend:
  if(all(old>=vec2i(0))&&all(old<vec2i(i32(n)))){v=field[${HEAD}u+u32(old.y)*n+u32(old.x)]*u.keep;}
  let w=u.origin+(vec2f(g.xy)+0.5)/u.cells;
  for(var i=0u;i<u.count;i++){
-  let m=movers[i];let o=w-m.xy;let d=length(o);
-  if(d<m.z&&d>1e-6){let s=m.w*(1.0-(d/m.z)*(d/m.z));if(s>length(v)){v=o/d*s;}}
+  let m=movers[i];
+  // An overflowing component difference is outside every finite radius. Detect it before subtracting.
+  let bound=vec2f(3.4028234663852886e38)-abs(m.xy);
+  if(((w.x<0)!=(m.x<0)&&abs(w.x)>=bound.x)||((w.y<0)!=(m.y<0)&&abs(w.y)>=bound.y)){continue;}
+  let o=w-m.xy;let a=max(abs(o.x),abs(o.y));
+  if(a<m.z&&a>0){
+   // Normalize before length: squaring a large but finite offset would overflow, or a tiny ratio would underflow.
+   let axis=o/a;let norm=length(axis);let d=(a/m.z)*norm;
+   if(d<1.0&&a>1e-6/norm){let s=m.w*(1.0-d*d);if(s>length(v)){v=axis/norm*s;}}
+  }
  }
  // Fully recovered at last, so a field nothing presses draws as plain grass.
  if(length(v)<1e-3){v=vec2f(0);}
@@ -138,11 +149,13 @@ export class TrampledScatter extends Scatter {
     super(geometry, options);
     if (!trample || typeof trample !== 'object') throw typeError('Trample options must be an object', 'scatter');
     const { size = 64, resolution = 128, recover = 1.5, bend = 1.2 } = trample;
-    if (!(Number.isFinite(size) && size > 0)) throw rangeError('A trample size is world units above 0', 'scatter');
     if (!(Number.isInteger(resolution) && resolution >= 8 && resolution <= 1024))
       throw rangeError('A trample resolution is an integer from 8 to 1024', 'scatter');
+    if (!(gpuPositive(size) && gpuPositive(resolution / size)))
+      throw rangeError('A trample size and its cells per unit must fit positive normal GPU floats', 'scatter');
     if (!(Number.isFinite(recover) && recover > 0)) throw rangeError('A trample recover time is seconds above 0', 'scatter');
-    if (!(bend > 0 && bend <= Math.PI / 2)) throw rangeError('A trample bend is radians above 0, at most pi / 2', 'scatter');
+    if (!(gpuPositive(bend) && bend <= Math.PI / 2))
+      throw rangeError('A trample bend must fit a positive normal GPU float, at most pi / 2 radians', 'scatter');
     this.#size = size;
     this.#n = resolution;
     this.#recover = recover;
@@ -167,16 +180,21 @@ export class TrampledScatter extends Scatter {
   setInteractors(interactors: readonly Interactor[]): this {
     if (!Array.isArray(interactors) || interactors.length > MOST)
       throw rangeError('setInteractors takes an array of at most 4096 interactors', 'scatter');
-    if (this.#movers.length < interactors.length * 4)
-      this.#movers = new Float32Array(Math.max(4, 2 ** Math.ceil(Math.log2(interactors.length))) * 4);
-    interactors.forEach((m, i) => {
+    // Validate the entire list before changing the retained upload, including holes that forEach/every would skip.
+    for (let i = 0; i < interactors.length; i++) {
+      const m = interactors[i];
       if (!m || typeof m !== 'object' || !Array.isArray(m.position) || m.position.length !== 3)
         throw typeError('An interactor is { position: [x, y, z], radius, strength? }', 'scatter');
       const { position: p, radius, strength = 1 } = m;
-      if (!p.every(Number.isFinite)) throw rangeError('An interactor position is three finite numbers', 'scatter');
-      if (!(Number.isFinite(radius) && radius > 0))
-        throw rangeError('An interactor radius is world units above 0', 'scatter');
-      if (!(strength >= 0 && strength <= 1)) throw rangeError('An interactor strength is from 0 to 1', 'scatter');
+      if (![p[0], p[1], p[2]].every(gpuFloat))
+        throw rangeError('An interactor position is three finite GPU float numbers', 'scatter');
+      if (!gpuPositive(radius)) throw rangeError('An interactor radius must fit a positive normal GPU float', 'scatter');
+      if (!(Number.isFinite(strength) && strength >= 0 && strength <= 1))
+        throw rangeError('An interactor strength is a number from 0 to 1', 'scatter');
+    }
+    if (this.#movers.length < interactors.length * 4)
+      this.#movers = new Float32Array(Math.max(4, 2 ** Math.ceil(Math.log2(interactors.length))) * 4);
+    interactors.forEach(({ position: p, radius, strength = 1 }, i) => {
       this.#movers.set([p[0], p[2], radius, strength], i * 4);
     });
     this.#count = interactors.length;
@@ -217,7 +235,8 @@ export class TrampledScatter extends Scatter {
       words = new Int32Array(this.#words);
     this.#origin = origin;
     floats.set([origin[0] / cells, origin[1] / cells]);
-    words.set([origin[0] - last[0], origin[1] - last[1]], 2);
+    // Once a shift reaches the field's side there is no overlap. Clamp before Int32 conversion, which would wrap.
+    words.set(origin.map((v, i) => Math.max(-n, Math.min(n, v - last[i]))), 2);
     floats[4] = cells;
     words[5] = n;
     floats[6] = Math.exp((-3 * this.#delta) / this.#recover);

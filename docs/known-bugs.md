@@ -36,6 +36,23 @@ Owned-2D CCD remains the separately assigned Rapier parity row T-11 / 127.y.
 
 ## Rendering
 
+### Fixed 2026-11-08: scatter interaction input conversion and teleport wrap
+
+Trampling validated JavaScript numbers rather than their GPU representation: tiny sizes made infinite cell scales,
+huge radii overflowed on upload, sparse vectors passed `every`, and a rejected list could partially overwrite the
+last successful list. Validation now checks every element and its float representation before changing the upload.
+Camera displacement was converted directly to Int32, so a 2^32-cell teleport reused stale pushes. Displacements are
+now clamped at the field side, where there is no overlap. All three tests in
+`packages/scatter/test/interact-inputs.test.js` fail against the parent implementation and pass with the fix;
+`packages/scatter/test/interact.browser.mjs` additionally checks that a nonoverlapping teleport clears every field cell.
+
+The audit also reproduced a finite offset of 1e30 with radius 2e30 producing no push: `length(offset)` overflowed when
+squaring its components. The kernel now detects unrepresentable differences as outside any finite radius and scales
+the remaining offset before measuring length, retaining direction even with radius 2e38. GPU assertions compare every
+cell against a CPU reference for both cases without changing the existing tolerances or stamp/recovery/pixel checks.
+The inherited scatter attachment error also lacked its help link. Unsupported native WebGL2 and disposed instances
+now report their coded reason with `errors#scatter`; the GPU suite exercises an actual native WebGL2 engine.
+
 ### Fixed 2026-11-08: creative targets workspace GPU launch
 
 `npm run test:gpu:targets --workspace @margoengine/creative` started its browser server in the package directory and returned HTTP 404 for the repository's test page. The targets harness now resolves its repository root from its module URL before starting the server. `packages/creative/tests/targets-launch.test.js` invokes the harness from the package directory with a browser stand-in that asserts the served root. The real GPU command separately checks all target subresources.
