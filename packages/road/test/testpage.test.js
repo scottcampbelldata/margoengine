@@ -20,3 +20,26 @@ test('Gemini three-point closed loop has an exact seam at segments 128', () => {
   assert.deepEqual(v.slice(0, row * 6), v.slice(128 * row * 6));
 });
 
+test('vertical input gives a coded linked error while steep nonvertical ramps work', () => {
+  assert.throws(
+    () =>
+      road(
+        new Spline([
+          [0, 0, 0],
+          [0, 20, 0],
+          [0, 40, 0],
+        ]),
+      ),
+    (e) => e.code === 'unsupported' && /nonvertical.*https:\/\/margoengine.com\/errors#geometry/.test(e.message),
+  );
+  const steep = road(
+    new Spline([
+      [0, 0, 0],
+      [0.1, 20, 0],
+      [0.2, 40, 0],
+    ]),
+  );
+  assert.ok(steep.geometry.vertices.every(Number.isFinite));
+  assert.ok(steep.geometry.indices.length > 0);
+});
+

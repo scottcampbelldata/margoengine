@@ -1,6 +1,7 @@
 import { sampleRoadFrame } from './frame.js';
 import { Geometry } from '@margoengine/core';
 import type { Spline } from '@margoengine/splines';
+import { fault } from '../../shared/errors.js';
 /** Options for `road`. Lengths are world units; invalid values throw a RangeError. */
 export interface RoadOptions {
   /** Driving surface width, positive. Default 6. */
@@ -80,7 +81,7 @@ export function road(
       tz = after[2] - before[2];
     const horizontal = Math.hypot(tx, tz),
       length = Math.hypot(tx, ty, tz);
-    if (horizontal < 1e-10 || !length) throw new RangeError('Road spline needs a nonvertical tangent');
+    if (horizontal < 1e-10 || !length) throw fault('unsupported', 'Road spline needs a nonvertical tangent; use a nonvertical Y-up road', 'geometry');
     const rx = tz / horizontal,
       rz = -tx / horizontal;
     tx /= length;
