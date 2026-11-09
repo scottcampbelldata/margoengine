@@ -1,22 +1,18 @@
 # Known bugs and unverified features
 
-### Open: batch 134 ETC2 and EAC RG11 source-quality losses
+### Resolved scalar bar: batch 134 source-reference mismatch (2026-11-09)
 
-ETC1S ETC2 RGBA passes 22/23 files; Seaside normal fails by 9,562,857 SSE.
-Its encoded alpha is normal Y while the JPEG reference alpha is opaque 255.
-All decoded RGB remains identical. Alpha reconstruction SSE improves from
-92,110 to 65,595, but the source-interaction term is +9,589,372. EAC RG11
-fails all 26 UASTC pairs under the existing conventional RG source reference:
-its observed output mapping is R/alpha. Even opaque input alpha is quantized
-slightly below 255 by the old output; exact reconstruction can increase that
-reference's error. These are retained losses, not waived differences or proof
-that no encoder can pass. EAC R11 passes all 26 source-quality pairs.
-Reproduce with the author-retained `measure/remaining-quality-report21.mjs`
-and `measure/remaining-quality-report21-etc2.mjs`; captured payloads support
-diagnostics without repeating transcodes. No source/channel/bar change.
-[Per-file evidence and diagnostics](whitepaper/results/batch-134-remaining-targets.json).
-Public integration, complete expanded container fuzz, memory and new-Wasm GPU
-acceptance remain open. The prebuilt is retained.
+Scott's written "Do recommend" replaces scalar acceptance with per-file SSE
+against the spec-defined payload RGBA8 decode, new <= old, zero tolerance,
+all 98 BC4/BC5 pairs and every exact old control. The same scalar paths cover
+EAC R11/RG11 and ETC2 alpha with their unchanged channel mappings. The
+[full evidence](whitepaper/results/batch-134-scalar-payload-bar.json) retains
+the 14 BC4/BC5, 26 RG11 and one ETC2 original-source losses, old beside new.
+The old losses remain measured facts; their former acceptance reference is
+superseded by Scott's ruling, following the 17/98 ideal-fidelity diagnostic.
+The rejected latent model is removed; report-16 bytes are restored alongside
+later ETC2/EAC. Public integration, other targets, final all-current-Wasm
+corpus/fuzz/uploads/memory/entry acceptance remain open; prebuilt retained.
 
 ### Fixed: LIC mixed-magnitude normalization
 
@@ -166,22 +162,13 @@ reuse guidance and a complete alternate-name example, before construction.
 `packages/labels/tests/testpage-attach.test.js` rejects the old error and covers
 default and custom collisions without replacing existing labels or DOM.
 
-### Open: batch 134 scalar source-quality acceptance
+### Historical: batch 134 rejected scalar source model
 
-The original min/max, refined and complete byte-objective drafts failed 40,
-12 and 14 of the same 98 source-quality pairs, respectively. The rational
-source-estimation experiment now fails 21; 7 previously passing pairs become
-losses and 0 previous losses pass. This rejects the tested symmetric-residual
-model. Complete optimization of an estimated source does not establish either
-original-source bar. Every failure remains open; no case is waived or declared
-impossible. Both conventional RG and mapped R/alpha bars, the byte-domain
-bound, all 1,296 old controls and frozen totals stay unchanged. Normative RGBA
-controls are also exact. Reproduce with retained author-workspace identifiers
-`measure/scalar-quality-report17.mjs` and `measure/report17-analyze.mjs`;
-the latter uses captured payloads/sums without another transcode. The private
-experiment is not integrated and the public prebuilt remains in use.
-[Current negative evidence](whitepaper/results/batch-134-scalar-rational.json),
-[previous byte-objective evidence](whitepaper/results/batch-134-scalar-exact-edge.json).
+The report-17 rational estimate failed 21/98 original-source pairs and remains
+rejected. It is archived, with the unchanged historical evidence, in
+[the rational-source report](whitepaper/results/batch-134-scalar-rational.json).
+Scott's 2026-11-09 scalar ruling above resolves the reference decision; it
+does not validate that source model or hide any original-source loss.
 
 ### Fixed: GPU gate mutex target lookup raced junction retirement
 

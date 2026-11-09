@@ -1,5 +1,28 @@
 # Reproducing Margo's numbers
 
+## Batch 134 scalar payload bar (2026-11-09)
+
+With the author-retained licensed corpus, control payloads, independent
+quality readers and private combined draft in an evidence folder, run:
+
+```sh
+node scripts/measure/scalar-payload-bar.mjs <evidence-directory> scalar scalar.json
+node scripts/measure/scalar-payload-bar.mjs <evidence-directory> eac eac.json
+node scripts/measure/scalar-payload-bar.mjs <evidence-directory> etc2 etc2.json
+node --test --test-timeout=60000 tests/scalar-payload-metrics.test.js
+```
+
+Each command is CPU-only and needs a hard process limit (600, 900, 600 and
+120 seconds respectively). The evidence folder is the retained `measure`
+folder with the matching sibling `transcoder`, not a downloaded implementation.
+The script checks input/control pins, every candidate RGBA hash, every frozen
+old source metric and complete pair/image counts; captures each new payload;
+compares exact scalar numerator SSE, new <= old with zero tolerance; and
+publishes original-source conventional and mapped numbers, including losses.
+The [published evidence](results/batch-134-scalar-payload-bar.json) pins this
+combined Wasm and its sources. EAC denominator is 2047 squared, not a rounded
+byte decode. No GPU lock or timing A/B is involved in these commands.
+
 The [remaining-target draft](results/batch-134-remaining-targets.json) uses
 author-retained measurement scripts `remaining-quality-report21.mjs`
 (UASTC EAC) and `remaining-quality-report21-etc2.mjs` (ETC1S ETC2).

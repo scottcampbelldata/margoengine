@@ -1,5 +1,32 @@
 # Design envelope
 
+## Batch 134 scalar reference ruling (2026-11-09)
+
+Scoped scalar quality now passes 98/98 BC4/BC5 pairs (1,296 images),
+52/52 EAC R11/RG11 pairs (690 images), and 23/23 ETC2-alpha pairs (303 images).
+All 2,289 old source controls, 1,296 normative RGBA controls and 2,289 new
+payload rehashes pass. BC4/BC5 output/source numbers equal report16 exactly;
+all 993 ETC2/EAC output hashes and source numbers equal report21 exactly.
+The original-source losses remain 14 BC4/BC5, 26 RG11 and one ETC2 pair.
+
+Scott's written "Do recommend" sets per-file SSE against the spec-defined
+RGBA8 decode of the same payload, new <= prebuilt on all 98 BC4/BC5 pairs,
+zero tolerance, every old control exact. The same rule applies to EAC R11/RG11
+and ETC2 scalar alpha; channel mappings and strict color rules stay fixed.
+The [evidence](whitepaper/results/batch-134-scalar-payload-bar.json) publishes
+all original-source old/new measurements, including the 14 BC4/BC5 losses,
+26 RG11 losses and one ETC2 source loss. No original-source loss is hidden.
+The [zero-added-error diagnostic](whitepaper/results/batch-134-scalar-ideal-bound.json)
+fails 17/98 against the former source bar, explaining the reference change.
+
+The combined private candidate is 187,031 B raw / 68,167 B gzip9, versus
+202,177 / 74,823 B before removing the rejected latent model. This is a
+rebuilt report-16 byte fitter with the later ETC2/EAC paths retained, not the
+old report-16 binary. No optional-entry ceiling or core/stage size changed.
+Public integration, remaining targets, all-current-Wasm fuzz/corpus,
+candidate GPU uploads, peak memory and final entry acceptance remain open.
+All timing proof stays deferred. Earlier reports below are historical.
+
 Batch 134 remaining-target draft: UASTC EAC R11 source quality passes 26/26
 pairs; EAC RG11 fails 26/26; ETC1S ETC2 RGBA passes 22/23. All 993 original
 payload/source controls and zero-tolerance per-file bars remain unchanged.

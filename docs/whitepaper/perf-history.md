@@ -1,5 +1,19 @@
 # Performance history: losses, causes and fixes
 
+### Batch 134 scalar ruling, no timing claim (2026-11-09)
+
+Scott's "Do recommend" adopts payload RGBA8 scalar SSE as the acceptance
+reference, new <= prebuilt per file with zero tolerance, all 98 BC4/BC5 pairs
+and exact old controls; the same scalar paths include R11/RG11 and ETC2 alpha.
+[Every original-source number and loss](results/batch-134-scalar-payload-bar.json)
+remains published. This follows the [17/98 ideal-fidelity diagnostic](results/batch-134-scalar-ideal-bound.json),
+not a hidden source prior or another optimization round. The restored byte
+fitter removes rejected estimate computation and search; later ETC2/EAC stays.
+The combined private Wasm changes from 202,177 raw / 74,823 gzip9 to 187,031 /
+68,167 B. Final entry/peak-memory acceptance remains owed. No wall-clock A/B,
+benchmark, startup or speed claim; all timing targets stay in speed-phase.md.
+The rational-source and old source-bar descriptions below are historical.
+
 ### Batch 134 rational-source experiment, no speed acceptance
 
 The [negative source-estimation checkpoint](results/batch-134-scalar-rational.json)

@@ -1,5 +1,32 @@
 # Engine architecture and quality reference
 
+### Section 5 evidence: batch 134 scalar reference ruling
+
+Scoped scalar quality now passes 98/98 BC4/BC5 pairs (1,296 images),
+52/52 EAC R11/RG11 pairs (690 images), and 23/23 ETC2-alpha pairs (303 images).
+All 2,289 old source controls, 1,296 normative RGBA controls and 2,289 new
+payload rehashes pass. BC4/BC5 output/source numbers equal report16 exactly;
+all 993 ETC2/EAC output hashes and source numbers equal report21 exactly.
+The original-source losses remain 14 BC4/BC5, 26 RG11 and one ETC2 pair.
+
+Scott's written 2026-11-09 "Do recommend" ruling requires per-file SSE against
+the spec-defined ETC1S/UASTC payload RGBA8 decode, new <= prebuilt on every
+one of 98 BC4/BC5 pairs, zero tolerance and exact old controls. EAC R11/RG11
+and ETC2 scalar alpha use the same rule and existing output channels. EAC
+keeps 11-bit reconstruction: integer numerator SSE / 2047 squared, aggregated
+with BigInt, never byte-rounded. Original-source floating arithmetic, image
+order and all original losses remain published in the
+[full evidence](../whitepaper/results/batch-134-scalar-payload-bar.json).
+
+The report-16 byte objective is restored; the rejected latent model is
+archived. Two wiring regressions fail on preserved report-21 source and pass
+on the candidate. Existing exhaustive byte/header oracles remain unchanged.
+New public metric regressions cover channel mapping, a one-unit loss and
+exact EAC totals beyond Number's safe integer range. This scoped quality
+proof does not close remaining-target/API/fuzz/GPU/memory/entry acceptance.
+No timing A/B, benchmark or timing assertion; speed-phase debt stays open.
+Earlier experiment descriptions retain their historical scope.
+
 ### Section 5 evidence: batch 134 rejected rational-source hypothesis
 
 The private scalar experiment completely optimizes rational source estimates

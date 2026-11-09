@@ -1,0 +1,122 @@
+{
+  "status": "scoped-correctness-with-repaired-generated-docs",
+  "scope": "Scalar acceptance ruling and private candidate proof; no public package/README/exports change. No README/API update applicable. No all-green full-verify claim.",
+  "steps": [
+    {
+      "name": "report14-report22-wasm",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 7.2
+    },
+    {
+      "name": "report14-report22-native",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 41.2
+    },
+    {
+      "name": "report14-report22-wiring",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 17.3
+    },
+    {
+      "name": "report14-report22-node",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 3.7
+    },
+    {
+      "name": "report14-report22-metric-tests",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 0.2
+    },
+    {
+      "name": "report14-report22-lint",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 2
+    },
+    {
+      "name": "report14-report22-hygiene",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 18.8
+    },
+    {
+      "name": "report14-report22-decoder-cpu",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 10.7
+    },
+    {
+      "name": "report14-report22-gltf-cpu",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 2.2
+    },
+    {
+      "name": "report14-report22-focused-current-docs",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 2.5
+    },
+    {
+      "name": "report14-report22-node-gltf-gpu-classified",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 2.3
+    }
+  ],
+  "fullVerify": {
+    "ranOnce": true,
+    "tests": 13953,
+    "passed": 13952,
+    "failed": 1,
+    "onlyFailure": "Generated site/llms.txt and site/llms-full.txt stale after docs change. Regenerated with build-llms; all29 focused docs/llms/sizes/fixed-waits/metric tests pass. All other successful verify steps retained; no second full verify."
+  },
+  "native": {
+    "fullBeforeAddedWiring": 65,
+    "addedWiring": 2,
+    "bothWiringFailOnOldReport21": true,
+    "composed": 67,
+    "freshFullComposedRun": false
+  },
+  "gpu": {
+    "gltf": {
+      "name": "gltf-gpu",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 35.7
+    },
+    "decoders": {
+      "name": "decoders-browser",
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 12.6
+    },
+    "nativeNodeGltf": {
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 2.3
+    },
+    "lock": "One shared slot per lane, wait-max60, real GPU leaves only, no exclusive lock. Initial native Node GPU leaf was refused by classifier before GPU work; explicit native render/readback reason supplied. Public GPU leaves use shipped prebuilt, not candidate acceptance."
+  },
+  "coreStageGzip": 23924,
+  "timing": "No A/B, benchmark or timing-only assertion. Correctness process hard limits only; speed-phase debt unchanged."
+}

@@ -1,5 +1,35 @@
 # Clean room
 
+## Batch 134 scalar ruling and byte-fitter restoration (2026-11-09)
+
+Scott's written "Do recommend" ruling in the batch brief authorizes per-file
+SSE against the specification-defined RGBA8 decode of the same payload,
+new <= old, all 98 BC4/BC5 pairs, zero tolerance, all old controls exact.
+The same scalar paths include EAC R11/RG11 and ETC2 alpha. Original-source
+numbers remain measured and [published with every loss](whitepaper/results/batch-134-scalar-payload-bar.json).
+The reason is the [17/98 ideal-fidelity proof](whitepaper/results/batch-134-scalar-ideal-bound.json),
+not an inferred old optimizer or source-specific tuning.
+
+Research preceded the restore and harness change. Renewed wide primary-source
+searches compared Andrew Garrard / Khronos Group, *Data Format Specification
+1.4* (2025), https://registry.khronos.org/DataFormat/specs/1.4/dataformat.1.4.html,
+sections 19.1/19.3 and 22.3/22.5/22.6 scoped rereads, with Per Wennersten and
+Jacob Strom, *Table-based Alpha Compression* (2009), retained text 4.1-4.3,
+https://www.jacobstrom.com/publications/alphalineWennerstenStrom09.pdf.
+The former defines decode/channel precision; the latter motivates fitting
+actual discrete palettes. Report-16 comparison also used Shin Fujieda and
+Takahiro Harada, *Neural Texture Block Compression* (2024), 2.3 and 3-3.1,
+https://arxiv.org/html/2407.09543v1, and Ariel Doubchak, Tal Philosof, Uri Erez
+and Amit Berman, *Design of Threshold-Constrained Indirect Quantizers* (2024),
+abstract/introduction through I-C.2, https://arxiv.org/html/2409.06839v1.
+These are scoped reviews, not full-paper certification or use of neural
+training. No companion/implementation code, foreign wrapper, disassembly
+or remembered optimizer was read or used. Only Margo's own report-16 source
+was restored, with fresh mtimes and content pins before Cargo; the later
+ETC2/EAC code remains. Rejected latent source code/tests stay archived in
+private experiment backups. Existing byte/header/vector tests are retained.
+Earlier notes below retain the bars and observations at their checkpoint.
+
 ## Batch 134 ETC1S ETC2 and UASTC EAC draft (2026-11-09)
 
 Research preceded implementation. Compared Andrew Garrard / Khronos Group,

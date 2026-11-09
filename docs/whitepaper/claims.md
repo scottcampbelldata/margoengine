@@ -1,5 +1,36 @@
 # Claims and evidence
 
+## Batch 134 scalar ruling (Scott, 2026-11-09)
+
+Scoped scalar quality now passes 98/98 BC4/BC5 pairs (1,296 images),
+52/52 EAC R11/RG11 pairs (690 images), and 23/23 ETC2-alpha pairs (303 images).
+All 2,289 old source controls, 1,296 normative RGBA controls and 2,289 new
+payload rehashes pass. BC4/BC5 output/source numbers equal report16 exactly;
+all 993 ETC2/EAC output hashes and source numbers equal report21 exactly.
+The original-source losses remain 14 BC4/BC5, 26 RG11 and one ETC2 pair.
+
+Scott's written "Do recommend" ruling replaces the scalar acceptance reference
+with the spec-defined ETC1S/UASTC RGBA8 decode of the same payload: per-file
+SSE, new <= old, zero tolerance, every old control exact. BC4/BC5 retain all
+98 pairs, both input kinds and every mip/layer/face. The same rule covers
+EAC R11/RG11 and ETC2 alpha. R/alpha channel output contracts are unchanged;
+ETC2 RGB remains strict. [Full scalar payload-bar evidence](results/batch-134-scalar-payload-bar.json) publishes every
+old/new original-source number, including losses; those numbers remain measured.
+The reason is the [ideal-fidelity proof](results/batch-134-scalar-ideal-bound.json):
+zero added reconstruction error still fails 17/98 old source-bar pairs.
+
+[Gate record](results/batch-134-scalar-payload-gates.json): the single full verify
+passed 13,952 of 13,953 tests; its one stale generated-doc index failure was
+repaired by regeneration, then all 29 focused checks passed. Lint, hygiene,
+decoders/glTF CPU and all three shared public GPU leaves pass. Those GPU
+leaves exercise the shipped prebuilt; no candidate GPU acceptance is implied.
+
+The restored report-16 byte fitter replaces the rejected latent source model;
+later ETC2/EAC work is retained in one rebuilt optional private Wasm. The
+historical reports below keep their original bars and results. Their statements
+about waiting for Scott or a then-current bar do not describe this new ruling.
+No public decoder replacement or completed batch job is claimed.
+
 The [remaining-target draft](results/batch-134-remaining-targets.json) passes
 all 26 UASTC EAC R11 original-source pairs (345 images). EAC RG11 fails all
 26 pairs and ETC1S ETC2 RGBA fails one of 23, so neither is accepted.
