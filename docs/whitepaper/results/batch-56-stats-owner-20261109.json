@@ -265,15 +265,54 @@
       }
     },
     "finalOwnerGpu": {
-      "state": "queued at checkpoint; no slot held by this lane",
-      "wrapperPid": 71388,
-      "lockPid": 110392,
-      "result": "test-results/56fix/owed-results-compute-owner-final-final-rebase.json",
-      "log": "test-results/56fix/owed-final-rebase-compute-owner-final.log",
-      "command": "npm.cmd run test:gpu:owners --workspace @margoengine/compute",
+      "id": "compute-owner-final",
+      "words": [
+        "npm.cmd",
+        "run",
+        "test:gpu:owners",
+        "--workspace",
+        "@margoengine/compute"
+      ],
+      "max": 0.5,
+      "code": 0,
+      "timedOut": false,
+      "seconds": 352.053,
+      "log": "C:\\Development\\Projects\\margoengine-lane-P\\test-results\\56fix\\owed-final-rebase-compute-owner-final.log",
+      "state": "passed; shared slot released",
       "maxMinutes": 0.5,
       "waitMaxMinutes": 60,
-      "note": "Existing strengthened command passed before the alias consolidation. Collect this queued package-alias run before mutating its checkout or claiming fresh final GPU acceptance."
-    }
+      "note": "Elapsed includes FIFO wait. Both native and compatibility owner proofs pass with 1024 exact values after each dispatch and zero shader errors."
+    },
+    "finalBase": "449dd9676",
+    "finalValidatedHead": "42b499882a9bd83d05697ac7e40567efa8e4a948",
+    "lastRebase": "Preserved every upstream checkpoint, the compute compat:false native baseline and four-dispatch comment, plus the exhaustive-subset comment. Runtime stats/core/compute package source is unchanged. Prior proof had no outer MARGO_COMPAT (runner rejects it), so the explicit native opt-out retains that baseline. No duplicate GPU or full verify is required for documentation and equivalent test setup.",
+    "lastRebaseChecks": {
+      "stats-push-current-cpu": {
+        "code": 0,
+        "timedOut": false,
+        "seconds": 7.761,
+        "log": "test-results/56fix/stats-push-current-cpu.log",
+        "tests": 167
+      },
+      "stats-push-current-lint": {
+        "code": 0,
+        "timedOut": false,
+        "seconds": 3.751,
+        "log": "test-results/56fix/stats-push-current-lint.log"
+      },
+      "stats-push-current-hygiene": {
+        "code": 0,
+        "timedOut": false,
+        "seconds": 15.08,
+        "log": "test-results/56fix/stats-push-current-hygiene.log"
+      },
+      "stats-push-current-doclinks": {
+        "code": 0,
+        "timedOut": false,
+        "seconds": 2.465,
+        "log": "test-results/56fix/stats-push-current-doclinks.log"
+      }
+    },
+    "originalStatsSourceIdentical": true
   }
 }

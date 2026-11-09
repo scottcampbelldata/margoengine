@@ -1,7 +1,7 @@
 # Batch 56 wider scene-owner audit
 
 Status: OPEN. Current syntactic snapshot includes the accepted stats repair
-and the current-main rebase onto 1aa76ee38. This is a complete syntactic call inventory, not proof
+and the current-main rebase onto 449dd9676. This is a complete syntactic call inventory, not proof
 that every candidate is a bug or that every plugin has correct lifetime.
 
 The parser finds 182 actual removePlugin calls in package TypeScript sources:

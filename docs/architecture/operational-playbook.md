@@ -4584,3 +4584,10 @@ wait forms. All ten fixed-wait tests and the complete repository scan pass after
 the correction. Browser fixtures, numerical checks, wait baseline and timeouts
 remain unchanged. This corrects the sole failed affected step; it is not a new
 full verify run or a GPU execution claim.
+
+Final stats integration onto main 449dd9676 preserves its materials and other
+owner checkpoints, compute native opt-out and subset-enumeration explanation.
+The queued compute/test:gpu:owners command passes both backends and releases its
+shared slot; elapsed time includes its FIFO wait. The earlier proof ran without
+an outer compatibility shim, so the explicit native opt-out retains its setup.
+No runtime stats/core/compute source changes in this last rebase.
