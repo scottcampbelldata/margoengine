@@ -454,7 +454,7 @@ API currentness (897 entries, 8696 exports), both changed planner regressions
 and documentation links. No successful full unit, sciviz GPU or README suite
 is repeated after rebase, and no new full-verify success is claimed.
 
-The final rebase onto 0ba1d4f94 also preserves main's stats owner changes,
+The rebase onto 0ba1d4f94 also preserves main's stats owner changes,
 strengthened compute owner oracle, planner regression movement and fixed-work
 classifier. No sciviz or owning regression byte changes. Retain the passing
 full combined build and rebuild only stats for its changed runtime source;
@@ -463,3 +463,10 @@ the selective build passes. Regenerate genuine paired records from e42608c3e
 combined-tree measurements, without changing their metadata by hand. The
 sciviz sizes, 23924 B root and three kit figures remain unchanged. Main's
 already recorded stats/compute unit, GPU and README evidence is retained.
+
+The final documentation-only rebase through 933268527 changes no package
+byte. Retain all source/GPU/README and current API/size-gate evidence. Genuine
+paired measurements now name d28f0200b with dirty=false, followed by a scoped
+sciviz API refresh and llms generation. All 17 record/llms cases and docs links
+pass again for those changed artifacts. No metadata is relabeled and no
+successful source correctness or GPU suite is replayed.
