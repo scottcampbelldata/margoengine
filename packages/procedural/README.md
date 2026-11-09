@@ -513,3 +513,55 @@ cross-device byte identity or timing is claimed (LIM-639).
 GPU wait promises are observed before checking cancellation, and loss/cancellation
 is checked again after completion. An already lost factory and a cancelled queue
 cannot leave a later GPU rejection unhandled; the original abort reason still wins.
+
+## Rectangular building shape grammar
+
+The optional `@margoengine/procedural/buildings` entry applies a restricted,
+declarative shape grammar: footprint -> floor splits -> four facade components ->
+repeated equal bays -> centred window insets -> flat or gable roof. Changing simple
+data changes the shell and its floor/bay scopes. It is not a general CGA parser.
+
+```ts
+import { createBuildingGenerator } from '@margoengine/procedural/buildings';
+
+using buildings = await createBuildingGenerator();
+const mesh = buildings.generate({
+  width: 18, depth: 10, floorHeights: [4, 3, 3], bayWidth: 3,
+  window: [0.55, 0.6], roof: 'gable', roofHeight: 2,
+});
+console.log(mesh.positions.length / 3, mesh.indices.length / 3, mesh.bays.length / 8);
+```
+
+Metres, Y up. Defaults: width12, depth8, origin[0,0,0] (bottom centre), yaw0,
+floorHeights[3,3,3], bayWidth3, window[.55,.6], roof'flat', roofHeight2 (ignored
+for flat), no signal. Width/depth .1..1000; bayWidth .1..1000; each side uses
+ceil(length/bayWidth) equal bays, 1..256; at most4096 bays overall. Floor heights
+are1..64 values of .1..100 with total<=5000; window fractions .05...95; gable rise
+.1..100; origin coordinates +/-10000 and yaw +/-2pi. All numbers must be finite.
+
+Positions are owned Float64 XYZ; normals Float32; indices Uint32; materials Uint8
+per triangle (0 wall,1 window,2 roof/gables,3 base). Floors pack bottom/height;
+bays pack floor,side,start,bottom,width,height,windowWidth,windowHeight. Facade
+sides run +X at -Z, +Z at +X, -X at +Z, -Z at -X. Roof ridge runs along local Z.
+Wall rings and flush panes partition the shell without overlapping faces. There
+are no interior slabs, doors, wall thickness, collision data, UVs, arbitrary
+footprints, recursive user productions or context/occlusion queries. Separate
+planar faces have separate vertices; boundary T junctions require welding and
+subdivision before use as a manifold solid in downstream tooling.
+
+One lazy buildings.wasm; no import-time fetch. Independent of GPU resources and
+identical on WebGPU/WebGL2 before and after loss. Synchronous generation checks
+signal before work; use a worker for interruption. Dispose is idempotent and owned
+outputs survive disposal. Errors are coded with help links. JS 1502 B gzip;
+Wasm 31252 B raw / 12794 B gzip. Native and browser area/volume, partition,
+ownership and hostile-input tests; real Montreal CityJSON supplies measured
+envelope dimensions only. Generated facades and other controls remain stand-ins.
+Two shared sine/cosine evaluations equal the per-vertex transform oracle with
+fewer trig calls; no timing, SIMD gain or architecture-realism claim (LIM-642).
+
+A downloaded real CMP facade photo and its annotation XML additionally calibrate
+four windows in a 2x2 region. Measured floor splits preserve the row heights;
+generated bounds agree within1.89 source pixels against the fixed2-pixel bar.
+Source hashes, licence (publisher CC BY-SA, no version stated), measurements and
+method are in test/fixtures/buildings/facade-reference.json. This limited calibrated
+layout test does not recover the whole facade, its ornamentation or material.

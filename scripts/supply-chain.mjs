@@ -127,6 +127,14 @@ export const BUNDLED = [
 /** Credits for the assets the site, demos and examples use. None of these files is in an npm tarball. */
 const ASSETS = [
   [
+    'packages/procedural/test/fixtures/buildings/facade-reference.json',
+    'Own numeric observations of four annotated windows in CMP Facade Database base/cmp_b0001, Radim Tylecek and Radim Sara (2013), https://cmp.felk.cvut.cz/~tylecr1/facade/. Publisher CC BY-SA, no version stated. Original archive, photo and XML downloaded but never redistributed; all SHA-256, observation ordinals and calibration method recorded in the fixture. No external code.',
+  ],
+  [
+    'packages/procedural/test/fixtures/buildings/reference.json',
+    'Own envelope measurements from the real Ville de Montreal two-building CityJSON tutorial sample: https://www.cityjson.org/tutorials/files/twobuildings.city.json, SHA-256 a713f41252f1a1430698160f697123e70db81476a83b5ec1921c61cc6a9bd51c. CC-BY-4.0 (Quebec); licence and provenance links in the fixture. The byte-identical 48488-byte standard tutorial sample and our numeric measurements are committed as test-only fixtures, never shipped in npm. No implementation or image redistributed.',
+  ],
+  [
     'packages/procedural/test/fixtures/textures/structural-reference.json',
     'Our numerical joint-centre measurements from Lefebvre and Poulin, Analysis and Synthesis of Structural Textures, Graphics Interface 2000, Fig.1(d), https://graphicsinterface.org/wp-content/uploads/gi2000-12.pdf. Source PDF SHA-256, method and uncertainty in the fixture. Original paper/JPEG remain outside shipped files; no image or implementation redistributed. Factual measurements only, with author/title attribution.',
   ],

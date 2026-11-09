@@ -37,3 +37,5 @@ python/margoengine/nbextension/
 # Mutation runner work builds (scripts/mutation.mjs)
 .mutation/
 packages/voxel-pathtracer/mesh-kernel/target/
+
+/packages/procedural/buildings-kernel/target/

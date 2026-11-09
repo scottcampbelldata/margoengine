@@ -20,8 +20,9 @@ try {
      import {createDungeonGenerator} from '@margoengine/procedural/dungeon';
      import {createTreeGenerator} from '@margoengine/procedural/trees';
      import {createSdfModeler} from '@margoengine/procedural/sdf';
+     import {createBuildingGenerator} from '@margoengine/procedural/buildings';
      window.makeSampler = createPoissonSampler; window.makeDungeon = createDungeonGenerator;
-     window.makeTree = createTreeGenerator; window.makeSdf = createSdfModeler;`,
+     window.makeTree = createTreeGenerator; window.makeSdf = createSdfModeler; window.makeBuilding = createBuildingGenerator;`,
   );
   await build({
     root: dir,
@@ -34,6 +35,7 @@ try {
         '@margoengine/procedural/dungeon': fileURLToPath(new URL('../dist/dungeon.js', import.meta.url)),
         '@margoengine/procedural/trees': fileURLToPath(new URL('../dist/trees.js', import.meta.url)),
         '@margoengine/procedural/sdf': fileURLToPath(new URL('../dist/sdf.js', import.meta.url)),
+        '@margoengine/procedural/buildings': fileURLToPath(new URL('../dist/buildings.js', import.meta.url)),
       },
     },
     build: { outDir: join(dir, 'dist') },
@@ -74,6 +76,9 @@ try {
       const dungeon = await window.makeDungeon();
       const trees = await window.makeTree();
       const sdf = await window.makeSdf();
+      const buildings = await window.makeBuilding();
+      const buildingOptions = { width: 12, depth: 8, floorHeights: [3, 4], bayWidth: 3, roof: 'gable', roofHeight: 2 };
+      const building = buildings.generate(buildingOptions);
       const sdfShape = { type: 'box', halfSize: [0.7, 0.6, 0.5] };
       const sdfMesh = sdf.mesh(sdfShape, { resolution: 17 });
       const treeOptions = { seed: 7, attractionCount: 64, maxNodes: 256, maxIterations: 64 };
@@ -98,6 +103,16 @@ try {
       const dungeonAfter = dungeon.generate(dungeonOptions);
       const treeAfter = trees.generate(treeOptions);
       const sdfAfter = sdf.mesh(sdfShape, { resolution: 17 });
+      const buildingAfter = buildings.generate(buildingOptions);
+      buildings.dispose();
+      buildings[Symbol.dispose]();
+      let buildingDisposed = false;
+      try {
+        buildings.generate();
+      } catch (e) {
+        buildingDisposed = e.code === 'disposed';
+      }
+      if (!buildingDisposed) throw new Error('Disposed building generator accepted work');
       sdf.dispose();
       sdf.dispose();
       let sdfDisposed = false;
@@ -136,6 +151,13 @@ try {
       if (!disposed) throw new Error('Disposed sampler accepted work');
       output.push({
         route,
+        building: {
+          positions: [...building.positions],
+          indices: [...building.indices],
+          materials: [...building.materials],
+          bays: [...building.bays],
+        },
+        buildingAfter: [...buildingAfter.positions],
         sdf: { positions: [...sdfMesh.positions], indices: [...sdfMesh.indices] },
         sdfAfter: { positions: [...sdfAfter.positions], indices: [...sdfAfter.indices] },
         points: [...a.positions],
@@ -157,7 +179,24 @@ try {
     }
     return output;
   });
-  assert.equal(new Set(wasmRequests).size, 4, 'one independent lazy asset per feature');
+  assert.equal(new Set(wasmRequests).size, 5, 'one independent lazy asset per feature');
+  assert.deepEqual(result[0].building, result[1].building);
+  for (const r of result) {
+    assert.deepEqual(r.building.positions, r.buildingAfter);
+    assert.equal(r.building.bays.length / 8, 28);
+    assert.equal(r.building.materials.filter((v) => v === 1).length, 56);
+    const ys = r.building.positions.filter((_, i) => i % 3 === 1);
+    assert.equal(Math.min(...ys), 0);
+    assert.equal(Math.max(...ys), 9);
+    let volume = 0;
+    for (let i = 0; i < r.building.indices.length; i += 3) {
+      const [a, b, c] = r.building.indices.slice(i, i + 3).map((v) => r.building.positions.slice(v * 3, v * 3 + 3));
+      volume +=
+        (a[0] * (b[1] * c[2] - b[2] * c[1]) + a[1] * (b[2] * c[0] - b[0] * c[2]) + a[2] * (b[0] * c[1] - b[1] * c[0])) /
+        6;
+    }
+    assert.ok(Math.abs(volume - 768) < 1e-8, 'browser shell volume matches rectangle plus gable');
+  }
   assert.deepEqual(result[0].sdf, result[1].sdf);
   assert.deepEqual(result[0].points, result[1].points);
   assert.deepEqual(result[0].dungeon, result[1].dungeon);

@@ -36,6 +36,14 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/procedural',
+    file: 'packages/procedural/dist/buildings.wasm',
+    label: 'buildings.wasm',
+    kind: 'Rust Wasm building split grammar',
+    measure: 'file',
+    when: '`createBuildingGenerator()`, only from the optional /buildings entry',
+  },
+  {
+    package: '@margoengine/procedural',
     file: 'packages/procedural/dist/sdf.wasm',
     label: 'sdf.wasm',
     kind: 'Rust Wasm dual contouring',

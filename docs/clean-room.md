@@ -2057,3 +2057,31 @@ No external implementation source was read or copied; no dependency, downloaded 
 All fixtures are generated stand-ins. The edge oracle integrates a uniform disk over the exact front/back
 miss interval of a finite-depth emissive slab, including its side face. No tolerance was raised after
 the initial zero-thickness oracle exposed that distinction.
+
+## Batch 68 job 7: rectangular building grammar
+
+Research combined Wonka, Wimmer, Sillion and Ribarsky, Instant Architecture (2003),
+https://peterwonka.net/Publications/pdfs/2003.SG.Wonka.InstantArchitecture.high.pdf
+(section4 split grammars and section5 attribute propagation), with Mueller, Wonka,
+Haegler, Ulmer and Van Gool, Procedural Modeling of Buildings (2006),
+https://peterwonka.net/Publications/pdfs/2006.SG.Mueller.ProceduralModelingOfBuildings.final.pdf
+(section2 oriented scopes, component/repeat splits and section4 modelling example).
+Both papers were downloaded and read as text; no linked implementation or foreign
+source was read. This deliberately bounded grammar combines absolute floor splits,
+equal bay repeats and window inset conversions with a flat/gable roof production.
+The private CAD API was inspected first: its body tessellation is for CAD bodies,
+not rule-generated shells; no suitable building grammar API exists. No CAD code or
+dependency enters this public package. Geometry loops are feature-local Rust/Wasm.
+CityJSON's tutorial identifies its two-building standard sample as real Montreal
+data. Source/municipal licence links, original SHA-256 and our own dequantized
+envelope measurements are in test/fixtures/buildings/reference.json. The byte-identical small standard CityJSON tutorial sample is a credited test fixture;
+no original paper, image or external code is redistributed, and no fixture ships in npm. Facades are generated stand-ins.
+
+Additional real facade reference: Radim Tylecek and Radim Sara, CMP Facade Database,
+https://cmp.felk.cvut.cz/~tylecr1/facade/ (2013). The base dataset was downloaded;
+photo base/cmp_b0001.jpg was visually inspected and its XML read as annotation data,
+never as code. Four window bounds supply a calibrated2x2 region. Mean horizontal
+pitch/width and per-row window heights determine floor splits with a common window
+ratio. No external image or XML is redistributed. Numeric observations, archive,
+photo and XML hashes, licence and reproduction method are recorded in the fixture.
+The publisher says CC BY-SA without a version. No parsing implementation was read.

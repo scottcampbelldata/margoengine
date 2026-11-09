@@ -65,6 +65,10 @@
     "./textures": {
       "types": "./dist/textures.d.ts",
       "import": "./dist/textures.js"
+    },
+    "./buildings": {
+      "types": "./dist/buildings.d.ts",
+      "import": "./dist/buildings.js"
     }
   },
   "files": [
@@ -83,7 +87,7 @@
     "@margoengine/core": "^1.0.0"
   },
   "scripts": {
-    "build": "node ../../scripts/build-optional.js procedural && node scripts/copy-poisson.mjs && node scripts/copy-dungeon.mjs && node scripts/copy-trees.mjs && node scripts/copy-sdf.mjs",
+    "build": "node ../../scripts/build-optional.js procedural && node scripts/copy-poisson.mjs && node scripts/copy-dungeon.mjs && node scripts/copy-trees.mjs && node scripts/copy-sdf.mjs && node scripts/copy-buildings.mjs",
     "test": "npm run build && node --test test/*.test.js",
     "build:poisson": "node scripts/build-poisson.mjs",
     "test:poisson-kernel": "node scripts/build-poisson.mjs --test",
@@ -94,6 +98,8 @@
     "build:trees": "node scripts/build-trees.mjs",
     "test:trees-kernel": "node scripts/build-trees.mjs --test",
     "build:sdf": "node scripts/build-sdf.mjs",
-    "test:sdf-kernel": "node scripts/build-sdf.mjs --test"
+    "test:sdf-kernel": "node scripts/build-sdf.mjs --test",
+    "build:buildings": "node scripts/build-buildings.mjs",
+    "test:buildings-kernel": "node scripts/build-buildings.mjs --test"
   }
 }

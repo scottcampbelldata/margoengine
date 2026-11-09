@@ -50,3 +50,6 @@ packages/sky/test/fixtures/bsc5/ReadMe -text
 # Real motion capture, byte for byte as tests/fixtures/cmu-mocap/NOTICE.md hashes it.
 tests/fixtures/cmu-mocap/*.bvh -text
 packages/weather/tests/fixtures/metar/*.txt -text
+
+# Downloaded standard CityJSON sample: preserve publisher bytes for the pinned SHA-256.
+packages/procedural/test/fixtures/buildings/twobuildings.city.json -text

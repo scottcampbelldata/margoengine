@@ -1,0 +1,58 @@
+{
+  "source": "https://cmp.felk.cvut.cz/~tylecr1/facade/CMP_facade_DB_base.zip",
+  "archiveSha256": "5cff59b2156dad44e00777ee43960357b44c1522bd2f8701e52bc6026305a29a",
+  "image": "base/cmp_b0001.jpg",
+  "imageSha256": "2d683ef5e289e9683e585bf6684008a1e4d49a0ec9f33dd6e39419660f57c07e",
+  "xml": "base/cmp_b0001.xml",
+  "xmlSha256": "0233724e77ca2fce3fbabc7ea4a8b10da0f6f1cf0c3ecc2585b389ca3d3656ea",
+  "author": "Radim Tylecek and Radim Sara, CMP Facade Database (2013)",
+  "licence": "CC BY-SA (publisher does not name a version)",
+  "licenceSource": "https://cmp.felk.cvut.cz/~tylecr1/facade/",
+  "width": 543,
+  "height": 1024,
+  "windowOrdinals": [
+    0,
+    6,
+    1,
+    7
+  ],
+  "windows": [
+    [
+      56.73807,
+      239.50336,
+      76.35665999999999,
+      299.84768
+    ],
+    [
+      97.03953,
+      241.38752,
+      116.13141,
+      299.84768
+    ],
+    [
+      58.32906,
+      320.59392,
+      77.42094,
+      380.93824
+    ],
+    [
+      98.63052,
+      320.59392,
+      117.7224,
+      377.15968
+    ]
+  ],
+  "pitchX": 40.1697825,
+  "pitchY": 79.67487999999997,
+  "windowWidth": 19.223557499999995,
+  "windowHeight": 58.92864,
+  "left": 47.12629125000001,
+  "top": 229.98895290325385,
+  "tolerancePixels": 2,
+  "method": "Our numeric measurements from four annotated windows in one 2x2 region. Mean horizontal centre pitch/width and mean height per row; floor splits preserve row heights with one common window-height ratio. Fixed two-source-pixel calibration bound. Only this region is asserted, no whole-facade reconstruction. Original photo, XML and archive remain outside shipped files.",
+  "floorHeights": [
+    80.31521419349235,
+    79.0345458065076
+  ],
+  "windowRatioY": 0.7396137904443661
+}

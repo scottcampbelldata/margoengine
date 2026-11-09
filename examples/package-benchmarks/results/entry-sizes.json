@@ -1,6 +1,6 @@
 {
-  "commit": "7dfb04f53",
-  "dirty": true,
+  "commit": "42831ffb4",
+  "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
     "raw": 58792,
@@ -2286,6 +2286,10 @@
       "./textures": {
         "raw": 6437,
         "gzip": 2874
+      },
+      "./buildings": {
+        "raw": 2987,
+        "gzip": 1502
       }
     },
     "@margoengine/quality": {
@@ -3800,6 +3804,11 @@
       "raw": 24282,
       "gzip": 9596,
       "brotli": 8153
+    },
+    "packages/procedural/dist/buildings.wasm": {
+      "raw": 31252,
+      "gzip": 12794,
+      "brotli": 11104
     },
     "packages/procedural/dist/sdf.wasm": {
       "raw": 40594,

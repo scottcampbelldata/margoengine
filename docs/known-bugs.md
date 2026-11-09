@@ -2040,3 +2040,14 @@ The initial optional spectral coverage pass left its wavelength at zero, so chro
 were nonfinite and an opaque emitter returned alpha zero. The pass now chooses a uniform wavelength
 or the capture wavelength before generating each ray. The unchanged full-coverage GPU regression
 fails with alpha [0] before the repair and requires alpha [1] for packet, 450, 587.6 and 650 nm captures.
+
+### Batch 68 job 7 verification scope
+
+No open defect identified in the rectangular building entry. Facade reconstruction,
+general grammars and welded solid topology are explicitly outside its shell API;
+the tested boundary and missing evidence are recorded in LIM-642.
+
+Building reference checkout correction: Git text conversion changed the pinned
+CityJSON bytes. The fixture now opts out of text conversion and its original bytes
+are restored. Root procedural-standard-assets.test.js checks the attribute and
+length/hash; the existing package test independently parses the actual asset.

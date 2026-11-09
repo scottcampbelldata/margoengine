@@ -1100,3 +1100,29 @@ Run node packages/voxel-pathtracer/tests/browser-check.mjs --spectral --report=s
 viewport through the same GPU lock for the unchanged analytic Snell and actual device-replacement
 and raster-restoration assertions. No external spectral asset, reference renderer or speed claim.
 The committed reports are results/batch-99-spectral-20261109.json and the matching Snell/lifecycle record.
+
+### Batch 68 job 7: building shape grammar
+
+Run procedural test, test:buildings-kernel and GPU-locked test:gpu. The JS test
+compares floor/bay coverage, material areas, normals and shell volume with analytic
+oracles; a per-vertex sine/cosine transform is coordinate-identical to the shared
+scope while doing2 trig calls per vertex instead of2 per model. This is a work count,
+not elapsed time. Download the CityJSON tutorial sample linked and SHA-256 pinned
+in packages/procedural/test/fixtures/buildings/reference.json. Dequantize referenced
+vertices by scale/translate, take min/max on each axis and build envelope rectangles
+with those dimensions and one floor of the measured height. This proves envelopes
+only: source polygon/facade reconstruction is not asserted. Generated controls are
+STAND-IN. Browser harness serves a nonroot base, checks lazy assets and exact values
+on real WebGPU/WebGL2 contexts before/after loss and idempotent disposal (LIM-640).
+
+For the limited real facade check, download the CMP base archive in
+packages/procedural/test/fixtures/buildings/facade-reference.json, verify all three
+SHA-256 values and select window annotation ordinals0,6,1,7 from cmp_b0001.xml.
+Multiply normalized X by543 and Y by1024. Average horizontal centre differences,
+window widths and each row's window heights; use the measured vertical centre
+pitch to derive a common window-height ratio and the two floor heights. Apply
+those recorded rules and compare all16 bounds, fixed2-source-pixel bar. The model
+agrees within1.88928 pixels. The first equal-floor calibration missed at2.12608;
+using the measured unequal floors resolves its cause without changing the bar.
+This is calibrated layout reproduction of four windows, not inference/reconstruction
+of the whole facade. No original CMP photo or XML ships.

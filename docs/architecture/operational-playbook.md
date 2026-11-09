@@ -2635,3 +2635,30 @@ retain the centre ray. Transparent coverage initializes its own fixed or uniform
 the chromatic lens, with exact opaque-alpha regressions on both backends. The root API is unchanged.
 There is no measured production spectral-colour, multi-element lens, diffraction or packet speed claim;
 RGB coefficients and independent optional subclasses remain explicit limits.
+
+### Rectangular building rule evidence (batch 68 job 7)
+
+Optional buildings entry loads one independent Rust/Wasm asset lazily. Typed rules
+split absolute floors, component facades, repeated equal bays, centred panes and a
+flat/gable roof; one oriented scope shares sine/cosine. No core/stage change. Tests
+check all surface areas, enclosed volume, normals/winding, bay coverage and owned
+arrays on hostile/tiny/large rules. Real WebGPU/WebGL2 compare values through actual
+loss/disposal; no device resource belongs to the generator. Source geometry from
+Montreal supplies envelope measurements only; facades remain stand-ins. T junctions
+are a documented shell limit, not a manifold-solid claim. Deterministic trig count
+proves reduced transform work with exact coordinates; no timing/SIMD gain claimed.
+Evidence missing: arbitrary footprints, recursive grammars, real facade recovery
+and production-city quality/performance. Bounds and sizes are in LIM-642.
+
+The additional CMP facade reference checks four real annotation rectangles against
+a calibrated2x2 bay/floor region within1.88928 source pixels, below the unchanged
+2-pixel bound. Measured unequal floor splits correct the initial equal-row fixture
+assumption; this was a proof-calibration error, not a generator bug. Original photo
+and XML stay outside shipped files. Full facade/ornament/material recovery remains
+unproven and is not claimed.
+
+The exact-byte CityJSON fixture is marked -text in .gitattributes. Git line-ending
+conversion initially changed its SHA-256 after checkout; publisher bytes were
+restored. tests/procedural-standard-assets.test.js guards both the Git attribute
+and exact length/hash in the root verification and check:merge test suite. No hash
+assertion was loosened, and the full verification is rerun after the correction.

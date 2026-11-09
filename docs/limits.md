@@ -23,7 +23,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-641). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-642). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -1653,3 +1653,32 @@ tracer subclasses are not combined by this entry. Root glass and sampling limita
 Generated stand-in analytic transport and disk-edge tests run on native WebGPU and WebGL2 compatibility;
 plain WebGL2 gives linked unsupported. The entry measures 1541 B gzip (ceiling 1797 B),
 with inherited root 80918 B gzip. Core plus stage stays 23797 B gzip, under 25,000 B.
+
+## Rectangular building grammar (LIM-642)
+
+Optional procedural/buildings: fixed footprint/floor/component/repeat/window/roof
+productions for an oriented rectangle. It is not a general CGA grammar interpreter.
+Width/depth .1..1000 m, origin +/-10000 m, yaw +/-2pi; 1..64 floors, heights .1..100 m,
+sum<=5000; bayWidth .1..1000 m, ceil(length/bayWidth) equal bays, <=256 per side and
+4096 total. Window fractions .05...95. Flat roof or Z-running gable, rise .1..100 m.
+Owned Float64 positions, Float32 normals, Uint32 indices and triangle materials.
+No arbitrary/concave footprints, recursive custom rules, occlusion, doors, internal
+slabs, thickness, UVs or collision mesh. Flush panes partition exterior wall rings.
+Face-separated vertices and T junctions form a visual shell, not a welded manifold
+solid; downstream solid processing must weld/subdivide first. GPU-independent lazy
+Rust/Wasm, abort before synchronous work; dispose releases instance, outputs survive.
+Actual WebGPU/WebGL2 value assertions and real loss; Montreal CityJSON measurements
+prove envelope dimensions only, not source footprint/facade reconstruction. Remaining
+controls are STAND-IN. Shared scope uses2 trig calls versus2 per output vertex, exact
+paired coordinate oracle; no elapsed-time/SIMD or production-city claim.
+JS 1502 B gzip, ceiling 1758 B; buildings.wasm 31252 B raw / 12794 B gzip.
+Core plus stage stays23797 B gzip, strictly below25000 B.
+
+Building grammar reference detail: CMP Facade Database cmp_b0001 supplies four
+annotated windows in a2x2 region. Mean horizontal centre pitch/width and measured
+floor splits with a common window-height ratio reproduce bounds within1.88928
+source pixels (fixed2-pixel bound). Source photo and XML downloaded; hashes, numeric
+measurements and method committed. No whole-facade, ornament or material claim.
+Source data CC BY-SA, publisher does not name a version; original images/XML stay
+outside shipped files. The small unmodified CityJSON tutorial sample is a credited,
+hash-checked test fixture, not shipped in npm.

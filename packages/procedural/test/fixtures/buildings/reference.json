@@ -1,0 +1,54 @@
+{
+  "source": "https://www.cityjson.org/tutorials/files/twobuildings.city.json",
+  "sha256": "a713f41252f1a1430698160f697123e70db81476a83b5ec1921c61cc6a9bd51c",
+  "bytes": 48488,
+  "author": "Ville de Montreal; CityJSON tutorial extract",
+  "licence": "CC-BY-4.0 (Quebec)",
+  "licenceSource": "https://open.canada.ca/data/fr/dataset/58dd9b17-8242-4013-bf9d-0c8d3d93f081",
+  "provenance": "https://www.cityjson.org/tutorials/getting-started/",
+  "method": "Dequantize all referenced vertices using CityJSON scale/translate; axis-aligned bounds in source EPSG:26918. Margo uses an envelope approximation, not the original footprint or facade. Byte-identical small standard sample and own measurements committed as test-only fixtures; never shipped.",
+  "buildings": [
+    {
+      "id": "Building_1",
+      "vertexCount": 57,
+      "bounds": [
+        [
+          300578.235,
+          300598.401
+        ],
+        [
+          5041270.864999999,
+          5041289.393999999
+        ],
+        [
+          13.688,
+          28.840000000000003
+        ]
+      ],
+      "width": 20.166000000026543,
+      "depth": 18.529000000096858,
+      "height": 15.152000000000003
+    },
+    {
+      "id": "Building_2",
+      "vertexCount": 198,
+      "bounds": [
+        [
+          300604.451,
+          300618.138
+        ],
+        [
+          5041258.061,
+          5041272.408
+        ],
+        [
+          16.482,
+          29.450000000000003
+        ]
+      ],
+      "width": 13.686999999976251,
+      "depth": 14.347000000067055,
+      "height": 12.968000000000004
+    }
+  ]
+}

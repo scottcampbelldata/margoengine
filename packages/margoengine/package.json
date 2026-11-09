@@ -2166,6 +2166,10 @@
       "types": "./dist/procedural/textures.d.ts",
       "import": "./dist/procedural/textures.js"
     },
+    "./procedural/buildings": {
+      "types": "./dist/procedural/buildings.d.ts",
+      "import": "./dist/procedural/buildings.js"
+    },
     "./quality": {
       "types": "./dist/quality.d.ts",
       "import": "./dist/quality.js"
