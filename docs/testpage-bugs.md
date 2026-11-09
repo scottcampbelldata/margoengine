@@ -143,3 +143,13 @@ GPU scripts and the ten-package corrected README run already passed.
 
 Bugs 20, 23, 24 and 25 remain next, after this batch lands. The other latest
 Added entries belong to lane S. Physics remains on hold.
+
+The final live reread found a newer Added night section covering 32 and 34-41.
+These remain untriaged after this batch lands, alongside 20/23/24/25. Entries
+35/38/40 must first be checked on a fresh build; working declared exports are
+not a package defect, but an existing post-build export-target check must be
+confirmed or added. For 32/36, choose one consistent vector-assignment rule;
+if 36 requires core, stop and report for Scott's approval. The other assignments
+are burst-join counting (34), initial inspector ranges (37), relative tile URLs
+(39), and existing LabelRenderer attachment (41). No implementation for these
+entries has begun, preserving the required landing order.
