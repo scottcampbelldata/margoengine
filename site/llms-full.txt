@@ -1104,12 +1104,12 @@ extra install), and it costs nothing you do not use: a bundler keeps only the na
 
 | Kit | For | Everything in it, at startup |
 | --- | --- | --- |
-| `margoengine/game` | Games: models, animation, light and shadow, sky, physics, audio, input, effects | 352,718 B |
-| `margoengine/viz` | Data and scientific visualization: figures and GPU compute, points, lines, splats, terrain, labels and text | 228,204 B |
-| `margoengine/web` | Product viewers and 3D on web pages: a glTF model, studio light, orbit, HTML on top | 94,241 B |
+| `margoengine/game` | Games: models, animation, light and shadow, sky, physics, audio, input, effects | 355,223 B |
+| `margoengine/viz` | Data and scientific visualization: figures and GPU compute, points, lines, splats, terrain, labels and text | 248,151 B |
+| `margoengine/web` | Product viewers and 3D on web pages: a glTF model, studio light, orbit, HTML on top | 95,208 B |
 
 The last column is min+gzip JavaScript with every name in the kit used, core and stage included (an app that uses
-part of a kit pays for that part; core + stage alone is 23,626 B). Wasm decoders, workers and lazily loaded parts
+part of a kit pays for that part; core + stage alone is 23,924 B). Wasm decoders, workers and lazily loaded parts
 are extra and load only when used. `tests/umbrella.test.js` measures these numbers on every run and fails when one
 moves more than 3%.
 
@@ -5393,6 +5393,27 @@ Only the package test command and browser proof change. Runtime source, exports,
 entry ceilings and core plus stage (23924 B) are unchanged. Four intermediate
 1,024-value readbacks strengthen correctness; they make no speed claim.
 
+### Published colour-map decimals (audit finding 8, 2026-11-10)
+
+| Entry | Before gzip B | After gzip B | Old ceiling B | New ceiling B |
+|---|---:|---:|---:|---:|
+| @margoengine/sciviz | 36916 | 50303 | 36916 | 51813 |
+| @margoengine/sciviz/bricks | 13832 | 26785 | 14265 | 27589 |
+| @margoengine/sciviz/colormaps | 4171 | 16874 | 4427 | 17381 |
+| @margoengine/sciviz/graph | 9362 | 22444 | 9722 | 23118 |
+| @margoengine/sciviz/grids | 10520 | 23599 | 10885 | 24307 |
+
+Full 256-row data retains the authors' published six decimal places for the
+viridis family and four for cividis. JavaScript sample() retains those values;
+GPU table() uses float32 after interpolation and optional sRGB decoding. CSS
+remains 8-bit by design. Plain tables stay bundled with the synchronous API;
+lazy data would introduce an API/loading/deployment burden solely for optional
+size. Other entries and core plus stage (23924 B) are unchanged.
+Before/after: 5ec86fe7c and that commit plus finding 8, identical bare-import
+external/minification/default-gzip method. Source hashes, research and numeric
+regression proof: [size restoration](size-restore.md). No new speed or display
+perceptual-accuracy claim is made.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -9006,6 +9027,15 @@ The checker now traces the filter's outer counter and callback bit index to an
 assigned input passed to render. Its new regression fails before the repair;
 all ten tests pass afterward, including five negative forms. The actual browser
 fixture, case count, assertions and fixed-wait baseline are unchanged.
+
+### Fixed: published colour-map precision (audit finding 8)
+
+The recorded sciviz tables rounded published decimals to 8 bits and delta-coded
+them, so e.g. viridis sample(0) differed from [0.267004, 0.004874, 0.329415].
+The root cause was packaging quantization, not scientific data or GPU precision.
+Restore plain published decimal RGB rows and interpolate before documented
+float32 output conversion. All-row digests and precision regressions cover this
+class; sources and proof are in [size restoration](size-restore.md).
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 

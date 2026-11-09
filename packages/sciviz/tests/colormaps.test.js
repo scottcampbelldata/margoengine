@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { TABLES } from '../src/tables.ts';
 import { colormap, colormapNames, cubehelix, diverging, describeColormap } from '@margoengine/sciviz';
 import { linearToOklab, oklabToLinear } from '@margoengine/sciviz/colormaps';
 import { SRGBToLinear as decodeSRGB } from '@margoengine/math/color';
@@ -113,7 +115,7 @@ test('tables, reversed maps, CSS gradients and custom stops interpolated in OKLa
 });
 
 test('the recorded standard maps match their published tables (viridis family CC0, cividis PLOS ONE S2)', () => {
-  // [t, published row] pairs: first, middle (entry 128 of 256) and last entries of each table, read to 8 bits.
+  // [t, published row] pairs: first, middle (entry 128 of 256) and last entries at their published precision.
   const known = {
     viridis: [
       [0, [0.267004, 0.004874, 0.329415]],
@@ -147,10 +149,7 @@ test('the recorded standard maps match their published tables (viridis family CC
       colormap(name)
         .sample(t)
         .forEach((v, c) =>
-          assert.ok(
-            Math.abs(v - want[c]) <= 0.5 / 255 + 1e-6,
-            `${name}(${t}) = ${colormap(name).sample(t)}, want ${want}`,
-          ),
+          assert.ok(Math.abs(v - want[c]) <= 2e-15, `${name}(${t}) = ${colormap(name).sample(t)}, want ${want}`),
         );
   }
   // Between entries the map interpolates: halfway between viridis entries 0 and 1.
@@ -158,4 +157,62 @@ test('the recorded standard maps match their published tables (viridis family CC
     b = colormap('viridis').sample(1 / 255),
     half = colormap('viridis').sample(0.5 / 255);
   half.forEach((v, c) => assert.ok(Math.abs(v - (a[c] + b[c]) / 2) < 1e-6));
+});
+
+// SHA-256 of JSON.stringify(rows), parsed from the authors' published data, independently of Margo's table reader.
+// Sources and original file digests are recorded in docs/size-restore.md (finding 8).
+const PUBLISHED_HASHES = {
+  viridis: '7c3d75c98bc3fd26f8adbe0a82d600f04bab92d34aa69ed80e3abb28efdf3c8c',
+  magma: 'aacb32ad4805d962b7a1d42041bced982453878bd8220a516bd94ccb9ea9c45a',
+  inferno: 'ff9305fd6f5d01debe399a748f3e5accf0ab776fec00d6dc8fac0606f6f3fad8',
+  plasma: 'bb6fd55156bcb85198928b92ccc3ab22c761385ce1c0f8b9b3eddad5c587bc26',
+  cividis: '5168c11013409c66c8b297dc9fab2587c97ae4565e37477517784d2166ef62c0',
+};
+
+test('all 1280 standard rows preserve the complete published decimals and synchronous sampling', () => {
+  for (const [name, rows] of Object.entries(TABLES)) {
+    assert.equal(rows.length, 256);
+    assert.equal(createHash('sha256').update(JSON.stringify(rows)).digest('hex'), PUBLISHED_HASHES[name], name);
+    const map = colormap(name);
+    for (let k = 0; k < rows.length; k++) {
+      const sample = map.sample(k / 255);
+      rows[k].forEach((v, c) => assert.ok(Math.abs(sample[c] - v) <= 2e-15, name + ' row ' + k + ' channel ' + c));
+    }
+    const first = map.sample(0);
+    first[0] = -1;
+    assert.deepEqual(map.sample(0), rows[0], 'sampling does not expose mutable table storage');
+    assert.deepEqual(map.sample(-1), rows[0]);
+    assert.deepEqual(map.sample(2), rows[255]);
+    assert.deepEqual(map.sample(NaN), rows[0]);
+  }
+});
+
+test('standard maps interpolate before float32 conversion, including reversed and linear-light GPU tables', () => {
+  for (const [name, rows] of Object.entries(TABLES)) {
+    const map = colormap(name),
+      reversed = map.reversed();
+    for (let k = 0; k < 255; k++) {
+      const t = (k + 0.5) / 255;
+      const actual = map.sample(t),
+        backwards = reversed.sample(1 - t);
+      rows[k].forEach((v, c) => {
+        const expected = (v + rows[k + 1][c]) / 2;
+        assert.ok(Math.abs(actual[c] - expected) <= 2e-15, name + ' interpolated row ' + k);
+        assert.ok(Math.abs(backwards[c] - expected) <= 2e-15, name + ' reversed row ' + k);
+      });
+    }
+    const srgb = map.table(),
+      linear = map.table(256, { linear: true });
+    rows.forEach((row, k) =>
+      row.forEach((v, c) => {
+        assert.equal(srgb[4 * k + c], Math.fround(v), name + ' sRGB table');
+        const decoded = v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+        assert.equal(linear[4 * k + c], Math.fround(decoded), name + ' linear table');
+      }),
+    );
+    for (let k = 0; k < 256; k++) {
+      assert.equal(srgb[4 * k + 3], 1);
+      assert.equal(linear[4 * k + 3], 1);
+    }
+  }
 });

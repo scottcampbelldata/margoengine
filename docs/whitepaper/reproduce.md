@@ -1924,3 +1924,12 @@ browser driver and --packages=compute runtime README command in separate shared
 slots. The CPU regression tests/compute-owner-gate.test.js asserts the real
 planner command and shared mode; it fails before the missing script is added.
 Collected results: test-results/56fix/owed-results-compute-owner-gate-gate-repair-rooted.json.
+
+### Recorded colour-map decimal fidelity
+
+After building sciviz, run
+`node --test --test-timeout=300000 packages/sciviz/tests/colormaps.test.js`.
+The normalized source hashes cover every published row; numerical checks
+cover interpolation, reversal and sRGB/linear float32 tables. Research and
+original data container hashes: [size restoration](../size-restore.md), finding 8.
+No timing or new display perceptual claim is made.

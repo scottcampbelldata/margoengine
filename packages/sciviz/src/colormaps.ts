@@ -176,23 +176,19 @@ interface Definition {
 const path = (L0: number, L1: number, h0: number, h1: number, chroma: number) => (t: number) =>
   oklch(L0 + (L1 - L0) * t, chroma * (0.35 + 0.65 * Math.sin(Math.PI * Math.min(1, t * 1.1))), h0 + (h1 - h0) * t);
 
-// A recorded table (tables.ts) read at t: decoded once on first use, linear between neighbouring entries.
-const table = (name: keyof typeof TABLES) => {
-  let rows: Float32Array | undefined;
-  return (t: number): SRGB => {
-    if (!rows) {
-      const text = TABLES[name],
-        bytes = [0, 2, 4].map((k) => Number.parseInt(text.slice(k, k + 2), 16));
-      for (let k = 6; k < text.length; k++) bytes.push(bytes[bytes.length - 3] + text.charCodeAt(k) - 79);
-      rows = new Float32Array(bytes.map((v) => v / 255));
-    }
-    const last = rows.length / 3 - 1,
+// Plain published rows stay in JavaScript number precision. Only table() quantizes to GPU float32.
+const table =
+  (name: keyof typeof TABLES) =>
+  (t: number): SRGB => {
+    const rows = TABLES[name],
+      last = rows.length - 1,
       x = t * last,
       k = Math.min(last - 1, Math.floor(x)),
-      f = x - k;
-    return [0, 1, 2].map((c) => rows![3 * k + c] * (1 - f) + rows![3 * k + 3 + c] * f) as unknown as SRGB;
+      f = x - k,
+      a = rows[k],
+      b = rows[k + 1];
+    return [a[0] * (1 - f) + b[0] * f, a[1] * (1 - f) + b[1] * f, a[2] * (1 - f) + b[2] * f];
   };
-};
 
 const DEFINITIONS: Record<ColormapName, Definition> = {
   aurora: {

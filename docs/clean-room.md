@@ -1482,7 +1482,7 @@ The library source was not opened.
 | cubehelix | D. A. Green, Bull. Astr. Soc. India 39, 289 (2011) |
 | coolwarm | K. Moreland, "Diverging color maps for scientific visualization", ISVC 2009 |
 | viridis, magma, inferno, plasma (recorded data, CC0) | N. Smith and S. van der Walt, mpl-colormaps, https://github.com/BIDS/colormap (the authors' table file `colormaps.py`; data only) |
-| cividis (recorded data, CC BY 4.0) | J. R. Nuñez, C. R. Anderton and R. S. Renslow, PLOS ONE 13(7): e0199239 (2018), supporting file S2 |
+| cividis (recorded data, CC0) | J. R. Nuñez, C. R. Anderton and R. S. Renslow, PLOS ONE 13(7): e0199239 (2018), supporting file S2 |
 | OKLab and the perceptual maps | B. Ottosson, "A perceptual color space for image processing" (2020); sRGB transfer from IEC 61966-2-1; CIELAB and D65 from CIE 15:2004 |
 | NRRD volumes in a figure (`sciviz/nrrd`) | Teem project, "Definition of NRRD File Format", https://teem.sourceforge.net/nrrd/format.html, read in full (2026-11-07), and its general description descformat.html; the reading itself is `loaders/nrrd`, row LF5 |
 | NIfTI-1 and NIfTI-2 headers (`sciviz/formats`) | NIfTI Data Format Working Group: the annotated header definitions nifti1.h (1528 lines) and nifti2.h, read in full (2026-11-07) from the NIFTI-Imaging nifti_clib copies because the NIMH copies were offline (header files only, no library code), and the NIfTI-2 committee document nifti2_doc.html on NITRC (signature bytes, version and byte-swap test), read in full |
@@ -3528,3 +3528,11 @@ The regression and actual repository scan fail before the repair; all ten checke
 tests pass afterward. Browser fixtures, all 32 cases, numerical assertions,
 wait baseline, timeouts and readiness contracts are unchanged. This is a test
 classification repair, with no runtime package or GPU implementation change.
+
+### Recorded colour-map precision restoration (2026-11-10)
+
+Size restoration finding 8 restores the existing standard-data exception's
+published decimal rows without 8-bit quantization or custom delta coding.
+The BIDS container is parsed only for the four data arrays; PLOS S2 is numeric
+data. No companion implementation is used. Comparison research, source
+hashes, precision boundaries and regression proofs: [size restoration](size-restore.md).

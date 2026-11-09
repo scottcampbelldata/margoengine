@@ -881,7 +881,12 @@ Margo's own maps are computed from their published definitions:
 The standard maps people already know are the authors' published tables, recorded as data:
 
 - `viridis`, `magma`, `inferno` and `plasma`: Smith and van der Walt (CC0);
-- `cividis`: Nuñez, Anderton and Renslow, PLOS ONE 2018 (CC BY 4.0), made for red-green colour vision deficiency.
+- `cividis`: Nuñez, Anderton and Renslow, PLOS ONE 2018 (CC0), made for red-green colour vision deficiency.
+
+Each recorded map keeps all 256 published decimal RGB rows: six decimal places for the viridis family and four for
+cividis. Sampling interpolates those values as JavaScript numbers, without an 8-bit round trip. Tables are plain
+numeric rows bundled with the existing synchronous API; there is no runtime data download. GPU tables convert to
+float32 only after interpolation (and after sRGB decoding with `linear: true`); CSS gradients still use 8-bit RGB.
 
 `colormap(['#000004', '#b63679', '#fcfdbf'])` builds a map from your own stops, interpolated in OKLab.
 `map.table(n, { linear })` gives RGBA floats for your own shaders, and `map.css()` a gradient string.
@@ -890,7 +895,8 @@ The standard maps people already know are the authors' published tables, recorde
 import { colormap, colormapNames } from '@margoengine/sciviz';
 import { ticks } from '@margoengine/sciviz/maths';
 
-const map = colormap('cubehelix');
+const map = colormap('viridis');
+console.log(map.sample(0)); // [0.267004, 0.004874, 0.329415], the published first row
 console.log(colormapNames, map.sample(0.5), map.reversed().css(8));
 console.log(ticks(0, 97).labels); // ['0', '20', '40', '60', '80']
 ```

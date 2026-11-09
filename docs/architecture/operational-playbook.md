@@ -4603,3 +4603,13 @@ The queued compute/test:gpu:owners command passes both backends and releases its
 shared slot; elapsed time includes its FIFO wait. The earlier proof ran without
 an outer compatibility shim, so the explicit native opt-out retains its setup.
 No runtime stats/core/compute source changes in this last rebase.
+
+### Section 5 evidence: recorded colour-map precision
+
+Size restoration finding 8 preserves all published decimal RGB rows for the
+five recorded sciviz maps. Independent digests pin every table; tests cover
+all 1280 samples, adjacent interpolation, reversal and sRGB/linear float32
+output. Sampling stays synchronous; only documented GPU/CSS boundaries
+quantize. Optional entry ceilings grow instead of adding a data loader for
+size. This is numeric precision evidence, without a new perceptual display or
+speed claim. Research and measured bytes: size-restore.md and limits.md.

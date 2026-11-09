@@ -2802,3 +2802,24 @@ phases 1458 to 1467 B. No ceiling is raised; core plus stage remains 23924 B.
 Only the package test command and browser proof change. Runtime source, exports,
 entry ceilings and core plus stage (23924 B) are unchanged. Four intermediate
 1,024-value readbacks strengthen correctness; they make no speed claim.
+
+### Published colour-map decimals (audit finding 8, 2026-11-10)
+
+| Entry | Before gzip B | After gzip B | Old ceiling B | New ceiling B |
+|---|---:|---:|---:|---:|
+| @margoengine/sciviz | 36916 | 50303 | 36916 | 51813 |
+| @margoengine/sciviz/bricks | 13832 | 26785 | 14265 | 27589 |
+| @margoengine/sciviz/colormaps | 4171 | 16874 | 4427 | 17381 |
+| @margoengine/sciviz/graph | 9362 | 22444 | 9722 | 23118 |
+| @margoengine/sciviz/grids | 10520 | 23599 | 10885 | 24307 |
+
+Full 256-row data retains the authors' published six decimal places for the
+viridis family and four for cividis. JavaScript sample() retains those values;
+GPU table() uses float32 after interpolation and optional sRGB decoding. CSS
+remains 8-bit by design. Plain tables stay bundled with the synchronous API;
+lazy data would introduce an API/loading/deployment burden solely for optional
+size. Other entries and core plus stage (23924 B) are unchanged.
+Before/after: 5ec86fe7c and that commit plus finding 8, identical bare-import
+external/minification/default-gzip method. Source hashes, research and numeric
+regression proof: [size restoration](size-restore.md). No new speed or display
+perceptual-accuracy claim is made.

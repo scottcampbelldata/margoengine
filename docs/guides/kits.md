@@ -10,12 +10,12 @@ extra install), and it costs nothing you do not use: a bundler keeps only the na
 
 | Kit | For | Everything in it, at startup |
 | --- | --- | --- |
-| `margoengine/game` | Games: models, animation, light and shadow, sky, physics, audio, input, effects | 352,718 B |
-| `margoengine/viz` | Data and scientific visualization: figures and GPU compute, points, lines, splats, terrain, labels and text | 228,204 B |
-| `margoengine/web` | Product viewers and 3D on web pages: a glTF model, studio light, orbit, HTML on top | 94,241 B |
+| `margoengine/game` | Games: models, animation, light and shadow, sky, physics, audio, input, effects | 355,223 B |
+| `margoengine/viz` | Data and scientific visualization: figures and GPU compute, points, lines, splats, terrain, labels and text | 248,151 B |
+| `margoengine/web` | Product viewers and 3D on web pages: a glTF model, studio light, orbit, HTML on top | 95,208 B |
 
 The last column is min+gzip JavaScript with every name in the kit used, core and stage included (an app that uses
-part of a kit pays for that part; core + stage alone is 23,626 B). Wasm decoders, workers and lazily loaded parts
+part of a kit pays for that part; core + stage alone is 23,924 B). Wasm decoders, workers and lazily loaded parts
 are extra and load only when used. `tests/umbrella.test.js` measures these numbers on every run and fails when one
 moves more than 3%.
 

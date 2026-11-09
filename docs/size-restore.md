@@ -375,3 +375,66 @@ Unity remains 50038 B, exporters root unchanged, core plus stage 23924 B. The
 merged size gate, nine paired-record/API tests, llms currentness and documentation
 links pass. Retain the successful full unit, GPU and README evidence without
 replaying those suites. No record is relabeled and no timing work is introduced.
+
+## Published colour-map precision (audit finding 8)
+
+Verified on 5ec86fe7c: sciviz still rounded all five published maps to 8 bits
+and used a custom one-letter delta encoding. Restore every published decimal
+in plain RGB rows. sample() interpolates in JavaScript number precision;
+table() converts to float32 only at its documented output boundary, after
+optional sRGB decoding. CSS remains intentionally rounded to 8-bit RGB.
+Keep the synchronous API and bundle its data as before: a lazy import/fetch
+would require asynchronous loading or a new preload contract solely for size.
+Only optional entry ceilings grow. No engine source is changed.
+
+Research compared:
+
+- Nathaniel Smith and Stefan van der Walt, *mpl colormaps*, SciPy 2015,
+  [authors' design and data](https://bids.github.io/colormap/): published
+  perceptually uniform maps, four CC0 data arrays in colormaps.py.
+- Jamie R. Nunez, Christopher R. Anderton and Ryan S. Renslow, *Optimizing
+  colormaps with consideration for color vision deficiency to enable accurate
+  interpretation of scientific data*, PLOS ONE 13(7): e0199239, 2018,
+  [paper](https://doi.org/10.1371/journal.pone.0199239),
+  [S2 data](https://doi.org/10.1371/journal.pone.0199239.s002): the 256
+  four-decimal rows of cividis, including its distinct published endpoints.
+- Peter Kovesi, *Good Colour Maps: How to Design Them*, 2015,
+  [arXiv:1509.03700](https://arxiv.org/abs/1509.03700): perceptual flat spots
+  and discontinuities can hide or create apparent structure. Preserve the
+  authors' values rather than introduce an optional packaging quantization.
+
+Only standard data arrays were extracted under the existing clean-room
+standard-file exception; no companion implementation was read or used.
+Downloaded BIDS data container SHA-256:
+b7478d10e2ccfdb22128867e137f16f55b687e9c225065e91bcbd6bb9e6c0352.
+PLOS S2 SHA-256:
+b7f72c98272a2378d7716f8b88622989baefe192286cad435d668231aff5fd4d.
+The regression pins independent normalized hashes of all 1280 rows and tests
+every sampled row, every adjacent midpoint, reversed samples, non-finite and
+clamped inputs, storage isolation, sRGB float32 output and linear-light float32
+output. The three precision cases fail against the old built reader before
+the new implementation is built; no tolerance is relaxed. This is a numeric
+fidelity restoration, without a new display perceptual or performance claim.
+Regression: packages/sciviz/tests/colormaps.test.js.
+
+The PLOS publication explicitly dedicates the work to CC0; correct the earlier
+CC BY 4.0 cividis metadata to that published dedication while retaining all
+author/source attribution. The supply-chain generator and notices agree on
+both the plain representation and actual shared colormap dist chunk location.
+
+Validation: lint/hygiene, all 168 sciviz unit tests, all six sciviz GPU suites
+and all 23 README examples pass. GPU evidence includes 30 root checks, 13 brick
+checks, 12 native/compatibility entry cases, six restoration/cancellation
+checks, 32 demo/backend/layout checks and the native WebGL2 pixel parity suite.
+One shared slot is held by this worktree at a time, wait-max 60, with GPU leaves
+only; README and network checks self-lock and are sequenced after the leaves.
+The paired entry/network records measure 5ec86fe7c with dirty packages; the
+basic scene makes five requests and has no unused built files. api:update
+records the new optional sizes; core plus stage stays 23924 B.
+
+Full verify passed every non-unit step and 13842 unit cases. Its 21 failures
+were the inherited integration defects and the local CPU-fixture environment
+mistake detailed in verification-repairs.md, plus the viz kit's stale size.
+Only failed/unrun cases are rerun, with no bar, tolerance or production policy
+changed. The actual static kit bundles are game 355223 B, viz 248151 B and web
+95208 B; kits.md records them and the current 23924 B root. No timing work runs.

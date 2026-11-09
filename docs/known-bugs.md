@@ -3609,3 +3609,12 @@ The checker now traces the filter's outer counter and callback bit index to an
 assigned input passed to render. Its new regression fails before the repair;
 all ten tests pass afterward, including five negative forms. The actual browser
 fixture, case count, assertions and fixed-wait baseline are unchanged.
+
+### Fixed: published colour-map precision (audit finding 8)
+
+The recorded sciviz tables rounded published decimals to 8 bits and delta-coded
+them, so e.g. viridis sample(0) differed from [0.267004, 0.004874, 0.329415].
+The root cause was packaging quantization, not scientific data or GPU precision.
+Restore plain published decimal RGB rows and interpolate before documented
+float32 output conversion. All-row digests and precision regressions cover this
+class; sources and proof are in [size restoration](size-restore.md).

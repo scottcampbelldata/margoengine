@@ -2357,3 +2357,12 @@ No speed or runtime-size change is claimed.
 ### Completed stats owner acceptance
 
 Stats closing acceptance: the collected verify on the current-main stats rebase completes with 13,864 of 13,881 repository tests passing, 17 failures and zero skips. Missing ComputeFrame GPU-script wiring, a fixed-frame workload classification and a pre-initialization planner test reference cause those failures. The repairs pass all 244 checks in the complete failed test files plus compute units and the new gate regression. The complete compute GPU suite, strengthened owner proof on both backends and all 21 compute README examples also pass. Every other verify step passed; no second full verify or fresh all-green full-run claim is made. The original process disappeared without a result, so its incomplete log is retained without a pass claim. The single replacement finished within its 40-minute bound. The real-GPU stats script passes, including eight owner cases, two shader modules and zero compilation errors; all eight runtime README examples pass. Stats source is unchanged by the exporter/documentation-only rebase. Lint and hygiene pass with 120 existing lint warnings; entry ceilings are unchanged. [Durable receipt](results/batch-56-stats-owner-20261109.json). The wider owner audit remains open.
+
+### Recorded colour-map fidelity (2026-11-10)
+
+sciviz preserves all published decimal values for viridis, magma, inferno,
+plasma and the PLOS S2 cividis. Independent table digests and all 1280 sampled
+rows are checked; interpolation and linear-light float32 output are covered.
+This removes the previous 8-bit packaging approximation. It does not claim
+new perceptual display accuracy or speed. Reproduction and sources:
+[size restoration](../size-restore.md), [limits](../limits.md).
