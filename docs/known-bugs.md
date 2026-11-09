@@ -2210,6 +2210,19 @@ assumptions were updated for the new real dependency, with stronger downstream/f
 
 The contact receiver's native preview refusal lacked its help link; the new regression failed before repair and now checks the unsupported code and link. Malformed up directions also use linked argument errors. No open defect remains from the oriented receiver review. The first new GPU screenshot assertion exposed an invalid clearColor test option: the harness now uses scene.background, then proves the unchanged darkness assertion on white. No production threshold or tolerance was relaxed.
 
+### Closed: GPU mutex reclaimed a paused live requester (2026-11-09)
+
+Lane K's CPU-only reproduction paused a requester after mkdir(mutex), aged the
+mutex past ten seconds and let another requester steal it; the original then
+failed with ENOENT in retireMutex. Age was treated as proof of a crashed owner,
+and the mutex had no published identity. The replacement atomically publishes
+identity before exposing the mutex, refreshes its mtime independently for old
+clients and reclaims only an identified dead owner. Reclamation claims metadata
+at the pinned unique backing path, so a delayed reclaimer cannot touch a later
+live owner. Regression: tests/gpu-lock-owner.test.js and
+tests/gpu-lock-integration.test.js. No open entry for this defect exists on the
+starting origin/main; this closure records the lane K finding and its repair.
+
 ### Closed: GPU mutex reuse collided with pending Windows deletion (2026-11-09)
 
 The combined biome/loader runtime gate failed at mkdir(gpu.lock/mutex) with EPERM while other runs released the same reusable directory. Deleting the live mutex name left it unavailable while a Windows handle retained a pending deletion. Mutex release, stale reclamation and tidying now rename that directory to a unique retired name before deletion. Permission and cleanup errors still throw; no retry or suppressed error was added. tests/gpu-lock-mutex.test.js reproduces the original EPERM using a real Win32 delete-pending directory handle, then creates a new mutex while the retired one is still pending. Existing locking, legacy compatibility and limit tests remain required.

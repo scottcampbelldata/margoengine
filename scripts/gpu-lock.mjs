@@ -15,7 +15,7 @@
 //   wait limit  a request waits at most 60 min (`--wait-max=<min>` / acquire({waitMax})), then fails naming each holder,
 //               its owner and the command it runs.
 // Layout of the lock folder: shared/<token>.json per shared holder, exclusive.json for the exclusive holder and mutex/
-// (a mkdir held for microseconds around every state change). Queued exclusive requests are <ts>-<token>.json in the
+// (an atomically published directory link, populated with owner.json before publication). Queued exclusive requests are <ts>-<token>.json in the
 // folder beside it, gpu.lock-waiting/, which an old client's release (it removes the whole lock folder) leaves alone. A holder, waiter or legacy owner.json whose process is gone is stale and removed. Release removes
 // only our own entry: never delete an entry you don't own.
 // Compatibility with the one-holder lock (before 2026-10-26, still run by agents in older worktrees): that version
@@ -36,12 +36,15 @@ import {
   appendFileSync,
   existsSync,
   mkdirSync,
+  lstatSync,
   readFileSync,
+  realpathSync,
   readdirSync,
   renameSync,
   rmSync,
   rmdirSync,
   statSync,
+  symlinkSync,
   unlinkSync,
   utimesSync,
   writeFileSync,
@@ -49,6 +52,7 @@ import {
 import { spawn, spawnSync } from 'node:child_process';
 import { basename, dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { Worker } from 'node:worker_threads';
 import { exitOnHelp } from './support/help.mjs';
 
 /**
@@ -112,6 +116,106 @@ const leaseMs = () =>
 const beatMs = () => Number(process.env.MARGO_GPU_BEAT_MS ?? 15_000);
 // How long an empty folder with no owner.json counts as an old client that has just made it (see Compatibility).
 const freshMs = () => Number(process.env.MARGO_GPU_FRESH_MS ?? 5_000);
+
+// Publish a populated owner directory by atomically creating a junction (a directory symlink on Unix).
+// Unlike renaming a directory, this cannot replace an empty mutex just made by an older client.
+const mutexToken = `${process.pid}-${Math.random().toString(36).slice(2)}`;
+const mutexOwnerDir = `${lockDir}-mutex-${mutexToken}`;
+let mutexHeartbeat;
+function readyMutexHeartbeat() {
+  mutexHeartbeat ??= new Promise((done, fail) => {
+    const worker = new Worker(new URL('./support/gpu-mutex-beat.mjs', import.meta.url), {
+      workerData: mutexOwnerDir,
+      // This built-in-only worker needs no caller flags (eval-only and process-only flags are invalid here).
+      execArgv: [],
+    });
+    const timer = setTimeout(() => {
+      void worker.terminate();
+      fail(
+        Object.assign(new Error('gpu-lock: mutex heartbeat did not start within 30 seconds'), {
+          code: 'ERR_GPU_MUTEX_HEARTBEAT_TIMEOUT',
+        }),
+      );
+    }, 30_000);
+    let ready = false;
+    worker.on('error', (error) => {
+      clearTimeout(timer);
+      if (ready) throw error;
+      fail(error);
+    });
+    worker.once('message', () => {
+      clearTimeout(timer);
+      ready = true;
+      worker.unref();
+      done();
+    });
+  });
+  return mutexHeartbeat;
+}
+
+function tryMutex() {
+  mkdirSync(mutexOwnerDir);
+  writeFileSync(join(mutexOwnerDir, 'owner.json'), JSON.stringify({ pid: process.pid, token: mutexToken }));
+  try {
+    symlinkSync(mutexOwnerDir, mutexDir, process.platform === 'win32' ? 'junction' : 'dir');
+  } catch (error) {
+    rmSync(mutexOwnerDir, { recursive: true });
+    if (error.code === 'EEXIST' || error.code === 'ENOENT') return null;
+    throw error;
+  }
+  return () => {
+    if (read(join(mutexDir, 'owner.json'))?.token !== mutexToken)
+      throw Object.assign(new Error('gpu-lock: mutex ownership changed during its critical section'), {
+        code: 'ERR_GPU_MUTEX_OWNER_LOST',
+      });
+    retireMutex(mutexDir);
+    rmSync(mutexOwnerDir, { recursive: true });
+  };
+}
+
+function reclaimDeadMutex() {
+  // Pin the unique backing directory, not the reusable mutex name: another reclaimer can finish
+  // while this process is descheduled. A later owner must never lose its metadata to that process.
+  let target;
+  try {
+    if (!lstatSync(mutexDir).isSymbolicLink()) return;
+    target = realpathSync(mutexDir);
+  } catch (error) {
+    if (error.code === 'ENOENT') return; // the owner released before we inspected the link
+    throw error;
+  }
+  let ownerFile = join(target, 'owner.json');
+  let owner = read(ownerFile);
+  if (!owner) {
+    // A reclaimer may itself have died after claiming the dead owner's metadata.
+    // Its PID is atomically published in the claim name; live reclaimers alone may finish.
+    const claim = files(target).find((name) => {
+      const pid = /^reclaimed-(\d+)-[a-z0-9]+\.json$/.exec(name)?.[1];
+      return pid && !alive(Number(pid));
+    });
+    if (claim) {
+      ownerFile = join(target, claim);
+      owner = read(ownerFile);
+    }
+  }
+  // An old anonymous mutex has no evidence of a dead owner. Age alone is never such evidence.
+  if (!Number.isInteger(owner?.pid) || owner.pid <= 0 || alive(owner.pid)) return;
+  if (
+    typeof owner.token !== 'string' ||
+    !/^\d+-[a-z0-9]+$/.test(owner.token) ||
+    resolve(target) !== resolve(`${lockDir}-mutex-${owner.token}`)
+  )
+    return;
+  // Claim this dead owner's metadata first. Only one reclaimer can rename it; all others see no owner.
+  try {
+    renameSync(ownerFile, join(target, `reclaimed-${mutexToken}.json`));
+  } catch (error) {
+    if (error.code === 'ENOENT') return; // another reclaimer won the claim
+    throw error;
+  }
+  retireMutex(mutexDir);
+  rmSync(target, { recursive: true });
+}
 
 /**
  * Ends a process and everything it started. On Windows `taskkill /T /F` (a plain kill stops only the shell or launcher
@@ -198,13 +302,15 @@ export function retireMutex(path, { rename = renameSync, remove = rmSync } = {})
   remove(retired, { recursive: true, force: true });
 }
 
-// Runs `fn` (synchronous, short) while holding the lock's mutex. A mutex older than 10 s belongs to a crashed process.
+// Runs `fn` (synchronous, short) while holding a mutex with atomically published owner identity.
 // `fn` gets {fresh}: true when the folder was made by someone else less than freshMs() ago (an old client mid-acquire
 // when nothing is in it; see Compatibility). A folder `fn` leaves empty is removed again unless it is fresh: an empty
 // folder would make old clients wait forever.
-async function locked(fn) {
+async function locked(fn, deadline) {
   mkdirSync(dirname(lockDir), { recursive: true });
+  await readyMutexHeartbeat();
   let fresh = false;
+  let release;
   for (;;) {
     try {
       mkdirSync(lockDir);
@@ -216,22 +322,24 @@ async function locked(fn) {
         fresh = Date.now() - (made.birthtimeMs || made.mtimeMs) < freshMs();
       } catch {}
     }
-    try {
-      mkdirSync(mutexDir);
-      break;
-    } catch (error) {
-      if (error.code === 'ENOENT') continue; // a release just tidied the folder away
-      if (error.code !== 'EEXIST') throw error;
-      try {
-        if (Date.now() - statSync(mutexDir).mtimeMs > 10_000) retireMutex(mutexDir);
-      } catch {}
-      await sleep(10);
-    }
+    release = tryMutex();
+    if (release) break;
+    reclaimDeadMutex();
+    if (Date.now() > deadline)
+      throw Object.assign(
+        new Error(
+          `gpu-lock: timed out waiting for mutex owner ${JSON.stringify(read(join(mutexDir, 'owner.json')))}; anonymous legacy mutexes require their owner to release them`,
+        ),
+        {
+          code: 'ERR_GPU_MUTEX_WAIT_TIMEOUT',
+        },
+      );
+    await sleep(10);
   }
   try {
     return fn({ fresh });
   } finally {
-    retireMutex(mutexDir);
+    release();
     if (!fresh)
       try {
         rmdirSync(lockDir);
@@ -305,16 +413,13 @@ function snapshot(log, fresh = false) {
 // Removes the lock folder when nothing is in it, so a script that still makes the folder by hand (older checkouts) is
 // not blocked by an empty one. Skipped when another process is changing the lock right now.
 function tidy() {
-  try {
-    mkdirSync(mutexDir);
-  } catch {
-    return;
-  }
+  const release = tryMutex();
+  if (!release) return;
   for (const dir of [sharedDir, waitingDir])
     try {
       rmdirSync(dir);
     } catch {}
-  retireMutex(mutexDir);
+  release();
   try {
     rmdirSync(lockDir);
   } catch {}
@@ -428,33 +533,36 @@ export async function acquire({
     );
   };
   for (let announced = 0; ; ) {
-    const result = await locked(({ fresh }) => {
-      const state = snapshot(log, fresh),
-        others = state.waiting.filter((w) => w.token !== token);
-      // An old client's release removes the whole folder, our ticket with it: queue again, in the same place.
-      if (queued && others.length === state.waiting.length) queued = false;
-      const first = state.waiting[0]?.token === token || (!queued && others.length === 0);
-      if (mode === 'shared') {
-        if (!state.exclusive && !state.waiting.length && state.shared.length < slots()) {
-          mkdirSync(sharedDir, { recursive: true });
-          const file = join(sharedDir, `${token}.json`);
-          writeFileSync(file, entry());
-          return { file };
+    const result = await locked(
+      ({ fresh }) => {
+        const state = snapshot(log, fresh),
+          others = state.waiting.filter((w) => w.token !== token);
+        // An old client's release removes the whole folder, our ticket with it: queue again, in the same place.
+        if (queued && others.length === state.waiting.length) queued = false;
+        const first = state.waiting[0]?.token === token || (!queued && others.length === 0);
+        if (mode === 'shared') {
+          if (!state.exclusive && !state.waiting.length && state.shared.length < slots()) {
+            mkdirSync(sharedDir, { recursive: true });
+            const file = join(sharedDir, `${token}.json`);
+            writeFileSync(file, entry());
+            return { file };
+          }
+          return { held: [state.exclusive, ...state.shared, ...state.waiting].filter(Boolean) };
         }
-        return { held: [state.exclusive, ...state.shared, ...state.waiting].filter(Boolean) };
-      }
-      if (!state.exclusive && !state.shared.length && first) {
-        if (queued) rmSync(join(waitingDir, ticket), { force: true });
-        writeFileSync(exclusiveFile, entry());
-        return { file: exclusiveFile };
-      }
-      if (!queued) {
-        mkdirSync(waitingDir, { recursive: true });
-        writeFileSync(join(waitingDir, ticket), entry(false));
-        queued = true;
-      }
-      return { held: [state.exclusive, ...state.shared, ...others].filter(Boolean) };
-    });
+        if (!state.exclusive && !state.shared.length && first) {
+          if (queued) rmSync(join(waitingDir, ticket), { force: true });
+          writeFileSync(exclusiveFile, entry());
+          return { file: exclusiveFile };
+        }
+        if (!queued) {
+          mkdirSync(waitingDir, { recursive: true });
+          writeFileSync(join(waitingDir, ticket), entry(false));
+          queued = true;
+        }
+        return { held: [state.exclusive, ...state.shared, ...others].filter(Boolean) };
+      },
+      waitStart + waitMax * MIN,
+    );
     if (result.file) return take(result.file);
     if (Date.now() - waitStart > waitMax * MIN) throw giveUp(result.held);
     if (Date.now() - announced >= 10 * MIN || announced === 0) {

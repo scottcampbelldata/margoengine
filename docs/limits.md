@@ -9,6 +9,14 @@ Labels share the declared math/mat4 dependency; the entry is 5,450 B gzip agains
 its unchanged 5,546 B ceiling.
 The approved test-page 36 guard adds 87 B: core + stage 23,837 to 23,924 B gzip.
 
+GPU scheduling mutexes publish owner identity atomically and reclaim only an
+identified dead process. A live or anonymous legacy mutex is never reclaimed by
+age; its owner's release is required. Acquisition has a bounded wait (default
+60 minutes, `--wait-max` / `MARGO_GPU_WAIT_MAX_MIN`), including mutex contention.
+An independent one-second refresh preserves the old reader/writer client's
+ten-second freshness convention during synchronous work. Holder/waiter formats
+remain compatible. This is CPU-only scheduling evidence, not a GPU speed claim.
+
 Biome prefetch shares raw work with streaming and retains at most 1,024 terrain/object results,
 with capacity checked on completion. The original 144-tile flight still generates every tile;
 all 292 unique default-world worker outputs match the parent exactly. The view entry is

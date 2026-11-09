@@ -74,6 +74,50 @@ client; issue reports of taskkill.exe exhausting WMI on Windows desktops
 Windows grandchild pipe inheritance discussion ([libuv PR 343](https://github.com/joyent/libuv/pull/343)).
 Only documentation and issue text were read, no other project's source.
 
+## GPU mutex ownership and scheduling research (section 5 supplement)
+
+The GPU lock publishes its mutex as a directory junction on Windows (a directory
+symlink elsewhere) to a unique, already populated owner directory. Publication
+cannot replace an anonymous mutex held by a legacy client. A live PID is never
+reclaimed just because its mutex aged. An independent worker refreshes that
+directory every second while the owning JavaScript thread is paused, so older
+reader/writer clients still see a fresh mutex. Anonymous legacy mutexes have no
+proof of a dead owner and must be released by their owner; a bounded wait names
+this condition with `ERR_GPU_MUTEX_WAIT_TIMEOUT`.
+
+Dead-owner reclamation pins the unique backing path before claiming its owner
+metadata. A delayed reclaimer therefore cannot rename a later live owner's
+metadata through the reusable mutex name. Release still retires the mutex name
+before deleting it, preserving the Windows delete-pending repair. Only the
+claimed dead owner's backing directory is removed. No GPU holder/waiter format
+changes and no engine package changes are involved.
+
+Evidence: `tests/gpu-lock-owner.test.js` pauses a live requester at publication,
+ages the mutex past the old ten-second cutoff, checks identity and exclusion,
+then resumes it successfully. It also proves heartbeat renewal independently of
+the blocked owning thread and safe waiting for an anonymous legacy mutex.
+`tests/gpu-lock-integration.test.js` covers dead-owner recovery and a delayed
+reclaimer racing a replacement live owner. The complete seven-file lock group
+passes 50 CPU-only tests on isolated folders; no real GPU run is used. Dead
+reclaimer recovery is included: a crashed metadata claimant does not strand the
+mutex, and a live claimant is allowed to finish without interference.
+
+Research guiding the remaining queue and phase work, read before implementation:
+
+- [Mellor-Crummey and Scott, reader/writer synchronization (1991)](https://www.cs.rochester.edu/u/scott/papers/1991_PPoPP_read_write.pdf)
+  distinguishes preference from fairness. Writer preference blocks incoming
+  readers, explaining why an unnecessary exclusive waiter stalls free slots.
+- [Their scalable synchronization paper (1991)](https://www.cs.rochester.edu/u/scott/papers/1991_TOCS_synch.pdf)
+  motivates explicit ordered request state and reduced contention. Margo uses
+  sleeping filesystem clients, not the paper's shared-memory spin algorithms.
+- [Slurm GRES scheduling](https://slurm.schedmd.com/gres.html) separates counted
+  GPU sharing from exclusive allocation; a slot is scheduling capacity rather
+  than performance isolation. Margo's three correctness slots provide no speed
+  measurement guarantee.
+- [Bazel test execution and sharding](https://bazel.build/reference/test-encyclopedia)
+  emphasizes hermetic resources and explicit shard support. Correctness and
+  speed work need explicit suite ownership, with every deferred budget retained.
+
 ## Purpose and authority
 
 This document preserves the engine-specific technical design, validation model, measured limits, and known gaps that
