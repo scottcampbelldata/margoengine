@@ -564,3 +564,10 @@ fit literal. Register the exact message, modernize the obsolete stage.load
 install entry, regenerate site/errors.html and the MCP help data, and all five
 errors-page cases pass. Only failed/changed help work runs again; no tolerance,
 test or gate is weakened and no fresh all-green full verify is claimed.
+
+Stage diagnostic acceptance rebases onto the concurrent quality ownership
+repair without changing stage source, tests or README. Rebuild quality only.
+Genuine paired records measure 0f509ea6c with dirty=false, then API/llms
+regeneration, 17 record tests, full API currentness, docs links and size gate
+pass. The ten restored stage entry sizes and 23924 B core/stage are unchanged.
+Retain every successful stage unit/GPU/README and verification step.
