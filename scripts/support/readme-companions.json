@@ -1,0 +1,37 @@
+[
+  {
+    "file": "t_doorMan_d.png",
+    "url": "https://raw.githubusercontent.com/pyvista/vtk-data/5a3de12d34c24aa5dd5e5db1cbc2defebc0d4da3/Data/doorman/t_doorMan_d.png",
+    "sha256": "546b788154641ae094471c94303fc0e6ff8c49215778b5125dcbf2a5bf396791"
+  },
+  {
+    "file": "t_doorMan_n.png",
+    "url": "https://raw.githubusercontent.com/pyvista/vtk-data/5a3de12d34c24aa5dd5e5db1cbc2defebc0d4da3/Data/doorman/t_doorMan_n.png",
+    "sha256": "6fa62b39c6a7bc92a615dedda00a47742d5091e8675ba9ef4733b328ea6a746d"
+  },
+  {
+    "file": "t_doorMan_s.png",
+    "url": "https://raw.githubusercontent.com/pyvista/vtk-data/5a3de12d34c24aa5dd5e5db1cbc2defebc0d4da3/Data/doorman/t_doorMan_s.png",
+    "sha256": "812212a4bc7d519ac3225c0c79df909f79fcd78758dc69a4b7b90a182b514492"
+  },
+  {
+    "file": "t_eye_d.png",
+    "url": "https://raw.githubusercontent.com/pyvista/vtk-data/5a3de12d34c24aa5dd5e5db1cbc2defebc0d4da3/Data/doorman/t_eye_d.png",
+    "sha256": "2f830ad9e55fecee6c3932ecb196c9591f7c2e940686ba3b2f4c98e6314f1c28"
+  },
+  {
+    "file": "t_eye_n.png",
+    "url": "https://raw.githubusercontent.com/pyvista/vtk-data/5a3de12d34c24aa5dd5e5db1cbc2defebc0d4da3/Data/doorman/t_eye_n.png",
+    "sha256": "e8eb17cb543784d648daeb90ba893914fe4910c16009ce8f74d2c71fc6f8a8f1"
+  },
+  {
+    "file": "t_doorMan_teeth_d.png",
+    "url": "https://raw.githubusercontent.com/pyvista/vtk-data/5a3de12d34c24aa5dd5e5db1cbc2defebc0d4da3/Data/doorman/t_doorMan_teeth_d.png",
+    "sha256": "eaa6daa2151892ebba6312aba5a5b5c48dea706a125950afe61c481fb06a1c6e"
+  },
+  {
+    "file": "t_doorMan_teeth_n.png",
+    "url": "https://raw.githubusercontent.com/pyvista/vtk-data/5a3de12d34c24aa5dd5e5db1cbc2defebc0d4da3/Data/doorman/t_doorMan_teeth_n.png",
+    "sha256": "293133e9c90678fd30a5d961c3e078771ae80e2d6adb6a28189c8a9f43f3d822"
+  }
+]

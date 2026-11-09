@@ -2133,3 +2133,16 @@ Optional CPU heap solver uses bit domains and an indexed heap; generated 192x192
 ### WFC worker responsiveness evidence
 
 Optional wfc/worker runs the same local heap solver in a one-shot dedicated worker. TypeScript and the single Rust SIMD artifact emit bounded actual work counters without consuming randomness. shared/worker.js serves/transfers results and revives errors. Abort/dispose/watchdog end the worker and close listeners/progress. Package lifecycle tests cover clone/startup, crashes, malformed messages, timeout and seed/rule parity; real browser records show rendered frames during positive in-flight work on both WebGPU and WebGL2, then abort active TS and SIMD solves. Evidence: docs/whitepaper/results/batch-69-worker.json. No measured frame-time or general responsiveness budget; main-thread cloning still costs time. Core/stage and rendering backends are unchanged.
+
+### README required assets (section 5, 2026-11-09)
+
+Run `node scripts/fetch-readme-assets.mjs` before `npm run check:readme-run`. External standard files live in
+`engine-bench/readme-samples` beside the worktrees, overridden by `MARGO_README_SAMPLES`; source, licence and SHA-256
+are retained through the loader corpus and the fetcher. Explicit tracked aliases reject absent files and LFS pointers.
+OBJ/MTL/PNG, TMX/TSX and LAZ/WDP companions keep their relative paths, and the sample server implements HTTP byte
+ranges, including suffix/open ranges, HEAD and 416. `tests/readme-assets.test.js` checks those contracts; verify
+also runs the existing README harness regressions. Scoped executions preserve their own report.json.
+
+The loader/decoder/FBX/environment/points run passed 73/88 examples, 15 existing failures, zero fresh failures.
+Thirty proved entries were removed from the runtime known list. This does not prove fictional asset identities or
+close the remaining input, clip, cubic-curve, NURBS-only or MTL-as-OBJ errors. Physics remains held.

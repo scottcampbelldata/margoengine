@@ -1651,3 +1651,13 @@ ConstrainedWFC checked every adjacency edge with an opposite-list includes scan,
 No open WFC worker defect after lifecycle, actual classic-worker and dual-backend browser checks. Progress is coalesced work counters, not completion percentage; await result for errors. SSR construction deliberately reports coded unsupported. Synchronous heap APIs still cannot receive new abort events while blocking their thread; the optional worker entry supplies termination-based cancellation.
 
 The worker build initially stopped Vite from implicitly emitting wfc.wasm when URL resolution moved behind the classic-worker boundary. The package build now explicitly copies its own single artifact; chunks.test.js compares installed bytes with the source artifact, and actual TS/SIMD worker tests exercise installed loading. The browser-launch harness fixture was updated to its new evidence result shape while retaining its workspace-root assertion.
+
+### README inputs exposed separate causes (2026-11-09)
+
+Reproduce with `node scripts/fetch-readme-assets.mjs` then
+`npm run check:readme-run -- --packages=loaders,fbx`. The explicit files close the 404s but four examples still
+have separate causes: the FBX introduction asks for Walking on the CC0 mechanical fan (whose actual clips stay
+unchanged); the inherit/deformer samples carry unsupported cubic curves without the layers extension; the NURBS
+curve-only sample has no triangle mesh for the glTF model loader; the second textured OBJ example passes the fetched
+MTL to parseOBJ. These remain on the runtime known list, deferred to the later README job under Scott's
+other-causes scope. They are not claimed passing or patched by renaming clips or substituting unrelated bytes.

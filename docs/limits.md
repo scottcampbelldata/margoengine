@@ -1269,3 +1269,8 @@ WFC entry sizes (bare peers external): root 1,824 B, overlapping 2,451 B, constr
 ## WFC worker solving (batch 69)
 
 Local heap solves only, same grid/rule/pair/restart bounds and backend selection as chunks. One dedicated browser worker per job, rules/pins cloned, Uint16 result transferred. Main-thread cloning has a cost. Latest-only single-consumer progress is real work, not a percentage; restarts may revisit cells and Wasm counters wrap after 2^32-1. Defaults seed 1, pins empty, attempts 4, auto backend, signal absent and timeout 60000 ms including startup/loading; timeout integer 1..2147483647. Abort/dispose/timeout terminate active work and close progress; result must be awaited for errors. Stopping progress iteration leaves the solve running. Node/SSR construction is coded unsupported. Same-origin worker/CSP and Wasm support apply. Real rendering/progress/abort proof on WebGPU and WebGL2, no frame-time guarantee (LIM-624).
+
+README runtime evidence (2026-11-09): explicit standard sample aliases prove that the API examples execute with
+format-correct inputs; they do not prove the fictional filenames or authored semantics (for example a carrier aliased
+as teapot, or Source Sans aliased as Inter). The scoped loaders/decoders/FBX/environment/points run passed 73/88,
+with 15 failures retained. Sources, licences and outstanding inputs: [missing-test-items](work-lists/missing-test-items.md).

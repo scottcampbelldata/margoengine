@@ -3879,3 +3879,12 @@ Limits: bounded restarts can fail, chunk order affects output and retained bound
 Failures resolved: initial dense validation hit its five-minute hard limit, then passed after the linear membership fix; stale API size summaries were regenerated after entry sizes, rather than before them; the worker's missing emitted artifact was fixed by package-owned copying and installed-byte regression. One launcher fixture needed its new result shape. The previous GPU-slot deadline expired before any test ran; resumed waits use the normal lock wait with a hard limit. The unpushed duplicate SQL cleanup da5bf4383 was rebased out as requested. Batch 160's fix landed as 52ccbbb00 and is used from main; no duplicate cleanup commit was pushed. No WFC defect or timing-test failure remains open. Quiet release speed evidence is still unmeasured.
 
 Closing evidence: verify passed in 377 s, with 13,255 passed, zero failed and 14 existing suite skips (the same skip count before worker solving). WFC separately passed 37/37 with zero skips. Real WebGPU/WebGL2 checks passed, and all 7 README examples passed. No test, tolerance or budget was weakened.
+
+### README missing-input rerun (2026-11-09)
+
+Explicit standard-file mappings and a reproducible SHA-256-checked fetcher replaced incompatible fallback bytes for
+the audited aliases. A real scoped run of loaders, decoders, FBX, environment and points passed 73/88 examples;
+30 formerly known failures now pass and were removed, leaving 70 exceptions repository-wide at this checkpoint.
+Fifteen scoped failures remain, including missing inputs and deferred nonmissing README causes. OpenVDB smoke's
+density example now runs. No core, stage or physics source changed. Detailed scope, sources, accepted alias identities
+and regression paths are in docs/work-lists/missing-test-items.md. This is execution proof, not a performance claim.

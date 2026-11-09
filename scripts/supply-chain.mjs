@@ -127,6 +127,10 @@ export const BUNDLED = [
 /** Credits for the assets the site, demos and examples use. None of these files is in an npm tarball. */
 const ASSETS = [
   [
+    'scripts/fetch-readme-assets.mjs',
+    'README runner external standard samples, downloaded outside the repository with SHA-256 checks: fourteen families reuse the source/author/licence records in packages/loaders/tests/real-files/manifest.json (NASA public domain; dolphin MD2 sample-file grant; AMF MIT; PDB CC0; KMZ CC-BY-4.0; Lottie Apache-2.0; STL BSD-3-Clause; SVG and TMX public domain; 3MF BSD-2-Clause; COLLADA Khronos MIT-style; OBJ/MTL and seven PNG companions Apache-2.0; LAS/WDP BSD-2-Clause). OBJ PNG sources/hashes in scripts/support/readme-companions.json, PyVista vtk-data commit 5a3de12d34c24aa5dd5e5db1cbc2defebc0d4da3. OpenVDB smoke.vdb, OpenVDB website 3d8fd4d3f2d670464f4390e2775cfc87274233dc, CC-BY-4.0, repository LICENSE.txt. No implementation files or FFmpeg binaries ship in Margo.',
+  ],
+  [
     'packages/audio/tests/fixtures/NOTICE.md',
     'Ambisonic test audio: first-second, first-four-channel excerpt of RainSceneO7.wav by Stefan Riedel, Ambisonic Stimuli Files and Binaural Renders, Zenodo 10.5281/zenodo.10227483 (CC BY 4.0). Original samples unchanged; WAV header rewritten and higher orders/metadata omitted. rain-foa.json pins source and excerpt hashes. Test-only, never shipped in package tarballs',
   ],

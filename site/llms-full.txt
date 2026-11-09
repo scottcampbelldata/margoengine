@@ -3857,6 +3857,11 @@ WFC entry sizes (bare peers external): root 1,824 B, overlapping 2,451 B, constr
 
 Local heap solves only, same grid/rule/pair/restart bounds and backend selection as chunks. One dedicated browser worker per job, rules/pins cloned, Uint16 result transferred. Main-thread cloning has a cost. Latest-only single-consumer progress is real work, not a percentage; restarts may revisit cells and Wasm counters wrap after 2^32-1. Defaults seed 1, pins empty, attempts 4, auto backend, signal absent and timeout 60000 ms including startup/loading; timeout integer 1..2147483647. Abort/dispose/timeout terminate active work and close progress; result must be awaited for errors. Stopping progress iteration leaves the solve running. Node/SSR construction is coded unsupported. Same-origin worker/CSP and Wasm support apply. Real rendering/progress/abort proof on WebGPU and WebGL2, no frame-time guarantee (LIM-624).
 
+README runtime evidence (2026-11-09): explicit standard sample aliases prove that the API examples execute with
+format-correct inputs; they do not prove the fictional filenames or authored semantics (for example a carrier aliased
+as teapot, or Source Sans aliased as Inter). The scoped loaders/decoders/FBX/environment/points run passed 73/88,
+with 15 failures retained. Sources, licences and outstanding inputs: [missing-test-items](work-lists/missing-test-items.md).
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -5512,6 +5517,16 @@ ConstrainedWFC checked every adjacency edge with an opposite-list includes scan,
 No open WFC worker defect after lifecycle, actual classic-worker and dual-backend browser checks. Progress is coalesced work counters, not completion percentage; await result for errors. SSR construction deliberately reports coded unsupported. Synchronous heap APIs still cannot receive new abort events while blocking their thread; the optional worker entry supplies termination-based cancellation.
 
 The worker build initially stopped Vite from implicitly emitting wfc.wasm when URL resolution moved behind the classic-worker boundary. The package build now explicitly copies its own single artifact; chunks.test.js compares installed bytes with the source artifact, and actual TS/SIMD worker tests exercise installed loading. The browser-launch harness fixture was updated to its new evidence result shape while retaining its workspace-root assertion.
+
+### README inputs exposed separate causes (2026-11-09)
+
+Reproduce with `node scripts/fetch-readme-assets.mjs` then
+`npm run check:readme-run -- --packages=loaders,fbx`. The explicit files close the 404s but four examples still
+have separate causes: the FBX introduction asks for Walking on the CC0 mechanical fan (whose actual clips stay
+unchanged); the inherit/deformer samples carry unsupported cubic curves without the layers extension; the NURBS
+curve-only sample has no triangle mesh for the glTF model loader; the second textured OBJ example passes the fetched
+MTL to parseOBJ. These remain on the runtime known list, deferred to the later README job under Scott's
+other-causes scope. They are not claimed passing or patched by renaming clips or substituting unrelated bytes.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 

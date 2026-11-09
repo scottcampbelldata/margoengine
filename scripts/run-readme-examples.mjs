@@ -12,7 +12,16 @@
 //   npm run check:readme-run -- --failed           the examples that failed in the last report
 //   npm run check:readme-run -- --shrink           writes the known list down to what still fails; it never adds an entry
 import { spawn, spawnSync } from 'node:child_process';
-import { copyFileSync, createReadStream, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { basename, dirname, extname, join, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createServer, transformWithOxc } from 'vite';
@@ -21,6 +30,7 @@ import { launchBrowser } from './lib/browser.mjs';
 import { exampleIds, packageMarkdown, readmeEntries } from './support/readme-types.mjs';
 import { closeAll } from './support/shutdown.mjs';
 import { workspacePackages } from './check-readme-types.mjs';
+import { readmeFixture, serveSample } from './support/readme-assets.mjs';
 
 const root = resolve(import.meta.dirname, '..'),
   // Each run writes only its own folder: the lock gives a run one shared GPU slot, so two runs in one checkout can overlap,
@@ -78,7 +88,8 @@ export function collectExamples(packages) {
 /** True for code that can run only in a page, and false for code that needs Node, undefined when either may do. */
 export function placeOf(code) {
   if (/from\s+['"](?:node:|webgpu['"])/.test(code)) return 'node';
-  if (/\bdocument\.|\bwindow\.|\bnavigator\.|requestAnimationFrame|createStage\(|Engine\.create\(|<canvas/.test(code)) return 'page';
+  if (/\bdocument\.|\bwindow\.|\bnavigator\.|requestAnimationFrame|createStage\(|Engine\.create\(|<canvas/.test(code))
+    return 'page';
   return undefined;
 }
 
@@ -88,7 +99,19 @@ const PREFERRED = {
   '.glb': 'examples/assets/khronos-samples/AnimatedColorsCube.glb',
 };
 // The clip names the examples use, on one real rigged model: an example's own file has them.
-const CLIPS = ['Idle', 'Walk', 'Run', 'Walking', 'Running', 'Jump', 'Attack', 'SwingLeft', 'SwingRight', 'Wave', 'Dance'];
+const CLIPS = [
+  'Idle',
+  'Walk',
+  'Run',
+  'Walking',
+  'Running',
+  'Jump',
+  'Attack',
+  'SwingLeft',
+  'SwingRight',
+  'Wave',
+  'Dance',
+];
 
 /** A plain static GLB from the exporter. */
 async function staticModel(file) {
@@ -99,7 +122,11 @@ async function staticModel(file) {
       nodes: [
         {
           name: 'Triangle',
-          geometry: { positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], normals: [0, 0, 1, 0, 0, 1, 0, 0, 1], indices: [0, 1, 2] },
+          geometry: {
+            positions: [0, 0, 0, 1, 0, 0, 0, 1, 0],
+            normals: [0, 0, 1, 0, 0, 1, 0, 0, 1],
+            indices: [0, 1, 2],
+          },
         },
       ],
     }),
@@ -156,7 +183,12 @@ export function sampleFiles(
     const path = join(base, file),
       extension = extname(file).toLowerCase();
     // A file kept to test a refusal is no sample.
-    if (!extension || CODE.has(extension) || !existsSync(path) || /invalid|corrupt|truncat|broken|malformed|\bbad\b|damaged/i.test(file))
+    if (
+      !extension ||
+      CODE.has(extension) ||
+      !existsSync(path) ||
+      /invalid|corrupt|truncat|broken|malformed|\bbad\b|damaged/i.test(file)
+    )
       return undefined;
     const { size } = statSync(path);
     // An empty file or a Git LFS pointer is no sample, and a loader would rightly refuse it; a small real file is one.
@@ -179,7 +211,8 @@ export function sampleFiles(
   const gltf = samples.get('.gltf'),
     uri = gltf && JSON.parse(readFileSync(gltf.path, 'utf8')).buffers?.[0]?.uri,
     buffer = typeof uri === 'string' && !uri.startsWith('data:') ? join(dirname(gltf.path), decodeURI(uri)) : undefined;
-  if (buffer && existsSync(buffer) && !isLfsPointer(buffer)) samples.set('.bin', { path: buffer, size: statSync(buffer).size });
+  if (buffer && existsSync(buffer) && !isLfsPointer(buffer))
+    samples.set('.bin', { path: buffer, size: statSync(buffer).size });
   return { byName, byExtension: samples };
 }
 
@@ -189,14 +222,17 @@ export function sampleFiles(
  */
 export function assetFile(pathname, base = join(root, 'examples/assets')) {
   const path = resolve(base, `.${pathname}`);
-  return path.startsWith(base + sep) && existsSync(path) && statSync(path).isFile() && !isLfsPointer(path) ? { path } : undefined;
+  return path.startsWith(base + sep) && existsSync(path) && statSync(path).isFile() && !isLfsPointer(path)
+    ? { path }
+    : undefined;
 }
 
 const sampleFor = ({ byName, byExtension }, name) =>
   byName.get(basename(name).toLowerCase()) ?? byExtension.get(extname(name).toLowerCase());
 
 /** File names an example names in strings, for the folder it runs in. */
-export const namedFiles = (code) => [...code.matchAll(/['"`]([\w./-]+\.[a-zA-Z0-9]{2,5})['"`]/g)].map(([, name]) => name);
+export const namedFiles = (code) =>
+  [...code.matchAll(/['"`]([\w./-]+\.[a-zA-Z0-9]{2,5})['"`]/g)].map(([, name]) => name);
 
 /** The elements an example asks a page for, as selectors. */
 export const askedElements = (code) => [
@@ -213,12 +249,9 @@ async function writeNodeExample(example, samples) {
   const folder = join(scratch, 'node', example.id),
     file = join(folder, 'example.mjs');
   mkdirSync(folder, { recursive: true });
-  writeFileSync(
-    file,
-    (await transformWithOxc(example.code, 'example.tsx', { jsx: { runtime: 'automatic' } })).code,
-  );
+  writeFileSync(file, (await transformWithOxc(example.code, 'example.tsx', { jsx: { runtime: 'automatic' } })).code);
   for (const name of namedFiles(example.code)) {
-    const sample = sampleFor(samples, name);
+    const sample = readmeFixture(name) ?? sampleFor(samples, name);
     if (!sample || name.startsWith('/') || name.includes('..')) continue;
     mkdirSync(dirname(join(folder, name)), { recursive: true });
     copyFileSync(sample.path, join(folder, name));
@@ -229,7 +262,10 @@ async function writeNodeExample(example, samples) {
 export async function runInNode(example, samples) {
   const { file, folder } = await writeNodeExample(example, samples);
   return new Promise((done) => {
-    const child = spawn(process.execPath, ['--unhandled-rejections=strict', file], { cwd: folder, stdio: ['ignore', 'ignore', 'pipe'] });
+    const child = spawn(process.execPath, ['--unhandled-rejections=strict', file], {
+      cwd: folder,
+      stdio: ['ignore', 'ignore', 'pipe'],
+    });
     let errors = '',
       limited = false;
     child.stderr.on('data', (chunk) => (errors += chunk));
@@ -248,7 +284,11 @@ export async function runInNode(example, samples) {
 
 /** The line of a stack trace that says what went wrong. */
 const firstError = (text) =>
-  (text.split(/\r?\n/).find((line) => /^\s*(?:\w*Error|MargoError|Uncaught)\b|\bERR_/.test(line)) ?? text.split(/\r?\n/)[0] ?? '')
+  (
+    text.split(/\r?\n/).find((line) => /^\s*(?:\w*Error|MargoError|Uncaught)\b|\bERR_/.test(line)) ??
+    text.split(/\r?\n/)[0] ??
+    ''
+  )
     .trim()
     .slice(0, 300);
 
@@ -305,11 +345,20 @@ async function startPages(samples) {
               return response.end(PAGE);
             }
             // Minimal glTF takes static models only, so its examples get one.
-            const minimal = /\.gl(?:b|tf)$/.test(pathname) && request.headers.referer?.includes('example=%2Fgltf%2F'),
-              sample = minimal ? { path: samples.staticModel } : (assetFile(pathname) ?? sampleFor(samples, pathname));
-            if (!sample || /\.(?:tsx|js|mjs|css|html)$/.test(pathname) || pathname.startsWith('/@') || pathname.includes('/node_modules/') || pathname.includes('/packages/'))
+            const fixture = readmeFixture(pathname),
+              minimal = /\.gl(?:b|tf)$/.test(pathname) && request.headers.referer?.includes('example=%2Fgltf%2F'),
+              sample = minimal
+                ? { path: samples.staticModel }
+                : (fixture ?? assetFile(pathname) ?? sampleFor(samples, pathname));
+            if (
+              !sample ||
+              (!fixture && /\.(?:tsx|js|mjs|css|html)$/.test(pathname)) ||
+              pathname.startsWith('/@') ||
+              pathname.includes('/node_modules/') ||
+              pathname.includes('/packages/')
+            )
               return next();
-            createReadStream(sample.path).pipe(response);
+            serveSample(request, response, sample.path);
           });
         },
       },
@@ -373,7 +422,9 @@ async function eachLimited(items, jobs, work) {
 
 /** The examples a run takes: those of `packages` (names), when given, whose id holds `only`, when given, and in `ids`, when given. */
 export const pickExamples = (examples, { only, packages, ids }) =>
-  examples.filter(({ id, name }) => (!packages || packages.includes(name)) && (!only || id.includes(only)) && (!ids || ids.has(id)));
+  examples.filter(
+    ({ id, name }) => (!packages || packages.includes(name)) && (!only || id.includes(only)) && (!ids || ids.has(id)),
+  );
 
 /** What to print for a known entry that did not fail: `gone` of {@link judge}. */
 export const goneLine = (id, report) =>
@@ -403,6 +454,7 @@ async function run() {
     samples = sampleFiles(),
     results = new Map();
   claimScratch(scratchBase);
+  for (const example of examples) for (const name of namedFiles(example.code)) readmeFixture(name);
   samples.byExtension.set('.glb', { path: modelWithClips(join(scratch, 'clips.glb')), size: 0 });
   samples.staticModel = await staticModel(join(scratch, 'static.glb'));
   await eachLimited(nodeTurns(examples.filter(({ code }) => placeOf(code) !== 'page')), NODE_JOBS, async (turn) => {
@@ -412,25 +464,33 @@ async function run() {
   if (forPage.length) {
     const pages = await startPages(samples);
     try {
-      await eachLimited(forPage, PAGE_JOBS, async (example) => results.set(example.id, await runInPage(example, pages)));
+      await eachLimited(forPage, PAGE_JOBS, async (example) =>
+        results.set(example.id, await runInPage(example, pages)),
+      );
     } finally {
       await closeAll({ browser: pages.browser, servers: [pages.server] });
     }
   }
   const report = examples.map(({ id }) => ({ id, ...results.get(id) }));
+  writeFileSync(join(scratch, 'report.json'), `${JSON.stringify(report, null, 1)}\n`);
   if (last) for (const entry of last) if (!results.has(entry.id)) report.push(entry);
   const { failed, fresh, gone } = judge(report, known, Boolean(part || last)),
     passed = report.filter(({ result }) => result === 'pass').length,
     inNode = report.filter(({ result, place }) => result === 'pass' && place === 'node').length;
   if (!part) writeFileSync(reportFile, `${JSON.stringify(report, null, 1)}\n`);
   if (process.argv.includes('--shrink') && !part && !last) {
-    writeFileSync(knownFile, `${JSON.stringify(Object.fromEntries(Object.entries(known).filter(([id]) => !gone.includes(id))), null, 2)}\n`);
+    writeFileSync(
+      knownFile,
+      `${JSON.stringify(Object.fromEntries(Object.entries(known).filter(([id]) => !gone.includes(id))), null, 2)}\n`,
+    );
     console.log(`known list: ${gone.length} removed`);
     gone.length = 0;
   }
   for (const { id, place, reason } of fresh) console.error(`${id} (${place}): ${reason}`);
   for (const id of gone) console.error(goneLine(id, report));
-  console.log(`${passed} of ${report.length} examples ran: ${inNode} in Node, ${passed - inNode} in a page; ${failed.length} failed, ${fresh.length} not on the known list`);
+  console.log(
+    `${passed} of ${report.length} examples ran: ${inNode} in Node, ${passed - inNode} in a page; ${failed.length} failed, ${fresh.length} not on the known list`,
+  );
   if (fresh.length || gone.length) process.exitCode = 1;
 }
 
