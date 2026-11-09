@@ -365,6 +365,9 @@ pub unsafe extern "C" fn contour(
         mesh.uses as f64,
     ];
     out.extend(mesh.positions.iter().flatten());
+    for &p in &mesh.positions {
+        out.extend(field(code, p).1);
+    }
     out.extend(mesh.indices.iter().map(|&v| v as f64));
     out[0] = out.len() as f64;
     Box::into_raw(out.into_boxed_slice()) as *mut f64

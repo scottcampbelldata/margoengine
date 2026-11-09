@@ -17,10 +17,12 @@ export interface SdfOptions {
   /** Checked before synchronous work; use a worker to interrupt work in flight. */
   signal?: AbortSignal;
 }
-/** Owned dual vertices and outward triangles. Compute face normals when rendering sharp edges. */
+/** Owned dual vertices, analytic gradient normals and outward triangles. */
 export interface SdfMesh {
   /** Packed world-space XYZ vertices, one per active cell. */
   positions: Float64Array;
+  /** Unit outward SDF gradient at each vertex; deterministic branch/axis ties at CSG seams and box edges. */
+  normals: Float64Array;
   /** Outward-wound triangle vertex indices, two triangles per dual quad. */
   indices: Uint32Array;
   /** Number of unique sign-changing grid edges solved. */
@@ -165,7 +167,8 @@ class Modeler implements SdfModeler {
         count = header[1];
       return {
         positions: data.slice(5, 5 + count * 3),
-        indices: Uint32Array.from(data.subarray(5 + count * 3)),
+        normals: data.slice(5 + count * 3, 5 + count * 6),
+        indices: Uint32Array.from(data.subarray(5 + count * 6)),
         edgeSolves: header[3],
         cellEdgeUses: header[4],
       };

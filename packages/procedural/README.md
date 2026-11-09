@@ -400,6 +400,7 @@ their constrained quadratic error minimum retains box corners and sharp CSG edge
 The default model is a box, so no user-supplied field or asset is required.
 
 ```ts
+import { Geometry } from '@margoengine/core';
 import { createSdfModeler } from '@margoengine/procedural/sdf';
 using modeler = await createSdfModeler();
 const mesh = modeler.mesh({
@@ -407,13 +408,14 @@ const mesh = modeler.mesh({
   a: { type: 'box', halfSize: [0.8, 0.7, 0.6] },
   b: { type: 'sphere', center: [0.5, 0, 0], radius: 0.4 },
 }, { resolution: 32 });
-console.log(mesh.positions.length / 3, mesh.indices.length / 3);
+const geometry = new Geometry(mesh.positions, mesh.normals, mesh.indices);
+console.log(geometry.indices.length / 3);
 ```
 
-`mesh(shape?, options?)` returns owned Float64 XYZ `positions` and Uint32 triangle
-`indices`, in outward order. For sharp shading, expand indexed triangles and compute
-one normal per face before passing Float32 data to a renderer. No normals, UVs or
-material assignments are generated. `edgeSolves` counts unique sign-changing grid
+`mesh(shape?, options?)` returns owned Float64 XYZ `positions`, unit outward SDF
+gradient `normals` at those vertices, and Uint32 triangle `indices`, in outward
+order. Pass them directly to core `Geometry`. For sharp shading, expand indexed
+triangles and compute one normal per face. No UVs or material assignments are generated. `edgeSolves` counts unique sign-changing grid
 edges; `cellEdgeUses` counts the four cell uses per edge on an enclosed surface.
 Sharing Hermite roots removes three of four root solves with identical inputs and
 output, without a wall-time or SIMD speed claim.
@@ -458,9 +460,12 @@ stand-ins. No production model, render-quality or timing claim (LIM-632).
 
 `@margoengine/procedural/textures` bakes periodic noise, bricks, tiles, wood-like
 bands and rust-like patches directly into owned RGBA8 GPU textures. It accepts a
-WebGPU device or a Margo engine with a live `gpu`; native WebGL2 gives code
-`unsupported` with a help link. This entry compiles one compute pipeline and uses
-no CPU pixel loop, asset fetch or Wasm.
+WebGPU device or a Margo engine. On native WebGL2 it compiles a fragment pipeline
+on the engine canvas, with all five patterns and the same options. Pass the engine
+itself on that route; its `gpu` is null. Each RGBA8 colour channel agrees within
+one quantization step on the tested GPU. Mortar exactly on a threshold may vary
+with floating-point rasterization. No CPU pixel loop, asset fetch or Wasm is used.
+The WebGL2 chunk loads only when that backend is selected.
 
 ```ts
 import { createTextureBaker } from '@margoengine/procedural/textures';

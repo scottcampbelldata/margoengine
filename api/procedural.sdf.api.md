@@ -5,6 +5,7 @@
 ```ts
 export interface SdfMesh {
     positions: Float64Array;
+    normals: Float64Array;
     indices: Uint32Array;
     edgeSolves: number;
     cellEdgeUses: number;
