@@ -1,3 +1,10 @@
+import { deferSpeed, isSpeedEntry } from '../../../scripts/support/speed-phase.mjs';
+if (
+  isSpeedEntry(import.meta.url) &&
+  !process.argv.some((arg) => ['--help', '-h', '--list'].includes(arg)) &&
+  deferSpeed('examples/package-benchmarks/gates/post-stack.mjs')
+)
+  process.exit(0);
 // Post full-stack gate and the SSAO-with-IBL cost. Real GPU, serial, under the GPU lock, on AC power.
 // From the repository root after `npm run build:packages`:
 //   node examples/package-benchmarks/gates/post-stack.mjs [--rounds=8] [--frames=120]

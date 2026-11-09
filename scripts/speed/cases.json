@@ -1,0 +1,326 @@
+[
+  {
+    "id": "time budget: one default 256 m tile at 1 m in under 150 ms of CPU (measured about 30 ms on the reference PC)",
+    "file": "packages/biomes/tests/climate.test.js",
+    "kind": "test",
+    "budget": "<150 ms CPU per tile"
+  },
+  {
+    "id": "time budget: an undo and a 50 m dab take under 2 ms of CPU, far inside one 60 Hz frame, before tiles are remade",
+    "file": "packages/biomes/tests/editor.test.js",
+    "kind": "test",
+    "budget": "dab <2 ms and undo <2 ms CPU"
+  },
+  {
+    "id": "time budget (G1): one preset forest tile placed in under 150 ms of CPU on one thread (measured about 30 ms on the reference PC)",
+    "file": "packages/biomes/tests/placement.test.js",
+    "kind": "test",
+    "budget": "<150 ms CPU per placement tile"
+  },
+  {
+    "id": "removing many meshes does not scan every slot per mesh",
+    "file": "tests/core-remove-children.test.js",
+    "kind": "test",
+    "budget": "<150 ms CPU for 30,001 removals"
+  },
+  {
+    "id": "benchmark: chunk and world get/set throughput (printed)",
+    "file": "packages/voxel/tests/benchmark.test.js",
+    "kind": "test",
+    "budget": "printed throughput, no numeric budget"
+  },
+  {
+    "id": "benchmark: chunk, block-change and entity codecs (printed)",
+    "file": "packages/voxel/tests/codec-benchmark.test.js",
+    "kind": "test",
+    "budget": "printed throughput, no numeric budget"
+  },
+  {
+    "id": "benchmark: torch in open air and a 32-wide roof removal (printed)",
+    "file": "packages/voxel/tests/light-benchmark.test.js",
+    "kind": "test",
+    "budget": "printed throughput, no numeric budget"
+  },
+  {
+    "id": "a roof removed and put back: page milliseconds with VoxelLighting and with VoxelLightWorker",
+    "file": "packages/voxel/tests/light-worker-benchmark.test.js",
+    "kind": "test",
+    "budget": "printed throughput; light-worker also requires posted + written < flood"
+  },
+  {
+    "id": "benchmark: meshChunk per random-terrain chunk and per worst-case checkerboard (printed)",
+    "file": "packages/voxel/tests/mesher-benchmark.test.js",
+    "kind": "test",
+    "budget": "printed throughput, no numeric budget"
+  },
+  {
+    "id": "benchmark: VoxelMesher meshes per second with 1, 2 and 3 workers (printed)",
+    "file": "packages/voxel/tests/mesher-worker-benchmark.test.js",
+    "kind": "test",
+    "budget": "printed throughput, no numeric budget"
+  },
+  {
+    "id": "frame cost while generated chunks arrive (printed)",
+    "file": "packages/voxel/tests/stream-benchmark.test.js",
+    "kind": "test",
+    "budget": "printed throughput, no numeric budget"
+  },
+  {
+    "id": "generation benchmark (printed)",
+    "file": "packages/voxel/tests/stream-benchmark.test.js",
+    "kind": "test",
+    "budget": "printed throughput, no numeric budget"
+  },
+  {
+    "id": "benchmark: ray casts, sweeps and character updates (printed)",
+    "file": "packages/voxel/tests/query.test.js",
+    "kind": "test",
+    "budget": "printed rays/sweeps/updates throughput"
+  },
+  {
+    "id": "geometry-edges",
+    "file": "packages/geometry/tests/edges.test.js",
+    "kind": "budget",
+    "budget": "<150 ms CPU on 8,385 vertices"
+  },
+  {
+    "id": "geometry-triangulate",
+    "file": "packages/geometry/tests/triangulate.test.js",
+    "kind": "budget",
+    "budget": "<150 ms CPU"
+  },
+  {
+    "id": "geometry-circle",
+    "file": "packages/geometry/tests/triangulate.test.js",
+    "kind": "budget",
+    "budget": "CPU <2.5 * noisy ring +50 ms; same 100k and 65,536 points"
+  },
+  {
+    "id": "geometry-inputs",
+    "file": "packages/geometry/tests/triangulate-inputs.test.js",
+    "kind": "budget",
+    "budget": "<1500 ms CPU to reject invalid input"
+  },
+  {
+    "id": "biomes-object-allocation",
+    "file": "packages/biomes/tests/objects.test.js",
+    "kind": "budget",
+    "budget": "<100 ms CPU to reject oversized detail"
+  },
+  {
+    "id": "biomes-wide-road",
+    "file": "packages/biomes/tests/splines.test.js",
+    "kind": "budget",
+    "budget": "<200 ms CPU"
+  },
+  {
+    "id": "biomes-wander-road",
+    "file": "packages/biomes/tests/splines.test.js",
+    "kind": "budget",
+    "budget": "<800 ms CPU"
+  },
+  {
+    "id": "points-las",
+    "file": "packages/points/tests/las.test.js",
+    "kind": "budget",
+    "budget": "<150 ms CPU for fuzz cases"
+  },
+  {
+    "id": "points-e57",
+    "file": "packages/points/tests/e57.test.js",
+    "kind": "budget",
+    "budget": "<300 ms CPU for fuzz cases"
+  },
+  {
+    "id": "points-laz",
+    "file": "packages/points/tests/laz.test.js",
+    "kind": "budget",
+    "budget": "<8000 ms CPU for fuzz cases"
+  },
+  {
+    "id": "tiles-fuzz",
+    "file": "packages/tiles/tests/tiles.test.js",
+    "kind": "budget",
+    "budget": "<150 ms CPU"
+  },
+  {
+    "id": "wgsl-fuzz",
+    "file": "packages/webgl2-compat/test/wgsl-fuzz.test.js",
+    "kind": "budget",
+    "budget": "<400 ms CPU per contract"
+  },
+  {
+    "id": "loaders-xml",
+    "file": "packages/loaders/tests/loaders.test.js",
+    "kind": "budget",
+    "budget": "<150 ms CPU for 200k attributes"
+  },
+  {
+    "id": "security-stl",
+    "file": "tests/security.test.js",
+    "kind": "budget",
+    "budget": "<150 ms CPU for 200k unterminated facets"
+  },
+  {
+    "id": "fuzz-parsers",
+    "file": "tests/fuzz-regressions.test.js",
+    "kind": "budget",
+    "budget": "per-case original budget (default 600 ms CPU)"
+  },
+  {
+    "id": "materials-half",
+    "file": "packages/materials/test/texture-formats.test.js",
+    "kind": "budget",
+    "budget": "<120 ms CPU for 4,194,304 values, native true and false"
+  },
+  {
+    "id": "environment-exr",
+    "file": "packages/environment/tests/environment.test.js",
+    "kind": "budget",
+    "budget": "parse < per-texel half conversion, best of 9 alternating rounds"
+  },
+  {
+    "id": "exporters-writer",
+    "file": "packages/exporters/tests/exporters.test.js",
+    "kind": "budget",
+    "budget": "writer < search, best of 9 alternating rounds"
+  },
+  {
+    "id": "exporters-usdz",
+    "file": "packages/exporters/tests/exporters.test.js",
+    "kind": "budget",
+    "budget": "USDZ <10 * control unit, best of 15 alternating rounds"
+  },
+  {
+    "id": "netcode-rtt",
+    "file": "packages/netcode/tests/transports.test.js",
+    "kind": "budget",
+    "budget": "<250 ms localhost RTT"
+  },
+  {
+    "id": "sandbox-finds",
+    "file": "examples/voxel-sandbox/test/finds.test.js",
+    "kind": "budget",
+    "budget": "<1000 ms, seeds 1, 2 and 3"
+  },
+  {
+    "id": "quickstart",
+    "file": "scripts/quickstart-timing.mjs",
+    "kind": "budget",
+    "budget": "<300 s default to verified interactive frame"
+  },
+  {
+    "id": "biomes-slow-sends",
+    "file": "packages/biomes/tests/flythrough-speed.mjs",
+    "kind": "budget",
+    "budget": "max <=2 ms send +1.5 ms"
+  },
+  {
+    "id": "biomes-flight-p99",
+    "file": "packages/biomes/tests/flythrough-speed.mjs",
+    "kind": "budget",
+    "budget": "added p99 <=0.3 ms; original settle function"
+  },
+  {
+    "id": "biomes-flight-max",
+    "file": "packages/biomes/tests/flythrough-speed.mjs",
+    "kind": "budget",
+    "budget": "added worst <=1 ms; original settle function"
+  },
+  {
+    "id": "biomes-camera01",
+    "file": "packages/biomes/tests/objects-frame-speed.mjs",
+    "kind": "budget",
+    "budget": "<=0.7 * RTX A6000 baseline (19.8/53.2 ms)"
+  },
+  {
+    "id": "biomes-camera02",
+    "file": "packages/biomes/tests/objects-frame-speed.mjs",
+    "kind": "budget",
+    "budget": "<RTX A6000 baseline (23.4/63.4 ms)"
+  },
+  {
+    "id": "biomes-far-forest",
+    "file": "packages/biomes/tests/objects-frame-speed.mjs",
+    "kind": "budget",
+    "budget": "<=1 ms, median of 3 alternating pairs"
+  },
+  {
+    "id": "sandbox-figures",
+    "file": "examples/voxel-sandbox/test/play.browser.mjs",
+    "kind": "budget",
+    "budget": "mean <4 ms for 200 figures over 2,000 updates"
+  },
+  {
+    "id": "proof-speedup",
+    "file": "examples/package-benchmarks/proofs/compare.js",
+    "kind": "budget",
+    "budget": "speedup >=1; original warmup 3, A B B A rounds=12 default; per-proof rounds retained"
+  },
+  {
+    "id": "biomes-copy-packing",
+    "file": "packages/biomes/tests/flythrough-speed.mjs",
+    "kind": "budget",
+    "budget": "0 frames stopped copying with <0.25 ms used while steps wait; detail writes delayed 1 ms"
+  },
+  {
+    "id": "biomes-flight-samples",
+    "file": "packages/biomes/tests/flythrough-speed.mjs",
+    "kind": "budget",
+    "budget": "each streamed sample has >600 real-time frames; 3 streamed/prefetched alternating flight pairs"
+  },
+  {
+    "id": "voxel-physics",
+    "file": "packages/voxel/tests/physics.test.js",
+    "kind": "test",
+    "budget": "printed collider timings; pure benchmark speedRtest deferred, triangle/cell work assertions live"
+  },
+  {
+    "id": "voxel-million",
+    "file": "packages/voxel/tests/vox.test.js",
+    "kind": "diagnostic",
+    "budget": "printed parse/write and best-of-3 batched/setBlock comparisons; equality scene remains live once"
+  },
+  {
+    "id": "sciviz-million",
+    "file": "packages/sciviz/tests/graph.test.js",
+    "kind": "diagnostic",
+    "budget": "printed ms per step, no speed threshold; finite values and movement remain live"
+  },
+  {
+    "id": "grass-frame-diagnostics",
+    "file": "scripts/modern-grass-tests.js",
+    "kind": "diagnostic",
+    "budget": "100k and 500k blades, 90 completed GPU frames after warmup; median and p95, no numeric budget"
+  },
+  {
+    "id": "hierarchy-frame-diagnostics",
+    "file": "scripts/modern-finalization-tests.js",
+    "kind": "diagnostic",
+    "budget": "10k hierarchy parts, 70 frames (10 warmup); CPU/GPU median and p95, no speed threshold; draw/visible/frame counts live"
+  },
+  {
+    "id": "dof-route-diagnostic",
+    "file": "scripts/modern-postfx-tests.js",
+    "kind": "diagnostic",
+    "budget": "printed per-frame cost; no threshold; fragment/CPU dispatch correctness live"
+  },
+  {
+    "id": "boulder-diagnostics",
+    "file": "scripts/test-boulder-browser.mjs",
+    "kind": "diagnostic",
+    "budget": "2 s GPU submission window and 1.5 s solver window; no speed threshold; pass-count assertions live"
+  },
+  {
+    "id": "desktop-cadence",
+    "file": "scripts/desktop-demo-tests.js",
+    "kind": "diagnostic",
+    "budget": "3 s native callback cadence, no FPS threshold; pixels and controls live"
+  },
+  {
+    "id": "shadows-cost",
+    "file": "packages/shadows/test/cutout-casters-browser.mjs",
+    "kind": "diagnostic",
+    "budget": "--cost paired caster frame costs, no threshold; default pixel regression remains shared"
+  }
+]

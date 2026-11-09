@@ -1,3 +1,10 @@
+import { deferSpeed, isSpeedEntry } from '../../../scripts/support/speed-phase.mjs';
+if (
+  isSpeedEntry(import.meta.url) &&
+  !process.argv.some((arg) => ['--help', '-h', '--list'].includes(arg)) &&
+  deferSpeed('packages/ecs/scripts/bridge-bench.mjs')
+)
+  process.exit(0);
 // MeshBridge.sync timed on 20,000 links, one process per case so one case's JIT state does not reach the next.
 // Run: npm run build --workspace packages/ecs, then node packages/ecs/scripts/bridge-bench.mjs
 // Prints the median of 300 calls after 300 calls of warm-up. "none after all" is a world that stopped moving.

@@ -5,6 +5,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from '
 import { basename, dirname, join, resolve } from 'node:path';
 import { runLimited } from './support/run-limited.mjs';
 import { endTree } from './support/shutdown.mjs';
+import { speedEnabled } from './support/speed-phase.mjs';
 
 export function createGpuQueue({
   acquire,
@@ -12,6 +13,7 @@ export function createGpuQueue({
   lockDir,
   measuresSpeed,
   resolveMode,
+  validateRequest,
   windowsCommandLine,
 }) {
   const MIN = 60_000;
@@ -39,6 +41,9 @@ export function createGpuQueue({
 
   /** Queue a bounded command; return only once its detached owner has queued or been admitted. */
   async function enqueue(command, options) {
+    if (basename(lockDir) === 'gpu.lock' && options.mode === 'exclusive' && !speedEnabled()) {
+      validateRequest({ ...options, maxMinutes: options.max ?? defaultMaxMinutes(), command: command.join(' ') });
+    }
     const queuedAt = Date.now();
     const ticket = `${String(queuedAt).padStart(15, '0')}-${process.pid}-${Math.random().toString(36).slice(2, 10)}`;
     const log = resolve('test-results', 'gpu-queue', `${ticket}.log`);

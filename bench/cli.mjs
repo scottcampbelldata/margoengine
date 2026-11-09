@@ -1,3 +1,10 @@
+import { deferSpeed, isSpeedEntry } from '../scripts/support/speed-phase.mjs';
+if (
+  isSpeedEntry(import.meta.url) &&
+  !process.argv.some((arg) => ['--help', '-h', '--list'].includes(arg)) &&
+  deferSpeed('bench/cli.mjs')
+)
+  process.exit(0);
 // Margo's benchmark tool. From the repository root after `npm run build:packages`:
 //   npm run bench                         every suite
 //   npm run bench -- render objects       some suites (or npm run bench:render)

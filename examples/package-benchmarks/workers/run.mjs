@@ -1,3 +1,10 @@
+import { deferSpeed, isSpeedEntry } from '../../../scripts/support/speed-phase.mjs';
+if (
+  isSpeedEntry(import.meta.url) &&
+  !process.argv.some((arg) => ['--help', '-h', '--list'].includes(arg)) &&
+  deferSpeed('examples/package-benchmarks/workers/run.mjs')
+)
+  process.exit(0);
 // real browser. From the repository root after `npm run build:packages`:
 //   node examples/package-benchmarks/workers/run.mjs [--rounds=6] [--skip-parse] [--skip-offscreen]
 // Takes the GPU lock (main checkout's test-results/gpu.lock, checked every 60 s), requires AC power before and after.

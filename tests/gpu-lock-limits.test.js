@@ -1,3 +1,5 @@
+// Fake lock folders only: exercise active scheduler policy without running speed work.
+process.env.MARGO_SPEED_PHASE = 'active';
 // scripts/gpu-lock.mjs never lets anything hang while holding or waiting: a hold limit that ends the command's whole
 // process tree and frees the lock, a heartbeat lease a waiter can reclaim past, a wait limit that names the holder.
 import test from 'node:test';

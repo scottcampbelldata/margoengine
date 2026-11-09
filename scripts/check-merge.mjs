@@ -1,3 +1,4 @@
+import { reportSpeedPhase, speedEnabled } from './support/speed-phase.mjs';
 // `npm run check:merge`: the pre-push check, with the work narrowed to what the change can affect (session rule 20:
 // never narrow by skipping a test the change can affect; explicit full validation remains available).
 //   npm run check:merge         the affected work only
@@ -318,6 +319,7 @@ async function planRun(args) {
 }
 
 async function main() {
+  reportSpeedPhase('check:merge');
   const args = process.argv.slice(2),
     only = args.find((a) => a.startsWith('--steps='));
   let decision, base, planned;
@@ -338,6 +340,7 @@ async function main() {
       .filter((t) => t.exclusive)
       .map(testId),
     hasTiming = (command) => {
+      if (!speedEnabled()) return false;
       const select = /--select=(\S+)/.exec(command)?.[1]?.split(',');
       return timingTests.some((id) => !select || select.includes(id));
     };

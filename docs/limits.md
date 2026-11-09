@@ -9,6 +9,19 @@ Labels share the declared math/mat4 dependency; the entry is 5,450 B gzip agains
 its unchanged 5,546 B ceiling.
 The approved test-page 36 guard adds 87 B: core + stage 23,837 to 23,924 B gzip.
 
+Speed work is deferred during Scott's build phase (2026-11-10), with the single
+checked-in default in `scripts/speed-phase.json`. Verify, merge and README gates
+keep correctness, deterministic work counts and clock/timeout safety checks;
+they report deferred benchmarks and timing assertions. The complete inventory
+and unchanged budgets are in [speed-phase.md](work-lists/speed-phase.md).
+`npm run test:speed` does no measurement while deferred. After Scott ends the
+build phase, `MARGO_SPEED_PHASE=active` runs the named suite on a quiet machine,
+sequentially with bounded commands. Its entire inventory must pass before release,
+along with an empty busy-retest list. Deferral makes no speed or GPU-quality claim. Every build-phase exclusive request
+is refused and logged unless the coordinator records Scott's approval for that
+exact command with a reason and future expiry in `scripts/gpu-exclusive-allow.json`.
+The checked-in allowlist is empty.
+
 New GPU clients retain FIFO admission tickets for shared and exclusive requests.
 Detached `gpu-lock.mjs enqueue` submissions retain the 60-minute default gate
 wait; `wait <ticket>` observes the same request and never cancels it on timeout.

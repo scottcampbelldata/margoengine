@@ -1,3 +1,10 @@
+import { deferSpeed, isSpeedEntry } from '../../../scripts/support/speed-phase.mjs';
+if (
+  isSpeedEntry(import.meta.url) &&
+  !process.argv.some((arg) => ['--help', '-h', '--list'].includes(arg)) &&
+  deferSpeed('packages/tween/scripts/rival-bench.mjs')
+)
+  process.exit(0);
 // 10,000 linear tweens, one 16 ms step, against tween.js installed outside the repository.
 // tween.js is a black box (engine-bench/batch-167/tween.mjs). This file never names its functions.
 // Margo's duration is in seconds; the rival's is in milliseconds. Both advance one frame of 16 ms.

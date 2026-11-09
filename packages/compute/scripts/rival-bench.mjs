@@ -1,3 +1,10 @@
+import { deferSpeed, isSpeedEntry } from '../../../scripts/support/speed-phase.mjs';
+if (
+  isSpeedEntry(import.meta.url) &&
+  !process.argv.some((arg) => ['--help', '-h', '--list'].includes(arg)) &&
+  deferSpeed('packages/compute/scripts/rival-bench.mjs')
+)
+  process.exit(0);
 // matmul-256, fft-65536 and a sum of 1,048,576 against TensorFlow.js WebGPU.
 // Node 26.12.0 exposes neither navigator.gpu nor a WebGPU flag (node --help has no match), so both
 // libraries run in one headless page, taking turns. Times are per-round minima. Busy machine: diagnostic.

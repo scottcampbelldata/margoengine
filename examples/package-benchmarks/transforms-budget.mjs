@@ -1,3 +1,10 @@
+import { deferSpeed, isSpeedEntry } from '../../scripts/support/speed-phase.mjs';
+if (
+  isSpeedEntry(import.meta.url) &&
+  !process.argv.some((arg) => ['--help', '-h', '--list'].includes(arg)) &&
+  deferSpeed('examples/package-benchmarks/transforms-budget.mjs')
+)
+  process.exit(0);
 // Moving transforms per frame within a CPU budget (item 53.1). How many meshes can move every frame (each one's
 // position.y and rotation.y through the setters) while core's whole CPU frame stays within the budget: the onFrame
 // callback, the Wasm kernel tick (world matrices, bounds, frustum culling), instance patching and the renderer's

@@ -1,3 +1,10 @@
+import { deferSpeed, isSpeedEntry } from '../../../scripts/support/speed-phase.mjs';
+if (
+  isSpeedEntry(import.meta.url) &&
+  !process.argv.some((arg) => ['--help', '-h', '--list'].includes(arg)) &&
+  deferSpeed('packages/vfx/test/bench-soft.mjs')
+)
+  process.exit(0);
 // Frame cost of soft particles (run from the repository root after building packages; a benchmark, so it takes the GPU
 // exclusively): the same one-million-particle system with and without `softness`, alternated, wall time per frame at
 // 1280 x 720 including the floor depth pass the sampler reads.

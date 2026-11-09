@@ -1,3 +1,10 @@
+import { deferSpeed, isSpeedEntry } from '../../../scripts/support/speed-phase.mjs';
+if (
+  isSpeedEntry(import.meta.url) &&
+  !process.argv.some((arg) => ['--help', '-h', '--list'].includes(arg)) &&
+  deferSpeed('packages/sciviz/scripts/rival-bench.mjs')
+)
+  process.exit(0);
 // volume-64 render time and image against VTK.js.
 // Both libraries share one headless page and take turns. Times are per-round minima of
 // one frame plus the pixel read. Busy machine: diagnostic.

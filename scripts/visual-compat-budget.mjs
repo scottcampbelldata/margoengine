@@ -1,3 +1,10 @@
+import { deferSpeed, isSpeedEntry } from './support/speed-phase.mjs';
+if (
+  isSpeedEntry(import.meta.url) &&
+  !process.argv.some((arg) => ['--help', '-h', '--list'].includes(arg)) &&
+  deferSpeed('scripts/visual-compat-budget.mjs')
+)
+  process.exit(0);
 // The frame budget of the visual check's WebGL2 compatibility run (docs/webgl2-compat-demos.md), a timing step of its
 // own: the same demos as npm run visual:compat (scripts/support/visual-compat-pages.js), each opened natively and on the
 // layer, and the frame cost of its still frame measured on both paths.

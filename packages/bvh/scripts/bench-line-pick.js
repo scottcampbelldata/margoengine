@@ -1,3 +1,10 @@
+import { deferSpeed, isSpeedEntry } from '../../../scripts/support/speed-phase.mjs';
+if (
+  isSpeedEntry(import.meta.url) &&
+  !process.argv.some((arg) => ['--help', '-h', '--list'].includes(arg)) &&
+  deferSpeed('packages/bvh/scripts/bench-line-pick.js')
+)
+  process.exit(0);
 // Times intersectLines on one polyline of 100,000 segments: tree build, then picks that hit and picks that miss,
 // against testing every segment. Run by hand after building: node packages/bvh/scripts/bench-line-pick.js
 import { intersectLines } from '../dist/lines.js';

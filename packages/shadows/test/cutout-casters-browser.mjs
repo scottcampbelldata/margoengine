@@ -1,3 +1,4 @@
+import { deferSpeed } from '../../../scripts/support/speed-phase.mjs';
 // Real-GPU regression test: a materials mesh with a base colour map or alphaMap and `alphaTest` casts the cut-out shape,
 // not its whole quad, into every shadow pass (`Shadows`, `LocalShadows` spot and point, Clustered's integrated local
 // maps). Without the fix each of those passes shaded the floor under the cut-out half.
@@ -14,6 +15,7 @@ import { acquire } from '../../../scripts/gpu-lock.mjs';
 const SHADED = 0.6,
   LIT = 0.93;
 const measuringCost = process.argv.includes('--cost');
+if (measuringCost && deferSpeed('shadows cutout caster paired cost')) process.exit(0);
 process.chdir(fileURLToPath(new URL('../../..', import.meta.url)));
 const release = await acquire({
   owner: 'shadows-cutout-casters',

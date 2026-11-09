@@ -1,3 +1,10 @@
+import { deferSpeed, isSpeedEntry } from '../../../scripts/support/speed-phase.mjs';
+if (
+  isSpeedEntry(import.meta.url) &&
+  !process.argv.some((arg) => ['--help', '-h', '--list'].includes(arg)) &&
+  deferSpeed('packages/wfc/test/heap-bench.mjs')
+)
+  process.exit(0);
 // Paired, interleaved CPU comparison. Loaded-machine diagnostics, never a release speed claim.
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';

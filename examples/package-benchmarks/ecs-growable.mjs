@@ -1,3 +1,10 @@
+import { deferSpeed, isSpeedEntry } from '../../scripts/support/speed-phase.mjs';
+if (
+  isSpeedEntry(import.meta.url) &&
+  !process.argv.some((arg) => ['--help', '-h', '--list'].includes(arg)) &&
+  deferSpeed('examples/package-benchmarks/ecs-growable.mjs')
+)
+  process.exit(0);
 // Cost of a GrowableWorld's resizable arrays against a fixed World's plain ones: one system's loop over 100,000 rows.
 // Run after a build: node examples/package-benchmarks/ecs-growable.mjs
 // Same work on both sides, in alternating rounds. Published in docs/limits.md and docs/whitepaper/perf-history.md.

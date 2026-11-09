@@ -1,3 +1,10 @@
+import { deferSpeed, isSpeedEntry } from '../../scripts/support/speed-phase.mjs';
+if (
+  isSpeedEntry(import.meta.url) &&
+  !process.argv.some((arg) => ['--help', '-h', '--list'].includes(arg)) &&
+  deferSpeed('examples/package-benchmarks/large-coordinates.mjs')
+)
+  process.exit(0);
 // CPU-side precision of core's float32 path for parts far from the origin, and the FloatingOrigin rebase cost.
 // Run after npm run build:packages:  node examples/package-benchmarks/large-coordinates.mjs [--cost] [--json=file]
 // Precision: real core (kernel world matrices, Camera.matrix) on a fake WebGPU device; the vertex shader is emulated

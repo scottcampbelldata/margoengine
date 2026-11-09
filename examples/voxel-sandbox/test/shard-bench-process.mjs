@@ -1,3 +1,10 @@
+import { deferSpeed, isSpeedEntry } from '../../../scripts/support/speed-phase.mjs';
+if (
+  isSpeedEntry(import.meta.url) &&
+  !process.argv.some((arg) => ['--help', '-h', '--list'].includes(arg)) &&
+  deferSpeed('examples/voxel-sandbox/test/shard-bench-process.mjs')
+)
+  process.exit(0);
 // A bench server for the Plaza: packages/voxel-net/bench/run.mjs forks it with --server, in place of its own, so the bots
 // meet the Plaza's blocks and terrain. Modes, in --server-options:
 //   plain: a VoxelServer on the sandbox's own terrain (no plaza=1), for comparing bytes;

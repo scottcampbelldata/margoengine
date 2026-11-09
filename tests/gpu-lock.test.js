@@ -1,3 +1,5 @@
+// Fake lock folders only: exercise active scheduler policy without running speed work.
+process.env.MARGO_SPEED_PHASE = 'active';
 // scripts/gpu-lock.mjs: `run` passes arguments exactly as given (spaces and quotes survive, on Windows too, where cmd.exe
 // starts it); the nested marker covers only the lock being held, so a GPU test inside a different lock still takes the
 // GPU lock; and the reader/writer rules: shared slots, an exclusive request that waits without starving, stale holders.
@@ -137,7 +139,13 @@ const settled = (promise, ms = 500) => {
 const BOUND = 30_000;
 const deadPid = () => spawnSync(process.execPath, ['-e', '']).pid;
 const take = (gpu, owner, mode) =>
-  gpu.acquire({ owner, mode, timing: 'CPU-only scheduler regression', poll: 10, log: quiet });
+  gpu.acquire({
+    owner,
+    mode,
+    ...(mode === 'exclusive' ? { timing: 'CPU-only scheduler regression' } : {}),
+    poll: 10,
+    log: quiet,
+  });
 // Runs `body(gpu, folder)` against a fresh gpu.lock; `env` is set while the module loads and, for MARGO_GPU_SLOTS and
 // MARGO_GPU_LOCK_NESTED*, while the body runs.
 async function withLock(body, envOrFn = {}) {
@@ -267,7 +275,13 @@ test('exclusive requests are served in the order they arrived', () =>
 test('MARGO_GPU_EXCLUSIVE raises a shared request to exclusive; other locks are always exclusive', async () => {
   await withLock(
     async (gpu) => {
-      const release = await take(gpu, 'a');
+      const release = await gpu.acquire({
+        owner: 'a',
+        mode: 'shared',
+        command: 'node bench/fake.mjs',
+        poll: 10,
+        log: quiet,
+      });
       assert.equal(release.mode, 'exclusive');
       release();
     },

@@ -1,3 +1,10 @@
+import { deferSpeed, isSpeedEntry } from './support/speed-phase.mjs';
+if (
+  isSpeedEntry(import.meta.url) &&
+  !process.argv.some((arg) => ['--help', '-h', '--list'].includes(arg)) &&
+  deferSpeed('scripts/benchmark-package-workloads.js')
+)
+  process.exit(0);
 import assert from 'node:assert/strict';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';

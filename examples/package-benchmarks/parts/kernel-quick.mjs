@@ -1,3 +1,10 @@
+import { deferSpeed, isSpeedEntry } from '../../../scripts/support/speed-phase.mjs';
+if (
+  isSpeedEntry(import.meta.url) &&
+  !process.argv.some((arg) => ['--help', '-h', '--list'].includes(arg)) &&
+  deferSpeed('examples/package-benchmarks/parts/kernel-quick.mjs')
+)
+  process.exit(0);
 // Quick kernel tick check at the max assembly size (Node, same Wasm as the browser): static and 1%-moving ticks.
 // Run: node examples/package-benchmarks/parts/kernel-quick.mjs
 import { Engine, TransformStore } from '../../../packages/core/dist/extension.js';

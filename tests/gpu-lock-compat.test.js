@@ -1,3 +1,5 @@
+// Fake lock folders only: exercise active scheduler policy without running speed work.
+process.env.MARGO_SPEED_PHASE = 'active';
 // scripts/gpu-lock.mjs against the one-holder lock it replaced (tests/fixtures/gpu-lock-v1.mjs), which agents in older
 // worktrees still run on the same folder: each waits for the other, both ways, and they take turns. Also which commands
 // count as benchmarks (exclusive), and a custom lock's hold limit.
@@ -77,7 +79,13 @@ test('an ambient MARGO_GPU_* setting does not reach the locks under test, and is
 });
 
 const takeNew = (gpu, owner, mode) =>
-  gpu.acquire({ owner, mode, timing: 'CPU-only scheduler regression', poll: 10, log: quiet });
+  gpu.acquire({
+    owner,
+    mode,
+    ...(mode === 'exclusive' ? { timing: 'CPU-only scheduler regression' } : {}),
+    poll: 10,
+    log: quiet,
+  });
 const takeOld = (gpu, owner) => gpu.acquire({ owner, poll: 10, log: quiet });
 
 test('an old-style holder blocks new shared and exclusive requests until it releases', () =>

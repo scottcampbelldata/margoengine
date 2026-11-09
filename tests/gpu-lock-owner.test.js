@@ -1,3 +1,5 @@
+// Fake lock folders only: exercise active scheduler policy without running speed work.
+process.env.MARGO_SPEED_PHASE = 'active';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';

@@ -1,3 +1,10 @@
+import { deferSpeed, isSpeedEntry } from '../../../scripts/support/speed-phase.mjs';
+if (
+  isSpeedEntry(import.meta.url) &&
+  !process.argv.some((arg) => ['--help', '-h', '--list'].includes(arg)) &&
+  deferSpeed('packages/navmesh/scripts/rival-bench.mjs')
+)
+  process.exit(0);
 // One mesh, build time and path length, against recast-navigation installed outside the repository.
 // The rival is a black box (engine-bench/batch-167/navmesh.mjs). This file never names its functions.
 // The triangle soup and the config live here and are passed in. Busy machine: diagnostic times only.

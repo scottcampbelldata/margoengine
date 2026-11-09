@@ -1,3 +1,10 @@
+import { deferSpeed, isSpeedEntry } from '../../scripts/support/speed-phase.mjs';
+if (
+  isSpeedEntry(import.meta.url) &&
+  !process.argv.some((arg) => ['--help', '-h', '--list'].includes(arg)) &&
+  deferSpeed('examples/voxel-sandbox/bench.mjs')
+)
+  process.exit(0);
 // Voxel sandbox benchmark (real GPU). Loads the deterministic mode (?view=overview, seed 1, 10:00, fixed camera) at
 // render distance 8 and 16 in headless Edge at 1920 x 1080 with the high tier (4x MSAA) and records, per distance:
 // - spawn: ms from the streamer's start until every chunk in range is loaded, lit, meshed and uploaded (the renderer's

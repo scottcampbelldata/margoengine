@@ -1,3 +1,10 @@
+import { deferSpeed, isSpeedEntry } from '../../../scripts/support/speed-phase.mjs';
+if (
+  isSpeedEntry(import.meta.url) &&
+  !process.argv.some((arg) => ['--help', '-h', '--list'].includes(arg)) &&
+  deferSpeed('packages/webgl2-compat/test/perf-browser.mjs')
+)
+  process.exit(0);
 // Milestone M7: the layer's performance on the browser matrix this PC has (Edge's default ANGLE Direct3D 11, and
 // Chrome on ANGLE Direct3D 11, OpenGL, Vulkan and SwiftShader), against native WebGPU in the same browser. For each
 // scene: start-up (Engine.create to the first finished frame), programs made with their translation and link time,

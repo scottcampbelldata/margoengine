@@ -81,5 +81,18 @@ package name, so an app holds one copy of each module.
 
 ## Sources
 
+Repository checks separate correctness and speed. During Scott's build phase,
+`test:gpu:flythrough` and `test:gpu:objects-frame` use shared GPU slots for
+correctness; their `:speed` counterparts retain the original measured scenes
+and budgets and report deferral. CPU timing tests follow the same phase. From
+the repository root, inspect the named release suite without running measurements:
+
+```sh
+npm run test:speed -- --list
+```
+
+After Scott ends the build phase, run the full suite with `MARGO_SPEED_PHASE=active`
+on a quiet machine. See `docs/work-lists/speed-phase.md` for the retained budgets.
+
 Written clean room from public papers: Volder 1959 (CORDIC), Jarzynski and Olano 2020 (PCG hashes for GPUs), Perlin
 2002 (quintic fade), Wendland 1995 (compactly supported kernels). Details in `docs/clean-room.md`.

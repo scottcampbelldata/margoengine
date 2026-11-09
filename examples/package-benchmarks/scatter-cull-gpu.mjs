@@ -1,3 +1,10 @@
+import { deferSpeed, isSpeedEntry } from '../../scripts/support/speed-phase.mjs';
+if (
+  isSpeedEntry(import.meta.url) &&
+  !process.argv.some((arg) => ['--help', '-h', '--list'].includes(arg)) &&
+  deferSpeed('examples/package-benchmarks/scatter-cull-gpu.mjs')
+)
+  process.exit(0);
 // GPU time of scatter's distribute (cull) pass and LOD draw in two @margoengine/scatter builds on the real GPU,
 // alternating A/B, plus a parity check: the same instances in every ring. Made for the ordered cull (src/order.ts),
 // which replaced the atomicAdd append; A is a build from before it. Snapshot the baseline first:

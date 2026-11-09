@@ -1,5 +1,55 @@
 # Engine architecture and quality reference
 
+## Build-phase speed deferral (section 5 supplement)
+
+Scott's 2026-11-10 ruling defers benchmarks, paired wall-clock A/B measurements
+and timing-only assertions until everything is built. `scripts/speed-phase.json`
+is the single checked-in default (`deferred`). No gate enables speed work.
+Verify, check:merge, check:readme-run and the GPU package runner print the phase.
+The three shared GPU slots remain available for correctness. Classified timing
+CLI requests are refused and logged before creating a child, holder or ticket;
+direct exclusive GPU APIs refuse with `ERR_SPEED_PHASE_DEFERRED`. The only build-
+phase exception is an exact, unexpired entry in `scripts/gpu-exclusive-allow.json`
+(command, reason, approvedBy, expiry). Only the coordinator adds entries, with
+Scott's OK; this change adds none. Approved uses are logged and retain the hold
+cap. Incorrect
+exclusive requests still fail the independent timing-purpose check.
+
+The named `npm run test:speed` suite retains the budgets in
+`scripts/speed/budgets.mjs`, speed test registrations and standalone drivers,
+listed in [the release inventory](../work-lists/speed-phase.md). Mixed CPU files
+still check values, geometry, errors, allocations and work counts. Pure speed
+callbacks are registered only in the active speed phase, with explicit deferral
+output rather than skipped tests or passing substitute numbers. Repeated EXR,
+USDZ and polygon comparisons do no timing work in the build phase. The million-
+voxel paste scene keeps its equality checks in correctness without best-of rounds.
+
+Biome flythrough and object-camera correctness use shared holds. Separate
+`flythrough-speed.mjs` and `objects-frame-speed.mjs` retain the original speed
+scenes, sampling, baselines and assertions under short exclusive holds. The
+flythrough's worker scheduling, send/copy counts, clock monotonicity and GPU
+validation stay in correctness. Visual compatibility's 50 ms timing-only step
+defers while the pixel comparison still runs. Quickstart keeps all pixel and
+interaction checks and moves its unchanged 300 s default speed assertion to the
+named budget suite. Clock behavior, readiness deadlines, timeout/teardown safety,
+deterministic byte/allocation/draw/triangle/pass counts, and local CI per-commit
+duration history with its 1.5x jump flag are retained.
+
+After Scott ends the build phase, set `MARGO_SPEED_PHASE=active` on a quiet
+machine and run `npm run test:speed`. Commands run one at a time with hard
+process-tree limits; direct benchmark and `--timing` entries read the same phase.
+Every listed scene and budget must pass before release, as must busy-retests.
+The phase is not permission to weaken a budget, change a scene or publish busy-
+machine speed numbers. External rival fixtures remain outside this repository.
+
+Evidence: `tests/speed-phase.test.js` uses fabricated readings and fake lock
+folders to prove unchanged boundary failures, deferred comparison callbacks,
+and no child/holder/ticket creation. GPU planning tests pin separate shared and
+exclusive drivers; the lock/queue tests use CPU-only fixtures. No GPU speed run
+or new speed claim is part of this change. The queue uses the common process
+limiter, so affected-step closure now selects views/depth when that limiter changes;
+the regression checks both the dependency and the selected checks.
+
 ## Browser shutdown evidence (batch 160, section 5 supplement)
 
 The Windows browser owner distinguishes native process exit from ChildProcess

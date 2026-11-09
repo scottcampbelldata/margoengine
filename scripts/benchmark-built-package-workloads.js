@@ -1,3 +1,10 @@
+import { deferSpeed, isSpeedEntry } from './support/speed-phase.mjs';
+if (
+  isSpeedEntry(import.meta.url) &&
+  !process.argv.some((arg) => ['--help', '-h', '--list'].includes(arg)) &&
+  deferSpeed('scripts/benchmark-built-package-workloads.js')
+)
+  process.exit(0);
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
@@ -25,6 +32,10 @@ if (!buildOnly) {
     source = source.replace(before, after);
   };
   replace("'../tests/support/png.js'", JSON.stringify(pathToFileURL(resolve('tests/support/png.js')).href));
+  replace(
+    "'./support/speed-phase.mjs'",
+    JSON.stringify(pathToFileURL(resolve('scripts/support/speed-phase.mjs')).href),
+  );
   replace("'./browser.js'", JSON.stringify(pathToFileURL(resolve('scripts/support/built-workload-browser.js')).href));
   replace(
     '`${origin}/examples/package-benchmarks/index.html?package=${name}`',

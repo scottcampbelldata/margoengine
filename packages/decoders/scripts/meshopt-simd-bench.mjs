@@ -1,3 +1,10 @@
+import { deferSpeed, isSpeedEntry } from '../../../scripts/support/speed-phase.mjs';
+if (
+  isSpeedEntry(import.meta.url) &&
+  !process.argv.some((arg) => ['--help', '-h', '--list'].includes(arg)) &&
+  deferSpeed('packages/decoders/scripts/meshopt-simd-bench.mjs')
+)
+  process.exit(0);
 // Times every compressed view of a glTF binary through both meshopt decoders, median of 15 passes.
 // Run after `npm run build --workspace packages/decoders`: `node packages/decoders/scripts/meshopt-simd-bench.mjs <file.glb>`.
 import { readFileSync } from 'node:fs';
@@ -30,4 +37,6 @@ await MeshoptSIMDDecoder.ready;
 const output = calls.reduce((sum, call) => sum + call[1] * call[2], 0),
   typescript = median(meshoptDecodeGltfBuffer),
   simd = median(meshoptDecodeGltfBufferSIMD);
-console.log(`${calls.length} views, ${output} bytes out: TypeScript ${typescript.toFixed(2)} ms, Wasm SIMD ${simd.toFixed(2)} ms`);
+console.log(
+  `${calls.length} views, ${output} bytes out: TypeScript ${typescript.toFixed(2)} ms, Wasm SIMD ${simd.toFixed(2)} ms`,
+);

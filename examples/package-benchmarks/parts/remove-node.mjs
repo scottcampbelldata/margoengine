@@ -1,3 +1,10 @@
+import { deferSpeed, isSpeedEntry } from '../../../scripts/support/speed-phase.mjs';
+if (
+  isSpeedEntry(import.meta.url) &&
+  !process.argv.some((arg) => ['--help', '-h', '--list'].includes(arg)) &&
+  deferSpeed('examples/package-benchmarks/parts/remove-node.mjs')
+)
+  process.exit(0);
 // Mesh removal cost at the max assembly size (Node, fake renderer): one leaf, 1,000 leaves, groups, then engine.dispose().
 // Run: node examples/package-benchmarks/parts/remove-node.mjs
 import { Engine, TransformStore } from '../../../packages/core/dist/extension.js';

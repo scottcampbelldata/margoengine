@@ -26,6 +26,7 @@ import { basename, dirname, extname, join, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createServer, transformWithOxc } from 'vite';
 import { acquire } from './gpu-lock.mjs';
+import { reportSpeedPhase } from './support/speed-phase.mjs';
 import { chromiumLaunchOptions, launchBrowser } from './lib/browser.mjs';
 import { exampleIds, packageMarkdown, readmeEntries } from './support/readme-types.mjs';
 import { closeAll, endTree } from './support/shutdown.mjs';
@@ -613,6 +614,7 @@ async function run() {
 }
 
 async function main() {
+  reportSpeedPhase('check:readme-run');
   const release = await acquire({ owner: 'check-readme-run', max: LIMIT_MINUTES });
   try {
     await run();

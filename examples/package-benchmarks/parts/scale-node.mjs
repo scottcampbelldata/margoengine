@@ -1,3 +1,10 @@
+import { deferSpeed, isSpeedEntry } from '../../../scripts/support/speed-phase.mjs';
+if (
+  isSpeedEntry(import.meta.url) &&
+  !process.argv.some((arg) => ['--help', '-h', '--list'].includes(arg)) &&
+  deferSpeed('examples/package-benchmarks/parts/scale-node.mjs')
+)
+  process.exit(0);
 // Core at 100k / 500k / 1M entities in Node (same Wasm as the browser, fake renderer): the parts assembly built from the
 // default 1,024-slot store, so the store doubles on demand. Records memory, build/growth/dispose time, kernel tick
 // (static, 1% moving, full recompute) and batch collection.

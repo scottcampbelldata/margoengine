@@ -1,3 +1,10 @@
+import { deferSpeed, isSpeedEntry } from '../../../scripts/support/speed-phase.mjs';
+if (
+  isSpeedEntry(import.meta.url) &&
+  !process.argv.some((arg) => ['--help', '-h', '--list'].includes(arg)) &&
+  deferSpeed('examples/package-benchmarks/gates/memory.mjs')
+)
+  process.exit(0);
 // Loader gate: native FBX, USD (USDA/USDC/USDZ), loaders formats and gltf-pro models in a real browser,
 // then a memory audit. Real GPU, under the GPU lock, on AC power. From the repository root after `npm run build:packages`:
 //   node examples/package-benchmarks/gates/memory.mjs [--cycles=20]

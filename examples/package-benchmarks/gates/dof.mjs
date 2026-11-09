@@ -1,3 +1,10 @@
+import { deferSpeed, isSpeedEntry } from '../../../scripts/support/speed-phase.mjs';
+if (
+  isSpeedEntry(import.meta.url) &&
+  !process.argv.some((arg) => ['--help', '-h', '--list'].includes(arg)) &&
+  deferSpeed('examples/package-benchmarks/gates/dof.mjs')
+)
+  process.exit(0);
 // DOF cost and quality, old build vs new build on the real GPU. Serial, under the GPU lock, on AC power.
 // From the repository root after `npm run build:packages`:
 //   node examples/package-benchmarks/gates/dof.mjs [--baseline=5b9dbbd] [--rounds=6] [--frames=90] [--sizes=1280x720,1920x1080]

@@ -1,3 +1,10 @@
+import { deferSpeed, isSpeedEntry } from '../../../scripts/support/speed-phase.mjs';
+if (
+  isSpeedEntry(import.meta.url) &&
+  !process.argv.some((arg) => ['--help', '-h', '--list'].includes(arg)) &&
+  deferSpeed('packages/staging/scripts/rival-bench.mjs')
+)
+  process.exit(0);
 // Default contact shadow against deterministic cosine-weighted ray tracing, no timing claim.
 import { openBrowser } from '../../../scripts/browser.js';
 import { writeFileSync } from 'node:fs';

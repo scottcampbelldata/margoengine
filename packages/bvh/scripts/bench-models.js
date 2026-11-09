@@ -1,3 +1,10 @@
+import { deferSpeed, isSpeedEntry } from '../../../scripts/support/speed-phase.mjs';
+if (
+  isSpeedEntry(import.meta.url) &&
+  !process.argv.some((arg) => ['--help', '-h', '--list'].includes(arg)) &&
+  deferSpeed('packages/bvh/scripts/bench-models.js')
+)
+  process.exit(0);
 // Node benchmark: Raycaster against gltf-pro models. A CAD-like assembly of 1,000 distinct ~1k-triangle parts (1M triangles)
 // and one 1M-triangle primitive: per-primitive BVH build cost and ray cost through `intersectObjects`.
 import { mkdir, writeFile } from 'node:fs/promises';

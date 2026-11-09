@@ -1,3 +1,10 @@
+import { deferSpeed, isSpeedEntry } from '../../../scripts/support/speed-phase.mjs';
+if (
+  isSpeedEntry(import.meta.url) &&
+  !process.argv.some((arg) => ['--help', '-h', '--list'].includes(arg)) &&
+  deferSpeed('examples/package-benchmarks/parts/kernel-node.mjs')
+)
+  process.exit(0);
 // Kernel tick in Node (same Wasm as the browser): the parts assembly (5 levels) and the earlier 10-deep chain case.
 // Run: node examples/package-benchmarks/parts/kernel-node.mjs
 import { Engine, TransformStore } from '../../../packages/core/dist/extension.js';

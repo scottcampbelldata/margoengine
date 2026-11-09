@@ -1,3 +1,10 @@
+import { deferSpeed, isSpeedEntry } from '../../../scripts/support/speed-phase.mjs';
+if (
+  isSpeedEntry(import.meta.url) &&
+  !process.argv.some((arg) => ['--help', '-h', '--list'].includes(arg)) &&
+  deferSpeed('packages/fsm/scripts/rival-bench.mjs')
+)
+  process.exit(0);
 // 10,000 transitions of a two-state toggle, against XState installed outside the repository.
 // XState is a black box (engine-bench/batch-167/fsm.mjs). This file never names its functions.
 // Times are per-round minima of paired turns in this process. Busy machine: diagnostic only.

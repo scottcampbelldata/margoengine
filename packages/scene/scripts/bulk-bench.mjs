@@ -1,3 +1,10 @@
+import { deferSpeed, isSpeedEntry } from '../../../scripts/support/speed-phase.mjs';
+if (
+  isSpeedEntry(import.meta.url) &&
+  !process.argv.some((arg) => ['--help', '-h', '--list'].includes(arg)) &&
+  deferSpeed('packages/scene/scripts/bulk-bench.mjs')
+)
+  process.exit(0);
 // Setters against TransformWriter, in Node, CPU only. Build first: npm run build --workspace packages/scene
 // Usage: node packages/scene/scripts/bulk-bench.mjs [meshes]
 import { Engine, TransformStore } from '@margoengine/core/extension';
@@ -5,7 +12,11 @@ import { TransformWriter } from '../dist/bulk.js';
 
 const renderer = () => ({ backend: 'webgl2', add() {}, remove() {}, render() {}, dispose() {} });
 const count = Number(process.argv[2] ?? 10000);
-const engine = new Engine({ width: 16, height: 16, clientWidth: 16, clientHeight: 16 }, await TransformStore.create(count + 1), renderer());
+const engine = new Engine(
+  { width: 16, height: 16, clientWidth: 16, clientHeight: 16 },
+  await TransformStore.create(count + 1),
+  renderer(),
+);
 const meshes = Array.from({ length: count }, () => engine.createMesh());
 const positions = new Float32Array(count * 3).map((_, i) => Math.sin(i)),
   quaternions = new Float32Array(count * 4).map((_, i) => Math.cos(i * 1.3) + 0.1),
@@ -14,7 +25,8 @@ const writer = new TransformWriter(meshes);
 const row = [0, 0, 0, 0];
 const cases = {
   'setter position': () => {
-    for (let i = 0; i < count; i++) meshes[i].position.set(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]);
+    for (let i = 0; i < count; i++)
+      meshes[i].position.set(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]);
   },
   'bulk position': () => writer.write({ positions }),
   'setter position+quaternion': () => {

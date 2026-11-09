@@ -2596,6 +2596,42 @@ Labels share the declared math/mat4 dependency; the entry is 5,450 B gzip agains
 its unchanged 5,546 B ceiling.
 The approved test-page 36 guard adds 87 B: core + stage 23,837 to 23,924 B gzip.
 
+Speed work is deferred during Scott's build phase (2026-11-10), with the single
+checked-in default in `scripts/speed-phase.json`. Verify, merge and README gates
+keep correctness, deterministic work counts and clock/timeout safety checks;
+they report deferred benchmarks and timing assertions. The complete inventory
+and unchanged budgets are in [speed-phase.md](work-lists/speed-phase.md).
+`npm run test:speed` does no measurement while deferred. After Scott ends the
+build phase, `MARGO_SPEED_PHASE=active` runs the named suite on a quiet machine,
+sequentially with bounded commands. Its entire inventory must pass before release,
+along with an empty busy-retest list. Deferral makes no speed or GPU-quality claim. Every build-phase exclusive request
+is refused and logged unless the coordinator records Scott's approval for that
+exact command with a reason and future expiry in `scripts/gpu-exclusive-allow.json`.
+The checked-in allowlist is empty.
+
+New GPU clients retain FIFO admission tickets for shared and exclusive requests.
+Detached `gpu-lock.mjs enqueue` submissions retain the 60-minute default gate
+wait; `wait <ticket>` observes the same request and never cancels it on timeout.
+Status records persist beside the lock, and command logs stay in the submitting
+worktree. Older clients remain interoperable but keep their older ordering;
+FIFO applies only to new clients. A shared head request needs one free slot,
+not an empty GPU. Commands and observers each have a hard time limit.
+
+Exclusive GPU holds are reserved for classified speed commands or an explicit,
+logged timing reason, with a 20-minute maximum including wrapper overhead.
+Oversize holds and correctness requests fail before waiting and are recorded in
+`test-results/gpu-lock-refusals.log`. Long matrices must release between bounded
+suites. This scheduling cap is based on existing 88.4/113.3/184.4-second benchmark
+records, not a new measurement on the busy build machine.
+
+GPU scheduling mutexes publish owner identity atomically and reclaim only an
+identified dead process. A live or anonymous legacy mutex is never reclaimed by
+age; its owner's release is required. Acquisition has a bounded wait (default
+60 minutes, `--wait-max` / `MARGO_GPU_WAIT_MAX_MIN`), including mutex contention.
+An independent one-second refresh preserves the old reader/writer client's
+ten-second freshness convention during synchronous work. Holder/waiter formats
+remain compatible. This is CPU-only scheduling evidence, not a GPU speed claim.
+
 Biome prefetch shares raw work with streaming and retains at most 1,024 terrain/object results,
 with capacity checked on completion. The original 144-tile flight still generates every tile;
 all 292 unique default-world worker outputs match the parent exactly. The view entry is
@@ -6722,6 +6758,19 @@ assumptions were updated for the new real dependency, with stronger downstream/f
 ### Batch 56 job 6 review
 
 The contact receiver's native preview refusal lacked its help link; the new regression failed before repair and now checks the unsupported code and link. Malformed up directions also use linked argument errors. No open defect remains from the oriented receiver review. The first new GPU screenshot assertion exposed an invalid clearColor test option: the harness now uses scene.background, then proves the unchanged darkness assertion on white. No production threshold or tolerance was relaxed.
+
+### Closed: GPU mutex reclaimed a paused live requester (2026-11-09)
+
+Lane K's CPU-only reproduction paused a requester after mkdir(mutex), aged the
+mutex past ten seconds and let another requester steal it; the original then
+failed with ENOENT in retireMutex. Age was treated as proof of a crashed owner,
+and the mutex had no published identity. The replacement atomically publishes
+identity before exposing the mutex, refreshes its mtime independently for old
+clients and reclaims only an identified dead owner. Reclamation claims metadata
+at the pinned unique backing path, so a delayed reclaimer cannot touch a later
+live owner. Regression: tests/gpu-lock-owner.test.js and
+tests/gpu-lock-integration.test.js. No open entry for this defect exists on the
+starting origin/main; this closure records the lane K finding and its repair.
 
 ### Closed: GPU mutex reuse collided with pending Windows deletion (2026-11-09)
 

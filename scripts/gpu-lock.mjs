@@ -56,6 +56,7 @@ import { basename, dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { Worker } from 'node:worker_threads';
 import { exitOnHelp } from './support/help.mjs';
+import { speedEnabled } from './support/speed-phase.mjs';
 
 /**
  * The main checkout of the clone that holds `root`, so every worktree shares one lock folder. A git worktree's `.git`
@@ -298,6 +299,29 @@ export function resolveMode(requested) {
 export const defaultMaxMinutes = () => (isGpuLock ? 20 : 30);
 export const EXCLUSIVE_MAX_MINUTES = 20;
 
+// Only the coordinator may add an entry, with Scott's OK. No wildcards or immortal approvals.
+export function exclusiveApproval(
+  command,
+  entries = read(new URL('./gpu-exclusive-allow.json', import.meta.url)),
+  now = Date.now(),
+) {
+  if (!Array.isArray(entries))
+    throw new TypeError('gpu-exclusive-allow.json must be an array of coordinator approvals');
+  return entries.find(
+    (entry) =>
+      entry &&
+      typeof entry === 'object' &&
+      entry.command === command &&
+      typeof entry.reason === 'string' &&
+      entry.reason.trim() &&
+      typeof entry.approvedBy === 'string' &&
+      entry.approvedBy.trim() &&
+      typeof entry.expiry === 'string' &&
+      Number.isFinite(Date.parse(entry.expiry)) &&
+      Date.parse(entry.expiry) > now,
+  );
+}
+
 function refusal(code, message, request) {
   mkdirSync(dirname(lockDir), { recursive: true });
   appendFileSync(
@@ -308,21 +332,37 @@ function refusal(code, message, request) {
 }
 
 /** Validate exclusive GPU use before waiting or entering an outer holder. Other locks are unaffected. */
-function validateRequest({ owner, mode, maxMinutes, command, timing }) {
+export function validateRequest({ owner, mode, maxMinutes, command, timing }) {
+  if (!owner) throw new Error('gpu-lock: pass an owner (agent id)');
   if (!Number.isFinite(maxMinutes) || maxMinutes <= 0)
     throw new RangeError('gpu-lock: max must be a finite positive number of minutes');
   if (!isGpuLock || mode !== 'exclusive') return;
   const request = { owner, mode, maxMinutes, command, timing };
+  const approval = !speedEnabled() ? exclusiveApproval(command) : undefined;
   if (
     !measuresSpeed(command.split(/\s+/)) &&
     !measuresSpeed(process.argv.slice(1, 2)) &&
-    !(typeof timing === 'string' && timing.trim())
+    !(typeof timing === 'string' && timing.trim()) &&
+    !approval
   )
     refusal(
       'ERR_GPU_EXCLUSIVE_NOT_TIMING',
       'exclusive GPU access is only for speed measurement; correctness gates use shared slots. For an unclassified timing command pass --timing=<reason>.',
       request,
     );
+  if (!speedEnabled() && !approval)
+    refusal(
+      'ERR_SPEED_PHASE_DEFERRED',
+      'all exclusive GPU requests are refused during the build phase; only an exact, unexpired coordinator allowlist entry approved by Scott may proceed.',
+      request,
+    );
+  if (approval) {
+    mkdirSync(dirname(lockDir), { recursive: true });
+    appendFileSync(
+      join(dirname(lockDir), 'gpu-lock-timing.log'),
+      JSON.stringify({ at: new Date().toISOString(), ...request, approval }) + '\n',
+    );
+  }
   if (maxMinutes > EXCLUSIVE_MAX_MINUTES)
     refusal(
       'ERR_GPU_EXCLUSIVE_LIMIT',
@@ -532,7 +572,7 @@ export async function acquire({
   log = console.error,
 } = {}) {
   if (!owner) throw new Error('gpu-lock: pass an owner (agent id)');
-  const mode = resolveMode(requested);
+  const mode = resolveMode(timing === undefined ? requested : 'exclusive');
   const maxMinutes = max ?? defaultMaxMinutes(mode);
   validateRequest({ owner, mode, maxMinutes, command, timing });
   // Inside `run` of this same lock the command already holds it; a different lock is still taken.
@@ -717,6 +757,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       lockDir,
       measuresSpeed,
       resolveMode,
+      validateRequest,
       windowsCommandLine,
     }).queueCli(verb, rest);
   } else if (verb === 'run') {

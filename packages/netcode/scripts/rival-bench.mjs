@@ -1,3 +1,10 @@
+import { deferSpeed, isSpeedEntry } from '../../../scripts/support/speed-phase.mjs';
+if (
+  isSpeedEntry(import.meta.url) &&
+  !process.argv.some((arg) => ['--help', '-h', '--list'].includes(arg)) &&
+  deferSpeed('packages/netcode/scripts/rival-bench.mjs')
+)
+  process.exit(0);
 // Rollback resimulation cost. No JavaScript rival does this: GGPO is C++ and Colyseus is not rollback.
 // The number published is milliseconds per rolled-back frame, beside a forward-only run of the same game.
 // Busy machine: diagnostic only. A run that never rolls back is a broken bench and exits 1.

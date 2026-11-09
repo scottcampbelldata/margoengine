@@ -1,3 +1,10 @@
+import { deferSpeed, isSpeedEntry } from '../../../scripts/support/speed-phase.mjs';
+if (
+  isSpeedEntry(import.meta.url) &&
+  !process.argv.some((arg) => ['--help', '-h', '--list'].includes(arg)) &&
+  deferSpeed('packages/ecs/scripts/rival-bench.mjs')
+)
+  process.exit(0);
 // 100,000 entities, one SoA pass of position += velocity, against bitECS installed outside the repository.
 // bitECS is a black box (engine-bench/batch-167/ecs.mjs). This file never names its functions.
 // Times are per-round minima of paired turns in this process. Busy machine: diagnostic only.

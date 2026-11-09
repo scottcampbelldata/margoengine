@@ -1,3 +1,10 @@
+import { deferSpeed, isSpeedEntry } from '../../../scripts/support/speed-phase.mjs';
+if (
+  isSpeedEntry(import.meta.url) &&
+  !process.argv.some((arg) => ['--help', '-h', '--list'].includes(arg)) &&
+  deferSpeed('packages/lightmap/scripts/rival-bench.mjs')
+)
+  process.exit(0);
 // Cornell box irradiance against a Cycles bake. Cycles runs in Blender, outside this process.
 import { spawn } from 'node:child_process';
 import { createWriteStream } from 'node:fs';

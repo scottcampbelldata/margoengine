@@ -1,3 +1,10 @@
+import { deferSpeed, isSpeedEntry } from '../../scripts/support/speed-phase.mjs';
+if (
+  isSpeedEntry(import.meta.url) &&
+  !process.argv.some((arg) => ['--help', '-h', '--list'].includes(arg)) &&
+  deferSpeed('examples/package-benchmarks/tier-presets-gpu.mjs')
+)
+  process.exit(0);
 // Light tier with and without the tier presets, on the island (examples/gameplay-sandbox) and the depth-of-field
 // demo (packages/dof/examples). Each run loads the page fresh at `?quality=low` (1x MSAA, DPR 1, paced to ~60 FPS);
 // variant "off" blocks `globalThis.margoPreset` before the page runs (every package keeps its defaults), "on" is the page

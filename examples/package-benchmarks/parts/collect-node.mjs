@@ -1,3 +1,10 @@
+import { deferSpeed, isSpeedEntry } from '../../../scripts/support/speed-phase.mjs';
+if (
+  isSpeedEntry(import.meta.url) &&
+  !process.argv.some((arg) => ['--help', '-h', '--list'].includes(arg)) &&
+  deferSpeed('examples/package-benchmarks/parts/collect-node.mjs')
+)
+  process.exit(0);
 // Full batch collection cost at the max assembly size (Node, fake renderer): frames forced to re-collect, as when the
 // cull result changes every frame during an orbit. Run: node examples/package-benchmarks/parts/collect-node.mjs
 import { Engine, TransformStore } from '../../../packages/core/dist/extension.js';

@@ -1,0 +1,537 @@
+[
+  {
+    "id": "examples/voxel-sandbox/test/finds.test.js",
+    "command": "node --experimental-test-module-mocks --test --test-timeout=300000 examples/voxel-sandbox/test/finds.test.js",
+    "limitMinutes": 20
+  },
+  {
+    "id": "packages/biomes/tests/climate.test.js",
+    "command": "node --experimental-test-module-mocks --test --test-timeout=300000 packages/biomes/tests/climate.test.js",
+    "limitMinutes": 20
+  },
+  {
+    "id": "packages/biomes/tests/editor.test.js",
+    "command": "node --experimental-test-module-mocks --test --test-timeout=300000 packages/biomes/tests/editor.test.js",
+    "limitMinutes": 20
+  },
+  {
+    "id": "packages/biomes/tests/objects.test.js",
+    "command": "node --experimental-test-module-mocks --test --test-timeout=300000 packages/biomes/tests/objects.test.js",
+    "limitMinutes": 20
+  },
+  {
+    "id": "packages/biomes/tests/placement.test.js",
+    "command": "node --experimental-test-module-mocks --test --test-timeout=300000 packages/biomes/tests/placement.test.js",
+    "limitMinutes": 20
+  },
+  {
+    "id": "packages/biomes/tests/splines.test.js",
+    "command": "node --experimental-test-module-mocks --test --test-timeout=300000 packages/biomes/tests/splines.test.js",
+    "limitMinutes": 20
+  },
+  {
+    "id": "packages/environment/tests/environment.test.js",
+    "command": "node --experimental-test-module-mocks --test --test-timeout=300000 packages/environment/tests/environment.test.js",
+    "limitMinutes": 20
+  },
+  {
+    "id": "packages/exporters/tests/exporters.test.js",
+    "command": "node --experimental-test-module-mocks --test --test-timeout=300000 packages/exporters/tests/exporters.test.js",
+    "limitMinutes": 20
+  },
+  {
+    "id": "packages/geometry/tests/edges.test.js",
+    "command": "node --experimental-test-module-mocks --test --test-timeout=300000 packages/geometry/tests/edges.test.js",
+    "limitMinutes": 20
+  },
+  {
+    "id": "packages/geometry/tests/triangulate-inputs.test.js",
+    "command": "node --experimental-test-module-mocks --test --test-timeout=300000 packages/geometry/tests/triangulate-inputs.test.js",
+    "limitMinutes": 20
+  },
+  {
+    "id": "packages/geometry/tests/triangulate.test.js",
+    "command": "node --experimental-test-module-mocks --test --test-timeout=300000 packages/geometry/tests/triangulate.test.js",
+    "limitMinutes": 20
+  },
+  {
+    "id": "packages/loaders/tests/loaders.test.js",
+    "command": "node --experimental-test-module-mocks --test --test-timeout=300000 packages/loaders/tests/loaders.test.js",
+    "limitMinutes": 20
+  },
+  {
+    "id": "packages/materials/test/texture-formats.test.js",
+    "command": "node --experimental-test-module-mocks --test --test-timeout=300000 packages/materials/test/texture-formats.test.js",
+    "limitMinutes": 20
+  },
+  {
+    "id": "packages/netcode/tests/transports.test.js",
+    "command": "node --experimental-test-module-mocks --test --test-timeout=300000 packages/netcode/tests/transports.test.js",
+    "limitMinutes": 20
+  },
+  {
+    "id": "packages/points/tests/e57.test.js",
+    "command": "node --experimental-test-module-mocks --test --test-timeout=300000 packages/points/tests/e57.test.js",
+    "limitMinutes": 20
+  },
+  {
+    "id": "packages/points/tests/las.test.js",
+    "command": "node --experimental-test-module-mocks --test --test-timeout=300000 packages/points/tests/las.test.js",
+    "limitMinutes": 20
+  },
+  {
+    "id": "packages/points/tests/laz.test.js",
+    "command": "node --experimental-test-module-mocks --test --test-timeout=300000 packages/points/tests/laz.test.js",
+    "limitMinutes": 20
+  },
+  {
+    "id": "packages/sciviz/tests/graph.test.js",
+    "command": "node --experimental-test-module-mocks --test --test-timeout=300000 packages/sciviz/tests/graph.test.js",
+    "limitMinutes": 20
+  },
+  {
+    "id": "packages/tiles/tests/tiles.test.js",
+    "command": "node --experimental-test-module-mocks --test --test-timeout=300000 packages/tiles/tests/tiles.test.js",
+    "limitMinutes": 20
+  },
+  {
+    "id": "packages/voxel/tests/benchmark.test.js",
+    "command": "node --experimental-test-module-mocks --test --test-timeout=300000 packages/voxel/tests/benchmark.test.js",
+    "limitMinutes": 20
+  },
+  {
+    "id": "packages/voxel/tests/codec-benchmark.test.js",
+    "command": "node --experimental-test-module-mocks --test --test-timeout=300000 packages/voxel/tests/codec-benchmark.test.js",
+    "limitMinutes": 20
+  },
+  {
+    "id": "packages/voxel/tests/light-benchmark.test.js",
+    "command": "node --experimental-test-module-mocks --test --test-timeout=300000 packages/voxel/tests/light-benchmark.test.js",
+    "limitMinutes": 20
+  },
+  {
+    "id": "packages/voxel/tests/light-worker-benchmark.test.js",
+    "command": "node --experimental-test-module-mocks --test --test-timeout=300000 packages/voxel/tests/light-worker-benchmark.test.js",
+    "limitMinutes": 20
+  },
+  {
+    "id": "packages/voxel/tests/mesher-benchmark.test.js",
+    "command": "node --experimental-test-module-mocks --test --test-timeout=300000 packages/voxel/tests/mesher-benchmark.test.js",
+    "limitMinutes": 20
+  },
+  {
+    "id": "packages/voxel/tests/mesher-worker-benchmark.test.js",
+    "command": "node --experimental-test-module-mocks --test --test-timeout=300000 packages/voxel/tests/mesher-worker-benchmark.test.js",
+    "limitMinutes": 20
+  },
+  {
+    "id": "packages/voxel/tests/physics.test.js",
+    "command": "node --experimental-test-module-mocks --test --test-timeout=300000 packages/voxel/tests/physics.test.js",
+    "limitMinutes": 20
+  },
+  {
+    "id": "packages/voxel/tests/query.test.js",
+    "command": "node --experimental-test-module-mocks --test --test-timeout=300000 packages/voxel/tests/query.test.js",
+    "limitMinutes": 20
+  },
+  {
+    "id": "packages/voxel/tests/stream-benchmark.test.js",
+    "command": "node --experimental-test-module-mocks --test --test-timeout=300000 packages/voxel/tests/stream-benchmark.test.js",
+    "limitMinutes": 20
+  },
+  {
+    "id": "packages/voxel/tests/vox.test.js",
+    "command": "node --experimental-test-module-mocks --test --test-timeout=300000 packages/voxel/tests/vox.test.js",
+    "limitMinutes": 20
+  },
+  {
+    "id": "packages/webgl2-compat/test/wgsl-fuzz.test.js",
+    "command": "node --experimental-test-module-mocks --test --test-timeout=300000 packages/webgl2-compat/test/wgsl-fuzz.test.js",
+    "limitMinutes": 20
+  },
+  {
+    "id": "tests/core-remove-children.test.js",
+    "command": "node --experimental-test-module-mocks --test --test-timeout=300000 tests/core-remove-children.test.js",
+    "limitMinutes": 20
+  },
+  {
+    "id": "tests/fuzz-regressions.test.js",
+    "command": "node --experimental-test-module-mocks --test --test-timeout=300000 tests/fuzz-regressions.test.js",
+    "limitMinutes": 20
+  },
+  {
+    "id": "tests/security.test.js",
+    "command": "node --experimental-test-module-mocks --test --test-timeout=300000 tests/security.test.js",
+    "limitMinutes": 20
+  },
+  {
+    "id": "bench/cli.mjs",
+    "command": "node bench/cli.mjs",
+    "limitMinutes": 20
+  },
+  {
+    "id": "examples/voxel-sandbox/bench.mjs",
+    "command": "node examples/voxel-sandbox/bench.mjs",
+    "limitMinutes": 20
+  },
+  {
+    "id": "examples/voxel-sandbox/test/shard-bench-blocks.mjs",
+    "command": "node examples/voxel-sandbox/test/shard-bench-blocks.mjs",
+    "limitMinutes": 20
+  },
+  {
+    "id": "packages/behavior/scripts/rival-bench.mjs",
+    "command": "node packages/behavior/scripts/rival-bench.mjs",
+    "limitMinutes": 20
+  },
+  {
+    "id": "packages/bvh/scripts/bench-line-pick.js",
+    "command": "node packages/bvh/scripts/bench-line-pick.js",
+    "limitMinutes": 20
+  },
+  {
+    "id": "packages/bvh/scripts/bench-models.js",
+    "command": "node packages/bvh/scripts/bench-models.js",
+    "limitMinutes": 20
+  },
+  {
+    "id": "packages/bvh/scripts/bench.js",
+    "command": "node packages/bvh/scripts/bench.js",
+    "limitMinutes": 20
+  },
+  {
+    "id": "packages/compute/scripts/rival-bench.mjs",
+    "command": "node packages/compute/scripts/rival-bench.mjs",
+    "limitMinutes": 20
+  },
+  {
+    "id": "packages/decoders/scripts/meshopt-simd-bench.mjs",
+    "command": "node packages/decoders/scripts/meshopt-simd-bench.mjs",
+    "limitMinutes": 20
+  },
+  {
+    "id": "packages/ecs/scripts/bridge-bench.mjs",
+    "command": "node packages/ecs/scripts/bridge-bench.mjs",
+    "limitMinutes": 20
+  },
+  {
+    "id": "packages/ecs/scripts/rival-bench.mjs",
+    "command": "node packages/ecs/scripts/rival-bench.mjs",
+    "limitMinutes": 20
+  },
+  {
+    "id": "packages/fsm/scripts/rival-bench.mjs",
+    "command": "node packages/fsm/scripts/rival-bench.mjs",
+    "limitMinutes": 20
+  },
+  {
+    "id": "packages/geometry/scripts/polygon-bench.mjs",
+    "command": "node packages/geometry/scripts/polygon-bench.mjs",
+    "limitMinutes": 20
+  },
+  {
+    "id": "packages/lightmap/scripts/rival-bench.mjs",
+    "command": "node packages/lightmap/scripts/rival-bench.mjs",
+    "limitMinutes": 20
+  },
+  {
+    "id": "packages/navmesh/scripts/rival-bench.mjs",
+    "command": "node packages/navmesh/scripts/rival-bench.mjs",
+    "limitMinutes": 20
+  },
+  {
+    "id": "packages/netcode/scripts/rival-bench.mjs",
+    "command": "node packages/netcode/scripts/rival-bench.mjs",
+    "limitMinutes": 20
+  },
+  {
+    "id": "packages/oit/scripts/rival-bench.mjs",
+    "command": "node packages/oit/scripts/rival-bench.mjs",
+    "limitMinutes": 20
+  },
+  {
+    "id": "packages/points/scripts/rival-bench.mjs",
+    "command": "node packages/points/scripts/rival-bench.mjs",
+    "limitMinutes": 20
+  },
+  {
+    "id": "packages/scene/scripts/bulk-bench.mjs",
+    "command": "node packages/scene/scripts/bulk-bench.mjs",
+    "limitMinutes": 20
+  },
+  {
+    "id": "packages/sciviz/scripts/rival-bench.mjs",
+    "command": "node packages/sciviz/scripts/rival-bench.mjs",
+    "limitMinutes": 20
+  },
+  {
+    "id": "packages/sky/scripts/rival-bench.mjs",
+    "command": "node packages/sky/scripts/rival-bench.mjs",
+    "limitMinutes": 20
+  },
+  {
+    "id": "packages/splats/scripts/rival-bench.mjs",
+    "command": "node packages/splats/scripts/rival-bench.mjs",
+    "limitMinutes": 20
+  },
+  {
+    "id": "packages/staging/scripts/rival-bench.mjs",
+    "command": "node packages/staging/scripts/rival-bench.mjs",
+    "limitMinutes": 20
+  },
+  {
+    "id": "packages/tiles/scripts/rival-bench.mjs",
+    "command": "node packages/tiles/scripts/rival-bench.mjs",
+    "limitMinutes": 20
+  },
+  {
+    "id": "packages/tween/scripts/rival-bench.mjs",
+    "command": "node packages/tween/scripts/rival-bench.mjs",
+    "limitMinutes": 20
+  },
+  {
+    "id": "packages/vfx/test/bench-soft.mjs",
+    "command": "node packages/vfx/test/bench-soft.mjs",
+    "limitMinutes": 20
+  },
+  {
+    "id": "packages/wfc/test/heap-bench.mjs",
+    "command": "node packages/wfc/test/heap-bench.mjs",
+    "limitMinutes": 20
+  },
+  {
+    "id": "scripts/benchmark-built-package-workloads.js",
+    "command": "node scripts/benchmark-built-package-workloads.js",
+    "limitMinutes": 20
+  },
+  {
+    "id": "scripts/benchmark-bvh.js",
+    "command": "node scripts/benchmark-bvh.js",
+    "limitMinutes": 20
+  },
+  {
+    "id": "scripts/benchmark-net.js",
+    "command": "node scripts/benchmark-net.js",
+    "limitMinutes": 20
+  },
+  {
+    "id": "scripts/benchmark-package-workloads.js",
+    "command": "node scripts/benchmark-package-workloads.js",
+    "limitMinutes": 20
+  },
+  {
+    "id": "scripts/benchmark-road.js",
+    "command": "node scripts/benchmark-road.js",
+    "limitMinutes": 20
+  },
+  {
+    "id": "scripts/benchmark-vfx-island.js",
+    "command": "node scripts/benchmark-vfx-island.js",
+    "limitMinutes": 20
+  },
+  {
+    "id": "scripts/benchmark-vfx-memory.js",
+    "command": "node scripts/benchmark-vfx-memory.js",
+    "limitMinutes": 20
+  },
+  {
+    "id": "scripts/benchmark-vfx-render-chain.js",
+    "command": "node scripts/benchmark-vfx-render-chain.js",
+    "limitMinutes": 20
+  },
+  {
+    "id": "scripts/visual-compat-budget.mjs",
+    "command": "node scripts/visual-compat-budget.mjs",
+    "limitMinutes": 20
+  },
+  {
+    "id": "packages/biomes/tests/flythrough-speed.mjs",
+    "command": "node packages/biomes/tests/flythrough-speed.mjs",
+    "limitMinutes": 20
+  },
+  {
+    "id": "packages/biomes/tests/objects-frame-speed.mjs",
+    "command": "node packages/biomes/tests/objects-frame-speed.mjs",
+    "limitMinutes": 20
+  },
+  {
+    "id": "scripts/quickstart-timing.mjs",
+    "command": "node scripts/quickstart-timing.mjs",
+    "limitMinutes": 20
+  },
+  {
+    "id": "examples/voxel-sandbox/test/play.browser.mjs",
+    "command": "node examples/voxel-sandbox/test/play.browser.mjs",
+    "limitMinutes": 20
+  },
+  {
+    "id": "scripts/modern-grass-tests.js",
+    "command": "node scripts/modern-grass-tests.js",
+    "limitMinutes": 20
+  },
+  {
+    "id": "scripts/modern-finalization-tests.js",
+    "command": "node scripts/modern-finalization-tests.js",
+    "limitMinutes": 20
+  },
+  {
+    "id": "scripts/modern-postfx-tests.js",
+    "command": "node scripts/modern-postfx-tests.js",
+    "limitMinutes": 20
+  },
+  {
+    "id": "scripts/test-boulder-browser.mjs",
+    "command": "node scripts/test-boulder-browser.mjs",
+    "limitMinutes": 20
+  },
+  {
+    "id": "scripts/desktop-demo-tests.js",
+    "command": "node scripts/desktop-demo-tests.js",
+    "limitMinutes": 20
+  },
+  {
+    "id": "shadows-cost",
+    "command": "node packages/shadows/test/cutout-casters-browser.mjs --cost",
+    "limitMinutes": 20
+  },
+  {
+    "id": "proofs-timing",
+    "command": "node examples/package-benchmarks/proofs/run.mjs",
+    "limitMinutes": 20
+  },
+  {
+    "id": "bench/biomes/placement.mjs",
+    "command": "node bench/biomes/placement.mjs",
+    "limitMinutes": 20
+  },
+  {
+    "id": "packages/voxel-pathtracer/bench/run.mjs",
+    "command": "node packages/voxel-pathtracer/bench/run.mjs",
+    "limitMinutes": 20
+  },
+  {
+    "id": "packages/webgl2-compat/test/perf-browser.mjs",
+    "command": "node packages/webgl2-compat/test/perf-browser.mjs",
+    "limitMinutes": 20
+  },
+  {
+    "id": "examples/package-benchmarks/ecs-growable.mjs",
+    "command": "node examples/package-benchmarks/ecs-growable.mjs",
+    "limitMinutes": 20
+  },
+  {
+    "id": "examples/package-benchmarks/exporters-model.mjs",
+    "command": "node examples/package-benchmarks/exporters-model.mjs",
+    "limitMinutes": 20
+  },
+  {
+    "id": "examples/package-benchmarks/large-coordinates.mjs",
+    "command": "node examples/package-benchmarks/large-coordinates.mjs",
+    "limitMinutes": 20
+  },
+  {
+    "id": "examples/package-benchmarks/scatter-cull-gpu.mjs",
+    "command": "node examples/package-benchmarks/scatter-cull-gpu.mjs",
+    "limitMinutes": 20
+  },
+  {
+    "id": "examples/package-benchmarks/shadow-shimmer.mjs",
+    "command": "node examples/package-benchmarks/shadow-shimmer.mjs",
+    "limitMinutes": 20
+  },
+  {
+    "id": "examples/package-benchmarks/textured-instancing.mjs",
+    "command": "node examples/package-benchmarks/textured-instancing.mjs",
+    "limitMinutes": 20
+  },
+  {
+    "id": "examples/package-benchmarks/tier-presets-gpu.mjs",
+    "command": "node examples/package-benchmarks/tier-presets-gpu.mjs",
+    "limitMinutes": 20
+  },
+  {
+    "id": "examples/package-benchmarks/transforms-budget.mjs",
+    "command": "node examples/package-benchmarks/transforms-budget.mjs",
+    "limitMinutes": 20
+  },
+  {
+    "id": "examples/package-benchmarks/vfx-gpu.mjs",
+    "command": "node examples/package-benchmarks/vfx-gpu.mjs",
+    "limitMinutes": 20
+  },
+  {
+    "id": "examples/package-benchmarks/vfx-island.mjs",
+    "command": "node examples/package-benchmarks/vfx-island.mjs",
+    "limitMinutes": 20
+  },
+  {
+    "id": "examples/package-benchmarks/walk-cpu.mjs",
+    "command": "node examples/package-benchmarks/walk-cpu.mjs",
+    "limitMinutes": 20
+  },
+  {
+    "id": "examples/package-benchmarks/gates/dof.mjs",
+    "command": "node examples/package-benchmarks/gates/dof.mjs",
+    "limitMinutes": 20
+  },
+  {
+    "id": "examples/package-benchmarks/gates/memory.mjs",
+    "command": "node examples/package-benchmarks/gates/memory.mjs",
+    "limitMinutes": 20
+  },
+  {
+    "id": "examples/package-benchmarks/gates/post-stack.mjs",
+    "command": "node examples/package-benchmarks/gates/post-stack.mjs",
+    "limitMinutes": 20
+  },
+  {
+    "id": "examples/package-benchmarks/progressive/run.mjs",
+    "command": "node examples/package-benchmarks/progressive/run.mjs",
+    "limitMinutes": 20
+  },
+  {
+    "id": "examples/package-benchmarks/workers/run.mjs",
+    "command": "node examples/package-benchmarks/workers/run.mjs",
+    "limitMinutes": 20
+  },
+  {
+    "id": "examples/package-benchmarks/proofs/math-consolidation.proof.js --time",
+    "command": "node examples/package-benchmarks/proofs/math-consolidation.proof.js --current --time",
+    "limitMinutes": 20
+  },
+  {
+    "id": "examples/package-benchmarks/proofs/gltf-pro-lighting-hooks.proof.js --time",
+    "command": "node examples/package-benchmarks/proofs/gltf-pro-lighting-hooks.proof.js --current --time",
+    "limitMinutes": 20
+  },
+  {
+    "id": "examples/package-benchmarks/parts/collect-node.mjs",
+    "command": "node examples/package-benchmarks/parts/collect-node.mjs",
+    "limitMinutes": 20
+  },
+  {
+    "id": "examples/package-benchmarks/parts/culling.mjs",
+    "command": "node examples/package-benchmarks/parts/culling.mjs",
+    "limitMinutes": 20
+  },
+  {
+    "id": "examples/package-benchmarks/parts/kernel-node.mjs",
+    "command": "node examples/package-benchmarks/parts/kernel-node.mjs",
+    "limitMinutes": 20
+  },
+  {
+    "id": "examples/package-benchmarks/parts/kernel-quick.mjs",
+    "command": "node examples/package-benchmarks/parts/kernel-quick.mjs",
+    "limitMinutes": 20
+  },
+  {
+    "id": "examples/package-benchmarks/parts/remove-node.mjs",
+    "command": "node examples/package-benchmarks/parts/remove-node.mjs",
+    "limitMinutes": 20
+  },
+  {
+    "id": "examples/package-benchmarks/parts/scale-node.mjs",
+    "command": "node examples/package-benchmarks/parts/scale-node.mjs",
+    "limitMinutes": 20
+  }
+]

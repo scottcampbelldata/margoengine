@@ -1,3 +1,10 @@
+import { deferSpeed, isSpeedEntry } from '../../../scripts/support/speed-phase.mjs';
+if (
+  isSpeedEntry(import.meta.url) &&
+  !process.argv.some((arg) => ['--help', '-h', '--list'].includes(arg)) &&
+  deferSpeed('packages/behavior/scripts/rival-bench.mjs')
+)
+  process.exit(0);
 // Flock of 1,000 agents, one step, against Yuka 0.7.x installed outside the repository.
 // Yuka is a black box (engine-bench/batch-167/behavior.mjs). This file never names its classes.
 // Reynolds 1987 is the flock; the rival's documented example is cited in docs/clean-room.md.

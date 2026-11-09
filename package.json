@@ -202,7 +202,7 @@
     "modern:test:hardware": "node scripts/modern-hardware-gpu-tests.js",
     "modern:test:stress": "node scripts/modern-stress-tests.js",
     "modern:test:stress:aggregate": "node scripts/aggregate-stress.js",
-    "test:release": "npm run test:all && npm run fuzz -- --short && npm run measure:size && npm run modern:build:starters && npm run modern:build:showcase && npm run test:modules:packages && npm run modern:test:game:packages && npm run modern:test:interop:packages && npm run modern:test:postfx:packages && npm run modern:test:browser && npm run test:basic-scene && npm run modern:test:wrapper && npm run modern:test:domains && npm run modern:test:game && npm run modern:test:extensions && npm run modern:test:postfx:browser && npm run modern:test:xr:browser && npm run modern:test:usdz:browser && npm run test:modules:browser && npm run test:catalog:browser && npm run modern:test:stress -- --sessions=500 --frames=120",
+    "test:release": "npm run test:all && npm run fuzz -- --short && npm run measure:size && npm run modern:build:starters && npm run modern:build:showcase && npm run test:modules:packages && npm run modern:test:game:packages && npm run modern:test:interop:packages && npm run modern:test:postfx:packages && npm run modern:test:browser && npm run test:basic-scene && npm run modern:test:wrapper && npm run modern:test:domains && npm run modern:test:game && npm run modern:test:extensions && npm run modern:test:postfx:browser && npm run modern:test:xr:browser && npm run modern:test:usdz:browser && npm run test:modules:browser && npm run test:catalog:browser && npm run modern:test:stress -- --sessions=500 --frames=120 && node scripts/speed-suite.mjs --release",
     "modern:test:extensions": "node scripts/modern-extension-suite.mjs",
     "modern:test:blender": "node scripts/modern-blender-tests.js",
     "modern:test:interop": "node --test packages/xr/tests/*.test.js packages/loaders/tests/usdz.test.js packages/exporters/tests/usdz.test.js",
@@ -236,7 +236,7 @@
     "modern:test:postfx:browser": "node scripts/modern-postfx-tests.js",
     "predev:sandbox": "npm run build:packages",
     "predev:voxel": "npm run build:packages",
-    "release:check": "npm run test:all && npm run measure:size && npm run test:modules:packages && npm run modern:test:postfx:packages",
+    "release:check": "npm run test:all && npm run measure:size && npm run test:modules:packages && npm run modern:test:postfx:packages && node scripts/speed-suite.mjs --release",
     "publish:rehearsal": "node scripts/publish-rehearsal.mjs",
     "publish:dry-run": "npm run release:check && node scripts/supply-chain.mjs --check && npm run publish:rehearsal -- --no-build && npm publish --workspace packages --ignore-scripts --access public --dry-run",
     "supply-chain": "node scripts/supply-chain.mjs",
@@ -269,7 +269,8 @@
     "test:physics2d-kernel-browsers": "node scripts/physics2d-kernel-browsers.mjs --browsers=default --rounds=0",
     "build:physics-kernel": "node packages/physics/scripts/build-kernel.mjs",
     "fuzz": "node scripts/fuzz/run.js",
-    "modern:test:bundlers": "node scripts/bundler-matrix.mjs"
+    "modern:test:bundlers": "node scripts/bundler-matrix.mjs",
+    "test:speed": "node scripts/speed-suite.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",

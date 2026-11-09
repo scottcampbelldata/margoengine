@@ -1,3 +1,10 @@
+import { deferSpeed, isSpeedEntry } from '../../scripts/support/speed-phase.mjs';
+if (
+  isSpeedEntry(import.meta.url) &&
+  !process.argv.some((arg) => ['--help', '-h', '--list'].includes(arg)) &&
+  deferSpeed('examples/package-benchmarks/vfx-gpu.mjs')
+)
+  process.exit(0);
 // GPU time of two @margoengine/vfx builds on the real GPU, alternating A/B, plus a pixel/state parity check.
 // Snapshot a build first, e.g. `npm run build:packages` on the baseline commit, then copy packages/vfx/dist to
 // test-results/vfx-base. Run on AC power with nothing else using the GPU:

@@ -1,3 +1,10 @@
+import { deferSpeed, isSpeedEntry } from '../../scripts/support/speed-phase.mjs';
+if (
+  isSpeedEntry(import.meta.url) &&
+  !process.argv.some((arg) => ['--help', '-h', '--list'].includes(arg)) &&
+  deferSpeed('examples/package-benchmarks/exporters-model.mjs')
+)
+  process.exit(0);
 // exportModel cost and output: export time (median of 7 after 2 warm-ups), output size and Khronos glTF-Validator
 // counts for SciFiHelmet, RobotExpressive (14 clips) and a generated instanced GLB, next to the source files.
 // Run after `npm run build:packages`: node examples/package-benchmarks/exporters-model.mjs  (writes results/exporters-model.json)

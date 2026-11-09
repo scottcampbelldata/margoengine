@@ -1,3 +1,10 @@
+import { deferSpeed, isSpeedEntry } from '../../scripts/support/speed-phase.mjs';
+if (
+  isSpeedEntry(import.meta.url) &&
+  !process.argv.some((arg) => ['--help', '-h', '--list'].includes(arg)) &&
+  deferSpeed('examples/package-benchmarks/shadow-shimmer.mjs')
+)
+  process.exit(0);
 // Shadow shimmer under slow camera motion, real GPU. Run from the repository root after
 // `npm run build:packages`, on AC power (takes the GPU lock):
 //   node examples/package-benchmarks/shadow-shimmer.mjs [--low] [--frames=64]

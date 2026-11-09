@@ -1,3 +1,10 @@
+import { deferSpeed, isSpeedEntry } from '../../scripts/support/speed-phase.mjs';
+if (
+  isSpeedEntry(import.meta.url) &&
+  !process.argv.some((arg) => ['--help', '-h', '--list'].includes(arg)) &&
+  deferSpeed('examples/package-benchmarks/textured-instancing.mjs')
+)
+  process.exit(0);
 // Textured instancing (gltf-pro PBRInstances via @margoengine/materials createInstancedMesh) against N separate materials
 // meshes: CPU time per frame and GPU calls for 1,000-10,000 textured boxes sharing one material. GPU calls are counted on
 // the recording mock GPU over one steady frame; CPU time is the median frame (transform tick + frame graph) on the silent

@@ -1,3 +1,10 @@
+import { deferSpeed, isSpeedEntry } from '../../../scripts/support/speed-phase.mjs';
+if (
+  isSpeedEntry(import.meta.url) &&
+  !process.argv.some((arg) => ['--help', '-h', '--list'].includes(arg)) &&
+  deferSpeed('packages/splats/scripts/rival-bench.mjs')
+)
+  process.exit(0);
 // Truck image 000001 against the published photograph, and one frame against GaussianSplats3D.
 // Both renderers share one headless page. Times are per-round minima of one frame, after the GPU
 // has finished it. The pixel read is not in the clock. Busy machine: diagnostic.
@@ -45,7 +52,9 @@ try {
     process.exitCode = 1;
   } else {
     console.log(line('truck-7k-fit', 'margo', report.minA, 'gaussian-splats-3d', report.minB));
-    console.log(`splats ${report.count} of ${fit.sourceCount} drawn ${report.ink} image ${report.width}x${report.height}`);
+    console.log(
+      `splats ${report.count} of ${fit.sourceCount} drawn ${report.ink} image ${report.width}x${report.height}`,
+    );
     console.log(`camera ${report.winner} isolated ${report.isolated}`);
     console.log(`psnr w2c ${report.poses.w2c.psnr} mae ${report.poses.w2c.mae}`);
     console.log(`psnr c2w ${report.poses.c2w.psnr} mae ${report.poses.c2w.mae}`);
@@ -54,7 +63,9 @@ try {
     console.log(`rival psnr ${report.rivalPsnr} mae ${report.rivalMae} ${brief(report.rivalFrame)}`);
     console.log(`probe ${brief(report.probe)}`);
     console.log(`rival probe ${brief(report.rivalProbe)}`);
-    console.log(`reveal ${report.reveal} ${brief(report.revealStats)} draws ${report.drawCalls} canvases ${report.canvases} sameRenderer ${report.sameRenderer}`);
+    console.log(
+      `reveal ${report.reveal} ${brief(report.revealStats)} draws ${report.drawCalls} canvases ${report.canvases} sameRenderer ${report.sameRenderer}`,
+    );
     if (!report.probe || report.probe.nonzero === 0) {
       console.error('Margo canvas readback is empty; the clear did not come back');
       process.exitCode = 1;

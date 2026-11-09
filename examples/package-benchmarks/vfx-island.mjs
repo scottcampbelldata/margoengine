@@ -1,3 +1,10 @@
+import { deferSpeed, isSpeedEntry } from '../../scripts/support/speed-phase.mjs';
+if (
+  isSpeedEntry(import.meta.url) &&
+  !process.argv.some((arg) => ['--help', '-h', '--list'].includes(arg)) &&
+  deferSpeed('examples/package-benchmarks/vfx-island.mjs')
+)
+  process.exit(0);
 // Whole-app GPU frame time of the Afterlight island (examples/gameplay-sandbox) with each @margoengine/vfx build
 // swapped in at the same particle count, light tier (1x MSAA, DPR 1, paced to 60) and full tier (4x MSAA, DPR 1).
 // Run on AC power with nothing else using the GPU, after `npm run build:packages`:

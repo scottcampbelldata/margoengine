@@ -1,3 +1,10 @@
+import { deferSpeed, isSpeedEntry } from './support/speed-phase.mjs';
+if (
+  isSpeedEntry(import.meta.url) &&
+  !process.argv.some((arg) => ['--help', '-h', '--list'].includes(arg)) &&
+  deferSpeed('scripts/benchmark-vfx-memory.js')
+)
+  process.exit(0);
 import assert from 'node:assert/strict';
 import { writeFile, appendFile } from 'node:fs/promises';
 import { openBrowser } from './browser.js';

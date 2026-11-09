@@ -1,3 +1,10 @@
+import { deferSpeed, isSpeedEntry } from '../../scripts/support/speed-phase.mjs';
+if (
+  isSpeedEntry(import.meta.url) &&
+  !process.argv.some((arg) => ['--help', '-h', '--list'].includes(arg)) &&
+  deferSpeed('bench/biomes/placement.mjs')
+)
+  process.exit(0);
 // Biomes goal G1 (spec 1.1): time per km2 of each CPU stage on the reference world R16, median of N warm runs.
 // Run from the repository root after `npm run build:packages`, on a quiet machine (benchmarks take the GPU lock
 // exclusively): node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node bench/biomes/placement.mjs [--runs=20]

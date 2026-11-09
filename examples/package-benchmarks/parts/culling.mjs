@@ -1,3 +1,10 @@
+import { deferSpeed, isSpeedEntry } from '../../../scripts/support/speed-phase.mjs';
+if (
+  isSpeedEntry(import.meta.url) &&
+  !process.argv.some((arg) => ['--help', '-h', '--list'].includes(arg)) &&
+  deferSpeed('examples/package-benchmarks/parts/culling.mjs')
+)
+  process.exit(0);
 // Real-GPU benchmark and pixel check for @margoengine/culling. From the repository root, after `npm run build:packages`:
 //   node examples/package-benchmarks/parts/culling.mjs [--sizes=10000,50000,max] [--modes=core,none,frustum,occlusion] [--views=orbit,still,grazing] [--layouts=sheet,stack] [--check] [--label=culling]
 // Takes test-results/gpu.lock (waits while another GPU run holds it), checks AC power before every run and repeats a run

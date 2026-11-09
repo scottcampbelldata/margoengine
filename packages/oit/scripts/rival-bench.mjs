@@ -1,3 +1,10 @@
+import { deferSpeed, isSpeedEntry } from '../../../scripts/support/speed-phase.mjs';
+if (
+  isSpeedEntry(import.meta.url) &&
+  !process.argv.some((arg) => ['--help', '-h', '--list'].includes(arg)) &&
+  deferSpeed('packages/oit/scripts/rival-bench.mjs')
+)
+  process.exit(0);
 // Starts the batch 168 OIT measurement. The rival import stays in scripts/.
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';

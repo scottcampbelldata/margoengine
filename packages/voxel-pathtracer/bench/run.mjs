@@ -1,3 +1,10 @@
+import { deferSpeed, isSpeedEntry } from '../../../scripts/support/speed-phase.mjs';
+if (
+  isSpeedEntry(import.meta.url) &&
+  !process.argv.some((arg) => ['--help', '-h', '--list'].includes(arg)) &&
+  deferSpeed('packages/voxel-pathtracer/bench/run.mjs')
+)
+  process.exit(0);
 // Path tracer numbers: runs the package's GPU checks (the five test:gpu scripts of package.json, then the `timing` case)
 // one after another and writes everything they measured to bench/results.json, with the machine, browser, driver and
 // commit. The README's "Measured performance" and "Verification" numbers cite that file.

@@ -1,3 +1,10 @@
+import { deferSpeed, isSpeedEntry } from '../../../scripts/support/speed-phase.mjs';
+if (
+  isSpeedEntry(import.meta.url) &&
+  !process.argv.some((arg) => ['--help', '-h', '--list'].includes(arg)) &&
+  deferSpeed('packages/geometry/scripts/polygon-bench.mjs')
+)
+  process.exit(0);
 // Times the polygon entry on large outlines: node packages/geometry/scripts/polygon-bench.mjs, after a build.
 import { polygonArea, polygonIntersection, polygonOffset, polygonStroke } from '../dist/polygon.js';
 

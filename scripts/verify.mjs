@@ -14,6 +14,7 @@ import { availableParallelism } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { ResultStore, ShadowRun, servingRequested, shadowEnabled } from './support/result-cache.mjs';
+import { reportSpeedPhase } from './support/speed-phase.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 
@@ -101,6 +102,7 @@ function kill(child) {
 }
 
 async function main() {
+  reportSpeedPhase('verify');
   const serial = process.argv.includes('--serial'),
     started = performance.now(),
     times = [];
