@@ -15,12 +15,23 @@
     "ceiling": 3942
   },
   "pending": [
-    "full once-run verify, lint and hygiene",
+    "full once-run verify",
     "all quality GPU correctness commands and new helper rendering proof",
     "quality runtime README examples",
     "route inherited timestamp 7ms speed assertion and old-rule wall-clock measurement to deferred suite, preserve all correctness and original release budget",
     "rebase and fast-forward push"
   ],
   "gpuRun": false,
-  "coreStageChanged": false
+  "coreStageChanged": false,
+  "localChecks": {
+    "lintPassed": true,
+    "existingLintWarnings": 120,
+    "documentationLinks": {
+      "documents": 227,
+      "broken": 0
+    },
+    "hygienePassed": true,
+    "hygienePrerequisiteFailure": "new upstream sciviz/dist/lic.d.ts missing; built sciviz, then hygiene passed; failed receipt retained",
+    "generatedCorpusUpdated": true
+  }
 }
