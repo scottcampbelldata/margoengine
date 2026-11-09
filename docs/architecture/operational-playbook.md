@@ -1351,6 +1351,19 @@ The all-glyph test covers unbeveled solids; synthetic cases cover rounded/chamfe
 
 ## 5. Current evidence gaps
 
+### WebGL2 consolidation evidence
+
+The optional compatibility package also owns `/preview`, `/pick`, `/restore` and
+`/auto`. The real-context proof is `packages/webgl2-compat/test/preview-browser-check.mjs`,
+covering selection, context loss and escalation, alongside the full compatibility
+GPU suite. The preview remains necessary below the full device float-target tier.
+See [the feature mapping and inventory](../webgl-consolidation.md).
+The WFC browser test now tears down its browser and server together with bounded
+`closeAll`, including failed startup. `tests/browser-teardown.test.js` caught its
+previous unbounded shutdown while validating this consolidation.
+
+
+
 Batch 160 adds the first outside metallic-roughness picture budget: all 123 Khronos textureless sphere
 primitives, matched embedded camera/sun, neutral display transform and every pixel, against Sample Viewer
 PNG output. RTX A6000 RGB MAE 1.837511698404948 on WebGPU and 1.837506612141927 through WebGL2

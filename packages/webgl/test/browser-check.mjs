@@ -331,7 +331,7 @@ try {
     const plain = await autoEngine(document.createElement('canvas'), red, { camera, loadCompat });
     out.plain = plain.backend;
     plain.dispose();
-    out.previewOnly = !files().some((path) => path.includes('webgl2-compat'));
+    out.previewOnly = !files().some((path) => path.endsWith('/webgl2-compat/dist/index.js'));
     // Without the one option the refusal reaches the caller and setup ran once.
     let runs = 0;
     out.off = await autoEngine(
@@ -348,7 +348,7 @@ try {
       runs++;
       throw new TypeError('app bug');
     }, { loadCompat }).catch((error) => [error.name, runs]);
-    out.stillPreview = !files().some((path) => path.includes('webgl2-compat'));
+    out.stillPreview = !files().some((path) => path.endsWith('/webgl2-compat/dist/index.js'));
     // A refused package: same page element position, on the layer, with the whole scene.
     runs = 0;
     const seen = [];
@@ -366,7 +366,7 @@ try {
     out.gpu = !!engine.gpu;
     out.seen = seen;
     out.replaced = engine.canvas !== canvas && !canvas.isConnected && engine.canvas.id === 'gl';
-    out.layer = files().some((path) => path.includes('webgl2-compat'));
+    out.layer = files().some((path) => path.endsWith('/webgl2-compat/dist/index.js'));
     engine.render();
     await engine.gpu.queue.onSubmittedWorkDone();
     const flat = new OffscreenCanvas(engine.canvas.width, engine.canvas.height).getContext('2d', {

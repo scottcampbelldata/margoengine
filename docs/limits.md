@@ -1183,3 +1183,17 @@ and dark edges; sketch uses Sobel outlines and six-pixel hatches. No anisotropic
 temporal stabilization, aesthetic, throughput, mobile or cross-browser proof. Generated noise, flat, hard-edge,
 tiny and split-view images on RTX A6000 match independent CPU references; real Engine/PostStack resize and device
 replacement are read back. RGB tolerance is one UNORM code for f32/store rounding, alpha and bypass exact.
+
+### WebGL2 consolidation
+
+The preview implementation and its picking, restore and auto entries now belong
+to `@margoengine/webgl2-compat` as `/preview`, `/pick`, `/restore` and `/auto`.
+The full-device float-target requirement and preview limitations are unchanged.
+The old workspace is a temporary internal bridge during the three-step merge.
+See [feature mapping and inventory](webgl-consolidation.md).
+
+Consolidation measurement (min+gzip, `entry-sizes.json`): full root 102,192 B
+before, 102,200 B after; `/preview` 3,443 B, `/pick` 4,798 B, `/restore` 850 B,
+`/auto` 3,720 B. The former preview root measured 3,442 B. Core plus stage is
+23,797 B against the unchanged strict 25,000 B ceiling. Chunk name changes can
+change gzip bytes even when the root implementation has not changed.

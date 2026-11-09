@@ -3414,6 +3414,22 @@
       "types": "./dist/webgl2-compat/xr.d.ts",
       "import": "./dist/webgl2-compat/xr.js"
     },
+    "./webgl2-compat/preview": {
+      "types": "./dist/webgl2-compat/preview.d.ts",
+      "import": "./dist/webgl2-compat/preview.js"
+    },
+    "./webgl2-compat/pick": {
+      "types": "./dist/webgl2-compat/pick.d.ts",
+      "import": "./dist/webgl2-compat/pick.js"
+    },
+    "./webgl2-compat/restore": {
+      "types": "./dist/webgl2-compat/restore.d.ts",
+      "import": "./dist/webgl2-compat/restore.js"
+    },
+    "./webgl2-compat/auto": {
+      "types": "./dist/webgl2-compat/auto.d.ts",
+      "import": "./dist/webgl2-compat/auto.js"
+    },
     "./wfc": {
       "types": "./dist/wfc.d.ts",
       "import": "./dist/wfc.js"

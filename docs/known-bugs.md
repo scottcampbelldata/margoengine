@@ -1553,3 +1553,14 @@ stack; Painterly now preflights its backend and gives its own coded, linked refu
 terminal disposal and independent view uniforms are covered by paint.test.js; paint-browser.js checks independent
 CPU pixels, hard edges, alpha/bypass, MSAA/BGRA, resize, real replacement devices and native WebGL2. Classic
 Kuwahara square artifacts and noisy variance ties are documented algorithm limits, not a tensor-filter claim.
+
+## WebGL consolidation: package-prefix comparison in the duplicate gate
+
+Repro: a package named `@margoengine/webgl` re-exports a value from
+`@margoengine/webgl2-compat/preview`. `scripts/quality/duplicates.js` excludes it
+as an own-package export because it uses `spec.startsWith(pkg.name)` without
+requiring a slash boundary. Distinct package names can share that prefix.
+The current temporary workspace bridge exposes this case. Fix the comparison
+and add a temporary-directory regression fixture when removing that bridge in
+the final consolidation step, so the quality gate gains the missing coverage
+without accepting a permanent duplicate API.

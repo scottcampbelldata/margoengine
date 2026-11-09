@@ -3771,6 +3771,20 @@ temporal stabilization, aesthetic, throughput, mobile or cross-browser proof. Ge
 tiny and split-view images on RTX A6000 match independent CPU references; real Engine/PostStack resize and device
 replacement are read back. RGB tolerance is one UNORM code for f32/store rounding, alpha and bypass exact.
 
+### WebGL2 consolidation
+
+The preview implementation and its picking, restore and auto entries now belong
+to `@margoengine/webgl2-compat` as `/preview`, `/pick`, `/restore` and `/auto`.
+The full-device float-target requirement and preview limitations are unchanged.
+The old workspace is a temporary internal bridge during the three-step merge.
+See [feature mapping and inventory](webgl-consolidation.md).
+
+Consolidation measurement (min+gzip, `entry-sizes.json`): full root 102,192 B
+before, 102,200 B after; `/preview` 3,443 B, `/pick` 4,798 B, `/restore` 850 B,
+`/auto` 3,720 B. The former preview root measured 3,442 B. Core plus stage is
+23,797 B against the unchanged strict 25,000 B ceiling. Chunk name changes can
+change gzip bytes even when the root implementation has not changed.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -5329,6 +5343,17 @@ terminal disposal and independent view uniforms are covered by paint.test.js; pa
 CPU pixels, hard edges, alpha/bypass, MSAA/BGRA, resize, real replacement devices and native WebGL2. Classic
 Kuwahara square artifacts and noisy variance ties are documented algorithm limits, not a tensor-filter claim.
 
+## WebGL consolidation: package-prefix comparison in the duplicate gate
+
+Repro: a package named `@margoengine/webgl` re-exports a value from
+`@margoengine/webgl2-compat/preview`. `scripts/quality/duplicates.js` excludes it
+as an own-package export because it uses `spec.startsWith(pkg.name)` without
+requiring a slash boundary. Distinct package names can share that prefix.
+The current temporary workspace bridge exposes this case. Fix the comparison
+and add a temporary-directory regression fixture when removing that bridge in
+the final consolidation step, so the quality gate gains the missing coverage
+without accepting a permanent duplicate API.
+
 === Using Margo with AI tools (docs/ai-tools.md) ===
 
 # Using Margo with AI tools
@@ -5749,7 +5774,7 @@ each scene's plugins hear `onDeviceRestored`. Like `webglPicking`, it does nothi
 
 Import `margoengine/webgl2-compat` from the `margoengine` package, or `@margoengine/webgl2-compat` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
-**Status: milestones M0 to M8 of the [roadmap](../../docs/webgl2-compat-roadmap.md) done.** This layer is the site's fallback: every live demo on margoengine.com loads it when the browser has no WebGPU. Of the 27 site demos, 20 draw the same pixels as native WebGPU and 7 run with one accepted difference (WebGL2 cannot read one sample of a multisampled texture); all 32 Khronos gallery models draw the same pixels ([webgl2-compat-demos.md](../../docs/webgl2-compat-demos.md) lists each one). The voxel path tracer refuses the layer (MargoError `unsupported`); XR runs on it through the [`/xr` entry](#xr-margoenginewebgl2-compatxr). Not done: the frame-budget run on an integrated GPU is not recorded yet, and a transform-feedback tier for own-index compute stores is parked (speed only, those stores already run on the scatter tier with the same pixels). The small `@margoengine/webgl` preview stays for v1.0. This package
+**Status: milestones M0 to M8 of the [roadmap](../../docs/webgl2-compat-roadmap.md) done.** This layer is the site's fallback: every live demo on margoengine.com loads it when the browser has no WebGPU. Of the 27 site demos, 20 draw the same pixels as native WebGPU and 7 run with one accepted difference (WebGL2 cannot read one sample of a multisampled texture); all 32 Khronos gallery models draw the same pixels ([webgl2-compat-demos.md](../../docs/webgl2-compat-demos.md) lists each one). The voxel path tracer refuses the layer (MargoError `unsupported`); XR runs on it through the [`/xr` entry](#xr-margoenginewebgl2-compatxr). Not done: the frame-budget run on an integrated GPU is not recorded yet, and a transform-feedback tier for own-index compute stores is parked (speed only, those stores already run on the scatter tier with the same pixels). The small preview is now the optional `/preview` entry of this package. This package
 is the WebGL2 compatibility layer for browsers without WebGPU: a WebGPU-shaped device built on WebGL2 that translates
 every WGSL shader to GLSL ES 3.00, so core and the packages run their usual WebGPU code unchanged. Today core renders
 on it (meshes, instancing, 4x MSAA and exact-pixel mode, several views, picking and device loss) with the same pixels

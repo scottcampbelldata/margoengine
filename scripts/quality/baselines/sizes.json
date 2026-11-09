@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11511585,
+  "total": 11512998,
   "history": [
     {
       "date": "2026-10-24",
@@ -4904,6 +4904,12 @@
       "commit": "75406d386",
       "reason": "Batch 77 new optional creative/paint, 3073 B gzip, size class S. New budget 3329 B includes standard 256 B headroom; all existing budgets unchanged. No core/stage change.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-09",
+      "commit": "bc17c4e35",
+      "reason": "Scott-authorized-WebGL-entry-consolidation",
+      "grew": 4
     }
   ],
   "items": {
@@ -5057,6 +5063,7 @@
     "@margoengine/core/extension": 21951,
     "@margoengine/creative": 19177,
     "@margoengine/creative/grass": 6122,
+    "@margoengine/creative/paint": 3329,
     "@margoengine/creative/particles": 759,
     "@margoengine/creative/planet": 7174,
     "@margoengine/creative/post": 7092,
@@ -5756,17 +5763,21 @@
     "@margoengine/weather/puddles": 4070,
     "@margoengine/weather/regions": 2504,
     "@margoengine/weather/snow": 3300,
-    "@margoengine/webgl": 3663,
-    "@margoengine/webgl/auto": 3942,
-    "@margoengine/webgl/pick": 5010,
-    "@margoengine/webgl/restore": 1097,
+    "@margoengine/webgl": 324,
+    "@margoengine/webgl/auto": 321,
+    "@margoengine/webgl/pick": 321,
+    "@margoengine/webgl/restore": 324,
     "@margoengine/webgl2-compat": 102814,
     "@margoengine/webgl2-compat base (without compute runtime and read-back)": 72383,
     "@margoengine/webgl2-compat lazy compute runtime and read-back": 31741,
     "@margoengine/webgl2-compat/adapter": 1214,
+    "@margoengine/webgl2-compat/auto": 3976,
     "@margoengine/webgl2-compat/compute": 49684,
     "@margoengine/webgl2-compat/device": 102935,
     "@margoengine/webgl2-compat/glsl": 43584,
+    "@margoengine/webgl2-compat/pick": 5054,
+    "@margoengine/webgl2-compat/preview": 3699,
+    "@margoengine/webgl2-compat/restore": 1106,
     "@margoengine/webgl2-compat/wgsl": 27240,
     "@margoengine/webgl2-compat/xr": 103981,
     "@margoengine/wfc": 1878,
@@ -5848,7 +5859,6 @@
     "margoengine": 308,
     "margoengine/game": 996,
     "margoengine/viz": 800,
-    "margoengine/web": 577,
-    "@margoengine/creative/paint": 3329
+    "margoengine/web": 577
   }
 }

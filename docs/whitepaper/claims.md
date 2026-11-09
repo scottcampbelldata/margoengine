@@ -1294,3 +1294,11 @@ constant-preserving bilinear/mean arithmetic provide this fixture invariant; no 
 | Measurement | Proof | Scope |
 | --- | --- | --- |
 | RGB-byte MAE 1.4250882466634114 on WebGPU and WebGL2 compatibility | [Frozen result](results/batch-160-sheen.json), `tests/reference-rendering.test.js`, `scripts/reference-rendering/run.mjs --case=sheen` | Entire 20-primitive SheenTestGrid; all pixels at 512 x 512, matched camera/sun, no IBL, neutral/sRGB. Native WebGL2 rejects PBR. Open image loss, not physical equivalence. |
+
+### One optional WebGL2 package
+
+`@margoengine/webgl2-compat` now owns the preview, optional picking and context
+restore, and automatic escalation entries as well as the full compatibility device.
+Proof: `packages/webgl2-compat/test/preview-browser-check.mjs` checks the moved
+preview entries on real WebGL2, with native WebGPU and missing-WebGPU branches.
+This move makes no speed or new image-parity claim. See `docs/webgl-consolidation.md`.

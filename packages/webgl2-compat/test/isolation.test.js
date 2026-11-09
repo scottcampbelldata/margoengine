@@ -11,7 +11,7 @@ import { dirname, join, resolve } from 'node:path';
 const root = resolve(import.meta.dirname, '..', '..', '..');
 const NAME = '@margoengine/webgl2-compat';
 /** The umbrella's generated alias of each entry, and what each one re-exports. */
-const ENTRIES = ['', '/adapter', '/compute', '/device', '/glsl', '/wgsl', '/xr'];
+const ENTRIES = ['', '/adapter', '/compute', '/device', '/glsl', '/wgsl', '/xr', '/preview', '/pick', '/restore', '/auto'];
 const UMBRELLA = ENTRIES.map((e) => `packages/margoengine/src/webgl2-compat${e}.ts`);
 const ALIASED = ENTRIES.map((e) => NAME + e);
 
@@ -28,7 +28,7 @@ test('no other package source names the compatibility layer', () => {
   const files = out
     .split('\n')
     .filter(Boolean)
-    .filter((f) => !f.startsWith('packages/webgl2-compat/') && !UMBRELLA.includes(f));
+    .filter((f) => !f.startsWith('packages/webgl2-compat/') && !f.startsWith('packages/webgl/src/') && !UMBRELLA.includes(f));
   assert.deepEqual(files, []);
 });
 
@@ -36,7 +36,7 @@ test('only the umbrella depends on it', () => {
   const out = execFileSync('git', ['ls-files', 'packages/*/package.json'], { cwd: root, encoding: 'utf8' });
   for (const file of out.split('\n').filter(Boolean)) {
     const m = JSON.parse(readFileSync(join(root, file), 'utf8'));
-    if (m.name === NAME || m.name === 'margoengine') continue;
+    if (m.name === NAME || m.name === 'margoengine' || m.name === '@margoengine/webgl') continue;
     const all = { ...m.dependencies, ...m.peerDependencies, ...m.optionalDependencies, ...m.devDependencies };
     assert.ok(!(NAME in all), `${m.name} must not depend on ${NAME}`);
   }

@@ -676,3 +676,10 @@ Build packages, then run `npm test --workspace @margoengine/creative` and
 The GPU script reads every tested pixel against the independent CPU reference (double-precision squared
 deviations), asserts exact alpha/bypass and one-code RGB error, tests BGRA/MSAA, separate views, real device
 replacement and real Engine/PostStack integration. Generated stand-ins only; no timing or aesthetic judgement.
+
+### Consolidated WebGL2 entries
+
+After `npm run build:packages`, run
+`node scripts/gpu-lock.mjs run --owner=webgl-merge --max=20 --wait-max=20 -- node packages/webgl2-compat/test/preview-browser-check.mjs`.
+The result is `test-results/webgl2-preview-browser.json`: picks, context recovery,
+native WebGPU isolation and preview-to-full-device escalation.
