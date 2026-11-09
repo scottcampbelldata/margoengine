@@ -9,8 +9,8 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { EventEmitter } from 'node:events';
 import { createServer, request } from 'node:http';
-import { launchBrowser, withBoundedClose } from '../scripts/lib/browser.mjs';
-import { closeAll, endTree, runSuite, taskkillPids, waitSignaled } from '../scripts/support/shutdown.mjs';
+import { launchBrowser, stopOwned, withBoundedClose } from '../scripts/lib/browser.mjs';
+import { closeAll, endTree, runSuite, taskkillPids, taskkillTree, waitSignaled } from '../scripts/support/shutdown.mjs';
 
 const root = new URL('..', import.meta.url);
 
@@ -179,14 +179,16 @@ test('owned Chromium terminates asynchronously before invoking the driver kill A
         calls.push('owner');
       },
     },
-    end: async (pid) => {
-      assert.equal(pid, child.pid);
+    stop: (stopped) => {
+      assert.equal(stopped, child);
       calls.push('terminate');
-      child.exitCode = 1;
-      child.emit('exit', 1, null);
-      child.emit('close', 1, null);
-      return [];
+      setImmediate(() => {
+        child.exitCode = 1;
+        child.emit('exit', 1, null);
+        child.emit('close', 1, null);
+      });
     },
+    end: () => assert.fail('an owned browser is ended through its own handle, never a helper program'),
   });
   await browser.close();
   assert.ok(calls.indexOf('terminate') < calls.indexOf('owner'));
@@ -195,13 +197,12 @@ test('owned Chromium terminates asynchronously before invoking the driver kill A
 
 test('a pending owned process termination keeps the shutdown timer runnable', async () => {
   const child = Object.assign(new EventEmitter(), { pid: 123, exitCode: null, signalCode: null });
-  let release;
-  const pending = new Promise((resolve) => (release = resolve));
   let killed = false, disconnected = false;
+  // The process is told to end but has not finished exiting (its handle is not signalled yet).
   const closing = withBoundedClose({ close: async () => { disconnected = true; } }, {
     platform: 'win32',
     server: { process: () => child, kill: async () => { killed = true; } },
-    end: () => pending,
+    stop: () => {},
   }).close();
   try {
     await assert.rejects(closeAll({ browser: { close: () => closing }, budgetMs: 50 }), { code: 'SHUTDOWN_TIMEOUT' });
@@ -211,7 +212,6 @@ test('a pending owned process termination keeps the shutdown timer runnable', as
     child.exitCode = 1;
     child.emit('exit', 1, null);
     child.emit('close', 1, null);
-    release([]);
     await closing;
   }
 });
@@ -239,10 +239,9 @@ test('owned Chromium releases stdout, stderr and CDP pipes and observes close be
         kills++;
       },
     },
-    end: async () => {
+    stop: () => {
       child.exitCode = 1;
       child.emit('exit', 1, null);
-      return [];
     },
   });
   try {
@@ -251,6 +250,116 @@ test('owned Chromium releases stdout, stderr and CDP pipes and observes close be
   } finally {
     for (const pipe of pipes) pipe.destroy();
   }
+});
+
+// The SHUTDOWN_TIMEOUT that blocked five lanes on 2026-11-09 ("still open: browser" after every check passed): the owned
+// browser was ended by helper programs started at close time (taskkill.exe, which reads the process table through WMI,
+// then a PowerShell handle wait). On this PC those failed or stalled under load and around GPU driver resets; a helper
+// that could not run reported no process ended, which read as "all gone", so nothing ended the browser and the close
+// waited out the 30,000 ms budget on its exit. Here the helpers report nothing, as they did then.
+const helpersCannotRun = async () => [];
+
+test('owned Chromium on Windows is ended through its own process handle, so a helper that cannot run cannot leave it running', async () => {
+  const child = Object.assign(new EventEmitter(), { pid: 123, exitCode: null, signalCode: null });
+  const signals = [];
+  child.kill = (signal) => {
+    signals.push(signal);
+    setImmediate(() => {
+      child.signalCode = signal;
+      child.emit('exit', null, signal);
+      child.emit('close', null, signal);
+    });
+    return true;
+  };
+  const browser = withBoundedClose({ close: async () => {} }, {
+    platform: 'win32',
+    server: { process: () => child, kill: async () => assert.equal(child.signalCode, 'SIGKILL') },
+    end: helpersCannotRun,
+  });
+  await closeAll({ browser, budgetMs: 2000 });
+  assert.deepEqual(signals, ['SIGKILL']);
+});
+
+test('a real owned process is ended and closed within the budget while the helper programs cannot run', { timeout: 30_000 }, async () => {
+  // Like Chromium under Playwright: piped stdio plus two extra pipes (the CDP pair), and a process that would run forever.
+  const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], {
+    stdio: ['pipe', 'pipe', 'pipe', 'pipe', 'pipe'],
+    windowsHide: true,
+  });
+  await new Promise((resolve, reject) => child.once('spawn', resolve).once('error', reject));
+  let driverKills = 0;
+  const browser = withBoundedClose({ close: async () => {} }, {
+    platform: 'win32',
+    server: {
+      process: () => child,
+      kill: async () => {
+        assert.equal(child.signalCode, 'SIGKILL', 'the driver kill runs only once the process has closed');
+        driverKills++;
+      },
+    },
+    end: helpersCannotRun,
+  });
+  try {
+    await closeAll({ browser, budgetMs: 10_000 });
+    assert.equal(driverKills, 1);
+    assert.equal(child.signalCode, 'SIGKILL');
+  } finally {
+    if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
+  }
+});
+
+test('stopOwned ends the browser through its handle and every process Chromium lists, with no helper program', async () => {
+  const child = Object.assign(new EventEmitter(), { pid: 10, exitCode: null, signalCode: null });
+  child.kill = (signal) => (child.signalCode = signal);
+  const browser = {
+    newBrowserCDPSession: async () => ({
+      send: async (method) => {
+        assert.equal(method, 'SystemInfo.getProcessInfo');
+        return { processInfo: [{ id: 10, type: 'browser' }, { id: 11, type: 'GPU' }, { id: 12, type: 'utility' }] };
+      },
+    }),
+  };
+  const live = new Set([11, 12]);
+  let polls = 0;
+  await stopOwned(child, browser, {
+    end: () => assert.fail('a browser that lists its processes needs no helper program'),
+    kill: (pid) => setTimeout(() => live.delete(pid), 20),
+    alive: (pid) => (polls++, live.has(pid)),
+  });
+  assert.equal(child.signalCode, 'SIGKILL');
+  assert.equal(live.size, 0, 'it returns only once the listed children have exited');
+  assert.ok(polls > 2);
+});
+
+test('stopOwned falls back to the helper route only when Chromium does not list its processes, and still ends the browser', async () => {
+  const child = Object.assign(new EventEmitter(), { pid: 10, exitCode: null, signalCode: null });
+  child.kill = (signal) => (child.signalCode = signal);
+  const ended = [];
+  await stopOwned(child, { newBrowserCDPSession: () => new Promise(() => {}) }, {
+    listMs: 20,
+    end: async (pid) => (ended.push(pid), []),
+  });
+  assert.deepEqual(ended, [10]);
+  assert.equal(child.signalCode, 'SIGKILL', 'a helper that ended nothing still leaves no browser running');
+  child.signalCode = null;
+  await assert.rejects(stopOwned(child, {}, { end: async () => [10, 11] }), { code: 'SHUTDOWN_TIMEOUT' });
+});
+
+test('an owned process that refuses to be ended fails the close with that error', async () => {
+  const child = Object.assign(new EventEmitter(), { pid: 123, exitCode: null, signalCode: null });
+  child.kill = () => {
+    child.emit('error', Object.assign(new Error('kill EPERM'), { code: 'EPERM' }));
+    return false;
+  };
+  let driverKills = 0;
+  const browser = withBoundedClose({ close: async () => {} }, {
+    platform: 'win32',
+    server: { process: () => child, kill: async () => driverKills++ },
+    end: helpersCannotRun,
+  });
+  await assert.rejects(closeAll({ browser, budgetMs: 2000 }), { code: 'EPERM' });
+  assert.equal(driverKills, 0, 'the synchronous driver kill must not run on a process still alive');
+  assert.equal(child.listenerCount('error'), 0, 'no listener is left behind');
 });
 
 test('owned Chromium outside Windows retains native driver termination', async () => {
@@ -412,6 +521,23 @@ test('the pids come from taskkill lines, never the parent it names', () => {
     [95380, 55468],
   );
   assert.deepEqual(taskkillPids(''), []);
+});
+
+test('a taskkill that could not run has ended nothing known, so its root pid is still waited for', async () => {
+  const run = (outcome) => (file, args, options, callback) => {
+    assert.equal(file, 'taskkill');
+    assert.deepEqual(args, ['/PID', '77', '/T', '/F']);
+    callback(outcome.error ?? null, outcome.stdout ?? '');
+  };
+  const success = 'SUCCESS: The process with PID 78 (child process of PID 77) has been terminated.\r\nSUCCESS: The process with PID 77 (child process of PID 5) has been terminated.\r\n';
+  assert.deepEqual(await taskkillTree(77, 1000, run({ stdout: success })), [78, 77]);
+  // Exit code 128: the process had already ended. Nothing to wait for.
+  assert.deepEqual(await taskkillTree(77, 1000, run({ error: { code: 128 } })), []);
+  // Did not start (a console that could not be created), ran out of time, or a WMI failure with no process ended.
+  for (const error of [{ code: 3221225794 }, { code: null, killed: true, signal: 'SIGTERM' }, { code: 1 }, { code: 'ENOENT' }])
+    assert.deepEqual(await taskkillTree(77, 1000, run({ error })), [77], JSON.stringify(error));
+  // Partly done: the lines still say what was ended.
+  assert.deepEqual(await taskkillTree(77, 1000, run({ error: { code: 1 }, stdout: success })), [78, 77]);
 });
 
 test('a server with a connected client is dropped and closed (the case that hung check:depth and check:no-webgpu)', async () => {

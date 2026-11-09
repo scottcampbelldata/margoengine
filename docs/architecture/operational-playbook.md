@@ -11,6 +11,69 @@ regression for PID reuse. These repairs retain the 30,000 ms shutdown budget.
 The root catalog and browser launcher tests exercise the shared owner; this
 change adds no rendering capability and does not change core or stage.
 
+### Owned Chromium ended without helper programs (section 5, 2026-11-09)
+
+Symptom: GPU suites in five lanes passed every check, then failed with
+`SHUTDOWN_TIMEOUT`, "still open: browser", at the unchanged 30,000 ms budget
+(for example sciviz: 30 checks, then 46.5 s in all). The pipe repair above did
+not stop it.
+
+Cause: the owned browser was ended by two programs started at close time.
+`taskkill.exe` builds the tree from WMI (its binary holds the `Win32_Process`
+and `ParentProcessId` queries; it takes 0.65 to 1.6 s per call on this PC when
+idle), then a Windows PowerShell waits for the handles. Its result was read
+from its output lines only, so a taskkill that did not start, ran out of time
+or failed in WMI reported "no process ended", which read as "nothing left".
+Nothing then ended the browser, and the close waited for an exit that only
+Chromium's own starved shutdown could give (68 to 146 s under load, above).
+The helper wait also had the whole 30 s budget, so its own "Chromium processes
+did not exit" error could never be reported first. The failures clustered in
+windows when helper programs were failing on this PC: Windows Error Reporting
+holds powershell.exe console-host crashes (`ConsoleControl` static
+constructor) in groups of four at the same seconds as GPU driver resets
+(LiveKernelEvent 141, eight groups on 2026-11-09), and the WMI log holds
+failed `Win32_Process` enumerations (0x80041032, 0x800706BE). No failing run
+was traced phase by phase: eight traced sciviz runs and the CPU loops passed
+(close 1.1 to 1.9 s), so the chain above is shown by these records and by the
+deterministic regressions, not by a captured hang.
+
+Fix (`scripts/lib/browser.mjs`, `stopOwned`): the browser process is ended
+through the handle Node holds (`ChildProcess.kill`, TerminateProcess), and
+each process Chromium lists for itself over CDP (`SystemInfo.getProcessInfo`)
+by its pid, then the close waits for the listed processes to exit and for the
+browser's `close` event. No helper program runs. Measured on this PC: killing
+only the browser process left two Edge utility processes
+(`entity_extraction_service`, `edge_collections`) running past 10 s, so the
+listed children are ended explicitly; with them, the whole tree, crashpad
+included, was gone in 50 to 285 ms (with a live WebGPU device). Only a browser
+that does not list its processes within 5,000 ms (`LIST_PROCESSES_MS`) takes
+the old taskkill route, and its browser process is still ended through its
+handle afterwards. `taskkillTree` now returns the root pid when taskkill could
+not run, so `endTree` waits for and reports it instead of returning success.
+
+Regressions (`tests/browser-teardown.test.js`): with the helper route reporting
+nothing, as it did, a fake owned browser and a real child process with five
+pipes both reach `SHUTDOWN_TIMEOUT` "still open: browser" on the parent commit
+and close at once with the fix; `stopOwned` ends listed children without a
+helper and falls back only when the list never comes; the taskkill failure
+modes return the root pid; the existing real-browser test checks every listed
+process has exited after the close. The 30,000 ms budget is unchanged. Not
+measured: a capture of the original hang, other Windows PCs, and GPU resets
+during a close (a process held in the kernel by a reset still has to exit).
+
+Sources: Microsoft, [TerminateProcess](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-terminateprocess)
+(asynchronous; a process exits once pending I/O completes; wait on its handle);
+Raymond Chen, [Why do some processes stay in Task Manager after they have been killed?](https://devblogs.microsoft.com/oldnewthing/?p=102303)
+and [Why can't I delete a file immediately after terminating the process?](https://devblogs.microsoft.com/oldnewthing/20120329-00/?p=7973);
+Node.js [child_process](https://nodejs.org/api/child_process.html) (`close`
+after stdio ends, `exit` before it; `subprocess.kill`); Playwright
+[BrowserServer](https://playwright.dev/docs/api/class-browserserver) and
+[Browser.close](https://playwright.dev/docs/api/class-browser) for a connected
+client; issue reports of taskkill.exe exhausting WMI on Windows desktops
+([openai/codex 34260](https://upd.dev/openai/codex/issues/34260)); libuv's
+Windows grandchild pipe inheritance discussion ([libuv PR 343](https://github.com/joyent/libuv/pull/343)).
+Only documentation and issue text were read, no other project's source.
+
 ## Purpose and authority
 
 This document preserves the engine-specific technical design, validation model, measured limits, and known gaps that

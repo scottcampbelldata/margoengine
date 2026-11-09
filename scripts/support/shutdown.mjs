@@ -82,12 +82,23 @@ export function waitSignaled(pids, waitMs, sinceMs) {
   });
 }
 
-function taskkillTree(pid, timeout) {
+/**
+ * Ends `pid` and its tree with `taskkill /T /F` and resolves to the pids it ended. Exit code 128 only says a process had
+ * already ended, so the lines say what happened, not the code. A taskkill that could not run (it did not start, ran out
+ * of time, or failed with no process ended: it reads the process table through WMI, which a loaded PC can fail) has
+ * ended nothing known, so it resolves to `[pid]`: the caller then waits for that process and reports it if it still
+ * runs, instead of taking "no lines" for "nothing left".
+ * @param {number} pid
+ * @param {number} timeout
+ * @param {typeof execFile} [run]
+ * @returns {Promise<number[]>}
+ */
+export function taskkillTree(pid, timeout, run = execFile) {
   return new Promise((resolve) => {
-    // Exit code 128 only says one process had already ended, so the lines say what happened, not the code.
-    execFile('taskkill', ['/PID', String(pid), '/T', '/F'], { timeout, windowsHide: true }, (_, stdout) =>
-      resolve(taskkillPids(String(stdout))),
-    );
+    run('taskkill', ['/PID', String(pid), '/T', '/F'], { timeout, windowsHide: true }, (error, stdout) => {
+      const ended = taskkillPids(String(stdout ?? ''));
+      resolve(error && error.code !== 128 && !ended.length ? [pid] : ended);
+    });
   });
 }
 
