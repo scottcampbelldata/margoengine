@@ -307,11 +307,12 @@ work and the required GPU proofs are complete.
 The PostStack peer audit also reproduced the same wrong-scene detachment in
 DOF, Autofocus and Tonemap; their local sceneOf repairs and per-package
 scene-owner.test.js regressions pass CPU checks, with GPU/README acceptance
-pending. Creative PostProcessing remains open: `const post = new PostProcessing();
-scene.use(post); post.dispose();` leaves its registration and passes installed.
-Cause: it stores only the device and releases resources without detaching its
-plugin; restoration calls dispose as its resource-release helper. Split that
-resource release from explicit owner removal in the creative package.
+pending. Creative PostProcessing also left its registration and passes installed:
+it stored only the device and used dispose as restoration's resource-release
+helper. Its local repair separates resource release from explicit owner removal;
+Painterly now removes its own scene registration too. The creative post-owner
+regression reproduces the original failures and proves restoration, owner removal,
+same-name isolation and replacement. Physical GPU/README gates remain pending.
 
 ### Batch 56 review repair audit
 

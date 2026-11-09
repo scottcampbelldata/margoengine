@@ -2188,3 +2188,9 @@ preserve another scene's same-name effect. Proof: the scene-owner.test.js files
 in packages/dof/tests and packages/tonemap/tests use real engine registries with
 inert GPU resources, and fail against the preceding implementations. Physical
 GPU/README acceptance is pending, with no rendering-quality or speed claim.
+
+Creative PostProcessing and Painterly detach from their owning scene while device
+restoration preserves registration. Proof: packages/creative/tests/post-owner.test.js
+uses real engine registries with inert GPU resources for standalone/stacked effects,
+owner removal, same-name isolation and replacement; pre-repair disposal fails.
+Physical GPU/README acceptance remains pending.

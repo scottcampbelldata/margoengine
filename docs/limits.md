@@ -2620,3 +2620,7 @@ The audited FXAA entry is 4,642 bytes gzip and PostStack is 3,995 bytes gzip
 DOF, Autofocus and Tonemap's owner-disposal repairs change registry cleanup only;
 their GPU algorithms and existing entry ceilings are unchanged. Real-browser
 acceptance remains pending; these CPU lifecycle proofs make no speed claim.
+
+Creative's PostProcessing and Painterly disposal removes their owning registration;
+restoration keeps it. No shaders, passes or entry ceilings change. Lifecycle
+claims currently have CPU evidence; physical GPU/README acceptance remains pending.

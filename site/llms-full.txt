@@ -5211,6 +5211,10 @@ DOF, Autofocus and Tonemap's owner-disposal repairs change registry cleanup only
 their GPU algorithms and existing entry ceilings are unchanged. Real-browser
 acceptance remains pending; these CPU lifecycle proofs make no speed claim.
 
+Creative's PostProcessing and Painterly disposal removes their owning registration;
+restoration keeps it. No shaders, passes or entry ceilings change. Lifecycle
+claims currently have CPU evidence; physical GPU/README acceptance remains pending.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -5522,11 +5526,12 @@ work and the required GPU proofs are complete.
 The PostStack peer audit also reproduced the same wrong-scene detachment in
 DOF, Autofocus and Tonemap; their local sceneOf repairs and per-package
 scene-owner.test.js regressions pass CPU checks, with GPU/README acceptance
-pending. Creative PostProcessing remains open: `const post = new PostProcessing();
-scene.use(post); post.dispose();` leaves its registration and passes installed.
-Cause: it stores only the device and releases resources without detaching its
-plugin; restoration calls dispose as its resource-release helper. Split that
-resource release from explicit owner removal in the creative package.
+pending. Creative PostProcessing also left its registration and passes installed:
+it stored only the device and used dispose as restoration's resource-release
+helper. Its local repair separates resource release from explicit owner removal;
+Painterly now removes its own scene registration too. The creative post-owner
+regression reproduces the original failures and proves restoration, owner removal,
+same-name isolation and replacement. Physical GPU/README gates remain pending.
 
 ### Batch 56 review repair audit
 
@@ -12521,6 +12526,23 @@ scene capture. For bloom, or to combine it with SSAO, DOF or FXAA, add it to a `
 0.3}), new PostProcessing({atmosphere: {density: 0.02}}), new FXAA()])`. In a stack its `target` is undefined.
 For a sky behind the fog, attach `Sky` from `@margoengine/sky`.
 
+`PostProcessing` and `Painterly` detach from their owning scene on disposal,
+including stack members. Device restoration keeps their registrations. For a
+secondary scene, attach the stack with `scene.use()`:
+
+```ts
+import {Engine} from 'margoengine/core';
+import {PostStack} from 'margoengine/post/stack';
+import {PostProcessing} from 'margoengine/creative/post';
+import {Painterly} from 'margoengine/creative/paint';
+const engine = await Engine.create(document.querySelector('canvas')!, {backend:'webgpu'});
+const product = engine.createScene('product');
+const stack = new PostStack([new PostProcessing(), new Painterly()]);
+product.use(stack);
+stack.dispose();
+engine.dispose();
+```
+
 Each subpath loads that feature and its dependencies. Existing named imports from `@margoengine/creative` remain available and can be tree-shaken by a bundler. `await import('@margoengine/creative')` loads the complete pack namespace; use a subpath when loading one feature independently. The stage's `addParticles` and `addEffects` (`@margoengine/stage/particles`, `/effects`) load only `/particles` and `/post`.
 
 Attach a grass field directly to an existing Stage, without extending the facade:
@@ -12528,14 +12550,6 @@ Attach a grass field directly to an existing Stage, without extending the facade
 ```ts
 import {createStage} from 'margoengine';
 import {GrassField} from 'margoengine/creative/grass';
-
-const stage = await createStage('#viewport', {backend: 'webgpu'});
-const meadow = GrassField.attach(stage.engine, {
-  blades: 100_000, area: [50, 50], bladeHeight: 1.2, windSpeed: 1.2, spores: true,
-});
-meadow.windStrength = 0.6;
-// Remove this field early, or let stage.dispose() release it with the scene.
-meadow.dispose();
 ```
 
 [README continues: https://margoengine.com/llms/packages/creative.md]

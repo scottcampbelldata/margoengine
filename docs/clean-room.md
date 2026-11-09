@@ -3001,3 +3001,10 @@ rule to DOF, Autofocus and Tonemap. Explicit disposal resolves the existing
 Real-engine inert-GPU tests reproduce both the orphaned secondary registration
 and accidental removal of the default scene's same-name effect before repair.
 The fix changes no shaders, geometry, rendering work or core API.
+
+Creative's PostProcessing and Painterly use the same object-identity rule from
+the ownership papers above. PostProcessing separates GPU-resource release from
+terminal registration cleanup, so device restoration retains its scene passes.
+This is lifecycle bookkeeping in the owning optional package; it adds no passes
+or shader changes. Real-engine inert-GPU tests cover both standalone and stacked
+PostProcessing, stacked Painterly, restoration and same-name scene isolation.
