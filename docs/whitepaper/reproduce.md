@@ -2072,6 +2072,15 @@ old submit-to-done wall-clock diagnostic until Scott ends the build phase.
 Timestamp validity, tier storage/next-load and wrapper cleanup stay live.
 
 
+### Cinematic registration reproduction
+
+Build Cinematic, then run packages/cinematic/test/*.test.js and
+tests/cinematic-owner-contract.test.js with a 120-second per-test limit. Four of
+sixteen scene-owner cases fail on parent a1831da68. Run the complete package
+browser leaf through one shared GPU slot with wait-max60 and measured hold plus
+margin; it now includes eight actual owner/pixel cases. Run the runtime README
+examples separately through that same slot. Builds stay outside the GPU lock.
+
 ### Controls wrapper owner reproduction
 
 Build Controls, then run packages/controls/tests/*.test.js and

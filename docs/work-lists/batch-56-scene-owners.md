@@ -136,3 +136,5 @@ Fresh syntactic inventory: 183 calls, 75 identity, two stored Save calls, three
 core routers and 103 active/delegated candidates. The latter includes the now
 proved CAD replacement; counts remain syntax, not exhaustive lifetime proof.
 No second full verify. [Controls receipt](../whitepaper/results/batch-56-controls-owner-20261109.json).
+
+Cinematic and CameraBrain now have four reproduced direct/reattached owner failures in sixteen real-engine cases. The optional two-line identity repair passes 108 package units and a source-wide class guard. GPU/README acceptance remains open. No core/stage or capture work is included.

@@ -572,7 +572,7 @@ export class CameraBrain implements EnginePlugin {
     const engine = this.engine;
     this.engine = undefined;
     this.layers = [];
-    engine?.removePlugin(this.name);
+    engine?.sceneOf(this)?.removePlugin(this.name);
   }
   declare [Symbol.dispose]: () => void;
   [(Symbol.dispose ?? Symbol()) as symbol](): void {

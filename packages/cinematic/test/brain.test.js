@@ -12,7 +12,14 @@ const fixes =
     assert.match(error.message, /;/);
     return true;
   };
-const fake = () => ({ camera: {}, canvas: { width: 200, height: 100 }, removePlugin() {} });
+const fake = () => ({
+  camera: {},
+  canvas: { width: 200, height: 100 },
+  removePlugin() {},
+  sceneOf() {
+    return this;
+  },
+});
 const view = (pose) => {
   const d = [0, 1, 2].map((i) => pose.target[i] - pose.position[i]),
     l = Math.hypot(...d);

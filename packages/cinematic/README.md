@@ -1,5 +1,11 @@
 # @margoengine/cinematic
 
+`Cinematic` and `CameraBrain` detach from the scene where their actual plugin
+instance was registered. Direct disposal, removing the owning plugin or scene,
+and engine disposal all release the registration. Repeated disposal preserves
+same-name replacements. Both plugins can attach to another scene after disposal;
+later cleanup follows that new registration.
+
 Import `margoengine/cinematic` from the `margoengine` package, or `@margoengine/cinematic` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 `rig.setOrbitOffset(yaw, pitch, distance, height = 0)` writes the retained camera

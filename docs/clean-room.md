@@ -3946,6 +3946,27 @@ The helper GPU proof renders the owning scene twice and checks red canvas pixels
 then exercises cancellation before and between frames with same-name isolation.
 
 
+### Cinematic plugin ownership (batch 56 continuation)
+
+The wider audit compares Anindya Banerjee and David A. Naumann, *Ownership
+Confinement Ensures Representation Independence for Object-Oriented Programs*
+(2002), https://arxiv.org/abs/cs/0212003; Daan Leijen, *Structured Asynchrony with
+Algebraic Effects* (2017),
+https://www.microsoft.com/en-us/research/publication/structured-asynchrony-algebraic-effects/;
+and Ecma International, *ECMAScript 2026 Language Specification* (2026),
+https://262.ecma-international.org/17.0/. Object confinement supports resolving
+the actual instance rather than the active namespace, while structured resource
+lifetime motivates idempotent cleanup and reattachment checks. This is a design
+inference for synchronous registration, not a formal proof. No companion source
+or other repository implementation was read.
+
+Cinematic and CameraBrain retained the engine but removed through its active
+scene. Direct secondary disposal and disposal after reattachment could remove
+a default same-name plugin and retain the actual registration. Both optional
+classes now resolve sceneOf(this). Four of sixteen real-engine cases fail on
+the parent; all 108 package units and a class guard pass after repair. GPU and
+runtime README acceptance remain pending; no core or stage source changed.
+
 ### Controls wrapper ownership (batch 56 continuation)
 
 Compared Anindya Banerjee and David A. Naumann, *Ownership Confinement Ensures

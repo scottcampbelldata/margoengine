@@ -82,6 +82,74 @@ try {
   assert.deepEqual(zoom.inside, [true, true], 'the subject reaches to 4 pixels of its share');
   assert.deepEqual(zoom.outside, [false, false], 'and stops within 4 pixels of it');
   assert.deepEqual(swap.errors, [], 'no GPU error');
+  const owner = await page.evaluate(async () => {
+    const { Engine, box } = await import('/packages/core/dist/index.js');
+    const { engineRuntime } = await import('/packages/core/dist/extension.js');
+    const { Cinematic } = await import('/packages/cinematic/dist/index.js');
+    const { CameraBrain } = await import('/packages/cinematic/dist/brain.js');
+    const canvas = document.createElement('canvas');
+    document.body.append(canvas);
+    const engine = await Engine.create(canvas, {
+      backend: 'webgpu',
+      exactSize: [64, 64],
+      camera: { position: [0, 0, 3], target: [0, 0, 0] },
+    });
+    engine.stop();
+    const rows = [],
+      errors = [];
+    engineRuntime(engine).gpu.addEventListener('uncapturederror', (event) => errors.push(event.error.message));
+    try {
+      for (const [name, Plugin] of Object.entries({ Cinematic, CameraBrain }))
+        for (const target of ['default', 'secondary']) {
+          const scene = target === 'default' ? engine.scene : engine.createScene('cinematic-target');
+          scene.background = '#000000';
+          const mesh = scene.createMesh().setGeometry(box());
+          mesh.material.set({ color: [1, 0, 0], unlit: true });
+          for (const mode of ['direct', 'owner']) {
+            const plugin = name === 'Cinematic' ? new Plugin({ offset: [0, 0, 3] }) : new Plugin();
+            if (name === 'Cinematic') plugin.follow([0, 0, 0]);
+            else plugin.add({ position: [0, 0, 3], target: [0, 0, 0] });
+            scene.use(plugin);
+            const sentinel = { name: plugin.name, setup() {} };
+            if (target === 'secondary') engine.use(sentinel);
+            engine.render({ delta: 0, views: [{ scene, camera: engine.camera, viewport: [0, 0, 1, 1] }] });
+            const bitmap = await createImageBitmap(canvas);
+            const flat = new OffscreenCanvas(64, 64).getContext('2d');
+            flat.drawImage(bitmap, 0, 0);
+            bitmap.close();
+            const pixels = flat.getImageData(0, 0, 64, 64).data;
+            let red = 0;
+            for (let i = 0; i < pixels.length; i += 4) if (pixels[i] > 100 && pixels[i + 1] < 20) red++;
+            if (mode === 'direct') plugin.dispose();
+            else scene.removePlugin(plugin.name);
+            const detached = engine.sceneOf(plugin) === undefined;
+            const isolated = target === 'default' || engine.scene.plugins.get(plugin.name) === sentinel;
+            const replacement = { name: plugin.name, setup() {} };
+            scene.use(replacement);
+            plugin.dispose();
+            const preserved = scene.plugins.get(plugin.name) === replacement;
+            scene.removePlugin(replacement.name);
+            if (target === 'secondary') engine.removePlugin(sentinel.name);
+            rows.push({ name, target, mode, red, detached, isolated, preserved });
+          }
+          mesh.dispose();
+          if (target === 'secondary') scene.dispose();
+        }
+      await engineRuntime(engine).gpu.queue.onSubmittedWorkDone();
+      return { rows, errors };
+    } finally {
+      engine.dispose();
+      canvas.remove();
+    }
+  });
+  console.log('owner', JSON.stringify(owner));
+  for (const row of owner.rows) {
+    assert.ok(row.red > 100, `${row.name} ${row.target}: owning camera scene must render`);
+    assert.equal(row.detached, true);
+    assert.equal(row.isolated, true);
+    assert.equal(row.preserved, true);
+  }
+  assert.deepEqual(owner.errors, []);
   assert.deepEqual(pageErrors, [], 'no page error');
   console.log('cinematic browser check passed');
 } catch (error) {

@@ -2978,6 +2978,13 @@ and install help, with their npm command and restart advice. Entry growth:
 @margoengine/stage/gltf: 1393->1473 B gzip; ceiling 1621->1729; @margoengine/stage/sky: 463->500 B gzip; ceiling 719->756; @margoengine/stage/particles: 468->505 B gzip; ceiling 724->761; @margoengine/stage/effects: 471->508 B gzip; ceiling 727->764; @margoengine/stage/environment: 491->528 B gzip; ceiling 747->784; @margoengine/stage/shadows: 494->530 B gzip; ceiling 750->786; @margoengine/stage/xr: 1882->1914 B gzip; ceiling 2138->2170; @margoengine/stage/viewer: 2386->2465 B gzip; ceiling 2480->2721; @margoengine/stage/physics: 1148->1181 B gzip; ceiling 1404->1437; @margoengine/stage/scene: 3185->3261 B gzip; ceiling 3441->3517. Core plus stage root stays 23924 B.
 
 
+### Cinematic registration ownership continuation
+
+Cinematic and CameraBrain dispose by actual plugin identity, including after
+reattachment. Four of sixteen real-engine parent cases fail; the repair passes
+108 package units and a source guard. GPU/README acceptance remains pending.
+No exports, core/stage source, speed budget or optional ceiling changed.
+
 ### Controls wrapper ownership continuation
 
 Three optional wrapper registrations retain identity and dispose from their actual

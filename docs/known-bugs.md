@@ -3722,6 +3722,16 @@ runtime README examples pass. The exact inherited 7 ms speed budget remains
 in the named deferred suite. See the [acceptance receipt](whitepaper/results/batch-56-quality-owner-20261109.json).
 
 
+### Cinematic owner disposal: local repair awaiting acceptance
+
+Repro: register Cinematic or CameraBrain in a secondary scene, put a same-name
+plugin in the default scene, and directly dispose outside setup. It removes the
+default plugin and retains the secondary registration. Reattachment followed by
+direct disposal has the same fault. Cause: active-engine name cleanup instead
+of registration identity. The local two-line optional-package repair passes 108
+units and a class guard; four of sixteen real-engine parent cases fail. GPU and
+runtime README acceptance remain pending.
+
 ### Controls secondary wrapper disposal: resolved
 
 The shared Controls base and two gizmos retain their actual wrappers and detach

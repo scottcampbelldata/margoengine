@@ -1,0 +1,10 @@
+{
+  "status": "LOCAL_REPAIR_ACCEPTANCE_PENDING",
+  "base": "a1831da68",
+  "parent": { "pass": 12, "fail": 4 },
+  "packageUnits": { "pass": 108, "fail": 0 },
+  "guard": { "pass": 1, "fail": 0 },
+  "coreStageSourceChanged": false,
+  "hunterCaptureChanged": false,
+  "pending": ["GPU browser owner/pixel proof", "runtime README", "affected gates", "push"]
+}
