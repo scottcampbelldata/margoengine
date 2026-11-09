@@ -1,7 +1,7 @@
 // Detached GPU gate jobs keep their place while the submitting agent does CPU work.
 // Holder and waiting entries use gpu-lock's existing format, including for older clients.
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from 'node:fs';
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { runLimited } from './support/run-limited.mjs';
 import { endTree } from './support/shutdown.mjs';
@@ -62,18 +62,27 @@ export function createGpuQueue({
     const queuedAt = Date.now();
     const ticket = `${String(queuedAt).padStart(15, '0')}-${process.pid}-${Math.random().toString(36).slice(2, 10)}`;
     const log = resolve('test-results', 'gpu-queue', `${ticket}.log`);
+    const ownerLog = `${log}.owner.log`;
     mkdirSync(resolve('test-results', 'gpu-queue'), { recursive: true });
     mkdirSync(jobsDir, { recursive: true });
-    write(ticket, { ticket, queuedAt, cwd: process.cwd(), command, options, log, state: 'starting' });
+    write(ticket, { ticket, queuedAt, cwd: process.cwd(), command, options, log, ownerLog, state: 'starting' });
     const env = { ...process.env };
     delete env.MARGO_GPU_LOCK_NESTED;
     delete env.MARGO_GPU_LOCK_NESTED_MODE;
-    const child = launch(process.execPath, [resolve(import.meta.dirname, 'gpu-lock.mjs'), 'queue-run', ticket], {
-      env,
-      detached: true,
-      windowsHide: true,
-      stdio: 'ignore',
-    });
+    // A file survives detachment and catches failures even before queue-run can read its ticket.
+    // Keeping this separate from the command log avoids its runLimited writer truncating startup evidence.
+    const output = openSync(ownerLog, 'a');
+    let child;
+    try {
+      child = launch(process.execPath, [resolve(import.meta.dirname, 'gpu-lock.mjs'), 'queue-run', ticket], {
+        env,
+        detached: true,
+        windowsHide: true,
+        stdio: ['ignore', output, output],
+      });
+    } finally {
+      closeSync(output);
+    }
     let failed;
     child.once('error', (error) => {
       failed = error;
@@ -95,8 +104,9 @@ export function createGpuQueue({
       if (Date.now() > deadline || exited) {
         if (!exited) await endTree(child.pid);
         const code = exited ? 'ERR_GPU_QUEUE_OWNER_EXIT' : 'ERR_GPU_QUEUE_START_TIMEOUT';
+        const evidence = readFileSync(ownerLog, 'utf8').trim();
         const error = exited
-          ? `${code}: detached owner exited before publishing queue admission (exit ${child.exitCode}, signal ${child.signalCode})`
+          ? `${code}: detached owner exited before publishing queue admission (exit ${child.exitCode}, signal ${child.signalCode}); ${ownerLog}${evidence ? `\n${evidence}` : ''}`
           : `${code}: detached owner did not queue within 30 seconds`;
         write(ticket, { ...read(ticket), state: 'failed', error, code });
         throw Object.assign(new Error(error), { code });
@@ -106,13 +116,14 @@ export function createGpuQueue({
   }
 
   async function runQueued(ticket) {
-    let record = { ...read(ticket), pid: process.pid };
+    let record;
     const update = (change) => {
       record = write(ticket, { ...record, ...change });
     };
-    const { command, options } = record;
     let release;
     try {
+      record = { ...read(ticket), pid: process.pid };
+      const { command, options } = record;
       release = await acquire({
         ...options,
         command: command.join(' '),
@@ -142,6 +153,9 @@ export function createGpuQueue({
       release = undefined;
       update({ state: result.ok ? 'passed' : 'failed', result, finishedAt: Date.now() });
     } catch (error) {
+      // A failed initial read has no valid revision to update. Preserve the original exception
+      // on the detached owner's stderr rather than overwriting a ticket or masking its cause.
+      if (!record) throw error;
       update({ state: 'failed', error: error.message, code: error.code, finishedAt: Date.now() });
       process.exitCode = 2;
     } finally {

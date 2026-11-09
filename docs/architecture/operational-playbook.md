@@ -217,6 +217,23 @@ again. A default observer bound covers the command's admission wait plus hold
 limit and one minute of shutdown allowance. The command itself retains its
 independent hard limit and process-tree termination.
 
+Detached owner stdout and stderr persist in `<command log>.owner.log`, separately
+from the command log. An owner exiting before admission reports
+`ERR_GPU_QUEUE_OWNER_EXIT`, its exit/signal, log path and original stderr; only an
+owner still running after the unchanged 30-second startup deadline is a startup
+timeout. Initial ticket-read errors retain their original exception rather than
+attempting to replace an unreadable ticket. Lane-C's 707.6 ms failure was on
+7289abf3b, before the immutable publication repair b7af6646a: a Windows observer
+could pin the status name and make replacement fail with EPERM. That root repair
+and the retained bootstrap diagnostics are CPU-only regressions in
+`tests/gpu-queue-publication.test.js`. The failed queue step passes with verify's
+read recorder enabled; no second full verify or GPU run is needed for this repair.
+Research: Microsoft, [Creating a Child Process with Redirected Input and Output](https://learn.microsoft.com/en-us/windows/win32/procthread/creating-a-child-process-with-redirected-input-and-output)
+(2025 documentation), informs persistent inherited output handles. Gray and
+Cheriton, [Leases: An Efficient Fault-Tolerant Mechanism for Distributed File Cache Consistency](https://www.cs.cmu.edu/afs/cs.cmu.edu/academic/class/15712-s12/www/papers/gray89.pdf)
+(1989), separates lease expiry from owner failure; our startup deadline does not
+stand in for a child exit. No external implementation source was used.
+
 Queue status is published as immutable numbered JSON revisions beside the initial
 ticket record. An observer reads the newest published revision; old single-file
 records still read as revision zero. A Windows reader can pin a published name,

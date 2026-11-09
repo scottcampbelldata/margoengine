@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { EventEmitter } from 'node:events';
+import { spawn } from 'node:child_process';
 import { syncBuiltinESMExports } from 'node:module';
 import { join, resolve } from 'node:path';
 import test from 'node:test';
@@ -21,6 +22,33 @@ test('a detached owner that exits before admission reports its exit, never a fic
       assert.match(error.message, /exit 13/);
       return true;
     });
+  } finally {
+    fs.rmSync(folder, { recursive: true, force: true });
+  }
+});
+
+test('a detached bootstrap failure retains the original stderr and exit in its ticket', {
+  timeout: 30_000,
+}, async () => {
+  const folder = fs.mkdtempSync(resolve('test-results/gpu-queue-bootstrap-'));
+  const evidence = 'ERR_QUEUE_BOOTSTRAP_PROOF: failure before ticket admission';
+  try {
+    const queue = createGpuQueue({
+      lockDir: join(folder, 'gpu.lock'),
+      launch: (file, _args, options) => spawn(file, ['-e', `console.error(${JSON.stringify(evidence)}); process.exit(19)`], options),
+    });
+    await assert.rejects(queue.enqueue([process.execPath, '-e', ''], { mode: 'shared' }), (error) => {
+      assert.equal(error.code, 'ERR_GPU_QUEUE_OWNER_EXIT');
+      assert.match(error.message, /exit 19/);
+      assert.ok(error.message.includes(evidence), error.message);
+      return true;
+    });
+    const [base] = fs.readdirSync(`${join(folder, 'gpu.lock')}-jobs`).filter((name) => !name.includes('.000000'));
+    const { readGpuQueueRecord } = await import('../scripts/gpu-queue.mjs');
+    const record = readGpuQueueRecord(join(`${join(folder, 'gpu.lock')}-jobs`, base));
+    assert.equal(record.code, 'ERR_GPU_QUEUE_OWNER_EXIT');
+    assert.ok(record.error.includes(evidence));
+    assert.ok(fs.readFileSync(record.ownerLog, 'utf8').includes(evidence));
   } finally {
     fs.rmSync(folder, { recursive: true, force: true });
   }
