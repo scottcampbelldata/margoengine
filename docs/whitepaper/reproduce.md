@@ -1,5 +1,27 @@
 # Reproducing Margo's numbers
 
+## Batch 134 prebuilt Basis targets (partial)
+
+The [record](results/batch-134-prebuilt-baseline.json) pins each input URL/hash,
+both opaque wrapper hashes, the Wasm hash and per-file/per-target results.
+Use the built static-embind wrapper and its unchanged Wasm from an outside
+folder; never inspect either implementation. The retained vendor pass is a
+control, not the shipped timing target. Decode every mip, layer and face.
+For warm controls, create one module per file/target, record its first call,
+then alternate A/B order for three rounds, taking each side's minimum of two
+complete transcodes. For cold controls, use a fresh initialized module for
+every trial with the same round/order/minimum design. Verify every output's
+hash after its timer. A/B are identical prebuilts until a replacement exists.
+
+Measure memory in a fresh process for each file/target, retaining only that
+pair's complete output; record process peak RSS and Wasm high-water bytes.
+Use seven more fresh processes for compile/instantiate/startup, keeping
+instrumented phases separate from natural per-target startup. Gzip assets
+at level 9. All current timing data is a loaded-machine diagnostic.
+Original harnesses, complete trial arrays and per-image hashes are retained
+in lane M's private `batch-134/measure` folder; a portable public runner and
+complete source-quality/licensing evidence remain work for the later jobs.
+
 ## Five executable README repairs (2026-11-09)
 
 After `npm run build:packages`, run

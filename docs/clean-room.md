@@ -76,6 +76,60 @@ methods, predictive EdgeBreaker and the remaining planned experiments are still
 unproven. A private sequential Rust prototype exercises these rules; no shipped
 decoder or public entry changes in the specification-review job.
 
+## Basis replacement specification gate (batch 134, 2026-11-09)
+
+Scott's ruling dated 2026-11-10 supersedes the previous byte-choice blocker.
+Require identical prescribed output and per-file quality no worse for open
+encoding choices. The specification-only planner updated the private plan
+before implementation. The four required input documents were read in full;
+the destination-format review still has the precise remaining work below.
+No foreign codec implementation repository or wrapper was inspected, and no
+remembered internals or comparison-derived Basis algorithms were used.
+
+| Permitted source | Read in full? | Retrieved SHA-256 |
+| --- | --- | --- |
+| [KTX 2.0.4](https://registry.khronos.org/KTX/specs/2.0/ktxspec.v2.html) | Yes, appendices/examples/history and cube-map figure included | `88e367640b3f1902f2f195489e7215ec82efbf4c569d5980b3200ee5c1ac9e93` |
+| [KHR_texture_basisu](https://github.com/KhronosGroup/glTF/blob/main/extensions/2.0/Khronos/KHR_texture_basisu/README.md) | Yes, ratified extension and appendix | `6f6d0767b95a8ac4f197c9394a28e8d4c71a2ff3ced2c4fd9357ed1c869b83a6` |
+| [.basis/ETC1S 1.03](https://github.com/BinomialLLC/basis_universal/wiki/.basis-File-Format-and-ETC1S-Texture-Video-Specification) | Yes, sections 1-13 | `2fec0636cd7a73eb245cde7fb14f5fe86f61e27dbf47df3ad0c3270fd9e1631a` |
+| [UASTC LDR 4x4](https://github.com/BinomialLLC/basis_universal/wiki/UASTC-LDR-4x4-Texture-Specification) | Yes, tables, 64 vectors and nine linked figures | `e9928f57ebd3dc6cc397505aee136e18f303be7a03394ef7118479e5463c56a4` |
+| [UASTC HDR 4x4 v1.1](https://github.com/BinomialLLC/basis_universal/wiki/UASTC-HDR-4x4-Texture-Specification) | Yes, 48 vectors, appendix and partition figure | `1853c854e436b9b97076d42688538dc92271d96f03e33946a24d06acf4429430` |
+| [Khronos Data Format 1.4.0](https://registry.khronos.org/DataFormat/specs/1.4/dataformat.1.4.pdf) | Selected descriptor, FP16, sRGB, BC1-7, ETC1/ETC2/EAC, ASTC/HDR, PVRTC and UASTC text; not the whole book | `d12295ff97b2e2042ac29e2aeaff99a8daeb41b5e9242ddc8373b7e5168d7abb` |
+| [Data Format HTML](https://registry.khronos.org/DataFormat/specs/1.4/dataformat.1.4.html) | Selected repaired table/formula readings only | `80b60747535a9f47eba71b5be3073aa91c8cca7bebbd962954f7d712dbe8973c` |
+| [Basis KTX2 format notes v2.5](https://github.com/BinomialLLC/basis_universal/wiki/KTX2-File-Format-Support-Technical-Details) | Introduction, container rules, ETC1S, LDR 4x4 and HDR 4x4 signaling; newer codec sections not certified | `183648f6c80db37f8c8de3afeb95cfbae70f09634246b928d57bdb7fb82f1c64` |
+| [AMD ATC extension rev7](https://registry.khronos.org/OpenGL/extensions/AMD/AMD_compressed_ATC_texture.txt) | Yes; explicitly withholds internal format details | `de58d302d447d5549726500100474b899a907a76446b50220163c720d3c88fc8` |
+| [3DFX FXT1 extension draft 0.4](https://registry.khronos.org/OpenGL/extensions/3DFX/3DFX_texture_compression_FXT1.txt) | Yes, extension and format appendix | `fe2b554ebb333c5e23e9010d91d8e6ee95829bd679874e8901fd1256f690e531` |
+| [Ratelis/Bergman ATC format paper, 2012](https://www.guildsoftware.com/papers/2012.Converting.DXTC.to.ATC.pdf) | Format prose sections 1-3; extraction also surfaced illustrative example source in section 4, which was not used; not a complete normative contract | `99a7e447ef8e4f198bddc1767ee14f6926a0ff7d3682ed45082eef1f2596a516` |
+
+The UASTC implementation-source links were not followed. Open BC1 fallback,
+endpoint, BC3 alpha, BC4 and BC5 encoding choices now use Scott's quality bar.
+The ATC disclosure gap is not a replacement blocker: opaque support queries
+for every exposed input enum show ATC, FXT1 and PVRTC2 disabled in this shipped
+build. No ATC implementation is planned or derived from the paper's examples.
+No genuinely missing rule for a served input bitstream has been established.
+
+Data Format chapter 11 tables 11.1, 11.10, 11.11, 11.17 and 11.18 were read
+and visually checked in the PDF. Table 11.1's green offset of 6 conflicts with
+its stated contiguous 5/6/5 allocation; that allocation places green at bit 5.
+Table 11.18's size 40 describes one sample despite its printed multiplier of
+three. These illustrative descriptor typos do not change the normative field
+layout or packed-format definitions. The remaining destination-format table
+checks and pseudocode errata must be resolved from the normative text before
+affected code is written. Margo's existing `packages/shared/zstd.d.ts` contract
+already provides bounded, abortable RFC 8878 decompression; the KTX2 level
+loader uses it, so this replacement needs no new Zstd implementation. The
+private coverage ledger records the exact remaining target-format review.
+
+The prebuilt ran only from an outside folder as an opaque binary. The
+[partial baseline](whitepaper/results/batch-134-prebuilt-baseline.json) records
+51 attempted files, 699 successful file/target pairs, all-image hashes,
+cold/warm same-prebuilt controls, startup and isolated peak memory. A separate
+built static-embind wrapper pass matches all 9,491 image hashes and all 186
+existing source-quality measurements against the retained vendor-wrapper pass.
+The latter is retained as control evidence, not the shipped timing target. Complete
+source-quality coverage, replacement identity/quality, old/new speed, hostile
+input and GPU proof remain open. No replacement code has been written; the
+prebuilt stays until all gates pass.
+
 ## Creative texture targets (batch 77)
 
 Cube/array texture views, mip extents and 3D render attachment depthSlice follow the

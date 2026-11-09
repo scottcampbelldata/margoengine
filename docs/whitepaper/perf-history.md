@@ -27,6 +27,64 @@ Machines named in the records:
 Both ran Windows 11 and Edge 155 ([claims.md](claims.md) has the full setup). Losses that are still open are listed in
 [Open losses](#open-losses), which links to [known-bugs.md](../known-bugs.md).
 
+## Batch 134: prebuilt Basis targets, baseline incomplete
+
+The [local measurement record](results/batch-134-prebuilt-baseline.json) is a
+prebuilt-only diagnostic, not a replacement speed or parity claim. It records
+51 attempted files (48 KTX2 and three .basis), 699 successful file/target pairs
+and 9,491 per-image hashes. Unsupported cases remain in the record. The .basis
+files accompany the upstream root Apache-2.0 notice, but its source-image notice
+disclaims ownership: original-image and derivative licensing remains unverified.
+Those measurements are provisional. Other downloaded assets are
+Khronos CarConcept (CC-BY-4.0), FlightHelmet (CC0-1.0), donmccurdy KTX2-Samples
+(CC-BY-SA-4.0), and existing licensed Margo test fixtures.
+
+Shipped targets use a second pass with the actual built static-embind wrapper,
+copied and executed opaquely outside the worktree. The retained vendor-wrapper
+pass is a control: all 9,491 image hashes and 186 existing quality measurements
+match. Both wrappers use the same Wasm. The built wrapper is 58,516 bytes raw,
+15,516 bytes gzip level 9; its hash and both variants are recorded.
+
+- **Size target:** shipped Wasm 527,333 bytes raw, 247,535 bytes gzip level 9;
+  SHA-256 `6cf17dc889352c42e9acf8897107978d127005fe3386c36a0e3845e27967630a`.
+- **Time targets:** per-file/per-target first transcode on a fresh Wasm instance,
+  then three alternating A/B control rounds, each side's minimum of two full
+  transcodes. A separate cold control creates a fresh Wasm instance for every
+  trial, using the same three-round/two-trial/alternating-order design. Module
+  startup is timed separately. A and B are the same prebuilt. All image hashes
+  match after every timed control. Per-round minima are in the record; old/new
+  A/B has not happened.
+- **Startup target:** seven fresh Node processes, with opaque startup's
+  instantiate call instrumented as compile then instantiate. Observed minima
+  are 0.6618 ms compile, 0.1409 ms instantiate and 32.6742 ms factory plus
+  initialization. These component minima can come from different trials.
+  Natural uninstrumented startup is also recorded separately per corpus target.
+- **Memory target:** 699 additional processes, one file/target in each, retaining
+  only that target's full output. Maximum process peak is 128,276 KiB; maximum
+  Wasm high-water size is 30,867,456 bytes. Both include startup; process RSS
+  includes the Node runtime, input and output. Pair these with the replacement.
+- **Quality target, incomplete:** 186 pairs, from 31 matching PNG originals at
+  level/layer/face zero, measured in stored byte values. BC1 compares RGB,
+  BC3/BC7/RGBA8 compare RGBA, BC4 compares R and BC5 compares RG. Per-file SSE,
+  MSE, maximum absolute error and channel sums are retained. Other targets,
+  mips, arrays, cube faces, HDR and .basis source quality still need measurement.
+- **Feature target:** opaque `isFormatSupported` probes and corpus calls confirm
+  ETC1S/UASTC, all served LDR targets, HDR, mips, arrays, alpha and cube maps.
+  EAC R/RG is UASTC-only. ATC, FXT1 and PVRTC2 are disabled in this shipped
+  build, independently of the enum names present in its public runtime object.
+
+CPU load was 100 percent during this run. Cold controls overlapped part of the
+isolated-memory controls and repository verification; raw records retain this
+limitation. Timings are diagnostic targets for
+paired follow-up, not release performance numbers. Cold here means first full
+transcode after a new module instance, not an operating-system cache flush.
+All harnesses and raw per-image/trial records remain in the lane-M private
+batch-134 measurement folder; no foreign implementation was inspected.
+Complete the missing baseline quality before freezing the comparison corpus.
+The replacement must meet every target, with bit identity for prescribed output
+and per-file quality no worse where the specifications leave encoding choices
+open. No missed replacement target may be accepted as a published loss.
+
 ## Rendering and CPU speed
 
 ### 1. Shadow casters: one draw per caster per cascade

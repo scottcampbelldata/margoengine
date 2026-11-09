@@ -1,0 +1,199 @@
+{
+  "status": "pass",
+  "job": "Batch134 job1 mandatory source review and partial prebuilt baseline",
+  "testedParent": "d47ac477f",
+  "checks": {
+    "lint": {
+      "exit": 0,
+      "elapsedSeconds": 5.0537731647491455,
+      "command": [
+        "npm.cmd",
+        "run",
+        "lint"
+      ]
+    },
+    "hygiene-built": {
+      "exit": 0,
+      "elapsedSeconds": 48.332465410232544,
+      "command": [
+        "npm.cmd",
+        "run",
+        "hygiene"
+      ]
+    },
+    "verify-snapshot": {
+      "exit": 0,
+      "elapsedSeconds": 447.28563046455383,
+      "command": [
+        "npm.cmd",
+        "run",
+        "verify"
+      ]
+    },
+    "decoders-tests": {
+      "exit": 0,
+      "elapsedSeconds": 17.453908443450928,
+      "command": [
+        "npm.cmd",
+        "test",
+        "--workspace",
+        "@margoengine/decoders"
+      ]
+    },
+    "gltf-tests": {
+      "exit": 0,
+      "elapsedSeconds": 1.5284059047698975,
+      "command": [
+        "npm.cmd",
+        "test",
+        "--workspace",
+        "@margoengine/gltf"
+      ]
+    },
+    "decoders-browser": {
+      "exit": 0,
+      "elapsedSeconds": 10.46408200263977,
+      "command": [
+        "node",
+        "scripts/gpu-lock.mjs",
+        "run",
+        "--owner=codex-134",
+        "--",
+        "node",
+        "packages/decoders/scripts/test-browser.js"
+      ]
+    },
+    "gltf-gpu": {
+      "exit": 0,
+      "elapsedSeconds": 3.944901943206787,
+      "command": [
+        "node",
+        "scripts/gpu-lock.mjs",
+        "run",
+        "--owner=codex-134",
+        "--",
+        "node",
+        "scripts/test-gltf-browser.mjs"
+      ]
+    },
+    "decoders-node-gpu": {
+      "exit": 0,
+      "elapsedSeconds": 2.2667510509490967,
+      "command": [
+        "node",
+        "scripts/gpu-lock.mjs",
+        "run",
+        "--owner=codex-134",
+        "--",
+        "node",
+        "packages/decoders/scripts/test-node-gltf.mjs"
+      ]
+    },
+    "llms-regression": {
+      "exit": 0,
+      "elapsedSeconds": 2.334832191467285,
+      "command": [
+        "node",
+        "--test",
+        "--test-timeout=60000",
+        "tests/llms.test.js"
+      ]
+    },
+    "docs-links": {
+      "exit": 0,
+      "elapsedSeconds": 0.5552389621734619,
+      "command": [
+        "node",
+        "scripts/docs-links.mjs"
+      ]
+    },
+    "supply-chain": {
+      "exit": 0,
+      "elapsedSeconds": 0.5763909816741943,
+      "command": [
+        "node",
+        "scripts/supply-chain.mjs",
+        "--check"
+      ]
+    },
+    "consolidate-built-final": {
+      "exit": 0,
+      "elapsedSeconds": 0.23764705657958984,
+      "command": [
+        "node",
+        "private/batch-134/measure/consolidate-built.mjs"
+      ]
+    }
+  },
+  "unitSuite": {
+    "tests": 13437,
+    "pass": 13437,
+    "fail": 0,
+    "skipped": 0,
+    "cancelled": 0,
+    "todo": 0
+  },
+  "baselineValidation": {
+    "status": "pass",
+    "files": 51,
+    "pairs": 699,
+    "hashedImages": 9491,
+    "sourceQualityPairs": 186,
+    "memoryPairs": 699,
+    "coldPairs": 699,
+    "coldTrials": 8388,
+    "coldImageHashes": 113892,
+    "recordBytes": 1257195
+  },
+  "currentArtifactValidation": {
+    "status": "pass",
+    "assets": {
+      "js": {
+        "bytes": 58516,
+        "sha256": "fe39f181e00028df0d9e9213b481b74163d4054789b60b5cc36b15ac6ccea3be"
+      },
+      "wasm": {
+        "bytes": 527333,
+        "sha256": "6cf17dc889352c42e9acf8897107978d127005fe3386c36a0e3845e27967630a"
+      }
+    }
+  },
+  "resolvedInitialFailures": [
+    {
+      "check": "hygiene",
+      "cause": "Rebase added procedural declarations not yet present in dist",
+      "resolution": "Required package build restored current declarations; full hygiene passed"
+    },
+    {
+      "check": "verify",
+      "cause": "Edited documentation made generated site/llms-full.txt stale",
+      "resolution": "Regenerated with node scripts/build-llms.mjs; all8 llms regression tests and full verify passed",
+      "regression": "tests/llms.test.js"
+    }
+  ],
+  "scope": "No package, README, API export or third-party asset changed; package README execution and API update not applicable. Existing package/GPU tests validate the shipped decoder, not a replacement. Baseline source quality/licensing remains incomplete. Physics implementation stays on hold.",
+  "postRebase": {
+    "base": "d83fd88d56d6e5c1c8674f5e9af9baeb467c2d16",
+    "note": "Preserved upstream sciviz documentation and regenerated the merged documentation snapshot. Decoder and glTF package source is unchanged from the full verification parent.",
+    "checks": {
+      "llms-rebase": {
+        "exit": 0,
+        "elapsedSeconds": 2.8275861740112305,
+        "command": [
+          "node",
+          "--test",
+          "--test-timeout=60000",
+          "tests/llms.test.js"
+        ]
+      },
+      "docs-links-rebase": {
+        "exit": 0,
+        "elapsedSeconds": 0.5720858573913574,
+        "command": [
+          "node",
+          "scripts/docs-links.mjs"
+        ]
+      }
+    }
+  }
+}

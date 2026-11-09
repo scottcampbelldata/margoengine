@@ -1388,6 +1388,25 @@ the source ledger and private plan; codec and wrapper source remain unread.
 No replacement was built or benchmarked. The prebuilt decoders remain pending
 all five jobs; existing tests do not prove a clean-room replacement.
 
+### Basis clean-room replacement (batch 134, 2026-11-09)
+
+Scott's ruling dated 2026-11-10 replaces the earlier byte-choice blocker with
+bit identity for prescribed output and per-file quality no worse for free
+encoding choices. The [source ledger](../clean-room.md#basis-replacement-specification-gate-batch-134-2026-11-09)
+records the review. The [partial prebuilt baseline](../whitepaper/results/batch-134-prebuilt-baseline.json)
+records 51 files, 699 successful file/target pairs, cold/warm paired controls,
+per-image hashes, isolated per-target process/Wasm memory and startup phases.
+Both vendor and shipped static-embind wrappers were measured separately;
+their complete image signatures and existing source-quality measurements match.
+Shipped targets use the built wrapper. Only
+186 level-zero source-quality pairs are measured. Full source-quality
+coverage, a replacement, replacement identity, paired old/new speed, hostile
+input and GPU uploads remain unverified. Runtime feature probes show this
+prebuilt disables ATC, FXT1 and PVRTC2; these are not missing replacement paths.
+Retain the prebuilt until all five job gates pass. Use one optional Rust/Wasm
+asset and the unchanged TypeScript API, including the existing HDR entry.
+Core, stage and physics are unchanged.
+
 ### Procedural space colonisation (batch 68, job 4)
 
 The optional trees entry owns its Rust crate and lazy Wasm asset. Attraction assignment and growth are

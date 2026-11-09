@@ -1,5 +1,42 @@
 # Build record
 
+## Batch 134: Basis specification review and partial prebuilt baseline
+
+Scott's ruling dated 2026-11-10 supersedes the earlier byte-choice blocker:
+prescribed output remains bit-identical; open encoding choices must give
+per-file quality at least as good as the prebuilt. The private plan and
+[source ledger](../clean-room.md#basis-replacement-specification-gate-batch-134-2026-11-09)
+preserve the clean-room boundary. The prebuilt ran only as an opaque runtime
+outside the worktree. No decoder implementation source was inspected.
+
+The [measurement record](results/batch-134-prebuilt-baseline.json) covers 51
+attempted files and 699 successful file/target pairs, 9,491 image hashes,
+cold/warm prebuilt-vs-itself controls, startup phases, isolated process/Wasm
+memory and 186 level-zero source-quality pairs. The [performance entry](perf-history.md#batch-134-prebuilt-basis-targets-baseline-incomplete)
+states the exact scope and missing baseline measurements. ATC, FXT1 and PVRTC2
+are compiled out of this prebuilt, so their format-documentation gaps do not
+block the replacement. Existing HDR behavior must be preserved. Separate
+vendor and shipped static-embind wrapper passes match every image hash and
+existing quality measurement. Shipped targets use built glue; the earlier
+vendor pass is retained as control evidence. Both use the same Wasm.
+
+| Job | State | Evidence and remaining work |
+| --- | --- | --- |
+| 1. Obtain and read specifications in full | DONE | Four required input documents fully reviewed, including appendices, figures and vectors; private plan written before decoder code |
+| 2. Complete ETC1S/UASTC transcoder | Not started | One optional Rust/Wasm asset, same TypeScript API |
+| 3. External corpus identity and corrupt-input fuzzing | Partial prebuilt corpus | Complete source provenance/quality, replacement comparison and fuzz |
+| 4. Speed, size and real GPU uploads | Partial prebuilt targets | Complete baseline quality, old/new A/B and GPU proof |
+| 5. Remove prebuilt transcoder | Pending | All preceding gates passing |
+
+Job 1 records source review and partial prebuilt measurements only. Selected
+Data Format target chapters were reviewed, including further visual checks;
+remaining path-specific target checks and regression vectors belong to the
+implementation job. Open encoder choices use Scott's per-file quality bar,
+not an obsolete request for unique encoder bytes. No runtime, package, export
+or third-party asset changed, and there is no replacement parity or speed
+claim. The generated full-documentation snapshot accompanies these docs.
+Batch 134 stays open; physics and batch-133 remain untouched.
+
 This file records every finished batch of work on Margo Engine: what each batch was for, what landed, which bugs it
 found, how it was proved and what is still unproved. Scott directs AI agents to build and test this engine; no section
 below describes hand-written code. Agents wrote the code and the tests, and an agent pushed each commit after its

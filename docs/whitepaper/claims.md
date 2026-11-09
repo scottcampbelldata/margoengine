@@ -17,6 +17,14 @@ Removal detaches points and lines synchronously, and attached figure disposal fr
 It rebuilds resources and briefly holds both layers. These are correctness claims;
 no speed or official-demo presentation claim is made. Reproduction commands are in reproduce.md.
 
+Batch 134's [partial prebuilt Basis baseline](results/batch-134-prebuilt-baseline.json)
+records 51 attempted files, 699 successful file/target pairs and 9,491 image
+hashes. Built and vendor wrappers agree on those hashes and the 186 measured
+base-level source-quality pairs. The [performance entry](perf-history.md#batch-134-prebuilt-basis-targets-baseline-incomplete)
+separates loaded-machine same-prebuilt controls from replacement claims.
+All-target source quality and three .basis source/derivative licenses remain
+unverified. No replacement, new/old speed, fuzz or GPU proof is claimed.
+
 The lane-Q README repair (2026-11-09) runs all 40 examples in React, Stage, text and worker with zero failures.
 This closes five runtime exceptions: React CommonJS conversion, a self-hosted asynchronous picking test, Stage's
 static glTF selection, a generated OFL ASCII atlas and the worker companion source. It proves these examples on

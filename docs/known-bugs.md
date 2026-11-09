@@ -32,6 +32,23 @@ the source ledger and private plan. No implementation source may be read or used
 The remedy is the full Rust/Wasm decoder followed by all comparison and quality
 gates. The existing prebuilt files remain and batch 133 stays open.
 
+### Open: batch 134 Basis replacement remains unverified
+
+Scott's ruling dated 2026-11-10 resolves the earlier byte-choice prerequisite:
+require identical output where specified and per-file quality no worse than the
+old transcoder where encoding choices are open. The old BC1/BC3-alpha/BC4/BC5
+objection is no longer a blocker. No new shipped decoder defect is claimed.
+The [prebuilt baseline](whitepaper/results/batch-134-prebuilt-baseline.json)
+contains 51 files and 699 successful file/target pairs, with all-image hashes,
+cold/warm control timings, startup phases and isolated memory measurements.
+Source-image quality is measured for only 186 level-zero pairs; remaining
+targets, mips, faces, layers, HDR and .basis original provenance remain open.
+Separate timing/startup/memory passes now cover vendor and built static-embind
+glue. Their 9,491 image hashes and 186 source-quality measurements match; shipped
+targets use built glue. The retained vendor pass is control evidence.
+There is no replacement implementation, replacement identity, paired speed,
+hostile-input fuzz or GPU proof. Keep the prebuilt until every gate passes.
+
 ### Fixed 2026-11-09: batch 76 transition review
 
 Built-in/custom composites used viewport-local UVs to address full-target captures, reading uncaptured pixels in offset views. They now derive capture UVs from absolute fragment positions. viewport-browser.js compares spatial colors against baseline at idle/0/0.5/1 across all built-in kinds, custom and mask, at 1x/4x, including preservation outside a stacked scissor. Live target validation omitted the fragment output's format domain, so integer/depth targets could advance source scenes before invalid GPU work. A shared float-color/resolve check now rejects those formats before live allocation or updates and also guards frozen-frame capture. live.test.js, live-browser.js and transitions.test.js cover this class, including non-resolvable 32-bit float 4x outputs. README and limits document custom WGSL's trusted-author requirement and fixed resource interface; real-compiler regressions accept costly code without dispatch, reject reachable extra resources and distinguish unused declarations. No core/stage change.
