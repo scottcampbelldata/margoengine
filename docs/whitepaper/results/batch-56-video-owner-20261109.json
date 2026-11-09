@@ -13,7 +13,7 @@
     "reason": "Scott requested affected checks only"
   },
   "pending": [],
-  "fix": "same-change acceptance commit; original local source proof retained as localFixBeforeAcceptance",
+  "fix": "405b24504",
   "units": {
     "pass": 34,
     "fail": 0,
@@ -243,5 +243,19 @@
       "timedOut": false,
       "seconds": 6.903
     }
+  },
+  "rebase": {
+    "onto": "d15e46fd2",
+    "acceptedLocal": "f12a89e74",
+    "sourceAndTestsIdentical": true,
+    "mergedBaselineOtherItemsPreserved": true,
+    "trueTotal": 11928891,
+    "docsLinks": {
+      "code": 0,
+      "timedOut": false,
+      "seconds": 1.187
+    },
+    "gpuRepeated": false,
+    "reason": "Accepted Video source and tests unchanged; incoming Sciviz/viewcube work retained."
   }
 }
