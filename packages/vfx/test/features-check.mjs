@@ -209,6 +209,14 @@ try {
     );
   }
   {
+    const name = 'shadow release',
+      r = await page.evaluate(() => window.checkShadowRelease());
+    report.results[name] = r;
+    clean(r, name);
+    assert.deepEqual(r.rejected, [], name);
+    console.log(`ok ${name}`);
+  }
+  {
     const name = 'nodes',
       r = await page.evaluate(() => window.checkNodes());
     report.results[name] = r;

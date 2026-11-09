@@ -516,5 +516,26 @@ window.checkShadowFar=async()=>{
  sphere.dispose();
  return {error:depthRun.error,errors:errors.splice(0),samples};
 };
+// Disposal while the light read-back is mapping. run() copies the list, the next simulate asks to map it, and dispose
+// destroys that buffer before the map resolves. The cancelled map must not reject without a handler.
+window.checkShadowRelease=async()=>{
+ const rejected=[];
+ const onReject=(event)=>{
+  const reason=event.reason;
+  rejected.push(reason&&reason.name?reason.name+': '+reason.message:String(reason));
+  event.preventDefault();
+ };
+ window.addEventListener('unhandledrejection', onReject);
+ try{
+  const effect=new VFX({...still,capacity:1,shadows:{into:{setLights(){}}}});
+  const started=await run(effect,{frames:0,dt:0,setup:()=>device.queue.writeBuffer(effect.gpuState.particles,0,records([{at:[1,2,3],life:4,size:2,color:[1,0,0]}],1))});
+  effect.simulate({backend:'webgpu',device,delta:0,camera,width:size,height:size,encoder:device.createCommandEncoder()});
+  effect.dispose();
+  await new Promise((resolve)=>setTimeout(resolve,100));
+  return {error:started.error,errors:errors.splice(0),rejected};
+ }finally{
+  window.removeEventListener('unhandledrejection', onReject);
+ }
+};
 window.ready=true;
 </script></body></html>

@@ -1,5 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
+import { writeFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { join } from 'node:path';
 import { VFX } from '../dist/index.js';
 import { VFX as Base } from '../dist/base.js';
 import { MAX_PARTICLE_LIGHTS } from '../dist/shadows.js';
@@ -102,4 +107,114 @@ test('shadows rejects a missing feature and a bad count, range, intensity or tar
     false,
   );
   effect.dispose();
+});
+
+const flush = () => new Promise((resolve) => setImmediate(resolve));
+
+const deferMaps = (engine) => {
+  const create = engine.gpu.createBuffer;
+  engine.gpu.createBuffer = (descriptor) => {
+    const buffer = create(descriptor);
+    let settle = null;
+    buffer.mapAsync = () =>
+      new Promise((resolve, reject) => {
+        buffer.mapState = 'pending';
+        settle = { resolve, reject };
+      });
+    const destroy = buffer.destroy.bind(buffer);
+    buffer.destroy = () => {
+      destroy();
+      if (!settle) return;
+      const reject = settle.reject;
+      settle = null;
+      reject(
+        Object.assign(new Error('Buffer was destroyed before mapping was resolved'), { name: 'AbortError' }),
+      );
+    };
+    return buffer;
+  };
+};
+
+test('releasing the effect during the light readback settles the cancelled map', async () => {
+  const rejections = [];
+  const onReject = (reason) => {
+    rejections.push(reason);
+  };
+  process.on('unhandledRejection', onReject);
+  try {
+    const disposed = optionalGPU();
+    disposed.engine.stats = { drawCalls: 0 };
+    deferMaps(disposed.engine);
+    const disposedEffect = new VFX({ capacity: 1, shadows: { into: { setLights() {} } } });
+    disposed.engine.use(disposedEffect);
+    disposed.frame();
+    disposed.frame();
+    disposedEffect.dispose();
+    await flush();
+    assert.deepEqual(rejections, [], 'dispose destroyed the mapped buffer');
+
+    const restored = optionalGPU();
+    restored.engine.stats = { drawCalls: 0 };
+    deferMaps(restored.engine);
+    const restoredEffect = new VFX({ capacity: 1, shadows: { into: { setLights() {} } } });
+    restored.engine.use(restoredEffect);
+    restored.frame();
+    restored.frame();
+    restoredEffect.onDeviceRestored(restored.engine);
+    await flush();
+    assert.deepEqual(rejections, [], 'device restore destroyed the mapped buffer');
+    restoredEffect.dispose();
+  } finally {
+    process.off('unhandledRejection', onReject);
+  }
+});
+
+test('a light readback that fails on its own stays a rejection', async () => {
+  const file = join(tmpdir(), `vfx-readback-${process.pid}.mjs`);
+  const vfx = pathToFileURL(fileURLToPath(new URL('../dist/index.js', import.meta.url))).href;
+  const harness = pathToFileURL(fileURLToPath(new URL('../../../tests/support/optional-gpu.js', import.meta.url))).href;
+  await writeFile(
+    file,
+    `import { VFX } from ${JSON.stringify(vfx)};
+import { optionalGPU } from ${JSON.stringify(harness)};
+const seen = [];
+process.on('unhandledRejection', (reason) => seen.push(String(reason)));
+const h = optionalGPU();
+h.engine.stats = { drawCalls: 0 };
+const effect = new VFX({ capacity: 1, shadows: { into: { setLights() {} } } });
+h.engine.use(effect);
+h.frame();
+const staging = h.resources.find((resource) => resource.usage === 9);
+if (!staging) { console.error('no readback buffer'); process.exit(2); }
+staging.mapAsync = () => Promise.reject(new TypeError('readback failed'));
+h.frame();
+setImmediate(() => {
+  effect.dispose();
+  setImmediate(() => {
+    if (seen.length === 1 && seen[0].includes('readback failed')) process.exit(0);
+    console.error(JSON.stringify(seen));
+    process.exit(1);
+  });
+});
+`,
+  );
+  try {
+    const child = spawn(process.execPath, [file], { stdio: ['ignore', 'pipe', 'pipe'] });
+    const out = [];
+    child.stdout.on('data', (chunk) => out.push(chunk));
+    child.stderr.on('data', (chunk) => out.push(chunk));
+    const code = await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        child.kill();
+        reject(new Error('readback child hung'));
+      }, 10000);
+      child.on('exit', (status) => {
+        clearTimeout(timer);
+        resolve(status);
+      });
+    });
+    assert.equal(code, 0, Buffer.concat(out).toString());
+  } finally {
+    await rm(file, { force: true });
+  }
 });

@@ -183,6 +183,7 @@ export const shadows: VFXExtension<VFXShadows> = {
     let copied = false;
     let mapping = false;
     let pending: Float32Array | null = null;
+    let released = false;
     let removed = false;
     let unbind: (() => void) | undefined;
     const matrices: GPUBuffer[] = [];
@@ -232,6 +233,7 @@ export const shadows: VFXExtension<VFXShadows> = {
     const drop = () => {
       if (removed) return;
       removed = true;
+      released = true;
       source.disposed = true;
       unbind?.();
     };
@@ -268,13 +270,25 @@ export const shadows: VFXExtension<VFXShadows> = {
         c.device.queue.writeBuffer(uniform, 0, floats);
         if (into && staging && copied && !mapping) {
           mapping = true;
-          void staging.mapAsync(GPUMapMode.READ).then(() => {
-            const copy = new Float32Array(staging!.getMappedRange().slice(0));
-            staging!.unmap();
-            mapping = false;
-            copied = false;
-            pending = copy;
-          });
+          const buffer = staging;
+          // Disposal and device restore destroy this buffer while the map is still open. That rejection is the
+          // map ending, and it is settled here. Any other rejection is left unhandled so it stays visible.
+          void buffer.mapAsync(GPUMapMode.READ).then(
+            () => {
+              mapping = false;
+              copied = false;
+              if (released) return;
+              const copy = new Float32Array(buffer.getMappedRange().slice(0));
+              buffer.unmap();
+              pending = copy;
+            },
+            (error: unknown) => {
+              mapping = false;
+              copied = false;
+              if (released && error instanceof Error && error.name === 'AbortError') return;
+              throw error;
+            },
+          );
         }
         if (pending && into) {
           const data = pending;

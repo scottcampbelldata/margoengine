@@ -81,6 +81,11 @@ try {
     `ok shadow far webgl2: ${far.samples.map((sample) => `${sample.center} ${sample.got.toFixed(5)}`).join(' ')}`,
   );
 
+  const release = await page.evaluate(() => window.checkShadowRelease());
+  clean(release, 'shadow release');
+  assert.deepEqual(release.rejected, [], 'shadow release');
+  console.log('ok shadow release webgl2');
+
   const nodes = await page.evaluate(() => window.checkNodes());
   clean(nodes, 'nodes');
   assert.deepEqual(nodes.mismatches, [], JSON.stringify(nodes));
