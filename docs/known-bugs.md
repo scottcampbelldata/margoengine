@@ -24,15 +24,18 @@ The coordinator requires the existing local test-page follow-ups to land first;
 entry 45 is retained for subsequent owning-package triage, alongside 42-44 in
 testpage-bugs.md. No core change is implied by this report.
 
-### Fixed: test-page 36 retained mesh transforms; open 32 Label diagnostic
+### Fixed: test-page 36 retained mesh transforms and 32 Label diagnostic
 
 Mesh fields were readonly only in TypeScript: JavaScript assignment replaced refs
 without updating the store and corrupted inspector snapshots. Core now guards
 all three refs at construction with a coded TypeError. No optional package can
 guard every mesh. `core/tests/transform-refs.test.js` fails before, passes after,
 and checks store growth, identity, supported mutations and snapshot restoration.
-Core + stage: 23,837 to 23,924 B gzip. Label.position still throws a raw getter-only
-TypeError; entry 32's matching coded diagnostic is the next separate piece.
+Core + stage: 23,837 to 23,924 B gzip. Label.position now rejects replacement
+with the same coded TypeError, retaining its getter-only declaration and existing
+setPosition behaviour. labels/tests/testpage-position.test.js fails before and
+passes after; it also pins use of the declared shared math dependency. Labels
+measure 5,450 B gzip, below the unchanged 5,546 B entry budget.
 
 ### Fixed 2026-11-09: decoder Node Basis README example
 

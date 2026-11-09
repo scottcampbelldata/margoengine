@@ -26,7 +26,7 @@ await build({
       formats: ['es'],
       fileName: (_, name) => name + '.js',
     },
-    rollupOptions: { external: ['@margoengine/core', '@margoengine/core/extension'] },
+    rollupOptions: { external: ['@margoengine/core', '@margoengine/core/extension', '@margoengine/math/mat4'] },
   },
 });
 execFileSync(

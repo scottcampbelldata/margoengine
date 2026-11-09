@@ -11,7 +11,7 @@ import {
   type Vec3,
 } from './projection.js';
 import { hiddenInTree } from '../../shared/visibility.js';
-import { rangeError } from '../../shared/errors.js';
+import { rangeError, vectorAssignment } from '../../shared/errors.js';
 import { createScreenPoint, isOrthographic, projectPoint, type ScreenPoint } from '@margoengine/math/mat4';
 
 /** Where a label sits this frame: its screen position, depth, distance from the camera and world anchor. */
@@ -268,6 +268,9 @@ export class Label extends Item {
     return this;
   }
 }
+
+// Keep the public getter-only type while giving rejected assignment the core transform diagnostic.
+Object.defineProperty(Label.prototype, 'position', { set: vectorAssignment });
 
 /** An HTML element placed in world space with a CSS matrix3d transform. */
 export class CSS3DObject extends Item {

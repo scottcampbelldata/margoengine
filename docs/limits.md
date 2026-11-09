@@ -3,6 +3,10 @@
 Mesh position, rotation and scale refs cannot be replaced. Assignment throws TypeError
 with code `transform` and `Retained vector: use a transform setter` plus the help link.
 Use `.set()`, `.setAll()`, components or mesh setters; Camera tuples remain assignable.
+Label.position retains its getter-only type and rejects assignment with the same coded
+TypeError. Use label.setPosition to validate/copy the new position and stop mesh following.
+Labels share the declared math/mat4 dependency; the entry is 5,450 B gzip against
+its unchanged 5,546 B ceiling.
 The approved test-page 36 guard adds 87 B: core + stage 23,837 to 23,924 B gzip.
 
 Biome prefetch shares raw work with streaming and retains at most 1,024 terrain/object results,

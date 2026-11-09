@@ -1747,3 +1747,9 @@ All 46 shadows/quality/post and 35 biome README snippets execute without
 exceptions, and all 16 effect-package GPU scripts pass. Full verify: 13,534/13,534,
 zero skips. results/missing-items-landing-20261109.json records the scoped evidence.
 The 7.4 ms diagnostic frame is still unclassified; no timing closure is claimed.
+
+Test-page 32: Label position rejects assignment with core's coded TypeError and
+keeps its getter-only public type. labels/tests/testpage-position.test.js fails
+before and passes after; supported setPosition behaviour is retained. The labels
+entry shares the declared math/mat4 module instead of embedding its implementation:
+5,546 to 5,450 B gzip, within the unchanged 5,546 B budget. No speed claim.

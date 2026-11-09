@@ -335,3 +335,19 @@ umbrella README size; that number is corrected and the existing size regression
 passes. Repaired full verify passed all 13,546 tests, zero failures/skips, in
 400.4 s. Core-only measured 21,553 B, below 21,587 B. GPU and executable README
 checks are queued under codex-testpage; the local commit is not pushed yet.
+
+### Entry 32: preserve getter-only Label position with the core diagnostic
+
+The before regression fails on the raw getter-only TypeError. A rejecting runtime
+setter preserves the getter and the getter-only public declaration, while using
+core's shared coded diagnostic verbatim. Array/object/self/null assignment and
+Reflect.set preserve the position and followed mesh; setPosition still copies and
+detaches. The declared math/mat4 dependency was being embedded by labels' custom
+build. Keeping it external removes that redundant implementation and funds the
+error guard: 5,546 to 5,450 B gzip, within the unchanged 5,546 B ceiling. The class
+regression and the shared dependency assertion are in check:testpage-contracts.
+
+Entry 32 gates: labels units passed (2.3 s), lint passed (2.1 s), hygiene
+passed (12.6 s), and full verify passed in 405.2 s with zero failures/skips.
+The labels GPU and executable README checks are queued under codex-testpage;
+the separate local commit is not pushed until those actual checks pass.

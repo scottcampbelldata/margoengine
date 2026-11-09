@@ -56,6 +56,26 @@ creating an overlay; the existing renderer, layout and labels are preserved.
 - **Engine views.** `new LabelRenderer({view})` (or `labels.view = {camera, viewport, pixels?}`) places labels through that view's camera inside its rectangle, clipped to it; hook coordinates are then relative to the view's corner. One renderer per view.
 - **Occlusion hook.** Depth-buffer occlusion is not built in. `occlude(label, {x, y, depth, distance, world})` on the renderer or a label returns true to hide that label this frame; the per-label hook overrides the renderer one.
 
+## Moving a label
+
+`label.position` is getter-only. Assignment throws TypeError with code `transform`
+and the same message as core mesh refs: `Retained vector: use a transform setter`,
+followed by the help link. `setPosition` validates and copies a world position,
+and stops following a mesh:
+
+```ts
+import { Engine } from '@margoengine/core';
+import { LabelRenderer } from '@margoengine/labels';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const labels = LabelRenderer.attach(engine);
+const label = labels.add(document.createElement('span'), { position: [0, 1, 0] });
+label.element.textContent = 'Valve';
+label.setPosition([2, 1, 0]);
+engine.render();
+engine.dispose();
+```
+
 ## Scaled pages
 
 A CSS scale on an element around the canvas (a zoomed preview, a slide, a fitted dashboard tile) scales what the browser draws but not the `left` and `top` the overlay is placed with. Each update the renderer reads the overlay's drawn width against the width it gave it, converts its correction by that scale, and lands on the canvas content box in the same update at any scale. An overlay in another `parent`, outside the scaled element, is scaled itself (`transform: scale(k)`, origin at its corner) so a CSS pixel of the labels is a CSS pixel of the canvas.
