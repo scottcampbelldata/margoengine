@@ -507,3 +507,11 @@ network record makes five requests and leaves no unused built files.
 Finding 9 acceptance: lint, hygiene and full verify pass, including all repository
 unit cases, API currentness, quality gates, sandbox checks and README type checks.
 Successful points GPU/unit/README steps are retained without replay.
+
+Rebased finding 9 through 02e0f5d8a, retaining concurrent materials, LIC and Save
+work. Points source, regression and README are byte-identical to the tested
+restoration. Rebuilt only changed save/sciviz/umbrella packages; genuine paired
+records measure f56e53077 with dirty=false. API/llms regeneration, 17 record
+tests, full API currentness, docs links and the size gate pass. Points remains
+24138 B; core/stage remains 23924 B. Main owns Save GPU/unit and LIC evidence;
+no second full verify or replay of successful points GPU/README tests.
