@@ -73,7 +73,7 @@ Windows viewport/UA emulation cannot certify iOS, iPadOS or Android GPU drivers;
 Playwright WebKit cannot certify Safari.
 
 The coordinator should request the real Mac, iPhone, iPad and both Android GPU
-families above, plus stable Firefox access or permission to repair/install it.
+families above, plus a working stable Firefox setup or access to one.
 Physical lower-tier hardware and the integrated AMD browser rows are still
 unmeasured. Chrome and Edge availability is not a completed matrix row.
 

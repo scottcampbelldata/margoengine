@@ -51,6 +51,27 @@
     "hygiene": "PASS after building inherited sciviz LIC declarations",
     "generatedGuide": "PASS"
   },
+  "focusedCallerRegression": {
+    "native": "44 checks/44 captures PASS, zero failures",
+    "compat": "44 checks/44 captures PASS, zero failures",
+    "receipt": "test-results/batch-273-dispersion-caller-regression.log",
+    "reports": [
+      "test-results/material-dispersion/native-caller-gpu.json",
+      "test-results/material-dispersion/compat-caller-gpu.json"
+    ],
+    "execution": "one shared slot, wait-max 60; elapsed 587.3 s includes FIFO queue, not a speed measurement"
+  },
+  "landingRebase": {
+    "onto": "40a1548cc",
+    "build": "PASS, rebuilt all packages including inherited changes",
+    "affectedUnits": "402/402 PASS across points, quality, save, water and scalar-payload metrics",
+    "api": "PASS, 899 entries / 8702 exports",
+    "lint": "PASS",
+    "hygiene": "PASS",
+    "generatedGuide": "PASS after regeneration",
+    "size": "PASS, 23924 B root gzip",
+    "secondWholeVerify": false
+  },
   "compatSuitesClosed": 2,
   "compatSuitesTotal": 26,
   "remainingCause": "4x reset divergence not isolated between uniform replay and multisample rendering; no driver attribution proven",
