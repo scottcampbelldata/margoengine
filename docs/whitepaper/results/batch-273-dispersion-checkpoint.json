@@ -72,6 +72,19 @@
     "size": "PASS, 23924 B root gzip",
     "secondWholeVerify": false
   },
+  "finalRebase": {
+    "onto": "a1831da68",
+    "inheritedScope": "Controls wrapper ownership and restored stage diagnostics",
+    "build": "PASS, all packages rebuilt",
+    "affectedUnits": "326 tests PASS; four stage files initially could not run because the command omitted --experimental-test-module-mocks",
+    "correctedRunner": "Only those four unrun stage files continued with the repository-required module-mocking flag: 66/66 PASS; original failed invocation retained",
+    "api": "PASS, 899 entries / 8702 exports",
+    "lint": "PASS",
+    "hygiene": "PASS",
+    "generatedGuide": "PASS after regeneration",
+    "size": "PASS, 23924 B root gzip",
+    "secondWholeVerify": false
+  },
   "compatSuitesClosed": 2,
   "compatSuitesTotal": 26,
   "remainingCause": "4x reset divergence not isolated between uniform replay and multisample rendering; no driver attribution proven",
