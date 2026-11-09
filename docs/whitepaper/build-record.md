@@ -4243,7 +4243,7 @@ The reservation/React Native decision landed in ad59b13cb966701eeae90625a7233981
 | 5. Sharp SDF modelling | DONE | 61db2517114b8175abe1794a41dfdad2baa591b9 | procedural/sdf; real standard Box plus stand-in sharp shapes, LIM-632 |
 | 6. Tileable textures | DONE | 978a86423, 1d303bc21, 06e58f18c | procedural/textures; calibrated paper figure plus stand-in pixel controls, LIM-639 |
 | 7. Building grammar | DONE | 252df10cc4bdd2628e4fa7fef597a6e6be864d4e | procedural/buildings; real municipal envelopes and four calibrated facade windows, LIM-642 |
-| 8. Cellular automata caves | DONE | this commit | procedural/caves; real Natural Earth mask plus stand-in seeded/3D controls, LIM-643 |
+| 8. Cellular automata caves | DONE | 482ca02af | procedural/caves; real Natural Earth mask plus stand-in seeded/3D controls, LIM-643 |
 
 Every implemented entry is optional and tree-shakable, with its own Rust/Wasm
 CPU feature except the GPU texture baker. No other engine implementation was
@@ -4303,7 +4303,7 @@ Complete gates at dd1d4f5a7 passed: 13445/13445 full verification tests,
 README examples (13 Node, 3 page). Native cave tests and the focused 28 cave/claim
 regressions passed. That earlier rebase preserved exact feature/loader/dependency
 bytes and repeated affected tests, GPU values, README execution, API and quality.
-The subsequent geometry changes on main require a new complete push-gate run.
+The subsequent geometry changes on main received a new complete push-gate run.
 
 Docs per implemented job: procedural README/example, clean-room research,
 operational playbook section 5, claims, limits and reproduction notes. Work-count
@@ -4311,3 +4311,32 @@ results and unmeasured timing are in perf-history.md and perf-vs-threejs.md.
 Job 2 adds no duplicate feature or new API documentation because the existing
 biomes/erosion README already describes it. Open-defect status is in known-bugs.md;
 this batch leaves no known cave defect.
+
+### Batch 68 closing validation
+
+Caves landed in 482ca02af. The complete pre-rebase run passed lint,
+hygiene, verify (13464/13464, no skips), procedural 103/103, staging 32/32 and both
+packages' full GPU suites. Native cave kernel tests passed 2/2. README execution:
+procedural 16 of 16 examples ran: 13 in Node, 3 in a page; 0 failed, 0 not on the known list; staging 7 of 7 examples ran: 0 in Node, 7 in a page; 0 failed, 0 not on the known list.
+
+The final rebase kept exact procedural sources, dependencies, lazy-asset rules
+and applicable fixture attributes. Only unrelated scientific-demo LFS patterns
+were added. The required shorter run passed 229 affected unit/root tests,
+API and quality, the complete procedural GPU suite and executable README examples.
+Both orientation GPU oracles also passed on main's completed-sample restoration
+implementation, preserving the full-texture and pixel equality bars.
+
+The first post-geometry verify failed two root checks: a fixed 16-frame staging
+restore loop and excluded local-path references in two batch-134 evidence records.
+Main's fc1ed452f and 988ba0005 fixed those causes while this lane was checking;
+the local duplicate repairs were dropped during rebase. The unchanged root
+regressions pass on the final tree. No baseline, assertion, tolerance, workload
+or deadline was weakened.
+
+One GPU admission wait expired after ten minutes with all slots held by other
+lanes; the native orientation test had not started. The passing checks were kept,
+and that unstarted test ran after capacity became available under its original
+limits. Its final result passed.
+
+This closing documentation commit marks row 68 done. Entry sizes and limits above
+remain current. Core, stage and physics source are unchanged by this lane.
