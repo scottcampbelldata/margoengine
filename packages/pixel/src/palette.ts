@@ -137,8 +137,11 @@ export function cyclePalette(
         throw rangeError(`Palette cycles ${owner[i]} and ${k} must not share entry ${i}`, 'pixel-palette');
       owner[i] = k;
     }
+    const product = rate * seconds;
+    if (!Number.isFinite(product))
+      throw fault('state', 'cyclePalette rate * seconds must be finite; reduce rate or seconds', 'pixel-palette');
     const length = to - from + 1,
-      shift = rate * seconds,
+      shift = product % length,
       whole = Math.floor(shift),
       part = cycle.blend ? shift - whole : 0,
       wrap = (i: number) => from + (((i % length) + length) % length);
@@ -477,7 +480,7 @@ export class PaletteQuantize implements EnginePlugin {
   dispose(): void {
     if (this.#disposed) return;
     this.#disposed = true;
-    this.#engine?.removePlugin(this.name);
+    this.#engine?.sceneOf(this)?.removePlugin(this.name);
     this.#engine = undefined;
     this.#release();
   }

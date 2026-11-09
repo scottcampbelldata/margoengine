@@ -1,0 +1,1144 @@
+{
+  "date": "2026-11-08",
+  "baseCommit": "c5d2a6fb8ff02bef6747fc71fa14532489204da4",
+  "scope": "Pixel batch 102 review fixes; RTX A6000/Edge only; no timing claim",
+  "unitTests": 45,
+  "coreStageGzipBytes": 23626,
+  "backends": {
+    "native": {
+      "hardware": {
+        "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "webgpu": {
+          "vendor": "nvidia",
+          "architecture": "ampere",
+          "device": "",
+          "description": "",
+          "fallback": false
+        },
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+        "browserName": "chromium",
+        "browserVersion": "157.0.4341.42",
+        "requestedChannel": "msedge",
+        "launchArgs": [],
+        "powerPreference": "high-performance",
+        "hostPlatform": "win32",
+        "headless": true
+      },
+      "suites": {
+        "pixel-browser": {
+          "checks": {
+            "background": {
+              "wrong": 0,
+              "first": null
+            },
+            "one layer at 4x, zoom fitted": {
+              "wrong": 0,
+              "first": null
+            },
+            "two 16 x 8 layers at 4x": {
+              "wrong": 0,
+              "first": null
+            },
+            "z puts a layer below": {
+              "wrong": 0,
+              "first": null
+            },
+            "visible false": {
+              "wrong": 0,
+              "first": null
+            },
+            "removed layer": {
+              "wrong": 0,
+              "first": null
+            },
+            "after dispose": {
+              "wrong": 0,
+              "first": null
+            },
+            "zoom 2 in the middle": {
+              "wrong": 0,
+              "first": null
+            },
+            "zoom 3, middle rounds down": {
+              "wrong": 0,
+              "first": null
+            },
+            "zoom 8 clipped": {
+              "wrong": 0,
+              "first": null
+            },
+            "layer offset": {
+              "wrong": 0,
+              "first": null
+            },
+            "90 degrees of a 1-pixel line": {
+              "wrong": 0,
+              "first": null
+            },
+            "180 degrees of a 1-pixel line": {
+              "wrong": 0,
+              "first": null
+            },
+            "270 degrees of a 1-pixel line": {
+              "wrong": 0,
+              "first": null
+            },
+            "-90 degrees is 270": {
+              "wrong": 0,
+              "first": null
+            },
+            "360 degrees is none": {
+              "wrong": 0,
+              "first": null
+            },
+            "quarter turn with texel edges": {
+              "wrong": 0,
+              "first": null
+            },
+            "30 degrees: only source colours": {
+              "wrong": 0,
+              "drawn": 1572,
+              "first": null
+            },
+            "scroll 0.5 moves nothing": {
+              "wrong": 0,
+              "first": null
+            },
+            "scroll 0.75 moves nothing": {
+              "wrong": 0,
+              "first": null
+            },
+            "scroll 0.99 moves nothing": {
+              "wrong": 0,
+              "first": null
+            },
+            "scroll 1 moves one pixel": {
+              "wrong": 0,
+              "first": null
+            },
+            "ten steps of 0.1 move one pixel": {
+              "wrong": 0,
+              "first": null
+            },
+            "both axes": {
+              "wrong": 0,
+              "first": null
+            },
+            "parallax 0.5: 3 moves one": {
+              "wrong": 0,
+              "first": null
+            },
+            "parallax 0.5: 4 moves two": {
+              "wrong": 0,
+              "first": null
+            },
+            "parallax per axis": {
+              "wrong": 0,
+              "first": null
+            },
+            "two layers, two parallaxes": {
+              "wrong": 0,
+              "first": null
+            },
+            "smooth 0.5 moves 2 output pixels": {
+              "wrong": 0,
+              "first": null
+            },
+            "smooth 0.25 moves 1 output pixel": {
+              "wrong": 0,
+              "first": null
+            },
+            "smooth 0.2 moves none": {
+              "wrong": 0,
+              "first": null
+            },
+            "smooth 1.5 moves 6 output pixels": {
+              "wrong": 0,
+              "first": null
+            },
+            "smooth view layer shows its spare pixel": {
+              "wrong": 0,
+              "first": null
+            },
+            "add": {
+              "wrong": 0,
+              "first": null
+            },
+            "add at 1/3": {
+              "wrong": 0,
+              "first": null
+            },
+            "multiply": {
+              "wrong": 0,
+              "first": null
+            },
+            "screen": {
+              "wrong": 0,
+              "first": null
+            },
+            "opacity 1/3, within 1": {
+              "wrong": 0,
+              "first": null
+            },
+            "opacity 0": {
+              "wrong": 0,
+              "first": null
+            },
+            "a pass at order 10 draws the target": {
+              "wrong": 0,
+              "first": null
+            },
+            "core view into a layer": {
+              "wrong": 0,
+              "first": null
+            },
+            "two canvas views": {
+              "wrong": 0,
+              "first": null
+            },
+            "view layers": {
+              "wrong": 0,
+              "first": null
+            },
+            "order 40 after a Tonemap": {
+              "wrong": 0,
+              "first": null
+            },
+            "real sprite layer": {
+              "wrong": 0,
+              "first": null
+            },
+            "MSAA engine": {
+              "wrong": 0,
+              "first": null
+            },
+            "after device loss": {
+              "wrong": 0,
+              "first": null
+            },
+            "dispose after device loss": {
+              "wrong": 0,
+              "first": null
+            }
+          },
+          "badOpacity": "RangeError",
+          "viewTexel": [
+            192,
+            128,
+            64,
+            255
+          ],
+          "gradedAtOrder30": [
+            107,
+            143,
+            226
+          ],
+          "msaa": {
+            "samples": 4,
+            "validation": null,
+            "size": [
+              64,
+              32
+            ]
+          },
+          "validation": null,
+          "errors": []
+        },
+        "palette-browser": {
+          "checks": {
+            "none oklab": {
+              "wrong": 0,
+              "first": null
+            },
+            "bayer2 oklab": {
+              "wrong": 0,
+              "first": null
+            },
+            "bayer4 oklab": {
+              "wrong": 0,
+              "first": null
+            },
+            "bayer8 oklab": {
+              "wrong": 0,
+              "first": null
+            },
+            "blue-noise oklab": {
+              "wrong": 0,
+              "first": null
+            },
+            "none srgb": {
+              "wrong": 0,
+              "first": null
+            },
+            "bayer2 srgb": {
+              "wrong": 0,
+              "first": null
+            },
+            "bayer4 srgb": {
+              "wrong": 0,
+              "first": null
+            },
+            "bayer8 srgb": {
+              "wrong": 0,
+              "first": null
+            },
+            "blue-noise srgb": {
+              "wrong": 0,
+              "first": null
+            },
+            "wide spread": {
+              "wrong": 0,
+              "first": null
+            },
+            "palette swap": {
+              "wrong": 0,
+              "first": null
+            },
+            "straight alpha kept": {
+              "wrong": 0,
+              "first": null
+            },
+            "transparent stays clear": {
+              "wrong": 0,
+              "first": null
+            },
+            "dither changed live": {
+              "wrong": 0,
+              "first": null
+            },
+            "palette changed live": {
+              "wrong": 0,
+              "first": null
+            },
+            "target format changed live": {
+              "wrong": 0,
+              "first": null
+            },
+            "target format changed back": {
+              "wrong": 0,
+              "first": null
+            },
+            "swap set live": {
+              "wrong": 0,
+              "first": null
+            },
+            "after device loss": {
+              "wrong": 0,
+              "first": null
+            }
+          },
+          "distinct": 4,
+          "sameTexture": "state",
+          "swapTextures": 0,
+          "validation": null,
+          "errors": []
+        },
+        "render3d-browser": {
+          "checks": {
+            "depth edges exact": {
+              "wrong": 0,
+              "first": null
+            },
+            "clear stays transparent": {
+              "wrong": 0
+            },
+            "creases and colour exact": {
+              "wrong": 0,
+              "first": null
+            },
+            "a large depthEdge keeps only the silhouette": {
+              "wrong": 0,
+              "first": null
+            },
+            "outline off is the colour": {
+              "wrong": 0,
+              "first": null
+            },
+            "through a compositor layer": {
+              "wrong": 0
+            },
+            "sheet size and frames": {
+              "wrong": 0
+            },
+            "mesh rotation restored": {
+              "wrong": 0
+            },
+            "frame 0 equals one shot": {
+              "wrong": 0,
+              "first": null
+            },
+            "frame 1 equals one shot": {
+              "wrong": 0,
+              "first": null
+            },
+            "frame 1 differs from frame 0": {
+              "wrong": 0
+            },
+            "frame 2 equals one shot": {
+              "wrong": 0,
+              "first": null
+            },
+            "frame 2 differs from frame 0": {
+              "wrong": 0
+            },
+            "the clear repeats each frame": {
+              "wrong": 0
+            },
+            "an opaque background": {
+              "wrong": 0
+            },
+            "another scene": {
+              "wrong": 0,
+              "first": null
+            },
+            "after device loss": {
+              "wrong": 0,
+              "first": null
+            }
+          },
+          "notAttached": "state",
+          "covered": 175,
+          "outlined": 123,
+          "creases": 10,
+          "otherScene": 175,
+          "validation": null,
+          "fourSamples": {
+            "corner": 0,
+            "middle": 255,
+            "validation": null
+          },
+          "errors": []
+        },
+        "pixel-scale-browser": {
+          "checks": {
+            "nearest at 3.29": {
+              "wrong": 0,
+              "first": null
+            },
+            "sharp-bilinear at 3.29": {
+              "wrong": 0,
+              "first": null
+            },
+            "edge at 3.29": {
+              "wrong": 0,
+              "first": null
+            },
+            "sharp-bilinear stretched": {
+              "wrong": 0,
+              "first": null
+            },
+            "edge stretched": {
+              "wrong": 0,
+              "first": null
+            },
+            "sharp-bilinear at 2x": {
+              "wrong": 0,
+              "first": null
+            },
+            "edge below 2x": {
+              "wrong": 0,
+              "first": null
+            },
+            "canvas nearest": {
+              "wrong": 0,
+              "first": null
+            },
+            "canvas edge, filter changed live": {
+              "wrong": 0,
+              "first": null
+            },
+            "format switch 0": {
+              "wrong": 0,
+              "skipped": 0
+            },
+            "format switch 1": {
+              "wrong": 0,
+              "skipped": 0
+            },
+            "format switch 2": {
+              "wrong": 0,
+              "skipped": 0
+            },
+            "format switch 3": {
+              "wrong": 0,
+              "skipped": 0
+            },
+            "half scissor": {
+              "wrong": 0,
+              "skipped": 0
+            },
+            "offset scissor": {
+              "wrong": 0,
+              "skipped": 0
+            },
+            "empty scissor intersection": {
+              "wrong": 0,
+              "skipped": 0
+            },
+            "owning scene disposal": {
+              "wrong": 0,
+              "skipped": 0
+            },
+            "after device loss": {
+              "wrong": 0,
+              "first": null
+            }
+          },
+          "badFilter": true,
+          "sameTexture": "state",
+          "validation": null,
+          "errors": []
+        },
+        "pixel-crt-browser": {
+          "checks": {
+            "defaults at 3.29x": {
+              "wrong": 0,
+              "skipped": 0,
+              "first": null
+            },
+            "flat": {
+              "wrong": 0,
+              "skipped": 0,
+              "first": null
+            },
+            "strong look": {
+              "wrong": 0,
+              "skipped": 4,
+              "first": null
+            },
+            "all off": {
+              "wrong": 0,
+              "skipped": 0,
+              "first": null
+            },
+            "all-off rational nearest sweep": {
+              "wrong": 0,
+              "skipped": 0,
+              "tested": 154,
+              "first": null
+            },
+            "canvas defaults": {
+              "wrong": 0,
+              "skipped": 4,
+              "first": null
+            },
+            "canvas, look changed live": {
+              "wrong": 0,
+              "skipped": 8,
+              "first": null
+            },
+            "format switch 0": {
+              "wrong": 0,
+              "skipped": 0
+            },
+            "format switch 1": {
+              "wrong": 0,
+              "skipped": 0
+            },
+            "format switch 2": {
+              "wrong": 0,
+              "skipped": 0
+            },
+            "format switch 3": {
+              "wrong": 0,
+              "skipped": 0
+            },
+            "half scissor": {
+              "wrong": 0,
+              "skipped": 0
+            },
+            "offset scissor": {
+              "wrong": 0,
+              "skipped": 0
+            },
+            "empty scissor intersection": {
+              "wrong": 0,
+              "skipped": 0
+            },
+            "owning scene disposal": {
+              "wrong": 0,
+              "skipped": 0
+            },
+            "after device loss": {
+              "wrong": 0,
+              "skipped": 0,
+              "first": null
+            }
+          },
+          "badSetting": true,
+          "sameTexture": "state",
+          "validation": null,
+          "errors": []
+        }
+      }
+    },
+    "compat": {
+      "hardware": {
+        "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "webgpu": {
+          "vendor": "margo-webgl2",
+          "architecture": "webgl2",
+          "device": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+          "description": "WebGL2 compatibility layer on ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+          "fallback": false
+        },
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+        "browserName": "chromium",
+        "browserVersion": "157.0.4341.42",
+        "requestedChannel": "msedge",
+        "launchArgs": [],
+        "powerPreference": "high-performance",
+        "hostPlatform": "win32",
+        "headless": true,
+        "compat": true
+      },
+      "suites": {
+        "pixel-browser": {
+          "checks": {
+            "background": {
+              "wrong": 0,
+              "first": null
+            },
+            "one layer at 4x, zoom fitted": {
+              "wrong": 0,
+              "first": null
+            },
+            "two 16 x 8 layers at 4x": {
+              "wrong": 0,
+              "first": null
+            },
+            "z puts a layer below": {
+              "wrong": 0,
+              "first": null
+            },
+            "visible false": {
+              "wrong": 0,
+              "first": null
+            },
+            "removed layer": {
+              "wrong": 0,
+              "first": null
+            },
+            "after dispose": {
+              "wrong": 0,
+              "first": null
+            },
+            "zoom 2 in the middle": {
+              "wrong": 0,
+              "first": null
+            },
+            "zoom 3, middle rounds down": {
+              "wrong": 0,
+              "first": null
+            },
+            "zoom 8 clipped": {
+              "wrong": 0,
+              "first": null
+            },
+            "layer offset": {
+              "wrong": 0,
+              "first": null
+            },
+            "90 degrees of a 1-pixel line": {
+              "wrong": 0,
+              "first": null
+            },
+            "180 degrees of a 1-pixel line": {
+              "wrong": 0,
+              "first": null
+            },
+            "270 degrees of a 1-pixel line": {
+              "wrong": 0,
+              "first": null
+            },
+            "-90 degrees is 270": {
+              "wrong": 0,
+              "first": null
+            },
+            "360 degrees is none": {
+              "wrong": 0,
+              "first": null
+            },
+            "quarter turn with texel edges": {
+              "wrong": 0,
+              "first": null
+            },
+            "30 degrees: only source colours": {
+              "wrong": 0,
+              "drawn": 1572,
+              "first": null
+            },
+            "scroll 0.5 moves nothing": {
+              "wrong": 0,
+              "first": null
+            },
+            "scroll 0.75 moves nothing": {
+              "wrong": 0,
+              "first": null
+            },
+            "scroll 0.99 moves nothing": {
+              "wrong": 0,
+              "first": null
+            },
+            "scroll 1 moves one pixel": {
+              "wrong": 0,
+              "first": null
+            },
+            "ten steps of 0.1 move one pixel": {
+              "wrong": 0,
+              "first": null
+            },
+            "both axes": {
+              "wrong": 0,
+              "first": null
+            },
+            "parallax 0.5: 3 moves one": {
+              "wrong": 0,
+              "first": null
+            },
+            "parallax 0.5: 4 moves two": {
+              "wrong": 0,
+              "first": null
+            },
+            "parallax per axis": {
+              "wrong": 0,
+              "first": null
+            },
+            "two layers, two parallaxes": {
+              "wrong": 0,
+              "first": null
+            },
+            "smooth 0.5 moves 2 output pixels": {
+              "wrong": 0,
+              "first": null
+            },
+            "smooth 0.25 moves 1 output pixel": {
+              "wrong": 0,
+              "first": null
+            },
+            "smooth 0.2 moves none": {
+              "wrong": 0,
+              "first": null
+            },
+            "smooth 1.5 moves 6 output pixels": {
+              "wrong": 0,
+              "first": null
+            },
+            "smooth view layer shows its spare pixel": {
+              "wrong": 0,
+              "first": null
+            },
+            "add": {
+              "wrong": 0,
+              "first": null
+            },
+            "add at 1/3": {
+              "wrong": 0,
+              "first": null
+            },
+            "multiply": {
+              "wrong": 0,
+              "first": null
+            },
+            "screen": {
+              "wrong": 0,
+              "first": null
+            },
+            "opacity 1/3, within 1": {
+              "wrong": 0,
+              "first": null
+            },
+            "opacity 0": {
+              "wrong": 0,
+              "first": null
+            },
+            "a pass at order 10 draws the target": {
+              "wrong": 0,
+              "first": null
+            },
+            "core view into a layer": {
+              "wrong": 0,
+              "first": null
+            },
+            "two canvas views": {
+              "wrong": 0,
+              "first": null
+            },
+            "view layers": {
+              "wrong": 0,
+              "first": null
+            },
+            "order 40 after a Tonemap": {
+              "wrong": 0,
+              "first": null
+            },
+            "real sprite layer": {
+              "wrong": 0,
+              "first": null
+            },
+            "MSAA engine": {
+              "wrong": 0,
+              "first": null
+            },
+            "after device loss": {
+              "wrong": 0,
+              "first": null
+            },
+            "dispose after device loss": {
+              "wrong": 0,
+              "first": null
+            }
+          },
+          "badOpacity": "RangeError",
+          "viewTexel": [
+            192,
+            128,
+            64,
+            255
+          ],
+          "gradedAtOrder30": [
+            107,
+            143,
+            226
+          ],
+          "msaa": {
+            "samples": 4,
+            "validation": null,
+            "size": [
+              64,
+              32
+            ]
+          },
+          "validation": null,
+          "errors": []
+        },
+        "palette-browser": {
+          "checks": {
+            "none oklab": {
+              "wrong": 0,
+              "first": null
+            },
+            "bayer2 oklab": {
+              "wrong": 0,
+              "first": null
+            },
+            "bayer4 oklab": {
+              "wrong": 0,
+              "first": null
+            },
+            "bayer8 oklab": {
+              "wrong": 0,
+              "first": null
+            },
+            "blue-noise oklab": {
+              "wrong": 0,
+              "first": null
+            },
+            "none srgb": {
+              "wrong": 0,
+              "first": null
+            },
+            "bayer2 srgb": {
+              "wrong": 0,
+              "first": null
+            },
+            "bayer4 srgb": {
+              "wrong": 0,
+              "first": null
+            },
+            "bayer8 srgb": {
+              "wrong": 0,
+              "first": null
+            },
+            "blue-noise srgb": {
+              "wrong": 0,
+              "first": null
+            },
+            "wide spread": {
+              "wrong": 0,
+              "first": null
+            },
+            "palette swap": {
+              "wrong": 0,
+              "first": null
+            },
+            "straight alpha kept": {
+              "wrong": 0,
+              "first": null
+            },
+            "transparent stays clear": {
+              "wrong": 0,
+              "first": null
+            },
+            "dither changed live": {
+              "wrong": 0,
+              "first": null
+            },
+            "palette changed live": {
+              "wrong": 0,
+              "first": null
+            },
+            "target format changed live": {
+              "wrong": 0,
+              "first": null
+            },
+            "target format changed back": {
+              "wrong": 0,
+              "first": null
+            },
+            "swap set live": {
+              "wrong": 0,
+              "first": null
+            },
+            "after device loss": {
+              "wrong": 0,
+              "first": null
+            }
+          },
+          "distinct": 4,
+          "sameTexture": "state",
+          "swapTextures": 0,
+          "validation": null,
+          "errors": []
+        },
+        "render3d-browser": {
+          "checks": {
+            "depth edges exact": {
+              "wrong": 0,
+              "first": null
+            },
+            "clear stays transparent": {
+              "wrong": 0
+            },
+            "creases and colour exact": {
+              "wrong": 0,
+              "first": null
+            },
+            "a large depthEdge keeps only the silhouette": {
+              "wrong": 0,
+              "first": null
+            },
+            "outline off is the colour": {
+              "wrong": 0,
+              "first": null
+            },
+            "through a compositor layer": {
+              "wrong": 0
+            },
+            "sheet size and frames": {
+              "wrong": 0
+            },
+            "mesh rotation restored": {
+              "wrong": 0
+            },
+            "frame 0 equals one shot": {
+              "wrong": 0,
+              "first": null
+            },
+            "frame 1 equals one shot": {
+              "wrong": 0,
+              "first": null
+            },
+            "frame 1 differs from frame 0": {
+              "wrong": 0
+            },
+            "frame 2 equals one shot": {
+              "wrong": 0,
+              "first": null
+            },
+            "frame 2 differs from frame 0": {
+              "wrong": 0
+            },
+            "the clear repeats each frame": {
+              "wrong": 0
+            },
+            "an opaque background": {
+              "wrong": 0
+            },
+            "another scene": {
+              "wrong": 0,
+              "first": null
+            },
+            "after device loss": {
+              "wrong": 0,
+              "first": null
+            }
+          },
+          "notAttached": "state",
+          "covered": 175,
+          "outlined": 123,
+          "creases": 10,
+          "otherScene": 175,
+          "validation": null,
+          "fourSamples": {
+            "corner": 0,
+            "middle": 255,
+            "validation": null
+          },
+          "errors": []
+        },
+        "pixel-scale-browser": {
+          "checks": {
+            "nearest at 3.29": {
+              "wrong": 0,
+              "first": null
+            },
+            "sharp-bilinear at 3.29": {
+              "wrong": 0,
+              "first": null
+            },
+            "edge at 3.29": {
+              "wrong": 0,
+              "first": null
+            },
+            "sharp-bilinear stretched": {
+              "wrong": 0,
+              "first": null
+            },
+            "edge stretched": {
+              "wrong": 0,
+              "first": null
+            },
+            "sharp-bilinear at 2x": {
+              "wrong": 0,
+              "first": null
+            },
+            "edge below 2x": {
+              "wrong": 0,
+              "first": null
+            },
+            "canvas nearest": {
+              "wrong": 0,
+              "first": null
+            },
+            "canvas edge, filter changed live": {
+              "wrong": 0,
+              "first": null
+            },
+            "format switch 0": {
+              "wrong": 0,
+              "skipped": 0
+            },
+            "format switch 1": {
+              "wrong": 0,
+              "skipped": 0
+            },
+            "format switch 2": {
+              "wrong": 0,
+              "skipped": 0
+            },
+            "format switch 3": {
+              "wrong": 0,
+              "skipped": 0
+            },
+            "half scissor": {
+              "wrong": 0,
+              "skipped": 0
+            },
+            "offset scissor": {
+              "wrong": 0,
+              "skipped": 0
+            },
+            "empty scissor intersection": {
+              "wrong": 0,
+              "skipped": 0
+            },
+            "owning scene disposal": {
+              "wrong": 0,
+              "skipped": 0
+            },
+            "after device loss": {
+              "wrong": 0,
+              "first": null
+            }
+          },
+          "badFilter": true,
+          "sameTexture": "state",
+          "validation": null,
+          "errors": []
+        },
+        "pixel-crt-browser": {
+          "checks": {
+            "defaults at 3.29x": {
+              "wrong": 0,
+              "skipped": 0,
+              "first": null
+            },
+            "flat": {
+              "wrong": 0,
+              "skipped": 0,
+              "first": null
+            },
+            "strong look": {
+              "wrong": 0,
+              "skipped": 4,
+              "first": null
+            },
+            "all off": {
+              "wrong": 0,
+              "skipped": 0,
+              "first": null
+            },
+            "all-off rational nearest sweep": {
+              "wrong": 0,
+              "skipped": 0,
+              "tested": 154,
+              "first": null
+            },
+            "canvas defaults": {
+              "wrong": 0,
+              "skipped": 4,
+              "first": null
+            },
+            "canvas, look changed live": {
+              "wrong": 0,
+              "skipped": 8,
+              "first": null
+            },
+            "format switch 0": {
+              "wrong": 0,
+              "skipped": 0
+            },
+            "format switch 1": {
+              "wrong": 0,
+              "skipped": 0
+            },
+            "format switch 2": {
+              "wrong": 0,
+              "skipped": 0
+            },
+            "format switch 3": {
+              "wrong": 0,
+              "skipped": 0
+            },
+            "half scissor": {
+              "wrong": 0,
+              "skipped": 0
+            },
+            "offset scissor": {
+              "wrong": 0,
+              "skipped": 0
+            },
+            "empty scissor intersection": {
+              "wrong": 0,
+              "skipped": 0
+            },
+            "owning scene disposal": {
+              "wrong": 0,
+              "skipped": 0
+            },
+            "after device loss": {
+              "wrong": 0,
+              "skipped": 0,
+              "first": null
+            }
+          },
+          "badSetting": true,
+          "sameTexture": "state",
+          "validation": null,
+          "errors": []
+        }
+      }
+    }
+  }
+}

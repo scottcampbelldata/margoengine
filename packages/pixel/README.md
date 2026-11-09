@@ -142,6 +142,9 @@ scale.filter = 'edge'; // read each frame
 The picture covers whole screen pixels: `fitRect(width, height, viewWidth, viewHeight, fit)` gives that rectangle.
 `'edge'` needs room for the doubled picture: below 2 times it draws as `'sharp-bilinear'`. Colours mix as stored, not
 in linear light. `scale2x(image)` is the CPU form of the doubling, to export sprites at twice the size.
+Canvas draws intersect the fitted picture with the view's scissor and canvas bounds, without rescaling the clipped
+picture. PixelScale and CRT may switch output formats and return to a cached format. Direct `dispose()` unregisters
+the pass from its owning scene, even when another scene has a plugin of the same name, and frees its uniform buffers.
 
 ## CRT look
 
@@ -174,7 +177,9 @@ crt.glow = 0.4; // every look setting is read each frame
 | `order` | `35` | Frame-graph order, after a compositor (30) |
 | `name` | `crt-1`, ... | Plugin name, unique per scene |
 
-With every effect at 0 and `brightness` 1 the CRT is plain nearest sampling. The grille needs about 3 screen pixels a
+With every effect at 0 and `brightness` 1 the CRT is plain nearest sampling, including exact source boundaries:
+output coordinate `o` inside a fitted side of length `w` selects source texel `floor((2 * o + 1) * n / (2 * w))`.
+Flat glass uses this integer quotient, so a boundary selects the texel on its right or below. The grille needs about 3 screen pixels a
 column to read as one; below that it shows as a faint pattern.
 
 ## Palettes and dithering
@@ -247,6 +252,10 @@ console.log(cyclePalette(['#000000', '#ff0000', '#00ff00', '#0000ff'], [{from: 1
 | `rate` | Entries a second the colours move toward `to`; below 0 toward `from` |
 | `blend` | Mixes in Oklab between steps instead of jumping a whole entry. Default false |
 
+The finite product `rate * seconds` is reduced modulo the run length before subtracting entry indices, so large
+finite shifts preserve the rotation. A product that overflows throws `MargoError` with code `'state'` and a help link;
+reduce the rate or elapsed time. `PaletteQuantize.dispose()` unregisters only its owning scene and destroys its
+palette textures, dither textures and uniform buffer. `LayerCompositor.dispose()` likewise removes only its owner.
 
 ## 3D to pixels
 

@@ -22,7 +22,7 @@ try {
   await writeFile('test-results/pixel-scale-browser.json', JSON.stringify({ hardware, result }, null, 1));
   const failed = Object.entries(result.checks).filter(([, check]) => check.wrong !== 0);
   assert.deepEqual(failed, [], 'every pixel matches the CPU reference');
-  assert.equal(Object.keys(result.checks).length, 10);
+  assert.equal(Object.keys(result.checks).length, 18);
   assert.equal(result.badFilter, true, 'an unknown filter is a RangeError');
   assert.equal(result.sameTexture, 'state', 'the same source and target name their fix');
   assert.equal(result.validation, null, 'no validation errors');

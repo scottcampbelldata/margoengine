@@ -373,6 +373,48 @@ vertex stage cannot write out. Checked on the RTX A6000 only. Unmeasured: its fr
 
 `@margoengine/vfx/nodes` normalizes with one scaled length on the CPU and in WGSL, function `nodeNorm`: divide by the largest absolute component, then by the length of that vector (Blue, James L., "A Portable Fortran Program to Find the Euclidean Norm of a Vector", ACM TOMS 4(1), 1978). A zero vector stays zero. WebGL2 translates that same function. Finite values 1e-21 and 1e20 both become a unit vector on the CPU, on WebGPU and on WebGL2. A finite double that is not a finite f32 is rejected for a node literal and for shadow range and intensity (`vfx-float`) before it is stored in a uniform.
 
+### PixelScale, CRT and PaletteQuantize
+
+`@margoengine/pixel/scale` fits a whole-pixel rectangle into each view (contain rounds down the unconstrained side and
+centres the result). Nearest selects `floor((2 o + 1) n / (2 w))` by integer arithmetic, so an exact source boundary
+selects the texel to its right or below. Sharp-bilinear integrates the last two texels on each axis: at the right edge
+`r = (o + 1) n / w`, it mixes texels `floor(r)-1` and `floor(r)` with weight
+`clamp(fract(r) w / n, 0, 1)`, then the two rows the same way. Edge first applies the public Scale2x corner rule
+(matching adjacent neighbours and differing opposite neighbours), only when at least 2x fits. Below 1x this two-texel
+filter is not full box integration; colours mix in their stored encoding, not linear light.
+
+`@margoengine/pixel/crt` maps the output centre to `c = 2 (o + 0.5) / w - 1`, bends it with
+`b = c (1 + curvature * c.yx^2)`, rejects points outside the glass and maps back to source coordinates. Flat glass
+avoids that normalized round trip: it uses the same integer nearest quotient as PixelScale. Scanlines multiply by
+`1 - scanlines * (1 - sin(pi * fract(t.y))^2)`. The three-column grille passes one RGB channel and multiplies the other
+two by `1-mask`. Glow adds a clamped-edge 3x3 binomial `[1,2,1] x [1,2,1] / 16` blur. The beam is multiplied by
+brightness, glow alpha is added and clamped, and RGB is capped at alpha before premultiplied compositing. This is a
+designed look, not a measured physical tube. All-off must equal rational nearest exactly; it has no excluded samples.
+
+Both screen passes intersect the fitted rectangle with canvas bounds and RenderView.scissor, preserving the original
+mapping. Explicit output textures cover their own rectangle, independent of the canvas view. Per-view uniforms
+prevent queue writes for a later view overwriting an earlier one. Bind groups retain both source texture and selected
+pipeline identity because WebGPU auto layouts belong to their creating pipeline, even when shapes match. Disposal
+queries `engine.sceneOf(this)` before unregistering, so equal names in other scenes are untouched; buffers are destroyed
+and pipeline/bind-group references released. The same ownership rule holds for PaletteQuantize and LayerCompositor.
+
+`@margoengine/pixel/palette` unpremultiplies nonzero-alpha source texels (unless straight input is requested), adds
+`spread * (threshold - 0.5)` in encoded sRGB, clamps to [0,1], then minimizes squared distance in sRGB or Oklab. Oklab
+decodes sRGB with its standard piecewise transfer function, applies Ottosson's LMS matrix, cube roots and Lab matrix.
+Ties keep the first palette entry. The chosen swap colour is premultiplied by the original alpha. Bayer ranks use
+`(rank + 0.5) / side^2`; blue noise is Margo's deterministic 64x64 tile. CPU cycling reduces the finite `rate * seconds`
+modulo the run length before subtracting small indices, floors the reduced shift, and optionally interpolates its
+fraction in Oklab. Product overflow is rejected with coded `state` and a help link. GPU palette disposal destroys its
+palette/dither textures and uniform buffer as well as removing the owning scene's pass.
+
+Evidence: `packages/pixel/tests/screen-pass.test.js` checks auto-layout identity on repeated format changes, scissor
+intersection and exactly-once resource destruction; `palette-cycle.test.js` checks huge signed shifts and overflow in
+both blend modes. These run in verify, hence check:merge. Both scale/crt GPU harnesses import `screen-regressions.js`
+for real-device format round trips, clipped and empty scissors, and same-name plugins in different scenes. The CRT
+harness additionally compares 154 source/output size pairs against both rational nearest and PixelScale with exact
+bytes and zero exclusions. Existing scale/palette/CRT GPU checks retain CPU maths comparisons and device restore.
+Backend evidence and its remaining scope are recorded in section 5.
+
 ## 3. Rendering backends and hardware tiers
 
 `@margoengine/vfx/shadows` and `@margoengine/vfx/nodes` run on WebGPU and on the WebGL2 compatibility layer from the same shaders. WebGL2 has no compute stage; the particle simulation uses the existing GPU point-draw route in `vfx/src/compat.ts`, and the shadow depth pass is a fragment shader. Disposal removes the point lights that effect published into its clustered list, and a dispose or device restore during the light read-back settles the cancelled map.
@@ -1310,6 +1352,13 @@ The all-glyph test covers unbeveled solids; synthetic cases cover rounded/chamfe
 ## 5. Current evidence gaps
 
 The following remain technical gaps, not permission to weaken a check:
+
+PixelScale, CRT and PaletteQuantize have CPU-reference/readback evidence on the RTX A6000 through native WebGPU and
+the WebGL2 compatibility layer. The pixel regressions above cover format reuse, scene ownership, clipping and flat
+nearest boundaries; the palette unit suite covers finite-cycle reduction and overflow. Curved CRT comparisons still
+exclude samples within 0.001 texel of an edge (float32 versus float64 can choose different neighbours); flat/all-off
+samples are never excluded, and all-off is exact. No other GPU/browser family, physical CRT fidelity or speed result
+is established by these checks. Native WebGL2 preview remains unsupported for these optional GPU passes.
 
 Extruded text has the scoped evidence above, not cross-font-family or multi-device certification; font hinting,
 shaping and arbitrary bevel topology changes are not proved by those checks.

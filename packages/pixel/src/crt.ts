@@ -35,12 +35,17 @@ return textureLoad(image,clamp(t,vec2i(0),vec2i(textureDimensions(image))-1),0);
 @fragment fn fs(@builtin(position) p:vec4f)->@location(0) vec4f{
 let o=floor(p.xy)-vec2f(s.rect.xy);
 let w=vec2f(s.rect.zw);
+let n=vec2f(textureDimensions(image));
+// Flat coordinates never round-trip through [-1,1]. The integer quotient fixes the exact-boundary convention.
+var t=(o+0.5)*n/w;
+var i=clamp((vec2i(o)*2+1)*vec2i(n)/(s.rect.zw*2),vec2i(0),vec2i(n)-1);
+if(s.curvature!=0){
 let c=(o+0.5)/w*2-1;
 let b=c*(1+s.curvature*c.yx*c.yx);
 if(any(abs(b)>vec2f(1))){return vec4f(0,0,0,1);}
-let n=vec2f(textureDimensions(image));
-let t=(b*0.5+0.5)*n;
-let i=vec2i(min(floor(t),n-1));
+t=(b*0.5+0.5)*n;
+i=vec2i(min(floor(t),n-1));
+}
 let f=t.y-floor(t.y);
 let beam=1-s.scanlines*(1-sin(3.14159265*f)*sin(3.14159265*f));
 let column=u32(o.x)%3u;

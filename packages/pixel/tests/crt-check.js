@@ -1,9 +1,11 @@
 // The page of crt-check.mjs: each picture is read back and compared with the CRT maths worked out on the CPU in float64
-// here, within one step of 255 (the GPU works in float32). A pixel whose sample point lies within 0.001 texel of a texel
-// edge is left out: float32 and float64 may pick different texels there.
+// here, within one step of 255 (the GPU works in float32). Curved samples within 0.001 texel of an edge are left out;
+// flat mapping includes every boundary, and the all-off case requires exact bytes against rational nearest mapping.
 import { EngineKernel } from '/packages/core/dist/index.js';
 import { engineRuntime } from '/packages/core/dist/extension.js';
 import { CRT } from '/packages/pixel/dist/crt.js';
+import { PixelScale } from '/packages/pixel/dist/scale.js';
+import { screenRegressions } from './screen-regressions.js';
 
 const SW = 7,
   SH = 5,
@@ -85,10 +87,10 @@ const reference = (vw, vh, look, under = [0, 0, 0, 0]) => {
         let own;
         if (Math.abs(bx) > 1 || Math.abs(by) > 1) own = [0, 0, 0, 1];
         else {
-          const tx = (bx * 0.5 + 0.5) * SW,
-            ty = (by * 0.5 + 0.5) * SH,
+          const tx = curvature === 0 ? ((2 * ox + 1) * SW) / (2 * rw) : (bx * 0.5 + 0.5) * SW,
+            ty = curvature === 0 ? ((2 * oy + 1) * SH) / (2 * rh) : (by * 0.5 + 0.5) * SH,
             near = (v) => Math.abs(v - Math.round(v)) < 1e-3;
-          if (near(tx) || near(ty)) skip[y * vw + x] = 1;
+          if (curvature !== 0 && (near(tx) || near(ty))) skip[y * vw + x] = 1;
           const ix = Math.min(Math.floor(tx), SW - 1),
             iy = Math.min(Math.floor(ty), SH - 1),
             f = ty - Math.floor(ty),
@@ -115,9 +117,9 @@ const reference = (vw, vh, look, under = [0, 0, 0, 0]) => {
         (y * vw + x) * 4,
       );
     }
-  return { out, skip };
+  return { out, skip, exact: curvature === 0 && scanlines === 0 && mask === 0 && glow === 0 && brightness === 1 };
 };
-const compare = (actual, { out, skip }) => {
+const compare = (actual, { out, skip, exact }) => {
   let wrong = 0,
     skipped = 0,
     first = null;
@@ -127,7 +129,9 @@ const compare = (actual, { out, skip }) => {
       continue;
     }
     for (let ch = 0; ch < 4; ch++)
-      if (Math.abs(actual[p * 4 + ch] - out[p * 4 + ch]) > 1) {
+      if (
+        exact ? actual[p * 4 + ch] !== Math.round(out[p * 4 + ch]) : Math.abs(actual[p * 4 + ch] - out[p * 4 + ch]) > 1
+      ) {
         wrong++;
         first ??= { pixel: p, channel: ch, actual: actual[p * 4 + ch], expected: out[p * 4 + ch] };
         break;
@@ -154,6 +158,7 @@ window.check = {
     await into('strong look', 41, 30, { curvature: 0.5, scanlines: 1, mask: 1, glow: 1, brightness: 4 });
     // With every effect off the CRT is plain nearest sampling of the flat picture.
     await into('all off', 23, 17, { curvature: 0, scanlines: 0, mask: 0, glow: 0, brightness: 1 });
+    out.checks['all-off rational nearest sweep'] = await nearestSweep();
 
     // Settings read each frame, and the canvas: the picture over the background, letterboxed in the middle.
     {
@@ -185,6 +190,19 @@ window.check = {
       }
       self.dispose();
     }
+    Object.assign(
+      out.checks,
+      await screenRegressions({
+        instance,
+        engine,
+        Pass: CRT,
+        options: { curvature: 0, scanlines: 0, mask: 0, glow: 0, brightness: 1 },
+        read,
+        readCanvas,
+        texture,
+        canvas,
+      }),
+    );
     out.validation = (await engine.gpu.popErrorScope())?.message ?? null;
     source.destroy();
 
@@ -216,3 +234,41 @@ const readCanvas = async () => {
   return context.getImageData(0, 0, 40, 30).data;
 };
 window.ready = true;
+
+async function nearestSweep() {
+  const result = { wrong: 0, skipped: 0, tested: 0, first: null };
+  for (let size = 1; size <= 11; size++) {
+    const data = new Uint8Array(size * size * 4);
+    for (let y = 0; y < size; y++)
+      for (let x = 0; x < size; x++) data.set([x * 19, y * 23, (x + y) * 11, 255], (y * size + x) * 4);
+    const source = texture(size, size, data);
+    for (const width of [1, 2, 3, 4, 7, 11, 17, 23, 31, 47, 63, 95, 127, 191]) {
+      const target = texture(width, width),
+        crt = CRT.attach(instance, { source, target, curvature: 0, scanlines: 0, mask: 0, glow: 0, brightness: 1 });
+      instance.render({ delta: 1 / 60 });
+      const actual = await read(target);
+      crt.dispose();
+      const nearest = PixelScale.attach(instance, { source, target, filter: 'nearest' });
+      instance.render({ delta: 1 / 60 });
+      const scaled = await read(target);
+      for (let y = 0; y < width; y++)
+        for (let x = 0; x < width; x++) {
+          const sx = Math.floor(((2 * x + 1) * size) / (2 * width)),
+            sy = Math.floor(((2 * y + 1) * size) / (2 * width)),
+            at = (y * width + x) * 4,
+            from = (sy * size + sx) * 4;
+          for (let k = 0; k < 4; k++)
+            if (actual[at + k] !== data[from + k] || actual[at + k] !== scaled[at + k]) {
+              result.wrong++;
+              result.first ??= { size, width, x, y, channel: k, actual: actual[at + k], expected: data[from + k] };
+              break;
+            }
+        }
+      result.tested++;
+      nearest.dispose();
+      target.destroy();
+    }
+    source.destroy();
+  }
+  return result;
+}

@@ -56,3 +56,22 @@ test('bad cycles, mixes and swaps are refused', () => {
   assert.throws(() => pass.setSwap(['#000000']), /as many colours/);
   pass.setSwap(PALETTE.slice().reverse());
 });
+
+test('large finite cycle shifts preserve the permutation before subtracting small indices', () => {
+  for (const rate of [1e20, -1e20, 1e308, -1e308])
+    for (const blend of [false, true]) {
+      const cycle = { from: 1, to: 3, rate, blend };
+      assert.deepEqual(cyclePalette(PALETTE, [cycle], 1), cyclePalette(PALETTE, [{ ...cycle, rate: rate % 3 }], 1));
+      assert.deepEqual(cyclePalette(PALETTE, [cycle], 0), PALETTE);
+    }
+});
+
+test('cycle product overflow throws a coded error with help for either blend direction', () => {
+  for (const rate of [1e308, -1e308])
+    for (const blend of [false, true])
+      assert.throws(
+        () => cyclePalette(PALETTE, [{ from: 1, to: 3, rate, blend }], 2),
+        (error) =>
+          error.code === 'state' && /finite|overflow/.test(error.message) && /errors#pixel-palette/.test(error.message),
+      );
+});

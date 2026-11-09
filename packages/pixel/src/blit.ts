@@ -1,7 +1,7 @@
 // The plumbing the scale and CRT passes share: one low-res source drawn over a rectangle of the canvas (each canvas
 // view, the picture as large as fits) or of a target texture, by a full-screen triangle and a fragment shader of the
 // pass's own. Each view keeps its own uniform buffer, since a frame's writes all land before its passes run.
-import { type Engine, type EnginePlugin, type PassContext } from '@margoengine/core/extension';
+import type { Engine, EnginePlugin, PassContext } from '@margoengine/core/extension';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
 import { checkLayers, ViewStates } from '../../shared/view-rect.js';
 
@@ -50,6 +50,7 @@ interface State {
   buffer?: GPUBuffer;
   group?: GPUBindGroup;
   groupFor?: GPUTexture;
+  groupPipeline?: GPURenderPipeline;
 }
 const BLEND: GPUBlendState = {
   color: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' },
@@ -118,7 +119,7 @@ export abstract class ScreenPass implements EnginePlugin {
   dispose(): void {
     if (this.#disposed) return;
     this.#disposed = true;
-    this.#engine?.removePlugin(this.name);
+    this.#engine?.sceneOf(this)?.removePlugin(this.name);
     this.#engine = undefined;
     this.#release();
   }
@@ -161,7 +162,6 @@ export abstract class ScreenPass implements EnginePlugin {
         multisample: { count: samples },
       });
       this.#pipelines.set(key, pipeline);
-      for (const state of this.#states.values()) state.group = undefined;
     }
     const x0 = target ? 0 : view ? view.viewport[0] : 0,
       y0 = target ? 0 : view ? view.viewport[1] : 0,
@@ -175,7 +175,7 @@ export abstract class ScreenPass implements EnginePlugin {
       size: this.#bytes,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
-    if (!state.group || state.groupFor !== source) {
+    if (!state.group || state.groupFor !== source || state.groupPipeline !== pipeline) {
       state.group = device.createBindGroup({
         layout: pipeline.getBindGroupLayout(0),
         entries: [
@@ -184,6 +184,7 @@ export abstract class ScreenPass implements EnginePlugin {
         ],
       });
       state.groupFor = source;
+      state.groupPipeline = pipeline;
     }
     this.fill(this.#values, rect, source);
     device.queue.writeBuffer(state.buffer, 0, this.#values);
@@ -196,10 +197,11 @@ export abstract class ScreenPass implements EnginePlugin {
     });
     const width = target ? target.width : c.width,
       height = target ? target.height : c.height,
-      sx = Math.max(0, rect[0]),
-      sy = Math.max(0, rect[1]),
-      ex = Math.min(width, rect[0] + rect[2]),
-      ey = Math.min(height, rect[1] + rect[3]);
+      clip = target ? [0, 0, width, height] : (view?.scissor ?? [0, 0, width, height]),
+      sx = Math.max(0, rect[0], clip[0]),
+      sy = Math.max(0, rect[1], clip[1]),
+      ex = Math.min(width, rect[0] + rect[2], clip[0] + clip[2]),
+      ey = Math.min(height, rect[1] + rect[3], clip[1] + clip[3]);
     if (ex > sx && ey > sy) {
       pass.setScissorRect(sx, sy, ex - sx, ey - sy);
       pass.setPipeline(pipeline);

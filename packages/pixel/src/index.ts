@@ -361,7 +361,7 @@ export class LayerCompositor implements EnginePlugin {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
-    this.engine?.removePlugin(this.name);
+    this.engine?.sceneOf(this)?.removePlugin(this.name);
     this.engine = undefined;
     for (const layer of this.list.slice()) this.removeLayer(layer);
     this.release();

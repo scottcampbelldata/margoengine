@@ -590,3 +590,9 @@ hard 600-second process-tree deadline, with current full hash and awake assertio
 The copied harness/provenance is .lane/p/frame-preparation-v2-browser-v1. Separate browser sessions
 have changing load; the paired advantage belongs to the combination. Quiet release reruns remain
 required. Box2D parity is open and owned-2D CCD stays T-11 / 127.y.
+
+### Pixel batch 102 review fixes
+
+Retained native/compatibility hardware and readback evidence: [pixel-review102.json](results/pixel-review102.json).
+
+After `npm run build:packages`, run `npm test --workspace @margoengine/pixel` for pipeline identity, scene/resource ownership, scissor intersections, huge cycle shifts, overflow errors and the architecture evidence check. Run `node scripts/gpu-lock.mjs run --owner=codex-pixel --max=12 --wait-max=2 -- npm run test:gpu --workspace @margoengine/pixel` for all five pixel GPU harnesses, including shared format/disposal/scissor regressions and the 154-size exact CRT/nearest sweep. Repeat with environment `MARGO_COMPAT=1` for the WebGL2 layer. Each CRT all-off sample is checked byte for byte against rational nearest and PixelScale, including exact boundaries; no sample is skipped. GPU result files are `test-results/pixel-browser.json`, `palette-browser.json`, `render3d-browser.json`, `pixel-scale-browser.json` and `pixel-crt-browser.json`; native and compatibility runs overwrite those local files, so retain copies between runs. No speed measurement is claimed.

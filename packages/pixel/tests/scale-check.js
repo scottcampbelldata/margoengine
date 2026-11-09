@@ -3,6 +3,7 @@
 import { EngineKernel } from '/packages/core/dist/index.js';
 import { engineRuntime } from '/packages/core/dist/extension.js';
 import { PixelScale } from '/packages/pixel/dist/scale.js';
+import { screenRegressions } from './screen-regressions.js';
 
 const SW = 7,
   SH = 5,
@@ -197,6 +198,19 @@ window.check = {
       }
       self.dispose();
     }
+    Object.assign(
+      out.checks,
+      await screenRegressions({
+        instance,
+        engine,
+        Pass: PixelScale,
+        options: { filter: 'nearest' },
+        read,
+        readCanvas,
+        texture,
+        canvas,
+      }),
+    );
     out.validation = (await engine.gpu.popErrorScope())?.message ?? null;
     source.destroy();
 
