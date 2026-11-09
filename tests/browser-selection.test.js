@@ -201,6 +201,22 @@ const attempt = async (env, launchers = { chromium: missing('chromium'), firefox
   return { text: printed.join('\n'), code };
 };
 
+test('Chromium uses an owned loopback launch server and terminates through its driver API', async () => {
+  const closed = [];
+  const client = {close: async () => {closed.push('client');}};
+  const server = {wsEndpoint: () => 'ws://127.0.0.1:1234/owned',kill: async () => {closed.push('server');}};
+  const browser = await launchBrowser({
+    env: {MARGO_BROWSER: 'chromium'},platform: 'linux',argv: [],needs: 'none',headless: true,
+    launchers: {chromium: {
+      launch: async () => assert.fail('a launch client cannot own forced process cleanup'),
+      launchServer: async options => {assert.equal(options.host,'127.0.0.1');assert.equal(options.headless,true);return server;},
+      connect: async (endpoint,options) => {assert.equal(endpoint,server.wsEndpoint());assert.equal(options.timeout,30000);return client;},
+    }},
+    report: message => assert.fail(message),exit: code => assert.fail(`launch failed ${code}`),
+  });
+  await browser.close();assert.deepEqual(closed,['server','client']);
+});
+
 test('webkit is Playwright WebKit: it has WebGPU, takes no Chromium switches, and is refused Chromium-only steps', async () => {
   const browser = pick({ MARGO_BROWSER: 'webkit' }, 'darwin');
   assert.equal(browser.name, 'webkit');

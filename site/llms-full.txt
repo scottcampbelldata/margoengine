@@ -3647,7 +3647,7 @@ Flat CRT mapping uses the same integer centre-coordinate quotient as PixelScale 
 
 Optional audio/ambisonics: 1,919 B gzip; audio root 7,638 B and core plus stage 23,797 B. First-order four-channel ACN/SN3D W,Y,Z,X buffers only, positive finite duration, explicit convention assumption. Default format ambix; other conventions/channel counts produce linked unsupported. No FuMa/N3D/A-format conversion, higher/mixed orders, appended stereo, CAF adaptor or Opus metadata parser. Loading delegates to existing listener.load with AbortSignal and browser codec support; four-channel 24-bit PCM WAV with 44.1-to-48 kHz resampling is tested.
 
-Default loop true, volume 1 within 0..1, smoothing listener.smoothing (default 0.02 s finite nonnegative time constant). Eight gain paths, one source, splitter and stereo merger per bed. Identity ACN front/left/up maps engine -Z/-X/+Y. Normalized copied world quaternion rotates field; listener forward/up define the inverse head orientation, translation ignored. Directions must be independent. Two virtual cardioids at +/-30 degrees output 0.5*(W+direction dot XYZ) times volume. This is stereo ambience, not HRTF/binaural localization or arbitrary loudspeaker decoding. Gain interpolation blends matrices rather than remaining a rigid rotation during fades. Author seamless loops and headroom. Start at/after now; stop/restart resets phase. Listener teardown/dispose cuts sources and frees decoder nodes, preserving buffers.
+Default loop true, volume 1 within 0..1, smoothing listener.smoothing (default 0.02 s finite nonnegative time constant). Eight gain paths, one source, splitter and stereo merger per bed. Identity ACN front/left/up maps engine -Z/-X/+Y. Normalized copied world quaternion rotates field; listener forward/up define the inverse head orientation, translation ignored. Collinear directions retain the last independent decoder orientation (initially -Z forward, +Y up). Camera following copies camera.up, including roll and exact poles. Two virtual cardioids at +/-30 degrees output 0.5*(W+direction dot XYZ) times volume. This is stereo ambience, not HRTF/binaural localization or arbitrary loudspeaker decoding. Gain interpolation blends matrices rather than remaining a rigid rotation during fades. Author seamless loops and headroom. Start at/after now; stop/restart resets phase. Listener teardown/dispose cuts sources and frees decoder nodes, preserving buffers.
 
 LIM-610: Node full yaw/elevation/roll basis and lifecycle checks, and real browser PCM on all three routes for generated independent-channel tones/loops and a licensed external rain-stimulus excerpt, each within 1e-6 of float64 channel matrices with zero GPU errors. First four channels of the CC BY 4.0 external 64-channel file are interpreted as ACN/SN3D; this proves file decoding and matrix routing, not a microphone chain or verified acoustic capture. XR apps feed headset world forward/up through existing listener.setPose; physical headset tracking, subjective localization, other browsers/devices and performance unmeasured.
 
@@ -3745,6 +3745,8 @@ drawn-ring limits still apply. No speed measurement or increase to supported wor
 
 Optional wfc/sockets 676 B min+gzip (peers external): up to 4096 expanded variants, four Y orientations by default or 24 proper cube rotations; no reflections/deduplication. Exact equality of orientation-independent face labels. O(variants squared) adjacency construction; output rule lists may be dense. Uses constraints Uint16 solver without changing legacy root IDs. Generated 48-variant fixture only, no physical asset proof.
 
+Audio camera repair (2026-11-09): current audio root 7,642 B gzip, ambisonics entry 1,921 B; core plus stage unchanged at 23,626 B. Earlier batch sizes above are historical. README loading examples use WAV filenames so the runtime example gate supplies its available WAV fixture.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -3760,6 +3762,10 @@ The batch 110 baseline `npm run verify` found that the text extrusion repair cha
 required mutable arrays. Regenerated `api/text.extrude.api.md` from the built declaration;
 `npm run api:check` checks the snapshot against the public declaration without changing it.
 The runtime and the accepted inputs are unchanged by this documentation repair.
+
+### Fixed 2026-11-09: audio listener camera poles
+
+Camera following omitted camera.up, making exact Top/Bottom views collinear with the listener up vector. Ambisonic decoding then threw from the frame pass. The listener now follows camera up and beds retain a valid decoder basis through degenerate manual poses. The regression in packages/audio/tests/ambisonics.test.js checks exact poles, roll, first-use degeneracy and later-source updates.
 
 ## Own 2D physics acceptance gaps
 
@@ -5273,6 +5279,10 @@ The package GPU script now runs as written from npm's workspace cwd. No WFC algo
 ### WFC sockets review (batch 69, job 3)
 
 No new open defect found in generated labelled-face, 48-ID and invalid-input checks. Orientation-independent labels and proper rotations only are documented limits.
+
+### Fixed 2026-11-09: pre-push browser teardown regressions
+
+WFC omitted shared bounded teardown and served package-relative files under a repository-relative URL when run by npm workspace. Its harness now resolves the repository root, disables unrelated scanning/watchers, releases its configured GPU surface and uses closeAll. Diagnostic teardown confirmed native Chromium termination while the launch client cleanup promise stayed pending beyond 30 seconds. Chromium now uses Playwright launchServer plus connect, and the owning server.kill API settles driver/process cleanup within the unchanged deadline. Regression: tests/browser-selection.test.js; tests/browser-teardown.test.js; packages/wfc/test/browser-check.mjs. Generated llms-full content is refreshed with the README changes and checked by tests/llms.test.js.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 
@@ -10415,6 +10425,8 @@ Web Audio listener, global and positional sounds, encoded-file loading and a fre
 
 Build from source with `npm run build` in `packages/audio`.
 
+For the loading examples, serve `tests/fixtures/rain-foa.wav` at `/sounds/rain-foa.wav` (CC BY 4.0, attribution in `tests/fixtures/NOTICE.md`). Replace this shared sample with your app's engine, cue and step recordings.
+
 ```ts
 import {AudioListener, Audio, PositionalAudio, AudioVoicePool, AudioAnalyser} from 'margoengine/audio';
 import {Engine} from 'margoengine/core';
@@ -10434,7 +10446,7 @@ const engineSound = new PositionalAudio(listener, {
   mesh: truck, refDistance: 2, distanceModel: 'inverse', rolloffFactor: 1.2,
   coneInnerAngle: 90, coneOuterAngle: 220, coneOuterGain: 0.3, muteWhenHidden: true,
 });
-engineSound.setBuffer(await listener.load('/sounds/engine.ogg'));
+engineSound.setBuffer(await listener.load('/sounds/rain-foa.wav'));
 engineSound.loop = true;
 engineSound.fadeIn(0.5);
 
@@ -10443,11 +10455,11 @@ music.setMediaElementSource(document.querySelector('audio')!).play();
 
 // A sound on an editor timeline: starts at timeline second 4, follows play, pause, scrubbing and timeline speed.
 const cue = new Audio(listener, {volume: 0.6, loop: false, timelineStart: 4});
-cue.setBuffer(await listener.load('/sounds/cue.ogg'));
+cue.setBuffer(await listener.load('/sounds/rain-foa.wav'));
 engine.onFrame(() => cue.sync(timeline.seconds, timeline.playing, timeline.speed));
 
 // Footsteps and block sounds: 6 voices share one buffer; a 7th overlapping play steals the oldest voice.
-const steps = new AudioVoicePool(listener, await listener.load('/sounds/step.ogg'), {voices: 6, refDistance: 2});
+const steps = new AudioVoicePool(listener, await listener.load('/sounds/rain-foa.wav'), {voices: 6, refDistance: 2});
 steps.play([x, y, z], {volume: 0.7, playbackRate: 0.9 + Math.random() * 0.2});
 
 const analyser = new AudioAnalyser(music, 1024);
@@ -10463,7 +10475,7 @@ engine.removePlugin(listener.name);
 import {AudioListener, Audio} from 'margoengine/audio';
 
 using listener = new AudioListener({volume: 0.8}); // disposed at the end of the block
-const buffer = await listener.load('/sounds/step.ogg', {signal: AbortSignal.timeout(10_000)}); // rejects with an AbortError
+const buffer = await listener.load('/sounds/rain-foa.wav', {signal: AbortSignal.timeout(10_000)}); // rejects with an AbortError
 using step = new Audio(listener).setBuffer(buffer);
 step.play();
 ```

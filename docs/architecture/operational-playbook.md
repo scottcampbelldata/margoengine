@@ -2008,3 +2008,7 @@ Optional CPU socket construction checks all 24 proper signed-axis transforms, in
 ### Audio camera orientation regression (section 5, 2026-11-09)
 
 The listener copies camera.up as well as position/forward, so panner orientation follows camera roll and Top/Bottom views. Ambisonic beds retain their last independent orientation during a collinear manual pose, using -Z forward and +Y up initially. `packages/audio/tests/ambisonics.test.js` checks both exact poles, roll, finite initial/frozen decoder gains and continued updates of later sources. Browser offline PCM matrix proofs remain separate from live device evidence.
+
+### Browser gate shutdown ownership (section 5, 2026-11-09)
+
+Chromium checks use a loopback Playwright launchServer and a connected client. The owning server.kill API releases process and driver resources together; an external taskkill could end Chromium in 8 seconds while the launch client close promise stayed pending past the unchanged 30-second deadline. The WFC diagnostic now completes client disconnect and owned server termination. tests/browser-selection.test.js checks explicit ownership, loopback binding and bounded connection setup; existing browser-teardown/catalog tests retain process-death and teardown assertions. WFC resolves its server root from import.meta.url, disables unrelated optimizer discovery and watchers, unconfigures its test surface before destroying its device, and closes its browser/server together. The package GPU check exercises both backend routes from npm workspace execution.

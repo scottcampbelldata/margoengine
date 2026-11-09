@@ -7,7 +7,7 @@ const server = await createServer({
   root: fileURLToPath(new URL('../../..', import.meta.url)),
   configFile: false,
   // This suite serves only its middleware page, not the repository's unrelated HTML entries.
-  optimizeDeps: { entries: [] },
+  optimizeDeps: { entries: [], noDiscovery: true, include: [] },
   plugins: [
     {
       name: 'wfc-test-page',
@@ -19,7 +19,7 @@ const server = await createServer({
       },
     },
   ],
-  server: { host: '127.0.0.1', port: 0 },
+  server: { host: '127.0.0.1', port: 0, watch: null, hmr: false },
   logLevel: 'error',
 });
 let browser;
@@ -70,6 +70,7 @@ try {
       if (device) {
         const error = await device.popErrorScope();
         if (error) throw new Error(error.message);
+        canvas.getContext('webgpu').unconfigure();
         device.destroy();
       }
       outputs.push({ route, image: [...image], global: [...global], sockets: [...sockets] });

@@ -2,6 +2,8 @@ import { chromium, firefox, webkit } from '@playwright/test';
 import { gpuAdapterArg } from './gpu-adapter.mjs';
 import { closeAll, endTree } from '../support/shutdown.mjs';
 
+const ownedBrowserServers = new WeakMap();
+
 /**
  * Which browser the repository's browser checks drive, and how it is launched, in one place.
  *
@@ -174,13 +176,23 @@ async function endChromium(browser, end) {
  * not finished within the shared budget (scripts/support/shutdown.mjs), instead of leaving a suite that has passed every
  * assertion hanging on its cleanup. A Chromium-family browser's processes are ended first (see `endChromium`).
  */
-export function withBoundedClose(browser, { end = endTree } = {}) {
+export function withBoundedClose(browser, { end = endTree, server = ownedBrowserServers.get(browser) } = {}) {
   if (typeof browser?.close !== 'function') return browser;
   const close = browser.close.bind(browser);
   browser.close = (...args) =>
     closeAll({
       browser: {
         close: async () => {
+          if (server) {
+            // The launch server owns both the process and driver cleanup. An external taskkill can end
+            // Chromium while leaving the launch() client's cleanup promise waiting indefinitely.
+            const results = await Promise.allSettled([
+              Promise.resolve().then(() => server.kill()),
+              Promise.resolve().then(() => close(...args)),
+            ]);
+            for (const result of results) if (result.status === 'rejected') throw result.reason;
+            return;
+          }
           // An end that fails (its CDP session refused, say) still closes the ordinary way, then throws: a browser left
           // running holds its suite's process open after the last check, and the run around it never ends.
           let failed;
@@ -246,13 +258,28 @@ export async function launchBrowser({
   if (reason) return skipSuite(reason);
   try {
     if (browser.engine !== 'chromium') return withBoundedClose(await launchers[browser.engine].launch({ ...options }));
-    const launch = (channel) =>
-      launchers.chromium.launch({
+    const launch = async (channel) => {
+      const settings = {
         ...options,
         args: launchArgs(browser, args),
         ...(channel ? { channel } : {}),
         ...(browser.executablePath ? { executablePath: browser.executablePath } : {}),
-      });
+      };
+      // launchServer exposes explicit process ownership and an immediate kill API.
+      if (typeof launchers.chromium.launchServer === 'function') {
+        const server = await launchers.chromium.launchServer({...settings, host: '127.0.0.1'});
+        let browser;
+        try {
+          browser = await launchers.chromium.connect(server.wsEndpoint(), {timeout: 30_000});
+        } catch (error) {
+          await server.kill();
+          throw error;
+        }
+        ownedBrowserServers.set(browser, server);
+        return browser;
+      }
+      return await launchers.chromium.launch(settings);
+    };
     try {
       return withBoundedClose(await launch(browser.channel));
     } catch (error) {

@@ -121,3 +121,5 @@ Up to 4096 expanded variants, Uint16 IDs through ConstrainedWFC; legacy root WFC
 is O(variants squared), with six lists per variant; invalid inputs throw RangeError. Solver budgets and memory limits
 still apply. Pure CPU, identical on WebGPU and WebGL2 pages. Generated 48-variant tests are stand-ins; no artist
 asset compatibility claim. This entry builds rules only and imports no solver or rendering backend.
+
+`npm run test:gpu --workspace @margoengine/wfc` runs the overlapping solver beside WebGPU and WebGL2. Its server resolves the repository root from the script location, so workspace execution uses the same imports, and teardown closes the browser and server together.

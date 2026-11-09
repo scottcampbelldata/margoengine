@@ -1528,3 +1528,7 @@ The package GPU script now runs as written from npm's workspace cwd. No WFC algo
 ### WFC sockets review (batch 69, job 3)
 
 No new open defect found in generated labelled-face, 48-ID and invalid-input checks. Orientation-independent labels and proper rotations only are documented limits.
+
+### Fixed 2026-11-09: pre-push browser teardown regressions
+
+WFC omitted shared bounded teardown and served package-relative files under a repository-relative URL when run by npm workspace. Its harness now resolves the repository root, disables unrelated scanning/watchers, releases its configured GPU surface and uses closeAll. Diagnostic teardown confirmed native Chromium termination while the launch client cleanup promise stayed pending beyond 30 seconds. Chromium now uses Playwright launchServer plus connect, and the owning server.kill API settles driver/process cleanup within the unchanged deadline. Regression: tests/browser-selection.test.js; tests/browser-teardown.test.js; packages/wfc/test/browser-check.mjs. Generated llms-full content is refreshed with the README changes and checked by tests/llms.test.js.
