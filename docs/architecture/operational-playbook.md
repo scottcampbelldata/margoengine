@@ -2973,3 +2973,29 @@ GPU follow-up: the registered shadows/test:gpu:cutout-casters test passes in
 driver-reset rerun. Its rescheduled result file is current and contains exactly
 that selected test. The remaining 15 shared package scripts and the two README
 requests are still supervised and queued; none is claimed passed.
+
+
+### Missing-items landing confirmation (2026-11-09)
+
+Rebased source aa3b0dfc4 includes batch 160's browser pipe-lifecycle
+repair 6ebbd1aa4. Catalog passes in 24.6 s and the full default-world
+prefetch proof passes in 51.8 s, including bounded browser teardown. Every
+field/typed-array hash for 292 unique results matches the parent; view/placement
+work remains 204/190 before and 144/144 after. No workload or budget changed.
+
+Full verify passes 13,534 tests with zero failures/skips (472.8 s supervisor),
+all 887 API reports / 8,638 exports, and all 1,117 README type examples. Lint and
+hygiene pass. The explicit changed-package CPU run passes 775 tests, zero
+failures/skips. All 16 registered shadows/quality/post GPU scripts pass without
+driver-reset retries; those completed results were collected before the rebase.
+All 46 shadows/quality/post and 35 biome original README examples now execute
+with zero failures or exceptions. The required outside-input manifest remains
+460 files; no assets, exports, core/stage or held physics source changed here.
+Core plus stage is 23,837 B gzip, below 25,000.
+
+Durable checks and per-example/script results: whitepaper/results/missing-items-landing-20261109.json
+(use results/ from this whitepaper directory). Per the newest coordinator note,
+land these validated repairs before diagnosing the separate 7.4 ms slow-send
+outlier. That frame remains open, above twice the 3.5 ms gate, without a busy
+exemption or speed claim. The remaining 42 README exceptions and P01-P29 proof
+boundaries remain unchanged.

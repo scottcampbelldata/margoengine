@@ -1,0 +1,810 @@
+{
+  "source": "aa3b0dfc40b621ebe92a3305ee6bf00610115033",
+  "main": "6ebbd1aa4",
+  "checks": {
+    "landing-verify": {
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 472.8
+    },
+    "landing-lint": {
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 7.3
+    },
+    "landing-hygiene": {
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 23.6
+    },
+    "landing-package-cpu": {
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 205.4
+    },
+    "landing-catalog": {
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 24.6
+    },
+    "landing-prefetch": {
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 51.8
+    },
+    "landing-readmes-ownership": {
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 68.5
+    },
+    "landing-readmes-biomes": {
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 147.7
+    }
+  },
+  "tests": {
+    "verify": 13534,
+    "packages": 775,
+    "fail": 0,
+    "skip": 0
+  },
+  "readmes": {
+    "ownership": [
+      {
+        "id": "post/readme-hdr-images-and-render-exports-im-bb1b8b",
+        "result": "pass",
+        "place": "page"
+      },
+      {
+        "id": "post/readme-combining-effects-poststack-da2512",
+        "result": "pass",
+        "place": "page"
+      },
+      {
+        "id": "post/readme-screen-space-reflections-ssr-7d242f",
+        "result": "pass",
+        "place": "page"
+      },
+      {
+        "id": "post/readme-screen-space-reflections-ssr-28bc98",
+        "result": "pass",
+        "place": "page"
+      },
+      {
+        "id": "post/readme-ground-truth-ambient-occlusion-g-255bb7",
+        "result": "pass",
+        "place": "page"
+      },
+      {
+        "id": "post/readme-screen-space-global-illumination-f7358c",
+        "result": "pass",
+        "place": "page"
+      },
+      {
+        "id": "post/readme-screen-space-global-illumination-e67d1c",
+        "result": "pass",
+        "place": "page"
+      },
+      {
+        "id": "post/readme-motion-blur-motionblur-6933a7",
+        "result": "pass",
+        "place": "page"
+      },
+      {
+        "id": "post/readme-lens-flare-lensflare-d87535",
+        "result": "pass",
+        "place": "page"
+      },
+      {
+        "id": "post/readme-smaa-a45972",
+        "result": "pass",
+        "place": "page"
+      },
+      {
+        "id": "post/readme-glitch-ab008e",
+        "result": "pass",
+        "place": "page"
+      },
+      {
+        "id": "post/readme-afterimage-33ec60",
+        "result": "pass",
+        "place": "page"
+      },
+      {
+        "id": "post/readme-outlines-outline-a3da51",
+        "result": "pass",
+        "place": "page"
+      },
+      {
+        "id": "post/readme-writing-your-own-effect-aba9cb",
+        "result": "pass",
+        "place": "page"
+      },
+      {
+        "id": "post/readme-contact-shadows-contactshadows-2972a1",
+        "result": "pass",
+        "place": "page"
+      },
+      {
+        "id": "post/readme-subsurface-scattering-sss-725580",
+        "result": "pass",
+        "place": "page"
+      },
+      {
+        "id": "post/readme-anamorphic-streaks-anamorphic-5d8667",
+        "result": "pass",
+        "place": "page"
+      },
+      {
+        "id": "post/readme-blur-blur-574ede",
+        "result": "pass",
+        "place": "page"
+      },
+      {
+        "id": "post/readme-lens-model-lens-366c68",
+        "result": "pass",
+        "place": "page"
+      },
+      {
+        "id": "post/readme-multiple-render-targets-scenetar-b12cc8",
+        "result": "pass",
+        "place": "page"
+      },
+      {
+        "id": "post/readme-depth-texture-depthtexture-3e6070",
+        "result": "pass",
+        "place": "page"
+      },
+      {
+        "id": "post/readme-projected-decals-decals-4315ce",
+        "result": "pass",
+        "place": "page"
+      },
+      {
+        "id": "post/readme-projected-decals-decals-f21505",
+        "result": "pass",
+        "place": "page"
+      },
+      {
+        "id": "post/readme-material-decals-materialdecals-f0331a",
+        "result": "pass",
+        "place": "page"
+      },
+      {
+        "id": "post/readme-fxaa-e5cfec",
+        "result": "pass",
+        "place": "page"
+      },
+      {
+        "id": "shadows/readme-margoengine-shadows-7f4d25",
+        "result": "pass",
+        "place": "page"
+      },
+      {
+        "id": "shadows/readme-margoengine-shadows-bd4a2d",
+        "result": "pass",
+        "place": "page"
+      },
+      {
+        "id": "shadows/readme-margoengine-shadows-6aa044",
+        "result": "pass",
+        "place": "page"
+      },
+      {
+        "id": "shadows/readme-coloured-shadows-d66cc7",
+        "result": "pass",
+        "place": "page"
+      },
+      {
+        "id": "shadows/readme-cloud-shadows-and-light-patterns-55a697",
+        "result": "pass",
+        "place": "page"
+      },
+      {
+        "id": "shadows/readme-cloud-shadows-and-light-patterns-c315e9",
+        "result": "pass",
+        "place": "page"
+      },
+      {
+        "id": "shadows/readme-variance-shadow-maps-e805e2",
+        "result": "pass",
+        "place": "page"
+      },
+      {
+        "id": "shadows/readme-light-through-leaves-4957cb",
+        "result": "pass",
+        "place": "page"
+      },
+      {
+        "id": "shadows/readme-far-shadows-558bea",
+        "result": "pass",
+        "place": "page"
+      },
+      {
+        "id": "shadows/readme-shadow-intensity-and-colour-c2f3ad",
+        "result": "pass",
+        "place": "page"
+      },
+      {
+        "id": "shadows/readme-ray-traced-shadows-44da42",
+        "result": "pass",
+        "place": "page"
+      },
+      {
+        "id": "shadows/readme-virtual-shadow-maps-8208dc",
+        "result": "pass",
+        "place": "page"
+      },
+      {
+        "id": "shadows/readme-virtual-shadow-maps-6f0053",
+        "result": "pass",
+        "place": "page"
+      },
+      {
+        "id": "shadows/readme-update-scheduling-cadence-9e32a2",
+        "result": "pass",
+        "place": "page"
+      },
+      {
+        "id": "quality/readme-margoengine-quality-2c3704",
+        "result": "pass",
+        "place": "page"
+      },
+      {
+        "id": "quality/readme-dynamic-resolution-349523",
+        "result": "pass",
+        "place": "page"
+      },
+      {
+        "id": "quality/readme-feature-scaling-3b8453",
+        "result": "pass",
+        "place": "page"
+      },
+      {
+        "id": "quality/readme-battery-and-heat-7db8a2",
+        "result": "pass",
+        "place": "page"
+      },
+      {
+        "id": "quality/readme-tier-presets-2768c5",
+        "result": "pass",
+        "place": "page"
+      },
+      {
+        "id": "quality/readme-pipeline-warm-up-and-device-rest-87986c",
+        "result": "pass",
+        "place": "page"
+      },
+      {
+        "id": "quality/readme-supersampling-stills-and-screens-946961",
+        "result": "pass",
+        "place": "page"
+      }
+    ],
+    "biomes": [
+      {
+        "id": "biomes/readme-hello-world-7c64d3",
+        "result": "pass",
+        "place": "page"
+      },
+      {
+        "id": "biomes/docs-biomes-and-painting-biomes-presets-and-blends-da4fd8",
+        "result": "pass",
+        "place": "node"
+      },
+      {
+        "id": "biomes/docs-biomes-and-painting-clearings-1576ed",
+        "result": "pass",
+        "place": "node"
+      },
+      {
+        "id": "biomes/docs-biomes-and-painting-multi-noise-maps-7c8dcb",
+        "result": "pass",
+        "place": "node"
+      },
+      {
+        "id": "biomes/docs-biomes-and-painting-koppen-labels-c9f41c",
+        "result": "pass",
+        "place": "node"
+      },
+      {
+        "id": "biomes/docs-biomes-and-painting-editing-paint-undo-and-dirty-rec-f715b8",
+        "result": "pass",
+        "place": "node"
+      },
+      {
+        "id": "biomes/docs-determinism-same-seed-same-bytes-everywhere-7f074b",
+        "result": "pass",
+        "place": "node"
+      },
+      {
+        "id": "biomes/docs-disturbance-disturbance-b73ec9",
+        "result": "pass",
+        "place": "node"
+      },
+      {
+        "id": "biomes/docs-disturbance-ecosystem-growth-10dc50",
+        "result": "pass",
+        "place": "node"
+      },
+      {
+        "id": "biomes/docs-disturbance-ecosystem-growth-0c1ec7",
+        "result": "pass",
+        "place": "node"
+      },
+      {
+        "id": "biomes/docs-files-files-in-and-out-7b879b",
+        "result": "pass",
+        "place": "page"
+      },
+      {
+        "id": "biomes/docs-placement-trees-shrubs-rocks-and-props-39cda7",
+        "result": "pass",
+        "place": "node"
+      },
+      {
+        "id": "biomes/docs-placement-rule-graphs-f993aa",
+        "result": "pass",
+        "place": "node"
+      },
+      {
+        "id": "biomes/docs-relief-and-hydrology-procedural-relief-773a2d",
+        "result": "pass",
+        "place": "node"
+      },
+      {
+        "id": "biomes/docs-relief-and-hydrology-procedural-relief-2f7239",
+        "result": "pass",
+        "place": "node"
+      },
+      {
+        "id": "biomes/docs-relief-and-hydrology-hydrology-e27152",
+        "result": "pass",
+        "place": "node"
+      },
+      {
+        "id": "biomes/docs-relief-and-hydrology-erosion-1878ad",
+        "result": "pass",
+        "place": "node"
+      },
+      {
+        "id": "biomes/docs-roads-and-paths-the-three-things-a-path-does-89abe8",
+        "result": "pass",
+        "place": "node"
+      },
+      {
+        "id": "biomes/docs-roads-and-paths-villages-and-the-roads-between-t-5a1d71",
+        "result": "pass",
+        "place": "node"
+      },
+      {
+        "id": "biomes/docs-seasons-seasons-34dd9f",
+        "result": "pass",
+        "place": "node"
+      },
+      {
+        "id": "biomes/docs-seasons-seasons-2b2804",
+        "result": "pass",
+        "place": "page"
+      },
+      {
+        "id": "biomes/docs-terrain-view-drawing-a-world-as-terrain-35241d",
+        "result": "pass",
+        "place": "page"
+      },
+      {
+        "id": "biomes/docs-terrain-view-drawing-a-world-as-terrain-797727",
+        "result": "pass",
+        "place": "page"
+      },
+      {
+        "id": "biomes/docs-terrain-view-drawing-a-world-as-terrain-bbb5c5",
+        "result": "pass",
+        "place": "page"
+      },
+      {
+        "id": "biomes/docs-terrain-view-drawing-a-world-as-terrain-3178af",
+        "result": "pass",
+        "place": "page"
+      },
+      {
+        "id": "biomes/docs-terrain-view-drawing-a-world-as-terrain-87076a",
+        "result": "pass",
+        "place": "page"
+      },
+      {
+        "id": "biomes/docs-terrain-view-drawing-a-world-as-terrain-ced7aa",
+        "result": "pass",
+        "place": "page"
+      },
+      {
+        "id": "biomes/docs-terrain-view-trees-rocks-and-grass-on-the-ter-d73caa",
+        "result": "pass",
+        "place": "page"
+      },
+      {
+        "id": "biomes/docs-terrain-view-trees-rocks-and-grass-on-the-ter-c0f6f6",
+        "result": "pass",
+        "place": "page"
+      },
+      {
+        "id": "biomes/docs-terrain-view-forest-floor-and-far-hills-e93839",
+        "result": "pass",
+        "place": "page"
+      },
+      {
+        "id": "biomes/docs-terrain-view-forest-floor-and-far-hills-b77a1c",
+        "result": "pass",
+        "place": "page"
+      },
+      {
+        "id": "biomes/docs-workers-workers-f8307d",
+        "result": "pass",
+        "place": "page"
+      },
+      {
+        "id": "biomes/docs-worlds-and-climate-a-world-in-three-lines-0b4aea",
+        "result": "pass",
+        "place": "node"
+      },
+      {
+        "id": "biomes/docs-worlds-and-climate-a-world-in-three-lines-8f02f5",
+        "result": "pass",
+        "place": "node"
+      },
+      {
+        "id": "biomes/docs-worlds-and-climate-region-fields-on-your-own-grid-c1056c",
+        "result": "pass",
+        "place": "node"
+      }
+    ]
+  },
+  "gpu": [
+    {
+      "label": "post test:gpu",
+      "cwd": "packages/post",
+      "command": "cd ../.. && node packages/post/test/image-browser.mjs && node packages/post/test/outline-browser.mjs && node packages/post/test/contact-shadows-browser.mjs && node packages/post/test/sss-browser.mjs && node packages/post/test/material-decals-browser.mjs && node packages/post/test/decals-cull-browser.mjs && node packages/post/test/ssr-rough-browser.mjs && node packages/post/test/ssgi-bounce-browser.mjs && node packages/post/test/anamorphic-browser.mjs && node packages/post/test/blur-browser.mjs && node packages/post/test/lens-browser.mjs",
+      "dir": "post",
+      "script": "test:gpu",
+      "id": "post/test:gpu",
+      "part": [
+        1,
+        1
+      ],
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 166.4,
+      "outcome": "pass",
+      "pauses": [],
+      "peakC": null
+    },
+    {
+      "label": "post test:gpu:looks",
+      "cwd": "packages/post",
+      "command": "cd ../.. && node scripts/post-looks-gpu-check.js",
+      "dir": "post",
+      "script": "test:gpu:looks",
+      "id": "post/test:gpu:looks",
+      "part": [
+        1,
+        1
+      ],
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 44,
+      "outcome": "pass",
+      "pauses": [],
+      "peakC": null
+    },
+    {
+      "label": "quality test:gpu",
+      "cwd": "packages/quality",
+      "command": "cd ../.. && node packages/quality/test/browser-check.mjs && node packages/quality/test/ssaa-browser.mjs && node packages/quality/test/features-browser.mjs && node packages/quality/test/power-browser.mjs",
+      "dir": "quality",
+      "script": "test:gpu",
+      "id": "quality/test:gpu",
+      "part": [
+        1,
+        1
+      ],
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 28.9,
+      "outcome": "pass",
+      "pauses": [],
+      "peakC": null
+    },
+    {
+      "label": "shadows test:gpu",
+      "cwd": "packages/shadows",
+      "command": "cd ../.. && node packages/shadows/test/lit-faces-browser.mjs",
+      "dir": "shadows",
+      "script": "test:gpu",
+      "id": "shadows/test:gpu",
+      "part": [
+        1,
+        1
+      ],
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 6.1,
+      "outcome": "pass",
+      "pauses": [],
+      "peakC": null
+    },
+    {
+      "label": "shadows test:gpu:colored",
+      "cwd": "packages/shadows",
+      "command": "cd ../.. && node packages/shadows/test/colored-browser.mjs",
+      "dir": "shadows",
+      "script": "test:gpu:colored",
+      "id": "shadows/test:gpu:colored",
+      "part": [
+        1,
+        1
+      ],
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 5.7,
+      "outcome": "pass",
+      "pauses": [],
+      "peakC": null
+    },
+    {
+      "label": "shadows test:gpu:distance",
+      "cwd": "packages/shadows",
+      "command": "cd ../.. && node packages/shadows/test/distance-browser.mjs",
+      "dir": "shadows",
+      "script": "test:gpu:distance",
+      "id": "shadows/test:gpu:distance",
+      "part": [
+        1,
+        1
+      ],
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 4.4,
+      "outcome": "pass",
+      "pauses": [],
+      "peakC": null
+    },
+    {
+      "label": "shadows test:gpu:light-function",
+      "cwd": "packages/shadows",
+      "command": "cd ../.. && node packages/shadows/test/light-function-browser.mjs",
+      "dir": "shadows",
+      "script": "test:gpu:light-function",
+      "id": "shadows/test:gpu:light-function",
+      "part": [
+        1,
+        1
+      ],
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 19.7,
+      "outcome": "pass",
+      "pauses": [],
+      "peakC": null
+    },
+    {
+      "label": "shadows test:gpu:outside",
+      "cwd": "packages/shadows",
+      "command": "cd ../.. && node packages/shadows/test/outside/check.mjs",
+      "dir": "shadows",
+      "script": "test:gpu:outside",
+      "id": "shadows/test:gpu:outside",
+      "part": [
+        1,
+        1
+      ],
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 18.7,
+      "outcome": "pass",
+      "pauses": [],
+      "peakC": null
+    },
+    {
+      "label": "shadows test:gpu:transmission",
+      "cwd": "packages/shadows",
+      "command": "cd ../.. && node packages/shadows/test/transmission-browser.mjs",
+      "dir": "shadows",
+      "script": "test:gpu:transmission",
+      "id": "shadows/test:gpu:transmission",
+      "part": [
+        1,
+        1
+      ],
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 4,
+      "outcome": "pass",
+      "pauses": [],
+      "peakC": null
+    },
+    {
+      "label": "shadows test:gpu:vsm",
+      "cwd": "packages/shadows",
+      "command": "cd ../.. && node packages/shadows/test/vsm-browser.mjs",
+      "dir": "shadows",
+      "script": "test:gpu:vsm",
+      "id": "shadows/test:gpu:vsm",
+      "part": [
+        1,
+        1
+      ],
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 4.2,
+      "outcome": "pass",
+      "pauses": [],
+      "peakC": null
+    },
+    {
+      "label": "shadows test:gpu:virtual-custom",
+      "cwd": "packages/shadows",
+      "command": "cd ../.. && node packages/shadows/test/virtual-custom-browser.mjs",
+      "dir": "shadows",
+      "script": "test:gpu:virtual-custom",
+      "id": "shadows/test:gpu:virtual-custom",
+      "part": [
+        1,
+        1
+      ],
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 5.2,
+      "outcome": "pass",
+      "pauses": [],
+      "peakC": null
+    },
+    {
+      "label": "shadows test:gpu:virtual",
+      "cwd": "packages/shadows",
+      "command": "cd ../.. && node packages/shadows/test/virtual-sampling-browser.mjs",
+      "dir": "shadows",
+      "script": "test:gpu:virtual",
+      "id": "shadows/test:gpu:virtual",
+      "part": [
+        1,
+        1
+      ],
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 4.3,
+      "outcome": "pass",
+      "pauses": [],
+      "peakC": null
+    },
+    {
+      "label": "shadows test:gpu:virtual-feedback",
+      "cwd": "packages/shadows",
+      "command": "cd ../.. && node packages/shadows/test/virtual-feedback-browser.mjs",
+      "dir": "shadows",
+      "script": "test:gpu:virtual-feedback",
+      "id": "shadows/test:gpu:virtual-feedback",
+      "part": [
+        1,
+        1
+      ],
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 4.9,
+      "outcome": "pass",
+      "pauses": [],
+      "peakC": null
+    },
+    {
+      "label": "shadows test:gpu:virtual-cache",
+      "cwd": "packages/shadows",
+      "command": "cd ../.. && node packages/shadows/test/virtual-cache-browser.mjs",
+      "dir": "shadows",
+      "script": "test:gpu:virtual-cache",
+      "id": "shadows/test:gpu:virtual-cache",
+      "part": [
+        1,
+        1
+      ],
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 4.4,
+      "outcome": "pass",
+      "pauses": [],
+      "peakC": null
+    },
+    {
+      "label": "shadows test:gpu:virtual-filters",
+      "cwd": "packages/shadows",
+      "command": "cd ../.. && node packages/shadows/test/lit-faces-browser.mjs --page=virtual && node packages/shadows/test/virtual-edges-browser.mjs",
+      "dir": "shadows",
+      "script": "test:gpu:virtual-filters",
+      "id": "shadows/test:gpu:virtual-filters",
+      "part": [
+        1,
+        1
+      ],
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 13.9,
+      "outcome": "pass",
+      "pauses": [],
+      "peakC": null
+    },
+    {
+      "label": "shadows test:gpu:cutout-casters",
+      "cwd": "packages/shadows",
+      "command": "cd ../.. && node packages/shadows/test/cutout-casters-browser.mjs",
+      "dir": "shadows",
+      "script": "test:gpu:cutout-casters",
+      "exclusive": true,
+      "id": "shadows/test:gpu:cutout-casters",
+      "part": [
+        1,
+        1
+      ],
+      "ok": true,
+      "timedOut": false,
+      "aborted": false,
+      "seconds": 22.5,
+      "outcome": "pass",
+      "pauses": [],
+      "peakC": null
+    }
+  ],
+  "prefetch": {
+    "parent": "fc1ed452f",
+    "evidence": "Full 4 km default world, three workers, exact worker output parity and deterministic job reduction; no speed ratio",
+    "world": {
+      "size": [
+        4096,
+        4096
+      ],
+      "resolution": 1,
+      "workers": 3,
+      "prefetch": [
+        -1500,
+        -1500,
+        1500,
+        1500
+      ]
+    },
+    "before": {
+      "overview": 3,
+      "cover": 1,
+      "view": 204,
+      "place": 190
+    },
+    "after": {
+      "overview": 3,
+      "cover": 1,
+      "view": 144,
+      "place": 144
+    },
+    "unique": 292
+  },
+  "remaining": "7.4 ms diagnostic frame remains unclassified; coordinator directs landing validated repairs first. No timing exemption or performance ratio."
+}

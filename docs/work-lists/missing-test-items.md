@@ -1,8 +1,8 @@
 # Required test items audit
 
-## Current continuation, not yet landed (2026-11-09)
+## Validated continuation ready to land (2026-11-09)
 
-The runtime known list is 42 after three further ownership repairs (real execution pending below), down from 48. All 29 loader examples run with zero exceptions:
+The runtime known list is 42 after three further ownership repairs (real execution confirmed below), down from 48. All 29 loader examples run with zero exceptions:
 browser color rendering no longer carries Node imports, OBJ examples use the local licensed
 Doorman family, and the step-by-step example fetches the OBJ rather than its MTL and resolves
 material maps from an absolute base. All 520 loader CPU tests and both GPU suites pass.
@@ -39,29 +39,30 @@ Physics stays on hold. P01-P29 proof boundaries below are unchanged this continu
 The earlier pre-repair verification passed 13,439 tests, but did not establish a combined
 runtime pass. Current landing checks and their exact outcomes are recorded in the build record.
 
-### Current landing blockers
+### Missing-items landing confirmation (2026-11-09)
 
-The current full verify passes all 13,499 tests with zero failures/skips (396.1 s).
-Both API gates pass with one snapshot file-list query; the short-path CLI completes
-in 38.8 s under the full run. Existing prefetch chain/plan/exit checks and the new
-GPU-planner eval-import regression pass. Lint/hygiene, 476 biome CPU tests and all
-311 shadows/quality/post CPU tests pass. Source checkpoint: 257af82e7.
+Rebased source aa3b0dfc4 includes batch 160's browser pipe-lifecycle
+repair 6ebbd1aa4. Catalog passes in 24.6 s and the full default-world
+prefetch proof passes in 51.8 s, including bounded browser teardown. Every
+field/typed-array hash for 292 unique results matches the parent; view/placement
+work remains 204/190 before and 144/144 after. No workload or budget changed.
 
-Real execution of the three repaired README examples and all registered GPU tests
-of shadows/quality/post is still queued; the known list is 42, but no runtime pass
-for those repairs is claimed yet. Initial README/package-GPU requests expired
-before acquiring the lock; zero workloads ran. Rescheduling changes only the queue
-allowance, with shared/exclusive groups separated and existing test budgets intact.
-The original 64/64 biome/loader run and prior hardware proofs remain historical
-source evidence. A current biome README confirmation is also queued.
+Full verify passes 13,534 tests with zero failures/skips (472.8 s supervisor),
+all 887 API reports / 8,638 exports, and all 1,117 README type examples. Lint and
+hygiene pass. The explicit changed-package CPU run passes 775 tests, zero
+failures/skips. All 16 registered shadows/quality/post GPU scripts pass without
+driver-reset retries; those completed results were collected before the rebase.
+All 46 shadows/quality/post and 35 biome original README examples now execute
+with zero failures or exceptions. The required outside-input manifest remains
+460 files; no assets, exports, core/stage or held physics source changed here.
+Core plus stage is 23,837 B gzip, below 25,000.
 
-The new slow-send paired record has no minimum-time regression beyond round spread,
-but its 7.4 ms current outlier exceeds twice the unchanged 3.5 ms gate and remains
-open, not busy-exempted. Batch 160 still owns the browser pipe-lifecycle repair:
-the latest fetched main has no such repair. Despite two later passing catalog
-controls, the earlier cleanup defect is not declared fixed. Do not rerun the
-failed prefetch GPU proof or push this dependent group until that mainline repair
-is rebased and the catalog/prefetch confirmations pass. No timing budget changed.
+Durable checks and per-example/script results: whitepaper/results/missing-items-landing-20261109.json
+(use results/ from this whitepaper directory). Per the newest coordinator note,
+land these validated repairs before diagnosing the separate 7.4 ms slow-send
+outlier. That frame remains open, above twice the 3.5 ms gate, without a busy
+exemption or speed claim. The remaining 42 README exceptions and P01-P29 proof
+boundaries remain unchanged.
 
 ## README five ownership (2026-11-09)
 

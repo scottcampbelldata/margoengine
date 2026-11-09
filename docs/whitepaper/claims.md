@@ -1722,3 +1722,11 @@ Latest integration evidence: full verify passes 13,499 tests, zero failures/skip
 including the real short-path query-count regression, prefetch entry contract and
 GPU planner eval import. Real README/GPU evidence remains queued, so no rendering
 or runtime closure is inferred from these CPU checks.
+
+
+Missing-items runtime confirmation (2026-11-09): catalog and full default-world
+prefetch now pass including teardown after mainline browser repair 6ebbd1aa4.
+All 46 shadows/quality/post and 35 biome README snippets execute without
+exceptions, and all 16 effect-package GPU scripts pass. Full verify: 13,534/13,534,
+zero skips. results/missing-items-landing-20261109.json records the scoped evidence.
+The 7.4 ms diagnostic frame is still unclassified; no timing closure is claimed.

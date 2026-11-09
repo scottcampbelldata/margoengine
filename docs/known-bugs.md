@@ -2212,7 +2212,7 @@ queued/started/detached disposal. No deadline, extent, resolution or exception w
 
 Importing scripts/build-llms.mjs from node --input-type=module -e failed because its CLI guard passed absent process.argv[1] to pathToFileURL. The guard now checks that the filename exists before comparing it. tests/llms.test.js imports the actual module in a fresh eval process and checks both its exports and absence of CLI output; generation and --check remain unchanged.
 
-### Open: verification child and browser-close hangs (missing-items continuation)
+### Resolved API/browser blockers: historical missing-items failures
 
 At local checkpoint 5ee6138db, full verify executed 13,483 tests with zero skips; 13,480 passed.
 The short-path API regression's full-report child hit its unchanged 280,000 ms hard deadline.
@@ -2291,3 +2291,14 @@ integration blocker is satisfied. Browser teardown still awaits batch 160's actu
 repair despite passing catalog controls. The 7.4 ms diagnostic frame remains an
 open attribution task, not a busy exemption or accepted limit. Real README/GPU
 validation remains queued. No dependent push has occurred.
+
+
+Missing-items browser closure (2026-11-09): mainline 6ebbd1aa4 repairs the owned
+Chromium pipe lifecycle with regression coverage. After rebasing, this lane
+confirms catalog and full prefetch including teardown; no browser source was
+changed here. Full verify passes 13,534/13,534 with zero skips. Both repaired
+README groups and all 16 effect-package GPU scripts pass; runtime validation is
+complete for this landing group. Earlier queued/blocker notes above are history.
+The separate 7.4 ms flythrough attribution remains open and is next per the
+coordinator; it is not a busy exemption. Durable results:
+whitepaper/results/missing-items-landing-20261109.json.

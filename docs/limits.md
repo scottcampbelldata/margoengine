@@ -1869,3 +1869,12 @@ the repaired API and prefetch-entry contracts. The 8.3 report finishes in 38.8 s
 at its unchanged 280 s bound. No performance limit changed. The 7.4 ms diagnostic
 frame remains open, and browser teardown and queued GPU/README evidence still
 block landing; the earlier failed runs are retained as historical records.
+
+
+Missing-items runtime confirmation (2026-11-09): after mainline browser repair
+6ebbd1aa4, catalog and full 4 km prefetch complete their bounded teardown; all
+292 result records still match the parent exactly, with 144 view and 144
+placement jobs. All 46 effect-package and 35 biome README examples execute
+without exceptions. Evidence: whitepaper/results/missing-items-landing-20261109.json.
+The separate 7.4 ms slow-send outlier remains open with its unchanged 3.5 ms
+gate; no performance ratio, busy exemption or new accepted difference.

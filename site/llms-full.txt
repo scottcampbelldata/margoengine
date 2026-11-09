@@ -4442,6 +4442,7 @@ other primitives. The existing strict 1,550 B gzip consumer check, primitive
 geometry/UV/group controls and full-package ratio check remain unchanged.
 
 
+
 Missing-items timing continuation (2026-11-09): the API report's repeated immutable
 snapshot query is repaired (886 file-list requests to one, unchanged reports). Its
 earlier 280 s child timeout still requires the full integration gate. Paired biome
@@ -4455,6 +4456,15 @@ the repaired API and prefetch-entry contracts. The 8.3 report finishes in 38.8 s
 at its unchanged 280 s bound. No performance limit changed. The 7.4 ms diagnostic
 frame remains open, and browser teardown and queued GPU/README evidence still
 block landing; the earlier failed runs are retained as historical records.
+
+
+Missing-items runtime confirmation (2026-11-09): after mainline browser repair
+6ebbd1aa4, catalog and full 4 km prefetch complete their bounded teardown; all
+292 result records still match the parent exactly, with 144 view and 144
+placement jobs. All 46 effect-package and 35 biome README examples execute
+without exceptions. Evidence: whitepaper/results/missing-items-landing-20261109.json.
+The separate 7.4 ms slow-send outlier remains open with its unchanged 3.5 ms
+gate; no performance ratio, busy exemption or new accepted difference.
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
@@ -6672,7 +6682,7 @@ queued/started/detached disposal. No deadline, extent, resolution or exception w
 
 Importing scripts/build-llms.mjs from node --input-type=module -e failed because its CLI guard passed absent process.argv[1] to pathToFileURL. The guard now checks that the filename exists before comparing it. tests/llms.test.js imports the actual module in a fresh eval process and checks both its exports and absence of CLI output; generation and --check remain unchanged.
 
-### Open: verification child and browser-close hangs (missing-items continuation)
+### Resolved API/browser blockers: historical missing-items failures
 
 At local checkpoint 5ee6138db, full verify executed 13,483 tests with zero skips; 13,480 passed.
 The short-path API regression's full-report child hit its unchanged 280,000 ms hard deadline.
@@ -6751,6 +6761,17 @@ integration blocker is satisfied. Browser teardown still awaits batch 160's actu
 repair despite passing catalog controls. The 7.4 ms diagnostic frame remains an
 open attribution task, not a busy exemption or accepted limit. Real README/GPU
 validation remains queued. No dependent push has occurred.
+
+
+Missing-items browser closure (2026-11-09): mainline 6ebbd1aa4 repairs the owned
+Chromium pipe lifecycle with regression coverage. After rebasing, this lane
+confirms catalog and full prefetch including teardown; no browser source was
+changed here. Full verify passes 13,534/13,534 with zero skips. Both repaired
+README groups and all 16 effect-package GPU scripts pass; runtime validation is
+complete for this landing group. Earlier queued/blocker notes above are history.
+The separate 7.4 ms flythrough attribution remains open and is next per the
+coordinator; it is not a busy exemption. Durable results:
+whitepaper/results/missing-items-landing-20261109.json.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 
