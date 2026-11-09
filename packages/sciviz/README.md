@@ -3,7 +3,8 @@
 Real-data examples: [MRI head volume](../../examples/sciviz-head.html) (OpenNeuro, CC0),
 [Star catalogue](../../examples/sciviz-stars.html) (one million public-domain 2MASS sources in observed sky position
 and colour space, selection linked to a histogram), and [Wind field](../../examples/sciviz-wind.html)
-(eight NOAA daily fields, streamlines and arrows replaced through `Figure.replace`).
+(eight NOAA daily fields, streamlines and arrows replaced through `Figure.replace`) and
+[Moving wind](../../examples/sciviz-moving-flow.html) (GPU particles/trails through the same NOAA daily means).
 [Data preparation and licences](../../examples/assets/sciviz/README.md) record the exact reductions and limitations.
 Run them from the repository root with `npm run dev:examples` after building packages and pulling Git LFS assets.
 
@@ -21,12 +22,12 @@ Layers read `@margoengine/compute` GPU arrays in place, so data computed on the 
 CPU. The package is optional and tree-shakable, and adds nothing to core. The points, lines, labels, controls and
 compute packages load with `import()` only when a figure uses them.
 
-## CPU pathlines (batch 171 foundation)
+## Moving flow, pathlines and streaklines
 
 The optional `@margoengine/sciviz/flow` entry provides `tracePathline`: physical velocity on a regular 2D/3D grid,
 bilinear/trilinear spatial interpolation, linear interpolation between frames and classical RK4. Steps shorten
-at frame boundaries and the requested end. This is the CPU reference foundation of moving flow. GPU particles,
-trails, seeding/respawn, streaklines and the official moving-flow demo are pending.
+at frame boundaries and the requested end. `flowParticles` carries particles on the GPU with fading trails,
+uniform/random/rake/region seeds and respawn. `traceStreakline` observes successive releases at one time.
 
 ```ts
 import { tracePathline } from '@margoengine/sciviz/flow';
@@ -59,6 +60,73 @@ nothing after settling and needs no explicit disposal. Import requests no GPU. T
 Build the committed binary with `npm run build:flow --workspace @margoengine/sciviz`; normal builds need no Rust.
 Tests cover analytic solutions and two days of the frozen NOAA wind converted to projected km/s. These trajectories
 through daily means are numerical illustrations, not observed parcel tracks or forecasts. No speed claim is made.
+
+```ts
+import { Figure } from '@margoengine/sciviz';
+import { flowParticles } from '@margoengine/sciviz/flow';
+
+const figure = await Figure.create(document.querySelector('canvas')!);
+const particles = await flowParticles(figure, {
+  dims: [2, 2, 1], bounds: [-2, 2, -2, 2, 0, 0],
+  frames: [{ time: 0, u: new Float32Array(4).fill(1), v: new Float32Array(4).fill(0.25) }],
+}, { count: 256, seeding: { kind: 'random', seed: 171 }, lifetime: 2 });
+await particles.advance(1, { step: 0.125 }); // physical time; drawing never advances it
+await figure.ready();
+figure.render();
+// particles.dispose(), figure.remove(particles), or figure.dispose() frees GPU resources.
+// Both figure and particles also support `using` / Symbol.dispose.
+```
+
+Create this custom layer in a 3D figure, including for planar fields. It participates in axes, bounds,
+visibility, `Figure.remove` and disposal. WebGPU and WebGL2 compatibility run the same GPU code; native
+WebGL2 flow awaits the remaining native backend work. Creation copies inputs in tasks of 16,384 samples
+with `signal` cancellation. Later caller mutation has no effect. Importing the entry allocates no GPU resources.
+
+Defaults: `count: 1024` (1..1,000,000), `seeding: { kind: 'uniform' }`, `from: firstFrame.time`,
+`trails: 32` (2..256), `lifetime: 10` positive time units, `respawn: true`, `width: 2` device pixels
+(positive, at most 64), `opacity: 0.8` (0..1), `color: '#7ddcff'` (sRGB hex, optional hex alpha multiplies opacity),
+`maxSteps: 10000` (1..1,000,000 total accepted steps). Rendering includes square particle heads and
+screen-width trail segments with quadratic age fade. History is bounded, on the GPU, and cut at respawn
+generations so no segment bridges two releases. Lifetime expires at a step endpoint. On invalid RK4 stages,
+missing data, domain exit or expiry, respawn reuses that particle's fixed seed at the endpoint, or marks it dead
+when disabled. It does not integrate a partial invalid step or invent a boundary point.
+
+`advance(to, { step, signal? })` is forward only, shortens at frame boundaries/end and yields after each
+substep. Only one advance/recovery operation may run at a time. Cancellation throws its exact reason and
+retains completed submissions; `time` and `steps` report them. Device replacement replays that exact partition
+from retained seeds/field copies with no network load or position readback. Await `figure.ready()` before
+advancing after replacement. The replay budget is `maxSteps`; create a new layer when it is exhausted.
+GPU storage/uniform buffers together must fit 128 MiB and the device's buffer/binding limits. CPU copies
+and the caller's arrays require additional memory. GPU bounds/widths and normalised velocities must fit
+float32; normalised velocities and step-times-velocity are capped at float32 max / 16 for RK/interpolation
+arithmetic headroom. Use local coordinates and consistent units. Float32 GPU results match the float64 CPU reference
+within 0.0002 distance units in the bounded analytic test fields, not a universal error guarantee. Refine the
+time step for your field. `readPositions({ signal?, timeoutMs? })` explicitly reads packed xyz/age to the CPU,
+with age -1 for dead particles; timeout defaults to 30000 ms (positive, at most 2147483647).
+
+`flowSeeds(grid, count = 1024, seeding = { kind: 'uniform' })` returns float64 xyz independent of velocities.
+Uniform and region layouts use cell centres on an axis-balanced lattice; non-factorable counts cover the
+whole lattice. Random uses an unsigned 32-bit `seed` (default 0). A rake's `start`/`end` include endpoints
+(one seed uses the midpoint). A region's six `bounds` and a rake's endpoints must lie inside the grid.
+The same seed/layout and step partition are deterministic on the same backend; cross-device bit identity
+is not claimed. The official moving-wind demo exposes all four layouts on the hash-pinned NOAA fixture.
+
+```ts
+import { traceStreakline } from '@margoengine/sciviz/flow';
+
+const streak = await traceStreakline({
+  dims: [2, 2, 1], bounds: [-3, 3, -3, 3, 0, 0],
+  frames: [0, 2].map(time => ({ time, u: new Float32Array(4).fill(time), v: new Float32Array(4) })),
+}, [0, 0, 0], [0, 1, 2], { to: 2, step: 0.125 });
+console.log(Array.from(streak.samples)); // [2,0,0,0, 1.5,0,0,1, 0,0,0,2]
+```
+
+Streaklines accept 1..4096 finite, strictly increasing release times, at or before observation `to`.
+Their xyzt samples store **release** time; `time` stores observation time. `stops` reports each trace's
+outcome. Unfinished/invalid releases have NaN xyz, preserving gaps rather than joining across missing data.
+They reuse one lazily loaded Wasm instance and one field copy per call, with pathline cancellation and
+per-release `maxSteps`. They retain nothing after settling. The `/flow` Wasm binary stays separate from
+all other feature kernels. GPU transport itself uses no Wasm and reads back only when explicitly requested.
 
 ## CPU isosurface extraction
 

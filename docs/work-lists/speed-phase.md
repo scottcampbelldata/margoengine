@@ -216,6 +216,10 @@ approvedBy and future expiry to `scripts/gpu-exclusive-allow.json`; it is empty.
 Scott deferred all benchmarks, paired wall-clock A/Bs, timing-only assertions and exclusive GPU use during
 the build phase (2026-11-10). Correctness gates still run under the shared GPU lock.
 
+- Batch 171 moving-flow continuation: GPU positions/history stay resident during advance/draw, with zero position
+  readbacks until explicit inspection. Streaklines load/copy a field once for all releases (mocked instantiation
+  work-count regression). Full particle/trail throughput, recovery cost, CPU streakline throughput and rival
+  comparisons on the NOAA daily-mean scene remain for the quiet speed phase; no timing proof is claimed.
 - Batch 171 flow foundation: CPU arithmetic is in one feature-local Rust/Wasm module, with one reservation,
   no allocator calls during integration and chunks of at most 128 RK4 steps. No speed or SIMD gain is claimed;
   comparison with an equivalent scalar reference and any SIMD throughput proof belong to the deferred speed phase.

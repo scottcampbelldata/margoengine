@@ -1,5 +1,10 @@
-// CPU transport foundation for batch 171. Research: docs/clean-room.md. No renderer or Wasm load on import.
+// Moving flow and its CPU reference. Research: docs/clean-room.md. No renderer or Wasm load on import.
 import { fault, rangeError, wasmError } from '../../shared/errors.js';
+import { validateFlowGrid } from './flow-seeds.js';
+export { flowSeeds } from './flow-seeds.js';
+export type { FlowSeeding } from './flow-seeds.js';
+export { FlowParticles, flowParticles } from './flow-particles.js';
+export type { FlowParticlesOptions, FlowAdvanceOptions } from './flow-particles.js';
 
 /** A velocity snapshot, in distance units per time unit. Components are planar, x fastest. */
 export interface FlowFrame {
@@ -43,6 +48,14 @@ export interface FlowTrace {
   readonly samples: Float64Array;
   /** `end`: reached to; `invalid`: a stage/endpoint left the grid or touched missing data; `steps`: budget exhausted. */
   readonly stop: 'end' | 'invalid' | 'steps';
+}
+
+/** A streakline at one observation time, ordered by release time, without connecting across invalid samples. */
+export interface FlowStreakline {
+  /** Packed x,y,z,releaseTime. Invalid/unfinished releases have NaN xyz; release times remain intact. */
+  readonly samples: Float64Array;
+  readonly stops: readonly FlowTrace['stop'][];
+  readonly time: number;
 }
 
 interface FlowKernel {
@@ -106,43 +119,47 @@ export async function tracePathline(
   seed: readonly [number, number, number],
   options: FlowTraceOptions,
 ): Promise<FlowTrace> {
+  return traceFlow(grid, seed, options) as Promise<FlowTrace>;
+}
+
+/**
+ * Releases a particle at the same seed at each strictly increasing release time (1..4096).
+ * Integrates each to `options.to`, which must be at or after every release, with the pathline RK4 method.
+ * `options.from` is replaced by the release times. One Wasm instance and one field copy serve the whole call.
+ * `maxSteps` applies to each release. Cancellation/budget behaviour matches tracePathline.
+ */
+export async function traceStreakline(
+  grid: FlowGrid,
+  seed: readonly [number, number, number],
+  releases: ArrayLike<number>,
+  options: Omit<FlowTraceOptions, 'from'>,
+): Promise<FlowStreakline> {
+  options?.signal?.throwIfAborted();
+  if (!releases || !Number.isInteger(releases.length) || releases.length < 1 || releases.length > 4096)
+    throw rangeError('Flow streakline needs 1..4096 strictly increasing release times at or before to', 'sciviz');
+  const times = Float64Array.from(releases);
+  if (times.some((x, i) => !Number.isFinite(x) || x > options?.to || (i > 0 && x <= times[i - 1])))
+    throw rangeError('Flow streakline needs 1..4096 strictly increasing release times at or before to', 'sciviz');
+  return traceFlow(grid, seed, { ...options, from: times[0] }, times) as Promise<FlowStreakline>;
+}
+
+async function traceFlow(
+  grid: FlowGrid,
+  seed: readonly [number, number, number],
+  options: FlowTraceOptions,
+  releases?: Float64Array,
+): Promise<FlowTrace | FlowStreakline> {
   const signal = options?.signal;
   signal?.throwIfAborted();
   const fail = (message: string): never => {
     throw rangeError(message, 'sciviz');
   };
-  const dims = grid?.dims;
-  if (!dims || dims.length !== 3 || dims.some((n, i) => !Number.isSafeInteger(n) || n < (i === 2 ? 1 : 2)))
-    fail('Flow dims need integer x/y counts of at least 2 and z of at least 1');
-  const bounds = grid.bounds;
-  if (!bounds || bounds.length !== 6 || bounds.some((x) => !Number.isFinite(x)))
-    fail('Flow bounds need six finite first/last sample coordinates');
-  for (let i = 0; i < 3; i++) {
-    const width = bounds[i * 2 + 1] - bounds[i * 2];
-    if (!Number.isFinite(width) || (dims[i] === 1 ? width !== 0 : width <= 0))
-      fail('Flow bounds must ascend on sampled axes and be equal on the singleton z axis');
-  }
-  const frames = grid.frames;
-  if (!frames?.length || frames.length > 4096) fail('Flow needs 1 to 4096 velocity frames');
-  const size = dims[0] * dims[1] * dims[2];
+  const size = validateFlowGrid(grid), dims = grid.dims, bounds = grid.bounds, frames = grid.frames;
   const max = options?.maxSteps ?? 10_000;
   if (!Number.isInteger(max) || max < 1 || max > 1_000_000) fail('Flow maxSteps must be an integer from 1 to 1000000');
   const bytes = size * frames.length * 12;
-  if (!Number.isSafeInteger(bytes) || bytes + (max + 1) * 64 + CHUNK * 32 + frames.length * 8 + 96 > BUDGET)
+  if (!Number.isSafeInteger(bytes) || bytes + (releases ? releases.length * 64 : (max + 1) * 64) + CHUNK * 32 + frames.length * 8 + 96 > BUDGET)
     fail('Flow input and output exceed the 128 MiB working budget; reduce the grid, frames or maxSteps');
-  for (let i = 0; i < frames.length; i++) {
-    const f = frames[i];
-    if (
-      !f ||
-      !Number.isFinite(f.time) ||
-      (i > 0 && (!(f.time > frames[i - 1].time) || !Number.isFinite(f.time - frames[i - 1].time)))
-    )
-      fail('Flow frame times must be finite, strictly increasing, with finite differences');
-    for (const a of [f.u, f.v, f.w])
-      if (a !== undefined && (!(a instanceof Float32Array) || a.length !== size))
-        fail('Flow components must be Float32Arrays with one value per grid sample');
-    if (!f.u || !f.v) fail('Flow frames need both u and v components');
-  }
   const from = options?.from,
     to = options?.to,
     step = options?.step;
@@ -193,27 +210,38 @@ export async function tracePathline(
       }
     }
     signal?.throwIfAborted();
-    new Float64Array(k.memory.buffer, state, 4).set([...seed, from]);
     const call = (limit: number) =>
       k.trace(data, dimensions, box, times, frames.length, state, output, to, step, limit);
-    // Validate the seed without taking a step, even when from == to.
-    if ((call(0) & 3) === 2) return { samples: new Float64Array(), stop: 'invalid' };
-    const samples = new Float64Array((max + 1) * 4);
-    samples.set([...seed, from]);
-    let count = 1,
-      status = from === to ? 1 : 0;
-    while (status === 0 && count <= max) {
+    const streak = releases ? new Float64Array(releases.length * 4) : undefined;
+    const stops: FlowTrace['stop'][] = [];
+    for (let release = 0; release < (releases?.length ?? 1); release++) {
+      const start = releases?.[release] ?? from;
+      new Float64Array(k.memory.buffer, state, 4).set([...seed, start]);
+      // Validate even a zero-duration release. An invalid seed is not an observed particle.
+      let status = (call(0) & 3) === 2 ? 2 : start === to ? 1 : 0;
+      const samples = releases ? undefined : new Float64Array((max + 1) * 4);
+      samples?.set([...seed, start]);
+      let count = status === 2 ? 0 : 1;
+      while (status === 0 && count <= max) {
+        signal?.throwIfAborted();
+        const result = call(Math.min(CHUNK, max - count + 1));
+        status = result & 3;
+        const added = result >>> 2;
+        samples?.set(new Float64Array(k.memory.buffer, output, added * 4), count * 4);
+        count += added;
+        if (status === 3) fail('Flow step cannot advance this time value; use a larger time step or relative times');
+        await yieldTask();
+      }
       signal?.throwIfAborted();
-      const result = call(Math.min(CHUNK, max - count + 1));
-      status = result & 3;
-      const added = result >>> 2;
-      samples.set(new Float64Array(k.memory.buffer, output, added * 4), count * 4);
-      count += added;
-      if (status === 3) fail('Flow step cannot advance this time value; use a larger time step or relative times');
+      const stop = status === 1 ? 'end' : status === 2 ? 'invalid' : 'steps';
+      if (!streak) return { samples: samples!.slice(0, count * 4), stop };
+      stops.push(stop);
+      const endpoint = new Float64Array(k.memory.buffer, state, 4);
+      streak.set(stop === 'end' ? [endpoint[0], endpoint[1], endpoint[2], start] : [NaN, NaN, NaN, start], release * 4);
       await yieldTask();
     }
     signal?.throwIfAborted();
-    return { samples: samples.slice(0, count * 4), stop: status === 1 ? 'end' : status === 2 ? 'invalid' : 'steps' };
+    return { samples: streak!, stops, time: to };
   } catch (error) {
     throw wasmError(error);
   }

@@ -4,7 +4,7 @@ Lane X, after batch 118. Data drawing only; physics remains on hold.
 
 | Job | State | Evidence and remaining work |
 | --- | --- | --- |
-| 1. Moving flow | In progress | Optional `/flow` CPU physical-time pathline reference, feature-local Rust/Wasm, analytic/NOAA tests and real-browser pathline rendering/restoration on WebGPU and WebGL2 compatibility pass. GPU particles, fading trails, deterministic seeding, respawn, streaklines and the official real-data demo remain. |
+| 1. Moving flow | Done | GPU physical-time RK4 particles on 2D/3D steady/unsteady fields, fading generation-cut trails, all four deterministic seed layouts, fixed-seed respawn, CPU pathlines/streaklines and bounded exact device replay. NOAA Moving wind passes both layouts/backends; numeric, all-pixel parity, cancellation and all 23 README examples pass. Core/stage unchanged. |
 | 2. Line integral convolution | Pending | Published LIC methods, animated/scalar-coloured surface slices and real-data demo. |
 | 3. Tubes and ribbons | Pending | Scalar radius, vorticity twist, stable frames/normals and real-data demo. |
 | 4. Derived fields | Pending | CPU/GPU gradient, divergence, curl, vorticity, Q and lambda-2 parity, volume/isosurface integration. |

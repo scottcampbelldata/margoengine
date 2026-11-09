@@ -116,7 +116,7 @@ async function run(compat) {
       { width: 390, height: 844 },
     ]) {
       await page.setViewportSize(viewport);
-      for (const name of ['head', 'stars', 'wind', 'aeroflow', 'astrometrics', 'medical', 'showcase']) {
+      for (const name of ['head', 'stars', 'wind', 'moving-flow', 'aeroflow', 'astrometrics', 'medical', 'showcase']) {
         if (only && !only.split(',').includes(name)) continue;
         const fixture = ['aeroflow', 'astrometrics', 'medical', 'showcase'].includes(name);
         const path = `${fixture ? '/packages/sciviz/tests/pages' : '/examples'}/sciviz-${name}.ts`;
@@ -268,6 +268,28 @@ async function run(compat) {
             frames.length > 0 && frames.every((n) => n === 1),
             'cloud replacement never leaves an empty or duplicate trace',
           );
+        } else if (name === 'moving-flow') {
+          const first = await structure(path);
+          await page.click('#next');
+          await page.waitForFunction(() => document.getElementById('date').textContent.includes('12:00'));
+          assert.notEqual(await structure(path), first, 'physical-time NOAA particles move');
+          for (const kind of ['random', 'rake', 'region', 'uniform']) {
+            await select('seeding', kind);
+            await page.waitForFunction(() => !document.getElementById('seeding').disabled);
+            await structure(path);
+          }
+          await page.uncheck('#traces');
+          assert.equal(await page.evaluate(async (path) => (await import(path)).figure.layers
+            .filter((layer) => layer.kind === 'line').every((layer) => layer.line.visible === false), path), true,
+          'reference line renderables really hide');
+          await structure(path); // real GPU particles/trails alone, no reference-line substitute
+          await page.check('#traces');
+          await page.click('#play');
+          await page.waitForFunction(() => !document.getElementById('date').textContent.includes('06:00'));
+          await page.click('#play');
+          await page.waitForFunction(() => !document.getElementById('next').disabled);
+          await download('export');
+          await page.screenshot({ path: `test-results/sciviz-fixes/moving-flow-${compat ? 'webgl2' : 'webgpu'}-${viewport.width}.png` });
         } else if (name === 'wind') {
           const first = await structure(path);
           await page.evaluate(monitor, path);

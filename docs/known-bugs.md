@@ -92,6 +92,14 @@ experiment is not integrated and the public prebuilt remains in use.
 [Current negative evidence](whitepaper/results/batch-134-scalar-rational.json),
 [previous byte-objective evidence](whitepaper/results/batch-134-scalar-exact-edge.json).
 
+### Fixed: GPU gate mutex target lookup raced junction retirement
+
+Batch 171's browser gate encountered EINVAL before browser startup. The scheduler statted the reusable mutex
+junction and then resolved it, allowing retirement/replacement to invalidate that second lookup. It now reads
+the backing name once, retaining dead-owner identity checks. Regression, research and repro:
+[GPU mutex target lookup](quality/gpu-mutex-target.md). Permission/I/O errors still surface; no retry or wait
+budget changes. The resumed flow browser case passes its original numeric, parity and recovery assertions.
+
 ### Fixed 2026-11-09: owned Chromium process listing raced client close
 
 After the helper-program repair, voxel GI passed its rendering assertions but
@@ -139,12 +147,14 @@ check (`flow-current-records.json`). No provenance flag, lazy asset,
 pixel bound or time budget is waived. Earlier full verify failures for preview GL mocks and literal error help
 are already repaired and retain their passing regressions. Only the failed size prerequisite is rerun.
 
-### Sciviz moving flow in progress (batch 171 job 1)
+### Sciviz moving flow implementation (batch 171 job 1)
 
 The source/exports audit found only steady CPU streamlines with normalised velocity in `/maths`; those cannot
 trace moving particles through time. `/flow` now supplies the CPU physical-time pathline reference with
 temporal interpolation, analytic/real-NOAA correctness tests, cancellation and bounded memory. GPU advection,
-fading trails, seeding/respawn, streaklines and an official moving-flow demo remain to be implemented and validated.
+fading trails, seeding/respawn, streaklines and an official moving-flow demo are now implemented. The analytic
+CPU/GPU, deterministic replay, all-pixel parity and desktop/mobile real-data browser evidence is recorded in
+the operational playbook's moving-flow section. Native WebGL2 flow awaits batch 181; jobs 2 to 6 remain pending.
 Batch 171 jobs 2 to 6 are not completed by this foundation. Main's teardown repair and the native surface/rectangle
 piece are landed; their complete passing browser evidence is retained. The CPU reference's new README example
 and paired size-record gate are validated before its push. [Progress](work-lists/sciviz-progress.md) tracks all six jobs.

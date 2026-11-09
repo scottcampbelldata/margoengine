@@ -92,15 +92,31 @@ basic scene. Both records retain their actual commit and packages-dirty flag;
 This measures byte counts only during the deferred speed phase. The core + stage
 ceiling remains 25,000 B; the reviewed build measures 23,924 B gzip.
 
-Sciviz `/flow` supplies CPU pathlines only: fixed-step RK4 on regular 2D/3D grids with linear temporal
-interpolation. Adaptive error control, extrapolation, GPU particles, trails, respawn, seeding and streaklines
-are pending. The default 10,000-step budget accepts 1 to 1,000,000; at most 4,096 frames. Input copies plus
+Sciviz `/flow` supplies fixed-step RK4 pathlines/streaklines and GPU particles/trails on regular 2D/3D grids
+with linear temporal interpolation. Adaptive error control and extrapolation are not supplied. The default
+10,000-step budget accepts 1 to 1,000,000; at most 4,096 frames. CPU input copies plus
 output/final-copy/scratch are capped at 128 MiB, excluding caller input and module overhead. Copy/integration
 chunks are 16,384 samples/128 steps. The feature-local Wasm is 7,916 bytes, capped below 16,000 raw and 8,000 gzip
 by CPU tests. It loads lazily per call; root/fallback do not load it. Samples are float32 and arithmetic/output
-float64; future GPU transport still owes a numeric parity bound. NOAA daily means do not establish observed tracks.
-The new `/flow` JavaScript entry measures 2,130 B gzip with a 2,386 B ceiling. The root remains exactly
-36,916 B; the existing root/driver ceilings from the native correction are unchanged by flow.
+float64. Streaklines reuse one instance/field copy for 1..4096 ordered releases, returning observation-time
+endpoints and NaN gaps for invalid/unfinished releases. GPU transport is forward only; each RK stage uses
+float32 normalised coordinates/velocities, with four stages and an accepted-endpoint validity check. The
+analytic GPU/CPU test bound is 0.0002 distance units on its stated fields, not a general error guarantee.
+GPU layer creation copies fields; its 1..1000000 particles and 2..256 history samples (defaults 1024/32)
+must fit 128 MiB of GPU buffers and device binding/buffer limits. CPU copies are additional. Bounds/widths
+must survive float32; normalised velocities and step-times-velocity are at most float32 max/16 for arithmetic
+headroom. Lifetime defaults to 10 time units, expires at step endpoints and fixed-seed respawn defaults true.
+Width defaults 2 device pixels (positive, at most 64), opacity 0.8, sRGB colour #7ddcff. Heads are squares;
+history fades quadratically and never bridges respawn generations. Uniform/random/rake/region seed layouts
+are deterministic for a given seed/partition on one backend; cross-device bit identity is unclaimed.
+Actual device replacement replays accepted partitions, bounded by maxSteps; advance/draw do no position
+readback. Explicit readPositions has a 30000 ms default timeout. WebGPU and WebGL2 compatibility pass
+numeric/pixel/lifecycle tests; native WebGL2 flow remains pending with batch 181. NOAA daily means do not
+establish observed tracks or forecast accuracy. The official Moving wind example preserves these limitations.
+The `/flow` JavaScript entry is 8,596 B gzip (raised optional ceiling 8,854 B);
+the previous CPU-only size was 2,130 B (ceiling 2,386 B). Root remains 36,916 B, driver 4,476 B, Wasm 7,916 raw /
+3,585 gzip B; their ceilings are unchanged by flow. Keeping one coherent flow entry avoids an artificial loader
+between transport, seed semantics and owned replay state.
 No core/stage implementation change is part of this feature.
 
 Mesh position, rotation and scale refs cannot be replaced. Assignment throws TypeError

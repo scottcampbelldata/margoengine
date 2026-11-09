@@ -3,11 +3,113 @@
 import { gridLayer, sliceGrid, CELL_TYPES } from '@margoengine/sciviz/grids';
 import { ForceLayout, graphLayer } from '@margoengine/sciviz/graph';
 import { tileLayer } from '@margoengine/sciviz/geo';
-import { tracePathline } from '@margoengine/sciviz/flow';
+import { tracePathline, traceStreakline, flowParticles, flowSeeds } from '@margoengine/sciviz/flow';
 
 /** The cases entries-browser.js runs, in order. */
 export const cases = [];
 const addCase = (name, run, mode = '3d') => cases.push({ name, run, mode });
+
+addCase('flow-motion', async (figure, { assert, pixels, lit }) => {
+  figure.engine.stop();
+  const field = {
+    dims: [2, 2, 1], bounds: [-4, 4, -4, 4, 0, 0],
+    frames: [{ time: 0, u: new Float32Array(4).fill(1), v: new Float32Array(4).fill(0.5) }],
+  };
+  const reject = async (promise, check) => {
+    let error;
+    try { await promise; } catch (e) { error = e; }
+    assert(error && check(error), `expected rejection, got ${error?.message}`);
+  };
+  const close = (a, b, bound = 0.0002) => {
+    assert(a.length === b.length, 'matching sample counts');
+    a.forEach((v, i) => assert(Math.abs(v - b[i]) <= bound, `component ${i}: ${v} vs ${b[i]}`));
+  };
+  const options = { count: 96, trails: 16, width: 3, opacity: 1, lifetime: 10,
+    seeding: { kind: 'region', bounds: [-3, 1, -3, 1, 0, 0] } };
+  const layer = await flowParticles(figure, field, options);
+  const seeds = flowSeeds(field, options.count, options.seeding);
+  await layer.advance(1, { step: 0.125 });
+  const actual = await layer.readPositions();
+  for (let i = 0; i < options.count; i++) close(actual.slice(4 * i, 4 * i + 4), [seeds[3 * i] + 1, seeds[3 * i + 1] + 0.5, 0, 1]);
+  const again = await flowParticles(figure, field, options);
+  await again.advance(1, { step: 0.125 });
+  close(await again.readPositions(), actual, 0);
+  again.dispose();
+  // Analytic unsteady 3D expansion/rotation and a piecewise temporal kink, against the CPU Wasm reference.
+  const dims = [5, 5, 5], frames = [0, 0.3, 2].map((time) => {
+    const u = new Float32Array(125), v = new Float32Array(125), w = new Float32Array(125);
+    for (let z = 0; z < 5; z++) for (let y = 0; y < 5; y++) for (let x = 0; x < 5; x++) {
+      const k = x + 5 * (y + 5 * z);
+      u[k] = -(y - 2) + time * 0.125; v[k] = x - 2; w[k] = (z - 2) * 0.125;
+    }
+    return { time, u, v, w };
+  });
+  const grid = { dims, bounds: [-2, 2, -2, 2, -2, 2], frames }, seed = [0.5, 0, 0.25];
+  const rotation = await flowParticles(figure, grid, { count: 1, respawn: false, lifetime: 10,
+    seeding: { kind: 'rake', start: seed, end: seed } });
+  const reference = await tracePathline(grid, seed, { from: 0, to: 1, step: 0.025 });
+  await rotation.advance(1, { step: 0.025 });
+  close((await rotation.readPositions()).slice(0, 3), reference.samples.slice(-4, -1));
+  rotation.dispose();
+  const streak = await traceStreakline(grid, seed, [0, 0.3, 1], { to: 1, step: 0.025 });
+  close(streak.samples.slice(0, 3), reference.samples.slice(-4, -1), 1e-12);
+  close(streak.samples.slice(-4), [...seed, 1], 0);
+  // Lifetimes and domain exits restart at the fixed seeds, without joining different releases.
+  const life = await flowParticles(figure, field, { count: 1, lifetime: 0.25, seeding: { kind: 'rake', start: [0, 0, 0], end: [0, 0, 0] } });
+  await life.advance(0.375, { step: 0.125 });
+  close(await life.readPositions(), [0.125, 0.0625, 0, 0.125]);
+  life.dispose();
+  const longLife = await flowParticles(figure, { ...field, frames: [{ time: 0, u: new Float32Array(4), v: new Float32Array(4) }] },
+    { count: 1, lifetime: 3e38 });
+  await longLife.advance(4e38, { step: 2e38 });
+  assert((await longLife.readPositions())[3] === 0, 'finite large ages/steps expire without storing an overflowing sum');
+  longLife.dispose();
+  const missing = { ...field, frames: [field.frames[0], { time: 1, u: new Float32Array(4).fill(NaN), v: new Float32Array(4) }] };
+  const death = await flowParticles(figure, missing, { count: 1, respawn: false });
+  assert((await death.readPositions())[3] === 0, 'inactive NaN next frame does not invalidate exact current time');
+  await death.advance(0.1, { step: 0.1 });
+  assert((await death.readPositions())[3] === -1, 'an active NaN frame kills the particle');
+  death.dispose();
+  const abort = new AbortController(), reason = { cancelled: true };
+  const pending = layer.advance(1.5, { step: 0.125, signal: abort.signal });
+  await reject(layer.advance(2, { step: 0.125 }), (e) => e.code === 'state');
+  abort.abort(reason);
+  await reject(pending, (e) => e === reason);
+  assert(layer.time === 1.125, 'cancelled advance retains exactly the first submitted step');
+  await reject(layer.readPositions({ signal: abort.signal }), (e) => e === reason);
+  await reject(flowParticles(figure, field, { signal: abort.signal }), (e) => e === reason);
+  await reject(layer.advance(0, { step: 0.1 }), (e) => e instanceof RangeError);
+  await reject(flowParticles(figure, field, { count: 1_000_000, trails: 256 }), (e) => e instanceof RangeError);
+  await reject(flowParticles(figure, field, { respawn: 'yes' }), (e) => e instanceof RangeError);
+  const extreme = await flowParticles(figure, { ...field, frames: [{ ...field.frames[0], u: new Float32Array(4).fill(1e37) }] }, { count: 1 });
+  await reject(extreme.advance(1e10, { step: 1e10 }), (e) => e instanceof RangeError);
+  assert(extreme.steps === 0, 'float32 overflow is rejected before any integration dispatch');
+  extreme.dispose();
+  const copiedField = { ...field, frames: [{ ...field.frames[0], u: field.frames[0].u.slice() }] };
+  const copied = await flowParticles(figure, copiedField, { count: 1, maxSteps: 1, respawn: false,
+    seeding: { kind: 'rake', start: [0, 0, 0], end: [0, 0, 0] } });
+  copiedField.frames[0].u.fill(-1);
+  copiedField.bounds = [0, 1, 0, 1, 0, 0];
+  await copied.advance(1, { step: 1 });
+  close(await copied.readPositions(), [1, 0.5, 0, 1]);
+  await reject(copied.advance(2, { step: 1 }), (e) => e instanceof RangeError);
+  copied.dispose();
+  copied.dispose();
+  await reject(copied.advance(2, { step: 1 }), (e) => e.code === 'disposed');
+  for (const respawn of [true, false]) {
+    const exit = await flowParticles(figure, field, { count: 1, respawn,
+      seeding: { kind: 'rake', start: [3.9375, 0, 0], end: [3.9375, 0, 0] } });
+    await exit.advance(0.125, { step: 0.125 });
+    const position = await exit.readPositions();
+    if (respawn) close(position, [3.9375, 0, 0, 0]);
+    else assert(position[3] === -1, 'domain exit without respawn is explicitly dead');
+    exit.dispose();
+  }
+  const count = lit(await pixels());
+  assert(count > 500, `particles/trails cover ${count} pixels`);
+  // Runner also replaces the actual device and requires exact rendered pixels after replay.
+  return { checked: 'GPU RK4 2D/3D steady/unsteady, CPU oracle, deterministic replay, trails, seeds, respawn, NaNs, abort and bounds', steps: layer.steps, lit: count };
+});
 
 addCase('flow-pathline', async (figure, { assert }) => {
   figure.engine.stop();

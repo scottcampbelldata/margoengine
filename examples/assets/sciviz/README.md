@@ -26,6 +26,17 @@ direction follows the projection and colour and arrow length still encode physic
 bilinear between native samples. Streamlines are instantaneous daily mean field traces, not parcel trajectories.
 No forecast skill or performance claim is made.
 
+The **Moving wind** example reuses this exact `wind.bin` and `wind.json` hash manifest (no new download).
+For physical-time integration it converts native m/s to projected km/s, using
+`(u / 1000 * cos(42.5 N) / cos(phi), v / 1000)` **without** the instantaneous display's speed rescaling.
+Daily snapshots at seconds 0 through 604800 are interpolated linearly in time and bilinearly in space.
+GPU particles use 600 s RK4 steps, 32 history samples, fixed deterministic seeds and a two-day endpoint lifetime;
+domain exits respawn at those seeds. The gold pathline follows a January 1 release to January 3; the pink
+streakline observes January 3 particles released every three hours at the same seed. They are distinct numerical
+constructions and remain fixed reference curves during particle playback. Daily means omit subdaily variability;
+these are projected numerical trajectories, not measured parcel paths, forecasts or great-circle transport.
+The original public-domain NOAA credit, input hashes and asset hash apply unchanged.
+
 Rebuild from the repository root with Python and `numpy`, `nibabel`, `netCDF4` installed:
 
 ```sh

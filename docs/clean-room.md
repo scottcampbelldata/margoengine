@@ -153,6 +153,29 @@ tolerance. Two regressions cover non-associative totals and missing/duplicate
 image identities. All 1,296 old payload/source controls and original aggregates
 then reproduce exactly. [Unaccepted evidence](whitepaper/results/batch-134-scalar-prototype.json).
 
+The GPU mutex lookup repair's research comparison, reviewed scope and independent implementation are recorded
+in [gpu-mutex-target.md](quality/gpu-mutex-target.md): Bishop/Dilger 1996, Herlihy/Wing 1990 and Node/POSIX
+link-lookup contracts. No foreign implementation was read.
+
+## Batch 171 moving-flow continuation (2026-11-10)
+
+Research before implementation compared Tony McLoughlin, Robert S. Laramee, Ronald Peikert,
+Frits H. Post and Min Chen, *Over Two Decades of Integration-Based, Geometric Flow Visualization*
+(2010), https://cronfa.swan.ac.uk/Record/cronfa7688 (survey and path/streak definitions), with
+Jens Kruger, Peter Kipfer, Polina Kondratieva and Rudiger Westermann, *A Particle System for
+Interactive Visualization of 3D Flows* (2005), https://doi.org/10.1109/TVCG.2005.87 (abstract),
+and Kai Burger, Jens Schneider, Polina Kondratieva, Jens Kruger and Rudiger Westermann,
+*Interactive Visual Exploration of Unsteady 3D Flows* (2007),
+https://doi.org/10.2312/VisSym/EuroVis07/251-258 (abstract). Publisher PDF requests for the
+latter two failed (timeout/403); their full methods have not been reviewed. No companion code
+was read. The independent implementation combines physical-time RK4 and interpolation from
+the foundation's Joy reference with GPU-resident particle state/history motivated by Kruger
+and time-aware release/observation semantics motivated by Burger and the survey. It does not
+claim to implement their sorting, streaming or adaptive integration algorithms. W3C editors
+Alan Baker, Mehmet Oguz Derin and David Neto, *WebGPU Shading Language* (2026),
+https://www.w3.org/TR/WGSL/, defines storage layouts, workgroup dispatch and float32 arithmetic.
+All shaders and seeding/replay logic are written here clean room. No speed claim is made.
+
 ## Native GL loss-event gate ordering (2026-11-10)
 
 The Khronos WebGL Working Group's *WEBGL_lose_context* specification, revision

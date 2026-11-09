@@ -83,13 +83,23 @@ spatial/temporal interpolation and RK4. `packages/sciviz/tests/flow.test.js` che
 and rotation/expansion fields, backwards integration, NaNs, budgets, exact-reason abort and concurrent isolation.
 The NOAA fixture checks deterministic two-day paths and 20 m endpoint agreement after halving a 600 s step;
 this refinement result for daily means is not observational accuracy. Raw Wasm is 7,916 bytes, below the enforced
-16,000-byte cap. GPU particles, trails, seeding/respawn, streaklines and the official demo remain pending.
+16,000-byte cap. The continuation adds GPU particles/trails, seeding/respawn, streaklines and an official demo
+as described below.
 No throughput or frame-rate claim follows.
 
 Browser integration proof: `entries-browser.mjs --only=flow-pathline` verifies every analytic sample after
 real lazy Wasm loading, renders 1,517 lit pixels with the existing line layer on WebGPU and WebGL2 compatibility,
 and preserves all pixels on actual device replacement. The unchanged all-pixel parity bounds pass.
-This is a CPU pathline/rendering proof; GPU particles and direct native WebGL2 lines remain pending.
+This is a CPU pathline/rendering proof; direct native WebGL2 lines remain pending.
+
+Batch 171 moving-flow evidence: `flow-seeds.test.js` checks four deterministic layouts and analytic unsteady
+streakline release times, with exactly one Wasm instantiation/field copy for multiple releases. The GPU
+`flow-motion` case checks all 96 constant-field particles against analytic positions, unsteady 3D rotation/
+expansion against the CPU reference within 0.0002 distance units, NaNs, respawn, abort and exact replay pixels
+after actual device replacement. WebGPU and WebGL2 compatibility pass the existing all-pixel parity bounds.
+The NOAA Moving wind demo passes desktop/mobile, seed-layout changes, playback, particle-only drawing and PNG
+export on both backends. Its fixed gold pathline and pink streakline are separately labelled. These daily-mean
+numerical trajectories are not observed tracks or forecasts. No cross-hardware bit-identity or speed claim.
 
 Test-page 36: mesh position, rotation and scale retain their refs and reject assignment
 with a coded TypeError before store writes. Proof: core/tests/transform-refs.test.js

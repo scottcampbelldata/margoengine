@@ -13,8 +13,23 @@ registry entry fails the existing bidirectional sizes-page test before correctio
 entry/network records now pass all eight size-page tests. Only failed or changed-dependent checks are rerun;
 earlier full verify and unaffected package GPU/README successes are retained. The JavaScript entry is 2,130 B
 gzip under 2,386 B; Wasm is 7,916 B raw, 3,585 B gzip. Root/driver remain 36,916/4,476 B; core + stage 23,924 B.
-GPU particles, trails, seeding/respawn, streaklines, an official moving-flow demo and jobs 2 to 6 remain pending.
+The continuation implements GPU RK4 particles, fading trails, deterministic uniform/random/rake/region seeds,
+fixed-seed respawn, CPU streaklines reusing one field copy, device replay and an official NOAA Moving wind demo.
+Analytic GPU/CPU checks, exact restored pixels, WebGPU/WebGL2 compatibility parity and four demo layouts pass;
+the existing native WebGL2 flow path and jobs 2 to 6 remain pending. Flow JS: 8,596 B gzip, ceiling raised from
+2,386 to 8,854 B under Scott's optional-entry ruling; root/driver/Wasm and core + stage remain unchanged.
 No benchmark, exclusive GPU hold, speed claim, relaxed tolerance or raised README budget is part of this piece.
+
+The continuation's full verify stopped at a stale aggregate API-summary header (891 entries instead of 890),
+while all declarations matched. Full report regeneration repairs the aggregate without changing API code;
+API checking then passes. The interrupted repository-unit and quality stages are completed separately.
+The repository unit run completes 13,653 tests with two generated-artifact failures: LLMS text predating
+the final docs and a hand-edited supply-chain row. Their generators restore the canonical artifacts; only
+those two affected test files are rerun. Other 13,651 tests pass, with no skipped tests or changed assertions.
+The scoped GPU matrix, both feature crates, 170 scoped CPU tests and all 23 sciviz README examples pass.
+Lifetime expiry compares the remaining interval before adding ages, preserving finite arithmetic at large
+times; the focused GPU recheck includes this case. The final flow and mobile demo rechecks and truthful
+paired size/network records pass without relaxed thresholds or replay/readback substitutions.
 
 ## Batch 160: separate browser shutdown prerequisite
 
@@ -779,7 +794,7 @@ Ray queries in `@margoengine/bvh`.
 | 3 | Raycast points and sprites | DONE | `cefe31618` | `/points` | LIM-123 |
 | 4 | Mesh distance fields | DONE | `e7a273eae` | `/sdf` | LIM-125 |
 | 5 | Inside test and mesh distance | DONE | `6caa52aad` | `/inside` | LIM-126 |
-| 6 | GPU build for deforming meshes | DONE | `018853730` | `/gpu-build` | LIM-128 |
+| 6 | GPU build for deforming meshes | DONE | `018859630` | `/gpu-build` | LIM-128 |
 | 7 | Alpha-mask aware raycasts | DONE | `030cd54d6` | `/alpha` | LIM-130 |
 
 - **Bugs:** caught before landing: a half-float rounding error in `toTexture`, `bakeSDF` accepting a resolution of 1, and a

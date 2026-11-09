@@ -57,9 +57,16 @@ CPU pathline foundation (batch 171 job 1): run `npm run build:flow --workspace @
 `node --test --test-timeout=120000 packages/sciviz/tests/flow.test.js`. No device or GPU lock is requested.
 The NOAA daily-mean asset is the existing hash-pinned `examples/assets/sciviz/wind.bin`; tests convert its
 velocity components to projected km/s and trace two days in seconds. Analytic tests are the accuracy references;
-halving the NOAA time step is a convergence check only. GPU transport and official demo evidence remain pending.
+halving the NOAA time step is a convergence check only.
 After building packages, run `node scripts/gpu-lock.mjs run --owner=flow-reference-proof --wait-max=60 --max=1 -- node packages/sciviz/tests/entries-browser.mjs --only=flow-pathline` for real-browser Wasm loading,
 analytic samples, existing-line pixels and device replacement on WebGPU and WebGL2 compatibility.
+
+Moving-flow continuation: include `packages/sciviz/tests/flow-seeds.test.js` in the CPU command above.
+After building sciviz, run `node scripts/gpu-lock.mjs run --owner=codex-batch171 --wait-max=60 --max=1 -- node packages/sciviz/tests/entries-browser.mjs --only=flow-motion` for GPU particle arithmetic,
+CPU reference comparison, deterministic seeds, respawn/NaNs/abort, all-pixel parity and actual device replay.
+Then run `node scripts/gpu-lock.mjs run --owner=codex-batch171 --wait-max=60 --max=2 -- node packages/sciviz/tests/demos-browser.mjs --only=moving-flow` for all four mobile/desktop/backend demo groups.
+The latter writes screenshots under `test-results/sciviz-fixes/`. The real asset and its provenance are
+unchanged `examples/assets/sciviz/wind.bin` and `wind.json`. No speed suite or exclusive hold is required.
 
 CPU isosurface extraction (batch 181 job 1 foundation): run
 `npm run build:fallback --workspace @margoengine/sciviz`,

@@ -151,14 +151,37 @@ or new speed claim is part of this change. The queue uses the common process
 limiter, so affected-step closure now selects views/depth when that limiter changes;
 the regression checks both the dependency and the selected checks.
 
-## CPU temporal flow reference (batch 171, section 5 supplement)
+## Moving-flow transport (batch 171, section 5 supplement)
+
+The gate also exposed a CPU scheduler junction-observation race. The backing target is now read once before
+PID/token validation; an absent/non-link name is not reclaimable. Live-owner and permission failures retain
+their previous semantics. [Mutex target evidence](../quality/gpu-mutex-target.md) records the regression.
+
+The optional flow entry now also holds GPU-resident RK4 particles and a fixed-size per-particle history ring.
+Velocities/positions are normalised by domain widths, never by speed. Missing samples use a separate validity
+component, with zero-weight spatial and temporal neighbours ignored. A dispatch owns one particle; four RK stages
+and the accepted endpoint sample share linear space/time interpolation. CPU partitions time at frame kinks/end.
+There is no position readback in advance/draw. Generation tags cut trail segments at respawn. Age fades
+quadratically over the retained ring; square heads remain visible in zero flow. Buffer limits are checked before
+allocation (128 MiB/device limits), replay is bounded by maxSteps, and cancellation retains submitted substeps.
+Device replacement reuploads immutable copies and replays exactly those partitions. Scoped ownership rejects
+overlapping advances and invalidates an in-flight caller on replacement/disposal.
+
+CPU streaklines reuse one feature-local Wasm instance and copied field for all releases, retaining only endpoints
+at the common observation time. Invalid/unfinished releases are NaN gaps with explicit stop reasons.
+`flow-seeds.test.js` checks layout semantics, release-time analytics and one-instantiation work counts.
+The `flow-motion` browser case checks 2D/3D steady/unsteady GPU arithmetic against the float64 reference within
+0.0002 distance units on its analytic fields, respawn, missing data, cancellation and exact replay pixels.
+WebGPU/WebGL2 compatibility all-pixel parity passes with unchanged thresholds. The official NOAA moving-wind
+demo passes at 390/1440 pixels on both backends, including all seed layouts, playback and export. Native
+WebGL2 flow is still pending with batch 181. No universal float bound, speed or observational-accuracy claim.
 
 Optional `/flow` loads its own `flow.wasm` from `sciviz/flow-kernel`. Spatial/temporal interpolation feeds
 classical RK4 with physical velocity and steps shortened at frame kinks. One reservation holds component copies,
 metadata and 128-step scratch; no kernel allocator or shared mutable instance. TypeScript owns validation, task
 yields, cancellation and output copies. Analytic constant/temporal/3D rotation tests, missing samples, backwards
-tracing, chunk boundaries and the existing NOAA daily means supply CPU evidence. GPU particles still owe parity,
-restore, trails/respawn and browser proof. No backend, speed or adaptive-error claim. Core/stage are untouched.
+tracing, chunk boundaries and the existing NOAA daily means supply CPU evidence. No speed or adaptive-error
+claim. Core/stage are untouched.
 The merge gate now discovers every immediate `kernel`/`*-kernel` crate in a workspace, rather than only the first
 conventional manifest. `tests/rust-kernel-tests.test.js` checks both sciviz feature crates and package deduplication.
 The focused `flow-pathline` entry case fetches the feature-local Wasm in a real browser, checks every xyzt sample

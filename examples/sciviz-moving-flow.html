@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Moving wind | Margo Engine</title>
+  <link rel="stylesheet" href="./sciviz-demo.css">
+</head>
+<body>
+  <!-- Margo engine ❤️ made for Margie -->
+  <nav aria-label="Scientific examples"><a href="./sciviz-head.html">MRI head volume</a><a href="./sciviz-stars.html">Star catalogue</a><a href="./sciviz-wind.html">Wind field</a><a href="./sciviz-moving-flow.html" aria-current="page">Moving wind</a></nav>
+  <header><h1>Moving wind</h1><p>Particles carried through eight NOAA daily mean wind fields over the North Atlantic, January 1-8, 2024. Velocities interpolate in space and time. Fading trails show recent motion; these numerical trajectories through daily means are not observed parcel tracks or forecasts.</p></header>
+  <div class="controls">
+    <button id="play" type="button">Play</button>
+    <button id="next" type="button">Advance 6 hours</button>
+    <button id="reset" type="button">Reset</button>
+    <label>Seeds <select id="seeding"><option value="uniform">Uniform</option><option value="random">Random, seed 171</option><option value="rake">Rake at 40 W</option><option value="region">Region around 40 W, 42.5 N</option></select></label>
+    <label><input id="traces" type="checkbox" checked> Pathline and streakline</label>
+    <button id="export" type="button">Save PNG</button>
+    <output id="date">2024-01-01 06:00 UTC</output>
+  </div>
+  <div class="view"><canvas id="viewport" aria-label="NOAA wind particles, fading trails, a pathline and a streakline"></canvas></div>
+  <p id="status" role="status" data-webgpu-status>Loading NOAA winds...</p>
+  <footer>NCEP-NCAR Reanalysis 1 data provided by <a href="https://psl.noaa.gov/data/gridded/data.ncep.reanalysis.html">NOAA PSL, Boulder, Colorado, USA</a>. Public domain. Near-surface 0.995 sigma winds on the native 2.5 degree grid, 100 W to 20 E, 20 N to 65 N. Fixed equirectangular projection centred at 42.5 N; units km and seconds, without speed renormalisation. Blue particles respawn at fixed seeds on exit or after two days. Gold: one particle released January 1 and followed to January 3. Pink: particles released every three hours from the same point, all observed January 3. Both reference curves stay fixed as the blue particles advance. <a href="./assets/sciviz/README.md">Data preparation and limits</a>.</footer>
+  <script type="module">
+    import { needsWebGPU } from './needs-webgpu.js';
+    needsWebGPU('#viewport').then((ok) => ok && import('./sciviz-moving-flow.ts'));
+  </script>
+</body>
+</html>
