@@ -1,5 +1,5 @@
 {
-  "commit": "100aeb06b",
+  "commit": "fea2d857d",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -3426,8 +3426,8 @@
         "gzip": 9095
       },
       "./stream": {
-        "raw": 37153,
-        "gzip": 13019
+        "raw": 37353,
+        "gzip": 13086
       },
       "./generate": {
         "raw": 10337,
