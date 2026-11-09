@@ -37,9 +37,9 @@ export interface CookieTextureOptions {
 
 /** A 2D cookie / gobo texture for shaping 2D lights. */
 export class CookieTexture2D {
-  readonly width: number;
-  readonly height: number;
-  readonly data: Float32Array;
+  declare readonly width: number;
+  declare readonly height: number;
+  declare readonly data: Float32Array;
 
   constructor(options: CookieTextureOptions) {
     const { width, height, data } = options;
@@ -63,21 +63,12 @@ export class CookieTexture2D {
 }
 
 /** Creates a CookieTexture2D from raw RGBA data. */
-export function createCookieTexture(
-  width: number,
-  height: number,
-  data: ArrayLike<number>,
-): CookieTexture2D {
+export function createCookieTexture(width: number, height: number, data: ArrayLike<number>): CookieTexture2D {
   return new CookieTexture2D({ width, height, data });
 }
 
 /** Creates a window blinds cookie pattern with horizontal or vertical slats. */
-export function createWindowCookie(
-  width: number,
-  height: number,
-  slats = 6,
-  vertical = false,
-): CookieTexture2D {
+export function createWindowCookie(width: number, height: number, slats = 6, vertical = false): CookieTexture2D {
   if (slats < 1 || !Number.isInteger(slats)) throw rangeError('Invalid slats count', 'pixel-lighting');
   const data = new Uint8Array(width * height * 4);
   for (let y = 0; y < height; y++) {
@@ -96,11 +87,7 @@ export function createWindowCookie(
 }
 
 /** Creates a flashlight gobo pattern with a bright center and falloff rings. */
-export function createSpotCookie(
-  size: number,
-  innerRatio = 0.5,
-  outerRatio = 0.95,
-): CookieTexture2D {
+export function createSpotCookie(size: number, innerRatio = 0.5, outerRatio = 0.95): CookieTexture2D {
   if (size < 2 || !Number.isInteger(size)) throw rangeError('Invalid cookie size', 'pixel-lighting');
   const data = new Uint8Array(size * size * 4);
   const half = size / 2;
@@ -185,12 +172,12 @@ export interface CookieLight2DOptions extends Light2DOptions {
 
 /** One 2D light shaped by a cookie texture. */
 export class CookieLight2D extends Light2D {
-  cookie?: CookieTexture2D;
-  cookieScale: [number, number];
-  cookieOffset: [number, number];
-  cookieRotation: number;
-  cookieWrap: CookieWrapMode;
-  cookieMode: CookieBlendMode;
+  declare cookie?: CookieTexture2D;
+  declare cookieScale: [number, number];
+  declare cookieOffset: [number, number];
+  declare cookieRotation: number;
+  declare cookieWrap: CookieWrapMode;
+  declare cookieMode: CookieBlendMode;
 
   constructor(options: CookieLight2DOptions = {}) {
     super(options);
@@ -412,8 +399,7 @@ cookieMod=vec4f(0.0);
 }
 else{
 let dims=vec2i(textureDimensions(cookie_tex));
-let texel=clamp(vec2i(floor(uv*vec2f(dims)+vec2f(${
-COOKIE_TEXEL_BIAS}
+let texel=clamp(vec2i(floor(uv*vec2f(dims)+vec2f(${COOKIE_TEXEL_BIAS}
 ))),vec2i(0),dims - vec2i(1));
 cookieMod=textureLoad(cookie_tex,texel,0);
 }
@@ -456,12 +442,12 @@ let count = 0;
  * WebGPU only.
  */
 export class CookieLighting2D implements EnginePlugin {
-  readonly name: string;
-  ambient: string;
-  camera: { readonly x: number; readonly y: number; readonly zoom: number };
-  cookieScale: [number, number];
-  cookieWrap: CookieWrapMode;
-  cookieMode: CookieBlendMode;
+  declare readonly name: string;
+  declare ambient: string;
+  declare camera: { readonly x: number; readonly y: number; readonly zoom: number };
+  declare cookieScale: [number, number];
+  declare cookieWrap: CookieWrapMode;
+  declare cookieMode: CookieBlendMode;
   readonly lights: CookieLight2D[] = [];
   readonly #target: GPUTexture | (() => GPUTexture);
   readonly #normals?: GPUTexture | (() => GPUTexture);
@@ -486,13 +472,12 @@ export class CookieLighting2D implements EnginePlugin {
   #edgeBuffer?: GPUBuffer;
   #flat?: GPUTexture;
   #group?: GPUBindGroup;
-  #groupBump?: GPUTexture;
   #flatCookie?: GPUTexture;
   #cookieSampler?: GPUSampler;
   #defaultCookieGroup?: GPUBindGroup;
   #cookieGpuMap = new Map<CookieTexture2D, GPUTexture>();
   #cookieGroupMap = new WeakMap<CookieTexture2D, GPUBindGroup>();
-  layer: number;
+  declare layer: number;
   #masks = new MaskData();
   #disposed = false;
 
@@ -588,7 +573,7 @@ export class CookieLighting2D implements EnginePlugin {
     this.#module = this.#layout = this.#cookieLayout = this.#pipelines = this.#format = this.#light = undefined;
     this.#show = this.#showGroup = this.#sum = this.#sumView = undefined;
     this.#sumLayers = [];
-    this.#group = this.#groupBump = this.#device = undefined;
+    this.#group = this.#device = undefined;
     this.#edgesWritten = false;
   }
 
@@ -734,7 +719,6 @@ export class CookieLighting2D implements EnginePlugin {
         size: this.#values.byteLength,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
       });
-      this.#group = undefined;
     }
 
     const edges = this.#edges;
@@ -748,7 +732,6 @@ export class CookieLighting2D implements EnginePlugin {
         usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
       });
       this.#edgesWritten = false;
-      this.#group = undefined;
     }
     if (!this.#edgesWritten) {
       if (edges.length) {
@@ -760,18 +743,15 @@ export class CookieLighting2D implements EnginePlugin {
     }
 
     const shown = bump ?? this.#flat!;
-    if (!this.#group || this.#groupBump !== shown) {
-      this.#group = device.createBindGroup({
-        layout: this.#layout!,
-        entries: [
-          { binding: 0, resource: { buffer: this.#uniform, size: 176 } },
-          { binding: 1, resource: shown.createView() },
-          { binding: 4, resource: { buffer: this.#masks.buffer! } },
-          { binding: 2, resource: { buffer: this.#edgeBuffer! } },
-        ],
-      });
-      this.#groupBump = shown;
-    }
+    this.#group = device.createBindGroup({
+      layout: this.#layout!,
+      entries: [
+        { binding: 0, resource: { buffer: this.#uniform, size: 176 } },
+        { binding: 1, resource: shown.createView() },
+        { binding: 4, resource: { buffer: this.#masks.buffer! } },
+        { binding: 2, resource: { buffer: this.#edgeBuffer! } },
+      ],
+    });
 
     if (!this.#sum || this.#sum.width !== target.width || this.#sum.height !== target.height) {
       this.#sum?.destroy();
@@ -835,7 +815,10 @@ export class CookieLighting2D implements EnginePlugin {
           edgeCount,
           l.shadows ? 1 : 0,
           l.intensity,
-          l.x, l.y, 0, 0,
+          l.x,
+          l.y,
+          0,
+          0,
           ...this.#masks.fields[i],
         ],
         i * FLOATS,

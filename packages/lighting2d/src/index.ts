@@ -33,8 +33,10 @@ export function inLightMask(mask: LightMask2D, x: number, y: number): boolean {
   } else if (mask.kind === 'polygon') {
     const pts = mask.points;
     for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
-      const xi = pts[i][0], yi = pts[i][1],
-        xj = pts[j][0], yj = pts[j][1],
+      const xi = pts[i][0],
+        yi = pts[i][1],
+        xj = pts[j][0],
+        yj = pts[j][1],
         intersect = yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi;
       if (intersect) inside = !inside;
     }
@@ -83,21 +85,21 @@ export interface Light2DOptions {
 
 /** One light. Make it with {@link Lighting2D.addLight}; change any field and the next frame shows it. */
 export class Light2D implements Required<Omit<Light2DOptions, 'mask'>> {
-  kind: LightKind2D;
-  x: number;
-  y: number;
-  color: string;
-  intensity: number;
-  radius: number;
-  falloff: number;
-  height: number;
-  angle: number;
-  cone: number;
-  softness: number;
-  elevation: number;
-  shadows: boolean;
-  layers: number;
-  mask?: LightMask2D;
+  declare kind: LightKind2D;
+  declare x: number;
+  declare y: number;
+  declare color: string;
+  declare intensity: number;
+  declare radius: number;
+  declare falloff: number;
+  declare height: number;
+  declare angle: number;
+  declare cone: number;
+  declare softness: number;
+  declare elevation: number;
+  declare shadows: boolean;
+  declare layers: number;
+  declare mask?: LightMask2D;
   constructor(options: Light2DOptions = {}) {
     this.kind = options.kind ?? 'point';
     this.x = options.x ?? 0;
@@ -324,13 +326,13 @@ let count = 0;
  * @throws MargoError `'unsupported'` on a WebGL engine, `'disposed'` after `dispose()`, `'state'` when normals differ in size.
  */
 export class Lighting2D implements EnginePlugin {
-  readonly name: string;
+  declare readonly name: string;
   /** The light everything gets, `#rrggbb`, read each frame. */
-  ambient: string;
+  declare ambient: string;
   /** World units to pixels, read each frame. */
-  camera: { readonly x: number; readonly y: number; readonly zoom: number };
+  declare camera: { readonly x: number; readonly y: number; readonly zoom: number };
   /** Layer bitmask of this lighting pass. */
-  layer: number;
+  declare layer: number;
   /** The lights, in the order added. Use {@link addLight} and {@link removeLight} to change the list. */
   readonly lights: Light2D[] = [];
   readonly #target: GPUTexture | (() => GPUTexture);
@@ -358,7 +360,6 @@ export class Lighting2D implements EnginePlugin {
   #stencilView?: GPUTextureView;
   #flat?: GPUTexture;
   #group?: GPUBindGroup;
-  #groupBump?: GPUTexture;
   #masks = new MaskData();
   #disposed = false;
 
@@ -435,7 +436,7 @@ export class Lighting2D implements EnginePlugin {
     this.#module = this.#layout = this.#pipelines = this.#format = this.#light = this.#shadow = undefined;
     this.#show = this.#showGroup = this.#sum = this.#sumView = undefined;
     this.#sumLayers = [];
-    this.#group = this.#groupBump = this.#device = undefined;
+    this.#group = this.#device = undefined;
     this.#edgesWritten = false;
   }
   #prepare(device: GPUDevice, target: GPUTextureFormat): void {
@@ -538,7 +539,6 @@ export class Lighting2D implements EnginePlugin {
     this.#prepare(device, target.format);
     const activeLights = lights.filter((l) => (l.layers & this.layer) !== 0);
     this.#masks.upload(device, activeLights);
-    this.#group = undefined;
     const wanted = Math.max(1, activeLights.length) * FLOATS;
     if (!this.#uniform || this.#values.length < wanted) {
       this.#uniform?.destroy();
@@ -548,20 +548,16 @@ export class Lighting2D implements EnginePlugin {
         size: this.#values.byteLength,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
       });
-      this.#group = undefined;
     }
     const shown = bump ?? this.#flat!;
-    if (!this.#group || this.#groupBump !== shown) {
-      this.#group = device.createBindGroup({
-        layout: this.#layout!,
-        entries: [
-          { binding: 0, resource: { buffer: this.#uniform, size: 112 } },
-          { binding: 1, resource: shown.createView() },
-          { binding: 3, resource: { buffer: this.#masks.buffer! } },
-        ],
-      });
-      this.#groupBump = shown;
-    }
+    this.#group = device.createBindGroup({
+      layout: this.#layout!,
+      entries: [
+        { binding: 0, resource: { buffer: this.#uniform, size: 112 } },
+        { binding: 1, resource: shown.createView() },
+        { binding: 3, resource: { buffer: this.#masks.buffer! } },
+      ],
+    });
     if (!this.#stencil || this.#stencil.width !== target.width || this.#stencil.height !== target.height) {
       this.#stencil?.destroy();
       this.#sum?.destroy();

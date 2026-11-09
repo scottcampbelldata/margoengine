@@ -7,7 +7,12 @@ import { fault, rangeError, typeError } from '../../shared/errors.js';
 import type { Point2D } from './index.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; STORAGE: number };
-declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number; RENDER_ATTACHMENT: number; COPY_SRC: number };
+declare const GPUTextureUsage: {
+  TEXTURE_BINDING: number;
+  COPY_DST: number;
+  RENDER_ATTACHMENT: number;
+  COPY_SRC: number;
+};
 declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };
 
 let emissivePluginCount = 0;
@@ -44,19 +49,19 @@ export interface EmissiveSpriteItem2D {
 
 /** One emissive sprite item. */
 export class EmissiveSprite2D implements Required<EmissiveSpriteItem2D> {
-  x: number;
-  y: number;
-  shape: 'circle' | 'box';
-  radius: number;
-  width: number;
-  height: number;
-  color: string;
-  intensity: number;
-  glowRadius: number;
-  falloff: number;
-  bloomThreshold: number;
-  bloomStrength: number;
-  layer: number;
+  declare x: number;
+  declare y: number;
+  declare shape: 'circle' | 'box';
+  declare radius: number;
+  declare width: number;
+  declare height: number;
+  declare color: string;
+  declare intensity: number;
+  declare glowRadius: number;
+  declare falloff: number;
+  declare bloomThreshold: number;
+  declare bloomStrength: number;
+  declare layer: number;
 
   constructor(options: EmissiveSpriteItem2D = {}) {
     this.x = options.x ?? 0;
@@ -81,30 +86,21 @@ export function checkEmissiveSprite(sp: EmissiveSpriteItem2D): void {
   if (sp.shape !== undefined && sp.shape !== 'circle' && sp.shape !== 'box') {
     throw rangeError('Unknown emissive sprite shape', 'pixel-lighting');
   }
-  if (sp.x !== undefined && !Number.isFinite(sp.x)) throw rangeError('Invalid x', 'pixel-lighting');
-  if (sp.y !== undefined && !Number.isFinite(sp.y)) throw rangeError('Invalid y', 'pixel-lighting');
-  if (sp.radius !== undefined && (!Number.isFinite(sp.radius) || sp.radius <= 0)) {
-    throw rangeError('Invalid sprite radius: must be positive', 'pixel-lighting');
-  }
-  if (sp.width !== undefined && (!Number.isFinite(sp.width) || sp.width <= 0)) {
-    throw rangeError('Invalid sprite width: must be positive', 'pixel-lighting');
-  }
-  if (sp.height !== undefined && (!Number.isFinite(sp.height) || sp.height <= 0)) {
-    throw rangeError('Invalid sprite height: must be positive', 'pixel-lighting');
-  }
-  if (sp.intensity !== undefined && (!Number.isFinite(sp.intensity) || sp.intensity < 0)) {
-    throw rangeError('Invalid sprite intensity: must be non-negative', 'pixel-lighting');
-  }
-  if (sp.glowRadius !== undefined && (!Number.isFinite(sp.glowRadius) || sp.glowRadius < 0)) {
-    throw rangeError('Invalid glow radius: must be non-negative', 'pixel-lighting');
-  }
-  if (sp.falloff !== undefined && (!Number.isFinite(sp.falloff) || sp.falloff <= 0)) {
-    throw rangeError('Invalid falloff: must be positive', 'pixel-lighting');
-  }
-  for (const field of ['bloomStrength', 'bloomThreshold'] as const) {
-    if (sp[field] !== undefined && (!Number.isFinite(sp[field]) || sp[field]! < 0)) {
-      throw rangeError(`Invalid ${field}`, 'pixel-lighting');
-    }
+  for (const [field, minimum, label] of [
+    ['x', -Infinity, 'x'],
+    ['y', -Infinity, 'y'],
+    ['radius', Number.MIN_VALUE, 'sprite radius'],
+    ['width', Number.MIN_VALUE, 'sprite width'],
+    ['height', Number.MIN_VALUE, 'sprite height'],
+    ['falloff', Number.MIN_VALUE, 'falloff'],
+    ['intensity', 0, 'sprite intensity'],
+    ['glowRadius', 0, 'glow radius'],
+    ['bloomStrength', 0, 'bloomStrength'],
+    ['bloomThreshold', 0, 'bloomThreshold'],
+  ] as const) {
+    const value = sp[field];
+    if (value !== undefined && (!Number.isFinite(value) || value < minimum))
+      throw rangeError(`Invalid ${label}`, 'pixel-lighting');
   }
   if (sp.layer !== undefined) checkLayer(sp.layer);
   if (sp.color !== undefined && !hexColor(sp.color)) {
@@ -125,7 +121,8 @@ export function emissiveLightAt(
   bloomThreshold: number = 0.8,
 ): number[] {
   checkEmissiveSprite(sprite);
-  if (![bloomIntensity, bloomThreshold].every(Number.isFinite) || bloomIntensity < 0 || bloomThreshold < 0) throw rangeError('Invalid bloomIntensity', 'pixel-lighting');
+  if (![bloomIntensity, bloomThreshold].every(Number.isFinite) || bloomIntensity < 0 || bloomThreshold < 0)
+    throw rangeError('Invalid bloomIntensity', 'pixel-lighting');
   const spLayer = sprite.layer ?? 0xffffffff;
   if (layerMask !== undefined && (spLayer & layerMask) === 0) return [0, 0, 0];
 
@@ -173,7 +170,7 @@ export function emissiveLightAt(
     amount = intensity;
     const peak = Math.max(rgb[0], rgb[1], rgb[2]) * intensity;
     if (peak > threshold) {
-      bloom = intensity * (peak - threshold) / peak * strength * bloomIntensity;
+      bloom = ((intensity * (peak - threshold)) / peak) * strength * bloomIntensity;
     }
   } else if (distFromEdge > 0 && glowR > 0) {
     const atten = Math.max(0, 1 - distFromEdge / glowR) ** falloff;
@@ -181,7 +178,7 @@ export function emissiveLightAt(
     amount = added;
     const luma = Math.max(rgb[0] * added, rgb[1] * added, rgb[2] * added);
     if (luma > threshold) {
-      bloom = added * (luma - threshold) / luma * strength * bloomIntensity;
+      bloom = ((added * (luma - threshold)) / luma) * strength * bloomIntensity;
     }
   }
 
@@ -304,7 +301,11 @@ return textureLoad(image,vec2i(in.position.xy),0);
 
 /** An owned, unattached image effect, such as a new Bloom from @margoengine/post/bloom. */
 export interface EmissiveBloom2D {
-  encodeImage(context: { device: GPUDevice; encoder: GPUCommandEncoder; width: number; height: number }, input: GPUTextureView, output: GPUTextureView): void;
+  encodeImage(
+    context: { device: GPUDevice; encoder: GPUCommandEncoder; width: number; height: number },
+    input: GPUTextureView,
+    output: GPUTextureView,
+  ): void;
   dispose(): void;
 }
 
@@ -313,8 +314,8 @@ export interface EmissiveBloom2D {
  * Adds glowing emissive sprites and isolates high-luminance light for bloom.
  */
 export class EmissiveLighting2D implements EnginePlugin, Disposable {
-  readonly name: string;
-  readonly order: number;
+  declare readonly name: string;
+  declare readonly order: number;
   readonly #sprites = new Set<EmissiveSprite2D>();
   #engine: Engine | null = null;
   #pipeline: GPURenderPipeline | null = null;
@@ -333,11 +334,11 @@ export class EmissiveLighting2D implements EnginePlugin, Disposable {
   emissiveTexture: GPUTexture | null = null;
   /** Owned rgba16float local threshold extraction, before spatial filtering. */
   bloomTexture: GPUTexture | null = null;
-  camera: { x: number; y: number; zoom: number };
-  bloom: boolean;
-  bloomIntensity: number;
-  bloomThreshold: number;
-  layer: number;
+  declare camera: { x: number; y: number; zoom: number };
+  declare bloom: boolean;
+  declare bloomIntensity: number;
+  declare bloomThreshold: number;
+  declare layer: number;
 
   constructor(options: EmissiveLighting2DOptions = {}) {
     this.name = options.name ?? `emissive-lighting2d-${++emissivePluginCount}`;
@@ -359,7 +360,11 @@ export class EmissiveLighting2D implements EnginePlugin, Disposable {
     const emissive = new EmissiveLighting2D(options);
     const runtime = engineRuntime(instance);
     if (!runtime.gpu || typeof runtime.gpu.createShaderModule !== 'function') {
-      throw fault('unsupported', 'WebGL2 is not supported for @margoengine/lighting2d/emissive; use WebGPU', 'pixel-lighting');
+      throw fault(
+        'unsupported',
+        'WebGL2 is not supported for @margoengine/lighting2d/emissive; use WebGPU',
+        'pixel-lighting',
+      );
     }
     runtime.use(emissive);
     return emissive;
@@ -368,7 +373,11 @@ export class EmissiveLighting2D implements EnginePlugin, Disposable {
   setup(engine: Engine): void {
     if (this.#disposed) throw fault('disposed', 'EmissiveLighting2D disposed; create a new one');
     if (engine.backend !== 'webgpu' || !engine.gpu) {
-      throw fault('unsupported', 'WebGL2 is not supported for @margoengine/lighting2d/emissive; use WebGPU', 'pixel-lighting');
+      throw fault(
+        'unsupported',
+        'WebGL2 is not supported for @margoengine/lighting2d/emissive; use WebGPU',
+        'pixel-lighting',
+      );
     }
     this.#engine = engine;
     engine.frameGraph.add({
@@ -396,7 +405,8 @@ export class EmissiveLighting2D implements EnginePlugin, Disposable {
   /** Takes ownership of an unattached Bloom made per device. Called again after restoration. */
   connectBloom(create: () => EmissiveBloom2D): void {
     if (this.#disposed) throw typeError('EmissiveLighting2D has been disposed', 'pixel-lighting');
-    if (typeof create !== 'function') throw typeError('connectBloom needs a factory returning an unattached Bloom', 'pixel-lighting');
+    if (typeof create !== 'function')
+      throw typeError('connectBloom needs a factory returning an unattached Bloom', 'pixel-lighting');
     this.#bloomPass?.dispose();
     this.#bloomPass = undefined;
     this.#createBloom = create;
@@ -416,12 +426,17 @@ export class EmissiveLighting2D implements EnginePlugin, Disposable {
       this.#device = device;
       this.#format = target.format;
     }
-    if (!this.emissiveTexture || this.emissiveTexture.width !== target.width || this.emissiveTexture.height !== target.height) {
+    if (
+      !this.emissiveTexture ||
+      this.emissiveTexture.width !== target.width ||
+      this.emissiveTexture.height !== target.height
+    ) {
       this.emissiveTexture?.destroy();
       this.bloomTexture?.destroy();
       this.#filtered?.destroy();
       const descriptor = {
-        size: [target.width, target.height], format: 'rgba16float' as const,
+        size: [target.width, target.height],
+        format: 'rgba16float' as const,
         usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
       };
       this.emissiveTexture = device.createTexture({ ...descriptor, label: 'emissive HDR' });
@@ -472,32 +487,19 @@ export class EmissiveLighting2D implements EnginePlugin, Disposable {
     for (let i = 0; i < count; i++) {
       const sp = spriteList[i];
       const base = i * 16;
-      spriteFloats[base + 0] = sp.x;
-      spriteFloats[base + 1] = sp.y;
-
+      spriteFloats.set([sp.x, sp.y], base + 0);
       if (sp.shape === 'box') {
-        spriteFloats[base + 2] = sp.width * 0.5;
-        spriteFloats[base + 3] = sp.height * 0.5;
+        spriteFloats.set([sp.width * 0.5, sp.height * 0.5], base + 2);
       } else {
-        spriteFloats[base + 2] = sp.radius;
-        spriteFloats[base + 3] = 0;
+        spriteFloats.set([sp.radius, 0], base + 2);
       }
 
       const rgb = hexColor(sp.color) ?? [1, 1, 1];
-      spriteFloats[base + 4] = rgb[0];
-      spriteFloats[base + 5] = rgb[1];
-      spriteFloats[base + 6] = rgb[2];
-      spriteFloats[base + 7] = sp.intensity;
-
-      spriteFloats[base + 8] = sp.falloff;
-      spriteFloats[base + 9] = sp.glowRadius;
-      spriteFloats[base + 10] = sp.bloomThreshold;
-      spriteFloats[base + 11] = sp.bloomStrength;
-
-      spriteU32[base + 12] = sp.shape === 'box' ? 1 : 0;
-      spriteU32[base + 13] = sp.layer;
-      spriteU32[base + 14] = 0;
-      spriteU32[base + 15] = 0;
+      spriteFloats.set(
+        [rgb[0], rgb[1], rgb[2], sp.intensity, sp.falloff, sp.glowRadius, sp.bloomThreshold, sp.bloomStrength],
+        base + 4,
+      );
+      spriteU32.set([sp.shape === 'box' ? 1 : 0, sp.layer, 0, 0], base + 12);
     }
 
     device.queue.writeBuffer(this.#storageBuffer, 0, spriteFloats);
@@ -511,30 +513,22 @@ export class EmissiveLighting2D implements EnginePlugin, Disposable {
 
     const uniFloats = new Float32Array(12);
     const uniU32 = new Uint32Array(uniFloats.buffer);
-
-    uniFloats[0] = this.camera.x;
-    uniFloats[1] = this.camera.y;
-    uniFloats[2] = this.camera.zoom;
-    uniFloats[3] = target.width ?? 32;
-    uniFloats[4] = target.height ?? 16;
-    uniU32[5] = count;
-    uniU32[6] = this.layer;
-    uniU32[7] = this.bloom ? 1 : 0;
-    uniFloats[8] = this.bloomThreshold;
-    uniFloats[9] = this.bloomIntensity;
-    uniFloats[10] = 0;
-    uniFloats[11] = 0;
-
+    uniFloats.set([this.camera.x, this.camera.y, this.camera.zoom, target.width ?? 32, target.height ?? 16], 0);
+    uniU32.set([count, this.layer, this.bloom ? 1 : 0], 5);
+    uniFloats.set([this.bloomThreshold, this.bloomIntensity, 0, 0], 8);
     device.queue.writeBuffer(this.#uniformBuffer, 0, uniFloats);
 
     const encoder = commandEncoder ?? device.createCommandEncoder();
     const pass = encoder.beginRenderPass({
-      colorAttachments: [{
-        view: this.emissiveTexture!.createView(),
-        loadOp: 'clear',
-        clearValue: [0, 0, 0, 1],
-        storeOp: 'store',
-      }, { view: this.bloomTexture!.createView(), loadOp: 'clear', clearValue: [0, 0, 0, 1], storeOp: 'store' }],
+      colorAttachments: [
+        {
+          view: this.emissiveTexture!.createView(),
+          loadOp: 'clear',
+          clearValue: [0, 0, 0, 1],
+          storeOp: 'store',
+        },
+        { view: this.bloomTexture!.createView(), loadOp: 'clear', clearValue: [0, 0, 0, 1], storeOp: 'store' },
+      ],
     });
     pass.setPipeline(this.#pipeline);
 
@@ -552,12 +546,24 @@ export class EmissiveLighting2D implements EnginePlugin, Disposable {
     let shown = this.emissiveTexture!;
     if (this.#createBloom) {
       this.#bloomPass ??= this.#createBloom();
-      this.#bloomPass.encodeImage({ device, encoder, width: target.width, height: target.height }, shown.createView(), this.#filtered!.createView());
+      this.#bloomPass.encodeImage(
+        { device, encoder, width: target.width, height: target.height },
+        shown.createView(),
+        this.#filtered!.createView(),
+      );
       shown = this.#filtered!;
     }
-    const presentation = encoder.beginRenderPass({ colorAttachments: [{ view: target.createView(), loadOp: 'clear', clearValue: [0, 0, 0, 1], storeOp: 'store' }] });
+    const presentation = encoder.beginRenderPass({
+      colorAttachments: [{ view: target.createView(), loadOp: 'clear', clearValue: [0, 0, 0, 1], storeOp: 'store' }],
+    });
     presentation.setPipeline(this.#presentation!);
-    presentation.setBindGroup(1, device.createBindGroup({ layout: this.#presentation!.getBindGroupLayout(1), entries: [{ binding: 0, resource: shown.createView() }] }));
+    presentation.setBindGroup(
+      1,
+      device.createBindGroup({
+        layout: this.#presentation!.getBindGroupLayout(1),
+        entries: [{ binding: 0, resource: shown.createView() }],
+      }),
+    );
     presentation.draw(3);
     presentation.end();
 

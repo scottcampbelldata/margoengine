@@ -304,3 +304,5 @@ format changes, name reuse, HDR extraction, the actual Bloom image adapter and d
 to the physical-correctness claims above until its known defects are resolved.
 
 Height lights accumulate into an owned `rgba16float` image and present once to the target. This retains contributions smaller than one target byte (100 lights at intensity .001 sum to .1); the HDR image is rebuilt on resize or device restoration.
+
+Direct-light bind groups use the current mask buffer and normal target every frame. Contiguous uniform fields are packed together; validation still checks every numeric field before rendering.

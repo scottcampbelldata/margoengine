@@ -62,8 +62,10 @@ export function checkHeightOccluder(o: HeightOccluder2D): void {
     throw rangeError('Invalid occluder offset', 'pixel-lighting');
   }
   if (o.shape === 'box') {
-    if ((o.width !== undefined && (!Number.isFinite(o.width) || o.width <= 0)) ||
-        (o.depth !== undefined && (!Number.isFinite(o.depth) || o.depth <= 0))) {
+    if (
+      (o.width !== undefined && (!Number.isFinite(o.width) || o.width <= 0)) ||
+      (o.depth !== undefined && (!Number.isFinite(o.depth) || o.depth <= 0))
+    ) {
       throw rangeError('Invalid box dimensions: width and depth must be positive', 'pixel-lighting');
     }
   } else if (o.shape === 'circle') {
@@ -583,8 +585,8 @@ return sqrt(x*x+y*y);
  * Supports height-based ray occlusion, ground projection, and self-shadowing.
  */
 export class HeightLighting2D implements EnginePlugin, Disposable {
-  readonly name: string;
-  readonly order: number;
+  declare readonly name: string;
+  declare readonly order: number;
   readonly #lights = new Set<HeightLight2D>();
   #occluders: HeightOccluder2D[] = [];
   #engine: Engine | null = null;
@@ -599,9 +601,9 @@ export class HeightLighting2D implements EnginePlugin, Disposable {
   #masks = new MaskData();
   #disposed = false;
   #target?: GPUTexture | (() => GPUTexture);
-  receiverElevation: number;
-  layer: number;
-  camera: { x: number; y: number; zoom: number };
+  declare receiverElevation: number;
+  declare layer: number;
+  declare camera: { x: number; y: number; zoom: number };
 
   constructor(options: HeightLighting2DOptions = {}) {
     this.name = options.name ?? `height-lighting2d-${++heightPluginCount}`;
@@ -622,7 +624,11 @@ export class HeightLighting2D implements EnginePlugin, Disposable {
     const lighting = new HeightLighting2D(options);
     const runtime = engineRuntime(instance);
     if (!runtime.gpu || typeof runtime.gpu.createShaderModule !== 'function') {
-      throw fault('unsupported', 'WebGL2 is not supported for @margoengine/lighting2d/height; use WebGPU', 'pixel-lighting');
+      throw fault(
+        'unsupported',
+        'WebGL2 is not supported for @margoengine/lighting2d/height; use WebGPU',
+        'pixel-lighting',
+      );
     }
     runtime.use(lighting);
     return lighting;
@@ -631,7 +637,11 @@ export class HeightLighting2D implements EnginePlugin, Disposable {
   setup(engine: Engine): void {
     if (this.#disposed) throw fault('disposed', 'HeightLighting2D disposed; create a new one');
     if (engine.backend !== 'webgpu' || !engine.gpu) {
-      throw fault('unsupported', 'WebGL2 is not supported for @margoengine/lighting2d/height; use WebGPU', 'pixel-lighting');
+      throw fault(
+        'unsupported',
+        'WebGL2 is not supported for @margoengine/lighting2d/height; use WebGPU',
+        'pixel-lighting',
+      );
     }
     this.#engine = engine;
     engine.frameGraph.add({
@@ -685,7 +695,11 @@ export class HeightLighting2D implements EnginePlugin, Disposable {
       const module = device.createShaderModule({ code: maskShader(2) + HEIGHT_LIGHTING_WGSL });
       this.#bindGroupLayout = device.createBindGroupLayout({
         entries: [
-          { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform', minBindingSize: 144, hasDynamicOffset: true } },
+          {
+            binding: 0,
+            visibility: GPUShaderStage.FRAGMENT,
+            buffer: { type: 'uniform', minBindingSize: 144, hasDynamicOffset: true },
+          },
           { binding: 1, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'read-only-storage' } },
           { binding: 2, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'read-only-storage' } },
         ],
@@ -696,26 +710,34 @@ export class HeightLighting2D implements EnginePlugin, Disposable {
         fragment: {
           module,
           entryPoint: 'fs_main',
-          targets: [{
-            format: 'rgba16float',
-            blend: {
-              color: { srcFactor: 'one', dstFactor: 'one', operation: 'add' },
-              alpha: { srcFactor: 'one', dstFactor: 'zero', operation: 'add' },
+          targets: [
+            {
+              format: 'rgba16float',
+              blend: {
+                color: { srcFactor: 'one', dstFactor: 'one', operation: 'add' },
+                alpha: { srcFactor: 'one', dstFactor: 'zero', operation: 'add' },
+              },
             },
-          }],
+          ],
         },
       });
     }
 
     if (!this.#sum || this.#sum.width !== target.width || this.#sum.height !== target.height) {
       this.#sum?.destroy();
-      this.#sum = device.createTexture({ size: [target.width, target.height], format: 'rgba16float',
-        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT });
+      this.#sum = device.createTexture({
+        size: [target.width, target.height],
+        format: 'rgba16float',
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT,
+      });
     }
     if (!this.#show) {
       const module = device.createShaderModule({ code: maskShader(2) + HEIGHT_LIGHTING_WGSL });
-      this.#show = device.createRenderPipeline({ layout: 'auto', vertex: { module, entryPoint: 'vs_main' },
-        fragment: { module, entryPoint: 'present', targets: [{ format: target.format }] } });
+      this.#show = device.createRenderPipeline({
+        layout: 'auto',
+        vertex: { module, entryPoint: 'vs_main' },
+        fragment: { module, entryPoint: 'present', targets: [{ format: target.format }] },
+      });
     }
 
     const count = this.#occluders.length;
@@ -737,32 +759,19 @@ export class HeightLighting2D implements EnginePlugin, Disposable {
     for (let i = 0; i < count; i++) {
       const o = this.#occluders[i];
       const base = i * 12;
-      occFloats[base + 0] = o.offset ? o.offset[0] : 0;
-      occFloats[base + 1] = o.offset ? o.offset[1] : 0;
-
+      occFloats.set([o.offset ? o.offset[0] : 0, o.offset ? o.offset[1] : 0], base + 0);
       if (o.shape === 'box') {
-        occFloats[base + 2] = (o.width ?? 16) / 2;
-        occFloats[base + 3] = (o.depth ?? 16) / 2;
+        occFloats.set([(o.width ?? 16) / 2, (o.depth ?? 16) / 2], base + 2);
       } else if (o.shape === 'circle') {
-        occFloats[base + 2] = o.radius ?? 8;
-        occFloats[base + 3] = 0;
+        occFloats.set([o.radius ?? 8, 0], base + 2);
       } else if (o.shape === 'segment') {
-        occFloats[base + 2] = o.to ? o.to[0] : 0;
-        occFloats[base + 3] = o.to ? o.to[1] : 0;
+        occFloats.set([o.to ? o.to[0] : 0, o.to ? o.to[1] : 0], base + 2);
       }
-
-      occFloats[base + 4] = o.rotation ?? 0;
-      occFloats[base + 5] = o.elevation ?? 0;
-      occFloats[base + 6] = o.height;
-      occFloats[base + 7] = 0;
-
+      occFloats.set([o.rotation ?? 0, o.elevation ?? 0, o.height, 0], base + 4);
       let shapeCode = 0;
       if (o.shape === 'circle') shapeCode = 1;
       else if (o.shape === 'segment') shapeCode = 2;
-      occU32[base + 8] = shapeCode;
-      occU32[base + 9] = o.selfShadow !== false ? 1 : 0;
-      occU32[base + 10] = 0;
-      occU32[base + 11] = 0;
+      occU32.set([shapeCode, o.selfShadow !== false ? 1 : 0, 0, 0], base + 8);
     }
 
     device.queue.writeBuffer(this.#storageBuffer, 0, occFloats);
@@ -782,12 +791,14 @@ export class HeightLighting2D implements EnginePlugin, Disposable {
 
     const encoder = commandEncoder ?? device.createCommandEncoder();
     const pass = encoder.beginRenderPass({
-      colorAttachments: [{
-        view: this.#sum.createView(),
-        loadOp: 'clear',
-        clearValue: [0, 0, 0, 1],
-        storeOp: 'store',
-      }],
+      colorAttachments: [
+        {
+          view: this.#sum.createView(),
+          loadOp: 'clear',
+          clearValue: [0, 0, 0, 1],
+          storeOp: 'store',
+        },
+      ],
     });
     pass.setPipeline(this.#pipeline);
 
@@ -796,50 +807,44 @@ export class HeightLighting2D implements EnginePlugin, Disposable {
 
     for (const light of this.#lights) {
       const mask = this.#masks.fields[index];
-      if ((light.layers & this.layer) === 0) { index++; continue; }
+      if ((light.layers & this.layer) === 0) {
+        index++;
+        continue;
+      }
 
       const offset = index++ * stride;
       const uniformFloats = new Float32Array(values.buffer, offset, 36);
       const uniformU32 = new Uint32Array(values.buffer, offset, 36);
       const rgb = hexColor(light.color) ?? [1, 1, 1];
-      uniformFloats[0] = light.x;
-      uniformFloats[1] = light.y;
-      uniformFloats[2] = light.radius;
-      uniformFloats[3] = light.falloff;
-
-      uniformFloats[4] = rgb[0];
-      uniformFloats[5] = rgb[1];
-      uniformFloats[6] = rgb[2];
-      uniformFloats[7] = light.intensity;
-
-      uniformFloats[8] = light.height;
-      uniformFloats[9] = light.angle;
-      uniformFloats[10] = light.cone;
-      uniformFloats[11] = light.softness;
-
-      uniformFloats[12] = light.elevation;
-      uniformFloats[13] = this.receiverElevation;
-      uniformFloats[14] = this.camera.x;
-      uniformFloats[15] = this.camera.y;
-
-      uniformFloats[16] = this.camera.zoom;
-      uniformFloats[17] = target.width ?? 32;
-      uniformFloats[18] = target.height ?? 16;
-      uniformFloats[19] = 0;
-
+      uniformFloats.set(
+        [
+          light.x,
+          light.y,
+          light.radius,
+          light.falloff,
+          rgb[0],
+          rgb[1],
+          rgb[2],
+          light.intensity,
+          light.height,
+          light.angle,
+          light.cone,
+          light.softness,
+          light.elevation,
+          this.receiverElevation,
+          this.camera.x,
+          this.camera.y,
+          this.camera.zoom,
+          target.width ?? 32,
+          target.height ?? 16,
+          0,
+        ],
+        0,
+      );
       let kindCode = 0;
       if (light.kind === 'spot') kindCode = 1;
       else if (light.kind === 'directional') kindCode = 2;
-
-      uniformU32[20] = kindCode;
-      uniformU32[21] = light.shadows ? 1 : 0;
-      uniformU32[22] = count;
-      uniformU32[23] = this.layer;
-
-      uniformU32[24] = light.layers;
-      uniformU32[25] = 0;
-      uniformU32[26] = 0;
-      uniformU32[27] = 0;
+      uniformU32.set([kindCode, light.shadows ? 1 : 0, count, this.layer, light.layers, 0, 0, 0], 20);
       uniformFloats.set(mask, 28);
 
       const bindGroup = device.createBindGroup({
@@ -857,11 +862,17 @@ export class HeightLighting2D implements EnginePlugin, Disposable {
 
     pass.end();
     device.queue.writeBuffer(this.#uniformBuffer, 0, values);
-    const show = encoder.beginRenderPass({ colorAttachments: [{ view: target.createView(), loadOp: 'clear',
-      clearValue: [0, 0, 0, 1], storeOp: 'store' }] });
+    const show = encoder.beginRenderPass({
+      colorAttachments: [{ view: target.createView(), loadOp: 'clear', clearValue: [0, 0, 0, 1], storeOp: 'store' }],
+    });
     show.setPipeline(this.#show);
-    show.setBindGroup(1, device.createBindGroup({ layout: this.#show.getBindGroupLayout(1),
-      entries: [{ binding: 0, resource: this.#sum.createView() }] }));
+    show.setBindGroup(
+      1,
+      device.createBindGroup({
+        layout: this.#show.getBindGroupLayout(1),
+        entries: [{ binding: 0, resource: this.#sum.createView() }],
+      }),
+    );
     show.draw(3);
     show.end();
     if (!commandEncoder) {

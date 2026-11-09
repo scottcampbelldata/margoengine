@@ -30,8 +30,8 @@ export interface SoftLight2DOptions extends Light2DOptions {
 
 /** One 2D light with soft penumbra properties. */
 export class SoftLight2D extends Light2D {
-  sourceRadius: number;
-  samples: number;
+  declare sourceRadius: number;
+  declare samples: number;
   constructor(options: SoftLight2DOptions = {}) {
     super(options);
     this.sourceRadius = options.sourceRadius ?? 4;
@@ -339,11 +339,11 @@ let count = 0;
  * WebGPU only.
  */
 export class SoftLighting2D implements EnginePlugin {
-  readonly name: string;
-  ambient: string;
-  camera: { readonly x: number; readonly y: number; readonly zoom: number };
-  sourceRadius: number;
-  samples: number;
+  declare readonly name: string;
+  declare ambient: string;
+  declare camera: { readonly x: number; readonly y: number; readonly zoom: number };
+  declare sourceRadius: number;
+  declare samples: number;
   readonly lights: SoftLight2D[] = [];
   readonly #target: GPUTexture | (() => GPUTexture);
   readonly #normals?: GPUTexture | (() => GPUTexture);
@@ -368,8 +368,7 @@ export class SoftLighting2D implements EnginePlugin {
   #edgeBuffer?: GPUBuffer;
   #flat?: GPUTexture;
   #group?: GPUBindGroup;
-  #groupBump?: GPUTexture;
-  layer: number;
+  declare layer: number;
   #masks = new MaskData();
   #disposed = false;
 
@@ -455,7 +454,7 @@ export class SoftLighting2D implements EnginePlugin {
     this.#module = this.#layout = this.#pipelines = this.#format = this.#light = undefined;
     this.#show = this.#showGroup = this.#sum = this.#sumView = undefined;
     this.#sumLayers = [];
-    this.#group = this.#groupBump = this.#device = undefined;
+    this.#group = this.#device = undefined;
     this.#edgesWritten = false;
   }
 
@@ -547,7 +546,6 @@ export class SoftLighting2D implements EnginePlugin {
         size: this.#values.byteLength,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
       });
-      this.#group = undefined;
     }
 
     const edges = this.#edges;
@@ -561,7 +559,6 @@ export class SoftLighting2D implements EnginePlugin {
         usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
       });
       this.#edgesWritten = false;
-      this.#group = undefined;
     }
     if (!this.#edgesWritten) {
       if (edges.length) {
@@ -573,18 +570,15 @@ export class SoftLighting2D implements EnginePlugin {
     }
 
     const shown = bump ?? this.#flat!;
-    if (!this.#group || this.#groupBump !== shown) {
-      this.#group = device.createBindGroup({
-        layout: this.#layout!,
-        entries: [
-          { binding: 0, resource: { buffer: this.#uniform, size: 128 } },
-          { binding: 1, resource: shown.createView() },
-          { binding: 4, resource: { buffer: this.#masks.buffer! } },
-          { binding: 2, resource: { buffer: this.#edgeBuffer! } },
-        ],
-      });
-      this.#groupBump = shown;
-    }
+    this.#group = device.createBindGroup({
+      layout: this.#layout!,
+      entries: [
+        { binding: 0, resource: { buffer: this.#uniform, size: 128 } },
+        { binding: 1, resource: shown.createView() },
+        { binding: 4, resource: { buffer: this.#masks.buffer! } },
+        { binding: 2, resource: { buffer: this.#edgeBuffer! } },
+      ],
+    });
 
     if (!this.#sum || this.#sum.width !== target.width || this.#sum.height !== target.height) {
       this.#sum?.destroy();
