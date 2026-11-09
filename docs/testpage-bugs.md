@@ -454,3 +454,26 @@ heartbeats continue until termination. No render/disposal boundary is reached.
 The trace compilation/readiness boundary needs further attribution; no package
 runtime change or NOT A BUG conclusion was made. Logs and supervisors use the
 testpage-45-pipeline-probe prefix. The final live BUGS.md reread still ends at 45.
+
+### Entry 44 landing gates completed without a GPU lock around verify
+
+The coordinator ended the preceding verification because its outer GPU lock
+held a slot during CPU work. The required replacement command is plain
+`npm run verify`, supervised with the unchanged 40-minute hard limit and no
+GPU-lock environment. It passes in 721.2 s: 13,562 tests, zero failures and zero
+skips. Build, API, quality, sizes, README types, both sandbox chains, links and
+correctness proofs all pass. No benchmark or separate speed test was run.
+The durable local result is test-results/testpage-unlocked-verify.json and its
+log; the supervisor reports success in 721.7 s, including process exit.
+
+Together with the retained package units, lint/hygiene, four browser suites and
+the successful scoped executable README command documented above, this completes
+the gates for f4dc6d8e5 and the 15c888929/fdfbace45 coverage. The three existing
+README exception failures remain explicitly reported; they are not passing
+examples. The live BUGS.md reread at 13:02 EST still ends at entry 45.
+
+The pending readiness observation for entry 45 matches the already documented
+ANGLE Direct3D11 monolithic trace compilation defect in known-bugs.md. A new
+bounded probe will dispose while trace compilation is active, rather than wait
+for that known pending readiness promise. No runtime change or disposal-cause
+claim is made before that probe runs.
