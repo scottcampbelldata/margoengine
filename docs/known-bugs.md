@@ -1698,3 +1698,23 @@ entry. A distinct package sharing a name prefix can no longer evade the gate.
 `tests/quality-gate.test.js` creates a TEMP fixture with cross-package, same-package,
 subpath and type-only exports; its two runtime re-exports fail to be detected without
 the boundary fix. The temporary WebGL bridge is gone, so no exception or budget is added.
+
+### Batch 99 optional sky scope (2026-11-09)
+
+The missing multiple-scattering/ozone/night environment in the voxel tracer is addressed by optional `/sky`,
+using the existing sky model. Its generated native/compatibility value and lifecycle proof is recorded under
+`docs/whitepaper/results/batch-99-sky-20261109.json`. This does not close the existing exact MagicaVoxel atmosphere
+parity or moving-camera denoising defects. Stylized night, isotropic higher orders and the fixed-altitude distant
+map are documented limits, not claims of astronomical or spectral reference accuracy.
+
+### Open: nearly closed conservative Hillaire atmospheres
+
+The existing raster Hillaire model accepts atmospheres whose geometric-series transfer rounds to one.
+Repro: HillaireSky with atmosphere `{rayleigh:[1,1,1],mie:1,mieAbsorption:0,rayleighHeight:100000,
+mieHeight:100000,groundAlbedo:[1,1,1]}` on Earth radii. A native GPU probe returns nonfinite radiance.
+Cause: `packages/sky/src/atmosphere-luts.ts` computes `L2 / (1 - fms)`; in this opaque conservative domain
+`fms` rounds to one and L2 underflows to zero. The model needs a numerically stable treatment beyond its
+large-mean-free-path approximation; no epsilon clamp or scattering-order truncation was added. The new
+environment bake rejects vertical scattering depth above 6 before allocating, keeping an upward-quarter
+escape bound exp(-6 / 0.625) / 4 above Float32 subtraction error. This is an explicit bake domain limit,
+not a repair of the pre-existing raster model. Regression: sky-environment.test.js checks the domain refusal.

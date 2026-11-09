@@ -38,6 +38,10 @@
     "./guiding": {
       "types": "./dist/guiding.d.ts",
       "import": "./dist/guiding.js"
+    },
+    "./sky": {
+      "types": "./dist/sky-environment.d.ts",
+      "import": "./dist/sky-environment.js"
     }
   },
   "files": [
@@ -49,7 +53,8 @@
     "access": "public"
   },
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0"
+    "@margoengine/core": "^1.0.0",
+    "@margoengine/sky": "^1.0.0"
   },
   "dependencies": {
     "@margoengine/math": "^1.0.0"
@@ -67,7 +72,8 @@
     "test:gpu:slow-compile": "cd ../.. && node packages/voxel-pathtracer/tests/browser-check.mjs agx --pipeline-delay=500",
     "test:gpu:spec-math": "cd ../.. && node packages/voxel-pathtracer/tests/browser-check.mjs projections --spec-math-error=1",
     "test:gpu:stall": "cd ../.. && node packages/voxel-pathtracer/tests/stall-check.mjs",
-    "test:gpu:guiding": "cd ../.. && node packages/voxel-pathtracer/tests/guiding-browser.mjs"
+    "test:gpu:guiding": "cd ../.. && node packages/voxel-pathtracer/tests/guiding-browser.mjs",
+    "test:gpu:sky": "cd ../.. && node packages/voxel-pathtracer/tests/sky-browser.mjs"
   },
   "margo": {
     "gpuTestTimeoutMinutes": {
@@ -77,7 +83,13 @@
       "test:gpu:denoise-materials": 15,
       "test:gpu:denoise-caustics": 15,
       "test:gpu:viewport": 10,
-      "test:gpu:guiding": 10
+      "test:gpu:guiding": 10,
+      "test:gpu:sky": 10
+    }
+  },
+  "peerDependenciesMeta": {
+    "@margoengine/sky": {
+      "optional": true
     }
   }
 }

@@ -1,0 +1,241 @@
+[
+  {
+    "compat": false,
+    "hardware": {
+      "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "webgpu": {
+        "vendor": "nvidia",
+        "architecture": "ampere",
+        "device": "",
+        "description": "",
+        "fallback": false
+      },
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+      "browserName": "chromium",
+      "browserVersion": "157.0.4341.42",
+      "requestedChannel": "msedge",
+      "launchArgs": [],
+      "powerPreference": "high-performance",
+      "hostPlatform": "win32",
+      "headless": true
+    },
+    "result": {
+      "errors": [],
+      "messages": [],
+      "noon": [
+        0.4131394624710083,
+        0.5738968849182129,
+        0.9891979694366455
+      ],
+      "single": 1544.2373106479645,
+      "multiple": 1766.2662552595139,
+      "ozone": [
+        0.0021415764931589365,
+        0.0016851634718477726,
+        0.004533000290393829
+      ],
+      "noOzone": [
+        0.002787215868011117,
+        0.0035940331872552633,
+        0.00468660332262516
+      ],
+      "sunset": [
+        0.18527983129024506,
+        0.03214724361896515,
+        0.0008970377966761589
+      ],
+      "nightOff": 0,
+      "stars": 0.35304567217826843,
+      "starsDelta": 0,
+      "moonFull": 193.92788813263178,
+      "moonNew": 7.458764980779961,
+      "vacuum": 0,
+      "lambert": [
+        1.909859299659729,
+        1.2732396125793457,
+        0.6366198062896729
+      ],
+      "high": 101586.9921875,
+      "tiny": 0,
+      "orbit": 0,
+      "narrow": [
+        0.15777228772640228,
+        0.17749381065368652,
+        0.19721534848213196
+      ],
+      "largePlanet": [
+        0.40798425674438477,
+        0.5691390037536621,
+        0.9851712584495544
+      ],
+      "dense": 2351.6132687926292,
+      "disposedBeforeRender": true,
+      "disposedAfterAbort": true,
+      "abortExact": true,
+      "constantImage": [
+        0.10000000149011612,
+        0.20000000298023224,
+        0.30000001192092896
+      ],
+      "ground": [
+        4.96505880355835,
+        4.786376953125,
+        4.681011199951172
+      ],
+      "refusal": {
+        "code": "unsupported",
+        "message": "Hillaire environment needs a WebGPU GPUDevice; see https://margoengine.com/errors#sky"
+      }
+    }
+  },
+  {
+    "compat": true,
+    "hardware": {
+      "webglRenderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A6000 (0x00002230)), NVIDIA)",
+      "webgpu": null,
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+      "browserName": "chromium",
+      "browserVersion": "157.0.4341.42",
+      "requestedChannel": "msedge",
+      "launchArgs": [
+        "--use-angle=vulkan"
+      ],
+      "powerPreference": "high-performance",
+      "hostPlatform": "win32",
+      "headless": true
+    },
+    "result": {
+      "errors": [],
+      "messages": [],
+      "noon": [
+        0.41315391659736633,
+        0.5739303827285767,
+        0.9892820119857788
+      ],
+      "single": 1544.2372895479202,
+      "multiple": 1766.3244588375092,
+      "ozone": [
+        0.002141838427633047,
+        0.001685228431597352,
+        0.004533872939646244
+      ],
+      "noOzone": [
+        0.002787373960018158,
+        0.0035945165436714888,
+        0.004687611013650894
+      ],
+      "sunset": [
+        0.18527983129024506,
+        0.03214724361896515,
+        0.0008970377966761589
+      ],
+      "nightOff": 0,
+      "stars": 0.35304564237594604,
+      "starsDelta": 0,
+      "moonFull": 193.92788567394018,
+      "moonNew": 7.458764967508614,
+      "vacuum": 0,
+      "lambert": [
+        1.909859299659729,
+        1.2732396125793457,
+        0.6366198062896729
+      ],
+      "high": 101590.8125,
+      "tiny": 0,
+      "orbit": 0,
+      "narrow": [
+        0.1577722728252411,
+        0.17749379575252533,
+        0.19721533358097076
+      ],
+      "largePlanet": [
+        0.4079951047897339,
+        0.5691474676132202,
+        0.9852654337882996
+      ],
+      "dense": 2352.150439321995,
+      "disposedBeforeRender": true,
+      "disposedAfterAbort": true,
+      "abortExact": true,
+      "constantImage": [
+        0.10000000149011612,
+        0.20000000298023224,
+        0.30000001192092896
+      ],
+      "ground": [
+        4.965084075927734,
+        4.786428928375244,
+        4.681077003479004
+      ],
+      "refusal": {
+        "code": "unsupported",
+        "message": "Hillaire environment needs a WebGPU GPUDevice; see https://margoengine.com/errors#sky"
+      }
+    }
+  },
+  {
+    "lifecycle": {
+      "disabled": {
+        "differing": 0,
+        "max": 0
+      },
+      "traced": {
+        "differing": 76800,
+        "max": 250
+      },
+      "restored": {
+        "differing": 0,
+        "max": 0
+      },
+      "afterDispose": {
+        "differing": 0,
+        "max": 0
+      },
+      "newDevice": true,
+      "statsBefore": {
+        "samples": 16,
+        "frameMs": 65.09999996423721,
+        "gpuBytes": 4069504,
+        "converged": true,
+        "width": 320,
+        "height": 240,
+        "requestedWidth": 320,
+        "requestedHeight": 240,
+        "sceneRevision": 1,
+        "packedModels": 7,
+        "reusedModels": 0,
+        "renders": 0
+      },
+      "statsAfter": {
+        "samples": 16,
+        "frameMs": 15,
+        "gpuBytes": 4069504,
+        "converged": true,
+        "width": 320,
+        "height": 240,
+        "requestedWidth": 320,
+        "requestedHeight": 240,
+        "sceneRevision": 1,
+        "packedModels": 7,
+        "reusedModels": 0,
+        "renders": 0
+      },
+      "resized": {
+        "samples": 4,
+        "frameMs": 15,
+        "gpuBytes": 4991104,
+        "converged": false,
+        "width": 400,
+        "height": 240,
+        "requestedWidth": 400,
+        "requestedHeight": 240,
+        "sceneRevision": 1,
+        "packedModels": 7,
+        "reusedModels": 0,
+        "renders": 0
+      },
+      "errors": [],
+      "messages": []
+    }
+  }
+]

@@ -3346,6 +3346,10 @@
       "types": "./dist/voxel-pathtracer/guiding.d.ts",
       "import": "./dist/voxel-pathtracer/guiding.js"
     },
+    "./voxel-pathtracer/sky": {
+      "types": "./dist/voxel-pathtracer/sky.d.ts",
+      "import": "./dist/voxel-pathtracer/sky.js"
+    },
     "./water": {
       "types": "./dist/water.d.ts",
       "import": "./dist/water.js"

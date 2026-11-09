@@ -1731,3 +1731,22 @@ Clean-room orchestration from the [WHATWG HTML Web Workers specification](https:
 ## Custom image transitions (batch 76, job 1)
 
 Clean-room shader-function interface from the [W3C WGSL specification](https://www.w3.org/TR/WGSL/), textureDimensions, textureLoad and user functions; binding validation and pipeline compilation from the [WebGPU specification](https://www.w3.org/TR/webgpu/). Image separation and recombination follow Porter and Duff, [Compositing Digital Images](https://keithp.com/~keithp/porterduff/p253-porter.pdf), SIGGRAPH 1984, and [W3C Compositing and Blending](https://www.w3.org/TR/compositing-1/). The transition uses a weighted RGBA interpolation, not a claim of source-over equivalence. No external engine or library source read, copied or adapted. Generated color targets are stand-ins. Work per frame is GPU sampling and interpolation; no CPU-heavy loop or Wasm feature is introduced.
+
+## Batch 99 multiple-scattering environment bake (2026-11-09)
+
+All packages were searched first: sky already owns Hillaire's transmittance/multiple tables, spherical ray integration,
+ozone and the stylized night shader. This job exposes a bake using those pieces and adds one voxel-pathtracer entry;
+it does not copy another atmosphere implementation. Public research consulted:
+
+- Hillaire 2020, [A Scalable and Production Ready Sky and Atmosphere Rendering Technique](https://sebh.github.io/publications/egsr2020.pdf),
+  sections 5.5.1-5.5.3: second-order light and a local transfer summed geometrically, isotropic higher orders.
+- Bruneton and Neyret 2008, [Precomputed Atmospheric Scattering](https://doi.org/10.1111/j.1467-8659.2008.01245.x):
+  spherical atmospheres and multiple-scattered daylight/twilight, reused through the existing sky implementation.
+- Jensen et al. 2001, [A Physically-Based Night Sky Model](https://graphics.stanford.edu/papers/nightsky/nightsky.pdf),
+  sections 2 and 5: night components and separating visible stars from integrated starlight. This bake's night is
+  explicitly stylized, not that paper's astronomical model.
+
+The coarse procedural-star aggregate is derived here: the radial smoothstep disc integrates to 1.2 pi s squared;
+the existing star-cell threshold and fixed half-amplitude have expected weight (1 - 0.975 squared) / 4. This restores
+the mean energy where the existing night shader fades unresolved cells. No external source code or asset was read,
+copied or downloaded into the repository. GPU cases are generated stand-ins, documented as such.

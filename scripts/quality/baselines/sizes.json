@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11531463,
+  "total": 11536220,
   "history": [
     {
       "date": "2026-10-24",
@@ -4952,6 +4952,12 @@
       "commit": "8e5af534b",
       "reason": "lighting2d height and GI edge contact tolerance (Metal parity)",
       "grew": 2
+    },
+    {
+      "date": "2026-11-09",
+      "commit": "85bfe1020",
+      "reason": "Batch 99 optional multiple-scattering sky: lazy tracer wrapper 212 B and Hillaire bake/night with explicit Float32 domain 10822 B, with standard max(256 B, 3%) entry headroom; root, core and stage unchanged.",
+      "grew": 2
     }
   ],
   "items": {
@@ -5603,7 +5609,7 @@
     "@margoengine/sky/cloud-shadows": 3448,
     "@margoengine/sky/clouds": 2338,
     "@margoengine/sky/fog": 2295,
-    "@margoengine/sky/hillaire": 6858,
+    "@margoengine/sky/hillaire": 11147,
     "@margoengine/sky/lighting": 4064,
     "@margoengine/sky/night": 2523,
     "@margoengine/sky/preetham": 953,
@@ -5903,6 +5909,7 @@
     "margoengine": 308,
     "margoengine/game": 996,
     "margoengine/viz": 800,
-    "margoengine/web": 577
+    "margoengine/web": 577,
+    "@margoengine/voxel-pathtracer/sky": 468
   }
 }

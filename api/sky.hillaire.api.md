@@ -23,6 +23,28 @@ export interface AtmosphereParameters {
 
 export const EARTH_ATMOSPHERE: Readonly<Required<AtmosphereParameters>>;
 
+export interface HillaireEnvironment {
+    width: number;
+    height: number;
+    data: Float32Array;
+    sunDirection: Vec3;
+    sunColor: Vec3;
+    sunIntensity: number;
+}
+
+export interface HillaireEnvironmentOptions {
+    width?: number;
+    height?: number;
+    sunDirection?: Vec3;
+    hours?: number;
+    altitude?: number;
+    sunIlluminance?: number;
+    atmosphere?: AtmosphereParameters;
+    multipleScattering?: boolean;
+    night?: SkyNightOptions | false;
+    signal?: AbortSignal;
+}
+
 export class HillaireSky implements EnginePlugin {
     readonly options: HillaireSkyOptions;
     readonly name: string;
@@ -53,4 +75,22 @@ export interface HillaireSkyOptions {
 }
 
 export function atmosphereParameters(p?: AtmosphereParameters): Required<AtmosphereParameters>;
+
+export function bakeHillaireEnvironment(device: GPUDevice, options?: HillaireEnvironmentOptions): Promise<HillaireEnvironment>;
+
+// Not exported from this entry, but used by the exports above:
+
+interface SkyNightOptions {
+    zenithColor?: Vec3;
+    horizonColor?: Vec3;
+    moonColor?: Vec3;
+    moonDirection?: Vec3;
+    moonSize?: number;
+    moonPhase?: number;
+    moonLitBySun?: boolean;
+    glowIntensity?: number;
+    starIntensity?: number;
+    starTwinkleIntensity?: number;
+    hazeDensity?: number;
+}
 ```

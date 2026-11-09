@@ -41,7 +41,7 @@ const sky = Sky.attach(engine, {model: 'bruneton', clouds: {coverage: 0.4}}, {br
 | `/volumetric-clouds` | `VolumetricClouds`, its own plugin: ray-marched 3D clouds you can fly through | 7.3 kB |
 | `/cloud-shadows` | `volumetricCloudShadows`, a shadow effect for `@margoengine/shadows` | 3.2 kB |
 | `/aerial` | `AerialPerspective`, its own plugin: distant surfaces take the air's colour | 6.5 kB |
-| `/hillaire` | `HillaireSky`, its own plugin: a physical sky with ozone from the ground to space | 6.6 kB |
+| `/hillaire` | `HillaireSky`, its own plugin: a physical sky with ozone and an HDR environment bake | 10.8 kB |
 | `/shafts` | `LightShafts`, its own plugin: god rays past geometry and through cloud gaps | 6.9 kB |
 | `/presets` | `EARTH`, `MARS` and `marsAtmosphere` for the Hillaire entries (not a `Sky` feature) | 1.6 kB |
 | `/astro` | `AstroSky`, its own plugin: the real sun, moon, planets and catalogue stars for a date and place | 9.5 kB |
@@ -778,3 +778,40 @@ Install Mitsuba 3.9.1 in the external engine-bench/batch-168/mitsuba-venv; setup
 over 297 directions. Each sky is normalized by its own zenith luminance because their absolute units differ.
 Normalized RGB MAE is 1.439228; this remains an open model loss, not a physical radiance parity claim.
 [Per-case results](../../docs/whitepaper/results/batch-168-sky.json).
+
+## Bake an HDR environment
+
+`bakeHillaireEnvironment` from the existing `/hillaire` entry reuses its transmittance and multiple-scattering
+tables to make an owned linear RGBA Float32 equirectangular map. Columns turn about +Y from -Z at the centre
+to +X at three quarters; rows run from zenith to nadir. The sun is returned separately, with its atmospheric
+transmittance, to avoid putting a sharp disc into a coarse map.
+
+```ts
+import { Engine } from '@margoengine/core';
+import { engineRuntime } from '@margoengine/core/extension';
+import { bakeHillaireEnvironment } from '@margoengine/sky/hillaire';
+const engine = await Engine.create(document.querySelector('canvas')!, { backend: 'webgpu' });
+const environment = await bakeHillaireEnvironment(engineRuntime(engine).gpu!, {
+  hours: 18.2, signal: AbortSignal.timeout(60000),
+});
+console.log(environment.width, environment.height, environment.data.length);
+engine.dispose();
+```
+
+Defaults: width 256 (integer 1..2048), height 128 (integer 1..1024), hours 12 (finite, wraps at 24), altitude 0 metres
+(0..100000000), sunIlluminance 20 (0..1000000), atmosphere Earth, multipleScattering true, night {}, optional signal.
+An explicit nonzero sunDirection overrides hours. Atmosphere fields use the defaults above; bake coefficients and
+ground albedo are 0..1, radii and scale heights at most 100000 km. `multipleScattering: false` isolates single
+scattering. `night` accepts `SkyNightOptions` or false: the existing gradient, procedural stars and phased moon are
+held at time zero with twinkle disabled. Unresolved stars retain their integrated mean light. Night numeric
+magnitudes other than moonDirection are at most 1000000. The bake marches 64 steps per texel and frees temporary
+resources on success, cancellation and failure. Recreate it when its settings change; the CPU result survives
+device loss. WebGPU and WebGL2 compatibility GPUDevice work; plain WebGL2 refuses with coded `unsupported` and
+a help link. Higher scattering orders are isotropic and the planet spherical; night is stylized, without an
+astronomical catalogue, and the distant map adds no local aerial perspective.
+
+The environment bake requires Float32-distinct planet/atmosphere radii and vertical scattering optical depth
+at most 6 in every channel (Rayleigh plus scattering Mie, integrated from ground to top). This keeps a
+representable escape probability in the geometric-series LUT. Minimum observer clearance is 1 metre or
+2 to 4 Float32 radius steps, whichever is larger. Night moonSize must be at least 0.000001 radians; narrower
+discs are outside the bake domain. Both equirectangular dimensions determine the night filtering footprint.

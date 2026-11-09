@@ -758,3 +758,16 @@ For the Windows README tool proof, run node scripts/fetch-readme-assets.mjs --ff
 MARGO_README_FFMPEG to the emitted cache/ffmpeg/bin/ffmpeg.exe, then run npm run check:readme-run -- --packages=headless.
 Only that example child receives the tool directory in PATH. The optional build is FFmpeg 8.1.2 GPL-3.0 from Gyan,
 publisher archive SHA-256 db580001caa24ac104c8cb856cd113a87b0a443f7bdf47d8c12b1d740584a2ec. No tool binary ships.
+
+## Batch 99 multiple-scattering tracer sky
+
+Build packages, then run `node scripts/gpu-lock.mjs run --owner=codex-99 -- node packages/voxel-pathtracer/tests/sky-browser.mjs`
+with a 10-minute hard limit. It runs native WebGPU and WebGL2 compatibility and writes
+`test-results/voxel-pathtracer-sky.json`; the committed record is `results/batch-99-sky-20261109.json`.
+Generated 32x16 maps compare higher orders on/off, Earth/no ozone, low sun and vacuum with Lambert ground;
+128x64 maps check stable integrated procedural stars. Independent constants are zero in vacuum and
+sun illuminance times albedo divided by pi on the planet. Empty-scene tracing reproduces RGB [0.1, 0.2, 0.3] within
+1e-5, and sky plus sun illuminate a diffuse receiver. Lifecycle runs the normal traced scene with a baked map,
+destroys/restores the real native device and requires an identical converged image and raster restoration on
+disposal. Unit tests in `packages/voxel-pathtracer/tests/sky-environment.test.js` inject pipeline/readback failures
+and cancellation while each waits. No wall-time performance result or outside-renderer radiometric parity is claimed.

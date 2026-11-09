@@ -18,7 +18,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-625). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-626). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -1280,3 +1280,30 @@ with 15 failures retained. Sources, licences and outstanding inputs: [missing-te
 ## Custom WGSL transitions (LIM-625)
 
 Optional transitions/custom accepts 1..65536 UTF-16 source code units containing the documented transition function and helpers. Three fixed bindings, no caller-supplied resources or enabled device features. Validation uses rgba8unorm; rendering uses the active capture format with no extra transfer conversion. UV top left, clamped nearest sampling; finite RGBA output is the shader author's responsibility. Exact 0/1 endpoints bypass the custom function. Start durations (0,60] seconds, default 1; built-in kind/displacement do not change a custom shader. AbortSignal defaults absent, cancels waiting and attachment, not browser compilation. Resize retains the outgoing resolution and progress; device replacement cancels unavailable history. Capture -80/composite 50. WebGL2 attachment throws linked unsupported. No quality or speed claim. Generated solid-color pixel proof at 1x/4x on RTX A6000 only. Entry min+gzip: root 4280 B (budget 4303 unchanged), custom 5019 B (new budget 5275 with standard headroom), umbrella custom 65 B (budget 321). Core plus stage 23797 B unchanged.
+
+## Multiple-scattering tracer sky (batch 99, LIM-626)
+
+The new optional `@margoengine/voxel-pathtracer/sky` imports the optional sky peer's existing `/hillaire` entry.
+`traceSkyEnvironment` calls `bakeHillaireEnvironment`, returning a linear RGBA Float32 map plus a separate attenuated
+sun. Bake defaults are 256x128, noon, altitude zero, sun illuminance 20, Earth, multiple scattering and stylized
+night enabled. Width is 1..2048, height 1..1024 and storage must fit the device's buffers. Altitude is at most
+100000000 metres, sun illuminance at most 1000000, coefficients/albedo at most 1, radii/heights at most 100000 km.
+The existing 256x64 transmittance and 32x32 multiple LUTs feed a 64-step ray march per texel. Higher scattering orders
+are isotropic, geometry spherical and the observer position fixed by altitude. Re-bake when settings change; this
+environment adds no local atmospheric attenuation or aerial perspective. Night reuses the stylized gradient,
+procedural stars and moon, time zero without twinkle; unresolved stars retain mean integrated light. It does not
+include astronomical catalogues, Milky Way, spectral airglow or spectral transport. Numeric night magnitudes other
+than normalized moon direction are at most 1000000. A plain WebGL2 context is refused with coded help; a WebGL2
+compatibility device executes the same model. Native and compatibility values, analytic vacuum/ground, traced
+lighting, cancellation, resource disposal and real native device restoration are recorded in
+`docs/whitepaper/results/batch-99-sky-20261109.json`. No speed or reference-renderer equality claim.
+
+Batch 99 sky entry sizes (bare peers external): lazy tracer sky 212 B gzip, sky Hillaire including the reusable
+bake 10822 B; tracer root 80431 B and core plus stage 23797 B unchanged. Entry budgets use the standard
+max(256 B, 3%) headroom; the strict core/stage limit remains 25000 B.
+
+The environment bake requires Float32-distinct planet/atmosphere radii and vertical scattering optical depth
+at most 6 in every channel (Rayleigh plus scattering Mie, integrated from ground to top). This keeps a
+representable escape probability in the geometric-series LUT. Minimum observer clearance is 1 metre or
+2 to 4 Float32 radius steps, whichever is larger. Night moonSize must be at least 0.000001 radians; narrower
+discs are outside the bake domain. Both equirectangular dimensions determine the night filtering footprint.

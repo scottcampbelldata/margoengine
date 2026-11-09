@@ -1135,7 +1135,12 @@ window.check={
   const mesh=engine.createMesh();mesh.setGeometry(box());mesh.setScale([3,3,3]);
   look([18,14,26],[-3,3,-2]);
   const raster=await shot();
-  const tracer=VoxelPathTracer.attach(engine,{scene:scenes.materials(),maxSamples:16,samplesPerFrame:4});
+  const scene=scenes.materials();
+  if(new URLSearchParams(location.search).has('sky')){
+   const {traceSkyEnvironment}=await import('/packages/voxel-pathtracer/dist/sky-environment.js');
+   scene.environment={...scene.environment,...await traceSkyEnvironment(device(),{width:32,height:16,signal:AbortSignal.timeout(60000)})};
+  }
+  const tracer=VoxelPathTracer.attach(engine,{scene,maxSamples:16,samplesPerFrame:4});
   await tracer.ready;
   tracer.enabled=false;const disabled=await shot();
   tracer.enabled=true;

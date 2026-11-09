@@ -2194,3 +2194,16 @@ The full compat GPU suite remains the proof for the translated device. Source
 and built-root isolation now inspect AST import edges; a regression distinguishes
 actual imports/exports from comments and loader advice. The duplicate-gate TEMP
 fixture detects cross-package exports when package names share a prefix.
+
+### Batch 99 sky: section 5 evidence
+
+The optional voxel-pathtracer sky entry reuses sky's atmosphere tables and integration through the public
+`bakeHillaireEnvironment` in the existing Hillaire feature entry. It creates no root/core/stage capability. Compute
+produces owned RGBA floats, plus the separate sun's transmittance; every temporary buffer and texture is released
+before success, abort or failure settles. The tracer's existing map sampling and device restoration consume those
+floats unchanged. Native WebGPU and WebGL2 compatibility pass value assertions, including added multiple-scattering
+energy, ozone's twilight shift, stable night, moon phase, vacuum black, analytic Lambert ground and constant-radiance
+tracing; native restoration reproduces the converged image exactly. Unit failure injection covers compilation,
+mapping and cancellation. Evidence: `docs/whitepaper/results/batch-99-sky-20261109.json`. Proof uses generated
+maps and scenes, not an outside radiometric oracle. Isotropic higher orders, finite angular maps and stylized night
+remain accepted approximations; MagicaVoxel parity and moving-camera denoising remain separate unfinished jobs.

@@ -734,7 +734,8 @@ Not done or not verified, stated plainly:
   index ratio; media are homogeneous per palette index with grey extinction; the ground is a plain diffuse plane;
   default matrix motion and the camera's corner rays interpolate linearly (matrix rotations can shrink; explicit TRS
   motion preserves rigid shape); no chromatic aberration; the physical sky is Preetham's (no multiple scattering, ozone or night sky);
-  bloom comes from `@margoengine/post`.
+  bloom comes from `@margoengine/post`. The optional `/sky` entry replaces the Preetham environment with Hillaire
+  multiple scattering, ozone and stylized night, as described below.
 - **Measured only on one machine** (RTX A6000, Edge 155, Windows). Other GPUs, browsers and the editor's own scenes are
   untested.
 
@@ -743,3 +744,48 @@ Not done or not verified, stated plainly:
 Outside the root entry: `studioPresets()` / `studioPreset(name)` (lighting presets as a `TraceEnvironment`),
 `PreviewBudget` (samples per frame while the view changes and after it settles), and material builders (`diffuse`,
 `metal`, `glass`, `emit`, `blend`, `media`, `materialBuilders`, `paletteFromMaterials`).
+
+## Multiple-scattering sky (`@margoengine/voxel-pathtracer/sky`)
+
+Install the optional `@margoengine/sky` peer to bake Hillaire's multiple-scattering atmosphere, ozone and a stable
+stylized night into the tracer's existing importance-sampled HDR environment. The bake also returns the separate
+sun with its atmospheric transmittance. The sun disc is excluded from the map, so it is sampled only once.
+
+```ts
+import { Engine } from '@margoengine/core';
+import { engineRuntime } from '@margoengine/core/extension';
+import { VoxelPathTracer } from '@margoengine/voxel-pathtracer';
+import { traceSkyEnvironment } from '@margoengine/voxel-pathtracer/sky';
+const engine = await Engine.create(document.querySelector('canvas')!, { backend: 'webgpu' });
+const environment = await traceSkyEnvironment(engineRuntime(engine).gpu!, {
+  hours: 18.2, signal: AbortSignal.timeout(60000),
+});
+const tracer = VoxelPathTracer.attach(engine, {
+  scene: { revision: 1, models: [], instances: [], materials: [], environment },
+});
+await tracer.ready;
+engine.render();
+```
+
+Options and defaults: `width: 256` (1..2048), `height: 128` (1..1024), `hours: 12` (finite, wraps at 24),
+`sunDirection` (optional, nonzero, normalized; overrides hours), `altitude: 0` metres (0..100000000),
+`sunIlluminance: 20` (0..1000000), `atmosphere` (Earth; coefficients and ground albedo 0..1, radii and scale heights
+at most 100000 km), `multipleScattering: true` (false isolates single scattering), `night: {}` (the sky package's
+stylized gradient, stars and phased moon; false disables it), and optional `signal`. Night settings follow
+`SkyNightOptions`; twinkle is always disabled and time held at zero. Other night numeric magnitudes are at most
+1000000, except the normalized moon direction. Unresolved procedural stars retain their mean integrated light.
+
+The bake reuses the sky package's 256x64 transmittance and 32x32 multiple-scattering LUTs and marches 64 steps per
+map texel. It uses GPU compute, returns owned RGBA Float32 texels, and frees temporary GPU resources on success,
+cancellation or failure. The returned map works with the existing tracer and device restoration. WebGL2 works
+through `@margoengine/webgl2-compat`; a plain WebGL2 context is refused with coded `unsupported` and a help link.
+Rebake when time, atmosphere or observer altitude changes, then update the scene revision. This is a distant
+environment, with isotropic higher scattering orders, a spherical planet and stylized night; it does not add
+aerial perspective or astronomical catalogues. Ground bounce comes from the atmosphere's `groundAlbedo`;
+the tracer's optional local ground remains a separate surface. No root entry, core or stage feature was added.
+
+The environment bake requires Float32-distinct planet/atmosphere radii and vertical scattering optical depth
+at most 6 in every channel (Rayleigh plus scattering Mie, integrated from ground to top). This keeps a
+representable escape probability in the geometric-series LUT. Minimum observer clearance is 1 metre or
+2 to 4 Float32 radius steps, whichever is larger. Night moonSize must be at least 0.000001 radians; narrower
+discs are outside the bake domain. Both equirectangular dimensions determine the night filtering footprint.

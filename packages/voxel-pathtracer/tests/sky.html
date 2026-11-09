@@ -1,0 +1,65 @@
+<!doctype html><html><meta charset="utf-8"><title>Multiple scattering sky checks</title><canvas width="32" height="32"></canvas><script type="module">
+import {Engine} from '/packages/core/dist/index.js';
+import {engineRuntime} from '/packages/core/dist/extension.js';
+import {VoxelPathTracer} from '/packages/voxel-pathtracer/dist/index.js';
+import {traceSkyEnvironment} from '/packages/voxel-pathtracer/dist/sky-environment.js';
+window.run=async(compat=false)=>{
+ if(compat){const {install}=await import('/packages/webgl2-compat/dist/index.js');await install({force:true});}
+ const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,2,0],target:[0,3,0]}});
+ const device=engineRuntime(engine).gpu,errors=[],messages=[],reports=[];
+ device.addEventListener('uncapturederror',event=>errors.push(event.error.message));
+ const create=device.createShaderModule.bind(device);
+ device.createShaderModule=descriptor=>{const module=create(descriptor);reports.push(module.getCompilationInfo().then(info=>messages.push(...info.messages.filter(m=>m.type==='error').map(m=>m.message))));return module;};
+ const buffers=[],textures=[],buffer=device.createBuffer.bind(device),texture=device.createTexture.bind(device);
+ device.createBuffer=desc=>{const b=buffer(desc);const destroy=b.destroy.bind(b);const item={destroyed:false};buffers.push(item);b.destroy=()=>{item.destroyed=true;destroy();};return b;};
+ device.createTexture=desc=>{const t=texture(desc);const destroy=t.destroy.bind(t);const item={destroyed:false};textures.push(item);t.destroy=()=>{item.destroyed=true;destroy();};return t;};
+ const base={width:32,height:16,night:false,signal:AbortSignal.timeout(60000)};
+ const bake=async(options={})=>{const e=await traceSkyEnvironment(device,{...base,...options});if(!e.map.data.every(v=>Number.isFinite(v)&&v>=0))throw Error('invalid radiance bake');return e;};
+ const total=e=>{let s=0;for(let i=0;i<e.map.data.length;i+=4)s+=e.map.data[i]+e.map.data[i+1]+e.map.data[i+2];return s;};
+ const pixel=(e,x,y)=>Array.from(e.map.data.slice((y*e.map.width+x)*4,(y*e.map.width+x)*4+3));
+ const peak=e=>{let v=0;for(let i=0;i<e.map.data.length;i+=4)v=Math.max(v,e.map.data[i],e.map.data[i+1],e.map.data[i+2]);return v;};
+ const delta=(a,b)=>{let s=0;for(let i=0;i<a.map.data.length;i++)s+=Math.abs(a.map.data[i]-b.map.data[i]);return s;};
+ try{
+  const noon=await bake({sunDirection:[0,1,0]}),single=await bake({sunDirection:[0,1,0],multipleScattering:false});
+  const twilight=await bake({sunDirection:[1,-0.07,0]}),noOzone=await bake({sunDirection:[1,-0.07,0],atmosphere:{ozone:[0,0,0]}});
+  const sunset=await bake({sunDirection:[1,0.01745,0]});
+  const stableNight={zenithColor:[0,0,0],horizonColor:[0,0,0],moonColor:[0,0,0],starIntensity:1000,glowIntensity:0};
+  const nightOff=await bake({sunDirection:[0,-1,0],sunIlluminance:0});
+  const stars=await bake({width:128,height:64,sunDirection:[0,-1,0],sunIlluminance:0,night:stableNight});
+  const starsAgain=await bake({width:128,height:64,sunDirection:[0,-1,0],sunIlluminance:0,night:{...stableNight,starTwinkleIntensity:100}});
+  const moonOptions={sunDirection:[0,-1,0],sunIlluminance:0,night:{...stableNight,starIntensity:0,moonColor:[1,1,1],moonDirection:[0,1,0],moonSize:0.4}};
+  const moonFull=await bake({...moonOptions,night:{...moonOptions.night,moonPhase:1}});
+  const moonNew=await bake({...moonOptions,night:{...moonOptions.night,moonPhase:-1}});
+  const constant=await bake({sunDirection:[0,-1,0],sunIlluminance:0,night:{...stableNight,starIntensity:0,zenithColor:[0.1,0.2,0.3],horizonColor:[0.1,0.2,0.3]}});
+  const vacuum=await bake({sunDirection:[0,1,0],atmosphere:{rayleigh:[0,0,0],mie:0,mieAbsorption:0,ozone:[0,0,0],groundAlbedo:[0,0,0]}});
+  const lambert=await bake({sunDirection:[0,1,0],atmosphere:{rayleigh:[0,0,0],mie:0,mieAbsorption:0,ozone:[0,0,0],groundAlbedo:[0.3,0.2,0.1]}});
+  const high=await bake({sunIlluminance:1e6,night:false});
+  const narrow=await bake({width:1,height:1024,sunDirection:[0,-1,0],sunIlluminance:0,night:stableNight});
+  const largePlanet=await bake({atmosphere:{bottomRadius:99000,topRadius:99100},sunDirection:[0,1,0]});
+  const dense=await bake({atmosphere:{rayleigh:[0.75,0.75,0.75],mie:0,mieAbsorption:0,groundAlbedo:[1,1,1]}});
+  const orbit=await bake({altitude:1e8,sunDirection:[0,1,0]});
+  const tiny=await bake({width:1,height:1,sunIlluminance:0});
+  const disposedBeforeRender=buffers.every(b=>b.destroyed)&&textures.every(t=>t.destroyed);
+  const controller=new AbortController(),reason=new Error('bake cancelled'),pending=traceSkyEnvironment(device,{...base,signal:controller.signal});
+  controller.abort(reason);let abortExact=false;try{await pending;}catch(e){abortExact=e===reason;}
+  const disposedAfterAbort=buffers.every(b=>b.destroyed)&&textures.every(t=>t.destroyed);
+  const scene={revision:1,models:[],instances:[],materials:[],environment:constant};
+  engine.camera.up=[0,0,-1];engine.render();
+  let tracer=VoxelPathTracer.attach(engine,{scene,denoise:false,maxBounces:2});
+  await tracer.ready;
+  const image=await tracer.renderImage({width:1,height:1,samples:1,jitter:false,signal:AbortSignal.timeout(60000)});
+  tracer.dispose();
+  scene.environment={...noon,groundColor:[0.8,0.8,0.8]};scene.revision++;
+  engine.camera.position=[0,2,0];engine.camera.target=[0,0,0];engine.camera.up=[0,0,-1];engine.render();
+  tracer=VoxelPathTracer.attach(engine,{scene,denoise:false,maxBounces:2});
+  await tracer.ready;
+  const ground=await tracer.renderImage({width:1,height:1,samples:256,jitter:false,signal:AbortSignal.timeout(60000)});
+  tracer.dispose();
+  let refusal;try{await traceSkyEnvironment(document.createElement('canvas').getContext('webgl2'));}catch(e){refusal={code:e.code,message:e.message};}
+  await Promise.all(reports);await device.queue.onSubmittedWorkDone();
+  return {errors,messages,noon:pixel(noon,16,0),single:total(single),multiple:total(noon),ozone:pixel(twilight,16,0),noOzone:pixel(noOzone,16,0),sunset:sunset.sunColor,
+   nightOff:peak(nightOff),stars:peak(stars),starsDelta:delta(stars,starsAgain),moonFull:total(moonFull),moonNew:total(moonNew),vacuum:peak(vacuum),lambert:pixel(lambert,16,15),high:peak(high),tiny:peak(tiny),orbit:total(orbit),narrow:pixel(narrow,0,0),largePlanet:pixel(largePlanet,16,0),
+   dense:total(dense),disposedBeforeRender,disposedAfterAbort,abortExact,constantImage:Array.from(image.color),ground:Array.from(ground.color),refusal};
+ }finally{engine.dispose();}
+};window.ready=true;
+</script></html>

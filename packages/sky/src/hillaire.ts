@@ -23,8 +23,18 @@ import {
   type AtmosphereParameters,
 } from './atmosphere-luts.js';
 import { sunDirection } from './clock.js';
+import { night } from './night.js';
+import type { SkyNightOptions } from './base.js';
 export { EARTH_ATMOSPHERE, atmosphereParameters, type AtmosphereParameters } from './atmosphere-luts.js';
 declare const GPUTextureUsage: { STORAGE_BINDING: number; TEXTURE_BINDING: number };
+declare const GPUBufferUsage: {
+  STORAGE: number;
+  COPY_SRC: number;
+  COPY_DST: number;
+  MAP_READ: number;
+  UNIFORM: number;
+};
+declare const GPUMapMode: { READ: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 /** {@link HillaireSky} settings, read every frame from `sky.options`. */
 export interface HillaireSkyOptions {
@@ -74,6 +84,229 @@ const tables = /* wgsl */ `${atmosphereCommon}
 @group(0) @binding(2) var multipleTable:texture_2d<f32>;
 @group(0) @binding(3) var lutSampler:sampler;
 `;
+/** Settings for a one-shot, linear HDR environment bake. No sun disc is baked. */
+export interface HillaireEnvironmentOptions {
+  /** Equirectangular columns, integer 1 to 2048. Default 256. */
+  width?: number;
+  /** Equirectangular rows, integer 1 to 1024. Default 128. */
+  height?: number;
+  /** Normalized internally; overrides hours. Default: the clock at noon. */
+  sunDirection?: Vec3;
+  /** Clock time in hours; wraps at 24. Default 12. */
+  hours?: number;
+  /** Height above the planet in metres, 0 to 100000000. Default 0. */
+  altitude?: number;
+  /** Sun illuminance above the atmosphere, 0 to 1000000. Default 20. */
+  sunIlluminance?: number;
+  /** Atmosphere; default Earth. Coefficients/albedo 0 to 1, radii at most 100000 km, vertical scattering depth at most 6. */
+  atmosphere?: AtmosphereParameters;
+  /** Include Hillaire's multiple-scattering table. False gives single scattering for comparisons. Default true. */
+  multipleScattering?: boolean;
+  /** Existing stylized night options, fixed at time zero with twinkle disabled. False disables night. Default {}. */
+  night?: SkyNightOptions | false;
+  /** Cancels compilation or readback and releases all temporary GPU resources. */
+  signal?: AbortSignal;
+}
+
+/** Linear RGBA float environment, y-up: centre column -Z, three-quarter column +X. */
+export interface HillaireEnvironment {
+  /** Number of equirectangular columns. */
+  width: number;
+  /** Number of rows, from zenith to nadir. */
+  height: number;
+  /** Owned linear RGBA float texels; alpha is one. */
+  data: Float32Array;
+  /** Unit direction toward the separate sun. */
+  sunDirection: Vec3;
+  /** Sun transmittance from the bake altitude through the atmosphere. */
+  sunColor: Vec3;
+  /** Sun illuminance above the atmosphere. */
+  sunIntensity: number;
+}
+
+const bakeShader = /* wgsl */ `${tables}
+struct Bake {size:vec4f,nightZenith:vec4f,nightHorizon:vec4f,nightMoon:vec4f,nightMoonColor:vec4f,nightParams:vec4f,sunlight:vec4f,sun:vec4f}
+@group(0) @binding(4) var<uniform> frame:Bake;
+@group(0) @binding(5) var<storage,read_write> result:array<vec4f>;
+${atmosphereLookups}${skyAlong}${night.wgsl}
+fn bakedNight(d:vec3f,footprint:f32)->vec3f {
+ var light=stylizedNight(d,footprint);
+ if(d.y>0.258819){
+  let scale=434.0/(1.0+d.y);let radius=max(0.0003,footprint*0.7);let size=radius*scale;
+  // Unresolved cells retain their integrated starlight instead of disappearing.
+  // Integral of 1-smoothstep(0,2s,r) on the plane is 1.2*pi*s*s.
+  // E[random * 0.5 * (random > .975)] = (1-.975^2)/4.
+  let mean=1.2*PI*0.0003*0.0003*scale*scale*0.01234375;
+  let moon=clamp(dot(d,frame.nightMoon.xyz),-1.0,1.0);
+  light+=vec3f(0.8,0.9,1.0)*mean*frame.nightParams.z*smoothstep(0.35,0.5,size)*smoothstep(0.258819,0.5,d.y)*(1.0-smoothstep(0.96,1.0,moon));
+ }
+ return light;
+}
+@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u){
+ if(any(id.xy>=vec2u(frame.size.xy))){return;}
+ let uv=(vec2f(id.xy)+0.5)/frame.size.xy;let phi=(uv.x-0.5)*2.0*PI;let theta=uv.y*PI;
+ let d=vec3f(sin(theta)*sin(phi),cos(theta),-sin(theta)*cos(phi));let a=atmosphere;
+ let o=vec3f(0,a.view.y,0);let seg=airSegment(a,o,d);
+ var light=skyAlong(a,o,d,64u)[0];
+ // The planet hides the stars and moon. Retain twilight scattering, adding night as the sun sets.
+ if(seg.z<0.5){let fade=1.0-smoothstep(-0.2,0.0,a.sun.y);let footprint=max(PI/frame.size.y,2.0*PI*sin(theta)/frame.size.x);light+=bakedNight(d,footprint)*frame.size.z*fade;}
+ result[id.y*u32(frame.size.x)+id.x]=vec4f(light,1);
+}
+`;
+
+/**
+ * Bake the existing Hillaire atmosphere and night model on a WebGPU device.
+ * Returns owned CPU floats; every temporary GPU allocation is released before settlement.
+ * A plain WebGL2 context is refused with a coded error; a WebGL2 compatibility GPUDevice works.
+ */
+export async function bakeHillaireEnvironment(
+  device: GPUDevice,
+  options: HillaireEnvironmentOptions = {},
+): Promise<HillaireEnvironment> {
+  if (!options || typeof options !== 'object') throw new TypeError('Hillaire environment options must be an object');
+  const { width = 256, height = 128, signal } = options;
+  signal?.throwIfAborted();
+  if (!Number.isInteger(width) || width < 1 || width > 2048 || !Number.isInteger(height) || height < 1 || height > 1024)
+    throw new RangeError('Hillaire environment dimensions must be integers: width 1 to 2048, height 1 to 1024');
+  if (options.multipleScattering !== undefined && typeof options.multipleScattering !== 'boolean')
+    throw new TypeError('Hillaire environment multipleScattering must be boolean');
+  if (options.night !== undefined && options.night !== false && (!options.night || typeof options.night !== 'object'))
+    throw new TypeError('Hillaire environment night must be an options object or false');
+  const sky = new HillaireSky({
+    sunDirection: options.sunDirection,
+    hours: options.hours,
+    altitude: options.altitude,
+    sunIlluminance: options.sunIlluminance,
+    atmosphere: options.atmosphere,
+  });
+  const a = sky.resolvedAtmosphere;
+  if (!(Math.fround(a.topRadius) > Math.fround(a.bottomRadius)))
+    throw new RangeError('Hillaire environment atmosphere thickness must survive Float32 rounding; increase topRadius');
+  // The LUTs use Float32 distances and half-float radiance. Keep the bake in their documented physical domain.
+  if (
+    a.topRadius > 100000 ||
+    a.rayleighHeight > 100000 ||
+    a.mieHeight > 100000 ||
+    a.ozoneCenter > 100000 ||
+    a.ozoneWidth > 100000 ||
+    [
+      ...a.rayleigh,
+      ...a.ozone,
+      ...(typeof a.mie === 'number' ? [a.mie] : a.mie),
+      ...(typeof a.mieAbsorption === 'number' ? [a.mieAbsorption] : a.mieAbsorption),
+      ...a.groundAlbedo,
+    ].some((v) => v > 1)
+  )
+    throw new RangeError(
+      'Hillaire environment atmosphere exceeds the bake domain; use radii/heights at most 100000 km and coefficients/albedo at most 1',
+    );
+  const n = options.night === false ? {} : (options.night ?? {});
+  // A geometric series needs a representable escape probability. With vertical
+  // scattering depth <= 6, the LUT's upward quarter-sphere (mu >= .625) keeps
+  // escape >= exp(-6/.625)/4, well above Float32 subtraction error at one.
+  const shell = a.topRadius - a.bottomRadius;
+  const rayleighColumn = -a.rayleighHeight * Math.expm1(-shell / a.rayleighHeight);
+  const mieColumn = -a.mieHeight * Math.expm1(-shell / a.mieHeight);
+  if (a.rayleigh.some((v, c) => v * rayleighColumn + (typeof a.mie === 'number' ? a.mie : a.mie[c]) * mieColumn > 6))
+    throw new RangeError(
+      'Hillaire environment vertical scattering depth must be at most 6; reduce scattering or scale heights',
+    );
+  night.validate(n);
+  if (n.moonSize !== undefined && n.moonSize < 1e-6)
+    throw new RangeError('Hillaire environment moonSize must be at least 0.000001 radians; use a resolvable radius');
+  for (const [key, value] of Object.entries(n)) {
+    const values = Array.isArray(value) ? value : typeof value === 'number' ? [value] : [];
+    if (key !== 'moonDirection' && values.some((v) => Math.abs(v) > 1000000))
+      throw new RangeError('Hillaire environment night parameters must have magnitude at most 1000000');
+  }
+  if (!device || typeof device.createComputePipelineAsync !== 'function' || typeof device.createBuffer !== 'function')
+    throw new MargoError(
+      'unsupported',
+      'Hillaire environment needs a WebGPU GPUDevice; see https://margoengine.com/errors#sky',
+    );
+  const bytes = width * height * 16;
+  if (bytes > device.limits.maxStorageBufferBindingSize || bytes > device.limits.maxBufferSize)
+    throw new RangeError('Hillaire environment exceeds the device buffer limit; reduce width or height');
+  const table = new AtmosphereTables(device);
+  const resources: GPUBuffer[] = [];
+  let abort: (() => void) | undefined;
+  const cancelled = new Promise<never>((_, reject) => {
+    abort = () => reject(signal!.reason);
+    signal?.addEventListener('abort', abort, { once: true });
+  });
+  const wait = <T>(promise: Promise<T>): Promise<T> => Promise.race([promise, cancelled]);
+  try {
+    table.medium(a as Required<AtmosphereParameters>, 1);
+    table.values[34] = sky.sunIlluminance;
+    table.values.set(sky.sun, 36);
+    // Stay above the surface after Float32 rounding, also for large planets.
+    const clearance = Math.max(0.001, a.bottomRadius * 2 ** -22);
+    table.values[45] = a.bottomRadius + Math.max(clearance, (options.altitude ?? 0) / 1000);
+    const values = new Float32Array(32),
+      original = new Float32Array(64);
+    night.write(original, { ...n, starTwinkleIntensity: 0 }, 0);
+    values.set([width, height, +(options.night !== false), 0]);
+    values.set(original.subarray(40, 64), 4);
+    values.set(sky.sun, 28);
+    const buffer = (size: number, usage: number) => {
+      const b = device.createBuffer({ size, usage });
+      resources.push(b);
+      return b;
+    };
+    const params = buffer(values.byteLength, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
+    const output = buffer(bytes, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC);
+    const read = buffer(bytes, GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST);
+    device.queue.writeBuffer(params, 0, values);
+    // Disabling higher orders changes only the lookup contribution, never the atmospheric ray march.
+    const code =
+      options.multipleScattering === false
+        ? bakeShader.replace('(sr+sm)*multipleScattering(a,r,dot(up,a.sun.xyz))', 'vec3f(0)')
+        : bakeShader;
+    const pipeline = await wait(
+      device.createComputePipelineAsync({
+        layout: 'auto',
+        compute: { module: device.createShaderModule({ code }), entryPoint: 'main' },
+      }),
+    );
+    signal?.throwIfAborted();
+    const encoder = device.createCommandEncoder();
+    table.upload(encoder);
+    const entries: GPUBindGroupEntry[] = [
+      { binding: 0, resource: { buffer: table.uniform } },
+      { binding: 1, resource: table.transmittance.createView() },
+      ...(options.multipleScattering === false ? [] : [{ binding: 2, resource: table.multiple.createView() }]),
+      { binding: 3, resource: table.sampler },
+      { binding: 4, resource: { buffer: params } },
+      { binding: 5, resource: { buffer: output } },
+    ];
+    const pass = encoder.beginComputePass();
+    pass.setPipeline(pipeline);
+    pass.setBindGroup(0, device.createBindGroup({ layout: pipeline.getBindGroupLayout(0), entries }));
+    pass.dispatchWorkgroups(Math.ceil(width / 8), Math.ceil(height / 8));
+    pass.end();
+    encoder.copyBufferToBuffer(output, 0, read, 0, bytes);
+    device.queue.submit([encoder.finish()]);
+    await wait(read.mapAsync(GPUMapMode.READ));
+    signal?.throwIfAborted();
+    const data = new Float32Array(read.getMappedRange().slice(0));
+    read.unmap();
+    const sunColor = new Float32Array(3);
+    sunThrough(a as Required<AtmosphereParameters>, table.values[45], sky.sun[1], sunColor);
+    return {
+      width,
+      height,
+      data,
+      sunDirection: [sky.sun[0], sky.sun[1], sky.sun[2]],
+      sunColor: [sunColor[0], sunColor[1], sunColor[2]],
+      sunIntensity: sky.sunIlluminance,
+    };
+  } finally {
+    if (abort) signal?.removeEventListener('abort', abort);
+    for (const buffer of resources) buffer.destroy();
+    table.dispose();
+    sky.dispose();
+  }
+}
 // The sky-view table (Hillaire 2020 sec. 5.2): the sky around the camera by azimuth from the sun (0 to 180 degrees, the
 // air being symmetric about the sun's plane) and zenith angle, squeezed toward the horizon, where the colour changes
 // fastest: row v above the horizon is zenith angle h (1 - (1 - 2v)^2), below it h + (180 - h)(2v - 1)^2, where h is the

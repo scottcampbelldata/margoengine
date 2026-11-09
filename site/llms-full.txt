@@ -2605,7 +2605,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-625). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-626). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -3867,6 +3867,33 @@ with 15 failures retained. Sources, licences and outstanding inputs: [missing-te
 ## Custom WGSL transitions (LIM-625)
 
 Optional transitions/custom accepts 1..65536 UTF-16 source code units containing the documented transition function and helpers. Three fixed bindings, no caller-supplied resources or enabled device features. Validation uses rgba8unorm; rendering uses the active capture format with no extra transfer conversion. UV top left, clamped nearest sampling; finite RGBA output is the shader author's responsibility. Exact 0/1 endpoints bypass the custom function. Start durations (0,60] seconds, default 1; built-in kind/displacement do not change a custom shader. AbortSignal defaults absent, cancels waiting and attachment, not browser compilation. Resize retains the outgoing resolution and progress; device replacement cancels unavailable history. Capture -80/composite 50. WebGL2 attachment throws linked unsupported. No quality or speed claim. Generated solid-color pixel proof at 1x/4x on RTX A6000 only. Entry min+gzip: root 4280 B (budget 4303 unchanged), custom 5019 B (new budget 5275 with standard headroom), umbrella custom 65 B (budget 321). Core plus stage 23797 B unchanged.
+
+## Multiple-scattering tracer sky (batch 99, LIM-626)
+
+The new optional `@margoengine/voxel-pathtracer/sky` imports the optional sky peer's existing `/hillaire` entry.
+`traceSkyEnvironment` calls `bakeHillaireEnvironment`, returning a linear RGBA Float32 map plus a separate attenuated
+sun. Bake defaults are 256x128, noon, altitude zero, sun illuminance 20, Earth, multiple scattering and stylized
+night enabled. Width is 1..2048, height 1..1024 and storage must fit the device's buffers. Altitude is at most
+100000000 metres, sun illuminance at most 1000000, coefficients/albedo at most 1, radii/heights at most 100000 km.
+The existing 256x64 transmittance and 32x32 multiple LUTs feed a 64-step ray march per texel. Higher scattering orders
+are isotropic, geometry spherical and the observer position fixed by altitude. Re-bake when settings change; this
+environment adds no local atmospheric attenuation or aerial perspective. Night reuses the stylized gradient,
+procedural stars and moon, time zero without twinkle; unresolved stars retain mean integrated light. It does not
+include astronomical catalogues, Milky Way, spectral airglow or spectral transport. Numeric night magnitudes other
+than normalized moon direction are at most 1000000. A plain WebGL2 context is refused with coded help; a WebGL2
+compatibility device executes the same model. Native and compatibility values, analytic vacuum/ground, traced
+lighting, cancellation, resource disposal and real native device restoration are recorded in
+`docs/whitepaper/results/batch-99-sky-20261109.json`. No speed or reference-renderer equality claim.
+
+Batch 99 sky entry sizes (bare peers external): lazy tracer sky 212 B gzip, sky Hillaire including the reusable
+bake 10822 B; tracer root 80431 B and core plus stage 23797 B unchanged. Entry budgets use the standard
+max(256 B, 3%) headroom; the strict core/stage limit remains 25000 B.
+
+The environment bake requires Float32-distinct planet/atmosphere radii and vertical scattering optical depth
+at most 6 in every channel (Rayleigh plus scattering Mie, integrated from ground to top). This keeps a
+representable escape probability in the geometric-series LUT. Minimum observer clearance is 1 metre or
+2 to 4 Float32 radius steps, whichever is larger. Night moonSize must be at least 0.000001 radians; narrower
+discs are outside the bake domain. Both equirectangular dimensions determine the night filtering footprint.
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
@@ -5570,6 +5597,26 @@ entry. A distinct package sharing a name prefix can no longer evade the gate.
 `tests/quality-gate.test.js` creates a TEMP fixture with cross-package, same-package,
 subpath and type-only exports; its two runtime re-exports fail to be detected without
 the boundary fix. The temporary WebGL bridge is gone, so no exception or budget is added.
+
+### Batch 99 optional sky scope (2026-11-09)
+
+The missing multiple-scattering/ozone/night environment in the voxel tracer is addressed by optional `/sky`,
+using the existing sky model. Its generated native/compatibility value and lifecycle proof is recorded under
+`docs/whitepaper/results/batch-99-sky-20261109.json`. This does not close the existing exact MagicaVoxel atmosphere
+parity or moving-camera denoising defects. Stylized night, isotropic higher orders and the fixed-altitude distant
+map are documented limits, not claims of astronomical or spectral reference accuracy.
+
+### Open: nearly closed conservative Hillaire atmospheres
+
+The existing raster Hillaire model accepts atmospheres whose geometric-series transfer rounds to one.
+Repro: HillaireSky with atmosphere `{rayleigh:[1,1,1],mie:1,mieAbsorption:0,rayleighHeight:100000,
+mieHeight:100000,groundAlbedo:[1,1,1]}` on Earth radii. A native GPU probe returns nonfinite radiance.
+Cause: `packages/sky/src/atmosphere-luts.ts` computes `L2 / (1 - fms)`; in this opaque conservative domain
+`fms` rounds to one and L2 underflows to zero. The model needs a numerically stable treatment beyond its
+large-mean-free-path approximation; no epsilon clamp or scattering-order truncation was added. The new
+environment bake rejects vertical scattering depth above 6 before allocating, keeping an upward-quarter
+escape bound exp(-6 / 0.625) / 4 above Float32 subtraction error. This is an explicit bake domain limit,
+not a repair of the pre-existing raster model. Regression: sky-environment.test.js checks the domain refusal.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 
@@ -7302,7 +7349,7 @@ const sky = Sky.attach(engine, {model: 'bruneton', clouds: {coverage: 0.4}}, {br
 | `/volumetric-clouds` | `VolumetricClouds`, its own plugin: ray-marched 3D clouds you can fly through | 7.3 kB |
 | `/cloud-shadows` | `volumetricCloudShadows`, a shadow effect for `@margoengine/shadows` | 3.2 kB |
 | `/aerial` | `AerialPerspective`, its own plugin: distant surfaces take the air's colour | 6.5 kB |
-| `/hillaire` | `HillaireSky`, its own plugin: a physical sky with ozone from the ground to space | 6.6 kB |
+| `/hillaire` | `HillaireSky`, its own plugin: a physical sky with ozone and an HDR environment bake | 10.8 kB |
 | `/shafts` | `LightShafts`, its own plugin: god rays past geometry and through cloud gaps | 6.9 kB |
 | `/presets` | `EARTH`, `MARS` and `marsAtmosphere` for the Hillaire entries (not a `Sky` feature) | 1.6 kB |
 | `/astro` | `AstroSky`, its own plugin: the real sun, moon, planets and catalogue stars for a date and place | 9.5 kB |
