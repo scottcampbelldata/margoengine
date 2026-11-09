@@ -2394,6 +2394,20 @@ gives commands. No accuracy assertion or timing budget was weakened.
 - **Rerun:** `node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node packages/sciviz/scripts/rival-bench.mjs`.
   Citation in clean-room.md.
 
+### 103. truck 7k prefix against GaussianSplats3D (diagnostic, loss)
+
+- **Measurement:** the published truck at iteration 7,000, first 699,050 of 1,692,538 degree-3 splats (the rest do
+  not fit the 128 MiB storage binding). One still frame at the `000001` photograph's 979 x 546, world-to-camera
+  pose, black background, antialiasing off. The clock is one update and one render plus GPU completion. Two
+  warmups, then 7 paired rounds, fastest round. GaussianSplats3D 0.4.7 on its CPU sort (the shared-memory GPU sort
+  drew no calls). RTX A6000.
+- **Result:** loss. Margo 10.765 ms, GaussianSplats3D 4.500 ms. The rounds do not overlap (Margo 10.765 to 14.535,
+  GaussianSplats3D 4.500 to 7.470). Against the photograph, Margo PSNR 12.226 dB (MAE 52.272) and the rival 9.994 dB
+  (MAE 60.646). Camera-to-world was also scored for Margo (10.672 dB) and lost to world-to-camera. Neither picture
+  matches the photograph. Busy machine, diagnostic. Tracked in known-bugs.md. Publishing the number does not close it.
+- **Rerun:** `node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node packages/splats/scripts/rival-bench.mjs`.
+  Citation in clean-room.md.
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).
@@ -2401,6 +2415,10 @@ These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bu
 - **volume-64 against VTK.js 38.0.5 (entry 102).** 1.500 ms against 1.300 ms for one 256 x 256 frame plus the pixel
   read. The rounds overlap. Mean absolute channel difference 1.801. Rerun:
   `node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node packages/sciviz/scripts/rival-bench.mjs`.
+
+- **Truck 7k prefix against GaussianSplats3D 0.4.7 (entry 103).** 10.765 ms against 4.500 ms for one still frame of
+  699,050 degree-3 splats. The rounds do not overlap. PSNR against the published photo is 12.226 dB (MAE 52.272).
+  Rerun: `node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node packages/splats/scripts/rival-bench.mjs`.
 
 - **Own 2D physics, the 100-row pyramid: 2.9 to 3.2 ms a step in Wasm against Box2D v3's Wasm 1.4 ms (entries
   83, 85 to 91; entry 91 took about 6 percent more off, paired).** One page, the engines taking turns, busy machine,
@@ -2477,3 +2495,4 @@ These entries lack a recorded number, a named machine or a quiet run:
 
 24. Certified 2D faces and solver study (entry 101): quiet paired Wasm and browser reruns; the Box2D loss remains open.
 25. volume-64 against VTK.js (entry 102): a quiet paired rerun. The loss stays open.
+26. Truck 7k prefix against GaussianSplats3D (entry 103): a quiet paired rerun. The loss and the picture error stay open.

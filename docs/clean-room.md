@@ -628,6 +628,8 @@ The own solver's kernel (`packages/physics/kernel`, Rust, no dependencies). Noth
 | SP11 | anti-aliased splats: opacity scaled by sqrt(det(S) / det(S + 0.3 I)) of the screen covariance, the 2D Mip filter with the 0.3 px^2 dilation | splats/src/shader.ts | Yu et al. 2024, "Mip-Splatting: Alias-free 3D Gaussian Splatting", CVPR, eq. 9 (2D Mip filter); Kerbl et al. 2023, "3D Gaussian Splatting", App. C (0.3 px^2 dilation) |
 | SP12 | splat picking with meshes: the colour pass's projection run again in a vertex shader for a 3 x 3 pick tile under a cropped view-projection, IDs written where the Gaussian opacity reaches a threshold, nearest centre wins against the meshes' depth (reversed Z) | splats/src/pick.ts | Kerbl et al. 2023, "3D Gaussian Splatting for Real-Time Radiance Field Rendering", ACM TOG 42(4), App. C (falloff, 0.99 cap); Zwicker et al. 2001, "EWA Splatting" (ellipses); W3C WebGPU specification (r32uint render target, instanced triangle strips, depthCompare) |
 
+The batch 168 timing drives `@mkkellogg/gaussian-splats-3d` 0.4.7 as a black box from its README (https://github.com/mkkellogg/GaussianSplats3D): `Viewer` with `selfDrivenMode: false`, then `update` and `render`. The library source was not opened. The photograph and the camera row are the published truck test image `000001` and `cameras.json` from the 3D Gaussian Splatting dataset (Kerbl et al. 2023). The pose is COLMAP's camera frame (https://colmap.github.io/format.html): x right, y down, z forward. Both interpretations of the stored rotation were scored. The shared-memory GPU sort drew nothing in this page, so the timed rival uses the README's CPU sort (`gpuAcceleratedSort` and `sharedMemoryForWorkers` false).
+
 ### taa
 
 | id | formula | file | source |

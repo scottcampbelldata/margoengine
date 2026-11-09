@@ -21,6 +21,8 @@ time is the fastest round. These numbers were taken on a busy machine and are di
 | `@margoengine/compute` | FFT of 65,536 real points, then read both halves | 2.400 ms | TensorFlow.js 4.22.0 WebGPU, 22.700 ms | win |
 | `@margoengine/compute` | sum of 1,048,576 values, then read the scalar | 0.900 ms | TensorFlow.js 4.22.0 WebGPU, 3.000 ms | win |
 | `@margoengine/sciviz` | volume-64, 256 x 256, frame plus the pixel read | 1.500 ms | VTK.js 38.0.5, 1.300 ms | loss |
+| `@margoengine/splats` | truck 7k prefix, 699,050 degree-3 splats, one still frame | 10.765 ms | GaussianSplats3D 0.4.7, 4.500 ms | loss |
+| `@margoengine/splats` | same frame against the published photo `000001` | PSNR 12.226 dB, MAE 52.272 | GaussianSplats3D 0.4.7, PSNR 9.994 dB, MAE 60.646 | picture error |
 
 The flock checksums after that step were 31517.19 (Margo) and 31516.70 (Yuka). Both moved from the same grid. They are
 not bit-equal: Yuka keeps a neighbourhood per vehicle and Margo uses one uniform grid. The behaviours are the ones in
@@ -79,3 +81,19 @@ fastest round. One headless page on an RTX A6000. The last pair differs by 1.801
 (Margo 1.5 to 2.0 ms, VTK.js 1.3 to 2.2). The minimum still favours VTK.js, so the row is a loss. Busy machine,
 diagnostic. Rerun:
 `node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node packages/sciviz/scripts/rival-bench.mjs`.
+
+The splat rows are the published truck at iteration 7,000 (1,692,538 degree-3 splats) cut to the first 699,050,
+the most whose SH buffer fits the WebGPU minimum storage binding of 134,217,728 bytes. The full cloud is refused
+(`RangeError: Splat attributes exceed device storage limits`). Both sides load that prefix. The photograph is the
+dataset's `000001` JPEG, 979 x 546, and the render is that size. `cameras.json` names 1957 x 1091; the vertical
+field of view uses that height and `fy` (50.513 degrees), and the principal point is taken as the image centre.
+COLMAP's frame (x right, y down, z forward) was tried as world-to-camera and as camera-to-world. World-to-camera
+is closer (PSNR 12.226 dB, MAE 52.272) than camera-to-world (10.672 dB, MAE 59.713). The rival is shown that same
+world-to-camera pose (PSNR 9.994 dB, MAE 60.646). Neither is a match to the photograph. The clock is one update
+and one render plus GPU completion, not the pixel read. Two warmups, then 7 paired rounds, still camera,
+per-round minimum. The rounds do not overlap (Margo 10.765 to 14.535 ms, GaussianSplats3D 4.500 to 7.470). The
+rival's shared-memory GPU sort produced no draw calls, so the timed path is its CPU sort (`gpuAcceleratedSort`
+false, `sharedMemoryForWorkers` false, `integerBasedSort` false), antialiasing off, SH degree 3, black background.
+RTX A6000, busy machine, diagnostic. The loss and the picture error stay open. Rerun:
+`node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node packages/splats/scripts/rival-bench.mjs`.
+The fit count is `packages/splats/test/storage-fit.test.js`. The pose maths are `packages/splats/test/paper-camera.test.js`.

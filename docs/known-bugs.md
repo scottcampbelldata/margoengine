@@ -840,6 +840,23 @@ Measured but not fixed. Their history, sources and rerun commands are in
   Repro: `node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node packages/sciviz/scripts/rival-bench.mjs`
   after the sciviz build. The rival is installed outside the repository. Cause not yet found. Publishing the number
   does not close it.
+- **A degree-3 cloud of 1,692,538 splats does not attach** (`@margoengine/splats`, perf history entry 103): the
+  published truck at iteration 7,000. SH is 16 coefficients per channel as float32 (192 bytes a splat, about 310 MiB).
+  `Splats.attach` refuses that buffer because the device's `maxStorageBufferBindingSize` stays at the WebGPU minimum
+  of 134,217,728 bytes. Core does not request a higher limit. The largest degree-3 cloud that attaches is 699,050
+  splats. The batch 168 row uses that prefix of the ply on both sides. Cause: the storage binding is not raised, and
+  the SH buffer is one binding. Publishing the prefix does not close it.
+- **Truck 7k prefix frame is slower than GaussianSplats3D 0.4.7** (`@margoengine/splats`, perf history entry 103):
+  10.765 ms against 4.500 ms, one still frame of the 699,050 prefix at 979 x 546, paired turns, per-round minimum,
+  busy machine, diagnostic. The rounds do not overlap (Margo 10.765 to 14.535 ms, GaussianSplats3D 4.500 to 7.470).
+  The rival's shared-memory GPU sort drew no calls, so the number is its CPU sort. Repro:
+  `node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node packages/splats/scripts/rival-bench.mjs`.
+  Cause not yet found. Publishing the number does not close it.
+- **Truck 7k prefix does not match the published photograph** (`@margoengine/splats`, perf history entry 103):
+  world-to-camera PSNR 12.226 dB (MAE 52.272), camera-to-world 10.672 dB (MAE 59.713), against `000001`. The rival
+  at the same world-to-camera pose is 9.994 dB (MAE 60.646). The principal point is the image centre. The model is
+  the 7,000-iteration prefix, not the paper's 30,000-iteration cloud, and it is not the paper's dataset-average
+  PSNR. Cause not yet found. Publishing the number does not close it.
 
 - **Own 2D physics steps the 100-row pyramid in 2.9 ms in Wasm where Box2D v3's Wasm takes 1.4 ms**
   (`packages/physics2d/kernel`, perf history entries 83 to 91): repro `BOX2D_WASM=<box2d3-pyramid.mjs> node
