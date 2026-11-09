@@ -562,3 +562,5 @@ existing shared required downloader supplies them; missing/LFS/changed bytes fai
 The known README list now has 53 entries. Physics remains held.
 
 Splat input landing validation: full verify passes 13,368 tests with zero failures/skips (333.9 s); all 73 package tests, 32 root harness/asset tests, the GPU suite (20 shader modules, zero errors) and all 14 original README examples pass. Lint and hygiene pass. The alias regression fails before the mapping. No exports, codec source or runtime size budgets changed.
+`nLane C claims decoders introduction and meshopt SIMD README rows for exact compressed view inputs and metadata-aware examples. Physics remains held.
+`nLane C also claims the two points/Potree README rows for complete licensed PotreeConverter folder inputs. No generated folder will count as outside-file proof.
