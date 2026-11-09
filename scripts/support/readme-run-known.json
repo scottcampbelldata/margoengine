@@ -13,7 +13,6 @@
   "animator/readme-sync-groups-margoengine-animator-ced03a": "sample: RangeError: Unknown animator clip \"Sprint\"; use a clip name from animation.clips",
   "animator/readme-triggers-exit-times-any-state-tr-2794f3": "sample: RangeError: Unknown animator clip \"Land\"; use a clip name from animation.clips",
   "cameras/readme-physical-exposure-margoengine-ca-6d1c49": "example: MargoError: Tonemap needs an explicit HDR source when another effect owns scene capture; pass options.source",
-  "clustered/readme-ies-profiles-9e957a": "sample: RangeError: Invalid IES file: no TILT= line; pass the text of a valid IES LM-63 photometric file",
   "cutscene/readme-render-to-video-4f9104": "sample: EncodingError: Unable to decode audio data",
   "decoders/readme-any-image-to-pixels-margoengine-86f34e": "sample: TypeError: Failed to fetch",
   "decoders/readme-margoengine-decoders-b7ae99": "sample: Error: Draco: invalid header; pass an unmodified .drc buffer",

@@ -101,7 +101,7 @@ not a verified download or licence grant. Do not replace any of these with gener
 | P10 | build-record metadata job | real cc:license, xmpRights:UsageTerms/WebStatement and non-mesh 3MF objects | Public 3MF Consortium sample data; per-file licence | Pending |
 | P11 | build-record VFX jobs | external reference render for real scene effects | Public renderer output only, with matching authored scene and open asset licences | Pending |
 | P12 | limits splats/animate, LIM-490 | real 4D/rigged splat capture | Public dynamic capture datasets, per-dataset licence | Pending |
-| P13 | limits tiles/s2, LIM-362 | real S2 tileset | Cesium 3D Tiles standard sample data, Apache-2.0 to verify | Pending |
+| P13 | limits tiles/s2, LIM-362 | real S2 tileset | CesiumJS fae001dee63d9fb5bd88eef4162f7e765406ec19 ImplicitHeightSemantics, Apache-2.0 LICENSE.md | Passed outside standard-data hierarchy/containment proof: all 21 cells and 45,738 independent WGS84 points. No content meshes; metadata height tightening and production-world rendering remain unproved |
 | P14 | limits correctives, LIM-232 | authored corrective morph model | Openly licensed Blender/Maya rig; per-model licence | Pending |
 | P15 | limits face, LIM-237 | real ARKit-named face model and tracker frames | Public face capture sample, explicit model/data licence | Pending; live tracker separately needs hardware |
 | P16 | limits PVR, decoder batch job 7 | real PVRTC cube and array texture | Imagination public texture samples/tools; licence not yet verified | Pending |
@@ -230,7 +230,7 @@ Their original reasons are preserved. No known-list entry was added, removed or 
 | animator/readme-sync-groups-margoengine-animator-ced03a | /hero.glb | sample: RangeError: Unknown animator clip "Sprint"; use a clip name from animation.clips | Deferred to later README job |
 | animator/readme-triggers-exit-times-any-state-tr-2794f3 | /hero.glb | sample: RangeError: Unknown animator clip "Land"; use a clip name from animation.clips | Deferred to later README job |
 | cameras/readme-physical-exposure-margoengine-ca-6d1c49 | See named example | example: MargoError: Tonemap needs an explicit HDR source when another effect owns scene capture; pass options.source | Deferred to later README job |
-| clustered/readme-ies-profiles-9e957a | /downlight.ies | sample: RangeError: Invalid IES file: no TILT= line; pass the text of a valid IES LM-63 photometric file | Deferred to later README job |
+| clustered/readme-ies-profiles-9e957a | /downlight.ies | sample: RangeError: Invalid IES file: no TILT= line; pass the text of a valid IES LM-63 photometric file | Passed with the existing published CC-BY-4.0 EXT_lights_ies profile; exception removed |
 | cutscene/readme-render-to-video-4f9104 | theme.ogg | sample: EncodingError: Unable to decode audio data | Deferred to later README job |
 | exporters/readme-render-to-file-80cd28 | See named example | example: TypeError: Cannot read properties of undefined (reading '1') | Deferred to later README job |
 | exporters/readme-unity-asset-and-support-bundles-a4fd05 | See named example | example: MargoError: Unity import profile requires the explicit Margo Mesh Studio source profile; use general GLB for other generators; change the scene or choose anothe | Deferred to later README job |
@@ -443,3 +443,30 @@ is 3,458 B gzip under the unchanged 3,593 B ceiling. No public exports changed.
 
 Lane C (missing-test-items) claims P13 real S2 tileset proof; lane Q keeps its five README rows, physics remains held.
 Lane C also claims clustered/readme-ies-profiles-9e957a for its existing licensed IES file and runtime rerun.
+
+## S2 outside-data proof and IES README input (2026-11-09)
+
+P13 now runs on the three unmodified CesiumJS ImplicitHeightSemantics S2 data files,
+pinned by URL, SHA-256 and size. All 21 implicit cells expand, fetch exactly the three
+files and contain 45,738 points calculated independently from the face-0 quadratic
+projection and WGS84 ellipsoid equations, using each published metadata height range.
+This is an outside authored standard-data sample, not a production landscape or mesh
+render. The reader retains the root's conservative 0..10,000 m slab instead of tightening
+it to each binary metadata height range (1,000..5,000 m here); that limitation remains.
+Other faces and octrees still use the existing generated/specification controls.
+The three files join verify's required manifest, now 352 inputs; direct tiles tests
+validate the full family too. Missing, changed and LFS-only input still fails loudly.
+
+The original IES README selects the complete CC-BY-4.0 EXT_lights_ies profile already
+recorded in supply-chain.mjs. Its new regression fails before the alias and checks the
+published peak of 8,500 candela. All 10 clustered README examples pass in the browser.
+Only that exception is removed (58 remain). Lane Q's five rows and physics are untouched.
+The S2 test, full tiles/clustered unit suites, tiles GPU test and tiles README pass.
+Durable result records: s2-real-20261109.json and readme-ies-input-20261109.json under
+docs/whitepaper/results. The 38 small CGAL PLY data candidates inspected contained no
+big-endian file; P20 stays open and no reader tolerance changes.
+
+Lane C claims P06 real-tool mip-chain upload/readback proof next; no material source change is claimed yet.
+Lane C also claims usdz/readme-margoengine-usdz-087124 missing /model.usdz input; the composition example is not claimed.
+
+S2/IES landing validation: full verify passes 13,318 tests with zero failures/skips (440.9 s), lint and hygiene pass. After rebasing lane Q and the unrelated media entry, 212 scoped tests and all 20 clustered/tiles README examples pass; the new media entry was built to supply its declaration before hygiene. The tiles GPU suite passes 16 checks, 11 shader modules and zero shader errors. The earlier IES alias regression fails without the repair. No API exports changed.

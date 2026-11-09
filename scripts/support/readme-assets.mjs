@@ -6,6 +6,7 @@ import { readmeCache } from '../fetch-readme-assets.mjs';
 
 const decoder = 'packages/decoders/tests/fixtures/';
 export const README_FILES = {
+  '/downlight.ies': 'packages/gltf-pro/tests/fixtures/lights/LightProfile.ies',
   '/textures/albedo.ktx2': decoder + 'ktx2-gpu/alpha-uastc-zstd.ktx2',
   '/textures/sky-cube.ktx2': decoder + 'ktx2-layers/cube-uastc-zstd.ktx2',
   '/albedo.ktx2': decoder + 'ktx2-gpu/alpha-etc1s.ktx2',

@@ -2006,7 +2006,7 @@ byte-identical; regression `packages/tiles/tests/terrain.test.js`).
   Metadata: real Cesium property tables read as their README lists; real Draco bitstreams (google/draco) in a
   stand-in pnts decode as Draco's own decoder gives. Splats: CesiumJS's real sh_unit_cube drawn pixel for pixel as
   `@margoengine/splats` draws it (0 of 129,600 pixels differ). S2: the extension README's id table, all 20 cells of its
-  availability figure and its Philadelphia example (STAND-IN: no real S2 dataset). Budget: Khronos BoomBox counts
+  availability figure and its Philadelphia example (original STAND-IN; the 2026-11-09 missing-input follow-up below adds outside standard data with stated limits). Budget: Khronos BoomBox counts
   89,836,912 B against 89,902,448 B allocated at the device. Terrain: Cesium World Terrain's real tile 9/759/335 puts
   its highest vertex on Everest's summit; a real two-level layer draws as a globe with STAND-IN checker imagery.
   Orthographic: generated matrices give the view height to 1e-4 and the root's error follows zoom, not distance.
@@ -3943,3 +3943,17 @@ Job 6 checks passed: lint, hygiene, the 11 reference/packing contracts, full ver
 The complete job 1 source scene (123 primitives, 528,291 vertices, 1,040,409 triangles) is lit with constant linear [0.3,0.5,0.7] radiance and no sun. Margo EnvironmentLighting defaults are compared with Mitsuba 3.9.1 scalar_rgb public-API output, 128 spp, seed 160, direct max depth 2 and full max depth 8. Full-transport all-pixel RGB-byte MAE is 1.8851051330566406 / 1.8851038614908855 (native/compatibility); direct-only is 2.9175326029459634 / 2.9175211588541665. Exact first budgets, raw and display hashes are frozen in batch-160-environment.json. Native WebGL2 is explicitly refused. Geometry visibility/reflections, split-sum/SH and principled/glTF differences remain open; this constant furnace does not establish nonuniform-sky or directional prefilter accuracy. No renderer/package code or speed claim changed. Batch 168 sky evidence is reused.
 
 Job 7 checks passed: lint, hygiene, all four new reference contracts, full verify and the frozen GPU-locked direct/full budgets on both backends. Root harness/docs only; package README execution and API regeneration are not applicable.
+
+## Missing-input continuation: S2 and IES (2026-11-09)
+
+- P13: outside CesiumJS S2 standard data, three pinned files; 21 cells, 45,738 independently
+  calculated WGS84 containment points. Test: packages/tiles/tests/s2-real.test.js. No content
+  meshes, production-world rendering or binary metadata height-tightening proof. Other faces
+  and octrees keep their generated controls; no renderer or parser source changed.
+- IES README: the original example uses the existing published CC-BY-4.0 profile; its alias
+  regression fails before the repair. All 10 clustered README examples pass; one exception
+  removed, 58 remain. Ownership claim: eff2fa3b6; evidence and input repair: this commit.
+- Three required external inputs bring the shared manifest to 352. Missing/changed bytes
+  fail before verify and in direct tiles tests. No asset bytes or engine code were copied.
+
+S2/IES validation: lint and hygiene pass; full verify 13,318 pass, zero failures/skips. Rebase: 212 scoped tests and 20/20 original clustered/tiles README examples pass. Tiles GPU: 16 checks, 11 shader modules, zero errors. No exports or package size budgets changed.

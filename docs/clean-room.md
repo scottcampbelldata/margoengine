@@ -1806,3 +1806,12 @@ is derived from grid intervals and prevents zero-distance re-entry at grazing an
 changing the physical integration segment. No external traversal implementation was consulted.
 
 Batch 160 job 7 uses only [Mitsuba public mesh I/O](https://mitsuba.readthedocs.io/en/stable/src/how_to_guides/mesh_io_and_manipulation.html), [BSDF](https://mitsuba.readthedocs.io/en/stable/src/generated/plugins_bsdfs.html), [emitter](https://mitsuba.readthedocs.io/en/stable/src/generated/plugins_emitters.html) and [sensor](https://mitsuba.readthedocs.io/en/stable/src/generated/plugins_sensors.html) descriptions. Its adapter is independently written from those APIs and glTF 2.0 accessor/node/PBR specifications, not reference-renderer source. The already-cited glTF PBR appendix B, Burley 2012, Heitz 2014, Kulla and Conty 2017 and Turquin 2019 explain the BSDF/energy scope; no bit-exact equivalence between principled and glTF is inferred. It reuses Margo's PBR Neutral/sRGB display implementation and the batch 168 top-down raw RGB float contract, without fitting output.
+
+### Outside S2 sample containment oracle (2026-11-09)
+
+packages/tiles/tests/s2-real.test.js derives face-0 directions (1,u,v) from the quadratic
+projection described by the S2 cell hierarchy guide (https://s2geometry.io/devguide/s2cell_hierarchy.html),
+then uses the WGS84 ellipsoid equations and constants (a=6378137 m, f=1/298.257223563).
+The implicit cell token order follows the 3DTILES_bounding_volume_S2 availability figure:
+https://github.com/CesiumGS/3d-tiles/tree/main/extensions/3DTILES_bounding_volume_S2.
+Only published CesiumJS standard data was downloaded. No engine implementation was read.

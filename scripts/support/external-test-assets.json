@@ -2094,5 +2094,26 @@
     "size": 1128375,
     "licence": "CC0-1.0",
     "licenceUrl": "https://github.com/mdn/interactive-examples/blob/main/LICENSE"
+  },
+  {
+    "file": "tiles/s2/s2-tileset_1.1.json",
+    "url": "https://raw.githubusercontent.com/CesiumGS/cesium/fae001dee63d9fb5bd88eef4162f7e765406ec19/Specs/Data/Cesium3DTiles/Metadata/ImplicitHeightSemantics/s2-tileset_1.1.json",
+    "size": 1045,
+    "sha256": "16cfba8ff082a7368fcb5d0fdcf6d051ea9e687a4507535f69d13a4970fd0dc4",
+    "licence": "Apache-2.0 (CesiumJS standard test data)"
+  },
+  {
+    "file": "tiles/s2/subtrees/1.1/0.0.0.json",
+    "url": "https://raw.githubusercontent.com/CesiumGS/cesium/fae001dee63d9fb5bd88eef4162f7e765406ec19/Specs/Data/Cesium3DTiles/Metadata/ImplicitHeightSemantics/subtrees/1.1/0.0.0.json",
+    "size": 692,
+    "sha256": "b269b36e2933ed78d6a984f57b3eb4258b0babe3d31f26243845d72d8ea35248",
+    "licence": "Apache-2.0 (CesiumJS standard test data)"
+  },
+  {
+    "file": "tiles/s2/subtrees/metadata.bin",
+    "url": "https://raw.githubusercontent.com/CesiumGS/cesium/fae001dee63d9fb5bd88eef4162f7e765406ec19/Specs/Data/Cesium3DTiles/Metadata/ImplicitHeightSemantics/subtrees/metadata.bin",
+    "size": 336,
+    "sha256": "2544d943418052f8332a3ac0bc76a859093710dfaf23faef288bdd64f8dc1d48",
+    "licence": "Apache-2.0 (CesiumJS standard test data)"
   }
 ]

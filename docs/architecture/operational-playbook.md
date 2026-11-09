@@ -1363,6 +1363,17 @@ removed from the known list. This evidence covers Chromium on this machine, not 
 The atlas writer is registered as a browser tool in the GPU planner; generation never replaces the planned text
 rendering suite or rewrites a committed fixture during verification.
 
+### Required S2 sample and IES README evidence (2026-11-09)
+
+The pinned CesiumJS S2 standard-data sample expands 21 implicit cells; 45,738 points from
+independent face-0 quadratic projection/WGS84 equations fit the loaded boxes at the file's
+height ranges. Three exact data files join the required external manifest (352 inputs).
+This is hierarchy/containment proof, without content meshes or production-world rendering.
+Binary metadata heights do not tighten the inherited 0..10,000 m slab; other faces/octrees
+retain generated controls. The IES README now runs its published CC-BY-4.0 profile, and all
+10 clustered examples pass. These results establish no new image-quality or timing claim.
+
+
 ### Procedural BSP layouts (batch 68, job 3)
 
 The optional dungeon entry owns one dungeon-kernel crate and one lazily loaded dungeon.wasm. Partitioning,

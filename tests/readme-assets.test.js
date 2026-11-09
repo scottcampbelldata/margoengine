@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, join } from 'node:path';
 import { createServer } from 'node:http';
@@ -12,6 +12,17 @@ import {
   sampleRange,
   serveSample,
 } from '../scripts/support/readme-assets.mjs';
+import { parseIES } from '../packages/clustered/dist/ies.js';
+
+test('the IES README resolves the complete published photometric profile and its candela values', () => {
+  assert.equal(README_FILES['/downlight.ies'], 'packages/gltf-pro/tests/fixtures/lights/LightProfile.ies');
+  const fixture = readmeFixture('/downlight.ies');
+  const text = readFileSync(fixture.path, 'utf8');
+  assert.match(text, /^IES:LM-63-2019/);
+  const profile = parseIES(text);
+  assert.equal(profile.peak, 8500);
+  assert.ok(profile.flux > 0);
+});
 
 test('explicit README formats never become another extension sample, HTML, or an LFS pointer', () => {
   const base = mkdtempSync(join(tmpdir(), 'readme-required-'));

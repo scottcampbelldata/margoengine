@@ -1,0 +1,14 @@
+{
+  "command": "npm run check:readme-run -- --packages=clustered",
+  "examples": 10,
+  "pass": 10,
+  "fail": 0,
+  "remainingKnown": 58,
+  "removed": "clustered/readme-ies-profiles-9e957a",
+  "input": "packages/gltf-pro/tests/fixtures/lights/LightProfile.ies",
+  "licence": "CC-BY-4.0, EXT_lights_ies published sample; supply-chain.mjs",
+  "alias": "/downlight.ies",
+  "regression": "tests/readme-assets.test.js",
+  "peakCandela": 8500,
+  "scope": "Original executable README and published file values; not physical photometry calibration"
+}
