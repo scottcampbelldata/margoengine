@@ -3340,7 +3340,7 @@
   },
   "regression": {
     "cause": "Spec table128 typography marks two subset1 anchors for partition1. The new extractor incorrectly retained the last highlight; explicit tables129-131 resolve the ambiguity.",
-    "test": "private/batch-134/transcoder/tests/bc7.rs:explicit_bc7_anchor_table_wins_over_duplicate_partition_emphasis",
+    "test": "explicit_bc7_anchor_table_wins_over_duplicate_partition_emphasis (retained author-workspace Rust test; not shipped)",
     "before": "regression fails;5 of345 primary hashes differ",
     "after": "regression passes;345 of345 exact",
     "changedInputOrTolerance": false

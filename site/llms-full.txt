@@ -5005,13 +5005,18 @@ ExactOIT limit, and its refusal/help contract before changing either test or rou
 
 ### Voxel browser gate revalidation pending after the Chromium repair (2026-11-09)
 
+### Fixed 2026-11-09: voxel memory admission and browser revalidation
+
 The earlier voxel GPU run passed render, bevel, lighting, LOD and coloured-light
 assertions, then failed closing `light-rgb-browser-check.mjs` with
 `SHUTDOWN_TIMEOUT`, still open: browser, at the unchanged30,000ms budget.
-The owning helper-program cause is fixed by cf699846f (above), now fetched on
-origin/main. The full voxel GPU and README gates must pass after rebase before
-the separately tested memory-admission fix lands. The historical13,548-test
-verify and250 voxel CPU passes do not establish repaired browser acceptance.
+The helper-program repair cf699846f was followed by the independent CDP
+list/disconnect ordering repair c0e7053ee. All nine voxel GPU suites now pass,
+alongside the decoder/glTF GPU gates. The README gate passes with its unchanged
+five known failures; 18 of 23 examples succeed. Full verify passed 13,616 tests
+with zero failures/skips before the final main rebase; all 80 scoped rebase
+regressions pass. The memory-admission fix landed first as 0d318eb86, followed
+by the separate browser repair. No timing proof or completed Basis job follows.
 
 ### Fixed 2026-11-09: owned Windows Chromium shutdown pipes (batch 160)
 

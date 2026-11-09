@@ -924,7 +924,7 @@
   "countContract": "decodeCalls counts .basis image/target ABI calls and KTX whole-file/target jobs; successfulMutatedDecodes follows that same per-interface granularity. controlPayloadHashes counts individual output image checks. Wasm pages are end-instance pages after the campaign for that seed, not per-target isolated peak memory acceptance.",
   "regression": {
     "cause": "Private KTX2 adapter failed to wrap the shared supercompression helper at the owned API boundary. Corrupt Zstd frame magic escaped as RangeError.",
-    "test": "private/batch-134/measure/private-ktx-container.test.mjs: damaged supercompressed levels keep coded draft errors and the original cause",
+    "test": "damaged supercompressed levels keep coded draft errors and the original cause (retained author-workspace Node test; not shipped)",
     "red": "report11-zstd-red: rejects with raw RangeError, expected coded failure",
     "green": "report11-private-suite-final:15passed,0failed,0skipped",
     "fix": "Private level helper preserves the cause and aborted signal reason; shared Zstd was unchanged."

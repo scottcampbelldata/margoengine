@@ -1549,8 +1549,9 @@ mixed call counts, implemented subsets and end-instance memory still apply.
 
 For the [private UASTC ETC checkpoint](results/batch-134-uastc-etc.json), use
 the same pinned private crate and Node gzip9 baseline. Research extent and
-pre-use SOLID-ETC-1 convention are recorded in `docs/clean-room.md` and
-`private/batch-134/planner/etc-research-report13.md`. With the bounded CPU
+pre-use SOLID-ETC-1 convention are recorded in [clean-room review](../clean-room.md).
+The detailed planner record remains in the retained author workspace, outside
+clone contents. With the bounded CPU
 runner, execute `measure/etc-solid-contract.mjs`, native crate tests, release
 Wasm build, `measure/etc.test.mjs` and the retained adapter/packed/BC7 tests.
 `measure/etc-compare.mjs` is a strict byte-identity diagnostic: it reports498

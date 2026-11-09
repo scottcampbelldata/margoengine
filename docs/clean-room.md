@@ -2536,7 +2536,8 @@ Outside opaque prebuilt targets 14/15/16 match nearest UNORM rounding of v*(2^b-
 little-endian RGB565/BGR565/RGBA4444. Truncation differs on 13,120/13,120/3,584 pixels per
 transfer mode; nearest rounding differs on zero. Target 13 matches the authored colors.
 The experiment selects the omitted conversion convention only, never a codec algorithm.
-Evidence: private/batch-134/measure/packed-ldr-probe.json and eight frozen payloads.
+Evidence: [PACK16-1 checkpoint](whitepaper/results/batch-134-packed-ldr.json).
+The original probe and eight frozen payloads remain in the retained author workspace.
 No implementation source, companion code, foreign glue, disassembly or remembered internals used.
 
 ## Batch 134 BC7 conversion research and SOLID-BC7-1 (2026-11-09)
@@ -2609,8 +2610,9 @@ The published UASTC solid ETC1S selector field does not spell out its numbering.
 Authorized opaque experiment SOLID-ETC-1 crafted 64 blocks across two color
 modes, eight intensity tables and all four hint indices, in both transfer
 modes (128 cases). The pinned old binary emits bit-plane indices 3/2/0/1 for
-hint0/1/2/3, meaning -b/-a/+a/+b. Record:
-`private/batch-134/measure/etc-solid-contract.json`. This is a field convention,
+hint0/1/2/3, meaning -b/-a/+a/+b. The public
+[ETC checkpoint](whitepaper/results/batch-134-uastc-etc.json) records this contract;
+the original experiment remains in the retained author workspace. This is a field convention,
 not an inferred encoder algorithm. No implementation source or glue was read.
 
 Research before implementation compared Jacob Strom and Tomas Akenine-Moller,
