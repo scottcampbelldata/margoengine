@@ -2610,7 +2610,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-640). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-641). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -4221,6 +4221,25 @@ accepted backend difference or package workaround is declared. Exact repeat test
 and original error budgets remain required. Jobs 4/5 and batch 160 remain open.
 See [the evidence](whitepaper/results/batch-160-determinism.json) and
 [reproduction](whitepaper/reproduce.md).
+
+### Spectral transport and chromatic lens (batch 99 job 8, LIM-641)
+
+Optional voxel-pathtracer/spectral uses four equally spaced wavelengths in 380-780 nm, uniform hero,
+and companion termination at wavelength-dependent glass or the camera lens. It scales dielectric
+transmission by the squared incident/transmitted index ratio, retaining separate light-PDF Jacobians.
+RGB coefficients remain RGB; the CIE weights do not reconstruct reflectance or emission spectra.
+Captures with wavelength set are monochromatic with unit RGB weight; Albedo, normal and depth use hero samples; instance/palette IDs remain centre-ray values. Transparent alpha averages geometric coverage uniformly over wavelengths, or uses the fixed capture wavelength.
+
+Lens settings are immutable at attachment: lensAbbe 0 or 5-200 (default 0), focalLength 1e-6-1e6 world
+units (default 0.05). Only camera projection with nonzero aperture uses longitudinal chromatic power.
+There is no lateral colour, physical lens stack, diffraction, lens transmission or measured optical
+fidelity. Slope correction permits virtual/infinite wavelength focus without singular division.
+One packet can replay four traversals; no equal-cost convergence or speed claim. Independent optional
+tracer subclasses are not combined by this entry. Root glass and sampling limitations still apply.
+
+Generated stand-in analytic transport and disk-edge tests run on native WebGPU and WebGL2 compatibility;
+plain WebGL2 gives linked unsupported. The entry measures 1541 B gzip (ceiling 1797 B),
+with inherited root 80918 B gzip. Core plus stage stays 23797 B gzip, under 25,000 B.
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
@@ -6251,6 +6270,21 @@ Markings audit regression: positive subnormal dimensions could underflow when th
 ### Batch 65 job 6: Road network graph audit
 
 No open defect found within the documented contract. Explicit vertex topology only; at most 65536 vertices and 65536 roads, zero allowed. No geometric intersection detection, snapping, lane/turn restrictions, traffic simulation, live updates or OpenDRIVE parser. Split links at intended junctions; bridges remain distinct IDs. Parallel arcs retain the least travel time, losing road identity; remove closed roads and rebuild for changed traffic. Weights and solver sums are float32, with normal positive edge seconds from 2^-126 to 2^127/max(1,vertices); f32 rounding and generic compute/graph predecessor limitations apply. The bounded adapter reuses the existing graph builder and solver; no new CPU-heavy solver. Dispose graph, solver output arrays and caller-owned context separately. A graph bound to a lost device must be rebuilt with a new context after engine reboot.
+
+### Batch 99 spectral transport evidence
+
+The root tracer's documented unscaled-index convention and single dispersive wavelength are retained
+there; the optional /spectral entry provides physical index-ratio transport, hero packets and chromatic
+thin-lens power. Generated GPU regressions cover one interface, index cancellation across a closed
+slab, a single collapse when lens and glass both disperse, and a finite-slab lens edge. The first edge
+oracle incorrectly treated a solid slab as zero thickness; it now includes side-face visibility with
+the original tolerance. Spectral material reconstruction and physical lens stacks are documented
+scope limits, not proven capabilities. Existing parity and temporal-disocclusion defects remain open.
+
+The initial optional spectral coverage pass left its wavelength at zero, so chromatic aperture rays
+were nonfinite and an opaque emitter returned alpha zero. The pass now chooses a uniform wavelength
+or the capture wavelength before generating each ray. The unchanged full-coverage GPU regression
+fails with alpha [0] before the repair and requires alpha [1] for packet, 450, 587.6 and 650 nm captures.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 

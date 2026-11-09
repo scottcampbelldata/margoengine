@@ -729,13 +729,14 @@ Not done or not verified, stated plainly:
   glass beyond the 8 light-sampled instances are found by path sampling only and converge slowly; `clamp` trades that
   noise for bias. The optional `/guiding` entry directs pure diffuse continuations toward the existing deflector
   bounds; it does not add objects to the eight-per-kind table or solve specular manifolds.
-- **Simplifications:** RGB everywhere except dispersive glass, which samples one wavelength per path (no hero-wavelength
+- **Root-entry simplifications:** RGB everywhere except dispersive glass, which samples one wavelength per path (no hero-wavelength
   sharing, so dispersion converges with colour noise); refracted radiance is not scaled by the squared
   index ratio; media are homogeneous per palette index with grey extinction; the ground is a plain diffuse plane;
   default matrix motion and the camera's corner rays interpolate linearly (matrix rotations can shrink; explicit TRS
   motion preserves rigid shape); no chromatic aberration; the physical sky is Preetham's (no multiple scattering, ozone or night sky);
   bloom comes from `@margoengine/post`. The optional `/sky` entry replaces the Preetham environment with Hillaire
-  multiple scattering, ozone and stylized night, as described below.
+  multiple scattering, ozone and stylized night, as described below. The optional `/spectral` entry adds
+  wavelength packets, index-ratio scaling and a chromatic thin lens, with its limits below.
 - **Measured only on one machine** (RTX A6000, Edge 155, Windows). Other GPUs, browsers and the editor's own scenes are
   untested.
 
@@ -915,3 +916,58 @@ assert constant emission, analytic sunlight, mutual shadows and mirror paths, sh
 geometry, glass furnace values, real device replacement and exact raster restoration. They establish
 no outside-renderer equality, arbitrary asset coverage or GPU speed claim. The paired CPU preparation
 driver requires the Rust output to match an independent scalar builder byte for byte.
+
+## Spectral transport and chromatic lens (optional)
+
+`SpectralVoxelPathTracer` from `@margoengine/voxel-pathtracer/spectral` traces a uniform hero wavelength
+and three companions spaced 100 nm apart over 380-780 nm. Companion paths replay the same random stream
+and stop at the first dispersive glass event, preserving their earlier contributions; the hero takes their
+remaining weight. A dispersive lens collapses the packet at the camera. Every transmitted dielectric
+sample, including refracted light-sampling walks, scales radiance by `(nIncident/nTransmitted)^2`.
+The root tracer retains its existing colour and transport convention.
+
+```ts
+import { Engine } from '@margoengine/core';
+import { SpectralVoxelPathTracer } from '@margoengine/voxel-pathtracer/spectral';
+
+const canvas = document.querySelector('canvas')!;
+const engine = await Engine.create(canvas, {
+  camera: { position: [0, 0, 4], target: [0, 0, 0] },
+});
+const tracer = SpectralVoxelPathTracer.attach(engine, {
+  scene: {
+    revision: 1,
+    models: [{ id: 'glass', revision: 1, size: [1, 1, 1], voxels: new Uint8Array([1]) }],
+    instances: [{ id: 'glass', modelId: 'glass',
+      matrix: [1,0,0,0, 0,1,0,0, 0,0,1,0, -0.5,-0.5,-0.5,1] }],
+    materials: [{ id: 1, type: 'glass', color: [1, 1, 1], ior: 1.5, abbe: 30 }],
+    environment: { skyColor: [1, 1, 1] },
+  },
+  aperture: 0.02,
+  focusDistance: 4,
+  lensAbbe: 30,
+  focalLength: 0.05,
+});
+await tracer.ready;
+const image = await tracer.renderImage({ width: 64, height: 64, samples: 16,
+  signal: AbortSignal.timeout(120000) });
+console.log(image.color.length);
+tracer.dispose();
+engine.dispose();
+```
+
+The two lens settings are fixed at attachment. `lensAbbe` defaults to 0 (achromatic), otherwise 5-200;
+`focalLength` defaults to 0.05 world units, range 1e-6-1e6. In metre scenes 0.05 is 50 mm.
+The root's `aperture` and `focusDistance` keep their defaults and remain mutable. Chromatic lens power is
+`P(lambda) = P(d) * (n(lambda)-1)/(n(d)-1)`, with the root's Cauchy/Abbe model. Only the camera projection
+with a nonzero aperture uses the lens. Other projections and a pinhole remain achromatic. A slope formulation
+stays finite at infinite and virtual wavelength focus distances. This is longitudinal colour from a
+paraxial thin lens, without a physical multi-element lens, diffraction, lens transmission or lateral colour.
+
+Material/light coefficients remain RGB; CIE analytic colour weights integrate wavelength-dependent paths.
+This is not RGB-to-spectrum reconstruction or measured spectral colour fidelity. A capture's `wavelength`
+selects one monochromatic path with unit RGB weight. Albedo, normal and depth use hero samples; instance/palette IDs retain the root centre-ray rule. Transparent alpha is geometric coverage averaged uniformly over wavelengths (or the fixed capture wavelength). A sample is one packet,
+up to four traversals; there is no equal-cost speed or convergence claim. This subclass is independent
+of the other tracer subclasses. Native WebGPU and WebGL2 compatibility run the feature; plain WebGL2
+raises coded `unsupported` with help. Tests use generated scenes, analytic radiance and finite-slab disk
+coverage; no outside renderer or production lens was used.

@@ -1088,3 +1088,15 @@ npm run measure:size
 ```
 
 The browser proof uses native WebGPU and forced real WebGL2 compatibility. It checks pixels and navigation values, exact rendered geometry after reboot, explicit graph/context reconstruction and disposal. CPU graph tests force createCompute({backend:'cpu'}). All generated outputs are stand-ins. No surveyed-road, traffic-model, highway compliance, other-hardware or speed claim follows from these checks.
+
+### Batch 99 spectral and lens effects
+
+After npm run build:packages, run the voxel-pathtracer package tests. Through scripts/gpu-lock.mjs
+with owner codex-99 and a ten-minute limit, run npm run test:gpu:spectral --workspace
+@margoengine/voxel-pathtracer. This runs native WebGPU and WebGL2 compatibility analytic values:
+equal-energy colour, one glass interface, a closed slab, glass and lens furnaces, finite-slab disk
+coverage at three wavelengths, and extreme finite lens settings. All scenes are generated stand-ins.
+Run node packages/voxel-pathtracer/tests/browser-check.mjs --spectral --report=spectral-snell dispersion
+viewport through the same GPU lock for the unchanged analytic Snell and actual device-replacement
+and raster-restoration assertions. No external spectral asset, reference renderer or speed claim.
+The committed reports are results/batch-99-spectral-20261109.json and the matching Snell/lifecycle record.

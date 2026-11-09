@@ -1,6 +1,6 @@
 {
-  "commit": "9b8f6c535",
-  "dirty": false,
+  "commit": "7dfb04f53",
+  "dirty": true,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
     "raw": 58792,
@@ -2508,6 +2508,10 @@
       "./markings": {
         "raw": 1643,
         "gzip": 887
+      },
+      "./graph": {
+        "raw": 1124,
+        "gzip": 665
       }
     },
     "@margoengine/save": {
@@ -3622,6 +3626,10 @@
       "./mesh": {
         "raw": 54485,
         "gzip": 22864
+      },
+      "./spectral": {
+        "raw": 3647,
+        "gzip": 1541
       }
     },
     "@margoengine/water": {

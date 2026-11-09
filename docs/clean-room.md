@@ -2042,3 +2042,18 @@ remove material equations and texture derivatives from the reproducer. Sources:
 These specifications define the API operations; they do not identify the closed
 NVIDIA mechanism behind the observed variable bytes. No driver-internal algorithm
 or engine bug is inferred solely from a precision allowance.
+
+### Spectral and lens transport (batch 99 job 8)
+
+All-package research found the root tracer's Cauchy dispersion and independent post-process RGB shifts
+in shader/tonemap, but no wavelength packet or chromatic camera transport. Existing Margo code is reused.
+No external implementation source was read or copied; no dependency, downloaded code or test asset is added.
+
+- Wilkie, Nawaz, Droske, Weidlich and Hanika, [Hero Wavelength Spectral Sampling](https://doi.org/10.1111/cgf.12419), 2014: random hero and evenly spaced companions, hero-only directional selection. This implementation terminates companions at wavelength-dependent events instead of sharing refracted directions; common random streams replay nondispersive traversal.
+- Veach, [Robust Monte Carlo Methods for Light Transport Simulation](https://aperture.stanford.edu/papers/veach_thesis/), 1997, chapters 5 and 7: refraction's non-symmetric scattering and invariance of radiance divided by squared index. Camera-path transmission uses the squared incident/transmitted ratio; geometric light-PDF Jacobians remain separate.
+- OpenStax, [University Physics Volume 3, section 2.4](https://openstax.org/books/university-physics-volume-3/pages/2-4-thin-lenses): thin-lens and lensmaker equations, wavelength-dependent power and chromatic focal planes. The paraxial slope correction avoids division by an infinite focus distance.
+- Wyman, Sloan and Shirley, [Simple Analytic Approximations to the CIE XYZ Color Matching Functions](https://jcgt.org/published/0002/02/01/), 2013: the existing Margo analytic observer weights, unchanged. No spectral reflectance reconstruction claim.
+
+All fixtures are generated stand-ins. The edge oracle integrates a uniform disk over the exact front/back
+miss interval of a finite-depth emissive slab, including its side face. No tolerance was raised after
+the initial zero-thickness oracle exposed that distinction.

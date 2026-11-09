@@ -1,0 +1,91 @@
+<!doctype html><html><meta charset="utf-8"><title>Spectral transport values</title><canvas width="64" height="64"></canvas><script type="module">
+import {Engine} from '/packages/core/dist/index.js';
+import {engineRuntime} from '/packages/core/dist/extension.js';
+import {SpectralVoxelPathTracer} from '/packages/voxel-pathtracer/dist/spectral.js';
+import {webglRenderer} from '/packages/webgl2-compat/dist/preview.js';
+window.run=async(compat=false)=>{
+ if(compat){const {install}=await import('/packages/webgl2-compat/dist/index.js');await install({force:true});}
+ const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,0,4],target:[0,0,0]}});
+ const device=engineRuntime(engine).gpu,errors=[],messages=[],reports=[],coverage=[];
+ device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+ const create=device.createShaderModule.bind(device);let source;
+ device.createShaderModule=d=>{if(d.code.includes('fn spectralPath'))source=d.code;const m=create(d);reports.push(m.getCompilationInfo().then(i=>messages.push(...i.messages.filter(x=>x.type==='error').map(x=>x.message))));return m;};
+ engine.camera.project=(out,aspect)=>{out.fill(0);out[0]=1/aspect;out[5]=1;out[10]=1/100;out[14]=1;out[15]=1;};engine.render();
+ const transform=(x,y,z,sx=1,sy=sx,sz=sx)=>[sx,0,0,0,0,sy,0,0,0,0,sz,0,x,y,z,1];
+ const blank=()=>({revision:1,models:[],instances:[],materials:[],environment:{skyIntensity:0,sunIntensity:0}});
+ const mean=im=>[0,1,2].map(c=>{let s=0;for(let i=c;i<im.color.length;i+=3)s+=im.color[i];return s/(im.color.length/3);});
+ const render=async(s,options={},capture={},Tracer=SpectralVoxelPathTracer)=>{
+  const t=Tracer.attach(engine,{scene:s,denoise:false,maxBounces:32,...options});
+  try{await t.ready;return await t.renderImage({width:8,height:8,samples:1,seed:173,jitter:false,signal:AbortSignal.timeout(120000),...capture});}
+  finally{t.dispose();}
+ };
+ try {
+  let s=blank();let im=await render(s);
+  coverage.push({name:'empty black',actual:mean(im),expected:[0,0,0],finite:im.color.every(Number.isFinite),tolerance:0});
+  s.environment.background=[0.25,0.5,1];
+  im=await render(s,{}, {samples:4096});
+  coverage.push({name:'packet equal energy RGB',actual:mean(im),expected:[0.25,0.5,1],finite:im.color.every(Number.isFinite),tolerance:0.01});
+  // One air/glass interface before an absorbing emitter, then two interfaces in a closed slab.
+  const glass={id:1,type:'glass',color:[1,1,1],ior:1.5,roughness:0,density:0};
+  const emitter={id:2,type:'emit',color:[0,0,0],emissionColor:[1,0.5,0.25],emission:2};
+  s=blank();s.materials=[glass,emitter];s.models=[{id:'slab',revision:1,size:[1,1,2],voxels:new Uint8Array([2,1])}];s.instances=[{id:'slab',modelId:'slab',matrix:transform(-1,-1,0,2,2,1)}];
+  im=await render(s,{}, {wavelength:587.6,samples:4096});
+  const entry=(1-0.04)/(1.5*1.5);
+  coverage.push({name:'single interface radiance',actual:mean(im),expected:[2*entry,entry,0.5*entry],finite:im.color.every(Number.isFinite),tolerance:0.008});
+  s.models[0]={...s.models[0],size:[1,1,3],voxels:new Uint8Array([2,0,1])};s.revision++;
+  im=await render(s,{}, {wavelength:587.6,samples:4096});
+  const slab=(1-0.04)/(1+0.04);
+  coverage.push({name:'closed slab index cancellation',actual:mean(im),expected:[2*slab,slab,0.5*slab],finite:im.color.every(Number.isFinite),tolerance:0.008});
+  // Packet collapse at glass must preserve a constant-radiance furnace.
+  s.materials[0]={...glass,abbe:30};s.revision++;
+  s.environment={map:{width:4,height:2,data:new Float32Array(24).fill(1)},skyIntensity:1,sunIntensity:0};
+  s.models[0]={...s.models[0],size:[1,1,1],voxels:new Uint8Array([1])};s.instances[0].matrix=transform(-1,-1,0,2,2,1);
+  im=await render(s,{}, {samples:4096});
+  coverage.push({name:'dispersive packet furnace',actual:mean(im),expected:[1,1,1],finite:im.color.every(Number.isFinite),tolerance:0.02});
+  im=await render(s,{lensAbbe:30,focalLength:0.5,aperture:0.5},{samples:4096});
+  coverage.push({name:'lens and glass collapse once',actual:mean(im),expected:[1,1,1],finite:im.color.every(Number.isFinite),tolerance:0.02});
+  // Focus-plane edge: a monochromatic d-line is sharp; blue/red have analytic disk blur.
+  s=blank();s.materials=[emitter];s.models=[{id:'edge',revision:1,size:[1,1,1],voxels:new Uint8Array([2])}];s.instances=[{id:'edge',modelId:'edge',matrix:transform(-2,-2,-0.1,2,4,0.1)}];
+  const profiles=[];
+  for(const wavelength of [450,587.6,650]){
+   im=await render(s,{aperture:0.5,focusDistance:4,lensAbbe:5,focalLength:0.5},{width:64,height:64,samples:256,wavelength});
+   const profile=Array.from({length:64},(_,x)=>{let sum=0;for(let y=0;y<64;y++)sum+=im.color[3*(y*64+x)];return sum/128;});
+   const B=1/(5*(1/0.4861**2-1/0.6563**2)*0.5),dp=B*(1/(wavelength/1000)**2-1/0.5876**2),radius=Math.abs(4*0.25*dp);
+   // A solid finite slab also exposes its side face to aperture rays. Integrate
+   // the exact intersection of the two front/back miss intervals over a disk.
+   const cdf=q=>q<=-1?0:q>=1?1:1-(Math.acos(q)-q*Math.sqrt(1-q*q))/Math.PI;
+   const predicted=profile.map((_,x)=>{
+    const screen=(x+0.5)/32-1;let low=-1,high=1;
+    for(const distance of [4,4.1]){
+     const a=0.25*(1-distance/4-distance*dp);
+     if(Math.abs(a)<1e-10){if(screen<=0)return 1;continue;}
+     const boundary=-screen/a;if(a>0)low=Math.max(low,boundary);else high=Math.min(high,boundary);
+    }
+    return 1-Math.max(0,cdf(high)-cdf(low));
+   });
+   profiles.push({wavelength,radius,maximumError:Math.max(...profile.map((v,i)=>Math.abs(v-predicted[i]))),transition:profile.filter(v=>v>0.02&&v<0.98).length,finite:im.color.every(Number.isFinite)});
+  }
+  for(const options of [{lensAbbe:5,focalLength:1e-6,aperture:1e6},{lensAbbe:200,focalLength:1e6,aperture:0.5}]){
+   // Each CIE channel weight is below 4 per lane, four lanes and emission <=2:
+   // |colour| <=32, even before exploiting cancellation of the signed weights.
+   im=await render(s,options,{samples:2});coverage.push({name:'extreme lens '+options.focalLength,actual:mean(im),finite:im.color.every(Number.isFinite),bounded:im.color.every(v=>Math.abs(v)<=32)});
+  }
+  const native=await Engine.create(document.createElement('canvas'),{backend:'webgl2',fallback:webglRenderer});let refusal;
+  try{SpectralVoxelPathTracer.attach(native,{scene:blank()});}catch(e){refusal={code:e.code,message:e.message};}finally{native.dispose();}
+  await Promise.all(reports);return {coverage,profiles,refusal,errors,messages,sourceLength:source.length};
+ }finally{engine.dispose();}
+};
+window.alpha=async()=>{
+ const engine=await Engine.create(document.createElement('canvas'),{backend:'webgpu',camera:{position:[0,0,4],target:[0,0,0]}});
+ const scene={revision:1,models:[{id:'solid',revision:1,size:[1,1,1],voxels:new Uint8Array([1])}],instances:[{id:'solid',modelId:'solid',matrix:[20,0,0,0,0,20,0,0,0,0,1,0,-10,-10,-1,1]}],materials:[{id:1,type:'emit',color:[0,0,0],emission:1,emissionColor:[1,1,1]}],environment:{skyIntensity:0,sunIntensity:0}};
+ const t=SpectralVoxelPathTracer.attach(engine,{scene,lensAbbe:30,focalLength:0.05,aperture:0.5,focusDistance:4});
+ try{
+  await t.ready;const output=[];
+  for(const wavelength of [undefined,450,587.6,650]){
+   const im=await t.renderImage({width:8,height:8,samples:4,wavelength,transparent:true,signal:AbortSignal.timeout(120000)});
+   output.push({wavelength:wavelength??'packet',alpha:Array.from(new Set(im.alpha)),finite:im.color.every(Number.isFinite)});
+  }
+  return output;
+ }finally{t.dispose();engine.dispose();}
+};window.ready=true;
+</script></html>

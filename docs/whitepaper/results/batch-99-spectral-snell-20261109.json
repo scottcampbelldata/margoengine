@@ -1,0 +1,136 @@
+{
+ "hardware": {
+  "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "webgpu": {
+   "vendor": "nvidia",
+   "architecture": "ampere",
+   "device": "",
+   "description": "",
+   "fallback": false
+  },
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+  "browserName": "chromium",
+  "browserVersion": "157.0.4341.42",
+  "requestedChannel": "msedge",
+  "launchArgs": [],
+  "powerPreference": "high-performance",
+  "hostPlatform": "win32",
+  "headless": true
+ },
+ "date": "2026-11-09T12:07:15.864Z",
+ "results": {
+  "dispersion": {
+   "calibration": {
+    "line": 175.9987515095837,
+    "pixelsPerUnit": 32.00213594541407
+   },
+   "abbe 0 550 nm": {
+    "measured": 2.7531313145989618,
+    "expected": 2.751560016726065,
+    "n": 1.5
+   },
+   "abbe 20 450 nm": {
+    "measured": 2.8348508868536046,
+    "expected": 2.833271966497776,
+    "n": 1.5267225626753755
+   },
+   "abbe 20 550 nm": {
+    "measured": 2.7697861947262257,
+    "expected": 2.7682370400094807,
+    "n": 1.5053592841528889
+   },
+   "abbe 20 650 nm": {
+    "measured": 2.731304438645233,
+    "expected": 2.7297805937832353,
+    "n": 1.4930722387541568
+   },
+   "spectrum": {
+    "red": 2.7345897035706668,
+    "green": 2.7714270914087176,
+    "blue": 2.843199013460459
+   },
+   "furnace": {
+    "mean": [
+     0.9977425520359862,
+     0.9997069941035911,
+     1.0014419027837869
+    ],
+    "pixels": 1861
+   },
+   "errors": []
+  },
+  "viewport": {
+   "disabled": {
+    "differing": 0,
+    "max": 0
+   },
+   "traced": {
+    "differing": 76800,
+    "max": 250
+   },
+   "restored": {
+    "differing": 0,
+    "max": 0
+   },
+   "afterDispose": {
+    "differing": 0,
+    "max": 0
+   },
+   "newDevice": true,
+   "statsBefore": {
+    "samples": 16,
+    "frameMs": 31.100000023841858,
+    "gpuBytes": 4059216,
+    "converged": true,
+    "width": 320,
+    "height": 240,
+    "requestedWidth": 320,
+    "requestedHeight": 240,
+    "sceneRevision": 1,
+    "packedModels": 7,
+    "reusedModels": 0,
+    "renders": 0
+   },
+   "statsAfter": {
+    "samples": 16,
+    "frameMs": 31.19999998807907,
+    "gpuBytes": 4059216,
+    "converged": true,
+    "width": 320,
+    "height": 240,
+    "requestedWidth": 320,
+    "requestedHeight": 240,
+    "sceneRevision": 1,
+    "packedModels": 7,
+    "reusedModels": 0,
+    "renders": 0
+   },
+   "resized": {
+    "samples": 4,
+    "frameMs": 31.19999998807907,
+    "gpuBytes": 4980816,
+    "converged": false,
+    "width": 400,
+    "height": 240,
+    "requestedWidth": 400,
+    "requestedHeight": 240,
+    "sceneRevision": 1,
+    "packedModels": 7,
+    "reusedModels": 0,
+    "renders": 0
+   },
+   "errors": [],
+   "messages": []
+  }
+ },
+ "timings": {
+  "dispersion": {
+   "seconds": 22.8,
+   "longestGpuWait": 19
+  },
+  "viewport": {
+   "seconds": 0.6,
+   "longestGpuWait": 1
+  }
+ }
+}

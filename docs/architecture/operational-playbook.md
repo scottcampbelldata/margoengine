@@ -2618,3 +2618,20 @@ error budget or merge gate is changed. The exact assertions remain failing
 regressions on the affected platform; batch 160 jobs 4/5 cannot land as passing
 and the list row stays open. tests/reference-blend-repeat.test.js verifies the
 fixture's uint32 indices, all retained triangles and atomic concurrent downloads.
+
+### Batch 99 spectral transport and section 5 evidence
+
+The optional voxel-pathtracer/spectral subclass generates its own tracing kernel through the existing
+protected shader hook. It adds a four-wavelength uniform hero packet with companion termination at the
+first dispersive glass event, squared index-ratio scaling in dielectric samples and refracted shadow
+walks, and optional Cauchy/Abbe thin-lens power. It adds no buffer, texture, CPU-heavy loop, Wasm,
+core or stage source dependency. Device restoration regenerates the same feature kernel.
+
+Section 5 evidence: generated native WebGPU and WebGL2 compatibility value tests cover empty and extreme
+inputs, equal-energy colour weights, a single interface, a closed slab, dispersive furnaces, and lens
+coverage at 450, 587.6 and 650 nm. The original analytic Snell and viewport lifecycle fixtures can also
+select the spectral subclass with --spectral. Albedo/normal/depth use hero samples; instance/palette IDs
+retain the centre ray. Transparent coverage initializes its own fixed or uniform wavelength before
+the chromatic lens, with exact opaque-alpha regressions on both backends. The root API is unchanged.
+There is no measured production spectral-colour, multi-element lens, diffraction or packet speed claim;
+RGB coefficients and independent optional subclasses remain explicit limits.

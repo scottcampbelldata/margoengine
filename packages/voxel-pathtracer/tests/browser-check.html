@@ -5,7 +5,7 @@
 import {Engine} from '/packages/core/dist/index.js';
 import {Camera,box,engineRuntime} from '/packages/core/dist/extension.js';
 import {VoxelPathTracer as BaseVoxelPathTracer} from '/packages/voxel-pathtracer/dist/index.js';
-const VoxelPathTracer=new URLSearchParams(location.search).has('media')?(await import('/packages/voxel-pathtracer/dist/media.js')).MediaVoxelPathTracer:new URLSearchParams(location.search).has('guiding')?(await import('/packages/voxel-pathtracer/dist/guiding.js')).GuidedVoxelPathTracer:new URLSearchParams(location.search).has('restir')?(await import('/packages/voxel-pathtracer/dist/restir.js')).ResampledVoxelPathTracer:BaseVoxelPathTracer;
+const VoxelPathTracer=new URLSearchParams(location.search).has('spectral')?(await import('/packages/voxel-pathtracer/dist/spectral.js')).SpectralVoxelPathTracer:new URLSearchParams(location.search).has('media')?(await import('/packages/voxel-pathtracer/dist/media.js')).MediaVoxelPathTracer:new URLSearchParams(location.search).has('guiding')?(await import('/packages/voxel-pathtracer/dist/guiding.js')).GuidedVoxelPathTracer:new URLSearchParams(location.search).has('restir')?(await import('/packages/voxel-pathtracer/dist/restir.js')).ResampledVoxelPathTracer:BaseVoxelPathTracer;
 import {motionCheck} from './motion-browser.js';
 const canvas=document.querySelector('canvas'),errors=[],messages=[],reports=[];
 const runtime=()=>engineRuntime(engine);
@@ -1141,7 +1141,7 @@ window.check={
    const {traceSkyEnvironment}=await import('/packages/voxel-pathtracer/dist/sky-environment.js');
    scene.environment={...scene.environment,...await traceSkyEnvironment(device(),{width:32,height:16,signal:AbortSignal.timeout(60000)})};
   }
-  const tracer=VoxelPathTracer.attach(engine,{scene,maxSamples:16,samplesPerFrame:4});
+  const tracer=VoxelPathTracer.attach(engine,{scene,maxSamples:16,samplesPerFrame:4,...(new URLSearchParams(location.search).has('spectral')?{lensAbbe:30,focalLength:0.05,aperture:0.1}:{})});
   await tracer.ready;
   tracer.enabled=false;const disabled=await shot();
   tracer.enabled=true;

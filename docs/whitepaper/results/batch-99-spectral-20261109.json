@@ -1,0 +1,559 @@
+[
+  {
+    "compat": false,
+    "hardware": {
+      "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "webgpu": {
+        "vendor": "nvidia",
+        "architecture": "ampere",
+        "device": "",
+        "description": "",
+        "fallback": false
+      },
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+      "browserName": "chromium",
+      "browserVersion": "157.0.4341.42",
+      "requestedChannel": "msedge",
+      "launchArgs": [],
+      "powerPreference": "high-performance",
+      "hostPlatform": "win32",
+      "headless": true
+    },
+    "result": {
+      "coverage": [
+        {
+          "name": "empty black",
+          "actual": [
+            0,
+            0,
+            0
+          ],
+          "expected": [
+            0,
+            0,
+            0
+          ],
+          "finite": true,
+          "tolerance": 0
+        },
+        {
+          "name": "packet equal energy RGB",
+          "actual": [
+            0.24991033202968538,
+            0.5000999555923045,
+            1.0004974277690053
+          ],
+          "expected": [
+            0.25,
+            0.5,
+            1
+          ],
+          "finite": true,
+          "tolerance": 0.01
+        },
+        {
+          "name": "single interface radiance",
+          "actual": [
+            0.8532085344195366,
+            0.4266042672097683,
+            0.21330213360488415
+          ],
+          "expected": [
+            0.8533333333333333,
+            0.42666666666666664,
+            0.21333333333333332
+          ],
+          "finite": true,
+          "tolerance": 0.008
+        },
+        {
+          "name": "closed slab index cancellation",
+          "actual": [
+            1.8447285890579224,
+            0.9223642945289612,
+            0.4611821472644806
+          ],
+          "expected": [
+            1.846153846153846,
+            0.923076923076923,
+            0.4615384615384615
+          ],
+          "finite": true,
+          "tolerance": 0.008
+        },
+        {
+          "name": "dispersive packet furnace",
+          "actual": [
+            0.997593380510807,
+            1.0052004791796207,
+            0.9979235054925084
+          ],
+          "expected": [
+            1,
+            1,
+            1
+          ],
+          "finite": true,
+          "tolerance": 0.02
+        },
+        {
+          "name": "lens and glass collapse once",
+          "actual": [
+            0.9977962635457516,
+            1.0051336837932467,
+            0.9978961758315563
+          ],
+          "expected": [
+            1,
+            1,
+            1
+          ],
+          "finite": true,
+          "tolerance": 0.02
+        },
+        {
+          "name": "extreme lens 0.000001",
+          "actual": [
+            0,
+            0,
+            0
+          ],
+          "finite": true,
+          "bounded": true
+        },
+        {
+          "name": "extreme lens 1000000",
+          "actual": [
+            0.6705086422837212,
+            0.4244988518061632,
+            0.16634020090303636
+          ],
+          "finite": true,
+          "bounded": true
+        }
+      ],
+      "profiles": [
+        {
+          "wavelength": 450,
+          "radius": 0.4275610028060093,
+          "maximumError": 0.009339233842136085,
+          "transition": 25,
+          "finite": true
+        },
+        {
+          "wavelength": 587.6,
+          "radius": 0,
+          "maximumError": 0,
+          "transition": 0,
+          "finite": true
+        },
+        {
+          "wavelength": 650,
+          "radius": 0.11084417993349023,
+          "maximumError": 0.008387465025227137,
+          "transition": 6,
+          "finite": true
+        }
+      ],
+      "refusal": {
+        "code": "unsupported",
+        "message": "VoxelPathTracer needs WebGPU or the WebGL2 compatibility layer; see https://margoengine.com/errors#voxel-pathtracer"
+      },
+      "errors": [],
+      "messages": [],
+      "sourceLength": 91229,
+      "alpha": [
+        {
+          "wavelength": "packet",
+          "alpha": [
+            1
+          ],
+          "finite": true
+        },
+        {
+          "wavelength": 450,
+          "alpha": [
+            1
+          ],
+          "finite": true
+        },
+        {
+          "wavelength": 587.6,
+          "alpha": [
+            1
+          ],
+          "finite": true
+        },
+        {
+          "wavelength": 650,
+          "alpha": [
+            1
+          ],
+          "finite": true
+        }
+      ]
+    }
+  },
+  {
+    "compat": true,
+    "hardware": {
+      "webglRenderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A6000 (0x00002230)), NVIDIA)",
+      "webgpu": null,
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+      "browserName": "chromium",
+      "browserVersion": "157.0.4341.42",
+      "requestedChannel": "msedge",
+      "launchArgs": [
+        "--use-angle=vulkan"
+      ],
+      "powerPreference": "high-performance",
+      "hostPlatform": "win32",
+      "headless": true
+    },
+    "result": {
+      "coverage": [
+        {
+          "name": "empty black",
+          "actual": [
+            0,
+            0,
+            0
+          ],
+          "expected": [
+            0,
+            0,
+            0
+          ],
+          "finite": true,
+          "tolerance": 0
+        },
+        {
+          "name": "packet equal energy RGB",
+          "actual": [
+            0.24991033459082246,
+            0.5000999430194497,
+            1.0004974650219083
+          ],
+          "expected": [
+            0.25,
+            0.5,
+            1
+          ],
+          "finite": true,
+          "tolerance": 0.01
+        },
+        {
+          "name": "single interface radiance",
+          "actual": [
+            0.8532085344195366,
+            0.4266042672097683,
+            0.21330213360488415
+          ],
+          "expected": [
+            0.8533333333333333,
+            0.42666666666666664,
+            0.21333333333333332
+          ],
+          "finite": true,
+          "tolerance": 0.008
+        },
+        {
+          "name": "closed slab index cancellation",
+          "actual": [
+            1.8447285890579224,
+            0.9223642945289612,
+            0.4611821472644806
+          ],
+          "expected": [
+            1.846153846153846,
+            0.923076923076923,
+            0.4615384615384615
+          ],
+          "finite": true,
+          "tolerance": 0.008
+        },
+        {
+          "name": "dispersive packet furnace",
+          "actual": [
+            0.9975934075191617,
+            1.005200456827879,
+            0.9979235660284758
+          ],
+          "expected": [
+            1,
+            1,
+            1
+          ],
+          "finite": true,
+          "tolerance": 0.02
+        },
+        {
+          "name": "lens and glass collapse once",
+          "actual": [
+            0.9977963054552674,
+            1.005133661441505,
+            0.9978962261229753
+          ],
+          "expected": [
+            1,
+            1,
+            1
+          ],
+          "finite": true,
+          "tolerance": 0.02
+        },
+        {
+          "name": "extreme lens 0.000001",
+          "actual": [
+            0,
+            0,
+            0
+          ],
+          "finite": true,
+          "bounded": true
+        },
+        {
+          "name": "extreme lens 1000000",
+          "actual": [
+            0.6705086513568403,
+            0.42449885074933036,
+            0.1663402077140148
+          ],
+          "finite": true,
+          "bounded": true
+        }
+      ],
+      "profiles": [
+        {
+          "wavelength": 450,
+          "radius": 0.4275610028060093,
+          "maximumError": 0.009339233842136085,
+          "transition": 25,
+          "finite": true
+        },
+        {
+          "wavelength": 587.6,
+          "radius": 0,
+          "maximumError": 0,
+          "transition": 0,
+          "finite": true
+        },
+        {
+          "wavelength": 650,
+          "radius": 0.11084417993349023,
+          "maximumError": 0.008387465025227137,
+          "transition": 6,
+          "finite": true
+        }
+      ],
+      "refusal": {
+        "code": "unsupported",
+        "message": "VoxelPathTracer needs WebGPU or the WebGL2 compatibility layer; see https://margoengine.com/errors#voxel-pathtracer"
+      },
+      "errors": [],
+      "messages": [],
+      "sourceLength": 87842,
+      "alpha": [
+        {
+          "wavelength": "packet",
+          "alpha": [
+            1
+          ],
+          "finite": true
+        },
+        {
+          "wavelength": 450,
+          "alpha": [
+            1
+          ],
+          "finite": true
+        },
+        {
+          "wavelength": 587.6,
+          "alpha": [
+            1
+          ],
+          "finite": true
+        },
+        {
+          "wavelength": 650,
+          "alpha": [
+            1
+          ],
+          "finite": true
+        }
+      ]
+    }
+  },
+  {
+    "compat": false,
+    "hardware": {
+      "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "webgpu": {
+        "vendor": "nvidia",
+        "architecture": "ampere",
+        "device": "",
+        "description": "",
+        "fallback": false
+      },
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+      "browserName": "chromium",
+      "browserVersion": "157.0.4341.42",
+      "requestedChannel": "msedge",
+      "launchArgs": [],
+      "powerPreference": "high-performance",
+      "hostPlatform": "win32",
+      "headless": true
+    },
+    "lifecycle": {
+      "disabled": {
+        "differing": 0,
+        "max": 0
+      },
+      "traced": {
+        "differing": 76800,
+        "max": 250
+      },
+      "restored": {
+        "differing": 0,
+        "max": 0
+      },
+      "afterDispose": {
+        "differing": 0,
+        "max": 0
+      },
+      "newDevice": true,
+      "statsBefore": {
+        "samples": 16,
+        "frameMs": 10.100000023841858,
+        "gpuBytes": 4059216,
+        "converged": true,
+        "width": 320,
+        "height": 240,
+        "requestedWidth": 320,
+        "requestedHeight": 240,
+        "sceneRevision": 1,
+        "packedModels": 7,
+        "reusedModels": 0,
+        "renders": 0
+      },
+      "statsAfter": {
+        "samples": 16,
+        "frameMs": 10.600000023841858,
+        "gpuBytes": 4059216,
+        "converged": true,
+        "width": 320,
+        "height": 240,
+        "requestedWidth": 320,
+        "requestedHeight": 240,
+        "sceneRevision": 1,
+        "packedModels": 7,
+        "reusedModels": 0,
+        "renders": 0
+      },
+      "resized": {
+        "samples": 4,
+        "frameMs": 10.600000023841858,
+        "gpuBytes": 4980816,
+        "converged": false,
+        "width": 400,
+        "height": 240,
+        "requestedWidth": 400,
+        "requestedHeight": 240,
+        "sceneRevision": 1,
+        "packedModels": 7,
+        "reusedModels": 0,
+        "renders": 0
+      },
+      "errors": [],
+      "messages": []
+    }
+  },
+  {
+    "compat": true,
+    "hardware": {
+      "webglRenderer": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A6000 (0x00002230)), NVIDIA)",
+      "webgpu": {
+        "vendor": "margo-webgl2",
+        "architecture": "webgl2",
+        "device": "ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A6000 (0x00002230)), NVIDIA)",
+        "description": "WebGL2 compatibility layer on ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA RTX A6000 (0x00002230)), NVIDIA)",
+        "fallback": false
+      },
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+      "browserName": "chromium",
+      "browserVersion": "157.0.4341.42",
+      "requestedChannel": "msedge",
+      "launchArgs": [
+        "--use-angle=vulkan"
+      ],
+      "powerPreference": "high-performance",
+      "hostPlatform": "win32",
+      "headless": true,
+      "compat": true
+    },
+    "lifecycle": {
+      "disabled": {
+        "differing": 0,
+        "max": 0
+      },
+      "traced": {
+        "differing": 76800,
+        "max": 250
+      },
+      "restored": {
+        "differing": 0,
+        "max": 0
+      },
+      "afterDispose": {
+        "differing": 0,
+        "max": 0
+      },
+      "newDevice": true,
+      "statsBefore": {
+        "samples": 16,
+        "frameMs": 28.900000035762787,
+        "gpuBytes": 4059216,
+        "converged": true,
+        "width": 320,
+        "height": 240,
+        "requestedWidth": 320,
+        "requestedHeight": 240,
+        "sceneRevision": 1,
+        "packedModels": 7,
+        "reusedModels": 0,
+        "renders": 0
+      },
+      "statsAfter": {
+        "samples": 16,
+        "frameMs": 29.200000047683716,
+        "gpuBytes": 4059216,
+        "converged": true,
+        "width": 320,
+        "height": 240,
+        "requestedWidth": 320,
+        "requestedHeight": 240,
+        "sceneRevision": 1,
+        "packedModels": 7,
+        "reusedModels": 0,
+        "renders": 0
+      },
+      "resized": {
+        "samples": 4,
+        "frameMs": 29.200000047683716,
+        "gpuBytes": 4980816,
+        "converged": false,
+        "width": 400,
+        "height": 240,
+        "requestedWidth": 400,
+        "requestedHeight": 240,
+        "sceneRevision": 1,
+        "packedModels": 7,
+        "reusedModels": 0,
+        "renders": 0
+      },
+      "errors": [],
+      "messages": []
+    }
+  }
+]

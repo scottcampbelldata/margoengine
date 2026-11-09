@@ -71,7 +71,7 @@ const started = performance.now(),
   stallMs = stallLimitMs(),
   // On the layer, ANGLE's Vulkan backend on Windows: its Direct3D backend takes minutes on the tracer's kernels (limits.md).
   context = await openBrowser({
-    startPath: path,
+    startPath: path + (args.includes('--spectral') ? '?spectral=1' : ''),
     port,
     ...(args.includes('--compat') && process.platform === 'win32' ? { args: ['--use-angle=vulkan'] } : {}),
   }),

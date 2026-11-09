@@ -23,7 +23,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-640). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-641). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -1634,3 +1634,22 @@ accepted backend difference or package workaround is declared. Exact repeat test
 and original error budgets remain required. Jobs 4/5 and batch 160 remain open.
 See [the evidence](whitepaper/results/batch-160-determinism.json) and
 [reproduction](whitepaper/reproduce.md).
+
+### Spectral transport and chromatic lens (batch 99 job 8, LIM-641)
+
+Optional voxel-pathtracer/spectral uses four equally spaced wavelengths in 380-780 nm, uniform hero,
+and companion termination at wavelength-dependent glass or the camera lens. It scales dielectric
+transmission by the squared incident/transmitted index ratio, retaining separate light-PDF Jacobians.
+RGB coefficients remain RGB; the CIE weights do not reconstruct reflectance or emission spectra.
+Captures with wavelength set are monochromatic with unit RGB weight; Albedo, normal and depth use hero samples; instance/palette IDs remain centre-ray values. Transparent alpha averages geometric coverage uniformly over wavelengths, or uses the fixed capture wavelength.
+
+Lens settings are immutable at attachment: lensAbbe 0 or 5-200 (default 0), focalLength 1e-6-1e6 world
+units (default 0.05). Only camera projection with nonzero aperture uses longitudinal chromatic power.
+There is no lateral colour, physical lens stack, diffraction, lens transmission or measured optical
+fidelity. Slope correction permits virtual/infinite wavelength focus without singular division.
+One packet can replay four traversals; no equal-cost convergence or speed claim. Independent optional
+tracer subclasses are not combined by this entry. Root glass and sampling limitations still apply.
+
+Generated stand-in analytic transport and disk-edge tests run on native WebGPU and WebGL2 compatibility;
+plain WebGL2 gives linked unsupported. The entry measures 1541 B gzip (ceiling 1797 B),
+with inherited root 80918 B gzip. Core plus stage stays 23797 B gzip, under 25,000 B.

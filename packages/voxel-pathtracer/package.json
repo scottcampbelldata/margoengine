@@ -50,6 +50,10 @@
     "./mesh": {
       "types": "./dist/mesh.d.ts",
       "import": "./dist/mesh.js"
+    },
+    "./spectral": {
+      "types": "./dist/spectral.d.ts",
+      "import": "./dist/spectral.js"
     }
   },
   "files": [
@@ -85,7 +89,8 @@
     "test:gpu:media": "cd ../.. && node packages/voxel-pathtracer/tests/media-browser.mjs",
     "build:mesh": "node scripts/build-mesh.mjs",
     "test:mesh-kernel": "node scripts/build-mesh.mjs --test",
-    "test:gpu:mesh": "cd ../.. && node packages/voxel-pathtracer/tests/mesh-browser.mjs"
+    "test:gpu:mesh": "cd ../.. && node packages/voxel-pathtracer/tests/mesh-browser.mjs",
+    "test:gpu:spectral": "cd ../.. && node packages/voxel-pathtracer/tests/spectral-browser.mjs"
   },
   "margo": {
     "gpuTestTimeoutMinutes": {
@@ -98,7 +103,8 @@
       "test:gpu:guiding": 10,
       "test:gpu:sky": 10,
       "test:gpu:media": 10,
-      "test:gpu:mesh": 10
+      "test:gpu:mesh": 10,
+      "test:gpu:spectral": 10
     }
   },
   "peerDependenciesMeta": {

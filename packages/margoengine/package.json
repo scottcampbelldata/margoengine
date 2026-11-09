@@ -3410,6 +3410,10 @@
       "types": "./dist/voxel-pathtracer/mesh.d.ts",
       "import": "./dist/voxel-pathtracer/mesh.js"
     },
+    "./voxel-pathtracer/spectral": {
+      "types": "./dist/voxel-pathtracer/spectral.d.ts",
+      "import": "./dist/voxel-pathtracer/spectral.js"
+    },
     "./water": {
       "types": "./dist/water.d.ts",
       "import": "./dist/water.js"

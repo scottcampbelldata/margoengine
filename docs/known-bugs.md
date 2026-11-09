@@ -2025,3 +2025,18 @@ Markings audit regression: positive subnormal dimensions could underflow when th
 ### Batch 65 job 6: Road network graph audit
 
 No open defect found within the documented contract. Explicit vertex topology only; at most 65536 vertices and 65536 roads, zero allowed. No geometric intersection detection, snapping, lane/turn restrictions, traffic simulation, live updates or OpenDRIVE parser. Split links at intended junctions; bridges remain distinct IDs. Parallel arcs retain the least travel time, losing road identity; remove closed roads and rebuild for changed traffic. Weights and solver sums are float32, with normal positive edge seconds from 2^-126 to 2^127/max(1,vertices); f32 rounding and generic compute/graph predecessor limitations apply. The bounded adapter reuses the existing graph builder and solver; no new CPU-heavy solver. Dispose graph, solver output arrays and caller-owned context separately. A graph bound to a lost device must be rebuilt with a new context after engine reboot.
+
+### Batch 99 spectral transport evidence
+
+The root tracer's documented unscaled-index convention and single dispersive wavelength are retained
+there; the optional /spectral entry provides physical index-ratio transport, hero packets and chromatic
+thin-lens power. Generated GPU regressions cover one interface, index cancellation across a closed
+slab, a single collapse when lens and glass both disperse, and a finite-slab lens edge. The first edge
+oracle incorrectly treated a solid slab as zero thickness; it now includes side-face visibility with
+the original tolerance. Spectral material reconstruction and physical lens stacks are documented
+scope limits, not proven capabilities. Existing parity and temporal-disocclusion defects remain open.
+
+The initial optional spectral coverage pass left its wavelength at zero, so chromatic aperture rays
+were nonfinite and an opaque emitter returned alpha zero. The pass now chooses a uniform wavelength
+or the capture wavelength before generating each ray. The unchanged full-coverage GPU regression
+fails with alpha [0] before the repair and requires alpha [1] for packet, 450, 587.6 and 650 nm captures.
