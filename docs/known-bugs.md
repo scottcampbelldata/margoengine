@@ -12,6 +12,27 @@ process creation time before waiting, so recycled PIDs cannot spend the shutdown
 budget on an unrelated replacement. Both cases have regression coverage in
 `tests/browser-teardown.test.js`; no timeout or assertion was relaxed.
 
+### Open: test-page 36 writable mesh transform references; 32 assignment consistency
+
+On main 6ebbd1aa4, create a mesh, assign `mesh.position = [0, -2.5, 0]`
+(`rotation` and `scale` behave the same), then call `snapshotMeshes(engine, [mesh])`
+and `restoreSnapshot(engine, snapshot)`. Assignment replaces the VectorRef without
+updating the transform store. Snapshot components become undefined and restore
+rejects them as non-finite. Cause: core Mesh declares TypeScript readonly instance
+fields, which remain writable properties in JavaScript. No optional package can
+guard all mesh construction and assignment; an inspector-only repair would leave
+rendering transforms stale. Fixing the property contract belongs in core.
+
+Label.position is getter-only and the corresponding array assignment throws a raw
+TypeError; setPosition currently works. The test-page brief requires one consistent
+public assignment rule for both packages. Proposed rule: vector-like assignment
+copies validated components into the existing reference, preserving its identity
+and updating the store. Invalid input must reject before any mutation.
+Scott's brief explicitly requires stopping for his yes when 36 needs core. No
+core or bug-32 implementation is changed pending that approval; the empty-Geometry
+exception does not authorize it. Bounded real-Engine/JSDOM reproduction is retained
+in this lane's test-results/testpage-32-36-repro.mjs and .log.
+
 ### Fixed 2026-11-09: decoder Node Basis README example
 
 The Node `nodeKTX2` example used a page's `document` and fetched the placeholder

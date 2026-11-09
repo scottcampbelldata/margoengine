@@ -163,7 +163,7 @@ test('test-page 20: direct disposal detaches an attached environment and permits
     assert.equal(engine.plugins.get(replacement.name), replacement);
     replacement.dispose();
     assert.equal(engine.plugins.size, 0);
-    assert.ok(device.luts.every(lut => lut.destroyed === 1));
+    assert.ok(device.luts.every((lut) => lut.destroyed === 1));
   } finally {
     engine.dispose();
   }
@@ -191,7 +191,7 @@ test('test-page 20: disposal removes the owning scene, preserving an identically
     scene.removePlugin(replacement.name);
     assert.equal(replacement.disposed, true);
     first.dispose();
-    assert.ok(device.luts.every(lut => lut.destroyed === 1));
+    assert.ok(device.luts.every((lut) => lut.destroyed === 1));
   } finally {
     engine.dispose();
   }

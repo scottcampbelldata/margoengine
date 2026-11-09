@@ -30,7 +30,10 @@ test('test-page 37: unbound ranges start with explicit finite neutral values', a
       undefined,
       null,
     );
-    t.after(() => { engine.dispose(); dom.window.close(); });
+    t.after(() => {
+      engine.dispose();
+      dom.window.close();
+    });
     const inspector = Inspector.attach(engine, { parent: dom.window.document.body, ...(effects ? { effects } : {}) });
     for (const key of ['exposure', 'bloom']) {
       const input = field(inspector, key);

@@ -24,7 +24,7 @@ test('test-page 25: real Engine default-scene disposal permits immediate reattac
     assert.equal(engine.plugins.get(replacement.name), replacement);
     replacement.dispose();
     assert.equal(engine.plugins.size, 0);
-    assert.ok(h.resources.every(resource => resource.destroyed));
+    assert.ok(h.resources.every((resource) => resource.destroyed));
   } finally {
     engine.dispose();
     h.cleanup();
@@ -36,16 +36,18 @@ test('dispose removes only the owning scene and leaves default-scene passes aliv
   const first = new Transitions();
   h.engine.use(first);
   const plugins = new Map();
-  const owner = { removePlugin(name) {
-    const plugin = plugins.get(name);
-    plugins.delete(name);
-    plugin?.dispose();
-  } };
+  const owner = {
+    removePlugin(name) {
+      const plugin = plugins.get(name);
+      plugins.delete(name);
+      plugin?.dispose();
+    },
+  };
   const second = new Transitions();
   plugins.set(second.name, second);
   second.setup(h.engine);
   const sceneOf = h.engine.sceneOf.bind(h.engine);
-  h.engine.sceneOf = (plugin) => plugins.get(plugin.name) === plugin ? owner : sceneOf(plugin);
+  h.engine.sceneOf = (plugin) => (plugins.get(plugin.name) === plugin ? owner : sceneOf(plugin));
   second.dispose();
   second.dispose();
   assert.equal(plugins.size, 0);
@@ -53,5 +55,5 @@ test('dispose removes only the owning scene and leaves default-scene passes aliv
   h.frame();
   first.dispose();
   await null;
-  assert.ok(h.resources.every(resource => resource.destroyed));
+  assert.ok(h.resources.every((resource) => resource.destroyed));
 });

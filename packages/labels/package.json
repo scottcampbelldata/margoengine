@@ -25,7 +25,7 @@
   },
   "scripts": {
     "build": "node scripts/build.js",
-    "test": "npm run build && node --test tests/labels.test.js tests/css3d.test.js tests/declutter.test.js tests/depth3d.test.js tests/callouts.test.js tests/scaled.test.js",
+    "test": "npm run build && node --test tests/*.test.js",
     "test:browser": "npm run build && node scripts/test-browser.js",
     "prepack": "npm run build"
   },

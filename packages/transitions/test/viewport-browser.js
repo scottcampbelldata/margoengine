@@ -100,7 +100,17 @@ export async function viewportChecks() {
               pixels++;
             }
         };
-        for (const kind of ['wipe', 'dissolve', 'radial', 'chromatic', 'custom', 'mask', 'mask-with-built-in', 'built-in-with-mask', 'custom-with-peers']) {
+        for (const kind of [
+          'wipe',
+          'dissolve',
+          'radial',
+          'chromatic',
+          'custom',
+          'mask',
+          'mask-with-built-in',
+          'built-in-with-mask',
+          'custom-with-peers',
+        ]) {
           if (kind === 'mask-with-built-in' || kind === 'custom-with-peers') peers.push(Transitions.attach(engine));
           if (kind === 'built-in-with-mask' || kind === 'custom-with-peers')
             peers.push(createMaskTransition(engine, new ImageData(new Uint8ClampedArray([128, 128, 128, 255]), 1, 1)));

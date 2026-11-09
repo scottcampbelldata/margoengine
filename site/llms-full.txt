@@ -4411,6 +4411,21 @@ entries measure 1934/2535/212/1954/22864/1541 B respectively. Core plus stage re
 strictly below 25000 B. These are entry-size measurements, not runtime performance measurements.
 
 
+### Test-page transition coexistence (2026-11-09)
+
+Each scene supports one built-in, one mask and one custom frozen-frame transition.
+Names are transitions, transitions:mask and transitions:custom. Their independent
+capture targets nest in that order and unwind in reverse, including idle peers;
+overlapping active effects follow that fixed composition order. Each attached kind
+owns its own capture/history storage. Replace an existing kind by disposing it first.
+
+### Test-page environment replacement (2026-11-09)
+
+Environment.dispose removes its owning scene registration and frees its resources;
+it permits a replacement with the same name. Existing lighting/background objects
+keep their original borrowed environment and must be replaced separately. No new
+core option, format, backend or speed guarantee is introduced.
+
 ### Test-page contract limits (2026-11-09)
 
 Cabins return floorElevation plus parts, whose four values are geometry. Existing
@@ -4481,6 +4496,27 @@ The four-pipe regression fails before this repair. Native termination also check
 process creation time before waiting, so recycled PIDs cannot spend the shutdown
 budget on an unrelated replacement. Both cases have regression coverage in
 `tests/browser-teardown.test.js`; no timeout or assertion was relaxed.
+
+### Open: test-page 36 writable mesh transform references; 32 assignment consistency
+
+On main 6ebbd1aa4, create a mesh, assign `mesh.position = [0, -2.5, 0]`
+(`rotation` and `scale` behave the same), then call `snapshotMeshes(engine, [mesh])`
+and `restoreSnapshot(engine, snapshot)`. Assignment replaces the VectorRef without
+updating the transform store. Snapshot components become undefined and restore
+rejects them as non-finite. Cause: core Mesh declares TypeScript readonly instance
+fields, which remain writable properties in JavaScript. No optional package can
+guard all mesh construction and assignment; an inspector-only repair would leave
+rendering transforms stale. Fixing the property contract belongs in core.
+
+Label.position is getter-only and the corresponding array assignment throws a raw
+TypeError; setPosition currently works. The test-page brief requires one consistent
+public assignment rule for both packages. Proposed rule: vector-like assignment
+copies validated components into the existing reference, preserving its identity
+and updating the store. Invalid input must reject before any mutation.
+Scott's brief explicitly requires stopping for his yes when 36 needs core. No
+core or bug-32 implementation is changed pending that approval; the empty-Geometry
+exception does not authorize it. Bounded real-Engine/JSDOM reproduction is retained
+in this lane's test-results/testpage-32-36-repro.mjs and .log.
 
 ### Fixed 2026-11-09: decoder Node Basis README example
 
@@ -7337,7 +7373,9 @@ function attach(engine: EngineKernel, effects: {exposure: number; bloom: number}
 ```
 
 Pass the mutable options object of your attached post-processing effect to
-`effects`; exposure/bloom controls bind directly to it. Unbound controls are disabled.
+`effects`; exposure/bloom controls bind directly to it. Unbound controls are disabled
+and initially display zero. With no selected entity, roughness/metallic sliders
+initially display the core material defaults, 0.5/0, while disabled.
 
 ## Place the panel in your page layout
 
@@ -8238,6 +8276,11 @@ lighting.add(await loadGLTF(engine, '/helmet.glb'));       // glTF-pro models: s
 engine.start();
 // On teardown: engine.dispose() disposes every plugin; lighting.dispose() also detaches it from models.
 ```
+
+`environment.dispose()` also removes its registration from the scene that owns it,
+so another `await Environment.attach(engine, image)` can use the same name. It is
+safe to dispose twice. Dispose dependent backgrounds and lighting before replacing
+their environment; they retain the environment object originally passed to them.
 
 A plain color (or vertical gradient) background and fog, without any environment map:
 
@@ -9339,6 +9382,13 @@ label.remove();
 engine.removePlugin(labels.name); // or engine.dispose(): removes every element and the overlay
 ```
 
+`attach` uses plugin name `margoengine-labels` by default. If a subsystem such as
+sciviz Axes already attached it, reuse that LabelRenderer from `engine.plugins`,
+or attach your annotations with an unused name, for example
+`LabelRenderer.attach(engine, {name: 'annotations', layout: callouts})`.
+A duplicate name throws linked code `state` and explains these choices before
+creating an overlay; the existing renderer, layout and labels are preserved.
+
 ## How it works
 
 - **Overlay.** `setup` inserts one `div` right after the canvas (or into `parent`), absolutely positioned over the canvas content box with `pointer-events: none` and `overflow: hidden`. Each frame it measures the canvas and corrects the overlay offset, so it stays aligned inside any containing block, border or padding, and under a CSS `scale()` on the canvas's ancestors (see [Scaled pages](#scaled-pages)).
@@ -9346,9 +9396,7 @@ engine.removePlugin(labels.name); // or engine.dispose(): removes every element 
 - **Placement.** `transform: translate(x, y) [scale(s)] translate(-anchorX%, -anchorY%)` with `transform-origin: 0 0`, so the anchor point of the element sits exactly on the projected point, with or without distance scaling.
 - **Depth order.** Visible labels are sorted by distance to the camera every frame and get `z-index` 1..n, nearest on top. `sort: false` leaves a label's z-index alone.
 - **CSS 3D.** A viewer element gets `perspective: (height / 2) / tan(fov / 2)` and a `preserve-3d` camera element gets `translateZ(perspective) matrix3d(view with Y flipped) translate(width / 2, height / 2)`. Each object gets `translate(-50%, -50%) matrix3d(world * scale(pixelScale) with Y flipped)`. The view matrix is rebuilt from `camera.position` and `camera.target` with the same Y-up look-at the core camera uses. CSS cannot clip at the near plane, so the renderer does: an object partly behind it is cut there with a `clip-path` (see [Depth with CSS 3D objects](#depth-with-css-3d-objects)), and one wholly behind it is hidden.
-- **Orthographic cameras.** When `camera.matrix` has a constant clip w (for example with `CameraProjection` from `@margoengine/cameras`, which the package does not depend on), the viewer gets `perspective: none` and the camera element `orthographicCSSTransform(matrix, width, height, backend)`: the clip matrix scaled to CSS pixels around the viewport centre, Y flipped, with Z scaled like Y so CSS depth sorting follows the camera. Objects are cut or hidden at the near plane the same way. 2D labels need nothing special; `distanceScale` uses the distance at which a perspective camera with the same fov shows the same zoom, so labels grow when zooming in and do not change with depth. `isOrthographic(matrix)` is exported.
-- **Minimal DOM writes.** Every style property is cached per element and written only when its string changes; `renderer.writes` reports how many writes the last update made (0 on a static frame).
-- **Engine views.** `new LabelRenderer({view})` (or `labels.view = {camera, viewport, pixels?}`) places l
+- **Orthographic cameras.** When `camera.matrix` has a constant clip w (for example with `CameraProjection` from `@margoengine/cameras`, which the package does not depend on), the viewer gets `perspective: none` and the camera element `orthographicCSSTransform(matrix, width, height, backend)`: the clip matrix scaled to CSS pixels around the viewport centre, Y flipped, with Z scaled like Y so CSS depth sorting follows the camera. Objects are cut or hidden at the near plane the same way. 2D labels need nothing special; `distanceScale` uses the distance at which a perspec
 
 [README continues: https://margoengine.com/llms/packages/labels.md]
 
@@ -9934,7 +9982,14 @@ transitions.start('dissolve', 0.75);
 // Change the active scene; subsequent renders advance the transition.
 ```
 
-start freezes the last rendered color target on the next frame. Durations use seconds, in (0, 60]. progress ends at one and rendering continues normally. Resize preserves progress and samples the outgoing image at its original resolution with clamped nearest sampling. Device restoration cancels a transition because its old device's image is lost. Capture order is -80 and composite order 50; effects drawing after 50 are not part of the transition. WebGL2 attachment throws code `unsupported` with a help link. Dispose removes the effect from its owning scene, including when attached through scene.use(effect); other scenes remain attached. No core or stage code changes are required.
+start freezes the last rendered color target on the next frame. Durations use seconds, in (0, 60]. progress ends at one and rendering continues normally. Resize preserves progress and samples the outgoing image at its original resolution with clamped nearest sampling. Device restoration cancels a transition because its old device's image is lost. Built-in capture order is -80 and composite order 50; effects drawing after 50 are not part of the transition. WebGL2 attachment throws code `unsupported` with a help link. Dispose removes the effect from its owning scene, including when attached through scene.use(effect); other scenes remain attached. No core or stage code changes are required.
+
+One built-in, one mask and one custom transition may coexist per scene, named
+`transitions`, `transitions:mask` and `transitions:custom`. Captures nest in that
+order (-80/-79/-78) and composites unwind in reverse (48/49/50), regardless of
+attachment order. Each keeps its own progress and outgoing image. An idle peer
+passes through its captured frame; overlapping active effects compose in that
+fixed nesting order. Dispose a particular kind before attaching its replacement.
 
 Custom WGSL is an optional entry, `@margoengine/transitions/custom` (also `margoengine/transitions/custom`):
 

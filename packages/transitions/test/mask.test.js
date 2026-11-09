@@ -62,7 +62,7 @@ test('test-page 24: built-in and mask transitions coexist and unwind captures in
       frame();
       mask.dispose();
       assert.equal(engine.plugins.size, 0);
-      assert.ok(h.resources.every(resource => resource.destroyed));
+      assert.ok(h.resources.every((resource) => resource.destroyed));
     } finally {
       engine.dispose();
       h.cleanup();

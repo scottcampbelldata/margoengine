@@ -1678,6 +1678,16 @@ regressions only. Subsurface, glass and atmosphere exact-pixel parity, independe
 repeatability and noise-free camera-move denoising remain unproven. Batch 99 remains incomplete.
 
 
+### Test-page follow-up: optional transition coexistence (2026-11-09)
+
+Built-in, mask and custom frozen-frame transitions use distinct plugin/pass names
+and correctly nested capture/composite orders. transitions/test/mask.test.js checks
+real Engine ownership in either attachment order; viewport-browser.js passes 3,456
+spatial pixels at 1x/4x across individual, paired and three-kind compositions.
+The complete 13-script environment/transitions GPU run passes with no shader errors.
+This proves the tested composition/lifetime contract, with no speed or cross-device
+claim. No new core implementation is included; vector assignment awaits approval.
+
 ### Test-page contracts (2026-11-09)
 
 Analytic bounded SDF trees infer enclosing sample bounds; contour results include

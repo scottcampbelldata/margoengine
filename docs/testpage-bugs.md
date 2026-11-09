@@ -232,3 +232,25 @@ resolve their input against location.href before resolving linked content. The
 existing tiles/tests/tiles.test.js regression passes; it now also keeps the
 reported root-relative variant beside the relative variant. The combined export
 and tiles run passes 22 tests. No production tile-loader change was needed.
+
+Follow-up validation before the required core stop: all six changed packages'
+470 unit tests pass, as do all 13 environment/transitions browser/GPU scripts.
+The expanded transition oracle passes 3,456 spatial pixels at 1x/4x, including
+paired and three-kind captures, with zero shader errors. Gate logs are
+test-results/testpage-next-packages.log and testpage-next-gpu.log. New-batch
+lint/hygiene/verify, remaining package GPU/README gates and API regeneration are
+still required before these local commits can land.
+
+Entries 32/36 reproduce on main's core: assignments clobber the three live mesh
+refs and leave the store unchanged; snapshots contain undefined components and
+restore rejects. Label's same assignment throws a getter-only TypeError. The
+universal fix belongs in core Mesh, so work stops for Scott's explicit yes as the
+brief requires. Both entries remain open in known-bugs.md; no new core edit or
+partial Label assignment rule is applied. Proposed consistent rule: validate and
+copy vector-like assignment into the retained reference, with atomic rejection.
+
+The final live log reread also found new entries 42 (exporter collect triangle
+index validation), 43 (exportUSDZ root export), and 44 (bevel mesh planarity).
+They remain untriaged at this mandatory stop, rather than being silently omitted.
+Read their exact live steps and check current main before writing fixes. Lane S
+still owns the preview class, and physics remains on hold.

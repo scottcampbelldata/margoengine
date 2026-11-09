@@ -2891,7 +2891,10 @@ Optional mask/custom transitions own distinct plugin/pass names and nested captu
 layers. Capture orders -80/-79/-78 reverse at composite orders 48/49/50, restoring
 the frame target in either attachment order. CPU tests use real Engine ownership;
 the spatial viewport oracle adds paired and three-kind compositions at 1x/4x.
-The expanded GPU gate is required before publishing the change. Core is unchanged.
+The expanded GPU gate passes 3,456 spatial pixels at 1x/4x with zero shader errors;
+all 13 environment/transitions browser/GPU scripts and 470 changed-package unit
+tests pass. Remaining landing gates are still required. Core is unchanged. The
+separate mesh-vector assignment defect requires Scott's approval and remains open.
 
 ### Test-page follow-up: environment lifetime evidence (2026-11-09)
 
