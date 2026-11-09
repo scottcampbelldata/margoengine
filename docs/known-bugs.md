@@ -299,6 +299,32 @@ compile-completion check (176.1 s overall), not the outer supervisor deadline.
 Thus the empty-reservoir success does not prove a bounded complete transport
 stage. A finer split, including the final reservoir/BSDF evaluation, needs proof.
 
+Cause (bug hunt, 2026-11-09): the hang is the trace program's compile, and
+context loss waits for it. Both raw probes whose loss returned did so only
+after tens of seconds (92.2 s and 176.1 s commands), and the trace program's
+`D3DCompile` does not finish within 3,000 s (entry below), so its loss does not
+return. The same ANGLE HLSL, captured with `WEBGL_debug_shaders` and compiled
+by the Windows SDK `fxc` on the CPU, reproduces the non-finishing compile with
+no browser or GPU. The compiler's time grows much faster than the code:
+calling `cameraRay` 1, 2 and 4 times takes 3.2, 17.1 and 89.7 s, and `closest`
+1 and 2 times 36.6 and 130.8 s. `/Od` is no faster (55.6 against 61.7 s), and a
+stubbed program that folds to 14 instructions still takes 119.5 s, so the time
+is spent on the inlined source before dead code is removed. `[loop]` on every
+loop and a table in place of the trig-reduction switch lower the constant only.
+In traversal, stubbing `march`'s shape cut and cut-through takes `closest`
+from 40 s to 11.5 s. Full table and method: testpage-research.md, "Bug 45 hunt".
+
+What this rules out: no shutdown-side change in Margo can bound the wait
+within the rules. Parallel compilation has no cancellation, and skipping
+context loss, rejecting a renderer by name or raising a limit are excluded
+above. The fix is the wavefront split listed under "The path tracer never
+compiles on ANGLE Direct3D 11", with a size budget per compiled program: at
+most one traversal and one copy of the precise camera maths in each, since one
+traversal alone costs 25 to 40 s here and doubling the code costs 3.6 to 5.3
+times as much. A smaller shape-cut/cut-through block in `march` belongs to the
+same work. Bug 45 closes with that split plus a disposal-during-compilation
+regression on ANGLE D3D11; it stays OPEN until then.
+
 ### Fixed: test-page 36 retained mesh transforms and 32 Label diagnostic
 
 Mesh fields were readonly only in TypeScript: JavaScript assignment replaced refs
@@ -1103,7 +1129,9 @@ Sweep record: every package's tests and browser or GPU tests on the Mac mini (M6
   A stub that zeroes `cameraRay` folds the whole shader to 1,132 bytes, so that timing says nothing.
 - **Cause boundary:** the earlier standalone HLSL experiments localize the compilation failure below WGSL/GLSL
   translation, in native `D3DCompile`. Its inlining/optimization of the combined program is implicated; the exact
-  pathological compiler pass has not been identified. The stub results do not establish that every constituent
+  pathological compiler pass has not been identified, but the 2026-11-09 bug-45 probes show its time grows 3.6 to
+  5.3 times per doubling of inlined code, is no lower with `/Od`, and is spent before dead code is removed
+  (testpage-research.md, "Bug 45 hunt"). The stub results do not establish that every constituent
   shader is unmanageable: the bug-45 continuation above now links isolated dependency trees, including one direct
   light at a time. The original combined program still fails its bounded check.
 - **Ruled out:** native trig (the numbers above, and it would change the output); leaving features out per scene (the

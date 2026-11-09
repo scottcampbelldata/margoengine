@@ -229,3 +229,46 @@ The next decomposition should isolate the final reservoir/BSDF evaluation as
 well as shadow/candidate work, preserving all operations and their order.
 Command: `node test-results/testpage-45-split-light-supervisor.mjs light --carried`.
 All own GPU commands have ended and released their shared slot.
+
+### Bug 45 hunt (2026-11-09): where the compile time goes
+
+Method, CPU only after one GPU-locked capture: Chromium with
+`--use-angle=d3d11 --enable-privileged-webgl-extensions` returns ANGLE's
+translated HLSL through `WEBGL_debug_shaders.getTranslatedShaderSource` after
+`compileShader`, with no link. Filling the three link-time `@@` placeholders
+(pixel output struct, `SV_Position` parameter, `gl_FragCoord` prologue) gives a
+file that `fxc /T ps_5_0 /E main` (Windows SDK 10.0.26100) compiles. The full
+trace program does not finish in 240 s there either, with default flags, `/Od`
+or `[loop]`, so the D3D11 hang reproduces without a browser or a GPU.
+
+Results (one RTX A6000 PC with other jobs running, several compiles at once;
+diagnostic compile times, not speed claims):
+
+| Program compiled | fxc result |
+| --- | --- |
+| `main` calls `cameraRay` 1, 2, 4, 8 times | 3.2 s, 17.1 s, 89.7 s, over 300 s |
+| `main` calls `closest` 1, 2, 4 times | 36.6 s, 130.8 s, over 300 s |
+| `closest` once, `[loop]` (with or without `[fastopt]`) on every loop | 25 s |
+| `closest` once, `march` stubbed | 1.2 s |
+| `closest` once, `shapeCut` and `cutThrough` stubbed | 11.5 s |
+| `closest` once, `octWalk` stubbed | 31.2 s |
+| `cameraRay` kept, the other heavy callees stubbed, default / `/Od` | 61.7 s / 55.6 s |
+| Same, `qpmTwoOverPi` switch as a table | 29.7 s (39.9 s base in that batch) |
+| Same, precise trig stubbed | 13.2 s |
+| `cameraRay` and `direct` stubbed (folds to 14 instruction slots) | 119.5 s |
+| Full program, `[loop]` on all 27 loops | over 300 s |
+
+Reading: doubling the inlined code multiplies the compile time by 3.6 to 5.3,
+and a program that folds to 14 instructions still takes two minutes, so the
+time goes into the compiler's handling of the inlined source before dead code
+is removed, not into optimizing the final code. Loop attributes and the switch
+table change the constant, not the growth. Inside traversal, `march`'s shape
+cut and cut-through code carries most of the cost.
+
+Sources: the ANGLE project list thread "Solving slow compilation (and eventual
+fail) in complex shaders" (2011) reports FXC loop unrolling and optimization
+cost on ANGLE output, with `[loop]` and `[fastopt]` helping that case; the
+Khronos public_webgl threads (2013, 2017) on long Windows compiles and the GPU
+watchdog; the Khronos public_webgl threads (2019) on `KHR_parallel_shader_compile`,
+which offers completion polling and no cancellation. No browser, ANGLE or
+other engine source was read.

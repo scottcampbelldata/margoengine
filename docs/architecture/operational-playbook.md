@@ -1876,6 +1876,16 @@ empty-reservoir success therefore does not prove that a complete transport
 stage is bounded. Final reservoir/BSDF evaluation and shadow/candidate work need
 finer separation with actual carried-state and GPU-output regression evidence.
 
+Bug hunt, 2026-11-09: context loss waits for the pending compile, and the
+trace program's compile does not end, so the hang is the compile. ANGLE's own
+HLSL (from `WEBGL_debug_shaders`) compiled by the Windows SDK `fxc` reproduces
+it on the CPU, with no browser or GPU, which gives the split work a cheap check.
+Compile time grows 3.6 to 5.3 times per doubling of inlined code, `/Od` does
+not help, and a program folded to 14 instructions still takes 119.5 s, so a
+D3D11 route needs a size budget per compiled program (one traversal, one copy
+of precise camera maths), not only a split. Evidence still missing: the split
+itself, GPU output parity and a disposal-during-compilation regression.
+
 ### Bevel polygon validity (test-page 44)
 
 The mesh-edit whole-mesh bevel now uses its existing ear clipper for
