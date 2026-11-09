@@ -4340,3 +4340,27 @@ limits. Its final result passed.
 
 This closing documentation commit marks row 68 done. Entry sizes and limits above
 remain current. Core, stage and physics source are unchanged by this lane.
+
+## Batch 56: product staging (2026-11-09)
+
+Seven staging jobs were checked across all packages before implementation. Existing capabilities were composed and proved where available; only accumulated shadows and the idle still controller add entries. Any-up receivers extend the optional staging package. No core, stage-facade, held physics or registry-publication change was needed for the final floor work.
+
+| Job | Feature | Status | Commit | Result |
+| --- | --- | --- | --- | --- |
+| 1 | Ground projected backdrop | SKIPPED | 9c802b0d6 | Existing environment/ground plus ContactShadows; generated box and licensed HDR composition proof. |
+| 2 | Accumulated soft shadows | DONE | 892b797f3 | Optional staging/accumulate; disk-light samples and height-dependent penumbrae. |
+| 3 | Studio light rigs | SKIPPED | fac5eda7c | Existing environment/studio key, fill and rim softboxes; no duplicate entry. |
+| 4 | Auto framing and turntable | SKIPPED | 073547716 | Existing optional stage/viewer; real FlightHelmet framing and turntable proof. |
+| 5 | Progressive path traced still | DONE | d47ac477f | Optional staging/pathtrace idle controller over the existing mesh integrator. |
+| 6 | Any up axis and WebGL2 path | DONE | caeeae2ac | Contact and accumulated receivers share an arbitrary normalized planar frame. |
+| 7 | Reflective floor | SKIPPED | 3738e54b49120b52ae50b4462eaf1ecc08cca4d6 | Existing environment/reflector; real FlightHelmet glossy-floor recipe and strict mip proof. |
+
+All jobs update the staging README, operational playbook, claims, limits, known-bug review and committed evidence. Jobs 1 through 6 also carry clean-room and reproduction notes; job 7 reuses the existing reflector and its independently documented capture/precision repair. Evidence records are docs/whitepaper/results/batch-56-{ground,accumulate,rigs,frame,pathtrace,axis,floor}.json. Pixel evidence for the floor is examples/package-benchmarks/results/batch-56-floor.json and its -compat counterpart.
+
+Separate audit repairs landed for the viewer period (247a1d0c7), physical-map sampler pressure (b72d23ec5) and mandatory real glTF GPU inputs (463f4b1ba). The floor review exposed capture viewport ownership, an MSAA cached scissor, binary16 mip rounding bias and an unsupported error without a help link; owning environment fix 14a5bb5e83cd3f53465920351f49fbf67d7c2d59 carries failing regressions. The original half-ULP plus 5e-7 mip bound is unchanged. Mirror fixture repair 660fb2dd1e7594b5e9527b5d0d8326ccce22cbf3 queues readback before native canvas expiration and maps after completion, including first-use compatibility compute. Its regular GPU script now runs both backends. Shared repairs fc1ed452f and 988ba0005 replace the fixed receiver wait with completed coverage and clarify unpublished decoder evidence; this lane rebased over them instead of landing duplicate fixes.
+
+Final job-7 checks passed lint, hygiene, verify, staging tests, the complete staging GPU suite and all eight staging README runtime examples. Environment unit tests, both 65-assertion mirror GPU runs and all 16 environment README runtime examples also pass. The floor uses the licensed 20,734-triangle FlightHelmet: 4,078 reflected pixels below the full silhouette, 4,077 pixels changed by blur, all eight mip levels independently bounded, exact half-rounding boundary probes, real replacement-device frame equality, resize, a uniform empty capture and double disposal. The orientation oracle covers eight frames and every one of 4,096 texels for both receivers on both backends; the shared readiness repair additionally checks the completed restored sample count. No test, input workload or tolerance was reduced.
+
+Final gzip entry bytes: staging root 8,520 (ceiling 8,776), accumulate 9,655 (9,945), pathtrace 1,213 (1,469); reused reflector 11,104 (11,438), refractor 11,065 (11,397), cube-camera 5,680 (5,691). Core plus stage is 23,797 B, strictly below 25,000 B. Entry dependencies are separate downloads.
+
+The floor is a finite tinted opaque planar image reflection with box-filtered mip blur, no Fresnel, GGX floor BRDF or distance-dependent cone, and one bounce per frame for other mirrors. Native WebGL2 preview refuses with a code and help link; installed WebGL2 compatibility draws. The idle still retains the existing static, flat triangle/material limits and the documented ANGLE Direct3D compiler limit; its real compatibility proof uses ANGLE Vulkan. Ground and studio visual studies remain generated stand-ins, not photographic-quality proofs. No speed, cross-device pixel identity or general photographic-material claim is made. Closing validation is recorded in the closing result and this row is now done.

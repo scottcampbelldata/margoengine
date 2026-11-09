@@ -1,0 +1,148 @@
+{
+  "batch": 56,
+  "jobs": [
+    {
+      "job": 1,
+      "feature": "Ground projected backdrop",
+      "status": "SKIPPED",
+      "commit": "9c802b0d6",
+      "note": "Existing environment/ground plus ContactShadows; generated box and licensed HDR composition proof."
+    },
+    {
+      "job": 2,
+      "feature": "Accumulated soft shadows",
+      "status": "DONE",
+      "commit": "892b797f3",
+      "note": "Optional staging/accumulate; disk-light samples and height-dependent penumbrae."
+    },
+    {
+      "job": 3,
+      "feature": "Studio light rigs",
+      "status": "SKIPPED",
+      "commit": "fac5eda7c",
+      "note": "Existing environment/studio key, fill and rim softboxes; no duplicate entry."
+    },
+    {
+      "job": 4,
+      "feature": "Auto framing and turntable",
+      "status": "SKIPPED",
+      "commit": "073547716",
+      "note": "Existing optional stage/viewer; real FlightHelmet framing and turntable proof."
+    },
+    {
+      "job": 5,
+      "feature": "Progressive path traced still",
+      "status": "DONE",
+      "commit": "d47ac477f",
+      "note": "Optional staging/pathtrace idle controller over the existing mesh integrator."
+    },
+    {
+      "job": 6,
+      "feature": "Any up axis and WebGL2 path",
+      "status": "DONE",
+      "commit": "caeeae2ac",
+      "note": "Contact and accumulated receivers share an arbitrary normalized planar frame."
+    },
+    {
+      "job": 7,
+      "feature": "Reflective floor",
+      "status": "SKIPPED",
+      "commit": "3738e54b49120b52ae50b4462eaf1ecc08cca4d6",
+      "note": "Existing environment/reflector; real FlightHelmet glossy-floor recipe and strict mip proof."
+    }
+  ],
+  "auditFixes": {
+    "capture": "14a5bb5e83cd3f53465920351f49fbf67d7c2d59",
+    "canvas": "660fb2dd1e7594b5e9527b5d0d8326ccce22cbf3",
+    "readiness": "fc1ed452f",
+    "evidencePaths": "988ba0005"
+  },
+  "job7Checks": [
+    {
+      "check": "lint",
+      "command": "npm run lint",
+      "exitCode": 0
+    },
+    {
+      "check": "hygiene",
+      "command": "npm run hygiene",
+      "exitCode": 0
+    },
+    {
+      "check": "verify",
+      "command": "npm run verify",
+      "exitCode": 0
+    },
+    {
+      "check": "package",
+      "command": "npm test --workspace @margoengine/staging",
+      "exitCode": 0
+    },
+    {
+      "check": "gpu",
+      "command": "node scripts/gpu-lock.mjs run --owner=codex-56 --exclusive --max=20 --wait-max=40 -- npm run test:gpu --workspace @margoengine/staging",
+      "exitCode": 0
+    },
+    {
+      "check": "readme",
+      "command": "node scripts/gpu-lock.mjs run --owner=codex-56 --exclusive --max=20 --wait-max=40 -- npm run check:readme-run -- --packages=staging",
+      "exitCode": 0
+    },
+    {
+      "check": "env-rebased-unit",
+      "command": "npm test --workspace @margoengine/environment",
+      "exitCode": 0
+    },
+    {
+      "check": "env-rebased-gpu",
+      "command": "node scripts/gpu-lock.mjs run --owner=codex-56 --max=15 --wait-max=14 -- npm run test:gpu:mirror --workspace @margoengine/environment",
+      "exitCode": 0
+    },
+    {
+      "check": "env-rebased-readme",
+      "command": "node scripts/gpu-lock.mjs run --owner=codex-56 --max=20 --wait-max=39 -- npm run check:readme-run -- --packages=environment",
+      "exitCode": 0
+    },
+    {
+      "check": "build",
+      "command": "npm run build:packages",
+      "exitCode": 0
+    },
+    {
+      "check": "api",
+      "command": "npm run api:check",
+      "exitCode": 0
+    },
+    {
+      "check": "quality",
+      "command": "npm run quality",
+      "exitCode": 0
+    },
+    {
+      "check": "environment",
+      "command": "npm test --workspace @margoengine/environment",
+      "exitCode": 0
+    },
+    {
+      "check": "staging",
+      "command": "npm test --workspace @margoengine/staging",
+      "exitCode": 0
+    },
+    {
+      "check": "root",
+      "command": "node --experimental-test-module-mocks --test --test-concurrency=8 --test-timeout=300000 tests/*.test.js",
+      "exitCode": 0
+    }
+  ],
+  "coreStageGzip": 23797,
+  "entryGzip": {
+    "staging": 8520,
+    "accumulate": 9655,
+    "pathtrace": 1213,
+    "reflector": 11104,
+    "refractor": 11065,
+    "cubeCamera": 5680
+  },
+  "closingValidation": "The closing commit runs lint, hygiene and full verify before its guarded push.",
+  "speedClaim": false
+}
