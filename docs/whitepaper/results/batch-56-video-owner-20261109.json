@@ -13,7 +13,7 @@
     "reason": "Scott requested affected checks only"
   },
   "pending": [],
-  "fix": "405b24504",
+  "fix": "96bf994b8",
   "units": {
     "pass": 34,
     "fail": 0,
@@ -257,5 +257,18 @@
     },
     "gpuRepeated": false,
     "reason": "Accepted Video source and tests unchanged; incoming Sciviz/viewcube work retained."
+  },
+  "finalRebase": {
+    "onto": "01af5ec29",
+    "sourceAndTestsIdenticalToAcceptedLocal": "f12a89e74",
+    "mergedBaselineOtherItemsPreserved": true,
+    "trueTotal": 11928891,
+    "docsLinks": {
+      "code": 0,
+      "timedOut": false,
+      "seconds": 1.957
+    },
+    "gpuRepeated": false,
+    "incoming": "Sciviz, viewcube, compatibility clamp and decoder owned Zstd work retained"
   }
 }

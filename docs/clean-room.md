@@ -4276,8 +4276,7 @@ The parent fails direct secondary disposal and the viewport/scissor unit. Its
 real-GPU overlay changes 4608 components outside the selected scissor, against
 the unchanged exact-zero assertion. The optional repair passes package units and
 source guards. All 34 checks, all six GPU leaves and seven runtime README
-examples pass. Core, stage and
-the hunter capture repair are untouched.
+examples pass. Core, stage and the hunter capture repair are untouched.
 
 The corrected GPU fixture draws its neighbor and overlay in the same frame;
 WebGPU swapchain textures do not retain undrawn pixels from an earlier task.

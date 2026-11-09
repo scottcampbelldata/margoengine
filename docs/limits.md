@@ -3154,8 +3154,8 @@ same-name peers/replacements. View viewport/scissor state constrains every
 overlay draw. Disposal is terminal; the caller owns VideoFrame.close. Parent
 pixel proof finds 4608 out-of-scissor changed components; the repaired four
 owner GPU cases change zero and each draws exactly 512 red pixels. All 34
-units/guards, six GPU leaves and seven runtime README examples pass. No core/stage source,
-public exports, optional ceiling or timing budget changes.
+units/guards, six GPU leaves and seven runtime README examples pass. No core/stage
+source, public exports or timing budget changes. The optional ceiling is recorded below.
 
 Video optional root grows from 2144 to 2211 B min+gzip for correct disposal and
 viewport/scissor state. Its ceiling changes from 2199 to 2467 B (standard measured
