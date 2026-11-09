@@ -1,4 +1,5 @@
 // Test helpers: the Khronos validator loader, a headless engine, a GLB reader and small reference parsers.
+import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { crc32, inflateSync } from 'node:zlib';
 import { existsSync } from 'node:fs';
@@ -8,9 +9,11 @@ import { Engine, TransformStore } from '@margoengine/core/extension';
 
 // An override remains available for external toolchains; CI uses the local test dependency.
 export const toolsDir = process.env.MARGOENGINE_EXPORTERS_TOOLS ?? fileURLToPath(new URL('../../../', import.meta.url));
-export const validator = existsSync(resolve(toolsDir, 'node_modules/gltf-validator'))
-  ? createRequire(resolve(toolsDir, 'package.json'))('gltf-validator')
-  : null;
+assert.ok(
+  existsSync(resolve(toolsDir, 'node_modules/gltf-validator')),
+  `Missing required validator at ${resolve(toolsDir, 'node_modules/gltf-validator')}; run npm ci in ${toolsDir} (or unset MARGOENGINE_EXPORTERS_TOOLS to use this checkout)`,
+);
+export const validator = createRequire(resolve(toolsDir, 'package.json'))('gltf-validator');
 
 /** Runs the Khronos validator and returns the issue summary plus any error/warning messages. */
 export async function validate(data, resources = {}) {

@@ -19,7 +19,6 @@ import {
   readGLB,
   transformPoint,
   validate,
-  validator,
 } from './helpers.js';
 
 const fixture = async (name) => new Uint8Array(await readFile(new URL(`./fixtures/${name}`, import.meta.url)));
@@ -55,7 +54,6 @@ const close = (a, b, epsilon = 1e-5, label = 'value') => {
   assert.equal(a.length, b.length, `${label} length`);
   for (let i = 0; i < a.length; i++) assert.ok(Math.abs(a[i] - b[i]) <= epsilon, `${label}[${i}]: ${a[i]} vs ${b[i]}`);
 };
-const needsValidator = validator ? {} : { skip: 'gltf-validator not installed in MARGOENGINE_EXPORTERS_TOOLS' };
 async function assertValid(data, resources) {
   const result = await validate(data, resources);
   assert.equal(result.errors, 0, JSON.stringify(result.messages, null, 1));
@@ -135,78 +133,74 @@ test('public API exposes exporter functions and module evaluation is SSR-safe', 
   execFileSync(process.execPath, ['--input-type=module', '-e', script], { stdio: 'pipe' });
 });
 
-test(
-  'GLB of an engine hierarchy: dedup, transforms, min/max, alignment, Khronos validator',
-  needsValidator,
-  async () => {
-    const { engine, cube, base, arm, hand, other } = await buildScene();
-    const glb = exportGLB(engine, { generator: 'exporter tests' });
-    assert.equal(glb.length % 4, 0);
-    await assertValid(glb);
-    const { json, bin, jsonLength } = readGLB(glb);
-    assert.equal(jsonLength % 4, 0);
-    assertAligned(json, bin);
-    assert.equal(json.asset.generator, 'exporter tests');
-    assert.deepEqual(
-      json.nodes.map((n) => n.name),
-      ['base', 'arm', 'pivot', 'hand', 'other'],
+test('GLB of an engine hierarchy: dedup, transforms, min/max, alignment, Khronos validator', async () => {
+  const { engine, cube, base, arm, hand, other } = await buildScene();
+  const glb = exportGLB(engine, { generator: 'exporter tests' });
+  assert.equal(glb.length % 4, 0);
+  await assertValid(glb);
+  const { json, bin, jsonLength } = readGLB(glb);
+  assert.equal(jsonLength % 4, 0);
+  assertAligned(json, bin);
+  assert.equal(json.asset.generator, 'exporter tests');
+  assert.deepEqual(
+    json.nodes.map((n) => n.name),
+    ['base', 'arm', 'pivot', 'hand', 'other'],
+  );
+  assert.deepEqual(json.scenes[0].nodes, [0, 4]);
+  assert.deepEqual(json.nodes[0].children, [1]);
+  // One geometry shared by four meshes and two materials: one set of accessors, two glTF meshes.
+  assert.equal(json.accessors.length, 3);
+  assert.equal(json.meshes.length, 2);
+  assert.equal(json.materials.length, 2);
+  assert.equal(json.nodes[0].mesh, json.nodes[3].mesh);
+  assert.equal(json.nodes[1].mesh, json.nodes[4].mesh);
+  assert.equal(json.accessors[2].componentType, 5123);
+  assert.deepEqual(json.accessors[0].min, [-0.5, -1, -1.5]);
+  assert.deepEqual(json.accessors[0].max, [0.5, 1, 1.5]);
+  close(json.nodes[0].translation, [1, 2, 3]);
+  close(json.nodes[0].scale, [2, 2, 2]);
+  close(json.nodes[1].scale, [1, 0.5, -1]);
+  close(json.nodes[1].rotation, [0, 0.38268343, 0, 0.92387953]);
+  assert.equal(json.nodes[2].mesh, undefined);
+  const red = json.materials[json.meshes[json.nodes[0].mesh].primitives[0].material];
+  assert.deepEqual(red.pbrMetallicRoughness, {
+    baseColorFactor: [1, 0, 0, 1],
+    metallicFactor: 1,
+    roughnessFactor: 0.25,
+  });
+  assert.equal(red.doubleSided, true);
+  const blue = json.materials[json.meshes[json.nodes[1].mesh].primitives[0].material];
+  close(blue.pbrMetallicRoughness.baseColorFactor, [0, 0.2, 0.9, 1], 1e-7);
+  assert.equal(blue.doubleSided, undefined);
+  // Vertex data is the core geometry, de-interleaved.
+  const positions = accessor(json, bin, 0),
+    normals = accessor(json, bin, 1),
+    indices = accessor(json, bin, 2);
+  for (let i = 0; i < 24; i++) {
+    close(positions.subarray(i * 3, i * 3 + 3), cube.vertices.subarray(i * 6, i * 6 + 3), 0);
+    close(normals.subarray(i * 3, i * 3 + 3), cube.vertices.subarray(i * 6 + 3, i * 6 + 6), 0);
+  }
+  assert.deepEqual(Array.from(indices), Array.from(cube.indices));
+
+  // Re-import with @margoengine/gltf into a second engine and compare kernel world matrices.
+  const target = await headlessEngine();
+  const model = parseGLTF(target, glb);
+  engine.store.tick(false);
+  target.store.tick(false);
+  assert.equal(model.meshes.length, 4);
+  const expected = [base, arm, hand, other].map((m) => engine.store.matrices.subarray(m.id * 16, m.id * 16 + 16));
+  const actual = model.meshes.map((m) => target.store.matrices.subarray(m.id * 16, m.id * 16 + 16));
+  for (const want of expected)
+    assert.ok(
+      actual.some((got) => got.every((v, i) => Math.abs(v - want[i]) < 1e-5)),
+      'world matrix survives the round trip',
     );
-    assert.deepEqual(json.scenes[0].nodes, [0, 4]);
-    assert.deepEqual(json.nodes[0].children, [1]);
-    // One geometry shared by four meshes and two materials: one set of accessors, two glTF meshes.
-    assert.equal(json.accessors.length, 3);
-    assert.equal(json.meshes.length, 2);
-    assert.equal(json.materials.length, 2);
-    assert.equal(json.nodes[0].mesh, json.nodes[3].mesh);
-    assert.equal(json.nodes[1].mesh, json.nodes[4].mesh);
-    assert.equal(json.accessors[2].componentType, 5123);
-    assert.deepEqual(json.accessors[0].min, [-0.5, -1, -1.5]);
-    assert.deepEqual(json.accessors[0].max, [0.5, 1, 1.5]);
-    close(json.nodes[0].translation, [1, 2, 3]);
-    close(json.nodes[0].scale, [2, 2, 2]);
-    close(json.nodes[1].scale, [1, 0.5, -1]);
-    close(json.nodes[1].rotation, [0, 0.38268343, 0, 0.92387953]);
-    assert.equal(json.nodes[2].mesh, undefined);
-    const red = json.materials[json.meshes[json.nodes[0].mesh].primitives[0].material];
-    assert.deepEqual(red.pbrMetallicRoughness, {
-      baseColorFactor: [1, 0, 0, 1],
-      metallicFactor: 1,
-      roughnessFactor: 0.25,
-    });
-    assert.equal(red.doubleSided, true);
-    const blue = json.materials[json.meshes[json.nodes[1].mesh].primitives[0].material];
-    close(blue.pbrMetallicRoughness.baseColorFactor, [0, 0.2, 0.9, 1], 1e-7);
-    assert.equal(blue.doubleSided, undefined);
-    // Vertex data is the core geometry, de-interleaved.
-    const positions = accessor(json, bin, 0),
-      normals = accessor(json, bin, 1),
-      indices = accessor(json, bin, 2);
-    for (let i = 0; i < 24; i++) {
-      close(positions.subarray(i * 3, i * 3 + 3), cube.vertices.subarray(i * 6, i * 6 + 3), 0);
-      close(normals.subarray(i * 3, i * 3 + 3), cube.vertices.subarray(i * 6 + 3, i * 6 + 6), 0);
-    }
-    assert.deepEqual(Array.from(indices), Array.from(cube.indices));
+  for (const mesh of model.meshes) assert.deepEqual(Array.from(mesh.geometry.vertices), Array.from(cube.vertices));
+  const names = model.nodes.map((n) => n.name).sort();
+  assert.deepEqual(names, ['arm', 'base', 'hand', 'other', 'pivot']);
+});
 
-    // Re-import with @margoengine/gltf into a second engine and compare kernel world matrices.
-    const target = await headlessEngine();
-    const model = parseGLTF(target, glb);
-    engine.store.tick(false);
-    target.store.tick(false);
-    assert.equal(model.meshes.length, 4);
-    const expected = [base, arm, hand, other].map((m) => engine.store.matrices.subarray(m.id * 16, m.id * 16 + 16));
-    const actual = model.meshes.map((m) => target.store.matrices.subarray(m.id * 16, m.id * 16 + 16));
-    for (const want of expected)
-      assert.ok(
-        actual.some((got) => got.every((v, i) => Math.abs(v - want[i]) < 1e-5)),
-        'world matrix survives the round trip',
-      );
-    for (const mesh of model.meshes) assert.deepEqual(Array.from(mesh.geometry.vertices), Array.from(cube.vertices));
-    const names = model.nodes.map((n) => n.name).sort();
-    assert.deepEqual(names, ['arm', 'base', 'hand', 'other', 'pivot']);
-  },
-);
-
-test('only visible, root mesh, flatten and invisible export', needsValidator, async () => {
+test('only visible, root mesh, flatten and invisible export', async () => {
   const { engine, base, arm, hand, hidden, other } = await buildScene();
   const all = readGLB(exportGLB(engine, { onlyVisible: false })).json;
   assert.ok(all.nodes.some((n) => n.name === 'hidden'));
@@ -251,119 +245,108 @@ test('only visible, root mesh, flatten and invisible export', needsValidator, as
   );
 });
 
-test(
-  'flatten bakes sheared world transforms into vertices with flipped winding for mirrors',
-  needsValidator,
-  async () => {
-    const geometry = {
-      positions: [0, 0, 0, 1, 0, 0, 0, 1, 0],
-      normals: [0, 0, 1, 0, 0, 1, 0, 0, 1],
-      indices: [0, 1, 2],
-    };
-    const s = Math.SQRT1_2;
-    const scene = {
-      nodes: [
-        {
-          name: 'parent',
-          scale: [3, 1, -1],
-          children: [{ name: 'child', rotation: [0, 0, Math.sin(Math.PI / 8), Math.cos(Math.PI / 8)], geometry }],
-        },
-      ],
-    };
-    const glb = exportGLB(scene, { flatten: true });
+test('flatten bakes sheared world transforms into vertices with flipped winding for mirrors', async () => {
+  const geometry = {
+    positions: [0, 0, 0, 1, 0, 0, 0, 1, 0],
+    normals: [0, 0, 1, 0, 0, 1, 0, 0, 1],
+    indices: [0, 1, 2],
+  };
+  const s = Math.SQRT1_2;
+  const scene = {
+    nodes: [
+      {
+        name: 'parent',
+        scale: [3, 1, -1],
+        children: [{ name: 'child', rotation: [0, 0, Math.sin(Math.PI / 8), Math.cos(Math.PI / 8)], geometry }],
+      },
+    ],
+  };
+  const glb = exportGLB(scene, { flatten: true });
+  await assertValid(glb);
+  const { json, bin } = readGLB(glb);
+  assert.equal(json.nodes.length, 1);
+  assert.equal(json.nodes[0].scale, undefined);
+  const p = accessor(json, bin, 0),
+    n = accessor(json, bin, 1),
+    idx = accessor(json, bin, 2);
+  // child world = scale(3,1,-1) * rotZ(45deg): vertex (1,0,0) -> (3s, s, 0).
+  close(p, [0, 0, 0, 3 * s, s, 0, -3 * s, s, 0], 1e-6);
+  close(n.subarray(0, 3), [0, 0, -1], 1e-6);
+  assert.deepEqual(Array.from(idx), [0, 2, 1]);
+});
+
+test('geometry data with UVs, tangents, colors and a real PNG texture (Khronos BoxTextured)', async () => {
+  const source = readGLB(await fixture('BoxTextured.glb')),
+    primitive = source.json.meshes[0].primitives[0];
+  const positions = accessor(source.json, source.bin, primitive.attributes.POSITION),
+    normals = accessor(source.json, source.bin, primitive.attributes.NORMAL);
+  const uvs = accessor(source.json, source.bin, primitive.attributes.TEXCOORD_0),
+    indices = accessor(source.json, source.bin, primitive.indices);
+  const view = source.json.bufferViews[source.json.images[0].bufferView],
+    image = source.bin.slice(view.byteOffset, view.byteOffset + view.byteLength);
+  const count = positions.length / 3;
+  const tangents = Array.from({ length: count }, (_, i) => [
+    normals[i * 3 + 2] || normals[i * 3 + 1],
+    0,
+    -normals[i * 3] || 0.5,
+    i % 2 ? -1 : 1,
+  ]).flat();
+  const colors = Array.from({ length: count * 4 }, (_, i) => (i % 4 === 3 ? 1 : (i % 7) / 7));
+  const textured = { positions, normals, uvs, tangents, colors, indices };
+  const texture = { image, mimeType: 'image/png', name: 'CesiumLogoFlat' };
+  const material = {
+    name: 'Textured',
+    color: [1, 1, 1],
+    roughness: 0.6,
+    metalness: 0,
+    baseColorTexture: texture,
+    normalTexture: texture,
+    emissive: [0.1, 0, 0],
+  };
+  const scene = {
+    nodes: [
+      { name: 'a', geometry: textured, material, translation: [1, 0, 0] },
+      { name: 'b', geometry: textured, material, translation: [-1, 0, 0] },
+    ],
+  };
+
+  for (const glb of [exportGLB(scene), exportGLB(scene, { flatten: true })]) {
     await assertValid(glb);
     const { json, bin } = readGLB(glb);
-    assert.equal(json.nodes.length, 1);
-    assert.equal(json.nodes[0].scale, undefined);
-    const p = accessor(json, bin, 0),
-      n = accessor(json, bin, 1),
-      idx = accessor(json, bin, 2);
-    // child world = scale(3,1,-1) * rotZ(45deg): vertex (1,0,0) -> (3s, s, 0).
-    close(p, [0, 0, 0, 3 * s, s, 0, -3 * s, s, 0], 1e-6);
-    close(n.subarray(0, 3), [0, 0, -1], 1e-6);
-    assert.deepEqual(Array.from(idx), [0, 2, 1]);
-  },
-);
+    assertAligned(json, bin);
+    assert.equal(json.images.length, 1);
+    assert.equal(json.textures.length, 1);
+    assert.equal(json.meshes.length, 1);
+    const attributes = json.meshes[0].primitives[0].attributes;
+    assert.deepEqual(Object.keys(attributes).sort(), ['COLOR_0', 'NORMAL', 'POSITION', 'TANGENT', 'TEXCOORD_0']);
+    assert.deepEqual(Array.from(accessor(json, bin, attributes.TEXCOORD_0)), Array.from(uvs));
+    assert.deepEqual(
+      accessor(json, bin, attributes.TANGENT)
+        .filter((_, i) => i % 4 === 3)
+        .map(Math.abs),
+      new Float32Array(count).fill(1),
+    );
+    const imageView = json.bufferViews[json.images[0].bufferView];
+    assert.deepEqual(bin.subarray(imageView.byteOffset, imageView.byteOffset + imageView.byteLength), image);
+    assert.equal(json.materials[0].normalTexture.index, json.materials[0].pbrMetallicRoughness.baseColorTexture.index);
+  }
 
-test(
-  'geometry data with UVs, tangents, colors and a real PNG texture (Khronos BoxTextured)',
-  needsValidator,
-  async () => {
-    const source = readGLB(await fixture('BoxTextured.glb')),
-      primitive = source.json.meshes[0].primitives[0];
-    const positions = accessor(source.json, source.bin, primitive.attributes.POSITION),
-      normals = accessor(source.json, source.bin, primitive.attributes.NORMAL);
-    const uvs = accessor(source.json, source.bin, primitive.attributes.TEXCOORD_0),
-      indices = accessor(source.json, source.bin, primitive.indices);
-    const view = source.json.bufferViews[source.json.images[0].bufferView],
-      image = source.bin.slice(view.byteOffset, view.byteOffset + view.byteLength);
-    const count = positions.length / 3;
-    const tangents = Array.from({ length: count }, (_, i) => [
-      normals[i * 3 + 2] || normals[i * 3 + 1],
-      0,
-      -normals[i * 3] || 0.5,
-      i % 2 ? -1 : 1,
-    ]).flat();
-    const colors = Array.from({ length: count * 4 }, (_, i) => (i % 4 === 3 ? 1 : (i % 7) / 7));
-    const textured = { positions, normals, uvs, tangents, colors, indices };
-    const texture = { image, mimeType: 'image/png', name: 'CesiumLogoFlat' };
-    const material = {
-      name: 'Textured',
-      color: [1, 1, 1],
-      roughness: 0.6,
-      metalness: 0,
-      baseColorTexture: texture,
-      normalTexture: texture,
-      emissive: [0.1, 0, 0],
-    };
-    const scene = {
-      nodes: [
-        { name: 'a', geometry: textured, material, translation: [1, 0, 0] },
-        { name: 'b', geometry: textured, material, translation: [-1, 0, 0] },
-      ],
-    };
+  // .gltf with an embedded data URI, and with a separate .bin
+  const embedded = exportGLTF(scene);
+  assert.equal(embedded.bin, null);
+  assert.match(embedded.json.buffers[0].uri, /^data:application\/octet-stream;base64,/);
+  await assertValid(embedded.text);
+  const separate = exportGLTF(scene, { embed: false, binUri: 'box textured.bin' });
+  assert.equal(separate.binUri, 'box%20textured.bin');
+  assert.equal(separate.bin.length, separate.json.buffers[0].byteLength);
+  assertAligned(separate.json, separate.bin);
+  await assertValid(separate.text, { 'box%20textured.bin': separate.bin, 'box textured.bin': separate.bin });
+  const fromUri = Uint8Array.from(atob(embedded.json.buffers[0].uri.split(',')[1]), (c) => c.charCodeAt(0));
+  assert.deepEqual(fromUri, separate.bin);
+  assert.deepEqual(readGLB(exportGLB(scene)).bin, separate.bin);
+});
 
-    for (const glb of [exportGLB(scene), exportGLB(scene, { flatten: true })]) {
-      await assertValid(glb);
-      const { json, bin } = readGLB(glb);
-      assertAligned(json, bin);
-      assert.equal(json.images.length, 1);
-      assert.equal(json.textures.length, 1);
-      assert.equal(json.meshes.length, 1);
-      const attributes = json.meshes[0].primitives[0].attributes;
-      assert.deepEqual(Object.keys(attributes).sort(), ['COLOR_0', 'NORMAL', 'POSITION', 'TANGENT', 'TEXCOORD_0']);
-      assert.deepEqual(Array.from(accessor(json, bin, attributes.TEXCOORD_0)), Array.from(uvs));
-      assert.deepEqual(
-        accessor(json, bin, attributes.TANGENT)
-          .filter((_, i) => i % 4 === 3)
-          .map(Math.abs),
-        new Float32Array(count).fill(1),
-      );
-      const imageView = json.bufferViews[json.images[0].bufferView];
-      assert.deepEqual(bin.subarray(imageView.byteOffset, imageView.byteOffset + imageView.byteLength), image);
-      assert.equal(
-        json.materials[0].normalTexture.index,
-        json.materials[0].pbrMetallicRoughness.baseColorTexture.index,
-      );
-    }
-
-    // .gltf with an embedded data URI, and with a separate .bin
-    const embedded = exportGLTF(scene);
-    assert.equal(embedded.bin, null);
-    assert.match(embedded.json.buffers[0].uri, /^data:application\/octet-stream;base64,/);
-    await assertValid(embedded.text);
-    const separate = exportGLTF(scene, { embed: false, binUri: 'box textured.bin' });
-    assert.equal(separate.binUri, 'box%20textured.bin');
-    assert.equal(separate.bin.length, separate.json.buffers[0].byteLength);
-    assertAligned(separate.json, separate.bin);
-    await assertValid(separate.text, { 'box%20textured.bin': separate.bin, 'box textured.bin': separate.bin });
-    const fromUri = Uint8Array.from(atob(embedded.json.buffers[0].uri.split(',')[1]), (c) => c.charCodeAt(0));
-    assert.deepEqual(fromUri, separate.bin);
-    assert.deepEqual(readGLB(exportGLB(scene)).bin, separate.bin);
-  },
-);
-
-test('Khronos Box.glb survives import, export and re-import', needsValidator, async () => {
+test('Khronos Box.glb survives import, export and re-import', async () => {
   const engine = await headlessEngine(),
     original = parseGLTF(engine, await fixture('Box.glb'));
   const glb = exportGLB(engine);
@@ -386,7 +369,7 @@ test('Khronos Box.glb survives import, export and re-import', needsValidator, as
   assert.deepEqual(Array.from(copy.meshes[0].material.data), Array.from(original.meshes[0].material.data));
 });
 
-test('large geometry switches to 32-bit indices and normals are normalized', needsValidator, async () => {
+test('large geometry switches to 32-bit indices and normals are normalized', async () => {
   const count = 70_002,
     positions = new Float32Array(count * 3),
     normals = new Float32Array(count * 3),
@@ -635,7 +618,7 @@ test('OBJ writes flipped v texture coordinates and vertex colors; PLY uses verte
   assert.deepEqual(ply.elements.face[1].vertex_indices, [3, 4, 5]);
 });
 
-test('core Geometry and PbrMaterial can be overridden with richer data for engine export', needsValidator, async () => {
+test('core Geometry and PbrMaterial can be overridden with richer data for engine export', async () => {
   const engine = await headlessEngine(),
     geometry = box(),
     material = new PbrMaterial({ color: '#808080' });
@@ -697,62 +680,54 @@ function deformationScene() {
   return { scene, mesh, tip, joint, geometry, skin, move };
 }
 
-test(
-  'data scenes export skins, morph targets and animation compatible with the optional animation package',
-  needsValidator,
-  async () => {
-    const { scene, skin } = deformationScene(),
-      glb = exportGLB(scene);
-    await assertValid(glb);
-    const { json, bin } = readGLB(glb),
-      primitive = json.meshes[0].primitives[0];
-    assertAligned(json, bin);
-    assert.deepEqual(json.skins[0].joints, [1, 2]);
-    assert.equal(json.nodes[0].skin, 0);
-    assert.equal(json.accessors[primitive.attributes.JOINTS_0].componentType, 5123);
-    assert.equal(json.accessors[primitive.attributes.WEIGHTS_0].componentType, 5126);
-    close(
-      accessor(json, bin, primitive.attributes.WEIGHTS_0),
-      [0.25, 0.75, 0, 0, 0.25, 0.75, 0, 0, 0.25, 0.75, 0, 0],
-      0,
-    );
-    close(accessor(json, bin, json.skins[0].inverseBindMatrices), skin.inverseBindMatrices, 0);
-    assert.deepEqual(json.nodes[0].weights, [0.25]);
-    assert.deepEqual(json.meshes[0].extras.targetNames, ['raise']);
-    close(accessor(json, bin, primitive.targets[0].POSITION), [0, 0, 0, 0, 0, 0.5, 0, 0, 0], 0);
-    assert.equal(json.accessors[primitive.targets[0].TANGENT].type, 'VEC3');
-    assert.deepEqual(
-      json.animations[0].channels.map((channel) => channel.target),
-      [
-        { node: 2, path: 'translation' },
-        { node: 0, path: 'weights' },
-      ],
-    );
-    const sampler = json.animations[0].samplers[0];
-    close(accessor(json, bin, sampler.input), [0, 1], 0);
-    close(accessor(json, bin, sampler.output), [0, 1, 0, 2, 1, 0], 0);
-    for (const id of [sampler.input, sampler.output, json.skins[0].inverseBindMatrices])
-      assert.equal(json.bufferViews[json.accessors[id].bufferView].target, undefined);
+test('data scenes export skins, morph targets and animation compatible with the optional animation package', async () => {
+  const { scene, skin } = deformationScene(),
+    glb = exportGLB(scene);
+  await assertValid(glb);
+  const { json, bin } = readGLB(glb),
+    primitive = json.meshes[0].primitives[0];
+  assertAligned(json, bin);
+  assert.deepEqual(json.skins[0].joints, [1, 2]);
+  assert.equal(json.nodes[0].skin, 0);
+  assert.equal(json.accessors[primitive.attributes.JOINTS_0].componentType, 5123);
+  assert.equal(json.accessors[primitive.attributes.WEIGHTS_0].componentType, 5126);
+  close(accessor(json, bin, primitive.attributes.WEIGHTS_0), [0.25, 0.75, 0, 0, 0.25, 0.75, 0, 0, 0.25, 0.75, 0, 0], 0);
+  close(accessor(json, bin, json.skins[0].inverseBindMatrices), skin.inverseBindMatrices, 0);
+  assert.deepEqual(json.nodes[0].weights, [0.25]);
+  assert.deepEqual(json.meshes[0].extras.targetNames, ['raise']);
+  close(accessor(json, bin, primitive.targets[0].POSITION), [0, 0, 0, 0, 0, 0.5, 0, 0, 0], 0);
+  assert.equal(json.accessors[primitive.targets[0].TANGENT].type, 'VEC3');
+  assert.deepEqual(
+    json.animations[0].channels.map((channel) => channel.target),
+    [
+      { node: 2, path: 'translation' },
+      { node: 0, path: 'weights' },
+    ],
+  );
+  const sampler = json.animations[0].samplers[0];
+  close(accessor(json, bin, sampler.input), [0, 1], 0);
+  close(accessor(json, bin, sampler.output), [0, 1, 0, 2, 1, 0], 0);
+  for (const id of [sampler.input, sampler.output, json.skins[0].inverseBindMatrices])
+    assert.equal(json.bufferViews[json.accessors[id].bufferView].target, undefined);
 
-    const engine = await headlessEngine(),
-      model = new PBRModel(engine, new GLTFAsset(json, [bin]));
-    const animation = new Animation(model, { loop: false });
-    animation.play('Move').seek(0.5);
-    close([engine.store.transforms.x[model.nodes[2].id], engine.store.transforms.y[model.nodes[2].id]], [1, 1], 0);
-    close(model.primitives[0].weights, [0.25], 0);
-    animation.seek(1);
-    close(model.primitives[0].weights, [0.75], 0);
-    animation.dispose();
-    model.dispose();
-    engine.dispose();
+  const engine = await headlessEngine(),
+    model = new PBRModel(engine, new GLTFAsset(json, [bin]));
+  const animation = new Animation(model, { loop: false });
+  animation.play('Move').seek(0.5);
+  close([engine.store.transforms.x[model.nodes[2].id], engine.store.transforms.y[model.nodes[2].id]], [1, 1], 0);
+  close(model.primitives[0].weights, [0.25], 0);
+  animation.seek(1);
+  close(model.primitives[0].weights, [0.75], 0);
+  animation.dispose();
+  model.dispose();
+  engine.dispose();
 
-    const separate = exportGLTF(scene, { embed: false });
-    await assertValid(separate.text, { [separate.binUri]: separate.bin });
-    assert.deepEqual(separate.bin, bin);
-  },
-);
+  const separate = exportGLTF(scene, { embed: false });
+  await assertValid(separate.text, { [separate.binUri]: separate.bin });
+  assert.deepEqual(separate.bin, bin);
+});
 
-test('cubic rotation and morph channels preserve value/tangent arity and Float32 timing', needsValidator, async () => {
+test('cubic rotation and morph channels preserve value/tangent arity and Float32 timing', async () => {
   const { scene, mesh, tip } = deformationScene(),
     q = Math.SQRT1_2;
   const rotation = [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, q, q, 0, 0, 0, 0];
@@ -777,7 +752,7 @@ test('cubic rotation and morph channels preserve value/tangent arity and Float32
   assert.equal(samplers[0].interpolation, 'CUBICSPLINE');
 });
 
-test('morph animation packs all target weights per key and keeps per-instance defaults', needsValidator, async () => {
+test('morph animation packs all target weights per key and keeps per-instance defaults', async () => {
   const { scene, mesh, geometry } = deformationScene();
   geometry.morphs.push({ name: 'slide', positions: [0.5, 0, 0, 0, 0, 0, 0, 0, 0] });
   mesh.morphWeights = [0.25, 0.5];
@@ -1132,5 +1107,8 @@ test('numbers are written as the shortest text that reads back as the same Float
   }
   // The ratio read 4.9 to 5.1 alone and 2.6 to 4.9 with 32 processes allocating on 32 threads; the export before its number
   // writer was fast reads about 16.
-  assert.ok(usdz < unit * 10, `exportUSDZ of 1,000 boxes took ${usdz.toFixed(1)} ms, the control ${unit.toFixed(1)} ms`);
+  assert.ok(
+    usdz < unit * 10,
+    `exportUSDZ of 1,000 boxes took ${usdz.toFixed(1)} ms, the control ${unit.toFixed(1)} ms`,
+  );
 });

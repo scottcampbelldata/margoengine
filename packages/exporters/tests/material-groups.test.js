@@ -27,7 +27,6 @@ function withUV1(model, values) {
   return model;
 }
 async function valid(bytes) {
-  if (!validator) return;
   const report = await validate(bytes);
   assert.equal(report.errors, 0, JSON.stringify(report.messages));
 }

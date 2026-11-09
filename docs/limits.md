@@ -1,5 +1,10 @@
 # Design envelope
 
+Required test inputs and still-missing real-file proof are listed in
+[missing-test-items](work-lists/missing-test-items.md). The fixture gate rejects the audited
+skip/early-success patterns in verify; its batch-160 and held-physics exclusions remain explicit.
+It does not establish any of the pending real-file, reference-render or hardware claims.
+
 Margo is a small WebGPU engine: core plus the stage facade is 23,797 B gzip (`npm run measure:size` prints the exact figure; the build fails at 25,000 bytes; core alone is 21,449 B of its 21,587 B cap (2026-11-07: `CADCameraControls` moved to the stage, core 21,586 B to 20,672 B and core + stage 23,013 B to 23,016 B; stable instance rows with changed-row uploads then added 382 B and `Engine.writePoses` 231 B, so core + stage was 23,626 B; CSP diagnostics then added 171 B, taking it to 23,797 B); the 2026-10-30 core cleanup, which removed the view target depth copy pass, `mesh.euler` and four small duplicates, took core from 21,176 B to 20,790 B and core + stage from 22,580 B to 22,189 B; storing a caller's 4x view target depth then added 23 B to each, a package's frame in one render pass 293 B to core + stage, and `Engine.renderTarget` 44 B), and every
 other capability is an optional package. That size is a decision, and so are the boundaries below. Each one exists
 for one of two reasons: it keeps core small and frozen, or it follows the limits WebGPU guarantees on every adapter

@@ -1364,6 +1364,16 @@ previous unbounded shutdown while validating this consolidation.
 
 
 
+The required-fixture audit is tracked in [missing-test-items](../work-lists/missing-test-items.md).
+The verify root suite now runs `tests/fixture-skips.test.js`, which parses test/proof syntax with
+`scripts/check-fixture-skips.mjs` and rejects the audited missing-file skip/early-success patterns.
+Required reads also reject absent files and Git LFS pointers with an exact path and recovery command.
+Download failures (HTTP, byte budget, digest) fail. Batch 160's four files and held physics packages
+remain explicit ownership exclusions, not fresh proof. The initial existing-fixture run passed 561
+tests with no skips; final strict CPU, GPU and gate results are recorded in the work list as they finish.
+Missing real-file variants and reference renders remain pending there; no runtime quality or speed
+claim follows from replacing a silent skip with a failure.
+
 Batch 160 adds the first outside metallic-roughness picture budget: all 123 Khronos textureless sphere
 primitives, matched embedded camera/sun, neutral display transform and every pixel, against Sample Viewer
 PNG output. RTX A6000 RGB MAE 1.837511698404948 on WebGPU and 1.837506612141927 through WebGL2

@@ -1,7 +1,7 @@
 // End-to-end check of the margoengine Python package in real notebooks: starts a Jupyter server from the data venv
 // (test-results/.venv-data in the main checkout, python/requirements-notebook.txt; python/tests/venv.mjs makes it from
 // the pinned file when it is missing, as `npm run setup:python-test` does, and when that cannot work, no Python or no
-// network, the check prints a loud SKIP naming the fix and exits 0, or 1 with MARGO_REQUIRE_JUPYTER=1), opens the same notebook in
+// network, the check fails naming the setup command), opens the same notebook in
 // JupyterLab 4 and in Notebook 7 in headless Edge, runs it, and checks that each figure's widget view appears and draws
 // (non-background pixels in its canvas) with no errors in the page. In JupyterLab it also checks the camera both ways:
 // the camera the kernel sets is where the view starts, and dragging in the view reaches the kernel's `camera` trait,
@@ -44,13 +44,13 @@ if (!process.env.MARGO_JUPYTER_CHILD) {
     const strict = process.env.MARGO_REQUIRE_JUPYTER === '1';
     console.error(
       `
-==== ${strict ? 'FAIL' : 'SKIP'}: test:python:browser did not run (this is not a pass) ====
+==== FAIL: test:python:browser did not run (this is not a pass) ====
 jupyter: ${venv.reason}
 Fix: ${SETUP}
 ====
 `,
     );
-    process.exit(strict ? 1 : 0);
+    process.exit(1);
   }
   const limit = 10 * 60_000;
   const child = spawn(process.execPath, [import.meta.filename], {

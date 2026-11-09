@@ -4,9 +4,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { animateCels, animatePlacements, animateTransforms, exportGLB, exportGLTF } from '../dist/index.js';
-import { accessor, readGLB, validate, validator } from './helpers.js';
+import { accessor, readGLB, validate } from './helpers.js';
 
-const needsValidator = validator ? {} : { skip: 'gltf-validator not installed' };
 const quad = () => ({
   positions: [0, 0, 0, 1, 0, 0, 1, 1, 0],
   normals: [0, 0, 1, 0, 0, 1, 0, 0, 1],
@@ -16,7 +15,7 @@ const big = [16_777_217, -16_777_217, 0.1];
 // Exactly unit to within 1e-16, with digits Float32 cannot hold.
 const turn = [0, Math.sin(0.3), 0, Math.cos(0.3)];
 
-test('TRS, matrix and hierarchy JSON keep exact double values', needsValidator, async () => {
+test('TRS, matrix and hierarchy JSON keep exact double values', async () => {
   const child = {
       name: 'Child',
       translation: [0.1, 0.2, 0.30000000000000004],
@@ -87,7 +86,7 @@ test('validation still refuses nonfinite values, bad shapes, partial zero scale 
   assert.deepEqual(readGLB(exportGLB(node({ rotation: [0, 0, 0, -2] }))).json.nodes[0].rotation, [0, 0, 0, -1]);
 });
 
-test('keyframe helpers keep the saved base placement exactly; channel keys stay Float32', needsValidator, async () => {
+test('keyframe helpers keep the saved base placement exactly; channel keys stay Float32', async () => {
   const clip = { fps: 10, frames: [0, 1] },
     pose = { translation: big, rotation: turn, scale: [1e-30, 1, 1] },
     model = { name: 'Model', geometry: quad() },
@@ -122,41 +121,37 @@ test('keyframe helpers keep the saved base placement exactly; channel keys stay 
   assert.deepEqual([...accessor(json, bin, sampler.output)].slice(0, 3), big.map(Math.fround));
 });
 
-test(
-  'material factors are exact JSON numbers; given transform fields are written even at their defaults',
-  needsValidator,
-  async () => {
-    const material = { color: [0.1, 0.2, 0.3, 1], metalness: 0.8, roughness: 0.35, emissive: [0.65, 0, 0.1] },
-      glb = exportGLB({
-        nodes: [
-          {
-            name: 'Given',
-            translation: [0, 0, 0],
-            rotation: [0, 0, 0, 1],
-            scale: [1, 1, 1],
-            geometry: quad(),
-            material,
-          },
-          { name: 'Omitted', geometry: quad() },
-        ],
-      }),
-      report = await validate(glb);
-    assert.equal(report.errors + report.warnings, 0, JSON.stringify(report.messages));
-    const { json } = readGLB(glb);
-    assert.deepEqual(json.materials[0].pbrMetallicRoughness, {
-      baseColorFactor: [0.1, 0.2, 0.3, 1],
-      metallicFactor: 0.8,
-      roughnessFactor: 0.35,
-    });
-    assert.deepEqual(json.materials[0].emissiveFactor, [0.65, 0, 0.1]);
-    assert.deepEqual(
-      [json.nodes[0].translation, json.nodes[0].rotation, json.nodes[0].scale],
-      [
-        [0, 0, 0],
-        [0, 0, 0, 1],
-        [1, 1, 1],
+test('material factors are exact JSON numbers; given transform fields are written even at their defaults', async () => {
+  const material = { color: [0.1, 0.2, 0.3, 1], metalness: 0.8, roughness: 0.35, emissive: [0.65, 0, 0.1] },
+    glb = exportGLB({
+      nodes: [
+        {
+          name: 'Given',
+          translation: [0, 0, 0],
+          rotation: [0, 0, 0, 1],
+          scale: [1, 1, 1],
+          geometry: quad(),
+          material,
+        },
+        { name: 'Omitted', geometry: quad() },
       ],
-    );
-    assert.deepEqual(Object.keys(json.nodes[1]), ['name', 'mesh']);
-  },
-);
+    }),
+    report = await validate(glb);
+  assert.equal(report.errors + report.warnings, 0, JSON.stringify(report.messages));
+  const { json } = readGLB(glb);
+  assert.deepEqual(json.materials[0].pbrMetallicRoughness, {
+    baseColorFactor: [0.1, 0.2, 0.3, 1],
+    metallicFactor: 0.8,
+    roughnessFactor: 0.35,
+  });
+  assert.deepEqual(json.materials[0].emissiveFactor, [0.65, 0, 0.1]);
+  assert.deepEqual(
+    [json.nodes[0].translation, json.nodes[0].rotation, json.nodes[0].scale],
+    [
+      [0, 0, 0],
+      [0, 0, 0, 1],
+      [1, 1, 1],
+    ],
+  );
+  assert.deepEqual(Object.keys(json.nodes[1]), ['name', 'mesh']);
+});

@@ -1,30 +1,23 @@
-// Downloads the small third-party fixtures used by tests/loaders.test.js (PCL, libigl and PyVista samples). Files
-// that 404 are skipped (the tests skip their checks when a fixture is missing). Run with `npm run fixtures`. The
-// Margo-made fixtures come from scripts/make-fixtures.js instead.
-import { mkdir, writeFile } from 'node:fs/promises';
+// Standard test data only. HTTP, size and hash failures fail this command; tests require every fixture.
+// Provenance: tests/fixtures/SOURCES.txt and scripts/supply-chain.mjs.
 import { fileURLToPath } from 'node:url';
-import { resolve } from 'node:path';
-
-const sources = {
-  'bunny.pcd': 'https://raw.githubusercontent.com/PointCloudLibrary/pcl/master/test/bunny.pcd',
-  'cube.off': 'https://raw.githubusercontent.com/libigl/libigl-tutorial-data/master/cube.off',
-  'decimated-knight.off': 'https://raw.githubusercontent.com/libigl/libigl-tutorial-data/master/decimated-knight.off',
-  'fran_cut.vtk': 'https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/fran_cut.vtk',
-  'polyEx.vtk': 'https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/polyEx.vtk',
-};
-const folder = fileURLToPath(new URL('../tests/fixtures/', import.meta.url));
-await mkdir(folder, { recursive: true });
-for (const [name, url] of Object.entries(sources)) {
-  const response = await fetch(url);
-  if (!response.ok) {
-    console.warn(`skip ${name}: HTTP ${response.status}`);
-    continue;
-  }
-  const bytes = new Uint8Array(await response.arrayBuffer());
-  if (bytes.length > 1 << 20) {
-    console.warn(`skip ${name}: ${bytes.length} bytes is over 1 MB`);
-    continue;
-  }
-  await writeFile(resolve(folder, name), bytes);
-  console.log(`${name} ${bytes.length} bytes`);
-}
+import { fetchFixture } from '../../../scripts/support/fetch-fixture.mjs';
+const sources = [
+  [
+    'bunny.pcd',
+    'https://raw.githubusercontent.com/PointCloudLibrary/pcl/3aac7b68cc8f26428ba9c9192d990c0c21cc5a7d/test/bunny.pcd',
+    'f5418a140de7a21adc8a46b83bca8ee05b0ebd5a5fe3ca8a0925bcb6535ed511',
+  ],
+  [
+    'fran_cut.vtk',
+    'https://raw.githubusercontent.com/pyvista/vtk-data/5a3de12d34c24aa5dd5e5db1cbc2defebc0d4da3/Data/fran_cut.vtk',
+    '499c170dd475725f47de4e436f080bd18d1a2cc315411f9c490ba42b6dffbc6d',
+  ],
+  [
+    'polyEx.vtk',
+    'https://raw.githubusercontent.com/pyvista/vtk-data/5a3de12d34c24aa5dd5e5db1cbc2defebc0d4da3/Data/polyEx.vtk',
+    'f020ce787fa515d949723b67b9e667dff8eed8d908830dc6e6ae525df87c60bf',
+  ],
+];
+for (const [name, url, hash] of sources)
+  await fetchFixture(url, fileURLToPath(new URL('../tests/fixtures/' + name, import.meta.url)), hash);

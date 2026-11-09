@@ -33,7 +33,7 @@ const root = resolve(import.meta.dirname, '..'),
 const at = (path) => join(root, path);
 const read = (path) => new Uint8Array(readFileSync(at(path)));
 const sharp = await loadSharp();
-const needsSharp = sharp ? {} : { skip: 'sharp is not installed' };
+assert.ok(sharp, 'Missing required sharp test encoder; run npm ci in the checkout and tools/margo-convert');
 
 /** RGBA8 test picture: a diagonal gradient with some detail, optionally with alpha varying. */
 function picture(width, height, alpha = false) {
@@ -158,7 +158,6 @@ test('processImage without sharp: PNG is resized and recompressed, other formats
 });
 
 test('processImage with sharp: lossy WebP for colour, lossless for data, JPEG stays JPEG when kept', {
-  ...needsSharp,
   timeout: 60_000,
 }, async () => {
   const w = 256,
@@ -212,7 +211,6 @@ async function loadsInMargo(glb) {
 }
 
 test('web preset shrinks the textures of a model: WebP through EXT_texture_webp, valid, loads in Margo', {
-  ...needsSharp,
   timeout: 300_000,
 }, async () => {
   const input = read('examples/assets/khronos/BoomBox/BoomBox.glb');
@@ -264,7 +262,7 @@ test('without sharp a model keeps its formats: PNG textures are recompressed and
   assert.match(result.stats.notes.join('\n'), /needs sharp, kept PNG/);
 });
 
-test('game presets keep PNG and JPEG and write no texture extension', { ...needsSharp, timeout: 300_000 }, async () => {
+test('game presets keep PNG and JPEG and write no texture extension', { timeout: 300_000 }, async () => {
   const input = read('examples/assets/khronos/BoomBox/BoomBox.glb');
   const unity = preset('unity');
   const result = await optimizeModel(input, unity.model, {
@@ -297,7 +295,6 @@ function textureWorkspace() {
 }
 
 test('build: standalone textures follow the preset (web: WebP, unity: PNG, mobile: power of two, --mipmaps: DDS)', {
-  ...needsSharp,
   timeout: 300_000,
 }, async () => {
   const w = textureWorkspace();
@@ -388,7 +385,7 @@ test('CLI texture flags: --max-texture, --texture-format, --mipmaps', { timeout:
   }
 });
 
-test('each preset sizes a 1500 x 900 texture by its own rule', { ...needsSharp, timeout: 120_000 }, async () => {
+test('each preset sizes a 1500 x 900 texture by its own rule', { timeout: 120_000 }, async () => {
   const dir = mkdtempSync(join(tmpdir(), 'margo-convert-sizes-'));
   try {
     const input = join(dir, 'in');

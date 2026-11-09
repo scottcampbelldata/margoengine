@@ -3767,3 +3767,33 @@ to done.
   lossy or slow network, no browser WebTransport client, no Postgres server, no certificate authority chain.
 - **Not done here:** batch 99 (voxel-pathtracer), the rest of stream F, was claimed by the dev PC on 2026-11-09
   (0b7009d68), so this lane stops at 98.
+
+## Required test items audit (2026-11-09, first group)
+
+The work list is [missing-test-items](../work-lists/missing-test-items.md). It inventories 28
+executable missing-evidence paths, 32 remaining file/reference investigations and three held
+physics rows. Batch 160's 14 already-owned items are not duplicated. This group changes test
+infrastructure only: required files/LFS data, sibling builds, glTF validator, sharp and Python
+setup no longer disappear behind passing skips or early returns. No engine algorithm, public
+API, accepted output or tolerance changes.
+
+Seven upstream standard files were downloaded for comparison: two EXR, bunny.pcd, two VTK and
+two OFF. Five have verified BSD-3-Clause/Apache-2.0 notices and pinned fetchers; the OFF data's
+README gives attribution but no explicit licence, so no new OFF copy is committed and the
+fetcher restores no OFF data. All files already existed in this checkout; the original combined
+comparison passed 561 tests with zero skips. This does not establish the pending real-file
+variants or renderer/reference claims.
+
+Regression evidence is `tests/fixture-skips.test.js` and `tests/python-venv.test.js`. The former
+also audits test/proof syntax in verify/check:merge. A new download regression initially matched
+the wrong error wording; it now checks the existing `byte budget exceeded` rejection without
+changing the helper or its limit. Final group checks are recorded in the work list as they finish.
+
+The strict package/support run passed 1,471 tests and the final fixture-gate run 15, both without
+failures/skips. GPU: 18 of 19 suites passed, including real Python notebooks. Exporter capture passed
+its rendering assertions but failed browser shutdown at 30,000 ms; this is an open bug, not a pass.
+The scoped README command exited zero with 62 of 94 examples run and 32 allowed failures. An added
+inventory records all 85 sample-labelled known exceptions across packages; no exception was removed
+or relaxed. Scott assigned the capture shutdown failure to batch 160 in lane-M; this lane makes no teardown change.
+The README inventory separates missing or misserved inputs from other causes deferred to a later job.
+The continuation verify is supervised with a 40-minute process-tree deadline; the prior run left no final result.

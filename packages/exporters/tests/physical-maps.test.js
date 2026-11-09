@@ -8,7 +8,7 @@ import { extendedMaterials } from '@margoengine/gltf-pro/extended';
 import { instancing } from '@margoengine/gltf-pro/instancing';
 import { exportModel } from '../dist/model.js';
 import { headless, headlessModels } from '../../../tests/support/pbr-snapshot.js';
-import { accessor, glTFRows, glTFUV, readGLB, validate, validator } from './helpers.js';
+import { accessor, glTFRows, glTFUV, readGLB, validate } from './helpers.js';
 
 const quad = {
   positions: [0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0],
@@ -56,7 +56,6 @@ function imagePixel(model, textureIndex) {
   return [...inflateSync(Buffer.concat(chunks)).subarray(1, 5)];
 }
 async function valid(bytes) {
-  if (!validator) return;
   const report = await validate(bytes);
   assert.equal(report.errors, 0, JSON.stringify(report.messages));
   assert.equal(report.warnings, 0, JSON.stringify(report.messages));

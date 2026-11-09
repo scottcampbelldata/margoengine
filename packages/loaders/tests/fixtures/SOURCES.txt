@@ -1,5 +1,12 @@
 Fixtures for tests/loaders.test.js (each under 1 MB).
 
+Missing fixtures now fail; they never skip a comparison. fetch-fixtures.js pins and SHA-256 checks PCL at
+3aac7b68cc8f26428ba9c9192d990c0c21cc5a7d and PyVista data at 5a3de12d34c24aa5dd5e5db1cbc2defebc0d4da3.
+PyVista's data repository LICENSE is Apache-2.0. Fetch hashes are source bytes before Git CRLF conversion.
+The libigl README attributes cube.off to libigl and decimated-knight.off to Cosmic Blobs but states no explicit
+licence. Those already tracked files are not re-fetched by the script; restore them with git restore. This audit
+does not assert a new redistribution grant for them. See docs/work-lists/missing-test-items.md, E07.
+
 Margo-made, written by scripts/make-fixtures.js (procedural shapes, deterministic bytes, no third-party data):
   torus.ply, torus_be.ply, torus_le.ply, torus_colored.ply, gears.3mf, face_colors.3mf, corner_colors.3mf,
   rose.pcd, spiral.pcd, helix.xyz

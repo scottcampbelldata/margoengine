@@ -3,9 +3,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { exportGLB, exportGLTF } from '../dist/index.js';
-import { readGLB, validate, validator } from './helpers.js';
+import { readGLB, validate } from './helpers.js';
 
-const needsValidator = validator ? {} : { skip: 'gltf-validator not installed' };
 const quad = {
   positions: [0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0],
   normals: [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1],
@@ -18,7 +17,7 @@ async function png() {
   return bin.slice(view.byteOffset, view.byteOffset + view.byteLength);
 }
 
-test('data-scene textures keep their sampler; the default sampler is unchanged', needsValidator, async () => {
+test('data-scene textures keep their sampler; the default sampler is unchanged', async () => {
   const image = await png(),
     smooth = { image, mimeType: 'image/png' },
     pixel = {
@@ -56,7 +55,7 @@ test('data-scene textures keep their sampler; the default sampler is unchanged',
   assert.equal(mipNearest.json.samplers[0].minFilter, 9984);
 });
 
-test('unlit materials, cameras and punctual lights round-trip through the GLB JSON', needsValidator, async () => {
+test('unlit materials, cameras and punctual lights round-trip through the GLB JSON', async () => {
   const sun = { type: 'directional', color: [1, 0.9, 0.8], intensity: 3 },
     lamp = { type: 'point', name: 'lamp', color: [1, 1, 1], intensity: 20, range: 8 },
     spot = { type: 'spot', color: [0, 0, 1], intensity: 5, innerConeAngle: 0.2, outerConeAngle: 0.6 };

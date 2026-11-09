@@ -225,7 +225,10 @@ const ASSETS = [
     'Workshop scene from the retired Light Keeper demo, kept for the benchmark HDR and the orb test model: Margo-made model and rig, Poly Haven surface textures (CC0 1.0)',
   ],
   ['tools/create-margo/templates/game/public/pete-LICENSE.txt', 'game starter character (Kay Lousberg, KayKit, CC0)'],
-  ['packages/environment/tests/fixtures/NOTICE.md', 'test fixtures: OpenEXR test images (BSD-3-Clause)'],
+  [
+    'packages/environment/tests/fixtures/NOTICE.md',
+    'test fixtures: OpenEXR test images (BSD-3-Clause), pinned at e38ffb0790f62f05a6f083a6fa4cac150b3b7452 with SHA-256 checks in packages/environment/scripts/fetch-fixtures.mjs; no implementation code fetched',
+  ],
   [
     'packages/usdz/tests/fixtures/real/NOTICE.md',
     'test fixtures: USD composition scenes, two subdivision meshes and MaterialX documents of https://github.com/usd-wg/assets, commit 091bb5c6 (Apache-2.0, Alliance for OpenUSD working group; Open Chess Set and Standard Shader Ball documents CC BY 4.0), with what OpenUSD 26.08 reads from them; RiggedSimple, RiggedFigure and BoxAnimated of the same commit (CC-BY-4.0, Cesium); AnimatedTriangle and InterpolationTest of the same commit (CC0)',
@@ -298,7 +301,7 @@ const ASSETS = [
   ],
   [
     'packages/loaders/tests/fixtures/SOURCES.txt',
-    'test fixtures: Point Cloud Library test/bunny.pcd (BSD-3-Clause, github.com/PointCloudLibrary/pcl; Stanford bunny scan), libigl tutorial data cube.off and decimated-knight.off, PyVista vtk-data fran_cut.vtk and polyEx.vtk',
+    'test fixtures: Point Cloud Library test/bunny.pcd (BSD-3-Clause, github.com/PointCloudLibrary/pcl at 3aac7b68cc8f26428ba9c9192d990c0c21cc5a7d; Stanford bunny scan); PyVista data fran_cut.vtk and polyEx.vtk (Apache-2.0, at 5a3de12d34c24aa5dd5e5db1cbc2defebc0d4da3); fetch-fixtures.js pins source hashes. Existing libigl tutorial cube.off and decimated-knight.off have attribution only, no explicit licence located; not newly redistributed or fetched by the script',
   ],
   [
     'packages/points/tests/fixtures/NOTICE.md',

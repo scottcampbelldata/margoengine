@@ -5,9 +5,8 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { exportGLB } from '@margoengine/exporters';
 import { checkJoints, humanoidJoints, skinBindMatrices, skinHierarchy, skinWeights } from '@margoengine/exporters/skin';
-import { accessor, readGLB, validate, validator } from './helpers.js';
+import { accessor, readGLB, validate } from './helpers.js';
 
-const needsValidator = validator ? {} : { skip: 'gltf-validator not installed' };
 const chain = [
   { name: 'Root', parent: -1, position: [1, 0, 0.5] },
   { name: 'Spine', parent: 0, position: [1, 2, 0.5] },
@@ -74,72 +73,68 @@ test('skinBindMatrices: local chains to world, world times inverse bind is ident
   }
 });
 
-test(
-  'a skinned voxel mesh from skinHierarchy and skinWeights validates and keeps its rest pose',
-  needsValidator,
-  async () => {
-    // An L of three unit cubes' corner vertices, pivot (origin) at [1, 0, 0.5] in grid coordinates.
-    const origin = [1, 0, 0.5],
-      positions = [],
-      indices = [];
-    for (const [x, y] of [
-      [0, 0],
-      [1, 0],
-      [0, 1],
-    ]) {
-      const base = positions.length / 3;
-      for (let k = 0; k < 8; k++) positions.push(x + (k & 1) - 1, y + ((k >> 1) & 1), ((k >> 2) & 1) - 0.5);
-      for (const [a, b, c, d] of [
-        [0, 2, 3, 1],
-        [4, 5, 7, 6],
-        [0, 1, 5, 4],
-        [2, 6, 7, 3],
-        [0, 4, 6, 2],
-        [1, 3, 7, 5],
-      ])
-        indices.push(base + a, base + b, base + c, base + a, base + c, base + d);
-    }
-    const { root, nodes, skin } = skinHierarchy(chain, { origin, name: 'Rig' }),
-      weights = skinWeights(positions, chain, { origin }),
-      mesh = {
-        name: 'Figure_Mesh',
-        geometry: { positions, normals: positions.map(() => 0), indices, ...weights },
-        skin,
-      };
-    const glb = exportGLB({ nodes: [mesh, root] }),
-      report = await validate(glb);
-    assert.equal(report.errors + report.warnings, 0, JSON.stringify(report.messages));
-    const { json, bin } = readGLB(glb),
-      gltfSkin = json.skins[0];
-    assert.equal(gltfSkin.name, 'Rig');
+test('a skinned voxel mesh from skinHierarchy and skinWeights validates and keeps its rest pose', async () => {
+  // An L of three unit cubes' corner vertices, pivot (origin) at [1, 0, 0.5] in grid coordinates.
+  const origin = [1, 0, 0.5],
+    positions = [],
+    indices = [];
+  for (const [x, y] of [
+    [0, 0],
+    [1, 0],
+    [0, 1],
+  ]) {
+    const base = positions.length / 3;
+    for (let k = 0; k < 8; k++) positions.push(x + (k & 1) - 1, y + ((k >> 1) & 1), ((k >> 2) & 1) - 0.5);
+    for (const [a, b, c, d] of [
+      [0, 2, 3, 1],
+      [4, 5, 7, 6],
+      [0, 1, 5, 4],
+      [2, 6, 7, 3],
+      [0, 4, 6, 2],
+      [1, 3, 7, 5],
+    ])
+      indices.push(base + a, base + b, base + c, base + a, base + c, base + d);
+  }
+  const { root, nodes, skin } = skinHierarchy(chain, { origin, name: 'Rig' }),
+    weights = skinWeights(positions, chain, { origin }),
+    mesh = {
+      name: 'Figure_Mesh',
+      geometry: { positions, normals: positions.map(() => 0), indices, ...weights },
+      skin,
+    };
+  const glb = exportGLB({ nodes: [mesh, root] }),
+    report = await validate(glb);
+  assert.equal(report.errors + report.warnings, 0, JSON.stringify(report.messages));
+  const { json, bin } = readGLB(glb),
+    gltfSkin = json.skins[0];
+  assert.equal(gltfSkin.name, 'Rig');
+  assert.deepEqual(
+    gltfSkin.joints.map((j) => json.nodes[j].name),
+    chain.map((j) => j.name),
+  );
+  assert.equal(json.nodes[gltfSkin.skeleton].name, 'Root');
+  // What the file holds for each vertex, not what went in.
+  const { attributes } = json.meshes[json.nodes.find((node) => node.skin !== undefined).mesh].primitives[0],
+    held = (name) => Array.from(accessor(json, bin, attributes[name]));
+  assert.deepEqual(held('POSITION'), Array.from(positions, Math.fround));
+  assert.deepEqual(held('JOINTS_0'), Array.from(weights.joints));
+  assert.deepEqual(held('WEIGHTS_0'), Array.from(weights.weights));
+  // Rest pose: each joint's node-chain translation plus its inverse bind translation is zero.
+  const parents = new Map();
+  json.nodes.forEach((node, i) => (node.children ?? []).forEach((c) => parents.set(c, i)));
+  const ibm = accessor(json, bin, gltfSkin.inverseBindMatrices);
+  gltfSkin.joints.forEach((node, j) => {
+    const sum = [0, 0, 0];
+    for (let at = node; at !== undefined; at = parents.get(at))
+      (json.nodes[at].translation ?? [0, 0, 0]).forEach((v, i) => (sum[i] += v));
     assert.deepEqual(
-      gltfSkin.joints.map((j) => json.nodes[j].name),
-      chain.map((j) => j.name),
+      sum.map((v, i) => v + ibm[j * 16 + 12 + i] || 0),
+      [0, 0, 0],
+      `${chain[j].name} rest`,
     );
-    assert.equal(json.nodes[gltfSkin.skeleton].name, 'Root');
-    // What the file holds for each vertex, not what went in.
-    const { attributes } = json.meshes[json.nodes.find((node) => node.skin !== undefined).mesh].primitives[0],
-      held = (name) => Array.from(accessor(json, bin, attributes[name]));
-    assert.deepEqual(held('POSITION'), Array.from(positions, Math.fround));
-    assert.deepEqual(held('JOINTS_0'), Array.from(weights.joints));
-    assert.deepEqual(held('WEIGHTS_0'), Array.from(weights.weights));
-    // Rest pose: each joint's node-chain translation plus its inverse bind translation is zero.
-    const parents = new Map();
-    json.nodes.forEach((node, i) => (node.children ?? []).forEach((c) => parents.set(c, i)));
-    const ibm = accessor(json, bin, gltfSkin.inverseBindMatrices);
-    gltfSkin.joints.forEach((node, j) => {
-      const sum = [0, 0, 0];
-      for (let at = node; at !== undefined; at = parents.get(at))
-        (json.nodes[at].translation ?? [0, 0, 0]).forEach((v, i) => (sum[i] += v));
-      assert.deepEqual(
-        sum.map((v, i) => v + ibm[j * 16 + 12 + i] || 0),
-        [0, 0, 0],
-        `${chain[j].name} rest`,
-      );
-    });
-    assert.equal(nodes.length, 4);
-  },
-);
+  });
+  assert.equal(nodes.length, 4);
+});
 
 test('checkJoints and humanoidJoints', () => {
   assert.throws(() => checkJoints([]), RangeError);

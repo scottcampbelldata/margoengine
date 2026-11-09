@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
+import { requiredFixture } from '../../../scripts/support/required-fixture.mjs';
 import { createHash } from 'node:crypto';
 import { deflateSync, constants } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
@@ -25,7 +26,8 @@ import { SKY, decodeRGBE, skyRGBE } from '../scripts/make-hdr-fixture.js';
 import { halfFloats } from '../src/half.ts';
 
 const fixtures = fileURLToPath(new URL('./fixtures/', import.meta.url));
-const fixture = (name) => readFileSync(fixtures + name);
+const fixture = (name) =>
+  requiredFixture(fixtures + name, `git restore -- packages/environment/tests/fixtures/${name}`);
 const reference = JSON.parse(readFileSync(fixtures + 'reference.json', 'utf8'));
 const digest = (data) => {
   const copy = new Float32Array(data),
@@ -59,7 +61,6 @@ test('the half lookup table equals halfToFloat for every pattern, and BrightRing
   // for the 800 x 800 BrightRings (the p-exr-load parity row); the table and one pass make it about 13.
   const table = halfFloats();
   for (let bits = 0; bits < 65536; bits++) assert.ok(same(table[bits], Math.fround(halfToFloat(bits))), `${bits}`);
-  if (!existsSync(fixtures + 'BrightRings.exr')) return;
   // Timed against the per-texel conversion alone, on the same machine and load: the old parse did that and more.
   const bytes = fixture('BrightRings.exr'),
     texels = new Uint16Array(parseEXR(bytes).data.length).map((_, i) => (i * 40503) & 0xffff),
@@ -122,9 +123,7 @@ for (const [name, compression] of [
   ['BrightRings.exr', 'ZIP'],
   ['AllHalfValues.exr', 'PIZ'],
 ]) {
-  test(`real OpenEXR file ${name} (${compression}) matches the reference OpenEXR library`, {
-    skip: !existsSync(fixtures + name) && 'fixture missing',
-  }, () => {
+  test(`real OpenEXR file ${name} (${compression}) matches the reference OpenEXR library`, () => {
     const image = parseEXR(fixture(name));
     assert.equal(image.compression, compression);
     assert.equal(image.width, reference[name].width);
@@ -369,7 +368,6 @@ test('OpenEXR rejects unsupported and malformed files with errors instead of cra
     'synthetic-half-y-rle.exr',
     'AllHalfValues.exr',
   ]) {
-    if (!existsSync(fixtures + name)) continue;
     const bytes = fixture(name),
       headerEnd = bytes.indexOf(Buffer.from('\0\0', 'binary'), 300);
     for (let trial = 0; trial < 60; trial++) {
@@ -495,9 +493,7 @@ test('Radiance HDR decodes adaptive RLE, flat and old-style run scanlines and bo
   }
 });
 
-test('Margo Radiance file sun_sky.hdr matches the RGBE bytes it was written from', {
-  skip: !existsSync(fixtures + 'sun_sky.hdr') && 'fixture missing',
-}, () => {
+test('Margo Radiance file sun_sky.hdr matches the RGBE bytes it was written from', () => {
   const bytes = fixture('sun_sky.hdr'),
     image = parseHDR(bytes);
   assert.equal(image.width, SKY.width);

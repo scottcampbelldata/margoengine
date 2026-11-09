@@ -2,9 +2,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { exportGLB } from '../dist/index.js';
-import { accessor, readGLB, validate, validator } from './helpers.js';
+import { accessor, readGLB, validate } from './helpers.js';
 
-const needsValidator = validator ? {} : { skip: 'gltf-validator not installed' };
 const triangle = (extra) => ({
   positions: [0, 0, 0, 1, 0, 0, 0, 1, 0],
   normals: [0, 0, 1, 0, 0, 1, 0, 0, 1],
@@ -14,7 +13,7 @@ const triangle = (extra) => ({
 });
 const scene = (geometry, material) => ({ nodes: [{ name: 'T', geometry, material }] });
 
-test('uvs2, uvs3 and colors1 reach TEXCOORD_2, TEXCOORD_3 and COLOR_1 with their own values', needsValidator, async () => {
+test('uvs2, uvs3 and colors1 reach TEXCOORD_2, TEXCOORD_3 and COLOR_1 with their own values', async () => {
   const uvs1 = [0.5, 0.5, 0.75, 0.5, 0.5, 0.75],
     uvs2 = [0.25, 0.25, 0.5, 0.25, 0.25, 0.5],
     uvs3 = [0.75, 0, 1, 0, 0.75, 0.25],
@@ -43,7 +42,10 @@ test('a texture on set 2 needs uvs2', () => {
   const png =
       'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAADUlEQVQImWP4////fwAJ+wP9CNHoHgAAAABJRU5ErkJggg==',
     texture = { mimeType: 'image/png', image: Buffer.from(png, 'base64'), texCoord: 2 };
-  assert.throws(() => exportGLB(scene(triangle(), { baseColorTexture: texture })), /texCoord 2 need geometry with uvs2/);
+  assert.throws(
+    () => exportGLB(scene(triangle(), { baseColorTexture: texture })),
+    /texCoord 2 need geometry with uvs2/,
+  );
   const { json } = readGLB(exportGLB(scene(triangle({ uvs2: [0, 0, 1, 0, 0, 1] }), { baseColorTexture: texture })));
   assert.equal(json.materials[0].pbrMetallicRoughness.baseColorTexture.texCoord, 2);
 });

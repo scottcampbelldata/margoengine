@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { cpuTimer } from '../../../scripts/support/cpu-budget.mjs';
-import { existsSync, readFileSync } from 'node:fs';
+import { requiredFixture } from '../../../scripts/support/required-fixture.mjs';
 import { execFileSync } from 'node:child_process';
 import { createServer } from 'node:http';
 import { crc32 as zlibCrc32, deflateRawSync, inflateRawSync } from 'node:zlib';
@@ -46,7 +46,8 @@ import {
 } from '../scripts/make-fixtures.js';
 
 const fixtures = fileURLToPath(new URL('./fixtures/', import.meta.url));
-const fixture = (name) => (existsSync(fixtures + name) ? new Uint8Array(readFileSync(fixtures + name)) : null);
+const fixture = (name) =>
+  new Uint8Array(requiredFixture(fixtures + name, `git restore -- packages/loaders/tests/fixtures/${name}`));
 const text = (value) => new TextEncoder().encode(value);
 const close = (actual, expected, epsilon = 1e-5, label = 'value') =>
   assert.ok(
@@ -409,12 +410,11 @@ test('PLY: malformed headers, truncated data and limits', () => {
   rejects(() => parsePLY('not bytes'), 'range');
 });
 
-test('PLY: torus fixtures (ascii, both binary byte orders, colored) agree with the generator and an independent read', (t) => {
+test('PLY: torus fixtures (ascii, both binary byte orders, colored) agree with the generator and an independent read', () => {
   const ascii = fixture('torus.ply'),
     big = fixture('torus_be.ply'),
     little = fixture('torus_le.ply'),
     colored = fixture('torus_colored.ply');
-  if (!ascii || !big || !little || !colored) return t.skip('fixtures missing');
   const a = parsePLY(ascii),
     b = parsePLY(big),
     le = parsePLY(little),
@@ -492,7 +492,7 @@ test('OFF: plain, COFF with 0-255 colors, NOFF, STOFF, comments and counts on th
   assert.equal(points.kind, 'points');
 });
 
-test('OFF: errors and real libigl files', (t) => {
+test('OFF: errors and real libigl files', () => {
   rejects(() => parseOFF(text('PLY\n')), 'header');
   rejects(() => parseOFF(text('OFF BINARY\n')), 'unsupported');
   rejects(() => parseOFF(text('4OFF\n')), 'unsupported');
@@ -504,7 +504,6 @@ test('OFF: errors and real libigl files', (t) => {
   rejects(() => parseOFF(text('OFF\n3000000000 1 0\n')), 'limit');
   const cube = fixture('cube.off'),
     knight = fixture('decimated-knight.off');
-  if (!cube || !knight) return t.skip('fixtures missing');
   const c = parseOFF(cube);
   assert.equal(c.positions.length / 3, 8);
   assert.equal(c.indices.length / 3, 12);
@@ -534,7 +533,7 @@ test('regression: an XYZ column name line, as swisstopo writes, is not a point',
   rejects(() => parseXYZ(text('1 2 3\nX Y Z\n')), 'syntax');
 });
 
-test('XYZ: layouts, separators, labels, count lines and errors', (t) => {
+test('XYZ: layouts, separators, labels, count lines and errors', () => {
   const xyz = parseXYZ(text('# points\n1 2 3\n4,5,6\n7;8;9\n'));
   assert.deepEqual([...xyz.positions], [1, 2, 3, 4, 5, 6, 7, 8, 9]);
   assert.equal(xyz.kind, 'points');
@@ -565,7 +564,6 @@ test('XYZ: layouts, separators, labels, count lines and errors', (t) => {
   rejects(() => parseXYZ(text('1 2 3\n4 5 6\n'), { maxVertices: 1 }), 'limit');
   rejects(() => parseXYZ(text('1 2 3\n'), { layout: 'xyz-rgb' }), 'syntax');
   const helix = fixture('helix.xyz');
-  if (!helix) return t.skip('fixture missing');
   const h = parseXYZ(helix),
     rows = new TextDecoder()
       .decode(helix)
@@ -771,11 +769,10 @@ test('PCD: malformed headers, truncated and corrupt data, limits', () => {
   rejects(() => parsePCD(binary, { maxVertices: 19 }), 'limit');
 });
 
-test('PCD: Margo clouds (ascii packed rgb, binary_compressed) and the real PCL bunny', (t) => {
+test('PCD: Margo clouds (ascii packed rgb, binary_compressed) and the real PCL bunny', () => {
   const simple = fixture('rose.pcd'),
     logo = fixture('spiral.pcd'),
     bunny = fixture('bunny.pcd');
-  if (!simple || !logo || !bunny) return t.skip('fixtures missing');
   const s = parsePCD(simple),
     rose = rosePoints();
   assert.equal(s.positions.length / 3, rose.length);
@@ -959,10 +956,9 @@ test('VTK: errors', () => {
   rejects(() => parseVTK(text(fractionalOffset)), 'range', /offsets/);
 });
 
-test('VTK: real pyvista polydata files', (t) => {
+test('VTK: real pyvista polydata files', () => {
   const fran = fixture('fran_cut.vtk'),
     cube = fixture('polyEx.vtk');
-  if (!fran || !cube) return t.skip('fixtures missing');
   const f = parseVTK(fran),
     source = new TextDecoder().decode(fran);
   const pointCount = Number(/POINTS (\d+)/.exec(source)[1]),
@@ -1388,7 +1384,6 @@ test('3MF: Margo sample packages agree with the generator and an independent zli
   const gears = fixture('gears.3mf'),
     faces = fixture('face_colors.3mf'),
     vertex = fixture('corner_colors.3mf');
-  if (!gears || !faces || !vertex) return t.skip('fixtures missing');
   const readModel = (bytes) => {
     const entry = readZipDirectory(bytes).find((e) => e.name.endsWith('.model'));
     const view = new DataView(bytes.buffer, bytes.byteOffset),

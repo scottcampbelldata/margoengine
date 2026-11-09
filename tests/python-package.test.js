@@ -3,7 +3,7 @@
 // (test-results/.venv-data in the main checkout, or MARGO_JUPYTER_VENV), which python/tests/venv.mjs makes from the
 // pinned python/requirements-notebook.txt when it is missing (`npm run setup:python-test`). A fresh clone once failed
 // here: the suite ran the bare `python` on PATH, which has no traitlets. When the venv cannot be made (no Python, no
-// network) the test is skipped with a loud message naming the fix, or fails with MARGO_REQUIRE_PYTHON=1.
+// network) the test fails with a message naming the setup command.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
@@ -12,16 +12,13 @@ import { colormapNames } from '@margoengine/sciviz/colormaps';
 import { join } from 'node:path';
 import { ensureVenv, SETUP } from '../python/tests/venv.mjs';
 
-test('the Python package suite passes', (t) => {
+test('the Python package suite passes', () => {
   let python = process.env.MARGO_PYTHON;
   if (!python) {
     const venv = ensureVenv();
     if (!venv.ok) {
       const message = `the margoengine Python package suite did not run (this is not a pass): ${venv.reason}\nFix: ${SETUP}`;
-      console.error(`\n==== ${process.env.MARGO_REQUIRE_PYTHON === '1' ? 'FAIL' : 'SKIP'}: ${message}\n====\n`);
-      assert.notEqual(process.env.MARGO_REQUIRE_PYTHON, '1', message);
-      t.skip(message);
-      return;
+      assert.fail(message);
     }
     python = venv.tools.python;
   }

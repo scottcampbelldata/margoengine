@@ -4,9 +4,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { exportGLB, exportGLTF, exportOBJ, exportSTL, paletteTexture } from '../dist/index.js';
-import { accessor, decodePNG, readGLB, validate, validator } from './helpers.js';
-
-const needsValidator = validator ? {} : { skip: 'gltf-validator not installed' };
+import { accessor, decodePNG, readGLB, validate } from './helpers.js';
 
 // Two unit quads side by side: quad 0 red, quad 1 blue in the palette.
 const twoQuads = () => ({
@@ -72,7 +70,7 @@ async function richScene() {
   };
 }
 
-test('multi-material primitives share one vertex set and keep extras at every scope', needsValidator, async () => {
+test('multi-material primitives share one vertex set and keep extras at every scope', async () => {
   const { scene } = await richScene(),
     glb = exportGLB(scene, { generator: 'Rich test' }),
     report = await validate(glb);
@@ -141,7 +139,7 @@ test('multi-material primitives share one vertex set and keep extras at every sc
   );
 });
 
-test('the .gltf writer carries the same extras and extension fields', needsValidator, async () => {
+test('the .gltf writer carries the same extras and extension fields', async () => {
   const { scene } = await richScene(),
     { json, text } = exportGLTF(scene),
     report = await validate(text);
@@ -150,36 +148,32 @@ test('the .gltf writer carries the same extras and extension fields', needsValid
   assert.equal(json.meshes[0].primitives.length, 2);
 });
 
-test(
-  'nodes sharing a primitives array share one mesh; another mesh name gets its own mesh',
-  needsValidator,
-  async () => {
-    const geometry = twoQuads(),
-      primitives = [
-        { geometry, indices: [0, 1, 2, 0, 2, 3], material: { color: [1, 0, 0, 1] } },
-        { geometry, indices: [4, 5, 6, 4, 6, 7], material: { color: [0, 0, 1, 1] } },
+test('nodes sharing a primitives array share one mesh; another mesh name gets its own mesh', async () => {
+  const geometry = twoQuads(),
+    primitives = [
+      { geometry, indices: [0, 1, 2, 0, 2, 3], material: { color: [1, 0, 0, 1] } },
+      { geometry, indices: [4, 5, 6, 4, 6, 7], material: { color: [0, 0, 1, 1] } },
+    ],
+    glb = exportGLB({
+      nodes: [
+        { name: 'A', primitives },
+        { name: 'B', primitives, translation: [3, 0, 0] },
+        { name: 'C', primitives, meshName: 'Other' },
       ],
-      glb = exportGLB({
-        nodes: [
-          { name: 'A', primitives },
-          { name: 'B', primitives, translation: [3, 0, 0] },
-          { name: 'C', primitives, meshName: 'Other' },
-        ],
-      }),
-      report = await validate(glb);
-    assert.equal(report.errors + report.warnings, 0, JSON.stringify(report.messages));
-    const { json } = readGLB(glb);
-    assert.deepEqual(
-      json.nodes.map((n) => n.mesh),
-      [0, 0, 1],
-    );
-    assert.deepEqual(
-      json.meshes.map((m) => m.name),
-      ['A', 'Other'],
-    );
-    assert.equal(json.accessors.filter((a) => a.type === 'VEC3').length, 2, 'one POSITION and one NORMAL in all');
-  },
-);
+    }),
+    report = await validate(glb);
+  assert.equal(report.errors + report.warnings, 0, JSON.stringify(report.messages));
+  const { json } = readGLB(glb);
+  assert.deepEqual(
+    json.nodes.map((n) => n.mesh),
+    [0, 0, 1],
+  );
+  assert.deepEqual(
+    json.meshes.map((m) => m.name),
+    ['A', 'Other'],
+  );
+  assert.equal(json.accessors.filter((a) => a.type === 'VEC3').length, 2, 'one POSITION and one NORMAL in all');
+});
 
 test('indexed palette textures: one texel per entry, NEAREST, texel-centre UVs', async () => {
   const colors = Array.from({ length: 5 * 4 }, (_, i) => (i * 37 + 11) % 256),
@@ -204,7 +198,7 @@ test('indexed palette textures: one texel per entry, NEAREST, texel-centre UVs',
   await assert.rejects(paletteTexture([1, 2, 3, 256]), RangeError);
 });
 
-test('a [0, 0, 0] scale collapses a node: glTF keeps it, mesh-only formats leave it out', needsValidator, async () => {
+test('a [0, 0, 0] scale collapses a node: glTF keeps it, mesh-only formats leave it out', async () => {
   const quad = { positions: [0, 0, 0, 1, 0, 0, 1, 1, 0], normals: [0, 0, 1, 0, 0, 1, 0, 0, 1] };
   const scene = {
     nodes: [
@@ -226,7 +220,7 @@ test('a [0, 0, 0] scale collapses a node: glTF keeps it, mesh-only formats leave
   assert.throws(() => exportGLB({ nodes: [{ geometry: quad, scale: [1, 0, 1] }] }), /Scale must be nonzero/);
 });
 
-test('skins name their skeleton root and keep extras; animations keep extras', needsValidator, async () => {
+test('skins name their skeleton root and keep extras; animations keep extras', async () => {
   const joint = { name: 'Head', translation: [0, 1, 0] },
     root = { name: 'Root', children: [joint] },
     skin = {
@@ -274,7 +268,7 @@ test('skins name their skeleton root and keep extras; animations keep extras', n
   );
 });
 
-test('cameras and lights carry extras', needsValidator, async () => {
+test('cameras and lights carry extras', async () => {
   const glb = exportGLB({
       nodes: [
         { name: 'Eye', camera: { type: 'perspective', perspective: { yfov: 1, znear: 0.1 }, extras: { lens: 35 } } },
@@ -346,7 +340,7 @@ test('extras must be JSON; invalid rich fields are refused with the fix in the m
   );
 });
 
-test('a lightmap is a texture recorded under root extras, not a material slot', needsValidator, async () => {
+test('a lightmap is a texture recorded under root extras, not a material slot', async () => {
   const { texture } = await paletteTexture([10, 20, 30, 255, 40, 50, 60, 255]),
     lightmap = { ...texture, minFilter: 'linear', magFilter: 'linear', name: 'lightmap' },
     scene = {
@@ -378,7 +372,7 @@ test('a lightmap is a texture recorded under root extras, not a material slot', 
   );
 });
 
-test('a lightmap record can carry the emission atlas and both scales', needsValidator, async () => {
+test('a lightmap record can carry the emission atlas and both scales', async () => {
   const { texture } = await paletteTexture([10, 20, 30, 255, 40, 50, 60, 255]),
     lightmap = { texture, emission: { ...texture, name: 'emission' }, lightmapScale: 2.5, emissionScale: 4 },
     scene = { nodes: [{ geometry: twoQuads() }], lightmap },

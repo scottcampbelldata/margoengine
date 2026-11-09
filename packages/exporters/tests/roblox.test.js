@@ -5,9 +5,8 @@ import test from 'node:test';
 import { box, PbrMaterial } from '@margoengine/core/extension';
 import { exportGLB } from '@margoengine/exporters';
 import { exportRobloxGLB } from '@margoengine/exporters/roblox';
-import { accessor, headlessEngine, readGLB, validate, validator } from './helpers.js';
+import { accessor, headlessEngine, readGLB, validate } from './helpers.js';
 
-const needsValidator = validator ? {} : { skip: 'gltf-validator not installed' };
 const triangle = () => ({ positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], normals: [0, 0, 1, 0, 0, 1, 0, 0, 1] });
 const values = ({ json, bin }, id) => accessor(json, bin, id);
 const png = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0]);
@@ -101,7 +100,7 @@ test('the default cap makes parts of 20,000 triangles and a partial last part', 
   }
 });
 
-test('shared geometry and shared primitive lists are split once and reused', needsValidator, async () => {
+test('shared geometry and shared primitive lists are split once and reused', async () => {
   const geometry = { ...triangle(), indices: [0, 1, 2, 0, 2, 1] },
     primitives = [{ geometry, indices: [0, 2, 1, 0, 1, 2] }],
     scene = {
@@ -132,31 +131,27 @@ test('shared geometry and shared primitive lists are split once and reused', nee
   );
 });
 
-test(
-  'a textured palette keeps its image, sampler and material and passes the Khronos validator',
-  needsValidator,
-  async () => {
-    const fixture = readGLB(new Uint8Array(await readFile(new URL('./fixtures/BoxTextured.glb', import.meta.url)))),
-      view = fixture.json.bufferViews[fixture.json.images[0].bufferView],
-      image = fixture.bin.slice(view.byteOffset, view.byteOffset + view.byteLength),
-      geometry = {
-        positions: [0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0],
-        normals: [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1],
-        uvs: [0, 0, 1, 0, 1, 1, 0, 1],
-        indices: [0, 1, 2, 0, 2, 3],
-      },
-      texture = { image, mimeType: 'image/png', magFilter: 'nearest', minFilter: 'nearest', mipmaps: false },
-      scene = { nodes: [{ geometry, material: { name: 'Palette', baseColorTexture: texture } }] },
-      ordinary = readGLB(exportGLB(scene)),
-      { glb, mapping } = exportRobloxGLB(scene, { maxTrianglesPerPart: 1 }),
-      roblox = readGLB(glb),
-      report = await validate(glb);
-    assert.equal(report.errors + report.warnings, 0, JSON.stringify(report.messages));
-    for (const key of ['materials', 'samplers', 'textures', 'images'])
-      assert.deepEqual(roblox.json[key], ordinary.json[key]);
-    sameCorners(ordinary, roblox, mapping);
-  },
-);
+test('a textured palette keeps its image, sampler and material and passes the Khronos validator', async () => {
+  const fixture = readGLB(new Uint8Array(await readFile(new URL('./fixtures/BoxTextured.glb', import.meta.url)))),
+    view = fixture.json.bufferViews[fixture.json.images[0].bufferView],
+    image = fixture.bin.slice(view.byteOffset, view.byteOffset + view.byteLength),
+    geometry = {
+      positions: [0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0],
+      normals: [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1],
+      uvs: [0, 0, 1, 0, 1, 1, 0, 1],
+      indices: [0, 1, 2, 0, 2, 3],
+    },
+    texture = { image, mimeType: 'image/png', magFilter: 'nearest', minFilter: 'nearest', mipmaps: false },
+    scene = { nodes: [{ geometry, material: { name: 'Palette', baseColorTexture: texture } }] },
+    ordinary = readGLB(exportGLB(scene)),
+    { glb, mapping } = exportRobloxGLB(scene, { maxTrianglesPerPart: 1 }),
+    roblox = readGLB(glb),
+    report = await validate(glb);
+  assert.equal(report.errors + report.warnings, 0, JSON.stringify(report.messages));
+  for (const key of ['materials', 'samplers', 'textures', 'images'])
+    assert.deepEqual(roblox.json[key], ordinary.json[key]);
+  sameCorners(ordinary, roblox, mapping);
+});
 
 test('engine scenes split like data scenes', async () => {
   const engine = await headlessEngine();

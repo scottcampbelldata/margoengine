@@ -13,11 +13,10 @@ import { exportModel } from '../dist/model.js';
 import { headless, headlessModels } from '../../../tests/support/pbr-snapshot.js';
 import { bigGLB } from '../../../tests/support/big-glb.js';
 import { instancedGLTF } from '../../../tests/support/instanced-gltf.js';
-import { glTFRows, readGLB, validate, validator } from './helpers.js';
+import { glTFRows, readGLB, validate } from './helpers.js';
 
 const asset = (name) =>
   readFile(new URL(`../../../examples/assets/${name}`, import.meta.url)).then((b) => new Uint8Array(b));
-const needsValidator = validator ? {} : { skip: 'gltf-validator not installed' };
 const bytes = (a) => new Uint8Array(a.buffer, a.byteOffset, a.byteLength);
 const same = (a, b, label) => assert.ok(Buffer.compare(bytes(a), bytes(b)) === 0, `${label} differs`);
 const close = (a, b, epsilon, label) => {
@@ -128,7 +127,7 @@ for (const [file, animated] of [
   ['scifi-helmet.glb', false],
   ['robot-expressive.glb', true],
 ]) {
-  test(`exportModel round trip: ${file}`, needsValidator, () =>
+  test(`exportModel round trip: ${file}`, () =>
     headlessModels(async () => {
       const source = await asset(file),
         model = await parseGLTFAsync(await headless(), source.slice());
@@ -162,8 +161,7 @@ for (const [file, animated] of [
       posed.root.engine.store.tick(false);
       model.nodes.forEach((node, i) => close(posed.nodes[i].matrix, node.matrix, 1e-6, `posed node ${i}`));
       model.primitives.forEach((p, i) => same(posed.primitives[i].weights, p.weights, `posed weights ${i}`));
-    }),
-  );
+    }));
 }
 
 test('exportModel: onlyVisible drops hidden subtrees and their channels; a hidden joint is an error', () =>
@@ -197,7 +195,7 @@ test('exportModel: onlyVisible drops hidden subtrees and their channels; a hidde
     );
   }));
 
-test('exportModel: EXT_mesh_gpu_instancing round trip (generated grids, 50 instances each)', needsValidator, () =>
+test('exportModel: EXT_mesh_gpu_instancing round trip (generated grids, 50 instances each)', () =>
   headlessModels(async () => {
     const source = bigGLB({ segments: 16, meshes: 2, instances: 50 }),
       model = await parseGLTFAsync(await headless(), source, { decoders: { instancing } });
@@ -216,8 +214,7 @@ test('exportModel: EXT_mesh_gpu_instancing round trip (generated grids, 50 insta
       assert.equal(b.count, a.count);
       for (let k = 0; k < a.count; k++) close(b.getMatrixAt(k), a.getMatrixAt(k), 1e-6, `primitive ${i} instance ${k}`);
     });
-  }),
-);
+  }));
 
 /** RGBA8 rows back out of an exportModel PNG (filter types None and Sub). */
 function decodePNG(png) {
@@ -247,139 +244,131 @@ function decodePNG(png) {
   return { width, height, data: out };
 }
 
-test(
-  'exportModel: @margoengine/materials meshes with raw textures, UV transform, alpha modes and instances',
-  needsValidator,
-  () =>
-    headlessModels(async () => {
-      const engine = await headless(),
-        pixels = (w, h, seed) => ({
-          width: w,
-          height: h,
-          data: Uint8Array.from({ length: w * h * 4 }, (_, i) => (i * seed + 7 * (i >> 2)) % 256),
-        });
-      const base = new Texture(pixels(5, 3, 13), { wrapS: 'repeat', wrapT: 'mirror' }),
-        normal = new Texture(pixels(4, 4, 31), { magFilter: 'nearest', minFilter: 'nearest' });
-      const quad = {
-        positions: [0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0],
-        normals: [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1],
-        uvs: [0, 0, 1, 0, 1, 1, 0, 1],
-        tangents: [1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, -1],
-        colors: [1, 0, 0, 1, 0, 1, 0, 1, 0, 0, 1, 0.5, 1, 1, 1, 1],
-        indices: [0, 1, 2, 0, 2, 3],
-      };
-      const textured = new Material({
-        color: [0.8, 0.4, 0.2],
-        opacity: 0.6,
-        transparent: true,
-        roughness: 0.3,
-        metalness: 0.7,
-        emissive: [0.1, 0.2, 0],
-        map: base,
-        normalMap: normal,
-        normalScale: 0.5,
-        aoMap: base,
-        aoMapIntensity: 0.25,
-        doubleSided: true,
-        uvTransform: { offset: [0.25, 0.5], scale: [2, 0.5], rotation: 0.3 },
+test('exportModel: @margoengine/materials meshes with raw textures, UV transform, alpha modes and instances', () =>
+  headlessModels(async () => {
+    const engine = await headless(),
+      pixels = (w, h, seed) => ({
+        width: w,
+        height: h,
+        data: Uint8Array.from({ length: w * h * 4 }, (_, i) => (i * seed + 7 * (i >> 2)) % 256),
       });
-      const masked = new Material({ shading: 'basic', color: '#336699', alphaTest: 0.4 });
-      const a = createMesh(engine, quad, textured),
-        b = createInstancedMesh(engine, quad, masked, 3);
-      a.root.setPosition([1, 2, 3]).setScale([2, 2, 2]);
-      b.instances.setMatrixAt(1, [-1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 4, 0, 0, 1]).setColorAt(2, [0.2, 0.4, 0.6]);
-      assert.equal(a.material, textured);
-      const glb = await exportModel([a, b], { binary: true }),
-        { json } = readGLB(glb);
-      await assertNoNewIssues(glb);
-      assert.deepEqual(json.extensionsUsed.sort(), [
-        'EXT_mesh_gpu_instancing',
-        'KHR_materials_unlit',
-        'KHR_texture_transform',
-      ]);
-      assert.deepEqual(json.samplers, [
-        { magFilter: 9729, minFilter: 9987, wrapS: 10497, wrapT: 33648 },
-        { magFilter: 9728, minFilter: 9984, wrapS: 33071, wrapT: 33071 },
-      ]);
-      assert.equal(json.images.length, 2, 'one image per Texture');
-      const copy = await reimport(glb, { instancing });
-      // Raw rows are the GPU rows (row 0 at v = 0, the image's bottom): written last row first, losslessly.
-      for (const [i, texture] of [
-        [0, base],
-        [1, normal],
-      ]) {
-        const { width, height, data } = texture.source,
-          rows = Array.from({ length: height }, (_, y) =>
-            data.subarray((height - 1 - y) * width * 4, (height - y) * width * 4),
-          );
-        assert.deepEqual(decodePNG(docImage(copy, json.textures[i].source)), {
-          ...texture.source,
-          data: Uint8Array.from(rows.flatMap((row) => [...row])),
-        });
-      }
-      // Two models -> two wrapped scene roots (a has a root transform), materials from the live Material values.
-      assert.equal(copy.primitives.length, 2);
-      const [p, q] = copy.primitives;
-      for (const [x, m] of [
-        [p, a.primitives[0]],
-        [q, b.primitives[0]],
-      ]) {
-        for (const key of ['base', 'factors', 'emission']) close(x.material[key], m.material[key], 1e-6, key);
-        // UV transforms travel with textures, conjugated to glTF's v down: the map, normal and occlusion slots of
-        // `textured` (untextured `masked` keeps the identity).
-        for (const slot of m === a.primitives[0] ? [0, 2, 3] : [0, 1, 2, 3, 4])
-          close(
-            x.material.uvt.slice(slot * 8, slot * 8 + 8),
-            glTFRows(m.material.uvt.slice(slot * 8, slot * 8 + 8)),
-            1e-6,
-            `uvt ${slot}`,
-          );
-        // alphaCutoff is written for MASK only; BLEND reads back the default 0.5.
-        close(
-          x.material.settings,
-          m.material.settings.map((v, i) => (i === 1 && m.material.settings[0] !== 1 ? 0.5 : v)),
-          0,
-          'settings',
+    const base = new Texture(pixels(5, 3, 13), { wrapS: 'repeat', wrapT: 'mirror' }),
+      normal = new Texture(pixels(4, 4, 31), { magFilter: 'nearest', minFilter: 'nearest' });
+    const quad = {
+      positions: [0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0],
+      normals: [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1],
+      uvs: [0, 0, 1, 0, 1, 1, 0, 1],
+      tangents: [1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, -1],
+      colors: [1, 0, 0, 1, 0, 1, 0, 1, 0, 0, 1, 0.5, 1, 1, 1, 1],
+      indices: [0, 1, 2, 0, 2, 3],
+    };
+    const textured = new Material({
+      color: [0.8, 0.4, 0.2],
+      opacity: 0.6,
+      transparent: true,
+      roughness: 0.3,
+      metalness: 0.7,
+      emissive: [0.1, 0.2, 0],
+      map: base,
+      normalMap: normal,
+      normalScale: 0.5,
+      aoMap: base,
+      aoMapIntensity: 0.25,
+      doubleSided: true,
+      uvTransform: { offset: [0.25, 0.5], scale: [2, 0.5], rotation: 0.3 },
+    });
+    const masked = new Material({ shading: 'basic', color: '#336699', alphaTest: 0.4 });
+    const a = createMesh(engine, quad, textured),
+      b = createInstancedMesh(engine, quad, masked, 3);
+    a.root.setPosition([1, 2, 3]).setScale([2, 2, 2]);
+    b.instances.setMatrixAt(1, [-1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 4, 0, 0, 1]).setColorAt(2, [0.2, 0.4, 0.6]);
+    assert.equal(a.material, textured);
+    const glb = await exportModel([a, b], { binary: true }),
+      { json } = readGLB(glb);
+    await assertNoNewIssues(glb);
+    assert.deepEqual(json.extensionsUsed.sort(), [
+      'EXT_mesh_gpu_instancing',
+      'KHR_materials_unlit',
+      'KHR_texture_transform',
+    ]);
+    assert.deepEqual(json.samplers, [
+      { magFilter: 9729, minFilter: 9987, wrapS: 10497, wrapT: 33648 },
+      { magFilter: 9728, minFilter: 9984, wrapS: 33071, wrapT: 33071 },
+    ]);
+    assert.equal(json.images.length, 2, 'one image per Texture');
+    const copy = await reimport(glb, { instancing });
+    // Raw rows are the GPU rows (row 0 at v = 0, the image's bottom): written last row first, losslessly.
+    for (const [i, texture] of [
+      [0, base],
+      [1, normal],
+    ]) {
+      const { width, height, data } = texture.source,
+        rows = Array.from({ length: height }, (_, y) =>
+          data.subarray((height - 1 - y) * width * 4, (height - y) * width * 4),
         );
-        // Packed vertices equal, except UV0's v (glTF v down) and UV1: packGeometry copies UV0 there and only
-        // TEXCOORD_0 is written.
+      assert.deepEqual(decodePNG(docImage(copy, json.textures[i].source)), {
+        ...texture.source,
+        data: Uint8Array.from(rows.flatMap((row) => [...row])),
+      });
+    }
+    // Two models -> two wrapped scene roots (a has a root transform), materials from the live Material values.
+    assert.equal(copy.primitives.length, 2);
+    const [p, q] = copy.primitives;
+    for (const [x, m] of [
+      [p, a.primitives[0]],
+      [q, b.primitives[0]],
+    ]) {
+      for (const key of ['base', 'factors', 'emission']) close(x.material[key], m.material[key], 1e-6, key);
+      // UV transforms travel with textures, conjugated to glTF's v down: the map, normal and occlusion slots of
+      // `textured` (untextured `masked` keeps the identity).
+      for (const slot of m === a.primitives[0] ? [0, 2, 3] : [0, 1, 2, 3, 4])
         close(
-          x.vertices,
-          m.vertices.map((v, i) => (i % 20 === 13 ? 1 - v : i % 20 === 14 || i % 20 === 15 ? 0 : v)),
-          0,
-          'vertices',
+          x.material.uvt.slice(slot * 8, slot * 8 + 8),
+          glTFRows(m.material.uvt.slice(slot * 8, slot * 8 + 8)),
+          1e-6,
+          `uvt ${slot}`,
         );
-        same(x.indices, m.indices, 'indices');
-      }
-      assert.equal(q.material.ext[0], 1, 'basic shading is KHR_materials_unlit');
-      copy.root.engine.store.tick(false);
-      engine.store.tick(false);
-      close(p.node.matrix, a.primitives[0].node.matrix, 1e-6, 'world matrix');
-      for (let k = 0; k < 3; k++) close(q.instances.getMatrixAt(k), b.instances.getMatrixAt(k), 1e-6, `instance ${k}`);
-      // Without OffscreenCanvas (Node) a texture larger than maxTextureSize cannot be resized.
-      await assert.rejects(exportModel(a, { maxTextureSize: 4 }), /OffscreenCanvas/);
-    }),
-);
+      // alphaCutoff is written for MASK only; BLEND reads back the default 0.5.
+      close(
+        x.material.settings,
+        m.material.settings.map((v, i) => (i === 1 && m.material.settings[0] !== 1 ? 0.5 : v)),
+        0,
+        'settings',
+      );
+      // Packed vertices equal, except UV0's v (glTF v down) and UV1: packGeometry copies UV0 there and only
+      // TEXCOORD_0 is written.
+      close(
+        x.vertices,
+        m.vertices.map((v, i) => (i % 20 === 13 ? 1 - v : i % 20 === 14 || i % 20 === 15 ? 0 : v)),
+        0,
+        'vertices',
+      );
+      same(x.indices, m.indices, 'indices');
+    }
+    assert.equal(q.material.ext[0], 1, 'basic shading is KHR_materials_unlit');
+    copy.root.engine.store.tick(false);
+    engine.store.tick(false);
+    close(p.node.matrix, a.primitives[0].node.matrix, 1e-6, 'world matrix');
+    for (let k = 0; k < 3; k++) close(q.instances.getMatrixAt(k), b.instances.getMatrixAt(k), 1e-6, `instance ${k}`);
+    // Without OffscreenCanvas (Node) a texture larger than maxTextureSize cannot be resized.
+    await assert.rejects(exportModel(a, { maxTextureSize: 4 }), /OffscreenCanvas/);
+  }));
 
-test(
-  'exportModel: .gltf output, external images kept with embedImages false, and image bytes reused',
-  needsValidator,
-  () =>
-    headlessModels(async () => {
-      // An external image: only its decoded pixels were kept, which only a canvas can encode again.
-      const image = 'textures/checker.png',
-        { doc, buffers } = instancedGLTF([{ t: [0, 0, 0] }], { instanced: false, image });
-      const model = parseGLTF(await headless(), doc, buffers, [{ width: 4, height: 4, close() {} }]);
-      const helmet = await parseGLTFAsync(await headless(), await asset('scifi-helmet.glb'));
-      const result = await exportModel(helmet, { embed: false, binUri: 'helmet.bin' });
-      assert.equal(result.binUri, 'helmet.bin');
-      assert.ok(result.bin.length > 3_000_000);
-      const report = await validate(result.text, { 'helmet.bin': result.bin });
-      assert.equal(report.errors, 0);
-      const embedded = await exportModel(helmet);
-      assert.match(embedded.json.buffers[0].uri, /^data:application\/octet-stream;base64,/);
-      const { json } = await exportModel(model, { embedImages: false });
-      assert.deepEqual(json.images, [{ uri: image }]);
-      await assert.rejects(exportModel(model), /OffscreenCanvas/);
-    }),
-);
+test('exportModel: .gltf output, external images kept with embedImages false, and image bytes reused', () =>
+  headlessModels(async () => {
+    // An external image: only its decoded pixels were kept, which only a canvas can encode again.
+    const image = 'textures/checker.png',
+      { doc, buffers } = instancedGLTF([{ t: [0, 0, 0] }], { instanced: false, image });
+    const model = parseGLTF(await headless(), doc, buffers, [{ width: 4, height: 4, close() {} }]);
+    const helmet = await parseGLTFAsync(await headless(), await asset('scifi-helmet.glb'));
+    const result = await exportModel(helmet, { embed: false, binUri: 'helmet.bin' });
+    assert.equal(result.binUri, 'helmet.bin');
+    assert.ok(result.bin.length > 3_000_000);
+    const report = await validate(result.text, { 'helmet.bin': result.bin });
+    assert.equal(report.errors, 0);
+    const embedded = await exportModel(helmet);
+    assert.match(embedded.json.buffers[0].uri, /^data:application\/octet-stream;base64,/);
+    const { json } = await exportModel(model, { embedImages: false });
+    assert.deepEqual(json.images, [{ uri: image }]);
+    await assert.rejects(exportModel(model), /OffscreenCanvas/);
+  }));

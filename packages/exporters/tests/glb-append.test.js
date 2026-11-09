@@ -3,9 +3,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { appendGLBMeshes, exportGLB, joinGLB, splitGLB } from '../dist/index.js';
-import { accessor, readGLB, validate, validator } from './helpers.js';
+import { accessor, readGLB, validate } from './helpers.js';
 
-const needsValidator = validator ? {} : { skip: 'gltf-validator not installed' };
 const cube = (size) => ({
   positions: [
     0,
@@ -98,7 +97,7 @@ test('splitGLB copy: false returns views into the file and parse replaces JSON.p
   );
 });
 
-test('appendGLBMeshes adds named proxies and keeps every existing byte', needsValidator, async () => {
+test('appendGLBMeshes adds named proxies and keeps every existing byte', async () => {
   const before = visual(),
     original = splitGLB(before),
     after = appendGLBMeshes(before, [
@@ -144,7 +143,7 @@ test('appendGLBMeshes adds named proxies and keeps every existing byte', needsVa
   assert.deepEqual(appendGLBMeshes(before, []), before);
 });
 
-test('appendGLBMeshes gives a scene-less file a scene with its existing roots', needsValidator, async () => {
+test('appendGLBMeshes gives a scene-less file a scene with its existing roots', async () => {
   const parts = splitGLB(
     exportGLB({ nodes: [{ name: 'A', geometry: { ...cube(1), normals: new Array(24).fill(1) } }] }),
   );

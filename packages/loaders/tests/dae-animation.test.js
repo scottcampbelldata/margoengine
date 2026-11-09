@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { requiredFixture } from '../../../scripts/support/required-fixture.mjs';
 import {
   LoaderError,
   bindDAESkin,
@@ -160,7 +161,7 @@ test('DAE skin: posed vertices at keyframes through poseDAE and flattenDAE', () 
   close(flattenDAE(dae, pose).normals.subarray(0, 3), [0, 0, 1], 'normal');
 });
 
-test('DAE skin: bindDAESkin and daeKeyframeClip feed the animation Skeleton and Skin', async (t) => {
+test('DAE skin: bindDAESkin and daeKeyframeClip feed the animation Skeleton and Skin', async () => {
   const dae = parseDAE(skinned()),
     binding = bindDAESkin(dae);
   assert.equal(binding.node, dae.nodes[1]);
@@ -191,13 +192,8 @@ test('DAE skin: bindDAESkin and daeKeyframeClip feed the animation Skeleton and 
   assert.equal(rotation.length, 31); // 0 to 1 s at 30 fps
   close(rotation[30].value, [0, 0, s, s], 'quaternion at t = 1');
   close(clip.tracks[0].keys[30].value, [0, 1, 0], 'translation at t = 1');
-  let animation;
-  try {
-    animation = await import('../../animation/dist/index.js');
-  } catch {
-    t.skip('packages/animation is not built');
-    return;
-  }
+  requiredFixture(new URL('../../animation/dist/index.js', import.meta.url), 'npm run build:packages');
+  const animation = await import('../../animation/dist/index.js');
   const { Skeleton, Skin, createKeyframeClip, applyKeyframeClip } = animation;
   const skeleton = new Skeleton(binding.bones, binding.inverseBindMatrices),
     skin = new Skin(skeleton, binding.joints, binding.weights),

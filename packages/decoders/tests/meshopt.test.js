@@ -5,6 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
+import { requiredFixture } from '../../../scripts/support/required-fixture.mjs';
 import { fileURLToPath } from 'node:url';
 import {
   MeshoptDecoder,
@@ -46,7 +47,7 @@ test('meshopt: every reference vector decodes bit for bit', () => {
   assert.equal(MeshoptDecoder.supported, true);
 });
 
-test('meshopt: every compressed bufferView of MeshoptCubeTest and Triangle.meshopt decodes to the recorded bytes', (t) => {
+test('meshopt: every compressed bufferView of MeshoptCubeTest and Triangle.meshopt decodes to the recorded bytes', () => {
   let checked = 0;
   for (const file of views.gltfs) {
     const doc = JSON.parse(readFileSync(repo + file.path, 'utf8'));
@@ -59,7 +60,7 @@ test('meshopt: every compressed bufferView of MeshoptCubeTest and Triangle.mesho
           index,
           uri.startsWith('data:')
             ? Buffer.from(uri.slice(uri.indexOf(',') + 1), 'base64')
-            : readFileSync(repo + dir + uri),
+            : requiredFixture(repo + dir + uri, 'git lfs pull'),
         );
       }
       return buffers.get(index);
@@ -68,7 +69,6 @@ test('meshopt: every compressed bufferView of MeshoptCubeTest and Triangle.mesho
       const bv = doc.bufferViews[view.bufferView];
       const ext = bv.extensions.KHR_meshopt_compression ?? bv.extensions.EXT_meshopt_compression;
       const data = buffer(ext.buffer);
-      if (data.subarray(0, 7).toString() === 'version') return t.skip('Git LFS objects are not checked out');
       const src = new Uint8Array(data.buffer, data.byteOffset + (ext.byteOffset ?? 0), ext.byteLength);
       assert.equal(`0x${src[0].toString(16)}`, view.header, `view ${view.bufferView} header`);
       const out = decode(src, view.count, view.byteStride, view.mode, view.filter);

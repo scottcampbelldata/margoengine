@@ -131,7 +131,7 @@ test('a hung pip install is reported as passing its time limit', () => {
   assert.equal(existsSync(venv), false);
 });
 
-test('the check itself, with a missing venv and no Python: loud SKIP naming the fix, exit 0; exit 1 when required', () => {
+test('the check itself, with a missing venv and no Python: fails naming the fix, even without a strict environment flag', () => {
   const dir = scratch();
   try {
     const env = {
@@ -148,8 +148,8 @@ test('the check itself, with a missing venv and no Python: loud SKIP naming the 
       });
     const skipped = check({ MARGO_REQUIRE_JUPYTER: '' });
     assert.equal(skipped.error, undefined, 'the check ends by itself');
-    assert.equal(skipped.status, 0, skipped.stderr);
-    assert.match(skipped.stderr, /==== SKIP: test:python:browser did not run \(this is not a pass\) ====/);
+    assert.equal(skipped.status, 1, skipped.stderr);
+    assert.match(skipped.stderr, /==== FAIL: test:python:browser did not run \(this is not a pass\) ====/);
     assert.ok(skipped.stderr.includes(`Fix: ${SETUP}`), skipped.stderr);
     assert.ok(skipped.stderr.includes('MARGO_PYTHON='), 'names the Python it tried');
     const required = check({ MARGO_REQUIRE_JUPYTER: '1' });
@@ -160,7 +160,7 @@ test('the check itself, with a missing venv and no Python: loud SKIP naming the 
   }
 });
 
-test('the Python package suite (in verify) with no venv and no Python: loud SKIP naming the fix; FAIL when required', () => {
+test('the Python package suite (in verify) with no venv and no Python: fails naming the fix, even without a strict environment flag', () => {
   const dir = scratch();
   try {
     // No Python anywhere: an empty PATH, no MARGO_PYTHON, a venv folder that does not exist.
@@ -177,10 +177,11 @@ test('the Python package suite (in verify) with no venv and no Python: loud SKIP
     const skipped = suite({ MARGO_REQUIRE_PYTHON: '' });
     const out = `${skipped.stdout}\n${skipped.stderr}`;
     assert.equal(skipped.error, undefined, 'the suite ends by itself');
-    assert.equal(skipped.status, 0, out);
-    assert.match(out, /SKIP: the margoengine Python package suite did not run \(this is not a pass\)/);
+    assert.equal(skipped.status, 1, out);
+    assert.match(out, /the margoengine Python package suite did not run \(this is not a pass\)/);
     assert.ok(out.includes(`Fix: ${SETUP}`), out);
-    assert.match(out, /skipped 1/);
+    assert.match(out, /fail 1/);
+    assert.match(out, /skipped 0/);
     const required = suite({ MARGO_REQUIRE_PYTHON: '1' });
     assert.equal(required.status, 1, `${required.stdout}\n${required.stderr}`);
   } finally {

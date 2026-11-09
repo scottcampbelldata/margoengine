@@ -13,6 +13,25 @@ are still open.
 
 The root voxel tracer used the final ray segment's `h.t` to convert the emitter PDF to solid angle after crossing a medium without scattering. NEE used the whole vertex-to-light distance, so the two MIS shares did not sum to one and over-counted energy. The tracer retains the last scattering position and uses its full distance for both voxel emission and area hits. `packages/voxel-pathtracer/tests/restir-browser.mjs` compares an absorbing half-block slab under a square light against independent quadrature, for both light types and both native WebGPU and compatibility. Before the correction, voxel emission averaged 0.756703 against about 0.69 physically expected, failing the unchanged 0.02 bound. The many-light 2x requirement is unchanged.
 
+### Fixed 2026-11-09: missing evidence could pass verification
+
+Environment EXR/HDR comparisons, six loader fixture checks, the meshopt LFS buffer check, COLLADA's
+animation integration and exporter validation could skip or return successfully when required inputs
+were absent. Texture encoder and Python setup absence could also report skipped success. The cause
+was treating required test evidence as optional. Fixture reads now fail with a path and recovery command;
+the validator is mandatory, imports propagate missing-build failure, and Python setup failure exits
+unsuccessfully. `tests/fixture-skips.test.js` regresses missing files, LFS pointers, HTTP/size/hash failure
+and executable skip/return patterns; `tests/python-venv.test.js` checks missing Python even with strict
+flags unset. [The inventory](work-lists/missing-test-items.md) separates batch 160, held physics and
+remaining unverified real-file variants. Their proof gaps are not claimed fixed by the gate.
+
+### Open 2026-11-09: exporter capture browser shutdown exceeded its deadline
+
+- **Repro:** after a package build, run `node scripts/gpu-lock.mjs run --owner=codex-missing -- node packages/exporters/tests/capture-browser.mjs` with a process-tree limit. The required-input audit's 19-suite GPU run observed this at base `c1646e3ec` plus test-only edits, RTX A6000, Edge 157.0.4341.42.
+- **Observed:** all capture/render/GIF/JPEG/WebM assertions printed success, then `closeAll` threw `SHUTDOWN_TIMEOUT`, still open: browser, at its unchanged 30,000 ms deadline. The suite failed in 36 s; the other 18 selected suites, including real Jupyter notebooks, passed.
+- **Cause narrowed, not isolated:** shutdown awaits the wrapped browser close before closing the server. The owned Chromium wrapper waits for both `server.kill()` and the connected client's ordinary `close()` through `Promise.allSettled`; at least one browser teardown wait did not settle before the deadline. The failing run did not instrument the two promises independently, so it does not identify which one or establish a load-only explanation.
+- **Owner:** Scott assigned this GPU teardown hang to batch 160 in lane-M (2026-11-09). This lane does not work on it or count the suite as passing. No retry, budget increase or assertion change was made. Logs remain in the lane's ignored `test-results/missing-items/gpu-packages.log`; the active [work list](work-lists/missing-test-items.md) records the owner.
+
 ### Fixed 2026-11-08: text extrusion API report
 
 The batch 110 baseline `npm run verify` found that the text extrusion repair changed
@@ -120,14 +139,17 @@ The byte ceilings above are approved; all normal checks are required before push
 
 ## README examples
 
-### 101 README examples do not run yet
+### README examples still need matching inputs and repairs
 
 - **What:** `npm run check:readme-run`, a step of `check:merge` since 2026-11-07, ran 641 of 767 examples that day (RTX A6000,
   Chromium). The other 126 went into `scripts/support/readme-run-known.json`; 101 are left there, each with its error. The voxel-pathtracer introduction now builds a complete generated model instead of fetching an absent raw array; its package regression executes the actual scene setup and the browser runner checks capture. A new failure fails the step, and
   so does an entry that passes or names an example that is gone. An id is the heading above an example and a hash of its code, so
   an example added above one on the list leaves it alone; changing a listed example changes its id, and the entry moves with it.
 - **Repro:** `npm run build:packages`, then `npm run check:readme-run -- --only=<id>` with an id from that list.
-- **Cause:** 84 entries start `sample:`. The example names a file of its own (a font, a scan, a rigged model with named joints)
+- **Current source audit (2026-11-09):** 101 entries remain after the upstream voxel-pathtracer repair, 84 labelled `sample:` and 17 labelled `example:`.
+  The required-test-items scoped rerun ran 62 of 94 examples, with 32 allowed failures. It exited zero; that does not mean
+  those 32 examples ran. Their missing/incompatible inputs are indexed in [missing-test-items](work-lists/missing-test-items.md).
+- **Cause:** sample entries name a file of their own (a font, a scan, a rigged model with named joints)
   and the check has no matching sample, or the sample does not fit it, so these say nothing about the example yet. The ragdoll's
   get-up is in this group: it needs prone and supine get-up clips (getting up from the front and from the back) on a humanoid rig, and no free rig in the repository has them; the Quaternius Universal Animation Library Standard 3.0 pack (CC0) was checked on 2026-11-07 and has none (its closest clips, `Sitting_Exit`, `Death01` and `Fixing_Kneeling`, are not get-ups). Fbx, the animator's joint indices and `usdz/readme-margoengine-usdz-087124` and `usdz/readme-composition-fbebfe` (no `.usdz` file is in the repository) are in this group too. 17 start
   `example:`, and these need reading one at a time:

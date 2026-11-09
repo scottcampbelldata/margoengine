@@ -474,6 +474,9 @@ until it ends or times out, so no new decode queues behind it unknowingly.
 
 ## Tests
 
+The real meshopt bufferView checks require their Khronos buffers. Missing data or a Git LFS pointer
+fails with the exact file path; run `git lfs pull` from the repository root to fetch the buffers.
+
 `npm test` in `packages/decoders` runs Node checks with mock and real Wasm: SSR safety, target negotiation, row pitch, mip upload, pool limits and recovery, transfer instead of copy, handle and heap release, the Khronos Box, Avocado and AnisotropyBarnLamp assets, meshopt vectors produced by the meshoptimizer 1.1.1 reference encoder and decoder, and round trips through the repository's own test encoder (`tests/support/meshopt-encode.js`, written from the extension specifications). It also covers a real normalized UV/color triangle and index promotion at 65,535, 65,536 and 65,537 vertices. The triangle was generated with pinned `draco3d@1.5.7`; `tests/generate-normalized-fixture.mjs` regenerates it from an external encoder installation without adding a runtime dependency. `npm run test:browser` adds module workers in Chromium, a 64-decode burst, a compressed upload with no validation errors, byte-identical RGBA8 GPU readback, and a production Vite consumer build that must emit the worker and decoders as assets.
 
 The Draco and Basis Universal binaries are Apache-2.0. See `vendor/NOTICE.md`.
