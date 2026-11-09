@@ -2,7 +2,6 @@
 // node packages/cutscene/tests/editor-browser.mjs
 // Drives the panel with a real mouse and keyboard. The numbers are pixels of a panel at 100 pixels a second.
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
 import { waitReady, watchPage } from './page-ready.mjs';
 
@@ -124,7 +123,10 @@ try {
   // Export: a real download, and a real Cutscene reads the file.
   const [download] = await Promise.all([page.waitForEvent('download'), page.locator('.mtl-bar button', { hasText: 'Export' }).click()]);
   assert.equal(download.suggestedFilename(), 'cutscene.json');
-  const text = await readFile(await download.path(), 'utf8');
+  // The browser is connected over a socket (scripts/lib/browser.mjs): a download has no local path, so read its stream.
+  const chunks = [];
+  for await (const chunk of await download.createReadStream()) chunks.push(chunk);
+  const text = Buffer.concat(chunks).toString('utf8');
   assert.equal(JSON.parse(text).format, 'margo-cutscene');
   assert.deepEqual(JSON.parse(text).tracks[0].keys.map((key) => key.time), [1, 3, 6]);
   assert.equal(await panel('reads', text), true);
