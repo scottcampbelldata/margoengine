@@ -1,3 +1,4 @@
+import { giRegressions } from './gi-regressions.js';
 import { frameRegressions } from './frame-regressions.js';
 // The page of browser-check.mjs: each picture is read back and compared with the CPU form, pixel by pixel.
 import { EngineKernel } from '/packages/core/dist/index.js';
@@ -482,8 +483,8 @@ window.check = {
       const rc = new RadianceCascade2D(cascades);
       for (let y = 0; y < HEIGHT; y++) {
         for (let x = 0; x < WIDTH; x++) {
-          const wx = camera.x + (x + 0.5 - WIDTH * 0.5) / camera.zoom;
-          const wy = camera.y + (y + 0.5 - HEIGHT * 0.5) / camera.zoom;
+          const wx = camera.x + (x + 0.5) / camera.zoom;
+          const wy = camera.y + (y + 0.5) / camera.zoom;
           const irr = rc.evaluateAt([wx, wy], undefined, { emitters, occluders });
           for (let c = 0; c < 3; c++) wantGI[(y * WIDTH + x) * 3 + c] = Math.min(1, irr[c]) * 255;
         }
@@ -604,7 +605,19 @@ window.check = {
       );
       pass.dispose();
     }
-    await frameRegressions({ instance, engine, texture, read, compare, frame, checks: out.checks, errors, width: WIDTH, height: HEIGHT });
+    await frameRegressions({
+      instance,
+      engine,
+      texture,
+      read,
+      compare,
+      frame,
+      checks: out.checks,
+      errors,
+      width: WIDTH,
+      height: HEIGHT,
+    });
+    await giRegressions({ instance, engine, texture, frame, checks: out.checks, errors });
     out.errors = errors.splice(0);
     return out;
   },

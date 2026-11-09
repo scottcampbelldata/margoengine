@@ -1640,5 +1640,8 @@ Bloom image API (Jimenez, SIGGRAPH 2014, as cited in the post package).
 
 GI acceptance must follow the mathematical descriptions in [Sannikov's Radiance Cascades paper](https://github.com/Raikiri/RadianceCascadesPaper/blob/main/RadianceCascades.tex),
 including spatial probes and radiance/transmittance interval composition, and [Osborne and Sannikov, RASTI](https://doi.org/10.1093/rasti/rzae062),
-sections 2.2.1 and 2.3, including the bilinear fix for ringing. Only these papers were consulted during this repair;
-the existing GI implementation is not yet certified against them. No third-party engine files or assets were imported.
+sections 2.2.1, 2.3 and appendix A. The replacement stores radiance RGB and transmittance, doubles spatial probe
+spacing, increases angular samples, and traces separate connectors from each near start to each child interval start;
+it composes before bilinear weighting. Diffuse surface gathers use finite-order Jacobi radiosity with two-sided
+midpoint patches and normalized cosine quadrature. The independent circular-source check is asin(r/d)/pi from
+geometry. Only these papers were consulted; no third-party engine files, code or assets were imported.

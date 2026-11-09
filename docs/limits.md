@@ -925,10 +925,22 @@ Mixer gain/mute/solo/duck scheduling now validates finite nonnegative audio time
 
 ## 2D global illumination (batch 55)
 
-The `@margoengine/lighting2d/gi` prototype is not a validated spatial radiance-cascade or multi-bounce implementation.
-LIM-599 is withdrawn pending the seven GI correctness fixes in [known bugs](known-bugs.md#lighting2d-batch-55-gi-review).
-The accepted options allow cascades 1..8, base rays 1..32, angular ratio 1..8 and bounces 0..4, but the current code only
-traces three nested ray levels and treats positive bounce counts identically. These API ceilings are not working-feature claims.
+Optional `@margoengine/lighting2d/gi` evaluates 1..8 spatial cascades, 1..32 base directions, angular ratio 1..8,
+interval ratio >1, base distance >0, 0..4 finite diffuse bounce orders, albedo 0..1, intensity >=0. Defaults are
+4/4/4/4/16/1/.5/1 respectively. World probe spacing doubles from one unit; centres are on the .5 lattice.
+The far interval ends at baseDistance * intervalRatio ** (cascades - 1), which must fit float32.
+Radiance/transmittance merges trace each of four child connectors before interpolation (RASTI appendix A).
+Two-sided surface patches are at most baseDistance long; diffuse gathers use 32 normalized cosine samples and
+midpoint-constant patch radiance. Small sources and spatial detail below those samples can be missed. The analytic
+radius-six circular-source test over eleven distances 8..60 is within 5% of asin(radius/distance)/pi on CPU and RTX A6000;
+this is a measured fixture bound, not an arbitrary-scene accuracy guarantee. No speed claim.
+Patch count is capped at 65,536. The CPU hierarchy has an 8,000,000 sample-evaluation ceiling per query/grid.
+GPU scene/cascade buffers must each fit maxStorageBufferBindingSize and 1D dispatch groups must fit
+maxComputeWorkgroupsPerDimension; excessive combinations throw a coded RangeError instead of truncating work.
+Cascade memory is 16 bytes per spatial/angular sample; two surface fields use 64 bytes per patch, plus 32 bytes
+geometry per patch, 32 per emitter, 96 per direct light, masks and aligned per-dispatch uniforms.
+CPU/GPU options, finite bounce orders, exact opaque visibility/energy fixtures and lifecycle are tested. Native WebGL2
+rejects with coded unsupported/help. HDR needs a floating target; an unorm target clamps at presentation. LIM-599.
 
 ## 2.5D height and self-shadowing (batch 55)
 
@@ -1097,8 +1109,10 @@ A policy that restricts scripts must permit Wasm compilation with `script-src 'w
 - Native WebGL2 is unsupported by every lighting2d entry. Tests assert the coded rejection rather than a rendered route.
   GPU evidence is one RTX A6000 only. Manually supplied command encoders must be submitted before pass disposal.
 
-Lighting2d repair candidate entry bytes (min+gzip, other packages external): root 5,421; soft 5,926; cookie 7,374;
-gi 6,687; height 6,698; emissive 4,198. These are unlanded measurements, not an accepted increase of the existing optional
-entry budgets. Core plus stage remains 23,626 B. See the batch-55 repair record and known bugs for remaining blockers.
+Lighting2d repair candidate entry bytes (min+gzip, other packages external): root 5,394; soft 5,901; cookie 7,350;
+GI 8,457; height 6,832; emissive 4,087. Their unchanged budgets are 5,152/5,605/7,079/6,941/6,323/3,780 B.
+The 293 B shrink removes redundant stores/cache logic/validation code without removing features or tests. The remaining
+3,141 B total increase over the six budgets requires Scott's approval; no budget has been raised and no push is allowed
+while verify fails. See known-bugs.md for the per-entry request and the work retained.
 
 Height lighting accumulates in an owned rgba16float image (8 bytes per target pixel), then converts once to the caller format. Individual sums still have half-float blend precision. The 100-light .001 contribution regression is within one display byte.

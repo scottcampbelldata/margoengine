@@ -2,21 +2,14 @@
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type Engine, type EnginePlugin, type PassContext } from '@margoengine/core/extension';
 import { hexColor } from '@margoengine/math';
+import { MaskData, maskShader } from './masks.js';
+import { checkCamera, checkLayer, checkLight } from './validation.js';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
-import {
-  Light2D,
-  type Light2DOptions,
-  type Occluder2D,
-  type Point2D,
-  occluderEdges,
-} from './index.js';
+import { Light2D, type Light2DOptions, type Occluder2D, type Point2D, occluderEdges, lightAt } from './index.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; STORAGE: number };
-declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number; RENDER_ATTACHMENT: number };
-declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };
+declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number; COMPUTE: number };
 
-const PI = Math.PI;
-const TWO_PI = Math.PI * 2;
 let giPluginCount = 0;
 
 /** Shape of an emissive sprite. */
@@ -70,272 +63,253 @@ export interface GIScene2D {
   readonly lights?: readonly Light2D[];
   /** Occluder obstacles blocking rays and reflecting bounce light. */
   readonly occluders?: readonly Occluder2D[];
+  /** Direct-light layer mask. Default all bits. */
+  readonly layer?: number;
 }
 
-/** Parsed internal edge with bounds, normal, and albedo. */
-interface GIEdge {
-  readonly a: Point2D;
-  readonly b: Point2D;
-  readonly normal: Point2D;
-  readonly albedo: number;
+type RGB = [number, number, number];
+type Interval = [number, number, number, number]; // radiance RGB, transmittance
+interface Patch {
+  a: Point2D;
+  b: Point2D;
+  n: Point2D;
 }
-
-/** Parsed internal emitter. */
-interface GIEmitter {
-  readonly x: number;
-  readonly y: number;
-  readonly size: [number, number];
-  readonly shape: number; // 0 = rect, 1 = circle
-  readonly color: [number, number, number];
-  readonly intensity: number;
+interface Emitter {
+  p: Point2D;
+  size: Point2D;
+  color: RGB;
+  circle: boolean;
 }
-
-function parseColor(c?: number | string | readonly [number, number, number]): [number, number, number] {
-  if (c == null) return [1, 1, 1];
-  if (typeof c === 'number') {
-    const r = ((c >> 16) & 0xff) / 255;
-    const g = ((c >> 8) & 0xff) / 255;
-    const b = (c & 0xff) / 255;
-    return [r, g, b];
-  }
-  if (typeof c === 'string') {
-    const rgb = hexColor(c);
-    if (!rgb) throw rangeError('Invalid hex color', 'pixel-lighting');
-    return [rgb[0], rgb[1], rgb[2]];
-  }
-  if (Array.isArray(c)) {
-    if (c.length < 3 || !Number.isFinite(c[0]) || !Number.isFinite(c[1]) || !Number.isFinite(c[2])) {
-      throw rangeError('Invalid RGB color array', 'pixel-lighting');
-    }
-    return [Math.max(0, c[0]), Math.max(0, c[1]), Math.max(0, c[2])];
-  }
-  throw rangeError('Invalid color', 'pixel-lighting');
+interface Scene {
+  patches: Patch[];
+  emitters: Emitter[];
+  lights: readonly Light2D[];
+  layer: number;
 }
-
-function parseScene(scene: GIScene2D, defaultAlbedo: number): { edges: GIEdge[]; emitters: GIEmitter[]; lights: Light2D[] } {
-  const edges: GIEdge[] = [];
-  if (scene.occluders) {
-    const raw = occluderEdges(scene.occluders);
-    for (let i = 0; i < raw.length; i += 4) {
-      const a: Point2D = [raw[i], raw[i + 1]];
-      const b: Point2D = [raw[i + 2], raw[i + 3]];
-      const vx = b[0] - a[0];
-      const vy = b[1] - a[1];
-      const len = Math.hypot(vx, vy);
-      if (len > 1e-6) {
-        edges.push({
-          a,
-          b,
-          normal: [-vy / len, vx / len],
-          albedo: defaultAlbedo,
-        });
-      }
-    }
+const TAU = 2 * Math.PI;
+const direction = (i: number, count: number): Point2D => [
+  Math.cos((TAU * (i + 0.5)) / count),
+  Math.sin((TAU * (i + 0.5)) / count),
+];
+const add = (p: Point2D, d: Point2D, t: number): Point2D => [p[0] + d[0] * t, p[1] + d[1] * t];
+const color = (c: EmissiveSprite2D['color'] = 0xffffff): RGB => {
+  if (Array.isArray(c) && c.length === 3 && c.every((v) => Number.isFinite(v) && v >= 0)) return [...c] as RGB;
+  const rgb = hexColor(typeof c === 'number' ? '#' + c.toString(16).padStart(6, '0') : (c as string));
+  if (!rgb) throw rangeError('Invalid GI color', 'pixel-lighting');
+  return [rgb[0], rgb[1], rgb[2]];
+};
+function parse(scene: GIScene2D, distance: number): Scene {
+  const patches: Patch[] = [],
+    raw = occluderEdges(scene.occluders ?? []);
+  for (let i = 0; i < raw.length; i += 4) {
+    const dx = raw[i + 2] - raw[i],
+      dy = raw[i + 3] - raw[i + 1],
+      length = Math.hypot(dx, dy);
+    const count = Math.ceil(length / distance);
+    if (patches.length + count > 65536) throw rangeError('GI surface patch limit (65536)', 'pixel-lighting');
+    for (let k = 0; k < count; k++)
+      patches.push({
+        a: [raw[i] + (dx * k) / count, raw[i + 1] + (dy * k) / count],
+        b: [raw[i] + (dx * (k + 1)) / count, raw[i + 1] + (dy * (k + 1)) / count],
+        n: [-dy / length, dx / length],
+      });
   }
-
-  const emitters: GIEmitter[] = [];
-  if (scene.emitters) {
-    for (const em of scene.emitters) {
-      if (!Number.isFinite(em.x) || !Number.isFinite(em.y)) {
-        throw rangeError('Emitter position must be finite numbers', 'pixel-lighting');
-      }
-      const isCircle = em.shape === 'circle' || (em.radius != null && em.shape !== 'rect');
-      const color = parseColor(em.color);
-      const intensity = em.intensity ?? 1.0;
-      if (intensity < 0 || !Number.isFinite(intensity)) {
-        throw rangeError('Emitter intensity must be nonnegative finite number', 'pixel-lighting');
-      }
-      if (isCircle) {
-        const r = em.radius ?? em.width ?? 10;
-        if (r <= 0 || !Number.isFinite(r)) throw rangeError('Emitter radius must be positive', 'pixel-lighting');
-        emitters.push({
-          x: em.x,
-          y: em.y,
-          size: [r, r],
-          shape: 1,
-          color,
-          intensity,
-        });
-      } else {
-        const w = em.width ?? 10;
-        const h = em.height ?? 10;
-        if (w <= 0 || h <= 0 || !Number.isFinite(w) || !Number.isFinite(h)) {
-          throw rangeError('Emitter dimensions must be positive', 'pixel-lighting');
-        }
-        emitters.push({
-          x: em.x,
-          y: em.y,
-          size: [w, h],
-          shape: 0,
-          color,
-          intensity,
-        });
-      }
+  const emitters = (scene.emitters ?? []).map((em) => {
+    const circle = em.shape === 'circle' || (em.shape === undefined && em.radius !== undefined);
+    const size: Point2D = circle
+      ? [em.radius ?? em.width ?? 10, em.radius ?? em.width ?? 10]
+      : [em.width ?? 10, em.height ?? 10];
+    const intensity = em.intensity ?? 1;
+    if (
+      ![em.x, em.y, ...size, intensity].every(Number.isFinite) ||
+      size.some((v) => v <= 0) ||
+      intensity < 0 ||
+      (em.shape !== undefined && em.shape !== 'circle' && em.shape !== 'rect')
+    )
+      throw rangeError('Invalid GI emitter', 'pixel-lighting');
+    return { p: [em.x, em.y] as Point2D, size, color: color(em.color).map((v) => v * intensity) as RGB, circle };
+  });
+  const layer = scene.layer ?? 0xffffffff,
+    lights = scene.lights ?? [];
+  checkLayer(layer);
+  for (const light of lights) checkLight(light);
+  return { patches, emitters, lights, layer };
+}
+// Opaque analytic intersections. An emitter owns its nearest hit, including when the ray starts inside it.
+function trace(p: Point2D, d: Point2D, length: number, scene: Scene, surfaces: Float32Array): Interval {
+  let nearest = length,
+    side = -1,
+    rgb: RGB = [0, 0, 0],
+    hit = false;
+  for (let i = 0; i < scene.patches.length; i++) {
+    const e = scene.patches[i],
+      vx = e.b[0] - e.a[0],
+      vy = e.b[1] - e.a[1],
+      den = d[0] * vy - d[1] * vx;
+    if (Math.abs(den) < 1e-7) continue;
+    const dx = e.a[0] - p[0],
+      dy = e.a[1] - p[1],
+      t = (dx * vy - dy * vx) / den,
+      u = (dx * d[1] - dy * d[0]) / den;
+    if (t > 1e-4 && t <= nearest && u >= 0 && u <= 1) {
+      nearest = t;
+      hit = true;
+      side = i * 2 + (d[0] * e.n[0] + d[1] * e.n[1] > 0 ? 1 : 0);
     }
   }
-
-  const lights = scene.lights ? [...scene.lights] : [];
-  return { edges, emitters, lights };
-}
-
-/**
- * Traces an interval along a ray, checking occluder edges and emitters.
- */
-function traceRayInterval(
-  origin: Point2D,
-  dir: Point2D,
-  minT: number,
-  maxT: number,
-  edges: readonly GIEdge[],
-  emitters: readonly GIEmitter[],
-  lights: readonly Light2D[],
-  evalBounce: boolean,
-  defaultAlbedo: number,
-): { hit: boolean; hitT: number; hitPoint: Point2D | null; hitNormal: Point2D; hitAlbedo: number; radiance: [number, number, number] } {
-  let hit = false;
-  let hitT = maxT;
-  let hitPoint: Point2D | null = null;
-  let hitNormal: Point2D = [0, 1];
-  let hitAlbedo = defaultAlbedo;
-  const radiance: [number, number, number] = [0, 0, 0];
-
-  for (const edge of edges) {
-    const vx = edge.b[0] - edge.a[0];
-    const vy = edge.b[1] - edge.a[1];
-    const denom = dir[0] * vy - dir[1] * vx;
-    if (Math.abs(denom) > 1e-7) {
-      const diffX = edge.a[0] - origin[0];
-      const diffY = edge.a[1] - origin[1];
-      const t = (diffX * vy - diffY * vx) / denom;
-      const u = (diffX * dir[1] - diffY * dir[0]) / denom;
-      if (t >= minT && t <= hitT && u >= 0.0 && u <= 1.0) {
-        hit = true;
-        hitT = t;
-        hitPoint = [origin[0] + t * dir[0], origin[1] + t * dir[1]];
-        let n = edge.normal;
-        if (dir[0] * n[0] + dir[1] * n[1] > 0) n = [-n[0], -n[1]];
-        hitNormal = n;
-        hitAlbedo = edge.albedo;
-      }
-    }
-  }
-
-  for (const em of emitters) {
-    if (em.shape === 1) {
-      // Circle
-      const r = em.size[0];
-      const wx = origin[0] - em.x;
-      const wy = origin[1] - em.y;
-      const b = dir[0] * wx + dir[1] * wy;
-      const c = wx * wx + wy * wy - r * r;
-      const disc = b * b - c;
-      if (disc >= 0) {
-        const root = Math.sqrt(disc);
-        const t1 = -b - root;
-        const t2 = -b + root;
-        const tEnter = Math.max(t1, minT);
-        const tExit = Math.min(t2, maxT);
-        if (tEnter <= tExit && tEnter < hitT) {
-          radiance[0] += em.color[0] * em.intensity;
-          radiance[1] += em.color[1] * em.intensity;
-          radiance[2] += em.color[2] * em.intensity;
+  if (side >= 0) rgb = [surfaces[side * 4], surfaces[side * 4 + 1], surfaces[side * 4 + 2]];
+  for (const e of scene.emitters) {
+    const w: Point2D = [p[0] - e.p[0], p[1] - e.p[1]];
+    let near = 0,
+      far = length;
+    if (e.circle) {
+      const b = w[0] * d[0] + w[1] * d[1],
+        disc = b * b - w[0] ** 2 - w[1] ** 2 + e.size[0] ** 2;
+      if (disc < 0) continue;
+      near = Math.max(0, -b - Math.sqrt(disc));
+      far = Math.min(far, -b + Math.sqrt(disc));
+    } else
+      for (let j = 0; j < 2; j++) {
+        if (Math.abs(d[j]) < 1e-7) {
+          if (Math.abs(w[j]) > e.size[j] / 2) far = -1;
+        } else {
+          const a = (-e.size[j] / 2 - w[j]) / d[j],
+            b = (e.size[j] / 2 - w[j]) / d[j];
+          near = Math.max(near, Math.min(a, b));
+          far = Math.min(far, Math.max(a, b));
         }
       }
-    } else {
-      // Rect
-      const halfW = em.size[0] * 0.5;
-      const halfH = em.size[1] * 0.5;
-      const minX = em.x - halfW;
-      const maxX = em.x + halfW;
-      const minY = em.y - halfH;
-      const maxY = em.y + halfH;
-      let tNear = minT;
-      let tFar = maxT;
-      let hitBox = true;
-      if (Math.abs(dir[0]) > 1e-7) {
-        let tx1 = (minX - origin[0]) / dir[0];
-        let tx2 = (maxX - origin[0]) / dir[0];
-        if (tx1 > tx2) [tx1, tx2] = [tx2, tx1];
-        tNear = Math.max(tNear, tx1);
-        tFar = Math.min(tFar, tx2);
-        if (tNear > tFar) hitBox = false;
-      } else if (origin[0] < minX || origin[0] > maxX) {
-        hitBox = false;
-      }
-      if (Math.abs(dir[1]) > 1e-7) {
-        let ty1 = (minY - origin[1]) / dir[1];
-        let ty2 = (maxY - origin[1]) / dir[1];
-        if (ty1 > ty2) [ty1, ty2] = [ty2, ty1];
-        tNear = Math.max(tNear, ty1);
-        tFar = Math.min(tFar, ty2);
-        if (tNear > tFar) hitBox = false;
-      } else if (origin[1] < minY || origin[1] > maxY) {
-        hitBox = false;
-      }
-      if (hitBox && tNear <= maxT && tNear < hitT) {
-        radiance[0] += em.color[0] * em.intensity;
-        radiance[1] += em.color[1] * em.intensity;
-        radiance[2] += em.color[2] * em.intensity;
-      }
+    if (near <= far && near <= nearest) {
+      nearest = near;
+      hit = true;
+      rgb = e.color;
     }
   }
-
-  if (hit && evalBounce && hitPoint) {
-    let directR = 0, directG = 0, directB = 0;
-    for (const em of emitters) {
-      const toX = em.x - hitPoint[0];
-      const toY = em.y - hitPoint[1];
-      const dist = Math.hypot(toX, toY);
-      if (dist > 1e-4) {
-        const lx = toX / dist;
-        const ly = toY / dist;
-        const nDotL = Math.max(0, hitNormal[0] * lx + hitNormal[1] * ly);
-        const atten = 1 / (1 + dist / 32);
-        const intens = em.intensity * nDotL * atten;
-        directR += em.color[0] * intens;
-        directG += em.color[1] * intens;
-        directB += em.color[2] * intens;
-      }
-    }
-    for (const lt of lights) {
-      const toX = lt.x - hitPoint[0];
-      const toY = lt.y - hitPoint[1];
-      const dist = Math.hypot(toX, toY);
-      if (dist < lt.radius && dist > 1e-4) {
-        const lx = toX / dist;
-        const ly = toY / dist;
-        const nDotL = Math.max(0, hitNormal[0] * lx + hitNormal[1] * ly);
-        const atten = Math.pow(Math.max(0, 1 - dist / lt.radius), lt.falloff);
-        const col = parseColor(lt.color);
-        const intens = lt.intensity * nDotL * atten;
-        directR += col[0] * intens;
-        directG += col[1] * intens;
-        directB += col[2] * intens;
-      }
-    }
-    const factor = hitAlbedo / PI;
-    radiance[0] += factor * directR;
-    radiance[1] += factor * directG;
-    radiance[2] += factor * directB;
-  }
-
-  return { hit, hitT, hitPoint, hitNormal, hitAlbedo, radiance };
+  return [...rgb, hit ? 0 : 1];
 }
-
-/**
- * 2D radiance cascade global illumination evaluator.
- * Hierarchically partitions the spatial and angular domain into cascades
- * and merges them to compute bounce light and emissive illumination.
- */
+// Finite-order two-sided diffuse radiosity, midpoint patches and 32 uniform angular samples.
+// Every gather sees only the preceding order. No history from another frame is used.
+function reflect(scene: Scene, rc: RadianceCascade2D): Float32Array {
+  let values = new Float32Array(scene.patches.length * 8);
+  const reach = rc.baseDistance * rc.intervalRatio ** (rc.cascades - 1);
+  for (let bounce = 0; bounce < rc.bounces; bounce++) {
+    const next = new Float32Array(values.length);
+    scene.patches.forEach((patch, index) => {
+      for (let side = 0; side < 2; side++) {
+        const n: Point2D = [patch.n[0] * (side ? -1 : 1), patch.n[1] * (side ? -1 : 1)];
+        const p = add([(patch.a[0] + patch.b[0]) / 2, (patch.a[1] + patch.b[1]) / 2], n, 0.001);
+        const rgb: RGB = [0, 0, 0];
+        let cosineSum = 0;
+        for (let k = 0; k < 32; k++) {
+          const d = direction(k, 32);
+          cosineSum += Math.max(0, n[0] * d[0] + n[1] * d[1]);
+        }
+        for (let k = 0; k < 32; k++) {
+          const d = direction(k, 32),
+            weight = Math.max(0, n[0] * d[0] + n[1] * d[1]) / cosineSum;
+          const ray = trace(p, d, reach, scene, values);
+          for (let c = 0; c < 3; c++) rgb[c] += ray[c] * weight;
+        }
+        for (const light of scene.lights) {
+          const d: Point2D =
+            light.kind === 'directional'
+              ? [-Math.cos(light.angle), -Math.sin(light.angle)]
+              : [light.x - p[0], light.y - p[1]];
+          const distance = Math.hypot(...d),
+            unit: Point2D = distance ? [d[0] / distance, d[1] / distance] : [0, 0];
+          if (
+            light.shadows &&
+            trace(p, unit, light.kind === 'directional' ? 1e10 : Math.max(0, distance - 0.001), scene, values)[3] === 0
+          )
+            continue;
+          const direct = lightAt(light, p[0], p[1], [...n, 0], scene.layer);
+          for (let c = 0; c < 3; c++) rgb[c] += direct[c] / 2;
+        }
+        next.set(
+          rgb.map((v) => v * rc.albedo),
+          (index * 2 + side) * 4,
+        );
+      }
+    });
+    values = next;
+  }
+  return values;
+}
+// Appendix A of Osborne/Sannikov: trace a distinct connector to each child interval start,
+// compose L_near + T_near L_far BEFORE bilinear interpolation. Never share a parent visibility ray.
+function field(scene: Scene, rc: RadianceCascade2D, surfaces: Float32Array) {
+  const cache = new Map<string, Interval>();
+  let work = 0;
+  function sample(p: Point2D, level: number, angle: number): Interval {
+    if (++work > 8_000_000) throw rangeError('GI CPU sample limit (8000000)', 'pixel-lighting');
+    const count = rc.baseRays * rc.angularRatio ** level,
+      d = direction(angle, count);
+    const near = level ? rc.baseDistance * rc.intervalRatio ** (level - 1) : 0;
+    const far = rc.baseDistance * rc.intervalRatio ** level,
+      start = add(p, d, near);
+    if (level === rc.cascades - 1) return trace(start, d, far - near, scene, surfaces);
+    const scale = 2 ** (level + 1),
+      gx = (p[0] - 0.5) / scale,
+      gy = (p[1] - 0.5) / scale;
+    const x = Math.floor(gx),
+      y = Math.floor(gy),
+      fx = gx - x,
+      fy = gy - y;
+    const sum: Interval = [0, 0, 0, 0];
+    for (let child = 0; child < rc.angularRatio; child++) {
+      const a = angle * rc.angularRatio + child,
+        cd = direction(a, count * rc.angularRatio);
+      for (let j = 0; j < 4; j++) {
+        const ix = x + (j & 1),
+          iy = y + (j >> 1),
+          weight = ((j & 1 ? fx : 1 - fx) * (j >> 1 ? fy : 1 - fy)) / rc.angularRatio;
+        if (!weight) continue;
+        const q: Point2D = [ix * scale + 0.5, iy * scale + 0.5],
+          end = add(q, cd, far);
+        const dx = end[0] - start[0],
+          dy = end[1] - start[1],
+          length = Math.hypot(dx, dy);
+        const ray = trace(start, length ? [dx / length, dy / length] : cd, length, scene, surfaces);
+        if (ray[3]) {
+          const key = `${level + 1},${ix},${iy},${a}`;
+          let upper = cache.get(key);
+          if (!upper) {
+            upper = sample(q, level + 1, a);
+            cache.set(key, upper);
+          }
+          for (let c = 0; c < 3; c++) ray[c] += ray[3] * upper[c];
+          ray[3] *= upper[3];
+        }
+        for (let c = 0; c < 4; c++) sum[c] += ray[c] * weight;
+      }
+    }
+    return sum;
+  }
+  return (p: Point2D, normal?: Point2D): RGB => {
+    if (!p.every(Number.isFinite) || (normal && !normal.every(Number.isFinite)))
+      throw rangeError('Invalid GI query', 'pixel-lighting');
+    const rgb: RGB = [0, 0, 0],
+      length = normal ? Math.hypot(...normal) : 0;
+    for (let i = 0; i < rc.baseRays; i++) {
+      const ray = sample(p, 0, i),
+        d = direction(i, rc.baseRays);
+      const weight =
+        ((length ? (Math.PI * Math.max(0, d[0] * normal![0] + d[1] * normal![1])) / length : 1) * rc.intensity) /
+        rc.baseRays;
+      for (let c = 0; c < 3; c++) rgb[c] += ray[c] * weight;
+    }
+    return rgb;
+  };
+}
 export class RadianceCascade2D {
-  readonly cascades: number;
-  readonly baseRays: number;
-  readonly baseDistance: number;
-  readonly intervalRatio: number;
-  readonly angularRatio: number;
-  readonly bounces: number;
-  readonly albedo: number;
-  readonly intensity: number;
+  declare readonly cascades: number;
+  declare readonly baseRays: number;
+  declare readonly baseDistance: number;
+  declare readonly intervalRatio: number;
+  declare readonly angularRatio: number;
+  declare readonly bounces: number;
+  declare readonly albedo: number;
+  declare readonly intensity: number;
 
   constructor(options: RadianceCascadeOptions2D = {}) {
     const {
@@ -374,6 +348,8 @@ export class RadianceCascade2D {
       throw rangeError('intensity must be a nonnegative number', 'pixel-lighting');
     }
 
+    if (!Number.isFinite(Math.fround(baseDistance * intervalRatio ** (cascades - 1))))
+      throw rangeError('Cascade reach overflows', 'pixel-lighting');
     this.cascades = cascades;
     this.baseRays = baseRays;
     this.baseDistance = baseDistance;
@@ -384,141 +360,40 @@ export class RadianceCascade2D {
     this.intensity = intensity;
   }
 
-  /**
-   * Evaluates the diffuse GI irradiance at a 2D query point, optionally cosine-weighted by surface normal.
-   */
-  evaluateAt(point: Point2D, normal?: Point2D, scene: GIScene2D = {}): [number, number, number] {
-    const { edges, emitters, lights } = parseScene(scene, this.albedo);
-    const cascades = this.cascades;
-    const baseRays = this.baseRays;
-    const baseDist = this.baseDistance;
-    const intervalRatio = this.intervalRatio;
-    const angRatio = this.angularRatio;
-    const hasBounce = this.bounces > 0;
-    const defaultAlbedo = this.albedo;
-    const intensity = this.intensity;
-
-    let norm: Point2D | null = null;
-    if (normal) {
-      const len = Math.hypot(normal[0], normal[1]);
-      if (len > 1e-6) norm = [normal[0] / len, normal[1] / len];
-    }
-
-    let totalR = 0, totalG = 0, totalB = 0;
-    const r0Min = 0.0;
-    const r0Max = baseDist;
-
-    for (let k0 = 0; k0 < baseRays; k0++) {
-      const theta0 = TWO_PI * (k0 + 0.5) / baseRays;
-      const dir0: Point2D = [Math.cos(theta0), Math.sin(theta0)];
-      const res0 = traceRayInterval(point, dir0, r0Min, r0Max, edges, emitters, lights, hasBounce, defaultAlbedo);
-
-      let rad0R = res0.radiance[0];
-      let rad0G = res0.radiance[1];
-      let rad0B = res0.radiance[2];
-
-      if (!res0.hit && cascades > 1) {
-        const r1Min = r0Max;
-        const r1Max = r0Max * intervalRatio;
-        const totalC1 = baseRays * angRatio;
-        let c1R = 0, c1G = 0, c1B = 0;
-
-        for (let j1 = 0; j1 < angRatio; j1++) {
-          const k1 = k0 * angRatio + j1;
-          const theta1 = TWO_PI * (k1 + 0.5) / totalC1;
-          const dir1: Point2D = [Math.cos(theta1), Math.sin(theta1)];
-          const res1 = traceRayInterval(point, dir1, r1Min, r1Max, edges, emitters, lights, hasBounce, defaultAlbedo);
-
-          let rad1R = res1.radiance[0];
-          let rad1G = res1.radiance[1];
-          let rad1B = res1.radiance[2];
-
-          if (!res1.hit && cascades > 2) {
-            const r2Min = r1Max;
-            const r2Max = r1Max * intervalRatio;
-            const totalC2 = totalC1 * angRatio;
-            let c2R = 0, c2G = 0, c2B = 0;
-
-            for (let j2 = 0; j2 < angRatio; j2++) {
-              const k2 = k1 * angRatio + j2;
-              const theta2 = TWO_PI * (k2 + 0.5) / totalC2;
-              const dir2: Point2D = [Math.cos(theta2), Math.sin(theta2)];
-              const res2 = traceRayInterval(point, dir2, r2Min, r2Max, edges, emitters, lights, hasBounce, defaultAlbedo);
-
-              c2R += res2.radiance[0];
-              c2G += res2.radiance[1];
-              c2B += res2.radiance[2];
-            }
-            rad1R += c2R / angRatio;
-            rad1G += c2G / angRatio;
-            rad1B += c2B / angRatio;
-          }
-
-          c1R += rad1R;
-          c1G += rad1G;
-          c1B += rad1B;
-        }
-
-        rad0R += c1R / angRatio;
-        rad0G += c1G / angRatio;
-        rad0B += c1B / angRatio;
-      }
-
-      if (norm) {
-        const weight = Math.max(0, dir0[0] * norm[0] + dir0[1] * norm[1]) * PI;
-        totalR += rad0R * weight;
-        totalG += rad0G * weight;
-        totalB += rad0B * weight;
-      } else {
-        totalR += rad0R;
-        totalG += rad0G;
-        totalB += rad0B;
-      }
-    }
-
-    return [
-      (totalR / baseRays) * intensity,
-      (totalG / baseRays) * intensity,
-      (totalB / baseRays) * intensity,
-    ];
+  /** Evaluate the hierarchy at a world point. Upper probes use a fixed world lattice centred at .5. */
+  evaluateAt(point: Point2D, normal?: Point2D, scene: GIScene2D = {}): RGB {
+    const parsed = parse(scene, this.baseDistance);
+    return field(parsed, this, reflect(parsed, this))(point, normal);
   }
 
-  /**
-   * Computes a 2D grid of RGB irradiance values across width by height query probes.
-   */
+  /** Compute world-space queries starting at zero, separated by spacing (default 1). */
   computeGrid(width: number, height: number, scene: GIScene2D = {}, spacing = 1): Float32Array {
     if (!Number.isInteger(width) || width <= 0 || !Number.isInteger(height) || height <= 0) {
       throw rangeError('Grid dimensions must be positive integers', 'pixel-lighting');
     }
+    if (!Number.isFinite(spacing) || spacing <= 0) throw rangeError('Invalid GI spacing', 'pixel-lighting');
+    const parsed = parse(scene, this.baseDistance),
+      evaluate = field(parsed, this, reflect(parsed, this));
     const grid = new Float32Array(width * height * 3);
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        const pt: Point2D = [x * spacing, y * spacing];
-        const irr = this.evaluateAt(pt, undefined, scene);
-        const idx = (y * width + x) * 3;
-        grid[idx] = irr[0];
-        grid[idx + 1] = irr[1];
-        grid[idx + 2] = irr[2];
-      }
-    }
+    for (let y = 0; y < height; y++)
+      for (let x = 0; x < width; x++) grid.set(evaluate([x * spacing, y * spacing]), (y * width + x) * 3);
     return grid;
   }
 }
-
-/** Evaluates diffuse 2D global illumination irradiance at a query point. */
+/** Evaluate diffuse 2D GI using the same hierarchy as the WebGPU entry. */
 export function evaluate2DGI(
   point: Point2D,
   normal?: Point2D,
   scene: GIScene2D = {},
   options?: RadianceCascadeOptions2D,
-): [number, number, number] {
-  const rc = new RadianceCascade2D(options);
-  return rc.evaluateAt(point, normal, scene);
+): RGB {
+  return new RadianceCascade2D(options).evaluateAt(point, normal, scene);
 }
-
 /** Options for GILighting2D WebGPU engine plugin. */
 export interface GILighting2DOptions {
   /** Target texture receiving GI irradiance. */
+  /** Direct-light layer mask. Default all bits. */
+  readonly layer?: number;
   readonly target: GPUTexture | (() => GPUTexture);
   /** Render pass execution order (default 20). */
   readonly order?: number;
@@ -539,294 +414,141 @@ export interface GILighting2DOptions {
 }
 
 const giShader = /* wgsl */ `
-struct VertexOutput {
-  @builtin(position) position: vec4f,
-  @location(0) uv: vec2f,
-};
-
-@vertex
-fn wide(@builtin(vertex_index) index: u32) -> VertexOutput {
-  var out: VertexOutput;
-  let x = f32((index << 1u) & 2u);
-  let y = f32(index & 2u);
-  out.position = vec4f(x * 2.0 - 1.0, 1.0 - y * 2.0, 0.0, 1.0);
-  out.uv = vec2f(x, y);
-  return out;
+struct Params {
+ camera:vec4f, ambient:vec4f, config:vec4f, material:vec4f, counts:vec4u,
+ grid:vec4f, upper:vec4f, misc:vec4f,
 }
-
-struct GIUniforms {
-  camera: vec4f,          // x, y, zoom, pad
-  ambient: vec4f,         // r, g, b, pad
-  cascades_config: vec4f, // cascades, base_rays, base_distance, interval_ratio
-  gi_config: vec4f,       // angular_ratio, bounces, albedo, intensity
-  counts: vec4u,          // emitter_count, edge_count, light_count, pad
-  viewport: vec4f,        // width, height, pad, pad
-};
-
-@group(0) @binding(0) var<uniform> uniforms: GIUniforms;
-
-struct Emitter {
-  pos: vec2f,
-  size: vec2f,
-  color: vec3f,
-  intensity: f32,
-  shape: u32,
-  pad0: u32,
-  pad1: u32,
-  pad2: u32,
-};
-@group(0) @binding(1) var<storage, read> emitters: array<Emitter>;
-
-struct Edge {
-  a: vec2f,
-  b: vec2f,
-  normal: vec2f,
-  albedo: f32,
-  pad: f32,
-};
-@group(0) @binding(2) var<storage, read> edges: array<Edge>;
-
-struct Light {
-  pos: vec2f,
-  color: vec3f,
-  radius: f32,
-  intensity: f32,
-  falloff: f32,
-  kind: u32,
-  pad0: f32,
-  pad1: f32,
-  pad2: f32,
-};
-@group(0) @binding(3) var<storage, read> lights: array<Light>;
-
-struct TraceResult {
-  hit: bool,
-  hit_t: f32,
-  hit_point: vec2f,
-  hit_normal: vec2f,
-  hit_albedo: f32,
-  radiance: vec3f,
-};
-
-fn trace_interval(origin: vec2f, dir: vec2f, min_t: f32, max_t: f32, eval_bounce: bool) -> TraceResult {
-  var res: TraceResult;
-  res.hit = false;
-  res.hit_t = max_t;
-  res.radiance = vec3f(0.0);
-  res.hit_normal = vec2f(0.0, 1.0);
-  res.hit_albedo = uniforms.gi_config.z;
-
-  let edge_count = uniforms.counts.y;
-  for (var i: u32 = 0u; i < edge_count; i++) {
-    let edge = edges[i];
-    let v = edge.b - edge.a;
-    let denom = dir.x * v.y - dir.y * v.x;
-    if (abs(denom) > 1e-7) {
-      let diff = edge.a - origin;
-      let t = (diff.x * v.y - diff.y * v.x) / denom;
-      let u = (diff.x * dir.y - diff.y * dir.x) / denom;
-      if (t >= min_t && t <= res.hit_t && u >= 0.0 && u <= 1.0) {
-        res.hit = true;
-        res.hit_t = t;
-        res.hit_point = origin + t * dir;
-        var n = edge.normal;
-        if (dot(dir, n) > 0.0) {
-          n = -n;
-        }
-        res.hit_normal = n;
-        res.hit_albedo = edge.albedo;
-      }
-    }
-  }
-
-  let emitter_count = uniforms.counts.x;
-  for (var i: u32 = 0u; i < emitter_count; i++) {
-    let em = emitters[i];
-    if (em.shape == 1u) {
-      // Circle
-      let w = origin - em.pos;
-      let b = dot(dir, w);
-      let r = em.size.x;
-      let c = dot(w, w) - r * r;
-      let disc = b * b - c;
-      if (disc >= 0.0) {
-        let root = sqrt(disc);
-        let t1 = -b - root;
-        let t2 = -b + root;
-        let t_enter = max(t1, min_t);
-        let t_exit = min(t2, max_t);
-        if (t_enter <= t_exit && t_enter < res.hit_t) {
-          res.radiance += em.color * em.intensity;
-        }
-      }
-    } else {
-      // Rect
-      let half = em.size * 0.5;
-      let p_min = em.pos - half;
-      let p_max = em.pos + half;
-      var t_near = min_t;
-      var t_far = max_t;
-      var hit_box = true;
-      if (abs(dir.x) > 1e-7) {
-        var tx1 = (p_min.x - origin.x) / dir.x;
-        var tx2 = (p_max.x - origin.x) / dir.x;
-        if (tx1 > tx2) { let tmp = tx1; tx1 = tx2; tx2 = tmp; }
-        t_near = max(t_near, tx1);
-        t_far = min(t_far, tx2);
-        if (t_near > t_far) { hit_box = false; }
-      } else if (origin.x < p_min.x || origin.x > p_max.x) {
-        hit_box = false;
-      }
-      if (abs(dir.y) > 1e-7) {
-        var ty1 = (p_min.y - origin.y) / dir.y;
-        var ty2 = (p_max.y - origin.y) / dir.y;
-        if (ty1 > ty2) { let tmp = ty1; ty1 = ty2; ty2 = tmp; }
-        t_near = max(t_near, ty1);
-        t_far = min(t_far, ty2);
-        if (t_near > t_far) { hit_box = false; }
-      } else if (origin.y < p_min.y || origin.y > p_max.y) {
-        hit_box = false;
-      }
-      if (hit_box && t_near <= max_t && t_near < res.hit_t) {
-        res.radiance += em.color * em.intensity;
-      }
-    }
-  }
-
-  if (res.hit && eval_bounce) {
-    var direct_irradiance = vec3f(0.0);
-    let hp = res.hit_point;
-    let hn = res.hit_normal;
-    for (var i: u32 = 0u; i < emitter_count; i++) {
-      let em = emitters[i];
-      let to_em = em.pos - hp;
-      let dist = length(to_em);
-      if (dist > 1e-4) {
-        let l_dir = to_em / dist;
-        let n_dot_l = max(0.0, dot(hn, l_dir));
-        let atten = 1.0 / (1.0 + dist / 32.0);
-        direct_irradiance += em.color * (em.intensity * n_dot_l * atten);
-      }
-    }
-    let light_count = uniforms.counts.z;
-    for (var i: u32 = 0u; i < light_count; i++) {
-      let lt = lights[i];
-      let to_lt = lt.pos - hp;
-      let dist = length(to_lt);
-      if (dist < lt.radius && dist > 1e-4) {
-        let l_dir = to_lt / dist;
-        let n_dot_l = max(0.0, dot(hn, l_dir));
-        let atten = pow(max(0.0, 1.0 - dist / lt.radius), lt.falloff);
-        direct_irradiance += lt.color * (lt.intensity * n_dot_l * atten);
-      }
-    }
-    res.radiance += (res.hit_albedo / 3.14159265359) * direct_irradiance;
-  }
-
-  return res;
+struct Patch { a:vec2f,b:vec2f,n:vec2f,pad:vec2f }
+struct Emitter { p:vec2f,size:vec2f,color:vec3f,circle:f32 }
+struct Light { pos:vec4f,color:vec4f,geo:vec4f,flags:vec4u,bounds:vec4f,mask:vec4f }
+@group(0)@binding(0)var<uniform>u:Params;
+@group(0)@binding(1)var<storage,read>patches:array<Patch>;
+@group(0)@binding(2)var<storage,read>emitters:array<Emitter>;
+@group(0)@binding(3)var<storage,read>lights:array<Light>;
+@group(1)@binding(0)var<storage,read>upper:array<vec4f>;
+@group(1)@binding(1)var<storage,read>surfaces:array<vec4f>;
+@group(2)@binding(0)var<storage,read_write>output:array<vec4f>;
+fn direction(i:u32,count:u32)->vec2f {
+ let a=6.28318530718*(f32(i)+.5)/f32(count);return vec2f(cos(a),sin(a));
 }
-
-@fragment
-fn evaluate_gi(in: VertexOutput) -> @location(0) vec4f {
-  let screen_pos = in.position.xy;
-  let cam = uniforms.camera;
-  let world_pos = vec2f(
-    cam.x + (screen_pos.x - uniforms.viewport.x * 0.5) / cam.z,
-    cam.y + (screen_pos.y - uniforms.viewport.y * 0.5) / cam.z
-  );
-
-  let num_cascades = u32(uniforms.cascades_config.x);
-  let base_rays = u32(uniforms.cascades_config.y);
-  let base_dist = uniforms.cascades_config.z;
-  let interval_ratio = uniforms.cascades_config.w;
-  let ang_ratio = u32(uniforms.gi_config.x);
-  let has_bounce = uniforms.gi_config.y > 0.0;
-  let intensity = uniforms.gi_config.w;
-
-  var total_irradiance = vec3f(0.0);
-  let r0_min = 0.0;
-  let r0_max = base_dist;
-
-  for (var k0: u32 = 0u; k0 < base_rays; k0++) {
-    let theta0 = 6.28318530718 * (f32(k0) + 0.5) / f32(base_rays);
-    let dir0 = vec2f(cos(theta0), sin(theta0));
-    let res0 = trace_interval(world_pos, dir0, r0_min, r0_max, has_bounce);
-
-    var rad0 = res0.radiance;
-
-    if (!res0.hit && num_cascades > 1u) {
-      let r1_min = r0_max;
-      let r1_max = r0_max * interval_ratio;
-      let total_c1 = base_rays * ang_ratio;
-      var c1_rad = vec3f(0.0);
-
-      for (var j1: u32 = 0u; j1 < ang_ratio; j1++) {
-        let k1 = k0 * ang_ratio + j1;
-        let theta1 = 6.28318530718 * (f32(k1) + 0.5) / f32(total_c1);
-        let dir1 = vec2f(cos(theta1), sin(theta1));
-        let res1 = trace_interval(world_pos, dir1, r1_min, r1_max, has_bounce);
-
-        var rad1 = res1.radiance;
-
-        if (!res1.hit && num_cascades > 2u) {
-          let r2_min = r1_max;
-          let r2_max = r1_max * interval_ratio;
-          let total_c2 = total_c1 * ang_ratio;
-          var c2_rad = vec3f(0.0);
-
-          for (var j2: u32 = 0u; j2 < ang_ratio; j2++) {
-            let k2 = k1 * ang_ratio + j2;
-            let theta2 = 6.28318530718 * (f32(k2) + 0.5) / f32(total_c2);
-            let dir2 = vec2f(cos(theta2), sin(theta2));
-            let res2 = trace_interval(world_pos, dir2, r2_min, r2_max, has_bounce);
-            c2_rad += res2.radiance;
-          }
-          rad1 += c2_rad / f32(ang_ratio);
-        }
-
-        c1_rad += rad1;
-      }
-      rad0 += c1_rad / f32(ang_ratio);
-    }
-
-    total_irradiance += rad0;
+fn trace(p:vec2f,d:vec2f,length:f32)->vec4f {
+ var nearest=length;var rgb=vec3f(0);var hit=false;
+ for(var i=0u;i<u.counts.x;i++){
+  let e=patches[i];let v=e.b-e.a;let den=d.x*v.y-d.y*v.x;
+  if(abs(den)<1e-7){continue;}
+  let w=e.a-p;let t=(w.x*v.y-w.y*v.x)/den;let s=(w.x*d.y-w.y*d.x)/den;
+  if(t>1e-4&&t<=nearest&&s>=0&&s<=1){nearest=t;hit=true;rgb=surfaces[i*2u+select(0u,1u,dot(d,e.n)>0)].rgb;}
+ }
+ for(var i=0u;i<u.counts.y;i++){
+  let e=emitters[i];let w=p-e.p;var near=0.0;var far=length;
+  if(e.circle>0){
+   let b=dot(w,d);let disc=b*b-dot(w,w)+e.size.x*e.size.x;
+   if(disc<0){continue;}
+   near=max(0,-b-sqrt(disc));far=min(far,-b+sqrt(disc));
+  }else{
+   for(var j=0u;j<2u;j++){
+    if(abs(d[j])<1e-7){if(abs(w[j])>e.size[j]*.5){far=-1;}}
+    else{let a=(-e.size[j]*.5-w[j])/d[j];let b=(e.size[j]*.5-w[j])/d[j];near=max(near,min(a,b));far=min(far,max(a,b));}
+   }
   }
-
-  total_irradiance = (total_irradiance / f32(base_rays)) * intensity;
-  let final_color = uniforms.ambient.rgb + total_irradiance;
-  return vec4f(final_color, 1.0);
+  if(near<=far&&near<=nearest){nearest=near;hit=true;rgb=e.color;}
+ }
+ return vec4f(rgb,select(1.0,0.0,hit));
+}
+fn direct(p:vec2f,n:vec2f)->vec3f {
+ var sum=vec3f(0);
+ for(var i=0u;i<u.counts.z;i++){
+  let l=lights[i];if((l.flags.y&u.counts.w)==0u||!maskVisible(p,l.bounds,l.mask)){continue;}
+  var d=l.pos.xy-p;var distance=length(d);var shade=1.0;var cosine=1.0;
+  if(l.flags.x==2u){
+   d=-vec2f(cos(l.geo.y),sin(l.geo.y));distance=1e10;cosine=max(0,dot(n,d)*cos(l.geo.x));
+  }else{
+   shade=pow(max(0,1-distance/l.pos.z),l.pos.w);
+   let len=sqrt(distance*distance+l.geo.x*l.geo.x);
+   cosine=select(1.0,max(0,dot(n,d)/max(len,1e-20)),len>0);
+   if(l.flags.x==1u){
+    var along=1.0;if(distance>0){along=-dot(d,vec2f(cos(l.geo.y),sin(l.geo.y)))/distance;}
+    let outer=cos(l.geo.z);let inner=cos(l.geo.z*(1-l.geo.w));
+    if(inner>outer){shade*=clamp((along-outer)/(inner-outer),0,1);}else if(along<outer){shade=0;}
+   }
+   if(distance>0){d/=distance;}
+  }
+  if(l.flags.z>0u&&trace(p,d,max(0,distance-.001)).w==0){continue;}
+  sum+=l.color.rgb*(l.color.w*shade*cosine*.5);
+ }
+ return sum;
+}
+@compute @workgroup_size(64)fn bounce(@builtin(global_invocation_id)id:vec3u){
+ let i=id.x;if(i>=u.counts.x*2u){return;}
+ let e=patches[i/2u];let n=e.n*select(1.0,-1.0,i%2u==1u);let p=(e.a+e.b)*.5+n*.001;
+ var rgb=direct(p,n);var cosineSum=0.0;
+ for(var k=0u;k<32u;k++){cosineSum+=max(0,dot(n,direction(k,32u)));}
+ for(var k=0u;k<32u;k++){
+  let d=direction(k,32u);rgb+=trace(p,d,u.misc.w).rgb*(max(0,dot(n,d))/cosineSum);
+ }
+ output[i]=vec4f(rgb*u.material.x,0);
+}
+// Each child has its own visible connector. Composition precedes interpolation (RASTI appendix A).
+fn merge(p:vec2f,angle:u32)->vec4f{
+ let level=u.misc.x;let count=u32(u.config.y*pow(u.config.w,level));let d=direction(angle,count);
+ var near=0.0;if(level>0){near=u.config.z*pow(u.material.z,level-1);}
+ let far=u.config.z*pow(u.material.z,level);let start=p+d*near;
+ if(level==u.config.x-1){return trace(start,d,far-near);}
+ let scale=pow(2.0,level+1);let g=(p-vec2f(.5))/scale;let cell=floor(g);let f=fract(g);
+ let branch=u32(u.config.w);let upperCount=count*branch;var sum=vec4f(0);
+ for(var child=0u;child<branch;child++){
+  let a=angle*branch+child;let cd=direction(a,upperCount);
+  for(var j=0u;j<4u;j++){
+   let offset=vec2f(f32(j&1u),f32(j>>1u));let xy=cell+offset;let q=xy*scale+vec2f(.5);
+   let delta=q+cd*far-start;let length=length(delta);
+   var ray=trace(start,delta/max(length,1e-20),length);
+   let index=vec2u(xy-u.upper.xy);let sample=upper[(index.y*u32(u.upper.z)+index.x)*upperCount+a];
+   ray=vec4f(ray.rgb+ray.w*sample.rgb,ray.w*sample.w);
+   let weights=mix(vec2f(1)-f,f,offset);sum+=ray*(weights.x*weights.y/f32(branch));
+  }
+ }
+ return sum;
+}
+@compute @workgroup_size(64)fn cascade(@builtin(global_invocation_id)id:vec3u){
+ let count=u32(u.config.y*pow(u.config.w,u.misc.x));let total=u32(u.grid.z*u.grid.w)*count;
+ let i=id.x;if(i>=total){return;}
+ let probe=i/count;let xy=vec2f(f32(probe%u32(u.grid.z)),f32(probe/u32(u.grid.z)))+u.grid.xy;
+ output[i]=merge(xy*pow(2.0,u.misc.x)+vec2f(.5),i%count);
+}
+@vertex fn wide(@builtin(vertex_index)i:u32)->@builtin(position)vec4f{
+ let xy=vec2f(f32((i<<1u)&2u),f32(i&2u));return vec4f(xy*vec2f(2,-2)+vec2f(-1,1),0,1);
+}
+@fragment fn show(@builtin(position)p:vec4f)->@location(0)vec4f{
+ let world=u.camera.xy+p.xy/u.camera.z;var rgb=vec3f(0);
+ for(var i=0u;i<u32(u.config.y);i++){rgb+=merge(world,i).rgb;}
+ return vec4f(u.ambient.rgb+rgb*(u.material.y/u.config.y),1);
 }
 `;
-
-/**
- * WebGPU 2D global illumination plugin.
- * Computes indirect bounce light and emissive sprite illumination in a screen pass.
- */
+/** WebGPU spatial radiance intervals, with finite-order diffuse surface gathers. */
 export class GILighting2D implements EnginePlugin, Disposable {
-  name: string;
-  order: number;
-
+  declare name: string;
+  declare order: number;
+  declare readonly cascades: RadianceCascade2D;
+  declare camera: { x: number; y: number; zoom: number };
+  declare ambient: number | string;
+  declare layer: number;
+  declare emitters: EmissiveSprite2D[];
+  declare lights: Light2D[];
+  declare occluders: Occluder2D[];
   #engine?: Engine;
   #disposed = false;
   #device?: GPUDevice;
   #module?: GPUShaderModule;
-  #layout?: GPUBindGroupLayout;
-  #pipeline?: GPURenderPipeline;
-  #uniformBuffer?: GPUBuffer;
-  #emitterBuffer?: GPUBuffer;
-  #edgeBuffer?: GPUBuffer;
-  #lightBuffer?: GPUBuffer;
-  #bindGroup?: GPUBindGroup;
+  #sceneLayout?: GPUBindGroupLayout;
+  #inputLayout?: GPUBindGroupLayout;
+  #outputLayout?: GPUBindGroupLayout;
+  #cascade?: GPUComputePipeline;
+  #bounce?: GPUComputePipeline;
+  #show?: GPURenderPipeline;
   #format?: GPUTextureFormat;
+  #buffers = new Map<string, GPUBuffer>();
+  #masks = new MaskData();
   #target: GPUTexture | (() => GPUTexture);
-
-  readonly cascades: RadianceCascade2D;
-  camera: { x: number; y: number; zoom: number };
-  ambient: number | string;
-  emitters: EmissiveSprite2D[];
-  lights: Light2D[];
-  occluders: Occluder2D[];
-
   constructor(options: GILighting2DOptions) {
     if (!options?.target) throw typeError('target is required for GILighting2D', 'pixel-lighting');
     this.#target = options.target;
@@ -834,18 +556,17 @@ export class GILighting2D implements EnginePlugin, Disposable {
     this.order = options.order ?? 20;
     this.cascades = new RadianceCascade2D(options.cascades);
     this.camera = options.camera ?? { x: 0, y: 0, zoom: 1 };
-    this.ambient = options.ambient ?? 0x000000;
-    this.emitters = options.emitters ? [...options.emitters] : [];
-    this.lights = options.lights ? [...options.lights] : [];
-    this.occluders = options.occluders ? [...options.occluders] : [];
+    this.ambient = options.ambient ?? 0;
+    this.layer = options.layer ?? 0xffffffff;
+    this.emitters = [...(options.emitters ?? [])];
+    this.lights = [...(options.lights ?? [])];
+    this.occluders = [...(options.occluders ?? [])];
   }
-
   static attach(instance: EngineKernel, options: GILighting2DOptions): GILighting2D {
-    const lighting = new GILighting2D(options);
-    engineRuntime(instance).use(lighting);
-    return lighting;
+    const pass = new GILighting2D(options);
+    engineRuntime(instance).use(pass);
+    return pass;
   }
-
   setup(engine: Engine): void {
     if (this.#disposed) throw fault('disposed', 'GILighting2D disposed; create a new one');
     if (engine.backend !== 'webgpu') throw fault('unsupported', 'GILighting2D needs WebGPU', 'webgpu');
@@ -858,255 +579,242 @@ export class GILighting2D implements EnginePlugin, Disposable {
       },
     });
   }
-
-  #release(): void {
-    this.#bindGroup = undefined;
-    this.#uniformBuffer?.destroy();
-    this.#uniformBuffer = undefined;
-    this.#emitterBuffer?.destroy();
-    this.#emitterBuffer = undefined;
-    this.#edgeBuffer?.destroy();
-    this.#edgeBuffer = undefined;
-    this.#lightBuffer?.destroy();
-    this.#lightBuffer = undefined;
-    this.#pipeline = undefined;
-    this.#layout = undefined;
-    this.#module = undefined;
-    this.#device = undefined;
-    this.#format = undefined;
+  #buffer(key: string, size: number, uniform = false): GPUBuffer {
+    const device = this.#device!;
+    size = Math.max(16, size);
+    if (
+      !Number.isSafeInteger(size) ||
+      size > (uniform ? device.limits.maxBufferSize : device.limits.maxStorageBufferBindingSize)
+    ) {
+      throw rangeError('GI buffer exceeds device limit', 'pixel-lighting');
+    }
+    let buffer = this.#buffers.get(key);
+    if (!buffer || buffer.size < size) {
+      buffer?.destroy();
+      buffer = device.createBuffer({
+        label: `gi ${key}`,
+        size,
+        usage: (uniform ? GPUBufferUsage.UNIFORM : GPUBufferUsage.STORAGE) | GPUBufferUsage.COPY_DST,
+      });
+      this.#buffers.set(key, buffer);
+    }
+    return buffer;
   }
-
-  #prepare(device: GPUDevice, targetFormat: GPUTextureFormat): void {
+  #prepare(device: GPUDevice, format: GPUTextureFormat): void {
     if (this.#device !== device) {
-      if (this.#device) this.#release();
+      this.#release();
       this.#device = device;
     }
+    const visibility = GPUShaderStage.COMPUTE | GPUShaderStage.FRAGMENT;
     if (!this.#module) {
-      this.#module = device.createShaderModule({ label: 'gi-lighting2d', code: giShader });
-      this.#layout = device.createBindGroupLayout({
-        label: 'gi-lighting2d layout',
+      this.#module = device.createShaderModule({ label: 'radiance cascades', code: maskShader(4) + giShader });
+      this.#sceneLayout = device.createBindGroupLayout({
         entries: [
-          {
-            binding: 0,
-            visibility: GPUShaderStage.FRAGMENT,
-            buffer: { type: 'uniform', minBindingSize: 96 },
-          },
-          {
-            binding: 1,
-            visibility: GPUShaderStage.FRAGMENT,
-            buffer: { type: 'read-only-storage' },
-          },
-          {
-            binding: 2,
-            visibility: GPUShaderStage.FRAGMENT,
-            buffer: { type: 'read-only-storage' },
-          },
-          {
-            binding: 3,
-            visibility: GPUShaderStage.FRAGMENT,
-            buffer: { type: 'read-only-storage' },
-          },
+          { binding: 0, visibility, buffer: { type: 'uniform', hasDynamicOffset: true, minBindingSize: 128 } },
+          ...[1, 2, 3, 4].map((binding) => ({ binding, visibility, buffer: { type: 'read-only-storage' as const } })),
         ],
       });
-    }
-    if (targetFormat !== this.#format || !this.#pipeline) {
-      this.#format = targetFormat;
-      const pipelineLayout = device.createPipelineLayout({
-        bindGroupLayouts: [this.#layout!],
+      this.#inputLayout = device.createBindGroupLayout({
+        entries: [0, 1].map((binding) => ({ binding, visibility, buffer: { type: 'read-only-storage' as const } })),
       });
-      this.#pipeline = device.createRenderPipeline({
-        label: 'gi-lighting2d pipeline',
-        layout: pipelineLayout,
+      this.#outputLayout = device.createBindGroupLayout({
+        entries: [{ binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } }],
+      });
+      const layout = device.createPipelineLayout({
+        bindGroupLayouts: [this.#sceneLayout, this.#inputLayout, this.#outputLayout],
+      });
+      this.#cascade = device.createComputePipeline({
+        layout,
+        compute: { module: this.#module, entryPoint: 'cascade' },
+      });
+      this.#bounce = device.createComputePipeline({ layout, compute: { module: this.#module, entryPoint: 'bounce' } });
+    }
+    if (format !== this.#format) {
+      this.#format = format;
+      this.#show = device.createRenderPipeline({
+        layout: device.createPipelineLayout({ bindGroupLayouts: [this.#sceneLayout!, this.#inputLayout!] }),
         vertex: { module: this.#module!, entryPoint: 'wide' },
-        fragment: {
-          module: this.#module!,
-          entryPoint: 'evaluate_gi',
-          targets: [
-            {
-              format: targetFormat,
-            },
-          ],
-        },
+        fragment: { module: this.#module!, entryPoint: 'show', targets: [{ format }] },
       });
     }
   }
-
   #run(c: Extract<PassContext, { backend: 'webgpu' }>): void {
-    const device = c.device;
-    const pick = (texture: GPUTexture | (() => GPUTexture)) => (typeof texture === 'function' ? texture() : texture);
-    const target = pick(this.#target);
-    if (!target) return;
-
+    const target = typeof this.#target === 'function' ? this.#target() : this.#target;
+    checkCamera(this.camera);
+    checkLayer(this.layer);
+    const rc = this.cascades,
+      scene = parse(
+        { emitters: this.emitters, lights: this.lights, occluders: this.occluders, layer: this.layer },
+        rc.baseDistance,
+      );
+    const ambient = color(this.ambient),
+      device = c.device;
     this.#prepare(device, target.format);
-
-    const { edges, emitters, lights } = parseScene(
-      { occluders: this.occluders, emitters: this.emitters, lights: this.lights },
-      this.cascades.albedo,
-    );
-
-    const amb = parseColor(this.ambient);
-    const rc = this.cascades;
-    const cam = this.camera;
-    const width = target.width;
-    const height = target.height;
-
-    // Uniform buffer (96 bytes: 6 x vec4)
-    const uniformData = new Float32Array(24);
-    // camera
-    uniformData[0] = cam.x;
-    uniformData[1] = cam.y;
-    uniformData[2] = cam.zoom;
-    uniformData[3] = 0;
-    // ambient
-    uniformData[4] = amb[0];
-    uniformData[5] = amb[1];
-    uniformData[6] = amb[2];
-    uniformData[7] = 0;
-    // cascades_config
-    uniformData[8] = rc.cascades;
-    uniformData[9] = rc.baseRays;
-    uniformData[10] = rc.baseDistance;
-    uniformData[11] = rc.intervalRatio;
-    // gi_config
-    uniformData[12] = rc.angularRatio;
-    uniformData[13] = rc.bounces;
-    uniformData[14] = rc.albedo;
-    uniformData[15] = rc.intensity;
-    // counts (cast as u32)
-    const countsView = new Uint32Array(uniformData.buffer, 16 * 4, 4);
-    countsView[0] = emitters.length;
-    countsView[1] = edges.length;
-    countsView[2] = lights.length;
-    countsView[3] = 0;
-    // viewport
-    uniformData[20] = width;
-    uniformData[21] = height;
-    uniformData[22] = 0;
-    uniformData[23] = 0;
-
-    if (!this.#uniformBuffer) {
-      this.#uniformBuffer = device.createBuffer({
-        label: 'gi-uniforms',
-        size: 96,
-        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-      });
-    }
-    device.queue.writeBuffer(this.#uniformBuffer, 0, uniformData);
-
-    // Emitters buffer: 12 floats (48 bytes) per emitter
-    const emitterStrideFloats = 12;
-    const emitterCount = Math.max(1, emitters.length);
-    const emitterData = new Float32Array(emitterCount * emitterStrideFloats);
-    const emitterU32 = new Uint32Array(emitterData.buffer);
-    for (let i = 0; i < emitters.length; i++) {
-      const em = emitters[i];
-      const base = i * emitterStrideFloats;
-      emitterData[base] = em.x;
-      emitterData[base + 1] = em.y;
-      emitterData[base + 2] = em.size[0];
-      emitterData[base + 3] = em.size[1];
-      emitterData[base + 4] = em.color[0];
-      emitterData[base + 5] = em.color[1];
-      emitterData[base + 6] = em.color[2];
-      emitterData[base + 7] = em.intensity;
-      emitterU32[base + 8] = em.shape;
-    }
-    if (!this.#emitterBuffer || this.#emitterBuffer.size < emitterData.byteLength) {
-      this.#emitterBuffer?.destroy();
-      this.#emitterBuffer = device.createBuffer({
-        label: 'gi-emitters',
-        size: Math.max(128, emitterData.byteLength),
-        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-      });
-    }
-    device.queue.writeBuffer(this.#emitterBuffer, 0, emitterData);
-
-    // Edges buffer: 8 floats (32 bytes) per edge
-    const edgeStrideFloats = 8;
-    const edgeCount = Math.max(1, edges.length);
-    const edgeData = new Float32Array(edgeCount * edgeStrideFloats);
-    for (let i = 0; i < edges.length; i++) {
-      const ed = edges[i];
-      const base = i * edgeStrideFloats;
-      edgeData[base] = ed.a[0];
-      edgeData[base + 1] = ed.a[1];
-      edgeData[base + 2] = ed.b[0];
-      edgeData[base + 3] = ed.b[1];
-      edgeData[base + 4] = ed.normal[0];
-      edgeData[base + 5] = ed.normal[1];
-      edgeData[base + 6] = ed.albedo;
-      edgeData[base + 7] = 0;
-    }
-    if (!this.#edgeBuffer || this.#edgeBuffer.size < edgeData.byteLength) {
-      this.#edgeBuffer?.destroy();
-      this.#edgeBuffer = device.createBuffer({
-        label: 'gi-edges',
-        size: Math.max(128, edgeData.byteLength),
-        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-      });
-    }
-    device.queue.writeBuffer(this.#edgeBuffer, 0, edgeData);
-
-    // Lights buffer: 12 floats (48 bytes) per light
-    const lightStrideFloats = 12;
-    const lightCount = Math.max(1, lights.length);
-    const lightData = new Float32Array(lightCount * lightStrideFloats);
-    const lightU32 = new Uint32Array(lightData.buffer);
-    for (let i = 0; i < lights.length; i++) {
-      const lt = lights[i];
-      const base = i * lightStrideFloats;
-      const col = parseColor(lt.color);
-      lightData[base] = lt.x;
-      lightData[base + 1] = lt.y;
-      lightData[base + 2] = col[0];
-      lightData[base + 3] = col[1];
-      lightData[base + 4] = col[2];
-      lightData[base + 5] = lt.radius;
-      lightData[base + 6] = lt.intensity;
-      lightData[base + 7] = lt.falloff;
-      lightU32[base + 8] = lt.kind === 'point' ? 0 : lt.kind === 'spot' ? 1 : 2;
-    }
-    if (!this.#lightBuffer || this.#lightBuffer.size < lightData.byteLength) {
-      this.#lightBuffer?.destroy();
-      this.#lightBuffer = device.createBuffer({
-        label: 'gi-lights',
-        size: Math.max(128, lightData.byteLength),
-        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-      });
-    }
-    device.queue.writeBuffer(this.#lightBuffer, 0, lightData);
-
-    this.#bindGroup = device.createBindGroup({
-      label: 'gi-lighting2d bind group',
-      layout: this.#layout!,
+    this.#masks.upload(device, this.lights);
+    const patchData = new Float32Array(Math.max(8, scene.patches.length * 8));
+    scene.patches.forEach((p, i) => patchData.set([...p.a, ...p.b, ...p.n], i * 8));
+    const emitterData = new Float32Array(Math.max(8, scene.emitters.length * 8));
+    scene.emitters.forEach((e, i) => emitterData.set([...e.p, ...e.size, ...e.color, e.circle ? 1 : 0], i * 8));
+    const lightData = new Float32Array(Math.max(24, this.lights.length * 24)),
+      flags = new Uint32Array(lightData.buffer);
+    this.lights.forEach((l, i) => {
+      const base = i * 24;
+      lightData.set(
+        [
+          l.x,
+          l.y,
+          l.radius,
+          l.falloff,
+          ...color(l.color),
+          l.intensity,
+          l.kind === 'directional' ? l.elevation : l.height,
+          l.angle,
+          l.cone,
+          l.softness,
+        ],
+        base,
+      );
+      flags.set([l.kind === 'directional' ? 2 : l.kind === 'spot' ? 1 : 0, l.layers, l.shadows ? 1 : 0, 0], base + 12);
+      lightData.set(this.#masks.fields[i], base + 16);
+    });
+    const data = [patchData, emitterData, lightData],
+      buffers = data.map((a, i) => this.#buffer(`scene${i}`, a.byteLength));
+    data.forEach((a, i) => device.queue.writeBuffer(buffers[i], 0, a));
+    const surfaces = [
+      this.#buffer('surface0', scene.patches.length * 32),
+      this.#buffer('surface1', scene.patches.length * 32),
+    ];
+    const empty = this.#buffer('empty', 16);
+    c.encoder.clearBuffer(surfaces[0]);
+    c.encoder.clearBuffer(surfaces[1]);
+    const stride = Math.max(256, device.limits.minUniformBufferOffsetAlignment);
+    const values = new Float32Array(((rc.bounces + rc.cascades) * stride) / 4);
+    const uniforms = this.#buffer('uniforms', values.byteLength, true);
+    const sceneGroup = device.createBindGroup({
+      layout: this.#sceneLayout!,
       entries: [
-        { binding: 0, resource: { buffer: this.#uniformBuffer } },
-        { binding: 1, resource: { buffer: this.#emitterBuffer } },
-        { binding: 2, resource: { buffer: this.#edgeBuffer } },
-        { binding: 3, resource: { buffer: this.#lightBuffer } },
+        { binding: 0, resource: { buffer: uniforms, size: 128 } },
+        ...buffers.map((buffer, i) => ({ binding: i + 1, resource: { buffer } })),
+        { binding: 4, resource: { buffer: this.#masks.buffer! } },
       ],
     });
-
+    const input = (upper: GPUBuffer, surface: GPUBuffer) =>
+      device.createBindGroup({
+        layout: this.#inputLayout!,
+        entries: [
+          { binding: 0, resource: { buffer: upper } },
+          { binding: 1, resource: { buffer: surface } },
+        ],
+      });
+    // Expand every upper grid to include all four neighbours required by the grid beneath it.
+    const grids: number[][] = [[0, 0, 0, 0]];
+    let min = [this.camera.x + 0.5 / this.camera.zoom, this.camera.y + 0.5 / this.camera.zoom];
+    let max = [
+      this.camera.x + (target.width - 0.5) / this.camera.zoom,
+      this.camera.y + (target.height - 0.5) / this.camera.zoom,
+    ];
+    for (let level = 1; level < rc.cascades; level++) {
+      const scale = 2 ** level,
+        lo = min.map((v) => Math.floor((v - 0.5) / scale)),
+        hi = max.map((v) => Math.floor((v - 0.5) / scale) + 1);
+      grids.push([lo[0], lo[1], hi[0] - lo[0] + 1, hi[1] - lo[1] + 1]);
+      min = lo.map((v) => v * scale + 0.5);
+      max = hi.map((v) => v * scale + 0.5);
+    }
+    let slot = 0;
+    const config = (level: number): number => {
+      const offset = slot++ * stride,
+        f = new Float32Array(values.buffer, offset, 32),
+        u = new Uint32Array(values.buffer, offset, 32);
+      f.set([
+        this.camera.x,
+        this.camera.y,
+        this.camera.zoom,
+        0,
+        ...ambient,
+        0,
+        rc.cascades,
+        rc.baseRays,
+        rc.baseDistance,
+        rc.angularRatio,
+        rc.albedo,
+        rc.intensity,
+        rc.intervalRatio,
+        0,
+      ]);
+      u.set([scene.patches.length, scene.emitters.length, this.lights.length, this.layer], 16);
+      f.set(grids[level], 20);
+      f.set(grids[level + 1] ?? [0, 0, 1, 1], 24);
+      f.set([level, 0, 0, rc.baseDistance * rc.intervalRatio ** (rc.cascades - 1)], 28);
+      return offset;
+    };
+    const dispatch = (
+      pipeline: GPUComputePipeline,
+      count: number,
+      offset: number,
+      sources: GPUBindGroup,
+      output: GPUBuffer,
+    ): void => {
+      const groups = Math.ceil(count / 64);
+      if (groups > device.limits.maxComputeWorkgroupsPerDimension)
+        throw rangeError('GI dispatch exceeds device limit', 'pixel-lighting');
+      const pass = c.encoder.beginComputePass();
+      pass.setPipeline(pipeline);
+      pass.setBindGroup(0, sceneGroup, [offset]);
+      pass.setBindGroup(1, sources);
+      pass.setBindGroup(
+        2,
+        device.createBindGroup({
+          layout: this.#outputLayout!,
+          entries: [{ binding: 0, resource: { buffer: output } }],
+        }),
+      );
+      pass.dispatchWorkgroups(groups);
+      pass.end();
+    };
+    let surface = surfaces[0];
+    for (let bounce = 0; bounce < rc.bounces; bounce++) {
+      const output = surfaces[(bounce + 1) % 2];
+      dispatch(this.#bounce!, scene.patches.length * 2, config(0), input(empty, surface), output);
+      surface = output;
+    }
+    let upper = empty;
+    for (let level = rc.cascades - 1; level >= 1; level--) {
+      const grid = grids[level],
+        count = grid[2] * grid[3] * rc.baseRays * rc.angularRatio ** level;
+      const output = this.#buffer(`cascade${level}`, count * 16);
+      dispatch(this.#cascade!, count, config(level), input(upper, surface), output);
+      upper = output;
+    }
+    const offset = config(0);
     const pass = c.encoder.beginRenderPass({
-      label: 'gi-lighting2d pass',
-      colorAttachments: [
-        {
-          view: target.createView(),
-          loadOp: 'load',
-          storeOp: 'store',
-        },
-      ],
+      colorAttachments: [{ view: target.createView(), loadOp: 'clear', clearValue: [0, 0, 0, 1], storeOp: 'store' }],
     });
-    pass.setPipeline(this.#pipeline!);
-    pass.setBindGroup(0, this.#bindGroup);
+    pass.setPipeline(this.#show!);
+    pass.setBindGroup(0, sceneGroup, [offset]);
+    pass.setBindGroup(1, input(upper, surface));
     pass.draw(3);
     pass.end();
+    device.queue.writeBuffer(uniforms, 0, values);
   }
-
   onDeviceRestored(): void {
     this.#release();
   }
-
+  #release(): void {
+    for (const buffer of this.#buffers.values()) buffer.destroy();
+    this.#buffers.clear();
+    this.#masks.dispose();
+    this.#device =
+      this.#module =
+      this.#sceneLayout =
+      this.#inputLayout =
+      this.#outputLayout =
+      this.#cascade =
+      this.#bounce =
+      this.#show =
+      this.#format =
+        undefined;
+  }
   dispose(): void {
     if (this.#disposed) return;
     this.#disposed = true;
@@ -1114,7 +822,6 @@ export class GILighting2D implements EnginePlugin, Disposable {
     this.#engine?.removePlugin(this.name);
     this.#engine = undefined;
   }
-
   [Symbol.dispose](): void {
     this.dispose();
   }

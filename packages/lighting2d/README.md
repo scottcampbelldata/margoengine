@@ -153,10 +153,21 @@ and `createWindowCookie` construct standard patterns. CPU helper `cookieLightAt(
 
 ## 2D global illumination
 
-The `@margoengine/lighting2d/gi` prototype has unresolved correctness defects. It is not a validated spatial radiance-cascade
-implementation. Multi-bounce transport, interval merging, visibility, light packing and camera alignment remain under repair;
-see [the lighting2d findings](../../docs/known-bugs.md#lighting2d-batch-55-gi-review). CPU/GPU agreement in the original scene
-is not proof of physical correctness. The example below demonstrates the current API only.
+`@margoengine/lighting2d/gi` stores spatial radiance/transmittance intervals on world-space probe grids.
+Probe spacing doubles at each level from a one-world-unit base lattice centred at .5; angular samples multiply by
+`angularRatio`. Each child interval has its own visibility connector, composed before bilinear interpolation
+(Osborne/Sannikov appendix A). Opaque emitters terminate transmission. Cameras use the pixel layer's top-left origin.
+
+`cascades` defaults: `cascades: 4` (1..8), `baseRays: 4` (1..32), `baseDistance: 16` (>0), `intervalRatio: 4` (>1),
+`angularRatio: 4` (1..8), `bounces: 1` (0..4), `albedo: .5` (0..1), `intensity: 1` (>=0).
+The far reach is `baseDistance * intervalRatio ** (cascades - 1)`.
+Each requested bounce performs a separate two-sided diffuse surface gather, using only the preceding order;
+`bounces: 0` leaves reflecting surfaces black. Surface patches are at most `baseDistance` long and gather 32 angular
+samples with normalized cosine weights. This finite quadrature can miss small emitters; increase their resolved size
+or shorten `baseDistance` to improve spatial resolution. It is an approximation, with no performance or arbitrary-scene accuracy claim.
+Direct point, spot and directional lights retain their cones, heights/elevation, masks, layers and shadow setting.
+`layer` defaults to all bits, as does `scene.layer` in the CPU forms. Unorm targets clamp HDR output; use `rgba16float`
+when the result must exceed one. Every frame rebuilds the field without temporal history.
 
 ```ts
 import {EngineKernel} from 'margoengine/core';

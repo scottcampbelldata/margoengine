@@ -1367,9 +1367,9 @@ height uniforms and isolated HDR threshold images; actual `Bloom.encodeImage` ou
 encoded dispatch and must spread outside a zero-glow sprite. All six entries reject a native WebGL2 engine with a coded
 error and help link. Direct-light storage ceilings are device limits rather than silent 64-item truncation.
 
-Current evidence is one RTX A6000/Edge device. Cross-vendor rounding and adapter behaviour remain unproved. GI's spatial
-hierarchy, interval/transmittance merging, source visibility, actual cascade/bounce counts and ringing fix are not proved;
-LIM-599 is withdrawn and the seven review repros remain in `docs/known-bugs.md`. No speed claim or benchmark is added.
+Current evidence is one RTX A6000/Edge device. Cross-vendor rounding and adapter behaviour remain unproved. The spatial
+GI replacement now has the independent energy, visibility and analytic-circle evidence described below. No speed claim
+or benchmark is added. All six optional byte budgets remain unchanged; the candidate cannot land until their gate passes.
 
 
 The following remain technical gaps, not permission to weaken a check:
@@ -1932,3 +1932,13 @@ The shared loader translates policy-blocked compilation through the shared error
 The approved core correction changes only `packages/core/src/kernel.ts`: core owns the transform-kernel compilation and instantiation, so an optional package cannot report its startup failure. Approval: Scott, "Yes approved", 2026-11-10. Core plus stage measures 23,797 B gzip with `npm run measure:size`, below 25,000 B.
 
 Lighting2d height precision repair (2026-11-08): owned rgba16float accumulation precedes one target presentation. `frame-regressions.js` proves 100 individually sub-byte directional lights, in addition to format, resize, frame order and restoration checks. RTX A6000: 148 pixel checks, no errors. Half-float blending retains its finite rounding precision; this is not a float32 accumulation claim.
+
+Lighting2d spatial GI repair (2026-11-08): GPU compute builds each upper spatial/angular grid, retaining radiance and
+transmittance. Per-child connectors implement Osborne/Sannikov appendix A before interpolation. Separate two-sided
+surface fields ping-pong for each requested bounce, with current-frame resets. Explicit vec4-aligned light records
+carry point/spot/directional and mask/layer/shadow data. New Node/GPU suites assert exact opaque darkness/energy,
+all eight levels, distinct bounce orders, analytic circle angular measure (11 distances, <5% relative error),
+and format/resize/removal/restore/dispose/reattach lifecycle. These suites extend lighting2d test:gpu, already a
+check:merge GPU gate; there is no new bypass. Original GI fails 21 Node assertions and the GPU value checks.
+Missing evidence: other GPUs, general scene convergence and performance. Surface patches/32-direction quadrature
+are finite approximations, detailed in limits.md. Byte-budget approval is still needed before landing.

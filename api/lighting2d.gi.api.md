@@ -29,6 +29,7 @@ export class GILighting2D implements EnginePlugin, Disposable {
         zoom: number;
     };
     ambient: number | string;
+    layer: number;
     emitters: EmissiveSprite2D[];
     lights: Light2D[];
     occluders: Occluder2D[];
@@ -41,6 +42,7 @@ export class GILighting2D implements EnginePlugin, Disposable {
 }
 
 export interface GILighting2DOptions {
+    readonly layer?: number;
     readonly target: GPUTexture | (() => GPUTexture);
     readonly order?: number;
     readonly camera?: {
@@ -60,6 +62,7 @@ export interface GIScene2D {
     readonly emitters?: readonly EmissiveSprite2D[];
     readonly lights?: readonly Light2D[];
     readonly occluders?: readonly Occluder2D[];
+    readonly layer?: number;
 }
 
 export class RadianceCascade2D {
@@ -72,7 +75,7 @@ export class RadianceCascade2D {
     readonly albedo: number;
     readonly intensity: number;
     constructor(options?: RadianceCascadeOptions2D);
-    evaluateAt(point: Point2D, normal?: Point2D, scene?: GIScene2D): [number, number, number];
+    evaluateAt(point: Point2D, normal?: Point2D, scene?: GIScene2D): RGB;
     computeGrid(width: number, height: number, scene?: GIScene2D, spacing?: number): Float32Array;
 }
 
@@ -87,7 +90,7 @@ export interface RadianceCascadeOptions2D {
     readonly intensity?: number;
 }
 
-export function evaluate2DGI(point: Point2D, normal?: Point2D, scene?: GIScene2D, options?: RadianceCascadeOptions2D): [number, number, number];
+export function evaluate2DGI(point: Point2D, normal?: Point2D, scene?: GIScene2D, options?: RadianceCascadeOptions2D): RGB;
 
 // Not exported from this entry, but used by the exports above:
 
@@ -171,4 +174,6 @@ type Occluder2D = {
 };
 
 type Point2D = readonly [number, number];
+
+type RGB = [number, number, number];
 ```
