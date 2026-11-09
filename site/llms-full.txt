@@ -2590,6 +2590,16 @@ features add no core or stage functionality.
 
 # Design envelope
 
+Batch 134 scalar ideal-fidelity diagnostic reproduces **17/98** failing
+file/target pairs against the existing original-source bars; the untouched
+source-size subset has **3/82** failing pairs (130 image comparisons).
+All 1,296 frozen old controls and both zero-tolerance channel mappings remain
+unchanged. Margo alpha UASTC BC5 mapped SSE increases 9.5372%; its base alpha
+residual correlation is -0.364748. This compares unquantized decoded pixels,
+not an encoded BC payload or a mathematical lower bound on every encoder's
+original-source error. Acceptance is waiting on Scott; no fourth scalar round.
+[Evidence and input pins](whitepaper/results/batch-134-scalar-ideal-bound.json).
+
 Batch 134 rational scalar-source experiment: 184,335 B raw /
 69,278 B gzip9, versus the byte-objective draft's 169,084 / 61,994 B.
 The 7,284 extra gzip bytes test rational source estimates with complete

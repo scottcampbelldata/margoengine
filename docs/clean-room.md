@@ -3176,3 +3176,31 @@ No correctness callback or numeric tolerance is deferred or weakened. The source
 guard fails against the parent and rejects missing/constant/else guards; it also
 pins the complete set of phase-gated callbacks so unrelated correctness cannot
 silently move behind the flag. No benchmark or wall-clock A/B was run here.
+
+## Batch 134 report18: scalar ideal-fidelity diagnostic
+
+Evidence only; no runtime or acceptance change. Research reviewed before
+writing the reproducer: Andrew Garrard / Khronos Group, *Khronos Data Format
+Specification v1.4.0* (2025), chapters19 and25,
+https://registry.khronos.org/DataFormat/specs/1.4/dataformat.1.4.html;
+Mark Callow, *KTX File Format Specification 2.0.4* (2025), mip/container
+contract, https://registry.khronos.org/KTX/specs/2.0/ktxspec.v2.html;
+Don P. Mitchell and Arun N. Netravali, *Reconstruction Filters in Computer
+Graphics* (SIGGRAPH 1988), introduction and reconstruction/filter discussion,
+https://www.cs.utexas.edu/~fussell/courses/cs384g-fall2013/lectures/mitchell/Mitchell.pdf.
+These are scoped rereads, not new full-document certifications. The standards
+define reconstruction/storage; the paper explains why a resampling reference
+need not match another filter. Retain the original reference and arithmetic,
+rather than introduce a filter or inferred source prior. No companion code,
+foreign implementation, optimizer, glue or disassembly was read or used.
+
+`scripts/measure/scalar-ideal-bound.mjs` reuses the lane's specification-derived
+quality-pixels readers and frozen original-source controls. It hashes all
+loaded payloads and sources, verifies 1,296 old SSE controls and reproduces
+17/98 failing pairs, 3/82 untouched pairs, 9.5372% Margo alpha mapped increase
+and -0.364748 base-alpha residual correlation. BC5 ideal G takes payload A,
+preserving the frozen conventional and mapped comparisons exactly. Its
+zero-added-reconstruction-error comparator is not an encoded BC output and
+not a universal lower bound on original-source SSE. No runtime fitting,
+fourth scalar campaign, tolerance change or bar adoption. Scott's ruling is
+pending; other targets continue under the existing bars.

@@ -1,5 +1,17 @@
 # Claims and evidence
 
+The [scalar ideal-fidelity diagnostic](results/batch-134-scalar-ideal-bound.json)
+reproduces 17/98 failures on all images and 3/82 on untouched source-size
+pairs, using frozen prebuilt RGBA8 as a zero-added-reconstruction-error
+comparator. All 1,296 old controls are exact. The 130 untouched comparisons,
+234 prebuilt-RGBA references and 932 area-resampled comparisons remain
+separate in the evidence. Margo alpha BC5's mapped increase is 9.5372% and
+base-alpha residual correlation is -0.364748. This diagnoses reference and
+channel interactions; it does not prove that every possible encoder fails.
+No scalar bar changed, no accepted scalar improvement, no fourth scalar round.
+Reproduction: `node scripts/measure/scalar-ideal-bound.mjs <evidence-directory>` with the retained
+private corpus, control payloads and specification-derived quality readers.
+
 Pixel's readable palette shader preserves the prior operations, literals and
 binding positions after identifier normalization. The real GPU palette suite
 passes 20 exact checks with zero wrong pixels or validation errors; both palette

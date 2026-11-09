@@ -1811,3 +1811,22 @@ command, with `--owner=codex-56fix --wait-max=60 --max=1.5`, followed by
 `node scripts/run-readme-examples.mjs --packages=terrain` with `--max=2`.
 The inherited sequence's original successful commands and reset-interrupted
 README are retained under test-results/56fix/owed-terrain-*.
+
+## Batch 134 scalar ideal-fidelity evidence
+
+From the repository root, after building `@margoengine/decoders`, run
+`node scripts/measure/scalar-ideal-bound.mjs <retained-evidence-directory>`. Positional arguments
+select the retained evidence directory and optional output JSON path. The inputs
+are the author-retained measurement directory; default output is
+`docs/whitepaper/results/batch-134-scalar-ideal-bound.json`.
+The private directory must contain the frozen report17 control JSON, the
+comparison-corpus and quality-pixels readers with their dependencies, baseline
+metadata, licensed source PNG/RGBA files and old target13/4/5 payloads.
+The committed rational report must equal the frozen control JSON. Every
+payload/source hash and all 1,296 old SSE controls must match. No old decoder,
+candidate Wasm, transcode, optimizer or GPU command runs. The script asserts
+17/98 all-pair failures and 3/82 untouched-pair failures and prints the table.
+Input hashes and per-image/pair results are written to the JSON evidence.
+Use an external hard process-tree timeout, 240 seconds for the retained corpus.
+This is a zero-added-reconstruction-error diagnostic, not BC bitstream output
+or a universal source-error lower bound. Both current bars stay unchanged.

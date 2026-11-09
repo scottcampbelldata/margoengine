@@ -1,0 +1,26 @@
+{
+  "status": "evidence-checkpoint-composed-gates",
+  "scope": "Scalar ideal-fidelity reproducer and documentation only. No runtime, bar, public package, README, export or core/stage change. Job2 remains incomplete; no fourth BC4/BC5 round.",
+  "diagnostic": { "files": 49, "pairs": 98, "images": 1296, "failingPairs": 17, "untouchedPairs": 82, "untouchedFailingPairs": 3 },
+  "verify": {
+    "freshRuns": 1,
+    "passed": 13797,
+    "failed": 1,
+    "skipped": 0,
+    "failure": "tests/no-private-paths.test.js: new reproduction paragraph named an author-only folder path",
+    "resolution": "Require an explicit evidence-directory argument and describe the retained inputs without a non-clone path. Strict private-path, llms and document-consistency tests pass afterward. No second full verify or unconditional all-green claim."
+  },
+  "lint": "pass after final script changes",
+  "hygiene": "pass after build; initial overlapping run refused temporarily missing gltf-pro declaration while verify rebuilt it",
+  "decodersCpu": { "passed": 260, "failed": 0, "skipped": 0 },
+  "gltfCpu": { "packagePassed": 59, "integrationPassed": 2, "failed": 0 },
+  "gpu": {
+    "mode": "shared, one slot per lane, wait-max60, real GPU leaves only",
+    "gltf": "pass, max0.75 minutes",
+    "decodersBrowser": "pass, max1 minute",
+    "nativeNodeGltf": "pass, max0.5 minutes",
+    "candidateWasmAcceptance": false
+  },
+  "readmeAndApi": "not applicable: no public package, README or export changes",
+  "speed": "deferred under the existing build phase; no benchmark, timing A/B, timing-only assertion or exclusive GPU"
+}
