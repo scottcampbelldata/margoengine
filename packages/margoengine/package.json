@@ -378,6 +378,10 @@
       "types": "./dist/bvh/alpha.d.ts",
       "import": "./dist/bvh/alpha.js"
     },
+    "./bvh/alpha-triangles": {
+      "types": "./dist/bvh/alpha-triangles.d.ts",
+      "import": "./dist/bvh/alpha-triangles.js"
+    },
     "./cache": {
       "types": "./dist/cache.d.ts",
       "import": "./dist/cache.js"
@@ -2617,6 +2621,10 @@
     "./shadows/rt": {
       "types": "./dist/shadows/rt.d.ts",
       "import": "./dist/shadows/rt.js"
+    },
+    "./shadows/rt-alpha": {
+      "types": "./dist/shadows/rt-alpha.d.ts",
+      "import": "./dist/shadows/rt-alpha.js"
     },
     "./sky": {
       "types": "./dist/sky.d.ts",

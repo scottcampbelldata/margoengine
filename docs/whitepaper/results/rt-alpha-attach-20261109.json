@@ -1,0 +1,74 @@
+[
+  {
+    "rotated": false,
+    "mode": "opaque",
+    "faces": 61,
+    "holes": 968,
+    "solid": 2553,
+    "lit": 7654,
+    "shaded": 3521
+  },
+  {
+    "rotated": false,
+    "mode": "alpha",
+    "faces": 61,
+    "holes": 968,
+    "solid": 2553,
+    "lit": 8622,
+    "shaded": 2553
+  },
+  {
+    "rotated": false,
+    "mode": "restored",
+    "faces": 61,
+    "holes": 968,
+    "solid": 2553,
+    "lit": 8622,
+    "shaded": 2553
+  },
+  {
+    "rotated": false,
+    "mode": "fallback",
+    "faces": 61,
+    "holes": 968,
+    "solid": 2553,
+    "lit": 5670,
+    "shaded": 5505
+  },
+  {
+    "rotated": true,
+    "mode": "opaque",
+    "faces": 61,
+    "holes": 1448,
+    "solid": 2291,
+    "lit": 7654,
+    "shaded": 3739
+  },
+  {
+    "rotated": true,
+    "mode": "alpha",
+    "faces": 61,
+    "holes": 1448,
+    "solid": 2291,
+    "lit": 9102,
+    "shaded": 2291
+  },
+  {
+    "rotated": true,
+    "mode": "restored",
+    "faces": 61,
+    "holes": 1448,
+    "solid": 2291,
+    "lit": 9102,
+    "shaded": 2291
+  },
+  {
+    "rotated": true,
+    "mode": "fallback",
+    "faces": 61,
+    "holes": 1448,
+    "solid": 2291,
+    "lit": 5670,
+    "shaded": 5723
+  }
+]

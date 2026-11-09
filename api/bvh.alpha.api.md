@@ -61,6 +61,7 @@ export interface ModelAlphaMaskSource extends AlphaMaskSource {
         readonly material: AlphaMaskedMaterial;
         readonly reason: string;
     }[];
+    forPrimitive(primitive: object): AlphaMask | null;
 }
 
 export interface ModelAlphaMasksOptions {

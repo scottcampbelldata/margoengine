@@ -5,7 +5,18 @@ import { GPUMeshBVH, bvhWGSL } from '@margoengine/bvh/gpu';
 import type { MeshBVH } from '@margoengine/bvh';
 import type { ShadowEffectFrame, ShadowFilter, ShadowFilterEffect } from './shader.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
-/** {@link rayTracedFilter} settings. All but `fallback` are read every frame from the effect's `options`. */
+/** Optional candidate coverage data, normally created by shadows/rt-alpha. One fragment storage binding. */
+export interface RayTracedAlpha {
+  /** Declare shadowFxAlphaAccept(face: u32, barycoord: vec3f) -> bool, and its shadowFx-prefixed binding. */
+  wgsl(group: number, binding: number): string;
+  /** One storage buffer binding. */
+  resources(): readonly GPUBindingResource[];
+  /** Upload immutable coverage data; called again on device restore. */
+  setup(device: GPUDevice): void;
+  /** Release GPU objects; may be set up again. */
+  dispose(): void;
+}
+/** {@link rayTracedFilter} settings. `alpha` and `fallback` are captured at creation; other fields are read every frame. */
 export interface RayTracedFilterOptions {
   /** Rays per lit pixel, a whole number from 1 to 256. One is enough for a sun of no size. Default 16. */
   rays?: number;
@@ -17,6 +28,8 @@ export interface RayTracedFilterOptions {
   far?: number;
   /** The map filter used where a fragment shader cannot read storage buffers. Default 'soft'. */
   fallback?: ShadowFilter;
+  /** Candidate cutout coverage, captured at creation. Default none: every triangle is opaque. */
+  alpha?: RayTracedAlpha;
 }
 /** The filter `rayTracedFilter` returns, with live `options`. */
 export interface RayTracedFilter<Context = unknown> extends ShadowFilterEffect<Context> {
@@ -28,10 +41,12 @@ export interface RayTracedFilter<Context = unknown> extends ShadowFilterEffect<C
 export interface RayTracingTarget {
   readonly gpu: GPUDevice | null;
 }
-/** True where a fragment shader can walk a tree: four storage buffers there, which WebGPU's compatibility level may withhold. */
-export const canTraceShadows = (target: RayTracingTarget): boolean => {
+/** True with four fragment storage buffers, or five when alpha is true (default false). Compatibility tiers may withhold them. */
+export const canTraceShadows = (target: RayTracingTarget, alpha = false): boolean => {
   const limits = target.gpu?.limits as (GPUSupportedLimits & { maxStorageBuffersInFragmentStage?: number }) | undefined;
-  return !!limits && (limits.maxStorageBuffersInFragmentStage ?? limits.maxStorageBuffersPerShaderStage) >= 4;
+  return (
+    !!limits && (limits.maxStorageBuffersInFragmentStage ?? limits.maxStorageBuffersPerShaderStage) >= (alpha ? 5 : 4)
+  );
 };
 /**
  * Exact shadows from rays against `bvh`, in place of a map filter: `Shadows.attach(engine, {filter: rayTracedFilter(engine, bvh,
@@ -44,12 +59,14 @@ export function rayTracedFilter<Context extends { device: GPUDevice }>(
   bvh: MeshBVH,
   options: RayTracedFilterOptions = {},
 ): RayTracedFilter<Context> | ShadowFilter {
-  if (!canTraceShadows(target)) return options.fallback ?? 'soft';
+  const alpha = options.alpha;
+  if (!canTraceShadows(target, !!alpha)) return options.fallback ?? 'soft';
   const values = new Float32Array(8);
   let tree: GPUMeshBVH | undefined, uniform: GPUBuffer | undefined;
   const free = () => {
     tree?.dispose();
     uniform?.destroy();
+    alpha?.dispose();
     tree = uniform = undefined;
   };
   return {
@@ -67,23 +84,34 @@ export function rayTracedFilter<Context extends { device: GPUDevice }>(
   return f32(seen)/f32(count);`,
     wgsl(group, at) {
       // moveEffects finds an effect's bindings by the shadowFx prefix.
-      return `${bvhWGSL({ group, binding: at }).replace(/\bbvh([A-Z])/g, 'shadowFxBvh$1')}
+      return `${bvhWGSL({ group, binding: at, accept: alpha ? 'shadowFxAlphaAccept' : undefined }).replace(/\bbvh([A-Z])/g, 'shadowFxBvh$1')}
 struct ShadowFxRay {light:vec4f,settings:vec4f}
 @group(${group}) @binding(${at + 5}) var<uniform> shadowFxRayData:ShadowFxRay;
+${alpha?.wgsl(group, at + 6) ?? ''}
 `;
     },
     resources() {
       const t = tree!;
-      return [t.nodes, t.index, t.faces, t.positions, t.params, uniform!].map((buffer) => ({ buffer }));
+      return [
+        ...[t.nodes, t.index, t.faces, t.positions, t.params, uniform!].map((buffer) => ({ buffer })),
+        ...(alpha?.resources() ?? []),
+      ];
     },
     setup(device: GPUDevice) {
       free();
-      tree = GPUMeshBVH.forShader(device, bvh);
-      uniform = device.createBuffer({ size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+      try {
+        tree = GPUMeshBVH.forShader(device, bvh);
+        uniform = device.createBuffer({ size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+        alpha?.setup(device);
+      } catch (error) {
+        free();
+        throw error;
+      }
     },
     update(frame: ShadowEffectFrame<Context>) {
       const { rays = 16, lightSize = 0, bias = 0.001, far = 1e6 } = options;
-      if (!Number.isInteger(rays) || rays < 1 || rays > 256) throw new RangeError('Invalid ray count; use a whole number from 1 to 256');
+      if (!Number.isInteger(rays) || rays < 1 || rays > 256)
+        throw new RangeError('Invalid ray count; use a whole number from 1 to 256');
       if (!(lightSize >= 0)) throw new RangeError('Invalid ray traced lightSize; use 0 or more');
       if (!(bias > 0) || !(far > 0)) throw new RangeError('Invalid ray traced bias or far; use numbers above 0');
       values.set(frame.light);

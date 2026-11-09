@@ -1,0 +1,16 @@
+[
+  {
+    "rotated": false,
+    "rays": 1020,
+    "holes": 166,
+    "solid": 918,
+    "restores": 2
+  },
+  {
+    "rotated": true,
+    "rays": 1020,
+    "holes": 218,
+    "solid": 918,
+    "restores": 2
+  }
+]

@@ -281,6 +281,35 @@ with zero failures/skips before the final main rebase; all 80 scoped rebase
 regressions pass. The memory-admission fix landed first as 0d318eb86, followed
 by the separate browser repair. No timing proof or completed Basis job follows.
 
+### Closed 2026-11-09: ray-shadow cutouts (batch 49 job 1)
+
+Cause: ordinary RT accepted a geometric candidate without checking its material
+coverage. The optional shadows/rt-alpha path now packs source-face UV/material
+provenance and modelAlphaMasks into bvhWGSL's candidate predicate, before closest
+or any-hit acceptance. A hole continues the same traversal, including coplanar
+or farther candidates. Six RT-alpha CPU cases cover malformed/overflowing data,
+wraps, transforms, factors, inclusive cutoff, ownership, restore and cleanup.
+All 379 owning-package/included integration CPU tests pass. The registered
+rt-alpha-browser.mjs and rt-alpha-attach-browser.mjs GPU regressions pass on the
+complete real Khronos cutout model, including opaque controls, quarter-turn UVs,
+restored coverage resources and map fallback. Raw counts are retained in the
+[attached proof](whitepaper/results/rt-alpha-attach-20261109.json). No core or stage
+change was needed.
+
+### Withdrawn 2026-11-09: texture-transform rotation sign allegation
+
+The earlier allegation relied on the extension overview's historical GLSL
+snippet as an independent oracle. Khronos issue 1563 and PR 1624 explain that
+snippet's sign discrepancy in U-right/V-down coordinates. No Margo sign changes
+are warranted: the actual TextureTransformMultiTest production GPU proof passes
+both independently authored baked-UV comparisons (max UV error 0.0059999654,
+unchanged bound 0.01) and their rendered-pixel bars. Default and quarter-turn
+cutout ray/shadow coverage also pass. Keep those independent authored references;
+do not replace them with an oracle that repeats the implementation's matrix.
+Sources are in [the research record](work-lists/skip-gaps-research.md); actual
+[production results](whitepaper/results/rt-alpha-texture-reference-20261109.json)
+retain the source-model pin and rendered comparison counts.
+
 ### Fixed 2026-11-09: owned Windows Chromium shutdown pipes (batch 160)
 
 ChildProcess `exit` does not establish that its stdio has closed. The shared
@@ -1428,6 +1457,18 @@ Sweep record: every package's tests and browser or GPU tests on the Mac mini (M6
   that passed only on such a rerun ends with a "PASSED WITH A DRIVER RESET: <step>, <reset and time>" line per step
   and sets `passedAfterDriverReset: true` at the top of both files, so it never reads like a clean pass. The path
   tracer viewport traces at most 2^20 paths a dispatch (`packages/voxel-pathtracer/src/dispatch.ts`).
+- **2026-11-09 skip-gap item 2 occurrence:** shadows' README gate passed 14/15,
+  including the new rt-alpha example, but ordinary RT was refused at requestDevice
+  with D3D12 create-command-queue E_OUTOFMEMORY. Windows records nvlddmkm event
+  153 at 16:05:40 EST, inside that gate's 16:05:18..16:05:51 interval. A later
+  nvidia-smi query reports 3,632/49,140 MiB used, not VRAM exhaustion. No shader or
+  traversal assertion failed. Preserve the full first report and run only the
+  failed ordinary-RT example once under the existing driver-reset policy; do not
+  weaken the test or replay the fourteen passes. The single failed example passes on its one isolated rerun. The original gate
+  log is test-results/skip-gaps/item2-shadows-readme.log, with the matching reset
+  in item2-readme-driver-reset.json and the isolated pass in
+  item2-shadows-readme-failed-only.log. This remains a pass after a driver reset,
+  not a clean first-run gate.
 - **Needed to close:** run the checks with the Remote Desktop session disconnected (or with Remote Desktop not using the
   GPU) for a day and count resets; if 153 still comes, a per-second recorder (GPU engine use and memory per process,
   Edge GPU processes, lock holders, running tests; kept with the private notes) saves the 150 s before it, and the

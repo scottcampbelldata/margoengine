@@ -38,7 +38,9 @@
     "test:gpu:virtual-feedback": "cd ../.. && node packages/shadows/test/virtual-feedback-browser.mjs",
     "test:gpu:virtual-cache": "cd ../.. && node packages/shadows/test/virtual-cache-browser.mjs",
     "test:gpu:virtual-filters": "cd ../.. && node packages/shadows/test/lit-faces-browser.mjs --page=virtual && node packages/shadows/test/virtual-edges-browser.mjs",
-    "prepack": "npm --prefix ../.. run build:packages"
+    "prepack": "npm --prefix ../.. run build:packages",
+    "test:gpu:rt-alpha": "cd ../.. && node packages/shadows/test/rt-alpha-browser.mjs",
+    "test:gpu:rt-alpha-attach": "cd ../.. && node packages/shadows/test/rt-alpha-attach-browser.mjs"
   },
   "sideEffects": false,
   "exports": {
@@ -73,6 +75,10 @@
     "./rt": {
       "types": "./dist/rt.d.ts",
       "import": "./dist/rt.js"
+    },
+    "./rt-alpha": {
+      "types": "./dist/rt-alpha.d.ts",
+      "import": "./dist/rt-alpha.js"
     }
   },
   "files": [

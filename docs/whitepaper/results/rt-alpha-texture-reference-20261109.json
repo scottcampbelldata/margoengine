@@ -1,0 +1,219 @@
+{
+  "hardware": {
+    "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "webgpu": {
+      "vendor": "nvidia",
+      "architecture": "ampere",
+      "device": "",
+      "description": "",
+      "fallback": false
+    },
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+    "browserName": "chromium",
+    "browserVersion": "157.0.4341.42",
+    "requestedChannel": "msedge",
+    "launchArgs": [],
+    "powerPreference": "high-performance",
+    "hostPlatform": "win32",
+    "headless": true
+  },
+  "commit": "edc7c9e67c639d230715049ee31f9a96a6babbbe",
+  "models": [
+    {
+      "name": "TextureTransformMultiTest",
+      "primitives": 29,
+      "vertices": 2302,
+      "uv1Primitives": 18,
+      "transforms": 18,
+      "images": [
+        {
+          "width": 512,
+          "height": 512,
+          "bitmap": true
+        },
+        {
+          "width": 512,
+          "height": 512,
+          "bitmap": true
+        },
+        {
+          "width": 512,
+          "height": 512,
+          "bitmap": true
+        },
+        {
+          "width": 512,
+          "height": 512,
+          "bitmap": true
+        }
+      ],
+      "extensionsRequired": [
+        "KHR_texture_transform"
+      ],
+      "extensionsUsed": [
+        "KHR_materials_clearcoat",
+        "KHR_materials_unlit",
+        "KHR_texture_transform"
+      ],
+      "workers": [],
+      "installedMaterials": 9,
+      "authoredReferences": [
+        {
+          "name": "BaseColor",
+          "maxUVError": 0.005999965337987467,
+          "rectangles": [
+            {
+              "left": 319.9999964009357,
+              "right": 352.2038863414545,
+              "top": 150.92961428279455,
+              "bottom": 183.1335042233134
+            },
+            {
+              "left": 360.25484802939127,
+              "right": 392.4587379699101,
+              "top": 150.92961428279455,
+              "bottom": 183.1335042233134
+            },
+            {
+              "left": 400.5097056562874,
+              "right": 432.71359559680616,
+              "top": 150.92961428279455,
+              "bottom": 183.1335042233134
+            }
+          ],
+          "pixelMismatches": [
+            44,
+            44
+          ]
+        },
+        {
+          "name": "Emission",
+          "maxUVError": 0.005999965337987467,
+          "rectangles": [
+            {
+              "left": 319.9999964009357,
+              "right": 352.2038863414545,
+              "top": 191.18446711093824,
+              "bottom": 223.38835705145704
+            },
+            {
+              "left": 360.25484802939127,
+              "right": 392.4587379699101,
+              "top": 191.18446711093824,
+              "bottom": 223.38835705145704
+            },
+            {
+              "left": 400.5097056562874,
+              "right": 432.71359559680616,
+              "top": 191.18446711093824,
+              "bottom": 223.38835705145704
+            }
+          ],
+          "pixelMismatches": [
+            37,
+            36
+          ]
+        }
+      ],
+      "pixels": {
+        "width": 640,
+        "height": 640,
+        "foreground": 122375,
+        "colored": 76614,
+        "peak": 254
+      },
+      "screenshot": "test-results/gltf-production-assets/TextureTransformMultiTest.png",
+      "restored": {
+        "workers": 0,
+        "maxPixelDifference": 0
+      },
+      "disposed": {
+        "pluginDisposed": true,
+        "meshes": 0,
+        "workers": [],
+        "resources": 101,
+        "leaked": []
+      }
+    },
+    {
+      "name": "AnisotropyBarnLamp",
+      "primitives": 3,
+      "vertices": 7712,
+      "uv1Primitives": 0,
+      "transforms": 0,
+      "images": [
+        {
+          "width": 2048,
+          "height": 2048,
+          "format": "rgba8unorm",
+          "mips": 1,
+          "target": "rgba8"
+        },
+        {
+          "width": 2048,
+          "height": 2048,
+          "format": "rgba8unorm",
+          "mips": 1,
+          "target": "rgba8"
+        },
+        {
+          "width": 2048,
+          "height": 2048,
+          "format": "rgba8unorm-srgb",
+          "mips": 1,
+          "target": "rgba8"
+        },
+        {
+          "width": 2048,
+          "height": 2048,
+          "format": "rgba8unorm",
+          "mips": 1,
+          "target": "rgba8"
+        }
+      ],
+      "extensionsRequired": [
+        "KHR_texture_basisu"
+      ],
+      "extensionsUsed": [
+        "KHR_materials_anisotropy",
+        "KHR_materials_clearcoat",
+        "KHR_materials_emissive_strength",
+        "KHR_materials_transmission",
+        "KHR_materials_volume",
+        "KHR_texture_basisu"
+      ],
+      "workers": [
+        {
+          "url": "http://127.0.0.1:5198/packages/decoders/dist/decoder.worker.js?no-inline",
+          "terminated": true
+        }
+      ],
+      "installedMaterials": 2,
+      "authoredReferences": [],
+      "pixels": {
+        "width": 640,
+        "height": 640,
+        "foreground": 45829,
+        "colored": 45063,
+        "peak": 253
+      },
+      "screenshot": "test-results/gltf-production-assets/AnisotropyBarnLamp.png",
+      "restored": {
+        "workers": 1,
+        "maxPixelDifference": 0
+      },
+      "disposed": {
+        "pluginDisposed": true,
+        "meshes": 0,
+        "workers": [
+          {
+            "url": "http://127.0.0.1:5198/packages/decoders/dist/decoder.worker.js?no-inline",
+            "terminated": true
+          }
+        ],
+        "resources": 36,
+        "leaked": []
+      }
+    }
+  ]
+}

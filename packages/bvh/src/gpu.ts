@@ -8,7 +8,13 @@ import { INTERNAL_FLAG, NODE_WORDS } from './build.js';
 import type { MeshBVH } from './bvh.js';
 import type { Side } from './math.js';
 
-declare const GPUBufferUsage: { STORAGE: number; UNIFORM: number; COPY_DST: number; COPY_SRC: number; MAP_READ: number };
+declare const GPUBufferUsage: {
+  STORAGE: number;
+  UNIFORM: number;
+  COPY_DST: number;
+  COPY_SRC: number;
+  MAP_READ: number;
+};
 declare const GPUMapMode: { READ: number };
 
 /** Floats per ray in a ray buffer: origin xyz, near, direction xyz, far. */
@@ -62,6 +68,8 @@ export interface GPUBVHBindingOptions {
   group?: number;
   /** First of its five bindings. Default 0. */
   binding?: number;
+  /** Optional WGSL function name: (face: u32, barycoord: vec3f) -> bool. Reject before closest/any-hit acceptance. Default none. */
+  accept?: string;
 }
 
 /**
@@ -70,7 +78,9 @@ export interface GPUBVHBindingOptions {
  * a miss). `side` is 0 double, 1 front, 2 back. `direction` need not be unit length; distances are lengths in the
  * tree's space.
  */
-export function bvhWGSL({ group = 0, binding = 0 }: GPUBVHBindingOptions = {}): string {
+export function bvhWGSL({ group = 0, binding = 0, accept }: GPUBVHBindingOptions = {}): string {
+  if (accept !== undefined && !/^[A-Za-z][A-Za-z0-9_]*$/.test(accept))
+    throw new TypeError('Invalid BVH candidate function; pass a WGSL identifier');
   const at = (offset: number): string => `@group(${group}) @binding(${binding + offset})`;
   return /* wgsl */ `
 struct BVHNode { lo: vec3f, left: u32, hi: vec3f, right: u32 }
@@ -192,6 +202,7 @@ fn bvhWalk(r: BVHRay, side: u32, any: bool) -> BVHHit {
         let hit = bvhTriangle(r, a, b, c, side, best.distance);
         if (hit.w < 0.0) { continue; }
         let face = bvhFaces[at];
+        ${accept ? `if (!${accept}(face, hit.xyz)) { continue; }` : ''}
         // Equal distances answer the lowest face index, as raycastFirst does.
         if (hit.w < best.distance || best.face == BVH_MISS || face < best.face) {
           best = BVHHit(hit.w, face, hit.xyz, dot(cross(b - a, c - a), r.direction) < 0.0);
@@ -418,7 +429,12 @@ export class GPUMeshBVH {
         throw new RangeError(
           `BVH ${name} take ${bytes} bytes, over this device's ${limit}; request a higher maxStorageBufferBindingSize or split the mesh.`,
         );
-    const upload = (label: string, data: ArrayBuffer | ArrayBufferView | null, size: number, usage: number): GPUBuffer => {
+    const upload = (
+      label: string,
+      data: ArrayBuffer | ArrayBufferView | null,
+      size: number,
+      usage: number,
+    ): GPUBuffer => {
       const buffer = device.createBuffer({ label, size, usage: usage | GPUBufferUsage.COPY_DST });
       if (data) device.queue.writeBuffer(buffer, 0, data as BufferSource);
       return buffer;
@@ -490,7 +506,8 @@ export class GPUMeshBVH {
       y = Math.ceil(groups / x);
     if (y > max) throw new RangeError(`${count} rays are more than one dispatch holds; trace them in parts.`);
     const pipeline = this.#pipeline;
-    if (!pipeline) throw new MargoError('state', 'This tree is for your own shader; make one with GPUMeshBVH.create to trace rays.');
+    if (!pipeline)
+      throw new MargoError('state', 'This tree is for your own shader; make one with GPUMeshBVH.create to trace rays.');
     const pass = encoder.beginComputePass({ label: 'bvh trace' });
     pass.setPipeline(pipeline);
     pass.setBindGroup(0, this.#tree);
@@ -519,7 +536,8 @@ export class GPUMeshBVH {
     const { signal } = options;
     signal?.throwIfAborted();
     const packed = rays instanceof Float32Array ? rays : packRays(rays, options);
-    if (packed.length % GPU_RAY_FLOATS) throw new RangeError('Incomplete ray buffer; pass whole rays of GPU_RAY_FLOATS floats.');
+    if (packed.length % GPU_RAY_FLOATS)
+      throw new RangeError('Incomplete ray buffer; pass whole rays of GPU_RAY_FLOATS floats.');
     const count = packed.length / GPU_RAY_FLOATS,
       device = this.device;
     for (let i = 0; i < packed.length; i++)

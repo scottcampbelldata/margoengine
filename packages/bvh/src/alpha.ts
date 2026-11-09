@@ -107,6 +107,8 @@ export type AlphaPixels = Pick<AlphaMask, 'width' | 'height' | 'data'>;
 /** A mask source for one model, and what it could not read: those materials pick as solid. */
 export interface ModelAlphaMaskSource extends AlphaMaskSource {
   readonly skipped: readonly { readonly material: AlphaMaskedMaterial; readonly reason: string }[];
+  /** Look up an actual primitive of this model without manufacturing a ray hit. Other primitives answer null. */
+  forPrimitive(primitive: object): AlphaMask | null;
 }
 
 const MASK = 1,
@@ -146,9 +148,13 @@ async function readMask(
   const { textures = [], samplers = [] } = model.asset.doc,
     texture = textures[map.index],
     sampler = samplers[texture?.sampler ?? -1],
-    source = SOURCES.map((name) => (texture?.extensions?.[name] as { source?: number } | undefined)?.source).find((index) => index !== undefined) ?? texture?.source,
+    source =
+      SOURCES.map((name) => (texture?.extensions?.[name] as { source?: number } | undefined)?.source).find(
+        (index) => index !== undefined,
+      ) ?? texture?.source,
     image = model.image(source as number) as object;
-  if ('ktx2' in image || 'mipmaps' in image) return 'its base colour map is compressed for the GPU, so no pixels can be read';
+  if ('ktx2' in image || 'mipmaps' in image)
+    return 'its base colour map is compressed for the GPU, so no pixels can be read';
   const read = await pixels(image);
   return {
     width: read.width,
@@ -188,7 +194,12 @@ export async function modelAlphaMasks(
     const primitive = hit.primitive ?? model.primitives[hit.primitiveIndex ?? -1];
     return masks.get((primitive as { material?: AlphaMaskedMaterial } | undefined)?.material!) ?? null;
   };
-  return Object.assign(source, { skipped });
+  const primitives = new Set<object>(model.primitives);
+  return Object.assign(source, {
+    skipped,
+    forPrimitive: (primitive: object) =>
+      primitives.has(primitive) ? (masks.get((primitive as { material: AlphaMaskedMaterial }).material) ?? null) : null,
+  });
 }
 
 /**

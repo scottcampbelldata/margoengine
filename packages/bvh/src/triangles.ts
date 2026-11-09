@@ -1,7 +1,7 @@
 import type { Engine, Geometry, Mesh } from '@margoengine/core';
 import { multiplyMatrices } from '@margoengine/math/mat4';
 import { MargoError } from '@margoengine/math/errors';
-import { isModel, type ModelLike } from './raycaster.js';
+import { isModel, type ModelLike, type ModelPrimitiveLike } from './raycaster.js';
 
 // Structural view of `engineRuntime(engine)`; types only, like the Raycaster.
 interface RuntimeEngine {
@@ -15,7 +15,7 @@ export interface WorldTrianglesOptions {
   /** Run the transform kernel first so world matrices include transform edits made since the last render. Default true. */
   refresh?: boolean;
   /** Return false to leave out a core mesh, or a model primitive (its node and model are passed). Hidden meshes are not skipped by default. */
-  filter?: (mesh: Mesh, model?: ModelLike) => boolean;
+  filter?: (mesh: Mesh, model?: ModelLike, primitive?: ModelPrimitiveLike) => boolean;
 }
 /** Merged world-space triangles: packed xyz `vertices` and `indices` into them, three per triangle. */
 export interface WorldTriangles {
@@ -56,7 +56,7 @@ export function worldTriangles(
     if (isModel(object)) {
       if (object.disposed) continue;
       for (const primitive of object.primitives) {
-        if (!live(primitive.node) || (filter && !filter(primitive.node, object))) continue;
+        if (!live(primitive.node) || (filter && !filter(primitive.node, object, primitive))) continue;
         const node = world(primitive.node),
           instances = primitive.instances,
           matrices: Float32Array[] = [];

@@ -1662,3 +1662,32 @@ dispersive furnace, finite-slab lens disk-edge, alpha and restoration checks ret
 This is deterministic work removal, without a measured speed claim.
 The committed native/compatibility transport and lifecycle report is
 `results/review-99-spectral-20261109.json`.
+
+## RT cutout CPU preparation
+
+After `node scripts/build-modern.js --precompiled --only=bvh,shadows`, run
+`node --test --test-timeout=120000 packages/bvh/tests/*.test.js packages/shadows/test/*.test.js tests/modern-game.test.js tests/modern-shadow-texture-transform.test.js`
+under an eight-minute process-tree limit. All 379 tests run, with no skip or
+timing-only assertion. The new real-model test decodes the actual MASK PNG from
+the standard AlphaBlendModeTest GLB; unrelated opaque RGB JPEGs need no alpha
+decode. It packs the unchanged complete model and compares candidate results
+with AlphaRaycaster, counting rays through clear nearest candidates even when
+a farther opaque surface is present. The CPU oracle caches decoded masks by
+identity; it does not decode the same million pixels again for each ray. Mock
+GPU resources prove ownership/restore/fallback/cleanup without acquiring a GPU.
+Then run these registered real-GPU steps, each in its own shared slot with
+`--owner=codex-skipgaps --wait-max=60 --max=1`:
+`node packages/shadows/test/rt-alpha-browser.mjs` and
+`node packages/shadows/test/rt-alpha-attach-browser.mjs`.
+The first checks actual standard-model closest/any/fragment coverage and repeated
+setup. The second renders public Shadows.attach with the complete model and
+opaque/alpha/restored/fallback controls. Its RT far=7.1 ends before the opaque
+backboard; the fallback oracle reaches the full model. Independent five-point CPU
+rays select unmixed pixel coverage before rendering; visibility bars are 0.05/0.95.
+JSON and PNG evidence is in test-results/shadows-rt-alpha*. No timing gate runs.
+
+For the independent texture-rotation reference, prepare the pinned assets on CPU
+with scripts/support/gltf-production-assets.js cachedProductionAssets(), then run
+`node scripts/gltf-production-assets-tests.js` in one shared slot. This generic
+filename needs an explicit `--gpu=Renders production models and texture pixels`
+classification when invoking gpu-lock directly. No companion implementation is used.

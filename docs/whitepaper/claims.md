@@ -2089,3 +2089,30 @@ with `packages/biomes/tests/erosion-dem.mjs` (see reproduce.md). Work counts pro
 elapsed execution. Total backing memory including copies is 244,908,032 B in a
 fresh instance. Production-browser, package GPU and README proofs pass. Research and
 the clean-room comparison are in docs/work-lists/skip-gaps-research.md.
+## RT cutout coverage evidence
+
+The optional RT-alpha path tests MASK coverage before closest/any acceptance,
+using original face UV/material provenance through leaf permutation. All 379
+bvh/shadows and included integration CPU tests pass with independent alpha,
+candidate-ordering, overflow and ownership regressions. Real-GPU tests compare
+1,020 rays per UV configuration to AlphaRaycaster for closest/any and rendered
+filter visibility, including repeated resource setup. The public Shadows.attach
+proof uses the complete Khronos AlphaBlendModeTest model, an opaque control and
+CPU-derived receiver pixels: default and quarter-turn masks, restored coverage
+resources and the map fallback all pass, with zero shader compilation errors.
+The finite RT reach isolates foreground panels from the sample's opaque backboard;
+the fallback uses its own full-distance oracle. This is deterministic MASK
+coverage, not stochastic transparency or hardware ray queries. Reproduce using
+the registered package GPU scripts and whitepaper/reproduce.md; clean-room sources
+and the texture-rotation reconciliation are in work-lists/skip-gaps-research.md.
+Raw passing [traversal results](results/rt-alpha-traversal-20261109.json) and
+[attached receiver results](results/rt-alpha-attach-20261109.json) retain the
+reported ray/pixel counts, including opaque controls and restoration.
+
+The independent production texture-transform reference passes its baked-UV and
+rendered-pixel bars; [actual results](results/rt-alpha-texture-reference-20261109.json)
+record the standard-asset pin. All owning GPU scripts and all 31 scoped README
+examples pass. One ordinary-RT README requestDevice failure coincided with a
+[logged NVIDIA driver reset](results/rt-alpha-readme-reset-20261109.json); only
+that failed example reran, once, and passed. The result is explicitly a pass
+after a driver reset, with the fourteen first-run shadow README passes retained.

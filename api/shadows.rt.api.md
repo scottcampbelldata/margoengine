@@ -5,6 +5,13 @@
 ```ts
 import { MeshBVH } from "@margoengine/bvh";
 
+export interface RayTracedAlpha {
+    wgsl(group: number, binding: number): string;
+    resources(): readonly GPUBindingResource[];
+    setup(device: GPUDevice): void;
+    dispose(): void;
+}
+
 export interface RayTracedFilter<Context = unknown> extends ShadowFilterEffect<Context> {
     readonly options: RayTracedFilterOptions;
     refit(): void;
@@ -16,13 +23,14 @@ export interface RayTracedFilterOptions {
     bias?: number;
     far?: number;
     fallback?: ShadowFilter;
+    alpha?: RayTracedAlpha;
 }
 
 export interface RayTracingTarget {
     readonly gpu: GPUDevice | null;
 }
 
-export const canTraceShadows: (target: RayTracingTarget) => boolean;
+export const canTraceShadows: (target: RayTracingTarget, alpha?: boolean) => boolean;
 
 export function rayTracedFilter<Context extends {
     device: GPUDevice;

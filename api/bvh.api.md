@@ -365,7 +365,7 @@ export interface WorldTriangles {
 
 export interface WorldTrianglesOptions {
     refresh?: boolean;
-    filter?: (mesh: Mesh, model?: ModelLike) => boolean;
+    filter?: (mesh: Mesh, model?: ModelLike, primitive?: ModelPrimitiveLike) => boolean;
 }
 
 export function buildAsync(source: GeometryLike | TriangleSource, options?: AsyncBuildOptions): Promise<MeshBVH>;

@@ -326,7 +326,7 @@ engine.start();
 
 WebGPU has no ray queries yet, so no hardware path is used: the rays walk the tree in the fragment shader, on any GPU, and cost follows rays times lit pixels. When browsers expose ray queries this entry is where they go.
 
-Only the tree casts, in the pose it was built. After moving what it holds, call `bvh.refit()` and then `filter.refit()`, for the same triangles. Alpha masks are not in the tree, so a cutout casts its whole triangles. Shadows end where the map's reach ends. `Shadows` only: `VirtualShadows` keeps its named filters.
+Only the tree casts, in the pose it was built. After moving what it holds, call `bvh.refit()` and then `filter.refit()`, for the same triangles. The ordinary tree treats triangles as opaque; use `shadows/rt-alpha` below for MASK coverage. Shadows end where the map's reach ends. `Shadows` only: `VirtualShadows` keeps its named filters.
 
 ## Virtual shadow maps
 
@@ -381,3 +381,79 @@ Shadows.attach(engine, {cadence: [1, 1, 2, 4]});
 ## Preview tier contract
 
 GPU-only attachments refuse the small WebGL2 preview during setup with `MargoError` code `unsupported` and a help link. Native WebGPU and the full WebGL2 compatibility layer expose the WebGPU-shaped device these passes need. Use [automatic escalation](../webgl2-compat/README.md#automatic-escalation) with awaited setup to load the full layer when required. Existing real preview routes remain available.
+
+## Cutout coverage in ray-traced shadows
+
+The optional `shadows/rt-alpha` entry connects `modelAlphaMasks` to the RT
+candidate test. Collect UV provenance with `bvh/alpha-triangles`, build the tree
+from those same positions and indices, then pack the masks:
+
+```ts
+import { Engine, box } from '@margoengine/core';
+import { loadGLTF } from '@margoengine/gltf-pro';
+import { MeshBVH } from '@margoengine/bvh';
+import { modelAlphaMasks } from '@margoengine/bvh/alpha';
+import { alphaWorldTriangles } from '@margoengine/bvh/alpha-triangles';
+import { Shadows } from '@margoengine/shadows';
+import { alphaRayTracedFilter, packRayTracedAlpha } from '@margoengine/shadows/rt-alpha';
+
+const canvas = document.createElement('canvas');
+canvas.width = 480; canvas.height = 240;
+document.body.append(canvas);
+const engine = await Engine.create(canvas, { backend: 'webgpu' });
+const model = await loadGLTF(engine, '/examples/assets/khronos/AlphaBlendModeTest/AlphaBlendModeTest.glb');
+// View the receiver from between it and the caster, so the model does not hide its shadow.
+engine.camera.position = [0, 1.35, 5];
+engine.camera.target = [0, 1.35, 7];
+engine.camera.fov = 100;
+engine.lighting.direction.set([0, 0, -1]);
+const receiver = engine.createMesh().setGeometry(box(8, 6, 0.1)).setPosition([0, 1.35, 7.05]);
+const triangles = alphaWorldTriangles(engine, [model]);
+const bvh = MeshBVH.build({ positions: triangles.vertices, indices: triangles.indices });
+const masks = await modelAlphaMasks(model);
+const packed = packRayTracedAlpha(triangles, masks);
+// Reach the foreground cutouts, ending before this sample model's opaque backboard.
+const filter = alphaRayTracedFilter(engine, bvh, packed, { rays: 1, far: 7.1 });
+const shadows = Shadows.attach(engine, { filter });
+shadows.add(model); // also supplies cutout casters to the map fallback
+shadows.add(receiver, { castShadow: false });
+engine.start();
+```
+
+Pass an array of mask sources for several models, or a function from an actual
+primitive to its `AlphaMask`. Unmasked faces stay opaque. `modelAlphaMasks.skipped`
+lists unsupported masks (including texture coordinate sets other than TEXCOORD_0
+and compressed images without readable pixels); those stay opaque, as on
+`AlphaRaycaster`. Pass an abort signal as `modelAlphaMasks(model, {signal})`.
+
+Coverage uses interpolated TEXCOORD_0, explicit bilinear alpha reads, independent
+repeat/mirror/clamp wrapping, affine UV rows, factor and inclusive cutoff
+(`alpha >= cutoff`). A rejected texel continues the same traversal, preserving
+coplanar candidates. BLEND surfaces follow the existing CPU oracle's opaque
+policy; this is deterministic MASK coverage, not stochastic transparency.
+Skin/morph positions are bind pose, as with `worldTriangles`.
+
+Packing snapshots UVs and mask pixels. Repack and create a new filter after
+topology, UV, material or mask edits; position-only edits use the filter's existing
+`refit()` after updating and refitting its BVH. Never pair the data with a different
+same-size tree. `createRayTracedAlpha(packed)` exposes the supported coverage hook
+for `rayTracedFilter(..., {alpha})`. Each effect owns its hook; do not share a hook
+between attached effects. Setup restores resources from the CPU snapshot after a
+device loss; disposal frees the GPU buffer. Packed data can be released after
+creating the effect. Defaults of rays, bias, light size and far stay those of RT.
+
+Alpha requires five fragment storage buffers (ordinary RT needs four). Unsupported
+WebGPU tiers and WebGL2 return the configured map fallback (default `'soft'`).
+The alpha image is one binding: 16-byte header, 32 bytes per original face, 64
+bytes per distinct mask, and one alpha byte per pixel padded to four bytes per
+mask. RGBA input channels must be integer bytes; factor/cutoff must be 0..1;
+UVs/transform rows must be finite float32 values. For each masked face, four
+times the absolute affine bound over its vertex UVs must fit float32, leaving
+headroom for interpolation/row evaluation; reduce UV or transform magnitudes
+when this validation rejects them. Mask dimensions are positive
+integers at most 1,048,576 per axis. CPU packing is below 256 MiB; the actual
+device buffer limits also apply. CPU provenance, real-model packing, candidate ordering and resource tests accompany
+real-GPU closest/any-hit and fragment tests. The rendered `Shadows.attach` proof
+compares receiver pixels to independent CPU rays for the complete Khronos model,
+with default and quarter-turn UV transforms, opaque control, restored resources
+and map fallback. Both lit and shaded receiver pixels are required.

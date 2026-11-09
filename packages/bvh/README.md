@@ -492,3 +492,46 @@ rectangle(x1,y1,x2,y2) normalizes an inclusive CSS rectangle borrowing the captu
 Source/camera/result ownership,finite inputs and actionable typed failures follow the other captured APIs. Nonfinite/overflowing or invalid reconstructed data rejects instead of publishing unusable numbers. The 15 focused cases include independent perspective/orthographic arithmetic,ordinary Float32 camera storage,inclusive/zero spans,near crossing,duplicates,directional degeneracy,lazy ownership,invalid data,getter disposal and engine disposal. Caller-owned eligibility,radii,layer priority,document identities and visibility remain outside these primitives. Synthetic checks alone do not establish actual gesture coverage,UI/p95/FPS,custom projection hooks,general rigs or overall acceptance.
 
 Finite clip ratios that overflow to infinity are safely clamped by the same Liang-Barsky span rules;no nonfinite sample is published. Unclipped guide endpoints reuse captured point projections;returned world endpoints remain separate owned copies. Independent regressions cover extreme finite enclosing/excluding rectangles and repeated-guide transform counts plus cache ownership.
+## UV provenance for alpha candidates
+
+`@margoengine/bvh/alpha-triangles` collects the same live, filtered world
+triangles as `worldTriangles`, with six TEXCOORD_0 numbers per original face and
+primitive/model/instance ranges. These face numbers survive BVH leaf permutation.
+
+```js
+import { Engine } from '@margoengine/core';
+import { loadGLTF } from '@margoengine/gltf-pro';
+import { alphaWorldTriangles } from '@margoengine/bvh/alpha-triangles';
+import { MeshBVH } from '@margoengine/bvh';
+
+const canvas = document.createElement('canvas');
+canvas.width = 480; canvas.height = 240;
+document.body.append(canvas);
+const engine = await Engine.create(canvas, { backend: 'webgpu' });
+const model = await loadGLTF(engine, '/examples/assets/khronos/AlphaBlendModeTest/AlphaBlendModeTest.glb');
+const triangles = alphaWorldTriangles(engine, [model]);
+const bvh = MeshBVH.build({ positions: triangles.vertices, indices: triangles.indices });
+console.log(bvh.triangleCount, triangles.uv.length, triangles.ranges.length);
+engine.dispose();
+canvas.remove();
+```
+
+Options are `refresh` (default true) and `filter(mesh, model?, primitive?)`.
+`worldTriangles` now also supplies that optional third filter argument.
+Disposed/non-live sources are omitted, repeated objects deduplicated, and instance
+and node transforms applied exactly as before. Core meshes carry zero UVs and no
+model material. Skin/morph geometry stays in bind pose. Recollect after topology,
+UV or material changes. The optional entry allocates UVs and ranges; ordinary
+`worldTriangles` allocates neither.
+
+`modelAlphaMasks(model, {signal, pixels})` in `bvh/alpha` now also returns
+`source.forPrimitive(primitive)`, which checks actual primitive ownership and
+retains shared-mask identity. It needs no fabricated RaycasterHit. The existing
+callable hit lookup and `skipped` diagnostics are unchanged. See the shadows
+README's complete `rt-alpha` example for collecting and packing several sources.
+
+For a custom WGSL query, `bvhWGSL({accept: 'coverage'})` calls your
+`fn coverage(face: u32, barycoord: vec3f) -> bool` after intersection and before
+closest-hit replacement or any-hit return. Face is the original input face index;
+false continues that traversal without epsilon recasts. Default `accept` is
+undefined and accepts every triangle. Only a WGSL identifier is accepted.

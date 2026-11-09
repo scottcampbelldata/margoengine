@@ -8,6 +8,7 @@ import { MutableVec3, RayLike } from "@margoengine/math";
 export interface GPUBVHBindingOptions {
     group?: number;
     binding?: number;
+    accept?: string;
 }
 
 export interface GPUFollowedVertices {
@@ -73,7 +74,7 @@ export const GPU_MAX_DEPTH = 64;
 
 export const GPU_RAY_FLOATS = 8;
 
-export function bvhWGSL({ group, binding }?: GPUBVHBindingOptions): string;
+export function bvhWGSL({ group, binding, accept }?: GPUBVHBindingOptions): string;
 
 export function packRays(rays: readonly RayLike[], { near, far }?: Pick<GPURaycastOptions, 'near' | 'far'>): Float32Array;
 

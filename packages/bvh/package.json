@@ -76,6 +76,10 @@
     "./alpha": {
       "types": "./dist/alpha.d.ts",
       "import": "./dist/alpha.js"
+    },
+    "./alpha-triangles": {
+      "types": "./dist/alpha-triangles.d.ts",
+      "import": "./dist/alpha-triangles.js"
     }
   },
   "files": [

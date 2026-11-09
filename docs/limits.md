@@ -2465,3 +2465,25 @@ diagnostics to a synchronous pass. All matching, alpha, dithering and swap
 operations are preserved. Spread must be finite and non-negative; infinity is
 now rejected before GPU work instead of being uploaded as a shader parameter.
 Research, normalization proof and minifier evaluation: [size restoration](size-restore.md).
+
+## Optional RT alpha limits
+
+`bvh/alpha-triangles` preserves original face TEXCOORD_0/material provenance;
+`shadows/rt-alpha` snapshots those data into one storage buffer. Five fragment
+storage buffers are required, versus four for ordinary RT. WebGL2 and lower
+WebGPU tiers use the existing map fallback. Storage costs 16 + 32*faces +
+64*masks bytes plus each mask's alpha pixels padded to four bytes, with masks
+deduplicated by identity. CPU images must be below 256 MiB and within the device's
+buffer limits; each dimension is an integer 1..1,048,576. UV/transform values must
+be finite float32; factor/cutoff are 0..1. Four times each masked face's absolute
+affine UV bound must fit float32, including the offset, to prevent intermediate
+overflow. Repack after UV/material/topology edits.
+Core geometry is opaque; model skin/morph positions are bind pose. Unsupported
+images/UV sets are reported by modelAlphaMasks.skipped and retain its opaque
+policy. The real-GPU traversal/fragment and public Shadows.attach pixel proofs
+pass for default/quarter-turn masks, restoration and fallback. RT far ends at
+the configured distance; the map fallback instead uses the map's full reach.
+Measured gzip entries: bvh root 23,362 / 23,398 B ceiling, bvh/gpu
+5,582 / 5,738 B, bvh/alpha 16,513 / 16,873 B, shadows/rt 6,409 / 6,486 B.
+New alpha-triangles is 1,125 B (1,381 B ceiling); rt-alpha is 8,739 B
+(8,816 B ceiling). No existing ceiling rises. Core plus stage remains 23,924 B.

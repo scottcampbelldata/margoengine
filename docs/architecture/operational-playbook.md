@@ -4139,3 +4139,51 @@ and research are in size-restore.md. All five pixel GPU suites pass; the palette
 suite has 20 exact checks with zero wrong pixels or validation errors and two
 shader modules compile. No build-time shader transformation or speed claim is
 introduced. All seven README examples run in the browser with zero failures.
+
+### Section 5 evidence: RT cutout coverage
+
+Optional bvh/alpha-triangles preserves source-face UV/material/instance provenance;
+ordinary worldTriangles gains no UV/range allocation. modelAlphaMasks supplies an
+owning primitive lookup. bvhWGSL's named candidate predicate runs before closest
+or any-hit acceptance, retaining farther and coplanar candidates after a hole.
+Optional shadows/rt-alpha owns one packed storage image alongside its RT tree.
+Core and stage are unchanged. Five fragment storage buffers are required; lower
+tiers use the named map fallback. Repack after topology, UV or mask edits.
+
+All 379 bvh/shadows and included integration CPU tests pass, including malformed
+input, independent wrap/factor/cutoff/UV results, affine overflow, real-model leaf
+permutation, restore/fallback/limits and partial resource cleanup. The new real-GPU
+proof compares closest/any and rendered fragment visibility against AlphaRaycaster
+for 1,020 rays in each of two UV configurations, with resources set up twice.
+The public Shadows.attach proof retains the complete 61-face standard model and
+checks actual receiver pixels: 968 default and 1,448 rotated holes are lit where
+the opaque control shadows them. Both resource restoration and map fallback pass.
+Fifteen attached-scene shader modules and four direct-test modules compile without
+errors. The first attached test's infinite reach correctly hit the opaque backboard;
+its revised finite reach and separate full-distance fallback oracle measure the
+intended foreground shadow, without changing geometry or acceptance thresholds.
+Research and reproduction are in skip-gaps-research.md and whitepaper/reproduce.md.
+
+The production TextureTransformMultiTest GPU gate also passes its independent
+baked-UV and rendered-pixel comparisons. Khronos issue 1563/PR 1624 resolve the
+overview-matrix discrepancy; the earlier sign allegation is withdrawn without
+changing implementation signs. Source pins and actual production results are
+retained in whitepaper/results/rt-alpha-texture-reference-20261109.json.
+
+Item 2 landing checks: all 15 registered shadows GPU scripts and the bvh browser
+suite pass, including the new two RT-alpha scripts. All 13 bvh, 15 shadows and
+3 umbrella README examples pass across the preserved run and failed-only rerun.
+The shadows gate is explicitly a pass after a driver reset: 14 examples passed,
+ordinary RT requestDevice hit nvlddmkm event 153 at 16:05:40 EST, and only that
+one example ran again and passed. Its event evidence is retained in
+whitepaper/results/rt-alpha-readme-reset-20261109.json. No traversal/shader
+assertion failed, no known-failure exemption was added and no tolerance changed.
+Lint, hygiene, quality and CPU package tests pass. The earlier complete verify
+passes 13,585 tests with zero failures/skips (repair-api-fullverify.log); it is
+preserved rather than replayed, as requested. No benchmark or timing gate ran.
+The final main rebase inherits only unrelated pixel, tracer and sciviz work;
+own bvh/shadows/umbrella source and passing GPU inputs are byte-identical.
+Inherited packages were rebuilt, then genuine paired entry/network records
+measure 0986b11d2, dirty=false, followed by API generation. Core plus stage stays
+23,924 B; alpha-triangles is 1,125 B and rt-alpha 8,739 B, without raising any
+existing ceiling. Logs: test-results/skip-gaps/item2-*.log.

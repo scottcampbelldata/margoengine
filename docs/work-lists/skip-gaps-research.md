@@ -125,3 +125,52 @@ consumer and checks its emitted bytes; the browser checks lazy fetches and all
 real-DEM crop outputs on both WebGPU and WebGL2 pages. This caught a missing
 package export/build-copy registration in the saved chain before publication.
 No companion code or foreign implementation was read.
+
+## Item 2: cutout ray-shadow coverage
+
+- Aila and Laine 2009 and Woop, Benthin and Wald 2013, above.
+- Eric Enderton, Erik Sintorn, Peter Shirley and David Luebke, *Stochastic
+  Transparency*, IEEE TVCG 17(8), 2011,
+  https://research.nvidia.com/publication/2011-08_stochastic-transparency.
+- Khronos Group, *glTF 2.0 Specification*, 2021, alpha coverage and texture
+  coordinates, https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html.
+- Khronos Group / Steven Vergenz, *KHR_texture_transform*, ratified 2018,
+  https://registry.khronos.org/glTF/extensions/2.0/Khronos/KHR_texture_transform/.
+- Ed Mackey and Khronos contributors, *KHR_texture_transform has the wrong
+  rotation matrix*, issue 1563, 2019-2026,
+  https://github.com/KhronosGroup/glTF/issues/1563; and *Clarify descriptions of
+  rotation direction in KHR_texture_transform*, PR 1624, 2019-2026,
+  https://github.com/KhronosGroup/glTF/pull/1624.
+- W3C GPU for the Web Working Group, *WebGPU* and *WebGPU Shading Language*,
+  2026 working drafts, https://www.w3.org/TR/webgpu/ and https://www.w3.org/TR/WGSL/.
+
+These primary publications and standards were searched/rechecked before this
+continuation. No companion code or foreign renderer implementation was read.
+Traversal and robust intersection are separate from deterministic MASK coverage;
+Enderton's stochastic transmission does not replace glTF's inclusive cutoff.
+A transparent candidate continues the same traversal before closest/any acceptance.
+Epsilon recasts would lose coplanar candidates. Original face UV/material
+provenance must survive leaf permutation. Margo's existing bilinear CPU oracle
+motivates four explicit alpha reads with independent repeat/mirror/clamp wrapping.
+One optional storage image keeps coverage resources owned/restorable with RT.
+The WGSL finite-arithmetic requirement motivates fourfold float32 affine headroom;
+individually finite UVs and rows alone do not prevent overflow. Direct and forged
+packed-data regressions reject that case before GPU upload.
+
+The extension overview's historical GLSL matrix is not an independent reason to
+flip Margo's signs. Khronos issue 1563 and PR 1624 explain the U-right/V-down
+rotation discrepancy and call for the authored sample model as conformity evidence.
+The production standard-model GPU gate passes both baked-UV comparisons
+(max error 0.0059999654 under the unchanged 0.01 bound) and rendered-pixel bars;
+the synthetic quarter-turn coverage proof alone establishes CPU/GPU agreement.
+
+The complete AlphaBlendModeTest model has 61 faces, including an opaque backboard.
+The traversal proof keeps the complete model and checks nearest accepted distance,
+including clear front texels with farther opaque hits. The attached-scene proof
+also keeps every face; its 7.1-unit RT reach isolates the foreground cutout shadow
+from the backboard. Its map fallback uses a full-distance CPU oracle, since maps
+have no RT distance cutoff. Four corners and centre must agree before a receiver
+pixel is compared, excluding mixed MSAA boundaries independently of the rendering.
+Opaque controls, default/quarter-turn masks, coverage resource restoration and
+map fallback all pass with unchanged 0.05/0.95 shadow/light visibility bars.
+No elapsed-speed or hardware ray-query claim follows.
