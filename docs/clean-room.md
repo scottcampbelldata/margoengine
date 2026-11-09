@@ -3782,6 +3782,33 @@ is claimed. Logs and generator output stay in this worktree's test-results.
 Failure 8 remains open; continue to failure 9, with Bug 45 still lane-U's.
 
 
+### Batch 273 compatibility failure 9: compare shader edits without serializing resources
+
+Research before the change: Ecma International / TC39, ECMAScript Language
+Specification (2026), SerializeJSONObject and SameValue,
+https://tc39.es/ecma262/multipage/structured-data.html#sec-serializejsonobject
+and https://tc39.es/ecma262/multipage/abstract-operations.html#sec-samevalue;
+W3C GPU for the Web Working Group, WebGPU (2026), GPUTextureView,
+https://www.w3.org/TR/webgpu/#gputextureview; Khronos Group,
+KHR_materials_dispersion (2024),
+https://github.com/KhronosGroup/glTF/tree/main/extensions/2.0/Khronos/KHR_materials_dispersion;
+and Bruce Walter, Stephen R. Marschner, Hongsong Li and Kenneth E. Torrance,
+Microfacet Models for Refraction through Rough Surfaces (2007),
+https://www.cs.cornell.edu/~srm/publications/EGSR07-btdf.pdf.
+
+ECMAScript requires JSON serialization to reject cycles; WebGPU resources are
+handles, not serializable state snapshots. The glTF extension and refraction
+paper justify keeping the independent scalar-IOR references and their fixed
+Fresnel term. Combine these contracts: compare the original extension's field
+values with the shallow edited extension by identity/value, without traversing
+GPU resources. Do not add resource serialization or alter the shader/reference
+math. No rival or companion code was read.
+
+The unchanged caller subset fails on full compatibility in 22.9 s including
+orchestration: JSON.stringify traverses device.queue.device before any caller
+comparison can finish. Receipt: test-results/batch-273-dispersion-before.log.
+This is a fixture failure, not evidence of a rendering mismatch.
+
 ## Batch 171 LIC landing integration
 
 Main's full published-precision colormap restoration changes shared data, not LIC tracing or shader source.
