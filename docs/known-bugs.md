@@ -2211,3 +2211,23 @@ queued/started/detached disposal. No deadline, extent, resolution or exception w
 ### Closed: llms generator import required a CLI filename (2026-11-09)
 
 Importing scripts/build-llms.mjs from node --input-type=module -e failed because its CLI guard passed absent process.argv[1] to pathToFileURL. The guard now checks that the filename exists before comparing it. tests/llms.test.js imports the actual module in a fresh eval process and checks both its exports and absence of CLI output; generation and --check remain unchanged.
+
+### Open: verification child and browser-close hangs (missing-items continuation)
+
+At local checkpoint 5ee6138db, full verify executed 13,483 tests with zero skips; 13,480 passed.
+The short-path API regression's full-report child hit its unchanged 280,000 ms hard deadline.
+Repro: npm run verify, or node --test tests/api-report-short-path.test.js after building packages.
+The finer cause is not isolated: later instrumented controls completed the same 885 reports and
+8,627 exports in 46.7 s and 10.6 s. The correct short-path module trace counted 22,002 source-file
+queries and 885 source-file-name queries; this identifies repeated work, not the earlier hang's
+cause. A passing control is not treated as a repaired regression or a busy-machine exemption.
+
+The same verify failed catalog.test.js during browser teardown; the registered biome prefetch
+GPU proof later passed every byte/work assertion and failed during the same cleanup. Repro:
+node --test tests/catalog.test.js or npm run test:gpu:prefetch --workspace @margoengine/biomes.
+Both reached SHUTDOWN_TIMEOUT, still open: browser, at the unchanged 30,000 ms bound in
+scripts/lib/browser.mjs's owned launchServer cleanup. An isolated public-API trace of client
+close, native exit and driver kill completed in 1.93 s; the stalled substep in the original
+failures is not yet attributed. Do not retry these gates as a substitute for identifying and
+fixing that cause. Raw logs and tracing helpers are in this lane's test-results/missing-items.
+These are active landing blockers handed off for continued investigation, not accepted limits.

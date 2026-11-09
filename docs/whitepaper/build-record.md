@@ -83,7 +83,8 @@ No full-README audit or loaded-machine speed ratio is claimed here.
 Current landing status: scoped CPU 1,035/1,035 and runtime README 64/64 pass. Full verify is
 13,480/13,483, zero skips: the disposal help entry is now corrected, while short-path API-child
 and browser-close hangs remain under investigation. Biome view/water, objects, shadows and
-objects-frame pass; clean-commit backend proofs and the slow-send paired investigation remain.
+objects-frame and both clean-commit backend proofs pass; both loader GPU suites pass. The
+slow-send paired investigation and the two harness hangs remain.
 No failed check is accepted as a passing landing gate.
 
 This file records every finished batch of work on Margo Engine: what each batch was for, what landed, which bugs it

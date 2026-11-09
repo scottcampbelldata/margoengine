@@ -52,8 +52,8 @@ shutdown failure. No hang is classified as a busy-machine exemption.
 
 The current scoped CPU run passes 1,035 tests and the complete biomes/loaders README run
 passes 64/64 with zero exceptions. Biome view/water, objects, shadows and objects-frame GPU
-suites pass. Backend and placement hardware proofs refused the uncommitted tree and must run
-from the clean local commit. Flythrough's slow-send frame is 5.4 ms versus 3.5 ms, with one send,
+suites pass. Backend and placement hardware proofs initially refused the uncommitted tree. Both now pass
+from clean checkpoint 5ee6138db (14.8 s and 33.1 s, zero skips); both loader GPU suites also pass. Flythrough's slow-send frame is 5.4 ms versus 3.5 ms, with one send,
 no texture writes and 3.3 ms inside real postMessage. This is unresolved: obtain the interleaved
 parent/current evidence before treating a small loaded-machine miss as a busy retest. No timing
 budget changed. These checks block the push; this continuation is not yet landed.
