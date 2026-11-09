@@ -269,7 +269,10 @@ test('all or nothing: a bad model, a bad component or a throwing onEntity leaves
   assert.equal(world.models.at(-1).disposed, 1);
   assert.equal(count(stage), 0);
   await assert.rejects(addScene(stage, { format: 'other' }), TypeError);
-  await assert.rejects(addScene(stage, level, { fit: 1 }), TypeError);
+  await assert.rejects(addScene(stage, level, { fit: 1 }), {
+    name: 'TypeError',
+    message: /Invalid fit: expected a boolean; use true to fit the camera or false to keep its view; see https:\/\/margoengine\.com\/errors#arguments/,
+  });
   stage.dispose();
 });
 

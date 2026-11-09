@@ -38,7 +38,13 @@ for (const [name, options] of [
       };
     disposed.length = 0;
     missing = name;
-    await assert.rejects(addViewer(stage, '/shoe.glb', options), { message: new RegExp(`Install ${name}`) });
+    await assert.rejects(addViewer(stage, '/shoe.glb', options), {
+      name: 'MargoError',
+      code: 'state',
+      message: new RegExp(
+        `Install ${name} to use this stage feature; run npm install ${name} and restart the app; see https://margoengine.com/errors#install`,
+      ),
+    });
     for (const [key, value] of Object.entries({ position, target, near, far }))
       assert.equal(camera[key], value, `camera.${key} changed`);
     assert.deepEqual(disposed, ['model']);

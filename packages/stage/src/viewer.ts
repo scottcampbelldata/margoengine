@@ -135,7 +135,8 @@ export async function addViewer(
 ): Promise<Viewer> {
   if (shadows !== 'contact' && shadows !== 'cascaded' && shadows !== false)
     throw typeError('shadows: contact, cascaded or false', 'arguments');
-  if (typeof fit !== 'boolean') throw typeError('fit: boolean', 'arguments');
+  if (typeof fit !== 'boolean')
+    throw typeError('Invalid fit: expected a boolean; use true to fit the camera or false to keep its view', 'arguments');
   const { seconds = 30, resumeAfter = 3 } = typeof turntable === 'object' ? turntable : {};
   if (!Number.isFinite(seconds) || !seconds || !Number.isFinite(resumeAfter) || !(resumeAfter >= 0))
     throw rangeError('Turntable: finite seconds not 0, finite resumeAfter 0 or more', 'arguments');

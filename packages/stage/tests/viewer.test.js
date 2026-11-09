@@ -457,7 +457,10 @@ test('after the stage is disposed the engine owns the teardown, so dispose touch
 test('bad options throw before anything loads', async () => {
   const { stage } = fixture();
   await assert.rejects(addViewer(stage, '/shoe.glb', { shadows: 'soft' }), TypeError);
-  await assert.rejects(addViewer(stage, '/shoe.glb', { fit: 1 }), TypeError);
+  await assert.rejects(addViewer(stage, '/shoe.glb', { fit: 1 }), {
+    name: 'TypeError',
+    message: /Invalid fit: expected a boolean; use true to fit the camera or false to keep its view; see https:\/\/margoengine\.com\/errors#arguments/,
+  });
   await assert.rejects(addViewer(stage, '/shoe.glb', { turntable: { seconds: 0 } }), RangeError);
   await assert.rejects(addViewer(stage, '/shoe.glb', { turntable: { resumeAfter: -1 } }), RangeError);
   assert.deepEqual(log, []);

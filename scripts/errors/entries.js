@@ -133,12 +133,12 @@ export const entries = [
   },
   {
     id: 'install',
-    title: 'Optional package missing or format unknown',
+    title: 'Optional stage package missing',
     kind: 'family',
-    messages: ['Install <package>', 'Specify format'],
+    messages: ['Install <package> to use this stage feature; run npm install <package> and restart the app'],
     cause:
-      '`stage.load` needs an optional package for this format and it is not installed, or the URL has no known extension.',
-    fix: 'Install the named package (for example `npm i @margoengine/gltf`), or pass `{format}`: one of gltf, glb.',
+      'A stage feature such as `addGLTF`, `addViewer` or `addScene` could not import an optional package because it is not installed or the app build cannot resolve it.',
+    fix: 'Run `npm install <package>` with the name from the error, for example `npm install @margoengine/gltf`. Restart the app; rebuild and redeploy a bundled app so the installed package is included.',
   },
   {
     id: 'gltf-decoders',
@@ -492,7 +492,7 @@ export const entries = [
       'receiveShadow: boolean',
       'Visibility: boolean',
       'Box: 3 values',
-      'fit: boolean',
+      'Invalid fit: expected a boolean; use true to fit the camera or false to keep its view',
       'Invalid stage options',
       'Expected element',
       'shadows: contact, cascaded or false',

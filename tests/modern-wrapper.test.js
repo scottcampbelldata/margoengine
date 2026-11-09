@@ -160,7 +160,10 @@ test('model loading fits imports, rolls back failures and aborts on disposal', a
     globalThis.fetch = async () => new Response(offset);
     const copy = await addGLTF(app, 'https://example.invalid/copy.gltf', { fit: false });
     copy.destroy();
-    await assert.rejects(addGLTF(app, 'https://example.invalid/model.gltf', { fit: 'yes' }), /fit: boolean/);
+    await assert.rejects(
+      addGLTF(app, 'https://example.invalid/model.gltf', { fit: 'yes' }),
+      /Invalid fit: expected a boolean; use true to fit the camera or false to keep its view; see https:\/\/margoengine\.com\/errors#arguments/,
+    );
     await assert.rejects(
       addGLTF(app, 'https://example.invalid/model.gltf', { signal: AbortSignal.abort('cancelled') }),
       (error) => error === 'cancelled',

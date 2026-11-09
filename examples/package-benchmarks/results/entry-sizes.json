@@ -1,6 +1,6 @@
 {
-  "commit": "8694e3a01",
-  "dirty": false,
+  "commit": "7f791d68f",
+  "dirty": true,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
     "raw": 59077,
@@ -2956,44 +2956,44 @@
         "gzip": 2974
       },
       "./gltf": {
-        "raw": 2922,
-        "gzip": 1393
+        "raw": 3063,
+        "gzip": 1473
       },
       "./sky": {
-        "raw": 714,
-        "gzip": 463
+        "raw": 782,
+        "gzip": 500
       },
       "./particles": {
-        "raw": 733,
-        "gzip": 468
+        "raw": 801,
+        "gzip": 505
       },
       "./effects": {
-        "raw": 728,
-        "gzip": 471
+        "raw": 796,
+        "gzip": 508
       },
       "./environment": {
-        "raw": 794,
-        "gzip": 491
+        "raw": 862,
+        "gzip": 528
       },
       "./shadows": {
-        "raw": 787,
-        "gzip": 494
+        "raw": 855,
+        "gzip": 530
       },
       "./xr": {
-        "raw": 3605,
-        "gzip": 1882
+        "raw": 3673,
+        "gzip": 1914
       },
       "./viewer": {
-        "raw": 4979,
-        "gzip": 2386
+        "raw": 5120,
+        "gzip": 2465
       },
       "./physics": {
-        "raw": 2107,
-        "gzip": 1148
+        "raw": 2175,
+        "gzip": 1181
       },
       "./scene": {
-        "raw": 7450,
-        "gzip": 3185
+        "raw": 7591,
+        "gzip": 3261
       }
     },
     "@margoengine/staging": {

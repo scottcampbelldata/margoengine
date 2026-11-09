@@ -4747,3 +4747,11 @@ are retained in the deferred named suite while timestamp validity, tier decision
 and wrapper cleanup remain live. Affected checks pass (102 tests, lint, hygiene,
 documentation, types, API and size); the single earlier full verify is retained
 without repeating unaffected code, per Scott's instruction. No capture fix changed.
+
+### Section 5 evidence: optional stage diagnostic restoration
+
+Finding 10 preserves the stage root while restoring boolean fit guidance and
+exact npm commands in optional entries. Regressions cover glTF/viewer/scene
+validation and four missing viewer peers, with error type/code/help and camera
+rollback. The old viewer and missing-peer diagnostics fail the strengthened
+checks. Sources and measured optional ceilings: [size restoration](../size-restore.md).

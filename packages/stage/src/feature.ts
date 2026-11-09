@@ -9,7 +9,7 @@ export function stageSignal(stage: Stage, signal?: AbortSignal): AbortSignal {
 }
 
 /**
- * Imports an optional package for a stage feature entry. A missing package rejects with `Install <name>`; every other
+ * Imports an optional package for a stage feature entry. A missing package rejects with its npm install command and a help link; every other
  * failure, including AbortError, is rethrown. Rejects with AbortError when `abort` fires before the import resolves.
  */
 export async function optionalPackage<T>(name: string, load: () => Promise<T>, abort: AbortSignal): Promise<T> {
@@ -24,7 +24,11 @@ export async function optionalPackage<T>(name: string, load: () => Promise<T>, a
       code === 'ERR_MODULE_NOT_FOUND' ||
       /Cannot find (module|package)|Failed to resolve|dynamically imported module/i.test(message)
     )
-      throw fault('state', `Install ${name}`, 'install');
+      throw fault(
+        'state',
+        `Install ${name} to use this stage feature; run npm install ${name} and restart the app`,
+        'install',
+      );
     throw error instanceof Error ? error : fault('failed', message);
   }
   abort.throwIfAborted();
@@ -43,7 +47,11 @@ export async function attachPlugin<T extends EnginePlugin, M>(
 
 /** Validates the shared load options of the model loaders (`addGLTF`). */
 export function loadTarget(url: string | URL, fit: unknown): URL {
-  if (typeof fit !== 'boolean') throw typeError('fit: boolean', 'arguments');
+  if (typeof fit !== 'boolean')
+    throw typeError(
+      'Invalid fit: expected a boolean; use true to fit the camera or false to keep its view',
+      'arguments',
+    );
   return new URL(url, globalThis.location?.href);
 }
 

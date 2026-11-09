@@ -523,3 +523,44 @@ now measure 8694e3a01 with dirty=false; full API (899 entries, 8702 exports),
 repository build, LAS/Potree and split LAS streams return to their original
 measurements; the initial standalone-build differences above are retained as
 such, rather than claimed as final growth. Root points remains 24138 B.
+
+## Finding 10, stage optional entries: actionable diagnostics
+
+Restore the shared optional-package message with its npm installation command,
+package name, restart advice and existing state code/install help link. Restore
+fit validation in addGLTF, addViewer and addScene with the boolean choices and
+camera effect, preserving TypeError and the arguments link. The stage root is
+outside this change. Missing-package regressions check all four viewer peers,
+the code/name/help link and existing cleanup/camera preservation. Existing glTF,
+viewer and scene validation tests now require the full guidance.
+
+Research compares Ben Shneiderman,
+[Designing Computer System Messages](https://www.cs.umd.edu/users/ben/papers/Shneiderman1982Designing.pdf)
+(1982), Tim Neusesser and Evan Sunwall,
+[Error-Message Guidelines](https://www.nngroup.com/articles/error-message-guidelines/)
+(2023), and the Node.js contributors,
+[Errors: ERR_MODULE_NOT_FOUND](https://nodejs.org/api/errors.html#err_module_not_found)
+(2026 documentation). Specificity and recovery steps motivate naming the field
+and giving the exact npm command; Node's stable missing-module code and Margo's
+existing error classification remain intact. No companion code or foreign
+implementation was read. Viewer fit and all four missing-peer cases fail on the
+old built entries before restoration.
+
+Measured optional entries: @margoengine/stage/gltf: 1393->1473 B gzip; ceiling 1621->1729; @margoengine/stage/sky: 463->500 B gzip; ceiling 719->756; @margoengine/stage/particles: 468->505 B gzip; ceiling 724->761; @margoengine/stage/effects: 471->508 B gzip; ceiling 727->764; @margoengine/stage/environment: 491->528 B gzip; ceiling 747->784; @margoengine/stage/shadows: 494->530 B gzip; ceiling 750->786; @margoengine/stage/xr: 1882->1914 B gzip; ceiling 2138->2170; @margoengine/stage/viewer: 2386->2465 B gzip; ceiling 2480->2721; @margoengine/stage/physics: 1148->1181 B gzip; ceiling 1404->1437; @margoengine/stage/scene: 3185->3261 B gzip; ceiling 3441->3517.
+Core plus stage root stays 23924 B. The shared helper changes all its feature
+consumers; ceilings retain the measured diagnostic text instead of adding a
+loader or copying terse messages. All 116 stage unit cases pass.
+
+All three stage GPU suites pass: viewer (25 shader modules), saved-scene exact
+pixels (five modules), and optional lighting features (ten modules), without
+compilation errors. All eight README examples pass. Network: five requests, no
+unused built files. The first scene CLI wrapper was refused as unclassified
+before execution; its corrected command supplies an explicit real-pixel reason.
+Only that failed/unrun work continued; the successful viewer suite was retained.
+
+Lint and hygiene pass. Full verify passes every non-unit step and 13983 of
+13984 unit cases; its single failure is the help registry missing the restored
+fit literal. Register the exact message, modernize the obsolete stage.load
+install entry, regenerate site/errors.html and the MCP help data, and all five
+errors-page cases pass. Only failed/changed help work runs again; no tolerance,
+test or gate is weakened and no fresh all-green full verify is claimed.

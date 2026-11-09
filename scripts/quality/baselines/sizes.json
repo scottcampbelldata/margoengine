@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11924839,
+  "total": 11925513,
   "history": [
     {
       "date": "2026-10-24",
@@ -5234,6 +5234,12 @@
       "commit": "1f538fa11",
       "grew": 5,
       "reason": "Size restoration finding 9: @margoengine/points: 23947->24138 B gzip; ceiling 23954->24863; @margoengine/points/las: 13735->13737 B gzip; ceiling 14148->14150; @margoengine/points/potree: 17178->17179 B gzip; ceiling 17694->17695; @margoengine/points/las base (without LAZ decoder): 5761->5764 B gzip; ceiling 6017->6020; @margoengine/points/las lazy LAZ decoder: 8523->8525 B gzip; ceiling 8779->8781. Restore the shared math/mat4 projectPoint wrapper, eliminating duplicate clip-space arithmetic and rejecting invalid depth. Keep the shared helper rather than copying it to save optional bytes. LAS/Potree chunk naming and gzip stream changes are measured, not relabeled. Core plus stage unchanged at 23924 B."
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "7f791d68f",
+      "grew": 10,
+      "reason": "Size restoration finding 10, optional stage diagnostics: @margoengine/stage/gltf: 1393->1473 B gzip; ceiling 1621->1729; @margoengine/stage/sky: 463->500 B gzip; ceiling 719->756; @margoengine/stage/particles: 468->505 B gzip; ceiling 724->761; @margoengine/stage/effects: 471->508 B gzip; ceiling 727->764; @margoengine/stage/environment: 491->528 B gzip; ceiling 747->784; @margoengine/stage/shadows: 494->530 B gzip; ceiling 750->786; @margoengine/stage/xr: 1882->1914 B gzip; ceiling 2138->2170; @margoengine/stage/viewer: 2386->2465 B gzip; ceiling 2480->2721; @margoengine/stage/physics: 1148->1181 B gzip; ceiling 1404->1437; @margoengine/stage/scene: 3185->3261 B gzip; ceiling 3441->3517. Preserve precise fit guidance, package name, npm install command and restart advice in the error itself. Optional bytes are worth actionable diagnostics; splitting message data would add loading complexity. Core plus stage root remains 23924 B."
     }
   ],
   "items": {
@@ -5921,16 +5927,16 @@
     "@margoengine/sprites/shader": 1222,
     "@margoengine/sprites/skeletal": 5526,
     "@margoengine/stage": 3222,
-    "@margoengine/stage/effects": 727,
-    "@margoengine/stage/environment": 747,
-    "@margoengine/stage/gltf": 1621,
-    "@margoengine/stage/particles": 724,
-    "@margoengine/stage/physics": 1404,
-    "@margoengine/stage/scene": 3441,
-    "@margoengine/stage/shadows": 750,
-    "@margoengine/stage/sky": 719,
-    "@margoengine/stage/viewer": 2480,
-    "@margoengine/stage/xr": 2138,
+    "@margoengine/stage/effects": 764,
+    "@margoengine/stage/environment": 784,
+    "@margoengine/stage/gltf": 1729,
+    "@margoengine/stage/particles": 761,
+    "@margoengine/stage/physics": 1437,
+    "@margoengine/stage/scene": 3517,
+    "@margoengine/stage/shadows": 786,
+    "@margoengine/stage/sky": 756,
+    "@margoengine/stage/viewer": 2721,
+    "@margoengine/stage/xr": 2170,
     "@margoengine/staging": 8776,
     "@margoengine/staging/accumulate": 9945,
     "@margoengine/stats": 4934,

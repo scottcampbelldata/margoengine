@@ -2936,3 +2936,8 @@ draw 484 red pixels with two redraws; stop/removal cancel queued frames and
 preserve same-name registrations. The exact 7 ms speed assertion is retained
 in the named deferred speed suite. The inherited single full Save verify is
 retained; only affected checks were rerun, as Scott requested.
+
+Size restoration finding 10 restores actionable optional stage errors. Fit
+validation retains TypeError and arguments help; missing peers retain state
+and install help, with their npm command and restart advice. Entry growth:
+@margoengine/stage/gltf: 1393->1473 B gzip; ceiling 1621->1729; @margoengine/stage/sky: 463->500 B gzip; ceiling 719->756; @margoengine/stage/particles: 468->505 B gzip; ceiling 724->761; @margoengine/stage/effects: 471->508 B gzip; ceiling 727->764; @margoengine/stage/environment: 491->528 B gzip; ceiling 747->784; @margoengine/stage/shadows: 494->530 B gzip; ceiling 750->786; @margoengine/stage/xr: 1882->1914 B gzip; ceiling 2138->2170; @margoengine/stage/viewer: 2386->2465 B gzip; ceiling 2480->2721; @margoengine/stage/physics: 1148->1181 B gzip; ceiling 1404->1437; @margoengine/stage/scene: 3185->3261 B gzip; ceiling 3441->3517. Core plus stage root stays 23924 B.

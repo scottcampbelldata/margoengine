@@ -293,3 +293,13 @@ Run `npm run modern:dev` and open `/quickstart.html` for the five-line demo. Ver
 ## Content Security Policy
 
 Creating the engine compiles core's embedded Rust transform kernel, so restricted pages need `'wasm-unsafe-eval'` in `script-src`. A stage creates that same engine. Every Margo engine page under a strict CSP needs this permission. A blocked compile or instantiate rejects with MargoError code `failed`, its original cause and a link to the CSP docs. Imports alone do not compile Wasm. See [the exact header and package requirements](../../docs/csp.md).
+
+### Optional feature diagnostics
+
+A missing optional package rejects with a linked MargoError (code `state`)
+that names the package, gives its exact `npm install @margoengine/<package>`
+command and asks you to restart the app. Other import errors and cancellation
+keep their existing error identity. In `addGLTF`, `addViewer` and `addScene`,
+`fit` must be a boolean: pass `true` to fit the camera or `false` to keep
+its view. A wrong type throws a TypeError with that guidance and the arguments
+help link before importing packages or changing the camera.

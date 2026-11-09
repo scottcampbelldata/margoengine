@@ -2486,3 +2486,10 @@ examples pass. Both default and secondary scenes draw 484 red pixels on their
 two live redraws; stopping/removal cancels queued work with identity isolation.
 [Acceptance receipt](results/batch-56-quality-owner-20261109.json). Sources:
 [clean-room record](../clean-room.md). No speed claim is added.
+
+### Optional stage diagnostic recovery (2026-11-10)
+
+Invalid fit options explain both boolean choices before loading or changing the
+camera. Missing optional peers report their npm installation command, state
+code and help link. Proof: stage viewer/scene/missing-package regressions and
+tests/modern-wrapper.test.js; research and reproduction: [size restoration](../size-restore.md).

@@ -169,7 +169,8 @@ export async function addScene(
   source: string | URL | SaveDocument | ArrayBuffer | ArrayBufferView,
   { migrations, prefab, parent, base, fit, onEntity, gltf, signal, ...checks }: AddSceneOptions = {},
 ): Promise<LoadedScene> {
-  if (fit !== undefined && typeof fit !== 'boolean') throw typeError('fit: boolean', 'arguments');
+  if (fit !== undefined && typeof fit !== 'boolean')
+    throw typeError('Invalid fit: expected a boolean; use true to fit the camera or false to keep its view', 'arguments');
   const abort = stageSignal(stage, signal);
   abort.throwIfAborted();
   const save = await optionalPackage('@margoengine/save', () => import('@margoengine/save'), abort);
