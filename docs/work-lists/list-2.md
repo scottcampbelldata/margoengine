@@ -12,7 +12,7 @@ For the second account. Start now.
 | D | lighting | 53 | clustered | 2 | todo |
 | D | lighting | 54 | lightmap | 8 | todo |
 | D | lighting | 55 | lighting2d | 6 | done |
-| D | lighting | 56 | staging | 7 | todo |
+| D | lighting | 56 | staging | 7 | list 1 (dev PC) |
 | E | post and effects | 70 | post | 8 | done |
 | E | post and effects | 71 | post | 1 | done |
 | E | post and effects | 72 | tonemap | 6 | done |
