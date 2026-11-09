@@ -127,35 +127,52 @@ test('a block between the shooter and the walker stops the shot', async (t) => {
   assert.ok(Math.abs(blocked.distance - Math.hypot(...blocked.point.map((v, i) => v - eye[i]))) < 1e-9);
 });
 
-test("a client's shot at the walker it draws is a hit, where the same aim unrewound misses", async (t) => {
-  const { server, rewind, state, url } = await start(t),
-    shots = [];
-  rewind.onShot = (shooter, hit, shot) => shots.push({ shooter, hit, shot });
-  // Drawn 0.25 s behind: about 5 ticks, 0.6 blocks back, past the walker's half width of 0.3.
-  const client = await join(url, 'shooter', { interpolationDelay: 0.25 });
-  assert.equal(sendShot(client, [0, 0, 1]), false, 'no players message yet: no tick to send');
-  await join(url, 'walker');
-  const walker = server.players.find((p) => p.name === 'walker');
-  state.walking = true;
-  const from = state.tick;
-  await until('the walker drawn walking', () => {
-    const drawn = client.samplePlayers().get(walker.id);
-    return state.tick >= from + 15 && drawn && drawn.snapshot.position[0] > 31 + STEP * 4;
+for (const frameStall of [0, 30]) {
+  test(`a client shot hits rewound and misses unrewound with a ${frameStall}s frame-clock stall`, async (t) => {
+    const { server, rewind, state, url } = await start(t),
+      shots = [];
+    rewind.onShot = (shooter, hit, shot) => shots.push({ shooter, hit, shot });
+    // Drawn 0.25 s behind: about 5 ticks, 0.6 blocks back, past the walker's half width of 0.3.
+    const client = await join(url, 'shooter', { interpolationDelay: 0.25 });
+    assert.equal(sendShot(client, [0, 0, 1]), false, 'no players message yet: no tick to send');
+    await join(url, 'walker');
+    const walker = server.players.find((p) => p.name === 'walker');
+    state.walking = true;
+    const from = state.tick;
+    await until('the walker drawn walking', () => {
+      const drawn = client.samplePlayers().get(walker.id);
+      return state.tick >= from + 15 && drawn && drawn.snapshot.position[0] > 31 + STEP * 4;
+    });
+    // Anchor the rendered frame to a received simulation tick, not elapsed wall time.
+    // A loaded event loop can advance the frame clock while the server tick is still waiting.
+    const sampleTick = client.players.get(walker.id).last.time * server.tickRate - 5,
+      frameClock = performance.now() / 1000 + frameStall,
+      now = frameClock + (sampleTick - client.viewTick(frameClock)) / server.tickRate,
+      drawn = client.samplePlayers(now).get(walker.id).snapshot.position,
+      eye = [client.player.position[0], client.player.position[1] + 1.62, client.player.position[2]],
+      aim = towards(eye, [drawn[0], drawn[1] + 0.9, drawn[2]]);
+    const seen = client.viewTick(now);
+    assert.ok(Math.abs(seen - sampleTick) < 1e-9, 'the frame shows the chosen received tick even after a clock stall');
+    assert.ok(seen < state.tick - 2, 'the client sees the past');
+    const shooterNow = server.players.find((p) => p.name === 'shooter');
+    assert.equal(
+      rewind.shoot(shooterNow, { viewTick: state.tick, direction: aim }).player?.id,
+      undefined,
+      'the same frame already misses without rewind before transport callbacks advance the walker',
+    );
+    assert.equal(sendShot(client, aim, now), true);
+    await until('the shot', () => shots.length === 1);
+    const [{ shooter, hit, shot }] = shots;
+    assert.equal(shooter.name, 'shooter');
+    assert.equal(hit.player, walker, `rewound to tick ${hit.tick}`);
+    assert.equal(shot.viewTick, seen);
+    assert.equal(
+      rewind.shoot(shooter, { viewTick: state.tick, direction: aim }).player?.id,
+      undefined,
+      'unrewound: a miss',
+    );
   });
-  const now = performance.now() / 1000,
-    drawn = client.samplePlayers(now).get(walker.id).snapshot.position,
-    eye = [client.player.position[0], client.player.position[1] + 1.62, client.player.position[2]],
-    aim = towards(eye, [drawn[0], drawn[1] + 0.9, drawn[2]]);
-  const seen = client.viewTick(now);
-  assert.ok(seen < state.tick - 2, 'the client sees the past');
-  assert.equal(sendShot(client, aim, now), true);
-  await until('the shot', () => shots.length === 1);
-  const [{ shooter, hit, shot }] = shots;
-  assert.equal(shooter.name, 'shooter');
-  assert.equal(hit.player, walker, `rewound to tick ${hit.tick}`);
-  assert.equal(shot.viewTick, seen);
-  assert.equal(rewind.shoot(shooter, { viewTick: state.tick, direction: aim }).player, undefined, 'unrewound: a miss');
-});
+}
 
 test('options are checked, a custom hitbox is used, unreadable shots close the client, and dispose stops it', async (t) => {
   const server = new VoxelServer({ blocks, workers: 1, generator: flat });

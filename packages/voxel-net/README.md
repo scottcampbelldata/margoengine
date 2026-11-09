@@ -545,3 +545,9 @@ does, send the page's `Origin`, stay connected from step to step and read server
 [bench/remote.mjs](bench/remote.mjs). `VoxelBot` and `connectWebSocket` accept `wss://` URLs and request headers.
 
 Apache-2.0. Build and tests: `npm test --workspace @margoengine/voxel-net`.
+
+The rewind integration tests choose a rendered frame five ticks behind a received
+snapshot. They run with both the normal frame clock and a simulated 30-second
+clock stall, checking the same sampled tick, rewound hit and unrewound miss.
+This keeps the fixture independent of loaded-machine callback scheduling; no
+runtime interpolation delay or hitbox tolerance is changed.
