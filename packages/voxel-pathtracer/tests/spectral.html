@@ -2,6 +2,7 @@
 import {Engine} from '/packages/core/dist/index.js';
 import {engineRuntime} from '/packages/core/dist/extension.js';
 import {SpectralVoxelPathTracer} from '/packages/voxel-pathtracer/dist/spectral.js';
+import {VoxelPathTracer} from '/packages/voxel-pathtracer/dist/index.js';
 import {webglRenderer} from '/packages/webgl2-compat/dist/preview.js';
 window.run=async(compat=false)=>{
  if(compat){const {install}=await import('/packages/webgl2-compat/dist/index.js');await install({force:true});}
@@ -9,7 +10,7 @@ window.run=async(compat=false)=>{
  const device=engineRuntime(engine).gpu,errors=[],messages=[],reports=[],coverage=[];
  device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
  const create=device.createShaderModule.bind(device);let source;
- device.createShaderModule=d=>{if(d.code.includes('fn spectralPath'))source=d.code;const m=create(d);reports.push(m.getCompilationInfo().then(i=>messages.push(...i.messages.filter(x=>x.type==='error').map(x=>x.message))));return m;};
+ device.createShaderModule=d=>{if(d.code.includes('var<private> spectralLambda'))source=d.code;const m=create(d);reports.push(m.getCompilationInfo().then(i=>messages.push(...i.messages.filter(x=>x.type==='error').map(x=>x.message))));return m;};
  engine.camera.project=(out,aspect)=>{out.fill(0);out[0]=1/aspect;out[5]=1;out[10]=1/100;out[14]=1;out[15]=1;};engine.render();
  const transform=(x,y,z,sx=1,sy=sx,sz=sx)=>[sx,0,0,0,0,sy,0,0,0,0,sz,0,x,y,z,1];
  const blank=()=>({revision:1,models:[],instances:[],materials:[],environment:{skyIntensity:0,sunIntensity:0}});
@@ -24,7 +25,24 @@ window.run=async(compat=false)=>{
   coverage.push({name:'empty black',actual:mean(im),expected:[0,0,0],finite:im.color.every(Number.isFinite),tolerance:0});
   s.environment.background=[0.25,0.5,1];
   im=await render(s,{}, {samples:4096});
-  coverage.push({name:'packet equal energy RGB',actual:mean(im),expected:[0.25,0.5,1],finite:im.color.every(Number.isFinite),tolerance:0.01});
+  coverage.push({name:'RGB background',actual:mean(im),expected:[0.25,0.5,1],finite:im.color.every(Number.isFinite),tolerance:0.01});
+  // Wavelength-independent paths must stay RGB, even when a dispersive lens is
+  // configured but inactive. Compare every pixel with an independently traced root.
+  const white=blank();white.environment.background=[1,1,1];
+  white.environment.map={width:4,height:2,data:new Float32Array(24).fill(1)};white.environment.skyIntensity=1;
+  white.materials=[{id:1,type:'diffuse',color:[1,1,1]}];
+  white.models=[{id:'white',revision:1,size:[1,1,1],voxels:new Uint8Array([1])}];
+  white.instances=[{id:'white',modelId:'white',matrix:transform(-0.5,-0.5,-0.5)}];
+  for(const options of [{},{lensAbbe:30},{aperture:0.5}])for(const samples of [1,64]){
+   const capture={samples,seed:173+samples,jitter:true};
+   const image=await render(white,options,capture),root=await render(white,options,capture,VoxelPathTracer);
+   let spread=0,difference=0;
+   for(let i=0;i<image.color.length;i+=3){
+    spread=Math.max(spread,Math.max(...image.color.slice(i,i+3))-Math.min(...image.color.slice(i,i+3)));
+    for(let c=0;c<3;c++)difference=Math.max(difference,Math.abs(image.color[i+c]-root.color[i+c]));
+   }
+   coverage.push({name:'non-dispersive RGB '+JSON.stringify(options)+' '+samples,finite:image.color.every(Number.isFinite),spread,difference});
+  }
   // One air/glass interface before an absorbing emitter, then two interfaces in a closed slab.
   const glass={id:1,type:'glass',color:[1,1,1],ior:1.5,roughness:0,density:0};
   const emitter={id:2,type:'emit',color:[0,0,0],emissionColor:[1,0.5,0.25],emission:2};
@@ -36,14 +54,14 @@ window.run=async(compat=false)=>{
   im=await render(s,{}, {wavelength:587.6,samples:4096});
   const slab=(1-0.04)/(1+0.04);
   coverage.push({name:'closed slab index cancellation',actual:mean(im),expected:[2*slab,slab,0.5*slab],finite:im.color.every(Number.isFinite),tolerance:0.008});
-  // Packet collapse at glass must preserve a constant-radiance furnace.
+  // Hero sampling at glass must preserve a constant-radiance furnace.
   s.materials[0]={...glass,abbe:30};s.revision++;
   s.environment={map:{width:4,height:2,data:new Float32Array(24).fill(1)},skyIntensity:1,sunIntensity:0};
   s.models[0]={...s.models[0],size:[1,1,1],voxels:new Uint8Array([1])};s.instances[0].matrix=transform(-1,-1,0,2,2,1);
   im=await render(s,{}, {samples:4096});
-  coverage.push({name:'dispersive packet furnace',actual:mean(im),expected:[1,1,1],finite:im.color.every(Number.isFinite),tolerance:0.02});
+  coverage.push({name:'dispersive hero furnace',actual:mean(im),expected:[1,1,1],finite:im.color.every(Number.isFinite),tolerance:0.02});
   im=await render(s,{lensAbbe:30,focalLength:0.5,aperture:0.5},{samples:4096});
-  coverage.push({name:'lens and glass collapse once',actual:mean(im),expected:[1,1,1],finite:im.color.every(Number.isFinite),tolerance:0.02});
+  coverage.push({name:'lens and glass sample wavelength once',actual:mean(im),expected:[1,1,1],finite:im.color.every(Number.isFinite),tolerance:0.02});
   // Focus-plane edge: a monochromatic d-line is sharp; blue/red have analytic disk blur.
   s=blank();s.materials=[emitter];s.models=[{id:'edge',revision:1,size:[1,1,1],voxels:new Uint8Array([2])}];s.instances=[{id:'edge',modelId:'edge',matrix:transform(-2,-2,-0.1,2,4,0.1)}];
   const profiles=[];
@@ -66,8 +84,8 @@ window.run=async(compat=false)=>{
    profiles.push({wavelength,radius,maximumError:Math.max(...profile.map((v,i)=>Math.abs(v-predicted[i]))),transition:profile.filter(v=>v>0.02&&v<0.98).length,finite:im.color.every(Number.isFinite)});
   }
   for(const options of [{lensAbbe:5,focalLength:1e-6,aperture:1e6},{lensAbbe:200,focalLength:1e6,aperture:0.5}]){
-   // Each CIE channel weight is below 4 per lane, four lanes and emission <=2:
-   // |colour| <=32, even before exploiting cancellation of the signed weights.
+   // The importance-sampled CIE weight and emission <=2 stay within the
+   // existing absolute 32 bound (including signed out-of-gamut weights).
    im=await render(s,options,{samples:2});coverage.push({name:'extreme lens '+options.focalLength,actual:mean(im),finite:im.color.every(Number.isFinite),bounded:im.color.every(v=>Math.abs(v)<=32)});
   }
   const native=await Engine.create(document.createElement('canvas'),{backend:'webgl2',fallback:webglRenderer});let refusal;

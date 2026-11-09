@@ -1632,3 +1632,13 @@ For the production browser proof, first run the package CPU bundle regression:
 Then run `node packages/biomes/tests/erosion-browser.mjs` in one shared GPU slot
 with wait-max 60 and a one-minute hold. It validates separate emission, lazy
 fetch, exact served Wasm and all real-crop fields on WebGPU/WebGL2 pages.
+### Review 99 deferred spectral regression
+
+Run `node scripts/gpu-lock.mjs run --owner=review-99 --wait-max=60 --max=7 -- node
+packages/voxel-pathtracer/tests/spectral-browser.mjs` with `MARGO_GPU_SLOTS=1` after building packages.
+The native and real WebGL2 compatibility reports require exactly zero white-scene RGB spread at
+1 and 64 spp, and exact root equality for achromatic/inactive lens paths. Analytic interface/slab,
+dispersive furnace, finite-slab lens disk-edge, alpha and restoration checks retain their bounds.
+This is deterministic work removal, without a measured speed claim.
+The committed native/compatibility transport and lifecycle report is
+`results/review-99-spectral-20261109.json`.

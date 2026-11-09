@@ -1,5 +1,5 @@
 {
-  "commit": "604f09866",
+  "commit": "2a6972562",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -3660,8 +3660,8 @@
         "gzip": 22954
       },
       "./spectral": {
-        "raw": 3647,
-        "gzip": 1541
+        "raw": 2364,
+        "gzip": 1083
       }
     },
     "@margoengine/water": {

@@ -764,7 +764,7 @@ Not done or not verified, stated plainly:
   motion preserves rigid shape); no chromatic aberration; the physical sky is Preetham's (no multiple scattering, ozone or night sky);
   bloom comes from `@margoengine/post`. The optional `/sky` entry replaces the Preetham environment with Hillaire
   multiple scattering, ozone and stylized night, as described below. The optional `/spectral` entry adds
-  wavelength packets, index-ratio scaling and a chromatic thin lens, with its limits below.
+  deferred hero wavelengths, index-ratio scaling and a chromatic thin lens, with its limits below.
 - **Measured only on one machine** (RTX A6000, Edge 155, Windows). Other GPUs, browsers and the editor's own scenes are
   untested.
 
@@ -971,10 +971,13 @@ driver requires the Rust output to match an independent scalar builder byte for 
 
 ## Spectral transport and chromatic lens (optional)
 
-`SpectralVoxelPathTracer` from `@margoengine/voxel-pathtracer/spectral` traces a uniform hero wavelength
-and three companions spaced 100 nm apart over 380-780 nm. Companion paths replay the same random stream
-and stop at the first dispersive glass event, preserving their earlier contributions; the hero takes their
-remaining weight. A dispersive lens collapses the packet at the camera. Every transmitted dielectric
+`SpectralVoxelPathTracer` from `@margoengine/voxel-pathtracer/spectral` traces one RGB path until
+wavelength-dependent transport is needed. At the first dispersive glass event it importance-samples
+one hero wavelength over 380-780 nm and weights only subsequent contributions by its CIE response
+divided by the wavelength density. An active chromatic lens samples that hero at the camera instead.
+Paths without dispersion receive no spectral weight, have exactly zero channel spread in a white
+scene per sample and share the root tracer's random stream. No identical paths are replayed.
+Every transmitted dielectric
 sample, including refracted light-sampling walks, scales radiance by `(nIncident/nTransmitted)^2`.
 The root tracer retains its existing colour and transport convention.
 
@@ -1018,8 +1021,7 @@ paraxial thin lens, without a physical multi-element lens, diffraction, lens tra
 
 Material/light coefficients remain RGB; CIE analytic colour weights integrate wavelength-dependent paths.
 This is not RGB-to-spectrum reconstruction or measured spectral colour fidelity. A capture's `wavelength`
-selects one monochromatic path with unit RGB weight. Albedo, normal and depth use hero samples; instance/palette IDs retain the root centre-ray rule. Transparent alpha is geometric coverage averaged uniformly over wavelengths (or the fixed capture wavelength). A sample is one packet,
-up to four traversals; there is no equal-cost speed or convergence claim. This subclass is independent
+selects one monochromatic path with unit RGB weight. Albedo, normal and depth use hero samples; instance/palette IDs retain the root centre-ray rule. Transparent alpha is geometric coverage averaged uniformly over wavelengths (or the fixed capture wavelength). A sample is one path; there is no equal-cost speed or convergence claim. This subclass is independent
 of the other tracer subclasses. Native WebGPU and WebGL2 compatibility run the feature; plain WebGL2
 raises coded `unsupported` with help. Tests use generated scenes, analytic radiance and finite-slab disk
 coverage; no outside renderer or production lens was used.

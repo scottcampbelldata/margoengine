@@ -18,9 +18,9 @@ function number(value: unknown, name: string, min: number, max: number): number 
 }
 
 /**
- * Four equally spaced wavelengths follow a uniform hero. Companion paths use the
- * same random stream and end at the first dispersive interface; the hero then
- * carries their weight. A dispersive camera lens collapses the packet at the sensor.
+ * One RGB path carries wavelength-independent transport. At the first dispersive
+ * glass interface (or an active dispersive camera lens), sample an importance-
+ * weighted hero once. Earlier contributions stay RGB; later ones use its weight.
  * RGB material/light coefficients retain the root integrator's colour model.
  */
 export class SpectralVoxelPathTracer extends VoxelPathTracer {
@@ -54,37 +54,24 @@ export class SpectralVoxelPathTracer extends VoxelPathTracer {
         );
       source = source.replace(from, to);
     };
+    edit('fn radiance(px:vec2u)->Path {', 'var<private> spectralLambda:f32;\nfn radiance(px:vec2u)->Path {');
+    // Keep the root's deferred, importance-sampled collapse for glass. Only an
+    // active chromatic lens needs a wavelength before its camera ray is made.
     edit(
-      'fn radiance(px:vec2u)->Path {',
-      `var<private> spectralLambda:f32;
-var<private> spectralLane:u32;
-var<private> spectralFixed:bool;
-var<private> spectralSplit:bool;
-var<private> spectralDiscard:bool;
-fn spectralPath(px:vec2u)->Path {`,
+      ' let ray=cameraRay(vec2f(px)+jit);',
+      ` var cameraLambda=bitcast<f32>(f.lights.w);var cameraWeight=vec3f(1.0);
+ if(${this.#abbe > 0 ? 'true' : 'false'}&&f.forward.w>0.0&&f.projection.x==0u){collapse(&cameraLambda,&cameraWeight);}
+ spectralLambda=cameraLambda;
+ let ray=cameraRay(vec2f(px)+jit);`,
     );
-    edit('var lambda=bitcast<f32>(f.lights.w);', 'var lambda=spectralLambda;');
-    const a = source.indexOf('fn collapse('),
-      b = source.indexOf('fn groundMat()', a);
-    if (a < 0 || b < a)
-      throw new MargoError('state', 'Spectral collapse mismatch; see https://margoengine.com/errors#voxel-pathtracer');
-    edit(
-      source.slice(a, b),
-      `fn collapse(lambda:ptr<function,f32>,thr:ptr<function,vec3f>) {
- if(spectralFixed||spectralSplit){return;}
- spectralSplit=true;
- if(spectralLane!=0u){spectralDiscard=true;return;}
- *thr*=4.0;
-}
-`,
-    );
-    // Each call is inside the integrator loop. Stop companions before sampling a
-    // wavelength-dependent direction, preserving their already accumulated light.
-    source = source.replaceAll('collapse(&lambda,&thr);', 'collapse(&lambda,&thr);if(spectralDiscard){break;}');
+    edit('var thr=vec3f(1.0);var L=vec3f(0.0);', 'var thr=cameraWeight;var L=vec3f(0.0);');
+    edit('var lambda=bitcast<f32>(f.lights.w);', 'var lambda=cameraLambda;');
+    // Alpha estimates geometric coverage, so its wavelength density stays uniform
+    // and receives no colour weight. Never consume wavelength draws for a pinhole.
     edit(
       '  let ray=cameraRay(vec2f(px)+(vec2f(f32(s%8u),f32(s/8u))',
       `  spectralLambda=bitcast<f32>(f.lights.w);
-  if(spectralLambda<=0.0){spectralLambda=380.0+400.0*rand();}
+  if(${this.#abbe > 0 ? 'true' : 'false'}&&f.forward.w>0.0&&f.projection.x==0u&&spectralLambda<=0.0){spectralLambda=380.0+400.0*rand();}
   let ray=cameraRay(vec2f(px)+(vec2f(f32(s%8u),f32(s/8u))`,
     );
     edit(
@@ -96,38 +83,14 @@ fn spectralPath(px:vec2u)->Path {`,
     // Lensmaker power: P(lambda)-P(d) = B/(n_d-1)/f * (lambda^-2-d^-2).
     // Slope form remains finite when the wavelength focus passes through infinity.
     const power = this.#abbe === 0 ? 0 : 1 / (this.#abbe * (1 / 0.4861 ** 2 - 1 / 0.6563 ** 2) * this.#focal);
-    edit(
-      'r.d=normalize(focus-r.o);',
-      `r.d=normalize(focus-r.o);
+    if (this.#abbe > 0)
+      edit(
+        'r.d=normalize(focus-r.o);',
+        `r.d=normalize(focus-r.o);
   let um=spectralLambda*0.001;
   let dp=${power.toExponential(12)}*(1.0/(um*um)-1.0/(0.5876*0.5876));
   r.d=normalize(r.d/dot(r.d,fw)-(rt*l.x+up*l.y)*dp);`,
-    );
-    edit(
-      '@compute @workgroup_size(8,8) fn trace(',
-      `fn radiance(px:vec2u)->Path {
- let fixed=bitcast<f32>(f.lights.w);
- spectralFixed=fixed>0.0;
- var hero=0.0;if(!spectralFixed){hero=rand();}let pathSeed=rng;
- var result:Path;
- for(var lane=0u;lane<4u;lane++){
-  if(spectralFixed&&lane>0u){break;}
-  // A dispersive lens chooses the hero direction before the scene is reached.
-  if(${this.#abbe > 0 ? 'true' : 'false'}&&f.forward.w>0.0&&f.projection.x==0u&&lane>0u){break;}
-  spectralLane=lane;spectralSplit=${this.#abbe > 0 ? 'true' : 'false'}&&f.forward.w>0.0&&f.projection.x==0u;spectralDiscard=false;
-  spectralLambda=select(380.0+400.0*fract(hero+f32(lane)*0.25),fixed,spectralFixed);
-  rng=pathSeed;
-  let p=spectralPath(px);
-  var weight=100.0*spectralRgb(spectralLambda);
-  if(${this.#abbe > 0 ? 'true' : 'false'}&&f.forward.w>0.0&&f.projection.x==0u){weight*=4.0;}
-  if(spectralFixed){weight=vec3f(1.0);}
-  result.color+=p.color*weight;result.caustic+=p.caustic*weight;
-  if(lane==0u){result.albedo=p.albedo;result.normal=p.normal;result.inv=p.inv;result.primary=p.primary;}
- }
- return result;
-}
-@compute @workgroup_size(8,8) fn trace(`,
-    );
+      );
     return source;
   }
 }

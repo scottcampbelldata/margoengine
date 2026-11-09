@@ -3389,8 +3389,8 @@ fixture's uint32 indices, all retained triangles and atomic concurrent downloads
 ### Batch 99 spectral transport and section 5 evidence
 
 The optional voxel-pathtracer/spectral subclass generates its own tracing kernel through the existing
-protected shader hook. It adds a four-wavelength uniform hero packet with companion termination at the
-first dispersive glass event, squared index-ratio scaling in dielectric samples and refracted shadow
+protected shader hook. It uses one RGB path with importance-sampled hero selection only at the first dispersive glass
+event or active chromatic lens, squared index-ratio scaling in dielectric samples and refracted shadow
 walks, and optional Cauchy/Abbe thin-lens power. It adds no buffer, texture, CPU-heavy loop, Wasm,
 core or stage source dependency. Device restoration regenerates the same feature kernel.
 
@@ -3400,7 +3400,7 @@ coverage at 450, 587.6 and 650 nm. The original analytic Snell and viewport life
 select the spectral subclass with --spectral. Albedo/normal/depth use hero samples; instance/palette IDs
 retain the centre ray. Transparent coverage initializes its own fixed or uniform wavelength before
 the chromatic lens, with exact opaque-alpha regressions on both backends. The root API is unchanged.
-There is no measured production spectral-colour, multi-element lens, diffraction or packet speed claim;
+There is no measured production spectral-colour, multi-element lens, diffraction or speed claim;
 RGB coefficients and independent optional subclasses remain explicit limits.
 
 ### Rectangular building rule evidence (batch 68 job 7)
@@ -4076,3 +4076,14 @@ Final main rebase inherits unrelated diagnostics and documentation; erosion
 source/Wasm and proof inputs stay unchanged. Packages are rebuilt, with genuine
 paired entry/network records from 604f09866, dirty=false, then generated API.
 Logs: test-results/skip-gaps/item1-*.log; no benchmark or timing-only run.
+### Review 99 deferred spectral transport and section 5 evidence
+
+The spectral entry retains the root integrator's deferred importance sampler instead of replaying
+four identical paths with random colour weights. The active chromatic camera lens selects a wavelength
+once before ray construction, hands its density-corrected weight to path throughput, and reuses the
+same wavelength at glass. Fixed-wavelength captures retain unit RGB weights. The squared index-ratio
+radiance factors and the independent uniform-wavelength alpha coverage are preserved.
+The spectral GPU suite now requires exact zero channel spread and exact root image equality for a
+white diffuse scene at 1 and 64 spp, with an inactive dispersive lens and an achromatic open aperture.
+The existing interface, slab, lens disk-edge, furnace and lifecycle bounds remain unchanged.
+No timing, spectral upsampling or production-lens fidelity claim follows.

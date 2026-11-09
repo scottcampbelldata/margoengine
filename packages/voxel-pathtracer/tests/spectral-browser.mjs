@@ -24,6 +24,10 @@ for (const compat of [false, true]) {
     }
     for (const row of result.coverage) {
       assert.equal(row.finite, true, row.name);
+      if (row.spread !== undefined) {
+        assert.equal(row.spread, 0, `${row.name} channel spread`);
+        assert.equal(row.difference, 0, `${row.name} root difference`);
+      }
       if (row.bounded !== undefined) assert.equal(row.bounded, true, row.name);
       if (!row.expected) continue;
       for (let c = 0; c < 3; c++)

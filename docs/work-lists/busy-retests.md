@@ -27,3 +27,9 @@ or a waiver. The image loss remains open independently of timing. Raw rounds: pe
 | Test | Commit | Machine | Measured against budget | CPU load | Date | Rerun result |
 | --- | --- | --- | --- | --- | --- | --- |
 | `tests/page-ready.test.js`: delayed last-module proof, browser shutdown | `b9985bd07`; this test, browser launcher and shutdown source are unchanged by preview-silent-skip | Windows workstation, Node 26.12 | 30,000 ms browser close budget exceeded; first test 33,141.4642 ms, no readiness/value failure or outer test hang. Same-session alternating parent/current tests (identical source): parent 10,864 / 4,957 ms, current 4,982 / 5,206 ms. Current minimum differs by 25 ms, within the 249 ms current-round spread. No browser or shutdown speed change. | not sampled at the instant of failure; immediately following full unit run, Win32_Processor reported 99 percent | 2026-11-09 | quiet release rerun required; four diagnostic runs closed successfully, budget and test unchanged |
+
+### Review 99 deferred spectral verification (2026-11-09)
+
+| Test | Commit | Machine | Measured against budget | CPU load | Date | Rerun result |
+| --- | --- | --- | --- | --- | --- | --- |
+| Scoped tracer README resampled-emissive example | parent 258721517 plus deferred spectral correction; root and resampled sources unchanged | Ryzen 9 9950X, Windows 11, RTX A6000, Edge 157 | existing 20000 ms module-completion deadline expired, with no value or GPU error. The previously failing root example now passes. Only spectral transport changed; no timing experiment, budget edit or speed claim. The remaining compatibility, mesh and changed spectral examples all pass in the next narrowed run. | 99 percent immediately after the failure; full repository verification and other lanes active | 2026-11-09 | quiet release rerun required |

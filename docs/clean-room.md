@@ -2420,7 +2420,7 @@ All-package research found the root tracer's Cauchy dispersion and independent p
 in shader/tonemap, but no wavelength packet or chromatic camera transport. Existing Margo code is reused.
 No external implementation source was read or copied; no dependency, downloaded code or test asset is added.
 
-- Wilkie, Nawaz, Droske, Weidlich and Hanika, [Hero Wavelength Spectral Sampling](https://doi.org/10.1111/cgf.12419), 2014: random hero and evenly spaced companions, hero-only directional selection. This implementation terminates companions at wavelength-dependent events instead of sharing refracted directions; common random streams replay nondispersive traversal.
+- Wilkie, Nawaz, Droske, Weidlich and Hanika, [Hero Wavelength Spectral Sampling](https://doi.org/10.1111/cgf.12419), 2014: random hero and evenly spaced companions, hero-only directional selection. The initial packet replay is superseded by the Review 99 deferred-hero correction below.
 - Veach, [Robust Monte Carlo Methods for Light Transport Simulation](https://aperture.stanford.edu/papers/veach_thesis/), 1997, chapters 5 and 7: refraction's non-symmetric scattering and invariance of radiance divided by squared index. Camera-path transmission uses the squared incident/transmitted ratio; geometric light-PDF Jacobians remain separate.
 - OpenStax, [University Physics Volume 3, section 2.4](https://openstax.org/books/university-physics-volume-3/pages/2-4-thin-lenses): thin-lens and lensmaker equations, wavelength-dependent power and chromatic focal planes. The paraxial slope correction avoids division by an infinite focus distance.
 - Wyman, Sloan and Shirley, [Simple Analytic Approximations to the CIE XYZ Color Matching Functions](https://jcgt.org/published/0002/02/01/), 2013: the existing Margo analytic observer weights, unchanged. No spectral reflectance reconstruction claim.
@@ -2763,3 +2763,23 @@ center/hints. [Evidence](whitepaper/results/batch-134-uastc-etc.json) records
 690 images/52 pairs/26 files, with lower original-source SSE in every pair;
 192 images are old-byte-exact and498 have permitted selector differences.
 All old payload hashes and old source metrics are independently rechecked.
+
+### Review 99 spectral correction (2026-11-09)
+
+Research compared Alexander Wilkie, Sehera Nawaz, Marc Droske, Andrea Weidlich and Johannes Hanika,
+[Hero Wavelength Spectral Sampling](https://doi.org/10.1111/cgf.12419), 2014, section 3 (path generation
+and combined wavelength density), with Ayoung Kim and Atanas Gotchev,
+[Spectral Rendering: From Input to Rendering Process](https://doi.org/10.2352/EI.2024.36.10.IPAS-251),
+2024 (sampling, reconstruction and wavelength-dependent transport), and Eric Veach,
+[Robust Monte Carlo Methods for Light Transport Simulation](https://aperture.stanford.edu/papers/veach_thesis/),
+1997 (density-corrected transport and refractive radiance). Only descriptions, papers and existing
+Margo sources were read; no companion implementation or external engine source was used.
+
+Synthesis: this RGB-coefficient renderer can integrate wavelength-independent path contributions
+exactly without a random wavelength estimator. Keep a single spatial path and its RGB contributions
+until dispersion first makes path generation wavelength-dependent. Then use the existing positive
+mixture density (25% uniform plus 75% truncated logistic) and the analytic observer weight divided
+by that density. A chromatic lens requires this selection at the sensor; glass must reuse it.
+This is a deferred single-hero estimator, not Wilkie's full multi-wavelength spectral MIS, and claims
+no packet convergence advantage. It removes three identical nondispersive replays deterministically;
+there is no timing experiment. Existing eta-squared factors and alpha's geometric integral are kept.

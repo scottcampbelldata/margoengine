@@ -15,7 +15,7 @@ function harness() {
   return { ...fakeEngine(device), sources };
 }
 
-test('spectral entry owns packet transport, radiance scaling and lens without changing root', async () => {
+test('spectral entry owns deferred wavelength transport, radiance scaling and lens without changing root', async () => {
   const h = harness(),
     base = harness(),
     scene = simpleScene(),
@@ -25,12 +25,17 @@ test('spectral entry owns packet transport, radiance scaling and lens without ch
   try {
     await Promise.all([t.ready, b.ready]);
     assert.ok(t instanceof SpectralVoxelPathTracer);
-    assert.match(h.sources[0], /fn spectralPath/);
-    assert.match(h.sources[0], /if\(spectralDiscard\)\{break;\}/);
+    assert.equal(h.sources[0].match(/fn radiance\(/g).length, 1);
+    assert.doesNotMatch(h.sources[0], /spectralPath|spectralLane|pathSeed|spectralDiscard/);
+    assert.match(h.sources[0], /collapse\(&cameraLambda,&cameraWeight\)/);
+    assert.match(h.sources[0], /var thr=cameraWeight/);
+    assert.match(h.sources[0], /var lambda=cameraLambda/);
+    assert.match(h.sources[0], /let w=sampleLambda\(vec2f\(rand\(\),rand\(\)\)\)/);
+    assert.match(h.sources[0], /\*thr\*=spectralRgb\(w.x\)\/w.y/);
     assert.match(h.sources[0], /s\.w\*=select\(1\.0,eta\*eta,s\.transmit\)/);
     assert.match(h.sources[0], /spectralLambda=bitcast<f32>\(f\.lights\.w\)/);
     assert.match(h.sources[0], /wT\*=\(1\.0-fr\)\*ma\.ior\*ma\.ior/);
-    assert.doesNotMatch(base.sources[0], /fn spectralPath/);
+    assert.doesNotMatch(base.sources[0], /cameraLambda|spectralLambda/);
     assert.deepEqual(scene, before);
     const replacement = harness();
     h.engine.gpu = replacement.device;

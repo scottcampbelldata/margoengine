@@ -1906,8 +1906,9 @@ See [the evidence](whitepaper/results/batch-160-determinism.json) and
 
 ### Spectral transport and chromatic lens (batch 99 job 8, LIM-641)
 
-Optional voxel-pathtracer/spectral uses four equally spaced wavelengths in 380-780 nm, uniform hero,
-and companion termination at wavelength-dependent glass or the camera lens. It scales dielectric
+Optional voxel-pathtracer/spectral traces one RGB path, then importance-samples one hero wavelength
+in 380-780 nm only at the first dispersive glass interface or active chromatic camera lens.
+Earlier contributions stay RGB, and a path without dispersion has no spectral colour noise. It scales dielectric
 transmission by the squared incident/transmitted index ratio, retaining separate light-PDF Jacobians.
 RGB coefficients remain RGB; the CIE weights do not reconstruct reflectance or emission spectra.
 Captures with wavelength set are monochromatic with unit RGB weight; Albedo, normal and depth use hero samples; instance/palette IDs remain centre-ray values. Transparent alpha averages geometric coverage uniformly over wavelengths, or uses the fixed capture wavelength.
@@ -1916,12 +1917,12 @@ Lens settings are immutable at attachment: lensAbbe 0 or 5-200 (default 0), foca
 units (default 0.05). Only camera projection with nonzero aperture uses longitudinal chromatic power.
 There is no lateral colour, physical lens stack, diffraction, lens transmission or measured optical
 fidelity. Slope correction permits virtual/infinite wavelength focus without singular division.
-One packet can replay four traversals; no equal-cost convergence or speed claim. Independent optional
+One sample uses one traversal; no equal-cost convergence or speed claim. Independent optional
 tracer subclasses are not combined by this entry. Root glass and sampling limitations still apply.
 
 Generated stand-in analytic transport and disk-edge tests run on native WebGPU and WebGL2 compatibility;
-plain WebGL2 gives linked unsupported. The entry measures 1541 B gzip (ceiling 1797 B),
-with inherited root 80918 B gzip. Core plus stage stays 23837 B gzip, under 25,000 B.
+plain WebGL2 gives linked unsupported. The corrected entry measures 1083 B gzip (previously 1541 B,
+ceiling 1797 B), with inherited root 81091 B gzip. Core plus stage stays 23924 B gzip, under 25,000 B.
 
 ## Rectangular building grammar (LIM-642)
 
