@@ -3538,3 +3538,10 @@ disables the outer shim before the second case installs compatibility. All
 the nine failed planner/scanner files pass after repair. The original full
 verify failure and the invalid README run overlapping a rebuild are retained.
 A sequenced materials README run passes 29/29 after the build completes.
+
+Final batch 273 rebase inherits compute registration 39fb88cf9 and keeps its
+single test:gpu:owners script and regression. The inherited tracer compose
+fixture enumerates all 32 feature subsets, not frames until ready; its existing
+32-result assertion remains. A comment explains that fixed work to the wait
+scanner, which now passes with no rule/baseline change. No bug 45 compile-hang,
+shader or teardown investigation was performed here.

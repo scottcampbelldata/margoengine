@@ -46,6 +46,7 @@ window.run=async(compat=false,phase='all')=>{
  };
  try{
   const subsets=[];
+  // fixed-wait: enumerate all 32 subsets of five features; each has its own exact image oracle and awaits readiness.
   for(let mask=0;mask<32;mask++){
    progress('subset',{mask});
    const selected=factories.filter((_,i)=>mask&(1<<i)).map(make=>make()).reverse();

@@ -3385,3 +3385,18 @@ The existing 1,024-value, four-step and owner/disposal assertions stay exact.
 Both backends pass the leaf; all 133 tests in the nine originally failing
 planner/scanner files pass. The full verify remains recorded as failed
 (13,856/13,873) before repair; all other chains passed. No full-pass relabeling.
+
+Final rebase integration: main supplied 39fb88cf9, registering the compute
+ownership leaf as test:gpu:owners with its own planner regression. Kept that
+single entry and regression; did not add a second registration or duplicate test.
+The local compute changes now only clarify the exact four-dispatch oracle,
+force a true native baseline and document the retained work. The rebase also
+introduced compose.html's exhaustive 32 feature-subset loop. Its existing
+32-result assertion proves this is case enumeration, not readiness polling;
+a fixed-wait reason comment makes that fact explicit to the existing scanner.
+The scanner now passes without changing its rules, baseline, cases or assertions.
+This is one fixture comment, with no tracer shader, teardown or bug 45 run.
+Rebuilt inherited exporters, water, tracer and umbrella entries; API, lint,
+hygiene, llms and 20 affected inherited source tests pass. The full planner
+selection passes all but the inherited enumeration-comment issue; its affected
+fixed-wait file passes after the explanatory comment. Original receipts remain.
