@@ -2017,3 +2017,14 @@ The retained NOAA wind observation drives the FFT cases. Actual GPU raster
 positions/normals, finite-difference displacement velocity, an independent
 coastal face-flux oracle and lifecycle/edit invalidation are correctness
 checks. The detailed results are `batch234-water-query-*.json` in `results/`.
+
+
+### Quality redraw helper pending acceptance
+
+Run npm run test --workspace @margoengine/quality for all 93 units; the ten
+cases in test/scene-owner.test.js fail on parent 02e0f5d8a. The current local fix
+passes those cases. Before GPU acceptance, retain the original timestamp workload
+and exact 7 ms speed assertion in the named deferred suite, and keep all clock,
+wrapper restoration and tier-selection correctness live. Then run every package
+GPU command, README examples and the required once-run full gates. No quality GPU
+run or all-green full acceptance has yet been recorded for this continuation.

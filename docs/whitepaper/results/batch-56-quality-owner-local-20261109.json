@@ -1,0 +1,26 @@
+{
+  "status": "LOCAL_REPAIR_NOT_PUSHED_ACCEPTANCE_PENDING",
+  "base": "02e0f5d8a",
+  "parent": {
+    "pass": 0,
+    "fail": 10
+  },
+  "packageUnits": {
+    "pass": 93,
+    "fail": 0
+  },
+  "sizes": {
+    "before": 3686,
+    "after": 3714,
+    "ceiling": 3942
+  },
+  "pending": [
+    "full once-run verify, lint and hygiene",
+    "all quality GPU correctness commands and new helper rendering proof",
+    "quality runtime README examples",
+    "route inherited timestamp 7ms speed assertion and old-rule wall-clock measurement to deferred suite, preserve all correctness and original release budget",
+    "rebase and fast-forward push"
+  ],
+  "gpuRun": false,
+  "coreStageChanged": false
+}

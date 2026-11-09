@@ -3803,3 +3803,25 @@ linked in water-query.md. The preservation proof caught an unnecessary test-only
 flux texture usage change; that rendering change was removed. Its independent
 flux oracle instead reads the existing sampleable texture in a compute pass.
 
+
+
+### Quality redraw helper ownership and cancellation (local batch 56 continuation)
+
+Compared Anindya Banerjee and David A. Naumann, *Ownership Confinement Ensures
+Representation Independence for Object-Oriented Programs* (2002),
+https://arxiv.org/abs/cs/0212003; Daan Leijen, *Structured Asynchrony with Algebraic
+Effects* (2017), https://www.microsoft.com/en-us/research/publication/structured-asynchrony-algebraic-effects/;
+and Don Syme, Tomas Petricek and Dmitry Lomov, *The F# Asynchronous Programming
+Model* (2011), https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/async-padl-revised-v2.pdf.
+Ownership confinement and structured cancellation suggest an explicit plugin
+identity and a callback lifetime bounded by that registration. This is a design
+inference for a synchronous JavaScript event loop, not a formal concurrency
+proof. No companion implementation was read or copied.
+
+The helper previously discarded its registration identity and removed by the
+engine's currently active name. Queued callbacks also had no disposal state.
+The local optional-package repair retains the object, resolves its actual scene
+with sceneOf, and guards both queued callbacks with the registration lifetime.
+A stop invoked inside the first render prevents scheduling a second. All ten
+new real-engine regressions fail on the parent; repaired package units pass 93.
+GPU, README runtime and full acceptance for this continuation remain pending.

@@ -4732,3 +4732,14 @@ for perspective, transformed and orthographic matrices, retains offscreen x/y,
 and rejects NaN depth without overwriting caller output. The NaN case fails the
 old implementation. No core, GPU math or reversed-Z convention changes.
 Research and size evidence: [size restoration](../size-restore.md).
+
+
+### Section 5 pending evidence: Quality redraw helper
+
+The owner inventory now covers factory-created setup objects as well as explicit
+plugin classes. Ten real-engine Quality regressions fail on the parent and all
+91 package units pass with the local registration-identity and cancellation fix.
+The normal package suite brings this class check into check:merge/verify. No
+core change. Full gates, GPU and README runtime remain owed, including separating
+the inherited 7 ms speed proof from timestamp/tier-selection correctness under
+the build-phase policy. This is a local repair, not a landed GPU proof.

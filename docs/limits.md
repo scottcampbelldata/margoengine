@@ -2921,3 +2921,14 @@ The wrapper keeps offscreen x/y and perspective w or orthographic normalized
 depth; failed depth/front checks leave output unchanged. Exact shared parity
 and NaN depth rejection are covered by points.test.js. Entry min+gzip changes:
 @margoengine/points: 23947->24138 B gzip; ceiling 23954->24863; @margoengine/points/las: 13735->13737 B gzip; ceiling 14148->14150; @margoengine/points/potree: 17178->17179 B gzip; ceiling 17694->17695; @margoengine/points/las base (without LAZ decoder): 5761->5764 B gzip; ceiling 6017->6020; @margoengine/points/las lazy LAZ decoder: 8523->8525 B gzip; ceiling 8779->8781. Core plus stage remains 23924 B. No performance claim.
+
+
+### Quality redraw owner continuation (acceptance pending)
+
+The local redrawAfterRestore repair uses the registered helper identity and
+cancels callbacks after stop, plugin removal, scene disposal or engine disposal.
+It retains two redraws while active and preserves later same-name replacements.
+Ten real-engine regressions fail on the parent; all 93 package units pass.
+Canonical root entry min+gzip grows 3686 to 3714 B, within its unchanged 3942 B
+ceiling. No core/stage change or new performance claim. GPU/README/full acceptance
+and routing the inherited timing-only browser assertions remain pending.

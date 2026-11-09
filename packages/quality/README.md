@@ -244,7 +244,9 @@ redrawAfterRestore(engine, () => engine.render({delta: 0})); // only for apps th
 - `redrawAfterRestore(engine, render)`: core restores a lost GPU device by itself and the engine's loop draws the next
   frame, but an app that renders on demand (paused, loop stopped) shows an empty canvas until it renders again. This
   runs `render` on the two frames after every restoration (effects that read the previous frame, such as water
-  refraction and sky reflections, settle on the second).
+  refraction and sky reflections, settle on the second). The returned stop function removes the helper from its
+  registered scene and cancels queued redraws. Removing that plugin, disposing its scene or disposing the engine
+  also cancels pending redraws; a later plugin with the same name is preserved.
 - First-use hitch per feature (`node examples/package-benchmarks/warm-up-gpu.mjs`, results
   `examples/package-benchmarks/results/warm-up-gpu.json`): see the table there.
 

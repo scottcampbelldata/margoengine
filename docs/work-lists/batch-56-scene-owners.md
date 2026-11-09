@@ -4,8 +4,8 @@ Status: OPEN. Current syntactic snapshot includes the accepted stats repair
 and the current-main rebase onto 449dd9676. This is a complete syntactic call inventory, not proof
 that every candidate is a bug or that every plugin has correct lifetime.
 
-The parser finds 182 actual removePlugin calls in package TypeScript sources:
-71 resolve identity with sceneOf, 1 uses a stored scene/owner receiver whose
+The post-Save parser finds 183 actual removePlugin calls in package TypeScript sources:
+71 resolve identity with sceneOf, 2 use a stored scene/owner receiver whose
 binding needs review, 3 are core scene-router implementation, and 107 require
 registration/receiver inspection. The old 187-line text scan included signatures
 and comments and came from older source. No calls or packages are silently
@@ -104,3 +104,11 @@ Save's factory bug is repaired in the optional engine entry. The original three 
 The fresh rebase inventory adds the upstream FFTOcean active-shaped removal to
 the candidate list. Its registration/runtime ownership has not been accepted by
 this audit; no defect or waiver is inferred from the syntactic category.
+
+
+The post-Save inventory at 02e0f5d8a has 183 calls: 71 identity, 2 stored-scene
+calls (Save scope and exact-instance rollback), 3 core routers and 107 candidates.
+The two Save calls are proved by its accepted 16-case runtime suite, not waived
+by receiver syntax. Quality's helper-created registration now has ten reproduced
+owner/lifetime failures and a local repair passing all 93 package units. Its
+remaining acceptance gates are open; no wider-owner completion is claimed.

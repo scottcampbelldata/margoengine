@@ -1,4 +1,4 @@
-import type { EngineKernel } from '@margoengine/core';
+import type { EngineKernel, EnginePlugin } from '@margoengine/core';
 import { sceneSamples as samples } from '../../shared/quality.js';
 import type { DeviceLike, QueueLike } from './reading.js';
 declare global {
@@ -314,18 +314,31 @@ export function redrawAfterRestore(
   request: (callback: () => void) => unknown = globalThis.requestAnimationFrame?.bind(globalThis),
 ): () => void {
   const name = `redraw-after-restore-${++restorers}`;
+  let active = true;
   // Core runs onDeviceRestored before its recovery settles; a frame rendered then would be skipped.
-  engine.use({
+  const plugin: EnginePlugin = {
     name,
     setup() {},
     onDeviceRestored: () => {
+      if (!active) return;
       request(() => {
+        if (!active) return;
         render();
-        request(render);
+        if (active)
+          request(() => {
+            if (active) render();
+          });
       });
     },
-  });
-  return () => engine.removePlugin(name);
+    dispose() {
+      active = false;
+    },
+  };
+  engine.use(plugin);
+  return () => {
+    active = false;
+    engine.sceneOf(plugin)?.removePlugin(name);
+  };
 }
 export { frameDue, frameStatus } from './pacing.js';
 /** 1 on phones and the light tier, 4 on the desktop full tier: the scene sample count core uses (call after applyQualityTier). */

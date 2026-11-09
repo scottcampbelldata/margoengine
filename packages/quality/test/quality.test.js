@@ -677,7 +677,12 @@ test('redrawAfterRestore renders the two frames after each device restoration un
       return engine;
     },
     removePlugin(name) {
+      const plugin = plugins.get(name);
       plugins.delete(name);
+      plugin?.dispose?.();
+    },
+    sceneOf(plugin) {
+      return plugins.get(plugin.name) === plugin ? engine : undefined;
     },
   };
   let renders = 0;

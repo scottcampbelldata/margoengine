@@ -2473,3 +2473,13 @@ perspective w or orthographic depth exactly. Non-finite normalized depth rejects
 without publishing output. Evidence: packages/points/tests/points.test.js;
 reproduce with the points unit suite. Sources: [size restoration](../size-restore.md).
 No performance or cross-runtime floating-point claim is added.
+
+
+### Quality redraw ownership: local CPU proof only
+
+Ten real-engine failures reproduce default/secondary cleanup, pending
+callbacks after stop/removal/scene or engine disposal, same-name preservation and
+stop during the first redraw. The local optional-package fix passes all 93 units;
+root entry grows 3686 to 3714 B within its unchanged ceiling. Runtime GPU,
+README and full acceptance are pending; no current-main acceptance claim for
+this repair. Sources: [clean-room record](../clean-room.md).
