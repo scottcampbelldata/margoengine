@@ -4506,6 +4506,20 @@ self-intersecting outlines or a new equal-width bevel guarantee.
 
 # Known bugs and unverified features
 
+### Fixed 2026-11-09: owned Chromium close waited on helper programs (SHUTDOWN_TIMEOUT, five lanes)
+
+GPU suites passed every check, then failed with `SHUTDOWN_TIMEOUT`, "still open:
+browser", at the unchanged 30,000 ms budget; the pipe repair below did not stop
+it. The owned browser was ended by `taskkill.exe` (WMI) and a PowerShell handle
+wait started at close time; a taskkill that could not run reported no process
+ended, which read as success, so nothing ended the browser. It is now ended
+through the handle Node holds, with each process Chromium lists over CDP, and
+no helper program runs (`stopOwned` in `scripts/lib/browser.mjs`); `taskkillTree`
+reports a failed run as the root still running. Regressions in
+`tests/browser-teardown.test.js` reach the same "still open: browser" on the
+parent commit. Details and sources: operational playbook, "Owned Chromium ended
+without helper programs".
+
 ### Fixed 2026-11-09: owned Windows Chromium shutdown pipes (batch 160)
 
 ChildProcess `exit` does not establish that its stdio has closed. The shared
