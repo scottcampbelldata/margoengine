@@ -61,6 +61,13 @@ over the zero-config world adds nothing measurable to the slowest 1 percent of f
 same flight with every tile made first (medians of three flights each, within the timer's 0.1 ms); copying one arrived
 tile in takes 0.1 ms at the median and 0.3 ms at the 99th percentile on the page's thread.
 
+Streaming and prefetch share one generation per tile and edit revision. Pass `{ signal }` to
+`prefetch` to cancel only that caller; the raw generation stops when its last caller leaves.
+World edits detach old work so new callers get the current revision. Disposing the view cancels
+all outstanding generations, including revisions detached by edits. Prefetch retains at most
+1,024 terrain/object results, checked when each result completes; every requested tile is still
+generated when a batch starts below that limit.
+
 The sea comes with the world: a world whose relief runs below `climate.seaLevel` (the wetland preset's west coast,
 `coast` on `createRelief`) gets a water surface there with no option. The terrain hides it under land, so the shore
 follows the coastline, with the water's shoreline foam. Rivers stay dry valleys unless you ask for water in them (below). The sea

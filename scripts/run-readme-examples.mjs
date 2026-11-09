@@ -44,7 +44,6 @@ const root = resolve(import.meta.dirname, '..'),
   PAGE_LIMIT = 20_000,
   SETTLE = 500,
   NODE_JOBS = 8,
-  PAGE_JOBS = 3,
   // A whole run took 5 minutes on the RTX A6000 (2026-11-07) and about 25 when first measured; the limit is well past both.
   LIMIT_MINUTES = 60;
 
@@ -524,6 +523,11 @@ async function eachLimited(items, jobs, work) {
   );
 }
 
+/** A run holds one GPU slot: finish and close one page before starting the next example. */
+export async function eachPage(items, work) {
+  for (const item of items) await work(item);
+}
+
 /** The examples a run takes: those of `packages` (names), when given, whose id holds `only`, when given, and in `ids`, when given. */
 export const pickExamples = (examples, { only, packages, ids }) =>
   examples.filter(
@@ -568,7 +572,7 @@ async function run() {
   if (forPage.length) {
     const pages = await startPages(samples, examples);
     try {
-      await eachLimited(forPage, PAGE_JOBS, async (example) => {
+      await eachPage(forPage, async (example) => {
         if (pages.failed) throw new Error(pages.failed);
         results.set(example.id, await runInPage(example, pages));
         writeFileSync(

@@ -4,8 +4,112 @@ import assert from 'node:assert/strict';
 import { crc32, inflateSync } from 'node:zlib';
 import { BiomeWorld } from '../dist/index.js';
 import { encodePng, exportHeight, exportLayer, exportMasks, exportWeights, loadWorld, saveWorld } from '../dist/io.js';
+import { ThreadWebWorker } from './thread-worker.js';
 
 const options = { seed: 5, size: [512, 512], tileSize: 256, workers: false };
+
+test('weight exports classify once per tile and keep all available workers busy with a bounded batch', {
+  timeout: 10000,
+}, async () => {
+  const world = await BiomeWorld.create({ ...options, resolution: 4 }),
+    tile = world.tile.bind(world),
+    calls = [],
+    releases = [];
+  Object.defineProperty(world, 'workers', { value: { size: 3 } });
+  let active = 0,
+    peak = 0,
+    released = false;
+  world.tile = async (x, z, request) => {
+    calls.push([x, z, [...request.layers]]);
+    peak = Math.max(peak, ++active);
+    if (!released) await new Promise((resolve) => releases.push(resolve));
+    try {
+      return await tile(x, z, request);
+    } finally {
+      active--;
+    }
+  };
+  const pending = exportWeights(world);
+  try {
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(calls.length, 3, 'starts one job per worker before waiting');
+  } finally {
+    released = true;
+    for (const release of releases) release();
+    await pending;
+    world.dispose();
+  }
+  assert.equal(peak, 3, 'never queues more than the worker count');
+  assert.deepEqual(
+    calls,
+    [
+      [0, 0],
+      [1, 0],
+      [0, 1],
+      [1, 1],
+    ].map(([x, z]) => [x, z, ['biome', 'biomeWeight']]),
+  );
+});
+
+test('parallel worker I/O is byte-identical to serial I/O, including cropped edge tiles and edited weights', {
+  timeout: 60000,
+}, async () => {
+  const settings = { ...options, size: [576, 544], resolution: 4 },
+    local = await BiomeWorld.create(settings),
+    remote = await BiomeWorld.create({ ...settings, workers: 2, createWorker: () => new ThreadWebWorker() });
+  try {
+    for (const world of [local, remote]) world.writeLayer('paint/wetland', 1, 1, new Uint8Array(64 * 64).fill(173));
+    for (const rect of [undefined, [1, 0, 2, 2]]) {
+      const exportOptions = { tiles: rect };
+      for (const format of ['png16', 'raw16', 'f32'])
+        assert.deepEqual(
+          await exportHeight(remote, format, exportOptions),
+          await exportHeight(local, format, exportOptions),
+        );
+      assert.deepEqual(await exportWeights(remote, exportOptions), await exportWeights(local, exportOptions));
+      assert.deepEqual(await exportMasks(remote, exportOptions), await exportMasks(local, exportOptions));
+      for (const name of ['temperature', 'biomeWeight'])
+        for (const format of ['json', 'csv'])
+          assert.equal(
+            await exportLayer(remote, name, format, exportOptions),
+            await exportLayer(local, name, format, exportOptions),
+          );
+    }
+  } finally {
+    local.dispose();
+    remote.dispose();
+  }
+});
+
+test('a failed export settles its whole batch and schedules no later tiles', { timeout: 10000 }, async () => {
+  const world = await BiomeWorld.create({ ...options, resolution: 4 });
+  Object.defineProperty(world, 'workers', { value: { size: 2 } });
+  const failure = new Error('tile failed');
+  let calls = 0,
+    finished = false,
+    release;
+  world.tile = async () => {
+    if (++calls === 1) throw failure;
+    await new Promise((resolve) => {
+      release = resolve;
+    });
+    finished = true;
+    throw failure;
+  };
+  const pending = exportWeights(world);
+  try {
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(calls, 2);
+    assert.equal(finished, false);
+    release();
+    await assert.rejects(pending, (error) => error === failure);
+    assert.equal(finished, true);
+    assert.equal(calls, 2);
+  } finally {
+    release?.();
+    world.dispose();
+  }
+});
 
 /** Decodes a PNG made by the encoder (filter 0 only): header fields and the unfiltered rows. */
 function decodePng(bytes) {

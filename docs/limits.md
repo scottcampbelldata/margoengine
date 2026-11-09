@@ -1,5 +1,12 @@
 # Design envelope
 
+Biome prefetch shares raw work with streaming and retains at most 1,024 terrain/object results,
+with capacity checked on completion. The original 144-tile flight still generates every tile;
+all 292 unique default-world worker outputs match the parent exactly. The view entry is
+10,454 B gzip, within its unchanged 10,454 B ceiling. The paired proof establishes fewer
+requests (view 204 to 144; placement 190 to 144), without a wall-clock speed claim. Evidence:
+whitepaper/results/biomes-prefetch-20261109.json and packages/biomes/tests/view-prefetch.test.js.
+
 The real-data sciviz demos keep a 2 mm, 88 x 128 x 128 CC0 head MRI, one million public-domain 2MASS sources,
 and eight daily North Atlantic NOAA wind fields locally in Git LFS. The 2MASS axes are observed RA, Dec and J-Ks
 colour, with no inferred distance. Its systematic, truncated sample is biased and not a complete survey.
@@ -39,6 +46,14 @@ files use real FlightHelmet image content; the HDR cube uses an analytic light
 field. The historical baseline is retained, and its timings are not transplanted
 onto new inputs. Replacement timing and the transcoder's acceptance gates remain.
 
+Biome whole-world I/O (2026-11-09): the full default 4,096 x 4,096 samples, every PNG/weight
+plane/mask/temperature CSV value and saved-world digest match parent 349243b3d. Exports keep
+at most one outstanding tile per available worker (one without workers); the paired biome
+outputs are requested together, and height-only reads omit unrelated fields. Export tile
+requests are 1,024 instead of 1,536 for the documented workload. This proves less repeated
+work with identical output; no wall-clock speed ratio or cross-machine deadline is claimed.
+The README runner uses one complete page at a time in its one reserved GPU slot, with the
+existing 20 s deadline. Record: whitepaper/results/biomes-io-20261109.json.
 
 The prebuilt text README atlas is a 48 px/em, 16-pixel-range SDF sample covering printable ASCII
 (U+0020 through U+007E). Other characters need another atlas or a runtime Font. Its bitmap generation uses

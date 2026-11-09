@@ -1,0 +1,42 @@
+<!doctype html><meta charset="utf-8"><title>Full default biome prefetch work/output proof</title><canvas></canvas>
+<script type="module">
+import { Engine } from '/packages/core/dist/index.js';
+import { BiomeWorld } from '/packages/biomes/dist/index.js';
+import { BiomeView } from '/packages/biomes/dist/view.js';
+const summarize=async value=>{
+  if(ArrayBuffer.isView(value)){
+    const bytes=new Uint8Array(value.buffer,value.byteOffset,value.byteLength);
+    const hash=await crypto.subtle.digest('SHA-256',bytes);
+    return {type:value.constructor.name,bytes:bytes.length,sha256:[...new Uint8Array(hash)].map(n=>n.toString(16).padStart(2,'0')).join('')};
+  }
+  if(Array.isArray(value))return Promise.all(value.map(summarize));
+  if(value&&typeof value==='object')return Object.fromEntries(await Promise.all(Object.entries(value).map(async([k,v])=>[k,await summarize(v)])));
+  return value;
+};
+window.run=async(parent)=>{
+  const View=parent?(await import('/test-results/biomes-prefetch-proof/parent/dist/view.js')).BiomeView:BiomeView;
+  const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu'});
+  const errors=[];engine.onError=e=>errors.push(e.message);
+  engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+  const world=await BiomeWorld.create({workers:3});
+  const pool=world.workers,run=pool.run.bind(pool),counts={},records=[],hashes=[];
+  pool.run=(message,options)=>{
+    counts[message.op]=(counts[message.op]??0)+1;
+    const key=[message.op,message.x,message.z,message.v0,message.v1].join(':');
+    return run(message,options).then(result=>{
+      hashes.push(summarize(result).then(output=>records.push({key,output})));
+      return result;
+    });
+  };
+  let view;
+  try{
+    view=await View.attach(engine,world,{lookahead:4,budget:.5});
+    await view.prefetch([-1500,-1500,1500,1500]);
+    await view.whenIdle();
+    await Promise.all(hashes);
+    engine.render();await engine.gpu.queue.onSubmittedWorkDone();
+    return {world:{size:[4096,4096],resolution:1,workers:3,prefetch:[-1500,-1500,1500,1500]},counts,records:records.sort((a,b)=>a.key.localeCompare(b.key)),errors};
+  }finally{view?.dispose();world.dispose();engine.dispose();}
+};
+window.ready=true;
+</script>

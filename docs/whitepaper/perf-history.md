@@ -9,6 +9,27 @@ files use real FlightHelmet image content; the HDR cube uses an analytic light
 field. The historical baseline is retained, and its timings are not transplanted
 onto new inputs. Replacement timing and the transcoder's acceptance gates remain.
 
+### Biome prefetch duplicated streaming work (2026-11-09)
+
+The complete 144-tile README flight prefetch submitted 204 view and 190 placement jobs because
+prefetch and streaming had separate ownership of the same raw generation. Sharing raw work
+while keeping independent subscribers reduces those counts to 144/144. The full default 4 km
+world/three-worker paired GPU proof compares every result field and full typed-array SHA-256:
+all 292 unique results are identical. No tile, resolution, deadline or size ceiling changed.
+View lifetime cancellation replaces duplicate per-job disposal and the entry fits its existing
+10,454 B gzip ceiling. Regression: packages/biomes/tests/view-prefetch.test.js; paired reproduction:
+node packages/biomes/scripts/prefetch-proof.mjs. Record: results/biomes-prefetch-20261109.json.
+No wall-clock speed ratio is published from this loaded machine.
+
+### Biome whole-world I/O repeated work (2026-11-09)
+
+The README's full default 4 km exports exceeded its 20 s page deadline. Height-only requests
+computed unrelated fields; weight IDs and weights triggered separate full classifications;
+serial tile requests left world workers unused. Exact-extent height sampling, paired outputs
+and bounded worker batches retain all exported bytes and metadata while reducing tile requests
+from 1,536 to 1,024. The complete parent/current proof is results/biomes-io-20261109.json.
+No wall-clock ratio is published from this loaded machine. One held README GPU slot now
+runs one full page lifecycle at a time, without changing the workload or deadline.
 
 This page lists every performance loss and every significant bug that Margo's checks caught and that was then fixed.
 Each entry gives:

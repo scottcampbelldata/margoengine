@@ -1088,6 +1088,7 @@ export const entries = [
       'BiomeEditor is disposed; attach a new one',
       'BiomeEditor.attach takes a BiomeWorld',
       'BiomeView needs a WebGPU engine; create the engine with WebGPU',
+      'BiomeView disposed',
       'BiomeView lookahead must be 0 or more seconds and budget above 0 ms',
       'BiomeView prefetch takes a [minX, minZ, maxX, maxZ] rectangle in metres',
       'BiomeView radius must be above 0',

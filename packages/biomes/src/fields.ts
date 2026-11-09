@@ -93,8 +93,15 @@ export function rectFields(
           `Raw region ${name} must be an Int32Array of width * depth samples; supply the full plane`,
           'biomes',
         );
-  const { climate, region, heights, cell, scratch } = frame,
-    apron = Math.max(1, divFloor(TPI_RADIUS, cell)),
+  const { climate, region, heights, cell, scratch } = frame;
+  // A height-only request needs no terrain derivatives, region interpolation or climate classification.
+  // Copy out of scratch exactly as the general route does, so later tiles cannot overwrite the result.
+  if (names.length && names.every((name) => name === 'height')) {
+    const layer = raster('height', width, depth, temporary ? scratch : undefined);
+    layer.data.set(heights.grid(ox, oz, width, depth, cell, scratch));
+    return new Map([['height', layer]]);
+  }
+  const apron = Math.max(1, divFloor(TPI_RADIUS, cell)),
     side = width + 2 * apron,
     rows = depth + 2 * apron,
     h = heights.grid(ox - apron, oz - apron, side, rows, cell, scratch),

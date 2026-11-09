@@ -54,6 +54,42 @@ at 1440 x 900 and 390 x 844, exercises controls and exports, checks rendered str
 counts, and observes live frames during trace updates. Results and screenshots are under
 `test-results/sciviz-demos/`. Source data, exact reduction, hashes, projection and subset biases are recorded in
 `examples/assets/sciviz/README.md` and adjacent JSON manifests. This is functional evidence, not a speed measurement.
+### Biome prefetch shared-generation proof (2026-11-09)
+
+After building packages, run
+`node scripts/gpu-lock.mjs run --exclusive --owner=codex-missing -- node packages/biomes/scripts/prefetch-proof.mjs`.
+The five-minute child supervisor compares isolated Margo parent fc1ed452f sources with the
+current build using the same dependencies, full default 4 km world, three workers and original
+144-tile rectangle. It checks every result field and typed-array SHA-256 for 292 unique keys,
+requires one current submission per key and fewer total submissions than the parent, and writes
+test-results/biomes-prefetch-proof/result.json. Copy the successful record to
+results/biomes-prefetch-20261109.json. This is deterministic work/output evidence, not timing.
+Run `node --test packages/biomes/tests/view-prefetch.test.js` for independent aborts, edits,
+cache capacity, failure and disposal. The unchanged size ceiling is checked by npm run quality.
+
+### Biome I/O and runtime README continuation (2026-11-09)
+
+After building packages, run `node packages/biomes/scripts/io-proof.mjs` from the repository.
+Its outer supervisor kills the whole process tree after five minutes. It builds an isolated
+copy of Margo's own biome sources at 349243b3d, including its optional entries, then executes
+the complete default 4 km exports through that copy and the current build in one process.
+Every byte is hashed, all metadata is compared, and both saved-world digests must agree.
+The record is `test-results/biomes-io-proof/result.json`; the retained evidence is
+`results/biomes-io-20261109.json`. This is an output/work proof, not a timing benchmark.
+
+`node --test --test-timeout=120000 packages/biomes/tests/io.test.js packages/biomes/tests/gpu-field-integration.test.js`
+checks exact worker/serial output, cropped edits, bounded outstanding jobs, one classification
+per tile, failure cleanup and exact height-only cell requests. Run all biome package tests too.
+The runtime gate is `node scripts/gpu-lock.mjs run --owner=codex-missing -- npm run check:readme-run -- --packages=biomes,loaders`.
+Both loaders GPU suites and biome `test:gpu` remain required under the same GPU lock.
+
+`node --test --test-timeout=120000 tests/gpu-lock-mutex.test.js tests/gpu-lock.test.js tests/gpu-lock-compat.test.js tests/gpu-lock-limits.test.js tests/run-readme-examples.test.js`
+checks locking and complete-page scheduling. On Windows the native regression uses the OS's
+PowerShell and a clean-room Win32 fixture to hold a directory delete-pending: the old name
+fails with EPERM, while a retired name leaves the reusable mutex available. No fixture or
+platform is silently skipped; the portable retirement/permission models run everywhere.
+API basis: [SetFileInformationByHandle](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-setfileinformationbyhandle)
+and [directory deletion lifetime](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-removedirectoryw).
 
 ## Five executable README repairs (2026-11-09)
 

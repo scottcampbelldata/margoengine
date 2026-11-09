@@ -552,6 +552,8 @@ function quantise(w: Int32Array, out: Uint8Array, at: number): void {
   }
 }
 
+const combineSignals = (a: AbortSignal, b?: AbortSignal): AbortSignal => (b ? AbortSignal.any([a, b]) : a);
+
 const srgbToLinear = (c: number) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
 const look = (key: string, extra?: Readonly<Record<string, MaterialLook>>): MaterialLook =>
   extra?.[key] ?? MATERIALS[key] ?? { color: [0.4, 0.36, 0.3] };
@@ -671,7 +673,9 @@ export class BiomeView implements Disposable {
   /** Share of the ground the canopy material takes under full crowns (0: no canopy material). */
   readonly #canopy: number;
   readonly #cover?: typeof import('@margoengine/biomes/cover');
-  readonly #signal?: AbortSignal;
+  /** Owns current generations and old revisions detached by edits. */
+  readonly #lifetime = new AbortController();
+  readonly #signal: AbortSignal;
   readonly #lookahead: number;
   readonly #budget: number;
   /** Distance within which small plants, rocks and props are drawn (BiomeObjects' near radius). */
@@ -691,6 +695,14 @@ export class BiomeView implements Disposable {
   readonly #drawn = new Set<string>();
   /** Tiles whose objects are on the GPU: the tile, and whether it went in near the camera (with the small plants). */
   readonly #placed = new Map<string, readonly [number, number, boolean]>();
+  /** One raw generation per tile/revision; streaming and prefetch subscribe independently. */
+  readonly #making = new Map<
+    string,
+    {
+      readonly controller: AbortController;
+      readonly waiters: Set<(result?: ViewTile | PlacedTile, reason?: unknown) => void>;
+    }
+  >();
   readonly #pending = new Map<
     string,
     { readonly controller: AbortController; readonly x: number; readonly z: number }
@@ -737,7 +749,7 @@ export class BiomeView implements Disposable {
   ) {
     this.#engine = engine;
     this.#world = world;
-    this.#signal = options.signal;
+    this.#signal = combineSignals(this.#lifetime.signal, options.signal);
     this.#radius = options.radius ?? 1000;
     this.#lookahead = options.lookahead ?? 3;
     this.#budget = options.budget ?? 0.25;
@@ -1153,24 +1165,55 @@ export class BiomeView implements Disposable {
     this.#settled();
   }
 
-  /** A tile's terrain (`v`) or objects (`p`), made by the world's workers when it has them. */
-  #make(kind: 'v' | 'p', x: number, z: number, priority: number, signal?: AbortSignal): Promise<ViewTile | PlacedTile> {
-    const w = this.#world,
-      step = Math.round(this.textureResolution / w.resolution); // float division: exact multiple
-    if (kind === 'p') return this.#placement!.tile(x, z, { signal, priority, detail: this.#detailStep });
-    return w.workers
-      ? w.workers.run<ViewTile>(
-          { op: 'view', x, z, materials: this.materials, step, canopy: this.#canopy },
-          { near: [x, z], priority, signal },
-        )
-      : // No workers: made on this thread, one per task so frames keep drawing.
-        new Promise<void>((done) => setTimeout(done, 0))
-          .then(() => w.tile(x, z, { layers: VIEW_LAYERS, signal }))
-          .then((tile) => {
-            const made = viewTile(w, tile, this.materials, step);
-            if (this.#canopy) this.#cover!.darkenTile(w, made, step, this.materials, this.#canopy);
-            return made;
-          });
+  /** Joins a raw generation without giving one caller ownership of another caller's cancellation. */
+  #make(kind: 'v' | 'p', x: number, z: number, priority: number, signal: AbortSignal): Promise<ViewTile | PlacedTile> {
+    return new Promise((resolve, reject) => {
+      signal.throwIfAborted();
+      const key = `${kind}${x},${z}`;
+      let job = this.#making.get(key);
+      const forget = () => this.#making.get(key) === job && this.#making.delete(key);
+      if (!job) {
+        job = { controller: new AbortController(), waiters: new Set() };
+        this.#making.set(key, job);
+        const complete = (result?: ViewTile | PlacedTile, reason?: unknown) => {
+          forget();
+          for (const done of job!.waiters) done(result, reason);
+        };
+        // Both handlers observe completion even if every subscriber left before the worker settles.
+        (async () => {
+          const signal = job!.controller.signal,
+            w = this.#world,
+            step = Math.round(this.textureResolution / w.resolution); // float division: exact multiple
+          if (kind === 'p') return this.#placement!.tile(x, z, { signal, priority, detail: this.#detailStep });
+          if (w.workers)
+            return w.workers.run<ViewTile>(
+              { op: 'view', x, z, materials: this.materials, step, canopy: this.#canopy },
+              { near: [x, z], priority, signal },
+            );
+          // No workers: made on this thread, one per task so frames keep drawing.
+          await new Promise<void>((done) => setTimeout(done, 0));
+          const tile = await w.tile(x, z, { layers: VIEW_LAYERS, signal }),
+            made = viewTile(w, tile, this.materials, step);
+          if (this.#canopy) this.#cover!.darkenTile(w, made, step, this.materials, this.#canopy);
+          return made;
+        })().then(complete, (reason) => complete(undefined, reason));
+      }
+      const done = (result?: ViewTile | PlacedTile, reason?: unknown) => {
+        signal.removeEventListener('abort', abort);
+        if (result) resolve(result);
+        else reject(reason);
+      };
+      const abort = () => {
+        job!.waiters.delete(done);
+        done(undefined, signal.reason);
+        if (!job!.waiters.size) {
+          forget();
+          job!.controller.abort(signal.reason);
+        }
+      };
+      job!.waiters.add(done);
+      signal.addEventListener('abort', abort);
+    });
   }
 
   /**
@@ -1180,7 +1223,7 @@ export class BiomeView implements Disposable {
    * dozen jobs.
    */
   #fetch(kind: 'v' | 'p', x: number, z: number, priority: number): void {
-    const key = kind + `${x},${z}`,
+    const key = `${kind}${x},${z}`,
       job = { controller: new AbortController(), x, z },
       made = this.#made.get(key);
     this.#pending.set(key, job);
@@ -1212,9 +1255,11 @@ export class BiomeView implements Disposable {
     priority: number,
     made?: ViewTile | PlacedTile,
   ): void {
-    const { controller, x, z } = job,
-      signal = this.#signal ? AbortSignal.any([this.#signal, controller.signal]) : controller.signal;
-    (made ? Promise.resolve(made) : this.#make(kind, x, z, priority, signal)).then(
+    const { controller, x, z } = job;
+    (made
+      ? Promise.resolve(made)
+      : this.#make(kind, x, z, priority, combineSignals(this.#signal, controller.signal))
+    ).then(
       (result) => {
         if (this.#pending.get(key) !== job || this.#disposed) return;
         this.#pending.delete(key);
@@ -1293,6 +1338,8 @@ export class BiomeView implements Disposable {
   ): Promise<void> {
     if (!Array.isArray(rect) || rect.length !== 4 || !rect.every(Number.isFinite))
       throw typeError('BiomeView prefetch takes a [minX, minZ, maxX, maxZ] rectangle in metres', 'biomes');
+    const signal = combineSignals(this.#signal, options.signal);
+    signal.throwIfAborted();
     const w = this.#world,
       side = w.tileSize,
       jobs: Promise<void>[] = [];
@@ -1302,12 +1349,12 @@ export class BiomeView implements Disposable {
           z0 = w.bounds[1] + z * side;
         if (x0 >= rect[2] || x0 + side <= rect[0] || z0 >= rect[3] || z0 + side <= rect[1]) continue;
         for (const kind of this.#objects ? (['v', 'p'] as const) : (['v'] as const)) {
-          const key = kind + `${x},${z}`;
+          const key = `${kind}${x},${z}`;
           if (this.#made.has(key) || this.#made.size >= 1024) continue;
           const edits = this.#edits[kind];
           jobs.push(
-            this.#make(kind, x, z, 0, options.signal).then((result) => {
-              if (edits === this.#edits[kind]) this.#made.set(key, result);
+            this.#make(kind, x, z, 0, signal).then((result) => {
+              if (!this.#disposed && edits === this.#edits[kind] && this.#made.size < 1024) this.#made.set(key, result);
             }),
           );
         }
@@ -1375,7 +1422,7 @@ export class BiomeView implements Disposable {
     const w = this.#world,
       side = w.tileSize,
       held = kind === 'v' ? [...this.#drawn] : [...this.#placed.keys()],
-      keys = [...this.#pending.keys(), ...this.#made.keys(), ...this.#arrived.map((a) => a.key)]
+      keys = [...this.#pending.keys(), ...this.#making.keys(), ...this.#made.keys(), ...this.#arrived.map((a) => a.key)]
         .filter((k) => k[0] === kind)
         .map((k) => k.slice(1)),
       dropped: string[] = [];
@@ -1387,6 +1434,8 @@ export class BiomeView implements Disposable {
       if (x0 < rect[2] && x0 + side > rect[0] && z0 < rect[3] && z0 + side > rect[1]) {
         const job = kind + key;
         this.#made.delete(job);
+        // An independent prefetch may finish the old revision, but new callers must not join it.
+        this.#making.delete(job);
         this.#pending.get(job)?.controller.abort();
         this.#pending.delete(job);
         dropped.push(job);
@@ -1522,11 +1571,13 @@ export class BiomeView implements Disposable {
   dispose(): void {
     if (this.#disposed) return;
     this.#disposed = true;
+    this.#lifetime.abort(fault('disposed', 'BiomeView disposed', 'biomes'));
+    this.#made.clear();
     this.#off();
     this.#offObjects?.();
     this.#offSeasons?.();
     for (const off of this.#offShadows.splice(0)) off();
-    for (const job of this.#pending.values()) job.controller.abort();
+    // The lifetime abort above cancels every started subscriber; queued jobs are removed below.
     this.#pending.clear();
     this.#arrived.length = 0;
     clearTimeout(this.#drainTimer);

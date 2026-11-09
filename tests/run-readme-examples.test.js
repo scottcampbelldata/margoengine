@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { exampleIds, readmeEntries } from '../scripts/support/readme-types.mjs';
 import {
   askedElements,
+  eachPage,
   goneLine,
   judge,
   listenPort,
@@ -26,6 +27,61 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const samples = { byName: new Map(), byExtension: new Map() };
+
+test('one GPU slot runs every complete page lifecycle in order without overlapping examples', async () => {
+  const started = [],
+    finished = [];
+  let release,
+    active = 0,
+    peak = 0;
+  const pending = eachPage(['first', 'second', 'third'], async (id) => {
+    started.push(id);
+    peak = Math.max(peak, ++active);
+    if (id === 'first')
+      await new Promise((resolve) => {
+        release = resolve;
+      });
+    await new Promise((resolve) => setImmediate(resolve));
+    finished.push(id);
+    active--;
+  });
+  assert.deepEqual(started, ['first'], 'no second browser workload competes with the held page');
+  release();
+  await pending;
+  assert.equal(peak, 1);
+  assert.deepEqual(started, ['first', 'second', 'third']);
+  assert.deepEqual(finished, started, 'all examples do the same work');
+  const failure = new Error('failed lifecycle'),
+    later = [];
+  await assert.rejects(
+    eachPage(['first', 'second'], async (id) => {
+      later.push(id);
+      throw failure;
+    }),
+    (error) => error === failure,
+  );
+  assert.deepEqual(later, ['first'], 'a terminated browser schedules no later page');
+});
+
+test('loader rendering and resolver examples choose one host, and OBJ examples fetch mesh bytes', () => {
+  const examples = readmeEntries(readFileSync('packages/loaders/README.md', 'utf8')),
+    render = examples.find(({ heading }) => heading === 'Optional vertex color and opacity rendering');
+  assert.ok(render);
+  assert.equal(placeOf(render.code), 'page');
+  assert.doesNotMatch(render.code, /node:/, 'a browser render cannot carry disk resolver imports');
+  const obj = examples.filter(({ heading }) => heading === 'Textured OBJ meshes');
+  assert.equal(obj.length, 2);
+  for (const { code } of obj) {
+    assert.doesNotMatch(code, /https:\/\/example\.com/, 'the documented sample must be served by the reader project');
+    assert.doesNotMatch(code, /fetch\(['"][^'"]+\.mtl['"]\)/, 'parseOBJ needs OBJ bytes, not an MTL library');
+  }
+  assert.match(
+    obj[1].code,
+    /new URL\('\/models\/crate.obj', location.href\).href/,
+    'material maps need an absolute base URL',
+  );
+  assert.match(obj[1].code, /fetch\(objUrl\)/);
+});
 
 test('the Node Basis example has a Node host and any execution failure fails the gate', () => {
   const example = collectExamples(workspacePackages()).find(

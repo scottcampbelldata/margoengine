@@ -1,5 +1,63 @@
 # Required test items audit
 
+## Current continuation, not yet landed (2026-11-09)
+
+The runtime known list is 45, down from 48. All 29 loader examples run with zero exceptions:
+browser color rendering no longer carries Node imports, OBJ examples use the local licensed
+Doorman family, and the step-by-step example fetches the OBJ rather than its MTL and resolves
+material maps from an absolute base. All 520 loader CPU tests and both GPU suites pass.
+The inputs and their seven image companions were already downloaded with pinned provenance;
+no new outside-file proof or asset identity is claimed by these example aliases.
+
+Biome I/O's root causes are repaired: height-only sampling omits unrelated fields, paired
+classification outputs are read together, and export batches use available workers. Complete
+4 km parent/current outputs and metadata match exactly; export tile requests are 1,024 instead
+of 1,536. Evidence: whitepaper/results/biomes-io-20261109.json and the reproducible five-minute
+packages/biomes/scripts/io-proof.mjs. All 465 biome CPU tests and the view/water GPU suite pass.
+The flight prefetch repair below has separate full-output evidence; a complete current
+runtime result is recorded with the landing gates, rather than inferred from an earlier run.
+
+The combined gate first exposed a Windows mutex delete-pending race. Cleanup now retires the
+name before deletion; a real Win32-handle regression reproduces the original EPERM and proves
+reuse while the old directory is still pending. Lock/legacy/limit tests pass. One GPU slot now
+owns one complete page lifecycle; the deterministic scheduler test proves no overlapping page
+work, no missing examples, and no scheduling after failure. Neither deadline nor workload changed.
+
+BiomeView now shares one in-flight generation per kind/tile/revision between streaming and
+prefetch. Independent subscribers retain their own aborts; the last abort retires raw work.
+Edits detach old generations, revision guards protect the cache, and view disposal cancels
+both current and detached work. Simultaneous completions now enforce the existing 1,024-result
+cache bound. The original default 4 km/three-worker/144-tile workload is unchanged: the paired
+proof reduces view requests 204 to 144 and placement requests 190 to 144, with every result
+field and full typed-array SHA-256 identical for all 292 unique keys. No speed ratio is claimed.
+Reproduce with packages/biomes/scripts/prefetch-proof.mjs; the durable result is
+whitepaper/results/biomes-prefetch-20261109.json. The view is 10,454 B gzip at its unchanged
+10,454 B quality ceiling. Shared lifetime cancellation replaces duplicate per-job disposal;
+queued/started streaming, overlap, abort, failure, edit/cache and disposal regressions cover it.
+Physics stays on hold. P01-P29 proof boundaries below are unchanged this continuation.
+
+The earlier pre-repair verification passed 13,439 tests, but did not establish a combined
+runtime pass. Current landing checks and their exact outcomes are recorded in the build record.
+
+### Current landing blockers
+
+The final full verify ran 13,483 tests: 13,480 passed, zero skipped, three failed. The new
+BiomeView disposal message was absent from its error-help entry; that documentation is now
+added and tests/errors-page.test.js passes. The two remaining failures need root-cause work:
+api-report-short-path.test.js timed out its child at 280 s, and catalog.test.js hit the unchanged
+30 s browser close bound. An instrumented short-path control later completed all 885 reports
+in 46.7 s; it did not establish the cause of the earlier hang and is not a replacement gate pass.
+The registered prefetch proof also completed every output assertion before the same browser
+shutdown failure. No hang is classified as a busy-machine exemption.
+
+The current scoped CPU run passes 1,035 tests and the complete biomes/loaders README run
+passes 64/64 with zero exceptions. Biome view/water, objects, shadows and objects-frame GPU
+suites pass. Backend and placement hardware proofs refused the uncommitted tree and must run
+from the clean local commit. Flythrough's slow-send frame is 5.4 ms versus 3.5 ms, with one send,
+no texture writes and 3.3 ms inside real postMessage. This is unresolved: obtain the interleaved
+parent/current evidence before treating a small loaded-machine miss as a busy retest. No timing
+budget changed. These checks block the push; this continuation is not yet landed.
+
 ## README five ownership (2026-11-09)
 
 Lane Q, branch `readme-five`, owns these five executable README exceptions under
@@ -185,8 +243,8 @@ fixture notices are the first source; no arbitrary tiny fixture or renamed rig p
 | loaders/readme-margoengine-loaders-6065f6 | /parts/bracket.3mf, /scans/part.ply | sample: LoaderError: load: request for /parts/bracket.3mf returned HTTP 404 | Passed with explicit licensed sample; exception removed |
 | loaders/readme-stl-c220c0 | /parts/bracket.stl | sample: LoaderError: STL: the header declares 171861356 triangles (8593067884 bytes) but the data has 156; pass the whole file | Passed with explicit licensed sample; exception removed |
 | loaders/readme-svg-6d7995 | /logo.svg | sample: LoaderError: SVG: closing tag </head> does not match <meta> | Passed with explicit licensed sample; exception removed |
-| loaders/readme-textured-obj-meshes-b6f1ea | /crate.mtl, /models/crate.obj | sample: LoaderError: OBJ: the OBJ has no faces to draw as a mesh; draw its points with pointsToGeometry instead | Pending file selection, provenance and rerun |
-| loaders/readme-textured-obj-meshes-c37231 | See named example | sample: LoaderError: load: request for https://example.com/models/chair.obj failed (Failed to fetch) | Pending file selection, provenance and rerun |
+| loaders/readme-textured-obj-meshes-b6f1ea | /crate.mtl, /models/crate.obj | sample: LoaderError: OBJ: the OBJ has no faces to draw as a mesh; draw its points with pointsToGeometry instead | Passed: fetches the complete OBJ, resolves its MTL and seven image companions from an absolute URL; exception removed |
+| loaders/readme-textured-obj-meshes-c37231 | See named example | sample: LoaderError: load: request for https://example.com/models/chair.obj failed (Failed to fetch) | Passed: local URL serves the complete previously licensed Doorman OBJ/MTL/image family; exception removed |
 | loaders/readme-xml-128d10 | /map.tmx | sample: LoaderError: TMX: closing tag </head> does not match <meta> | Passed with explicit licensed sample; exception removed |
 | materials/readme-ktx2-textures-11832d | /textures/albedo.ktx2 | sample: MargoError: Texture download request failed: HTTP 404; check the URL and that the server serves it | Passed with explicit licensed full sample; exception removed |
 | materials/readme-ktx2-textures-8d6d24 | /textures/sky-cube.ktx2 | sample: MargoError: Texture download request failed: HTTP 404; check the URL and that the server serves it | Passed with explicit licensed full sample; exception removed |
@@ -238,7 +296,7 @@ Their original reasons are preserved. No known-list entry was added, removed or 
 | headless/readme-image-sequences-and-video-9967ce | See named example | example: MargoError: readPixels needs an engine on createHeadlessCanvas; see https://margoengine.com/errors#headless | Deferred to later README job |
 | input/readme-chords-contexts-rebinding-and-pr-5e2c1c | See named example | example: TimeoutError: signal timed out | Deferred to later README job |
 | loaders/readme-3ds-lwo-amf-md2-pdb-and-kmz-406f48 | /models/teapot.3ds, /models/ship.lwo, /prints/bracket.amf, /models/knight.md2, /molecules/1crn.pdb, /maps/tower.kmz | sample: LoaderError: 3DS: missing the 0x4D4D main chunk | Passed with explicit licensed sample; exception removed |
-| loaders/readme-optional-vertex-color-and-opacit-5d5952 | See named example | example: ReferenceError: document is not defined | Deferred to later README job |
+| loaders/readme-optional-vertex-color-and-opacit-5d5952 | See named example | example: ReferenceError: document is not defined | Passed: standalone browser rendering of the colored PLY; disk and URL resolvers are independent examples; exception removed |
 | loaders/readme-vdb-volumes-573d3c | See named example | example: LoaderError: VDB: not an OpenVDB file | Passed with explicit licensed sample; exception removed |
 | mesh-edit/readme-import-to-editable-meshes-and-fl-03d481 | /models/crate.glb | sample: TypeError: glTF accessor undefined does not exist; pass an index into accessors | Deferred to later README job |
 | post/readme-smaa-10a00a | See named example | example: TypeError: Invalid plugin; see https://margoengine.com/errors#arguments | Deferred to later README job |

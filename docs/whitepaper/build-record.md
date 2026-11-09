@@ -49,6 +49,43 @@ or third-party asset changed, and there is no replacement parity or speed
 claim. The generated full-documentation snapshot accompanies these docs.
 Batch 134 stays open; physics and batch-133 remain untouched.
 
+## Missing-items continuation: biome I/O and loader README repairs (2026-11-09)
+
+Biome I/O now requests paired classification outputs together, samples height-only rectangles
+without climate/derivative work, and fills bounded worker batches. The complete default 4 km
+outputs and saved-world digest match parent 349243b3d exactly; export tile requests are 1,024
+instead of 1,536. All 465 biome CPU tests, its view/water GPU suite, all 520 loader CPU tests
+and both loader GPU suites pass. The full-output record is results/biomes-io-20261109.json;
+no speed ratio or additional outside-asset proof is claimed.
+
+The loaders examples now keep disk resolvers in Node, browser rendering in a page, use a
+local OBJ URL, fetch OBJ rather than MTL bytes and pass an absolute material base URL.
+The optional color renderer reads the existing colored PLY sample; OBJ examples use the
+complete previously licensed Doorman family, including seven texture companions.
+
+The first combined runtime attempt failed at Windows mutex creation with EPERM; the next
+reached the terrain-view example's 20 s deadline. These are failures, not passing evidence.
+Mutex cleanup now retires its reusable name before deletion, with a real native pending-delete
+regression. Page examples now run one at a time within the one held GPU slot, with deterministic
+lifecycle/failure regressions. The complete-page deadline and every example's work are unchanged.
+
+The independent prefetch cause is now repaired by shared raw generations, independent abort
+subscribers, edit revision isolation and lifetime disposal. A completion-time capacity check
+also fixes a race that exceeded the existing 1,024-result cache bound. The full 4 km paired GPU
+proof retains every result field and typed-array hash for all 292 unique keys while reducing
+view jobs 204 to 144 and placement jobs 190 to 144. The final entry is 10,454 B gzip against the
+unchanged 10,454 B ceiling; cancellation composition is shared and disposal no longer repeats
+per-job aborts after the view lifetime already cancelled them. Eleven deterministic integration
+regressions cover both overlap orders, individual/final abort, failure, edits, actual cache
+bytes, capacity and detached/queued/started disposal. Proof: results/biomes-prefetch-20261109.json.
+No full-README audit or loaded-machine speed ratio is claimed here.
+
+Current landing status: scoped CPU 1,035/1,035 and runtime README 64/64 pass. Full verify is
+13,480/13,483, zero skips: the disposal help entry is now corrected, while short-path API-child
+and browser-close hangs remain under investigation. Biome view/water, objects, shadows and
+objects-frame pass; clean-commit backend proofs and the slow-send paired investigation remain.
+No failed check is accepted as a passing landing gate.
+
 This file records every finished batch of work on Margo Engine: what each batch was for, what landed, which bugs it
 found, how it was proved and what is still unproved. Scott directs AI agents to build and test this engine; no section
 below describes hand-written code. Agents wrote the code and the tests, and an agent pushed each commit after its

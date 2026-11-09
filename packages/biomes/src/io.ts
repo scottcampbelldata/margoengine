@@ -154,13 +154,13 @@ export async function encodePng(
   return out;
 }
 
-/** One layer of the chosen tiles stitched into one raster (cropped to the world), `channels` values per cell. */
+/** Chosen layers stitched in one tile traversal, with at most one outstanding tile per worker. */
 async function stitch(
   world: BiomeWorld,
-  name: string,
+  names: readonly string[],
   options: ExportOptions,
-): Promise<{ layer: RasterLayer; width: number; depth: number; channels: number }> {
-  if (typeof name !== 'string' || !(name in LAYERS))
+): Promise<{ layers: RasterLayer[]; width: number; depth: number }> {
+  if (!names.every((name) => typeof name === 'string' && name in LAYERS))
     throw rangeError('Unknown biome layer name; use names from LAYERS', 'biomes');
   const rect = options.tiles ?? [0, 0, world.tilesX - 1, world.tilesZ - 1];
   if (
@@ -184,26 +184,43 @@ async function stitch(
     z0 = rect[1] * cells,
     width = Math.min((rect[2] + 1) * cells, worldCells[0]) - x0,
     depth = Math.min((rect[3] + 1) * cells, worldCells[1]) - z0,
-    format = LAYERS[name].format,
-    channels = format === 'rgba8' ? 4 : 1,
-    Type = ({ i32: Int32Array, i16: Int16Array, u16: Uint16Array, u8: Uint8Array, rgba8: Uint8Array } as const)[format],
-    data = new Type(width * depth * channels);
-  for (let tz = rect[1]; tz <= rect[3]; tz++)
-    for (let tx = rect[0]; tx <= rect[2]; tx++) {
-      options.signal?.throwIfAborted();
-      const tile = await world.tile(tx, tz, { layers: [name], signal: options.signal }),
-        source = tile.layer(name)!,
-        cx = tx * cells - x0,
-        cz = tz * cells - z0,
+    layers = names.map((name): RasterLayer => {
+      const info = LAYERS[name],
+        Type = ({ i32: Int32Array, i16: Int16Array, u16: Uint16Array, u8: Uint8Array, rgba8: Uint8Array } as const)[
+          info.format
+        ];
+      return { name, ...info, width, depth, data: new Type(width * depth * (info.format === 'rgba8' ? 4 : 1)) };
+    });
+  const copyTile = async (tx: number, tz: number) => {
+    options.signal?.throwIfAborted();
+    const tile = await world.tile(tx, tz, { layers: names, signal: options.signal }),
+      cx = tx * cells - x0,
+      cz = tz * cells - z0;
+    for (const layer of layers) {
+      const channels = layer.format === 'rgba8' ? 4 : 1,
+        source = tile.layer(layer.name)!,
         span = Math.min(cells, width - cx) * channels;
       for (let j = 0; j < cells && cz + j < depth; j++)
-        data.set(
+        layer.data.set(
           source.data.subarray(j * cells * channels, j * cells * channels + span),
           ((cz + j) * width + cx) * channels,
         );
     }
-  const info = LAYERS[name];
-  return { layer: { name, format, width, depth, data, scale: info.scale, unit: info.unit }, width, depth, channels };
+  };
+  const concurrency = world.workers?.size ?? 1,
+    pending: Promise<void>[] = [];
+  const drain = async () => {
+    // Settle the whole batch even on failure: no export leaves copies still writing its raster.
+    const results = await Promise.allSettled(pending.splice(0));
+    for (const result of results) if (result.status === 'rejected') throw result.reason;
+  };
+  for (let tz = rect[1]; tz <= rect[3]; tz++)
+    for (let tx = rect[0]; tx <= rect[2]; tx++) {
+      pending.push(copyTile(tx, tz));
+      if (pending.length === concurrency) await drain();
+    }
+  await drain();
+  return { layers, width, depth };
 }
 
 /**
@@ -221,7 +238,11 @@ export async function exportHeight(
 ): Promise<HeightExport> {
   if (format !== 'png16' && format !== 'raw16' && format !== 'f32')
     throw rangeError("exportHeight format is 'png16', 'raw16' or 'f32'", 'biomes');
-  const { layer, width, depth } = await stitch(world, 'height', options),
+  const {
+      layers: [layer],
+      width,
+      depth,
+    } = await stitch(world, ['height'], options),
     mm = layer.data as Int32Array;
   let lo = mm[0],
     hi = mm[0];
@@ -253,9 +274,13 @@ async function weightPlanes(
   world: BiomeWorld,
   options: ExportOptions,
 ): Promise<{ width: number; depth: number; names: string[]; planes: Uint8Array[] }> {
-  const ids = (await stitch(world, 'biome', options)).layer.data as Uint8Array,
-    { layer, width, depth } = await stitch(world, 'biomeWeight', options),
-    weights = layer.data as Uint8Array,
+  const {
+      layers: [idLayer, weightLayer],
+      width,
+      depth,
+    } = await stitch(world, ['biome', 'biomeWeight'], options),
+    ids = idLayer.data as Uint8Array,
+    weights = weightLayer.data as Uint8Array,
     names = world.biomes.map((b) => b.id),
     planes = names.map(() => new Uint8Array(width * depth));
   for (let cell = 0; cell < width * depth; cell++)
@@ -302,7 +327,12 @@ export async function exportLayer(
   options: ExportOptions = {},
 ): Promise<string> {
   if (format !== 'json' && format !== 'csv') throw rangeError("exportLayer format is 'json' or 'csv'", 'biomes');
-  const { layer, width, depth, channels } = await stitch(world, name, options);
+  const {
+      layers: [layer],
+      width,
+      depth,
+    } = await stitch(world, [name], options),
+    channels = layer.format === 'rgba8' ? 4 : 1;
   if (format === 'json')
     return JSON.stringify({
       name,

@@ -1396,6 +1396,32 @@ already-loaded plugin promise; attached figure disposal frees its traces through
 Isosurfaces hold both the displayed and pending vertex buffer. No speed, other-hardware or official-demo
 presentation claim is added by these checks.
 
+### Biome I/O and executable README continuation (2026-11-09)
+
+The complete default 4 km height/weight/mask/temperature exports and saved-world digest match
+parent 349243b3d byte for byte (results/biomes-io-20261109.json). Height-only sampling omits
+unrequested climate fields; paired classifier outputs reduce export tile requests from 1,536
+to 1,024. Bounded worker batches have exact serial parity, including edits and cropped tiles,
+and settle every started job on failure. These are deterministic work/output proofs, not speed results.
+
+One runtime README GPU slot now owns one complete page lifecycle at a time; three concurrent
+pages previously competed inside that slot and the terrain-view example hit its unchanged
+20 s deadline. The gate still fails incomplete examples and preserves partial results. GPU mutex
+cleanup retires its reusable directory name before deletion. The native Windows regression
+holds a real delete-pending directory and reproduces the original EPERM, alongside portable
+contention/permission models and the existing legacy lock tests. Cross-device timing and
+headset/phone/input-device gaps remain open; held physics sources are unchanged.
+
+BiomeView streaming and prefetch now share one raw generation per tile/revision, with independent
+subscriber aborts and identity-guarded retirement. Edits detach old generations; disposal reaches
+them through the view lifetime. The completion guard enforces the existing 1,024-result cache cap.
+The full default-world proof compares every worker result field and typed-array hash with the
+parent: view requests 204 to 144, placement 190 to 144, all 292 unique results identical.
+The entry remains within the unchanged 10,454 B gzip ceiling. CPU regressions cover overlap,
+cancellation, failure, actual edited/cache bytes, capacity, queued/started streaming and detached
+revisions. The reproducible GPU proof is packages/biomes/scripts/prefetch-proof.mjs and its record
+is whitepaper/results/biomes-prefetch-20261109.json. This proves work reduction, not a speed ratio.
+
 ### Draco clean-room replacement (batch 133, 2026-11-09)
 
 The complete published specification and five figures were reviewed before code.

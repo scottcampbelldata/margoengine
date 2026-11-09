@@ -22,6 +22,10 @@ const csv = await exportLayer(world, 'temperature', 'csv'); // or 'json'; the st
 
 Every export takes `{ tiles: [x0, z0, x1, z1], compress, signal }`: a rectangle of tile indices (default the whole world).
 The 16-bit mapping is integer maths, so the same world gives the same file on every machine.
+Exports request at most one tile per available world worker at a time (one without workers).
+Weights and masks request biome IDs and weights together, so each tile is classified once per export.
+Height-only exports sample heights without computing unrelated terrain or climate layers.
+The exported extent, sample resolution, pixels and stored values are the same on both routes.
 
 Saving a world keeps its options and every painted and masked layer; it does not keep the cache or runtime options (device,
 workers). A `field` height function cannot be saved, and `saveWorld` says so.

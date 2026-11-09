@@ -53,6 +53,30 @@ const cases = fieldIntegrationCases();
 const args = (r) => [r.ox, r.oz, r.width, r.depth];
 const bytes = (data) => Buffer.from(data.buffer, data.byteOffset, data.byteLength);
 
+test('height-only fields sample exactly the requested cells and retain the full-field bytes across scratch reuse', () => {
+  for (const spec of cases) {
+    const frame = frameFor(module, spec),
+      scratch = new Scratch();
+    for (const r of spec.rectangles) {
+      const expected = rectFields(frame, ...args(r), fieldNames).get('height'),
+        grids = [],
+        heights = {
+          ...frame.heights,
+          grid(...params) {
+            grids.push(params.slice(0, 5));
+            return frame.heights.grid(...params);
+          },
+        },
+        actual = rectFields({ ...frame, heights, scratch }, ...args(r), ['height']).get('height');
+      assert.deepEqual(grids, [[...args(r), frame.cell]], 'no 24 m TPI apron or derivative cells for height alone');
+      equalLayers(new Map([['height', actual]]), new Map([['height', expected]]), 'height only');
+      const saved = bytes(actual.data).slice();
+      rectFields({ ...frame, scratch }, r.ox + 3, r.oz + 5, r.width, r.depth, fieldNames, true);
+      assert.deepEqual(bytes(actual.data), saved, 'requested height survives reuse of working arrays');
+    }
+  }
+});
+
 test('hardware proof host gate accepts the DEV worker OS name and rejects unrelated hosts', () => {
   for (const name of ['DEV', 'dev', 'SCOTT-DEV', 'scott-dev'])
     assert.doesNotThrow(() => requireFieldIntegrationHost(name));

@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
+import { spawnSync } from 'node:child_process';
 import {
   README_CAP,
   generate,
@@ -19,6 +20,17 @@ import { GUIDES, collectCorpus, summaryOf } from '../scripts/support/llms-corpus
 // fails then (fix: node scripts/build-llms.mjs).
 
 const corpus = collectCorpus();
+
+test('the llms generator imports from an eval module without running its CLI or requiring argv[1]', () => {
+  const url = new URL('../scripts/build-llms.mjs', import.meta.url).href,
+    result = spawnSync(
+      process.execPath,
+      ['--input-type=module', '-e', `const m = await import(${JSON.stringify(url)}); console.log(typeof m.generate);`],
+      { encoding: 'utf8', timeout: 15000 },
+    );
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout.trim(), 'function');
+});
 
 test('site/llms.txt and site/llms-full.txt are current (run: node scripts/build-llms.mjs)', () => {
   assert.deepEqual(stale(), []);

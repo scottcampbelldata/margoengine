@@ -2141,9 +2141,9 @@ length/hash; the existing package test independently parses the actual asset.
 The count oracle advanced four bytes per float vertex property and ignored color bytes; it also assumed one-byte face counts and 32-bit indices. The valid outside VTK horse reproduced a false face-data failure. The reference count walk now consumes every declared scalar/list width and element, with both-endian and malformed-body regressions in packages/loaders/tests/ply-outside.test.js. Every position, white color and index of the complete horse matches independent python-plyfile output. The production PLY reader needed no change.
 
 
-### Open: biome whole-world I/O README does not finish within the page budget (2026-11-09)
+### Closed: biome whole-world I/O recomputed unrelated and duplicate fields (2026-11-09)
 
-Repro: npm run check:readme-run -- --packages=biomes. The docs-files-files-in-and-out-7b879b example creates the default 4 km world, exports complete height/weights/masks/temperature data, then saves/loads and compares digests. The corrected runner reports failure after 20 s while waiting for module completion and closes the owning browser. No missing file or network fixture is involved in those exports. The repeated whole-world generation/serialization workload is the path to profile; the individual expensive or stalled operation has not yet been isolated. This is still open, without a claimed root-cause repair, accepted slowdown, shrunk example or raised deadline. The aborted wider audit supplies no result for later examples.
+The whole-world height exporter computed every climate/terrain field, weight exports classified every tile twice to obtain the two outputs of the same classifier, and I/O awaited tiles serially despite available workers. Height-only requests now sample their exact rectangle, weights and IDs travel together, and each export uses at most one outstanding job per worker. All output bytes and metadata of the complete default 4 km README workload match parent 349243b3d, including saved-world digests; its tile requests fall from 1,536 to 1,024. No sample, output, resolution or deadline changed. The 35-example biome runtime gate passes. Regression tests count requested cells/jobs, compare serial/worker outputs including edited/cropped tiles, and prove failure cleanup. Record: whitepaper/results/biomes-io-20261109.json. This is work/output evidence, not a published speed ratio.
 
 ### Batch 56 idle-still audit
 
@@ -2188,3 +2188,26 @@ The new real-product test exposed outer-view viewport leakage into reduced or fi
 ### Batch 56 mirror fixture canvas lifetime
 
 The legacy mirror fixture read the presented canvas before its first lazy compatibility compute submission completed, producing a stale or black TAA reference. Moving that read after queue completion also failed: native WebGPU expires its canvas texture across the task boundary. The fixture now configures COPY_SRC, queues a texture-to-buffer copy in the render task, then maps the completed bytes, with BGRA conversion where needed. The unchanged 65 mirror, glass, cube, layer and TAA assertions pass on each backend at 1x and 4x MSAA. The regular environment mirror GPU script now runs both backends. No renderer defect or open fixture defect remains from this review.
+### Corrected: one README GPU slot ran three browser workloads (2026-11-09)
+
+The runtime runner held one GPU slot but concurrently created three page examples, each with its own renderer, workers and full deadline. The runner now completes and closes each page before starting the next, matching its single reserved slot. Node-only concurrency is unchanged. A deterministic lifecycle regression holds the first page open, proves no later page starts, checks every successful example completes, and checks that a failure stops scheduling. Workloads and the 20 s complete-page deadline are unchanged. This resource-accounting repair exposed the independent prefetch duplication below, repaired separately.
+
+### Fixed: biome prefetch duplicates active streaming jobs (2026-11-09)
+
+The unmodified default-world terrain-view README prefetch overlapped active streaming,
+submitting 204 view and 190 placement jobs for 144 tile keys of each kind. Both paths now
+subscribe to one raw generation per kind/tile/revision. Each subscriber cancels independently;
+the last abort retires raw work immediately, edits detach old generations, and disposal cancels
+even detached revisions. Revision checks prevent stale cache publication. A second cause found
+by the regression was concurrent prefetch completions growing the cache beyond its existing
+1,024-result bound; capacity is now checked at completion without removing any requested tile.
+The full 4 km paired GPU proof retains every result field and typed-array SHA-256 for 292
+unique keys while reducing jobs to 144/144. See whitepaper/results/biomes-prefetch-20261109.json.
+The view fits the unchanged 10,454 B gzip ceiling by sharing abort composition and removing
+duplicate disposal cancellation. packages/biomes/tests/view-prefetch.test.js covers both overlap
+orders, independent/final abort, failure recovery, actual edited bytes, cache capacity and
+queued/started/detached disposal. No deadline, extent, resolution or exception was changed.
+
+### Closed: llms generator import required a CLI filename (2026-11-09)
+
+Importing scripts/build-llms.mjs from node --input-type=module -e failed because its CLI guard passed absent process.argv[1] to pathToFileURL. The guard now checks that the filename exists before comparing it. tests/llms.test.js imports the actual module in a fresh eval process and checks both its exports and absence of CLI output; generation and --check remain unchanged.

@@ -1,0 +1,115 @@
+{
+  "parent": "349243b3d",
+  "world": {
+    "size": [
+      4096,
+      4096
+    ],
+    "resolution": 1,
+    "tiles": 256
+  },
+  "evidence": "Complete CPU export output equality and deterministic work counts; no speed claim",
+  "beforeTiles": 1536,
+  "afterTiles": 1024,
+  "output": {
+    "exportHeight": {
+      "format": "png16",
+      "data": {
+        "type": "Uint8Array",
+        "bytes": 33561156,
+        "sha256": "57e8f39c8eeadcd62b32fa594d36b4db424e85a4ec1c58adbf20ab3c693342b6"
+      },
+      "width": 4096,
+      "depth": 4096,
+      "resolution": 1,
+      "min": 74.014,
+      "max": 877.756
+    },
+    "exportWeights": {
+      "width": 4096,
+      "depth": 4096,
+      "biomes": [
+        "temperate",
+        "alpine",
+        "wetland",
+        "boreal"
+      ],
+      "planes": [
+        {
+          "type": "Uint8Array",
+          "bytes": 16777216,
+          "sha256": "aa855e2d5cd3ca9cefd517d2709585df36b38bc3343ac7158319702904ced08c"
+        },
+        {
+          "type": "Uint8Array",
+          "bytes": 16777216,
+          "sha256": "080acf35a507ac9849cfcba47dc2ad83e01b75663a516279c8b9d243b719643e"
+        },
+        {
+          "type": "Uint8Array",
+          "bytes": 16777216,
+          "sha256": "080acf35a507ac9849cfcba47dc2ad83e01b75663a516279c8b9d243b719643e"
+        },
+        {
+          "type": "Uint8Array",
+          "bytes": 16777216,
+          "sha256": "d89bc8cf638562733ffa8d952caddabe2255dc0fa1e3b3dd6a9e513bf16bf13e"
+        }
+      ],
+      "splats": [
+        {
+          "biomes": [
+            "temperate",
+            "alpine",
+            "wetland",
+            "boreal"
+          ],
+          "png": {
+            "type": "Uint8Array",
+            "bytes": 67118148,
+            "sha256": "6aa89186235a3e9183d308c50a33020d7a06252adae169537c128bde388fe466"
+          }
+        }
+      ]
+    },
+    "exportMasks": [
+      [
+        "temperate",
+        {
+          "type": "Uint8Array",
+          "bytes": 16782660,
+          "sha256": "3a2fdffa54cd8f54e3bfb4d19e07d5b98f7c5afd9bf24c4645fd7460345fc2c7"
+        }
+      ],
+      [
+        "alpine",
+        {
+          "type": "Uint8Array",
+          "bytes": 16782660,
+          "sha256": "856b84a403079e42b0bd6d9d67e2febc82df1fea2061ff93a70dde97cf64292a"
+        }
+      ],
+      [
+        "wetland",
+        {
+          "type": "Uint8Array",
+          "bytes": 16782660,
+          "sha256": "856b84a403079e42b0bd6d9d67e2febc82df1fea2061ff93a70dde97cf64292a"
+        }
+      ],
+      [
+        "boreal",
+        {
+          "type": "Uint8Array",
+          "bytes": 16782660,
+          "sha256": "88180135caa9e0d5214d5ae54c3bc858fc2c17290f0299d4a4a5aecd174c3209"
+        }
+      ]
+    ],
+    "exportLayer": {
+      "chars": 68638314,
+      "sha256": "1ee589292354763fb23576435eec2ef1987c402c6d4973900a402ce1c2b7f66c"
+    },
+    "digest": "1a055d6ce79e75c87ac219218ad67e490ba79c37525376f33492af6de5bc0e82"
+  }
+}

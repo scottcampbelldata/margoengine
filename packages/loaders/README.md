@@ -193,17 +193,13 @@ Root `npm run modern:test:interop` checks round trips, units, transforms, visibi
 Install `@margoengine/gltf-pro` alongside loaders to use this entry. The decode/root entry does not import it.
 
 ```ts
-import fs from 'node:fs';
-import {dirname, join} from 'node:path';
-import {parseUSDZ} from 'margoengine/loaders';
+import {parsePLY} from 'margoengine/loaders';
 import {createPBRMeshes} from 'margoengine/loaders/render';
 import {Engine} from 'margoengine/core';
 const engine = await Engine.create(document.querySelector('canvas')!);
-const bytes = new Uint8Array(await (await fetch('/model.usdz')).arrayBuffer());
+const bytes = new Uint8Array(await (await fetch('/scans/part.ply')).arrayBuffer());
 
-const file = '/models/ship.glb';
-const modelUrl = '/models/ship.glb';
-const source = await parseUSDZ(bytes);
+const source = parsePLY(bytes);
 const model = createPBRMeshes(engine, source, {
   baseColorFactor: [1, 1, 1, 1], // linear material multiplier; default white
   maxBytes: 256 << 20,          // packed geometry budget; default 256 MiB
@@ -226,9 +222,19 @@ Parsers stay pure and return plain data. Files a model refers to come through a 
 
 ```ts
 // Electron (main or preload): read next to the model.
+import fs from 'node:fs';
+import {dirname, join} from 'node:path';
+const file = '/models/ship.glb';
 const resolveFromDisk = (path: string) => fs.promises.readFile(join(dirname(file), path));
+```
+
+```ts
 // Browser: fetch next to the model.
+import {resolveFromURL} from 'margoengine/loaders/ldraw';
+const modelUrl = new URL('/models/ship.glb', location.href);
 const resolve = async (path: string) => new Uint8Array(await (await fetch(new URL(path, modelUrl))).arrayBuffer());
+// The built-in URL resolver has the same relative-path convention.
+const builtInResolve = resolveFromURL(new URL('.', modelUrl).href);
 ```
 
 ## OBJ and MTL
@@ -254,7 +260,7 @@ import {Engine} from 'margoengine/core';
 const signal = AbortSignal.timeout(30_000);
 const engine = await Engine.create(document.querySelector('canvas')!);
 
-const {mesh, warnings, dispose} = await loadOBJ(engine, 'https://example.com/models/chair.obj', {signal});
+const {mesh, warnings, dispose} = await loadOBJ(engine, '/models/crate.obj', {signal});
 // mesh is a materials mesh (a gltf-pro model): move it with mesh.root, add it to shadows, clustered, ...
 dispose(); // destroys the mesh, its materials and its textures
 ```
@@ -266,10 +272,9 @@ import {parseMTL, parseOBJ} from 'margoengine/loaders';
 import {createMTLMaterials, createOBJMesh} from 'margoengine/loaders/mtl';
 import {Engine} from 'margoengine/core';
 const engine = await Engine.create(document.querySelector('canvas')!);
-const bytes = new Uint8Array(await (await fetch('/crate.mtl')).arrayBuffer());
-
-const objUrl = '/models/crate.obj';
-const resolve = async (path: string) => new Uint8Array(await (await fetch(new URL(path, new URL(objUrl, location.href)))).arrayBuffer());
+const objUrl = new URL('/models/crate.obj', location.href).href;
+const bytes = new Uint8Array(await (await fetch(objUrl)).arrayBuffer());
+const resolve = async (path: string) => new Uint8Array(await (await fetch(new URL(path, objUrl))).arrayBuffer());
 const obj = await parseOBJ(bytes, {resolve});
 const set = await createMTLMaterials(obj.materials, {baseUrl: objUrl, bump: 'normal'});
 const mesh = createOBJMesh(engine, obj, set); // one mesh, one material slot per usemtl material
