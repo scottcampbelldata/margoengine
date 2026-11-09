@@ -71,6 +71,10 @@
     "./flow": {
       "types": "./dist/flow.d.ts",
       "import": "./dist/flow.js"
+    },
+    "./lic": {
+      "types": "./dist/lic.d.ts",
+      "import": "./dist/lic.js"
     }
   },
   "files": [

@@ -1,5 +1,12 @@
 # Real scientific demo data
 
+`sciviz-lic.html` reuses the exact `wind.bin` reduction and `wind.json` provenance below: NOAA PSL NCEP-NCAR
+Reanalysis 1 daily near-surface wind, January 1-8, 2024, US-government public domain. SHA-256:
+`e6ab31d5a3816b68f1c22e9c3563230bcb7e574aaaa90bb6513e34280ee93edd`.
+Equirectangular projection at 42.5 N corrects longitudinal velocity by latitude; scalar colour uses the
+original measured speed (0..35 m/s). Noise seed 171 is a drawing aid. Animation indicates steady-field
+direction, not elapsed physical time or observed parcel tracks. No source data or licence changed.
+
 These are scientific measurements and reanalysis data, not generated example shapes.
 The binary assets use Git LFS. Run `git lfs pull` after cloning.
 Each adjacent JSON records source URLs, source and asset SHA-256, dimensions and byte size.

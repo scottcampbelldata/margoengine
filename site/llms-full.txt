@@ -2609,6 +2609,21 @@ not an encoded BC payload or a mathematical lower bound on every encoder's
 original-source error. Acceptance is waiting on Scott; no fourth scalar round.
 [Evidence and input pins](whitepaper/results/batch-134-scalar-ideal-bound.json).
 
+Batch 171 LIC (`@margoengine/sciviz/lic`): optional GPU dense convolution of regular 2D fields and affine planar
+slices through regular 3D fields. Static box filter or explicit-phase periodic direction animation, with scalar
+colour (default interpolated full-vector speed). Each image/noise dimension is 8..2048, independently of the
+field; 1..128 midpoint samples each way, step 0.1..1 texels. Snapshot plus packed field: 128 MiB working budget;
+image: 16 bytes/texel, maximum 64 MiB, also bounded by device storage limits. Samples: finite within +/-1e30
+or NaN; slice coordinates/mappings within +/-1e15, sin(angle)^2 > 1e-8. Missing/outside texels mask rather than
+bridge. Readback temporarily adds one image-sized buffer and a luminance array. No arbitrary-triangle surface
+LIC, volume LIC or physical unsteady advection claim. Native sciviz/webgl2 is unsupported; the intended
+backends are WebGPU and compatibility-backed WebGL2. Independent analytical box error: 1.4725853414443435e-7;
+exact circular-arc error: 1.1380660922433172e-5. Both have zero backend pixel differences and exact restoration.
+The NOAA demo passes both layouts/backends. New entry: 10,210 B gzip, ceiling 10,517 B; root 36,915 B,
+flow 8,673 B, native driver 4,476 B (shared bundling changes root -1 B and flow +8 B, source unchanged).
+Core/stage source is unchanged at 23,924 B combined gzip, with the strict 25,000 B ceiling intact.
+Full landing gates are pending at this checkpoint; no speed claim.
+
 Batch 134 rational scalar-source experiment: 184,335 B raw /
 69,278 B gzip9, versus the byte-objective draft's 169,084 / 61,994 B.
 The 7,284 extra gzip bytes test rational source estimates with complete
@@ -5442,6 +5457,14 @@ diagnostics without repeating transcodes. No source/channel/bar change.
 [Per-file evidence and diagnostics](whitepaper/results/batch-134-remaining-targets.json).
 Public integration, complete expanded container fuzz, memory and new-Wasm GPU
 acceptance remain open. The prebuilt is retained.
+
+### LIC validation checkpoint
+
+The new optional LIC entry's input/lifecycle tests and real-GPU analytical, animation, mask, slice, exact
+restoration and strict backend pixel checks pass. NOAA demo checks pass in all four layout/backend cases.
+Full landing gates remain pending at this checkpoint. Native sciviz/webgl2 has no LIC implementation and
+rejects it explicitly; compatibility-backed WebGL2 is the supported fallback.
+There is no claim of physical unsteady advection, volume LIC or arbitrary triangle-surface support.
 
 ### Fixed: moving-flow sort centre on offset grids
 
@@ -15672,49 +15695,45 @@ Layers read `@margoengine/compute` GPU arrays in place, so data computed on the 
 CPU. The package is optional and tree-shakable, and adds nothing to core. The points, lines, labels, controls and
 compute packages load with `import()` only when a figure uses them.
 
-## Moving flow, pathlines and streaklines
+## Line integral convolution
 
-The optional `@margoengine/sciviz/flow` entry provides `tracePathline`: physical velocity on a regular 2D/3D grid,
-bilinear/trilinear spatial interpolation, linear interpolation between frames and classical RK4. Steps shorten
-at frame boundaries and the requested end. `flowParticles` carries particles on the GPU with fading trails,
-uniform/random/rake/region seeds and respawn. `traceStreakline` observes successive releases at one time.
-
-```ts
-import { tracePathline } from '@margoengine/sciviz/flow';
-
-const path = await tracePathline({
-  dims: [2, 2, 1], bounds: [-2, 2, -2, 2, 0, 0],
-  frames: [{ time: 0, u: new Float32Array(4).fill(1), v: new Float32Array(4) }],
-}, [0, 0, 0], { from: 0, to: 1, step: 0.25 });
-console.log(path.stop); // end
-console.log(Array.from(path.samples.slice(-4))); // [1, 0, 0, 1], packed x,y,z,time
-```
-
-Components are `Float32Array`s, x fastest; omitted `w` is zero. Output xyzt is float64 and owns its memory.
-Use consistent distance/time units. Frames share dimensions/bounds; one frame is steady at any finite time,
-while multiple frame times must strictly increase and cover the interval. A 2D seed lies on the grid's z plane.
-`from > to` traces backwards; `step` is always positive. Speed is never normalised. This fixed-step method has
-no adaptive error guarantee; reduce the step and check convergence for your field.
-
-`maxSteps` defaults to 10,000 (range 1 to 1,000,000), counting shortened steps. `stop` is `end`, `steps`, or
-`invalid` when a stage/endpoint leaves the grid or touches NaN data. Only accepted samples are returned, with
-no extrapolation or invented boundary point. Invalid seeds give no samples. Exact frame times ignore inactive
-frame NaNs; zero-weight spatial neighbours are ignored. Infinity is rejected. Input copies, output including
-the final copy, and scratch must together fit 128 MiB; caller input and module overhead are additional.
-There may be 1 to 4,096 frames; x/y dimensions are at least two, z at least one. Bounds ascend on sampled axes,
-with equal z bounds for 2D. Keep input unchanged until the call settles.
-
-An optional `signal` cancels loading/copying/tracing with its exact reason. Copies yield every 16,384 samples
-and integration every 128 steps. Each call owns a fresh, lazily loaded feature-local Wasm instance; it retains
-nothing after settling and needs no explicit disposal. Import requests no GPU. The root never loads this entry.
-Build the committed binary with `npm run build:flow --workspace @margoengine/sciviz`; normal builds need no Rust.
-Tests cover analytic solutions and two days of the frozen NOAA wind converted to projected km/s. These trajectories
-through daily means are numerical illustrations, not observed parcel tracks or forecasts. No speed claim is made.
+`@margoengine/sciviz/lic` creates a dense GPU LIC image from a regular 2D vector field or a planar slice
+through a 3D field. Noise and image resolution are independent of the input grid. Bidirectional midpoint
+streamline integration convolves deterministic bilinear noise, renormalizing at boundaries and missing data.
+The GPU retains the image between changes; orbiting the camera does not regenerate it. WebGPU and the real
+WebGL2 compatibility backend work; the native `sciviz/webgl2` driver does not yet support this entry.
 
 ```ts
 import { Figure } from '@margoengine/sciviz';
-import { flowParticles } from '@margoengine/sciviz/flow';
+import { lic } from '@margoengine/sciviz/lic';
+
+const canvas = document.querySelector<HTMLCanvasElement>('canvas')!;
+using fig = await Figure.create(canvas, { axes: false, controls: false });
+const layer = await lic(fig, {
+  dims: [2, 2, 1], bounds: [-2, 2, -1, 1, 0, 0],
+  u: new Float32Array([1, 1, 1, 1]), v: new Float32Array([0, 0, 0, 0]),
+}, { seed: 171, animated: true, resolution: [128, 64] });
+layer.setPhase(1); // Radians, explicit: drawing never advances the animation.
+await fig.ready();
+fig.engine.render();
+const luminance = await layer.readIntensity({ signal: AbortSignal.timeout(30000) });
+console.log(luminance.length); // 8192, x fastest; NaN marks missing texels.
 ```
+
+Options and defaults: `resolution: [256,256]` (each dimension 8..2048), `steps: 20` (1..128 each way),
+`step: 0.5` (0.1..1 image texels), `seed: 0` (uint32), `contrast: 3` (0..10 about luminance 0.5),
+`coloured: true`, `colormap: 'aurora'`, `opacity: 1` (0..1), `animated: false`, `phase: 0` radians and no `signal`.
+`scalar` defaults to the magnitude of the interpolated full vector, with `range` spanning finite node speeds;
+provide one scalar per field node to colour another quantity. `range` defaults to its finite extent, expanded
+by max(1, abs(value)*1e-6) for a constant field, or [0,1] for an entirely missing field. The image luminance and
+scalar colour multiply in linear light. Static grayscale LIC is orientation-free; animation uses a Hann window
+with three phase-shifted ripples over its support to show direction. Phase is a visual cue, not physical time.
+
+`slice: { origin, axisU, axisV }` describes a parallelogram in field data units. Default: the full x/y plane at
+the lowest z. Its edges may be oblique or non-orthogonal; the inverse Gram matrix projects the interpolated
+3D velocity into slice coordinates. Only tangential motion is convolved; the default colour still gives full
+3D speed. Outside-field and weighted NaN nodes mask texels rather than bridging holes; zero flow retains noise.
+This entry does not claim arbitrary triangle-surface LIC, volume LIC, or physical unsteady texture advection.
 
 [README continues: https://margoengine.com/llms/packages/sciviz.md]
 

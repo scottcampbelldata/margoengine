@@ -18,6 +18,14 @@ diagnostics without repeating transcodes. No source/channel/bar change.
 Public integration, complete expanded container fuzz, memory and new-Wasm GPU
 acceptance remain open. The prebuilt is retained.
 
+### LIC validation checkpoint
+
+The new optional LIC entry's input/lifecycle tests and real-GPU analytical, animation, mask, slice, exact
+restoration and strict backend pixel checks pass. NOAA demo checks pass in all four layout/backend cases.
+Full landing gates remain pending at this checkpoint. Native sciviz/webgl2 has no LIC implementation and
+rejects it explicitly; compatibility-backed WebGL2 is the supported fallback.
+There is no claim of physical unsteady advection, volume LIC or arbitrary triangle-surface support.
+
 ### Fixed: moving-flow sort centre on offset grids
 
 The initial moving-flow layer returned its model translation as the transparent sorting centre. That is

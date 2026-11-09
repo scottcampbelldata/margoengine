@@ -5,7 +5,7 @@ Lane X, after batch 118. Data drawing only; physics remains on hold.
 | Job | State | Evidence and remaining work |
 | --- | --- | --- |
 | 1. Moving flow | Done | GPU physical-time RK4 particles on 2D/3D steady/unsteady fields, fading generation-cut trails, all four deterministic seed layouts, fixed-seed respawn, CPU pathlines/streaklines and bounded exact device replay. NOAA Moving wind passes both layouts/backends; numeric, all-pixel parity, cancellation and all 23 README examples pass. Core/stage unchanged. |
-| 2. Line integral convolution | Pending | Published LIC methods, animated/scalar-coloured surface slices and real-data demo. |
+| 2. Line integral convolution | In progress | Optional retained GPU LIC, phase animation, scalar colour and affine 3D slices. Node and analytical box/circular, mask, animation, exact restoration and zero-difference backend pixel checks pass. NOAA demo passes both layouts/backends. Full landing gates pending; 10,210 B gzip, core/stage 23,924 B. |
 | 3. Tubes and ribbons | Pending | Scalar radius, vorticity twist, stable frames/normals and real-data demo. |
 | 4. Derived fields | Pending | CPU/GPU gradient, divergence, curl, vorticity, Q and lambda-2 parity, volume/isosurface integration. |
 | 5. Climate and solver formats | Pending | NetCDF, existing VTK XML reader integration, VTK 5.1, lazy range reads and real files. |

@@ -23,6 +23,20 @@ No scalar bar changed, no accepted scalar improvement, no fourth scalar round.
 Reproduction: `node scripts/measure/scalar-ideal-bound.mjs <evidence-directory>` with the retained
 private corpus, control payloads and specification-derived quality readers.
 
+Batch 171 LIC implementation checkpoint: `packages/sciviz/tests/lic.test.js` passes validation, immutable
+inputs, tiny velocity normalization, cancellation, resource budgets, partial-allocation cleanup and device
+reconstruction. `entries-cases.js` independently checks horizontal/vertical analytical box convolution with
+absolute luminance bound 2e-6, static sign reversal, anisotropic axes, oblique slices, boundaries, masks,
+stagnation and periodic phase. The harness also enforces exact restored pixels and existing strict backend
+parity. [Box/slice/animation evidence](results/batch-171-lic.json) has maximum analytical error
+1.4725853414443435e-7, 21,681 lit pixels and zero differing pixels between backends.
+[Exact circular-arc evidence](results/batch-171-lic-curvature.json) has maximum error 1.1380660922433172e-5,
+22,492 lit pixels, exact restoration, and zero backend differences. Reversing phase and velocity preserves
+animation luminance within 2e-6. [NOAA demo evidence](results/batch-171-lic-demo.json) covers both desktop/mobile
+layouts on both backends, day/colour/animation changes and PNG export. Full landing gates remain pending.
+New entry is 10,210 B gzip (10,517 B ceiling), core + stage 23,924 B. No speed result;
+[method sources](../clean-room.md#batch-171-job-2-line-integral-convolution).
+
 Pixel's readable palette shader preserves the prior operations, literals and
 binding positions after identifier normalization. The real GPU palette suite
 passes 20 exact checks with zero wrong pixels or validation errors; both palette

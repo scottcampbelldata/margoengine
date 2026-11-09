@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>North Atlantic wind texture | Margo Engine</title>
+  <link rel="stylesheet" href="./sciviz-demo.css">
+</head>
+<body>
+  <!-- Margo engine ❤️ made for Margie -->
+  <nav aria-label="Scientific examples"><a href="./sciviz-wind.html">Wind field</a><a href="./sciviz-moving-flow.html">Moving wind</a><a href="./sciviz-lic.html" aria-current="page">Wind texture</a></nav>
+  <header><h1>North Atlantic wind texture</h1><p>Dense line integral convolution of NOAA daily mean near-surface winds, January 1-8, 2024. Colour gives measured speed in m/s. Optional animation shows the direction of each day's steady field; it does not follow air parcels or represent elapsed physical time.</p></header>
+  <div class="controls">
+    <label>Day <select id="day"><option value="0">January 1</option><option value="1">January 2</option><option value="2">January 3</option><option value="3">January 4</option><option value="4">January 5</option><option value="5">January 6</option><option value="6">January 7</option><option value="7">January 8</option></select></label>
+    <label><input id="colour" type="checkbox" checked> Colour by speed, 0-35 m/s</label>
+    <label><input id="animate" type="checkbox"> Animate direction</label>
+    <button id="play" type="button" disabled>Play</button>
+    <label>Phase <input id="phase" type="range" min="0" max="6.283185307" step="0.01" value="0" disabled></label>
+    <button id="export" type="button">Save PNG</button>
+  </div>
+  <div class="view"><canvas id="viewport" aria-label="Dense NOAA wind texture coloured by speed"></canvas></div>
+  <p id="status" role="status" data-webgpu-status>Loading NOAA winds...</p>
+  <footer>NCEP-NCAR Reanalysis 1 from <a href="https://psl.noaa.gov/data/gridded/data.ncep.reanalysis.html">NOAA PSL, Boulder, Colorado, USA</a>. Public domain. Native 2.5 degree grid, 100 W to 20 E, 20 N to 65 N, 0.995 sigma. Fixed equirectangular projection centred on 42.5 N, with longitude velocities corrected by latitude; colour uses the original vector magnitude. Seed 171; noise is a drawing aid, not a measurement. Data are unchanged from the Wind field and Moving wind examples. <a href="./assets/sciviz/README.md">Preparation, hashes and limits</a>.</footer>
+  <script type="module">
+    import { needsWebGPU } from './needs-webgpu.js';
+    needsWebGPU('#viewport').then((ok) => ok && import('./sciviz-lic.ts'));
+  </script>
+</body>
+</html>

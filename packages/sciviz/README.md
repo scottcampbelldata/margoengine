@@ -22,6 +22,57 @@ Layers read `@margoengine/compute` GPU arrays in place, so data computed on the 
 CPU. The package is optional and tree-shakable, and adds nothing to core. The points, lines, labels, controls and
 compute packages load with `import()` only when a figure uses them.
 
+## Line integral convolution
+
+`@margoengine/sciviz/lic` creates a dense GPU LIC image from a regular 2D vector field or a planar slice
+through a 3D field. Noise and image resolution are independent of the input grid. Bidirectional midpoint
+streamline integration convolves deterministic bilinear noise, renormalizing at boundaries and missing data.
+The GPU retains the image between changes; orbiting the camera does not regenerate it. WebGPU and the real
+WebGL2 compatibility backend work; the native `sciviz/webgl2` driver does not yet support this entry.
+
+```ts
+import { Figure } from '@margoengine/sciviz';
+import { lic } from '@margoengine/sciviz/lic';
+
+const canvas = document.querySelector<HTMLCanvasElement>('canvas')!;
+using fig = await Figure.create(canvas, { axes: false, controls: false });
+const layer = await lic(fig, {
+  dims: [2, 2, 1], bounds: [-2, 2, -1, 1, 0, 0],
+  u: new Float32Array([1, 1, 1, 1]), v: new Float32Array([0, 0, 0, 0]),
+}, { seed: 171, animated: true, resolution: [128, 64] });
+layer.setPhase(1); // Radians, explicit: drawing never advances the animation.
+await fig.ready();
+fig.engine.render();
+const luminance = await layer.readIntensity({ signal: AbortSignal.timeout(30000) });
+console.log(luminance.length); // 8192, x fastest; NaN marks missing texels.
+```
+
+Options and defaults: `resolution: [256,256]` (each dimension 8..2048), `steps: 20` (1..128 each way),
+`step: 0.5` (0.1..1 image texels), `seed: 0` (uint32), `contrast: 3` (0..10 about luminance 0.5),
+`coloured: true`, `colormap: 'aurora'`, `opacity: 1` (0..1), `animated: false`, `phase: 0` radians and no `signal`.
+`scalar` defaults to the magnitude of the interpolated full vector, with `range` spanning finite node speeds;
+provide one scalar per field node to colour another quantity. `range` defaults to its finite extent, expanded
+by max(1, abs(value)*1e-6) for a constant field, or [0,1] for an entirely missing field. The image luminance and
+scalar colour multiply in linear light. Static grayscale LIC is orientation-free; animation uses a Hann window
+with three phase-shifted ripples over its support to show direction. Phase is a visual cue, not physical time.
+
+`slice: { origin, axisU, axisV }` describes a parallelogram in field data units. Default: the full x/y plane at
+the lowest z. Its edges may be oblique or non-orthogonal; the inverse Gram matrix projects the interpolated
+3D velocity into slice coordinates. Only tangential motion is convolved; the default colour still gives full
+3D speed. Outside-field and weighted NaN nodes mask texels rather than bridging holes; zero flow retains noise.
+This entry does not claim arbitrary triangle-surface LIC, volume LIC, or physical unsteady texture advection.
+
+Inputs are copied before the promise resolves and retained for exact device restoration. Field copying has a
+128 MiB working budget; the image uses 16 bytes per texel (at most 64 MiB), further bounded by device limits.
+Samples must be finite within +/-1e30 or NaN. Slice coordinates/mapping ratios are within +/-1e15 and
+sin(angle)^2 between edges must exceed 1e-8; use local coordinates for extreme scales. `dispose()` and `using`
+free the image and field; the figure also owns the layer. `readIntensity` has a 30000 ms timeout by default
+(positive, at most 2147483647), supports exact-reason cancellation and always frees its staging buffer.
+
+[North Atlantic wind texture](../../examples/sciviz-lic.html) shows hash-pinned, public-domain NOAA daily means,
+colour by measured speed, static LIC and optional direction animation. Research and method choices are in
+[the clean-room record](../../docs/clean-room.md#batch-171-job-2-line-integral-convolution).
+
 ## Moving flow, pathlines and streaklines
 
 The optional `@margoengine/sciviz/flow` entry provides `tracePathline`: physical velocity on a regular 2D/3D grid,

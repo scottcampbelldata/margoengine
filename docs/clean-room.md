@@ -38,6 +38,57 @@ was changed. ETC2 1/23 and EAC RG11 26/26 losses stay unaccepted; R11 source
 quality passes26/26. No BC4/BC5 work or fourth scalar campaign. Evidence:
 [remaining targets](whitepaper/results/batch-134-remaining-targets.json).
 
+## Batch 171 job 2: line integral convolution
+
+Audit before implementation: the sciviz README and manifest exports offered arrows, streamlines and moving
+particles, but no dense convolution. The new optional `/lic` owns its shaders, image, field copy and lifecycle.
+Core and stage source are untouched. No engine/tool source or paper companion repository was read.
+
+Research compared before implementation, from papers/descriptions only:
+
+- Brian Cabral and Leith (Casey) Leedom, *Imaging Vector Fields Using Line Integral Convolution*, 1993,
+  [paper](https://cs.brown.edu/courses/csci2370/2000/1999/cabral.pdf),
+  [DOI](https://doi.org/10.1145/166117.166151). Sections 4, 4.1 and 4.2 supply curved bidirectional convolution,
+  normalization of truncated kernels, and phase-shifted motion filtering. Static mode uses a box; animation
+  uses a Hann envelope times three ripples per full window. Phase does not represent physical time.
+- Detlev Stalling and Hans-Christian Hege, *Fast and Resolution Independent Line Integral Convolution*, 1995,
+  [DOI](https://doi.org/10.1145/218380.218448),
+  [paper transcription](https://paperzz.com/doc/8180821/fast-and-resolution-independent-line-integral-convolution).
+  Compared separate field/noise/output resolution, arc-length sampling and rolling box sums. We retain
+  independent resolution and normalized discrete convolution but use per-texel GPU integration, not a claim
+  to the paper's rolling-sum speedup. Midpoint steps are bounded to at most one image texel.
+- Lisa Forssell and Scott Cohen, *Using Line Integral Convolution for Flow Visualization: Curvilinear Grids,
+  Variable Speed Animation, and Unsteady Flows*, 1995,
+  [authors' description](https://graphics.stanford.edu/papers/flowvis2/),
+  [DOI](https://doi.org/10.1109/2945.468406). Separates geometry, direction and magnitude. Our affine slice
+  uses an inverse Gram basis; speed is taken after vector interpolation, whereas an explicit scalar is
+  interpolated separately. This entry does not implement the paper's unsteady advection.
+- Daniel Weiskopf and Thomas Ertl, *A Hybrid Physical/Device-Space Approach for Spatio-Temporally Coherent
+  Interactive Texture Advection on Curved Surfaces*, 2004,
+  [paper](https://www.visus.uni-stuttgart.de/documentcenter/forschung/visualisierung_und_visual_analytics/gi04-weiskopf.pdf).
+  Object-space noise motivates camera coherence. A retained slice-coordinate image supplies that here;
+  the paper's arbitrary curved-surface hybrid method is not claimed.
+- Robert S. Laramee, Helwig Hauser, Helmut Doleisch, Benjamin Vrolijk, Frits H. Post and Daniel Weiskopf,
+  *The State of the Art in Flow Visualization: Dense and Texture-Based Techniques*, 2004,
+  [publisher](https://diglib.eg.org/items/2c61423d-1b92-49e2-b998-0425e772888d),
+  [DOI](https://doi.org/10.1111/j.1467-8659.2004.00753.x). The survey distinguishes steady LIC, periodic
+  direction cues, arbitrary-surface methods and physical unsteady advection; these are not conflated here.
+
+Dominant tracing/convolution loops run on the GPU; bounded CPU copying needs no new Rust/Wasm kernel.
+Independently written uint32 hash noise is interpolated bilinearly. Trilinear field sampling ignores
+zero-weight missing neighbours and masks weighted NaNs. Common velocity scaling in float64 before float32
+packing preserves tiny finite directions. The demo reuses the frozen public-domain NOAA data and hashes.
+No wall-clock speed claim or exclusive GPU lease is introduced.
+
+Validation checkpoint: Node lifecycle/input tests pass. Independent analytical GPU box convolution error is
+1.4725853414443435e-7; exact circular-arc reference error is 1.1380660922433172e-5. Sign symmetry, anisotropic
+axes, oblique slice projection, masks, stagnation, phase loops and reversed velocity/phase pass on both
+WebGPU and compatibility-backed WebGL2, with exact restored pixels and zero backend pixel differences.
+The real NOAA demo passes all four desktop/mobile/backend cases. Frozen evidence:
+`docs/whitepaper/results/batch-171-lic.json`, `batch-171-lic-curvature.json`, `batch-171-lic-demo.json`.
+Full landing gates remain pending at this implementation checkpoint. New optional entry: 10,210 B gzip,
+10,517 B ceiling; core + stage remains 23,924 B. No quality or functionality was removed for optional size.
+
 ## Batch 134 rational scalar-source experiment (2026-11-09)
 
 Before code, broad standards, arXiv, Eurographics, JCGT and IEEE searches

@@ -16,6 +16,17 @@ calls, not final whole-container fuzz. The first EAC campaign was deliberately
 interrupted for an exact work reduction before its cap; its partial results
 are preserved. No timing A/B or completed replacement claim follows.
 
+Batch 171 LIC checkpoint (analytical and demo GPU checks pass; full gates pending):
+`npm run build --workspace @margoengine/sciviz`, then
+`node --test --test-timeout=120000 packages/sciviz/tests/lic.test.js`. Analytical convolution, masks, slices,
+animation and restored/backend pixels: `node scripts/gpu-lock.mjs run --owner=codex-batch171 --wait-max=60
+--max=2 -- node packages/sciviz/tests/entries-browser.mjs --only=lic`. Use `--only=lic-curvature` for exact
+circular-arc and phase-reversal checks. Run `packages/sciviz/tests/demos-browser.mjs --only=lic` under a
+separate shared lease (max 3 minutes) for both layouts/backends and the NOAA controls. Full package GPU gates and README runs
+use separate shared leases, one at a time per lane; CPU builds/lint/hygiene/verify do not hold a lease.
+`examples/sciviz-lic.html` reuses hash-pinned `examples/assets/sciviz/wind.bin`; phase is a direction cue,
+not atmospheric elapsed time. No new timing claim.
+
 The [rational scalar experiment](results/batch-134-scalar-rational.json) is an
 unaccepted negative research checkpoint. Retained author-workspace identifiers:
 `planner/scalar-research-report17.md` records the chosen method before code;

@@ -116,7 +116,7 @@ async function run(compat) {
       { width: 390, height: 844 },
     ]) {
       await page.setViewportSize(viewport);
-      for (const name of ['head', 'stars', 'wind', 'moving-flow', 'aeroflow', 'astrometrics', 'medical', 'showcase']) {
+      for (const name of ['head', 'stars', 'wind', 'moving-flow', 'lic', 'aeroflow', 'astrometrics', 'medical', 'showcase']) {
         if (only && !only.split(',').includes(name)) continue;
         const fixture = ['aeroflow', 'astrometrics', 'medical', 'showcase'].includes(name);
         const path = `${fixture ? '/packages/sciviz/tests/pages' : '/examples'}/sciviz-${name}.ts`;
@@ -290,6 +290,25 @@ async function run(compat) {
           await page.waitForFunction(() => !document.getElementById('next').disabled);
           await download('export');
           await page.screenshot({ path: `test-results/sciviz-fixes/moving-flow-${compat ? 'webgl2' : 'webgpu'}-${viewport.width}.png` });
+        } else if (name === 'lic') {
+          const first = await structure(path);
+          await select('day', '3'); await settled(path);
+          assert.notEqual(await structure(path), first, 'different NOAA days change the dense LIC image');
+          await page.uncheck('#colour'); await settled(path);
+          const gray = await structure(path);
+          await page.check('#animate'); await settled(path);
+          await input('phase', 1);
+          assert.notEqual(await structure(path), gray, 'direction animation changes the convolution');
+          const before = await page.evaluate(async (path) => (await import(path)).layer.phase, path);
+          await page.click('#play');
+          await page.waitForFunction(async ({ path, before }) => (await import(path)).layer.phase !== before, { path, before });
+          await page.click('#play');
+          assert.equal(await page.locator('#play').textContent(), 'Play');
+          await page.check('#colour'); await settled(path); await structure(path);
+          assert.equal(await page.evaluate(async (path) => (await import(path)).figure.layers.length, path), 1,
+            'field/colour/animation replacements keep exactly one layer');
+          await download('export');
+          await page.screenshot({ path: `test-results/sciviz-fixes/lic-${compat ? 'webgl2' : 'webgpu'}-${viewport.width}.png` });
         } else if (name === 'wind') {
           const first = await structure(path);
           await page.evaluate(monitor, path);

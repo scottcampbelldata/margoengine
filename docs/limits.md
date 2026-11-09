@@ -19,6 +19,21 @@ not an encoded BC payload or a mathematical lower bound on every encoder's
 original-source error. Acceptance is waiting on Scott; no fourth scalar round.
 [Evidence and input pins](whitepaper/results/batch-134-scalar-ideal-bound.json).
 
+Batch 171 LIC (`@margoengine/sciviz/lic`): optional GPU dense convolution of regular 2D fields and affine planar
+slices through regular 3D fields. Static box filter or explicit-phase periodic direction animation, with scalar
+colour (default interpolated full-vector speed). Each image/noise dimension is 8..2048, independently of the
+field; 1..128 midpoint samples each way, step 0.1..1 texels. Snapshot plus packed field: 128 MiB working budget;
+image: 16 bytes/texel, maximum 64 MiB, also bounded by device storage limits. Samples: finite within +/-1e30
+or NaN; slice coordinates/mappings within +/-1e15, sin(angle)^2 > 1e-8. Missing/outside texels mask rather than
+bridge. Readback temporarily adds one image-sized buffer and a luminance array. No arbitrary-triangle surface
+LIC, volume LIC or physical unsteady advection claim. Native sciviz/webgl2 is unsupported; the intended
+backends are WebGPU and compatibility-backed WebGL2. Independent analytical box error: 1.4725853414443435e-7;
+exact circular-arc error: 1.1380660922433172e-5. Both have zero backend pixel differences and exact restoration.
+The NOAA demo passes both layouts/backends. New entry: 10,210 B gzip, ceiling 10,517 B; root 36,915 B,
+flow 8,673 B, native driver 4,476 B (shared bundling changes root -1 B and flow +8 B, source unchanged).
+Core/stage source is unchanged at 23,924 B combined gzip, with the strict 25,000 B ceiling intact.
+Full landing gates are pending at this checkpoint; no speed claim.
+
 Batch 134 rational scalar-source experiment: 184,335 B raw /
 69,278 B gzip9, versus the byte-objective draft's 169,084 / 61,994 B.
 The 7,284 extra gzip bytes test rational source estimates with complete

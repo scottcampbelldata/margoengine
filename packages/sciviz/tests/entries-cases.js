@@ -4,10 +4,114 @@ import { gridLayer, sliceGrid, CELL_TYPES } from '@margoengine/sciviz/grids';
 import { ForceLayout, graphLayer } from '@margoengine/sciviz/graph';
 import { tileLayer } from '@margoengine/sciviz/geo';
 import { tracePathline, traceStreakline, flowParticles, flowSeeds } from '@margoengine/sciviz/flow';
+import { lic } from '@margoengine/sciviz/lic';
 
 /** The cases entries-browser.js runs, in order. */
 export const cases = [];
 const addCase = (name, run, mode = '3d') => cases.push({ name, run, mode });
+
+addCase('lic', async (figure, { assert, pixels, lit }) => {
+  figure.engine.stop();
+  const base = { dims: [2, 2, 1], bounds: [-2, 2, -1, 1, 5, 5], u: [1, 1, 1, 1], v: [0, 0, 0, 0] };
+  const options = { resolution: [64, 32], steps: 8, step: 1, seed: 171, contrast: 1, coloured: false };
+  const hash = (x, y) => {
+    let h = (Math.imul(x, 1664525) + Math.imul(y, 1013904223)) ^ 171;
+    h = Math.imul(h ^ (h >>> 16), 2246822519); h = Math.imul(h ^ (h >>> 13), 3266489917);
+    return ((h ^ (h >>> 16)) >>> 8) / 16777216;
+  };
+  const layer = await lic(figure, base, options);
+  const read = await layer.readIntensity();
+  let error = 0;
+  for (let y = 0; y < 32; y++) for (let x = 0; x < 64; x++) {
+    let sum = 0, n = 0;
+    for (let at = Math.max(0, x - 8); at <= Math.min(63, x + 8); at++) { sum += hash(at, y); n++; }
+    error = Math.max(error, Math.abs(read[y * 64 + x] - sum / n));
+  }
+  assert(error < 2e-6, `LIC horizontal analytical box convolution error ${error}`);
+  // Static LIC has no orientation: reversing the field must preserve every texel.
+  const reverse = await lic(figure, { ...base, u: [-1, -1, -1, -1] }, options);
+  const reversed = await reverse.readIntensity();
+  assert(read.every((v, i) => Math.abs(v - reversed[i]) < 2e-6), 'symmetric forward/backward convolution');
+  figure.remove(reverse);
+  const tiny = await lic(figure, { ...base, u: [1e-100, 1e-100, 1e-100, 1e-100] }, options);
+  const tinyImage = await tiny.readIntensity();
+  assert(read.every((v, i) => Math.abs(v - tinyImage[i]) < 2e-6), 'tiny velocities have identical geometry'); figure.remove(tiny);
+  // Orthogonal field: exact vertical, rather than horizontal, convolution.
+  const vertical = await lic(figure, { ...base, u: [0, 0, 0, 0], v: [1, 1, 1, 1] }, options);
+  const vr = await vertical.readIntensity();
+  for (const [x, y] of [[0, 0], [32, 16], [63, 31]]) {
+    let sum = 0, n = 0;
+    for (let at = Math.max(0, y - 8); at <= Math.min(31, y + 8); at++) { sum += hash(x, at); n++; }
+    assert(Math.abs(vr[y * 64 + x] - sum / n) < 2e-6, 'vertical box convolution in an anisotropic field');
+  }
+  figure.remove(vertical); figure.remove(layer);
+  const stopped = await lic(figure, { ...base, u: [0, 0, 0, 0] }, { ...options, animated: true, phase: Math.PI });
+  const noise = await stopped.readIntensity();
+  assert(noise.every((v, i) => Math.abs(v - hash(i % 64, Math.floor(i / 64))) < 2e-6), 'stagnation retains noise even at a zero filter weight');
+  figure.remove(stopped);
+  const volume = { dims: [2, 2, 2], bounds: [-2, 2, -1, 1, 3, 7], u: new Float32Array(8).fill(1), v: new Float32Array(8), w: new Float32Array(8).fill(1) };
+  const slice = { origin: [-2, -1, 3], axisU: [4, 0, 4], axisV: [0, 2, 0] };
+  const oblique = await lic(figure, volume, { ...options, slice });
+  const sr = await oblique.readIntensity();
+  assert(read.every((v, i) => Math.abs(v - sr[i]) < 2e-6), 'oblique 3D projection follows the slice tangent'); figure.remove(oblique);
+  const masked = await lic(figure, { ...base, u: [NaN, 1, NaN, 1] }, options);
+  assert((await masked.readIntensity()).every(Number.isNaN), 'weighted missing field nodes mask without bridging'); figure.remove(masked);
+  const partial = await lic(figure, base, { ...options, slice: { origin: [-4, -1, 5], axisU: [8, 0, 0], axisV: [0, 2, 0] } });
+  const pr = await partial.readIntensity();
+  assert(pr.filter(Number.isFinite).length === 32 * 32, 'outside slice texels are transparent'); figure.remove(partial);
+  const animation = await lic(figure, base, { ...options, animated: true, coloured: true, scalar: [0, 1, 0, 1] });
+  const initial = await animation.readIntensity(); animation.setPhase(1);
+  const moved = await animation.readIntensity();
+  assert(moved.every(Number.isFinite) && moved.some((v, i) => Math.abs(v - initial[i]) > 0.01), 'phase changes the convolution');
+  animation.setPhase(1 + 2 * Math.PI);
+  const loop = await animation.readIntensity();
+  assert(moved.every((v, i) => Math.abs(v - loop[i]) < 2e-6), 'animation loops in phase');
+  look(figure, ...TOP); await figure.ready();
+  const count = lit(await pixels()); assert(count > 5000, `LIC surface lit ${count} pixels`);
+  return { analyticalError: error, lit: count };
+});
+
+addCase('lic-curvature', async (figure, { assert, pixels, lit }) => {
+  figure.engine.stop();
+  const u = [], v = [];
+  for (let y = 0; y < 17; y++) for (let x = 0; x < 17; x++) { u.push(-(y / 8 - 1)); v.push(x / 8 - 1); }
+  const grid = { dims: [17, 17, 1], bounds: [-1, 1, -1, 1, 0, 0], u, v };
+  const options = { resolution: [64, 64], steps: 12, step: 0.5, contrast: 1, coloured: false, seed: 0 };
+  const layer = await lic(figure, grid, options);
+  const raw = await layer.readIntensity();
+  // Independent exact circular streamline, with the specified bilinear noise image.
+  const hash = (x, y) => {
+    let h = Math.imul(x, 1664525) + Math.imul(y, 1013904223);
+    h = Math.imul(h ^ (h >>> 16), 2246822519); h = Math.imul(h ^ (h >>> 13), 3266489917);
+    return ((h ^ (h >>> 16)) >>> 8) / 16777216;
+  };
+  const noise = (x, y) => {
+    x = Math.max(0, Math.min(63, x)); y = Math.max(0, Math.min(63, y));
+    const i = Math.floor(x), j = Math.floor(y), tx = x - i, ty = y - j;
+    return (hash(i, j) * (1 - tx) + hash(Math.min(63, i + 1), j) * tx) * (1 - ty) +
+      (hash(i, Math.min(63, j + 1)) * (1 - tx) + hash(Math.min(63, i + 1), Math.min(63, j + 1)) * tx) * ty;
+  };
+  let error = 0;
+  for (const [x, y] of [[48, 32], [45, 45], [32, 48], [16, 32], [32, 16]]) {
+    const px = x - 31.5, py = y - 31.5, radius = Math.hypot(px, py), angle = Math.atan2(py, px);
+    let sum = 0;
+    for (let i = -12; i <= 12; i++) {
+      const a = angle + i * 0.5 / radius;
+      sum += noise(31.5 + radius * Math.cos(a), 31.5 + radius * Math.sin(a));
+    }
+    error = Math.max(error, Math.abs(raw[y * 64 + x] - sum / 25));
+  }
+  assert(error < 0.001, `curved-streamline LIC differs from exact circular arcs by ${error}`);
+  figure.remove(layer);
+  const animation = await lic(figure, grid, { ...options, animated: true, phase: 0.7 });
+  const ar = await animation.readIntensity(); figure.remove(animation);
+  const reverse = await lic(figure, { ...grid, u: u.map((x) => -x), v: v.map((x) => -x) }, { ...options, animated: true, phase: -0.7 });
+  const rr = await reverse.readIntensity();
+  assert(ar.every((value, i) => Math.abs(value - rr[i]) < 2e-6), 'reversing velocity and phase preserves direction-animation luminance');
+  look(figure, ...TOP); await figure.ready();
+  const count = lit(await pixels()); assert(count > 5000, 'curved LIC covers its plane');
+  return { exactArcError: error, lit: count };
+});
 
 addCase('flow-motion', async (figure, { assert, pixels, lit }) => {
   figure.engine.stop();
