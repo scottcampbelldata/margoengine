@@ -3587,3 +3587,29 @@ A repair must preserve blocks across partial uploads, mip/layer/alias views and
 buffer/texture copies, including versions and disposal. No such complete repair
 is claimed here; no shader, colour work, assertion or limit was changed. Move
 to failure 8 rather than substitute a consumer-specific workaround.
+
+### Batch 273 compatibility failure 8: back-side await isolation
+
+Compared W3C GPU for the Web Working Group, WebGPU (2026),
+https://www.w3.org/TR/webgpu/ (queue completion and mapAsync ordering);
+Jeff A. Stuart and John D. Owens, Efficient Synchronization Primitives for GPUs
+(2011), https://arxiv.org/abs/1110.4623 (abstract: GPU and CPU synchronization
+models differ); Oleg Kuznetsov, Advanced API Performance: Synchronization (2023),
+https://developer.nvidia.com/blog/advanced-api-performance-synchronization/;
+and Freeman, Pryce, Mackinnon and Walnes, Mock Roles, not Objects (2004),
+https://jmock.org/oopsla2004.pdf. These distinguish submitted work, host awaits
+and observation of real collaborators. They do not justify replacing queue
+completion or reducing the fixture's image/picking contract. No companion
+implementation, new fence strategy or speed measurement was used.
+
+The owned batch-273-back-side-probe.mjs preserves the entire original case grid
+and every assertion, adding await markers only. It completes the 4-sample work
+and reaches the 1-sample transmission cases: 116 render starts, 131 completed
+reads and 38 returned explicit/automatic pick calls. The shared lock kills its
+process tree at the 1.25-minute hard limit. Its last marker is the 1-sample
+back-transmission-HDR-scalar-instances-back render start. This disproves a
+permanent initial-scene await, but does not locate the accumulated cost or prove
+pixel conformance: the fixture accumulates comparisons until its final assert,
+which the killed run never reaches. No busy exemption or longer passing budget
+is claimed. Logs and generator output stay in this worktree's test-results.
+Failure 8 remains open; continue to failure 9, with Bug 45 still lane-U's.
