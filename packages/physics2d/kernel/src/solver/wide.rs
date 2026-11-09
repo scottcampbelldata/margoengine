@@ -389,6 +389,9 @@ fn friction_point(c: &mut Block, ma: &mut Motion4, mb: &mut Motion4, i: usize) {
     let x = p.tangent_impulse - p.tangent_mass * vt;
     let x = F4::select(x.lt(low), low, x);
     let total = F4::select(x.gt(limit), limit, x);
+    // As in the scalar IEEE clamp, invalid derived bounds propagate NaN to World's checked step boundary.
+    let invalid = limit.lt(F4::splat(0.0)).or(M4::from_bits(15).and_not(limit.eq(limit)));
+    let total = F4::select(invalid, F4::splat(f32::NAN), total);
     let applied = total - p.tangent_impulse;
     let full = i == 0 || c.all_two;
     c.points[i].tangent_impulse = if full { total } else { F4::select(m, total, p.tangent_impulse) };

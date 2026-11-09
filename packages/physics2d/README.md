@@ -95,3 +95,57 @@ npm run check:rust-kernels -- --packages=physics2d
 [Performance history](../../docs/whitepaper/perf-history.md) records the modest paired gain and the remaining Box2D
 loss; the 0.35 ms narrow-phase target has not been met. Browser evidence covers Edge WebGPU/WebGL2 and Firefox
 WebGL2; Firefox WebGPU has no adapter on the test installation.
+
+### Checked Rust input
+
+The raw Rust world and collision APIs return `Result<_, PhysicsError>`. Handle errors with `?` or inspect
+`error.code()` and `error.help()`; the [input contract](../../docs/limits.md#own-2d-input-validation) lists the
+codes and representability rules. This API belongs to `kernel/`; the Rapier-backed TypeScript facade above
+keeps its existing API and units.
+
+```rust
+use margoengine_physics2d_kernel::{
+    error::PhysicsError,
+    math::{V2, v2},
+    shape::Core,
+    world::{BodyDef, ShapeDef, World},
+};
+
+fn main() -> Result<(), PhysicsError> {
+    let mut world = World::default();
+    let body = world.create_body(&BodyDef {
+        position: v2(0.0, 0.5),
+        ..BodyDef::default()
+    })?;
+    let core = Core::rect(0.5, 0.5, V2::ZERO, 1.0, 0.0, 0.0)?;
+    world.create_shape(body, core, &ShapeDef::default())?;
+    world.step(1.0 / 60.0)?;
+
+    let error = world.create_shape(body, core, &ShapeDef {
+        density: f32::INFINITY,
+        ..ShapeDef::default()
+    }).unwrap_err();
+    assert_eq!(error.code(), "PHYSICS2D_NOT_FINITE");
+    assert_eq!(world.shapes.len(), 1); // The refused shape was never published.
+    Ok(())
+}
+```
+
+Body, shape and whole-chain creation refuse invalid input before publishing a partial result. Finite positive
+density alone is insufficient: derived mass, inertia, centres and reciprocals must also remain representable.
+The inverse metric's reciprocal and the reconstructed rounded origin are checked too. Finite friction coefficients
+use an overflow-safe geometric mean; used cached normal impulses cannot be negative.
+Contact normal/tangent metrics are checked before inversion, including sums of individually valid inverse masses.
+Rotation normalization scales exceptional finite pairs to preserve their direction across overflow/underflow;
+nonfinite integration arithmetic returns the coded error. A directly mutated zero body rotation is refused.
+Genuine zero density or zero area retains its documented zero-mass behavior; positive mass or inertia rounded
+to zero is refused. Before stepping, the world checks current public data and handles, including edits made
+after creation. A reported arithmetic error during simulation does not promise rollback of the whole step.
+
+Collision calls (`collide`, `collide_coherent`, `collide_four` and `collide_smooth`) refuse nonfinite poses or
+cutoffs and invalid current core data instead of indexing a missing face or returning an invented contact.
+The existing [four-pair Rust doctest](kernel/src/manifold/four.rs) demonstrates the checked collision call.
+Run `cargo test --locked --manifest-path packages/physics2d/kernel/Cargo.toml --doc` for both examples. Native
+input/manifold regression commands are in [reproduce.md](../../docs/whitepaper/reproduce.md#own-2d-input-validation).
+Valid-scene hashes and the retained manifold reference are unchanged. This input fix makes no speed claim or
+hash re-pin; the 1:1000 support/settling correction remains open, and owned-2D CCD is the separate T-11 / 127.y work.

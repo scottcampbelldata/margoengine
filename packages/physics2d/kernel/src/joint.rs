@@ -269,7 +269,7 @@ fn lock_bias(l: &Locks, pass: &Pass) -> [f32; 3] {
         start = 2;
     }
     for k in start..l.n {
-        bias[k] = (rate * l.error[k]).clamp(-pass.max_push, pass.max_push);
+        bias[k] = crate::math::clamp(rate * l.error[k], -pass.max_push, pass.max_push);
     }
     bias
 }
@@ -377,7 +377,7 @@ fn motor_row(pair: &mut Pair, row: &Coupled, x: f32, m: &Motor, impulse: &mut f3
     let bias = per_error * (x - m.target_position) - h * m.damping * m.target_velocity / s;
     let v = row.speed(pair);
     let most = m.max_force * h;
-    let total = (*impulse - ms * mass * (v + bias) - is * *impulse).clamp(-most, most);
+    let total = crate::math::clamp(*impulse - ms * mass * (v + bias) - is * *impulse, -most, most);
     let delta = total - *impulse;
     *impulse = total;
     row.push(pair, delta, lock);

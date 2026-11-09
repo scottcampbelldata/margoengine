@@ -52,7 +52,7 @@ impl Fnv {
 pub fn run(mut world: World) -> u64 {
     let mut h = Fnv::new();
     for _ in 0..120 {
-        world.step(DT);
+        world.step(DT).unwrap();
         for b in &world.bodies {
             h.add(b.exact_center[0].to_bits());
             h.add(b.exact_center[1].to_bits());
@@ -71,8 +71,8 @@ pub fn run(mut world: World) -> u64 {
 /// A box turned by `TURN[turn]`.
 fn rect(world: &mut World, kind: Kind, at: V2, hx: f32, hy: f32, turn: usize, def: &ShapeDef) -> u32 {
     let (c, s) = TURN[turn];
-    let b = world.create_body(&BodyDef { kind, position: at, rotation: Rot::from_pair(f32::from_bits(c), f32::from_bits(s)), ..Default::default() });
-    world.create_shape(b, Core::rect(hx, hy, V2::ZERO, 1.0, 0.0, 0.0).unwrap(), def);
+    let b = world.create_body(&BodyDef { kind, position: at, rotation: Rot::from_pair(f32::from_bits(c), f32::from_bits(s)), ..Default::default() }).unwrap();
+    world.create_shape(b, Core::rect(hx, hy, V2::ZERO, 1.0, 0.0, 0.0).unwrap(), def).unwrap();
     b
 }
 
@@ -96,8 +96,8 @@ pub fn joint_grid() -> World {
     for r in 0..n {
         for c in 0..n {
             let kind = if r == 0 { Kind::Static } else { Kind::Dynamic };
-            let b = world.create_body(&BodyDef { kind, position: v2(c as f32, -(r as f32)), ..Default::default() });
-            world.create_shape(b, Core::circle(V2::ZERO, 0.4).unwrap(), &ShapeDef::default());
+            let b = world.create_body(&BodyDef { kind, position: v2(c as f32, -(r as f32)), ..Default::default() }).unwrap();
+            world.create_shape(b, Core::circle(V2::ZERO, 0.4).unwrap(), &ShapeDef::default()).unwrap();
             id.push(b);
         }
     }
@@ -105,10 +105,10 @@ pub fn joint_grid() -> World {
     for r in 0..n {
         for c in 0..n {
             if c + 1 < n && r > 0 {
-                world.create_joint(&JointDef { kind: revolute, a: id[r * n + c], b: id[r * n + c + 1], anchor_a: v2(0.5, 0.0), anchor_b: v2(-0.5, 0.0), collide: false });
+                world.create_joint(&JointDef { kind: revolute, a: id[r * n + c], b: id[r * n + c + 1], anchor_a: v2(0.5, 0.0), anchor_b: v2(-0.5, 0.0), collide: false }).unwrap();
             }
             if r + 1 < n {
-                world.create_joint(&JointDef { kind: revolute, a: id[r * n + c], b: id[(r + 1) * n + c], anchor_a: v2(0.0, -0.5), anchor_b: v2(0.0, 0.5), collide: false });
+                world.create_joint(&JointDef { kind: revolute, a: id[r * n + c], b: id[(r + 1) * n + c], anchor_a: v2(0.0, -0.5), anchor_b: v2(0.0, 0.5), collide: false }).unwrap();
             }
         }
     }
@@ -120,7 +120,7 @@ pub fn joint_grid() -> World {
 /// contacts, sleep and wake.
 pub fn mixed() -> World {
     let mut world = World::default();
-    let floor = world.create_body(&BodyDef { kind: Kind::Static, ..Default::default() });
+    let floor = world.create_body(&BodyDef { kind: Kind::Static, ..Default::default() }).unwrap();
     let points: Vec<V2> = (0..=40).map(|i| v2(i as f32 - 20.0, 0.3 * f32::from_bits(WAVE[i]))).collect();
     world.create_chain(floor, &points, false, &ShapeDef::default()).unwrap();
     let def = ShapeDef { density: 1.0, friction: 0.5, restitution: 0.0 };
@@ -130,17 +130,17 @@ pub fn mixed() -> World {
     }
     let bouncy = ShapeDef { density: 1.0, friction: 0.3, restitution: 0.7 };
     for i in 0..10 {
-        let b = world.create_body(&BodyDef { position: v2(-10.0 + 2.0 * i as f32, 6.0), linear_velocity: v2(1.0, 0.0), ..Default::default() });
-        world.create_shape(b, Core::circle(V2::ZERO, 0.3).unwrap(), &bouncy);
+        let b = world.create_body(&BodyDef { position: v2(-10.0 + 2.0 * i as f32, 6.0), linear_velocity: v2(1.0, 0.0), ..Default::default() }).unwrap();
+        world.create_shape(b, Core::circle(V2::ZERO, 0.3).unwrap(), &bouncy).unwrap();
     }
-    let paddle = world.create_body(&BodyDef { kind: Kind::Kinematic, position: v2(-18.0, 1.0), linear_velocity: v2(3.0, 0.0), angular_velocity: 1.0, ..Default::default() });
-    world.create_shape(paddle, Core::rect(1.0, 0.1, V2::ZERO, 1.0, 0.0, 0.0).unwrap(), &def);
-    let anchor = world.create_body(&BodyDef { kind: Kind::Static, position: v2(5.0, 8.0), ..Default::default() });
+    let paddle = world.create_body(&BodyDef { kind: Kind::Kinematic, position: v2(-18.0, 1.0), linear_velocity: v2(3.0, 0.0), angular_velocity: 1.0, ..Default::default() }).unwrap();
+    world.create_shape(paddle, Core::rect(1.0, 0.1, V2::ZERO, 1.0, 0.0, 0.0).unwrap(), &def).unwrap();
+    let anchor = world.create_body(&BodyDef { kind: Kind::Static, position: v2(5.0, 8.0), ..Default::default() }).unwrap();
     let mut prev = anchor;
     for i in 0..10 {
         let b = rect(&mut world, Kind::Dynamic, v2(5.5 + i as f32, 8.0), 0.45, 0.1, 0, &def);
         let anchor_a = if i == 0 { V2::ZERO } else { v2(0.5, 0.0) };
-        world.create_joint(&JointDef { kind: JointKind::Revolute { limits: None, motor: None }, a: prev, b, anchor_a, anchor_b: v2(-0.5, 0.0), collide: false });
+        world.create_joint(&JointDef { kind: JointKind::Revolute { limits: None, motor: None }, a: prev, b, anchor_a, anchor_b: v2(-0.5, 0.0), collide: false }).unwrap();
         prev = b;
     }
     world

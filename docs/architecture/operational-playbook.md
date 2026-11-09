@@ -1541,6 +1541,47 @@ alternatives with all old bars retained and zero accepted hash re-pins. A new 1:
 the old recovery-bias support ceiling; it is distinct from the passing 1000:1 joint chain. Owned-2D CCD is missing,
 not proved by speculation. Both acceptance gaps and the separate raw-density defect are tracked in known-bugs.
 
+### Owned-2D input and absent-candidate checks (2026-11-08, section 5 addendum)
+
+The raw `physics2d/kernel` World, collision, smooth-collision and bounds entry points return coded
+`PhysicsError` results with a help link to [Own 2D input validation](../limits.md#own-2d-input-validation).
+Body, shape and whole-chain creation validate before publication; chain proxies are staged until all segments
+and mass updates succeed. The checked mass path retains the existing valid arithmetic and distinguishes
+genuine zero mass/area from positive mass or inertia rounded to zero. Nonfinite derived centres, moments,
+extents and required reciprocals are refused. Public `mass_of` remains a direct utility, not this checked boundary.
+The reciprocal-metric check also prevents a finite rounded inverse from overflowing on reinversion. Both rounded
+centre and origin are staged; shape ownership uses a linear visitation witness. Overflow-only friction mixing
+uses a scale-safe mean with the ordinary finite-product bits retained. Dynamic scalar/SIMD clamp bounds propagate
+invalid arithmetic to the checked step error instead of a Rust assertion; used negative normal caches are refused.
+
+Before stepping, current public body/shape/contact/joint arrays and handles are checked, including used core
+data, materials, chain ghosts and cached numerical state. Broad callbacks check stale shape IDs. Collision
+also checks absent face/distance candidates before indexing. This matters on both native and aborting Wasm:
+the reproduced `47f81f909` panic used a NaN pose together with a NaN cutoff; the literal finite-cutoff review
+call returned empty here. It is now a coded refusal rather than a sentinel index or invented manifold.
+
+Regression coverage is in `kernel/tests/input.rs`, `manifold_exact.rs`, `manifold.rs`, native unit checks and the
+existing Wasm `check(i)` invalid-input checks. Two creation assertions copied unchanged into an isolated
+`47f81f909` tree fail as expected (`.lane/p/input-baseline.log`); the current checked versions exercise rollback
+and coded errors. Retained-reference tests and the three valid production hashes remain the compatibility
+contract; the reference, scene, tolerance and hashes are not re-pinned. Final package/repository gate execution
+is recorded separately at landing, not asserted by this addendum.
+
+The final independent input audit also found squared-length rotation overflow/underflow, hidden nonfinite
+integration and contact-metric sums overflowing despite finite individual inverse masses. Scale-safe exceptional
+rotation normalization preserves the ordinary operation order, while zero stored rotations and unrepresentable
+derived contact metrics are refused. `rotation_input.rs` and `contact_metric_input.rs` reproduce these failures
+on the retained pre-edge input implementation; the same classes run in Wasm's existing checks. The rotation
+regression uses one substep so zero/identity alternation cannot hide the failure.
+`point_velocity_input.rs` additionally exercises overflow of `v + w cross r` with finite body velocities,
+mass and contact metrics. The row builder checks relative point velocity, approach and base before publication,
+so a NaN comparison cannot silently select a zero normal impulse. This class also runs in Wasm input checks.
+
+This first correctness change does not alter solver formulation or prove a speed gain. The separate sustained
+support and 1:1000 settling correction remains open. Owned-2D CCD belongs to T-11 / 127.y; the existing 1000:1
+joint-chain and separate 3D CCD tests do not establish it. An arithmetic error after simulation starts is
+reported without claiming rollback of the complete step. The TypeScript Rapier facade is unchanged.
+
 ### Video frame decoding evidence (batch 112, section 5 addendum)
 
 The optional `video/codecs` path owns MP4 demuxing and WebCodecs decode/flush lifecycle outside core/stage. Its unit tests cover decode versus presentation order, signed offsets, chunk runs, 64-bit offsets, edit timeline boundary regression, bounds, cancellation, exclusivity and caller-owned frames. The video GPU suite now includes `codecs-check.mjs`: real Edge/RTX A6000 decoding of a generated MP4, random frame access with exact timestamps, seek/step, cancellation and consumption on WebGPU/beside WebGL2. GOP decoding is renderer independent; external material binding still refuses WebGL2. Evidence is a stand-in; real B-frame files, third-party movies, other hardware/browsers and speed unmeasured. Supported container scope and memory limits are in LIM-575 and limits.md. No new open engine defect; known-bugs.md unchanged.

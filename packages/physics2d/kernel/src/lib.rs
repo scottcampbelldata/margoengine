@@ -2,6 +2,7 @@
 // One dependency, the shared kernel parts (packages/physics/kernel-common). Native builds exist for `cargo test`; the
 // shipped build is wasm32 with simd128.
 // Determinism rule, as in the 3D kernel: only + - * / sqrt, compares and integer operations reach the state.
+#![doc = include_str!("../../README.md")]
 #![cfg_attr(target_arch = "wasm32", no_std)]
 extern crate alloc;
 
@@ -9,6 +10,7 @@ extern crate alloc;
 #[cfg(test)]
 extern crate self as margoengine_physics2d_kernel;
 
+pub mod error;
 pub mod joint;
 pub mod manifold;
 pub mod mass;

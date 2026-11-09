@@ -2,6 +2,30 @@
 // native and Wasm agree bit for bit: Rust never fuses a * b + c, and the kernel uses no trigonometry on the step path.
 // A rotation is the pair (cos, sin), advanced by a first order update and normalised (own-physics-plan.md, section 2).
 
+/// The ordinary IEEE clamp with the same comparisons and signed-zero behavior. A derived invalid bound is an
+/// arithmetic failure, carried as NaN to the checked step boundary rather than a Rust assertion/panic.
+#[inline(always)]
+pub(crate) fn clamp(value: f32, minimum: f32, maximum: f32) -> f32 {
+    if minimum.is_nan() || maximum.is_nan() || minimum > maximum { return f32::NAN; }
+    if value < minimum { minimum } else if value > maximum { maximum } else { value }
+}
+
+#[cfg(test)]
+mod clamp_tests {
+    #[test]
+    fn dynamic_bounds_preserve_ieee_results_and_propagate_invalid_bounds() {
+        for (lo, hi) in [(-1.0, 1.0), (-0.0, 0.0), (f32::NEG_INFINITY, f32::INFINITY)] {
+            for value in [f32::NEG_INFINITY, -2.0, -0.0, 0.0, 0.5, 2.0, f32::INFINITY] {
+                assert_eq!(super::clamp(value, lo, hi).to_bits(), value.clamp(lo, hi).to_bits());
+            }
+            assert!(super::clamp(f32::NAN, lo, hi).is_nan());
+        }
+        for (lo, hi) in [(1.0, -1.0), (f32::NAN, 1.0), (0.0, f32::NAN)] {
+            assert!(super::clamp(0.0, lo, hi).is_nan());
+        }
+    }
+}
+
 /// Correctly rounded square root. Wasm: the `f32.sqrt` instruction through the SIMD form, as core has no float maths.
 #[inline(always)]
 pub fn sqrt(value: f32) -> f32 {
@@ -134,8 +158,20 @@ impl Rot {
     pub const IDENTITY: Rot = Rot { c: 1.0, s: 0.0 };
     /// The rotation whose (cos, sin) is the unit vector along (c, s); identity for (0, 0).
     pub fn from_pair(c: f32, s: f32) -> Rot {
-        let (unit, length) = v2(c, s).normalize();
-        if length > 0.0 { Rot { c: unit.x, s: unit.y } } else { Rot::IDENTITY }
+        if c == 0.0 && s == 0.0 { return Rot::IDENTITY; }
+        let squared = c * c + s * s;
+        if squared.is_finite() && squared >= f32::MIN_POSITIVE {
+            // Preserve every ordinary normalization operation and result bit.
+            let inverse = 1.0 / sqrt(squared);
+            return Rot { c: c * inverse, s: s * inverse };
+        }
+        if !c.is_finite() || !s.is_finite() { return Rot { c: f32::NAN, s: f32::NAN }; }
+        // Scaling makes the squared norm lie in [1,2], even for subnormal or MAX pairs.
+        // Nonfinite integration intermediates must reach the checked arithmetic-error boundary.
+        let scale = if c.abs() > s.abs() { c.abs() } else { s.abs() };
+        let (c, s) = (c / scale, s / scale);
+        let inverse = 1.0 / sqrt(c * c + s * s);
+        Rot { c: c * inverse, s: s * inverse }
     }
     #[inline(always)]
     pub fn apply(self, v: V2) -> V2 {

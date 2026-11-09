@@ -73,15 +73,15 @@ fn the_tree_keeps_the_pairs_brute_force_finds_as_boxes_move_come_and_go() {
 
 fn pyramid(settings: Settings, rows: usize) -> (World, Vec<u32>) {
     let mut world = World::new(settings);
-    let g = world.create_body(&BodyDef { kind: Kind::Static, ..Default::default() });
-    world.create_shape(g, Core::rect(500.0, 0.5, v2(0.0, -0.5), 1.0, 0.0, 0.0).unwrap(), &ShapeDef::default());
+    let g = world.create_body(&BodyDef { kind: Kind::Static, ..Default::default() }).unwrap();
+    world.create_shape(g, Core::rect(500.0, 0.5, v2(0.0, -0.5), 1.0, 0.0, 0.0).unwrap(), &ShapeDef::default()).unwrap();
     let mut boxes = Vec::new();
     for row in 0..rows {
         let count = rows - row;
         for i in 0..count {
             let x = i as f32 - 0.5 * (count as f32 - 1.0);
-            let b = world.create_body(&BodyDef { position: v2(x, 0.5 + row as f32), ..Default::default() });
-            world.create_shape(b, Core::rect(0.5, 0.5, V2::ZERO, 1.0, 0.0, 0.0).unwrap(), &ShapeDef { density: 1.0, friction: 0.6, restitution: 0.0 });
+            let b = world.create_body(&BodyDef { position: v2(x, 0.5 + row as f32), ..Default::default() }).unwrap();
+            world.create_shape(b, Core::rect(0.5, 0.5, V2::ZERO, 1.0, 0.0, 0.0).unwrap(), &ShapeDef { density: 1.0, friction: 0.6, restitution: 0.0 }).unwrap();
             boxes.push(b);
         }
     }
@@ -103,8 +103,8 @@ fn the_100_row_pyramid_steps_to_the_same_bits_with_either_broad_phase() {
     let (mut tested_tree, mut tested_sweep, mut pairs) = (0u64, 0u64, 0u64);
     let steps = 120;
     for step in 0..steps {
-        tree.step(DT);
-        sweep.step(DT);
+        tree.step(DT).unwrap();
+        sweep.step(DT).unwrap();
         assert_eq!(tree.counts.pairs, sweep.counts.pairs, "step {step}: pairs");
         assert!(tree.contacts.iter().map(|c| (c.a, c.b)).eq(sweep.contacts.iter().map(|c| (c.a, c.b))), "step {step}: contacts");
         assert_eq!(bits(&tree), bits(&sweep), "step {step}: the bodies' bits");
@@ -136,10 +136,10 @@ fn paired_timing_of_the_two_broad_phases_on_the_100_row_pyramid() {
         let (mut t, mut s) = (f64::INFINITY, f64::INFINITY);
         for _ in 0..20 {
             let start = Instant::now();
-            tree.step(DT);
+            tree.step(DT).unwrap();
             t = t.min(start.elapsed().as_secs_f64() * 1e3);
             let start = Instant::now();
-            sweep.step(DT);
+            sweep.step(DT).unwrap();
             s = s.min(start.elapsed().as_secs_f64() * 1e3);
         }
         assert_eq!(bits(&tree), bits(&sweep), "round {round}");

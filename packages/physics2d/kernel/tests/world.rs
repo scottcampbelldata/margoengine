@@ -13,14 +13,14 @@ use margoengine_physics2d_kernel::world::{BodyDef, Kind, Settings, ShapeDef, Wor
 const DT: f32 = 1.0 / 60.0;
 
 fn ground(world: &mut World, at: V2, half_width: f32) -> u32 {
-    let g = world.create_body(&BodyDef { kind: Kind::Static, position: at, ..Default::default() });
-    world.create_shape(g, Core::rect(half_width, 0.5, v2(0.0, -0.5), 1.0, 0.0, 0.0).unwrap(), &ShapeDef::default());
+    let g = world.create_body(&BodyDef { kind: Kind::Static, position: at, ..Default::default() }).unwrap();
+    world.create_shape(g, Core::rect(half_width, 0.5, v2(0.0, -0.5), 1.0, 0.0, 0.0).unwrap(), &ShapeDef::default()).unwrap();
     g
 }
 
 fn boxed(world: &mut World, at: V2, hx: f32, hy: f32, density: f32, friction: f32) -> u32 {
-    let b = world.create_body(&BodyDef { position: at, ..Default::default() });
-    world.create_shape(b, Core::rect(hx, hy, V2::ZERO, 1.0, 0.0, 0.0).unwrap(), &ShapeDef { density, friction, restitution: 0.0 });
+    let b = world.create_body(&BodyDef { position: at, ..Default::default() }).unwrap();
+    world.create_shape(b, Core::rect(hx, hy, V2::ZERO, 1.0, 0.0, 0.0).unwrap(), &ShapeDef { density, friction, restitution: 0.0 }).unwrap();
     b
 }
 
@@ -54,7 +54,7 @@ fn settle_from(world: &mut World, boxes: &[u32], seconds: f32) -> (f32, Option<f
         if step == 60 {
             at_one = boxes.iter().map(|&b| world.bodies[b as usize].xf.p).collect();
         }
-        world.step(DT);
+        world.step(DT).unwrap();
         if asleep_at.is_none() && boxes.iter().all(|&b| !world.bodies[b as usize].awake) {
             asleep_at = Some((step + 1) as f32 * DT);
         }
@@ -161,10 +161,10 @@ fn a_card_house_stands() {
     let lean_back = Rot { c, s: -s };
     let mut cards = Vec::new();
     let mut card = |world: &mut World, at: V2, q: Rot, flat: bool| {
-        let body = world.create_body(&BodyDef { position: at, rotation: q, ..Default::default() });
+        let body = world.create_body(&BodyDef { position: at, rotation: q, ..Default::default() }).unwrap();
         // A card is a segment rounded by half its thickness: thinner than the polygon weld allows as a box.
         let core = if flat { Core::capsule(v2(-half, 0.0), v2(half, 0.0), 0.5 * thickness) } else { Core::capsule(v2(0.0, -half), v2(0.0, half), 0.5 * thickness) };
-        world.create_shape(body, core.unwrap(), &ShapeDef { density: 1000.0, friction, restitution: 0.0 });
+        world.create_shape(body, core.unwrap(), &ShapeDef { density: 1000.0, friction, restitution: 0.0 }).unwrap();
         cards.push(body);
     };
     // A leaning card's top corner sits on the pair's ridge; its foot lies height * sin(angle) out from it.
@@ -187,7 +187,7 @@ fn a_card_house_stands() {
     }
     let start: Vec<V2> = cards.iter().map(|&b| world.bodies[b as usize].xf.p).collect();
     for _ in 0..(10.0 / DT) as usize {
-        world.step(DT);
+        world.step(DT).unwrap();
     }
     let drift = cards.iter().zip(&start).map(|(&b, s)| world.bodies[b as usize].xf.p.sub(*s).length()).fold(0.0, f32::max);
     println!("card house: {} cards, drift {:.2} mm", cards.len(), drift * 1000.0);
@@ -251,14 +251,14 @@ fn friction_holds_below_tan_t_equal_to_mu_and_slides_above() {
         // mu = 0.6 for both shapes; tan(0.45) = 0.483 holds, tan(0.60) = 0.684 slides.
         let mut world = World::default();
         let q = Rot { c: cos(angle), s: sin(angle) };
-        let slope = world.create_body(&BodyDef { kind: Kind::Static, rotation: q, ..Default::default() });
-        world.create_shape(slope, Core::rect(20.0, 0.5, v2(0.0, -0.5), 1.0, 0.0, 0.0).unwrap(), &ShapeDef::default());
+        let slope = world.create_body(&BodyDef { kind: Kind::Static, rotation: q, ..Default::default() }).unwrap();
+        world.create_shape(slope, Core::rect(20.0, 0.5, v2(0.0, -0.5), 1.0, 0.0, 0.0).unwrap(), &ShapeDef::default()).unwrap();
         let up = q.apply(v2(0.0, 0.5));
-        let b = world.create_body(&BodyDef { position: up, rotation: q, ..Default::default() });
-        world.create_shape(b, Core::rect(0.5, 0.5, V2::ZERO, 1.0, 0.0, 0.0).unwrap(), &ShapeDef::default());
+        let b = world.create_body(&BodyDef { position: up, rotation: q, ..Default::default() }).unwrap();
+        world.create_shape(b, Core::rect(0.5, 0.5, V2::ZERO, 1.0, 0.0, 0.0).unwrap(), &ShapeDef::default()).unwrap();
         let start = world.bodies[b as usize].xf.p;
         for _ in 0..120 {
-            world.step(DT);
+            world.step(DT).unwrap();
         }
         let moved = world.bodies[b as usize].xf.p.sub(start).length();
         println!("slope {angle} rad: moved {:.2} mm", moved * 1000.0);
@@ -275,12 +275,12 @@ fn restitution_bounces_and_zero_restitution_does_not() {
     for (e, low, high) in [(0.0f32, 0.0f32, 0.05f32), (0.8, 0.55, 0.75)] {
         let mut world = World::default();
         ground(&mut world, V2::ZERO, 10.0);
-        let ball = world.create_body(&BodyDef { position: v2(0.0, 2.25), ..Default::default() });
-        world.create_shape(ball, Core::circle(V2::ZERO, 0.25).unwrap(), &ShapeDef { restitution: e, ..Default::default() });
+        let ball = world.create_body(&BodyDef { position: v2(0.0, 2.25), ..Default::default() }).unwrap();
+        world.create_shape(ball, Core::circle(V2::ZERO, 0.25).unwrap(), &ShapeDef { restitution: e, ..Default::default() }).unwrap();
         // Falls 2 m; e^2 of the drop comes back as height.
         let (mut hit, mut peak) = (false, 0.0f32);
         for _ in 0..240 {
-            world.step(DT);
+            world.step(DT).unwrap();
             let y = world.bodies[ball as usize].xf.p.y - 0.25;
             if !hit && world.bodies[ball as usize].linear_velocity.y > 0.0 {
                 hit = true;
@@ -301,11 +301,11 @@ fn a_sleeping_stack_wakes_when_struck() {
     let boxes = pyramid(&mut world, V2::ZERO, 3);
     let (_, asleep) = settle(&mut world, &boxes, 3.0);
     assert!(asleep.is_some());
-    let ball = world.create_body(&BodyDef { position: v2(-6.0, 0.5), linear_velocity: v2(8.0, 0.0), ..Default::default() });
-    world.create_shape(ball, Core::circle(V2::ZERO, 0.5).unwrap(), &ShapeDef::default());
+    let ball = world.create_body(&BodyDef { position: v2(-6.0, 0.5), linear_velocity: v2(8.0, 0.0), ..Default::default() }).unwrap();
+    world.create_shape(ball, Core::circle(V2::ZERO, 0.5).unwrap(), &ShapeDef::default()).unwrap();
     let mut woke = false;
     for _ in 0..60 {
-        world.step(DT);
+        world.step(DT).unwrap();
         woke |= boxes.iter().any(|&b| world.bodies[b as usize].awake);
     }
     assert!(woke, "the struck stack never woke");
@@ -316,10 +316,10 @@ fn two_worlds_built_alike_step_alike_bit_for_bit() {
     let run = || {
         let mut world = World::default();
         let boxes = pyramid(&mut world, v2(3.0, 1.0), 8);
-        let ball = world.create_body(&BodyDef { position: v2(-4.0, 2.0), linear_velocity: v2(6.0, 1.0), angular_velocity: 2.0, ..Default::default() });
-        world.create_shape(ball, Core::capsule(v2(-0.3, 0.0), v2(0.3, 0.0), 0.2).unwrap(), &ShapeDef::default());
+        let ball = world.create_body(&BodyDef { position: v2(-4.0, 2.0), linear_velocity: v2(6.0, 1.0), angular_velocity: 2.0, ..Default::default() }).unwrap();
+        world.create_shape(ball, Core::capsule(v2(-0.3, 0.0), v2(0.3, 0.0), 0.2).unwrap(), &ShapeDef::default()).unwrap();
         for _ in 0..300 {
-            world.step(DT);
+            world.step(DT).unwrap();
         }
         boxes.iter().chain([ball].iter()).flat_map(|&b| {
             let body = &world.bodies[b as usize];
@@ -342,7 +342,7 @@ fn a_pyramid_of_a_hundred_rows_keeps_its_warm_start_and_sags_as_the_references()
     let row30: usize = (0..30).map(|r| rows - r).sum();
     let (mut worst_cold, mut colours, mut overflow) = (0, 0, 0);
     for step in 0..300 {
-        world.step(DT);
+        world.step(DT).unwrap();
         if step >= 60 {
             worst_cold = worst_cold.max(world.counts.cold_points);
         }

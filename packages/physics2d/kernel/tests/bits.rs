@@ -30,12 +30,12 @@ fn step_time_of_the_100_row_pyramid() {
     // this commit's and the other's test binaries in turns, many rounds, and compare per-round minimums (AGENTS.md).
     let mut world = pyramid(100);
     for _ in 0..60 {
-        world.step(DT);
+        world.step(DT).unwrap();
     }
     let mut best = f64::INFINITY;
     for _ in 0..40 {
         let start = std::time::Instant::now();
-        world.step(DT);
+        world.step(DT).unwrap();
         best = best.min(start.elapsed().as_secs_f64() * 1e3);
     }
     println!("STEP {best:.3}");

@@ -10,13 +10,13 @@ use margoengine_physics2d_kernel::world::{BodyDef, Kind, Settings, ShapeDef, Wor
 const DT: f32 = 1.0 / 60.0;
 
 fn fixed(world: &mut World, at: V2) -> u32 {
-    world.create_body(&BodyDef { kind: Kind::Static, position: at, ..Default::default() })
+    world.create_body(&BodyDef { kind: Kind::Static, position: at, ..Default::default() }).unwrap()
 }
 
 fn ball(world: &mut World, at: V2, radius: f32, mass: f32) -> u32 {
-    let b = world.create_body(&BodyDef { position: at, can_sleep: false, ..Default::default() });
+    let b = world.create_body(&BodyDef { position: at, can_sleep: false, ..Default::default() }).unwrap();
     let density = mass / (std::f32::consts::PI * radius * radius);
-    world.create_shape(b, Core::circle(V2::ZERO, radius).unwrap(), &ShapeDef { density, ..Default::default() });
+    world.create_shape(b, Core::circle(V2::ZERO, radius).unwrap(), &ShapeDef { density, ..Default::default() }).unwrap();
     b
 }
 
@@ -42,7 +42,7 @@ fn a_pendulum_swings_with_the_elliptic_period() {
     let theta0 = 1.0f32;
     let (s, c) = ((theta0 as f64).sin() as f32, (theta0 as f64).cos() as f32);
     let bob = ball(&mut world, v2(s, 10.0 - c), 0.05, 1.0);
-    world.create_joint(&revolute(pivot, bob, V2::ZERO, v2(-s, c)));
+    world.create_joint(&revolute(pivot, bob, V2::ZERO, v2(-s, c))).unwrap();
     let (l, r, g) = (1.0f64, 0.05f64, 9.81f64);
     let inertia = l * l + 0.5 * r * r;
     let expected = 4.0 * (inertia / (g * l)).sqrt() * elliptic_k((0.5 * theta0 as f64).sin());
@@ -50,7 +50,7 @@ fn a_pendulum_swings_with_the_elliptic_period() {
     let (mut last_x, mut crossings, mut t) = (s, Vec::new(), 0.0f64);
     let mut highest = 0.0f32;
     for step in 0..(20.0 / DT) as usize {
-        world.step(DT);
+        world.step(DT).unwrap();
         t += DT as f64;
         let x = world.bodies[bob as usize].xf.p.x;
         if last_x > 0.0 && x <= 0.0 {
@@ -79,16 +79,16 @@ fn chain(settings: Settings, r: f32, end: f32) -> f64 {
     let mut links = Vec::new();
     for i in 1..=n {
         let mass = if i == n { end } else { 1.0 };
-        let b = world.create_body(&BodyDef { position: v2(i as f32 * l, 20.0), can_sleep: false, ..Default::default() });
+        let b = world.create_body(&BodyDef { position: v2(i as f32 * l, 20.0), can_sleep: false, ..Default::default() }).unwrap();
         let density = mass / (std::f32::consts::PI * r * r);
-        world.create_shape(b, Core::circle(V2::ZERO, r).unwrap(), &ShapeDef { density, ..Default::default() });
-        world.create_joint(&revolute(prev, b, v2(0.5 * l, 0.0), v2(-0.5 * l, 0.0)));
+        world.create_shape(b, Core::circle(V2::ZERO, r).unwrap(), &ShapeDef { density, ..Default::default() }).unwrap();
+        world.create_joint(&revolute(prev, b, v2(0.5 * l, 0.0), v2(-0.5 * l, 0.0))).unwrap();
         links.push(b);
         prev = b;
     }
     let mut worst = 0.0f64;
     for step in 0..600 {
-        world.step(DT);
+        world.step(DT).unwrap();
         if step < 300 {
             continue;
         }
@@ -141,8 +141,8 @@ fn the_joint_grid_keeps_its_anchors_together() {
     for r in 0..n {
         for c in 0..n {
             let kind = if r == 0 { Kind::Static } else { Kind::Dynamic };
-            let b = world.create_body(&BodyDef { kind, position: v2(c as f32, -(r as f32)), ..Default::default() });
-            world.create_shape(b, Core::circle(V2::ZERO, 0.4).unwrap(), &ShapeDef::default());
+            let b = world.create_body(&BodyDef { kind, position: v2(c as f32, -(r as f32)), ..Default::default() }).unwrap();
+            world.create_shape(b, Core::circle(V2::ZERO, 0.4).unwrap(), &ShapeDef::default()).unwrap();
             id.push(b);
         }
     }
@@ -158,10 +158,10 @@ fn the_joint_grid_keeps_its_anchors_together() {
         }
     }
     for &(a, b, pa, pb) in &joints {
-        world.create_joint(&revolute(a, b, pa, pb));
+        world.create_joint(&revolute(a, b, pa, pb)).unwrap();
     }
     for _ in 0..600 {
-        world.step(DT);
+        world.step(DT).unwrap();
     }
     let worst = joints
         .iter()
@@ -178,11 +178,11 @@ fn revolute_limits_hold_and_a_motor_reaches_its_speed() {
     let bob = ball(&mut world, v2(1.0, 5.0), 0.1, 1.0);
     let mut def = revolute(pivot, bob, V2::ZERO, v2(-1.0, 0.0));
     def.kind = JointKind::Revolute { limits: Some((-0.5, 0.5)), motor: None };
-    world.create_joint(&def);
+    world.create_joint(&def).unwrap();
     let mut least = f32::INFINITY;
     for _ in 0..300 {
-        world.step(DT);
-        least = least.min(world.angle(bob));
+        world.step(DT).unwrap();
+        least = least.min(world.angle(bob).unwrap());
     }
     println!("limit -0.5: lowest angle {least:.4} rad");
     assert!(least > -0.5 - 0.01, "passed the limit: {least}");
@@ -192,9 +192,9 @@ fn revolute_limits_hold_and_a_motor_reaches_its_speed() {
     let wheel = ball(&mut world, V2::ZERO, 0.5, 1.0);
     let mut def = revolute(axle, wheel, V2::ZERO, V2::ZERO);
     def.kind = JointKind::Revolute { limits: None, motor: Some(Motor::velocity(2.0, 100.0)) };
-    world.create_joint(&def);
+    world.create_joint(&def).unwrap();
     for _ in 0..60 {
-        world.step(DT);
+        world.step(DT).unwrap();
     }
     let w = world.bodies[wheel as usize].angular_velocity;
     println!("motor: {w:.4} rad/s");
@@ -206,9 +206,9 @@ fn revolute_limits_hold_and_a_motor_reaches_its_speed() {
     let inertia = world.bodies[wheel as usize].inertia;
     let mut def = revolute(axle, wheel, V2::ZERO, V2::ZERO);
     def.kind = JointKind::Revolute { limits: None, motor: Some(Motor { max_force: 0.05, ..Motor::velocity(2.0, 100.0) }) };
-    world.create_joint(&def);
+    world.create_joint(&def).unwrap();
     for _ in 0..30 {
-        world.step(DT);
+        world.step(DT).unwrap();
     }
     let w = world.bodies[wheel as usize].angular_velocity;
     let expected = 0.05 / inertia * 0.5;
@@ -220,8 +220,8 @@ fn revolute_limits_hold_and_a_motor_reaches_its_speed() {
 fn a_prismatic_joint_keeps_to_its_line_and_stops_at_its_limit() {
     let mut world = World::default();
     let base = fixed(&mut world, V2::ZERO);
-    let slider = world.create_body(&BodyDef { position: v2(0.0, 0.0), can_sleep: false, ..Default::default() });
-    world.create_shape(slider, Core::rect(0.2, 0.2, V2::ZERO, 1.0, 0.0, 0.0).unwrap(), &ShapeDef::default());
+    let slider = world.create_body(&BodyDef { position: v2(0.0, 0.0), can_sleep: false, ..Default::default() }).unwrap();
+    world.create_shape(slider, Core::rect(0.2, 0.2, V2::ZERO, 1.0, 0.0, 0.0).unwrap(), &ShapeDef::default()).unwrap();
     // A line at 45 degrees down to the right; the body slides down it, held from turning, and stops 2 m along.
     let h = std::f32::consts::FRAC_1_SQRT_2;
     world.create_joint(&JointDef {
@@ -231,27 +231,27 @@ fn a_prismatic_joint_keeps_to_its_line_and_stops_at_its_limit() {
         anchor_a: V2::ZERO,
         anchor_b: V2::ZERO,
         collide: false,
-    });
+    }).unwrap();
     let mut off_line = 0.0f32;
     for _ in 0..240 {
-        world.step(DT);
+        world.step(DT).unwrap();
         let p = world.bodies[slider as usize].xf.p;
         off_line = off_line.max((p.x + p.y).abs());
     }
     let p = world.bodies[slider as usize].xf.p;
     let along = p.x * h - p.y * h;
-    println!("prismatic: {along:.4} m along, off the line by at most {:.3} mm, angle {:.2e}", off_line * 1e3, world.angle(slider));
+    println!("prismatic: {along:.4} m along, off the line by at most {:.3} mm, angle {:.2e}", off_line * 1e3, world.angle(slider).unwrap());
     assert!(off_line < 0.002, "left the line by {off_line}");
     assert!((along - 2.0).abs() < 0.01, "stopped at {along}");
-    assert!(world.angle(slider).abs() < 1e-3);
+    assert!(world.angle(slider).unwrap().abs() < 1e-3);
 }
 
 #[test]
 fn a_fixed_joint_holds_a_beam_out_from_a_wall_and_keeps_its_angles() {
     let mut world = World::default();
     let wall = fixed(&mut world, V2::ZERO);
-    let beam = world.create_body(&BodyDef { position: v2(1.0, 0.0), can_sleep: false, ..Default::default() });
-    world.create_shape(beam, Core::rect(1.0, 0.05, V2::ZERO, 1.0, 0.0, 0.0).unwrap(), &ShapeDef::default());
+    let beam = world.create_body(&BodyDef { position: v2(1.0, 0.0), can_sleep: false, ..Default::default() }).unwrap();
+    world.create_shape(beam, Core::rect(1.0, 0.05, V2::ZERO, 1.0, 0.0, 0.0).unwrap(), &ShapeDef::default()).unwrap();
     // A quarter turn in A's frame against none in B's: the beam stands up from the wall's anchor.
     world.create_joint(&JointDef {
         kind: JointKind::Fixed { angle_a: Rot { c: 0.0, s: 1.0 }, angle_b: Rot::IDENTITY },
@@ -260,11 +260,11 @@ fn a_fixed_joint_holds_a_beam_out_from_a_wall_and_keeps_its_angles() {
         anchor_a: V2::ZERO,
         anchor_b: v2(-1.0, 0.0),
         collide: false,
-    });
+    }).unwrap();
     for _ in 0..240 {
-        world.step(DT);
+        world.step(DT).unwrap();
     }
-    let angle = world.angle(beam);
+    let angle = world.angle(beam).unwrap();
     let tip = world.bodies[beam as usize].xf.apply(v2(1.0, 0.0));
     println!("weld: angle {angle:.5} rad, tip at {tip:?}");
     assert!((angle - std::f32::consts::FRAC_PI_2).abs() < 0.01, "angle {angle}");
@@ -276,10 +276,10 @@ fn a_rope_holds_at_its_length_and_goes_slack_inside_it() {
     let mut world = World::default();
     let hook = fixed(&mut world, v2(0.0, 5.0));
     let weight = ball(&mut world, v2(1.0, 5.0), 0.1, 2.0);
-    world.create_joint(&JointDef { kind: JointKind::Rope { length: 2.0 }, a: hook, b: weight, anchor_a: V2::ZERO, anchor_b: V2::ZERO, collide: false });
+    world.create_joint(&JointDef { kind: JointKind::Rope { length: 2.0 }, a: hook, b: weight, anchor_a: V2::ZERO, anchor_b: V2::ZERO, collide: false }).unwrap();
     let (mut longest, mut fell) = (0.0f32, false);
     for step in 0..300 {
-        world.step(DT);
+        world.step(DT).unwrap();
         let d = world.bodies[weight as usize].xf.p.sub(v2(0.0, 5.0)).length();
         longest = longest.max(d);
         // Inside the rope's length it falls freely for the first steps.
@@ -298,11 +298,11 @@ fn a_spring_joint_oscillates_with_period_two_pi_root_m_over_k() {
     let anchor = fixed(&mut world, V2::ZERO);
     let mass = ball(&mut world, v2(1.5, 0.0), 0.1, 1.0);
     let k = 40.0f32;
-    world.create_joint(&JointDef { kind: JointKind::Spring { rest_length: 1.0, stiffness: k, damping: 0.0 }, a: anchor, b: mass, anchor_a: V2::ZERO, anchor_b: V2::ZERO, collide: false });
+    world.create_joint(&JointDef { kind: JointKind::Spring { rest_length: 1.0, stiffness: k, damping: 0.0 }, a: anchor, b: mass, anchor_a: V2::ZERO, anchor_b: V2::ZERO, collide: false }).unwrap();
     let expected = 2.0 * std::f64::consts::PI * (1.0f64 / k as f64).sqrt();
     let (mut last, mut crossings, mut t) = (0.5f32, Vec::new(), 0.0f64);
     for _ in 0..600 {
-        world.step(DT);
+        world.step(DT).unwrap();
         t += DT as f64;
         let x = world.bodies[mass as usize].xf.p.x - 1.0;
         if last > 0.0 && x <= 0.0 {
@@ -320,13 +320,13 @@ fn a_spring_joint_oscillates_with_period_two_pi_root_m_over_k() {
 fn joined_bodies_do_not_collide_unless_asked() {
     for collide in [false, true] {
         let mut world = World::new(Settings { gravity: V2::ZERO, ..Default::default() });
-        let a = world.create_body(&BodyDef { can_sleep: false, ..Default::default() });
-        world.create_shape(a, Core::rect(0.5, 0.5, V2::ZERO, 1.0, 0.0, 0.0).unwrap(), &ShapeDef::default());
-        let b = world.create_body(&BodyDef { position: v2(0.6, 0.0), can_sleep: false, ..Default::default() });
-        world.create_shape(b, Core::rect(0.5, 0.5, V2::ZERO, 1.0, 0.0, 0.0).unwrap(), &ShapeDef::default());
-        world.create_joint(&JointDef { kind: JointKind::Rope { length: 5.0 }, a, b, anchor_a: V2::ZERO, anchor_b: V2::ZERO, collide });
+        let a = world.create_body(&BodyDef { can_sleep: false, ..Default::default() }).unwrap();
+        world.create_shape(a, Core::rect(0.5, 0.5, V2::ZERO, 1.0, 0.0, 0.0).unwrap(), &ShapeDef::default()).unwrap();
+        let b = world.create_body(&BodyDef { position: v2(0.6, 0.0), can_sleep: false, ..Default::default() }).unwrap();
+        world.create_shape(b, Core::rect(0.5, 0.5, V2::ZERO, 1.0, 0.0, 0.0).unwrap(), &ShapeDef::default()).unwrap();
+        world.create_joint(&JointDef { kind: JointKind::Rope { length: 5.0 }, a, b, anchor_a: V2::ZERO, anchor_b: V2::ZERO, collide }).unwrap();
         for _ in 0..60 {
-            world.step(DT);
+            world.step(DT).unwrap();
         }
         let gap = world.bodies[b as usize].xf.p.x - world.bodies[a as usize].xf.p.x;
         println!("collide {collide}: centres {gap:.4} m apart");

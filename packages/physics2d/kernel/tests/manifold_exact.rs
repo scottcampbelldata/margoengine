@@ -11,13 +11,103 @@ mod scenes;
 mod reference;
 
 use margoengine_physics_kernel_common::lanes::F4;
-use margoengine_physics2d_kernel::manifold::{Manifold, collide_coherent, collide_four, reference_flip};
+use margoengine_physics2d_kernel::error::PhysicsError;
+use margoengine_physics2d_kernel::manifold::{Manifold, collide, collide_coherent, collide_four, reference_flip};
 use margoengine_physics2d_kernel::math::{Rot, V2, Xf, v2};
 use margoengine_physics2d_kernel::shape::Core;
 use margoengine_physics2d_kernel::smooth::collide_smooth;
 use margoengine_physics2d_kernel::world::{BodyDef, Kind, SPECULATIVE, Settings, ShapeDef, World};
 
 type Input = (Core, Xf, Core, Xf, Option<bool>);
+
+#[test]
+fn nonfinite_pose_is_rejected_without_indexing_a_missing_face() {
+    let square = Core::rect(0.5, 0.5, V2::ZERO, 1.0, 0.0, 0.0).unwrap();
+    let xa = Xf { p: v2(f32::NAN, 0.0), ..Xf::IDENTITY };
+    assert_eq!(collide_coherent(&square, xa, &square, Xf::IDENTITY, SPECULATIVE, None), Err(PhysicsError::NotFinite));
+    assert_eq!(collide_four([(&square, xa, &square, Xf::IDENTITY, None); 4], SPECULATIVE), Err(PhysicsError::NotFinite));
+    // A non-finite cutoff bypasses the old infinity rejection and reaches the missing distance candidate.
+    assert_eq!(collide_coherent(&square, xa, &square, Xf::IDENTITY, f32::NAN, None), Err(PhysicsError::NotFinite));
+}
+
+#[test]
+fn nonfinite_raw_collision_inputs_return_coded_errors() {
+    fn rejected(a: &Core, xa: Xf, b: &Core, xb: Xf, speculative: f32, error: PhysicsError) {
+        assert_eq!(collide(a, xa, b, xb, speculative), Err(error));
+        for last in [None, Some(false), Some(true)] {
+            assert_eq!(collide_coherent(a, xa, b, xb, speculative, last), Err(error));
+            for lane in 0..4 {
+                let mut batch = [(b, Xf::IDENTITY, b, Xf::IDENTITY, last); 4];
+                batch[lane] = (a, xa, b, xb, last);
+                assert_eq!(collide_four(batch, speculative), Err(error));
+            }
+        }
+        assert!(error.code().starts_with("PHYSICS2D_"));
+        assert!(error.help().starts_with("https://"));
+        assert!(error.to_string().contains(error.code()));
+    }
+    let square = Core::rect(0.5, 0.5, V2::ZERO, 1.0, 0.0, 0.0).unwrap();
+    for value in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+        for component in 0..4 {
+            let mut pose = Xf::IDENTITY;
+            match component { 0 => pose.p.x = value, 1 => pose.p.y = value, 2 => pose.q.c = value, _ => pose.q.s = value }
+            rejected(&square, pose, &square, Xf::IDENTITY, SPECULATIVE, PhysicsError::NotFinite);
+            rejected(&square, Xf::IDENTITY, &square, pose, SPECULATIVE, PhysicsError::NotFinite);
+        }
+        rejected(&square, Xf::IDENTITY, &square, Xf::IDENTITY, value, PhysicsError::NotFinite);
+        for component in 0..5 {
+            let mut bad = square;
+            match component { 0 => bad.vertices[0].x = value, 1 => bad.vertices[3].y = value, 2 => bad.normals[1].x = value, 3 => bad.normals[2].y = value, _ => bad.radius = value }
+            rejected(&bad, Xf::IDENTITY, &square, Xf::IDENTITY, SPECULATIVE, PhysicsError::NotFinite);
+        }
+    }
+    for count in [0, 9, usize::MAX] {
+        let bad = Core { count, ..square };
+        rejected(&bad, Xf::IDENTITY, &square, Xf::IDENTITY, SPECULATIVE, PhysicsError::InvalidCore);
+    }
+    rejected(&Core { radius: -1.0, ..square }, Xf::IDENTITY, &square, Xf::IDENTITY, SPECULATIVE, PhysicsError::InvalidCore);
+}
+
+#[test]
+fn tiny_boxes_and_huge_half_extents_keep_the_finite_reference_bits() {
+    use margoengine_physics2d_kernel::shape::{LINEAR_SLOP, ShapeError};
+    // Half-extents below the solver slop remain real boxes when their corners do not weld together.
+    let tiny = Core::rect(0.8 * LINEAR_SLOP, 0.9 * LINEAR_SLOP, V2::ZERO, 1.0, 0.0, 0.0).unwrap();
+    assert_eq!(tiny.count, 4);
+    assert_eq!(Core::rect(0.01 * LINEAR_SLOP, 0.01 * LINEAR_SLOP, V2::ZERO, 1.0, 0.0, 0.0), Err(ShapeError::Degenerate));
+    let huge = Core::rect(1.0e6, 2.0e6, V2::ZERO, 1.0, 0.0, 0.0).unwrap();
+    let mut inputs = Vec::new();
+    for core in [tiny, huge] {
+        let height = core.vertices[..core.count].iter().map(|v| v.y).fold(0.0, f32::max);
+        for gap in [-0.002, 0.0, 0.01, 0.03, 0.5] {
+            for last in LAST_FACES {
+                for q in [Rot::IDENTITY, Rot { c: 0.8, s: 0.6 }] {
+                    inputs.push((core, Xf::IDENTITY, core, Xf { p: v2(0.0, 2.0 * height + gap), q }, last));
+                }
+            }
+        }
+    }
+    let (compared, differences) = compare(&inputs);
+    assert!(compared >= 360);
+    assert_eq!(differences, 0);
+}
+
+#[test]
+fn finite_collision_overflow_returns_a_coded_refusal() {
+    let square = Core::rect(0.5, 0.5, V2::ZERO, 1.0, 0.0, 0.0).unwrap();
+    let xa = Xf { p: v2(-f32::MAX, 0.0), ..Xf::IDENTITY };
+    let xb = Xf { p: v2(f32::MAX, 0.0), ..Xf::IDENTITY };
+    assert_eq!(collide(&square, xa, &square, xb, SPECULATIVE), Err(PhysicsError::ArithmeticOverflow));
+    assert_eq!(collide_four([(&square, xa, &square, xb, None); 4], SPECULATIVE), Err(PhysicsError::ArithmeticOverflow));
+    let huge_radius = Core { radius: f32::MAX, ..square };
+    assert_eq!(collide(&huge_radius, Xf::IDENTITY, &huge_radius, Xf::IDENTITY, SPECULATIVE), Err(PhysicsError::ArithmeticOverflow));
+    assert_eq!(collide_four([(&huge_radius, Xf::IDENTITY, &huge_radius, Xf::IDENTITY, None); 4], SPECULATIVE), Err(PhysicsError::ArithmeticOverflow));
+    // These are finite dimensions, but edge squared lengths exceed f32's representable arithmetic.
+    let mut huge = square;
+    for vertex in &mut huge.vertices[..4] { *vertex = vertex.scale(2.0e20); }
+    assert_eq!(collide(&huge, Xf::IDENTITY, &huge, Xf::IDENTITY, SPECULATIVE), Err(PhysicsError::ArithmeticOverflow));
+    assert_eq!(collide_four([(&huge, Xf::IDENTITY, &huge, Xf::IDENTITY, None); 4], SPECULATIVE), Err(PhysicsError::ArithmeticOverflow));
+}
 
 /// Every manifold field as bits, including the unused point slots and an empty manifold's normal.
 fn key(m: &Manifold) -> [u32; 11] {
@@ -50,10 +140,10 @@ fn narrow_inputs(world: &World) -> Vec<Input> {
 /// Both entry points against the kept reference, lane by lane; no lane can borrow another lane's result or face choice.
 fn compare_lanes(inputs: [&Input; 4], speculative: f32, n: &mut u64, differ: &mut u64) {
     let batch = inputs.map(|(a, xa, b, xb, last)| (a, *xa, b, *xb, *last));
-    let batched = collide_four(batch, speculative);
+    let batched = collide_four(batch, speculative).unwrap();
     for (lane, (a, xa, b, xb, last)) in inputs.into_iter().enumerate() {
         let old = reference::collide_coherent(a, *xa, b, *xb, speculative, *last);
-        let scalar = collide_coherent(a, *xa, b, *xb, speculative, *last);
+        let scalar = collide_coherent(a, *xa, b, *xb, speculative, *last).unwrap();
         for (path, new) in [("scalar", scalar), ("four", batched[lane])] {
             *n += 1;
             if key(&new) != key(&old) {
@@ -86,7 +176,7 @@ fn suite_scene_manifolds_keep_their_bits() {
         for _ in 0..240 {
             let (a, b) = compare(&narrow_inputs(&world));
             (n, differ) = (n + a, differ + b);
-            world.step(scenes::DT);
+            world.step(scenes::DT).unwrap();
         }
     }
     println!("compared {n} manifolds, {differ} differ");
@@ -250,26 +340,26 @@ fn world_quad_queue_crosses_scalar_chain_and_sleep_gaps_and_keeps_tail_bits() {
                     continue;
                 }
                 let x = (group * 4 + kind) as f32 * 10.0;
-                let base = world.create_body(&BodyDef { kind: Kind::Static, position: v2(x, 0.0), ..Default::default() });
+                let base = world.create_body(&BodyDef { kind: Kind::Static, position: v2(x, 0.0), ..Default::default() }).unwrap();
                 let height = if kind == 2 { 0.51 } else { 1.01 };
-                let top = world.create_body(&BodyDef { position: v2(x, height), ..Default::default() });
+                let top = world.create_body(&BodyDef { position: v2(x, height), ..Default::default() }).unwrap();
                 match kind {
                     0 | 3 => {
-                        world.create_shape(base, square, &ShapeDef::default());
-                        world.create_shape(top, square, &ShapeDef::default());
+                        world.create_shape(base, square, &ShapeDef::default()).unwrap();
+                        world.create_shape(top, square, &ShapeDef::default()).unwrap();
                     }
                     1 => {
-                        world.create_shape(base, circle, &ShapeDef::default());
-                        world.create_shape(top, circle, &ShapeDef::default());
+                        world.create_shape(base, circle, &ShapeDef::default()).unwrap();
+                        world.create_shape(top, circle, &ShapeDef::default()).unwrap();
                     }
                     _ => {
                         // Alternate which shape id owns the chain, exercising both smooth-dispatch directions.
                         if group % 2 == 0 {
-                            world.create_shape(top, circle, &ShapeDef::default());
+                            world.create_shape(top, circle, &ShapeDef::default()).unwrap();
                         }
                         world.create_chain(base, &[v2(-0.5, 0.0), v2(0.5, 0.0)], false, &ShapeDef::default()).unwrap();
                         if group % 2 != 0 {
-                            world.create_shape(top, circle, &ShapeDef::default());
+                            world.create_shape(top, circle, &ShapeDef::default()).unwrap();
                         }
                     }
                 }
@@ -281,7 +371,7 @@ fn world_quad_queue_crosses_scalar_chain_and_sleep_gaps_and_keeps_tail_bits() {
         for step in 0..3 {
             let before = world.bodies.clone();
             let old_contacts = world.contacts.clone();
-            world.step(scenes::DT);
+            world.step(scenes::DT).unwrap();
             let (mut eligible, mut built, mut cold) = (0, 0, 0);
             for contact in &world.contacts {
                 let (sa, sb) = (&world.shapes[contact.a as usize], &world.shapes[contact.b as usize]);
@@ -298,9 +388,9 @@ fn world_quad_queue_crosses_scalar_chain_and_sleep_gaps_and_keeps_tail_bits() {
                     let xa = Xf { p: v2((oa[0] - from[0]) as f32, (oa[1] - from[1]) as f32), q: ba.xf.q };
                     let xb = Xf { p: v2((ob[0] - from[0]) as f32, (ob[1] - from[1]) as f32), q: bb.xf.q };
                     let manifold = if sa.chain {
-                        collide_smooth(&sa.core, sa.ghosts, xa, &sb.core, xb, SPECULATIVE)
+                        collide_smooth(&sa.core, sa.ghosts, xa, &sb.core, xb, SPECULATIVE).unwrap()
                     } else if sb.chain {
-                        let mut m = collide_smooth(&sb.core, sb.ghosts, xb, &sa.core, xa, SPECULATIVE);
+                        let mut m = collide_smooth(&sb.core, sb.ghosts, xb, &sa.core, xa, SPECULATIVE).unwrap();
                         m.normal = m.normal.neg();
                         m
                     } else {
@@ -401,7 +491,7 @@ fn narrow_ab_of_the_100_row_pyramid() {
     const VISITS: usize = 5;
     let mut world = scenes::pyramid(100);
     for _ in 0..60 {
-        world.step(scenes::DT);
+        world.step(scenes::DT).unwrap();
     }
     let inputs = narrow_inputs(&world);
     assert!(!inputs.is_empty());
@@ -410,14 +500,14 @@ fn narrow_ab_of_the_100_row_pyramid() {
             let (a, xa, b, xb, last) = &chunk[lane];
             (a, *xa, b, *xb, *last)
         });
-        for ((a, xa, b, xb, last), four) in chunk.iter().zip(collide_four(batch, SPECULATIVE)) {
-            assert_eq!(key(&collide_coherent(a, *xa, b, *xb, SPECULATIVE, *last)), key(&four));
+        for ((a, xa, b, xb, last), four) in chunk.iter().zip(collide_four(batch, SPECULATIVE).unwrap()) {
+            assert_eq!(key(&collide_coherent(a, *xa, b, *xb, SPECULATIVE, *last).unwrap()), key(&four));
         }
     }
     let scalar = || {
         let mut sink = 0.0f32;
         for (a, xa, b, xb, last) in std::hint::black_box(inputs.as_slice()) {
-            let manifold = std::hint::black_box(collide_coherent(a, *xa, b, *xb, SPECULATIVE, *last));
+            let manifold = std::hint::black_box(collide_coherent(a, *xa, b, *xb, SPECULATIVE, *last).unwrap());
             sink += manifold.normal.x;
         }
         std::hint::black_box(sink)
@@ -430,14 +520,14 @@ fn narrow_ab_of_the_100_row_pyramid() {
                 let (a, xa, b, xb, last) = &chunk[lane];
                 (a, *xa, b, *xb, *last)
             });
-            for manifold in collide_four(batch, SPECULATIVE) {
+            for manifold in collide_four(batch, SPECULATIVE).unwrap() {
                 let manifold = std::hint::black_box(manifold);
                 sink += manifold.normal.x;
             }
         }
         // The same final one, two or three pairs are still solved, without padding or extra work.
         for (a, xa, b, xb, last) in chunks.remainder() {
-            let manifold = std::hint::black_box(collide_coherent(a, *xa, b, *xb, SPECULATIVE, *last));
+            let manifold = std::hint::black_box(collide_coherent(a, *xa, b, *xb, SPECULATIVE, *last).unwrap());
             sink += manifold.normal.x;
         }
         std::hint::black_box(sink)

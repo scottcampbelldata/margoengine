@@ -8,12 +8,14 @@
 // segment both ways, so rounded corners meet as rounded corners; when the best face's separation is the distance (a
 // face is the closest feature), the clip gives that face's two points, as a box resting on a box needs.
 use crate::math::{V2, Xf, v2};
+use crate::error::PhysicsError;
 use margoengine_physics_kernel_common::lanes::F4;
 use crate::shape::{Core, LINEAR_SLOP, MAX_VERTICES};
 
 mod four;
 mod face_distance;
 pub use four::collide_four;
+pub(crate) use four::collide_four_trusted;
 
 /// How far a face's separation may sit under the true distance and still count as the closest feature.
 const FACE_TOLERANCE: f32 = 0.1 * LINEAR_SLOP;
@@ -50,14 +52,17 @@ const fn pair_id(a: u32, b: u32) -> u32 {
 }
 
 /// The closest point to `p` on the segment from `a` to `b`, and the fraction along it.
-fn closest_on_segment(p: V2, a: V2, b: V2) -> (V2, f32) {
+fn closest_on_segment(p: V2, a: V2, b: V2) -> Result<(V2, f32), PhysicsError> {
     let ab = b.sub(a);
     let span = ab.length_squared();
+    if !span.is_finite() { return Err(PhysicsError::ArithmeticOverflow); }
     if span <= 0.0 {
-        return (a, 0.0);
+        return Ok((a, 0.0));
     }
     let t = (p.sub(a).dot(ab) / span).clamp(0.0, 1.0);
-    (a.add(ab.scale(t)), t)
+    let on = a.add(ab.scale(t));
+    if !finite(on) { return Err(PhysicsError::ArithmeticOverflow); }
+    Ok((on, t))
 }
 
 /// A core's vertices and normals as `clip`, `best_face` and `closest` read them: a placed core of any count, or four
@@ -218,7 +223,8 @@ fn first_most(v: F4) -> (f32, usize) {
     let l = v.get();
     let pick = |a: f32, b: f32| if b > a { b } else { a };
     let most = pick(pick(l[0], l[1]), pick(l[2], l[3]));
-    (most, v.ge(F4::splat(most)).bits().trailing_zeros() as usize)
+    let mask = v.ge(F4::splat(most)).bits();
+    (most, if mask == 0 { usize::MAX } else { mask.trailing_zeros() as usize })
 }
 
 /// The first lane of `v` holding its least value, without branches: the lane a strict `<` scan from lane 0 keeps.
@@ -227,7 +233,8 @@ fn first_least(v: F4) -> (f32, usize) {
     let l = v.get();
     let pick = |a: f32, b: f32| if b < a { b } else { a };
     let least = pick(pick(l[0], l[1]), pick(l[2], l[3]));
-    (least, v.le(F4::splat(least)).bits().trailing_zeros() as usize)
+    let mask = v.le(F4::splat(least)).bits();
+    (least, if mask == 0 { usize::MAX } else { mask.trailing_zeros() as usize })
 }
 
 /// A vertex is its index; an edge is 0x800 plus its index; a circle's point is vertex 0.
@@ -244,13 +251,14 @@ fn feature(count: usize, segment: usize, t: f32) -> u32 {
 }
 
 /// The closest points of two cores that do not overlap: (distance, point on a, point on b, id).
-fn closest(a: &impl Poly, b: &impl Poly) -> (f32, V2, V2, u32) {
+fn closest(a: &impl Poly, b: &impl Poly) -> Result<(f32, V2, V2, u32), PhysicsError> {
     let mut best = (f32::INFINITY, V2::ZERO, V2::ZERO, 0);
     for i in 0..b.count() {
         for s in 0..a.segments() {
             let (p, q) = a.edge(s);
-            let (on_a, t) = closest_on_segment(b.vertex(i), p, q);
+            let (on_a, t) = closest_on_segment(b.vertex(i), p, q)?;
             let d = b.vertex(i).sub(on_a).length_squared();
+            if !d.is_finite() { return Err(PhysicsError::ArithmeticOverflow); }
             if d < best.0 {
                 best = (d, on_a, b.vertex(i), pair_id(feature(a.count(), s, t), i as u32));
             }
@@ -259,14 +267,16 @@ fn closest(a: &impl Poly, b: &impl Poly) -> (f32, V2, V2, u32) {
     for i in 0..a.count() {
         for s in 0..b.segments() {
             let (p, q) = b.edge(s);
-            let (on_b, t) = closest_on_segment(a.vertex(i), p, q);
+            let (on_b, t) = closest_on_segment(a.vertex(i), p, q)?;
             let d = a.vertex(i).sub(on_b).length_squared();
+            if !d.is_finite() { return Err(PhysicsError::ArithmeticOverflow); }
             if d < best.0 {
                 best = (d, a.vertex(i), on_b, pair_id(i as u32, feature(b.count(), s, t)));
             }
         }
     }
-    (crate::math::sqrt(best.0), best.1, best.2, best.3)
+    if !best.0.is_finite() { return Err(PhysicsError::ArithmeticOverflow); }
+    Ok((crate::math::sqrt(best.0), best.1, best.2, best.3))
 }
 
 /// The edge vectors of a quad, b - a per edge, and their squared lengths.
@@ -295,9 +305,10 @@ fn quad_distances(x: f32, y: f32, q: &Quad, ex: F4, ey: F4, span: F4) -> F4 {
 /// `closest` of two quads: the 32 squared distances in lanes, then the first least one in `closest`'s order (B's
 /// vertices against A's edges, then A's against B's), which is the one its strict `<` scan keeps; the winner's points
 /// and id are computed again by `closest_on_segment`, so they are the scalar's bits.
-fn closest_quads(a: &Quad, b: &Quad) -> (f32, V2, V2, u32) {
+fn closest_quads(a: &Quad, b: &Quad) -> Result<(f32, V2, V2, u32), PhysicsError> {
     let (ax, ay, aspan) = quad_edges(a);
     let (bx, by, bspan) = quad_edges(b);
+    if aspan.get().into_iter().chain(bspan.get()).any(|span| !span.is_finite()) { return Err(PhysicsError::ArithmeticOverflow); }
     let mut d = [F4::splat(0.0); 8];
     for i in 0..4 {
         d[i] = quad_distances(b.vx[i], b.vy[i], a, ax, ay, aspan);
@@ -311,24 +322,29 @@ fn closest_quads(a: &Quad, b: &Quad) -> (f32, V2, V2, u32) {
     let (least, _) = first_least(low);
     let mut hits = 0u32;
     for (k, row) in d.iter().enumerate() {
+        if row.get().into_iter().any(|distance| !distance.is_finite()) { return Err(PhysicsError::ArithmeticOverflow); }
         hits |= row.le(F4::splat(least)).bits() << (4 * k);
     }
+    // No candidate compares equal when the computed minimum is NaN. A zero mask is not an index: trailing_zeros
+    // would return32, whose row8 then indexed vertex4. Reject before interpreting the selected feature.
+    if hits == 0 || !least.is_finite() { return Err(PhysicsError::ArithmeticOverflow); }
     let first = hits.trailing_zeros() as usize;
     let at = (first / 4, first % 4);
     let (k, s) = at;
     if k < 4 {
         let (p, q) = a.edge(s);
-        let (on_a, t) = closest_on_segment(b.vertex(k), p, q);
-        (crate::math::sqrt(least), on_a, b.vertex(k), pair_id(feature(4, s, t), k as u32))
+        let (on_a, t) = closest_on_segment(b.vertex(k), p, q)?;
+        Ok((crate::math::sqrt(least), on_a, b.vertex(k), pair_id(feature(4, s, t), k as u32)))
     } else {
         let (p, q) = b.edge(s);
-        let (on_b, t) = closest_on_segment(a.vertex(k - 4), p, q);
-        (crate::math::sqrt(least), a.vertex(k - 4), on_b, pair_id((k - 4) as u32, feature(4, s, t)))
+        let (on_b, t) = closest_on_segment(a.vertex(k - 4), p, q)?;
+        Ok((crate::math::sqrt(least), a.vertex(k - 4), on_b, pair_id((k - 4) as u32, feature(4, s, t))))
     }
 }
 
 /// The manifold of `a` at `xa` and `b` at `xb`, keeping points whose separation is at most `speculative`.
-pub fn collide(a: &Core, xa: Xf, b: &Core, xb: Xf, speculative: f32) -> Manifold {
+/// Invalid current core data or non-finite input returns a coded error, as does unrepresentable collision arithmetic.
+pub fn collide(a: &Core, xa: Xf, b: &Core, xb: Xf, speculative: f32) -> Result<Manifold, PhysicsError> {
     collide_coherent(a, xa, b, xb, speculative, None)
 }
 
@@ -340,7 +356,59 @@ pub fn reference_flip(m: &Manifold) -> Option<bool> {
 
 /// As `collide`, given `last`, the previous manifold's `reference_flip`: while the two faces separate within
 /// FACE_HYSTERESIS of each other, the last reference face is kept.
-pub fn collide_coherent(a: &Core, xa: Xf, b: &Core, xb: Xf, speculative: f32, last: Option<bool>) -> Manifold {
+pub fn collide_coherent(a: &Core, xa: Xf, b: &Core, xb: Xf, speculative: f32, last: Option<bool>) -> Result<Manifold, PhysicsError> {
+    validate_collision_inputs(a, xa, b, xb, speculative)?;
+    collide_coherent_inner(a, xa, b, xb, speculative, last)
+}
+
+#[inline]
+fn finite(v: V2) -> bool { v.x.is_finite() && v.y.is_finite() }
+
+/// Validate only the values used by collision. Zero-span edges are deliberate supported inputs.
+pub(crate) fn validate_collision_core(core: &Core) -> Result<(), PhysicsError> {
+    if core.count == 0 || core.count > MAX_VERTICES { return Err(PhysicsError::InvalidCore); }
+    if !core.radius.is_finite() { return Err(PhysicsError::NotFinite); }
+    if core.radius < 0.0 { return Err(PhysicsError::InvalidCore); }
+    for i in 0..core.count {
+        if !finite(core.vertices[i]) || (core.edges() > 0 && !finite(core.normals[i])) { return Err(PhysicsError::NotFinite); }
+    }
+    Ok(())
+}
+
+pub(crate) fn validate_collision_pose(xf: Xf) -> Result<(), PhysicsError> {
+    if !finite(xf.p) || !xf.q.c.is_finite() || !xf.q.s.is_finite() { return Err(PhysicsError::NotFinite); }
+    Ok(())
+}
+
+fn validate_collision_inputs(a: &Core, xa: Xf, b: &Core, xb: Xf, speculative: f32) -> Result<(), PhysicsError> {
+    validate_collision_core(a)?;
+    validate_collision_core(b)?;
+    validate_collision_pose(xa)?;
+    validate_collision_pose(xb)?;
+    if !speculative.is_finite() { return Err(PhysicsError::NotFinite); }
+    Ok(())
+}
+
+fn checked_manifold(m: Manifold) -> Result<Manifold, PhysicsError> {
+    if m.count > m.points.len() || !finite(m.normal)
+        || m.points.iter().any(|p| !finite(p.point) || !p.separation.is_finite()) {
+        Err(PhysicsError::ArithmeticOverflow)
+    } else { Ok(m) }
+}
+
+/// World validates inputs at its public boundary. Mutable raw data can still be invalid; internal collision must
+/// reject it without indexing an absent face. Errors remain visible to the caller.
+pub(crate) fn collide_trusted(a: &Core, xa: Xf, b: &Core, xb: Xf, speculative: f32) -> Result<Manifold, PhysicsError> {
+    collide_coherent_trusted(a, xa, b, xb, speculative, None)
+}
+
+pub(crate) fn collide_coherent_trusted(a: &Core, xa: Xf, b: &Core, xb: Xf, speculative: f32, last: Option<bool>) -> Result<Manifold, PhysicsError> {
+    collide_coherent_inner(a, xa, b, xb, speculative, last)
+}
+
+fn collide_coherent_inner(a: &Core, xa: Xf, b: &Core, xb: Xf, speculative: f32, last: Option<bool>) -> Result<Manifold, PhysicsError> {
+    // Count is public and governs placement array accesses even for the trusted entry point.
+    if a.count == 0 || a.count > MAX_VERTICES || b.count == 0 || b.count > MAX_VERTICES { return Err(PhysicsError::InvalidCore); }
     // Work in A's frame. Two four-cornered polygons (boxes) take the lane path, which gives the same bits.
     if a.count == 4 && b.count == 4 {
         let (pa, pb) = (place_quad(a, Xf::IDENTITY), place_quad(b, xa.inverse_mul(xb)));
@@ -365,13 +433,14 @@ fn decide<P: Poly>(
     xa: Xf,
     speculative: f32,
     last: Option<bool>,
-    closest: fn(&P, &P) -> (f32, V2, V2, u32),
-) -> Manifold {
+    closest: fn(&P, &P) -> Result<(f32, V2, V2, u32), PhysicsError>,
+) -> Result<Manifold, PhysicsError> {
     let mut manifold = Manifold::default();
     let radii = a_radius + b_radius;
+    validate_faces(pa, pb, (face_a, face_b), radii, speculative)?;
     let face = face_a.0.max(face_b.0);
     if face - radii > speculative {
-        return manifold;
+        return Ok(manifold);
     }
     // The reference face: A's unless B's separates clearly more, so a resting pair keeps one choice; within the
     // hysteresis the last step's choice stands.
@@ -382,9 +451,9 @@ fn decide<P: Poly>(
     };
     if face > 0.0 || face_a.1 == usize::MAX && face_b.1 == usize::MAX {
         // Apart (or two circles): the exact distance decides.
-        let (distance, on_a, on_b, id) = closest(pa, pb);
+        let (distance, on_a, on_b, id) = closest(pa, pb)?;
         if distance - radii > speculative {
-            return manifold;
+            return Ok(manifold);
         }
         // The face's two points stand only when the face is the closest feature: its separation is the distance, and
         // its clipped points reach it (a vertex just past the end of a short face passes the first test alone). When
@@ -396,7 +465,7 @@ fn decide<P: Poly>(
                 if choice { (pb, pa, b_radius, a_radius) } else { (pa, pb, a_radius, b_radius) };
             face_is_closest = reference.1 != usize::MAX && reference.0 >= distance - FACE_TOLERANCE;
             if face_is_closest {
-                clip(&mut manifold, owner, other, reference.1, choice, owner_radius, other_radius, speculative);
+                clip(&mut manifold, owner, other, reference.1, choice, owner_radius, other_radius, speculative)?;
                 let least = manifold.points[..manifold.count].iter().map(|p| p.separation).fold(f32::INFINITY, f32::min);
                 face_is_closest = least <= distance - radii + FACE_TOLERANCE;
                 if !face_is_closest {
@@ -422,24 +491,37 @@ fn decide<P: Poly>(
             manifold.normal = xa.q.apply(normal);
             manifold.points[0] = ManifoldPoint { point: xa.apply(surface_a.lerp(surface_b, 0.5)), separation: distance - radii, id };
             manifold.count = 1;
-            return manifold;
+            return checked_manifold(manifold);
         }
     } else {
         let reference = if flip { face_b } else { face_a };
         let (owner, other, owner_radius, other_radius) = if flip { (pb, pa, b_radius, a_radius) } else { (pa, pb, a_radius, b_radius) };
-        clip(&mut manifold, owner, other, reference.1, flip, owner_radius, other_radius, speculative);
+        clip(&mut manifold, owner, other, reference.1, flip, owner_radius, other_radius, speculative)?;
     }
     // Back to world space; the normal always runs from A to B.
     manifold.normal = xa.q.apply(manifold.normal);
     for i in 0..manifold.count {
         manifold.points[i].point = xa.apply(manifold.points[i].point);
     }
-    manifold
+    checked_manifold(manifold)
+}
+
+fn validate_faces<P: Poly>(a: &P, b: &P, faces: ((f32, usize), (f32, usize)), radii: f32, speculative: f32) -> Result<(), PhysicsError> {
+    if !radii.is_finite() || !speculative.is_finite() { return Err(PhysicsError::ArithmeticOverflow); }
+    for (poly, (separation, edge)) in [(a, faces.0), (b, faces.1)] {
+        if poly.edges() == 0 {
+            if edge != usize::MAX { return Err(PhysicsError::InvalidCore); }
+        } else if edge >= poly.edges() || !separation.is_finite() {
+            return Err(PhysicsError::ArithmeticOverflow);
+        }
+    }
+    Ok(())
 }
 
 /// Clips the incident feature of `other` to the side planes of `owner`'s edge `edge`, in A's frame.
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn clip(m: &mut Manifold, owner: &impl Poly, other: &impl Poly, edge: usize, flip: bool, owner_radius: f32, other_radius: f32, speculative: f32) {
+pub(crate) fn clip(m: &mut Manifold, owner: &impl Poly, other: &impl Poly, edge: usize, flip: bool, owner_radius: f32, other_radius: f32, speculative: f32) -> Result<(), PhysicsError> {
+    if edge >= owner.edges() || owner.count() == 0 || other.count() == 0 { return Err(PhysicsError::InvalidCore); }
     let n = owner.normal(edge);
     let (r1, r2) = owner.edge(edge);
     // The incident edge: the face of `other` most against the reference normal; a circle's one point.
@@ -450,17 +532,20 @@ pub(crate) fn clip(m: &mut Manifold, owner: &impl Poly, other: &impl Poly, edge:
         count = 1;
     } else {
         incident = other.incident(n);
+        if incident >= other.edges() { return Err(PhysicsError::ArithmeticOverflow); }
         let (i1, i2) = other.edge(incident);
         points = [i1, i2];
         ends = [0, 1];
         count = 2;
         // Clip to the side planes: t.(x - r1) >= 0 and t.(x - r2) <= 0.
-        let (t, _) = r2.sub(r1).normalize();
+        let (t, length) = r2.sub(r1).normalize();
+        if !length.is_finite() { return Err(PhysicsError::ArithmeticOverflow); }
         for (side, origin, sign) in [(0usize, r1, 1.0f32), (1, r2, -1.0)] {
             let d0 = sign * t.dot(points[0].sub(origin));
             let d1 = sign * t.dot(points[1].sub(origin));
+            if !d0.is_finite() || !d1.is_finite() { return Err(PhysicsError::ArithmeticOverflow); }
             if d0 < 0.0 && d1 < 0.0 {
-                return;
+                return Ok(());
             }
             if d0 < 0.0 || d1 < 0.0 {
                 let cut = points[0].lerp(points[1], d0 / (d0 - d1));
@@ -479,6 +564,7 @@ pub(crate) fn clip(m: &mut Manifold, owner: &impl Poly, other: &impl Poly, edge:
         let p = points[k];
         let depth = n.dot(p.sub(r1));
         let separation = depth - owner_radius - other_radius;
+        if !separation.is_finite() { return Err(PhysicsError::ArithmeticOverflow); }
         if separation > speculative {
             continue;
         }
@@ -487,6 +573,41 @@ pub(crate) fn clip(m: &mut Manifold, owner: &impl Poly, other: &impl Poly, edge:
         let id = clip_id(flip, edge, incident, ends[k]);
         m.points[m.count] = ManifoldPoint { point, separation, id };
         m.count += 1;
+    }
+    checked_manifold(*m).map(|_| ())
+}
+
+#[cfg(test)]
+mod invalid_input_tests {
+    use super::*;
+
+    #[test]
+    fn missing_scalar_features_are_rejected_before_any_array_index() {
+        let square = Core::rect(0.5, 0.5, V2::ZERO, 1.0, 0.0, 0.0).unwrap();
+        let a = place_quad(&square, Xf::IDENTITY);
+        let b = place_quad(&square, Xf { p: v2(f32::NAN, 0.0), ..Xf::IDENTITY });
+        assert_eq!(first_most(F4::splat(f32::NAN)).1, usize::MAX);
+        assert_eq!(first_least(F4::splat(f32::NAN)).1, usize::MAX);
+        assert_eq!(closest_quads(&a, &b), Err(PhysicsError::ArithmeticOverflow));
+        assert_eq!(decide(&a, &b, ((0.0, 32), (0.0, 0)), 0.0, 0.0, Xf::IDENTITY, 0.02, None, closest_quads), Err(PhysicsError::ArithmeticOverflow));
+        assert_eq!(clip(&mut Manifold::default(), &a, &a, 32, false, 0.0, 0.0, 0.02), Err(PhysicsError::InvalidCore));
+        assert_eq!(clip(&mut Manifold::default(), &a, &b, 0, false, 0.0, 0.0, 0.02), Err(PhysicsError::ArithmeticOverflow));
+        assert_eq!(closest_on_segment(V2::ZERO, v2(-1.0e20, 0.0), v2(1.0e20, 0.0)), Err(PhysicsError::ArithmeticOverflow));
+    }
+
+    #[test]
+    fn trusted_paths_remain_bounds_safe_after_raw_data_mutation() {
+        let square = Core::rect(0.5, 0.5, V2::ZERO, 1.0, 0.0, 0.0).unwrap();
+        let xa = Xf { p: v2(f32::NAN, 0.0), ..Xf::IDENTITY };
+        assert!(collide_coherent_trusted(&square, xa, &square, Xf::IDENTITY, f32::NAN, None).is_err());
+        assert!(collide_four_trusted([(&square, xa, &square, Xf::IDENTITY, None); 4], f32::NAN).is_err());
+        for count in [0, MAX_VERTICES + 1, usize::MAX] {
+            let invalid = Core { count, ..square };
+            assert_eq!(collide_trusted(&invalid, Xf::IDENTITY, &square, Xf::IDENTITY, 0.02), Err(PhysicsError::InvalidCore));
+            let mut batch = [(&square, Xf::IDENTITY, &square, Xf::IDENTITY, None); 4];
+            batch[2].0 = &invalid;
+            assert_eq!(collide_four_trusted(batch, 0.02), Err(PhysicsError::InvalidCore));
+        }
     }
 }
 

@@ -226,7 +226,7 @@ fn inverse(q: Rot) -> Rot {
 }
 
 /// One step of `dt` over the world's awake bodies and the contacts that touch one.
-pub fn solve(world: &mut World, dt: f32) {
+pub fn solve(world: &mut World, dt: f32) -> Result<(), crate::error::PhysicsError> {
     let settings = world.settings;
     let substeps = settings.substeps.max(1);
     let passes = settings.passes.max(1);
@@ -314,17 +314,26 @@ pub fn solve(world: &mut World, dt: f32) {
             let (rta, rtb) = (ra.cross(t), rb.cross(t));
             let kn = ima + imb + iia * rna * rna + iib * rnb * rnb;
             let kt = ima + imb + iia * rta * rta + iib * rtb * rtb;
+            if !kn.is_finite() || !kt.is_finite() || kn < 0.0 || kt < 0.0
+                || kn > 0.0 && !(1.0 / kn).is_finite() || kt > 0.0 && !(1.0 / kt).is_finite() {
+                return Err(crate::error::PhysicsError::ArithmeticOverflow);
+            }
             let dv = speed_at(mb, rb).sub(speed_at(ma, ra));
+            let approach = n.dot(dv);
+            let base = mp.separation - n.dot(rb.sub(ra));
+            if !dv.x.is_finite() || !dv.y.is_finite() || !approach.is_finite() || !base.is_finite() {
+                return Err(crate::error::PhysicsError::ArithmeticOverflow);
+            }
             c.points[k] = Point {
                 anchor_a: ra,
                 anchor_b: rb,
-                base: mp.separation - n.dot(rb.sub(ra)),
+                base,
                 normal_impulse: contact.normal_impulse[k],
                 tangent_impulse: contact.tangent_impulse[k],
                 normal_mass: if kn > 0.0 { 1.0 / kn } else { 0.0 },
                 tangent_mass: if kt > 0.0 { 1.0 / kt } else { 0.0 },
             };
-            bounce.approach[k] = n.dot(dv);
+            bounce.approach[k] = approach;
             load += contact.normal_impulse[k];
         }
         if m.count == 2 {
@@ -333,6 +342,7 @@ pub fn solve(world: &mut World, dt: f32) {
             let k11 = ima + imb + iia * r1a * r1a + iib * r1b * r1b;
             let k22 = ima + imb + iia * r2a * r2a + iib * r2b * r2b;
             let k12 = ima + imb + iia * r1a * r2a + iib * r1b * r2b;
+            if !k12.is_finite() { return Err(crate::error::PhysicsError::ArithmeticOverflow); }
             c.k = [k11, k12, k22];
             c.block = settings.block_solver && k11 * k11 < MAX_CONDITION * (k11 * k22 - k12 * k12);
         }
@@ -494,12 +504,18 @@ pub fn solve(world: &mut World, dt: f32) {
     world.scratch.paths = paths;
     world.scratch.blocks = blocks;
     world.scratch.colouring = colouring;
+    Ok(())
 }
 
 /// sqrt(a b): the friction of two materials.
 #[inline]
 fn sqrt_product(a: f32, b: f32) -> f32 {
-    crate::math::sqrt(a * b)
+    let product = a * b;
+    if product.is_finite() { return crate::math::sqrt(product); }
+    // Finite nonnegative material coefficients can have an overflowing product but a representable mean.
+    // In this branch smaller>1, so the ratio cannot underflow to zero; ratio<=1 proves the result<=larger.
+    let (larger, smaller) = if a > b { (a, b) } else { (b, a) };
+    larger * crate::math::sqrt(smaller / larger)
 }
 
 /// The solver bodies contact `c` writes, `NONE` for one it only reads (static, kinematic): what `store` writes.
@@ -593,7 +609,7 @@ fn friction(c: &mut Constraint, ma: &mut Motion, mb: &mut Motion) {
         let p = c.points[k];
         let vt = t.dot(speed_at(*mb, p.anchor_b).sub(speed_at(*ma, p.anchor_a)));
         let limit = mu * p.normal_impulse;
-        let total = (p.tangent_impulse - p.tangent_mass * vt).clamp(-limit, limit);
+        let total = crate::math::clamp(p.tangent_impulse - p.tangent_mass * vt, -limit, limit);
         let applied = total - p.tangent_impulse;
         c.points[k].tangent_impulse = total;
         apply(c, ma, mb, &p, t.scale(applied));
@@ -683,5 +699,19 @@ mod tests {
         assert_eq!(core::mem::size_of::<SolverBody>(), 32);
         assert_eq!(core::mem::align_of::<SolverBody>(), 16);
         assert_eq!(core::mem::size_of::<Constraint>(), 128);
+    }
+
+    #[test]
+    fn material_mean_preserves_finite_product_bits_and_handles_overflowing_products() {
+        for (a, b) in [(0.0, f32::MAX), (0.3, 0.7), (1.234_567, 8.765_432), (f32::MIN_POSITIVE, f32::MAX)] {
+            assert_eq!(sqrt_product(a, b).to_bits(), crate::math::sqrt(a * b).to_bits());
+        }
+        for (a, b) in [(1.0e20, 1.0e20), (f32::MAX, f32::MAX), (f32::MAX, 1.234_567), (2.0e19, 3.0e19)] {
+            let actual = sqrt_product(a, b);
+            let reference = ((a as f64) * (b as f64)).sqrt();
+            assert!(actual.is_finite() && actual >= a.min(b) && actual <= a.max(b));
+            assert!(((actual as f64) - reference).abs() <= 8.0 * f32::EPSILON as f64 * reference);
+            assert_eq!(actual.to_bits(), sqrt_product(b, a).to_bits());
+        }
     }
 }

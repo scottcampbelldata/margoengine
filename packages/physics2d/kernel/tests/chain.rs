@@ -13,13 +13,13 @@ const DT: f32 = 1.0 / 60.0;
 /// The floor: 51 points, a segment a metre, as one chain or as loose segments.
 fn floor(world: &mut World, ghosts: bool) {
     let points: Vec<V2> = (0..=50).map(|i| v2(i as f32, 0.0)).collect();
-    let body = world.create_body(&BodyDef { kind: Kind::Static, ..Default::default() });
+    let body = world.create_body(&BodyDef { kind: Kind::Static, ..Default::default() }).unwrap();
     let def = ShapeDef { friction: 0.0, ..Default::default() };
     if ghosts {
         world.create_chain(body, &points, false, &def).unwrap();
     } else {
         for w in points.windows(2) {
-            world.create_shape(body, Core::segment(w[0], w[1]).unwrap(), &def);
+            world.create_shape(body, Core::segment(w[0], w[1]).unwrap(), &def).unwrap();
         }
     }
 }
@@ -38,14 +38,14 @@ fn slide(ghosts: bool, ball: bool, chain_first: bool) -> Slide {
         floor(&mut world, ghosts);
     }
     let (y, core) = if ball { (0.5, Core::circle(V2::ZERO, 0.5).unwrap()) } else { (0.5, Core::rect(0.5, 0.5, V2::ZERO, 1.0, 0.0, 0.0).unwrap()) };
-    let body = world.create_body(&BodyDef { position: v2(1.0, y), linear_velocity: v2(5.0, 0.0), can_sleep: false, fixed_rotation: ball, ..Default::default() });
-    world.create_shape(body, core, &ShapeDef { friction: 0.0, ..Default::default() });
+    let body = world.create_body(&BodyDef { position: v2(1.0, y), linear_velocity: v2(5.0, 0.0), can_sleep: false, fixed_rotation: ball, ..Default::default() }).unwrap();
+    world.create_shape(body, core, &ShapeDef { friction: 0.0, ..Default::default() }).unwrap();
     if !chain_first {
         floor(&mut world, ghosts);
     }
     let mut out = Slide { min_vx: 5.0, max_vx: 5.0, max_vy: 0.0, max_angle: 0.0 };
     for _ in 0..480 {
-        world.step(DT);
+        world.step(DT).unwrap();
         let b = &world.bodies[body as usize];
         if b.xf.p.x >= 48.0 {
             break;
@@ -82,14 +82,14 @@ fn without_their_ghosts_the_same_segments_catch() {
 fn a_ball_rolls_over_a_bump_and_settles_in_a_valley() {
     // A chain up a slope, over a ridge and down into a valley: corners that turn away from the ball and toward it.
     let mut world = World::default();
-    let body = world.create_body(&BodyDef { kind: Kind::Static, ..Default::default() });
+    let body = world.create_body(&BodyDef { kind: Kind::Static, ..Default::default() }).unwrap();
     let points = [v2(-6.0, 3.0), v2(-3.0, 0.0), v2(0.0, 0.0), v2(2.0, 1.0), v2(4.0, 0.0), v2(7.0, 3.0)];
     world.create_chain(body, &points, false, &ShapeDef::default()).unwrap();
-    let ball = world.create_body(&BodyDef { position: v2(-5.0, 3.5), ..Default::default() });
-    world.create_shape(ball, Core::circle(V2::ZERO, 0.25).unwrap(), &ShapeDef { friction: 0.6, ..Default::default() });
+    let ball = world.create_body(&BodyDef { position: v2(-5.0, 3.5), ..Default::default() }).unwrap();
+    world.create_shape(ball, Core::circle(V2::ZERO, 0.25).unwrap(), &ShapeDef { friction: 0.6, ..Default::default() }).unwrap();
     let mut lowest = f32::INFINITY;
     for _ in 0..1200 {
-        world.step(DT);
+        world.step(DT).unwrap();
         let p = world.bodies[ball as usize].xf.p;
         assert!(p.y > -0.01, "fell through the chain at {p:?}");
         lowest = lowest.min(p.y);
@@ -104,14 +104,14 @@ fn a_ball_rolls_over_a_bump_and_settles_in_a_valley() {
 #[test]
 fn a_closed_chain_holds_a_box_inside() {
     let mut world = World::default();
-    let body = world.create_body(&BodyDef { kind: Kind::Static, ..Default::default() });
+    let body = world.create_body(&BodyDef { kind: Kind::Static, ..Default::default() }).unwrap();
     let ring = [v2(-2.0, 0.0), v2(2.0, 0.0), v2(2.0, 4.0), v2(-2.0, 4.0)];
     let shapes = world.create_chain(body, &ring, true, &ShapeDef::default()).unwrap();
     assert_eq!(shapes.len(), 4);
-    let b = world.create_body(&BodyDef { position: v2(0.0, 2.0), linear_velocity: v2(7.0, 3.0), angular_velocity: 3.0, ..Default::default() });
-    world.create_shape(b, Core::rect(0.3, 0.2, V2::ZERO, 1.0, 0.0, 0.0).unwrap(), &ShapeDef { restitution: 0.5, ..Default::default() });
+    let b = world.create_body(&BodyDef { position: v2(0.0, 2.0), linear_velocity: v2(7.0, 3.0), angular_velocity: 3.0, ..Default::default() }).unwrap();
+    world.create_shape(b, Core::rect(0.3, 0.2, V2::ZERO, 1.0, 0.0, 0.0).unwrap(), &ShapeDef { restitution: 0.5, ..Default::default() }).unwrap();
     for _ in 0..600 {
-        world.step(DT);
+        world.step(DT).unwrap();
         let p = world.bodies[b as usize].xf.p;
         assert!(p.x.abs() < 2.0 && p.y > 0.0 && p.y < 4.0, "left the ring at {p:?}");
     }
@@ -120,7 +120,7 @@ fn a_closed_chain_holds_a_box_inside() {
 #[test]
 fn a_chain_refuses_too_few_points() {
     let mut world = World::default();
-    let body = world.create_body(&BodyDef { kind: Kind::Static, ..Default::default() });
+    let body = world.create_body(&BodyDef { kind: Kind::Static, ..Default::default() }).unwrap();
     assert!(world.create_chain(body, &[v2(0.0, 0.0)], false, &ShapeDef::default()).is_err());
     assert!(world.create_chain(body, &[v2(0.0, 0.0), v2(0.0, 0.0)], false, &ShapeDef::default()).is_err());
     assert!(world.create_chain(body, &[v2(0.0, 0.0), v2(1.0, 0.0)], true, &ShapeDef::default()).is_err());

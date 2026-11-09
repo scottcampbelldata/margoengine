@@ -5,6 +5,7 @@
 // 1996, reduced to the plane: a triangle from the origin to a and b has area a x b / 2, first moment area (a + b) / 3
 // and polar second moment area (a.a + a.b + b.b) / 6).
 use crate::math::{PI, V2, atan2, sqrt, v2};
+use crate::error::PhysicsError;
 use crate::shape::Core;
 
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -63,11 +64,25 @@ impl Moments {
 
 /// The mass of `core` at `density` (kilograms per square metre). A segment, with no area, has none.
 pub fn mass_of(core: &Core, density: f32) -> MassData {
+    mass_properties(core, density).0
+}
+
+/// Zero density and zero area deliberately have no mass. A positive geometric property rounded to zero cannot
+/// take that fallback: its reciprocal (or the physical property itself) is unrepresentable.
+pub(crate) fn checked_mass_of(core: &Core, density: f32) -> Result<MassData, PhysicsError> {
+    let (data, positive_mass, positive_inertia) = mass_properties(core, density);
+    if !data.mass.is_finite() || !data.inertia.is_finite() || !data.center.x.is_finite() || !data.center.y.is_finite()
+        || positive_mass && !(data.mass > 0.0) || positive_inertia && !(data.inertia > 0.0) {
+        Err(PhysicsError::ArithmeticOverflow)
+    } else { Ok(data) }
+}
+
+fn mass_properties(core: &Core, density: f32) -> (MassData, bool, bool) {
     let r = core.radius;
     match core.count {
         1 => {
             let mass = density * PI * r * r;
-            MassData { mass, center: core.vertices[0], inertia: 0.5 * mass * r * r }
+            (MassData { mass, center: core.vertices[0], inertia: 0.5 * mass * r * r }, density > 0.0 && r > 0.0, density > 0.0 && r > 0.0)
         }
         2 => capsule(core.vertices[0], core.vertices[1], r, density),
         _ => polygon(core, density),
@@ -75,7 +90,7 @@ pub fn mass_of(core: &Core, density: f32) -> MassData {
 }
 
 /// A capsule: the rectangle between the two half discs plus the two half discs, which make one disc.
-fn capsule(a: V2, b: V2, r: f32, density: f32) -> MassData {
+fn capsule(a: V2, b: V2, r: f32, density: f32) -> (MassData, bool, bool) {
     let center = a.lerp(b, 0.5);
     let length = b.sub(a).length() as f64;
     let (r, rho) = (r as f64, density as f64);
@@ -88,10 +103,10 @@ fn capsule(a: V2, b: V2, r: f32, density: f32) -> MassData {
     let own = half * r * r / 2.0 - half * offset * offset;
     let shift = 0.5 * length + offset;
     let caps = 2.0 * (own + half * shift * shift);
-    MassData { mass: (box_mass + disc_mass) as f32, center, inertia: (box_inertia + caps) as f32 }
+    (MassData { mass: (box_mass + disc_mass) as f32, center, inertia: (box_inertia + caps) as f32 }, box_mass + disc_mass > 0.0, box_inertia + caps > 0.0)
 }
 
-fn polygon(core: &Core, density: f32) -> MassData {
+fn polygon(core: &Core, density: f32) -> (MassData, bool, bool) {
     let n = core.count;
     let mut reference = V2::ZERO;
     for i in 0..n {
@@ -121,5 +136,11 @@ fn polygon(core: &Core, density: f32) -> MassData {
             m.sector(b, bisector, r as f64, angle, half_sine);
         }
     }
-    m.finish(density, reference)
+    let data = m.finish(density, reference);
+    let positive_mass = density > 0.0 && m.area > 0.0;
+    let positive_inertia = if positive_mass {
+        let (cx, cy) = (m.first.0 / m.area, m.first.1 / m.area);
+        m.second - m.area * (cx * cx + cy * cy) > 0.0
+    } else { false };
+    (data, positive_mass, positive_inertia)
 }

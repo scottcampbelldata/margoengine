@@ -73,7 +73,7 @@ fn every_pair_of_shapes_reports_the_gap_or_the_depth_that_separates_them() {
     for _ in 0..4000 {
         let (a, b) = (shape(&mut random), shape(&mut random));
         let (xa, xb) = (pose(&mut random, 0.3), pose(&mut random, 1.2));
-        let m = collide(&a, xa, &b, xb, 0.5);
+        let m = collide(&a, xa, &b, xb, 0.5).unwrap();
         if m.count == 0 {
             assert!(sampled_gap(&a, xa, &b, xb) > 0.5 - 2e-3, "a pair within reach has no points");
             continue;
@@ -105,25 +105,25 @@ fn a_box_on_a_box_has_two_points_whose_ids_hold_while_it_slides() {
     let ground = Core::rect(5.0, 0.5, V2::ZERO, 1.0, 0.0, 0.0).unwrap();
     let crate_ = Core::rect(0.5, 0.5, V2::ZERO, 1.0, 0.0, 0.0).unwrap();
     let at = |x: f32, y: f32| Xf { p: v2(x, y), q: Rot::IDENTITY };
-    let m = collide(&ground, at(0.0, 0.0), &crate_, at(0.3, 1.0 - 0.002), 0.02);
+    let m = collide(&ground, at(0.0, 0.0), &crate_, at(0.3, 1.0 - 0.002), 0.02).unwrap();
     assert_eq!(m.count, 2);
     assert!((m.normal.y - 1.0).abs() < 1e-6 && m.normal.x == 0.0);
     for p in &m.points {
         assert!((p.separation + 0.002).abs() < 1e-6, "{}", p.separation);
         assert!((p.point.y - 0.499).abs() < 1e-5);
     }
-    let later = collide(&ground, at(0.0, 0.0), &crate_, at(0.31, 1.0 - 0.0021), 0.02);
+    let later = collide(&ground, at(0.0, 0.0), &crate_, at(0.31, 1.0 - 0.0021), 0.02).unwrap();
     assert_eq!([m.points[0].id, m.points[1].id], [later.points[0].id, later.points[1].id]);
     // Apart by 1 cm the points are speculative; apart by more than the margin there are none.
-    assert_eq!(collide(&ground, at(0.0, 0.0), &crate_, at(0.3, 1.01), 0.02).count, 2);
-    assert_eq!(collide(&ground, at(0.0, 0.0), &crate_, at(0.3, 1.03), 0.02).count, 0);
+    assert_eq!(collide(&ground, at(0.0, 0.0), &crate_, at(0.3, 1.01), 0.02).unwrap().count, 2);
+    assert_eq!(collide(&ground, at(0.0, 0.0), &crate_, at(0.3, 1.03), 0.02).unwrap().count, 0);
 }
 
 #[test]
 fn rounded_corners_meet_at_one_point_and_a_lying_capsule_at_two() {
     let rounded = Core::rect(0.5, 0.5, V2::ZERO, 1.0, 0.0, 0.0).map(|c| Core { radius: 0.1, ..c }).unwrap();
     // Corner to corner along the diagonal: one point on the line between the corners.
-    let m = collide(&rounded, Xf::IDENTITY, &rounded, Xf { p: v2(1.25, 1.25), q: Rot::IDENTITY }, 0.5);
+    let m = collide(&rounded, Xf::IDENTITY, &rounded, Xf { p: v2(1.25, 1.25), q: Rot::IDENTITY }, 0.5).unwrap();
     assert_eq!(m.count, 1);
     let diagonal = std::f32::consts::FRAC_1_SQRT_2;
     assert!((m.normal.x - diagonal).abs() < 1e-5 && (m.normal.y - diagonal).abs() < 1e-5);
@@ -132,7 +132,7 @@ fn rounded_corners_meet_at_one_point_and_a_lying_capsule_at_two() {
     let ground = Core::rect(5.0, 0.5, V2::ZERO, 1.0, 0.0, 0.0).unwrap();
     let capsule = Core::capsule(v2(-1.0, 0.0), v2(1.0, 0.0), 0.25).unwrap();
     let tilt = 0.002f32;
-    let m = collide(&ground, Xf::IDENTITY, &capsule, Xf { p: v2(0.0, 0.749), q: Rot::from_pair(1.0, tilt) }, 0.05);
+    let m = collide(&ground, Xf::IDENTITY, &capsule, Xf { p: v2(0.0, 0.749), q: Rot::from_pair(1.0, tilt) }, 0.05).unwrap();
     assert_eq!(m.count, 2);
     assert!(m.points[0].separation < 0.0 || m.points[1].separation < 0.0);
 }
@@ -150,7 +150,7 @@ fn a_box_rocking_on_a_box_keeps_its_point_ids_through_level() {
     for step in 0..=400 {
         let angle = -0.01 + 0.02 * step as f32 / 400.0;
         let xf = Xf { p: v2(0.1, 1.0 - 0.002), q: Rot::from_pair(angle.cos(), angle.sin()) };
-        let m = collide_coherent(&below, rest, &above, xf, 0.02, last);
+        let m = collide_coherent(&below, rest, &above, xf, 0.02, last).unwrap();
         assert_eq!(m.count, 2, "step {step}");
         let ids = [m.points[0].id, m.points[1].id];
         if let Some(old) = previous {

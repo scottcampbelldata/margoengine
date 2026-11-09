@@ -68,16 +68,17 @@ fn distance_bounds(a: &Quad, b: &Quad, face_a: (f32, usize), magnitude: f32) -> 
 }
 
 #[allow(clippy::too_many_arguments)]
-pub(super) fn decide_quads(a: &Quad, b: &Quad, faces: ((f32, usize), (f32, usize)), ar: f32, br: f32, xa: Xf, speculative: f32, last: Option<bool>) -> Manifold {
+pub(super) fn decide_quads(a: &Quad, b: &Quad, faces: ((f32, usize), (f32, usize)), ar: f32, br: f32, xa: Xf, speculative: f32, last: Option<bool>) -> Result<Manifold, PhysicsError> {
     decide_quads_with_metadata(a, b, faces, ar, br, xa, speculative, last, None)
 }
 
 #[allow(clippy::too_many_arguments)]
-pub(super) fn decide_quads_with_metadata(a: &Quad, b: &Quad, faces: ((f32, usize), (f32, usize)), ar: f32, br: f32, xa: Xf, speculative: f32, last: Option<bool>, metadata: Option<four::DistanceMetadata>) -> Manifold {
+pub(super) fn decide_quads_with_metadata(a: &Quad, b: &Quad, faces: ((f32, usize), (f32, usize)), ar: f32, br: f32, xa: Xf, speculative: f32, last: Option<bool>, metadata: Option<four::DistanceMetadata>) -> Result<Manifold, PhysicsError> {
     let (face_a, face_b) = faces;
     let radii = ar + br;
+    validate_faces(a, b, faces, radii, speculative)?;
     // Exactly the old first rejection, before attempting any certificate.
-    if face_a.0.max(face_b.0) - radii > speculative { return Manifold::default(); }
+    if face_a.0.max(face_b.0) - radii > speculative { return Ok(Manifold::default()); }
     #[cfg(test)]
     ATTEMPTS.with(|count| count.set(count.get() + 1));
     if ar >= 0.0 && br >= 0.0 && ar.is_finite() && br.is_finite() && radii.is_finite()
@@ -97,7 +98,7 @@ pub(super) fn decide_quads_with_metadata(a: &Quad, b: &Quad, faces: ((f32, usize
         if reference.1 < 4 && upper - radii <= speculative && reference.0 >= upper - FACE_TOLERANCE {
             let (owner, other, owner_radius, other_radius) = if flip { (b, a, br, ar) } else { (a, b, ar, br) };
             let mut clipped = Manifold::default();
-            clip(&mut clipped, owner, other, reference.1, flip, owner_radius, other_radius, speculative);
+            clip(&mut clipped, owner, other, reference.1, flip, owner_radius, other_radius, speculative)?;
             let least = clipped.points[..clipped.count].iter().map(|point| point.separation).fold(f32::INFINITY, f32::min);
             if least <= lower - radii + FACE_TOLERANCE {
                 // The old preferred face necessarily succeeds for every d in[L,U].
@@ -109,7 +110,7 @@ pub(super) fn decide_quads_with_metadata(a: &Quad, b: &Quad, faces: ((f32, usize
                 {
                     #[cfg(test)]
                     HITS.with(|count| count.set(count.get() + 1));
-                    return clipped;
+                    return Ok(clipped);
                 }
             }
         }
@@ -136,13 +137,13 @@ mod tests {
     fn verify(a: &Quad, b: &Quad) {
         let faces = (best_face_quads(a, b), best_face_quads(b, a));
         if let Some((lower, upper)) = bounds(a, b, faces.0) {
-            let old = closest_quads(a, b).0;
+            let old = closest_quads(a, b).unwrap().0;
             assert!(lower <= old && old <= upper, "L={lower:?} d={old:?} U={upper:?}");
         }
         for last in [None, Some(false), Some(true)] {
             for speculative in [0.0, 0.02, 0.5] {
-                let old = decide(a, b, faces, 0.01, 0.02, Xf::IDENTITY, speculative, last, closest_quads);
-                let got = decide_quads(a, b, faces, 0.01, 0.02, Xf::IDENTITY, speculative, last);
+                let old = decide(a, b, faces, 0.01, 0.02, Xf::IDENTITY, speculative, last, closest_quads).unwrap();
+                let got = decide_quads(a, b, faces, 0.01, 0.02, Xf::IDENTITY, speculative, last).unwrap();
                 assert_eq!(bits(&got), bits(&old));
             }
         }
@@ -181,7 +182,7 @@ mod tests {
         let (mut attempts, mut hits) = (0u64, 0u64);
         for step in 0..100 {
             ATTEMPTS.with(|count| count.set(0)); HITS.with(|count| count.set(0));
-            world.step(profile_scenes::DT);
+            world.step(profile_scenes::DT).unwrap();
             if step >= 60 {
                 let a = ATTEMPTS.with(Cell::get);
                 let h = HITS.with(Cell::get);

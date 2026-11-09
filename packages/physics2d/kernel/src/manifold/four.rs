@@ -231,6 +231,11 @@ fn square_root(v: F4) -> F4 {
     }
 }
 
+fn finite_lanes(value: F4, active: M4) -> Result<(), PhysicsError> {
+    let finite = value.ge(F4::splat(-f32::MAX)).and(value.le(F4::splat(f32::MAX)));
+    if active.and_not(finite).bits() != 0 { Err(PhysicsError::ArithmeticOverflow) } else { Ok(()) }
+}
+
 impl Quads {
     // The apart path reads the same placed vertices, normals and SAT results, without repeating that work.
     #[inline(always)]
@@ -262,7 +267,7 @@ fn separated(
     pair: (&Core, Xf, &Core, Xf, Option<bool>),
     speculative: f32,
     metadata: Option<DistanceMetadata>,
-) -> Manifold {
+) -> Result<Manifold, PhysicsError> {
     face_distance::decide_quads_with_metadata(
         a,
         b,
@@ -288,16 +293,22 @@ fn separated(
 /// let square = Core::rect(0.5, 0.5, V2::ZERO, 1.0, 0.0, 0.0).unwrap();
 /// let above = Xf { p: v2(0.0, 0.9), ..Xf::IDENTITY };
 /// let pair = (&square, Xf::IDENTITY, &square, above, None);
-/// let contacts = collide_four([pair; 4], 0.02);
+/// let contacts = collide_four([pair; 4], 0.02).unwrap();
 /// assert!(contacts.iter().all(|m| m.count == 2));
 /// ```
-pub fn collide_four(pairs: [(&Core, Xf, &Core, Xf, Option<bool>); 4], speculative: f32) -> [Manifold; 4] {
+pub fn collide_four(pairs: [(&Core, Xf, &Core, Xf, Option<bool>); 4], speculative: f32) -> Result<[Manifold; 4], PhysicsError> {
+    for &(a, xa, b, xb, _) in &pairs { validate_collision_inputs(a, xa, b, xb, speculative)?; }
+    collide_four_trusted(pairs, speculative)
+}
+
+pub(crate) fn collide_four_trusted(pairs: [(&Core, Xf, &Core, Xf, Option<bool>); 4], speculative: f32) -> Result<[Manifold; 4], PhysicsError> {
     let quad_bits = pairs
         .iter()
         .enumerate()
         .fold(0, |bits, (i, p)| bits | (((p.0.count == 4 && p.2.count == 4) as u32) << i));
     if quad_bits == 0 {
-        return pairs.map(|(a, xa, b, xb, last)| collide_coherent(a, xa, b, xb, speculative, last));
+        let [a, b, c, d] = pairs.map(|(a, xa, b, xb, last)| collide_coherent_trusted(a, xa, b, xb, speculative, last));
+        return Ok([a?, b?, c?, d?]);
     }
     let zero = F4::splat(0.0);
     let one = F4::splat(1.0);
@@ -315,6 +326,15 @@ pub fn collide_four(pairs: [(&Core, Xf, &Core, Xf, Option<bool>); 4], speculativ
     let a = place_four(pairs.map(|p| p.0), one, zero, V { x: zero, y: zero });
     let b = place_four(pairs.map(|p| p.2), c * bc + s * bs, c * bs - s * bc, relative_origin);
     let ((da, ea), (db, eb), certificate) = restricted(&a, &b);
+    // The selected float edge is used as an index only when both SAT scans produced a real finite face.
+    // NaN compares produce the old -1 sentinel; overflowing projections can leave infinite separations.
+    for lane in 0..4 {
+        if quad_bits >> lane & 1 != 0
+            && (!da.get()[lane].is_finite() || !db.get()[lane].is_finite()
+                || !(0.0..4.0).contains(&ea.get()[lane]) || !(0.0..4.0).contains(&eb.get()[lane])) {
+            return Err(PhysicsError::ArithmeticOverflow);
+        }
+    }
     let (ra, rb) = (F4::new(pairs.map(|p| p.0.radius)), F4::new(pairs.map(|p| p.2.radius)));
     let face = da.pmax(db);
     let valid = M4::from_bits(quad_bits).and(ea.ge(zero)).and(eb.ge(zero));
@@ -360,11 +380,14 @@ pub fn collide_four(pairs: [(&Core, Xf, &Core, Xf, Option<bool>); 4], speculativ
         let mut p1 = pick(&other_v, end);
         let edge_vector = r2.sub(r1);
         let length = square_root(edge_vector.dot(edge_vector));
+        finite_lanes(length, overlap)?;
         let tangent = V::select(length.gt(zero), edge_vector.scale(one / length), V { x: zero, y: zero });
         let mut alive = overlap;
         for (origin, sign) in [(r1, one), (r2, F4::splat(-1.0))] {
             let d0 = sign * tangent.dot(p0.sub(origin));
             let d1 = sign * tangent.dot(p1.sub(origin));
+            finite_lanes(d0, alive)?;
+            finite_lanes(d1, alive)?;
             let (outside0, outside1) = (d0.lt(zero), d1.lt(zero));
             alive = alive.and_not(outside0.and(outside1));
             if alive.and(outside0.or(outside1)).bits() != 0 {
@@ -409,7 +432,8 @@ pub fn collide_four(pairs: [(&Core, Xf, &Core, Xf, Option<bool>); 4], speculativ
     let (das, dbs, eas, ebs) = (da.get(), db.get(), ea.get(), eb.get());
     let rejected_bits = rejected.and(valid).bits();
     if overlap_bits | rejected_bits == 15 {
-        return out;
+        for manifold in &out { checked_manifold(*manifold)?; }
+        return Ok(out);
     }
     // Fixed lane indices let the SIMD targets extract only the requested pair. A dynamic get would spill every
     // vector to an array; transposing all four pairs would construct unused Quad values for overlapping lanes.
@@ -425,9 +449,9 @@ pub fn collide_four(pairs: [(&Core, Xf, &Core, Xf, Option<bool>); 4], speculativ
                         pairs[$lane],
                         speculative,
                         certificate.metadata::<$lane>(),
-                    )
+                    )?
                 } else {
-                    collide_coherent(ac, xa, bc, xb, speculative, last)
+                    collide_coherent_trusted(ac, xa, bc, xb, speculative, last)?
                 };
             }
         };
@@ -436,7 +460,8 @@ pub fn collide_four(pairs: [(&Core, Xf, &Core, Xf, Option<bool>); 4], speculativ
     fallback!(1);
     fallback!(2);
     fallback!(3);
-    out
+    for manifold in &out { checked_manifold(*manifold)?; }
+    Ok(out)
 }
 
 #[cfg(test)]

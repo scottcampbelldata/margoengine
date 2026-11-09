@@ -711,6 +711,65 @@ existing 1000:1 joint-chain and 3D CCD coverage. See [known-bugs](known-bugs.md#
 After browser diagnostics: Edge 3.66/1.69/14.52 ms and Firefox 3.50/1.52/11.20 ms for Margo/Box2D/Rapier; separate
 loaded sessions cannot prove before/after speed. The Box2D goal remains open and quiet reruns are required.
 
+### Own 2D input validation
+
+The raw Rust kernel under `packages/physics2d/kernel` exposes checked `Result<_, PhysicsError>` body/shape/chain
+creation, world stepping and handle operations, bounds queries, scalar/coherent/four-pair and smooth-chain collision.
+Use `?` to propagate a refusal, or read `PhysicsError::code()` and `help()`; the latter points to this section.
+The Rapier-backed TypeScript facade is a separate API. Pure math and mass-property utilities are not all checked
+entry points; in particular, `mass::mass_of` retains its direct `MassData` return.
+
+| Code | Refusal |
+| --- | --- |
+| `PHYSICS2D_NOT_FINITE` | A required finite input or current-state value is NaN or infinite |
+| `PHYSICS2D_INVALID_CORE` | An invalid active core count or radius would make collision data unsafe to index or use |
+| `PHYSICS2D_DEGENERATE` | A requested shape/chain has insufficient usable geometry |
+| `PHYSICS2D_ARITHMETIC_OVERFLOW` | Derived arithmetic cannot represent a required finite value, including positive mass/inertia lost to underflow or an overflowing reciprocal |
+| `PHYSICS2D_INVALID_HANDLE` | A body, shape, contact or joint relationship refers outside the current valid objects |
+| `PHYSICS2D_INVALID_PARAMETER` | A checked parameter violates its domain, such as negative density, friction or restitution |
+
+Body definitions, collision poses and speculative cutoffs require finite used values. Shape material values are
+finite and nonnegative. There is no geometry-independent minimum positive density: shape and aggregate mass,
+inertia, moments, centres, extents and required reciprocals must remain representable in their actual arithmetic.
+This includes the reciprocal of a positive inverse mass/inertia: a finite first reciprocal can round to a value
+whose inverse overflows. Both the rounded centre and reconstructed origin are checked before publication.
+Derived contact normal/tangent metrics and their required inverses must also be finite: two individually valid
+inverse masses can overflow when added. Such a contact returns `PHYSICS2D_ARITHMETIC_OVERFLOW` before solving.
+Computed contact-point relative velocity, normal approach and anchor base are also checked; finite body velocity
+alone does not imply a representable `v + w cross r` at a very large contact arm.
+Nonzero finite rotation pairs use scale-safe normalization when their squared length overflows or underflows;
+ordinary normalization bits are retained. Exact zero pairs in a body definition retain the documented identity
+conversion. A directly mutated zero stored body rotation is `PHYSICS2D_INVALID_PARAMETER`; a nonfinite or zero
+rotation derived during integration returns the arithmetic error rather than becoming identity or zero silently.
+An infinite density and a unit box at `f32::from_bits(1)` are refused before publishing a shape or NaN centre.
+Genuine zero density or zero-area geometry keeps its zero-mass behavior; a positive mass/inertia rounded to zero
+cannot take that fallback. A dynamic body with no mass retains the existing 1 kg, no-turn fallback.
+
+Body/shape creation and an entire `create_chain` call are transactional for validation/arithmetic failures:
+no partial body, shape list, mass state or chain proxies are published, and refused IDs remain available.
+`World::step` preflights current public mutable data and relationships before simulation work: body state and
+shape lists, current core counts/used vertices/normals/radii, materials/chain ghosts, contact handles/counts/used
+values and joint handles/state. A stale broad-phase shape ID is checked before callback indexing. A linear
+visitation check over shape references refuses duplicate, missing and foreign-body references.
+Used cached normal impulses must be nonnegative. Friction retains the ordinary product/sqrt result when that
+product is finite and uses a scale-safe geometric mean when it overflows. Invalid derived scalar or SIMD clamp
+bounds propagate to the step's coded arithmetic-error check, rather than asserting inside Rust's clamp.
+These checks use current data. Explicit documented sentinels, such as a joint motor's
+positive-infinite maximum force for an unlimited motor, remain supported. A later simulation arithmetic error
+is returned to the caller; the whole step is not a rollback transaction.
+
+At `47f81f909`, the reproduced collision panic requires both a NaN pose and NaN cutoff: a missing closest-distance
+candidate leaves a zero hit mask, whose trailing-zero index escapes the candidate rows. The literal NaN-pose
+review call with a finite cutoff returned an empty manifold here. The fix rejects nonfinite public inputs and
+checks missing face/distance candidates internally, including the four-pair path; it does not treat invalid
+input as an ordinary empty contact. Native regressions cover both forms, overflow, current-array mutations,
+creation rollback and valid retained-reference results. Each existing Wasm `check(i)` also exercises invalid
+input refusal before comparing the same three production hashes. No hash was re-pinned and no speed result is
+claimed. [Reproduce](whitepaper/reproduce.md#own-2d-input-validation) lists the commands and baseline failures.
+
+This closes the input/publication and absent-candidate error class only. The 1:1000 contact support/creep/sleep
+correction remains open; owned-2D CCD is separate T-11 / 127.y work, distinct from joint-chain and 3D CCD evidence.
+
 ## Frame-accurate video decoding (2026-11-08)
 
 Optional `@margoengine/video/codecs` fully buffers nonfragmented, self-contained, unencrypted AVC avc1 MP4. It reads the first video track, one sample description, stsz/stsc/stco/co64/stts/ctts/stss and a rate-1 media edit optionally after an empty edit, including 64-bit headers and edit versions 0/1. Movie times have microsecond precision; colliding timestamps are refused. Each request decodes from sync through the GOP, flushing reordering, selecting the requested timestamp and closing other frames. Requests are exclusive and abortable; caller closes returned frames. Edits expose only frames whose PTS starts inside the media edit; empty lead-in clamps to the first visible frame. No audio, streaming, playback scheduler, arbitrary edits, fragmented MP4, WebM, other codecs, rotation/display transforms or external media references. Large files/long GOPs can need substantial memory/CPU. WebCodecs/AVC support is browser-specific and checked; renderer independent, including beside WebGL2 (the external material remains WebGPU-only). Unit stand-ins prove reordered sample tables, edit boundary regression and ownership. Generated AVC MP4 is decoded/rendered on RTX A6000/Edge, not a third-party movie or a real B-frame test. Other browsers/GPUs and speed unmeasured. Entry 3,337 B gzip, budget 3,593 B. LIM-575.

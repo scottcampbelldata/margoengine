@@ -268,3 +268,78 @@ after. Firefox WebGPU without an adapter remains unrun. All raw rounds and accep
 with paths and formulas in the [study](../architecture/physics2d-solver-study.md). They are not production options.
 The 1:1000 contact extension is a new failing baseline diagnostic, not a passed bar. Existing 1:1000 joints and
 3D CCD run in the full Rust gate. Loaded timings are diagnostic; no Box2D parity or release speed is claimed.
+
+## Own 2D input validation
+
+From the repository root, with cargo on PATH, run the checked raw Rust API regressions, complete retained-reference
+collision comparisons, valid native hashes and the existing collision doctest:
+
+```sh
+cargo test --locked --manifest-path packages/physics2d/kernel/Cargo.toml --test input -- --nocapture
+cargo test --locked --manifest-path packages/physics2d/kernel/Cargo.toml --test rotation_input --test contact_metric_input -- --nocapture
+cargo test --locked --manifest-path packages/physics2d/kernel/Cargo.toml --test point_velocity_input -- --nocapture
+cargo test --locked --manifest-path packages/physics2d/kernel/Cargo.toml --test manifold
+cargo test --locked --manifest-path packages/physics2d/kernel/Cargo.toml --test manifold_exact -- --nocapture
+cargo test --locked --manifest-path packages/physics2d/kernel/Cargo.toml --test bits -- --nocapture
+cargo test --locked --manifest-path packages/physics2d/kernel/Cargo.toml --doc
+npm run test:physics2d-kernel
+npm run check:rust-kernels -- --packages=physics2d
+npm run check:readme-run -- --packages=physics2d
+```
+
+Use the repository's hard process-tree timeout runner for these commands; a hang is a failure. The input suite
+covers nonfinite definitions/current state, checked material domains, positive mass/inertia underflow, derived
+overflow, invalid handles and transactional body/shape/whole-chain creation.
+The directed input cases also reproduce the formerly panicking MAX-density effective reciprocal and finite
+`1e20` friction-product overflow, check negative used normal caches and staged origin rollback, and exercise
+both scalar and SIMD contact modes. The original closing-speed overflow already returned an error; its case
+guards that behavior without claiming a newly reproduced panic.
+`rotation_input` covers huge/subnormal finite pairs, large finite angular velocity at one substep, nonfinite
+integration arithmetic and zero stored body rotation. `contact_metric_input` uses two fixed-rotation unit boxes
+of density `4e-39`: each inverse mass is finite, but their sum overflows. The pre-edge input implementation
+accepted that step without collision response. All five strengthened tests fail on the retained first input
+implementation (`.lane/p/rotation-baseline`, archived from `f8d812a6330c4cf05fb1153e21246cccc670dd71`);
+the final normalization/setup guards must pass them. Logs retain the initial four-substep rotation test's false
+negative: zero and identity alternated, so the regression was strengthened to inspect a single substep.
+An API-independent four-case behavioral extraction also compiles on verified `47f81f909`: all four fail at
+runtime there and the identical extraction passes against current code. It checks finite-pair direction,
+single-substep dynamic/kinematic rotation, refusal before a zero-rotation step advances, and pair-metric overflow
+before interpenetration. Baseline/green logs and provenance are retained under `.lane/p/verified_main_rotation_metric_*`.
+`point_velocity_input` covers the separate derived contact-velocity overflow. Checked circle construction,
+finite individual inverse metrics and a real floor contact all succeed; `omega*radius` then overflows, so the
+step must return `ArithmeticOverflow`. The pre-guard diagnostic returned success in all four scalar/SIMD/radius
+cases (`.lane/p/point-velocity-probe`), despite NaN normal approach. The row builder now refuses it before a NaN
+comparison can invent zero response.
+`manifold_exact` includes scalar and four-pair nonfinite cutoff/pose refusal, missing-candidate and finite-overflow
+cases alongside the unchanged
+whole-field reference comparisons. The ordinary full kernel run also exercises the independent geometry cases
+and current public-array/handle preflight. The three Wasm `check(i)` calls first run invalid-input checks and then
+compare the unchanged production hashes:
+
+```text
+9ffefc83c3a99be4
+95a47530df180011
+9acb68471fbe6ba0
+```
+
+For the behavioral before/after proof, `nonfinite_body_creation_does_not_publish_a_body` and
+`invalid_density_does_not_publish_a_shape_or_nonfinite_centre` in `kernel/tests/input.rs` deliberately use
+assertions that also compile against the former infallible API. Copy these two tests into `tests/input_repro.rs`
+of an isolated copy of `47f81f9090eb9cdec62247d2c315a2e33e9472bb`, retaining its own shared kernel-common package.
+Lane P retained that copy under `.lane/p/input-baseline` and ran:
+
+```sh
+cargo test --locked --manifest-path .lane/p/input-baseline/packages/physics2d/kernel/Cargo.toml --test input_repro -- --nocapture
+```
+
+That baseline command is **expected red**: both `nonfinite_body_creation_does_not_publish_a_body` and
+`invalid_density_does_not_publish_a_shape_or_nonfinite_centre` fail (0 passed, 2 failed, exit 101), with no timeout;
+the retained log is `.lane/p/input-baseline.log`. The current checked API must pass them. Do not change the
+baseline assertions to accommodate its unsafe publication behavior.
+
+The actual collision panic reproduction on that commit combines a NaN pose and NaN speculative cutoff; the
+literal review call with a finite cutoff returns empty here. Preserve this distinction when reproducing the
+zero-hit-mask/absent-candidate bug. The fixed public call returns `PhysicsError::NotFinite`; internal guards also
+refuse missing candidates or unrepresentable arithmetic before an index is used. These commands document the
+checks, not a claim that final landing gates have already run. No speed comparison or hash re-pin accompanies
+this fix. The support/settling correction remains open; owned-2D CCD stays with T-11 / 127.y.
