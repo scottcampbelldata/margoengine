@@ -468,5 +468,24 @@ window.checkNodes=async()=>{
  if(!near(got.v,v))mismatches.push({what:'velocity',got:got.v,want:v});
  return {error,errors:errors.splice(0),mismatches,got,want:{at,v}};
 };
+// No shadows and no nodes. Gravity and turbulence are 0, so velocity stays (1, 0, 0) and position
+// advances by velocity times the step. Four steps of 0.05 s.
+window.checkPlain=async()=>{
+ const dt=0.05,frames=3,steps=frames+1;
+ const effect=new VFX({...still,capacity:1,lifetime:[100,100],velocity:[1,0,0]});
+ const {buffers:[p],error}=await run(effect,{
+  frames,dt,
+  setup:()=>device.queue.writeBuffer(effect.gpuState.particles,0,records([{at:[0,0,0],velocity:[1,0,0],size:0.01,color:[1,1,1],life:100}],1)),
+  read:()=>[effect.gpuState.particles],
+ });
+ effect.dispose();
+ const got={at:[...p.subarray(0,3)],v:[...p.subarray(4,7)]};
+ const want={at:[dt*steps,0,0],v:[1,0,0]};
+ const near=(a,b)=>a.every((x,i)=>Math.abs(x-b[i])<=1e-4+1e-4*Math.abs(b[i]));
+ const mismatches=[];
+ if(!near(got.at,want.at))mismatches.push({what:'position',got:got.at,want:want.at});
+ if(!near(got.v,want.v))mismatches.push({what:'velocity',got:got.v,want:want.v});
+ return {error,errors:errors.splice(0),mismatches,got,want};
+};
 window.ready=true;
 </script></body></html>

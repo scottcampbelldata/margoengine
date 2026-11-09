@@ -24,9 +24,11 @@
 // Flipbook: two particles held halfway between atlas frames (including a row wrap) match the CPU mix of the two
 // solid cells times the life fade, within 2 of 255. Removing the mix fails this.
 // Shadows: the first two live slots of four (a dead slot between them) pack as point lights, and one sphere at the
-// origin writes the orthographic sphere depth into a 64 x 64 map. The WebGL2 route is not part of this check.
+// origin writes the orthographic sphere depth into a 64 x 64 map. The same numbers on the WebGL2 route are
+// shadows-nodes-webgl2.mjs.
 // Nodes: one particle with velocity (1, 0, 0), force (0, 2, 0) and drag 0.5 matches four steps of 0.05 s of
-// velocity += (force - drag * velocity) * dt, then position += velocity * dt. The WebGL2 route is not part of this check.
+// velocity += (force - drag * velocity) * dt, then position += velocity * dt. The same numbers on the WebGL2
+// route are shadows-nodes-webgl2.mjs.
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';

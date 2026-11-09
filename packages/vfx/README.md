@@ -584,7 +584,7 @@ VFX.attach(engine, {
 engine.start();
 ```
 
-The light list is packed with a workgroup prefix sum, so the same slots give the same lights and nothing is chosen with an atomic. The sphere draw is a depth-only pass, one per cascade, and it does not add a storage buffer to the simulation. `node packages/vfx/test/features-check.mjs` (real GPU) reads the light buffer of four slots (live, dead, live, live) with `count` 2 and checks a sphere at the origin against the orthographic depth. The WebGL2 route was not run.
+The light list is packed with a workgroup prefix sum, so the same slots give the same lights and nothing is chosen with an atomic. The sphere draw is a depth-only pass, one per cascade, and it does not add a storage buffer to the simulation. `node packages/vfx/test/features-check.mjs` (real GPU) reads the light buffer of four slots (live, dead, live, live) with `count` 2 and checks a sphere at the origin against the orthographic depth. `node packages/vfx/test/shadows-nodes-webgl2.mjs` runs that page on the WebGL2 compatibility layer: on an RTX A6000 the header is 2, 5, 3, the lights are (1, 2, 3) red and (4, 5, 6) blue, and the depths are 0.45005, 0.48770 and 1.00000. A particle that uses neither shadows nor nodes, with velocity (1, 0, 0), is at (0.20000, 0, 0) after four steps of 0.05 s.
 
 ### Particle update nodes
 
@@ -609,4 +609,4 @@ VFX.attach(engine, {
 engine.start();
 ```
 
-`evaluateNodes(graph, sample)` runs the same operators on the CPU. `node packages/vfx/test/features-check.mjs` (real GPU) holds one particle at velocity (1, 0, 0) under force (0, 2, 0) and drag 0.5, and checks position and velocity after four steps of 0.05 s. The WebGL2 route was not run.
+`evaluateNodes(graph, sample)` runs the same operators on the CPU. `node packages/vfx/test/features-check.mjs` (real GPU) holds one particle at velocity (1, 0, 0) under force (0, 2, 0) and drag 0.5, and checks position and velocity after four steps of 0.05 s. `node packages/vfx/test/shadows-nodes-webgl2.mjs` runs the same four steps on the WebGL2 compatibility layer: on an RTX A6000 the particle is at (0.18781, 0.04877, 0.00000) with velocity (0.90369, 0.38525, 0.00000).
