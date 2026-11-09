@@ -909,3 +909,13 @@ the corrected oracle retains exact equality at every texel and has independent s
 The fallback fixture initially omitted its preview renderer, then imported it from the wrong entry;
 both setup errors were corrected before the successful complete runs. No failed step was ignored.
 No benchmark or physical-lighting comparison was performed.
+
+### Batch 56 job 3: studio rig reuse
+
+Build packages. Run `node --test --test-timeout=120000 packages/environment/tests/studio.test.js`.
+Under the GPU lock with owner codex-56, max 20 minutes and wait-max 40 minutes, run
+`node packages/environment/scripts/test-browser.js --page=studio` and again with `--compat`.
+Run `node packages/staging/test/ground-browser.mjs --studio` on both paths too. The studio value
+oracle checks all four softboxes' source directions, SH and irradiance ordering; staging checks off/on
+contact pixels, unchanged product/outside pixels, removal, disposal and real replacement-device
+recovery. [Frozen evidence](results/batch-56-rigs.json). No external assets or speed comparison.

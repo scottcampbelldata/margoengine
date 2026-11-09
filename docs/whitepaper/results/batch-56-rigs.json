@@ -1,0 +1,38 @@
+{
+  "batch": 56,
+  "job": 3,
+  "status": "SKIPPED",
+  "reason": "environment/studio already supplies overhead, key, fill and rim softboxes; no staging/rigs implementation is duplicated.",
+  "product": "Generated box stand-in",
+  "image": "Margo procedural studio, no external asset",
+  "cpu": {"test": "packages/environment/tests/studio.test.js", "tests": 5, "passed": true},
+  "runs": [
+    {
+      "backend": "WebGPU",
+      "studioChecks": 4,
+      "cubeRelativeError": 0.0015139849607136286,
+      "shRelativeError": 0.00023778207354006246,
+      "keyIrradiance": 1.979343084543486,
+      "fillIrradiance": 0.9218126980713924,
+      "contactOff": [80,80,80],
+      "contactOn": [70,70,70],
+      "compositionChecks": 7,
+      "passed": true
+    },
+    {
+      "backend": "WebGL2 compatibility",
+      "studioChecks": 4,
+      "cubeRelativeError": 0.0015139849607136286,
+      "shRelativeError": 0.00025116639643814147,
+      "keyIrradiance": 1.9793348067431862,
+      "fillIrradiance": 0.9218123627358737,
+      "contactOff": [80,80,80],
+      "contactOn": [70,70,70],
+      "compositionChecks": 7,
+      "passed": true
+    }
+  ],
+  "tests": ["packages/environment/scripts/test-browser.js --page=studio", "packages/staging/test/ground-browser.mjs --studio"],
+  "compositionScope": ["contact cue", "unchanged product and outside pixels", "caster removal", "disposal", "real device destruction and replacement"],
+  "scope": "Distant image lights, no local-light falloff, physical area shadows, photographic quality or speed claim. Native WebGL2 unsupported."
+}

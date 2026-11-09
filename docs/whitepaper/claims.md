@@ -1426,3 +1426,12 @@ device replacement, native fallback refusal, scene ownership and contact-effect 
 [batch-56-accumulate.json](results/batch-56-accumulate.json), staging's accumulation unit/GPU tests.
 The geometry is a stand-in. Equal visibility weights establish penumbrae, not radiometric area/HDR
 lighting, photographed-product quality, other-device subpixel parity or measured speed.
+
+## Batch 56 job 3: existing studio softboxes
+
+SKIPPED implementation: environment/studio already provides the overhead/key/fill/rim preset.
+Existing studio tests verify each box, deterministic radiance, source-cube values and SH, with key
+irradiance above 1.5 times fill. The new staging composition variant retains its contact cue, product
+occlusion and outside pixels after actual device replacement on WebGPU and WebGL2 compatibility.
+[Evidence](results/batch-56-rigs.json). Generated studio/box stand-ins only, distant image lighting,
+no local-light falloff, physical area-shadow, photographic-product or performance claim.

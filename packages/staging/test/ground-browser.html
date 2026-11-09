@@ -6,10 +6,12 @@ import {engineRuntime} from '/packages/core/dist/extension.js';
 import {EnvironmentLighting} from '/packages/environment/dist/index.js';
 import {GroundProjectedBackground} from '/packages/environment/dist/ground.js';
 import {ContactShadows} from '/packages/staging/dist/index.js';
+import {studio} from '/packages/environment/dist/studio.js';
 const engine = await Engine.create(document.querySelector('canvas'), {
   backend: 'webgpu', camera: {position: [0, 2.5, 5], target: [0, 0.4, 0]},
 });
 const lighting = await EnvironmentLighting.load(engine,
+  new URLSearchParams(location.search).has('studio') ? studio({width:128}) :
   '/packages/environment/tests/fixtures/BrightRings.exr', {size: 32, samples: 32});
 const ground = GroundProjectedBackground.attach(engine, lighting.environment,
   {height: 1.6, radius: 20, order: 0.25});

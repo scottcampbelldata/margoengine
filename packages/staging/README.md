@@ -144,3 +144,38 @@ an additional 4096-texel PBR caster case, resize, removal, actual device replace
 and coexistence with ContactShadows. This Windows oracle includes Direct3D's
 specified eight-bit coordinate snapping; it is not an assertion of subpixel identity across other GPU
 backends. The geometry is a stand-in. Native WebGL2 throws coded `unsupported` with a help link.
+
+## Studio softboxes
+
+The studio rig already lives in `@margoengine/environment/studio`; staging does not duplicate it.
+`STUDIO_LIGHTS` contains an overhead box, a front-left key, a dimmer front-right fill and a rear rim
+strip, designed for a camera on +Z. Use the generated image for lighting and the backdrop:
+
+```ts
+import {Engine, PbrMaterial, box} from 'margoengine/core';
+import {EnvironmentLighting} from 'margoengine/environment';
+import {STUDIO_LIGHTS, studio} from 'margoengine/environment/studio';
+import {GroundProjectedBackground} from 'margoengine/environment/ground';
+import {ContactShadows} from 'margoengine/staging';
+const engine = await Engine.create(document.querySelector('canvas')!, {
+  backend: 'webgpu', camera: {position: [0, 2.5, 5], target: [0, 0.4, 0]},
+});
+const lighting = await EnvironmentLighting.load(engine, studio({width: 128, lights: STUDIO_LIGHTS}), {
+  size: 32, samples: 32, signal: AbortSignal.timeout(30_000),
+});
+GroundProjectedBackground.attach(engine, lighting.environment, {height: 1.6, radius: 20, order: 0.25});
+const product = engine.createMesh().setGeometry(box(1, 1, 1))
+  .setMaterial(new PbrMaterial({color: '#a08050', roughness: 0.3})).setPosition([0, 0.5, 0]);
+ContactShadows.attach(engine, {size: 4, height: 2, blur: 0.15}).add(product);
+engine.start();
+// Later: engine.dispose() releases the rig, backdrop and catcher.
+```
+
+The image generator defaults to width 512, with a grey floor, walls and ceiling and four softboxes.
+`width` is a power of two in 16..4096; angular box dimensions are in (0, PI), intensity in 0..65504,
+softness in 0..1. See the [studio options](../environment/README.md#procedural-studio-environment)
+for every default and custom lights. These are distant image lights: no parallax, distance falloff,
+local light transforms or area-light shadow calculation. The catcher supplies its existing contact cue.
+WebGPU and WebGL2 compatibility pass the existing studio value oracle and the staging composition
+test (`ground-browser.mjs --studio`, optionally `--compat`), including actual device replacement,
+caster removal and disposal. Native WebGL2 remains unsupported. Geometry is a generated stand-in.

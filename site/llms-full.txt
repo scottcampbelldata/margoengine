@@ -4031,6 +4031,17 @@ at subpixel boundaries. WebGPU and WebGL2 compatibility are tested; native WebGL
 linked unsupported. Generated geometry is a stand-in. Entry 9,314 B gzip (ceiling 9,593 B); inherited
 root 8,129 B (unchanged ceiling 8,259 B); core plus stage 23,797 B below 25,000 B. No speed claim.
 
+### Studio rig reuse (batch 56, job 3)
+
+No staging/rigs entry: environment/studio already provides overhead/key/fill/rim softboxes in an
+equirect FloatImage. Defaults, validated ranges and CPU image-generation cost remain those of E38
+and the environment README; the staging recipe uses width 128 and a 32-texel filtered cube. Lights
+are infinitely distant with no parallax, inverse-square falloff, local transforms or physical shadow
+solver. The staging contact cue is separate. Both WebGPU and WebGL2 compatibility pass source-cube,
+SH and staging contact pixels, including real device replacement. Native WebGL2 remains unsupported.
+No new runtime code or size increase; staging root 8,129 B and core plus stage 23,797 B gzip.
+All scene geometry is generated stand-in data. No photographic quality or speed claim.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -5877,6 +5888,14 @@ existing unsupported-feature regression in packages/usdz/tests/usdz.test.js requ
 outside NormalsTextureBiasAndScale sample reproduced that documented-boundary mismatch.
 The README now requires subdivisionScheme none; no parser, test or tolerance changed.
 The introduction's missing compatible archive remains open in missing-test-items.md.
+
+### Batch 56 studio rig reuse audit
+
+Job 3 is SKIPPED implementation: environment/studio already supplies the four-box product rig.
+The existing studio CPU/value GPU tests and new staging composition variant pass on WebGPU and
+WebGL2 compatibility, including contact removal and actual replacement-device recovery. No new
+defect was exposed by this scoped audit. Distant image lighting and native WebGL2 exclusion remain
+documented limits; the independent batch 168 physical contact-shadow picture loss remains open.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 

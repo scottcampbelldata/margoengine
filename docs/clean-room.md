@@ -1842,3 +1842,12 @@ Margo chooses a base-2 radical-inverse radius, golden-angle azimuth, one sample 
 bounded integer R16F sums divided once on the receiver. Equal visibility weights do not claim the
 full radiometric solution. No library, renderer or paper-linked implementation source was opened.
 All new geometry is generated stand-in test data; no third-party implementation or asset is added.
+
+## Batch 56 job 3: existing studio rig composition
+
+No implementation is rebuilt. Existing E38 describes Margo's room gradient and angular softboxes.
+The reuse audit checked public descriptions of [Debevec's image-based lighting](https://www.pauldebevec.com/Research/IBL/)
+and [Ramamoorthi and Hanrahan's irradiance environment maps](https://vis.stanford.edu/papers/envmap/):
+the rig is distant incident radiance, with low-frequency diffuse SH and prefiltered specular response.
+These papers explain the lighting route and its limits; the preset values remain Margo design values.
+Only Margo's source/tests and public papers were read. No external source code or assets were added.

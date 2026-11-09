@@ -2391,3 +2391,14 @@ quality, arbitrary-axis or full radiometric light integration evidence.
 
 The inherited receiver also registers its pass under the effect's own name, allowing contact and
 accumulated effects in one scene. CPU and real-GPU coexistence regressions cover both registrations.
+
+### Studio rig reuse: section 5 evidence (batch 56, job 3)
+
+SKIPPED implementation: environment/studio already generates overhead, key, fill and rim softboxes.
+The staging recipe composes its FloatImage with EnvironmentLighting, projected ground at order 0.25
+and the contact receiver at 0.5. No new shader, CPU pixel loop, Wasm, runtime entry or core/stage change.
+The existing studio GPU oracle verifies source-cube values and projected SH, with key irradiance above
+1.5 times the fill, on WebGPU and WebGL2 compatibility. The new studio variant of staging's ground
+oracle gives identical off/on contact RGB [80,80,80]/[70,70,70] on both paths, preserves product/outside
+pixels, clears removed casters and restores after actual device destruction. Stand-in box and generated
+image only; no photographic-product, local-light falloff, physical soft shadow or speed claim.

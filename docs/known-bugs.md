@@ -1842,3 +1842,11 @@ existing unsupported-feature regression in packages/usdz/tests/usdz.test.js requ
 outside NormalsTextureBiasAndScale sample reproduced that documented-boundary mismatch.
 The README now requires subdivisionScheme none; no parser, test or tolerance changed.
 The introduction's missing compatible archive remains open in missing-test-items.md.
+
+### Batch 56 studio rig reuse audit
+
+Job 3 is SKIPPED implementation: environment/studio already supplies the four-box product rig.
+The existing studio CPU/value GPU tests and new staging composition variant pass on WebGPU and
+WebGL2 compatibility, including contact removal and actual replacement-device recovery. No new
+defect was exposed by this scoped audit. Distant image lighting and native WebGL2 exclusion remain
+documented limits; the independent batch 168 physical contact-shadow picture loss remains open.

@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { openBrowser } from '../../../scripts/browser.js';
 import { decodePNG } from '../../../tests/support/png.js';
 
-const context = await openBrowser({ startPath: '/packages/staging/test/ground-browser.html', port: 'free' });
+const studio = process.argv.includes('--studio');
+const context = await openBrowser({ startPath: `/packages/staging/test/ground-browser.html${studio?'?studio':''}`, port: 'free' });
 const { page } = context;
 const errors = [];
 page.on('pageerror', e => errors.push(e.message));
@@ -30,7 +31,7 @@ try {
   assert.deepEqual(pixel(removed, points.contact), unshadowed, 'removing the caster clears its shadow');
   assert.deepEqual(await page.evaluate(() => window.check.dispose()), []);
   assert.deepEqual(errors, []);
-  console.log(JSON.stringify({contact: {off: unshadowed, on: shadowed}, checks: 7, fixture: 'OpenEXR BrightRings', product: 'stand-in'}));
+  console.log(JSON.stringify({contact: {off: unshadowed, on: shadowed}, checks: 7, fixture: studio?'generated studio':'OpenEXR BrightRings', product: 'stand-in'}));
   console.log('staging ground composition passed');
 } finally {
   await context.close();

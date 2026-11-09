@@ -1443,3 +1443,14 @@ detail. The exact GPU oracle is the Windows Direct3D eight-bit raster grid; othe
 at subpixel boundaries. WebGPU and WebGL2 compatibility are tested; native WebGL2 refuses with
 linked unsupported. Generated geometry is a stand-in. Entry 9,314 B gzip (ceiling 9,593 B); inherited
 root 8,129 B (unchanged ceiling 8,259 B); core plus stage 23,797 B below 25,000 B. No speed claim.
+
+### Studio rig reuse (batch 56, job 3)
+
+No staging/rigs entry: environment/studio already provides overhead/key/fill/rim softboxes in an
+equirect FloatImage. Defaults, validated ranges and CPU image-generation cost remain those of E38
+and the environment README; the staging recipe uses width 128 and a 32-texel filtered cube. Lights
+are infinitely distant with no parallax, inverse-square falloff, local transforms or physical shadow
+solver. The staging contact cue is separate. Both WebGPU and WebGL2 compatibility pass source-cube,
+SH and staging contact pixels, including real device replacement. Native WebGL2 remains unsupported.
+No new runtime code or size increase; staging root 8,129 B and core plus stage 23,797 B gzip.
+All scene geometry is generated stand-in data. No photographic quality or speed claim.
