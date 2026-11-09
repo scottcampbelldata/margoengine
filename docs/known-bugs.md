@@ -18,6 +18,13 @@ diagnostics without repeating transcodes. No source/channel/bar change.
 Public integration, complete expanded container fuzz, memory and new-Wasm GPU
 acceptance remain open. The prebuilt is retained.
 
+### Fixed: LIC mixed-magnitude normalization
+
+The original squared norm and 1e-20 cutoff changed a parallel 1e-24 velocity region into noise beside unit
+velocities. Post-interpolation and post-projection scaled norms remove that cutoff, restoring scalar
+magnitude separately. The real repro changed 928/2,048 texels before and zero afterward on both backends.
+`entries-cases.js` checks the whole mixed image; `lic.test.js` rejects ranges that need subnormal interpolation.
+
 ### Fixed: LIC demo reused an expired loader deadline
 
 The first draft combined every later layer update with the module's initial 120-second data-load signal.

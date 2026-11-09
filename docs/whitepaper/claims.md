@@ -39,7 +39,11 @@ the affected checks passed. [Closure evidence](results/batch-171-lic-validation.
 the coherent clean-source entry/network pair. All package GPU suites, 24 sciviz and three umbrella README examples pass.
 Rebased main's fixed-wait scanner also passes after documenting the compute-owner test's existing exact
 four-step invariant, with its original GPU value/count assertions unchanged and passing on both backends.
-New entry is 10,210 B gzip (10,517 B ceiling), core + stage 23,924 B. No speed result;
+The [normalization regression](results/batch-171-lic-normalization.json) records zero error for mixed parallel
+speeds spanning 24 orders against the unit-speed image on both backends. The old
+squared norm changed 928/2,048 luminances. Permanent GPU/CPU regressions cover scaled norms and portable input
+headroom without changing any existing bounds. New entry is 10,429 B gzip (+219 B from 10,210 B, ceiling
+10,517 B), core + stage 23,924 B. No speed result;
 [method sources](../clean-room.md#batch-171-job-2-line-integral-convolution).
 
 Pixel's readable palette shader preserves the prior operations, literals and

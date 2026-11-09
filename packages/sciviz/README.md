@@ -64,7 +64,10 @@ This entry does not claim arbitrary triangle-surface LIC, volume LIC, or physica
 
 Inputs are copied before the promise resolves and retained for exact device restoration. Field copying has a
 128 MiB working budget; the image uses 16 bytes per texel (at most 64 MiB), further bounded by device limits.
-Samples must be finite within +/-1e30 or NaN. Slice coordinates/mapping ratios are within +/-1e15 and
+Samples must be finite within +/-1e30 or NaN. After common velocity scaling, each nonzero node must have a
+component of magnitude at least 8*2^-126 (headroom for eight trilinear weights without relying on subnormals);
+split fields with a larger dynamic range. Local rescaling after interpolation preserves tangents across
+24 orders of magnitude, without a nonzero speed cutoff. Slice coordinates/mapping ratios are within +/-1e15 and
 sin(angle)^2 between edges must exceed 1e-8; use local coordinates for extreme scales. `dispose()` and `using`
 free the image and field; the figure also owns the layer. `readIntensity` has a 30000 ms timeout by default
 (positive, at most 2147483647), supports exact-reason cancellation and always frees its staging buffer.

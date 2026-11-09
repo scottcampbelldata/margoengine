@@ -128,6 +128,23 @@ matrix, not a warm-up: each mask changes features and the browser runner asserts
 existing supported fixed-wait annotation now states that distinction. No iterations, renders, assertion,
 threshold or timeout changed; the class scanner still tests the actual wait rules.
 
+LIC normalization correction: a squared norm and 1e-20 cutoff turned a representable 1e-24 region into
+stagnation beside unit velocities. The real GPU repro changed 928/2,048 luminances (maximum 0.6448244452476501)
+although every vector was parallel. Rescale after interpolation and again after projection before norms,
+restoring scalar magnitude separately. The probe now has zero error on both backends; the permanent entries
+regression checks the entire mixed image without changing the existing box/circular/mask/phase/pixel bars.
+
+Research before correction: David Goldberg, *What Every Computer Scientist Should Know About Floating-Point
+Arithmetic*, 1991, [authorized reprint](https://docs.oracle.com/cd/E19957-01/806-3568/ncg_goldberg.html),
+[DOI](https://doi.org/10.1145/103162.103163); James L. Blue, *A Portable Fortran Program to Find the Euclidean
+Norm of a Vector*, 1978, [publication](https://doi.org/10.1145/355769.355771) (abstract/method description only;
+no program read); W3C, *WebGPU Shading Language*, 2026,
+[floating-point evaluation](https://www.w3.org/TR/2026/CRD-WGSL-20261021/#floating-point-evaluation).
+Compare scaled norms, rounding and permitted subnormal flushing. Validation rejects nonzero nodes below
+8*2^-126 after common scaling, avoiding dependence on subnormals in eight-neighbour interpolation. Uniform
+tiny fields still normalize before rounding. LIC grows 10,210 to 10,429 B gzip (+219), within the existing
+10,517 B ceiling; core + stage stays 23,924 B. These bytes prevent incorrect geometry; no size trick or split.
+
 ## Batch 134 rational scalar-source experiment (2026-11-09)
 
 Before code, broad standards, arXiv, Eurographics, JCGT and IEEE searches

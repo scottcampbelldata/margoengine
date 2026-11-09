@@ -24,12 +24,15 @@ slices through regular 3D fields. Static box filter or explicit-phase periodic d
 colour (default interpolated full-vector speed). Each image/noise dimension is 8..2048, independently of the
 field; 1..128 midpoint samples each way, step 0.1..1 texels. Snapshot plus packed field: 128 MiB working budget;
 image: 16 bytes/texel, maximum 64 MiB, also bounded by device storage limits. Samples: finite within +/-1e30
-or NaN; slice coordinates/mappings within +/-1e15, sin(angle)^2 > 1e-8. Missing/outside texels mask rather than
+or NaN; a nonzero node must retain a component >=8*2^-126 after common scaling, so eight-neighbour
+interpolation does not rely on subnormals. Local scaled norms preserve parallel tangents across 24 orders
+without a nonzero speed cutoff. Slice coordinates/mappings within +/-1e15, sin(angle)^2 > 1e-8. Missing/outside texels mask rather than
 bridge. Readback temporarily adds one image-sized buffer and a luminance array. No arbitrary-triangle surface
 LIC, volume LIC or physical unsteady advection claim. Native sciviz/webgl2 is unsupported; the intended
 backends are WebGPU and compatibility-backed WebGL2. Independent analytical box error: 1.4725853414443435e-7;
 exact circular-arc error: 1.1380660922433172e-5. Both have zero backend pixel differences and exact restoration.
-The NOAA demo passes both layouts/backends. New entry: 10,210 B gzip, ceiling 10,517 B; the final full build
+The NOAA demo passes both layouts/backends. New entry: 10,429 B gzip (+219 B from 10,210 B for scaled norms),
+ceiling 10,517 B; the final build
 records root 36,916 B, flow 8,665 B and native driver 4,476 B, all unchanged from the prior full build.
 Core/stage source is unchanged at 23,924 B combined gzip, with the strict 25,000 B ceiling intact.
 The one full verify ran 13,769 tests: 13,765 passed; four metadata/test-fixture failures were corrected and the

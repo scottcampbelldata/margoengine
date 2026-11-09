@@ -5216,6 +5216,12 @@
       "commit": "batch-171-lic",
       "reason": "New optional sciviz/lic entry: absent -> 10210 B gzip, ceiling 10517 B. Retained GPU convolution image, scalar colour, phase animation, affine 3D slices and owned recovery/readback justify the optional bytes. No core/stage source change; no speed claim.",
       "grew": 10517
+    },
+    {
+      "date": "2026-11-10",
+      "commit": "batch-171-lic-normalization",
+      "reason": "LIC 10210 -> 10429 B gzip (+219), within unchanged 10517 B ceiling. Scaled post-interpolation/projected norms preserve mixed-magnitude tangents; portable float32 node validation prevents silent underflow. Correctness bytes are retained; no split, feature loss or speed claim. Core + stage unchanged at 23924 B.",
+      "grew": 0
     }
   ],
   "items": {

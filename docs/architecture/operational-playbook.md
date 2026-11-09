@@ -1951,7 +1951,10 @@ WebGL2, with zero backend pixel differences. Frozen `batch-171-lic*.json` eviden
 NOAA demo controls/export and late updates after loader-deadline expiry pass on desktop/mobile on both backends.
 One full verify ran 13,769 tests (13,765 passed); its four metadata/test-fixture failures were corrected and their
 affected checks pass. All sciviz GPU suites, 24 README examples, lint, hygiene and all five quality gates pass.
-Native WebGL2 LIC rejects before GPU allocation. New optional entry 10,210 B gzip; core + stage stays 23,924 B.
+Scaled norms after interpolation and projection preserve parallel flow across 24 orders, with zero difference
+from unit-speed LIC on both backends. Nonzero nodes below 8*2^-126 after common scaling reject portably.
+Native WebGL2 LIC rejects before GPU allocation. New optional entry 10,429 B gzip (+219 B within the existing
+ceiling); core + stage stays 23,924 B.
 No arbitrary curved-surface/unsteady-advection proof or timing claim.
 
 Preview/compat continuation: the first interrupted compatibility run preserved 22

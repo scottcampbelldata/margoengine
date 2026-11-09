@@ -70,3 +70,10 @@ test('LIC device budgets reject before allocation and release partial resource b
   await assert.rejects(lic(failed, grid()), (e) => e === reason);
   assert.ok(failed.buffers.every((b) => b.destroyed)); assert.equal(failed.layers.size, 0);
 });
+
+test('LIC refuses a dynamic range that cannot preserve nonzero nodes in portable GPU arithmetic', async () => {
+  const f = fake();
+  await assert.rejects(lic(f, { ...grid(), u: [1, 1e-100, 1, 1e-100] }),
+    (error) => error instanceof RangeError && error.message.includes('dynamic range'));
+  assert.equal(f.buffers.length, 0); assert.equal(f.layers.size, 0);
+});

@@ -163,6 +163,9 @@ export class LicLayer implements Drawable {
     for (let start = 0; start < n; start += 16384) {
       signal?.throwIfAborted();
       for (let i = start; i < Math.min(n, start + 16384); i++) {
+        const relative = Math.max(Math.abs(source[4 * i]), Math.abs(source[4 * i + 1]), Math.abs(source[4 * i + 2])) / (scale || 1);
+        if (relative > 0 && relative < 8 * 2 ** -126)
+          fail('LIC nonzero field nodes must retain eight float32 normal units after common scaling; split fields with excessive dynamic range');
         for (let c = 0; c < 3; c++) field[4 * i + c] = source[4 * i + c] / (scale || 1);
         field[4 * i + 3] = (source[4 * i + 3] - range[0]) / width;
         if (!Number.isFinite(field[4 * i + 3]) && !Number.isNaN(field[4 * i + 3])) fail('LIC scalar range overflows float32; rescale scalar units');

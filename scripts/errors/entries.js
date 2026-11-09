@@ -626,6 +626,7 @@ export const entries = [
         'LIC samples exceed +/-1e30; rescale field units',
         'LIC colour range needs representable float32 ratios; rescale scalar units',
         'LIC scalar range overflows float32; rescale scalar units',
+        'LIC nonzero field nodes must retain eight float32 normal units after common scaling; split fields with excessive dynamic range',
         'LIC image or field exceeds device buffer limits; reduce grid or resolution',
         'LIC readback timeoutMs must be positive and <=2147483647',
       'Marching cubes Wasm could not load; serve valid package assets',

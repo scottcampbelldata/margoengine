@@ -1,0 +1,30 @@
+{
+  "before": {
+    "source": "66e8a50cf",
+    "maxError": 0.6448244452476501,
+    "wrong": 928,
+    "samples": 2048
+  },
+  "after": [
+    {
+      "compat": false,
+      "max": 0,
+      "wrong": 0,
+      "samples": 2048
+    },
+    {
+      "compat": true,
+      "max": 0,
+      "wrong": 0,
+      "samples": 2048
+    }
+  ],
+  "shaderSHA256": "96102e06bc9e7a15e4b7dc8de07721059b433a4825ea86a836746a558eb38d64",
+  "input": "4 x 2 regular field, parallel u=[1e-24,1e-24,1,1] on both rows, v=0; compared with u=1 everywhere; 64 x 32 LIC, step=1, steps=8, contrast=1",
+  "gzip": {
+    "before": 10210,
+    "after": 10429,
+    "ceiling": 10517,
+    "coreStage": 23924
+  }
+}

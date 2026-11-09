@@ -36,6 +36,12 @@ addCase('lic', async (figure, { assert, pixels, lit }) => {
   const tiny = await lic(figure, { ...base, u: [1e-100, 1e-100, 1e-100, 1e-100] }, options);
   const tinyImage = await tiny.readIntensity();
   assert(read.every((v, i) => Math.abs(v - tinyImage[i]) < 2e-6), 'tiny velocities have identical geometry'); figure.remove(tiny);
+  const mixed = await lic(figure, { ...base, dims: [4, 2, 1],
+    u: [1e-24, 1e-24, 1, 1, 1e-24, 1e-24, 1, 1], v: Array(8).fill(0) }, options);
+  const mixedImage = await mixed.readIntensity();
+  assert(read.every((v, i) => Math.abs(v - mixedImage[i]) < 2e-6),
+    '24 orders of magnitude of parallel velocities preserve every LIC tangent and intensity');
+  figure.remove(mixed);
   // Orthogonal field: exact vertical, rather than horizontal, convolution.
   const vertical = await lic(figure, { ...base, u: [0, 0, 0, 0], v: [1, 1, 1, 1] }, options);
   const vr = await vertical.readIntensity();

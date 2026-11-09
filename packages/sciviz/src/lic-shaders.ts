@@ -37,11 +37,18 @@ fn sampleField(uv: vec2f) -> vec4f {
       }
     }
   }
-  let direction = vec2f(dot(sum.xyz, lic.dualU.xyz), dot(sum.xyz, lic.dualV.xyz)) * vec2f(lic.image.xy);
-  let magnitude = length(direction);
+  // Rescale after interpolation, before projection or a squared norm can underflow.
+  let componentScale = max(max(abs(sum.x), abs(sum.y)), abs(sum.z));
+  var unit = vec3f(0.0);
+  if (componentScale > 0.0) { unit = sum.xyz / componentScale; }
+  let direction = vec2f(dot(unit, lic.dualU.xyz), dot(unit, lic.dualV.xyz)) * vec2f(lic.image.xy);
+  let directionScale = max(abs(direction.x), abs(direction.y));
   var velocity = vec2f(0.0);
-  if (magnitude > 1e-20) { velocity = direction / magnitude / vec2f(lic.image.xy); }
-  let scalar = select(length(sum.xyz) * lic.colour.x + lic.colour.y, sum.w, lic.dims.w == 1u);
+  if (directionScale > 0.0) {
+    let scaled = direction / directionScale;
+    velocity = scaled / length(scaled) / vec2f(lic.image.xy);
+  }
+  let scalar = select((componentScale * lic.colour.x) * length(unit) + lic.colour.y, sum.w, lic.dims.w == 1u);
   return vec4f(velocity, scalar, 1.0);
 }
 fn hash(p: vec2u) -> f32 {
