@@ -1,5 +1,5 @@
 {
-  "commit": "0a70b4194",
+  "commit": "c923f4389",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -996,8 +996,8 @@
         "gzip": 1353
       },
       "./unity": {
-        "raw": 142105,
-        "gzip": 40965
+        "raw": 200209,
+        "gzip": 50038
       },
       "./hash": {
         "raw": 2830,
@@ -1130,8 +1130,8 @@
         "gzip": 3587
       },
       "dist/workers/fbx.js": {
-        "raw": 251439,
-        "gzip": 83143
+        "raw": 251536,
+        "gzip": 83173
       }
     },
     "@margoengine/fsm": {
@@ -2614,8 +2614,8 @@
         "gzip": 977
       },
       "./scenes": {
-        "raw": 64163,
-        "gzip": 18947
+        "raw": 64781,
+        "gzip": 19197
       },
       "./stars": {
         "raw": 10171,
@@ -2628,16 +2628,16 @@
     },
     "@margoengine/sciviz": {
       ".": {
-        "raw": 110962,
-        "gzip": 36916
+        "raw": 138099,
+        "gzip": 50303
       },
       "./bricks": {
-        "raw": 37718,
-        "gzip": 13832
+        "raw": 64855,
+        "gzip": 26785
       },
       "./colormaps": {
-        "raw": 10516,
-        "gzip": 4171
+        "raw": 37653,
+        "gzip": 16874
       },
       "./formats": {
         "raw": 37198,
@@ -2648,12 +2648,12 @@
         "gzip": 4037
       },
       "./graph": {
-        "raw": 24665,
-        "gzip": 9362
+        "raw": 51802,
+        "gzip": 22444
       },
       "./grids": {
-        "raw": 26679,
-        "gzip": 10520
+        "raw": 53816,
+        "gzip": 23599
       },
       "./maths": {
         "raw": 12305,
@@ -3306,8 +3306,8 @@
         "gzip": 7649
       },
       "dist/workers/usdz.js": {
-        "raw": 338321,
-        "gzip": 113871
+        "raw": 338426,
+        "gzip": 113909
       }
     },
     "@margoengine/vfx": {
@@ -3682,8 +3682,12 @@
     },
     "@margoengine/water": {
       ".": {
-        "raw": 63385,
-        "gzip": 19846
+        "raw": 63396,
+        "gzip": 19856
+      },
+      "./fft": {
+        "raw": 19878,
+        "gzip": 7334
       }
     },
     "@margoengine/weather": {
@@ -4044,14 +4048,14 @@
       "brotli": 14147
     },
     "packages/fbx/dist/workers/fbx.js": {
-      "raw": 249282,
-      "gzip": 82988,
-      "brotli": 71299
+      "raw": 249379,
+      "gzip": 83018,
+      "brotli": 71307
     },
     "packages/usdz/dist/workers/usdz.js": {
-      "raw": 334666,
-      "gzip": 113570,
-      "brotli": 97558
+      "raw": 334771,
+      "gzip": 113608,
+      "brotli": 97628
     },
     "packages/loaders/dist/workers/usd.js": {
       "raw": 21482,

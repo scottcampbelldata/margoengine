@@ -4613,3 +4613,16 @@ output. Sampling stays synchronous; only documented GPU/CSS boundaries
 quantize. Optional entry ceilings grow instead of adding a data loader for
 size. This is numeric precision evidence, without a new perceptual display or
 speed claim. Research and measured bytes: size-restore.md and limits.md.
+
+### Section 5 evidence: affected-plan setup and combined restoration build
+
+The affected-plan regression now completes its asynchronous context setup
+before registering tests that read it. A named planner regression also pins
+the inherited compute ownership GPU leaf; the concurrent main registration
+and exact four-step/native-compatibility oracle are preserved. The initial
+full verify's successful steps and 13842 unit passes are retained; failed and
+unrun unit cases pass scoped continuation. Details and standards:
+[verification repairs](../verification-repairs.md). No scheduler assertion,
+production slot policy or timeout is loosened. A combined post-rebase build
+passes, followed by genuine paired measurements and generated API/llms records;
+sciviz sizes and the 23924 B core plus stage remain unchanged.

@@ -438,3 +438,18 @@ mistake detailed in verification-repairs.md, plus the viz kit's stale size.
 Only failed/unrun cases are rerun, with no bar, tolerance or production policy
 changed. The actual static kit bundles are game 355223 B, viz 248151 B and web
 95208 B; kits.md records them and the current 23924 B root. No timing work runs.
+
+Rebase onto 449dd9676 preserves the concurrent compute registration/four-step
+oracle, tracer composition, FFT ocean and materials fixes. All sciviz source,
+README and precision tests are byte-identical to the tested restoration.
+The combined package build passes. Genuine paired entry/network records then
+measure c923f4389 with dirty=false, followed by api:update and llms generation;
+no record is relabeled. All five restored entry sizes and the 23924 B root
+are unchanged. A fresh static kit measurement matches all three documented
+figures exactly. Successful full verification steps, sciviz GPU suites and
+README execution are retained without replaying them.
+
+Merged acceptance passes: the size gate, all 17 paired-record/llms tests, full
+API currentness (897 entries, 8696 exports), both changed planner regressions
+and documentation links. No successful full unit, sciviz GPU or README suite
+is repeated after rebase, and no new full-verify success is claimed.
