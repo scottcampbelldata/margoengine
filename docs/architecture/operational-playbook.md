@@ -1766,3 +1766,7 @@ The shipped Preetham WGSL is evaluated directly before the display transform and
 Mitsuba sunsky. Unit-direction, axis conversion, zenith normalization and error-metric tests accompany
 297 samples over nine cases. Normalized RGB MAE 1.439228 remains an open loss. Separate physical units,
 the sun disk and hemisphere integration are not covered. No rendering implementation/core/stage changes.
+
+### Audio Doppler evidence (batch 110, section 5)
+
+The optional audio/doppler controller registers after its positional sound and samples sound/listener world poses against context.currentTime. It owns the existing playback-rate control; no renderer or core change. Real browser generated-tone PCM frequency checks run beside native WebGPU, native WebGL2 and the compatibility device, with zero GPU validation errors. LIM-603 and whitepaper/results/audio-doppler-20261108.json record stand-in evidence. No recording, listening-quality, other-browser or performance proof. Reset explicitly for teleports; 0.95 radial Mach clamp is an approximation limit, not a supersonic claim.

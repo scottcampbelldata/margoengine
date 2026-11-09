@@ -43,6 +43,7 @@ try {
   report.engine = await page.evaluate(() => window.runEngineTests());
   report.checks.push(...report.engine.checks);
   report.occlusion = await page.evaluate(() => window.runOcclusionTests());
+  report.doppler = await page.evaluate(() => window.runDopplerTests());
   assert.equal(await page.evaluate(() => window.prepareGesture()), 'suspended');
   await page.mouse.click(20, 20);
   assert.equal(await page.evaluate(() => window.checkGesture()), 'running');

@@ -1543,3 +1543,7 @@ Public model, axes, parameters and units: https://mitsuba.readthedocs.io/en/late
 Hosek and Wilkie (2012), "An Analytic Model for Full Spectral Sky-Dome Radiance", DOI
 https://doi.org/10.1145/2185520.2185591, identifies the rival model. The tested Margo shader remains
 Preetham, Shirley and Smits (1999), with the already documented Margo tuning. No coefficients are imported.
+
+## Audio Doppler (batch 110)
+
+Implemented from the classical stationary-medium source/observer formula in [OpenStax University Physics Volume 1, 17.7](https://openstax.org/books/university-physics-volume-1/pages/17-7-the-doppler-effect), with current world radial velocities and a documented 0.95 Mach clamp. Buffer playback and automation follow the [W3C Web Audio Recommendation, AudioBufferSourceNode](https://www.w3.org/TR/2021/REC-webaudio-20210617/#AudioBufferSourceNode). No engine or library implementation was read. Generated sine tones and motion are stand-ins; no external files.

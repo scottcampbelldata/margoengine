@@ -174,3 +174,61 @@ blocker/proxy. Radius is a sampled source aperture, not a physical acoustic simu
 Node tests use stand-in rendering and audio graphs. The browser test measures generated tones
 in real OfflineAudioContext renders beside real WebGPU, WebGL2 and compatibility engines.
 Real recordings, listening quality, other browsers and speed are unmeasured.
+
+## Doppler
+
+`@margoengine/audio/doppler` shifts buffer pitch from source and listener world motion.
+Attach it after setting the buffer; the listener samples both poses after the sound update.
+It works identically with WebGPU, native WebGL2 and WebGL2 compatibility rendering.
+The audio root does not import this entry.
+
+```ts
+import {AudioListener, PositionalAudio} from 'margoengine/audio';
+import {AudioDoppler} from 'margoengine/audio/doppler';
+
+const context = new OfflineAudioContext(2, 24000, 48000);
+using listener = new AudioListener({context, smoothing: 0});
+listener.follow(null);
+using sound = new PositionalAudio(listener, {rolloffFactor: 0});
+const buffer = context.createBuffer(1, 48000, 48000);
+buffer.getChannelData(0).forEach((_, i, a) => { a[i] = 0.2 * Math.sin(2 * Math.PI * 1000 * i / 48000); });
+sound.setBuffer(buffer).setPosition(20, 0, 0).play();
+using doppler = new AudioDoppler(sound);
+listener.update();
+const paused = context.suspend(0.128);
+const rendered = context.startRendering();
+await paused;
+sound.setPosition(20 - 34.3 * context.currentTime, 0, 0);
+listener.update();
+console.log(doppler.ratio); // 1.111...: source approaching at 34.3 m/s
+await context.resume();
+console.log((await rendered).length); // 24000 frames, shifted tone after the motion sample
+```
+
+Options: `speedOfSound=343` m/s (finite, positive), `playbackRate=sound.playbackRate`
+(finite, nonnegative, at most float32 maximum / 39). `doppler.playbackRate` changes
+authored pitch; `ratio` reports the motion multiplier. The controller owns
+`sound.playbackRate` until disposal and restores authored pitch then. Detune,
+volume, fades, filters and the panner stay independent. Use one controller per sound;
+duplicate attachment raises `attached`. Buffer sources only; other source kinds raise
+`unsupported`, with a help link. Dispose the controller before switching source kind.
+
+Velocity is world displacement divided by audio-clock elapsed time. Initial, coincident
+and backward-clock samples are neutral; repeated timestamps retain the previous sample.
+`reset()` clears history and pitch after teleports, cuts or motion during suspension.
+Call it before the next update. Explicit `update()` needs current sound/listener poses;
+attached listeners do this automatically. Updates use existing playback-rate smoothing
+(`listener.smoothing=0.02` s by default). Playback speed and duration change with pitch.
+Do not combine with `Audio.sync`, which also owns playback rate.
+
+The classical stationary-medium ratio is `(c + listener radial velocity) / (c + source
+radial velocity)` with the axis pointing listener to source. Each radial Mach number
+is clamped to -0.95..0.95, bounding the ratio to 1/39..39. This keeps extreme motion
+finite; supersonic propagation, sonic booms, wind, travel delay and retarded positions
+are outside this instantaneous approximation. Stop updating to freeze the last pitch;
+dispose or reset to restore it. Sound disposal detaches on the next listener update;
+listener teardown disposes controllers. Supports `using` and idempotent `dispose()`.
+Node tests use stand-in audio. Real browser renders measure generated 1 kHz tones for
+approach, recession, listener approach, co-motion and rest on all three rendering routes.
+Generated audio/motion are stand-ins; recordings, listening quality, other browsers
+and performance remain unmeasured.

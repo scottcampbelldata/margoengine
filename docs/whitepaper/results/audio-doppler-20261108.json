@@ -1,0 +1,114 @@
+{
+  "browser": "157.0.4341.42",
+  "fixture": "Generated 1 kHz sine and engine mesh motion, stand-ins",
+  "reports": [
+    {
+      "backend": "webgpu",
+      "cases": [
+        {
+          "name": "approach",
+          "ratio": 1.111111109223191,
+          "expectedHz": 1111.111111111111,
+          "measuredHz": 1111.1111640912225
+        },
+        {
+          "name": "recede",
+          "ratio": 0.9090909103547234,
+          "expectedHz": 909.090909090909,
+          "measuredHz": 909.0909361840015
+        },
+        {
+          "name": "listener-approach",
+          "ratio": 1.1,
+          "expectedHz": 1100,
+          "measuredHz": 1100.0000238406544
+        },
+        {
+          "name": "co-motion",
+          "ratio": 1.0000000013901957,
+          "expectedHz": 1000,
+          "measuredHz": 999.9999999999997
+        },
+        {
+          "name": "stationary",
+          "ratio": 1,
+          "expectedHz": 1000,
+          "measuredHz": 999.9999999999997
+        }
+      ],
+      "gpuErrors": []
+    },
+    {
+      "backend": "webgl2",
+      "cases": [
+        {
+          "name": "approach",
+          "ratio": 1.111111109223191,
+          "expectedHz": 1111.111111111111,
+          "measuredHz": 1111.1111640912225
+        },
+        {
+          "name": "recede",
+          "ratio": 0.9090909103547234,
+          "expectedHz": 909.090909090909,
+          "measuredHz": 909.0909361840015
+        },
+        {
+          "name": "listener-approach",
+          "ratio": 1.1,
+          "expectedHz": 1100,
+          "measuredHz": 1100.0000238406544
+        },
+        {
+          "name": "co-motion",
+          "ratio": 1.0000000013901957,
+          "expectedHz": 1000,
+          "measuredHz": 999.9999999999997
+        },
+        {
+          "name": "stationary",
+          "ratio": 1,
+          "expectedHz": 1000,
+          "measuredHz": 999.9999999999997
+        }
+      ],
+      "gpuErrors": []
+    },
+    {
+      "backend": "webgl2-compat",
+      "cases": [
+        {
+          "name": "approach",
+          "ratio": 1.111111109223191,
+          "expectedHz": 1111.111111111111,
+          "measuredHz": 1111.1111640912225
+        },
+        {
+          "name": "recede",
+          "ratio": 0.9090909103547234,
+          "expectedHz": 909.090909090909,
+          "measuredHz": 909.0909361840015
+        },
+        {
+          "name": "listener-approach",
+          "ratio": 1.1,
+          "expectedHz": 1100,
+          "measuredHz": 1100.0000238406544
+        },
+        {
+          "name": "co-motion",
+          "ratio": 1.0000000013901957,
+          "expectedHz": 1000,
+          "measuredHz": 999.9999999999997
+        },
+        {
+          "name": "stationary",
+          "ratio": 1,
+          "expectedHz": 1000,
+          "measuredHz": 999.9999999999997
+        }
+      ],
+      "gpuErrors": []
+    }
+  ]
+}

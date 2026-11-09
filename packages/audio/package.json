@@ -38,6 +38,10 @@
     "./occlusion": {
       "types": "./dist/occlusion.d.ts",
       "import": "./dist/occlusion.js"
+    },
+    "./doppler": {
+      "types": "./dist/doppler.d.ts",
+      "import": "./dist/doppler.js"
     }
   },
   "files": [

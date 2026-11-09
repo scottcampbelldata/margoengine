@@ -1326,3 +1326,9 @@ No known open defect in tested static geometry/partial-cover paths. Generated br
   with Margo horizon/turbidity clamps and daylight-locus chromaticity adjustment, not the newer fitted
   sunsky model. Absolute units are also not interchangeable. Repro under the shared GPU lock:
   `node packages/sky/scripts/rival-bench.mjs`. The normalized model loss remains open.
+
+### Audio Doppler (batch 110)
+
+No known open defect in tested buffer-motion paths. Node tests cover radial signs, transverse/co-motion, coincident positions, frozen/backward clocks, resets, bounded extreme velocities, rate smoothing, recreated sources, invalid options, duplicate attachment and teardown. The first local build used an error code outside MargoErrorCode; corrected to the established linked RangeError convention. The first test fixture omitted required listener forward/up arguments; corrected the fixture. Source-kind and acoustic approximation limits are in limits.md.
+
+The first Doppler verify found the limits index still at LIM-602 and the generated llms corpus stale after the final size update. Updated the exact index line and regenerated the corpus; existing claims-file and llms regression checks cover both. No tests or budgets were changed.

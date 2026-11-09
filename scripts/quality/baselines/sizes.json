@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 11467408,
+  "total": 11468755,
   "history": [
     {
       "date": "2026-10-24",
@@ -4796,6 +4796,12 @@
       "commit": "5ec353be7",
       "reason": "Batch-110-adds-optional-audio-occlusion-with-unchanged-audio-root-and-core",
       "grew": 1
+    },
+    {
+      "date": "2026-11-09",
+      "commit": "4068cec2f",
+      "reason": "Batch-110-optional-Doppler-entry-with-unchanged-root",
+      "grew": 1
     }
   ],
   "items": {
@@ -4822,6 +4828,7 @@
     "@margoengine/animator/sync": 2070,
     "@margoengine/animator/warping": 4883,
     "@margoengine/audio": 7716,
+    "@margoengine/audio/doppler": 1347,
     "@margoengine/audio/occlusion": 1772,
     "@margoengine/behavior": 8897,
     "@margoengine/behavior/context": 1658,

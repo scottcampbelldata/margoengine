@@ -13,7 +13,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-602). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-603). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -961,3 +961,9 @@ The default Preetham sky does not match Mitsuba 3.9.1 sunsky (Hosek-Wilkie): zen
 MAE 1.439228 over 297 directions, max 70.681783. Per-case relative MAE is 0.199319 to 0.765628.
 Sun elevations 10/45/75 degrees, turbidity 2/3/6, ground albedo 0, sun disk off. This is a sampled
 angular-radiance comparison, not hemisphere integration or absolute physical-unit equivalence. Loss open.
+
+## Audio Doppler (batch 110)
+
+Optional audio/doppler: 1,090 B gzip; audio root unchanged at 7,508 B; core plus stage unchanged at 23,626 B. Defaults: speedOfSound 343 m/s, authored playbackRate from the sound. Positive finite sound speed; nonnegative finite rate at most float32 maximum / 39. Estimates world displacement per audio-clock second; first/coincident/backward-clock samples neutral, repeated times retain history. Reset after teleports and motion during suspension. Owns playback rate while attached, restores authored rate on disposal; use controller.playbackRate for authored changes, never Audio.sync concurrently. Buffers only; other source kinds produce unsupported with a help link. One controller per sound. Listener pose/source ordering and teardown are covered.
+
+Classical instantaneous stationary-medium approximation with each radial Mach number clamped to -0.95..0.95, ratio bounded 1/39..39. Not supersonic acoustics, wind, retarded-time positions, travel delay or pitch-only time stretching. Existing listener smoothing applies. Real browser renders beside all three rendering routes measure generated 1 kHz source approach at 1111.111 Hz, recession at 909.091 Hz, listener approach at 1100 Hz and co-motion/rest at 1000 Hz, each within 0.1 Hz with zero GPU validation errors. LIM-603, generated stand-ins only; real recordings, listening quality, other browsers and performance unmeasured.

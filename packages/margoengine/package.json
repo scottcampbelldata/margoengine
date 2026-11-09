@@ -134,6 +134,10 @@
       "types": "./dist/audio/occlusion.d.ts",
       "import": "./dist/audio/occlusion.js"
     },
+    "./audio/doppler": {
+      "types": "./dist/audio/doppler.d.ts",
+      "import": "./dist/audio/doppler.js"
+    },
     "./behavior": {
       "types": "./dist/behavior.d.ts",
       "import": "./dist/behavior.js"
