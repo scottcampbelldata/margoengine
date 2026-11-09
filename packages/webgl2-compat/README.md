@@ -59,6 +59,23 @@ checks capabilities; package parity failures remain tracked in
 
 What it does:
 
+Depth bias uses `EXT_polygon_offset_clamp` when available: positive `depthBiasClamp`
+caps the offset with `min`, negative uses `max`, and zero (the default) leaves it
+unclamped. Clamp changes, including reset to zero, are replayed with pipeline
+state. Without the extension, both pipeline creation methods reject a nonzero
+clamp with linked MargoError code `unsupported` before shader compilation; ordinary
+zero-clamp depth bias still works. For example, after creating a device above:
+
+```js
+// `device` is an existing GPUDevice (native or compatibility).
+const depthStencil = {
+  format: 'depth32float', depthWriteEnabled: true, depthCompare: 'less',
+  depthBias: 2048, depthBiasSlopeScale: 1, depthBiasClamp: 0,
+};
+// Pass depthStencil to device.createRenderPipeline with your vertex/fragment modules.
+console.log(depthStencil.depthBiasClamp); // zero works without the clamp extension
+```
+
 - **Device** (`margoengine/webgl2-compat/device`): `createCompatGPU()` gives the same GPU without installing it;
   `isCompatDevice(device)` tells a package it runs on WebGL2. Each device owns one WebGL2 context made with
   `antialias: false`, so exact-pixel rendering stays exact; it multisamples itself when a pipeline asks for 4

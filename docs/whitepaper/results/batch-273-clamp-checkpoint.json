@@ -1,0 +1,36 @@
+{
+  "scope": "Clamp repaired; stencil and failure 10 remain open",
+  "corePlusStageGzip": 23924,
+  "sizes": {
+    "index": {
+      "beforeSource": 105011,
+      "afterSource": 105099,
+      "afterDist": 105179
+    },
+    "device": {
+      "beforeSource": 105553,
+      "afterSource": 105646,
+      "afterDist": 105227
+    },
+    "xr": {
+      "beforeSource": 105409,
+      "afterSource": 105502,
+      "afterDist": 105134
+    },
+    "tiers": {
+      "beforeSource": 105513,
+      "afterSource": 105607,
+      "afterDist": 104916
+    }
+  },
+  "checks": 596,
+  "captures": 278,
+  "failures": [
+    "4x reference uses eight-bit stencil target mask: [[5,6,9,255],[5,6,9,255],[5,6,9,255]] != [[0,0,255,255],[0,0,255,255],[0,0,255,255]]",
+    "1x reference uses eight-bit stencil target mask: [[5,6,9,255],[5,6,9,255],[5,6,9,255]] != [[0,0,255,255],[0,0,255,255],[0,0,255,255]]"
+  ],
+  "units": "13/13 device tests; 2 added regressions fail on parent",
+  "remaining": "High-bit stencil reference masking before GL",
+  "sizeCeilings": "unchanged",
+  "cleanRoom": "docs/clean-room.md"
+}

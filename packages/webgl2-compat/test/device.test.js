@@ -50,6 +50,69 @@ test('an adapter only on a full-tier context; below it, null and the context is 
   assert.equal(gpu.getPreferredCanvasFormat(), 'rgba8unorm');
 });
 
+// Exercise the actual replay/cache with a recording GL context, without compiling or drawing on a GPU.
+async function offsetDevice(withClamp) {
+  const calls = [], requested = [];
+  const context = fakeContext();
+  const get = context.getExtension.bind(context);
+  context.getExtension = (name) => {
+    requested.push(name);
+    if (name === 'EXT_polygon_offset_clamp')
+      return withClamp ? { polygonOffsetClampEXT: (...args) => calls.push(['clamp', ...args]) } : null;
+    return get(name);
+  };
+  const constants = ['DITHER', 'SCISSOR_TEST', 'CULL_FACE', 'DEPTH_TEST', 'STENCIL_TEST',
+    'POLYGON_OFFSET_FILL', 'SAMPLE_ALPHA_TO_COVERAGE', 'ALWAYS', 'TRIANGLES', 'CW'];
+  constants.forEach((name, i) => { context[name] = i + 1; });
+  context.polygonOffset = (...args) => calls.push(['plain', ...args]);
+  const gl = new Proxy(context, { get: (target, key) => key in target ? target[key] : () => ({}) });
+  const adapter = await createCompatGPU({ createContext: () => gl }).requestAdapter();
+  const device = await adapter.requestDevice();
+  const pass = { desc: { depth: { view: { texture: { info: { kind: 'depth' } } } } } };
+  const apply = (bias, slope, clamp) => {
+    device.replayer.applyPipeline({
+      program: null, vao: null, cull: 0, frontFace: gl.CW, targets: [],
+      depthStencil: { depthBias: bias, depthBiasSlopeScale: slope, depthBiasClamp: clamp },
+    }, pass);
+  };
+  return { device, calls, requested, apply };
+}
+
+test('polygon offset loads its extension and caches the signed clamp, including reset to zero', async () => {
+  const { device, calls, requested, apply } = await offsetDevice(true);
+  try {
+    assert.ok(requested.includes('EXT_polygon_offset_clamp'));
+    apply(100000, 2, 1e-6);
+    apply(100000, 2, 1e-6);
+    apply(100000, 2, -1e-6);
+    apply(100000, 2, 0);
+    apply(100000, 2, 0);
+    apply(0, 0, 0);
+    apply(100000, 2, 1e-6);
+    assert.deepEqual(calls, [
+      ['clamp', 2, 100000, 1e-6], ['clamp', 2, 100000, -1e-6],
+      ['clamp', 2, 100000, 0], ['clamp', 2, 100000, 1e-6],
+    ]);
+  } finally { device.destroy(); }
+});
+
+test('without polygon offset clamp, nonzero clamp refuses sync and async pipelines before compilation', async () => {
+  const { device, calls, apply } = await offsetDevice(false);
+  try {
+    for (const depthBiasClamp of [1e-6, -1e-6]) {
+      const descriptor = { layout: 'auto', vertex: { module: {} },
+        depthStencil: { format: 'depth32float', depthBiasClamp } };
+      const refusal = (e) => e.code === 'unsupported' && /EXT_polygon_offset_clamp/.test(e.message) && /https:/.test(e.message);
+      assert.throws(() => device.createRenderPipeline(descriptor), refusal);
+      await assert.rejects(device.createRenderPipelineAsync(descriptor), refusal);
+    }
+    assert.equal(device.programs.count, 0);
+    apply(100000, 2, 0);
+    apply(100000, 2, undefined);
+    assert.deepEqual(calls, [['plain', 2, 100000]]);
+  } finally { device.destroy(); }
+});
+
 test('limits come from the context, never above WebGPU defaults; vertex strides stop at WebGL 255 bytes', async () => {
   const gpu = createCompatGPU({
     createContext: () =>

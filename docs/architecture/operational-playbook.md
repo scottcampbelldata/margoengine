@@ -4875,3 +4875,21 @@ pass 213 cases; all eight real-GPU owner cases pass (242 model pixels each),
 the complete game browser passes and all fifteen runtime README examples pass.
 The asset-contract regression checks real authored clip, marker and bone names.
 The inherited full verify is retained; only affected gates are rerun.
+
+
+### Section 5 evidence: batch 273 polygon offset clamp
+
+The optional compatibility device now loads EXT_polygon_offset_clamp and replays
+slope, units and the signed depthBiasClamp together. Positive clamp is a minimum
+with the computed offset, negative a maximum; zero disables clamping. The cache
+includes clamp and replays reset to zero. Without the extension, nonzero clamp
+refuses synchronous and asynchronous pipeline creation with code unsupported and
+a help link before shader compilation. Zero-clamp offset remains supported.
+No core or stage source or export changed; their gzip remains 23,924 B.
+Device CPU regressions fail on the parent and pass after repair (13/13 device
+tests). The complete compat render-state grid now finishes 596 checks and 278
+captures: all positive and negative clamp pixels pass at 4x and 1x, including
+material mapping. The two high-bit stencil failures remain open for the next
+checkpoint; this is not a pass of failure 10 or a suite closure.
+Receipts: whitepaper/results/batch-273-clamp-checkpoint.json and local
+batch-273-clamp-{before,after,render-state} logs under test-results.

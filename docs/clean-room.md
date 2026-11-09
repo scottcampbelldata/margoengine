@@ -4191,3 +4191,20 @@ name and load the real bundled models. The regression parses each example and
 compares its clip, marker-table and literal bone references with the GLB JSON.
 Runtime execution proves dynamic full-body chains and the solver setup too.
 All fifteen pass, without adding a skip, fallback or synthetic replacement.
+
+### Batch 273 signed polygon offset clamp repair
+
+Compared W3C GPU for the Web Working Group, WebGPU, editors Kai Ninomiya,
+Brandon Jones and Jim Blandy (2026), https://www.w3.org/TR/webgpu/#depth-bias;
+Eric Lengyel and Tobias Hector, EXT_polygon_offset_clamp revision 4 (2016),
+https://registry.khronos.org/OpenGL/extensions/EXT/EXT_polygon_offset_clamp.txt;
+and Khronos WebGL Working Group, EXT_polygon_offset_clamp revision 3 (2023),
+https://registry.khronos.org/webgl/extensions/EXT_polygon_offset_clamp/.
+Also compared Hang Dou, Yajie Yan, Ethan Kerzner, Zeng Dai and Chris Wyman,
+Adaptive Depth Bias for Shadow Maps (2014),
+https://jcgt.org/published/0003/04/08/paper-lowres.pdf. The paper explains why
+bias magnitude changes visibility. The standards give the exact signed bound
+and reset behavior; hardware polygon offset preserves rasterizer slope/precision
+semantics better than injecting an approximate fragment depth. The repair uses
+that extension and explicitly refuses nonzero clamp when absent. No paper
+companion code or rival implementation was read or used.

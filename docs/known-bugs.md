@@ -342,21 +342,14 @@ finishes its own attachment, translator and DOF repairs without chasing them.
   cause is not isolated between uniform replay and multisample rendering;
   neither a driver cause nor acceptable numerical drift is proven. Failure 9
   stays open; no tolerance, shader math, sample grid or resource work is changed.
-- `materials/test:gpu:render-state`: the complete owned probe now finishes in
-  72.5 s including orchestration, with 588 checks/274 captures and six assertion
-  failures. At both 4x and 1x, native/material clamped depth bias is red instead
-  of green and a stencil reference with high bits misses its eight-bit target.
-  Root owners: Replayer.applyPipeline calls two-argument gl.polygonOffset and
-  ignores depthBiasClamp; its stencilFuncSeparate call passes the unmasked
-  uint32 reference, which GL clamps to stencil range instead of taking the low
-  eight bits. Chrome and Edge expose EXT_polygon_offset_clamp locally, but the
-  device's extensions() does not load it. A complete repair needs sign-correct
-  clamp mapping, cache invalidation on clamp changes, an honest path/refusal
-  without the extension, and stencil masking before GL's signed/clamped input.
-  No runtime, stencil arithmetic, pixel expectation or timeout was changed.
-  Receipts: test-results/batch-273-render-state-probe.log and
-  test-results/material-render-state/gpu.json. This is an assertion failure,
-  not a remaining unidentified initial await or a busy exemption.
+- `materials/test:gpu:render-state`: clamp repaired in the optional device.
+  EXT_polygon_offset_clamp is loaded where present; signed clamp and reset to zero
+  are cached/replayed. Nonzero clamp is explicitly unsupported without it.
+  The full grid finishes 596 checks/278 captures, with positive and negative clamp
+  pixels passing at 4x and 1x. Two high-bit stencil-reference failures remain:
+  stencilFuncSeparate receives the unmasked uint32; GL clamps instead of using
+  the target's low eight bits. Failure 10 remains open. Receipt:
+  test-results/batch-273-clamp-render-state.json. No tolerance is changed.
 - `materials/test:gpu:wireframe` reports
   mirrored/reference pixel hashes and duplicate-edge alpha differences, and
   `materials/test:gpu:normal-map` reports a mesh dome shading as a dent. Those
@@ -3769,3 +3762,18 @@ marker-table and bone names; twelve of fourteen old asset-contract cases failed
 with the fictional hero path. Ten obsolete known-list failures are removed only
 after every replacement example executes successfully.
 [Acceptance receipt](whitepaper/results/batch-56-animator-owner-20261109.json).
+
+### Read-only Firefox spawn UNKNOWN diagnosis
+
+Direct hidden Process.Start of the installed Firefox with --version also fails
+before execution: Windows native error 14001, incorrect side-by-side configuration.
+Application/SideBySide event 33 names missing dependent assembly mozglue 1.0.0.0.
+Both executable and DLL are x64. The executable's RT_MANIFEST ID 1 requires
+mozglue; mozglue.dll embeds its assembly manifest only at ID 2, and no external
+mozglue.manifest is installed. Microsoft's [Assembly Searching Sequence](https://learn.microsoft.com/en-us/windows/win32/sbscs/assembly-searching-sequence)
+requires resource ID 1 for a private assembly DLL. Thus the installed browser's
+manifest packaging explains this loader refusal and Playwright's generic spawn
+UNKNOWN, before renderer/GPU startup. The [resource documentation](https://learn.microsoft.com/en-us/windows/win32/sbscs/using-side-by-side-assemblies-as-a-resource)
+distinguishes IDs 1 and 2. No installation, binary, registry or setting was changed;
+no Firefox pixel pass is claimed. Evidence with hashes, resource IDs, manifest
+text and event: docs/whitepaper/results/batch-273-firefox-diagnosis.json.

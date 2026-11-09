@@ -183,6 +183,8 @@ export class CompatRenderPipeline {
     this.frontFace = prim.frontFace === 'cw' ? gl.CCW : gl.CW;
     this.unclippedDepth = !!prim.unclippedDepth;
     this.depthStencil = descriptor.depthStencil;
+    if ((this.depthStencil?.depthBiasClamp ?? 0) !== 0 && !device.ext.polygonOffsetClamp)
+      throw device.unsupported('nonzero depthBiasClamp requires EXT_polygon_offset_clamp');
     this.alphaToCoverage = !!descriptor.multisample?.alphaToCoverageEnabled;
     this.sampleCount = descriptor.multisample?.count ?? 1;
     this.targets = [...(descriptor.fragment?.targets ?? [])].map((t) =>
@@ -1426,9 +1428,15 @@ export class Replayer {
       const write = !!ds.depthWriteEnabled && !d?.depthReadOnly;
       s.set('depthMask', write ? '1' : '0', () => gl.depthMask(write));
       const bias = ds.depthBias ?? 0,
-        slope = ds.depthBiasSlopeScale ?? 0;
+        slope = ds.depthBiasSlopeScale ?? 0,
+        clamp = ds.depthBiasClamp ?? 0;
       s.enable(gl.POLYGON_OFFSET_FILL, bias !== 0 || slope !== 0);
-      if (bias || slope) s.set('polygonOffset', `${slope},${bias}`, () => gl.polygonOffset(slope, bias));
+      if (bias || slope)
+        s.set('polygonOffset', `${slope},${bias},${clamp}`, () => {
+          // The extension and WebGPU share signed min/max semantics; zero disables the clamp.
+          if (ext.polygonOffsetClamp) ext.polygonOffsetClamp.polygonOffsetClampEXT(slope, bias, clamp);
+          else gl.polygonOffset(slope, bias);
+        });
     } else s.enable(gl.POLYGON_OFFSET_FILL, false);
     const stencilOn = !!ds && !!d && hasStencil(d.view.texture.info);
     s.enable(gl.STENCIL_TEST, stencilOn);

@@ -2161,3 +2161,13 @@ in a page. The nine entry APIs and unchanged size ceilings pass. See the
 fixture missed its required viewport and was corrected; no product assertion
 was weakened. Retained diagnostics include the large failed-assertion formatting
 stall, old README failures and the subsequently corrected sync-marker table.
+
+### Batch 273 clamp checkpoint
+
+Build webgl2-compat, then run node --test packages/webgl2-compat/test/device.test.js.
+Run node scripts/material-render-state-gpu-check.js once natively and once with
+MARGO_COMPAT=1, each under one shared scripts/gpu-lock.mjs run slot with
+--owner=codex-batch273 --wait-max=60 --max=2. Full assertions remain unchanged;
+negative native-bias clamp cases extend the grid. The clamp checkpoint retains
+the two independently known stencil failures and does not count that suite closed.
+Never invoke the canonical compatibility GPU chain containing tracer compilation.

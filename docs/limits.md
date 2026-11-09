@@ -3102,3 +3102,23 @@ Animator entry sizes after the owner repair (min+gzip, package dependencies exte
 | @margoengine/animator/motion-matching | 6994 | 7250 |
 | @margoengine/animator/mirror | 1774 | 2030 |
 | @margoengine/animator/spline-ik | 3862 | 4094 |
+
+
+### Batch 273 polygon offset clamp checkpoint
+
+The optional compatibility device now loads EXT_polygon_offset_clamp and replays
+slope, units and the signed depthBiasClamp together. Positive clamp is a minimum
+with the computed offset, negative a maximum; zero disables clamping. The cache
+includes clamp and replays reset to zero. Without the extension, nonzero clamp
+refuses synchronous and asynchronous pipeline creation with code unsupported and
+a help link before shader compilation. Zero-clamp offset remains supported.
+No core or stage source or export changed; their gzip remains 23,924 B.
+Device CPU regressions fail on the parent and pass after repair (13/13 device
+tests). The complete compat render-state grid now finishes 596 checks and 278
+captures: all positive and negative clamp pixels pass at 4x and 1x, including
+material mapping. The two high-bit stencil failures remain open for the next
+checkpoint; this is not a pass of failure 10 or a suite closure.
+Receipts: whitepaper/results/batch-273-clamp-checkpoint.json and local
+batch-273-clamp-{before,after,render-state} logs under test-results.
+
+Clamp entry sizes (minified gzip, bare imports external): {"index":{"beforeSource":105011,"afterSource":105099,"afterDist":105179},"device":{"beforeSource":105553,"afterSource":105646,"afterDist":105227},"xr":{"beforeSource":105409,"afterSource":105502,"afterDist":105134},"tiers":{"beforeSource":105513,"afterSource":105607,"afterDist":104916}}. Source before/after uses the parent versions of only the two owned changed source files through a build plugin. Dist uses the real package build. No ceiling changes.

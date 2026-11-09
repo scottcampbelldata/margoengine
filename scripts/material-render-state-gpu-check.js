@@ -173,13 +173,15 @@ try {
       ]);
       colors(name + ' independent pixel oracle', actual, expected);
     }
-    for (const [name, state, expected] of [
-      ['native-unclamped', { depthBias: 100000 }, red],
-      ['native-clamped', { depthBias: 100000, depthBiasClamp: 1e-6 }, green],
+    for (const [name, state, expected, z] of [
+      ['native-unclamped', { depthBias: 100000 }, red, -0.001],
+      ['native-clamped', { depthBias: 100000, depthBiasClamp: 1e-6 }, green, -0.001],
+      ['native-negative-unclamped', { depthBias: -100000 }, green, 0.001],
+      ['native-negative-clamped', { depthBias: -100000, depthBiasClamp: -1e-6 }, red, 0.001],
     ]) {
       const actual = await render(name, [
         { options: { color: [0, 1, 0] } },
-        { options: { color: [1, 0, 0] }, z: -0.001, state },
+        { options: { color: [1, 0, 0] }, z, state },
       ]);
       colors(name + ' limits depth shift', actual, expected);
     }
