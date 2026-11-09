@@ -5370,6 +5370,14 @@ The `/fft` entry is 7,334 B minified gzip (new ceiling 7,590 B); core + stage
 is unchanged at 23,924 B in the full rebuilt measurement. Snapshot time,
 mean height and patch lengths are binary32 GPU values, including rounding.
 
+### Stats registration disposal
+
+Frame listeners and device wrappers observe their existing engine/device scope;
+scene ownership governs registration and detachment, not independent per-scene
+profiling. Canonical min+gzip against the committed 559e2dba1 entry measurement:
+stats root 4853 to 4861 B, beacon 1383 to 1394 B, compile 1802 to 1813 B and
+phases 1458 to 1467 B. No ceiling is raised; core plus stage remains 23924 B.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -8920,6 +8928,17 @@ fixture enumerates all 32 feature subsets, not frames until ready; its existing
 scanner, which now passes with no rule/baseline change. No bug 45 compile-hang,
 shader or teardown investigation was performed here.
 
+
+### Fixed: stats secondary-scene registrations
+
+Register any of Stats, FramePhases, PipelineCompiles or FrameBeacon in a secondary
+scene and a same-name sentinel in the default scene, then dispose it directly.
+The registration stayed in the secondary scene while the default sentinel was
+removed. Each owner now uses sceneOf(this); the eight-case real-engine test fails
+four direct cases before repair and passes all eight afterward. Scene removal,
+restoration, resource release and replacements remain covered. GPU/README and
+closing acceptance are pending; the wider audit remains open.
+
 === Using Margo with AI tools (docs/ai-tools.md) ===
 
 # Using Margo with AI tools
@@ -9400,6 +9419,22 @@ Zero runtime dependencies. Frame sampling uses a fixed Float64Array ring.
 DOM strings and canvas drawing refresh separately every 150 ms. Encoder/pass wrappers
 and asynchronous GPU readback allocate outside `tick`.
 
+`Stats`, `FramePhases`, `PipelineCompiles` and `FrameBeacon` detach from the scene
+that registered them when disposed directly. Another scene may use the same
+plugin name. Registration is scene-owned; frame listeners and device wrappers
+still observe the engine/device rather than providing independent scene timings.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Stats} from 'margoengine/stats';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const scene = engine.createScene('preview');
+const stats = new Stats();
+scene.use(stats);
+stats.dispose(); // detaches from preview and releases its overlay and listeners
+```
+
 ```ts
 import {Stats} from 'margoengine/stats';
 import type {EngineKernel} from 'margoengine/core';
@@ -9464,15 +9499,7 @@ The CPU phase breakdown times the kernel tick, culling, encoding and submit of e
 import {Engine} from 'margoengine/core';
 import {Stats} from 'margoengine/stats';
 import {FramePhases} from 'margoengine/stats/phases';
-
-const engine = await Engine.create(document.querySelector('canvas')!);
-const phases = FramePhases.attach(engine, {samples: 120});
-phases.view(Stats.attach(engine));              // the averages in the panel
-engine.start();
-setInterval(() => console.log(phases.last.encode, phases.average().tick), 1000);
 ```
-
-All numbers are CPU milliseconds, and they add up to `total`:
 
 [README continues: https://margoengine.com/llms/packages/stats.md]
 

@@ -2325,3 +2325,12 @@ direct-Fourier oracle in `packages/water/test/fft-reference.js`. No speed
 or general hydrodynamic-accuracy claim is made. The batch record links passing
 native WebGPU and full WebGL2 compatibility results and the complete landing
 checks; maximum six-field Fourier-oracle error is below 0.000002.
+
+### Stats registration ownership
+
+The four stats EnginePlugin classes detach from their actual scene on direct
+disposal. The real-engine scene-owner regression distinguishes direct disposal
+from scene removal and preserves default-scene names and later replacements;
+four direct failures become eight passing cases including removal controls.
+The package plus source guard passes 95 checks. Real-GPU and README acceptance
+remain pending. This makes no timing, performance or scene-isolated profiling claim.

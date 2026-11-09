@@ -62,6 +62,7 @@ test('a zero-delta restart excludes paused time from rolling frame samples', (t)
       frame = callback;
       return () => {};
     },
+    sceneOf() {},
     removePlugin() {},
   });
   t.mock.method(performance, 'now', () => now);
@@ -392,7 +393,7 @@ test('timestamp limbs exactly match unsigned 64-bit BigInt differences and sums'
 test('default Stats creates no GPU profiling resources or writes on a timestamp-capable device', (t) => {
   const stats = overlay(t),
     { device, resources } = gpu(t);
-  stats.setup({ gpu: device, removePlugin() {} });
+  stats.setup({ gpu: device, sceneOf() {}, removePlugin() {} });
   assert.equal(resources.length, 0);
   assert.equal(stats.gpuPassMilliseconds, null);
   assert.equal(stats.gpuPassCount, 0);
@@ -424,7 +425,7 @@ test('default Stats creates no GPU profiling resources or writes on a timestamp-
 test('Stats getters reuse completed pass data and HUD distinguishes warmup, unavailable and restoration', async (t) => {
   const stats = overlay(t, { profiling: true }),
     { device, resources, timestamps } = gpu(t),
-    engine = { gpu: device, removePlugin() {}, onError() {} };
+    engine = { gpu: device, sceneOf() {}, removePlugin() {}, onError() {} };
   stats.setup(engine);
   const storage = stats.gpuPassMilliseconds;
   assert.equal(storage.length, 128);
@@ -721,6 +722,7 @@ test('Stats clears overflowed or invalid GPU samples while unsampled frames reta
   stats.enableGPUProfiling(device);
   stats.setup({
     gpu: device,
+    sceneOf() {},
     removePlugin() {},
     onError(error) {
       errors.push(error);

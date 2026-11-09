@@ -79,7 +79,7 @@ The lane-local JSON retains the full call and explicit-plugin inventories.
 | sky | 8 | [Weather](../../packages/sky/src/weather.ts#L689), [WeatherFX](../../packages/sky/src/weather-fx.ts#L501), [VolumetricClouds](../../packages/sky/src/volumetric-clouds.ts#L601), [LightShafts](../../packages/sky/src/shafts.ts#L394), [HillaireSky](../../packages/sky/src/hillaire.ts#L588), [Sky](../../packages/sky/src/base.ts#L662), [AstroSky](../../packages/sky/src/astro.ts#L941), [AerialPerspective](../../packages/sky/src/aerial.ts#L334) |
 | splats | 6 | [SplatLod](../../packages/splats/src/lod.ts#L467), [SplatLighting](../../packages/splats/src/lighting.ts#L271), [Splats](../../packages/splats/src/index.ts#L611), [SplatDepth](../../packages/splats/src/depth.ts#L168), [SplatBrush](../../packages/splats/src/brush.ts#L310), [Player](../../packages/splats/src/animate.ts#L137) |
 | sprites | 3 | [SkeletalLayer](../../packages/sprites/src/skeletal.ts#L483), [SpriteLayer](../../packages/sprites/src/index.ts#L443), [BillboardLayer](../../packages/sprites/src/billboard.ts#L399) |
-| stats | 4 | [FramePhases](../../packages/stats/src/phases.ts#L215), [Stats](../../packages/stats/src/index.ts#L440), [PipelineCompiles](../../packages/stats/src/compile.ts#L314), [FrameBeacon](../../packages/stats/src/beacon.ts#L196) |
+| stats (repaired; closing gates pending) | 4 | [FramePhases](../../packages/stats/src/phases.ts#L215), [Stats](../../packages/stats/src/index.ts#L440), [PipelineCompiles](../../packages/stats/src/compile.ts#L314), [FrameBeacon](../../packages/stats/src/beacon.ts#L196) |
 | tilemap | 2 | [TileMap](../../packages/tilemap/src/renderer.ts#L362), [GridTileMap](../../packages/tilemap/src/iso.ts#L287) |
 | tiles | 2 | [TilesRenderer](../../packages/tiles/src/renderer.ts#L449), [TilesRenderer](../../packages/tiles/src/renderer.ts#L450) |
 | toon | 3 | [ModelOutlines](../../packages/toon/src/models.ts#L444), [Toon](../../packages/toon/src/index.ts#L110), [Hatching](../../packages/toon/src/hatch.ts#L212) |
@@ -95,3 +95,5 @@ The lane-local JSON retains the full call and explicit-plugin inventories.
 ## Stored scene/owner bindings to verify
 
 - [<function>](../../packages/save/src/engine.ts#L482): scene.removePlugin(made.name)
+
+Stats continuation: all four classes are reproduced and repaired with eight real-engine cases and a class-wide source guard. Package plus guard passes 95 checks. This supersedes the stats candidate row; the original inventory counts above are historical, not a fresh post-repair recount. GPU/README and closing acceptance remain pending. Save factory target and other owner groups remain unproved.

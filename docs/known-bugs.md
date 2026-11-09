@@ -3545,3 +3545,14 @@ fixture enumerates all 32 feature subsets, not frames until ready; its existing
 32-result assertion remains. A comment explains that fixed work to the wait
 scanner, which now passes with no rule/baseline change. No bug 45 compile-hang,
 shader or teardown investigation was performed here.
+
+
+### Fixed: stats secondary-scene registrations
+
+Register any of Stats, FramePhases, PipelineCompiles or FrameBeacon in a secondary
+scene and a same-name sentinel in the default scene, then dispose it directly.
+The registration stayed in the secondary scene while the default sentinel was
+removed. Each owner now uses sceneOf(this); the eight-case real-engine test fails
+four direct cases before repair and passes all eight afterward. Scene removal,
+restoration, resource release and replacements remain covered. GPU/README and
+closing acceptance are pending; the wider audit remains open.

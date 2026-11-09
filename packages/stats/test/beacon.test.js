@@ -234,13 +234,20 @@ test('attach samples the engine frames, leaves out pauses, and goes with dispose
   const b = browser(t),
     callbacks = new Set(),
     engine = {
-      use: (plugin) => plugin.setup(engine),
+      use(plugin) {
+        engine.plugin = plugin;
+        plugin.setup(engine);
+      },
       onFrame(callback) {
         callbacks.add(callback);
         return () => callbacks.delete(callback);
       },
+      sceneOf(plugin) {
+        return engine.plugin === plugin ? engine : undefined;
+      },
       removePlugin(name) {
         engine.removed = name;
+        if (engine.plugin?.name === name) engine.plugin = undefined;
       },
     },
     step = (milliseconds, delta = milliseconds / 1000) => {

@@ -4531,3 +4531,17 @@ command. The original metadata run had 28/30 passes; its two planner failures ar
 repaired by the failed-file-only 5/5 continuation. All five quality gates pass.
 No rendering source, limit or assertion changed. The earlier full verify and
 its repaired scheduler files are retained; no new full verify success is claimed.
+
+### Section 5 evidence: stats registration owners
+
+Stats, FramePhases, PipelineCompiles and FrameBeacon now resolve their registered
+scene before direct disposal. Their engine/device observations retain their
+existing scope; this does not add scene-isolated profiling. The real-engine CPU
+regression has four failing direct cases and four passing scene-removal controls
+before repair, then eight passing cases. It covers restoration, same-name default
+isolation, store/DOM release and stale disposal after replacement. A source guard
+covers all four EnginePlugin classes. Package and guard checks pass 95/95.
+An incomplete-double run was killed at its five-minute hard limit; cleanup had
+stopped at missing sceneOf methods. Explicit fixture registration contracts fix
+that cause without weakening assertions. GPU/README and closing gates remain
+pending until their receipts are recorded. No core/stage or timing claim.

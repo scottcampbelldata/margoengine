@@ -7,6 +7,22 @@ Zero runtime dependencies. Frame sampling uses a fixed Float64Array ring.
 DOM strings and canvas drawing refresh separately every 150 ms. Encoder/pass wrappers
 and asynchronous GPU readback allocate outside `tick`.
 
+`Stats`, `FramePhases`, `PipelineCompiles` and `FrameBeacon` detach from the scene
+that registered them when disposed directly. Another scene may use the same
+plugin name. Registration is scene-owned; frame listeners and device wrappers
+still observe the engine/device rather than providing independent scene timings.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Stats} from 'margoengine/stats';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const scene = engine.createScene('preview');
+const stats = new Stats();
+scene.use(stats);
+stats.dispose(); // detaches from preview and releases its overlay and listeners
+```
+
 ```ts
 import {Stats} from 'margoengine/stats';
 import type {EngineKernel} from 'margoengine/core';

@@ -212,7 +212,7 @@ export class FramePhases implements EnginePlugin {
     this.disposed = true;
     this.removeFrameListener?.();
     this.removeFrameListener = undefined;
-    this.engine?.removePlugin(this.name);
+    this.engine?.sceneOf(this)?.removePlugin(this.name);
     this.engine = undefined;
     this.restoreDevice?.();
     this.restoreStore?.();

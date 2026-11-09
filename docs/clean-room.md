@@ -3400,3 +3400,32 @@ Rebuilt inherited exporters, water, tracer and umbrella entries; API, lint,
 hygiene, llms and 20 affected inherited source tests pass. The full planner
 selection passes all but the inherited enumeration-comment issue; its affected
 fixed-wait file passes after the explanatory comment. Original receipts remain.
+
+
+### Batch 56 stats owner audit
+
+Research compared David G. Clarke, John Potter and James Noble,
+[Ownership Types for Flexible Alias Protection](https://doi.org/10.1145/286936.286947),
+1998; Chandrasekhar Boyapati, Barbara Liskov and Liuba Shrira,
+[Ownership Types for Object Encapsulation](https://doi.org/10.1145/604131.604156),
+2003 (the authors' institutional abstract); and Anindya Banerjee and David A.
+Naumann, [Ownership Confinement Ensures Representation Independence for
+Object-Oriented Programs](https://arxiv.org/abs/cs/0212003), 2002. The first two
+describe containment and reasoning within the owner; the third explicitly covers
+observers, factories and subclass boundaries. These inform our lifecycle audit,
+not a claim that Margo implements their static type systems. No foreign source
+or companion implementation was read or copied.
+
+Inference for Margo: Stats, FramePhases, PipelineCompiles and FrameBeacon own
+scene registrations separately from their engine/device observations. Direct
+disposal must resolve registration identity instead of the engine's active
+scene. Eight real-engine cases distinguish explicit disposal from scene removal,
+preserve same-name default registrations, exercise restoration, release the DOM
+and store wrapper, and preserve replacements after stale disposal. Before the
+repair four direct cases fail and four removal controls pass; afterward all eight
+pass. The source guard covers all four EnginePlugin classes. Numerical test
+doubles now implement sceneOf explicitly: direct setup has no registration,
+while attached doubles track their plugin identity. The initial incomplete-host
+run hit its five-minute hard limit after cleanup exceptions left timers alive;
+its whole process tree was killed. No assertion or numerical bar was weakened.
+GPU and README acceptance are recorded separately after completion.

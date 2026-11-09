@@ -43,8 +43,12 @@ function rig(t, { backend = 'webgpu' } = {}) {
           callbacks.add(callback);
           return () => callbacks.delete(callback);
         },
+        sceneOf(plugin) {
+          return r.plugin === plugin ? r.engine : undefined;
+        },
         removePlugin(name) {
           r.removed = name;
+          if (r.plugin?.name === name) r.plugin = null;
         },
       },
       view(pass) {

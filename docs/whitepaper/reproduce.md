@@ -1887,3 +1887,14 @@ runtime entry bytes. Logs use test-results/batch-273-vertex-*, materials-main-*,
 compute-* and materials-unit. Bug 45 compilation tests remain with lane-U.
 This closes only materials/test:gpu:vertex-inputs from the 26-failure index;
 culling, KTX2 image reproducibility, sampler pressure and LOD remain open.
+
+### Stats owner regression
+
+Build @margoengine/stats, then run node --test --test-timeout=120000
+packages/stats/test/*.test.js tests/stats-owner-contract.test.js with a five-minute
+process-tree limit. The focused scene-owner test has four direct failures on the
+parent with four passing owner-removal controls. Run scripts/test-stats-browser.mjs
+in one shared GPU slot, --owner=codex-56fix --wait-max=60 --max=1.5, then
+scripts/run-readme-examples.mjs --packages=stats with --max=1.5. Both commands
+render on a real GPU; never hold a slot for the CPU suite or closing checks.
+The browser adds eight scene-owner cases to all existing profiling checks.

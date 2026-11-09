@@ -150,6 +150,44 @@ try {
 
     engine.stop();
     await frames(2);
+    const { Stats } = await import('/packages/stats/dist/index.js');
+    result.owners = [];
+    for (const make of [
+      () => new Stats(),
+      () => new PipelineCompiles(),
+      () => new FramePhases(),
+      () => new FrameBeacon({ endpoint: '/stats-beacon-probe', intervalMilliseconds: 0 }),
+    ]) {
+      for (const remove of [false, true]) {
+        const scene = instance.createScene('stats-owner'),
+          plugin = make(),
+          tick = engine.store.tick,
+          encoder = device.createCommandEncoder,
+          pipeline = device.createRenderPipeline;
+        scene.createMesh().setGeometry(box());
+        scene.use(plugin);
+        let defaultDisposals = 0;
+        const primary = { name: plugin.name, setup() {}, dispose() { defaultDisposals++; } };
+        instance.use(primary);
+        plugin.onDeviceRestored?.(engine);
+        engine.render({ views: [{ scene, camera: engine.camera, viewport: [0, 0, 128, 96], pixels: true }] });
+        if (remove) scene.removePlugin(plugin.name);
+        else plugin.dispose();
+        plugin.dispose();
+        ensure(instance.sceneOf(plugin) === undefined && scene.plugins.size === 0, 'Disposed stats registration remains');
+        ensure(engine.scene.plugins.get(primary.name) === primary && defaultDisposals === 0, 'Default stats name was removed');
+        ensure(engine.store.tick === tick && device.createCommandEncoder === encoder && device.createRenderPipeline === pipeline,
+          'Stats device/store wrappers remain');
+        const replacement = { name: plugin.name, setup() {}, dispose() {} };
+        scene.use(replacement);
+        plugin.dispose();
+        ensure(scene.plugins.get(plugin.name) === replacement, 'Stale stats disposal removes replacement');
+        scene.removePlugin(plugin.name);
+        instance.removePlugin(primary.name);
+        result.owners.push({ name: plugin.name, removal: remove ? 'owner' : 'direct' });
+      }
+    }
+    await device.queue.onSubmittedWorkDone();
     ensure(gpuErrors.length === 0, 'Native GPU validation errors: ' + gpuErrors.join('; '));
     instance.dispose();
     return result;

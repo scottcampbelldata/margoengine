@@ -209,14 +209,19 @@ test('attach follows the engine: its device, its frames, a restored device, and 
     engine = {
       gpu: r.device,
       use(plugin) {
+        engine.plugin = plugin;
         plugin.setup(engine);
       },
       onFrame(callback) {
         callbacks.add(callback);
         return () => callbacks.delete(callback);
       },
+      sceneOf(plugin) {
+        return engine.plugin === plugin ? engine : undefined;
+      },
       removePlugin(name) {
         engine.removed = name;
+        if (engine.plugin?.name === name) engine.plugin = undefined;
       },
     },
     step = (delta) => callbacks.forEach((callback) => callback(engine, delta)),
@@ -255,9 +260,17 @@ test('a WebGL engine has no device to follow and still attaches', (t) => {
   rig(t);
   const engine = {
       gpu: null,
-      use: (plugin) => plugin.setup(engine),
+      use(plugin) {
+        engine.plugin = plugin;
+        plugin.setup(engine);
+      },
       onFrame: () => () => {},
-      removePlugin() {},
+      sceneOf(plugin) {
+        return engine.plugin === plugin ? engine : undefined;
+      },
+      removePlugin() {
+        engine.plugin = undefined;
+      },
     },
     compiles = PipelineCompiles.attach(engine);
   assert.equal(compiles.count, 0);

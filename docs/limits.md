@@ -2779,3 +2779,11 @@ and correctness reproduction: [water-fft.md](water-fft.md).
 The `/fft` entry is 7,334 B minified gzip (new ceiling 7,590 B); core + stage
 is unchanged at 23,924 B in the full rebuilt measurement. Snapshot time,
 mean height and patch lengths are binary32 GPU values, including rounding.
+
+### Stats registration disposal
+
+Frame listeners and device wrappers observe their existing engine/device scope;
+scene ownership governs registration and detachment, not independent per-scene
+profiling. Canonical min+gzip against the committed 559e2dba1 entry measurement:
+stats root 4853 to 4861 B, beacon 1383 to 1394 B, compile 1802 to 1813 B and
+phases 1458 to 1467 B. No ceiling is raised; core plus stage remains 23924 B.
