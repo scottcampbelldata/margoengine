@@ -307,10 +307,20 @@ finishes its own attachment, translator and DOF repairs without chasing them.
   await. The accumulated cost remains unisolated, and the final comparison
   assertion was not reached, so no pixel pass or busy exemption is claimed.
   Receipt: test-results/batch-273-back-side-probe.log.
-- `materials/test:gpu:dispersion`: the fixture's `JSON.stringify` reaches the
-  compatibility device/queue/device cycle at `tests/material-dispersion-browser.ts`.
-  Native GPU handles are opaque to that serialization, so the snapshot method's
-  resource assumptions need review before any rendering conclusion.
+- `materials/test:gpu:dispersion`: its circular-resource fixture failure is
+  repaired by shallow field identity/value comparison. The complete native grid
+  passes 278 checks/254 captures. The complete full-compat grid now reaches all
+  comparisons: its sole failure is the 4x live positive-to-zero reset, with 10
+  HDR channels differing by at most 0.000244140625 against the exact-zero bound.
+  1x reset, live-versus-constructor dispersion, all caller scalar-IOR references,
+  resource counts and device-restoration checks pass. Repro after building:
+  `node scripts/material-dispersion-gpu-check.js --backend=compat` under a shared
+  lock; receipt: test-results/batch-273-dispersion-compat-complete.log and
+  test-results/material-dispersion/compat-gpu.json. The material setter writes
+  ext[3] back to zero without extra GPU allocation or binding. The remaining
+  cause is not isolated between uniform replay and multisample rendering;
+  neither a driver cause nor acceptable numerical drift is proven. Failure 9
+  stays open; no tolerance, shader math, sample grid or resource work is changed.
   `materials/test:gpu:render-state` also reached its 60 s body deadline; the
   awaited operation remains unisolated. `materials/test:gpu:wireframe` reports
   mirrored/reference pixel hashes and duplicate-edge alpha differences, and

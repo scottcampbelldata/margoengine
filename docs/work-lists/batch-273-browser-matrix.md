@@ -57,10 +57,25 @@ a particular browser selected that adapter.
   No Playwright WebKit directory, `adb` or `safaridriver` was found locally.
   No connected physical Android or Apple device/farm access has been established.
 
-Chrome, Edge and patched Firefox are candidates for local real WebGL2 runs;
-their launch/readback verification is recorded separately when complete.
+Local clear/readback receipts confirm Chrome and Edge can execute real WebGL2
+on the RTX A6000/D3D11 route. Both report versions matching the installed files,
+zero GL errors and the exact endpoint pixel [255, 0, 255, 255]. Patched Firefox
+157.0 is present but cannot launch: Playwright reports `spawn UNKNOWN`.
+Its PE file is x64 (machine 0x8664), 1,140,736 bytes, with an MZ signature;
+architecture mismatch is not shown. No Firefox render pass is claimed and no
+browser was installed or repaired. The raw receipt is
+`test-results/batch-273-browser-inventory.json`; the inventory process exits
+nonzero for the Firefox refusal. An initial mid-range clear probe asserted an
+unjustified exact quantization value (expected 128, observed 127 with default
+dithering); it is retained as a failed diagnostic. The availability receipt
+uses exact endpoint colours instead and makes no mid-range accuracy claim.
 Windows viewport/UA emulation cannot certify iOS, iPadOS or Android GPU drivers;
 Playwright WebKit cannot certify Safari.
+
+The coordinator should request the real Mac, iPhone, iPad and both Android GPU
+families above, plus stable Firefox access or permission to repair/install it.
+Physical lower-tier hardware and the integrated AMD browser rows are still
+unmeasured. Chrome and Edge availability is not a completed matrix row.
 
 ## Sources and clean-room boundary
 
@@ -77,3 +92,11 @@ extension inventories with physical devices and forced-tier correctness, rather
 than inferring physical tier coverage from a desktop result. The matrix is an
 evidence plan, without a new performance or rendering claim. No rival source
 or paper companion implementation was read.
+
+Apple, *Enable WebDriver on macOS* and *WebDriver* (2026),
+https://developer.apple.com/documentation/safari-developer-tools/macos-enabling-webdriver
+and https://developer.apple.com/documentation/safari-developer-tools/webdriver:
+Safari automation needs the Apple driver; iOS/iPadOS use a connected Mac.
+Microsoft / Playwright contributors, *Android* (2026),
+https://playwright.dev/docs/api/class-android: Android automation needs an
+authenticated ADB connection. Request that access with the physical devices.
