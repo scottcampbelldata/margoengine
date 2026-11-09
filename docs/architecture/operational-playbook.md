@@ -1770,3 +1770,20 @@ the sun disk and hemisphere integration are not covered. No rendering implementa
 ### Audio Doppler evidence (batch 110, section 5)
 
 The optional audio/doppler controller registers after its positional sound and samples sound/listener world poses against context.currentTime. It owns the existing playback-rate control; no renderer or core change. Real browser generated-tone PCM frequency checks run beside native WebGPU, native WebGL2 and the compatibility device, with zero GPU validation errors. LIM-603 and whitepaper/results/audio-doppler-20261108.json record stand-in evidence. No recording, listening-quality, other-browser or performance proof. Reset explicitly for teleports; 0.95 radial Mach clamp is an approximation limit, not a supersonic claim.
+
+
+### Batch 168 staging: section 5 evidence
+
+The default contact cue now has a numerical comparison with cosine ray-traced ground occlusion.
+The tracer agrees with the independent projected-solid-angle integral; blank renders fail explicit
+caster/background/shadow checks. Across 15,472 exposed-ground pixels the darkness MAE is 0.048174.
+The fixed-blur nearness field does not reproduce broad hemispherical occlusion; the loss remains open.
+No runtime/core/stage changes and no speed or directional-light parity claim.
+
+
+### Batch 168 closing path-tracer evidence
+
+Cycles independently path-traces the same OIT emission/coverage scene. Its exact-oracle MAE is 0.094812
+with identical centre RGB; Margo/Babylon MAE against it is 1.632960/0.132651. Residual path noise and
+silhouette sampling limit full-frame PSNR. This is independent confirmation of the open weighted image
+loss, with no runtime changes or added timing claim. Root scripts reproduce the comparison outside the repo.

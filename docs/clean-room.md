@@ -1547,3 +1547,23 @@ Preetham, Shirley and Smits (1999), with the already documented Margo tuning. No
 ## Audio Doppler (batch 110)
 
 Implemented from the classical stationary-medium source/observer formula in [OpenStax University Physics Volume 1, 17.7](https://openstax.org/books/university-physics-volume-1/pages/17-7-the-doppler-effect), with current world radial velocities and a documented 0.95 Mach clamp. Buffer playback and automation follow the [W3C Web Audio Recommendation, AudioBufferSourceNode](https://www.w3.org/TR/2021/REC-webaudio-20210617/#AudioBufferSourceNode). No engine or library implementation was read. Generated sine tones and motion are stand-ins; no external files.
+
+
+## Batch 168 staging ray reference
+
+Ray/sphere intersection follows the quadratic sphere description in PBRT 4e section 6.2,
+https://pbr-book.org/4ed/Shapes/Spheres . Cosine-weighted hemisphere sampling follows the probability
+derivation in appendix A.5.3, https://pbr-book.org/4ed/Sampling_Algorithms/Sampling_Multidimensional_Functions .
+The harness was written independently; no renderer implementation files were read or copied.
+An independent projected-solid-angle integral, R^2*h/d^3 for a sphere entirely above the ground, validates
+the traced visibility. This is uniform environment occlusion, not a fitted directional-light shadow.
+
+
+## Batch 168 independent OIT path trace
+
+The closing cross-check drives Cycles through the public bpy API only, with a Transparent BSDF and
+Emission mixed by coverage, matching the unlit-pane transport. Public node descriptions:
+https://docs.blender.org/manual/en/latest/render/shader_nodes/shader/transparent.html and
+https://docs.blender.org/manual/en/latest/render/shader_nodes/shader/emission.html . Renderer code was
+not opened. Camera, meshes, node setup, float readback and comparison are independently authored in
+`scripts/rival-oit-cycles.py` and `.mjs`; generated EXR, float data and engine pictures stay in engine-bench.

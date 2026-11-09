@@ -967,3 +967,18 @@ angular-radiance comparison, not hemisphere integration or absolute physical-uni
 Optional audio/doppler: 1,090 B gzip; audio root unchanged at 7,508 B; core plus stage unchanged at 23,626 B. Defaults: speedOfSound 343 m/s, authored playbackRate from the sound. Positive finite sound speed; nonnegative finite rate at most float32 maximum / 39. Estimates world displacement per audio-clock second; first/coincident/backward-clock samples neutral, repeated times retain history. Reset after teleports and motion during suspension. Owns playback rate while attached, restores authored rate on disposal; use controller.playbackRate for authored changes, never Audio.sync concurrently. Buffers only; other source kinds produce unsupported with a help link. One controller per sound. Listener pose/source ordering and teardown are covered.
 
 Classical instantaneous stationary-medium approximation with each radial Mach number clamped to -0.95..0.95, ratio bounded 1/39..39. Not supersonic acoustics, wind, retarded-time positions, travel delay or pitch-only time stretching. Existing listener smoothing applies. Real browser renders beside all three rendering routes measure generated 1 kHz source approach at 1111.111 Hz, recession at 909.091 Hz, listener approach at 1100 Hz and co-motion/rest at 1000 Hz, each within 0.1 Hz with zero GPU validation errors. LIM-603, generated stand-ins only; real recordings, listening quality, other browsers and performance unmeasured.
+
+
+## Batch 168 contact-shadow reference
+
+Default ContactShadows is a height-faded, fixed-Gaussian local contact cue. Under a radius-0.5 sphere,
+against ray-traced uniform-hemisphere visibility, exposed-ground darkness MAE is 0.048174, RMSE 0.074416,
+max 0.288788 (15,472 pixels, 4096 rays each; reference quadrature max error 0.001734). Defaults are retained:
+size 4, height 1, blur 0.06, opacity 0.6, resolution 256. No physical lighting or area-light parity is claimed;
+the measured picture loss remains open.
+
+
+The independent Cycles OIT reference (1024 samples, seed 168) gives Margo MAE 1.632960 versus Babylon
+0.132651. Exact primary-ray transport versus Cycles MAE is 0.094812; maximum miss 125 includes path
+noise and silhouette sampling. This validates the ordering loss without treating stochastic reference
+pixels as a zero-error raster oracle. No additional speed claim. See whitepaper/results/batch-168-oit-cycles.json.

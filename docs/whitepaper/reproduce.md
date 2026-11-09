@@ -535,3 +535,23 @@ After building packages run
 Inputs and outputs stay in external batch-168/data/sunsky. scalar_rgb needs no LLVM vectorization;
 this install reports an LLVM initialization warning but evaluates the scalar model successfully.
 No timing is measured. [Per-case result](results/batch-168-sky.json).
+
+
+### Batch 168 staging (perf history 111)
+
+After building packages run
+`node scripts/gpu-lock.mjs run --max=3 --wait-max=1 --owner=codex-168 -- node packages/staging/scripts/rival-bench.mjs`.
+No external renderer installation is needed: a clean-room cosine ray tracer has an independent analytic
+projected-solid-angle oracle (`node --test packages/staging/test/contact-reference.test.js`).
+The actual canvas goes to ignored `test-results/staging-ray-reference.png`; all defaults are retained.
+15,472 exposed-ground pixels, 4096 rays per pixel; no timing comparison. [Result](results/batch-168-staging.json).
+
+
+### Batch 168 independent OIT path tracer
+
+`node scripts/gpu-lock.mjs run --exclusive --max=6 --wait-max=1 --owner=codex-168 -- node scripts/rival-oit-cycles.mjs`
+uses Blender 5.3.0 Beta at `C:\blender\blender.exe` (`MARGO_BLENDER` overrides), CPU, four threads,
+1024 samples and seed 168. External Babylon setup is the same as entry 109. Inputs/EXR/float RGB and
+both engine images stay under external engine-bench/batch-168/data/oit-cycles; `MARGO_ENGINE_BENCH`
+overrides the parent folder. Hard Blender limit 240 s. The page is used for pictures; its extra timing
+values are not collected or published here. [Retained result](results/batch-168-oit-cycles.json).

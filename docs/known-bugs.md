@@ -1332,3 +1332,21 @@ No known open defect in tested static geometry/partial-cover paths. Generated br
 No known open defect in tested buffer-motion paths. Node tests cover radial signs, transverse/co-motion, coincident positions, frozen/backward clocks, resets, bounded extreme velocities, rate smoothing, recreated sources, invalid options, duplicate attachment and teardown. The first local build used an error code outside MargoErrorCode; corrected to the established linked RangeError convention. The first test fixture omitted required listener forward/up arguments; corrected the fixture. Source-kind and acoustic approximation limits are in limits.md.
 
 The first Doppler verify found the limits index still at LIM-602 and the generated llms corpus stale after the final size update. Updated the exact index line and regenerated the corpus; existing claims-file and llms regression checks cover both. No tests or budgets were changed.
+
+
+### Batch 168 closing reference losses
+
+- **Default contact shadow misses broad ray-traced ground occlusion** (`@margoengine/staging`, perf history 111):
+  a radius-0.5 sphere touches ground under uniform hemispherical lighting. Across 15,472 visible ground pixels,
+  normalized darkness MAE 0.048174, RMSE 0.074416, max 0.288788 against 4096 cosine rays per pixel.
+  Reference quadrature differs from projected solid angle by at most 0.001734. Mean darkness is 0.000177
+  versus 0.048351. Cause: `packages/staging/src/index.ts` keeps nearest-surface height and applies fixed
+  Gaussian blur and opacity, which cannot integrate the directional hemispherical visibility field.
+  Repro under the shared GPU lock: `node packages/staging/scripts/rival-bench.mjs`. Loss stays open.
+
+
+The batch 168 OIT image loss above is also confirmed against an independent Cycles path trace:
+MAE 1.632960 (Margo) versus 0.132651 (Babylon), 1024 samples, seed 168, same emission/coverage panes.
+The reference has residual noise/silhouette sampling differences (exact oracle versus Cycles MAE
+0.094812); this does not close or excuse the weighted-order approximation defect. Repro:
+`node scripts/rival-oit-cycles.mjs` under the exclusive GPU lock.

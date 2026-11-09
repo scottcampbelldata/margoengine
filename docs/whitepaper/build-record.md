@@ -3521,3 +3521,41 @@ are extended or built over. No job was skipped.
 - **Slips and bugs:** In radiance cascade testing, segment endpoints exactly on the 45-degree ray diagonal passing through pixel centers caused float32 boundary rounding differences against double float64, resolved by extending wall segments past grid diagonals. In direct pass with blending, alpha was initially cleared to 0, resolved by writing alpha 1.0 (255). Concurrent pushes from other lanes required ordinary rebases; no force-push, skipped checks or loosened bars.
 - **Docs per job:** 1, 2, 3, 4, 5 and 6 each update packages/lighting2d/README.md, docs/limits.md, docs/whitepaper/claims.md, docs/clean-room.md, plus generated API surface and LLM records. Job 6 adds this record and marks list-2 row 55 done.
 - **Final entry sizes (gzip B):** root 4,896 B; soft 4,778 B; cookie 4,213 B; gi 6,432 B; height 5,310 B; emissive 4,685 B. Core plus stage stays 23,626 B, well under the 25,000 B freeze gate.
+
+
+## Batch 168: rival measurements
+
+Seven package measurements are DONE. Splats, tiles and points were already landed and were not remeasured
+by the finishing session. The remaining four land one package per push. Core and stage are untouched.
+External engines run as black boxes from engine-bench; no rival source files are read or copied.
+Wall-clock comparisons are alternating paired rounds, per-round minima, busy machine, diagnostic.
+
+| # | Package | Commit | Result | Open loss |
+| --- | --- | --- | --- | --- |
+| 1 | splats | `f9e677300` | loss: 10.765 ms vs GaussianSplats3D 0.4.7 CPU sort 4.500 ms; picture PSNR 12.226 dB | frame time and picture |
+| 2 | tiles | `d2192ba35` | equal selection: 1120 tiles, checksum 121586381; win: 0.300 vs 3DTilesRendererJS 0.4.21 2.300 ms | none; quiet timing rerun |
+| 3 | points | `bf2cb121a` | loss: 10M points, 9.000 vs potree-core 2.0.17 5.400 ms | frame time |
+| 4 | lightmap | `4867e4189` | loss: Cycles irradiance MAE 0.069543, relative 0.211475, 881 texels | coarse radiosity/sampling/quantization |
+| 5 | oit | `b347a004e` | speed win 2.000 vs Babylon 8.33.0 7.100 ms; image loss MAE 1.567519 vs 0.048151; against Cycles 1.632960 vs 0.132651 | weighted approximation; separate display-domain blending defect |
+| 6 | sky | `59b38c1e1` | loss: normalized angular RGB MAE 1.439228 vs Mitsuba 3.9.1 sunsky, 297 samples | default Preetham model difference |
+| 7 | staging | this commit | loss: default contact cue vs ray-traced hemisphere, darkness MAE 0.048174, 15,472 pixels | local fixed blur vs broad visibility |
+
+- **Evidence:** raw results in whitepaper/results/batch-168-{lightmap,oit,sky,staging}.json;
+  independent Cycles path-traced OIT proof in batch-168-oit-cycles.json; full scope, controls, original rows and reproductions in perf-vs-rivals.md, perf-history.md and reproduce.md.
+  The OIT row includes completion costs; its binary palette isolates order approximation. The sky row
+  normalizes each model by zenith Y and is not an absolute physical-unit claim. Staging compares exposed
+  ground under uniform hemispherical illumination, not directional area lighting.
+- **Oracles:** Cornell geometry and independent direct-light quadrature; Cycles complete-scene lifecycle
+  (fails with the inherited isolated-face implementation); exact per-ray pane coverage; sky coordinate,
+  normalization and shipped-WGSL evaluation; cosine ray tracing validated against projected solid angle.
+  Staging also checks visible caster, white background and nonzero exposed-ground shadow to reject blanks.
+- **Corrections while finishing:** the inherited Cycles script removed every face after its bake, so no
+  complete room existed; all receivers now stay present. Calibration now uses independent quadrature,
+  not Margo output. A file-URL path and generated attribution registration were corrected before landing.
+  Future browser tools were isolated until their package push and registered in the GPU tool inventory.
+- **Checks:** lint, hygiene and full verify per package; package Node tests, existing GPU suites where
+  present, and runnable README examples. No new skips or weakened accuracy/time/size bars. Existing
+  14 verify skips remain visible. Required corrections were followed by targeted regression checks.
+  Core plus stage is 23,626 B gzip, below 25,000 B. No exports changed.
+- **Losses:** all image and timing losses remain in known-bugs.md. Publishing measurements does not close
+  them. Busy-machine speed rows require quiet release reruns; no speed-budget waiver was used here.

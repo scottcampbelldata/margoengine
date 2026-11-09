@@ -1,0 +1,24 @@
+{
+  "mae": 0.04817386029045438,
+  "rmse": 0.07441639916026489,
+  "max": 0.28878772212009807,
+  "pixels": 15472,
+  "rays": 4096,
+  "quadratureMax": 0.0017337055225461195,
+  "margoMax": 0.04705882352941182,
+  "margoMean": 0.00017742360646430213,
+  "referenceMean": 0.048351283896918625,
+  "scene": {
+    "width": 128,
+    "height": 128,
+    "size": 4,
+    "radius": 0.5,
+    "center": [
+      0,
+      0.5,
+      0
+    ],
+    "rays": 4096
+  },
+  "options": "ContactShadows defaults"
+}

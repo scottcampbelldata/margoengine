@@ -1215,3 +1215,17 @@ The full VFX GPU suite checks the same velocity-stretch pixels on WebGPU and Web
 | Claim | Evidence | Scope |
 | --- | --- | --- |
 | Default Preetham has measured angular radiance error against external sunsky | [Entry 110](perf-history.md), [per-case result](results/batch-168-sky.json), `packages/sky/test/sunsky-reference.test.js` | Shipped WGSL, Mitsuba 3.9.1 scalar_rgb, 297 directions, per-sky zenith-Y normalization; MAE 1.439228; no absolute-unit, physical atmosphere or speed parity |
+
+
+## Batch 168 staging reference
+
+| Claim | Evidence | Scope |
+| --- | --- | --- |
+| Default contact shadows have measured error against ray-traced visibility | [Entry 111](perf-history.md), [raw result](results/batch-168-staging.json), `packages/staging/test/contact-reference.test.js` | Uniform hemisphere, sphere, exposed ground; normalized darkness MAE 0.048174; no full physical-lighting or speed parity |
+
+
+## Batch 168 independent OIT path trace
+
+| Claim | Evidence | Scope |
+| --- | --- | --- |
+| Cycles independently confirms the weighted OIT image loss | [Path-traced result](results/batch-168-oit-cycles.json), `scripts/rival-oit-cycles.mjs` | 1024-sample emission/transparent mixtures, MAE 1.632960 vs 0.132651; oracle/Cycles MAE 0.094812; reference noise and silhouette differences included, no new speed or dielectric claim |

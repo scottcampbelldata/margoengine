@@ -1,0 +1,36 @@
+{
+  "blender": "5.3.0 Beta",
+  "samples": 1024,
+  "width": 1280,
+  "height": 720,
+  "seed": 168,
+  "integrator": "Cycles CPU path tracer; transparent/emission mixture; black world",
+  "filter": "BOX, 0.01 pixel",
+  "layout": "top-down RGB float32 little-endian",
+  "oracle": {
+    "mae": 0.09481155960648148,
+    "psnr": 38.27945646547957,
+    "max": 125
+  },
+  "margo": {
+    "mae": 1.6329597077546296,
+    "psnr": 33.63028343403049,
+    "max": 125
+  },
+  "babylon": {
+    "mae": 0.13265082465277778,
+    "psnr": 38.26058099770901,
+    "max": 125
+  },
+  "note": "common sRGB after readback; binary source palette; residual Cycles path noise and silhouette sampling differences; no timing row",
+  "centerCycles": [
+    198,
+    163,
+    103
+  ],
+  "centerOracle": [
+    198,
+    163,
+    103
+  ]
+}

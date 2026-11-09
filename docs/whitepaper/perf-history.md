@@ -2549,6 +2549,12 @@ measured on the corrected accuracy baseline before any improvement or Box2D-pari
 - **Reproduce:** `node scripts/gpu-lock.mjs run --exclusive --owner=codex-168 -- node packages/oit/scripts/rival-bench.mjs`.
   Oracle tests: `node --test packages/oit/test/oit-reference.test.js`. Dependencies stay in engine-bench/batch-168.
 
+The closing independent Cycles path trace (Blender 5.3.0 Beta, 1024 samples, seed 168) confirms entry 109:
+Margo MAE 1.632960 versus Babylon 0.132651, PSNR 33.630 versus 38.261 dB. Exact oracle versus Cycles
+MAE 0.094812, identical centre RGB (198,163,103); reference noise and silhouette sampling produce max
+125 in each comparison. No additional timing claim. [Raw Cycles comparison](results/batch-168-oit-cycles.json).
+Command: `node scripts/gpu-lock.mjs run --exclusive --max=6 --wait-max=1 --owner=codex-168 -- node scripts/rival-oit-cycles.mjs`.
+
 ### 110. Preetham angular radiance against Mitsuba sunsky
 
 - **Measurement:** shipped Preetham WGSL, 9 sun/turbidity combinations, 33 directions each, versus external
@@ -2559,6 +2565,17 @@ measured on the corrected accuracy baseline before any improvement or Box2D-pari
   not a measured atmosphere or absolute-irradiance claim. Publishing does not close the loss. No speed row.
 - **Reproduce:** `node scripts/gpu-lock.mjs run --max=3 --wait-max=1 --owner=codex-168 -- node packages/sky/scripts/rival-bench.mjs`.
   External Mitsuba setup is in reproduce.md. Coordinate and metric oracle: `packages/sky/test/sunsky-reference.test.js`.
+
+### 111. Default contact shadow against ray-traced ground occlusion
+
+- **Measurement:** radius-0.5 black sphere touching ground, uniform upper hemisphere, default ContactShadows.
+  128 x 128 top view, 15,472 exposed-ground pixels, one-pixel silhouette guard. Deterministic 4096 cosine rays
+  per pixel. Independent analytic projected-solid-angle checks validate the tracer (max grid error 0.001734).
+- **Result:** picture loss, normalized darkness MAE 0.048174, RMSE 0.074416, max 0.288788. Mean darkness
+  0.000177 versus 0.048351. Fixed blur of nearness is local and does not integrate hemispherical visibility.
+  [Raw result](results/batch-168-staging.json). No speed measurement. Publishing does not close the loss.
+- **Reproduce:** `node scripts/gpu-lock.mjs run --max=3 --wait-max=1 --owner=codex-168 -- node packages/staging/scripts/rival-bench.mjs`.
+  Oracle: `node --test packages/staging/test/contact-reference.test.js`.
 
 ## Open losses
 

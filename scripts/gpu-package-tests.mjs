@@ -133,6 +133,8 @@ export const RUNNER_SMOKE = [
 ];
 /** Browser scripts under packages/ that are tools, not tests (the guard below skips them). */
 const TOOLS = {
+  'packages/staging/scripts/rival-bench.mjs':
+    'contact-shadow ray reference comparison, run directly under the GPU lock',
   'packages/sky/scripts/rival-bench.mjs':
     'external sunsky radiance comparison, run directly under the GPU lock',
   'packages/biomes/tests/gpu-region-fields-check.mjs':

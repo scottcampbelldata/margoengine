@@ -30,6 +30,7 @@ time is the fastest round. These numbers were taken on a busy machine and are di
 | `@margoengine/oit` | five panes, 1280 x 720, frame plus completion | 2.000 ms | Babylon.js 8.33.0 dual depth peeling, 7.100 ms | win, busy machine |
 | `@margoengine/oit` | same picture against exact ray-composited reference | MAE 1.567519, PSNR 35.388 dB | Babylon MAE 0.048151, PSNR 61.305 dB | loss |
 | `@margoengine/sky` | default Preetham angular radiance, 297 samples, zenith-Y normalized | MAE 1.439228, max 70.681783 | Mitsuba 3.9.1 sunsky (Hosek-Wilkie), scalar_rgb | loss |
+| `@margoengine/staging` | default ContactShadows, sphere on ground, ray-traced hemispherical occlusion | MAE 0.048174, RMSE 0.074416 | 4096 cosine rays/pixel; projected-solid-angle oracle | loss |
 
 The flock checksums after that step were 31517.19 (Margo) and 31516.70 (Yuka). Both moved from the same grid. They are
 not bit-equal: Yuka keeps a neighbourhood per vehicle and Margo uses one uniform grid. The behaviours are the ones in
@@ -171,3 +172,27 @@ Preetham and Hosek-Wilkie are different models; Margo also clamps turbidity/hori
 These differences explain the model loss, which remains open. No coefficients were copied or invented.
 [Per-case values](results/batch-168-sky.json). Rerun under the shared GPU lock:
 `node packages/sky/scripts/rival-bench.mjs`. No speed comparison is claimed.
+
+
+The staging reference is a black sphere of radius 0.5 touching white diffuse ground under uniform
+upper-hemisphere illumination. Actual default ContactShadows settings: 4 m plane, height 1 m, blur 0.06 m,
+opacity 0.6, resolution 256. A 128 x 128 top view compares 15,472 exposed-ground pixels, excluding the visible
+sphere and a one-pixel silhouette guard. The clean-room reference traces 4096 cosine-weighted rays per
+pixel; its largest difference from the independent analytic projected solid angle is 0.001734.
+Compare normalized shadow-catcher darkness over display white; no exposure or opacity is fitted.
+MAE 0.048174, RMSE 0.074416, max 0.288788. Mean darkness is 0.000177 (contact) versus 0.048351 (reference).
+The nearness map's fixed blur and height falloff produce a local contact cue rather than broad hemispherical
+occlusion. The loss remains open. No directional area-light or speed equivalence is claimed.
+[Raw result](results/batch-168-staging.json). Rerun under the shared GPU lock:
+`node packages/staging/scripts/rival-bench.mjs`.
+
+
+The closing batch 168 check also path-traces the OIT panes independently in Cycles (Blender 5.3.0 Beta,
+CPU, 1024 samples, seed 168). Transparent BSDF/emission mixtures implement the same linear coverage
+transport, black world, identical camera and geometry. After a common sRGB encoding, Margo MAE is
+1.632960 (PSNR 33.630 dB) and Babylon 0.132651 (38.261 dB). The exact primary-ray oracle versus Cycles
+has MAE 0.094812; their centre RGB is identical (198,163,103). Residual path noise and silhouette sampling
+differences give max 125 on all three comparisons, so the full-frame PSNR includes reference noise and
+edge differences. The independent trace confirms the weighted image loss, not an accuracy-parity claim.
+No second timing row is published. [Path-traced result](results/batch-168-oit-cycles.json).
+Reproduce: `node scripts/gpu-lock.mjs run --exclusive --max=6 --wait-max=1 --owner=codex-168 -- node scripts/rival-oit-cycles.mjs`.

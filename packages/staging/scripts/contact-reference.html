@@ -1,0 +1,31 @@
+<!doctype html><meta charset="utf-8"><title>Contact shadow ray reference</title>
+<canvas width="128" height="128" style="width:128px;height:128px"></canvas>
+<script type="module">
+import { Engine } from '../../core/dist/index.js';
+import { engineRuntime } from '../../core/dist/extension.js';
+import { Material, createMesh } from '../../materials/dist/index.js';
+import { sphereGeometry } from '../../geometry/dist/index.js';
+import { ContactShadows } from '../dist/index.js';
+import { waitForPipelines } from '../../../scripts/support/gpu-ready.js';
+import { CONTACT_SCENE as s } from './contact-reference.mjs';
+try {
+  const canvas=document.querySelector('canvas');
+  const engine=await Engine.create(canvas,{backend:'webgpu',exactSize:[s.width,s.height],
+    camera:{position:[0,5,0.001],target:[0,0,0],fov:50,near:0.1,far:20}});
+  engine.stop(); engine.camera.position=[0,5,0]; engine.camera.up=[0,0,-1];
+  engine.camera.project=(out,aspect,webgpu)=>{
+    out.fill(0);out[0]=2/s.size;out[5]=2/s.size;out[10]=1/20;out[14]=1;out[15]=1;
+    if(!webgpu) throw new Error('reference requires WebGPU');
+  };
+  engine.scene.background='#ffffff';
+  const sphere=createMesh(engine,sphereGeometry(s.radius,96,48),new Material({shading:'basic',color:[0,0,0]}));
+  sphere.root.setPosition(s.center);
+  const contact=ContactShadows.attach(engine);contact.add(sphere);
+  const device=engineRuntime(engine).gpu;
+  await waitForPipelines(async()=>{engine.render();await device.queue.onSubmittedWorkDone();});
+  const bitmap=await createImageBitmap(await (await fetch(canvas.toDataURL('image/png'))).blob());
+  const read=new OffscreenCanvas(s.width,s.height),g=read.getContext('2d',{willReadFrequently:true});
+  g.drawImage(bitmap,0,0); bitmap.close();
+  window.contactReference={pixels:Array.from(g.getImageData(0,0,s.width,s.height).data),options:contact.options};
+}catch(error){window.contactReference={error:String(error),stack:error.stack};}
+</script>

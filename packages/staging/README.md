@@ -54,3 +54,12 @@ only (nothing is drawn on the WebGL2 fallback); the plane is not in SSAO's G-buf
 Apache-2.0. Optional, tree-shakable package, about 6.0 kB min+gzip ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)); core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/staging. Real GPU: `node packages/staging/test/browser-check.mjs`.
+
+
+## Ray-traced reference
+
+After building, run `node scripts/gpu-lock.mjs run --max=3 --wait-max=1 --owner=codex-168 -- node packages/staging/scripts/rival-bench.mjs`.
+The default effect is compared with 4096 cosine rays per exposed-ground pixel around a sphere under uniform
+hemispherical lighting. Independent projected-solid-angle tests validate the ray tracer. Normalized darkness
+MAE is 0.048174; the local contact cue differs from broad physical occlusion. This remains an open picture
+loss. [Scene, metrics and scope](../../docs/whitepaper/perf-vs-rivals.md).
