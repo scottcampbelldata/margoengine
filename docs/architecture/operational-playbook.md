@@ -4555,3 +4555,12 @@ backends. Complete compute browser acceptance remains 132 checks / 413 shader
 modules / zero errors; 21 runtime README examples pass. The first package-context
 attempt's HTTP failure is retained, then its root cause is corrected. The fixed
 wait baseline and numerical assertions are unchanged.
+
+### Section 5 evidence: planner regression initialization
+
+The real-plan regression now registers after its awaited planContext is
+initialized, so Node cannot execute it in ctx's temporal dead zone. Its complete
+export-only affected-set and umbrella full-set assertions remain unchanged.
+The complete failed gate files plus compute units pass 244 checks after the
+planner and ComputeFrame gate repairs. The once-run verify failure is retained;
+this is corrected-step evidence, not a second full-green verify claim.

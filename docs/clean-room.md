@@ -3451,3 +3451,21 @@ Each now awaits its readback and checks all 1,024 intermediate values against
 remain. Native and compatibility proofs pass; the complete browser suite
 passes 132 checks and 413 shader modules without errors, and 21 runtime README
 examples pass. No timeout, numerical tolerance or baseline was changed.
+
+### Batch 56 planner test registration ordering
+
+Compared Ecma International, *ECMAScript 2026 Language Specification*, 17th
+edition (2026), lexical binding initialization and try-statement semantics,
+https://262.ecma-international.org/17.0/; and the regression-selection sources
+cited in the preceding ComputeFrame gate record. The language contract requires
+a lexical binding to be initialized before access. The selection research
+motivates executing the existing real-plan assertions rather than weakening them.
+
+Node began a synchronous registered test while module evaluation awaited the
+real plan context declared farther down the file. The test accessed ctx in its
+temporal dead zone. Register that complete test only after the awaited context
+exists; all assertions and expected affected/full decisions remain unchanged.
+The existing failing regression is tests/check-merge-affected.test.js, test
+' the real plan' (without the leading space). All failed gate files and compute
+units pass 244 checks after the wiring and ordering repairs. No foreign source
+or companion code was read, and no wait, retry or timeout was introduced.

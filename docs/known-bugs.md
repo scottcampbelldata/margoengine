@@ -3566,3 +3566,11 @@ repository root. The owner GPU loop now checks every intermediate dispatch
 result after readback, retaining the exact four-step workload and disposal
 assertions. Native/compatibility owner proof, all 132 browser checks, all 21
 runtime examples and the full failed-gate/compute unit rerun pass.
+
+### Fixed: real-plan test could start before context initialization
+
+Node's test runner starts the registered real-plan assertion before the module's
+later top-level await initializes ctx. Register this complete test after that
+await, retaining every assertion. The collected verify's ReferenceError is
+retained; the complete failed-suite/compute rerun passes 244 checks. No timing
+wait, retry, weakened assertion or runtime engine change is involved.

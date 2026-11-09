@@ -190,42 +190,6 @@ console.log(1);
   }
 });
 
-test('the real plan: an export-only umbrella change plus one package runs the affected set, an umbrella source change runs all', () => {
-  const texts = {
-    [PJ]: {
-      before: BEFORE,
-      after: pkgJson(
-        { '.': entry('index'), './a': entry('a'), './dof/x': entry('dof/x') },
-        { dependencies: { '@margoengine/a': '1.0.0' } },
-      ),
-    },
-    'packages/margoengine/src/dof/x.ts': {
-      before: null,
-      after: `${BANNER}export * from '@margoengine/dof/x';
-`,
-    },
-  };
-  const narrow = { ...ctx, umbrellaReexport: umbrella(texts) };
-  const only = planFiles(narrow, [PJ, 'packages/margoengine/src/dof/x.ts', 'packages/dof/src/index.ts']);
-  assert.equal(only.decision.mode, 'affected', only.decision.reason);
-  assert.ok(only.decision.changed.includes('@margoengine/dof'));
-  assert.ok(!only.scope.packages.full);
-  assert.deepEqual(only.scope.packages.dirs.includes('dof'), true);
-  const kit = {
-    'packages/margoengine/src/game.ts': {
-      before: `${BANNER}export * from '@margoengine/stage';
-`,
-      after: `${BANNER}export { Stage } from '@margoengine/stage';
-`,
-    },
-  };
-  const real2 = planFiles({ ...ctx, umbrellaReexport: umbrella(kit) }, [
-    'packages/margoengine/src/game.ts',
-    'packages/dof/src/index.ts',
-  ]);
-  assert.equal(real2.decision.mode, 'full');
-});
-
 test('the root package.json, lock files, build configuration and the check code run everything', () => {
   for (const file of [
     'package.json',
@@ -396,6 +360,43 @@ const real = ctx.footprints;
 const closure = ctx.matrix;
 const planFor = (files) => planFiles(ctx, files);
 const stepName = (command) => /^npm run (\S+)/.exec(command)?.[1];
+
+// Register after the awaited real context exists, so Node cannot start this test in its TDZ.
+test('the real plan: an export-only umbrella change plus one package runs the affected set, an umbrella source change runs all', () => {
+  const texts = {
+    [PJ]: {
+      before: BEFORE,
+      after: pkgJson(
+        { '.': entry('index'), './a': entry('a'), './dof/x': entry('dof/x') },
+        { dependencies: { '@margoengine/a': '1.0.0' } },
+      ),
+    },
+    'packages/margoengine/src/dof/x.ts': {
+      before: null,
+      after: `${BANNER}export * from '@margoengine/dof/x';
+`,
+    },
+  };
+  const narrow = { ...ctx, umbrellaReexport: umbrella(texts) };
+  const only = planFiles(narrow, [PJ, 'packages/margoengine/src/dof/x.ts', 'packages/dof/src/index.ts']);
+  assert.equal(only.decision.mode, 'affected', only.decision.reason);
+  assert.ok(only.decision.changed.includes('@margoengine/dof'));
+  assert.ok(!only.scope.packages.full);
+  assert.deepEqual(only.scope.packages.dirs.includes('dof'), true);
+  const kit = {
+    'packages/margoengine/src/game.ts': {
+      before: `${BANNER}export * from '@margoengine/stage';
+`,
+      after: `${BANNER}export { Stage } from '@margoengine/stage';
+`,
+    },
+  };
+  const real2 = planFiles({ ...ctx, umbrellaReexport: umbrella(kit) }, [
+    'packages/margoengine/src/game.ts',
+    'packages/dof/src/index.ts',
+  ]);
+  assert.equal(real2.decision.mode, 'full');
+});
 
 test('every check:merge step is either narrowed GPU work or plain; a new step has to be classified', () => {
   const names = steps.map(stepName);
