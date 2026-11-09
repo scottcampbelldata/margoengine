@@ -130,3 +130,18 @@ console.log(await predecessors.read()); // Int32Array [-1, 0, 1]
 Up to 65536 vertices and 65536 input roads; zero vertices/roads, isolated vertices and positive self loops are supported. Parallel arcs keep only the minimum cost, without road identities. Edge seconds must be normal float32 values at least 2^-126 and at most 2^127/max(1,vertices), keeping simple-path sums finite. Solvers use f32 sums, so rounding affects costs; compute/graph's predecessor limitations apply. This adapter does not reconstruct road itineraries. The signal checks before reading and before upload; a synchronous build cannot yield mid-loop. Solvers and reads accept their own signal.
 
 Native WebGPU and real WebGL2 compatibility both run the existing device-backed compute route, proved by distance/predecessor and lifecycle assertions. For a CPU fallback, use `createCompute({backend:'cpu'})`; the same graph API works in Node. When sharing a render engine, pass `createCompute({engine})`; dispose graph/output arrays/context before engine disposal. Those objects do not own the engine device. After device loss/reboot, create a fresh context and rebuild the graph from your retained road descriptions. Graphs do not restore themselves. The GPU test proves the rebuilt graph has the same answers on both backends.
+
+Tessellated root-road frames use adjacent chord bisectors, joined periodically
+on closed curves. On tight bends the inside lateral offsets (curbs included)
+compress proportionally before their focal fold. Both projected triangle areas
+stay positive, retaining 5% of the available signed span area at the narrowest
+limit; the outside width stays unchanged. Cross-section heights and UV distances
+remain authored. This can narrow the inside driving surface, so choose a wider
+bend when the full lane width matters. Nonlocal footprint overlaps at crossings
+or adjacent return legs still use `/repair` or `/junctions` for a planar surface;
+local fold prevention does not classify bridges or trim global intersections.
+Vertical tangents reject with linked code `unsupported`; arbitrarily steep
+nonvertical ramps work. A sampled cusp/reversal rejects with linked code `failed`:
+refine the spline or increase segments. Core Geometry/PbrMaterial have no texture
+channel by design; use the separate `uvs` with an optional textured renderer or
+exporter, as documented above.
