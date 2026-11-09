@@ -35,13 +35,13 @@ export interface Take {
 }
 
 export class TakeRecorder {
-    constructor({ tolerance, now }?: TakeRecorderOptions);
+    constructor(_arg0?: TakeRecorderOptions);
     get time(): number;
     get frames(): number;
     transform(name: string, source: TransformSample | (() => TransformSample)): this;
     camera(source: CameraSample | (() => CameraSample)): this;
     property(target: string, property: string, read: () => number | readonly number[]): this;
-    input(input: RecordSource, { target }?: {
+    input(input: RecordSource, _arg1?: {
         target?: string;
     }): this;
     event(name: string, data?: unknown): this;
@@ -68,9 +68,9 @@ export interface TransformSample {
     scale?: VectorLike;
 }
 
-export function appendTake(document: CutsceneDocument, take: Take, { at, prefix }?: AppendTakeOptions): CutsceneDocument;
+export function appendTake(document: CutsceneDocument, take: Take, _arg3?: AppendTakeOptions): CutsceneDocument;
 
-export function inputTracks(clip: InputClip, { at, target }?: InputTrackOptions): Track[];
+export function inputTracks(clip: InputClip, _arg2?: InputTrackOptions): Track[];
 
 export function takeDocument(take: Take): CutsceneDocument;
 

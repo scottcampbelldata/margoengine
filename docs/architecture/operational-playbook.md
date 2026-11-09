@@ -2146,3 +2146,13 @@ also runs the existing README harness regressions. Scoped executions preserve th
 The loader/decoder/FBX/environment/points run passed 73/88 examples, 15 existing failures, zero fresh failures.
 Thirty proved entries were removed from the runtime known list. This does not prove fictional asset identities or
 close the remaining input, clip, cubic-curve, NURBS-only or MTL-as-OBJ errors. Physics remains held.
+
+### Optional-peer declaration packaging: section 5 evidence
+
+Typed declaration parameter patterns are emitted as named parameters in files
+with optional-peer guards. Their annotations and optionality are unchanged, so
+installed peers retain full checking and absent peers cannot make binding names
+fail strict library checking. The declaration fixture runs the real strict
+compiler without and with a peer, rejects wrong installed option types and checks
+idempotency/name collisions. The packed bundler proof retains skipLibCheck false.
+This changes declaration text only, without physics or renderer implementation.

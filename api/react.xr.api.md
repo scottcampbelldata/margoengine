@@ -7,7 +7,7 @@ import { Mesh, Vec3 } from "@margoengine/core";
 import { XR } from "@margoengine/xr";
 import { ReactNode } from "react";
 
-export function Controller({ children, position, rotation, scale, ...all }: ControllerProps): import("react").JSX.Element;
+export function Controller(_arg1: ControllerProps): import("react").JSX.Element;
 
 export interface ControllerEvent {
     nativeEvent: Event;
@@ -29,7 +29,7 @@ export interface ControllerProps extends MeshProps {
     onSqueezeEnd?: (event: ControllerEvent) => void;
 }
 
-export function XR({ children, ...props }: XRProps): import("react").JSX.Element;
+export function XR(_arg0: XRProps): import("react").JSX.Element;
 
 export interface XRContextValue {
     readonly manager: XRManager | null;

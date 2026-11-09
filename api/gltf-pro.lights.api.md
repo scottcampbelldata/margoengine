@@ -62,7 +62,7 @@ export function gltfImageLight(model: PBRModel, options?: GLTFLightFileOptions &
 
 export function orientIES(profile: IESProfile, candelaOf: (profile: IESProfile, theta: number, phi: number) => number, basis: readonly [Vec3, Vec3, Vec3]): IESProfile;
 
-export function rotateCube(cube: CubeFaces, [x, y, z, w]: Quaternion): CubeFaces;
+export function rotateCube(cube: CubeFaces, _arg0: Quaternion): CubeFaces;
 
 // Not exported from this entry, but used by the exports above:
 

@@ -86,8 +86,27 @@ export function guardOptionalPeers(filename, text, manifest) {
       : null;
     if (source && check(source)) guarded.add(source);
   }
+  const parameterEdits = [];
+  let parameterId = 0;
   (function walk(node) {
     if (!node || typeof node !== 'object') return;
+    // A declaration needs a typed parameter, not its implementation's destructuring. When
+    // an absent optional peer supplies inherited fields, binding names otherwise produce
+    // TS2339 even though its import is guarded. Preserve the complete annotation and arity.
+    if (guarded.size && Array.isArray(node.params)) {
+      for (const parameter of node.params) {
+        if (!['ObjectPattern', 'ArrayPattern'].includes(parameter.type) || !parameter.typeAnnotation) continue;
+        let name;
+        do {
+          name = `_arg${parameterId++}`;
+        } while (text.includes(name));
+        parameterEdits.push({
+          start: parameter.start,
+          end: parameter.typeAnnotation.start,
+          value: name + (parameter.optional ? '?' : ''),
+        });
+      }
+    }
     if (node.type === 'TSImportType') {
       const source = bare(node.source ?? node.argument?.literal ?? node.argument);
       if (source && check(source))
@@ -112,9 +131,17 @@ export function guardOptionalPeers(filename, text, manifest) {
   );
   let output = '',
     end = 0;
-  for (const start of [...lines].sort((a, b) => a - b)) {
-    output += `${text.slice(end, start)}${OPTIONAL_PEER_GUARD}\n`;
-    end = start;
+  const edits = [
+    ...parameterEdits,
+    ...[...lines].map((start) => ({
+      start,
+      end: start,
+      value: OPTIONAL_PEER_GUARD + '\n',
+    })),
+  ].sort((a, b) => a.start - b.start);
+  for (const edit of edits) {
+    output += text.slice(end, edit.start) + edit.value;
+    end = edit.end;
   }
   return output + text.slice(end);
 }

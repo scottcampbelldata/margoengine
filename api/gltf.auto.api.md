@@ -21,7 +21,7 @@ export interface AutoOptions extends Omit<GLTFOptions, 'extensions'> {
     fetch?: typeof fetch;
 }
 
-export function loadAuto(engine: EngineKernel, url: string | URL, { signal, fetch: get, maxNodes, allowedURLs }?: AutoOptions): Promise<AutoModel>;
+export function loadAuto(engine: EngineKernel, url: string | URL, _arg0?: AutoOptions): Promise<AutoModel>;
 
 // Not exported from this entry, but used by the exports above:
 

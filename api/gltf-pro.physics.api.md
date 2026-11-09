@@ -50,7 +50,7 @@ export function filterMasks(filters: readonly Filter[]): {
     filter: number;
 }[];
 
-export function jointOptions({ limits, drives }: JointDef, notes?: string[]): Pick<GenericOptions, 'locked' | 'limits' | 'motors'>;
+export function jointOptions(_arg0: JointDef, notes?: string[]): Pick<GenericOptions, 'locked' | 'limits' | 'motors'>;
 
 export function shapeCollider(shape: ImplicitShape, scale: Vec3): {
     collider: ColliderOptions;

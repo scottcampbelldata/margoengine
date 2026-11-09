@@ -144,7 +144,7 @@ class Raycaster {
     setFromCamera(coords: ArrayLike<number>, camera: Camera, webgpu?: boolean): this;
     setFromEngine(engine: Engine, x: number, y: number): this;
     intersectEngine(engine: Engine, options?: IntersectOptions): RaycasterHit[];
-    intersectModel(source: DeformedPickingSource, { refresh }?: IntersectOptions): Promise<RaycasterHit[]>;
+    intersectModel(source: DeformedPickingSource, _arg0?: IntersectOptions): Promise<RaycasterHit[]>;
     intersectMeshes(engine: Engine, meshes: Iterable<Mesh>, options?: IntersectOptions): RaycasterHit[];
     intersectObjects(engine: Engine, objects: Iterable<Mesh | ModelLike>, options?: IntersectOptions): RaycasterHit[];
     castCandidates(runtime: RaycastRuntime, candidates: Candidate[]): RaycasterHit[];

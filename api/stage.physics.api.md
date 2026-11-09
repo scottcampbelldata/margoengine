@@ -14,9 +14,9 @@ export interface AddPhysicsOptions extends PhysicsOptions {
     signal?: AbortSignal;
 }
 
-export function addBody(stage: Stage, mesh: Mesh | null, { collider, ...options }?: AddBodyOptions): Promise<PhysicsBody>;
+export function addBody(stage: Stage, mesh: Mesh | null, _arg1?: AddBodyOptions): Promise<PhysicsBody>;
 
-export function addPhysics(stage: Stage, { signal, ...options }?: AddPhysicsOptions): Promise<Physics>;
+export function addPhysics(stage: Stage, _arg0?: AddPhysicsOptions): Promise<Physics>;
 
 // Not exported from this entry, but used by the exports above:
 

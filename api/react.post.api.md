@@ -24,7 +24,7 @@ export interface DepthTextureProps extends DepthTextureOptions, ErrorProps {
     onResize?: (depth: DepthPlugin) => void;
 }
 
-export function EffectComposer({ children, enabled, onError }: EffectComposerProps): import("react").JSX.Element;
+export function EffectComposer(_arg0: EffectComposerProps): import("react").JSX.Element;
 
 export interface EffectComposerProps {
     children?: ReactNode;

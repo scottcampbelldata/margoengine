@@ -54,7 +54,7 @@ export function creased(vertices: readonly ArrayLike<number>[], triangles: reado
 
 export function hierarchicalLOD(system: LODSystem, meshes: readonly LODSource[], options: HierarchicalLODOptions): Promise<HierarchicalLOD>;
 
-export function simplifyAttributes(geometry: PackedGeometry, ratios?: readonly number[], { signal, apart }?: {
+export function simplifyAttributes(geometry: PackedGeometry, ratios?: readonly number[], _arg0?: {
     signal?: AbortSignal;
     apart?: (vertex: number) => string;
 }): Promise<PackedGeometry[]>;

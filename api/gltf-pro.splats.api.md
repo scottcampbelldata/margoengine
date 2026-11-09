@@ -9,7 +9,7 @@ import { SplatData, Splats } from "@margoengine/splats";
 
 export const gaussianSplats: GLTFSplatReader;
 
-export function readGaussianSplats(asset: GLTFAsset, primitive: GLTFPrimitive, { signal }?: {
+export function readGaussianSplats(asset: GLTFAsset, primitive: GLTFPrimitive, _arg0?: {
     signal?: AbortSignal;
 }): Promise<SplatData>;
 

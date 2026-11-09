@@ -49,9 +49,9 @@ export interface RenderCutsceneOptions extends CutsceneFramesOptions, Pick<Encod
     signal?: AbortSignal;
 }
 
-export function cutsceneFrames(cutscene: Cutscene, { fps, from, to }?: CutsceneFramesOptions): Generator<CutsceneFrame, void, void>;
+export function cutsceneFrames(cutscene: Cutscene, _arg1?: CutsceneFramesOptions): Generator<CutsceneFrame, void, void>;
 
-export function mixCutsceneAudio(cutscene: Cutscene, sounds: Readonly<Record<string, MixSound>>, { sampleRate, channels, from, to }?: MixOptions): CutsceneMix;
+export function mixCutsceneAudio(cutscene: Cutscene, sounds: Readonly<Record<string, MixSound>>, _arg0?: MixOptions): CutsceneMix;
 
 export function renderCutscene(engine: Engine, cutscene: Cutscene | CutscenePlayer | CutsceneDocument | string | unknown, options: RenderCutsceneOptions): Promise<EncodedVideo>;
 

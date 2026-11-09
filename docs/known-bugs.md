@@ -1661,3 +1661,17 @@ unchanged); the inherit/deformer samples carry unsupported cubic curves without 
 curve-only sample has no triangle mesh for the glTF model loader; the second textured OBJ example passes the fetched
 MTL to parseOBJ. These remain on the runtime known list, deferred to the later README job under Scott's
 other-causes scope. They are not claimed passing or patched by renaming clips or substituting unrelated bytes.
+
+### Fixed: optional-peer declaration parameter bindings
+
+A strict consumer of React alone loaded an optional binding declaration whose
+Props interface inherited from an absent peer. Its emitted destructured parameter
+still checked the inherited binding names and produced TS2339, despite the import
+guard. The declaration packager now emits ordinary named parameters for typed
+binding patterns in files with optional-peer guards, preserving their annotations,
+optional marker and arity. No runtime or physics source changes. The TEMP strict
+compiler regression in tests/package-declarations.test.js covers absent and
+installed peers, invalid installed option types, array/object patterns, name
+collisions and idempotent packaging. The bundler matrix checks the packed React
+consumer with skipLibCheck false. Evidence: declarations-red.log and
+switch-bundlers-ready.log under test-results/webgl-merge.

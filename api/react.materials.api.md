@@ -9,7 +9,7 @@ import { BatchedMesh, BatchedMeshOptions } from "@margoengine/materials/batched"
 import { ColorInput } from "@margoengine/math";
 import { ReactNode } from "react";
 
-export function BatchedItem({ geometry, position, rotation, scale, matrix, color, visible }: BatchedItemProps): null;
+export function BatchedItem(_arg0: BatchedItemProps): null;
 
 export interface BatchedItemProps {
     geometry: MeshGeometry;
@@ -29,7 +29,7 @@ export interface BatchedMeshProps extends BatchedMeshOptions, ErrorProps {
     children?: ReactNode;
 }
 
-export function MeshTransmissionMaterial({ factor, ...props }: MeshTransmissionMaterialProps): import("react").JSX.Element;
+export function MeshTransmissionMaterial(_arg0: MeshTransmissionMaterialProps): import("react").JSX.Element;
 
 export interface MeshTransmissionMaterialProps extends PbrMaterialProps, Omit<TransmissionOptions, 'opaqueColor'> {
     onError?: (error: unknown) => void;

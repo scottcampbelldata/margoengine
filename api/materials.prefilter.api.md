@@ -14,7 +14,7 @@ export type PrefilterTarget = GPUDevice | {
     readonly gpu?: GPUDevice | null;
 };
 
-export function prefilterCube(target: PrefilterTarget, cube: CubeTexture, { size, signal, ...options }?: PrefilterOptions): Promise<Environment>;
+export function prefilterCube(target: PrefilterTarget, cube: CubeTexture, _arg0?: PrefilterOptions): Promise<Environment>;
 
 // Not exported from this entry, but used by the exports above:
 

@@ -840,3 +840,7 @@ export function App() {
   such as "Box in Part". Safari and other WebKit browsers drop a component that ends in `return <Mesh ... />` from that name, as
   their engine replaces the frame of a tail call: give the mesh a `name`, or assign the element first
   (`const mesh = <Mesh ... />; return mesh;`).
+
+Strict consumers can use `skipLibCheck: false` with optional engine peers absent.
+Declaration packaging keeps parameter annotations while removing implementation
+binding patterns; installing a peer restores its full option checking.

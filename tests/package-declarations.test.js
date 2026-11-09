@@ -231,3 +231,55 @@ test('built declarations name only declared packages and guard every optional en
   }
   assert.deepEqual(unguarded, []);
 });
+
+test('typed binding parameters remain strict with an optional peer installed or absent', async (t) => {
+  const { repository, root } = await fixture(t, {
+    ...peerFixture,
+    'packages/sample/dist/index.d.ts': [
+      "import type { PeerOptions } from '@margoengine/peer/options';",
+      'export interface SampleProps extends PeerOptions { label?: string }',
+      'export declare function sample({ strength, label }: SampleProps, _arg0: number): void;',
+      'export declare const callback: ({ strength }: SampleProps) => void;',
+      'export declare function tuple([value]: readonly [PeerOptions]): void;',
+      '',
+    ].join('\n'),
+    'consumer.ts': [
+      "import {sample,callback,tuple} from './packages/sample/dist/index.js';",
+      "sample({label: 'cube'}, 0); callback({label: 'cube'}); tuple([{}]);",
+    ].join('\n'),
+  });
+  await packageDeclarations(root);
+  const packaged = await readFile(join(root, 'dist/index.d.ts'), 'utf8');
+  await packageDeclarations(root);
+  assert.equal(await readFile(join(root, 'dist/index.d.ts'), 'utf8'), packaged, 'packaging is idempotent');
+  assert.equal(strict(repository), '', 'absent optional types do not make binding names library errors');
+  await mkdir(join(repository, 'node_modules/@margoengine/peer'), { recursive: true });
+  await writeFile(
+    join(repository, 'node_modules/@margoengine/peer/package.json'),
+    JSON.stringify({
+      name: '@margoengine/peer',
+      exports: { './options': { types: './options.d.ts' } },
+    }),
+  );
+  await writeFile(
+    join(repository, 'node_modules/@margoengine/peer/options.d.ts'),
+    'export interface PeerOptions {strength?: number}\n',
+  );
+  await writeFile(
+    join(repository, 'consumer.ts'),
+    [
+      "import {sample,callback,tuple} from './packages/sample/dist/index.js';",
+      'sample({strength: 2}, 0); callback({strength: 2}); tuple([{strength: 2}]);',
+    ].join('\n'),
+  );
+  assert.equal(strict(repository), '', 'the installed peer retains valid types');
+  await writeFile(
+    join(repository, 'consumer.ts'),
+    [
+      "import {sample,callback,tuple} from './packages/sample/dist/index.js';",
+      "sample({strength: 'high'}, 0); callback({strength: 'high'}); tuple([{strength: 'high'}]);",
+    ].join('\n'),
+  );
+  const diagnostics = strict(repository);
+  assert.equal(diagnostics.match(/TS2322/g)?.length, 3, diagnostics);
+});

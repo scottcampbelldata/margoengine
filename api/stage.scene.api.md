@@ -39,7 +39,7 @@ export interface SceneLight {
     ambient?: number;
 }
 
-export function addScene(stage: Stage, source: string | URL | SaveDocument | ArrayBuffer | ArrayBufferView, { migrations, prefab, parent, base, fit, onEntity, gltf, signal, ...checks }?: AddSceneOptions): Promise<LoadedScene>;
+export function addScene(stage: Stage, source: string | URL | SaveDocument | ArrayBuffer | ArrayBufferView, _arg0?: AddSceneOptions): Promise<LoadedScene>;
 
 // Not exported from this entry, but used by the exports above:
 

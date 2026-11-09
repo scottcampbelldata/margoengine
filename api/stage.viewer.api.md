@@ -40,7 +40,7 @@ export interface ViewerOptions {
     signal?: AbortSignal;
 }
 
-export function addViewer(stage: Stage, url: string | URL, { environment, lighting, background, shadows, shadow, tonemap, turntable, fit, gltf, signal }?: ViewerOptions): Promise<Viewer>;
+export function addViewer(stage: Stage, url: string | URL, _arg0?: ViewerOptions): Promise<Viewer>;
 
 // Not exported from this entry, but used by the exports above:
 

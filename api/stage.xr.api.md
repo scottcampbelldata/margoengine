@@ -26,7 +26,7 @@ export interface XRButtonOptions extends Omit<XRSessionOptions, 'signal'> {
     signal?: AbortSignal;
 }
 
-export function addXRButton(stage: Stage, { mode, parent, label, exitLabel, unavailableLabel, className, onError, signal, ...session }?: XRButtonOptions): Promise<XRButton>;
+export function addXRButton(stage: Stage, _arg0?: XRButtonOptions): Promise<XRButton>;
 
 // Not exported from this entry, but used by the exports above:
 

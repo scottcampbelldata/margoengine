@@ -6,7 +6,7 @@
 import { InspectorOptions } from "@margoengine/inspector";
 import { StatsOptions } from "@margoengine/stats";
 
-export function DevTools({ enabled, inspector, stats, onError }: DevToolsProps): null;
+export function DevTools(_arg0: DevToolsProps): null;
 
 export interface DevToolsProps {
     enabled?: boolean;

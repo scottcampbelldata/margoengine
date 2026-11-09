@@ -59,7 +59,7 @@ export interface TimelineItem extends ItemRef {
 
 export class TimelineModel {
     readonly history: EditHistory;
-    constructor(document: CutsceneDocument | string | unknown, { tracks, history }?: TimelineModelOptions);
+    constructor(document: CutsceneDocument | string | unknown, _arg0?: TimelineModelOptions);
     get duration(): number;
     get document(): CutsceneDocument;
     toJSON(): CutsceneDocument;
@@ -77,7 +77,7 @@ export class TimelineModel {
     commit(): void;
     undo(): void;
     redo(): void;
-    snap(time: number, { step, reach, ignore, times }?: SnapOptions): number;
+    snap(time: number, _arg1?: SnapOptions): number;
 }
 
 export interface TimelineModelOptions {

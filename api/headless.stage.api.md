@@ -25,7 +25,7 @@ export interface HeadlessStageOptions extends Omit<EngineOptions, 'backend'> {
     onError?: (error: unknown) => void;
 }
 
-export function createHeadlessStage({ width, height, gpu, globals, onError, ...options }: HeadlessStageOptions): Promise<HeadlessStage>;
+export function createHeadlessStage(_arg0: HeadlessStageOptions): Promise<HeadlessStage>;
 
 // Not exported from this entry, but used by the exports above:
 

@@ -16,7 +16,7 @@ export interface FigureProps extends FigureOptions, ErrorProps {
     children?: ReactNode;
 }
 
-export function GameUi({ onError, ...props }: GameUiProps): ReactNode;
+export function GameUi(_arg0: GameUiProps): ReactNode;
 
 export interface GameUiProps extends Omit<UiRootProps, 'engine'>, ErrorProps {
 }
