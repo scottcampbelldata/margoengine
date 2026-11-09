@@ -683,3 +683,6 @@ After `npm run build:packages`, run
 `node scripts/gpu-lock.mjs run --owner=webgl-merge --max=20 --wait-max=20 -- node packages/webgl2-compat/test/preview-browser-check.mjs`.
 The result is `test-results/webgl2-preview-browser.json`: picks, context recovery,
 native WebGPU isolation and preview-to-full-device escalation.
+### Browser shutdown control-flow regressions
+
+Run `node --experimental-test-module-mocks --test --test-timeout=120000 tests/browser-teardown.test.js tests/browser-selection.test.js tests/gltf-pro-materials-lifecycle.test.js tests/shutdown.test.js`. The Windows ownership fixtures are injected on every platform; a separate control retains the POSIX driver route. `node --test --test-timeout=180000 tests/catalog.test.js` checks the actual catalog lifecycle after the package build. Material GPU validation uses the usual GPU lock and `node scripts/gltf-pro-materials-gpu-check.js`. Production shutdown stays at 30,000 ms; the larger command limits cover the complete tests, not a longer teardown.

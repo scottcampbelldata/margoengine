@@ -1302,3 +1302,6 @@ restore, and automatic escalation entries as well as the full compatibility devi
 Proof: `packages/webgl2-compat/test/preview-browser-check.mjs` checks the moved
 preview entries on real WebGL2, with native WebGPU and missing-WebGPU branches.
 This move makes no speed or new image-parity claim. See `docs/webgl-consolidation.md`.
+### Bounded Windows browser termination
+
+The shared Chromium launcher asynchronously terminates its owned native process before asking the driver to finish cleanup. `tests/browser-teardown.test.js` requires this ordering, tests an unresolved termination without blocking the shutdown timer, and preserves the POSIX driver route. This proves the control flow, not that every operating-system process can exit within 30 seconds. A process that cannot exit still fails the unchanged bound.

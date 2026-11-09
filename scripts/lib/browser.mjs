@@ -176,7 +176,7 @@ async function endChromium(browser, end) {
  * not finished within the shared budget (scripts/support/shutdown.mjs), instead of leaving a suite that has passed every
  * assertion hanging on its cleanup. A Chromium-family browser's processes are ended first (see `endChromium`).
  */
-export function withBoundedClose(browser, { end = endTree, server = ownedBrowserServers.get(browser) } = {}) {
+export function withBoundedClose(browser, { end = endTree, server = ownedBrowserServers.get(browser), platform = process.platform } = {}) {
   if (typeof browser?.close !== 'function') return browser;
   const close = browser.close.bind(browser);
   browser.close = (...args) =>
@@ -184,10 +184,29 @@ export function withBoundedClose(browser, { end = endTree, server = ownedBrowser
       browser: {
         close: async () => {
           if (server) {
-            // The launch server owns both the process and driver cleanup. An external taskkill can end
-            // Chromium while leaving the launch() client's cleanup promise waiting indefinitely.
+            // Windows driver kill uses synchronous taskkill: calling it on a live process blocks even
+            // the shutdown timer. End the owned process asynchronously first, then finish driver cleanup.
+            const terminate = async () => {
+              const child = server.process?.();
+              if (platform === 'win32' && child?.pid && child.exitCode === null && child.signalCode === null) {
+                let onExit;
+                const exited = new Promise((resolve) => child.once('exit', (onExit = resolve)));
+                try {
+                  const remaining = await end(child.pid);
+                  if (remaining?.length)
+                    throw Object.assign(new Error(`Chromium processes did not exit: ${remaining.join(', ')}`), {
+                      code: 'SHUTDOWN_TIMEOUT',
+                      open: remaining.map((pid) => `Chromium process ${pid}`),
+                    });
+                  await exited;
+                } finally {
+                  child.removeListener('exit', onExit);
+                }
+              }
+              await server.kill();
+            };
             const results = await Promise.allSettled([
-              Promise.resolve().then(() => server.kill()),
+              Promise.resolve().then(terminate),
               Promise.resolve().then(() => close(...args)),
             ]);
             for (const result of results) if (result.status === 'rejected') throw result.reason;

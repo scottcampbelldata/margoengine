@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { EventEmitter } from 'node:events';
 import { createServer, request } from 'node:http';
 import { launchBrowser, withBoundedClose } from '../scripts/lib/browser.mjs';
 import { closeAll, endTree, runSuite, taskkillPids, waitSignaled } from '../scripts/support/shutdown.mjs';
@@ -164,6 +165,66 @@ test('owned Chromium cleanup releases a client waiting after native process term
     // A regression must release its fake client too, so its own 30-second close does not hold the test open.
     release();
   }
+});
+
+test('owned Chromium terminates asynchronously before invoking the driver kill API', async () => {
+  const child = Object.assign(new EventEmitter(), { pid: 123, exitCode: null, signalCode: null });
+  const calls = [];
+  const browser = withBoundedClose({ close: async () => calls.push('client') }, {
+    platform: 'win32',
+    server: {
+      process: () => child,
+      kill: async () => {
+        assert.equal(child.exitCode, 1, 'driver kill would synchronously taskkill a running process');
+        calls.push('owner');
+      },
+    },
+    end: async (pid) => {
+      assert.equal(pid, child.pid);
+      calls.push('terminate');
+      child.exitCode = 1;
+      child.emit('exit', 1, null);
+      return [];
+    },
+  });
+  await browser.close();
+  assert.ok(calls.indexOf('terminate') < calls.indexOf('owner'));
+  assert.equal(calls.filter((call) => call === 'client').length, 1);
+});
+
+test('a pending owned process termination keeps the shutdown timer runnable', async () => {
+  const child = Object.assign(new EventEmitter(), { pid: 123, exitCode: null, signalCode: null });
+  let release;
+  const pending = new Promise((resolve) => (release = resolve));
+  let killed = false, disconnected = false;
+  const closing = withBoundedClose({ close: async () => { disconnected = true; } }, {
+    platform: 'win32',
+    server: { process: () => child, kill: async () => { killed = true; } },
+    end: () => pending,
+  }).close();
+  try {
+    await assert.rejects(closeAll({ browser: { close: () => closing }, budgetMs: 50 }), { code: 'SHUTDOWN_TIMEOUT' });
+    assert.equal(disconnected, true);
+    assert.equal(killed, false, 'the blocking driver kill must not run while the native process is alive');
+  } finally {
+    child.exitCode = 1;
+    child.emit('exit', 1, null);
+    release([]);
+    await closing;
+  }
+});
+
+test('owned Chromium outside Windows retains native driver termination', async () => {
+  let killed = false;
+  await withBoundedClose({ close: async () => {} }, {
+    platform: 'linux',
+    server: {
+      process: () => ({ pid: 123, exitCode: null, signalCode: null }),
+      kill: async () => { killed = true; },
+    },
+    end: () => assert.fail('the Windows workaround must not change POSIX process groups'),
+  }).close();
+  assert.equal(killed, true);
 });
 
 test('Firefox and a browser already gone close the ordinary way', async () => {
