@@ -2970,3 +2970,20 @@ TAA's temporary camera wrapper carries its source under a shared symbol so
 separately bundled optional entries agree on identity. Staging supplies the
 unjittered projection only during its own integrator interval, then restores
 raster jitter before temporal resolve. These changes do not modify core.
+
+### Batch 56 sibling audit: post-effect scene ownership
+
+Research compared David G. Clarke, John Potter and James Noble,
+[Ownership Types for Flexible Alias Protection (OOPSLA 1998)](https://doi.org/10.1145/286936.286947);
+Chandrasekhar Boyapati, Barbara Liskov and Liuba Shrira,
+[Ownership Types for Object Encapsulation (POPL 2003)](https://doi.org/10.1145/604131.604156);
+and Stefan Nageli, [Ownership in Design Patterns (ETH Zurich, 2006)](https://ece.uwaterloo.ca/~wdietl/students/pubs/SNaegeli06.pdf),
+the abstract and narrative discussion of composite ownership in section 6.3.
+The first emphasizes protected access paths, the second module-local reasoning,
+and the third the limits of rigid ownership when clients retain child references.
+Our dynamic registry keeps the public child references, resolves their existing
+scene ownership by object identity, and detaches only that registered identity.
+PostStack uses the same identity test for live rendering, so a removed child's
+name cannot reanimate its disposed stage. No foreign implementation or companion
+code is used. Real-engine inert-GPU regressions check direct and scene removal,
+same-name isolation, child replacement and failed setup cleanup. Core is untouched.

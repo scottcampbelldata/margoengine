@@ -28,8 +28,10 @@ function harness(samples = 4, shader = wgsl) {
     gpu: gpu.device,
     frameGraph: graph,
     hasPlugin: (name) => plugins.has(name),
+    sceneOf: (plugin) => (plugins.get(plugin.name) === plugin ? engine : undefined),
     use(plugin) {
       if (plugins.has(plugin.name)) throw new TypeError('Invalid plugin');
+      plugins.set(plugin.name, plugin);
       try {
         graph.withOwner(plugin.name, () => {
           plugin.setup(engine);
@@ -38,6 +40,7 @@ function harness(samples = 4, shader = wgsl) {
         plugins.set(plugin.name, plugin);
       } catch (error) {
         graph.removeOwner(plugin.name);
+        plugins.delete(plugin.name);
         plugin.dispose?.();
         throw error;
       }

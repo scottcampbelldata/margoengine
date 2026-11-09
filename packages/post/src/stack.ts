@@ -59,7 +59,7 @@ export class PostStack implements EnginePlugin {
     )
       throw new TypeError('PostStack needs distinct effects');
     if (effects.some((effect) => effect?.name === 'smaa') && effects.some((effect) => effect?.name === 'fxaa'))
-      throw new TypeError('PostStack takes one anti-aliasing effect; keep SMAA or FXAA, not both');
+      throw new TypeError('PostStack takes SMAA or FXAA, never both');
     let last = 0,
       displays = 0;
     this.stages = effects.map((effect) => {
@@ -68,7 +68,7 @@ export class PostStack implements EnginePlugin {
         throw new TypeError(`${effect.name} cannot join a PostStack; pass a post effect.`);
       const stage = join.call(effect, this.host);
       if (rank[stage.kind] < last || (displays += +(stage.kind === 'display')) > 1)
-        throw new RangeError('PostStack order: HDR effects, at most one display effect, then LDR effects');
+        throw new RangeError('PostStack order: HDR, at most one display, then LDR');
       last = rank[stage.kind];
       return stage;
     });
@@ -126,9 +126,10 @@ export class PostStack implements EnginePlugin {
   }
   private capture(c: Context): void {
     let hdr = false;
+    const scene = this.engine!.sceneOf(this);
     this.count = 0;
     for (let i = 0; i < this.stages.length; i++)
-      if ((this.live[i] = this.engine!.hasPlugin(this.effects[i].name))) {
+      if ((this.live[i] = this.engine!.sceneOf(this.effects[i]) === scene)) {
         this.count++;
         hdr ||= this.stages[i].kind !== 'ldr';
       }
@@ -230,9 +231,11 @@ export class PostStack implements EnginePlugin {
     this.disposed = true;
     const engine = this.engine;
     this.engine = undefined;
-    engine?.removePlugin(this.name);
-    for (let i = 0; i < this.attached; i++)
-      if (engine?.hasPlugin(this.effects[i].name)) engine.removePlugin(this.effects[i].name);
+    engine?.sceneOf(this)?.removePlugin(this.name);
+    for (let i = 0; i < this.attached; i++) {
+      const effect = this.effects[i];
+      engine?.sceneOf(effect)?.removePlugin(effect.name);
+    }
     this.release();
   }
   declare [Symbol.dispose]: () => void;

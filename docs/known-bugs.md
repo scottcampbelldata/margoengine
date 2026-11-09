@@ -282,7 +282,7 @@ regressions pass. The memory-admission fix landed first as 0d318eb86, followed
 by the separate browser repair. No timing proof or completed Basis job follows.
 ### Open: secondary-scene disposal outside the batch 56 environment repair
 
-The cross-package audit reproduces orphaned post effects. With a WebGPU engine,
+The cross-package audit reproduced orphaned FXAA/PostStack effects. With a WebGPU engine,
 `const scene = engine.createScene('product'); const effect = new FXAA();
 scene.use(effect); effect.dispose();` leaves `scene.plugins.has(effect.name)` true.
 The same reproduction with `new PostStack([new FXAA()])` leaves both the stack and
@@ -292,8 +292,11 @@ has restored the default active scene. Stack disposal additionally checks child
 membership against that active scene. The existing `sceneOf` API can hold the
 repair in the owning optional packages; no core change is needed.
 
-This audit is not closed or accepted. Environment and temporal-effect repairs do
-not fix post effects. Other direct default-scene disposal call sites still need
+The FXAA/PostStack repair now uses sceneOf-based identity for disposal and live
+child rendering. packages/post/test/scene-owner.test.js proves default-scene
+isolation, owner removal, replacement and failed-setup cleanup. Its GPU and
+README package gates remain pending, so this audit is not closed or accepted.
+Other direct default-scene disposal call sites still need
 per-plugin classification and regressions, followed by their package checks.
 Do not treat the batch 56 scene-ownership finding as fully accepted until that
 work and the required GPU proofs are complete.

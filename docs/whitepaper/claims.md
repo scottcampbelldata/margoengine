@@ -2171,3 +2171,9 @@ repairs are retained separately. This is not an all-package parity claim.
 No new speed comparison or claim of full photographic equivalence is made.
 
 Batch 56 sibling audit: TAA and TAAUpscale owner detachment, same-name isolation and replacement are proved by packages/taa/test/scene-owner.test.js. Both regressions fail against the earlier default-scene disposal calls.
+
+Batch 56 post audit: FXAA/PostStack detach by registered object identity, preserving
+same-name effects in other scenes and replacement children. Removed stages no
+longer render through their reused names. Proof: packages/post/test/scene-owner.test.js
+uses real engine registries with inert GPU calls; browser/README acceptance is
+pending. This is a lifecycle claim, with no new image-quality or speed claim.

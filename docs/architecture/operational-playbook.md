@@ -4281,3 +4281,9 @@ The complete environment acceptance still requires the remaining package GPU
 and runtime README gates; this fixture repair changes no rendering algorithm.
 
 Batch 56 ownership audit also applies sceneOf-based detachment to TAA and TAAUpscale. The real engine/scene unit regression keeps GPU calls inert and proves owner registry cleanup and same-name isolation.
+
+Batch 56 post audit: FXAA and PostStack resolve scene ownership by identity during
+cleanup. PostStack also excludes a removed child's stage when its name is reused.
+The real-engine scene-owner regression covers explicit disposal, scene removal,
+replacement and failed setup. Package GPU/README acceptance remains pending;
+this adds no rendering pass, shader change, speed claim or core change.

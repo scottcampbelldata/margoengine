@@ -52,6 +52,21 @@ values, while Bloom needs linear radiance above one. GTAO inherits SSAO's check
 inside its required PostStack. No effect silently replaces these values with
 clamped eight-bit data.
 
+`FXAA` and `PostStack` can be attached to a secondary scene with `scene.use()`.
+Disposing either detaches it from its owning scene. A stack removes only its
+original attached children, preserving same-name replacements and other scenes.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {PostStack} from 'margoengine/post/stack';
+import {FXAA} from 'margoengine/post/fxaa';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const product = engine.createScene('product');
+const stack = new PostStack([new FXAA()]);
+product.use(stack);
+stack.dispose();
+```
+
 Each effect alone owns its own scene capture, so alone they reject each other. `PostStack`
 (`@margoengine/post/stack`) captures the scene once in linear HDR and runs its effects on that
 capture in array order:

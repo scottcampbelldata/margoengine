@@ -5198,6 +5198,11 @@ TAA and TAAUpscale explicit disposal uses the owning scene; another scene's effe
 
 Batch 56 repair tree entry gzip bytes (bundleBytes, packages external): staging 8,520; ground 9,103; accumulate 9,655; pathtrace 1,316; reflector 11,140; refractor 11,101; cube-camera 5,688; TAA 14,233; upscale 7,088. Core plus stage is 23,837 bytes. Existing entry ceilings are unchanged; the new ground entry ceiling is 9,363 bytes.
 
+Batch 56 post audit: FXAA and PostStack disposal and stack-child liveness resolve
+registered object identity through sceneOf. This covers secondary scenes and
+same-name replacement without a new core API. Other post-effect disposal sites
+remain under audit in known-bugs.md; no cross-package closure is claimed.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -5484,7 +5489,7 @@ regressions pass. The memory-admission fix landed first as 0d318eb86, followed
 by the separate browser repair. No timing proof or completed Basis job follows.
 ### Open: secondary-scene disposal outside the batch 56 environment repair
 
-The cross-package audit reproduces orphaned post effects. With a WebGPU engine,
+The cross-package audit reproduced orphaned FXAA/PostStack effects. With a WebGPU engine,
 `const scene = engine.createScene('product'); const effect = new FXAA();
 scene.use(effect); effect.dispose();` leaves `scene.plugins.has(effect.name)` true.
 The same reproduction with `new PostStack([new FXAA()])` leaves both the stack and
@@ -5494,8 +5499,11 @@ has restored the default active scene. Stack disposal additionally checks child
 membership against that active scene. The existing `sceneOf` API can hold the
 repair in the owning optional packages; no core change is needed.
 
-This audit is not closed or accepted. Environment and temporal-effect repairs do
-not fix post effects. Other direct default-scene disposal call sites still need
+The FXAA/PostStack repair now uses sceneOf-based identity for disposal and live
+child rendering. packages/post/test/scene-owner.test.js proves default-scene
+isolation, owner removal, replacement and failed-setup cleanup. Its GPU and
+README package gates remain pending, so this audit is not closed or accepted.
+Other direct default-scene disposal call sites still need
 per-plugin classification and regressions, followed by their package checks.
 Do not treat the batch 56 scene-ownership finding as fully accepted until that
 work and the required GPU proofs are complete.
@@ -11433,23 +11441,24 @@ values, while Bloom needs linear radiance above one. GTAO inherits SSAO's check
 inside its required PostStack. No effect silently replaces these values with
 clamped eight-bit data.
 
+`FXAA` and `PostStack` can be attached to a secondary scene with `scene.use()`.
+Disposing either detaches it from its owning scene. A stack removes only its
+original attached children, preserving same-name replacements and other scenes.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {PostStack} from 'margoengine/post/stack';
+import {FXAA} from 'margoengine/post/fxaa';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const product = engine.createScene('product');
+const stack = new PostStack([new FXAA()]);
+product.use(stack);
+stack.dispose();
+```
+
 Each effect alone owns its own scene capture, so alone they reject each other. `PostStack`
 (`@margoengine/post/stack`) captures the scene once in linear HDR and runs its effects on that
 capture in array order:
-
-```ts
-import {createStage} from 'margoengine';
-import {PostStack} from 'margoengine/post/stack';
-import {SSAO} from 'margoengine/post/ssao';
-import {Bloom} from 'margoengine/post/bloom';
-import {FXAA} from 'margoengine/post/fxaa';
-import {DOF} from 'margoengine/dof';
-import {Tonemap} from 'margoengine/tonemap';
-const stage = await createStage('#viewport', {backend: 'webgpu'});
-const stack = PostStack.attach(stage.engine, [new SSAO(), new DOF({focalDistance: 6}), new Bloom({strength: 0.6}), new Tonemap({curve: 'neutral'}), new FXAA()]);
-// TAA wraps the stack: TAA.attach(stage.engine, {depth: () => stack.depthTexture});
-stack.dispose(); // also disposes its effects
-```
 
 [README continues: https://margoengine.com/llms/packages/post.md]
 

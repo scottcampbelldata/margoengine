@@ -98,6 +98,7 @@ export function gpuHarness() {
         return plugins.get(plugin.name) === plugin ? engine : undefined;
       },
       use(plugin) {
+        plugins.set(plugin.name, plugin);
         try {
           graph.withOwner(plugin.name, () => {
             plugin.setup(engine);
@@ -106,6 +107,7 @@ export function gpuHarness() {
           plugins.set(plugin.name, plugin);
         } catch (error) {
           graph.removeOwner(plugin.name);
+          plugins.delete(plugin.name);
           plugin.dispose();
           throw error;
         }
